@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { Effect } from 'effect';
 
 import { jsonResponse } from '../../dashboard/server/http-helpers.js';
-import { readWorkspacePlanSync } from '../vbrief/io.js';
+import { readWorkspacePlanSync } from '../xbrief/io.js';
 import { resolveIssueProjectPathSync } from './issue-reads.js';
 
 export function buildChildStoriesFromRally(
@@ -30,7 +30,7 @@ export function generateTasksForIssue(id: string) {
     const plan = readWorkspacePlanSync(workspacePath);
     if (!plan) {
       return jsonResponse(
-        { success: false, error: `No vBRIEF spec found on main for ${id} — run planning first.` },
+        { success: false, error: `No xBRIEF spec found on main for ${id} — run planning first.` },
         { status: 409 },
       );
     }

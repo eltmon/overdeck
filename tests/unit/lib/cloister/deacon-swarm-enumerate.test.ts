@@ -3,7 +3,7 @@ import { join } from 'path';
 import { tmpdir } from 'os';
 import { mkdtemp, rm } from 'fs/promises';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import type { VBriefDocument } from '../../../../src/lib/vbrief/types.js';
+import type { XBriefDocument } from '../../../../src/lib/xbrief/types.js';
 
 const mocks = vi.hoisted(() => ({
   listProjectsSync: vi.fn(),
@@ -38,19 +38,19 @@ afterEach(async () => {
   await rm(tempRoot, { recursive: true, force: true });
 });
 
-function writeSpec(projectPath: string, issueId: string, doc: VBriefDocument): void {
+function writeSpec(projectPath: string, issueId: string, doc: XBriefDocument): void {
   const specsDir = join(projectPath, '.pan', 'specs');
   mkdirSync(specsDir, { recursive: true });
-  writeFileSync(join(specsDir, `2026-07-01-${issueId}-test.vbrief.json`), JSON.stringify({
+  writeFileSync(join(specsDir, `2026-07-01-${issueId}-test.xbrief.json`), JSON.stringify({
     ...doc,
     status: 'active',
   }, null, 2));
 }
 
-function makeDoc(issueId: string, itemCount: number): VBriefDocument {
+function makeDoc(issueId: string, itemCount: number): XBriefDocument {
   const now = '2026-07-01T00:00:00.000Z';
   return {
-    vBRIEFInfo: {
+    xBRIEFInfo: {
       version: '0.6',
       created: now,
       author: 'test',
@@ -96,7 +96,7 @@ describe('coordinateSwarmSlots enumerate-swarms', () => {
     ]);
   });
 
-  it('enumerates feature workspaces whose main-side vBRIEF is swarm eligible', async () => {
+  it('enumerates feature workspaces whose main-side xBRIEF is swarm eligible', async () => {
     const { coordinateSwarmSlots } = await import('../../../../src/lib/cloister/deacon-swarm.js');
     const projectPath = join(tempRoot, 'project');
     mkdirSync(join(projectPath, 'workspaces', 'feature-pan-100'), { recursive: true });

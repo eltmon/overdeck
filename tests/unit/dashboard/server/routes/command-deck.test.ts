@@ -46,7 +46,7 @@ vi.mock('../../../../../src/lib/projects.js', () => ({
 }));
 
 const mockIsPlanningComplete = vi.hoisted(() => vi.fn(() => Effect.succeed(false)));
-vi.mock('../../../../../src/lib/vbrief/io.js', () => ({
+vi.mock('../../../../../src/lib/xbrief/io.js', () => ({
   isPlanningComplete: mockIsPlanningComplete,
   readWorkspacePlan: vi.fn(),
 }));

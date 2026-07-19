@@ -96,11 +96,11 @@ import { getActiveSessionModelSync } from '../../../lib/cost-parsers/jsonl-parse
 import { getCostsForIssueSync } from '../../../lib/costs/index.js';
 import { resolveIssueHeadlineCost } from '../services/issue-cost-resolver.js';
 import { getCachedRunningAgents } from '../services/running-agents-cache.js';
-import { readPlan, isPlanningComplete } from '../../../lib/vbrief/io.js';
-import { VBRIEF_INSPECTION_POLICIES } from '../../../lib/vbrief/types.js';
-import type { VBriefDocument, VBriefInspectionPolicy } from '../../../lib/vbrief/types.js';
-import { findVBriefByIssue, readVBriefDocument } from '../../../lib/vbrief/vbrief-index.js';
-import { criticalPath, actionableDoc } from '../../../lib/vbrief/dag.js';
+import { readPlan, isPlanningComplete } from '../../../lib/xbrief/io.js';
+import { XBRIEF_INSPECTION_POLICIES } from '../../../lib/xbrief/types.js';
+import type { XBriefDocument, XBriefInspectionPolicy } from '../../../lib/xbrief/types.js';
+import { findXBriefByIssue, readXBriefDocument } from '../../../lib/xbrief/xbrief-index.js';
+import { criticalPath, actionableDoc } from '../../../lib/xbrief/dag.js';
 import { getChangedFiles, getDiffBase, getDiffStat, type ChangedFile } from '../../../lib/cloister/review-context.js';
 import { capturePane, listSessionNames, sessionExists } from '../../../lib/tmux.js';
 import { getUnblockedItemsSync } from '../../../lib/cloister/task-readiness.js';

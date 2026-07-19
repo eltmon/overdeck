@@ -26,7 +26,7 @@ function tieredChipLabel(effective: boolean, source: string): string {
  * PlanCard — the plan at a glance: acceptance-criteria progress + the tasks
  * list (sourced from the authoritative /api/issues/:id/tasks endpoint, shared
  * with the Tasks dig tab's cache). The full Plan DAG is deliberately NOT mounted
- * here — it lives in the vBRIEF dig tab. (Command Deck remodel S3.)
+ * here — it lives in the xBRIEF dig tab. (Command Deck remodel S3.)
  */
 export function PlanCard({ issueId }: { issueId: string }) {
   const queryClient = useQueryClient()

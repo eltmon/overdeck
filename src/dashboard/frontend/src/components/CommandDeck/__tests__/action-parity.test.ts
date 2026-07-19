@@ -48,7 +48,7 @@ const zoneBSessionActionKeys = [
   'replaySession',
   'openStateDir',
   'viewState',
-  'viewFocusedVbrief',
+  'viewFocusedXbrief',
   'copySessionId',
   'copyTmuxCommand',
   'viewJsonl',

@@ -428,7 +428,7 @@ describe('flywheel telemetry', () => {
     expect(criterion.dataSufficient).toBe(true);
   });
 
-  it('uses tasks count before falling back to vBRIEF plan item count for criterion 6 buckets', () => {
+  it('uses tasks count before falling back to xBRIEF plan item count for criterion 6 buckets', () => {
     const criterion = computeCriterion6([
       criterion6Run(100, { tasksCount: 9, planItemsCount: 2 }),
       criterion6Run(110, { tasksCount: 9, planItemsCount: 2 }),

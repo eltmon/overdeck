@@ -8,7 +8,7 @@ import { resetSessionCommand } from './reset-session.js';
 import { getAgentDir, getAgentStateSync, listRunningAgentsSync } from '../../lib/agents.js';
 import { resolveBareNumericIdSync } from '../../lib/issue-id.js';
 import { resolveProjectFromIssueSync } from '../../lib/projects.js';
-import { findPlanSync } from '../../lib/vbrief/io.js';
+import { findPlanSync } from '../../lib/xbrief/io.js';
 import { resetPipelineVerdictsForWorkStartSync } from '../../lib/review-status.js';
 import { dequeueMerge } from '../../lib/overdeck/merge.js';
 import { resetPostMergeState } from '../../lib/cloister/merge-agent.js';

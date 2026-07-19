@@ -29,7 +29,7 @@ function makeFeature(overrides: Partial<ProjectFeature> = {}): ProjectFeature {
       remoteBranchCount: 0,
       tmuxSessionCount: 0,
       prs: [],
-      hasVbrief: false,
+      hasXbrief: false,
       hasTasks: true,
       dockerContainerCount: 0,
       conversations: [],

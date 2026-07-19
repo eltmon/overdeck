@@ -4,9 +4,9 @@ import { chooseDispatchTier } from '../../src/lib/agents/dispatch-tier.js';
 import { resolveRegisteredSlotSpawn } from '../../src/lib/agents/spawn-prep.js';
 import { verifyAndMergeSlot } from '../../src/lib/agents/slot-merge.js';
 import { reconcileSlotState, type ReconciledSlotAgent, type ReconciledSlotBranch } from '../../src/lib/agents/slot-reconcile.js';
-import { lintPlanQuality } from '../../src/lib/vbrief/quality-lint.js';
-import { analyzeSwarmReadiness } from '../../src/lib/vbrief/swarm-readiness.js';
-import type { VBriefDocument, VBriefItem } from '../../src/lib/vbrief/types.js';
+import { lintPlanQuality } from '../../src/lib/xbrief/quality-lint.js';
+import { analyzeSwarmReadiness } from '../../src/lib/xbrief/swarm-readiness.js';
+import type { XBriefDocument, XBriefItem } from '../../src/lib/xbrief/types.js';
 
 const ISSUE_ID = 'PAN-1762';
 const FEATURE_WORKSPACE = '/repo/workspaces/feature-pan-1762';
@@ -20,7 +20,7 @@ function ac(id: string, title: string) {
   };
 }
 
-function item(id: string, filesScope: string[], verifyCommand: string, expectedOutput: string): VBriefItem {
+function item(id: string, filesScope: string[], verifyCommand: string, expectedOutput: string): XBriefItem {
   return {
     id,
     title: id,
@@ -42,9 +42,9 @@ function item(id: string, filesScope: string[], verifyCommand: string, expectedO
   };
 }
 
-function swarmablePlan(): VBriefDocument {
+function swarmablePlan(): XBriefDocument {
   return {
-    vBRIEFInfo: { version: '1.0', created: '2026-06-30T00:00:00Z' },
+    xBRIEFInfo: { version: '1.0', created: '2026-06-30T00:00:00Z' },
     plan: {
       id: ISSUE_ID.toLowerCase(),
       title: 'Foreman swarm dogfood',

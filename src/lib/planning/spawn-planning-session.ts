@@ -325,7 +325,7 @@ ${repos.map((r: any) => `| \`${r.name}/\` | Git worktree for ${r.path} |`).join(
     const storyLines = issue.childStories.map(
       (s) => `- **${s.ref}**: ${s.title} (status: ${s.status})\n  ${s.description || ''}`.trim(),
     );
-    childStoriesSection = `\n## Child Stories\n\n**This Rally Feature has ${issue.childStories.length} child story(ies).** Reference these existing stories during planning — do NOT create new ones.\n\n${storyLines.join('\n\n')}\n\n**Cross-story dependencies:** If any child story must be completed before another, encode this as a \\\`blocks\\\` edge in the vBRIEF plan between the corresponding beads. Use \\\`informs\\\` for softer ordering hints.\n`;
+    childStoriesSection = `\n## Child Stories\n\n**This Rally Feature has ${issue.childStories.length} child story(ies).** Reference these existing stories during planning — do NOT create new ones.\n\n${storyLines.join('\n\n')}\n\n**Cross-story dependencies:** If any child story must be completed before another, encode this as a \\\`blocks\\\` edge in the xBRIEF plan between the corresponding beads. Use \\\`informs\\\` for softer ordering hints.\n`;
   }
 
   const effortSection = effort && effort !== 'medium' ? `
@@ -360,13 +360,13 @@ The user invoked \`pan plan --auto\`. Complete planning end-to-end without askin
 - When normal planning would ask a question, choose the most defensible default and record it in \`plan.autoDecisions[]\` as \`{ "summary": "...", "rationale": "..." }\`.
 - If the issue body, PRD, or comments list options and name a recommended/default/smallest acceptable option, choose that option and record it in \`plan.autoDecisions[]\`; do not ask the operator to choose among already-documented options.
 - Halt only for a genuine contradiction between authoritative inputs, such as the issue body requiring one behavior while a linked PRD requires the opposite. If that happens, write the contradiction into continue.json hazards and stop with a clear escalation message so the dashboard surfaces it.
-- Still produce the same complete vBRIEF and beads via \`pan plan finalize\` when no contradiction exists.
+- Still produce the same complete xBRIEF and beads via \`pan plan finalize\` when no contradiction exists.
 ` : '';
 
   const probeSection = probe || effort === 'high' ? `
 ## Probe Pass (required before finalize)
 
-After drafting the vBRIEF and BEFORE running \`pan plan finalize\`, attack your own plan:
+After drafting the xBRIEF and BEFORE running \`pan plan finalize\`, attack your own plan:
 - For each item: what hidden assumption would make this item wrong? Name it or clear it.
 - Which item could produce two very different diffs that both look "done"? Tighten its
   ACs or set requiresInspection: true.

@@ -7,11 +7,16 @@ import { checkOrphanProposedSpecs, findOrphanProposedSpecs } from '../doctor.js'
 
 let testDir: string;
 
-function writeSpec(projectPath: string, issueId: string, planItemCount: number): void {
+function writeSpec(
+  projectPath: string,
+  issueId: string,
+  planItemCount: number,
+  extension: 'vbrief' | 'xbrief' = 'vbrief',
+): void {
   const specsDir = join(projectPath, '.pan', 'specs');
   mkdirSync(specsDir, { recursive: true });
-  writeFileSync(join(specsDir, `${issueId}.vbrief.json`), JSON.stringify({
-    vBRIEFInfo: { version: '0.5', created: '2026-05-25T00:00:00.000Z' },
+  writeFileSync(join(specsDir, `${issueId}.${extension}.json`), JSON.stringify({
+    xBRIEFInfo: { version: '0.5', created: '2026-05-25T00:00:00.000Z' },
     plan: {
       id: issueId,
       title: issueId,
@@ -65,7 +70,7 @@ describe('orphan proposed specs doctor check', () => {
     writeSpec(projectPath, 'PAN-2001', 2);
     writeSpec(projectPath, 'PAN-2002', 2);
     writeTasks(projectPath, 'PAN-2002', 1);
-    writeSpec(projectPath, 'PAN-2003', 2);
+    writeSpec(projectPath, 'PAN-2003', 2, 'xbrief');
     writeTasks(projectPath, 'PAN-2003', 2);
 
     const projects = [{ key: 'overdeck', config: { name: 'Overdeck CLI', path: projectPath } }];

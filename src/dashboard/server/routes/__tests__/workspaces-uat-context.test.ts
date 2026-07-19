@@ -5,11 +5,11 @@ import {
   emptyUatContextGitFields,
 } from '../workspaces/workspace-data.js';
 import type { ChangedFile } from '../../../../lib/cloister/review-context.js';
-import type { VBriefDocument } from '../../../../lib/vbrief/types.js';
+import type { XBriefDocument } from '../../../../lib/xbrief/types.js';
 
-function makeDoc(items: VBriefDocument['plan']['items']): VBriefDocument {
+function makeDoc(items: XBriefDocument['plan']['items']): XBriefDocument {
   return {
-    vBRIEFInfo: { version: '0.5', created: '2026-06-09T00:00:00.000Z' },
+    xBRIEFInfo: { version: '0.5', created: '2026-06-09T00:00:00.000Z' },
     plan: {
       id: 'pan-1686',
       title: 'Show UAT context',
@@ -108,7 +108,7 @@ describe('assembleUatContextPlanFields', () => {
     ]);
   });
 
-  it('returns empty plan fields when no vBRIEF document is available', () => {
+  it('returns empty plan fields when no xBRIEF document is available', () => {
     expect(assembleUatContextPlanFields(null)).toEqual({
       acceptanceCriteria: [],
       deliverables: [],

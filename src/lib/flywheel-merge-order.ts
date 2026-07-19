@@ -5,9 +5,9 @@ import { getReviewStatusSync, mergeGateEligibility, type MergeGateEligibility } 
 import { resolveGitHubIssueSync } from './tracker-utils.js';
 import type { SequenceNode } from './backlog/types.js';
 import { classifyIssue, isAutoPickable, type ClassifyLookups } from './backlog/pickup.js';
-import { compileGlob, type CompiledGlob } from './vbrief/dag.js';
-import { computeIssueFootprint } from './vbrief/swarm-readiness.js';
-import type { VBriefDocument } from './vbrief/types.js';
+import { compileGlob, type CompiledGlob } from './xbrief/dag.js';
+import { computeIssueFootprint } from './xbrief/swarm-readiness.js';
+import type { XBriefDocument } from './xbrief/types.js';
 import { findProjectByPathSync, getProjectSwarmHotspots } from './projects.js';
 
 export interface MergeQueueItem {
@@ -89,7 +89,7 @@ export function planMergeTrain<T extends MergeCandidateMeta>(candidates: Readonl
   };
 }
 
-export function declaredIssueFootprint(issueId: string, doc: VBriefDocument): IssueFileFootprint {
+export function declaredIssueFootprint(issueId: string, doc: XBriefDocument): IssueFileFootprint {
   return { issueId, files: computeIssueFootprint(doc), source: 'declared' };
 }
 
@@ -337,7 +337,7 @@ export interface SequencePickResult {
  * - not in-pipeline (active review/work/test)
  * - no parked labels (`parked`; legacy `needs-design`/`needs-discussion`)
  * - not in the optional exclusion set (e.g. already running agents)
- * - FR-14: must have a vBRIEF spec (ready) or a PRD draft (hasPrd)
+ * - FR-14: must have an xBRIEF spec (ready) or a PRD draft (hasPrd)
  *
  * Returns null when no eligible issue is found.
  */
@@ -349,7 +349,7 @@ export function pickFromSequence(
     /** Flywheel author/assignee safety gate. Return false to skip an issue. When
      *  absent every issue passes (backward-compatible default). */
     isAuthorizedIssue?: (issueId: string) => boolean;
-    /** FR-14 eligibility gate. Return true if the issue has a vBRIEF spec (ready)
+    /** FR-14 eligibility gate. Return true if the issue has an xBRIEF spec (ready)
      *  or a PRD draft (hasPrd). When absent every issue passes (backward-compatible
      *  default). */
     isReadyOrHasPrd?: (issueId: string) => boolean;

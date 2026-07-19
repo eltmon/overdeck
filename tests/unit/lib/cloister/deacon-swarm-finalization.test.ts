@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { VBriefDocument } from '../../../../src/lib/vbrief/types.js';
+import type { XBriefDocument } from '../../../../src/lib/xbrief/types.js';
 import {
   finalizeSwarmIssueIfComplete,
   type RequestIssueReviewResult,
@@ -20,10 +20,10 @@ beforeEach(() => {
   mocks.getReviewStatusSync.mockReturnValue(null);
 });
 
-function makeCompletedDoc(issueId: string): VBriefDocument {
+function makeCompletedDoc(issueId: string): XBriefDocument {
   const now = '2026-07-04T00:00:00.000Z';
   return {
-    vBRIEFInfo: {
+    xBRIEFInfo: {
       version: '0.6',
       created: now,
       author: 'test',

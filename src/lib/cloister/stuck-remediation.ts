@@ -21,8 +21,8 @@ import {
   writeStuckRemediationState,
   type StuckRemediationState,
 } from './stuck-remediation-state.js';
-import { readWorkspacePlanSync } from '../vbrief/io.js';
-import { getDispatchableItems } from '../vbrief/dag.js';
+import { readWorkspacePlanSync } from '../xbrief/io.js';
+import { getDispatchableItems } from '../xbrief/dag.js';
 import { recordRecoveryFailure } from './recovery-trip.js';
 
 export interface StuckRemediationOptions {

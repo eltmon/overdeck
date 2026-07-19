@@ -56,8 +56,8 @@ vi.mock('../../../../../src/dashboard/server/services/issue-service-singleton.js
 
 // Mock findSpecByIssue from specs.js — used by resolveFeatureTitle in the new
 // single-spec-on-main model (PAN-1124). This replaces the old approach of
-// reading workspace-local .pan/spec.vbrief.json via async readFile. Preserve
-// other exports (e.g. getProjectPanPaths) so sync vBRIEF helpers keep working.
+// reading workspace-local .pan/spec.xbrief.json via async readFile. Preserve
+// other exports (e.g. getProjectPanPaths) so sync xBRIEF helpers keep working.
 const mockFindSpecByIssue = vi.hoisted(() => vi.fn());
 vi.mock(import('../../../../../src/lib/pan-dir/specs.js'), async (importOriginal) => {
   const actual = await importOriginal();
@@ -79,7 +79,7 @@ vi.mock('node:fs/promises', async () => {
 });
 
 const mockIsPlanningComplete = vi.hoisted(() => vi.fn(() => Effect.succeed(false)));
-vi.mock('../../../../../src/lib/vbrief/io.js', () => ({
+vi.mock('../../../../../src/lib/xbrief/io.js', () => ({
   isPlanningComplete: mockIsPlanningComplete,
 }));
 
@@ -269,7 +269,7 @@ describe('fetchProjectSessionTree', () => {
     mockWorkspaceReaddir([{ name: 'feature-pan-123', isDirectory: () => true, isFile: () => false }]);
 
     // Mock findSpecByIssue to return a spec entry — Effect-returning post-PAN-1249.
-    const specPath = '/tmp/overdeck/.pan/specs/2026-01-01-PAN-123-implement-command-deck.vbrief.json';
+    const specPath = '/tmp/overdeck/.pan/specs/2026-01-01-PAN-123-implement-command-deck.xbrief.json';
     mockFindSpecByIssue.mockReturnValue(Effect.succeed({ path: specPath }));
 
     // Mock readFile to return spec content when the spec path is read (by readOptional)

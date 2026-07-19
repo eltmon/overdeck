@@ -4,10 +4,10 @@ import { tmpdir } from 'os';
 import { mkdtemp, rm } from 'fs/promises';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Effect } from 'effect';
-import type { VBriefDocument } from '../../../../src/lib/vbrief/types.js';
+import type { XBriefDocument } from '../../../../src/lib/xbrief/types.js';
 import type { CoordinateSwarmSlotsDeps } from '../../../../src/lib/cloister/deacon-swarm.js';
-import { applyStatusOverrides } from '../../../../src/lib/vbrief/io.js';
-import { getDispatchableItems } from '../../../../src/lib/vbrief/dag.js';
+import { applyStatusOverrides } from '../../../../src/lib/xbrief/io.js';
+import { getDispatchableItems } from '../../../../src/lib/xbrief/dag.js';
 
 const mocks = vi.hoisted(() => ({
   listProjectsSync: vi.fn(),
@@ -68,10 +68,10 @@ afterEach(async () => {
   await rm(tempRoot, { recursive: true, force: true });
 });
 
-function makeDoc(issueId: string, itemCount: number): VBriefDocument {
+function makeDoc(issueId: string, itemCount: number): XBriefDocument {
   const now = '2026-07-02T00:00:00.000Z';
   return {
-    vBRIEFInfo: {
+    xBRIEFInfo: {
       version: '0.6',
       created: now,
       author: 'test',
@@ -100,16 +100,16 @@ function makeDoc(issueId: string, itemCount: number): VBriefDocument {
   };
 }
 
-function writeSpec(projectPath: string, issueId: string, doc: VBriefDocument): void {
+function writeSpec(projectPath: string, issueId: string, doc: XBriefDocument): void {
   const specsDir = join(projectPath, '.pan', 'specs');
   mkdirSync(specsDir, { recursive: true });
-  writeFileSync(join(specsDir, `2026-07-02-${issueId}-test.vbrief.json`), JSON.stringify({
+  writeFileSync(join(specsDir, `2026-07-02-${issueId}-test.xbrief.json`), JSON.stringify({
     ...doc,
     status: 'active',
   }, null, 2));
 }
 
-function makeAllCompletedDoc(issueId: string, planStatus: string): VBriefDocument {
+function makeAllCompletedDoc(issueId: string, planStatus: string): XBriefDocument {
   const doc = makeDoc(issueId, 2);
   doc.plan.status = planStatus;
   doc.plan.items = doc.plan.items.map(item => ({ ...item, status: 'completed' }));

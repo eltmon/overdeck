@@ -219,7 +219,7 @@ applies to, and the blockers. The `issues` cache table mirrors that record:
 | `reviewOutcome`, `testOutcome`, `verificationOutcome` | the durable verdict for each kept gate |
 | `verdictCommit` | the commit a passing verdict applies to (collapses the old `reviewed_at_commit` and `last_verified_commit`) |
 | `blockers` | typed blockers — merge conflicts and the like, replacing the old practice of sniffing a JSON `blocker_reasons` string |
-| `planRef` | a pointer to the vBRIEF spec in git `.pan/specs` |
+| `planRef` | a pointer to the xBRIEF spec in git `.pan/specs` |
 | `prUrl`, `prNumber`, `prHeadSha` | the PR identity, read live from GitHub |
 
 GitHub's CI status, mergeable state, and blocker labels are read live, never
@@ -278,7 +278,7 @@ The controller is `IssuesApi`:
 
 - `GET /issues` lists issues by filter.
 - `GET /issues/:id` gets one, or returns `IssueNotFound`.
-- `GET /issues/:id/plan` returns the vBRIEF plan.
+- `GET /issues/:id/plan` returns the xBRIEF plan.
 - `POST /issues/:id/advance` advances the stage, or returns `IllegalTransition`.
 - `POST /issues/:id/blockers` sets the merge-conflict blockers.
 - `POST /issues/:id/pr` sets the PR identity.

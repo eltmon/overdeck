@@ -12,7 +12,7 @@ import { resolveProjectFromIssueSync } from '../../lib/projects.js';
 import { resolveBareNumericIdSync } from '../../lib/issue-id.js';
 import { spawnInspectAgent, type InspectContext } from '../../lib/cloister/inspect-agent.js';
 import { getDiffBase, getDiffStats } from '../../lib/cloister/inspect-checkpoints.js';
-import { readWorkspacePlanSync } from '../../lib/vbrief/io.js';
+import { readWorkspacePlanSync } from '../../lib/xbrief/io.js';
 
 interface InspectOptions {
   item: string;
@@ -27,8 +27,8 @@ interface ResolvedInspectItem {
 export function registerInspectCommand(program: Command): void {
   program
     .command('inspect <issueId>')
-    .description('Request inspection of a completed vBRIEF item before proceeding to the next')
-    .requiredOption('--item <itemId>', 'vBRIEF item ID to inspect')
+    .description('Request inspection of a completed xBRIEF item before proceeding to the next')
+    .requiredOption('--item <itemId>', 'xBRIEF item ID to inspect')
     .option('--workspace <path>', 'Workspace path (auto-detected if not provided)')
     .option('--deep', 'Use the deep inspection sub-role')
     .action(async (issueId: string, options: InspectOptions) => {
@@ -43,8 +43,8 @@ export function registerInspectCommand(program: Command): void {
 
 export async function resolveInspectItem(itemId: string, workspacePath: string): Promise<ResolvedInspectItem> {
   const doc = readWorkspacePlanSync(workspacePath);
-  if (!doc) throw new Error(`The vBRIEF is missing or unreadable in ${workspacePath}.`);
-  if (!doc.plan.items.some(item => item.id === itemId)) throw new Error(`Item "${itemId}" does not exist in the vBRIEF for ${doc.plan.id}.`);
+  if (!doc) throw new Error(`The xBRIEF is missing or unreadable in ${workspacePath}.`);
+  if (!doc.plan.items.some(item => item.id === itemId)) throw new Error(`Item "${itemId}" does not exist in the xBRIEF for ${doc.plan.id}.`);
   return { itemId };
 }
 

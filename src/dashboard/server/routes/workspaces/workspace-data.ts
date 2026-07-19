@@ -39,16 +39,16 @@ import { listSessionNames, capturePane } from '../../../../lib/tmux.js';
 import { getActiveSessionModelSync } from '../../../../lib/cost-parsers/jsonl-parser.js';
 import { getReviewStatusSync } from '../../../../lib/review-status.js';
 import { listStashes, isSalvageableStash } from '../../../../lib/stashes.js';
-import { findPlan, isPlanningComplete, mergeRecordStatusOverrides, readPlan } from '../../../../lib/vbrief/io.js';
+import { findPlan, isPlanningComplete, mergeRecordStatusOverrides, readPlan, serializeXBriefDocument } from '../../../../lib/xbrief/io.js';
 import { getCostsForIssueSync } from '../../../../lib/costs/index.js';
 import { resolveIssueHeadlineCost } from '../../services/issue-cost-resolver.js';
 import { getCachedRunningAgents } from '../../services/running-agents-cache.js';
 import { PAN_CONTINUE_FILENAME, PAN_DIRNAME } from '../../../../lib/pan-dir/types.js';
 import { getWorkspacePathForIssue } from '../../workspace-paths.js';
-import { criticalPath, actionableDoc } from '../../../../lib/vbrief/dag.js';
-import { findVBriefByIssue, readVBriefDocument } from '../../../../lib/vbrief/vbrief-index.js';
-import { VBRIEF_INSPECTION_POLICIES } from '../../../../lib/vbrief/types.js';
-import type { VBriefDocument, VBriefInspectionPolicy } from '../../../../lib/vbrief/types.js';
+import { criticalPath, actionableDoc } from '../../../../lib/xbrief/dag.js';
+import { findXBriefByIssue, readXBriefDocument } from '../../../../lib/xbrief/xbrief-index.js';
+import { XBRIEF_INSPECTION_POLICIES } from '../../../../lib/xbrief/types.js';
+import type { XBriefDocument, XBriefInspectionPolicy } from '../../../../lib/xbrief/types.js';
 import { getChangedFiles, getDiffBase, getDiffStat } from '../../../../lib/cloister/review-context.js';
 import type { ChangedFile } from '../../../../lib/cloister/review-context.js';
 import { getTldrDaemonServiceSync } from '../../../../lib/tldr-daemon.js';
@@ -178,7 +178,7 @@ async function getIndexStats(workspacePath: string): Promise<{
     return {};
   }
 }
-function resolvePlanLocation(projectPath: string, issueId: string): Effect.Effect<{ path: string; lifecycleDir: string; doc: VBriefDocument } | null, unknown> {
+function resolvePlanLocation(projectPath: string, issueId: string): Effect.Effect<{ path: string; lifecycleDir: string; doc: XBriefDocument } | null, unknown> {
   return Effect.gen(function* () {
     // PAN-2401: every doc this route returns gets the per-issue record's
     // statusOverrides applied — merged tasks must read 'completed', not the
@@ -186,9 +186,9 @@ function resolvePlanLocation(projectPath: string, issueId: string): Effect.Effec
     const issueLower = issueId.toLowerCase();
     const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
 
-    const found = yield* findVBriefByIssue(projectPath, issueId);
+    const found = yield* findXBriefByIssue(projectPath, issueId);
     if (found) {
-      const doc = yield* readVBriefDocument(found.path);
+      const doc = yield* readXBriefDocument(found.path);
       return {
         path: found.path,
         lifecycleDir: found.lifecycleDir,
@@ -246,7 +246,7 @@ interface UatContextGitFields {
 const MAX_UAT_CONTEXT_CHANGED_FILES = 12;
 const MAX_UAT_CONTEXT_DIFF_STAT_LENGTH = 4_000;
 
-export function assembleUatContextPlanFields(doc: VBriefDocument | null): UatContextPlanFields {
+export function assembleUatContextPlanFields(doc: XBriefDocument | null): UatContextPlanFields {
   if (!doc) {
     return { acceptanceCriteria: [], deliverables: [], proposal: null };
   }
@@ -781,7 +781,7 @@ const getWorkspacePlanRoute = HttpRouter.add(
     const location = yield* resolvePlanLocation(projectPath, issueId);
     if (!location) {
       return jsonResponse(
-        { error: 'No vBRIEF plan found for this workspace' },
+        { error: 'No xBRIEF plan found for this workspace' },
         { status: 404 }
       );
     }
@@ -841,7 +841,7 @@ const patchWorkspacePlanInspectionPolicyRoute = HttpRouter.add(
 
     const body = yield* readJsonBody;
     const policy = (body as { inspectionPolicy?: unknown }).inspectionPolicy;
-    if (!VBRIEF_INSPECTION_POLICIES.includes(policy as VBriefInspectionPolicy)) {
+    if (!XBRIEF_INSPECTION_POLICIES.includes(policy as XBriefInspectionPolicy)) {
       return jsonResponse({ error: 'Invalid inspection policy' }, { status: 400 });
     }
 
@@ -850,17 +850,17 @@ const patchWorkspacePlanInspectionPolicyRoute = HttpRouter.add(
     const location = yield* resolvePlanLocation(projectPath, issueId);
     if (!location) {
       return jsonResponse(
-        { error: 'No vBRIEF plan found for this workspace' },
+        { error: 'No xBRIEF plan found for this workspace' },
         { status: 404 }
       );
     }
 
     const now = new Date().toISOString();
-    const updated: VBriefDocument = {
+    const updated: XBriefDocument = {
       ...location.doc,
-      vBRIEFInfo: {
-        ...location.doc.vBRIEFInfo,
-        inspectionPolicy: policy as VBriefInspectionPolicy,
+      xBRIEFInfo: {
+        ...location.doc.xBRIEFInfo,
+        inspectionPolicy: policy as XBriefInspectionPolicy,
         updated: now,
       },
       plan: {
@@ -869,7 +869,7 @@ const patchWorkspacePlanInspectionPolicyRoute = HttpRouter.add(
       },
     };
 
-    yield* Effect.promise(() => writeFile(location.path, JSON.stringify(updated, null, 2) + '\n', 'utf-8'));
+    yield* Effect.promise(() => writeFile(location.path, `${serializeXBriefDocument(updated)}\n`, 'utf-8'));
     const cp = criticalPath(updated);
     return jsonResponse({ ...updated, criticalPath: cp, lifecycleDir: location.lifecycleDir });
   }))
@@ -960,7 +960,7 @@ const patchWorkspaceTieredExecutionRoute = HttpRouter.add(
     const location = yield* resolvePlanLocation(projectPath, issueId);
     if (!location) {
       return jsonResponse(
-        { error: 'No vBRIEF plan found for this workspace' },
+        { error: 'No xBRIEF plan found for this workspace' },
         { status: 404 }
       );
     }

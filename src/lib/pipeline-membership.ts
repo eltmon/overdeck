@@ -20,7 +20,7 @@
  *   L2  unmerged branch      · `git merge-tree` vs main (blind to squash — always
  *                              paired with L1-merged, which wins)
  *   L3  issue open           · L4  current-phase label
- *   L6-spec  vBRIEF exists   · durable plan on the `overdeck-state` branch
+ *   L6-spec  xBRIEF exists   · durable plan on the `overdeck-state` branch
  *
  * L5 (agents / DB / state.json) is a *liveness accelerator* only — it can
  * annotate "is an agent running right now," but it NEVER decides membership.
@@ -31,7 +31,7 @@ import type { PipelineBucket } from '@overdeck/contracts';
 
 export type { PipelineBucket } from '@overdeck/contracts';
 
-export const PLANNED_BACKLOG_SPEC_ONLY_REASON = 'open issue with a vBRIEF spec but no branch/PR — planned work whose plan encodes code paths that age; needs starting or re-planning';
+export const PLANNED_BACKLOG_SPEC_ONLY_REASON = 'open issue with an xBRIEF spec but no branch/PR — planned work whose plan encodes code paths that age; needs starting or re-planning';
 
 export interface IssueLensSignals {
   issueId: string;
@@ -59,8 +59,8 @@ export interface IssueLensSignals {
   hasMergedBranchWork: boolean;
   /** L4 — current-phase label (in-review/in-progress/planned/verifying-on-main/…), else null. */
   phaseLabel: string | null;
-  /** L6-spec — a durable vBRIEF spec exists on `overdeck-state`; gather via `findSpecByIssue`, never the DB. */
-  hasVbriefSpec: boolean;
+  /** L6-spec — a durable xBRIEF spec exists on `overdeck-state`; gather via `findSpecByIssue`, never the DB. */
+  hasXbriefSpec: boolean;
   /** Durable Definition-of-Ready signal from the issue's `ready` label. */
   explicitlyReady: boolean;
 }
@@ -161,7 +161,7 @@ export function resolvePipelineMembership(s: IssueLensSignals): PipelineMembersh
     // and classifies as backlog — visible and safe, unlike false close-out.)
     return result('planned_backlog', 'open issue with a convention branch but no unique commits — created, work not yet landed; needs work or disposition');
   }
-  if (s.hasVbriefSpec) {
+  if (s.hasXbriefSpec) {
     return result(
       'planned_backlog',
       PLANNED_BACKLOG_SPEC_ONLY_REASON,

@@ -57,7 +57,7 @@ the *logical* condition; the physical writes that realize them are in §2.
 | Stage | One-line meaning | Entry condition | Exit condition |
 |---|---|---|---|
 | **todo** | Issue exists, no plan, no work | Issue opened / reset / wiped | Planning starts |
-| **planning** | Planning agent is producing a vBRIEF | `start-planning` spawns plan role (`IssueState=in_planning`) | Planning completes or aborts |
+| **planning** | Planning agent is producing an xBRIEF | `start-planning` spawns plan role (`IssueState=in_planning`) | Planning completes or aborts |
 | **planned/proposed** | Plan exists, awaiting start | `complete-planning` writes `plan.status=proposed` + beads | `pan start` (or auto-start) |
 | **working** | A work agent is implementing beads | `plan.status=running`, `IssueState=in_progress`, work agent running | Work agent signals done |
 | **in-review** | Code review role is judging the diff | `work.completed` event → review role dispatched (`reviewStatus=reviewing`) | Review verdict (approved / blocked) |
@@ -76,7 +76,7 @@ orthogonal toggles — see §1c.
 |---|---|---|---|---|---|
 | 1 | **Tracker `IssueState`** | `open · in_progress · in_review · closed` | GitHub labels + issue open/closed | `IssueLifecycleService.transitionTo` | `src/lib/tracker/interface.ts:28`; lifecycle svc `src/dashboard/server/services/issue-lifecycle.ts:198` |
 | 1b | **Lifecycle `IssueState` (richer)** | `open · in_planning · in_progress · in_review · verifying_on_main · closed · canceled` | GitHub labels (`planned`, `in-progress`, `in-review`, `verifying-on-main`, `wontfix`) + `canonicalStatus` cache | `transitionTo` → `GITHUB_STATE_LABELS` | `src/dashboard/server/services/issue-lifecycle.ts:45`, label map `:154`, `canonicalStatus()` `:178` |
-| 2 | **`plan.status`** (vBRIEF spec) | `draft · proposed · approved · running · completed · cancelled` | `.pan/specs/*.vbrief.json` (git) | `updateSpecStatus` only (PAN-1124 single writer) | `src/lib/pan-dir/specs.ts:266`; finalize `src/cli/commands/plan-finalize.ts:377` |
+| 2 | **`plan.status`** (xBRIEF spec) | `draft · proposed · approved · running · completed · cancelled` | `.pan/specs/*.xbrief.json` (git) | `updateSpecStatus` only (PAN-1124 single writer) | `src/lib/pan-dir/specs.ts:266`; finalize `src/cli/commands/plan-finalize.ts:377` |
 | 3 | **`review_status.review_status`** | `pending · reviewing · passed · failed · blocked` | SQLite `review_status` + mirrored to `.pan` record | `setReviewStatusSync` | `packages/contracts/src/types.ts:27`; writer `src/lib/review-status.ts:194` |
 | 4 | **`review_status.test_status`** | `pending · testing · passed · failed · skipped · dispatch_failed` | SQLite `review_status` (+ record) | `setReviewStatusSync` | `packages/contracts/src/types.ts:30` |
 | 5 | **`review_status.merge_status`** | `pending · queued · merging · verifying · merged · failed` | SQLite `review_status` (+ record) | `setReviewStatusSync` / merge-agent | `packages/contracts/src/types.ts:36` |
@@ -128,7 +128,7 @@ Production transition sites, grouped by the axis they write. Each row:
 Stores legend: **GH** = GitHub labels/state · **RS** = SQLite `review_status` ·
 **REC** = `.pan` record · **SH** = `status_history` · **EV** = `events`/pipeline
 event · **AG** = SQLite `agents` · **SJ** = `state.json` · **SPEC** =
-`.pan/specs` vBRIEF.
+`.pan/specs` xBRIEF.
 
 ### 2a. The one near-controller — `IssueLifecycleService.transitionTo`
 
@@ -196,9 +196,9 @@ and — critically — **emits reactive EV** (`review.approved` / `test.passed`,
 
 | From → To | Trigger (invoker) | Code location | Stores |
 |---|---|---|---|
-| (new) → `draft` | `pan plan` PRD write | `src/lib/vbrief/builder.ts:41` | (file) |
-| `draft → proposed` | `complete-planning` / plan finalize | `src/cli/commands/plan-finalize.ts:377`; `src/lib/vbrief/auto-synthesize.ts:88`,`:133` | SPEC |
-| `proposed → approved/running` | `start-agent` | `updateSpecStatus` via `src/lib/vbrief/lifecycle-io.ts:246` | SPEC |
+| (new) → `draft` | `pan plan` PRD write | `src/lib/xbrief/builder.ts:41` | (file) |
+| `draft → proposed` | `complete-planning` / plan finalize | `src/cli/commands/plan-finalize.ts:377`; `src/lib/xbrief/auto-synthesize.ts:88`,`:133` | SPEC |
+| `proposed → approved/running` | `start-agent` | `updateSpecStatus` via `src/lib/xbrief/lifecycle-io.ts:246` | SPEC |
 | `running → completed` | close-out | `lifecycle-io.ts:338` | SPEC |
 | any → `cancelled` | issue closed | `updateSpecStatus` (`pan-dir/specs.ts:266`) | SPEC |
 

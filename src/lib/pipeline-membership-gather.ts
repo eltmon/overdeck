@@ -447,7 +447,7 @@ export async function gatherProjectLensSignals(
     branchUnmerged: unmergedBranchIssues.has(id),
     hasMergedBranchWork: mergedBranchWorkIssues.has(id),
     phaseLabel: STALE_PIPELINE_LABELS.find((label) => labelsByIssue.get(id)?.includes(label)) ?? null,
-    hasVbriefSpec: specIssues.has(id),
+    hasXbriefSpec: specIssues.has(id),
     explicitlyReady: labelsByIssue.get(id)?.includes('ready') ?? false,
   }));
 }

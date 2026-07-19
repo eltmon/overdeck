@@ -31,8 +31,8 @@ export interface WorkspaceContextInput {
   issueTitle?: string;
   /** Feature branch name, when known. */
   branch?: string;
-  /** Short vBRIEF summary, when known. */
-  vbriefSummary?: string;
+  /** Short xBRIEF summary, when known. */
+  xbriefSummary?: string;
   /** Current pipeline phase, when known. */
   phase?: string;
   /** Pre-formatted PAN-1052 memory block, when available. */
@@ -57,8 +57,8 @@ export function assembleWorkspaceContext(input: WorkspaceContextInput): string {
   if (input.branch) header.push(`**Branch:** ${input.branch}`);
   header.push(`**Path:** ${input.workspacePath}`);
   if (input.phase) header.push(`**Phase:** ${input.phase}`);
-  if (input.vbriefSummary) {
-    header.push('', '## Plan Summary', '', input.vbriefSummary.trim());
+  if (input.xbriefSummary) {
+    header.push('', '## Plan Summary', '', input.xbriefSummary.trim());
   }
   sections.push(header.join('\n'));
 

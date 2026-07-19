@@ -3,7 +3,7 @@ import { Effect } from 'effect';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import type { VBriefDocument } from '../../../../src/lib/vbrief/types.js';
+import type { XBriefDocument } from '../../../../src/lib/xbrief/types.js';
 import type { SwarmCommandDeps, SwarmHoldCommandDeps, SwarmResetCommandDeps, SwarmStopCommandDeps } from '../../../../src/cli/commands/swarm.js';
 import type { SwarmStatusCommandDeps } from '../../../../src/cli/commands/swarm.js';
 import { swarmCommand, swarmFreezeCommand, swarmRecoverCommand, swarmResetCommand, swarmResumeCommand, swarmStatusCommand, swarmStopCommand } from '../../../../src/cli/commands/swarm.js';
@@ -15,10 +15,10 @@ import {
 } from '../../../../src/lib/cloister/deacon-swarm.js';
 import { writeIssueRecordForWorkspaceSync } from '../../../../src/lib/pan-dir/record.js';
 
-function makeDoc(items: VBriefDocument['plan']['items']): VBriefDocument {
+function makeDoc(items: XBriefDocument['plan']['items']): XBriefDocument {
   return {
     status: 'active',
-    vBRIEFInfo: { version: '0.6' },
+    xBRIEFInfo: { version: '0.6' },
     plan: {
       id: 'PAN-2203',
       title: 'Swarm test',
@@ -26,10 +26,10 @@ function makeDoc(items: VBriefDocument['plan']['items']): VBriefDocument {
       items,
       edges: [],
     },
-  } as VBriefDocument;
+  } as XBriefDocument;
 }
 
-function makeEligibleItem(id: string, filePath: string): VBriefDocument['plan']['items'][number] {
+function makeEligibleItem(id: string, filePath: string): XBriefDocument['plan']['items'][number] {
   return {
     id,
     title: id,
@@ -44,7 +44,7 @@ function makeEligibleItem(id: string, filePath: string): VBriefDocument['plan'][
   };
 }
 
-function makeDeps(doc: VBriefDocument): SwarmCommandDeps {
+function makeDeps(doc: XBriefDocument): SwarmCommandDeps {
   return {
     resolveProjectFromIssueSync: vi.fn(() => ({ projectName: 'overdeck', projectPath: '/repo' })),
     findSpecByIssue: vi.fn(() => Effect.succeed({
@@ -149,7 +149,7 @@ describe('pan swarm command', () => {
       ]);
       mkdirSync(join(projectPath, '.pan', 'specs'), { recursive: true });
       writeFileSync(
-        join(projectPath, '.pan', 'specs', '2026-07-01-PAN-2203-test.vbrief.json'),
+        join(projectPath, '.pan', 'specs', '2026-07-01-PAN-2203-test.xbrief.json'),
         JSON.stringify({ ...doc, status: 'active' }, null, 2),
       );
       const workspacePath = join(projectPath, 'workspaces', 'feature-pan-2203');
@@ -494,7 +494,7 @@ describe('pan swarm stop (PAN-2214)', () => {
 
 describe('pan swarm status (PAN-2214)', () => {
   function makeStatusDeps(options: {
-    doc?: VBriefDocument;
+    doc?: XBriefDocument;
     hold?: { deaconIgnored?: boolean; deaconIgnoredReason?: string; stuck?: boolean; stuckReason?: string } | null;
     reconciled?: Record<string, unknown>;
     classified?: Array<Record<string, unknown>>;

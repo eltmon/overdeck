@@ -17,7 +17,7 @@ vi.mock('../../projects.js', () => ({
   resolveProjectFromIssueSync: mocks.resolveProjectFromIssueSync,
 }));
 
-vi.mock('../../vbrief/lifecycle-io.js', () => ({
+vi.mock('../../xbrief/lifecycle-io.js', () => ({
   appendContinueSessionEntryForIssue: mocks.appendContinueSessionEntryForIssue,
   appendFeedbackEntryForIssue: mocks.appendFeedbackEntryForIssue,
   clearFeedbackForIssue: mocks.clearFeedbackForIssue,

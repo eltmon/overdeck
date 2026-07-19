@@ -10,7 +10,7 @@ import {
   readTierOverrides,
   readWorkspacePlanSync,
   recordTierPromotion,
-} from '../../../lib/vbrief/io.js';
+} from '../../../lib/xbrief/io.js';
 
 export interface TieredInspectFailureEscalationDeps {
   loadConfig?: typeof loadConfigSync;

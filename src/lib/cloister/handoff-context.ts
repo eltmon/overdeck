@@ -13,9 +13,9 @@ import type { TokenUsage, RuntimeName } from '../runtimes/types.js';
 import type { ComplexityLevel } from './complexity.js';
 import type { AgentState } from '../agents.js';
 import { renderPrompt } from './prompts.js';
-import type { ContinueState } from '../vbrief/continue-state.js';
+import type { ContinueState } from '../xbrief/continue-state.js';
 import { getProjectConfigFromWorkspacePath, readRecordContinueViewSync, resolveProjectForIssue } from '../pan-dir/record.js';
-import { readWorkspacePlanSync } from '../vbrief/io.js';
+import { readWorkspacePlanSync } from '../xbrief/io.js';
 
 const execAsync = promisify(exec);
 
@@ -166,7 +166,7 @@ async function captureGitState(context: HandoffContext, workspace: string): Prom
 }
 
 /**
- * Capture merged vBRIEF task state.
+ * Capture merged xBRIEF task state.
  */
 function captureTasks(context: HandoffContext, workspace: string): void {
   try {
@@ -255,7 +255,7 @@ export function serializeHandoffContext(context: HandoffContext): string {
 
   // Continue file content (structured planning state)
   if (context.continueState) {
-    lines.push('## Current State (continue.vbrief.json)');
+    lines.push('## Current State (.overdeck/continue.json)');
     lines.push('');
     lines.push('```json');
     lines.push(JSON.stringify(context.continueState, null, 2));

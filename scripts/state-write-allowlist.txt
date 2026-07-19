@@ -7,4 +7,3 @@ src/lib/pan-dir/records.ts
 src/lib/pan-dir/sessions.ts
 src/lib/pan-dir/specs.ts
 src/lib/state-home.ts
-src/lib/vbrief/beads.ts

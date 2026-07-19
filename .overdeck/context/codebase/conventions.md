@@ -33,14 +33,12 @@
 - Inline SVG icons use `currentColor` + a color map (see
   `components/chat/ProviderIcons.tsx` for the existing pattern).
 
-## Planning artifacts (vBRIEF v0.5/0.6, PAN-1124)
-- PRD drafts: `<root>/.pan/drafts/<ISSUE>.md` (human-mutable narrative).
-- Spec: `<root>/.pan/specs/<date>-<ISSUE>-<slug>.vbrief.json` — immutable after
-  planning except `plan.status` via `updateSpecStatus()`.
-- Workspace continue state: `<workspace>/.pan/continue.json` (gitignored);
-  item status changes go to its `statusOverrides`, never the spec.
-- Beads are materialized only by `pan plan finalize` (never hand-run `bd create`
-  for plan items).
+## Planning artifacts (xBRIEF v0.8, PAN-1124)
+- PRD drafts: `${OVERDECK_HOME}/state/<project>/drafts/<issue>.md` (human-mutable narrative).
+- Spec: `${OVERDECK_HOME}/state/<project>/specs/<date>-<ISSUE>-<slug>.xbrief.json` — immutable after planning except `plan.status` via `updateSpecStatus()`.
+- Project continue state: `${OVERDECK_HOME}/state/<project>/continues/<issue>.xbrief.json`.
+- Workspace continue state: `<workspace>/.overdeck/continue.json` (gitignored); item status changes go to its `statusOverrides`, never the spec.
+- `pan task` reads and updates the xBRIEF item checklist through the canonical state door.
 
 ## Testing
 - Vitest, unit tests under `tests/unit/**` mirroring `src/`, plus co-located

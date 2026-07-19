@@ -38,7 +38,7 @@ function signal(issueId: string, overrides: Record<string, unknown> = {}) {
     hasConventionBranch: true,
     branchUnmerged: true, hasMergedBranchWork: false,
     phaseLabel: 'in-review',
-    hasVbriefSpec: true,
+    hasXbriefSpec: true,
     explicitlyReady: false,
     ...overrides,
   };

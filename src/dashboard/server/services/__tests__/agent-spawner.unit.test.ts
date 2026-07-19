@@ -49,10 +49,10 @@ vi.mock('../../../../lib/lifecycle/workflows.js', () => ({
   deepWipe: mockDeepWipe,
 }));
 
-// ─── Mock vBRIEF plan reader ─────────────────────────────────────────────────
+// ─── Mock xBRIEF plan reader ─────────────────────────────────────────────────
 
 const mockReadWorkspacePlanSync = vi.fn();
-vi.mock('../../../../lib/vbrief/io.js', () => ({
+vi.mock('../../../../lib/xbrief/io.js', () => ({
   readWorkspacePlanSync: mockReadWorkspacePlanSync,
 }));
 
@@ -67,7 +67,7 @@ vi.mock('../../../../lib/projects.js', () => ({
   findProjectByPathSync: vi.fn().mockReturnValue({ path: '/projects/myapp', name: 'myapp' }),
 }));
 
-vi.mock('../../../../lib/vbrief/io.js', () => ({
+vi.mock('../../../../lib/xbrief/io.js', () => ({
   readWorkspacePlanSync: vi.fn().mockReturnValue({ plan: { items: [{ id: 'item-1' }] } }),
 }));
 

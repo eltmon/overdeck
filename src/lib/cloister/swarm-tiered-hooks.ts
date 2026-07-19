@@ -35,7 +35,7 @@ import {
   supervisorAgentId,
 } from '../agents/tier-supervisor.js';
 import { listSlotAssignments } from '../agents/slot-reconcile.js';
-import type { VBriefDocument, VBriefItem } from '../vbrief/types.js';
+import type { XBriefDocument, XBriefItem } from '../xbrief/types.js';
 
 const execAsync = promisify(exec);
 
@@ -44,9 +44,9 @@ export interface FireTieredCommitHooksOptions {
   /** Feature workspace the slot branch just merged into (its HEAD is the commit). */
   workspacePath: string;
   /** The bead the merged commits implement. */
-  item: VBriefItem;
+  item: XBriefItem;
   /** The merged plan view — plan.metadata carries the per-issue tiered override. */
-  doc: VBriefDocument;
+  doc: XBriefDocument;
 }
 
 export interface FireTieredCommitHooksDeps {
@@ -76,7 +76,7 @@ const defaultDeps: FireTieredCommitHooksDeps = {
  * the slot label when the tier table cannot resolve the item (fail-open here is
  * correct: the feed is informational and the commit has already landed). */
 function tierNameForItem(
-  item: VBriefItem | undefined,
+  item: XBriefItem | undefined,
   tiered: ValidatedTieredExecutionConfig,
   slotIndex: number,
 ): string {

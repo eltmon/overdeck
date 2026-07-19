@@ -177,7 +177,7 @@ describe('resource-discovery grouping', () => {
           tmuxSessionCount: 0,
           tmuxSessionNames: [],
           prs: [],
-          hasVbrief: false,
+          hasXbrief: false,
           hasTasks: false,
           dockerContainerCount: 0,
           dockerContainerNames: [],
@@ -214,7 +214,7 @@ describe('resource-discovery grouping', () => {
           tmuxSessionCount: 0,
           tmuxSessionNames: [],
           prs: [],
-          hasVbrief: false,
+          hasXbrief: false,
           hasTasks: false,
           dockerContainerCount: 0,
           dockerContainerNames: [],
@@ -256,7 +256,7 @@ describe('resource-discovery grouping', () => {
               isDraft: false,
             },
           ],
-          hasVbrief: true,
+          hasXbrief: true,
           hasTasks: true,
           dockerContainerCount: 1,
           dockerContainerNames: ['pan-100-db'],
@@ -310,7 +310,7 @@ describe('resource-discovery sanitization', () => {
               isDraft: false,
             },
           ],
-          hasVbrief: false,
+          hasXbrief: false,
           hasTasks: false,
           dockerContainerCount: 1,
           dockerContainerNames: ['pan-300-db'],
@@ -709,18 +709,18 @@ describe('resource-discovery conversation signal', () => {
   });
 });
 
-describe('resource-discovery vbrief recency signal', () => {
+describe('resource-discovery xbrief recency signal', () => {
   beforeEach(() => {
     resetResourceAllocatedIssuesCacheForTests();
     mocks.issueService.getIssues.mockReturnValue([
-      { identifier: 'PAN-9005', title: 'Vbrief recency issue', state: 'open', rawTrackerState: 'OPEN' },
+      { identifier: 'PAN-9005', title: 'Xbrief recency issue', state: 'open', rawTrackerState: 'OPEN' },
     ]);
-    mocks.findSpecByIssue.mockReturnValue(Effect.succeed({ path: '/state/specs/pan-9005.vbrief.json' }));
+    mocks.findSpecByIssue.mockReturnValue(Effect.succeed({ path: '/state/specs/pan-9005.xbrief.json' }));
   });
 
-  it('admits an inactive issue when its vBRIEF spec was touched recently', async () => {
+  it('admits an inactive issue when its xBRIEF spec was touched recently', async () => {
     mocks.getPipelineMembershipForProjects.mockResolvedValue([{
-      issueId: 'PAN-9005', inPipeline: true, bucket: 'planned', reasons: ['vBRIEF spec'], labelDrift: null,
+      issueId: 'PAN-9005', inPipeline: true, bucket: 'planned', reasons: ['xBRIEF spec'], labelDrift: null,
       lenses: { L1_openPr: false, L2_unmergedBranch: false, L3_issueOpen: true, L4_phaseLabel: null },
     }]);
     mocks.readdir.mockImplementation(async (path: string, options?: { withFileTypes?: boolean }) => {
@@ -737,7 +737,7 @@ describe('resource-discovery vbrief recency signal', () => {
     expect(discovered[0]?.resourceSources).toContain('vbrief');
   });
 
-  it('excludes stale vBRIEF residue when the resolver reports no pipeline membership', async () => {
+  it('excludes stale xBRIEF residue when the resolver reports no pipeline membership', async () => {
     mocks.readdir.mockImplementation(async (path: string, options?: { withFileTypes?: boolean }) => {
       if (typeof path === 'string' && path.endsWith('/workspaces') && options?.withFileTypes) {
         return [{ name: 'feature-pan-9005', isDirectory: () => true }];

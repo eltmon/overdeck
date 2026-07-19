@@ -18,8 +18,8 @@ import { requireModelOverrideSync } from '../model-validation.js';
 import type { MemoryIdentity } from '@overdeck/contracts';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import type { RuntimeName } from '../runtimes/types.js';
-import { readWorkspacePlanSync } from '../vbrief/io.js';
-import { getDispatchableItems } from '../vbrief/dag.js';
+import { readWorkspacePlanSync } from '../xbrief/io.js';
+import { getDispatchableItems } from '../xbrief/dag.js';
 import { type Role } from './agent-state.js';
 import type { TierAssignment } from './dispatch-tier.js';
 import { resolveStaffing } from './staffing.js';
@@ -91,7 +91,7 @@ export interface SpawnOptions {
   agentId?: string;
   /** Registered swarm slot index for per-item work-agent spawning. */
   slotIndex?: number;
-  /** vBRIEF item id assigned to the registered swarm slot. */
+  /** xBRIEF item id assigned to the registered swarm slot. */
   slotItemId?: string;
   allowHost?: boolean;
   flywheelRunId?: string;
@@ -128,7 +128,7 @@ export interface SpawnRunOptions {
   flywheelRunId?: string;
   /** 1-based registered slot index for per-item work-agent spawning. */
   slotIndex?: number;
-  /** vBRIEF item id assigned to this registered slot. Required with slotIndex. */
+  /** xBRIEF item id assigned to this registered slot. Required with slotIndex. */
   slotItemId?: string;
   /** Optional per-spawn cap for registered work-agent slots. Defaults to the work-agent governor cap. */
   maxRegisteredSlots?: number;
@@ -265,7 +265,7 @@ export function resolveSlotTierSpawnParams(
 /**
  * Tiered-execution model resolution for the single work-agent path.
  * Auto-start and non-swarm issues still run one foreground work agent, but
- * the first dispatchable vBRIEF item is the same scheduling unit the agent is
+ * the first dispatchable xBRIEF item is the same scheduling unit the agent is
  * about to execute. If tiered execution is enabled for the issue, route that
  * agent through the item's resolved tier; otherwise leave role-default model
  * resolution untouched.
@@ -444,7 +444,7 @@ export async function buildAgentLaunchConfig(opts: {
   // Substrate guard: inject permission deny rules for Overdeck infrastructure
   // paths (.claude/agents/, .claude/hooks/, ~/.overdeck/, JSONL session dirs)
   // into the workspace's .claude/settings.local.json. Idempotent. Without this
-  // a vBRIEF action like "delete the legacy pan-*-agent.md files" can convince
+  // an xBRIEF action like "delete the legacy pan-*-agent.md files" can convince
   // an agent to brick its own runtime. PAN-1048 X1 incident, 2026-05-09.
   try {
     const { injectOverdeckInfraDeny } = await import('../claude-settings-overlay.js');

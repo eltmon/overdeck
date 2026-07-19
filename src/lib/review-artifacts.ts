@@ -3,7 +3,7 @@ import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { Data, Effect } from 'effect';
-import { findPlanSync } from './vbrief/io.js';
+import { findPlanSync } from './xbrief/io.js';
 import { promisify } from 'node:util';
 import { getForgeAdapter } from './forge.js';
 import { extractNumberSync } from './issue-id.js';

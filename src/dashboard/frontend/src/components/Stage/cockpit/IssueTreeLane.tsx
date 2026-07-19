@@ -195,7 +195,7 @@ export function IssueTreeLane({
       remoteBranchCount: 0,
       tmuxSessionCount: sessions.length,
       prs: [],
-      hasVbrief: actions.state.hasPlan,
+      hasXbrief: actions.state.hasPlan,
       hasTasks: actions.state.hasTasks,
       dockerContainerCount: 0,
       conversations: [],

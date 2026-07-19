@@ -27,7 +27,7 @@ doc audits the *gating decisions* those fields drive.
   `readyForMerge`.
 - **Verification gate** — `runVerificationForIssue` in
   `src/lib/cloister/verification-runner.ts`. Runs branch-sync + project quality gates
-  + vBRIEF AC-completion. Invoked at TWO points: pre-review (request-review) and
+  + xBRIEF AC-completion. Invoked at TWO points: pre-review (request-review) and
   post-rebase (merge time).
 - **Test role** — the `test` pipeline agent (`roles/test.md`,
   `src/lib/cloister/test-agent-queue.ts:19`). Runs project quality gates AND browser
@@ -136,7 +136,7 @@ dropped — verification covers it — but the browser UAT is.
    (`:224-258`). **Unique — neither test nor CI does this.**
 2. **Project quality gates** — typecheck/lint/test from `projects.yaml`
    (`:344-390`). **Overlaps the test role.**
-3. **vBRIEF AC-completion** — every acceptance criterion's bead must be closed
+3. **xBRIEF AC-completion** — every acceptance criterion's bead must be closed
    (`:392-478`). Incomplete AC is a FAIL (`:433-477`). **Unique — this is the only
    gate that blocks on "the plan's acceptance criteria are not all done."**
 
@@ -177,7 +177,7 @@ gate machinery — preserve it *with* verification.
 "appears to overlap test." **That is only true of the quality-gate slice (check 2).**
 Verification carries THREE unique blocks test does not:
 - **Branch-sync conflict detection** (check 1) — pre-review.
-- **vBRIEF AC-completion** (check 3) — the only enforcement that all acceptance
+- **xBRIEF AC-completion** (check 3) — the only enforcement that all acceptance
   criteria are actually closed.
 - **The post-rebase re-run at merge time** — catches semantic breakage introduced
   by rebasing onto a moved main, which neither the pre-rebase test verdict nor

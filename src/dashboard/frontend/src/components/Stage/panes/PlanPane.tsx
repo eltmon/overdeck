@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { VBriefTab } from '../../CommandDeck/ZoneCOverviewTabs/VBriefTab'
+import { XBriefTab } from '../../CommandDeck/ZoneCOverviewTabs/XBriefTab'
 import { TasksTab } from '../../CommandDeck/ZoneCOverviewTabs/TasksTab'
 import type { PaneWrapperProps } from '../types'
 import styles from '../stage.module.css'
@@ -8,7 +8,7 @@ type PlanView = 'plan' | 'tasks'
 
 /**
  * PlanPane — paneType='plan' (PAN-1549). A simple sub-toggle between the
- * existing VBriefTab (List/DAG/Raw) and TasksTab for the workspace issue.
+ * existing XBriefTab (List/DAG/Raw) and TasksTab for the workspace issue.
  * Both tab bodies are reused as-is.
  */
 export function PlanPane({ pane, ctx }: PaneWrapperProps) {
@@ -39,7 +39,7 @@ export function PlanPane({ pane, ctx }: PaneWrapperProps) {
       </div>
       <div className={styles.subBody}>
         {view === 'plan' ? (
-          <VBriefTab issueId={issueId} />
+          <XBriefTab issueId={issueId} />
         ) : (
           <TasksTab issueId={issueId} />
         )}

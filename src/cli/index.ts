@@ -439,13 +439,13 @@ planCmd
   .option('-w, --workspace <path>', 'Workspace path (defaults to cwd, walks up to find .pan/)')
   .option('--json', 'Emit JSON result')
   .option('--no-promote', 'Skip auto-promotion to main; leave spec at status=proposed for manual Done')
-  .option('--no-quality-lint', 'Emergency bypass for vBRIEF quality lint during finalize')
+  .option('--no-quality-lint', 'Emergency bypass for xBRIEF quality lint during finalize')
   .option('--no-prd', 'Bypass the PRD-first gate for a genuinely trivial issue (loud; prefer writing the PRD)')
   .action(planFinalizeCommand);
 
 planCmd
   .command('done <id>')
-  .description('Complete planning — promote the vBRIEF and transition the issue to Planned')
+  .description('Complete planning — promote the xBRIEF and transition the issue to Planned')
   .option('--no-prd', 'Bypass the PRD-first gate for a genuinely trivial issue (loud; prefer writing the PRD)')
   .action(planDoneCommand);
 
@@ -573,7 +573,7 @@ program
   .option('--remote', 'Use remote workspace (Fly.io)')
   .option('--local', 'Use local workspace (explicit override)')
   .option('--plan <mode>', "Planning depth when no plan exists yet: interactive | auto | skip (default: config planning.default_mode, shipped default auto)")
-  .option('--auto', '[deprecated: use --plan skip] Skip planning agent by synthesizing a minimal vBRIEF from the issue title/body')
+  .option('--auto', '[deprecated: use --plan skip] Skip planning agent by synthesizing a minimal xBRIEF from the issue title/body')
   .option('--force', 'Clear a paused agent gate and start anyway')
   .option('--fresh', 'Drop the saved Claude session (non-destructive) and start a new one — e.g. to switch a stopped agent\'s model')
   .option('--host', 'Bypass workspace docker stack-health gate and spawn on the host')

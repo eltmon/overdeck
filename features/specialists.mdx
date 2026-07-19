@@ -88,7 +88,7 @@ Human clicks "Review"
 
 ## Review Agent
 
-The review-agent is the gatekeeper. It reads the diff, the PRD, and the vBRIEF plan, and looks for:
+The review-agent is the gatekeeper. It reads the diff, the PRD, and the xBRIEF plan, and looks for:
 
 - Logic errors and missed edge cases
 - Security vulnerabilities (OWASP top 10, injection, auth bypass)
@@ -169,7 +169,7 @@ projects:
 The UAT (User Acceptance Testing) agent opens a real browser via Playwright MCP and walks through the acceptance criteria like a user would.
 
 **What it does:**
-1. Reads the PRD and the vBRIEF acceptance criteria
+1. Reads the PRD and the xBRIEF acceptance criteria
 2. Launches a browser against the project's dev URL
 3. Executes each AC as a user flow
 4. Takes screenshots as evidence (pass *and* fail)

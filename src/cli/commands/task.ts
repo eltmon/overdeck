@@ -7,8 +7,8 @@ import { applyTaskStatusChange, type TaskStatusChange } from '../../lib/pan-dir/
 import { isPidDead } from '../../lib/pan-dir/fs-lock.js';
 import { readIssueRecordSync } from '../../lib/pan-dir/record.js';
 import { getProjectSync, resolveProjectFromIssueSync } from '../../lib/projects.js';
-import { getDispatchableItems } from '../../lib/vbrief/dag.js';
-import { readWorkspacePlanSync } from '../../lib/vbrief/io.js';
+import { getDispatchableItems } from '../../lib/xbrief/dag.js';
+import { readWorkspacePlanSync } from '../../lib/xbrief/io.js';
 
 interface TaskOptions {
   json?: boolean;
@@ -34,7 +34,7 @@ function resolveTaskContext(issue: string) {
   const project = { ...configured, path: resolved.projectPath };
   const workspacePath = join(resolved.projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`);
   const doc = readWorkspacePlanSync(workspacePath);
-  if (!doc) throw new Error(`The vBRIEF for ${issueId} is missing or unreadable. Return the issue to planning before reading task state.`);
+  if (!doc) throw new Error(`The xBRIEF for ${issueId} is missing or unreadable. Return the issue to planning before reading task state.`);
   return { issueId, project, doc };
 }
 
@@ -55,7 +55,7 @@ export async function runTaskRead(command: 'next' | 'show', issue: string, itemI
   const record = readIssueRecordSync(project, issueId);
   if (command === 'show') {
     const item = doc.plan.items.find(({ id }) => id === itemId);
-    if (!item) throw new Error(`Task ${itemId} does not exist in the immutable vBRIEF for ${issueId}. Return the issue to planning to change scope.`);
+    if (!item) throw new Error(`Task ${itemId} does not exist in the immutable xBRIEF for ${issueId}. Return the issue to planning to change scope.`);
     print({ ...item, claim: record?.tasks?.claims[item.id], sequence: record?.tasks?.sequence ?? 0 }, options.json);
     return;
   }
@@ -94,7 +94,7 @@ function mutation(command: Command, type: TaskStatusChange['type'], reasonRequir
 }
 
 export function registerTaskCommands(program: Command): void {
-  const task = program.command('task').description('Read and update vBRIEF task state for one issue');
+  const task = program.command('task').description('Read and update xBRIEF task state for one issue');
   task.command('next <issue>').option('--json', 'Print JSON').action(async (issue, options) => taskAction(() => runTaskRead('next', issue, undefined, options)));
   task.command('show <issue> <item>').option('--json', 'Print JSON').action(async (issue, item, options) => taskAction(() => runTaskRead('show', issue, item, options)));
   mutation(task.command('claim <issue> <item>'), 'claim');

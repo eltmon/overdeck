@@ -59,7 +59,7 @@ Use TLDR to navigate quickly, then use full Reads for the actual files and exact
 **IMPORTANT:** DO NOT run tests. You are the REVIEW agent — the test-agent runs tests in the next step.
 
 {{#ACCEPTANCE_CRITERIA}}
-## Acceptance Criteria (from vBRIEF plan) — MANDATORY GATE
+## Acceptance Criteria (from xBRIEF plan) — MANDATORY GATE
 
 Every acceptance criterion below MUST be verifiable in the code. If ANY criterion is not met, you MUST request changes.
 

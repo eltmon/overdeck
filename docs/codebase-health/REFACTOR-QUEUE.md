@@ -8,9 +8,9 @@ honest-state narrative). Maintained by the orchestrating conversation during the
 **Execution model (operator-directed 2026-07-02):**
 - **One GPT-5.5 work agent at a time** (`pan start <id> --model gpt-5.5`, harness = provider
   default/codex). Heavy refactors do not parallelize safely against each other.
-- **One vBRIEF planned ahead** at all times (planning role runs on the configured default,
+- **One xBRIEF planned ahead** at all times (planning role runs on the configured default,
   claude-fable-5). Planning is **PRD-first** (see `roles/plan.md`): the PRD draft must exist
-  before the vBRIEF is lowered from it.
+  before the xBRIEF is lowered from it.
 - **PRDs written ahead of time** by a dedicated Fable 5 handoff agent, in queue order,
   to `<projectRoot>/.pan/drafts/PAN-<n>.md` (uppercase — the de-facto house convention,
   66 of 78 existing drafts).

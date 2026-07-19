@@ -2,7 +2,7 @@
 name: plan
 description: >
   Opus-driven planning for issues before Sonnet implementation. Creates workspace,
-  .pan/continue.json, .pan/spec.vbrief.json with vBRIEF tasks, and updates issue tracker.
+  .pan/continue.json, .pan/spec.vbrief.json with xBRIEF tasks, and updates issue tracker.
   Ensures strategic decisions are made by Opus, not cheaper models.
 triggers:
   - plan
@@ -31,7 +31,7 @@ license: "MIT"
 
 **Opus plans EVERYTHING. Sonnet executes.**
 
-Do NOT leave any decisions for the implementation agent. Every architectural choice, every file path, every function name, every edge case - all decided here. The implementation agent should be able to work through vBRIEF tasks mechanically without making any design decisions.
+Do NOT leave any decisions for the implementation agent. Every architectural choice, every file path, every function name, every edge case - all decided here. The implementation agent should be able to work through xBRIEF tasks mechanically without making any design decisions.
 
 ---
 
@@ -103,7 +103,7 @@ Create `.pan/continue.json` with COMPLETE planning context:
     { "id": "H1", "summary": "<risk/edge case>", "mitigation": "<how to handle it>" }
   ],
   "resumePoint": null,
-  "vBRIEF tasksMapping": {},
+  "tasksMapping": {},
   "agentModel": "plan",
   "sessionHistory": [
     { "timestamp": "<ISO timestamp>", "reason": "planning", "note": "Initial planning session", "agentModel": "plan" }
@@ -116,8 +116,8 @@ Create `.pan/continue.json` with COMPLETE planning context:
 
 ```json
 {
-  "vBRIEFInfo": {
-    "version": "0.5",
+  "xBRIEFInfo": {
+    "version": "0.8",
     "created": "<ISO timestamp>"
   },
   "plan": {
@@ -167,9 +167,9 @@ Create `.pan/continue.json` with COMPLETE planning context:
 }
 ```
 
-**CRITICAL vBRIEF Structure Rules:**
+**CRITICAL xBRIEF Structure Rules:**
 
-1. **Acceptance criteria MUST be subItems, NEVER top-level items.** Each AC is nested under its parent task/requirement as a `subItems` entry. Top-level items with `kind: "acceptance_criterion"` will fail vBRIEF Studio validation.
+1. **Acceptance criteria MUST be subItems, NEVER top-level items.** Each AC is nested under its parent task/requirement as a `subItems` entry. Top-level items with `kind: "acceptance_criterion"` will fail xBRIEF Studio validation.
 
 2. **Hierarchical IDs required.** SubItem IDs must use dot-notation from the parent: `parent-id.ac-name`. Example: `work-prompt-ac.injects-ac-per-task`. The parent prefix is mandatory.
 
@@ -183,17 +183,17 @@ Create `.pan/continue.json` with COMPLETE planning context:
 - Set `edges` to capture blocking relationships between items
 - `difficulty`: trivial (typo/config), simple (1 file), medium (2-3 files), complex (multi-system)
 - 10-40 items for a typical feature; more for large refactors
-- SubItems (acceptance criteria) are NOT converted to vBRIEF tasks — they're verification checklists
+- SubItems (acceptance criteria) are NOT converted to xBRIEF tasks — they're verification checklists
 
 **After writing the JSON file:**
 ```bash
-# Materialize vBRIEF tasks and mark the workspace spec proposed
+# Materialize xBRIEF tasks and mark the workspace spec proposed
 pan plan finalize
 ```
 
 **Cloister hand-off:** When `pan plan finalize` runs, it automatically:
 1. Reads `.pan/spec.vbrief.json` from the workspace
-2. Validates the vBRIEF tasks already stored in `plan.items[]`
+2. Validates the xBRIEF tasks already stored in `plan.items[]`
 3. Preserves dependency relationships from `edges` (blocking order)
 4. Includes acceptance criteria in task descriptions
 5. Marks `plan.status` as `proposed` so the dashboard shows Done
@@ -230,7 +230,7 @@ gh issue comment <number> --body "## Planning Complete
 **Planned by:** Claude Opus 4.6
 **Workspace:** workspaces/feature-<issue-id>/
 
-### vBRIEF tasks: <N> items in .pan/spec.vbrief.json
+### xBRIEF tasks: <N> items in .pan/spec.vbrief.json
 ### Next: /work-issue <ISSUE-ID>"
 ```
 

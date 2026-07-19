@@ -169,7 +169,7 @@ describe('promoteUatGeneration — rejections (no git mutation)', () => {
     // are untouched and the no-ff merge still hard-fails on real conflicts.
     const deps = makeDeps([gen('uat/pan-moved-0610')], {
       mainSha: 'newer-main-sha',
-      mainChangedFiles: ['docs/flywheel-tick.md', '.pan/specs/x.vbrief.json'],
+      mainChangedFiles: ['docs/flywheel-tick.md', '.pan/specs/x.xbrief.json'],
       batchChangedFiles: ['src/feature-a.ts', 'src/feature-b.ts'],
     });
 

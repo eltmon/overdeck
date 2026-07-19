@@ -4,11 +4,11 @@
  *
  * Walks src/lib/**\/*.ts (excluding tests + already-migrated files), parses
  * imports via the TypeScript compiler API, builds an internal dependency
- * graph, topologically sorts into waves, and emits a vBRIEF plan JSON ready
+ * graph, topologically sorts into waves, and emits an xBRIEF plan JSON ready
  * to attach to the swarm issue.
  *
  * Output:
- *   .pan/swarm-migration-plan.vbrief.json
+ *   .pan/swarm-migration-plan.xbrief.json
  *
  * Each per-file item carries:
  *   - id: effect-migrate-<sanitized-relative-path>
@@ -34,7 +34,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const REPO_ROOT = resolve(__dirname, '..');
 const LIB_ROOT = resolve(REPO_ROOT, 'src/lib');
-const DEFAULT_OUT = resolve(REPO_ROOT, '.pan/swarm-migration-plan.vbrief.json');
+const DEFAULT_OUT = resolve(REPO_ROOT, '.pan/swarm-migration-plan.xbrief.json');
 
 const ALREADY_MIGRATED = new Set<string>([
   resolve(LIB_ROOT, 'cloister/flywheel.ts'),
@@ -340,20 +340,20 @@ function assignWaves(graph: AnalysisGraph): {
   return { waves: waveList, cycleSCCs };
 }
 
-interface VBriefEdge {
+interface XBriefEdge {
   from: string;
   to: string;
   type: 'blocks';
 }
 
-interface VBriefSubItem {
+interface XBriefSubItem {
   id: string;
   title: string;
   status: 'pending';
   metadata: { kind: 'acceptance_criterion' };
 }
 
-interface VBriefItem {
+interface XBriefItem {
   id: string;
   title: string;
   status: 'pending';
@@ -368,7 +368,7 @@ interface VBriefItem {
     sizeBytes: number;
   };
   narrative: { Action: string };
-  subItems: VBriefSubItem[];
+  subItems: XBriefSubItem[];
 }
 
 const ACCEPTANCE_CRITERIA_TEMPLATE: ReadonlyArray<string> = [
@@ -394,7 +394,7 @@ function buildPerFileItem(args: {
   sizeBytes: number;
   importsCount: number;
   nowIso: string;
-}): VBriefItem {
+}): XBriefItem {
   const isCycle = args.absPaths.length > 1;
   const relPaths = args.absPaths.map(relFromRepo);
   const id = isCycle
@@ -475,7 +475,7 @@ function buildPerFileItem(args: {
   };
 }
 
-function buildSharedErrorsItem(nowIso: string): VBriefItem {
+function buildSharedErrorsItem(nowIso: string): XBriefItem {
   const id = 'effect-migrate-w0-shared-errors';
   return {
     id,
@@ -579,7 +579,7 @@ function main(): void {
 
   // Build items
   const nowIso = new Date().toISOString();
-  const items: VBriefItem[] = [];
+  const items: XBriefItem[] = [];
   const sharedErrors = buildSharedErrorsItem(nowIso);
   items.push(sharedErrors);
 
@@ -627,7 +627,7 @@ function main(): void {
   }
 
   // Build edges
-  const edges: VBriefEdge[] = [];
+  const edges: XBriefEdge[] = [];
   // Every per-file item depends on shared-errors (wave 0)
   for (const item of items) {
     if (item.id === sharedErrors.id) continue;
@@ -649,10 +649,10 @@ function main(): void {
     }
   }
 
-  // Build vBRIEF document
+  // Build xBRIEF document
   const doc = {
-    vBRIEFInfo: {
-      version: '0.5.0',
+    xBRIEFInfo: {
+      version: '0.8',
       created: nowIso,
       updated: nowIso,
       author: 'scripts/analyze-effect-migration.ts',
@@ -685,7 +685,7 @@ function main(): void {
           'PAN-1193 (no files_scope enforcement at merge time) is mitigated by wave-0 shared errors + strict per-slot prompt. PAN-1192 (model default) is overridden at dispatch via --model.',
       },
       metadata: {
-        canonicalFilename: 'pan-1249-effect-migration.vbrief.json',
+        canonicalFilename: 'pan-1249-effect-migration.xbrief.json',
         generatedBy: 'analyze-effect-migration.ts',
         stats: {
           fileCount: files.length,
@@ -742,7 +742,7 @@ function main(): void {
   }
 
   writeFileSync(args.out, JSON.stringify(doc, null, 2) + '\n', 'utf-8');
-  process.stdout.write(`\nWrote vBRIEF plan: ${args.out}\n`);
+  process.stdout.write(`\nWrote xBRIEF plan: ${args.out}\n`);
   process.stdout.write(`  ${items.length} items, ${edges.length} edges\n`);
 }
 

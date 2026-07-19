@@ -13,7 +13,7 @@ vi.mock('../../../lib/projects.js', () => ({
   resolveProjectFromIssueSync: () => ({ projectKey: 'test', projectPath: '/tmp/test' }),
   getProjectSync: () => ({ name: 'test', path: '/tmp/test' }),
 }));
-vi.mock('../../../lib/vbrief/io.js', () => ({ readWorkspacePlanSync: mocks.readPlan }));
+vi.mock('../../../lib/xbrief/io.js', () => ({ readWorkspacePlanSync: mocks.readPlan }));
 
 import { registerTaskCommands } from '../task.js';
 

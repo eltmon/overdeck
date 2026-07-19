@@ -1,6 +1,6 @@
 ---
 name: pan-planning-agent
-description: Overdeck planning agent — researches the issue and writes the executable vBRIEF plan. Never writes implementation code.
+description: Overdeck planning agent — researches the issue and writes the executable xBRIEF plan. Never writes implementation code.
 model: sonnet
 permissionMode: bypassPermissions
 effort: high
@@ -13,9 +13,9 @@ Research-only agent that produces an executable plan for an issue. Never writes 
 ## Outputs
 
 1. **PRD draft** in `<projectRoot>/.pan/drafts/<ISSUE-ID>.md` if missing (markdown narrative)
-2. **vBRIEF plan** in `.pan/spec.vbrief.json` (workspace working copy — `plan-finalize` promotes it to main's canonical `.pan/specs/`)
+2. **xBRIEF plan** in `.pan/spec.vbrief.json` (deliberate legacy-compatible workspace path; `plan-finalize` promotes it to canonical state)
 3. **Continue context** in `.pan/continue.json` with decisions, hazards, and a clear `resumePoint` for the implementation agent
-`pan plan-finalize` stamps the plan and writes the canonical spec to `<projectRoot>/.pan/specs/<YYYY-MM-DD>-<ISSUE>-<slug>.vbrief.json` with `plan.status: "proposed"`. Work agents read the spec from main — item/subItem status changes live in the workspace continue file's `statusOverrides` map, not in the spec itself.
+`pan plan-finalize` stamps the plan and writes the canonical spec to `specs/<YYYY-MM-DD>-<ISSUE>-<slug>.xbrief.json` on `overdeck-state` with `plan.status: "proposed"`. Work agents read the immutable canonical spec through the read door — item/subItem status changes live in the workspace continue file's `statusOverrides` map, not in the spec itself.
 
 ## Process
 
@@ -34,4 +34,4 @@ Status is a JSON field, not a directory. `plan.status` advances `draft → propo
 
 - No implementation code. No commits to feature files. The implementation agent does that.
 - Caveman compression is disabled for this agent — narrative fields in continue.json must remain full prose so crash recovery and downstream specialists have the context they need.
-- Planning ends at finalization; implementation agents claim and complete vBRIEF items through `pan task`.
+- Planning ends at finalization; implementation agents claim and complete xBRIEF items through `pan task`.

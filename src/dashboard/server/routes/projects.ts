@@ -42,7 +42,7 @@ import { getReviewStatusSync } from '../review-status.js';
 import { resolveJsonlPath } from './jsonl-resolver.js';
 import { buildReviewerNodes, readSynthesisRounds, type ReviewerRoundMetadata } from './reviewer-tree.js';
 import { PAN_CONTINUE_FILENAME, PAN_DIRNAME, WORKSPACE_RUNTIME_DIRNAME } from '../../../lib/pan-dir/index.js';
-import { isPlanningComplete } from '../../../lib/vbrief/io.js';
+import { isPlanningComplete } from '../../../lib/xbrief/io.js';
 import { findSpecByIssueThroughOverdeck } from '../../../lib/overdeck/specs.js';
 import { findSpecByIssue } from '../../../lib/pan-dir/specs.js';
 import { getOverdeckHome } from '../../../lib/paths.js';

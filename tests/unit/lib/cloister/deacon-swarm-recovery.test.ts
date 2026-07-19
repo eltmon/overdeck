@@ -28,14 +28,14 @@ import {
 } from '../../../../src/lib/cloister/deacon-swarm.js';
 import { readIssueRecordForWorkspaceSync, writeIssueRecordForWorkspaceSync } from '../../../../src/lib/pan-dir/record.js';
 import { requeueFailedSwarmSlots } from '../../../../src/lib/cloister/swarm-failed-slot.js';
-import type { VBriefDocument, VBriefItem } from '../../../../src/lib/vbrief/types.js';
+import type { XBriefDocument, XBriefItem } from '../../../../src/lib/xbrief/types.js';
 
 beforeEach(() => {
   mocks.listProjectsSync.mockReturnValue([]);
   mocks.resolveProjectFromIssueSync.mockReturnValue(null);
 });
 
-function item(id = 'wi-a', status: VBriefItem['status'] = 'running'): VBriefItem {
+function item(id = 'wi-a', status: XBriefItem['status'] = 'running'): XBriefItem {
   return {
     id,
     title: id,
@@ -50,9 +50,9 @@ function item(id = 'wi-a', status: VBriefItem['status'] = 'running'): VBriefItem
   };
 }
 
-function doc(planItem = item()): VBriefDocument {
+function doc(planItem = item()): XBriefDocument {
   return {
-    vBRIEFInfo: {
+    xBRIEFInfo: {
       version: '0.6',
       created: '2026-07-01T00:00:00.000Z',
       updated: '2026-07-01T00:00:00.000Z',

@@ -12,7 +12,7 @@ tools:
 
 # Overdeck Inspect Agent
 
-Per-item specification verifier. Runs against the scoped diff of a single vBRIEF item.
+Per-item specification verifier. Runs against the scoped diff of a single xBRIEF item.
 
 ## Responsibilities
 

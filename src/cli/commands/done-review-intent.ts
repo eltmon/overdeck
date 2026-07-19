@@ -1,6 +1,6 @@
 import { getProjectConfigFromWorkspacePath, resolveProjectForIssue } from '../../lib/pan-dir/record.js';
 import { updateIssueRecord } from '../../lib/pan-dir/record-update.js';
-import type { ScopeDriftRecord } from '../../lib/vbrief/continue-state.js';
+import type { ScopeDriftRecord } from '../../lib/xbrief/continue-state.js';
 
 export interface DoneReviewIntent {
   reviewRequestedAt: string;

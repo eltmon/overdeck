@@ -129,81 +129,69 @@ developer configured globally.
 
 ---
 
-## vBRIEF Lifecycle — `specs/` on `overdeck-state`
+## xBRIEF Lifecycle — `specs/` on `overdeck-state`
 
-Scope vBRIEFs are durable, first-class source-of-truth artifacts. They live in `specs/`
+Scope xBRIEFs are durable, first-class source-of-truth artifacts. They live in `specs/`
 on `overdeck-state` (on disk: `${OVERDECK_HOME}/state/<project>/specs/`) and **do not move between directories** — status is tracked via the `plan.status`
-field inside each JSON file. See [VBRIEF.md](./VBRIEF.md) for the full format and lifecycle
+field inside each JSON file. See [XBRIEF.md](./XBRIEF.md) for the full format and lifecycle
 reference.
 
 ```
 state-worktree/  (overdeck-state branch)
 ├── specs/
-    │   ├── 2026-05-01-PAN-960-foo.vbrief.json     (status: "proposed")
-    │   ├── 2026-04-28-PAN-714-bar.vbrief.json     (status: "active")
-    │   └── 2026-04-20-MIN-846-baz.vbrief.json     (status: "completed")
+    │   ├── 2026-05-01-PAN-960-foo.xbrief.json     (status: "proposed")
+    │   ├── 2026-04-28-PAN-714-bar.xbrief.json     (status: "active")
+    │   └── 2026-04-20-MIN-846-baz.xbrief.json     (status: "completed")
 └── drafts/
         └── PAN-970-next-thing.md                   PRD being refined
 ```
 
 **Key points:**
-- Filenames are issue-keyed: `YYYY-MM-DD-<ISSUE-ID>-<slug>.vbrief.json`
+- Filenames are issue-keyed: `YYYY-MM-DD-<ISSUE-ID>-<slug>.xbrief.json`
 - The date prefix is the immutable creation date (UTC)
 - Files never move — `plan.status` field transitions: `draft → proposed → active → completed` (or `cancelled`)
 - Continue state lives in the workspace at `.overdeck/continue.json`, not alongside the canonical spec
 
-### PRDs vs vBRIEFs
+### PRDs vs xBRIEFs
 
 These are complementary, not competing artifacts:
 
 | Artifact | Author | Format | Location | Purpose |
 |----------|--------|--------|----------|---------|
 | **PRD** | Human | Markdown | `drafts/` on `overdeck-state` | Requirements, intent, context — input to planning |
-| **vBRIEF** | Agent (Opus) | JSON | `specs/` on `overdeck-state` | Structured operational plan — output of planning |
+| **xBRIEF** | Agent (Opus) | JSON | `specs/` on `overdeck-state` | Structured operational plan — output of planning |
 
 PRDs are human-authored Product Requirement Definitions that describe *what* to build and
 *why*. Canonical drafts live in `drafts/` on `overdeck-state`.
 
-vBRIEFs are machine-readable operational artifacts that describe *how* to build it — with
+xBRIEFs are machine-readable operational artifacts that describe *how* to build it — with
 acceptance criteria, dependency DAGs, and status tracking. They live in `specs/` on
 `overdeck-state` with field-based status transitions (files never move between directories).
 
-The planning agent reads the PRD (if one exists) as input and produces a vBRIEF plan as output.
+The planning agent reads the PRD (if one exists) as input and produces an xBRIEF plan as output.
 
 ---
 
-## Workspace Orchestration — `.pan/` (feature branch)
+## Workspace Runtime — `.overdeck/` (feature workspace)
 
 ```
-project-repo/  (feature branch workspace)
-└── .pan/
-    ├── spec.vbrief.json     Machine-readable work plan (copied from main at branch creation)
-    ├── continue.json        Structured session state (resume point, decisions, hazards)
-    ├── prd.md               Discovered/created requirements (copied from docs/prds/)
+project-repo/  (feature workspace)
+└── .overdeck/
+    ├── continue.json        Mutable session state and xBRIEF statusOverrides
     ├── context.md           Workspace context for agents
     ├── sessions.jsonl       Append-only session history
     └── review/              Specialist feedback (review-agent, test-agent)
 ```
 
-`.pan/` is **committed to git** in the feature branch worktree. It is not gitignored.
-This means the entire planning/orchestration context travels with the branch and is visible in PRs.
+Workspace runtime files are local and gitignored. The canonical xBRIEF remains in `specs/` on `overdeck-state`; work agents and the dashboard read it through `findPlan()`, and `.overdeck/continue.json` overlays item and sub-item status without mutating the spec.
 
-Beads (task tracking) live at `.beads/` — a separate dot-directory, not inside `.pan/`.
+Older workspace plan filenames remain readable for compatibility, but they are not canonical state or current write targets. See the [xBRIEF migration note](./XBRIEF.md) for the exact legacy surfaces.
 
-During planning, the vBRIEF spec is created in `specs/` on `overdeck-state` with
-`plan.status: "proposed"`. When work starts, it is copied to the workspace as
-`.overdeck/spec.vbrief.json`.
+### Continue State
 
-### Continue State (replaces STATE.md)
+The workspace continue file stores the current resume point, decisions, hazards, session history, and xBRIEF `statusOverrides`. Project-side durable continue state lives separately in `continues/<issue>.xbrief.json` on `overdeck-state`.
 
-The structured continuation state file (`continue.json`) replaces the
-free-form `STATE.md`. It contains git state, decisions, hazards, resume points, beads
-mapping, agent model, and session history — all machine-parseable.
-
-**During work**: Written to `.overdeck/continue.json` in the workspace.
-**After merge**: Archived with the completed spec on main.
-
-See [VBRIEF.md § Continue State](./VBRIEF.md#continue-state--structured-session-history) for the full schema.
+See [xBRIEF Continue State](./XBRIEF.md#continue-state--structured-session-history) for the full schema.
 
 ---
 
@@ -238,14 +226,20 @@ project-repo/
 │   ├── agents/<name>/AGENT.md     Project-specific agent overrides
 │   └── rules/<name>.md            Project-specific rules
 ├── .pan.yaml                      Per-project config (committed)
-├── specs/                    vBRIEF specs on overdeck-state (field-based status)
-│   └── YYYY-MM-DD-ID-slug.vbrief.json
-├── drafts/                   PRDs being refined on overdeck-state
-├── .overdeck/spec.vbrief.json          Workspace scope plan (on feature branch)
-├── .overdeck/continue.json             Workspace session state (on feature branch)
-├── .pan/prd.md                    Workspace PRD copy (on feature branch)
-├── .overdeck/review/                   Specialist feedback (on feature branch)
-├── .beads/                        Task tracking beads (on feature branch)
+├── .overdeck/                     Gitignored workspace runtime state
+│   ├── continue.json              Session state and xBRIEF statusOverrides
+│   └── review/                    Specialist feedback
+├── src/                           Implementation files
+
+${OVERDECK_HOME}/state/<project>/  Dedicated overdeck-state worktree
+├── specs/
+│   └── YYYY-MM-DD-ID-slug.xbrief.json
+├── continues/
+│   └── issue-id.xbrief.json
+├── drafts/
+│   └── issue-id.md
+└── records/
+    └── issue-id.json
 ├── .claude/                       Claude Code tool directories (committed)
 │   ├── skills/                    ← .pan/skills/ synced here; user-owned skills NOT overwritten
 │   ├── agents/
@@ -307,7 +301,7 @@ If yes → root. If no → find or create the appropriate `docs/` subdirectory.
 | Global skills cache | `~/.overdeck/skills/` | Machine-local, refreshed by `pan sync` |
 | Agent state dirs | `~/.overdeck/agents/<id>/` | Runtime state, not portable. Includes `state.json`, `health.json`, `lifecycle.log`, `spawn.log`, `output.log`, launcher scripts, and saved Claude session metadata. |
 | Specialist sessions | `~/.overdeck/specialists/` | Runtime state |
-| Issue archives (runtime) | `~/.overdeck/archives/<issue>/` | Closed-issue runtime state backup (agent dirs, logs). Scope vBRIEFs remain in `specs/` with `status: "completed"`. |
+| Issue archives (runtime) | `~/.overdeck/archives/<issue>/` | Closed-issue runtime state backup (agent dirs, logs). Scope xBRIEFs remain in `specs/` with `status: "completed"`. |
 | Traefik config | `~/.overdeck/traefik/` | Infrastructure, not project content |
 | Cost database | `~/.overdeck/panopticon.db` | Aggregated across all projects |
 | Shadow state | `~/.overdeck/shadow-state/` | Derived from tracker, not authoritative |

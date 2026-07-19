@@ -1,5 +1,5 @@
-import type { VBriefDifficulty, VBriefItem } from '../vbrief/types.js';
-import { hasFileOverlap } from '../vbrief/dag.js';
+import type { XBriefDifficulty, XBriefItem } from '../xbrief/types.js';
+import { hasFileOverlap } from '../xbrief/dag.js';
 import { verifyAndMergeSlot, type SlotMergeIssue, type SlotMergeOptions, type SlotMergeResult } from './slot-merge.js';
 
 /**
@@ -20,7 +20,7 @@ import { verifyAndMergeSlot, type SlotMergeIssue, type SlotMergeOptions, type Sl
  * singleton has no batching benefit and stays on the normal in-context path.
  */
 
-const FAST_TRACK_DIFFICULTIES = new Set<VBriefDifficulty>(['trivial', 'simple']);
+const FAST_TRACK_DIFFICULTIES = new Set<XBriefDifficulty>(['trivial', 'simple']);
 
 export const DEFAULT_FAST_TRACK_MAX_SCOPE_FILES = 3;
 
@@ -32,16 +32,16 @@ export interface FastTrackOptions {
 export interface FastTrackBatch {
   /** Shared key identifying the single dispatch this batch becomes. */
   fastTrackBatchKey: string;
-  items: VBriefItem[];
+  items: XBriefItem[];
 }
 
 export interface FastTrackGrouping {
   batches: FastTrackBatch[];
   /** Items not batched (ineligible or singleton runs), in input order. */
-  rest: VBriefItem[];
+  rest: XBriefItem[];
 }
 
-function isFastTrackEligible(item: VBriefItem, maxScopeFiles: number): boolean {
+function isFastTrackEligible(item: XBriefItem, maxScopeFiles: number): boolean {
   const metadata = item.metadata;
   const difficulty = metadata?.difficulty;
   if (!difficulty || !FAST_TRACK_DIFFICULTIES.has(difficulty)) return false;
@@ -50,7 +50,7 @@ function isFastTrackEligible(item: VBriefItem, maxScopeFiles: number): boolean {
   return metadata?.files_scope_confidence === 'high';
 }
 
-function batchKey(items: VBriefItem[]): string {
+function batchKey(items: XBriefItem[]): string {
   return `fast-track:${items[0].id}`;
 }
 
@@ -119,11 +119,11 @@ export function isFastTrackAutoMergeAllowed(itemId: string, escalations: FastTra
   return !escalations.some(e => e.itemId === itemId);
 }
 
-export function groupFastTrack(items: VBriefItem[], options: FastTrackOptions = {}): FastTrackGrouping {
+export function groupFastTrack(items: XBriefItem[], options: FastTrackOptions = {}): FastTrackGrouping {
   const maxScopeFiles = options.maxScopeFiles ?? DEFAULT_FAST_TRACK_MAX_SCOPE_FILES;
   const batches: FastTrackBatch[] = [];
-  const rest: VBriefItem[] = [];
-  let current: VBriefItem[] = [];
+  const rest: XBriefItem[] = [];
+  let current: XBriefItem[] = [];
 
   const flush = () => {
     if (current.length >= 2) {
@@ -207,7 +207,7 @@ export async function autoMergeFastTrackBatch(
 
   // One batch = one dispatch = one slot: reuse verifyAndMergeSlot with a
   // synthetic batch-level item carrying the typecheck+lint gate.
-  const gateItem: VBriefItem = {
+  const gateItem: XBriefItem = {
     id: batch.fastTrackBatchKey,
     title: `fast-track batch ${batch.fastTrackBatchKey} (${batch.items.map(i => i.id).join(', ')})`,
     status: 'running',

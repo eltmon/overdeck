@@ -10,7 +10,7 @@ import { getAgentState, getAgentRuntimeState, messageAgent, saveAgentRuntimeStat
 import { getUnblockedItemsSync } from '../../../../lib/cloister/task-readiness.js';
 import { resolveProjectFromIssueSync } from '../../../../lib/projects.js';
 import { getReviewStatusSync, loadReviewStatuses, setReviewStatusSync as setReviewStatusBase, type ReviewStatus } from '../../../../lib/review-status.js';
-import { readWorkspacePlanSync } from '../../../../lib/vbrief/io.js';
+import { readWorkspacePlanSync } from '../../../../lib/xbrief/io.js';
 import { jsonResponse } from '../../http-helpers.js';
 import { EventStoreService } from '../../services/domain-services.js';
 import { validateAgentRuntimeEventAuth } from '../agents.js';
@@ -157,7 +157,7 @@ const postSpecialistsDoneRoute = HttpRouter.add(
       const workspacePath = project && join(project.projectPath, 'workspaces', `feature-${normalizedIssueId.toLowerCase()}`);
       const plan = workspacePath ? readWorkspacePlanSync(workspacePath) : undefined;
       if (!plan?.plan.items.some(item => item.id === itemId)) {
-        return jsonResponse({ error: `Item "${itemId}" does not exist in the vBRIEF for ${normalizedIssueId}` }, { status: 400 });
+        return jsonResponse({ error: `Item "${itemId}" does not exist in the xBRIEF for ${normalizedIssueId}` }, { status: 400 });
       }
     }
     console.log(`[specialists/done] ${specialist} signaling ${status} for ${normalizedIssueId}`);

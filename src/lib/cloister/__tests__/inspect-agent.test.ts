@@ -98,7 +98,7 @@ vi.mock('../../agents.js', () => ({
   saveAgentState: mocks.saveAgentState,
 }));
 
-vi.mock('../../vbrief/io.js', () => ({
+vi.mock('../../xbrief/io.js', () => ({
   readWorkspacePlanSync: mocks.readWorkspacePlanSync,
 }));
 
@@ -392,7 +392,7 @@ function planItem(id: string) {
 
 function planDoc(items: ReturnType<typeof planItem>[]) {
   return {
-    vBRIEFInfo: {
+    xBRIEFInfo: {
       version: '0.6.0',
       created: '2026-07-02T00:00:00Z',
     },

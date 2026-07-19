@@ -90,7 +90,7 @@ all reviewers + the test specialist sign off; humans only click the button.
 
 ## See also
 
-- `pan show <id>` — inspect work agent state, vBRIEF status, recent activity
+- `pan show <id>` — inspect work agent state, xBRIEF status, recent activity
 - `pan done <id>` — signal initial work completion (from the worker side)
 - `pan code-review` skill — orchestrated parallel code review with synthesis
 - `roles/review.md` — the review role's frontmatter and prompt

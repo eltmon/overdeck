@@ -37,7 +37,7 @@ describe('PAN-1919: retire dead continue modules', () => {
   });
 
   it('AC2: continue-state.ts exports no fs-I/O functions', () => {
-    const src = readFileSync(join(ROOT, 'src/lib/vbrief/continue-state.ts'), 'utf-8');
+    const src = readFileSync(join(ROOT, 'src/lib/xbrief/continue-state.ts'), 'utf-8');
     expect(src).not.toContain('readFileSync');
     expect(src).not.toContain('writeFileSync');
     expect(src).not.toContain('writeFile(');
@@ -49,7 +49,7 @@ describe('PAN-1919: retire dead continue modules', () => {
   });
 
   it('AC2: continue-state.ts still exports ContinueState interface', () => {
-    const src = readFileSync(join(ROOT, 'src/lib/vbrief/continue-state.ts'), 'utf-8');
+    const src = readFileSync(join(ROOT, 'src/lib/xbrief/continue-state.ts'), 'utf-8');
     expect(src).toContain('export interface ContinueState');
     expect(src).toContain('export interface ContinueFeedbackEntry');
     expect(src).toContain('export interface ContinueSessionEntry');
@@ -65,7 +65,7 @@ describe('PAN-1919: retire dead continue modules', () => {
 
   it('AC3: promoteContinueToProject absent from lifecycle-io.ts', () => {
     const result = execSync(
-      `git grep -n "promoteContinueToProject" -- src/lib/vbrief/lifecycle-io.ts || true`,
+      `git grep -n "promoteContinueToProject" -- src/lib/xbrief/lifecycle-io.ts || true`,
       { cwd: ROOT, encoding: 'utf-8' },
     );
     expect(result.trim()).toBe('');

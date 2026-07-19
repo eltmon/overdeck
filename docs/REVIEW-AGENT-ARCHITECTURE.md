@@ -223,7 +223,7 @@ Each convoy reviewer has a distinct focus and uses the same severity/evidence vo
 | `correctness` | Logic errors, edge cases, null handling, type safety, stub detection | [`verification/verification.md`](https://github.com/deftai/directive/blob/main/verification/verification.md) |
 | `security` | OWASP Top 10, injection, authn/authz, secrets, supply-chain risk | — |
 | `performance` | Algorithms, N+1 queries, memory leaks, allocation hot paths | — |
-| `requirements` | Acceptance criteria coverage, vBRIEF fulfillment, missing functionality | [`verification/plan-checking.md`](https://github.com/deftai/directive/blob/main/verification/plan-checking.md) |
+| `requirements` | Acceptance criteria coverage, xBRIEF fulfillment, missing functionality | [`verification/plan-checking.md`](https://github.com/deftai/directive/blob/main/verification/plan-checking.md) |
 
 ### Severity glyphs (RFC 2119)
 

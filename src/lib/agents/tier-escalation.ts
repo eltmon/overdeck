@@ -1,5 +1,5 @@
-import type { TierOverridesMap } from '../vbrief/io.js';
-import type { VBriefDifficulty, VBriefItem } from '../vbrief/types.js';
+import type { TierOverridesMap } from '../xbrief/io.js';
+import type { XBriefDifficulty, XBriefItem } from '../xbrief/types.js';
 import type { ValidatedEscalationConfig } from './tier-table.js';
 import { TIERED_EXECUTION_DIFFICULTIES } from './tier-table.js';
 
@@ -10,11 +10,11 @@ export type EscalationTrigger =
 
 export type EscalationAction =
   | { action: 'retry'; attempt: number }
-  | { action: 'promote'; from: VBriefDifficulty; to: VBriefDifficulty; reason: string }
+  | { action: 'promote'; from: XBriefDifficulty; to: XBriefDifficulty; reason: string }
   | { action: 'block'; reason: string };
 
 export interface VerificationFailureEscalationInput {
-  bead: Pick<VBriefItem, 'id' | 'metadata'>;
+  bead: Pick<XBriefItem, 'id' | 'metadata'>;
   config: ValidatedEscalationConfig;
   overrides: TierOverridesMap;
   detail: string;
@@ -22,7 +22,7 @@ export interface VerificationFailureEscalationInput {
 }
 
 export interface FlounderingEscalationInput {
-  bead: Pick<VBriefItem, 'id' | 'metadata'>;
+  bead: Pick<XBriefItem, 'id' | 'metadata'>;
   config: ValidatedEscalationConfig;
   overrides: TierOverridesMap;
   dispatchedAt: string;
@@ -30,7 +30,7 @@ export interface FlounderingEscalationInput {
   attemptsAtCurrentTier?: number;
 }
 
-export function applyEffectiveDifficulty<T extends Pick<VBriefItem, 'id' | 'metadata'>>(
+export function applyEffectiveDifficulty<T extends Pick<XBriefItem, 'id' | 'metadata'>>(
   item: T,
   overrides: TierOverridesMap,
 ): T {
@@ -52,7 +52,7 @@ export function applyEffectiveDifficulty<T extends Pick<VBriefItem, 'id' | 'meta
  */
 export function decideEscalation(
   trigger: EscalationTrigger,
-  bead: Pick<VBriefItem, 'id' | 'metadata'>,
+  bead: Pick<XBriefItem, 'id' | 'metadata'>,
   config: ValidatedEscalationConfig,
   overrides: TierOverridesMap,
 ): EscalationAction {

@@ -9,7 +9,7 @@ Durable portable state is committed through domain writers to the orphan
 `overdeck-state` branch in a dedicated worktree at
 `${OVERDECK_HOME}/state/<projectKey>`:
 
-- `specs/` — canonical vBRIEF content. Work and task operations change only lifecycle status; explicit re-planning may replace the document at its stable filename through the spec writer.
+- `specs/` — canonical xBRIEF content. Work and task operations change only lifecycle status; explicit re-planning may replace the document at its stable filename through the spec writer.
 - `drafts/` — PRD narrative.
 - `records/` and `continues/` — per-issue decisions, hazards, progress,
   verdicts, ownership, and close-out.
@@ -43,7 +43,7 @@ project root during cutover.
 Project context is reviewed with code on `main` at
 `<projectRoot>/.overdeck/context/`; `.pan/context/` remains a read fallback.
 Workspace-local runtime files use `<workspace>/.overdeck/` and are gitignored.
-Task reads resolve the vBRIEF plus issue-record task state through the canonical
+Task reads resolve the xBRIEF plus issue-record task state through the canonical
 read door; agents mutate that state only through `pan task …`.
 
 ## Runtime plane — local SQLite
