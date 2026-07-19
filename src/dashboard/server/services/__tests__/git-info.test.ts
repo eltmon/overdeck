@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // ─── Mocks ────────────────────────────────────────────────────────────────────
 //
@@ -68,6 +68,8 @@ beforeEach(() => {
   mockReadFile.mockReset();
 });
 
+afterEach(() => vi.restoreAllMocks());
+
 describe('resolveConversationGitInfo', () => {
   it('returns null branch when path has no .git', async () => {
     mockStat.mockRejectedValueOnce(new Error('ENOENT'));
@@ -117,6 +119,25 @@ describe('resolveConversationGitInfo', () => {
     await resolveConversationGitInfo('/repo');
     // Second call hits the cache — execFile must not be invoked again.
     await resolveConversationGitInfo('/repo');
+    expect(mockExecFile).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not expire unchanged HEAD entries on a wall-clock timer', async () => {
+    vi.spyOn(Date, 'now')
+      .mockReturnValueOnce(0)
+      .mockReturnValueOnce(31_000);
+    mockStat
+      .mockResolvedValueOnce(dirGit(0))
+      .mockResolvedValueOnce(headStat(3_500))
+      .mockResolvedValueOnce(dirGit(0))
+      .mockResolvedValueOnce(headStat(3_500));
+    mockExecFile
+      .mockResolvedValueOnce({ stdout: 'main\n' })
+      .mockResolvedValueOnce({ stdout: '/repo/.git\n/repo/.git\n' });
+
+    await resolveConversationGitInfo('/repo');
+    await resolveConversationGitInfo('/repo');
+
     expect(mockExecFile).toHaveBeenCalledTimes(2);
   });
 

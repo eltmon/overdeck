@@ -19,6 +19,7 @@ Pipeline membership is advisory to rendering. Membership loading or failure may 
 - A project failure preserves its last-good snapshot and does not prevent later queued projects from running.
 - Boot warming, lifecycle events, and the five-minute convergence sweep all use this queue.
 - Agent lifecycle events refresh live resource evidence from the existing membership snapshot. They do not rerun durable tracker/branch/PR/spec membership lenses; boot warming and the five-minute convergence sweep own that work.
+- Workspace branch metadata is cached until `.git/HEAD` changes, and merged-PR history is queried only for open issues because closed issues resolve terminal without it. Periodic convergence therefore does not respawn git/GraphQL work for unchanged historical workspaces.
 
 The server binds its HTTP socket before it starts triggers or enqueues the boot warm. Boot logs must show `Dashboard listening` before `Project resource refresh queue and resources snapshot service started` and `Boot cache warm complete`.
 

@@ -413,21 +413,6 @@ export async function gatherProjectLensSignals(
   for (const id of specIssues) candidates.add(id);
 
   if (owner && repo) {
-    const candidateHeads = [...new Set([...candidates].flatMap((id) => [
-      ...(headRefsByIssue.get(id) ?? []),
-      `feature/${id.toLowerCase()}`,
-      `strike/${id.toLowerCase()}`,
-    ]))];
-    const mergedHeads = new Set(await deps.listMergedPullRequestHeads(owner, repo, candidateHeads));
-    for (const id of candidates) {
-      const possibleHeads = [
-        ...(headRefsByIssue.get(id) ?? []),
-        `feature/${id.toLowerCase()}`,
-        `strike/${id.toLowerCase()}`,
-      ];
-      if (possibleHeads.some((head) => mergedHeads.has(head))) mergedPrIssues.add(id);
-    }
-
     const unknownIssueIds = [...candidates].filter((id) => !knownStateByIssue.has(id));
     const issueStates = await deps.listIssueStates(owner, repo, unknownIssueIds.map(issueNumber));
     const stateByNumber = new Map(issueStates.map((entry) => [entry.number, entry.state]));
@@ -435,6 +420,26 @@ export async function gatherProjectLensSignals(
       const state = stateByNumber.get(issueNumber(id));
       if (state) knownStateByIssue.set(id, state);
       else candidates.delete(id);
+    }
+
+    // Closed issues resolve terminal regardless of merged-PR history (unless a PR
+    // is still open, already captured above), so only open candidates need the
+    // expensive merged-head oracle. This keeps historical refs/specs out of the
+    // GraphQL fan-out without changing membership semantics.
+    const openCandidates = [...candidates].filter((id) => knownStateByIssue.get(id) === 'open');
+    const candidateHeads = [...new Set(openCandidates.flatMap((id) => [
+      ...(headRefsByIssue.get(id) ?? []),
+      `feature/${id.toLowerCase()}`,
+      `strike/${id.toLowerCase()}`,
+    ]))];
+    const mergedHeads = new Set(await deps.listMergedPullRequestHeads(owner, repo, candidateHeads));
+    for (const id of openCandidates) {
+      const possibleHeads = [
+        ...(headRefsByIssue.get(id) ?? []),
+        `feature/${id.toLowerCase()}`,
+        `strike/${id.toLowerCase()}`,
+      ];
+      if (possibleHeads.some((head) => mergedHeads.has(head))) mergedPrIssues.add(id);
     }
   }
 
