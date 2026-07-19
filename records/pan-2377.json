@@ -77,9 +77,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-19T01:59:18.741Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-19T02:05Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-19T02:05:43.155Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-19T02:05:43Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2377\n\nOrder-book overlays disappear on resume, and post-spawn failures leave a live run bound to a rolled-back book.\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2377 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "configuration/state-branch.mdx",
@@ -284,7 +297,7 @@
     "recordedAt": "2026-07-19T00:54:19.291Z"
   },
   "created": "2026-07-17T12:54:30.819Z",
-  "updated": "2026-07-19T02:05:42.467Z",
+  "updated": "2026-07-19T02:05:43.156Z",
   "pipeline": {
     "issueId": "PAN-2377",
     "reviewStatus": "blocked",
