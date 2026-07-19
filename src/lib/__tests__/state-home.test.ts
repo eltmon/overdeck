@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ProjectConfig } from '../projects.js';
 import {
   clearStateMigrationCache,
@@ -119,6 +119,99 @@ describe('state home', () => {
       migrated: true,
       migrationInProgress: false,
       remoteTip: markedTip,
+    });
+  });
+
+  it('re-resolves a marker when overdeck-state advances between ls-remote and fetch', async () => {
+    const listedTip = 'a'.repeat(40);
+    const fetchedTip = 'b'.repeat(40);
+    const markerSha = 'c'.repeat(40);
+    const runGit = vi.fn(async (_repoPath: string, args: string[]) => {
+      if (args[0] === 'ls-remote') return `${listedTip}\trefs/heads/overdeck-state`;
+      if (args[0] === 'fetch') return '';
+      if (args[0] === 'rev-parse') return fetchedTip;
+      if (args[0] === 'show') {
+        expect(args[1]).toBe(`${fetchedTip}:migration-complete.json`);
+        return JSON.stringify({
+          sourceMainSha: 'd'.repeat(40),
+          stateBranchSha: markerSha,
+          completedAt: '2026-07-19T02:43:54.000Z',
+          version: 1,
+        });
+      }
+      if (args[0] === 'merge-base') {
+        expect(args.slice(1)).toEqual(['--is-ancestor', markerSha, fetchedTip]);
+        return '';
+      }
+      throw new Error(`Unexpected git command: ${args.join(' ')}`);
+    });
+
+    await expect(inspectStateMigration(project, { git: runGit })).resolves.toEqual({
+      migrated: true,
+      migrationInProgress: false,
+      remoteTip: fetchedTip,
+    });
+    expect(runGit.mock.calls.filter(([, args]) => args[0] === 'fetch')).toHaveLength(2);
+  });
+
+  it('uses the last-known-good migration result when the remote check fails', async () => {
+    const tip = 'e'.repeat(40);
+    const markerSha = 'f'.repeat(40);
+    let unavailable = false;
+    const runGit = vi.fn(async (_repoPath: string, args: string[]) => {
+      if (unavailable) throw new Error('origin unavailable');
+      if (args[0] === 'ls-remote') return `${tip}\trefs/heads/overdeck-state`;
+      if (args[0] === 'fetch') return '';
+      if (args[0] === 'rev-parse') return tip;
+      if (args[0] === 'show') {
+        return JSON.stringify({
+          sourceMainSha: '1'.repeat(40),
+          stateBranchSha: markerSha,
+          completedAt: '2026-07-19T02:43:54.000Z',
+          version: 1,
+        });
+      }
+      if (args[0] === 'merge-base') return '';
+      throw new Error(`Unexpected git command: ${args.join(' ')}`);
+    });
+
+    await expect(inspectStateMigration(project, { git: runGit })).resolves.toMatchObject({ migrated: true });
+    unavailable = true;
+    await expect(inspectStateMigration(project, { git: runGit })).resolves.toEqual({
+      migrated: true,
+      migrationInProgress: false,
+      remoteTip: tip,
+      fallback: 'cache',
+    });
+  });
+
+  it('uses a valid local worktree marker when the remote check fails with a cold cache', async () => {
+    const path = stateWorktreePath(project, { projectKey: 'fixture' });
+    mkdirSync(path, { recursive: true });
+    writeFileSync(join(path, 'migration-complete.json'), JSON.stringify({
+      sourceMainSha: '2'.repeat(40),
+      stateBranchSha: '3'.repeat(40),
+      completedAt: '2026-07-19T02:43:54.000Z',
+      version: 1,
+    }));
+    const runGit = vi.fn(async () => { throw new Error('origin unavailable'); });
+
+    await expect(inspectStateMigration(project, { projectKey: 'fixture', git: runGit })).resolves.toEqual({
+      migrated: true,
+      migrationInProgress: false,
+      remoteTip: null,
+      fallback: 'local',
+    });
+  });
+
+  it('reports a failed remote check when no valid cached or local marker exists', async () => {
+    const runGit = vi.fn(async () => { throw new Error('origin unavailable'); });
+
+    await expect(inspectStateMigration(project, { git: runGit })).resolves.toEqual({
+      migrated: false,
+      migrationInProgress: false,
+      remoteTip: null,
+      remoteCheckFailed: true,
     });
   });
 

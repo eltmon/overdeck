@@ -46,13 +46,24 @@ export type StateWorktreeStatus =
   | { status: 'healthy'; path: string }
   | { status: 'created'; path: string }
   | { status: 'recreated'; path: string }
-  | { status: 'legacy'; path: string }
+  | { status: 'legacy'; path: string; detail: string }
   | { status: 'dirty'; path: string; detail: string }
   | { status: 'error'; path: string; detail: string };
+
+export interface StateMigrationInspection {
+  migrated: boolean;
+  migrationInProgress: boolean;
+  remoteTip: string | null;
+  fallback?: 'cache' | 'local';
+  remoteCheckFailed?: true;
+}
+
+type StateGit = (repoPath: string, args: string[], signal?: AbortSignal) => Promise<string>;
 
 interface StateHomeOptions {
   projectKey?: string;
   signal?: AbortSignal;
+  git?: StateGit;
 }
 
 const migrationCache = new Map<string, { remoteTip: string | null; migrated: boolean }>();
@@ -87,28 +98,55 @@ export function parseMigrationCompleteMarker(value: unknown): MigrationCompleteM
   return marker as MigrationCompleteMarker;
 }
 
-async function remoteStateTip(repoPath: string, signal?: AbortSignal): Promise<string | null> {
-  const output = await git(repoPath, ['ls-remote', '--heads', 'origin', `refs/heads/${STATE_BRANCH}`], signal);
+function readMigrationCompleteMarker(path: string): MigrationCompleteMarker | null {
+  if (!existsSync(path)) return null;
+  try {
+    return parseMigrationCompleteMarker(JSON.parse(readFileSync(path, 'utf8')));
+  } catch {
+    return null;
+  }
+}
+
+async function remoteStateTip(repoPath: string, signal?: AbortSignal, runGit: StateGit = git): Promise<string | null> {
+  const output = await runGit(repoPath, ['ls-remote', '--heads', 'origin', `refs/heads/${STATE_BRANCH}`], signal);
   const sha = output.split(/\s+/)[0];
   return isSha(sha) ? sha : null;
 }
 
-async function markerAtRemoteTip(repoPath: string, tip: string, signal?: AbortSignal): Promise<MigrationCompleteMarker | null> {
-  await git(repoPath, [
-    'fetch',
-    '--quiet',
-    'origin',
-    `refs/heads/${STATE_BRANCH}:refs/remotes/origin/${STATE_BRANCH}`,
-  ], signal);
-  const fetchedTip = await git(repoPath, ['rev-parse', `refs/remotes/origin/${STATE_BRANCH}`], signal);
-  if (fetchedTip !== tip) return null;
+interface RemoteMarkerInspection {
+  marker: MigrationCompleteMarker | null;
+  tip: string;
+}
+
+async function markerAtRemoteTip(
+  repoPath: string,
+  initialTip: string,
+  signal?: AbortSignal,
+  runGit: StateGit = git,
+): Promise<RemoteMarkerInspection> {
+  let tip = initialTip;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    await runGit(repoPath, [
+      'fetch',
+      '--quiet',
+      'origin',
+      `refs/heads/${STATE_BRANCH}:refs/remotes/origin/${STATE_BRANCH}`,
+    ], signal);
+    const fetchedTip = await runGit(repoPath, ['rev-parse', `refs/remotes/origin/${STATE_BRANCH}`], signal);
+    if (!isSha(fetchedTip)) throw new Error(`Invalid origin/${STATE_BRANCH} tip: ${fetchedTip}`);
+    if (fetchedTip === tip || attempt === 2) {
+      tip = fetchedTip;
+      break;
+    }
+    tip = fetchedTip;
+  }
 
   let raw: string;
   try {
-    raw = await git(repoPath, ['show', `${tip}:${MIGRATION_COMPLETE_MARKER}`], signal);
+    raw = await runGit(repoPath, ['show', `${tip}:${MIGRATION_COMPLETE_MARKER}`], signal);
   } catch {
     signal?.throwIfAborted();
-    return null;
+    return { marker: null, tip };
   }
   let marker: MigrationCompleteMarker | null;
   try {
@@ -116,42 +154,65 @@ async function markerAtRemoteTip(repoPath: string, tip: string, signal?: AbortSi
   } catch {
     marker = null;
   }
-  if (!marker) return null;
+  if (!marker) return { marker: null, tip };
 
   // The marker's stateBranchSha must be an ancestor of (or equal to) the tip —
   // the state branch keeps growing after migration (records, specs, notes),
   // so requiring the marker to be the LAST commit would un-migrate the project
   // on its first post-migration state write. Ancestry still proves the marker
   // belongs to this branch's history rather than a graft from elsewhere.
-  const anchored = await git(repoPath, ['merge-base', '--is-ancestor', marker.stateBranchSha, tip], signal)
+  const anchored = await runGit(repoPath, ['merge-base', '--is-ancestor', marker.stateBranchSha, tip], signal)
     .then(() => true)
     .catch(() => {
       signal?.throwIfAborted();
       return false;
     });
-  return anchored ? marker : null;
+  return { marker: anchored ? marker : null, tip };
 }
 
-export async function inspectStateMigration(project: ProjectConfig, options: StateHomeOptions = {}): Promise<{
-  migrated: boolean;
-  migrationInProgress: boolean;
-  remoteTip: string | null;
-}> {
+export async function inspectStateMigration(
+  project: ProjectConfig,
+  options: StateHomeOptions = {},
+): Promise<StateMigrationInspection> {
   const { repoPath } = resolveInfraRepo(project);
-  let tip: string | null;
+  const cached = migrationCache.get(repoPath);
+  const runGit = options.git ?? git;
   try {
-    tip = await remoteStateTip(repoPath, options.signal);
+    const listedTip = await remoteStateTip(repoPath, options.signal, runGit);
+    if (cached?.remoteTip === listedTip) {
+      return {
+        migrated: cached.migrated,
+        migrationInProgress: listedTip !== null && !cached.migrated,
+        remoteTip: listedTip,
+      };
+    }
+    if (listedTip === null) {
+      migrationCache.set(repoPath, { remoteTip: null, migrated: false });
+      return { migrated: false, migrationInProgress: false, remoteTip: null };
+    }
+
+    const remote = await markerAtRemoteTip(repoPath, listedTip, options.signal, runGit);
+    const migrated = remote.marker !== null;
+    migrationCache.set(repoPath, { remoteTip: remote.tip, migrated });
+    return { migrated, migrationInProgress: !migrated, remoteTip: remote.tip };
   } catch {
     options.signal?.throwIfAborted();
-    return { migrated: false, migrationInProgress: false, remoteTip: null };
+    if (cached?.migrated) {
+      return {
+        migrated: true,
+        migrationInProgress: false,
+        remoteTip: cached.remoteTip,
+        fallback: 'cache',
+      };
+    }
+    const localMarker = readMigrationCompleteMarker(
+      join(stateWorktreePath(project, options), MIGRATION_COMPLETE_MARKER),
+    );
+    if (localMarker) {
+      return { migrated: true, migrationInProgress: false, remoteTip: null, fallback: 'local' };
+    }
+    return { migrated: false, migrationInProgress: false, remoteTip: null, remoteCheckFailed: true };
   }
-  const cached = migrationCache.get(repoPath);
-  if (cached?.remoteTip === tip) {
-    return { migrated: cached.migrated, migrationInProgress: tip !== null && !cached.migrated, remoteTip: tip };
-  }
-  const migrated = tip !== null && await markerAtRemoteTip(repoPath, tip, options.signal) !== null;
-  migrationCache.set(repoPath, { remoteTip: tip, migrated });
-  return { migrated, migrationInProgress: tip !== null && !migrated, remoteTip: tip };
 }
 
 export async function isStateMigrated(project: ProjectConfig): Promise<boolean> {
@@ -199,15 +260,7 @@ export function resolveStateReadHomeSync(
 ): StateReadHome {
   const worktreePath = stateWorktreePath(project, options);
   const markerPath = join(worktreePath, MIGRATION_COMPLETE_MARKER);
-  if (existsSync(markerPath)) {
-    try {
-      if (parseMigrationCompleteMarker(JSON.parse(readFileSync(markerPath, 'utf8')))) {
-        return { root: worktreePath, migrated: true };
-      }
-    } catch {
-      // Invalid or interrupted marker: preserve D12's legacy resolution.
-    }
-  }
+  if (readMigrationCompleteMarker(markerPath)) return { root: worktreePath, migrated: true };
   return { root: resolveInfraRepo(project).repoPath, migrated: false };
 }
 
@@ -241,7 +294,12 @@ export async function ensureStateWorktree(
 ): Promise<StateWorktreeStatus> {
   const migration = await inspectStateMigration(project, options);
   const path = stateWorktreePath(project, options);
-  if (!migration.migrated) return { status: 'legacy', path };
+  if (!migration.migrated) {
+    const detail = migration.remoteCheckFailed
+      ? 'The remote overdeck-state marker check failed transiently and no valid cached or local marker was available.'
+      : 'The remote overdeck-state branch is reachable but does not contain a valid migration marker.';
+    return { status: 'legacy', path, detail };
+  }
 
   const { repoPath } = resolveInfraRepo(project);
   if (!existsSync(path)) {
