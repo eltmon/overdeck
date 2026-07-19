@@ -45,7 +45,7 @@ import type { AgentSnapshot, SessionNodePresence } from '@overdeck/contracts';
 import { deriveSessionPresence } from '../services/session-presence.js';
 import { resolveIssueHeadlineCost } from '../services/issue-cost-resolver.js';
 import { getCachedRunningAgents } from '../services/running-agents-cache.js';
-import { findPrdAtStatusSync, type PrdLocation } from '../../../lib/prd-locations.js';
+import { findPrdAnywhereSync, type PrdLocation } from '../../../lib/prd-locations.js';
 import { resolveProjectFromIssueSync, listProjectsSync } from '../../../lib/projects.js';
 import { extractPrefixSync, parseIssueIdSync } from '../../../lib/issue-id.js';
 import { loadSettingsApi } from '../../../lib/settings-api.js';
@@ -785,7 +785,7 @@ async function fetchPlanningData(
   } catch { /* no xBRIEF plan */ }
 
   if (!hasPlanningDir && !hasPanContinue) {
-    const prd = await readPrdContent(findPrdAtStatusSync(projectPath, issueId, 'active'));
+    const prd = await readPrdContent(findPrdAnywhereSync(projectPath, issueId));
     if (prd) {
       result.prd = prd;
       result.hasPrd = true;
@@ -820,13 +820,14 @@ async function fetchPlanningData(
   }
 
   if (!result.prd) {
-    for (const status of ['active', 'planned', 'completed'] as const) {
-      const content = await readPrdContent(findPrdAtStatusSync(projectPath, issueId, status));
-      if (content) {
-        result.prd = content;
-        result.hasPrd = true;
-        break;
-      }
+    // findPrdAnywhereSync covers the legacy docs/prds status roots AND the
+    // canonical drafts/<issue>.md on overdeck-state (pan-draft format) — the
+    // previous status-only loop never looked at the canonical draft location,
+    // so promoted PRDs were invisible here.
+    const content = await readPrdContent(findPrdAnywhereSync(projectPath, issueId));
+    if (content) {
+      result.prd = content;
+      result.hasPrd = true;
     }
   }
 

@@ -22,7 +22,7 @@ import {
   PROJECT_PRDS_PLANNED_SUBDIR,
   PROJECT_PRDS_COMPLETED_SUBDIR,
 } from './paths.js';
-import { getIssueDraftPath } from './pan-dir/index.js';
+import { getDraftPath, getIssueDraftPath } from './pan-dir/index.js';
 
 export type PrdStatus = 'active' | 'planned' | 'completed' | 'draft';
 export type PrdFormat = 'subdir' | 'flat' | 'pan-draft';
@@ -83,13 +83,19 @@ export function findPrdAtStatusSync(
 }
 
 export function findDraftPrdSync(projectPath: string, issueId: string): PrdLocation | null {
-  const path = getIssueDraftPath(projectPath, issueId)
-  if (!existsSync(path)) return null
-  return {
-    path,
-    format: 'pan-draft',
-    status: 'draft',
+  // Canonical drafts exist in both filename cases on disk (the door writes
+  // UPPER.md; humans and conversations historically wrote lower.md) — accept
+  // either, matching checkPrdGateSync.
+  const candidates = [
+    getIssueDraftPath(projectPath, issueId),
+    getDraftPath(projectPath, `${issueId.toLowerCase()}.md`),
+  ]
+  for (const path of candidates) {
+    if (existsSync(path)) {
+      return { path, format: 'pan-draft', status: 'draft' }
+    }
   }
+  return null
 }
 
 /**
