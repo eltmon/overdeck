@@ -41,6 +41,7 @@ describe('state-plane documentation', () => {
     expect(matches).toEqual([
       'docs/FLYWHEEL-STATE.md',
       'docs/STATE-PLANE-COMMIT-POLICY.md',
+      'docs/XBRIEF.md',
     ]);
     expect(readFileSync('docs/FLYWHEEL-STATE.md', 'utf8')).toContain('Historical-path note (PAN-2541)');
     expect(readFileSync('docs/STATE-PLANE-COMMIT-POLICY.md', 'utf8')).toContain('old permanent locations');
