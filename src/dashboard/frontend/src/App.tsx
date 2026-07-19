@@ -55,6 +55,7 @@ import {
 } from './App/StandaloneRoutes';
 import { AppRoutes, type PendingConversationTarget } from './App/AppRoutes';
 import { AppChrome } from './App/AppChrome';
+import { isRunningAgentStatus } from './components/AgentPillPopoverRow';
 import { usePendingInputDialogs } from './App/hooks/usePendingInputDialogs';
 import { useDesktopActivityNotifications } from './App/hooks/useDesktopActivityNotifications';
 
@@ -534,7 +535,7 @@ export default function App() {
   const agents = useDashboardStore(selectAgents) as unknown as Agent[];
   // Live agent count for the app-bar status pill (PAN-1591).
   const runningAgentCount = useMemo(
-    () => agents.filter((a) => ['running', 'active', 'starting', 'thinking', 'working'].includes(a.status)).length,
+    () => agents.filter((agent) => isRunningAgentStatus(agent.status)).length,
     [agents],
   );
   // Issues from Zustand store (event-sourced via snapshot — no polling)
