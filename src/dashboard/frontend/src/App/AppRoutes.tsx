@@ -17,6 +17,7 @@ import { ContextPage } from '../components/context/ContextPage';
 import { ConversationsPage } from '../components/conversations/ConversationsPage';
 import { AutoPresoView } from '../components/autopreso/AutoPresoView';
 import { BootstrapGate } from '../components/BootstrapGate';
+import { HomeSwitch } from '../components/simple/HomeSwitch';
 import { KanbanSkeleton } from '../components/skeletons/KanbanSkeleton';
 import { AgentsSkeleton } from '../components/skeletons/AgentsSkeleton';
 import { PipelineSkeleton } from '../components/skeletons/PipelineSkeleton';
@@ -96,7 +97,9 @@ export function AppRoutes({
     <>
       {activeTab === 'home' && (
         <div className="w-full h-full overflow-hidden">
-          <HomePage onOpenWorkspaceHome={onOpenWorkspaceHome} onNewProject={onNewProject} onSelectProject={onSelectProject} onOpenSettings={onOpenSettings} />
+          <HomeSwitch
+            advanced={<HomePage onOpenWorkspaceHome={onOpenWorkspaceHome} onNewProject={onNewProject} onSelectProject={onSelectProject} onOpenSettings={onOpenSettings} />}
+          />
         </div>
       )}
       {activeTab === 'command-deck' && (

@@ -1,6 +1,6 @@
 # Overdeck UX Overhaul — Simple by Default, Unified Underneath
 
-> **Status:** Proposal · 2026-07-19 (rev 2 — junior-dev simplicity contract added) · Author: UX audit (Playwright walkthrough + code architecture review)
+> **Status:** Proposal · 2026-07-19 (rev 3 — C-SIMPLE v1 implemented: foundations + simple home + simple issue page + mode toggle live) · Author: UX audit (Playwright walkthrough + code architecture review)
 > **Mockups (binding visual spec):** [`docs/design/mockups/overdeck-ux-overhaul/index.html`](../../design/mockups/overdeck-ux-overhaul/index.html) (entry point — links to all three screen mocks)
 > **Style guide:** [`design/style-guide/STYLE-GUIDE.md`](../../../design/style-guide/STYLE-GUIDE.md)
 > **Supersedes / completes:** [`pan-dashboard-unified-redesign.md`](./pan-dashboard-unified-redesign.md) (2026-05-16) and the PAN-2499 "three issue views" unification — this PRD is the **conformance pass** those efforts never got.
@@ -104,6 +104,8 @@ The 2026-05 unified redesign PRD specified "one vocabulary, one row, one drawer 
 The mocks are the binding visual spec. Where this document and a mock disagree, **the mock wins for layout; this document wins for behavior and data contracts.**
 
 ### 3.1 Simple mode — the default (contract C-SIMPLE)
+
+> **Implementation status (2026-07-19): v1 shipped.** Foundations (`lib/simple/phases.ts`, `userFacingState.ts`, `strings.ts` + copy lint), "My work" home (`components/simple/SimpleHomePage.tsx`), simple issue page (`SimpleIssuePage.tsx`), mode toggle + routing (`HomeSwitch`, `App.tsx` issue-route branch, `uiMode.ts` store). 31 tests green across foundations/derive/pages; typecheck clean; verified live via Playwright. Still open from this contract: expectations ("usually ~2h" from historical durations), the rich conversation in simple mode (v1 renders memory-observation narratives + steering composer), the new-issue creation endpoint (v1 composer links to the tracker new-issue URL), "Get help" routing, and the junior-dev usability run (§5).
 
 **Mockups: [`simple-home.html`](../../design/mockups/overdeck-ux-overhaul/simple-home.html) · [`simple-issue.html`](../../design/mockups/overdeck-ux-overhaul/simple-issue.html) — binding for copy and state behavior.**
 

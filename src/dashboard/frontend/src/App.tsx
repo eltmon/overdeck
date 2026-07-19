@@ -55,6 +55,7 @@ import {
 } from './App/StandaloneRoutes';
 import { AppRoutes, type PendingConversationTarget } from './App/AppRoutes';
 import { AppChrome } from './App/AppChrome';
+import { useUiMode } from './lib/simple/uiMode';
 import { isRunningAgentStatus } from './components/AgentPillPopoverRow';
 import { usePendingInputDialogs } from './App/hooks/usePendingInputDialogs';
 import { useDesktopActivityNotifications } from './App/hooks/useDesktopActivityNotifications';
@@ -397,9 +398,17 @@ export default function App() {
   }, [activeTab]);
 
   // PAN-1234: /issues/:id opens the drawer without rewriting the URL.
+  // PAN-2908: in simple mode the same URL opens the simple issue page instead.
   const applyIssueRoute = useCallback(() => {
     const issueId = getIssueIdFromPath();
     if (!issueId) return;
+    if (useUiMode.getState().mode === 'simple') {
+      if (activeTab !== 'home') {
+        setActiveTabState('home');
+      }
+      useUiMode.getState().openSimpleIssue(issueId);
+      return;
+    }
     // Ensure the parent surface is active (initial load may resolve it from
     // getTabFromPath, but popstate can arrive with any tab).
     const targetTab = getLastTab() ?? 'pipeline';

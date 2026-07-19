@@ -2,6 +2,14 @@ import '@testing-library/jest-dom';
 import { afterEach, beforeEach, expect, vi } from 'vitest';
 import { Terminal } from '@xterm/xterm';
 
+// PAN-2908: tests default to Advanced UI mode (pre-existing behavior). Simple-mode
+// tests opt in explicitly via useUiMode.setState({ mode: 'simple' }).
+try {
+  window.localStorage.setItem('overdeck:ui-mode', 'advanced');
+} catch {
+  // happy-dom without storage — uiMode falls back to 'advanced' anyway
+}
+
 const environmentFetch = globalThis.fetch;
 let unexpectedRequests: string[] = [];
 let guardedFetch: typeof fetch | undefined;

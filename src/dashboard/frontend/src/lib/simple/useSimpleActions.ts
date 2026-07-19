@@ -1,0 +1,77 @@
+/**
+ * PAN-2908 · C-SIMPLE — the simple-mode action handlers.
+ *
+ * Thin wrappers over the EXISTING endpoints (no new server routes). Every
+ * mutation refreshes the dashboard state on success and surfaces errors via
+ * the global alert dialog. Advanced actions (stop/wipe/reset…) deliberately
+ * do not exist here — they live in Advanced mode only.
+ */
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { refreshDashboardState } from '../refresh-dashboard-state';
+import { useAlert } from '../../components/DialogProvider';
+
+async function postJson(url: string, body?: unknown): Promise<unknown> {
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    let message = `Request failed (${res.status})`;
+    try {
+      const data = JSON.parse(text);
+      message = data.error || message;
+    } catch {
+      if (text.length < 200) message = text;
+    }
+    throw new Error(message);
+  }
+  return res.json().catch(() => ({}));
+}
+
+export function useSimpleActions() {
+  const queryClient = useQueryClient();
+  const showAlert = useAlert();
+  const onError = (err: Error) => showAlert({ message: err.message, variant: 'error' });
+  const onSuccess = async () => {
+    await refreshDashboardState(queryClient);
+  };
+
+  const tell = useMutation({
+    mutationFn: ({ agentId, message }: { agentId: string; message: string }) =>
+      postJson(`/api/agents/${encodeURIComponent(agentId)}/tell`, { message }),
+    onSuccess,
+    onError,
+  });
+
+  const answer = useMutation({
+    mutationFn: ({ agentId, text }: { agentId: string; text: string }) =>
+      postJson(`/api/agents/${encodeURIComponent(agentId)}/answer-question`, { answers: [text] }),
+    onSuccess,
+    onError,
+  });
+
+  const recover = useMutation({
+    mutationFn: ({ agentId }: { agentId: string }) =>
+      postJson(`/api/agents/${encodeURIComponent(agentId)}/recover`),
+    onSuccess,
+    onError,
+  });
+
+  const merge = useMutation({
+    mutationFn: ({ issueId }: { issueId: string }) =>
+      postJson(`/api/issues/${encodeURIComponent(issueId)}/merge`),
+    onSuccess,
+    onError,
+  });
+
+  const startWork = useMutation({
+    mutationFn: ({ issueId }: { issueId: string }) =>
+      postJson(`/api/agents`, { issueId }),
+    onSuccess,
+    onError,
+  });
+
+  return { tell, answer, recover, merge, startWork };
+}
