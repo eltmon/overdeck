@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Overdeck UX Overhaul — Overview</title>
+<link rel="stylesheet" href="shared.css">
+<script src="shared.js" defer></script>
+<style>
+  .page { max-width: 1240px; margin: 0 auto; padding: 30px 26px 90px; }
+  .hero { margin-bottom: 34px; }
+  .hero .kicker { font-size: 11px; text-transform: uppercase; letter-spacing: 0.14em; color: var(--signal-cost-foreground); font-weight: 500; }
+  .hero h1 { font-size: 30px; font-weight: 500; margin-top: 6px; max-width: 900px; }
+  .hero p { color: var(--muted-foreground); margin-top: 8px; max-width: 780px; font-size: 14px; }
+  .hero .big { color: var(--foreground); font-weight: 500; }
+
+  h2.section { font-size: 17px; margin: 38px 0 12px; }
+  h2.section .n { color: var(--signal-cost-foreground); margin-right: 8px; }
+
+  .diag { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  .diag-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-xl); padding: 14px 16px; }
+  .diag-card h3 { font-size: 14px; }
+  .diag-card p { font-size: 12.5px; color: var(--muted-foreground); margin-top: 6px; line-height: 1.55; }
+  .diag-card .ev { margin-top: 8px; font-size: 11px; font-family: 'SF Mono', ui-monospace, monospace; color: var(--muted-foreground); background: rgb(0 0 0 / 25%); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 6px 8px; line-height: 1.5; }
+  .bad-stat { color: var(--destructive-foreground); font-weight: 500; }
+
+  .vocab-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 4px; }
+  .vocab-table th { text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted-foreground); font-weight: 500; padding: 5px 8px; border-bottom: 1px solid var(--border); }
+  .vocab-table td { padding: 6px 8px; border-bottom: 1px solid var(--border); color: var(--muted-foreground); }
+  .vocab-table td:first-child { color: var(--foreground); }
+  .vocab-table .frag { color: var(--destructive-foreground); }
+  .vocab-table .uni { color: var(--success-foreground); }
+
+  .arch { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .arch-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-xl); padding: 16px; position: relative; display: block; }
+  .arch-card.hero-card { grid-column: 1 / -1; border-color: color-mix(in srgb, var(--primary) 45%, transparent); background: color-mix(in srgb, var(--primary) 5%, var(--card)); }
+  .arch-card h3 { font-size: 15px; }
+  .arch-card .sub { font-size: 12.5px; color: var(--muted-foreground); margin-top: 6px; line-height: 1.55; }
+  .arch-card .before { margin-top: 10px; font-size: 11.5px; color: var(--destructive-foreground); }
+  .arch-card .after { margin-top: 4px; font-size: 11.5px; color: var(--success-foreground); }
+  .arch-card .go { position: absolute; top: 14px; right: 14px; font-size: 11px; color: var(--info-foreground); }
+
+  .map-table { width: 100%; border-collapse: collapse; font-size: 12.5px; margin-top: 8px; }
+  .map-table th { text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted-foreground); font-weight: 500; padding: 6px 10px; border-bottom: 1px solid var(--border); }
+  .map-table td { padding: 7px 10px; border-bottom: 1px solid var(--border); color: var(--muted-foreground); }
+  .map-table td:last-child { color: var(--foreground); font-weight: 500; }
+
+  .principles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .principle { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-xl); padding: 14px 16px; }
+  .principle h3 { font-size: 13.5px; }
+  .principle p { font-size: 12px; color: var(--muted-foreground); margin-top: 5px; line-height: 1.5; }
+
+  .screen-links { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 12px; }
+  .screen-link { display: block; background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-xl); padding: 18px; transition: border-color 200ms; }
+  .screen-link:hover { border-color: color-mix(in srgb, var(--primary) 50%, transparent); }
+  .screen-link.simple { border-color: color-mix(in srgb, var(--success) 32%, transparent); }
+  .screen-link h3 { font-size: 15px; }
+  .screen-link h3 .mode-chip { font-size: 10px; vertical-align: middle; margin-left: 6px; }
+  .screen-link p { font-size: 12px; color: var(--muted-foreground); margin-top: 5px; }
+  .screen-link .open { color: var(--info-foreground); font-size: 11.5px; margin-top: 10px; display: block; }
+</style>
+</head>
+<body>
+
+<div class="mock-banner">
+  <span class="tag">Mockup 1 of 7</span>
+  <span class="crumbs"><b>Overdeck UX Overhaul</b> — diagnosis & convergence plan</span>
+  <span style="margin-left:auto;font-size:11px">2026-07-19 · companion to PRD <span class="mono">docs/prds/planned/overdeck-ux-overhaul.md</span></span>
+</div>
+
+<div class="page">
+  <div class="hero">
+    <div class="kicker">Design proposal · "Make Overdeck not suck"</div>
+    <h1>Simple enough for a junior dev. Powerful enough for the operator. In that order.</h1>
+    <p><span class="big">The default experience is four plain-English states, one obvious button — and the conversation front and center.</span> Talking to the agent is how work actually gets steered, so the rich conversation (turns, thinking, tool calls, your messages, a real composer) is the main pane of every issue view in both modes. The rest of the machinery — phases, specialists, gates, 43 actions — still exists, one "Advanced" toggle away, unified into a single detail view instead of four divergent ones.</p>
+  </div>
+
+  <h2 class="section"><span class="n">01</span>The diagnosis (verified with live walkthrough, 2026-07-19)</h2>
+  <div class="diag">
+    <div class="diag-card">
+      <h3>Zero on-ramp: machinery is the first thing you see</h3>
+      <p>A new user lands on 701-card columns, verb badges like <span class="mono" style="font-size:11px">QUEUED FOR PLAN</span>, five-action card footers ("Start agent · Tell agent · Done — mark work complete &amp; start review · ··· 41 more"), and banners about boot reconciliation. Nothing answers the only three questions a junior dev has: <b>what is it doing, does it need me, is it done?</b></p>
+      <div class="ev">card footer: Start agent · Tell agent · Done — mark work complete &amp; start review · ··· 41 more</div>
+    </div>
+    <div class="diag-card">
+      <h3>Four issue surfaces, four dialects</h3>
+      <p>The same issue renders as a <b>kanban card</b> (/board), a <b>drawer</b> (/issues/:id), a <b>cockpit page</b> (/command-deck/:project/:issue), and an <b>expandable row</b>. The task DAG exists only in the cockpit; verification gates only in the drawer; per-phase agent rows only in the rail. Every answer requires knowing which view holds it.</p>
+      <div class="ev">drawer tabs: Overview·Plan·Tasks·Conversation·Terminal·Activity·Files·Artifacts<br>cockpit tabs: Overview·Code·PRD/Plan·Timeline·Discussion·Costs·Artifacts·Terminal</div>
+    </div>
+    <div class="diag-card">
+      <h3>37 actions, all at once, everywhere</h3>
+      <p>Drawer and cockpit each dump ~37 verbs in a flat list — <b>Start agent</b> next to <b>Stop agent</b>, <b>Pause</b> next to <b>Unpause</b> — and disagree about the danger set (6 vs 5) for the same issue. Two registry entries point at dead endpoints; two open stub dialogs; a dead component carries a parallel bypass action set.</p>
+      <div class="ev">drawer: Plan·Auto-plan·Watch·Done planning·Start·Stop·Pause·Unpause·…·Danger(6)<br>cockpit: Tell·Plan·…·Start·Stop·Pause·Unpause·…·Danger(5)</div>
+    </div>
+    <div class="diag-card">
+      <h3>Five phase vocabularies &amp; loading fossils</h3>
+      <table class="vocab-table">
+        <tr><th>Surface</th><th>Vocabulary</th></tr>
+        <tr><td>Board columns</td><td class="frag">To Do · In Progress · In Review · Verifying · Done</td></tr>
+        <tr><td>Pipeline groups</td><td class="frag">Ship · Review · Verifying · Work · Plan</td></tr>
+        <tr><td>Drawer timeline</td><td class="frag">Triaged · Planned · Implemented · Reviewed · Shipping · Merged</td></tr>
+        <tr><td>Cockpit stepper</td><td class="frag">Planned · Building · Reviewing · Testing · Shipping</td></tr>
+        <tr><td>Simple mode</td><td class="uni">Not started · Working · Needs you · Ready · Done</td></tr>
+        <tr><td>Advanced mode</td><td class="uni">Plan · Work · Review · Test · Ship · Done</td></tr>
+      </table>
+      <p style="margin-top:8px">Plus permanent spinners ("Loading tasks…", "Loading the plan map…") with no data boundary, and event-loop diagnostics spamming the operator activity feed.</p>
+    </div>
+  </div>
+
+  <h2 class="section"><span class="n">02</span>The convergence — five contracts</h2>
+  <div class="arch">
+    <a class="arch-card hero-card" href="simple-home.html">
+      <span class="go">open mockups →</span>
+      <h3>1 · Simple by default (the junior-dev contract)</h3>
+      <div class="sub">The default UI answers three questions only: <b>what is it doing · does it need me · is it done.</b> Five user-facing states, exactly one primary action per issue, plain-English status ("The agent is writing the code · started 34 min ago · usually ~2h"), a "Needs you" section at the top of home, and a banned-words list (convoy, specialist, gate, xBRIEF, beads, cloister, deacon…) enforced by a copy lint. Advanced mode is one toggle away, per-view, remembered per user — never a separate app.</div>
+      <table class="map-table">
+        <tr><th>Machine state (internal)</th><th>User sees (simple mode)</th><th>The one button</th></tr>
+        <tr><td>backlog · triaged · planned</td><td>Not started</td><td>Start work</td></tr>
+        <tr><td>planning · working</td><td>Working — writing code</td><td>Watch (optional)</td></tr>
+        <tr><td>review · test · ship running</td><td>Working — being checked</td><td>Watch (optional)</td></tr>
+        <tr><td>input requested · changes found · stuck</td><td>Needs you</td><td>Answer / Fix it / Unstick</td></tr>
+        <tr><td>approved, ready to merge</td><td>Ready</td><td>Merge to main</td></tr>
+        <tr><td>merged · verified</td><td>Done</td><td>See what changed</td></tr>
+      </table>
+    </a>
+    <a class="arch-card" href="issue-detail.html">
+      <span class="go">open mockup →</span>
+      <h3>2 · One IssueDetail, conversation-first</h3>
+      <div class="sub">One shell, three densities — drawer / page / rail. <b>The conversation is the default tab, not a buried one:</b> the phase rail doubles as the per-agent conversation switcher, a <b>specialist strip</b> shows every convoy agent in the active phase (each with its own conversation and verdict), and status facets (gates, specialists, resources, live activity) sit in an always-visible rail. One data model (<span class="mono">useIssueView</span>), DAG at every density.</div>
+      <div class="before">✗ today: 4 shells, 4 data paths — and the drawer reduces the agent to a gray "No recent stream output" box</div>
+      <div class="after">✓ after: the conversation renderer operators already love, everywhere; density prop decides frame only</div>
+    </a>
+    <a class="arch-card" href="actions.html">
+      <span class="go">open mockup →</span>
+      <h3>3 · One action model</h3>
+      <div class="sub">Keep the 43-action registry, delete the four menu skins. One grouped, state-filtered menu with disabled reasons; a phase table picks the 1–2 primary buttons. Merge joins the registry. In simple mode the whole registry hides behind Advanced.</div>
+      <div class="before">✗ today: primary-strip ×2, mega-menu, grouped context menu + extras</div>
+      <div class="after">✓ after: six groups, one order, danger behind typed confirms</div>
+    </a>
+    <a class="arch-card" href="board.html">
+      <span class="go">open mockup →</span>
+      <h3>4 · Board rebuilt around attention</h3>
+      <div class="sub">Backlog as grouped rollup (701 → per-project summaries), lifecycle columns, mini phase rail per card, one primary action per card, "Needs you" strip above everything. This is the advanced-mode WIP board; simple mode's home covers the junior-dev cases.</div>
+      <div class="before">✗ today: 701-card To Do column, config buttons on every card</div>
+      <div class="after">✓ after: glanceable WIP; backlog is a filter problem, not a wall</div>
+    </a>
+    <div class="arch-card">
+      <h3>5 · Freshness instead of spinners</h3>
+      <div class="sub">Every region declares live / polled / unavailable with "updated Ns ago" markers. A spinner older than 5s is a bug, not furniture. Event-loop diagnostics leave the operator feed and go to Health.</div>
+      <div class="before">✗ today: "Loading activity…" / "Loading the plan map…" forever</div>
+      <div class="after">✓ after: data, a skeleton that resolves, or a labeled outage</div>
+    </div>
+  </div>
+
+  <h2 class="section"><span class="n">03</span>Design principles applied</h2>
+  <div class="principles">
+    <div class="principle"><h3>The conversation is the interface</h3><p>Steering happens by talking. Every issue view leads with the rich conversation — turns, thinking, tool calls, your bubbles, a real composer — and every agent role (plan, work, review, test, ship) keeps its own conversation, one click apart.</p></div>
+    <div class="principle"><h3>Junior-dev default</h3><p>If a first-week dev can't do the core loop — hand off a task, answer its question, merge the result — without training, the design fails. Everything beyond that loop is Advanced.</p></div>
+    <div class="principle"><h3>One button rule</h3><p>Exactly one primary action per issue per state. Secondary actions are quiet. Destructive actions live in Advanced so they can't be clicked by accident.</p></div>
+    <div class="principle"><h3>Plain words, enforced</h3><p>"Writing code", "being checked", "needs you" — never "convoy dispatched". A copy lint bans internal jargon from user-facing simple-mode strings.</p></div>
+    <div class="principle"><h3>Attention is the scarce resource</h3><p>"Needs you" outranks chronology on every surface. Questions, found problems, and stuck work surface above everything else.</p></div>
+    <div class="principle"><h3>Conformance is enforced</h3><p>Component-usage and copy lints fail CI if a second detail shell, a third menu skin, or jargon in simple-mode copy reappears. Drift broke the last redesign; the gate prevents the next one.</p></div>
+  </div>
+
+  <h2 class="section"><span class="n">04</span>The screens</h2>
+  <div class="screen-links">
+    <a class="screen-link simple" href="simple-home.html">
+      <h3>My work <span class="mode-chip badge success">Simple · default</span></h3>
+      <p>Home for a junior dev: "Needs you" first, then working-now with progress and expectations, ready-to-merge with one green button, done. Plus a plain-words "hand it off" box.</p>
+      <span class="open">Open mockup</span>
+    </a>
+    <a class="screen-link simple" href="simple-issue.html">
+      <h3>One issue <span class="mode-chip badge success">Simple · default</span></h3>
+      <p>Plain-English status card, four-step progress — and the live conversation as the main content: what the agent is saying and doing, your messages as bubbles, a composer to steer it. Preview all four states from the top bar.</p>
+      <span class="open">Open mockup — try the state switcher</span>
+    </a>
+    <a class="screen-link" href="issue-detail.html">
+      <h3>The ONE Issue Detail <span class="mode-chip badge review">Advanced</span></h3>
+      <p>Conversation-first: the phase rail switches agent conversations, and a <b>specialist strip</b> shows every convoy agent (review.security · correctness · performance · requirements) with its verdict and last line — click any chip to open <i>its</i> conversation. Status rail always visible.</p>
+      <span class="open">Open mockup — try the specialist chips</span>
+    </a>
+    <a class="screen-link" href="patterns.html">
+      <h3>Conversations everywhere <span class="mode-chip badge info">Interaction model</span></h3>
+      <p>Three depths of conversation access: <b>glance</b> (hover peeks on any row or agent pill), <b>talk</b> (a persistent conversation dock you pull in from anywhere), <b>deep-dive</b> (the full issue detail). Interactive — hover rows, click the dock.</p>
+      <span class="open">Open mockup — it's live, hover things</span>
+    </a>
+    <a class="screen-link" href="board.html">
+      <h3>Board, rebuilt <span class="mode-chip badge review">Advanced</span></h3>
+      <p>Backlog rollup, lifecycle columns, mini phase rail per card, one primary action, "Needs you" strip above the columns.</p>
+      <span class="open">Open mockup</span>
+    </a>
+    <a class="screen-link" href="actions.html">
+      <h3>One action model <span class="mode-chip badge review">Advanced</span></h3>
+      <p>Four menu skins today vs. one grouped, state-filtered menu. The same issue in three states with the correct primary actions.</p>
+      <span class="open">Open mockup</span>
+    </a>
+    <div class="screen-link" style="border-style:dashed;display:flex;flex-direction:column;justify-content:center">
+      <h3 style="color:var(--muted-foreground)">Same data, two lenses</h3>
+      <p>Simple and Advanced render the same single data model. The toggle never changes facts — only how much machinery you see.</p>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

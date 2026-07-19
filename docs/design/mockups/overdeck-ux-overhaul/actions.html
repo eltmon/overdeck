@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>One Action Model — Overdeck UX Overhaul</title>
+<link rel="stylesheet" href="shared.css">
+<script src="shared.js" defer></script>
+<style>
+  .page { max-width: 1240px; margin: 0 auto; padding: 28px 26px 80px; }
+  .hero h1 { font-size: 26px; font-weight: 500; }
+  .hero p { color: var(--muted-foreground); margin-top: 6px; max-width: 720px; }
+
+  .flow { display: grid; grid-template-columns: 1fr 60px 1fr; gap: 0; align-items: stretch; margin: 26px 0 8px; }
+  .flow-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-xl); padding: 14px 16px; }
+  .flow-arrow { display: flex; align-items: center; justify-content: center; font-size: 22px; color: var(--muted-foreground); }
+  .reg-group { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
+  .reg-chip { font-size: 11px; padding: 3px 8px; background: var(--muted); border: 1px solid var(--border); border-radius: var(--radius-md); color: var(--muted-foreground); }
+  .reg-chip b { color: var(--foreground); font-weight: 500; }
+
+  .states { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 30px; }
+  .state-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-2xl); overflow: hidden; }
+  .state-head { padding: 12px 14px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px; }
+  .state-body { padding: 12px 14px; }
+  .primary-strip { display: flex; gap: 6px; margin-bottom: 12px; }
+  .menu-demo { border: 1px solid var(--input); border-radius: var(--radius-lg); padding: 5px; background: var(--popover); }
+  .am-group { padding: 6px 8px 2px; font-size: 10px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted-foreground); }
+  .am-item { display: flex; align-items: center; gap: 8px; width: 100%; padding: 5px 8px; border: none; background: none; color: var(--foreground); font-size: 12px; border-radius: var(--radius-md); text-align: left; }
+  .am-item:hover { background: var(--accent); }
+  .am-item .hint { margin-left: auto; font-size: 10px; color: var(--muted-foreground); }
+  .am-item.disabled { opacity: 0.45; }
+  .am-item.danger { color: var(--destructive-foreground); }
+  .am-sep { height: 1px; background: var(--border); margin: 5px 4px; }
+
+  .rules { margin-top: 34px; display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .rule { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-xl); padding: 14px 16px; }
+  .rule h3 { font-size: 14px; margin-bottom: 6px; }
+  .rule p { font-size: 12.5px; color: var(--muted-foreground); line-height: 1.5; }
+  .rule .bad { color: var(--destructive-foreground); }
+  .rule .good { color: var(--success-foreground); }
+
+  .skin-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 12px; }
+  .skin-table th { text-align: left; font-weight: 500; color: var(--muted-foreground); font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; padding: 6px 10px; border-bottom: 1px solid var(--border); }
+  .skin-table td { padding: 7px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  .skin-table tr:last-child td { border-bottom: none; }
+  .x { color: var(--destructive-foreground); } .c { color: var(--success-foreground); }
+</style>
+</head>
+<body>
+
+<div class="mock-banner">
+  <span class="tag">Mockup 6 of 7 · Advanced mode</span>
+  <span class="crumbs"><a href="index.html">UX Overhaul</a> → <b>One action model</b></span>
+  <span style="margin-left:auto" class="density-toggle"><a href="issue-detail.html"><button>← issue detail</button></a></span>
+</div>
+
+<div class="page">
+  <div class="hero">
+    <h1>One registry, one menu, filtered by state</h1>
+    <p>Today all four surfaces read the same 43-action registry — then each renders it through its own menu skin with its own pinning and its own filtering bugs, so the operator sees ~37 verbs at once, including <b>Start</b> and <b>Stop</b> side by side. The fix isn't a new registry; it's one presentation contract.</p>
+  </div>
+
+  <div class="flow">
+    <div class="flow-card">
+      <div class="section-label">Today — four skins, one registry, zero discipline</div>
+      <table class="skin-table">
+        <tr><th>Surface</th><th>Menu skin</th><th>Quirks</th></tr>
+        <tr><td>Drawer footer</td><td class="mono">IssueActionMenu primary-strip</td><td>Flat ~37-item overflow · MergeButton bolted on the side</td></tr>
+        <tr><td>Kanban card</td><td class="mono">IssueActionMenu primary-strip</td><td>Same, but no MergeButton · extra StartAgentCta chip</td></tr>
+        <tr><td>Cockpit header</td><td class="mono">IssueActionMegaMenu</td><td>Grouped, but "Danger (5)" vs drawer's "Danger (6)" for the same issue</td></tr>
+        <tr><td>Deck rail row</td><td class="mono">GroupedIssueActionMenu</td><td>Adds 3 non-registry actions (openStateDir, viewJsonl, deepWipe)</td></tr>
+      </table>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-card">
+      <div class="section-label">After — one registry, six groups, three presentations of one component</div>
+      <div class="reg-group">
+        <span class="reg-chip"><b>Communicate</b> · tell · answer</span>
+        <span class="reg-chip"><b>Lifecycle</b> · plan · start · done · review · reopen</span>
+        <span class="reg-chip"><b>Recover</b> · recover · reset review · sync main · rebuild</span>
+        <span class="reg-chip"><b>Inspect</b> · tasks · transcripts · inference · discussions</span>
+        <span class="reg-chip"><b>Navigate</b> · open in editor · view PR</span>
+        <span class="reg-chip" style="border-color:color-mix(in srgb,var(--destructive) 32%,transparent);color:var(--destructive-foreground)"><b>Danger</b> · stop · wipe · destroy · reset</span>
+      </div>
+      <p style="font-size:12px;color:var(--muted-foreground);margin-top:10px">Every surface renders <span class="mono" style="font-size:11px">&lt;IssueActionMenu&gt;</span> — as an inline strip (drawer footer), an overflow menu (cards, rows), or a right-click context menu. Same groups, same order, same disabled-reason tooltips, same danger confirms. Merge is the only pinned extra, and it lives in the registry like everything else.</p>
+    </div>
+  </div>
+
+  <h2 style="font-size:16px;margin-top:34px">The same issue, three states — three menus</h2>
+  <p style="color:var(--muted-foreground);font-size:12.5px;margin-top:4px">The footer strip always shows the 1–2 actions that make sense <i>now</i>. The overflow shows the rest, grouped, with disabled reasons — never hidden, never all-enabled.</p>
+
+  <div class="states">
+    <!-- STATE 1 -->
+    <div class="state-card">
+      <div class="state-head"><span class="mono" style="font-size:11px;color:var(--muted-foreground)">PAN-2902</span><span class="badge neutral">Queued for plan</span></div>
+      <div class="state-body">
+        <div class="primary-strip"><button class="btn sm">Plan…</button><button class="btn ghost sm">Start — skip planning</button><button class="btn ghost sm" style="width:28px;padding:0">⋯</button></div>
+        <div class="menu-demo">
+          <div class="am-group">Communicate</div>
+          <button class="am-item disabled">Tell agent <span class="hint">no agent yet</span></button>
+          <div class="am-group">Lifecycle</div>
+          <button class="am-item">Plan…</button>
+          <button class="am-item">Auto-plan</button>
+          <button class="am-item">Start — skip planning</button>
+          <div class="am-group">Inspect</div>
+          <button class="am-item">Tasks</button>
+          <button class="am-item">Discussions</button>
+          <div class="am-group">Danger</div>
+          <button class="am-item danger">Cancel issue…</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- STATE 2 -->
+    <div class="state-card">
+      <div class="state-head"><span class="mono" style="font-size:11px;color:var(--muted-foreground)">MIN-879</span><span class="badge info pulse"><span class="dot"></span>Work running</span></div>
+      <div class="state-body">
+        <div class="primary-strip"><button class="btn sm">Tell agent…</button><button class="btn ghost sm">Done — mark complete</button><button class="btn ghost sm" style="width:28px;padding:0">⋯</button></div>
+        <div class="menu-demo">
+          <div class="am-group">Communicate</div>
+          <button class="am-item">Tell agent…</button>
+          <button class="am-item disabled">Answer question <span class="hint">no pending question</span></button>
+          <div class="am-group">Lifecycle</div>
+          <button class="am-item">Done — mark work complete</button>
+          <button class="am-item disabled">Start agent <span class="hint">already running</span></button>
+          <div class="am-group">Recover</div>
+          <button class="am-item">Recover agent</button>
+          <button class="am-item">Sync with main</button>
+          <div class="am-group">Danger</div>
+          <button class="am-item danger">Stop agent…</button>
+          <button class="am-item danger">Pause agent…</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- STATE 3 -->
+    <div class="state-card">
+      <div class="state-head"><span class="mono" style="font-size:11px;color:var(--muted-foreground)">PAN-2895</span><span class="badge success">Ready to merge</span></div>
+      <div class="state-body">
+        <div class="primary-strip"><button class="btn sm" style="background:var(--success);color:#04120c">Merge to main</button><button class="btn ghost sm">View PR ↗</button><button class="btn ghost sm" style="width:28px;padding:0">⋯</button></div>
+        <div class="menu-demo">
+          <div class="am-group">Communicate</div>
+          <button class="am-item disabled">Tell agent <span class="hint">no agent running</span></button>
+          <div class="am-group">Lifecycle</div>
+          <button class="am-item">Merge to main</button>
+          <button class="am-item">Re-run review on latest commit</button>
+          <button class="am-item">Reopen work…</button>
+          <div class="am-group">Navigate</div>
+          <button class="am-item">View PR ↗</button>
+          <button class="am-item">Open in editor</button>
+          <div class="am-group">Danger</div>
+          <button class="am-item danger">Close out…</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="rules">
+    <div class="rule">
+      <h3><span class="bad">✗</span> What we do today</h3>
+      <p>Render every registry action in one flat list regardless of state. The operator hunts through 37 verbs — Start next to Stop, Pause next to Unpause — and different surfaces disagree about which danger actions even exist for the same issue. Two actions point at dead endpoints; two more open stub dialogs.</p>
+    </div>
+    <div class="rule">
+      <h3><span class="good">✓</span> The contract</h3>
+      <p><b>Enabled-filtered:</b> inapplicable actions show greyed with the reason, never as live buttons. <b>Grouped:</b> six fixed groups, fixed order, learned once. <b>One skin:</b> one component, three presentations, parity-tested. <b>Phased primary:</b> the strip mirrors the phase table — Queued→Plan, Work→Tell+Done, Review→Watch+Recover, Ready→Merge.</p>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

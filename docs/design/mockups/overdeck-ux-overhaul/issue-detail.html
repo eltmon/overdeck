@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Unified Issue Detail — Conversation-First — Overdeck UX Overhaul</title>
+<link rel="stylesheet" href="shared.css">
+<script src="shared.js" defer></script>
+<style>
+  .backdrop { position: fixed; inset: 0; padding: 20px 26px; filter: blur(2px); opacity: 0.55; pointer-events: none; transition: opacity 200ms, filter 200ms; }
+  .scrim { position: fixed; inset: 0; background: rgb(0 0 0 / 32%); transition: opacity 200ms; }
+
+  .issue-detail {
+    position: fixed; top: 0; right: 0; bottom: 0;
+    width: 1120px; max-width: calc(100vw - 48px);
+    background: var(--background); border-left: 1px solid var(--border);
+    box-shadow: -24px 0 64px rgb(0 0 0 / 40%);
+    display: flex; flex-direction: column;
+    transition: width 200ms ease-in-out, max-width 200ms ease-in-out;
+  }
+  body[data-density="page"] .issue-detail { width: 100vw; max-width: 100vw; border-left: none; box-shadow: none; }
+  body[data-density="page"] .scrim, body[data-density="page"] .backdrop { opacity: 0; }
+
+  /* Header */
+  .id-header { padding: 14px 22px 0; }
+  .id-title-row { display: flex; align-items: flex-start; gap: 12px; }
+  .prio-bar { width: 4px; align-self: stretch; border-radius: 2px; background: var(--warning); margin: 2px 0; }
+  .id-kicker { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted-foreground); }
+  .id-title { font-size: 19px; font-weight: 500; margin-top: 2px; }
+  .id-meta { display: flex; align-items: center; gap: 8px; margin-top: 7px; flex-wrap: wrap; }
+  .meta-chip { display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 8px; font-size: 11px; color: var(--muted-foreground); background: var(--accent); border-radius: var(--radius-md); }
+  .meta-chip.cost { color: var(--signal-cost-foreground); }
+  .id-actions { margin-left: auto; display: flex; gap: 8px; align-items: center; flex: none; }
+  .freshness { font-size: 10px; color: var(--muted-foreground); display: inline-flex; align-items: center; gap: 5px; }
+  .freshness i { width: 6px; height: 6px; border-radius: 50%; background: var(--success); }
+
+  /* Phase rail = status AND per-agent conversation switcher */
+  .phase-wrap { margin: 12px 22px 0; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--card); display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; overflow: hidden; }
+  .phase-step { position: relative; padding: 9px 12px 8px; border: none; background: none; text-align: left; cursor: pointer; border-top: 2px solid transparent; min-width: 0; }
+  .phase-step + .phase-step { border-left: 1px solid var(--border); }
+  .phase-step::before { content: ''; position: absolute; top: -2px; left: 0; right: 0; height: 2px; background: var(--muted); opacity: .6; }
+  .phase-step.done::before { background: var(--success); }
+  .phase-step.current::before { background: var(--signal-review); }
+  .phase-step.has-conv:hover { background: var(--accent); }
+  .phase-step.open-conv { background: color-mix(in srgb, var(--primary) 8%, transparent); }
+  .phase-step .p-name { font-size: 10px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted-foreground); display: flex; align-items: center; gap: 5px; }
+  .phase-step.done .p-name { color: var(--success-foreground); }
+  .phase-step.current .p-name { color: var(--signal-review-foreground); }
+  .phase-step .p-meta { font-size: 11px; color: var(--muted-foreground); margin-top: 2px; }
+  .phase-step .p-agent { font-size: 10px; color: var(--muted-foreground); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .conv-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--info); flex: none; animation: badge-pulse 1.6s infinite; }
+  .conv-hint { font-size: 9px; color: var(--info-foreground); margin-left: auto; }
+
+  /* Narrative strip */
+  .narrative { margin: 10px 22px 0; display: flex; gap: 10px; align-items: center; padding: 9px 14px; background: color-mix(in srgb, var(--info) 6%, transparent); border: 1px solid color-mix(in srgb, var(--info) 24%, transparent); border-radius: var(--radius-lg); }
+  .narrative .n-title { font-size: 12.5px; font-weight: 500; color: var(--info-foreground); }
+  .narrative .n-sub { font-size: 11.5px; color: var(--muted-foreground); }
+
+  /* Content facet tabs (ONE set) */
+  .tabs { display: flex; gap: 2px; padding: 10px 22px 0; border-bottom: 1px solid var(--border); }
+  .tab { padding: 8px 12px; font-size: 13px; font-weight: 500; color: var(--muted-foreground); background: none; border: none; position: relative; }
+  .tab:hover { color: var(--foreground); }
+  .tab.active { color: var(--foreground); }
+  .tab.active::after { content: ''; position: absolute; left: 12px; right: 12px; bottom: -1px; height: 2px; background: var(--primary); }
+  .tab .count { font-family: 'SF Mono', ui-monospace, monospace; font-size: 10px; background: var(--accent); padding: 1px 5px; border-radius: 4px; margin-left: 4px; }
+
+  /* Main: conversation + status rail */
+  .id-body { flex: 1; display: grid; grid-template-columns: 1fr 300px; min-height: 0; }
+  .conv-col { display: flex; flex-direction: column; min-width: 0; }
+
+  /* The rich conversation (same renderer as the deck's conversation view) */
+  .conv-scroll { flex: 1; overflow-y: auto; padding: 16px 22px; display: flex; flex-direction: column; gap: 12px; }
+  .turn { max-width: 92%; }
+  .turn.agent { align-self: flex-start; }
+  .turn.user { align-self: flex-end; max-width: 78%; }
+  .turn-head { display: flex; gap: 8px; align-items: baseline; margin-bottom: 4px; font-size: 10.5px; color: var(--muted-foreground); }
+  .turn-head .who { font-family: 'SF Mono', ui-monospace, monospace; font-size: 11px; color: var(--foreground); }
+  .bubble { border: 1px solid var(--border); border-radius: var(--radius-xl); padding: 10px 14px; font-size: 13px; line-height: 1.55; }
+  .turn.agent .bubble { background: var(--card); border-top-left-radius: 4px; }
+  .turn.user .bubble { background: color-mix(in srgb, var(--primary) 14%, var(--card)); border-color: color-mix(in srgb, var(--primary) 32%, transparent); border-top-right-radius: 4px; }
+  .bubble code { font-family: 'SF Mono', ui-monospace, monospace; font-size: 11.5px; background: rgb(0 0 0 / 30%); padding: 1px 5px; border-radius: 4px; }
+  .bubble a { color: var(--info-foreground); text-decoration: underline; }
+  .bubble ul { margin: 6px 0 0 16px; }
+  .bubble pre { background: rgb(0 0 0 / 32%); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 8px 10px; font-family: 'SF Mono', ui-monospace, monospace; font-size: 11px; margin-top: 8px; overflow-x: auto; }
+
+  .worklog { border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; }
+  .wl-row { display: flex; gap: 8px; align-items: center; width: 100%; padding: 6px 12px; background: none; border: none; border-bottom: 1px solid var(--border); font-size: 11.5px; color: var(--muted-foreground); text-align: left; cursor: pointer; }
+  .wl-row:last-child { border-bottom: none; }
+  .wl-row:hover { background: var(--accent); color: var(--foreground); }
+  .wl-row .wl-ico { width: 14px; text-align: center; flex: none; }
+  .wl-row.thinking { font-style: italic; }
+  .wl-row .mono { font-size: 11px; }
+  .wl-row.ok .wl-ico { color: var(--success-foreground); }
+  /* Verbosity handling: grouped work-log runs + collapsible long turns */
+  .wl-group { display: flex; gap: 8px; align-items: center; width: 100%; padding: 6px 12px; background: none; border: none; border-bottom: 1px solid var(--border); font-size: 11.5px; color: var(--muted-foreground); text-align: left; cursor: pointer; }
+  .wl-group:hover { background: var(--accent); color: var(--foreground); }
+  .wl-group .g-count { font-size: 10px; background: var(--accent); border-radius: 4px; padding: 1px 6px; }
+  .bubble .collapse-toggle { display: inline-flex; gap: 6px; align-items: center; margin-top: 8px; padding: 3px 8px; border: 1px solid var(--input); border-radius: var(--radius-md); background: none; color: var(--muted-foreground); font-size: 11px; cursor: pointer; }
+  .bubble .collapse-toggle:hover { color: var(--foreground); background: var(--accent); }
+  .bubble .collapsed-extra { display: none; }
+  .bubble.expanded .collapsed-extra { display: block; }
+  .bubble .tldr { font-weight: 500; }
+  .show-earlier { width: 100%; padding: 7px; background: var(--muted); border: none; color: var(--muted-foreground); font-size: 11.5px; border-bottom: 1px solid var(--border); text-align: left; padding-left: 12px; cursor: pointer; }
+  .show-earlier:hover { color: var(--foreground); }
+
+  /* Composer */
+  .composer { border-top: 1px solid var(--border); padding: 10px 22px 12px; }
+  .composer-box { display: flex; align-items: flex-end; gap: 8px; background: var(--card); border: 1px solid var(--input); border-radius: var(--radius-xl); padding: 8px 8px 8px 14px; }
+  .composer-box:focus-within { border-color: var(--ring); }
+  .composer-box textarea { flex: 1; background: none; border: none; outline: none; color: var(--foreground); font-family: inherit; font-size: 13px; resize: none; padding: 4px 0; }
+  .composer-meta { display: flex; align-items: center; gap: 6px; }
+  .model-pick { display: inline-flex; align-items: center; gap: 5px; height: 28px; padding: 0 10px; font-size: 11px; color: var(--muted-foreground); background: var(--muted); border: 1px solid var(--border); border-radius: var(--radius-md); }
+  .icon-btn { width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center; border-radius: var(--radius-md); border: none; background: none; color: var(--muted-foreground); font-size: 14px; }
+  .icon-btn:hover { background: var(--accent); color: var(--foreground); }
+  .send-btn { width: 32px; height: 32px; border-radius: var(--radius-md); background: var(--primary); color: #fff; border: none; font-size: 14px; }
+
+  /* Status rail */
+  .id-rail { border-left: 1px solid var(--border); background: color-mix(in srgb, var(--background) 97%, white); overflow-y: auto; padding: 14px 16px; display: flex; flex-direction: column; gap: 16px; }
+  .gates { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .gate { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 8px 10px; }
+  .gate.pass { border-color: color-mix(in srgb, var(--success) 32%, transparent); }
+  .gate .g-val { font-size: 12px; font-weight: 500; }
+  .gate.pass .g-val { color: var(--success-foreground); }
+  .gate .g-name { font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted-foreground); margin-top: 1px; }
+  .spec-row { display: flex; gap: 8px; align-items: center; padding: 5px 0; border-bottom: 1px solid var(--border); font-size: 11.5px; }
+  .spec-row:last-child { border-bottom: none; }
+  .spec-row .mono { font-size: 11px; }
+  .spec-row .badge { margin-left: auto; }
+  .status-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+  .status-dot.run { background: var(--info); animation: badge-pulse 1.6s infinite; }
+  .status-dot.ok { background: var(--success); }
+  .status-dot.idle { background: var(--muted-foreground); opacity: .5; }
+  .res-item { display: flex; gap: 8px; align-items: center; padding: 6px 0; font-size: 11.5px; border-bottom: 1px solid var(--border); }
+  .res-item:last-child { border-bottom: none; }
+  .res-item .go { margin-left: auto; color: var(--muted-foreground); font-size: 10.5px; }
+  .act-item { display: grid; grid-template-columns: 12px 1fr; gap: 8px; padding-bottom: 10px; margin-bottom: 10px; border-bottom: 1px solid var(--border); }
+  .act-item .a-text { font-size: 11.5px; }
+  .act-item .a-when { font-size: 10px; color: var(--muted-foreground); font-family: 'SF Mono', ui-monospace, monospace; margin-top: 1px; }
+
+  /* Specialist strip (every agent in the active phase, each with a conversation) */
+  .spec-strip { display: flex; gap: 6px; padding: 10px 22px 0; }
+  .spec-chip { flex: 1; display: grid; grid-template-columns: auto auto 1fr; grid-template-rows: auto auto; column-gap: 7px; align-items: center; padding: 7px 10px; background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-lg); cursor: pointer; text-align: left; min-width: 0; }
+  .spec-chip:hover { border-color: color-mix(in srgb, white 14%, transparent); }
+  .spec-chip.active { border-color: color-mix(in srgb, var(--primary) 45%, transparent); background: color-mix(in srgb, var(--primary) 6%, var(--card)); }
+  .spec-chip .status-dot { grid-row: span 1; }
+  .spec-chip .sc-name { font-size: 11px; }
+  .spec-chip .badge { justify-self: start; }
+  .spec-chip .sc-last { grid-column: 1 / -1; font-size: 10px; color: var(--muted-foreground); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 3px; }
+
+  .anno-rail { position: fixed; left: 20px; bottom: 20px; width: 300px; display: flex; flex-direction: column; gap: 8px; z-index: 60; transition: opacity 200ms; }
+  body[data-density="page"] .anno-rail { opacity: 0; pointer-events: none; }
+  .density-toggle { display: inline-flex; border: 1px solid var(--input); border-radius: var(--radius-lg); overflow: hidden; }
+  .density-toggle button { padding: 5px 12px; font-size: 11px; font-weight: 500; background: none; border: none; color: var(--muted-foreground); }
+  .density-toggle button.active { background: var(--accent); color: var(--foreground); }
+</style>
+</head>
+<body data-density="drawer">
+
+<div class="mock-banner">
+  <span class="tag">Mockup 4 of 7 · Advanced mode</span>
+  <span class="crumbs"><a href="index.html">UX Overhaul</a> → <b>The ONE Issue Detail</b> — conversation-first</span>
+  <span style="margin-left:auto" class="density-toggle">
+    <button id="btn-drawer" class="active" onclick="setDensity('drawer')">Drawer density</button>
+    <button id="btn-page" onclick="setDensity('page')">Full-page density</button>
+  </span>
+</div>
+
+<div class="backdrop">
+  <div style="display:flex;gap:10px;margin-bottom:14px">
+    <div class="card card-pad" style="flex:1"><div class="section-label">Active issues</div><div style="font-size:22px;font-weight:500">76</div></div>
+    <div class="card card-pad" style="flex:1"><div class="section-label">Work running</div><div style="font-size:22px;font-weight:500;color:var(--info-foreground)">4</div></div>
+    <div class="card card-pad" style="flex:1"><div class="section-label">Review running</div><div style="font-size:22px;font-weight:500;color:var(--warning-foreground)">2</div></div>
+    <div class="card card-pad" style="flex:1"><div class="section-label">Ready to merge</div><div style="font-size:22px;font-weight:500;color:var(--success-foreground)">1</div></div>
+  </div>
+  <div class="card card-pad" style="margin-bottom:8px">PAN-2895 — Resume path retries a session whose JSON… <span class="badge success">Ready to merge</span></div>
+  <div class="card card-pad">PAN-2377 — feat(flywheel): first-class 'special orders'… <span class="badge warning pulse"><span class="dot"></span>Review running</span></div>
+</div>
+<div class="scrim"></div>
+
+<!-- ══════════ THE ONE ISSUE DETAIL — conversation-first ══════════ -->
+<section class="issue-detail">
+  <header class="id-header">
+    <div class="id-title-row">
+      <div class="prio-bar"></div>
+      <div style="min-width:0">
+        <div class="id-kicker">
+          <span class="mono">PAN-2377</span><span>·</span><span>panopticon-cli</span><span>·</span>
+          <span class="badge warning pulse"><span class="dot"></span>Review running</span>
+        </div>
+        <h1 class="id-title">feat(flywheel): first-class 'special orders' runs — operator-supplied order book</h1>
+        <div class="id-meta">
+          <span class="label-chip">enhancement</span><span class="label-chip">in-review</span>
+          <span class="meta-chip">branch <span class="mono">feature/pan-2377</span></span>
+          <span class="meta-chip">PR <span class="mono">#2894</span></span>
+          <span class="meta-chip cost mono">$41.20</span>
+          <span class="freshness"><i></i>live · 4s ago</span>
+        </div>
+      </div>
+      <div class="id-actions">
+        <button class="btn ghost sm">Open in editor</button>
+        <button class="btn ghost sm">View PR ↗</button>
+        <button class="btn ghost sm" title="All actions — grouped, state-filtered">⋯</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Phase rail: status AND the per-agent conversation switcher -->
+  <div class="phase-wrap">
+    <button class="phase-step done has-conv"><div class="p-name">Plan <span class="conv-hint">⌘</span></div><div class="p-meta mono">done · 07/18</div><div class="p-agent">planning-pan-2377 · opus</div></button>
+    <button class="phase-step done has-conv"><div class="p-name">Work <span class="conv-hint">⌘</span></div><div class="p-meta mono">done · 07/19</div><div class="p-agent">agent-pan-2377 · gpt-5.6-sol · 8h</div></button>
+    <button class="phase-step current has-conv open-conv"><div class="p-name"><span class="conv-dot"></span>Review</div><div class="p-meta">running · 3 of 4</div><div class="p-agent">review.correctness · sonnet — conversation open</div></button>
+    <button class="phase-step"><div class="p-name">Test</div><div class="p-meta">queued</div><div class="p-agent">starts when review approves</div></button>
+    <button class="phase-step"><div class="p-name">Ship</div><div class="p-meta">—</div><div class="p-agent">rebase · push · PR</div></button>
+    <button class="phase-step"><div class="p-name">Done</div><div class="p-meta">—</div><div class="p-agent">merged to main</div></button>
+  </div>
+
+  <div class="narrative">
+    <span>⟳</span>
+    <div><span class="n-title">Review convoy is checking the finished work — 3 of 4 specialists back.</span> <span class="n-sub">Nothing needs you. Next: tests run when the last reviewer approves.</span></div>
+  </div>
+
+  <!-- Specialist strip: every agent in this phase, each with its own conversation -->
+  <div class="spec-strip" id="spec-strip">
+    <button class="spec-chip" data-spec="security">
+      <span class="status-dot ok"></span>
+      <span class="sc-name mono">review.security</span>
+      <span class="badge success">Approved</span>
+      <span class="sc-last">2 advisory findings, no blockers</span>
+    </button>
+    <button class="spec-chip" data-spec="performance">
+      <span class="status-dot ok"></span>
+      <span class="sc-name mono">review.performance</span>
+      <span class="badge success">Approved</span>
+      <span class="sc-last">no regressions vs main</span>
+    </button>
+    <button class="spec-chip active" data-spec="correctness">
+      <span class="status-dot run"></span>
+      <span class="sc-name mono">review.correctness</span>
+      <span class="badge warning pulse"><span class="dot"></span>Running</span>
+      <span class="sc-last">reading orders.ts — 2 advisory so far</span>
+    </button>
+    <button class="spec-chip" data-spec="requirements">
+      <span class="status-dot idle"></span>
+      <span class="sc-name mono">review.requirements</span>
+      <span class="badge neutral">Queued</span>
+      <span class="sc-last">starts when the convoy slot frees</span>
+    </button>
+  </div>
+
+  <!-- ONE tab set — Conversation is the default, not a buried tab -->
+  <nav class="tabs">
+    <button class="tab active">Conversation</button>
+    <button class="tab">Plan map</button>
+    <button class="tab">Tasks<span class="count">18/18</span></button>
+    <button class="tab">Terminal</button>
+    <button class="tab">Activity</button>
+    <button class="tab">Files<span class="count">41</span></button>
+    <button class="tab">Artifacts</button>
+  </nav>
+
+  <div class="id-body">
+    <!-- ══ The first-class conversation (the renderer from the deck's conversation view) ══ -->
+    <div class="conv-col">
+      <div class="conv-scroll" id="conv-scroll"></div>
+
+      <div class="composer">
+        <div class="composer-box">
+          <textarea rows="1" id="composer-input" placeholder="Message review.correctness… (steer, ask, correct)"></textarea>
+          <div class="composer-meta">
+            <span class="model-pick">GPT-5.6 Sol ⌄</span>
+            <span class="model-pick">Max ⌄</span>
+            <button class="icon-btn" title="Attach">📎</button>
+            <button class="send-btn" title="Send">➤</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ Status rail: everything the old Overview tab held, at a glance ══ -->
+    <aside class="id-rail">
+      <div>
+        <div class="section-label" style="margin-bottom:8px">Verification gates</div>
+        <div class="gates">
+          <div class="gate pass"><div class="g-val">pass</div><div class="g-name">Typecheck</div></div>
+          <div class="gate pass"><div class="g-val">pass</div><div class="g-name">Lint</div></div>
+          <div class="gate pass"><div class="g-val">pass</div><div class="g-name">Test</div></div>
+          <div class="gate"><div class="g-val" style="color:var(--muted-foreground)">queued</div><div class="g-name">UAT</div></div>
+        </div>
+      </div>
+      <div>
+        <div class="section-label" style="margin-bottom:6px">Review specialists</div>
+        <div class="spec-row"><span class="status-dot ok"></span><span class="mono">review.security</span><span class="badge success">Approved</span></div>
+        <div class="spec-row"><span class="status-dot ok"></span><span class="mono">review.performance</span><span class="badge success">Approved</span></div>
+        <div class="spec-row"><span class="status-dot run"></span><span class="mono">review.correctness</span><span class="badge warning pulse"><span class="dot"></span>Running</span></div>
+        <div class="spec-row"><span class="status-dot idle"></span><span class="mono">review.requirements</span><span class="badge neutral">Queued</span></div>
+      </div>
+      <div>
+        <div class="section-label" style="margin-bottom:6px">Resources</div>
+        <div class="res-item">⎇ <span class="mono">feature/pan-2377</span><span class="go">remote ✓</span></div>
+        <div class="res-item">⌗ <span>PR <span class="mono">#2894</span> · mergeable</span><span class="go">↗</span></div>
+        <div class="res-item">▣ <span class="mono">ws-pan-2377</span><span class="go">open ↗</span></div>
+        <div class="res-item">› <span class="mono">tmux agent-pan-2377</span><span class="go">attach ↗</span></div>
+      </div>
+      <div>
+        <div class="section-label" style="margin-bottom:8px">Live activity</div>
+        <div class="act-item"><span class="status-dot run" style="margin-top:4px"></span><div><div class="a-text">review.correctness reading <span class="mono" style="font-size:10.5px">orders.ts</span></div><div class="a-when">now</div></div></div>
+        <div class="act-item"><span class="status-dot ok" style="margin-top:4px"></span><div><div class="a-text">review.performance approved</div><div class="a-when">2m ago</div></div></div>
+        <div class="act-item"><span class="status-dot ok" style="margin-top:4px"></span><div><div class="a-text">Gates passed: typecheck · lint · test</div><div class="a-when">9m ago</div></div></div>
+      </div>
+    </aside>
+  </div>
+</section>
+
+<div class="anno-rail">
+  <div class="annotation"><span class="callout-num">1</span> <strong>The conversation is the main pane.</strong> Same rich renderer as the deck's conversation view — turns, thinking, tool calls, your bubbles, model picker, attachments. No more gray "No recent stream output" box.</div>
+  <div class="annotation"><span class="callout-num">2</span> <strong>The phase rail doubles as the agent switcher.</strong> Plan, Work, Review, Test, Ship each hold their own conversation. And when a phase runs a whole <strong>convoy</strong> — like Review's four specialists — the strip below the rail shows every agent with its verdict and last line; click any chip to open <em>its</em> conversation (try it above).</div>
+  <div class="annotation"><span class="callout-num">3</span> <strong>Status moved to a rail, not a tab.</strong> Gates, specialists, resources, live activity are always visible beside the conversation — no tab-hunting while you steer.</div>
+  <div class="annotation"><span class="callout-num">4</span> <strong>Wordy by default, digest by design.</strong> Real agents write paragraphs and raw exec payloads (see the "6 commands · 2 waits" group and the collapsible verdict turn above). The renderer leads with a one-line digest, groups command runs, and collapses anything past ~6 lines — full text always one click away, never in your face. Peeks and dock items show the digest only.</div>
+</div>
+
+<script>
+const CONVS = {
+  correctness: `
+    <div class="turn user">
+      <div class="turn-head" style="justify-content:flex-end"><span>you · review instructions · 2:51 AM</span></div>
+      <div class="bubble">Run the review convoy on the finished work. Signal the verdict with the CLI when done — exactly one of <code>passed</code> / <code>blocked</code>.</div>
+    </div>
+    <div class="worklog">
+      <button class="show-earlier">⌃ Show 59 earlier turns</button>
+      <button class="wl-row thinking"><span class="wl-ico">◌</span><span>thinking — Planning code review approach</span></button>
+      <button class="wl-row"><span class="wl-ico">⬢</span><span>Skill <span class="mono">code-review</span></span></button>
+      <button class="wl-group" data-expand="grp1"><span class="wl-ico">›</span><span><span class="g-count">6</span> commands · 2 waits <span style="opacity:.6">(grouped — click to expand)</span></span></button>
+      <span data-group="grp1" style="display:none">
+        <button class="wl-row"><span class="wl-ico">›</span><span class="mono" style="overflow:hidden;text-overflow:ellipsis">exec "const [gitdir, ignore, exclude, overdeck, kickoff, status] = await Promise.all(…</span></button>
+        <button class="wl-row"><span class="wl-ico">›</span><span class="mono" style="overflow:hidden;text-overflow:ellipsis">exec "const patch = \\"*** Begin Patch\\n*** Update File: /home/eltmon/Projects/myn/wo…</span></button>
+        <button class="wl-row"><span class="wl-ico">›</span><span class="mono" style="overflow:hidden;text-overflow:ellipsis">wait {"cell_id":"179","yield_time_ms":20000,"max_tokens":30000}</span></button>
+        <button class="wl-row"><span class="wl-ico">›</span><span class="mono" style="overflow:hidden;text-overflow:ellipsis">exec "const [outer, fe] = await Promise.all([\n tools.exec_command({cmd:\\"git status…</span></button>
+        <button class="wl-row"><span class="wl-ico">›</span><span class="mono" style="overflow:hidden;text-overflow:ellipsis">exec "const r = await tools.exec_command({\n cmd:\\"pan done MIN-865\\",\n workdir:\\"…</span></button>
+        <button class="wl-row"><span class="wl-ico">›</span><span class="mono" style="overflow:hidden;text-overflow:ellipsis">wait {"cell_id":"179","yield_time_ms":20000,"max_tokens":30000}</span></button>
+      </span>
+      <button class="wl-row"><span class="wl-ico">✎</span><span>Write <span class="mono">review.md</span></span></button>
+      <button class="wl-row thinking"><span class="wl-ico">◌</span><span>thinking — Confirming task completion before signaling</span></button>
+      <button class="wl-row ok"><span class="wl-ico">›</span><span>Bash <span class="mono">pan admin specialists done review PAN-2377 --status passed</span></span></button>
+    </div>
+    <div class="turn agent">
+      <div class="turn-head"><span class="who">review.correctness</span><span>3:00 AM · 9m 10s</span></div>
+      <div class="bubble" data-collapsible>
+        <span class="tldr">Review passed for PAN-2377 at 07088273a1 — 10,001 tests green, typecheck clean, no blockers.</span>
+        <span class="collapsed-extra">
+        <br><br>The mainline merges preserve the approved order-book behavior and integrate cleanly with the atomic agent-start placeholder flow. I read the full diff twice: once for semantics (order execution, lane routing, idempotency keys) and once for failure modes (partial writes, retry storms, clock skew across operators).
+        <br><br><b>Verification:</b>
+        <ul><li>27 unit tests passed (orders, lanes, idempotency)</li><li>Typecheck and lint passed</li><li>6 Playwright flows passed</li><li>Frontend branch is clean and pushed at <code>07088273a1</code></li><li>Convoy cross-check: zero conflicts with the security and performance read sets</li></ul>
+        The earlier test-agent failure was a CLIProxy authentication hiccup, not a failing test — I re-ran the suite after the sidecar recovered and it is green end to end. The optional pipeline auto-trigger reported a separate missing build module, but the completion signal exited successfully and moved the issue forward as intended.
+        <pre>Report: .pan/review/agent-pan-2377-review-07088273/review.md</pre>
+        </span>
+        <button class="collapse-toggle">▸ 9 more lines</button>
+      </div>
+    </div>`,
+  security: `
+    <div class="worklog">
+      <button class="show-earlier">⌃ Show 23 earlier turns</button>
+      <button class="wl-row"><span class="wl-ico">⬢</span><span>Skill <span class="mono">code-review-security</span></span></button>
+      <button class="wl-row"><span class="wl-ico">›</span><span>Grep <span class="mono">eval|exec|child_process in orders.ts</span></span></button>
+      <button class="wl-row ok"><span class="wl-ico">✓</span><span>Write <span class="mono">security-review.md</span></span></button>
+    </div>
+    <div class="turn agent">
+      <div class="turn-head"><span class="who">review.security</span><span>3:04 AM · 3m 18s</span></div>
+      <div class="bubble"><b>Approved with 2 informational findings</b> — no blockers:
+        <ul><li><code>orders.ts:88</code> — unvalidated order-book size (advisory)</li><li><code>flywheel.ts:204</code> — log line may include branch names (advisory)</li></ul></div>
+    </div>
+    <div class="turn user">
+      <div class="turn-head" style="justify-content:flex-end"><span>you · 3:20 AM</span></div>
+      <div class="bubble">File the size-validation one as a follow-up issue, don't block this PR.</div>
+    </div>
+    <div class="turn agent">
+      <div class="turn-head"><span class="who">review.security</span><span>3:20 AM</span></div>
+      <div class="bubble">Filed as <a href="#">PAN-2904</a> and linked from the findings. Verdict stays <b>approved</b>.</div>
+    </div>`,
+  performance: `
+    <div class="worklog">
+      <button class="show-earlier">⌃ Show 17 earlier turns</button>
+      <button class="wl-row"><span class="wl-ico">⬢</span><span>Skill <span class="mono">code-review-performance</span></span></button>
+      <button class="wl-row"><span class="wl-ico">›</span><span>Bash <span class="mono">hyperfine order-book replay (main vs branch)</span></span></button>
+    </div>
+    <div class="turn agent">
+      <div class="turn-head"><span class="who">review.performance</span><span>2:58 AM · 4m 02s</span></div>
+      <div class="bubble"><b>Approved.</b> Order-book replay within 1.2% of main (noise floor). No N+1 reads in the new lane dispatch; the single extra JSON parse per order is bounded and documented.</div>
+    </div>`,
+  requirements: `
+    <div class="turn agent">
+      <div class="turn-head"><span class="who">review.requirements</span><span>queued · starts next</span></div>
+      <div class="bubble" style="color:var(--muted-foreground)">Waiting for the convoy slot. Its conversation starts the moment it runs — you'll see the first turn here live.</div>
+    </div>`,
+};
+const convScroll = document.getElementById('conv-scroll');
+const composerInput = document.getElementById('composer-input');
+function selectSpec(key) {
+  convScroll.innerHTML = CONVS[key];
+  convScroll.scrollTop = 0;
+  composerInput.placeholder = `Message review.${key}… (steer, ask, correct)`;
+  document.querySelectorAll('.spec-chip').forEach(c => c.classList.toggle('active', c.dataset.spec === key));
+}
+document.querySelectorAll('.spec-chip').forEach(c => c.addEventListener('click', () => selectSpec(c.dataset.spec)));
+// Verbosity handling interactions (event-delegated, survives conversation swaps)
+convScroll.addEventListener('click', (e) => {
+  const grp = e.target.closest('[data-expand]');
+  if (grp) {
+    const rows = convScroll.querySelector(`[data-group="${grp.dataset.expand}"]`);
+    const open = rows && rows.style.display === 'none';
+    if (rows) rows.style.display = open ? '' : 'none';
+    grp.querySelector('span:last-child').innerHTML = `<span class="g-count">6</span> commands · 2 waits <span style="opacity:.6">(${open ? 'click to collapse' : 'grouped — click to expand'})</span>`;
+    return;
+  }
+  const tog = e.target.closest('.collapse-toggle');
+  if (tog) {
+    const bub = tog.closest('.bubble');
+    const open = bub.classList.toggle('expanded');
+    tog.textContent = open ? '▾ show less' : '▸ 9 more lines';
+  }
+});
+selectSpec('correctness');
+function setDensity(d) {
+  document.body.dataset.density = d;
+  document.getElementById('btn-drawer').classList.toggle('active', d === 'drawer');
+  document.getElementById('btn-page').classList.toggle('active', d === 'page');
+}
+</script>
+</body>
+</html>

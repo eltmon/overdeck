@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Conversations Everywhere — Overdeck UX Overhaul</title>
+<link rel="stylesheet" href="shared.css">
+<script src="shared.js" defer></script>
+<style>
+  .stage { display: grid; grid-template-columns: 1fr 340px; height: calc(100vh - 37px); }
+  .main { padding: 18px 24px; overflow: auto; }
+  .main-head { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+  .main-head h1 { font-size: 16px; font-weight: 500; }
+
+  /* Agent pill strip (top of every surface) */
+  .pill-strip { display: flex; gap: 6px; margin-left: auto; }
+  .agent-pill { display: inline-flex; align-items: center; gap: 7px; height: 30px; padding: 0 10px 0 6px; border: 1px solid var(--border); border-radius: 999px; background: var(--card); cursor: default; }
+  .agent-pill:hover { border-color: color-mix(in srgb, white 16%, transparent); }
+  .agent-pill .av { width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 500; color: #fff; background: linear-gradient(135deg, #a855f7, #06b6d4); }
+  .agent-pill .nm { font-size: 11px; font-family: 'SF Mono', ui-monospace, monospace; }
+  .agent-pill .st { width: 7px; height: 7px; border-radius: 50%; }
+  .st.run { background: var(--info); animation: badge-pulse 1.6s infinite; }
+  .st.need { background: var(--warning); animation: badge-pulse 1.6s infinite; }
+  .st.ok { background: var(--success); }
+
+  /* Issue rows (pipeline-like) */
+  .rows { border: 1px solid var(--border); border-radius: var(--radius-xl); overflow: hidden; }
+  .irow { display: grid; grid-template-columns: 80px 1fr auto 150px; gap: 12px; align-items: center; padding: 11px 16px; border-bottom: 1px solid var(--border); background: var(--card); cursor: default; position: relative; }
+  .irow:last-child { border-bottom: none; }
+  .irow:hover { background: color-mix(in srgb, var(--accent) 60%, var(--card)); }
+  .irow .rid { font-family: 'SF Mono', ui-monospace, monospace; font-size: 11px; color: var(--muted-foreground); }
+  .irow .rt { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .irow .rsaid { font-size: 11px; color: var(--muted-foreground); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
+  .irow .rsaid b { color: var(--foreground); font-weight: 500; }
+  .irow .rag { font-size: 11px; font-family: 'SF Mono', ui-monospace, monospace; color: var(--muted-foreground); text-align: right; }
+
+  /* ── PEEK (hover quick-look) ── */
+  .peek { position: fixed; z-index: 50; width: 380px; background: var(--popover); border: 1px solid var(--input); border-radius: var(--radius-2xl); box-shadow: 0 20px 60px rgb(0 0 0 / 55%); overflow: hidden; display: none; }
+  .peek.on { display: block; animation: peek-in 150ms ease-out; }
+  @keyframes peek-in { from { opacity: 0; transform: translateY(4px) scale(.99); } to { opacity: 1; transform: none; } }
+  .peek-head { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--border); }
+  .peek-head .rid { font-family: 'SF Mono', ui-monospace, monospace; font-size: 11px; color: var(--muted-foreground); }
+  .peek-conv { padding: 10px 14px; display: flex; flex-direction: column; gap: 8px; max-height: 260px; overflow: hidden; }
+  .pk-msg { font-size: 12px; line-height: 1.5; }
+  .pk-msg .pk-who { font-size: 10px; color: var(--muted-foreground); display: block; margin-bottom: 1px; }
+  .pk-msg.you { text-align: right; }
+  .pk-msg .bub { display: inline-block; padding: 6px 10px; border-radius: 12px; border: 1px solid var(--border); background: var(--card); text-align: left; }
+  .pk-msg.you .bub { background: color-mix(in srgb, var(--primary) 14%, var(--card)); border-color: color-mix(in srgb, var(--primary) 32%, transparent); }
+  .peek-status { display: flex; align-items: center; gap: 10px; padding: 8px 14px; border-top: 1px solid var(--border); font-size: 10.5px; color: var(--muted-foreground); }
+  .peek-foot { display: flex; gap: 12px; padding: 8px 14px; border-top: 1px solid var(--border); background: color-mix(in srgb, var(--background) 96%, white); font-size: 10.5px; color: var(--muted-foreground); }
+  .peek-foot b { color: var(--foreground); font-weight: 500; }
+
+  /* ── THE DOCK (persistent conversation rail) ── */
+  .dock { border-left: 1px solid var(--border); background: color-mix(in srgb, var(--background) 97%, white); display: flex; flex-direction: column; }
+  .dock-head { display: flex; align-items: center; gap: 8px; padding: 12px 16px; border-bottom: 1px solid var(--border); }
+  .dock-head h2 { font-size: 13px; font-weight: 500; }
+  .dock-head .hint { margin-left: auto; font-size: 10.5px; color: var(--muted-foreground); }
+  .dock-items { flex: 1; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+  .dock-item { border: 1px solid var(--border); border-radius: var(--radius-xl); background: var(--card); overflow: hidden; }
+  .dock-item .di-head { display: flex; align-items: center; gap: 8px; padding: 9px 12px; cursor: pointer; }
+  .dock-item .di-head:hover { background: var(--accent); }
+  .dock-item .di-name { font-size: 11.5px; font-family: 'SF Mono', ui-monospace, monospace; }
+  .dock-item .di-issue { font-size: 10.5px; color: var(--muted-foreground); }
+  .dock-item .di-last { font-size: 11.5px; color: var(--muted-foreground); padding: 0 12px 9px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .dock-item .di-x { margin-left: auto; color: var(--muted-foreground); font-size: 12px; }
+  .dock-item.need { border-color: color-mix(in srgb, var(--warning) 40%, transparent); }
+  .dock-item .unread { width: 7px; height: 7px; border-radius: 50%; background: var(--warning); flex: none; }
+
+  .dock-item.open .di-body { display: flex; flex-direction: column; }
+  .di-body { display: none; border-top: 1px solid var(--border); }
+  .di-conv { padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; max-height: 300px; overflow-y: auto; }
+  .di-msg { font-size: 12px; line-height: 1.5; }
+  .di-msg .who { font-size: 10px; color: var(--muted-foreground); display: block; }
+  .di-msg .bub { display: inline-block; padding: 7px 10px; border-radius: 12px; border: 1px solid var(--border); background: var(--card-2); max-width: 100%; }
+  .di-msg.you { text-align: right; }
+  .di-msg.you .bub { background: color-mix(in srgb, var(--primary) 14%, var(--card)); border-color: color-mix(in srgb, var(--primary) 32%, transparent); text-align: left; }
+  .di-msg code { font-family: 'SF Mono', ui-monospace, monospace; font-size: 10.5px; background: rgb(0 0 0 / 30%); padding: 0 4px; border-radius: 3px; }
+  .di-doing { font-size: 10.5px; color: var(--muted-foreground); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 6px 8px; }
+  .di-doing .ok { color: var(--success-foreground); }
+  .di-composer { display: flex; gap: 6px; padding: 8px; border-top: 1px solid var(--border); }
+  .di-composer input { flex: 1; height: 32px; background: var(--muted); border: 1px solid var(--input); border-radius: var(--radius-md); color: var(--foreground); padding: 0 10px; font-family: inherit; font-size: 12px; outline: none; }
+  .di-composer input:focus { border-color: var(--ring); }
+  .di-composer button { width: 32px; height: 32px; border-radius: var(--radius-md); border: none; background: var(--primary); color: #fff; }
+
+  .kbd-bar { padding: 10px 16px; border-top: 1px solid var(--border); font-size: 10.5px; color: var(--muted-foreground); display: flex; gap: 14px; }
+  kbd { font-family: 'SF Mono', ui-monospace, monospace; font-size: 9.5px; background: var(--accent); border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; }
+
+  .anno-col { position: fixed; left: 24px; bottom: 16px; display: flex; gap: 8px; z-index: 40; max-width: 60vw; }
+  .anno-col .annotation { flex: 1; }
+</style>
+</head>
+<body>
+
+<div class="mock-banner">
+  <span class="tag">Mockup 7 of 7 · Interaction model</span>
+  <span class="crumbs"><a href="index.html">UX Overhaul</a> → <b>Conversations everywhere</b> — hover the rows · click the dock</span>
+</div>
+
+<div class="stage">
+  <div class="main">
+    <div class="main-head">
+      <h1>Pipeline</h1>
+      <span style="font-size:11px;color:var(--muted-foreground)">hover any row or pill — peek without losing your place</span>
+      <div class="pill-strip">
+        <span class="agent-pill" data-peek="work"><span class="av">W</span><span class="nm">agent-pan-2377</span><span class="st run"></span></span>
+        <span class="agent-pill" data-peek="review"><span class="av" style="background:linear-gradient(135deg,#f59e0b,#ef4444)">R</span><span class="nm">review.correctness</span><span class="st run"></span></span>
+        <span class="agent-pill" data-peek="needs"><span class="av" style="background:linear-gradient(135deg,#34d399,#06b6d4)">M</span><span class="nm">agent-min-880</span><span class="st need"></span></span>
+      </div>
+    </div>
+
+    <div class="rows">
+      <div class="irow" data-peek="work">
+        <span class="rid">PAN-2377</span>
+        <div><div class="rt">feat(flywheel): first-class 'special orders' runs</div><div class="rsaid"><b>review.correctness:</b> reading src/lib/flywheel/orders.ts…</div></div>
+        <span class="badge warning pulse"><span class="dot"></span>Review running</span>
+        <span class="rag">gpt-5.6-sol · 8h</span>
+      </div>
+      <div class="irow" data-peek="needs">
+        <span class="rid">MIN-880</span>
+        <div><div class="rt">Mobile UI Refresh — "Unified Best-of" theme system</div><div class="rsaid"><b>agent-min-880 asked:</b> keep 4 legacy theme tokens or replace with 2 new?</div></div>
+        <span class="badge warning pulse"><span class="dot"></span>Input</span>
+        <span class="rag">sonnet-5 · 1h</span>
+      </div>
+      <div class="irow" data-peek="ready">
+        <span class="rid">PAN-2895</span>
+        <div><div class="rt">Resume path retries a session whose JSONL was deleted</div><div class="rsaid"><b>agent-pan-2895:</b> all checks green, PR #2901 mergeable</div></div>
+        <span class="badge success">Ready to merge</span>
+        <span class="rag">gpt-5.6-sol · 3h</span>
+      </div>
+      <div class="irow" data-peek="work2">
+        <span class="rid">MIN-879</span>
+        <div><div class="rt">Set up PostHog product analytics</div><div class="rsaid"><b>agent-min-879:</b> task 4 of 13 done — provider behind env flag</div></div>
+        <span class="badge info pulse"><span class="dot"></span>Work running</span>
+        <span class="rag">sonnet-5 · 34m</span>
+      </div>
+    </div>
+
+    <div style="margin-top:14px" class="annotation">
+      <strong>Level 1 · Glance.</strong> The "last said" line under every title is live. Hover (350ms) opens a peek: last turns + phase dots + gates. Nothing moves, nothing navigates. <b>Click</b> to open the full issue · <b>⏎</b> to jump straight into the conversation · <b>⌥-hover</b> pins the peek.
+    </div>
+  </div>
+
+  <!-- ── THE DOCK ── -->
+  <aside class="dock">
+    <div class="dock-head">
+      <h2>Conversations</h2>
+      <span class="badge warning">1 needs you</span>
+      <span class="hint">⌘J</span>
+    </div>
+    <div class="dock-items">
+
+      <div class="dock-item need open" id="dock-needs">
+        <div class="di-head" onclick="toggleDock('dock-needs')">
+          <span class="unread"></span>
+          <div><div class="di-name">agent-min-880</div><div class="di-issue">MIN-880 · Mobile UI Refresh</div></div>
+          <span class="di-x">▾</span>
+        </div>
+        <div class="di-body">
+          <div class="di-conv">
+            <div class="di-msg"><span class="who">agent · 12m ago</span><span class="bub">Before I wire up events: keep the <b>4 legacy theme tokens</b>, or replace them with the <b>2 new ones</b>?</span></div>
+            <div class="di-msg you"><span class="who">you · just now</span><span class="bub">Replace them — legacy is dead code. Go with the 2 new.</span></div>
+            <div class="di-doing"><span class="ok">✓</span> got it — replacing tokens, back to work</div>
+          </div>
+          <div class="di-composer"><input placeholder="Reply…"><button>➤</button></div>
+        </div>
+      </div>
+
+      <div class="dock-item" id="dock-review">
+        <div class="di-head" onclick="toggleDock('dock-review')">
+          <span class="st run"></span>
+          <div><div class="di-name">review.correctness</div><div class="di-issue">PAN-2377 · special orders</div></div>
+          <span class="di-x">▸</span>
+        </div>
+        <div class="di-body">
+          <div class="di-conv">
+            <div class="di-msg"><span class="who">review.correctness · 3:00 AM</span><span class="bub"><b>Review passed</b> for PAN-2377 at <code>07088273a1</code> — 10,001 tests green, typecheck clean.</span></div>
+          </div>
+          <div class="di-composer"><input placeholder="Message…"><button>➤</button></div>
+        </div>
+      </div>
+
+      <div class="dock-item" id="dock-work">
+        <div class="di-head" onclick="toggleDock('dock-work')">
+          <span class="st run"></span>
+          <div><div class="di-name">agent-pan-2377</div><div class="di-issue">PAN-2377 · special orders (work)</div></div>
+          <span class="di-x">▸</span>
+        </div>
+        <div class="di-body">
+          <div class="di-conv">
+            <div class="di-msg"><span class="who">agent · 44m ago</span><span class="bub">18/18 tasks complete, branch pushed. Review convoy dispatched.</span></div>
+          </div>
+          <div class="di-composer"><input placeholder="Message…"><button>➤</button></div>
+        </div>
+      </div>
+
+    </div>
+    <div class="kbd-bar"><span><kbd>⌘J</kbd> jump to conversation</span><span><kbd>⌥</kbd> pin peek</span><span><kbd>esc</kbd> close</span></div>
+  </aside>
+</div>
+
+<!-- ── PEEK TEMPLATE (populated by JS) ── -->
+<div class="peek" id="peek">
+  <div class="peek-head"><span class="rid" id="pk-id"></span><span id="pk-badge"></span><span style="margin-left:auto;font-size:10px;color:var(--muted-foreground)">peek · ⌥ pin</span></div>
+  <div class="peek-conv" id="pk-conv"></div>
+  <div class="peek-status" id="pk-status"></div>
+  <div class="peek-foot"><span><b>click</b> open issue</span><span><b>⏎</b> talk</span><span><b>⌘⇧</b> pop into dock</span></div>
+</div>
+
+<script>
+const PEEKS = {
+  work: { id: 'PAN-2377', badge: '<span class="badge warning pulse"><span class="dot"></span>Review running</span>',
+    conv: [{w:'agent-pan-2377 · 44m', t:'18/18 tasks complete · branch pushed — review convoy dispatched.'},
+           {w:'you · 20m', t:'Watch the order-book migration on rerun, it bit us last time.', you:1},
+           {w:'review.correctness · now', t:'Reading src/lib/flywheel/orders.ts — 2 findings so far, both advisory.'}],
+    status: '<span class="phase-dots"><i class="done"></i><i class="done"></i><i class="current"></i><i></i><i></i></span><span>review 3/4 · gates ✓✓✓·</span>' },
+  review: { id: 'PAN-2377', badge: '<span class="badge warning pulse"><span class="dot"></span>Review running</span>',
+    conv: [{w:'review.correctness · 3:00 AM', t:'Review passed for PAN-2377 at 07088273a1 — 10,001 tests green.'}],
+    status: '<span class="phase-dots"><i class="done"></i><i class="done"></i><i class="current"></i><i></i><i></i></span><span>3 of 4 specialists back</span>' },
+  needs: { id: 'MIN-880', badge: '<span class="badge warning pulse"><span class="dot"></span>Input</span>',
+    conv: [{w:'agent-min-880 · 12m', t:'Keep the 4 legacy theme tokens, or replace with the 2 new ones?'}],
+    status: '<span class="phase-dots"><i class="done"></i><i class="current"></i><i></i><i></i><i></i></span><span>waiting on you · work paused</span>' },
+  ready: { id: 'PAN-2895', badge: '<span class="badge success">Ready to merge</span>',
+    conv: [{w:'agent-pan-2895 · 18m', t:'All checks green. PR #2901 is mergeable with a clean merge state.'}],
+    status: '<span class="phase-dots"><i class="done"></i><i class="done"></i><i class="done"></i><i class="done"></i><i class="current"></i></span><span>merge is yours · nothing is automatic</span>' },
+  work2: { id: 'MIN-879', badge: '<span class="badge info pulse"><span class="dot"></span>Work running</span>',
+    conv: [{w:'agent-min-879 · just now', t:'Task 4 of 13 done — PostHog provider behind an env flag. Next: page-view tracking.'}],
+    status: '<span class="phase-dots"><i class="done"></i><i class="current"></i><i></i><i></i><i></i></span><span>~2h total · 34m in</span>' },
+};
+const peek = document.getElementById('peek');
+let timer = null, pinned = false;
+function showPeek(key, x, y) {
+  const d = PEEKS[key]; if (!d) return;
+  document.getElementById('pk-id').textContent = d.id;
+  document.getElementById('pk-badge').innerHTML = d.badge;
+  document.getElementById('pk-conv').innerHTML = d.conv.map(m =>
+    `<div class="pk-msg ${m.you ? 'you' : ''}"><span class="pk-who">${m.w}</span><span class="bub">${m.t}</span></div>`).join('');
+  document.getElementById('pk-status').innerHTML = d.status;
+  const W = 380, H = 300;
+  peek.style.left = Math.min(x + 16, innerWidth - W - 20) + 'px';
+  peek.style.top = Math.min(y + 12, innerHeight - H - 20) + 'px';
+  peek.classList.add('on');
+}
+function hidePeek() { if (!pinned) peek.classList.remove('on'); }
+document.querySelectorAll('[data-peek]').forEach(el => {
+  el.addEventListener('mouseenter', e => { clearTimeout(timer); timer = setTimeout(() => showPeek(el.dataset.peek, e.clientX, e.clientY), 350); });
+  el.addEventListener('mousemove', e => { if (peek.classList.contains('on') && !pinned) { /* keep position stable */ } });
+  el.addEventListener('mouseleave', () => { clearTimeout(timer); setTimeout(hidePeek, 120); });
+});
+peek.addEventListener('mouseenter', () => pinned = true);
+peek.addEventListener('mouseleave', () => { pinned = false; hidePeek(); });
+function toggleDock(id) {
+  const el = document.getElementById(id);
+  el.classList.toggle('open');
+  el.querySelector('.di-x').textContent = el.classList.contains('open') ? '▾' : '▸';
+}
+</script>
+</body>
+</html>
