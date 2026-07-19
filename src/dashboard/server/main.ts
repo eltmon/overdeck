@@ -15,6 +15,8 @@ import { startSharedIssueService, getSharedIssueService } from './services/issue
 import { startAgentEnrichmentService, stopAgentEnrichmentService } from './services/agent-enrichment-service.js';
 import { startMergeBlockerReconcileService } from './services/merge-blocker-reconcile-service.js';
 import { startResourceRefreshTriggers } from './services/resource-refresh-triggers.js';
+import { refreshMembershipSnapshotsForProjects } from './services/pipeline-membership.js';
+import { triggerResourceDiscoveryRefresh } from './services/resource-discovery.js';
 import {
   shouldStartStaleCheckRetriggerService,
   startStaleCheckRetriggerService,
@@ -507,6 +509,19 @@ void (async () => {
   // getEventStore() throws before that.
   startResourceRefreshTriggers();
   console.log('[overdeck] ResourceRefreshTriggers started (event-driven cache refresh)');
+  // PAN-2896: warm the membership + resource-discovery caches in the background
+  // so the first issues-pane click after a restart serves warm instead of
+  // blocking on a cold multi-second compute. Fire-and-forget — boot is not
+  // delayed and a warm failure only logs.
+  const warmStart = Date.now();
+  void refreshMembershipSnapshotsForProjects(listProjectsSync().map((entry) => entry.config))
+    .then(() => triggerResourceDiscoveryRefresh())
+    .then((issues) => {
+      console.log(`[overdeck] Boot cache warm complete: ${issues.length} resource-allocated issue(s) in ${Math.round((Date.now() - warmStart) / 1000)}s (PAN-2896)`);
+    })
+    .catch((err) => {
+      console.warn('[overdeck] Boot cache warm failed (pane falls back to on-demand compute):', err instanceof Error ? err.message : String(err));
+    });
   store.subscribe((event) => {
     if (event.type === 'agent.stopped' || event.type === 'agent.heartbeat_dead') {
       const agentId = typeof (event.payload as { agentId?: unknown }).agentId === 'string'
