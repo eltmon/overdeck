@@ -157,8 +157,8 @@ export async function runDeployPatrol(context: DeployPatrolContext): Promise<voi
 
   if (!context.config.auto_deploy) return;
   if (
-    staleness.originMainLastCommitAt !== null &&
-    now - staleness.originMainLastCommitAt < context.config.debounce_minutes * 60 * 1000
+    staleness.originMainLastBuildInputCommitAt !== null &&
+    now - staleness.originMainLastBuildInputCommitAt < context.config.debounce_minutes * 60 * 1000
   ) return;
   if (state.lastDeploySpawnAt > 0 && now - state.lastDeploySpawnAt < DEPLOY_SPAWN_COOLDOWN_MS) return;
 
