@@ -3,7 +3,7 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-07-19T03:01:24.444Z",
-  "updated": "2026-07-19T04:12:25.994Z",
+  "updated": "2026-07-19T04:18:37.317Z",
   "pipeline": {
     "issueId": "PAN-2899",
     "reviewStatus": "pending",
@@ -11,12 +11,21 @@
     "mergeStatus": "queued",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-19T04:12:25.747Z",
+    "updatedAt": "2026-07-19T04:18:37.032Z",
+    "mergeNotes": "Strike merge request failed: fetch failed; recovery delivery failed: Cannot find module '/home/eltmon/Projects/overdeck/dist/dashboard/remote-agents-Ck1TfVOf.js' imported from /home/eltmon/Projects/overdeck/dist/dashboard/queries-_IF8mtNS.js",
     "strikeReadyHead": "b3ce699615db076e86a04fb9bdf10d3248aa2ea6",
     "strikeReadyAt": "2026-07-19T04:06:26.064Z",
-    "strikeLandingState": "landing",
-    "strikeRecoveryCount": 0,
-    "strikeLandingAttempts": []
+    "strikeLandingState": "needs_you",
+    "strikeRecoveryCount": 1,
+    "strikeLandingAttempts": [
+      {
+        "timestamp": "2026-07-19T04:18:37.031Z",
+        "strikeHead": "b3ce699615db076e86a04fb9bdf10d3248aa2ea6",
+        "mainHead": "dd2b8678580ac595ee51a66602f044e2c0e7d35b",
+        "outcome": "failed",
+        "detail": "Strike merge request failed: fetch failed; recovery delivery failed: Cannot find module '/home/eltmon/Projects/overdeck/dist/dashboard/remote-agents-Ck1TfVOf.js' imported from /home/eltmon/Projects/overdeck/dist/dashboard/queries-_IF8mtNS.js"
+      }
+    ]
   },
   "closeOut": {
     "usage": {
@@ -40,7 +49,7 @@
       },
       "costAtCloseOut": {
         "usd": 28.313524,
-        "pricingAsOf": "2026-07-19T04:12:25.871Z"
+        "pricingAsOf": "2026-07-19T04:18:37.269Z"
       }
     },
     "merges": [],
