@@ -81,7 +81,7 @@ function makeSearchFetch(issueItems: GitHubSearchIssue[]) {
   return makeFetch((url) => {
     const query = url.searchParams.get('q') ?? '';
     if (url.pathname === '/search/issues' && query.includes('is:issue')) {
-      return response({ items: query.includes('author:panopticon-agent[bot]') ? issueItems : [] });
+      return response({ items: query.includes('Flywheel-Filed-By:') ? issueItems : [] });
     }
     if (url.pathname === '/search/issues' && query.includes('is:pr')) {
       return response({ items: [] });
@@ -173,6 +173,27 @@ describe('createSubstrateBugPoller', () => {
         severity: 'P1',
       },
     });
+  });
+
+  it('searches canonical flywheel trailers instead of the retired bot login', async () => {
+    const queries: string[] = [];
+    const fetchImpl = makeFetch((url) => {
+      if (url.pathname === '/search/issues') queries.push(url.searchParams.get('q') ?? '');
+      return response({ items: [] });
+    });
+    const poller = createSubstrateBugPoller({
+      fetchImpl,
+      repository: makeRepository(),
+      eventStore: makeEventStore(),
+      getConfig: () => config,
+      now: () => new Date('2026-05-25T12:05:00.000Z'),
+    });
+
+    await poller.pollOnce();
+
+    const issueQueries = queries.filter((query) => query.includes('is:issue'));
+    expect(issueQueries).toContainEqual(expect.stringContaining('"Flywheel-Filed-By:" in:body'));
+    expect(issueQueries).not.toContainEqual(expect.stringContaining('author:panopticon-agent[bot]'));
   });
 
   it('marks only known substrate bugs fixed from merged PR closing references', async () => {
@@ -321,13 +342,13 @@ describe('createSubstrateBugPoller', () => {
       }
       if (url.pathname === '/search/issues' && query.includes('is:issue')) {
         return response({
-          items: query.includes('author:panopticon-agent[bot]') ? [{
+          items: query.includes('Flywheel-Filed-By:') ? [{
             number: 1487,
             body: 'Flywheel-Filed-By: agent',
             created_at: '2026-05-25T12:00:00.000Z',
             updated_at: '2026-05-25T12:01:00.000Z',
             labels: [{ name: 'P1' }],
-            user: { login: 'panopticon-agent[bot]' },
+            user: { login: 'eltmon' },
           }] : [],
         });
       }

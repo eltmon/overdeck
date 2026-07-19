@@ -72,7 +72,8 @@ export interface SubstrateBugPollerOptions {
 
 const DEFAULT_INTERVAL_MS = 60_000;
 const DEFAULT_LOOKBACK_MS = 5 * 60_000;
-const BOT_LOGIN = 'panopticon-agent[bot]';
+const FLYWHEEL_FILED_BY_TRAILER = '"Flywheel-Filed-By:" in:body';
+const LEGACY_BOT_LOGIN = 'panopticon-agent[bot]';
 
 class CacheServiceRateLimitStore implements RateLimitStore {
   private cache: CacheService | null = null;
@@ -205,14 +206,14 @@ export function createSubstrateBugPoller(options: SubstrateBugPollerOptions = {}
     for (const repo of config.repos) {
       try {
         const repoQualifier = `repo:${repo.owner}/${repo.repo}`;
-        const authorResults = await fetchSearch(config.token, searchQuery([
+        const trailerResults = await fetchSearch(config.token, searchQuery([
           repoQualifier,
           'is:issue',
           '-is:pr',
-          `author:${BOT_LOGIN}`,
+          FLYWHEEL_FILED_BY_TRAILER,
           `updated:>=${since}`,
         ]));
-        if (authorResults === null) return;
+        if (trailerResults === null) return;
 
         const substrateResults = await fetchSearch(config.token, searchQuery([
           repoQualifier,
@@ -224,13 +225,13 @@ export function createSubstrateBugPoller(options: SubstrateBugPollerOptions = {}
         if (substrateResults === null) return;
 
         const byNumber = new Map<number, GitHubSearchIssue>();
-        for (const issue of [...authorResults, ...substrateResults]) byNumber.set(issue.number, issue);
+        for (const issue of [...trailerResults, ...substrateResults]) byNumber.set(issue.number, issue);
 
         for (const issue of byNumber.values()) {
           const issueId = issueIdFor(repo.prefix, issue.number);
           if (!issueId) continue;
           const trailer = parseSubstrateBugTrailer(issue.body);
-          const filedBy = trailer.filedBy ?? (issue.user?.login === BOT_LOGIN ? 'agent' : 'operator');
+          const filedBy = trailer.filedBy ?? (issue.user?.login === LEGACY_BOT_LOGIN ? 'agent' : 'operator');
           const labelNames = (issue.labels ?? []).map((label) => typeof label === 'string' ? label : label.name ?? '');
           const affectedCriteria = parseAffectedCriteria(issue.body, labelNames);
           const existing = repository.getByIssueId(issueId);

@@ -470,7 +470,11 @@ console.log('[overdeck] Merge-ready notifier → domain events wired');
 startConversationLifecycleService();
 console.log('[overdeck] ConversationLifecycleService started');
 
-startSubstrateBugPoller();
+if (isPeerDashboard) {
+  console.log('[overdeck] SubstrateBugPoller skipped — peer dashboard does not poll trackers');
+} else {
+  startSubstrateBugPoller();
+}
 
 // PAN-1737 UAT batch trains: keep one assembled, testable batch ready at all
 // times (gated per-tick on flywheel.merge_train_enabled; no-op without an
