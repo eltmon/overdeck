@@ -4,17 +4,17 @@
     "created": "2026-07-19T00:11:57Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2890: Agent pills: clickable drill-down, per-agent context, and scoped counts",
-    "updated": "2026-07-19T00:15:11.972Z"
+    "updated": "2026-07-19T03:16:01.189Z"
   },
   "plan": {
     "id": "pan-2890",
     "title": "Agent pills: clickable drill-down, per-agent context, and scoped counts",
-    "status": "running",
+    "status": "completed",
     "uid": "4ee56111-ad46-4b10-a487-c7568c72a774",
     "author": "agent:claude-fable-5",
-    "sequence": 4,
+    "sequence": 5,
     "created": "2026-07-19T00:11:57Z",
-    "updated": "2026-07-19T00:15:11.972Z",
+    "updated": "2026-07-19T03:16:01.189Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2890",
@@ -426,5 +426,5 @@
       "canonicalFilename": "2026-07-19-PAN-2890-agent-pills-clickable-drill-down-per-agent-context-and-scoped-counts.vbrief.json"
     }
   },
-  "status": "active"
+  "status": "completed"
 }
