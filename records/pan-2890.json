@@ -79,7 +79,7 @@
     "recordedAt": "2026-07-19T00:54:08.216Z"
   },
   "created": "2026-07-19T00:10:08.481Z",
-  "updated": "2026-07-19T02:57:50.435Z",
+  "updated": "2026-07-19T02:58:06.334Z",
   "pipeline": {
     "issueId": "PAN-2890",
     "reviewStatus": "passed",
@@ -87,10 +87,10 @@
     "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "merged",
-    "releaseStatus": "pending",
+    "releaseStatus": "skipped",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-19T00:54:07.403Z",
-    "updatedAt": "2026-07-19T02:57:50.331Z",
+    "updatedAt": "2026-07-19T02:58:05.423Z",
     "reviewNotes": "Review bypassed: verification passed but review infrastructure repeatedly failed.",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
     "inspectNotes": "All 4 ACs met: describeAgentStop covers all 5 branches incl. troubled-failures plural; click navigates via pushState+popstate then onNavigate in order; font-mono ID + truncate/title fallback rendered; relativeTime verified fully under fake timers (5m/3h/2d).",
@@ -191,7 +191,7 @@
       },
       "costAtCloseOut": {
         "usd": 63.185454,
-        "pricingAsOf": "2026-07-19T02:57:50.379Z"
+        "pricingAsOf": "2026-07-19T02:58:05.945Z"
       }
     },
     "merges": [
@@ -200,7 +200,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-fable-5",
   "tasks": {
     "sequence": 13,
     "claims": {},
