@@ -6,8 +6,12 @@
 > of the shipped UI see `concepts.mdx` / `introduction.mdx`.
 >
 > **What shipped:** full-height project sidebar + app bar (project crumb,
-> project-scoped search [PAN-1593], status pills) + full-width tab strip
-> (scroll / overflow arrows / middle-click / pop-out / **split panes** /
+> project-scoped search [PAN-1593], interactive agent status pills: the running
+> pill opens an "N running now" drill-down and the stopped pill opens an
+> "N stopped · pipeline agents, last 7 days" drill-down; both use shared
+> `AgentPillPopoverRow` rows that navigate issue-backed agents to `/issues/<ID>`
+> and system agents to `/agents`) + full-width tab strip (scroll / overflow
+> arrows / middle-click / pop-out / **split panes** /
 > close-all) + merged **Awareness rail** (Needs-you / Project / Global,
 > collapsible); the **issue cockpit** (blocker spotlight → phase timeline →
 > single-source metric strip → Review / Code / Plan / Cost / Workspace / Agent /
@@ -15,6 +19,9 @@
 > cockpit** (tight hero, Stuck tile, recent 7-day spend [PAN-1597]); role-named
 > pipeline tabs; and the phantom "Needs-you" / single-pane-collapse /
 > stopped-agent pending-input fixes.
+>
+> No dedicated Mintlify page documents the app bar, so this living design record
+> remains the documentation surface for the agent-pill interactions.
 >
 > **Sequence (completed):** archaeology → this outline → HTML mockups
 > (`docs/design/command-deck-*-v2/v4.html`) → iterate → implement → release.
