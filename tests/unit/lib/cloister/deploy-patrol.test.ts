@@ -3,6 +3,7 @@ import { EventEmitter } from 'node:events';
 
 import {
   _resetDeployPatrolForTests,
+  buildSystemdReloadArgs,
   runDeployPatrol,
   waitForChildSpawn,
 } from '../../../../src/lib/cloister/deploy-patrol.js';
@@ -135,6 +136,36 @@ describe('runDeployPatrol', () => {
     await runDeployPatrol(unknownCtx);
     expect(unknownCtx.spawnReload).not.toHaveBeenCalled();
     expect(unknownCtx.emitEntry).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('buildSystemdReloadArgs', () => {
+  it('runs the reload in a retrying unit outside the dashboard cgroup with captured output', () => {
+    const args = buildSystemdReloadArgs(
+      {
+        command: '/usr/bin/node',
+        args: ['/repo/dist/cli/index.js', 'reload', '--health-timeout', '120000'],
+        cwd: '/repo',
+        detached: true,
+      },
+      NOW,
+      '/home/test/.overdeck/logs/auto-deploy.log',
+      { PATH: '/usr/bin', 'BASH_FUNC_bad%%': '() { :; }' },
+    );
+
+    expect(args).toEqual([
+      '--user', '--unit', `overdeck-auto-deploy-${NOW}`,
+      '--collect', '--quiet',
+      '--property=Restart=on-failure',
+      '--property=RestartSec=10s',
+      '--property=StartLimitBurst=2',
+      '--property=StartLimitIntervalSec=300s',
+      '--property=StandardOutput=append:/home/test/.overdeck/logs/auto-deploy.log',
+      '--property=StandardError=append:/home/test/.overdeck/logs/auto-deploy.log',
+      '--property=WorkingDirectory=/repo',
+      '--setenv', 'PATH=/usr/bin',
+      '/usr/bin/node', '/repo/dist/cli/index.js', 'reload', '--health-timeout', '120000',
+    ]);
   });
 });
 
