@@ -46,7 +46,7 @@
   ],
   "feedback": [],
   "created": "2026-07-17T12:54:30.819Z",
-  "updated": "2026-07-19T00:29:57.936Z",
+  "updated": "2026-07-19T00:46:59.952Z",
   "pipeline": {
     "issueId": "PAN-2377",
     "reviewStatus": "pending",
@@ -119,16 +119,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 37,
-    "claims": {
-      "docs-order-books": {
-        "writerId": "agent-pan-2377",
-        "agentId": "agent-pan-2377",
-        "pid": 522140,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-19T00:29:57.936Z"
-      }
-    },
+    "sequence": 38,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2377",
@@ -324,6 +316,16 @@
         "itemId": "guard-rail-tests",
         "outcome": "completed",
         "releasedAt": "2026-07-19T00:29:46.643Z"
+      },
+      {
+        "writerId": "agent-pan-2377",
+        "agentId": "agent-pan-2377",
+        "pid": 522140,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-19T00:29:57.936Z",
+        "itemId": "docs-order-books",
+        "outcome": "completed",
+        "releasedAt": "2026-07-19T00:46:59.952Z"
       }
     ],
     "statusReasons": {
@@ -463,6 +465,9 @@
     "guard-rail-tests": "completed",
     "guard-rail-tests.guard-rail-tests.ac1": "completed",
     "guard-rail-tests.guard-rail-tests.ac2": "completed",
-    "docs-order-books": "running"
+    "docs-order-books": "completed",
+    "docs-order-books.docs-order-books.ac1": "completed",
+    "docs-order-books.docs-order-books.ac2": "completed",
+    "docs-order-books.docs-order-books.ac3": "completed"
   }
 }
