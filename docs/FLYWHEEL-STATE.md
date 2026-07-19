@@ -5987,3 +5987,8 @@ Substrate bugs filed: 2897 2898 2899 2900 2901 2902 2907 2913 (8; ALL fixed and 
 - PAN-2895: operator's strike, PR #2903 open.
 - MIN-852: needs interactive `claude mcp login linear`.
 - Backlog: ~20 planned_backlog PAN items awaiting release (auto_pickup OFF); TIN-1; lens-gather config gaps (lexerra GitHub App 404, krux missing issue_prefix) — unfiled, low priority.
+
+## Ticks 27-29 — 2026-07-19 ~08:25-09:10 — PAN-2731 landed+closed (12/12); patrol FIRED but crashed mid-deploy (~20-min outage) → PAN-2918 filed+struck
+- **PAN-2731 (codex liveness fields) merged (#2917), live, closed.** Fix: codex agents get NO synthetic lastActivity stamp and NO costSoFar:0 init — absence reads as unknown, not ghost. POSITIVE-EVIDENCE VERIFICATION STILL PENDING: needs a live codex agent showing advancing fields; check on the next codex spawn.
+- **PAN-2913 debounce fix CONFIRMED — the patrol fired autonomously** (marker `trigger: deacon, reason: auto-deploy` at 08:43)… **and then its detached reload (pid 3549157) died after killing the old server, before starting the new one → :3011 DOWN ~20 min.** Nothing supervised the child; the watchdog didn't recover; and `pan reload` recovery was REFUSED by a stale restart lock still citing the dead pid. Recovered via `pan reload --force` (fe28cdc99f live). Filed **PAN-2918** (2 legs: patrol must health-verify after its reload child exits; restart lock must liveness-check its holder pid) + spawned strike. Lesson: the deploy gate's refusal is only as good as its premise — when the cited pid is dead and nothing serves :3011, --force is the correct move, not gate-worship.
+- Tally: **12 merged / 12 closed**. Active: strike-pan-2918. Operator-gated: PAN-2377 promote, PAN-2858 nudge, 2895 #2903.
