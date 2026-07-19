@@ -59,7 +59,7 @@
     "recordedAt": "2026-07-19T00:54:08.216Z"
   },
   "created": "2026-07-19T00:10:08.481Z",
-  "updated": "2026-07-19T00:57:21.538Z",
+  "updated": "2026-07-19T00:57:22.459Z",
   "pipeline": {
     "issueId": "PAN-2890",
     "reviewStatus": "reviewing",
@@ -70,13 +70,13 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-19T00:54:07.403Z",
-    "updatedAt": "2026-07-19T00:57:20.449Z",
+    "updatedAt": "2026-07-19T00:57:21.574Z",
     "reviewNotes": "Verification failed at build",
     "inspectNotes": "All 4 ACs met: describeAgentStop covers all 5 branches incl. troubled-failures plural; click navigates via pushState+popstate then onNavigate in order; font-mono ID + truncate/title fallback rendered; relativeTime verified fully under fake timers (5m/3h/2d).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2892",
     "lastVerifiedCommit": "4dc55c4f5e56b77f728bc8e3be62c72a54925564",
     "reviewRequestedAt": "2026-07-19T00:54:08.987Z",
-    "reviewSpawnedAt": "2026-07-19T00:56:43.314Z",
+    "reviewSpawnedAt": "2026-07-19T00:57:21.574Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "src/dashboard/frontend/src/components/__tests__/StoppedAgentsBanner.test.tsx"
@@ -169,7 +169,7 @@
       },
       "costAtCloseOut": {
         "usd": 63.185454,
-        "pricingAsOf": "2026-07-19T00:57:20.455Z"
+        "pricingAsOf": "2026-07-19T00:57:21.681Z"
       }
     },
     "merges": [
