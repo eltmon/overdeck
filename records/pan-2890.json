@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-19T00:10:08.481Z",
-  "updated": "2026-07-19T00:15:38.339Z",
+  "updated": "2026-07-19T00:18:49.400Z",
   "pipeline": {
     "issueId": "PAN-2890",
     "reviewStatus": "pending",
@@ -53,18 +53,33 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "shared-row-component": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-2890",
         "agentId": "agent-pan-2890",
         "pid": 341562,
         "host": "eltmon-z790",
-        "claimedAt": "2026-07-19T00:15:38.339Z"
+        "claimedAt": "2026-07-19T00:15:38.339Z",
+        "itemId": "shared-row-component",
+        "outcome": "completed",
+        "reason": "Added the shared AgentPillPopoverRow, stop-reason/navigation/relative-time utilities, and focused component tests.",
+        "releasedAt": "2026-07-19T00:18:49.400Z"
+      }
+    ],
+    "statusReasons": {
+      "shared-row-component": {
+        "reason": "Added the shared AgentPillPopoverRow, stop-reason/navigation/relative-time utilities, and focused component tests.",
+        "updatedAt": "2026-07-19T00:18:49.400Z"
       }
     }
   },
   "statusOverrides": {
-    "shared-row-component": "running"
+    "shared-row-component": "completed",
+    "shared-row-component.shared-row-component.ac1": "completed",
+    "shared-row-component.shared-row-component.ac2": "completed",
+    "shared-row-component.shared-row-component.ac3": "completed",
+    "shared-row-component.shared-row-component.ac4": "completed"
   }
 }
