@@ -319,19 +319,20 @@
     "recordedAt": "2026-07-19T00:54:19.291Z"
   },
   "created": "2026-07-17T12:54:30.819Z",
-  "updated": "2026-07-19T07:00:53.386Z",
+  "updated": "2026-07-19T07:22:48.100Z",
   "pipeline": {
     "issueId": "PAN-2377",
     "reviewStatus": "passed",
-    "testStatus": "testing",
+    "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "failed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": false,
+    "readyForMerge": true,
     "panDoneRecoveredAt": "2026-07-19T00:54:56.018Z",
-    "updatedAt": "2026-07-19T07:00:53.369Z",
+    "updatedAt": "2026-07-19T07:22:48.085Z",
     "reviewNotes": "Mainline merges preserve approved order-book behavior and integrate cleanly with atomic agent-start placeholders; full tests and typecheck pass",
+    "testNotes": "Gates at HEAD 07088273 (matches review's reviewedAtCommit): npm run typecheck passed (contracts/hooks/evals/dashboard-types). npm run lint passed (eslint + effect/permissions/state-writes/overdeck-boundaries/pipeline-membership/skills/prompts/file-size/circular-deps/ratchet-audit/quarantine-audit). npm test (full suite, no --changed, per review's cycle-touches-dispatch-paths note): first run showed 1 flaky failure in tests/unit/cli/option-parsing.test.ts (pan sync --if-changed) caused by resource contention from concurrent dashboard/build processes; confirmed flaky via isolated rerun (12/12 passed) and a full clean rerun (1084 files/10001 tests passed, 3 files/50 skipped; frontend 3 files/51 tests passed) — 0 failures, not a PAN-2377 regression. Doc ACs verified directly: docs/ORDER-BOOKS.md and configuration/order-books.mdx exist, docs.json nav includes order-books, CLAUDE.md has the Flywheel Order Books pointer, docs/master-plan-cicd-and-refactoring.md has the handoff note, roles/flywheel.md has the 'Order books' section and docs/flywheel-brief.md references order-book scope resolution. UAT: built the dashboard from this workspace and ran it as a deck peer (mode=peer, buildCommit=07088273, PORT=3012, OVERDECK_DISABLE_DEACON=1, OVERDECK_DISABLE_AUTO_MERGE=1 — the primary host dashboard mechanically refuses to bind the canonical port from a workspace repoRoot, PAN-2322) after stopping and later restoring the main-checkout dashboard per instructions. Verified via Playwright: /orders nav entry and page shell render; lifecycle strip Draft/Ready/Running/Drained/Complete; OPEN posture renders neutral (no glow); Lane A/B structure with concurrency labels; search-and-add rail and backlog-candidates rail both add-only (no dispatch), candidates correctly exclude in-book issues and re-rank; added item renders the exact D11 chip format 'A1 · book' plus PRD/released chips and Move-to-B/Remove actions; re-searching the same issue shows a disabled 'Already in this book' affordance; ValidationPanel blocks Queue book with a named finding on an empty book and clears to 'Ready to start' once an item is added; toggling Pickup posture to DRAIN renders the amber who-set-it-and-why banner and flips the item to 'held' (D10); no console errors/warnings. Not exercised in this pass: drag-reorder (used click-based add instead), the Progress view live-status/eligibility ✓/✕ predicate rendering, and the read-only flywheel-page/issues-pane/kanban cross-surface projections — covered by their own passing component tests (LaneEditor, ProgressPanel, OrderBookModule, issueActions) per the vBRIEF file scope; a live spot-check of those was out of scope given time. Cleanup: removed the UAT test item and reset posture to open via the API; no delete-book endpoint exists in this feature (by design/scope) so an empty draft 'Test UAT Book PAN-2377' book remains — harmless residue, flagged here rather than fixed since editing code/scope is out of bounds for the test role. Observed and did not act on: a pre-existing stale merge_queue row for closed issue PAN-2325 fires a harmless no-op resumeQueuedMerges() call on every dashboard boot (confirmed via merge_queue table: status stayed 'queued'/started_at null across 3 boots, and the dashboard's own reconciliation logged 'Cleared stuck merge statuses on startup') — unrelated to PAN-2377, not fixed here.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2894",
     "reviewedAtCommit": "07088273a11c5c86e1ef8bb0513c4545b6b6cf02",
@@ -367,17 +368,17 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 224,
-            "output": 38231,
-            "cacheRead": 16083172,
-            "cacheWrite": 347335
+            "input": 467,
+            "output": 85546,
+            "cacheRead": 45009039,
+            "cacheWrite": 663663
           }
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 20791107,
-            "output": 1458503,
-            "cacheRead": 684939776,
+            "input": 20822724,
+            "output": 1460531,
+            "cacheRead": 686759424,
             "cacheWrite": 0
           }
         }
@@ -390,21 +391,21 @@
           "cacheWrite": 169467
         },
         "openai/gpt-5.6-sol": {
-          "input": 31572620,
-          "output": 1913138,
-          "cacheRead": 781106176,
+          "input": 31604237,
+          "output": 1915166,
+          "cacheRead": 782925824,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 236,
-          "output": 44414,
-          "cacheRead": 16677358,
-          "cacheWrite": 479910
+          "input": 479,
+          "output": 91729,
+          "cacheRead": 45603225,
+          "cacheWrite": 796238
         }
       },
       "costAtCloseOut": {
-        "usd": 619.162451,
-        "pricingAsOf": "2026-07-19T07:00:53.377Z"
+        "usd": 627.340837,
+        "pricingAsOf": "2026-07-19T07:22:48.094Z"
       }
     },
     "merges": [
