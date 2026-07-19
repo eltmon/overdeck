@@ -24,7 +24,7 @@ import {
   type WarmIdleStatusShape,
 } from '../../../../lib/cloister/review-status-source.js';
 import { getOverdeckHome } from '../../../../lib/paths.js';
-import { listSessionNames } from '../../../../lib/tmux.js';
+import { getRuntimeCensus } from '../../../../lib/runtime-census.js';
 import { checkAgentHealth } from '../../../lib/health-filtering.js';
 import { ReadModelService } from '../../read-model.js';
 import {
@@ -335,7 +335,7 @@ const getHealthAgentsRoute = HttpRouter.add(
     const readModel = yield* ReadModelService;
     return yield* buildHealthAgentsResponse({
       snapshot: readModel.getSnapshot,
-      sessionNames: listSessionNames(),
+      sessionNames: Effect.promise(async () => [...(await getRuntimeCensus()).sessionNames]),
     });
   }),
 );
