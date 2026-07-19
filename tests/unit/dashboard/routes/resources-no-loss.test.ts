@@ -3,7 +3,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { Effect } from 'effect';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockListAgentStates = vi.hoisted(() => vi.fn(() => []));
 const mockListSessions = vi.hoisted(() => vi.fn(() => []));
@@ -17,8 +17,19 @@ vi.mock('../../../../src/lib/tmux.js', () => ({
   listPaneValues: () => Effect.succeed([]),
 }));
 
+vi.mock('../../../../src/lib/runtime-census.js', () => ({
+  getRuntimeCensus: async () => ({
+    sessionNames: new Set(mockListSessions().map((session: { name: string }) => session.name)),
+    processesByPid: new Map(),
+  }),
+  panePidsForSession: () => [],
+}));
+
 import {
   getResourcesEffect,
+  getResourcesSnapshotEffect,
+  refreshResourcesSnapshot,
+  resetResourcesSnapshotForTests,
   resourcesRouteLayer,
 } from '../../../../src/dashboard/server/routes/resources.js';
 
@@ -83,6 +94,9 @@ async function readJsonBody(response: Awaited<ReturnType<typeof Effect.runPromis
 }
 
 describe('PAN-2464 resources route no-loss audit', () => {
+  beforeEach(() => resetResourcesSnapshotForTests());
+  afterEach(() => resetResourcesSnapshotForTests());
+
   it('keeps the legacy resourcesRouteLayer export available', () => {
     expect(resourcesRouteLayer).toBeDefined();
   });
@@ -135,5 +149,20 @@ describe('PAN-2464 resources route no-loss audit', () => {
       'updatedAt',
       'volumes',
     ]);
+  });
+
+  it('serves the last-good resources snapshot without rebuilding per request', async () => {
+    mockListAgentStates.mockReturnValue([]);
+    mockListSessions.mockReturnValue([]);
+    await refreshResourcesSnapshot();
+    mockListAgentStates.mockClear();
+    mockListSessions.mockClear();
+
+    const first = await readJsonBody(await Effect.runPromise(getResourcesSnapshotEffect()));
+    const second = await readJsonBody(await Effect.runPromise(getResourcesSnapshotEffect()));
+
+    expect(first.updatedAt).toEqual(second.updatedAt);
+    expect(mockListAgentStates).not.toHaveBeenCalled();
+    expect(mockListSessions).not.toHaveBeenCalled();
   });
 });

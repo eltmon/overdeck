@@ -9,7 +9,7 @@ const DEFAULT_DURATION_SECONDS = 65
 const DEFAULT_BASE_URL = 'http://127.0.0.1:3011'
 const ROUTES = [
   '/api/health',
-  '/api/projects',
+  '/api/registered-projects',
   '/api/issues/resource-allocated',
   '/api/resources',
 ]

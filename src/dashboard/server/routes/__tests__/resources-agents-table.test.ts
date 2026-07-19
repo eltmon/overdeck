@@ -24,6 +24,14 @@ vi.mock('../../../../lib/tmux.js', () => ({
   listPaneValues: (...args: unknown[]) => Effect.succeed(mockListPaneValues(...args)),
 }));
 
+vi.mock('../../../../lib/runtime-census.js', () => ({
+  getRuntimeCensus: async () => ({
+    sessionNames: new Set(mockListSessions().map((session: { name: string }) => session.name)),
+    processesByPid: new Map(),
+  }),
+  panePidsForSession: (_census: unknown, sessionName: string) => mockListPaneValues(sessionName),
+}));
+
 vi.mock('../../../../lib/docker-stats.js', () => ({
   DockerStatsCollector: class {
     start() {

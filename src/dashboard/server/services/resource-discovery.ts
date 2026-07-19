@@ -803,16 +803,23 @@ function publishProjectResourceSnapshot(project: ProjectConfig, issues: Internal
   rebuildCombinedResourceSnapshot();
 }
 
+export interface RefreshResourceAllocatedProjectsOptions {
+  refreshMembership?: boolean;
+}
+
 /** Refresh only the requested projects, capturing fleet-wide signals once for the batch. */
 export async function refreshResourceAllocatedProjects(
   projects: ProjectConfig[],
+  options: RefreshResourceAllocatedProjectsOptions = {},
 ): Promise<ResourceAllocatedIssue[]> {
   if (projects.length === 0) return cachedResourceIssues?.value ?? [];
   const sharedSignals = await captureSharedResourceSignals();
   const failures: Error[] = [];
   for (const project of projects) {
     try {
-      await refreshMembershipSnapshotsForProjects([project]);
+      if (options.refreshMembership !== false) {
+        await refreshMembershipSnapshotsForProjects([project]);
+      }
       const issues = await computeResourceAllocatedIssues([project], sharedSignals);
       publishProjectResourceSnapshot(project, issues);
     } catch (error) {

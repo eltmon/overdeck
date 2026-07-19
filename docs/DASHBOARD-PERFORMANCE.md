@@ -4,7 +4,7 @@ The dashboard stays responsive by keeping request handling separate from converg
 
 ## Request-path invariant
 
-A list or detail request must not launch tracker, git, Docker, tmux, process-table, or cache-refresh work. The resource and membership routes read the latest published snapshot and return immediately. A cold membership snapshot returns a fast `503` with `Pipeline membership snapshot is loading`; it does not make the request perform discovery.
+A list or detail request must not launch tracker, git, Docker, tmux, process-table, or cache-refresh work. The resource and membership routes read the latest published snapshot and return immediately. Cold membership and machine-resource snapshots return a fast `503` while their background service warms; neither request performs discovery. The machine-resource snapshot is rebuilt once every three seconds regardless of how many dashboard clients poll `/api/resources`.
 
 Pipeline membership is advisory to rendering. Membership loading or failure may show a status message and Retry action, but it never replaces the issue tree or removes issue actions. Lifecycle events invalidate membership queries, so the frontend does not interval-poll membership.
 
@@ -18,8 +18,9 @@ Pipeline membership is advisory to rendering. Membership loading or failure may 
 - One drain captures fleet-wide signals once, computes each requested project separately, and publishes each project snapshot atomically.
 - A project failure preserves its last-good snapshot and does not prevent later queued projects from running.
 - Boot warming, lifecycle events, and the five-minute convergence sweep all use this queue.
+- Agent lifecycle events refresh live resource evidence from the existing membership snapshot. They do not rerun durable tracker/branch/PR/spec membership lenses; boot warming and the five-minute convergence sweep own that work.
 
-The server binds its HTTP socket before it starts triggers or enqueues the boot warm. Boot logs must show `Dashboard listening` before `Project resource refresh queue started` and `Boot cache warm complete`.
+The server binds its HTTP socket before it starts triggers or enqueues the boot warm. Boot logs must show `Dashboard listening` before `Project resource refresh queue and resources snapshot service started` and `Boot cache warm complete`.
 
 ## Shared runtime census
 
@@ -64,5 +65,5 @@ Pass `--pid` and `--base-url` for a throwaway instance. The script reads `/proc/
 - dashboard CPU below 15%;
 - fewer than two direct child processes per second;
 - event-loop p99 below 100 ms;
-- `/api/health`, `/api/projects`, `/api/issues/resource-allocated`, and `/api/resources` p95 below 200 ms;
+- `/api/health`, `/api/registered-projects`, `/api/issues/resource-allocated`, and `/api/resources` p95 below 200 ms;
 - no membership-caused issue skeleton and no lost issue action, route, view, status, or recovery affordance.

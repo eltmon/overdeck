@@ -11,8 +11,14 @@ export {
   setCurrentDockerStatsReaderForTests,
 } from './resources/shared.js';
 export {
+  buildResourcesPayloadEffect,
   getResourcesEffect,
   getResourcesRoute,
+  getResourcesSnapshotEffect,
+  refreshResourcesSnapshot,
+  resetResourcesSnapshotForTests,
+  startResourcesSnapshotService,
+  stopResourcesSnapshotService,
 } from './resources/snapshot.js';
 export {
   getContainerHistoryRoute,

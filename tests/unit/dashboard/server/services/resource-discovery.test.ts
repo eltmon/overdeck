@@ -179,6 +179,14 @@ describe('resource-discovery snapshot ownership', () => {
     expect(mocks.execFile).not.toHaveBeenCalled();
   });
 
+  it('reuses the membership snapshot for lifecycle-only resource refreshes', async () => {
+    const overdeckProject = { name: 'overdeck', path: '/tmp/overdeck', issue_prefix: 'PAN', github_repo: 'eltmon/overdeck' };
+
+    await refreshResourceAllocatedProjects([overdeckProject], { refreshMembership: false });
+
+    expect(mocks.getPipelineMembershipForProjects).not.toHaveBeenCalled();
+  });
+
   it('publishes refreshed projects independently into one combined snapshot', async () => {
     const overdeckProject = { name: 'overdeck', path: '/tmp/overdeck', issue_prefix: 'PAN', github_repo: 'eltmon/overdeck' };
     const mynProject = { name: 'mind-your-now', path: '/tmp/myn', issue_prefix: 'MIN', gitlab_repo: 'eltmon/mind-your-now' };

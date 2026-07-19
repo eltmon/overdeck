@@ -32,6 +32,10 @@ describe('project resource refresh queue', () => {
 
     expect(refreshProjects).toHaveBeenCalledOnce();
     expect(refreshProjects.mock.calls[0]?.[0]).toEqual([alpha, beta]);
+    expect(refreshProjects.mock.calls[0]?.[1].reasonsByProjectPath).toEqual(new Map([
+      [alpha.path, new Set(['agent.created', 'agent.started'])],
+      [beta.path, new Set(['agent.created'])],
+    ]));
     queue.stop();
   });
 
@@ -54,6 +58,9 @@ describe('project resource refresh queue', () => {
 
     expect(refreshProjects).toHaveBeenCalledTimes(2);
     expect(refreshProjects.mock.calls[1]?.[0]).toEqual([alpha]);
+    expect(refreshProjects.mock.calls[1]?.[1].reasonsByProjectPath.get(alpha.path)).toEqual(
+      new Set(['agent.started', 'agent.stopped']),
+    );
     queue.stop();
   });
 

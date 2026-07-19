@@ -14,8 +14,12 @@ export interface ProjectResourceRefreshQueueState {
   lastError: string | null;
 }
 
+export interface ProjectResourceRefreshContext {
+  reasonsByProjectPath: ReadonlyMap<string, ReadonlySet<string>>;
+}
+
 export interface ProjectResourceRefreshQueueDeps {
-  refreshProjects(projects: ProjectConfig[]): Promise<unknown>;
+  refreshProjects(projects: ProjectConfig[], context: ProjectResourceRefreshContext): Promise<unknown>;
   debounceMs?: number;
   now?: () => number;
 }
@@ -59,17 +63,21 @@ export function createProjectResourceRefreshQueue(
     try {
       while (!stopped && pending.size > 0) {
         const projects = [...pending.values()];
+        const reasonsByProjectPath = new Map<string, ReadonlySet<string>>();
+        for (const project of projects) {
+          reasonsByProjectPath.set(project.path, new Set(reasons.get(project.path) ?? []));
+          reasons.delete(project.path);
+        }
         pending.clear();
         activeProjectPaths = projects.map((project) => project.path);
         lastStartedAt = now();
         try {
-          await deps.refreshProjects(projects);
+          await deps.refreshProjects(projects, { reasonsByProjectPath });
           lastError = null;
         } catch (error) {
           lastError = error instanceof Error ? error.message : String(error);
           console.warn('[project-resource-refresh] batch failed:', lastError);
         } finally {
-          for (const project of projects) reasons.delete(project.path);
           activeProjectPaths = [];
           lastCompletedAt = now();
         }
@@ -125,8 +133,16 @@ export function createProjectResourceRefreshQueue(
   };
 }
 
+const MEMBERSHIP_REFRESH_REASONS = new Set([
+  'boot-warm',
+  'periodic-convergence',
+]);
+
 const projectResourceRefreshQueue = createProjectResourceRefreshQueue({
-  refreshProjects: refreshResourceAllocatedProjects,
+  refreshProjects: (projects, context) => refreshResourceAllocatedProjects(projects, {
+    refreshMembership: [...context.reasonsByProjectPath.values()]
+      .some((projectReasons) => [...projectReasons].some((reason) => MEMBERSHIP_REFRESH_REASONS.has(reason))),
+  }),
 });
 
 export function enqueueProjectResourceRefresh(project: ProjectConfig, reason: string): void {

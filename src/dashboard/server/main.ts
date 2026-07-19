@@ -56,6 +56,7 @@ import { mkdir } from 'node:fs/promises';
 import { getOverdeckHome } from '../../lib/paths.js';
 import { ensureManagedTmuxContextOnce } from '../../lib/tmux.js';
 import { startCliproxyWatchdog } from './routes/cliproxy.js';
+import { startResourcesSnapshotService } from './routes/resources/snapshot.js';
 import { cleanupOrphanedConversationAttachments } from './services/conversation-attachments.js';
 import { closeMemoryFtsDatabases } from '../../lib/memory/fts-db.js';
 import { startTranscriptPoller, stopTranscriptPoller, syncTranscriptPollerRegistry } from '../../lib/memory/poller.js';
@@ -522,12 +523,14 @@ void (async () => {
     await new Promise<void>((resolve) => setTimeout(resolve, 0));
     const stopTriggers = startResourceRefreshTriggers();
     const stopConvergence = startProjectResourceConvergence();
+    const stopResourcesSnapshot = startResourcesSnapshotService();
     stopResourceRefreshServices = () => {
       stopTriggers();
       stopConvergence();
+      stopResourcesSnapshot();
       stopProjectResourceRefreshQueue();
     };
-    console.log('[overdeck] Project resource refresh queue started');
+    console.log('[overdeck] Project resource refresh queue and resources snapshot service started');
 
     const warmStart = Date.now();
     enqueueProjectsResourceRefresh(
