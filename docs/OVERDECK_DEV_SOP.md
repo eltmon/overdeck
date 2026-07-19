@@ -41,6 +41,24 @@ For the common rebuild-and-restart path, use `pan reload`.
 pan reload
 ```
 
+## Production-bundle boot and performance verification
+
+A dashboard boot-path change is not ready for the live server until the built Node 22 bundle boots on a throwaway port. Typecheck and unit tests do not execute the Effect layer bootstrap, so they cannot prove that imports, layers, listeners, and post-listen warmers compose at runtime.
+
+Build first, then start `dist/dashboard/server.js` under Node 22 with an isolated `OVERDECK_HOME`, `OVERDECK_DISABLE_DEACON=1`, `OVERDECK_NO_RESUME=1`, and a non-live port. Verify that `/api/health` responds and that the log order is `Dashboard listening` → `Project resource refresh queue started` → `Boot cache warm complete`. The health response must arrive even if the resource warm is still running.
+
+Run the performance harness against that PID and port:
+
+```bash
+node scripts/verify-dashboard-performance.mjs \
+  --pid <throwaway-pid> \
+  --base-url http://127.0.0.1:<throwaway-port> \
+  --duration 65 \
+  --assert
+```
+
+The targets and architecture are documented in [DASHBOARD-PERFORMANCE.md](./DASHBOARD-PERFORMANCE.md). Do not restart the live dashboard into an untested boot-path change. After the throwaway boot is green, use the normal deploy owner; a manual restart that needs an explicit wait uses `pan restart --dashboard --health-timeout 120000` because the flag is milliseconds and the minimum boot-path allowance is 120 seconds.
+
 ## Restart behavior guarantees
 
 `pan reload` builds before it touches the running dashboard. If the build fails, the old dashboard keeps running and the command exits non-zero. If the build succeeds, `pan reload` restarts only the dashboard and waits for `/api/health`.

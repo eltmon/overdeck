@@ -189,6 +189,14 @@ next dispatch resumes the saved session with its context, so a shed costs re-rev
 state. Warm-idle sessions also do not count against the advancing ceiling
 (`countWarmIdleAdvancingAgents` in `concurrency.ts`), so keeping them warm never starves dispatch.
 
+## Quality-gate CPU admission
+
+Quality-gate admission is separate from agent admission and memory shedding. `src/lib/cloister/quality-gate-admission.ts` places local and container command gates in a cross-process FIFO, then admits the oldest live waiter only when sampled CPU utilization is below 75% and one-minute load is below 1.0 per core. It rechecks after a 1.5-second settle period, serializes active local gates through one owner lease, and reclaims dead or over-age queue state.
+
+Every retry obtains a fresh lease and releases it in `finally`. Remote commands and HTTP health checks bypass the local CPU slot. This scheduler never stops an agent, pauses a workspace, changes memory-governor mode, or enforces cost policy; it prevents simultaneous builds and test suites from starving the dashboard while the memory governor continues to own RAM admission and shedding.
+
+Detached verification workers persist `phase: queued | running` plus `admittedAt`. Their 65-minute execution timeout starts when the first gate is admitted, rather than when the worker entered the CPU queue.
+
 ## Kernel safety net
 
 Even a correct governor can be too slow, or wrong about what's safe to shed. `src/lib/tmux.ts`'s

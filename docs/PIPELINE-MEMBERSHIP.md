@@ -43,4 +43,6 @@ All consumers use one of these representations of the same verdict:
 - Dashboard API: `GET /api/pipeline/membership?project=<project-key>`, backed by the cached membership service.
 - Issue DTO: total `pipelineMembership` with `available`, `inPipeline`, `bucket`, and `labelDrift`, used by the dashboard frontend. `available: false` means durable membership could not be resolved; a successful lookup with no candidate is explicitly `clean_terminal`.
 
+Dashboard requests are snapshot-only. The membership API returns the last-good snapshot immediately or a fast `503` while its first background refresh is still loading; it never gathers tracker or git evidence inside the request. Membership is also advisory to issue rendering: loading and failure leave the issue tree and its actions mounted, with a status message or explicit Retry alongside them. Lifecycle events invalidate the affected query, so there is no interval membership poll.
+
 No command, route, view, or skill may reconstruct membership from tracker state, workspaces, agents, tmux, or review rows. `scripts/lint-pipeline-membership.sh` enforces delegation for the six migrated consumers and rejects disposable-state imports in the resolver/gatherer boundary. Run `bash scripts/lint-pipeline-membership.sh --self-test` to verify that the guard detects seeded legacy and L5 violations.
