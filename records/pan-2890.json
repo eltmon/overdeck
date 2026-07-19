@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-19T00:10:08.481Z",
-  "updated": "2026-07-19T00:37:47.943Z",
+  "updated": "2026-07-19T00:37:57.423Z",
   "pipeline": {
     "issueId": "PAN-2890",
     "reviewStatus": "pending",
@@ -69,7 +69,7 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 8,
+    "sequence": 9,
     "claims": {},
     "claimHistory": [
       {
@@ -123,8 +123,8 @@
         "updatedAt": "2026-07-19T00:18:49.400Z"
       },
       "save-session-investigation": {
-        "reason": "No operator screenshot is attached to the issue; defer the specified 'not reproduced, no screenshot' fallback comment until the other implementation items are complete.",
-        "updatedAt": "2026-07-19T00:19:49.414Z"
+        "reason": "All implementation items are complete; apply the planned no-screenshot fallback now.",
+        "updatedAt": "2026-07-19T00:37:57.423Z"
       },
       "running-agents-pill": {
         "reason": "Added a store-backed running-agents popover with shared status predicate, scoped count, sorted contextual rows, URL-door navigation, and browser-verified system-agent fallback.",
@@ -142,7 +142,7 @@
     "shared-row-component.shared-row-component.ac2": "completed",
     "shared-row-component.shared-row-component.ac3": "completed",
     "shared-row-component.shared-row-component.ac4": "completed",
-    "save-session-investigation": "blocked",
+    "save-session-investigation": "pending",
     "running-agents-pill": "completed",
     "running-agents-pill.running-agents-pill.ac1": "completed",
     "running-agents-pill.running-agents-pill.ac2": "completed",
