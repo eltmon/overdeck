@@ -3,7 +3,7 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-07-19T02:22:16.359Z",
-  "updated": "2026-07-19T04:12:25.613Z",
+  "updated": "2026-07-19T04:18:37.291Z",
   "pipeline": {
     "issueId": "PAN-2895",
     "reviewStatus": "pending",
@@ -12,12 +12,13 @@
     "mergeStatus": "queued",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-19T04:12:25.591Z",
+    "updatedAt": "2026-07-19T04:18:36.883Z",
     "verificationNotes": "The supervised verification worker stopped before recording a result; verification re-runs on the next cycle.",
+    "mergeNotes": "Strike merge request failed: fetch failed; recovery delivery failed: Cannot find module '/home/eltmon/Projects/overdeck/dist/dashboard/remote-agents-Ck1TfVOf.js' imported from /home/eltmon/Projects/overdeck/dist/dashboard/queries-_IF8mtNS.js",
     "strikeReadyHead": "9b5eadcccb765994d6794fdad6c44c9910489832",
     "strikeReadyAt": "2026-07-19T03:59:41.559Z",
-    "strikeLandingState": "landing",
-    "strikeRecoveryCount": 0,
+    "strikeLandingState": "needs_you",
+    "strikeRecoveryCount": 1,
     "strikeLandingAttempts": [
       {
         "timestamp": "2026-07-19T03:20:56.265Z",
@@ -25,6 +26,13 @@
         "mainHead": "c017a864e0b54dd7f4abec6866d6eeebf8831470",
         "outcome": "failed",
         "detail": "Strike merge request failed: fetch failed"
+      },
+      {
+        "timestamp": "2026-07-19T04:18:36.880Z",
+        "strikeHead": "9b5eadcccb765994d6794fdad6c44c9910489832",
+        "mainHead": "dd2b8678580ac595ee51a66602f044e2c0e7d35b",
+        "outcome": "failed",
+        "detail": "Strike merge request failed: fetch failed; recovery delivery failed: Cannot find module '/home/eltmon/Projects/overdeck/dist/dashboard/remote-agents-Ck1TfVOf.js' imported from /home/eltmon/Projects/overdeck/dist/dashboard/queries-_IF8mtNS.js"
       }
     ]
   },
@@ -50,7 +58,7 @@
       },
       "costAtCloseOut": {
         "usd": 38.526577,
-        "pricingAsOf": "2026-07-19T04:12:25.606Z"
+        "pricingAsOf": "2026-07-19T04:18:37.251Z"
       }
     },
     "merges": [],
