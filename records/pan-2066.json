@@ -12,9 +12,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-19T22:48:13.749Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-19T22:50Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-19T22:50:22.401Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-19T22:50:22Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2066\n\nKnown-lossy OpenKnowledge remains writable despite the read-only requirement; proxy routing and auth boundaries also fail.\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2066 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "docs.json",
@@ -85,7 +98,7 @@
     "recordedAt": "2026-07-19T22:32:41.050Z"
   },
   "created": "2026-07-19T20:18:40.159Z",
-  "updated": "2026-07-19T22:50:21.842Z",
+  "updated": "2026-07-19T22:50:22.401Z",
   "pipeline": {
     "issueId": "PAN-2066",
     "reviewStatus": "blocked",
