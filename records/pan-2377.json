@@ -92,9 +92,22 @@
       "reason": "feedback",
       "note": "[2026-07-19T02:45Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-07-19T02:45:13.693Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-19T02:51Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-19T02:51:14.303Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-19T02:51:14Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2377\n\nCommitted HEAD contains no fix for the prior automatic Flywheel recovery blocker; the prospective fix remains uncommitted\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2377 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "configuration/state-branch.mdx",
@@ -299,10 +312,10 @@
     "recordedAt": "2026-07-19T00:54:19.291Z"
   },
   "created": "2026-07-17T12:54:30.819Z",
-  "updated": "2026-07-19T02:49:40.325Z",
+  "updated": "2026-07-19T02:51:14.304Z",
   "pipeline": {
     "issueId": "PAN-2377",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "failed",
@@ -310,8 +323,8 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-19T00:54:56.018Z",
-    "updatedAt": "2026-07-19T02:49:39.799Z",
-    "reviewNotes": "Agent re-review request (2/25): Fixed review issues",
+    "updatedAt": "2026-07-19T02:51:13.698Z",
+    "reviewNotes": "Committed HEAD contains no fix for the prior automatic Flywheel recovery blocker; the prospective fix remains uncommitted",
     "inspectNotes": "AC1-AC4 met: orders-writer.test.ts covers createBook/addItems/moveItem/setStatus round-trip + index.json queue order; orders-resolver.test.ts covers backlogCandidates rank/exclusion and computeBookProgress drained semantics (running=false, parked-only=true); orders-validate.test.ts covers all five validateBookForStart finding types incl. planAtPickup downgrade. AC5 partially met: the writer-commit half is covered (git rev-list count check in orders-writer.test.ts). The parseOrderBookJson half is NOT covered — AC5 names src/lib/orders/types.ts parseOrderBookJson specifically, but tests/unit/lib/orders/orders-io.test.ts 'returns a descriptive error for malformed order book JSON' (line ~36) writes syntactically-invalid JSON ('{bad json'), which throws inside readOrderBook's own JSON.parse try/catch (io.ts ~line 30) BEFORE parseOrderBookJson (types.ts) is ever called. No test exercises parseOrderBookJson's own catch branch (types.ts, 'Invalid order book: ...' prefix) against syntactically-valid JSON that fails Schema decode (e.g. a well-formed OrderBook object with an item missing 'issue' or lane 'C'). Fix: add a case — either import parseOrderBookJson directly and assert its ok:false error string, or have readOrderBook fed a schema-invalid-but-JSON-valid fixture — to prove the descriptive-error path named in AC5 actually executes.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2894",
     "lastVerifiedCommit": "1efab25bdb7b55b494dffc64f858401acec57b05",
@@ -534,9 +547,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 8159315,
-            "output": 319526,
-            "cacheRead": 67957248,
+            "input": 8802438,
+            "output": 345511,
+            "cacheRead": 71836160,
             "cacheWrite": 0
           }
         },
@@ -565,9 +578,9 @@
           "cacheWrite": 169467
         },
         "openai/gpt-5.6-sol": {
-          "input": 25724948,
-          "output": 1740624,
-          "cacheRead": 707538432,
+          "input": 26368071,
+          "output": 1766609,
+          "cacheRead": 711417344,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -578,8 +591,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 543.497067,
-        "pricingAsOf": "2026-07-19T02:49:40.108Z"
+        "usd": 549.431688,
+        "pricingAsOf": "2026-07-19T02:51:13.760Z"
       }
     },
     "merges": [
