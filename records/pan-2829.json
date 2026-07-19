@@ -82,6 +82,8 @@
       "README.md",
       "docs/codebase-health/D-architect-and-gating-model.md",
       "docs/codebase-health/REFACTOR-QUEUE.md",
+      "docs/design/ISSUE-PANE-DATA.md",
+      "docs/design/inspector-parity-checklist.md",
       "docs/marketing/COMPETITIVE-LANDSCAPE.md",
       "docs/marketing/MARKETING.md",
       "docs/overdeck-remodel/END-STATE.md",
@@ -353,6 +355,8 @@
       "docs/XBRIEF.md",
       "docs/codebase-health/D-architect-and-gating-model.md",
       "docs/codebase-health/REFACTOR-QUEUE.md",
+      "docs/design/ISSUE-PANE-DATA.md",
+      "docs/design/inspector-parity-checklist.md",
       "docs/marketing/COMPETITIVE-LANDSCAPE.md",
       "docs/marketing/MARKETING.md",
       "docs/overdeck-remodel/END-STATE.md",
@@ -568,7 +572,6 @@
       "src/lib/cloister/test-verdict.ts",
       "src/lib/cloister/triggers.ts",
       "src/lib/cloister/verification-runner.ts",
-      "src/lib/cloister/verification-types.ts",
       "src/lib/cloister/work-agent-prompt.ts",
       "src/lib/context-layers/assemble.ts",
       "src/lib/flywheel-merge-order.ts",
@@ -720,10 +723,10 @@
       "tests/xbrief/full-spec.test.ts",
       "vision.mdx"
     ],
-    "recordedAt": "2026-07-18T21:43:49.419Z"
+    "recordedAt": "2026-07-19T02:54:08.900Z"
   },
   "created": "2026-07-17T12:54:46.866Z",
-  "updated": "2026-07-19T02:53:57.713Z",
+  "updated": "2026-07-19T02:54:08.929Z",
   "pipeline": {
     "issueId": "PAN-2829",
     "reviewStatus": "passed",
