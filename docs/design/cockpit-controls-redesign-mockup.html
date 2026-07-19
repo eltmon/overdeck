@@ -1,4 +1,4 @@
-<title>Cockpit controls — resume, policies &amp; work overrides</title>
+<title>Issues-tree controls — resume, policies &amp; work overrides</title>
 <style>
   /* ---------- Embedded DM Sans (variable, latin) ---------- */
   @font-face {
@@ -49,23 +49,19 @@
     --page-code-bg: rgba(79, 70, 229, 0.07);
   }
 
-  /* ---------- Dashboard dark tokens (faithful to src/dashboard/frontend/src/index.css .dark) ---------- */
-  .dash {
-    --d-bg: #080b10;
-    --d-card: #0c1018;
-    --d-card2: #10151f;
-    --d-fg: #e5e7eb;
-    --d-muted: #9ca3af;
-    --d-border: rgba(255, 255, 255, 0.06);
-    --d-primary: #6366f1;
-    --d-info: #3b82f6;
-    --d-info-fg: #60a5fa;
-    --d-warning: #f59e0b;
-    --d-warning-fg: #fbbf24;
-    --d-success: #10b981;
-    --d-success-fg: #34d399;
-    --d-destructive: #f87171;
-    --d-cost: #22d3ee;
+  /* ---------- Dashboard LIGHT tokens (faithful to src/dashboard/frontend/src/index.css :root) ---------- */
+  .tree {
+    --t-bg: #ffffff;
+    --t-fg: #1f2937;
+    --t-muted: #6b7280;
+    --t-border: rgba(0, 0, 0, 0.08);
+    --t-muted-bg: rgba(0, 0, 0, 0.04);
+    --t-primary: #4f46e5;
+    --t-info: #3b82f6;
+    --t-warning: #f59e0b;
+    --t-warning-fg: #b45309;
+    --t-cost: #0e7490;
+    --t-context: #0e7490;
   }
 
   * { box-sizing: border-box; }
@@ -89,9 +85,9 @@
     color: var(--page-accent); font-weight: 500; margin-bottom: 10px;
   }
   h1 { font-size: 29px; font-weight: 500; letter-spacing: -0.01em; margin: 0 0 10px; text-wrap: balance; }
-  .lede { color: var(--page-muted); max-width: 62ch; margin: 0 0 6px; }
+  .lede { color: var(--page-muted); max-width: 64ch; margin: 0 0 6px; }
   h2 { font-size: 20px; font-weight: 500; margin: 0 0 4px; letter-spacing: -0.005em; }
-  .section { margin-top: 64px; }
+  .section { margin-top: 60px; }
   .section > .kicker {
     font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
     color: var(--page-muted); font-weight: 500; margin-bottom: 6px;
@@ -99,8 +95,7 @@
   .section > p.problem { color: var(--page-muted); max-width: 68ch; margin: 6px 0 22px; }
   .section p.problem strong { color: var(--page-fg); font-weight: 500; }
 
-  .pair { display: grid; grid-template-columns: 1fr; gap: 22px; }
-  .stack { display: grid; gap: 22px; }
+  .pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(440px, 1fr)); gap: 24px; align-items: start; }
 
   .frame-label {
     display: flex; align-items: baseline; gap: 10px;
@@ -111,284 +106,117 @@
   .frame-label .tag-after { color: var(--page-accent); }
   .frame-label .hint { text-transform: none; letter-spacing: 0; font-size: 12.5px; color: var(--page-muted); font-weight: 400; }
 
-  /* ---------- Dashboard viewport frame ---------- */
+  /* ---------- Tree panel viewport (fixed at the max drag width) ---------- */
   .viewport {
-    background: var(--d-bg, #080b10);
+    width: 460px; max-width: 100%;
+    background: #fbfbfc;
     border: 1px solid var(--page-border);
     border-radius: 10px;
     overflow-x: auto;
   }
   .viewport-bar {
     display: flex; align-items: center; gap: 6px;
-    padding: 8px 12px; border-bottom: 1px solid rgba(255,255,255,0.06);
+    padding: 7px 12px; border-bottom: 1px solid rgba(20,24,40,0.07);
   }
-  .viewport-bar i { width: 8px; height: 8px; border-radius: 50%; background: rgba(255,255,255,0.12); display: inline-block; }
-  .viewport-bar span { margin-left: 8px; font-size: 11px; color: #6b7280; }
-  .viewport-body { padding: 18px; min-width: 640px; }
+  .viewport-bar i { width: 8px; height: 8px; border-radius: 50%; background: rgba(20,24,40,0.12); display: inline-block; }
+  .viewport-bar span { margin-left: 8px; font-size: 11px; color: #8a8f9c; }
 
-  .dash { color: var(--d-fg); font-size: 13px; }
-
-  /* ---------- Shared dashboard primitives ---------- */
-  .d-badge {
-    display: inline-flex; align-items: center; gap: 4px;
-    height: 20px; padding: 0 6px; border-radius: 4px;
-    font-size: 10.5px; font-weight: 500; letter-spacing: 0.03em; text-transform: uppercase;
+  /* ---------- Tree recreation ---------- */
+  .tree { background: var(--t-bg); color: var(--t-fg); font-size: 12.5px; padding: 10px 12px 14px; min-width: 420px; }
+  .tree-sec {
+    display: flex; align-items: center; gap: 6px; padding: 2px 0 8px;
+    font-size: 11px; letter-spacing: 0.06em; color: var(--t-muted); font-weight: 500;
   }
-  .d-badge.amber { background: color-mix(in srgb, var(--d-warning) 8%, transparent); border: 1px solid color-mix(in srgb, var(--d-warning) 32%, transparent); color: var(--d-warning-fg); }
-  .d-badge.neutral { background: rgba(255,255,255,0.04); border: 1px solid var(--d-border); color: var(--d-muted); text-transform: none; letter-spacing: 0; }
-
-  .d-issue-pill {
-    display: inline-flex; align-items: center; height: 20px; padding: 0 7px;
-    border-radius: 4px; border: 1px solid var(--d-border); background: var(--d-card2);
-    font-size: 11px; color: var(--d-fg);
+  .tree-sec .cnt { margin-left: auto; background: var(--t-muted-bg); border-radius: 4px; padding: 0 6px; font-size: 10.5px; }
+  .tabs { display: flex; gap: 4px; margin-bottom: 10px; }
+  .tabs span {
+    flex: 1; text-align: center; padding: 3px 0; font-size: 11.5px; font-weight: 500;
+    border: 1px solid var(--t-border); border-radius: 5px; color: var(--t-muted); background: var(--t-bg);
   }
+  .tabs span.on { background: color-mix(in srgb, var(--t-primary) 9%, white); border-color: color-mix(in srgb, var(--t-primary) 25%, transparent); color: var(--t-fg); }
+  .proj-row { display: flex; align-items: center; gap: 6px; padding: 4px 0 6px; font-weight: 500; }
+  .proj-row .cnt { margin-left: auto; color: var(--t-muted); font-size: 11px; }
+  .car { color: var(--t-muted); font-size: 9px; }
 
-  /* =========================================================
-     SECTION 1 — Resume session
-     ========================================================= */
-
-  /* BEFORE: the floating strip */
-  .before-strip { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
-  .before-strip-row { display: flex; align-items: center; gap: 6px; }
-  .b-policies-btn {
-    display: inline-flex; align-items: center; gap: 6px; height: 22px; padding: 0 8px;
-    border: 1px solid var(--d-border); border-radius: 5px; background: transparent;
-    color: var(--d-fg); font-size: 11px; font-weight: 500; font-family: inherit;
+  /* BEFORE: floating controls between blocks */
+  .b-ctl-stack { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 6px 0 10px; }
+  .b-ctl-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .b-policies {
+    display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 8px;
+    border: 1px solid var(--t-border); border-radius: 5px; background: var(--t-bg);
+    color: var(--t-fg); font-size: 11px; font-weight: 500;
   }
-  .b-policies-btn .cnt { display: inline-flex; min-width: 14px; justify-content: center; border-radius: 3px; background: color-mix(in srgb, var(--d-primary) 12%, transparent); color: var(--d-primary); font-size: 9px; padding: 0 3px; }
+  .b-policies .cnt { display: inline-flex; min-width: 14px; justify-content: center; border-radius: 3px; background: color-mix(in srgb, var(--t-primary) 12%, transparent); color: var(--t-primary); font-size: 9px; padding: 0 3px; }
   .b-chip {
     display: inline-flex; align-items: center; gap: 4px; height: 20px; padding: 0 6px;
-    border-radius: 5px; border: 1px solid color-mix(in srgb, var(--d-primary) 32%, transparent);
-    background: color-mix(in srgb, var(--d-primary) 8%, transparent);
-    font-size: 11px; color: var(--d-fg);
+    border-radius: 5px; border: 1px solid color-mix(in srgb, var(--t-primary) 32%, transparent);
+    background: color-mix(in srgb, var(--t-primary) 8%, transparent);
+    font-size: 11px; color: var(--t-fg);
   }
-  .b-chip .k { color: var(--d-muted); }
-  .b-resume-btn {
-    display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 14px;
-    border: none; border-radius: 6px; background: var(--d-info); color: #fff;
-    font-size: 13px; font-weight: 500; font-family: inherit;
+  .b-chip .k { color: var(--t-muted); }
+  .b-resume {
+    display: inline-flex; align-items: center; height: 30px; padding: 0 13px;
+    border-radius: 6px; background: var(--t-primary); color: #fff; font-size: 12.5px; font-weight: 500;
   }
-  .callout-pin { font-size: 11.5px; color: var(--d-muted); font-style: italic; margin-top: 2px; }
 
-  /* AFTER: stopped-session strip */
-  .resume-card {
-    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
-    background: var(--d-card);
-    border: 1px solid var(--d-border);
-    border-left: 2px solid color-mix(in srgb, var(--d-warning) 55%, transparent);
-    border-radius: 8px; padding: 10px 14px;
+  /* Issue block */
+  .issue { padding: 4px 0 8px; }
+  .issue .head { display: grid; grid-template-columns: 18px 1fr auto; gap: 8px; align-items: start; }
+  .issue .box { width: 13px; height: 13px; margin-top: 2px; border: 1.5px dashed var(--t-muted); border-radius: 3px; opacity: 0.6; }
+  .issue .head .tt { min-width: 0; }
+  .issue .id { font-size: 11px; color: var(--t-muted); }
+  .issue .title { font-size: 12.5px; line-height: 1.35; color: var(--t-fg); }
+  .issue .cost { font-size: 12px; color: var(--t-muted); font-variant-numeric: tabular-nums; text-align: right; }
+  .issue .cost .bar { display: block; margin-top: 6px; color: rgba(0,0,0,0.18); font-size: 9px; letter-spacing: 2px; }
+  .issue .sub { margin: 6px 0 0 26px; display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
+  .st-badge {
+    display: inline-flex; align-items: center; height: 19px; padding: 0 7px; border-radius: 4px;
+    font-size: 10.5px; font-weight: 500;
+    background: color-mix(in srgb, var(--t-context) 9%, white); color: var(--t-context);
+    border: 1px solid color-mix(in srgb, var(--t-context) 25%, transparent);
   }
-  .resume-card .who { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
-  .resume-card .who .line1 { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-  .resume-card .who .agent-id { font-size: 12px; color: var(--d-fg); }
-  .resume-card .who .meta { font-size: 11.5px; color: var(--d-muted); }
-  .resume-card .who .meta b { color: var(--d-fg); font-weight: 500; }
-  .resume-card .last { font-size: 11.5px; color: var(--d-muted); }
-  .resume-card .cost { font-size: 12px; color: var(--d-cost); font-variant-numeric: tabular-nums; }
-  .resume-card .actions { display: flex; align-items: center; gap: 8px; }
-  .d-btn-primary {
-    display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 12px;
-    border: none; border-radius: 5px; background: var(--d-primary); color: #fff;
-    font-size: 12px; font-weight: 500; font-family: inherit; cursor: pointer;
+  .st-badge.neutral { background: var(--t-muted-bg); color: var(--t-muted); border-color: var(--t-border); }
+  .mini {
+    display: inline-flex; align-items: center; gap: 4px; height: 19px; padding: 0 6px;
+    border: 1px solid var(--t-border); border-radius: 4px; background: var(--t-bg);
+    font-size: 10.5px; color: var(--t-muted); font-weight: 500;
   }
-  .d-btn-primary:hover { background: color-mix(in srgb, var(--d-primary) 88%, white); }
-  .d-btn-ghost {
-    display: inline-flex; align-items: center; height: 26px; padding: 0 10px;
-    border: 1px solid var(--d-border); border-radius: 5px; background: transparent;
-    color: var(--d-muted); font-size: 12px; font-weight: 500; font-family: inherit; cursor: pointer;
-  }
-  .d-btn-ghost:hover { color: var(--d-fg); background: rgba(255,255,255,0.04); }
+  .resources { margin: 8px 0 0 26px; font-size: 10px; letter-spacing: 0.06em; color: var(--t-muted); font-weight: 500; }
 
-  /* AFTER: stopped-sessions list */
-  .stopped-list { border: 1px solid var(--d-border); border-radius: 8px; overflow: hidden; }
-  .stopped-list .hdr {
-    display: flex; align-items: baseline; gap: 8px; padding: 8px 14px;
-    background: var(--d-card); border-bottom: 1px solid var(--d-border);
-    font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--d-muted); font-weight: 500;
+  /* AFTER: docked controls row */
+  .issue.after { border-radius: 6px; }
+  .ctl-row { margin: 7px 0 0 26px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .a-resume {
+    display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 9px;
+    border: 1px solid color-mix(in srgb, var(--t-primary) 32%, transparent);
+    background: color-mix(in srgb, var(--t-primary) 8%, transparent);
+    border-radius: 5px; font-size: 11.5px; font-weight: 500; color: var(--t-primary); cursor: pointer;
   }
-  .stopped-row {
-    display: grid; grid-template-columns: 92px minmax(180px, 1.4fr) minmax(220px, 1fr) 120px 84px;
-    gap: 12px; align-items: center; padding: 9px 14px;
-    border-bottom: 1px solid var(--d-border); background: transparent;
+  .a-resume:hover { background: color-mix(in srgb, var(--t-primary) 14%, transparent); }
+  .a-resume .when { color: var(--t-muted); font-weight: 400; }
+  .a-pol {
+    display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 8px;
+    border: 1px solid var(--t-border); border-radius: 5px; background: var(--t-bg);
+    color: var(--t-muted); font-size: 11px; font-weight: 500; cursor: pointer;
   }
-  .stopped-row:last-child { border-bottom: none; }
-  .stopped-row:hover { background: rgba(255,255,255,0.02); }
-  .stopped-row .title { font-size: 12.5px; color: var(--d-fg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .stopped-row .who { font-size: 11.5px; color: var(--d-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .stopped-row .who .id { color: var(--d-fg); }
-  .stopped-row .when { font-size: 11.5px; color: var(--d-muted); text-align: right; font-variant-numeric: tabular-nums; }
-  .stopped-row .act { text-align: right; }
-  .d-link-btn {
-    display: inline-flex; align-items: center; height: 24px; padding: 0 10px;
-    border: 1px solid color-mix(in srgb, var(--d-primary) 32%, transparent);
-    border-radius: 5px; background: color-mix(in srgb, var(--d-primary) 8%, transparent);
-    color: var(--d-fg); font-size: 11.5px; font-weight: 500; font-family: inherit; cursor: pointer;
+  .a-pol:hover { color: var(--t-fg); background: var(--t-muted-bg); }
+  .a-pol .cnt { display: inline-flex; min-width: 14px; height: 14px; align-items: center; justify-content: center; border-radius: 3px; background: color-mix(in srgb, var(--t-primary) 12%, transparent); color: var(--t-primary); font-size: 9px; }
+  .a-pol.has { color: var(--t-fg); }
+  .ov-chip {
+    display: inline-flex; align-items: stretch; height: 22px;
+    border: 1px solid var(--t-border); border-radius: 5px; overflow: hidden;
+    font-size: 11px; cursor: pointer; background: var(--t-bg);
   }
-  .d-link-btn:hover { background: color-mix(in srgb, var(--d-primary) 16%, transparent); }
+  .ov-chip .key { display: inline-flex; align-items: center; padding: 0 6px; background: var(--t-muted-bg); color: var(--t-muted); font-weight: 500; }
+  .ov-chip .val { display: inline-flex; align-items: center; gap: 4px; padding: 0 7px; color: var(--t-fg); font-weight: 500; }
+  .ov-chip .val .dot { width: 5px; height: 5px; border-radius: 50%; background: var(--t-primary); }
+  .ov-chip .x { display: inline-flex; align-items: center; padding: 0 6px; color: var(--t-muted); border-left: 1px solid var(--t-border); }
+  .ov-chip .x:hover { color: var(--t-fg); background: var(--t-muted-bg); }
 
-  /* =========================================================
-     SECTION 2 — Override chips
-     ========================================================= */
-  .after-chip-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-  .a-policies-btn {
-    display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 9px;
-    border: 1px solid var(--d-border); border-radius: 5px; background: var(--d-card2);
-    color: var(--d-fg); font-size: 11.5px; font-weight: 500; font-family: inherit; cursor: pointer;
-  }
-  .a-policies-btn:hover { background: rgba(255,255,255,0.05); }
-  .a-policies-btn .cnt {
-    display: inline-flex; min-width: 15px; height: 15px; align-items: center; justify-content: center;
-    border-radius: 3px; background: color-mix(in srgb, var(--d-primary) 16%, transparent);
-    color: #a5b4fc; font-size: 9.5px;
-  }
-  .a-chip {
-    display: inline-flex; align-items: stretch; height: 24px;
-    border: 1px solid var(--d-border); border-radius: 5px; overflow: hidden;
-    font-size: 11.5px; cursor: pointer; background: var(--d-card);
-  }
-  .a-chip .key {
-    display: inline-flex; align-items: center; padding: 0 7px;
-    background: rgba(255,255,255,0.04); color: var(--d-muted); font-weight: 500;
-  }
-  .a-chip .val { display: inline-flex; align-items: center; gap: 5px; padding: 0 8px; color: var(--d-fg); font-weight: 500; }
-  .a-chip .val .dot { width: 5px; height: 5px; border-radius: 50%; background: var(--d-primary); }
-  .a-chip .x {
-    display: inline-flex; align-items: center; padding: 0 7px; color: var(--d-muted);
-    border-left: 1px solid var(--d-border); font-size: 12px;
-  }
-  .a-chip .x:hover { color: var(--d-fg); background: rgba(255,255,255,0.05); }
-  .a-chip .note { color: var(--d-muted); font-weight: 400; }
-  .a-restart {
-    display: inline-flex; align-items: center; gap: 8px; height: 24px; padding: 0 4px 0 9px;
-    border: 1px solid color-mix(in srgb, var(--d-warning) 32%, transparent);
-    background: color-mix(in srgb, var(--d-warning) 8%, transparent);
-    border-radius: 5px; font-size: 11.5px; color: var(--d-warning-fg); font-weight: 500;
-  }
-  .a-restart button {
-    height: 18px; padding: 0 7px; margin: 0; border: 1px solid color-mix(in srgb, var(--d-warning) 45%, transparent);
-    border-radius: 4px; background: transparent; color: var(--d-warning-fg);
-    font-size: 10.5px; font-weight: 500; font-family: inherit; cursor: pointer;
-  }
-  .a-restart button:hover { background: color-mix(in srgb, var(--d-warning) 12%, transparent); }
-
-  /* =========================================================
-     SECTION 3 — Policies panel
-     ========================================================= */
-  .panel-pair { display: grid; grid-template-columns: 1fr; gap: 22px; align-items: start; }
-
-  /* BEFORE panel (faithful) */
-  .b-panel {
-    width: 440px; max-width: 100%; background: var(--d-card); border: 1px solid var(--d-border);
-    border-radius: 10px; padding: 14px 16px 12px; box-shadow: 0 12px 32px rgba(0,0,0,0.45);
-  }
-  .b-panel h3 { margin: 0 0 8px; font-size: 10px; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase; color: var(--d-muted); }
-  .b-panel h3 + .b-row { margin-top: 4px; }
-  .b-panel .divider { border-top: 1px solid var(--d-border); margin: 14px -16px 12px; }
-  .b-row { display: grid; grid-template-columns: 108px 1fr; gap: 10px; margin: 10px 0; align-items: start; }
-  .b-row .lbl { display: flex; align-items: center; gap: 5px; padding-top: 4px; font-size: 12px; color: var(--d-muted); font-weight: 500; }
-  .b-row .lbl .q { font-size: 9px; border: 1px solid var(--d-border); border-radius: 50%; width: 12px; height: 12px; display: inline-flex; align-items: center; justify-content: center; color: var(--d-muted); flex: none; }
-  .b-row .lbl .odot { width: 5px; height: 5px; border-radius: 50%; background: var(--d-primary); flex: none; }
-  .b-seg { display: inline-flex; border: 1px solid var(--d-border); border-radius: 5px; overflow: hidden; }
-  .b-seg span {
-    padding: 3px 8px; font-size: 11px; font-weight: 500; color: var(--d-muted);
-    border-left: 1px solid var(--d-border); white-space: nowrap;
-  }
-  .b-seg span:first-child { border-left: none; }
-  .b-seg span.on { background: color-mix(in srgb, var(--d-primary) 12%, transparent); color: var(--d-fg); }
-  .b-seg span .res { font-size: 10px; color: var(--d-muted); }
-  .b-select {
-    width: 100%; border: 1px solid var(--d-border); border-radius: 5px; background: var(--d-card);
-    color: var(--d-fg); font-size: 11.5px; font-weight: 500; padding: 3px 8px;
-    display: flex; justify-content: space-between; align-items: center;
-  }
-  .b-select .car { color: var(--d-muted); font-size: 9px; }
-  .b-hint { margin-top: 4px; font-size: 11px; line-height: 1.4; color: var(--d-muted); }
-  .b-reset { font-size: 10.5px; color: var(--d-muted); text-decoration: underline; text-underline-offset: 2px; margin-left: 8px; white-space: nowrap; }
-  .b-foot { display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--d-border); margin: 14px -16px 0; padding: 10px 16px 0; font-size: 10.5px; color: var(--d-muted); }
-  .b-foot .rst { text-decoration: underline; text-underline-offset: 2px; font-size: 11px; }
-  .b-ctlrow { display: flex; align-items: center; }
-  .b-ctlrow .ctl { min-width: 0; flex: 1; }
-
-  /* AFTER panel */
-  .a-panel {
-    width: 508px; max-width: 100%; background: var(--d-card); border: 1px solid var(--d-border);
-    border-radius: 10px; padding: 0; box-shadow: 0 12px 32px rgba(0,0,0,0.45); overflow: hidden;
-  }
-  .a-panel .ph {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 11px 16px; border-bottom: 1px solid var(--d-border); background: var(--d-card2);
-  }
-  .a-panel .ph .t { font-size: 12.5px; font-weight: 500; color: var(--d-fg); }
-  .a-panel .ph .s { font-size: 11px; color: var(--d-muted); }
-  .a-panel .grp { padding: 12px 16px 6px; }
-  .a-panel .grp + .grp { border-top: 1px solid var(--d-border); }
-  .a-panel .grp .gh {
-    display: flex; align-items: baseline; gap: 8px; margin-bottom: 10px;
-    font-size: 10px; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase; color: var(--d-muted);
-  }
-  .a-row { display: grid; grid-template-columns: 96px 1fr auto; gap: 10px; align-items: center; min-height: 34px; }
-  .a-row.overridden .a-seg button[data-v=""] .res { display: none; }
-  .a-row + .a-row { margin-top: 2px; }
-  .a-row .lbl { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--d-muted); font-weight: 500; }
-  .a-row.overridden .lbl { color: var(--d-fg); }
-  .a-row .lbl .odot { width: 5px; height: 5px; border-radius: 50%; background: var(--d-primary); opacity: 0; flex: none; }
-  .a-row.overridden .lbl .odot { opacity: 1; }
-  .a-row .lbl .q {
-    font-size: 9px; border: 1px solid var(--d-border); border-radius: 50%;
-    width: 12px; height: 12px; display: inline-flex; align-items: center; justify-content: center;
-    color: var(--d-muted); flex: none; cursor: help;
-  }
-  .a-row .rst {
-    visibility: hidden; border: none; background: none; color: var(--d-muted);
-    font-size: 11px; font-family: inherit; cursor: pointer; padding: 2px 4px; border-radius: 4px;
-  }
-  .a-row.overridden .rst { visibility: visible; }
-  .a-row .rst:hover { color: var(--d-fg); background: rgba(255,255,255,0.05); }
-
-  .a-seg { display: inline-flex; justify-self: start; border: 1px solid var(--d-border); border-radius: 6px; overflow: hidden; background: var(--d-bg); }
-  .a-seg button {
-    appearance: none; border: none; margin: 0; background: transparent;
-    padding: 4px 9px; font-size: 11.5px; font-weight: 500; font-family: inherit;
-    color: var(--d-muted); cursor: pointer; border-left: 1px solid var(--d-border); white-space: nowrap;
-  }
-  .a-seg button:first-child { border-left: none; }
-  .a-seg button:hover { color: var(--d-fg); background: rgba(255,255,255,0.04); }
-  .a-seg button.on { background: color-mix(in srgb, var(--d-primary) 14%, transparent); color: var(--d-fg); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--d-primary) 40%, transparent); }
-  .a-seg button .res { color: var(--d-muted); font-size: 10.5px; }
-  .a-seg button.on .res { color: #a5b4fc; }
-
-  .a-select {
-    display: inline-flex; align-items: center; justify-content: space-between; gap: 10px;
-    min-width: 220px; border: 1px solid var(--d-border); border-radius: 6px; background: var(--d-bg);
-    color: var(--d-fg); font-size: 11.5px; font-weight: 500; font-family: inherit;
-    padding: 4px 9px; cursor: pointer;
-  }
-  .a-select:hover { background: rgba(255,255,255,0.03); }
-  .a-select .muted { color: var(--d-muted); font-weight: 400; }
-  .a-select .car { color: var(--d-muted); font-size: 9px; }
-  .a-note { grid-column: 2 / -1; font-size: 11px; color: var(--d-muted); margin: -2px 0 6px; }
-  .a-warn {
-    margin: 10px 16px 12px; border: 1px solid color-mix(in srgb, var(--d-warning) 32%, transparent);
-    background: color-mix(in srgb, var(--d-warning) 8%, transparent);
-    border-radius: 7px; padding: 9px 12px; font-size: 11.5px; color: var(--d-warning-fg);
-    display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
-  }
-  .a-warn button {
-    height: 22px; padding: 0 9px; border: 1px solid color-mix(in srgb, var(--d-warning) 45%, transparent);
-    border-radius: 5px; background: transparent; color: var(--d-warning-fg);
-    font-size: 11px; font-weight: 500; font-family: inherit; cursor: pointer;
-  }
-  .a-warn button:hover { background: color-mix(in srgb, var(--d-warning) 12%, transparent); }
-  .a-foot {
-    display: flex; justify-content: space-between; align-items: center;
-    padding: 9px 16px; border-top: 1px solid var(--d-border); background: var(--d-card2);
-    font-size: 11px; color: var(--d-muted);
-  }
-  .a-foot .rall { border: none; background: none; color: var(--d-muted); font-size: 11px; font-family: inherit; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; padding: 0; }
-  .a-foot .rall:hover { color: var(--d-fg); }
+  .callout-pin { font-size: 11.5px; color: var(--t-muted); font-style: italic; }
 
   /* ---------- Design notes ---------- */
-  .notes { margin-top: 18px; border-left: 2px solid var(--page-accent); padding: 2px 0 2px 16px; }
+  .notes { margin-top: 20px; border-left: 2px solid var(--page-accent); padding: 2px 0 2px 16px; }
   .notes h4 { margin: 0 0 6px; font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--page-muted); font-weight: 500; }
   .notes ul { margin: 0; padding-left: 18px; color: var(--page-fg); }
   .notes li { margin: 5px 0; max-width: 74ch; }
@@ -398,96 +226,137 @@
   }
   .notes li .muted { color: var(--page-muted); }
 
-  .impl { margin-top: 64px; border-top: 1px solid var(--page-border); padding-top: 24px; }
+  .scope-note {
+    margin: 26px 0 0; padding: 12px 16px; border: 1px solid var(--page-border);
+    border-radius: 8px; background: var(--page-card); color: var(--page-muted); max-width: 74ch;
+  }
+  .scope-note strong { color: var(--page-fg); font-weight: 500; }
+
+  .impl { margin-top: 60px; border-top: 1px solid var(--page-border); padding-top: 24px; }
   .impl p { color: var(--page-muted); max-width: 70ch; }
   .impl ul { color: var(--page-fg); padding-left: 18px; }
   .impl li { margin: 5px 0; }
-
-  @media (max-width: 720px) {
-    .viewport-body { min-width: 560px; }
-    .stopped-row { grid-template-columns: 84px 1fr 96px; }
-    .stopped-row .who, .stopped-row .when { display: none; }
-  }
 </style>
 
 <div class="wrap">
-  <div class="eyebrow">Overdeck · design proposal</div>
-  <h1>Cockpit controls: resume session, policies &amp; work overrides</h1>
-  <p class="lede">Three surfaces in the issue cockpit share one problem: they present actions and state without identity or structure. Each section below recreates the current UI, then proposes a replacement built from the dashboard's own tokens (DM Sans · 500, SF Mono for identifiers, the 8%/32% badge formula, amber&nbsp;=&nbsp;human, blue&nbsp;=&nbsp;machine, emerald&nbsp;=&nbsp;outcome).</p>
+  <div class="eyebrow">Overdeck · design proposal · v2</div>
+  <h1>Issues-tree controls: resume session, policies &amp; work overrides</h1>
+  <p class="lede">Scope: only the inline controls in the ISSUES tree — the floating "Resume session" button and the Policies / work-override strip. Both viewports below are fixed at the panel's maximum drag width (~460px) in the dashboard's light tokens. <strong style="color: var(--page-fg); font-weight: 500;">The Policies popup panel is not touched by this proposal.</strong></p>
 
   <!-- ================= SECTION 1 ================= -->
   <div class="section">
-    <div class="kicker">01 · Resume session</div>
-    <h2>A resume affordance that says <em>what</em> it resumes</h2>
-    <p class="problem">Today the resume affordance is a lone filled-blue button floating between the tab bar and the issue card. It names no issue, no agent, no session — and blue is the wrong signal: blue means <strong>a machine is working</strong>, but a stopped session is waiting on <strong>you</strong>, which is amber's job. The same problem repeats wherever several stopped sessions appear together: nothing binds a session to its issue.</p>
+    <div class="kicker">01 · The problem</div>
+    <h2>Controls float <em>between</em> issues instead of living <em>inside</em> them</h2>
+    <p class="problem"><code>IssueView</code> renders the policy strip and the resume CTA <em>before</em> the issue row it belongs to, so in the tree every stopped issue grows a full-width solid-blue <strong>Resume session</strong> block and a <strong>Policies</strong> button hovering in the gap between cards. Reading top-to-bottom you can't tell if a button belongs to the issue above or below it — and at three stopped issues the panel is mostly buttons.</p>
 
-    <div class="stack">
+    <div class="pair">
       <div>
-        <div class="frame-label"><span class="tag-before">Before</span><span class="hint">a context-free button, parked above the issue header</span></div>
-        <div class="viewport"><div class="viewport-bar"><i></i><i></i><i></i><span>command-deck / panopticon-cli / PAN-2829</span></div>
-          <div class="viewport-body dash">
-            <div class="before-strip">
-              <div class="before-strip-row">
-                <span class="b-policies-btn">⚙ Policies <span class="cnt">1</span></span>
+        <div class="frame-label"><span class="tag-before">Before</span><span class="hint">faithful to the panel at max width</span></div>
+        <div class="viewport"><div class="viewport-bar"><i></i><i></i><i></i><span>command deck · issues tree · 460px</span></div>
+          <div class="tree">
+            <div class="tree-sec"><span class="car">▼</span> ISSUES <span class="cnt">14</span></div>
+            <div class="tabs"><span class="on">All</span><span>Alive</span><span>Failed</span><span>Planned</span></div>
+            <div class="proj-row"><span class="car">▼</span> panopticon-cli <span class="cnt">14</span></div>
+
+            <div class="b-ctl-stack">
+              <span class="b-policies">⚙ Policies</span>
+              <span class="b-resume">Resume session</span>
+            </div>
+            <div class="issue">
+              <div class="head">
+                <span class="box"></span>
+                <span class="tt"><span class="id mono">PAN-806</span>&nbsp; <span class="title">Mechanically block git rebase/reset/stash in agent workspaces (hook + PATH guard)</span></span>
+                <span class="cost">$6.53<span class="bar">▬ ▬ ▬ ▬</span></span>
+              </div>
+              <div class="sub"><span class="st-badge">Has Context</span></div>
+              <div class="sub"><span class="mini">📁 workspace</span><span class="mini">⎇ branch local 1</span><span class="mini">≡ vBRIEF</span><span class="mini">⚙ tasks</span></div>
+              <div class="resources">› RESOURCES&nbsp;&nbsp;1 BRANCH</div>
+            </div>
+
+            <div class="b-ctl-stack">
+              <span class="b-policies">⚙ Policies</span>
+              <span class="b-resume">Resume session</span>
+            </div>
+            <div class="issue">
+              <div class="head">
+                <span class="box"></span>
+                <span class="tt"><span class="id mono">PAN-1525</span>&nbsp; <span class="title">Harness-independent composer commands: canonical manifest, /pan router, and cross-harness parity</span></span>
+                <span class="cost">$5.08<span class="bar">▬ ▬ ▬ ▬</span></span>
+              </div>
+              <div class="sub"><span class="st-badge neutral">Allocated</span></div>
+              <div class="sub"><span class="mini">📁 workspace</span><span class="mini">⎇ branch local 1</span></div>
+              <div class="resources">› RESOURCES&nbsp;&nbsp;1 BRANCH</div>
+            </div>
+
+            <div class="b-ctl-stack">
+              <div class="b-ctl-row">
+                <span class="b-policies">⚙ Policies <span class="cnt">1</span></span>
                 <span class="b-chip"><span class="k">work ·</span> GPT-5.6 Sol · replaces crews</span>
               </div>
-              <button class="b-resume-btn" type="button">▶ Resume session</button>
-              <div class="callout-pin">…resume <em>which</em> session? For <em>which</em> issue? Stopped since <em>when</em>?</div>
             </div>
+            <div class="issue">
+              <div class="head">
+                <span class="box"></span>
+                <span class="tt"><span class="id mono">PAN-2377</span>&nbsp; <span class="title">feat(flywheel): first-class 'special orders' runs — operator…</span></span>
+                <span class="cost">$542.68</span>
+              </div>
+            </div>
+            <div style="margin-top: 10px;"><span class="callout-pin">…whose session does each blue block resume — the issue above it, or below?</span></div>
           </div>
         </div>
       </div>
 
       <div>
-        <div class="frame-label"><span class="tag-after">After</span><span class="hint">cockpit strip — the session carries its identity, state, and cost</span></div>
-        <div class="viewport"><div class="viewport-bar"><i></i><i></i><i></i><span>command-deck / panopticon-cli / PAN-2829</span></div>
-          <div class="viewport-body dash">
-            <div class="resume-card">
-              <span class="d-badge amber">⏸ Stopped · 7h</span>
-              <div class="who">
-                <div class="line1">
-                  <span class="d-issue-pill mono">PAN-2829</span>
-                  <span class="agent-id mono">agent-pan-2829</span>
-                  <span class="meta">work · <b>GPT-5.6 Sol</b> · claude-code</span>
-                </div>
-                <div class="last">10 of 10 tasks done — reviewer pending. Session memory intact.</div>
-              </div>
-              <span class="cost mono">$271.43</span>
-              <div class="actions">
-                <button class="d-btn-primary" type="button">▶ Resume session</button>
-                <button class="d-btn-ghost" type="button">Start fresh…</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+        <div class="frame-label"><span class="tag-after">After</span><span class="hint">same width — controls dock inside their issue</span></div>
+        <div class="viewport"><div class="viewport-bar"><i></i><i></i><i></i><span>command deck · issues tree · 460px</span></div>
+          <div class="tree">
+            <div class="tree-sec"><span class="car">▼</span> ISSUES <span class="cnt">14</span></div>
+            <div class="tabs"><span class="on">All</span><span>Alive</span><span>Failed</span><span>Planned</span></div>
+            <div class="proj-row"><span class="car">▼</span> panopticon-cli <span class="cnt">14</span></div>
 
-      <div>
-        <div class="frame-label"><span class="tag-after">After</span><span class="hint">anywhere sessions are listed (Agents view, boot recovery) — the issue leads every row</span></div>
-        <div class="viewport"><div class="viewport-bar"><i></i><i></i><i></i><span>agents / stopped sessions</span></div>
-          <div class="viewport-body dash">
-            <div class="stopped-list">
-              <div class="hdr">Stopped sessions · 3 resumable</div>
-              <div class="stopped-row">
-                <span class="d-issue-pill mono">PAN-2829</span>
-                <span class="title">Complete the vBRIEF → xBRIEF rename across code, docs, skills, and UI</span>
-                <span class="who"><span class="id mono">agent-pan-2829</span> · work · GPT-5.6 Sol</span>
-                <span class="when">7h ago · <span class="mono" style="color:var(--d-cost)">$271.43</span></span>
-                <span class="act"><button class="d-link-btn" type="button">▶ Resume</button></span>
+            <div class="issue after">
+              <div class="head">
+                <span class="box"></span>
+                <span class="tt"><span class="id mono">PAN-806</span>&nbsp; <span class="title">Mechanically block git rebase/reset/stash in agent workspaces (hook + PATH guard)</span></span>
+                <span class="cost">$6.53<span class="bar">▬ ▬ ▬ ▬</span></span>
               </div>
-              <div class="stopped-row">
-                <span class="d-issue-pill mono">MIN-865</span>
-                <span class="title">Codex work agent dead-ends after handoff — locked composer on resume</span>
-                <span class="who"><span class="id mono">agent-min-865</span> · work · gpt-5.6 · codex</span>
-                <span class="when">2d ago · <span class="mono" style="color:var(--d-cost)">$48.10</span></span>
-                <span class="act"><button class="d-link-btn" type="button">▶ Resume</button></span>
+              <div class="sub"><span class="st-badge">Has Context</span></div>
+              <div class="sub"><span class="mini">📁 workspace</span><span class="mini">⎇ branch local 1</span><span class="mini">≡ vBRIEF</span><span class="mini">⚙ tasks</span></div>
+              <div class="ctl-row">
+                <button class="a-resume" type="button">▶ Resume <span class="when">· stopped 3d</span></button>
+                <button class="a-pol" type="button" title="Issue policies">⚙</button>
               </div>
-              <div class="stopped-row">
-                <span class="d-issue-pill mono">PAN-2258</span>
-                <span class="title">Strike: merge gate wedged on stale review-status row</span>
-                <span class="who"><span class="id mono">strike-pan-2258</span> · strike · Sonnet 5</span>
-                <span class="when">3d ago · <span class="mono" style="color:var(--d-cost)">$6.53</span></span>
-                <span class="act"><button class="d-link-btn" type="button">▶ Resume</button></span>
+              <div class="resources">› RESOURCES&nbsp;&nbsp;1 BRANCH</div>
+            </div>
+
+            <div class="issue after">
+              <div class="head">
+                <span class="box"></span>
+                <span class="tt"><span class="id mono">PAN-1525</span>&nbsp; <span class="title">Harness-independent composer commands: canonical manifest, /pan router, and cross-harness parity</span></span>
+                <span class="cost">$5.08<span class="bar">▬ ▬ ▬ ▬</span></span>
+              </div>
+              <div class="sub"><span class="st-badge neutral">Allocated</span></div>
+              <div class="sub"><span class="mini">📁 workspace</span><span class="mini">⎇ branch local 1</span></div>
+              <div class="ctl-row">
+                <button class="a-resume" type="button">▶ Resume <span class="when">· stopped 5h</span></button>
+                <button class="a-pol" type="button" title="Issue policies">⚙</button>
+              </div>
+              <div class="resources">› RESOURCES&nbsp;&nbsp;1 BRANCH</div>
+            </div>
+
+            <div class="issue after">
+              <div class="head">
+                <span class="box"></span>
+                <span class="tt"><span class="id mono">PAN-2377</span>&nbsp; <span class="title">feat(flywheel): first-class 'special orders' runs — operator…</span></span>
+                <span class="cost">$542.68</span>
+              </div>
+              <div class="ctl-row">
+                <button class="a-pol has" type="button" title="Issue policies">⚙ <span class="cnt">1</span></button>
+                <span class="ov-chip" title="Open policies at Work · Model">
+                  <span class="key">work model</span>
+                  <span class="val"><span class="dot"></span>GPT-5.6 Sol</span>
+                  <span class="x" title="Clear override">×</span>
+                </span>
               </div>
             </div>
           </div>
@@ -498,286 +367,26 @@
     <div class="notes">
       <h4>Design notes</h4>
       <ul>
-        <li><strong>Identity travels with the action.</strong> Every resume affordance leads with the issue pill (<code>PAN-2829</code>, SF&nbsp;Mono) and the agent id, so ownership survives multi-pane layouts, lists, and recovery modals.</li>
-        <li><strong>Amber, not blue.</strong> A stopped-but-resumable session is a human-must-act state — the one colored signal on the card is the amber <em>Stopped</em> badge. The CTA stays primary-indigo; the current <code>--info</code> fill misreads as "machine running".</li>
-        <li><strong>Answer the questions the button raises.</strong> Role, model, harness, stopped-for duration, spend, and a one-line "where it left off" — everything you'd otherwise dig out of the crew card or tmux.</li>
-        <li><strong>One row, one signal.</strong> List rows keep taxonomy neutral (muted role/model text), reserving color for cost (cyan, tabular numerals) per the style guide.</li>
-        <li><strong>"Start fresh…"</strong> sits beside resume as the ghost secondary — today reset-session hides in a context menu while resume floats alone.</li>
+        <li><strong>Binding is structural, not inferred.</strong> The controls render as the <em>last row inside</em> the issue block, at the same indent as the badge rows — after the badges, before RESOURCES. Nothing sits in the gap between issues anymore, so "whose button is this" stops being a question.</li>
+        <li><strong>Resume right-sizes from block to chip.</strong> The 30px solid-primary bar becomes a 22px tinted chip (8%/32% formula) that carries the one fact the old button hid: <em>stopped · 3d</em>. It stays the single colored control in the block, so it still reads as "the action here".</li>
+        <li><strong>Policies goes quiet until it has something to say.</strong> Icon-only <code>⚙</code> at rest; the count badge and foreground color appear only when overrides exist. Same popover on click — <span class="muted">the panel itself is unchanged</span>.</li>
+        <li><strong>The work-selector chip gets key/value structure.</strong> <em>work model | GPT-5.6 Sol</em> replaces the "work · GPT-5.6 Sol · replaces crews" run-on; the side-effect note lives in the chip's tooltip, and the trailing <code>×</code> clears the override without opening the panel.</li>
+        <li><strong>Vertical cost.</strong> Each stopped issue currently spends ~64px on its floating controls; the docked row spends 22px inside space the block already owns.</li>
+        <li class="muted">No-loss audit: resume, policies popover access, override visibility, and override clearing all remain reachable — plus the popover keeps its own per-row resets, untouched.</li>
       </ul>
     </div>
-  </div>
 
-  <!-- ================= SECTION 2 ================= -->
-  <div class="section">
-    <div class="kicker">02 · Policy override chips</div>
-    <h2>Override chips that parse at a glance</h2>
-    <p class="problem">The strip next to the Policies button renders each override as a mid-dot run-on — <strong>"work · GPT-5.6 Sol · replaces crews"</strong> — where key, value, and side-effect all share one voice, and clearing an override means opening the panel and hunting for the right reset link. "restart pending" is a warning styled like just another chip.</p>
-
-    <div class="stack">
-      <div>
-        <div class="frame-label"><span class="tag-before">Before</span></div>
-        <div class="viewport"><div class="viewport-bar"><i></i><i></i><i></i><span>issue header · policy strip</span></div>
-          <div class="viewport-body dash">
-            <div class="before-strip-row">
-              <span class="b-policies-btn">⚙ Policies <span class="cnt">1</span></span>
-              <span class="b-chip"><span class="k">work ·</span> GPT-5.6 Sol · replaces crews</span>
-              <span class="b-chip" style="border-color: color-mix(in srgb, var(--d-warning) 32%, transparent); background: color-mix(in srgb, var(--d-warning) 8%, transparent); color: var(--d-warning-fg);">restart pending</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div>
-        <div class="frame-label"><span class="tag-after">After</span><span class="hint">key/value structure, inline clear, warning promoted to an action</span></div>
-        <div class="viewport"><div class="viewport-bar"><i></i><i></i><i></i><span>issue header · policy strip</span></div>
-          <div class="viewport-body dash">
-            <div class="after-chip-row">
-              <button class="a-policies-btn" type="button">⚙ Policies <span class="cnt">2</span></button>
-              <span class="a-chip" title="Open policies at Work · Model">
-                <span class="key">work model</span>
-                <span class="val"><span class="dot"></span>GPT-5.6 Sol <span class="note">· replaces crews</span></span>
-                <span class="x" title="Clear override">×</span>
-              </span>
-              <span class="a-chip" title="Open policies at Review · Mode">
-                <span class="key">review</span>
-                <span class="val"><span class="dot"></span>Full</span>
-                <span class="x" title="Clear override">×</span>
-              </span>
-              <span class="a-restart">⏻ Model change applies on next spawn <button type="button">Restart now</button></span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="notes">
-      <h4>Design notes</h4>
-      <ul>
-        <li><strong>Two-cell chips.</strong> A muted key cell (<em>work model</em>) and a foreground value cell (<em>GPT-5.6 Sol</em>) replace the mid-dot run-on; the override dot marks it as a deviation from defaults, matching the dot inside the panel.</li>
-        <li><strong>Clear without opening the panel.</strong> The trailing <code>×</code> resets that one override in place — the chip body still opens the panel scrolled to its row.</li>
-        <li><strong>Warnings aren't chips.</strong> "restart pending" becomes a sentence with its action attached — amber, because a human must act — instead of cosplaying as a policy value.</li>
-        <li>Side effects (<em>replaces crews</em>) render muted inside the value cell: visible, but subordinate to the value itself.</li>
-      </ul>
-    </div>
-  </div>
-
-  <!-- ================= SECTION 3 ================= -->
-  <div class="section">
-    <div class="kicker">03 · Policies panel &amp; work selectors</div>
-    <h2>One aligned grid, honest defaults, obvious overrides</h2>
-    <p class="problem">The current panel mixes three control styles (segmented buttons, native selects, underlined reset links), wraps its own labels ("Standing crew"), and spends its widest segment on the confusing <strong>"Default · quick"</strong> — a button whose label changes meaning depending on config elsewhere. Hints repeat under every row whether you need them or not. The redesign below is interactive — click the segments.</p>
-
-    <div class="panel-pair">
-      <div>
-        <div class="frame-label"><span class="tag-before">Before</span></div>
-        <div class="viewport"><div class="viewport-bar"><i></i><i></i><i></i><span>Policies popover (440px)</span></div>
-          <div class="viewport-body dash" style="min-width: 0;">
-            <div class="b-panel">
-              <h3>Review</h3>
-              <div class="b-row">
-                <span class="lbl">Mode <span class="q">?</span></span>
-                <div>
-                  <div class="b-seg"><span>Default <span class="res">· quick</span></span><span>Quick</span><span>Full</span><span>None</span></div>
-                  <div class="b-hint">How much AI review runs before merge.</div>
-                </div>
-              </div>
-              <div class="b-row">
-                <span class="lbl">Model <span class="q">?</span></span>
-                <div>
-                  <div class="b-select"><span>Default · per-role default</span><span class="car">▼</span></div>
-                  <div class="b-hint">Which model reviews this issue.</div>
-                </div>
-              </div>
-              <div class="divider"></div>
-              <h3>Work</h3>
-              <div class="b-row">
-                <span class="lbl"><span class="odot"></span>Model <span class="q">?</span></span>
-                <div>
-                  <div class="b-ctlrow"><div class="ctl b-select"><span>GPT-5.6 Sol</span><span class="car">▼</span></div><span class="b-reset">reset</span></div>
-                  <div class="b-hint">Pins the implementation model for this issue.</div>
-                  <div class="b-hint">Overrides crew routing — every item on this issue runs this model.</div>
-                </div>
-              </div>
-              <div class="b-row">
-                <span class="lbl">Swarm <span class="q">?</span></span>
-                <div>
-                  <div class="b-seg"><span>Default <span class="res">· off</span></span><span>Off</span><span>Auto</span><span>Always</span></div>
-                  <div class="b-hint">Run plan items in parallel across several agents.</div>
-                </div>
-              </div>
-              <div class="b-row">
-                <span class="lbl">Standing crew <span class="q">?</span></span>
-                <div>
-                  <div class="b-seg"><span>Default <span class="res">· on (global)</span></span><span>On</span><span>Off</span></div>
-                  <div class="b-hint">Route each item to a model tier by difficulty.</div>
-                </div>
-              </div>
-              <div class="b-foot"><span>Overrides apply to this issue only.</span><span class="rst">Reset all to defaults</span></div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div>
-        <div class="frame-label"><span class="tag-after">After</span><span class="hint">interactive — click around</span></div>
-        <div class="viewport"><div class="viewport-bar"><i></i><i></i><i></i><span>Policies popover (508px)</span></div>
-          <div class="viewport-body dash" style="min-width: 0;">
-            <div class="a-panel" id="apanel">
-              <div class="ph">
-                <span class="t">Policies — <span class="mono" style="font-size:11.5px">PAN-2829</span></span>
-                <span class="s">this issue only</span>
-              </div>
-
-              <div class="grp">
-                <div class="gh">Review</div>
-                <div class="a-row" data-row="reviewMode">
-                  <span class="lbl"><span class="odot"></span>Mode <span class="q" title="How much AI review runs once the work agent finishes. Typecheck, lint, and tests always run first.">?</span></span>
-                  <div class="a-seg" role="group" aria-label="Review mode">
-                    <button type="button" class="on" data-v="">Inherit <span class="res">· quick</span></button>
-                    <button type="button" data-v="quick">Quick</button>
-                    <button type="button" data-v="full">Full</button>
-                    <button type="button" data-v="none">None</button>
-                  </div>
-                  <button class="rst" type="button" title="Reset to inherited default">↺ reset</button>
-                </div>
-                <div class="a-row" data-row="reReview" hidden>
-                  <span class="lbl"><span class="odot"></span>Re-review <span class="q" title="On the second and later review cycles, which of the four reviewers run again. Skipped reviewers carry their earlier verdict forward.">?</span></span>
-                  <div class="a-seg" role="group" aria-label="Re-review scope">
-                    <button type="button" class="on" data-v="">Inherit <span class="res">· changed</span></button>
-                    <button type="button" data-v="changed">Changed</button>
-                    <button type="button" data-v="all">All</button>
-                    <button type="button" data-v="blockers">Blockers</button>
-                  </div>
-                  <button class="rst" type="button">↺ reset</button>
-                </div>
-                <div class="a-row" data-row="reviewModel">
-                  <span class="lbl"><span class="odot"></span>Model <span class="q" title="Overrides the model used to review this issue.">?</span></span>
-                  <button class="a-select" type="button"><span class="muted">Inherit · per-role default</span><span class="car">▼</span></button>
-                  <button class="rst" type="button">↺ reset</button>
-                </div>
-              </div>
-
-              <div class="grp">
-                <div class="gh">Work</div>
-                <div class="a-row overridden" data-row="workModel">
-                  <span class="lbl"><span class="odot"></span>Model <span class="q" title="Pins the model every work agent on this issue uses. Takes effect on the next spawn.">?</span></span>
-                  <button class="a-select" type="button"><span>GPT-5.6 Sol</span><span class="car">▼</span></button>
-                  <button class="rst" type="button">↺ reset</button>
-                </div>
-                <div class="a-note">Suspends crew routing — every item on this issue runs this model.</div>
-                <div class="a-row" data-row="swarm">
-                  <span class="lbl"><span class="odot"></span>Swarm <span class="q" title="Whether several work agents take independent plan items at the same time.">?</span></span>
-                  <div class="a-seg" role="group" aria-label="Swarm mode">
-                    <button type="button" class="on" data-v="">Inherit <span class="res">· off</span></button>
-                    <button type="button" data-v="off">Off</button>
-                    <button type="button" data-v="auto">Auto</button>
-                    <button type="button" data-v="always">Always</button>
-                  </div>
-                  <button class="rst" type="button">↺ reset</button>
-                </div>
-                <div class="a-row" data-row="crew">
-                  <span class="lbl"><span class="odot"></span>Crew <span class="q" title="Routes each plan item to a model tier by its declared difficulty, instead of one model for everything.">?</span></span>
-                  <div class="a-seg" role="group" aria-label="Standing crew">
-                    <button type="button" class="on" data-v="">Inherit <span class="res">· on (global)</span></button>
-                    <button type="button" data-v="on">On</button>
-                    <button type="button" data-v="off">Off</button>
-                  </div>
-                  <button class="rst" type="button">↺ reset</button>
-                </div>
-              </div>
-
-              <div class="a-warn"><span>⏻ Work-model change applies on the next spawn — running agents keep their model.</span><button type="button">Restart agent now</button></div>
-
-              <div class="a-foot">
-                <span id="ovcount">1 override on this issue</span>
-                <button class="rall" type="button" id="resetall">Reset all to defaults</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="notes">
-      <h4>Design notes</h4>
-      <ul>
-        <li><strong>"Inherit", not "Default".</strong> The first segment is renamed <em>Inherit · quick</em> — "Default · quick" next to a "Quick" option reads as a duplicate. Inherit says what it does: follow project/global config, whatever that currently resolves to.</li>
-        <li><strong>The resolved value shows only while inheriting.</strong> <em>Inherit · quick</em> collapses to <em>Inherit</em> once you override — the inherited value is a fallback fact, not a competing label.</li>
-        <li><strong>Override state is one consistent grammar.</strong> Overridden rows get the primary dot, a foreground label, an inset-ring on the chosen segment, and a visible <code>↺ reset</code> — identical across segments and selects, replacing three different reset styles.</li>
-        <li><strong>Hints on demand.</strong> Per-row hint sentences move into the <code>?</code> tooltips; only conditional consequences (crew suspension, restart pending) stay inline, so the panel is half the vertical noise at the same information content.</li>
-        <li><strong>One select style.</strong> Model pickers match the segment styling (same ground, border, radius) instead of native <code>&lt;select&gt;</code> chrome; model names in DM Sans, ids stay mono in the dropdown.</li>
-        <li><strong>The panel names its scope.</strong> Header carries the issue id (<code>PAN-2829</code>) and "this issue only" — today that fact hides in the footer while the panel itself is anonymous.</li>
-        <li><strong>Grouped footer count.</strong> "1 override on this issue" + reset-all in a fixed footer; the count matches the chip-strip badge so the two surfaces visibly agree.</li>
-        <li class="muted">No-loss audit: every current control survives — review mode, re-review scope (appears when mode resolves to full, same as today), review model, work model, swarm, standing crew, restart-pending action, per-row resets, reset-all.</li>
-      </ul>
-    </div>
+    <div class="scope-note"><strong>Out of scope, deliberately:</strong> the Policies popup panel keeps its current layout, labels, and controls exactly as shipped. This proposal only changes the trigger strip and resume affordance in the tree. The panel width assumption from v1 is dropped — everything here fits the panel's maximum drag width without changing it.</div>
   </div>
 
   <!-- ================= IMPLEMENTATION ================= -->
   <div class="impl">
     <h2>Where this lands</h2>
-    <p>All three surfaces live in the same code the request touched:</p>
     <ul>
-      <li><code>src/dashboard/frontend/src/components/CommandDeck/SessionView/SessionResumeButton.tsx</code> — becomes the contextual resume strip (issue pill + agent id + state + spend from <code>useIssueActions</code> / lifecycle).</li>
-      <li><code>src/dashboard/frontend/src/components/IssuePolicyStrip.tsx</code> — chip row (two-cell chips with inline clear) and the panel (Inherit segments, unified select style, header/footer).</li>
-      <li>List surfaces that show stopped sessions (<code>FleetAgentsView</code>, <code>BootReconciliationModal</code>) adopt the issue-pill-first row.</li>
+      <li><code>src/dashboard/frontend/src/components/issue-view/IssueView.tsx</code> — stop rendering <code>ReviewPolicyControl</code> + <code>StartAgentCta</code> above <code>{children}</code>; expose them as a docked controls row the density shells place inside the issue block.</li>
+      <li><code>src/dashboard/frontend/src/components/issue-view/StartAgentCta.tsx</code> — the tree surface uses the compact chip variant with the stopped-duration suffix (the full-size button remains for the cockpit surface).</li>
+      <li><code>src/dashboard/frontend/src/components/IssuePolicyStrip.tsx</code> — trigger row only: quiet icon trigger + key/value override chip with inline clear. The popover portal is untouched.</li>
+      <li><code>src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx</code> — slot the controls row after the badge rows, before RESOURCES.</li>
     </ul>
-    <p>Mock renders in the dashboard's dark tokens only — matching the operator's environment; the real components inherit both themes from <code>index.css</code> automatically.</p>
   </div>
 </div>
-
-<script>
-  (function () {
-    const panel = document.getElementById('apanel');
-    if (!panel) return;
-    const countEl = document.getElementById('ovcount');
-
-    function refreshCount() {
-      const n = panel.querySelectorAll('.a-row.overridden').length;
-      countEl.textContent = n === 1 ? '1 override on this issue' : n + ' overrides on this issue';
-    }
-
-    panel.querySelectorAll('.a-seg').forEach(function (seg) {
-      seg.addEventListener('click', function (e) {
-        const btn = e.target.closest('button[data-v]');
-        if (!btn) return;
-        seg.querySelectorAll('button').forEach(function (b) { b.classList.remove('on'); });
-        btn.classList.add('on');
-        const row = seg.closest('.a-row');
-        row.classList.toggle('overridden', btn.dataset.v !== '');
-        if (row.dataset.row === 'reviewMode') {
-          // Re-review scope only applies when the effective review mode is full — same rule as the live panel.
-          panel.querySelector('[data-row="reReview"]').hidden = btn.dataset.v !== 'full';
-        }
-        refreshCount();
-      });
-    });
-
-    panel.querySelectorAll('.a-row .rst').forEach(function (rst) {
-      rst.addEventListener('click', function () {
-        const row = rst.closest('.a-row');
-        const seg = row.querySelector('.a-seg');
-        if (seg) {
-          seg.querySelectorAll('button').forEach(function (b) { b.classList.remove('on'); });
-          seg.querySelector('button[data-v=""]').classList.add('on');
-        }
-        row.classList.remove('overridden');
-        refreshCount();
-      });
-    });
-
-    document.getElementById('resetall').addEventListener('click', function () {
-      panel.querySelectorAll('.a-row').forEach(function (row) {
-        const seg = row.querySelector('.a-seg');
-        if (seg) {
-          seg.querySelectorAll('button').forEach(function (b) { b.classList.remove('on'); });
-          seg.querySelector('button[data-v=""]').classList.add('on');
-        }
-        row.classList.remove('overridden');
-      });
-      refreshCount();
-    });
-
-    refreshCount();
-  })();
-</script>
