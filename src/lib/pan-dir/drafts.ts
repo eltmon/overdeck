@@ -217,3 +217,62 @@ export function checkPrdGateSync(args: {
   }
   return { ok: false, reason: 'missing', searched }
 }
+
+export interface PromoteWorkspacePrdDraftResult {
+  promoted: boolean
+  reason: 'promoted' | 'canonical-exists' | 'no-workspace-draft'
+  /** Canonical draft path (written by this call, or already present). */
+  path?: string
+  /** Workspace file the content was promoted from. */
+  source?: string
+}
+
+/**
+ * Promote a workspace-authored PRD draft to the canonical drafts/ location on
+ * the state plane. Planning agents author the PRD at
+ * `<workspace>/.pan/drafts/<ISSUE>.md`; the PRD-first gate accepts it there,
+ * but the workspace is disposable — without this promotion the PRD is lost on
+ * workspace teardown and invisible at the canonical location (the PAN-2858
+ * defect). Runs at complete-planning, after the PRD gate.
+ *
+ * No-loss rule: an existing canonical draft is never overwritten — the
+ * canonical copy may carry operator edits the workspace copy predates.
+ */
+export function promoteWorkspacePrdDraft(args: {
+  projectRoot: string
+  workspacePath: string
+  issueId: string
+}): Effect.Effect<PromoteWorkspacePrdDraftResult, FsError> {
+  return Effect.suspend(() => {
+    const { projectRoot, workspacePath, issueId } = args
+    const upperFile = `${issueId.toUpperCase()}.md`
+    const lowerFile = `${issueId.toLowerCase()}.md`
+    const draftsDir = getDraftsDir(projectRoot)
+    for (const canonical of [join(draftsDir, upperFile), join(draftsDir, lowerFile)]) {
+      if (existsSync(canonical)) {
+        return Effect.succeed<PromoteWorkspacePrdDraftResult>({
+          promoted: false,
+          reason: 'canonical-exists',
+          path: canonical,
+        })
+      }
+    }
+    const wsDrafts = join(workspacePath, '.pan', 'drafts')
+    const source = [join(wsDrafts, upperFile), join(wsDrafts, lowerFile)].find((p) => existsSync(p))
+    if (!source) {
+      return Effect.succeed<PromoteWorkspacePrdDraftResult>({
+        promoted: false,
+        reason: 'no-workspace-draft',
+      })
+    }
+    let content: string
+    try {
+      content = readFileSync(source, 'utf-8')
+    } catch (cause) {
+      return Effect.fail(new FsError({ path: source, operation: 'readFileString', cause }))
+    }
+    return writeIssueDraft(projectRoot, issueId, content).pipe(
+      Effect.map((path): PromoteWorkspacePrdDraftResult => ({ promoted: true, reason: 'promoted', path, source })),
+    )
+  })
+}
