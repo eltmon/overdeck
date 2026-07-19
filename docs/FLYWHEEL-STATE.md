@@ -5954,3 +5954,36 @@ Remaining in flight: PAN-2710 strike (nudged at 83m idle), 7 work agents + 1491,
 - **PAN-2907 merged (#2915), deploy done; close chained on the newer CI run.** `pan done --strike` now accepts squash-merged strikes via forge merge evidence. NOTE: the 2907 agent stranded a local rebase (non-fast-forward push refused, correctly). Resolution: unnecessary — the PR from the pushed tip was MERGEABLE; squash-merge landed it. Lesson: a stale strike branch does NOT need a re-push if its PR is mergeable — squash rebases content implicitly.
 - **PAN-2913 strike spawned** (patrol debounce → build-input commits).
 - **Cohort approaching drain**: after 2913 + 2907-close, remaining = PAN-2377 (UAT promote, operator), PAN-2858 (needs one nudge, operator), 2895 (operator's strike #2903). All three are operator-gated — quiescence per role doctrine once 2913 lands.
+
+# RUN-66 RETROSPECTIVE — 2026-07-19 02:21Z → ~07:15Z (~5h, 23 ticks)
+
+## Shipped (11 issues merged + deployed + closed; main GREEN throughout except 0 red incidents)
+- **PAN-2890** agent-pills drill-down + **PAN-2829** (features, via 2 operator UAT promotes of uat/pan-vale-0719)
+- **PAN-2859** Kimi K3 (`k3`/`k3[1m]`) on claude-code kimi provider — operator-requested mid-run, landed same run
+- **PAN-2897** pan reload bun ENOENT (auto-deploy path un-broken)
+- **PAN-2898** placeholder clobbers live agent state (MIN-880 Start-button bug; self-heal VERIFIED live)
+- **PAN-2899** orchestrated /compact continuation (silent stall class)
+- **PAN-2900** DoD deploy row → buildCommit ancestry (operator-demanded "closed before shipped" fix)
+- **PAN-2901** verification runner skips merged issues + deploy-window release
+- **PAN-2902** state-migration tip-move race (MYN spawn blocks)
+- **PAN-2907** pan done --strike squash acceptance
+- **PAN-2913** patrol debounce → build-input commits
+Substrate bugs filed: 2897 2898 2899 2900 2901 2902 2907 2913 (8; ALL fixed and landed same run). Plus 3 occurrences appended to operator's PAN-2895.
+
+## Mechanisms that carried the run
+1. Land loop: review diff → squash-merge → gh run watch → deploy (manual, PAN-2913 debounce) → pan close --force + structural strike accepts.
+2. Orchestrator opens the PR when a strike agent's turn ends pre-submit (2899, 2907, sanctioned by brief) — and a stale strike branch needs NO re-push if its PR is MERGEABLE (squash rebases content implicitly; 2907 rebase-strand resolved this way).
+3. Positive-evidence discipline before overriding gates (live vitest pid before believing "verification in flight"; 3x ls-remote before calling the migration marker valid).
+
+## Standing lessons
+- `pan reload` needs PATH="$HOME/.bun/bin:$PATH" in ALL non-interactive shells (until server env carries it).
+- Watch cwd drift in long-lived shells: two mistakes this run (state commit from strike ws; reload refused from non-primary) — both caught by guards.
+- Close-out DoD gate + deployment gate blocked incorrect orderings 5+ times this run and were RIGHT each time — trust them, satisfy rows honestly, use accepts only for structural strike rows or artifacts citing a filed issue.
+- UAT/merge-queue reads the emitted verbs (PAN-1736): emit shipping verbs BEFORE assemble-uat.
+
+## Handover state (operator-gated remainder)
+- PAN-2377: review+test passed, UAT batch uat/pan-vale-0719 assembled → operator promotes.
+- PAN-2858: wedged pre-2899-fix; ONE operator message (or stop/start) re-drives it.
+- PAN-2895: operator's strike, PR #2903 open.
+- MIN-852: needs interactive `claude mcp login linear`.
+- Backlog: ~20 planned_backlog PAN items awaiting release (auto_pickup OFF); TIN-1; lens-gather config gaps (lexerra GitHub App 404, krux missing issue_prefix) — unfiled, low priority.
