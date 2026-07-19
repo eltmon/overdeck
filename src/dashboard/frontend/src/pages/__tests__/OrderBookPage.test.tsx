@@ -141,6 +141,28 @@ describe('OrderBookPage', () => {
     expect(screen.queryByLabelText('Run settings')).not.toBeInTheDocument();
   });
 
+  it('queues a valid draft through the lifecycle write route', async () => {
+    const draft = book({ id: '2026-07-18-draft', name: 'Draft campaign', validation: { blocks: [], warns: [] } });
+    const ready = { ...draft, status: 'ready' as const };
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url === '/api/orders/2026-07-18-draft' && init?.method === 'PATCH') return Response.json(ready);
+      if (url === '/api/orders/2026-07-18-draft') return Response.json(draft);
+      return ordersResponse([draft]);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    render(<OrderBookPage />);
+
+    fireEvent.click(await screen.findByRole('button', { name: /Queue book/ }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/orders/2026-07-18-draft', expect.objectContaining({
+      method: 'PATCH',
+      body: JSON.stringify({ status: 'ready' }),
+    })));
+    expect(await screen.findByText('Draft campaign is queued and ready to start.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Start run/ })).toBeEnabled();
+  });
+
   it('loads detail validation, previews the brief, and starts through order routes', async () => {
     const warning = { code: 'missing-prd', issue: 'PAN-3', message: 'PAN-3 will be planned at pickup' };
     const launchable = book({ id: '2026-07-18-launch', name: 'Launchable', status: 'ready', validation: { blocks: [], warns: [warning] } });

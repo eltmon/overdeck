@@ -177,6 +177,10 @@ The legacy aliases below are deprecated but still functional through the depreca
 
 **Always verify available flags with `pan <verb> --help`** — the CLI is self-documenting and flags may change between versions.
 
+## Flywheel Order Books
+
+Operator-curated Flywheel campaigns live as order books on `overdeck-state`. Read [`docs/ORDER-BOOKS.md`](docs/ORDER-BOOKS.md) before changing order-book storage, dispatch eligibility, lane semantics, lifecycle, or continuation; all reads and writes must use the orders resolver and writer doors.
+
 ## Project Structure
 
 - **Stack**: TypeScript, Node.js 22+, React dashboard, SQLite, Effect.js

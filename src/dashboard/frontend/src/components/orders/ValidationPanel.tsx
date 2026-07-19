@@ -1,16 +1,30 @@
+import type { OrderBookStatus } from '@overdeck/contracts';
 import { AlertTriangle, Eye, Play, XCircle } from 'lucide-react';
 import type { OrderBookFindingView } from './BookStrip';
 
 interface ValidationPanelProps {
+  status: OrderBookStatus;
   blocks: OrderBookFindingView[];
   warns: OrderBookFindingView[];
   starting?: boolean;
   onPreview: () => void;
+  onQueue: () => void;
   onStart: () => void;
 }
 
-export function ValidationPanel({ blocks, warns, starting = false, onPreview, onStart }: ValidationPanelProps) {
+export function ValidationPanel({ status, blocks, warns, starting = false, onPreview, onQueue, onStart }: ValidationPanelProps) {
   const blocked = blocks.length > 0;
+  const canQueue = status === 'draft';
+  const canStart = status === 'ready';
+  const actionLabel = starting
+    ? (canQueue ? 'Queueing…' : 'Starting…')
+    : canQueue
+      ? 'Queue book'
+      : canStart
+        ? 'Start run'
+        : status === 'running'
+          ? 'Run active'
+          : 'Book complete';
   return (
     <section className="rounded-lg border border-border bg-card p-4" aria-label="Start validation">
       <div className="flex items-center gap-2">
@@ -40,12 +54,12 @@ export function ValidationPanel({ blocks, warns, starting = false, onPreview, on
         </button>
         <button
           type="button"
-          disabled={blocked || starting}
-          title={blocked ? 'Resolve every blocking finding before starting this run' : undefined}
-          onClick={onStart}
+          disabled={blocked || starting || (!canQueue && !canStart)}
+          title={blocked ? 'Resolve every blocking finding before queueing or starting this book' : undefined}
+          onClick={canQueue ? onQueue : onStart}
           className="flex items-center gap-1.5 rounded-md border border-primary/50 bg-primary px-3 py-1.5 text-xs text-primary-foreground disabled:cursor-not-allowed disabled:opacity-40"
         >
-          <Play className="h-3.5 w-3.5" /> {starting ? 'Starting…' : 'Start run'}
+          <Play className="h-3.5 w-3.5" /> {actionLabel}
         </button>
       </div>
     </section>

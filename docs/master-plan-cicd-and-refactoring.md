@@ -1,5 +1,7 @@
 # Master Plan — CI/CD Reliability × Refactor Campaign (2026-07-04)
 
+> **Order-book handoff:** after first-class order books land, the remaining A13 and B10–B13 entries become the seed content of the first real order book, **Refactor P3 remainder**. This file remains the historical cross-campaign plan; the order book owns execution order and live status from that point forward.
+
 **Audience:** the orchestrating session that drips these items into the pipeline.
 **Feeds from:** `docs/ci-cd/CICD-QUEUE.md` (epic [PAN-2376](https://github.com/eltmon/overdeck/issues/2376)) and
 `docs/codebase-health/REFACTOR-QUEUE.md` (Phase 3 remainder). Those two docs stay the

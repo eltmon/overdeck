@@ -104,7 +104,8 @@
               "configuration/state-branch",
               "configuration/issue-trackers",
               "configuration/polyrepo",
-              "configuration/auto-merge"
+              "configuration/auto-merge",
+              "configuration/order-books"
             ]
           }
         ]

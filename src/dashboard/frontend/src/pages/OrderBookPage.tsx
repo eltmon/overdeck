@@ -91,14 +91,32 @@ export function OrderBookPage() {
     setSelectedId(created.id);
   };
 
-  const patchSettings = async (patch: Partial<OrderBookView['settings']>) => {
+  const patchBook = async (patch: Record<string, unknown>) => {
     if (!selected) return;
     const response = await fetch(`/api/orders/${encodeURIComponent(selected.id)}`, {
       method: 'PATCH', credentials: 'include', headers: await dashboardMutationJsonHeaders(),
-      body: JSON.stringify({ settings: patch }),
+      body: JSON.stringify(patch),
     });
     if (!response.ok) throw new Error(await readError(response));
     updateBook(await response.json() as OrderBookView);
+  };
+
+  const patchSettings = async (patch: Partial<OrderBookView['settings']>) => {
+    await patchBook({ settings: patch });
+  };
+
+  const queueBook = async () => {
+    if (!selected) return;
+    setStarting(true);
+    setActionMessage(null);
+    try {
+      await patchBook({ status: 'ready' });
+      setActionMessage(`${selected.name} is queued and ready to start.`);
+    } catch (cause) {
+      setActionMessage(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setStarting(false);
+    }
   };
 
   const previewBrief = async () => {
@@ -222,10 +240,12 @@ export function OrderBookPage() {
             <section className="grid gap-3 lg:grid-cols-2">
               <RunSettingsPanel settings={selected.settings} onChange={patchSettings} />
               <ValidationPanel
+                status={selected.status}
                 blocks={selected.validation?.blocks ?? []}
                 warns={selected.validation?.warns ?? []}
                 starting={starting}
                 onPreview={() => void previewBrief()}
+                onQueue={() => void queueBook()}
                 onStart={() => void startRun()}
               />
             </section>
