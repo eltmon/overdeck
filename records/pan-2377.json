@@ -304,23 +304,21 @@
     "recordedAt": "2026-07-19T00:54:19.291Z"
   },
   "created": "2026-07-17T12:54:30.819Z",
-  "updated": "2026-07-19T03:13:54.343Z",
+  "updated": "2026-07-19T03:19:52.539Z",
   "pipeline": {
     "issueId": "PAN-2377",
-    "reviewStatus": "passed",
-    "testStatus": "testing",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "failed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-19T00:54:56.018Z",
-    "updatedAt": "2026-07-19T03:13:54.126Z",
-    "reviewNotes": "Launch workspace, standing brief, and order-book overlay now survive cwd-independent automatic recovery; no blocking findings",
+    "updatedAt": "2026-07-19T03:19:51.714Z",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "AC1-AC4 met: orders-writer.test.ts covers createBook/addItems/moveItem/setStatus round-trip + index.json queue order; orders-resolver.test.ts covers backlogCandidates rank/exclusion and computeBookProgress drained semantics (running=false, parked-only=true); orders-validate.test.ts covers all five validateBookForStart finding types incl. planAtPickup downgrade. AC5 partially met: the writer-commit half is covered (git rev-list count check in orders-writer.test.ts). The parseOrderBookJson half is NOT covered — AC5 names src/lib/orders/types.ts parseOrderBookJson specifically, but tests/unit/lib/orders/orders-io.test.ts 'returns a descriptive error for malformed order book JSON' (line ~36) writes syntactically-invalid JSON ('{bad json'), which throws inside readOrderBook's own JSON.parse try/catch (io.ts ~line 30) BEFORE parseOrderBookJson (types.ts) is ever called. No test exercises parseOrderBookJson's own catch branch (types.ts, 'Invalid order book: ...' prefix) against syntactically-valid JSON that fails Schema decode (e.g. a well-formed OrderBook object with an item missing 'issue' or lane 'C'). Fix: add a case — either import parseOrderBookJson directly and assert its ok:false error string, or have readOrderBook fed a schema-invalid-but-JSON-valid fixture — to prove the descriptive-error path named in AC5 actually executes.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2894",
-    "reviewedAtCommit": "a58dda6ba3889240e092425f90eaf5eeda9d15f2",
     "lastVerifiedCommit": "1efab25bdb7b55b494dffc64f858401acec57b05",
     "reviewRequestedAt": "2026-07-19T00:54:56.018Z",
     "reviewSpawnedAt": "2026-07-19T03:05:46.521Z",
@@ -555,11 +553,19 @@
             "cacheWrite": 132575
           }
         },
+        "test": {
+          "anthropic/claude-sonnet-5": {
+            "input": 66,
+            "output": 10709,
+            "cacheRead": 4309781,
+            "cacheWrite": 153754
+          }
+        },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 17648918,
-            "output": 1425829,
-            "cacheRead": 650285056,
+            "input": 18305408,
+            "output": 1428353,
+            "cacheRead": 655316992,
             "cacheWrite": 0
           }
         }
@@ -572,21 +578,21 @@
           "cacheWrite": 169467
         },
         "openai/gpt-5.6-sol": {
-          "input": 27239305,
-          "output": 1812202,
-          "cacheRead": 731700736,
+          "input": 27895795,
+          "output": 1814726,
+          "cacheRead": 736732672,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 12,
-          "output": 6183,
-          "cacheRead": 594186,
-          "cacheWrite": 132575
+          "input": 78,
+          "output": 16892,
+          "cacheRead": 4903967,
+          "cacheWrite": 286329
         }
       },
       "costAtCloseOut": {
-        "usd": 565.297344,
-        "pricingAsOf": "2026-07-19T03:13:54.258Z"
+        "usd": 572.525043,
+        "pricingAsOf": "2026-07-19T03:19:51.883Z"
       }
     },
     "merges": [
