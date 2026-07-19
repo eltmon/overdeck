@@ -6011,3 +6011,8 @@ Substrate bugs filed: 2897 2898 2899 2900 2901 2902 2907 2913 (8; ALL fixed and 
   3. **Strike agents deadlock on 'need green main to verify red-main fix'** (2925) and over-run full local suites against explicit recipe advice (2927, 25+ min). Orchestrator publishing the agent's committed work + PR CI as arbiter breaks both — used twice successfully.
   4. **Patrol ships red tips** (PAN-2924 leg 2 now has live evidence — deployed 67542218 while red). CI gate on the patrol is now priority.
 - Standing watch unchanged: PAN-2377 promote, PAN-2858 nudge, 2895 #2903, MIN-852.
+
+## Ticks 55-59 — 2026-07-19 ~15:45-16:30 — 2nd red-main (30-min turnaround); operator perf series deployed 3x on request
+- **2nd red-main today:** 82a6da7a13 (poller rework: retired-bot search → Flywheel-Filed-By trailer) broke the substrate-smoke integration fixture (still mocked the old author: query → poller projected null). Protocol from incident 1 executed cleanly: diagnose→file (PAN-2929)→insurance strike→publish agent's 2-line fixture fix (PR #2930)→merged, ~30 min red window. Green-verify + 2929 close chained on run 24bf3426 (which combines the operator's bc1027ba6a perf series + the fixture fix).
+- **Operator perf-stabilization series deployed on direct request 3x:** 3031bf2bec → 82a6da7a13 → bc1027ba6a (live). Series highlights: SubstrateBugPoller 422-storm killed (also cleans pan flywheel weights), /api/resources pre-serialized 3s snapshot (was 90ms rebuild+tmux per request per client), lifecycle refreshes reuse membership snapshot (durable lenses only at boot + 5-min convergence).
+- **strike-pan-2924** (patrol CI gate + initiator attribution): implemented +210/-24, long verify phase — land next tick.
