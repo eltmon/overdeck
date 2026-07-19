@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-19T20:18:40.159Z",
-  "updated": "2026-07-19T21:00:18.967Z",
+  "updated": "2026-07-19T21:12:19.974Z",
   "pipeline": {
     "issueId": "PAN-2066",
     "reviewStatus": "pending",
@@ -69,16 +69,8 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 9,
-    "claims": {
-      "viewer-service": {
-        "writerId": "agent-pan-2066",
-        "agentId": "agent-pan-2066",
-        "pid": 2410715,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-19T21:00:18.967Z"
-      }
-    },
+    "sequence": 10,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2066",
@@ -123,6 +115,17 @@
         "outcome": "completed",
         "reason": "Documented /okf open in the command table, dedicated SKILL.md section, and USAGE.md with bundle resolution, pan knowledge delegation, --no-install/--no-browser, and the arm's-length GPL subprocess boundary. Skills lint passes.",
         "releasedAt": "2026-07-19T21:00:08.668Z"
+      },
+      {
+        "writerId": "agent-pan-2066",
+        "agentId": "agent-pan-2066",
+        "pid": 2410715,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-19T21:00:18.967Z",
+        "itemId": "viewer-service",
+        "outcome": "completed",
+        "reason": "Added a per-project viewer lifecycle service with canonical bundle resolution, typed unavailable states, in-flight deduplication, health polling with fake-timer tests, healthy reuse, ok stop + SIGTERM cleanup, and graceful dashboard shutdown registration. Service tests, typecheck, lint, server build, and throwaway Node 22 boot to the HTTP listening state pass.",
+        "releasedAt": "2026-07-19T21:12:19.974Z"
       }
     ],
     "statusReasons": {
@@ -141,6 +144,10 @@
       "okf-open-skill": {
         "reason": "Documented /okf open in the command table, dedicated SKILL.md section, and USAGE.md with bundle resolution, pan knowledge delegation, --no-install/--no-browser, and the arm's-length GPL subprocess boundary. Skills lint passes.",
         "updatedAt": "2026-07-19T21:00:08.668Z"
+      },
+      "viewer-service": {
+        "reason": "Added a per-project viewer lifecycle service with canonical bundle resolution, typed unavailable states, in-flight deduplication, health polling with fake-timer tests, healthy reuse, ok stop + SIGTERM cleanup, and graceful dashboard shutdown registration. Service tests, typecheck, lint, server build, and throwaway Node 22 boot to the HTTP listening state pass.",
+        "updatedAt": "2026-07-19T21:12:19.974Z"
       }
     }
   },
@@ -161,6 +168,10 @@
     "okf-open-skill": "completed",
     "okf-open-skill.okf-open-skill.ac1": "completed",
     "okf-open-skill.okf-open-skill.ac2": "completed",
-    "viewer-service": "running"
+    "viewer-service": "completed",
+    "viewer-service.viewer-service.ac1": "completed",
+    "viewer-service.viewer-service.ac2": "completed",
+    "viewer-service.viewer-service.ac3": "completed",
+    "viewer-service.viewer-service.ac4": "completed"
   }
 }
