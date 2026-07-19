@@ -122,7 +122,7 @@ describe('resolvePipelineMembership (PAN-1980)', () => {
 
   it('PAN-2887: contained branch without merged work stays planned_backlog even with a spec', () => {
     const r = resolvePipelineMembership(sig({
-      issueOpen: true, hasConventionBranch: true, branchUnmerged: false, hasMergedBranchWork: false, hasVbriefSpec: true,
+      issueOpen: true, hasConventionBranch: true, branchUnmerged: false, hasMergedBranchWork: false, hasXbriefSpec: true,
     }));
     expect(r.bucket).toBe('planned_backlog');
   });

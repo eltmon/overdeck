@@ -86,7 +86,7 @@ const expectedZoneBActionKeys = [
   'replaySession',
   'openStateDir',
   'viewState',
-  'viewFocusedVbrief',
+  'viewFocusedXbrief',
   'copySessionId',
   'copyTmuxCommand',
   'viewJsonl',
@@ -146,10 +146,10 @@ function renderMenuLabels(entries: typeof legacyCommandDeckIssueActions) {
 
 describe('issueActions no-actions-lost audit', () => {
   it('keeps human-only and session-only identities outside IssueActionKey', () => {
-    expectTypeOf<Extract<IssueActionKey, 'merge' | 'viewVbrief'>>()
+    expectTypeOf<Extract<IssueActionKey, 'merge' | 'viewXbrief'>>()
       .toEqualTypeOf<never>();
     expect([...registryKeys]).not.toContain('merge');
-    expect([...registryKeys]).not.toContain('viewVbrief');
+    expect([...registryKeys]).not.toContain('viewXbrief');
   });
 
   it('maps every pre-reconciliation issue-scoped Command Deck action to the registry or a documented human-only exclusion', () => {

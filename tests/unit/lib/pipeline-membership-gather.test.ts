@@ -161,8 +161,8 @@ describe('gatherProjectLensSignals', () => {
       ['strike/pan-20', 'feature/pan-20', 'strike/pan-21', 'feature/pan-21'],
     );
     expect(result).toEqual([
-      { issueId: 'PAN-20', issueOpen: true, hasOpenPr: false, hasMergedPr: false, hasConventionBranch: true, branchUnmerged: true, hasMergedBranchWork: false, phaseLabel: null, hasVbriefSpec: false, explicitlyReady: false },
-      { issueId: 'PAN-21', issueOpen: false, hasOpenPr: false, hasMergedPr: false, hasConventionBranch: true, branchUnmerged: true, hasMergedBranchWork: false, phaseLabel: null, hasVbriefSpec: false, explicitlyReady: false },
+      { issueId: 'PAN-20', issueOpen: true, hasOpenPr: false, hasMergedPr: false, hasConventionBranch: true, branchUnmerged: true, hasMergedBranchWork: false, phaseLabel: null, hasXbriefSpec: false, explicitlyReady: false },
+      { issueId: 'PAN-21', issueOpen: false, hasOpenPr: false, hasMergedPr: false, hasConventionBranch: true, branchUnmerged: true, hasMergedBranchWork: false, phaseLabel: null, hasXbriefSpec: false, explicitlyReady: false },
     ]);
     expect(resolvePipelineMembership(result[0]!)).toMatchObject({
       bucket: 'planned_backlog',
@@ -185,7 +185,7 @@ describe('gatherProjectLensSignals', () => {
     mocked.run = vi.fn().mockResolvedValue('strike/pan-2879\nstrike/pan-2778\n');
 
     await expect(gatherProjectLensSignals(project, mocked)).resolves.toEqual([
-      { issueId: 'PAN-2879', issueOpen: true, hasOpenPr: false, hasMergedPr: false, hasConventionBranch: true, branchUnmerged: true, hasMergedBranchWork: false, phaseLabel: null, hasVbriefSpec: false, explicitlyReady: false },
+      { issueId: 'PAN-2879', issueOpen: true, hasOpenPr: false, hasMergedPr: false, hasConventionBranch: true, branchUnmerged: true, hasMergedBranchWork: false, phaseLabel: null, hasXbriefSpec: false, explicitlyReady: false },
     ]);
   });
 
@@ -210,7 +210,7 @@ describe('gatherProjectLensSignals', () => {
       hasConventionBranch: false,
       branchUnmerged: false, hasMergedBranchWork: false,
       phaseLabel: null,
-      hasVbriefSpec: false,
+      hasXbriefSpec: false,
       explicitlyReady: false,
     }]);
     expect(resolvePipelineMembership(result[0]!)).toMatchObject({
@@ -243,7 +243,7 @@ describe('gatherProjectLensSignals', () => {
       hasConventionBranch: false,
       branchUnmerged: false, hasMergedBranchWork: false,
       phaseLabel: null,
-      hasVbriefSpec: false,
+      hasXbriefSpec: false,
       explicitlyReady: false,
     }]);
     expect(resolvePipelineMembership(result[0]!)).toMatchObject({
@@ -280,7 +280,7 @@ describe('gatherProjectLensSignals', () => {
       hasConventionBranch: true,
       branchUnmerged: true, hasMergedBranchWork: false,
       phaseLabel: null,
-      hasVbriefSpec: false,
+      hasXbriefSpec: false,
       explicitlyReady: false,
     }]);
     expect(resolvePipelineMembership(result[0]!)).toMatchObject({
@@ -332,9 +332,9 @@ describe('gatherProjectLensSignals', () => {
     };
 
     await expect(gatherProjectLensSignals(mixedTrackerProject, mocked)).resolves.toEqual([
-      { issueId: 'MIN-1', issueOpen: true, hasOpenPr: false, hasMergedPr: false, hasConventionBranch: false, branchUnmerged: false, hasMergedBranchWork: false, phaseLabel: 'in-progress', hasVbriefSpec: false, explicitlyReady: false },
-      { issueId: 'MIN-2', issueOpen: false, hasOpenPr: false, hasMergedPr: false, hasConventionBranch: true, branchUnmerged: true, hasMergedBranchWork: false, phaseLabel: null, hasVbriefSpec: false, explicitlyReady: false },
-      { issueId: 'MIN-3', issueOpen: false, hasOpenPr: false, hasMergedPr: false, hasConventionBranch: false, branchUnmerged: false, hasMergedBranchWork: false, phaseLabel: null, hasVbriefSpec: true, explicitlyReady: false },
+      { issueId: 'MIN-1', issueOpen: true, hasOpenPr: false, hasMergedPr: false, hasConventionBranch: false, branchUnmerged: false, hasMergedBranchWork: false, phaseLabel: 'in-progress', hasXbriefSpec: false, explicitlyReady: false },
+      { issueId: 'MIN-2', issueOpen: false, hasOpenPr: false, hasMergedPr: false, hasConventionBranch: true, branchUnmerged: true, hasMergedBranchWork: false, phaseLabel: null, hasXbriefSpec: false, explicitlyReady: false },
+      { issueId: 'MIN-3', issueOpen: false, hasOpenPr: false, hasMergedPr: false, hasConventionBranch: false, branchUnmerged: false, hasMergedBranchWork: false, phaseLabel: null, hasXbriefSpec: true, explicitlyReady: false },
     ]);
     expect(mocked.listTrackerIssues).toHaveBeenCalledWith(mixedTrackerProject);
     expect(mocked.listOpenIssues).not.toHaveBeenCalled();

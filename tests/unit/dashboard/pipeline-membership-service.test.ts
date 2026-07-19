@@ -67,7 +67,7 @@ describe('pipeline membership service', () => {
     const signals = [{
       issueId: 'MIN-1', issueOpen: true, hasOpenPr: false, hasMergedPr: false,
       hasConventionBranch: true, branchUnmerged: true, hasMergedBranchWork: false, phaseLabel: null,
-      hasVbriefSpec: false, explicitlyReady: false,
+      hasXbriefSpec: false, explicitlyReady: false,
     }];
     const gather = vi.fn().mockResolvedValue(signals);
     const getMembership = createPipelineMembershipService({ gather, now: Date.now });
