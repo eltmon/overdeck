@@ -26,16 +26,17 @@
   ],
   "feedback": [],
   "created": "2026-07-07T02:41:17.313Z",
-  "updated": "2026-07-17T03:34:03.655Z",
+  "updated": "2026-07-19T23:55:48.420Z",
   "pipeline": {
     "issueId": "PAN-2375",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
+    "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-07T06:51:31.487Z",
+    "updatedAt": "2026-07-19T23:55:48.402Z",
     "reviewNotes": "Agent re-review request (3/25): Fixed review issues",
     "inspectNotes": "Bead state-plane-predicate ack: commit 2fe848f6 is a pure test-colocation move (tests/unit/lib/state-plane.test.ts -> src/lib/__tests__/state-plane.test.ts, import path fixed), no logic changes; verified all 4 acceptance criteria still pass against current src/lib/state-plane.ts (state-only=true, mixed src+state=false, drafts-only=false, empty-diff=true).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2457",
@@ -69,9 +70,9 @@
         },
         "review": {
           "unknown": {
-            "input": 5882997,
-            "output": 19891,
-            "cacheRead": 5447168,
+            "input": 6718944,
+            "output": 23956,
+            "cacheRead": 6190464,
             "cacheWrite": 0
           }
         },
@@ -83,11 +84,19 @@
             "cacheWrite": 74433
           }
         },
+        "test": {
+          "custom/kimi-k2.7-code": {
+            "input": 462665,
+            "output": 5746,
+            "cacheRead": 2179584,
+            "cacheWrite": 0
+          }
+        },
         "work": {
           "unknown": {
-            "input": 93289133,
-            "output": 147522,
-            "cacheRead": 89330304,
+            "input": 95120087,
+            "output": 149744,
+            "cacheRead": 90848512,
             "cacheWrite": 0
           }
         }
@@ -112,9 +121,9 @@
           "cacheWrite": 149428
         },
         "unknown": {
-          "input": 99172130,
-          "output": 167413,
-          "cacheRead": 94777472,
+          "input": 101839031,
+          "output": 173700,
+          "cacheRead": 97038976,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -122,11 +131,17 @@
           "output": 2055,
           "cacheRead": 302999,
           "cacheWrite": 74433
+        },
+        "custom/kimi-k2.7-code": {
+          "input": 462665,
+          "output": 5746,
+          "cacheRead": 2179584,
+          "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 57.9841824,
-        "pricingAsOf": "2026-07-07T06:51:31.595Z"
+        "usd": 62.0231424,
+        "pricingAsOf": "2026-07-19T23:55:48.416Z"
       }
     },
     "merges": [
