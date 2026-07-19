@@ -5,7 +5,7 @@ import { tmpdir } from 'os';
 import { mkdtemp, rm } from 'fs/promises';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Effect } from 'effect';
-import type { VBriefDocument } from '../../../../src/lib/vbrief/types.js';
+import type { XBriefDocument } from '../../../../src/lib/xbrief/types.js';
 import type { CoordinateSwarmSlotsDeps } from '../../../../src/lib/cloister/deacon-swarm.js';
 
 const mocks = vi.hoisted(() => ({
@@ -68,19 +68,19 @@ afterEach(async () => {
   await rm(tempRoot, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
 });
 
-function writeSpec(projectPath: string, issueId: string, doc: VBriefDocument): void {
+function writeSpec(projectPath: string, issueId: string, doc: XBriefDocument): void {
   const specsDir = join(projectPath, '.pan', 'specs');
   mkdirSync(specsDir, { recursive: true });
-  writeFileSync(join(specsDir, `2026-07-01-${issueId}-test.vbrief.json`), JSON.stringify({
+  writeFileSync(join(specsDir, `2026-07-01-${issueId}-test.xbrief.json`), JSON.stringify({
     ...doc,
     status: 'active',
   }, null, 2));
 }
 
-function makeDoc(issueId: string, itemCount: number): VBriefDocument {
+function makeDoc(issueId: string, itemCount: number): XBriefDocument {
   const now = '2026-07-01T00:00:00.000Z';
   return {
-    vBRIEFInfo: {
+    xBRIEFInfo: {
       version: '0.6',
       created: now,
       author: 'test',
@@ -227,7 +227,7 @@ function dispatchDeps(overrides: Partial<DispatchDeps> = {}): DispatchDeps {
 describe('per-spawn freeze/hold re-check (PAN-2214 slot-20 regression)', () => {
   it('a global freeze activating mid-wave halts every subsequent spawn in the same wave', async () => {
     const { dispatchNextWave } = await import('../../../../src/lib/cloister/deacon-swarm.js');
-    const { analyzeSwarmReadiness } = await import('../../../../src/lib/vbrief/swarm-readiness.js');
+    const { analyzeSwarmReadiness } = await import('../../../../src/lib/xbrief/swarm-readiness.js');
     mocks.getReviewStatusSync.mockReturnValue(null);
     const doc = makeDoc('PAN-105', 3);
     const deps = dispatchDeps({
@@ -253,7 +253,7 @@ describe('per-spawn freeze/hold re-check (PAN-2214 slot-20 regression)', () => {
 
   it('a hold set mid-wave halts remaining spawns and unwinds the halted claim', async () => {
     const { dispatchNextWave } = await import('../../../../src/lib/cloister/deacon-swarm.js');
-    const { analyzeSwarmReadiness } = await import('../../../../src/lib/vbrief/swarm-readiness.js');
+    const { analyzeSwarmReadiness } = await import('../../../../src/lib/xbrief/swarm-readiness.js');
     mocks.getReviewStatusSync.mockReturnValue(null);
     const doc = makeDoc('PAN-106', 2);
     const deps = dispatchDeps({

@@ -4,17 +4,17 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CoordinateSwarmSlotsDeps } from '../../../../src/lib/cloister/deacon-swarm.js';
 import type { SlotReconcileResult } from '../../../../src/lib/agents/slot-reconcile.js';
-import { analyzeSwarmReadiness } from '../../../../src/lib/vbrief/swarm-readiness.js';
-import type { VBriefDocument, VBriefItem } from '../../../../src/lib/vbrief/types.js';
+import { analyzeSwarmReadiness } from '../../../../src/lib/xbrief/swarm-readiness.js';
+import type { XBriefDocument, XBriefItem } from '../../../../src/lib/xbrief/types.js';
 
 let workspacePath: string;
 
 function item(
   id: string,
   filesScope: string[],
-  metadata: Partial<VBriefItem['metadata']> = {},
-  status: VBriefItem['status'] = 'pending',
-): VBriefItem {
+  metadata: Partial<XBriefItem['metadata']> = {},
+  status: XBriefItem['status'] = 'pending',
+): XBriefItem {
   return {
     id,
     title: id,
@@ -30,9 +30,9 @@ function item(
   };
 }
 
-function doc(items: VBriefItem[], edges: VBriefDocument['plan']['edges']): VBriefDocument {
+function doc(items: XBriefItem[], edges: XBriefDocument['plan']['edges']): XBriefDocument {
   return {
-    vBRIEFInfo: {
+    xBRIEFInfo: {
       version: '0.6',
       created: '2026-07-01T00:00:00.000Z',
       updated: '2026-07-01T00:00:00.000Z',

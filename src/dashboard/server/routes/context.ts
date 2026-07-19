@@ -422,7 +422,7 @@ function fullPromptPreview(previews: Record<Harness, string>): string {
     '## Runtime-only sections',
     '',
     '- Memory retrieval: injected at agent spawn when enabled; unavailable in this layer editor preview.',
-    '- Issue briefing and vBRIEF excerpts: injected per agent run; unavailable until a specific issue/session is selected.',
+    '- Issue briefing and xBRIEF excerpts: injected per agent run; unavailable until a specific issue/session is selected.',
     '- Status and tool output: produced during the live session; not part of static context layers.',
   ].join('\n');
 }

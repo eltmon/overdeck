@@ -102,7 +102,7 @@ describe('collectOpenBacklog', () => {
   it('ready=false when specs dir exists but no spec for this issue', async () => {
     const specsDir = join(tmpDir, '.pan', 'specs');
     mkdirSync(specsDir, { recursive: true });
-    writeFileSync(join(specsDir, '2026-01-01-PAN-99-some-other.vbrief.json'), '{}');
+    writeFileSync(join(specsDir, '2026-01-01-PAN-99-some-other.xbrief.json'), '{}');
     const result = await collectOpenBacklog(tmpDir, [makeIssue({ ref: 'PAN-1' })]);
     expect(result.manifest[0].ready).toBe(false);
   });
@@ -110,7 +110,7 @@ describe('collectOpenBacklog', () => {
   it('ready=true when a spec exists without a legacy workspace task store', async () => {
     const specsDir = join(tmpDir, '.pan', 'specs');
     mkdirSync(specsDir, { recursive: true });
-    writeFileSync(join(specsDir, '2026-01-01-PAN-1-my-feature.vbrief.json'), '{}');
+    writeFileSync(join(specsDir, '2026-01-01-PAN-1-my-feature.xbrief.json'), '{}');
     const result = await collectOpenBacklog(tmpDir, [makeIssue({ ref: 'PAN-1' })]);
     expect(result.manifest[0].ready).toBe(true);
   });
@@ -118,7 +118,7 @@ describe('collectOpenBacklog', () => {
   it('ready=true when spec and workspace tasks both exist', async () => {
     const specsDir = join(tmpDir, '.pan', 'specs');
     mkdirSync(specsDir, { recursive: true });
-    writeFileSync(join(specsDir, '2026-01-01-PAN-1-my-feature.vbrief.json'), '{}');
+    writeFileSync(join(specsDir, '2026-01-01-PAN-1-my-feature.xbrief.json'), '{}');
     const tasksDir = join(tmpDir, 'workspaces', 'feature-pan-1', '.tasks');
     mkdirSync(tasksDir, { recursive: true });
     writeFileSync(join(tasksDir, 'issues.jsonl'), '');

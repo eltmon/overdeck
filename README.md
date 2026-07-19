@@ -113,7 +113,7 @@ Project tree, activity feed, kanban board, agent status, cost analytics, convoy 
 ┌──────┐    ┌──────┐    ┌──────────┐    ┌──────┐    ┌──────┐    ┌──────────┐
 │ Task │ ─► │ Plan │ ─► │ Write    │ ─► │ Code │ ─► │ Run  │ ─► │ Merge    │
 │ from │    │ with │    │ code in  │    │ rev. │    │ test │    │ train    │
-│ any  │    │vBRIEF│    │ isolated │    │ conv-│    │ +    │    │ keeps    │
+│ any  │    │xBRIEF│    │ isolated │    │ conv-│    │ +    │    │ keeps    │
 │track-│    │ beads│    │ worktree │    │ oy ×4│    │ UAT  │    │ main     │
 │ er   │    │      │    │          │    │      │    │      │    │ green    │
 └──────┘    └──────┘    └──────────┘    └──────┘    └──────┘    └──────────┘

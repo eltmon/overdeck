@@ -37,14 +37,14 @@
 | [reference/harness-landscape.mdx](../reference/harness-landscape.mdx) | Planning survey of 13 coding-agent harnesses — extensibility mechanisms, skill/AGENTS.md/MCP support, headless interfaces, and harness-adoption implications |
 | [OKF-LANDSCAPE.md](./OKF-LANDSCAPE.md) | Research survey of the Open Knowledge Format ecosystem — how Overdeck stores its knowledge bundle vs in-repo/sibling-repo/submodule patterns in the wild, branch-based storage analogues to `overdeck-state`, upstream spec proposals, and the inkeep open-knowledge viewer plan (PAN-2066) |
 | [reference/template-conversations.mdx](../reference/template-conversations.mdx) | Proposal: loading curated skill bundles into a single conversation without touching the global `pan sync` skill set |
-| [REPO-ARTIFACTS.md](./REPO-ARTIFACTS.md) | What lives in a project's repo: `.pan/`, skills hierarchy, `vbrief/` lifecycle dirs, PRD vs vBRIEF, multi-tool sync |
+| [REPO-ARTIFACTS.md](./REPO-ARTIFACTS.md) | What lives in a project's repo and `overdeck-state`: context layers, xBRIEF specs, PRD drafts, runtime artifacts, and multi-tool sync |
 | [VISION.md](./VISION.md) | Product vision and deployment model roadmap (local → shared → SaaS) |
 | [PRD.md](./PRD.md) | Product requirements document for Overdeck |
 | [PRD-CLOISTER.md](./PRD-CLOISTER.md) | Cloister lifecycle manager requirements (historical — see DEACON doc for current state) |
 | [DEACON-HEALTH-MONITORING.md](./DEACON-HEALTH-MONITORING.md) | Deacon health monitoring: all 10 stuck detection mechanisms, thresholds, escalation, recovery |
 | [PRD-REMOTE-WORKSPACES.md](./PRD-REMOTE-WORKSPACES.md) | Remote workspace requirements |
-| [VBRIEF.md](./VBRIEF.md) | vBRIEF plan format, lifecycle directories, continue state, `pan scope` commands |
-| [HIERARCHICAL-PLANNING.md](./HIERARCHICAL-PLANNING.md) | vBRIEF planning, DAG scheduling, acceptance criteria pipeline |
+| [XBRIEF.md](./XBRIEF.md) | xBRIEF plan format, field-based lifecycle, continue state, compatibility, and migration |
+| [HIERARCHICAL-PLANNING.md](./HIERARCHICAL-PLANNING.md) | xBRIEF planning, DAG scheduling, acceptance criteria pipeline |
 | [SWARM.md](./SWARM.md) | Per-item DAG dispatch, synthesis agents at convergence points, file-overlap serialization, slot-merge auto-advance, `pan swarm` CLI + `--task` operations, HTTP routes, `SwarmRuntime` continue-state shape, DAG library API |
 | [FLYWHEEL.md](./FLYWHEEL.md) | Flywheel contract, lifecycle, role settings, brief authoring, status vs state, and skill → CLI → API → UI mapping |
 | [flywheel-brief.md](./flywheel-brief.md) | Default operating contract the Flywheel orchestrator reads at the start of every run |
@@ -170,9 +170,9 @@
 - **"session ID"** / **"session persistence"** → SPECIALIST_WORKFLOW.md (Session Persistence & Memory)
 - **"deterministic UUID"** → SPECIALIST_WORKFLOW.md (Session Persistence & Memory)
 - **"merge"** / **"merge validation"** → PRD-CLOISTER.md (Merge Validation Pipeline section)
-- **"vBRIEF"** / **"DAG"** / **"acceptance criteria"** / **"planning"** → VBRIEF.md, HIERARCHICAL-PLANNING.md, SPECIALIST_WORKFLOW.md
+- **"xBRIEF"** / **"DAG"** / **"acceptance criteria"** / **"planning"** → XBRIEF.md, HIERARCHICAL-PLANNING.md, SPECIALIST_WORKFLOW.md
 - **"swarm"** / **"pan swarm"** / **"per-item dispatch"** / **"synthesis agent"** / **"files_scope"** / **"slot-merged"** / **"SwarmRuntime"** → SWARM.md
-- **"beads conversion"** / **"createBeadsFromVBrief"** → HIERARCHICAL-PLANNING.md
+- **"beads conversion"** / **"createBeadsFromXBrief"** → HIERARCHICAL-PLANNING.md
 - **"sync with main"** / **"sync-main"** → SPECIALIST_WORKFLOW.md (Sync with Main section)
 - **"deacon"** / **"health monitor"** / **"health"** / **"patrol"** → DEACON-HEALTH-MONITORING.md
 - **"rollback"** / **"revert"** / **"ORIG_HEAD"** → PRD-CLOISTER.md
@@ -238,9 +238,9 @@
 ### Development
 - **"skills"** → README.md, CLAUDE.md, REPO-ARTIFACTS.md
 - **".pan"** / **".pan.yaml"** / **"repo artifacts"** → REPO-ARTIFACTS.md
-- **"STATE.md archive"** / **"vBRIEF archive"** / **"planning artifacts"** / **"continue state"** → REPO-ARTIFACTS.md, VBRIEF.md
-- **"lifecycle"** / **"vbrief lifecycle"** / **"proposed"** / **"active"** / **"completed"** / **"cancelled"** → VBRIEF.md, REPO-ARTIFACTS.md
-- **"pan scope"** / **"scope list"** / **"scope approve"** / **"scope restore"** → VBRIEF.md
+- **"STATE.md archive"** / **"xBRIEF archive"** / **"planning artifacts"** / **"continue state"** → REPO-ARTIFACTS.md, XBRIEF.md
+- **"xbrief lifecycle"** / **"proposed"** / **"active"** / **"completed"** / **"cancelled"** → XBRIEF.md, REPO-ARTIFACTS.md
+- **"pan scope"** / **"scope list"** / **"scope approve"** / **"scope restore"** → XBRIEF.md
 - **"also_sync"** / **"multi-tool sync"** / **"cursor sync"** / **"codex sync"** → REPO-ARTIFACTS.md
 - **"commit"** / **"git commit"** → CLAUDE.md
 - **"messaging"** / **"messageAgent"** → CLAUDE.md

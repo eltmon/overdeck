@@ -268,7 +268,7 @@ export async function notifyTldrDaemon(projectPath: string, _sourceBranch: strin
 /**
  * Post-merge handoff: mark merged work as verifying on main and free runtime resources.
  *
- * Leaves the issue, workspace, vBRIEF, branches, and agent state dirs intact.
+ * Leaves the issue, workspace, xBRIEF, branches, and agent state dirs intact.
  * The explicit close-out ceremony performs final archival and destructive cleanup.
  *
  * IDEMPOTENT: Safe to call multiple times for the same issueId. Tracks completed

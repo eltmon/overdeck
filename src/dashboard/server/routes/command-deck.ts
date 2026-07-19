@@ -65,7 +65,7 @@ import { httpHandler } from './http-handler.js';
 import { resolveJsonlPath } from './jsonl-resolver.js';
 import { buildReviewerNodes, readSynthesisRounds, type ReviewerRoundMetadata } from './reviewer-tree.js';
 import { PAN_CONTINUE_FILENAME, PAN_DIRNAME } from '../../../lib/pan-dir/types.js';
-import { isPlanningComplete, readWorkspacePlan } from '../../../lib/vbrief/io.js';
+import { isPlanningComplete, readWorkspacePlan } from '../../../lib/xbrief/io.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -766,7 +766,7 @@ async function fetchPlanningData(
   const hasPlanningDir = await pathExists(planningDir);
   const hasPanContinue = await pathExists(panContinuePath);
 
-  // Acceptance criteria progress from vBRIEF plan (PAN-847)
+  // Acceptance criteria progress from xBRIEF plan (PAN-847)
   // Pipeline mirror corroboration (PAN-977)
   try {
     const doc = await Effect.runPromise(readWorkspacePlan(workspacePath));
@@ -782,7 +782,7 @@ async function fetchPlanningData(
       }
       result.pipelineMirror = doc.plan.metadata?.pipeline;
     }
-  } catch { /* no vBRIEF plan */ }
+  } catch { /* no xBRIEF plan */ }
 
   if (!hasPlanningDir && !hasPanContinue) {
     const prd = await readPrdContent(findPrdAtStatusSync(projectPath, issueId, 'active'));
@@ -1036,7 +1036,7 @@ ${issueContext ? `\n${issueContext}\n` : ''}
 - Review: ${reviewStatus}
 - Tests: ${testStatus}
 
-## Planning Context (continue.vbrief.json)
+## Planning Context (.overdeck/continue.json)
 ${state ? state.slice(0, 4000) : '(No planning state available)'}
 
 ## Files Changed

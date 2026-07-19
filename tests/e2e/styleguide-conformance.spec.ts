@@ -171,7 +171,7 @@ const feature = {
     remoteBranchCount: 1,
     tmuxSessionCount: 1,
     prs: [],
-    hasVbrief: true,
+    hasXbrief: true,
     hasBeads: true,
     dockerContainerCount: 0,
   },

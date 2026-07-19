@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { IMPLICIT_TIER_NAME, resolveImplicitStaffing, resolveStaffing } from '../staffing.js';
 import { resolveModel } from '../../config-yaml/roles.js';
-import type { VBriefItem } from '../../vbrief/types.js';
+import type { XBriefItem } from '../../xbrief/types.js';
 
 const WORK_ROLES = { work: { model: 'claude-sonnet-5' } } as never;
 
-function item(id: string, metadata: Record<string, unknown> = {}): Pick<VBriefItem, 'id' | 'title' | 'metadata'> {
-  return { id, title: `${id} title`, metadata: metadata as VBriefItem['metadata'] };
+function item(id: string, metadata: Record<string, unknown> = {}): Pick<XBriefItem, 'id' | 'title' | 'metadata'> {
+  return { id, title: `${id} title`, metadata: metadata as XBriefItem['metadata'] };
 }
 
 function explicitTiered(overrides: Record<string, unknown> = {}) {

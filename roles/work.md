@@ -72,14 +72,14 @@ Never batch multiple tasks into a single commit. A one-item diff is what makes i
 
 ## Foreman wave-driver protocol
 
-The serial per-item workflow above remains the default. Use the foreman path only when the vBRIEF is swarm-eligible: items are vertical tracer-bullet slices with declared `files_scope`, `files_scope_confidence`, `readiness`, `verify_commands`, and `expected_outputs`.
+The serial per-item workflow above remains the default. Use the foreman path only when the xBRIEF is swarm-eligible: items are vertical tracer-bullet slices with declared `files_scope`, `files_scope_confidence`, `readiness`, `verify_commands`, and `expected_outputs`.
 
 You remain the durable work agent for the issue. The foreman path is not a revived server-side swarm runtime: there is no `SynthesisOutput` state, no slot callback endpoint, no auto-advance poller, and no per-slot PR. The issue still lands as one reviewed branch.
 
 ### Wave loop
 
-1. Read `.overdeck/spec.vbrief.json` and compute dependency waves with `groupItemsByWave(doc)` from `src/lib/vbrief/dag.ts`.
-2. Run `analyzeSwarmReadiness(doc)` from `src/lib/vbrief/swarm-readiness.ts`. Use its overlap matrix and conflict groups to serialize items inside a wave when scopes overlap. Overlap orders work; it never refuses the issue.
+1. Read `.overdeck/spec.vbrief.json` and compute dependency waves with `groupItemsByWave(doc)` from `src/lib/xbrief/dag.ts`.
+2. Run `analyzeSwarmReadiness(doc)` from `src/lib/xbrief/swarm-readiness.ts`. Use its overlap matrix and conflict groups to serialize items inside a wave when scopes overlap. Overlap orders work; it never refuses the issue.
 3. On every start or restart, run the reconcile helper from `src/lib/agents/slot-reconcile.ts` before dispatching new work. Existing `feature/<issue>-slot-*` branches, `agent-<issue>-slot-<n>` agents, and status overrides determine which items are already merged, in flight, or still pending.
 4. For each pending item in the current wave, call `chooseDispatchTier(item)` from `src/lib/agents/dispatch-tier.ts`.
 5. Dispatch `in-context` items through the harness's in-context subagent primitive. These are cheap/mechanical slices whose output comes back to you for review, staging, and the normal one-item commit.

@@ -53,7 +53,7 @@ export const PAN_COMMANDS: PanCommandEntry[] = [
   { name: 'pan issues', description: 'List and triage work across connected trackers', group: 'Issues', keywords: ['list', 'tickets'] },
   { name: 'pan show <id>', description: 'Show agent state, work history, context, or health for an issue', group: 'Issues', keywords: ['inspect', 'detail'] },
   { name: 'pan triage', description: 'Triage backlog with priority + complexity heuristics', group: 'Issues' },
-  { name: 'pan plan <id>', description: 'Plan an issue (interactive vBRIEF + tasks)', group: 'Issues', keywords: ['planning', 'vbrief'] },
+  { name: 'pan plan <id>', description: 'Plan an issue (interactive xBRIEF + tasks)', group: 'Issues', keywords: ['planning', 'xbrief'] },
   { name: 'pan plan <id> --auto', description: 'Plan an issue non-interactively (auto mode)', group: 'Issues', keywords: ['planning', 'auto'] },
 
   // Work agents

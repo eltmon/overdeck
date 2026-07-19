@@ -20,7 +20,7 @@
  */
 import { existsSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { join } from 'node:path';
-import type { VBriefDocument } from '../vbrief/types.js';
+import type { XBriefDocument } from '../xbrief/types.js';
 
 export interface TestVerdictArtifact {
   status: 'passed' | 'failed';
@@ -136,7 +136,7 @@ export function decideUnsignaledTestAction(input: {
 export function resolveSlotFeedbackAgentId(
   issueId: string,
   slotItemId: string | undefined,
-  _doc: VBriefDocument | null | undefined,
+  _doc: XBriefDocument | null | undefined,
   slotOwnership: Array<{ slotIndex: number; slotItemId?: string; itemId?: string }> = [],
 ): string | null {
   const normalizedItemId = slotItemId?.trim();

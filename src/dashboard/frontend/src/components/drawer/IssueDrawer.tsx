@@ -233,7 +233,7 @@ export function IssueDrawer() {
                 <TasksPanel issueId={drawer.issueId} />
               </div>
             ) : drawer.tab === 'plan' && drawer.issueId ? (
-              <div data-section="DrawerPlanPanel / VBriefViewer"><DrawerPlanPanel issueId={drawer.issueId} /></div>
+              <div data-section="DrawerPlanPanel / XBriefViewer"><DrawerPlanPanel issueId={drawer.issueId} /></div>
             ) : drawer.tab === 'activity' ? (
               <div data-section="DrawerActivityRail / DrawerActivityPanel"><DrawerActivityPanel /></div>
             ) : drawer.tab === 'artifacts' ? (

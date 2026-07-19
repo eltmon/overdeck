@@ -1,15 +1,15 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Circle, CheckCircle2, Clock, List, GitFork, ListTodo, RefreshCw, Loader2, Download, ChevronDown, ChevronRight } from 'lucide-react';
-import { PlanMapViewer } from './vbrief/PlanMapViewer.js';
-import type { VBriefItem, VBriefDocument } from './vbrief/types.js';
+import { PlanMapViewer } from './xbrief/PlanMapViewer.js';
+import type { XBriefItem, XBriefDocument } from './xbrief/types.js';
 import { taskStatusBucket } from '../lib/taskStatus';
 
 interface TaskTask {
   id: string;
   name?: string;
   title?: string;
-  /** Raw vBRIEF item status ('planned' | 'running' | 'completed' | …); legacy beads values tolerated (PAN-2696). */
+  /** Raw xBRIEF item status ('planned' | 'running' | 'completed' | …); legacy beads values tolerated (PAN-2696). */
   status: string;
   labels: string[];
   blockedBy: string[];
@@ -39,7 +39,7 @@ export function TasksPanel({ issueId }: TasksPanelProps) {
     }
   });
 
-  const [selectedItem, setSelectedItem] = useState<VBriefItem | null>(null);
+  const [selectedItem, setSelectedItem] = useState<XBriefItem | null>(null);
 
   const { data: tasksData, isLoading, refetch, isRefetching } = useQuery<TasksResponse>({
     queryKey: ['tasks', issueId],
@@ -51,8 +51,8 @@ export function TasksPanel({ issueId }: TasksPanelProps) {
     refetchInterval: 10000,
   });
 
-  // Fetch the vBRIEF plan (also used to check if plan exists)
-  const { data: planDoc } = useQuery<VBriefDocument | null>({
+  // Fetch the xBRIEF plan (also used to check if plan exists)
+  const { data: planDoc } = useQuery<XBriefDocument | null>({
     queryKey: ['plan', issueId],
     queryFn: async () => {
       const res = await fetch(`/api/workspaces/${issueId}/plan`);
@@ -124,13 +124,13 @@ export function TasksPanel({ issueId }: TasksPanelProps) {
                     const url = URL.createObjectURL(blob);
                     const a = document.createElement('a');
                     a.href = url;
-                    a.download = `${issueId.toLowerCase()}-plan.vbrief.json`;
+                    a.download = `${issueId.toLowerCase()}-plan.xbrief.json`;
                     a.click();
                     URL.revokeObjectURL(url);
                   });
               }}
               className="p-1 hover:bg-popover rounded transition-colors"
-              title="Download vBRIEF plan (for vBRIEF Studio)"
+              title="Download xBRIEF plan (for xBRIEF Studio)"
             >
               <Download className="w-3 h-3" />
             </button>
@@ -198,11 +198,11 @@ const AC_STATUS_ICONS: Record<string, { color: string; symbol: string }> = {
   cancelled:   { color: '#6b7280', symbol: '○' },
 };
 
-function TaskItem({ task, planDoc }: { task: TaskTask; planDoc: VBriefDocument | null }) {
+function TaskItem({ task, planDoc }: { task: TaskTask; planDoc: XBriefDocument | null }) {
   const [expanded, setExpanded] = useState(false);
 
   // Match task to plan item using the same pattern as PlanItemDetail
-  const planItem: VBriefItem | undefined = planDoc
+  const planItem: XBriefItem | undefined = planDoc
     ? planDoc.plan.items.find(item =>
         `${planDoc.plan.id}: ${item.title}`.toLowerCase() === (task.title || task.name || '').toLowerCase()
       )
@@ -293,8 +293,8 @@ function TaskItem({ task, planDoc }: { task: TaskTask; planDoc: VBriefDocument |
 // ── PlanItemDetail — shows narrative, ACs, task status, blockers/dependents ──
 
 interface PlanItemDetailProps {
-  item: VBriefItem;
-  doc: VBriefDocument;
+  item: XBriefItem;
+  doc: XBriefDocument;
   tasks: TaskTask[];
 }
 

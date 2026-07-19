@@ -28,7 +28,7 @@ import { enqueueMerge, getCurrentMerge, markMergeProcessing, dequeueMerge, getAl
 import { findProjectByTeamSync } from '../../../../lib/projects.js';
 import { getReviewStatusSync, markWorkspaceStuck, setReviewStatusSync as setReviewStatusBase, type ReviewStatus } from '../../../../lib/review-status.js';
 import { isStatePlaneOnlyStatus } from '../../../../lib/state-plane.js';
-import { findPlan } from '../../../../lib/vbrief/io.js';
+import { findPlan } from '../../../../lib/xbrief/io.js';
 import { isIntegrationPermissionError, verifyAppCanMerge } from '../../../../lib/github-app.js';
 import { resolveGitHubIssueSync as resolveGitHubIssueShared } from '../../../../lib/tracker-utils.js';
 import { sessionExists } from '../../../../lib/tmux.js';
@@ -119,7 +119,7 @@ export async function reconcileGitHubMergeStatus(issueId: string, status: Pick<R
 
 /**
  * Build a rich PR body with issue link, tasks task summary, and AC checklist
- * from the vBRIEF plan. Exported for testing.
+ * from the xBRIEF plan. Exported for testing.
  */
 export async function buildRichPRBody(issueId: string, workspacePath: string): Promise<string> {
   const lines: string[] = [];
@@ -132,7 +132,7 @@ export async function buildRichPRBody(issueId: string, workspacePath: string): P
   lines.push(`**Issue:** #${extractNumberSync(issueId) ?? issueId}`);
   lines.push('');
 
-  // Acceptance criteria checklist from vBRIEF plan items
+  // Acceptance criteria checklist from xBRIEF plan items
   try {
     const planPath = await Effect.runPromise(findPlan(workspacePath));
     if (planPath && existsSync(planPath)) {
@@ -150,7 +150,7 @@ export async function buildRichPRBody(issueId: string, workspacePath: string): P
       }
     }
   } catch {
-    // No vBRIEF plan — omit checklist
+    // No xBRIEF plan — omit checklist
   }
 
   return lines.join('\n') || `Automated PR for ${issueId}`;

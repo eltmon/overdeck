@@ -164,7 +164,7 @@ export const WORK_TYPE_REQUIREMENTS: Record<string, SkillRequirement[]> = {
   'review-requirements': [
     { skill: 'planning', weight: 0.4 },    // Mapping requirements to code
     { skill: 'code-review', weight: 0.4 }, // Understanding what code does
-    { skill: 'documentation', weight: 0.2 }, // Reading vBRIEF structure
+    { skill: 'documentation', weight: 0.2 }, // Reading xBRIEF structure
   ],
 
   'review-synthesis': [

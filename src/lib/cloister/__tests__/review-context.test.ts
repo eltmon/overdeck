@@ -37,16 +37,16 @@ vi.mock('child_process', () => ({
   }),
 }));
 
-// ── vbrief / config mocks ──────────────────────────────────────────────────
-vi.mock('../../vbrief/io.js', () => ({
+// ── xbrief / config mocks ──────────────────────────────────────────────────
+vi.mock('../../xbrief/io.js', () => ({
   findPlan: vi.fn(() => null),
   findPlanSync: vi.fn(() => null),
   readPlan: (...args: unknown[]) => mockReadPlan(...args),
   readPlanProgram: (...args: unknown[]) => mockReadPlan(...args),
 }));
-vi.mock('../../vbrief/lifecycle-io.js', () => ({
-  findVBriefByIssue: vi.fn(() => null),
-  findVBriefByIssueSync: vi.fn(() => null),
+vi.mock('../../xbrief/lifecycle-io.js', () => ({
+  findXBriefByIssue: vi.fn(() => null),
+  findXBriefByIssueSync: vi.fn(() => null),
 }));
 vi.mock('../../config.js', () => ({
   getDevrootPath: vi.fn(() => null),
@@ -66,7 +66,7 @@ vi.mock('../coderabbit-ingestion.js', () => ({
 
 // ── import after mocks ─────────────────────────────────────────────────────
 import { buildReviewContext, formatTier1Summary, REVIEW_LARGE_CHANGESET_FILES, REVIEW_LARGE_CHANGESET_LINES } from '../review-context.js';
-import { findPlanSync } from '../../vbrief/io.js';
+import { findPlanSync } from '../../xbrief/io.js';
 import { scanStubUi } from '../lint-stub-ui.js';
 
 // ── helpers ────────────────────────────────────────────────────────────────
@@ -135,7 +135,7 @@ describe('buildReviewContext', () => {
   it('includes plan NonGoals in the manifest', async () => {
     vi.mocked(findPlanSync).mockReturnValue(join(workspace, '.pan', 'spec.vbrief.json'));
     mockReadPlan.mockReturnValue(Effect.succeed({
-      vBRIEFInfo: { version: '0.5', created: '2026-06-12T00:00:00Z' },
+      xBRIEFInfo: { version: '0.5', created: '2026-06-12T00:00:00Z' },
       plan: {
         id: issueId.toLowerCase(),
         title: 'Plan',
@@ -169,7 +169,7 @@ describe('buildReviewContext', () => {
   it("includes plan item traces in the manifest", async () => {
     vi.mocked(findPlanSync).mockReturnValue(join(workspace, '.pan', 'spec.vbrief.json'));
     mockReadPlan.mockReturnValue(Effect.succeed({
-      vBRIEFInfo: { version: '0.5', created: '2026-06-12T00:00:00Z' },
+      xBRIEFInfo: { version: '0.5', created: '2026-06-12T00:00:00Z' },
       plan: {
         id: issueId.toLowerCase(),
         title: 'Plan',

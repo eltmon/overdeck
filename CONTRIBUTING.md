@@ -225,7 +225,7 @@ Use the affected subsystem: `cloister`, `dashboard`, `workspace`, `cli`, `review
 ```
 feat(cloister): add preTrustDirectory to initializeSpecialist (PAN-502)
 fix(dashboard): Done column shows 0 issues — selectIssuesByCycle must not filter done (PAN-500)
-chore: stop tracking .beads/ — ephemeral, derived from vBRIEF
+chore: stop tracking .overdeck/continue.json — workspace runtime state
 fix(workspace): git restore after worktree add clears unstaged deletions (PAN-495)
 fix(review-status): clear stuck merging status on server restart (PAN-490)
 ```
@@ -278,10 +278,10 @@ export default defineConfig({
 ### 4. No ephemeral files staged
 
 ```bash
-git status   # Must not show .beads/, *.log, or dist/ changes
+git status   # Must not show .overdeck/ runtime files, *.log, or dist/ changes
 ```
 
-`.beads/` is gitignored because beads are derived from `plan.vbrief.json` at runtime. They are not repo artifacts. If you see them staged, something has gone wrong upstream — do not commit them.
+`.overdeck/continue.json` and other workspace runtime files are gitignored because canonical plans and durable task state live on `overdeck-state`. If you see workspace runtime files staged, something has gone wrong upstream — do not commit them.
 
 ---
 
@@ -601,7 +601,7 @@ These properties must be preserved across all changes. A change that would viola
 | Invariant | Why it matters |
 |-----------|---------------|
 | `mergeStatus: 'merging'` is cleared on server restart | Pending merges are in-memory only. Stale `merging` permanently disables the Merge button. |
-| `.beads/` is never committed | Beads are derived from `plan.vbrief.json`. Committing them creates false authoritative state and merge conflicts. |
+| `.overdeck/continue.json` is never committed | It is mutable workspace runtime state; committing it creates false authoritative state and merge conflicts. |
 | `preTrustDirectory()` is called before every agent/specialist spawn | Without it, Claude Code hangs asking "Do you trust this folder?" — the session never starts. |
 | `maxForks: 4` in all Vitest configs | 24 cores × 3.5 GB = OOM. Non-negotiable. |
 | Node 22 is the production runtime | The production server path must explicitly use the Node 22 binary, not the system default. |

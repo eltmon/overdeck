@@ -15,7 +15,7 @@ import { resolveProjectFromIssueSync } from '../projects.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import { sessionRotationRefused } from '../session-rotation.js';
-import { appendContinueSessionEntryForIssue } from '../vbrief/lifecycle-io.js';
+import { appendContinueSessionEntryForIssue } from '../xbrief/lifecycle-io.js';
 import { createSession, isPaneDead, killSession, listPaneValues, sessionExists } from '../tmux.js';
 import {
   decideResumeGate,

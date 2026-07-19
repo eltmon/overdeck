@@ -8,8 +8,8 @@ import chalk from 'chalk';
 import { resolveProjectFromIssueSync } from '../../lib/projects.js';
 import { createWorkspace } from '../../lib/workspace-manager.js';
 import { findSpecByIssue } from '../../lib/pan-dir/specs.js';
-import { analyzeSwarmReadiness, type SwarmReadinessVerdict } from '../../lib/vbrief/swarm-readiness.js';
-import type { VBriefDocument } from '../../lib/vbrief/types.js';
+import { analyzeSwarmReadiness, type SwarmReadinessVerdict } from '../../lib/xbrief/swarm-readiness.js';
+import type { XBriefDocument } from '../../lib/xbrief/types.js';
 import {
   classifyInFlightSlots,
   clearAllSlotAssignments,
@@ -767,12 +767,12 @@ async function ensureFeatureWorkspace(issueId: string, project: ResolvedProjectL
 async function loadSwarmPlan(
   issueId: string,
   deps: Pick<SwarmCommandDeps, 'resolveProjectFromIssueSync' | 'findSpecByIssue'>,
-): Promise<{ ok: true; project: ResolvedProjectLike; doc: VBriefDocument } | { ok: false; error: string }> {
+): Promise<{ ok: true; project: ResolvedProjectLike; doc: XBriefDocument } | { ok: false; error: string }> {
   const project = deps.resolveProjectFromIssueSync(issueId);
   if (!project) return { ok: false, error: `Could not resolve project for ${issueId}.` };
 
   const spec = await Effect.runPromise(deps.findSpecByIssue(project.projectPath, issueId));
-  if (!spec) return { ok: false, error: `No main-side vBRIEF spec found for ${issueId}.` };
+  if (!spec) return { ok: false, error: `No main-side xBRIEF spec found for ${issueId}.` };
 
   return { ok: true, project, doc: spec.document };
 }

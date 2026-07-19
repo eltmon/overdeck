@@ -19,10 +19,12 @@ import {
 } from '../overdeck/cost-sync.js';
 import { getMergeSetSync } from '../merge-set.js';
 import {
+  findProjectByPathSync,
   getProjectSync,
   resolveProjectFromIssueSync,
   type ProjectConfig,
 } from '../projects.js';
+import { resolveStateReadHomeSync } from '../state-read-home.js';
 import type { ReviewStatus } from '../review-status.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import type {
@@ -32,7 +34,11 @@ import type {
   ContinueResumePoint,
   ContinueSessionEntry,
   ScopeDriftRecord,
-} from '../vbrief/continue-state.js';
+} from '../xbrief/continue-state.js';
+import {
+  LEGACY_VBRIEF_FILENAME_SUFFIX,
+  XBRIEF_FILENAME_SUFFIX,
+} from '../xbrief/lifecycle.js';
 import { listOverdeckAgentStatesSync } from '../overdeck/agent-state-sync.js';
 import {
   getIssueWorkspacePath,
@@ -163,10 +169,26 @@ function projectMerges(issueId: string): string[] {
 
 // ─── Record builder ───────────────────────────────────────────────────────────
 
+export function resolveContinuePath(projectRoot: string, issueId: string): string {
+  const project: ProjectConfig = findProjectByPathSync(projectRoot) ?? {
+    name: projectRoot,
+    path: projectRoot,
+  };
+  const stateHome = resolveStateReadHomeSync(project);
+  const continuesDir = stateHome.migrated
+    ? join(stateHome.root, PAN_CONTINUES_DIRNAME)
+    : join(stateHome.root, PAN_DIRNAME, PAN_CONTINUES_DIRNAME);
+  const basePath = join(continuesDir, issueId.toLowerCase());
+  const canonicalPath = `${basePath}${XBRIEF_FILENAME_SUFFIX}`;
+  const legacyPath = `${basePath}${LEGACY_VBRIEF_FILENAME_SUFFIX}`;
+  if (existsSync(canonicalPath)) return canonicalPath;
+  if (existsSync(legacyPath)) return legacyPath;
+  return canonicalPath;
+}
+
 async function readLegacyContinueText(projectRoot: string, issueId: string): Promise<string | null> {
-  const path = join(projectRoot, PAN_DIRNAME, PAN_CONTINUES_DIRNAME, `${issueId.toLowerCase()}.vbrief.json`);
   try {
-    return await fsp.readFile(path, 'utf-8');
+    return await fsp.readFile(resolveContinuePath(projectRoot, issueId), 'utf-8');
   } catch {
     return null;
   }

@@ -191,7 +191,7 @@ If merge-agent can't complete:
 cd ~/Projects/overdeck
 git status
 
-# If .vBRIEF tasks/ files are modified, that's OK (should be ignored)
+# Workspace `.overdeck/` runtime files are gitignored and should not be staged
 # Other uncommitted changes need to be committed or stashed
 ```
 

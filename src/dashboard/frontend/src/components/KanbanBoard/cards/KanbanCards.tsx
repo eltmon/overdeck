@@ -38,7 +38,7 @@ export function FeatureCard({
   onSelect,
   onPlan,
   onViewTasks,
-  onViewVBrief,
+  onViewXBrief,
   planningState: planningStateProp,
   children,
 }: {
@@ -50,7 +50,7 @@ export function FeatureCard({
   onSelect?: () => void;
   onPlan?: () => void;
   onViewTasks?: () => void;
-  onViewVBrief?: () => void;
+  onViewXBrief?: () => void;
   planningState?: PlanningState;
   children?: React.ReactNode;
 }) {
@@ -133,7 +133,7 @@ export function FeatureCard({
             </div>
           )}
 
-          {/* Action bar for features — Plan, vBRIEF, Tasks; NO Start Agent */}
+          {/* Action bar for features — Plan, xBRIEF, Tasks; NO Start Agent */}
           <div className="mt-2 flex items-center gap-2 flex-wrap rounded-xl border border-border/70 bg-card/80 px-2.5 py-2">
             {STATUS_LABELS[feature.status] !== 'done' && STATUS_LABELS[feature.status] !== 'canceled' && (
               <button
@@ -163,13 +163,13 @@ export function FeatureCard({
             )}
             {hasPlan && (
               <button
-                data-testid={`action-vbrief-${feature.identifier}`}
-                onClick={(e) => { e.stopPropagation(); onViewVBrief && onViewVBrief(); }}
+                data-testid={`action-xbrief-${feature.identifier}`}
+                onClick={(e) => { e.stopPropagation(); onViewXBrief && onViewXBrief(); }}
                 className="flex items-center gap-1 text-xs text-success hover:text-success/80 transition-colors"
-                title="vBRIEF"
+                title="xBRIEF"
               >
                 <ScrollText className="w-3.5 h-3.5" />
-                vBRIEF
+                xBRIEF
               </button>
             )}
           </div>
@@ -548,7 +548,7 @@ interface IssueCardProps {
   onSelect: () => void;
   onPlan: (autoStart?: boolean) => void; // Lifted to parent to survive re-renders
   onViewTasks?: (issue: Issue) => void;
-  onViewVBrief?: (issue: Issue) => void;
+  onViewXBrief?: (issue: Issue) => void;
   isBulkSelected?: boolean;
   onBulkToggle?: () => void;
   planningState?: PlanningState;

@@ -51,7 +51,7 @@ export interface ResourceDetails {
   remoteBranchCount: number;
   tmuxSessionCount: number;
   prs: ResourcePullRequest[];
-  hasVbrief: boolean;
+  hasXbrief: boolean;
   hasTasks: boolean;
   dockerContainerCount: number;
   /** Current HEAD of the agent's workspace, or null when no workspace exists. */
@@ -116,8 +116,8 @@ interface InternalResourceDetails {
   localBranches: string[];
   remoteBranches: string[];
   prs: GhPullRequest[];
-  vbriefPath: string | null;
-  vbriefMtime: number | null;
+  xbriefPath: string | null;
+  xbriefMtime: number | null;
   tasksPath: string | null;
   dockerContainers: string[];
   actualBranch: string | null;
@@ -233,7 +233,7 @@ function summarizeResourceDetails(details: InternalResourceDetails): ResourceDet
       state: pr.state,
       isDraft: pr.isDraft,
     })),
-    hasVbrief: details.vbriefPath !== null,
+    hasXbrief: details.xbriefPath !== null,
     hasTasks: details.tasksPath !== null,
     dockerContainerCount: details.dockerContainers.length,
     actualBranch: details.actualBranch,
@@ -451,9 +451,9 @@ interface WorkspaceScanResult {
   hasPlanning: boolean;
   hasPrd: boolean;
   hasState: boolean;
-  hasVbrief: boolean;
-  vbriefPath: string | null;
-  vbriefMtime: number | null;
+  hasXbrief: boolean;
+  xbriefPath: string | null;
+  xbriefMtime: number | null;
   hasTasks: boolean;
 }
 
@@ -472,14 +472,14 @@ async function scanWorkspace(
   const specEntry = issueId
     ? await Effect.runPromise(findSpecByIssue(projectRoot, issueId)).catch(() => null)
     : null;
-  const vbriefPath = specEntry ? specEntry.path : null;
-  let vbriefMtime: number | null = null;
-  if (vbriefPath) {
+  const xbriefPath = specEntry ? specEntry.path : null;
+  let xbriefMtime: number | null = null;
+  if (xbriefPath) {
     try {
-      const stats = await stat(vbriefPath);
-      vbriefMtime = stats.mtimeMs;
+      const stats = await stat(xbriefPath);
+      xbriefMtime = stats.mtimeMs;
     } catch {
-      vbriefMtime = null;
+      xbriefMtime = null;
     }
   }
 
@@ -488,10 +488,10 @@ async function scanWorkspace(
     hasPlanning: workspaceEntries.has(PAN_DIRNAME),
     hasPrd: panEntries.has('prd.md'),
     hasState: panEntries.has(PAN_CONTINUE_FILENAME),
-    hasVbrief: vbriefPath !== null,
-    vbriefPath,
-    vbriefMtime,
-    hasTasks: vbriefPath !== null,
+    hasXbrief: xbriefPath !== null,
+    xbriefPath,
+    xbriefMtime,
+    hasTasks: xbriefPath !== null,
   };
 }
 
@@ -559,8 +559,8 @@ async function computeResourceAllocatedIssues(): Promise<InternalDiscoveredIssue
         localBranches: [],
         remoteBranches: [],
         prs: [],
-        vbriefPath: null,
-        vbriefMtime: null,
+        xbriefPath: null,
+        xbriefMtime: null,
         tasksPath: null,
         dockerContainers: [],
         actualBranch: null,
@@ -671,10 +671,10 @@ async function computeResourceAllocatedIssues(): Promise<InternalDiscoveredIssue
       issue.hasPlanning = workspace.hasPlanning;
       issue.hasPrd = workspace.hasPrd;
       issue.hasState = workspace.hasState;
-      if (workspace.vbriefPath) {
+      if (workspace.xbriefPath) {
         issue.resourceSources.add('vbrief');
-        issue.resourceDetails.vbriefPath = workspace.vbriefPath;
-        issue.resourceDetails.vbriefMtime = workspace.vbriefMtime;
+        issue.resourceDetails.xbriefPath = workspace.xbriefPath;
+        issue.resourceDetails.xbriefMtime = workspace.xbriefMtime;
       }
       if (workspace.hasTasks) {
         issue.resourceSources.add('tasks');
@@ -894,7 +894,7 @@ export function sanitizeResourceAllocatedIssues(issues: ResourceAllocatedIssue[]
         state: pr.state,
         isDraft: pr.isDraft,
       })),
-      hasVbrief: issue.resourceDetails.hasVbrief,
+      hasXbrief: issue.resourceDetails.hasXbrief,
       hasTasks: issue.resourceDetails.hasTasks,
       dockerContainerCount: issue.resourceDetails.dockerContainerCount,
       actualBranch: issue.resourceDetails.actualBranch,

@@ -111,7 +111,7 @@ function collectPanWorkspaceFiles(workspacePath: string): MigratableWorkspaceFil
 
   const files: MigratableWorkspaceFile[] = [];
   const directFiles = [
-    { name: PAN_SPEC_FILENAME, label: 'workspace vBRIEF' },
+    { name: PAN_SPEC_FILENAME, label: 'workspace xBRIEF' },
     { name: PAN_CONTINUE_FILENAME, label: 'continue state' },
     { name: PAN_CONTEXT_FILENAME, label: 'feature context' },
   ];
@@ -193,7 +193,7 @@ async function copyWorkspacePanStateFromRemote(
   mkdirSync(localFeedbackDir, { recursive: true });
 
   const directFiles = [
-    { name: PAN_SPEC_FILENAME, label: 'workspace vBRIEF' },
+    { name: PAN_SPEC_FILENAME, label: 'workspace xBRIEF' },
     { name: PAN_CONTINUE_FILENAME, label: 'continue state' },
     { name: PAN_CONTEXT_FILENAME, label: 'feature context' },
   ];

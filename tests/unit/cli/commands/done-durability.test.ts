@@ -60,8 +60,8 @@ vi.mock('../../../../src/lib/pan-dir/record.js', async () => {
   };
 });
 
-vi.mock('../../../../src/lib/vbrief/io.js', async () => {
-  const actual = await vi.importActual<typeof import('../../../../src/lib/vbrief/io.js')>('../../../../src/lib/vbrief/io.js');
+vi.mock('../../../../src/lib/xbrief/io.js', async () => {
+  const actual = await vi.importActual<typeof import('../../../../src/lib/xbrief/io.js')>('../../../../src/lib/xbrief/io.js');
   return { ...actual, readWorkspacePlanSync: vi.fn(() => null) };
 });
 

@@ -13,7 +13,7 @@ import {
 } from './review-status.js';
 import { Data, Effect } from 'effect';
 import { resolveProjectFromIssueSync } from './projects.js';
-import { appendContinueSessionEntryForIssue } from './vbrief/lifecycle-io.js';
+import { appendContinueSessionEntryForIssue } from './xbrief/lifecycle-io.js';
 import { clearIssueClosedCache } from './cloister/issue-closed.js';
 
 export interface ReopenResult {
@@ -78,7 +78,7 @@ export interface ReopenOptions {
   });
   result.specialistStatesReset = true;
 
-  // 2. Append a reopen breadcrumb to the scope vBRIEF's continue file.
+  // 2. Append a reopen breadcrumb to the scope xBRIEF's continue file.
   const resolved = resolveProjectFromIssueSync(issueId);
   if (resolved) {
     try {

@@ -1,14 +1,14 @@
 import { existsSync, readdirSync, statSync } from 'fs';
 import { join, dirname } from 'path';
 import { Effect } from 'effect';
-import type { ContinueFeedbackEntry } from '../vbrief/continue-state.js';
+import type { ContinueFeedbackEntry } from '../xbrief/continue-state.js';
 import { renderPrompt } from './prompts.js';
 import { extractTeamPrefix, findProjectByTeamSync } from '../projects.js';
 import { isTldrEnabledSync } from '../config-yaml.js';
 import { getReadableWorkspacePanPaths, readWorkspaceContext, readFeedback, writeWorkspaceContext } from '../pan-dir/index.js';
 import { getProjectConfigFromWorkspacePath, readRecordContinueViewSync, resolveProjectForIssue } from '../pan-dir/record.js';
-import { findPlanSync, readWorkspacePlanSync, readPlanSync, readWorkspacePlan } from '../vbrief/io.js';
-import { createActiveSlice, getDispatchableItems } from '../vbrief/dag.js';
+import { findPlanSync, readWorkspacePlanSync, readPlanSync, readWorkspacePlan } from '../xbrief/io.js';
+import { createActiveSlice, getDispatchableItems } from '../xbrief/dag.js';
 import { loadConfigSync } from '../config.js';
 import { createTrackerFromConfig } from '../tracker/factory.js';
 import { NotImplementedError } from '../tracker/interface.js';
@@ -116,11 +116,11 @@ async function buildActiveSliceContext(workspacePath: string, issueId: string): 
       synthesisOutputs: undefined,
     });
     return [
-      '## Active vBRIEF Slice (Canonical Task Graph)',
+      '## Active xBRIEF Slice (Canonical Task Graph)',
       '',
       slice.prompt,
       '',
-      '_The merged vBRIEF is the canonical task authority._',
+      '_The merged xBRIEF is the canonical task authority._',
     ].join('\n');
   } catch {
     return '';
@@ -485,9 +485,9 @@ export async function writeStoryFeatureContext(workspacePath: string, issueId: s
               `## Plan Narratives\n${narrativeSection || '_No narratives found._'}\n\n` +
               `## Cross-Story Dependencies\n${edgesSection || '_No dependency edges found._'}\n\n` +
               `## Related Plan Items\n${itemsSection || '_No plan items found for this story._'}\n\n` +
-              `---\n*Synthesized from parent feature workspace vBRIEF*\n`;
+              `---\n*Synthesized from parent feature workspace xBRIEF*\n`;
           } catch (planErr) {
-            console.warn(`[writeStoryFeatureContext] Could not read parent workspace vBRIEF: ${planErr instanceof Error ? planErr.message : String(planErr)}`);
+            console.warn(`[writeStoryFeatureContext] Could not read parent workspace xBRIEF: ${planErr instanceof Error ? planErr.message : String(planErr)}`);
           }
         }
 

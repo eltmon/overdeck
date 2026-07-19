@@ -389,8 +389,8 @@ describe('AgentState role persistence', () => {
       createSession: vi.fn((...args: unknown[]) => Effect.promise(() => Promise.resolve(createSessionAsync(...args)))),
     }));
     vi.doMock('../tasks-query.js', () => ({ assertIssueHasTasks: vi.fn(() => Effect.succeed(undefined)) }));
-    vi.doMock('../vbrief/io.js', async (importOriginal) => ({
-      ...((await importOriginal()) as typeof import('../vbrief/io.js')),
+    vi.doMock('../xbrief/io.js', async (importOriginal) => ({
+      ...((await importOriginal()) as typeof import('../xbrief/io.js')),
       readWorkspacePlanSync: vi.fn(() => ({ plan: { id: 'PAN-1140', items: [] } })),
     }));
     vi.doMock('../activity-logger.js', async (importOriginal) => ({
@@ -480,7 +480,7 @@ describe('AgentState role persistence', () => {
     const workspace = mkdtempSync(join(tmpdir(), 'pan-stack-host-'));
     mkdirSync(join(workspace, '.pan'), { recursive: true });
     writeFileSync(join(workspace, '.pan', 'spec.vbrief.json'), JSON.stringify({
-      vBRIEFInfo: { version: '0.5', created: '2026-07-14T00:00:00.000Z' },
+      xBRIEFInfo: { version: '0.5', created: '2026-07-14T00:00:00.000Z' },
       plan: {
         id: 'PAN-1140',
         title: 'Host override fixture',
@@ -519,8 +519,8 @@ describe('AgentState role persistence', () => {
       emitActivityTts: vi.fn(),
       emitActivityTtsSync: vi.fn(),
     }));
-    vi.doMock('../vbrief/io.js', async (importOriginal) => ({
-      ...((await importOriginal()) as typeof import('../vbrief/io.js')),
+    vi.doMock('../xbrief/io.js', async (importOriginal) => ({
+      ...((await importOriginal()) as typeof import('../xbrief/io.js')),
       readWorkspacePlanSync: vi.fn(() => ({ plan: { id: 'PAN-1140', items: [] } })),
     }));
     vi.doMock('../cloister/work-agent-prompt.js', () => ({

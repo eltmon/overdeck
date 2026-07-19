@@ -3,14 +3,14 @@ import { mkdir, writeFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { resolveSlotTierSpawnParams, resolveSingleWorkTierSpawnParams } from '../spawn-prep.js';
-import type { VBriefDocument } from '../../vbrief/types.js';
+import type { XBriefDocument } from '../../xbrief/types.js';
 
 describe('Dispatch record override (PAN-2383)', () => {
   let testDir: string;
   let workspacePath: string;
   let recordPath: string;
 
-  const basePlan: Pick<VBriefDocument, 'plan'> = {
+  const basePlan: Pick<XBriefDocument, 'plan'> = {
     plan: {
       id: 'plan-1',
       status: 'active',
@@ -41,12 +41,12 @@ describe('Dispatch record override (PAN-2383)', () => {
 
     // Write base plan to .pan/spec.vbrief.json (where readWorkspacePlanSync looks)
     const specPath = join(workspacePath, '.pan', 'spec.vbrief.json');
-    const vbrief: VBriefDocument = {
+    const xbrief: XBriefDocument = {
       ...basePlan,
-      vBRIEFInfo: { version: '0.5', created: new Date().toISOString(), updated: new Date().toISOString() },
+      xBRIEFInfo: { version: '0.5', created: new Date().toISOString(), updated: new Date().toISOString() },
       plan: { ...basePlan.plan, created: new Date().toISOString() },
     };
-    await writeFile(specPath, JSON.stringify(vbrief, null, 2));
+    await writeFile(specPath, JSON.stringify(xbrief, null, 2));
   });
 
   afterEach(async () => {
@@ -93,15 +93,15 @@ describe('Dispatch record override (PAN-2383)', () => {
   it('honors record override "off" even when plan-metadata and global are "on"', async () => {
     // Create a plan with tiered_execution: 'on'
     const specPath = join(workspacePath, '.pan', 'spec.vbrief.json');
-    const vbrief: VBriefDocument = {
-      vBRIEFInfo: { version: '0.5', created: new Date().toISOString(), updated: new Date().toISOString() },
+    const xbrief: XBriefDocument = {
+      xBRIEFInfo: { version: '0.5', created: new Date().toISOString(), updated: new Date().toISOString() },
       plan: {
         ...basePlan.plan,
         metadata: { tiered_execution: 'on' }, // plan explicitly ON
         created: new Date().toISOString(),
       },
     };
-    await writeFile(specPath, JSON.stringify(vbrief, null, 2));
+    await writeFile(specPath, JSON.stringify(xbrief, null, 2));
 
     // Initialize record with override='off'
     const record = {

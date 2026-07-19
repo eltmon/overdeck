@@ -119,7 +119,7 @@ const EXPECTED_CONSOLE_SECTIONS = [
   'DrawerVerificationGates',
   'DrawerReviewSpecialists',
   'DrawerTasksList',
-  'DrawerPlanPanel / VBriefViewer',
+  'DrawerPlanPanel / XBriefViewer',
   'DrawerArtifactsPanel',
   'DrawerActivityRail / DrawerActivityPanel',
   'DrawerAgentSession',

@@ -123,7 +123,7 @@ vi.mock('../../../lib/cloister/inspect-checkpoints.js', () => ({
   getDiffStats: inspectMocks.getDiffStats,
 }));
 
-vi.mock('../../../lib/vbrief/io.js', () => ({
+vi.mock('../../../lib/xbrief/io.js', () => ({
   readWorkspacePlanSync: vi.fn(() => ({
     plan: {
       id: 'PAN-9999',

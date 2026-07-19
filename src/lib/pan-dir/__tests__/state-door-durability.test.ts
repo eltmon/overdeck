@@ -13,7 +13,7 @@ import {
   writeIssueDraft,
   writeSpecDocument,
 } from '../index.js'
-import type { VBriefDocument } from '../../vbrief/types.js'
+import type { XBriefDocument } from '../../xbrief/types.js'
 
 // PAN-2677: the state write door must commit+push every mutation immediately so
 // the state worktree never lingers dirty. These tests exercise the door write
@@ -32,9 +32,9 @@ function porcelain(root: string): string {
   return execSync('git status --porcelain', { cwd: root, encoding: 'utf-8' }).trim()
 }
 
-function makeDoc(issueId: string, title: string, status = 'draft'): VBriefDocument {
+function makeDoc(issueId: string, title: string, status = 'draft'): XBriefDocument {
   return {
-    vBRIEFInfo: {
+    xBRIEFInfo: {
       version: '0.5',
       created: '2026-07-14T00:00:00Z',
       updated: '2026-07-14T00:00:00Z',
@@ -48,7 +48,7 @@ function makeDoc(issueId: string, title: string, status = 'draft'): VBriefDocume
       created: '2026-07-14T00:00:00Z',
       updated: '2026-07-14T00:00:00Z',
     },
-  } as VBriefDocument
+  } as XBriefDocument
 }
 
 /**

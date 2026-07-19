@@ -62,7 +62,7 @@ Commands:
   close [options] <id>            Verify, clean up, and close issue on tracker
   start [options] <id>            Create workspace and spawn agent for an issue
   swarm [options] [id]            Swarm execution: spawn parallel agents across
-                                  vBRIEF plan items using dependency-wave
+                                  xBRIEF plan items using dependency-wave
                                   scheduling
   workspace                       Workspace management
   test                            Test running and management
@@ -82,7 +82,7 @@ Commands:
                                   automated). Calls the Claude API recursively
                                   to compress prose by ~65-75% while preserving
                                   technical accuracy.
-  scope                           vBRIEF lifecycle management
+  scope                           xBRIEF lifecycle management
   flywheel                        Flywheel orchestrator lifecycle and status
                                   helpers
   status [options]                Show running agents

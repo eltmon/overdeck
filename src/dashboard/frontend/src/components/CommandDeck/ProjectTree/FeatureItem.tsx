@@ -82,7 +82,7 @@ function resourceSummary(feature: ProjectFeature, source: ResourceSource): { lab
     case 'tmux':
       return details.tmuxSessionCount > 0 ? { label: 'tmux', detail: `${details.tmuxSessionCount} session${details.tmuxSessionCount === 1 ? '' : 's'}` } : null;
     case 'vbrief':
-      return details.hasVbrief ? { label: 'vBRIEF', detail: 'present' } : null;
+      return details.hasXbrief ? { label: 'xBRIEF', detail: 'present' } : null;
     case 'tasks':
       return details.hasTasks ? { label: 'tasks', detail: 'present' } : null;
     case 'pr':
@@ -204,7 +204,7 @@ function ResourceStrip({
       rows.push({ key: 'remote-agent', label: `fly.io: ${details.remoteAgent.vmName} · ${details.remoteAgent.status} · ${details.remoteAgent.model}` });
     }
 
-    if (details.hasVbrief) rows.push({ key: 'vbrief', label: 'vBRIEF present' });
+    if (details.hasXbrief) rows.push({ key: 'vbrief', label: 'xBRIEF present' });
     if (details.hasTasks) rows.push({ key: 'tasks', label: 'tasks present' });
     for (const pr of identifiers?.prs ?? details.prs) {
       rows.push({ key: `pr-${pr.number}`, label: `PR: #${pr.number} ${pr.title} (${formatPrState(pr)})` });
@@ -536,7 +536,7 @@ function getFeatureStateTitle(feature: ProjectFeature, aggregateSessions: readon
   const contextParts = [
     feature.hasPrd ? 'PRD' : null,
     feature.hasState ? 'continue file' : null,
-    feature.resourceDetails?.hasVbrief ? 'vBRIEF' : null,
+    feature.resourceDetails?.hasXbrief ? 'xBRIEF' : null,
     feature.resourceDetails?.hasTasks ? 'tasks' : null,
   ].filter((part): part is string => part !== null);
   const contextSuffix = contextParts.length > 0 ? ` Context present: ${contextParts.join(', ')}.` : '';

@@ -226,7 +226,7 @@ export function PickupGateControls({ issueId, onOpenIssueBrowser }: {
               <button style={BTN_PRIMARY} onClick={() => startPlanning('auto')} disabled={busy}>Plan (Auto)</button>
               <button style={BTN_BASE} onClick={() => startPlanning('interactive')} disabled={busy}>⚑ Plan (Interactive)</button>
             </div>
-            <div style={SECTION_HINT}>Generates the vBRIEF + tasks. Auto runs end-to-end and stops before pickup; Interactive opens a Q&amp;A session. The plan must be Released before an agent can pick it up.</div>
+            <div style={SECTION_HINT}>Generates the xBRIEF + tasks. Auto runs end-to-end and stops before pickup; Interactive opens a Q&amp;A session. The plan must be Released before an agent can pick it up.</div>
           </>
         ) : !released ? (
           <>

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { fireTieredCommitHooks, type FireTieredCommitHooksDeps } from '../swarm-tiered-hooks.js';
 import type { ValidatedTieredExecutionConfig } from '../../agents/tier-table.js';
-import type { VBriefDocument, VBriefItem } from '../../vbrief/types.js';
+import type { XBriefDocument, XBriefItem } from '../../xbrief/types.js';
 
 const ISSUE_ID = 'PAN-2385';
 const WORKSPACE = '/workspace/feature-pan-2385';
@@ -31,20 +31,20 @@ function tieredConfig(overrides: Partial<ValidatedTieredExecutionConfig> = {}): 
   } as ValidatedTieredExecutionConfig;
 }
 
-function fixtureItem(id: string, difficulty: 'simple' | 'medium', requiresInspection = false): VBriefItem {
+function fixtureItem(id: string, difficulty: 'simple' | 'medium', requiresInspection = false): XBriefItem {
   return {
     id,
     title: `${id} title`,
     status: 'pending',
     metadata: { difficulty, requiresInspection },
     items: [],
-  } as unknown as VBriefItem;
+  } as unknown as XBriefItem;
 }
 
-function fixtureDoc(items: VBriefItem[], metadata: Record<string, unknown> = {}): VBriefDocument {
+function fixtureDoc(items: XBriefItem[], metadata: Record<string, unknown> = {}): XBriefDocument {
   return {
     plan: { id: ISSUE_ID.toLowerCase(), title: ISSUE_ID, status: 'running', items, metadata },
-  } as unknown as VBriefDocument;
+  } as unknown as XBriefDocument;
 }
 
 function makeDeps(config: ValidatedTieredExecutionConfig | undefined, overrides: Partial<FireTieredCommitHooksDeps> = {}): {

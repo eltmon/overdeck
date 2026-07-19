@@ -211,11 +211,11 @@ export function ZoneBActionStrip({ session, issueId, onViewTerminal }: ZoneBActi
     setOverflowOpen(false);
   }, [session.sessionId]);
 
-  const handleViewVbrief = useCallback(() => {
+  const handleViewXbrief = useCallback(() => {
     if (issueId) {
       const path = `workspaces/feature-${issueId.toLowerCase()}/.pan/spec.vbrief.json`;
       navigator.clipboard?.writeText(path).catch(() => { /* ignore */ });
-      toast.success('vBRIEF path copied');
+      toast.success('xBRIEF path copied');
     }
     setOverflowOpen(false);
   }, [issueId]);
@@ -250,7 +250,7 @@ export function ZoneBActionStrip({ session, issueId, onViewTerminal }: ZoneBActi
     onReplaySession: onViewTerminal ? handleReplay : undefined,
     onOpenStateDir: handleOpenStateDir,
     onViewState: handleViewState,
-    onViewVbrief: handleViewVbrief,
+    onViewXbrief: handleViewXbrief,
     onCopySessionId: handleCopySessionId,
     onCopyTmuxCommand: handleCopyTmuxCommand,
     onExportSessionMetadata: handleExportSessionMetadata,
@@ -409,7 +409,7 @@ function ZoneBActionIcon({ actionKey }: { actionKey: NonIssueActionKey }) {
     case 'viewState':
     case 'viewJsonl':
       return <FileText className="w-3 h-3" />;
-    case 'viewFocusedVbrief':
+    case 'viewFocusedXbrief':
       return <BookText className="w-3 h-3" />;
     case 'copySessionId':
       return <Copy className="w-3 h-3" />;

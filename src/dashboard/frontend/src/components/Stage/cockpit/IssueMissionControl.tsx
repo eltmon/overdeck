@@ -6,7 +6,7 @@ import { CostsTab } from '../../CommandDeck/ZoneCOverviewTabs/CostsTab'
 import { DiscussionsTab } from '../../CommandDeck/ZoneCOverviewTabs/DiscussionsTab'
 import { MarkdownTab } from '../../CommandDeck/ZoneCOverviewTabs/MarkdownTab'
 import { statusColor } from '../../CommandDeck/ZoneCOverviewTabs/PrDiffTab'
-import { VBriefTab } from '../../CommandDeck/ZoneCOverviewTabs/VBriefTab'
+import { XBriefTab } from '../../CommandDeck/ZoneCOverviewTabs/XBriefTab'
 import {
   useActivityQuery,
   useIssueCheckRunsQuery,
@@ -442,7 +442,7 @@ function MarkdownMissionTab({ issueId, field }: { issueId: string; field: 'prd' 
 function PlanMissionTab({ issueId }: { issueId: string }) {
   return (
     <div className="grid gap-3 xl:grid-cols-2">
-      <CockpitCard tone="info" title="vBRIEF"><VBriefTab issueId={issueId} /></CockpitCard>
+      <CockpitCard tone="info" title="xBRIEF"><XBriefTab issueId={issueId} /></CockpitCard>
       <CockpitCard tone="muted" title="PRD draft"><MarkdownMissionTab issueId={issueId} field="prd" /></CockpitCard>
       <CockpitCard tone="muted" title="STATE"><MarkdownMissionTab issueId={issueId} field="state" /></CockpitCard>
     </div>

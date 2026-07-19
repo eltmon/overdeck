@@ -30,8 +30,9 @@ import { writeFeedbackFile } from './feedback-writer.js';
 import { resolveIssueFeedbackTarget, surfaceIssueFeedbackNeedsYou } from './feedback-target.js';
 import { messageAgent, setAgentPaused, stopAgent } from '../agents.js';
 import { findProjectByPathSync, resolveProjectFromIssueSync } from '../projects.js';
-import { getVBriefACStatusSync } from '../vbrief/acceptance-criteria.js';
-import { VBriefMergeConflictError } from '../vbrief/io.js';
+import { getXBriefACStatusSync } from '../xbrief/acceptance-criteria.js';
+import { XBriefMergeConflictError } from '../xbrief/io.js';
+import { isXBriefFilename } from '../xbrief/lifecycle.js';
 import { checkIncompletePlanItemsPromise } from '../work/done-preflight.js';
 import type { TemplatePlaceholders } from '../workspace-config.js';
 
@@ -337,7 +338,7 @@ function getSyncTargetBranch(
 
 /**
  * PAN-2179: detect a "plan-only" / zombie changeset — one whose only changes are
- * pipeline artifacts (.pan/, beads, vbrief) with no actual implementation. A work
+ * pipeline artifacts (.pan/, task state, xBRIEF) with no actual implementation. A work
  * agent that never received its kickoff produces exactly this. The verification
  * gate uses it to bounce the branch back instead of letting an empty "completion"
  * advance to review/merge. A legit non-code change (docs, rules under
@@ -347,7 +348,7 @@ export function changesetHasNoContent(changedFiles: readonly string[]): boolean 
   const content = changedFiles
     .map((f) => f.trim())
     .filter(Boolean)
-    .filter((f) => !f.startsWith('.pan/') && !f.endsWith('.vbrief.json'));
+    .filter((f) => !f.startsWith('.pan/') && !isXBriefFilename(f));
   return content.length === 0;
 }
 
@@ -652,48 +653,48 @@ async function runVerificationForIssuePromise(
       return { outcome: 'failed', failedCheck, cycleCount: newCycleCount, maxCycles: VERIFICATION_MAX_CYCLES };
     }
 
-    // vBRIEF AC gate: check all acceptance criteria are completed (runs after quality gates)
-    // Wrap in try-catch to detect merge conflict markers in plan.vbrief.json and send
+    // xBRIEF AC gate: check all acceptance criteria are completed (runs after quality gates)
+    // Wrap in try-catch to detect merge conflict markers in the xBRIEF document and send
     // actionable feedback rather than falling through to a generic infrastructure error.
-    let acStatus: ReturnType<typeof getVBriefACStatusSync>;
+    let acStatus: ReturnType<typeof getXBriefACStatusSync>;
     try {
-      acStatus = getVBriefACStatusSync(workspacePath);
-    } catch (vbriefErr: any) {
-      if (vbriefErr instanceof VBriefMergeConflictError) {
+      acStatus = getXBriefACStatusSync(workspacePath);
+    } catch (xbriefErr: any) {
+      if (xbriefErr instanceof XBriefMergeConflictError) {
         const newCycleCount = currentCycles + 1;
         const failedCheck = 'vbrief-conflicts';
-        const summary = `vBRIEF spec has unresolved git merge conflict markers. Resolve all conflict markers in the spec file and commit before resubmitting.`;
+        const summary = `xBRIEF spec has unresolved git merge conflict markers. Resolve all conflict markers in the spec file and commit before resubmitting.`;
         setStateDerivedVerificationFailure(issueId, failedCheck, summary, newCycleCount, currentStatus);
         if (shouldEscalateVerificationFailure(currentStatus, failedCheck, newCycleCount)) {
           await escalateVerificationStuck(issueId, failedCheck, newCycleCount, summary, logPrefix);
         }
         const feedbackBody = shouldEscalateVerificationFailure(currentStatus, failedCheck, newCycleCount)
           ? `VERIFICATION STUCK for ${issueId} (attempt ${newCycleCount}/${VERIFICATION_MAX_CYCLES}):\n\nFailed check: ${failedCheck}\n\n${summary}\n\n${buildFinalFailureInstructions(issueId)}`
-          : `VERIFICATION FAILED for ${issueId} (attempt ${newCycleCount}/${VERIFICATION_MAX_CYCLES}):\n\nFailed check: ${failedCheck}\n\n${summary}\n\n## REQUIRED: Fix merge conflicts in vBRIEF spec BEFORE resubmitting\n\n1. Open the vBRIEF spec (on main in .pan/specs/)\n2. Find and resolve all <<<<<<< HEAD / ======= / >>>>>>> conflict markers\n3. Ensure the file is valid JSON (only keep ONE version of each conflicted block)\n4. Commit the fixed file on main\n5. ONLY THEN resubmit: pan review request ${issueId} -m "Resolved spec merge conflict"\n\nDo NOT resubmit until the spec parses cleanly.`;
+          : `VERIFICATION FAILED for ${issueId} (attempt ${newCycleCount}/${VERIFICATION_MAX_CYCLES}):\n\nFailed check: ${failedCheck}\n\n${summary}\n\n## REQUIRED: Fix merge conflicts in xBRIEF spec BEFORE resubmitting\n\n1. Open the xBRIEF spec (on main in .pan/specs/)\n2. Find and resolve all <<<<<<< HEAD / ======= / >>>>>>> conflict markers\n3. Ensure the file is valid JSON (only keep ONE version of each conflicted block)\n4. Commit the fixed file on main\n5. ONLY THEN resubmit: pan review request ${issueId} -m "Resolved spec merge conflict"\n\nDo NOT resubmit until the spec parses cleanly.`;
         try {
           const fileResult = await Effect.runPromise(writeFeedbackFile({
             issueId,
             workspacePath,
             specialist: 'verification-gate',
             outcome: 'failed',
-            summary: `vBRIEF plan has merge conflicts (attempt ${newCycleCount}/${VERIFICATION_MAX_CYCLES})`,
+            summary: `xBRIEF plan has merge conflicts (attempt ${newCycleCount}/${VERIFICATION_MAX_CYCLES})`,
             markdownBody: feedbackBody,
           }));
           if (fileResult.success) {
             const msg = shouldEscalateVerificationFailure(currentStatus, failedCheck, newCycleCount)
               ? `VERIFICATION STUCK for ${issueId}.\nFailed check: ${failedCheck} after repeated attempts.\n\nMUST READ: ${fileResult.filePath}\n\nFix every reported failure, commit and push the corrections, then run pan done ${issueId} -c "<summary>" to reset verification and return the latest commit to the normal pipeline.`
-              : `VERIFICATION FAILED for ${issueId}.\nFailed check: ${failedCheck} — plan.vbrief.json has merge conflict markers.\n\nMUST READ: ${fileResult.filePath}\n\nUse your Read tool to open this file, read every line, resolve the merge conflict markers, commit and push the fix, then request a new review with pan review request. Do NOT stop at the prompt — keep working until pan review request completes successfully.`;
+              : `VERIFICATION FAILED for ${issueId}.\nFailed check: ${failedCheck} — the xBRIEF document has merge conflict markers.\n\nMUST READ: ${fileResult.filePath}\n\nUse your Read tool to open this file, read every line, resolve the merge conflict markers, commit and push the fix, then request a new review with pan review request. Do NOT stop at the prompt — keep working until pan review request completes successfully.`;
             await deliverVerificationFeedback(issueId, msg, {
               failedCheck,
               feedbackPath: fileResult.filePath,
             }, logPrefix);
           }
         } catch (feedbackErr: any) {
-          console.error(`[${logPrefix}] Failed to write vBRIEF conflict feedback for ${issueId}:`, feedbackErr);
+          console.error(`[${logPrefix}] Failed to write xBRIEF conflict feedback for ${issueId}:`, feedbackErr);
         }
         return { outcome: 'failed', failedCheck, cycleCount: newCycleCount, maxCycles: VERIFICATION_MAX_CYCLES };
       }
-      throw vbriefErr;
+      throw xbriefErr;
     }
     if (acStatus && !acStatus.allCompleted) {
       const newCycleCount = currentCycles + 1;
@@ -791,7 +792,7 @@ async function runVerificationForIssuePromise(
 
     // PAN-2179: reject a plan-only / zombie changeset before it can reach
     // review/merge. A work agent that never got its kickoff (or did nothing)
-    // leaves a branch whose only changes are pipeline artifacts (.pan/vBRIEF task state);
+    // leaves a branch whose only changes are pipeline artifacts (.pan/xBRIEF task state);
     // lint/test/build and the AC gate all pass trivially on no code, so without
     // this guard the empty "completion" silently advances. Bounce it back.
     try {
@@ -802,7 +803,7 @@ async function runVerificationForIssuePromise(
       if (changesetHasNoContent(changedOut.split('\n'))) {
         const newCycleCount = currentCycles + 1;
         const failedCheck = 'empty-changeset';
-        const summary = `Branch has no implementation — only pipeline artifacts (.pan/vBRIEF task state) changed vs ${changedBase}. The work agent produced no code (likely a kickoff-delivery zombie — PAN-2179).`;
+        const summary = `Branch has no implementation — only pipeline artifacts (.pan/xBRIEF task state) changed vs ${changedBase}. The work agent produced no code (likely a kickoff-delivery zombie — PAN-2179).`;
         setReviewStatusSync(issueId, {
           reviewStatus: 'pending',
           verificationStatus: 'failed',
@@ -816,7 +817,7 @@ async function runVerificationForIssuePromise(
         try {
           const msg = shouldEscalateVerificationFailure(currentStatus, failedCheck, newCycleCount)
             ? `VERIFICATION STUCK for ${issueId}.\nFailed check: ${failedCheck} after ${newCycleCount}/${VERIFICATION_MAX_CYCLES} attempts — branch still has no implementation.\n\n${buildFinalFailureInstructions(issueId)}`
-            : `VERIFICATION FAILED for ${issueId}.\nFailed check: ${failedCheck} — your branch contains NO code (only .pan/vBRIEF task state changed vs ${changedBase}).\n\nYou must actually implement the issue: read the plan (.pan/spec.vbrief.json + the issue body), write and commit the code, push, then run pan review request. Do NOT stop at the prompt — keep working until pan review request completes.`;
+            : `VERIFICATION FAILED for ${issueId}.\nFailed check: ${failedCheck} — your branch contains NO code (only .pan/xBRIEF task state changed vs ${changedBase}).\n\nYou must actually implement the issue: read the plan (.pan/spec.vbrief.json + the issue body), write and commit the code, push, then run pan review request. Do NOT stop at the prompt — keep working until pan review request completes.`;
           await deliverVerificationFeedback(issueId, msg, {
             failedCheck,
             changedBase,

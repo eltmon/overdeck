@@ -7,10 +7,10 @@ import {
 } from '../../../../src/lib/cloister/deacon-swarm.js';
 import { countRunningSwarmSlotsForIssue } from '../../../../src/lib/cloister/concurrency.js';
 import type { ReconciledSlotItem, SlotReconcileResult } from '../../../../src/lib/agents/slot-reconcile.js';
-import { analyzeSwarmReadiness } from '../../../../src/lib/vbrief/swarm-readiness.js';
-import type { VBriefDocument, VBriefItem } from '../../../../src/lib/vbrief/types.js';
+import { analyzeSwarmReadiness } from '../../../../src/lib/xbrief/swarm-readiness.js';
+import type { XBriefDocument, XBriefItem } from '../../../../src/lib/xbrief/types.js';
 
-function item(id: string, filesScope: string[]): VBriefItem {
+function item(id: string, filesScope: string[]): XBriefItem {
   return {
     id,
     title: id,
@@ -25,9 +25,9 @@ function item(id: string, filesScope: string[]): VBriefItem {
   };
 }
 
-function doc(items: VBriefItem[]): VBriefDocument {
+function doc(items: XBriefItem[]): XBriefDocument {
   return {
-    vBRIEFInfo: {
+    xBRIEFInfo: {
       version: '0.6',
       created: '2026-07-01T00:00:00.000Z',
       updated: '2026-07-01T00:00:00.000Z',

@@ -43,7 +43,7 @@ PAN-1028   in_flight           TTS: first speech utterance gets clipped   kimi-k
 PAN-945    post_merge_limbo    Planning artifact path mismatch            gpt-5.4            ·      ·       ·     ·       ✓*     ·
 PAN-1024   zombie_pr           Lazy-load per-turn diff summaries          gpt-5.4            ·      ·       ·     ·       ·      ·
 
-PLANNING (Opus drafting vBRIEFs)
+PLANNING (Opus drafting xBRIEFs)
 PAN-1015   Remove claudish routing in favor of CLIProxy           claude-sonnet-4-6  ◐ planning
 
 ✓ done/passing  ◐ in-progress  ✗ failed/blocked  · pending/n-a
@@ -170,7 +170,7 @@ for i in panissues:
           f"{'✓' if ready else '·'}")
 
 print()
-print("PLANNING SESSIONS (Opus drafting vBRIEFs)")
+print("PLANNING SESSIONS (Opus drafting xBRIEFs)")
 print('─' * 130)
 sessions = subprocess.check_output(['tmux','-L','overdeck','list-sessions','-F','#{session_name}']).decode().split('\n')
 for ps in sorted(s for s in sessions if s.startswith('planning-pan-')):

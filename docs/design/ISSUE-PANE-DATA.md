@@ -167,7 +167,7 @@ Each gate: `{ label, value, tone: Enum(ok\|bad\|run\|wait) }`.
 | `localBranchCount` / `remoteBranchCount` | `Integer` | `1` / `1` |
 | `tmuxSessionCount` | `Integer` | `3` |
 | `prs[]` | `Array<{number,title,state,isDraft}>` | `[{number:1975,state:"OPEN",isDraft:false}]` |
-| `hasVbrief` / `hasBeads` | `Boolean` | `true` / `true` |
+| `hasXbrief` / `hasBeads` | `Boolean` | `true` / `true` |
 | `dockerContainerCount` | `Integer` | `3` |
 | `actualBranch` | `Git ref?` | `feature/pan-1866` |
 | `branchDrifted` | `Boolean` | `false` |

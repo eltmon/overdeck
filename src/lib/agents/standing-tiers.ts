@@ -36,8 +36,8 @@
  * start — so a cancelled run never strands sessions it would not have used.
  */
 
-import type { VBriefDocument, VBriefItem } from '../vbrief/types.js';
-import { groupItemsByWave } from '../vbrief/dag.js';
+import type { XBriefDocument, XBriefItem } from '../xbrief/types.js';
+import { groupItemsByWave } from '../xbrief/dag.js';
 import { resolveTier, type ResolveTierConfig } from './resolve-tier.js';
 import type { AgentState } from './agent-state.js';
 import type { SpawnRunOptions } from './spawn-prep.js';
@@ -66,7 +66,7 @@ export class StandingTierError extends Error {
  * family as the quality-lint checks, never silent fallbacks.
  */
 export function computeTierRunSchedule(
-  doc: VBriefDocument,
+  doc: XBriefDocument,
   config: ResolveTierConfig,
 ): TierRun[] {
   const itemById = new Map(doc.plan.items.map((item) => [item.id, item]));
@@ -187,7 +187,7 @@ export class StandingTierManager {
    * Throws for a tier the schedule does not contain — the manager never
    * spawns outside the schedule.
    */
-  async ensureStandingAgentForTier(tierName: string, bead: Pick<VBriefItem, 'id'>): Promise<string> {
+  async ensureStandingAgentForTier(tierName: string, bead: Pick<XBriefItem, 'id'>): Promise<string> {
     if (this.firstRunIndexFor(tierName) === -1) {
       throw new StandingTierError(
         `tier '${tierName}' is not in the schedule for ${this.options.issueId}; refusing to route bead '${bead.id}'`,
@@ -209,7 +209,7 @@ export class StandingTierManager {
    * Throws while another bead is in flight; call completeBead after the
    * foreman has staged, committed, and broadcast the result.
    */
-  async dispatchBeadToTier(tierName: string, bead: Pick<VBriefItem, 'id'>): Promise<string> {
+  async dispatchBeadToTier(tierName: string, bead: Pick<XBriefItem, 'id'>): Promise<string> {
     if (this.inFlight) {
       throw new StandingTierError(
         `bead '${this.inFlight.itemId}' is still in flight on tier '${this.inFlight.tierName}' for ${this.options.issueId}; `
@@ -222,7 +222,7 @@ export class StandingTierManager {
   }
 
   /** Backward-compatible name for callers that already spell the invariant explicitly. */
-  async dispatchBeadExclusive(tierName: string, bead: Pick<VBriefItem, 'id'>): Promise<string> {
+  async dispatchBeadExclusive(tierName: string, bead: Pick<XBriefItem, 'id'>): Promise<string> {
     return this.dispatchBeadToTier(tierName, bead);
   }
 

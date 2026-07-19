@@ -32,7 +32,7 @@ The inspect specialist runs **during** implementation — but only on beads the 
 
 ### Agent Workflow
 
-After closing a bead, the work agent reads `metadata.requiresInspection` from `.pan/spec.vbrief.json`:
+After completing an xBRIEF item, the work agent re-reads `metadata.requiresInspection` through `pan task show`:
 
 ```bash
 # After closing a bead
@@ -121,38 +121,36 @@ When a user clicks **Start Agent** in the dashboard (`POST /api/agents`), the sy
 ### Lifecycle
 
 ```
-1. Planning agent writes:
-   .pan/
-   ├── spec.vbrief.json      # Machine-readable work plan (scope vBRIEF)
-   ├── continue.json         # Session state (decisions, approach, resume point)
-   ├── prd.md                # Discovered/copied PRD
-   └── context.md            # Workspace context for agents
+1. Planning finalizes:
+   overdeck-state/
+   ├── drafts/<issue>.md
+   ├── specs/<date>-<issue>-<slug>.xbrief.json
+   └── continues/<issue>.xbrief.json
 
 2. User clicks "Start Agent" → POST /api/agents
 
 3. Dashboard server:
-   a. Stops planning agent (marks state as 'stopped', stoppedReason: 'work-agent-started')
-   b. Commits .pan/ artifacts to git
-   c. Determines phase: .pan/spec.vbrief.json exists → 'implementation', otherwise → 'exploration'
-   d. Evaluates work-agent lifecycle truth: real resumable stopped agent ⇒ resume path, orphaned placeholder/stale record ⇒ fresh start path
-   e. Shells out via detached `pan start <ID> --local --phase implementation` and records exact lifecycle + spawn output in `~/.overdeck/agents/agent-<id>/lifecycle.log` and `spawn.log`
+   a. Stops the planning agent (marks state as 'stopped', stoppedReason: 'work-agent-started')
+   b. Resolves the canonical xBRIEF through `findPlan()` and starts implementation only when it is readable and implementation-ready
+   c. Evaluates work-agent lifecycle truth: real resumable stopped agent ⇒ resume path, orphaned placeholder/stale record ⇒ fresh start path
+   d. Launches `pan start <ID>` and records lifecycle and spawn output in the agent runtime directory
 
-4. Dashboard UI shows `Starting...` / `Resuming...` immediately, then switches to the normal running controls once the work agent is actually live
+4. Dashboard UI shows `Starting...` / `Resuming...` immediately, then switches to normal running controls once the work agent is live
 
-5. Work agent reads .pan/continue.json and .pan/spec.vbrief.json and implements remaining work
+5. Work agent reads `.overdeck/continue.json` plus the canonical xBRIEF through the read door and implements the remaining items
 ```
 
-### vBRIEF Prerequisite
+### xBRIEF Prerequisite
 
-A readable, implementation-ready vBRIEF is a hard prerequisite for starting work agents. The `POST /api/agents` endpoint returns **422** when the plan is missing, unreadable, belongs to another issue, or contains no implementation items. Planning writes the checklist directly and does not create an external task store.
+A readable, implementation-ready xBRIEF is a hard prerequisite for starting work agents. The `POST /api/agents` endpoint returns **422** when the plan is missing, unreadable, belongs to another issue, or contains no implementation items. Planning writes the checklist directly and does not create an external task store.
 
 ### DAG-Aware Task Scheduling
 
-The vBRIEF plan includes dependency edges (`blocks`, `informs`) between items. Work agents use `pan task next <issue>` to find the next dispatchable checklist item, so tasks are worked in dependency order. The `criticalPath()` utility in `src/lib/vbrief/dag.ts` computes the longest dependency chain for visualization.
+The xBRIEF plan includes dependency edges (`blocks`, `informs`) between items. Work agents use `pan task next <issue>` to find the next dispatchable checklist item, so tasks are worked in dependency order. The `criticalPath()` utility in `src/lib/xbrief/dag.ts` computes the longest dependency chain for visualization.
 
 ### Acceptance Criteria Pipeline
 
-Each vBRIEF item can have `subItems` with `metadata.kind: "acceptance_criterion"`. These AC flow through the specialist pipeline:
+Each xBRIEF item can have `subItems` with `metadata.kind: "acceptance_criterion"`. These AC flow through the specialist pipeline:
 
 1. **Work agent**: sees AC per bead as an indented checklist
 2. **Inspect agent**: verifies per-bead AC against the diff (Spec Fidelity check)
@@ -166,7 +164,7 @@ Each vBRIEF item can have `subItems` with `metadata.kind: "acceptance_criterion"
 
 A PRD may already exist in `docs/prds/active/` or `docs/prds/drafts/` before the planning agent runs — e.g., written manually or by a previous session. The planning agent handles three cases:
 
-1. **PRD with `<task>` XML tags** (execution-ready): Skip discovery. Use existing tasks directly to create `.pan/spec.vbrief.json`, beads, and continue state.
+1. **PRD with `<task>` XML tags** (execution-ready): Skip discovery. Convert the existing tasks into the canonical `specs/*.xbrief.json` plan and initialize continue state.
 
 2. **Prose PRD** (architecture decisions, requirements, no `<task>` tags): Use as foundation — do NOT redo decisions already made. Run abbreviated discovery to fill gaps, then convert prose into executable `<task>` XML structure. The PRD provides the "what and why"; planning creates the "how and in what order."
 
@@ -701,7 +699,7 @@ The build pipeline copies `*.md` from source to dist (see [BUILD.md](./BUILD.md#
 | Template | Used by | Purpose |
 |----------|---------|---------|
 | `work.md` | Work agents | Implementation task instructions |
-| `planning.md` | Planning agents | vBRIEF authoring and PRD analysis |
+| `planning.md` | Planning agents | xBRIEF authoring and PRD analysis |
 | `review.md` | review-agent | Code review checklist and criteria |
 | `test.md` | test-agent | Test execution and baseline comparison |
 | `merge.md` | merge-agent | PR merge, rebase, and conflict resolution |

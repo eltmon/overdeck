@@ -94,7 +94,7 @@ git push -u origin $(git branch --show-current)
 # 4. Verify clean state
 git status  # Must show "nothing to commit"
 
-# 5. Update vBRIEF tasks
+# 5. Update xBRIEF item state
 ```
 
 **If ANY step fails, fix it before declaring work complete.**

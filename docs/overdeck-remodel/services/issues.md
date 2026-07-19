@@ -109,7 +109,7 @@ identity, and the side-states — with its new home. Disposition is one of four:
   folded into another), with the reason.
 
 Stores legend used in reasons: **RS** = SQLite `review_status` · **REC** = git
-`.pan/records` · **GH** = GitHub labels/state · **SPEC** = `.pan/specs` vBRIEF.
+`.pan/records` · **GH** = GitHub labels/state · **SPEC** = `.pan/specs` xBRIEF.
 
 ## 1A. HTTP endpoints
 
@@ -125,7 +125,7 @@ Stores legend used in reasons: **RS** = SQLite `review_status` · **REC** = git
 | `GET /api/specialists/:project/:issueId/:type/status` (`specialists.ts:1007`) | reads | **`IssuesResolver.get`** | Legacy per-role status mirror; same three outcomes. Duplicate door → folded. |
 | `GET /api/issues/:id/pr` (`issues.ts:3161`) | reads | **`IssuesResolver.get` (`.pr`)** + live GitHub for CI | PR identity is `prUrl/prNumber/prHeadSha` on `issues`; CI/check-runs read live from GitHub at the controller, not stored. |
 | `GET /api/issues/:id/pr-diff`, `pr-details`, `check-runs` (`issues.ts:3516`,`3530`,`3544`) | reads | **RELOCATE → Diffs / live GitHub** | Diff bodies + check-runs are GitHub/Diffs concerns, not the issue entity. (API-SURFACE §H lists Diffs as cohesive.) |
-| `GET /api/workspaces/:issueId/plan` (`workspaces.ts:1815`) | reads | **`IssuesResolver.getPlan(id)`** | The vBRIEF body lives in git `.pan/specs` via `planRef`; resolver reads the file behind the pointer (cache holds only `planRef`). |
+| `GET /api/workspaces/:issueId/plan` (`workspaces.ts:1815`) | reads | **`IssuesResolver.getPlan(id)`** | The xBRIEF body lives in git `.pan/specs` via `planRef`; resolver reads the file behind the pointer (cache holds only `planRef`). |
 | `GET /api/metrics/summary`, `GET /api/godview/system-health`, `GET /api/system/health` (API-SURFACE §A) | reads | **aggregate → recomposed** (Issues + Agents + Merge) | System-wide rollups; cross-domain by definition. |
 | `GET /api/issues/:id/beads` (`issues.ts:2870`) | reads | **RELOCATE → Beads (out of scope)** | Bead list is the workspace's `.beads/`, not the `issues` cache. |
 | `GET /api/issues/:id/costs` (`issues.ts:3916`) | reads | **RELOCATE → `CostResolver`** | Cost is its own domain (END-STATE Cost §). |
@@ -389,18 +389,18 @@ const outcomeForMove = (from: Stage, to: Stage, hint?: "skipped"):
 
 Methods trace to Part-1 §1A reads: `get` (the canonical-state read collapsing the
 8+ scattered doors), `list` (board + `readyForMerge` filter), `getPlan` (the
-vBRIEF body behind `planRef`).
+xBRIEF body behind `planRef`).
 
 ```ts
 export class IssuesResolver extends Context.Service<IssuesResolver, {
   readonly get:     (id: IssueId)     => Effect.Effect<Issue, IssueNotFound>
   readonly list:    (f: IssueFilter)  => Effect.Effect<ReadonlyArray<Issue>>
-  readonly getPlan: (id: IssueId)     => Effect.Effect<unknown, IssueNotFound>  // vBRIEF JSON from git via planRef
+  readonly getPlan: (id: IssueId)     => Effect.Effect<unknown, IssueNotFound>  // xBRIEF JSON from git via planRef
 }>()("overdeck/IssuesResolver") {}
 
 export const IssuesResolverLayer = Layer.effect(IssuesResolver, Effect.gen(function* () {
   const { q }   = yield* Db          // Drizzle handle — appears ONLY in resolver/writer Layer R
-  const records = yield* Records     // to read the vBRIEF body git-side
+  const records = yield* Records     // to read the xBRIEF body git-side
 
   const decode = Schema.decodeUnknown(Issue)
 
@@ -494,7 +494,7 @@ export const IssueWriterLayer = Layer.effect(IssueWriter, Effect.gen(function* (
 
       // 1. SOURCE OF TRUTH FIRST — the commit point (CONVENTIONS §5 ordering).
       //    Mirrors stage + outcomes to the .pan/records pipeline block; flips
-      //    the vBRIEF plan.status and the GitHub label/state in the same step.
+      //    the xBRIEF plan.status and the GitHub label/state in the same step.
       //    This single call replaces transitionTo + setReviewStatusSync's REC
       //    mirror + updateSpecStatus + the raw `gh issue edit` label ops.
       yield* records.writeIssue(next, { reason })
@@ -578,7 +578,7 @@ export const IssuesApi = HttpApiGroup.make("issues")
   }))
   .add(HttpApiEndpoint.get("getPlan", "/issues/:id/plan", {
     params:  Schema.Struct({ id: IssueId }),
-    success: Schema.Unknown,           // vBRIEF JSON from git via planRef
+    success: Schema.Unknown,           // xBRIEF JSON from git via planRef
     error:   IssueNotFound,
   }))
   // ── writes ──

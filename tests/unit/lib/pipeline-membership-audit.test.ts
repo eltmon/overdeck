@@ -30,7 +30,7 @@ function signals(overrides: Partial<IssueLensSignals>): IssueLensSignals {
     hasConventionBranch: false,
     branchUnmerged: false, hasMergedBranchWork: false,
     phaseLabel: null,
-    hasVbriefSpec: false,
+    hasXbriefSpec: false,
     explicitlyReady: false,
     ...overrides,
   };
@@ -58,7 +58,7 @@ describe('pipeline membership no-loss audit', () => {
   it.each([
     ['closed issue with open PR', signals({ issueOpen: false, hasOpenPr: true }), 'zombie_pr'],
     ['open issue with merged PR', signals({ hasMergedPr: true }), 'post_merge_limbo'],
-    ['open issue with spec only', signals({ hasVbriefSpec: true }), 'planned_backlog'],
+    ['open issue with spec only', signals({ hasXbriefSpec: true }), 'planned_backlog'],
     [
       'squash-merged branch',
       signals({ hasMergedPr: true, hasConventionBranch: true, branchUnmerged: true }),
@@ -74,12 +74,12 @@ describe('pipeline membership no-loss audit', () => {
   });
 
   it('identifies the spec-only planned backlog reason', () => {
-    const membership = resolvePipelineMembership(signals({ hasVbriefSpec: true }));
+    const membership = resolvePipelineMembership(signals({ hasXbriefSpec: true }));
 
     expect(membership.bucket).toBe('planned_backlog');
     expect(membership.reasons).toContain(PLANNED_BACKLOG_SPEC_ONLY_REASON);
     expect(PLANNED_BACKLOG_SPEC_ONLY_REASON).toBe(
-      'open issue with a vBRIEF spec but no branch/PR — planned work whose plan encodes code paths that age; needs starting or re-planning',
+      'open issue with an xBRIEF spec but no branch/PR — planned work whose plan encodes code paths that age; needs starting or re-planning',
     );
   });
 

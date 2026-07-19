@@ -7,8 +7,8 @@ import { Effect } from 'effect';
 
 import { ProcessSpawnError } from '../errors.js';
 import { isStatePlaneOnlyStatus } from '../state-plane.js';
-import { readWorkspacePlanSync } from '../vbrief/io.js';
-import { subItemsOf } from '../vbrief/types.js';
+import { readWorkspacePlanSync } from '../xbrief/io.js';
+import { subItemsOf } from '../xbrief/types.js';
 import { runTestRequirementCheck } from './test-requirement-gate.js';
 
 const execAsync = promisify(exec);
@@ -16,7 +16,7 @@ const terminal = new Set(['completed', 'cancelled']);
 
 export function checkIncompletePlanItemsSync(workspacePath: string): string[] {
   const doc = readWorkspacePlanSync(workspacePath);
-  if (!doc) return ['  The required vBRIEF checklist is missing or unreadable; return the issue to planning before completion.'];
+  if (!doc) return ['  The required xBRIEF checklist is missing or unreadable; return the issue to planning before completion.'];
   const incomplete = doc.plan.items.flatMap((item) => {
     const lines: string[] = [];
     if (!terminal.has(item.status)) lines.push(`    - ${item.id} ${item.title} (${item.status})`);

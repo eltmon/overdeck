@@ -29,12 +29,12 @@ import {
   createActiveSlice,
   getDispatchableItems,
   type PersistedTaskOperation,
-} from '../vbrief/dag.js';
+} from '../xbrief/dag.js';
 import { applyTaskStatusChange } from '../pan-dir/task-door.js';
 import { getProjectConfigFromWorkspacePath, resolveProjectForIssue } from '../pan-dir/record.js';
-import { applyStatusOverrides } from '../vbrief/io.js';
-import { analyzeSwarmReadiness, type SwarmReadinessVerdict } from '../vbrief/swarm-readiness.js';
-import type { VBriefDocument, VBriefItem } from '../vbrief/types.js';
+import { applyStatusOverrides } from '../xbrief/io.js';
+import { analyzeSwarmReadiness, type SwarmReadinessVerdict } from '../xbrief/swarm-readiness.js';
+import type { XBriefDocument, XBriefItem } from '../xbrief/types.js';
 import { getReviewStatusSync, type ReviewStatus } from '../review-status.js';
 import { isDeaconGloballyPausedSync } from '../overdeck/control-settings.js';
 import { resolveAutomaticSwarmPolicy, resolveSwarmMaxSlots } from '../swarm-policy.js';
@@ -102,7 +102,7 @@ export interface CoordinateSwarmSlotsDeps {
   reconcileSlotState: (
     issueId: string,
     workspace: string,
-    doc: VBriefDocument,
+    doc: XBriefDocument,
   ) => Promise<SlotReconcileResult>;
   listSessionNames: () => Promise<readonly string[]>;
   isPaneDead: (sessionName: string) => Promise<boolean>;
@@ -117,12 +117,12 @@ export interface CoordinateSwarmSlotsDeps {
   verifyAndMergeSlot: (
     issue: { issueId: string; featureWorkspace: string },
     slotIndex: number,
-    item: VBriefItem,
+    item: XBriefItem,
   ) => Promise<SlotMergeResult>;
   applyTaskOperationToPlanFile: (issueId: string, operation: PersistedTaskOperation, workspacePath?: string) => Promise<unknown>;
   /** PAN-2385: fire the tiered commit feed + supervisor review after a slot merges. */
   fireTieredCommitHooks: (
-    options: { issueId: string; workspacePath: string; item: VBriefItem; doc: VBriefDocument },
+    options: { issueId: string; workspacePath: string; item: XBriefItem; doc: XBriefDocument },
   ) => Promise<string[]>;
   recordSlotAssignment: (workspacePath: string, issueId: string, assignment: SlotAssignment) => Promise<void>;
   clearSlotAssignment: (workspacePath: string, issueId: string, slotIndex: number, itemId?: string) => Promise<void>;
@@ -538,7 +538,7 @@ function swarmStallThresholdMs(): number {
 export async function mergeReadySlots(
   issueId: string,
   workspacePath: string,
-  doc: VBriefDocument,
+  doc: XBriefDocument,
   slots: ClassifiedSwarmSlot[],
   deps: Pick<CoordinateSwarmSlotsDeps, 'verifyAndMergeSlot' | 'applyTaskOperationToPlanFile' | 'fireTieredCommitHooks'> = defaultDeps,
   blockedSlotIndexes: Set<number> = new Set(),
@@ -715,7 +715,7 @@ export async function recoverFailedMergeSlot(
   issueId: string,
   workspacePath: string,
   slotIndex: number,
-  doc: VBriefDocument,
+  doc: XBriefDocument,
   action: SwarmRecoveryAction,
   deps: Pick<
     CoordinateSwarmSlotsDeps,
@@ -863,7 +863,7 @@ function isSlotMergeCoolingDown(branchKey: string, now = Date.now()): boolean {
 export async function dispatchNextWave(
   issueId: string,
   workspacePath: string,
-  doc: VBriefDocument,
+  doc: XBriefDocument,
   reconciled: SlotReconcileResult,
   readiness: SwarmReadinessVerdict,
   deps: Pick<
@@ -1068,11 +1068,11 @@ function slotIndexConflictReason(
   return undefined;
 }
 
-function dispatchPhaseForItem(doc: VBriefDocument, item: VBriefItem): 'implementation' | 'synthesis' {
+function dispatchPhaseForItem(doc: XBriefDocument, item: XBriefItem): 'implementation' | 'synthesis' {
   return itemRequiresSynthesis(doc, item) && !synthesisContextForItem(item) ? 'synthesis' : 'implementation';
 }
 
-function promptForDispatchItem(issueId: string, doc: VBriefDocument, item: VBriefItem): string | undefined {
+function promptForDispatchItem(issueId: string, doc: XBriefDocument, item: XBriefItem): string | undefined {
   if (!itemRequiresSynthesis(doc, item)) return undefined;
 
   const synthesisContext = synthesisContextForItem(item);
@@ -1095,15 +1095,15 @@ function promptForDispatchItem(issueId: string, doc: VBriefDocument, item: VBrie
     'Do not implement this item yet. Summarize the blocking parent outputs into a concise context update for the implementation slot.',
     `Blocking parents: ${parentIds.join(', ') || '(none)'}`,
     '',
-    'Persist the synthesis context on the vBRIEF item metadata as synthesisContext, commit it, then stop.',
+    'Persist the synthesis context on the xBRIEF item metadata as synthesisContext, commit it, then stop.',
   ].join('\n');
 }
 
-function itemRequiresSynthesis(doc: VBriefDocument, item: VBriefItem): boolean {
+function itemRequiresSynthesis(doc: XBriefDocument, item: XBriefItem): boolean {
   return item.metadata?.requiresSynthesis === true || blockingParentCount(doc, item.id) > 1;
 }
 
-function synthesisContextForItem(item: VBriefItem): string | undefined {
+function synthesisContextForItem(item: XBriefItem): string | undefined {
   const raw = item.metadata?.synthesisContext;
   return typeof raw === 'string' && raw.trim().length > 0 ? raw : undefined;
 }

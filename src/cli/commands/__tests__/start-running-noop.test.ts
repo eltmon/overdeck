@@ -43,7 +43,7 @@ const oraMocks = vi.hoisted(() => {
 
 vi.mock('../../../lib/work-agent-lifecycle.js', () => lifecycleMocks);
 
-vi.mock('../../../lib/vbrief/io.js', () => ({
+vi.mock('../../../lib/xbrief/io.js', () => ({
   findPlanSync: findPlanSyncMock,
 }));
 
@@ -200,7 +200,7 @@ describe('pan start on already-running work agent (PAN-2407)', () => {
 
   it('preserves the resume/fresh refusal for a stopped agent with a resumable session', async () => {
     createWorkspace('PAN-X');
-    findPlanSyncMock.mockReturnValue('/tmp/.pan/specs/PAN-X.vbrief.json');
+    findPlanSyncMock.mockReturnValue('/tmp/.pan/specs/PAN-X.xbrief.json');
     agentMocks.getAgentStateSync.mockReturnValue({
       id: 'agent-pan-x',
       issueId: 'PAN-X',
