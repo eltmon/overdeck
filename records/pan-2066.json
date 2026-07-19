@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-19T20:18:40.159Z",
-  "updated": "2026-07-19T22:02:25.697Z",
+  "updated": "2026-07-19T22:06:47.115Z",
   "pipeline": {
     "issueId": "PAN-2066",
     "reviewStatus": "pending",
@@ -83,16 +83,8 @@
   "harness": "claude-code",
   "model": "claude-sonnet-5",
   "tasks": {
-    "sequence": 19,
-    "claims": {
-      "viewer-docs": {
-        "writerId": "agent-pan-2066",
-        "agentId": "agent-pan-2066",
-        "pid": 3067643,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-19T22:02:25.697Z"
-      }
-    },
+    "sequence": 20,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2066",
@@ -190,6 +182,16 @@
         "itemId": "mcp-wiring-docs",
         "outcome": "completed",
         "releasedAt": "2026-07-19T22:02:13.571Z"
+      },
+      {
+        "writerId": "agent-pan-2066",
+        "agentId": "agent-pan-2066",
+        "pid": 3067643,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-19T22:02:25.697Z",
+        "itemId": "viewer-docs",
+        "outcome": "completed",
+        "releasedAt": "2026-07-19T22:06:47.114Z"
       }
     ],
     "statusReasons": {
@@ -263,6 +265,10 @@
     "mcp-wiring-docs": "completed",
     "mcp-wiring-docs.mcp-wiring-docs.ac1": "completed",
     "mcp-wiring-docs.mcp-wiring-docs.ac2": "completed",
-    "viewer-docs": "running"
+    "viewer-docs": "completed",
+    "viewer-docs.viewer-docs.ac1": "completed",
+    "viewer-docs.viewer-docs.ac2": "completed",
+    "viewer-docs.viewer-docs.ac3": "completed",
+    "viewer-docs.viewer-docs.ac4": "completed"
   }
 }
