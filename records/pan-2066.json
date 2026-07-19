@@ -2,7 +2,7 @@
   "issueId": "PAN-2066",
   "schemaVersion": 2,
   "created": "2026-07-19T20:18:40.159Z",
-  "updated": "2026-07-19T20:18:40.159Z",
+  "updated": "2026-07-19T20:18:41.298Z",
   "pipeline": {
     "issueId": "PAN-2066",
     "reviewStatus": "pending",
@@ -25,5 +25,7 @@
       "note": "Planning session started for PAN-2066: OKF v2 — knowledge viewer: inkeep open-knowledge coinstall (progressive), /okf open, dashboard Knowledge page",
       "timestamp": "2026-07-19T20:18:40.159Z"
     }
-  ]
+  ],
+  "harness": "claude-code",
+  "model": "claude-fable-5"
 }
