@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-19T20:18:40.159Z",
-  "updated": "2026-07-19T22:32:34.012Z",
+  "updated": "2026-07-19T22:32:41.053Z",
   "pipeline": {
     "issueId": "PAN-2066",
     "reviewStatus": "pending",
@@ -283,5 +283,74 @@
     "closeout-successor": "completed",
     "closeout-successor.closeout-successor.ac1": "completed",
     "closeout-successor.closeout-successor.ac2": "completed"
+  },
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      "docs.json",
+      "src/dashboard/frontend/src/App/AppRoutes.tsx",
+      "src/dashboard/frontend/src/components/Sidebar.tsx",
+      "src/dashboard/server/main.ts",
+      "src/lib/memory/injection.ts",
+      "tests/unit/lib/overdeck/no-loss-matrix.ts"
+    ],
+    "declaredScopeUntouched": [
+      ".overdeck/continue.json"
+    ],
+    "declaredScope": [
+      ".overdeck/continue.json",
+      "CLAUDE.md",
+      "configuration/knowledge.mdx",
+      "docs/ACKNOWLEDGEMENTS.md",
+      "docs/OKF-LANDSCAPE.md",
+      "src/cli/commands/__tests__/knowledge.test.ts",
+      "src/cli/commands/install.ts",
+      "src/cli/commands/knowledge.ts",
+      "src/dashboard/frontend/src/App/routes.ts",
+      "src/dashboard/frontend/src/components/Header.tsx",
+      "src/dashboard/frontend/src/components/knowledge/KnowledgePage.test.tsx",
+      "src/dashboard/frontend/src/components/knowledge/KnowledgePage.tsx",
+      "src/dashboard/server/routes/knowledge-viewer.ts",
+      "src/dashboard/server/server.ts",
+      "src/dashboard/server/services/knowledge-viewer.ts",
+      "src/lib/installers/__tests__/open-knowledge.test.ts",
+      "src/lib/installers/open-knowledge.ts",
+      "sync-sources/skills/okf/SKILL.md",
+      "sync-sources/skills/okf/docs/USAGE.md",
+      "sync-sources/skills/okf/references/overdeck.md",
+      "sync-sources/skills/pan-knowledge/SKILL.md",
+      "tests/unit/dashboard/server/routes/knowledge-viewer.test.ts",
+      "tests/unit/dashboard/server/services/knowledge-viewer.test.ts"
+    ],
+    "actualChangedFiles": [
+      "CLAUDE.md",
+      "configuration/knowledge.mdx",
+      "docs.json",
+      "docs/ACKNOWLEDGEMENTS.md",
+      "docs/OKF-LANDSCAPE.md",
+      "src/cli/commands/__tests__/knowledge.test.ts",
+      "src/cli/commands/install.ts",
+      "src/cli/commands/knowledge.ts",
+      "src/dashboard/frontend/src/App/AppRoutes.tsx",
+      "src/dashboard/frontend/src/App/routes.ts",
+      "src/dashboard/frontend/src/components/Header.tsx",
+      "src/dashboard/frontend/src/components/Sidebar.tsx",
+      "src/dashboard/frontend/src/components/knowledge/KnowledgePage.test.tsx",
+      "src/dashboard/frontend/src/components/knowledge/KnowledgePage.tsx",
+      "src/dashboard/server/main.ts",
+      "src/dashboard/server/routes/knowledge-viewer.ts",
+      "src/dashboard/server/server.ts",
+      "src/dashboard/server/services/knowledge-viewer.ts",
+      "src/lib/installers/__tests__/open-knowledge.test.ts",
+      "src/lib/installers/open-knowledge.ts",
+      "src/lib/memory/injection.ts",
+      "sync-sources/skills/okf/SKILL.md",
+      "sync-sources/skills/okf/docs/USAGE.md",
+      "sync-sources/skills/okf/references/overdeck.md",
+      "sync-sources/skills/pan-knowledge/SKILL.md",
+      "tests/unit/dashboard/server/routes/knowledge-viewer.test.ts",
+      "tests/unit/dashboard/server/services/knowledge-viewer.test.ts",
+      "tests/unit/lib/overdeck/no-loss-matrix.ts"
+    ],
+    "recordedAt": "2026-07-19T22:32:41.050Z"
   }
 }
