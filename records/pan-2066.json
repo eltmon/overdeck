@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-19T20:18:40.159Z",
-  "updated": "2026-07-19T21:52:06.845Z",
+  "updated": "2026-07-19T21:56:33.820Z",
   "pipeline": {
     "issueId": "PAN-2066",
     "reviewStatus": "pending",
@@ -83,16 +83,8 @@
   "harness": "claude-code",
   "model": "claude-sonnet-5",
   "tasks": {
-    "sequence": 15,
-    "claims": {
-      "knowledge-page-embed": {
-        "writerId": "agent-pan-2066",
-        "agentId": "agent-pan-2066",
-        "pid": 2977507,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-19T21:52:06.845Z"
-      }
-    },
+    "sequence": 16,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2066",
@@ -170,6 +162,16 @@
         "outcome": "completed",
         "reason": "Added the /knowledge tab through the current Sidebar/AppRoutes navigation surfaces, with project resolution and no-project, no-bundle, not-installed/installing, starting, ready, and error states. The page uses the recorded lossy-spike read-only copy. Component/no-loss tests, typecheck, lint, frontend build, and isolated Playwright screenshots of no-bundle plus pending install states pass.",
         "releasedAt": "2026-07-19T21:46:59.961Z"
+      },
+      {
+        "writerId": "agent-pan-2066",
+        "agentId": "agent-pan-2066",
+        "pid": 2977507,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-19T21:52:06.845Z",
+        "itemId": "knowledge-page-embed",
+        "outcome": "completed",
+        "releasedAt": "2026-07-19T21:56:33.820Z"
       }
     ],
     "statusReasons": {
@@ -236,6 +238,9 @@
     "knowledge-page-states.knowledge-page-states.ac3": "completed",
     "knowledge-page-states.knowledge-page-states.ac4": "completed",
     "knowledge-page-states.knowledge-page-states.ac5": "completed",
-    "knowledge-page-embed": "running"
+    "knowledge-page-embed": "completed",
+    "knowledge-page-embed.knowledge-page-embed.ac1": "completed",
+    "knowledge-page-embed.knowledge-page-embed.ac2": "completed",
+    "knowledge-page-embed.knowledge-page-embed.ac3": "completed"
   }
 }
