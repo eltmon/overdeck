@@ -4,17 +4,17 @@
     "created": "2026-07-19T20:22:40Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2066: OKF v2 — knowledge viewer: inkeep open-knowledge coinstall (progressive), /okf open, dashboard Knowledge page",
-    "updated": "2026-07-19T20:27:03.306Z"
+    "updated": "2026-07-19T20:27:05.307Z"
   },
   "plan": {
     "id": "pan-2066",
     "title": "OKF v2 — knowledge viewer: inkeep open-knowledge coinstall (progressive), /okf open, dashboard Knowledge page",
-    "status": "approved",
+    "status": "running",
     "uid": "ae378cd3-9c4e-4042-b6d1-a97a21c53cd4",
     "author": "agent:claude-fable-5",
-    "sequence": 3,
+    "sequence": 4,
     "created": "2026-07-19T20:22:40Z",
-    "updated": "2026-07-19T20:27:03.306Z",
+    "updated": "2026-07-19T20:27:05.307Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2066",
