@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { TAB_PATHS } from '../../App/routes';
 import { KnowledgePage, knowledgeViewerPostureCopy } from './KnowledgePage';
@@ -26,6 +26,7 @@ function jsonResponse(body: unknown, ok = true): Response {
 }
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
@@ -114,7 +115,7 @@ describe('KnowledgePage', () => {
     expect(screen.getByRole('status')).toBeInTheDocument();
   });
 
-  it('starts an installed idle viewer and transitions to ready', async () => {
+  it('starts an installed idle viewer and embeds the running workspace', async () => {
     const fetchMock = vi.fn((input: RequestInfo | URL) => {
       if (String(input).includes('/start')) {
         return Promise.resolve(jsonResponse({
@@ -138,10 +139,72 @@ describe('KnowledgePage', () => {
 
     renderPage();
 
-    expect(await screen.findByText('Viewer ready')).toBeInTheDocument();
+    const iframe = await screen.findByTitle('OpenKnowledge viewer');
+    expect(iframe).toHaveAttribute('src', '/knowledge-viewer/?project=overdeck');
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/knowledge-viewer/start', expect.objectContaining({
       method: 'POST',
     })));
+  });
+
+  it('accepts a loaded iframe document as the embedded viewer', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => jsonResponse({
+      projectKey: 'overdeck',
+      bundleConfigured: true,
+      installed: true,
+      starting: false,
+      running: true,
+      url: 'http://127.0.0.1:39847',
+    })));
+
+    renderPage();
+    const iframe = await screen.findByTitle('OpenKnowledge viewer');
+    Object.defineProperty(iframe, 'contentDocument', {
+      configurable: true,
+      value: {
+        location: { href: 'http://localhost/knowledge-viewer/' },
+        documentElement: { childElementCount: 1 },
+      },
+    });
+
+    vi.useFakeTimers();
+    fireEvent.load(iframe);
+    await act(async () => { await vi.advanceTimersByTimeAsync(100); });
+
+    expect(screen.getByTestId('knowledge-viewer-embedded')).toBeInTheDocument();
+    expect(screen.queryByText('Loading knowledge workspace')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('knowledge-viewer-blocked')).not.toBeInTheDocument();
+  });
+
+  it('falls back to a direct link when the iframe document is blocked', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => jsonResponse({
+      projectKey: 'overdeck',
+      bundleConfigured: true,
+      installed: true,
+      starting: false,
+      running: true,
+      url: 'http://127.0.0.1:39847',
+    })));
+
+    renderPage();
+    const iframe = await screen.findByTitle('OpenKnowledge viewer');
+    Object.defineProperty(iframe, 'contentDocument', {
+      configurable: true,
+      value: {
+        location: { href: 'about:blank' },
+        documentElement: { childElementCount: 0 },
+      },
+    });
+
+    vi.useFakeTimers();
+    fireEvent.load(iframe);
+    await act(async () => { await vi.advanceTimersByTimeAsync(100); });
+
+    expect(screen.getByTestId('knowledge-viewer-blocked')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Open viewer' })).toHaveAttribute(
+      'href',
+      'http://127.0.0.1:39847',
+    );
+    expect(screen.queryByTitle('OpenKnowledge viewer')).not.toBeInTheDocument();
   });
 
   it('uses the recorded lossy-spike posture copy', async () => {
