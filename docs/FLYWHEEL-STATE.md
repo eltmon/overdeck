@@ -5919,3 +5919,10 @@ Remaining in flight: PAN-2710 strike (nudged at 83m idle), 7 work agents + 1491,
 - **PAN-2377: review PASSED (cycle 2), tests running** — next UAT candidate when green.
 - **PAN-2858 still wedged 45+ min** — poke backstop provably absent (evidence appended to PAN-2899).
 - Headline: prsMerged=2, closedOut=2 this run.
+
+## Ticks 6-8 — 2026-07-19 ~03:30-04:10 — ★ PAN-2859 Kimi K3 LANDED (353247e0, PR #2904); PAN-2377 ready → UAT batch assembled; PAN-2907 filed
+- **PAN-2859 landed**: reviewed 18-file diff (on-spec: providers/capabilities/cost/bracket-safe model-validation/provider-env dual export/docs/tests), ran independent gates (typecheck+lint green; 9914/9915 tests — one ENOTEMPTY tmpdir flake in deacon-swarm-doneness verified passing in isolation), PR #2904 all checks green, squash-merged. K3 (`k3`, `k3[1m]`) now selectable on claude-code kimi provider.
+- **`pan done --strike` squash-refusal now FILED as PAN-2907** (was an unfiled tick-32 note): ancestry check can never pass the prescribed gh-API squash-merge; fix = forge-PR-merged evidence or git cherry.
+- **PAN-2377 review+test PASSED → UAT batch re-assembled** (uat/pan-vale-0719, base 353247e0, single member PR #2894) — operator promotes.
+- **Deploy gate friction observed**: with 7 strikes cycling, "verification in flight" defers agent-issued reloads repeatedly (2829 earlier, 2902 now) — K3+b6ea(PAN-2896) deploy pending behind it; retry loop armed. If this recurs across runs, consider a deploy-gate refinement (queue deploy for gate-clear instead of refuse) — fold into PAN-2901's item 3 or file separately.
+- **Strike states**: 2895 PR #2903 (operator's, landing recovery), 2902 PR #2906 (pushed, verifying), 2897 pushed (1 ahead, rebase-loop), 2898 pushed (2 ahead), 2899/2900 implementing. PAN-2858 still wedged (2899 pending); MIN-880 still clobber-hidden (2898 pending).
