@@ -70,6 +70,19 @@ describe('AgentPillPopoverRow', () => {
     expect(dispatchEvent.mock.invocationCallOrder[0]).toBeLessThan(onNavigate.mock.invocationCallOrder[0]);
   });
 
+  it('navigates issue-less system agents to the agents surface', () => {
+    render(
+      <AgentPillPopoverRow
+        agent={agent({ id: 'sequencer-runner', issueId: 'sequencer-runner', role: 'sequencer' })}
+        contextLine="glm-5.2 · 28m ago"
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button'));
+
+    expect(window.location.pathname).toBe('/agents');
+  });
+
   it('renders a mono issue ID, truncated titled row, role, and context', () => {
     const title = 'Order book: backlog integration for ready-queue lanes';
     render(

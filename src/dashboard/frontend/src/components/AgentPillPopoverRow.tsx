@@ -1,5 +1,12 @@
 import type { Agent } from '../types';
 
+const RUNNING_AGENT_STATUSES = new Set(['running', 'active', 'starting', 'thinking', 'working']);
+const SYSTEM_AGENT_ROLES = new Set(['flywheel', 'sequencer', 'knowledge']);
+
+export function isRunningAgentStatus(status: Agent['status']): boolean {
+  return RUNNING_AGENT_STATUSES.has(status);
+}
+
 export function describeAgentStop(agent: Agent): string {
   if (agent.pausedReason) return `paused: ${agent.pausedReason}`;
   if (agent.paused) return 'paused';
@@ -11,10 +18,13 @@ export function describeAgentStop(agent: Agent): string {
   return 'stopped cleanly';
 }
 
-export function navigateToIssue(issueId: string): void {
-  const path = `/issues/${encodeURIComponent(issueId)}`;
+function navigateToPath(path: string): void {
   if (window.location.pathname !== path) window.history.pushState({}, '', path);
   window.dispatchEvent(new PopStateEvent('popstate'));
+}
+
+export function navigateToIssue(issueId: string): void {
+  navigateToPath(`/issues/${encodeURIComponent(issueId)}`);
 }
 
 export function relativeTime(iso: string, now: number): string {
@@ -50,7 +60,8 @@ export function AgentPillPopoverRow({
       type="button"
       className="block w-full rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-accent"
       onClick={() => {
-        navigateToIssue(issueId);
+        if (agent.issueId && !SYSTEM_AGENT_ROLES.has(agent.role ?? '')) navigateToIssue(agent.issueId);
+        else navigateToPath('/agents');
         onNavigate?.();
       }}
     >
