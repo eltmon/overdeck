@@ -1,4 +1,4 @@
-import { useCallback, useState, type ReactNode } from 'react'
+import { useCallback, useMemo, useState, type ReactNode } from 'react'
 import { ActivityTab } from '../../CommandDeck/ZoneCOverviewTabs/ActivityTab'
 import { ShipTab } from './ShipTab'
 import { TasksTab } from '../../CommandDeck/ZoneCOverviewTabs/TasksTab'
@@ -20,6 +20,9 @@ import {
 import DrawerArtifactsPanel from '../../drawer/DrawerArtifactsPanel'
 import { IssueActionMenu } from '../../IssueActionMenu/IssueActionMenu'
 import { useIssueActions } from '../../IssueActionMenu/useIssueActions'
+import { selectReviewStatus, useDashboardStore } from '../../../lib/store'
+import { SpecialistStrip } from '../../issue-detail/SpecialistStrip'
+import { deriveSpecialistChips } from '../../issue-detail/deriveSpecialists'
 import { IssueView } from '../../issue-view/IssueView'
 import { SessionPanel } from '../../CommandDeck/SessionView/SessionPanel'
 import { MissionConversationTab } from './MissionConversationTab'
@@ -453,6 +456,11 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
   const checks = useIssueCheckRunsQuery(issueId)
   const costs = useIssueCostsQuery(issueId)
   const headerActions = useIssueActions(issueId)
+  const reviewSnapshot = useDashboardStore(selectReviewStatus(issueId))
+  const specialistChips = useMemo(
+    () => deriveSpecialistChips([...treeSessions], reviewSnapshot),
+    [treeSessions, reviewSnapshot],
+  )
   const phase = phaseStatus(review.data)
   const cost = costs.data?.resolvedTotalCost ?? costs.data?.totalCost ?? 0
   const toggleSpine = () => {
@@ -553,6 +561,20 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
             onStageClick={handleStageClick}
           />
         </div>
+        {/* PAN-2908 C-DETAIL: every convoy specialist, one click to its
+            conversation (verdict + last line per chip). */}
+        {specialistChips.length > 0 && (
+          <div data-section="SpecialistStrip" className="mt-3">
+            <SpecialistStrip
+              specialists={specialistChips}
+              activeId={selectedTreeSession?.type === 'reviewer' ? selectedTreeSession.role ?? null : null}
+              onSelect={(chip) => {
+                const session = treeSessions.find((s) => s.type === 'reviewer' && s.role === chip.id);
+                if (session) selectSessionFromTree(session);
+              }}
+            />
+          </div>
+        )}
       </header>
 
       <nav data-section="Detail Tabs" className="flex flex-nowrap gap-1 overflow-x-auto border-b border-border bg-card px-3 pt-2" aria-label="Issue cockpit tabs">

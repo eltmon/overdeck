@@ -15,7 +15,7 @@ import DrawerReviewSpecialists from './DrawerReviewSpecialists';
 import DrawerTabs from './DrawerTabs';
 import { VerificationGates } from '../issue-view/VerificationGates';
 import { ActiveAgentPanel } from '../issue-view/ActiveAgentPanel';
-import PhaseTimeline from './PhaseTimeline';
+import DrawerPhaseRail from './DrawerPhaseRail';
 import { PickupGateControls } from '../backlog/PickupGateControls';
 import { useDrawerData } from './useDrawerData';
 import { DrawerActivityPanel, DrawerPlanPanel } from './DrawerSecondaryPanels';
@@ -219,7 +219,7 @@ export function IssueDrawer() {
           >
             {drawer.tab === 'overview' ? (
               <div data-testid="drawer-tab-panel-overview" className="space-y-[14px]">
-                <div data-section="PhaseTimeline"><PhaseTimeline /></div>
+                <div data-section="PhaseTimeline"><DrawerPhaseRail /></div>
                 <div data-section="DrawerPickupSection / PickupGateControls"><DrawerPickupSection issueId={drawer.issueId} /></div>
                 <div data-section="DrawerWorkspaceSection"><DrawerWorkspaceSection issueId={drawer.issueId} /></div>
                 <div data-section="UatEnvironmentPanel"><UatEnvironmentPanel issueId={drawer.issueId} /></div>

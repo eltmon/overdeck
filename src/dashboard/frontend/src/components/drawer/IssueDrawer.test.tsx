@@ -582,19 +582,24 @@ describe('IssueDrawer', () => {
 
     renderDrawer();
 
-    expect(screen.getByTestId('drawer-phase-timeline')).toHaveClass('grid-cols-6');
-    expect(screen.getByText('Triaged')).toBeInTheDocument();
-    expect(screen.getByText('Planned')).toBeInTheDocument();
-    expect(screen.getByText('Implemented')).toBeInTheDocument();
-    expect(screen.getByText('Reviewed')).toBeInTheDocument();
-    expect(screen.getByText('Shipping')).toBeInTheDocument();
-    expect(screen.getByText('Merged')).toBeInTheDocument();
-    expect(within(screen.getByTestId('drawer-phase-triaged')).getByTestId('drawer-phase-accent-done')).toHaveClass('bg-success');
-    expect(within(screen.getByTestId('drawer-phase-reviewed')).getByTestId('drawer-phase-accent-done')).toHaveClass('bg-success');
-    expect(within(screen.getByTestId('drawer-phase-shipping')).getByTestId('drawer-phase-accent-current')).toHaveClass('bg-signal-review');
-    expect(within(screen.getByTestId('drawer-phase-merged')).getByTestId('drawer-phase-accent-upcoming')).toHaveClass('bg-transparent');
-    expect(within(screen.getByTestId('drawer-phase-shipping')).getByText('05/18')).toHaveClass('font-medium', 'text-foreground');
-    expect(within(screen.getByTestId('drawer-phase-merged')).getByText('—')).toHaveClass('text-muted-foreground');
+    // PAN-2908 C-VOCAB: the drawer renders the shared six-phase rail.
+    const timeline = screen.getByTestId('drawer-phase-timeline');
+    expect(within(timeline).getByText('Plan')).toBeInTheDocument();
+    expect(within(timeline).getByText('Work')).toBeInTheDocument();
+    expect(within(timeline).getByText('Review')).toBeInTheDocument();
+    expect(within(timeline).getByText('Test')).toBeInTheDocument();
+    expect(within(timeline).getByText('Ship')).toBeInTheDocument();
+    expect(within(timeline).getByText('Done')).toBeInTheDocument();
+    const steps = timeline.querySelectorAll('[data-component="phase-rail"] > button');
+    expect(steps).toHaveLength(6);
+    // Fixture: review passed, ready to merge → plan..test done, ship current, done pending.
+    expect(steps[0].getAttribute('data-state')).toBe('done');
+    expect(steps[3].getAttribute('data-state')).toBe('done');
+    expect(steps[4].getAttribute('data-state')).toBe('current');
+    expect(steps[5].getAttribute('data-state')).toBe('pending');
+    // Legacy when-stamps are preserved as meta where the old timeline had them.
+    expect(within(steps[4] as HTMLElement).getByText('05/18')).toBeInTheDocument();
+    expect(within(steps[5] as HTMLElement).getByText('—')).toBeInTheDocument();
   });
 
   it('renders verification gates from drawer data with PRD border tones', async () => {

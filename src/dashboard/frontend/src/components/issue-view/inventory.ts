@@ -28,7 +28,7 @@ export const ISSUE_VIEW_INVENTORY: readonly IssueViewInventoryEntry[] = [
       home: 'src/dashboard/frontend/src/components/IssueActionMenu/IssueActionMenu.tsx',
     },
   },
-  { section: 'PhaseTimeline', view: 'console', home: 'src/dashboard/frontend/src/components/drawer/PhaseTimeline.tsx' },
+  { section: 'PhaseTimeline', view: 'console', home: 'src/dashboard/frontend/src/components/drawer/DrawerPhaseRail.tsx' },
   { section: 'DrawerTabs', view: 'console', home: 'src/dashboard/frontend/src/components/drawer/DrawerTabs.tsx' },
   { section: 'DrawerPickupSection / PickupGateControls', view: 'console', home: 'src/dashboard/frontend/src/components/backlog/PickupGateControls.tsx' },
   { section: 'DrawerWorkspaceSection', view: 'console', home: 'src/dashboard/frontend/src/components/drawer/IssueDrawer.tsx' },

@@ -1,6 +1,6 @@
 # Overdeck UX Overhaul — Simple by Default, Unified Underneath
 
-> **Status:** Proposal · 2026-07-19 (rev 3 — C-SIMPLE v1 implemented: foundations + simple home + simple issue page + mode toggle live) · Author: UX audit (Playwright walkthrough + code architecture review)
+> **Status:** Proposal · 2026-07-19 (rev 4 — C-SIMPLE v1 + C-ACTIONS shipped; C-DETAIL v1 in flight: shared PhaseRail + SpecialistStrip live in drawer & cockpit) · Author: UX audit (Playwright walkthrough + code architecture review)
 > **Mockups (binding visual spec):** [`docs/design/mockups/overdeck-ux-overhaul/index.html`](../../design/mockups/overdeck-ux-overhaul/index.html) (entry point — links to all three screen mocks)
 > **Style guide:** [`design/style-guide/STYLE-GUIDE.md`](../../../design/style-guide/STYLE-GUIDE.md)
 > **Supersedes / completes:** [`pan-dashboard-unified-redesign.md`](./pan-dashboard-unified-redesign.md) (2026-05-16) and the PAN-2499 "three issue views" unification — this PRD is the **conformance pass** those efforts never got.
@@ -139,6 +139,8 @@ Six phases, in order, used by every surface: **`Plan → Work → Review → Tes
 - **One component** renders it: `<PhaseRail>` (full, in IssueDetail), `<PhaseDots>` (mini, on cards/rows — five pips, current step ringed). Board columns, Pipeline groups, and the drawer/cockpit headers are all generated from the same six-token enum. A unit test asserts the enum has six members and that every surface imports the shared label function (grep-level conformance).
 
 ### 3.3 One IssueDetail, conversation-first (contract C-DETAIL)
+
+> **Implementation status (2026-07-19): v1 shipped.** Shared components landed in both existing shells: `issue-detail/PhaseRail.tsx` (the six-phase rail on the shared classifier — the drawer's legacy Triaged→…→Merged timeline is **deleted**, `DrawerPhaseRail` drives the drawer and `IssueStatusBand` from the same vocabulary) and `issue-detail/SpecialistStrip.tsx` + `deriveSpecialists.ts` (mounted in the cockpit header: every review specialist with verdict + last line, one click to *its* conversation via the session tree). Also shipped with C-ACTIONS in the same window: the cockpit header runs the shared `<IssueActionMenu>` and merge flows through the registry. Still open from this contract: the single shell itself (drawer + cockpit + rail + card becoming one component at three densities), Conversation as the default tab everywhere, per-phase conversation switching in the drawer, and `useIssueView` as the only data path.
 
 **One shell, three densities — and the conversation is the main pane.** `components/issue-detail/IssueDetail.tsx` takes `density: 'drawer' | 'page' | 'rail'` and replaces: `drawer/IssueDrawer.tsx`, `Stage/cockpit/IssueMissionControl.tsx`, the rail expansion sections in `FeatureItem.tsx`, and the issue-detail responsibility of `KanbanCards.tsx` (cards become summary-only; clicking opens the drawer).
 

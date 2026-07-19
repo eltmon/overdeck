@@ -1,4 +1,4 @@
-import PhaseTimeline from '../drawer/PhaseTimeline'
+import DrawerPhaseRail from '../drawer/DrawerPhaseRail'
 import { IssueActionMenu } from '../IssueActionMenu/IssueActionMenu'
 import { IssueBlockerSpotlight } from './cockpit/IssueBlockerSpotlight'
 import { IssueMetricStrip } from './cockpit/IssueMetricStrip'
@@ -10,7 +10,7 @@ import { IssueMetricStrip } from './cockpit/IssueMetricStrip'
  *
  *   1. BlockerSpotlight — the #1 thing right now (stuck reason + unblock action,
  *      or "ready to merge"); renders nothing when neither applies.
- *   2. PhaseTimeline — 6-step lifecycle (TRIAGED→…→MERGED).
+ *   2. DrawerPhaseRail — the shared six-phase rail (Plan→…→Done, C-VOCAB).
  *   3. MetricStrip — cost · diff · PR · sessions · last-activity, single-sourced
  *      so the scan cards below never repeat these figures.
  *   4. ActionStrip — the phase-gated action registry (IssueActionMenu, primary-strip).
@@ -23,7 +23,7 @@ export function IssueStatusBand({ issueId }: { issueId: string }) {
     <div className="flex flex-col">
       <IssueBlockerSpotlight issueId={issueId} />
       <div className="mt-4">
-        <PhaseTimeline issueId={issueId} />
+        <DrawerPhaseRail issueId={issueId} />
       </div>
       <IssueMetricStrip issueId={issueId} />
       <div className="mt-4 rounded-[var(--radius)] border border-border bg-card px-2 py-1.5">
