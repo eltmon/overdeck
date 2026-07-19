@@ -254,7 +254,7 @@
     "recordedAt": "2026-07-19T00:54:19.291Z"
   },
   "created": "2026-07-17T12:54:30.819Z",
-  "updated": "2026-07-19T00:54:56.359Z",
+  "updated": "2026-07-19T00:55:51.153Z",
   "pipeline": {
     "issueId": "PAN-2377",
     "reviewStatus": "pending",
@@ -264,7 +264,8 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-19T00:54:25.853Z",
+    "panDoneRecoveredAt": "2026-07-19T00:54:56.018Z",
+    "updatedAt": "2026-07-19T00:55:50.816Z",
     "inspectNotes": "AC1-AC4 met: orders-writer.test.ts covers createBook/addItems/moveItem/setStatus round-trip + index.json queue order; orders-resolver.test.ts covers backlogCandidates rank/exclusion and computeBookProgress drained semantics (running=false, parked-only=true); orders-validate.test.ts covers all five validateBookForStart finding types incl. planAtPickup downgrade. AC5 partially met: the writer-commit half is covered (git rev-list count check in orders-writer.test.ts). The parseOrderBookJson half is NOT covered — AC5 names src/lib/orders/types.ts parseOrderBookJson specifically, but tests/unit/lib/orders/orders-io.test.ts 'returns a descriptive error for malformed order book JSON' (line ~36) writes syntactically-invalid JSON ('{bad json'), which throws inside readOrderBook's own JSON.parse try/catch (io.ts ~line 30) BEFORE parseOrderBookJson (types.ts) is ever called. No test exercises parseOrderBookJson's own catch branch (types.ts, 'Invalid order book: ...' prefix) against syntactically-valid JSON that fails Schema decode (e.g. a well-formed OrderBook object with an item missing 'issue' or lane 'C'). Fix: add a case — either import parseOrderBookJson directly and assert its ok:false error string, or have readOrderBook fed a schema-invalid-but-JSON-valid fixture — to prove the descriptive-error path named in AC5 actually executes.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2894",
     "reviewRequestedAt": "2026-07-19T00:54:56.018Z",
@@ -471,8 +472,7 @@
         "tests/unit/lib/overdeck/no-loss-matrix.ts"
       ],
       "recordedAt": "2026-07-19T00:54:19.291Z"
-    },
-    "panDoneRecoveredAt": "2026-07-19T00:54:56.018Z"
+    }
   },
   "closeOut": {
     "usage": {
@@ -485,6 +485,14 @@
             "cacheWrite": 169467
           }
         },
+        "review": {
+          "openai/gpt-5.6-sol": {
+            "input": 473550,
+            "output": 14816,
+            "cacheRead": 2768896,
+            "cacheWrite": 0
+          }
+        },
         "review.supervisor": {
           "anthropic/claude-sonnet-5": {
             "input": 12,
@@ -495,9 +503,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 10828785,
-            "output": 1138396,
-            "cacheRead": 451336192,
+            "input": 10840311,
+            "output": 1139788,
+            "cacheRead": 452472320,
             "cacheWrite": 0
           }
         }
@@ -509,22 +517,22 @@
           "cacheRead": 3608092,
           "cacheWrite": 169467
         },
+        "openai/gpt-5.6-sol": {
+          "input": 11313861,
+          "output": 1154604,
+          "cacheRead": 455241216,
+          "cacheWrite": 0
+        },
         "anthropic/claude-sonnet-5": {
           "input": 12,
           "output": 6183,
           "cacheRead": 594186,
           "cacheWrite": 132575
-        },
-        "openai/gpt-5.6-sol": {
-          "input": 10828785,
-          "output": 1138396,
-          "cacheRead": 451336192,
-          "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 322.848292,
-        "pricingAsOf": "2026-07-19T00:54:25.970Z"
+        "usd": 327.712424,
+        "pricingAsOf": "2026-07-19T00:55:51.042Z"
       }
     },
     "merges": [
