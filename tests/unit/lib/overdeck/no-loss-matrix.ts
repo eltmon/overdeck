@@ -692,6 +692,18 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'POST /api/backlog/sequence/clear',           kind: 'http', disposition: 'DELETE',     door: 'backlog route deletes sequence.md + clears the disposable backlog_sequence cache via clearBacklogSequence (PAN-2005)' },
   { surface: 'GET /api/backlog/sequencer-status',          kind: 'http', disposition: 'READ',       door: 'backlog route reports live sequencer pass progress (running/total/processed) from listRunningAgentsSync + manifest + transcript (PAN-2005)' },
 
+  // PAN-2377: operator order-book routes (canonical orders read/write doors)
+  { surface: 'GET /api/orders/backlog-candidates',         kind: 'http', disposition: 'AGGREGATE',  door: 'OrdersResolver.list membership joined with the backlog candidate resolver' },
+  { surface: 'GET /api/orders',                            kind: 'http', disposition: 'READ',       door: 'OrdersResolver.list' },
+  { surface: 'POST /api/orders',                           kind: 'http', disposition: 'WRITE',      door: 'OrdersWriter.create' },
+  { surface: 'GET /api/orders/:id',                        kind: 'http', disposition: 'READ',       door: 'OrdersResolver.get' },
+  { surface: 'PATCH /api/orders/:id',                      kind: 'http', disposition: 'WRITE',      door: 'OrdersWriter.update' },
+  { surface: 'POST /api/orders/:id/items',                 kind: 'http', disposition: 'WRITE',      door: 'OrdersWriter.addItem' },
+  { surface: 'DELETE /api/orders/:id/items/:issue',        kind: 'http', disposition: 'WRITE',      door: 'OrdersWriter.removeItem' },
+  { surface: 'PATCH /api/orders/:id/items/:issue',         kind: 'http', disposition: 'WRITE',      door: 'OrdersWriter.updateItem' },
+  { surface: 'POST /api/orders/:id/start',                 kind: 'http', disposition: 'WRITE',      door: 'OrdersWriter.start' },
+  { surface: 'GET /api/orders/:id/preview-brief',          kind: 'http', disposition: 'READ',       door: 'OrdersResolver.previewBrief' },
+
   // Pre-existing routes discovered during PAN-1866 audit (were missing from matrix)
   { surface: 'POST /api/agents/:id/restart-fresh',         kind: 'http', disposition: 'WRITE',      door: 'agents route wipes work-agent state and re-spawns on new harness/model; deliberate operator override for harness switch' },
   { surface: 'POST /api/review/:issueId/purge',            kind: 'http', disposition: 'WRITE',      door: 'workspaces route purges all review agents for an issue and resets review status' },

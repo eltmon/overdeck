@@ -22,6 +22,7 @@ import { loadWorkspaceMetadataSync as loadWorkspaceMetadataFn } from '../../../.
 import { getWorkAgentLifecycleState } from '../../../../lib/work-agent-lifecycle.js';
 import { validateProviderHealth } from '../../../../lib/provider-health.js';
 import { checkActiveOrderDispatch } from '../../../../lib/orders/dispatch-gate.js';
+import type { OrderDispatchEligibility } from '../../../../lib/orders/eligibility.js';
 import { getProjectSync, resolveProjectFromIssueSync } from '../../../../lib/projects.js';
 import { clearWorkspaceStuck, getReviewStatusSync } from '../../../../lib/review-status.js';
 import { isStateMigrated } from '../../../../lib/state-home.js';
@@ -65,6 +66,21 @@ import {
 } from './spawn-helpers.js';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
+
+export function orderDispatchConflict(decision: OrderDispatchEligibility): {
+  status: 409;
+  body: { error: string; code: string; conditions: OrderDispatchEligibility['conditions'] };
+} | null {
+  if (decision.eligible) return null;
+  return {
+    status: 409,
+    body: {
+      error: decision.message ?? 'Order-book dispatch is blocked.',
+      code: decision.code ?? 'order-dispatch-blocked',
+      conditions: decision.conditions,
+    },
+  };
+}
 
 /**
  * PAN-2386: emit a dashboard activity event when start-agent refuses to spawn
@@ -321,13 +337,8 @@ export const postAgentsRoute = HttpRouter.add(
     const projectConfig = resolvedProject ? getProjectSync(resolvedProject.projectKey) : null;
     const projectPath = projectConfig?.path ?? getProjectPath(projectId, issuePrefix);
     const orderDispatch = yield* Effect.promise(() => checkActiveOrderDispatch(projectPath, issueId, { offBook }));
-    if (!orderDispatch.decision.eligible) {
-      return jsonResponse({
-        error: orderDispatch.decision.message,
-        code: orderDispatch.decision.code,
-        conditions: orderDispatch.decision.conditions,
-      }, { status: 409 });
-    }
+    const orderConflict = orderDispatchConflict(orderDispatch.decision);
+    if (orderConflict) return jsonResponse(orderConflict.body, { status: orderConflict.status });
 
     const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
     if (!existsSync(workspacePath)) {

@@ -151,6 +151,19 @@ describe('computePredictedConflictSignals (declared-footprint conflict signal)',
 });
 
 describe('pickFromSequence predicted-conflict signal', () => {
+  it('treats active order-book membership as operator release while off-book work stays held', () => {
+    const nodes = [node('PAN-10', 1), node('PAN-20', 2)];
+    const options = {
+      issueLabels: () => ['ready'],
+      isReadyOrHasPrd: () => true,
+      requireReady: true,
+      autoPickupBacklog: false,
+    };
+
+    expect(pickFromSequence(nodes, options)).toBeNull();
+    expect(pickFromSequence(nodes, { ...options, activeBookMembership: new Set(['PAN-20']) })).toMatchObject({ issueId: 'PAN-20' });
+  });
+
   it('uses predicted conflicts as an advisory launch-order preference', () => {
     const signals = computePredictedConflictSignals([
       declaredIssueFootprint('PAN-10', spec('PAN-10', ['src/shared.ts'])),

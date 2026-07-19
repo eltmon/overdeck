@@ -151,4 +151,23 @@ if [[ -n "$state_violations" ]]; then
   exit 1
 fi
 
+# ── Rule 5: order books use the orders resolver/writer doors (PAN-2377) ──
+# Direct reads and writes of orders/*.json belong only in src/lib/orders/. API
+# routes, CLI commands, dashboard services, and scripts must call that domain.
+orders_violations=$(
+  while IFS= read -r file; do
+    [[ -z "$file" ]] && continue
+    if grep -Eq 'readFileSync|readFileString|readFile\(|readdirSync|readdir\(|writeFileSync|writeFileString|writeFile\(|renameSync|\.rename\(|unlinkSync|\.unlink\(|rmSync|\.remove\(' "$file" \
+      && grep -Eq '\.json' "$file"; then
+      printf '%s\n' "$file"
+    fi
+  done < <( { git grep -lE -e "(join|resolve).*'orders'" -e '(join|resolve).*"orders"' -e 'orders/[^[:space:]]*\.json' -- 'src/**' 'scripts/**' ':!src/lib/orders/**' ':!src/**/__tests__/**' ':!scripts/lint-state-writes.sh'; } || true )
+)
+if [[ -n "$orders_violations" ]]; then
+  echo "✗ direct orders/*.json access outside src/lib/orders/:" >&2
+  echo "$orders_violations" >&2
+  echo "Read through src/lib/orders/resolver.ts and mutate through src/lib/orders/writer.ts." >&2
+  exit 1
+fi
+
 echo "✓ state-write lint passed (single write surface intact)"

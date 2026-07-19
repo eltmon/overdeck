@@ -24,7 +24,7 @@ describe('prompt load-bearing rails', () => {
     });
 
     it('states the auto-pickable predicate', () => {
-      expect(prompt).toMatch(/ready && planned && \(released \|\| auto_pickup_backlog\)/);
+      expect(prompt).toMatch(/ready && planned && \(released \|\| auto_pickup_backlog \|\| activeBookMember\)/);
     });
   });
 
