@@ -22,7 +22,7 @@ import { parseCodexConversationMessages } from './services/codex-conversation-pa
 import { resolveAgentHarness, resolvePiSessionPath, resolveCodexRolloutPath, readLauncherPinnedSessionId } from './routes/jsonl-resolver.js';
 import { watch as fsWatch } from 'node:fs';
 import { sessionFilePath } from '../../lib/paths.js';
-import { listSessionNames } from '../../lib/tmux.js';
+import { getRuntimeCensus } from '../../lib/runtime-census.js';
 import { listProjectsSync } from '../../lib/projects.js';
 import type { AgentStatus, ConversationEvent, DomainEvent, EmbedProgressEvent, EnrichCompleteEvent, EnrichProgressEvent, ScanCompleteEvent, ScanProgressEvent, ScanStartedEvent, SessionNodePresence, SessionTreeDelta, SystemHeartbeatEvent } from '@overdeck/contracts';
 import type { StoredEvent } from './event-store.js';
@@ -673,9 +673,9 @@ function startSharedPresencePoller(): void {
 
   const tick = async () => {
     try {
-      const sessions = await Effect.runPromise(listSessionNames());
-      const current = new Set(sessions.filter(s => s.trim()));
-
+      const census = await getRuntimeCensus();
+      if (!census.available) return;
+      const current = new Set(census.sessionNames);
       for (const s of sharedPresencePoller.knownSessions) {
         if (!current.has(s)) {
           const issueId = extractIssueIdFromSession(s);

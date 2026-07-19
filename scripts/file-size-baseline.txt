@@ -29,4 +29,4 @@
 1161 src/lib/review-status.ts
 1486 src/lib/settings-api.ts
 1205 src/lib/sync.ts
-1306 src/lib/tmux.ts
+1303 src/lib/tmux.ts

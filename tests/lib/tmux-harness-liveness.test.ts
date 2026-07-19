@@ -10,11 +10,23 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { paneTreeHasHarnessProcess } from '../../src/lib/tmux.js';
+import { paneTreeHasHarnessProcess, parseTmuxPaneRecords } from '../../src/lib/tmux.js';
 
 function table(rows: Array<[pid: number, ppid: number, comm: string]>): string {
   return rows.map(([pid, ppid, comm]) => `${pid}  ${ppid}  ${comm}`).join('\n');
 }
+
+describe('parseTmuxPaneRecords', () => {
+  it('parses one bulk list-panes result for all sessions', () => {
+    expect(parseTmuxPaneRecords([
+      'agent-pan-1\t100\t0\t',
+      'conv-one\t200\t1\t7',
+    ].join('\n'))).toEqual([
+      { sessionName: 'agent-pan-1', panePid: 100, paneDead: false, paneDeadStatus: null },
+      { sessionName: 'conv-one', panePid: 200, paneDead: true, paneDeadStatus: 7 },
+    ]);
+  });
+});
 
 describe('paneTreeHasHarnessProcess', () => {
   it('reports alive for a supervisor-wrapped claude session (bash → node → claude)', () => {

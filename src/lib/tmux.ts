@@ -11,6 +11,9 @@ import { loadConfigSync, type TmuxConfigMode } from './config-yaml.js';
 import { buildChildEnvSync } from './child-env.js';
 import { TmuxError } from './errors.js';
 import { getUiTheme, TERMINAL_BG } from './ui-theme.js';
+import { paneTreeHasHarnessProcess } from './tmux-process-tree.js';
+
+export { paneTreeHasHarnessProcess } from './tmux-process-tree.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -529,6 +532,13 @@ export interface TmuxSession {
   windows: number;
 }
 
+export interface TmuxPaneRecord {
+  sessionName: string;
+  panePid: number;
+  paneDead: boolean;
+  paneDeadStatus: number | null;
+}
+
 export function listSessionsSync(): TmuxSession[] {
   try {
     const output = tmuxExecSync(
@@ -751,49 +761,6 @@ async function listPaneValuesText(target: string, format: string): Promise<strin
 }
 
 /**
- * Process names that mean a launcher session is a keep-alive *corpse*, not a
- * live harness. Launchers end with `while true; do sleep 60; done`
- * (src/lib/launcher-generator.ts), so after the harness process (Claude/Pi/…)
- * exits the tmux session stays alive running that loop — its process tree is
- * then only the hosting shell and `sleep`, never the harness, which surfaces
- * as `node`/`claude`/the runtime binary.
- */
-const KEEPALIVE_FOREGROUND_COMMANDS = new Set(['sleep', 'bash', 'sh', 'dash', 'zsh', 'ash']);
-
-/**
- * Pure tree walk behind isHarnessProcessAlive, exported for tests: true when
- * any process in the pane's tree (the pane pids themselves or any descendant)
- * is something other than a shell or `sleep`. `psTable` is `ps -eo
- * pid=,ppid=,comm=` output.
- */
-export function paneTreeHasHarnessProcess(panePids: number[], psTable: string): boolean {
-  const childrenByPpid = new Map<number, number[]>();
-  const commByPid = new Map<number, string>();
-  for (const line of psTable.split('\n')) {
-    const match = line.trim().match(/^(\d+)\s+(\d+)\s+(.+)$/);
-    if (!match) continue;
-    const pid = Number(match[1]);
-    const ppid = Number(match[2]);
-    commByPid.set(pid, match[3].trim());
-    const siblings = childrenByPpid.get(ppid);
-    if (siblings) siblings.push(pid);
-    else childrenByPpid.set(ppid, [pid]);
-  }
-  const queue = [...panePids];
-  const seen = new Set<number>();
-  while (queue.length > 0) {
-    const pid = queue.pop()!;
-    if (seen.has(pid)) continue;
-    seen.add(pid);
-    const comm = commByPid.get(pid);
-    if (comm && !KEEPALIVE_FOREGROUND_COMMANDS.has(comm)) return true;
-    const children = childrenByPpid.get(pid);
-    if (children) queue.push(...children);
-  }
-  return false;
-}
-
-/**
  * Honest liveness signal for a launcher-managed session: true only when the
  * session exists AND a real harness process is running in it — not the post-exit
  * keep-alive loop. `sessionExists` alone cannot tell a live session from a
@@ -1011,6 +978,36 @@ export const listSessionNames = (): Effect.Effect<readonly string[], TmuxError> 
       }
     },
     catch: (cause) => toTmuxError('list-session-names', cause),
+  });
+
+export function parseTmuxPaneRecords(output: string): TmuxPaneRecord[] {
+  return output.split('\n').flatMap((line) => {
+    if (!line) return [];
+    const [sessionName = '', panePidRaw = '', paneDeadRaw = '', paneDeadStatusRaw = ''] = line.split('\t');
+    const panePid = Number.parseInt(panePidRaw, 10);
+    if (!sessionName || !Number.isInteger(panePid) || panePid <= 0) return [];
+    const paneDeadStatus = Number.parseInt(paneDeadStatusRaw, 10);
+    return [{
+      sessionName,
+      panePid,
+      paneDead: paneDeadRaw === '1',
+      paneDeadStatus: Number.isInteger(paneDeadStatus) ? paneDeadStatus : null,
+    }];
+  });
+}
+
+export const listAllPaneRecords = (): Effect.Effect<readonly TmuxPaneRecord[], TmuxError> =>
+  Effect.tryPromise({
+    try: async () => {
+      const { stdout } = await tmuxExecAsync([
+        'list-panes',
+        '-a',
+        '-F',
+        '#{session_name}\t#{pane_pid}\t#{pane_dead}\t#{pane_dead_status}',
+      ], { encoding: 'utf-8' });
+      return parseTmuxPaneRecords(String(stdout));
+    },
+    catch: (cause) => toTmuxError('list-all-pane-records', cause),
   });
 
 export const getWindowDimensions = (

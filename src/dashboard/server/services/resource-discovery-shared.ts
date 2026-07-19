@@ -1,9 +1,8 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { Effect } from 'effect';
 
 import { listConversations, type LegacyConversation as Conversation } from '../../../lib/overdeck/conversations.js';
-import { listSessionNames } from '../../../lib/tmux.js';
+import { getRuntimeCensus } from '../../../lib/runtime-census.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -50,14 +49,6 @@ async function loadTrackerIssues(): Promise<Map<string, TrackerIssueRecord>> {
   return map;
 }
 
-async function loadTmuxSessions(): Promise<string[]> {
-  try {
-    return (await Effect.runPromise(listSessionNames())).map((name) => name.trim()).filter(Boolean);
-  } catch {
-    return [];
-  }
-}
-
 async function loadDockerContainers(): Promise<string[]> {
   try {
     const { stdout } = await execFileAsync('docker', ['ps', '--format', '{{.Names}}'], {
@@ -80,12 +71,13 @@ async function loadActiveRemoteAgentStates(): Promise<ActiveRemoteAgentState[]> 
 }
 
 export async function captureSharedResourceSignals(): Promise<SharedResourceSignals> {
-  const [trackerIssues, tmuxSessions, dockerContainers, remoteAgentStates] = await Promise.all([
+  const [trackerIssues, runtimeCensus, dockerContainers, remoteAgentStates] = await Promise.all([
     loadTrackerIssues(),
-    loadTmuxSessions(),
+    getRuntimeCensus(),
     loadDockerContainers(),
     loadActiveRemoteAgentStates(),
   ]);
+  const tmuxSessions = [...runtimeCensus.sessionNames];
   let conversations: Conversation[] = [];
   try {
     conversations = listConversations();

@@ -5,7 +5,8 @@ import { FsError, TmuxError } from '../errors.js';
 import type { AgentStatus } from '@overdeck/contracts';
 import type { AgentState, Role } from '../agents.js';
 import { getAgentState, isRole, normalizeAgentId } from '../agents.js';
-import { killSession, listSessions, listSessionsSync } from '../tmux.js';
+import { killSession, listSessionsSync } from '../tmux.js';
+import { getRuntimeCensus, getRuntimeCensusSnapshot } from '../runtime-census.js';
 import { AGENTS_DIR } from '../paths.js';
 import { getRollbackAgentStatePath } from '../overdeck/agent-rollback-state.js';
 import { listOverdeckAgentStatesSync } from '../overdeck/agent-state-sync.js';
@@ -15,15 +16,18 @@ export function listRunningAgentsSync(): (AgentState & { tmuxActive: boolean })[
   // Agent state dirs are named by role prefix (planning-/agent-/conv-/strike-);
   // getAgentSessions only returns `agent-*`, so planning/conv/strike sessions
   // would always read tmuxActive:false and get dropped by the enrichment poller.
-  const tmuxSessions = listSessionsSync();
-  const tmuxNames = new Set(tmuxSessions.map(s => s.name));
+  const census = getRuntimeCensusSnapshot();
+  const tmuxNames = census
+    ? census.sessionNames
+    : new Set(listSessionsSync().map((session) => session.name));
+  const tmuxUnavailable = census?.tmuxAvailable === false;
 
   return listOverdeckAgentStatesSync().map((state) => {
     const normalizedId = normalizeAgentId(state.id);
     return {
       ...state,
       id: normalizedId,
-      tmuxActive: tmuxNames.has(normalizedId),
+      tmuxActive: tmuxUnavailable || tmuxNames.has(normalizedId),
     };
   });
 }
@@ -47,27 +51,24 @@ export const listRunningAgents = (): Effect.Effect<(AgentState & { tmuxActive: b
     // PAN-1908: authoritative registry is the SQLite agents table; no directory scan.
     //
     // TRAP — `tmuxActive` reflects whether THIS process can see the agent's tmux
-    // session on the `overdeck` socket. Run this from a one-off `tsx -e`/CLI
-    // process that lacks access to that socket and `listSessions()` returns
-    // empty, so EVERY agent comes back `tmuxActive: false` — including ones that
-    // are genuinely running. Do not conclude "the agent isn't running" / "the
-    // enrichment poller skips it" from an out-of-server-process reading. Trust
-    // the live dashboard server's view (it owns the socket) or check the tmux
-    // session directly with `tmux -L overdeck list-sessions`.
+    // session on the `overdeck` socket. A one-off `tsx -e`/CLI process may not;
+    // unavailable census evidence deliberately fails open rather than declaring
+    // every agent dead. Trust the dashboard server's view (it owns the socket) or
+    // check the tmux session directly with `tmux -L overdeck list-sessions`.
     //
     // Use the UNFILTERED session list (not getAgentSessions, which is `agent-*`
     // only): agent state dirs carry role prefixes (planning-/agent-/conv-/strike-),
     // and planning/conv/strike sessions must read tmuxActive:true so the
     // enrichment poller scans them for AskUserQuestion / pending input (PAN-1395).
-    const tmuxSessions = yield* listSessions();
-    const tmuxNames = new Set(tmuxSessions.map(s => s.name));
+    const runtimeCensus = yield* Effect.promise(() => getRuntimeCensus());
+    const tmuxNames = runtimeCensus.sessionNames;
 
     return listOverdeckAgentStatesSync().map((state) => {
       const normalizedId = normalizeAgentId(state.id);
       return {
         ...state,
         id: normalizedId,
-        tmuxActive: tmuxNames.has(normalizedId),
+        tmuxActive: !runtimeCensus.tmuxAvailable || tmuxNames.has(normalizedId),
       };
     });
   });

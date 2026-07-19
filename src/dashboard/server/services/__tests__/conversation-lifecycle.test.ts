@@ -12,10 +12,28 @@ const mockCleanupUnreferencedConversationAttachments = vi.fn();
 const mockListSessionNames = vi.fn();
 const mockIsHarnessProcessAlive = vi.fn();
 const mockListPaneValues = vi.fn();
+const mockGetRuntimeCensus = vi.fn();
+const mockRefreshRuntimeCensus = vi.fn();
 const mockCreateConversation = vi.fn();
 const mockGetConversationByClaudeSessionId = vi.fn();
 const mockGetConversationByName = vi.fn();
 const mockSetClearedToConvId = vi.fn();
+
+async function buildRuntimeCensusMock() {
+  const sessions = await Effect.runPromise(mockListSessionNames());
+  const panesBySession = new Map<string, Array<{ paneDeadStatus: number | null }>>();
+  for (const session of sessions) {
+    const values = await Effect.runPromise(mockListPaneValues(session));
+    panesBySession.set(session, values.map((value: string) => ({
+      paneDeadStatus: Number.isFinite(Number(value)) ? Number(value) : null,
+    })));
+  }
+  return {
+    available: true,
+    sessionNames: new Set(sessions),
+    panesBySession,
+  };
+}
 
 vi.mock('../../../../lib/overdeck/conversations.js', () => ({
   listConversations: mockListConversations,
@@ -46,6 +64,13 @@ vi.mock('../../../../lib/tmux.js', () => ({
   listPaneValues: mockListPaneValues,
 }));
 
+vi.mock('../../../../lib/runtime-census.js', () => ({
+  getRuntimeCensus: mockGetRuntimeCensus,
+  refreshRuntimeCensus: mockRefreshRuntimeCensus,
+  runtimeCensusHasHarnessProcess: (_census: unknown, sessionName: string) =>
+    mockIsHarnessProcessAlive(sessionName),
+}));
+
 const mockIsRespawnPending = vi.fn();
 vi.mock('../pending-respawn.js', () => ({
   isRespawnPending: mockIsRespawnPending,
@@ -63,6 +88,8 @@ describe('ConversationLifecycleService — pollConversations', () => {
     mockIsRespawnPending.mockReturnValue(false);
     // Default: no dead-pane status available (corpse-diagnostics cases set it).
     mockListPaneValues.mockReturnValue(Effect.succeed([]));
+    mockGetRuntimeCensus.mockImplementation(buildRuntimeCensusMock);
+    mockRefreshRuntimeCensus.mockImplementation(buildRuntimeCensusMock);
   });
 
   it('marks active conversations as ended when session is not in tmux list', async () => {
@@ -78,11 +105,26 @@ describe('ConversationLifecycleService — pollConversations', () => {
 
     await pollConversations();
 
-    expect(mockListSessionNames).toHaveBeenCalledTimes(1);
+    expect(mockListSessionNames).toHaveBeenCalledTimes(2);
     expect(mockMarkConversationEnded).toHaveBeenCalledWith('gone-session');
     expect(mockCleanupUnreferencedConversationAttachments).toHaveBeenCalledWith(
       expect.objectContaining({ name: 'gone-session', sessionFile: null }),
     );
+  });
+
+  it('rechecks the bulk census before ending a session that resumed during the poll', async () => {
+    mockListConversations.mockReturnValue([
+      { name: 'raced', tmuxSession: 'conv-raced', status: 'active', cwd: '/tmp/work', claudeSessionId: null },
+    ]);
+    mockListSessionNames
+      .mockReturnValueOnce(Effect.succeed([]))
+      .mockReturnValueOnce(Effect.succeed(['conv-raced']));
+
+    const { pollConversations } = await import('../conversation-lifecycle.js');
+    await pollConversations();
+
+    expect(mockListSessionNames).toHaveBeenCalledTimes(2);
+    expect(mockMarkConversationEnded).not.toHaveBeenCalled();
   });
 
   it('does NOT mark conversations as ended when session is in tmux list', async () => {
@@ -179,7 +221,7 @@ describe('ConversationLifecycleService — pollConversations', () => {
 
     await pollConversations();
 
-    expect(mockListSessionNames).toHaveBeenCalledTimes(1);
+    expect(mockListSessionNames).toHaveBeenCalledTimes(2);
     expect(mockMarkConversationEnded).toHaveBeenCalledTimes(1);
     expect(mockMarkConversationEnded).toHaveBeenCalledWith('gone');
     expect(mockCleanupUnreferencedConversationAttachments).toHaveBeenCalledTimes(1);

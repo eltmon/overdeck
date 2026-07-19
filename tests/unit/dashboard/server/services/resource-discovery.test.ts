@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   getPipelineMembershipForProjects: vi.fn(),
   membershipSnapshotResults: [] as Array<{ project: { name: string; path: string }; memberships: unknown[] }>,
   getAgentRuntimeState: vi.fn(),
+  getRuntimeCensus: vi.fn(),
   getGitHubConfig: vi.fn(),
   issueService: {
     getIssues: vi.fn(),
@@ -73,6 +74,10 @@ vi.mock('../../../../../src/lib/tmux.js', () => ({
   listSessionNames: mocks.listSessionNames,
 }));
 
+vi.mock('../../../../../src/lib/runtime-census.js', () => ({
+  getRuntimeCensus: mocks.getRuntimeCensus,
+}));
+
 vi.mock('../../../../../src/dashboard/server/review-status.js', () => ({
   loadReadyForMergeFlags: mocks.loadReadyForMergeFlags,
 }));
@@ -134,6 +139,9 @@ beforeEach(() => {
     { key: 'overdeck', config: { name: 'overdeck', path: '/tmp/overdeck', issue_prefix: 'PAN', github_repo: 'eltmon/overdeck' } },
   ]);
   mocks.listSessionNames.mockReturnValue(Effect.succeed([]));
+  mocks.getRuntimeCensus.mockImplementation(async () => ({
+    sessionNames: new Set(await Effect.runPromise(mocks.listSessionNames())),
+  }));
   mocks.listConversations.mockReturnValue([]);
   mocks.openPullRequests = [];
   mocks.readdir.mockResolvedValue([]);
