@@ -394,7 +394,11 @@ describe('spawnAgent PTY supervisor wiring', () => {
       });
 
       expect(openaiState.harness).toBe('codex');
+      expect(openaiState.lastActivity).toBeUndefined();
+      expect(openaiState.costSoFar).toBeUndefined();
       expect(kimiState.harness).toBe('ohmypi');
+      expect(kimiState.lastActivity).toEqual(expect.any(String));
+      expect(kimiState.costSoFar).toBe(0);
       expect(resolveHarnessMock).toHaveBeenCalledWith({ explicit: undefined, role: 'work', model: 'gpt-5.5' });
       expect(resolveHarnessMock).toHaveBeenCalledWith({ explicit: undefined, role: 'work', model: 'kimi-k2.6' });
       expect(prepareHarnessLaunchMock).toHaveBeenCalledWith('codex');
