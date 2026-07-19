@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   buildAgentStatsSnapshot,
   getAgentStatsSnapshotEffect,
+  parseProcessTable,
   type AgentCostEvent,
   type AgentProcessRecord,
   type MinimalAgentState,
@@ -51,6 +52,16 @@ describe('agent resource stats payload', () => {
       hypotheticalUsdPerHour: 1.5,
       totalUsd: 0,
     });
+  });
+
+  it('keeps the legacy four-column process parser available through the resources barrel', () => {
+    expect(parseProcessTable([
+      ' 100 1 2.5 1024',
+      ' 101 100 7.0 2048',
+    ].join('\n'))).toEqual([
+      { pid: 100, ppid: 1, cpuPercent: 2.5, rssBytes: 1024 * 1024 },
+      { pid: 101, ppid: 100, cpuPercent: 7, rssBytes: 2048 * 1024 },
+    ]);
   });
 
   it('sums a four-process pid tree from one batched process parse', async () => {
