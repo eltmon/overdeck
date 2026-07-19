@@ -820,9 +820,8 @@ async function fetchPlanningData(
   }
 
   if (!result.prd) {
-    // findPrdAnywhereSync covers the legacy docs/prds status roots AND the
-    // canonical drafts/<issue>.md on overdeck-state (pan-draft format) — the
-    // previous status-only loop never looked at the canonical draft location,
+    // findPrdAnywhereSync covers legacy docs/prds roots and canonical
+    // drafts/<issue>.md on overdeck-state, which the status-only loop missed,
     // so promoted PRDs were invisible here.
     const content = await readPrdContent(findPrdAnywhereSync(projectPath, issueId));
     if (content) {
