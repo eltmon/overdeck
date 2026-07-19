@@ -80,20 +80,21 @@
     "recordedAt": "2026-07-19T22:32:41.050Z"
   },
   "created": "2026-07-19T20:18:40.159Z",
-  "updated": "2026-07-19T22:32:52.462Z",
+  "updated": "2026-07-19T22:39:01.013Z",
   "pipeline": {
     "issueId": "PAN-2066",
     "reviewStatus": "failed",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "inspectStatus": "failed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-19T22:32:51.495Z",
+    "updatedAt": "2026-07-19T22:39:00.977Z",
     "reviewNotes": "Review role spawn failed: Role run agent-pan-2066-review already running. Use 'pan tell' to message it.",
     "inspectNotes": "AC3 not fully guaranteed: knowledge-viewer.ts:161-169 stopEntry awaits stop(entry.bundlePath) with no timeout before reaching the kill('SIGTERM') fallback at line 168; the default stop impl stopOpenKnowledgeWithSpawn (lines 226-235) spawns a separate 'ok stop' process and awaits its exit event with no timeout — if that helper hangs instead of rejecting, the tracked ok server process is never killed, risking an orphan on shutdown. Fix: wrap the stop() call in a bounded race/timeout so entry.process.kill('SIGTERM') always fires within bounded time. AC1, AC2, AC4 verified as met.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2942",
+    "lastVerifiedCommit": "7b3e78346b74b478290c09b57f944aa62e00a0a7",
     "reviewRequestedAt": "2026-07-19T22:32:43.888Z",
     "reviewSpawnedAt": "2026-07-19T22:32:49.087Z",
     "scopeDrift": {
@@ -177,6 +178,14 @@
             "cacheWrite": 184458
           }
         },
+        "review": {
+          "openai/gpt-5.6-sol": {
+            "input": 424318,
+            "output": 17827,
+            "cacheRead": 4161024,
+            "cacheWrite": 0
+          }
+        },
         "review.supervisor": {
           "anthropic/claude-sonnet-5": {
             "input": 8,
@@ -187,9 +196,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 4522453,
-            "output": 404495,
-            "cacheRead": 171012096,
+            "input": 4582985,
+            "output": 409628,
+            "cacheRead": 176088064,
             "cacheWrite": 0
           }
         }
@@ -201,22 +210,22 @@
           "cacheRead": 2677646,
           "cacheWrite": 184458
         },
+        "openai/gpt-5.6-sol": {
+          "input": 5007303,
+          "output": 427455,
+          "cacheRead": 180249088,
+          "cacheWrite": 0
+        },
         "anthropic/claude-sonnet-5": {
           "input": 8,
           "output": 15730,
           "cacheRead": 395600,
           "cacheWrite": 146195
-        },
-        "openai/gpt-5.6-sol": {
-          "input": 4522453,
-          "output": 404495,
-          "cacheRead": 171012096,
-          "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 127.610353,
-        "pricingAsOf": "2026-07-19T22:32:51.678Z"
+        "usd": 135.341899,
+        "pricingAsOf": "2026-07-19T22:39:00.989Z"
       }
     },
     "merges": [
