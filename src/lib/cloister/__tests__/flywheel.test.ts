@@ -1,3 +1,6 @@
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
@@ -5,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   paused: false,
   autoPickupBacklog: false,
   requireUatBeforeMerge: true,
+  launchMetadata: null as null | { briefOverlayPath?: string },
   spawnRun: vi.fn(async (issueId: string, role: string, options: { agentId: string; workspace: string; harness?: 'claude-code' | 'pi'; flywheelRunId?: string }) => ({
     id: options.agentId,
     issueId,
@@ -49,7 +53,7 @@ vi.mock('../../overdeck/control-settings.js', () => ({
 // short-circuit it to mirror the prior gate-only semantics; the resolver's
 // self-heal logic is covered by flywheel-run-state's own tests.
 vi.mock('../../../dashboard/server/services/flywheel-run-state.js', () => ({
-  readFlywheelLaunchMetadata: async () => null,
+  readFlywheelLaunchMetadata: async () => mocks.launchMetadata,
   resolveLiveFlywheelRunId: async () => mocks.activeRunId,
   saveRunCohort: vi.fn(),
 }));
@@ -64,6 +68,7 @@ describe('flywheel lifecycle', () => {
     mocks.paused = false;
     mocks.autoPickupBacklog = false;
     mocks.requireUatBeforeMerge = true;
+    mocks.launchMetadata = null;
     mocks.spawnRun.mockClear();
     mocks.stopAgentProgram.mockClear();
   });
@@ -199,6 +204,26 @@ describe('flywheel lifecycle', () => {
     expect(resumePrompt).toContain('Run configuration:');
     expect(resumePrompt).toContain('Auto-pickup backlog: false');
     expect(resumePrompt).toContain('Require UAT before merge: true');
+  });
+
+  it('re-attaches the persisted order-book overlay when resuming', async () => {
+    const workspace = mkdtempSync(join(tmpdir(), 'flywheel-overlay-resume-'));
+    mkdirSync(join(workspace, 'docs'), { recursive: true });
+    writeFileSync(join(workspace, 'docs', 'flywheel-brief.md'), 'Standing instructions.');
+    writeFileSync(join(workspace, 'docs', 'campaign-overlay.md'), 'Resume this campaign in strict order.');
+    try {
+      await spawnFlywheel({ runId: 'RUN-9', workspace, env: cleanEnv });
+      await pauseFlywheel();
+      mocks.launchMetadata = { briefOverlayPath: 'docs/campaign-overlay.md' };
+
+      await resumeFlywheel({ workspace, env: cleanEnv });
+
+      const resumePrompt = mocks.spawnRun.mock.calls[1][2].prompt;
+      expect(resumePrompt).toContain('Order-book brief overlay: docs/campaign-overlay.md');
+      expect(resumePrompt).toContain('Resume this campaign in strict order.');
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
   });
 
   it('keeps the pause gate set when resume spawn fails', async () => {

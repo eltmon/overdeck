@@ -49,7 +49,8 @@ describe('orders writer', () => {
       reVerify: false,
       planAtPickup: true,
     }, at);
-    await setStatus(root, '2026-07-17-first', 'ready', { at });
+    await setStatus(root, '2026-07-17-first', 'running', { at, runId: 'RUN-1' });
+    await setStatus(root, '2026-07-17-first', 'ready', { at, runId: null });
 
     expect(getBook(root, '2026-07-17-first')).toMatchObject({
       id: '2026-07-17-first',
@@ -59,6 +60,7 @@ describe('orders writer', () => {
         { issue: 'PAN-2', lane: 'B', order: 1, prereqs: ['PAN-3'], reVerify: false, planAtPickup: true, addedAt: at, addedBy: 'operator' },
       ],
     });
+    expect(getBook(root, '2026-07-17-first')?.runId).toBeUndefined();
     const index = JSON.parse(readFileSync(join(root, 'orders', 'index.json'), 'utf8')) as Array<{ id: string }>;
     expect(index.map((entry) => entry.id)).toEqual(['2026-07-17-first', '2026-07-17-second']);
     expect(Number(git(['rev-list', '--count', 'HEAD'], root))).toBeGreaterThan(1);

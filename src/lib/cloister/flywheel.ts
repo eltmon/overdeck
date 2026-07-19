@@ -10,6 +10,7 @@ import { getInternalTokenSync, INTERNAL_TOKEN_HEADER } from '../internal-token.j
 import { getAgentDir, spawnRun, stopAgent } from '../agents.js';
 import { parseSequenceMd } from '../backlog/sequence-io.js';
 import { computePredictedConflictSignals, declaredIssueFootprint, pickFromSequence, type IssueFileFootprint } from '../flywheel-merge-order.js';
+import { requireFlywheelBrief } from '../flywheel-start.js';
 import { findProjectByPathSync, getProjectSwarmHotspots } from '../projects.js';
 import { getBook as getOrderBook } from '../orders/resolver.js';
 import { resolveStateReadHomeSync } from '../state-read-home.js';
@@ -21,7 +22,7 @@ import {
   setFlywheelActiveRunId,
   setFlywheelGloballyPaused,
 } from '../overdeck/control-settings.js';
-import { readFlywheelLaunchMetadata, resolveLiveFlywheelRunId, saveRunCohort } from '../../dashboard/server/services/flywheel-run-state.js';
+import { abortFlywheelRun, readFlywheelLaunchMetadata, resolveLiveFlywheelRunId, saveRunCohort } from '../../dashboard/server/services/flywheel-run-state.js';
 import { buildClassifyLookups } from '../backlog/lookups.js';
 import { computeCohort } from '../backlog/pickup.js';
 import { gatherProjectLensSignals } from '../pipeline-membership-gather.js';
@@ -332,10 +333,17 @@ export async function spawnFlywheelAgent(runId: string, options: FlywheelLifecyc
   // Re-read the brief on every spawn (fresh AND resume) so its directives survive
   // resume/compaction. Default to the standard brief path when none is supplied.
   const briefPath = options.briefPath ?? join(workspace, 'docs', 'flywheel-brief.md');
+  let briefOverlayPath = options.briefOverlayPath;
+  let briefOverlayContent = options.briefOverlayContent;
+  if (briefOverlayPath && briefOverlayContent === undefined) {
+    const resolvedOverlay = await requireFlywheelBrief(workspace, briefOverlayPath);
+    briefOverlayPath = resolvedOverlay.displayPath;
+    briefOverlayContent = await readFile(resolvedOverlay.absolutePath, 'utf8');
+  }
   const briefContent = withOrderBookBriefOverlay(
     await readFile(briefPath, 'utf8').catch(() => undefined),
-    options.briefOverlayPath,
-    options.briefOverlayContent,
+    briefOverlayPath,
+    briefOverlayContent,
   );
   const prompt = options.resumeSessionId
     ? buildFlywheelResumePrompt(await flywheelRunConfigurationSection(options, runId), briefContent)
@@ -404,6 +412,14 @@ export async function spawnFlywheel(options: FlywheelLifecycleOptions = {}): Pro
   return agent;
 }
 
+export async function abortSpawnedFlywheel(runId: string): Promise<void> {
+  try {
+    await Effect.runPromise(stopAgent(FLYWHEEL_ORCHESTRATOR_AGENT_ID));
+  } finally {
+    await abortFlywheelRun(runId);
+  }
+}
+
 export async function pauseFlywheel(): Promise<FlywheelPauseResult> {
   const activeRunId = getFlywheelActiveRunId();
   if (activeRunId) {
@@ -429,7 +445,12 @@ export async function resumeFlywheel(options: FlywheelLifecycleOptions = {}): Pr
   const runId = parseRunId(activeRunId);
 
   const resumeSessionId = options.resumeSessionId ?? await loadResumeSessionId(runId) ?? undefined;
-  const agent = await spawnFlywheelAgent(runId, withFlywheelAutonomyOptions({ ...options, resumeSessionId }));
+  const launch = await readFlywheelLaunchMetadata(runId);
+  const agent = await spawnFlywheelAgent(runId, withFlywheelAutonomyOptions({
+    ...options,
+    briefOverlayPath: options.briefOverlayPath ?? launch?.briefOverlayPath,
+    resumeSessionId,
+  }));
   setFlywheelGloballyPaused(false);
   return { activeRunId, agent };
 }

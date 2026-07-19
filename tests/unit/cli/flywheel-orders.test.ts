@@ -73,6 +73,7 @@ function startDeps(stateRoot: string, overrides: Partial<StartFlywheelRunDeps> =
       startedAt: at,
     })),
     writeStatus: vi.fn(async () => 'latest.json'),
+    cleanupSpawnedRun: vi.fn(async () => {}),
     orderStateRoot: () => stateRoot,
     validateOrderBook: () => ({ blocks: [], warns: [] }),
     ...overrides,
@@ -106,7 +107,7 @@ describe('pan flywheel start --orders', () => {
 
   it('resolves and appends the configured brief overlay for the spawned orchestrator', async () => {
     const stateRoot = gitFixture();
-    overdeckHome();
+    const home = overdeckHome();
     const bookId = '2026-07-18-overlay';
     await readyBook(stateRoot, bookId);
     await setSettings(stateRoot, bookId, { briefOverlay: 'docs/campaign-overlay.md' }, at);
@@ -126,6 +127,8 @@ describe('pan flywheel start --orders', () => {
       briefOverlayPath: 'docs/campaign-overlay.md',
       briefOverlayContent: 'Campaign-specific instruction.',
     }));
+    expect(JSON.parse(readFileSync(join(home, 'flywheel', 'runs', 'RUN-1', 'launch.json'), 'utf8')))
+      .toMatchObject({ briefOverlayPath: 'docs/campaign-overlay.md' });
   });
 
   it('reports every validation block and leaves the ready book unchanged', async () => {
@@ -187,6 +190,8 @@ describe('pan flywheel start --orders', () => {
     await expect(startFlywheelRun({ cwd: process.cwd(), orders: bookId }, deps)).rejects.toThrow(
       'latest status write failed',
     );
+    expect(deps.cleanupSpawnedRun).toHaveBeenCalledWith('RUN-1');
     expect(getBook(stateRoot, bookId)).toMatchObject({ status: 'ready' });
+    expect(getBook(stateRoot, bookId)?.runId).toBeUndefined();
   });
 });

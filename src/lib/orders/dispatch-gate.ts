@@ -74,7 +74,7 @@ export async function checkActiveOrderDispatch(
   const bookId = launch?.orders?.bookId;
   if (!bookId) return { ordersBound: false, runId, decision: booklessDecision };
 
-  const stateRoot = (deps.stateRoot ?? stateRootFor)(projectRoot);
+  const stateRoot = (deps.stateRoot ?? stateRootFor)(launch?.workspace ?? projectRoot);
   const book = (deps.getOrderBook ?? getBook)(stateRoot, bookId);
   if (!book) throw new Error(`Active Flywheel run ${runId} references missing order book ${bookId}`);
   const progress = (deps.computeProgress ?? computeBookProgress)(book);

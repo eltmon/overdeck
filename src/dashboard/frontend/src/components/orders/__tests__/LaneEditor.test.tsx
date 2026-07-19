@@ -83,6 +83,21 @@ describe('LaneEditor', () => {
     ));
   });
 
+  it('keeps the holds editor open and consumes failed item mutations', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ error: 'write failed' }), {
+      status: 500,
+      headers: { 'content-type': 'application/json' },
+    })));
+    render(<LaneEditor book={book} onBookChange={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit holds for PAN-2' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save holds' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('write failed');
+    expect(screen.getByLabelText('Prerequisites for PAN-2')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Save holds' })).toBeEnabled();
+  });
+
   it('leads with lane position, renders item chips, and uses one row status tone', () => {
     render(<LaneEditor book={book} inFlightIssues={new Set(['PAN-2'])} onBookChange={vi.fn()} />);
 

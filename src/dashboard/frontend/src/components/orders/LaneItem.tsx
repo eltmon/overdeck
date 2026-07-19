@@ -54,6 +54,8 @@ export function LaneItem({
         planAtPickup,
       });
       setEditing(false);
+    } catch {
+      // LaneEditor owns the visible mutation error; keep this editor open for correction.
     } finally {
       setSaving(false);
     }

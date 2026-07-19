@@ -26,6 +26,7 @@ export interface OrderBookView extends OrderBook {
   progress: OrderBookProgressView;
   validation?: { blocks: OrderBookFindingView[]; warns: OrderBookFindingView[] };
   itemReadiness?: Record<string, { hasPrd: boolean }>;
+  prerequisiteTerminal?: Record<string, boolean>;
 }
 
 interface BookStripProps {

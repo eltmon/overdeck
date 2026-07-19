@@ -180,8 +180,13 @@ describe('/api/orders routes', () => {
           warns: [{ code: 'missing-prd', issue: 'PAN-2' }],
         },
         itemReadiness: { 'PAN-1': { hasPrd: false }, 'PAN-2': { hasPrd: false } },
+        prerequisiteTerminal: { 'PAN-1': true, 'PAN-3': false },
       },
     });
+
+    await expect(requestOrdersRoute(layer, `/api/orders/${bookId}`, mutation('PATCH', {
+      settings: { posture: 'drain', postureSetAt: 'spoofed', postureSetBy: 'spoofed' },
+    }))).resolves.toMatchObject({ status: 400, body: { error: expect.stringContaining('server-controlled') } });
 
     await expect(requestOrdersRoute(layer, `/api/orders/${bookId}`, mutation('PATCH', {
       name: 'Renamed campaign',
@@ -189,8 +194,22 @@ describe('/api/orders routes', () => {
       status: 'ready',
     }))).resolves.toMatchObject({
       status: 200,
-      body: { name: 'Renamed campaign', status: 'ready', settings: { laneAConcurrency: 3, posture: 'drain' } },
+      body: {
+        name: 'Renamed campaign',
+        status: 'ready',
+        settings: {
+          laneAConcurrency: 3,
+          posture: 'drain',
+          postureSetAt: at,
+          postureSetBy: 'authenticated-operator',
+        },
+      },
     });
+
+    await expect(requestOrdersRoute(layer, `/api/orders/${bookId}`, mutation('PATCH', {
+      status: 'running',
+      runId: 'RUN-SPOOFED',
+    }))).resolves.toMatchObject({ status: 400, body: { error: expect.stringContaining('may only transition') } });
 
     await expect(requestOrdersRoute(layer, '/api/orders')).resolves.toMatchObject({
       status: 200,

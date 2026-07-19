@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import type { OrderBook } from '@overdeck/contracts';
 
+import { abortSpawnedFlywheel } from '../../lib/cloister/flywheel.js';
 import { requireFlywheelBrief } from '../../lib/flywheel-start.js';
 import { getBook } from '../../lib/orders/resolver.js';
 import { validateBookForStart } from '../../lib/orders/validate.js';
@@ -15,6 +16,7 @@ export interface FlywheelOrderStartDeps {
   setOrderStatus?: typeof setOrderBookStatus;
   requireBrief?: typeof requireFlywheelBrief;
   readBrief?: (path: string) => Promise<string>;
+  cleanupSpawnedRun?: (runId: string) => Promise<void>;
 }
 
 export interface FlywheelOrderStartContext {
@@ -65,16 +67,41 @@ export async function resolveFlywheelOrderBriefOverlay(
   };
 }
 
+export async function compensateFailedFlywheelStart(
+  context: FlywheelOrderStartContext | null,
+  runId: string,
+  cause: unknown,
+  deps: FlywheelOrderStartDeps = {},
+): Promise<never> {
+  const failures = [cause];
+  try {
+    await (deps.cleanupSpawnedRun ?? abortSpawnedFlywheel)(runId);
+  } catch (error) {
+    failures.push(error);
+  }
+  if (context) {
+    try {
+      await setFlywheelOrderStatus(context, 'ready', null, deps);
+    } catch (error) {
+      failures.push(error);
+    }
+  }
+  if (failures.length > 1) {
+    throw new AggregateError(failures, `Flywheel run ${runId} failed to start and compensation was incomplete`);
+  }
+  throw cause;
+}
+
 export async function setFlywheelOrderStatus(
   context: FlywheelOrderStartContext,
   status: 'ready' | 'running',
-  runId: string | undefined,
+  runId: string | null | undefined,
   deps: FlywheelOrderStartDeps = {},
 ): Promise<void> {
   await (deps.setOrderStatus ?? setOrderBookStatus)(
     context.stateRoot,
     context.book.id,
     status,
-    runId ? { runId } : {},
+    runId === undefined ? {} : { runId },
   );
 }

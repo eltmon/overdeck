@@ -58,6 +58,7 @@ export interface FlywheelLaunchMetadata {
   workspace: string;
   briefPath: string;
   briefDisplayPath: string;
+  briefOverlayPath?: string;
   orders?: { bookId: string };
 }
 
@@ -255,6 +256,9 @@ function decodeLaunchMetadata(payload: unknown): FlywheelLaunchMetadata {
   if (record.version !== 1) throw new Error('Invalid Flywheel launch metadata version');
   for (const key of ['runId', 'workspace', 'briefPath', 'briefDisplayPath']) {
     if (typeof record[key] !== 'string' || !record[key]) throw new Error(`Invalid Flywheel launch metadata: ${key}`);
+  }
+  if (record.briefOverlayPath !== undefined && (typeof record.briefOverlayPath !== 'string' || !record.briefOverlayPath)) {
+    throw new Error('Invalid Flywheel launch metadata: briefOverlayPath');
   }
   if (record.orders !== undefined) {
     const orders = record.orders as Record<string, unknown>;

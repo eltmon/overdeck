@@ -78,6 +78,29 @@ describe('ProgressPanel', () => {
     expect(within(conditions).getByText(/PRD re-verified/)).toHaveTextContent('✕');
   });
 
+  it('matches server eligibility for external prerequisites and terminal pipeline entries', () => {
+    const eligibleBook: OrderBookView = {
+      ...book,
+      settings: { ...book.settings, posture: 'open' },
+      items: book.items.map((item) => item.issue === 'PAN-Q' ? { ...item, reVerify: false } : item),
+      prerequisiteTerminal: { 'PAN-P': true },
+    };
+    const status = flywheelStatus();
+    status.activePipeline = status.activePipeline.map((item) =>
+      item.issueId === 'PAN-W' ? { ...item, status: 'merged' as const } : item,
+    );
+    const { laneBInFlight: _terminalLaneB, ...orders } = status.orders!;
+    status.orders = orders;
+
+    render(<ProgressPanel book={eligibleBook} initialStatus={status} onOpenReport={vi.fn()} />);
+
+    const conditions = screen.getByLabelText('PAN-Q eligibility');
+    expect(within(conditions).getByText(/Pickup posture/)).toHaveTextContent('✓');
+    expect(within(conditions).getByText(/Serial B-slot free/)).toHaveTextContent('✓');
+    expect(within(conditions).getByText(/Prereqs landed/)).toHaveTextContent('✓');
+    expect(within(conditions).getByText(/PRD re-verified/)).toHaveTextContent('✓');
+  });
+
   it('uses status colors and links the report when drained', () => {
     const onOpenReport = vi.fn();
     render(<ProgressPanel book={book} initialStatus={flywheelStatus(true)} onOpenReport={onOpenReport} />);

@@ -3,13 +3,12 @@ import type {
   OrderBookItem,
   OrderBookLane,
   OrderBookSettings,
-  OrderBookStatus,
 } from '@overdeck/contracts';
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
 import { backlogCandidates, computeBookProgress, getBook, listBooks, liveOrderIssueLookup } from '../../../lib/orders/resolver.js';
-import type { OrderIssueLookup } from '../../../lib/orders/types.js';
+import type { OrderIssueLookup, OrderIssueState } from '../../../lib/orders/types.js';
 import { createOrderPrdLookup, hasOrderIssuePrd, validateBookForStart } from '../../../lib/orders/validate.js';
 import {
   addItems,
@@ -49,6 +48,7 @@ export interface OrdersRouteDeps {
 interface OrdersReadSnapshot {
   stateRoot: string;
   books: OrderBook[];
+  issueState: ReadonlyMap<string, OrderIssueState>;
   issueLookup: OrderIssueLookup;
   hasPrd: (issueId: string) => boolean;
 }
@@ -57,14 +57,6 @@ interface JsonBodyResult {
   ok: boolean;
   body: Record<string, unknown>;
 }
-
-const ORDER_BOOK_STATUSES = new Set<OrderBookStatus>([
-  'draft',
-  'ready',
-  'running',
-  'drained',
-  'complete',
-]);
 
 function stateRootFor(deps: OrdersRouteDeps): string {
   if (deps.stateRoot) return deps.stateRoot();
@@ -79,7 +71,7 @@ function errorResult(error: unknown): RouteResult {
   if (/already (exists|belongs|running|active)|multiple non-complete/i.test(message)) {
     return { status: 409, body: { error: message } };
   }
-  if (/invalid|required|must be|cannot be empty|positive integer/i.test(message)) {
+  if (/invalid|required|must be|cannot be empty|positive integer|server-controlled|may only transition/i.test(message)) {
     return { status: 400, body: { error: message } };
   }
   return { status: 500, body: { error: message } };
@@ -149,6 +141,9 @@ function record(value: unknown, field: string): Record<string, unknown> {
 
 function settingsPatch(value: unknown): Partial<OrderBookSettings> {
   const raw = record(value, 'settings');
+  if ('postureSetAt' in raw || 'postureSetBy' in raw) {
+    throw new Error('postureSetAt and postureSetBy are server-controlled');
+  }
   const result: Partial<OrderBookSettings> = {};
   if ('laneAConcurrency' in raw) {
     result.laneAConcurrency = positiveInteger(raw['laneAConcurrency'], 'laneAConcurrency');
@@ -160,8 +155,6 @@ function settingsPatch(value: unknown): Partial<OrderBookSettings> {
     }
     result.posture = raw['posture'];
   }
-  if ('postureSetAt' in raw) result.postureSetAt = optionalString(raw['postureSetAt'], 'postureSetAt');
-  if ('postureSetBy' in raw) result.postureSetBy = optionalString(raw['postureSetBy'], 'postureSetBy');
   if ('postureReason' in raw) result.postureReason = optionalString(raw['postureReason'], 'postureReason');
   return result;
 }
@@ -194,6 +187,7 @@ function buildOrdersReadSnapshot(deps: OrdersRouteDeps): OrdersReadSnapshot {
   return {
     stateRoot,
     books,
+    issueState,
     issueLookup,
     hasPrd: deps.hasPrd ?? createOrderPrdLookup(stateRoot),
   };
@@ -203,6 +197,8 @@ function enrichedBook(book: OrderBook, deps: OrdersRouteDeps, snapshot?: OrdersR
   const stateRoot = snapshot?.stateRoot ?? stateRootFor(deps);
   const hasPrd = snapshot?.hasPrd ?? deps.hasPrd ?? ((issueId: string) => hasOrderIssuePrd(stateRoot, issueId));
   const issueLookup = snapshot?.issueLookup ?? deps.issueLookup;
+  const prerequisiteIds = [...new Set(book.items.flatMap((item) => item.prereqs.map((prereq) => prereq.toUpperCase())))];
+  const prerequisiteState = snapshot?.issueState ?? issueLookup?.(prerequisiteIds) ?? new Map();
   return {
     ...book,
     progress: computeBookProgress(book, issueLookup),
@@ -212,6 +208,10 @@ function enrichedBook(book: OrderBook, deps: OrdersRouteDeps, snapshot?: OrdersR
       books: snapshot?.books,
     }),
     itemReadiness: Object.fromEntries(book.items.map((item) => [item.issue, { hasPrd: hasPrd(item.issue) }])),
+    prerequisiteTerminal: Object.fromEntries(prerequisiteIds.map((issue) => {
+      const state = prerequisiteState.get(issue);
+      return [issue, state ? !state.open || state.parked : false];
+    })),
   };
 }
 
@@ -305,22 +305,29 @@ export async function patchOrderPayload(
 ): Promise<RouteResult> {
   return routeResult(async () => {
     const stateRoot = stateRootFor(deps);
+    const patch = body['settings'] === undefined ? undefined : settingsPatch(body['settings']);
+    if (patch?.posture !== undefined) {
+      patch.postureSetAt = (deps.now ?? (() => new Date()))().toISOString();
+      patch.postureSetBy = (deps.actor ?? (() => 'dashboard'))();
+    }
+    if (body['status'] !== undefined) {
+      if (body['status'] !== 'ready') throw new Error('status may only transition to ready through this route');
+      if (body['runId'] !== undefined) throw new Error('runId is server-controlled');
+      const book = requireBook(stateRoot, bookId);
+      if (book.status !== 'draft') throw new Error(`Order book ${bookId} must be draft before it can be queued`);
+    }
+
     let changed = false;
     if (body['name'] !== undefined) {
       await renameBook(stateRoot, bookId, requireString(body['name'], 'name'));
       changed = true;
     }
-    if (body['settings'] !== undefined) {
-      await setSettings(stateRoot, bookId, settingsPatch(body['settings']));
+    if (patch !== undefined) {
+      await setSettings(stateRoot, bookId, patch);
       changed = true;
     }
     if (body['status'] !== undefined) {
-      if (typeof body['status'] !== 'string' || !ORDER_BOOK_STATUSES.has(body['status'] as OrderBookStatus)) {
-        throw new Error('status must be draft, ready, running, drained, or complete');
-      }
-      await setStatus(stateRoot, bookId, body['status'] as OrderBookStatus, {
-        runId: optionalString(body['runId'], 'runId'),
-      });
+      await setStatus(stateRoot, bookId, 'ready');
       changed = true;
     }
     if (!changed) throw new Error('name, settings, or status is required');

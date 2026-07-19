@@ -36,7 +36,7 @@ import { ensureInternalTokenSync, INTERNAL_TOKEN_HEADER } from '../../lib/intern
 import { computeMergeQueue, type MergeQueueItem } from '../../lib/flywheel-merge-order.js';
 import { DEFAULT_BRIEF_PATH, requireFlywheelBrief, resolvePrimaryWorktreeRoot } from '../../lib/flywheel-start.js';
 import { formatMergeBackendStatus, loadMergeBackendStatusForCli } from './flywheel-merge-backend.js';
-import { resolveFlywheelOrderBriefOverlay, resolveFlywheelOrderStart, setFlywheelOrderStatus, type FlywheelOrderStartDeps } from './flywheel-orders.js';
+import { compensateFailedFlywheelStart, resolveFlywheelOrderBriefOverlay, resolveFlywheelOrderStart, setFlywheelOrderStatus, type FlywheelOrderStartDeps } from './flywheel-orders.js';
 import { createFlywheelCompleteCommand } from './flywheel-complete.js';
 import { registerFlywheelSurfaceCommands } from './flywheel-surfaces.js';
 
@@ -342,30 +342,27 @@ export async function startFlywheelRun(
     workspace: cwd,
     briefPath: brief.absolutePath,
     briefDisplayPath: brief.displayPath,
+    ...(overlay.briefOverlayPath ? { briefOverlayPath: overlay.briefOverlayPath } : {}),
     ...(book ? { orders: { bookId: book.id } } : {}),
   };
   await (deps.writeLaunchMetadata ?? writeFlywheelLaunchMetadata)(launchMetadata);
   const roleConfig = await (deps.resolveRoleConfig ?? resolveFlywheelRoleConfig)();
-  let statusAttempted = false;
+  const agent = await (deps.spawn ?? spawnFlywheel)({
+    runId,
+    briefPath: brief.absolutePath,
+    ...overlay,
+    workspace: cwd,
+    model: roleConfig.model,
+    harness: roleConfig.harness,
+    effort: roleConfig.effort,
+    minAgents: roleConfig.minAgents,
+    maxAgents: roleConfig.maxAgents,
+    scope: roleConfig.scope,
+    autoPickupBacklog: roleConfig.autoPickupBacklog,
+    requireUatBeforeMerge: roleConfig.requireUatBeforeMerge,
+  });
   try {
-    const agent = await (deps.spawn ?? spawnFlywheel)({
-      runId,
-      briefPath: brief.absolutePath,
-      ...overlay,
-      workspace: cwd,
-      model: roleConfig.model,
-      harness: roleConfig.harness,
-      effort: roleConfig.effort,
-      minAgents: roleConfig.minAgents,
-      maxAgents: roleConfig.maxAgents,
-      scope: roleConfig.scope,
-      autoPickupBacklog: roleConfig.autoPickupBacklog,
-      requireUatBeforeMerge: roleConfig.requireUatBeforeMerge,
-    });
-    if (orderContext) {
-      statusAttempted = true;
-      await setFlywheelOrderStatus(orderContext, 'running', runId, deps);
-    }
+    if (orderContext) await setFlywheelOrderStatus(orderContext, 'running', runId, deps);
     await (deps.writeStatus ?? writeLatestFlywheelStatus)(await createInitialFlywheelStatus(
       runId,
       startedAt,
@@ -376,10 +373,7 @@ export async function startFlywheelRun(
     ));
     return { runId, briefDisplayPath: brief.displayPath, agentModel: agent.model };
   } catch (error) {
-    if (orderContext && statusAttempted) {
-      await setFlywheelOrderStatus(orderContext, 'ready', undefined, deps).catch(() => {});
-    }
-    throw error;
+    return compensateFailedFlywheelStart(orderContext, runId, error, deps);
   }
 }
 

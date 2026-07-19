@@ -82,8 +82,6 @@ export function RunSettingsPanel({ settings, onChange }: RunSettingsPanelProps) 
                 disabled={saving || settings.posture === posture}
                 onClick={() => void save({
                   posture,
-                  postureSetAt: new Date().toISOString(),
-                  postureSetBy: 'operator',
                   postureReason: postureReason.trim() || (posture === 'drain' ? 'Operator paused new pickup.' : 'Operator reopened pickup.'),
                 })}
                 className={`rounded-md border px-2 py-1 text-[10px] uppercase tracking-wide ${posture === 'drain' && settings.posture === posture ? 'border-warning/[0.32] bg-warning/[0.08] text-warning-foreground' : 'border-border text-muted-foreground'}`}

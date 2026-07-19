@@ -192,14 +192,14 @@ export async function setStatus(
   stateRoot: string,
   bookId: string,
   status: OrderBookStatus,
-  options: { runId?: string; at?: string } = {},
+  options: { runId?: string | null; at?: string } = {},
 ): Promise<OrderBook> {
   const book = requireBook(stateRoot, bookId);
   if (status === 'running') {
     const running = listBooks(stateRoot).find((candidate) => candidate.status === 'running' && candidate.id !== bookId);
     if (running) throw new Error(`Order book ${running.id} is already running`);
   }
-  const runId = options.runId ?? book.runId;
+  const runId = options.runId === undefined ? book.runId : options.runId ?? undefined;
   return writeOrderBookState(stateRoot, updated(book, { status, runId }, options.at));
 }
 

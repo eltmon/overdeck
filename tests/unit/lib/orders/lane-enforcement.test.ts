@@ -193,7 +193,8 @@ describe('order-book dispatch eligibility', () => {
 
   it('loads the active book binding and applies the same pure predicate', async () => {
     const value = book();
-    const result = await checkActiveOrderDispatch('/project', 'PAN-2', {}, {
+    const stateRoot = vi.fn(() => '/state');
+    const result = await checkActiveOrderDispatch('/target-project', 'PAN-2', {}, {
       resolveRunId: async () => 'RUN-1',
       readLaunch: async () => ({
         version: 1,
@@ -203,11 +204,12 @@ describe('order-book dispatch eligibility', () => {
         briefDisplayPath: 'docs/flywheel-brief.md',
         orders: { bookId: value.id },
       } as never),
-      stateRoot: () => '/state',
+      stateRoot,
       getOrderBook: () => value,
       computeProgress: () => progress(),
       inFlightIssues: () => new Set(['PAN-1']),
     });
+    expect(stateRoot).toHaveBeenCalledWith('/project');
     expect(result).toMatchObject({
       ordersBound: true,
       runId: 'RUN-1',

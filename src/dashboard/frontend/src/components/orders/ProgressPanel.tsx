@@ -64,7 +64,14 @@ export function ProgressPanel({ book, initialStatus, onOpenReport }: ProgressPan
     () => new Map((matchingStatus?.activePipeline ?? []).map((item) => [item.issueId.toUpperCase(), item])),
     [matchingStatus],
   );
-  const inFlight = useMemo(() => new Set(pipeline.keys()), [pipeline]);
+  const inFlight = useMemo(() => new Set([
+    ...(matchingStatus?.orders?.laneAInFlight ?? []),
+    ...(matchingStatus?.orders?.laneBInFlight ? [matchingStatus.orders.laneBInFlight] : []),
+  ].map((issue) => issue.toUpperCase())), [matchingStatus]);
+  const prerequisiteTerminal = useMemo(
+    () => new Map(Object.entries(book.prerequisiteTerminal ?? {})),
+    [book.prerequisiteTerminal],
+  );
   const progressItems = book.items.map((item) => {
     const value = book.progress.items?.find((entry) => entry.issue.toUpperCase() === item.issue.toUpperCase());
     return {
@@ -95,6 +102,7 @@ export function ProgressPanel({ book, initialStatus, onOpenReport }: ProgressPan
               progress: { bookId: book.id, total: book.progress.total, landed: book.progress.landed, drained: book.progress.drained, items: progressItems },
               issueId: item.issue,
               inFlightIssues: inFlight,
+              prerequisiteTerminal,
             });
             const held = currentStatus === 'queued';
             return (
