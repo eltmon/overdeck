@@ -16,6 +16,10 @@ import type { QualityGateConfig, TemplatePlaceholders } from '../workspace-confi
 import { replacePlaceholdersSync } from '../workspace-config.js';
 import { loadConfigSync } from '../config.js';
 import { GitError } from '../errors.js';
+import {
+  acquireQualityGateAdmission,
+  type QualityGateAdmissionHandle,
+} from './quality-gate-admission.js';
 
 const execAsync = promisify(exec);
 const DASHBOARD_RUNTIME_ENV_KEYS = ['API_PORT', 'PORT', 'DASHBOARD_URL'] as const;
@@ -336,6 +340,8 @@ export interface QualityGateResult {
  * Options for running quality gates
  */
 export interface QualityGateRunOptions {
+  /** Issue identity included in admission logs and durable worker state. */
+  issueId?: string;
   /** Whether the workspace is remote (SSH) */
   isRemote?: boolean;
   /** VM name for SSH connections (required when isRemote is true) */
@@ -353,6 +359,13 @@ export interface QualityGateRunOptions {
   /** PAN-2665: raw stdout/stderr chunks from the RUNNING gate, streamed as
    *  they arrive so the Test/Lint panel can show a live output tail. */
   onGateOutput?: (name: string, chunk: string) => void;
+  /** Durable worker phase update; queued time does not consume execution timeout. */
+  onAdmissionPhase?: (state: {
+    phase: 'queued' | 'running';
+    gateName: string;
+    attempt: number;
+    admittedAt?: string;
+  }) => void;
 }
 
 // PAN-2669: gate child processes must never outlive their gate. exec's
@@ -438,7 +451,11 @@ export const DEFAULT_GATES: Record<string, QualityGateConfig> = {
     const startTime = Date.now();
 
     if (gate.type === 'http_health') {
-      // HTTP health check gate
+      // HTTP health checks do not consume a CPU admission slot, but they do
+      // start the supervised worker's execution timeout immediately.
+      opts.onAdmissionPhase?.({
+        phase: 'running', gateName: name, attempt: 1, admittedAt: new Date().toISOString(),
+      });
       const result = await runHttpHealthGate(name, gate, required);
       results.push(result);
       opts.onGateResult?.(result);
@@ -549,7 +566,32 @@ export const DEFAULT_GATES: Record<string, QualityGateConfig> = {
     let passOutput = '';
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       let gatePgid: number | undefined;
+      let admission: QualityGateAdmissionHandle | null = null;
       try {
+        if (!isRemote) {
+          const identity = `${opts.issueId ?? 'unscoped'} gate="${name}" attempt=${attempt}/${maxAttempts} workspace=${cwd}`;
+          console.log(`[quality-gate] Queued for CPU admission: ${identity}`);
+          opts.onLog?.(`Queued ${name} for CPU admission…`);
+          opts.onAdmissionPhase?.({ phase: 'queued', gateName: name, attempt });
+          admission = await acquireQualityGateAdmission({
+            issueId: opts.issueId,
+            workspacePath: cwd,
+            gateName: name,
+            attempt,
+          });
+          console.log(`[quality-gate] Admitted: ${identity}`);
+          opts.onAdmissionPhase?.({
+            phase: 'running',
+            gateName: name,
+            attempt,
+            admittedAt: admission.admittedAt,
+          });
+        } else {
+          opts.onAdmissionPhase?.({
+            phase: 'running', gateName: name, attempt, admittedAt: new Date().toISOString(),
+          });
+        }
+
         // When running in container, don't set host cwd (irrelevant)
         const useHostCwd = !isRemote && !(gate.container && gate.container_name);
         const env = buildQualityGateEnv(gate.env);
@@ -572,18 +614,21 @@ export const DEFAULT_GATES: Record<string, QualityGateConfig> = {
           execPromise.child.stderr?.on('data', (chunk) => opts.onGateOutput!(name, String(chunk)));
         }
         const { stdout, stderr } = await execPromise;
-        killGateProcessGroup(gatePgid);
         passedGate = true;
         passOutput = formatGateOutput(stdout, stderr);
-        break;
       } catch (error: any) {
-        killGateProcessGroup(gatePgid);
         lastError = error;
         if (attempt < maxAttempts) {
           console.log(`[quality-gate] ✗ "${name}" failed attempt ${attempt}/${maxAttempts} — retrying (gate declares retry: ${gate.retry})`);
           opts.onLog?.(`↻ ${name} failed attempt ${attempt}/${maxAttempts} — retrying`);
         }
+      } finally {
+        killGateProcessGroup(gatePgid);
+        try { await admission?.release(); } catch (error) {
+          console.warn(`[quality-gate] Failed to release CPU admission for ${opts.issueId ?? 'unscoped'} gate="${name}": ${error instanceof Error ? error.message : String(error)}`);
+        }
       }
+      if (passedGate) break;
     }
 
     if (passedGate) {

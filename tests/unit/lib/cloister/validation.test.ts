@@ -3,6 +3,19 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdirSync, rmSync, writeFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
+
+const admissionMocks = vi.hoisted(() => ({
+  release: vi.fn(async () => undefined),
+  acquire: vi.fn(async () => ({
+    admittedAt: '2026-07-19T00:00:00.000Z',
+    release: async () => admissionMocks.release(),
+  })),
+}));
+
+vi.mock('../../../../src/lib/cloister/quality-gate-admission.js', () => ({
+  acquireQualityGateAdmission: admissionMocks.acquire,
+}));
+
 import { runMergeValidation, autoRevertMerge, runQualityGates } from '../../../../src/lib/cloister/validation.js';
 import { exec } from 'child_process';
 import { promisify } from 'util';

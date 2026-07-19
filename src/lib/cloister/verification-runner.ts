@@ -19,7 +19,11 @@ import { getReviewStatusSync, markWorkspaceStuck, setReviewStatusSync } from '..
 import { runQualityGates, DEFAULT_GATES } from './validation.js';
 import { readVerificationArtifact, writeVerificationArtifact } from './verification-artifact.js';
 import { buildFinalFailureInstructions } from './verification-feedback.js';
-import { isVerificationWorkerActive, runSupervisedVerification } from './verification-worker-supervisor.js';
+import {
+  isVerificationWorkerActive,
+  markVerificationWorkerAdmissionPhase,
+  runSupervisedVerification,
+} from './verification-worker-supervisor.js';
 import type {
   VerificationRunnerOptions,
   VerificationRunnerOutcome,
@@ -568,10 +572,12 @@ async function runVerificationForIssuePromise(
     writeLiveArtifact();
 
     const gateResults = await Effect.runPromise(runQualityGates(gates, workspacePath, 'pre_push', {
+      issueId,
       isRemote: workspaceInfo.isRemote,
       vmName: workspaceInfo.vmName,
       placeholders,
       ...(options.onGateLog ? { onLog: options.onGateLog } : {}),
+      onAdmissionPhase: (state) => markVerificationWorkerAdmissionPhase(issueId, state),
       onGateStart: (name) => {
         liveGateName = name;
         liveGateTail = '';

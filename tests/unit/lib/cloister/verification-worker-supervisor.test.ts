@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawn } from 'node:child_process';
@@ -6,8 +6,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   isVerificationWorkerActive,
+  markVerificationWorkerAdmissionPhase,
   readVerificationWorkerState,
   runSupervisedVerification,
+  verificationWorkerDeadline,
 } from '../../../../src/lib/cloister/verification-worker-supervisor.js';
 
 const originalHome = process.env.OVERDECK_HOME;
@@ -42,6 +44,54 @@ afterEach(() => {
 });
 
 describe('verification worker supervisor', () => {
+  it('starts the execution deadline at admission rather than queue time', () => {
+    const queued = {
+      runId: 'run-1',
+      issueId: 'PAN-1',
+      workspacePath: '/tmp/workspace',
+      pid: process.pid,
+      startedAt: '2026-07-19T00:00:00.000Z',
+      resultPath: '/tmp/result.json',
+      phase: 'queued' as const,
+      admittedAt: null,
+    };
+    expect(verificationWorkerDeadline(queued)).toBeNull();
+
+    const admittedAt = '2026-07-19T01:00:00.000Z';
+    expect(verificationWorkerDeadline({ ...queued, phase: 'running', admittedAt }))
+      .toBe(Date.parse(admittedAt) + 65 * 60 * 1000);
+  });
+
+  it('persists queued and running admission phases without resetting first admission', () => {
+    const home = useFixture();
+    const dir = join(home, 'verification-workers', 'pan-1');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, 'state.json'), JSON.stringify({
+      runId: 'run-1',
+      issueId: 'PAN-1',
+      workspacePath: '/tmp/workspace',
+      pid: process.pid,
+      startedAt: '2026-07-19T00:00:00.000Z',
+      resultPath: join(dir, 'result.json'),
+      phase: 'queued',
+      admittedAt: null,
+    }));
+
+    markVerificationWorkerAdmissionPhase('PAN-1', {
+      phase: 'running', gateName: 'typecheck', attempt: 1, admittedAt: '2026-07-19T01:00:00.000Z',
+    });
+    markVerificationWorkerAdmissionPhase('PAN-1', {
+      phase: 'queued', gateName: 'lint', attempt: 1,
+    });
+
+    expect(readVerificationWorkerState('PAN-1')).toMatchObject({
+      phase: 'queued',
+      admittedAt: '2026-07-19T01:00:00.000Z',
+      currentGate: 'lint',
+      currentAttempt: 1,
+    });
+  });
+
   it('runs verification in a detached worker and returns its durable result', async () => {
     const home = useFixture();
 
@@ -54,6 +104,7 @@ describe('verification worker supervisor', () => {
 
     const state = readVerificationWorkerState('PAN-2597');
     expect(state?.pid).toBeGreaterThan(0);
+    expect(state).toMatchObject({ phase: 'queued', admittedAt: null });
     expect(JSON.parse(readFileSync(state!.resultPath, 'utf8'))).toEqual({ outcome: 'passed' });
     expect(state!.resultPath).toContain(join(home, 'verification-workers', 'pan-2597'));
   });
