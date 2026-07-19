@@ -800,10 +800,10 @@
       "tsdown.config.ts",
       "vitest.config.ts"
     ],
-    "recordedAt": "2026-07-19T13:30:33.731Z"
+    "recordedAt": "2026-07-19T15:21:39.631Z"
   },
   "created": "2026-07-18T01:08:14.744Z",
-  "updated": "2026-07-19T15:21:32.410Z",
+  "updated": "2026-07-19T15:21:39.648Z",
   "pipeline": {
     "issueId": "PAN-2858",
     "reviewStatus": "pending",
