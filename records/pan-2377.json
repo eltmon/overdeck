@@ -319,10 +319,10 @@
     "recordedAt": "2026-07-19T00:54:19.291Z"
   },
   "created": "2026-07-17T12:54:30.819Z",
-  "updated": "2026-07-19T06:51:40.361Z",
+  "updated": "2026-07-19T07:00:45.131Z",
   "pipeline": {
     "issueId": "PAN-2377",
-    "reviewStatus": "pending",
+    "reviewStatus": "passed",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "failed",
@@ -330,17 +330,13 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-19T00:54:56.018Z",
-    "updatedAt": "2026-07-19T06:51:38.537Z",
-    "blockerReasons": [
-      {
-        "type": "merge_conflict",
-        "summary": "Merge conflict with target branch",
-        "detectedAt": "2026-07-19T06:51:05.900Z"
-      }
-    ],
+    "updatedAt": "2026-07-19T07:00:45.106Z",
+    "reviewNotes": "Mainline merges preserve approved order-book behavior and integrate cleanly with atomic agent-start placeholders; full tests and typecheck pass",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2894",
+    "reviewedAtCommit": "07088273a11c5c86e1ef8bb0513c4545b6b6cf02",
     "lastVerifiedCommit": "1efab25bdb7b55b494dffc64f858401acec57b05",
-    "reviewSpawnedAt": "2026-07-19T05:21:53.260Z"
+    "reviewSpawnedAt": "2026-07-19T06:51:39.050Z"
   },
   "closeOut": {
     "usage": {
@@ -355,9 +351,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 10252313,
-            "output": 403155,
-            "cacheRead": 88219648,
+            "input": 10771355,
+            "output": 453990,
+            "cacheRead": 95700992,
             "cacheWrite": 0
           }
         },
@@ -379,9 +375,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 20790631,
-            "output": 1458479,
-            "cacheRead": 684830720,
+            "input": 20791107,
+            "output": 1458503,
+            "cacheRead": 684939776,
             "cacheWrite": 0
           }
         }
@@ -394,9 +390,9 @@
           "cacheWrite": 169467
         },
         "openai/gpt-5.6-sol": {
-          "input": 31042944,
-          "output": 1861634,
-          "cacheRead": 773050368,
+          "input": 31562462,
+          "output": 1912493,
+          "cacheRead": 780640768,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -407,8 +403,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 610.941047,
-        "pricingAsOf": "2026-07-19T06:51:38.589Z"
+        "usd": 618.859607,
+        "pricingAsOf": "2026-07-19T07:00:45.124Z"
       }
     },
     "merges": [
