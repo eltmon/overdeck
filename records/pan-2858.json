@@ -843,10 +843,10 @@
     "recordedAt": "2026-07-19T15:21:39.631Z"
   },
   "created": "2026-07-18T01:08:14.744Z",
-  "updated": "2026-07-19T15:27:36.836Z",
+  "updated": "2026-07-19T15:28:07.321Z",
   "pipeline": {
     "issueId": "PAN-2858",
-    "reviewStatus": "failed",
+    "reviewStatus": "reviewing",
     "testStatus": "testing",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -854,14 +854,14 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-19T15:22:19.616Z",
-    "updatedAt": "2026-07-19T15:27:36.799Z",
+    "updatedAt": "2026-07-19T15:28:07.244Z",
     "reviewNotes": "Review role spawn failed: Command failed: tmux -L overdeck -f /home/eltmon/.overdeck/tmux/overdeck.tmux.conf new-session -d -s agent-pan-2858-review -c /home/eltmon/Projects/overdeck/workspaces/feature-pan-2858 -x 200 -y 50 -e ANTHROPIC_API_KEY= -e ANTHROPIC_BASE_URL=http://127.0.0.1:8317 -e ANTHROPIC_AUTH_TOKEN=overdeck-local-cliproxy-key -e ANTHROPIC_DEFAULT_HAIKU_MODEL= -e OPENAI_API_KEY= -e GEMINI_API_KEY= -e API_TIMEOUT_MS= -e CLAUDE_CODE_API_KEY_HELPER_TTL_MS= -e KIMI_API_KEY= -e MINIMAX_API_KEY= -e ZAI_API_KEY= -e MIMO_API_KEY= -e OPENROUTER_API_KEY= -e NOUS_API_KEY= -e DASHSCOPE_API_KEY= -e TERM=xterm-256color -e OVERDECK_AGENT_ID=agent-pan-2858-review -e OVERDECK_ISSUE_ID=PAN-2858 -e OVERDECK_SESSION_TYPE=review -e CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false -e GIT_SEQUENCE_EDITOR=false bash /home/eltmon/.overdeck/agents/agent-pan-2858-review/launcher.sh\nduplicate session: agent-pan-2858-review\n",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2875",
     "reviewedAtCommit": "8f356629dafd5a3655eb97365a1f056ece3a4b73",
     "lastVerifiedCommit": "6f652e74da859163c9f316e1ee7ac85a4955d59b",
     "reviewRequestedAt": "2026-07-19T15:22:19.616Z",
-    "reviewSpawnedAt": "2026-07-19T15:21:42.419Z",
+    "reviewSpawnedAt": "2026-07-19T15:28:07.242Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "bun.lock",
@@ -1223,9 +1223,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 45416880,
-            "output": 988839,
-            "cacheRead": 220451328,
+            "input": 45789852,
+            "output": 994003,
+            "cacheRead": 221108736,
             "cacheWrite": 0
           }
         },
@@ -1262,9 +1262,9 @@
           "cacheWrite": 213417
         },
         "openai/gpt-5.6-sol": {
-          "input": 90357507,
-          "output": 2990481,
-          "cacheRead": 862585856,
+          "input": 90730479,
+          "output": 2995645,
+          "cacheRead": 863243264,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -1275,8 +1275,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 988.629299,
-        "pricingAsOf": "2026-07-19T15:27:36.821Z"
+        "usd": 990.977783,
+        "pricingAsOf": "2026-07-19T15:28:07.304Z"
       }
     },
     "merges": [
