@@ -367,6 +367,33 @@ describe('checkApiErrorAgents context overflow recovery', () => {
     expect(orchestratedCompactionContinuations.has('specialist-review-pan-1781')).toBe(false);
   });
 
+  it('does not let the transient API cooldown suppress a compact continuation', async () => {
+    const sessionName = 'planning-pan-2899';
+    mockListSessionNames.mockReturnValue(Effect.succeed([sessionName]));
+    mockCapturePane.mockReturnValue(Effect.succeed('API Error: Overloaded\n❯'));
+
+    await checkApiErrorAgents();
+    expect(mockSendKeysAsync).toHaveBeenCalledWith(
+      sessionName,
+      expect.stringContaining('transient API error'),
+    );
+
+    mockSendKeysAsync.mockClear();
+    scheduleOrchestratedCompactionContinuation(
+      sessionName,
+      Date.now() - COMPACTION_CONTINUE_MIN_SETTLE_MS,
+    );
+    mockCapturePane.mockReturnValue(Effect.succeed('Compacted summary\n❯'));
+
+    const actions = await checkApiErrorAgents();
+
+    expect(mockSendKeysAsync).toHaveBeenCalledWith(
+      sessionName,
+      ORCHESTRATED_COMPACTION_CONTINUE_MESSAGE,
+    );
+    expect(actions).toContain(`Context compaction recovery: resumed ${sessionName} after compaction`);
+  });
+
   it('returns a failed compaction to the bounded overflow retry ladder', async () => {
     const sessionName = 'specialist-review-pan-2899';
     const now = Date.now();

@@ -205,8 +205,9 @@ export async function checkApiErrorAgents(): Promise<string[]> {
   );
 
   for (const sessionName of sessionsToInspect) {
+    const compactionPendingAtStart = hasOrchestratedCompactionContinuation(sessionName);
     const recovery = apiErrorRecoveryState.get(sessionName);
-    if (recovery && (now - recovery.lastAttempt) < API_ERROR_RECOVERY_COOLDOWN_MS) {
+    if (!compactionPendingAtStart && recovery && (now - recovery.lastAttempt) < API_ERROR_RECOVERY_COOLDOWN_MS) {
       continue;
     }
 
@@ -263,7 +264,8 @@ export async function checkApiErrorAgents(): Promise<string[]> {
       }
     }
 
-    const compactionPending = hasOrchestratedCompactionContinuation(sessionName);
+    const compactionPending = compactionPendingAtStart
+      || hasOrchestratedCompactionContinuation(sessionName);
     if (compactionPending) {
       try {
         const continuedAfterCompaction = await maybeContinueOrchestratedCompaction({
