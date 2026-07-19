@@ -768,18 +768,19 @@
     "recordedAt": "2026-07-18T20:48:20.399Z"
   },
   "created": "2026-07-18T01:08:14.744Z",
-  "updated": "2026-07-19T02:25:44.311Z",
+  "updated": "2026-07-19T13:14:56.208Z",
   "pipeline": {
     "issueId": "PAN-2858",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-18T21:10:55.719Z",
-    "updatedAt": "2026-07-19T00:11:54.899Z",
+    "updatedAt": "2026-07-19T13:14:56.130Z",
+    "reviewNotes": "Agent re-review request (4/25): Fixed review issues",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2875",
     "reviewedAtCommit": "5e304c614b5b5485270fed7f628d07d071367505",
     "lastVerifiedCommit": "a6fb883a5e140dfd8284a2bd5a349a1e07e4f075",
@@ -1142,9 +1143,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 44515476,
-            "output": 1960803,
-            "cacheRead": 621680128,
+            "input": 44679613,
+            "output": 1962951,
+            "cacheRead": 624115200,
             "cacheWrite": 0
           }
         }
@@ -1157,9 +1158,9 @@
           "cacheWrite": 213417
         },
         "openai/gpt-5.6-sol": {
-          "input": 84699506,
-          "output": 2880640,
-          "cacheRead": 829031936,
+          "input": 84863643,
+          "output": 2882788,
+          "cacheRead": 831467008,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -1170,8 +1171,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 939.13394,
-        "pricingAsOf": "2026-07-19T00:11:54.907Z"
+        "usd": 941.236601,
+        "pricingAsOf": "2026-07-19T13:14:56.190Z"
       }
     },
     "merges": [
