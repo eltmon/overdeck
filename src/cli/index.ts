@@ -351,7 +351,7 @@ review
 review
   .command('reset <id>')
   .description('Reset review/test/merge cycles (human override)')
-  .option('--session', 'Also clear saved Claude session')
+  .option('--session', 'Also clear all saved Claude review-session pointers')
   .action(resetReviewCommand);
 
 review

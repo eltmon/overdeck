@@ -26,6 +26,7 @@ import {
   saveAgentStateSync,
 } from './agent-state.js';
 import { getLatestSessionIdSync, saveSessionId } from './activity.js';
+import { clearAgentSessionPointers } from './session-pointers.js';
 import {
   deliverInitialPromptWithRetry,
   deliverResumeMessageWithTranscriptConfirmation,
@@ -350,7 +351,22 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
     if (piDeadRecovery) {
       logAgentLifecycleSync(normalizedId, 'resumeAgent: dead ohmypi process — fresh-launching for recovery instead of omp --resume (PAN-2009)');
     }
-    const shouldResumeSavedSession = !compactSeed && resumeDriftReasons.length === 0 && !piDeadRecovery;
+    const expectedClaudeJsonl = sessionFilePath(agentState.workspace, sessionId);
+    const claudeJsonlMissingRecovery = effectiveHarness === 'claude-code'
+      && !compactSeed
+      && resumeDriftReasons.length === 0
+      && !existsSync(expectedClaudeJsonl);
+    if (claudeJsonlMissingRecovery) {
+      logAgentLifecycleSync(
+        normalizedId,
+        `resumeAgent: saved Claude transcript is missing at ${expectedClaudeJsonl} — clearing stale pointers and fresh-launching (PAN-2895)`,
+      );
+      await clearAgentSessionPointers(normalizedId);
+    }
+    const shouldResumeSavedSession = !compactSeed
+      && resumeDriftReasons.length === 0
+      && !piDeadRecovery
+      && !claudeJsonlMissingRecovery;
     // PAN-1980: refuse to rotate to a new session. A resume that would need a
     // fresh session — compact/overflow recovery or model/harness drift — now
     // errors and stops instead of starting a new transcript.
@@ -371,6 +387,7 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
     }
     if (freshSessionId) {
       saveSessionId(normalizedId, freshSessionId);
+      agentState.sessionId = freshSessionId;
     } else if (!shouldResumeSavedSession) {
       try {
         unlinkSync(join(getAgentDir(normalizedId), 'session.id'));
@@ -431,6 +448,13 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
         ...providerEnv
       }
     }));
+    if (freshSessionId) {
+      await saveAgentRuntimeState(normalizedId, {
+        claudeSessionId: freshSessionId,
+        sessionModel: model,
+        sessionHarness: effectiveHarness,
+      });
+    }
 
     // Always wake the resumed agent with a continue prompt — without it, the
     // re-attached session sits silently at its last state, and the user (or
@@ -497,6 +521,9 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
     } else if (piDeadRecovery) {
       console.log(`[agents] Respawned ${normalizedId} fresh because the prior Pi process was dead (archived session ${sessionId})`);
       logAgentLifecycleSync(normalizedId, `resumeAgent SUCCESS: fresh respawn after dead Pi process (archived sessionId=${sessionId}), messageDelivered=${messageDelivered}`);
+    } else if (claudeJsonlMissingRecovery) {
+      console.log(`[agents] Respawned ${normalizedId} fresh because the saved Claude transcript was missing (stale session ${sessionId}${freshSessionId ? `, new session ${freshSessionId}` : ''})`);
+      logAgentLifecycleSync(normalizedId, `resumeAgent SUCCESS: fresh respawn after missing Claude JSONL (stale sessionId=${sessionId}${freshSessionId ? `, newSessionId=${freshSessionId}` : ''}), messageDelivered=${messageDelivered}`);
     } else if (!shouldResumeSavedSession) {
       console.log(`[agents] Respawned ${normalizedId} fresh because session origin drifted (archived session ${sessionId}${freshSessionId ? `, new session ${freshSessionId}` : ''})`);
       logAgentLifecycleSync(normalizedId, `resumeAgent SUCCESS: fresh respawn after origin drift (archived sessionId=${sessionId}${freshSessionId ? `, newSessionId=${freshSessionId}` : ''}), messageDelivered=${messageDelivered}`);
