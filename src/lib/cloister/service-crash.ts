@@ -9,6 +9,7 @@ import { setCloisterSpawnsPausedSync } from '../overdeck/control-settings.js';
 import { getRuntimeForAgent } from '../runtimes/index.js';
 import { exactPaneTarget } from '../tmux.js';
 import { isRoleTerminal, type AdvancingRole } from './reap-terminal-sessions.js';
+import { deliverOrchestratedCompact } from './orchestrated-compaction.js';
 import type { AgentHealth } from './health.js';
 import type { CloisterConfig } from './config.js';
 
@@ -175,7 +176,10 @@ export async function pokeAgentWithEscalation(host: CrashHost, agentId: string):
     }
   }
 
-  await Promise.resolve(runtime.sendMessage(agentId, pokeMessage)).catch((sendErr) => {
+  const delivery = pokeMessage === '/compact'
+    ? deliverOrchestratedCompact(agentId, () => Promise.resolve(runtime.sendMessage(agentId, pokeMessage)))
+    : Promise.resolve(runtime.sendMessage(agentId, pokeMessage));
+  await delivery.catch((sendErr) => {
     console.error(`Failed to send poke to ${agentId}:`, sendErr);
   });
   host.emit({ type: 'poked_agent', agentId });
