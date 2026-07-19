@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>PAN-2890 — Agent pills drill-down mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    color-scheme: light;
+    --radius: 0.625rem;
+    --background: #ffffff; --foreground: #1f2937;
+    --card: #ffffff; --popover: #ffffff;
+    --accent: color-mix(in srgb, black 4%, transparent);
+    --muted-foreground: #6b7280;
+    --border: color-mix(in srgb, black 8%, transparent);
+    --primary: oklch(0.488 0.217 264);
+    --success: #10b981; --success-foreground: #047857;
+    --warning: #f59e0b; --warning-foreground: #b45309;
+    --destructive: #ef4444; --destructive-foreground: #b91c1c;
+  }
+  .dark {
+    color-scheme: dark;
+    --background: #080b10; --foreground: #e5e7eb;
+    --card: #0c1018; --popover: #0c1018;
+    --accent: color-mix(in srgb, white 8%, transparent);
+    --muted-foreground: #9ca3af;
+    --border: color-mix(in srgb, white 6%, transparent);
+    --primary: oklch(0.588 0.217 264);
+    --success: #10b981; --success-foreground: #34d399;
+    --warning: #f59e0b; --warning-foreground: #fbbf24;
+    --destructive: #f87171; --destructive-foreground: #fca5a5;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--background); color: var(--foreground);
+    font-family: "DM Sans", system-ui, sans-serif; font-weight: 500; font-size: 14px;
+  }
+  .page { max-width: 980px; margin: 0 auto; padding: 32px 24px 80px; }
+  h1 { font-size: 18px; font-weight: 500; margin: 0 0 4px; }
+  .sub { color: var(--muted-foreground); font-size: 13px; margin-bottom: 28px; }
+  h2 { font-size: 13px; font-weight: 500; color: var(--muted-foreground); text-transform: uppercase; letter-spacing: 0.06em; margin: 40px 0 12px; }
+  .note { font-size: 12.5px; color: var(--muted-foreground); line-height: 1.55; max-width: 640px; }
+  .mono { font-family: "SF Mono", ui-monospace, Menlo, monospace; }
+
+  /* ── App bar ─────────────────────────────────────────── */
+  .appbar {
+    display: flex; align-items: center; justify-content: flex-end; gap: 8px;
+    height: 48px; padding: 0 16px; border: 1px solid var(--border);
+    border-radius: 10px; background: var(--card);
+  }
+  .appbar .crumb { margin-right: auto; color: var(--muted-foreground); font-size: 13px; }
+  .pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    border-radius: 9999px; padding: 4px 10px; font-size: 12px; font-weight: 500;
+    border: 1px solid transparent; background: none; color: inherit;
+    font-family: inherit; cursor: pointer;
+  }
+  .pill .dot { width: 6px; height: 6px; border-radius: 9999px; }
+  .pill-running {
+    border-color: color-mix(in srgb, var(--success) 30%, transparent);
+    background: color-mix(in srgb, var(--success) 10%, transparent);
+    color: var(--success-foreground);
+  }
+  .pill-running:hover { background: color-mix(in srgb, var(--success) 18%, transparent); }
+  .pill-running .dot { background: var(--success); }
+  .pill-stopped {
+    border-color: color-mix(in srgb, var(--warning) 40%, transparent);
+    background: color-mix(in srgb, var(--warning) 10%, transparent);
+    color: var(--warning-foreground);
+  }
+  .pill-stopped:hover { background: color-mix(in srgb, var(--warning) 20%, transparent); }
+  .pill-stopped .dot { background: var(--warning); }
+  .pill-stopall {
+    border-color: color-mix(in srgb, var(--destructive) 40%, transparent);
+    background: color-mix(in srgb, var(--destructive) 10%, transparent);
+    color: var(--destructive); cursor: default;
+  }
+
+  /* ── Popover ─────────────────────────────────────────── */
+  .anchor { position: relative; }
+  .popover {
+    position: absolute; right: 0; top: calc(100% + 6px); z-index: 50; width: 340px;
+    border: 1px solid var(--border); border-radius: 10px; background: var(--popover);
+    padding: 12px; box-shadow: 0 12px 32px color-mix(in srgb, black 45%, transparent);
+    display: none; text-align: left;
+  }
+  .popover.open { display: block; }
+  .pop-head { display: flex; align-items: baseline; gap: 6px; font-size: 12px; margin-bottom: 8px; }
+  .pop-head .count { font-weight: 500; }
+  .pop-head .scope { color: var(--muted-foreground); font-weight: 400; }
+  .pop-head.warn .count { color: var(--warning-foreground); }
+  .rows { max-height: 300px; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
+  .row {
+    display: block; width: 100%; text-align: left; border: 0; background: none;
+    font-family: inherit; color: inherit; padding: 6px 8px; border-radius: 8px; cursor: pointer;
+  }
+  .row:hover { background: var(--accent); }
+  .row .l1 { display: flex; align-items: baseline; gap: 8px; font-size: 12.5px; }
+  .row .id { font-family: "SF Mono", ui-monospace, Menlo, monospace; font-size: 11.5px; flex-shrink: 0; }
+  .row .title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; font-weight: 400; }
+  .row .role { color: var(--muted-foreground); font-size: 11px; flex-shrink: 0; }
+  .row .l2 { margin-top: 1px; font-size: 11px; color: var(--muted-foreground); font-weight: 400; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pop-foot { margin-top: 10px; }
+  .btn-primary {
+    display: flex; width: 100%; align-items: center; justify-content: center; gap: 6px;
+    border: 0; border-radius: 8px; padding: 8px 0; font-family: inherit; font-size: 12.5px;
+    font-weight: 500; background: var(--primary); color: #fff; cursor: pointer;
+  }
+
+  /* ── Chrome around the demo ──────────────────────────── */
+  .toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+    background: var(--card); border: 1px solid var(--border); border-radius: 8px;
+    padding: 8px 14px; font-size: 12.5px; opacity: 0; transition: opacity 0.15s; pointer-events: none;
+  }
+  .toast.show { opacity: 1; }
+  .toggle {
+    position: fixed; top: 16px; right: 16px; border: 1px solid var(--border);
+    background: var(--card); color: var(--muted-foreground); border-radius: 8px;
+    padding: 5px 10px; font-family: inherit; font-size: 12px; cursor: pointer;
+  }
+  .before { border: 1px dashed var(--border); border-radius: 10px; padding: 12px; width: 300px; }
+  .before .brow { display: flex; justify-content: space-between; padding: 2px 0; font-size: 12px; }
+  .before .brole { color: var(--muted-foreground); }
+  .compare { display: flex; gap: 24px; flex-wrap: wrap; align-items: flex-start; }
+  .cap { font-size: 11px; color: var(--muted-foreground); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.06em; }
+</style>
+</head>
+<body>
+<button class="toggle" onclick="document.documentElement.classList.toggle('dark')">light / dark</button>
+<div class="page">
+  <h1>PAN-2890 — Agent pills: drill-down, context, scoped counts</h1>
+  <div class="sub">Interactive mockup. Click the <b>9 agents</b> and <b>7 stopped</b> pills; click any row to see the navigation it would perform.</div>
+
+  <h2>App bar (interactive)</h2>
+  <div class="appbar">
+    <span class="crumb">panopticon-cli · Command Deck</span>
+
+    <span class="anchor">
+      <button class="pill pill-running" onclick="toggle('pop-running')" aria-expanded="false">
+        <span class="dot"></span>9 agents
+      </button>
+      <div class="popover" id="pop-running">
+        <div class="pop-head"><span class="count">9 running</span><span class="scope">· now</span></div>
+        <div class="rows" id="rows-running"></div>
+      </div>
+    </span>
+
+    <button class="pill pill-stopall">⏹ Stop all</button>
+
+    <span class="anchor">
+      <button class="pill pill-stopped" onclick="toggle('pop-stopped')" aria-expanded="false">
+        <span class="dot"></span>7 stopped
+      </button>
+      <div class="popover" id="pop-stopped">
+        <div class="pop-head warn"><span class="count">⚠ 7 stopped</span><span class="scope">· pipeline agents, last 7 days</span></div>
+        <div class="rows" id="rows-stopped"></div>
+        <div class="pop-foot"><button class="btn-primary" onclick="toastMsg('POST /api/agents × 7 — restarting all stopped agents')">▷ Restart all</button></div>
+      </div>
+    </span>
+  </div>
+
+  <h2>Before / after — stopped row</h2>
+  <div class="compare">
+    <div>
+      <div class="cap">Today (bare id + role)</div>
+      <div class="before">
+        <div class="brow"><span class="mono">PAN-2377</span><span class="brole">review</span></div>
+        <div class="brow"><span class="mono">MIN-865</span><span class="brole">test</span></div>
+      </div>
+    </div>
+    <div>
+      <div class="cap">This PRD (title + reason + time, clickable)</div>
+      <div class="before" style="width:340px">
+        <button class="row">
+          <span class="l1"><span class="id">PAN-2377</span><span class="title">Order book: backlog integration for ready-queue lanes</span><span class="role">review</span></span>
+          <span class="l2">paused: awaiting close-out (verify on main) · 2d ago</span>
+        </button>
+        <button class="row">
+          <span class="l1"><span class="id">MIN-865</span><span class="title">Habit streak repair misses timezone boundary</span><span class="role">test</span></span>
+          <span class="l2">troubled (3 failures) · 6h ago</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <h2>Notes</h2>
+  <p class="note">
+    Rows are one shared component (<span class="mono">AgentPillPopoverRow</span>) used by both popovers.
+    Line 1: mono issue ID, issue title from the store (falls back to bare ID when the issue isn't loaded — e.g. LEX-1), role right-aligned muted.
+    Line 2: stop reason via <span class="mono">describeAgentStop()</span> for stopped agents, <span class="mono">model · relative time</span> for running agents.
+    Click navigates through the URL door to <span class="mono">/issues/&lt;ID&gt;</span> and closes the popover.
+    Scope words in each header make the three on-screen counts (boot-held / stopped-7d / running-now) self-describing.
+    One colored signal per surface: color lives on the pill trigger; rows stay neutral.
+  </p>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  const running = [
+    { id: 'PAN-2858', title: 'Verification runner: supervised verify on main for merged batches', role: 'work',   ctx: 'claude-sonnet-4-6 · 2m ago' },
+    { id: 'PAN-2888', title: 'Membership false-limbo: placeholder agents mask live pipeline slot', role: 'work',   ctx: 'gpt-5.5 · 4m ago' },
+    { id: 'PAN-2840', title: 'Linear lazy-relation storm: batch issue relations in one query',     role: 'review', ctx: 'gpt-5.5 · 7m ago' },
+    { id: 'MIN-871',  title: 'Compass briefing: grocery list dedupe across households',            role: 'work',   ctx: 'claude-sonnet-4-6 · 11m ago' },
+    { id: 'PAN-2886', title: 'Resume: detect pending- placeholder agents in any status',           role: 'test',   ctx: 'gpt-5.5 · 14m ago' },
+    { id: 'PAN-2879', title: 'Auto-deploy staleness banner for dashboard builds',                  role: 'work',   ctx: 'claude-fable-5 · 18m ago' },
+    { id: 'MIN-868',  title: 'Timer notifications double-fire on resumed sessions',                role: 'work',   ctx: 'gpt-5.5 · 25m ago' },
+    { id: 'PAN-2876', title: 'Close-out reaper: verify _devnet teardown for terminal issues',      role: 'plan',   ctx: 'claude-sonnet-4-6 · 31m ago' },
+    { id: 'TIN-42',   title: 'Lesson planner: spaced-repetition deck export',                      role: 'work',   ctx: 'gpt-5.5 · 44m ago' },
+  ];
+  const stopped = [
+    { id: 'PAN-1525', title: 'Kanban swimlane density toggle',                                  role: 'plan',   ctx: 'stopped cleanly · 3d ago' },
+    { id: 'MIN-852',  title: 'Recurring tasks: skip-holiday rule',                              role: 'review', ctx: 'stopped cleanly · 5h ago' },
+    { id: 'PAN-2377', title: 'Order book: backlog integration for ready-queue lanes',           role: 'review', ctx: 'paused: awaiting close-out (verify on main) · 2d ago' },
+    { id: 'PAN-2838', title: 'Spec lint: Given-When-Then enforcement for acceptance criteria',  role: 'work',   ctx: 'stopped by operator · 1d ago' },
+    { id: 'MIN-865',  title: 'Habit streak repair misses timezone boundary',                    role: 'test',   ctx: 'troubled (3 failures) · 6h ago' },
+    { id: 'PAN-2876', title: 'Close-out reaper: verify _devnet teardown for terminal issues',   role: 'work',   ctx: 'stopped cleanly · 9h ago' },
+    { id: 'LEX-1',    title: null,                                                              role: 'work',   ctx: 'stopped cleanly · 4d ago' },
+  ];
+
+  function rowHtml(a) {
+    return `<button class="row" onclick="toastMsg('pushState → /issues/${a.id} · popstate dispatched · popover closed')">
+      <span class="l1"><span class="id">${a.id}</span><span class="title">${a.title ?? ''}</span><span class="role">${a.role}</span></span>
+      <span class="l2">${a.ctx}</span>
+    </button>`;
+  }
+  document.getElementById('rows-running').innerHTML = running.map(rowHtml).join('');
+  document.getElementById('rows-stopped').innerHTML = stopped.map(rowHtml).join('');
+
+  function toggle(id) {
+    for (const p of document.querySelectorAll('.popover')) {
+      if (p.id === id) p.classList.toggle('open'); else p.classList.remove('open');
+    }
+  }
+  document.addEventListener('mousedown', (e) => {
+    if (!e.target.closest('.anchor')) for (const p of document.querySelectorAll('.popover')) p.classList.remove('open');
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') for (const p of document.querySelectorAll('.popover')) p.classList.remove('open');
+  });
+  let toastTimer;
+  function toastMsg(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg; t.classList.add('show');
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 2200);
+  }
+</script>
+</body>
+</html>
