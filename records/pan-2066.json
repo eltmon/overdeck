@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-19T20:18:40.159Z",
-  "updated": "2026-07-19T20:27:45.812Z",
+  "updated": "2026-07-19T20:35:03.100Z",
   "pipeline": {
     "issueId": "PAN-2066",
     "reviewStatus": "pending",
@@ -53,18 +53,31 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "roundtrip-spike": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-2066",
         "agentId": "agent-pan-2066",
         "pid": 2044706,
         "host": "eltmon-z790",
-        "claimedAt": "2026-07-19T20:27:45.812Z"
+        "claimedAt": "2026-07-19T20:27:45.812Z",
+        "itemId": "roundtrip-spike",
+        "outcome": "completed",
+        "reason": "Tested open-knowledge v0.34.0 in an isolated Playwright profile; description-only UI save preserved key order and unknown keys but rewrote inline tag spacing, so posted the lossy diff verdict and selected read-only Knowledge-page posture. Captured actual start flags and the required no-MCP init step.",
+        "releasedAt": "2026-07-19T20:35:03.100Z"
+      }
+    ],
+    "statusReasons": {
+      "roundtrip-spike": {
+        "reason": "Tested open-knowledge v0.34.0 in an isolated Playwright profile; description-only UI save preserved key order and unknown keys but rewrote inline tag spacing, so posted the lossy diff verdict and selected read-only Knowledge-page posture. Captured actual start flags and the required no-MCP init step.",
+        "updatedAt": "2026-07-19T20:35:03.100Z"
       }
     }
   },
   "statusOverrides": {
-    "roundtrip-spike": "running"
+    "roundtrip-spike": "completed",
+    "roundtrip-spike.roundtrip-spike.ac1": "completed",
+    "roundtrip-spike.roundtrip-spike.ac2": "completed"
   }
 }
