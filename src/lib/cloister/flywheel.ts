@@ -448,6 +448,8 @@ export async function resumeFlywheel(options: FlywheelLifecycleOptions = {}): Pr
   const launch = await readFlywheelLaunchMetadata(runId);
   const agent = await spawnFlywheelAgent(runId, withFlywheelAutonomyOptions({
     ...options,
+    workspace: options.workspace ?? launch?.workspace,
+    briefPath: options.briefPath ?? launch?.briefPath,
     briefOverlayPath: options.briefOverlayPath ?? launch?.briefOverlayPath,
     resumeSessionId,
   }));

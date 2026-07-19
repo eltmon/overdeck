@@ -8,7 +8,7 @@ const mocks = vi.hoisted(() => ({
   paused: false,
   autoPickupBacklog: false,
   requireUatBeforeMerge: true,
-  launchMetadata: null as null | { briefOverlayPath?: string },
+  launchMetadata: null as null | { workspace?: string; briefPath?: string; briefOverlayPath?: string },
   spawnRun: vi.fn(async (issueId: string, role: string, options: { agentId: string; workspace: string; harness?: 'claude-code' | 'pi'; flywheelRunId?: string }) => ({
     id: options.agentId,
     issueId,
@@ -206,23 +206,34 @@ describe('flywheel lifecycle', () => {
     expect(resumePrompt).toContain('Require UAT before merge: true');
   });
 
-  it('re-attaches the persisted order-book overlay when resuming', async () => {
+  it('re-attaches the persisted order-book overlay during cwd-independent automatic recovery', async () => {
     const workspace = mkdtempSync(join(tmpdir(), 'flywheel-overlay-resume-'));
+    const dashboardCwd = mkdtempSync(join(tmpdir(), 'flywheel-dashboard-cwd-'));
+    const originalCwd = process.cwd();
     mkdirSync(join(workspace, 'docs'), { recursive: true });
     writeFileSync(join(workspace, 'docs', 'flywheel-brief.md'), 'Standing instructions.');
     writeFileSync(join(workspace, 'docs', 'campaign-overlay.md'), 'Resume this campaign in strict order.');
     try {
       await spawnFlywheel({ runId: 'RUN-9', workspace, env: cleanEnv });
       await pauseFlywheel();
-      mocks.launchMetadata = { briefOverlayPath: 'docs/campaign-overlay.md' };
+      mocks.launchMetadata = {
+        workspace,
+        briefPath: join(workspace, 'docs', 'flywheel-brief.md'),
+        briefOverlayPath: 'docs/campaign-overlay.md',
+      };
+      process.chdir(dashboardCwd);
 
-      await resumeFlywheel({ workspace, env: cleanEnv });
+      await resumeFlywheel();
 
+      expect(mocks.spawnRun.mock.calls[1][2].workspace).toBe(workspace);
       const resumePrompt = mocks.spawnRun.mock.calls[1][2].prompt;
+      expect(resumePrompt).toContain('Standing instructions.');
       expect(resumePrompt).toContain('Order-book brief overlay: docs/campaign-overlay.md');
       expect(resumePrompt).toContain('Resume this campaign in strict order.');
     } finally {
+      process.chdir(originalCwd);
       rmSync(workspace, { recursive: true, force: true });
+      rmSync(dashboardCwd, { recursive: true, force: true });
     }
   });
 
