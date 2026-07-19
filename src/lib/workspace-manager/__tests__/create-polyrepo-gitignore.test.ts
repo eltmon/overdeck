@@ -33,7 +33,7 @@ describe('ensurePolyrepoWorkspaceGitignoreSync', () => {
       { name: 'infra' },
     ]);
 
-    expect(result.added).toEqual(['api/', 'fe/', 'docs/', 'infra/']);
+    expect(result.added).toEqual(['api/', 'fe/', 'docs/', 'infra/', '.overdeck/']);
     expect(result.removed).toEqual([]);
     const content = readFileSync(join(workspacePath, '.gitignore'), 'utf-8');
     expect(content).not.toContain('.pan/records/');
@@ -42,11 +42,40 @@ describe('ensurePolyrepoWorkspaceGitignoreSync', () => {
     expect(content).toContain('docs/');
     expect(content).toContain('infra/');
     expect(content).toContain('Polyrepo sub-repositories');
+    expect(content).toContain('.overdeck/');
+  });
+
+  it('appends the .overdeck/ runtime entry when missing', () => {
+    writeFileSync(join(workspacePath, '.gitignore'), [
+      'api/',
+      '',
+    ].join('\n'));
+
+    const result = ensurePolyrepoWorkspaceGitignoreSync(workspacePath, [{ name: 'api' }]);
+
+    expect(result.added).toEqual(['.overdeck/']);
+    const lines = readFileSync(join(workspacePath, '.gitignore'), 'utf-8').split('\n');
+    expect(lines.filter(l => l === '.overdeck/')).toHaveLength(1);
+    expect(lines.some(l => l.includes('Overdeck workspace runtime'))).toBe(true);
+  });
+
+  it('does not duplicate an existing .overdeck entry with or without trailing slash', () => {
+    writeFileSync(join(workspacePath, '.gitignore'), [
+      'api/',
+      '.overdeck',
+      '',
+    ].join('\n'));
+
+    const result = ensurePolyrepoWorkspaceGitignoreSync(workspacePath, [{ name: 'api' }]);
+
+    expect(result.added).toEqual([]);
+    expect(result.removed).toEqual([]);
   });
 
   it('appends missing entries to an existing .gitignore', () => {
     writeFileSync(join(workspacePath, '.gitignore'), [
       '.pan/continue.json',
+      '.overdeck/',
       'api/',
       '',
     ].join('\n'));
@@ -71,6 +100,7 @@ describe('ensurePolyrepoWorkspaceGitignoreSync', () => {
     writeFileSync(join(workspacePath, '.gitignore'), [
       'api',
       'fe/',
+      '.overdeck/',
       '',
     ].join('\n'));
 
@@ -86,6 +116,7 @@ describe('ensurePolyrepoWorkspaceGitignoreSync', () => {
   it('returns empty added array when nothing changes', () => {
     writeFileSync(join(workspacePath, '.gitignore'), [
       'api/',
+      '.overdeck/',
       '',
     ].join('\n'));
 
@@ -100,6 +131,7 @@ describe('ensurePolyrepoWorkspaceGitignoreSync', () => {
       '.pan/records/',
       'api/',
       '.pan/records',
+      '.overdeck/',
       '',
     ].join('\n'));
 
