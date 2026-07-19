@@ -1,9 +1,10 @@
 import { Effect } from 'effect';
 import chalk from 'chalk';
 import { exec, spawn } from 'child_process';
-import { dirname, join } from 'path';
+import { constants, promises as fs, statSync } from 'fs';
+import { homedir } from 'os';
+import { delimiter, dirname, isAbsolute, join, resolve } from 'path';
 import { promisify } from 'util';
-import { promises as fs, statSync } from 'fs';
 import { acquireRestartLock, readRestartLockHolder } from '../../lib/restart-lock.js';
 import { readPlatformConfigSync, restartDashboard, StageError } from '../../lib/platform-lifecycle.js';
 import { writeRestartStatus } from '../../lib/restart-status.js';
@@ -95,8 +96,34 @@ function runCommand(command: string, args: string[], cwd: string): Promise<numbe
  * `bun install` is idempotent and ~instant on a warm cache, so running it
  * unconditionally before every reload makes "apply my merged changes" safe.
  */
-function runBunInstall(cwd: string): Promise<number> {
-  return runCommand('bun', ['install'], cwd);
+async function resolveBunBinary(cwd: string): Promise<string> {
+  const pathDirectories = (process.env.PATH ?? '')
+    .split(delimiter)
+    .filter(Boolean)
+    .map((directory) => isAbsolute(directory) ? directory : resolve(cwd, directory));
+
+  for (const directory of pathDirectories) {
+    const candidate = join(directory, 'bun');
+    try {
+      await fs.access(candidate, constants.X_OK);
+      return candidate;
+    } catch {
+      // Keep searching the inherited PATH.
+    }
+  }
+
+  const fallback = join(process.env.HOME || homedir(), '.bun', 'bin', 'bun');
+  try {
+    await fs.access(fallback, constants.X_OK);
+    return fallback;
+  } catch {
+    throw new Error(`bun executable not found in PATH or at ${fallback}`);
+  }
+}
+
+async function runBunInstall(cwd: string): Promise<number> {
+  const bunBinary = await resolveBunBinary(cwd);
+  return runCommand(bunBinary, ['install'], cwd);
 }
 
 function runBuild(cwd: string): Promise<number> {

@@ -17,6 +17,7 @@ const mocks = vi.hoisted(() => ({
   exec: vi.fn(),
   spawn: vi.fn(),
   statSync: vi.fn(),
+  fsAccess: vi.fn(),
   fsRm: vi.fn(),
   fsCp: vi.fn(),
   fsRename: vi.fn(),
@@ -81,6 +82,7 @@ vi.mock('fs', async (importActual) => ({
   ...(await importActual<typeof import('fs')>()),
   promises: {
     ...(await importActual<typeof import('fs')>()).promises,
+    access: mocks.fsAccess,
     rm: mocks.fsRm,
     cp: mocks.fsCp,
     rename: mocks.fsRename,
@@ -121,10 +123,16 @@ function mockExecByCommand(handlers: Record<string, Array<{ stdout?: string; cod
 }
 
 const originalAgentId = process.env.OVERDECK_AGENT_ID;
+const originalHome = process.env.HOME;
+const originalPath = process.env.PATH;
 
-function restoreAgentId(): void {
+function restoreEnv(): void {
   if (originalAgentId === undefined) delete process.env.OVERDECK_AGENT_ID;
   else process.env.OVERDECK_AGENT_ID = originalAgentId;
+  if (originalHome === undefined) delete process.env.HOME;
+  else process.env.HOME = originalHome;
+  if (originalPath === undefined) delete process.env.PATH;
+  else process.env.PATH = originalPath;
 }
 
 describe('reloadCommand', () => {
@@ -132,6 +140,8 @@ describe('reloadCommand', () => {
     vi.clearAllMocks();
     process.exitCode = undefined;
     delete process.env.OVERDECK_AGENT_ID;
+    process.env.HOME = '/home/test';
+    process.env.PATH = '/usr/bin:/bin';
     vi.spyOn(process, 'cwd').mockReturnValue('/repo');
     vi.spyOn(console, 'error').mockImplementation(() => {});
     vi.spyOn(console, 'log').mockImplementation(() => {});
@@ -153,6 +163,10 @@ describe('reloadCommand', () => {
     mocks.readDevSupervisorMarker.mockReturnValue(null);
     mocks.devSupervisorRefusalLines.mockReturnValue([]);
     mocks.agentRestartBlockReason.mockResolvedValue(null);
+    mocks.fsAccess.mockImplementation(async (path: string) => {
+      if (path === '/usr/bin/bun') return;
+      throw Object.assign(new Error(`ENOENT: ${path}`), { code: 'ENOENT' });
+    });
     mocks.fsRm.mockResolvedValue(undefined);
     mocks.fsCp.mockResolvedValue(undefined);
     mocks.fsRename.mockResolvedValue(undefined);
@@ -164,7 +178,7 @@ describe('reloadCommand', () => {
   });
 
   afterEach(() => {
-    restoreAgentId();
+    restoreEnv();
     process.exitCode = undefined;
   });
 
@@ -294,13 +308,54 @@ describe('reloadCommand', () => {
     expect(mocks.exec).toHaveBeenCalledWith("git 'fetch' 'origin' 'main'", expect.objectContaining({ cwd: '/repo' }));
     expect(mocks.exec).toHaveBeenCalledWith("git 'merge-base' '--is-ancestor' 'origin/main' 'HEAD'", expect.objectContaining({ cwd: '/repo' }));
     expect(mocks.exec).not.toHaveBeenCalledWith(expect.stringContaining("'worktree' 'add'"), expect.anything());
-    expect(mocks.spawn).toHaveBeenCalledWith('bun', ['install'], expect.objectContaining({ cwd: '/repo', stdio: 'inherit' }));
+    expect(mocks.spawn).toHaveBeenCalledWith('/usr/bin/bun', ['install'], expect.objectContaining({ cwd: '/repo', stdio: 'inherit' }));
     expect(mocks.spawn).toHaveBeenCalledWith('npm', ['run', 'build'], expect.objectContaining({ cwd: '/repo', stdio: 'inherit' }));
-    const installOrder = mocks.spawn.mock.calls.findIndex(([c]) => c === 'bun');
+    const installOrder = mocks.spawn.mock.calls.findIndex(([c]) => c === '/usr/bin/bun');
     const buildOrder = mocks.spawn.mock.calls.findIndex(([c, a]) => c === 'npm' && a[1] === 'build');
     expect(installOrder).toBeLessThan(buildOrder);
     expect(mocks.restartDashboard).toHaveBeenCalledTimes(1);
     expect(process.exitCode).toBeUndefined();
+  });
+
+  it('falls back to ~/.bun/bin/bun when the inherited PATH does not contain bun', async () => {
+    process.env.HOME = '/home/service';
+    mocks.fsAccess.mockImplementation(async (path: string) => {
+      if (path === '/home/service/.bun/bin/bun') return;
+      throw Object.assign(new Error(`ENOENT: ${path}`), { code: 'ENOENT' });
+    });
+    mocks.statSync
+      .mockReturnValueOnce({ mtimeMs: 1000 })
+      .mockReturnValueOnce({ mtimeMs: 2000 });
+    mockSpawnExits();
+
+    await reloadCommand({});
+
+    expect(mocks.fsAccess).toHaveBeenCalledWith('/usr/bin/bun', expect.any(Number));
+    expect(mocks.fsAccess).toHaveBeenCalledWith('/bin/bun', expect.any(Number));
+    expect(mocks.fsAccess).toHaveBeenCalledWith('/home/service/.bun/bin/bun', expect.any(Number));
+    expect(mocks.spawn).toHaveBeenCalledWith(
+      '/home/service/.bun/bin/bun',
+      ['install'],
+      expect.objectContaining({ cwd: '/repo', stdio: 'inherit' }),
+    );
+    expect(mocks.restartDashboard).toHaveBeenCalledTimes(1);
+    expect(process.exitCode).toBeUndefined();
+  });
+
+  it('reports a clear error when bun is absent from PATH and ~/.bun/bin', async () => {
+    process.env.HOME = '/home/service';
+    mocks.fsAccess.mockRejectedValue(Object.assign(new Error('ENOENT'), { code: 'ENOENT' }));
+    mocks.statSync.mockReturnValue({ mtimeMs: 1000 });
+
+    await reloadCommand({});
+
+    expect(mocks.spawn).not.toHaveBeenCalled();
+    expect(mocks.restartDashboard).not.toHaveBeenCalled();
+    expect(mocks.writeRestartStatus).toHaveBeenCalledWith(expect.objectContaining({
+      success: false,
+      error: expect.stringContaining('bun executable not found in PATH or at /home/service/.bun/bin/bun'),
+    }));
+    expect(process.exitCode).toBe(1);
   });
 
   it('aborts without building or restarting when bun install fails', async () => {
@@ -309,7 +364,7 @@ describe('reloadCommand', () => {
 
     await reloadCommand({});
 
-    expect(mocks.spawn).toHaveBeenCalledWith('bun', ['install'], expect.objectContaining({ stdio: 'inherit' }));
+    expect(mocks.spawn).toHaveBeenCalledWith('/usr/bin/bun', ['install'], expect.objectContaining({ stdio: 'inherit' }));
     expect(mocks.spawn).not.toHaveBeenCalledWith('npm', ['run', 'build'], expect.anything());
     expect(mocks.restartDashboard).not.toHaveBeenCalled();
     expect(mocks.spawnDashboardDetached).not.toHaveBeenCalled();
@@ -346,7 +401,7 @@ describe('reloadCommand', () => {
 
     await reloadCommand({});
 
-    expect(mocks.spawn).toHaveBeenCalledWith('bun', ['install'], expect.objectContaining({ cwd: buildWorktree }));
+    expect(mocks.spawn).toHaveBeenCalledWith('/usr/bin/bun', ['install'], expect.objectContaining({ cwd: buildWorktree }));
     expect(mocks.spawn).toHaveBeenCalledWith('npm', ['run', 'build'], expect.objectContaining({ cwd: buildWorktree }));
     expect(mocks.fsCp).toHaveBeenCalledWith(`${buildWorktree}/dist`, `${repoRoot}/dist.incoming`, { recursive: true });
     expect(mocks.fsRename).toHaveBeenCalledWith(`${repoRoot}/dist`, `${repoRoot}/dist.old.${process.pid}`);
@@ -424,7 +479,7 @@ describe('reloadCommand', () => {
       expect.objectContaining({ cwd: '/repo/workspaces/feature-pan-2095/subdir' }),
     );
     expect(mocks.exec).toHaveBeenCalledWith("git 'fetch' 'origin' 'main'", expect.objectContaining({ cwd: '/repo' }));
-    expect(mocks.spawn).toHaveBeenCalledWith('bun', ['install'], expect.objectContaining({ cwd: '/repo' }));
+    expect(mocks.spawn).toHaveBeenCalledWith('/usr/bin/bun', ['install'], expect.objectContaining({ cwd: '/repo' }));
     expect(mocks.restartDashboard).toHaveBeenCalledWith(
       expect.anything(),
       expect.any(Function),
