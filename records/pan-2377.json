@@ -97,15 +97,20 @@
       "reason": "feedback",
       "note": "[2026-07-19T02:51Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-07-19T02:51:14.303Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-19T03:05Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-07-19T03:05:46.951Z"
     }
   ],
   "feedback": [
     {
       "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-19T02:51:14Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2377\n\nCommitted HEAD contains no fix for the prior automatic Flywheel recovery blocker; the prospective fix remains uncommitted\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2377 -m \"Fixed review issues\"`"
+      "specialist": "verification-gate",
+      "outcome": "failed",
+      "timestamp": "2026-07-19T03:05:46Z",
+      "markdownBody": "VERIFICATION FAILED for PAN-2377 (attempt 1/3):\n\nFailed check: sync-target-branch\n\nSync with main FAILED — merge conflicts detected:\n\nMerge conflicts with main:\n  - src/lib/cloister/flywheel.ts\n\n## REQUIRED: Resolve merge conflicts BEFORE resubmitting\n\n1. Run: `git fetch origin main && git merge origin/main`\n2. Resolve all conflicts in the listed files\n3. Run the project's build and tests to verify nothing broke\n4. Commit and push ALL changes\n\nAfter fixing:\n1. Run the project's build and tests\n2. Commit and push ALL changes\n3. ONLY THEN resubmit: pan review request PAN-2377 -m \"Fixed sync-target-branch\"\n\nDo NOT resubmit until all repos sync cleanly and tests pass."
     }
   ],
   "scopeDrift": {
@@ -312,7 +317,7 @@
     "recordedAt": "2026-07-19T00:54:19.291Z"
   },
   "created": "2026-07-17T12:54:30.819Z",
-  "updated": "2026-07-19T03:05:45.417Z",
+  "updated": "2026-07-19T03:05:46.951Z",
   "pipeline": {
     "issueId": "PAN-2377",
     "reviewStatus": "pending",
