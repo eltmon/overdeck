@@ -177,11 +177,6 @@ console.log('[overdeck] AgentOutputService started');
 startMergeBlockerReconcileService();
 console.log('[overdeck] MergeBlockerReconcileService started');
 
-// PAN-2893: agent lifecycle events refresh the membership + resource-discovery
-// caches immediately, so `pan start` reaches the issues pane in seconds instead
-// of waiting out the 30s/5m TTLs.
-startResourceRefreshTriggers();
-console.log('[overdeck] ResourceRefreshTriggers started (event-driven cache refresh)');
 if (shouldStartStaleCheckRetriggerService()) {
   startStaleCheckRetriggerService();
   console.log('[overdeck] StaleCheckRetriggerService started');
@@ -506,6 +501,12 @@ console.log(conversationSearchWatcher
 
 void (async () => {
   const store = await initEventStore();
+  // PAN-2893: agent lifecycle events refresh the membership + resource-discovery
+  // caches immediately, so `pan start` reaches the issues pane in seconds instead
+  // of waiting out the 30s/5m TTLs. Must start AFTER initEventStore() resolves —
+  // getEventStore() throws before that.
+  startResourceRefreshTriggers();
+  console.log('[overdeck] ResourceRefreshTriggers started (event-driven cache refresh)');
   store.subscribe((event) => {
     if (event.type === 'agent.stopped' || event.type === 'agent.heartbeat_dead') {
       const agentId = typeof (event.payload as { agentId?: unknown }).agentId === 'string'
