@@ -36,7 +36,11 @@ describe('state-plane documentation', () => {
     const matches = readdirSync('docs', { withFileTypes: true })
       .filter((entry) => entry.isFile())
       .map((entry) => `docs/${entry.name}`)
-      .filter((file) => /\.pan\/(records|specs|drafts)/.test(readFileSync(file, 'utf8')))
+      .filter((file) => {
+        const text = readFileSync(file, 'utf8')
+          .replaceAll('<workspace>/.pan/drafts/<ISSUE>.md', '');
+        return /\.pan\/(records|specs|drafts)/.test(text);
+      })
       .sort();
     expect(matches).toEqual([
       'docs/FLYWHEEL-STATE.md',
