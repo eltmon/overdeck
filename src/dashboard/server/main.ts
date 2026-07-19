@@ -73,6 +73,7 @@ import { startEventLoopMonitor, stopEventLoopMonitor } from './services/event-lo
 import { formatBootGateState, resolveBootGates } from '../../lib/boot-gates.js';
 import { startBootReconciliation } from '../../lib/cloister/boot-reconciliation.js';
 import { startDeaconChild, stopDeaconChild } from './services/deacon-supervisor.js';
+import { stopAllKnowledgeViewers } from './services/knowledge-viewer.js';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { Layer } from 'effect';
@@ -661,6 +662,7 @@ const handleShutdownSignal = async (signal: NodeJS.Signals) => {
   stopCostReconcileService();
   stopStaleCheckRetriggerService();
   stopRestartAnnouncer();
+  await stopAllKnowledgeViewers().catch((err) => console.warn('[knowledge-viewer] shutdown failed:', err?.message ?? err));
   await stopDeaconChild().catch((err) => console.warn('[deacon-supervisor] child shutdown failed:', err?.message ?? err));
   try {
     // Reap only quality-gate trees owned by this dashboard process. Normal
