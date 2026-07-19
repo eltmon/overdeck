@@ -741,20 +741,21 @@
     "recordedAt": "2026-07-19T02:54:08.900Z"
   },
   "created": "2026-07-17T12:54:46.866Z",
-  "updated": "2026-07-19T03:01:22.777Z",
+  "updated": "2026-07-19T03:05:29.205Z",
   "pipeline": {
     "issueId": "PAN-2829",
-    "reviewStatus": "passed",
+    "reviewStatus": "pending",
     "testStatus": "passed",
-    "verificationStatus": "running",
+    "verificationStatus": "failed",
     "inspectStatus": "passed",
     "mergeStatus": "merged",
     "releaseStatus": "skipped",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-19T02:54:58.005Z",
-    "updatedAt": "2026-07-19T03:01:21.229Z",
+    "updatedAt": "2026-07-19T03:05:29.125Z",
     "reviewNotes": "Review bypassed: verification passed but review infrastructure repeatedly failed.",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
+    "verificationNotes": "Branch has no implementation — only pipeline artifacts (.pan/vBRIEF task state) changed vs origin/main. The work agent produced no code (likely a kickoff-delivery zombie — PAN-2179).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2889",
     "reviewedAtCommit": "de5b0152ccb2a600bde13bd9e0579ca867abf06e",
     "reviewRequestedAt": "2026-07-19T02:54:58.005Z",
@@ -1465,7 +1466,7 @@
       },
       "costAtCloseOut": {
         "usd": 287.965057,
-        "pricingAsOf": "2026-07-19T03:01:22.428Z"
+        "pricingAsOf": "2026-07-19T03:05:29.141Z"
       }
     },
     "merges": [
