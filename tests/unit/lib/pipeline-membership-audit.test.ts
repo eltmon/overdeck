@@ -28,7 +28,7 @@ function signals(overrides: Partial<IssueLensSignals>): IssueLensSignals {
     hasOpenPr: false,
     hasMergedPr: false,
     hasConventionBranch: false,
-    branchUnmerged: false,
+    branchUnmerged: false, hasMergedBranchWork: false,
     phaseLabel: null,
     hasVbriefSpec: false,
     explicitlyReady: false,
@@ -86,7 +86,7 @@ describe('pipeline membership no-loss audit', () => {
   it('names both convention branches in the branch-backed planned backlog reason', () => {
     const membership = resolvePipelineMembership(signals({
       hasConventionBranch: true,
-      branchUnmerged: true,
+      branchUnmerged: true, hasMergedBranchWork: false,
     }));
 
     expect(membership.bucket).toBe('planned_backlog');

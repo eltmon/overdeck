@@ -36,7 +36,7 @@ function signal(issueId: string, overrides: Record<string, unknown> = {}) {
     hasOpenPr: true,
     hasMergedPr: false,
     hasConventionBranch: true,
-    branchUnmerged: true,
+    branchUnmerged: true, hasMergedBranchWork: false,
     phaseLabel: 'in-review',
     hasVbriefSpec: true,
     explicitlyReady: false,
@@ -147,7 +147,7 @@ describe('pendingCommand', () => {
   it('prints resolver membership and drift when review status is empty', async () => {
     gatherProjects.mockResolvedValue([{
       project: { name: 'overdeck', path: '/project' },
-      signals: [signal('PAN-10', { hasOpenPr: false, hasMergedPr: true, hasConventionBranch: false, branchUnmerged: false, phaseLabel: null })],
+      signals: [signal('PAN-10', { hasOpenPr: false, hasMergedPr: true, hasConventionBranch: false, branchUnmerged: false, hasMergedBranchWork: false, phaseLabel: null })],
     }]);
 
     await pendingCommand();

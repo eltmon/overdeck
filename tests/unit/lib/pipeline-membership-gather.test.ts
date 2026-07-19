@@ -88,11 +88,32 @@ describe('gatherProjectLensSignals', () => {
     const result = await gatherProjectLensSignals(project, deps());
 
     expect(result).toEqual([
-      { issueId: 'PAN-1', issueOpen: true, hasOpenPr: false, hasMergedPr: true, hasConventionBranch: true, branchUnmerged: true, phaseLabel: 'in-review', hasVbriefSpec: false, explicitlyReady: false },
-      { issueId: 'PAN-2', issueOpen: false, hasOpenPr: true, hasMergedPr: false, hasConventionBranch: false, branchUnmerged: false, phaseLabel: null, hasVbriefSpec: false, explicitlyReady: false },
-      { issueId: 'PAN-3', issueOpen: false, hasOpenPr: false, hasMergedPr: false, hasConventionBranch: true, branchUnmerged: true, phaseLabel: null, hasVbriefSpec: false, explicitlyReady: false },
-      { issueId: 'PAN-4', issueOpen: true, hasOpenPr: false, hasMergedPr: false, hasConventionBranch: false, branchUnmerged: false, phaseLabel: null, hasVbriefSpec: true, explicitlyReady: false },
+      { issueId: 'PAN-1', issueOpen: true, hasOpenPr: false, hasMergedPr: true, hasConventionBranch: true, branchUnmerged: true, hasMergedBranchWork: false, phaseLabel: 'in-review', hasVbriefSpec: false, explicitlyReady: false },
+      { issueId: 'PAN-2', issueOpen: false, hasOpenPr: true, hasMergedPr: false, hasConventionBranch: false, branchUnmerged: false, hasMergedBranchWork: false, phaseLabel: null, hasVbriefSpec: false, explicitlyReady: false },
+      { issueId: 'PAN-3', issueOpen: false, hasOpenPr: false, hasMergedPr: false, hasConventionBranch: true, branchUnmerged: true, hasMergedBranchWork: false, phaseLabel: null, hasVbriefSpec: false, explicitlyReady: false },
+      { issueId: 'PAN-4', issueOpen: true, hasOpenPr: false, hasMergedPr: false, hasConventionBranch: false, branchUnmerged: false, hasMergedBranchWork: false, phaseLabel: null, hasVbriefSpec: true, explicitlyReady: false },
     ]);
+  });
+
+  it('PAN-2887: contained branch off main first-parent line yields hasMergedBranchWork; fresh zero-ahead branch does not', async () => {
+    const mocked = deps();
+    mocked.listOpenIssues = vi.fn().mockResolvedValue([{ number: 7, labels: [] }, { number: 8, labels: [] }]);
+    mocked.listOpenPullRequests = vi.fn().mockResolvedValue([]);
+    mocked.listMergedPullRequestHeads = vi.fn().mockResolvedValue([]);
+    mocked.listSpecIssueIds = vi.fn().mockResolvedValue([]);
+    mocked.run = vi.fn().mockImplementation(async (command, args: string[]) => {
+      if (command !== 'git') throw new Error(`Unexpected command: ${command}`);
+      // feature/pan-7 tip = merge-lineage commit (bbb, NOT first-parent) → landed work.
+      // feature/pan-8 tip = main's HEAD (aaa, first-parent) → fresh branch, no work.
+      if (args[0] === 'rev-list') return 'aaa\nccc\n';
+      if (args.includes('--no-merged=main')) return '';
+      return 'bbb feature/pan-7\naaa feature/pan-8\n';
+    });
+
+    const result = await gatherProjectLensSignals(project, mocked);
+    const byId = new Map(result.map((signal) => [signal.issueId, signal]));
+    expect(byId.get('PAN-7')).toMatchObject({ hasConventionBranch: true, branchUnmerged: false, hasMergedBranchWork: true });
+    expect(byId.get('PAN-8')).toMatchObject({ hasConventionBranch: true, branchUnmerged: false, hasMergedBranchWork: false });
   });
 
   it('gathers local and remote strike branches as unmerged convention branches', async () => {
@@ -118,12 +139,13 @@ describe('gatherProjectLensSignals', () => {
 
     expect(mocked.run).toHaveBeenCalledWith('git', [
       'for-each-ref',
-      '--format=%(refname:short)',
+      '--format=%(objectname) %(refname:short)',
       'refs/heads/feature/*',
       'refs/remotes/origin/feature/*',
       'refs/heads/strike/*',
       'refs/remotes/origin/strike/*',
     ], project.path);
+    expect(mocked.run).toHaveBeenCalledWith('git', ['rev-list', '--first-parent', 'main'], project.path);
     expect(mocked.run).toHaveBeenCalledWith('git', [
       'for-each-ref',
       '--no-merged=main',
@@ -139,8 +161,8 @@ describe('gatherProjectLensSignals', () => {
       ['strike/pan-20', 'feature/pan-20', 'strike/pan-21', 'feature/pan-21'],
     );
     expect(result).toEqual([
-      { issueId: 'PAN-20', issueOpen: true, hasOpenPr: false, hasMergedPr: false, hasConventionBranch: true, branchUnmerged: true, phaseLabel: null, hasVbriefSpec: false, explicitlyReady: false },
-      { issueId: 'PAN-21', issueOpen: false, hasOpenPr: false, hasMergedPr: false, hasConventionBranch: true, branchUnmerged: true, phaseLabel: null, hasVbriefSpec: false, explicitlyReady: false },
+      { issueId: 'PAN-20', issueOpen: true, hasOpenPr: false, hasMergedPr: false, hasConventionBranch: true, branchUnmerged: true, hasMergedBranchWork: false, phaseLabel: null, hasVbriefSpec: false, explicitlyReady: false },
+      { issueId: 'PAN-21', issueOpen: false, hasOpenPr: false, hasMergedPr: false, hasConventionBranch: true, branchUnmerged: true, hasMergedBranchWork: false, phaseLabel: null, hasVbriefSpec: false, explicitlyReady: false },
     ]);
     expect(resolvePipelineMembership(result[0]!)).toMatchObject({
       bucket: 'planned_backlog',
@@ -163,7 +185,7 @@ describe('gatherProjectLensSignals', () => {
     mocked.run = vi.fn().mockResolvedValue('strike/pan-2879\nstrike/pan-2778\n');
 
     await expect(gatherProjectLensSignals(project, mocked)).resolves.toEqual([
-      { issueId: 'PAN-2879', issueOpen: true, hasOpenPr: false, hasMergedPr: false, hasConventionBranch: true, branchUnmerged: true, phaseLabel: null, hasVbriefSpec: false, explicitlyReady: false },
+      { issueId: 'PAN-2879', issueOpen: true, hasOpenPr: false, hasMergedPr: false, hasConventionBranch: true, branchUnmerged: true, hasMergedBranchWork: false, phaseLabel: null, hasVbriefSpec: false, explicitlyReady: false },
     ]);
   });
 
@@ -186,7 +208,7 @@ describe('gatherProjectLensSignals', () => {
       hasOpenPr: true,
       hasMergedPr: false,
       hasConventionBranch: false,
-      branchUnmerged: false,
+      branchUnmerged: false, hasMergedBranchWork: false,
       phaseLabel: null,
       hasVbriefSpec: false,
       explicitlyReady: false,
@@ -219,7 +241,7 @@ describe('gatherProjectLensSignals', () => {
       hasOpenPr: false,
       hasMergedPr: true,
       hasConventionBranch: false,
-      branchUnmerged: false,
+      branchUnmerged: false, hasMergedBranchWork: false,
       phaseLabel: null,
       hasVbriefSpec: false,
       explicitlyReady: false,
@@ -256,7 +278,7 @@ describe('gatherProjectLensSignals', () => {
       hasOpenPr: false,
       hasMergedPr: true,
       hasConventionBranch: true,
-      branchUnmerged: true,
+      branchUnmerged: true, hasMergedBranchWork: false,
       phaseLabel: null,
       hasVbriefSpec: false,
       explicitlyReady: false,
@@ -310,16 +332,16 @@ describe('gatherProjectLensSignals', () => {
     };
 
     await expect(gatherProjectLensSignals(mixedTrackerProject, mocked)).resolves.toEqual([
-      { issueId: 'MIN-1', issueOpen: true, hasOpenPr: false, hasMergedPr: false, hasConventionBranch: false, branchUnmerged: false, phaseLabel: 'in-progress', hasVbriefSpec: false, explicitlyReady: false },
-      { issueId: 'MIN-2', issueOpen: false, hasOpenPr: false, hasMergedPr: false, hasConventionBranch: true, branchUnmerged: true, phaseLabel: null, hasVbriefSpec: false, explicitlyReady: false },
-      { issueId: 'MIN-3', issueOpen: false, hasOpenPr: false, hasMergedPr: false, hasConventionBranch: false, branchUnmerged: false, phaseLabel: null, hasVbriefSpec: true, explicitlyReady: false },
+      { issueId: 'MIN-1', issueOpen: true, hasOpenPr: false, hasMergedPr: false, hasConventionBranch: false, branchUnmerged: false, hasMergedBranchWork: false, phaseLabel: 'in-progress', hasVbriefSpec: false, explicitlyReady: false },
+      { issueId: 'MIN-2', issueOpen: false, hasOpenPr: false, hasMergedPr: false, hasConventionBranch: true, branchUnmerged: true, hasMergedBranchWork: false, phaseLabel: null, hasVbriefSpec: false, explicitlyReady: false },
+      { issueId: 'MIN-3', issueOpen: false, hasOpenPr: false, hasMergedPr: false, hasConventionBranch: false, branchUnmerged: false, hasMergedBranchWork: false, phaseLabel: null, hasVbriefSpec: true, explicitlyReady: false },
     ]);
     expect(mocked.listTrackerIssues).toHaveBeenCalledWith(mixedTrackerProject);
     expect(mocked.listOpenIssues).not.toHaveBeenCalled();
     expect(mocked.listOpenPullRequests).not.toHaveBeenCalled();
     expect(mocked.listMergedPullRequestHeads).not.toHaveBeenCalled();
     expect(mocked.listIssueStates).not.toHaveBeenCalled();
-    expect(mocked.run).toHaveBeenCalledTimes(4);
+    expect(mocked.run).toHaveBeenCalledTimes(6);
   });
 
   it('rejects GitHub projects without an issue prefix', async () => {

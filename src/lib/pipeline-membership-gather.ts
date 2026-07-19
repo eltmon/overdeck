@@ -312,9 +312,9 @@ export async function gatherProjectLensSignals(
 
   const repositories = projectRepositories(project);
   const branchSnapshots = repositories.map(async (repository) => {
-    const [refs, unmergedRefs] = await Promise.all([
+    const [refs, unmergedRefs, firstParentShas] = await Promise.all([
       deps.run('git', [
-        'for-each-ref', '--format=%(refname:short)',
+        'for-each-ref', '--format=%(objectname) %(refname:short)',
         'refs/heads/feature/*', 'refs/remotes/origin/feature/*',
         'refs/heads/strike/*', 'refs/remotes/origin/strike/*',
       ], repository.path),
@@ -324,8 +324,13 @@ export async function gatherProjectLensSignals(
         'refs/heads/feature/*', 'refs/remotes/origin/feature/*',
         'refs/heads/strike/*', 'refs/remotes/origin/strike/*',
       ], repository.path),
+      // L2-work (PAN-2887): main's first-parent line. A contained branch whose
+      // tip is ON this line has zero unique commits (fresh pointer, not landed
+      // work); a contained tip OFF this line arrived via a merge — positive
+      // non-PR merge evidence.
+      deps.run('git', ['rev-list', '--first-parent', repository.defaultBranch], repository.path),
     ]);
-    return { refs, unmergedRefs };
+    return { refs, unmergedRefs, firstParentShas };
   });
 
   const [trackerIssues, openIssues, phaseLabeledIssues, openPrs, branches, specIssueIds] = await Promise.all([
@@ -345,6 +350,7 @@ export async function gatherProjectLensSignals(
   const headRefsByIssue = new Map<string, Set<string>>();
   const branchIssues = new Set<string>();
   const unmergedBranchIssues = new Set<string>();
+  const mergedBranchWorkIssues = new Set<string>();
   const specIssues = new Set(specIssueIds
     .map((id) => id.toUpperCase())
     .filter((id) => id.startsWith(`${issuePrefix}-`)));
@@ -380,16 +386,27 @@ export async function gatherProjectLensSignals(
     }
   }
   for (const snapshot of branches) {
-    const refs = snapshot.refs.split('\n').map((ref) => ref.trim()).filter(Boolean);
+    const refLines = snapshot.refs.split('\n').map((line) => line.trim()).filter(Boolean);
     const unmerged = new Set(snapshot.unmergedRefs.split('\n').map((ref) => ref.trim()).filter(Boolean));
-    for (const ref of refs) {
+    const firstParentShas = new Set(snapshot.firstParentShas.split('\n').map((sha) => sha.trim()).filter(Boolean));
+    for (const line of refLines) {
+      // "<objectname> <refname:short>"; tolerate refname-only lines (legacy fixtures).
+      const spaceIdx = line.indexOf(' ');
+      const tipSha = spaceIdx === -1 ? null : line.slice(0, spaceIdx);
+      const ref = spaceIdx === -1 ? line : line.slice(spaceIdx + 1);
       const id = issueIdFromRef(ref, issuePrefix);
       if (id) {
         candidates.add(id);
         branchIssues.add(id);
         const headRef = ref.replace(/^origin\//, '');
         headRefsByIssue.set(id, new Set([...(headRefsByIssue.get(id) ?? []), headRef]));
-        if (unmerged.has(ref)) unmergedBranchIssues.add(id);
+        if (unmerged.has(ref)) {
+          unmergedBranchIssues.add(id);
+        } else if (tipSha && !firstParentShas.has(tipSha)) {
+          // Contained in the default branch AND off its first-parent line ⇒ the
+          // branch's unique commits were merged in — positive non-PR evidence.
+          mergedBranchWorkIssues.add(id);
+        }
       }
     }
   }
@@ -428,6 +445,7 @@ export async function gatherProjectLensSignals(
     hasMergedPr: mergedPrIssues.has(id),
     hasConventionBranch: branchIssues.has(id),
     branchUnmerged: unmergedBranchIssues.has(id),
+    hasMergedBranchWork: mergedBranchWorkIssues.has(id),
     phaseLabel: STALE_PIPELINE_LABELS.find((label) => labelsByIssue.get(id)?.includes(label)) ?? null,
     hasVbriefSpec: specIssues.has(id),
     explicitlyReady: labelsByIssue.get(id)?.includes('ready') ?? false,

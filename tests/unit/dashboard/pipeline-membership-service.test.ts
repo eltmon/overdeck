@@ -30,7 +30,7 @@ describe('pipeline membership service', () => {
   it('caches classified membership within the TTL and refreshes after expiry', async () => {
     const gather = vi.fn().mockResolvedValue([{
       issueId: 'PAN-1', issueOpen: true, hasOpenPr: true, hasMergedPr: false,
-      hasConventionBranch: true, branchUnmerged: true, phaseLabel: 'in-review', hasVbriefSpec: true, explicitlyReady: false,
+      hasConventionBranch: true, branchUnmerged: true, hasMergedBranchWork: false, phaseLabel: 'in-review', hasVbriefSpec: true, explicitlyReady: false,
     }]);
     const getMembership = createPipelineMembershipService({ gather, now: Date.now });
     const project = { name: 'overdeck', path: '/project', github_repo: 'eltmon/overdeck', issue_prefix: 'PAN' };
@@ -64,7 +64,7 @@ describe('pipeline membership service', () => {
   it('resolves non-GitHub projects through the capability-aware gatherer', async () => {
     const signals = [{
       issueId: 'MIN-1', issueOpen: true, hasOpenPr: false, hasMergedPr: false,
-      hasConventionBranch: true, branchUnmerged: true, phaseLabel: null,
+      hasConventionBranch: true, branchUnmerged: true, hasMergedBranchWork: false, phaseLabel: null,
       hasVbriefSpec: false, explicitlyReady: false,
     }];
     const gather = vi.fn().mockResolvedValue(signals);

@@ -8,7 +8,7 @@ const sig = (over: Partial<IssueLensSignals>): IssueLensSignals => ({
   hasOpenPr: false,
   hasMergedPr: false,
   hasConventionBranch: false,
-  branchUnmerged: false,
+  branchUnmerged: false, hasMergedBranchWork: false,
   phaseLabel: null,
   hasVbriefSpec: false,
   explicitlyReady: false,
@@ -97,14 +97,33 @@ describe('resolvePipelineMembership (PAN-1980)', () => {
 
   it('squash-merge pairing: branch reads UNMERGED (L2) but a merged PR exists → post_merge_limbo, L1-merged wins', () => {
     const r = resolvePipelineMembership(
-      sig({ issueOpen: true, hasConventionBranch: true, branchUnmerged: true, hasMergedPr: true }),
+      sig({ issueOpen: true, hasConventionBranch: true, branchUnmerged: true, hasMergedBranchWork: false, hasMergedPr: true }),
     );
     expect(r.bucket).toBe('post_merge_limbo');
     expect(r.lenses.L2_unmergedBranch).toBe(false);
   });
 
-  it('post_merge_limbo: open issue whose branch is already in main (non-PR path), no merged PR', () => {
-    const r = resolvePipelineMembership(sig({ issueOpen: true, hasConventionBranch: true, branchUnmerged: false }));
+  it('post_merge_limbo: open issue whose branch WORK is contained in main (non-PR path, positive evidence), no merged PR', () => {
+    const r = resolvePipelineMembership(sig({
+      issueOpen: true, hasConventionBranch: true, branchUnmerged: false, hasMergedBranchWork: true,
+    }));
     expect(r.bucket).toBe('post_merge_limbo');
+  });
+
+  it('PAN-2887: fresh zero-ahead branch (no unique commits) is planned_backlog, NOT post_merge_limbo', () => {
+    // Every `pan start` creates feature/<id> at main's HEAD; until the first
+    // commit the branch is contained in main with hasMergedBranchWork=false.
+    const r = resolvePipelineMembership(sig({
+      issueOpen: true, hasConventionBranch: true, branchUnmerged: false, hasMergedBranchWork: false,
+    }));
+    expect(r.bucket).toBe('planned_backlog');
+    expect(r.inPipeline).toBe(true);
+  });
+
+  it('PAN-2887: contained branch without merged work stays planned_backlog even with a spec', () => {
+    const r = resolvePipelineMembership(sig({
+      issueOpen: true, hasConventionBranch: true, branchUnmerged: false, hasMergedBranchWork: false, hasVbriefSpec: true,
+    }));
+    expect(r.bucket).toBe('planned_backlog');
   });
 });

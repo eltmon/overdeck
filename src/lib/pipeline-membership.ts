@@ -49,6 +49,14 @@ export interface IssueLensSignals {
    * the resolver always trusts {@link hasMergedPr} over this.
    */
   branchUnmerged: boolean;
+  /**
+   * L2-work — positive non-PR merge evidence (PAN-2887): a convention branch is
+   * contained in main AND its tip sits OFF main's first-parent line, i.e. the
+   * branch carried unique commits that arrived via a merge. A branch whose tip
+   * IS a first-parent main commit is just a pointer at main (freshly created or
+   * never started) — zero unique work, NOT evidence anything landed.
+   */
+  hasMergedBranchWork: boolean;
   /** L4 — current-phase label (in-review/in-progress/planned/verifying-on-main/…), else null. */
   phaseLabel: string | null;
   /** L6-spec — a durable vBRIEF spec exists on `overdeck-state`; gather via `findSpecByIssue`, never the DB. */
@@ -139,10 +147,19 @@ export function resolvePipelineMembership(s: IssueLensSignals): PipelineMembersh
     return result('planned_backlog', 'open issue with an unmerged convention branch (feature/ or strike/) but no PR — needs a PR or disposition');
   }
   if (s.hasConventionBranch) {
-    // Branch exists, L2 says it is already in main, but no merged PR was found —
-    // work landed via a non-PR path (merge-agent / direct commit, §2e); the open
-    // issue still needs closing out.
-    return result('post_merge_limbo', 'open issue whose branch is already in main but with no merged PR — landed via a non-PR path; run close-out');
+    if (s.hasMergedBranchWork) {
+      // Branch exists, its unique commits are contained in main (merge lineage),
+      // but no merged PR was found — work landed via a non-PR path (merge-agent /
+      // direct commit, §2e); the open issue still needs closing out.
+      return result('post_merge_limbo', 'open issue whose branch work is contained in main but with no merged PR — landed via a non-PR path; run close-out');
+    }
+    // PAN-2887: a contained branch with NO unique commits is a branch that was
+    // created and never (or not yet) worked — every `pan start` sits here from
+    // workspace prep until the first commit. Absence of unmerged work is NOT
+    // evidence of a landing; only hasMergedBranchWork is. (Known blind spot:
+    // a fast-forward-landed branch is indistinguishable from a fresh pointer
+    // and classifies as backlog — visible and safe, unlike false close-out.)
+    return result('planned_backlog', 'open issue with a convention branch but no unique commits — created, work not yet landed; needs work or disposition');
   }
   if (s.hasVbriefSpec) {
     return result(
