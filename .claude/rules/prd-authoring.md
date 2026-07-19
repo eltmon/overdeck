@@ -3,7 +3,7 @@ scope: universal
 ---
 ### PRD / spec authoring — write for the cheapest model that will execute it
 
-PRDs, specs, and plans (e.g. `.pan/drafts/<issue>.md`, vBRIEF items) are executed
+PRDs, specs, and plans (e.g. `.pan/drafts/<issue>.md`, xBRIEF items) are executed
 by implementation agents that may run on cheaper or smaller models than the one
 that wrote the plan. Ambiguity in the spec becomes wrong guesses in the diff.
 Author every plan so it can be executed without re-research or judgment calls:

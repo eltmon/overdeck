@@ -284,7 +284,7 @@ function renderCommandDeck(props?: Partial<React.ComponentProps<typeof CommandDe
                 remoteBranchCount: 0,
                 tmuxSessionCount: 0,
                 prs: [],
-                hasVbrief: false,
+                hasXbrief: false,
                 hasTasks: false,
                 dockerContainerCount: 0,
                 conversations: [],

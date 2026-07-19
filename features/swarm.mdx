@@ -11,7 +11,7 @@ A swarm runs one work agent per plan item, in parallel, on the same issue. Each 
 
 ## When to Use a Swarm
 
-A swarm fits when an issue's vBRIEF plan splits into several items that can be implemented independently. If the plan is one linear sequence, a single work agent is faster — there is nothing to parallelize.
+A swarm fits when an issue's xBRIEF plan splits into several items that can be implemented independently. If the plan is one linear sequence, a single work agent is faster — there is nothing to parallelize.
 
 Use a swarm when:
 
@@ -23,7 +23,7 @@ Use a swarm when:
 
 ![Per-item DAG dispatch with synthesis](/images/swarm/dag-dispatch.png)
 
-Items A, B, C, D, E are vBRIEF items wired by `blocks` edges. A has merged into the feature branch. B and D are running in slots 1 and 2. C is ready, but its `files_scope` overlaps B's, so the dispatcher defers it. E has two blocking parents (B and D) — a **synthesis agent** runs at the convergence point, writes a `SynthesisOutput`, and the E work-agent reads that context block from its prompt.
+Items A, B, C, D, E are xBRIEF items wired by `blocks` edges. A has merged into the feature branch. B and D are running in slots 1 and 2. C is ready, but its `files_scope` overlaps B's, so the dispatcher defers it. E has two blocking parents (B and D) — a **synthesis agent** runs at the convergence point, writes a `SynthesisOutput`, and the E work-agent reads that context block from its prompt.
 
 | Surface | Single-agent (default) | Swarm slot |
 |---|---|---|
@@ -73,7 +73,7 @@ pan swarm <id> --task unblock --item <itemId>
 pan swarm <id> --task cancel --item <itemId>
 ```
 
-Pass `--sequence <n>` to enforce CAS. A mismatch raises `vBRIEF sequence conflict` and the write is rejected.
+Pass `--sequence <n>` to enforce CAS. A mismatch raises `xBRIEF sequence conflict` and the write is rejected.
 
 ## HTTP Surface
 
@@ -89,7 +89,7 @@ The two mutating routes require `INTERNAL_TOKEN_HEADER`. `POST /api/swarm` addit
 
 ## Plan Authoring: `files_scope` and Synthesis
 
-Two fields on `VBriefItem.metadata` control swarm behavior.
+Two fields on `XBriefItem.metadata` control swarm behavior.
 
 | Field | Purpose |
 |---|---|
@@ -100,7 +100,7 @@ Plans that omit `files_scope` will still run — but every parallel pair is trea
 
 ## Runtime State
 
-Swarm runtime state lives in `<projectRoot>/.pan/continues/<issue>.vbrief.json` under `ContinueState.swarmRuntime`. The old PAN-970 sidecar (`~/.overdeck/swarms/<id>.json`) is gone.
+Swarm runtime state lives in `<projectRoot>/.pan/continues/<issue>.xbrief.json` under `ContinueState.swarmRuntime`. The old PAN-970 sidecar (`~/.overdeck/swarms/<id>.json`) is gone.
 
 ```ts
 interface SwarmRuntime {

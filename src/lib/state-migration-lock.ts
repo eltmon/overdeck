@@ -7,10 +7,12 @@ export function stateMigrationLockPath(projectKey: string): string {
 }
 
 export function isStateMigrationLocked(projectKey: string): boolean {
+  const path = stateMigrationLockPath(projectKey);
+  mkdirSync(dirname(path), { recursive: true });
   try {
-    const fd = openSync(stateMigrationLockPath(projectKey), 'wx');
+    const fd = openSync(path, 'wx');
     closeSync(fd);
-    rmSync(stateMigrationLockPath(projectKey));
+    rmSync(path);
     return false;
   } catch {
     return true;

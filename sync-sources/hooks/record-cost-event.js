@@ -25962,9 +25962,11 @@ function stateMigrationLockPath(projectKey) {
 	return join$1(getOverdeckHome(), "locks", "state-migration", `${projectKey}.lock`);
 }
 function isStateMigrationLocked(projectKey) {
+	const path = stateMigrationLockPath(projectKey);
+	mkdirSync$1(dirname$1(path), { recursive: true });
 	try {
-		closeSync$1(openSync$1(stateMigrationLockPath(projectKey), "wx"));
-		rmSync(stateMigrationLockPath(projectKey));
+		closeSync$1(openSync$1(path, "wx"));
+		rmSync(path);
 		return false;
 	} catch {
 		return true;
@@ -26025,7 +26027,9 @@ async function isStatePlaneOnlyDiff(baseSha, tipSha, repoRoot) {
 * sync-state-via-commit shape this helper produces is the substrate for that.
 */
 const spawnerLayer = layer$4.pipe(provide$2(mergeAll(layer$2, layer)));
+const DEFAULT_STATE_GIT_TIMEOUT_MS = 3e4;
 const DEFAULT_STATE_PUSH_TIMEOUT_MS = 3e4;
+const DEFAULT_STATE_FLUSH_TIMEOUT_MS = 6e4;
 function parsePositiveInteger(value, fallback) {
 	if (!value) return fallback;
 	const parsed = Number(value);
@@ -26054,9 +26058,10 @@ function isAutoCommitExcludedPath(relativePath) {
 	return false;
 }
 const pending = /* @__PURE__ */ new Map();
-let serializer = Promise.resolve();
+const active = /* @__PURE__ */ new Map();
+const serializers = /* @__PURE__ */ new Map();
 /** Run a git subcommand. Fails with GitError on non-zero exit. */
-function runGit(args, cwd) {
+function runGitRaw(args, cwd) {
 	return gen(function* () {
 		const handle = yield* make$1("git", [...args], {
 			cwd,
@@ -26076,10 +26081,13 @@ function runGit(args, cwd) {
 			stderr: stderrBuf.toString("utf-8"),
 			exitCode
 		};
-	}).pipe(scoped, provide(spawnerLayer), catchCause((cause) => fail(causeToGitError(cause, args))));
+	}).pipe(scoped, provide(spawnerLayer));
+}
+function runGit(args, cwd) {
+	return runGitWithTimeout(args, cwd, parsePositiveInteger(process.env.OVERDECK_STATE_GIT_TIMEOUT_MS, DEFAULT_STATE_GIT_TIMEOUT_MS));
 }
 function runGitWithTimeout(args, cwd, timeoutMs) {
-	return runGit(args, cwd).pipe(timeout(millis(timeoutMs)), catchCause((cause) => fail(causeToGitError(cause, args))));
+	return runGitRaw(args, cwd).pipe(timeout(millis(timeoutMs)), catchCause((cause) => fail(causeToGitError(cause, args))));
 }
 function causeToGitError(cause, args) {
 	const squashed = squash(cause);
@@ -26139,31 +26147,120 @@ function queueAutoCommit(opts) {
 	});
 }
 /**
-* Force a flush of any pending commits for `projectRoot`. Returns an Effect that
-* resolves after the commit attempt (success or no-op).
+* Force a flush of every pending or active commit that targets the same Git
+* checkout as `projectRoot`. Callers may pass either a logical project root or
+* the effective Git root; the Effect resolves only after every matching writer
+* has settled.
 */
-function flushAutoCommits(projectRoot) {
-	return promise(() => flushPromise(projectRoot));
+function flushAutoCommits(projectRoot, signal) {
+	return promise(() => flushPromise(projectRoot, signal));
 }
-function flushPromise(projectRoot) {
-	const batch = pending.get(projectRoot);
-	if (!batch) return Promise.resolve({
-		committed: false,
-		reason: "no pending"
-	});
-	clearTimeout(batch.timer);
-	return flushInner(projectRoot);
+function flushPromise(projectRoot, signal) {
+	const gitRoot = pending.get(projectRoot)?.repoRoot ?? active.get(projectRoot)?.gitRoot ?? projectRoot;
+	const matching = /* @__PURE__ */ new Set();
+	for (const [queuedProjectRoot, batch] of pending) {
+		if ((batch.repoRoot ?? queuedProjectRoot) !== gitRoot) continue;
+		clearTimeout(batch.timer);
+		const started = flushInner(queuedProjectRoot);
+		if (started) matching.add(started);
+	}
+	for (const activeFlush of active.values()) if (activeFlush.gitRoot === gitRoot) matching.add(activeFlush);
+	if (matching.size === 0) {
+		signal?.throwIfAborted();
+		return Promise.resolve({
+			committed: false,
+			reason: "no pending"
+		});
+	}
+	return waitForFlushes(gitRoot, [...matching], signal);
 }
 function flushInner(projectRoot) {
 	const batch = pending.get(projectRoot);
-	if (!batch) return Promise.resolve({
-		committed: false,
-		reason: "no pending"
-	});
+	if (!batch) return active.get(projectRoot);
 	pending.delete(projectRoot);
-	const task = serializer.then(() => runPromise(doCommit(projectRoot, batch)));
-	serializer = task.catch(() => void 0);
-	return task;
+	return startSerializedFlush(projectRoot, batch.repoRoot ?? projectRoot, doBoundedCommit(projectRoot, batch));
+}
+function startSerializedFlush(projectRoot, gitRoot, operation) {
+	const prior = serializers.get(gitRoot) ?? Promise.resolve();
+	const controller = new AbortController();
+	const promise = prior.then(() => {
+		controller.signal.throwIfAborted();
+		return runPromise(operation, { signal: controller.signal });
+	});
+	const activeFlush = {
+		controller,
+		gitRoot,
+		promise
+	};
+	active.set(projectRoot, activeFlush);
+	const tail = promise.catch(() => void 0);
+	serializers.set(gitRoot, tail);
+	promise.then(() => clearActiveFlush(projectRoot, activeFlush, tail), () => clearActiveFlush(projectRoot, activeFlush, tail));
+	return activeFlush;
+}
+async function waitForFlushes(gitRoot, activeFlushes, signal) {
+	const completion = Promise.all(activeFlushes.map((flush) => flush.promise)).then(combineFlushResults);
+	if (!signal) return completion;
+	if (signal.aborted) {
+		await abortAndSettleGitRoot(gitRoot, signal.reason);
+		throw signal.reason;
+	}
+	return new Promise((resolve, reject) => {
+		let completed = false;
+		const onAbort = () => {
+			if (completed) return;
+			completed = true;
+			signal.removeEventListener("abort", onAbort);
+			abortAndSettleGitRoot(gitRoot, signal.reason).then(() => reject(signal.reason), reject);
+		};
+		signal.addEventListener("abort", onAbort, { once: true });
+		completion.then((result) => {
+			if (completed) return;
+			completed = true;
+			signal.removeEventListener("abort", onAbort);
+			resolve(result);
+		}, (error) => {
+			if (completed) return;
+			completed = true;
+			signal.removeEventListener("abort", onAbort);
+			reject(error);
+		});
+		if (signal.aborted) onAbort();
+	});
+}
+function combineFlushResults(results) {
+	if (results.length === 1) return results[0];
+	const combined = { committed: results.some((result) => result.committed) };
+	const committed = results.filter((result) => result.committed);
+	if (committed.some((result) => result.pushed === false)) combined.pushed = false;
+	else if (committed.length > 0 && committed.every((result) => result.pushed === true)) combined.pushed = true;
+	if (results.some((result) => result.errored)) combined.errored = true;
+	const reasons = results.flatMap((result) => result.reason ? [result.reason] : []);
+	if (reasons.length > 0) combined.reason = reasons.join("; ");
+	return combined;
+}
+async function abortAndSettleGitRoot(gitRoot, reason) {
+	const matching = [...active.values()].filter((flush) => flush.gitRoot === gitRoot);
+	for (const flush of matching) flush.controller.abort(reason);
+	await Promise.allSettled(matching.map((flush) => flush.promise));
+}
+function clearActiveFlush(projectRoot, activeFlush, tail) {
+	if (active.get(projectRoot) === activeFlush) active.delete(projectRoot);
+	if (serializers.get(activeFlush.gitRoot) === tail) serializers.delete(activeFlush.gitRoot);
+}
+function doBoundedCommit(projectRoot, batch) {
+	return boundStateFlush(doCommit(projectRoot, batch));
+}
+function boundStateFlush(operation, timeoutMs = parsePositiveInteger(process.env.OVERDECK_STATE_FLUSH_TIMEOUT_MS, DEFAULT_STATE_FLUSH_TIMEOUT_MS)) {
+	return operation.pipe(timeout(millis(timeoutMs)), catchCause((cause) => {
+		const reason = `state writer timed out after ${timeoutMs / 1e3}s: ${String(squash(cause))}`;
+		console.warn(`[pan-dir/auto-commit] ${reason}`);
+		return succeed({
+			committed: false,
+			errored: true,
+			reason
+		});
+	}));
 }
 function doCommit(projectRoot, batch) {
 	const gitRoot = batch.repoRoot ?? projectRoot;
@@ -26443,10 +26540,10 @@ function getIssueRecordBasePath(project, issueId) {
 */
 function preserveCloseOutSync(path, record) {
 	const incoming = record.closeOut;
-	if (!(!incoming || Object.keys(incoming.usage?.byStage ?? {}).length === 0 && Object.keys(incoming.usage?.totals ?? {}).length === 0 && (incoming.merges ?? []).length === 0) || !existsSync$1(path)) return record;
+	if (!(!incoming || Object.keys(incoming.usage?.byStage ?? {}).length === 0 && Object.keys(incoming.usage?.totals ?? {}).length === 0 && (incoming.merges ?? []).length === 0 && !incoming.dodGate) || !existsSync$1(path)) return record;
 	try {
 		const disk = JSON.parse(readFileSync$1(path, "utf-8")).closeOut;
-		if (disk && (Object.keys(disk.usage?.byStage ?? {}).length > 0 || Object.keys(disk.usage?.totals ?? {}).length > 0 || (disk.merges ?? []).length > 0)) {
+		if (disk && (Object.keys(disk.usage?.byStage ?? {}).length > 0 || Object.keys(disk.usage?.totals ?? {}).length > 0 || (disk.merges ?? []).length > 0 || Boolean(disk.dodGate))) {
 			console.warn(`[record] Preserving populated closeOut for ${record.issueId} — incoming write carried an empty closeOut (PAN-2466 guard)`);
 			return {
 				...record,
@@ -26490,7 +26587,7 @@ function preserveCorruptRecordSync(path) {
 * renamed file parses as JSON. A mid-write crash can no longer truncate the
 * record in place (rename is atomic); a write that somehow produces unparseable
 * bytes throws instead of leaving a corrupt record for readers to silently
-* fabricate over. Modeled on writePlanFileAtomic (src/lib/vbrief/dag-cli.ts:101).
+* fabricate over. Modeled on writePlanFileAtomic (src/lib/xbrief/dag-cli.ts:101).
 */
 function writeRecordFileAtomicSync(path, record) {
 	preserveCorruptRecordSync(path);
@@ -32263,7 +32360,196 @@ function getOverdeckDatabasePath() {
 	return join$1(getOverdeckHome(), "overdeck.db");
 }
 //#endregion
+//#region ../../src/lib/overdeck/schema-audit.ts
+const EMPTY_TOP_UP_EXPECTATIONS = {
+	columns: [],
+	indexes: []
+};
+function splitTableDefinitions(body) {
+	const definitions = [];
+	let start = 0;
+	let depth = 0;
+	let quote = null;
+	for (let index = 0; index < body.length; index += 1) {
+		const character = body[index];
+		if (quote) {
+			if (character === quote && body[index - 1] !== "\\") quote = null;
+			continue;
+		}
+		if (character === "'" || character === "\"" || character === "`") {
+			quote = character;
+			continue;
+		}
+		if (character === "(") depth += 1;
+		if (character === ")") depth -= 1;
+		if (character === "," && depth === 0) {
+			definitions.push(body.slice(start, index).trim());
+			start = index + 1;
+		}
+	}
+	definitions.push(body.slice(start).trim());
+	return definitions.filter(Boolean);
+}
+function parseOverdeckSchemaExpectations(migrationSql, topUps = EMPTY_TOP_UP_EXPECTATIONS) {
+	const tables = /* @__PURE__ */ new Map();
+	const indexes = /* @__PURE__ */ new Set();
+	for (const statement of migrationSql.split("--> statement-breakpoint")) {
+		const trimmed = statement.trim();
+		const tableMatch = trimmed.match(/^CREATE TABLE(?: IF NOT EXISTS)?\s+`([^`]+)`\s*\(([\s\S]*)\)\s*;?$/i);
+		if (tableMatch) {
+			const [, tableName, body] = tableMatch;
+			const columns = /* @__PURE__ */ new Set();
+			for (const definition of splitTableDefinitions(body)) {
+				const columnMatch = definition.match(/^`([^`]+)`\s+/);
+				if (columnMatch) columns.add(columnMatch[1]);
+			}
+			tables.set(tableName, columns);
+			continue;
+		}
+		const indexMatch = trimmed.match(/^CREATE (?:UNIQUE )?INDEX(?: IF NOT EXISTS)?\s+`([^`]+)`\s+ON\s+`[^`]+`/i);
+		if (indexMatch) indexes.add(indexMatch[1]);
+	}
+	for (const { table, column } of topUps.columns) {
+		const columns = tables.get(table) ?? /* @__PURE__ */ new Set();
+		columns.add(column);
+		tables.set(table, columns);
+	}
+	for (const index of topUps.indexes) indexes.add(index);
+	return {
+		tables,
+		indexes
+	};
+}
+function readOverdeckSchemaExpectationsSync(topUps = EMPTY_TOP_UP_EXPECTATIONS) {
+	return parseOverdeckSchemaExpectations(readFileSync$1(OVERDECK_MIGRATION_PATH, "utf8"), topUps);
+}
+function quoteIdentifier(identifier) {
+	return `"${identifier.replaceAll("\"", "\"\"")}"`;
+}
+function auditOverdeckSchemaSync(db, topUps = EMPTY_TOP_UP_EXPECTATIONS) {
+	const expected = readOverdeckSchemaExpectationsSync(topUps);
+	const artifacts = db.prepare(`
+      SELECT type, name
+      FROM sqlite_master
+      WHERE type IN ('table', 'index')
+        AND name NOT LIKE 'sqlite_%'
+    `).all();
+	const actualTables = new Set(artifacts.filter((artifact) => artifact.type === "table").map((artifact) => artifact.name));
+	const actualIndexes = new Set(artifacts.filter((artifact) => artifact.type === "index").map((artifact) => artifact.name));
+	const missingTables = [...expected.tables.keys()].filter((table) => !actualTables.has(table)).sort();
+	const missingIndexes = [...expected.indexes].filter((index) => !actualIndexes.has(index)).sort();
+	const missingColumns = [];
+	for (const [table, expectedColumns] of expected.tables) {
+		if (!actualTables.has(table)) continue;
+		const actualColumns = new Set(db.prepare(`PRAGMA table_info(${quoteIdentifier(table)})`).all().map((column) => column.name));
+		for (const column of expectedColumns) if (!actualColumns.has(column)) missingColumns.push({
+			table,
+			column
+		});
+	}
+	missingColumns.sort((left, right) => left.table === right.table ? left.column.localeCompare(right.column) : left.table.localeCompare(right.table));
+	return {
+		missingTables,
+		missingIndexes,
+		missingColumns
+	};
+}
+//#endregion
 //#region ../../src/lib/overdeck/infra.ts
+/**
+* Runtime infrastructure for the canonical overdeck.db cache.
+* Schema top-ups tolerate idempotency errors, log unexpected failures without
+* blocking boot, and getOverdeckDatabaseSync follows them with a report-only
+* schema audit that warns about drift without mutating the database.
+*/
+const OVERDECK_SCHEMA_TOP_UP_EXPECTATIONS = {
+	columns: [
+		{
+			table: "discovered_sessions",
+			column: "harness"
+		},
+		{
+			table: "flywheel_substrate_bugs",
+			column: "affected_criteria"
+		},
+		{
+			table: "review_status",
+			column: "release_status"
+		},
+		{
+			table: "review_status",
+			column: "release_notes"
+		},
+		{
+			table: "review_status",
+			column: "inspect_owner_session"
+		},
+		{
+			table: "review_status",
+			column: "strike_ready_head"
+		},
+		{
+			table: "review_status",
+			column: "strike_ready_at"
+		},
+		{
+			table: "review_status",
+			column: "strike_landing_state"
+		},
+		{
+			table: "review_status",
+			column: "strike_recovery_count"
+		},
+		{
+			table: "review_status",
+			column: "strike_landing_attempts"
+		},
+		{
+			table: "agents",
+			column: "yielded_by_scheduler"
+		},
+		{
+			table: "agents",
+			column: "review_discovery_pending"
+		},
+		{
+			table: "agents",
+			column: "review_context_manifest_path"
+		},
+		{
+			table: "agents",
+			column: "review_discovery_ready_at"
+		},
+		{
+			table: "agents",
+			column: "review_convoy_forked_at"
+		},
+		{
+			table: "agents",
+			column: "review_fork_cache_checked"
+		},
+		{
+			table: "agents",
+			column: "review_forked_from_parent"
+		},
+		{
+			table: "agents",
+			column: "yielded_at"
+		},
+		{
+			table: "agents",
+			column: "last_yield_resume_at"
+		}
+	],
+	indexes: [
+		"cost_session_id_idx",
+		"idx_cost_agent_id",
+		"idx_cost_issue_upper",
+		"release_sets_project_idx",
+		"release_set_components_issue_component_idx",
+		"release_set_components_issue_order_idx"
+	]
+};
 const overdeckEvents = sqliteTable("events", {
 	sequence: integer("sequence").primaryKey({ autoIncrement: true }),
 	type: text("type").notNull(),
@@ -32282,56 +32568,50 @@ function runOverdeckMigrationSync(db) {
 	}
 }
 /**
+* Run one idempotent schema top-up without hiding unexpected SQLite failures.
+* Only duplicate DDL is silent; missing tables and other failures are logged so
+* schema drift remains observable without blocking later top-ups or startup.
+*/
+function runSchemaTopUp(db, statement) {
+	try {
+		db.exec(statement);
+	} catch (error) {
+		const message = error instanceof Error ? error.message : String(error);
+		if (/duplicate column name|already exists/i.test(message)) return;
+		console.error(`[schema] top-up failed: ${statement}\n${message}`);
+	}
+}
+/**
 * Idempotent schema top-ups for databases created before a field/index existed
 * in the init migration. The init migration only runs on a fresh database.
 * PAN-2220: the conversation ledger-cost query joins cost_events on session_id;
 * without this index SQLite builds an automatic index on every query (~76ms → 7ms).
 */
 function ensureRuntimeIndexesSync(db) {
-	try {
-		db.exec("ALTER TABLE `discovered_sessions` ADD COLUMN `harness` text");
-	} catch {}
-	try {
-		db.exec("UPDATE `discovered_sessions` SET `harness` = 'claude-code' WHERE `harness` IS NULL");
-	} catch {}
-	try {
-		db.exec("ALTER TABLE `review_status` ADD COLUMN `release_status` text");
-	} catch {}
-	try {
-		db.exec("ALTER TABLE `review_status` ADD COLUMN `release_notes` text");
-	} catch {}
+	runSchemaTopUp(db, "ALTER TABLE `discovered_sessions` ADD COLUMN `harness` text");
+	runSchemaTopUp(db, "UPDATE `discovered_sessions` SET `harness` = 'claude-code' WHERE `harness` IS NULL");
+	runSchemaTopUp(db, "ALTER TABLE `review_status` ADD COLUMN `release_status` text");
+	runSchemaTopUp(db, "ALTER TABLE `review_status` ADD COLUMN `release_notes` text");
+	runSchemaTopUp(db, "ALTER TABLE `review_status` ADD COLUMN `inspect_owner_session` text");
+	runSchemaTopUp(db, "ALTER TABLE `review_status` ADD COLUMN `strike_ready_head` text");
+	runSchemaTopUp(db, "ALTER TABLE `review_status` ADD COLUMN `strike_ready_at` integer");
+	runSchemaTopUp(db, "ALTER TABLE `review_status` ADD COLUMN `strike_landing_state` text");
+	runSchemaTopUp(db, "ALTER TABLE `review_status` ADD COLUMN `strike_recovery_count` integer DEFAULT 0");
+	runSchemaTopUp(db, "ALTER TABLE `review_status` ADD COLUMN `strike_landing_attempts` text");
 	ensureReleaseSetTablesSync(db);
-	try {
-		db.exec("ALTER TABLE `flywheel_substrate_bugs` ADD COLUMN `affected_criteria` text");
-	} catch {}
-	db.exec("CREATE INDEX IF NOT EXISTS `cost_session_id_idx` ON `cost_events` (`session_id`)");
-	try {
-		db.exec("ALTER TABLE `agents` ADD COLUMN `yielded_by_scheduler` integer");
-	} catch {}
-	try {
-		db.exec("ALTER TABLE `agents` ADD COLUMN `review_discovery_pending` integer");
-	} catch {}
-	try {
-		db.exec("ALTER TABLE `agents` ADD COLUMN `review_context_manifest_path` text");
-	} catch {}
-	try {
-		db.exec("ALTER TABLE `agents` ADD COLUMN `review_discovery_ready_at` integer");
-	} catch {}
-	try {
-		db.exec("ALTER TABLE `agents` ADD COLUMN `review_convoy_forked_at` integer");
-	} catch {}
-	try {
-		db.exec("ALTER TABLE `agents` ADD COLUMN `review_fork_cache_checked` integer");
-	} catch {}
-	try {
-		db.exec("ALTER TABLE `agents` ADD COLUMN `review_forked_from_parent` integer");
-	} catch {}
-	try {
-		db.exec("ALTER TABLE `agents` ADD COLUMN `yielded_at` integer");
-	} catch {}
-	try {
-		db.exec("ALTER TABLE `agents` ADD COLUMN `last_yield_resume_at` integer");
-	} catch {}
+	runSchemaTopUp(db, "ALTER TABLE `flywheel_substrate_bugs` ADD COLUMN `affected_criteria` text");
+	runSchemaTopUp(db, "CREATE INDEX IF NOT EXISTS `cost_session_id_idx` ON `cost_events` (`session_id`)");
+	runSchemaTopUp(db, "CREATE INDEX IF NOT EXISTS `idx_cost_agent_id` ON `cost_events` (`agent_id`, `ts`)");
+	runSchemaTopUp(db, "CREATE INDEX IF NOT EXISTS `idx_cost_issue_upper` ON `cost_events` (UPPER(`issue_id`))");
+	runSchemaTopUp(db, "ALTER TABLE `agents` ADD COLUMN `yielded_by_scheduler` integer");
+	runSchemaTopUp(db, "ALTER TABLE `agents` ADD COLUMN `review_discovery_pending` integer");
+	runSchemaTopUp(db, "ALTER TABLE `agents` ADD COLUMN `review_context_manifest_path` text");
+	runSchemaTopUp(db, "ALTER TABLE `agents` ADD COLUMN `review_discovery_ready_at` integer");
+	runSchemaTopUp(db, "ALTER TABLE `agents` ADD COLUMN `review_convoy_forked_at` integer");
+	runSchemaTopUp(db, "ALTER TABLE `agents` ADD COLUMN `review_fork_cache_checked` integer");
+	runSchemaTopUp(db, "ALTER TABLE `agents` ADD COLUMN `review_forked_from_parent` integer");
+	runSchemaTopUp(db, "ALTER TABLE `agents` ADD COLUMN `yielded_at` integer");
+	runSchemaTopUp(db, "ALTER TABLE `agents` ADD COLUMN `last_yield_resume_at` integer");
 }
 /**
 * Idempotent schema top-up for release set tables (PAN-399). Existing overdeck.db
@@ -32373,6 +32653,17 @@ function ensureReleaseSetTablesSync(db) {
 	db.exec("CREATE UNIQUE INDEX IF NOT EXISTS `release_set_components_issue_component_idx` ON `release_set_components` (`issue_id`,`component_key`)");
 	db.exec("CREATE INDEX IF NOT EXISTS `release_set_components_issue_order_idx` ON `release_set_components` (`issue_id`,`release_order`,`component_key`)");
 }
+function warnSchemaDriftSync(db) {
+	try {
+		const report = auditOverdeckSchemaSync(db, OVERDECK_SCHEMA_TOP_UP_EXPECTATIONS);
+		for (const table of report.missingTables) console.warn(`[schema-audit] missing table: ${table}`);
+		for (const index of report.missingIndexes) console.warn(`[schema-audit] missing index: ${index}`);
+		for (const { table, column } of report.missingColumns) console.warn(`[schema-audit] missing column: ${table}.${column}`);
+	} catch (error) {
+		const message = error instanceof Error ? error.message : String(error);
+		console.warn(`[schema-audit] audit failed: ${message}`);
+	}
+}
 function getOverdeckDatabaseSync(dbPath = getOverdeckDatabasePath()) {
 	if (overdeckDbSync?.path === dbPath) return overdeckDbSync.db;
 	if (overdeckDbSync) {
@@ -32387,6 +32678,7 @@ function getOverdeckDatabaseSync(dbPath = getOverdeckDatabasePath()) {
 	db.pragma("synchronous = NORMAL");
 	runOverdeckMigrationSync(db);
 	ensureRuntimeIndexesSync(db);
+	warnSchemaDriftSync(db);
 	overdeckDbSync = {
 		path: dbPath,
 		db

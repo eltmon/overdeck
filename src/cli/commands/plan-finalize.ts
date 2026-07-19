@@ -2,14 +2,14 @@ import chalk from 'chalk';
 import { existsSync, readFileSync, renameSync, writeFileSync } from 'fs';
 import { homedir } from 'os';
 import { dirname, join, resolve } from 'path';
-import { findPlanSync, findWorkspaceDraftPlanSync, readPlanSync, serializeVBriefDocument } from '../../lib/vbrief/io.js';
-import { generateVBriefFilename, slugify } from '../../lib/vbrief/lifecycle.js';
+import { findPlanSync, findWorkspaceDraftPlanSync, readPlanSync, serializeXBriefDocument } from '../../lib/xbrief/io.js';
+import { generateXBriefFilename, slugify } from '../../lib/xbrief/lifecycle.js';
 import { emitActivityEntrySync, emitActivityTtsSync } from '../../lib/activity-logger.js';
 import { getDashboardApiUrlSync } from '../../lib/config.js';
 import { checkPrdGateSync, getIssueDraftPath, MIN_PRD_LINES, type PrdGateResult, PAN_DIRNAME, PAN_SPEC_FILENAME } from '../../lib/pan-dir/index.js';
-import type { VBriefDocument } from '../../lib/vbrief/types.js';
-import { formatQualityIssues, lintPlanQuality, type QualityIssue } from '../../lib/vbrief/quality-lint.js';
-import { analyzeSwarmReadiness, type SwarmReadinessVerdict } from '../../lib/vbrief/swarm-readiness.js';
+import type { XBriefDocument } from '../../lib/xbrief/types.js';
+import { formatQualityIssues, lintPlanQuality, type QualityIssue } from '../../lib/xbrief/quality-lint.js';
+import { analyzeSwarmReadiness, type SwarmReadinessVerdict } from '../../lib/xbrief/swarm-readiness.js';
 import { findProjectByPathSync, getProjectSwarmHotspots } from '../../lib/projects.js';
 
 interface PlanFinalizeOptions {
@@ -28,7 +28,7 @@ export type PlanFinalizeQualityGateResult =
   | { ok: false; skipped: false; issues: QualityIssue[] };
 
 export function evaluatePlanFinalizeQualityGate(
-  doc: VBriefDocument,
+  doc: XBriefDocument,
   options: Pick<PlanFinalizeOptions, 'qualityLint'> & { prdText?: string; hotspots?: string[] } = {},
 ): PlanFinalizeQualityGateResult {
   if (options.qualityLint === false) {
@@ -171,7 +171,7 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
 
   const planPath = findWorkspaceDraftPlanSync(workspacePath) ?? findPlanSync(workspacePath);
   if (!planPath) {
-    const msg = `vBRIEF plan not readable at ${workspacePath}/.pan/spec.vbrief.json`;
+    const msg = `xBRIEF plan not readable at ${workspacePath}/.pan/spec.vbrief.json`;
     if (options.json) console.log(JSON.stringify({ success: false, error: msg }));
     else console.error(chalk.red('✗ ' + msg));
     process.exit(1);
@@ -204,7 +204,7 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
 
   if (!options.json) {
     console.log(chalk.dim(`workspace: ${workspacePath}`));
-    console.log(chalk.dim('finalizing vBRIEF checklist…'));
+    console.log(chalk.dim('finalizing xBRIEF checklist…'));
   }
 
   const planDoc = readPlanSync(planPath);
@@ -219,9 +219,9 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
   } else {
     if (!qualityGate.ok) {
       if (options.json) {
-        console.log(JSON.stringify({ success: false, error: 'vBRIEF quality lint failed', qualityIssues: qualityGate.issues }));
+        console.log(JSON.stringify({ success: false, error: 'xBRIEF quality lint failed', qualityIssues: qualityGate.issues }));
       } else {
-        console.error(chalk.red('✗ vBRIEF quality lint failed:'));
+        console.error(chalk.red('✗ xBRIEF quality lint failed:'));
         for (const line of formatQualityIssues(qualityGate.issues)) {
           console.error(chalk.red('  ' + line));
         }
@@ -236,7 +236,7 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
       if (options.json) {
         console.error(JSON.stringify({ qualityWarnings: warnings }));
       } else {
-        console.error(chalk.yellow('⚠ vBRIEF quality warnings:'));
+        console.error(chalk.yellow('⚠ xBRIEF quality warnings:'));
         for (const line of formatQualityIssues(warnings)) {
           console.error(chalk.yellow('  ' + line));
         }
@@ -250,7 +250,7 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
   const autoSpawnOnFinalize = readAutoSpawnOnFinalize(issueId);
 
   // Stamp plan.status='proposed' and plan.metadata.canonicalFilename onto the
-  // vBRIEF only after beads creation succeeds. Atomic temp+rename.
+  // xBRIEF only after beads creation succeeds. Atomic temp+rename.
   const canonicalFilename = stampPlanForFinalization(planPath, issueId);
 
   emitActivityEntrySync({
@@ -455,12 +455,12 @@ export async function promotePlanning(issueId: string, autoSpawn = false, opts: 
  * Exported for tests.
  */
 export function stampPlanForFinalization(planPath: string, issueId: string): string {
-  const doc: VBriefDocument = readPlanSync(planPath);
+  const doc: XBriefDocument = readPlanSync(planPath);
   const slugSource = doc.plan.title || doc.plan.id || issueId;
   const slug = slugify(slugSource);
 
   const existingFilename = doc.plan.metadata?.canonicalFilename ?? null;
-  const canonicalFilename = existingFilename ?? generateVBriefFilename(issueId, slug);
+  const canonicalFilename = existingFilename ?? generateXBriefFilename(issueId, slug);
 
   doc.plan.metadata = { ...(doc.plan.metadata ?? {}), canonicalFilename };
 
@@ -468,10 +468,10 @@ export function stampPlanForFinalization(planPath: string, issueId: string): str
   doc.plan.status = 'proposed';
   doc.plan.sequence = (doc.plan.sequence ?? 0) + 1;
   doc.plan.updated = now;
-  doc.vBRIEFInfo.updated = now;
+  doc.xBRIEFInfo.updated = now;
 
   const tmp = planPath + '.tmp';
-  writeFileSync(tmp, serializeVBriefDocument(doc), 'utf-8');
+  writeFileSync(tmp, serializeXBriefDocument(doc), 'utf-8');
   renameSync(tmp, planPath);
 
   return canonicalFilename;

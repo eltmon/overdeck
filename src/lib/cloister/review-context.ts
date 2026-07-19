@@ -14,10 +14,10 @@ import { join } from 'path';
 import { promisify } from 'util';
 import { Effect } from 'effect';
 import { PAN_DIRNAME } from '../pan-dir/types.js';
-import { findPlanSync, readPlan } from '../vbrief/io.js';
+import { findPlanSync, readPlan } from '../xbrief/io.js';
 import { scanStubUi, type StubUiFinding } from './lint-stub-ui.js';
 import { fetchCodeRabbitFindings, type CodeRabbitFinding } from './coderabbit-ingestion.js';
-import { findVBriefByIssueSync } from '../vbrief/lifecycle-io.js';
+import { findXBriefByIssueSync } from '../xbrief/lifecycle-io.js';
 import { getDevrootPathSync } from '../config.js';
 import { FsError } from '../errors.js';
 
@@ -232,7 +232,7 @@ async function extractPlanReviewRequirements(workspace: string, issueId: string)
   try {
     const projectRoot = getDevrootPathSync();
     if (!projectRoot) return { acceptanceCriteria: [], nonGoals: [], traces: [] };
-    const found = findVBriefByIssueSync(projectRoot, issueId);
+    const found = findXBriefByIssueSync(projectRoot, issueId);
     if (found) {
       return {
         acceptanceCriteria: flattenAC(found.document),
@@ -262,7 +262,7 @@ function flattenAC(doc: { plan?: { items?: PanItem[] } }): string[] {
     if (Array.isArray(item.acceptanceCriteria)) {
       acs.push(...item.acceptanceCriteria);
     }
-    // Standard vBRIEF v0.5 sub-items
+    // Standard xBRIEF v0.5 sub-items
     for (const sub of item.subItems ?? []) {
       const text = sub.title ?? sub.description ?? '';
       if (text) acs.push(text);

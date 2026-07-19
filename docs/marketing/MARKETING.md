@@ -137,7 +137,7 @@ approach. Keep the original intact, compare both, merge the one that works.
 **Undo for agents.** Command Deck snapshots agent state as work progresses. If an agent
 goes sideways, roll back to any earlier checkpoint instead of starting over.
 
-### Visual plans (vBRIEF)
+### Visual plans (xBRIEF)
 **See the whole plan before a line is written.** Work plans render as interactive DAGs —
 dependencies, acceptance criteria, and live status. Know what's done and what's blocked at
 a glance.
@@ -177,7 +177,7 @@ audits, performance sweeps, or an epic split into concurrent streams — and a d
 synthesis agent merges the findings into one report.
 
 ### Swarm
-**Whole-plan parallelism.** Dispatch parallel work agents across a vBRIEF plan using
+**Whole-plan parallelism.** Dispatch parallel work agents across an xBRIEF plan using
 dependency-wave scheduling, so independent beads run at once and dependent ones wait their
 turn.
 

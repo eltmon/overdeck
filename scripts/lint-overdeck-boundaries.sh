@@ -17,7 +17,7 @@
 #                           not a "consumer to repoint" (the shared sqlite driver
 #                           lives here too and is allowed everywhere)
 #   - tests / *.md / db-bootstrap scripts
-# There are NO src/lib/{costs,conversations,vbrief,reconstruct}/** or
+# There are NO src/lib/{costs,conversations,xbrief,reconstruct}/** or
 # agent-backfill exemptions — if a file there still touches the old DB, that IS
 # the work, and the gate must show it.
 #

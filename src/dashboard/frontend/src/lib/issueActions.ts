@@ -149,7 +149,7 @@ export type NonIssueActionKey =
   | 'restartSession'
   | 'replaySession'
   | 'viewState'
-  | 'viewFocusedVbrief'
+  | 'viewFocusedXbrief'
   | 'copySessionId'
   | 'copyTmuxCommand'
   | 'exportSessionMetadata'
@@ -182,7 +182,7 @@ export interface NonIssueActionContext {
   onRestartSession?: (sessionId: string) => void | Promise<void>;
   onReplaySession?: (sessionId: string) => void | Promise<void>;
   onViewState?: (sessionId: string) => void | Promise<void>;
-  onViewVbrief?: (issueId: string) => void | Promise<void>;
+  onViewXbrief?: (issueId: string) => void | Promise<void>;
   onCopySessionId?: (sessionId: string) => void | Promise<void>;
   onCopyTmuxCommand?: (tmuxSession: string) => void | Promise<void>;
   onExportSessionMetadata?: (sessionId: string) => void | Promise<void>;
@@ -425,13 +425,13 @@ export const ZONE_B_SESSION_ACTIONS: NonIssueActionEntry[] = [
     confirm: null,
   },
   {
-    key: 'viewFocusedVbrief',
-    label: 'View vBRIEF',
-    description: 'Copy the focused issue vBRIEF path.',
+    key: 'viewFocusedXbrief',
+    label: 'View xBRIEF',
+    description: 'Copy the focused issue xBRIEF path.',
     scope: 'session',
     ownerSurface: 'ZoneBActionStrip',
-    enabledWhen: (context) => hasText(context.issueId) && !!context.onViewVbrief,
-    invoke: (context) => invokeWithText(context.issueId, context.onViewVbrief),
+    enabledWhen: (context) => hasText(context.issueId) && !!context.onViewXbrief,
+    invoke: (context) => invokeWithText(context.issueId, context.onViewXbrief),
     kind: 'safe',
     confirm: null,
   },

@@ -1,6 +1,6 @@
 # Tiered Execution
 
-Tiered execution routes each vBRIEF task to the cheapest warm agent tier that can do the work, while a durable foreman owns issue bookkeeping and commit boundaries. It is off by default. Enable it only for projects that have explicit tier configuration and are ready for standing tier sessions.
+Tiered execution routes each xBRIEF task to the cheapest warm agent tier that can do the work, while a durable foreman owns issue bookkeeping and commit boundaries. It is off by default. Enable it only for projects that have explicit tier configuration and are ready for standing tier sessions.
 
 ## Configuration
 
@@ -73,14 +73,14 @@ On load, tiers with identical staffing merge into one crew and own the union of 
 
 Every crew must retain at least one difficulty because runtime tiers reject an empty `difficulties` list. Removal performs the required reassignment through the hand-off prompt before deleting the crew. A crew with kind overrides remains blocked with `Move or remove these kind overrides before removing this crew.`; the last crew remains blocked with `This is the only crew, and every difficulty needs one. Add another crew first — or turn tiered execution off.` Moving the final difficulty of a kind-routed crew is also blocked until those overrides are explicitly moved or removed, so an unrelated routing edit cannot silently delete kind-routed work.
 
-The issue view's **Policies** panel exposes the per-issue override in its Work group as a **Standing crew** segmented control: `Default · <effective> (<source>)`, `On`, or `Off`. Explicit overrides appear in the collapsed strip as an overrides-only `crew · on|off` chip and write to the per-issue permanent record through `PATCH /api/workspaces/:issueId/tiered-execution`; the vBRIEF spec remains immutable under PAN-1124, so the override is stored outside the spec and resolved at runtime. When a per-issue work-model override is active, it suspends crew routing for the entire issue, and the panel and collapsed chip state that consequence.
+The issue view's **Policies** panel exposes the per-issue override in its Work group as a **Standing crew** segmented control: `Default · <effective> (<source>)`, `On`, or `Off`. Explicit overrides appear in the collapsed strip as an overrides-only `crew · on|off` chip and write to the per-issue permanent record through `PATCH /api/workspaces/:issueId/tiered-execution`; the xBRIEF spec remains immutable under PAN-1124, so the override is stored outside the spec and resolved at runtime. When a per-issue work-model override is active, it suspends crew routing for the entire issue, and the panel and collapsed chip state that consequence.
 
 ## Resolution Chain
 
 The following precedence applies when resolving tiered execution for an issue:
 
 - **Per-issue record override** — highest precedence; set by the Standing Crew toggle on the issue view and persisted to the per-issue permanent record.
-- **Plan metadata override** (`plan.metadata.tiered_execution`) — set at planning time in the vBRIEF spec.
+- **Plan metadata override** (`plan.metadata.tiered_execution`) — set at planning time in the xBRIEF spec.
 - **Global / project configuration** (`tiered_execution.enabled`) — the default switch in project config.
 
 If a record override is present, it wins over both plan metadata and the global flag. Deleting the record override falls back to plan metadata, and absent both, the global/project flag decides.
@@ -147,7 +147,7 @@ Escalation is disabled by default. When `escalation.enabled: true`, deterministi
 
 Triggers are supervisor `BLOCKED` verdicts for the task's commit, verification failures attributed to the task, and floundering when a configured per-difficulty time budget is exceeded. `retries_at_tier` controls how many attempts stay on the current tier before promotion, and `max_promotions` caps promotions per task. At `expert`, or after the promotion cap is reached, the result is block-and-surface for operator attention.
 
-Example with `retries_at_tier: 1` and `max_promotions: 2`: a `simple` task gets one retry at `simple`; the next qualifying trigger promotes it to `medium`; another retry/promotion cycle can move it to `complex`; a further trigger blocks because the promotion cap is spent. Promotions are recorded as effective difficulty in workspace `.pan/continue.json` `tierOverrides`, not by mutating the vBRIEF spec.
+Example with `retries_at_tier: 1` and `max_promotions: 2`: a `simple` task gets one retry at `simple`; the next qualifying trigger promotes it to `medium`; another retry/promotion cycle can move it to `complex`; a further trigger blocks because the promotion cap is spent. Promotions are recorded as effective difficulty in workspace `.pan/continue.json` `tierOverrides`, not by mutating the xBRIEF spec.
 
 ## Trivial Fast-Track
 
@@ -157,7 +157,7 @@ Fast-track is for mechanical work such as docs, tests, small refactors, and obvi
 
 ## Replay and Compaction
 
-A standing tier session's curated context is derivable from the vBRIEF plan plus the git commit log. If a tier session dies, saturates context, or reaches `replay_threshold` of its context window at a tier-run boundary, the foreman can restart it and replay the issue feed from durable commits.
+A standing tier session's curated context is derivable from the xBRIEF plan plus the git commit log. If a tier session dies, saturates context, or reaches `replay_threshold` of its context window at a tier-run boundary, the foreman can restart it and replay the issue feed from durable commits.
 
 Replay is the compaction strategy. Agents should not rely on hidden terminal state or uncommitted local memory for correctness.
 

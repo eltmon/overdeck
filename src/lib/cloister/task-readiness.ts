@@ -2,20 +2,20 @@
  * DAG-aware task readiness module for Cloister scheduling (PAN-388 Phase 4)
  *
  * Provides:
- * - isTaskReady(): checks if a vBRIEF item's hard dependencies are all done
+ * - isTaskReady(): checks if an xBRIEF item's hard dependencies are all done
  * - getUnblockedItems(): returns items newly unblocked after a task completes
  *
- * Gracefully degrades when no plan.vbrief.json exists — all tasks are ready.
+ * Gracefully degrades when no xBRIEF plan exists — all tasks are ready.
  */
 
 import { Effect } from 'effect';
-import { readWorkspacePlanSync, readWorkspacePlan, type VBriefReadError } from '../vbrief/io.js';
-import type { VBriefItemStatus } from '../vbrief/types.js';
+import { readWorkspacePlanSync, readWorkspacePlan, type XBriefReadError } from '../xbrief/io.js';
+import type { XBriefItemStatus } from '../xbrief/types.js';
 
-const TERMINAL_STATUSES: VBriefItemStatus[] = ['completed', 'cancelled'];
+const TERMINAL_STATUSES: XBriefItemStatus[] = ['completed', 'cancelled'];
 
 /**
- * Returns true if the given vBRIEF item can be worked on — i.e., all items
+ * Returns true if the given xBRIEF item can be worked on — i.e., all items
  * that block it have reached a terminal status (completed or cancelled).
  *
  * When no plan exists for the workspace, returns true (no-op for legacy flows).
@@ -24,7 +24,7 @@ export function isTaskReadySync(itemId: string, workspacePath: string): boolean 
   const doc = readWorkspacePlanSync(workspacePath);
   if (!doc) return true; // No plan → all tasks ready
 
-  // If item doesn't exist in this plan, don't block it (e.g., legacy bead not in vBRIEF)
+  // If item doesn't exist in this plan, don't block it (e.g., legacy bead not in xBRIEF)
   const itemExists = doc.plan.items.some(i => i.id === itemId);
   if (!itemExists) return true;
 
@@ -102,7 +102,7 @@ export function getUnblockedItemsSync(workspacePath: string, justCompletedId: st
 export const isTaskReady = (
   itemId: string,
   workspacePath: string,
-): Effect.Effect<boolean, VBriefReadError> =>
+): Effect.Effect<boolean, XBriefReadError> =>
   Effect.gen(function* () {
     const doc = yield* readWorkspacePlan(workspacePath);
     if (!doc) return true;
@@ -131,7 +131,7 @@ export const isTaskReady = (
 export const getUnblockedItems = (
   workspacePath: string,
   justCompletedId: string,
-): Effect.Effect<string[], VBriefReadError> =>
+): Effect.Effect<string[], XBriefReadError> =>
   Effect.gen(function* () {
     const doc = yield* readWorkspacePlan(workspacePath);
     if (!doc) return [];

@@ -33,7 +33,7 @@ describe('role definitions', () => {
     expect(body).toContain('Read the issue and the PRD draft');
     expect(body).toContain('drafts/<ISSUE-ID>.md` on `overdeck-state`');
     expect(body).toContain('AskUserQuestion');
-    expect(body).toContain('vBRIEF plan');
+    expect(body).toContain('xBRIEF plan');
     expect(body).toContain('task checklist');
     expect(body).toContain('pan plan finalize');
     expect(body).not.toContain('pan plan finalize <ISSUE-ID>');
@@ -147,7 +147,7 @@ describe('role definitions', () => {
     expect(body).toContain('Playwright MCP tools');
     expect(body).toContain('isolated browser instance per session');
     expect(body).toContain('.overdeck/continue.json');
-    expect(body).toContain('vBRIEF acceptance criteria');
+    expect(body).toContain('xBRIEF acceptance criteria');
     expect(body).toContain('TESTS PASSED');
     expect(body).toContain('TESTS FAILED');
   });

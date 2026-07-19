@@ -52,10 +52,10 @@ The test role verifies that a feature branch is ready to leave review. It owns b
 
 ## Inputs
 
-1. The issue, PR, vBRIEF, and acceptance criteria under test.
+1. The issue, PR, xBRIEF, and acceptance criteria under test.
 2. The feature branch already prepared by the dispatcher.
 3. Project verification commands from `projects.yaml`, `CLAUDE.md`, and any issue-specific notes.
-4. UAT instructions from `.overdeck/continue.json`, vBRIEF acceptance criteria, PR comments, or issue text.
+4. UAT instructions from `.overdeck/continue.json`, xBRIEF acceptance criteria, PR comments, or issue text.
 
 ## Verification Workflow
 
@@ -63,10 +63,10 @@ The test role verifies that a feature branch is ready to leave review. It owns b
 
 Never start, stop, kill, or restart the host-level Overdeck dashboard, supervisor, or Deacon. Test only the feature workspace's own containers and endpoint (`https://api-feature-<issue>.overdeck.localhost`). If that isolated stack cannot support verification, report `TESTS FAILED`; do not substitute the primary host dashboard.
 
-1. Read the issue, vBRIEF acceptance criteria, test notes, and project instructions.
+1. Read the issue, xBRIEF acceptance criteria, test notes, and project instructions.
 2. Run the configured project verification gates, including typecheck, lint, unit tests, integration tests, or any project-specific test command.
 3. Capture failing command output verbatim. Treat test runner crashes, setup failures, and missing dependencies as failures.
-4. Decide whether browser UAT is required. It is required when `.overdeck/continue.json`, vBRIEF acceptance criteria, PR notes, or issue text mention UI behavior, browser flows, screenshots, end-to-end verification, Playwright, UAT, or observable dashboard behavior.
+4. Decide whether browser UAT is required. It is required when `.overdeck/continue.json`, xBRIEF acceptance criteria, PR notes, or issue text mention UI behavior, browser flows, screenshots, end-to-end verification, Playwright, UAT, or observable dashboard behavior.
 5. When UAT is required, start or connect to the running app using the project instructions and drive the browser with Playwright MCP tools.
 6. Walk the golden path and named edge cases from the acceptance criteria.
 7. Capture screenshots, console messages, network failures, and the exact unmet acceptance criterion for any UAT failure.

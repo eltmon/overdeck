@@ -28,10 +28,10 @@ describe('task mutation door', () => {
     project = { name: 'door-test', path: join(root, 'project') };
     const specsDir = join(project.path, '.pan', 'specs');
     mkdirSync(specsDir, { recursive: true });
-    specPath = join(specsDir, '2026-07-14-DOOR-100-task-door.vbrief.json');
+    specPath = join(specsDir, '2026-07-14-DOOR-100-task-door.xbrief.json');
     writeFileSync(specPath, JSON.stringify({
       status: 'active',
-      vBRIEFInfo: { version: '1.0', created: '2026-07-14T00:00:00.000Z' },
+      xBRIEFInfo: { version: '1.0', created: '2026-07-14T00:00:00.000Z' },
       plan: {
         id: ISSUE_ID,
         title: 'Task door',

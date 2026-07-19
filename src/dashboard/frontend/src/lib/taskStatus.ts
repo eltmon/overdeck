@@ -1,6 +1,6 @@
 /**
- * PAN-2696: the tasks endpoint serves raw vBRIEF items since the beads removal
- * (PAN-2648) — statuses are VBriefItemStatus values ('completed', 'running',
+ * PAN-2696: the tasks endpoint serves raw xBRIEF items since the beads removal
+ * (PAN-2648) — statuses are XBriefItemStatus values ('completed', 'running',
  * 'planned', …), not the old beads 'open'/'closed'/'in_progress'. Bucket both
  * vocabularies so every task view classifies items the same way.
  */

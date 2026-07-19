@@ -1,8 +1,8 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import type { ModelId } from '../settings.js';
-import type { VBriefDocument, VBriefItem } from '../vbrief/types.js';
-import type { TierOverridesMap } from '../vbrief/io.js';
+import type { XBriefDocument, XBriefItem } from '../xbrief/types.js';
+import type { TierOverridesMap } from '../xbrief/io.js';
 import { getModelCapabilitySync, hasModelCapabilitySync, resolveModelIdSync } from '../model-capabilities.js';
 import type { AgentState } from './agent-state.js';
 import type { DeliveryResult } from './delivery.js';
@@ -53,7 +53,7 @@ export interface ReplayResult {
 }
 
 export interface ReplayRerouteContext {
-  doc: VBriefDocument;
+  doc: XBriefDocument;
   config: ValidatedTieredExecutionConfig;
   statusOverrides?: Record<string, string>;
   tierOverrides?: TierOverridesMap;
@@ -92,7 +92,7 @@ export interface ReplaySupervisorTarget extends ReplayTargetBase {
   kind: 'supervisor';
   supervisor: TieredExecutionSupervisorConfig;
   /** Plan used to apply the supervisor subscription policy to replay commits. */
-  doc: VBriefDocument;
+  doc: XBriefDocument;
   /** PRD markdown used to replay traced requirement text, when available. */
   prdMarkdown?: string;
   apiUrl?: string;
@@ -248,7 +248,7 @@ function resolveReroutedReplayTarget(target: ReplayTarget): ReplayTarget | null 
   return target;
 }
 
-function remainingScheduleDocument(reroute: ReplayRerouteContext): VBriefDocument {
+function remainingScheduleDocument(reroute: ReplayRerouteContext): XBriefDocument {
   const statusOverrides = reroute.statusOverrides ?? {};
   const tierOverrides = reroute.tierOverrides ?? {};
   return {
@@ -356,7 +356,7 @@ async function replaySupervisorFeed(
   return deliveries;
 }
 
-function findReplayItem(doc: VBriefDocument, commit: Pick<ReplayCommit, 'subject'>): VBriefItem | undefined {
+function findReplayItem(doc: XBriefDocument, commit: Pick<ReplayCommit, 'subject'>): XBriefItem | undefined {
   return doc.plan.items.find((item) => {
     const subject = commit.subject.toLowerCase();
     return subject.includes(item.id.toLowerCase()) || subject.includes(item.title.toLowerCase());

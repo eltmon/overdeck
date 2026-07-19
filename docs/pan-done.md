@@ -15,10 +15,10 @@ against the agent workspace. Any gate that fails prints diagnostics and aborts
 the command. Use `--force` to bypass **all** gates (not recommended for routine
 use). Use `--test-waived` to bypass only gate 4.
 
-### 1. Open vBRIEF tasks
+### 1. Open xBRIEF tasks
 
-`pan done` checks the workspace vBRIEF tasks database for any open vBRIEF tasks scoped to the
-issue. Open vBRIEF tasks mean unfinished tasks, so the command aborts until they are
+`pan done` checks the workspace xBRIEF tasks database for any open xBRIEF tasks scoped to the
+issue. Open xBRIEF tasks mean unfinished tasks, so the command aborts until they are
 closed or cancelled.
 
 ### 2. Uncommitted changes
@@ -27,11 +27,9 @@ The workspace must have a clean git status. Uncommitted source changes are not
 allowed because the review pipeline needs a committed HEAD to review. Planning
 artifacts under `.pan/` are auto-committed first.
 
-### 3. vBRIEF acceptance criteria
+### 3. xBRIEF acceptance criteria
 
-If the workspace has a `.pan/spec.vbrief.json`, `pan done` checks that every
-acceptance-criteria item is completed or cancelled. Incomplete ACs block
-completion.
+`pan done` resolves the current xBRIEF through the plan read door and checks that every acceptance-criteria item is completed or cancelled. A missing or unreadable plan, or an incomplete criterion, blocks completion.
 
 ### 4. Test-requirement gate
 

@@ -485,7 +485,7 @@ function planItemsComplete(plan: Record<string, unknown>): boolean {
   })
 }
 
-async function vbriefSatisfied(workspace: string): Promise<boolean> {
+async function xbriefSatisfied(workspace: string): Promise<boolean> {
   for (const path of [join(workspace, '.pan', 'spec.vbrief.json'), join(workspace, '.pan', 'continue.json')]) {
     try {
       const parsed = JSON.parse(await readFile(path, 'utf8')) as Record<string, unknown>
@@ -500,7 +500,7 @@ async function evidenceClean(env: HookEnv): Promise<boolean> {
   const issueId = await issueIdFor(env)
   const workspace = await workspaceFor(env)
   if (!issueId || !workspace) return false
-  return await allIssueBeadsClosed(workspace, issueId) && await vbriefSatisfied(workspace)
+  return await allIssueBeadsClosed(workspace, issueId) && await xbriefSatisfied(workspace)
 }
 
 async function readTurnOutput(env: HookEnv, event: TurnEndEvent): Promise<string> {

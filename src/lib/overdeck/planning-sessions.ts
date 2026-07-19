@@ -16,8 +16,8 @@ import { getGitHubConfig } from '../../dashboard/server/services/tracker-config.
 import { cleanupAgentStateDirs } from './workspace-hygiene.js';
 import { getAgentState, getProviderAuthMode, saveAgentStateSync } from '../agents.js';
 import { emitActivityEntrySync, emitActivityTtsSync } from '../activity-logger.js';
-import { appendContinueSessionEntryForIssue } from '../vbrief/lifecycle-io.js';
-import { isPlanningComplete, findPlan } from '../vbrief/io.js';
+import { appendContinueSessionEntryForIssue } from '../xbrief/lifecycle-io.js';
+import { isPlanningComplete, findPlan } from '../xbrief/io.js';
 import { extractPrefixSync } from '../issue-id.js';
 import { spawnPlanningSession, type PlanningIssue } from '../planning/spawn-planning-session.js';
 import { findProjectByTeamSync, resolveProjectFromIssueSync } from '../projects.js';

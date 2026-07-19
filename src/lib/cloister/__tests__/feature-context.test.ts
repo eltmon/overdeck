@@ -108,12 +108,12 @@ describe('writeStoryFeatureContext', () => {
     expect(mockGetIssue).not.toHaveBeenCalled();
   });
 
-  it('synthesizes context from parent vBRIEF spec on main', async () => {
+  it('synthesizes context from parent xBRIEF spec on main', async () => {
     mockTrackerResponse('US-123', 'F-456', 'The Big Feature');
 
     // Write the parent spec to the main-side .pan/specs/ directory
     const planDoc = {
-      vBRIEFInfo: { version: '0.5', created: '2024-01-01T00:00:00Z' },
+      xBRIEFInfo: { version: '0.5', created: '2024-01-01T00:00:00Z' },
       plan: {
         id: 'F-456',
         title: 'Feature Plan',
@@ -130,7 +130,7 @@ describe('writeStoryFeatureContext', () => {
     const specsDir = join(tmpDir, '.pan', 'specs');
     mkdirSync(specsDir, { recursive: true });
     writeFileSync(
-      join(specsDir, '2024-01-01-F-456-feature-plan.vbrief.json'),
+      join(specsDir, '2024-01-01-F-456-feature-plan.xbrief.json'),
       JSON.stringify(planDoc, null, 2),
       'utf-8',
     );

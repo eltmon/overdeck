@@ -343,9 +343,9 @@ function runPreflight(repoRoot: string, opts: { skipTests?: boolean } = {}): Pre
   // still tracked. Mirror that here so we catch leaks BEFORE tagging, not
   // after the release workflow fails.
   //
-  // PAN-967 retired the `.planning/` directory in favour of `vbrief/`
+  // PAN-967 retired the `.planning/` directory in favour of tracked planning artifacts
   // (proposed, active, completed, cancelled). Only `.planning/` is legacy;
-  // `vbrief/` is the current lifecycle and is tracked intentionally — listing
+  // Legacy `vbrief/` lifecycle archives are tracked intentionally — listing
   // it here used to false-flag every release with "233 file(s) tracked".
   const trackedLegacyPlanning = (() => {
     try {

@@ -18,7 +18,7 @@ export interface TaskTask {
   id: string
   name?: string
   title?: string
-  /** Raw vBRIEF item status ('planned' | 'running' | 'completed' | …); legacy beads values tolerated (PAN-2696). */
+  /** Raw xBRIEF item status ('planned' | 'running' | 'completed' | …); legacy beads values tolerated (PAN-2696). */
   status: string
   labels: string[]
   blockedBy: string[]

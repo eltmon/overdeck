@@ -1,7 +1,7 @@
 import { Effect } from 'effect';
 import { setReviewStatusSync, getReviewStatusSync } from '../review-status.js';
-import { applyStatusOverrides } from '../vbrief/io.js';
-import type { VBriefDocument } from '../vbrief/types.js';
+import { applyStatusOverrides } from '../xbrief/io.js';
+import type { XBriefDocument } from '../xbrief/types.js';
 
 export interface RequestIssueReviewResult {
   success: boolean;
@@ -36,7 +36,7 @@ export async function defaultRequestIssueReview(
 export async function finalizeSwarmIssueIfComplete(
   issueId: string,
   workspacePath: string,
-  baseDoc: VBriefDocument,
+  baseDoc: XBriefDocument,
   deps: {
     readStatusOverrides?: (workspacePath: string, issueId: string) => Record<string, string> | undefined;
     getFinalizedAt?: (issueId: string, workspacePath: string) => string | undefined;

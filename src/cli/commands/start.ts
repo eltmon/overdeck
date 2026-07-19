@@ -21,10 +21,10 @@ import { Effect } from 'effect';
 import { getLinearApiKey } from '../../lib/shadow-utils.js';
 import { getReadableWorkspacePanPaths } from '../../lib/pan-dir/index.js';
 import type { RuntimeName } from '../../lib/runtimes/types.js';
-import { findPlanSync, readWorkspacePlanSync } from '../../lib/vbrief/io.js';
+import { findPlanSync, readWorkspacePlanSync } from '../../lib/xbrief/io.js';
 import { findSpecByIssue } from '../../lib/pan-dir/specs.js';
-import { writeAutoStartVBrief, type AutoSynthesizeIssueInput } from '../../lib/vbrief/auto-synthesize.js';
-import { transitionVBriefOnMain, updatePlanStatus } from '../../lib/vbrief/lifecycle-io.js';
+import { writeAutoStartXBrief, type AutoSynthesizeIssueInput } from '../../lib/xbrief/auto-synthesize.js';
+import { transitionXBriefOnMain, updatePlanStatus } from '../../lib/xbrief/lifecycle-io.js';
 import { resolveIssueWorkModel } from '../../lib/agents/staffing.js';
 import {
   buildStartPlanningBody,
@@ -592,7 +592,7 @@ import {
 } from '../../lib/cloister/work-agent-prompt.js';
 
 /**
- * Validate that the resolved vBRIEF belongs to the current issue.
+ * Validate that the resolved xBRIEF belongs to the current issue.
  * Uses findPlan (resolves main-side spec first, then workspace fallback).
  */
 function validatePlanMatchesIssue(workspacePath: string, issueId: string): { valid: boolean; wrongIssue?: string } {
@@ -942,7 +942,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     // --fresh: wipe the work agent's state directory under
     // ~/.overdeck/agents/agent-<id>/ (PAN-1985) so the start below opens a
     // brand-new session against a clean dir. The new agent reads
-    // .pan/continue.json, the vBRIEF, the beads, and the branch state to
+    // .pan/continue.json, the xBRIEF, the beads, and the branch state to
     // pick up where the prior run left off.
     //
     // Operator note: --fresh is the deliberate override for harness/model
@@ -950,7 +950,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     // different harness) and for "I want a clean work run" recovery. The
     // NORMAL review flow continues the same session across re-dispatches
     // (PAN-1862); --fresh is the escape hatch that pays the re-research
-    // cost. Workspace, vBRIEF, beads, .pan/continue.json, .pan/feedback/,
+    // cost. Workspace, xBRIEF, beads, .pan/continue.json, .pan/feedback/,
     // branch, and commit history are all left untouched.
     //
     // Refuses if a live tmux session is alive (the wipe would race with it).
@@ -1188,9 +1188,9 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     }
 
     if (options.auto && !findPlanSync(workspace)) {
-      prep.update(`Synthesizing minimal vBRIEF for ${id}...`);
+      prep.update(`Synthesizing minimal xBRIEF for ${id}...`);
       const issue = await fetchIssueForAutoStart(id);
-      await Effect.runPromise(writeAutoStartVBrief(projectRoot, workspace, issue));
+      await Effect.runPromise(writeAutoStartXBrief(projectRoot, workspace, issue));
     }
 
     if (!findPlanSync(workspace)) {
@@ -1199,7 +1199,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
         issueId: id,
         projectRoot,
         workspaceCreatedThisRun,
-        message: `The required vBRIEF checklist for ${id} is missing or unreadable`,
+        message: `The required xBRIEF checklist for ${id} is missing or unreadable`,
         printDetails: () => {
           console.log(chalk.dim(`Run \`pan plan ${id}\` and finalize a readable implementation plan before starting work.`));
         },
@@ -1238,18 +1238,18 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     spinner.succeed(`Agent spawned: ${agent.id}`);
 
     try {
-      const transition = await Effect.runPromise(transitionVBriefOnMain(
+      const transition = await Effect.runPromise(transitionXBriefOnMain(
         projectRoot,
         id,
         'active',
         'approved',
-        `scope: approve ${id.toUpperCase()} vBRIEF`,
+        `scope: approve ${id.toUpperCase()} xBRIEF`,
       ));
       if (transition.moved) {
-        console.log(chalk.green(`  ✓ vBRIEF moved ${transition.fromDir} → active`));
+        console.log(chalk.green(`  ✓ xBRIEF moved ${transition.fromDir} → active`));
       }
     } catch (err: any) {
-      console.warn(chalk.dim(`  ⚠ Could not update main vBRIEF lifecycle: ${err?.message ?? String(err)}`));
+      console.warn(chalk.dim(`  ⚠ Could not update main xBRIEF lifecycle: ${err?.message ?? String(err)}`));
     }
 
     const spawnedPlanPath = findPlanSync(workspace);
@@ -1257,7 +1257,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
       try {
         updatePlanStatus(spawnedPlanPath, 'running');
       } catch (err: any) {
-        console.warn(chalk.dim(`  ⚠ Could not set workspace vBRIEF status=running: ${err?.message ?? String(err)}`));
+        console.warn(chalk.dim(`  ⚠ Could not set workspace xBRIEF status=running: ${err?.message ?? String(err)}`));
       }
     }
 

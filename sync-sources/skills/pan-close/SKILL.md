@@ -57,7 +57,7 @@ pan close PAN-1234 --force --accept-deploy
 Runs the close-out ceremony after mechanically checking review, tests, branch verification,
 forge merge, post-merge lifecycle, main verification, deployment, and teardown. Merge
 moves the issue to canonical state `verifying_on_main`; close-out is the deliberate final
-step that completes the vBRIEF, archives planning artifacts, applies final cleanup, closes
+step that completes the xBRIEF, archives planning artifacts, applies final cleanup, closes
 the tracker issue, and clears review status.
 
 Close-out is lighter than `pan wipe`: it preserves history and follows the configured

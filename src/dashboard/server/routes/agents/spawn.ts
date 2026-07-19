@@ -29,9 +29,9 @@ import { isStateMigrated } from '../../../../lib/state-home.js';
 import { shouldCommitLegacyWorkspaceArtifacts } from '../../../../lib/state-read-home.js';
 import { parsePorcelainStatusPaths } from '../../../../lib/state-plane.js';
 import { getWorkspaceStackHealth } from '../../../../lib/workspace/stack-health.js';
-import { writeAutoStartVBrief } from '../../../../lib/vbrief/auto-synthesize.js';
-import { findPlan, readPlan } from '../../../../lib/vbrief/io.js';
-import { transitionVBriefOnMain, updatePlanStatus } from '../../../../lib/vbrief/lifecycle-io.js';
+import { writeAutoStartXBrief } from '../../../../lib/xbrief/auto-synthesize.js';
+import { findPlan, readPlan } from '../../../../lib/xbrief/io.js';
+import { transitionXBriefOnMain, updatePlanStatus } from '../../../../lib/xbrief/lifecycle-io.js';
 import { jsonResponse } from '../../http-helpers.js';
 import { ReadModelService } from '../../read-model.js';
 import { EventStoreService } from '../../services/domain-services.js';
@@ -341,8 +341,8 @@ export const postAgentsRoute = HttpRouter.add(
     if (autoStart && !planPath) {
       const issueTitle = cachedIssue?.title || issueId;
       const issueBody = cachedIssue?.description || '';
-      // writeAutoStartVBrief is Effect-returning — yield it directly (PAN-1768).
-      yield* writeAutoStartVBrief(projectPath, workspacePath, {
+      // writeAutoStartXBrief is Effect-returning — yield it directly (PAN-1768).
+      yield* writeAutoStartXBrief(projectPath, workspacePath, {
         issueId,
         title: issueTitle,
         body: issueBody,
@@ -352,7 +352,7 @@ export const postAgentsRoute = HttpRouter.add(
     }
     if (!planPath) {
       return jsonResponse({
-        error: `No workspace vBRIEF found for ${issueId}. Work agents require a finalized plan.`,
+        error: `No workspace xBRIEF found for ${issueId}. Work agents require a finalized plan.`,
         hint: 'Run planning first, or use auto-start to synthesize a plan before starting the work agent.',
         issueId,
       }, { status: 422 });
@@ -367,8 +367,8 @@ export const postAgentsRoute = HttpRouter.add(
     if (planReadResult._tag === 'failure') {
       const { planErr } = planReadResult;
       return jsonResponse({
-        error: `Could not read workspace vBRIEF for ${issueId}: ${planErr instanceof Error ? planErr.message : String(planErr)}`,
-        hint: 'Re-run planning to produce a readable vBRIEF before starting the work agent.',
+        error: `Could not read workspace xBRIEF for ${issueId}: ${planErr instanceof Error ? planErr.message : String(planErr)}`,
+        hint: 'Re-run planning to produce a readable xBRIEF before starting the work agent.',
         issueId,
       }, { status: 422 });
     }
@@ -580,24 +580,24 @@ export const postAgentsRoute = HttpRouter.add(
       if (workStartAccepted) return;
       workStartAccepted = true;
 
-      await Effect.runPromise(transitionVBriefOnMain(
+      await Effect.runPromise(transitionXBriefOnMain(
         projectPath,
         issueId,
         'active',
         'approved',
-        `scope: approve ${issueId.toUpperCase()} vBRIEF`,
+        `scope: approve ${issueId.toUpperCase()} xBRIEF`,
       ).pipe(
         Effect.match({
           onSuccess: (result) => {
             if (result.moved) {
-              console.log(`[start-agent] vBRIEF moved ${result.fromDir} → active for ${issueId}`);
+              console.log(`[start-agent] xBRIEF moved ${result.fromDir} → active for ${issueId}`);
             }
             if (result.committed) {
               console.log(`[start-agent] Committed approval transition for ${issueId}`);
             }
           },
           onFailure: (err) => {
-            console.warn(`[start-agent] vBRIEF approval transition failed (non-fatal): ${err?.message ?? err}`);
+            console.warn(`[start-agent] xBRIEF approval transition failed (non-fatal): ${err?.message ?? err}`);
           },
         }),
       ));

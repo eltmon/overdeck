@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import type { VBriefDocument, VBriefItem } from '../../vbrief/types.js';
+import type { XBriefDocument, XBriefItem } from '../../xbrief/types.js';
 import {
   assignDispatchTier,
   chooseDispatchTier,
@@ -15,12 +15,12 @@ vi.mock('../../config-yaml.js', async (importOriginal) => {
     loadConfigSync: vi.fn(),
   };
 });
-vi.mock('../../vbrief/io.js', () => ({
+vi.mock('../../xbrief/io.js', () => ({
   readWorkspacePlanSync: vi.fn(),
 }));
 
 import { loadConfigSync } from '../../config-yaml.js';
-import { readWorkspacePlanSync } from '../../vbrief/io.js';
+import { readWorkspacePlanSync } from '../../xbrief/io.js';
 import { applyTierAssignment, resolveSingleWorkTierSpawnParams, resolveSlotTierSpawnParams } from '../spawn-prep.js';
 
 const TIER_CONFIG: TierAssignmentConfig = {
@@ -55,7 +55,7 @@ const TIERING: TierAssignmentConfig = {
   },
 };
 
-function item(metadata: VBriefItem['metadata'], id = 'item-1'): Pick<VBriefItem, 'id' | 'title' | 'metadata'> {
+function item(metadata: XBriefItem['metadata'], id = 'item-1'): Pick<XBriefItem, 'id' | 'title' | 'metadata'> {
   return { id, title: 'test item', metadata };
 }
 
@@ -71,7 +71,7 @@ describe('assignDispatchTier', () => {
   });
 
   it('returns exactly the current dispatch lane with no model override when disabled', () => {
-    const candidates: Array<Pick<VBriefItem, 'id' | 'title' | 'metadata'>> = [
+    const candidates: Array<Pick<XBriefItem, 'id' | 'title' | 'metadata'>> = [
       item({ difficulty: 'expert' }),
       item({ difficulty: 'simple', files_scope: ['a.ts'], files_scope_confidence: 'high' }),
       item({ difficulty: 'medium', files_scope: ['a.ts'], files_scope_confidence: 'high', readiness: 'ready' }),
@@ -127,9 +127,9 @@ describe('chooseTierAssignment', () => {
 });
 
 describe('resolveSlotTierSpawnParams', () => {
-  function planDoc(items: VBriefItem[], planMetadata?: Record<string, unknown>): VBriefDocument {
+  function planDoc(items: XBriefItem[], planMetadata?: Record<string, unknown>): XBriefDocument {
     return {
-      vBRIEFInfo: { version: '0.6', created: '2026-07-02T00:00:00Z' },
+      xBRIEFInfo: { version: '0.6', created: '2026-07-02T00:00:00Z' },
       plan: {
         id: 'plan-1',
         title: 'test plan',
@@ -141,7 +141,7 @@ describe('resolveSlotTierSpawnParams', () => {
     };
   }
 
-  function planItem(id: string, metadata: VBriefItem['metadata']): VBriefItem {
+  function planItem(id: string, metadata: XBriefItem['metadata']): XBriefItem {
     return { id, title: id, status: 'pending', metadata };
   }
 
@@ -212,9 +212,9 @@ describe('resolveSlotTierSpawnParams', () => {
 });
 
 describe('resolveSingleWorkTierSpawnParams', () => {
-  function planDoc(items: VBriefItem[], planMetadata?: Record<string, unknown>): VBriefDocument {
+  function planDoc(items: XBriefItem[], planMetadata?: Record<string, unknown>): XBriefDocument {
     return {
-      vBRIEFInfo: { version: '0.6', created: '2026-07-02T00:00:00Z' },
+      xBRIEFInfo: { version: '0.6', created: '2026-07-02T00:00:00Z' },
       plan: {
         id: 'plan-1',
         title: 'test plan',
@@ -226,7 +226,7 @@ describe('resolveSingleWorkTierSpawnParams', () => {
     };
   }
 
-  function planItem(id: string, metadata: VBriefItem['metadata'], status: VBriefItem['status'] = 'pending'): VBriefItem {
+  function planItem(id: string, metadata: XBriefItem['metadata'], status: XBriefItem['status'] = 'pending'): XBriefItem {
     return { id, title: id, status, metadata };
   }
 
@@ -272,7 +272,7 @@ describe('resolveSingleWorkTierSpawnParams', () => {
     expect(resolveSingleWorkTierSpawnParams('/ws')).toEqual(IMPLICIT_PARAMS);
   });
 
-  it('leaves ordinary single work-agent starts untouched when no vBRIEF plan is readable', () => {
+  it('leaves ordinary single work-agent starts untouched when no xBRIEF plan is readable', () => {
     mockConfig(TIER_CONFIG);
     vi.mocked(readWorkspacePlanSync).mockReturnValue(null);
 

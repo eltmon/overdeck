@@ -24,12 +24,12 @@ vi.mock('../../../src/lib/activity-logger.js', () => ({
   emitActivityTtsSync: vi.fn(),
 }));
 
-vi.mock('../../../src/lib/vbrief/dag.js', () => {
-  throw new Error('review-status must not import vbrief/dag; pipeline state lives in SQLite, not canonical vBRIEF specs');
+vi.mock('../../../src/lib/xbrief/dag.js', () => {
+  throw new Error('review-status must not import xbrief/dag; pipeline state lives in SQLite, not canonical xBRIEF specs');
 });
 
-vi.mock('../../../src/lib/vbrief/io.js', () => {
-  throw new Error('review-status must not import vbrief/io; pipeline state must not mutate canonical vBRIEF specs');
+vi.mock('../../../src/lib/xbrief/io.js', () => {
+  throw new Error('review-status must not import xbrief/io; pipeline state must not mutate canonical xBRIEF specs');
 });
 
 beforeEach(() => {

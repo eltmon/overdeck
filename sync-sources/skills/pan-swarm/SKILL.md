@@ -5,7 +5,7 @@ description: Start and recover Overdeck swarm slots for planned issues with `pan
 
 # Pan Swarm
 
-Use `pan swarm` when an issue has a finalized vBRIEF plan and the operator wants Deacon-managed parallel slot execution.
+Use `pan swarm` when an issue has a finalized xBRIEF plan and the operator wants Deacon-managed parallel slot execution.
 
 ## Start a Swarm
 

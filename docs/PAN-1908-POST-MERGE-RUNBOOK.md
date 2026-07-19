@@ -98,7 +98,7 @@ gh issue comment <NUMBER> --repo eltmon/overdeck \
 | [PAN-541](https://github.com/eltmon/overdeck/issues/541) | Specialist `.session` files and compact-offset migration to SQLite/db. |
 | [PAN-1888](https://github.com/eltmon/overdeck/issues/1888) | Remove the legacy stop-hook `review-status.json` writer entirely. |
 | [PAN-1325](https://github.com/eltmon/overdeck/issues/1325) | Canonical infra-repo setup for `docs/prds` and per-project configuration. |
-| [PAN-944](https://github.com/eltmon/overdeck/issues/944) | Collapse beads and vBRIEF into a single durable per-issue record. |
+| [PAN-944](https://github.com/eltmon/overdeck/issues/944) | Collapse beads and xBRIEF into a single durable per-issue record. |
 | [PAN-456](https://github.com/eltmon/overdeck/issues/456) | Resume-on-restart logic using persisted harness session ids. |
 | [PAN-793](https://github.com/eltmon/overdeck/issues/793) | Formal agent state-machine model and documentation. |
 | [PAN-1037](https://github.com/eltmon/overdeck/issues/1037) | Retire the `planning-` prefix in remaining call sites. |

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { openDatabase, type SqliteDatabase } from '../../../src/lib/database/driver.js';
 import { initSchema } from '../../../src/lib/database/schema.js';
-import type { ScopeDriftRecord } from '../../../src/lib/vbrief/continue-state.js';
+import type { ScopeDriftRecord } from '../../../src/lib/xbrief/continue-state.js';
 
 let testDb: SqliteDatabase;
 

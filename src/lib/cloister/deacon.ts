@@ -157,7 +157,7 @@ import { setReviewStatusSync, loadReviewStatuses, getReviewStatusSync, type Revi
 import { needsReviewDispatch } from '../review-dispatch-decision.js';
 import { readIssueRecordSync } from '../pan-dir/record.js';
 import { updateIssueRecord } from '../pan-dir/record-update.js';
-import { readWorkspacePlanSync } from '../vbrief/io.js';
+import { readWorkspacePlanSync } from '../xbrief/io.js';
 import { markWorkspaceStuck } from '../overdeck/review-status-sync.js';
 import { isDeaconGloballyPaused } from '../overdeck/control-settings.js';
 import { findWorkspacePath } from '../lifecycle/archive-planning.js';
@@ -3087,7 +3087,7 @@ export async function runPatrol(): Promise<PatrolResult> {
   for (const a of failedMergeRetryActions) addLog('action', a, state.patrolCycle);
   for (const a of await patrolStrikeLandings()) { actions.push(a); addLog('action', a, state.patrolCycle); }
   // PAN-2203: deterministic swarm coordination. This pass derives active
-  // swarms from workspaces + vBRIEF readiness; later beads fill in merge,
+  // swarms from workspaces + xBRIEF readiness; later beads fill in merge,
   // dispatch, recovery, and cooldown behavior.
   const swarmActions = await coordinateSwarmSlots();
   actions.push(...swarmActions);

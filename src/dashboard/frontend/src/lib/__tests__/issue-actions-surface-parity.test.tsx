@@ -282,7 +282,7 @@ function surfaceContexts(sessionPresence: StateFixture['sessionPresence']): Surf
       onReplaySession: noop,
       onOpenStateDir: noop,
       onViewState: noop,
-      onViewVbrief: noop,
+      onViewXbrief: noop,
       onCopySessionId: noop,
       onCopyTmuxCommand: noop,
       onExportSessionMetadata: noop,

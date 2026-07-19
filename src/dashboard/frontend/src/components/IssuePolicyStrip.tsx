@@ -79,14 +79,14 @@ const POLICY_HELP = {
     body: 'Whether several work agents take independent plan items on this issue at the same time.',
     options: [
       ['Off', 'One work agent at a time.'],
-      ['Auto', 'Swarms when the vBRIEF is partitionable and at least two items are independently startable.'],
+      ['Auto', 'Swarms when the xBRIEF is partitionable and at least two items are independently startable.'],
       ['Always', 'Behaves the same as Auto today — it does not yet force a swarm on a plan that cannot partition.'],
     ] as Array<[string, string]>,
   },
   standingCrew: {
     hint: 'Route each item to a model tier by difficulty.',
     title: 'Standing crew',
-    body: 'Routes each plan item to a model tier by its declared difficulty or kind, instead of running everything on one model. Items the tier table cannot place fall back to the work role’s model. Default shows both the value and where it came from — this issue, the plan’s vBRIEF metadata, or your global config.',
+    body: 'Routes each plan item to a model tier by its declared difficulty or kind, instead of running everything on one model. Items the tier table cannot place fall back to the work role’s model. Default shows both the value and where it came from — this issue, the plan’s xBRIEF metadata, or your global config.',
     options: [
       ['On', 'Use the tier table to pick a model per item.'],
       ['Off', 'Every item runs on the work role’s model.'],

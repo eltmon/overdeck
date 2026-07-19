@@ -1531,7 +1531,7 @@ describe('FeatureCard', () => {
     expect(screen.getByText('Tasks')).toBeDefined();
   });
 
-  it('renders vBRIEF button when feature has a plan', () => {
+  it('renders xBRIEF button when feature has a plan', () => {
     const feature = createMockFeature({ hasPlan: true });
     render(
       <FeatureCard
@@ -1539,11 +1539,11 @@ describe('FeatureCard', () => {
         childCount={2}
         isExpanded={false}
         onToggle={vi.fn()}
-        onViewVBrief={vi.fn()}
+        onViewXBrief={vi.fn()}
       />
     );
-    expect(screen.getByTestId('action-vbrief-F123')).toBeDefined();
-    expect(screen.getByText('vBRIEF')).toBeDefined();
+    expect(screen.getByTestId('action-xbrief-F123')).toBeDefined();
+    expect(screen.getByText('xBRIEF')).toBeDefined();
   });
 
   it('hides Plan button when feature is done', () => {

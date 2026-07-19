@@ -16,7 +16,7 @@ import { PAN_CONTINUE_FILENAME, PAN_DIRNAME } from '../../../../lib/pan-dir/type
 import { extractTeamPrefix, findProjectByTeamSync } from '../../../../lib/projects.js';
 import { loadRemoteAgentState } from '../../../../lib/remote/remote-agents.js';
 import { createSession, killSession, resizeWindow, sendKeys, sessionExists } from '../../../../lib/tmux.js';
-import { findPlan, readPlan } from '../../../../lib/vbrief/io.js';
+import { findPlan, readPlan } from '../../../../lib/xbrief/io.js';
 import { EventStoreService } from '../../services/domain-services.js';
 import { jsonResponse } from '../../http-helpers.js';
 import { httpHandler } from '../http-handler.js';

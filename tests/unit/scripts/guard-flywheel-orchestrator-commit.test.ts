@@ -64,7 +64,7 @@ function runGuard(root: string, env: Record<string, string | undefined> = {}): {
 }
 
 describe('guard-flywheel-orchestrator-commit.sh', () => {
-  it('blocks orchestrator-staged drafts and vbrief specs and names offending paths', () => {
+  it('blocks orchestrator-staged drafts and xbrief specs and names offending paths', () => {
     const root = makeTempRepo();
     installScript(root);
     stageFile(root, '.pan/drafts/PAN-1791.md');

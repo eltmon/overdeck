@@ -337,7 +337,7 @@ describe('parseConversationMessages', () => {
         origin: { kind: 'channel', server: 'overdeck-bridge' },
         message: {
           role: 'user',
-          content: '<channel source="overdeck-bridge" caller="conversation-message">\nCheck the vBRIEF spec\n</channel>',
+          content: '<channel source="overdeck-bridge" caller="conversation-message">\nCheck the xBRIEF spec\n</channel>',
         },
       },
     ];
@@ -350,7 +350,7 @@ describe('parseConversationMessages', () => {
     expect(result.messages[0]).toMatchObject({
       id: 'u-channel',
       role: 'user',
-      text: 'Check the vBRIEF spec',
+      text: 'Check the xBRIEF spec',
     });
   });
 

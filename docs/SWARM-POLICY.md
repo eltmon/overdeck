@@ -8,7 +8,7 @@ The policy resolves each field independently in this order: one-run CLI override
 - Project values are edited in the project's overview settings and stored in `~/.overdeck/projects.yaml`.
 - Issue values are edited in Issue Detail and stored in the issue's canonical record on `overdeck-state`.
 
-`off` selects a single work agent for future automatic dispatch. `auto` permits a swarm only when vBRIEF readiness proves the work can be partitioned safely. `always` requires swarm readiness rather than silently falling back. Policy changes never stop or resize an already-running swarm; use the existing freeze, stop, resume, recover, and reset controls for runtime operations.
+`off` selects a single work agent for future automatic dispatch. `auto` permits a swarm only when xBRIEF readiness proves the work can be partitioned safely. `always` requires swarm readiness rather than silently falling back. Policy changes never stop or resize an already-running swarm; use the existing freeze, stop, resume, recover, and reset controls for runtime operations.
 
 ## Existing controls retained
 

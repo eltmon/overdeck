@@ -19,7 +19,7 @@ import { resolveProjectFromIssueSync } from '../projects.js';
 import { loadRemoteAgentState } from '../remote/remote-agents.js';
 import { loadWorkspaceMetadataSync as loadWorkspaceMetadataStatic } from '../remote/workspace-metadata.js';
 import { resolveGitHubIssueSync } from '../tracker-utils.js';
-import { readWorkspacePlanSync } from '../vbrief/io.js';
+import { readWorkspacePlanSync } from '../xbrief/io.js';
 import { readIssueRecordSync } from '../pan-dir/record.js';
 
 function isGitHubIssue(issueId: string): {
@@ -207,7 +207,7 @@ export function getIssueTasks(id: string) {
     });
 
     const doc = workspacePath ? readWorkspacePlanSync(workspacePath) : null;
-    if (!doc) return jsonResponse({ error: `The vBRIEF for ${id} is missing or unreadable.` }, { status: 404 });
+    if (!doc) return jsonResponse({ error: `The xBRIEF for ${id} is missing or unreadable.` }, { status: 404 });
     const record = projectPath ? readIssueRecordSync({ name: resolvedProject?.projectName ?? id, path: projectPath }, id) : null;
     const blockers = new Map<string, string[]>();
     for (const edge of doc.plan.edges) if (edge.type === 'blocks') blockers.set(edge.to, [...(blockers.get(edge.to) ?? []), edge.from]);

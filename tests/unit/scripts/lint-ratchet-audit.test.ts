@@ -34,6 +34,11 @@ function writeAllowlist(root: string, paths: string[]): void {
   writeFileSync(join(root, 'eslint-any-allowlist.json'), `${JSON.stringify(paths, null, 2)}\n`);
 }
 
+function writeCircularBaseline(root: string, cycles: string[]): void {
+  mkdirSync(join(root, 'scripts'), { recursive: true });
+  writeFileSync(join(root, 'scripts', 'circular-deps-baseline.txt'), `${cycles.join('\n')}\n`);
+}
+
 function commitAll(root: string, message: string): string {
   execFileSync('git', ['add', '-A'], { cwd: root });
   execFileSync('git', ['commit', '-m', message, '--quiet'], { cwd: root });
@@ -160,6 +165,72 @@ describe('lint-ratchet-audit.sh', () => {
     expect(result.ok).toBe(true);
     expect(result.output).toContain(`cannot see parent of ${rootCommit.slice(0, 12)}`);
     expect(result.output).toContain('ratchet audit passed');
+  });
+
+  it('passes when circular baseline entries only follow source-file renames', () => {
+    const root = setupRepo();
+    const oldDir = join(root, 'src', 'lib', 'vbrief');
+    mkdirSync(oldDir, { recursive: true });
+    writeFileSync(join(oldDir, 'io.ts'), 'export const io = true;\n');
+    writeFileSync(join(oldDir, 'vbrief-index.ts'), 'export const index = true;\n');
+    writeCircularBaseline(root, [
+      'src/lib/pan-dir/specs.ts > src/lib/vbrief/io.ts',
+      'src/lib/pan-dir/specs.ts > src/lib/vbrief/vbrief-index.ts > src/lib/vbrief/io.ts',
+    ]);
+    commitAll(root, 'add existing cycles PAN-1');
+
+    mkdirSync(join(root, 'src', 'lib', 'xbrief'), { recursive: true });
+    execFileSync('git', ['mv', 'src/lib/vbrief/io.ts', 'src/lib/xbrief/io.ts'], { cwd: root });
+    execFileSync(
+      'git',
+      ['mv', 'src/lib/vbrief/vbrief-index.ts', 'src/lib/xbrief/xbrief-index.ts'],
+      { cwd: root },
+    );
+    commitAll(root, 'rename module PAN-2');
+
+    writeCircularBaseline(root, [
+      'src/lib/pan-dir/specs.ts > src/lib/xbrief/io.ts',
+      'src/lib/pan-dir/specs.ts > src/lib/xbrief/xbrief-index.ts > src/lib/xbrief/io.ts',
+    ]);
+    commitAll(root, 'update cycle paths');
+
+    const result = runAudit(root, ['--range', 'HEAD~1..HEAD']);
+
+    expect(result.ok).toBe(true);
+    expect(result.output).toContain('ratchet audit passed');
+  });
+
+  it('rejects replacing a removed circular baseline entry with an unrelated cycle', () => {
+    const root = setupRepo();
+    writeCircularBaseline(root, ['src/old.ts > src/shared.ts']);
+    commitAll(root, 'add existing cycle PAN-1');
+
+    writeCircularBaseline(root, ['src/unrelated.ts > src/shared.ts']);
+    const commit = commitAll(root, 'swap cycle');
+
+    const result = runAudit(root, ['--range', 'HEAD~1..HEAD']);
+
+    expect(result.ok).toBe(false);
+    expect(result.output).toContain(commit.slice(0, 12));
+    expect(result.output).toContain('circular baseline added: src/unrelated.ts > src/shared.ts');
+  });
+
+  it('rejects a genuinely new circular baseline entry without an issue reference', () => {
+    const root = setupRepo();
+    writeCircularBaseline(root, ['src/existing.ts > src/shared.ts']);
+    commitAll(root, 'add existing cycle PAN-1');
+
+    writeCircularBaseline(root, [
+      'src/existing.ts > src/shared.ts',
+      'src/new.ts > src/shared.ts',
+    ]);
+    const commit = commitAll(root, 'add new cycle');
+
+    const result = runAudit(root, ['--range', 'HEAD~1..HEAD']);
+
+    expect(result.ok).toBe(false);
+    expect(result.output).toContain(commit.slice(0, 12));
+    expect(result.output).toContain('circular baseline added: src/new.ts > src/shared.ts');
   });
 
   it('does not attribute already-main ratchet additions to a local merge commit', () => {

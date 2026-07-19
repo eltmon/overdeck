@@ -1,6 +1,6 @@
 # Swarm v2
 
-Swarm v2 runs one work agent per vBRIEF item when the plan DAG, file scope, and global capacity allow safe parallel work. It is coordinated by Deacon, not by a durable sidecar runtime file.
+Swarm v2 runs one work agent per xBRIEF item when the plan DAG, file scope, and global capacity allow safe parallel work. It is coordinated by Deacon, not by a durable sidecar runtime file.
 
 When resolved swarm mode is `off`, Deacon performs no automatic slot dispatch,
 recovery, merge, or cleanup. Existing slots are preserved but do not advance,
@@ -45,7 +45,7 @@ feature/<issue>-slot-<N>
 agent-<issue>-slot-<N>
 ```
 
-The vBRIEF DAG decides what can run. `getDispatchableItems(doc, mergedItemIds)` returns items whose blocking parents are merged or already terminal in the plan. `analyzeSwarmReadiness(doc)` decides which of those items are safe slot candidates based on item readiness, `files_scope`, `files_scope_confidence`, verify commands, and expected outputs.
+The xBRIEF DAG decides what can run. `getDispatchableItems(doc, mergedItemIds)` returns items whose blocking parents are merged or already terminal in the plan. `analyzeSwarmReadiness(doc)` decides which of those items are safe slot candidates based on item readiness, `files_scope`, `files_scope_confidence`, verify commands, and expected outputs.
 
 Two dispatchable items whose `files_scope` overlaps are serialized. Deacon may dispatch a later item only after the overlapping item is merged.
 
@@ -57,10 +57,10 @@ Two dispatchable items whose `files_scope` overlaps are serialized. Deacon may d
    Deacon lists regular `feature-*` workspaces and skips `feature-*-slot-N` workspaces for swarm enumeration.
 
 2. Load and check the plan.
-   Deacon loads the main-side vBRIEF spec with `findSpecByIssue()` and runs `analyzeSwarmReadiness()`. Non-eligible plans are ignored by the patrol; the CLI prints the reason.
+   Deacon loads the main-side xBRIEF spec with `findSpecByIssue()` and runs `analyzeSwarmReadiness()`. Non-eligible plans are ignored by the patrol; the CLI prints the reason.
 
 3. Reconcile slot state.
-   `reconcileSlotState()` derives merged, in-flight, pending, branch, and agent state from git branches, worktrees, agent state, and vBRIEF item status. Runtime truth is not stored in a swarm JSON file.
+   `reconcileSlotState()` derives merged, in-flight, pending, branch, and agent state from git branches, worktrees, agent state, and xBRIEF item status. Runtime truth is not stored in a swarm JSON file.
 
 4. Detect slot lifecycle.
    `classifyInFlightSlots()` classifies slots as `running`, `ready-to-merge`, `failed`, or `stalled`. It checks a slot's durable completion marker first (see [Durable Slot Completion](#durable-slot-completion) below); a matching marker makes the slot `ready-to-merge` with signal `durable-completion` regardless of session state. Otherwise a pane exit code of 0 makes a slot ready to merge. A missing session, missing agent, non-zero pane exit, or unknown dead-pane exit makes it failed. A live pane with no branch-tip commit progress and no pane-output progress past the stall threshold becomes stalled.
@@ -72,7 +72,7 @@ Two dispatchable items whose `files_scope` overlaps are serialized. Deacon may d
    `gcMergedSlots()` removes merged slot worktrees and branches after the slot has been incorporated into the parent feature branch.
 
 7. Dispatch the next wave.
-   `dispatchNextWave()` calls `getDispatchableItems(doc, mergedItemIds)`, filters to slot-eligible items, applies file-overlap serialization, checks global capacity, allocates the lowest free slot index, claims the vBRIEF item through the write door, and spawns `agent-<issue>-slot-N`.
+   `dispatchNextWave()` calls `getDispatchableItems(doc, mergedItemIds)`, filters to slot-eligible items, applies file-overlap serialization, checks global capacity, allocates the lowest free slot index, claims the xBRIEF item through the write door, and spawns `agent-<issue>-slot-N`.
 
 8. Recover failed or stalled slots.
    Failed merge and stalled-slot records are stored per slot. A block pauses automatic advancement for that specific slot only; the coordinator keeps working on the rest of the issue. `pan swarm status` lists all blocked slots and labels them `failed-merge-blocked` so they are not misreported as `ready-to-merge`. Recovery is applied slot-by-slot with `pan swarm recover <id> <slotIndex>`.
@@ -88,7 +88,7 @@ pan swarm PAN-2203
 `pan swarm <id>`:
 
 - resolves the issue to its project;
-- loads the main-side vBRIEF plan;
+- loads the main-side xBRIEF plan;
 - runs `analyzeSwarmReadiness()`;
 - exits non-zero with reasons when the plan is not swarm eligible;
 - ensures `workspaces/feature-<issue>/` exists;
@@ -110,14 +110,14 @@ pan swarm recover PAN-2203 1 --action handoff
 | Action | Effect |
 | --- | --- |
 | `retry` | Archives the conflicted slot attempt (renames its branch and worktree to a superseded attempt record) so the old attempt cannot re-assert, unblocks the item, clears the per-slot block, and redispatches a fresh attempt through `dispatchNextWave()`. |
-| `drop` | Marks the item done through the vBRIEF write door and clears the block. Use only when the operator has verified the slot output is no longer needed. |
+| `drop` | Marks the item done through the xBRIEF write door and clears the block. Use only when the operator has verified the slot output is no longer needed. |
 | `handoff` | Keeps advancement paused and records an operator handoff note for manual resolution. |
 
 ## Derive, Do Not Store
 
 Swarm v2 does not keep a canonical `SwarmRuntime` sidecar. The durable sources of truth are:
 
-- the vBRIEF spec and item status;
+- the xBRIEF spec and item status;
 - git branches and worktrees;
 - agent state and tmux sessions; and
 - review or merge evidence written through existing writer surfaces.
@@ -178,7 +178,7 @@ Both inference paths treat the slot worktree as clean when the only `git status`
 
 ## Synthesis Slots
 
-When a vBRIEF item is a convergence point, Deacon may dispatch a synthesis slot before implementation. The synthesis slot writes concise context into item metadata. The following implementation slot receives an active-slice prompt containing that synthesis context.
+When an xBRIEF item is a convergence point, Deacon may dispatch a synthesis slot before implementation. The synthesis slot writes concise context into item metadata. The following implementation slot receives an active-slice prompt containing that synthesis context.
 
 This keeps downstream implementation prompts bounded while preserving the relevant outputs from multiple parent items.
 

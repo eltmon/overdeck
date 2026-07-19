@@ -30,7 +30,7 @@ import { execFile } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
-import type { VBriefDocument, VBriefEdge, VBriefItem, VBriefSubItem } from '../vbrief/types.js';
+import type { XBriefDocument, XBriefEdge, XBriefItem, XBriefSubItem } from '../xbrief/types.js';
 import type { AgentState } from './agent-state.js';
 import { deliverAgentMessage } from './delivery.js';
 import type { DeliveryResult } from './delivery.js';
@@ -72,7 +72,7 @@ export interface ShouldSuperviseOptions {
  * - 'sampled' → a deterministic per-bead sample at the configured rate.
  */
 export function shouldSupervise(
-  bead: Pick<VBriefItem, 'id' | 'metadata'>,
+  bead: Pick<XBriefItem, 'id' | 'metadata'>,
   policy: TieredExecutionSubscription,
   options: ShouldSuperviseOptions = {},
 ): boolean {
@@ -172,7 +172,7 @@ const execFileAsync = promisify(execFile);
 /** One commit-review event as delivered to the standing supervisor. */
 export interface SupervisorReviewEvent {
   issueId: string;
-  /** vBRIEF item id receiving the verdict. */
+  /** xBRIEF item id receiving the verdict. */
   itemId: string;
   itemTitle: string;
   /** Full commit sha being reviewed. */
@@ -188,7 +188,7 @@ export interface SupervisorReviewEvent {
 }
 
 export interface SupervisorVerdict {
-  /** vBRIEF item id receiving the verdict. */
+  /** xBRIEF item id receiving the verdict. */
   itemId: string;
   /** Supervisor ack clears prior blocking findings; failed/blocked records one. */
   status: 'passed' | 'ack' | 'failed' | 'blocked';
@@ -200,10 +200,10 @@ export interface DeliverCommitForReviewOptions {
   /** Workspace the commit lives in (git worktree on the feature branch). */
   workspacePath: string;
   issueId: string;
-  /** The vBRIEF item the commit implements. */
-  item: VBriefItem;
+  /** The xBRIEF item the commit implements. */
+  item: XBriefItem;
   sha: string;
-  /** Item id receiving the verdict; defaults to the vBRIEF item id. */
+  /** Item id receiving the verdict; defaults to the xBRIEF item id. */
   itemId?: string;
   /**
    * PRD draft markdown to source traced FR text from. When omitted and the
@@ -236,8 +236,8 @@ function resolveApiUrl(): string {
  */
 export function shouldHaltDispatch(
   verdicts: readonly SupervisorVerdict[],
-  nextBead: Pick<VBriefItem, 'id'>,
-  dag: Pick<VBriefDocument, 'plan'>,
+  nextBead: Pick<XBriefItem, 'id'>,
+  dag: Pick<XBriefDocument, 'plan'>,
 ): boolean {
   const latestByBead = new Map<string, SupervisorVerdict>();
   for (const verdict of verdicts) {
@@ -260,7 +260,7 @@ export function shouldHaltDispatch(
   return false;
 }
 
-function dependencyClosure(itemId: string, edges: readonly VBriefEdge[]): Set<string> {
+function dependencyClosure(itemId: string, edges: readonly XBriefEdge[]): Set<string> {
   const incoming = new Map<string, string[]>();
   for (const edge of edges) {
     if (edge.type !== 'blocks') continue;
@@ -281,17 +281,17 @@ function dependencyClosure(itemId: string, edges: readonly VBriefEdge[]): Set<st
   return dependencies;
 }
 
-function childItems(item: VBriefItem): VBriefSubItem[] {
-  // vBRIEF v0.6 uses `items`; v0.5 documents used `subItems` for the same
+function childItems(item: XBriefItem): XBriefSubItem[] {
+  // xBRIEF v0.6 uses `items`; v0.5 documents used `subItems` for the same
   // structure and are still read as a compatibility alias.
   return item.items ?? item.subItems ?? [];
 }
 
 /**
- * Pull the bead's acceptance-criterion titles from its vBRIEF child items
+ * Pull the bead's acceptance-criterion titles from its xBRIEF child items
  * (child metadata.kind === 'acceptance_criterion').
  */
-export function extractAcceptanceCriteria(item: VBriefItem): string[] {
+export function extractAcceptanceCriteria(item: XBriefItem): string[] {
   return childItems(item)
     .filter((child) => child.metadata?.kind === 'acceptance_criterion')
     .map((child) => child.title);
@@ -414,7 +414,7 @@ async function getCommitDiff(workspacePath: string, sha: string): Promise<string
 
 /**
  * Deliver one subscribed commit to the standing supervisor for review:
- * resolve the diff, pull the bead's acceptance criteria from its vBRIEF item
+ * resolve the diff, pull the bead's acceptance criteria from its xBRIEF item
  * (plus traced FR text when metadata.traces is present and a PRD draft was
  * provided), and send the composed review request via deliverAgentMessage.
  */

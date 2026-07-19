@@ -27,7 +27,7 @@ Supervise an agent working on an issue through the **entire lifecycle**:
 `spawn/resume → work → completion → review → feedback loop → test → merge-ready`
 
 This is NOT passive monitoring. You are actively:
-- **Watching for bugs at every stage** — dashboard rendering, agent spawning, workspace creation, vBRIEF tasks lifecycle, specialist handoffs, status transitions, terminal output, API responses
+- **Watching for bugs at every stage** — dashboard rendering, agent spawning, workspace creation, xBRIEF tasks lifecycle, specialist handoffs, status transitions, terminal output, API responses
 - **Documenting everything** — no bug is too small. If something flickers, logs a warning, shows stale data, or doesn't match expected state, that's a finding
 - **Fixing infrastructure bugs** when they block progress, then continuing the test
 - **Filing or updating GitHub issues** (PAN-XXX) for every bug found
@@ -92,12 +92,12 @@ echo "Completed: ${COMPLETED:-NO}"
 REVIEW_STATUS=$(curl -s http://localhost:3011/api/review/$ISSUE_ID/status 2>/dev/null)
 echo "Review status: $REVIEW_STATUS"
 
-# 6b. Branch-portable vBRIEF pipeline mirror (corroborating, not authoritative)
+# 6b. Branch-portable xBRIEF pipeline mirror (corroborating, not authoritative)
 PIPELINE_MIRROR=""
 if [ -n "$WS_PATH" ] && [ -f "$WS_PATH/.pan/spec.vbrief.json" ]; then
   PIPELINE_MIRROR=$(jq -c '.plan.metadata.pipeline // empty' "$WS_PATH/.pan/spec.vbrief.json" 2>/dev/null)
 fi
-echo "vBRIEF pipeline mirror: ${PIPELINE_MIRROR:-NONE}"
+echo "xBRIEF pipeline mirror: ${PIPELINE_MIRROR:-NONE}"
 
 # 7. Specialist activity?
 SPECIALISTS=$(curl -s http://localhost:3011/api/specialists 2>/dev/null)
@@ -106,7 +106,7 @@ echo "Specialists: $SPECIALISTS"
 
 ### Phase Decision Matrix
 
-Based on the checks above, determine the current phase. Treat `REVIEW_STATUS` and other live SQLite-backed API status as authoritative; use the branch-portable vBRIEF `plan.metadata.pipeline` mirror as a corroborating signal when API status is missing, stale, or ambiguous. If the mirror disagrees with the API, log a bug and prefer the API.
+Based on the checks above, determine the current phase. Treat `REVIEW_STATUS` and other live SQLite-backed API status as authoritative; use the branch-portable xBRIEF `plan.metadata.pipeline` mirror as a corroborating signal when API status is missing, stale, or ambiguous. If the mirror disagrees with the API, log a bug and prefer the API.
 
 | Condition | Current Phase | Jump To |
 |-----------|--------------|---------|
@@ -344,7 +344,7 @@ When you find a bug in the Overdeck infrastructure:
 Be thorough. All of these are findings worth logging:
 - Dashboard shows wrong status, stale data, or flickers
 - Agent state file says one thing, dashboard shows another
-- vBRIEF tasks not created, duplicated, or disappearing
+- xBRIEF tasks not created, duplicated, or disappearing
 - Specialist doesn't wake up or takes too long
 - Terminal output garbled or missing
 - API returns unexpected response

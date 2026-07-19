@@ -163,7 +163,7 @@ vi.mock('../../CommandDeck/ZoneCOverviewTabs/PrDiffTab', () => ({
   PrDiffTab: () => <div>PR diff tab</div>,
   statusColor: () => ({ bg: 'transparent', fg: 'currentColor', label: 'pass' }),
 }))
-vi.mock('../../CommandDeck/ZoneCOverviewTabs/VBriefTab', () => ({ VBriefTab: () => <div>vBRIEF tab</div> }))
+vi.mock('../../CommandDeck/ZoneCOverviewTabs/XBriefTab', () => ({ XBriefTab: () => <div>xBRIEF tab</div> }))
 vi.mock('../../CommandDeck/SessionView/SessionPanel', () => ({
   SessionPanel: ({ session }: { session: { sessionId: string } }) => <div data-testid="session-panel">{session.sessionId}</div>,
 }))

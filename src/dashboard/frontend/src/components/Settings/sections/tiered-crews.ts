@@ -4,11 +4,11 @@ import type {
   ModelId,
   SettingsConfig,
   TieredExecutionConfig,
-  VBriefDifficulty,
-  VBriefItemKind,
+  XBriefDifficulty,
+  XBriefItemKind,
 } from '../types';
 
-export const DIFFICULTIES: readonly VBriefDifficulty[] = ['trivial', 'simple', 'medium', 'complex', 'expert'];
+export const DIFFICULTIES: readonly XBriefDifficulty[] = ['trivial', 'simple', 'medium', 'complex', 'expert'];
 
 export interface CrewEntry {
   model: ModelId;
@@ -24,13 +24,13 @@ export interface Crew {
   distribution?: CrewEntry[];
 }
 
-export type CrewAssignments = Partial<Record<VBriefDifficulty, string>>;
-export type CrewKindOverrides = Partial<Record<VBriefItemKind, string>>;
+export type CrewAssignments = Partial<Record<XBriefDifficulty, string>>;
+export type CrewKindOverrides = Partial<Record<XBriefItemKind, string>>;
 export type CrewRest = Omit<TieredExecutionConfig, 'tiers' | 'by_kind' | 'byKind' | 'difficultyToTier'> & {
   by_kind: CrewKindOverrides;
 };
 
-function sortedDifficulties(difficulties: readonly VBriefDifficulty[]): VBriefDifficulty[] {
+function sortedDifficulties(difficulties: readonly XBriefDifficulty[]): XBriefDifficulty[] {
   const wanted = new Set(difficulties);
   return DIFFICULTIES.filter((difficulty) => wanted.has(difficulty));
 }
@@ -48,7 +48,7 @@ function staffingKey(crew: Omit<Crew, 'id'>): string {
   return `mix:${JSON.stringify(sortedDistribution(crew.distribution))}`;
 }
 
-export function deriveTierName(difficulties: readonly VBriefDifficulty[]): string {
+export function deriveTierName(difficulties: readonly XBriefDifficulty[]): string {
   return sortedDifficulties(difficulties).join('-');
 }
 
@@ -83,7 +83,7 @@ export function importCrews(config: TieredExecutionConfig): {
   const crewByKind: CrewKindOverrides = {};
   for (const [kind, tierName] of Object.entries(byKind)) {
     const crewId = tierName ? sourceTierToCrew.get(tierName) : undefined;
-    if (crewId) crewByKind[kind as VBriefItemKind] = crewId;
+    if (crewId) crewByKind[kind as XBriefItemKind] = crewId;
   }
 
   const { tiers: _tiers, by_kind: _byKind, byKind: _byKindAlias, difficultyToTier: _difficultyToTier, ...rest } = config;
@@ -97,12 +97,12 @@ export function serializeCrews(
 ): TieredExecutionConfig {
   const tiers: TieredExecutionConfig['tiers'] = {};
   const crewToTier = new Map<string, string>();
-  const kindsByCrew = new Map<string, VBriefItemKind[]>();
+  const kindsByCrew = new Map<string, XBriefItemKind[]>();
 
   for (const [kind, crewId] of Object.entries(rest.by_kind)) {
     if (!crewId) continue;
     const kinds = kindsByCrew.get(crewId) ?? [];
-    kinds.push(kind as VBriefItemKind);
+    kinds.push(kind as XBriefItemKind);
     kindsByCrew.set(crewId, kinds);
   }
 
@@ -129,10 +129,10 @@ export function serializeCrews(
     };
   }
 
-  const by_kind: Partial<Record<VBriefItemKind, string>> = {};
+  const by_kind: Partial<Record<XBriefItemKind, string>> = {};
   for (const [kind, crewId] of Object.entries(rest.by_kind)) {
     const tierName = crewId ? crewToTier.get(crewId) : undefined;
-    if (tierName) by_kind[kind as VBriefItemKind] = tierName;
+    if (tierName) by_kind[kind as XBriefItemKind] = tierName;
   }
   const { by_kind: _crewByKind, ...configRest } = rest;
   return { ...configRest, tiers, by_kind };

@@ -5,10 +5,15 @@ import { FsError } from '../errors.js'
 import { findProjectByPathSync, type ProjectConfig } from '../projects.js'
 import { resolveStateReadHomeSync } from '../state-read-home.js'
 
-import { normalizeVBriefEnvelope, serializeVBriefDocument, VBriefMergeConflictError } from '../vbrief/io.js'
-import { generateVBriefFilename, parseVBriefFilename, slugify } from '../vbrief/lifecycle.js'
-import { invalidateVBriefIndex } from '../vbrief/vbrief-index.js'
-import type { VBriefDocument } from '../vbrief/types.js'
+import { normalizeXBriefEnvelope, serializeXBriefDocument, XBriefMergeConflictError } from '../xbrief/io.js'
+import {
+  generateXBriefFilename,
+  parseXBriefFilename,
+  slugify,
+  XBRIEF_FILENAME_SUFFIX,
+} from '../xbrief/lifecycle.js'
+import { invalidateXBriefIndex } from '../xbrief/xbrief-index.js'
+import type { XBriefDocument } from '../xbrief/types.js'
 import { deriveProjectRoot, flushAutoCommits, queueAutoCommit } from './auto-commit.js'
 import {
   PAN_DIRNAME,
@@ -58,7 +63,7 @@ export function ensurePanDirs(
   }).pipe(Effect.provide(NodeFileSystem.layer))
 }
 
-function mapVBriefPlanStatusToPanSpec(status: unknown): PanSpecStatus | null {
+function mapXBriefPlanStatusToPanSpec(status: unknown): PanSpecStatus | null {
   if (isPanSpecStatus(status)) return status
   if (typeof status !== 'string') return null
   switch (status) {
@@ -76,12 +81,12 @@ function mapVBriefPlanStatusToPanSpec(status: unknown): PanSpecStatus | null {
 
 function parsePanSpecDocumentFromString(raw: string, path: string): PanSpecDocument {
   if (raw.includes('<<<<<<<') && raw.includes('=======') && raw.includes('>>>>>>>')) {
-    throw new VBriefMergeConflictError(path)
+    throw new XBriefMergeConflictError(path)
   }
 
   let parsed: unknown
   try {
-    parsed = normalizeVBriefEnvelope(JSON.parse(raw))
+    parsed = normalizeXBriefEnvelope(JSON.parse(raw))
   } catch (error) {
     throw new Error(`Invalid JSON in pan spec ${path}: ${(error as Error).message}`)
   }
@@ -96,10 +101,10 @@ function parsePanSpecDocumentFromString(raw: string, path: string): PanSpecDocum
   // every issue in the project (PAN-1015 spec on main → review feedback
   // for PAN-977 silently dropped). Derive root status from plan.status
   // when missing rather than throwing.
-  // Also map vBRIEF legacy statuses (approved, running) → active.
+  // Also map xBRIEF legacy statuses (approved, running) → active.
   if (!isPanSpecStatus(doc.status)) {
     const plan = doc.plan as Record<string, unknown> | undefined
-    const mapped = mapVBriefPlanStatusToPanSpec(plan?.status)
+    const mapped = mapXBriefPlanStatusToPanSpec(plan?.status)
     if (mapped) {
       doc.status = mapped
     } else {
@@ -107,13 +112,17 @@ function parsePanSpecDocumentFromString(raw: string, path: string): PanSpecDocum
     }
   }
 
-  // Validate required vBRIEF shape
-  if (!doc.vBRIEFInfo || !doc.plan) {
+  // Validate required xBRIEF shape and normalize the legacy envelope on read.
+  if ((!doc.xBRIEFInfo && !doc.vBRIEFInfo) || !doc.plan) {
     throw new Error(
-      `Invalid vBRIEF format in ${path}: missing 'vBRIEFInfo' or 'xBRIEFInfo' and/or 'plan' top-level keys. ` +
-        `vBRIEF/xBRIEF v0.5-v0.8 requires { "vBRIEFInfo" or "xBRIEFInfo": { "version": "0.5" through "0.8" }, "plan": { ... } }. ` +
-        `See docs/VBRIEF.md for the correct format.`,
+      `Invalid xBRIEF format in ${path}: missing 'xBRIEFInfo' or legacy 'vBRIEFInfo' and/or 'plan' top-level keys. ` +
+        `xBRIEF v0.5-v0.8 requires { "xBRIEFInfo" or legacy "vBRIEFInfo": { "version": "0.5" through "0.8" }, "plan": { ... } }. ` +
+        `See docs/XBRIEF.md for the correct format.`,
     )
+  }
+  if (!doc.xBRIEFInfo && doc.vBRIEFInfo) {
+    doc.xBRIEFInfo = doc.vBRIEFInfo;
+    delete doc.vBRIEFInfo;
   }
 
   return doc as unknown as PanSpecDocument
@@ -148,7 +157,7 @@ export function writeSpec(
     }
     const fs = yield* FileSystem.FileSystem
     const tmp = `${path}.tmp`
-    yield* fs.writeFileString(tmp, serializeVBriefDocument(doc)).pipe(
+    yield* fs.writeFileString(tmp, serializeXBriefDocument(doc)).pipe(
       Effect.mapError((cause) => new FsError({ path: tmp, operation: 'writeFileString', cause })),
     )
     yield* fs.rename(tmp, path).pipe(
@@ -172,7 +181,7 @@ function entryFromFile(
   filename: string,
 ): Effect.Effect<PanSpecEntry | null, never> {
   return Effect.gen(function* () {
-    const parts = parseVBriefFilename(filename)
+    const parts = parseXBriefFilename(filename)
     if (!parts) return null
     const path = join(specsDir, filename)
     const document = yield* readSpec(path).pipe(
@@ -242,8 +251,11 @@ export function findSpecByIssue(
     // resource-discovery refresh.
     const upperIssueId = issueId.toUpperCase()
     const matching = filenames
-      .filter((filename) => parseVBriefFilename(filename)?.issueId.toUpperCase() === upperIssueId)
-      .sort((a, b) => a.localeCompare(b))
+      .filter((filename) => parseXBriefFilename(filename)?.issueId.toUpperCase() === upperIssueId)
+      .sort((a, b) => {
+        const extensionOrder = Number(!a.endsWith(XBRIEF_FILENAME_SUFFIX)) - Number(!b.endsWith(XBRIEF_FILENAME_SUFFIX))
+        return extensionOrder || a.localeCompare(b)
+      })
 
     for (const filename of matching) {
       const entry = yield* entryFromFile(specsDir, filename)
@@ -255,7 +267,7 @@ export function findSpecByIssue(
 
 
 export function buildPanSpecFilename(issueId: string, slug: string, createdDate?: Date | string): string {
-  return generateVBriefFilename(issueId, slug, createdDate)
+  return generateXBriefFilename(issueId, slug, createdDate)
 }
 
 export function buildPanSpecPath(
@@ -269,14 +281,14 @@ export function buildPanSpecPath(
 
 export function writeSpecForIssue(
   projectRoot: string,
-  doc: VBriefDocument,
+  doc: XBriefDocument,
   status: PanSpecStatus,
   filename?: string,
 ): Effect.Effect<PanSpecEntry, FsError> {
   return Effect.gen(function* () {
     const paths = yield* ensurePanDirs(projectRoot)
     const specDocument = asPanSpecDocument(doc, status)
-    const nextFilename = filename ?? generateVBriefFilename(doc.plan.id, doc.plan.title)
+    const nextFilename = filename ?? generateXBriefFilename(doc.plan.id, doc.plan.title)
     const path = join(paths.specsDir, nextFilename)
     yield* writeSpec(path, specDocument)
     queueAutoCommit({
@@ -292,13 +304,13 @@ export function writeSpecForIssue(
         cause: new Error(flushed.reason ?? 'spec commit was not pushed'),
       }))
     }
-    invalidateVBriefIndex(projectRoot)
+    invalidateXBriefIndex(projectRoot)
     return {
       path,
       filename: nextFilename,
       issueId: doc.plan.id,
-      slug: parseVBriefFilename(nextFilename)?.slug ?? slugify(doc.plan.title),
-      date: parseVBriefFilename(nextFilename)?.date ?? new Date().toISOString().slice(0, 10),
+      slug: parseXBriefFilename(nextFilename)?.slug ?? slugify(doc.plan.title),
+      date: parseXBriefFilename(nextFilename)?.date ?? new Date().toISOString().slice(0, 10),
       status,
       document: specDocument,
     }
@@ -333,7 +345,7 @@ export function updateSpecStatus(
         cause: new Error(flushed.reason ?? 'spec status commit was not pushed'),
       }))
     }
-    invalidateVBriefIndex(projectRoot)
+    invalidateXBriefIndex(projectRoot)
     return {
       ...existing,
       status: newStatus,
@@ -372,6 +384,6 @@ export function writeSpecDocument(
         cause: new Error(flushed.reason ?? 'spec commit was not pushed'),
       }))
     }
-    invalidateVBriefIndex(projectRoot)
+    invalidateXBriefIndex(projectRoot)
   })
 }

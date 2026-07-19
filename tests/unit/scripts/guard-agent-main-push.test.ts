@@ -100,7 +100,7 @@ describe('guard-agent-main-push.sh', () => {
     const { root, base } = setupRepo();
     mkdirSync(join(root, '.pan', 'specs'), { recursive: true });
     writeFileSync(join(root, '.pan', 'specs', 'x.vbrief.json'), '{}\n');
-    const head = commitAll(root, 'vbrief artifact');
+    const head = commitAll(root, 'xbrief artifact');
 
     const result = runGuard(root, ['--range', `${base}..${head}`], {
       OVERDECK_AGENT_ID: 'flywheel-orchestrator',

@@ -252,7 +252,7 @@ From the spec repo's issues/discussions (all open unless noted):
   thesis, filed [PAN-2066](https://github.com/eltmon/overdeck/issues/2066).
   Nothing was written to disk.
 - **2026-07-07/09** — [PAN-2468](https://github.com/eltmon/overdeck/issues/2468):
-  re-research (Karpathy wiki loops, embeddings), PRD → 22-item vBRIEF,
+  re-research (Karpathy wiki loops, embeddings), PRD → 22-item xBRIEF,
   implemented by a gpt-5.5 codex work agent, merged via PR #2488. Hybrid search
   pulled forward from PAN-2066 into v1 via the okf-embeddings extension.
 - **2026-07-14** — first real use: `/okf init` (peer repo + private remote

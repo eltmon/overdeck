@@ -126,11 +126,11 @@ const findSpecByIssue = (projectRoot: string, issueId: string) =>
   Effect.runPromise(findSpecByIssueProgram(projectRoot, issueId) as Effect.Effect<any, any, never>);
 const writeSpecForIssue = (projectRoot: string, doc: any, status: any, filename?: string) =>
   Effect.runPromise(writeSpecForIssueProgram(projectRoot, doc, status, filename) as Effect.Effect<any, any, never>);
-import type { VBriefDocument } from '../../../../src/lib/vbrief/types.js';
+import type { XBriefDocument } from '../../../../src/lib/xbrief/types.js';
 
-function makeVBrief(issueId: string, status = 'running'): VBriefDocument {
+function makeXBrief(issueId: string, status = 'running'): XBriefDocument {
   return {
-    vBRIEFInfo: { version: '0.5', created: '2026-05-18T00:00:00Z' },
+    xBRIEFInfo: { version: '0.5', created: '2026-05-18T00:00:00Z' },
     plan: {
       id: issueId,
       title: `Plan for ${issueId}`,
@@ -565,14 +565,14 @@ describe('workflows', () => {
       expect(result.steps.find(s => s.step === 'teardown:branches')).toBeDefined();
     });
 
-    it('should delete the workspace, complete vBRIEF, close GitHub, and swap verifying labels during configured close-out', async () => {
+    it('should delete the workspace, complete xBRIEF, close GitHub, and swap verifying labels during configured close-out', async () => {
       writeFileSync(
         join(OVERDECK_HOME, 'cloister.toml'),
         '[close_out]\nremove_workspace = true\ndelete_feature_branch = false\nauto = false\nauto_delay_minutes = 60\n',
       );
       const wsPath = join(testDir, 'workspaces', 'feature-pan-100');
       mkdirSync(wsPath, { recursive: true });
-      await writeSpecForIssue(testDir, makeVBrief('PAN-100'), 'active');
+      await writeSpecForIssue(testDir, makeXBrief('PAN-100'), 'active');
       mockExecAsync.mockImplementation(async (command: string) => {
         if (command.includes('gh issue view') && command.includes('--json labels')) {
           return { stdout: JSON.stringify(['verifying-on-main', 'needs-close-out', 'merged', 'ready']), stderr: '' };
@@ -602,19 +602,19 @@ describe('workflows', () => {
       expect(commands.some(command => command.includes('--remove-label "needs-close-out"'))).toBe(true);
     });
 
-    it('should complete vBRIEF status and prune checkpoint refs during close-out', async () => {
-      await writeSpecForIssue(testDir, makeVBrief('PAN-100'), 'active');
+    it('should complete xBRIEF status and prune checkpoint refs during close-out', async () => {
+      await writeSpecForIssue(testDir, makeXBrief('PAN-100'), 'active');
 
       const ctx = { issueId: 'PAN-100', projectPath: testDir };
       const result = await closeOut(ctx, { tracker: successfulTracker() });
 
-      const vbriefIdx = result.steps.findIndex(s => s.step === 'close-out:vbrief-completed');
+      const xbriefIdx = result.steps.findIndex(s => s.step === 'close-out:vbrief-completed');
       const teardownIdx = result.steps.findIndex(s => s.step === 'teardown:checkpoint-refs');
       const closeIdx = result.steps.findIndex(s => s.step === 'close-issue:transition');
-      expect(vbriefIdx).toBeGreaterThanOrEqual(0);
+      expect(xbriefIdx).toBeGreaterThanOrEqual(0);
       expect(teardownIdx).toBeGreaterThanOrEqual(0);
       expect(closeIdx).toBeGreaterThanOrEqual(0);
-      expect(vbriefIdx).toBeLessThan(teardownIdx);
+      expect(xbriefIdx).toBeLessThan(teardownIdx);
       expect(teardownIdx).toBeLessThan(closeIdx);
 
       const commands = mockExecAsync.mock.calls.map(([command, args]) => ({ command: String(command), args }));

@@ -35,7 +35,7 @@ vi.mock('../../src/lib/activity-logger.js', () => ({
 }));
 
 // PAN-946 regression: the reopen flow now resolves the project path so it can
-// append a session breadcrumb beside the issue's current vBRIEF (which may live
+// append a session breadcrumb beside the issue's current xBRIEF (which may live
 // in completed/ or cancelled/). Stub the resolver so the test controls the
 // project root and can seed the lifecycle layout below.
 vi.mock('../../src/lib/projects.js', async () => {

@@ -16,8 +16,8 @@ import {
   type DoneWithoutSignalObservation,
 } from '../../../../src/lib/cloister/deacon-swarm-completion.js';
 import type { ReconciledSlotItem, SlotReconcileResult } from '../../../../src/lib/agents/slot-reconcile.js';
-import { analyzeSwarmReadiness } from '../../../../src/lib/vbrief/swarm-readiness.js';
-import type { VBriefDocument, VBriefItem } from '../../../../src/lib/vbrief/types.js';
+import { analyzeSwarmReadiness } from '../../../../src/lib/xbrief/swarm-readiness.js';
+import type { XBriefDocument, XBriefItem } from '../../../../src/lib/xbrief/types.js';
 
 const STALL_THRESHOLD_MS = 10_000;
 
@@ -32,7 +32,7 @@ function slot(overrides: Partial<ReconciledSlotItem> = {}): ReconciledSlotItem {
   };
 }
 
-function item(id = 'wi-a'): VBriefItem {
+function item(id = 'wi-a'): XBriefItem {
   return {
     id,
     title: id,
@@ -47,9 +47,9 @@ function item(id = 'wi-a'): VBriefItem {
   };
 }
 
-function doc(items: VBriefItem[] = [item()]): VBriefDocument {
+function doc(items: XBriefItem[] = [item()]): XBriefDocument {
   return {
-    vBRIEFInfo: {
+    xBRIEFInfo: {
       version: '0.6',
       created: '2026-07-01T00:00:00.000Z',
       updated: '2026-07-01T00:00:00.000Z',
