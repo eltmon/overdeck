@@ -6,6 +6,7 @@ import { useDashboardStore, selectAgents, selectIssues } from '../lib/store';
 import { classifyDashboardAgent } from '../lib/agent-classifier';
 import { Agent, type StartAgentResponse } from '../types';
 import { isCodexBlockedResponse, setPendingCodexSpawn } from '../lib/pending-codex-spawn';
+import { AgentPillPopoverRow, describeAgentStop, relativeTime } from './AgentPillPopoverRow';
 
 interface RestartResult {
   issueId: string;
@@ -36,10 +37,13 @@ export function StoppedAgentsBanner({ variant = 'banner' }: { variant?: 'banner'
 
   // issueId (upper-cased) → canonicalStatus, for the advanced-past-role check below.
   const issueStatusById = new Map<string, string>();
+  const issueTitleById = new Map<string, string>();
   for (const issue of issues) {
     const id = typeof issue['identifier'] === 'string' ? (issue['identifier'] as string).toUpperCase() : null;
     const status = typeof issue['canonicalStatus'] === 'string' ? (issue['canonicalStatus'] as string) : null;
+    const title = typeof issue['title'] === 'string' ? (issue['title'] as string) : null;
     if (id && status) issueStatusById.set(id, status);
+    if (id && title) issueTitleById.set(id, title);
   }
 
   // Show toast when an agent hits an API error (resolution transitions to 'api_error')
@@ -213,18 +217,29 @@ export function StoppedAgentsBanner({ variant = 'banner' }: { variant?: 'banner'
           {stoppedAgents.length} stopped
         </button>
         {popoverOpen && (
-          <div className="absolute right-0 top-full z-50 mt-1.5 w-72 rounded-lg border border-border bg-card p-3 shadow-xl">
+          <div
+            data-testid="stopped-agents-popover"
+            className="absolute right-0 top-full z-50 mt-1.5 w-80 rounded-lg border border-border bg-card p-3 shadow-xl"
+          >
             <div className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-warning-foreground">
               <AlertTriangle className="h-3.5 w-3.5" />
-              {stoppedAgents.length} agent{stoppedAgents.length > 1 ? 's' : ''} stopped
+              {stoppedAgents.length} stopped · pipeline agents, last 7 days
             </div>
-            <div className="mb-3 max-h-40 overflow-y-auto">
-              {stoppedAgents.map((a) => (
-                <div key={a.id} className="flex items-center justify-between py-0.5 text-xs">
-                  <span className="font-mono text-foreground">{a.issueId || a.id}</span>
-                  {a.role && <span className="text-muted-foreground">{a.role}</span>}
-                </div>
-              ))}
+            <div className="mb-3 max-h-64 overflow-y-auto">
+              {stoppedAgents.map((agent) => {
+                const lastActivity = agent.lastActivity ? Date.parse(agent.lastActivity) : 0;
+                const startedAt = agent.startedAt ? Date.parse(agent.startedAt) : 0;
+                const activityAt = new Date(Math.max(lastActivity, startedAt)).toISOString();
+                return (
+                  <AgentPillPopoverRow
+                    key={agent.id}
+                    agent={agent}
+                    title={agent.issueId ? issueTitleById.get(agent.issueId.toUpperCase()) : undefined}
+                    contextLine={`${describeAgentStop(agent)} · ${relativeTime(activityAt, Date.now())}`}
+                    onNavigate={() => setPopoverOpen(false)}
+                  />
+                );
+              })}
             </div>
             {results && (
               <div className="mb-2 text-xs">

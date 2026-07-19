@@ -6,6 +6,7 @@ import { DecisionsIndicator } from '../components/DecisionsIndicator';
 import { OpenQuestionsIndicator } from '../components/OpenQuestionsIndicator';
 import { SystemMenu } from '../components/SystemMenu';
 import { StoppedAgentsBanner } from '../components/StoppedAgentsBanner';
+import { RunningAgentsPill } from '../components/RunningAgentsPill';
 import { OrphanTestAgentsSurface } from '../components/OrphanTestAgentsSurface';
 import { CodexAuthBanner } from '../components/CodexAuthBanner';
 import { SetupChecklistBanner } from '../components/SetupChecklistBanner';
@@ -203,11 +204,7 @@ export function AppChrome({
         {/* right: status pills */}
         <div className="flex shrink-0 items-center gap-2">
           <DeaconPauseToggle compact />
-          {runningAgentCount > 0 && (
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-xs text-emerald-600 dark:text-emerald-400">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />{runningAgentCount} agent{runningAgentCount === 1 ? '' : 's'}
-            </span>
-          )}
+          <RunningAgentsPill />
           {runningAgentCount > 0 && (
             <button
               type="button"
