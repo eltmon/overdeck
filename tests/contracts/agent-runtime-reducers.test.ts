@@ -215,6 +215,22 @@ describe('PAN-800 runtime reducer', () => {
     })
   })
 
+  it('agent.model_set clears a stale session id when explicitly set to null', () => {
+    let s = applyEvent(INITIAL_READ_MODEL_STATE, at(1, {
+      type: 'agent.model_set',
+      payload: { agentId: AGENT, model: 'claude-opus-4-7', claudeSessionId: 'sess-stale' },
+    } as any))
+    expect(s.agentIdBySessionId['sess-stale']).toBe(AGENT)
+
+    s = applyEvent(s, at(2, {
+      type: 'agent.model_set',
+      payload: { agentId: AGENT, model: 'claude-opus-4-7', claudeSessionId: null },
+    } as any))
+
+    expect(s.agentRuntimeById[AGENT].claudeSessionId).toBeUndefined()
+    expect(s.agentIdBySessionId['sess-stale']).toBeUndefined()
+  })
+
   it('agent.model_set keeps legacy runtime snapshots without session origin valid', () => {
     const next = applyEvent(INITIAL_READ_MODEL_STATE, at(1, {
       type: 'agent.model_set',
