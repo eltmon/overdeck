@@ -1,6 +1,6 @@
 import { open, mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { spawn } from 'node:child_process';
+import { execFile, spawn } from 'node:child_process';
 import type { ChildProcess } from 'node:child_process';
 
 import { emitActivityEntrySync, emitActivityTtsSync } from '../activity-logger.js';
@@ -12,6 +12,9 @@ import { loadCloisterConfigSync, type DeployConfig } from './config.js';
 
 const OBSERVATION_INTERVAL_MS = 30 * 60 * 1000;
 const DEPLOY_SPAWN_COOLDOWN_MS = 10 * 60 * 1000;
+const DEPLOY_PATROL_INITIATOR = 'deploy-patrol';
+const CI_WORKFLOW_FILE = 'ci.yml';
+const CI_RUN_FIELDS = 'databaseId,status,conclusion,headSha,attempt,createdAt';
 const SYSTEMD_ENV_NAME_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
 interface DeployPatrolState {
@@ -35,10 +38,25 @@ const state: DeployPatrolState = {
 type EmitEntry = typeof emitActivityEntrySync;
 type EmitTts = typeof emitActivityTtsSync;
 
+export interface DeployCiState {
+  readonly status: 'green' | 'pending' | 'red' | 'unknown';
+  readonly reason?: string;
+}
+
+interface DeployCiRun {
+  readonly databaseId: number;
+  readonly status: string;
+  readonly conclusion: string | null;
+  readonly headSha: string;
+  readonly attempt: number;
+  readonly createdAt: string;
+}
+
 export interface DeployPatrolContext {
   readonly repoRoot: string;
   readonly config: DeployConfig;
   readonly computeStaleness?: () => Promise<BuildStaleness>;
+  readonly getCiState?: (sha: string) => Promise<DeployCiState>;
   readonly getBlockReason?: () => Promise<string | null>;
   readonly spawnReload?: (request: ReloadRequest) => Promise<void>;
   readonly emitEntry?: EmitEntry;
@@ -51,6 +69,64 @@ export interface ReloadRequest {
   readonly args: readonly string[];
   readonly cwd: string;
   readonly detached: true;
+  readonly initiator: string;
+}
+
+function reloadEnvironment(request: ReloadRequest, env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  return { ...env, OVERDECK_AGENT_ID: request.initiator };
+}
+
+function execGh(args: readonly string[], cwd: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    execFile('gh', [...args], { cwd, encoding: 'utf8', timeout: 30_000 }, (error, stdout) => {
+      if (error) reject(error);
+      else resolve(stdout);
+    });
+  });
+}
+
+export async function getDeployCiState(
+  repoRoot: string,
+  sha: string,
+  runGh: (args: readonly string[], cwd: string) => Promise<string> = execGh,
+): Promise<DeployCiState> {
+  try {
+    const runs = JSON.parse(await runGh([
+      'run', 'list',
+      '--branch', 'main',
+      '--commit', sha,
+      '--workflow', CI_WORKFLOW_FILE,
+      '--limit', '10',
+      '--json', CI_RUN_FIELDS,
+    ], repoRoot)) as DeployCiRun[];
+    const run = runs.find((candidate) => candidate.headSha === sha);
+    const tip = shortSha(sha);
+
+    if (!run) {
+      return {
+        status: 'pending',
+        reason: `Automatic deployment deferred because CI has not started for origin/main ${tip}.`,
+      };
+    }
+    if (run.status !== 'completed') {
+      return {
+        status: 'pending',
+        reason: `Automatic deployment deferred because CI is ${run.status} for origin/main ${tip}.`,
+      };
+    }
+    if (run.conclusion !== 'success') {
+      return {
+        status: 'red',
+        reason: `Automatic deployment blocked because CI concluded ${run.conclusion || 'without a result'} for origin/main ${tip}.`,
+      };
+    }
+    return { status: 'green' };
+  } catch (error) {
+    return {
+      status: 'unknown',
+      reason: `Automatic deployment deferred because CI status for origin/main ${shortSha(sha)} could not be read: ${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
 }
 
 export function buildSystemdReloadArgs(
@@ -59,7 +135,7 @@ export function buildSystemdReloadArgs(
   logPath: string,
   env: NodeJS.ProcessEnv = process.env,
 ): string[] {
-  const setenvArgs = Object.entries(env)
+  const setenvArgs = Object.entries(reloadEnvironment(request, env))
     .filter(([name, value]) => value !== undefined && SYSTEMD_ENV_NAME_RE.test(name))
     .flatMap(([name, value]) => ['--setenv', `${name}=${value}`]);
 
@@ -154,6 +230,7 @@ async function spawnDetachedReload(request: ReloadRequest, now: number): Promise
       {
         cwd: request.cwd,
         detached: request.detached,
+        env: reloadEnvironment(request, process.env),
         stdio: ['ignore', log.fd, log.fd],
       },
     );
@@ -170,6 +247,21 @@ function clearState(): void {
   state.lastDeferralAt = 0;
   state.lastDeploySpawnAt = 0;
   state.unknownObserved = false;
+}
+
+function emitDeferral(reason: string, now: number, emitEntry: EmitEntry): void {
+  if (
+    state.lastDeferralReason === reason &&
+    now - state.lastDeferralAt < OBSERVATION_INTERVAL_MS
+  ) return;
+
+  emitEntry({
+    source: 'deploy-script',
+    level: 'warn',
+    message: reason,
+  });
+  state.lastDeferralReason = reason;
+  state.lastDeferralAt = now;
 }
 
 export async function runDeployPatrol(context: DeployPatrolContext): Promise<void> {
@@ -220,20 +312,23 @@ export async function runDeployPatrol(context: DeployPatrolContext): Promise<voi
   ) return;
   if (state.lastDeploySpawnAt > 0 && now - state.lastDeploySpawnAt < DEPLOY_SPAWN_COOLDOWN_MS) return;
 
+  if (!staleness.originMainSha) {
+    emitDeferral('Automatic deployment deferred because the origin/main commit is unknown.', now, emitEntry);
+    return;
+  }
+  const ciState = await (context.getCiState ?? ((sha) => getDeployCiState(context.repoRoot, sha)))(staleness.originMainSha);
+  if (ciState.status !== 'green') {
+    emitDeferral(
+      ciState.reason ?? `Automatic deployment deferred because CI is ${ciState.status} for origin/main ${shortSha(staleness.originMainSha)}.`,
+      now,
+      emitEntry,
+    );
+    return;
+  }
+
   const blockReason = await (context.getBlockReason ?? getDeployBlockReason)();
   if (blockReason) {
-    if (
-      state.lastDeferralReason !== blockReason ||
-      now - state.lastDeferralAt >= OBSERVATION_INTERVAL_MS
-    ) {
-      emitEntry({
-        source: 'deploy-script',
-        level: 'warn',
-        message: blockReason,
-      });
-      state.lastDeferralReason = blockReason;
-      state.lastDeferralAt = now;
-    }
+    emitDeferral(blockReason, now, emitEntry);
     return;
   }
 
@@ -242,6 +337,7 @@ export async function runDeployPatrol(context: DeployPatrolContext): Promise<voi
     args: [join(context.repoRoot, 'dist/cli/index.js'), 'reload', '--health-timeout', '120000'],
     cwd: context.repoRoot,
     detached: true,
+    initiator: DEPLOY_PATROL_INITIATOR,
   };
   await (context.spawnReload ?? ((request) => spawnDetachedReload(request, now)))(reloadRequest);
   state.lastDeploySpawnAt = now;
