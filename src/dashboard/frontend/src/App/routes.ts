@@ -12,6 +12,7 @@ export const TAB_PATHS: Record<Tab, string> = {
   flywheel: '/flywheel',
   backlog: '/backlog',
   resources: '/resources',
+  knowledge: '/knowledge',
   autopreso: '/autopreso',
   activity: '/activity',
   metrics: '/metrics',
