@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-19T00:10:08.481Z",
-  "updated": "2026-07-19T00:32:04.069Z",
+  "updated": "2026-07-19T00:37:47.943Z",
   "pipeline": {
     "issueId": "PAN-2890",
     "reviewStatus": "pending",
@@ -69,16 +69,8 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "stopped-popover-enrichment": {
-        "writerId": "agent-pan-2890",
-        "agentId": "agent-pan-2890",
-        "pid": 551590,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-19T00:32:04.069Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2890",
@@ -112,6 +104,17 @@
         "outcome": "completed",
         "reason": "Added a store-backed running-agents popover with shared status predicate, scoped count, sorted contextual rows, URL-door navigation, and browser-verified system-agent fallback.",
         "releasedAt": "2026-07-19T00:31:55.436Z"
+      },
+      {
+        "writerId": "agent-pan-2890",
+        "agentId": "agent-pan-2890",
+        "pid": 551590,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-19T00:32:04.069Z",
+        "itemId": "stopped-popover-enrichment",
+        "outcome": "completed",
+        "reason": "Reused the shared row for stopped agents, added title/stop reason/time context, scoped the header, preserved filters and restart-all behavior, and browser-verified issue navigation.",
+        "releasedAt": "2026-07-19T00:37:47.943Z"
       }
     ],
     "statusReasons": {
@@ -126,6 +129,10 @@
       "running-agents-pill": {
         "reason": "Added a store-backed running-agents popover with shared status predicate, scoped count, sorted contextual rows, URL-door navigation, and browser-verified system-agent fallback.",
         "updatedAt": "2026-07-19T00:31:55.436Z"
+      },
+      "stopped-popover-enrichment": {
+        "reason": "Reused the shared row for stopped agents, added title/stop reason/time context, scoped the header, preserved filters and restart-all behavior, and browser-verified issue navigation.",
+        "updatedAt": "2026-07-19T00:37:47.943Z"
       }
     }
   },
@@ -142,6 +149,11 @@
     "running-agents-pill.running-agents-pill.ac3": "completed",
     "running-agents-pill.running-agents-pill.ac4": "completed",
     "running-agents-pill.running-agents-pill.ac5": "completed",
-    "stopped-popover-enrichment": "running"
+    "stopped-popover-enrichment": "completed",
+    "stopped-popover-enrichment.stopped-popover-enrichment.ac1": "completed",
+    "stopped-popover-enrichment.stopped-popover-enrichment.ac2": "completed",
+    "stopped-popover-enrichment.stopped-popover-enrichment.ac3": "completed",
+    "stopped-popover-enrichment.stopped-popover-enrichment.ac4": "completed",
+    "stopped-popover-enrichment.stopped-popover-enrichment.ac5": "completed"
   }
 }
