@@ -46,10 +46,10 @@
       "src/dashboard/frontend/src/components/StoppedAgentsBanner.tsx",
       "src/dashboard/frontend/src/components/__tests__/StoppedAgentsBanner.test.tsx"
     ],
-    "recordedAt": "2026-07-19T00:46:57.524Z"
+    "recordedAt": "2026-07-19T00:54:08.216Z"
   },
   "created": "2026-07-19T00:10:08.481Z",
-  "updated": "2026-07-19T00:54:07.742Z",
+  "updated": "2026-07-19T00:54:08.217Z",
   "pipeline": {
     "issueId": "PAN-2890",
     "reviewStatus": "pending",
