@@ -1,19 +1,46 @@
 {
   "issueId": "PAN-2900",
   "schemaVersion": 2,
+  "feedback": [],
   "created": "2026-07-19T03:13:51.917Z",
-  "updated": "2026-07-19T03:13:51.917Z",
+  "updated": "2026-07-19T04:28:35.465Z",
   "pipeline": {
     "issueId": "PAN-2900",
     "reviewStatus": "pending",
     "testStatus": "pending",
+    "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-19T03:13:51.917Z"
+    "updatedAt": "2026-07-19T04:28:35.441Z",
+    "strikeReadyHead": "36dc2a6fb8c546ef141990ea4fa7fa63d943f50f",
+    "strikeReadyAt": "2026-07-19T04:28:35.440Z",
+    "strikeLandingState": "ready",
+    "strikeRecoveryCount": 0,
+    "strikeLandingAttempts": []
   },
   "closeOut": {
     "usage": {
-      "byStage": {},
-      "totals": {}
+      "byStage": {
+        "strike": {
+          "openai/gpt-5.6-sol": {
+            "input": 764662,
+            "output": 31026,
+            "cacheRead": 15337984,
+            "cacheWrite": 0
+          }
+        }
+      },
+      "totals": {
+        "openai/gpt-5.6-sol": {
+          "input": 764662,
+          "output": 31026,
+          "cacheRead": 15337984,
+          "cacheWrite": 0
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 12.423082,
+        "pricingAsOf": "2026-07-19T04:28:35.456Z"
+      }
     },
     "merges": [],
     "ranOn": "eltmon-z790"
