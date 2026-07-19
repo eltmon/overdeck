@@ -46,7 +46,7 @@
   ],
   "feedback": [],
   "created": "2026-07-17T12:54:30.819Z",
-  "updated": "2026-07-19T00:29:19.635Z",
+  "updated": "2026-07-19T00:29:46.643Z",
   "pipeline": {
     "issueId": "PAN-2377",
     "reviewStatus": "pending",
@@ -119,16 +119,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 35,
-    "claims": {
-      "guard-rail-tests": {
-        "writerId": "agent-pan-2377",
-        "agentId": "agent-pan-2377",
-        "pid": 512598,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-19T00:29:19.635Z"
-      }
-    },
+    "sequence": 36,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2377",
@@ -314,6 +306,16 @@
         "outcome": "released",
         "reason": "stale claim released (agent-pan-2377 dead)",
         "releasedAt": "2026-07-18T23:09:31.797Z"
+      },
+      {
+        "writerId": "agent-pan-2377",
+        "agentId": "agent-pan-2377",
+        "pid": 512598,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-19T00:29:19.635Z",
+        "itemId": "guard-rail-tests",
+        "outcome": "completed",
+        "releasedAt": "2026-07-19T00:29:46.643Z"
       }
     ],
     "statusReasons": {
@@ -450,6 +452,8 @@
     "readonly-projections.readonly-projections.ac1": "completed",
     "readonly-projections.readonly-projections.ac2": "completed",
     "readonly-projections.readonly-projections.ac3": "completed",
-    "guard-rail-tests": "running"
+    "guard-rail-tests": "completed",
+    "guard-rail-tests.guard-rail-tests.ac1": "completed",
+    "guard-rail-tests.guard-rail-tests.ac2": "completed"
   }
 }
