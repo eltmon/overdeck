@@ -91,16 +91,17 @@
     "recordedAt": "2026-07-08T23:32:23.025Z"
   },
   "created": "2026-07-08T21:36:56.346Z",
-  "updated": "2026-07-17T03:33:58.962Z",
+  "updated": "2026-07-19T23:55:28.616Z",
   "pipeline": {
     "issueId": "PAN-2167",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
+    "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-08T23:40:01.837Z",
+    "updatedAt": "2026-07-19T23:55:28.600Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
     "verificationNotes": "Pre-review verification already covered the reviewed commit",
@@ -149,15 +150,15 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 2807940,
-            "output": 3607,
-            "cacheRead": 2476160,
+            "input": 3026444,
+            "output": 4266,
+            "cacheRead": 2684416,
             "cacheWrite": 0
           },
           "openai/gpt-5.5": {
-            "input": 28052919,
-            "output": 51216,
-            "cacheRead": 27407872,
+            "input": 30469006,
+            "output": 55859,
+            "cacheRead": 29732480,
             "cacheWrite": 0
           }
         },
@@ -176,19 +177,27 @@
             "cacheRead": 1054987,
             "cacheWrite": 94784
           }
+        },
+        "test": {
+          "custom/kimi-k2.7-code": {
+            "input": 347416,
+            "output": 5093,
+            "cacheRead": 1958656,
+            "cacheWrite": 0
+          }
         }
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 2807940,
-          "output": 3607,
-          "cacheRead": 2476160,
+          "input": 3026444,
+          "output": 4266,
+          "cacheRead": 2684416,
           "cacheWrite": 0
         },
         "openai/gpt-5.5": {
-          "input": 28052919,
-          "output": 51216,
-          "cacheRead": 27407872,
+          "input": 30469006,
+          "output": 55859,
+          "cacheRead": 29732480,
           "cacheWrite": 0
         },
         "anthropic/claude-opus-4-8": {
@@ -202,11 +211,17 @@
           "output": 8351,
           "cacheRead": 1054987,
           "cacheWrite": 94784
+        },
+        "custom/kimi-k2.7-code": {
+          "input": 347416,
+          "output": 5093,
+          "cacheRead": 1958656,
+          "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 23.192231,
-        "pricingAsOf": "2026-07-08T23:40:01.968Z"
+        "usd": 25.673782,
+        "pricingAsOf": "2026-07-19T23:55:28.611Z"
       }
     },
     "merges": [
