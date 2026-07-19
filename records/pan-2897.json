@@ -3,15 +3,16 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-07-19T02:26:02.647Z",
-  "updated": "2026-07-19T04:18:38.000Z",
+  "updated": "2026-07-19T04:18:40.228Z",
   "pipeline": {
     "issueId": "PAN-2897",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "mergeStatus": "merging",
+    "mergeStatus": "failed",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-19T04:18:37.785Z",
+    "updatedAt": "2026-07-19T04:18:40.202Z",
+    "mergeNotes": "Merge pipeline error: Cannot find module '/home/eltmon/Projects/overdeck/dist/dashboard/merge-agent-BZT5mqk3.js' imported from /home/eltmon/Projects/overdeck/dist/dashboard/workspaces-Bm08g9GV.js",
     "strikeReadyHead": "ea270ae44b7f6e0e2cfbdf092fce68f7a62f0b59",
     "strikeReadyAt": "2026-07-19T04:00:40.156Z",
     "strikeLandingState": "landing",
@@ -40,12 +41,19 @@
       },
       "costAtCloseOut": {
         "usd": 13.209259,
-        "pricingAsOf": "2026-07-19T04:18:37.928Z"
+        "pricingAsOf": "2026-07-19T04:18:40.214Z"
       }
     },
     "merges": [],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol"
+  "model": "gpt-5.6-sol",
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-07-19T04:18Z] merge-agent → NEEDS-YOU — seq 1",
+      "timestamp": "2026-07-19T04:18:40.228Z"
+    }
+  ]
 }
