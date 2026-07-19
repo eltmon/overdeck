@@ -12,6 +12,7 @@ import { loadCloisterConfigSync, type DeployConfig } from './config.js';
 
 const OBSERVATION_INTERVAL_MS = 30 * 60 * 1000;
 const DEPLOY_SPAWN_COOLDOWN_MS = 10 * 60 * 1000;
+const SYSTEMD_ENV_NAME_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
 interface DeployPatrolState {
   lastObservedBehind: number | null;
@@ -52,6 +53,32 @@ export interface ReloadRequest {
   readonly detached: true;
 }
 
+export function buildSystemdReloadArgs(
+  request: ReloadRequest,
+  now: number,
+  logPath: string,
+  env: NodeJS.ProcessEnv = process.env,
+): string[] {
+  const setenvArgs = Object.entries(env)
+    .filter(([name, value]) => value !== undefined && SYSTEMD_ENV_NAME_RE.test(name))
+    .flatMap(([name, value]) => ['--setenv', `${name}=${value}`]);
+
+  return [
+    '--user', '--unit', `overdeck-auto-deploy-${now}`,
+    '--collect', '--quiet',
+    '--property=Restart=on-failure',
+    '--property=RestartSec=10s',
+    '--property=StartLimitBurst=2',
+    '--property=StartLimitIntervalSec=300s',
+    `--property=StandardOutput=append:${logPath}`,
+    `--property=StandardError=append:${logPath}`,
+    `--property=WorkingDirectory=${request.cwd}`,
+    ...setenvArgs,
+    request.command,
+    ...request.args,
+  ];
+}
+
 function shortSha(sha: string | null): string {
   return sha?.slice(0, 8) || 'unknown';
 }
@@ -79,8 +106,16 @@ export async function waitForChildSpawn(
   });
 }
 
+async function waitForChildExit(child: ChildProcess): Promise<number> {
+  return new Promise<number>((resolve, reject) => {
+    child.once('error', reject);
+    child.once('close', (code) => resolve(code ?? 1));
+  });
+}
+
 async function spawnDetachedReload(request: ReloadRequest, now: number): Promise<void> {
   const logsDir = join(OVERDECK_HOME, 'logs');
+  const logPath = join(logsDir, 'auto-deploy.log');
   await mkdir(logsDir, { recursive: true });
   await writeFile(
     join(OVERDECK_HOME, 'dashboard-restarting.json'),
@@ -88,8 +123,31 @@ async function spawnDetachedReload(request: ReloadRequest, now: number): Promise
     'utf8',
   );
 
-  const log = await open(join(logsDir, 'auto-deploy.log'), 'a');
+  const log = await open(logPath, 'a');
   try {
+    if (process.platform === 'linux') {
+      let systemdFailure: string | null = null;
+      try {
+        const launcher = spawn(
+          'systemd-run',
+          buildSystemdReloadArgs(request, now, logPath),
+          {
+            cwd: request.cwd,
+            stdio: ['ignore', log.fd, log.fd],
+          },
+        );
+        const exitCode = await waitForChildExit(launcher);
+        if (exitCode === 0) return;
+        systemdFailure = `systemd-run exited ${exitCode}`;
+      } catch (error) {
+        systemdFailure = error instanceof Error ? error.message : String(error);
+      }
+      await log.appendFile(
+        `[auto-deploy] WARNING: ${systemdFailure}; falling back to an unsupervised detached reload.\n`,
+        'utf8',
+      );
+    }
+
     const child = spawn(
       request.command,
       [...request.args],

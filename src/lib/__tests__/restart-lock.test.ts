@@ -85,7 +85,14 @@ describe('restart lock', () => {
     expect(await Effect.runPromise(readRestartLockHolder())).toBeNull();
   });
 
-  it('reads the lock holder from disk', async () => {
+  it('clears a dead lock holder instead of blocking restart gates', async () => {
+    writeLock({ pid: 999_999_999, ts: Date.now(), caller: 'dead reader' });
+
+    expect(await Effect.runPromise(readRestartLockHolder())).toBeNull();
+    expect(existsSync(lockPath())).toBe(false);
+  });
+
+  it('reads the live lock holder from disk', async () => {
     writeLock({ pid: process.pid, ts: 123, caller: 'reader' });
 
     expect(await Effect.runPromise(readRestartLockHolder())).toEqual({ pid: process.pid, ts: 123, caller: 'reader' });
