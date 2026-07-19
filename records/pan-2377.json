@@ -87,9 +87,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-19T02:38:56.193Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-19T02:45Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-19T02:45:13.693Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-19T02:45:13Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2377\n\nAutomatic recovery resolves the persisted order-book overlay from the dashboard cwd instead of the launch workspace\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2377 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "configuration/state-branch.mdx",
@@ -294,19 +307,19 @@
     "recordedAt": "2026-07-19T00:54:19.291Z"
   },
   "created": "2026-07-17T12:54:30.819Z",
-  "updated": "2026-07-19T02:39:07.898Z",
+  "updated": "2026-07-19T02:45:13.694Z",
   "pipeline": {
     "issueId": "PAN-2377",
-    "reviewStatus": "pending",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "inspectStatus": "failed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-19T00:54:56.018Z",
-    "updatedAt": "2026-07-19T02:39:07.844Z",
-    "reviewNotes": "Agent re-review request (2/25): Fixed review issues",
+    "updatedAt": "2026-07-19T02:45:13.039Z",
+    "reviewNotes": "Automatic recovery resolves the persisted order-book overlay from the dashboard cwd instead of the launch workspace",
     "inspectNotes": "AC1-AC4 met: orders-writer.test.ts covers createBook/addItems/moveItem/setStatus round-trip + index.json queue order; orders-resolver.test.ts covers backlogCandidates rank/exclusion and computeBookProgress drained semantics (running=false, parked-only=true); orders-validate.test.ts covers all five validateBookForStart finding types incl. planAtPickup downgrade. AC5 partially met: the writer-commit half is covered (git rev-list count check in orders-writer.test.ts). The parseOrderBookJson half is NOT covered — AC5 names src/lib/orders/types.ts parseOrderBookJson specifically, but tests/unit/lib/orders/orders-io.test.ts 'returns a descriptive error for malformed order book JSON' (line ~36) writes syntactically-invalid JSON ('{bad json'), which throws inside readOrderBook's own JSON.parse try/catch (io.ts ~line 30) BEFORE parseOrderBookJson (types.ts) is ever called. No test exercises parseOrderBookJson's own catch branch (types.ts, 'Invalid order book: ...' prefix) against syntactically-valid JSON that fails Schema decode (e.g. a well-formed OrderBook object with an item missing 'issue' or lane 'C'). Fix: add a case — either import parseOrderBookJson directly and assert its ok:false error string, or have readOrderBook fed a schema-invalid-but-JSON-valid fixture — to prove the descriptive-error path named in AC5 actually executes.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2894",
     "lastVerifiedCommit": "916e46285fe1b052ba7dfa7d2521cb7d4fd8fc8e",
@@ -529,9 +542,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 5214915,
-            "output": 267047,
-            "cacheRead": 61144576,
+            "input": 8153795,
+            "output": 319336,
+            "cacheRead": 67651072,
             "cacheWrite": 0
           }
         },
@@ -545,9 +558,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 17511728,
-            "output": 1414311,
-            "cacheRead": 630204928,
+            "input": 17528308,
+            "output": 1415478,
+            "cacheRead": 633586176,
             "cacheWrite": 0
           }
         }
@@ -560,9 +573,9 @@
           "cacheWrite": 169467
         },
         "openai/gpt-5.6-sol": {
-          "input": 22726643,
-          "output": 1681358,
-          "cacheRead": 691349504,
+          "input": 25682103,
+          "output": 1734814,
+          "cacheRead": 701237248,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -573,8 +586,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 518.633098,
-        "pricingAsOf": "2026-07-19T02:39:07.885Z"
+        "usd": 539.95795,
+        "pricingAsOf": "2026-07-19T02:45:13.089Z"
       }
     },
     "merges": [
