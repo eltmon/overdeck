@@ -24,7 +24,7 @@ import {
   type WarmIdleStatusShape,
 } from '../../../../lib/cloister/review-status-source.js';
 import { getOverdeckHome } from '../../../../lib/paths.js';
-import { getRuntimeCensus } from '../../../../lib/runtime-census.js';
+import { getRuntimeCensusSnapshot } from '../../../../lib/runtime-census.js';
 import { checkAgentHealth } from '../../../lib/health-filtering.js';
 import { ReadModelService } from '../../read-model.js';
 import {
@@ -38,6 +38,14 @@ import { httpHandler } from '../http-handler.js';
 
 interface SystemHealthRouteDependencies {
   snapshot: Effect.Effect<unknown, unknown>;
+}
+
+export function readHealthSessionNames(
+  readSnapshot: () => { sessionNames: ReadonlySet<string> } | null = getRuntimeCensusSnapshot,
+): readonly string[] {
+  const census = readSnapshot();
+  if (!census) throw new Error('Runtime census snapshot is warming');
+  return [...census.sessionNames];
 }
 
 function unavailableSystemHealthResponse() {
@@ -335,7 +343,7 @@ const getHealthAgentsRoute = HttpRouter.add(
     const readModel = yield* ReadModelService;
     return yield* buildHealthAgentsResponse({
       snapshot: readModel.getSnapshot,
-      sessionNames: Effect.promise(async () => [...(await getRuntimeCensus()).sessionNames]),
+      sessionNames: Effect.sync(() => readHealthSessionNames()),
     });
   }),
 );
