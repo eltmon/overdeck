@@ -1,14 +1,12 @@
 import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { mkdir } from 'node:fs/promises';
-import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 
 import { Effect } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
 import {
-  saveAgentStateSync, saveAgentState, determineModel, getProviderAuthMode, getAgentState,
+  saveAgentState, determineModel, getProviderAuthMode, getAgentState,
   clearAgentPaused, clearAgentTroubled,
 } from '../../../../lib/agents.js';
 import type { AgentState } from '../../../../lib/agents/agent-state.js';
@@ -35,7 +33,10 @@ import { transitionXBriefOnMain, updatePlanStatus } from '../../../../lib/xbrief
 import { jsonResponse } from '../../http-helpers.js';
 import { ReadModelService } from '../../read-model.js';
 import { EventStoreService } from '../../services/domain-services.js';
-import { saveAgentStateAndEmitEventProgram } from '../../services/agent-projection.js';
+import {
+  claimAgentStartPlaceholderProgram,
+  rollbackAgentStartPlaceholderProgram,
+} from '../../services/agent-projection.js';
 import { IssueLifecycle } from '../../services/issue-lifecycle.js';
 import { getSystemHealthSnapshot } from '../../services/system-health-service.js';
 import { httpHandler } from '../http-handler.js';
@@ -790,12 +791,66 @@ export const postAgentsRoute = HttpRouter.add(
       return containerResponse;
     }
 
-    // Containers already ready or no containers needed
+    // Containers already ready or no containers needed. Claim the spawn before
+    // launching `pan start`: two requests can pass the lifecycle read together,
+    // but only one may atomically write the starting placeholder.
+    const placeholderStartedAt = new Date().toISOString();
+    const placeholderState: AgentState = {
+      id: agentSessionName,
+      issueId,
+      workspace: workspacePath,
+      role,
+      ...(effectiveHarness ? { harness: effectiveHarness } : {}),
+      model: 'pending-work-spawn',
+      status: 'starting',
+      startedAt: placeholderStartedAt,
+      hostOverride: allowHost || undefined,
+    };
+    const hasLiveTmuxSession = yield* sessionExists(agentSessionName).pipe(
+      Effect.catch(() => Effect.succeed(true)),
+    );
+    const placeholderClaim = yield* claimAgentStartPlaceholderProgram(placeholderState, {
+      type: 'agent.started',
+      timestamp: placeholderStartedAt,
+      payload: {
+        agentId: agentSessionName,
+        issueId,
+        agent: {
+          id: agentSessionName,
+          issueId,
+          workspace: workspacePath,
+          status: 'starting',
+          startedAt: placeholderStartedAt,
+          role,
+          ...(effectiveHarness ? { runtime: effectiveHarness } : {}),
+        },
+      },
+    }, hasLiveTmuxSession);
+    if (!placeholderClaim.claimed) {
+      yield* Effect.promise(() => appendAgentLifecycleLog(agentSessionName, 'agent.start_placeholder_blocked', {
+        issueId,
+        role,
+        workspacePath,
+        reason: placeholderClaim.reason,
+      }));
+      return jsonResponse({
+        error: `Agent ${agentSessionName} is already starting or running.`,
+        code: 'AGENT_START_IN_FLIGHT',
+      }, { status: 409 });
+    }
+
+    yield* Effect.promise(() => appendAgentLifecycleLog(agentSessionName, 'agent.start_placeholder_created', {
+      issueId,
+      role,
+      workspacePath,
+      startedAt: placeholderStartedAt,
+    }));
     yield* Effect.promise(() => appendAgentLifecycleLog(agentSessionName, 'agent.work_spawn_requested', {
       issueId,
       role,
       workspacePath,
     }));
+
     let activityId: string;
     try {
       emitStartAgentPhase(issueId, 'spawn', 'start', 'starting local work agent', { workspacePath });
@@ -814,6 +869,32 @@ export const postAgentsRoute = HttpRouter.add(
         activityId,
       });
     } catch (error: any) {
+      const initialStateIsPlaceholder = initialAgentState?.model.startsWith('pending-') === true;
+      const fallbackState: AgentState = initialAgentState && !initialStateIsPlaceholder
+        ? { ...initialAgentState }
+        : {
+            ...placeholderState,
+            model: spawnModel,
+            status: 'stopped',
+            stoppedAt: new Date().toISOString(),
+          };
+      const rolledBack = yield* rollbackAgentStartPlaceholderProgram(placeholderState, fallbackState, {
+        type: 'agent.status_changed',
+        timestamp: new Date().toISOString(),
+        payload: {
+          agentId: agentSessionName,
+          status: fallbackState.status,
+          previousStatus: 'starting',
+          hasLiveTmuxSession: false,
+        },
+      });
+      yield* Effect.promise(() => appendAgentLifecycleLog(agentSessionName, 'agent.start_placeholder_rollback', {
+        issueId,
+        rolledBack,
+        fallbackStatus: fallbackState.status,
+      }));
+      invalidateAgentsCache();
+
       const output = String(error?.output ?? error?.message ?? '');
       if (output.includes(`Workspace docker stack for ${issueId}`) && output.includes('is not healthy')) {
         const failedStackHealth = yield* getWorkspaceStackHealth(issueId, { projectConfig, workspacePath });
@@ -857,76 +938,8 @@ export const postAgentsRoute = HttpRouter.add(
       }, { status: 500 });
     }
 
-    // Write early state.json so the dashboard immediately shows agent-<id> as the
-    // active agent. Without this there's a race window between spawnPanCommand returning
-    // and pan start calling saveAgentState(), during which the workspace detail
-    // panel shows the stale planning-<id> session and "No saved output available."
-    const earlyAgentId = agentSessionName; // e.g. "agent-pan-488"
-    const earlyStateDir = join(homedir(), '.overdeck', 'agents', earlyAgentId);
-    yield* Effect.promise(() => mkdir(earlyStateDir, { recursive: true }));
-    // PAN-1048 R2: legacy `runtime` removed; PAN-1055: persist user-picked harness.
-    saveAgentStateSync({
-      id: earlyAgentId,
-      issueId,
-      ...(effectiveHarness ? { harness: effectiveHarness } : {}),
-      model: 'pending-work-spawn',
-      status: 'starting',
-      startedAt: new Date().toISOString(),
-      workspace: workspacePath,
-      role,
-      hostOverride: allowHost || undefined,
-    });
-    updateRegistryForAgentStart(issueId, workspacePath, earlyAgentId);
-    yield* Effect.promise(() => appendAgentLifecycleLog(earlyAgentId, 'agent.start_placeholder_created', {
-      issueId,
-      role,
-      workspacePath,
-      activityId,
-    }));
-
+    updateRegistryForAgentStart(issueId, workspacePath, agentSessionName);
     yield* Effect.promise(() => updateIssueStatus());
-
-    // PAN-1048: lifecycle.transitionTo() inside updateIssueStatus() is the
-    // single source of issue.transitioned. The duplicate issue.statusChanged
-    // emit raced with reactive Cloister: the early state.json above (with
-    // role: 'work', status: 'starting') is already on disk, so any code path
-    // that wants to know about the in-flight spawn can read it. Removing the
-    // redundant emit collapses two-source-of-truth into one.
-    //
-    // PAN-1048 review feedback 003: emit a contract-compliant agent.started
-    // payload (agentId = session name, agent = AgentSnapshot) so the read-model
-    // reducer writes a real snapshot into agentsById instead of `undefined`.
-    // Mirrors the early state.json shape we just wrote at line 2693.
-    //
-    // PAN-1908: write-through projection — agents-row upsert + lifecycle event
-    // append in one SQLite transaction.
-    yield* saveAgentStateAndEmitEventProgram({
-      id: earlyAgentId,
-      issueId,
-      workspace: workspacePath,
-      role,
-      ...(effectiveHarness ? { harness: effectiveHarness } : {}),
-      model: 'pending-work-spawn',
-      status: 'starting',
-      startedAt: new Date().toISOString(),
-      hostOverride: allowHost || undefined,
-    }, {
-      type: 'agent.started',
-      timestamp: new Date().toISOString(),
-      payload: {
-        agentId: earlyAgentId,
-        issueId,
-        agent: {
-          id: earlyAgentId,
-          issueId,
-          workspace: workspacePath,
-          status: 'starting',
-          startedAt: new Date().toISOString(),
-          role,
-          ...(effectiveHarness ? { runtime: effectiveHarness } : {}),
-        },
-      },
-    });
     try { getIssueDataService().patchIssue(issueId, { status: 'In Progress', canonicalStatus: 'in_progress' }); } catch { /* non-fatal */ }
     invalidateAgentsCache();
     return jsonResponse({

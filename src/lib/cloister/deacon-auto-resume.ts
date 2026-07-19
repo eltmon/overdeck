@@ -47,8 +47,8 @@ import {
 import { readWorkspacePlanSync } from '../xbrief/io.js';
 import { getDispatchableItems } from '../xbrief/dag.js';
 import type { XBriefItem } from '../xbrief/types.js';
+import { reconcileLiveWorkSpawnPlaceholder } from '../agents/placeholder-reconciliation.js';
 import { consumeConfirmedSessionDetail, queryConfirmedSession } from './confirmed-session-query.js';
-
 export interface AutoResumeNotifierDeps {
   notifyAgentStopped: (agentId: string) => void;
   notifyAgentStatusChanged: (state: AgentState, previousStatus?: AgentState['status'], hasLiveTmuxSession?: boolean) => void;
@@ -57,7 +57,6 @@ export interface AutoResumeNotifierDeps {
 export type { BootReconciliationApplyResult, BootReconciliationOutcome, BootReconciliationOutcomeReason } from './boot-reconciliation-outcomes.js';
 const orphanFailureRecordedForAutoResume = new Set<string>();
 const appliedBootReconciliationDecisions = new Set<string>();
-
 const emptyBootReconciliationApplyResult = (): BootReconciliationApplyResult => ({ resumed: [], outcomes: [], skipped: { workspace_missing: 0, merged: 0, completed: 0, other: 0 }, deferred: 0 });
 
 function isVerifyPausedAgentState(state: Pick<AgentState, 'issueId' | 'paused'>): boolean {
@@ -182,7 +181,8 @@ export async function handleAgentHeartbeatDeadEvent(
         return []; // can't check — assume alive
       }
     } else {
-      return []; // truly still running
+      const action = await reconcileLiveWorkSpawnPlaceholder(state, deps.notifyAgentStatusChanged);
+      return action ? [action] : [];
     }
   } else if (state.status === 'starting') {
     // PAN-1256: work agents in `starting` status need a startup grace
