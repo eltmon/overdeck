@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-19T20:18:40.159Z",
-  "updated": "2026-07-19T20:35:19.477Z",
+  "updated": "2026-07-19T20:41:35.927Z",
   "pipeline": {
     "issueId": "PAN-2066",
     "reviewStatus": "pending",
@@ -53,16 +53,8 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "ensure-open-knowledge": {
-        "writerId": "agent-pan-2066",
-        "agentId": "agent-pan-2066",
-        "pid": 2111057,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-19T20:35:19.477Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2066",
@@ -74,12 +66,27 @@
         "outcome": "completed",
         "reason": "Tested open-knowledge v0.34.0 in an isolated Playwright profile; description-only UI save preserved key order and unknown keys but rewrote inline tag spacing, so posted the lossy diff verdict and selected read-only Knowledge-page posture. Captured actual start flags and the required no-MCP init step.",
         "releasedAt": "2026-07-19T20:35:03.100Z"
+      },
+      {
+        "writerId": "agent-pan-2066",
+        "agentId": "agent-pan-2066",
+        "pid": 2111057,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-19T20:35:19.477Z",
+        "itemId": "ensure-open-knowledge",
+        "outcome": "completed",
+        "reason": "Added ensureOpenKnowledge with injectable async command/install seams, no-install guidance, fake-timer health retries, exact Node 24 diagnosis, and a shared ok start launcher using the verified v0.34.0 init/port flags. Targeted tests, typecheck, and file lint pass.",
+        "releasedAt": "2026-07-19T20:41:35.927Z"
       }
     ],
     "statusReasons": {
       "roundtrip-spike": {
         "reason": "Tested open-knowledge v0.34.0 in an isolated Playwright profile; description-only UI save preserved key order and unknown keys but rewrote inline tag spacing, so posted the lossy diff verdict and selected read-only Knowledge-page posture. Captured actual start flags and the required no-MCP init step.",
         "updatedAt": "2026-07-19T20:35:03.100Z"
+      },
+      "ensure-open-knowledge": {
+        "reason": "Added ensureOpenKnowledge with injectable async command/install seams, no-install guidance, fake-timer health retries, exact Node 24 diagnosis, and a shared ok start launcher using the verified v0.34.0 init/port flags. Targeted tests, typecheck, and file lint pass.",
+        "updatedAt": "2026-07-19T20:41:35.927Z"
       }
     }
   },
@@ -87,6 +94,10 @@
     "roundtrip-spike": "completed",
     "roundtrip-spike.roundtrip-spike.ac1": "completed",
     "roundtrip-spike.roundtrip-spike.ac2": "completed",
-    "ensure-open-knowledge": "running"
+    "ensure-open-knowledge": "completed",
+    "ensure-open-knowledge.ensure-open-knowledge.ac1": "completed",
+    "ensure-open-knowledge.ensure-open-knowledge.ac2": "completed",
+    "ensure-open-knowledge.ensure-open-knowledge.ac3": "completed",
+    "ensure-open-knowledge.ensure-open-knowledge.ac4": "completed"
   }
 }
