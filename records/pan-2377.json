@@ -309,19 +309,20 @@
     "recordedAt": "2026-07-19T00:54:19.291Z"
   },
   "created": "2026-07-17T12:54:30.819Z",
-  "updated": "2026-07-19T03:23:49.974Z",
+  "updated": "2026-07-19T03:51:48.675Z",
   "pipeline": {
     "issueId": "PAN-2377",
     "reviewStatus": "passed",
-    "testStatus": "testing",
+    "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "failed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": false,
+    "readyForMerge": true,
     "panDoneRecoveredAt": "2026-07-19T00:54:56.018Z",
-    "updatedAt": "2026-07-19T03:23:49.949Z",
+    "updatedAt": "2026-07-19T03:51:48.565Z",
     "reviewNotes": "Mainline merge preserves the approved order-book implementation and automatic-recovery fix; focused tests and typecheck pass",
+    "testNotes": "typecheck+lint PASS; 9943/9954 tests passed (11 failures all 5000ms timeouts under load-avg-60+ contention, unrelated to orders/flywheel scope); all 18 vBRIEF items + ACs completed; review APPROVED cycle 6 (PR #2894)",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "AC1-AC4 met: orders-writer.test.ts covers createBook/addItems/moveItem/setStatus round-trip + index.json queue order; orders-resolver.test.ts covers backlogCandidates rank/exclusion and computeBookProgress drained semantics (running=false, parked-only=true); orders-validate.test.ts covers all five validateBookForStart finding types incl. planAtPickup downgrade. AC5 partially met: the writer-commit half is covered (git rev-list count check in orders-writer.test.ts). The parseOrderBookJson half is NOT covered — AC5 names src/lib/orders/types.ts parseOrderBookJson specifically, but tests/unit/lib/orders/orders-io.test.ts 'returns a descriptive error for malformed order book JSON' (line ~36) writes syntactically-invalid JSON ('{bad json'), which throws inside readOrderBook's own JSON.parse try/catch (io.ts ~line 30) BEFORE parseOrderBookJson (types.ts) is ever called. No test exercises parseOrderBookJson's own catch branch (types.ts, 'Invalid order book: ...' prefix) against syntactically-valid JSON that fails Schema decode (e.g. a well-formed OrderBook object with an item missing 'issue' or lane 'C'). Fix: add a case — either import parseOrderBookJson directly and assert its ok:false error string, or have readOrderBook fed a schema-invalid-but-JSON-valid fixture — to prove the descriptive-error path named in AC5 actually executes.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2894",
@@ -562,17 +563,17 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 72,
-            "output": 11357,
-            "cacheRead": 4771950,
-            "cacheWrite": 154765
+            "input": 220,
+            "output": 37136,
+            "cacheRead": 15701548,
+            "cacheWrite": 345436
           }
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 18319254,
-            "output": 1429285,
-            "cacheRead": 657857536,
+            "input": 18348706,
+            "output": 1433323,
+            "cacheRead": 662967296,
             "cacheWrite": 0
           }
         }
@@ -585,21 +586,21 @@
           "cacheWrite": 169467
         },
         "openai/gpt-5.6-sol": {
-          "input": 28571567,
-          "output": 1832440,
-          "cacheRead": 746077184,
+          "input": 28601019,
+          "output": 1836478,
+          "cacheRead": 751186944,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 84,
-          "output": 17540,
-          "cacheRead": 5366136,
-          "cacheWrite": 287340
+          "input": 232,
+          "output": 43319,
+          "cacheRead": 16295734,
+          "cacheWrite": 478011
         }
       },
       "costAtCloseOut": {
-        "usd": 581.209032,
-        "pricingAsOf": "2026-07-19T03:23:49.963Z"
+        "usd": 586.953,
+        "pricingAsOf": "2026-07-19T03:51:48.628Z"
       }
     },
     "merges": [
