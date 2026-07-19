@@ -44,10 +44,10 @@
     "recordedAt": "2026-07-19T00:46:57.524Z"
   },
   "created": "2026-07-19T00:10:08.481Z",
-  "updated": "2026-07-19T00:51:14.961Z",
+  "updated": "2026-07-19T00:51:18.371Z",
   "pipeline": {
     "issueId": "PAN-2890",
-    "reviewStatus": "failed",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "failed",
     "inspectStatus": "passed",
@@ -55,13 +55,13 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-19T00:48:58.071Z",
-    "updatedAt": "2026-07-19T00:51:14.916Z",
+    "updatedAt": "2026-07-19T00:51:18.183Z",
     "reviewNotes": "Verification failed at build",
     "verificationNotes": "Verification FAILED at build (97620ms):\n\n\n> @overdeck/core@0.45.22 build\n> npm run build:contracts && npm run build:pi-extension && npm run build:ohmypi-extension && npm run build:cli && node scripts/build-post-cli.mjs\n\n\n> @overdeck/core@0.45.22 build:contracts\n> node scripts/fs-helper.mjs rmrf packages/contracts/dist && npm --prefix ./packages/contracts run build\n\n\n> @overdeck/contracts@0.45.22 build\n> cross-env NODE_OPTIONS=--max-old-space-size=16384 tsdown\n\n\u001b[34mℹ\u001b[39m \u001b[34mtsdown v0.21.10\u001b[39m powered by \u001b[38;2;255;126;23mrolldown v1.0.0-rc.17\u001b[39m\n\u001b[34mℹ\u001b[39m config file: \u001b[4m/home/eltmon/Projects/overdeck/workspaces/feature-pan-2890/packages/contracts/tsdown.config.ts\u001b[24m \n\u001b[34mℹ\u001b[39m entry: \u001b[34msrc/index.ts\u001b[39m\n\u001b[34mℹ\u001b[39m tsconfig: \u001b[34mtsconfig.json\u001b[39m\n\u001b[34mℹ\u001b[39m entry: \u001b[34msrc/index.ts\u001b[39m\n\u001b[34mℹ\u001b[39m tsconfig: \u001b[34mtsconfig.json\u001b[39m\n\u001b[34mℹ\u001b[39m Build start\n\u001b[34mℹ\u001b[39m \u001b[33m[CJS]\u001b[39m \u001b[2mdist/\u001b[22m\u001b[1mindex.cjs\u001b[22m  \u001b[2m192.69 kB\u001b[22m \u001b[2m│ gzip: 33.04 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[33m[CJS]\u001b[39m 1 files, total: 192.69 kB\n\u001b[32m✔\u001b[39m Build complete in \u001b[32m2983ms\u001b[39m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22m\u001b[1mindex.mjs\u001b[22m       \u001b[2m164.53 kB\u001b[22m \u001b[2m│ gzip: 31.02 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22mindex.mjs.map   \u001b[2m310.49 kB\u001b[22m \u001b[2m│ gzip: 54.21 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22mindex.d.ts.map  \u001b[2m 41.73 kB\u001b[22m \u001b[2m│ gzip:  4.90 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22m\u001b[32m\u001b[1mindex.d.ts\u001b[22m\u001b[39m      \u001b[2m717.13 kB\u001b[22m \u001b[2m│ gzip: 68.77 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m 4 files, total: 1.23 MB\n\u001b[32m✔\u001b[39m Build complete in \u001b[32m3301ms\u001b[39m\n\n> @overdeck/core@0.45.22 build:pi-extension\n> npm --prefix ./packages/pi-extension run build\n\n\n> @overdeck/pi-extension@0.0.1 build\n> tsdown\n\n\u001b[34mℹ\u001b[39m \u001b[34mtsdown v0.21.10\u001b[39m powered by \u001b[38;2;255;126;23mrolldown v1.0.0-rc.17\u001b[39m\n\u001b[34mℹ\u001b[39m config file: \u001b[4m/home/eltmon/Projects/overdeck/workspaces/feature-pan-2890/packages/pi-extension/tsdown.config.ts\u001b[24m \n\u001b[34mℹ\u001b[39m entry: \u001b[34msrc/index.ts\u001b[39m\n\u001b[34mℹ\u001b[39m tsconfig: \u001b[34mtsconfig.json\u001b[39m\n\u001b[34mℹ\u001b[39m Build start\n\u001b[34mℹ\u001b[39m Cleaning 2 files\n\u001b[34mℹ\u001b[39m \u001b[2mdist/\u001b[22m\u001b[1mindex.js\u001b[22m    \u001b[2m27.10 kB\u001b[22m \u001b[2m│ gzip: 7.19 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[2mdist/\u001b[22m\u001b[32m\u001b[1mindex.d.ts\u001b[22m\u001b[39m  \u001b[2m 6.06 kB\u001b[22m \u001b[2m│ gzip: 1.59 kB\u001b[22m\n\u001b[34mℹ\u001b[39m 2 files, total: 33.16 kB\n\u001b[32m✔\u001b[39m Build complete in \u001b[32m532ms\u001b[39m\n\n> @overdeck/core@0.45.22 build:ohmypi-extension\n> npm --prefix ./packages/ohmypi-extension run build\n\n\n> @overdeck/ohmypi-extension@0.0.1 build\n> tsdown\n\n\u001b[34mℹ\u001b[39m \u001b[34mtsdown v0.21.10\u001b[39m powered by \u001b[38;2;255;126;23mrolldown v1.0.0-rc.17\u001b[39m\n\u001b[34mℹ\u001b[39m config file: \u001b[4m/home/eltmon/Projects/overdeck/workspaces/feature-pan-2890/packages/ohmypi-extension/tsdown.config.ts\u001b[24m \n\u001b[34mℹ\u001b[39m entry: \u001b[34msrc/index.ts\u001b[39m\n\u001b[34mℹ\u001b[39m tsconfig: \u001b[34mtsconfig.json\u001b[39m\n\u001b[34mℹ\u001b[39m Build start\n\u001b[34mℹ\u001b[39m Cleaning 2 files\n\u001b[34mℹ\u001b[39m \u001b[2mdist/\u001b[22m\u001b[1mindex.js\u001b[22m    \u001b[2m27.24 kB\u001b[22m \u001b[2m│ gzip: 7.21 kB\u001b[22m\n\u001b[34\n...(truncated)",
     "inspectNotes": "All 4 ACs met: describeAgentStop covers all 5 branches incl. troubled-failures plural; click navigates via pushState+popstate then onNavigate in order; font-mono ID + truncate/title fallback rendered; relativeTime verified fully under fake timers (5m/3h/2d).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2892",
     "reviewRequestedAt": "2026-07-19T00:48:58.071Z",
-    "reviewSpawnedAt": "2026-07-19T00:47:04.122Z",
+    "reviewSpawnedAt": "2026-07-19T00:51:18.182Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "src/dashboard/frontend/src/components/__tests__/StoppedAgentsBanner.test.tsx"
@@ -154,7 +154,7 @@
       },
       "costAtCloseOut": {
         "usd": 57.927807,
-        "pricingAsOf": "2026-07-19T00:51:14.953Z"
+        "pricingAsOf": "2026-07-19T00:51:18.276Z"
       }
     },
     "merges": [
