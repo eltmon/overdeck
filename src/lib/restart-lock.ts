@@ -101,7 +101,20 @@ async function acquireStaleBreaker(path: string): Promise<RestartLockHandle | nu
   }
   return null;
 }async function readRestartLockHolderPromise(): Promise<RestartLockHolder | null> {
-  return readHolderFromPath(restartLockPath());
+  const path = restartLockPath();
+  const observed = await readHolderFromPath(path);
+  if (!observed || isProcessAlive(observed.pid)) return observed;
+
+  const breaker = await acquireStaleBreaker(path);
+  if (!breaker) return observed;
+  try {
+    const current = await readHolderFromPath(path);
+    if (!matchesHolder(current, observed)) return current;
+    await unlinkIfExists(path);
+    return null;
+  } finally {
+    await breaker.release();
+  }
 }async function acquireRestartLockPromise(caller: string): Promise<RestartLockHandle | null> {
   const path = restartLockPath();
   await mkdir(dirname(path), { recursive: true });

@@ -76,8 +76,10 @@ deploy:
 ```
 
 Set `deploy.auto_deploy: false` for signal-only mode. Staleness remains visible in system health
-and the header, but Deacon does not start a deployment. Detached deployment output is appended to
-`~/.overdeck/logs/auto-deploy.log`.
+and the header, but Deacon does not start a deployment. On Linux, Deacon runs the reload in a
+transient systemd user unit with rate-limited failure recovery, so stopping the old dashboard cannot
+kill the reload through the dashboard's cgroup. Deployment output and retry failures are appended
+to `~/.overdeck/logs/auto-deploy.log`.
 
 `pan reload` remains the manual deployment door. It builds first, preserves the running dashboard
 when the build fails, restarts the Node 22 bundle after a successful build, and waits for health.
