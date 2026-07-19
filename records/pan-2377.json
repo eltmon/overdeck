@@ -309,10 +309,10 @@
     "recordedAt": "2026-07-19T00:54:19.291Z"
   },
   "created": "2026-07-17T12:54:30.819Z",
-  "updated": "2026-07-19T03:19:53.902Z",
+  "updated": "2026-07-19T03:23:39.233Z",
   "pipeline": {
     "issueId": "PAN-2377",
-    "reviewStatus": "pending",
+    "reviewStatus": "passed",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "failed",
@@ -320,13 +320,15 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-19T00:54:56.018Z",
-    "updatedAt": "2026-07-19T03:19:51.714Z",
+    "updatedAt": "2026-07-19T03:23:39.154Z",
+    "reviewNotes": "Mainline merge preserves the approved order-book implementation and automatic-recovery fix; focused tests and typecheck pass",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "AC1-AC4 met: orders-writer.test.ts covers createBook/addItems/moveItem/setStatus round-trip + index.json queue order; orders-resolver.test.ts covers backlogCandidates rank/exclusion and computeBookProgress drained semantics (running=false, parked-only=true); orders-validate.test.ts covers all five validateBookForStart finding types incl. planAtPickup downgrade. AC5 partially met: the writer-commit half is covered (git rev-list count check in orders-writer.test.ts). The parseOrderBookJson half is NOT covered — AC5 names src/lib/orders/types.ts parseOrderBookJson specifically, but tests/unit/lib/orders/orders-io.test.ts 'returns a descriptive error for malformed order book JSON' (line ~36) writes syntactically-invalid JSON ('{bad json'), which throws inside readOrderBook's own JSON.parse try/catch (io.ts ~line 30) BEFORE parseOrderBookJson (types.ts) is ever called. No test exercises parseOrderBookJson's own catch branch (types.ts, 'Invalid order book: ...' prefix) against syntactically-valid JSON that fails Schema decode (e.g. a well-formed OrderBook object with an item missing 'issue' or lane 'C'). Fix: add a case — either import parseOrderBookJson directly and assert its ok:false error string, or have readOrderBook fed a schema-invalid-but-JSON-valid fixture — to prove the descriptive-error path named in AC5 actually executes.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2894",
+    "reviewedAtCommit": "7e906f4ddad3108c09bd5abd59fe118b40ec4d47",
     "lastVerifiedCommit": "1efab25bdb7b55b494dffc64f858401acec57b05",
     "reviewRequestedAt": "2026-07-19T00:54:56.018Z",
-    "reviewSpawnedAt": "2026-07-19T03:05:46.521Z",
+    "reviewSpawnedAt": "2026-07-19T03:19:52.587Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "configuration/state-branch.mdx",
@@ -544,9 +546,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 9590387,
-            "output": 386373,
-            "cacheRead": 81415680,
+            "input": 10249457,
+            "output": 402997,
+            "cacheRead": 87673856,
             "cacheWrite": 0
           }
         },
@@ -560,17 +562,17 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 66,
-            "output": 10709,
-            "cacheRead": 4309781,
-            "cacheWrite": 153754
+            "input": 72,
+            "output": 11357,
+            "cacheRead": 4771950,
+            "cacheWrite": 154765
           }
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 18305408,
-            "output": 1428353,
-            "cacheRead": 655316992,
+            "input": 18319254,
+            "output": 1429285,
+            "cacheRead": 657857536,
             "cacheWrite": 0
           }
         }
@@ -583,21 +585,21 @@
           "cacheWrite": 169467
         },
         "openai/gpt-5.6-sol": {
-          "input": 27895795,
-          "output": 1814726,
-          "cacheRead": 736732672,
+          "input": 28568711,
+          "output": 1832282,
+          "cacheRead": 745531392,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 78,
-          "output": 16892,
-          "cacheRead": 4903967,
-          "cacheWrite": 286329
+          "input": 84,
+          "output": 17540,
+          "cacheRead": 5366136,
+          "cacheWrite": 287340
         }
       },
       "costAtCloseOut": {
-        "usd": 572.525043,
-        "pricingAsOf": "2026-07-19T03:19:51.883Z"
+        "usd": 580.917116,
+        "pricingAsOf": "2026-07-19T03:23:39.221Z"
       }
     },
     "merges": [
