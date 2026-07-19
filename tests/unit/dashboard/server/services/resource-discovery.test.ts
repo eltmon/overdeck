@@ -619,24 +619,17 @@ describe('resource-discovery branch-ahead signal', () => {
     resetResourceAllocatedIssuesCacheForTests();
     mocks.execFile.mockImplementation((command: string, args: string[], _options: unknown, callback: (error: Error | null, result?: { stdout: string }) => void) => {
       if (command === 'git' && args[0] === 'for-each-ref') {
-        const patterns = args.filter((a) => a.includes('feature/*') || a.includes('bypass/*'));
         const isNoMerged = args.includes('--no-merged=main');
-        const hasFeature = patterns.some((p) => p.includes('feature/*'));
-        const hasBypass = patterns.some((p) => p.includes('bypass/*'));
-        const isRemote = patterns.some((p) => p.includes('refs/remotes/'));
-        const prefix = isRemote ? 'origin/' : '';
-        const branches: string[] = [];
-        if (hasFeature) {
-          if (isNoMerged) {
-            branches.push(`${prefix}feature/pan-9002`, `${prefix}feature/pan-9003`);
-          } else {
-            branches.push(`${prefix}feature/pan-9001`, `${prefix}feature/pan-9002`, `${prefix}feature/pan-9003`);
-          }
-        }
-        if (hasBypass) {
-          branches.push(`${prefix}bypass/pan-9002`);
-        }
-        callback(null, { stdout: branches.join('\n') + (branches.length ? '\n' : '') });
+        const branches = isNoMerged
+          ? [
+              'feature/pan-9002', 'feature/pan-9003', 'bypass/pan-9002',
+              'origin/feature/pan-9002', 'origin/feature/pan-9003', 'origin/bypass/pan-9002',
+            ]
+          : [
+              'feature/pan-9001', 'feature/pan-9002', 'feature/pan-9003', 'bypass/pan-9002',
+              'origin/feature/pan-9001', 'origin/feature/pan-9002', 'origin/feature/pan-9003', 'origin/bypass/pan-9002',
+            ];
+        callback(null, { stdout: `${branches.join('\n')}\n` });
         return;
       }
       if (command === 'gh' && args[0] === 'pr') {
@@ -660,6 +653,8 @@ describe('resource-discovery branch-ahead signal', () => {
     expect(issue!.resourceSources).toContain('branch');
     expect(issue!.resourceDetails.branchAheadOfMain).toBe(true);
     expect(issue!.resourceDetails.localBranchCount).toBe(2);
+    expect(mocks.execFile.mock.calls.filter(([command, args]) =>
+      command === 'git' && args[0] === 'for-each-ref')).toHaveLength(2);
   });
 
   it('records branchAheadOfMain false for a feature branch fully merged into main', async () => {

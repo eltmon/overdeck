@@ -337,68 +337,41 @@ async function loadOpenPullRequests(projects: ProjectRef[]): Promise<Map<string,
   return pullRequests;
 }
 
-async function loadProjectBranches(projectPath: string): Promise<{ local: string[]; remote: string[] }> {
-  try {
-    const [localFeature, remoteFeature, localBypass, remoteBypass] = await Promise.all([
-      execFileAsync('git', ['for-each-ref', 'refs/heads/feature/*', '--format=%(refname:short)'], {
-        cwd: projectPath,
-        encoding: 'utf-8',
-        timeout: 10000,
-      }).catch(() => ({ stdout: '' })),
-      execFileAsync('git', ['for-each-ref', 'refs/remotes/origin/feature/*', '--format=%(refname:short)'], {
-        cwd: projectPath,
-        encoding: 'utf-8',
-        timeout: 10000,
-      }).catch(() => ({ stdout: '' })),
-      execFileAsync('git', ['for-each-ref', 'refs/heads/bypass/*', '--format=%(refname:short)'], {
-        cwd: projectPath,
-        encoding: 'utf-8',
-        timeout: 10000,
-      }).catch(() => ({ stdout: '' })),
-      execFileAsync('git', ['for-each-ref', 'refs/remotes/origin/bypass/*', '--format=%(refname:short)'], {
-        cwd: projectPath,
-        encoding: 'utf-8',
-        timeout: 10000,
-      }).catch(() => ({ stdout: '' })),
-    ]);
+const PROJECT_BRANCH_PATTERNS = [
+  'refs/heads/feature/*',
+  'refs/remotes/origin/feature/*',
+  'refs/heads/bypass/*',
+  'refs/remotes/origin/bypass/*',
+];
 
-    return {
-      local: [
-        ...localFeature.stdout.split('\n').map((line) => line.trim()).filter(Boolean),
-        ...localBypass.stdout.split('\n').map((line) => line.trim()).filter(Boolean),
-      ],
-      remote: [
-        ...remoteFeature.stdout.split('\n').map((line) => line.trim()).filter(Boolean),
-        ...remoteBypass.stdout.split('\n').map((line) => line.trim()).filter(Boolean),
-      ],
-    };
-  } catch {
-    return { local: [], remote: [] };
-  }
-}
-async function loadBranchesAheadOfMain(projectPath: string): Promise<Set<string>> {
-  const ahead = new Set<string>();
-  const run = async (patterns: string[]) => {
-    if (patterns.length === 0) return;
-    try {
-      const { stdout } = await execFileAsync('git', ['for-each-ref', '--format=%(refname:short)', ...patterns, '--no-merged=main'], {
-        cwd: projectPath,
-        encoding: 'utf-8',
-        timeout: 10000,
-      });
-      for (const line of stdout.split('\n')) {
-        const branch = line.trim();
-        if (branch) ahead.add(branch);
-      }
-    } catch {
-      // fail closed by treating all branches as merged
-    }
-  };
-  await Promise.all([
-    run(['refs/heads/feature/*', 'refs/heads/bypass/*']),
-    run(['refs/remotes/origin/feature/*', 'refs/remotes/origin/bypass/*']),
+async function loadProjectBranchSnapshot(projectPath: string): Promise<{
+  local: string[];
+  remote: string[];
+  ahead: Set<string>;
+}> {
+  const run = (extraArgs: string[] = []) => execFileAsync('git', [
+    'for-each-ref',
+    '--format=%(refname:short)',
+    ...extraArgs,
+    ...PROJECT_BRANCH_PATTERNS,
+  ], {
+    cwd: projectPath,
+    encoding: 'utf-8',
+    timeout: 10000,
+  }).catch(() => ({ stdout: '' }));
+
+  const [allRefs, unmergedRefs] = await Promise.all([
+    run(),
+    run(['--no-merged=main']),
   ]);
-  return ahead;
+  const branches = allRefs.stdout.split('\n').map((line) => line.trim()).filter(Boolean);
+  const ahead = new Set(unmergedRefs.stdout.split('\n').map((line) => line.trim()).filter(Boolean));
+
+  return {
+    local: branches.filter((branch) => !branch.startsWith('origin/')),
+    remote: branches.filter((branch) => branch.startsWith('origin/')),
+    ahead,
+  };
 }
 
 interface WorkspaceScanResult {
@@ -613,9 +586,8 @@ async function computeResourceAllocatedIssues(
     // count grows.
     const [workspaceEntries, branches] = await Promise.all([
       readdir(workspacesDir, { withFileTypes: true }).catch(() => []),
-      loadProjectBranches(projectPath),
+      loadProjectBranchSnapshot(projectPath),
     ]);
-    const aheadBranches = await loadBranchesAheadOfMain(projectPath);
 
     await Promise.all(workspaceEntries.map(async (entry) => {
       if (!entry.isDirectory() || !entry.name.startsWith('feature-')) return;
@@ -655,7 +627,7 @@ async function computeResourceAllocatedIssues(
       if (!issue.resourceDetails[key].includes(branch)) {
         issue.resourceDetails[key].push(branch);
       }
-      if (aheadBranches.has(branch)) {
+      if (branches.ahead.has(branch)) {
         issue.resourceDetails.branchAheadOfMain = true;
       }
     }

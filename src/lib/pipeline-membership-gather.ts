@@ -414,9 +414,20 @@ export async function gatherProjectLensSignals(
 
   if (owner && repo) {
     const unknownIssueIds = [...candidates].filter((id) => !knownStateByIssue.has(id));
-    const issueStates = await deps.listIssueStates(owner, repo, unknownIssueIds.map(issueNumber));
-    const stateByNumber = new Map(issueStates.map((entry) => [entry.number, entry.state]));
+    const issueStateCandidates = unknownIssueIds.filter((id) =>
+      openPrIssues.has(id) || branchIssues.has(id));
+    const issueStateCandidateSet = new Set(issueStateCandidates);
     for (const id of unknownIssueIds) {
+      // listOpenIssues is a complete paginated snapshot. A spec-only candidate
+      // absent from it is closed (or no longer an issue), and either case resolves
+      // terminal without another per-number GraphQL lookup.
+      if (!issueStateCandidateSet.has(id)) candidates.delete(id);
+    }
+    const issueStates = issueStateCandidates.length > 0
+      ? await deps.listIssueStates(owner, repo, issueStateCandidates.map(issueNumber))
+      : [];
+    const stateByNumber = new Map(issueStates.map((entry) => [entry.number, entry.state]));
+    for (const id of issueStateCandidates) {
       const state = stateByNumber.get(issueNumber(id));
       if (state) knownStateByIssue.set(id, state);
       else candidates.delete(id);
