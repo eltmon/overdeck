@@ -667,6 +667,11 @@
       "reason": "feedback",
       "note": "[2026-07-19T03:28Z] review-agent → FAILED — seq 105",
       "timestamp": "2026-07-19T03:28:01.522Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-19T04:13Z] review-agent → FAILED — seq 106",
+      "timestamp": "2026-07-19T04:13:02.648Z"
     }
   ],
   "feedback": [
@@ -1404,6 +1409,13 @@
       "outcome": "failed",
       "timestamp": "2026-07-19T03:28:01Z",
       "markdownBody": "# Review FAILED for PAN-2207\n\nReview role spawn failed: Workspace for PAN-2207 does not exist at /home/eltmon/Projects/overdeck/workspaces/feature-pan-2207 — refusing to spawn review. A missing workspace would land the agent in $HOME at the folder-trust prompt. Recreate the workspace ('pan workspace rebuild PAN-2207') before retrying.\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2207 -m \"Fixed review issues\"`"
+    },
+    {
+      "seq": 106,
+      "specialist": "review-agent",
+      "outcome": "failed",
+      "timestamp": "2026-07-19T04:13:02Z",
+      "markdownBody": "# Review FAILED for PAN-2207\n\nReview role spawn failed: Workspace for PAN-2207 does not exist at /home/eltmon/Projects/overdeck/workspaces/feature-pan-2207 — refusing to spawn review. A missing workspace would land the agent in $HOME at the folder-trust prompt. Recreate the workspace ('pan workspace rebuild PAN-2207') before retrying.\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2207 -m \"Fixed review issues\"`"
     }
   ],
   "scopeDrift": {
@@ -1433,7 +1445,7 @@
     "recordedAt": "2026-07-06T18:49:52.519Z"
   },
   "created": "2026-07-06T16:43:28.780Z",
-  "updated": "2026-07-19T04:11:45.133Z",
+  "updated": "2026-07-19T04:13:02.649Z",
   "pipeline": {
     "issueId": "PAN-2207",
     "reviewStatus": "failed",
