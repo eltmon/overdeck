@@ -3,7 +3,7 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-07-19T03:01:13.924Z",
-  "updated": "2026-07-19T04:41:20.389Z",
+  "updated": "2026-07-19T04:46:29.575Z",
   "pipeline": {
     "issueId": "PAN-2898",
     "reviewStatus": "pending",
@@ -11,17 +11,24 @@
     "mergeStatus": "merging",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-19T04:41:20.362Z",
+    "updatedAt": "2026-07-19T04:46:29.569Z",
     "mergeNotes": "Strike merge request failed: fetch failed",
     "strikeReadyHead": "81a440c568eb29390defc463aac740b329765288",
     "strikeReadyAt": "2026-07-19T04:40:04.360Z",
-    "strikeLandingState": "landing",
-    "strikeRecoveryCount": 0,
+    "strikeLandingState": "recovering",
+    "strikeRecoveryCount": 1,
     "strikeLandingAttempts": [
       {
         "timestamp": "2026-07-19T04:24:32.260Z",
         "strikeHead": "60a76d75304f31f85d3fd5c13ba391dfec1d72a7",
         "mainHead": "dd2b8678580ac595ee51a66602f044e2c0e7d35b",
+        "outcome": "failed",
+        "detail": "Strike merge request failed: fetch failed"
+      },
+      {
+        "timestamp": "2026-07-19T04:46:20.281Z",
+        "strikeHead": "81a440c568eb29390defc463aac740b329765288",
+        "mainHead": "70efb37663240e8b0d2ad8291748afdac09baa62",
         "outcome": "failed",
         "detail": "Strike merge request failed: fetch failed"
       }
@@ -32,24 +39,24 @@
       "byStage": {
         "strike": {
           "openai/gpt-5.6-sol": {
-            "input": 1498826,
-            "output": 179782,
-            "cacheRead": 76040704,
+            "input": 1524157,
+            "output": 183499,
+            "cacheRead": 80691712,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 1498826,
-          "output": 179782,
-          "cacheRead": 76040704,
+          "input": 1524157,
+          "output": 183499,
+          "cacheRead": 80691712,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 50.907942,
-        "pricingAsOf": "2026-07-19T04:41:20.385Z"
+        "usd": 53.471611,
+        "pricingAsOf": "2026-07-19T04:46:29.571Z"
       }
     },
     "merges": [],
