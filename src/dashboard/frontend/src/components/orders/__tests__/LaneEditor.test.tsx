@@ -63,6 +63,26 @@ describe('LaneEditor', () => {
     expect(onBookChange).toHaveBeenCalledTimes(2);
   });
 
+  it('edits prerequisites, PRD re-verification, and plan-at-pickup holds through the item route', async () => {
+    const fetchMock = vi.fn(async () => Response.json(book));
+    vi.stubGlobal('fetch', fetchMock);
+    render(<LaneEditor book={book} onBookChange={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit holds for PAN-2' }));
+    fireEvent.change(screen.getByLabelText('Prerequisites for PAN-2'), { target: { value: 'PAN-7, pan-8' } });
+    fireEvent.click(screen.getByLabelText('Re-verify PRD'));
+    fireEvent.click(screen.getByLabelText('Plan at pickup'));
+    fireEvent.click(screen.getByRole('button', { name: 'Save holds' }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
+      '/api/orders/2026-07-18-editor/items/PAN-2',
+      expect.objectContaining({
+        method: 'PATCH',
+        body: JSON.stringify({ prereqs: ['PAN-7', 'PAN-8'], reVerify: false, planAtPickup: true }),
+      }),
+    ));
+  });
+
   it('leads with lane position, renders item chips, and uses one row status tone', () => {
     render(<LaneEditor book={book} inFlightIssues={new Set(['PAN-2'])} onBookChange={vi.fn()} />);
 

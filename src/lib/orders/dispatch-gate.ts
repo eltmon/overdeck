@@ -11,7 +11,8 @@ import { findProjectByPathSync } from '../projects.js';
 import { resolveStateReadHomeSync } from '../state-read-home.js';
 import { getWorkAgentLifecycleStateSync } from '../work-agent-lifecycle.js';
 import { evaluateOrderDispatchEligibility, type OrderDispatchEligibility } from './eligibility.js';
-import { computeBookProgress, getBook } from './resolver.js';
+import { computeBookProgress, getBook, liveOrderIssueLookup } from './resolver.js';
+import type { OrderIssueLookup } from './types.js';
 
 interface OrdersLaunchMetadata {
   orders?: { bookId?: string };
@@ -30,6 +31,8 @@ export interface ActiveOrderDispatchDeps {
   stateRoot?: (projectRoot: string) => string;
   getOrderBook?: typeof getBook;
   computeProgress?: typeof computeBookProgress;
+  issueLookup?: OrderIssueLookup;
+  reservedIssues?: ReadonlySet<string>;
   inFlightIssues?: (bookId: string, issueIds: readonly string[]) => ReadonlySet<string>;
 }
 
@@ -75,11 +78,18 @@ export async function checkActiveOrderDispatch(
   const book = (deps.getOrderBook ?? getBook)(stateRoot, bookId);
   if (!book) throw new Error(`Active Flywheel run ${runId} references missing order book ${bookId}`);
   const progress = (deps.computeProgress ?? computeBookProgress)(book);
-  const inFlightIssues = (deps.inFlightIssues ?? defaultInFlightIssues)(
+  const prerequisiteIds = [...new Set(book.items.flatMap((item) => item.prereqs.map((prereq) => prereq.toUpperCase())))];
+  const prerequisiteState = (deps.issueLookup ?? liveOrderIssueLookup)(prerequisiteIds);
+  const prerequisiteTerminal = new Map(prerequisiteIds.map((prereq) => {
+    const state = prerequisiteState.get(prereq);
+    return [prereq, state ? !state.open || state.parked : false] as const;
+  }));
+  const inFlightIssues = new Set((deps.inFlightIssues ?? defaultInFlightIssues)(
     book.id,
     book.items.filter((item) => !progress.items.find((entry) => entry.issue === item.issue)?.terminal)
       .map((item) => item.issue),
-  );
+  ));
+  for (const reserved of deps.reservedIssues ?? []) inFlightIssues.add(reserved.toUpperCase());
   return {
     ordersBound: true,
     runId,
@@ -89,6 +99,7 @@ export async function checkActiveOrderDispatch(
       progress,
       issueId,
       inFlightIssues,
+      prerequisiteTerminal,
       offBook: options.offBook,
     }),
   };

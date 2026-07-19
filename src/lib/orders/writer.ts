@@ -148,11 +148,11 @@ export async function moveItem(
   return writeOrderBookState(stateRoot, updated(book, { items }, at));
 }
 
-export async function setItemFlags(
+export async function setItemRequirements(
   stateRoot: string,
   bookId: string,
   issueId: string,
-  flags: { reVerify?: boolean; planAtPickup?: boolean },
+  requirements: { prereqs?: readonly string[]; reVerify?: boolean; planAtPickup?: boolean },
   at?: string,
 ): Promise<OrderBook> {
   const book = requireBook(stateRoot, bookId);
@@ -163,8 +163,11 @@ export async function setItemFlags(
     found = true;
     return {
       ...item,
-      reVerify: flags.reVerify ?? item.reVerify,
-      planAtPickup: flags.planAtPickup ?? item.planAtPickup,
+      prereqs: requirements.prereqs === undefined
+        ? item.prereqs
+        : [...new Set(requirements.prereqs.map((prereq) => prereq.toUpperCase()))],
+      reVerify: requirements.reVerify ?? item.reVerify,
+      planAtPickup: requirements.planAtPickup ?? item.planAtPickup,
     };
   });
   if (!found) throw new Error(`Issue ${issue} is not in order book ${bookId}`);

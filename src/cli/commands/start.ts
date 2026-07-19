@@ -90,30 +90,10 @@ import { assertCanStartFreshSync, getWorkAgentLifecycleStateSync } from '../../l
 import { normalizeModelOverrideSync } from '../../lib/model-validation.js';
 import { resolvePlanningMode, type PlanningMode } from './planning-mode.js';
 import { requireAutomaticStateMigration } from '../../lib/state-auto-migrate.js';
-import { applyStartPolicyOptions } from './start-policy-overrides.js'; import { enforceActiveOrderDispatch } from '../../lib/orders/dispatch-gate.js';
-interface IssueOptions { model: string;
-  /** PAN-636 — explicit coding-agent harness override. Omit to use resolver defaults. */
-  harness?: RuntimeName;
-  /** Claude Code `--effort` level. Overrides roles.work.effort for this spawn. */
-  effort?: RoleEffort;
-  dryRun?: boolean;
-  shadow?: boolean;
-  remote?: boolean;
-  local?: boolean;
-  /** Remote workspace resiliency tier override: ephemeral | durable. */
-  tier?: string;
-  /** Explicit planning-depth flag: interactive | auto | skip. */
-  plan?: string;
-  /** Legacy auto-skip-planning flag; deprecated — use --plan skip instead. */
-  auto?: boolean;
-  host?: boolean; yes?: boolean; offBook?: boolean;
-  force?: boolean;
-  /** Drop the saved Claude session pointer (non-destructive) and start a brand-new
-   *  session — the one-step "restart fresh" path, e.g. to switch a stopped agent's model. */
-  fresh?: boolean;
-  /** Resolved planning mode for this start invocation. Set by issueCommand. */
-  planningMode?: PlanningMode;
-}
+import { checkActiveOrderDispatch } from '../../lib/orders/dispatch-gate.js';
+import { withActiveOrderDispatchReservation } from '../../lib/orders/dispatch-reservation.js';
+import type { IssueOptions } from './start-options.js';
+import { applyStartPolicyOptions } from './start-policy-overrides.js';
 
 /**
  * Determine workspace location based on flags and config
@@ -1204,7 +1184,10 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
       });
     }
 
-    await enforceActiveOrderDispatch(projectRoot, id, { offBook: options.offBook, recordOverride: !options.dryRun });
+    const orderDispatch = await checkActiveOrderDispatch(projectRoot, id, { offBook: options.offBook });
+    if (!orderDispatch.decision.eligible) {
+      throw new Error(orderDispatch.decision.message ?? `Order-book dispatch blocked for ${id}`);
+    }
 
     prep.update('Building agent prompt with planning context...');
     const trackerContext = await runStartPrepStep(prep, spinner, 'tracker-context', (signal) => getTrackerContext(id, workspace, signal), '');
@@ -1218,16 +1201,25 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
       clearAgentPausedSync(agentId);
     }
 
-    const agent = await runStartPrepStep(prep, spinner, 'spawn', () => spawnAgent({
-      issueId: id,
-      workspace,
-      harness: requestedHarness,
-      model: spawnModel,
-      role: 'work',
-      prompt,
-      allowHost: options.host,
-      effort: resolvedEffort,
-    }));
+    const admitted = await withActiveOrderDispatchReservation(
+      projectRoot,
+      id,
+      { offBook: options.offBook, recordOverride: !options.dryRun },
+      () => runStartPrepStep(prep, spinner, 'spawn', () => spawnAgent({
+        issueId: id,
+        workspace,
+        harness: requestedHarness,
+        model: spawnModel,
+        role: 'work',
+        prompt,
+        allowHost: options.host,
+        effort: resolvedEffort,
+      })),
+    );
+    if (!admitted.check.decision.eligible || !admitted.result) {
+      throw new Error(admitted.check.decision.message ?? `Order-book dispatch blocked for ${id}`);
+    }
+    const agent = admitted.result;
 
     if (agent.role === 'work' && agent.kickoffDelivered === false) {
       spinner.fail(`Agent spawned but kickoff delivery was not confirmed: ${agent.id}`);

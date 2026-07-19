@@ -53,6 +53,18 @@ export function LaneEditor({ book, inFlightIssues = new Set(), onBookChange }: L
     void patchItem(item.issue, { lane, order }).catch((cause) => setError(cause instanceof Error ? cause.message : String(cause)));
   };
 
+  const updateRequirements = async (
+    issueId: string,
+    requirements: { prereqs: string[]; reVerify: boolean; planAtPickup: boolean },
+  ) => {
+    try {
+      await patchItem(issueId, requirements);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause));
+      throw cause;
+    }
+  };
+
   const remove = async (issueId: string) => {
     setError(null);
     try {
@@ -87,6 +99,7 @@ export function LaneEditor({ book, inFlightIssues = new Set(), onBookChange }: L
                 onDragStart={setDraggedIssue}
                 onDrop={drop}
                 onSwapLane={swapLane}
+                onRequirementsChange={updateRequirements}
                 onRemove={(issueId) => void remove(issueId)}
               />
             ))}

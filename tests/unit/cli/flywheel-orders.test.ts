@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { startFlywheelRun, type StartFlywheelRunDeps } from '../../../src/cli/commands/flywheel.js';
 import { getBook } from '../../../src/lib/orders/resolver.js';
-import { createBook, setStatus } from '../../../src/lib/orders/writer.js';
+import { createBook, setSettings, setStatus } from '../../../src/lib/orders/writer.js';
 
 const roots: string[] = [];
 const at = '2026-07-18T12:00:00.000Z';
@@ -102,6 +102,30 @@ describe('pan flywheel start --orders', () => {
     expect(launch).toMatchObject({ runId: 'RUN-1', orders: { bookId } });
     expect(getBook(stateRoot, bookId)).toMatchObject({ status: 'running', runId: 'RUN-1' });
     expect(deps.spawn).toHaveBeenCalledOnce();
+  });
+
+  it('resolves and appends the configured brief overlay for the spawned orchestrator', async () => {
+    const stateRoot = gitFixture();
+    overdeckHome();
+    const bookId = '2026-07-18-overlay';
+    await readyBook(stateRoot, bookId);
+    await setSettings(stateRoot, bookId, { briefOverlay: 'docs/campaign-overlay.md' }, at);
+    const requireBrief = vi.fn(async (_cwd: string, requested?: string) => ({
+      absolutePath: join(process.cwd(), requested ?? 'docs/flywheel-brief.md'),
+      displayPath: requested ?? 'docs/flywheel-brief.md',
+    }));
+    const deps = startDeps(stateRoot, {
+      requireBrief,
+      readBrief: async () => 'Campaign-specific instruction.',
+    });
+
+    await startFlywheelRun({ cwd: process.cwd(), orders: bookId }, deps);
+
+    expect(requireBrief).toHaveBeenCalledWith(process.cwd(), 'docs/campaign-overlay.md');
+    expect(deps.spawn).toHaveBeenCalledWith(expect.objectContaining({
+      briefOverlayPath: 'docs/campaign-overlay.md',
+      briefOverlayContent: 'Campaign-specific instruction.',
+    }));
   });
 
   it('reports every validation block and leaves the ready book unchanged', async () => {

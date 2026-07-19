@@ -49,7 +49,9 @@ vi.mock('../../overdeck/control-settings.js', () => ({
 // short-circuit it to mirror the prior gate-only semantics; the resolver's
 // self-heal logic is covered by flywheel-run-state's own tests.
 vi.mock('../../../dashboard/server/services/flywheel-run-state.js', () => ({
+  readFlywheelLaunchMetadata: async () => null,
   resolveLiveFlywheelRunId: async () => mocks.activeRunId,
+  saveRunCohort: vi.fn(),
 }));
 
 import { FLYWHEEL_ORCHESTRATOR_AGENT_ID, buildFlywheelResumePrompt, pauseFlywheel, resumeFlywheel, spawnFlywheel } from '../flywheel.js';
@@ -104,6 +106,20 @@ describe('flywheel lifecycle', () => {
     expect(prompt).toContain('Scope: all-tracked-projects');
     expect(prompt).toContain('Auto-pickup backlog: false');
     expect(prompt).toContain('Require UAT before merge: true');
+  });
+
+  it('appends an order-book overlay to the effective orchestrator brief', async () => {
+    await spawnFlywheel({
+      runId: 'RUN-1',
+      workspace: '/repo',
+      env: cleanEnv,
+      briefOverlayPath: 'docs/campaign-overlay.md',
+      briefOverlayContent: 'Run this campaign in the operator-specified order.',
+    });
+
+    const prompt = mocks.spawnRun.mock.calls[0][2].prompt;
+    expect(prompt).toContain('Order-book brief overlay: docs/campaign-overlay.md');
+    expect(prompt).toContain('Run this campaign in the operator-specified order.');
   });
 
   it('renders the flywheel autonomy options truth table in the brief', async () => {

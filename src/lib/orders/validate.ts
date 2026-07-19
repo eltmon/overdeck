@@ -22,6 +22,28 @@ function issuePattern(issueId: string): RegExp {
   return new RegExp(`(?:^|[-_])${escaped}(?:[-_.]|$)`, 'i');
 }
 
+function nonEmptyFileNames(directory: string): string[] {
+  if (!existsSync(directory)) return [];
+  return readdirSync(directory).filter((name) => hasNonEmptyFile(join(directory, name)));
+}
+
+export function createOrderPrdLookup(stateRoot: string): (issueId: string) => boolean {
+  const draftNames = new Set([
+    ...nonEmptyFileNames(join(stateRoot, 'drafts')),
+    ...nonEmptyFileNames(join(stateRoot, '.pan', 'drafts')),
+  ].map((name) => name.toLowerCase()));
+  const specNames = [
+    ...nonEmptyFileNames(join(stateRoot, 'specs')),
+    ...nonEmptyFileNames(join(stateRoot, '.pan', 'specs')),
+  ];
+  return (issueId: string) => {
+    const lower = issueId.toLowerCase();
+    if (draftNames.has(`${lower}.md`)) return true;
+    const pattern = issuePattern(issueId);
+    return specNames.some((name) => pattern.test(name));
+  };
+}
+
 export function hasOrderIssuePrd(stateRoot: string, issueId: string): boolean {
   const lower = issueId.toLowerCase();
   const draftPaths = [
@@ -83,10 +105,18 @@ export function validateBookForStart(
   options: {
     issueLookup?: OrderIssueLookup;
     hasPrd?: (issueId: string) => boolean;
+    books?: readonly OrderBook[];
   } = {},
 ): OrderBookValidationResult {
   const blocks: OrderBookFinding[] = [];
   const warns: OrderBookFinding[] = [];
+  if (book.items.length === 0) {
+    blocks.push({
+      code: 'empty-book',
+      issue: book.id,
+      message: 'Order book must contain at least one issue',
+    });
+  }
   const issueLookup = options.issueLookup ?? liveOrderIssueLookup;
   const ids = new Set<string>();
   for (const item of book.items) {
@@ -107,7 +137,7 @@ export function validateBookForStart(
     }
   }
 
-  for (const other of listBooks(stateRoot)) {
+  for (const other of options.books ?? listBooks(stateRoot)) {
     if (other.id === book.id || other.status === 'complete') continue;
     for (const item of other.items) {
       const issue = item.issue.toUpperCase();

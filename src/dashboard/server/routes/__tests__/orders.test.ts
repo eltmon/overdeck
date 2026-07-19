@@ -124,11 +124,13 @@ describe('/api/orders routes', () => {
     const states = new Map<string, OrderIssueState>([
       ['PAN-1', { issue: 'PAN-1', open: false, parked: false }],
       ['PAN-2', { issue: 'PAN-2', open: true, parked: true }],
+      ['PAN-3', { issue: 'PAN-3', open: true, parked: false }],
     ]);
     const layer = makeOrdersRouteLayer({
       stateRoot: () => root,
       issueLookup: issueLookup(states),
       now: () => new Date(at),
+      actor: () => 'authenticated-operator',
     });
     const bookId = '2026-07-18-campaign';
 
@@ -138,6 +140,7 @@ describe('/api/orders routes', () => {
     }))).resolves.toMatchObject({ status: 200, body: { id: bookId, status: 'draft' } });
 
     await expect(requestOrdersRoute(layer, `/api/orders/${bookId}/items`, mutation('POST', {
+      actor: 'spoofed-operator',
       items: [
         { issue: 'PAN-1', lane: 'A' },
         { issue: 'PAN-2', lane: 'A', prereqs: ['PAN-1'] },
@@ -147,10 +150,15 @@ describe('/api/orders routes', () => {
     await expect(requestOrdersRoute(layer, `/api/orders/${bookId}/items/PAN-2`, mutation('PATCH', {
       lane: 'B',
       order: 1,
+      prereqs: ['PAN-1', 'pan-3'],
       reVerify: true,
+      planAtPickup: true,
     }))).resolves.toMatchObject({
       status: 200,
-      body: { items: [{ issue: 'PAN-1', lane: 'A' }, { issue: 'PAN-2', lane: 'B', reVerify: true }] },
+      body: { items: [
+        { issue: 'PAN-1', lane: 'A', addedBy: 'authenticated-operator' },
+        { issue: 'PAN-2', lane: 'B', prereqs: ['PAN-1', 'PAN-3'], reVerify: true, planAtPickup: true, addedBy: 'authenticated-operator' },
+      ] },
     });
 
     const detail = await requestOrdersRoute(layer, `/api/orders/${bookId}`);
@@ -168,10 +176,8 @@ describe('/api/orders routes', () => {
           ],
         },
         validation: {
-          blocks: [
-            { code: 'issue-not-open', issue: 'PAN-1' },
-            { code: 'missing-prd', issue: 'PAN-2' },
-          ],
+          blocks: [{ code: 'issue-not-open', issue: 'PAN-1' }],
+          warns: [{ code: 'missing-prd', issue: 'PAN-2' }],
         },
         itemReadiness: { 'PAN-1': { hasPrd: false }, 'PAN-2': { hasPrd: false } },
       },
@@ -193,10 +199,31 @@ describe('/api/orders routes', () => {
 
     const preview = await requestOrdersRoute(layer, `/api/orders/${bookId}/preview-brief`);
     expect(preview.status).toBe(200);
-    expect(preview.body['brief']).toContain('B1 PAN-2 — after PAN-1; re-verify PRD');
+    expect(preview.body['brief']).toContain('B1 PAN-2 — after PAN-1, PAN-3; re-verify PRD; plan at pickup');
 
     await expect(requestOrdersRoute(layer, `/api/orders/${bookId}/items/PAN-1`, mutation('DELETE')))
       .resolves.toMatchObject({ status: 200, body: { items: [{ issue: 'PAN-2', order: 1 }] } });
+  });
+
+  it('enriches the book list from one issue-state snapshot', async () => {
+    const root = gitFixture();
+    const lookup = vi.fn(() => new Map([
+      ['PAN-1', { issue: 'PAN-1', open: true, parked: false }],
+      ['PAN-2', { issue: 'PAN-2', open: true, parked: false }],
+    ]));
+    const layer = makeOrdersRouteLayer({ stateRoot: () => root, issueLookup: lookup, hasPrd: () => true });
+    for (const [id, issue] of [['2026-07-18-one', 'PAN-1'], ['2026-07-18-two', 'PAN-2']] as const) {
+      await requestOrdersRoute(layer, '/api/orders', mutation('POST', { id, name: id }));
+      await requestOrdersRoute(layer, `/api/orders/${id}/items`, mutation('POST', { items: [{ issue, lane: 'A' }] }));
+    }
+    lookup.mockClear();
+
+    await expect(requestOrdersRoute(layer, '/api/orders')).resolves.toMatchObject({
+      status: 200,
+      body: { books: [{ id: '2026-07-18-one' }, { id: '2026-07-18-two' }] },
+    });
+    expect(lookup).toHaveBeenCalledOnce();
+    expect(lookup).toHaveBeenCalledWith(['PAN-1', 'PAN-2']);
   });
 
   it('returns sequenced backlog candidates excluding every active-book member', async () => {

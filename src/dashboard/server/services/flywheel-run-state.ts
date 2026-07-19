@@ -14,6 +14,7 @@ import {
 import { countAgentsByStatusRole } from '../../../lib/overdeck/agents.js';
 import { computeBookProgress, getBook } from '../../../lib/orders/resolver.js';
 import type { OrderBookProgress } from '../../../lib/orders/types.js';
+import { setStatus as setOrderBookStatus } from '../../../lib/orders/writer.js';
 import { findProjectByPathSync } from '../../../lib/projects.js';
 import { resolveStateReadHomeSync } from '../../../lib/state-read-home.js';
 
@@ -21,6 +22,10 @@ export type FlywheelRunStatus = 'running' | 'paused' | 'complete' | 'aborted';
 
 export interface FlywheelRunStateOptions {
   overdeckHome?: string;
+  orderStateRoot?: (workspace: string) => string;
+  getOrderBook?: typeof getBook;
+  computeOrderProgress?: typeof computeBookProgress;
+  setOrderStatus?: typeof setOrderBookStatus;
 }
 
 export interface FlywheelRunListOptions extends FlywheelRunStateOptions {
@@ -222,11 +227,18 @@ async function mechanicallyEnrichOrdersStatus(
     const { orders: _untrustedOrders, ...booklessStatus } = status;
     return booklessStatus;
   }
-  const project = findProjectByPathSync(launch.workspace);
-  if (!project) throw new Error(`No configured project contains orders-bound Flywheel workspace ${launch.workspace}`);
-  const book = getBook(resolveStateReadHomeSync(project).root, launch.orders.bookId);
+  const stateRoot = options.orderStateRoot?.(launch.workspace) ?? (() => {
+    const project = findProjectByPathSync(launch.workspace);
+    if (!project) throw new Error(`No configured project contains orders-bound Flywheel workspace ${launch.workspace}`);
+    return resolveStateReadHomeSync(project).root;
+  })();
+  const book = (options.getOrderBook ?? getBook)(stateRoot, launch.orders.bookId);
   if (!book) throw new Error(`Flywheel run ${status.runId} references missing order book ${launch.orders.bookId}`);
-  return enrichFlywheelStatusWithOrders(status, book, computeBookProgress(book));
+  const progress = (options.computeOrderProgress ?? computeBookProgress)(book);
+  if (progress.drained && book.status === 'running') {
+    await (options.setOrderStatus ?? setOrderBookStatus)(stateRoot, book.id, 'drained', { runId: book.runId });
+  }
+  return enrichFlywheelStatusWithOrders(status, book, progress);
 }
 
 export async function writeLatestFlywheelStatus(status: FlywheelStatus, options: FlywheelRunStateOptions = {}): Promise<string> {

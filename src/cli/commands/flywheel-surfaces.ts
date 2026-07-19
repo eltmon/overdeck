@@ -109,7 +109,7 @@ export async function backlogForecastCommand(opts: { n?: string } = {}): Promise
     .sort((a, b) => a.rank - b.rank)
     .map((x) => x.issue);
   const needsPlanning = selectNeedsPlanning(nodes, lk, { cap: n * 2 }).map((x) => x.issue);
-  const orderBookIssues = activeOrderBookIssues(projectRoot);
+  const orderBookIssues = await activeOrderBookIssues(projectRoot);
   const waves = computeWaves(nodes, lk, n, autoPickupBacklog, orderBookIssues).map((w) => w.map((x) => x.issue));
   const cohort = computeCohort(nodes, lk, n, autoPickupBacklog, orderBookIssues);
   const stats = computeStats(nodes, lk, autoPickupBacklog, orderBookIssues);

@@ -9,11 +9,13 @@ interface RunSettingsPanelProps {
 export function RunSettingsPanel({ settings, onChange }: RunSettingsPanelProps) {
   const [concurrency, setConcurrency] = useState(String(settings.laneAConcurrency));
   const [briefOverlay, setBriefOverlay] = useState(settings.briefOverlay ?? '');
+  const [postureReason, setPostureReason] = useState(settings.postureReason ?? '');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => setConcurrency(String(settings.laneAConcurrency)), [settings.laneAConcurrency]);
   useEffect(() => setBriefOverlay(settings.briefOverlay ?? ''), [settings.briefOverlay]);
+  useEffect(() => setPostureReason(settings.postureReason ?? ''), [settings.postureReason]);
 
   const save = async (patch: Partial<OrderBookSettings>) => {
     setSaving(true);
@@ -59,6 +61,38 @@ export function RunSettingsPanel({ settings, onChange }: RunSettingsPanelProps) 
             className="min-w-56 rounded-md border border-input bg-background px-2 py-1 font-mono text-[11px] text-foreground"
           />
         </label>
+        <label className="flex items-center gap-3">
+          <span className="flex-1 text-muted-foreground">Posture reason</span>
+          <input
+            aria-label="Posture reason"
+            value={postureReason}
+            onChange={(event) => setPostureReason(event.target.value)}
+            placeholder="Why pickup is open or draining"
+            className="min-w-56 rounded-md border border-input bg-background px-2 py-1 text-[11px] text-foreground"
+          />
+        </label>
+        <div className="flex items-center gap-3">
+          <span className="flex-1 text-muted-foreground">Pickup posture</span>
+          <div className="flex gap-1">
+            {(['open', 'drain'] as const).map((posture) => (
+              <button
+                key={posture}
+                type="button"
+                aria-pressed={settings.posture === posture}
+                disabled={saving || settings.posture === posture}
+                onClick={() => void save({
+                  posture,
+                  postureSetAt: new Date().toISOString(),
+                  postureSetBy: 'operator',
+                  postureReason: postureReason.trim() || (posture === 'drain' ? 'Operator paused new pickup.' : 'Operator reopened pickup.'),
+                })}
+                className={`rounded-md border px-2 py-1 text-[10px] uppercase tracking-wide ${posture === 'drain' && settings.posture === posture ? 'border-warning/[0.32] bg-warning/[0.08] text-warning-foreground' : 'border-border text-muted-foreground'}`}
+              >
+                {posture}
+              </button>
+            ))}
+          </div>
+        </div>
         <div className="flex items-start gap-3">
           <span className="flex-1 text-muted-foreground">Off-book policy</span>
           <span className="max-w-72 text-right text-[11px] text-muted-foreground">Blocked by default; an operator must use the explicit logged <span className="font-mono text-foreground">--off-book</span> override.</span>

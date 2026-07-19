@@ -66,6 +66,7 @@ export interface OrderBookProgress {
 }
 
 export type OrderBookFindingCode =
+  | 'empty-book'
   | 'issue-not-open'
   | 'duplicate-membership'
   | 'unresolved-prerequisite'

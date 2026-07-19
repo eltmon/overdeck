@@ -8,16 +8,16 @@ import type {
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
-import { backlogCandidates, computeBookProgress, getBook, listBooks } from '../../../lib/orders/resolver.js';
+import { backlogCandidates, computeBookProgress, getBook, listBooks, liveOrderIssueLookup } from '../../../lib/orders/resolver.js';
 import type { OrderIssueLookup } from '../../../lib/orders/types.js';
-import { hasOrderIssuePrd, validateBookForStart } from '../../../lib/orders/validate.js';
+import { createOrderPrdLookup, hasOrderIssuePrd, validateBookForStart } from '../../../lib/orders/validate.js';
 import {
   addItems,
   createBook,
   moveItem,
   removeItem,
   renameBook,
-  setItemFlags,
+  setItemRequirements,
   setSettings,
   setStatus,
   type NewOrderBookItem,
@@ -44,6 +44,13 @@ export interface OrdersRouteDeps {
   now?: () => Date;
   actor?: () => string;
   startOrderBook?: (book: OrderBook) => Promise<StartOrderBookResult>;
+}
+
+interface OrdersReadSnapshot {
+  stateRoot: string;
+  books: OrderBook[];
+  issueLookup: OrderIssueLookup;
+  hasPrd: (issueId: string) => boolean;
 }
 
 interface JsonBodyResult {
@@ -175,13 +182,35 @@ function nextBookId(stateRoot: string, name: string, now: Date): string {
   return `${base}-${suffix}`;
 }
 
-function enrichedBook(book: OrderBook, deps: OrdersRouteDeps) {
+function buildOrdersReadSnapshot(deps: OrdersRouteDeps): OrdersReadSnapshot {
   const stateRoot = stateRootFor(deps);
-  const hasPrd = deps.hasPrd ?? ((issueId: string) => hasOrderIssuePrd(stateRoot, issueId));
+  const books = listBooks(stateRoot);
+  const issueIds = [...new Set(books.flatMap((book) => book.items.flatMap((item) => [item.issue, ...item.prereqs])))];
+  const issueState = (deps.issueLookup ?? liveOrderIssueLookup)(issueIds);
+  const issueLookup: OrderIssueLookup = (requested) => new Map(requested.flatMap((issueId) => {
+    const state = issueState.get(issueId.toUpperCase());
+    return state ? [[issueId.toUpperCase(), state] as const] : [];
+  }));
+  return {
+    stateRoot,
+    books,
+    issueLookup,
+    hasPrd: deps.hasPrd ?? createOrderPrdLookup(stateRoot),
+  };
+}
+
+function enrichedBook(book: OrderBook, deps: OrdersRouteDeps, snapshot?: OrdersReadSnapshot) {
+  const stateRoot = snapshot?.stateRoot ?? stateRootFor(deps);
+  const hasPrd = snapshot?.hasPrd ?? deps.hasPrd ?? ((issueId: string) => hasOrderIssuePrd(stateRoot, issueId));
+  const issueLookup = snapshot?.issueLookup ?? deps.issueLookup;
   return {
     ...book,
-    progress: computeBookProgress(book, deps.issueLookup),
-    validation: validateBookForStart(stateRoot, book, { issueLookup: deps.issueLookup, hasPrd }),
+    progress: computeBookProgress(book, issueLookup),
+    validation: validateBookForStart(stateRoot, book, {
+      issueLookup,
+      hasPrd,
+      books: snapshot?.books,
+    }),
     itemReadiness: Object.fromEntries(book.items.map((item) => [item.issue, { hasPrd: hasPrd(item.issue) }])),
   };
 }
@@ -247,9 +276,10 @@ async function defaultStartOrderBook(book: OrderBook): Promise<StartOrderBookRes
 }
 
 export async function getOrdersPayload(deps: OrdersRouteDeps = {}): Promise<RouteResult> {
-  return routeResult(async () => ({
-    books: listBooks(stateRootFor(deps)).map((book) => enrichedBook(book, deps)),
-  }));
+  return routeResult(async () => {
+    const snapshot = buildOrdersReadSnapshot(deps);
+    return { books: snapshot.books.map((book) => enrichedBook(book, deps, snapshot)) };
+  });
 }
 
 export async function postOrderPayload(body: Record<string, unknown>, deps: OrdersRouteDeps = {}): Promise<RouteResult> {
@@ -308,9 +338,7 @@ export async function postOrderItemsPayload(
     const book = requireBook(stateRoot, bookId);
     const input = body['items'] ?? body['item'];
     if (input === undefined) throw new Error('items is required');
-    const actor = typeof body['actor'] === 'string' && body['actor'].trim()
-      ? body['actor'].trim()
-      : (deps.actor ?? (() => 'dashboard'))();
+    const actor = (deps.actor ?? (() => 'dashboard'))();
     return enrichedBook(await addItems(stateRoot, bookId, parseItems(book, input), actor), deps);
   });
 }
@@ -350,14 +378,15 @@ export async function patchOrderItemPayload(
       );
       changed = true;
     }
-    if (body['reVerify'] !== undefined || body['planAtPickup'] !== undefined) {
-      await setItemFlags(stateRoot, bookId, issueId, {
+    if (body['prereqs'] !== undefined || body['reVerify'] !== undefined || body['planAtPickup'] !== undefined) {
+      await setItemRequirements(stateRoot, bookId, issueId, {
+        prereqs: body['prereqs'] === undefined ? undefined : stringArray(body['prereqs'], 'prereqs'),
         reVerify: optionalBoolean(body['reVerify'], 'reVerify'),
         planAtPickup: optionalBoolean(body['planAtPickup'], 'planAtPickup'),
       });
       changed = true;
     }
-    if (!changed) throw new Error('lane, order, reVerify, or planAtPickup is required');
+    if (!changed) throw new Error('lane, order, prereqs, reVerify, or planAtPickup is required');
     return enrichedBook(requireBook(stateRoot, bookId), deps);
   });
 }

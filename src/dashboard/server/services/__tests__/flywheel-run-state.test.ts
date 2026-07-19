@@ -39,6 +39,7 @@ import {
   listFlywheelRuns,
   nextFlywheelRunId,
   resolveLiveFlywheelRunId,
+  writeFlywheelLaunchMetadata,
   writeLatestFlywheelStatus,
 } from '../flywheel-run-state.js';
 
@@ -143,6 +144,31 @@ describe('flywheel run state', () => {
       orderProgress(new Set(['PAN-1', 'PAN-2', 'PAN-3']), new Set(['PAN-3'])),
     );
     expect(enriched.orders).toMatchObject({ bookId: orderBook().id, landed: 2, total: 3, drained: true });
+  });
+
+  it('persists the mechanical running-to-drained transition before writing status', async () => {
+    const value = orderBook();
+    const progress = orderProgress(new Set(['PAN-1', 'PAN-2', 'PAN-3']), new Set(['PAN-3']));
+    const setOrderStatus = vi.fn(async () => ({ ...value, status: 'drained' as const }));
+    await writeFlywheelLaunchMetadata({
+      version: 1,
+      runId: 'RUN-1',
+      workspace: '/project',
+      briefPath: '/project/docs/flywheel-brief.md',
+      briefDisplayPath: 'docs/flywheel-brief.md',
+      orders: { bookId: value.id },
+    }, { overdeckHome });
+
+    await writeLatestFlywheelStatus(makeStatus('RUN-1', '2026-05-18T10:00:00.000Z'), {
+      overdeckHome,
+      orderStateRoot: () => '/state',
+      getOrderBook: () => value,
+      computeOrderProgress: () => progress,
+      setOrderStatus,
+    });
+
+    expect(setOrderStatus).toHaveBeenCalledWith('/state', value.id, 'drained', { runId: 'RUN-1' });
+    expect((await getFlywheelRunDetail('RUN-1', { overdeckHome }))?.latest?.orders?.drained).toBe(true);
   });
 
   it('removes a self-reported orders block from a bookless run', async () => {

@@ -28,6 +28,7 @@ export interface EvaluateOrderDispatchInput {
   progress: OrderBookProgress;
   issueId: string;
   inFlightIssues: ReadonlySet<string>;
+  prerequisiteTerminal?: ReadonlyMap<string, boolean>;
   offBook?: boolean;
 }
 
@@ -54,6 +55,9 @@ export function evaluateOrderDispatchEligibility(input: EvaluateOrderDispatchInp
   }
 
   const terminalByIssue = new Map(input.progress.items.map((progress) => [progress.issue.toUpperCase(), progress.terminal]));
+  for (const [issue, terminal] of input.prerequisiteTerminal ?? []) {
+    if (!terminalByIssue.has(issue.toUpperCase())) terminalByIssue.set(issue.toUpperCase(), terminal);
+  }
   const unmetPrereq = item.prereqs.find((prereq) => terminalByIssue.get(prereq.toUpperCase()) !== true);
   const prereqsMet = unmetPrereq === undefined;
   const otherInFlight = input.book.items.filter((candidate) =>

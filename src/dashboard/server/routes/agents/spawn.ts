@@ -22,6 +22,7 @@ import { loadWorkspaceMetadataSync as loadWorkspaceMetadataFn } from '../../../.
 import { getWorkAgentLifecycleState } from '../../../../lib/work-agent-lifecycle.js';
 import { validateProviderHealth } from '../../../../lib/provider-health.js';
 import { checkActiveOrderDispatch } from '../../../../lib/orders/dispatch-gate.js';
+import { OrderDispatchReservationError, withActiveOrderDispatchReservation } from '../../../../lib/orders/dispatch-reservation.js';
 import type { OrderDispatchEligibility } from '../../../../lib/orders/eligibility.js';
 import { getProjectSync, resolveProjectFromIssueSync } from '../../../../lib/projects.js';
 import { clearWorkspaceStuck, getReviewStatusSync } from '../../../../lib/review-status.js';
@@ -654,21 +655,29 @@ export const postAgentsRoute = HttpRouter.add(
     };
 
     if (isRemote && workspaceMetadata) {
-      const response = yield* Effect.promise(() => spawnAfterClearingStartGates({
-        agentSessionName,
-        gate: startGateBlock,
-        initialState: initialAgentState,
-        spawn: () => Effect.runPromise(handleRemoteAgentSpawn({
-          issueId,
-          workspacePath,
-          workspaceMetadata,
-          spawnModel,
-          projectPath,
-          spawnGuardrails,
-          lifecycle,
-        })),
-        isSuccessful: (remoteResponse) => remoteResponse.status >= 200 && remoteResponse.status < 300,
-      }));
+      const admitted = yield* Effect.promise(() => withActiveOrderDispatchReservation(
+        projectPath,
+        issueId,
+        { offBook, recordOverride: true },
+        () => spawnAfterClearingStartGates({
+          agentSessionName,
+          gate: startGateBlock,
+          initialState: initialAgentState,
+          spawn: () => Effect.runPromise(handleRemoteAgentSpawn({
+            issueId,
+            workspacePath,
+            workspaceMetadata,
+            spawnModel,
+            projectPath,
+            spawnGuardrails,
+            lifecycle,
+          })),
+          isSuccessful: (remoteResponse) => remoteResponse.status >= 200 && remoteResponse.status < 300,
+        }),
+      ));
+      const admittedConflict = orderDispatchConflict(admitted.check.decision);
+      if (admittedConflict) return jsonResponse(admittedConflict.body, { status: admittedConflict.status });
+      const response = admitted.result!;
       if (response.status < 200 || response.status >= 300) return response;
       yield* Effect.promise(commitClearedGates);
       yield* Effect.promise(markWorkStartAccepted);
@@ -773,14 +782,22 @@ export const postAgentsRoute = HttpRouter.add(
 
     // Spawn pan start command
     const spawnPanCommand = async (args: string[], cwd?: string): Promise<string> => {
-      const activityId = await spawnAfterClearingStartGates({
-        agentSessionName,
-        gate: gatesCommitted ? null : startGateBlock,
-        initialState: initialAgentState,
-        spawn: () => spawnPanCommandDetached({ agentSessionName, issueId, role, workspacePath, args, cwd }),
-      });
+      const admitted = await withActiveOrderDispatchReservation(
+        projectPath,
+        issueId,
+        { offBook, recordOverride: false },
+        () => spawnAfterClearingStartGates({
+          agentSessionName,
+          gate: gatesCommitted ? null : startGateBlock,
+          initialState: initialAgentState,
+          spawn: () => spawnPanCommandDetached({ agentSessionName, issueId, role, workspacePath, args, cwd }),
+        }),
+      );
+      if (!admitted.check.decision.eligible || !admitted.result) {
+        throw new OrderDispatchReservationError(admitted.check);
+      }
       await commitClearedGates();
-      return activityId;
+      return admitted.result;
     };
 
     // Use IssueLifecycle service to transition issue to "In Progress" (PAN-449)
@@ -917,6 +934,10 @@ export const postAgentsRoute = HttpRouter.add(
       }));
       invalidateAgentsCache();
 
+      if (error instanceof OrderDispatchReservationError) {
+        const conflict = orderDispatchConflict(error.check.decision)!;
+        return jsonResponse(conflict.body, { status: conflict.status });
+      }
       const output = String(error?.output ?? error?.message ?? '');
       if (output.includes(`Workspace docker stack for ${issueId}`) && output.includes('is not healthy')) {
         const failedStackHealth = yield* getWorkspaceStackHealth(issueId, { projectConfig, workspacePath });

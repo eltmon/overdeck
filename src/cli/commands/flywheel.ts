@@ -36,7 +36,7 @@ import { ensureInternalTokenSync, INTERNAL_TOKEN_HEADER } from '../../lib/intern
 import { computeMergeQueue, type MergeQueueItem } from '../../lib/flywheel-merge-order.js';
 import { DEFAULT_BRIEF_PATH, requireFlywheelBrief, resolvePrimaryWorktreeRoot } from '../../lib/flywheel-start.js';
 import { formatMergeBackendStatus, loadMergeBackendStatusForCli } from './flywheel-merge-backend.js';
-import { resolveFlywheelOrderStart, setFlywheelOrderStatus, type FlywheelOrderStartDeps } from './flywheel-orders.js';
+import { resolveFlywheelOrderBriefOverlay, resolveFlywheelOrderStart, setFlywheelOrderStatus, type FlywheelOrderStartDeps } from './flywheel-orders.js';
 import { createFlywheelCompleteCommand } from './flywheel-complete.js';
 import { registerFlywheelSurfaceCommands } from './flywheel-surfaces.js';
 
@@ -68,7 +68,6 @@ interface StartOptions { brief?: string; cwd?: string; orders?: string }
 
 export interface StartFlywheelRunDeps extends FlywheelOrderStartDeps {
   resolvePrimaryRoot?: typeof resolvePrimaryWorktreeRoot;
-  requireBrief?: typeof requireFlywheelBrief;
   nextRunId?: typeof nextFlywheelRunId;
   writeLaunchMetadata?: typeof writeFlywheelLaunchMetadata;
   resolveRoleConfig?: () => Promise<ResolvedFlywheelRoleConfig>;
@@ -334,7 +333,7 @@ export async function startFlywheelRun(
   const brief = await (deps.requireBrief ?? requireFlywheelBrief)(cwd, options.brief);
   const orderContext = options.orders ? resolveFlywheelOrderStart(cwd, options.orders, deps) : null;
   const book = orderContext?.book ?? null;
-
+  const overlay = await resolveFlywheelOrderBriefOverlay(cwd, book, deps);
   const runId = await (deps.nextRunId ?? nextFlywheelRunId)();
   const startedAt = new Date().toISOString();
   const launchMetadata = {
@@ -352,6 +351,7 @@ export async function startFlywheelRun(
     const agent = await (deps.spawn ?? spawnFlywheel)({
       runId,
       briefPath: brief.absolutePath,
+      ...overlay,
       workspace: cwd,
       model: roleConfig.model,
       harness: roleConfig.harness,

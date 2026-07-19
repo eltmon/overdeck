@@ -5,7 +5,8 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { checkActiveOrderDispatch, recordOffBookOverride } from '../../../../src/lib/orders/dispatch-gate.js';
 import { evaluateOrderDispatchEligibility } from '../../../../src/lib/orders/eligibility.js';
-import type { OrderBookProgress } from '../../../../src/lib/orders/types.js';
+import type { OrderBookProgress, OrderIssueState } from '../../../../src/lib/orders/types.js';
+import { validateBookForStart } from '../../../../src/lib/orders/validate.js';
 
 const at = '2026-07-18T12:00:00.000Z';
 const tempHomes: string[] = [];
@@ -112,6 +113,30 @@ describe('order-book dispatch eligibility', () => {
       inFlightIssues: new Set(),
     });
     expect(eligible.eligible).toBe(true);
+  });
+
+  it('admits a closed prerequisite outside the book after the same book passes validation', () => {
+    const value = book();
+    value.items = value.items.map((item) => item.issue === 'PAN-4' ? { ...item, prereqs: ['PAN-9'] } : item);
+    const states = new Map<string, OrderIssueState>([
+      ...value.items.map((item) => [item.issue, { issue: item.issue, open: true, parked: false }] as const),
+      ['PAN-9', { issue: 'PAN-9', open: false, parked: false }],
+    ]);
+    const validation = validateBookForStart('/state', value, {
+      books: [value],
+      issueLookup: () => states,
+      hasPrd: () => true,
+    });
+    expect(validation.blocks).toEqual([]);
+
+    const decision = evaluateOrderDispatchEligibility({
+      book: value,
+      progress: progress(),
+      issueId: 'PAN-4',
+      inFlightIssues: new Set(),
+      prerequisiteTerminal: new Map([['PAN-9', true]]),
+    });
+    expect(decision.eligible).toBe(true);
   });
 
   it('requires --off-book for a non-member and records the accepted override in the run directory', async () => {

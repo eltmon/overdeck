@@ -2,7 +2,7 @@ import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { OrderBook } from '@overdeck/contracts';
 import { afterEach, describe, expect, it } from 'vitest';
-import { validateBookForStart } from '../../../../src/lib/orders/validate.js';
+import { createOrderPrdLookup, validateBookForStart } from '../../../../src/lib/orders/validate.js';
 
 const roots: string[] = [];
 const at = '2026-07-17T12:00:00.000Z';
@@ -45,6 +45,28 @@ afterEach(() => {
 });
 
 describe('order book start validation', () => {
+  it('builds one reusable PRD lookup from draft and spec directories', () => {
+    const root = fixtureRoot();
+    mkdirSync(join(root, 'drafts'), { recursive: true });
+    mkdirSync(join(root, 'specs'), { recursive: true });
+    writeFileSync(join(root, 'drafts', 'pan-1.md'), '# PRD\n', 'utf8');
+    writeFileSync(join(root, 'specs', '2026-07-18-PAN-2-feature.vbrief.json'), '{}\n', 'utf8');
+
+    const hasPrd = createOrderPrdLookup(root);
+
+    expect(hasPrd('PAN-1')).toBe(true);
+    expect(hasPrd('PAN-2')).toBe(true);
+    expect(hasPrd('PAN-3')).toBe(false);
+  });
+
+  it('blocks an empty book', () => {
+    const root = fixtureRoot();
+
+    expect(validateBookForStart(root, book([]), { issueLookup: () => new Map() }).blocks).toEqual([
+      expect.objectContaining({ code: 'empty-book' }),
+    ]);
+  });
+
   it('reports closed issues, cross-book duplicates, unresolved prerequisites, cycles, and missing Lane B PRDs', () => {
     const root = fixtureRoot();
     writeOtherBook(root, book([item('PAN-1', 'A')], '2026-07-17-other'));
