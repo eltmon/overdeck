@@ -1,6 +1,6 @@
 import { stat } from 'node:fs/promises';
 import { getHarnessBehavior } from '../../../../lib/runtimes/behavior.js';
-import { parseAcpConversationMessages } from '../acp-conversation-parser.js';
+import { projectAcpConversationActivity } from '../acp-conversation-parser.js';
 import { parseCodexConversationMessages } from '../codex-conversation-parser.js';
 import { isOhmypiSessionFile, parseOhmypiConversationMessages } from '../ohmypi-conversation-parser.js';
 import { isPiSessionFile, parsePiConversationMessages } from '../pi-conversation-parser.js';
@@ -20,6 +20,20 @@ const WORKING_STALENESS_MS = 180_000;
 const ACTIVITY_SUMMARY_CACHE_MAX = 100;
 const activitySummaryCache = new Map<string, { mtimeMs: number; size: number; summary: ConversationActivitySummary }>();
 
+function cacheActivitySummary(
+  cacheKey: string,
+  mtimeMs: number,
+  size: number,
+  summary: ConversationActivitySummary,
+): ConversationActivitySummary {
+  activitySummaryCache.set(cacheKey, { mtimeMs, size, summary });
+  if (activitySummaryCache.size > ACTIVITY_SUMMARY_CACHE_MAX) {
+    const firstKey = activitySummaryCache.keys().next().value;
+    if (firstKey !== undefined) activitySummaryCache.delete(firstKey);
+  }
+  return summary;
+}
+
 export async function summarizeConversationActivity(
   sessionFile: string,
   options: { harness?: string | null } = {},
@@ -32,8 +46,30 @@ export async function summarizeConversationActivity(
     return cached.summary;
   }
 
+  if (behavior.transcriptKind === 'acp-jsonl') {
+    const projected = await projectAcpConversationActivity(sessionFile);
+    const workingFileRecent = Date.now() - projected.mtimeMs < WORKING_STALENESS_MS;
+    const lastMsg = projected.messages[projected.messages.length - 1];
+    const isWorking = workingFileRecent && !projected.lastTurnCompletedAt && (
+      projected.streaming
+      || projected.pendingToolCount > 0
+      || projected.messages.length === 0
+      || lastMsg?.role === 'user'
+      || (lastMsg?.role === 'assistant' && !lastMsg.completedAt)
+    );
+    const fileRecent = Date.now() - projected.mtimeMs < 30_000;
+    const summary: ConversationActivitySummary = {
+      // Reuse the parser's existing message view instead of cloning the complete
+      // transcript for activity-only enrichment on every append.
+      messages: projected.messages,
+      streaming: projected.streaming,
+      isWorking,
+      currentTool: fileRecent ? projected.currentTool : null,
+    };
+    return cacheActivitySummary(cacheKey, fileStats.mtimeMs, fileStats.size, summary);
+  }
+
   const parsed = behavior.transcriptKind === 'codex-rollout-jsonl' ? await parseCodexConversationMessages(sessionFile)
-    : behavior.transcriptKind === 'acp-jsonl' ? await parseAcpConversationMessages(sessionFile)
     : behavior.transcriptKind === 'ohmypi-jsonl' || isOhmypiSessionFile(sessionFile) ? await parseOhmypiConversationMessages(sessionFile)
     : isPiSessionFile(sessionFile) ? await parsePiConversationMessages(sessionFile)
       // Parse from the last compact boundary instead of the full file — avoids
@@ -94,12 +130,5 @@ export async function summarizeConversationActivity(
   }
 
   const summary: ConversationActivitySummary = { messages, streaming, isWorking, currentTool };
-  activitySummaryCache.set(cacheKey, { mtimeMs, size: fileStats.size, summary });
-  if (activitySummaryCache.size > ACTIVITY_SUMMARY_CACHE_MAX) {
-    const firstKey = activitySummaryCache.keys().next().value;
-    if (firstKey !== undefined) {
-      activitySummaryCache.delete(firstKey);
-    }
-  }
-  return summary;
+  return cacheActivitySummary(cacheKey, mtimeMs, fileStats.size, summary);
 }

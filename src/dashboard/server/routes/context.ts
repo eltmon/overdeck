@@ -23,6 +23,7 @@ import {
 import { Effect, Layer, Schema } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
+import { workspaceContextWithoutProjectLayer } from '../../../lib/context-layers/assemble.js';
 import { renderForHarness, validateTemplate } from '../../../lib/context-layers/harness.js';
 import {
   globalContextFile as defaultGlobalContextFile,
@@ -381,7 +382,11 @@ async function renderBundledRulesAsync(harness: Harness): Promise<string> {
 function renderLayerSections(layers: readonly ResolvedLayer[], drafts: ReadonlyMap<string, string>, harness: Harness): string {
   return layers
     .map((layer) => {
-      const rendered = renderForHarness(contentForLayer(layer, drafts), harness).trim();
+      const raw = contentForLayer(layer, drafts);
+      const effective = harness === 'acp' && layer.kind === 'workspace'
+        ? workspaceContextWithoutProjectLayer(raw)
+        : raw;
+      const rendered = renderForHarness(effective, harness).trim();
       const label = layer.kind === 'global'
         ? 'Global layer'
         : layer.kind === 'project'

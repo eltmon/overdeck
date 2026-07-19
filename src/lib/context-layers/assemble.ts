@@ -18,18 +18,27 @@ import type { Harness } from '@overdeck/contracts';
 import { renderProjectLayer } from './render.js';
 
 const SECTION_SEPARATOR = '\n\n---\n\n';
-export const PROJECT_LAYER_START = '<!-- overdeck:project-layer:start -->';
+export const PROJECT_LAYER_START = '<!-- overdeck:project-layer:start';
 export const PROJECT_LAYER_END = '<!-- overdeck:project-layer:end -->';
 
 function markedProjectLayer(content: string): string {
-  return [PROJECT_LAYER_START, content, PROJECT_LAYER_END].join('\n');
+  return [`${PROJECT_LAYER_START} chars=${content.length} -->`, content, PROJECT_LAYER_END].join('\n');
 }
 
 function removeMarkedProjectLayer(content: string): string | null {
   const start = content.indexOf(PROJECT_LAYER_START);
   if (start < 0) return null;
-  const end = content.indexOf(PROJECT_LAYER_END, start + PROJECT_LAYER_START.length);
-  if (end < 0) return null;
+  const markerEnd = content.indexOf('-->', start + PROJECT_LAYER_START.length);
+  if (markerEnd < 0) return null;
+  const marker = content.slice(start, markerEnd + 3);
+  const lengthMatch = /\schars=(\d+)\s-->$/.exec(marker);
+  if (!lengthMatch) return null;
+  const projectStart = markerEnd + 4;
+  const projectLength = Number(lengthMatch[1]);
+  const projectEnd = projectStart + projectLength;
+  if (content[markerEnd + 3] !== '\n') return null;
+  if (content.slice(projectEnd, projectEnd + 1 + PROJECT_LAYER_END.length) !== `\n${PROJECT_LAYER_END}`) return null;
+  const end = projectEnd + 1;
 
   let before = content.slice(0, start);
   let after = content.slice(end + PROJECT_LAYER_END.length);

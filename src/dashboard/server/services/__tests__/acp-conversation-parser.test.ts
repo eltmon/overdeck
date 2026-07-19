@@ -6,8 +6,10 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import {
   ACP_PARSER_CACHE_MAX_ENTRIES,
+  acpParserProjectionStatsForTests,
   acpParserReadStatsForTests,
   parseAcpConversationMessages,
+  projectAcpConversationActivity,
 } from '../acp-conversation-parser.js';
 
 let tempDir: string;
@@ -285,6 +287,31 @@ describe('parseAcpConversationMessages', () => {
     expect(acpParserReadStatsForTests(path)).toEqual({
       byteOffset: concurrentSize,
       bytesRead: concurrentSize,
+    });
+  });
+
+  it('projects live activity without rebuilding the full transcript snapshot', async () => {
+    const entries = Array.from({ length: 100 }, (_, index) => ({
+      timestamp: `2026-07-18T10:${String(Math.floor(index / 60)).padStart(2, '0')}:${String(index % 60).padStart(2, '0')}.000Z`,
+      role: index % 2 === 0 ? 'user' : 'assistant',
+      content: `Message ${index}`,
+    }));
+    const path = await writeTranscript(entries);
+
+    const first = await projectAcpConversationActivity(path);
+    await appendFile(path, `${JSON.stringify({
+      timestamp: '2026-07-18T10:02:00.000Z',
+      role: 'assistant',
+      content: 'Latest',
+    })}\n`);
+    const second = await projectAcpConversationActivity(path);
+
+    expect(first.messages).toHaveLength(100);
+    expect(second.messages).toHaveLength(100);
+    expect(second.messages.at(-1)?.text).toContain('Latest');
+    expect(acpParserProjectionStatsForTests(path)).toEqual({
+      snapshotEntriesProjected: 0,
+      activityProjections: 2,
     });
   });
 

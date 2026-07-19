@@ -29,6 +29,18 @@ interface AcpParserCacheEntry {
   pendingTail: Buffer;
   mtimeMs: number;
   bytesRead: number;
+  snapshotEntriesProjected: number;
+  activityProjections: number;
+}
+
+export interface AcpConversationActivityProjection {
+  /** Borrowed parser-state view; activity consumers must treat it as read-only. */
+  readonly messages: ChatMessage[];
+  readonly streaming: boolean;
+  readonly lastTurnCompletedAt: string | undefined;
+  readonly pendingToolCount: number;
+  readonly currentTool: string | null;
+  readonly mtimeMs: number;
 }
 
 export const ACP_PARSER_CACHE_MAX_ENTRIES = 16;
@@ -242,15 +254,22 @@ async function readRange(path: string, start: number, length: number): Promise<B
   }
 }
 
-function snapshotResult(state: AcpParserState, fileSize: number, mtimeMs: number): ParseResult {
-  const messages = state.messages.map((message) => ({ ...message }));
-  const workLog = state.workLog.map((entry) => ({ ...entry }));
-  const workLogById = new Map(workLog.map((entry) => [entry.id, entry]));
-  const lastMessage = messages[messages.length - 1];
-  const streaming = state.lastTurnCompletedAt === undefined
+function stateIsStreaming(state: AcpParserState, mtimeMs: number): boolean {
+  const lastMessage = state.messages[state.messages.length - 1];
+  return state.lastTurnCompletedAt === undefined
     && state.lastRole === 'assistant'
     && lastMessage?.role === 'assistant'
     && Date.now() - mtimeMs < STREAMING_RECENCY_MS;
+}
+
+function snapshotResult(cache: AcpParserCacheEntry, fileSize: number, mtimeMs: number): ParseResult {
+  const { state } = cache;
+  const messages = state.messages.map((message) => ({ ...message }));
+  const workLog = state.workLog.map((entry) => ({ ...entry }));
+  cache.snapshotEntriesProjected += messages.length + workLog.length;
+  const workLogById = new Map(workLog.map((entry) => [entry.id, entry]));
+  const lastMessage = messages[messages.length - 1];
+  const streaming = stateIsStreaming(state, mtimeMs);
   if (lastMessage?.role === 'assistant' && state.lastTurnCompletedAt === undefined) {
     messages[messages.length - 1] = streaming
       ? { ...lastMessage, streaming: true }
@@ -280,12 +299,11 @@ function snapshotResult(state: AcpParserState, fileSize: number, mtimeMs: number
   };
 }
 
-/**
- * Incrementally parse the append-only ACP transcript into the full snapshot
- * consumed by the dashboard. Parser state is shared by file path, so multiple
- * open panels read and decode each appended byte only once.
- */
-async function parseAcpConversationMessagesUnlocked(sessionFile: string): Promise<ParseResult> {
+async function updateAcpParserCache(sessionFile: string): Promise<{
+  readonly cache: AcpParserCacheEntry;
+  readonly fileSize: number;
+  readonly mtimeMs: number;
+}> {
   const fileStats = await stat(sessionFile);
   const identity = `${fileStats.dev}:${fileStats.ino}`;
   let cache = parserCache.get(sessionFile);
@@ -303,6 +321,8 @@ async function parseAcpConversationMessagesUnlocked(sessionFile: string): Promis
       pendingTail: Buffer.alloc(0),
       mtimeMs: fileStats.mtimeMs,
       bytesRead: 0,
+      snapshotEntriesProjected: 0,
+      activityProjections: 0,
     };
     touchParserCache(sessionFile, cache);
   }
@@ -319,26 +339,68 @@ async function parseAcpConversationMessagesUnlocked(sessionFile: string): Promis
   }
   cache.mtimeMs = fileStats.mtimeMs;
   touchParserCache(sessionFile, cache);
-  return snapshotResult(cache.state, fileStats.size, fileStats.mtimeMs);
+  return { cache, fileSize: fileStats.size, mtimeMs: fileStats.mtimeMs };
 }
 
-export async function parseAcpConversationMessages(sessionFile: string): Promise<ParseResult> {
+async function withParserQueue<T>(sessionFile: string, operation: () => Promise<T>): Promise<T> {
   const previous = parserQueue.get(sessionFile) ?? Promise.resolve();
-  let result: ParseResult | undefined;
-  const operation = previous.then(async () => {
-    result = await parseAcpConversationMessagesUnlocked(sessionFile);
+  let result: T | undefined;
+  const queued = previous.then(async () => {
+    result = await operation();
   });
-  const settled = operation.then(
+  const settled = queued.then(
     () => undefined,
     () => undefined,
   );
   parserQueue.set(sessionFile, settled);
   try {
-    await operation;
+    await queued;
     return result!;
   } finally {
     if (parserQueue.get(sessionFile) === settled) parserQueue.delete(sessionFile);
   }
+}
+
+/**
+ * Incrementally parse the append-only ACP transcript into the full snapshot
+ * requested by the stopped-agent conversation endpoint. Parser state is shared
+ * by file path, so callers read and decode each appended byte only once.
+ */
+export async function parseAcpConversationMessages(sessionFile: string): Promise<ParseResult> {
+  return withParserQueue(sessionFile, async () => {
+    const { cache, fileSize, mtimeMs } = await updateAcpParserCache(sessionFile);
+    return snapshotResult(cache, fileSize, mtimeMs);
+  });
+}
+
+/**
+ * Project only the tail state needed by live activity enrichment. This avoids
+ * rebuilding a full message/work-log snapshot on every transcript append.
+ */
+export async function projectAcpConversationActivity(
+  sessionFile: string,
+): Promise<AcpConversationActivityProjection> {
+  return withParserQueue(sessionFile, async () => {
+    const { cache, mtimeMs } = await updateAcpParserCache(sessionFile);
+    const { state } = cache;
+    cache.activityProjections += 1;
+    let currentTool: string | null = null;
+    let maxSequence = -1;
+    for (const entry of state.pendingToolUse.values()) {
+      if (entry.toolTitle && (entry.sequence ?? -1) > maxSequence) {
+        maxSequence = entry.sequence ?? -1;
+        currentTool = entry.toolTitle;
+      }
+    }
+    return {
+      messages: state.messages,
+      streaming: stateIsStreaming(state, mtimeMs),
+      lastTurnCompletedAt: state.lastTurnCompletedAt,
+      pendingToolCount: state.pendingToolUse.size,
+      currentTool,
+      mtimeMs,
+    };
+  });
 }
 
 export function acpParserReadStatsForTests(sessionFile: string): {
@@ -347,4 +409,17 @@ export function acpParserReadStatsForTests(sessionFile: string): {
 } | undefined {
   const cache = parserCache.get(sessionFile);
   return cache ? { byteOffset: cache.byteOffset, bytesRead: cache.bytesRead } : undefined;
+}
+
+export function acpParserProjectionStatsForTests(sessionFile: string): {
+  readonly snapshotEntriesProjected: number;
+  readonly activityProjections: number;
+} | undefined {
+  const cache = parserCache.get(sessionFile);
+  return cache
+    ? {
+        snapshotEntriesProjected: cache.snapshotEntriesProjected,
+        activityProjections: cache.activityProjections,
+      }
+    : undefined;
 }
