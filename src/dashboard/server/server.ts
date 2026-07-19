@@ -17,6 +17,7 @@ import { getDashboardIdentity } from './identity.js';
 import { Effect, FileSystem, Layer, Option, Path } from 'effect';
 import { FetchHttpClient, HttpRouter, HttpServer, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
 import { ServerConfig } from './config.js';
+import { markDashboardListening } from './dashboard-listening.js';
 import { EventStoreServiceLive } from './services/domain-services.js';
 import { ReadModelServiceLive } from './read-model.js';
 import { AgentsResolverLive } from '../../lib/overdeck/agents.js';
@@ -406,6 +407,7 @@ export const makeServerLayer = Layer.unwrap(
       Effect.gen(function* () {
         yield* HttpServer.HttpServer;
         yield* Effect.sync(() => {
+          markDashboardListening();
           console.log(`[boot-timing] HTTP server listening at +${Math.round(performance.now())}ms (since process start)`);
           console.log(`[overdeck] Dashboard listening on http://${config.host}:${config.port}`);
           const mode = process.env['OVERDECK_MODE'] === 'production' ? 'production mode' : 'development mode';

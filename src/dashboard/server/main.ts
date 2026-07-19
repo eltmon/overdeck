@@ -15,8 +15,14 @@ import { startSharedIssueService, getSharedIssueService } from './services/issue
 import { startAgentEnrichmentService, stopAgentEnrichmentService } from './services/agent-enrichment-service.js';
 import { startMergeBlockerReconcileService } from './services/merge-blocker-reconcile-service.js';
 import { startResourceRefreshTriggers } from './services/resource-refresh-triggers.js';
-import { refreshMembershipSnapshotsForProjects } from './services/pipeline-membership.js';
-import { triggerResourceDiscoveryRefresh } from './services/resource-discovery.js';
+import {
+  enqueueProjectsResourceRefresh,
+  getProjectResourceRefreshQueueState,
+  startProjectResourceConvergence,
+  stopProjectResourceRefreshQueue,
+  whenProjectResourceRefreshIdle,
+} from './services/project-resource-refresh-queue.js';
+import { whenDashboardListening } from './dashboard-listening.js';
 import {
   shouldStartStaleCheckRetriggerService,
   startStaleCheckRetriggerService,
@@ -501,27 +507,39 @@ console.log(conversationSearchWatcher
   ? '[overdeck] Conversation search watcher started'
   : '[overdeck] Conversation search watcher skipped (conversationSearch.enabled=false)');
 
+let stopResourceRefreshServices = () => undefined;
+
 void (async () => {
   const store = await initEventStore();
-  // PAN-2893: agent lifecycle events refresh the membership + resource-discovery
-  // caches immediately, so `pan start` reaches the issues pane in seconds instead
-  // of waiting out the 30s/5m TTLs. Must start AFTER initEventStore() resolves —
-  // getEventStore() throws before that.
-  startResourceRefreshTriggers();
-  console.log('[overdeck] ResourceRefreshTriggers started (event-driven cache refresh)');
-  // PAN-2896: warm the membership + resource-discovery caches in the background
-  // so the first issues-pane click after a restart serves warm instead of
-  // blocking on a cold multi-second compute. Fire-and-forget — boot is not
-  // delayed and a warm failure only logs.
-  const warmStart = Date.now();
-  void refreshMembershipSnapshotsForProjects(listProjectsSync().map((entry) => entry.config))
-    .then(() => triggerResourceDiscoveryRefresh())
-    .then((issues) => {
-      console.log(`[overdeck] Boot cache warm complete: ${issues.length} resource-allocated issue(s) in ${Math.round((Date.now() - warmStart) / 1000)}s (PAN-2896)`);
-    })
-    .catch((err) => {
-      console.warn('[overdeck] Boot cache warm failed (pane falls back to on-demand compute):', err instanceof Error ? err.message : String(err));
-    });
+  // Request serving comes first. Resource convergence starts only after the
+  // Node 22 server has bound its socket, then all boot/event/periodic work flows
+  // through the same non-overlapping project queue.
+  void whenDashboardListening().then(async () => {
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    const stopTriggers = startResourceRefreshTriggers();
+    const stopConvergence = startProjectResourceConvergence();
+    stopResourceRefreshServices = () => {
+      stopTriggers();
+      stopConvergence();
+      stopProjectResourceRefreshQueue();
+    };
+    console.log('[overdeck] Project resource refresh queue started');
+
+    const warmStart = Date.now();
+    enqueueProjectsResourceRefresh(
+      listProjectsSync().map((entry) => entry.config),
+      'boot-warm',
+    );
+    await whenProjectResourceRefreshIdle();
+    const queueState = getProjectResourceRefreshQueueState();
+    if (queueState.lastError) {
+      console.warn('[overdeck] Boot cache warm completed with errors:', queueState.lastError);
+    } else {
+      console.log(`[overdeck] Boot cache warm complete in ${Math.round((Date.now() - warmStart) / 1000)}s`);
+    }
+  }).catch((err) => {
+    console.warn('[overdeck] Resource refresh startup failed:', err instanceof Error ? err.message : String(err));
+  });
   store.subscribe((event) => {
     if (event.type === 'agent.stopped' || event.type === 'agent.heartbeat_dead') {
       const agentId = typeof (event.payload as { agentId?: unknown }).agentId === 'string'
@@ -596,6 +614,7 @@ const handleShutdownSignal = async (signal: NodeJS.Signals) => {
     }
   }
   clearInterval(attachmentCleanupTimer);
+  stopResourceRefreshServices();
   stopAgentEnrichmentService();
   stopAgentOutputService();
   stopConversationLifecycleService();

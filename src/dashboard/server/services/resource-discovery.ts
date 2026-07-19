@@ -7,9 +7,13 @@ import { compareIssueIds } from '@overdeck/contracts';
 
 import type { TaskTotals } from './resource-discovery-signals.js';
 import { isWithinRecencyDate, isWithinRecencyMs } from './resource-discovery-signals.js';
+import {
+  captureSharedResourceSignals,
+  type SharedResourceSignals,
+  type TrackerIssueRecord,
+} from './resource-discovery-shared.js';
 
 import { getAgentRuntimeState } from '../../../lib/agents.js';
-import { listConversations, type LegacyConversation as Conversation } from '../../../lib/overdeck/conversations.js';
 import {
   PAN_CONTINUE_FILENAME,
   PAN_DIRNAME,
@@ -22,14 +26,15 @@ import {
   type PipelineMembership,
 } from '../../../lib/pipeline-membership.js';
 import { listOpenPullRequestsSnapshot } from '../../../lib/pipeline-membership-gather.js';
-import { listSessionNames } from '../../../lib/tmux.js';
 import { loadReadyForMergeFlags } from '../review-status.js';
 import { resolveAgentGitInfo } from './git-info.js';
 import { parseIssueIdFromTextSync } from '../../../lib/resource-utils.js';
-import { getPipelineMembershipSnapshotsForResourceDiscovery } from './pipeline-membership.js';
+import {
+  readPipelineMembershipSnapshotsForProjects,
+  refreshMembershipSnapshotsForProjects,
+} from './pipeline-membership.js';
 
 const execFileAsync = promisify(execFile);
-const RESOURCE_DISCOVERY_TTL_MS = 30_000;
 const RECENT_ACTIVITY_WINDOW_MS = 5_000;
 
 export { RECENCY_DAYS } from './resource-discovery-signals.js';
@@ -153,18 +158,6 @@ interface InternalDiscoveredIssue extends Omit<ResourceAllocatedIssue, 'resource
   resourceDetails: InternalResourceDetails;
 }
 
-interface TrackerIssueRecord {
-  identifier?: string;
-  title?: string;
-  state?: string;
-  status?: string;
-  rawTrackerState?: string;
-  source?: string;
-  totalChildCount?: number;
-  completedChildCount?: number;
-  inProgressChildCount?: number;
-}
-
 interface GhPullRequest {
   number: number;
   title: string;
@@ -185,10 +178,16 @@ interface ResourceDiscoveryCacheEntry {
   computedAt: number;
 }
 
+interface ProjectResourceSnapshot {
+  detailed: InternalDiscoveredIssue[];
+  public: ResourceAllocatedIssue[];
+  computedAt: number;
+}
+
+const projectResourceSnapshots = new Map<string, ProjectResourceSnapshot>();
 let cachedResourceIssues: ResourceDiscoveryCacheEntry | null = null;
 let cachedDetailedResourceIssues: InternalDiscoveredIssue[] | null = null;
 let resourceIssuesRefreshPromise: Promise<ResourceAllocatedIssue[]> | null = null;
-let pendingResourceRefreshFollowUp: Promise<ResourceAllocatedIssue[]> | null = null;
 
 function projectPrefixes(project: ProjectRef): string[] {
   const prefixes = new Set<string>();
@@ -303,51 +302,6 @@ const DISCOVERABLE_SESSION_PREFIXES = ['agent-', 'planning-', 'specialist-', 're
 
 export function isDiscoverableAgentSession(sessionName: string): boolean {
   return DISCOVERABLE_SESSION_PREFIXES.some((prefix) => sessionName.startsWith(prefix));
-}
-
-async function loadTrackerIssues(): Promise<Map<string, TrackerIssueRecord>> {
-  const map = new Map<string, TrackerIssueRecord>();
-  try {
-    const { getSharedIssueService } = await import('./issue-service-singleton.js');
-    const service = await getSharedIssueService();
-    const issues = service.getIssues() as TrackerIssueRecord[];
-    for (const issue of issues) {
-      if (issue.identifier) {
-        map.set(issue.identifier.toUpperCase(), issue);
-      }
-    }
-  } catch {
-    return map;
-  }
-  return map;
-}
-
-async function loadTmuxSessions(): Promise<string[]> {
-  try {
-    return (await Effect.runPromise(listSessionNames())).map((name) => name.trim()).filter(Boolean);
-  } catch {
-    return [];
-  }
-}
-
-function loadConversations(): Conversation[] {
-  try {
-    return listConversations();
-  } catch {
-    return [];
-  }
-}
-
-async function loadDockerContainers(): Promise<string[]> {
-  try {
-    const { stdout } = await execFileAsync('docker', ['ps', '--format', '{{.Names}}'], {
-      encoding: 'utf-8',
-      timeout: 5000,
-    });
-    return stdout.split('\n').map((line) => line.trim()).filter(Boolean);
-  } catch {
-    return [];
-  }
 }
 
 async function loadOpenPullRequests(projects: ProjectRef[]): Promise<Map<string, GhPullRequest[]>> {
@@ -496,14 +450,22 @@ async function scanWorkspace(
   };
 }
 
-async function computeResourceAllocatedIssues(): Promise<InternalDiscoveredIssue[]> {
-  const projects = listProjectsSync() as ProjectRef[];
-  const [trackerIssues, tmuxSessions, dockerContainers, pullRequests] = await Promise.all([
-    loadTrackerIssues(),
-    loadTmuxSessions(),
-    loadDockerContainers(),
-    loadOpenPullRequests(projects),
-  ]);
+async function computeResourceAllocatedIssues(
+  projectConfigs: ProjectConfig[],
+  sharedSignals?: SharedResourceSignals,
+): Promise<InternalDiscoveredIssue[]> {
+  const registeredProjects = listProjectsSync() as ProjectRef[];
+  const projects = projectConfigs.map((config) =>
+    registeredProjects.find((entry) => entry.config.path === config.path)
+      ?? { key: config.name ?? config.path, config });
+  const {
+    trackerIssues,
+    tmuxSessions,
+    dockerContainers,
+    conversations,
+    remoteAgentStates,
+  } = sharedSignals ?? await captureSharedResourceSignals();
+  const pullRequests = await loadOpenPullRequests(projects);
 
   const issueMap = new Map<string, MutableResourceIssue>();
   const projectByPrefix = new Map<string, ProjectRef>();
@@ -513,18 +475,18 @@ async function computeResourceAllocatedIssues(): Promise<InternalDiscoveredIssue
     }
   }
 
-  const projectRefFromResolved = (resolvedProject: ResolvedProject): ProjectRef => ({
-    key: resolvedProject.projectKey,
-    config: {
-      name: resolvedProject.projectName,
-      path: resolvedProject.projectPath,
-    },
-  });
+  const projectRefFromResolved = (resolvedProject: ResolvedProject): ProjectRef | null =>
+    projects.find((project) =>
+      project.key === resolvedProject.projectKey
+      || project.config.path === resolvedProject.projectPath) ?? null;
 
   const resolveProjectRef = (issueId: string, preferredProject?: ProjectRef): ProjectRef | null => {
     if (preferredProject) return preferredProject;
     const resolvedProject = resolveProjectFromIssueSync(issueId);
-    if (resolvedProject) return projectRefFromResolved(resolvedProject);
+    if (resolvedProject) {
+      const project = projectRefFromResolved(resolvedProject);
+      if (project) return project;
+    }
     const prefix = issueId.toUpperCase().match(/^([A-Z]+)-\d+$/)?.[1] ?? '';
     return projectByPrefix.get(prefix) ?? null;
   };
@@ -604,7 +566,6 @@ async function computeResourceAllocatedIssues(): Promise<InternalDiscoveredIssue
   // Non-archived conversations explicitly linked to an issue are a distinct
   // resource signal from tmux/agent sessions (PAN-2602). They indicate active
   // operator attention even when no agent session is running.
-  const conversations = loadConversations();
   for (const conv of conversations) {
     if (!conv.issueId || conv.archivedAt) continue;
     const issue = ensureIssue(conv.issueId);
@@ -622,22 +583,17 @@ async function computeResourceAllocatedIssues(): Promise<InternalDiscoveredIssue
   // Remote (fly.io) work agents have no local tmux session — surface them
   // from their remote-state.json so the tree shows the issue as actively
   // worked (PAN-1676).
-  try {
-    const { listActiveRemoteAgentStates } = await import('../../../lib/remote/remote-agents.js');
-    for (const remoteState of listActiveRemoteAgentStates()) {
-      const issue = ensureIssue(remoteState.issueId);
-      if (!issue) continue;
-      issue.resourceSources.add('remote-agent');
-      issue.resourceDetails.remoteAgent = {
-        vmName: remoteState.vmName,
-        status: remoteState.status,
-        model: remoteState.model,
-        startedAt: remoteState.startedAt,
-      };
-      if (!issue.agentStatus) issue.agentStatus = 'active';
-    }
-  } catch {
-    // Remote module unavailable — tree simply omits remote agents.
+  for (const remoteState of remoteAgentStates) {
+    const issue = ensureIssue(remoteState.issueId);
+    if (!issue) continue;
+    issue.resourceSources.add('remote-agent');
+    issue.resourceDetails.remoteAgent = {
+      vmName: remoteState.vmName,
+      status: remoteState.status,
+      model: remoteState.model,
+      startedAt: remoteState.startedAt,
+    };
+    if (!issue.agentStatus) issue.agentStatus = 'active';
   }
 
   for (const containerName of dockerContainers) {
@@ -751,7 +707,7 @@ async function computeResourceAllocatedIssues(): Promise<InternalDiscoveredIssue
 
   const memberships = new Map<string, PipelineMembership>();
   const unavailableProjects = new Set<string>();
-  const projectMemberships = await getPipelineMembershipSnapshotsForResourceDiscovery(projects.map((project) => project.config));
+  const projectMemberships = readPipelineMembershipSnapshotsForProjects(projects.map((project) => project.config));
   for (const result of projectMemberships) {
     if (result.error) unavailableProjects.add(result.project.name);
     for (const membership of result.memberships ?? []) {
@@ -825,70 +781,78 @@ function toPublicResourceIssue(issue: InternalDiscoveredIssue): ResourceAllocate
   };
 }
 
-function refreshResourceAllocatedIssues(): Promise<ResourceAllocatedIssue[]> {
-  if (resourceIssuesRefreshPromise) return resourceIssuesRefreshPromise;
+function rebuildCombinedResourceSnapshot(): ResourceAllocatedIssue[] {
+  const detailed = [...projectResourceSnapshots.values()]
+    .flatMap((snapshot) => snapshot.detailed)
+    .sort((a, b) => compareIssueIds(a.issueId, b.issueId));
+  const publicIssues = detailed.map(toPublicResourceIssue);
+  cachedDetailedResourceIssues = detailed;
+  cachedResourceIssues = {
+    value: publicIssues,
+    computedAt: Math.max(0, ...[...projectResourceSnapshots.values()].map((snapshot) => snapshot.computedAt)),
+  };
+  return publicIssues;
+}
 
-  resourceIssuesRefreshPromise = computeResourceAllocatedIssues()
-    .then((issues) => {
-      cachedDetailedResourceIssues = issues;
-      const publicIssues = issues.map(toPublicResourceIssue);
-      cachedResourceIssues = {
-        value: publicIssues,
-        computedAt: Date.now(),
-      };
-      return publicIssues;
-    })
-    .finally(() => {
-      resourceIssuesRefreshPromise = null;
-    });
+function publishProjectResourceSnapshot(project: ProjectConfig, issues: InternalDiscoveredIssue[]): void {
+  projectResourceSnapshots.set(project.path, {
+    detailed: issues,
+    public: issues.map(toPublicResourceIssue),
+    computedAt: Date.now(),
+  });
+  rebuildCombinedResourceSnapshot();
+}
 
-  return resourceIssuesRefreshPromise;
+/** Refresh only the requested projects, capturing fleet-wide signals once for the batch. */
+export async function refreshResourceAllocatedProjects(
+  projects: ProjectConfig[],
+): Promise<ResourceAllocatedIssue[]> {
+  if (projects.length === 0) return cachedResourceIssues?.value ?? [];
+  const sharedSignals = await captureSharedResourceSignals();
+  const failures: Error[] = [];
+  for (const project of projects) {
+    try {
+      await refreshMembershipSnapshotsForProjects([project]);
+      const issues = await computeResourceAllocatedIssues([project], sharedSignals);
+      publishProjectResourceSnapshot(project, issues);
+    } catch (error) {
+      const failure = error instanceof Error ? error : new Error(String(error));
+      failures.push(failure);
+      console.warn(
+        `[resource-discovery] refresh failed for ${project.name ?? project.path}; keeping last-good snapshot:`,
+        failure.message,
+      );
+    }
+  }
+  if (failures.length > 0) {
+    throw new AggregateError(failures, `${failures.length} project resource refresh(es) failed`);
+  }
+  return cachedResourceIssues?.value ?? [];
 }
 
 export async function getCachedResourceAllocatedIssues(): Promise<ResourceAllocatedIssue[]> {
-  const now = Date.now();
-  if (cachedResourceIssues && now - cachedResourceIssues.computedAt < RESOURCE_DISCOVERY_TTL_MS) {
-    return cachedResourceIssues.value;
-  }
-
-  if (cachedResourceIssues) {
-    void refreshResourceAllocatedIssues().catch(() => {
-      // keep serving the last good snapshot until the next successful refresh
-    });
-    return cachedResourceIssues.value;
-  }
-
-  return refreshResourceAllocatedIssues();
+  return cachedResourceIssues?.value ?? [];
 }
 
 export async function discoverResourceAllocatedIssues(): Promise<ResourceAllocatedIssue[]> {
-  return getCachedResourceAllocatedIssues();
+  return triggerResourceDiscoveryRefresh();
 }
 
-/**
- * PAN-2893 — event-driven refresh: recompute the resource-allocated snapshot
- * NOW instead of waiting out the TTL. If a refresh is already in flight (it may
- * predate the triggering event and carry stale membership), chain a second one
- * behind it so the post-event state is always captured.
- */
+/** Explicit all-project refresh for tests and diagnostics; runtime callers use the project queue. */
 export function triggerResourceDiscoveryRefresh(): Promise<ResourceAllocatedIssue[]> {
-  const inFlight = resourceIssuesRefreshPromise;
-  if (!inFlight) return refreshResourceAllocatedIssues();
-  // Coalesce: all callers arriving during an in-flight compute share ONE
-  // follow-up compute. One chained follow-up per caller compounds into a
-  // continuous compute loop under event churn (2026-07-19: 100% CPU).
-  if (!pendingResourceRefreshFollowUp) {
-    pendingResourceRefreshFollowUp = inFlight
-      .then(() => refreshResourceAllocatedIssues())
-      .finally(() => {
-        pendingResourceRefreshFollowUp = null;
-      });
-  }
-  return pendingResourceRefreshFollowUp;
+  if (resourceIssuesRefreshPromise) return resourceIssuesRefreshPromise;
+  resourceIssuesRefreshPromise = refreshResourceAllocatedProjects(
+    listProjectsSync().map((entry) => entry.config),
+  ).finally(() => {
+    resourceIssuesRefreshPromise = null;
+  });
+  return resourceIssuesRefreshPromise;
 }
 
 export async function discoverResourceAllocatedIssuesFresh(): Promise<ResourceAllocatedIssue[]> {
-  return (await computeResourceAllocatedIssues()).map(toPublicResourceIssue);
+  const projects = listProjectsSync().map((entry) => entry.config);
+  await refreshMembershipSnapshotsForProjects(projects);
+  return (await computeResourceAllocatedIssues(projects)).map(toPublicResourceIssue);
 }
 
 export function sanitizeResourceAllocatedIssues(issues: ResourceAllocatedIssue[]): ResourceAllocatedIssue[] {
@@ -925,13 +889,7 @@ export function toPublicResourceDetailIdentifiers(details: InternalResourceDetai
 export async function getResourceDetailIdentifiers(issueId: string): Promise<ResourceDetailIdentifiers | null> {
   const normalizedIssueId = issueId.toUpperCase();
   const cachedMatch = cachedDetailedResourceIssues?.find((entry) => entry.issueId === normalizedIssueId);
-  if (cachedMatch) {
-    return toPublicResourceDetailIdentifiers(cachedMatch.resourceDetails);
-  }
-
-  await refreshResourceAllocatedIssues();
-  const refreshedMatch = cachedDetailedResourceIssues?.find((entry) => entry.issueId === normalizedIssueId);
-  return refreshedMatch ? toPublicResourceDetailIdentifiers(refreshedMatch.resourceDetails) : null;
+  return cachedMatch ? toPublicResourceDetailIdentifiers(cachedMatch.resourceDetails) : null;
 }
 
 export function groupResourceAllocatedIssuesByProject(issues: ResourceAllocatedIssue[]): Array<{
@@ -963,6 +921,7 @@ export function groupResourceAllocatedIssuesByProject(issues: ResourceAllocatedI
 }
 
 export function resetResourceAllocatedIssuesCacheForTests(): void {
+  projectResourceSnapshots.clear();
   cachedResourceIssues = null;
   cachedDetailedResourceIssues = null;
   resourceIssuesRefreshPromise = null;
