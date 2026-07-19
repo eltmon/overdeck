@@ -195,7 +195,7 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
     modelSpawnKey,
     status: 'starting',
     startedAt: new Date().toISOString(),
-    costSoFar: 0,
+    ...(resolvedHarness === 'codex' ? {} : { costSoFar: 0 }),
     hostOverride: options.allowHost || undefined,
     slotIndex: options.slotIndex,
     slotItemId: options.slotItemId,
@@ -517,7 +517,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     modelSpawnKey,
     status: 'starting',
     startedAt: new Date().toISOString(),
-    costSoFar: 0,
+    ...(resolvedHarness === 'codex' ? {} : { costSoFar: 0 }),
     hostOverride: options.allowHost || undefined,
     sessionId: createFreshSessionIdentity(agentId, resolvedHarness),
   };
