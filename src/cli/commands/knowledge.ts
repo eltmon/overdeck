@@ -1,13 +1,17 @@
 import chalk from 'chalk';
 import ora from 'ora';
 import type { Command } from 'commander';
-import { readFile } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
-import { parse as parseYaml } from 'yaml';
 
 import { spawnRun } from '../../lib/agents.js';
 import { ensureMnemos } from '../../lib/installers/mnemos.js';
-import { loadProjectsConfigSync, resolveProjectFromIssueSync } from '../../lib/projects.js';
+import {
+  ensureOpenKnowledge,
+  startOpenKnowledgeServer,
+  type EnsureOpenKnowledgeResult,
+  type StartOpenKnowledgeServerResult,
+} from '../../lib/installers/open-knowledge.js';
+import { resolveKnowledgeBundleRoot } from '../../lib/memory/injection.js';
+import { resolveProjectFromIssueSync } from '../../lib/projects.js';
 import type { RoleEffort } from '../../lib/config-yaml.js';
 
 export interface KnowledgeOptions {
@@ -15,6 +19,18 @@ export interface KnowledgeOptions {
   retro?: boolean;
   model?: string;
   effort?: RoleEffort;
+}
+
+export interface KnowledgeOpenOptions {
+  install?: boolean;
+  browser?: boolean;
+}
+
+export interface KnowledgeOpenDependencies {
+  cwd?: () => string;
+  ensure?: (options: { autoInstall: boolean }) => Promise<EnsureOpenKnowledgeResult>;
+  start?: (bundlePath: string, options: { openBrowser: false }) => Promise<StartOpenKnowledgeServerResult>;
+  openBrowser?: (url: string) => Promise<void>;
 }
 
 function normalizeIssueId(issueId: string): string {
@@ -27,35 +43,6 @@ function quoteShellText(value: string): string {
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
-}
-
-function resolveBundlePath(projectPath: string, bundlePath: string): string {
-  return resolve(projectPath, bundlePath);
-}
-
-async function resolveKnowledgeBundlePath(projectKey: string, projectPath: string): Promise<string | null> {
-  const projectConfig = loadProjectsConfigSync().projects[projectKey];
-  if (typeof projectConfig?.knowledge_repo === 'string' && projectConfig.knowledge_repo.trim()) {
-    return resolveBundlePath(projectPath, projectConfig.knowledge_repo);
-  }
-
-  try {
-    const pointer = parseYaml(await readFile(join(projectPath, '.okf.yml'), 'utf8'));
-    if (isRecord(pointer) && typeof pointer.bundle === 'string' && pointer.bundle.trim()) {
-      return resolveBundlePath(projectPath, pointer.bundle);
-    }
-  } catch (error: unknown) {
-    if (error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'ENOENT') {
-      return null;
-    }
-    throw error;
-  }
-
-  return null;
 }
 
 export function buildKnowledgePrompt(issueId: string, options: KnowledgeOptions = {}): string {
@@ -105,7 +92,7 @@ export async function knowledgeCommand(issueId: string, options: KnowledgeOption
       throw new Error(`No Overdeck project is configured for issue prefix in "${normalized}". Add the project to projects.yaml first.`);
     }
 
-    const bundlePath = await resolveKnowledgeBundlePath(project.projectKey, project.projectPath);
+    const bundlePath = await resolveKnowledgeBundleRoot({ projectPath: project.projectPath });
     if (!bundlePath) {
       throw new Error(
         `No OKF bundle is configured for ${project.projectName}. ` +
@@ -146,13 +133,64 @@ export async function knowledgeCommand(issueId: string, options: KnowledgeOption
   }
 }
 
+export async function knowledgeOpenCommand(
+  options: KnowledgeOpenOptions = {},
+  dependencies: KnowledgeOpenDependencies = {},
+): Promise<void> {
+  const cwd = dependencies.cwd?.() ?? process.cwd();
+  const bundlePath = await resolveKnowledgeBundleRoot({ projectPath: cwd });
+  if (!bundlePath) {
+    throw new Error('No OKF bundle is configured for this project. Run `/okf init` first, then retry `pan knowledge open`.');
+  }
+
+  const ensure = dependencies.ensure ?? ensureOpenKnowledge;
+  const start = dependencies.start ?? startOpenKnowledgeServer;
+  await ensure({ autoInstall: options.install !== false });
+  const viewer = await start(bundlePath, { openBrowser: false });
+  viewer.process.unref();
+
+  console.log(`Knowledge viewer: ${viewer.url}`);
+  if (options.browser === false) return;
+
+  try {
+    await (dependencies.openBrowser ?? openViewerInBrowser)(viewer.url);
+  } catch (error: unknown) {
+    console.warn(`Could not open the browser automatically: ${errorMessage(error)}`);
+  }
+}
+
+async function openViewerInBrowser(url: string): Promise<void> {
+  const [{ Effect }, { openBrowser }, { layer: nodeServicesLayer }] = await Promise.all([
+    import('effect'),
+    import('../../lib/browser.js'),
+    import('@effect/platform-node/NodeServices'),
+  ]);
+  await Effect.runPromise(openBrowser(url).pipe(Effect.provide(nodeServicesLayer)));
+}
+
 export function configureKnowledgeCommand(program: Command): Command {
-  return program
-    .command('knowledge <id>')
-    .description('Spawn a knowledge agent to maintain the project OKF bundle')
+  const command = program
+    .command('knowledge')
+    .description('Maintain or open the project OKF bundle')
+    .argument('[id]', 'Issue ID for a knowledge maintenance agent')
     .option('--focus <topic>', 'Run /okf study for a focused topic before syncing')
     .option('--retro', 'Run /okf retro before syncing')
     .option('--model <model>', 'Model override (defaults to roles.knowledge.model from config)')
     .option('--effort <level>', 'Knowledge effort: low | medium | high | xhigh | max')
-    .action((id: string, options: KnowledgeOptions) => knowledgeCommand(id, options));
+    .action((id: string | undefined, options: KnowledgeOptions) => {
+      if (!id) {
+        command.help();
+        return;
+      }
+      return knowledgeCommand(id, options);
+    });
+
+  command
+    .command('open')
+    .description('Open the project OKF bundle in the local knowledge viewer')
+    .option('--no-install', 'Do not install @inkeep/open-knowledge when the ok binary is missing')
+    .option('--no-browser', 'Start or reuse the viewer without opening a browser')
+    .action((options: KnowledgeOpenOptions) => knowledgeOpenCommand(options));
+
+  return command;
 }

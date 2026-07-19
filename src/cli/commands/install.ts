@@ -616,5 +616,6 @@ async function installCommand(options: InstallOptions): Promise<void> {
   }
 
   console.log(`  4. Create a workspace with ${chalk.cyan('pan workspace create <issue-id>')}`);
+  console.log(chalk.dim('  Knowledge viewer installs on first use via pan knowledge open.'));
   console.log('');
 }

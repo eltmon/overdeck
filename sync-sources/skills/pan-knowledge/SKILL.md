@@ -9,6 +9,7 @@ triggers:
   - knowledge sync
   - knowledge study
   - knowledge retro
+  - knowledge open
 allowed-tools:
   - Bash
   - Read
@@ -30,6 +31,8 @@ pan knowledge PAN-123 --focus "auth flow"    # Study a topic, then sync
 pan knowledge PAN-123 --retro                # Capture retro knowledge, then sync
 pan knowledge PAN-123 --model claude-sonnet-5  # Override the knowledge role model
 pan knowledge PAN-123 --effort high          # Raise reasoning effort for the agent
+pan knowledge open                           # Open this project's OKF bundle in the viewer
+pan knowledge open --no-install --no-browser # Never install or launch a browser
 ```
 
 ## What It Does
@@ -50,6 +53,12 @@ The agent runs a sequence of `/okf` commands depending on the flags you pass:
 The command first tries to ensure `mnemos` is available on `PATH` (installing it
 on demand if necessary) and ingest the resolved bundle. If mnemos is unavailable,
 it resolves the installed `okf` skill and falls back to its bundled `scripts/` directory.
+
+`pan knowledge open` resolves the current project's bundle through
+`projects.yaml` or `.okf.yml`, progressively installs the separately licensed
+`@inkeep/open-knowledge` program when needed, starts or reuses its local viewer,
+and opens the URL. Use `--no-install` to require a preinstalled `ok` binary and
+`--no-browser` to print the URL without launching a browser.
 
 ## When to Use
 

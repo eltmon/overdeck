@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Command } from 'commander';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const agentMocks = vi.hoisted(() => ({
   spawnRun: vi.fn(),
@@ -7,11 +7,16 @@ const agentMocks = vi.hoisted(() => ({
 
 const projectMocks = vi.hoisted(() => ({
   resolveProjectFromIssueSync: vi.fn(),
-  loadProjectsConfigSync: vi.fn(),
 }));
 
 const installerMocks = vi.hoisted(() => ({
   ensureMnemos: vi.fn(),
+  ensureOpenKnowledge: vi.fn(),
+  startOpenKnowledgeServer: vi.fn(),
+}));
+
+const memoryMocks = vi.hoisted(() => ({
+  resolveKnowledgeBundleRoot: vi.fn(),
 }));
 
 vi.mock('../../../lib/agents.js', () => ({
@@ -22,37 +27,55 @@ vi.mock('../../../lib/installers/mnemos.js', () => ({
   ensureMnemos: installerMocks.ensureMnemos,
 }));
 
-vi.mock('../../../lib/projects.js', () => ({
-  resolveProjectFromIssueSync: projectMocks.resolveProjectFromIssueSync,
-  loadProjectsConfigSync: projectMocks.loadProjectsConfigSync,
+vi.mock('../../../lib/installers/open-knowledge.js', () => ({
+  ensureOpenKnowledge: installerMocks.ensureOpenKnowledge,
+  startOpenKnowledgeServer: installerMocks.startOpenKnowledgeServer,
 }));
 
-import { buildKnowledgePrompt, configureKnowledgeCommand, knowledgeCommand } from '../knowledge.js';
+vi.mock('../../../lib/memory/injection.js', () => ({
+  resolveKnowledgeBundleRoot: memoryMocks.resolveKnowledgeBundleRoot,
+}));
+
+vi.mock('../../../lib/projects.js', () => ({
+  resolveProjectFromIssueSync: projectMocks.resolveProjectFromIssueSync,
+}));
+
+import {
+  buildKnowledgePrompt,
+  configureKnowledgeCommand,
+  knowledgeCommand,
+  knowledgeOpenCommand,
+} from '../knowledge.js';
 
 describe('knowledgeCommand', () => {
   beforeEach(() => {
     agentMocks.spawnRun.mockReset();
     projectMocks.resolveProjectFromIssueSync.mockReset();
-    projectMocks.loadProjectsConfigSync.mockReset();
     installerMocks.ensureMnemos.mockReset();
+    installerMocks.ensureOpenKnowledge.mockReset();
+    installerMocks.startOpenKnowledgeServer.mockReset();
+    memoryMocks.resolveKnowledgeBundleRoot.mockReset();
+
     projectMocks.resolveProjectFromIssueSync.mockReturnValue({
       projectKey: 'overdeck',
       projectName: 'Overdeck',
       projectPath: '/repo/overdeck',
       linearTeam: 'PAN',
     });
-    projectMocks.loadProjectsConfigSync.mockReturnValue({
-      projects: {
-        overdeck: {
-          name: 'Overdeck',
-          path: '/repo/overdeck',
-          knowledge_repo: 'knowledge',
-        },
-      },
-    });
+    memoryMocks.resolveKnowledgeBundleRoot.mockResolvedValue('/repo/overdeck/knowledge');
     installerMocks.ensureMnemos.mockResolvedValue({
       status: 'already-installed',
       path: '/home/eltmon/.overdeck/bin/mnemos',
+    });
+    installerMocks.ensureOpenKnowledge.mockResolvedValue({
+      status: 'already-installed',
+      command: 'ok',
+    });
+    installerMocks.startOpenKnowledgeServer.mockResolvedValue({
+      process: { unref: vi.fn() },
+      port: 39847,
+      apiPort: 8789,
+      url: 'http://127.0.0.1:39847',
     });
     agentMocks.spawnRun.mockResolvedValue({
       id: 'agent-pan-2468-knowledge',
@@ -60,25 +83,18 @@ describe('knowledgeCommand', () => {
     });
   });
 
-  it('registers help with id, focus, retro, model, and effort', () => {
+  it('registers maintenance options and the open subcommand', () => {
     const program = new Command();
     program.name('pan');
     const command = configureKnowledgeCommand(program);
+    const help = command.helpInformation();
 
-    expect(command.helpInformation()).toMatchInlineSnapshot(`
-      "Usage: pan knowledge [options] <id>
-
-      Spawn a knowledge agent to maintain the project OKF bundle
-
-      Options:
-        --focus <topic>   Run /okf study for a focused topic before syncing
-        --retro           Run /okf retro before syncing
-        --model <model>   Model override (defaults to roles.knowledge.model from
-                          config)
-        --effort <level>  Knowledge effort: low | medium | high | xhigh | max
-        -h, --help        display help for command
-      "
-    `);
+    expect(help).toContain('Usage: pan knowledge [options] [command] [id]');
+    expect(help).toContain('--focus <topic>');
+    expect(help).toContain('--retro');
+    expect(help).toContain('--model <model>');
+    expect(help).toContain('--effort <level>');
+    expect(help).toContain('open [options]');
   });
 
   it('builds the OKF command sequence from focus and retro options', () => {
@@ -100,6 +116,7 @@ describe('knowledgeCommand', () => {
     });
 
     expect(projectMocks.resolveProjectFromIssueSync).toHaveBeenCalledWith('PAN-2468');
+    expect(memoryMocks.resolveKnowledgeBundleRoot).toHaveBeenCalledWith({ projectPath: '/repo/overdeck' });
     expect(installerMocks.ensureMnemos).toHaveBeenCalledWith({
       bundlePath: '/repo/overdeck/knowledge',
     });
@@ -115,18 +132,9 @@ describe('knowledgeCommand', () => {
   });
 
   it('throws a clear /okf init error when no knowledge bundle is configured', async () => {
-    projectMocks.loadProjectsConfigSync.mockReturnValue({
-      projects: {
-        overdeck: {
-          name: 'Overdeck',
-          path: '/repo/overdeck',
-        },
-      },
-    });
+    memoryMocks.resolveKnowledgeBundleRoot.mockResolvedValue(null);
 
-    await expect(knowledgeCommand('pan-2468')).rejects.toThrow(
-      /Run `\/okf init`/,
-    );
+    await expect(knowledgeCommand('pan-2468')).rejects.toThrow(/Run `\/okf init`/);
 
     expect(agentMocks.spawnRun).not.toHaveBeenCalled();
   });
@@ -143,5 +151,66 @@ describe('knowledgeCommand', () => {
       workspace: '/repo/overdeck',
       prompt: expect.stringContaining('/okf sync'),
     }));
+  });
+
+  it('opens the configured bundle, auto-installs on explicit use, and launches the browser', async () => {
+    const unref = vi.fn();
+    const ensure = vi.fn(async () => ({ status: 'already-installed' as const, command: 'ok' as const }));
+    const start = vi.fn(async () => ({
+      process: { unref } as never,
+      port: 39847,
+      apiPort: 8789,
+      url: 'http://127.0.0.1:39847',
+    }));
+    const openBrowser = vi.fn(async () => {});
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    await knowledgeOpenCommand({}, {
+      cwd: () => '/repo/overdeck',
+      ensure,
+      start,
+      openBrowser,
+    });
+
+    expect(memoryMocks.resolveKnowledgeBundleRoot).toHaveBeenCalledWith({ projectPath: '/repo/overdeck' });
+    expect(ensure).toHaveBeenCalledWith({ autoInstall: true });
+    expect(start).toHaveBeenCalledWith('/repo/overdeck/knowledge', { openBrowser: false });
+    expect(unref).toHaveBeenCalledOnce();
+    expect(openBrowser).toHaveBeenCalledWith('http://127.0.0.1:39847');
+    expect(log).toHaveBeenCalledWith('Knowledge viewer: http://127.0.0.1:39847');
+    log.mockRestore();
+  });
+
+  it('honors --no-install and --no-browser', async () => {
+    const unref = vi.fn();
+    const ensure = vi.fn(async () => ({ status: 'already-installed' as const, command: 'ok' as const }));
+    const start = vi.fn(async () => ({
+      process: { unref } as never,
+      port: 39847,
+      apiPort: 8789,
+      url: 'http://127.0.0.1:39847',
+    }));
+    const openBrowser = vi.fn(async () => {});
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    await knowledgeOpenCommand({ install: false, browser: false }, {
+      cwd: () => '/repo/overdeck',
+      ensure,
+      start,
+      openBrowser,
+    });
+
+    expect(ensure).toHaveBeenCalledWith({ autoInstall: false });
+    expect(openBrowser).not.toHaveBeenCalled();
+    log.mockRestore();
+  });
+
+  it('rejects with /okf init guidance when open cannot resolve a bundle', async () => {
+    memoryMocks.resolveKnowledgeBundleRoot.mockResolvedValue(null);
+
+    await expect(knowledgeOpenCommand({ browser: false }, { cwd: () => '/repo/empty' })).rejects.toThrow(
+      'Run `/okf init` first',
+    );
+    expect(installerMocks.ensureOpenKnowledge).not.toHaveBeenCalled();
   });
 });
