@@ -40,8 +40,24 @@ const execAsync = promisify(exec);
 
 export const VERIFICATION_MAX_CYCLES = 3;
 const NO_PROGRESS_REPEAT_THRESHOLD = 2;
+const MERGED_VERIFICATION_REASON = 'Merge already landed; verify-on-main owns post-merge validation.';
 
 export type { VerificationRunnerOptions, VerificationRunnerOutcome, WorkspaceInfo } from './verification-types.js';
+
+function skipMergedVerification(
+  issueId: string,
+  logPrefix: string,
+  status = getReviewStatusSync(issueId),
+): VerificationRunnerOutcome | null {
+  if (status?.mergeStatus !== 'merged') return null;
+
+  setReviewStatusSync(issueId, {
+    verificationStatus: 'skipped',
+    verificationNotes: MERGED_VERIFICATION_REASON,
+  });
+  console.log(`[${logPrefix}] Skipping pre-merge verification for ${issueId}: ${MERGED_VERIFICATION_REASON}`);
+  return { outcome: 'skipped', reason: MERGED_VERIFICATION_REASON };
+}
 
 interface SyncResult {
   repoDir: string;
@@ -108,6 +124,8 @@ async function escalateVerificationStuck(
   summary: string,
   logPrefix: string,
 ): Promise<void> {
+  if (skipMergedVerification(issueId, logPrefix)) return;
+
   const agentId = `agent-${issueId.toLowerCase()}`;
   const reason = `needs-you: verification stuck after ${cycleCount}/${VERIFICATION_MAX_CYCLES} attempts (${failedCheck})`;
 
@@ -189,7 +207,11 @@ async function deliverVerificationFeedback(
   details: Record<string, unknown>,
   logPrefix: string,
 ): Promise<void> {
+  if (skipMergedVerification(issueId, logPrefix)) return;
+
   const target = await resolveIssueFeedbackTarget(issueId);
+  if (skipMergedVerification(issueId, logPrefix)) return;
+
   if ('agentId' in target) {
     // PAN-2668: verification feedback owes rework — a stopped-by-user agent
     // with a completed handoff is re-driven, not silently queued mail.
@@ -360,6 +382,9 @@ async function runVerificationForIssuePromise(
   options: VerificationRunnerOptions = {},
 ): Promise<VerificationRunnerOutcome> {
   const currentStatus = getReviewStatusSync(issueId);
+  const mergedOutcome = skipMergedVerification(issueId, logPrefix, currentStatus);
+  if (mergedOutcome) return mergedOutcome;
+
   const currentCycles = currentStatus?.verificationCycleCount ?? 0;
 
   if (currentCycles >= VERIFICATION_MAX_CYCLES) {
@@ -389,6 +414,9 @@ async function runVerificationForIssuePromise(
           console.log(`[${logPrefix}] Syncing ${targetBranch} into ${displayName} for ${issueId}...`);
           syncResults.push(await syncSingleRepo(gitDir, targetBranch));
         }
+
+        const postSyncMergedOutcome = skipMergedVerification(issueId, logPrefix);
+        if (postSyncMergedOutcome) return postSyncMergedOutcome;
 
         const failures = syncResults.filter(r => !r.success);
 
@@ -448,6 +476,9 @@ async function runVerificationForIssuePromise(
     } else {
       console.log(`[${logPrefix}] Skipping target-branch sync for ${issueId}; verifying current workspace state`);
     }
+
+    const postSyncMergedOutcome = skipMergedVerification(issueId, logPrefix);
+    if (postSyncMergedOutcome) return postSyncMergedOutcome;
 
     // Load project-specific gates or fall back to defaults
     const gates =
@@ -564,6 +595,9 @@ async function runVerificationForIssuePromise(
         writeLiveArtifact();
       },
     }));
+
+    const postGateMergedOutcome = skipMergedVerification(issueId, logPrefix);
+    if (postGateMergedOutcome) return postGateMergedOutcome;
 
     const failedGate = gateResults.find(r => !r.passed && r.required !== false);
 
@@ -748,6 +782,9 @@ async function runVerificationForIssuePromise(
     const taskBlockers = options.skipPlanChecklist
       ? []
       : await checkIncompletePlanItemsPromise(workspacePath, issueId);
+    const postChecklistMergedOutcome = skipMergedVerification(issueId, logPrefix);
+    if (postChecklistMergedOutcome) return postChecklistMergedOutcome;
+
     if (taskBlockers.length > 0) {
       const newCycleCount = currentCycles + 1;
       const failedCheck = 'incomplete-plan-items';
@@ -800,6 +837,9 @@ async function runVerificationForIssuePromise(
         `git diff --name-only ${changedBase}...HEAD`,
         { cwd: workspacePath, encoding: 'utf-8', timeout: 15000 },
       );
+      const postDiffMergedOutcome = skipMergedVerification(issueId, logPrefix);
+      if (postDiffMergedOutcome) return postDiffMergedOutcome;
+
       if (changesetHasNoContent(changedOut.split('\n'))) {
         const newCycleCount = currentCycles + 1;
         const failedCheck = 'empty-changeset';
@@ -841,6 +881,9 @@ async function runVerificationForIssuePromise(
       lastVerifiedCommit = stdout.trim();
     } catch { /* non-fatal — skip optimization if we can't get HEAD */ }
 
+    const prePassMergedOutcome = skipMergedVerification(issueId, logPrefix);
+    if (prePassMergedOutcome) return prePassMergedOutcome;
+
     setReviewStatusSync(issueId, {
       verificationStatus: 'passed',
       verificationNotes: undefined,
@@ -865,6 +908,9 @@ async function runVerificationForIssuePromise(
     return { outcome: 'passed' };
 
   } catch (verifyErr: any) {
+    const errorMergedOutcome = skipMergedVerification(issueId, logPrefix);
+    if (errorMergedOutcome) return errorMergedOutcome;
+
     setReviewStatusSync(issueId, {
       reviewStatus: 'pending',
       verificationStatus: 'failed',

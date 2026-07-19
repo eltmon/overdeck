@@ -28,6 +28,19 @@ describe('getDeployBlockReason', () => {
     expect(deps.isMergeAgentRunning).not.toHaveBeenCalled();
   });
 
+  it('releases a running verification after the issue has merged', async () => {
+    const deps = clearDependencies();
+    deps.loadReviewStatuses.mockReturnValue({
+      'PAN-2901': {
+        issueId: 'PAN-2901',
+        mergeStatus: 'merged',
+        verificationStatus: 'running',
+      },
+    });
+
+    await expect(getDeployBlockReason(deps)).resolves.toBeNull();
+  });
+
   it('blocks while a merge specialist session is active', async () => {
     const deps = clearDependencies();
     deps.isMergeAgentRunning.mockResolvedValue(true);
