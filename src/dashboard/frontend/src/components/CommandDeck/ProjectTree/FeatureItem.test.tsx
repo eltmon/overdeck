@@ -388,7 +388,7 @@ describe('FeatureItem', () => {
     expect(screen.getByText('Issue actions')).toBeInTheDocument();
     expect(screen.getByText('Queued for plan')).toBeInTheDocument();
     expect(screen.getByText('For this phase')).toBeInTheDocument();
-    for (const section of ['Planning', 'Work', 'Review & Test', 'Agent', 'Workspace', 'Artifacts', 'Navigation']) {
+    for (const section of ['Communicate', 'Lifecycle', 'Recover', 'Inspect', 'Navigate']) {
       expect(within(menu).getByText(section)).toBeInTheDocument();
     }
 

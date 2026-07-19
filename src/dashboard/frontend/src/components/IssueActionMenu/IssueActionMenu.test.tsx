@@ -112,7 +112,10 @@ describe('IssueActionMenu', () => {
     fireEvent.click(screen.getByTestId('issue-action-overflow-button'));
 
     expect(screen.getByTestId('issue-action-overflow-menu')).toBeInTheDocument();
-    expect(screen.getByTestId('issue-action-plan')).toHaveTextContent('Plan');
+    // Phase-primary actions render both in the "For this phase" section and
+    // their group section — at least one Plan row must be present.
+    expect(screen.getAllByTestId('issue-action-plan').length).toBeGreaterThan(0);
+    expect(screen.getAllByTestId('issue-action-plan')[0]).toHaveTextContent('Plan');
   });
 
   it('renders only agent-control actions when agentScopeOnly is enabled', () => {
@@ -124,13 +127,15 @@ describe('IssueActionMenu', () => {
     const menu = screen.getByTestId('issue-action-overflow-menu');
     for (const label of [
       'Tell agent',
-      'Stop agent',
-      'Pause agent',
-      'Unpause agent',
       'Clear troubled gate',
       'Recover agent',
       'Resume session',
     ]) {
+      expect(within(menu).getByText(label)).toBeInTheDocument();
+    }
+    // Stop/Pause/Unpause live behind the collapsed Danger disclosure (C-ACTIONS).
+    fireEvent.click(within(menu).getByRole('menuitem', { name: /^Danger \(\d+ available\)$/ }));
+    for (const label of ['Stop agent', 'Pause agent', 'Unpause agent']) {
       expect(within(menu).getByText(label)).toBeInTheDocument();
     }
     expect(screen.queryByTestId('issue-action-switchModel')).not.toBeInTheDocument();
@@ -162,9 +167,10 @@ describe('IssueActionMenu', () => {
     expect(overflowButton).toHaveTextContent(/^\d+ more$/);
     fireEvent.click(overflowButton);
     expect(screen.getByTestId('issue-action-overflow-menu')).toBeInTheDocument();
-    expect(document.querySelector('[data-issue-action-section="artifacts"]')).toBeInTheDocument();
+    expect(document.querySelector('[data-issue-action-section="inspect"]')).toBeInTheDocument();
     expect(screen.getByTestId('issue-action-tasks')).toHaveTextContent('Tasks');
-    expect(within(screen.getByTestId('issue-action-overflow-menu')).queryByTestId('issue-action-startAgent')).not.toBeInTheDocument();
+    // The overflow is the full menu: the phase section also shows the primary.
+    expect(within(screen.getByTestId('issue-action-overflow-menu')).getAllByTestId('issue-action-startAgent').length).toBeGreaterThan(0);
   });
 
   it('pins registry actions and declared components after a flex spacer', () => {
@@ -301,6 +307,7 @@ describe('IssueActionMenu', () => {
     renderMenu(<IssueActionMenu issueId="PAN-1" mode="overflow-only" />);
 
     fireEvent.click(screen.getByTestId('issue-action-overflow-button'));
+    fireEvent.click(screen.getByRole('menuitem', { name: /^Danger \(\d+ available\)$/ }));
     fireEvent.click(screen.getByTestId('issue-action-resetToPlanned'));
     expect(screen.getByRole('alertdialog')).toHaveTextContent('clears task progress and claims');
 

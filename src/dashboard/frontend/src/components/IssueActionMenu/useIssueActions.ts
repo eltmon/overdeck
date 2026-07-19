@@ -186,6 +186,10 @@ function disabledReasonForAction(action: IssueActionEntry) {
       return 'No transcript artifact is available for this issue.';
     case 'closeOut':
       return 'Close out is available only after merge verification.';
+    case 'merge':
+      return 'Merge is available once review has approved and the PR is mergeable.';
+    case 'upload':
+      return 'Transcript upload is temporarily unavailable while its endpoint is rebuilt.';
     case 'reopen':
       return 'Reopen is available only for done or canceled issues.';
     case 'unpause':
@@ -356,6 +360,18 @@ export function useIssueActions(issueId: string): UseIssueActionsResult {
         confirmLabel: action.label,
         variant: 'destructive',
         requiredText: action.label,
+      });
+      if (!confirmed) return;
+    }
+
+    // Merge is safe-kind but irreversible-ish: keep the old MergeButton's
+    // confirm step (C-ACTIONS — same guard, one registry path).
+    if (action.key === 'merge') {
+      const confirmed = await confirm({
+        title: 'Merge to main',
+        message: `Merge ${issueId} into main?\n\nThe branch is approved and checks are green. This cannot be un-merged automatically.`,
+        confirmLabel: 'Merge to main',
+        variant: 'default',
       });
       if (!confirmed) return;
     }

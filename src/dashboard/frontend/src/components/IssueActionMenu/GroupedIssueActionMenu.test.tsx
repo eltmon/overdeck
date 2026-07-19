@@ -18,7 +18,7 @@ import {
 } from './IssueActionGroupedBody';
 import type { IssueActionView } from './useIssueActions';
 
-const NON_DANGER_GROUPS = ['planning', 'work', 'review', 'agent', 'workspace', 'artifacts', 'navigation'] as const;
+const NON_DANGER_GROUPS = ['communicate', 'lifecycle', 'recover', 'inspect', 'navigation'] as const;
 
 const invokes = new Map<IssueActionKey, ReturnType<typeof vi.fn>>();
 
@@ -161,7 +161,7 @@ describe('GroupedIssueActionMenu', () => {
     );
 
     expect(screen.getByTestId('plain-menu-host')).toBeInTheDocument();
-    for (const section of ['phase', 'planning', 'agent', 'session']) {
+    for (const section of ['phase', 'lifecycle', 'communicate', 'session']) {
       expect(container.querySelector(`[data-issue-action-section="${section}"]`)).toBeInTheDocument();
     }
     expect(container.querySelector('[data-issue-action-section="danger"]')).not.toBeInTheDocument();
@@ -234,9 +234,11 @@ describe('GroupedIssueActionMenu', () => {
     const phaseSection = document.querySelector('[data-issue-action-section="phase"]') as HTMLElement;
     expect(within(phaseSection).queryByText('Plan')).not.toBeInTheDocument();
     expect(screen.getAllByText('Tell agent')).toHaveLength(2);
-    expect(document.querySelector('[data-issue-action-section="planning"]')).toBeInTheDocument();
-    expect(document.querySelector('[data-issue-action-section="work"]')).not.toBeInTheDocument();
-    expect(document.querySelector('[data-issue-action-section="agent"]')).toBeInTheDocument();
+    expect(document.querySelector('[data-issue-action-section="lifecycle"]')).toBeInTheDocument();
+    expect(document.querySelector('[data-issue-action-section="communicate"]')).toBeInTheDocument();
+    expect(document.querySelector('[data-issue-action-section="recover"]')).not.toBeInTheDocument();
+    expect(document.querySelector('[data-issue-action-section="inspect"]')).not.toBeInTheDocument();
+    expect(document.querySelector('[data-issue-action-section="navigation"]')).not.toBeInTheDocument();
     expect(screen.queryByText('This session')).not.toBeInTheDocument();
   });
 

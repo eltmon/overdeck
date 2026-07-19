@@ -106,20 +106,18 @@ vi.mock('../../CommandDeck/ZoneCOverviewTabs/queries', () => ({
 
 vi.mock('../../../lib/issueActions', () => ({
   GROUP_LABELS: {
-    planning: 'Planning',
-    work: 'Work',
-    review: 'Review & Test',
-    agent: 'Agent',
-    workspace: 'Workspace',
-    artifacts: 'Artifacts',
-    navigation: 'Navigation',
+    communicate: 'Communicate',
+    lifecycle: 'Lifecycle',
+    recover: 'Recover',
+    inspect: 'Inspect',
+    navigation: 'Navigate',
     danger: 'Danger',
   },
-  GROUP_ORDER: ['planning', 'work', 'review', 'agent', 'workspace', 'artifacts', 'navigation', 'danger'],
+  GROUP_ORDER: ['communicate', 'lifecycle', 'recover', 'inspect', 'navigation', 'danger'],
   ISSUE_ACTIONS: [
-    { key: 'plan', label: 'Plan', description: 'Plan this issue.', group: 'planning', kind: 'dialog' },
-    { key: 'startAgent', label: 'Start agent', description: 'Start work on this issue.', group: 'work', kind: 'dialog' },
-    { key: 'tell', label: 'Tell agent', description: 'Send the agent a message.', group: 'agent', kind: 'dialog' },
+    { key: 'plan', label: 'Plan', description: 'Plan this issue.', group: 'lifecycle', kind: 'dialog' },
+    { key: 'startAgent', label: 'Start agent', description: 'Start work on this issue.', group: 'lifecycle', kind: 'dialog' },
+    { key: 'tell', label: 'Tell agent', description: 'Send the agent a message.', group: 'communicate', kind: 'dialog' },
     { key: 'wipe', label: 'Wipe', description: 'Erase this issue.', group: 'danger', kind: 'destructive' },
   ],
 }))
@@ -127,9 +125,10 @@ vi.mock('../../../lib/issueActions', () => ({
 vi.mock('../../IssueActionMenu/useIssueActions', () => ({
   useIssueActions: () => {
     const all = [
-      { action: { key: 'plan', label: 'Plan', description: 'Plan this issue.', group: 'planning', kind: 'dialog' }, enabled: true, isPending: false, invoke: actionInvoke },
-      { action: { key: 'startAgent', label: 'Start agent', description: 'Start work on this issue.', group: 'work', kind: 'dialog' }, enabled: true, isPending: false, invoke: actionInvoke },
-      { action: { key: 'tell', label: 'Tell agent', description: 'Send the agent a message.', group: 'agent', kind: 'dialog' }, enabled: true, isPending: false, invoke: actionInvoke },
+      { action: { key: 'plan', label: 'Plan', description: 'Plan this issue.', group: 'lifecycle', kind: 'dialog' }, enabled: true, isPending: false, invoke: actionInvoke },
+      { action: { key: 'startAgent', label: 'Start agent', description: 'Start work on this issue.', group: 'lifecycle', kind: 'dialog' }, enabled: true, isPending: false, invoke: actionInvoke },
+      { action: { key: 'tell', label: 'Tell agent', description: 'Send the agent a message.', group: 'communicate', kind: 'dialog' }, enabled: true, isPending: false, invoke: actionInvoke },
+      { action: { key: 'merge', label: 'Merge to main', description: 'Merge the approved branch.', group: 'lifecycle', kind: 'safe' }, enabled: false, disabledReason: 'Merge is available once review has approved and the PR is mergeable.', isPending: false, invoke: actionInvoke },
       { action: { key: 'wipe', label: 'Wipe', description: 'Erase this issue.', group: 'danger', kind: 'destructive' }, enabled: false, disabledReason: 'Wipe is unavailable.', isPending: false, invoke: actionInvoke },
     ]
     return {
@@ -142,10 +141,6 @@ vi.mock('../../IssueActionMenu/useIssueActions', () => ({
       activeDialog: null,
     }
   },
-}))
-
-vi.mock('../../IssueActionMenu/IssueActionMenu', () => ({
-  IssueActionDialogHost: () => null,
 }))
 
 vi.mock('../../MergeButton', () => ({ MergeButton: () => <div>Merge button</div> }))
@@ -383,8 +378,12 @@ describe('IssueMissionControl', () => {
     expect(screen.queryByTestId('cockpit-pipeline-progress')).toBeNull()
     expect(screen.queryByTestId('cockpit-gates')).toBeNull()
     expect(screen.queryByText('Merge-ready')).toBeNull()
-    // primary merge CTA reflects the blocking reason
-    expect(screen.getByText(/Merge — blocked by review/)).toBeTruthy()
+    // merge surfaces through the shared registry menu as a disabled row with reason
+    fireEvent.click(screen.getByTestId('issue-action-overflow-button'))
+    expect(screen.getByTestId('issue-action-disabled-merge')).toHaveAttribute(
+      'title',
+      'Merge is available once review has approved and the PR is mergeable.',
+    )
     // breadcrumb context
     expect(screen.getAllByText('Issues').length).toBeGreaterThan(0)
   })
@@ -394,7 +393,8 @@ describe('IssueMissionControl', () => {
 
     expect(screen.getByText('Blocker spotlight')).toBeTruthy()
     expect(screen.getByText('Review blocked — awaiting the work agent')).toBeTruthy()
-    expect(screen.getByText(/Merge — blocked by review/)).toBeTruthy()
+    fireEvent.click(screen.getByTestId('issue-action-overflow-button'))
+    expect(screen.getByTestId('issue-action-disabled-merge')).toBeInTheDocument()
   })
 
   it('shows a selected session, then relocates the conversation cards below the issue overview', () => {
@@ -448,17 +448,18 @@ describe('IssueMissionControl', () => {
     expect(screen.queryByTestId('issue-tree-context-panel')).toBeNull()
   })
 
-  it('renders shared grouped issue actions with collapsed Danger disclosure', () => {
+  it('renders the shared issue action menu with grouped overflow and collapsed Danger disclosure', () => {
     const { container } = renderMissionControl()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Issue actions' }))
+    // Phase-primary strip renders inline buttons.
+    expect(screen.getByTestId('issue-action-plan')).toBeInTheDocument()
+    expect(screen.getByTestId('issue-action-startAgent')).toBeInTheDocument()
 
-    expect(container.querySelector('[data-issue-action-section="planning"]')).toBeInTheDocument()
-    expect(container.querySelector('[data-issue-action-section="work"]')).toBeInTheDocument()
-    expect(container.querySelector('[data-issue-action-section="agent"]')).toBeInTheDocument()
-    for (const planAction of screen.getAllByRole('menuitem', { name: 'Plan' })) {
-      expect(planAction).toHaveAttribute('title', 'Plan this issue.')
-    }
+    // The grouped body lives behind the shared overflow button.
+    fireEvent.click(screen.getByTestId('issue-action-overflow-button'))
+
+    expect(container.querySelector('[data-issue-action-section="communicate"]')).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: 'Tell agent' })).toHaveAttribute('title', 'Send the agent a message.')
     expect(screen.queryByRole('menuitem', { name: 'Wipe' })).toBeNull()
 
     fireEvent.click(screen.getByRole('menuitem', { name: 'Danger (0 available)' }))

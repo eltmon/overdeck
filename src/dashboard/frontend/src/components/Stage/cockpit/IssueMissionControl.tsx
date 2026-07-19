@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type ReactNode } from 'react'
+import { useCallback, useState, type ReactNode } from 'react'
 import { ActivityTab } from '../../CommandDeck/ZoneCOverviewTabs/ActivityTab'
 import { ShipTab } from './ShipTab'
 import { TasksTab } from '../../CommandDeck/ZoneCOverviewTabs/TasksTab'
@@ -18,13 +18,7 @@ import {
   type ReviewStatusData,
 } from '../../CommandDeck/ZoneCOverviewTabs/queries'
 import DrawerArtifactsPanel from '../../drawer/DrawerArtifactsPanel'
-import { MergeButton } from '../../MergeButton'
-import { IssueActionDialogHost } from '../../IssueActionMenu/IssueActionMenu'
-import {
-  IssueActionGroupedBody,
-  type IssueActionMenuItemPrimitiveProps,
-  type IssueActionMenuPrimitives,
-} from '../../IssueActionMenu/IssueActionGroupedBody'
+import { IssueActionMenu } from '../../IssueActionMenu/IssueActionMenu'
 import { useIssueActions } from '../../IssueActionMenu/useIssueActions'
 import { IssueView } from '../../issue-view/IssueView'
 import { SessionPanel } from '../../CommandDeck/SessionView/SessionPanel'
@@ -138,141 +132,13 @@ function nextAction(rs: ReviewStatusData | undefined): string {
   return 'awaiting pipeline'
 }
 
-function mergeBlockReason(rs: ReviewStatusData | undefined): string {
-  if (!rs) return 'status unknown'
-  if (rs.mergeStatus === 'merged') return 'merged'
-  if (rs.reviewStatus === 'blocked' || rs.reviewStatus === 'failed') return 'blocked by review'
-  if (rs.testStatus === 'failed' || rs.testStatus === 'dispatch_failed') return 'test failed'
-  if (rs.reviewStatus !== 'passed') return 'review pending'
-  if (rs.testStatus === 'pending' || rs.testStatus === 'testing') return 'test pending'
-  return 'not ready'
-}
+
 
 function HeaderStat({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div className="flex flex-col gap-px text-right">
       <div className="text-[9px] uppercase tracking-[0.06em] text-muted-foreground">{label}</div>
       <div className="text-[11.5px] text-foreground">{value}</div>
-    </div>
-  )
-}
-
-function MergeCta({ issueId, rs }: { issueId: string; rs: ReviewStatusData | undefined }) {
-  if (rs?.mergeStatus === 'merged') {
-    return (
-      <span className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] border badge-border-success badge-bg-success px-3 py-2 text-[12px] font-medium text-success-foreground">
-        ✓ Merged
-      </span>
-    )
-  }
-  if (rs?.readyForMerge) {
-    return <MergeButton issueId={issueId} reviewStatus={rs} variant="inspector" tone="primary" />
-  }
-  const reason = mergeBlockReason(rs)
-  return (
-    <button
-      type="button"
-      disabled
-      title={`Merge gated: ${reason}`}
-      className="inline-flex cursor-not-allowed items-center gap-1.5 rounded-[var(--radius-sm)] border border-border bg-muted/40 px-3 py-2 text-[12px] font-medium text-muted-foreground opacity-80"
-    >
-      ⛔ Merge — {reason}
-    </button>
-  )
-}
-
-function createMegaMenuItem(onClose: () => void, destructive: boolean) {
-  return function MegaMenuItem({
-    children,
-    className = '',
-    disabled,
-    role = 'menuitem',
-    onActivate,
-    preventClose,
-    ...props
-  }: IssueActionMenuItemPrimitiveProps) {
-    const colorClass = destructive
-      ? 'text-destructive-foreground hover:bg-destructive/10'
-      : 'text-foreground hover:bg-accent'
-
-    return (
-      <button
-        {...props}
-        type="button"
-        role={role}
-        disabled={disabled}
-        className={`flex w-full items-center rounded-[8px] px-2 py-1.5 text-left text-[12px] transition-colors disabled:cursor-not-allowed disabled:opacity-45 ${colorClass} ${className}`}
-        onClick={() => {
-          onActivate?.()
-          if (!preventClose) onClose()
-        }}
-      >
-        {children}
-      </button>
-    )
-  }
-}
-
-function MegaMenuLabel({ children }: { children: ReactNode }) {
-  return (
-    <h4 className="mb-1.5 px-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-      {children}
-    </h4>
-  )
-}
-
-function MegaMenuSeparator() {
-  return <div className="col-span-full my-1 h-px bg-border" />
-}
-
-function megaMenuPrimitives(onClose: () => void): IssueActionMenuPrimitives {
-  return {
-    Item: createMegaMenuItem(onClose, false),
-    DestructiveItem: createMegaMenuItem(onClose, true),
-    Label: MegaMenuLabel,
-    Separator: MegaMenuSeparator,
-  }
-}
-
-function IssueActionMegaMenu({ issueId }: { issueId: string }) {
-  const [open, setOpen] = useState(false)
-  const actions = useIssueActions(issueId)
-
-  useEffect(() => {
-    if (!open) return
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setOpen(false)
-    }
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
-  }, [open])
-
-  return (
-    <div className="relative">
-      <button
-        type="button"
-        aria-expanded={open}
-        aria-label="Issue actions"
-        className="inline-flex items-center rounded-[var(--radius-sm)] border border-border bg-card px-3 py-2 text-[12px] font-semibold text-foreground transition-colors hover:bg-accent"
-        onClick={() => setOpen((value) => !value)}
-      >
-        ⌘ Actions ▾
-      </button>
-      {open && (
-        <>
-          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div
-            role="menu"
-            className="absolute right-0 top-full z-50 mt-2 grid w-[min(560px,calc(100vw-48px))] grid-cols-1 gap-x-5 gap-y-2 rounded-[18px] border border-border bg-popover p-3 shadow-xl md:grid-cols-2"
-          >
-            <IssueActionGroupedBody
-              actions={actions}
-              primitives={megaMenuPrimitives(() => setOpen(false))}
-            />
-          </div>
-        </>
-      )}
-      <IssueActionDialogHost issueId={issueId} actions={actions} />
     </div>
   )
 }
@@ -672,11 +538,9 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
               />
             </div>
             <div className="flex items-center gap-2">
-              {/* PAN-1874: per-issue review mode / re-review scope override (same
-                  control as the session-view IssueHeader; PAN-2499's unified view
-                  inventories it once). */}
-              <MergeCta issueId={issueId} rs={review.data} />
-              <IssueActionMegaMenu issueId={issueId} />
+              {/* PAN-2908 C-ACTIONS: merge flows through the shared registry menu
+                  (primary at READY_TO_MERGE); the bespoke MergeCta is gone. */}
+              <IssueActionMenu issueId={issueId} mode="primary-strip" className="flex items-center gap-1" />
             </div>
           </div>
         </div>

@@ -71,6 +71,7 @@ const AUDITED_REGISTRY_KEYS = [
   'syncMain',
   'rebuildAndStart',
   'inspectTask',
+  'merge',
   'reopen',
   'closeOut',
   'wipe',

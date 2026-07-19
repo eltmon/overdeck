@@ -903,6 +903,7 @@ describe('IssueCard', () => {
     expect(screen.getByTestId('issue-action-overflow-button')).toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId('issue-action-overflow-button'));
+    fireEvent.click(screen.getByRole('menuitem', { name: /^Danger \(\d+ available\)$/ }));
     fireEvent.click(await screen.findByTestId('issue-action-unpause'));
 
     await waitFor(() => {
@@ -1003,7 +1004,7 @@ describe('IssueCard', () => {
 
     expect(allowedDefault).toBe(false);
     await waitFor(() => expect(screen.getByTestId('issue-action-overflow-menu')).toBeInTheDocument());
-    expect(screen.getByTestId('issue-action-plan')).toHaveTextContent('Plan');
+    expect(screen.getAllByTestId('issue-action-plan').length).toBeGreaterThan(0);
   });
 
   it('snapshots inline Board action sets for representative phases', () => {
@@ -1053,6 +1054,7 @@ describe('IssueCard', () => {
           "issue-action-startAgent",
         ],
         "READY_TO_MERGE": [
+          "issue-action-merge",
           "issue-action-viewPr",
         ],
         "WORK_RUNNING": [

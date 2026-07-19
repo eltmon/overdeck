@@ -103,14 +103,12 @@ describe('ISSUE_ACTIONS', () => {
     expect(registered.size).toBe(ISSUE_ACTIONS.length);
   });
 
-  it('exports every action group once in the cockpit order', () => {
+  it('exports every action group once in the fixed six-group order (C-ACTIONS)', () => {
     expect(GROUP_ORDER).toEqual([
-      'planning',
-      'work',
-      'review',
-      'agent',
-      'workspace',
-      'artifacts',
+      'communicate',
+      'lifecycle',
+      'recover',
+      'inspect',
       'navigation',
       'danger',
     ]);
@@ -317,7 +315,7 @@ describe('ISSUE_ACTIONS', () => {
   it('points rebuildAndStart at the chained workspace endpoint as a safe action', () => {
     expect(action('rebuildAndStart').endpoint).toBe('/api/workspaces/:id/rebuild-and-start');
     expect(action('rebuildAndStart').kind).toBe('safe');
-    expect(action('rebuildAndStart').group).toBe('workspace');
+    expect(action('rebuildAndStart').group).toBe('recover');
   });
 });
 
@@ -332,7 +330,7 @@ describe('getPhasePrimaryActions', () => {
     ['SHIP_RUNNING', { ...baseState, agent: { status: 'running', role: 'ship' }, reviewStatus: reviewStatus({ mergeStatus: 'merging' }) }, ['tell', 'recoverAgent']],
     ['CHANGES_REQUESTED', { ...baseState, reviewStatus: reviewStatus({ reviewStatus: 'blocked' }) }, ['open', 'requestReview']],
     ['STUCK', { ...baseState, agent: { status: 'failed', role: 'work' }, reviewStatus: reviewStatus({ testStatus: 'failed' }) }, ['recoverAgent', 'tell']],
-    ['READY_TO_MERGE', { ...baseState, reviewStatus: reviewStatus({ reviewStatus: 'passed', testStatus: 'passed', readyForMerge: true }), hasPr: true }, ['viewPr']],
+    ['READY_TO_MERGE', { ...baseState, reviewStatus: reviewStatus({ reviewStatus: 'passed', testStatus: 'passed', readyForMerge: true }), hasPr: true }, ['merge', 'viewPr']],
     ['MERGED', { ...baseState, isMerged: true, reviewStatus: reviewStatus({ mergeStatus: 'merged' }) }, ['closeOut']],
   ];
 

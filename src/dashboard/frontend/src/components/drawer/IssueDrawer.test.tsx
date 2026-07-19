@@ -114,10 +114,13 @@ function drawerActionBar() {
 }
 
 function drawerIssueActionIds() {
-  return Array.from(drawerActionBar().querySelectorAll('button[data-testid^="issue-action-"]'))
+  const ids = Array.from(drawerActionBar().querySelectorAll('button[data-testid^="issue-action-"]'))
     .filter((button) => !['issue-action-overflow-button', 'issue-action-explain-toggle'].includes(button.getAttribute('data-testid') ?? ''))
     .filter((button) => !(button as HTMLButtonElement).disabled)
     .map((button) => button.getAttribute('data-testid'));
+  // Primaries render in the strip AND in the menu's phase/group sections — the
+  // snapshot records each action once.
+  return [...new Set(ids)];
 }
 
 describe('IssueDrawer', () => {
@@ -694,13 +697,12 @@ describe('IssueDrawer', () => {
     expect(screen.getByTestId('issue-action-overflow-button')).toBeInTheDocument();
     expect(screen.getByTestId('issue-action-pin-spacer')).toBeInTheDocument();
     expect(screen.getByTestId('issue-action-viewPr')).toHaveTextContent('View PR');
+    // Merge is a first-class registry action in the primary strip (no bespoke pin).
     await waitFor(() => {
-      const mergeButton = screen.getByTestId('merge-btn');
-      const mergePin = mergeButton.closest('[data-issue-action-pinned-component="merge"]');
-      expect(mergePin).toBeInTheDocument();
-      expect(screen.getByTestId('issue-action-menu')).toContainElement(mergePin as HTMLElement);
+      const mergeButton = screen.getByTestId('issue-action-merge');
       expect(mergeButton).toBeEnabled();
-      expect(mergeButton).toHaveClass('bg-success', 'text-success-foreground');
+      expect(screen.getByTestId('issue-action-menu')).toContainElement(mergeButton);
+      expect(screen.queryByTestId('merge-btn')).toBeNull();
     });
     expect(screen.queryByTestId('drawer-action-reset')).toBeNull();
     expect(screen.queryByTestId('drawer-action-stop')).toBeNull();
@@ -761,17 +763,17 @@ describe('IssueDrawer', () => {
     expect(actionSets).toMatchInlineSnapshot(`
       {
         "READY_TO_MERGE": [
-          "issue-action-resetToPlanned",
+          "issue-action-merge",
           "issue-action-syncMain",
           "issue-action-copySettings",
           "issue-action-tasks",
-          "issue-action-upload",
           "issue-action-syncDiscussions",
           "issue-action-statusReview",
           "issue-action-open",
           "issue-action-wipe",
           "issue-action-destroyWorkspace",
           "issue-action-resetIssue",
+          "issue-action-resetToPlanned",
           "issue-action-cancel",
           "issue-action-restartFromPlan",
           "issue-action-viewPr",
@@ -779,23 +781,22 @@ describe('IssueDrawer', () => {
         "WORK_RUNNING": [
           "issue-action-tell",
           "issue-action-doneWork",
-          "issue-action-resetToPlanned",
-          "issue-action-stopAgent",
-          "issue-action-pause",
-          "issue-action-restartAgent",
           "issue-action-syncMain",
           "issue-action-copySettings",
           "issue-action-tasks",
-          "issue-action-upload",
           "issue-action-syncDiscussions",
           "issue-action-statusReview",
           "issue-action-open",
+          "issue-action-stopAgent",
+          "issue-action-pause",
           "issue-action-wipe",
           "issue-action-destroyWorkspace",
           "issue-action-resetIssue",
+          "issue-action-resetToPlanned",
           "issue-action-cancel",
           "issue-action-completeWorkReset",
           "issue-action-restartFromPlan",
+          "issue-action-restartAgent",
         ],
       }
     `);
@@ -849,13 +850,14 @@ describe('IssueDrawer', () => {
     });
 
     fireEvent.click(screen.getByTestId('issue-action-overflow-button'));
+    fireEvent.click(screen.getByRole('menuitem', { name: /Danger \(\d+ available\)/ }));
     fireEvent.click(screen.getByTestId('issue-action-stopAgent'));
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith('/api/agents/agent-PAN-1/stop', expect.objectContaining({ method: 'POST' }));
     });
 
-    fireEvent.click(screen.getByTestId('merge-btn'));
-    fireEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Merge' }));
+    fireEvent.click(screen.getByTestId('issue-action-merge'));
+    fireEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Merge to main' }));
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith('/api/issues/PAN-1/merge', expect.objectContaining({ method: 'POST' }));
     });

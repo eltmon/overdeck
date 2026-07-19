@@ -50,8 +50,8 @@ export const ISSUE_VIEW_INVENTORY: readonly IssueViewInventoryEntry[] = [
     view: 'cockpit',
     home: 'src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.tsx',
     actionRelocation: {
-      surface: 'IssueActionMegaMenu',
-      home: 'src/dashboard/frontend/src/components/IssueActionMenu/IssueActionGroupedBody.tsx',
+      surface: 'IssueActionMenu (primary-strip)',
+      home: 'src/dashboard/frontend/src/components/IssueActionMenu/IssueActionMenu.tsx',
     },
   },
   { section: 'Stale-review warning', view: 'cockpit', home: 'src/dashboard/frontend/src/components/Stage/cockpit/IssueTreeLane.tsx' },

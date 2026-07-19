@@ -145,12 +145,15 @@ function OverflowButton({
   actions,
   triggerRef,
   openSignal,
+  count,
 }: {
   actions: Pick<UseIssueActionsResult, 'all' | 'primary' | 'phase'>;
   triggerRef?: RefObject<HTMLButtonElement>;
   openSignal?: number;
+  count?: number;
 }) {
   const [open, setOpen] = useState(false);
+  const more = count ?? actions.all.length;
 
   useEffect(() => {
     if (openSignal) setOpen(true);
@@ -162,12 +165,12 @@ function OverflowButton({
         ref={triggerRef}
         type="button"
         data-testid="issue-action-overflow-button"
-        aria-label={`${actions.all.length} more issue actions`}
+        aria-label={`${more} more issue actions`}
         className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
         onClick={() => setOpen((value) => !value)}
       >
         <MoreHorizontal className="h-4 w-4" />
-        <span>{actions.all.length} more</span>
+        <span>{more} more</span>
       </button>
       {open ? <OverflowMenu actions={actions} onClose={() => setOpen(false)} /> : null}
     </div>
@@ -373,9 +376,15 @@ export function IssueActionMenu({
   const primaryStripOverflow = [...scopedSecondary, ...scopedOverflow]
     .filter((view) => !excludedFromOverflow(view));
   const overflowOnly = scopedAll.filter((view) => !excludedFromOverflow(view));
+  // The overflow body is the FULL menu (phase section + every group) minus
+  // pinned entries — one complete menu everywhere (C-ACTIONS). The button
+  // count stays cosmetic: items beyond the inline strip.
+  const menuAll = mode === 'overflow-only' ? overflowOnly : [...primary, ...primaryStripOverflow];
+  const overflowPrimary = scopedPrimary.filter((view) => !excludedFromOverflow(view));
+  const overflowCount = (mode === 'overflow-only' ? overflowOnly : primaryStripOverflow).length;
   const overflowActions = {
-    all: mode === 'overflow-only' ? overflowOnly : primaryStripOverflow,
-    primary: [],
+    all: menuAll,
+    primary: overflowPrimary,
     phase: actions.phase,
   };
   const hasPins = registryPins.length > 0 || pinned.length > 0;
@@ -385,8 +394,8 @@ export function IssueActionMenu({
       {mode !== 'overflow-only' ? primary.map((view) => (
         <ActionButton key={view.action.key} view={view} inline />
       )) : null}
-      {mode === 'overflow-only' || (mode === 'primary-strip' && primaryStripOverflow.length > 0) ? (
-        <OverflowButton actions={overflowActions} triggerRef={overflowTriggerRef} openSignal={openSignal} />
+      {mode === 'overflow-only' || (mode === 'primary-strip' && menuAll.length > 0) ? (
+        <OverflowButton actions={overflowActions} count={overflowCount} triggerRef={overflowTriggerRef} openSignal={openSignal} />
       ) : null}
       {hasPins ? <div data-testid="issue-action-pin-spacer" className="flex-1" /> : null}
       {registryPins.map((view) => (
