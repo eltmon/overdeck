@@ -808,18 +808,18 @@
     "recordedAt": "2026-07-19T15:21:39.631Z"
   },
   "created": "2026-07-18T01:08:14.744Z",
-  "updated": "2026-07-19T15:24:36.616Z",
+  "updated": "2026-07-19T15:24:41.938Z",
   "pipeline": {
     "issueId": "PAN-2858",
     "reviewStatus": "passed",
-    "testStatus": "pending",
+    "testStatus": "testing",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-19T15:22:19.616Z",
-    "updatedAt": "2026-07-19T15:24:34.603Z",
+    "updatedAt": "2026-07-19T15:24:41.890Z",
     "reviewNotes": "Dashboard type baseline now matches the measured 65-error ratchet; focused ACP tests and typecheck pass with no blockers",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2875",
@@ -1233,7 +1233,7 @@
       },
       "costAtCloseOut": {
         "usd": 971.874607,
-        "pricingAsOf": "2026-07-19T15:24:34.649Z"
+        "pricingAsOf": "2026-07-19T15:24:41.926Z"
       }
     },
     "merges": [
