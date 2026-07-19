@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-19T20:18:40.159Z",
-  "updated": "2026-07-19T21:56:33.820Z",
+  "updated": "2026-07-19T21:56:54.183Z",
   "pipeline": {
     "issueId": "PAN-2066",
     "reviewStatus": "pending",
@@ -83,8 +83,16 @@
   "harness": "claude-code",
   "model": "claude-sonnet-5",
   "tasks": {
-    "sequence": 16,
-    "claims": {},
+    "sequence": 17,
+    "claims": {
+      "mcp-wiring-docs": {
+        "writerId": "agent-pan-2066",
+        "agentId": "agent-pan-2066",
+        "pid": 3021035,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-19T21:56:54.182Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-2066",
@@ -241,6 +249,7 @@
     "knowledge-page-embed": "completed",
     "knowledge-page-embed.knowledge-page-embed.ac1": "completed",
     "knowledge-page-embed.knowledge-page-embed.ac2": "completed",
-    "knowledge-page-embed.knowledge-page-embed.ac3": "completed"
+    "knowledge-page-embed.knowledge-page-embed.ac3": "completed",
+    "mcp-wiring-docs": "running"
   }
 }
