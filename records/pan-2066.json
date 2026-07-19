@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-19T20:18:40.159Z",
-  "updated": "2026-07-19T21:27:04.260Z",
+  "updated": "2026-07-19T21:37:30.776Z",
   "pipeline": {
     "issueId": "PAN-2066",
     "reviewStatus": "pending",
@@ -83,16 +83,8 @@
   "harness": "claude-code",
   "model": "claude-sonnet-5",
   "tasks": {
-    "sequence": 11,
-    "claims": {
-      "viewer-routes-proxy": {
-        "writerId": "agent-pan-2066",
-        "agentId": "agent-pan-2066",
-        "pid": 2587617,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-19T21:18:20.620Z"
-      }
-    },
+    "sequence": 12,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2066",
@@ -148,6 +140,17 @@
         "outcome": "completed",
         "reason": "Added a per-project viewer lifecycle service with canonical bundle resolution, typed unavailable states, in-flight deduplication, health polling with fake-timer tests, healthy reuse, ok stop + SIGTERM cleanup, and graceful dashboard shutdown registration. Service tests, typecheck, lint, server build, and throwaway Node 22 boot to the HTTP listening state pass.",
         "releasedAt": "2026-07-19T21:12:19.974Z"
+      },
+      {
+        "writerId": "agent-pan-2066",
+        "agentId": "agent-pan-2066",
+        "pid": 2587617,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-19T21:18:20.620Z",
+        "itemId": "viewer-routes-proxy",
+        "outcome": "completed",
+        "reason": "Added status/install/start APIs and same-origin /knowledge-viewer/* HTTP + WebSocket proxying with origin validation, active viewer targeting, path/redirect rewriting, and framing-header preservation. Route tests, typecheck, lint, server build, and throwaway Node 22 boot pass; the first boot exposed and fixed a duplicate wildcard/root route registration.",
+        "releasedAt": "2026-07-19T21:37:30.776Z"
       }
     ],
     "statusReasons": {
@@ -170,6 +173,10 @@
       "viewer-service": {
         "reason": "Added a per-project viewer lifecycle service with canonical bundle resolution, typed unavailable states, in-flight deduplication, health polling with fake-timer tests, healthy reuse, ok stop + SIGTERM cleanup, and graceful dashboard shutdown registration. Service tests, typecheck, lint, server build, and throwaway Node 22 boot to the HTTP listening state pass.",
         "updatedAt": "2026-07-19T21:12:19.974Z"
+      },
+      "viewer-routes-proxy": {
+        "reason": "Added status/install/start APIs and same-origin /knowledge-viewer/* HTTP + WebSocket proxying with origin validation, active viewer targeting, path/redirect rewriting, and framing-header preservation. Route tests, typecheck, lint, server build, and throwaway Node 22 boot pass; the first boot exposed and fixed a duplicate wildcard/root route registration.",
+        "updatedAt": "2026-07-19T21:37:30.776Z"
       }
     }
   },
@@ -195,6 +202,10 @@
     "viewer-service.viewer-service.ac2": "completed",
     "viewer-service.viewer-service.ac3": "completed",
     "viewer-service.viewer-service.ac4": "completed",
-    "viewer-routes-proxy": "running"
+    "viewer-routes-proxy": "completed",
+    "viewer-routes-proxy.viewer-routes-proxy.ac1": "completed",
+    "viewer-routes-proxy.viewer-routes-proxy.ac2": "completed",
+    "viewer-routes-proxy.viewer-routes-proxy.ac3": "completed",
+    "viewer-routes-proxy.viewer-routes-proxy.ac4": "completed"
   }
 }
