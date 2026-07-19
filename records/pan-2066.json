@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-19T20:18:40.159Z",
-  "updated": "2026-07-19T22:06:47.115Z",
+  "updated": "2026-07-19T22:07:11.847Z",
   "pipeline": {
     "issueId": "PAN-2066",
     "reviewStatus": "pending",
@@ -83,8 +83,16 @@
   "harness": "claude-code",
   "model": "claude-sonnet-5",
   "tasks": {
-    "sequence": 20,
-    "claims": {},
+    "sequence": 21,
+    "claims": {
+      "closeout-successor": {
+        "writerId": "agent-pan-2066",
+        "agentId": "agent-pan-2066",
+        "pid": 3107435,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-19T22:07:11.847Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-2066",
@@ -269,6 +277,7 @@
     "viewer-docs.viewer-docs.ac1": "completed",
     "viewer-docs.viewer-docs.ac2": "completed",
     "viewer-docs.viewer-docs.ac3": "completed",
-    "viewer-docs.viewer-docs.ac4": "completed"
+    "viewer-docs.viewer-docs.ac4": "completed",
+    "closeout-successor": "running"
   }
 }
