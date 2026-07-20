@@ -46,8 +46,8 @@ export interface RebaseResult {
     }
 
     // Step 1: Fetch latest base branch
-    console.log(`${logPrefix} Fetching origin/${baseBranch}...`);
-    await execAsync(`git fetch origin ${baseBranch}`, execOpts);
+    console.log(`${logPrefix} Fetching origin/${baseBranch} and origin/${featureBranch}...`);
+    await execAsync(`git fetch origin ${baseBranch} ${featureBranch}`, execOpts);
 
     // Step 2: Check if rebase is needed
     const { stdout: behindCount } = await execAsync(
@@ -58,14 +58,13 @@ export interface RebaseResult {
 
     if (behind === 0) {
       console.log(`${logPrefix} Already up-to-date with origin/${baseBranch}`);
-      // Push any cleanup commit we just made.
-      try {
-        await execAsync(
-          `git push --force-with-lease origin HEAD:${featureBranch}`,
-          execOpts,
-        );
-      } catch { /* up-to-date push is non-fatal */ }
-      const { stdout: currentHead } = await execAsync('git rev-parse HEAD', execOpts);
+      const [{ stdout: currentHead }, { stdout: remoteHead }] = await Promise.all([
+        execAsync('git rev-parse HEAD', execOpts),
+        execAsync(`git rev-parse origin/${featureBranch}`, execOpts),
+      ]);
+      if (currentHead.trim() !== remoteHead.trim()) {
+        await execAsync(`git push origin HEAD:${featureBranch}`, execOpts);
+      }
       return { success: true, skipped: true, newHead: currentHead.trim() };
     }
 
