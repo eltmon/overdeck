@@ -162,7 +162,9 @@ Six phases, in order, used by every surface: **`Plan → Work → Review → Tes
 
 ### 3.4 Conversation access model (contract C-CONVO)
 
-> **Implementation status (2026-07-19): v1 shipped.** Level 1 · **Peek** (`issue-detail/IssuePeek.tsx`): 350ms hover-intent quick-look with phase dots, state sentence, last-said (memory observations), review line, and "pop into dock" — wired into Pipeline rows via a `peek` prop on the shared `IssueRow` primitive. Level 2 · **The Dock** (`components/dock/ConversationDock.tsx` + `lib/convoDock.ts` slice): persistent right rail on every surface, ≤8 issue conversations with observations feed + tell composer, needs-you pinned amber, persisted across sessions. Still open: peeks on kanban cards / agent pills / deck rows, dock panels rendering the full rich transcript (v1 renders the observations slice), ⌘J jump, two-up comparison, and the same-transcript-slice guarantee across depths (needs the C-DETAIL data model).
+> **Implementation status (2026-07-20): v3 — peeks everywhere + full transcripts.** Level 1 · **Peek** (`issue-detail/IssuePeek.tsx`) now covers every row surface: pipeline rows (IssueRow `peek` prop), kanban cards (`KanbanCards.IssueCard`), and deck-tree rows (`FeatureItem` row — the wrap covers the row only, so browsing an expanded session list never re-triggers). Verified live: peek pops on board card and deck row. Level 2 · **The Dock** renders the full rich transcript per panel (shared `DrawerAgentSession` — same renderer as the drawer conversation tab and the simple issue page), needs-you pinned amber, persisted across sessions, ⌘J jump-to-conversation with preset scopes. Still open: two-up comparison (dock design decision, #2962-adjacent), agent-pill peeks (pills already carry their own click popover — hover peek would compete), and the same-transcript-slice depth budgets (C-VERB §3.8.4).
+>
+> _(2026-07-19): v1 — peek on pipeline rows; dock with observations feed._
 
 **Mockup: [`patterns.html`](../../design/mockups/overdeck-ux-overhaul/patterns.html) — interactive, binding for behavior.**
 
