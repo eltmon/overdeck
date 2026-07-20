@@ -516,7 +516,9 @@ export function formatTier1Summary(
   // changes (for MYN that's fe), falling back to the first root.
   const primary = perRepo.find(repo => repo.changedFiles.length > 0) ?? perRepo[0];
   const headSha = primary.headSha;
-  const currentBranch = opts.branch ?? primary.branch;
+  // Polyrepo: opts.branch describes the wrapper ("master") — the primary
+  // sub-repo's branch is the one reviewers should see.
+  const currentBranch = isPolyrepo ? primary.branch : (opts.branch ?? primary.branch);
   const changedFiles = perRepo
     .flatMap(repo => repo.changedFiles)
     .sort((a, b) => b.riskScore - a.riskScore);
