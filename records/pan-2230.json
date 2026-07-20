@@ -124,12 +124,13 @@
   },
   "pipeline": {
     "issueId": "PAN-2230",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
+    "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-07T12:44:45.568Z",
+    "updatedAt": "2026-07-20T00:05:23.121Z",
     "reviewNotes": "canonicalizer collapses distinct directed cycles with the same member set",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2462",
     "lastVerifiedCommit": "75c9e21e9967d6d7b8ebc6ccfccc97748c620b9f",
@@ -192,25 +193,25 @@
         },
         "review": {
           "unknown": {
-            "input": 16285714,
-            "output": 42997,
-            "cacheRead": 15465984,
+            "input": 18038692,
+            "output": 50024,
+            "cacheRead": 17119488,
             "cacheWrite": 0
           }
         },
         "test": {
           "custom/kimi-k2.7-code": {
-            "input": 325739,
-            "output": 11395,
-            "cacheRead": 3897088,
+            "input": 643547,
+            "output": 15143,
+            "cacheRead": 5491968,
             "cacheWrite": 0
           }
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 3147896,
-            "output": 172607,
-            "cacheRead": 80473088,
+            "input": 3168084,
+            "output": 180179,
+            "cacheRead": 84131328,
             "cacheWrite": 0
           }
         }
@@ -229,21 +230,21 @@
           "cacheWrite": 160632
         },
         "unknown": {
-          "input": 16285714,
-          "output": 42997,
-          "cacheRead": 15465984,
+          "input": 18038692,
+          "output": 50024,
+          "cacheRead": 17119488,
           "cacheWrite": 0
         },
         "custom/kimi-k2.7-code": {
-          "input": 3473635,
-          "output": 184002,
-          "cacheRead": 84370176,
+          "input": 3811631,
+          "output": 195322,
+          "cacheRead": 89623296,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 37.592568,
-        "pricingAsOf": "2026-07-07T12:44:45.621Z"
+        "usd": 40.361427,
+        "pricingAsOf": "2026-07-20T00:05:23.136Z"
       }
     },
     "merges": [
@@ -252,6 +253,6 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-07T11:40:53.373Z",
-  "updated": "2026-07-17T03:34:01.225Z",
+  "updated": "2026-07-20T00:05:23.139Z",
   "reviewMode": "quick"
 }
