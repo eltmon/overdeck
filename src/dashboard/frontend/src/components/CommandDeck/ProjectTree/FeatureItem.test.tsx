@@ -66,6 +66,14 @@ vi.mock('../../../lib/wsTransport', () => ({
   })),
 }));
 
+// The shared IssueDetail rail pulls in the whole transcript/WS chain; these
+// tests cover FeatureItem itself. The rail's mount is asserted via this stub.
+vi.mock('../../issue-detail/IssueDetail', () => ({
+  IssueDetail: (props: { issueId: string; density: string }) => (
+    <div data-testid="issue-detail-rail-mock" data-issue-id={props.issueId} data-density={props.density} />
+  ),
+}));
+
 vi.mock('./SessionNode', () => ({
   SessionNode: ({ session, isSelected, onClick }: {
     session: SessionNodeType;
@@ -770,6 +778,24 @@ describe('FeatureItem', () => {
     const caret = screen.getByTestId('chevron-right');
     fireEvent.click(caret);
     expect(screen.getByTestId('chevron-down')).toBeInTheDocument();
+    expect(screen.getByTestId('session-agent-pan-821')).toBeInTheDocument();
+  });
+
+  it('mounts the shared IssueDetail rail anatomy above the session rows when expanded (#2962 decision A)', () => {
+    renderFeature(
+      <FeatureItem
+        feature={makeFeature({ sessions: [makeSession()], stateLabel: 'Done' })}
+        isSelected={false}
+        onSelect={() => {}}
+      />,
+    );
+    // Additive: the shared rail appears only on expansion, alongside the
+    // existing session rows (which stay).
+    expect(screen.queryByTestId('issue-detail-rail-mock')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('chevron-right'));
+    const rail = screen.getByTestId('issue-detail-rail-mock');
+    expect(rail).toHaveAttribute('data-density', 'rail');
+    expect(rail).toHaveAttribute('data-issue-id', 'PAN-821');
     expect(screen.getByTestId('session-agent-pan-821')).toBeInTheDocument();
   });
 

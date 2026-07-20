@@ -78,8 +78,11 @@ describe('conformance gate: single shell (C-DETAIL §3.9)', () => {
     ]);
   });
 
-  it('IssueDrawer is the only IssueDetail host (the frame)', () => {
+  it('only the sanctioned shells host IssueDetail', () => {
+    // The frame (drawer), the deck tree (rail density, #2962 decision A).
+    // The cockpit route joins this list at page density (#2962 decision 2).
     expect(importersOf(/issue-detail\/IssueDetail/)).toEqual([
+      'components/CommandDeck/ProjectTree/FeatureItem.tsx',
       'components/drawer/IssueDrawer.tsx',
     ]);
   });

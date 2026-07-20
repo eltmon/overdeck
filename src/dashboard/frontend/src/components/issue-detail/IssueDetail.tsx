@@ -69,6 +69,8 @@ export interface IssueDetailProps {
   onSelectTab: (tab: IssueDetailTabId) => void;
   /** "3/13" badge on the Tasks tab. */
   tasksBadge?: string | undefined;
+  /** Conversation pane height in px (rail density). Default 420. */
+  conversationHeight?: number | undefined;
   className?: string;
 }
 
@@ -267,7 +269,7 @@ function IssueDetailTabs({ tab, onSelectTab, tasksBadge }: {
   );
 }
 
-export function IssueDetail({ issueId, density, agents, reviewStatus, tab, onSelectTab, tasksBadge, className }: IssueDetailProps) {
+export function IssueDetail({ issueId, density, agents, reviewStatus, tab, onSelectTab, tasksBadge, conversationHeight = 420, className }: IssueDetailProps) {
   // Selected agent for the Conversation/Terminal panes. Owned here so the
   // choice survives a Conversation ⇄ Terminal switch; falls back to the
   // default pick whenever the selection is cleared or no longer matches.
@@ -311,7 +313,7 @@ export function IssueDetail({ issueId, density, agents, reviewStatus, tab, onSel
     return (
       <div data-component="issue-detail" data-density="rail" className={className}>
         <div data-section="PhaseTimeline">{shell}</div>
-        <div className="mt-2 h-[420px] min-h-0 overflow-hidden">{conversationPane}</div>
+        <div className="mt-2 min-h-0 overflow-hidden" style={{ height: conversationHeight }}>{conversationPane}</div>
         <div className="mt-2" data-section="IssueDetailActionStrip">
           <IssueActionMenu issueId={issueId} mode="primary-strip" className="flex items-center gap-1" />
         </div>

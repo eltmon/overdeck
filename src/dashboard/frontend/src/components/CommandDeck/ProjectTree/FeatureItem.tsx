@@ -20,6 +20,7 @@ import {
   useIssueActions,
 } from '../../IssueActionMenu';
 import { IssuePeek } from '../../issue-detail/IssuePeek';
+import { IssueDetail } from '../../issue-detail/IssueDetail';
 import { useConvoDock } from '../../../lib/convoDock';
 import { PROJECT_TREE_CONTEXT_ACTIONS, type NonIssueActionContext } from '../../../lib/issueActions';
 import { parseContainerServiceName } from '../../../lib/resource-utils';
@@ -29,7 +30,8 @@ import { TroubledBadges } from './TroubledBadges';
 import { IssueView, IssueViewFullscreenButton, RailShipProgress } from '../../issue-view/IssueView';
 import { ExpandableSessionNode } from './ExpandableSessionNode';
 import { SessionNode } from './SessionNode';
-import { useDashboardStore } from '../../../lib/store';
+import { selectAgents, selectReviewStatus, useDashboardStore } from '../../../lib/store';
+import type { Agent } from '../../../types';
 import { computeDominantStatus, sessionsNeedAttention } from './sessionAggregates';
 import styles from '../styles/command-deck.module.css';
 export type TreeSessionFilter = 'all' | 'alive' | 'failed';
@@ -852,6 +854,14 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
   const queryClient = useQueryClient();
   const openIssue = useDashboardStore((state) => state.openIssue);
   const addToDock = useConvoDock((s) => s.add);
+  // PAN-2908 C-DETAIL (operator decision, #2962): the shared IssueDetail rail
+  // anatomy mounts ABOVE the session rows when expanded — additive first step.
+  const allAgents = useDashboardStore(selectAgents) as Agent[];
+  const reviewSnapshot = useDashboardStore(selectReviewStatus(feature.issueId));
+  const issueAgents = useMemo(
+    () => allAgents.filter((a) => a.issueId?.toLowerCase() === feature.issueId.toLowerCase()),
+    [allAgents, feature.issueId],
+  );
   const trimmedTitle = title?.trim() ?? '';
   const displayTitle = trimmedTitle || '(untitled)';
   const titleClassName = trimmedTitle
@@ -1170,6 +1180,22 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
           tasks {feature.taskTotals.closed}/{feature.taskTotals.total}</button>
       )}
 
+      {expanded && (
+        // PAN-2908 C-DETAIL (operator decision A, #2962): additive rail — the
+        // shared anatomy (phase rail + specialist strip + live conversation +
+        // one action strip) above the existing session rows and resources.
+        <div data-section="IssueDetailRail" style={{ margin: '4px 0 8px' }}>
+          <IssueDetail
+            issueId={feature.issueId}
+            density="rail"
+            agents={issueAgents}
+            reviewStatus={reviewSnapshot}
+            tab="conversation"
+            onSelectTab={() => {}}
+            conversationHeight={300}
+          />
+        </div>
+      )}
       {expanded && (
         <div data-section="ShipDoorTreeRow"><RailShipProgress issueId={feature.issueId} onClick={() => onSelect?.()} /></div>
       )}
