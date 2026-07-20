@@ -326,8 +326,8 @@ describe('PipelineView', () => {
 
     fireEvent.click(screen.getByText('Ready to ship'));
 
-    expect(useDashboardStore.getState().drawer).toEqual({ issueId: 'PAN-1', tab: 'overview' });
-    expect(window.location.search).toBe('?issue=PAN-1&tab=overview');
+    expect(useDashboardStore.getState().drawer).toEqual({ issueId: 'PAN-1', tab: 'conversation' });
+    expect(window.location.search).toBe('?issue=PAN-1&tab=conversation');
 
     useDashboardStore.getState().closeIssue();
 
@@ -454,7 +454,7 @@ describe('PipelineView', () => {
 
     // Enter opens the focused row.
     fireEvent.keyDown(document, { key: 'Enter' });
-    expect(useDashboardStore.getState().drawer).toEqual({ issueId: firstId, tab: 'overview' });
+    expect(useDashboardStore.getState().drawer).toEqual({ issueId: firstId, tab: 'conversation' });
   });
 
   it('does not move row focus when typing inside an input', () => {

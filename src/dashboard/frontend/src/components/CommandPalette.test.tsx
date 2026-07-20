@@ -110,8 +110,8 @@ describe('CommandPalette issue results', () => {
     fireEvent.change(screen.getByPlaceholderText('Search commands, issues, conversations, memory…'), { target: { value: 'PAN-42' } });
     selectPaletteResult(screen.getAllByText('PAN-42')[0]);
 
-    expect(useDashboardStore.getState().drawer).toEqual({ issueId: 'PAN-42', tab: 'overview' });
-    expect(window.location.search).toBe('?issue=PAN-42&tab=overview');
+    expect(useDashboardStore.getState().drawer).toEqual({ issueId: 'PAN-42', tab: 'conversation' });
+    expect(window.location.search).toBe('?issue=PAN-42&tab=conversation');
   });
 
   it('opens the drawer from a branch search result for the owning issue', () => {
@@ -120,8 +120,8 @@ describe('CommandPalette issue results', () => {
     fireEvent.change(screen.getByPlaceholderText('Search commands, issues, conversations, memory…'), { target: { value: 'feature/pan-42-command' } });
     selectPaletteResult(getOptionByValue('issue-PAN-42'));
 
-    expect(useDashboardStore.getState().drawer).toEqual({ issueId: 'PAN-42', tab: 'overview' });
-    expect(window.location.search).toBe('?issue=PAN-42&tab=overview');
+    expect(useDashboardStore.getState().drawer).toEqual({ issueId: 'PAN-42', tab: 'conversation' });
+    expect(window.location.search).toBe('?issue=PAN-42&tab=conversation');
   });
 
   it('opens the drawer from a title fragment search result', () => {
@@ -130,8 +130,8 @@ describe('CommandPalette issue results', () => {
     fireEvent.change(screen.getByPlaceholderText('Search commands, issues, conversations, memory…'), { target: { value: 'Alpha command' } });
     selectPaletteResult(getOptionByValue('issue-PAN-42'));
 
-    expect(useDashboardStore.getState().drawer).toEqual({ issueId: 'PAN-42', tab: 'overview' });
-    expect(window.location.search).toBe('?issue=PAN-42&tab=overview');
+    expect(useDashboardStore.getState().drawer).toEqual({ issueId: 'PAN-42', tab: 'conversation' });
+    expect(window.location.search).toBe('?issue=PAN-42&tab=conversation');
   });
 });
 

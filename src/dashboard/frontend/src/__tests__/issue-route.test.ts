@@ -13,7 +13,7 @@ describe('direct issue route drawer lifecycle', () => {
     expect(issueId).toBe('PAN-1234');
 
     useDashboardStore.getState().openIssueFromRoute(issueId!, '/board', window.location.pathname);
-    expect(useDashboardStore.getState().drawer).toEqual({ issueId: 'PAN-1234', tab: 'overview' });
+    expect(useDashboardStore.getState().drawer).toEqual({ issueId: 'PAN-1234', tab: 'conversation' });
     expect(window.location.pathname).toBe('/issues/PAN-1234');
 
     useDashboardStore.getState().closeIssue();

@@ -51,7 +51,9 @@ function PeekCard({ issueId, x, y, onPin, pinned, onDock }: {
       hasPlan: issue.hasPlan === true,
       hasTasks: issue.hasTasks === true,
       issueCanonicalState: issue.state ?? issue.status ?? null,
-      isMerged: reviewStatus?.mergeStatus === 'merged',
+      // Tolerate a lagging review snapshot: the issue record itself carries
+      // merge truth too (fixes peeks showing "Not started" for merged issues).
+      isMerged: reviewStatus?.mergeStatus === 'merged' || issue.mergeStatus === 'merged' || issue.labels?.some((l) => l.toLowerCase() === 'merged'),
     });
     const rail = phaseRailState(pipelineState);
     const display = userFacingDisplay({ pipelineState, pendingInput: agents.some((a) => !!a.pendingAskUserQuestion || (a.pendingInputCount ?? 0) > 0), stuck: agents.some((a) => a.troubled) });

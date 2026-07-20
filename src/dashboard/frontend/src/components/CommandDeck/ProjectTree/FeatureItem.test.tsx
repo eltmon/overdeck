@@ -886,7 +886,7 @@ describe('FeatureItem', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Expand issue full screen' }));
     expect(issueView()).toHaveAttribute('data-density', 'cockpit');
-    expect(useDashboardStore.getState().drawer).toEqual({ issueId: 'PAN-821', tab: 'overview' });
+    expect(useDashboardStore.getState().drawer).toEqual({ issueId: 'PAN-821', tab: 'conversation' });
     expect(onSelect).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByTestId('chevron-down'));

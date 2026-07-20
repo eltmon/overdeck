@@ -37,7 +37,7 @@ export const ISSUE_VIEW_INVENTORY: readonly IssueViewInventoryEntry[] = [
   { section: 'DrawerActiveAgent', view: 'console', home: 'src/dashboard/frontend/src/components/issue-view/ActiveAgentPanel.tsx' },
   { section: 'DrawerPausedBanner', view: 'console', home: 'src/dashboard/frontend/src/components/drawer/IssueDrawer.tsx' },
   { section: 'DrawerVerificationGates', view: 'console', home: 'src/dashboard/frontend/src/components/issue-view/VerificationGates.tsx' },
-  { section: 'DrawerReviewSpecialists', view: 'console', home: 'src/dashboard/frontend/src/components/drawer/DrawerReviewSpecialists.tsx' },
+  { section: 'SpecialistStrip', view: 'console', home: 'src/dashboard/frontend/src/components/issue-detail/SpecialistStrip.tsx' },
   { section: 'DrawerTasksList', view: 'console', home: 'src/dashboard/frontend/src/components/TasksPanel.tsx' },
   { section: 'DrawerPlanPanel / XBriefViewer', view: 'console', home: 'src/dashboard/frontend/src/components/xbrief/XBriefViewer.tsx' },
   { section: 'DrawerArtifactsPanel', view: 'console', home: 'src/dashboard/frontend/src/components/drawer/DrawerArtifactsPanel.tsx' },

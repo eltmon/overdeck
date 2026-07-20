@@ -602,8 +602,8 @@ describe('KanbanBoard drawer wiring', () => {
 
     fireEvent.click(await screen.findByTestId('issue-card-PAN-1'));
 
-    expect(useDashboardStore.getState().drawer).toEqual({ issueId: 'PAN-1', tab: 'overview' });
-    expect(window.location.search).toBe('?issue=PAN-1&tab=overview');
+    expect(useDashboardStore.getState().drawer).toEqual({ issueId: 'PAN-1', tab: 'conversation' });
+    expect(window.location.search).toBe('?issue=PAN-1&tab=conversation');
     expect(onSelectIssue).not.toHaveBeenCalled();
 
     useDashboardStore.getState().closeIssue();

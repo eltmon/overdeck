@@ -24,15 +24,20 @@ function agentPhaseInfo(agents: Agent[]): Partial<Record<Phase, PhaseAgentInfo>>
   const out: Partial<Record<Phase, PhaseAgentInfo>> = {};
   for (const agent of agents) {
     const phase = ROLE_TO_PHASE[agent.role ?? ''];
-    if (!phase || out[phase]) continue;
+    if (!phase) continue;
     const live = agent.status === 'running' || agent.status === 'starting' || agent.status === 'healthy';
-    out[phase] = {
-      name: agent.id,
-      model: agent.model,
-      runtime: agent.runtime,
-      live,
-      hasConversation: false, // per-phase conversation switching lands with the unified shell
-    };
+    const existing = out[phase];
+    // Prefer a live agent for the phase slot, but any agent marks the phase
+    // as having a conversation to open.
+    if (!existing || (live && !existing.live)) {
+      out[phase] = {
+        name: agent.id,
+        model: agent.model,
+        runtime: agent.runtime,
+        live,
+        hasConversation: true,
+      };
+    }
   }
   return out;
 }
@@ -45,7 +50,7 @@ const LEGACY_WHEN_TO_PHASE: Record<string, Phase> = {
   merged: 'done',
 };
 
-export default function DrawerPhaseRail({ issueId }: { issueId?: string }) {
+export default function DrawerPhaseRail({ issueId, onSelectPhase, activePhase }: { issueId?: string; onSelectPhase?: (phase: Phase) => void; activePhase?: Phase | null }) {
   const drawerIssueId = useDashboardStore((state) => state.drawer.issueId);
   const { issue, agents, reviewStatus, phaseTimeline } = useIssueData(issueId ?? drawerIssueId);
 
@@ -72,7 +77,7 @@ export default function DrawerPhaseRail({ issueId }: { issueId?: string }) {
 
   return (
     <div data-testid="drawer-phase-timeline">
-      <PhaseRail rail={rail} agents={agentPhaseInfo(agents)} meta={meta} />
+      <PhaseRail rail={rail} agents={agentPhaseInfo(agents)} meta={meta} onSelectPhase={onSelectPhase} activePhase={activePhase} />
     </div>
   );
 }

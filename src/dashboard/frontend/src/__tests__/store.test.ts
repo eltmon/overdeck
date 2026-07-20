@@ -157,8 +157,8 @@ describe('drawer store slice', () => {
 
     useDashboardStore.getState().openIssue('PAN-final')
 
-    expect(useDashboardStore.getState().drawer).toEqual({ issueId: 'PAN-final', tab: 'overview' })
-    expect(window.location.search).toBe('?issue=PAN-final&tab=overview')
+    expect(useDashboardStore.getState().drawer).toEqual({ issueId: 'PAN-final', tab: 'conversation' })
+    expect(window.location.search).toBe('?issue=PAN-final&tab=conversation')
   })
 
   it('preserves drawer state through event reducer updates', () => {

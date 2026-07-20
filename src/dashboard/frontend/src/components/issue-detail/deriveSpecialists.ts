@@ -9,6 +9,34 @@ import type { SpecialistChip, SpecialistStatus, SpecialistVerdict } from './Spec
 
 export const REVIEW_SPECIALIST_ROLES = ['security', 'correctness', 'performance', 'requirements'] as const;
 
+const REVIEWER_ID_ROLE = /-review-([a-z]+)$/i;
+
+/**
+ * Adapt legacy Agent records (drawer) to reviewer SessionNodes: specialists
+ * register as agents named agent-<issue>-review-<role>. Supervisors and the
+ * bare coordinator agent don't get chips — they aren't verdict reviewers.
+ */
+export function agentsToReviewerSessions(agents: readonly { id: string; status: string; model?: string; startedAt?: string }[]): SessionNode[] {
+  const out: SessionNode[] = [];
+  for (const agent of agents) {
+    const match = REVIEWER_ID_ROLE.exec(agent.id);
+    if (!match) continue;
+    const role = match[1].toLowerCase();
+    if (role === 'supervisor') continue;
+    const live = agent.status === 'running' || agent.status === 'starting' || agent.status === 'healthy';
+    out.push({
+      type: 'reviewer',
+      role,
+      sessionId: agent.id,
+      model: agent.model ?? '',
+      status: agent.status === 'error' || agent.status === 'failed' ? 'error' : live ? 'running' : 'stopped',
+      presence: live ? 'active' : 'ended',
+      startedAt: agent.startedAt ?? '',
+    } as SessionNode);
+  }
+  return out;
+}
+
 function verdictOf(session: SessionNode | undefined): SpecialistVerdict | null {
   const result = session?.roundMetadata?.latestReviewResult;
   if (result === 'APPROVED' || result === 'CHANGES_REQUESTED') return result;
