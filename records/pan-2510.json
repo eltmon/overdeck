@@ -84,15 +84,16 @@
     "recordedAt": "2026-07-09T00:19:08.915Z"
   },
   "created": "2026-07-08T23:07:44.941Z",
-  "updated": "2026-07-09T03:37:56.382Z",
+  "updated": "2026-07-20T00:14:22.304Z",
   "pipeline": {
     "issueId": "PAN-2510",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "pending",
     "testStatus": "passed",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
+    "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-09T00:31:16.071Z",
+    "updatedAt": "2026-07-20T00:14:22.280Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
     "verificationNotes": "Pre-review verification already covered the reviewed commit",
@@ -152,9 +153,9 @@
       "byStage": {
         "codex": {
           "openai/gpt-5.5": {
-            "input": 3082931,
-            "output": 9599,
-            "cacheRead": 2675968,
+            "input": 4838579,
+            "output": 12554,
+            "cacheRead": 4401664,
             "cacheWrite": 0
           }
         },
@@ -166,20 +167,28 @@
             "cacheWrite": 308697
           }
         },
+        "test": {
+          "custom/kimi-k2.7-code": {
+            "input": 274341,
+            "output": 5571,
+            "cacheRead": 2555904,
+            "cacheWrite": 0
+          }
+        },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 1204133,
-            "output": 130461,
-            "cacheRead": 74088704,
+            "input": 1211825,
+            "output": 132225,
+            "cacheRead": 76229376,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.5": {
-          "input": 3082931,
-          "output": 9599,
-          "cacheRead": 2675968,
+          "input": 4838579,
+          "output": 12554,
+          "cacheRead": 4401664,
           "cacheWrite": 0
         },
         "anthropic/claude-opus-4-8": {
@@ -189,15 +198,15 @@
           "cacheWrite": 308697
         },
         "custom/kimi-k2.7-code": {
-          "input": 1204133,
-          "output": 130461,
-          "cacheRead": 74088704,
+          "input": 1486166,
+          "output": 137796,
+          "cacheRead": 78785280,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 27.09757,
-        "pricingAsOf": "2026-07-09T00:31:16.120Z"
+        "usd": 29.388451,
+        "pricingAsOf": "2026-07-20T00:14:22.295Z"
       }
     },
     "merges": [
