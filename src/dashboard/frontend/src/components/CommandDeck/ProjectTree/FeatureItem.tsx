@@ -19,6 +19,8 @@ import {
   IssueActionDialogHost,
   useIssueActions,
 } from '../../IssueActionMenu';
+import { IssuePeek } from '../../issue-detail/IssuePeek';
+import { useConvoDock } from '../../../lib/convoDock';
 import { PROJECT_TREE_CONTEXT_ACTIONS, type NonIssueActionContext } from '../../../lib/issueActions';
 import { parseContainerServiceName } from '../../../lib/resource-utils';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -849,6 +851,7 @@ const PIPE_CLASS: Record<PipeSegState, string> = {
 export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, onSelectSession, title, cost, filter = 'all', onStopSession, onViewTerminal, onPauseSession, onResumeSession, onUnpauseSession, onRestartSession, onDeepWipe, onOpenStateDir, onViewJsonl, onCleanupOrphanedResources, onOpenPlanDialog, containerStats }: FeatureItemProps) {
   const queryClient = useQueryClient();
   const openIssue = useDashboardStore((state) => state.openIssue);
+  const addToDock = useConvoDock((s) => s.add);
   const trimmedTitle = title?.trim() ?? '';
   const displayTitle = trimmedTitle || '(untitled)';
   const titleClassName = trimmedTitle
@@ -1006,7 +1009,11 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
         data-component="feature-item"
         data-issue-id={feature.issueId}
       >
-        <div data-section="Filter bar"><div data-section="Feature (issue) row" className={styles.featureItemRow}>
+        <div data-section="Filter bar">
+        {/* PAN-2908 C-CONVO: deck rows carry the hover peek too — same glance
+            depth as pipeline rows and board cards. */}
+        <IssuePeek issueId={feature.issueId} onDock={addToDock}>
+        <div data-section="Feature (issue) row" className={styles.featureItemRow}>
           {hasExpandableChildren ? (
             <button
               className={styles.featureItemCaret}
@@ -1154,7 +1161,9 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
           </span>
         </button>
       </ContextMenuTrigger>
-      </div></div>
+      </div>
+        </IssuePeek>
+      </div>
       <div data-section="ResourceStrip"><ResourceStrip feature={feature} onCleanupOrphanedResources={onCleanupOrphanedResources} /></div>
       {feature.resourceDetails?.hasTasks && feature.taskTotals && (
         <button type="button" data-section="Tasks summary" className={styles.featureBadge} onClick={(event) => { event.stopPropagation(); onSelect?.(); }} title="Open issue tasks">

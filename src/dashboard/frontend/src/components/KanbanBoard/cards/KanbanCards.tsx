@@ -8,6 +8,8 @@ import { deriveIssueActionPhase, type PipelinePhase } from '../../../lib/issueAc
 import { derivePipelineState } from '../../../lib/issuePipelineState';
 import { phaseRailState } from '../../../lib/simple/phases';
 import { PhaseDots } from '../../issue-detail/PhaseDots';
+import { IssuePeek } from '../../issue-detail/IssuePeek';
+import { useConvoDock } from '../../../lib/convoDock';
 import { hasActualPendingQuestion } from '../../../lib/pipeline-state';
 import { cn } from '../../../lib/utils';
 import { getIssueWorkAgentMap, isAgentSessionAttachable } from '../../../lib/workAgents';
@@ -561,6 +563,7 @@ interface IssueCardProps {
 export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, specialists = [], cost, isSelected, isFocused = false, onSelect, isBulkSelected, onBulkToggle, planningState, workspace: workspaceProp }: IssueCardProps) {
   const [showCostModal, setShowCostModal] = useState(false);
   const [actionOpenSignal, setActionOpenSignal] = useState(0);
+  const addToDock = useConvoDock((s) => s.add);
   const cardRef = useRef<HTMLDivElement>(null);
   const stackHealth = workspaceProp?.stackHealth;
   const isStackUnhealthy = stackHealth?.healthy === false;
@@ -648,6 +651,9 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
       : issue.identifier;
 
   return (
+    // PAN-2908 C-CONVO: every card carries the hover peek (level 1 · glance) —
+    // 350ms intent delay, phase dots + state + last-said, "pop into dock".
+    <IssuePeek issueId={issue.identifier} onDock={addToDock}>
     <IssueCardPrimitive
       ref={cardRef}
       testId={`issue-card-${issue.identifier}`}
@@ -841,5 +847,6 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
         />
       </div>
     </IssueCardPrimitive>
+    </IssuePeek>
   );
 }
