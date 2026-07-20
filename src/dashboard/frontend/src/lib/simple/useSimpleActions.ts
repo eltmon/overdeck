@@ -73,5 +73,12 @@ export function useSimpleActions() {
     onError,
   });
 
-  return { tell, answer, recover, merge, startWork };
+  const startPlanning = useMutation({
+    mutationFn: ({ issueId }: { issueId: string }) =>
+      postJson(`/api/issues/${encodeURIComponent(issueId)}/start-planning`),
+    onSuccess,
+    onError,
+  });
+
+  return { tell, answer, recover, merge, startWork, startPlanning };
 }

@@ -15,12 +15,56 @@ import { SIMPLE_STRINGS } from '../../lib/simple/strings';
 import { useSimpleActions } from '../../lib/simple/useSimpleActions';
 import { useUiMode, syncSimpleIssueUrl } from '../../lib/simple/uiMode';
 import { ModeToggle, PrimaryButton, ProgressBar, QuietButton } from './parts';
+import { TalkItThrough } from './TalkItThrough';
 
 const S = SIMPLE_STRINGS.home;
 
 function openIssue(d: SimpleIssueDerivation, openSimpleIssue: (id: string) => void) {
   openSimpleIssue(d.issue.identifier);
   syncSimpleIssueUrl(d.issue.identifier);
+}
+
+/* ── Just filed: freshly created issues, one click from planning ─────── */
+const JUST_FILED_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+function justFiled(derivations: SimpleIssueDerivation[], now = Date.now()): SimpleIssueDerivation[] {
+  return derivations
+    .filter((d) => {
+      if (d.display.state !== 'not-started') return false;
+      const t = Date.parse(d.issue.createdAt ?? '');
+      return Number.isFinite(t) && now - t < JUST_FILED_WINDOW_MS;
+    })
+    .sort((a, b) => (b.issue.createdAt ?? '').localeCompare(a.issue.createdAt ?? ''))
+    .slice(0, 5);
+}
+
+function JustFiledCard({ item, onOpen }: { item: SimpleIssueDerivation; onOpen: () => void }) {
+  const actions = useSimpleActions();
+  const age = formatAge(item.issue.createdAt);
+  return (
+    <div className="mt-2.5 flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 shadow-sm">
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <span className="font-mono text-[10px]">{item.issue.identifier}</span>
+          {age && <span>filed {age}</span>}
+        </div>
+        <button onClick={onOpen} className="mt-0.5 block truncate text-left text-sm font-medium hover:underline">{item.issue.title}</button>
+      </div>
+      <QuietButton onClick={onOpen}>Open</QuietButton>
+      <PrimaryButton disabled={actions.startPlanning.isPending} onClick={() => actions.startPlanning.mutate({ issueId: item.issue.identifier })}>
+        Start planning
+      </PrimaryButton>
+    </div>
+  );
+}
+
+function formatAge(iso?: string): string {
+  const t = Date.parse(iso ?? '');
+  if (!Number.isFinite(t)) return '';
+  const mins = Math.round((Date.now() - t) / 60000);
+  if (mins < 60) return `${Math.max(mins, 1)}m ago`;
+  const hours = Math.round(mins / 60);
+  return `${hours}h ago`;
 }
 
 /* ── Needs-you cards ─────────────────────────────────────────────────── */
@@ -131,7 +175,7 @@ export function SimpleHomePage() {
   const pendingSubjects = useDashboardStore(selectPendingInputSubjects);
   const openSimpleIssue = useUiMode((s) => s.openSimpleIssue);
 
-  const { buckets, byIdentifier } = useMemo(() => {
+  const { derivations, buckets, byIdentifier } = useMemo(() => {
     const issues = (issuesRaw as Issue[]) ?? [];
     const allAgents = Object.values(agentsById ?? {}) as AgentSnapshot[];
     const agentsByIssue = new Map<string, AgentSnapshot[]>();
@@ -146,6 +190,7 @@ export function SimpleHomePage() {
       deriveSimpleIssue(issue, agentsByIssue.get(issue.identifier.toLowerCase()) ?? [], reviewByIssueId?.[issue.identifier]),
     );
     return {
+      derivations,
       buckets: bucketSimpleHome(derivations),
       byIdentifier: new Map(derivations.map((d) => [d.issue.identifier.toLowerCase(), d])),
     };
@@ -172,14 +217,7 @@ export function SimpleHomePage() {
   }, [buckets.needsYou, subjectByIssue, byIdentifier]);
 
   const needsCount = buckets.needsYou.length + extraQuestions.length;
-  const [composerText, setComposerText] = useState('');
-  const issues = (issuesRaw as Issue[]) ?? [];
-  const newIssueUrl = useMemo(() => {
-    const gh = issues.find((i) => i.url?.includes('github.com') && /\/issues\/\d+/.test(i.url));
-    if (gh) return gh.url.replace(/\/issues\/\d+.*$/, '/issues/new');
-    const any = issues.find((i) => i.url);
-    return any?.url ?? null;
-  }, [issues]);
+  const filed = useMemo(() => justFiled(derivations), [derivations]);
 
   return (
     <div className="h-full w-full overflow-y-auto">
@@ -199,25 +237,7 @@ export function SimpleHomePage() {
           <ModeToggle />
         </div>
 
-        <div className="mt-4 flex gap-2.5">
-          <input
-            value={composerText}
-            onChange={(e) => setComposerText(e.target.value)}
-            placeholder={S.composerPlaceholder}
-            className="h-11 flex-1 rounded-2xl border border-input bg-card px-4 text-sm text-foreground outline-none focus:border-ring"
-          />
-          <PrimaryButton
-            disabled={!newIssueUrl}
-            onClick={() => {
-              const url = composerText.trim() && newIssueUrl?.includes('github.com')
-                ? `${newIssueUrl}?title=${encodeURIComponent(composerText.trim())}`
-                : newIssueUrl;
-              if (url) window.open(url, '_blank', 'noopener');
-            }}
-          >
-            {S.composerButton}
-          </PrimaryButton>
-        </div>
+        <TalkItThrough />
 
         <section className="mt-8">
           <h2 className="text-[15px] font-medium">{S.needsYouTitle} <span className="text-xs text-muted-foreground">{needsCount}</span></h2>
@@ -234,6 +254,16 @@ export function SimpleHomePage() {
             <QuestionCard key={`q-${derivation.issue.identifier}`} item={derivation} subject={subject} onOpen={() => openIssue(derivation, openSimpleIssue)} />
           ))}
         </section>
+
+        {filed.length > 0 && (
+          <section className="mt-8">
+            <h2 className="text-[15px] font-medium">Just filed <span className="text-xs text-muted-foreground">{filed.length}</span></h2>
+            <div className="mt-0.5 text-xs text-muted-foreground">Fresh from your conversations — start planning when you're ready.</div>
+            {filed.map((d) => (
+              <JustFiledCard key={d.issue.identifier} item={d} onOpen={() => openIssue(d, openSimpleIssue)} />
+            ))}
+          </section>
+        )}
 
         <section className="mt-8">
           <h2 className="text-[15px] font-medium">{S.workingTitle} <span className="text-xs text-muted-foreground">{buckets.working.length}</span></h2>

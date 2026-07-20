@@ -6,7 +6,7 @@
  */
 import { render, screen } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi, afterEach } from 'vitest';
 import type { AgentSnapshot, ReviewStatusSnapshot } from '@overdeck/contracts';
 import { INITIAL_READ_MODEL_STATE } from '@overdeck/contracts';
 import { DialogProvider } from '../DialogProvider';
@@ -59,8 +59,16 @@ function renderWithProviders(ui: React.ReactElement) {
 describe('SimpleHomePage (C-SIMPLE)', () => {
   beforeEach(() => {
     useUiMode.setState({ mode: 'simple', simpleIssueId: null });
+    // ModelPicker (TalkItThrough composer) fetches model catalogs on mount.
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === '/api/settings/available-models') return Response.json({});
+      if (url === '/api/settings/openrouter/models') return Response.json({ models: [], favorites: [] });
+      if (url === '/api/settings') return Response.json({ models: {} });
+      if (url.includes('/api/settings/harness-policy')) return Response.json({ decisions: {} });
+      return Response.json({});
+    }));
   });
-
   it('renders the working section with progress for an in-progress issue', () => {
     seed({
       issues: [makeIssue({ taskCounts: { completed: 4, total: 13 } })],
