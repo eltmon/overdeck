@@ -3,16 +3,16 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-07-20T01:03:35.037Z",
-  "updated": "2026-07-20T01:40:22.669Z",
+  "updated": "2026-07-20T01:45:58.986Z",
   "pipeline": {
     "issueId": "PAN-2943",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "failed",
-    "mergeStatus": "verifying",
+    "mergeStatus": "failed",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-20T01:40:22.607Z",
+    "updatedAt": "2026-07-20T01:45:58.973Z",
     "verificationNotes": "Branch has no implementation — only pipeline artifacts (.pan/xBRIEF task state) changed vs origin/main. The work agent produced no code (likely a kickoff-delivery zombie — PAN-2179).",
     "strikeReadyHead": "cbcaaff734f5ad36ec7f50b732741110342b76d9",
     "strikeReadyAt": "2026-07-20T01:31:45.395Z",
@@ -33,24 +33,24 @@
       "byStage": {
         "strike": {
           "openai/gpt-5.6-sol": {
-            "input": 396868,
-            "output": 26488,
-            "cacheRead": 7670272,
+            "input": 402340,
+            "output": 31252,
+            "cacheRead": 8281600,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 396868,
-          "output": 26488,
-          "cacheRead": 7670272,
+          "input": 402340,
+          "output": 31252,
+          "cacheRead": 8281600,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 6.614116,
-        "pricingAsOf": "2026-07-20T01:40:22.622Z"
+        "usd": 7.09006,
+        "pricingAsOf": "2026-07-20T01:45:58.979Z"
       }
     },
     "merges": [],
