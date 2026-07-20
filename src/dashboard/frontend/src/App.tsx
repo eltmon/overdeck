@@ -12,6 +12,7 @@ import { SearchModal } from './components/search/SearchModal';
 import { CommandPalette, type ConversationPaletteOpenRequest } from './components/CommandPalette';
 import { NO_PROJECT_KEY } from './components/CommandDeck/projectsData';
 import { IssueDrawer } from './components/drawer/IssueDrawer';
+import { ConversationDock } from './components/dock/ConversationDock';
 import { SessionFeedSidebar } from './components/sessionFeed/SessionFeedSidebar';
 import { NewProjectModal, type CreatedProject } from './components/CommandDeck/NewProjectModal';
 import { Tab } from './components/Header';
@@ -835,6 +836,8 @@ export default function App() {
       </div>
 
       <IssueDrawer />
+      {/* PAN-2908 C-CONVO: persistent conversation dock (level 2 · talk). */}
+      <ConversationDock />
 
       <UpdateDialog
         isOpen={isUpdateDialogOpen}

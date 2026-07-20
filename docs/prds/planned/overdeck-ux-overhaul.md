@@ -160,6 +160,8 @@ Six phases, in order, used by every surface: **`Plan → Work → Review → Tes
 
 ### 3.4 Conversation access model (contract C-CONVO)
 
+> **Implementation status (2026-07-19): v1 shipped.** Level 1 · **Peek** (`issue-detail/IssuePeek.tsx`): 350ms hover-intent quick-look with phase dots, state sentence, last-said (memory observations), review line, and "pop into dock" — wired into Pipeline rows via a `peek` prop on the shared `IssueRow` primitive. Level 2 · **The Dock** (`components/dock/ConversationDock.tsx` + `lib/convoDock.ts` slice): persistent right rail on every surface, ≤8 issue conversations with observations feed + tell composer, needs-you pinned amber, persisted across sessions. Still open: peeks on kanban cards / agent pills / deck rows, dock panels rendering the full rich transcript (v1 renders the observations slice), ⌘J jump, two-up comparison, and the same-transcript-slice guarantee across depths (needs the C-DETAIL data model).
+
 **Mockup: [`patterns.html`](../../design/mockups/overdeck-ux-overhaul/patterns.html) — interactive, binding for behavior.**
 
 Steering happens in conversations, so conversation access is layered into **three depths** — one renderer (`components/chat/`), three presentations:

@@ -3,6 +3,8 @@ import type { KeyboardEvent, ReactNode } from 'react';
 import { cn } from '../../lib/utils';
 import { trackerIssueUrl } from '../../lib/issueLinks';
 import PhaseGlyph, { type PhaseGlyphPhase } from './PhaseGlyph';
+import { IssuePeek } from '../issue-detail/IssuePeek';
+import { useConvoDock } from '../../lib/convoDock';
 
 export type IssueRowVariant = 'pipeline' | 'command-deck';
 export type IssueRowPriority = 'urgent' | 'high' | 'medium' | 'low';
@@ -47,6 +49,8 @@ export type IssueRowProps = {
   focused?: boolean;
   onOpen?: (issueId: string) => void;
   onContextMenu?: () => void;
+  /** PAN-2908 C-CONVO: hover quick-look peek (level 1 · glance). */
+  peek?: boolean;
   actionMenu?: ReactNode;
   className?: string;
 };
@@ -112,6 +116,7 @@ export default function IssueRow({
   onContextMenu,
   actionMenu,
   className,
+  peek = false,
 }: IssueRowProps) {
   const avatarName = assignee?.name ?? issueId;
   const avatarTone = AVATAR_TONE_CLASSES[hashString(avatarName) % AVATAR_TONE_CLASSES.length];
@@ -126,7 +131,8 @@ export default function IssueRow({
     open();
   };
 
-  return (
+  const addToDock = useConvoDock((state) => state.add);
+  const row = (
     <div
       role="button"
       tabIndex={0}
@@ -248,4 +254,9 @@ export default function IssueRow({
       ) : null}
     </div>
   );
+  return peek ? (
+    <IssuePeek issueId={issueId} onDock={addToDock}>
+      {row}
+    </IssuePeek>
+  ) : row;
 }
