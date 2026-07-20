@@ -83,6 +83,34 @@ The full round trip between the work agent and review:
 
 ---
 
+## Polyrepo workspaces (PAN-2948)
+
+For `workspace.type: polyrepo` projects the workspace root is a one-commit
+wrapper repo whose `.gitignore` excludes the code sub-repos (`fe/`, `api/`, …),
+so no review-path git operation may run at the workspace root. The review
+pipeline resolves the actual repo roots via `resolveWorkspaceRepoRootsSync()`
+(`src/lib/project-repos.ts`) — monorepo degenerates to a single root at the
+workspace path:
+
+- **Context manifest** (`review-context.ts`): per-sub-repo merge-base/diff
+  against each repo's target branch, aggregated with `repoKey/`-prefixed paths
+  and an additive `repos: [{repoKey, branch, headSha, diffBase, fileCount}]`
+  manifest field. Top-level `headSha`/`branch` come from the first sub-repo
+  with changes.
+- **runId head suffix** (`review-agent.ts`): resolved from the primary sub-repo
+  so re-review runs get distinct directories.
+- **Dispatch pushes** (`review-pipeline.ts`): one shared helper pushes each
+  sub-repo's `feature/<issue>` where the branch exists locally; the wrapper is
+  never pushed.
+- **Drift anchors** (`reviewedAtCommit`, `lastVerifiedCommit`, reviewer verdict
+  `atCommit`): `snapshotWorkspaceHeadsPromise()` records a composite
+  `fe@<sha> api@<sha>` snapshot. Composite anchors compare equal iff every
+  sub-repo head is unchanged; consumers that use an anchor as a git ref fail
+  the lookup and fall back to their conservative full-rerun path
+  (`computeConvoyScope` diffs in the primary sub-repo for the same reason).
+
+---
+
 ## Warm-parent discovery + fork (PAN-1862, `full` mode on Claude Code)
 
 The convoy's first-cycle cost problem: four reviewers independently reading the
