@@ -6038,3 +6038,6 @@ Substrate bugs filed: 2897 2898 2899 2900 2901 2902 2907 2913 (8; ALL fixed and 
 - **CI-polling lesson:** a check-runs green-poll must require a NON-EMPTY completed set (total > threshold) — zero-registered-checks reads as green and false-passed once; the close gate caught it.
 - **PAN-2833/2869 'failed verification' flags = PAN-2888 residue again** (CLOSED issues, stale rows) — appended occurrence; the metric read 5 with 0 actionable.
 - 2943 close chained (test-green → deploy → close). Tally heading to 16 landed+closed.
+
+## Ticks 115-117 — 2026-07-20 ~06:05-06:35 — RED-MAIN #5 (25-min turnaround, 1-line)
+- **Red-main #5:** overnight #2908 slices changed resetSession to take the review agent id; review-reset.test.ts still expected the bare issue id. Strike reproduced+fixed in ~10 min; published (PR #2953), merged (ea8c3a0541). PAN-2940 pattern: 5 occurrences — every red-main this run traces to direct-push series skipping PR CI. Close of PAN-2951 chained on merge-commit CI + deploy.
