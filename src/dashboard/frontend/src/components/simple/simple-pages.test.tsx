@@ -4,7 +4,7 @@
  * pending input surfaces as an answerable question, simple issue page shows
  * the status card + conversation composer.
  */
-import { render, screen } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi, afterEach } from 'vitest';
 import type { AgentSnapshot, ReviewStatusSnapshot } from '@overdeck/contracts';
@@ -187,5 +187,67 @@ describe('SimpleIssuePage (C-SIMPLE)', () => {
     renderWithProviders(<SimpleIssuePage issueId="PAN-1" />);
     expect(screen.getByRole('button', { name: 'Merge to main' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Stop|Wipe|Reset/i })).not.toBeInTheDocument();
+  });
+
+  /**
+   * §3.9 one-button gate: across EVERY user-facing display variant the status
+   * card never renders more than one primary action (inline snapshot pins the
+   * mapping; a second primary is the bug this exists to catch).
+   */
+  it('one-button rule: at most one primary action across all 7 display variants', () => {
+    const CASES: Record<string, { agents?: Record<string, AgentSnapshot>; review?: ReviewStatusSnapshot; issue?: Partial<Issue> }> = {
+      'not-started': { issue: { state: 'todo' } },
+      'working': { agents: { 'agent-pan-1': makeAgent() } },
+      'needs-you / question': {
+        agents: {
+          'agent-pan-1': makeAgent({
+            pendingInputCount: 1,
+            pendingAskUserQuestion: {
+              toolUseId: 'tu-1',
+              askedAt: new Date().toISOString(),
+              questions: [{ question: 'Which project?', options: [] }],
+            },
+          }),
+        },
+      },
+      'needs-you / stuck': { agents: { 'agent-pan-1': makeAgent({ troubled: true }) } },
+      'needs-you / problems': {
+        agents: { 'agent-pan-1': makeAgent() },
+        review: { issueId: 'PAN-1', reviewStatus: 'blocked', updatedAt: new Date().toISOString() } as ReviewStatusSnapshot,
+      },
+      'ready': {
+        review: { issueId: 'PAN-1', readyForMerge: true, reviewStatus: 'passed', mergeStatus: 'pending' } as ReviewStatusSnapshot,
+      },
+      'done': {
+        review: { issueId: 'PAN-1', readyForMerge: false, reviewStatus: 'passed', mergeStatus: 'merged', prUrl: 'https://example.com/pr/1' } as ReviewStatusSnapshot,
+      },
+    };
+    const labels: Record<string, string | null> = {};
+    for (const [name, fixture] of Object.entries(CASES)) {
+      cleanup();
+      const needsReviewState = name === 'ready' || name === 'done' || name === 'needs-you / problems';
+      seed({
+        issues: [makeIssue(fixture.issue ?? (needsReviewState ? { state: 'in_review' } : {}))],
+        agents: fixture.agents ?? {},
+        review: fixture.review ? { 'PAN-1': fixture.review } : {},
+      });
+      const { container } = renderWithProviders(<SimpleIssuePage issueId="PAN-1" />);
+      const primaries = container.querySelectorAll('[data-slot="primary-action"]');
+      expect(primaries.length, `${name} rendered ${primaries.length} primary actions`).toBeLessThanOrEqual(1);
+      labels[name] = primaries[0]?.textContent ?? null;
+      // Destructive controls are unreachable in every state.
+      expect(screen.queryByRole('button', { name: /Stop|Wipe|Reset|Destroy/i })).not.toBeInTheDocument();
+    }
+    expect(labels).toMatchInlineSnapshot(`
+      {
+        "done": "See what changed",
+        "needs-you / problems": "Tell the agent to fix them",
+        "needs-you / question": "Answer",
+        "needs-you / stuck": "Get it unstuck",
+        "not-started": "Start work",
+        "ready": "Merge to main",
+        "working": null,
+      }
+    `);
   });
 });

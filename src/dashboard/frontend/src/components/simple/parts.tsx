@@ -157,6 +157,7 @@ export function PrimaryButton({ children, onClick, disabled, tone = 'primary' }:
 }) {
   return (
     <button
+      data-slot="primary-action"
       onClick={onClick}
       disabled={disabled}
       className={cn(
