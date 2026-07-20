@@ -26,8 +26,41 @@ export interface SimpleIssueDerivation {
   taskProgress: { completed: number; total: number } | null;
   costSoFar: number | null;
   prUrl: string | null;
+  /** Plain-English expectation: elapsed + rough time-to-go from task progress. */
+  expectation: string | null;
   /** reviewStatus.updatedAt when merged — for the Finished section. */
   activityAt: string | null;
+}
+
+function formatDuration(mins: number): string {
+  if (mins < 1) return '<1m';
+  if (mins < 60) return `${Math.round(mins)}m`;
+  const h = Math.floor(mins / 60);
+  const m = Math.round(mins % 60);
+  return m > 0 ? `${h}h ${m}m` : `${h}h`;
+}
+
+/**
+ * C-SIMPLE expectations: honest, computable-locally only. Elapsed comes from
+ * the agent's startedAt; time-to-go is a rough extrapolation from task
+ * progress — never fabricated precision when there is no basis.
+ */
+export function deriveExpectation(
+  agent: AgentSnapshot | undefined,
+  taskProgress: { completed: number; total: number } | null,
+  now = Date.now(),
+): string | null {
+  if (!agent?.startedAt) return null;
+  const started = Date.parse(agent.startedAt);
+  if (!Number.isFinite(started)) return null;
+  const elapsedMin = (now - started) / 60_000;
+  if (elapsedMin < 0) return null;
+  const elapsed = `started ${formatDuration(elapsedMin)} ago`;
+  if (taskProgress && taskProgress.completed > 0 && taskProgress.completed < taskProgress.total) {
+    const remainingMin = elapsedMin * (taskProgress.total / taskProgress.completed - 1);
+    return `${elapsed} · about ${formatDuration(remainingMin)} to go`;
+  }
+  return elapsed;
 }
 
 const ROLE_PRIORITY: Record<string, number> = { work: 0, plan: 1, review: 2, test: 3, ship: 4 };
@@ -88,6 +121,7 @@ export function deriveSimpleIssue(
     agents,
     taskProgress: issue.taskCounts ?? null,
     costSoFar: costs.length > 0 ? costs.reduce((a, b) => a + b, 0) : null,
+    expectation: deriveExpectation(primaryAgent, issue.taskCounts ?? null),
     prUrl: reviewStatus?.prUrl ?? null,
     // Fall back to agent activity so done issues without a review snapshot
     // still land in Finished within their window.

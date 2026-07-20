@@ -52,6 +52,8 @@ describe('TalkItThrough flow (C-SIMPLE)', () => {
       if (url === '/api/settings/available-models') return Response.json({});
       if (url === '/api/settings/openrouter/models') return Response.json({ models: [], favorites: [] });
       if (url === '/api/settings') return Response.json({ models: { default_conversation_model: 'claude-opus-4-6' } });
+      if (url === '/api/issues/resource-allocated') return Response.json([]);
+      if (url === '/api/registered-projects') return Response.json([{ key: 'panopticon-cli', name: 'panopticon-cli', path: '/tmp' }]);
       return Response.json({});
     }));
   });
@@ -67,6 +69,10 @@ describe('TalkItThrough flow (C-SIMPLE)', () => {
   it('posts the description to /api/conversations and navigates to the conversation', async () => {
     seed([]);
     renderWithProviders(<SimpleHomePage />);
+    // wait for the projects query to resolve and default the select
+    await waitFor(() => {
+      expect((screen.getByTestId('talk-it-through-project') as HTMLSelectElement).value).toBe('panopticon-cli');
+    });
     const input = screen.getByTestId('talk-it-through-input');
     fireEvent.change(input, { target: { value: 'sync our themes with the design system' } });
     fireEvent.keyDown(input, { key: 'Enter' });
@@ -78,6 +84,7 @@ describe('TalkItThrough flow (C-SIMPLE)', () => {
     const body = JSON.parse(String(vi.mocked(fetch).mock.calls.find(([url]) => String(url) === '/api/conversations')![1]!.body));
     expect(body.message).toContain('sync our themes with the design system');
     expect(body.message).toContain('do not file anything yet');
+    expect(body.projectKey).toBe('panopticon-cli');
     expect(window.location.pathname).toBe('/conv/conv-test-42');
   });
 

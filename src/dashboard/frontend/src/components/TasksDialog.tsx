@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { X, List, Loader2, CheckCircle, Clock } from 'lucide-react';
+import { LoadingBoundary } from './primitives/LoadingBoundary';
 
 interface TasksDialogProps {
   issueId: string;
@@ -76,8 +77,9 @@ export function TasksDialog({ issueId, isOpen, onClose }: TasksDialogProps) {
                 </div>
               ))}
               <div className="flex items-center justify-center py-2 text-muted-foreground text-sm">
-                <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                Loading tasks from workspace...
+                <LoadingBoundary label="Workspace tasks" timeoutMs={8000}>
+                  <span className="inline-flex items-center"><Loader2 className="w-4 h-4 animate-spin mr-2" />Loading tasks from workspace...</span>
+                </LoadingBoundary>
               </div>
             </div>
           )}

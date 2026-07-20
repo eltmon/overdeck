@@ -9,87 +9,47 @@
 import { useMemo, useState } from 'react';
 import { X, MessageSquare } from 'lucide-react';
 import { useConvoDock } from '../../lib/convoDock';
-import { selectMemoryObservations, selectPendingInputSubjects, useDashboardStore } from '../../lib/store';
+import { selectPendingInputSubjects, useDashboardStore } from '../../lib/store';
 import type { Issue } from '../../types';
-import type { AgentSnapshot } from '@overdeck/contracts';
-import { useSimpleActions } from '../../lib/simple/useSimpleActions';
+import type { Agent } from '../../types';
+import { DrawerAgentSession, pickDefaultDrawerAgent } from '../drawer/DrawerAgentSession';
 import { cn } from '../../lib/utils';
-
-function formatWhen(iso: string): string {
-  const t = Date.parse(iso);
-  if (!Number.isFinite(t)) return '';
-  const mins = Math.round((Date.now() - t) / 60000);
-  if (mins < 1) return 'now';
-  if (mins < 60) return `${mins}m`;
-  return `${Math.round(mins / 60)}h`;
-}
 
 function DockPanel({ issueId, needsYou, onClose }: { issueId: string; needsYou: boolean; onClose: () => void }) {
   const issuesRaw = useDashboardStore((s) => s.issuesRaw);
   const agentsById = useDashboardStore((s) => s.agentsById);
-  const observations = useDashboardStore(selectMemoryObservations(issueId));
-  const actions = useSimpleActions();
-  const [text, setText] = useState('');
-
-  const issue = ((issuesRaw as Issue[]) ?? []).find((i) => i.identifier.toLowerCase() === issueId.toLowerCase());
-  const agent = useMemo(() => {
-    const agents = (Object.values(agentsById ?? {}) as AgentSnapshot[]).filter(
-      (a) => a.issueId?.toLowerCase() === issueId.toLowerCase(),
-    );
-    return agents.find((a) => a.status === 'running' || a.status === 'starting')
-      ?? agents.find((a) => !!a.pendingAskUserQuestion || (a.pendingInputCount ?? 0) > 0)
-      ?? agents[0];
-  }, [agentsById, issueId]);
-
-  const feed = useMemo(
-    () => [...(observations ?? [])].sort((a, b) => b.timestamp.localeCompare(a.timestamp)).slice(0, 3).reverse(),
-    [observations],
+  const agents = useMemo(
+    () => (Object.values(agentsById ?? {}) as Agent[]).filter((a) => a.issueId?.toLowerCase() === issueId.toLowerCase()),
+    [agentsById, issueId],
   );
-
-  const send = () => {
-    const message = text.trim();
-    if (!message || !agent) return;
-    actions.tell.mutate({ agentId: agent.id, message });
-    setText('');
-  };
+  const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
+  const effectiveAgentId = selectedAgentId && agents.some((a) => a.id === selectedAgentId)
+    ? selectedAgentId
+    : pickDefaultDrawerAgent(agents)?.id ?? null;
+  const issue = ((issuesRaw as Issue[]) ?? []).find((i) => i.identifier.toLowerCase() === issueId.toLowerCase());
 
   return (
     <div className={cn('rounded-xl border bg-card shadow-sm', needsYou ? 'border-warning/40' : 'border-border')} data-dock-panel={issueId}>
       <div className="flex items-center gap-2 px-3 py-2">
         {needsYou && <span className="h-1.5 w-1.5 flex-none animate-pulse rounded-full bg-warning" />}
         <div className="min-w-0 flex-1">
-          <div className="truncate font-mono text-[11px]">{agent?.id ?? 'no agent'}</div>
+          <div className="truncate font-mono text-[11px]">{effectiveAgentId ?? 'no agent'}</div>
           <div className="truncate text-[10.5px] text-muted-foreground">{issueId}{issue ? ` · ${issue.title}` : ''}</div>
         </div>
         <button onClick={onClose} className="flex-none text-muted-foreground hover:text-foreground" aria-label={`Close ${issueId}`}>
           <X size={13} />
         </button>
       </div>
-      <div className="space-y-1.5 border-t border-border px-3 py-2">
-        {feed.length === 0 && <div className="text-[11px] text-muted-foreground">No activity yet.</div>}
-        {feed.map((obs) => (
-          <div key={obs.id} className="text-[11.5px] leading-snug">
-            <span className="mr-1.5 font-mono text-[9.5px] text-muted-foreground">{formatWhen(obs.timestamp)}</span>
-            {obs.narrative || obs.summary}
-          </div>
-        ))}
-      </div>
-      <div className="flex gap-1.5 border-t border-border p-2">
-        <input
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter') send(); }}
-          placeholder="Message…"
-          className="h-8 flex-1 rounded-md border border-input bg-muted px-2.5 text-xs text-foreground outline-none focus:border-ring"
+      {/* PAN-2908 C-CONVO v2: the full rich transcript in the dock — same
+          renderer as the drawer's conversation tab, not a summary feed. */}
+      <div className="h-[420px] border-t border-border p-2">
+        <DrawerAgentSession
+          view="conversation"
+          agents={agents}
+          agentId={effectiveAgentId}
+          onSelectAgent={setSelectedAgentId}
+          issueId={issueId}
         />
-        <button
-          onClick={send}
-          disabled={!text.trim() || !agent || actions.tell.isPending}
-          className="h-8 w-8 flex-none rounded-md bg-primary text-primary-foreground disabled:opacity-40"
-          aria-label="Send"
-        >
-          ➤
-        </button>
       </div>
     </div>
   );

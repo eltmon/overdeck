@@ -127,6 +127,7 @@ export function SimpleIssuePage({ issueId }: { issueId: string }) {
         <StepsTrack state={d.display.state} />
 
         <StatusCard display={d.display}>
+          {d.expectation && <span className="w-full text-xs text-muted-foreground">{d.expectation}</span>}
           {primary()}
           {d.display.secondaryActions.map((label) =>
             label === 'See what changed' && d.prUrl ? (

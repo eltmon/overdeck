@@ -20,11 +20,8 @@ import {
 import DrawerArtifactsPanel from '../../drawer/DrawerArtifactsPanel'
 import { IssueActionMenu } from '../../IssueActionMenu/IssueActionMenu'
 import { useIssueActions } from '../../IssueActionMenu/useIssueActions'
-import { selectReviewStatus, useDashboardStore } from '../../../lib/store'
-import { SpecialistStrip } from '../../issue-detail/SpecialistStrip'
-import IssuePhaseRail from '../../issue-detail/IssuePhaseRail'
-import type { Phase } from '../../../lib/simple/phases'
-import { deriveSpecialistChips } from '../../issue-detail/deriveSpecialists'
+import { selectAgents, selectReviewStatus, useDashboardStore } from '../../../lib/store'
+import { IssueDetailShell } from '../../issue-detail/IssueDetailShell'
 import { IssueView } from '../../issue-view/IssueView'
 import { SessionPanel } from '../../CommandDeck/SessionView/SessionPanel'
 import { MissionConversationTab } from './MissionConversationTab'
@@ -45,6 +42,7 @@ import { PlanMapCard } from './PlanMapCard'
 import { StatusNarrative } from './StatusNarrative'
 import { CockpitCard, CockpitPill, type CockpitTone } from './CockpitCard'
 import type { SessionNode } from '@overdeck/contracts'
+import type { Agent } from '../../../types'
 import styles from './cockpitBody.module.css'
 
 export interface IssueMissionControlProps {
@@ -458,21 +456,18 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
   const checks = useIssueCheckRunsQuery(issueId)
   const costs = useIssueCostsQuery(issueId)
   const headerActions = useIssueActions(issueId)
+  const allAgents = useDashboardStore(selectAgents) as Agent[]
   const reviewSnapshot = useDashboardStore(selectReviewStatus(issueId))
-  const specialistChips = useMemo(
-    () => deriveSpecialistChips([...treeSessions], reviewSnapshot),
-    [treeSessions, reviewSnapshot],
+  const issueAgents = useMemo(
+    () => allAgents.filter((a) => a.issueId?.toLowerCase() === issueId.toLowerCase()),
+    [allAgents, issueId],
   )
-  const railActivePhase = useMemo<Phase | null>(() => {
-    if (!selectedTreeSession) return null
-    const t = selectedTreeSession.type
-    if (t === 'planning') return 'plan'
-    if (t === 'work') return 'work'
-    if (t === 'review' || t === 'reviewer') return 'review'
-    if (t === 'test') return 'test'
-    if (t === 'ship' || t === 'merge') return 'ship'
-    return null
-  }, [selectedTreeSession])
+  const openAgentConversationById = (agentId: string) => {
+    const session = treeSessions.find((s) => s.sessionId === agentId)
+    if (session) { selectSessionFromTree(session); return }
+    const agent = issueAgents.find((a) => a.id === agentId)
+    if (agent?.role) handlePhaseClick(agent.role as PipelinePhaseKey)
+  }
   const phase = phaseStatus(review.data)
   const cost = costs.data?.resolvedTotalCost ?? costs.data?.totalCost ?? 0
   const toggleSpine = () => {
@@ -563,30 +558,20 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
             cost={cost > 0 ? `$${cost.toFixed(2)}` : undefined}
           />
         </div>
-        {/* PAN-2908 C-VOCAB/C-DETAIL: the shared phase rail replaces the
-            journey strip — same six words as the drawer, and clicking a phase
-            opens that agent's conversation. */}
+        {/* PAN-2908 C-DETAIL: the ONE issue-detail anatomy — same rail +
+            specialist strip as the drawer, one component to fix (journey
+            strip and bespoke strip mounts deleted). */}
         <div data-section="Pipeline Band" className="mt-3">
-          <IssuePhaseRail
+          <IssueDetailShell
             issueId={issueId}
+            agents={issueAgents}
+            reviewStatus={reviewSnapshot}
+            reviewerSessions={treeSessions.filter((s) => s.type === 'reviewer')}
+            activeAgentId={selectedTreeSession?.sessionId ?? null}
+            onOpenAgentConversation={openAgentConversationById}
             onSelectPhase={(railPhase) => handlePhaseClick(railPhase === 'done' ? 'ship' : railPhase)}
-            activePhase={railActivePhase}
           />
         </div>
-        {/* PAN-2908 C-DETAIL: every convoy specialist, one click to its
-            conversation (verdict + last line per chip). */}
-        {specialistChips.length > 0 && (
-          <div data-section="SpecialistStrip" className="mt-3">
-            <SpecialistStrip
-              specialists={specialistChips}
-              activeId={selectedTreeSession?.type === 'reviewer' ? selectedTreeSession.role ?? null : null}
-              onSelect={(chip) => {
-                const session = treeSessions.find((s) => s.type === 'reviewer' && s.role === chip.id);
-                if (session) selectSessionFromTree(session);
-              }}
-            />
-          </div>
-        )}
       </header>
 
       <nav data-section="Detail Tabs" className="flex flex-nowrap gap-1 overflow-x-auto border-b border-border bg-card px-3 pt-2" aria-label="Issue cockpit tabs">

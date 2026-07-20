@@ -804,14 +804,35 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
           onDragEnd={handleDragEnd}
         >
           <div className="flex gap-4 overflow-hidden pb-4">
-            {STATUS_ORDER.filter(s => s !== 'backlog').map((status) => {
-            const columnIssueIds = sortedGrouped[status].map(i => i.identifier);
-            const selectedInColumn = columnIssueIds.filter(id => bulkSelection.isSelected(id));
-            const allSelected = columnIssueIds.length > 0 && selectedInColumn.length === columnIssueIds.length;
-            const someSelected = selectedInColumn.length > 0 && selectedInColumn.length < columnIssueIds.length;
+            {(() => {
+              // PAN-2908 C-BOARD v2: the Plan column — issues in the planning
+              // phase (active planning agent, or a plan ready to start), split
+              // out of the backlog rollup column.
+              const planIssues: Issue[] = [];
+              const todoRest: Issue[] = [];
+              for (const issue of sortedGrouped.todo ?? []) {
+                const hasActivePlanning = agents.some(
+                  (a) => a.id?.startsWith('planning-') && a.issueId?.toLowerCase() === issue.identifier.toLowerCase() && !['stopped', 'dead', 'failed'].includes(a.status),
+                );
+                const hasPlanReady = planningStateById[issue.identifier]?.hasPlan === true;
+                if (hasActivePlanning || hasPlanReady) planIssues.push(issue);
+                else todoRest.push(issue);
+              }
+              const columns: { key: string; title: string; issues: Issue[]; rollup?: boolean }[] = [
+                { key: 'todo', title: COLUMN_TITLES.todo, issues: todoRest, rollup: true },
+                { key: 'plan', title: 'Plan', issues: planIssues },
+                ...STATUS_ORDER.filter((s) => s !== 'backlog' && s !== 'todo').map((s) => ({ key: s, title: COLUMN_TITLES[s], issues: sortedGrouped[s] })),
+              ];
+              return columns.map((column) => {
+                const status = column.key;
+                const columnIssues = column.issues ?? [];
+                const columnIssueIds = columnIssues.map((i) => i.identifier);
+                const selectedInColumn = columnIssueIds.filter((id) => bulkSelection.isSelected(id));
+                const allSelected = columnIssueIds.length > 0 && selectedInColumn.length === columnIssueIds.length;
+                const someSelected = selectedInColumn.length > 0 && selectedInColumn.length < columnIssueIds.length;
 
             return (
-              <DroppableColumn key={status} status={status} activeDragStatus={activeDragStatus} overId={activeOverId} issueIds={sortedGrouped[status].map(i => i.id)}>
+              <DroppableColumn key={status} status={status as CanonicalState} activeDragStatus={activeDragStatus} overId={activeOverId} issueIds={columnIssues.map(i => i.id)}>
                 <div
                   className="flex-1 min-w-0"
                   data-testid={`kanban-column-${status.replace(/_/g, '-')}`}
@@ -834,15 +855,15 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
                             }
                           }}
                           className="w-4 h-4 rounded border-border text-primary focus:ring-primary cursor-pointer shrink-0"
-                          aria-label={`Select all ${COLUMN_TITLES[status]}`}
+                          aria-label={`Select all ${column.title}`}
                         />
-                        <h3 className="font-semibold text-foreground">{COLUMN_TITLES[status]}</h3>
+                        <h3 className="font-semibold text-foreground">{column.title}</h3>
                       </div>
-                      <span className="text-sm text-muted-foreground">{sortedGrouped[status].length}</span>
+                      <span className="text-sm text-muted-foreground">{columnIssues.length}</span>
                     </div>
                   </div>
                   <ColumnContent
-                    issues={sortedGrouped[status]}
+                    issues={columnIssues}
                     issueWorkAgentsById={issueWorkAgentsById}
                     agents={agents}
                     specialists={specialists}
@@ -861,14 +882,15 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
                     onBulkToggle={bulkSelection.toggle}
                     planningStateById={planningStateById}
                     workspaceByIssueId={stackHealthByIssue}
-                    rollup={status === 'todo'}
+                    rollup={column.rollup === true}
                   />
                   {/* TODO(PAN-1242): + New issue column footer button — see PRD §4.7.6 */}
                   </div>
                 </div>
               </DroppableColumn>
             );
-          })}
+              });
+            })()}
           </div>
           <DragOverlay dropAnimation={dropAnimation}>
             {activeDragIssue ? <DragOverlayCard issue={activeDragIssue} /> : null}

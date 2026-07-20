@@ -8,11 +8,25 @@
  * lands in "Just filed" on My work, one click from planning.
  */
 import { useEffect, useState } from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { ModelPicker } from '../chat/ModelPicker';
 import { ensureDefaultConversationModel, getDefaultConversationModel } from '../chat/defaultConversationModel';
+import { fetchProjects } from '../CommandDeck/projectsData';
 import { SIMPLE_STRINGS } from '../../lib/simple/strings';
 import { PrimaryButton } from './parts';
+
+const PROJECT_KEY_STORAGE = 'overdeck:talk-project';
+
+function initialProjectKey(projects: { key: string }[]): string | undefined {
+  try {
+    const remembered = localStorage.getItem(PROJECT_KEY_STORAGE);
+    if (remembered && projects.some((p) => p.key === remembered)) return remembered;
+  } catch { /* ignore */ }
+  // Inside the deck the URL carries the current project — honor it.
+  const match = window.location.pathname.match(/^\/command-deck\/([^/]+)/);
+  if (match && projects.some((p) => p.key === match[1])) return match[1];
+  return projects[0]?.key;
+}
 
 export interface ConversationSpawn {
   id?: number | string;
@@ -38,6 +52,10 @@ export function TalkItThrough() {
   const [text, setText] = useState('');
   const [model, setModel] = useState(() => getDefaultConversationModel() || 'claude-opus-4-6');
   const [harness, setHarness] = useState<'claude-code' | 'codex'>('claude-code');
+  const projectsQuery = useQuery({ queryKey: ['projects'], queryFn: fetchProjects, staleTime: 60_000 });
+  const projects = projectsQuery.data ?? [];
+  const [projectKey, setProjectKey] = useState<string | undefined>(undefined);
+  const effectiveProjectKey = projectKey ?? initialProjectKey(projects);
 
   useEffect(() => {
     void ensureDefaultConversationModel().then(() => {
@@ -51,7 +69,7 @@ export function TalkItThrough() {
       const res = await fetch('/api/conversations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model, harness, message: seedDiscussPrompt(description) }),
+        body: JSON.stringify({ model, harness, projectKey: effectiveProjectKey, message: seedDiscussPrompt(description) }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({})) as { error?: string };
@@ -61,9 +79,10 @@ export function TalkItThrough() {
     },
     onSuccess: (conv) => {
       if (conv?.name) {
-        // The deck's conversation-first view owns the discussion from here.
-        window.history.pushState({}, '', `/conv/${encodeURIComponent(conv.name)}`);
-        window.dispatchEvent(new PopStateEvent('popstate'));
+        try { if (effectiveProjectKey) localStorage.setItem(PROJECT_KEY_STORAGE, effectiveProjectKey); } catch { /* ignore */ }
+        // Hard navigation: the deck loads fresh and selects the new conversation
+        // from the route (the synthetic popstate path raced the list refresh).
+        window.location.assign(`/conv/${encodeURIComponent(conv.name)}`);
       }
     },
   });
@@ -83,6 +102,19 @@ export function TalkItThrough() {
         className="h-11 flex-1 rounded-2xl border border-input bg-card px-4 text-sm text-foreground outline-none focus:border-ring"
         data-testid="talk-it-through-input"
       />
+      {projects.length > 0 && (
+        <select
+          value={effectiveProjectKey}
+          onChange={(e) => setProjectKey(e.target.value)}
+          aria-label="Project for this conversation"
+          data-testid="talk-it-through-project"
+          className="h-11 max-w-[150px] rounded-xl border border-input bg-card px-2 text-xs text-muted-foreground outline-none focus:border-ring"
+        >
+          {projects.map((p) => (
+            <option key={p.key} value={p.key}>{p.name}</option>
+          ))}
+        </select>
+      )}
       <ModelPicker value={model} onChange={(id) => setModel(id)} harness={harness} onHarnessChange={(h) => setHarness(h as typeof harness)} />
       <PrimaryButton disabled={!text.trim() || spawn.isPending} onClick={submit}>
         {spawn.isPending ? 'Starting…' : SIMPLE_STRINGS.home.composerButton}

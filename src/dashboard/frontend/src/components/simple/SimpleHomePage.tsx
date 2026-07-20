@@ -139,6 +139,7 @@ function WorkingRow({ item, onOpen }: { item: SimpleIssueDerivation; onOpen: () 
         <div className="mt-0.5 text-xs text-muted-foreground">
           <span className="text-info-foreground">{item.display.title}</span>
           {item.taskProgress ? ` · task ${item.taskProgress.completed} of ${item.taskProgress.total}` : ''}
+          {item.expectation ? ` · ${item.expectation}` : ''}
         </div>
         {item.taskProgress && <ProgressBar completed={item.taskProgress.completed} total={item.taskProgress.total} />}
       </div>

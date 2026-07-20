@@ -14,10 +14,7 @@ import { TasksPanel } from '../TasksPanel';
 import DrawerTabs from './DrawerTabs';
 import { VerificationGates } from '../issue-view/VerificationGates';
 import { ActiveAgentPanel } from '../issue-view/ActiveAgentPanel';
-import IssuePhaseRail from '../issue-detail/IssuePhaseRail';
-import { SpecialistStrip } from '../issue-detail/SpecialistStrip';
-import { agentsToReviewerSessions, deriveSpecialistChips } from '../issue-detail/deriveSpecialists';
-import type { Phase } from '../../lib/simple/phases';
+import { IssueDetailShell } from '../issue-detail/IssueDetailShell';
 import { PickupGateControls } from '../backlog/PickupGateControls';
 import { useDrawerData } from './useDrawerData';
 import { DrawerActivityPanel, DrawerPlanPanel } from './DrawerSecondaryPanels';
@@ -113,33 +110,6 @@ export function IssueDrawer() {
     setSelectedAgentId(agentId);
     openIssue(drawer.issueId, 'conversation');
   };
-  const ENDED = new Set(['stopped', 'dead', 'failed']);
-  const selectPhaseConversation = (phase: Phase) => {
-    const candidates = agents.filter((agent) => agent.role === phase);
-    const pick = candidates.find((agent) => !ENDED.has(agent.status))
-      ?? candidates.find((agent) => agent.id.endsWith('-review-supervisor'))
-      ?? candidates[0];
-    if (pick) openAgentConversation(pick.id);
-  };
-  const specialistChips = useMemo(
-    () => deriveSpecialistChips(agentsToReviewerSessions(agents), reviewStatus),
-    [agents, reviewStatus],
-  );
-  const selectSpecialistConversation = (chip: { id: string }) => {
-    const agent = agents.find((candidate) => candidate.id.toLowerCase().endsWith(`-review-${chip.id.toLowerCase()}`));
-    if (agent) openAgentConversation(agent.id);
-  };
-  const activeReviewerRole = useMemo(() => {
-    if (!effectiveAgentId) return null;
-    const match = /-review-([a-z]+)$/i.exec(effectiveAgentId);
-    return match ? match[1].toLowerCase() : null;
-  }, [effectiveAgentId]);
-  const activePhase = useMemo(() => {
-    if (drawer.tab !== 'conversation' || !effectiveAgentId) return null;
-    const agent = agents.find((candidate) => candidate.id === effectiveAgentId);
-    const role = agent?.role;
-    return role === 'plan' || role === 'work' || role === 'review' || role === 'test' || role === 'ship' ? role : null;
-  }, [drawer.tab, effectiveAgentId, agents]);
 
   useEffect(() => {
     syncDrawerFromUrl();
@@ -246,16 +216,17 @@ export function IssueDrawer() {
         </header>
         <div data-section="DrawerPausedBanner"><DrawerPausedBanner agents={agents} /></div>
         <div data-section="DrawerTabs"><DrawerTabs /></div>
-        {/* PAN-2908 C-DETAIL: rail + specialist strip live under the tabs,
-            visible on every tab — the per-agent conversation switcher. */}
+        {/* PAN-2908 C-DETAIL: the ONE issue-detail anatomy (rail + strip as
+            the per-agent conversation switcher), shared with the cockpit. */}
         <div data-section="PhaseTimeline" className="px-[22px] pt-[10px]">
-          <IssuePhaseRail onSelectPhase={selectPhaseConversation} activePhase={activePhase} />
+          <IssueDetailShell
+            issueId={drawer.issueId}
+            agents={agents}
+            reviewStatus={reviewStatus}
+            activeAgentId={drawer.tab === 'conversation' ? effectiveAgentId : null}
+            onOpenAgentConversation={openAgentConversation}
+          />
         </div>
-        {specialistChips.length > 0 && (
-          <div data-section="SpecialistStrip" className="px-[22px] pt-[8px]">
-            <SpecialistStrip specialists={specialistChips} activeId={activeReviewerRole} onSelect={selectSpecialistConversation} />
-          </div>
-        )}
         <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_320px]">
           <div
             className={cn(

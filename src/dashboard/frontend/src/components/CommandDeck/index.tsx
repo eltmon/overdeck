@@ -36,6 +36,7 @@ import { fetchWithTimeout } from '../../lib/apiFetch';
 import { fetchRegisteredProjects, findRegisteredProject, isKnownProject, ProjectRegistryErrorState, UnknownProjectState } from './UnknownProjectState';
 import { IssuesPaneFilterRow } from './IssuesPaneFilterRow';
 import { usePlannedBacklogVisibility } from '../../hooks/usePlannedBacklogVisibility';
+import { LoadingBoundary } from '../primitives/LoadingBoundary';
 
 async function fetchConversations(): Promise<Conversation[]> {
   const res = await fetchWithTimeout('/api/conversations');
@@ -1433,7 +1434,7 @@ export function CommandDeck({
 
         {/* Content Area — the project-scoped deck (PAN-1561) */}
         <div className={styles.content}>
-          {isProjectValidationPending ? <div className={styles.contentEmpty} role="status">Loading project…</div>
+          {isProjectValidationPending ? <div className={styles.contentEmpty} role="status"><LoadingBoundary label="The project" timeoutMs={8000} onRetry={() => void refetchRegisteredProjects()}><span>Loading project…</span></LoadingBoundary></div>
           : registeredProjectsError ? <ProjectRegistryErrorState onRetry={() => void refetchRegisteredProjects()} />
           : showUnknownProject ? (
             <UnknownProjectState project={selectedProject!} registeredProjects={registeredProjects} onSelectProject={onSelectProject} />

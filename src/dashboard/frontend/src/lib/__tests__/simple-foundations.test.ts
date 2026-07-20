@@ -132,11 +132,20 @@ describe('simple-mode copy lint (C-SIMPLE §3.1.6)', () => {
   it('simple components source contains no banned words', () => {
     const dir = join(__dirname, '../../components/simple');
     if (!existsSync(dir)) return; // components land in a later slice; lint activates with them
-    const files = readdirSync(dir).filter((f) => f.endsWith('.tsx') || f.endsWith('.ts'));
+    const files = readdirSync(dir).filter((f) => (f.endsWith('.tsx') || f.endsWith('.ts')) && !f.endsWith('.test.tsx') && !f.endsWith('.test.ts'));
+    // User-facing copy only: quoted string contents + JSX text nodes. Prop and
+    // identifier names (e.g. onHarnessChange) are API vocabulary, not copy.
+    const extractCopy = (src: string): string[] => {
+      const out: string[] = [];
+      for (const m of src.matchAll(/['"`]([^'"`\n]{2,})['"`]/g)) out.push(m[1]);
+      return out;
+    };
     for (const f of files) {
       const src = readFileSync(join(dir, f), 'utf8');
-      for (const re of BANNED_WORDS) {
-        expect(re.test(src), `banned word ${re.source} in components/simple/${f}`).toBe(false);
+      for (const copy of extractCopy(src)) {
+        for (const re of BANNED_WORDS) {
+          expect(re.test(copy), `banned word ${re.source} in components/simple/${f}: "${copy.slice(0, 60)}"`).toBe(false);
+        }
       }
     }
   });

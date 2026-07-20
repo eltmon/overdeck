@@ -3,6 +3,7 @@ import { useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-q
 import { formatRelativeTime } from '../../../lib/formatRelativeTime'
 import type { TaskStatusRollup } from '../../../lib/taskStatus'
 import styles from './tasksRail.module.css'
+import { LoadingBoundary } from '../../primitives/LoadingBoundary';
 
 /**
  * TasksRail — the compact at-a-glance progress view for the issue cockpit.
@@ -145,7 +146,7 @@ export function TasksRail({
         </div>
       )}
 
-      {isLoading && <div className={styles.empty}>Loading tasks…</div>}
+      {isLoading && <div className={styles.empty}><LoadingBoundary label="Tasks" timeoutMs={8000}><span>Loading tasks…</span></LoadingBoundary></div>}
 
       {!isLoading && total === 0 && (
         <div className={styles.empty}>

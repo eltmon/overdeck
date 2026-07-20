@@ -3,7 +3,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import type { AgentSnapshot, ReviewStatusSnapshot } from '@overdeck/contracts';
-import { bucketSimpleHome, deriveSimpleIssue } from '../simple/derive';
+import { bucketSimpleHome, deriveExpectation, deriveSimpleIssue } from '../simple/derive';
 import type { Issue } from '../../types';
 
 function makeIssue(overrides: Partial<Issue> = {}): Issue {
@@ -93,5 +93,21 @@ describe('bucketSimpleHome', () => {
     expect(b.ready.map((d) => d.issue.identifier)).toEqual(['PAN-2']);
     expect(b.finished.map((d) => d.issue.identifier)).toEqual(['PAN-4']);
     expect(b.needsYou).toEqual([]);
+  });
+});
+
+describe('deriveExpectation (C-SIMPLE expectations)', () => {
+  it('is null without an agent start time', () => {
+    expect(deriveExpectation(undefined, null)).toBeNull();
+    expect(deriveExpectation({ id: 'a', issueId: 'PAN-1' } as never, null)).toBeNull();
+  });
+  it('elapsed only when there is no task basis', () => {
+    const agent = { id: 'a', issueId: 'PAN-1', startedAt: new Date(Date.now() - 45 * 60_000).toISOString() } as never;
+    expect(deriveExpectation(agent, null)).toBe('started 45m ago');
+  });
+  it('extrapolates time-to-go from task progress', () => {
+    const agent = { id: 'a', issueId: 'PAN-1', startedAt: new Date(Date.now() - 60 * 60_000).toISOString() } as never;
+    const out = deriveExpectation(agent, { completed: 3, total: 6 });
+    expect(out).toBe('started 1h ago · about 1h to go');
   });
 });

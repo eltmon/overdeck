@@ -66,6 +66,8 @@ describe('SimpleHomePage (C-SIMPLE)', () => {
       if (url === '/api/settings/openrouter/models') return Response.json({ models: [], favorites: [] });
       if (url === '/api/settings') return Response.json({ models: {} });
       if (url.includes('/api/settings/harness-policy')) return Response.json({ decisions: {} });
+      if (url === '/api/issues/resource-allocated') return Response.json([]);
+      if (url === '/api/registered-projects') return Response.json([{ key: 'panopticon-cli', name: 'panopticon-cli', path: '/tmp' }]);
       return Response.json({});
     }));
   });

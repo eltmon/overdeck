@@ -6,6 +6,7 @@ import { bucketByTime, type TimeBucketKey } from '../../lib/timeBuckets';
 import { formatRelativeTime } from '../../lib/formatRelativeTime';
 import { NotificationClassBadge } from '../NotificationClassBadge';
 import { ActionStatusChip } from '../ActionStatusChip';
+import { FreshnessChip } from '../primitives/FreshnessChip';
 
 const BUCKET_LABELS: Record<TimeBucketKey, string> = {
   justNow: 'Just Now',
@@ -89,6 +90,7 @@ export function ActivityFeedSidebar({ issueId, issueIds, now = new Date() }: Act
     [idsKey, issueIds, issueId],
   );
   const observations = useDashboardStore(selectActionObservations);
+  const snapshotTimestamp = useDashboardStore((s) => s.snapshotTimestamp);
   const buckets = useMemo(
     () => bucketByTime(observations, (observation) => observation.timestamp, now),
     [observations, now],
@@ -97,7 +99,10 @@ export function ActivityFeedSidebar({ issueId, issueIds, now = new Date() }: Act
   return (
     <aside data-testid="activity-feed-sidebar" className="flex h-full min-h-0 flex-col gap-3 p-3">
       <div className="shrink-0">
-        <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Activity</h3>
+        <div className="flex items-baseline justify-between gap-2">
+          <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Activity</h3>
+          <FreshnessChip timestamp={snapshotTimestamp} />
+        </div>
         <p className="mt-1 text-xs text-muted-foreground/80">Recent workspace action updates</p>
       </div>
 
