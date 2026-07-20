@@ -16,6 +16,15 @@ import { useDashboardStore } from '../../lib/store';
 import { useUiMode } from '../../lib/simple/uiMode';
 import type { Issue } from '../../types';
 
+// The real transcript (ConversationPanel chain) is too heavy for jsdom; the
+// contract these tests prove is that the simple page MOUNTS it once an agent
+// exists and hides it before then.
+vi.mock('../drawer/DrawerAgentSession', () => ({
+  DrawerAgentSession: (props: { agentId: string | null; hideComposer?: boolean }) => (
+    <div data-testid="simple-transcript" data-agent-id={props.agentId ?? ''} data-hide-composer={String(!!props.hideComposer)} />
+  ),
+}));
+
 function makeIssue(overrides: Partial<Issue> = {}): Issue {
   return {
     id: overrides.identifier ?? 'PAN-1',
@@ -134,6 +143,40 @@ describe('SimpleIssuePage (C-SIMPLE)', () => {
     expect(screen.getByText('The agent is writing the code.')).toBeInTheDocument();
     expect(screen.getByText('What it\'s saying and doing')).toBeInTheDocument();
     expect(screen.getByPlaceholderText(/Say something to the agent/)).toBeInTheDocument();
+  });
+
+  it('shows the real transcript once an agent exists, with the panel composer hidden', () => {
+    seed({
+      issues: [makeIssue()],
+      agents: { 'agent-pan-1': makeAgent() },
+    });
+    renderWithProviders(<SimpleIssuePage issueId="PAN-1" />);
+    const transcript = screen.getByTestId('simple-transcript');
+    expect(transcript).toHaveAttribute('data-agent-id', 'agent-pan-1');
+    expect(transcript).toHaveAttribute('data-hide-composer', 'true');
+    // …and there is still exactly ONE way to talk to it (the simple composer).
+    expect(screen.getAllByRole('textbox')).toHaveLength(1);
+  });
+
+  it('shows the empty state instead of the transcript before work starts', () => {
+    seed({ issues: [makeIssue()] });
+    renderWithProviders(<SimpleIssuePage issueId="PAN-1" />);
+    expect(screen.queryByTestId('simple-transcript')).not.toBeInTheDocument();
+    expect(screen.getByText(/Nothing to show yet/)).toBeInTheDocument();
+  });
+
+  it('Get help routes to a new tracker issue pointing back at this task', () => {
+    seed({
+      issues: [makeIssue({ url: 'https://github.com/eltmon/overdeck/issues/42' })],
+      agents: { 'agent-pan-1': makeAgent() },
+    });
+    renderWithProviders(<SimpleIssuePage issueId="PAN-1" />);
+    const link = screen.getByRole('link', { name: 'Get help' });
+    expect(link).toHaveAttribute(
+      'href',
+      `https://github.com/eltmon/overdeck/issues/new?title=${encodeURIComponent('[HELP] PAN-1: Set up PostHog product analytics')}`,
+    );
+    expect(link).toHaveAttribute('target', '_blank');
   });
 
   it('ready state offers Merge to main as the one primary action', () => {

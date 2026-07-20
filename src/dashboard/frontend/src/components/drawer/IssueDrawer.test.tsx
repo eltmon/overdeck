@@ -739,6 +739,11 @@ describe('IssueDrawer', () => {
     const actionSets: Record<string, (string | null)[]> = {
       WORK_RUNNING: drawerIssueActionIds(),
     };
+    // PAN-2937: menu open state is global (survives unmount by design, so WS
+    // ticks can't close it). A real user can't reach this unmount with the
+    // menu still open — the overlay eats outside clicks — so close it before
+    // tearing down, mirroring the only reachable flow.
+    fireEvent.click(screen.getByTestId('issue-action-overflow-button'));
     first.unmount();
     resetDrawerIssueSubscriptionForTest();
 

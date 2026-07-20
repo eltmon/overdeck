@@ -105,6 +105,9 @@ interface ConversationPanelProps {
   onEmbeddedResume?: () => void;
   /** Label for the embedded resume button. Defaults to "Resume Session". */
   embeddedResumeLabel?: string;
+  /** Hide the composer entirely — the parent renders its own way to talk to
+   *  the agent (e.g. simple mode's jargon-free steering composer). */
+  hideComposer?: boolean;
   /** Called when a message POST fails — use to trigger a conversation refetch. */
   onSendFailed?: () => void;
 }
@@ -155,6 +158,7 @@ export function ConversationPanel({
   onToggleHideToolCalls,
   onEmbeddedResume,
   embeddedResumeLabel,
+  hideComposer = false,
   onSendFailed,
 }: ConversationPanelProps) {
   const [resumed, setResumed] = useState(false);
@@ -1005,6 +1009,7 @@ export function ConversationPanel({
               onArchive={!embedded ? handleArchive : undefined}
               resumePending={resumeMutation.isPending}
               resumeLabel={embeddedResumeLabel}
+              hideComposer={hideComposer}
               onSendFailed={onSendFailed}
               roundMarkers={roundMarkers}
               roundMetadata={roundMetadata}
@@ -1178,6 +1183,8 @@ interface ConversationViewProps {
   resumePending?: boolean;
   /** Override label for the resume button. Defaults to "Resume Session". */
   resumeLabel?: string;
+  /** Hide the composer — the parent renders its own way to talk to the agent. */
+  hideComposer?: boolean;
   /** Called when a message POST fails. */
   onSendFailed?: () => void;
   /** ModelPicker component to render next to the Resume button */
@@ -1209,7 +1216,7 @@ interface ConversationViewProps {
 
 export type { FailedMessage } from './chat-types';
 
-function ConversationView({ conversation, onResume, onArchive, resumePending, resumeLabel, onSendFailed: onSendFailedProp, modelPicker, roundMarkers, roundMetadata, turnDiffSummaryByAssistantMessageId, onOpenTurnDiff, resolvedTheme, agentId, hideToolCalls, workingPhase, agentBusy = false, streamMessagesEnabled, messagesData, messagesLoading, targetMessageId, targetMessageIndex, targetMessageNonce, onTargetMessageHandled }: ConversationViewProps) {
+function ConversationView({ conversation, onResume, onArchive, resumePending, resumeLabel, hideComposer = false, onSendFailed: onSendFailedProp, modelPicker, roundMarkers, roundMetadata, turnDiffSummaryByAssistantMessageId, onOpenTurnDiff, resolvedTheme, agentId, hideToolCalls, workingPhase, agentBusy = false, streamMessagesEnabled, messagesData, messagesLoading, targetMessageId, targetMessageIndex, targetMessageNonce, onTargetMessageHandled }: ConversationViewProps) {
   const isCompacting = useDashboardStore((s) => s.conversationsCompactingByName?.[conversation.name] ?? false);
   // Optimistic sent messages and the failed-send retry outbox live in the
   // module-level composerStore, keyed by conversation name. ConversationView is
@@ -1514,7 +1521,7 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, re
             {resumePending ? 'Resuming…' : (resumeLabel ?? 'Resume Session')}
           </button>
         </div>
-      ) : (
+      ) : hideComposer ? null : (
         <ComposerFooter
           conversation={conversation}
           onSend={handleMessageSent}

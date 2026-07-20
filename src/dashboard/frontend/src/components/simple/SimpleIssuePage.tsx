@@ -8,38 +8,29 @@
  */
 import { useMemo, useRef, useState } from 'react';
 import { ArrowLeft } from 'lucide-react';
-import { useDashboardStore, selectMemoryObservations } from '../../lib/store';
+import { useDashboardStore } from '../../lib/store';
 import type { Issue } from '../../types';
 import type { AgentSnapshot } from '@overdeck/contracts';
 import { deriveSimpleIssue } from '../../lib/simple/derive';
+import { getHelpUrl } from '../../lib/simple/helpUrl';
 import { SIMPLE_STRINGS } from '../../lib/simple/strings';
 import { useSimpleActions } from '../../lib/simple/useSimpleActions';
 import { useUiMode, syncSimpleIssueUrl } from '../../lib/simple/uiMode';
+import { DrawerAgentSession } from '../drawer/DrawerAgentSession';
 import { ModeToggle, PrimaryButton, QuietButton, StatusCard, StepsTrack } from './parts';
 
 const S = SIMPLE_STRINGS.issue;
-
-function formatWhen(iso: string): string {
-  const t = Date.parse(iso);
-  if (!Number.isFinite(t)) return '';
-  const mins = Math.round((Date.now() - t) / 60000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins}m ago`;
-  const hours = Math.round(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
-  return `${Math.round(hours / 24)}d ago`;
-}
 
 export function SimpleIssuePage({ issueId }: { issueId: string }) {
   const issuesRaw = useDashboardStore((s) => s.issuesRaw);
   const agentsById = useDashboardStore((s) => s.agentsById);
   const reviewByIssueId = useDashboardStore((s) => s.reviewStatusByIssueId);
-  const observations = useDashboardStore(selectMemoryObservations(issueId));
   const openDrawer = useDashboardStore((s) => s.openIssue);
   const closeSimpleIssue = useUiMode((s) => s.closeSimpleIssue);
   const actions = useSimpleActions();
   const composerRef = useRef<HTMLInputElement>(null);
   const [composerText, setComposerText] = useState('');
+  const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
 
   const derivation = useMemo(() => {
     const issues = (issuesRaw as Issue[]) ?? [];
@@ -50,11 +41,6 @@ export function SimpleIssuePage({ issueId }: { issueId: string }) {
     );
     return deriveSimpleIssue(issue, agents, reviewByIssueId?.[issue.identifier]);
   }, [issuesRaw, agentsById, reviewByIssueId, issueId]);
-
-  const feed = useMemo(
-    () => [...(observations ?? [])].sort((a, b) => b.timestamp.localeCompare(a.timestamp)).slice(0, 8).reverse(),
-    [observations],
-  );
 
   if (!derivation) {
     return (
@@ -70,6 +56,10 @@ export function SimpleIssuePage({ issueId }: { issueId: string }) {
   const d = derivation;
   const agent = d.primaryAgent;
   const questionAgent = d.pendingInputAgent;
+  // The transcript's agent picker owns this selection; the composer below
+  // always talks to the agent you're looking at.
+  const selectedAgent = d.agents.find((a) => a.id === selectedAgentId) ?? agent;
+  const helpUrl = getHelpUrl(d.issue);
   const busy = actions.tell.isPending || actions.answer.isPending || actions.recover.isPending || actions.merge.isPending || actions.startWork.isPending;
 
   const sendComposer = () => {
@@ -77,8 +67,8 @@ export function SimpleIssuePage({ issueId }: { issueId: string }) {
     if (!text) return;
     if (questionAgent) {
       actions.answer.mutate({ agentId: questionAgent.id, text });
-    } else if (agent) {
-      actions.tell.mutate({ agentId: agent.id, message: text });
+    } else if (selectedAgent) {
+      actions.tell.mutate({ agentId: selectedAgent.id, message: text });
     }
     setComposerText('');
   };
@@ -148,20 +138,27 @@ export function SimpleIssuePage({ issueId }: { issueId: string }) {
               </span>
             )}
           </div>
-          <div className="mt-2.5 flex flex-col gap-2.5">
-            {feed.length === 0 && (
+          <div className="mt-2.5">
+            {agent ? (
+              <div className="h-[420px] overflow-hidden rounded-xl border border-border">
+                {/* PAN-2908 C-SIMPLE/C-CONVO: the real transcript once work
+                    starts — the same renderer as every other conversation
+                    surface. The panel's own composer is hidden; the simple
+                    composer below stays the single way to talk to it. */}
+                <DrawerAgentSession
+                  view="conversation"
+                  agents={d.agents}
+                  agentId={selectedAgent?.id ?? null}
+                  onSelectAgent={setSelectedAgentId}
+                  issueId={d.issue.identifier}
+                  hideComposer
+                />
+              </div>
+            ) : (
               <div className="rounded-xl border border-dashed border-border p-4 text-center text-xs text-muted-foreground">
                 Nothing to show yet — updates appear here as it works.
               </div>
             )}
-            {feed.map((obs) => (
-              <div key={obs.id} className="max-w-[92%] self-start">
-                <div className="mb-0.5 text-[10.5px] text-muted-foreground">the agent · {formatWhen(obs.timestamp)}</div>
-                <div className="rounded-2xl rounded-tl-md border border-border bg-card px-3.5 py-2.5 text-[13px] leading-relaxed shadow-sm">
-                  {obs.narrative || obs.summary}
-                </div>
-              </div>
-            ))}
           </div>
           <div className="mt-3 flex items-center gap-2 rounded-2xl border border-input bg-card py-2 pl-3.5 pr-2 focus-within:border-ring">
             <input
@@ -174,7 +171,7 @@ export function SimpleIssuePage({ issueId }: { issueId: string }) {
             />
             <button
               onClick={sendComposer}
-              disabled={!composerText.trim() || (!agent && !questionAgent) || busy}
+              disabled={!composerText.trim() || (!selectedAgent && !questionAgent) || busy}
               className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground transition-opacity disabled:opacity-40"
               aria-label="Send"
             >
@@ -195,7 +192,15 @@ export function SimpleIssuePage({ issueId }: { issueId: string }) {
         </div>
 
         <div className="mt-6 text-center text-xs text-muted-foreground">
-          Something look wrong? <span className="text-info-foreground">{S.getHelp}</span> — a human sees these.
+          Something look wrong?{' '}
+          {helpUrl ? (
+            <a href={helpUrl} target="_blank" rel="noreferrer" className="text-info-foreground underline underline-offset-2">
+              {S.getHelp}
+            </a>
+          ) : (
+            <span className="text-info-foreground">{S.getHelp}</span>
+          )}{' '}
+          — a human sees these.
         </div>
       </div>
     </div>
