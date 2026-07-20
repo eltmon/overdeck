@@ -104,4 +104,16 @@ describe('IssueDetail (C-DETAIL one component)', () => {
     expect(screen.getByTestId('mock-action-menu')).toBeInTheDocument();
     expect(screen.queryByTestId('mock-activity-rail')).not.toBeInTheDocument();
   });
+
+  it('page density renders the full composition at route width with the wider status rail', () => {
+    const { container } = renderDetail(
+      <IssueDetail issueId="PAN-1" density="page" agents={AGENTS} tab="conversation" onSelectTab={() => {}} />,
+    );
+    expect(container.querySelector('[data-component="issue-detail"]')).toHaveAttribute('data-density', 'page');
+    expect(screen.getByTestId('drawer-tabs')).toBeInTheDocument();
+    expect(screen.getByTestId('mock-detail-shell')).toBeInTheDocument();
+    expect(screen.getByTestId('mock-activity-rail')).toBeInTheDocument();
+    expect(container.querySelector('.grid-cols-\\[minmax\\(0\\,1fr\\)_360px\\]')).not.toBeNull();
+    expect(screen.getByTestId('mock-agent-session-conversation')).toHaveAttribute('data-agent-id', 'agent-work-1');
+  });
 });

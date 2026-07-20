@@ -10,9 +10,12 @@
  * Densities:
  * - **drawer** — the full composition: tab strip + shell + tab bodies +
  *   320px status rail. This is exactly what IssueDrawer renders.
+ * - **page** — the same composition at full route width with a wider
+ *   360px status rail (the cockpit-route form). Adoption on
+ *   `/command-deck/:project/:issue` is a product decision tracked in #2962.
  * - **rail** — compact inline expansion: shell + active conversation +
  *   one action strip. (Adoption in the deck tree's FeatureItem is tracked
- *   as follow-up; the density is complete and tested here.)
+ *   in #2962; the density is complete and tested here.)
  *
  * The cockpit's conversation access deliberately stays on its session-tree →
  * SessionPanel flow (test-enshrined); both surfaces share this component's
@@ -40,7 +43,7 @@ import { PanOpenInPicker } from '../PanOpenInPicker';
 import type { WorkspaceInfo } from '../../lib/workspace-types';
 import { IssueDetailShell } from './IssueDetailShell';
 
-export type IssueDetailDensity = 'drawer' | 'rail';
+export type IssueDetailDensity = 'drawer' | 'page' | 'rail';
 
 export const ISSUE_DETAIL_TABS = [
   { id: 'overview', label: 'Overview' },
@@ -271,7 +274,7 @@ export function IssueDetail({ issueId, density, agents, reviewStatus, tab, onSel
   }
 
   return (
-    <div data-component="issue-detail" data-density="drawer" className={cn('flex min-h-0 flex-1 flex-col', className)}>
+    <div data-component="issue-detail" data-density={density} className={cn('flex min-h-0 flex-1 flex-col', className)}>
       <div data-section="DrawerPausedBanner"><PausedBanner agents={agents} /></div>
       <div data-section="DrawerTabs"><IssueDetailTabs tab={tab} onSelectTab={onSelectTab} tasksBadge={tasksBadge} /></div>
       {/* PAN-2908 C-DETAIL: the ONE issue-detail anatomy (rail + strip as the
@@ -279,7 +282,7 @@ export function IssueDetail({ issueId, density, agents, reviewStatus, tab, onSel
       <div data-section="PhaseTimeline" className="px-[22px] pt-[10px]">
         {shell}
       </div>
-      <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_320px]">
+      <div className={cn('grid min-h-0 flex-1', density === 'page' ? 'grid-cols-[minmax(0,1fr)_360px]' : 'grid-cols-[minmax(0,1fr)_320px]')}>
         <div
           className={cn(
             'flex min-w-0 flex-col',
