@@ -6,9 +6,18 @@ import { AgentTellForm } from '../AgentTellForm';
 import { PlanDialog } from '../PlanDialog';
 import type { IssueActionKey } from '../../lib/issueActions';
 import {
+  ContextMenuContent,
+  ContextMenuDestructiveItem,
+  ContextMenuItem,
+  ContextMenuLabel,
+  ContextMenuSeparator,
+} from '../shared/ContextMenu';
+import {
   IssueActionGroupedBody,
+  type IssueActionGroupedBodyProps,
   type IssueActionMenuItemPrimitiveProps,
   type IssueActionMenuPrimitives,
+  type NonIssueActionInvocation,
 } from './IssueActionGroupedBody';
 import { IssueOpenInDialog } from './IssueOpenInDialog';
 import type { IssueActionView, UseIssueActionsResult } from './useIssueActions';
@@ -139,6 +148,74 @@ function OverflowMenu({
         <IssueActionGroupedBody actions={actions} primitives={popoverMenuPrimitives(onClose)} />
       </div>
     </>
+  );
+}
+
+/* ── context presentation (right-click) — the third IssueActionMenu
+ *  presentation (strip · overflow · context), folded in from the deleted
+ *  GroupedIssueActionMenu skin (PAN-2908 C-ACTIONS §8.3). */
+
+function ContextMenuItemPrimitive({
+  onActivate,
+  preventClose,
+  ...props
+}: IssueActionMenuItemPrimitiveProps) {
+  return (
+    <ContextMenuItem
+      {...props}
+      onSelect={(event) => {
+        if (preventClose) event.preventDefault();
+        onActivate?.();
+      }}
+    />
+  );
+}
+
+function ContextMenuDestructiveItemPrimitive({
+  onActivate,
+  preventClose,
+  ...props
+}: IssueActionMenuItemPrimitiveProps) {
+  return (
+    <ContextMenuDestructiveItem
+      {...props}
+      onSelect={(event) => {
+        if (preventClose) event.preventDefault();
+        onActivate?.();
+      }}
+    />
+  );
+}
+
+const contextMenuPrimitives: IssueActionMenuPrimitives = {
+  Item: ContextMenuItemPrimitive,
+  DestructiveItem: ContextMenuDestructiveItemPrimitive,
+  Label: ContextMenuLabel,
+  Separator: ContextMenuSeparator,
+};
+
+export type { NonIssueActionInvocation };
+
+export type IssueActionContextMenuProps = Omit<IssueActionGroupedBodyProps, 'primitives'> & {
+  'data-section'?: string;
+};
+
+/** Right-click presentation of the one grouped body, for ContextMenuRoot hosts. */
+export function IssueActionContextMenu({
+  actions,
+  nonIssueActions,
+  defaultExplain,
+  'data-section': dataSection,
+}: IssueActionContextMenuProps) {
+  return (
+    <ContextMenuContent className="w-[320px] font-sans" data-section={dataSection}>
+      <IssueActionGroupedBody
+        actions={actions}
+        primitives={contextMenuPrimitives}
+        nonIssueActions={nonIssueActions}
+        defaultExplain={defaultExplain}
+      />
+    </ContextMenuContent>
   );
 }
 

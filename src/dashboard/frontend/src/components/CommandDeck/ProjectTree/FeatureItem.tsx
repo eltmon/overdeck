@@ -15,7 +15,7 @@ import { useWorkspaceQuery } from '../ZoneCOverviewTabs/queries';
 import { createUatActionHandler } from './uat-action-handlers';
 import { ContextMenuRoot, ContextMenuTrigger } from '../../shared/ContextMenu';
 import {
-  GroupedIssueActionMenu,
+  IssueActionContextMenu,
   IssueActionDialogHost,
   useIssueActions,
 } from '../../IssueActionMenu';
@@ -679,7 +679,7 @@ function FeatureContextMenu({
 
   return (
     <>
-      <GroupedIssueActionMenu actions={issueActions} nonIssueActions={nonIssueActions} data-section="FeatureContextMenu (issue-row right-click)" />
+      <IssueActionContextMenu actions={issueActions} nonIssueActions={nonIssueActions} data-section="FeatureContextMenu (issue-row right-click)" />
       <IssueActionDialogHost issueId={feature.issueId} actions={issueActions} />
     </>
   );

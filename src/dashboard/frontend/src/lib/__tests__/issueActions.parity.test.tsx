@@ -6,7 +6,7 @@ import { fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { DialogProvider } from '../../components/DialogProvider';
-import { GroupedIssueActionMenu } from '../../components/IssueActionMenu/GroupedIssueActionMenu';
+import { IssueActionContextMenu as GroupedIssueActionMenu } from '../../components/IssueActionMenu';
 import { IssueActionMenu } from '../../components/IssueActionMenu';
 import { useIssueActions, type IssueActionView } from '../../components/IssueActionMenu/useIssueActions';
 import { ContextMenuRoot, ContextMenuTrigger } from '../../components/shared/ContextMenu';

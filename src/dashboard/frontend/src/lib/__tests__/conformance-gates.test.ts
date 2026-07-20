@@ -92,7 +92,6 @@ describe('conformance gate: single shell (C-DETAIL §3.9)', () => {
 describe('conformance gate: single menu skin (C-ACTIONS §3.9)', () => {
   it('the grouped body only renders inside the IssueActionMenu skin', () => {
     expect(importersOf(/IssueActionGroupedBody/)).toEqual([
-      'components/IssueActionMenu/GroupedIssueActionMenu.tsx',
       'components/IssueActionMenu/IssueActionMenu.tsx',
       'components/IssueActionMenu/index.ts',
     ]);

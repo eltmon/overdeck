@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ZoneBActionStrip } from '../../components/CommandDeck/ZoneBActionStrip';
 import { DialogProvider } from '../../components/DialogProvider';
 import DrawerActionBar from '../../components/drawer/DrawerActionBar';
-import { GroupedIssueActionMenu } from '../../components/IssueActionMenu/GroupedIssueActionMenu';
+import { IssueActionContextMenu as GroupedIssueActionMenu } from '../../components/IssueActionMenu';
 import type { IssueActionView, UseIssueActionsResult } from '../../components/IssueActionMenu/useIssueActions';
 import { IssueCard } from '../../components/KanbanBoard/cards/KanbanCards';
 import { PipelineView } from '../../components/Pipeline/PipelineView';

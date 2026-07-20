@@ -83,7 +83,7 @@ export const ISSUE_VIEW_INVENTORY: readonly IssueViewInventoryEntry[] = [
     home: 'src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx',
     actionRelocation: {
       surface: 'FeatureContextMenu',
-      home: 'src/dashboard/frontend/src/components/IssueActionMenu/GroupedIssueActionMenu.tsx',
+      home: 'src/dashboard/frontend/src/components/IssueActionMenu/IssueActionMenu.tsx',
     },
   },
   { section: 'Badges', view: 'rail', home: 'src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx' },

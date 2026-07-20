@@ -10,7 +10,7 @@ import {
   type PipelinePhase,
 } from '../../lib/issueActions';
 import { ContextMenuRoot, ContextMenuTrigger } from '../shared/ContextMenu';
-import { GroupedIssueActionMenu, type NonIssueActionInvocation } from './GroupedIssueActionMenu';
+import { IssueActionContextMenu, type NonIssueActionInvocation } from './IssueActionMenu';
 import {
   IssueActionGroupedBody,
   type IssueActionMenuItemPrimitiveProps,
@@ -88,7 +88,7 @@ function renderMenu({
   render(
     <ContextMenuRoot>
       <ContextMenuTrigger>Open menu</ContextMenuTrigger>
-      <GroupedIssueActionMenu actions={{ all, primary, phase }} nonIssueActions={nonIssueActions} />
+      <IssueActionContextMenu actions={{ all, primary, phase }} nonIssueActions={nonIssueActions} />
     </ContextMenuRoot>,
   );
   fireEvent.contextMenu(screen.getByText('Open menu'));
@@ -109,7 +109,7 @@ afterEach(() => {
   invokes.clear();
 });
 
-describe('GroupedIssueActionMenu', () => {
+describe('IssueActionContextMenu', () => {
   it('renders the binding WORK_RUNNING structure, counts, and repeated phase-primary actions', () => {
     const sessionExtra = vi.fn();
     const menu = renderMenu({
