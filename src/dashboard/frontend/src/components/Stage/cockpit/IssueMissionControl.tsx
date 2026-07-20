@@ -21,6 +21,8 @@ import DrawerArtifactsPanel from '../../drawer/DrawerArtifactsPanel'
 import { IssueActionMenu } from '../../IssueActionMenu/IssueActionMenu'
 import { useIssueActions } from '../../IssueActionMenu/useIssueActions'
 import { selectAgents, selectReviewStatus, useDashboardStore } from '../../../lib/store'
+import { derivePipelineState, type PipelineState } from '../../../lib/issuePipelineState'
+import { currentPhase, phaseLabel } from '../../../lib/simple/phases'
 import { IssueDetailShell } from '../../issue-detail/IssueDetailShell'
 import { IssueView } from '../../issue-view/IssueView'
 import { SessionPanel } from '../../CommandDeck/SessionView/SessionPanel'
@@ -111,16 +113,14 @@ function checkRunLabel(run: Pick<IssueCheckRun, 'status' | 'conclusion'>): strin
   return (run.conclusion ?? 'unknown').replace(/_/g, ' ')
 }
 
-function phaseStatus(rs: ReviewStatusData | undefined) {
-  if (!rs) return 'pending'
-  if (rs.mergeStatus === 'merged') return 'merged'
-  if (rs.mergeStatus === 'merging' || rs.mergeStatus === 'queued' || rs.mergeStatus === 'verifying') return rs.mergeStatus
-  if (rs.testStatus === 'testing') return 'testing'
-  if (rs.reviewStatus === 'reviewing') return 'reviewing'
-  if (rs.reviewStatus === 'blocked' || rs.reviewStatus === 'failed') return rs.reviewStatus
-  if (rs.testStatus === 'failed' || rs.testStatus === 'dispatch_failed') return rs.testStatus
-  if (rs.readyForMerge) return 'ready'
-  return rs.reviewStatus ?? 'pending'
+// PAN-2908: the cockpit's bespoke phaseStatus() derivation is deleted — the
+// header pill speaks the ONE shared machine (derivePipelineState) and the
+// six-word vocabulary (phaseLabel), same as the board, drawer, and rail.
+function pillTone(state: PipelineState): CockpitTone {
+  if (state === 'merged' || state === 'done') return 'success'
+  if (state === 'in_review_changes_requested' || state === 'testing_failures' || state === 'verification_failing' || state === 'canceled') return 'destructive'
+  if (state === 'generic') return 'muted'
+  return 'info'
 }
 
 function nextAction(rs: ReviewStatusData | undefined): string {
@@ -458,6 +458,11 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
   const headerActions = useIssueActions(issueId)
   const allAgents = useDashboardStore(selectAgents) as Agent[]
   const reviewSnapshot = useDashboardStore(selectReviewStatus(issueId))
+  const issueRecord = useDashboardStore((s) =>
+    (s.issuesRaw as Array<{ identifier: string; state?: string; status?: string }> | undefined)?.find(
+      (candidate) => candidate.identifier === issueId,
+    ),
+  )
   const issueAgents = useMemo(
     () => allAgents.filter((a) => a.issueId?.toLowerCase() === issueId.toLowerCase()),
     [allAgents, issueId],
@@ -468,7 +473,31 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
     const agent = issueAgents.find((a) => a.id === agentId)
     if (agent?.role) handlePhaseClick(agent.role as PipelinePhaseKey)
   }
-  const phase = phaseStatus(review.data)
+  // PAN-2908 C-VOCAB/one-data-model: the header pill runs on the shared
+  // pipeline machine (WS snapshot first, HTTP detail as warmup fallback) —
+  // no bespoke phase re-derivation on this surface.
+  const primaryAgent = useMemo(() => {
+    const live = issueAgents.filter((a) => a.status === 'running' || a.status === 'starting')
+    return live.find((a) => a.role === 'work') ?? live[0] ?? issueAgents[0] ?? null
+  }, [issueAgents])
+  const workAgentRunning = useMemo(
+    () => issueAgents.some((a) => a.role === 'work' && (a.status === 'running' || a.status === 'starting')),
+    [issueAgents],
+  )
+  const pipelineState = derivePipelineState({
+    reviewStatus: (reviewSnapshot ?? review.data ?? null),
+    agent: primaryAgent,
+    hasPlan: headerActions.state.hasPlan,
+    hasTasks: tasksRollup.total > 0,
+    issueCanonicalState: issueRecord?.state ?? issueRecord?.status ?? null,
+    isMerged: (reviewSnapshot ?? review.data)?.mergeStatus === 'merged',
+  })
+  const currentPhaseKey = currentPhase(pipelineState)
+  const phase = currentPhaseKey
+    ? phaseLabel(currentPhaseKey)
+    : pipelineState === 'merged' || pipelineState === 'done'
+      ? phaseLabel('done')
+      : '—'
   const cost = costs.data?.resolvedTotalCost ?? costs.data?.totalCost ?? 0
   const toggleSpine = () => {
     setSpineCollapsed((collapsed) => {
@@ -526,7 +555,7 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
             <div className="mt-1 flex flex-wrap items-center gap-2">
               <span className="font-mono text-[13px] font-medium text-foreground">{issueId}</span>
               <h1 className="min-w-0 max-w-full break-words text-[16px] font-medium leading-snug text-foreground">{title}</h1>
-              <CockpitPill tone={statusToTone(phase)}>{phase}</CockpitPill>
+              <CockpitPill tone={pillTone(pipelineState)}>{phase}</CockpitPill>
             </div>
           </div>
           <div className={styles.headerMeta}>
@@ -554,7 +583,7 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
           <StatusNarrative
             issueId={issueId}
             hasPlan={headerActions.state.hasPlan}
-            workRunning={phase === 'pending'}
+            workRunning={workAgentRunning}
             cost={cost > 0 ? `$${cost.toFixed(2)}` : undefined}
           />
         </div>
