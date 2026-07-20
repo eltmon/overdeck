@@ -2,15 +2,9 @@
  * Cloister specialist spawn command and environment helpers.
  */
 
-import { existsSync, readdirSync } from 'fs';
-import { join } from 'path';
-import { exec } from 'child_process';
-import { promisify } from 'util';
 import { Effect } from 'effect';
 import { readCavemanVariant } from '../caveman/workspace.js';
 import { resolveHarness } from '../harness-resolve.js';
-
-const execAsync = promisify(exec);
 
 function roleForSpecialistModel(specialistType: string): { role: 'plan' | 'work' | 'review' | 'test' | 'ship'; subRole?: string } {
   const normalized = specialistType.replace(/-agent$/, '');
@@ -23,54 +17,6 @@ function roleForSpecialistModel(specialistType: string): { role: 'plan' | 'work'
   return { role: 'work' };
 }
 
-
-/**
- * Resolve git directories and branch name from a workspace path.
- * Handles both monorepo (single .git at root) and polyrepo (multiple .git in subdirs).
- * When task.branch is missing, detects it from the checked-out branch in git repos.
- */
-async function resolveWorkspaceGitInfo(workspace: string | undefined, taskBranch: string | undefined): Promise<{
-  gitDirs: string[];
-  branch: string;
-  isPolyrepo: boolean;
-}> {
-  const gitDirs: string[] = [];
-  let branch = taskBranch || 'unknown';
-
-  if (!workspace || workspace === 'unknown') {
-    return { gitDirs, branch, isPolyrepo: false };
-  }
-
-  // Detect git directories
-  if (existsSync(join(workspace, '.git'))) {
-    gitDirs.push(workspace);
-  } else {
-    try {
-      const entries = readdirSync(workspace, { withFileTypes: true });
-      for (const entry of entries) {
-        if (entry.isDirectory() && existsSync(join(workspace, entry.name, '.git'))) {
-          gitDirs.push(join(workspace, entry.name));
-        }
-      }
-    } catch {}
-  }
-
-  // Auto-resolve branch from git when not provided
-  if (branch === 'unknown' && gitDirs.length > 0) {
-    try {
-      const { stdout } = await execAsync(
-        `cd "${gitDirs[0]}" && git branch --show-current`,
-        { encoding: 'utf-8', timeout: 5000 }
-      );
-      const detected = stdout.trim();
-      if (detected) {
-        branch = detected;
-      }
-    } catch {}
-  }
-
-  return { gitDirs, branch, isPolyrepo: gitDirs.length > 1 };
-}
 
 /**
  * Shell fragment that unsets every provider-routing env var a parent tmux server

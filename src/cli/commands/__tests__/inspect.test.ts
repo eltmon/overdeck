@@ -4,7 +4,15 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({ resolve: vi.fn(), spawn: vi.fn(), readPlan: vi.fn() }));
 vi.mock('../../../lib/projects.js', () => ({ resolveProjectFromIssueSync: mocks.resolve }));
 vi.mock('../../../lib/cloister/inspect-agent.js', () => ({ spawnInspectAgent: mocks.spawn }));
-vi.mock('../../../lib/cloister/inspect-checkpoints.js', () => ({ getDiffBase: () => Effect.succeed('abc'), getDiffStats: () => Effect.succeed('1 file') }));
+vi.mock('../../../lib/cloister/inspect-checkpoints.js', () => ({
+  getInspectDiffContext: () => Effect.succeed({
+    currentHead: 'def',
+    checkpoint: 'abc',
+    diffStats: '1 file',
+    diffCommand: 'git diff abc...HEAD',
+    repos: [],
+  }),
+}));
 vi.mock('../../../lib/xbrief/io.js', () => ({ readWorkspacePlanSync: mocks.readPlan }));
 
 import { inspectCommand, resolveInspectItem } from '../inspect.js';

@@ -38,8 +38,7 @@ Perform exactly two checks. Be thorough but fast — you are reviewing one item'
 Read the item description above carefully. Then examine the diff:
 
 ```bash
-cd {{workspacePath}}
-git diff {{diffBase}}...HEAD
+{{diffCommand}}
 ```
 
 Look for:

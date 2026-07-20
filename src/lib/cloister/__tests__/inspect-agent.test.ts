@@ -8,8 +8,7 @@ const mocks = vi.hoisted(() => ({
   deliverCommitForReview: vi.fn(),
   generateLauncherScriptSync: vi.fn(),
   getCurrentHead: vi.fn(),
-  getDiffBase: vi.fn(),
-  getDiffStats: vi.fn(),
+  getInspectDiffContext: vi.fn(),
   getProviderEnvForModel: vi.fn(),
   isIssueClosed: vi.fn(),
   killSession: vi.fn(),
@@ -49,8 +48,7 @@ vi.mock('../issue-closed.js', () => ({
 
 vi.mock('../inspect-checkpoints.js', () => ({
   getCurrentHead: mocks.getCurrentHead,
-  getDiffBase: mocks.getDiffBase,
-  getDiffStats: mocks.getDiffStats,
+  getInspectDiffContext: mocks.getInspectDiffContext,
   saveCheckpoint: vi.fn(),
 }));
 
@@ -119,10 +117,15 @@ describe('spawnInspectAgent', () => {
     mocks.killSession.mockReturnValue(Effect.succeed(undefined));
     mocks.createSession.mockReturnValue(Effect.succeed(undefined));
     mocks.existsSync.mockReturnValue(true);
-    mocks.readFileSync.mockReturnValue('Inspect {{issueId}} {{itemId}} {{diffBase}} {{diffStats}} {{itemDescription}}');
+    mocks.readFileSync.mockReturnValue('Inspect {{issueId}} {{itemId}} {{diffCommand}} {{diffStats}} {{itemDescription}}');
     mocks.execFileAsync.mockResolvedValue({ stdout: JSON.stringify({ title: 'task title' }), stderr: '' });
-    mocks.getDiffBase.mockReturnValue(Effect.succeed('abcdef1234567890'));
-    mocks.getDiffStats.mockReturnValue(Effect.succeed('diff stats'));
+    mocks.getInspectDiffContext.mockReturnValue(Effect.succeed({
+      currentHead: 'fedcba9876543210',
+      checkpoint: 'abcdef12',
+      diffStats: 'diff stats',
+      diffCommand: 'git diff abcdef1234567890...HEAD',
+      repos: [],
+    }));
     mocks.getCurrentHead.mockReturnValue(Effect.succeed('fedcba9876543210'));
     mocks.getProviderEnvForModel.mockResolvedValue({});
     mocks.prepareHarnessLaunch.mockResolvedValue({

@@ -108,6 +108,15 @@ workspace path:
   sub-repo head is unchanged; consumers that use an anchor as a git ref fail
   the lookup and fall back to their conservative full-rerun path
   (`computeConvoyScope` diffs in the primary sub-repo for the same reason).
+- **Inspection checkpoints** (`inspect-checkpoints.ts`): per-item diffs run in
+  the code sub-repos and checkpoints store the same composite head snapshot.
+  On later items, unchanged repos are omitted so an inspector never reviews an
+  older commit from an untouched repo or the wrapper's `.gitignore` commit.
+- **Verification** (`verification-runner.ts`): target-branch sync and the
+  empty-changeset guard loop over every resolved repo. Any content change in any
+  repo satisfies the guard; a failed repo diff skips the guard conservatively.
+  When a container gate reports infrastructure unavailable, verification waits
+  for the triggered stack rebuild to settle before another cycle can start.
 
 ---
 
