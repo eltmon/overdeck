@@ -298,7 +298,6 @@ export function IssueDetail({ issueId, density, agents, reviewStatus, tab, onSel
               <div data-section="DrawerWorkspaceSection"><WorkspaceSection issueId={issueId} /></div>
               <div data-section="UatEnvironmentPanel"><UatEnvironmentPanel issueId={issueId} /></div>
               <div data-section="DrawerActiveAgent"><ActiveAgentPanel agentId={effectiveAgentId ?? ''} density="console" /></div>
-              <div data-section="DrawerVerificationGates"><VerificationGates issueId={issueId} /></div>
               <div data-section="DrawerTasksList"><TasksPanel issueId={issueId} /></div>
             </div>
           ) : tab === 'tasks' ? (
@@ -331,7 +330,17 @@ export function IssueDetail({ issueId, density, agents, reviewStatus, tab, onSel
             <TabPlaceholder tab={tab} />
           )}
         </div>
-        <div data-section="DrawerActivityRail / DrawerActivityPanel"><DrawerActivityRail /></div>
+        <div data-section="DrawerActivityRail / DrawerActivityPanel" className="flex min-h-0 flex-col">
+          {/* PAN-2908 C-DETAIL: status facets live in the always-visible right
+              rail (gates above live activity) — consulted while steering,
+              never a tab away. */}
+          <div data-section="DrawerVerificationGates" className="shrink-0 border-l border-border bg-card/70 p-[10px]">
+            <VerificationGates issueId={issueId} />
+          </div>
+          <div className="min-h-0 flex-1">
+            <DrawerActivityRail />
+          </div>
+        </div>
       </div>
     </div>
   );
