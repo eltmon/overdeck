@@ -6053,3 +6053,15 @@ Substrate bugs filed: 2897 2898 2899 2900 2901 2902 2907 2913 (8; ALL fixed and 
 - **Spurious FAILED root-caused → PAN-2959:** `pan inspect --item metering-cost-door` reviewed workspace HEAD (03b29a8d, 4 voice commits later) instead of the item's actual commit e39404ef. Separate from the PAN-2956 git-show infra bug. Filed PAN-2959 (inspect must resolve the item's commit, not HEAD, esp. on retry-after-HEAD-moved).
 - **Operator-approved PASSED disposition applied (grounded, not bypass):** verified all 4 metering-cost-door ACs present in e39404ef (api): AC1 migration V252 (usage_detail_json JSONB, reported_cost_usd NUMERIC(10,6), generated total_cost_usd); AC2 COALESCE cost computation; AC3 @Column usage_detail_json jsonb; AC4 NUMERIC(10,6)/scale=6/ROUND_HALF_UP + 293-line repo test. inspect_status → passed. Work agent can proceed to gemini-adapter.
 - LESSON: an inspect "no verdict / spurious verdict" can stack THREE distinct bugs (git-show composite ENAMETOOLONG=2956, wrong-commit scoping=2959, supervisor-no-self-terminate=2960). Fixing one un-masks the next; verify each by re-running on real data and reading the actual diff the inspector received.
+
+## Ticks 127-130 — 2026-07-20 ~11:00-14:40 — MIN-882 COMPLETED (In Review); polyrepo completion path hardened (6 substrate bugs)
+- **MIN-882 `pan done` completed cleanly** — no rebase, no force-push, branches unchanged (api 12c23b48 / fe ed3456fa1), moved to In Review. Did NOT merge (require_uat_before_merge ON; iOS-device sample-rate UAT + running-app Playwright AC remain explicit outstanding operator checkpoints — not asserted passed).
+- **The MIN-882 saga surfaced 6 real polyrepo/inspect substrate bugs, all filed, 2 fixed+deployed this session:**
+  - PAN-2956 (git-show composite ENAMETOOLONG in inspect) — FIXED+deployed+verified.
+  - PAN-2959 (inspect reviews workspace HEAD not the item's commit → spurious verdict) — filed.
+  - PAN-2960 (inspect supervisor lingers past 12m, no self-terminate) — filed.
+  - PAN-2961 (pan done force-pushes even when up-to-date → breaks GitLab/no-history-rewrite completion; fix in rebase-helper.ts, NOT merge-rebase.ts) — FIXED+deployed+verified via live pan done.
+  - PAN-2966 (polyrepo wrapper .gitignore misses .pan/ .devcontainer/ dev → cleanliness gate false-fails) — filed; worked around via operator-approved `pan done --force` (scaffolding-only untracked, work clean+pushed).
+  - metering-cost-door PASSED via operator-approved disposition (all 4 ACs verified in e39404ef); gemini-adapter unblocked (stale scheduling block).
+- **Red-main #6 (5eb82f2d53, #2908 source-introspection unbaselined conformance-gates.test.ts) cleared** via PAN-2963 (baseline) before the completion chain could verify. #2908 external UX agent = 6 red-mains today, all mechanical gate catches (PAN-2940 pattern).
+- LESSON: the polyrepo (MYN) completion+inspect path was genuinely under-hardened vs single-repo GitHub. Each fix un-masked the next (git-show → wrong-commit → force-push → wrapper-gitignore). Verify each by running the real command (pan inspect / pan done) on the real workspace and reading what it actually did.
