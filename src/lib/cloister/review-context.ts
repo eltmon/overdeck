@@ -20,6 +20,7 @@ import { fetchCodeRabbitFindings, type CodeRabbitFinding } from './coderabbit-in
 import { findXBriefByIssueSync } from '../xbrief/lifecycle-io.js';
 import { getDevrootPathSync } from '../config.js';
 import { FsError } from '../errors.js';
+import { resolveWorkspaceRepoRootsSync } from '../project-repos.js';
 
 const execAsync = promisify(exec);
 
@@ -68,12 +69,24 @@ export interface ReviewItemTrace {
   traces: string[];
 }
 
+/** Per-repo git context for polyrepo workspaces (PAN-2948). Additive — absent
+ * or single-entry for monorepo workspaces, so existing consumers are untouched. */
+export interface ReviewRepoContext {
+  repoKey: string;
+  branch: string;
+  headSha: string;
+  diffBase: string;
+  fileCount: number;
+}
+
 export interface ReviewContextManifest {
   runId: string;
   issueId: string;
   generatedAt: string;
   branch: string;
   headSha: string;
+  /** Present when the workspace is polyrepo: one entry per sub-repo reviewed. */
+  repos?: ReviewRepoContext[];
   diff: {
     stat: string;
     truncated: boolean;
@@ -118,21 +131,21 @@ async function getCurrentBranch(cwd: string): Promise<string> {
   }
 }
 
-export async function getDiffBase(cwd: string): Promise<string> {
+export async function getDiffBase(cwd: string, targetBranch = 'main'): Promise<string> {
   try {
-    const { stdout } = await execAsync('git merge-base origin/main HEAD', { cwd, encoding: 'utf-8' });
+    const { stdout } = await execAsync(`git merge-base origin/${targetBranch} HEAD`, { cwd, encoding: 'utf-8' });
     return stdout.trim();
   } catch {
     try {
-      const { stdout } = await execAsync('git merge-base main HEAD', { cwd, encoding: 'utf-8' });
+      const { stdout } = await execAsync(`git merge-base ${targetBranch} HEAD`, { cwd, encoding: 'utf-8' });
       return stdout.trim();
     } catch {
-      return 'main';
+      return targetBranch;
     }
   }
 }
 
-export async function getChangedFiles(cwd: string, base: string): Promise<ChangedFile[]> {
+export async function getChangedFiles(cwd: string, base: string, pathPrefix = ''): Promise<ChangedFile[]> {
   // --name-status gives us the status letter + path
   let nameStatus = '';
   try {
@@ -174,13 +187,14 @@ export async function getChangedFiles(cwd: string, base: string): Promise<Change
 
     const statusLetter = (statusChar?.[0] ?? 'M') as ChangedFile['status'];
     const counts = numstatMap.get(path) ?? { additions: 0, deletions: 0 };
+    const prefixedPath = `${pathPrefix}${path}`;
 
     files.push({
-      path,
+      path: prefixedPath,
       status: statusLetter,
       additions: counts.additions,
       deletions: counts.deletions,
-      riskScore: riskScore(path),
+      riskScore: riskScore(prefixedPath),
     });
   }
 
@@ -341,7 +355,7 @@ export interface BuildReviewContextOpts {
 export function formatTier1Summary(
   manifest: Pick<
     ReviewContextManifest,
-    | 'issueId' | 'branch' | 'headSha' | 'changedFiles' | 'acceptanceCriteria' | 'nonGoals' | 'traces' | 'policyNotes' | 'stubUiFindings' | 'codeRabbitFindings' | 'diff' | 'largeChangeset'
+    | 'issueId' | 'branch' | 'headSha' | 'repos' | 'changedFiles' | 'acceptanceCriteria' | 'nonGoals' | 'traces' | 'policyNotes' | 'stubUiFindings' | 'codeRabbitFindings' | 'diff' | 'largeChangeset'
   >,
 ): string {
   const lines: string[] = [];
@@ -349,6 +363,13 @@ export function formatTier1Summary(
   lines.push(`Issue: ${manifest.issueId}`);
   lines.push(`Branch: ${manifest.branch}`);
   lines.push(`Head: ${manifest.headSha}`);
+
+  if (manifest.repos && manifest.repos.length > 1) {
+    lines.push('Polyrepo workspace — changed-file paths are prefixed with the sub-repo name:');
+    for (const repo of manifest.repos) {
+      lines.push(`  ${repo.repoKey}: ${repo.branch} @ ${repo.headSha.slice(0, 8)} (${repo.fileCount} files changed)`);
+    }
+  }
 
   const highRisk = manifest.changedFiles.filter((f) => f.riskScore >= 5);
   const medRisk = manifest.changedFiles.filter((f) => f.riskScore >= 3 && f.riskScore < 5);
@@ -456,24 +477,70 @@ export function formatTier1Summary(
     throw new Error(`Workspace directory does not exist: ${workspace}`);
   }
 
-  const [headSha, currentBranch, diffBase] = await Promise.all([
-    getHeadSha(workspace),
-    opts.branch ? Promise.resolve(opts.branch) : getCurrentBranch(workspace),
-    getDiffBase(workspace),
-  ]);
+  // PAN-2948: a polyrepo workspace root is a one-commit wrapper repo whose
+  // .gitignore excludes the code sub-repos — diffing it always yields an empty
+  // manifest. Resolve the actual repo roots and build per-repo, aggregating
+  // with repo-prefixed paths. Monorepo resolves to one root at the workspace.
+  const roots = resolveWorkspaceRepoRootsSync(issueId, workspace);
+  const isPolyrepo = roots.some(root => root.isPolyrepo);
 
-  const [changedFiles, diff] = await Promise.all([
-    getChangedFiles(workspace, diffBase),
-    getDiffStat(workspace, diffBase),
-  ]);
+  const perRepo = await Promise.all(roots.map(async root => {
+    const prefix = isPolyrepo ? `${root.repoKey}/` : '';
+    const [headSha, branch, diffBase] = await Promise.all([
+      getHeadSha(root.dir),
+      getCurrentBranch(root.dir),
+      getDiffBase(root.dir, root.targetBranch),
+    ]);
+    const [changedFiles, diffStat, stubUiFindings] = await Promise.all([
+      getChangedFiles(root.dir, diffBase, prefix),
+      getDiffStat(root.dir, diffBase),
+      scanStubUi(root.dir, diffBase).catch((err) => {
+        console.warn(`[buildReviewContext] scanStubUi failed for ${root.repoKey}: ${err instanceof Error ? err.message : String(err)}`);
+        return [] as StubUiFinding[];
+      }),
+    ]);
+    return {
+      root,
+      headSha,
+      branch,
+      diffBase,
+      changedFiles,
+      diffStat,
+      stubUiFindings: prefix
+        ? stubUiFindings.map(finding => ({ ...finding, filePath: `${prefix}${finding.filePath}` }))
+        : stubUiFindings,
+    };
+  }));
 
-  const [planRequirements, policyNotes, stubUiFindings, codeRabbitFindings] = await Promise.all([
+  // Primary repo drives the top-level branch/headSha: the first root with
+  // changes (for MYN that's fe), falling back to the first root.
+  const primary = perRepo.find(repo => repo.changedFiles.length > 0) ?? perRepo[0];
+  const headSha = primary.headSha;
+  const currentBranch = opts.branch ?? primary.branch;
+  const changedFiles = perRepo
+    .flatMap(repo => repo.changedFiles)
+    .sort((a, b) => b.riskScore - a.riskScore);
+  const diff = isPolyrepo
+    ? {
+        stat: perRepo
+          .filter(repo => repo.changedFiles.length > 0)
+          .map(repo => `── ${repo.root.repoKey} ──\n${repo.diffStat.stat}`)
+          .join('\n') || 'No changes',
+        truncated: true,
+      }
+    : primary.diffStat;
+  const stubUiFindings = perRepo.flatMap(repo => repo.stubUiFindings);
+  const repoContexts: ReviewRepoContext[] = perRepo.map(repo => ({
+    repoKey: repo.root.repoKey,
+    branch: repo.branch,
+    headSha: repo.headSha,
+    diffBase: repo.diffBase,
+    fileCount: repo.changedFiles.length,
+  }));
+
+  const [planRequirements, policyNotes, codeRabbitFindings] = await Promise.all([
     extractPlanReviewRequirements(workspace, issueId),
     readPolicyNotes(workspace),
-    scanStubUi(workspace, diffBase).catch((err) => {
-      console.warn(`[buildReviewContext] scanStubUi failed: ${err instanceof Error ? err.message : String(err)}`);
-      return [] as StubUiFinding[];
-    }),
     fetchCodeRabbitFindings({ workspace, branch: currentBranch }).catch((err) => {
       console.warn(`[buildReviewContext] CodeRabbit ingestion failed: ${err instanceof Error ? err.message : String(err)}`);
       return [] as CodeRabbitFinding[];
@@ -498,6 +565,7 @@ export function formatTier1Summary(
     generatedAt: new Date().toISOString(),
     branch: currentBranch,
     headSha,
+    ...(isPolyrepo ? { repos: repoContexts } : {}),
     diff,
     changedFiles,
     largeChangeset,

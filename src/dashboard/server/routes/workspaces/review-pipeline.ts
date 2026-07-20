@@ -52,6 +52,34 @@ const requestReviewPipeline = createRequestReviewPipeline();
 /** Safe `.message` read for caught values of unknown shape. */
 const errorMessage = (e: unknown): string | undefined => e instanceof Error ? e.message : undefined;
 
+/**
+ * Push the feature branch of every repo in the workspace (PAN-2948).
+ *
+ * A polyrepo workspace root is a one-commit wrapper repo with no remote and no
+ * feature branch — pushing there fails and, on the verified-dispatch path,
+ * kills the whole re-review pipeline. Loop the resolved repo roots instead
+ * (mirrors rebase-helper.ts), skipping repos whose feature branch doesn't
+ * exist locally (untouched sub-repos). Monorepo resolves to a single root at
+ * the workspace path, preserving the previous behavior.
+ */
+async function pushFeatureBranches(issueId: string, workspacePath: string): Promise<void> {
+  const { resolveWorkspaceRepoRootsSync } = await import('../../../../lib/project-repos.js');
+  for (const root of resolveWorkspaceRepoRootsSync(issueId, workspacePath)) {
+    try {
+      await execAsync(`git rev-parse --verify --quiet refs/heads/${root.sourceBranch}`, {
+        cwd: root.dir,
+        encoding: 'utf-8',
+      });
+    } catch {
+      continue;
+    }
+    await execAsync(`git push origin ${root.sourceBranch}`, {
+      cwd: root.dir,
+      encoding: 'utf-8',
+    });
+  }
+}
+
 function shouldTreatAsRerun(status: Pick<ReviewStatus, 'readyForMerge' | 'reviewStatus' | 'testStatus' | 'mergeStatus'> | null | undefined): boolean {
   if (!status) return false;
   return status.readyForMerge === true
@@ -233,10 +261,7 @@ const postWorkspaceReviewRoute = HttpRouter.add(
             });
 
             try {
-              await execAsync(`git push origin ${branchName}`, {
-                cwd: workspacePath,
-                encoding: 'utf-8',
-              });
+              await pushFeatureBranches(issueId, workspacePath);
             } catch (pushErr: unknown) {
               console.log(`Feature branch push note: ${errorMessage(pushErr)}`);
             }
@@ -489,10 +514,7 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
             });
 
             try {
-              await execAsync(`git push origin ${branchNameRerun}`, {
-                cwd: workspacePathRerun,
-                encoding: 'utf-8',
-              });
+              await pushFeatureBranches(issueId, workspacePathRerun);
             } catch (pushErr: unknown) {
               console.log(`[request-review] Feature branch push note: ${errorMessage(pushErr)}`);
             }
@@ -711,16 +733,13 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
         });
       },
       pushBranch: async () => {
-        const pushCommand = `git push origin ${branchName}`;
         if (workspaceInfo.isRemote && workspaceInfo.vmName) {
-          await execAsync(flyExecCmd(workspaceInfo.vmName, `cd ${workspacePath} && ${pushCommand}`), {
+          // Remote workspaces are single-repo (PAN-1676) — push in place via fly exec.
+          await execAsync(flyExecCmd(workspaceInfo.vmName, `cd ${workspacePath} && git push origin ${branchName}`), {
             encoding: 'utf-8',
           });
         } else {
-          await execAsync(pushCommand, {
-            cwd: workspacePath,
-            encoding: 'utf-8',
-          });
+          await pushFeatureBranches(issueId, workspacePath);
         }
         console.log(`[request-review] Pushed verified branch ${branchName} for ${issueId}`);
       },

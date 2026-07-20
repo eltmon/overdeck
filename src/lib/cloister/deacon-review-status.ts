@@ -537,8 +537,9 @@ async function reconcileReviewStatusOrphan(
         if (project) {
           const workspacePath = join(project.projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`);
           if (existsSync(workspacePath)) {
-            const { stdout } = await execAsync('git rev-parse HEAD', { cwd: workspacePath });
-            reviewUpdate['reviewedAtCommit'] = stdout.trim();
+            // PAN-2948: polyrepo-aware — snapshots sub-repo heads, not the wrapper.
+            const { snapshotWorkspaceHeadsPromise } = await import('../git-utils.js');
+            reviewUpdate['reviewedAtCommit'] = await snapshotWorkspaceHeadsPromise(issueId, workspacePath);
           }
         }
       } catch { /* non-fatal */ }

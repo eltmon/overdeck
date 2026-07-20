@@ -881,10 +881,12 @@ async function runVerificationForIssuePromise(
 
     // Snapshot HEAD at verification pass time — compared with reviewedAtCommit
     // after review to skip redundant test-agent when no code changed.
+    // PAN-2948: polyrepo-aware — the wrapper repo's HEAD never changes, so
+    // snapshotting it would make this comparison report "no drift" forever.
     let lastVerifiedCommit: string | undefined;
     try {
-      const { stdout } = await execAsync('git rev-parse HEAD', { cwd: workspacePath, encoding: 'utf-8', timeout: 5000 });
-      lastVerifiedCommit = stdout.trim();
+      const { snapshotWorkspaceHeadsPromise } = await import('../git-utils.js');
+      lastVerifiedCommit = await snapshotWorkspaceHeadsPromise(issueId, workspacePath);
     } catch { /* non-fatal — skip optimization if we can't get HEAD */ }
 
     const prePassMergedOutcome = skipMergedVerification(issueId, logPrefix);

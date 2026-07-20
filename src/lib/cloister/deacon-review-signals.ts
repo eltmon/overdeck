@@ -236,10 +236,9 @@ async function nudgeSynthesisForCompleteReviewerReports(states: readonly AgentSt
       // next cycle's reviewersToRerun can skip provably-clean reviewers.
       let fallbackHead: string | undefined;
       try {
-        const { execFile } = await import('node:child_process');
-        const { promisify } = await import('node:util');
-        const { stdout } = await promisify(execFile)('git', ['rev-parse', 'HEAD'], { cwd: state.workspace, encoding: 'utf-8', timeout: 10_000 });
-        fallbackHead = stdout.trim() || undefined;
+        // PAN-2948: polyrepo-aware — anchors sub-repo heads, not the wrapper.
+        const { snapshotWorkspaceHeadsPromise } = await import('../git-utils.js');
+        fallbackHead = await snapshotWorkspaceHeadsPromise(state.issueId, state.workspace);
       } catch { /* non-fatal — verdicts without an anchor simply re-run next cycle */ }
       const anchoredVerdicts = Object.fromEntries(
         Object.entries(synthesis.reviewerVerdicts).map(([subRole, v]) => [subRole, { ...v, ...(fallbackHead ? { atCommit: fallbackHead } : {}) }]),

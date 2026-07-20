@@ -275,6 +275,35 @@ async function getWorkspaceGitInfoPromise(workspacePath: string): Promise<Worksp
   }
 }
 
+/**
+ * Snapshot the code HEAD(s) of a workspace for drift comparison (PAN-2948).
+ *
+ * Monorepo: returns the workspace HEAD SHA (unchanged behavior). Polyrepo:
+ * returns a composite `fe@<sha> api@<sha>` over the sub-repo worktrees —
+ * the wrapper repo at the workspace root is a one-commit artifacts repo whose
+ * SHA never changes, so snapshotting it makes every drift comparison
+ * (reviewedAtCommit vs lastVerifiedCommit, reviewer verdict anchors) report
+ * "no drift" forever. Composite snapshots compare equal iff every sub-repo
+ * head is unchanged; consumers that try to use the anchor as a git ref fail
+ * the ref lookup and fall back to their conservative full-rerun path.
+ */
+export async function snapshotWorkspaceHeadsPromise(issueId: string, workspacePath: string): Promise<string | undefined> {
+  // Dynamic import: project-repos → projects sits above this low-level module
+  // in the layering; a static edge here would risk a require cycle.
+  const { resolveWorkspaceRepoRootsSync } = await import('./project-repos.js');
+  const roots = resolveWorkspaceRepoRootsSync(issueId, workspacePath);
+  const isPolyrepo = roots.some(root => root.isPolyrepo);
+  const heads: string[] = [];
+  for (const root of roots) {
+    try {
+      const { stdout } = await execAsync('git rev-parse HEAD', { cwd: root.dir, encoding: 'utf-8', timeout: 10_000 });
+      const sha = stdout.trim();
+      if (sha) heads.push(isPolyrepo ? `${root.repoKey}@${sha}` : sha);
+    } catch { /* unreadable root — omit from the snapshot */ }
+  }
+  return heads.length > 0 ? heads.join(' ') : undefined;
+}
+
 async function hasStaleLocksPromise(repoPath: string): Promise<boolean> {
   const lockFiles = findGitLockFiles(repoPath);
   if (lockFiles.length === 0) {
