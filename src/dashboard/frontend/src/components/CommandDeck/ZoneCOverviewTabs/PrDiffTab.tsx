@@ -17,6 +17,7 @@
 import { useMemo, useRef } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { usePrDiffQuery, usePrQuery, type PullRequestData } from './queries';
+import { LoadingBoundary } from '../../primitives/LoadingBoundary';
 
 const DIFF_LINE_HEIGHT = 17; // font-size 11 × line-height 1.5, rounded up
 
@@ -126,7 +127,7 @@ export function PrDiffTab({ issueId }: PrDiffTabProps) {
         data-testid="prdiff-tab-loading"
         style={{ padding: 16, fontSize: 12, color: 'var(--muted-foreground)' }}
       >
-        Loading pull request…
+        <LoadingBoundary label="The pull request"><span>Loading pull request…</span></LoadingBoundary>
       </div>
     );
   }

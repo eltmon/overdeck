@@ -7,6 +7,7 @@
 
 import { useIssueCostStream } from '../../../hooks/useCostStream';
 import { useIssueCostsQuery, type IssueCostData } from './queries';
+import { LoadingBoundary } from '../../primitives/LoadingBoundary';
 
 interface CostsTabProps {
   issueId: string;
@@ -159,7 +160,7 @@ export function CostsTab({ issueId }: CostsTabProps) {
         data-testid="costs-tab-loading"
         style={{ padding: 16, fontSize: 12, color: 'var(--muted-foreground)' }}
       >
-        Loading costs…
+        <LoadingBoundary label="Costs"><span>Loading costs…</span></LoadingBoundary>
       </div>
     );
   }

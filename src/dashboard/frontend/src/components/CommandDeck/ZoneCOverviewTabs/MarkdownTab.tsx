@@ -6,6 +6,7 @@
  */
 
 import { ChatMarkdown } from '../../chat/ChatMarkdown';
+import { LoadingBoundary } from '../../primitives/LoadingBoundary';
 
 interface MarkdownTabProps {
   body: string | undefined | null;
@@ -20,7 +21,7 @@ export function MarkdownTab({ body, isLoading, emptyLabel = 'No content availabl
         data-testid="markdown-tab-loading"
         style={{ padding: 16, fontSize: 12, color: 'var(--muted-foreground)' }}
       >
-        Loading…
+        <LoadingBoundary label="The document"><span>Loading…</span></LoadingBoundary>
       </div>
     );
   }

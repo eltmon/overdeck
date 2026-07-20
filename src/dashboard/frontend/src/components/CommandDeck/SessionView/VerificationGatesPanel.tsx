@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { CircleCheck, CircleX, Loader2, Circle } from 'lucide-react';
 import styles from '../styles/command-deck.module.css';
+import { LoadingBoundary } from '../../primitives/LoadingBoundary';
 
 /**
  * VerificationGatesPanel (PAN-2665) — the Test/Lint tree node's live view.
@@ -72,7 +73,7 @@ export function VerificationGatesPanel({ issueId, fallbackTranscript }: { issueI
   });
 
   if (isLoading) {
-    return <div className={styles.sessionPanelEmpty}>Loading verification state…</div>;
+    return <div className={styles.sessionPanelEmpty}><LoadingBoundary label="Verification state"><span>Loading verification state…</span></LoadingBoundary></div>;
   }
 
   const artifact = data?.artifact;

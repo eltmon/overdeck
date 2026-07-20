@@ -9,6 +9,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { XBriefViewer } from '../../xbrief/XBriefViewer';
 import type { XBriefDocument, XBriefInspectionPolicy } from '../../xbrief/types';
+import { LoadingBoundary } from '../../primitives/LoadingBoundary';
 
 interface XBriefTabProps {
   issueId: string;
@@ -52,7 +53,7 @@ export function XBriefTab({ issueId }: XBriefTabProps) {
         data-testid="xbrief-tab-loading"
         style={{ padding: 16, fontSize: 12, color: 'var(--muted-foreground)' }}
       >
-        Loading plan…
+        <LoadingBoundary label="The plan"><span>Loading plan…</span></LoadingBoundary>
       </div>
     );
   }
