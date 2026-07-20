@@ -1,9 +1,5 @@
 import { monitorEventLoopDelay } from 'node:perf_hooks';
 import type { IntervalHistogram } from 'node:perf_hooks';
-import {
-  emitActivityEntrySync,
-  type EmitActivityOptions,
-} from '../../../lib/activity-logger.js';
 
 export const EVENT_LOOP_MONITOR_WINDOW_MS = 60_000;
 export const EVENT_LOOP_P99_WARN_THRESHOLD_MS = 100;
@@ -23,7 +19,6 @@ export interface EventLoopMonitorDeps {
   warnThresholdMs?: number;
   now?: () => Date;
   warn?: (message: string) => void;
-  emit?: (options: EmitActivityOptions) => void;
 }
 
 const EMPTY_SAMPLE: EventLoopDelaySample = {
@@ -51,7 +46,6 @@ export function sampleEventLoopDelay(
   const warnThresholdMs = deps.warnThresholdMs ?? EVENT_LOOP_P99_WARN_THRESHOLD_MS;
   const now = deps.now ?? (() => new Date());
   const warn = deps.warn ?? ((message) => console.warn(message));
-  const emit = deps.emit ?? emitActivityEntrySync;
 
   const sample: EventLoopDelaySample = {
     p50: nsToRoundedMs(histogram.percentile(50)),
@@ -65,14 +59,10 @@ export function sampleEventLoopDelay(
   lastSample = sample;
 
   if (sample.p99 > warnThresholdMs) {
-    const message = `Dashboard event loop p99 delay ${sample.p99}ms exceeded ${warnThresholdMs}ms`;
-    warn(`[event-loop-monitor] ${message}`);
-    emit({
-      source: 'dashboard',
-      level: 'warn',
-      message,
-      details: `p50=${sample.p50}ms p99=${sample.p99}ms max=${sample.max}ms over ${sample.windowMs}ms`,
-    });
+    // PAN-2908 C-FRESH: event-loop diagnostics are a Health concern, not an
+    // operator-feed event. No activity entry — the console line and the
+    // /api/metrics sample (getEventLoopDelaySample) carry it.
+    warn(`[event-loop-monitor] Dashboard event loop p99 delay ${sample.p99}ms exceeded ${warnThresholdMs}ms`);
   }
 
   histogram.reset();

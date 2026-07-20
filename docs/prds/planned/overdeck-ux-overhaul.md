@@ -198,6 +198,8 @@ The 43-action registry **stays**. Everything wrong is in presentation and rot, n
 
 ### 3.7 Freshness contract (contract C-FRESH)
 
+> **Implementation status (2026-07-19): v1 shipped.** Event-loop p99 diagnostics no longer emit operator-feed activity entries (console + `/api/metrics` sample only — the feed is pipeline events, not self-heartbeats). System notices render in ONE slim row (`system-notices-row` in AppChrome; boot-reconciliation and sync-required are compact chips with actions, detail on title). `primitives/LoadingBoundary` gives regions an explicit data boundary — after 8s the spinner becomes a labeled "taking longer than usual · Retry" state, wired into the four worst fossils (activity feed, plan map, tasks panel, pickup gate). Still open: boundaries across every region (adopt `LoadingBoundary` per surface), `updated Ns ago` markers, feed source filters beyond the p99 case, and the freshness e2e.
+
 - Every data region declares its boundary: **live** (WS subscription), **polled** (interval shown), **unavailable** (explicit empty state with reason). Rendered regions carry `updated Ns ago` / `stale` markers; skeletons must resolve or error within 5s. An integration test asserts no region renders a spinner past its boundary.
 - **Feed hygiene:** dashboard-internal diagnostics (event-loop p99, self-heartbeats) leave the operator Activity Feed; they go to Health. The feed only carries pipeline-relevant events (issue, agent, review, merge).
 - **Banner consolidation:** boot-reconciliation and setup-changed collapse into one dismissible notification center item each; at most one slim banner row renders at a time.

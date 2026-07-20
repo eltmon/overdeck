@@ -1,6 +1,7 @@
 import { useEffect, useState, type CSSProperties } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { dashboardMutationJsonHeaders } from '../../lib/wsTransport';
+import { LoadingBoundary } from '../primitives/LoadingBoundary';
 
 // PAN-2059: the operator pickup controls — Plan → Release, AI objection, Ready /
 // Park / Blocks-main, planning mode, and the pickup gate — for ONE issue. This is
@@ -198,7 +199,7 @@ export function PickupGateControls({ issueId, onOpenIssueBrowser }: {
       : { color: 'var(--info-foreground)', borderColor: 'color-mix(in srgb, var(--info) 34%, transparent)', background: 'color-mix(in srgb, var(--info) 9%, transparent)' }),
   });
 
-  if (isLoading) return <div style={{ fontSize: 11, color: 'var(--muted-foreground)' }}>Loading pickup state…</div>;
+  if (isLoading) return <LoadingBoundary label="Pickup state" timeoutMs={8000}><div style={{ fontSize: 11, color: 'var(--muted-foreground)' }}>Loading pickup state…</div></LoadingBoundary>;
   if (error || !data) return <div style={{ fontSize: 11, color: 'var(--destructive-foreground)' }}>{error ? String(error) : 'No pickup state'}</div>;
 
   return (

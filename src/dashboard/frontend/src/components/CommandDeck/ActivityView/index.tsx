@@ -6,6 +6,7 @@ import { ExternalLink } from 'lucide-react';
 import type { Issue } from '../../../types';
 import type { ProjectFeature } from '../ProjectTree/ProjectNode';
 import styles from '../styles/command-deck.module.css';
+import { LoadingBoundary } from '../../primitives/LoadingBoundary';
 
 interface ActivitySection {
   type: string;
@@ -302,9 +303,11 @@ export function ActivityView({ issueId, issues = [], featureData }: ActivityView
   if (isLoading && sections.length === 0) {
     return (
       <div className={styles.activityContainer}>
-        <div style={{ color: 'var(--muted-foreground)', fontSize: '12px' }}>
-          Loading activity...
-        </div>
+        <LoadingBoundary label="The activity feed" timeoutMs={8000} onRetry={() => window.location.reload()}>
+          <div style={{ color: 'var(--muted-foreground)', fontSize: '12px' }}>
+            Loading activity...
+          </div>
+        </LoadingBoundary>
       </div>
     );
   }

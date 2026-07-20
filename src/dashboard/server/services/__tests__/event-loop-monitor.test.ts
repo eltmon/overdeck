@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { IntervalHistogram } from 'node:perf_hooks';
-import type { EmitActivityOptions } from '../../../../lib/activity-logger.js';
 import {
   EVENT_LOOP_MONITOR_WINDOW_MS,
   getEventLoopDelaySample,
@@ -58,24 +57,18 @@ describe('event-loop-monitor', () => {
     expect(getEventLoopDelaySample()).toEqual(sample);
   });
 
-  it('emits console warning and activity entry when sampled p99 exceeds 100ms', () => {
+  it('warns on console only — p99 diagnostics stay OUT of the operator feed (C-FRESH)', () => {
     const histogram = makeHistogram({ p50Ms: 20, p99Ms: 101, maxMs: 150 });
     const warn = vi.fn();
-    const emitted: EmitActivityOptions[] = [];
 
     sampleEventLoopDelay(histogram, {
       now: () => new Date('2026-07-03T12:00:00.000Z'),
       warn,
-      emit: (entry) => emitted.push(entry),
     });
 
     expect(warn).toHaveBeenCalledWith('[event-loop-monitor] Dashboard event loop p99 delay 101ms exceeded 100ms');
-    expect(emitted).toEqual([{
-      source: 'dashboard',
-      level: 'warn',
-      message: 'Dashboard event loop p99 delay 101ms exceeded 100ms',
-      details: 'p50=20ms p99=101ms max=150ms over 60000ms',
-    }]);
+    // The sample stays available for the Health metrics endpoint.
+    expect(getEventLoopDelaySample().p99).toBe(101);
   });
 
   it('resets the histogram after each completed sample window', () => {
@@ -83,7 +76,6 @@ describe('event-loop-monitor', () => {
 
     sampleEventLoopDelay(histogram, {
       warn: vi.fn(),
-      emit: vi.fn(),
     });
 
     expect(histogram.reset).toHaveBeenCalledTimes(1);

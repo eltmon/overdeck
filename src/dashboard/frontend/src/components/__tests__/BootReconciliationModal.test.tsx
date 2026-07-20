@@ -272,7 +272,7 @@ describe('BootReconciliationModal', () => {
 
     const banner = await screen.findByTestId('boot-reconciliation-held-banner');
     // 3 held: the 4-agent set minus the read-only PAN-2078 row.
-    expect(within(banner).getByText(/holding 3 stopped agents/)).toBeInTheDocument();
+    expect(within(banner).getByText(/Holding 3 stopped agents/)).toBeInTheDocument();
     expect(screen.queryByTestId('boot-reconciliation-modal')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId('boot-reconciliation-held-resume-all'));
@@ -294,7 +294,7 @@ describe('BootReconciliationModal', () => {
     renderModal(vi.fn(async () => jsonResponse(perAgentState)));
 
     const banner = await screen.findByTestId('boot-reconciliation-held-banner');
-    expect(within(banner).getByText(/holding 1 stopped agent\b/)).toBeInTheDocument();
+    expect(within(banner).getByText(/Holding 1 stopped agent\b/)).toBeInTheDocument();
 
     cleanup();
     vi.unstubAllGlobals();

@@ -299,25 +299,24 @@ export function BootReconciliationModal() {
     const bannerPending = decisionMutation.isPending;
     return (
       <div
-        className="sticky top-0 z-40 badge-bg-warning border-b-2 badge-border-warning px-4 py-2 flex items-center gap-3 shrink-0"
+        className="badge-bg-warning badge-border-warning flex items-center gap-2 border-b px-4 py-1.5"
         data-testid="boot-reconciliation-held-banner"
       >
-        <Pause className="w-5 h-5 text-warning shrink-0" />
-        <p className="text-warning-foreground text-sm font-medium flex-1">
-          Boot reconciliation is holding {heldAgents.length} stopped agent{heldAgents.length === 1 ? '' : 's'} from
-          the boot at {formatTime(data.decidedAt ?? data.graceDeadline)}. Held agents will not pick up work until
-          resumed. Click <span className="font-semibold">Resume all</span> to put them back to work, or use{' '}
-          <code className="font-mono text-xs bg-warning/10 px-1 rounded">pan start &lt;id&gt;</code>{' '}
-          to spawn one individually.
+        <Pause className="w-4 h-4 shrink-0 text-warning" />
+        <p
+          className="flex-1 truncate text-xs font-medium text-warning-foreground"
+          title={`Boot reconciliation is holding ${heldAgents.length} stopped agent${heldAgents.length === 1 ? '' : 's'} from the boot at ${formatTime(data.decidedAt ?? data.graceDeadline)}. Held agents will not pick up work until resumed. Resume all puts them back to work; pan start <id> spawns one individually.`}
+        >
+          Holding {heldAgents.length} stopped agent{heldAgents.length === 1 ? '' : 's'} from boot — they won't pick up work until resumed
         </p>
         <button
           type="button"
           onClick={() => decisionMutation.mutate({ decision: 'resume_all' })}
           disabled={bannerPending}
           data-testid="boot-reconciliation-held-resume-all"
-          className="shrink-0 inline-flex items-center gap-1.5 h-[32px] rounded-[var(--radius-sm)] bg-warning px-[14px] text-[12px] font-medium text-warning-foreground transition-opacity hover:bg-warning/90 disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex h-[26px] shrink-0 items-center gap-1.5 rounded-[var(--radius-sm)] bg-warning px-[10px] text-[11px] font-medium text-warning-foreground transition-opacity hover:bg-warning/90 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          <Play className="w-3.5 h-3.5" />
+          <Play className="w-3 h-3" />
           {bannerPending ? 'Resuming…' : 'Resume all'}
         </button>
       </div>

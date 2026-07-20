@@ -34,17 +34,16 @@ export function SyncRequiredBanner() {
 
   if (!status.data?.needed) return null;
   return (
-    <div className="bg-primary/10 border-b border-primary/30 px-4 py-2 flex items-center gap-3 shrink-0">
-      <RefreshCw className={`w-4 h-4 text-primary shrink-0 ${runSync.isPending ? 'animate-spin' : ''}`} />
-      <p className="text-primary text-sm flex-1">
-        <span className="font-semibold">Overdeck setup changed.</span>{' '}
-        Sync the latest context rules, lifecycle hooks, and skills before starting new agents.
+    <div className="bg-primary/10 flex flex-1 items-center gap-2 px-4 py-1.5" data-testid="sync-required-banner">
+      <RefreshCw className={`w-3.5 h-3.5 text-primary shrink-0 ${runSync.isPending ? 'animate-spin' : ''}`} />
+      <p className="flex-1 truncate text-xs text-primary" title="Sync the latest context rules, lifecycle hooks, and skills before starting new agents.">
+        <span className="font-medium">Setup changed</span> — sync context, hooks, and skills
       </p>
       <button
         type="button"
         onClick={() => runSync.mutate()}
         disabled={runSync.isPending}
-        className="px-3 py-1.5 text-sm font-semibold rounded-sm bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+        className="h-[26px] shrink-0 rounded-sm bg-primary px-[10px] text-[11px] font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
       >
         {runSync.isPending ? 'Syncing…' : 'Sync now'}
       </button>
