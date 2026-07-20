@@ -19,6 +19,7 @@ beforeEach(() => {
     const url = input instanceof Request ? input.url : String(input)
     const method = init?.method ?? (input instanceof Request ? input.method : 'GET')
     if (method !== 'GET') {
+      if (url.includes('/api/dashboard/session')) return Response.json({ csrfToken: 'test-csrf' })
       unexpectedRequests.push(`${method} ${url}`)
       return Response.json({}, { status: 500 })
     }
@@ -41,6 +42,7 @@ beforeEach(() => {
         ],
       })
     }
+    if (url.includes('/api/dashboard/session')) return Response.json({ csrfToken: 'test-csrf' })
     unexpectedRequests.push(`${method} ${url}`)
     return Response.json({}, { status: 500 })
   }))
@@ -212,7 +214,7 @@ function renderMissionControl(extra?: { onOpenPane?: (pane: string) => void }) {
 describe('IssueMissionControl', () => {
   it('renders cockpit inventory markers on the real overview shell', () => {
     const { container } = renderMissionControl();
-    for (const section of ['Header bar', 'StatusNarrative', 'Pipeline Band', 'AgentsLane', 'Detail Tabs', 'TasksRail / TasksTab', 'Awareness rail', 'UatEnvironmentPanel', 'NowPanel', 'PickupGateCard', 'ReviewPolicyControl']) {
+    for (const section of ['Header bar', 'StatusNarrative', 'PhaseRail', 'SpecialistStrip', 'AgentsLane', 'Detail Tabs', 'TasksRail / TasksTab', 'Awareness rail', 'UatEnvironmentPanel', 'NowPanel', 'PickupGateCard', 'ReviewPolicyControl']) {
       expect(container.querySelector(`[data-section="${section}"]`), section).toBeInTheDocument();
     }
   });
@@ -363,20 +365,20 @@ describe('IssueMissionControl', () => {
     expect(screen.getByText('Tasks tab')).toBeInTheDocument()
   })
 
-  it('renders the status narrative + journey strip in place of the chip and gate rows (PAN-2398)', () => {
+  it('renders the status narrative + shared phase rail in place of the chip and gate rows (PAN-2398, C-VOCAB)', () => {
     renderMissionControl()
 
-    // ONE status representation: plain-language narrative + 5-stage journey.
+    // ONE status representation: plain-language narrative + the shared six-phase rail.
     expect(screen.getByTestId('status-narrative')).toBeTruthy()
-    expect(screen.getByTestId('journey-strip')).toBeTruthy()
-    expect(screen.getByText('Building')).toBeTruthy()
-    expect(screen.getByText('Reviewing')).toBeTruthy()
-    expect(screen.getByText('Shipping')).toBeTruthy()
+    const rail = document.querySelector('[data-component="phase-rail"]');
+    expect(rail).not.toBeNull()
+    expect([...rail!.querySelectorAll('[data-phase]')].map((el) => el.getAttribute('data-phase'))).toEqual(['plan', 'work', 'review', 'test', 'ship', 'done'])
     // the fixture's review is blocked — the narrative says so in plain words
     expect(screen.getByText('The reviewer found problems')).toBeTruthy()
     // the old jargon rows are gone
     expect(screen.queryByTestId('cockpit-pipeline-progress')).toBeNull()
     expect(screen.queryByTestId('cockpit-gates')).toBeNull()
+    expect(screen.queryByTestId('journey-strip')).toBeNull()
     expect(screen.queryByText('Merge-ready')).toBeNull()
     // merge surfaces through the shared registry menu as a disabled row with reason
     fireEvent.click(screen.getByTestId('issue-action-overflow-button'))
@@ -400,7 +402,7 @@ describe('IssueMissionControl', () => {
   it('shows a selected session, then relocates the conversation cards below the issue overview', () => {
     const { container } = renderMissionControl()
 
-    fireEvent.click(screen.getByRole('button', { name: /Building/ }))
+    fireEvent.click(document.querySelector('[data-component="phase-rail"] [data-phase="work"]')!)
 
     expect(container.querySelector('[data-section="SessionPanel"]')).toBeInTheDocument()
     expect(screen.getByTestId('session-panel')).toBeInTheDocument()
@@ -419,7 +421,7 @@ describe('IssueMissionControl', () => {
   it('caps the selected session at a centered 980px measure', () => {
     renderMissionControl()
 
-    fireEvent.click(screen.getByRole('button', { name: /Building/ }))
+    fireEvent.click(document.querySelector('[data-component="phase-rail"] [data-phase="work"]')!)
 
     expect(screen.getByTestId('session-panel').parentElement).toHaveClass(
       'mx-auto',
@@ -431,7 +433,7 @@ describe('IssueMissionControl', () => {
   it('keeps tabs visible but unselected when an issue-tree node drives the pane', () => {
     renderMissionControl()
 
-    fireEvent.click(screen.getByRole('button', { name: /Building/ }))
+    fireEvent.click(document.querySelector('[data-component="phase-rail"] [data-phase="work"]')!)
 
     expect(screen.getByTestId('issue-tree-context-panel')).toBeTruthy()
     expect(screen.getByTestId('session-panel')).toBeTruthy()

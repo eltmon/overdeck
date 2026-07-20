@@ -5,10 +5,10 @@
  * shared machine classifier. Legacy when-stamps are preserved as meta.
  */
 import { useMemo } from 'react';
-import { PhaseRail, type PhaseAgentInfo } from '../issue-detail/PhaseRail';
+import { PhaseRail, type PhaseAgentInfo } from './PhaseRail';
 import { derivePipelineState } from '../../lib/issuePipelineState';
 import { phaseRailState, type Phase } from '../../lib/simple/phases';
-import { useIssueData } from './useDrawerData';
+import { useIssueData } from '../drawer/useDrawerData';
 import { useDashboardStore } from '../../lib/store';
 import type { Agent } from '../../types';
 
@@ -50,9 +50,10 @@ const LEGACY_WHEN_TO_PHASE: Record<string, Phase> = {
   merged: 'done',
 };
 
-export default function DrawerPhaseRail({ issueId, onSelectPhase, activePhase }: { issueId?: string; onSelectPhase?: (phase: Phase) => void; activePhase?: Phase | null }) {
+export default function IssuePhaseRail({ issueId, onSelectPhase, activePhase }: { issueId?: string; onSelectPhase?: (phase: Phase) => void; activePhase?: Phase | null }) {
   const drawerIssueId = useDashboardStore((state) => state.drawer.issueId);
-  const { issue, agents, reviewStatus, phaseTimeline } = useIssueData(issueId ?? drawerIssueId);
+  const data = useIssueData(issueId ?? drawerIssueId);
+  const { issue, agents, reviewStatus, phaseTimeline } = data ?? { issue: null, agents: [], reviewStatus: undefined, phaseTimeline: [] };
 
   const rail = useMemo(() => {
     const pipelineState = derivePipelineState({

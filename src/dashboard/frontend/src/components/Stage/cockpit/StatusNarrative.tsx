@@ -156,25 +156,11 @@ export function detailFragments(args: {
   return fragments
 }
 
-const BAR_CLASS: Record<StageState, string> = {
-  done: 'bg-teal-500',
-  now: 'bg-blue-500',
-  fail: 'bg-red-500',
-  todo: 'bg-muted',
-}
-const LABEL_CLASS: Record<StageState, string> = {
-  done: 'text-muted-foreground',
-  now: 'text-foreground font-semibold',
-  fail: 'text-red-500 font-semibold',
-  todo: 'text-muted-foreground/60',
-}
-
-export function StatusNarrative({ issueId, workRunning, hasPlan, cost, onStageClick }: {
+export function StatusNarrative({ issueId, workRunning, hasPlan, cost }: {
   issueId: string
   workRunning: boolean
   hasPlan: boolean
   cost?: string
-  onStageClick?: (stage: JourneyStageKey) => void
 }) {
   const review = useReviewStatusQuery(issueId)
   const ci = useIssueCheckRunsQuery(issueId)
@@ -214,20 +200,9 @@ export function StatusNarrative({ issueId, workRunning, hasPlan, cost, onStageCl
           </div>
         )}
       </div>
-      <div className="mt-3.5 flex" data-testid="journey-strip" data-section="Pipeline Band">
-        {model.stages.map((stage) => (
-          <button
-            key={stage.key}
-            type="button"
-            onClick={onStageClick ? () => onStageClick(stage.key) : undefined}
-            className="relative flex-1 pt-3.5 text-center text-[11.5px]"
-          >
-            <span className={`absolute left-0 right-0 top-0.5 h-[3px] rounded-sm ${BAR_CLASS[stage.state]} ${stage.state === 'now' ? 'animate-pulse' : ''}`} />
-            <span className={LABEL_CLASS[stage.state]}>{stage.label}</span>
-            <span className="block text-[10px] font-normal text-muted-foreground/70">{stage.gloss}</span>
-          </button>
-        ))}
-      </div>
+      {/* PAN-2908 C-VOCAB: the legacy journey strip (Planned→…→Shipping) is
+          replaced by the shared IssuePhaseRail mounted beside this narrative
+          in the cockpit header — one vocabulary everywhere. */}
       <div className="mt-2 text-[11px] text-muted-foreground/80" data-testid="status-details">
         {detailFragments({ rs: review.data, ci: ci.data, prMergeable: pr.data?.pr?.mergeable, hasPr: Boolean(pr.data?.pr) }).join(' · ')}
       </div>

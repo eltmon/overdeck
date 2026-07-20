@@ -1,6 +1,6 @@
 # Overdeck UX Overhaul — Simple by Default, Unified Underneath
 
-> **Status:** Proposal · 2026-07-19 (rev 5 — C-SIMPLE v1 + C-ACTIONS + C-BOARD v1 + C-CONVO v1 shipped; C-DETAIL: conversation-first drawer live with rail/specialist switching, cockpit has strip + shared menu) · Author: UX audit (Playwright walkthrough + code architecture review)
+> **Status:** Proposal · 2026-07-19 (rev 6 — all contracts except full C-FRESH and the formal one-component shell now have shipped v1s; cockpit converged onto the shared rail + strip + menu; conversation-first with actionable no-agent surface) · Author: UX audit (Playwright walkthrough + code architecture review)
 > **Mockups (binding visual spec):** [`docs/design/mockups/overdeck-ux-overhaul/index.html`](../../design/mockups/overdeck-ux-overhaul/index.html) (entry point — links to all three screen mocks)
 > **Style guide:** [`design/style-guide/STYLE-GUIDE.md`](../../../design/style-guide/STYLE-GUIDE.md)
 > **Supersedes / completes:** [`pan-dashboard-unified-redesign.md`](./pan-dashboard-unified-redesign.md) (2026-05-16) and the PAN-2499 "three issue views" unification — this PRD is the **conformance pass** those efforts never got.

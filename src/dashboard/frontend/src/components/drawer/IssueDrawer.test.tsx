@@ -947,7 +947,8 @@ describe('IssueDrawer', () => {
 
     const panel = screen.getByTestId('drawer-tab-panel-conversation');
     expect(panel).toBeInTheDocument();
-    expect(within(panel).getByText(/No agent session for this issue yet/)).toBeInTheDocument();
+    expect(within(panel).getByText(/Nothing here yet — no agent has started/)).toBeInTheDocument();
+    expect(within(panel).getByText(/Start work and the live conversation appears here/)).toBeInTheDocument();
   });
 
   it('renders the Terminal tab with the no-agent empty state', () => {

@@ -19,6 +19,7 @@ import { useQuery } from '@tanstack/react-query';
 import { GitFork, TriangleAlert, AlertCircle, Wrench } from 'lucide-react';
 
 import { ConversationPanel } from '../chat/ConversationPanel';
+import { StartAgentCta } from '../issue-view/StartAgentCta';
 import type { Conversation } from '../CommandDeck/ConversationList';
 import { XTerminal } from '../XTerminal';
 import type { Agent } from '../../types';
@@ -101,9 +102,11 @@ interface DrawerAgentSessionProps {
   /** The agent to display — resolved by IssueDrawer, shared across both tabs. */
   agentId: string | null;
   onSelectAgent: (agentId: string) => void;
+  /** Needed for the no-agent start surface (StartAgentCta). */
+  issueId?: string | null;
 }
 
-export function DrawerAgentSession({ view, agents, agentId, onSelectAgent }: DrawerAgentSessionProps) {
+export function DrawerAgentSession({ view, agents, agentId, onSelectAgent, issueId }: DrawerAgentSessionProps) {
   const testId = `drawer-tab-panel-${view}`;
 
   const agent = useMemo(
@@ -137,9 +140,17 @@ export function DrawerAgentSession({ view, agents, agentId, onSelectAgent }: Dra
         <div className="mb-[8px] text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
           {view === 'conversation' ? 'Conversation' : 'Terminal'}
         </div>
-        <p className="text-[12px] leading-5 text-muted-foreground">
-          No agent session for this issue yet. The {view === 'conversation' ? 'transcript' : 'live terminal'} appears here once an agent starts.
+        <p className="text-[12px] font-medium text-foreground">
+          Nothing here yet — no agent has started on this issue.
         </p>
+        <p className="mt-[4px] text-[12px] leading-5 text-muted-foreground">
+          Start work and the live {view === 'conversation' ? 'conversation' : 'terminal'} appears here. Everything else about the issue is one tab away (Overview).
+        </p>
+        {issueId && (
+          <div className="mt-[12px]">
+            <StartAgentCta issueId={issueId} density="console" />
+          </div>
+        )}
       </div>
     );
   }

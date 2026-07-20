@@ -51,6 +51,7 @@ vi.mock('../../components/IssueActionMenu/useIssueActions', async (importOrigina
 
 vi.mock('../../components/drawer/useDrawerData', () => ({
   useDrawerData: () => drawerDataState.current,
+  useIssueData: () => drawerDataState.current,
 }));
 
 vi.mock('../../components/CommandDeck/ZoneCOverviewTabs/queries', () => ({

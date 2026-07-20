@@ -56,7 +56,10 @@ export function PhaseRail({ rail, agents, meta, activePhase, onSelectPhase, clas
         const state = rail[phase];
         const agent = agents?.[phase];
         const metaText = meta?.[phase] ?? (state === 'done' ? 'done' : state === 'current' ? 'in progress' : state === 'attention' ? 'needs a look' : 'queued');
-        const clickable = !!onSelectPhase && (agent?.hasConversation === true || state === 'current' || state === 'done');
+        // Clickable whenever a handler exists and the phase isn't explicitly
+        // conversation-less — shells decide what a click means with no agent
+        // (drawer: no-op; cockpit: falls back to the phase's default view).
+        const clickable = !!onSelectPhase && agent?.hasConversation !== false;
         return (
           <button
             key={phase}

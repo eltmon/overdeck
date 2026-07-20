@@ -22,6 +22,8 @@ import { IssueActionMenu } from '../../IssueActionMenu/IssueActionMenu'
 import { useIssueActions } from '../../IssueActionMenu/useIssueActions'
 import { selectReviewStatus, useDashboardStore } from '../../../lib/store'
 import { SpecialistStrip } from '../../issue-detail/SpecialistStrip'
+import IssuePhaseRail from '../../issue-detail/IssuePhaseRail'
+import type { Phase } from '../../../lib/simple/phases'
 import { deriveSpecialistChips } from '../../issue-detail/deriveSpecialists'
 import { IssueView } from '../../issue-view/IssueView'
 import { SessionPanel } from '../../CommandDeck/SessionView/SessionPanel'
@@ -40,7 +42,7 @@ import { StatusHistoryTab } from './StatusHistoryTab'
 import { CrewStage } from './CrewStage'
 import { HappenedFeed } from './HappenedFeed'
 import { PlanMapCard } from './PlanMapCard'
-import { StatusNarrative, type JourneyStageKey } from './StatusNarrative'
+import { StatusNarrative } from './StatusNarrative'
 import { CockpitCard, CockpitPill, type CockpitTone } from './CockpitCard'
 import type { SessionNode } from '@overdeck/contracts'
 import styles from './cockpitBody.module.css'
@@ -461,6 +463,16 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
     () => deriveSpecialistChips([...treeSessions], reviewSnapshot),
     [treeSessions, reviewSnapshot],
   )
+  const railActivePhase = useMemo<Phase | null>(() => {
+    if (!selectedTreeSession) return null
+    const t = selectedTreeSession.type
+    if (t === 'planning') return 'plan'
+    if (t === 'work') return 'work'
+    if (t === 'review' || t === 'reviewer') return 'review'
+    if (t === 'test') return 'test'
+    if (t === 'ship' || t === 'merge') return 'ship'
+    return null
+  }, [selectedTreeSession])
   const phase = phaseStatus(review.data)
   const cost = costs.data?.resolvedTotalCost ?? costs.data?.totalCost ?? 0
   const toggleSpine = () => {
@@ -491,15 +503,6 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
     const session = treeSessions.find((s) => s.type === type)
     if (session) { selectSessionFromTree(session); return true }
     return false
-  }
-  // PAN-1991 #4/#6: clicking a pipeline phase opens that phase's info. Work/
-  // Review/Test open the agent's own conversation/findings (per #6, review
-  // findings live on the Review agent, not a status tab); CI/CD opens Code.
-  const handleStageClick = (stage: JourneyStageKey) => {
-    const map: Record<JourneyStageKey, PipelinePhaseKey> = {
-      planned: 'plan', building: 'work', reviewing: 'review', testing: 'test', shipping: 'merge',
-    }
-    handlePhaseClick(map[stage])
   }
   const handlePhaseClick = (phase: PipelinePhaseKey) => {
     if (phase === 'work') { if (!openAgentByType('work')) selectTab('overview'); return }
@@ -558,7 +561,16 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
             hasPlan={headerActions.state.hasPlan}
             workRunning={phase === 'pending'}
             cost={cost > 0 ? `$${cost.toFixed(2)}` : undefined}
-            onStageClick={handleStageClick}
+          />
+        </div>
+        {/* PAN-2908 C-VOCAB/C-DETAIL: the shared phase rail replaces the
+            journey strip — same six words as the drawer, and clicking a phase
+            opens that agent's conversation. */}
+        <div data-section="PhaseRail" className="mt-3">
+          <IssuePhaseRail
+            issueId={issueId}
+            onSelectPhase={(railPhase) => handlePhaseClick(railPhase === 'done' ? 'ship' : railPhase)}
+            activePhase={railActivePhase}
           />
         </div>
         {/* PAN-2908 C-DETAIL: every convoy specialist, one click to its

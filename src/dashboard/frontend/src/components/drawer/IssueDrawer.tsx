@@ -14,7 +14,7 @@ import { TasksPanel } from '../TasksPanel';
 import DrawerTabs from './DrawerTabs';
 import { VerificationGates } from '../issue-view/VerificationGates';
 import { ActiveAgentPanel } from '../issue-view/ActiveAgentPanel';
-import DrawerPhaseRail from './DrawerPhaseRail';
+import IssuePhaseRail from '../issue-detail/IssuePhaseRail';
 import { SpecialistStrip } from '../issue-detail/SpecialistStrip';
 import { agentsToReviewerSessions, deriveSpecialistChips } from '../issue-detail/deriveSpecialists';
 import type { Phase } from '../../lib/simple/phases';
@@ -249,7 +249,7 @@ export function IssueDrawer() {
         {/* PAN-2908 C-DETAIL: rail + specialist strip live under the tabs,
             visible on every tab — the per-agent conversation switcher. */}
         <div data-section="PhaseTimeline" className="px-[22px] pt-[10px]">
-          <DrawerPhaseRail onSelectPhase={selectPhaseConversation} activePhase={activePhase} />
+          <IssuePhaseRail onSelectPhase={selectPhaseConversation} activePhase={activePhase} />
         </div>
         {specialistChips.length > 0 && (
           <div data-section="SpecialistStrip" className="px-[22px] pt-[8px]">
@@ -290,6 +290,7 @@ export function IssueDrawer() {
                 agents={agents}
                 agentId={effectiveAgentId}
                 onSelectAgent={setSelectedAgentId}
+                issueId={drawer.issueId}
               /></div>
             ) : drawer.tab === 'terminal' ? (
               <div data-section="DrawerAgentSession"><DrawerAgentSession
@@ -297,6 +298,7 @@ export function IssueDrawer() {
                 agents={agents}
                 agentId={effectiveAgentId}
                 onSelectAgent={setSelectedAgentId}
+                issueId={drawer.issueId}
               /></div>
             ) : (
               <DrawerTabPlaceholder tab={drawer.tab} />

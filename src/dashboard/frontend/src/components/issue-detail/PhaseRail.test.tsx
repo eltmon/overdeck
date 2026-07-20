@@ -17,21 +17,25 @@ describe('PhaseRail (C-DETAIL/C-VOCAB)', () => {
     expect(steps[5].getAttribute('data-state')).toBe('pending');
   });
 
-  it('fires onSelectPhase for clickable steps only', () => {
+  it('fires onSelectPhase on clickable steps; explicit conversation-less steps are disabled', () => {
     const onSelect = vi.fn();
     const { container } = render(
       <PhaseRail
         rail={phaseRailState('in_review_reviewers_running')}
-        agents={{ review: { name: 'review.correctness', live: true, hasConversation: true } }}
+        agents={{
+          review: { name: 'review.correctness', live: true, hasConversation: true },
+          test: { name: '', hasConversation: false },
+        }}
         onSelectPhase={onSelect}
       />,
     );
     const steps = container.querySelectorAll('[data-component="phase-rail"] > button');
-    // review has a conversation → clickable
     fireEvent.click(steps[2]);
     expect(onSelect).toHaveBeenCalledWith('review');
-    // test is queued with no conversation → not clickable
+    // explicitly conversation-less → disabled
     expect((steps[3] as HTMLButtonElement).disabled).toBe(true);
+    // queued without agent info → clickable (the shell decides what it means)
+    expect((steps[4] as HTMLButtonElement).disabled).toBe(false);
   });
 
   it('marks the active phase and shows the live agent', () => {
