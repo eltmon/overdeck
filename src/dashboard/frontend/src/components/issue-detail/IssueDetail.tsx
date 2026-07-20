@@ -86,8 +86,8 @@ function PickupSection({ issueId }: { issueId: string }) {
   );
 }
 
-function WorkspaceSection({ issueId }: { issueId: string }) {
-  const { data: workspace } = useQuery<WorkspaceInfo | null>({
+function useDrawerWorkspace(issueId: string) {
+  return useQuery<WorkspaceInfo | null>({
     queryKey: ['drawer-workspace', issueId],
     queryFn: async () => {
       const res = await fetch(`/api/workspaces/${issueId}`);
@@ -96,6 +96,10 @@ function WorkspaceSection({ issueId }: { issueId: string }) {
     },
     retry: false,
   });
+}
+
+function WorkspaceSection({ issueId }: { issueId: string }) {
+  const { data: workspace } = useDrawerWorkspace(issueId);
 
   if (!workspace?.exists || !workspace.path) return null;
 
@@ -111,6 +115,47 @@ function WorkspaceSection({ issueId }: { issueId: string }) {
         </div>
       </div>
     </section>
+  );
+}
+
+/** PAN-2908 C-DETAIL: the resources status facet for the always-visible right
+ *  rail — workspace containers at a glance (names + health dots), same query
+ *  as the Overview's Workspace section (shared cache, one fetch). */
+function ResourcesFacet({ issueId }: { issueId: string }) {
+  const { data: workspace } = useDrawerWorkspace(issueId);
+  const containers = Object.entries(workspace?.containers ?? {});
+  if (!workspace?.exists) return null;
+
+  return (
+    <div data-section="DrawerResourcesFacet" className="shrink-0 border-l border-border bg-card/70 px-[14px] py-[10px]">
+      <div className="mb-[6px] text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground">Resources</div>
+      {containers.length > 0 ? (
+        <div className="flex flex-wrap gap-x-3 gap-y-1">
+          {containers.map(([name, container]) => (
+            <span
+              key={name}
+              className="flex items-center gap-1.5 text-[11px] text-muted-foreground"
+              title={`${name}: ${container.status ?? (container.running ? 'running' : 'stopped')}${container.uptime ? ` · up ${container.uptime}` : ''}`}
+            >
+              <span
+                data-testid={`drawer-resource-dot-${name}`}
+                className={cn(
+                  'h-[7px] w-[7px] rounded-full',
+                  container.running
+                    ? container.health === 'unhealthy'
+                      ? 'bg-destructive'
+                      : 'bg-success'
+                    : 'bg-muted-foreground/40',
+                )}
+              />
+              <span className="font-mono">{name}</span>
+            </span>
+          ))}
+        </div>
+      ) : (
+        <div className="text-[11px] text-muted-foreground">Workspace on disk — no containers running.</div>
+      )}
+    </div>
   );
 }
 
@@ -337,6 +382,7 @@ export function IssueDetail({ issueId, density, agents, reviewStatus, tab, onSel
           <div data-section="DrawerVerificationGates" className="shrink-0 border-l border-border bg-card/70 p-[10px]">
             <VerificationGates issueId={issueId} />
           </div>
+          <ResourcesFacet issueId={issueId} />
           <div className="min-h-0 flex-1">
             <DrawerActivityRail />
           </div>
