@@ -36,4 +36,15 @@ describe('direct issue route drawer lifecycle', () => {
     expect(window.location.pathname).toBe('/board');
     expect(useDashboardStore.getState().drawer).toEqual({ issueId: null, tab: 'overview' });
   });
+
+  it('honors an explicit ?tab= deep-link over the conversation-first default', () => {
+    window.history.replaceState(null, '', '/issues/PAN-1234?tab=files');
+    useDashboardStore.getState().openIssueFromRoute('PAN-1234', '/board', window.location.pathname);
+    expect(useDashboardStore.getState().drawer).toEqual({ issueId: 'PAN-1234', tab: 'files' });
+  });
+
+  it('falls back to conversation-first when no ?tab= is present', () => {
+    useDashboardStore.getState().openIssueFromRoute('PAN-1234', '/board', window.location.pathname);
+    expect(useDashboardStore.getState().drawer.tab).toBe('conversation');
+  });
 });

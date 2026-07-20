@@ -169,8 +169,12 @@ export const useDashboardStore = create<DashboardStore>((set) => ({
 
   openIssueFromRoute: (issueId, parentPath, routePath) => {
     directIssueRoute = { parentPath, routePath }
-    // PAN-2908 C-DETAIL: the drawer opens conversation-first.
-    set({ drawer: { issueId, tab: 'conversation' } })
+    // PAN-2908 C-DETAIL: the drawer opens conversation-first — but an explicit
+    // ?tab= in the URL is a deep-link and always wins.
+    const urlTab = typeof window !== 'undefined'
+      ? new URLSearchParams(window.location.search).get('tab')
+      : null
+    set({ drawer: { issueId, tab: urlTab || 'conversation' } })
   },
 
   closeIssue: () => {
