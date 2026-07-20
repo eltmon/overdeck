@@ -548,29 +548,41 @@ export function CommandDeck({
 
   // On mount or when convId changes (popstate), apply the deep-link: switch to
   // the conversation's project and open it as an agent tab in that deck.
+  const convDeepLinkRetry = useRef({ id: null as string | null, count: 0 });
   useEffect(() => {
     if (!convId || conversations.length === 0) return;
     if (convId === appliedConvId.current) return;
     const conv = conversations.find((c) => String(c.id) === convId || c.name === convId);
-    if (conv) {
-      setSelectedConversation(conv.name);
-      setSelectedFeature(null);
-      const projectName = resolveConversationProjectName(conv) ?? NO_PROJECT_KEY;
-      const target = pendingConversationTarget?.conversationName === conv.name
-        ? {
-            messageId: pendingConversationTarget.messageId,
-            messageIndex: pendingConversationTarget.messageIndex,
-            nonce: pendingConversationTarget.nonce,
-          }
-        : undefined;
-      // Opening a conversation: the /conv/<id> route owns the URL, so switch the
-      // deck's project without writing /command-deck/<project> over it.
-      onSelectProject?.(projectName, { updateUrl: false });
-      openConversationTabIn(projectName, conv.name, pendingConversationTarget?.label ?? conv.title ?? 'Agent', target);
-      if (target) onPendingConversationTargetConsumed?.();
-      appliedConvId.current = convId;
+    if (!conv) {
+      // The deep-link targets a conversation the 10s poll hasn't surfaced yet
+      // (just created). Refresh promptly instead of waiting out the poll —
+      // with a small retry budget so a genuinely-unknown id doesn't loop.
+      if (convDeepLinkRetry.current.id !== convId) convDeepLinkRetry.current = { id: convId, count: 0 };
+      if (convDeepLinkRetry.current.count < 5) {
+        convDeepLinkRetry.current.count += 1;
+        const timer = setTimeout(() => void queryClient.invalidateQueries({ queryKey: ['conversations'] }), 700);
+        return () => clearTimeout(timer);
+      }
+      return;
     }
-  }, [convId, conversations, resolveConversationProjectName, onSelectProject, openConversationTabIn, pendingConversationTarget, onPendingConversationTargetConsumed]);
+    convDeepLinkRetry.current = { id: null, count: 0 };
+    setSelectedConversation(conv.name);
+    setSelectedFeature(null);
+    const projectName = resolveConversationProjectName(conv) ?? NO_PROJECT_KEY;
+    const target = pendingConversationTarget?.conversationName === conv.name
+      ? {
+          messageId: pendingConversationTarget.messageId,
+          messageIndex: pendingConversationTarget.messageIndex,
+          nonce: pendingConversationTarget.nonce,
+        }
+      : undefined;
+    // Opening a conversation: the /conv/<id> route owns the URL, so switch the
+    // deck's project without writing /command-deck/<project> over it.
+    onSelectProject?.(projectName, { updateUrl: false });
+    openConversationTabIn(projectName, conv.name, pendingConversationTarget?.label ?? conv.title ?? 'Agent', target);
+    if (target) onPendingConversationTargetConsumed?.();
+    appliedConvId.current = convId;
+  }, [convId, conversations, queryClient, resolveConversationProjectName, onSelectProject, openConversationTabIn, pendingConversationTarget, onPendingConversationTargetConsumed]);
 
   // Auto-select first conversation on initial load if no deep-link and no feature selected.
   // An `?issue=` deep-link (issue cockpit/drawer, e.g. ?issue=PAN-1908&tab=conversation)
