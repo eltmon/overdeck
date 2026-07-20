@@ -259,6 +259,77 @@ export interface WorkspaceCommitInfo {
   branch: string;
 }
 
+export interface WorkspaceHeadAnchorEntry {
+  repoKey: string;
+  sha: string;
+}
+
+export type WorkspaceGitShow = (
+  repoPath: string,
+  sha: string,
+  args: string[],
+) => Promise<string>;
+
+/**
+ * Parse a polyrepo head anchor such as `fe@<sha> api@<sha>`.
+ * Plain single-repo refs return null. Malformed composite anchors fail before
+ * any caller can accidentally pass the whitespace-containing value to git.
+ */
+export function parseWorkspaceHeadAnchor(anchor: string): WorkspaceHeadAnchorEntry[] | null {
+  const normalized = anchor.trim();
+  if (!normalized.includes('@')) {
+    if (/\s/.test(normalized)) {
+      throw new Error(`Invalid workspace head anchor: ${anchor}`);
+    }
+    return null;
+  }
+
+  const entries = normalized.split(/\s+/).map((token) => {
+    const match = /^([^@\s]+)@([0-9a-fA-F]{40,64})$/.exec(token);
+    if (!match) {
+      throw new Error(`Invalid workspace head anchor token '${token}' in '${anchor}'`);
+    }
+    return { repoKey: match[1], sha: match[2] };
+  });
+
+  return entries;
+}
+
+/**
+ * Render `git show` for a single-repo ref or every entry in a polyrepo anchor.
+ * Composite entries are resolved to their nested worktree and labeled using
+ * the same repo-section convention as review and inspect diff summaries.
+ */
+export async function renderWorkspaceGitShowPromise(
+  issueId: string | undefined,
+  workspacePath: string,
+  anchor: string,
+  args: string[],
+  gitShow: WorkspaceGitShow,
+): Promise<string> {
+  const entries = parseWorkspaceHeadAnchor(anchor);
+  if (!entries) return gitShow(workspacePath, anchor.trim(), args);
+  if (!issueId) {
+    throw new Error(`Cannot resolve composite workspace head anchor '${anchor}' without an issue id`);
+  }
+
+  const { resolveWorkspaceRepoRootsSync } = await import('./project-repos.js');
+  const rootsByKey = new Map(
+    resolveWorkspaceRepoRootsSync(issueId, workspacePath).map(root => [root.repoKey, root]),
+  );
+
+  const sections = await Promise.all(entries.map(async ({ repoKey, sha }) => {
+    const root = rootsByKey.get(repoKey);
+    if (!root) {
+      throw new Error(`Composite workspace head anchor repo '${repoKey}' was not found in ${workspacePath}`);
+    }
+    const diff = await gitShow(root.dir, sha, args);
+    return `── ${repoKey} ──\n${diff.trimEnd()}`;
+  }));
+
+  return sections.join('\n');
+}
+
 async function getWorkspaceGitInfoPromise(workspacePath: string): Promise<WorkspaceCommitInfo> {
   try {
     const [headResult, branchResult] = await Promise.all([
