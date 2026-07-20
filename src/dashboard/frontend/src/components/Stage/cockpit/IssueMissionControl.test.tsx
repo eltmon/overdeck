@@ -214,7 +214,7 @@ function renderMissionControl(extra?: { onOpenPane?: (pane: string) => void }) {
 describe('IssueMissionControl', () => {
   it('renders cockpit inventory markers on the real overview shell', () => {
     const { container } = renderMissionControl();
-    for (const section of ['Header bar', 'StatusNarrative', 'PhaseRail', 'SpecialistStrip', 'AgentsLane', 'Detail Tabs', 'TasksRail / TasksTab', 'Awareness rail', 'UatEnvironmentPanel', 'NowPanel', 'PickupGateCard', 'ReviewPolicyControl']) {
+    for (const section of ['Header bar', 'StatusNarrative', 'Pipeline Band', 'SpecialistStrip', 'AgentsLane', 'Detail Tabs', 'TasksRail / TasksTab', 'Awareness rail', 'UatEnvironmentPanel', 'NowPanel', 'PickupGateCard', 'ReviewPolicyControl']) {
       expect(container.querySelector(`[data-section="${section}"]`), section).toBeInTheDocument();
     }
   });

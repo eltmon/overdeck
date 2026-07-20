@@ -566,7 +566,7 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
         {/* PAN-2908 C-VOCAB/C-DETAIL: the shared phase rail replaces the
             journey strip — same six words as the drawer, and clicking a phase
             opens that agent's conversation. */}
-        <div data-section="PhaseRail" className="mt-3">
+        <div data-section="Pipeline Band" className="mt-3">
           <IssuePhaseRail
             issueId={issueId}
             onSelectPhase={(railPhase) => handlePhaseClick(railPhase === 'done' ? 'ship' : railPhase)}
