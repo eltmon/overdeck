@@ -12,7 +12,7 @@ const projectMocks = vi.hoisted(() => ({
 const installerMocks = vi.hoisted(() => ({
   ensureMnemos: vi.fn(),
   ensureOpenKnowledge: vi.fn(),
-  startOpenKnowledgeServer: vi.fn(),
+  startReadOnlyOpenKnowledgeServer: vi.fn(),
 }));
 
 const memoryMocks = vi.hoisted(() => ({
@@ -29,7 +29,7 @@ vi.mock('../../../lib/installers/mnemos.js', () => ({
 
 vi.mock('../../../lib/installers/open-knowledge.js', () => ({
   ensureOpenKnowledge: installerMocks.ensureOpenKnowledge,
-  startOpenKnowledgeServer: installerMocks.startOpenKnowledgeServer,
+  startReadOnlyOpenKnowledgeServer: installerMocks.startReadOnlyOpenKnowledgeServer,
 }));
 
 vi.mock('../../../lib/memory/injection.js', () => ({
@@ -53,7 +53,7 @@ describe('knowledgeCommand', () => {
     projectMocks.resolveProjectFromIssueSync.mockReset();
     installerMocks.ensureMnemos.mockReset();
     installerMocks.ensureOpenKnowledge.mockReset();
-    installerMocks.startOpenKnowledgeServer.mockReset();
+    installerMocks.startReadOnlyOpenKnowledgeServer.mockReset();
     memoryMocks.resolveKnowledgeBundleRoot.mockReset();
 
     projectMocks.resolveProjectFromIssueSync.mockReturnValue({
@@ -71,11 +71,14 @@ describe('knowledgeCommand', () => {
       status: 'already-installed',
       command: 'ok',
     });
-    installerMocks.startOpenKnowledgeServer.mockResolvedValue({
+    installerMocks.startReadOnlyOpenKnowledgeServer.mockResolvedValue({
       process: { unref: vi.fn() },
+      owned: true,
+      reused: false,
       port: 39847,
       apiPort: 8789,
       url: 'http://127.0.0.1:39847',
+      runtimeBundlePath: '/runtime/read-only-snapshot',
     });
     agentMocks.spawnRun.mockResolvedValue({
       id: 'agent-pan-2468-knowledge',
@@ -158,9 +161,12 @@ describe('knowledgeCommand', () => {
     const ensure = vi.fn(async () => ({ status: 'already-installed' as const, command: 'ok' as const }));
     const start = vi.fn(async () => ({
       process: { unref } as never,
+      owned: true,
+      reused: false,
       port: 39847,
       apiPort: 8789,
       url: 'http://127.0.0.1:39847',
+      runtimeBundlePath: '/runtime/read-only-snapshot',
     }));
     const openBrowser = vi.fn(async () => {});
     const log = vi.spyOn(console, 'log').mockImplementation(() => {});
@@ -181,14 +187,43 @@ describe('knowledgeCommand', () => {
     log.mockRestore();
   });
 
+  it('reports and opens the verified URL when the upstream lock is reused', async () => {
+    const ensure = vi.fn(async () => ({ status: 'already-installed' as const, command: 'ok' as const }));
+    const start = vi.fn(async () => ({
+      process: null,
+      owned: false,
+      reused: true,
+      port: 39847,
+      apiPort: 8789,
+      url: 'http://127.0.0.1:39847',
+      runtimeBundlePath: '/runtime/read-only-snapshot',
+    }));
+    const openBrowser = vi.fn(async () => {});
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    await knowledgeOpenCommand({}, {
+      cwd: () => '/repo/overdeck',
+      ensure,
+      start,
+      openBrowser,
+    });
+
+    expect(log).toHaveBeenCalledWith('Knowledge viewer: http://127.0.0.1:39847 (reused)');
+    expect(openBrowser).toHaveBeenCalledWith('http://127.0.0.1:39847');
+    log.mockRestore();
+  });
+
   it('honors --no-install and --no-browser', async () => {
     const unref = vi.fn();
     const ensure = vi.fn(async () => ({ status: 'already-installed' as const, command: 'ok' as const }));
     const start = vi.fn(async () => ({
       process: { unref } as never,
+      owned: true,
+      reused: false,
       port: 39847,
       apiPort: 8789,
       url: 'http://127.0.0.1:39847',
+      runtimeBundlePath: '/runtime/read-only-snapshot',
     }));
     const openBrowser = vi.fn(async () => {});
     const log = vi.spyOn(console, 'log').mockImplementation(() => {});

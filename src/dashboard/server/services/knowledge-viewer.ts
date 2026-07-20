@@ -1,8 +1,7 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import {
   ensureOpenKnowledge,
-  OpenKnowledgeError,
-  startOpenKnowledgeServer,
+  startReadOnlyOpenKnowledgeServer,
   type EnsureOpenKnowledgeResult,
   type StartOpenKnowledgeServerResult,
 } from '../../../lib/installers/open-knowledge.js';
@@ -19,12 +18,15 @@ export interface KnowledgeViewerStatus {
   port?: number;
   apiPort?: number;
   url?: string;
+  proxyUrl?: string;
+  embeddable?: boolean;
   message?: string;
 }
 
 export interface KnowledgeViewerService {
   getStatus(projectKey: string): Promise<KnowledgeViewerStatus>;
   getOrStartViewer(projectKey: string): Promise<KnowledgeViewerStatus>;
+  invalidateInstallationCache(): void;
   stopAll(): Promise<void>;
 }
 
@@ -34,36 +36,35 @@ export interface KnowledgeViewerDependencies {
   start?: (bundlePath: string, options: { openBrowser: false }) => Promise<StartOpenKnowledgeServerResult>;
   stop?: (bundlePath: string) => Promise<void>;
   fetchImpl?: typeof fetch;
-  sleep?: (ms: number) => Promise<void>;
-  retryDelayMs?: number;
-  maxHealthAttempts?: number;
 }
 
 interface ViewerEntry {
   bundlePath: string;
-  process: ChildProcess;
+  runtimeBundlePath: string;
+  process: ChildProcess | null;
+  owned: boolean;
   port: number;
   apiPort: number;
   url: string;
   exited: boolean;
 }
 
-const DEFAULT_RETRY_DELAY_MS = 250;
-const DEFAULT_MAX_HEALTH_ATTEMPTS = 40;
+interface ViewerProbe {
+  healthy: boolean;
+  embeddable: boolean;
+}
 
 export function createKnowledgeViewerService(
   dependencies: KnowledgeViewerDependencies = {},
 ): KnowledgeViewerService {
   const resolveBundle = dependencies.resolveBundle ?? resolveBundleForProject;
   const ensure = dependencies.ensure ?? ((options) => ensureOpenKnowledge(options));
-  const start = dependencies.start ?? ((bundlePath, options) => startOpenKnowledgeServer(bundlePath, options));
+  const start = dependencies.start ?? ((bundlePath, options) => startReadOnlyOpenKnowledgeServer(bundlePath, options));
   const stop = dependencies.stop ?? stopOpenKnowledgeWithSpawn;
   const fetchImpl = dependencies.fetchImpl ?? fetch;
-  const sleep = dependencies.sleep ?? ((ms) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
-  const retryDelayMs = dependencies.retryDelayMs ?? DEFAULT_RETRY_DELAY_MS;
-  const maxHealthAttempts = dependencies.maxHealthAttempts ?? DEFAULT_MAX_HEALTH_ATTEMPTS;
   const entries = new Map<string, ViewerEntry>();
   const starts = new Map<string, Promise<KnowledgeViewerStatus>>();
+  let installedCache: EnsureOpenKnowledgeResult | null = null;
 
   async function getStatus(projectKey: string): Promise<KnowledgeViewerStatus> {
     const bundlePath = await resolveBundle(projectKey);
@@ -74,26 +75,30 @@ export function createKnowledgeViewerService(
     let installed = true;
     let installMessage: string | undefined;
     try {
-      await ensure({ autoInstall: false });
+      installedCache ??= await ensure({ autoInstall: false });
     } catch (error) {
       installed = false;
       installMessage = errorMessage(error);
     }
 
     const entry = entries.get(projectKey);
-    if (entry && isProcessLive(entry) && await isViewerHealthy(entry.url, fetchImpl)) {
-      return {
-        projectKey,
-        bundleConfigured: true,
-        installed,
-        starting: starts.has(projectKey),
-        running: true,
-        bundlePath,
-        port: entry.port,
-        apiPort: entry.apiPort,
-        url: entry.url,
-        ...(installMessage ? { message: installMessage } : {}),
-      };
+    if (entry && isProcessLive(entry)) {
+      const probe = await probeViewer(entry.url, fetchImpl);
+      if (probe.healthy) {
+        return {
+          projectKey,
+          bundleConfigured: true,
+          installed,
+          starting: starts.has(projectKey),
+          running: true,
+          bundlePath,
+          port: entry.port,
+          apiPort: entry.apiPort,
+          url: entry.url,
+          embeddable: probe.embeddable,
+          ...(installMessage ? { message: installMessage } : {}),
+        };
+      }
     }
     if (entry) await stopEntry(projectKey, entry);
 
@@ -123,26 +128,33 @@ export function createKnowledgeViewerService(
     const status = await getStatus(projectKey);
     if (!status.bundleConfigured || !status.installed || status.running) return status;
 
-    const started = await start(status.bundlePath!, { openBrowser: false });
+    let started: StartOpenKnowledgeServerResult;
+    try {
+      started = await start(status.bundlePath!, { openBrowser: false });
+    } catch (error) {
+      installedCache = null;
+      throw error;
+    }
     const entry: ViewerEntry = {
       bundlePath: status.bundlePath!,
+      runtimeBundlePath: started.runtimeBundlePath,
       process: started.process,
+      owned: started.owned,
       port: started.port,
       apiPort: started.apiPort,
       url: started.url,
       exited: false,
     };
     entries.set(projectKey, entry);
-    started.process.once('exit', () => {
+    started.process?.once('exit', () => {
       entry.exited = true;
       if (entries.get(projectKey) === entry) entries.delete(projectKey);
     });
 
-    try {
-      await waitForViewerHealth(started.url, fetchImpl, sleep, retryDelayMs, maxHealthAttempts);
-    } catch (error) {
+    const probe = await probeViewer(started.url, fetchImpl);
+    if (!probe.healthy) {
       await stopEntry(projectKey, entry);
-      throw error;
+      throw new Error(`open-knowledge viewer did not remain healthy at ${started.url}`);
     }
 
     return {
@@ -155,17 +167,23 @@ export function createKnowledgeViewerService(
       port: entry.port,
       apiPort: entry.apiPort,
       url: entry.url,
+      embeddable: probe.embeddable,
     };
   }
 
   async function stopEntry(projectKey: string, entry: ViewerEntry): Promise<void> {
     if (entries.get(projectKey) === entry) entries.delete(projectKey);
+    if (!entry.owned) return;
     try {
-      await stop(entry.bundlePath);
+      await stop(entry.runtimeBundlePath);
     } catch {
       // The tracked child is still ours to terminate when the `ok stop` helper fails.
     }
-    if (isProcessLive(entry)) entry.process.kill('SIGTERM');
+    if (isProcessLive(entry)) entry.process?.kill('SIGTERM');
+  }
+
+  function invalidateInstallationCache(): void {
+    installedCache = null;
   }
 
   async function stopAll(): Promise<void> {
@@ -176,7 +194,7 @@ export function createKnowledgeViewerService(
     await Promise.all(active.map(async ([projectKey, entry]) => stopEntry(projectKey, entry)));
   }
 
-  return { getStatus, getOrStartViewer, stopAll };
+  return { getStatus, getOrStartViewer, invalidateInstallationCache, stopAll };
 }
 
 async function resolveBundleForProject(projectKey: string): Promise<string | null> {
@@ -197,30 +215,28 @@ function unavailableStatus(projectKey: string, starting: boolean, message: strin
 }
 
 function isProcessLive(entry: ViewerEntry): boolean {
-  return !entry.exited && entry.process.exitCode == null;
+  return entry.process === null || (!entry.exited && entry.process.exitCode == null);
 }
 
-async function isViewerHealthy(url: string, fetchImpl: typeof fetch): Promise<boolean> {
+async function probeViewer(url: string, fetchImpl: typeof fetch): Promise<ViewerProbe> {
   try {
     const response = await fetchImpl(url, { method: 'GET' });
-    return response.ok;
+    return {
+      healthy: response.ok,
+      embeddable: response.ok && responseAllowsEmbedding(response.headers),
+    };
   } catch {
-    return false;
+    return { healthy: false, embeddable: false };
   }
 }
 
-async function waitForViewerHealth(
-  url: string,
-  fetchImpl: typeof fetch,
-  sleep: (ms: number) => Promise<void>,
-  retryDelayMs: number,
-  maxAttempts: number,
-): Promise<void> {
-  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-    if (await isViewerHealthy(url, fetchImpl)) return;
-    if (attempt < maxAttempts) await sleep(retryDelayMs);
-  }
-  throw new OpenKnowledgeError(`open-knowledge viewer did not become healthy at ${url}`);
+function responseAllowsEmbedding(headers: Headers): boolean {
+  const frameOptions = headers.get('x-frame-options')?.trim().toLowerCase();
+  if (frameOptions === 'deny' || frameOptions === 'sameorigin') return false;
+  const csp = headers.get('content-security-policy')?.toLowerCase() ?? '';
+  const frameAncestors = csp.match(/(?:^|;)\s*frame-ancestors\s+([^;]+)/)?.[1]?.trim();
+  if (!frameAncestors) return true;
+  return frameAncestors !== "'none'" && frameAncestors !== "'self'";
 }
 
 async function stopOpenKnowledgeWithSpawn(bundlePath: string): Promise<void> {
@@ -229,7 +245,7 @@ async function stopOpenKnowledgeWithSpawn(bundlePath: string): Promise<void> {
     child.once('error', reject);
     child.once('exit', (code) => {
       if (code === 0) resolve();
-      else reject(new OpenKnowledgeError(`ok stop exited with code ${code}`));
+      else reject(new Error(`ok stop exited with code ${code}`));
     });
   });
 }
@@ -245,6 +261,9 @@ export const getKnowledgeViewerStatus = (projectKey: string): Promise<KnowledgeV
 
 export const getOrStartViewer = (projectKey: string): Promise<KnowledgeViewerStatus> =>
   defaultKnowledgeViewerService.getOrStartViewer(projectKey);
+
+export const invalidateKnowledgeViewerInstallationCache = (): void =>
+  defaultKnowledgeViewerService.invalidateInstallationCache();
 
 export const stopAllKnowledgeViewers = (): Promise<void> =>
   defaultKnowledgeViewerService.stopAll();

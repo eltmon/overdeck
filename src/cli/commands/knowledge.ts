@@ -6,7 +6,7 @@ import { spawnRun } from '../../lib/agents.js';
 import { ensureMnemos } from '../../lib/installers/mnemos.js';
 import {
   ensureOpenKnowledge,
-  startOpenKnowledgeServer,
+  startReadOnlyOpenKnowledgeServer,
   type EnsureOpenKnowledgeResult,
   type StartOpenKnowledgeServerResult,
 } from '../../lib/installers/open-knowledge.js';
@@ -144,12 +144,12 @@ export async function knowledgeOpenCommand(
   }
 
   const ensure = dependencies.ensure ?? ensureOpenKnowledge;
-  const start = dependencies.start ?? startOpenKnowledgeServer;
+  const start = dependencies.start ?? startReadOnlyOpenKnowledgeServer;
   await ensure({ autoInstall: options.install !== false });
   const viewer = await start(bundlePath, { openBrowser: false });
-  viewer.process.unref();
+  viewer.process?.unref();
 
-  console.log(`Knowledge viewer: ${viewer.url}`);
+  console.log(`Knowledge viewer: ${viewer.url}${viewer.reused ? ' (reused)' : ''}`);
   if (options.browser === false) return;
 
   try {

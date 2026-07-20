@@ -1,9 +1,13 @@
 import { EventEmitter } from 'node:events';
 import type { ChildProcess } from 'node:child_process';
+import { access, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   ensureOpenKnowledge,
   OpenKnowledgeError,
+  prepareOpenKnowledgeSnapshot,
   startOpenKnowledgeServer,
   type CommandResult,
 } from '../open-knowledge.js';
@@ -125,18 +129,33 @@ describe('ensureOpenKnowledge', () => {
 });
 
 describe('startOpenKnowledgeServer', () => {
-  it('initializes without MCP or skills and starts with distinct pinned API and UI ports', async () => {
+  const missingStatus = {
+    server: { name: 'server', state: 'missing', alive: false },
+    ui: { name: 'ui', state: 'missing', alive: false },
+  };
+  const liveStatus = {
+    server: { name: 'server', state: 'alive', alive: true, port: 8789 },
+    ui: { name: 'ui', state: 'alive', alive: true, port: 39847 },
+  };
+
+  it('initializes without MCP or skills and waits for the actual live ports', async () => {
     const runCommand = vi.fn(async () => success());
     const child = new EventEmitter() as ChildProcess;
+    Object.defineProperty(child, 'exitCode', { value: null, writable: true });
     child.kill = vi.fn(() => true);
     const spawnProcess = vi.fn((_command, _args, _options) => {
       queueMicrotask(() => child.emit('spawn'));
       return child;
     });
+    const getStatus = vi.fn()
+      .mockResolvedValueOnce(missingStatus)
+      .mockResolvedValueOnce(liveStatus);
 
     const result = await startOpenKnowledgeServer('/tmp/knowledge', {
       runCommand,
       spawnProcess,
+      getStatus,
+      fetchImpl: vi.fn(async () => new Response('ok')),
       isInitialized: async () => false,
       getAvailablePorts: async () => [8789, 39847],
     });
@@ -165,26 +184,86 @@ describe('startOpenKnowledgeServer', () => {
       '--mode',
       'browser',
     ], { stdio: 'ignore' });
-    expect(result).toEqual({ process: child, port: 39847, apiPort: 8789, url: 'http://127.0.0.1:39847' });
+    expect(result).toEqual({
+      process: child,
+      owned: true,
+      reused: false,
+      port: 39847,
+      apiPort: 8789,
+      url: 'http://127.0.0.1:39847',
+      runtimeBundlePath: '/tmp/knowledge',
+    });
+  });
+
+  it('reuses a healthy lock-reported viewer and returns its verified URL', async () => {
+    const spawnProcess = vi.fn();
+
+    const result = await startOpenKnowledgeServer('/tmp/knowledge', {
+      getStatus: async () => liveStatus,
+      fetchImpl: vi.fn(async () => new Response('ok')),
+      spawnProcess,
+    });
+
+    expect(spawnProcess).not.toHaveBeenCalled();
+    expect(result).toEqual({
+      process: null,
+      owned: false,
+      reused: true,
+      port: 39847,
+      apiPort: 8789,
+      url: 'http://127.0.0.1:39847',
+      runtimeBundlePath: '/tmp/knowledge',
+    });
   });
 
   it('adds --open only for an explicit browser-opening request', async () => {
     const child = new EventEmitter() as ChildProcess;
+    Object.defineProperty(child, 'exitCode', { value: null, writable: true });
     child.kill = vi.fn(() => true);
     const spawnProcess = vi.fn((_command, _args, _options) => {
       queueMicrotask(() => child.emit('spawn'));
       return child;
     });
+    const getStatus = vi.fn()
+      .mockResolvedValueOnce(missingStatus)
+      .mockResolvedValueOnce(liveStatus);
 
     await startOpenKnowledgeServer('/tmp/knowledge', {
       apiPort: 8789,
       uiPort: 39847,
       openBrowser: true,
       spawnProcess,
+      getStatus,
+      fetchImpl: vi.fn(async () => new Response('ok')),
       isInitialized: async () => true,
     });
 
     expect(spawnProcess.mock.calls[0]?.[1]).toContain('--open');
     expect(spawnProcess.mock.calls[0]?.[1]).not.toContain('--no-open');
+  });
+});
+
+describe('prepareOpenKnowledgeSnapshot', () => {
+  it('creates a disposable projection that cannot mutate the canonical bundle', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'open-knowledge-snapshot-'));
+    const source = join(root, 'source');
+    const snapshots = join(root, 'snapshots');
+    await mkdir(join(source, '.git'), { recursive: true });
+    await mkdir(join(source, '.ok'), { recursive: true });
+    await writeFile(join(source, 'concept.md'), 'canonical\n');
+    await writeFile(join(source, '.git', 'config'), 'git metadata\n');
+    await writeFile(join(source, '.ok', 'config.yml'), 'runtime metadata\n');
+
+    try {
+      const snapshot = await prepareOpenKnowledgeSnapshot(source, snapshots);
+      await writeFile(join(snapshot, 'concept.md'), 'viewer edit\n');
+
+      expect(await readFile(join(source, 'concept.md'), 'utf8')).toBe('canonical\n');
+      expect(await readFile(join(snapshot, 'concept.md'), 'utf8')).toBe('viewer edit\n');
+      await expect(access(join(snapshot, '.git', 'HEAD'))).resolves.toBeUndefined();
+      await expect(access(join(snapshot, '.ok'))).rejects.toThrow();
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
   });
 });

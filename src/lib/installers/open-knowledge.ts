@@ -1,10 +1,14 @@
 import { spawn, type ChildProcess, type SpawnOptions } from 'node:child_process';
-import { access } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import { access, cp, mkdir, mkdtemp, realpath, rename, rm } from 'node:fs/promises';
 import { createServer } from 'node:net';
-import { join } from 'node:path';
+import { dirname, join, relative, sep } from 'node:path';
+import { getOverdeckHome } from '../paths.js';
 
 const OPEN_KNOWLEDGE_PACKAGE = '@inkeep/open-knowledge';
 const MANUAL_INSTALL_COMMAND = `npm install -g ${OPEN_KNOWLEDGE_PACKAGE}`;
+const DEFAULT_START_RETRY_DELAY_MS = 250;
+const DEFAULT_START_MAX_ATTEMPTS = 40;
 
 export interface CommandResult {
   stdout: string;
@@ -28,6 +32,19 @@ export interface EnsureOpenKnowledgeResult {
   command: 'ok';
 }
 
+export interface OpenKnowledgeProcessStatus {
+  name: string;
+  state: string;
+  alive: boolean;
+  pid?: number;
+  port?: number;
+}
+
+export interface OpenKnowledgeStatus {
+  server: OpenKnowledgeProcessStatus;
+  ui: OpenKnowledgeProcessStatus;
+}
+
 export interface StartOpenKnowledgeServerOptions {
   apiPort?: number;
   uiPort?: number;
@@ -35,17 +52,30 @@ export interface StartOpenKnowledgeServerOptions {
   mode?: 'browser' | 'app';
   openBrowser?: boolean;
   initializeIfNeeded?: boolean;
+  retryDelayMs?: number;
+  maxHealthAttempts?: number;
   runCommand?: CommandRunner;
   spawnProcess?: SpawnProcess;
   isInitialized?: (bundlePath: string) => Promise<boolean>;
   getAvailablePorts?: (count: number, host: string) => Promise<number[]>;
+  getStatus?: (bundlePath: string) => Promise<OpenKnowledgeStatus>;
+  fetchImpl?: typeof fetch;
+  sleep?: (ms: number) => Promise<void>;
+}
+
+export interface StartReadOnlyOpenKnowledgeServerOptions extends StartOpenKnowledgeServerOptions {
+  snapshotRoot?: string;
+  prepareSnapshot?: (bundlePath: string, snapshotRoot?: string) => Promise<string>;
 }
 
 export interface StartOpenKnowledgeServerResult {
-  process: ChildProcess;
+  process: ChildProcess | null;
+  owned: boolean;
+  reused: boolean;
   port: number;
   apiPort: number;
   url: string;
+  runtimeBundlePath: string;
 }
 
 export class OpenKnowledgeError extends Error {
@@ -88,13 +118,97 @@ export async function ensureOpenKnowledge(
   throw await installationError(new Error('the ok binary did not pass `ok --version` after installation'), runCommand);
 }
 
+export async function startReadOnlyOpenKnowledgeServer(
+  bundlePath: string,
+  options: StartReadOnlyOpenKnowledgeServerOptions = {},
+): Promise<StartOpenKnowledgeServerResult> {
+  const prepareSnapshot = options.prepareSnapshot ?? prepareOpenKnowledgeSnapshot;
+  const runtimeBundlePath = await readOnlyOpenKnowledgeSnapshotPath(bundlePath, options.snapshotRoot);
+  const getStatus = options.getStatus ?? ((path) => getOpenKnowledgeStatus(path, options.runCommand));
+  const existing = await getStatus(runtimeBundlePath);
+  if (!liveStatus(existing)) {
+    await prepareSnapshot(bundlePath, options.snapshotRoot);
+  }
+  return startOpenKnowledgeServer(runtimeBundlePath, { ...options, getStatus });
+}
+
+export async function prepareOpenKnowledgeSnapshot(
+  bundlePath: string,
+  snapshotRoot = join(getOverdeckHome(), 'cache', 'knowledge-viewer'),
+): Promise<string> {
+  const source = await realpath(bundlePath);
+  const destination = await readOnlyOpenKnowledgeSnapshotPath(source, snapshotRoot);
+  const parent = dirname(destination);
+  await mkdir(parent, { recursive: true });
+  const temporaryRoot = await mkdtemp(join(parent, '.snapshot-'));
+  const temporaryBundle = join(temporaryRoot, 'bundle');
+
+  try {
+    await cp(source, temporaryBundle, {
+      recursive: true,
+      dereference: true,
+      filter: (path) => {
+        const relativePath = relative(source, path);
+        if (!relativePath) return true;
+        const firstSegment = relativePath.split(sep)[0];
+        return firstSegment !== '.git' && firstSegment !== '.ok';
+      },
+    });
+    await runCommandWithSpawn('git', ['init', '--quiet', temporaryBundle]);
+    await rm(destination, { recursive: true, force: true });
+    await rename(temporaryBundle, destination);
+  } finally {
+    await rm(temporaryRoot, { recursive: true, force: true });
+  }
+
+  return destination;
+}
+
+export async function readOnlyOpenKnowledgeSnapshotPath(
+  bundlePath: string,
+  snapshotRoot = join(getOverdeckHome(), 'cache', 'knowledge-viewer'),
+): Promise<string> {
+  let resolved = bundlePath;
+  try {
+    resolved = await realpath(bundlePath);
+  } catch {
+    // A not-yet-created snapshot still has a stable path derived from its source string.
+  }
+  const key = createHash('sha256').update(resolved).digest('hex').slice(0, 24);
+  return join(snapshotRoot, key, 'bundle');
+}
+
+export async function getOpenKnowledgeStatus(
+  bundlePath: string,
+  runCommand: CommandRunner = runCommandWithSpawn,
+): Promise<OpenKnowledgeStatus> {
+  try {
+    const result = await runCommand('ok', ['--cwd', bundlePath, 'status', '--json']);
+    const parsed = JSON.parse(result.stdout) as Partial<OpenKnowledgeStatus>;
+    return {
+      server: normalizeProcessStatus(parsed.server, 'server'),
+      ui: normalizeProcessStatus(parsed.ui, 'ui'),
+    };
+  } catch {
+    return missingStatus();
+  }
+}
+
 export async function startOpenKnowledgeServer(
   bundlePath: string,
   options: StartOpenKnowledgeServerOptions = {},
 ): Promise<StartOpenKnowledgeServerResult> {
   const runCommand = options.runCommand ?? runCommandWithSpawn;
-  const isInitialized = options.isInitialized ?? openKnowledgeIsInitialized;
+  const getStatus = options.getStatus ?? ((path) => getOpenKnowledgeStatus(path, runCommand));
+  const fetchImpl = options.fetchImpl ?? fetch;
+  const sleep = options.sleep ?? ((ms) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
+  const retryDelayMs = options.retryDelayMs ?? DEFAULT_START_RETRY_DELAY_MS;
+  const maxHealthAttempts = options.maxHealthAttempts ?? DEFAULT_START_MAX_ATTEMPTS;
+  const existing = await getStatus(bundlePath);
+  const reused = await readyResult(existing, options.host ?? '127.0.0.1', fetchImpl);
+  if (reused) return { ...reused, process: null, owned: false, reused: true, runtimeBundlePath: bundlePath };
 
+  const isInitialized = options.isInitialized ?? openKnowledgeIsInitialized;
   if (!(await isInitialized(bundlePath))) {
     if (options.initializeIfNeeded === false) {
       throw new OpenKnowledgeError(`open-knowledge is not initialized for ${bundlePath}. Run \`ok init\` first.`);
@@ -143,11 +257,62 @@ export async function startOpenKnowledgeServer(
   const child = spawnProcess('ok', args, { stdio: 'ignore' });
   await waitForSpawn(child);
 
+  for (let attempt = 1; attempt <= maxHealthAttempts; attempt += 1) {
+    if (child.exitCode != null) {
+      throw new OpenKnowledgeError(`open-knowledge exited before becoming ready (code ${child.exitCode})`);
+    }
+    const status = await getStatus(bundlePath);
+    const ready = await readyResult(status, host, fetchImpl);
+    if (ready) {
+      return { ...ready, process: child, owned: true, reused: false, runtimeBundlePath: bundlePath };
+    }
+    if (attempt < maxHealthAttempts) await sleep(retryDelayMs);
+  }
+
+  child.kill('SIGTERM');
+  throw new OpenKnowledgeError(`open-knowledge viewer did not become healthy for ${bundlePath}`);
+}
+
+function liveStatus(status: OpenKnowledgeStatus): boolean {
+  return status.server.alive && status.ui.alive && Number.isInteger(status.server.port) && Number.isInteger(status.ui.port);
+}
+
+async function readyResult(
+  status: OpenKnowledgeStatus,
+  host: string,
+  fetchImpl: typeof fetch,
+): Promise<Omit<StartOpenKnowledgeServerResult, 'process' | 'owned' | 'reused' | 'runtimeBundlePath'> | null> {
+  if (!liveStatus(status)) return null;
+  const apiPort = status.server.port!;
+  const port = status.ui.port!;
+  const url = `http://${formatUrlHost(host)}:${port}`;
+  try {
+    const response = await fetchImpl(url, { method: 'GET' });
+    if (!response.ok) return null;
+  } catch {
+    return null;
+  }
+  return { port, apiPort, url };
+}
+
+function normalizeProcessStatus(
+  value: OpenKnowledgeProcessStatus | undefined,
+  name: string,
+): OpenKnowledgeProcessStatus {
+  if (!value || typeof value !== 'object') return { name, state: 'missing', alive: false };
   return {
-    process: child,
-    port: uiPort,
-    apiPort,
-    url: `http://${formatUrlHost(host)}:${uiPort}`,
+    name,
+    state: typeof value.state === 'string' ? value.state : 'missing',
+    alive: value.alive === true,
+    ...(Number.isInteger(value.pid) ? { pid: value.pid } : {}),
+    ...(Number.isInteger(value.port) ? { port: value.port } : {}),
+  };
+}
+
+function missingStatus(): OpenKnowledgeStatus {
+  return {
+    server: { name: 'server', state: 'missing', alive: false },
+    ui: { name: 'ui', state: 'missing', alive: false },
   };
 }
 

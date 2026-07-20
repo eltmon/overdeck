@@ -56,8 +56,9 @@ it resolves the installed `okf` skill and falls back to its bundled `scripts/` d
 
 `pan knowledge open` resolves the current project's bundle through
 `projects.yaml` or `.okf.yml`, progressively installs the separately licensed
-`@inkeep/open-knowledge` program when needed, starts or reuses its local viewer,
-and opens the URL. Use `--no-install` to require a preinstalled `ok` binary and
+`@inkeep/open-knowledge` program when needed, starts or reuses a verified viewer
+against a disposable snapshot, and opens the URL. Viewer edits never touch the
+canonical PR-gated bundle. Use `--no-install` to require a preinstalled `ok` binary and
 `--no-browser` to print the URL without launching a browser.
 
 ## When to Use

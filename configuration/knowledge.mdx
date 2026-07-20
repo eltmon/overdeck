@@ -28,7 +28,7 @@ pan knowledge open
 /okf open
 ```
 
-The first explicit open may install `@inkeep/open-knowledge` globally. Overdeck does not install it during `pan install`, dashboard startup, or any other unattended path.
+The first explicit open may install `@inkeep/open-knowledge` globally. Overdeck does not install it during `pan install`, dashboard startup, or any other unattended path. Repeated opens inspect OpenKnowledge's project lock and reuse the verified live URL instead of printing an unproven port.
 
 | Option | Effect |
 | --- | --- |
@@ -39,14 +39,16 @@ OpenKnowledge v0.34 requires Node.js 24 or newer. The Overdeck dashboard continu
 
 ## Dashboard Knowledge page
 
-Select **Knowledge** under **System** in the dashboard sidebar. The page shows the selected project's bundle state and starts one reusable viewer process for that project. Viewer HTTP and WebSocket traffic stays same-origin through `/knowledge-viewer/*`.
+Select **Knowledge** under **System** in the dashboard sidebar. The page shows the selected project's bundle state and starts one reusable viewer process for that project. Each project is routed through its own `knowledge-<hex>.<dashboard-domain>` origin, so OpenKnowledge's root `/api/*` and `/collab` traffic stays pinned to that project. The proxy accepts a viewer-specific credential minted by an authenticated dashboard request; dashboard cookies, authorization, CSRF tokens, internal headers, and upstream cookies never cross the subprocess boundary.
 
 If the viewer permits framing, its workspace appears directly on the page. If a future viewer version refuses framing through `X-Frame-Options` or Content Security Policy, the page shows an **Open viewer** link to the direct local URL instead.
 
 <Warning>
-  The embedded viewer is read-only in Overdeck. A v0.34 round-trip test changed
-  unrelated YAML formatting during an edit, so editing remains on the
-  PR-gated `/okf author` path.
+  Overdeck starts both dashboard and CLI viewers against a disposable snapshot
+  outside the canonical bundle. OpenKnowledge can accept edits inside that
+  projection, but those writes are discarded and cannot bypass the PR-gated
+  `/okf author` path. A v0.34 round-trip test made this boundary necessary by
+  changing unrelated YAML formatting during an edit.
 </Warning>
 
 To change knowledge, use the portable OKF workflow:

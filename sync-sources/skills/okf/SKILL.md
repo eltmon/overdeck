@@ -88,7 +88,8 @@ Open the configured bundle in the local visual knowledge viewer.
 - Resolve the bundle from `.okf.yml`; under Overdeck, the canonical resolver also honors the project's `knowledge_repo` setting.
 - When `pan` is available, delegate to `pan knowledge open` and pass through `--no-install` and `--no-browser`.
 - By default, an explicit open request progressively installs the separately licensed GPL-3.0 `@inkeep/open-knowledge` program. `--no-install` requires an existing `ok` binary instead.
-- The viewer is an arm's-length subprocess served over HTTP. Never import, require, or bundle `@inkeep/open-knowledge` into the portable OKF scripts or Overdeck packages.
+- The viewer is an arm's-length subprocess served over HTTP. Overdeck launches it against a disposable snapshot, reuses healthy lock-reported processes, and never lets viewer edits touch the canonical PR-gated bundle.
+- Never import, require, or bundle `@inkeep/open-knowledge` into the portable OKF scripts or Overdeck packages.
 
 ## `/okf author "<topic>"`
 

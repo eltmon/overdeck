@@ -86,21 +86,27 @@ The integration is progressive:
 1. `pan install` does not install OpenKnowledge. The first explicit
    `pan knowledge open`, `/okf open`, or dashboard **Install viewer** action may
    install it globally; `--no-install` requires an existing installation.
-2. The server owns one viewer process per project, reuses healthy processes,
-   and proxies HTTP and WebSocket traffic through `/knowledge-viewer/*` so the
-   dashboard can embed the viewer without exposing a separate origin.
-3. The dashboard **Knowledge** page represents missing-bundle, not-installed,
+2. The server owns one viewer process per project, reuses healthy lock-reported
+   processes, and proxies every HTTP and WebSocket path through a project-keyed,
+   origin-isolated `knowledge-<hex>.<dashboard-domain>` host. Short-lived viewer
+   credentials never expose dashboard cookies or internal headers upstream.
+3. Every viewer runs against a disposable snapshot outside the canonical bundle.
+   OpenKnowledge may accept edits inside that projection, but those writes cannot
+   reach the PR-gated source and are discarded when the snapshot is refreshed.
+4. The dashboard **Knowledge** page represents missing-bundle, not-installed,
    installing, starting, embedded, and framing-blocked states. When framing is
    refused, it offers the viewer's direct local URL in a new tab.
-4. `ok init` MCP registration is always a separate opt-in action. Unattended
+5. `ok init` MCP registration is always a separate opt-in action. Unattended
    viewer initialization uses `--no-mcp --no-skills`, so opening the viewer
    never changes Claude Code, Codex, or Cursor configuration.
 
 The mandatory round-trip spike on OpenKnowledge v0.34.0 found source-format
 loss: editing only `description` also rewrote an unrelated inline YAML `tags`
-array. The integrated dashboard is therefore deliberately read-only. Operators
-browse and search there, then use `/okf author` for PR-gated edits that preserve
-unknown frontmatter and pass deterministic conformance checks. Lease-based
+array. The integrated dashboard is therefore mechanically read-only with respect
+to the canonical bundle: both the dashboard and CLI launch a disposable snapshot,
+so viewer edits are discarded rather than reaching source files. Operators browse
+and search there, then use `/okf author` for PR-gated edits that preserve unknown
+frontmatter and pass deterministic conformance checks. Lease-based
 writes and the advisory semantic auditor remain deferred capabilities rather
 than viewer responsibilities.
 
@@ -270,6 +276,7 @@ From the spec repo's issues/discussions (all open unless noted):
   viewer plan written into PAN-2066 as the preferred approach for items
   #1/#2/#4.
 - **2026-07-19** — progressive installation, `pan knowledge open`, `/okf open`,
-  server-owned lifecycle and same-origin proxying, and the dashboard Knowledge
+  server-owned lifecycle, origin-isolated proxying, and the dashboard Knowledge
   page implemented. The round-trip spike found YAML source-format churn, so the
-  viewer shipped read-only and MCP registration stayed explicitly opt-in.
+  viewer runs against a disposable read-only projection and MCP registration
+  stays explicitly opt-in.

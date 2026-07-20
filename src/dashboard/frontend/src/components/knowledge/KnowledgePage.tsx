@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertCircle, BookOpen, Download, Loader2 } from 'lucide-react';
+import { dashboardMutationJsonHeaders } from '../../lib/wsTransport';
 import { fetchProjects } from '../CommandDeck/projectsData';
 
 export interface KnowledgeViewerStatus {
@@ -11,6 +12,8 @@ export interface KnowledgeViewerStatus {
   running: boolean;
   bundlePath?: string;
   url?: string;
+  proxyUrl?: string;
+  embeddable?: boolean;
   message?: string;
 }
 
@@ -19,23 +22,9 @@ interface KnowledgePageProps {
 }
 
 const KNOWLEDGE_VIEWER_EDITABLE = false;
-const EMBED_PROBE_DELAY_MS = 100;
 const EMBED_TIMEOUT_MS = 5_000;
 
 type EmbedState = 'loading' | 'ready' | 'blocked';
-
-export function iframeDocumentLoaded(iframe: HTMLIFrameElement): boolean {
-  try {
-    const document = iframe.contentDocument;
-    return Boolean(
-      document &&
-      document.location.href !== 'about:blank' &&
-      document.documentElement.childElementCount > 0,
-    );
-  } catch {
-    return false;
-  }
-}
 
 export function knowledgeViewerPostureCopy(editable = KNOWLEDGE_VIEWER_EDITABLE): string {
   return editable
@@ -44,7 +33,9 @@ export function knowledgeViewerPostureCopy(editable = KNOWLEDGE_VIEWER_EDITABLE)
 }
 
 async function fetchViewerStatus(projectKey: string): Promise<KnowledgeViewerStatus> {
-  const response = await fetch(`/api/knowledge-viewer/status?project=${encodeURIComponent(projectKey)}`);
+  const response = await fetch(`/api/knowledge-viewer/status?project=${encodeURIComponent(projectKey)}`, {
+    credentials: 'include',
+  });
   const body = await response.json() as KnowledgeViewerStatus & { error?: string };
   if (!response.ok) throw new Error(body.error || 'Knowledge viewer status could not be loaded');
   return body;
@@ -53,7 +44,8 @@ async function fetchViewerStatus(projectKey: string): Promise<KnowledgeViewerSta
 async function mutateViewer(action: 'install' | 'start', projectKey: string): Promise<KnowledgeViewerStatus> {
   const response = await fetch(`/api/knowledge-viewer/${action}`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    credentials: 'include',
+    headers: await dashboardMutationJsonHeaders(),
     body: JSON.stringify({ project: projectKey }),
   });
   const body = await response.json() as KnowledgeViewerStatus & { error?: string };
@@ -64,7 +56,7 @@ async function mutateViewer(action: 'install' | 'start', projectKey: string): Pr
 export function KnowledgePage({ projectKey }: KnowledgePageProps) {
   const queryClient = useQueryClient();
   const requestedStart = useRef<string | null>(null);
-  const iframeRef = useRef<HTMLIFrameElement | null>(null);
+  const lastRunningProject = useRef<string | null>(null);
   const [embedState, setEmbedState] = useState<EmbedState>('loading');
   const projectsQuery = useQuery({
     queryKey: ['command-deck-projects'],
@@ -98,6 +90,22 @@ export function KnowledgePage({ projectKey }: KnowledgePageProps) {
 
   const status = statusQuery.data;
   useEffect(() => {
+    if (!activeProjectKey) {
+      lastRunningProject.current = null;
+      return;
+    }
+    if (status?.running) {
+      requestedStart.current = null;
+      lastRunningProject.current = activeProjectKey;
+      return;
+    }
+    if (lastRunningProject.current === activeProjectKey) {
+      requestedStart.current = null;
+      lastRunningProject.current = null;
+    }
+  }, [activeProjectKey, status?.running]);
+
+  useEffect(() => {
     if (!activeProjectKey || !status?.bundleConfigured || !status.installed || status.running || status.starting) return;
     if (requestedStart.current === activeProjectKey || startMutation.isPending) return;
     requestedStart.current = activeProjectKey;
@@ -107,22 +115,25 @@ export function KnowledgePage({ projectKey }: KnowledgePageProps) {
   useEffect(() => {
     setEmbedState('loading');
     if (!status?.running) return;
-    const timeout = window.setTimeout(() => {
-      if (!iframeRef.current || !iframeDocumentLoaded(iframeRef.current)) setEmbedState('blocked');
-    }, EMBED_TIMEOUT_MS);
+    if (status.embeddable === false || !status.proxyUrl) {
+      setEmbedState('blocked');
+      return;
+    }
+    const timeout = window.setTimeout(() => setEmbedState('blocked'), EMBED_TIMEOUT_MS);
     return () => window.clearTimeout(timeout);
-  }, [activeProjectKey, status?.running]);
+  }, [activeProjectKey, status?.embeddable, status?.proxyUrl, status?.running]);
 
-  const handleIframeLoad = useCallback(() => {
-    window.setTimeout(() => {
-      const iframe = iframeRef.current;
-      setEmbedState(iframe && iframeDocumentLoaded(iframe) ? 'ready' : 'blocked');
-    }, EMBED_PROBE_DELAY_MS);
-  }, []);
+  const handleIframeLoad = useCallback(() => setEmbedState('ready'), []);
+  const retryViewer = useCallback(() => {
+    requestedStart.current = activeProjectKey;
+    startMutation.reset();
+    startMutation.mutate();
+  }, [activeProjectKey, startMutation]);
 
   const loading = projectsQuery.isLoading || (Boolean(activeProjectKey) && statusQuery.isLoading);
   const error = projectsQuery.error ?? statusQuery.error ?? installMutation.error ?? startMutation.error;
   const starting = status?.starting || startMutation.isPending;
+  const embedBlocked = status?.running && (status.embeddable === false || !status.proxyUrl || embedState === 'blocked');
 
   return (
     <main className="h-full overflow-y-auto bg-background p-6" data-testid="knowledge-page">
@@ -151,6 +162,15 @@ export function KnowledgePage({ projectKey }: KnowledgePageProps) {
               <div>
                 <h2 className="text-sm font-medium text-foreground">Knowledge viewer unavailable</h2>
                 <p className="mt-1 text-sm text-muted-foreground">{error.message}</p>
+                {status?.bundleConfigured && status.installed && (
+                  <button
+                    type="button"
+                    onClick={retryViewer}
+                    className="mt-4 text-sm font-medium text-primary hover:underline"
+                  >
+                    Retry viewer
+                  </button>
+                )}
               </div>
             </div>
           </section>
@@ -170,6 +190,9 @@ export function KnowledgePage({ projectKey }: KnowledgePageProps) {
             <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
               OpenKnowledge is installed only after this explicit request. It runs as a separate local program.
             </p>
+            {status.message && (
+              <p className="mt-2 max-w-2xl font-mono text-xs text-muted-foreground">{status.message}</p>
+            )}
             <button
               type="button"
               onClick={() => installMutation.mutate()}
@@ -188,14 +211,30 @@ export function KnowledgePage({ projectKey }: KnowledgePageProps) {
           <ProgressState title="Starting knowledge viewer" />
         )}
 
-        {!loading && !error && status?.running && embedState === 'blocked' && (
+        {!loading && !error && status?.bundleConfigured && status.installed && !status.running && !starting && requestedStart.current === activeProjectKey && (
+          <section className="rounded-lg bg-card p-6" data-testid="knowledge-viewer-stopped">
+            <h2 className="text-sm font-medium text-foreground">Knowledge viewer stopped</h2>
+            <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
+              The local viewer exited before it could reconnect. Restart the read-only snapshot to continue browsing.
+            </p>
+            <button
+              type="button"
+              onClick={retryViewer}
+              className="mt-4 text-sm font-medium text-primary hover:underline"
+            >
+              Restart viewer
+            </button>
+          </section>
+        )}
+
+        {!loading && !error && embedBlocked && (
           <section className="rounded-lg bg-card p-6" data-testid="knowledge-viewer-blocked">
             <div className="flex items-start gap-3">
               <AlertCircle className="mt-0.5 h-5 w-5 text-warning" aria-hidden="true" />
               <div>
                 <h2 className="text-sm font-medium text-foreground">Viewer opens in a separate tab</h2>
                 <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-                  The local viewer refused dashboard framing. Open it directly to browse and search this bundle.
+                  The local viewer refused dashboard framing. Open its disposable read-only snapshot directly to browse and search.
                 </p>
                 {status.url && (
                   <a
@@ -212,20 +251,25 @@ export function KnowledgePage({ projectKey }: KnowledgePageProps) {
           </section>
         )}
 
-        {!loading && !error && status?.running && embedState !== 'blocked' && activeProjectKey && (
-          <section className="relative min-h-[70vh] overflow-hidden rounded-lg bg-card" data-testid="knowledge-viewer-embedded">
+        {!loading && !error && status?.running && status.proxyUrl && !embedBlocked && (
+          <section className="relative flex min-h-[70vh] flex-col overflow-hidden rounded-lg bg-card" data-testid="knowledge-viewer-embedded">
+            <div className="border-b border-border px-4 py-3">
+              <p className="text-xs text-muted-foreground">
+                Read-only snapshot — viewer edits are discarded. Use <span className="font-mono">/okf author</span> for durable changes.
+              </p>
+            </div>
             {embedState === 'loading' && (
-              <div className="absolute inset-0 z-10 flex items-center justify-center bg-card">
+              <div className="absolute inset-x-0 bottom-0 top-11 z-10 flex items-center justify-center bg-card">
                 <ProgressState title="Loading knowledge workspace" />
               </div>
             )}
             <iframe
-              ref={iframeRef}
               title="OpenKnowledge viewer"
-              src={`/knowledge-viewer/?project=${encodeURIComponent(activeProjectKey)}`}
+              src={status.proxyUrl}
+              sandbox="allow-downloads allow-forms allow-popups allow-same-origin allow-scripts"
               onLoad={handleIframeLoad}
               onError={() => setEmbedState('blocked')}
-              className="min-h-[70vh] w-full border-0 bg-background"
+              className="min-h-[66vh] w-full flex-1 border-0 bg-background"
             />
           </section>
         )}

@@ -320,6 +320,7 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'GET /api/knowledge-viewer/status',                    kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Optional OpenKnowledge subprocess status; outside 8 remodel domains' },
   { surface: 'POST /api/knowledge-viewer/install',                  kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Progressive third-party viewer installation; outside 8 remodel domains' },
   { surface: 'POST /api/knowledge-viewer/start',                    kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Optional OpenKnowledge subprocess lifecycle; outside 8 remodel domains' },
+  { surface: 'GET /knowledge-viewer/*',                              kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Authenticated compatibility redirect to the origin-isolated viewer host' },
 
   // ── metrics.ts ────────────────────────────────────────────────────────────
   { surface: 'GET /api/metrics/summary',                  kind: 'http', disposition: 'AGGREGATE',   door: 'Issues + Agents + Merge' },
