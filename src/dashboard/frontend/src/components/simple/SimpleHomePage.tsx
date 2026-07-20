@@ -221,7 +221,7 @@ export function SimpleHomePage() {
   const filed = useMemo(() => justFiled(derivations), [derivations]);
 
   return (
-    <div className="h-full w-full overflow-y-auto">
+    <div data-component="simple-home-page" className="h-full w-full overflow-y-auto">
       <div className="mx-auto max-w-3xl px-6 pb-24 pt-7">
         <div className="flex items-start justify-between gap-4">
           <div>
