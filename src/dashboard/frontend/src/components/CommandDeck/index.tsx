@@ -160,6 +160,14 @@ const CONVS_COLLAPSED_KEY = 'mc-convs-collapsed';
 const PROJECTS_COLLAPSED_KEY = 'mc-projects-collapsed';
 const SECTION_SPLIT_KEY = 'mc-section-split';
 
+function ProjectPendingState({ onRetry }: { onRetry: () => void }) {
+  return (
+    <div role="status" className="flex items-center justify-center p-8">
+      <LoadingBoundary label="The project" timeoutMs={8000} onRetry={onRetry}><span>Loading project…</span></LoadingBoundary>
+    </div>
+  )
+}
+
 export function CommandDeck({
   issues = [],
   convId,
@@ -1434,7 +1442,7 @@ export function CommandDeck({
 
         {/* Content Area — the project-scoped deck (PAN-1561) */}
         <div className={styles.content}>
-          {isProjectValidationPending ? <div className={styles.contentEmpty} role="status"><LoadingBoundary label="The project" timeoutMs={8000} onRetry={() => void refetchRegisteredProjects()}><span>Loading project…</span></LoadingBoundary></div>
+          {isProjectValidationPending ? <ProjectPendingState onRetry={() => void refetchRegisteredProjects()} />
           : registeredProjectsError ? <ProjectRegistryErrorState onRetry={() => void refetchRegisteredProjects()} />
           : showUnknownProject ? (
             <UnknownProjectState project={selectedProject!} registeredProjects={registeredProjects} onSelectProject={onSelectProject} />

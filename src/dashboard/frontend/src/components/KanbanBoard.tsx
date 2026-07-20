@@ -30,12 +30,12 @@ import {
 import { DragOverlayCard, ListIssueRow } from './KanbanBoard/cards';
 import { ColumnContent } from './KanbanBoard/columns';
 import { CanceledListView } from './KanbanBoard/CanceledListView';
+import { buildBoardColumns } from './KanbanBoard/planColumns';
 import { NeedsYouStrip } from './KanbanBoard/NeedsYouStrip';
 import { useDragDrop } from './KanbanBoard/hooks/useDragDrop';
 import { KanbanFilterBar } from './KanbanBoard/views';
 import {
   COLUMN_COLORS,
-  COLUMN_TITLES,
   applyReviewStateToIssue,
 
   generateMockRallyData,
@@ -805,24 +805,8 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
         >
           <div className="flex gap-4 overflow-hidden pb-4">
             {(() => {
-              // PAN-2908 C-BOARD v2: the Plan column — issues in the planning
-              // phase (active planning agent, or a plan ready to start), split
-              // out of the backlog rollup column.
-              const planIssues: Issue[] = [];
-              const todoRest: Issue[] = [];
-              for (const issue of sortedGrouped.todo ?? []) {
-                const hasActivePlanning = agents.some(
-                  (a) => a.id?.startsWith('planning-') && a.issueId?.toLowerCase() === issue.identifier.toLowerCase() && !['stopped', 'dead', 'failed'].includes(a.status),
-                );
-                const hasPlanReady = planningStateById[issue.identifier]?.hasPlan === true;
-                if (hasActivePlanning || hasPlanReady) planIssues.push(issue);
-                else todoRest.push(issue);
-              }
-              const columns: { key: string; title: string; issues: Issue[]; rollup?: boolean }[] = [
-                { key: 'todo', title: COLUMN_TITLES.todo, issues: todoRest, rollup: true },
-                { key: 'plan', title: 'Plan', issues: planIssues },
-                ...STATUS_ORDER.filter((s) => s !== 'backlog' && s !== 'todo').map((s) => ({ key: s, title: COLUMN_TITLES[s], issues: sortedGrouped[s] })),
-              ];
+              // PAN-2908 C-BOARD v2: Plan column split lives in planColumns.ts.
+              const columns = buildBoardColumns(sortedGrouped, agents, planningStateById);
               return columns.map((column) => {
                 const status = column.key;
                 const columnIssues = column.issues ?? [];
