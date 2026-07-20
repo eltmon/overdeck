@@ -2117,7 +2117,7 @@
     "recordedAt": "2026-07-06T18:49:52.519Z"
   },
   "created": "2026-07-06T16:43:28.780Z",
-  "updated": "2026-07-20T13:45:21.985Z",
+  "updated": "2026-07-20T13:46:25.982Z",
   "pipeline": {
     "issueId": "PAN-2207",
     "reviewStatus": "failed",
