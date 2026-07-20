@@ -100,19 +100,20 @@
     "recordedAt": "2026-07-19T22:32:41.050Z"
   },
   "created": "2026-07-19T20:18:40.159Z",
-  "updated": "2026-07-20T01:23:20.967Z",
+  "updated": "2026-07-20T01:32:46.025Z",
   "pipeline": {
     "issueId": "PAN-2066",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "failed",
     "inspectStatus": "failed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-19T22:39:05.364Z",
-    "updatedAt": "2026-07-20T01:23:20.861Z",
+    "updatedAt": "2026-07-20T01:32:45.967Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
+    "verificationNotes": "Verification FAILED at test (314025ms):\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-2066/src/dashboard/frontend\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-2066\n\n ✓ src/__tests__/issue-route.test.ts (2 tests) 7ms\n ✓ src/components/knowledge/KnowledgePage.test.tsx (9 tests) 265ms\n ✓ src/components/conversations/__tests__/sessions-page-no-loss.test.tsx (2 tests) 283ms\n ✓ src/components/conversations/__tests__/SessionDetail.test.tsx (22 tests) 433ms\n ✓ src/components/conversations/__tests__/ConversationsPage.test.tsx (16 tests) 679ms\n     ✓ forces keyword feed search when managed-archived is selected from semantic mode  383ms\n ✓ src/components/Sidebar.test.tsx (14 tests) 524ms\n ✓ src/App.test.tsx (40 tests) 444ms\n\n Test Files  7 passed (7)\n      Tests  105 passed (105)\n   Start at  21:30:21\n   Duration  3.52s (transform 2.47s, setup 1.25s, import 7.09s, tests 2.64s, environment 2.06s)\n\nstdout | tests/unit/dashboard/server/routes/reset-review-route.test.ts > processResetReviewPipeline — POST /api/review/:issueId/reset route contract > 200: resets review/test/merge/verification status to pending\n[reset-review] Human-initiated pipeline reset for PAN-1 (work-agent agent-pan-1 resolution=none/0 — preserved, not reset)\n\nstdout | tests/unit/dashboard/server/routes/reset-review-route.test.ts > processResetReviewPipeline — POST /api/review/:issueId/reset route contract > 200: clears the stuck marker and circuit-breaker retry counters\n[reset-review] Human-initiated pipeline reset for PAN-2 (work-agent agent-pan-2 resolution=none/0 — preserved, not reset)\n\nstdout | tests/unit/dashboard/server/routes/reset-review-route.test.ts > processResetReviewPipeline — POST /api/review/:issueId/reset route contract > PAN-805 regression: does NOT call saveAgentRuntimeState (resolution stays untouched)\n[reset-review] Human-initiated pipeline reset for PAN-805 (work-agent agent-pan-805 resolution=unclear/5 — preserved, not reset)\n\nstdout | tests/unit/dashboard/server/routes/reset-review\n…(229534 chars elided)…\nts__/events.test.ts (3 tests) 7ms\n ✓ |root| src/dashboard/server/routes/workspaces/__tests__/merge-ops-dirty-gate.test.ts (3 tests) 4ms\n ✓ |root| tests/unit/lib/cloister/stuck-remediation-flywheel.test.ts (5 tests) 5ms\n ✓ |root| tests/unit/lib/cloister/merge-train.test.ts (2 tests) 5ms\n ✓ |root| tests/cli/commands/start-conflicting-work.test.ts (1 test) 6ms\n ✓ |root| tests/unit/dashboard/server/routes/health-runtime-census.test.ts (2 tests) 6ms\n ✓ |root| tests/lib/cloister/service-cost-alerts.test.ts (3 tests) 6ms\n ✓ |root| tests/unit/dashboard/ws-terminal-restart-broadcast.test.ts (1 test) 6ms\n ✓ |root| src/lib/__tests__/agent-enrichment.test.ts (7 tests) 6ms\n ✓ |root| tests/unit/lib/cloister/auto-commit-excluded-paths.test.ts (7 tests) 5ms\n ✓ |root| tests/cli/commands/compliance.test.ts (2 tests) 4ms\n ✓ |root| src/cli/commands/__tests__/restart-supervisor-cycle.test.ts (3 tests) 4ms\n ✓ |root| src/lib/__tests__/agents-barrel-exports.test.ts (1 test) 4ms\n ✓ |ro\n...(truncated)",
     "inspectNotes": "AC3 not fully guaranteed: knowledge-viewer.ts:161-169 stopEntry awaits stop(entry.bundlePath) with no timeout before reaching the kill('SIGTERM') fallback at line 168; the default stop impl stopOpenKnowledgeWithSpawn (lines 226-235) spawns a separate 'ok stop' process and awaits its exit event with no timeout — if that helper hangs instead of rejecting, the tracked ok server process is never killed, risking an orphan on shutdown. Fix: wrap the stop() call in a bounded race/timeout so entry.process.kill('SIGTERM') always fires within bounded time. AC1, AC2, AC4 verified as met.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2942",
     "lastVerifiedCommit": "7b3e78346b74b478290c09b57f944aa62e00a0a7",
@@ -217,9 +218,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 8721501,
-            "output": 785292,
-            "cacheRead": 320918016,
+            "input": 8763343,
+            "output": 788956,
+            "cacheRead": 324401664,
             "cacheWrite": 0
           }
         }
@@ -232,9 +233,9 @@
           "cacheWrite": 184458
         },
         "openai/gpt-5.6-sol": {
-          "input": 10410650,
-          "output": 871674,
-          "cacheRead": 338153984,
+          "input": 10452492,
+          "output": 875338,
+          "cacheRead": 341637632,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -245,8 +246,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 254.637652,
-        "pricingAsOf": "2026-07-20T01:23:20.904Z"
+        "usd": 256.698606,
+        "pricingAsOf": "2026-07-20T01:32:46.006Z"
       }
     },
     "merges": [
