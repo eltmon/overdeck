@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { useDashboardStore } from '../../lib/store';
-import { ActiveAgentPanel, classifyStreamLine } from './ActiveAgentPanel';
+import { ActiveAgentPanel } from './ActiveAgentPanel';
 import type { AgentSnapshot } from '@overdeck/contracts';
 
 function mockFetch() {
@@ -30,43 +30,6 @@ function renderPanel(agentId = 'agent-pan-2499-slot-2', props: { density?: 'cons
   return render(<ActiveAgentPanel agentId={agentId} density={props.density} />);
 }
 
-describe('classifyStreamLine', () => {
-  it('classifies error glyphs and keywords as err', () => {
-    expect(classifyStreamLine('✗ test failed')).toBe('err');
-    expect(classifyStreamLine('something raised an ERROR')).toBe('err');
-    expect(classifyStreamLine('compilation FAIL')).toBe('err');
-  });
-
-  it('classifies warning glyphs and keywords as warn', () => {
-    expect(classifyStreamLine('! review changes requested')).toBe('warn');
-    expect(classifyStreamLine('WARN: stale cache hit')).toBe('warn');
-  });
-
-  it('classifies success glyphs and keywords as ok', () => {
-    expect(classifyStreamLine('✓ all tests pass')).toBe('ok');
-    expect(classifyStreamLine('OK now ready')).toBe('ok');
-    expect(classifyStreamLine('build PASS')).toBe('ok');
-    expect(classifyStreamLine('compile done')).toBe('ok');
-  });
-
-  it('classifies arrow/bullet glyphs as verb-line', () => {
-    expect(classifyStreamLine('→ implementing bead 4')).toBe('verb-line');
-    expect(classifyStreamLine('▸ entering review phase')).toBe('verb-line');
-    expect(classifyStreamLine('✱ thinking...')).toBe('verb-line');
-  });
-
-  it('falls back to neutral for unclassified lines', () => {
-    expect(classifyStreamLine('Reading file foo.ts')).toBe('neutral');
-    expect(classifyStreamLine('')).toBe('neutral');
-  });
-
-  it('err beats warn beats ok beats verb-line in precedence', () => {
-    expect(classifyStreamLine('→ ERROR detected')).toBe('err');
-    expect(classifyStreamLine('→ WARN cache stale')).toBe('warn');
-    expect(classifyStreamLine('→ done')).toBe('ok');
-  });
-});
-
 describe('ActiveAgentPanel', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
@@ -88,7 +51,7 @@ describe('ActiveAgentPanel', () => {
     expect(screen.getByText('No active agent.')).toBeInTheDocument();
   });
 
-  it('renders live output lines from the store', () => {
+  it('renders the agent header without the deleted stream excerpt', () => {
     useDashboardStore.setState({
       agentsById: {
         'agent-pan-2499-slot-2': makeAgent({ id: 'agent-pan-2499-slot-2' }),
@@ -100,12 +63,12 @@ describe('ActiveAgentPanel', () => {
 
     renderPanel();
 
-    const stream = screen.getByTestId('active-agent-panel-stream');
-    expect(stream).toBeInTheDocument();
-    expect(stream).toHaveClass('max-h-[180px]');
-    expect(screen.getByText('→ starting task')).toHaveClass('text-signal-review-foreground');
-    expect(screen.getByText('✓ done')).toHaveClass('text-success-foreground');
-    expect(screen.getByText('✗ lint failed')).toHaveClass('text-destructive-foreground');
+    // PAN-2908 C-DETAIL: the stream-excerpt box is deleted — the conversation
+    // pane is the live view. The header/meta/tell survive.
+    expect(screen.getByText('agent-pan-2499-slot-2')).toBeInTheDocument();
+    expect(screen.queryByTestId('active-agent-panel-stream')).not.toBeInTheDocument();
+    expect(screen.queryByText('No recent stream output')).not.toBeInTheDocument();
+    expect(screen.queryByText('→ starting task')).not.toBeInTheDocument();
   });
 
   it('keeps errored agents visible with diagnostics and recovery controls', () => {
@@ -121,7 +84,6 @@ describe('ActiveAgentPanel', () => {
     renderPanel();
 
     expect(screen.queryByText('No active agent.')).not.toBeInTheDocument();
-    expect(screen.getByText('✗ worker exited')).toBeInTheDocument();
     expect(screen.getByText(/STUCK/)).toBeInTheDocument();
     expect(screen.getByTestId('active-agent-panel-resume')).toBeInTheDocument();
   });
@@ -204,21 +166,6 @@ describe('ActiveAgentPanel', () => {
     });
   });
 
-  it('uses compact stream height for rail density', () => {
-    useDashboardStore.setState({
-      agentsById: {
-        'agent-pan-2499-slot-2': makeAgent({ id: 'agent-pan-2499-slot-2' }),
-      },
-      agentOutputById: {
-        'agent-pan-2499-slot-2': ['line one'],
-      },
-    } as Parameters<typeof useDashboardStore.setState>[0]);
-
-    renderPanel('agent-pan-2499-slot-2', { density: 'rail' });
-
-    expect(screen.getByTestId('active-agent-panel-stream')).toHaveClass('max-h-[120px]');
-  });
-
   it('exposes inventory section attributes', () => {
     useDashboardStore.setState({
       agentsById: {
@@ -233,8 +180,7 @@ describe('ActiveAgentPanel', () => {
 
     expect(document.querySelector('[data-section="active-agent-panel"]')).toBeInTheDocument();
     expect(document.querySelector('[data-section="active-agent-panel-header"]')).toBeInTheDocument();
-    expect(document.querySelector('[data-section="active-agent-panel-stream"]')).toBeInTheDocument();
-    expect(document.querySelectorAll('[data-section="active-agent-panel-stream-line"]')).toHaveLength(1);
+    expect(document.querySelector('[data-section="active-agent-panel-stream"]')).not.toBeInTheDocument();
     expect(document.querySelector('[data-section="active-agent-panel-tell"]')).toBeInTheDocument();
   });
 });

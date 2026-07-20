@@ -138,8 +138,6 @@ export const BEADS_PANEL_SECTIONS = ['beads-panel', 'beads-panel-compact'] as co
 export const ACTIVE_AGENT_PANEL_SECTIONS = [
   'active-agent-panel',
   'active-agent-panel-header',
-  'active-agent-panel-stream',
-  'active-agent-panel-stream-line',
   'active-agent-panel-resume',
   'active-agent-panel-tell',
 ] as const;

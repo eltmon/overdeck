@@ -634,7 +634,7 @@ describe('IssueDrawer', () => {
     expect(screen.getByTestId('verification-gate-uat')).toHaveClass('border-info/40', 'bg-info/10', 'text-info-foreground');
   });
 
-  it('renders active agent card with stream excerpt and sends tell input', async () => {
+  it('renders active agent card without the deleted stream excerpt and sends tell input', async () => {
     const fetchMock = vi.spyOn(window, 'fetch').mockResolvedValue({ ok: true, json: async () => ({ success: true }) } as Response);
     useDashboardStore.setState({
       agentsById: {
@@ -663,8 +663,10 @@ describe('IssueDrawer', () => {
     expect(screen.getByText('agent-PAN-1')).toHaveClass('font-mono', 'text-[13px]');
     expect(screen.getByText('WORK RUNNING').closest('[data-component="verb-badge"]')).toHaveClass('text-[9px]');
     expect(screen.getByText(/GPT-5\.5 · claude-code · spend loading/)).toHaveClass('text-right', 'font-mono');
-    expect(screen.getByTestId('active-agent-panel-stream')).toHaveClass('bg-[rgb(0_0_0_/_32%)]', 'text-[11px]', 'max-h-[180px]', 'overflow-auto');
-    expect(within(screen.getByTestId('active-agent-panel-stream')).getByText('Implementing drawer card')).toBeInTheDocument();
+    // PAN-2908 C-DETAIL: the stream-excerpt box and its "No recent stream
+    // output" state are deleted — the conversation pane is the live view.
+    expect(screen.queryByTestId('active-agent-panel-stream')).not.toBeInTheDocument();
+    expect(screen.queryByText('No recent stream output')).not.toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText('Tell agent-PAN-1'), { target: { value: 'Please continue' } });
     fireEvent.click(screen.getByRole('button', { name: 'Send' }));
