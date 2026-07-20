@@ -212,6 +212,9 @@ The 43-action registry **stays**. Everything wrong is in presentation and rot, n
 
 ### 3.8 Verbosity handling & theming (contracts C-VERB, C-THEME)
 
+> **Implementation status (2026-07-20): C-THEME done, C-VERB scoped (#2967).** C-THEME's gate is live: `tests/theme-conformance.spec.ts` runs the five key screens (simple home, simple issue, board, drawer, cockpit) × both color schemes, asserting the theme class tracks the preference, the token system actually flips the page background (no dark-only assumptions), and xterm code panels stay dark in both schemes (10/10 live). The new components are theme-safe by construction (tokens only, no hardcoded hex). C-VERB items 1–3 (digest-first turns, per-turn line budgets on every block type, verdict extraction) are a conversation-renderer redesign — scoped with its snapshot gate in #2967.
+
+
 **C-VERB — wordy by default, digest by design.** Measured reality (MIN-865, PAN-2377 conversations): single agent turns run 4–10 paragraphs; completion messages ship bullet lists; work-log rows carry raw ~150-char JSON exec payloads and `wait` lines; one conversation view holds ~277k characters. The conversation renderer must assume verbosity, not sample brevity:
 
 1. **Digest-first turns.** Every agent turn leads with a one-line digest (the verdict/result sentence). Bodies longer than ~6 rendered lines auto-collapse behind "▸ N more lines"; expansion is per-turn and never resets scroll. (Today `MessagesTimeline` already collapses *some* blocks — the contract is: uniform, every block type, with a line budget.)
