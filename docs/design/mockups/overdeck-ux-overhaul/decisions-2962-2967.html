@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The last two decisions — #2962 · #2967</title>
+<style>
+  :root {
+    --bg: #080b10; --card: #0e1420; --card2: #111a2a; --border: #1e2a3d;
+    --fg: #dbe4f0; --muted: #7d8ca3; --primary: #5b8def; --success: #34c98e;
+    --warning: #e5b545; --danger: #e5635e; --info: #56b8e0; --review: #a78bfa;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--fg); font: 14px/1.5 "DM Sans", system-ui, sans-serif; padding: 32px 20px 120px; }
+  .wrap { max-width: 1180px; margin: 0 auto; }
+  h1 { font-size: 26px; font-weight: 600; letter-spacing: -0.01em; }
+  h2 { font-size: 19px; font-weight: 600; margin-top: 44px; display: flex; align-items: center; gap: 10px; }
+  h3 { font-size: 14px; font-weight: 600; margin: 22px 0 10px; }
+  .sub { color: var(--muted); margin-top: 6px; max-width: 76ch; }
+  .pill { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 4px; border: 1px solid var(--border); color: var(--muted); }
+  .pill.issue { color: var(--primary); border-color: #5b8def55; }
+  .lean { font-size: 11px; color: var(--success); border: 1px solid #34c98e44; background: #34c98e11; padding: 2px 8px; border-radius: 4px; font-weight: 600; }
+  .options { display: grid; gap: 14px; margin-top: 14px; }
+  .options.cols-2 { grid-template-columns: 1fr 1fr; }
+  .options.cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+  @media (max-width: 900px) { .options.cols-2, .options.cols-3 { grid-template-columns: 1fr; } }
+  label.opt { display: block; cursor: pointer; }
+  label.opt input { position: absolute; opacity: 0; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 14px; height: 100%; transition: border-color .15s, box-shadow .15s; }
+  label.opt input:checked + .card { border-color: var(--primary); box-shadow: 0 0 0 3px #5b8def22; }
+  .card h4 { font-size: 14px; font-weight: 600; margin-bottom: 4px; display: flex; align-items: center; gap: 8px; }
+  .card .why { color: var(--muted); font-size: 12px; margin-bottom: 10px; }
+  .card .trade { color: var(--warning); font-size: 11.5px; margin-top: 8px; }
+  .card .good { color: var(--success); font-size: 11.5px; margin-top: 8px; }
+  /* ── mini wireframes ── */
+  .wf { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 8px; display: flex; flex-direction: column; gap: 5px; font-size: 9.5px; }
+  .wf .row { display: flex; gap: 5px; }
+  .wf .row > * { flex: 1; }
+  .b { border: 1px solid var(--border); border-radius: 5px; padding: 4px 6px; color: var(--muted); background: var(--card2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .b.hdr { color: var(--fg); font-weight: 600; }
+  .b.rail { border-color: #5b8def66; color: var(--primary); }
+  .b.strip { border-color: #a78bfa66; color: var(--review); }
+  .b.convo { border-color: #56b8e066; color: var(--info); min-height: 44px; }
+  .b.act { border-color: #34c98e55; color: var(--success); }
+  .b.gone { opacity: .35; text-decoration: line-through; }
+  .b.new { background: #5b8def18; border-style: dashed; }
+  .b.warn { border-color: #e5b54555; color: var(--warning); }
+  .wf .cap { text-align: center; color: var(--muted); font-size: 9px; padding: 2px 0 0; }
+  /* side-by-side cockpit compare */
+  .compare { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 14px; }
+  @media (max-width: 900px) { .compare { grid-template-columns: 1fr; } }
+  .compare .tag { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-bottom: 6px; }
+  /* summary */
+  #summaryBox { position: fixed; left: 50%; transform: translateX(-50%); bottom: 16px; width: min(920px, calc(100vw - 32px)); background: var(--card); border: 1px solid var(--primary); border-radius: 14px; padding: 14px 16px; box-shadow: 0 -12px 40px #0009; display: none; }
+  #summaryBox.show { display: block; }
+  #summaryText { width: 100%; height: 130px; background: var(--bg); color: var(--fg); border: 1px solid var(--border); border-radius: 8px; padding: 10px; font: 12px/1.5 ui-monospace, monospace; resize: vertical; }
+  .btn { background: var(--primary); color: #fff; border: none; border-radius: 8px; padding: 8px 16px; font-weight: 600; cursor: pointer; }
+  .btn.ghost { background: transparent; border: 1px solid var(--border); color: var(--muted); }
+  .btnrow { display: flex; gap: 10px; margin-top: 10px; align-items: center; }
+  .hint { color: var(--muted); font-size: 11.5px; }
+  a { color: var(--primary); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>The last two decisions</h1>
+  <p class="sub">Everything else in the UX overhaul is done and verified. These are the calls only you can make — pick an option in each card, then hit <b>Compose comment</b> at the bottom and paste the result into <a href="https://github.com/eltmon/overdeck/issues/2962">#2962</a> / <a href="https://github.com/eltmon/overdeck/issues/2967">#2967</a>. Options marked <span class="lean">my lean</span> are what I'd do, for what it's worth.</p>
+
+  <!-- ═══════════ DECISION 1 ═══════════ -->
+  <h2>1 · The deck tree's inline expansion <span class="pill issue">#2962 · FeatureItem rail</span></h2>
+  <p class="sub">Today, expanding an issue row in the deck tree shows bespoke session rows (Work · Lint · Review · Test · Ship) + RESOURCES. The shared <code>IssueDetail density="rail"</code> anatomy (phase rail + specialist strip + live conversation + one action strip) is built and tested — how should the tree adopt it?</p>
+
+  <div class="options cols-2">
+    <label class="opt">
+      <input type="radio" name="d1" value="A — Additive: shared anatomy ABOVE the existing session rows">
+      <div class="card">
+        <h4>A · Additive <span class="lean">my lean (first step)</span></h4>
+        <div class="why">Mount the shared anatomy at the top of the expansion; keep session rows and RESOURCES below. Nothing is deleted; you can compare them side by side for a week.</div>
+        <div class="wf">
+          <div class="b hdr">▾ PAN-2377 · feat(flywheel): special orders</div>
+          <div class="b rail new">Plan ─ Work ─ Review ─ Test ─ Ship ─ Done  (shared rail)</div>
+          <div class="b strip new">● security ● correctness ● performance ● requirements</div>
+          <div class="b convo new">live conversation (shared renderer) + composer</div>
+          <div class="b act new">Tell agent… · Done · ⋯ (one action strip)</div>
+          <div class="row"><div class="b">Work · gpt-5.6 18h</div><div class="b">Lint · gates</div></div>
+          <div class="row"><div class="b">Review · sonnet-5</div><div class="b">Ship · gpt-5.6</div></div>
+          <div class="b">RESOURCES · 1 PR · 2 branches</div>
+          <div class="cap">expansion gets taller — both anatomies coexist</div>
+        </div>
+        <div class="good">Zero-risk: nothing you use disappears. Duplication is visible, so the cutover is easy to judge.</div>
+        <div class="trade">Expansion gets long until B happens.</div>
+      </div>
+    </label>
+    <label class="opt">
+      <input type="radio" name="d1" value="B — Replacement: expansion is the shared anatomy, session rows gone">
+      <div class="card">
+        <h4>B · Replacement</h4>
+        <div class="why">The expansion becomes the shared anatomy outright. Session rows are deleted — their conversations now live behind the phase rail / specialist chips.</div>
+        <div class="wf">
+          <div class="b hdr">▾ PAN-2377 · feat(flywheel): special orders</div>
+          <div class="b rail new">Plan ─ Work ─ Review ─ Test ─ Ship ─ Done  (shared rail)</div>
+          <div class="b strip new">● security ● correctness ● performance ● requirements</div>
+          <div class="b convo new">live conversation (shared renderer) + composer</div>
+          <div class="b act new">Tell agent… · Done · ⋯ (one action strip)</div>
+          <div class="row"><div class="b gone">Work · gpt-5.6 18h</div><div class="b gone">Lint · gates</div></div>
+          <div class="row"><div class="b gone">Review · sonnet-5</div><div class="b gone">Ship · gpt-5.6</div></div>
+          <div class="b">RESOURCES · 1 PR · 2 branches</div>
+          <div class="cap">compact; per-session clicks move to the rail/strip</div>
+        </div>
+        <div class="good">The PRD's end state: one anatomy everywhere.</div>
+        <div class="trade">You lose the per-session rows you click today (model · runtime · per-session stop/pause) — those controls must live somewhere first.</div>
+      </div>
+    </label>
+  </div>
+
+  <!-- ═══════════ DECISION 2 ═══════════ -->
+  <h2>2 · The cockpit route <span class="pill issue">#2962 · page density</span></h2>
+  <p class="sub">The PRD's page density replaces <code>/command-deck/:project/:issue</code> (IssueMissionControl) with the one IssueDetail at full width. Today's cockpit is deliberate, test-enshrined design — this is the big one.</p>
+
+  <div class="compare">
+    <div>
+      <div class="tag">Today — IssueMissionControl</div>
+      <div class="wf">
+        <div class="b hdr">PAN-2377 · title · [phase pill] · branch · PR/CI · cost · actions</div>
+        <div class="b rail">status narrative + shared rail/strip (pipeline band)</div>
+        <div class="row"><div class="b">Overview</div><div class="b">Code</div><div class="b">PRD/Plan</div><div class="b">Timeline</div><div class="b">Discuss.</div><div class="b">Costs</div><div class="b">Ship</div></div>
+        <div class="row">
+          <div class="b" style="flex:0 0 30%">session-tree lane (work · review · test · ship → SessionPanel)</div>
+          <div class="b" style="flex:1">tab body — overview cards / CI+diff / plan / timeline / costs / ship-door…</div>
+        </div>
+        <div class="cap">10 tabs · tree lane · unique sections everywhere</div>
+      </div>
+    </div>
+    <div>
+      <div class="tag">PRD — IssueDetail density="page"</div>
+      <div class="wf">
+        <div class="b hdr">PAN-2377 · title · tracker link · close (drawer header)</div>
+        <div class="b rail">Plan ─ Work ─ Review ─ Test ─ Ship ─ Done + specialist strip</div>
+        <div class="row"><div class="b rail">Conversation</div><div class="b">Plan map</div><div class="b">Tasks</div><div class="b">Terminal</div><div class="b">Activity</div><div class="b">Files</div><div class="b">Artifacts</div></div>
+        <div class="row">
+          <div class="b convo" style="flex:1">conversation pane (default tab) — same renderer as everywhere</div>
+          <div class="b" style="flex:0 0 30%">gates · resources · live activity</div>
+        </div>
+        <div class="cap">one component · conversation-first · facets in the rail</div>
+      </div>
+    </div>
+  </div>
+
+  <h3>2a · What happens to the cockpit-only tabs? (Code · Costs · Discussion · Ship · Timeline)</h3>
+  <div class="options cols-3">
+    <label class="opt">
+      <input type="radio" name="d2a" value="Append: keep cockpit-only tabs after the binding set">
+      <div class="card">
+        <h4>Append them <span class="lean">my lean</span></h4>
+        <div class="why">Binding tab set first (Conversation · Plan map · Tasks · Terminal · Activity · Files · Artifacts), then cockpit extras after (Code · Costs · Ship). Nothing is lost; the cockpit route just starts rendering the one component.</div>
+        <div class="good">No feature deletions; convergence is real.</div>
+        <div class="trade">Tab strip is longer than the PRD's binding set.</div>
+      </div>
+    </label>
+    <label class="opt">
+      <input type="radio" name="d2a" value="Fold: map cockpit tabs into the binding tabs (lossy)">
+      <div class="card">
+        <h4>Fold them in</h4>
+        <div class="why">Code → Files, Ship + Timeline → Activity, Costs → Artifacts, Discussion → Conversation. Strictly the binding tab set.</div>
+        <div class="good">Exact PRD tab set.</div>
+        <div class="trade">Lossy: the ship-door view and CI/diff grouping get squeezed into generic tabs.</div>
+      </div>
+    </label>
+    <label class="opt">
+      <input type="radio" name="d2a" value="Redirect: cockpit route deep-links to the drawer instead">
+      <div class="card">
+        <h4>Retire the route</h4>
+        <div class="why"><code>/command-deck/:project/:issue</code> redirects into the IssueDetail drawer over the deck. The cockpit stops existing as a separate issue view.</div>
+        <div class="good">Truly ONE issue view.</div>
+        <div class="trade">Boldest: the tree lane + all cockpit-only tabs die in one move.</div>
+      </div>
+    </label>
+  </div>
+
+  <h3>2b · The session-tree lane?</h3>
+  <div class="options cols-3">
+    <label class="opt">
+      <input type="radio" name="d2b" value="Keep as left rail">
+      <div class="card"><h4>Keep it</h4><div class="why">The tree lane stays as the page's left rail; IssueDetail's pane replaces SessionPanel as the main body.</div><div class="trade">Two conversation-switchers remain (lane + phase rail) until you pick one.</div></div>
+    </label>
+    <label class="opt">
+      <input type="radio" name="d2b" value="Collapse behind a toggle">
+      <div class="card"><h4>Collapsible <span class="lean">my lean</span></h4><div class="why">Lane starts collapsed to a thin strip; expand to see the session tree. The phase rail is the primary switcher.</div><div class="good">Power users keep the tree; newcomers see one switcher.</div></div>
+    </label>
+    <label class="opt">
+      <input type="radio" name="d2b" value="Delete; phase rail + specialist strip cover it">
+      <div class="card"><h4>Delete it</h4><div class="why">The phase rail + specialist strip (already showing every session with status) fully replace it.</div><div class="trade">You built and use this tree daily — be sure first.</div></div>
+    </label>
+  </div>
+
+  <h3>2c · Default tab on the cockpit route?</h3>
+  <div class="options cols-3">
+    <label class="opt">
+      <input type="radio" name="d2c" value="Conversation (PRD binding)">
+      <div class="card"><h4>Conversation <span class="lean">my lean</span></h4><div class="why">Same as the drawer: you land on the live transcript. Steering is the job.</div></div>
+    </label>
+    <label class="opt">
+      <input type="radio" name="d2c" value="Overview (today's default)">
+      <div class="card"><h4>Overview</h4><div class="why">Keep today's muscle memory; conversation is one tab away.</div></div>
+    </label>
+    <label class="opt">
+      <input type="radio" name="d2c" value="Remember last tab per issue">
+      <div class="card"><h4>Remember last</h4><div class="why">Per-issue persistence — you always land where you left off.</div></div>
+    </label>
+  </div>
+
+  <!-- ═══════════ DECISION 3 ═══════════ -->
+  <h2>3 · C-VERB — tame the wordy transcripts? <span class="pill issue">#2967</span></h2>
+  <p class="sub">Agent turns run 4–10 paragraphs; one conversation holds ~277k characters. The contract: digest-first turns, ~6-line auto-collapse, grouped command runs, verdict cards.</p>
+  <div class="compare">
+    <div>
+      <div class="tag">Today</div>
+      <div class="wf">
+        <div class="b convo" style="min-height:70px">Full turn, all 8 paragraphs rendered + raw 150-char JSON exec payloads + wait rows…</div>
+        <div class="cap">everything expanded, always</div>
+      </div>
+    </div>
+    <div>
+      <div class="tag">C-VERB</div>
+      <div class="wf">
+        <div class="b hdr">✓ Review passed — 10,001 tests green</div>
+        <div class="b">▸ 8 more lines (per-turn, never resets scroll)</div>
+        <div class="b">⚙ 6 commands · 2 waits (one group row)</div>
+        <div class="cap">digest first; bodies on demand</div>
+      </div>
+    </div>
+  </div>
+  <div class="options cols-2">
+    <label class="opt">
+      <input type="radio" name="d3" value="In scope now — build C-VERB right after #2962">
+      <div class="card"><h4>Do it next</h4><div class="why">It's the biggest remaining readability win in the product you live in.</div></div>
+    </label>
+    <label class="opt">
+      <input type="radio" name="d3" value="Later — cockpit migration first, C-VERB after">
+      <div class="card"><h4>Later <span class="lean">my lean</span></h4><div class="why">Land the cockpit/rail decisions first; the renderer redesign rides on the converged anatomy anyway.</div></div>
+    </label>
+  </div>
+
+  <div class="btnrow" style="margin-top:28px">
+    <button class="btn" onclick="compose()">Compose comment</button>
+    <span class="hint">Pick one option per card — the composer builds the paste-ready summary.</span>
+  </div>
+</div>
+
+<div id="summaryBox">
+  <b>Your decision summary</b> <span class="hint">— paste into #2962 / #2967</span>
+  <textarea id="summaryText" readonly></textarea>
+  <div class="btnrow">
+    <button class="btn" onclick="copySummary()">Copy</button>
+    <button class="btn ghost" onclick="document.getElementById('summaryBox').classList.remove('show')">Close</button>
+  </div>
+</div>
+
+<script>
+function pick(name) {
+  const el = document.querySelector(`input[name="${name}"]:checked`);
+  return el ? el.value : null;
+}
+function compose() {
+  const missing = [];
+  const d1 = pick('d1'), d2a = pick('d2a'), d2b = pick('d2b'), d2c = pick('d2c'), d3 = pick('d3');
+  if (!d1) missing.push('FeatureItem rail');
+  if (!d2a) missing.push('cockpit-only tabs');
+  if (!d2b) missing.push('session-tree lane');
+  if (!d2c) missing.push('default tab');
+  if (!d3) missing.push('C-VERB');
+  const lines = [];
+  lines.push('Decisions (from the options mockup):');
+  lines.push('');
+  lines.push('#2962');
+  lines.push(`1. FeatureItem rail: ${d1 ?? '—'}`);
+  lines.push(`2a. Cockpit-only tabs: ${d2a ?? '—'}`);
+  lines.push(`2b. Session-tree lane: ${d2b ?? '—'}`);
+  lines.push(`2c. Default tab: ${d2c ?? '—'}`);
+  lines.push('');
+  lines.push('#2967');
+  lines.push(`3. C-VERB: ${d3 ?? '—'}`);
+  if (missing.length) lines.push('', `(unpicked: ${missing.join(', ')})`);
+  document.getElementById('summaryText').value = lines.join('\n');
+  document.getElementById('summaryBox').classList.add('show');
+}
+function copySummary() {
+  const t = document.getElementById('summaryText');
+  t.select();
+  navigator.clipboard.writeText(t.value).catch(() => document.execCommand('copy'));
+}
+</script>
+</body>
+</html>
