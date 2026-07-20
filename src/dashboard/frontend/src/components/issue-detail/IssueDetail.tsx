@@ -42,6 +42,7 @@ import { UatEnvironmentPanel } from '../CommandDeck/UatEnvironmentPanel';
 import { PanOpenInPicker } from '../PanOpenInPicker';
 import type { WorkspaceInfo } from '../../lib/workspace-types';
 import { IssueDetailShell } from './IssueDetailShell';
+import { ChangedFilesView } from '../Stage/cockpit/ChangedFilesView';
 
 export type IssueDetailDensity = 'drawer' | 'page' | 'rail';
 
@@ -310,6 +311,12 @@ export function IssueDetail({ issueId, density, agents, reviewStatus, tab, onSel
             <div data-section="DrawerActivityRail / DrawerActivityPanel"><DrawerActivityPanel /></div>
           ) : tab === 'artifacts' ? (
             <div data-section="DrawerArtifactsPanel"><DrawerArtifactsPanel issueId={issueId} /></div>
+          ) : tab === 'files' ? (
+            // C-DETAIL binding tab set: Files is the changed-files tree + diff
+            // (same component as the cockpit's Code tab), not a placeholder.
+            <div data-testid="drawer-tab-panel-files" data-section="ChangedFilesView">
+              <ChangedFilesView issueId={issueId} />
+            </div>
           ) : tab === 'conversation' ? (
             conversationPane
           ) : tab === 'terminal' ? (
