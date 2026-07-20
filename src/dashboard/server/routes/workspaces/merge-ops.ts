@@ -599,9 +599,9 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
 
       if (reposNeedingRebase.length > 0) {
         const rebaseInstructions = reposNeedingRebase.map((repo, index) => (
-          `${index + 1}. cd ${repo.repoKey}\n   git fetch origin ${repo.targetBranch}\n   ${repo.forge === 'gitlab' ? `git merge --no-edit origin/${repo.targetBranch}` : `git rebase origin/${repo.targetBranch}`}\n   ${repo.forge === 'gitlab' ? 'git push' : 'git push --force-with-lease'}`
+          `${index + 1}. cd ${repo.repoKey}\n   git fetch origin ${repo.targetBranch}\n   git rebase origin/${repo.targetBranch}\n   git push --force-with-lease`
         )).join('\n');
-        const rebaseMsg = `MERGE REQUESTED: The human has clicked MERGE for ${issueId}. Synchronize and push every affected repo in this merge set:\n\n${rebaseInstructions}\n\nResolve any conflicts in the workspaces above, complete every target-branch integration, and push all affected branches. Do NOT merge PRs/MRs yourself.`;
+        const rebaseMsg = `MERGE REQUESTED: The human has clicked MERGE for ${issueId}. Rebase and push every affected repo in this merge set:\n\n${rebaseInstructions}\n\nResolve any conflicts in the workspaces above, complete every rebase, and push all affected branches. Do NOT merge PRs/MRs yourself.`;
         await messageAgent(agentId, rebaseMsg);
       }
 
@@ -887,7 +887,7 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
     const agentId = request.kind === 'strike' ? request.recoveryTarget : `agent-${issueId.toLowerCase()}`;
     const rebaseMsg = request.kind === 'strike'
       ? `STRIKE LANDING REQUEST: Rebase ${branchName} onto ${targetBranch}, resolve conflicts, run the full quality gates, push ${branchName}, then run pan strike-ready ${issueId} to persist the new HEAD. Do NOT merge or push main.`
-      : primaryForge === 'gitlab' ? `MERGE REQUESTED: The human has clicked MERGE for ${issueId}. Merge ${targetBranch} into the feature branch without rewriting history, then push:\n\n1. git fetch origin ${targetBranch}\n2. git merge --no-edit origin/${targetBranch}\n3. If conflicts: resolve them, git add, git commit\n4. git push\n\nAfter pushing, the server will handle verification and merge automatically. Do NOT merge the MR yourself.` : `MERGE REQUESTED: The human has clicked MERGE for ${issueId}. Please rebase onto ${targetBranch} and push:\n\n1. git fetch origin ${targetBranch}\n2. git rebase origin/${targetBranch}\n3. If conflicts: resolve them, git add, git rebase --continue\n4. git push --force-with-lease\n\nAfter pushing, the server will handle verification and merge automatically. Do NOT run gh pr merge yourself.`;
+      : `MERGE REQUESTED: The human has clicked MERGE for ${issueId}. Please rebase onto ${targetBranch} and push:\n\n1. git fetch origin ${targetBranch}\n2. git rebase origin/${targetBranch}\n3. If conflicts: resolve them, git add, git rebase --continue\n4. git push --force-with-lease\n\nAfter pushing, the server will handle verification and merge automatically. Do NOT run gh pr merge yourself.`;
 
     setReviewStatus(issueId, { mergeStep: 'rebasing' });
     console.log(`[merge] Rebasing ${branchName} onto ${targetBranch} for ${issueId} (agent=${await Effect.runPromise(sessionExists(agentId)) ? 'running' : 'stopped'})...`);
@@ -1005,7 +1005,7 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
           { cwd: workspacePath, encoding: 'utf-8', timeout: 10000 }
         );
         await execAsync(
-          `git push origin HEAD:${branchName}`,
+          `git push --force-with-lease origin HEAD:${branchName}`,
           { cwd: workspacePath, encoding: 'utf-8', timeout: 30000 }
         );
         console.log(`[merge] Stripped .planning/ from ${branchName}`);

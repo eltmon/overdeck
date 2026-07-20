@@ -647,13 +647,17 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
   const spinner = ora('Marking work as done...').start();
 
   try {
-    // Step 0: Synchronize with the target branch and push when needed.
+    // Step 0: Rebase onto target branch + push.
     //
-    // Absorbing this into `pan done` eliminates the multi-step orchestration
-    // burden that was causing agents to stop partway through the submit flow.
-    // GitLab branches preserve history with a merge; other forges retain the
-    // existing rebase flow. Already-published, up-to-date branches perform no
-    // git write.
+    // Absorbing the rebase into `pan done` eliminates the multi-step
+    // orchestration burden that was causing agents to stop partway through
+    // the submit flow. An agent now has exactly one command to run; this
+    // step handles the fetch/rebase/push that agents previously had to
+    // perform manually before calling `pan done`.
+    //
+    // Planning-artifact conflicts (`.planning/*`) are auto-resolved with
+    // `--ours`. Any other conflicts abort the rebase and surface a clear
+    // error; the agent must resolve them and re-run `pan done`.
     {
       const { workspacePath: rebaseWorkspacePath } = await resolveDoneWorkspace(issueId, agentId);
 
@@ -663,7 +667,7 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
         const preMergeSet = ensureMergeSetForIssueSync(issueId);
 
         if (preMergeSet && preMergeSet.repos.length > 0) {
-          spinner.text = 'Synchronizing with target branch...';
+          spinner.text = 'Rebasing onto target branch and pushing...';
           const rebaseResult = await Effect.runPromise(rebaseAndPushRepos(rebaseWorkspacePath, preMergeSet));
 
           if (!rebaseResult.success) {
@@ -685,11 +689,11 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
             process.exit(1);
           }
 
-          const synchronized = rebaseResult.results.filter(r => r.outcome === 'rebased');
-          if (synchronized.length > 0) {
-            console.log(chalk.green(`  ✓ Synchronized and pushed ${synchronized.length} repo(s)`));
+          const rebased = rebaseResult.results.filter(r => r.outcome === 'rebased');
+          if (rebased.length > 0) {
+            console.log(chalk.green(`  ✓ Rebased and pushed ${rebased.length} repo(s)`));
           } else {
-            console.log(chalk.dim('  Branch already current with target and remote'));
+            console.log(chalk.dim('  Branch already current with target — pushed any local commits'));
           }
         }
       }
