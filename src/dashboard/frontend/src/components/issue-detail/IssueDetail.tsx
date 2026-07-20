@@ -48,7 +48,7 @@ export type IssueDetailDensity = 'drawer' | 'page' | 'rail';
 
 export const ISSUE_DETAIL_TABS = [
   { id: 'overview', label: 'Overview' },
-  { id: 'plan', label: 'Plan' },
+  { id: 'plan', label: 'Plan map' },
   { id: 'tasks', label: 'Tasks' },
   { id: 'conversation', label: 'Conversation' },
   { id: 'terminal', label: 'Terminal' },

@@ -17,5 +17,7 @@ export function DrawerActivityPanel() {
 
 export function DrawerPlanPanel({ issueId }: { issueId: string }) {
   const { data, isLoading, isError } = useQuery<XBriefDocument | null>({ queryKey: ['drawer-xbrief-plan', issueId], queryFn: async () => { const res = await fetch(`/api/workspaces/${issueId}/plan`); return res.ok ? res.json() as Promise<XBriefDocument> : null; }, retry: false });
-  return <div data-testid="drawer-tab-panel-plan">{isLoading ? <div className="text-[12px] text-muted-foreground">Loading plan…</div> : isError ? <div className="text-[12px] text-muted-foreground">Failed to load plan</div> : <XBriefViewer doc={data ?? null} />}</div>;
+  // C-DETAIL: the DAG is the body of Plan map — it leads; List/Raw stay one
+  // sub-tab away (initialTab only seeds the first mount per view).
+  return <div data-testid="drawer-tab-panel-plan">{isLoading ? <div className="text-[12px] text-muted-foreground">Loading plan…</div> : isError ? <div className="text-[12px] text-muted-foreground">Failed to load plan</div> : <XBriefViewer doc={data ?? null} initialTab="dag" />}</div>;
 }
