@@ -6032,3 +6032,9 @@ Substrate bugs filed: 2897 2898 2899 2900 2901 2902 2907 2913 (8; ALL fixed and 
 ## Ticks 80-82 — 2026-07-19 ~21:00-21:30 — RED-MAIN #3 (25-min turnaround); direct-push pattern filed
 - **Red-main #3:** caf515da3d (#2908 one-action-model) failed lint:source-introspection (stale baseline). Protocol run: diagnose→file (PAN-2938)→insurance strike→publish its 1-line baseline fix (PR #2939)→merged; green-verify + close chained on the fix's own run (LESSON: grab the run id AFTER the merge lands — the chain watched the pre-merge red run once and false-reported STILL RED).
 - **Pattern filed as PAN-2940-ish (see actual id in issues):** 3 red-mains today, all direct-push series bypassing PR CI, all mechanically preventable — options for operator: pre-push lint/typecheck doctrine, PR+auto-merge for series, or ratchet-guard pre-push leg.
+
+## Ticks 94-99 — 2026-07-20 ~00:30-01:50 — RED-MAIN #4 (1-line fix, no-loss gate vindicated); PAN-2888 residue confirmed again
+- **Red-main #4:** 0dfc7eae24 (#2908 drawer refactor) renamed a data-section (SpecialistStrip→DrawerReviewSpecialists) without updating the issue-view no-loss inventory — the audit gate failed main EXACTLY as designed (the no-actions-lost discipline working). 1-line alignment (PR #2944) landed during a GitHub Actions API outage (503s ~1h) using the commits/check-runs API instead of the runs API. PAN-2940 pattern: 4 same-day occurrences, all #2908-adjacent direct pushes.
+- **CI-polling lesson:** a check-runs green-poll must require a NON-EMPTY completed set (total > threshold) — zero-registered-checks reads as green and false-passed once; the close gate caught it.
+- **PAN-2833/2869 'failed verification' flags = PAN-2888 residue again** (CLOSED issues, stale rows) — appended occurrence; the metric read 5 with 0 actionable.
+- 2943 close chained (test-green → deploy → close). Tally heading to 16 landed+closed.
