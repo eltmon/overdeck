@@ -128,6 +128,9 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
   const [xbriefDialogIssue, setXbriefDialogIssue] = useState<Issue | null>(null); // xBRIEF viewer
   const [cycleFilter, setCycleFilter] = useState<CycleFilter>('current'); // Default to current cycle
   const [includeCompleted, setIncludeCompleted] = useState(false);
+  // PAN-2908 C-BOARD: the Done column collapses to the cycle's recent N
+  // (planColumns cap); this expands it on demand.
+  const [showAllDone, setShowAllDone] = useState(false);
 
   // Rally feature expand/collapse state (lifted from ColumnContent for expand/collapse all)
   const [collapsedFeatures, setCollapsedFeatures] = useState<Set<string>>(new Set());
@@ -809,7 +812,8 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
               const columns = buildBoardColumns(sortedGrouped, agents, planningStateById);
               return columns.map((column) => {
                 const status = column.key;
-                const columnIssues = column.issues ?? [];
+                const rawColumnIssues = column.issues ?? [];
+                const columnIssues = status === 'done' && showAllDone && column.fullIssues ? column.fullIssues : rawColumnIssues;
                 const columnIssueIds = columnIssues.map((i) => i.identifier);
                 const selectedInColumn = columnIssueIds.filter((id) => bulkSelection.isSelected(id));
                 const allSelected = columnIssueIds.length > 0 && selectedInColumn.length === columnIssueIds.length;
@@ -868,6 +872,16 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
                     workspaceByIssueId={stackHealthByIssue}
                     rollup={column.rollup === true}
                   />
+                  {status === 'done' && (column.overflowCount ?? 0) > 0 && (
+                    <button
+                      type="button"
+                      data-testid="done-column-overflow-toggle"
+                      className="w-full border-t border-border bg-card px-4 py-2 text-left text-[11px] text-muted-foreground transition-colors hover:text-foreground"
+                      onClick={() => setShowAllDone((value) => !value)}
+                    >
+                      {showAllDone ? 'Collapse to recent' : `…and ${column.overflowCount} more this cycle — show all`}
+                    </button>
+                  )}
                   {/* TODO(PAN-1242): + New issue column footer button — see PRD §4.7.6 */}
                   </div>
                 </div>
