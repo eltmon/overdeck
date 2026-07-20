@@ -142,12 +142,16 @@ vi.mock('fs', async (importOriginal) => {
   };
 });
 
-const execMock = vi.hoisted(() => vi.fn());
+// exec/execFile must invoke their callbacks or promisified callers hang the
+// test to timeout (PAN-1862's fallback-verdict HEAD probe, PAN-2948's
+// snapshotWorkspaceHeadsPromise). Fail fast; the production code treats a
+// failed probe as "no anchor" and proceeds down the conservative path.
+const execMock = vi.hoisted(() => vi.fn((_cmd: unknown, opts: unknown, cb?: unknown) => {
+  const callback = (typeof opts === 'function' ? opts : cb) as ((err: Error) => void) | undefined;
+  callback?.(new Error('exec unavailable in tests'));
+}));
 vi.mock('child_process', async (importOriginal) => {
   const actual = await importOriginal<typeof import('child_process')>();
-  // execFile must invoke its callback or promisify(execFile) callers hang the
-  // test to timeout (PAN-1862's fallback-verdict HEAD probe). Fail fast; the
-  // production code treats a failed probe as "no anchor" and proceeds.
   const execFileMock = vi.fn((_cmd: unknown, _args: unknown, opts: unknown, cb?: unknown) => {
     const callback = (typeof opts === 'function' ? opts : cb) as ((err: Error) => void) | undefined;
     callback?.(new Error('execFile unavailable in tests'));
