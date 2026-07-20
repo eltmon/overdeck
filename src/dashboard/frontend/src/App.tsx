@@ -223,6 +223,7 @@ export default function App() {
   // the app-bar search to that project (PAN-1593).
   const [searchProjectPrefix, setSearchProjectPrefix] = useState<string | null>(null);
   const [isPaletteOpen, setIsPaletteOpen] = useState(false);
+  const [paletteInitialScope, setPaletteInitialScope] = useState<'all' | 'conversations'>('all');
   const [pendingConversationTarget, setPendingConversationTarget] = useState<PendingConversationTarget | null>(null);
   const [isSessionFeedSidebarOpen, setIsSessionFeedSidebarOpen] = useState(readSessionFeedSidebarOpen);
   const [trackerBannerDismissed, setTrackerBannerDismissed] = useState(false);
@@ -621,7 +622,13 @@ export default function App() {
         setIsSearchOpen(true);
       } else if (e.key === 'k' && isCmdOrCtrl && !e.shiftKey) {
         e.preventDefault();
+        setPaletteInitialScope('all');
         setIsPaletteOpen((prev) => !prev);
+      } else if (e.key === 'j' && isCmdOrCtrl && !e.shiftKey) {
+        // PAN-2908 C-CONVO: ⌘J jumps straight to conversations.
+        e.preventDefault();
+        setPaletteInitialScope('conversations');
+        setIsPaletteOpen(true);
       }
     };
 
@@ -897,6 +904,7 @@ export default function App() {
       {/* Command Palette — Cmd+K / Ctrl+K */}
       <CommandPalette
         isOpen={isPaletteOpen}
+        initialScope={paletteInitialScope}
         onClose={() => setIsPaletteOpen(false)}
         onNavigate={(tab, issueId) => {
           setActiveTab(tab as Tab);

@@ -74,6 +74,8 @@ interface CommandPaletteProps {
   onClose: () => void;
   onNavigate: (tab: string, issueId?: string) => void;
   onOpenConversationHit?: (hit: ConversationPaletteOpenRequest) => void | Promise<void>;
+  /** PAN-2908 C-CONVO: preset scope on open (⌘J jumps to conversations). */
+  initialScope?: PaletteScope;
 }
 
 interface PanCommandEntry {
@@ -323,7 +325,7 @@ function useDebouncedValue<T>(value: T, delayMs: number): T {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export function CommandPalette({ isOpen, onClose, onNavigate, onOpenConversationHit }: CommandPaletteProps) {
+export function CommandPalette({ isOpen, onClose, onNavigate, onOpenConversationHit, initialScope = 'all' }: CommandPaletteProps) {
   const [query, setQuery] = useState('');
   const debouncedQuery = useDebouncedValue(query, 120);
   const agents = useDashboardStore((state) => isOpen ? selectAgents(state) : EMPTY_AGENTS) as unknown as Agent[];
@@ -333,7 +335,7 @@ export function CommandPalette({ isOpen, onClose, onNavigate, onOpenConversation
   const [panCommands, setPanCommands] = useState<PanCommandEntry[]>([]);
   const [searchResults, setSearchResults] = useState<PaletteSearchResponse>(EMPTY_SEARCH);
   const [isSearchLoading, setIsSearchLoading] = useState(false);
-  const [scope, setScope] = useState<PaletteScope>('all');
+  const [scope, setScope] = useState<PaletteScope>(initialScope);
 
   // Reset query when opened, and lazy-load the pan command catalog the first
   // time the palette is shown.
@@ -341,11 +343,11 @@ export function CommandPalette({ isOpen, onClose, onNavigate, onOpenConversation
     if (!isOpen) return;
     setQuery('');
     setSearchResults(EMPTY_SEARCH);
-    setScope('all');
+    setScope(initialScope);
     if (panCommands.length === 0) {
       void fetchPanCommands().then(setPanCommands);
     }
-  }, [isOpen, panCommands.length]);
+  }, [isOpen, initialScope, panCommands.length]);
 
   // Fan out to the unified search endpoint as the user types.
   useEffect(() => {
