@@ -182,6 +182,8 @@ Rules: peeks and dock items render the same transcript slice the deep-dive shows
 
 ### 3.5 One action model (contract C-ACTIONS)
 
+> **Implementation status (2026-07-20): complete.** The 43-action registry renders through the ONE `IssueActionMenu` module in three presentations — strip (drawer/page footers), overflow (cards, rows), context (right-click, `IssueActionContextMenu`) — all over the same grouped body; `IssueActionMegaMenu` and `GroupedIssueActionMenu` are deleted and import-banned via the §3.9 topology gate. Six fixed groups in fixed order; state-filtered with disabled reasons; ≤12 enabled non-danger items per state (snapshot across 10 representative phases + the drawer's rendered inline snapshots); Merge is a first-class registry entry; dead endpoints fixed (`syncDiscussions` → the real command-deck route, `upload` explicitly unavailable) with a route-table probe in CI; Danger group behind its collapsed submenu with derived counts, typed confirms for wipe/destroy. The conformance gate freezes the topology so no surface can re-fork a menu skin.
+
 The 43-action registry **stays**. Everything wrong is in presentation and rot, not in the catalog.
 
 1. **One menu component.** `<IssueActionMenu>` (single implementation) renders the registry in three presentations: `strip` (drawer/page footer), `overflow` (cards, rows), `context` (right-click). Deleted skins: `IssueActionMegaMenu`, `GroupedIssueActionMenu`, the rail's non-registry extras (moved into the registry as first-class entries), and the dead `IssueAgentCard` action set (component deleted).
