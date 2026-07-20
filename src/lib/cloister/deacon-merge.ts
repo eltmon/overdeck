@@ -874,8 +874,11 @@ export async function checkFirstCompletionAgents(): Promise<string[]> {
       // if the agent's heartbeat is older than the idle minimum, it's safe to treat as idle.
       if (!isAgentIdleForNudge(agent.id, FIRST_COMPLETION_IDLE_MS)) continue;
 
-      const runtimeState = getAgentRuntimeStateSync(agent.id)!;
-      const lastActivity = new Date(runtimeState.lastActivity);
+      const runtimeState = getAgentRuntimeStateSync(agent.id);
+      // PAN-2946: agents with no runtime record yet (fresh spawn, wiped state)
+      // must not crash the patrol's first-completion pass.
+      if (!runtimeState) continue;
+      const lastActivity = new Date(runtimeState.lastActivity ?? 0);
       const idleMs = now - lastActivity.getTime();
       if (idleMs < FIRST_COMPLETION_IDLE_MS) continue;
 

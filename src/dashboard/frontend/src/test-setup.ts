@@ -10,6 +10,13 @@ try {
   // happy-dom without storage — uiMode falls back to 'advanced' anyway
 }
 
+// PAN-2937: the menu-open store is global — reset between tests so menus from
+// one test can't leak into the next.
+beforeEach(async () => {
+  const { useMenuOpen } = await import('./lib/menuOpenState');
+  useMenuOpen.setState({ openMenuKey: null });
+});
+
 const environmentFetch = globalThis.fetch;
 let unexpectedRequests: string[] = [];
 let guardedFetch: typeof fetch | undefined;

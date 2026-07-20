@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode, type RefObject } from 'react';
 import { MoreHorizontal, X } from 'lucide-react';
+import { useMenuOpen } from '../../lib/menuOpenState';
 
 import { AgentTellForm } from '../AgentTellForm';
 import { PlanDialog } from '../PlanDialog';
@@ -146,17 +147,23 @@ function OverflowButton({
   triggerRef,
   openSignal,
   count,
+  menuKey,
 }: {
   actions: Pick<UseIssueActionsResult, 'all' | 'primary' | 'phase'>;
   triggerRef?: RefObject<HTMLButtonElement>;
   openSignal?: number;
   count?: number;
+  menuKey?: string;
 }) {
-  const [open, setOpen] = useState(false);
+  // PAN-2937: open state lives in the store so live re-renders can't close it.
+  const openMenuKey = useMenuOpen((s) => s.openMenuKey);
+  const setOpenMenu = useMenuOpen((s) => s.setOpenMenu);
+  const key = menuKey ?? `issue-action:${actions.phase}`;
+  const open = openMenuKey === key;
   const more = count ?? actions.all.length;
 
   useEffect(() => {
-    if (openSignal) setOpen(true);
+    if (openSignal) setOpenMenu(key);
   }, [openSignal]);
 
   return (
@@ -167,12 +174,12 @@ function OverflowButton({
         data-testid="issue-action-overflow-button"
         aria-label={`${more} more issue actions`}
         className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-        onClick={() => setOpen((value) => !value)}
+        onClick={() => setOpenMenu(open ? null : key)}
       >
         <MoreHorizontal className="h-4 w-4" />
         <span>{more} more</span>
       </button>
-      {open ? <OverflowMenu actions={actions} onClose={() => setOpen(false)} /> : null}
+      {open ? <OverflowMenu actions={actions} onClose={() => setOpenMenu(null)} /> : null}
     </div>
   );
 }
@@ -395,7 +402,7 @@ export function IssueActionMenu({
         <ActionButton key={view.action.key} view={view} inline />
       )) : null}
       {mode === 'overflow-only' || (mode === 'primary-strip' && menuAll.length > 0) ? (
-        <OverflowButton actions={overflowActions} count={overflowCount} triggerRef={overflowTriggerRef} openSignal={openSignal} />
+        <OverflowButton actions={overflowActions} count={overflowCount} triggerRef={overflowTriggerRef} openSignal={openSignal} menuKey={`issue-action:${issueId}`} />
       ) : null}
       {hasPins ? <div data-testid="issue-action-pin-spacer" className="flex-1" /> : null}
       {registryPins.map((view) => (
