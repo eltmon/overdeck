@@ -32,10 +32,18 @@ function deps(rootDir: string, samples: QualityGatePressureSample[] = [low]): Qu
   }
 }
 
+// Captured before vi.useFakeTimers() so it always schedules real wall-clock time.
+const nativeSetTimeout = globalThis.setTimeout
+
 async function driveUntilResolved<T>(promise: Promise<T>): Promise<T> {
   let settled = false
   promise.finally(() => { settled = true }).catch(() => undefined)
   for (let attempt = 0; attempt < 100 && !settled; attempt++) {
+    // The admission loop awaits real fs promises that resolve on the libuv
+    // threadpool; on a loaded host a bare setImmediate spin exhausts every
+    // attempt before a single fs op completes. A 1ms real yield per attempt
+    // gives the threadpool wall-clock time without unfaking tested delays.
+    await new Promise((resolve) => nativeSetTimeout(resolve, 1))
     await realSetImmediate()
     await vi.runOnlyPendingTimersAsync()
   }
