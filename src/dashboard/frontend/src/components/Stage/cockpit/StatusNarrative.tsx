@@ -1,12 +1,16 @@
 /**
  * PAN-2398 — the ONE status narrative. Replaces the cockpit's duplicate
- * pipeline chip row + gates pill row with a single plain-language headline,
- * a "what happens next" line, and a five-stage journey strip with glosses.
+ * pipeline chip row + gates pill row with a single plain-language headline
+ * and a "what happens next" line.
  * Design contract: docs/design/mockups/issue-cockpit-redesign.html.
  *
  * Copy rules (binding, from the PRD): no pipeline jargon — never render
  * "verification gate", "merge-ready", "pickup", "released". A failing gate is
  * folded into the headline in plain words; deep detail stays in the Code tab.
+ *
+ * PAN-2908 C-VOCAB: the five-stage journey strip (Planned→…→Shipping) is gone
+ * from the tree, not just the render — the shared IssuePhaseRail beside this
+ * narrative is the one phase vocabulary everywhere.
  */
 
 import { useQuery } from '@tanstack/react-query'
@@ -18,23 +22,12 @@ import {
   type ReviewStatusData,
 } from '../../CommandDeck/ZoneCOverviewTabs/queries'
 
-export type JourneyStageKey = 'planned' | 'building' | 'reviewing' | 'testing' | 'shipping'
-type StageState = 'done' | 'now' | 'fail' | 'todo'
-
 interface PlanCounts { done: number; total: number }
-
-interface JourneyStage {
-  key: JourneyStageKey
-  label: string
-  gloss: string
-  state: StageState
-}
 
 export interface NarrativeModel {
   headline: string
   next: string
   needsYou: boolean
-  stages: JourneyStage[]
 }
 
 /** Pure narrative derivation — exported for tests. */
@@ -49,8 +42,6 @@ export function deriveNarrative(args: {
   const summary = ci?.summary
   const ciFailing = Boolean(summary && (summary.failed || summary.cancelled))
   const progress = plan && plan.total > 0 ? `${plan.done} of ${plan.total} tasks done` : undefined
-  const buildingDone = Boolean(plan && plan.total > 0 && plan.done >= plan.total)
-    || rs?.reviewStatus === 'passed' || rs?.reviewStatus === 'reviewing'
 
   let headline: string
   let next: string
@@ -89,31 +80,7 @@ export function deriveNarrative(args: {
     next = 'The plan is ready; work begins when it’s picked up.'
   }
   if (!needsYou) next = `${next} Nothing needs you yet.`
-
-  const reviewState: StageState = rs?.reviewStatus === 'blocked' || rs?.reviewStatus === 'failed' ? 'fail'
-    : rs?.reviewStatus === 'reviewing' ? 'now'
-    : rs?.reviewStatus === 'passed' ? 'done' : 'todo'
-  const testState: StageState = rs?.testStatus === 'failed' || rs?.testStatus === 'dispatch_failed' || ciFailing ? 'fail'
-    : rs?.testStatus === 'testing' ? 'now'
-    : rs?.testStatus === 'passed' || rs?.testStatus === 'skipped' ? 'done' : 'todo'
-  const shippingState: StageState = rs?.mergeStatus === 'merged' ? 'done'
-    : rs?.readyForMerge ? 'now' : 'todo'
-  const buildingState: StageState = buildingDone ? 'done' : (workRunning || (plan && plan.total > 0)) ? 'now' : 'todo'
-
-  const stages: JourneyStage[] = [
-    { key: 'planned', label: 'Planned', gloss: 'what to build', state: hasPlan ? 'done' : 'now' },
-    { key: 'building', label: 'Building', gloss: progress ?? 'writing code', state: hasPlan ? buildingState : 'todo' },
-    { key: 'reviewing', label: 'Reviewing', gloss: 'quality check', state: reviewState },
-    { key: 'testing', label: 'Testing', gloss: 'does it work', state: testState },
-    { key: 'shipping', label: 'Shipping', gloss: 'merge to main', state: shippingState },
-  ]
-  // Exactly one "now": the first non-done stage after the last done one, if
-  // none is already active/failing — keeps the strip honest and calm.
-  if (!stages.some((stage) => stage.state === 'now' || stage.state === 'fail')) {
-    const first = stages.find((stage) => stage.state === 'todo')
-    if (first) first.state = 'now'
-  }
-  return { headline, next, needsYou, stages }
+  return { headline, next, needsYou }
 }
 
 
