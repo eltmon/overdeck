@@ -10,6 +10,7 @@ const {
   mockRunQualityGates,
   mockWriteFeedbackFile,
   mockWriteVerificationArtifact,
+  mockRebuildWorkspaceStack,
 } = vi.hoisted(() => ({
   mockGetReviewStatus: vi.fn(),
   mockMarkWorkspaceStuck: vi.fn(),
@@ -17,6 +18,7 @@ const {
   mockRunQualityGates: vi.fn(),
   mockWriteFeedbackFile: vi.fn(),
   mockWriteVerificationArtifact: vi.fn(),
+  mockRebuildWorkspaceStack: vi.fn(),
 }));
 
 vi.mock('../../../../src/lib/review-status.js', () => ({
@@ -33,6 +35,10 @@ vi.mock('../../../../src/lib/cloister/validation.js', () => ({
 vi.mock('../../../../src/lib/cloister/verification-artifact.js', () => ({
   readVerificationArtifact: vi.fn(() => null),
   writeVerificationArtifact: mockWriteVerificationArtifact,
+}));
+
+vi.mock('../../../../src/lib/workspace/rebuild-stack.js', () => ({
+  rebuildWorkspaceStack: mockRebuildWorkspaceStack,
 }));
 
 vi.mock('../../../../src/lib/cloister/feedback-writer.js', () => ({
@@ -67,6 +73,7 @@ describe('runVerificationForIssueInProcess merged issue guard', () => {
     vi.clearAllMocks();
     mockRunQualityGates.mockReturnValue([]);
     mockWriteFeedbackFile.mockReturnValue(Effect.succeed({ success: false, error: 'not written' }));
+    mockRebuildWorkspaceStack.mockReturnValue(Effect.succeed({ success: true }));
     mkdirSync(`${workspacePath}/repo/.git`, { recursive: true });
   });
 
@@ -100,6 +107,54 @@ describe('runVerificationForIssueInProcess merged issue guard', () => {
     expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-2901', {
       verificationStatus: 'skipped',
       verificationNotes: 'Merge already landed; verify-on-main owns post-merge validation.',
+    });
+  });
+
+  it('waits for an infrastructure-triggered stack rebuild before returning', async () => {
+    mockGetReviewStatus.mockReturnValue({
+      issueId: 'PAN-2901',
+      reviewStatus: 'passed',
+      testStatus: 'pending',
+      mergeStatus: 'pending',
+      verificationStatus: 'pending',
+    });
+    mockRunQualityGates.mockReturnValue([{
+      name: 'frontend-lint',
+      passed: false,
+      required: true,
+      infraUnavailable: true,
+      error: 'frontend container is stuck Created',
+      output: '',
+      durationMs: 10,
+    }]);
+
+    let markRebuildStarted!: () => void;
+    const rebuildStarted = new Promise<void>((resolve) => { markRebuildStarted = resolve; });
+    let finishRebuild!: (result: { success: boolean }) => void;
+    const rebuildFinished = new Promise<{ success: boolean }>((resolve) => { finishRebuild = resolve; });
+    mockRebuildWorkspaceStack.mockReturnValue(Effect.promise(async () => {
+      markRebuildStarted();
+      return rebuildFinished;
+    }));
+
+    let settled = false;
+    const verification = Effect.runPromise(runVerificationForIssueInProcess(
+      'PAN-2901',
+      workspacePath,
+      workspaceInfo,
+      'test',
+      { syncTargetBranch: false },
+    )).finally(() => { settled = true; });
+
+    await rebuildStarted;
+    expect(settled).toBe(false);
+
+    finishRebuild({ success: true });
+    await expect(verification).resolves.toEqual({
+      outcome: 'failed',
+      failedCheck: 'frontend-lint',
+      cycleCount: 0,
+      maxCycles: 3,
     });
   });
 
