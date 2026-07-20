@@ -100,18 +100,19 @@
     "recordedAt": "2026-07-19T22:32:41.050Z"
   },
   "created": "2026-07-19T20:18:40.159Z",
-  "updated": "2026-07-20T00:43:08.381Z",
+  "updated": "2026-07-20T01:23:20.967Z",
   "pipeline": {
     "issueId": "PAN-2066",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "pending",
     "inspectStatus": "failed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-19T22:39:05.364Z",
-    "updatedAt": "2026-07-20T00:43:08.363Z",
+    "updatedAt": "2026-07-20T01:23:20.861Z",
+    "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "inspectNotes": "AC3 not fully guaranteed: knowledge-viewer.ts:161-169 stopEntry awaits stop(entry.bundlePath) with no timeout before reaching the kill('SIGTERM') fallback at line 168; the default stop impl stopOpenKnowledgeWithSpawn (lines 226-235) spawns a separate 'ok stop' process and awaits its exit event with no timeout — if that helper hangs instead of rejecting, the tracked ok server process is never killed, risking an orphan on shutdown. Fix: wrap the stop() call in a bounded race/timeout so entry.process.kill('SIGTERM') always fires within bounded time. AC1, AC2, AC4 verified as met.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2942",
     "lastVerifiedCommit": "7b3e78346b74b478290c09b57f944aa62e00a0a7",
@@ -216,9 +217,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 6805394,
-            "output": 702854,
-            "cacheRead": 275333120,
+            "input": 8721501,
+            "output": 785292,
+            "cacheRead": 320918016,
             "cacheWrite": 0
           }
         }
@@ -231,9 +232,9 @@
           "cacheWrite": 184458
         },
         "openai/gpt-5.6-sol": {
-          "input": 8494543,
-          "output": 789236,
-          "cacheRead": 292569088,
+          "input": 10410650,
+          "output": 871674,
+          "cacheRead": 338153984,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -244,8 +245,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 219.791529,
-        "pricingAsOf": "2026-07-20T00:43:08.376Z"
+        "usd": 254.637652,
+        "pricingAsOf": "2026-07-20T01:23:20.904Z"
       }
     },
     "merges": [
