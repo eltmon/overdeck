@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-21T23:09:49.270Z",
-  "updated": "2026-07-21T23:38:29.739Z",
+  "updated": "2026-07-21T23:41:21.934Z",
   "pipeline": {
     "issueId": "PAN-2997",
     "reviewStatus": "pending",
@@ -43,18 +43,32 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "contracts-linear-mcp-events": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-2997",
         "agentId": "agent-pan-2997",
         "pid": 2535167,
         "host": "eltmon-z790",
-        "claimedAt": "2026-07-21T23:38:29.738Z"
+        "claimedAt": "2026-07-21T23:38:29.738Z",
+        "itemId": "contracts-linear-mcp-events",
+        "outcome": "completed",
+        "reason": "Added four additive Linear MCP auth event schemas to the DomainEvent union, rebuilt contracts, and passed typecheck",
+        "releasedAt": "2026-07-21T23:41:21.934Z"
+      }
+    ],
+    "statusReasons": {
+      "contracts-linear-mcp-events": {
+        "reason": "Added four additive Linear MCP auth event schemas to the DomainEvent union, rebuilt contracts, and passed typecheck",
+        "updatedAt": "2026-07-21T23:41:21.934Z"
       }
     }
   },
   "statusOverrides": {
-    "contracts-linear-mcp-events": "running"
+    "contracts-linear-mcp-events": "completed",
+    "contracts-linear-mcp-events.contracts-linear-mcp-events.ac1": "completed",
+    "contracts-linear-mcp-events.contracts-linear-mcp-events.ac2": "completed",
+    "contracts-linear-mcp-events.contracts-linear-mcp-events.ac3": "completed"
   }
 }
