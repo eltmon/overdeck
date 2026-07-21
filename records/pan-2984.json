@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-21T15:14:12.381Z",
-  "updated": "2026-07-21T15:31:48.940Z",
+  "updated": "2026-07-21T15:34:44.705Z",
   "pipeline": {
     "issueId": "PAN-2984",
     "reviewStatus": "pending",
@@ -97,16 +97,8 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "ok-shim-writer": {
-        "writerId": "agent-pan-2984",
-        "agentId": "agent-pan-2984",
-        "pid": 2079607,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-21T15:31:48.940Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2984",
@@ -129,6 +121,17 @@
         "outcome": "completed",
         "reason": "Documented the assisted Node 24 detection ladder, override, managed shim, consent boundaries, and manual path in user docs and the OKF skill contract; skills lint passes.",
         "releasedAt": "2026-07-21T15:31:19.318Z"
+      },
+      {
+        "writerId": "agent-pan-2984",
+        "agentId": "agent-pan-2984",
+        "pid": 2079607,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-21T15:31:48.940Z",
+        "itemId": "ok-shim-writer",
+        "outcome": "completed",
+        "reason": "Added managed-shim ownership detection, foreign-file protection, executable shim writing, and rewrite coverage; 14 scoped tests and typecheck pass.",
+        "releasedAt": "2026-07-21T15:34:44.704Z"
       }
     ],
     "statusReasons": {
@@ -139,6 +142,10 @@
       "docs-knowledge-ladder": {
         "reason": "Documented the assisted Node 24 detection ladder, override, managed shim, consent boundaries, and manual path in user docs and the OKF skill contract; skills lint passes.",
         "updatedAt": "2026-07-21T15:31:19.318Z"
+      },
+      "ok-shim-writer": {
+        "reason": "Added managed-shim ownership detection, foreign-file protection, executable shim writing, and rewrite coverage; 14 scoped tests and typecheck pass.",
+        "updatedAt": "2026-07-21T15:34:44.704Z"
       }
     }
   },
@@ -153,6 +160,10 @@
     "docs-knowledge-ladder.docs-knowledge-ladder.ac1": "completed",
     "docs-knowledge-ladder.docs-knowledge-ladder.ac2": "completed",
     "docs-knowledge-ladder.docs-knowledge-ladder.ac3": "completed",
-    "ok-shim-writer": "running"
+    "ok-shim-writer": "completed",
+    "ok-shim-writer.ok-shim-writer.ac1": "completed",
+    "ok-shim-writer.ok-shim-writer.ac2": "completed",
+    "ok-shim-writer.ok-shim-writer.ac3": "completed",
+    "ok-shim-writer.ok-shim-writer.ac4": "completed"
   }
 }
