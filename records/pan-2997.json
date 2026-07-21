@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-21T23:09:49.270Z",
-  "updated": "2026-07-21T23:41:46.635Z",
+  "updated": "2026-07-21T23:46:33.687Z",
   "pipeline": {
     "issueId": "PAN-2997",
     "reviewStatus": "pending",
@@ -43,16 +43,8 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "linear-mcp-auth-fold": {
-        "writerId": "agent-pan-2997",
-        "agentId": "agent-pan-2997",
-        "pid": 2596648,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-21T23:41:46.635Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2997",
@@ -64,12 +56,27 @@
         "outcome": "completed",
         "reason": "Added four additive Linear MCP auth event schemas to the DomainEvent union, rebuilt contracts, and passed typecheck",
         "releasedAt": "2026-07-21T23:41:21.934Z"
+      },
+      {
+        "writerId": "agent-pan-2997",
+        "agentId": "agent-pan-2997",
+        "pid": 2596648,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-21T23:41:46.635Z",
+        "itemId": "linear-mcp-auth-fold",
+        "outcome": "completed",
+        "reason": "Added the event-store-backed lifecycle fold, read/write helpers, projection, TTL expiry, wake-set computation, and fake-timer unit coverage",
+        "releasedAt": "2026-07-21T23:46:33.687Z"
       }
     ],
     "statusReasons": {
       "contracts-linear-mcp-events": {
         "reason": "Added four additive Linear MCP auth event schemas to the DomainEvent union, rebuilt contracts, and passed typecheck",
         "updatedAt": "2026-07-21T23:41:21.934Z"
+      },
+      "linear-mcp-auth-fold": {
+        "reason": "Added the event-store-backed lifecycle fold, read/write helpers, projection, TTL expiry, wake-set computation, and fake-timer unit coverage",
+        "updatedAt": "2026-07-21T23:46:33.687Z"
       }
     }
   },
@@ -78,6 +85,10 @@
     "contracts-linear-mcp-events.contracts-linear-mcp-events.ac1": "completed",
     "contracts-linear-mcp-events.contracts-linear-mcp-events.ac2": "completed",
     "contracts-linear-mcp-events.contracts-linear-mcp-events.ac3": "completed",
-    "linear-mcp-auth-fold": "running"
+    "linear-mcp-auth-fold": "completed",
+    "linear-mcp-auth-fold.linear-mcp-auth-fold.ac1": "completed",
+    "linear-mcp-auth-fold.linear-mcp-auth-fold.ac2": "completed",
+    "linear-mcp-auth-fold.linear-mcp-auth-fold.ac3": "completed",
+    "linear-mcp-auth-fold.linear-mcp-auth-fold.ac4": "completed"
   }
 }
