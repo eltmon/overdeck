@@ -130,18 +130,18 @@
   ],
   "feedback": [],
   "created": "2026-07-21T16:29:59.439Z",
-  "updated": "2026-07-21T18:22:18.848Z",
+  "updated": "2026-07-21T18:30:27.562Z",
   "pipeline": {
     "issueId": "PAN-806",
     "reviewStatus": "reviewing",
-    "testStatus": "pending",
+    "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-21T17:44:12.340Z",
-    "updatedAt": "2026-07-21T18:22:18.819Z",
+    "updatedAt": "2026-07-21T18:30:27.532Z",
     "reviewNotes": "Agent re-review request (2/25): Fixed review issues",
     "inspectNotes": "rebase-helper.ts:101,200 add OVERDECK_PAN_GIT_OP:'1' alongside GIT_EDITOR:'true' on git rebase and git rebase --continue; abort/merge-fallback also sentineled. New tests/unit/lib/rebase-helper.test.ts (3 tests) assert coexistence via objectContaining; ran locally, all pass.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2986",
@@ -188,10 +188,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 16,
-            "output": 2047,
-            "cacheRead": 860387,
-            "cacheWrite": 138974
+            "input": 40,
+            "output": 5088,
+            "cacheRead": 2596736,
+            "cacheWrite": 153587
           }
         },
         "work": {
@@ -223,15 +223,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 24,
-          "output": 5246,
-          "cacheRead": 1218001,
-          "cacheWrite": 265431
+          "input": 48,
+          "output": 8287,
+          "cacheRead": 2954350,
+          "cacheWrite": 280044
         }
       },
       "costAtCloseOut": {
-        "usd": 148.214835,
-        "pricingAsOf": "2026-07-21T18:22:18.830Z"
+        "usd": 148.629096,
+        "pricingAsOf": "2026-07-21T18:30:27.551Z"
       }
     },
     "merges": [
