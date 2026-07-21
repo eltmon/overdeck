@@ -90,23 +90,24 @@
   ],
   "feedback": [],
   "created": "2026-07-21T16:29:59.439Z",
-  "updated": "2026-07-21T17:44:12.719Z",
+  "updated": "2026-07-21T17:48:14.459Z",
   "pipeline": {
     "issueId": "PAN-806",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-21T17:43:11.450Z",
+    "panDoneRecoveredAt": "2026-07-21T17:44:12.340Z",
+    "updatedAt": "2026-07-21T17:48:14.444Z",
     "inspectNotes": "rebase-helper.ts:101,200 add OVERDECK_PAN_GIT_OP:'1' alongside GIT_EDITOR:'true' on git rebase and git rebase --continue; abort/merge-fallback also sentineled. New tests/unit/lib/rebase-helper.test.ts (3 tests) assert coexistence via objectContaining; ran locally, all pass.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2986",
+    "lastVerifiedCommit": "1e8633b850b2f01817acf6cabd59e738fce11e5e",
     "reviewRequestedAt": "2026-07-21T17:44:12.340Z",
     "reviewSpawnedAt": "2026-07-21T17:42:45.977Z",
-    "strikeRecoveryCount": 0,
-    "panDoneRecoveredAt": "2026-07-21T17:44:12.340Z"
+    "strikeRecoveryCount": 0
   },
   "closeOut": {
     "usage": {
@@ -127,6 +128,14 @@
             "cacheWrite": 235496
           }
         },
+        "review": {
+          "openai/gpt-5.6-sol": {
+            "input": 735872,
+            "output": 80416,
+            "cacheRead": 13396992,
+            "cacheWrite": 0
+          }
+        },
         "review.supervisor": {
           "anthropic/claude-sonnet-5": {
             "input": 8,
@@ -137,9 +146,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 2076414,
-            "output": 216658,
-            "cacheRead": 136578048,
+            "input": 2078048,
+            "output": 216868,
+            "cacheRead": 136722432,
             "cacheWrite": 0
           }
         }
@@ -157,22 +166,22 @@
           "cacheRead": 5814819,
           "cacheWrite": 235496
         },
+        "openai/gpt-5.6-sol": {
+          "input": 2813920,
+          "output": 297284,
+          "cacheRead": 150119424,
+          "cacheWrite": 0
+        },
         "anthropic/claude-sonnet-5": {
           "input": 8,
           "output": 3199,
           "cacheRead": 357614,
           "cacheWrite": 126457
-        },
-        "openai/gpt-5.6-sol": {
-          "input": 2076414,
-          "output": 216658,
-          "cacheRead": 136578048,
-          "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 92.123905,
-        "pricingAsOf": "2026-07-21T17:43:11.492Z"
+        "usd": 105.000903,
+        "pricingAsOf": "2026-07-21T17:48:14.450Z"
       }
     },
     "merges": [
