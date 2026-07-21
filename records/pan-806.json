@@ -90,10 +90,10 @@
   ],
   "feedback": [],
   "created": "2026-07-21T16:29:59.439Z",
-  "updated": "2026-07-21T17:48:16.218Z",
+  "updated": "2026-07-21T17:50:36.719Z",
   "pipeline": {
     "issueId": "PAN-806",
-    "reviewStatus": "pending",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -101,8 +101,8 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-21T17:44:12.340Z",
-    "updatedAt": "2026-07-21T17:48:15.154Z",
-    "reviewNotes": "Review dispatch skipped — already running: agent-pan-806-review",
+    "updatedAt": "2026-07-21T17:50:36.678Z",
+    "reviewNotes": "Existing project pre-rebase hooks are skipped by the pan sentinel before their policy runs",
     "inspectNotes": "rebase-helper.ts:101,200 add OVERDECK_PAN_GIT_OP:'1' alongside GIT_EDITOR:'true' on git rebase and git rebase --continue; abort/merge-fallback also sentineled. New tests/unit/lib/rebase-helper.test.ts (3 tests) assert coexistence via objectContaining; ran locally, all pass.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2986",
     "lastVerifiedCommit": "1e8633b850b2f01817acf6cabd59e738fce11e5e",
@@ -131,9 +131,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 735872,
-            "output": 80416,
-            "cacheRead": 13396992,
+            "input": 804876,
+            "output": 139496,
+            "cacheRead": 20124672,
             "cacheWrite": 0
           }
         },
@@ -168,9 +168,9 @@
           "cacheWrite": 235496
         },
         "openai/gpt-5.6-sol": {
-          "input": 2813920,
-          "output": 297284,
-          "cacheRead": 150119424,
+          "input": 2882924,
+          "output": 356364,
+          "cacheRead": 156847104,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -181,8 +181,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 105.000903,
-        "pricingAsOf": "2026-07-21T17:48:15.166Z"
+        "usd": 110.482163,
+        "pricingAsOf": "2026-07-21T17:50:36.715Z"
       }
     },
     "merges": [
