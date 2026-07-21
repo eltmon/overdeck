@@ -11,18 +11,18 @@
   ],
   "feedback": [],
   "created": "2026-07-21T15:14:12.381Z",
-  "updated": "2026-07-21T15:42:23.003Z",
+  "updated": "2026-07-21T15:43:16.283Z",
   "pipeline": {
     "issueId": "PAN-2984",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "inspecting",
+    "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-21T15:42:22.986Z",
-    "inspectNotes": "Inspecting item ensure-ladder"
+    "updatedAt": "2026-07-21T15:43:16.205Z",
+    "inspectNotes": "All 6 ACs verified: install-under-runtime plan prefixes PATH with runtime bin dir and writes shim via writeShim (AC1); manager-without-24 rejects OpenKnowledgeSetupRequiredError with plan.kind install-node-via-manager, volta installCommand 'volta fetch node@24' (AC2); no-manager case rejects install-nvm plan whose steps include the npm install one-liner (AC3); bare 'ok' probe failing falls through to shimPath probe and returns absolute shim path (AC4); autoInstall:false throws manual-install message without invoking resolveSetupPlan (AC5); health-poll test uses vi.advanceTimersByTimeAsync under file-level vi.useFakeTimers() (AC6). 12/12 tests pass locally."
   },
   "closeOut": {
     "usage": {
@@ -45,17 +45,17 @@
         },
         "review.supervisor": {
           "anthropic/claude-sonnet-5": {
-            "input": 6,
-            "output": 2418,
-            "cacheRead": 249075,
-            "cacheWrite": 130529
+            "input": 18,
+            "output": 5903,
+            "cacheRead": 1074960,
+            "cacheWrite": 145797
           }
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 889850,
-            "output": 176608,
-            "cacheRead": 25920000,
+            "input": 894620,
+            "output": 177042,
+            "cacheRead": 26561024,
             "cacheWrite": 0
           }
         }
@@ -74,21 +74,21 @@
           "cacheWrite": 305673
         },
         "anthropic/claude-sonnet-5": {
-          "input": 6,
-          "output": 2418,
-          "cacheRead": 249075,
-          "cacheWrite": 130529
+          "input": 18,
+          "output": 5903,
+          "cacheRead": 1074960,
+          "cacheWrite": 145797
         },
         "openai/gpt-5.6-sol": {
-          "input": 889850,
-          "output": 176608,
-          "cacheRead": 25920000,
+          "input": 894620,
+          "output": 177042,
+          "cacheRead": 26561024,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 32.781929,
-        "pricingAsOf": "2026-07-21T15:42:22.994Z"
+        "usd": 33.377531,
+        "pricingAsOf": "2026-07-21T15:43:16.261Z"
       }
     },
     "merges": [],
