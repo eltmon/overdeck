@@ -11,24 +11,26 @@
   ],
   "feedback": [],
   "created": "2026-07-21T15:14:12.381Z",
-  "updated": "2026-07-21T15:29:05.593Z",
+  "updated": "2026-07-21T15:29:12.735Z",
   "pipeline": {
     "issueId": "PAN-2984",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
+    "inspectStatus": "inspecting",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-21T15:24:14.390Z"
+    "updatedAt": "2026-07-21T15:29:12.726Z",
+    "inspectNotes": "Inspecting item node-runtime-resolver"
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "memory-extraction": {
           "anthropic/claude-haiku-4-5": {
-            "input": 8337,
-            "output": 200,
+            "input": 22930,
+            "output": 400,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -40,12 +42,20 @@
             "cacheRead": 3571820,
             "cacheWrite": 305673
           }
+        },
+        "work": {
+          "openai/gpt-5.6-sol": {
+            "input": 600607,
+            "output": 54798,
+            "cacheRead": 5944320,
+            "cacheWrite": 0
+          }
         }
       },
       "totals": {
         "anthropic/claude-haiku-4-5": {
-          "input": 8337,
-          "output": 200,
+          "input": 22930,
+          "output": 400,
           "cacheRead": 0,
           "cacheWrite": 0
         },
@@ -54,18 +64,24 @@
           "output": 45017,
           "cacheRead": 3571820,
           "cacheWrite": 305673
+        },
+        "openai/gpt-5.6-sol": {
+          "input": 600607,
+          "output": 54798,
+          "cacheRead": 5944320,
+          "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 9.655135,
-        "pricingAsOf": "2026-07-21T15:24:14.430Z"
+        "usd": 17.289863,
+        "pricingAsOf": "2026-07-21T15:29:12.729Z"
       }
     },
     "merges": [],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "model": "gpt-5.6-sol",
   "tasks": {
     "sequence": 2,
     "claims": {},
