@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-21T22:47:36.935Z",
-  "updated": "2026-07-21T23:16:55.103Z",
+  "updated": "2026-07-21T23:17:17.837Z",
   "pipeline": {
     "issueId": "PAN-2993",
     "reviewStatus": "pending",
@@ -89,8 +89,16 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 6,
-    "claims": {},
+    "sequence": 7,
+    "claims": {
+      "strike-recovery-undelivered": {
+        "writerId": "agent-pan-2993",
+        "agentId": "agent-pan-2993",
+        "pid": 2179204,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-21T23:17:17.836Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-2993",
@@ -156,6 +164,7 @@
     "message-delivery-outcome.message-delivery-outcome.ac1": "completed",
     "message-delivery-outcome.message-delivery-outcome.ac2": "completed",
     "message-delivery-outcome.message-delivery-outcome.ac3": "completed",
-    "message-delivery-outcome.message-delivery-outcome.ac4": "completed"
+    "message-delivery-outcome.message-delivery-outcome.ac4": "completed",
+    "strike-recovery-undelivered": "running"
   }
 }
