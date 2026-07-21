@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-21T15:14:12.381Z",
-  "updated": "2026-07-21T15:49:28.615Z",
+  "updated": "2026-07-21T15:52:51.561Z",
   "pipeline": {
     "issueId": "PAN-2984",
     "reviewStatus": "pending",
@@ -97,16 +97,8 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 11,
-    "claims": {
-      "cli-assisted-flow": {
-        "writerId": "agent-pan-2984",
-        "agentId": "agent-pan-2984",
-        "pid": 2329152,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-21T15:49:28.614Z"
-      }
-    },
+    "sequence": 12,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2984",
@@ -162,6 +154,17 @@
         "outcome": "completed",
         "reason": "Threaded the resolved ok command through installer status/init/start, CLI launch, dashboard start tracking, and stop cleanup; added installer, CLI, and service coverage with 24 scoped tests passing.",
         "releasedAt": "2026-07-21T15:49:08.074Z"
+      },
+      {
+        "writerId": "agent-pan-2984",
+        "agentId": "agent-pan-2984",
+        "pid": 2329152,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-21T15:49:28.614Z",
+        "itemId": "cli-assisted-flow",
+        "outcome": "completed",
+        "reason": "Added TTY plan display and y/N consent, non-TTY actionable failure, manual decline behavior, and injected prompt/executor seams; 13 CLI tests and a real pseudo-TTY decline flow pass.",
+        "releasedAt": "2026-07-21T15:52:51.561Z"
       }
     ],
     "statusReasons": {
@@ -184,6 +187,10 @@
       "thread-ok-command": {
         "reason": "Threaded the resolved ok command through installer status/init/start, CLI launch, dashboard start tracking, and stop cleanup; added installer, CLI, and service coverage with 24 scoped tests passing.",
         "updatedAt": "2026-07-21T15:49:08.074Z"
+      },
+      "cli-assisted-flow": {
+        "reason": "Added TTY plan display and y/N consent, non-TTY actionable failure, manual decline behavior, and injected prompt/executor seams; 13 CLI tests and a real pseudo-TTY decline flow pass.",
+        "updatedAt": "2026-07-21T15:52:51.561Z"
       }
     }
   },
@@ -215,6 +222,10 @@
     "thread-ok-command.thread-ok-command.ac2": "completed",
     "thread-ok-command.thread-ok-command.ac3": "completed",
     "thread-ok-command.thread-ok-command.ac4": "completed",
-    "cli-assisted-flow": "running"
+    "cli-assisted-flow": "completed",
+    "cli-assisted-flow.cli-assisted-flow.ac1": "completed",
+    "cli-assisted-flow.cli-assisted-flow.ac2": "completed",
+    "cli-assisted-flow.cli-assisted-flow.ac3": "completed",
+    "cli-assisted-flow.cli-assisted-flow.ac4": "completed"
   }
 }
