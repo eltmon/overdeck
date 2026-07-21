@@ -64,6 +64,7 @@ export function relocateVenvScripts(sourceVenv: string, destVenv: string): void 
 }
 
 const PRE_REBASE_HOOK_MARKER = '# OVERDECK MANAGED PRE-REBASE GUARD';
+const PRE_REBASE_ORIGINAL_SUFFIX = '.overdeck-original';
 const PRE_REBASE_HOOK_PREFIX = [
   '#!/bin/sh',
   PRE_REBASE_HOOK_MARKER,
@@ -85,11 +86,21 @@ export async function installPreRebaseHook(targetPath: string): Promise<string> 
   const hookPath = join(hooksDir, 'pre-rebase');
 
   mkdirSync(hooksDir, { recursive: true });
+  const originalHookPath = `${hookPath}${PRE_REBASE_ORIGINAL_SUFFIX}`;
   const existingHook = existsSync(hookPath) ? readFileSync(hookPath, 'utf-8') : '';
   if (!existingHook.includes(PRE_REBASE_HOOK_MARKER)) {
-    const hook = existingHook
-      ? `${PRE_REBASE_HOOK_PREFIX}# Existing project hook follows\n${existingHook}`
-      : `${PRE_REBASE_HOOK_PREFIX}exit 0\n`;
+    if (existingHook) {
+      rmSync(originalHookPath, { force: true });
+      renameSync(hookPath, originalHookPath);
+    }
+    const hook = [
+      PRE_REBASE_HOOK_PREFIX,
+      `if [ -x "\${0}${PRE_REBASE_ORIGINAL_SUFFIX}" ]; then`,
+      `  exec "\${0}${PRE_REBASE_ORIGINAL_SUFFIX}" "$@"`,
+      'fi',
+      'exit 0',
+      '',
+    ].join('\n');
     writeFileSync(hookPath, hook, { encoding: 'utf-8', mode: 0o755 });
   }
   chmodSync(hookPath, 0o755);

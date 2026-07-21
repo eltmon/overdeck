@@ -144,7 +144,15 @@ describe('generateLauncherScript', () => {
       env: { ...process.env, OVERDECK_PAN_GIT_OP: '' },
     });
 
-    for (const args of [['rebase', 'main'], ['reset', '--hard', 'HEAD'], ['stash', 'push']]) {
+    for (const args of [
+      ['rebase', 'main'],
+      ['reset', '--hard', 'HEAD'],
+      ['stash', 'push'],
+      ['-C', '/workspace', 'rebase', 'main'],
+      ['-C/workspace', 'reset', '--hard', 'HEAD'],
+      ['-c', 'core.hooksPath=/tmp/hooks', 'stash', 'push'],
+      ['-ccore.hooksPath=/tmp/hooks', 'rebase', 'main'],
+    ]) {
       const result = run(args);
       expect(result.status).toBe(1);
       expect(result.stderr).toContain('Overdeck agents must not run git');
@@ -203,9 +211,35 @@ describe('generateLauncherScript', () => {
       if [ "\\$OVERDECK_PAN_GIT_OP" = "1" ]; then
         exec "\\$_OVERDECK_REAL_GIT" "\\$@"
       fi
-      case "\\$1" in
+      _overdeck_git_find_command() {
+        while [ "\\$#" -gt 0 ]; do
+          case "\\$1" in
+            -C|-c|--git-dir|--work-tree|--namespace|--config-env|--super-prefix|--attr-source)
+              shift
+              [ "\\$#" -gt 0 ] && shift
+              ;;
+            -C?*|-c?*|--git-dir=*|--work-tree=*|--namespace=*|--config-env=*|--super-prefix=*|--attr-source=*)
+              shift
+              ;;
+            --)
+              shift
+              break
+              ;;
+            -*)
+              shift
+              ;;
+            *)
+              printf "%s\\n" "\\$1"
+              return
+              ;;
+          esac
+        done
+        [ "\\$#" -gt 0 ] && printf "%s\\n" "\\$1"
+      }
+      _overdeck_git_command="\\$(_overdeck_git_find_command "\\$@")"
+      case "\\$_overdeck_git_command" in
         rebase|stash)
-          echo "Overdeck agents must not run git \\$1 directly. Use pan sync-main to sync main or pan done to submit." >&2
+          echo "Overdeck agents must not run git \\$_overdeck_git_command directly. Use pan sync-main to sync main or pan done to submit." >&2
           exit 1
           ;;
         reset)
@@ -271,9 +305,35 @@ describe('generateLauncherScript', () => {
       if [ "\\$OVERDECK_PAN_GIT_OP" = "1" ]; then
         exec "\\$_OVERDECK_REAL_GIT" "\\$@"
       fi
-      case "\\$1" in
+      _overdeck_git_find_command() {
+        while [ "\\$#" -gt 0 ]; do
+          case "\\$1" in
+            -C|-c|--git-dir|--work-tree|--namespace|--config-env|--super-prefix|--attr-source)
+              shift
+              [ "\\$#" -gt 0 ] && shift
+              ;;
+            -C?*|-c?*|--git-dir=*|--work-tree=*|--namespace=*|--config-env=*|--super-prefix=*|--attr-source=*)
+              shift
+              ;;
+            --)
+              shift
+              break
+              ;;
+            -*)
+              shift
+              ;;
+            *)
+              printf "%s\\n" "\\$1"
+              return
+              ;;
+          esac
+        done
+        [ "\\$#" -gt 0 ] && printf "%s\\n" "\\$1"
+      }
+      _overdeck_git_command="\\$(_overdeck_git_find_command "\\$@")"
+      case "\\$_overdeck_git_command" in
         rebase|stash)
-          echo "Overdeck agents must not run git \\$1 directly. Use pan sync-main to sync main or pan done to submit." >&2
+          echo "Overdeck agents must not run git \\$_overdeck_git_command directly. Use pan sync-main to sync main or pan done to submit." >&2
           exit 1
           ;;
         reset)

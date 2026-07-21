@@ -6,7 +6,8 @@ import { getHarnessBehavior } from './runtimes/behavior.js';
 import { qualifyPiModel } from './providers.js';
 import { shellQuoteModelIdSync } from './model-validation.js';
 import { colorFgBgForTheme, getUiThemeSync } from './ui-theme.js';
-import { getOverdeckHome, packageRoot } from './paths.js';
+import { packageRoot } from './paths.js';
+import { buildGitGuardLines } from './launcher-git-guard.js';
 
 export type LauncherSpawnMode = 'conversation' | 'remote' | 'resume';
 
@@ -199,41 +200,6 @@ export interface LauncherConfig {
  */
 function shellQuote(value: string): string {
   return `'${value.replace(/'/g, `'\\''`)}'`;
-}
-
-function buildGitGuardLines(agentId: string): string[] {
-  const guardDir = join(getOverdeckHome(), 'agents', agentId, 'git-guard');
-  const guardPath = join(guardDir, 'git');
-  const pathForDoubleQuotes = guardDir.replace(/([\\"$`])/g, '\\$1');
-
-  return [
-    '_OVERDECK_REAL_GIT="$(command -v git)"',
-    `mkdir -p ${shellQuote(guardDir)}`,
-    `cat > ${shellQuote(guardPath)} <<EOF`,
-    '#!/bin/sh',
-    '_OVERDECK_REAL_GIT="$_OVERDECK_REAL_GIT"',
-    'if [ "\\$OVERDECK_PAN_GIT_OP" = "1" ]; then',
-    '  exec "\\$_OVERDECK_REAL_GIT" "\\$@"',
-    'fi',
-    'case "\\$1" in',
-    '  rebase|stash)',
-    '    echo "Overdeck agents must not run git \\$1 directly. Use pan sync-main to sync main or pan done to submit." >&2',
-    '    exit 1',
-    '    ;;',
-    '  reset)',
-    '    for _overdeck_git_arg in "\\$@"; do',
-    '      if [ "\\$_overdeck_git_arg" = "--hard" ]; then',
-    '        echo "Overdeck agents must not run git reset --hard. Commit, explicitly discard, or surface the state instead." >&2',
-    '        exit 1',
-    '      fi',
-    '    done',
-    '    ;;',
-    'esac',
-    'exec "\\$_OVERDECK_REAL_GIT" "\\$@"',
-    'EOF',
-    `chmod 0755 ${shellQuote(guardPath)}`,
-    `export PATH="${pathForDoubleQuotes}:$PATH"`,
-  ];
 }
 
 /**
