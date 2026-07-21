@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-21T15:14:12.381Z",
-  "updated": "2026-07-21T16:22:43.459Z",
+  "updated": "2026-07-21T16:22:46.631Z",
   "pipeline": {
     "issueId": "PAN-2984",
     "reviewStatus": "pending",
@@ -21,8 +21,51 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-21T15:43:16.205Z",
-    "inspectNotes": "All 6 ACs verified: install-under-runtime plan prefixes PATH with runtime bin dir and writes shim via writeShim (AC1); manager-without-24 rejects OpenKnowledgeSetupRequiredError with plan.kind install-node-via-manager, volta installCommand 'volta fetch node@24' (AC2); no-manager case rejects install-nvm plan whose steps include the npm install one-liner (AC3); bare 'ok' probe failing falls through to shimPath probe and returns absolute shim path (AC4); autoInstall:false throws manual-install message without invoking resolveSetupPlan (AC5); health-poll test uses vi.advanceTimersByTimeAsync under file-level vi.useFakeTimers() (AC6). 12/12 tests pass locally."
+    "updatedAt": "2026-07-21T16:22:46.629Z",
+    "inspectNotes": "All 6 ACs verified: install-under-runtime plan prefixes PATH with runtime bin dir and writes shim via writeShim (AC1); manager-without-24 rejects OpenKnowledgeSetupRequiredError with plan.kind install-node-via-manager, volta installCommand 'volta fetch node@24' (AC2); no-manager case rejects install-nvm plan whose steps include the npm install one-liner (AC3); bare 'ok' probe failing falls through to shimPath probe and returns absolute shim path (AC4); autoInstall:false throws manual-install message without invoking resolveSetupPlan (AC5); health-poll test uses vi.advanceTimersByTimeAsync under file-level vi.useFakeTimers() (AC6). 12/12 tests pass locally.",
+    "reviewRequestedAt": "2026-07-21T16:22:46.629Z",
+    "scopeDrift": {
+      "outsideDeclaredScope": [
+        "tests/unit/dashboard/server/services/knowledge-viewer.test.ts"
+      ],
+      "declaredScopeUntouched": [
+        "src/dashboard/server/services/__tests__/knowledge-viewer.test.ts"
+      ],
+      "declaredScope": [
+        "configuration/knowledge.mdx",
+        "src/cli/commands/__tests__/knowledge.test.ts",
+        "src/cli/commands/knowledge.ts",
+        "src/dashboard/frontend/src/components/knowledge/KnowledgePage.test.tsx",
+        "src/dashboard/frontend/src/components/knowledge/KnowledgePage.tsx",
+        "src/dashboard/server/routes/__tests__/knowledge-viewer.test.ts",
+        "src/dashboard/server/routes/knowledge-viewer.ts",
+        "src/dashboard/server/services/__tests__/knowledge-viewer.test.ts",
+        "src/dashboard/server/services/knowledge-viewer.ts",
+        "src/lib/installers/__tests__/node-runtime.test.ts",
+        "src/lib/installers/__tests__/open-knowledge.test.ts",
+        "src/lib/installers/node-runtime.ts",
+        "src/lib/installers/open-knowledge.ts",
+        "sync-sources/skills/okf/references/overdeck.md"
+      ],
+      "actualChangedFiles": [
+        "configuration/knowledge.mdx",
+        "src/cli/commands/__tests__/knowledge.test.ts",
+        "src/cli/commands/knowledge.ts",
+        "src/dashboard/frontend/src/components/knowledge/KnowledgePage.test.tsx",
+        "src/dashboard/frontend/src/components/knowledge/KnowledgePage.tsx",
+        "src/dashboard/server/routes/__tests__/knowledge-viewer.test.ts",
+        "src/dashboard/server/routes/knowledge-viewer.ts",
+        "src/dashboard/server/services/knowledge-viewer.ts",
+        "src/lib/installers/__tests__/node-runtime.test.ts",
+        "src/lib/installers/__tests__/open-knowledge.test.ts",
+        "src/lib/installers/node-runtime.ts",
+        "src/lib/installers/open-knowledge.ts",
+        "sync-sources/skills/okf/references/overdeck.md",
+        "tests/unit/dashboard/server/services/knowledge-viewer.test.ts"
+      ],
+      "recordedAt": "2026-07-21T16:22:43.458Z"
+    },
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2985"
   },
   "closeOut": {
     "usage": {
