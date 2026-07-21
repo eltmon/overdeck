@@ -16,18 +16,18 @@
   ],
   "feedback": [],
   "created": "2026-07-21T22:47:36.935Z",
-  "updated": "2026-07-21T23:15:12.285Z",
+  "updated": "2026-07-21T23:16:55.103Z",
   "pipeline": {
     "issueId": "PAN-2993",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "inspecting",
+    "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-21T23:15:12.265Z",
-    "inspectNotes": "Inspecting item message-delivery-outcome"
+    "updatedAt": "2026-07-21T23:16:54.973Z",
+    "inspectNotes": "All 4 ACs verified against src/lib/agents/messaging.ts@79bb7b47: stopped-agent resume failure returns {delivered:false,queuedToMail:true,reason} naming both resumeResult.error and PAN-1980 session-rotation disable; paused/gated path returns gate reason; live-session/successful-resume paths return delivered:true; only deacon-strike-landing.ts touched among callers and npm run typecheck passes clean (0 new errors)."
   },
   "closeOut": {
     "usage": {
@@ -40,11 +40,19 @@
             "cacheWrite": 311785
           }
         },
+        "review.supervisor": {
+          "anthropic/claude-sonnet-5": {
+            "input": 14,
+            "output": 4464,
+            "cacheRead": 828269,
+            "cacheWrite": 143725
+          }
+        },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 515809,
-            "output": 68023,
-            "cacheRead": 26799616,
+            "input": 555778,
+            "output": 76726,
+            "cacheRead": 31439872,
             "cacheWrite": 0
           }
         }
@@ -56,16 +64,22 @@
           "cacheRead": 4542519,
           "cacheWrite": 311785
         },
+        "anthropic/claude-sonnet-5": {
+          "input": 14,
+          "output": 4464,
+          "cacheRead": 828269,
+          "cacheWrite": 143725
+        },
         "openai/gpt-5.6-sol": {
-          "input": 515809,
-          "output": 68023,
-          "cacheRead": 26799616,
+          "input": 555778,
+          "output": 76726,
+          "cacheRead": 31439872,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 28.52914,
-        "pricingAsOf": "2026-07-21T23:15:12.276Z"
+        "usd": 31.879838,
+        "pricingAsOf": "2026-07-21T23:16:55.046Z"
       }
     },
     "merges": [],
