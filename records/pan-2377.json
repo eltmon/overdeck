@@ -365,20 +365,20 @@
     "recordedAt": "2026-07-21T14:09:48.216Z"
   },
   "created": "2026-07-17T12:54:30.819Z",
-  "updated": "2026-07-21T14:09:48.225Z",
+  "updated": "2026-07-21T14:09:49.162Z",
   "pipeline": {
     "issueId": "PAN-2377",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "pending",
     "inspectStatus": "failed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-21T14:09:45.641Z",
+    "updatedAt": "2026-07-21T14:09:49.160Z",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2894",
-    "reviewRequestedAt": "2026-07-21T13:57:53.545Z",
+    "reviewRequestedAt": "2026-07-21T14:09:49.160Z",
     "reviewSpawnedAt": "2026-07-21T14:06:01.709Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -399,6 +399,7 @@
         "src/dashboard/frontend/src/components/IssueActionMenu/IssueActionMenu.tsx",
         "src/dashboard/frontend/src/components/IssueActionMenu/useIssueActions.ts",
         "src/dashboard/frontend/src/components/Sidebar.tsx",
+        "src/dashboard/frontend/src/components/knowledge/KnowledgePage.test.tsx",
         "src/dashboard/frontend/src/components/orders/__tests__/RunSettingsPanel.test.tsx",
         "src/dashboard/frontend/src/lib/__tests__/issueActions.parity.test.tsx",
         "src/dashboard/frontend/src/pages/__tests__/BacklogSequencerPage.test.tsx",
@@ -528,6 +529,7 @@
         "src/dashboard/frontend/src/components/IssueActionMenu/IssueActionMenu.tsx",
         "src/dashboard/frontend/src/components/IssueActionMenu/useIssueActions.ts",
         "src/dashboard/frontend/src/components/Sidebar.tsx",
+        "src/dashboard/frontend/src/components/knowledge/KnowledgePage.test.tsx",
         "src/dashboard/frontend/src/components/orders/AddIssuesRail.tsx",
         "src/dashboard/frontend/src/components/orders/BacklogCandidatesRail.tsx",
         "src/dashboard/frontend/src/components/orders/BookStrip.tsx",
@@ -595,7 +597,7 @@
         "tests/unit/lib/orders/two-door-guard.test.ts",
         "tests/unit/lib/overdeck/no-loss-matrix.ts"
       ],
-      "recordedAt": "2026-07-21T13:57:01.547Z"
+      "recordedAt": "2026-07-21T14:09:48.216Z"
     }
   },
   "closeOut": {
