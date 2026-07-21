@@ -228,7 +228,7 @@ export function ConversationPanel({
   const { data: messagesData, isLoading: messagesLoading } = useQuery({
     queryKey: messagesQueryKey,
     queryFn: async ({ signal }) => {
-      const fetched = await fetchMessages(conversation.name, signal);
+      const fetched = await fetchMessages(conversation.name, signal, agentId);
       // If the WS subscription became active while this HTTP request was in
       // flight, prefer the streamed cache ONLY when it is at least as complete
       // as this HTTP backfill. When the WS snapshot has not arrived yet (or was
@@ -1166,12 +1166,19 @@ interface MessagesResponse {
   error?: string;
 }
 
-async function fetchMessages(name: string, signal?: AbortSignal): Promise<MessagesResponse> {
+export async function fetchMessages(name: string, signal?: AbortSignal, agentId?: string): Promise<MessagesResponse> {
   // PAN-1705: timeout + React Query's abort signal so a request in flight
   // during a server restart rejects (and retries) instead of pinning the
   // panel on "Loading…" forever, and switching conversations cancels the
   // previous conversation's fetch.
   const res = await fetchWithTimeout(`/api/conversations/${encodeURIComponent(name)}/messages`, { signal });
+  // An agent the store knows (queued specialist, wiped workspace, cleaned
+  // session file) 404s here — that means "no saved history", not an incident.
+  // Render the honest empty state instead of the warning card. Real user
+  // conversations (no agentId) keep the failure card + Retry.
+  if (res.status === 404 && agentId) {
+    return { messages: [], workLog: [], streaming: false };
+  }
   if (!res.ok) throw new Error('Failed to fetch messages');
   return res.json();
 }

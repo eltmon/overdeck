@@ -79,10 +79,10 @@ describe('conformance gate: single shell (C-DETAIL §3.9)', () => {
   });
 
   it('only the sanctioned shells host IssueDetail', () => {
-    // The frame (drawer), the deck tree (rail density, #2962 decision A),
-    // and the cockpit route (page density, #2962 decision 2).
+    // The drawer frame, and the cockpit route at page density (#2962
+    // decision 2). The deck tree's rail-density mount was rejected by the
+    // operator (2026-07-20) — no IssueDetail in the tree.
     expect(importersOf(/issue-detail\/IssueDetail/)).toEqual([
-      'components/CommandDeck/ProjectTree/FeatureItem.tsx',
       'components/Stage/cockpit/IssueMissionControl.tsx',
       'components/drawer/IssueDrawer.tsx',
     ]);
