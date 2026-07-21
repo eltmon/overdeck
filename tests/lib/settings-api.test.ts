@@ -45,6 +45,7 @@ vi.mock('../../src/lib/config-yaml.js', async () => {
           manualCompactMode: 'claude-code',
           richCompaction: false,
         },
+        defaultConversationModel: 'claude-sonnet-4-6',
         trackerKeys: {},
         tts: makeTtsConfig(),
       },
@@ -67,6 +68,7 @@ vi.mock('../../src/lib/config-yaml.js', async () => {
           manualCompactMode: 'claude-code',
           richCompaction: false,
         },
+        defaultConversationModel: 'claude-sonnet-4-6',
         trackerKeys: {},
         tts: makeTtsConfig(),
       },
@@ -91,9 +93,28 @@ vi.mock('fs/promises', async () => {
   const actual = await vi.importActual<typeof import('fs/promises')>('fs/promises');
   return {
     ...actual,
+    readFile: vi.fn(async () => {
+      const error = new Error('ENOENT') as Error & { code: string };
+      error.code = 'ENOENT';
+      throw error;
+    }),
     writeFile: vi.fn(),
   };
 });
+
+const validTieredExecution = {
+  enabled: true,
+  tiers: {
+    cheap: { model: 'claude-haiku-4-5', harness: 'claude-code' as const, difficulties: ['trivial', 'simple'] },
+    frontier: { model: 'claude-opus-4-8', harness: 'claude-code' as const, difficulties: ['medium', 'complex', 'expert'] },
+  },
+  supervisor: { model: 'claude-opus-4-8', harness: 'claude-code' as const, subscribe: 'flagged' as const },
+  by_kind: {},
+  feed: { callouts: 'off' as const, exclude: [], exclude_subjects: [], max_diff_bytes: null },
+  escalation: { enabled: false, retries_at_tier: 0, max_promotions: 0, flounder_budget_minutes: {} },
+  compaction_reroute: 'off' as const,
+  replay_threshold: 0.5,
+};
 
 
 describe('settings-api', () => {
@@ -167,6 +188,49 @@ describe('settings-api', () => {
         resiliency_tier: 'durable',
         max_concurrent_agents: 5,
       });
+    });
+
+    it('surfaces normalized tiered execution config for read-only Settings visibility', () => {
+      vi.mocked(loadConfigSync).mockReturnValueOnce({
+        config: {
+          preset: 'balanced',
+          enabledProviders: new Set(['anthropic']),
+          apiKeys: {},
+          overrides: {},
+          geminiThinkingLevel: 3,
+          tmux: { configMode: 'managed' },
+          conversations: { compactionModel: 'claude-haiku-4-5', manualCompactMode: 'claude-code', richCompaction: false },
+          trackerKeys: {},
+          tts: makeTtsConfig(),
+          tieredExecution: {
+            enabled: true,
+            tiers: {
+              cheap: { model: 'claude-haiku-4-5', harness: 'claude-code', difficulties: ['trivial', 'simple'] },
+              frontier: { model: 'claude-opus-4-8', harness: 'claude-code', difficulties: ['medium', 'complex', 'expert'] },
+            },
+            supervisor: { model: 'claude-opus-4-8', harness: 'claude-code', subscribe: 'flagged' },
+            by_kind: {},
+            byKind: {},
+            feed: { callouts: 'off', exclude: [], exclude_subjects: [], max_diff_bytes: null },
+            escalation: { enabled: false, retries_at_tier: 0, max_promotions: 0, flounder_budget_minutes: {} },
+            compaction_reroute: 'off',
+            replay_threshold: 0.5,
+            difficultyToTier: {
+              trivial: 'cheap',
+              simple: 'cheap',
+              medium: 'frontier',
+              complex: 'frontier',
+              expert: 'frontier',
+            },
+          },
+        },
+        migration: null,
+      } as any);
+
+      const settings = loadSettingsApi();
+      expect(settings.tiered_execution?.enabled).toBe(true);
+      expect(settings.tiered_execution?.tiers.cheap.model).toBe('claude-haiku-4-5');
+      expect(settings.tiered_execution?.difficultyToTier?.expert).toBe('frontier');
     });
 
     it('does not surface legacy model-route overrides in the settings API', () => {
@@ -247,6 +311,29 @@ describe('settings-api', () => {
       };
       const result = validateSettingsApi(settings);
       expect(result.valid).toBe(true);
+    });
+
+    it('accepts a valid tiered_execution table', () => {
+      const result = validateSettingsApi({
+        ...validSettings,
+        tiered_execution: validTieredExecution,
+      });
+      expect(result.valid).toBe(true);
+      expect(result.errors).toHaveLength(0);
+    });
+
+    it('rejects invalid tiered_execution tables with the validator message', () => {
+      const result = validateSettingsApi({
+        ...validSettings,
+        tiered_execution: {
+          ...validTieredExecution,
+          tiers: {
+            cheap: { model: 'claude-haiku-4-5', harness: 'claude-code', difficulties: ['trivial', 'simple'] },
+          },
+        },
+      });
+      expect(result.valid).toBe(false);
+      expect(result.errors).toContain("tiered_execution difficulty 'medium' is not mapped to any tier");
     });
 
     it('should return valid for valid settings', () => {
@@ -468,7 +555,7 @@ describe('settings-api', () => {
       });
 
       expect(result.valid).toBe(false);
-      expect(result.errors).toContain('models.provider_harnesses.openai must be claude-code, pi, codex, or empty string');
+      expect(result.errors).toContain('models.provider_harnesses.openai must be claude-code, ohmypi, codex, acp, or empty string');
     });
   });
 
@@ -665,29 +752,84 @@ describe('settings-api', () => {
       expect(yamlContent).toContain('background_ai:');
       expect(yamlContent).toContain('cheap_mode: false');
     });
+
+    it('persists tiered_execution while preserving unrelated comments and keys', async () => {
+      const { readFile, writeFile } = await import('fs/promises');
+      vi.mocked(readFile).mockResolvedValueOnce(`# keep this comment
+custom_key: still-here
+models:
+  # keep provider comment
+  providers:
+    anthropic: true
+`);
+      const settings: ApiSettingsConfig = {
+        models: {
+          providers: {
+            anthropic: true,
+            openai: false,
+            google: false,
+            minimax: false,
+            zai: false,
+            kimi: false,
+            openrouter: false,
+            nous: false,
+            dashscope: false,
+          },
+          overrides: {},
+        },
+        api_keys: {},
+        tiered_execution: validTieredExecution,
+      };
+
+      await Effect.runPromise(saveSettingsApi(settings));
+
+      const callArgs = vi.mocked(writeFile).mock.calls.at(-1)!;
+      const yamlContent = String(callArgs[1]);
+      expect(yamlContent).toContain('# keep this comment');
+      expect(yamlContent).toContain('custom_key: still-here');
+      expect(yamlContent).toContain('# keep provider comment');
+      expect(yamlContent).toContain('tiered_execution:');
+      expect(yamlContent).toContain('cheap:');
+      expect(yamlContent).toContain('supervisor:');
+      expect(yamlContent).toContain('replay_threshold: 0.5');
+      expect(yamlContent).not.toContain('difficultyToTier');
+    });
+
+    it('rejects enabled tiered_execution with an incomplete table before writing', async () => {
+      const { writeFile } = await import('fs/promises');
+      vi.mocked(writeFile).mockClear();
+      const settings: ApiSettingsConfig = {
+        models: {
+          providers: {
+            anthropic: true,
+            openai: false,
+            google: false,
+            minimax: false,
+            zai: false,
+            kimi: false,
+            openrouter: false,
+            nous: false,
+            dashscope: false,
+          },
+          overrides: {},
+        },
+        api_keys: {},
+        tiered_execution: {
+          enabled: true,
+          tiers: {},
+          replay_threshold: 0.5,
+        },
+      };
+
+      await expect(Effect.runPromise(saveSettingsApi(settings))).rejects.toMatchObject({
+        message: "tiered_execution difficulty 'trivial' is not mapped to any tier",
+      });
+      expect(writeFile).not.toHaveBeenCalled();
+    });
   });
 
   describe('getDefaultConversationModelApi', () => {
-    it('returns a MiniMax model when only MiniMax is enabled', () => {
-      vi.mocked(loadConfigSync).mockReturnValueOnce({
-        config: {
-          preset: 'balanced',
-          enabledProviders: new Set(['minimax']),
-          apiKeys: { minimax: 'minimax-test-key' },
-          overrides: {},
-          geminiThinkingLevel: 3,
-          tmux: { configMode: 'managed' as const },
-          conversations: { compactionModel: 'claude-haiku-4-5' as any, manualCompactMode: 'claude-code' as const, richCompaction: false },
-          trackerKeys: {},
-          tts: makeTtsConfig(),
-        } as any,
-        migration: null,
-      });
-      const model = getDefaultConversationModelApi();
-      expect(model).toContain('minimax');
-    });
-
-    it('returns an OpenAI model when OpenAI is enabled (takes precedence over MiniMax)', () => {
+    it('returns the explicitly configured default conversation model', () => {
       vi.mocked(loadConfigSync).mockReturnValueOnce({
         config: {
           preset: 'balanced',
@@ -700,19 +842,20 @@ describe('settings-api', () => {
           trackerKeys: {},
           tts: makeTtsConfig(),
           openrouterFavorites: [],
+          defaultConversationModel: 'claude-haiku-4-5',
         } as any,
         migration: null,
       });
       const model = getDefaultConversationModelApi();
-      expect(model).toContain('gpt');
+      expect(model).toBe('claude-haiku-4-5');
     });
 
-    it('returns a Google model when only Google is enabled', () => {
+    it('returns undefined when no default conversation model is configured (PAN-2589: Settings must still render)', () => {
       vi.mocked(loadConfigSync).mockReturnValueOnce({
         config: {
           preset: 'balanced',
-          enabledProviders: new Set(['google']),
-          apiKeys: { google: 'google-test-key' },
+          enabledProviders: new Set(['openai', 'minimax', 'google']),
+          apiKeys: {},
           overrides: {},
           geminiThinkingLevel: 3,
           tmux: { configMode: 'managed' as const },
@@ -723,89 +866,7 @@ describe('settings-api', () => {
         } as any,
         migration: null,
       });
-      const model = getDefaultConversationModelApi();
-      expect(model).toContain('gemini');
-    });
-
-    it('returns a Kimi model when only Kimi is enabled', () => {
-      vi.mocked(loadConfigSync).mockReturnValueOnce({
-        config: {
-          preset: 'balanced',
-          enabledProviders: new Set(['kimi']),
-          apiKeys: { kimi: 'kimi-test-key' },
-          overrides: {},
-          geminiThinkingLevel: 3,
-          tmux: { configMode: 'managed' as const },
-          conversations: { compactionModel: 'claude-haiku-4-5' as any, manualCompactMode: 'claude-code' as const, richCompaction: false },
-          trackerKeys: {},
-          tts: makeTtsConfig(),
-          openrouterFavorites: [],
-        } as any,
-        migration: null,
-      });
-      const model = getDefaultConversationModelApi();
-      expect(model).toContain('kimi');
-    });
-
-    it('returns a ZAI model when only ZAI is enabled', () => {
-      vi.mocked(loadConfigSync).mockReturnValueOnce({
-        config: {
-          preset: 'balanced',
-          enabledProviders: new Set(['zai']),
-          apiKeys: { zai: 'zai-test-key' },
-          overrides: {},
-          geminiThinkingLevel: 3,
-          tmux: { configMode: 'managed' as const },
-          conversations: { compactionModel: 'claude-haiku-4-5' as any, manualCompactMode: 'claude-code' as const, richCompaction: false },
-          trackerKeys: {},
-          tts: makeTtsConfig(),
-          openrouterFavorites: [],
-        } as any,
-        migration: null,
-      });
-      const model = getDefaultConversationModelApi();
-      expect(model).toContain('glm');
-    });
-
-    it('returns a DashScope model when only DashScope is enabled', () => {
-      vi.mocked(loadConfigSync).mockReturnValueOnce({
-        config: {
-          preset: 'balanced',
-          enabledProviders: new Set(['dashscope']),
-          apiKeys: { dashscope: 'dashscope-test-key' },
-          overrides: {},
-          geminiThinkingLevel: 3,
-          tmux: { configMode: 'managed' as const },
-          conversations: { compactionModel: 'claude-haiku-4-5' as any, manualCompactMode: 'claude-code' as const, richCompaction: false },
-          trackerKeys: {},
-          tts: makeTtsConfig(),
-          openrouterFavorites: [],
-        } as any,
-        migration: null,
-      });
-      const model = getDefaultConversationModelApi();
-      expect(model).toBe('qwen3-coder-plus');
-    });
-
-    it('does not return claude-sonnet-4-6 when Anthropic is disabled and Google is enabled', () => {
-      vi.mocked(loadConfigSync).mockReturnValueOnce({
-        config: {
-          preset: 'balanced',
-          enabledProviders: new Set(['google']),
-          apiKeys: { google: 'google-test-key' },
-          overrides: {},
-          geminiThinkingLevel: 3,
-          tmux: { configMode: 'managed' as const },
-          conversations: { compactionModel: 'claude-haiku-4-5' as any, manualCompactMode: 'claude-code' as const, richCompaction: false },
-          trackerKeys: {},
-          tts: makeTtsConfig(),
-          openrouterFavorites: [],
-        } as any,
-        migration: null,
-      });
-      const model = getDefaultConversationModelApi();
-      expect(model).not.toContain('claude');
-      expect(model).not.toContain('sonnet');
+      expect(getDefaultConversationModelApi()).toBeUndefined();
     });
   });
 });
@@ -828,6 +889,7 @@ describe('OpenRouter favorites', () => {
     trackerKeys: {},
     tts: makeTtsConfig(),
     openrouterFavorites: [] as string[],
+    defaultConversationModel: 'claude-sonnet-4-6' as const,
   };
 
   describe('getOpenRouterFavorites', () => {
@@ -877,6 +939,113 @@ describe('OpenRouter favorites', () => {
       const [, writtenContent] = vi.mocked(writeFile).mock.calls.at(-1)!;
       // YAML dump of empty array produces "favorites: []\n" or similar
       expect(String(writtenContent)).toContain('favorites:');
+    });
+  });
+
+  describe('validateSettingsApi distribution model (PAN-1832)', () => {
+    const baseProviders: ApiSettingsConfig = {
+      models: {
+        providers: {
+          anthropic: true,
+          openai: false,
+          google: false,
+          minimax: false,
+          zai: false,
+          kimi: false,
+          mimo: false,
+          openrouter: false,
+          nous: false,
+          dashscope: false,
+        },
+        overrides: {},
+        gemini_thinking_level: 3,
+      },
+    };
+
+    it('accepts a valid distribution for a role model', () => {
+      const result = validateSettingsApi({
+        ...baseProviders,
+        roles: {
+          work: {
+            model: [
+              { model: 'claude-opus-4-8', weight: 70 },
+              { model: 'claude-sonnet-4-6', weight: 30 },
+            ],
+          },
+        },
+      } as ApiSettingsConfig);
+      expect(result.errors).toHaveLength(0);
+    });
+
+    it('rejects a distribution entry with weight 0', () => {
+      const result = validateSettingsApi({
+        ...baseProviders,
+        roles: {
+          work: {
+            model: [{ model: 'claude-opus-4-8', weight: 0 }],
+          },
+        },
+      } as ApiSettingsConfig);
+      expect(result.errors.some((e) => /weight must be a positive integer/.test(e))).toBe(true);
+    });
+
+    it('rejects a distribution entry with negative weight', () => {
+      const result = validateSettingsApi({
+        ...baseProviders,
+        roles: {
+          work: {
+            model: [{ model: 'claude-opus-4-8', weight: -1 }],
+          },
+        },
+      } as ApiSettingsConfig);
+      expect(result.errors.some((e) => /weight must be a positive integer/.test(e))).toBe(true);
+    });
+
+    it('rejects an empty distribution array', () => {
+      const result = validateSettingsApi({
+        ...baseProviders,
+        roles: {
+          work: {
+            model: [],
+          },
+        },
+      } as ApiSettingsConfig);
+      expect(result.errors.some((e) => /distribution must be a non-empty array/.test(e))).toBe(true);
+    });
+
+    it('rejects a distribution on a sub-role model', () => {
+      const result = validateSettingsApi({
+        ...baseProviders,
+        roles: {
+          work: {
+            model: 'claude-sonnet-4-6',
+            sub: {
+              inspect: {
+                model: [{ model: 'claude-haiku-4-5', weight: 1 }],
+              },
+            },
+          },
+        },
+      } as ApiSettingsConfig);
+      expect(result.errors.some((e) => /distribution not allowed here/.test(e))).toBe(true);
+    });
+
+    it('rejects a distribution on a workhorse slot', () => {
+      const result = validateSettingsApi({
+        ...baseProviders,
+        workhorses: {
+          mid: [{ model: 'claude-sonnet-4-6', weight: 1 }] as unknown as string,
+        },
+      } as ApiSettingsConfig);
+      expect(result.errors.some((e) => /distribution not allowed here/.test(e))).toBe(true);
+    });
+
+    it('scalar role model still validates correctly (back-compat)', () => {
+      const result = validateSettingsApi({
+        ...baseProviders,
+        roles: { work: { model: 'claude-sonnet-4-6' } },
+      } as ApiSettingsConfig);
+      expect(result.errors).toHaveLength(0);
     });
   });
 });

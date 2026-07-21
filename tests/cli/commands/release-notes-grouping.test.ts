@@ -1,0 +1,82 @@
+import { describe, it, expect } from 'vitest';
+import { groupCommitSubjects, buildReleaseNotesMarkdown, resolveReleaseManifestPaths } from '../../../src/cli/commands/release.js';
+
+describe('groupCommitSubjects', () => {
+  it('drops pipeline bookkeeping commits entirely', () => {
+    const out = groupCommitSubjects([
+      'chore(records): update PAN-1793 per-issue record',
+      'chore(state): batch update 3 pan/tasks file(s)',
+      'chore(tasks): sync tasks state on main',
+      'chore(state): update spec for PAN-1827 (status=completed)',
+      'docs: run-16 ticks 6-7 state',
+      'chore: reconcile local deacon record commits with origin',
+      'Merge branch main into feature',
+    ]);
+    expect(out).toBe('- No user-facing changes in the selected range.');
+  });
+
+  it('groups features, fixes, and performance, stripping conventional prefixes', () => {
+    const out = groupCommitSubjects([
+      'feat(dashboard): backlog pickup controls on issue cockpit',
+      'fix(dashboard): show conversation-list cost from the cost_events ledger',
+      'Fix Pi handoff prompt readiness',
+      'perf(test): move frontend vitest to happy-dom',
+    ]);
+    expect(out).toContain('### Features\n- Backlog pickup controls on issue cockpit');
+    expect(out).toContain('### Fixes');
+    expect(out).toContain('- Show conversation-list cost from the cost_events ledger');
+    expect(out).toContain('- Fix Pi handoff prompt readiness'); // non-conventional kept as-is
+    expect(out).toContain('### Performance\n- Move frontend vitest to happy-dom');
+  });
+
+  it('collapses non-highlight commits into a single internal-changes count', () => {
+    const out = groupCommitSubjects([
+      'fix(dashboard): a real fix',
+      'refactor(cli): reshuffle internals',
+      'test(paths): cover pi extension cwd resolution',
+      'docs: explain the thing',
+    ]);
+    expect(out).toContain('- A real fix');
+    expect(out).toContain('_Plus 3 internal changes (refactors, tests, tooling)._');
+  });
+
+  it('uses singular phrasing for exactly one internal change', () => {
+    const out = groupCommitSubjects(['refactor(cli): one internal thing']);
+    expect(out).toBe('_Plus 1 internal change (refactors, tests, tooling)._');
+  });
+
+  it('de-duplicates identical subjects (e.g. cherry-picks)', () => {
+    const out = groupCommitSubjects([
+      'fix(dashboard): route pi transcripts for strike sessions',
+      'fix(dashboard): route pi transcripts for strike sessions',
+    ]);
+    expect(out.match(/Route pi transcripts/g)).toHaveLength(1);
+  });
+});
+
+describe('buildReleaseNotesMarkdown install command', () => {
+  it('pins the package.json name and the exact version (not "latest", not hardcoded)', () => {
+    const md = buildReleaseNotesMarkdown({
+      channel: 'stable',
+      version: '1.2.3',
+      from: 'v1.2.2',
+      to: 'v1.2.3',
+      entries: ['fix: a thing'],
+      packageName: '@panctl/cli',
+    });
+    // The package name is taken verbatim from the caller (sourced from package.json) and the
+    // version is pinned, so a release's notes install THAT release under THAT package — even
+    // across the project's historical renames (panopticon-cli -> @panctl/cli -> @overdeck/core).
+    expect(md).toContain('npm install -g @panctl/cli@1.2.3');
+  });
+});
+
+describe('resolveReleaseManifestPaths', () => {
+  it('targets the checkout being released rather than the installed CLI package', () => {
+    expect(resolveReleaseManifestPaths('/tmp/release-checkout')).toEqual({
+      core: '/tmp/release-checkout/package.json',
+      desktop: '/tmp/release-checkout/apps/desktop/package.json',
+      contracts: '/tmp/release-checkout/packages/contracts/package.json',
+    });
+  });
+});

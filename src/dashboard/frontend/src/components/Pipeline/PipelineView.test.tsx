@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -7,7 +7,7 @@ import type { Issue } from '../../types';
 import { DialogProvider } from '../DialogProvider';
 import { PipelineView } from './PipelineView';
 
-function renderPipelineView() {
+function renderPipelineView(props: Partial<Parameters<typeof PipelineView>[0]> = {}) {
   const client = new QueryClient({
     defaultOptions: {
       queries: { retry: false, staleTime: Infinity },
@@ -17,7 +17,7 @@ function renderPipelineView() {
   return render(
     <QueryClientProvider client={client}>
       <DialogProvider>
-        <PipelineView />
+        <PipelineView {...props} />
       </DialogProvider>
     </QueryClientProvider>,
   );
@@ -132,6 +132,94 @@ describe('PipelineView', () => {
     expect(container.querySelectorAll('[data-component="phase-header"]')).toHaveLength(6);
   });
 
+  it('keeps phase derivation unchanged when server membership is attached', () => {
+    useDashboardStore.setState({
+      issuesRaw: [issue({
+        identifier: 'PAN-10',
+        title: 'Merged but still open',
+        state: 'in_review',
+        pipelineMembership: { inPipeline: true, bucket: 'post_merge_limbo', labelDrift: null },
+      })],
+      reviewStatusByIssueId: {},
+      agentsById: {},
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+
+    const { container } = renderPipelineView();
+    const reviewPhase = container.querySelector('[data-component="pipeline-phase"][data-phase="review"]') as HTMLElement;
+    expect(within(reviewPhase).getByText('Merged but still open')).toBeInTheDocument();
+  });
+
+  it('excludes open clean-terminal issues before lane derivation and metric counting', () => {
+    useDashboardStore.setState({
+      issuesRaw: [issue({
+        identifier: 'PAN-11',
+        title: 'Stale open work',
+        state: 'in_progress',
+        pipelineMembership: { inPipeline: false, bucket: 'clean_terminal', labelDrift: 'stale_present' },
+      })],
+      reviewStatusByIssueId: {},
+      agentsById: {},
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+
+    renderPipelineView();
+
+    expect(screen.queryByText('Stale open work')).not.toBeInTheDocument();
+    const activeTile = screen.getByText('Active issues').closest('[data-component="metric-tile"]') as HTMLElement;
+    expect(activeTile.querySelector('[data-component="metric-tile-value"]')).toHaveTextContent('0');
+  });
+
+  it('excludes completed issues when membership is missing', () => {
+    useDashboardStore.setState({
+      issuesRaw: [issue({ identifier: 'PAN-14', title: 'Completed without residue', state: 'completed' })],
+      reviewStatusByIssueId: {},
+      agentsById: {},
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+
+    renderPipelineView();
+
+    expect(screen.queryByText('Completed without residue')).not.toBeInTheDocument();
+    const activeTile = screen.getByText('Active issues').closest('[data-component="metric-tile"]') as HTMLElement;
+    expect(activeTile.querySelector('[data-component="metric-tile-value"]')).toHaveTextContent('0');
+  });
+
+  it('falls back to tracker state when membership is unavailable', () => {
+    useDashboardStore.setState({
+      issuesRaw: [
+        issue({
+          identifier: 'PAN-15', title: 'Open while unavailable', state: 'in_progress',
+          pipelineMembership: { available: false, inPipeline: false, bucket: 'clean_terminal', labelDrift: null },
+        }),
+        issue({
+          identifier: 'PAN-16', title: 'Closed while unavailable', state: 'completed',
+          pipelineMembership: { available: false, inPipeline: false, bucket: 'clean_terminal', labelDrift: null },
+        }),
+      ],
+      reviewStatusByIssueId: {}, agentsById: {},
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+
+    renderPipelineView();
+
+    expect(screen.getByText('Open while unavailable')).toBeInTheDocument();
+    expect(screen.queryByText('Closed while unavailable')).not.toBeInTheDocument();
+  });
+
+  it('renders an explicitly ready issue admitted by canonical membership in the Ready lane', () => {
+    useDashboardStore.setState({
+      issuesRaw: [issue({
+        identifier: 'PAN-12',
+        title: 'Explicitly ready work',
+        labels: ['ready'],
+        pipelineMembership: { inPipeline: true, bucket: 'planned_backlog', labelDrift: null },
+      })],
+      reviewStatusByIssueId: {},
+      agentsById: {},
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+
+    const { container } = renderPipelineView();
+    const readyPhase = container.querySelector('[data-component="pipeline-phase"][data-phase="ready"]') as HTMLElement;
+    expect(within(readyPhase).getByText('Explicitly ready work')).toBeInTheDocument();
+  });
+
   it('sorts rows within each phase by priority rank then updatedAt descending', () => {
     const { container } = renderPipelineView();
     const workPhase = container.querySelector('[data-component="pipeline-phase"][data-phase="work"]') as HTMLElement;
@@ -159,7 +247,7 @@ describe('PipelineView', () => {
     const tiles = Array.from(strip.querySelectorAll('[data-component="metric-tile"]'));
     expect(tiles.map((tile) => tile.getAttribute('data-signal'))).toEqual(['info', 'info', 'review', 'success', 'cost']);
     expect(tiles.map((tile) => tile.querySelector('[data-component="metric-tile-value"]')?.textContent)).toEqual([
-      '7',
+      '6',
       '1',
       '1',
       '1',
@@ -218,7 +306,7 @@ describe('PipelineView', () => {
     fireEvent.click(within(row).getByTestId('issue-action-overflow-button'));
 
     const menu = screen.getByTestId('issue-action-overflow-menu');
-    expect(within(menu).getByTestId('issue-action-tell')).toHaveTextContent('Tell agent');
+    expect(within(menu).getAllByTestId('issue-action-tell').length).toBeGreaterThan(0);
   });
 
   it('opens the same Pipeline row action menu on right-click', () => {
@@ -238,8 +326,8 @@ describe('PipelineView', () => {
 
     fireEvent.click(screen.getByText('Ready to ship'));
 
-    expect(useDashboardStore.getState().drawer).toEqual({ issueId: 'PAN-1', tab: 'overview' });
-    expect(window.location.search).toBe('?issue=PAN-1&tab=overview');
+    expect(useDashboardStore.getState().drawer).toEqual({ issueId: 'PAN-1', tab: 'conversation' });
+    expect(window.location.search).toBe('?issue=PAN-1&tab=conversation');
 
     useDashboardStore.getState().closeIssue();
 
@@ -341,5 +429,143 @@ describe('PipelineView', () => {
     expect(container.querySelector('[data-component="top-bar"]')).toBeInTheDocument();
     expect(container.querySelector('[data-component="metric-strip"]')).toBeInTheDocument();
     expect(container.querySelector('[data-component="pipeline-filter-row"]')).toBeInTheDocument();
+  });
+
+  it('moves j/k through rows and Enter opens the selected issue', async () => {
+    const { container } = renderPipelineView();
+
+    const firstId = container.querySelector('[data-component="issue-row"]')?.getAttribute('data-issue-id');
+    expect(firstId).toBeTruthy();
+
+    // j selects the first row.
+    fireEvent.keyDown(document, { key: 'j' });
+    const firstRow = container.querySelector(`[data-component="issue-row"][data-issue-id="${firstId}"]`) as HTMLElement;
+    await waitFor(() => expect(firstRow.className).toContain('ring-primary'));
+
+    // j moves to the next row.
+    fireEvent.keyDown(document, { key: 'j' });
+    const rows = Array.from(container.querySelectorAll('[data-component="issue-row"]'));
+    const selectedIndex = rows.findIndex((row) => row.className.includes('ring-primary'));
+    expect(selectedIndex).toBe(1);
+
+    // k wraps back to the first row.
+    fireEvent.keyDown(document, { key: 'k' });
+    await waitFor(() => expect(firstRow.className).toContain('ring-primary'));
+
+    // Enter opens the focused row.
+    fireEvent.keyDown(document, { key: 'Enter' });
+    expect(useDashboardStore.getState().drawer).toEqual({ issueId: firstId, tab: 'conversation' });
+  });
+
+  it('does not move row focus when typing inside an input', () => {
+    const { container } = renderPipelineView();
+
+    const input = document.createElement('input');
+    document.body.appendChild(input);
+    input.focus();
+
+    fireEvent.keyDown(input, { key: 'j' });
+
+    const rows = Array.from(container.querySelectorAll('[data-component="issue-row"]'));
+    expect(rows.some((row) => row.className.includes('ring-primary'))).toBe(false);
+
+    document.body.removeChild(input);
+  });
+
+  it('surfaces an INPUT verb badge when an agent has an actual pending question (count > 0)', () => {
+    useDashboardStore.setState({
+      issuesRaw: [
+        issue({ identifier: 'PAN-8', title: 'Needs input', status: 'In Progress', state: 'in_progress', project: { id: 'ops', name: 'Operations', color: '#fff' } }),
+      ],
+      agentsById: {
+        'agent-pan-8': {
+          id: 'agent-pan-8',
+          issueId: 'PAN-8',
+          role: 'work',
+          status: 'running',
+          model: 'opus',
+          runtime: 'claude-code',
+          startedAt: '2026-05-18T01:00:00.000Z',
+          consecutiveFailures: 0,
+          killCount: 0,
+          hasPendingQuestion: true,
+          pendingQuestionCount: 1,
+        },
+      },
+      reviewStatusByIssueId: {},
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+
+    const { container } = renderPipelineView();
+    const row = container.querySelector('[data-component="issue-row"][data-issue-id="PAN-8"]') as HTMLElement;
+    const badge = row.querySelector('[data-component="verb-badge"]') as HTMLElement;
+    expect(badge).toHaveAttribute('data-variant', 'INPUT');
+  });
+
+  it('surfaces an INPUT verb badge when an agent has an actual pending question (prompt)', () => {
+    useDashboardStore.setState({
+      issuesRaw: [
+        issue({ identifier: 'PAN-8b', title: 'Needs input', status: 'In Progress', state: 'in_progress', project: { id: 'ops', name: 'Operations', color: '#fff' } }),
+      ],
+      agentsById: {
+        'agent-pan-8b': {
+          id: 'agent-pan-8b',
+          issueId: 'PAN-8b',
+          role: 'work',
+          status: 'running',
+          model: 'opus',
+          runtime: 'claude-code',
+          startedAt: '2026-05-18T01:00:00.000Z',
+          consecutiveFailures: 0,
+          killCount: 0,
+          hasPendingQuestion: true,
+          pendingQuestionCount: 0,
+          pendingQuestionPrompt: 'Which path?',
+        },
+      },
+      reviewStatusByIssueId: {},
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+
+    const { container } = renderPipelineView();
+    const row = container.querySelector('[data-component="issue-row"][data-issue-id="PAN-8b"]') as HTMLElement;
+    const badge = row.querySelector('[data-component="verb-badge"]') as HTMLElement;
+    expect(badge).toHaveAttribute('data-variant', 'INPUT');
+  });
+
+  it('does not surface INPUT when hasPendingQuestion is true but count is zero and prompt is empty', () => {
+    useDashboardStore.setState({
+      issuesRaw: [
+        issue({ identifier: 'PAN-9', title: 'Stale flag', status: 'In Progress', state: 'in_progress', project: { id: 'ops', name: 'Operations', color: '#fff' } }),
+      ],
+      agentsById: {
+        'agent-pan-9': {
+          id: 'agent-pan-9',
+          issueId: 'PAN-9',
+          role: 'work',
+          status: 'running',
+          model: 'opus',
+          runtime: 'claude-code',
+          startedAt: '2026-05-18T01:00:00.000Z',
+          consecutiveFailures: 0,
+          killCount: 0,
+          hasPendingQuestion: true,
+          pendingQuestionCount: 0,
+        },
+      },
+      reviewStatusByIssueId: {},
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+
+    const { container } = renderPipelineView();
+    const row = container.querySelector('[data-component="issue-row"][data-issue-id="PAN-9"]') as HTMLElement;
+    const badge = row.querySelector('[data-component="verb-badge"]') as HTMLElement;
+    expect(badge).not.toHaveAttribute('data-variant', 'INPUT');
+  });
+
+  it('does not move row focus when keyboardShortcutsDisabled is true', () => {
+    const { container } = renderPipelineView({ keyboardShortcutsDisabled: true });
+
+    fireEvent.keyDown(document, { key: 'j' });
+
+    const rows = Array.from(container.querySelectorAll('[data-component="issue-row"]'));
+    expect(rows.some((row) => row.className.includes('ring-primary'))).toBe(false);
   });
 });

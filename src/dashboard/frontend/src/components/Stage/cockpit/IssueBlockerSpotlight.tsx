@@ -34,6 +34,7 @@ export function IssueBlockerSpotlight({ issueId }: { issueId: string }) {
 
   return (
     <div
+      data-section="IssueBlockerSpotlight"
       className={`mt-3.5 flex items-start gap-3 rounded-[14px] border px-3.5 py-3 ${
         blocked
           ? 'badge-border-destructive badge-bg-destructive'

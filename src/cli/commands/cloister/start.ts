@@ -5,17 +5,16 @@
  */
 
 import chalk from 'chalk';
-import { getCloisterService } from '../../../lib/cloister/service.js';
+import { cloisterApi } from './api.js';
 
 export async function startCommand(): Promise<void> {
-  const service = getCloisterService();
-
-  if (service.isRunning()) {
+  const status = await cloisterApi<{ running: boolean }>('/api/cloister/status');
+  if (status.running) {
     console.log(chalk.yellow('⚠️  Cloister is already running'));
     return;
   }
 
-  await service.start();
+  await cloisterApi('/api/cloister/start', { method: 'POST' });
   console.log(chalk.green('✓ Cloister started'));
   console.log(chalk.dim('  Monitoring all running agents...'));
 }

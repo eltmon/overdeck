@@ -115,10 +115,17 @@ describe('ChatMarkdown file links', () => {
   });
 
   it('keeps Streamdown-rendered external links safe and blocks scriptable hrefs', async () => {
+    // Preload streamdown so the React.lazy StreamdownRenderer resolves
+    // synchronously and we actually exercise the streamdown path.
+    await import('streamdown');
+
     const { rerender } = renderMarkdown(<ChatMarkdown text="Visit [site](https://example.com)." cwd="/tmp/project" />, true);
 
-    const external = await screen.findByRole('link', { name: 'site' });
-    await waitFor(() => expect(external).toHaveAttribute('href', 'https://example.com/'));
+    await screen.findByRole('link', { name: 'site' });
+    await waitFor(() => {
+      expect(screen.getByRole('link', { name: 'site' })).toHaveAttribute('href', 'https://example.com/');
+    });
+    const external = screen.getByRole('link', { name: 'site' });
     expect(external).toHaveAttribute('target', '_blank');
     expect(external).toHaveAttribute('rel', 'noopener noreferrer');
 

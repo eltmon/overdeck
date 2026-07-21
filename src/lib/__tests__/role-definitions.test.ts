@@ -31,17 +31,17 @@ describe('role definitions', () => {
     expect(frontmatter.model).toBeUndefined();
     expect(frontmatter.description).toEqual(expect.any(String));
     expect(body).toContain('Read the issue and the PRD draft');
-    expect(body).toContain('.pan/drafts/');
+    expect(body).toContain('drafts/<ISSUE-ID>.md` on `overdeck-state`');
     expect(body).toContain('AskUserQuestion');
-    expect(body).toContain('vBRIEF plan');
-    expect(body).toContain('Beads');
+    expect(body).toContain('xBRIEF plan');
+    expect(body).toContain('task checklist');
     expect(body).toContain('pan plan finalize');
     expect(body).not.toContain('pan plan finalize <ISSUE-ID>');
     expect(body).toContain('Stop after `pan plan finalize` returns');
     // Status-as-field model — files do not move between directories
     expect(body).toContain('Files never move between directories');
-    // Output instructions must point at the canonical .pan/specs/ path, not legacy directories
-    expect(body).toMatch(/Promote.*\.pan\/specs\/|\.pan\/specs\/.*proposed/i);
+    // Output instructions must point at the canonical overdeck-state specs path.
+    expect(body).toMatch(/specs\/.*overdeck-state|overdeck-state.*specs\//i);
   });
 
   it('defines the work role with Jidoka inspection gates and no phase labels', () => {
@@ -53,11 +53,11 @@ describe('role definitions', () => {
       effort: 'high',
     });
     expect(frontmatter.model).toBeUndefined();
-    expect(body).toContain('## Per-Bead Workflow');
+    expect(body).toContain('## Per-Task Workflow');
     expect(body).toContain('metadata.requiresInspection === true');
     expect(body).toContain('inspectionDepth: "deep"');
-    expect(body).toContain('pan inspect <ISSUE-ID> --bead <bead-id>');
-    expect(body).toContain('pan inspect --deep');
+    expect(body).toContain('pan inspect <ISSUE-ID> --item <item-id>');
+    expect(body).toContain('--deep');
     expect(body).toContain("resolveModel('work', 'inspect')");
     expect(body).toContain("resolveModel('work', 'inspect-deep')");
     expect(body).toContain('one undifferentiated mode');
@@ -77,10 +77,21 @@ describe('role definitions', () => {
       };
       const bashMatcher = hooks.PreToolUse.find((entry) => entry.matcher === 'Bash');
 
-      expect(bashMatcher?.hooks.map((hook) => hook.command)).toEqual([
-        '$HOME/.overdeck/bin/gh-issue-trailer-hook',
-        '$HOME/.overdeck/bin/rtk-bash-filter',
-      ]);
+      // PAN-1084: work agents get an extra guard that blocks tmux send-keys to
+      // other agents' sessions; it must run before the Bash rewriter/filter.
+      const expected =
+        role === 'work'
+          ? [
+              '$HOME/.overdeck/bin/tmux-send-keys-guard',
+              '$HOME/.overdeck/bin/gh-issue-trailer-hook',
+              '$HOME/.overdeck/bin/rtk-bash-filter',
+            ]
+          : [
+              '$HOME/.overdeck/bin/gh-issue-trailer-hook',
+              '$HOME/.overdeck/bin/rtk-bash-filter',
+            ];
+
+      expect(bashMatcher?.hooks.map((hook) => hook.command)).toEqual(expected);
     },
   );
 
@@ -91,7 +102,7 @@ describe('role definitions', () => {
     expect(body).toContain('INSPECTION PASSED');
     expect(body).toContain('INSPECTION BLOCKED');
     expect(body).toContain('{{issueId}}');
-    expect(body).toContain('{{beadId}}');
+    expect(body).toContain('{{itemId}}');
 
     const dispatcher = readRepoFile('src/lib/cloister/inspect-agent.ts');
     expect(dispatcher).toContain("baseCommand: 'claude'");
@@ -135,10 +146,36 @@ describe('role definitions', () => {
     expect(body).toContain('There is no separate UAT role');
     expect(body).toContain('Playwright MCP tools');
     expect(body).toContain('isolated browser instance per session');
-    expect(body).toContain(".pan/continue.json");
-    expect(body).toContain('vBRIEF acceptance criteria');
+    expect(body).toContain('.overdeck/continue.json');
+    expect(body).toContain('xBRIEF acceptance criteria');
     expect(body).toContain('TESTS PASSED');
     expect(body).toContain('TESTS FAILED');
+  });
+
+  it('prohibits work, review, and test roles from controlling host dashboard processes', () => {
+    for (const role of ['work', 'review', 'test']) {
+      const { body } = splitFrontmatter(readRepoFile(`roles/${role}.md`));
+      expect(body).toContain('Never start, stop, kill, or restart the host-level Overdeck dashboard');
+      expect(body).toContain('https://api-feature-<issue>.overdeck.localhost');
+    }
+  });
+
+  it('defines the knowledge role as OKF maintenance with no merge or pan done authority', () => {
+    const { frontmatter, body } = splitFrontmatter(readRepoFile('roles/knowledge.md'));
+
+    expect(frontmatter).toMatchObject({
+      name: 'knowledge',
+      permissionMode: 'default',
+      effort: 'high',
+    });
+    expect(frontmatter.model).toBeUndefined();
+    expect(body).toContain('/okf study');
+    expect(body).toContain('/okf retro');
+    expect(body).toContain('/okf sync');
+    expect(body).toContain('Open PRs to the knowledge repository only');
+    expect(body).toContain('Never run `pan done`');
+    expect(body).toContain('Never merge code or knowledge PRs yourself');
+    expect(body).toContain('Cite concept IDs');
   });
 
   // PAN-1531: ship role removed. Rebase is performed server-side by

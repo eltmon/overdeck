@@ -1,0 +1,142 @@
+---
+title: "Introducing the Standing Crew: frontier quality, a fraction of the price"
+description: "Overdeck's tiered execution puts a persistent crew of AI models on your pipeline — cheap tiers write the bulk of the code while a frontier model supervises every line. Off by default, on with one config block."
+---
+
+{/* DRAFT — not yet in navigation. To publish: add "blog/standing-crew" to a
+    Blog tab/group in docs.json. Facts sourced from the verified research annex
+    at eltmon-video/explore/standing-crew-launch/research-annex.md.
+    Before publishing: (1) v0.43.x must be released, (2) resolve the
+    [VERIFY-PRICE] marker below, (3) confirm the feature brand name. */}
+
+The most capable AI models can now write production code. They can also read a
+bill of materials, review a junior's diff, and tell you precisely why a change
+is wrong. The problem is that today, most teams buy all of that at one price:
+every token — the brilliant insight and the boilerplate import statement — bills
+at frontier rates.
+
+No engineering organization staffs itself that way. You don't put your most
+senior engineer on every ticket. You staff a team, and you bring the senior in
+at exactly the moments that deserve them: the design call, the risky diff, the
+"something feels off here" review.
+
+Starting in v0.43, Overdeck staffs your AI pipeline the same way. We call it
+the **Standing Crew**.
+
+## What it does
+
+Every task in an Overdeck plan carries a difficulty — `trivial`, `simple`,
+`medium`, `complex`, `expert`. You declare a **tier table**: which model owns
+which difficulty.
+
+```yaml
+tiered_execution:
+  enabled: true
+  tiers:
+    cheap:
+      model: claude-haiku-4-5
+      harness: claude-code
+      difficulties: [trivial, simple]
+    standard:
+      model: claude-sonnet-4-6
+      harness: claude-code
+      difficulties: [medium]
+    frontier:
+      model: claude-opus-4-8
+      harness: claude-code
+      difficulties: [complex, expert]
+```
+
+From there, four mechanisms do the work:
+
+**Standing tier agents.** Each tier gets a long-lived agent session that
+persists across all of its tasks for an issue — not a fresh spawn per task. A
+foreman process owns dispatch: it claims each task, briefs the right tier, runs
+verification, and closes the task out. Tier agents do one thing: implement.
+
+**Everyone listens to the commit stream.** Here's the part that makes it a
+crew rather than a queue: every commit any agent lands is broadcast to every
+standing agent — the rendered diff, delivered read-only. Agents ingest and
+don't respond, so staying informed costs almost nothing. When the cheap tier
+picks up its next task, it already knows what the rest of the crew just built.
+
+**A frontier supervisor that never writes code.** One review-only frontier
+model stands over the stream. You choose its attention policy: review every
+commit, review flagged ones, or review a deterministic sample. When it blocks
+a commit, downstream work on that lane halts until the problem is fixed. Your
+best model spends its (expensive) tokens on judgment, not generation.
+
+**An escalation ladder.** When a cheap tier struggles — a failed verification,
+a supervisor block, a task that's floundering past its time budget — the task
+retries, then promotes exactly one rung up the ladder. Trivial work never
+silently ships broken, and hard work automatically finds the model that can do
+it.
+
+The result is the property we built this for: **the bulk of output tokens —
+the expensive ones — are written by the cheap tiers, while frontier-model
+judgment covers every line.** [VERIFY-PRICE: at current published pricing,
+cheap-tier output tokens cost a small fraction of frontier output tokens —
+insert the exact ratio here.]
+
+## Where this sits in the landscape
+
+The industry has converged on two patterns for using multiple models, and both
+are per-request:
+
+- **Ensembles** — mixture-of-agents systems ask several models the same
+  question in parallel and merge the answers. Quality goes up; so does cost,
+  on every single prompt, easy or hard.
+- **Per-request dispatchers** — a classifier picks one model for each prompt
+  in milliseconds, then forgets you. Cost goes down; nothing watches the work
+  after the choice is made.
+
+Both are clever. Both are stateless. Neither has any concept of a *project* —
+a stream of commits, a pipeline with review gates, work that spans days.
+
+The Standing Crew is a third step: **don't ensemble the answer, don't route
+the request — staff the pipeline.** A persistent, ranked crew attached to the
+work itself, with a supervisor and an escalation path. And unlike invisible
+per-request model selection — which one major consumer product famously walked
+back after users rejected it — tiering is structural and legible: the cost
+page shows you which tier wrote what, what the supervisor said, and why
+something escalated, model by model, token by token.
+
+## Beyond the loop, too
+
+There's a second convergence worth naming. Everyone now agrees an agent is
+"tools in a loop to achieve a goal," and every vendor is stretching how long
+the loop can run. But a loop is still one process doing one task. Overdeck's
+Flywheel already runs the layer above: the whole issue pipeline — plan, work,
+review, test, merge — self-pacing across days, with verification gates between
+every stage. The Standing Crew is what happens when that pipeline gets a
+properly ranked workforce: **the pipeline is the agent, and now it's staffed.**
+
+## The receipts
+
+We built this because we needed it. Overdeck meters every API call it makes —
+model, tokens, stage, dollars — and our own public spend report covers
+**734,000+ tracked calls** across four providers. That same metering is how
+you'll see the Standing Crew's effect on your own bill: the Costs page breaks
+every issue down per model and per stage, so "the cheap tiers wrote most of
+the tokens" is not a marketing claim on your dashboard — it's a query.
+
+## Off by default, on in one block
+
+Tiered execution ships **disabled**. Nothing about your existing setup changes
+until you add the `tiered_execution` block and flip `enabled: true` — and you
+can override it per issue. Validation is deliberately strict: every difficulty
+must map to exactly one tier, unknown models and harnesses are rejected at
+load, and there is no silent fallback anywhere in the resolution chain. If the
+configuration is ambiguous, it fails loudly before an agent ever spawns.
+
+Configure it in **Settings → Tiered Execution**: edit the tier table, set the
+supervisor and escalation policy, and preview the resolved effective state
+before anything runs.
+
+---
+
+The Standing Crew ships in v0.43. Overdeck is open source:
+[github.com/eltmon/overdeck](https://github.com/eltmon/overdeck).
+
+*If you run an engineering organization: this changes the cost curve of
+shipping software with AI. If you build: clone it tonight.*

@@ -19,17 +19,17 @@ import { join } from 'path';
 import { mapGitHubStateToCanonical } from '../../../core/state-mapping.js';
 import { CacheService, DEFAULT_TTLS, parseIntegerHeader } from './cache-service.js';
 import { getGitHubConfig, getLinearApiKey, getRallyConfig, validateRallyConfig } from './tracker-config.js';
-import type { GitHubConfig, RallyConfig } from './tracker-config.js';
 import { loadReviewStatusesForIssues, type ReviewStatus } from '../../../lib/review-status.js';
 import { resolveProjectFromIssueSync } from '../../../lib/projects.js';
-import { findPlan, readWorkspacePlan } from '../../../lib/vbrief/io.js';
-import type { VBriefDocument } from '../../../lib/vbrief/types.js';
+import { findPlan, readWorkspacePlan } from '../../../lib/xbrief/io.js';
+import type { XBriefDocument } from '../../../lib/xbrief/types.js';
+import { loadConfigSync } from '../../../lib/config-yaml.js';
 
 /**
- * Compute bead progress counts from a cached plan document.
+ * Compute task progress counts from a cached plan document.
  * Exported for testing.
  */
-export function computeBeadCounts(doc: VBriefDocument | null): { completed: number; total: number } | null {
+export function computeTaskCounts(doc: XBriefDocument | null): { completed: number; total: number } | null {
   const items = doc?.plan?.items ?? [];
   if (items.length === 0) return null;
   return { completed: items.filter((i) => i.status === 'completed').length, total: items.length };
@@ -80,6 +80,11 @@ export function getCanonicalStatus(status: string | undefined, stateType?: strin
   return 'backlog'; // Default fallback
 }
 
+export function shouldRefreshPlanningStateForIssue(issue: any): boolean {
+  const canonical = getCanonicalStatus(issue?.status, issue?.stateType);
+  return canonical !== 'done' && canonical !== 'canceled';
+}
+
 // Poll intervals (ms)
 const POLL_INTERVALS = {
   github:  { default: 30_000, min: 15_000, max: 300_000 },
@@ -96,6 +101,11 @@ interface TrackerState {
   lastFetchedIssues: any[];
   lastError: string | null;
   lastFetchedAt: string | null;
+}
+
+interface GetIssuesCacheEntry {
+  issues: any[];
+  json: string | null;
 }
 
 /**
@@ -136,7 +146,7 @@ function mapRallyStateToCanonical(issueState: string): string {
 /**
  * Compute planning-state for an issue via cheap filesystem checks.
  *
- * `isPlanningComplete()` reads and JSON-parses the workspace's plan.vbrief.json
+ * `isPlanningComplete()` resolves and parses the workspace's xBRIEF plan
  * file. Calling it for every issue on every getSnapshot — which happens once
  * per WS-RPC bootstrap and then every emitted snapshot — would do 870+ sync
  * disk reads per call and starve the dashboard event loop until WS clients
@@ -146,10 +156,10 @@ function mapRallyStateToCanonical(issueState: string): string {
 interface PlanningStateCacheEntry {
   result: {
     hasPlan: boolean;
-    hasBeads: boolean;
+    hasTasks: boolean;
     planningComplete: boolean;
     workspacePath: string;
-    beadCounts: { completed: number; total: number } | null;
+    taskCounts: { completed: number; total: number } | null;
   };
   planMtimeMs: number; // -1 when no plan file existed at compute time
   continueMtimeMs: number; // -1 when no continue.json existed at compute time
@@ -159,26 +169,27 @@ const planningStateCache = new Map<string, PlanningStateCacheEntry>();
 const planningStateRefreshInFlight = new Set<string>();
 const PLANNING_REFRESH_CONCURRENCY = 4;
 const PLANNING_FINISHED_STATUSES = new Set(['proposed', 'approved', 'pending', 'running', 'completed', 'blocked']);
+const DAY_MS = 86_400_000;
 
 function getCachedPlanningState(identifier: string): {
   hasPlan: boolean;
-  hasBeads: boolean;
+  hasTasks: boolean;
   planningComplete: boolean;
   workspacePath: string;
-  beadCounts: { completed: number; total: number } | null;
+  taskCounts: { completed: number; total: number } | null;
 } {
   try {
     const resolved = resolveProjectFromIssueSync(identifier);
     const projectPath = resolved?.projectPath ?? '';
     if (!projectPath) {
-      return { hasPlan: false, hasBeads: false, planningComplete: false, workspacePath: '', beadCounts: null };
+      return { hasPlan: false, hasTasks: false, planningComplete: false, workspacePath: '', taskCounts: null };
     }
     const issueLower = identifier.toLowerCase();
     const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
     return planningStateCache.get(identifier)?.result
-      ?? { hasPlan: false, hasBeads: false, planningComplete: false, workspacePath, beadCounts: null };
+      ?? { hasPlan: false, hasTasks: false, planningComplete: false, workspacePath, taskCounts: null };
   } catch {
-    return { hasPlan: false, hasBeads: false, planningComplete: false, workspacePath: '', beadCounts: null };
+    return { hasPlan: false, hasTasks: false, planningComplete: false, workspacePath: '', taskCounts: null };
   }
 }
 
@@ -189,7 +200,7 @@ async function refreshPlanningState(identifier: string): Promise<boolean> {
     const resolved = resolveProjectFromIssueSync(identifier);
     const projectPath = resolved?.projectPath ?? '';
     if (!projectPath) return updatePlanningStateCache(identifier, {
-      result: { hasPlan: false, hasBeads: false, planningComplete: false, workspacePath: '', beadCounts: null },
+      result: { hasPlan: false, hasTasks: false, planningComplete: false, workspacePath: '', taskCounts: null },
       planMtimeMs: -1,
       continueMtimeMs: -1,
     });
@@ -198,7 +209,7 @@ async function refreshPlanningState(identifier: string): Promise<boolean> {
     const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
     if (!existsSync(workspacePath)) {
       return updatePlanningStateCache(identifier, {
-        result: { hasPlan: false, hasBeads: false, planningComplete: false, workspacePath, beadCounts: null },
+        result: { hasPlan: false, hasTasks: false, planningComplete: false, workspacePath, taskCounts: null },
         planMtimeMs: -1,
         continueMtimeMs: -1,
       });
@@ -229,15 +240,15 @@ async function refreshPlanningState(identifier: string): Promise<boolean> {
 
     const doc = planPath ? await Effect.runPromise(readWorkspacePlan(workspacePath)) : null;
     const planningComplete = doc?.plan?.status ? PLANNING_FINISHED_STATUSES.has(doc.plan.status) : false;
-    const beadCounts = computeBeadCounts(doc);
+    const taskCounts = computeTaskCounts(doc);
     return updatePlanningStateCache(identifier, {
-      result: { hasPlan: planPath !== null, hasBeads: planningComplete, planningComplete, workspacePath, beadCounts },
+      result: { hasPlan: planPath !== null, hasTasks: planningComplete, planningComplete, workspacePath, taskCounts },
       planMtimeMs,
       continueMtimeMs,
     });
   } catch {
     return updatePlanningStateCache(identifier, {
-      result: { hasPlan: false, hasBeads: false, planningComplete: false, workspacePath: '', beadCounts: null },
+      result: { hasPlan: false, hasTasks: false, planningComplete: false, workspacePath: '', taskCounts: null },
       planMtimeMs: -1,
       continueMtimeMs: -1,
     });
@@ -258,6 +269,7 @@ function updatePlanningStateCache(identifier: string, entry: PlanningStateCacheE
 
 export class IssueDataService {
   private cache: CacheService;
+  private loadConfig: typeof loadConfigSync;
   private trackers: Record<string, TrackerState> = {};
   private linearLastFullRefresh = 0;
   private started = false;
@@ -273,14 +285,16 @@ export class IssueDataService {
   private planningRefreshActive = 0;
   private reviewStatusRefreshQueued = false;
   private reviewStatusRefreshIssueIds = new Set<string>();
+  private getIssuesCache = new Map<string, GetIssuesCacheEntry>();
 
   /** Register a callback invoked whenever issue data changes (PAN-433). */
   onIssuesChanged(fn: (issues: unknown[]) => void): void {
     this._onIssuesChanged = fn;
   }
 
-  constructor(cache: CacheService) {
+  constructor(cache: CacheService, options?: { loadConfig?: typeof loadConfigSync }) {
     this.cache = cache;
+    this.loadConfig = options?.loadConfig ?? loadConfigSync;
 
     for (const tracker of ['github', 'linear', 'rally'] as const) {
       this.trackers[tracker] = {
@@ -394,6 +408,40 @@ export class IssueDataService {
    * This is the hot path — must be fast.
    */
   getIssues(options?: { cycle?: string; includeCompleted?: boolean }): any[] {
+    return this.getIssuesCacheEntry(options).issues;
+  }
+
+  getIssuesJson(options?: { cycle?: string; includeCompleted?: boolean }): string {
+    const entry = this.getIssuesCacheEntry(options);
+    if (entry.json === null) {
+      entry.json = JSON.stringify(entry.issues);
+    }
+    return entry.json;
+  }
+
+  private getIssuesCacheEntry(options?: { cycle?: string; includeCompleted?: boolean }): GetIssuesCacheEntry {
+    const key = this.getIssuesCacheKey(options);
+    const cached = this.getIssuesCache.get(key);
+    if (cached) return cached;
+
+    const issues = this.computeIssues(options);
+    if (process.env.NODE_ENV !== 'production') {
+      Object.freeze(issues);
+    }
+    const entry: GetIssuesCacheEntry = { issues, json: null };
+    this.getIssuesCache.set(key, entry);
+    return entry;
+  }
+
+  private getIssuesCacheKey(options?: { cycle?: string; includeCompleted?: boolean }): string {
+    return `${options?.cycle ?? 'current'}|${options?.includeCompleted === true}`;
+  }
+
+  private invalidateGetIssuesCache(): void {
+    this.getIssuesCache.clear();
+  }
+
+  private computeIssues(options?: { cycle?: string; includeCompleted?: boolean }): any[] {
     let allIssues = [
       ...this.trackers.github.lastFetchedIssues,
       ...this.trackers.linear.lastFetchedIssues,
@@ -448,22 +496,21 @@ export class IssueDataService {
 
     // Augment with mergeStatus from the asynchronous review-status cache.
     allIssues = allIssues.map(issue => {
+      const canonical = getCanonicalStatus(issue.state ?? issue.canonicalStatus ?? issue.status, issue.stateType);
       const key = issue.identifier?.toUpperCase();
       const rs = key ? this.reviewStatusesCache[key] : null;
       if (rs?.mergeStatus) {
         const issueWithMerge = { ...issue, mergeStatus: rs.mergeStatus };
-        if (rs.mergeStatus === 'merged') {
-          const canonical = getCanonicalStatus(issue.state ?? issue.canonicalStatus ?? issue.status, issue.stateType);
-          if (canonical !== 'done' && canonical !== 'canceled') {
-            return {
-              ...issueWithMerge,
-              status: 'Verifying',
-              canonicalStatus: 'verifying_on_main',
-              state: 'verifying_on_main',
-            };
-          }
+        if (canonical === 'done' && issueWithMerge.mergeStatus !== 'merged') {
+          return { ...issueWithMerge, mergeStatus: 'merged' };
+        }
+        if (rs.mergeStatus === 'merged' && canonical !== 'done' && canonical !== 'canceled') {
+          return { ...issueWithMerge, status: 'Verifying', canonicalStatus: 'verifying_on_main', state: 'verifying_on_main' };
         }
         return issueWithMerge;
+      }
+      if (canonical === 'done' && issue.mergeStatus && issue.mergeStatus !== 'merged') {
+        return { ...issue, mergeStatus: 'merged' };
       }
       return issue;
     });
@@ -474,17 +521,18 @@ export class IssueDataService {
       return {
         ...issue,
         hasPlan: ps.hasPlan,
-        hasBeads: ps.hasBeads,
+        hasTasks: ps.hasTasks,
         planningComplete: ps.planningComplete,
         workspacePath: ps.workspacePath || undefined,
-        beadCounts: ps.beadCounts,
+        taskCounts: ps.taskCounts,
       };
     });
 
-    // Sort by updatedAt
-    allIssues.sort((a, b) =>
-      new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-    );
+    const updatedAtMs = new Map<any, number>();
+    for (const issue of allIssues) {
+      updatedAtMs.set(issue, Date.parse(issue.updatedAt) || 0);
+    }
+    allIssues.sort((a, b) => (updatedAtMs.get(b) ?? 0) - (updatedAtMs.get(a) ?? 0));
 
     return allIssues;
   }
@@ -708,10 +756,12 @@ export class IssueDataService {
   }
 
   private pushSnapshot(): void {
+    this.invalidateGetIssuesCache();
     this._onIssuesChanged?.(this.getIssues());
   }
 
   private pushUpdated(): void {
+    this.invalidateGetIssuesCache();
     const cachedIssues = this.getCachedTrackerIssues();
     this.schedulePlanningRefreshForIssues(cachedIssues);
     this.scheduleReviewStatusRefreshForIssues(cachedIssues);
@@ -729,6 +779,7 @@ export class IssueDataService {
   private schedulePlanningRefreshForIssues(issues: any[]): void {
     for (const issue of issues) {
       const identifier = typeof issue?.identifier === 'string' ? issue.identifier : '';
+      if (!shouldRefreshPlanningStateForIssue(issue)) continue;
       if (!identifier || this.planningRefreshQueued.has(identifier) || planningStateRefreshInFlight.has(identifier)) continue;
       this.planningRefreshQueued.add(identifier);
       this.planningRefreshQueue.push(identifier);
@@ -864,9 +915,12 @@ export class IssueDataService {
       requestParams.headers = { 'If-None-Match': cachedEtag };
     }
 
-    // Fetch ALL closed issues (no date filter) so Done column is complete after restarts
+    // Fetch recently updated closed issues; SQLite L2 cache keeps older closed
+    // issues visible within TTL across restarts while the windowed fetch runs.
     if (state === 'closed') {
       requestParams.per_page = 100;
+      const windowDays = this.loadConfig().config.issues.closedWindowDays;
+      requestParams.since = new Date(Date.now() - windowDays * DAY_MS).toISOString();
     }
 
     try {
@@ -1064,7 +1118,7 @@ export class IssueDataService {
   private async fetchLinearIssues(apiKey: string, sinceUpdatedAt: string | null): Promise<any[]> {
     const allIssues: any[] = [];
     let hasMore = true;
-    let cursor: string | undefined;
+    let cursor: string | null | undefined;
 
     // Build filter conditions
     const filterConditions: string[] = [];
@@ -1179,7 +1233,15 @@ export class IssueDataService {
         throw new Error(message);
       }
 
-      const json = await response.json();
+      const json = await response.json() as {
+        errors?: Array<{ message?: string }>;
+        data?: {
+          issues?: {
+            nodes: any[];
+            pageInfo: { hasNextPage: boolean; endCursor: string | null };
+          };
+        };
+      };
 
       if (json.errors) {
         const message = json.errors[0]?.message || 'Linear GraphQL error';

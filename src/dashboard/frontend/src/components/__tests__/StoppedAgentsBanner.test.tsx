@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useDashboardStore } from '../../lib/store';
@@ -12,7 +12,8 @@ vi.mock('sonner', () => ({
   },
 }));
 
-const NOW_MS = Date.parse('2026-05-23T12:00:00.000Z');
+const NOW = new Date('2026-05-23T12:00:00.000Z');
+const NOW_MS = NOW.getTime();
 const RECENT_AT = new Date(NOW_MS - 60 * 60 * 1000).toISOString();
 const OLD_AT = new Date(NOW_MS - 8 * 24 * 60 * 60 * 1000).toISOString();
 
@@ -32,28 +33,52 @@ function agent(overrides: Partial<Agent> & Pick<Agent, 'id' | 'issueId' | 'statu
   };
 }
 
-function seedAgents(agents: Agent[]): void {
+function seedStore(agents: Agent[], issues: Array<Record<string, unknown>> = []): void {
   useDashboardStore.setState({
     agentsById: Object.fromEntries(agents.map((item) => [item.id, item])),
+    issuesRaw: issues,
   } as Parameters<typeof useDashboardStore.setState>[0]);
+}
+
+function stoppedAgents(): Agent[] {
+  return [
+    agent({
+      id: 'agent-pan-1420-stopped',
+      issueId: 'PAN-1420',
+      status: 'stopped',
+      hasLiveTmuxSession: false,
+      pausedReason: 'waiting for deploy',
+    }),
+    agent({
+      id: 'agent-pan-1422-stopped',
+      issueId: 'PAN-1422',
+      status: 'stopped',
+      hasLiveTmuxSession: false,
+      troubled: true,
+      consecutiveFailures: 2,
+      role: 'review',
+    }),
+  ];
 }
 
 describe('StoppedAgentsBanner', () => {
   beforeEach(() => {
-    vi.spyOn(Date, 'now').mockReturnValue(NOW_MS);
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+    window.history.replaceState(null, '', '/');
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ id: 'agent-pan-1420' }), { status: 200 })));
-    seedAgents([]);
+    seedStore([]);
   });
 
   afterEach(() => {
-    vi.restoreAllMocks();
     vi.unstubAllGlobals();
-    seedAgents([]);
+    vi.useRealTimers();
+    seedStore([]);
   });
 
   it('renders and restarts only agents classified as stopped', async () => {
     const fetchMock = vi.mocked(fetch);
-    seedAgents([
+    seedStore([
       agent({
         id: 'agent-pan-1419-running',
         issueId: 'PAN-1419',
@@ -91,12 +116,69 @@ describe('StoppedAgentsBanner', () => {
     expect(banner).not.toHaveTextContent('PAN-1421');
     expect(banner).not.toHaveTextContent('PAN-AC-1');
 
-    fireEvent.click(screen.getByTestId('banner-restart-all'));
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('banner-restart-all'));
+      await vi.runAllTimersAsync();
+    });
 
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock).toHaveBeenCalledWith('/api/agents', expect.objectContaining({
       method: 'POST',
       body: JSON.stringify({ issueId: 'PAN-1420' }),
     }));
+  });
+
+  it('renders titled stop context, bare-ID fallback, scope, and issue navigation', () => {
+    seedStore(stoppedAgents(), [
+      { identifier: 'PAN-1420', title: 'Known stopped issue', canonicalStatus: 'in_progress' },
+    ]);
+
+    render(<StoppedAgentsBanner variant="pill" />);
+    fireEvent.click(screen.getByTestId('stopped-agents-pill'));
+
+    const popover = screen.getByTestId('stopped-agents-popover');
+    expect(within(popover).getByText('2 stopped · pipeline agents, last 7 days')).toBeInTheDocument();
+    expect(within(popover).getByText('Known stopped issue')).toBeInTheDocument();
+    expect(within(popover).getByText('paused: waiting for deploy · 1h ago')).toBeInTheDocument();
+    expect(within(popover).getByText('PAN-1422')).toBeInTheDocument();
+    expect(within(popover).getByText('troubled (2 failures) · 1h ago')).toBeInTheDocument();
+
+    fireEvent.click(within(popover).getByText('Known stopped issue'));
+
+    expect(window.location.pathname).toBe('/issues/PAN-1420');
+    expect(screen.queryByTestId('stopped-agents-popover')).not.toBeInTheDocument();
+  });
+
+  it('preserves the pill trigger, list, results summary, and one restart per agent', async () => {
+    const fetchMock = vi.mocked(fetch);
+    seedStore(stoppedAgents(), [
+      { identifier: 'PAN-1420', title: 'Known stopped issue', canonicalStatus: 'in_progress' },
+    ]);
+
+    render(<StoppedAgentsBanner variant="pill" />);
+    const trigger = screen.getByTestId('stopped-agents-pill');
+    expect(trigger).toHaveTextContent('2 stopped');
+    fireEvent.click(trigger);
+
+    const popover = screen.getByTestId('stopped-agents-popover');
+    expect(within(popover).getAllByRole('button')).toHaveLength(3);
+    expect(within(popover).getByTestId('pill-restart-all')).toHaveTextContent('Restart all');
+
+    await act(async () => {
+      fireEvent.click(within(popover).getByTestId('pill-restart-all'));
+      await vi.runAllTimersAsync();
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenNthCalledWith(1, '/api/agents', expect.objectContaining({
+      method: 'POST',
+      body: JSON.stringify({ issueId: 'PAN-1420' }),
+    }));
+    expect(fetchMock).toHaveBeenNthCalledWith(2, '/api/agents', expect.objectContaining({
+      method: 'POST',
+      body: JSON.stringify({ issueId: 'PAN-1422' }),
+    }));
+    expect(within(popover).getByText('✓ 2 restarted')).toBeInTheDocument();
+    expect(within(popover).getByTestId('pill-restart-all')).toHaveTextContent('Restart all');
   });
 });

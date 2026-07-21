@@ -1,101 +1,95 @@
 # Agent State Planes
 
-Overdeck splits every piece of agent and pipeline state into exactly one of three planes. Keeping the boundaries strict prevents the "directory-as-registry" and `state.json`-as-authority problems that caused dashboard stalls, deacon log bloat, and phantom incidents.
+Overdeck separates durable facts, host runtime state, and liveness so no cache
+or workspace can silently become canonical.
 
-## The three planes
+## Permanent plane — `overdeck-state`
 
-### 1. Permanent plane — git, the infra repo
+Durable portable state is committed through domain writers to the orphan
+`overdeck-state` branch in a dedicated worktree at
+`${OVERDECK_HOME}/state/<projectKey>`:
 
-**What lives here:** durable, portable per-issue state.
+- `specs/` — canonical xBRIEF content. Work and task operations change only lifecycle status; explicit re-planning may replace the document at its stable filename through the spec writer.
+- `drafts/` — PRD narrative.
+- `records/` and `continues/` — per-issue decisions, hazards, progress,
+  verdicts, ownership, and close-out.
+- `review/`, `test/`, and `feedback/` — durable specialist artifacts.
+- `backlog/` and `notes/` — sequencing and preserved operator notes.
+- `specs/` plus each issue record's `tasks` block — the canonical checklist and its
+  runtime claim/completion state, read and written through the task state doors.
 
-- The immutable vBRIEF **spec** (`.pan/specs/`).
-- The mutable per-issue **record** (`.pan/<recordsPath>/<issue-id>.json`):
-  - `decisions`, `hazards`, `feedback` — durable continue subset.
-  - `pipeline` — durable review/test/inspect/merge verdicts.
-  - `closeOut` — usage by stage, merges, ranOn, closedAt.
-  - `owner` — URI lease naming the machine currently driving the issue.
+The per-issue record under `records/` is also the permanent home for swarm
+durable state: `slotCompletions`, `finalizedAt`, `failedMergeBlock`,
+`slotAssignments`, and `supersededAttempts` all live there rather than in a
+sidecar runtime file. The workspace record door resolves the record through the
+canonical, migration-aware paths — one record, read through the per-domain
+resolver and written through the single record writer — so a slot's durable
+completion is never silently lost to a stale workspace-local copy.
 
-**Why it is portable.** Everything in this plane is plain JSON committed to git. Moving an issue to another machine is: stop on A, pull on B, resume on B. The runtime plane is rebuilt from git + tmux.
+`migration-complete.json` at the remote branch tip proves cutover. `pan sync`,
+dashboard coordinator startup, and work startup reconcile every registered
+project automatically before pipeline writes are allowed. The migrator carries
+tracked and untracked legacy `.pan/` payloads forward, then removes them from
+`main` with an ordinary commit. Afterward, legacy paths are fallback reads only
+and their recreation trips Doctor/Deacon diagnostics.
 
-**Where it is written.** `src/lib/pan-dir/records.ts` builds records, `src/lib/pan-dir/auto-commit.ts` queues commits. Each project declares the repo and subpath below.
+For polyrepo projects, `pan_records.repo` designates the infra/state-host
+sub-repository. `resolveInfraRepo()` places `overdeck-state` on that repository,
+not on the project root; migration can still read legacy `.pan/` from a non-Git
+project root during cutover.
 
-### 2. Runtime plane — local SQLite `~/.overdeck/panopticon.db`
+## Code-owned context and workspace runtime
 
-**What lives here:** machine-local, process-local state for agents running *on this host now*.
+Project context is reviewed with code on `main` at
+`<projectRoot>/.overdeck/context/`; `.pan/context/` remains a read fallback.
+Workspace-local runtime files use `<workspace>/.overdeck/` and are gitignored.
+Task reads resolve the xBRIEF plus issue-record task state through the canonical
+read door; agents mutate that state only through `pan task …`.
 
-- `agents` table — authoritative runtime registry. Replaces reading `~/.overdeck/agents/<id>/state.json` for enumeration and status.
-- `review_status` table — ephemeral columns such as retry counters, stuck flags, inspection bead id, and recovery timestamps.
-- `events` table — append-only lifecycle event log that drives reactive consumers.
-- `conversations` table — remains machine-local; not made portable here.
+## Runtime plane — local SQLite
 
-**Why it is fast.** Indexed queries replace O(all-agents-ever) directory scans. The table is written through a transactional projection: row upsert + event append in one SQLite transaction.
+`~/.overdeck/overdeck.db` contains machine-local projections: agents, review
+status, lifecycle events, and conversations. It is a disposable cache rebuilt
+from Git state, JSONL transcripts, tracker data, and tmux through the canonical
+domain resolvers.
 
-**Rebuild path.** `pan admin db rebuild-agents` reconstructs the `agents` table from the rollback `state.json` files + live tmux reconciliation. The permanent record plus tmux is sufficient to restore the runtime view.
+## Liveness oracle — tmux
 
-### 3. Liveness oracle — tmux on the `overdeck` socket
+A session on the `overdeck` tmux socket is the physical liveness authority.
+Lifecycle events project status, while the Deacon keeps a thin patrol as a
+dropped-event safety net. A global Deacon pause gates every patrol and recovery
+path.
 
-**What lives here:** the answer to "is this agent actually running?"
+Codex app-server sessions keep the same liveness oracle. The tmux pane hosts
+Overdeck's Codex app-server host process, which owns the `codex app-server`
+child over stdio and renders a readable event feed into the pane. Deacon still
+patrols the tmux session; it does not treat the Codex child process as a
+separate liveness source.
 
-- A tmux session named after the agent id exists on socket `-L overdeck`.
-- Lifecycle events project agent status, but tmux remains the ground truth for physical presence.
+## Resume classifier and intent policy
 
-## Infra-repo configuration (`pan_records`)
+`getAgentResumeGateBlockReason()` is the only classifier for `paused`, `troubled`,
+`stoppedByUser`, and failure backoff. `decideResumeGate(block, intent)` is the
+only policy function; autonomous recovery additionally passes through
+`decideAutonomousRedrive()`, which reads the cached memory verdict.
 
-Each project in `projects.yaml` declares where `.pan/` records are committed:
+| Gate | autonomous | operator-start | message-delivery |
+|---|---|---|---|
+| paused / scheduler-yielded | defer; explicit `pan unpause` required | block; start does not unpause | delivery allowed without resuming |
+| troubled | block; needs-you | block; explicit `pan untroubled` required | delivery allowed |
+| stopped-by-user, no completed handoff | block; one durable needs-you trip | clear the flag and start | delivery allowed |
+| stopped-by-user, completed handoff owing rework | clear the historical flag and re-drive | clear and start | delivery allowed |
+| failure backoff | defer | override with a logged warning | delivery allowed |
 
-```yaml
-projects:
-  overdeck:
-    name: Overdeck
-    path: /home/eltmon/Projects/overdeck
-    issue_prefix: PAN
-    pan_records:
-      repo: "."
-      path: .pan
+Durable breaker identity is `{ issue, recoveryPath, obligationGeneration,
+tripCount }`. Restart cannot duplicate an open trip; acknowledgement or a
+successful explicit recovery resets it, and a later obligation generation may
+trip independently.
 
-  myn:
-    name: Mind Your Now
-    path: /home/eltmon/Projects/myn
-    type: polyrepo
-    issue_prefix: MIN
-    workspace:
-      repos:
-        - name: api
-          path: api
-        - name: infra
-          path: infra
-        - name: fe
-          path: frontend
-    pan_records:
-      repo: infra
-      path: .pan
-```
+## Migration and recovery
 
-- `repo`: the repository that holds the records. For monorepos use `"."` (the project repo). For polyrepos use a repo name from `workspace.repos`.
-- `path`: subdir inside that repo where records live.
-
-`resolveInfraRepo(project)` in `src/lib/projects.ts` resolves these declarations to an absolute repo path and records path.
-
-## Lifecycle events
-
-State changes are pushed to the event store and projected into the `agents` table transactionally. Consumers react to events; they do not scan directories.
-
-- `agent.started` — agent session has started.
-- `agent.status_changed` — mutable columns changed; partial payload merges without nulling absent columns.
-- `agent.stopped` — agent stopped.
-- `agent.heartbeat_dead` — heartbeat missed, agent is orphaned.
-
-Deacon handlers subscribe to these events instead of reading `~/.overdeck/agents/`. A thin 60s patrol remains as a dropped-event safety net.
-
-## What is NOT here anymore
-
-- `~/.overdeck/agents/<id>/state.json` is no longer read for enumeration or status. It is still written as a rollback/rebuild source and kept until the new registry is proven.
-- `preSpawnStashRef`, `preSpawnStashMessage`, `preSpawnBaselineHead`, and `codexMode` were removed from the runtime serialization path; they were dead or single-valued.
-- `review_status` durable verdict columns are mirrored into the per-issue permanent record's `pipeline` block; ephemeral columns stay in SQLite.
-
-## Recovery and kill switches
-
-- **Pre-migration snapshot:** the v54→v55 migration copies `panopticon.db` to `panopticon.db.v54-backfill-snapshot` before touching agents data.
-- **Rebuild command:** `pan admin db rebuild-agents` rebuilds the `agents` table from `state.json` + live tmux.
-- **Records backfill:** `pan admin db backfill-records` writes permanent records for every in-flight issue.
-- **Kill switch:** `OVERDECK_NO_RESUME=1` disables event-driven deacon resume and orphan recovery, dropping to safe no-resume mode without data loss.
+Automatic reconciliation uses a cross-process lock, stable source SHA,
+source/destination mode-size-hash manifest, workspace redirect rewrite,
+completion marker, and atomic push of `main` plus `overdeck-state`. Operators
+can still run `pan admin state migrate <project> --dry-run` to preview a blocked
+cutover. Recovery never deletes a remote state branch or rewrites history.

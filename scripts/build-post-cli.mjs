@@ -9,8 +9,15 @@ import { spawn } from 'node:child_process';
 // and caused false verification failures. It is OPT-OUT: still built by default
 // (so publish/release via prepublishOnly + build-for-publish.mjs keep shipping a
 // fresh index), but skippable via SKIP_DOCS_INDEX=1 in per-issue CI/verification.
+// PAN-2699: build:scripts is deliberately NOT part of the default build. It
+// regenerates sync-sources/hooks/*.js — COMMITTED artifacts that inline lib
+// source — so running it on every build dirtied every checkout whose committed
+// bundle lagged its sources (workspace verification builds then tripped the
+// clean-workspace gates on pan done / pan review request for days). Refresh
+// the bundles deliberately with `npm run build:scripts` when hook behavior
+// must pick up source changes; the pre-push guard requires the rebuilt .js
+// whenever sync-sources/hooks/*.ts changes.
 const tasks = [
-  'build:scripts',
   'build:dashboard:frontend',
   'build:dashboard:server:bundle',
 ];

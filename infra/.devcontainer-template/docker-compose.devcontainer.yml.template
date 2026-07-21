@@ -1,8 +1,8 @@
 # Overdeck Dashboard Dev Container
 # Feature workspace: {{FEATURE_FOLDER}}
 # URLs:
-#   Frontend: https://{{FEATURE_FOLDER}}.pan.localhost
-#   API: https://api-{{FEATURE_FOLDER}}.pan.localhost
+#   Frontend: https://{{FEATURE_FOLDER}}.overdeck.localhost
+#   API: https://api-{{FEATURE_FOLDER}}.overdeck.localhost
 
 services:
   # Combined dev container for VS Code attach
@@ -19,6 +19,17 @@ services:
       - devnet
       - overdeck
 
+  # Docker creates named-volume roots as root. Repair ownership on every init so
+  # this also heals volumes created before PAN-2777.
+  init-perms:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    user: root
+    command: chown node:node /workspaces/overdeck/node_modules
+    volumes:
+      - container-node-modules:/workspaces/overdeck/node_modules
+
   # Init service: runs bun install + server build once for all workspaces
   # Frontend and server depend on this completing successfully
   init:
@@ -27,6 +38,9 @@ services:
       dockerfile: Dockerfile
     user: node
     working_dir: /workspaces/overdeck
+    depends_on:
+      init-perms:
+        condition: service_completed_successfully
     environment:
       - NODE_ENV=development
       - HUSKY=0
@@ -37,9 +51,11 @@ services:
         # PAN-1169: --filter leaves top-level node_modules un-hoisted on this named volume.
         # PAN-1764: retry once — install scripts fetch native prebuilds over the network
         # on a cold cache, and a transient DNS blip (EAI_AGAIN) must not hard-fail init.
-        { bun install || { echo 'bun install failed — retrying once in 5s...'; sleep 5; bun install; }; } &&
+        # Package lifecycle scripts are unnecessary here: init explicitly builds the
+        # required artifacts below, and running prepare can fail on an unlinked husky binary.
+        { bun install --ignore-scripts || { echo 'bun install failed — retrying once in 5s...'; sleep 5; bun install --ignore-scripts; }; } &&
         echo 'Rebuilding native Node.js addons...' &&
-        npm rebuild better-sqlite3 2>&1 &&
+        { npm rebuild better-sqlite3 2>&1 || { echo 'WARN: better-sqlite3 rebuild failed (dev-only transitive dep via evalite; runtime uses bundled node:sqlite/bun:sqlite) — continuing init (PAN-2312).'; }; } &&
         echo 'Building contracts...' &&
         cd packages/contracts && bun run build 2>&1 && cd ../.. &&
         echo 'Building dashboard server...' &&
@@ -49,6 +65,10 @@ services:
       "
     volumes:
       - ../:/workspaces/overdeck:cached
+      # Worktree .git files point into the primary checkout's common metadata.
+      # The dashboard build reads the current commit, so expose that metadata
+      # read-only at the same absolute path used by the worktree pointer.
+      - {{PROJECT_PATH}}/.git:{{PROJECT_PATH}}/.git:ro
       # Shared host-side bun package cache (PAN-1764). Services run as `user: node`
       # (HOME=/home/node) — the old `bun-store:/root/...` named volume was never
       # read, and `docker compose down -v` (workspace rebuild) wiped it anyway.
@@ -91,13 +111,14 @@ services:
     environment:
       - CI=true
       - CONTAINER_MODE=true
-      - VITE_API_URL=https://api-{{FEATURE_FOLDER}}.pan.localhost
+      - VITE_API_URL=https://api-{{FEATURE_FOLDER}}.overdeck.localhost
+      - VITE_PROXY_TARGET=http://server:3013
     networks:
       - devnet
       - overdeck
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.pan-fe-{{FEATURE_FOLDER}}.rule=Host(`{{FEATURE_FOLDER}}.pan.localhost`)"
+      - "traefik.http.routers.pan-fe-{{FEATURE_FOLDER}}.rule=Host(`{{FEATURE_FOLDER}}.overdeck.localhost`)"
       - "traefik.http.routers.pan-fe-{{FEATURE_FOLDER}}.entrypoints=websecure"
       - "traefik.http.routers.pan-fe-{{FEATURE_FOLDER}}.tls=true"
       - "traefik.http.services.pan-fe-{{FEATURE_FOLDER}}.loadbalancer.server.port=3010"
@@ -146,7 +167,7 @@ services:
       - ${HOME}/.codex:/home/node/.codex:ro
     environment:
       - NODE_ENV=development
-      - PORT=3011
+      - PORT=3013
       # Single-deacon invariant: see .claude/rules/single-deacon-invariant.md.
       # The host's `pan up` owns agent lifecycle; container dashboard runs as a read/UI peer only.
       - OVERDECK_DISABLE_DEACON=1
@@ -155,7 +176,7 @@ services:
       # from its own UI — Traefik's CORS middleware adds response headers,
       # but getTrustedOrigins() inside the server only knows localhost
       # variants. First hit live on the PAN-1737 UAT stack.
-      - OVERDECK_TRUSTED_ORIGINS=https://{{FEATURE_FOLDER}}.pan.localhost
+      - OVERDECK_TRUSTED_ORIGINS=https://{{FEATURE_FOLDER}}.overdeck.localhost
       - LINEAR_API_KEY=${LINEAR_API_KEY}
       - GITHUB_TOKEN=${GITHUB_TOKEN}
     networks:
@@ -163,13 +184,13 @@ services:
       - overdeck
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.pan-api-{{FEATURE_FOLDER}}.rule=Host(`api-{{FEATURE_FOLDER}}.pan.localhost`)"
+      - "traefik.http.routers.pan-api-{{FEATURE_FOLDER}}.rule=Host(`api-{{FEATURE_FOLDER}}.overdeck.localhost`)"
       - "traefik.http.routers.pan-api-{{FEATURE_FOLDER}}.entrypoints=websecure"
       - "traefik.http.routers.pan-api-{{FEATURE_FOLDER}}.tls=true"
       - "traefik.http.routers.pan-api-{{FEATURE_FOLDER}}.middlewares=pan-cors-{{FEATURE_FOLDER}}"
-      - "traefik.http.services.pan-api-{{FEATURE_FOLDER}}.loadbalancer.server.port=3011"
+      - "traefik.http.services.pan-api-{{FEATURE_FOLDER}}.loadbalancer.server.port=3013"
       - "traefik.http.middlewares.pan-cors-{{FEATURE_FOLDER}}.headers.accesscontrolallowmethods=GET,POST,PUT,DELETE,OPTIONS,PATCH"
-      - "traefik.http.middlewares.pan-cors-{{FEATURE_FOLDER}}.headers.accesscontrolalloworiginlist=https://{{FEATURE_FOLDER}}.pan.localhost"
+      - "traefik.http.middlewares.pan-cors-{{FEATURE_FOLDER}}.headers.accesscontrolalloworiginlist=https://{{FEATURE_FOLDER}}.overdeck.localhost"
       - "traefik.http.middlewares.pan-cors-{{FEATURE_FOLDER}}.headers.accesscontrolallowheaders=Content-Type,Authorization,X-Requested-With"
       - "traefik.http.middlewares.pan-cors-{{FEATURE_FOLDER}}.headers.accesscontrolallowcredentials=true"
 

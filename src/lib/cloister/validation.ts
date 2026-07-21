@@ -16,9 +16,30 @@ import type { QualityGateConfig, TemplatePlaceholders } from '../workspace-confi
 import { replacePlaceholdersSync } from '../workspace-config.js';
 import { loadConfigSync } from '../config.js';
 import { GitError } from '../errors.js';
+import {
+  acquireQualityGateAdmission,
+  type QualityGateAdmissionHandle,
+} from './quality-gate-admission.js';
 
 const execAsync = promisify(exec);
 const DASHBOARD_RUNTIME_ENV_KEYS = ['API_PORT', 'PORT', 'DASHBOARD_URL'] as const;
+
+function clipGateStream(stream: string, limit: number): string {
+  const signal = stream
+    .split('\n')
+    .filter(line => !/^\s*(?:hint|warning):\s/i.test(line))
+    .join('\n');
+  if (signal.length <= limit) return signal;
+
+  const headLength = Math.floor(limit / 2);
+  const tailLength = limit - headLength;
+  return `${signal.slice(0, headLength)}\n…(${signal.length - limit} chars elided)…\n${signal.slice(-tailLength)}`;
+}
+
+function formatGateOutput(stdout: string, stderr: string): string {
+  const streams = [clipGateStream(stdout, 4000), clipGateStream(stderr, 2000)].filter(Boolean);
+  return streams.join('\n--- stderr ---\n');
+}
 
 function buildQualityGateEnv(gateEnv: Record<string, string> | undefined): NodeJS.ProcessEnv {
   const env = { ...process.env };
@@ -309,18 +330,79 @@ export interface QualityGateResult {
   durationMs: number;
   /** Error message if gate failed */
   error?: string;
+  /** PAN-2461: the gate could not run at all (e.g. its container is not running).
+   *  Callers must treat this as retryable infrastructure failure — never as a
+   *  code failure, and never count it against verification attempt budgets. */
+  infraUnavailable?: boolean;
 }
 
 /**
  * Options for running quality gates
  */
 export interface QualityGateRunOptions {
+  /** Issue identity included in admission logs and durable worker state. */
+  issueId?: string;
   /** Whether the workspace is remote (SSH) */
   isRemote?: boolean;
   /** VM name for SSH connections (required when isRemote is true) */
   vmName?: string;
   /** Template placeholders for resolving container names (e.g., {{FEATURE_FOLDER}}) */
   placeholders?: TemplatePlaceholders;
+  /** PAN-2487: mirror of the human-readable gate progress lines (start/pass/fail
+   *  per gate), e.g. into the per-issue ship log so the UI can show live progress. */
+  onLog?: (line: string) => void;
+  /** PAN-2665: structured live-progress hooks — fired when a gate starts and
+   *  when its result is known, so the verification artifact can be written
+   *  incrementally and the dashboard's Test/Lint node can render gates live. */
+  onGateStart?: (name: string) => void;
+  onGateResult?: (result: QualityGateResult) => void;
+  /** PAN-2665: raw stdout/stderr chunks from the RUNNING gate, streamed as
+   *  they arrive so the Test/Lint panel can show a live output tail. */
+  onGateOutput?: (name: string, chunk: string) => void;
+  /** Durable worker phase update; queued time does not consume execution timeout. */
+  onAdmissionPhase?: (state: {
+    phase: 'queued' | 'running';
+    gateName: string;
+    attempt: number;
+    admittedAt?: string;
+  }) => void;
+}
+
+// PAN-2669: gate child processes must never outlive their gate. exec's
+// built-in timeout kills only the direct `sh -c` child; vitest fork workers
+// survive, hold the inherited stdio pipes, and the gate's await never
+// resolves — orphaned trees then accumulate across dashboard restarts. Gates
+// run detached (own process group); a watchdog group-kills at timeout+grace
+// so the pipes close and the await settles, and shutdown reaps every group.
+const GATE_TIMEOUT_MS = 20 * 60 * 1000; // 20 min per gate (PAN-1989: near-total renames select ~the whole suite)
+const GATE_WATCHDOG_GRACE_MS = 30_000;
+const activeGateProcessGroups = new Map<number, NodeJS.Timeout>();
+
+function registerGateProcessGroup(pid: number | undefined): number | undefined {
+  if (!pid || process.platform === 'win32') return undefined;
+  const watchdog = setTimeout(() => {
+    console.warn(`[quality-gate] process group ${pid} exceeded timeout+grace — killing group (PAN-2669)`);
+    killGateProcessGroup(pid);
+  }, GATE_TIMEOUT_MS + GATE_WATCHDOG_GRACE_MS);
+  watchdog.unref();
+  activeGateProcessGroups.set(pid, watchdog);
+  return pid;
+}
+
+function killGateProcessGroup(pgid: number | undefined): void {
+  if (!pgid) return;
+  const watchdog = activeGateProcessGroups.get(pgid);
+  if (watchdog) clearTimeout(watchdog);
+  activeGateProcessGroups.delete(pgid);
+  try { process.kill(-pgid, 'SIGKILL'); } catch { /* group already gone */ }
+}
+
+/** PAN-2669: reap every live gate process group — called on server shutdown so
+ *  restarts never orphan vitest/build trees. */
+export function killAllGateProcessGroups(): number {
+  const count = activeGateProcessGroups.size;
+  for (const pgid of [...activeGateProcessGroups.keys()]) killGateProcessGroup(pgid);
+  return count;
 }
 
 /**
@@ -332,7 +414,7 @@ export const DEFAULT_GATES: Record<string, QualityGateConfig> = {
   typecheck: { command: 'npm run typecheck 2>&1' },
   lint: { command: 'npm run lint 2>&1' },
   test: {
-    command: 'npx vitest run --changed {{CHANGED_BASE}} && npm --prefix ./src/dashboard/frontend run test -- src/lib/__tests__/issueActions.test.ts src/lib/__tests__/issueActions.no-actions-lost.test.ts src/lib/__tests__/issueActions.parity.test.tsx',
+    command: 'OVERDECK_VERIFICATION=1 npx vitest run --changed {{CHANGED_BASE}} && npm --prefix ./src/dashboard/frontend run test -- src/lib/__tests__/issueActions.test.ts src/lib/__tests__/issueActions.no-actions-lost.test.ts src/lib/__tests__/issueActions.parity.test.tsx',
   },
 };async function runQualityGatesPromise(
   gates: Record<string, QualityGateConfig>,
@@ -364,12 +446,19 @@ export const DEFAULT_GATES: Record<string, QualityGateConfig> = {
     const cwd = gate.path ? join(projectPath, gate.path) : projectPath;
 
     console.log(`[quality-gate] Running "${name}" (${required ? 'required' : 'optional'}) in ${cwd}`);
+    opts.onLog?.(`Running gate "${name}"${required ? '' : ' (optional)'}…`);
+    opts.onGateStart?.(name);
     const startTime = Date.now();
 
     if (gate.type === 'http_health') {
-      // HTTP health check gate
+      // HTTP health checks do not consume a CPU admission slot, but they do
+      // start the supervised worker's execution timeout immediately.
+      opts.onAdmissionPhase?.({
+        phase: 'running', gateName: name, attempt: 1, admittedAt: new Date().toISOString(),
+      });
       const result = await runHttpHealthGate(name, gate, required);
       results.push(result);
+      opts.onGateResult?.(result);
       if (!result.passed && required) {
         console.log(`[quality-gate] ✗ Required gate "${name}" failed — stopping`);
         break;
@@ -412,6 +501,40 @@ export const DEFAULT_GATES: Record<string, QualityGateConfig> = {
       if (opts.placeholders) {
         containerName = replacePlaceholdersSync(containerName, opts.placeholders);
       }
+      // PAN-2461: a missing container previously burned verification attempts as a
+      // fake check failure ("frontend-lint failed" in 33ms because docker exec had
+      // no target). Pre-check and report infra-unavailable instead.
+      try {
+        const { stdout: liveCheck } = await execAsync(
+          `docker ps --filter "name=^${containerName}$" --format "{{.Names}}"`,
+          { timeout: 10_000 },
+        );
+        if (!liveCheck.split('\n').map(s => s.trim()).includes(containerName)) {
+          console.log(`[quality-gate] ⚠ "${name}" skipped: container ${containerName} is not running (infra-unavailable, does not count as a check failure)`);
+          results.push({
+            name, passed: false, required,
+            output: `container ${containerName} is not running`,
+            durationMs: Date.now() - startTime,
+            error: `container ${containerName} is not running`,
+            infraUnavailable: true,
+          });
+          opts.onGateResult?.(results[results.length - 1]!);
+          if (required) break;
+          continue;
+        }
+      } catch {
+        // docker itself unreachable — same treatment.
+        results.push({
+          name, passed: false, required,
+          output: 'docker daemon unreachable',
+          durationMs: Date.now() - startTime,
+          error: 'docker daemon unreachable',
+          infraUnavailable: true,
+        });
+        opts.onGateResult?.(results[results.length - 1]!);
+        if (required) break;
+        continue;
+      }
       // Use -w to set working directory inside the container.
       // The container mounts workspace code at /workspaces/feature/<subdir>,
       // so map the gate.path (e.g., 'fe') to the container's working directory.
@@ -435,30 +558,97 @@ export const DEFAULT_GATES: Record<string, QualityGateConfig> = {
       }
     }
 
-    try {
-      // When running in container, don't set host cwd (irrelevant)
-      const useHostCwd = !isRemote && !(gate.container && gate.container_name);
-      const env = buildQualityGateEnv(gate.env);
-      const { stdout, stderr } = await execAsync(resolvedCommand, {
-        cwd: useHostCwd ? cwd : undefined,
-        env,
-        maxBuffer: 10 * 1024 * 1024, // 10MB
-        timeout: 5 * 60 * 1000, // 5 minute timeout per gate
-      });
+    // PAN-2461: gates may declare `retry: N` — CI-parity for suites with known
+    // order-dependent flakes. A pass on any attempt is a pass.
+    const maxAttempts = 1 + Math.max(0, gate.retry ?? 0);
+    let lastError: any = null;
+    let passedGate = false;
+    let passOutput = '';
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      let gatePgid: number | undefined;
+      let admission: QualityGateAdmissionHandle | null = null;
+      try {
+        if (!isRemote) {
+          const identity = `${opts.issueId ?? 'unscoped'} gate="${name}" attempt=${attempt}/${maxAttempts} workspace=${cwd}`;
+          console.log(`[quality-gate] Queued for CPU admission: ${identity}`);
+          opts.onLog?.(`Queued ${name} for CPU admission…`);
+          opts.onAdmissionPhase?.({ phase: 'queued', gateName: name, attempt });
+          admission = await acquireQualityGateAdmission({
+            issueId: opts.issueId,
+            workspacePath: cwd,
+            gateName: name,
+            attempt,
+          });
+          console.log(`[quality-gate] Admitted: ${identity}`);
+          opts.onAdmissionPhase?.({
+            phase: 'running',
+            gateName: name,
+            attempt,
+            admittedAt: admission.admittedAt,
+          });
+        } else {
+          opts.onAdmissionPhase?.({
+            phase: 'running', gateName: name, attempt, admittedAt: new Date().toISOString(),
+          });
+        }
 
+        // When running in container, don't set host cwd (irrelevant)
+        const useHostCwd = !isRemote && !(gate.container && gate.container_name);
+        const env = buildQualityGateEnv(gate.env);
+        const execPromise = execAsync(resolvedCommand, {
+          cwd: useHostCwd ? cwd : undefined,
+          env,
+          maxBuffer: 10 * 1024 * 1024, // 10MB
+          timeout: GATE_TIMEOUT_MS,
+          // PAN-2669: own process group so timeout/shutdown can kill the WHOLE
+          // tree. exec's timeout kills only the direct `sh -c` child; vitest
+          // fork workers survive holding the stdio pipes, the await never
+          // resolves, and orphaned trees accumulate for hours.
+          ...(process.platform !== 'win32' ? { detached: true } : {}),
+        });
+        gatePgid = registerGateProcessGroup(execPromise.child.pid);
+        // PAN-2665: tee the child's output to the live-progress sink without
+        // altering the buffered result promisify(exec) collects.
+        if (opts.onGateOutput) {
+          execPromise.child.stdout?.on('data', (chunk) => opts.onGateOutput!(name, String(chunk)));
+          execPromise.child.stderr?.on('data', (chunk) => opts.onGateOutput!(name, String(chunk)));
+        }
+        const { stdout, stderr } = await execPromise;
+        passedGate = true;
+        passOutput = formatGateOutput(stdout, stderr);
+      } catch (error: any) {
+        lastError = error;
+        if (attempt < maxAttempts) {
+          console.log(`[quality-gate] ✗ "${name}" failed attempt ${attempt}/${maxAttempts} — retrying (gate declares retry: ${gate.retry})`);
+          opts.onLog?.(`↻ ${name} failed attempt ${attempt}/${maxAttempts} — retrying`);
+        }
+      } finally {
+        killGateProcessGroup(gatePgid);
+        try { await admission?.release(); } catch (error) {
+          console.warn(`[quality-gate] Failed to release CPU admission for ${opts.issueId ?? 'unscoped'} gate="${name}": ${error instanceof Error ? error.message : String(error)}`);
+        }
+      }
+      if (passedGate) break;
+    }
+
+    if (passedGate) {
       const durationMs = Date.now() - startTime;
       console.log(`[quality-gate] ✓ "${name}" passed (${durationMs}ms)`);
+      opts.onLog?.(`✓ ${name} passed (${Math.round(durationMs/1000)}s)`);
       results.push({
         name,
         passed: true,
         required,
-        output: (stdout + stderr).slice(-2000), // keep last 2KB
+        output: passOutput,
         durationMs,
       });
-    } catch (error: any) {
+      opts.onGateResult?.(results[results.length - 1]!);
+    } else {
+      const error: any = lastError;
       const durationMs = Date.now() - startTime;
-      const output = ((error.stdout || '') + (error.stderr || '')).slice(-2000);
+      const output = formatGateOutput(error.stdout || '', error.stderr || '');
       console.log(`[quality-gate] ✗ "${name}" failed (${durationMs}ms): ${error.message?.slice(0, 200)}`);
+      opts.onLog?.(`✗ ${name} FAILED (${Math.round(durationMs/1000)}s): ${error.message?.slice(0, 160)}`);
       results.push({
         name,
         passed: false,
@@ -467,6 +657,7 @@ export const DEFAULT_GATES: Record<string, QualityGateConfig> = {
         durationMs,
         error: error.message?.slice(0, 500),
       });
+      opts.onGateResult?.(results[results.length - 1]!);
 
       if (required) {
         console.log(`[quality-gate] ✗ Required gate "${name}" failed — stopping`);

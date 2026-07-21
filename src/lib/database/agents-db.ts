@@ -37,6 +37,9 @@ export interface Agent {
   paused: boolean | null;
   pausedReason: string | null;
   pausedAt: string | null;
+  yieldedByScheduler: boolean | null;
+  yieldedAt: string | null;
+  lastYieldResumeAt: string | null;
   troubled: boolean | null;
   troubledAt: string | null;
   consecutiveFailures: number | null;
@@ -87,6 +90,9 @@ export function rowToAgent(row: Record<string, unknown>): Agent {
     paused: row['paused'] == null ? null : Boolean(row['paused']),
     pausedReason: (row['paused_reason'] as string | null) ?? null,
     pausedAt: (row['paused_at'] as string | null) ?? null,
+    yieldedByScheduler: row['yielded_by_scheduler'] == null ? null : Boolean(row['yielded_by_scheduler']),
+    yieldedAt: (row['yielded_at'] as string | null) ?? null,
+    lastYieldResumeAt: (row['last_yield_resume_at'] as string | null) ?? null,
     troubled: row['troubled'] == null ? null : Boolean(row['troubled']),
     troubledAt: (row['troubled_at'] as string | null) ?? null,
     consecutiveFailures: (row['consecutive_failures'] as number | null) ?? null,
@@ -118,6 +124,7 @@ const ALL_COLUMNS = [
   'stopped_by_user', 'stopped_by_pause', 'kickoff_delivered', 'host_override',
   'cost_so_far', 'phase', 'work_type',
   'paused', 'paused_reason', 'paused_at',
+  'yielded_by_scheduler', 'yielded_at', 'last_yield_resume_at',
   'troubled', 'troubled_at', 'consecutive_failures',
   'first_failure_in_run_at', 'last_failure_at', 'last_failure_reason', 'last_failure_next_retry_at',
   'flywheel_run_id', 'role_run_head',
@@ -154,6 +161,9 @@ function agentToParams(agent: Agent): unknown[] {
     agent.paused == null ? null : (agent.paused ? 1 : 0),
     agent.pausedReason,
     agent.pausedAt,
+    agent.yieldedByScheduler == null ? null : (agent.yieldedByScheduler ? 1 : 0),
+    agent.yieldedAt ?? null,
+    agent.lastYieldResumeAt ?? null,
     agent.troubled == null ? null : (agent.troubled ? 1 : 0),
     agent.troubledAt,
     agent.consecutiveFailures,

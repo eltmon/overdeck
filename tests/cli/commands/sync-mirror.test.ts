@@ -15,8 +15,8 @@ const mockMirrorProjectSkills = vi.fn().mockReturnValue({ added: [], updated: []
 const mockCheckDevrootDeprecation = vi.fn().mockReturnValue(null);
 const mockLoadConfig = vi.fn().mockReturnValue({ sync: {} });
 const mockPlanSync = vi.fn().mockReturnValue({ skills: [], commands: [], agents: [], rules: [], devSkills: [] });
-const mockExecuteSync = vi.fn().mockReturnValue({ created: [], updated: [], skipped: [], conflicts: [], diffs: [] });
-const mockSyncContextLayers = vi.fn().mockReturnValue({ globalWritten: false, globalStubCreated: false, projectsWritten: [], errors: [], firstInjections: [] });
+const mockExecuteSync = vi.fn().mockReturnValue({ created: [], updated: [], adopted: [], skipped: [], conflicts: [], diffs: [] });
+const mockSyncContextLayers = vi.fn().mockReturnValue({ globalWritten: false, globalStubCreated: false, projectsWritten: [], errors: [], firstInjections: [], legacyBeadsCleanups: [] });
 const mockRefreshCache = vi.fn().mockReturnValue({ skills: { copied: 0 }, agents: { copied: 0 }, rules: { copied: 0 } });
 const mockMigrateStalePersonalContent = vi.fn().mockReturnValue({ removedSymlinks: [], preservedUserContent: [] });
 const mockRemoveLegacySkills070 = vi.fn().mockReturnValue([]);
@@ -33,6 +33,15 @@ const mockEnsurePlaywrightIsolation = vi.fn().mockReturnValue(false);
 const mockEnsureExcalidrawMcp = vi.fn().mockReturnValue(false);
 const mockCreateBackup = vi.fn().mockReturnValue({ targets: [], timestamp: 'now' });
 const mockCleanupAgentDirectories = vi.fn().mockReturnValue(Effect.succeed({ totalOrphaned: 0, removed: [], protected: [], wouldRemove: [] }));
+const mockStartupSyncNeeded = vi.fn().mockReturnValue({ needed: true, reason: 'test' });
+const mockProvisionClaudeHooks = vi.fn().mockResolvedValue({
+  ok: true,
+  changed: false,
+  binariesSynced: 14,
+  registered: [],
+  pruned: [],
+});
+const mockExecSync = vi.fn();
 
 vi.mock('../../../src/lib/sync.js', () => ({
   planSync: mockPlanSync,
@@ -57,6 +66,8 @@ vi.mock('../../../src/lib/sync.js', () => ({
   mirrorProjectSkillsSync: mockMirrorProjectSkills,
   syncPiSettings: vi.fn(() => ({ status: 'skipped', path: '/tmp/none', reason: 'pi not on PATH' })),
   syncPiSettingsSync: vi.fn(() => ({ status: 'skipped', path: '/tmp/none', reason: 'pi not on PATH' })),
+  isStartupSyncNeededSync: mockStartupSyncNeeded,
+  writeSyncManifestSync: vi.fn(),
 }));
 
 vi.mock('../../../src/lib/config.js', () => ({
@@ -107,10 +118,15 @@ vi.mock('../../../src/lib/agent-directory-cleanup.js', () => ({
   cleanupAgentDirectories: mockCleanupAgentDirectories,
 }));
 
+vi.mock('../../../src/lib/claude-hooks-provision.js', () => ({
+  provisionClaudeHooks: mockProvisionClaudeHooks,
+}));
+
 vi.mock('../../../src/lib/paths.js', () => ({
   SYNC_TARGET: { skills: '/tmp/skills', commands: '/tmp/commands', agents: '/tmp/agents' },
   SYNC_SOURCES: { gitHooks: '/tmp/git-hooks', hooks: '/tmp/hooks', skills: '/tmp/src-skills' },
   SKILLS_DIR: '/tmp/pan-skills',
+  AGENT_SKILLS_DIR: '/tmp/agent-skills',
   isDevMode: vi.fn().mockReturnValue(false),
   AGENTS_DIR: '/tmp/agents',
 }));
@@ -123,7 +139,7 @@ vi.mock('ora', () => ({
 
 vi.mock('child_process', async (importOriginal) => {
   const actual = await importOriginal<typeof import('child_process')>();
-  return { ...actual, execSync: vi.fn() };
+  return { ...actual, execSync: mockExecSync };
 });
 
 // ── Tests ──────────────────────────────────────────────────────────────────
@@ -137,8 +153,17 @@ describe('syncCommand — layered sync (PAN-1201)', () => {
     mockLoadConfig.mockReturnValue({ sync: {} });
     mockListProjects.mockReturnValue([]);
     mockPlanSync.mockReturnValue({ skills: [], commands: [], agents: [], rules: [], devSkills: [] });
-    mockSyncContextLayers.mockReturnValue({ globalWritten: false, globalStubCreated: false, projectsWritten: [], errors: [], firstInjections: [] });
+    mockSyncContextLayers.mockReturnValue({ globalWritten: false, globalStubCreated: false, projectsWritten: [], errors: [], firstInjections: [], legacyBeadsCleanups: [] });
     mockCleanupAgentDirectories.mockReturnValue(Effect.succeed({ totalOrphaned: 0, removed: [], protected: [], wouldRemove: [] }));
+    mockStartupSyncNeeded.mockReturnValue({ needed: true, reason: 'test' });
+    mockProvisionClaudeHooks.mockResolvedValue({
+      ok: true,
+      changed: false,
+      binariesSynced: 14,
+      registered: [],
+      pruned: [],
+    });
+    mockExecSync.mockReturnValue(Buffer.from(''));
   });
 
   it('mirrors project skills from the current working directory', async () => {
@@ -151,6 +176,13 @@ describe('syncCommand — layered sync (PAN-1201)', () => {
     const { syncCommand } = await import('../../../src/cli/commands/sync.js');
     await syncCommand({});
     expect(mockSyncContextLayers).toHaveBeenCalledTimes(1);
+  });
+
+  it('repairs Claude hook registrations as part of an explicit sync', async () => {
+    const { syncCommand } = await import('../../../src/cli/commands/sync.js');
+    await syncCommand({});
+
+    expect(mockProvisionClaudeHooks).toHaveBeenCalledTimes(1);
   });
 
   it('prints the devroot deprecation warning when sync.devroot is still set', async () => {
@@ -195,5 +227,48 @@ describe('syncCommand — layered sync (PAN-1201)', () => {
     );
     expect(mirrorLog).toBeUndefined();
     consoleSpy.mockRestore();
+  });
+
+  it('points missing-jq users to the sudo-free installer without installing during sync', async () => {
+    mockExecSync.mockImplementation((command: string) => {
+      if (command === 'which jq') throw new Error('jq missing');
+      return Buffer.from('');
+    });
+    const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    const { syncCommand } = await import('../../../src/cli/commands/sync.js');
+    await syncCommand({});
+
+    expect(consoleSpy.mock.calls.some(
+      ([message]) => typeof message === 'string' && message.includes('curl -fsSL https://overdeck.ai/install | sh'),
+    )).toBe(true);
+    consoleSpy.mockRestore();
+  });
+
+  it('skips execution under --if-changed when startup sync inputs are unchanged', async () => {
+    mockStartupSyncNeeded.mockReturnValue({ needed: false, reason: 'inputs unchanged' });
+    const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    const { syncCommand } = await import('../../../src/cli/commands/sync.js');
+    await syncCommand({ ifChanged: true });
+
+    expect(mockStartupSyncNeeded).toHaveBeenCalledTimes(1);
+    expect(mockRefreshCache).not.toHaveBeenCalled();
+    expect(mockMirrorProjectSkills).not.toHaveBeenCalled();
+    expect(consoleSpy.mock.calls.some(
+      ([msg]) => typeof msg === 'string' && msg.includes('[sync] skipped'),
+    )).toBe(true);
+    consoleSpy.mockRestore();
+  });
+
+  it('still executes a full sync by default when inputs are unchanged', async () => {
+    mockStartupSyncNeeded.mockReturnValue({ needed: false, reason: 'inputs unchanged' });
+
+    const { syncCommand } = await import('../../../src/cli/commands/sync.js');
+    await syncCommand({});
+
+    expect(mockStartupSyncNeeded).not.toHaveBeenCalled();
+    expect(mockRefreshCache).toHaveBeenCalledTimes(1);
+    expect(mockMirrorProjectSkills).toHaveBeenCalledWith(process.cwd());
   });
 });

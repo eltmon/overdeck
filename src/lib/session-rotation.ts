@@ -26,7 +26,8 @@ export const ALLOW_SESSION_ROTATION_ON_RESUME = false;
 export function sessionRotationRefused(opts: {
   compactSeed: boolean;
   driftReasons: readonly string[];
+  allowExplicitRecovery?: boolean;
 }): boolean {
   const wouldRotate = opts.compactSeed || opts.driftReasons.length > 0;
-  return wouldRotate && !ALLOW_SESSION_ROTATION_ON_RESUME;
+  return wouldRotate && !ALLOW_SESSION_ROTATION_ON_RESUME && opts.allowExplicitRecovery !== true;
 }

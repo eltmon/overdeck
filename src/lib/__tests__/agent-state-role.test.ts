@@ -5,7 +5,31 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Effect } from 'effect';
 import type { AgentState } from '../agents.js';
 
+// Spawn/resume flows preflight the harness binary; CI runners have no claude/omp
+// installed, so stub the filesystem probes while keeping the pure helpers real.
+vi.mock('../harness-binary.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../harness-binary.js')>();
+  const fakePath = (harness: Parameters<typeof actual.harnessBinaryName>[0]) =>
+    `/home/test/.local/bin/${actual.harnessBinaryName(harness)}`;
+  return {
+    ...actual,
+    resolveHarnessBinary: vi.fn(async (harness) => fakePath(harness)),
+    requireHarnessBinary: vi.fn(async (harness) => fakePath(harness)),
+    prepareHarnessLaunch: vi.fn(async (harness) => ({
+      binaryPath: fakePath(harness),
+      pathExport: `export PATH='/home/test/.local/bin':"$PATH"`,
+    })),
+  };
+});
+
 let tempHome: string;
+
+function ensurePtySupervisorArtifact(): void {
+  const artifact = join(process.cwd(), 'dist', 'pty-supervisor.js');
+  if (existsSync(artifact)) return;
+  mkdirSync(join(process.cwd(), 'dist'), { recursive: true });
+  writeFileSync(artifact, '#!/usr/bin/env node\n');
+}
 
 describe('AgentState role persistence', () => {
   beforeEach(() => {
@@ -19,7 +43,7 @@ describe('AgentState role persistence', () => {
     vi.doUnmock('../tmux.js');
     vi.doUnmock('../workspace/stack-health.js');
     vi.doUnmock('../workspace/rebuild-stack.js');
-    vi.doUnmock('../beads-query.js');
+    vi.doUnmock('../tasks-query.js');
     vi.doUnmock('../activity-logger.js');
     vi.doUnmock('../cloister/work-agent-prompt.js');
     vi.doUnmock('../projects.js');
@@ -28,8 +52,12 @@ describe('AgentState role persistence', () => {
     vi.doUnmock('../cloister/issue-closed.js');
     vi.doUnmock('../cloister/specialists.js');
     vi.doUnmock('../transcript-landing.js');
+    vi.doUnmock('../agent-runtime-mirror.js');
+    vi.doUnmock('../runtimes/pi-fifo.js');
+    vi.doUnmock('../runtimes/ohmypi-fifo.js');
+    vi.doUnmock('../harness-resolve.js');
     delete process.env.OVERDECK_HOME;
-    rmSync(tempHome, { recursive: true, force: true });
+    rmSync(tempHome, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 });
   });
 
   it('resolves the work role model through role config defaults', async () => {
@@ -53,19 +81,24 @@ describe('AgentState role persistence', () => {
     });
     const { determineModel } = await import('../agents.js');
 
-    // PAN-1048 R4: default workhorse:mid is claude-sonnet-4-6.
-    expect(determineModel({ role: 'work' })).toBe('claude-sonnet-4-6');
+    // PAN-1048 R4: default workhorse:mid tracks the current Sonnet.
+    expect(determineModel({ role: 'work' })).toBe('claude-sonnet-5');
     expect(determineModel({ role: 'work', model: 'claude-opus-4-7' })).toBe('claude-opus-4-7');
-  });
+  }, 20_000);
 
   it('builds review role runtime commands from roles/review.md', async () => {
     const { getRoleRuntimeBaseCommand, roleAgentDefinitionPath, spawnRun } = await import('../agents.js');
 
-    expect(roleAgentDefinitionPath('review')).toBe('roles/review.md');
+    const rolePath = roleAgentDefinitionPath('review');
+    expect(rolePath).toMatch(/\/roles\/review\.md$/);
+    expect(existsSync(rolePath)).toBe(true);
     expect(spawnRun).toEqual(expect.any(Function));
 
     const command = await getRoleRuntimeBaseCommand('claude-opus-4-7', 'agent-pan-1048-review', 'review');
-    expect(command).toContain('--agent roles/review.md');
+    // PAN-2087: role FILES are injected as a system prompt (Claude Code 2.1.195
+    // dropped --agent file support), not passed to --agent.
+    expect(command).not.toContain('--agent ');
+    expect(command).toMatch(/--append-system-prompt-file '[^']*role-prompts\/review\.md'/);
     expect(command).toContain("--model 'claude-opus-4-7'");
     expect(command).toContain('--name agent-pan-1048-review');
     expect(command).not.toContain('pan-review-agent');
@@ -75,9 +108,29 @@ describe('AgentState role persistence', () => {
     const { getRoleRuntimeBaseCommand } = await import('../agents.js');
 
     const command = await getRoleRuntimeBaseCommand('claude-opus-4-7', 'flywheel-orchestrator', 'flywheel', 'claude-code', undefined, 'low');
-    expect(command).toContain('--agent roles/flywheel.md');
+    expect(command).not.toContain('--agent ');
+    expect(command).toMatch(/--append-system-prompt-file '[^']*role-prompts\/flywheel\.md'/);
     expect(command).toContain("--model 'claude-opus-4-7'");
     expect(command).toContain('--effort low');
+  });
+
+  it('PAN-2090: review role reconstitutes its tools: allow-list via --allowedTools (no MCP)', async () => {
+    const { getRoleRuntimeBaseCommand } = await import('../agents.js');
+    const command = await getRoleRuntimeBaseCommand('claude-opus-4-7', 'agent-pan-1-review', 'review');
+    expect(command).toContain("--allowedTools 'Read,Grep,Glob,Bash'");
+    expect(command).not.toContain('--mcp-config'); // review.md declares no mcpServers
+  });
+
+  it('PAN-2090: test role reconstitutes mcpServers via --mcp-config and keeps playwright in --allowedTools', async () => {
+    const { getRoleRuntimeBaseCommand } = await import('../agents.js');
+    const command = await getRoleRuntimeBaseCommand('claude-opus-4-7', 'agent-pan-1-test', 'test');
+    // playwright MCP wired, AND included in the allow-list so the strict list does not block it.
+    expect(command).toMatch(/--mcp-config '[^']*role-prompts\/test\.mcp\.json'/);
+    expect(command).toMatch(/--allowedTools 'Read,Grep,Glob,Bash,mcp__playwright'/);
+    // the generated config is valid JSON declaring the playwright stdio server.
+    const m = command.match(/--mcp-config '([^']*)'/);
+    const cfg = JSON.parse(readFileSync(m![1], 'utf-8'));
+    expect(cfg.mcpServers.playwright).toMatchObject({ command: 'npx' });
   });
 
   it('preserves first-class runtime session ids during normalization', async () => {
@@ -191,6 +244,7 @@ describe('AgentState role persistence', () => {
       isPaneDead: vi.fn(() => false),
     }));
     vi.doMock('../cloister/agent-idle.js', () => ({
+      getAgentEffectiveLastActivityMs: vi.fn(() => Date.now()),
       isAgentIdleForNudge: vi.fn(() => true),
     }));
     vi.doMock('../cloister/issue-closed.js', () => ({
@@ -334,7 +388,11 @@ describe('AgentState role persistence', () => {
       sessionExistsSync: vi.fn(() => false),
       createSession: vi.fn((...args: unknown[]) => Effect.promise(() => Promise.resolve(createSessionAsync(...args)))),
     }));
-    vi.doMock('../beads-query.js', () => ({ assertIssueHasBeads: vi.fn(() => Effect.succeed(undefined)) }));
+    vi.doMock('../tasks-query.js', () => ({ assertIssueHasTasks: vi.fn(() => Effect.succeed(undefined)) }));
+    vi.doMock('../xbrief/io.js', async (importOriginal) => ({
+      ...((await importOriginal()) as typeof import('../xbrief/io.js')),
+      readWorkspacePlanSync: vi.fn(() => ({ plan: { id: 'PAN-1140', items: [] } })),
+    }));
     vi.doMock('../activity-logger.js', async (importOriginal) => ({
       ...((await importOriginal()) as typeof import('../activity-logger.js')),
       emitActivityEntry,
@@ -391,7 +449,7 @@ describe('AgentState role persistence', () => {
       sessionExistsSync: vi.fn(() => false),
       createSession: vi.fn((...args: unknown[]) => Effect.promise(() => Promise.resolve(createSessionAsync(...args)))),
     }));
-    vi.doMock('../beads-query.js', () => ({ assertIssueHasBeads: vi.fn(() => Effect.succeed(undefined)) }));
+    vi.doMock('../tasks-query.js', () => ({ assertIssueHasTasks: vi.fn(() => Effect.succeed(undefined)) }));
     vi.doMock('../activity-logger.js', async (importOriginal) => ({
       ...((await importOriginal()) as typeof import('../activity-logger.js')),
       emitActivityEntry,
@@ -418,7 +476,19 @@ describe('AgentState role persistence', () => {
   });
 
   it('allows explicit host override when the workspace stack is unhealthy', async () => {
+    ensurePtySupervisorArtifact();
     const workspace = mkdtempSync(join(tmpdir(), 'pan-stack-host-'));
+    mkdirSync(join(workspace, '.pan'), { recursive: true });
+    writeFileSync(join(workspace, '.pan', 'spec.vbrief.json'), JSON.stringify({
+      xBRIEFInfo: { version: '0.5', created: '2026-07-14T00:00:00.000Z' },
+      plan: {
+        id: 'PAN-1140',
+        title: 'Host override fixture',
+        status: 'running',
+        items: [{ id: 'host-override', title: 'Host override', status: 'pending' }],
+        edges: [],
+      },
+    }));
     const createSessionAsync = vi.fn(async () => undefined);
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     const emitActivityEntry = vi.fn();
@@ -441,13 +511,17 @@ describe('AgentState role persistence', () => {
       capturePane: vi.fn(() => Effect.succeed('Claude Code')),
       setOption: vi.fn(() => Effect.void),
     }));
-    vi.doMock('../beads-query.js', () => ({ assertIssueHasBeads: vi.fn(() => Effect.succeed(undefined)) }));
+    vi.doMock('../tasks-query.js', () => ({ assertIssueHasTasks: vi.fn(() => Effect.succeed(undefined)) }));
     vi.doMock('../activity-logger.js', async (importOriginal) => ({
       ...((await importOriginal()) as typeof import('../activity-logger.js')),
       emitActivityEntry,
       emitActivityEntrySync: emitActivityEntry,
       emitActivityTts: vi.fn(),
       emitActivityTtsSync: vi.fn(),
+    }));
+    vi.doMock('../xbrief/io.js', async (importOriginal) => ({
+      ...((await importOriginal()) as typeof import('../xbrief/io.js')),
+      readWorkspacePlanSync: vi.fn(() => ({ plan: { id: 'PAN-1140', items: [] } })),
     }));
     vi.doMock('../cloister/work-agent-prompt.js', () => ({
       writeStoryFeatureContext: vi.fn(async () => undefined),
@@ -470,6 +544,130 @@ describe('AgentState role persistence', () => {
     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('retry with --host to override'));
     warnSpy.mockRestore();
     rmSync(workspace, { recursive: true, force: true });
+  });
+
+  it.each([
+    ['strike', 'strike-pan-2771'],
+    ['work', 'agent-pan-2771'],
+  ] as const)('PAN-2771: fails and stops a %s spawn when kickoff delivery fails', async (role, agentId) => {
+    const workspace = mkdtempSync(join(tmpdir(), 'pan-strike-kickoff-fail-'));
+    const agentDir = join(tempHome, 'agents', agentId);
+    const readyPath = join(agentDir, 'ready.json');
+    const fifoPath = join(agentDir, 'rpc.in');
+    let sessionAlive = false;
+    const createSessionAsync = vi.fn(async () => {
+      sessionAlive = true;
+      mkdirSync(agentDir, { recursive: true });
+      writeFileSync(readyPath, JSON.stringify({ agentId, sessionId: 'omp-session' }));
+    });
+    const killSessionAsync = vi.fn(async () => {
+      sessionAlive = false;
+    });
+    const writeOhmypiCommandSync = vi.fn(() => {
+      throw new Error('fifo write failed');
+    });
+    const emitActivityEntry = vi.fn();
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const originalHome = process.env.HOME;
+    process.env.HOME = tempHome;
+
+    vi.doMock('../workspace/stack-health.js', () => ({
+      getWorkspaceStackHealth: vi.fn(() => Effect.succeed({ healthy: true, reasons: [], lastObserved: '2026-06-25T00:00:00.000Z' })),
+    }));
+    vi.doMock('../workspace/rebuild-stack.js', () => ({
+      rebuildWorkspaceStack: vi.fn(() => Effect.succeed({ success: true })),
+    }));
+    vi.doMock('../tmux.js', async (importOriginal) => ({
+      ...((await importOriginal()) as typeof import('../tmux.js')),
+      sessionExists: vi.fn(() => Effect.succeed(sessionAlive)),
+      sessionExistsSync: vi.fn(() => sessionAlive),
+      createSession: vi.fn((...args: unknown[]) => Effect.promise(() => Promise.resolve(createSessionAsync(...args)))),
+      killSession: vi.fn(() => Effect.promise(() => killSessionAsync())),
+      capturePane: vi.fn(() => Effect.succeed('')),
+      setOption: vi.fn(() => Effect.void),
+    }));
+    vi.doMock('../activity-logger.js', async (importOriginal) => ({
+      ...((await importOriginal()) as typeof import('../activity-logger.js')),
+      emitActivityEntry,
+      emitActivityEntrySync: emitActivityEntry,
+      emitActivityTts: vi.fn(),
+      emitActivityTtsSync: vi.fn(),
+    }));
+    vi.doMock('../harness-resolve.js', async (importOriginal) => ({
+      ...((await importOriginal()) as typeof import('../harness-resolve.js')),
+      resolveHarness: vi.fn(async () => 'ohmypi'),
+    }));
+    vi.doMock('../workspace-manager.js', () => ({
+      preTrustDirectory: vi.fn(),
+    }));
+    vi.doMock('../github-app.js', () => ({
+      isGitHubAppConfigured: vi.fn(() => false),
+    }));
+    vi.doMock('../memory/injection.js', () => ({
+      injectPromptTimeMemory: vi.fn(async () => ({ context: '' })),
+    }));
+    vi.doMock('../runtimes/ohmypi-fifo.js', () => ({
+      OhmypiNotReady: class OhmypiNotReady extends Error {},
+      ohmypiFifoPaths: vi.fn(() => ({ agentDir, readyPath, fifoPath })),
+      createOhmypiFifo: vi.fn(() => Effect.succeed(fifoPath)),
+      writeOhmypiCommandSync,
+    }));
+
+    try {
+      const { getAgentStateSync, spawnAgent } = await import('../agents.js');
+      const spawn = spawnAgent({
+        issueId: 'PAN-2771',
+        workspace,
+        role,
+        harness: 'ohmypi',
+        model: 'claude-sonnet-4-6',
+        prompt: 'do the work',
+      });
+
+      await expect(spawn).rejects.toThrow(/kickoff delivery failed/);
+
+      expect(createSessionAsync).toHaveBeenCalled();
+      expect(writeOhmypiCommandSync).toHaveBeenCalled();
+      expect(killSessionAsync).toHaveBeenCalled();
+      expect(sessionAlive).toBe(false);
+      expect(getAgentStateSync(agentId)).toMatchObject({
+        status: 'stopped',
+        kickoffDelivered: false,
+        lastFailureReason: 'kickoff delivery failed',
+      });
+      expect(emitActivityEntry).not.toHaveBeenCalledWith(expect.objectContaining({
+        message: 'Work agent started for PAN-2771',
+      }));
+    } finally {
+      process.env.HOME = originalHome;
+      consoleErrorSpy.mockRestore();
+      rmSync(workspace, { recursive: true, force: true });
+    }
+  });
+
+  it('PAN-2093: gives ohmypi work-agent readiness more than the old 30s window', async () => {
+    const { OHMYPI_AGENT_READY_TIMEOUT_SECONDS } = await import('../agents.js');
+
+    expect(OHMYPI_AGENT_READY_TIMEOUT_SECONDS).toBe(120);
+    expect(OHMYPI_AGENT_READY_TIMEOUT_SECONDS).toBeGreaterThan(30);
+  });
+
+  it('PAN-2100: reports disk space and recent output when ohmypi readiness times out', async () => {
+    const agentId = 'agent-pan-2100';
+    const agentDir = join(tempHome, 'agents', agentId);
+    mkdirSync(agentDir, { recursive: true });
+    writeFileSync(join(agentDir, 'output.log'), [
+      'starting omp',
+      'Error: ENOSPC: no space left on device, write ready.json',
+    ].join('\n'));
+
+    const { describeOhmypiSpawnFailure } = await import('../agents.js');
+    const description = describeOhmypiSpawnFailure(agentId);
+
+    expect(description).toContain('freeDisk=');
+    expect(description).toContain('output.log tail:');
+    expect(description).toContain('ENOSPC');
+    expect(description).toContain('ready.json');
   });
 
   it('does not block when workspace stack health is healthy', async () => {
@@ -550,6 +748,175 @@ describe('AgentState role persistence', () => {
     const { assertWorkspaceStackHealthyForSpawn } = await import('../agents.js');
 
     await expect(assertWorkspaceStackHealthyForSpawn(undefined as any, 'work')).resolves.toBeUndefined();
+  });
+
+  it('PAN-2009: fresh-launches a stopped ohmypi agent when the prior ohmypi process is dead', async () => {
+    const workspace = mkdtempSync(join(tmpdir(), 'pan-dead-pi-resume-'));
+    const agentId = 'agent-pan-2009-review';
+    const createSessionAsync = vi.fn(async () => {
+      writeFileSync(join(tempHome, 'agents', agentId, 'ready.json'), JSON.stringify({
+        agentId,
+        sessionId: 'fresh-pi-session',
+      }));
+    });
+    const killSessionAsync = vi.fn(async () => undefined);
+    const writeOhmypiCommandSync = vi.fn();
+    const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+
+    vi.doMock('../workspace/stack-health.js', () => ({
+      getWorkspaceStackHealth: vi.fn(() => Effect.succeed({ healthy: true, reasons: [], lastObserved: '2026-06-23T00:00:00.000Z' })),
+    }));
+    vi.doMock('../workspace/rebuild-stack.js', () => ({
+      rebuildWorkspaceStack: vi.fn(() => Effect.succeed({ success: true })),
+    }));
+    vi.doMock('../projects.js', async (importOriginal) => ({
+      ...((await importOriginal()) as typeof import('../projects.js')),
+      resolveProjectFromIssueSync: vi.fn(() => null),
+    }));
+    vi.doMock('../tmux.js', async (importOriginal) => ({
+      ...((await importOriginal()) as typeof import('../tmux.js')),
+      sessionExists: vi.fn(() => Effect.succeed(true)),
+      sessionExistsSync: vi.fn(() => true),
+      killSession: vi.fn(() => Effect.promise(() => killSessionAsync())),
+      createSession: vi.fn((...args: unknown[]) => Effect.promise(() => Promise.resolve(createSessionAsync(...args)))),
+      listPaneValues: vi.fn(() => Effect.succeed([])),
+      capturePane: vi.fn(() => Effect.succeed('')),
+      setOption: vi.fn(() => Effect.void),
+    }));
+    vi.doMock('../agent-runtime-mirror.js', () => ({
+      getRuntimeSnapshot: vi.fn(() => Effect.succeed({
+        activity: 'stopped',
+        lastActivity: '2026-06-23T00:00:00.000Z',
+        sessionModel: 'claude-sonnet-4-6',
+        sessionHarness: 'ohmypi',
+      })),
+      isAgentStateServiceInProcess: vi.fn(() => Effect.succeed(true)),
+    }));
+    vi.doMock('../harness-resolve.js', async (importOriginal) => ({
+      ...((await importOriginal()) as typeof import('../harness-resolve.js')),
+      resolveHarness: vi.fn(async () => 'ohmypi'),
+    }));
+    vi.doMock('../runtimes/ohmypi-fifo.js', async (importOriginal) => ({
+      ...((await importOriginal()) as typeof import('../runtimes/ohmypi-fifo.js')),
+      writeOhmypiCommandSync,
+    }));
+
+    const { resumeAgent, saveAgentStateSync } = await import('../agents.js');
+    saveAgentStateSync({
+      id: agentId,
+      issueId: 'PAN-2009',
+      workspace,
+      harness: 'ohmypi',
+      role: 'review',
+      model: 'claude-sonnet-4-6',
+      status: 'stopped',
+      startedAt: '2026-06-23T00:00:00.000Z',
+    } as any);
+    writeFileSync(join(tempHome, 'agents', agentId, 'session.id'), 'dead-pi-session');
+
+    await expect(resumeAgent(agentId, 'continue review')).resolves.toMatchObject({
+      success: true,
+      messageDelivered: true,
+    });
+
+    expect(killSessionAsync).toHaveBeenCalled();
+    expect(createSessionAsync).toHaveBeenCalled();
+    expect(writeOhmypiCommandSync).toHaveBeenCalledWith(
+      agentId,
+      expect.objectContaining({ type: 'prompt', message: expect.stringContaining('continue review') }),
+    );
+    const launcher = readFileSync(join(tempHome, 'agents', agentId, 'launcher.sh'), 'utf-8');
+    expect(launcher).not.toContain('--resume');
+    expect(existsSync(join(tempHome, 'agents', agentId, 'session.id'))).toBe(false);
+    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('prior Pi process was dead'));
+
+    consoleSpy.mockRestore();
+    rmSync(workspace, { recursive: true, force: true });
+  });
+
+  it('resumes a status=starting agent whose tmux session died (runtime=stopped desync)', async () => {
+    // Regression: an agent stuck in status='starting' (spawn got past model
+    // resolution but tmux died mid-launch) with a dead session produces
+    // runtime=stopped, status=starting. The deacon patrol would normally heal
+    // starting→stopped, but only if it is running / not in OVERDECK_NO_RESUME.
+    // The lifecycle UI model treats runtime=stopped as isStopped (enabling the
+    // Resume button), but resumeAgent's gate only treated status='running' as
+    // crashed — so status='starting' was bricked with
+    // "Cannot resume agent in state: runtime=stopped, status=starting".
+    // Fix: isCrashed now also covers status='starting' with no live session.
+    const workspace = mkdtempSync(join(tmpdir(), 'pan-starting-resume-'));
+    const agentId = 'agent-pan-2031-review';
+    const createSessionAsync = vi.fn(async () => {
+      writeFileSync(join(tempHome, 'agents', agentId, 'ready.json'), JSON.stringify({
+        agentId,
+        sessionId: 'fresh-session',
+      }));
+    });
+    const killSessionAsync = vi.fn(async () => undefined);
+    const writeOhmypiCommandSync = vi.fn();
+    const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+
+    vi.doMock('../workspace/stack-health.js', () => ({
+      getWorkspaceStackHealth: vi.fn(() => Effect.succeed({ healthy: true, reasons: [], lastObserved: '2026-06-23T00:00:00.000Z' })),
+    }));
+    vi.doMock('../workspace/rebuild-stack.js', () => ({
+      rebuildWorkspaceStack: vi.fn(() => Effect.succeed({ success: true })),
+    }));
+    vi.doMock('../projects.js', async (importOriginal) => ({
+      ...((await importOriginal()) as typeof import('../projects.js')),
+      resolveProjectFromIssueSync: vi.fn(() => null),
+    }));
+    vi.doMock('../tmux.js', async (importOriginal) => ({
+      ...((await importOriginal()) as typeof import('../tmux.js')),
+      sessionExists: vi.fn(() => Effect.succeed(false)),
+      sessionExistsSync: vi.fn(() => false),
+      killSession: vi.fn(() => Effect.promise(() => killSessionAsync())),
+      createSession: vi.fn((...args: unknown[]) => Effect.promise(() => Promise.resolve(createSessionAsync(...args)))),
+      listPaneValues: vi.fn(() => Effect.succeed([])),
+      capturePane: vi.fn(() => Effect.succeed('')),
+      setOption: vi.fn(() => Effect.void),
+    }));
+    vi.doMock('../agent-runtime-mirror.js', () => ({
+      getRuntimeSnapshot: vi.fn(() => Effect.succeed({
+        activity: 'stopped',
+        lastActivity: '2026-06-23T00:00:00.000Z',
+        sessionModel: 'claude-sonnet-4-6',
+        sessionHarness: 'ohmypi',
+      })),
+      isAgentStateServiceInProcess: vi.fn(() => Effect.succeed(true)),
+    }));
+    vi.doMock('../harness-resolve.js', async (importOriginal) => ({
+      ...((await importOriginal()) as typeof import('../harness-resolve.js')),
+      resolveHarness: vi.fn(async () => 'ohmypi'),
+    }));
+    vi.doMock('../runtimes/ohmypi-fifo.js', async (importOriginal) => ({
+      ...((await importOriginal()) as typeof import('../runtimes/ohmypi-fifo.js')),
+      writeOhmypiCommandSync,
+    }));
+
+    const { resumeAgent, saveAgentStateSync } = await import('../agents.js');
+    saveAgentStateSync({
+      id: agentId,
+      issueId: 'PAN-2031',
+      workspace,
+      harness: 'ohmypi',
+      role: 'review',
+      model: 'claude-sonnet-4-6',
+      status: 'starting', // <-- the stuck state from the bug report
+      startedAt: '2026-06-23T00:00:00.000Z',
+    } as any);
+    writeFileSync(join(tempHome, 'agents', agentId, 'session.id'), 'dead-session');
+
+    const result = await resumeAgent(agentId, 'continue review');
+
+    // Before the fix this returned
+    // { success: false, error: 'Cannot resume agent in state: runtime=stopped, status=starting' }
+    expect(result).toMatchObject({ success: true, messageDelivered: true });
+    expect(result.error).toBeUndefined();
+    expect(createSessionAsync).toHaveBeenCalled();
+
+    consoleSpy.mockRestore();
+    rmSync(workspace, { recursive: true, force: true });
   });
 
   it('treats state.json without a valid role as missing', async () => {

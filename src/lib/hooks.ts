@@ -325,7 +325,7 @@ export function generateFixedPointPromptSync(agentId: string): string | null {
 
   lines.push('---');
   lines.push('');
-  lines.push('Execute these items in priority order. Use `bd hook pop <id>` after completing each item.');
+  lines.push('Execute these items in priority order and record completion through the owning workflow.');
 
   return lines.join('\n');
 }

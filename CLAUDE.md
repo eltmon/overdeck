@@ -2,6 +2,8 @@
 
 > **Note:** Universal and dev-scope engineering rules — async tmux, no execSync in server, fake timers for retry tests, worktree discipline, work-agents-via-pan, stash discipline, dashboard-Node22-only, single-deacon invariant, no-destructive-requests, file-path references, Karpathy rules — live in [`sync-sources/rules/`](sync-sources/rules/) and are folded into `~/.claude/CLAUDE.md` automatically via `pan sync`. This file holds **project-specific** guidance that doesn't apply outside this repo.
 
+> **Knowledge bundle (OKF):** Project knowledge lives in the OKF bundle at [`../overdeck-knowledge`](../overdeck-knowledge) (remote `eltmon/overdeck-knowledge`), pointed to by [`.okf.yml`](.okf.yml). Use `/okf extract "<query>"` to pull cited context and `/okf author`/`/okf sync`/`/okf study` to maintain it. `/okf open` and the dashboard **Knowledge** page run OpenKnowledge against a disposable read-only snapshot; edit through `/okf author` because the upstream v0.34 editor does not preserve YAML source formatting losslessly.
+
 ## Engineering Philosophy: No Bandaids
 
 **NEVER apply workarounds, hacks, or "just get it working" fixes.** Every issue, no matter how minor, must be addressed at its root cause as soon as it arises. If something is broken, find out WHY it's broken and fix the underlying problem — don't paper over symptoms with fallback chains or special-case handling.
@@ -18,7 +20,7 @@ This means:
 
 This means:
 - If a test should verify behavior, don't manually verify it — fix the test and run it.
-- If an API endpoint should create beads, don't run `bd init` manually — fix the endpoint.
+- If an API endpoint should create tasks, don't run `bd init` manually — fix the endpoint.
 - If Playwright MCP crashes, don't fall back to `curl` — investigate why it crashed and fix it.
 - If a label should be removed by the merge flow, don't run `gh issue edit` — fix the merge flow.
 - If the dashboard should show the right status, don't tell the user to refresh — fix the data pipeline.
@@ -64,6 +66,12 @@ The goal is autonomous correctness. Every manual intervention is a system bug.
 
 When working directly on `main` (not in a Overdeck workspace), commit completed changes and push to `origin` before ending the session. Agent PRs merge to `origin/main` through the pipeline — unpushed local commits cause divergence that requires manual merge resolution. Don't commit half-done work; finish the change, verify it builds, then commit and push.
 
+Permanent pipeline state is the exception to the code-branch destination: its
+domain writers commit and push to the dedicated `overdeck-state` worktree at
+`${OVERDECK_HOME}/state/<project>/`. Run `bd` against that worktree; do not
+assume `.beads/` exists at the code-repository root. Never stage state paths on
+`main` or a feature branch after a project is migrated.
+
 ## CRITICAL: Releases Go Through `pan release stable` — Never Manual
 
 **To cut a new release of `@overdeck/*`, ALWAYS use `pan release stable --version X.Y.Z`. NEVER run `git tag v...` manually, never edit `"version"` in any `package.json` directly, never `npm version` or `npm publish`.**
@@ -95,7 +103,7 @@ git push origin v0.9.4
 
 ## Harnesses
 
-Overdeck supports two coding-agent harnesses: `claude-code` (default) and `pi` (alternative, multi-provider). The harness is picked per spawn at plan kickoff, role runs, work agent start, and the conversation panel; roles read harness/model defaults from Settings. Pi + Anthropic + subscription auth is the only blocked combination (ToS gate in `src/lib/harness-policy.ts`).
+Overdeck supports four coding-agent harnesses: `claude-code` (default), `pi`/`ohmypi` (alternative, multi-provider), `codex` (OpenAI Codex CLI — first-party agent loop for the GPT model family), and `acp` (native Agent Client Protocol, with Kimi Code CLI as the first wired agent). Codex work agents use the persistent `codex app-server` transport by default, with `codex.transport: tui` as a temporary escape hatch to the legacy `codexMode: work-tui` path; the runtime adapter remains `src/lib/runtimes/codex.ts`. The ACP integration vendors the Effect-based protocol client in `packages/effect-acp/` and runs through `src/lib/runtimes/acp.ts`. The harness is picked per spawn at plan kickoff, role runs, work agent start, and the conversation panel; roles read harness/model defaults from Settings. Pi + Anthropic + subscription auth is the only blocked combination (ToS gate in `src/lib/harness-policy.ts`).
 
 See [configuration/harnesses.mdx](configuration/harnesses.mdx) for installation, picker locations, ToS rules, and troubleshooting. The wider field of coding-agent harnesses Overdeck could adopt is surveyed in [reference/harness-landscape.mdx](reference/harness-landscape.mdx). (`docs/HARNESSES.md` is now a redirect stub — the harness docs are published in the Mintlify site.)
 
@@ -105,8 +113,8 @@ Overdeck's issue pipeline is expressed as four spawned **roles** plus a server-s
 
 | Role | Purpose | Instruction source |
 | --- | --- | --- |
-| `plan` | Discover requirements and produce vBRIEF/beads artifacts | `roles/plan.md` |
-| `work` | Implement one bead at a time in the workspace | `roles/work.md` |
+| `plan` | Discover requirements and produce xBRIEF/tasks artifacts | `roles/plan.md` |
+| `work` | Implement one task at a time in the workspace | `roles/work.md` |
 | `review` | Synthesize code review and transition approved/blocked work | `roles/review.md` |
 | `test` | Run automated verification and required browser UAT | `roles/test.md` |
 
@@ -138,25 +146,34 @@ See [docs/SKILLS-CONVENTION.md](docs/SKILLS-CONVENTION.md) for the full rules, s
 
 ## Planning Modes
 
-Overdeck supports two planning modes:
+`pan start <id>` is the single paved-road entry point: it takes an issue from whatever state it is in to running work.
 
-### Interactive (default)
-```bash
-pan plan <id>
-```
-Launches an interactive planning session where the agent asks Q&A questions before producing a vBRIEF.
+- **No plan exists** → `pan start` auto-plans (non-interactive), materializes tasks, and starts the work agent when planning finalizes.
+- **Plan exists** → `pan start` spawns the work agent from the existing xBRIEF and tasks.
+- **Already running** → `pan start` exits 0 with a no-op message and guidance on messaging/attaching the agent.
 
-### Auto (non-interactive)
-```bash
-pan plan <id> --auto
-```
-Runs the planning agent end-to-end without prompting. If it encounters a contradiction it can't resolve, it escalates to interactive mode. All inferred choices are recorded in `plan.autoDecisions[]` for audit.
+Planning depth is one optional dial:
 
-### Auto-Start (skip planning)
 ```bash
-pan start <id> --auto
+pan start PAN-1071                    # default: config planning.default_mode, or auto if unset
+pan start PAN-1071 --plan interactive # Q&A planning session first, then work on approval
+pan start PAN-1071 --plan auto        # non-interactive planning, then work (same as default)
+pan start PAN-1071 --plan skip        # synthesize a minimal xBRIEF and tasks, then work
 ```
-Skips the planning agent entirely. Synthesizes a minimal vBRIEF from the issue title/body, creates beads, and spawns the work agent directly. For trivial issues (typos, version bumps) where full planning is overkill.
+
+`planning.default_mode` in `~/.overdeck/config.yaml` sets the default for unplanned issues:
+
+```yaml
+planning:
+  default_mode: auto   # interactive | auto | skip; unset = auto
+```
+
+`pan plan <id>` remains the plan-ONLY verb for producing or refreshing the PRD and xBRIEF without starting work.
+
+The legacy aliases below are deprecated but still functional through the deprecation window:
+
+- `pan start <id> --auto` is an alias for `pan start <id> --plan skip`.
+- `pan plan <id> --auto-start` is deprecated; use `pan start <id>` to plan and start work in one command.
 
 **Always verify available flags with `pan <verb> --help`** — the CLI is self-documenting and flags may change between versions.
 
@@ -228,6 +245,11 @@ The supervisor is Node 22-only because it owns a real PTY through
 `${OVERDECK_HOME}/sockets/pty-<id>.sock` at mode `0600`, accepts authenticated
 HTTP-on-unix POSTs, writes each delivered message into Claude's PTY input, and
 echoes the message into the tmux transcript so operators can see what was sent.
+`src/lib/channels/injection-budget.ts` is the single timing source for the
+supervisor's payload-sized echo, settle, and purge waits and for the delivery
+client deadline that must outlast them. The supervisor accepts at most 262,144
+characters, returns HTTP 400 above that limit, and can therefore purge every
+character it accepted before retrying without stacking duplicate composer text.
 
 `deliverAgentMessage(agentId, message, caller?)` is the single delivery
 primitive. In automatic mode it tries, in order:
@@ -235,6 +257,13 @@ primitive. In automatic mode it tries, in order:
 1. PTY supervisor socket (`path: "supervisor"`)
 2. legacy Claude Code Channels MCP socket for already-wired sessions
 3. tmux paste-buffer fallback
+
+Summary forks add a pane-verified recovery above that transport: when the
+runtime transcript stays silent but the delivered tail remains in the composer,
+the fork pipeline sends at most two standalone Enter keystrokes. If submission
+still cannot be confirmed, it keeps the conversation alive but records
+`forkStatus = 'failed'` with an actionable `forkError` instead of presenting an
+empty transcript as a healthy completed fork.
 
 Docker workspaces remain excluded from supervisor wiring until host/container
 socket sharing is designed; Pi keeps using its `rpc.in` FIFO. H1 lifecycle
@@ -260,6 +289,32 @@ the bridge listens on `${OVERDECK_HOME}/sockets/agent-<id>.sock`, and
 config is actually wired; supervisor-only sessions must not receive this Enter
 keystroke.
 
+## Pipeline membership — the canonical resolver
+
+Pipeline membership is the durable exception queue defined in
+[`docs/PIPELINE-MEMBERSHIP.md`](docs/PIPELINE-MEMBERSHIP.md). Every surface must
+delegate to `resolvePipelineMembership()` in `src/lib/pipeline-membership.ts` or
+its API/DTO projection; no surface may independently derive membership from
+tracker state, workspaces, agents, tmux, or review-status rows.
+
+## Decisions — the canonical operator-decision surface
+
+Everything that shows the operator a pending decision reads
+`src/dashboard/frontend/src/lib/useDecisions.ts` (`useDecisions()` for the
+Decisions list, `usePendingInputSubjects()` as the drop-in for consumers of
+`selectPendingInputSubjects`). It is the only place that joins the two domains a
+decision can arrive from: **agents**, which reach the store through the event
+pipeline into `agentsById`, and **conversations**, which are not rows in the
+agents table and arrive over REST from `/api/conversations/pending-input`.
+
+Never read `selectPendingInputSubjects` directly in a new surface — it sees
+agents alone, so a question from a conversation or the flywheel would be visible
+in one place and missing from another. That was the PAN-2765 defect.
+
+See [docs/ASKUSERQUESTION-DASHBOARD.md](docs/ASKUSERQUESTION-DASHBOARD.md) for
+the full pipeline, the `agentTurnEnded` kind, and why a transcript must be
+resolved by the agent's own session id rather than "newest file in the dir".
+
 ## Dashboard Server Architecture (Effect + Raw WebSocket)
 
 The dashboard server uses **Effect.js** for HTTP routes and structured RPC, plus a
@@ -283,7 +338,14 @@ The dashboard server uses **Effect.js** for HTTP routes and structured RPC, plus
 **Terminal architecture** (`ws-terminal.ts` + `XTerminal.tsx`):
 - Server: raw `WebSocketServer` with `noServer: true`, deferred PTY spawn (waits for
   client resize dimensions), `node-pty` spawns `tmux attach-session`
-- Client: raw `WebSocket` API with exponential backoff reconnection
+- Client: raw `WebSocket` API with a five-minute patient reconnect window from
+  `terminalReconnectPolicy.ts`: delays are 1s, 2s, 4s, then a flat 5s.
+- Reconnect state stays outside xterm scrollback in a status overlay; exhaustion keeps
+  the terminal mounted and offers a manual Reconnect action.
+- Close code `4404` means the tmux session is still gone after the server-side wait and
+  is fatal. Close code `4503` means the dashboard is gracefully restarting, so the UI
+  shows calm "Dashboard restarting" copy and uses the same patient reconnect policy;
+  `handleShutdownSignal` broadcasts `4503` before server teardown.
 - PTY waits for tmux session to exist (`waitForTmuxSession`) before spawning
 - Data flows immediately on attach — no stale data suppression
 - Dimension toggle at 200ms forces correct-size repaint
@@ -293,6 +355,11 @@ The dashboard server uses **Effect.js** for HTTP routes and structured RPC, plus
   subscribes to `subscribeDomainEvents` stream, applies events to Zustand store
 - `WsTransport.ts` — Effect-based RPC client with auto-reconnection
 - Store: Zustand with shared reducers from `@overdeck/contracts`
+
+**Issue views:** Rail, cockpit, and console issue surfaces share the kit documented in
+`docs/ISSUE-VIEW.md`. Route new issue sections through `IssueViewModel`, the shared
+components, and `DENSITY_SECTIONS`; update the inventory and real `data-section`
+marker so the no-loss gate proves that no existing surface disappeared.
 
 **Session lifecycle rules:**
 - On WebSocket close, do NOT kill the PTY — the tmux session survives independently.
@@ -310,7 +377,8 @@ After 3 consecutive failures, verification is bypassed to prevent permanent bloc
 
 ## Agent Auto-Resume Gates
 
-Deacon auto-resume is intentionally suppressible through three gates:
+Deacon auto-resume is intentionally suppressible through the unified
+`getAgentResumeGateBlockReason` classifier and `decideResumeGate` intent policy:
 
 - **Boot no-resume:** `OVERDECK_NO_RESUME=1`, `pan dev --no-resume`, or
   `pan up --no-resume` disables orphan recovery and stopped-agent auto-resume for
@@ -323,6 +391,29 @@ Deacon auto-resume is intentionally suppressible through three gates:
   preserve failure counters/backoff state in `state.json`. `pan untroubled <id>`
   clears the troubled gate and failure fields after the underlying crash cause has
   been investigated. It does not spawn the agent.
+- **Operator-stop gate:** `stoppedByUser` blocks autonomous re-drive when no
+  completed handoff exists and emits one durable needs-you trip. A completed
+  handoff that owes review/test/verification rework may clear the historical
+  flag and re-drive. Explicit operator start clears only `stoppedByUser`; it does
+  not silently clear paused or troubled state.
+- **Memory gate (PAN-2500):** `assessMemoryPressure()` in `src/lib/cloister/memory-governor.ts`
+  gates every autonomous resume/dispatch path — boot recovery, patrol auto-resume,
+  reactive resume-on-stop, and review/test/ship dispatch — on live memory pressure,
+  not just agent count and CPU load. Below the SOFT reserve it defers new admissions;
+  below HARD it sheds (stops merged/closed docker stacks, then pauses idle work
+  agents); it never re-admits until memory clears RECOVERY. See
+  [`docs/RESOURCE-GOVERNOR.md`](docs/RESOURCE-GOVERNOR.md) for the full model. This
+  is separate from `--no-resume`, which suppresses resume outright regardless of memory.
+
+Separately, the **preemptive scheduler** (PAN-2507, opt-in via `[concurrency]
+preemption = true`) may **yield** an idle work agent — pause it to free capacity
+for a blocked review/test/merge dispatch. A yield reuses the same `paused: true`
+gate (so all four suppression gates above protect it), tagged with
+`yieldedByScheduler`/`yieldedAt`. Unlike an operator pause it is **self-clearing**:
+`autoResumeStoppedWorkAgents` resumes yielded agents oldest-first, ahead of any
+other stopped candidate, once a slot and the memory gate allow — and `pan
+unpause` on a yielded agent clears the yield attribution too. See
+[`docs/RESOURCE-GOVERNOR.md`](docs/RESOURCE-GOVERNOR.md) → "Preemptive scheduling".
 
 These gates are orthogonal to the global Deacon freeze in SQLite
 (`deacon.globally_paused`) and the per-issue Deacon ignore flag in review status.
@@ -332,7 +423,7 @@ These gates are orthogonal to the global Deacon freeze in SQLite
 Agent and pipeline state is split into three planes. Do not read or write the wrong one.
 
 1. **Permanent plane — git infra repo.** Durable per-issue records under `.pan/<recordsPath>/<issue>.json` containing the continue subset (`decisions`, `hazards`, `feedback`), the `pipeline` verdict block, `closeOut` (usage, merges, ranOn), and the `owner` URI lease. Specs and project-side continues live here too. Portable across machines.
-2. **Runtime plane — local SQLite `~/.overdeck/panopticon.db`.** The `agents` table is the authoritative runtime registry; `review_status` holds ephemeral columns; `events` is the lifecycle event log. Rebuildable from git + tmux.
+2. **Runtime plane — local SQLite `~/.overdeck/overdeck.db`.** The `agents` table is the authoritative runtime registry; `review_status` holds ephemeral columns; `events` is the lifecycle event log. Rebuildable from git + tmux.
 3. **Liveness oracle — tmux on socket `-L overdeck`.** Ground truth for whether an agent process is actually running.
 
 Key rules:
@@ -358,12 +449,16 @@ and `parseGitHubRepos()` in `src/lib/tracker-utils.ts`. Resolution order:
 When adding a new project to `projects.yaml`, either set `linear_team` explicitly or
 ensure the project key (uppercased, hyphens removed) matches the issue prefix you want.
 
-## Beads Enforcement
+## Task Enforcement
 
-Work agents cannot start without beads tasks in the workspace. The start-agent endpoint
-returns 422 if `.beads/issues.jsonl` does not exist. Planning must create beads via
-`bd create` before handing off to implementation.
+Work agents require a readable, implementation-ready xBRIEF. The start-agent endpoint returns 422
+when the plan is missing, unreadable, belongs to another issue, or contains no implementation items.
+Planning writes the xBRIEF checklist directly; it does not materialize an external task store.
 
+Completion and verification are also gated by the xBRIEF checklist. `runVerificationForIssue()` in
+`src/lib/cloister/verification-runner.ts` calls `checkIncompletePlanItemsPromise()` and reports
+`failedCheck: 'incomplete-plan-items'` while any item or sub-item is not terminal. Agents update that
+checklist through `pan task`; there is no separate tracker to reconcile at merge or close-out.
 ## postMergeLifecycle Idempotency (enforced by a test, not by this note)
 
 `postMergeLifecycle` must run **at most once per merge**. If it can re-trigger
@@ -392,7 +487,7 @@ idempotent and the test stays green.
 
 `postMergeLifecycle()` in `merge-agent.ts` is a non-destructive merge handoff. After
 merge it marks the issue `verifying_on_main`, applies the `verifying-on-main` label,
-pauses the work/planning agents, preserves workspace/state/vBRIEF/branches, and stops
+pauses the work/planning agents, preserves workspace/state/xBRIEF/branches, and stops
 Docker containers and networks.
 
 Docker cleanup still happens at merge time because orphaned networks from merged
@@ -400,8 +495,15 @@ workspaces accumulate and eventually block new workspace creation with "all pred
 address pools have been fully subnetted". Docker's default pool only supports ~31 bridge
 networks. NEVER remove this cleanup step.
 
+The durable, verified teardown owner is **close-out**: `pan close <id>` / dashboard
+Close Out stops and removes the workspace Docker stack (including the
+`overdeck-feature-<issue>_devnet` network) and verifies the network is gone. The deacon's
+closed-issue reaper (`reapIssueResidue`) is the backstop that tears down any terminal
+issue's leaked stack by name. The single `rebuildWorkspaceStack` chokepoint no-ops for
+closed/merged issues, so patrols never recreate a terminal stack.
+
 The destructive/non-reversible completion steps are owned by close-out, not merge:
-`pan close <id>` / dashboard Close Out completes the vBRIEF, archives planning artifacts,
+`pan close <id>` / dashboard Close Out completes the xBRIEF, archives planning artifacts,
 optionally tears down the workspace or deletes feature branches according to `close_out`
 config, closes the tracker issue, and clears review status.
 
@@ -412,13 +514,13 @@ The deep-wipe endpoint (`POST /api/agents/:id/deep-wipe`) with `deleteWorkspace:
 1. **tmux sessions** — all agent sessions killed
 2. **Agent state directories** — `~/.overdeck/agents/<id>/` removed
 3. **Entire workspace directory** — this includes:
-   - `.pan/spec.vbrief.json` — the **workspace-specific vBRIEF plan**
-   - `.beads/` — all task tracking beads
+   - `.overdeck/spec.vbrief.json` — the **workspace-specific xBRIEF plan**
+   - `.beads/` — all task tracking tasks
    - Any implementation work in progress
 4. **Git branches** — both local AND remote `feature/<issue-id>` branches deleted
 5. **Linear/GitHub status** — issue status reset to Todo/Open
 
-**The scope vBRIEF** in `.pan/specs/` on main survives deep-wipe — it's committed to the project repo independently of the workspace. Project-level PRD archives (e.g., a team's own `docs/prds/` if they keep one for narrative archival) also survive; the Overdeck-managed PRD draft at `<projectRoot>/.pan/drafts/<issue>.md` survives too. The workspace `.pan/` directory (spec, continue state) and `.beads/` are destroyed.
+**The scope xBRIEF** in `specs/` on `overdeck-state` survives deep-wipe — it's committed to the project repo independently of the workspace. Project-level PRD archives also survive; the Overdeck-managed PRD at `drafts/<issue>.md` on `overdeck-state` survives too (on disk: `${OVERDECK_HOME}/state/<project>/drafts/<issue>.md`). The workspace `.overdeck/` runtime directory and `.beads/` redirect are disposable.
 
 **Rules:**
 - **NEVER call deep-wipe programmatically** without the user explicitly requesting it
@@ -463,14 +565,14 @@ When TLDR is available, you'll have these MCP tools:
 
 When `agents.rtk.enabled` is true, Bash outputs the agent sees (git status, npm output, etc.) may be compressed by RTK. Re-run with `OVERDECK_RTK_ENABLED=0` to regenerate raw command output.
 
-## vBRIEF Plans & Lifecycle
+## xBRIEF Plans & Lifecycle
 
-Overdeck uses **vBRIEF v0.5** for machine-readable work plans. Key references:
+Overdeck emits **xBRIEF v0.8** for machine-readable work plans (readers accept v0.5–v0.8; see `docs/XBRIEF.md`). Key references:
 
-- **Canonical spec:** [github.com/deftai/vBRIEF](https://github.com/deftai/vBRIEF)
-- **Our fork:** [github.com/eltmon/vBRIEF](https://github.com/eltmon/vBRIEF)
-- **Extension proposal:** [deftai/vBRIEF#1](https://github.com/deftai/vBRIEF/issues/1)
-- **Overdeck docs:** [docs/VBRIEF.md](docs/VBRIEF.md) — full schema, lifecycle, and migration notes
+- **Canonical spec:** [github.com/deftai/xBRIEF](https://github.com/deftai/xBRIEF) (renamed from xBRIEF at v0.7.0; spec now v0.8)
+- **Our fork:** [github.com/eltmon/xBRIEF](https://github.com/eltmon/xBRIEF)
+- **Extension proposal:** [deftai/xBRIEF#40](https://github.com/deftai/xBRIEF/issues/40) (supersedes #1)
+- **Overdeck docs:** [docs/XBRIEF.md](docs/XBRIEF.md) — full schema, lifecycle, and migration notes
 
 ### The four-artifact model (PAN-1124: single-spec-on-main)
 
@@ -478,30 +580,30 @@ There are four artifacts. They are distinct — do not conflate them.
 
 | Artifact | Location | Writer | Mutability |
 | --- | --- | --- | --- |
-| **PRD draft** (`.md`) | `<projectRoot>/.pan/drafts/<issue>.md` | Human or planning agent | Free-form narrative, human-mutable |
-| **vBRIEF spec** (`.json`) on main | `<projectRoot>/.pan/specs/<YYYY-MM-DD>-<ISSUE>-<slug>.vbrief.json` | Pipeline only (single writer) | Immutable after planning — only `plan.status` changes via `updateSpecStatus()` |
-| **Project-side continue state** (`.json`) | `<projectRoot>/.pan/continues/<issue-lowercase>.vbrief.json` | Pipeline | Session resume point, decisions, hazards, sessionHistory, feedback — one canonical file per issue, never moves |
-| **Workspace-side continue state** (`.json`) | `<workspace>/.pan/continue.json` | Pipeline + work agent | Session state + `statusOverrides` map tracking item/subItem completion |
+| **PRD draft** (`.md`) | `drafts/<issue>.md` on `overdeck-state` (disk: `${OVERDECK_HOME}/state/<project>/drafts/<issue>.md`); planning agents author it workspace-side at `.pan/drafts/<ISSUE>.md` and complete-planning promotes it to `overdeck-state` | Human or planning agent | Free-form narrative, human-mutable |
+| **xBRIEF spec** (`.json`) | `specs/<YYYY-MM-DD>-<ISSUE>-<slug>.xbrief.json` on `overdeck-state` (disk: `${OVERDECK_HOME}/state/<project>/specs/<file>`) | Pipeline only (single writer) | Immutable after planning — only `plan.status` changes via `updateSpecStatus()` |
+| **Project-side continue state** (`.json`) | `${OVERDECK_HOME}/state/<project>/continues/<issue-lowercase>.xbrief.json` | Pipeline | Session resume point, decisions, hazards, sessionHistory, feedback — one canonical file per issue, never moves |
+| **Workspace-side continue state** (`.json`) | `<workspace>/.overdeck/continue.json` | Pipeline + work agent | Session state + `statusOverrides` map tracking item/subItem completion |
 
-**The PAN-1124 invariant — the spec on main is immutable after planning.** `findPlan()` resolves the main-side spec via `findSpecByIssue()`. `readWorkspacePlan()` returns a merged view: main spec + `statusOverrides` from workspace continue.json. `updateItemStatus()` and `updateSubItemStatus()` write ONLY to the workspace continue file's `statusOverrides` map — they cannot mutate the spec. The only legal spec mutation is `plan.status` via `updateSpecStatus()` in `pan-dir/specs.ts`. This replaces the old PAN-946 invariant (workspace-spec isolation) with a stronger guarantee: there is no workspace spec to isolate.
+**The PAN-1124 invariant — the canonical spec is immutable after planning.** `findPlan()` resolves the canonical spec on `overdeck-state` via `findSpecByIssue()`. `readWorkspacePlan()` returns a merged view: canonical spec + `statusOverrides` from workspace continue.json. `updateItemStatus()` and `updateSubItemStatus()` write ONLY to the workspace continue file's `statusOverrides` map — they cannot mutate the spec. The only legal spec mutation is `plan.status` via `updateSpecStatus()` in `pan-dir/specs.ts`. This replaces the old PAN-946 invariant (workspace-spec isolation) with a stronger guarantee: there is no workspace spec to isolate.
 
-**Gitignore policy.** `.pan/continue.json` is listed in `.gitignore` and must NEVER be tracked in main. `.pan/spec.vbrief.json` may still exist in older workspaces (migration compat) but is no longer written by the pipeline. The lifecycle artifacts (`.pan/specs/`, `.pan/continues/`, `.pan/drafts/`) remain tracked — they're the canonical record of plans, continue states, and PRD drafts at rest.
+**Gitignore policy.** `.overdeck/continue.json` is listed in `.gitignore` and must NEVER be tracked in main. `.overdeck/spec.vbrief.json` may still exist in older workspaces (migration compat) but is no longer written by the pipeline. The lifecycle artifacts (`specs/`, `continues/`, `drafts/`) remain tracked — they're the canonical record of plans, continue states, and PRD drafts at rest.
 
 ### Status is a JSON field, not a directory
 
-`plan.status` advances through one canonical file via atomic single-commit updates on main. Files do not move between directories.
+`plan.status` advances through one canonical file via state-door commits on `overdeck-state`. Files do not move between directories.
 
 ```
-draft (in .pan/drafts/*.md) ──► proposed ──► approved ──► active/running ──► completed
+draft (in `drafts/*.md` on `overdeck-state`) ──► proposed ──► approved ──► active/running ──► completed
                                        │                                          │
                                        └──────────► cancelled ◄───────────────────┘
 ```
 
 | Transition | Trigger | What changes |
 | --- | --- | --- |
-| (new) → draft | `pan plan` starts | Markdown PRD written to `<projectRoot>/.pan/drafts/<issue>.md` |
-| draft → proposed | Planning completes | vBRIEF created in `<projectRoot>/.pan/specs/...` with `plan.status: "proposed"` |
-| proposed → approved/running | `pan start` | Status field flipped on main; work agent reads spec from main via `findPlan()` |
+| (new) → draft | `pan plan` starts | Markdown PRD written to `drafts/<issue>.md` |
+| draft → proposed | Planning completes | xBRIEF created in `specs/...` with `plan.status: "proposed"` |
+| proposed → approved/running | `pan start` | Status field flipped on `overdeck-state`; work agent reads spec from main via `findPlan()` |
 | running → completed | PR merges | Status field flipped to `"completed"` on main |
 | any → cancelled | Issue closed | Status field flipped to `"cancelled"` on main |
 
@@ -509,28 +611,28 @@ draft (in .pan/drafts/*.md) ──► proposed ──► approved ──► acti
 
 PAN-967 unified everything under `.pan/`. The following are gone or read-only legacy:
 
-- `.planning/plan.vbrief.json` — **DELETED.** Replaced by `.pan/spec.vbrief.json`.
-- `docs/prds/planned/`, `docs/prds/active/` — no longer a Overdeck convention. PRD drafts live in `.pan/drafts/`. Projects may keep their own `docs/prds/` for human archival, but Overdeck does not read or write it.
-- `vbrief/{proposed,active,completed,cancelled}/` at the project root — still read by `findLegacyVBriefByIssue` for backward compatibility during migration; pipeline writes target `.pan/specs/` only. Legacy spec files (non-continue) remain at these paths as read-only fallback.
+- `.planning/plan.vbrief.json` — **DELETED.** PAN-967 replaced it with `.pan/spec.vbrief.json`; PAN-1124 later retired new workspace copies. PAN-2541 uses `.overdeck/spec.vbrief.json` only as the renamed workspace-runtime compatibility path. The current canonical spec is `specs/<file>` on `overdeck-state`.
+- `docs/prds/planned/`, `docs/prds/active/` — no longer a Overdeck convention. PRD drafts live in `drafts/`. Projects may keep their own `docs/prds/` for human archival, but Overdeck does not read or write it.
+- `vbrief/{proposed,active,completed,cancelled}/` at the project root — still read by `findLegacyXBriefByIssue` for backward compatibility during migration; pipeline writes target `specs/` only. Legacy spec files (non-continue) remain at these paths as read-only fallback.
 
-If you see an agent referencing `.planning/`, `docs/prds/planned/*.vbrief.json`, or planning a "copy PRD vBRIEF into workspace .planning" step, the agent is reading a pre-PAN-967 problem statement and needs to be redirected at `docs/VBRIEF.md`.
+If you see an agent referencing `.planning/`, `docs/prds/planned/*.xbrief.json`, or planning a "copy PRD xBRIEF into workspace .planning" step, the agent is reading a pre-PAN-967 problem statement and needs to be redirected at `docs/XBRIEF.md`.
 
 ### Auto-Behaviors
 
 - `io.ts` (`updateItemStatus`/`updateSubItemStatus`) write to workspace continue.json `statusOverrides` map — they do NOT mutate the spec.
-- `readWorkspacePlan()` returns a merged view: main spec + `statusOverrides` overlay from workspace continue.json.
-- `complete-planning` writes the vBRIEF to `<projectRoot>/.pan/specs/...` with `plan.status: "proposed"`.
+- `readWorkspacePlan()` returns a merged view: canonical spec + `statusOverrides` overlay from workspace continue.json.
+- `complete-planning` writes the xBRIEF to `specs/...` with `plan.status: "proposed"`.
 - `start-agent` flips the main-side status field. Work agents read the spec from main via `findPlan()`.
-- `postMergeLifecycle` marks merged work as `verifying_on_main` and preserves the vBRIEF in its running/active state.
-- `closeOut` flips the main-side `plan.status` to `"completed"` after post-merge verification.
-- `findPlan(workspacePath)` resolves main-side spec via `findSpecByIssue(projectRoot, issueId)`, with fallback to workspace-local `.pan/spec.vbrief.json` for migration compat.
+- `postMergeLifecycle` marks merged work as `verifying_on_main` and preserves the xBRIEF in its running/active state.
+- `closeOut` flips the main-side `plan.status` to `"completed"` after post-merge verification, and runs verified Docker stack + `_devnet` network teardown (with the closed-issue reaper as a backstop).
+- `findPlan(workspacePath)` resolves `specs/<file>` on `overdeck-state` via `findSpecByIssue(projectRoot, issueId)`, with fallback to workspace-local `.overdeck/spec.vbrief.json` for migration compatibility.
 
 ### Dashboard Viewer
 
-VBriefViewer components at `src/dashboard/frontend/src/components/vbrief/`:
-- Accessible via **vBRIEF button** on kanban issue cards and InspectorPanel
+XBriefViewer components at `src/dashboard/frontend/src/components/xbrief/`:
+- Accessible via **xBRIEF button** on kanban issue cards and InspectorPanel
 - List / DAG / Raw JSON tabs
-- Fetches from `GET /api/workspaces/:issueId/plan` (resolves from `.pan/specs/` on main via `findSpecByIssue`, with workspace fallback for migration compat)
+- Fetches from `GET /api/workspaces/:issueId/plan` (resolves from `specs/` on `overdeck-state` via `findSpecByIssue`, with workspace fallback for migration compat)
 
 ## Issue Creation from PRDs
 
@@ -540,51 +642,8 @@ When creating a Linear or GitHub issue from a PRD, **always reference the PRD at
 **PRD:** [`path/to/prd.md`](https link to the file in the repo)
 ```
 
+For a migrated project, link the canonical PRD as
+`blob/overdeck-state/drafts/<issue>.md`; the legacy `.pan/drafts/` link is only
+for projects without a valid migration completion marker.
+
 The issue body should then contain a tight summary (vision, motivation, design goals, key capabilities, phases) -- NOT a full copy of the PRD. The PRD is the source of truth for data models, architecture, code samples, and implementation details. Duplicating that content into the issue creates drift.
-
-<!-- BEGIN BEADS INTEGRATION v:1 profile:minimal hash:ca08a54f -->
-## Beads Issue Tracker
-
-This project uses **bd (beads)** for issue tracking. Run `bd prime` to see full workflow context and commands.
-
-### Quick Reference
-
-```bash
-bd ready              # Find available work
-bd show <id>          # View issue details
-bd update <id> --claim  # Claim work
-bd close <id>         # Complete work
-```
-
-### Rules
-
-- Use `bd` for ALL task tracking — do NOT use TodoWrite, TaskCreate, or markdown TODO lists
-- Run `bd prime` for detailed command reference and session close protocol
-- Use `bd remember` for persistent knowledge — do NOT use MEMORY.md files
-
-## Session Completion
-
-**When ending a work session**, you MUST complete ALL steps below. Work is NOT complete until `git push` succeeds.
-
-**MANDATORY WORKFLOW:**
-
-1. **File issues for remaining work** - Create issues for anything that needs follow-up
-2. **Run quality gates** (if code changed) - Tests, linters, builds
-3. **Update issue status** - Close finished work, update in-progress items
-4. **PUSH TO REMOTE** - This is MANDATORY:
-   ```bash
-   git pull --rebase
-   bd dolt push
-   git push
-   git status  # MUST show "up to date with origin"
-   ```
-5. **Clean up** - Clear stashes, prune remote branches
-6. **Verify** - All changes committed AND pushed
-7. **Hand off** - Provide context for next session
-
-**CRITICAL RULES:**
-- Work is NOT complete until `git push` succeeds
-- NEVER stop before pushing - that leaves work stranded locally
-- NEVER say "ready to push when you are" - YOU must push
-- If push fails, resolve and retry until it succeeds
-<!-- END BEADS INTEGRATION -->

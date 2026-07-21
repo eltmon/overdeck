@@ -22,6 +22,7 @@ import {
   RagDecision,
   ResetMarker,
 } from "./memory"
+import { HealthState } from "./system-health"
 
 // ─── System Events ────────────────────────────────────────────────────────────
 
@@ -32,6 +33,19 @@ export const SystemHeartbeatEvent = Schema.Struct({
   payload: Schema.Struct({ ts: Schema.Number }),
 })
 export type SystemHeartbeatEvent = typeof SystemHeartbeatEvent.Type
+
+/** The canonical local Dolt head advanced after a background remote pull. */
+export const BeadsFreshnessChangedEvent = Schema.Struct({
+  type: Schema.Literal("beads.freshness_changed"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({
+    projectKey: Schema.String,
+    localHead: Schema.String,
+    lastSyncedAt: Schema.String,
+  }),
+})
+export type BeadsFreshnessChangedEvent = typeof BeadsFreshnessChangedEvent.Type
 
 // ─── Agent Events ─────────────────────────────────────────────────────────────
 
@@ -189,6 +203,12 @@ export const AgentEnrichmentChangedEvent = Schema.Struct({
           description: Schema.optional(Schema.String),
         })),
       })),
+    })),
+    // PAN-1520 (FR-1) — pending ExitPlanMode plan payload for the approval modal.
+    pendingProposedPlan: Schema.optional(Schema.Struct({
+      toolUseId: Schema.String,
+      askedAt: Schema.String,
+      plan: Schema.String,
     })),
     resolution: Schema.optional(AgentResolution),
     resolutionCount: Schema.optional(Schema.Number),
@@ -529,6 +549,39 @@ export const PipelineTestCompletedEvent = Schema.Struct({
 })
 export type PipelineTestCompletedEvent = typeof PipelineTestCompletedEvent.Type
 
+/** New — verification gate dispatched (review-pipeline verify step) */
+export const PipelineVerificationStartedEvent = Schema.Struct({
+  type: Schema.Literal("pipeline.verification-started"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({ issueId: IssueId }),
+})
+export type PipelineVerificationStartedEvent = typeof PipelineVerificationStartedEvent.Type
+
+/** New — verification gate failed (carries failedCheck for gate failures, message for infra errors) */
+export const PipelineVerificationFailedEvent = Schema.Struct({
+  type: Schema.Literal("pipeline.verification-failed"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({
+    issueId: IssueId,
+    failedCheck: Schema.optional(Schema.String),
+    message: Schema.optional(Schema.String),
+  }),
+})
+export type PipelineVerificationFailedEvent = typeof PipelineVerificationFailedEvent.Type
+
+/** New — issue lifecycle transition (single source: IssueLifecycle.transitionTo).
+ * `state` stays an open string so new server-side lifecycle states can never
+ * poison the domain-event stream (the failure mode behind this event's addition). */
+export const IssueTransitionedEvent = Schema.Struct({
+  type: Schema.Literal("issue.transitioned"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({ issueId: IssueId, state: Schema.String }),
+})
+export type IssueTransitionedEvent = typeof IssueTransitionedEvent.Type
+
 export const OperatorInterventionEvent = Schema.Struct({
   type: Schema.Literal("operator.intervention"),
   sequence: SequenceNumber,
@@ -697,6 +750,12 @@ export const SystemHealthSeverityChangedEvent = Schema.Struct({
     severity: Schema.String,
     reasons: Schema.Array(Schema.String),
     leakedSpecialistCount: Schema.Number,
+    version: Schema.optional(Schema.Literal(2)),
+    transitionVersion: Schema.optional(Schema.Number),
+    previousState: Schema.optional(HealthState),
+    state: Schema.optional(HealthState),
+    reasonCodes: Schema.optional(Schema.Array(Schema.String)),
+    acceptedAt: Schema.optional(Schema.String),
   }),
 })
 export type SystemHealthSeverityChangedEvent = typeof SystemHealthSeverityChangedEvent.Type
@@ -760,6 +819,8 @@ export const ActivityEntryEvent = Schema.Struct({
     issueId: Schema.optional(IssueId),
     /** Dashboard route the feed navigates to on click (e.g. /conv/<name>, /flywheel). */
     link: Schema.optional(Schema.String),
+    /** PAN-1862 (FR-12): fire a desktop notification for this entry (operator-facing warnings). */
+    desktop: Schema.optional(Schema.Boolean),
   }),
 })
 export type ActivityEntryEvent = typeof ActivityEntryEvent.Type
@@ -1001,6 +1062,20 @@ export const ConversationCreatedEvent = Schema.Struct({
 })
 export type ConversationCreatedEvent = typeof ConversationCreatedEvent.Type
 
+/** Emitted (in-memory only) when a conversation title changes, so the sidebar
+ * list can refresh immediately instead of waiting for its poll tick. */
+export const ConversationTitleChangedEvent = Schema.Struct({
+  type: Schema.Literal("conversation.title_changed"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({
+    conversationName: Schema.String,
+    title: Schema.String,
+    titleSource: Schema.String,
+  }),
+})
+export type ConversationTitleChangedEvent = typeof ConversationTitleChangedEvent.Type
+
 /** Emitted (in-memory only) when a PermissionRequest hook fires or resolves for a conversation. */
 export const ConversationPermissionChangedEvent = Schema.Struct({
   type: Schema.Literal("conversation.permission_changed"),
@@ -1106,6 +1181,7 @@ export type EmbedProgressEvent = typeof EmbedProgressEvent.Type
 /** All domain events — the shape streamed via subscribeDomainEvents RPC */
 export const DomainEvent = Schema.Union([
   SystemHeartbeatEvent,
+  BeadsFreshnessChangedEvent,
   AgentCreatedEvent,
   AgentEnrichmentChangedEvent,
   AgentStartedEvent,
@@ -1146,6 +1222,9 @@ export const DomainEvent = Schema.Union([
   PipelineReviewCompletedEvent,
   PipelineTestStartedEvent,
   PipelineTestCompletedEvent,
+  PipelineVerificationStartedEvent,
+  PipelineVerificationFailedEvent,
+  IssueTransitionedEvent,
   OperatorInterventionEvent,
   SubstrateBugFiledEvent,
   ReviewReviewerStartedEvent,
@@ -1182,6 +1261,7 @@ export const DomainEvent = Schema.Union([
   DashboardLifecycleFailedEvent,
   ConversationCompactingChangedEvent,
   ConversationCreatedEvent,
+  ConversationTitleChangedEvent,
   ConversationPermissionChangedEvent,
   ScanStartedEvent,
   ScanProgressEvent,

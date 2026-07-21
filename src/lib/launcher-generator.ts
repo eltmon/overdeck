@@ -1,15 +1,16 @@
-import { join } from 'node:path';
 import { Effect } from 'effect';
+import { dirname, join } from 'node:path';
 import type { Role } from './agents.js';
 import { toCodexSandboxValue } from './runtimes/codex.js';
+import { getHarnessBehavior } from './runtimes/behavior.js';
 import { qualifyPiModel } from './providers.js';
 import { shellQuoteModelIdSync } from './model-validation.js';
 import { colorFgBgForTheme, getUiThemeSync } from './ui-theme.js';
-import { getOverdeckHome } from './paths.js';
+import { getOverdeckHome, packageRoot } from './paths.js';
 
 export type LauncherSpawnMode = 'conversation' | 'remote' | 'resume';
 
-export type LauncherHarness = 'claude-code' | 'pi' | 'codex';
+export type LauncherHarness = 'claude-code' | 'ohmypi' | 'codex' | 'acp';
 
 export interface LauncherConfig {
   role: Role;
@@ -51,8 +52,9 @@ export interface LauncherConfig {
    *   - 'exec': non-interactive `codex exec` with approval_policy=never
    *   - 'tui': bare `codex` interactive TUI (conversation panels)
    *   - 'work-tui': interactive work-agent TUI with sandbox/approval flags
+   *   - 'app-server': persistent Codex app-server host process
    */
-  codexMode?: 'exec' | 'tui' | 'work-tui';
+  codexMode?: 'exec' | 'tui' | 'work-tui' | 'app-server';
   /**
    * Per-agent CODEX_HOME directory path (e.g. ~/.overdeck/agents/<id>/codex-home).
    * When set, exported as CODEX_HOME before launching codex.
@@ -68,6 +70,17 @@ export interface LauncherConfig {
    * reading and writing files in the working directory).
    */
   codexSandboxMode?: string;
+
+  /** Agent identity passed to the persistent ACP host. Required for harness='acp'. */
+  acpAgentId?: string;
+  /** ACP provider name (for example, 'kimi'). Required for harness='acp'. */
+  acpProvider?: string;
+  /** Workspace exposed to the ACP agent. Required for harness='acp'. */
+  acpWorkspace?: string;
+  /** Exact ACP provider executable validated by launch preflight. Required for harness='acp'. */
+  acpBinaryPath?: string;
+  /** Materialized Overdeck context bundle injected into the first fresh ACP prompt. */
+  acpContextFile?: string;
 
   // Command construction
   /**
@@ -239,7 +252,8 @@ function buildChannelsArgs(config: LauncherConfig): string {
 
 function wrapWithSupervisor(config: LauncherConfig, cmd: string): string {
   if (!config.useSupervisor) return cmd;
-  if (config.harness === 'pi' || config.reviewSignal) return cmd;
+  const behavior = getHarnessBehavior(config.harness ?? 'claude-code');
+  if (!behavior.supportsPtySupervisor || config.reviewSignal) return cmd;
   if (!config.supervisorScriptPath) {
     throw new Error('LauncherConfig.supervisorScriptPath is required when useSupervisor=true');
   }
@@ -269,7 +283,7 @@ export function generateLauncherScriptSync(config: LauncherConfig): string {
     lines.push('set -o pipefail');
   }
 
-  // Trust mkcert CA so agent CLI commands can reach https://pan.localhost
+  // Trust mkcert CA so agent CLI commands can reach https://overdeck.localhost
   lines.push('command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"');
 
   // PAN-1678: skip the heavy ~10-core build:docs-index job in any `npm run
@@ -448,19 +462,24 @@ const PROVIDER_ENV_UNSETS = [
   'GEMINI_API_KEY',
   'API_TIMEOUT_MS',
   'CLAUDE_CODE_API_KEY_HELPER_TTL_MS',
+  'CLAUDE_CODE_AUTO_COMPACT_WINDOW',
+  'CLAUDE_CODE_MAX_CONTEXT_TOKENS',
 ];
 
 function buildCommand(config: LauncherConfig): string[] {
   const parts: string[] = [];
+  const behavior = getHarnessBehavior(config.harness ?? 'claude-code');
 
   if (config.spawnMode === 'conversation') {
-    if (config.harness === 'pi') {
-      return buildPiCommand(config, false);
+    if (behavior.launchCommandKind === 'ohmypi-rpc') {
+      return buildOhmypiCommand(config, false);
     }
-    if (config.harness === 'codex') {
+    if (behavior.launchCommandKind === 'codex-work-tui') {
       return buildCodexCommand(config, false);
     }
-
+    if (behavior.launchCommandKind === 'acp-host') {
+      return buildAcpCommand(config, false);
+    }
 
     // Conversation panel doesn't use exec — it runs the command then loops
     if (config.baseCommand) {
@@ -542,11 +561,15 @@ function buildReviewSubRoleCommand(config: LauncherConfig): string[] {
  * frontmatter), permission flags are skipped — the frontmatter handles them.
  */
 function buildNonConversationCommand(config: LauncherConfig, useExec: boolean): string[] {
-  if (config.harness === 'pi') {
-    return buildPiCommand(config, useExec);
+  const behavior = getHarnessBehavior(config.harness ?? 'claude-code');
+  if (behavior.launchCommandKind === 'ohmypi-rpc') {
+    return buildOhmypiCommand(config, useExec);
   }
-  if (config.harness === 'codex') {
+  if (behavior.launchCommandKind === 'codex-work-tui') {
     return buildCodexCommand(config, useExec);
+  }
+  if (behavior.launchCommandKind === 'acp-host') {
+    return buildAcpCommand(config, useExec);
   }
 
   const parts: string[] = [];
@@ -604,6 +627,98 @@ function buildNonConversationCommand(config: LauncherConfig, useExec: boolean): 
 }
 
 /**
+ * Build an oh-my-pi (omp) command line (PAN-1989).
+ *
+ * RPC mode (work-agents):
+ *   omp --mode rpc \
+ *      --model <model> \
+ *      --session-dir <piSessionDir> \
+ *      --extension <piExtensionPath> \
+ *      [--resume <resumeSessionId>] \
+ *      [--append-system-prompt "$prompt"] \
+ *      <> <piFifoPath> >> <agentDir>/output.log 2>&1
+ *
+ * TUI mode (conversations):
+ *   omp --model <model> \
+ *      --session-dir <piSessionDir> \
+ *      [--extension <piExtensionPath>] \
+ *      [--resume <resumeSessionId>] \
+ *      [--append-system-prompt "$prompt"]
+ *
+ * Contract differences from pi (docs/ohmypi-contract.md):
+ * - Binary is `omp`, not `pi`
+ * - `--no-context-files` is REMOVED (flag does not exist in omp)
+ * - `--resume <id>` replaces `--session <id>`
+ */
+function buildOhmypiCommand(config: LauncherConfig, useExec: boolean): string[] {
+  const piMode = config.piMode ?? 'rpc';
+  if (!config.piSessionDir) {
+    throw new Error('ohmypi launcher requires piSessionDir');
+  }
+  if (piMode === 'rpc') {
+    if (!config.piExtensionPath) {
+      throw new Error('ohmypi launcher (rpc mode) requires piExtensionPath');
+    }
+    if (!config.piFifoPath) {
+      throw new Error('ohmypi launcher (rpc mode) requires piFifoPath');
+    }
+  }
+
+  const tokens: string[] = ['omp'];
+  if (piMode === 'rpc') {
+    tokens.push('--mode', 'rpc');
+  }
+  if (config.model) {
+    tokens.push('--model', shellQuoteModelIdSync(qualifyPiModel(config.model)));
+  }
+  tokens.push('--session-dir', shellQuote(config.piSessionDir));
+  if (config.piExtensionPath) {
+    tokens.push('--extension', shellQuote(config.piExtensionPath));
+  }
+  // NOTE: --no-context-files is intentionally absent — removed in omp (docs/ohmypi-contract.md).
+
+  for (const file of systemPromptFiles(config)) {
+    tokens.push('--append-system-prompt', `"$(cat ${shellQuote(file)} 2>/dev/null)"`);
+  }
+
+  if (config.resumeSessionId) {
+    tokens.push('--resume', shellQuote(config.resumeSessionId));
+  }
+  if (config.extraArgs) {
+    tokens.push(config.extraArgs);
+  }
+  if (config.promptFile) {
+    tokens.push('--append-system-prompt', '"$prompt"');
+  } else if (config.promptInline) {
+    tokens.push('--append-system-prompt', shellQuote(config.promptInline));
+  }
+
+  let cmd = tokens.join(' ').replace(/\s+/g, ' ').trim();
+
+  if (piMode === 'rpc') {
+    // PAN-2108: capture omp's exit so a silent post-startup death leaves a trace.
+    // The launcher bash must OUTLIVE omp to record the exit code + timestamp, so
+    // the rpc path deliberately does NOT `exec` (exec would replace bash with omp
+    // and the exit would be lost — the failure mode that made the flywheel
+    // orchestrator's death undiagnosable). `remain-on-exit on` keeps the dead
+    // pane for `#{pane_exit_status}`; the exit-status file survives even if the
+    // pane is later reaped. The deacon reads both on death detection.
+    const agentDir = dirname(config.piFifoPath!);
+    const outputLogPath = join(agentDir, 'output.log');
+    const exitStatusPath = join(agentDir, 'exit-status');
+    const runLine = `${cmd} <> ${shellQuote(config.piFifoPath!)} >> ${shellQuote(outputLogPath)} 2>&1`;
+    return [
+      runLine,
+      '__omp_exit=$?',
+      `printf '%s %s\\n' "$__omp_exit" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > ${shellQuote(exitStatusPath)}`,
+      'exit $__omp_exit',
+    ];
+  }
+
+  return [useExec ? `exec ${cmd}` : cmd];
+}
+
+/**
  * Build a Pi command line.
  *
  * RPC mode (work-agents):
@@ -633,6 +748,47 @@ function systemPromptFiles(config: LauncherConfig): string[] {
     ...(config.appendSystemPromptFile ? [config.appendSystemPromptFile] : []),
     ...(config.appendSystemPromptFiles ?? []),
   ];
+}
+
+function buildAcpCommand(config: LauncherConfig, useExec: boolean): string[] {
+  if (!config.acpAgentId) {
+    throw new Error('acp launcher requires acpAgentId');
+  }
+  if (!config.acpProvider) {
+    throw new Error('acp launcher requires acpProvider');
+  }
+  if (!config.acpWorkspace) {
+    throw new Error('acp launcher requires acpWorkspace');
+  }
+  if (!config.acpBinaryPath) {
+    throw new Error('acp launcher requires acpBinaryPath');
+  }
+
+  const hostPath = join(packageRoot, 'dist', 'acp-host.js');
+  const tokens = [
+    'node',
+    shellQuote(hostPath),
+    '--agent',
+    shellQuote(config.acpAgentId),
+    '--provider',
+    shellQuote(config.acpProvider),
+    '--workspace',
+    shellQuote(config.acpWorkspace),
+    '--binary-path',
+    shellQuote(config.acpBinaryPath),
+  ];
+  if (config.resumeSessionId) {
+    tokens.push('--resume', shellQuote(config.resumeSessionId));
+  }
+  if (config.model) {
+    tokens.push('--model', shellQuoteModelIdSync(config.model));
+  }
+  if (config.acpContextFile) {
+    tokens.push('--context-file', shellQuote(config.acpContextFile));
+  }
+
+  const cmd = tokens.join(' ');
+  return [useExec ? `exec ${cmd}` : cmd];
 }
 
 function buildCodexCommand(config: LauncherConfig, useExec: boolean): string[] {
@@ -696,6 +852,19 @@ function computeCodexCommandTokens(config: LauncherConfig, useExec: boolean): st
     return [useExec ? `exec ${cmd}` : cmd];
   }
 
+  if (codexMode === 'app-server') {
+    const hostPath = join(packageRoot, 'dist', 'codex-app-server-host.js');
+    const tokens: string[] = ['node', shellQuote(hostPath)];
+    if (config.model) {
+      tokens.push('--model', shellQuoteModelIdSync(config.model));
+    }
+    if (config.resumeSessionId) {
+      tokens.push('--resume', shellQuote(config.resumeSessionId));
+    }
+    const cmd = tokens.join(' ');
+    return [useExec ? `exec ${cmd}` : cmd];
+  }
+
   const isResume = Boolean(config.resumeSessionId);
 
   // Headless exec mode — fresh spawn or resume.
@@ -741,7 +910,7 @@ function computeCodexCommandTokens(config: LauncherConfig, useExec: boolean): st
   return [useExec ? `exec ${cmd}` : cmd];
 }
 
-function buildPiCommand(config: LauncherConfig, useExec: boolean): string[] {
+export function buildPiCommand(config: LauncherConfig, useExec: boolean): string[] {
   const piMode = config.piMode ?? 'rpc';
   if (!config.piSessionDir) {
     throw new Error('Pi launcher requires piSessionDir');

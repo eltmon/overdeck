@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { X, FolderPlus } from 'lucide-react';
+import posthog from 'posthog-js';
 import { fetchWithTimeout } from '../../lib/apiFetch.js';
 import { dashboardMutationJsonHeaders } from '../../lib/wsTransport.js';
 import { FolderPicker } from './FolderPicker.js';
@@ -77,6 +78,7 @@ export function NewProjectModal({ isOpen, onClose, onCreated }: NewProjectModalP
         return;
       }
       const project = await res.json() as CreatedProject;
+      posthog.capture('project_created', { mode, project_key: project.key });
       onCreated(project);
       onClose();
     } catch (err) {

@@ -23,7 +23,7 @@ const baseConfig = {
   dashboardPort: 43990,
   dashboardApiPort: 43991,
   traefikEnabled: false,
-  traefikDomain: 'pan.localhost',
+  traefikDomain: 'overdeck.localhost',
   traefikDir: '/tmp/does-not-exist/traefik',
 };
 
@@ -69,17 +69,29 @@ describe('restartDashboard — scope contract', () => {
     expect(cliproxySpies.isCliproxyRunning).not.toHaveBeenCalled();
   });
 
-  it('throws StageError if health check never passes', async () => {
+  it('reaps the spawned dashboard if health check never passes', async () => {
+    vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] });
     vi.unstubAllGlobals();
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockRejectedValue(new Error('ECONNREFUSED')),
-    );
-    const startHook = vi.fn().mockResolvedValue(undefined);
+    const fetchMock = vi.fn().mockRejectedValue(new Error('ECONNREFUSED'));
+    vi.stubGlobal('fetch', fetchMock);
+    const stop = vi.fn().mockResolvedValue(undefined);
+    const startHook = vi.fn().mockResolvedValue({ stop });
 
-    await expect(Effect.runPromise(
-      restartDashboard(baseConfig, startHook, { healthTimeoutMs: 300 }),
-    )).rejects.toBeInstanceOf(StageError);
+    try {
+      const restart = Effect.runPromise(
+        restartDashboard(baseConfig, startHook, { healthTimeoutMs: 300 }),
+      );
+      while (fetchMock.mock.calls.length === 0) {
+        await new Promise<void>((resolve) => setImmediate(resolve));
+      }
+      const rejection = expect(restart).rejects.toBeInstanceOf(StageError);
+      await vi.advanceTimersByTimeAsync(500);
+
+      await rejection;
+      expect(stop).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 
@@ -136,6 +148,57 @@ describe('waitForDashboardHealth', () => {
       waitForDashboardHealth(43991, { timeoutMs: 2000, pollIntervalMs: 50 }),
     )).resolves.toBeUndefined();
     expect(calls).toBeGreaterThanOrEqual(2);
+  });
+
+  it('rejects a 200 health response from a non-primary dashboard identity', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          status: 'ok',
+          repoRoot: '/repo/workspaces/feature-pan-2252',
+          mode: 'peer',
+        }),
+      }),
+    );
+
+    await expect(Effect.runPromise(
+      waitForDashboardHealth(43991, {
+        timeoutMs: 200,
+        pollIntervalMs: 50,
+        expectedIdentity: { repoRoot: '/repo', mode: 'primary' },
+      }),
+    )).rejects.toMatchObject({
+      failure: {
+        stage: 'dashboard',
+        reason: expect.stringContaining('port held by non-primary server (cwd=/repo/workspaces/feature-pan-2252, mode=peer)'),
+      },
+    });
+  });
+
+  it('accepts a 200 health response matching the expected dashboard identity', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          status: 'ok',
+          repoRoot: '/repo',
+          mode: 'primary',
+        }),
+      }),
+    );
+
+    await expect(Effect.runPromise(
+      waitForDashboardHealth(43991, {
+        timeoutMs: 200,
+        pollIntervalMs: 50,
+        expectedIdentity: { repoRoot: '/repo', mode: 'primary' },
+      }),
+    )).resolves.toBeUndefined();
   });
 
   it('StageError reports the dashboard stage on timeout', async () => {

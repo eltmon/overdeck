@@ -104,7 +104,7 @@ Turn `merge_train_enabled` ON, observe ONE real cascade (a merge → siblings re
 - **Commit subjects MUST be lowercase** (commitlint `subject-case` rejects PascalCase/UPPER). Scopes: `cloister|dashboard|db|cli|review|...`.
 - Work on `main`, commit each green slice, push. **Never touch** the pre-existing dirty churn files (`.pan/continues/*`, `TEST.MD`) — `git add` only your files.
 - Anything git-mutating or agent-spawning goes behind a flag or an explicit user action.
-- `pan reload` to make server changes live (frontend is also live via build); verify with Playwright over `https://pan.localhost` (Playwright blocks `file://` — serve over http for mockups).
+- `pan reload` to make server changes live (frontend is also live via build); verify with Playwright over `https://overdeck.localhost` (Playwright blocks `file://` — serve over http for mockups).
 
 ## 7. Future: decouple merge-train from the Flywheel?
 

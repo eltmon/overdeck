@@ -1,6 +1,6 @@
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
-import { existsSync, readFileSync, readdirSync, rmSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { httpHandler } from './http-handler.js';
@@ -12,18 +12,25 @@ import {
   applyIssueReadyLabel, removeIssueReadyLabel,
   applyIssueParkedLabel, removeIssueParkedLabel,
   applyIssueBlocksMainLabel, removeIssueBlocksMainLabel,
+  applyIssueReleasedLabel, removeIssueReleasedLabel,
+  applyIssueObjectionLabel, removeIssueObjectionLabel,
 } from '../../../lib/backlog/label-ops.js';
 import {
-  normalizeGate, classifyIssue, computeWaves, computeLanes, computeCohort, computeStats,
+  normalizeGate, classifyIssue, computeWaves, computeLanes, computeCohort, computeStats, computeEpicGroups,
+  selectNeedsPlanning,
   type ForecastNode, type LaneBlock,
 } from '../../../lib/backlog/pickup.js';
 import { buildClassifyLookups } from '../../../lib/backlog/lookups.js';
 import { getReviewStatusSync } from '../../../lib/review-status.js';
 import { getBacklogSequenceForRoot, clearBacklogSequence } from '../../../lib/overdeck/backlog.js';
-import { listRunningAgentsSync, getAgentStateSync } from '../../../lib/agents.js';
+import { isFlywheelAutoPickupBacklog } from '../../../lib/overdeck/control-settings.js';
 import { SEQUENCER_AGENT_ID } from '../../../lib/backlog/sequencer-agent.js';
 import { resolvePiSessionPath } from './jsonl-resolver.js';
-import { spawnSequencerAgent } from '../../../lib/backlog/sequencer-agent.js';
+import {
+  clearFinishedSequencerRun,
+  getSequencerRunStatus,
+  spawnSequencerAgent,
+} from '../../../lib/backlog/sequencer-agent.js';
 import type { PassMode } from '../../../lib/backlog/types.js';
 
 const readJsonBody = Effect.gen(function* () {
@@ -42,8 +49,8 @@ const getBacklogSequenceRoute = HttpRouter.add(
   'GET',
   '/api/backlog/sequence',
   httpHandler(Effect.gen(function* () {
-    return yield* Effect.try({
-      try: () => {
+    return yield* Effect.tryPromise({
+      try: async () => {
         const projectRoot = process.cwd();
 
         // Read nodes from cache (primary path), seeding it from sequence.md if needed.
@@ -70,18 +77,8 @@ const getBacklogSequenceRoute = HttpRouter.add(
           }
         }
 
+        // issuesWithTasks precomputed above in generator scope.
         const workspacesDir = join(projectRoot, 'workspaces');
-        const issuesWithBeads = new Set<string>();
-        if (existsSync(workspacesDir)) {
-          for (const dir of readdirSync(workspacesDir)) {
-            const match = /^feature-([a-z]+-\d+)$/i.exec(dir);
-            if (match) {
-              if (existsSync(join(workspacesDir, dir, '.beads', 'issues.jsonl'))) {
-                issuesWithBeads.add(match[1]!.toUpperCase());
-              }
-            }
-          }
-        }
 
         // Join issue titles from the in-memory read-model issue service so the
         // detail panel can show the title (the sequence cache stores only the id).
@@ -99,6 +96,8 @@ const getBacklogSequenceRoute = HttpRouter.add(
 
         // Per-issue pipeline state from the shared classifier (single source of truth)
         // so the editor drawer can read/toggle ready / parked / vetoed / blocks-main.
+        // issuesWithTasks passed in: without it the lookup builder blocks the
+        // event loop with per-workspace process calls.
         const lookups = buildClassifyLookups(projectRoot);
 
         const nodes = cachedNodes.map((r) => {
@@ -108,7 +107,7 @@ const getBacklogSequenceRoute = HttpRouter.add(
             (reviewStatus !== null && reviewStatus.reviewStatus !== 'pending') ||
             existsSync(join(workspacesDir, `feature-${r.issueId.toLowerCase()}`));
           const hasPrd = prdFiles.has(issueUpper);
-          const ready = specIssues.has(issueUpper) && issuesWithBeads.has(issueUpper);
+          const ready = specIssues.has(issueUpper);
           const state = classifyIssue({ issue: r.issueId, gate: r.gate } as unknown as Parameters<typeof classifyIssue>[0], lookups);
           return {
             issueId: r.issueId,
@@ -119,6 +118,7 @@ const getBacklogSequenceRoute = HttpRouter.add(
             score: r.score,
             condition: r.condition,
             dependsOn: r.dependsOn,
+            isEpic: (r as { isEpic?: boolean }).isEpic ?? false,
             why: r.why,
             gate: r.gate,
             planning: r.planning,
@@ -162,6 +162,7 @@ const postBacklogRegenerateRoute = HttpRouter.add(
       // into tracker `Issue` objects (their human ref is `identifier`, not `ref`).
       const issues = getSharedIssueService().getIssues() as Array<Record<string, unknown>>;
       try {
+        await clearFinishedSequencerRun(projectRoot);
         const agent = await spawnSequencerAgent(pass, { projectRoot, issues });
         return jsonResponse({ status: 'spawned', agentId: agent.id, pass });
       } catch (err) {
@@ -292,7 +293,7 @@ const getBacklogForecastRoute = HttpRouter.add(
         const projectRoot = process.cwd();
         const seqPath = join(projectRoot, '.pan', 'backlog', 'sequence.md');
         if (!existsSync(seqPath)) {
-          return jsonResponse({ n, stats: null, inFlight: [], waves: [], lanes: { blocks: [], makespan: 0 }, cohort: [] });
+          return jsonResponse({ n, stats: null, inFlight: [], needsPlanning: [], waves: [], lanes: { blocks: [], makespan: 0 }, cohort: [], epics: [], contains: [] });
         }
         const parsed = parseSequenceMd(readFileSync(seqPath, 'utf-8'));
         if (!parsed.ok) throw new Error(`parse error: ${parsed.error}`);
@@ -328,16 +329,26 @@ const getBacklogForecastRoute = HttpRouter.add(
           .filter((x) => x.state.inPipeline)
           .sort((a, b) => a.rank - b.rank)
           .map(enrich);
-        const waves = computeWaves(nodes, lk, n).map((w) => w.map(enrich));
-        const lanesRaw = computeLanes(nodes, lk, n);
+        // PAN-2059 + vision.mdx: when auto-pickup is ON the toggle blanket-releases the
+        // backlog, so the forecast's pickable/waves/lanes/cohort must reflect that too —
+        // keeping the dashboard view and the Flywheel's pick decision in lockstep (PAN-2006).
+        const autoPickup = isFlywheelAutoPickupBacklog();
+        const needsPlanning = selectNeedsPlanning(nodes, lk, { cap: n * 2 }).map(enrich);
+        const waves = computeWaves(nodes, lk, n, autoPickup).map((w) => w.map(enrich));
+        const lanesRaw = computeLanes(nodes, lk, n, autoPickup);
         const lanes = {
           makespan: lanesRaw.makespan,
           blocks: lanesRaw.blocks.map((b: LaneBlock) => ({ ...enrich(b), lane: b.lane, start: b.start, end: b.end })),
         };
-        const cohort = computeCohort(nodes, lk, n);
-        const stats = computeStats(nodes, lk);
+        const cohort = computeCohort(nodes, lk, n, autoPickup);
+        const stats = computeStats(nodes, lk, autoPickup);
+        const groups = computeEpicGroups(nodes, parsed.doc.edges, lk);
+        const epics = groups.epics.map((e) => ({
+          issue: e.issue,
+          title: titleByIssue.get(e.issue.toUpperCase()) ?? '',
+        }));
 
-        return jsonResponse({ n, stats, inFlight, waves, lanes, cohort });
+        return jsonResponse({ n, stats, inFlight, needsPlanning, waves, lanes, cohort, epics, contains: groups.contains });
       },
       catch: (err) => new Error(String(err)),
     });
@@ -361,7 +372,53 @@ const postBacklogLabelsRoute = HttpRouter.add(
       if (typeof body['ready'] === 'boolean') await (body['ready'] ? applyIssueReadyLabel : removeIssueReadyLabel)(issueId);
       if (typeof body['parked'] === 'boolean') await (body['parked'] ? applyIssueParkedLabel : removeIssueParkedLabel)(issueId);
       if (typeof body['blocksMain'] === 'boolean') await (body['blocksMain'] ? applyIssueBlocksMainLabel : removeIssueBlocksMainLabel)(issueId);
+      // PAN-2059 pickup-gate toggles. Release (operator's "go" after reviewing the plan)
+      // and Objection override/clear both flow through here.
+      if (typeof body['released'] === 'boolean') await (body['released'] ? applyIssueReleasedLabel : removeIssueReleasedLabel)(issueId);
+      if (typeof body['objection'] === 'boolean') await (body['objection'] ? applyIssueObjectionLabel : removeIssueObjectionLabel)(issueId);
       return jsonResponse({ status: 'ok', issueId });
+    });
+  })),
+);
+
+// ─── Route: GET /api/backlog/issue-state — single-issue pickup state (PAN-2059) ─
+// Focused per-issue read for the issue cockpit / overlay pickup controls so they
+// don't pull the whole 549-node sequence. Same classifier as /sequence (single
+// source of truth). Works even when the issue isn't in sequence.md: state is
+// label-derived; gate/planning then return defaults with inSequence=false (the UI
+// hides the sequence-only gate/planning controls in that case).
+
+const getBacklogIssueStateRoute = HttpRouter.add(
+  'GET',
+  '/api/backlog/issue-state',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const url = new URL(request.url, 'http://localhost');
+    const issueId = (url.searchParams.get('issueId') ?? '').trim();
+    if (!issueId) return yield* Effect.fail(new Error('issueId is required') as never);
+    return yield* Effect.try({
+      try: () => {
+        const projectRoot = process.cwd();
+        const lookups = buildClassifyLookups(projectRoot);
+
+        // Pull the operator gate + planning mode from sequence.md when the issue is
+        // ranked there; otherwise leave them at defaults and flag inSequence=false.
+        let gate = 'auto';
+        let planning: string | null = null;
+        let inSequence = false;
+        const seqPath = join(projectRoot, '.pan', 'backlog', 'sequence.md');
+        if (existsSync(seqPath)) {
+          const parsed = parseSequenceMd(readFileSync(seqPath, 'utf-8'));
+          if (parsed.ok) {
+            const node = parsed.doc.nodes.find((n) => n.issue.toUpperCase() === issueId.toUpperCase());
+            if (node) { gate = node.gate; planning = node.planning; inSequence = true; }
+          }
+        }
+
+        const state = classifyIssue({ issue: issueId, gate } as unknown as Parameters<typeof classifyIssue>[0], lookups);
+        return jsonResponse({ issueId, state, gate, planning, inSequence });
+      },
+      catch: (err) => new Error(String(err)),
     });
   })),
 );
@@ -409,15 +466,8 @@ const getSequencerStatusRoute = HttpRouter.add(
       const projectRoot = process.cwd();
       // The one-shot sequencer session lingers after it finishes, so "alive" alone
       // would falsely read as running. A pass is done once it writes a fresh
-      // sequence.md (mtime >= startedAt) — until then it's actively generating.
-      const alive = listRunningAgentsSync().some((a) => a.id === SEQUENCER_AGENT_ID && a.tmuxActive);
-      const startedAt = alive ? (getAgentStateSync(SEQUENCER_AGENT_ID)?.startedAt ?? null) : null;
-      const seqPath = join(projectRoot, '.pan', 'backlog', 'sequence.md');
-      let freshSequence = false;
-      if (alive && startedAt && existsSync(seqPath)) {
-        try { freshSequence = statSync(seqPath).mtimeMs >= new Date(startedAt).getTime(); } catch { /* stat failed */ }
-      }
-      const running = alive && !freshSequence;
+      // sequence.md (mtime >= startedAt) or its runtime is idle.
+      const { running, startedAt } = getSequencerRunStatus(projectRoot);
 
       let total = 0;
       const manifestPath = join(projectRoot, '.pan', 'backlog', 'manifest.json');
@@ -463,6 +513,7 @@ export const backlogRouteLayer = Layer.mergeAll(
   postBacklogPlanningRoute,
   getBacklogForecastRoute,
   postBacklogLabelsRoute,
+  getBacklogIssueStateRoute,
   postBacklogClearRoute,
   getSequencerStatusRoute,
 );

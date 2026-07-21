@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Project Overview — Pipeline Section Redesign (PAN-2446 mockup, BINDING)</title>
+<style>
+  :root{--bg:#0b0e14;--card:#11151f;--border:#1e2430;--fg:#e6e9ef;--muted:#8b93a5;--teal:#2dd4bf;--blue:#3b82f6;--violet:#8b5cf6;--amber:#f59e0b;--red:#ef4444;}
+  body{background:var(--bg);color:var(--fg);font:14px/1.45 "DM Sans",system-ui,sans-serif;margin:0;padding:32px;display:flex;gap:32px;flex-wrap:wrap}
+  .panel{width:760px}
+  h1{font:600 15px "Space Grotesk";margin:0 0 4px} .note{color:var(--muted);font-size:11.5px;margin-bottom:14px}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px;margin-bottom:14px}
+  /* ── Stage group header ─────────────────────────── */
+  .stage{display:flex;align-items:baseline;gap:10px;margin:14px 0 6px}
+  .stage b{font:600 13px "Space Grotesk"} .stage span{color:var(--muted);font-size:11px}
+  /* ── THE ROW: one issue in the pipeline ─────────── */
+  .row{display:grid;grid-template-columns:88px 1fr 200px 90px 34px;gap:12px;align-items:center;
+       padding:10px 12px;border:1px solid var(--border);border-radius:10px;margin-bottom:8px;background:rgba(255,255,255,.015)}
+  .row:hover{border-color:#2c3547;cursor:pointer}
+  .id{font:500 11.5px "DM Mono";color:var(--muted)}
+  .main{min-width:0}
+  .title{font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .subline{font-size:11px;color:var(--muted);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .phase{display:flex;flex-direction:column;gap:3px;min-width:0}
+  .chip{display:inline-flex;align-items:center;gap:6px;font-size:11px;padding:2px 8px;border-radius:99px;width:fit-content;max-width:100%}
+  .chip i{width:7px;height:7px;border-radius:99px;flex:none}
+  .c-work{background:rgba(59,130,246,.12);color:#93c5fd} .c-work i{background:var(--blue);animation:p 2s infinite}
+  .c-review{background:rgba(139,92,246,.12);color:#c4b5fd} .c-review i{background:var(--violet);animation:p 2s infinite}
+  .c-test{background:rgba(45,212,191,.12);color:#7ff0e0} .c-test i{background:var(--teal);animation:p 2s infinite}
+  .c-wait{background:rgba(139,147,165,.10);color:var(--muted)} .c-wait i{background:var(--muted)}
+  .c-needs{background:rgba(245,158,11,.14);color:#fcd34d} .c-needs i{background:var(--amber)}
+  .who{font-size:10.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .cost{text-align:right}.cost b{font:600 12.5px "Space Grotesk"}.cost span{display:block;font-size:9.5px;color:var(--muted)}
+  .ava{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;font:600 10.5px "Space Grotesk";
+       background:#1a2130;border:1.5px solid var(--blue)}
+  @keyframes p{50%{opacity:.45}}
+  /* rules card */
+  .rules{font-size:12px;color:var(--muted)} .rules li{margin-bottom:6px} .rules b{color:var(--fg)}
+  .bad{color:var(--red)} .good{color:var(--teal)}
+</style>
+</head>
+<body>
+<div class="panel">
+  <h1>Pipeline — panopticon-cli <span style="color:var(--muted);font-weight:400">· 15 active · newest movement first</span></h1>
+  <div class="note">BINDING mockup for the project-overview pipeline section. One row per issue (not per agent);
+  the agents fold INTO the row. No raw badge text, no overlap, titles always visible.</div>
+
+  <div class="stage"><b>Needs you</b><span>waiting on a human decision</span></div>
+  <div class="row" style="border-color:rgba(245,158,11,.4)">
+    <span class="id">MIN-857</span>
+    <div class="main">
+      <div class="title">Voice UX overhaul: make Gemini voice a native, first-class experience</div>
+      <div class="subline">merge train assembled — held for your UAT review</div>
+    </div>
+    <div class="phase"><span class="chip c-needs"><i></i>waiting on you</span><span class="who">all checks passed · 19/19 tasks</span></div>
+    <div class="cost"><b>$41.20</b><span>3 sessions</span></div>
+    <div class="ava" style="border-color:var(--amber)">G5</div>
+  </div>
+
+  <div class="stage"><b>Being reviewed</b><span>2</span></div>
+  <div class="row">
+    <span class="id">PAN-2095</span>
+    <div class="main">
+      <div class="title">pan reload builds stale primary worktree source — fixes never go live</div>
+      <div class="subline">review passed · tests running now</div>
+    </div>
+    <div class="phase"><span class="chip c-test"><i></i>testing</span><span class="who">gpt-5.5 test agent · 12m</span></div>
+    <div class="cost"><b>$9.55</b><span>2 sessions</span></div>
+    <div class="ava">G5</div>
+  </div>
+  <div class="row">
+    <span class="id">PAN-2373</span>
+    <div class="main">
+      <div class="title">Flake policy — CI retry semantics, quarantine, non-blocking flake lane</div>
+      <div class="subline">reviewer checking the finished work</div>
+    </div>
+    <div class="phase"><span class="chip c-review"><i></i>in review</span><span class="who">gpt-5.5 reviewer · 4m</span></div>
+    <div class="cost"><b>$28.80</b><span>4 sessions</span></div>
+    <div class="ava" style="border-color:var(--violet)">G5</div>
+  </div>
+
+  <div class="stage"><b>Being built</b><span>3</span></div>
+  <div class="row">
+    <span class="id">PAN-2388</span>
+    <div class="main">
+      <div class="title">Token cost capture for ohmypi and codex as first-class metering citizens</div>
+      <div class="subline">2 crew members working · 9 of 14 tasks done</div>
+    </div>
+    <div class="phase"><span class="chip c-work"><i></i>building</span><span class="who">gpt-5.5 ×2 + sonnet-5 supervisor</span></div>
+    <div class="cost"><b>$34.10</b><span>5 sessions</span></div>
+    <div class="ava">G5</div>
+  </div>
+  <div class="row">
+    <span class="id">PAN-2420</span>
+    <div class="main">
+      <div class="title">GitHub App merge-door hardening — preflight, scope errors, reconcile</div>
+      <div class="subline">writing code · 1 of 4 tasks done</div>
+    </div>
+    <div class="phase"><span class="chip c-work"><i></i>building</span><span class="who">gpt-5.5 · active now</span></div>
+    <div class="cost"><b>$4.30</b><span>1 session</span></div>
+    <div class="ava">G5</div>
+  </div>
+  <div class="row">
+    <span class="id">LEX-1</span>
+    <div class="main">
+      <div class="title">Milestone 1: The Persistent Heartbeat — durable storage, offline…</div>
+      <div class="subline">planning what to build (plan-only project: stops at vBRIEF)</div>
+    </div>
+    <div class="phase"><span class="chip c-work"><i></i>planning</span><span class="who">fable-5 · 22m</span></div>
+    <div class="cost"><b>$6.75</b><span>1 session</span></div>
+    <div class="ava" style="border-color:var(--teal)">F5</div>
+  </div>
+</div>
+
+<div class="panel">
+  <h1>Rules distilled from the screenshot's failures</h1>
+  <div class="card rules"><ol>
+    <li><b>One row per ISSUE, agents fold in.</b> The current view renders one row per agent, so a 3-agent issue eats 3 rows with <span class="bad">no titles anywhere</span>. Row = issue; the who-line summarizes crew ("gpt-5.5 ×2 + supervisor").</li>
+    <li><b class="bad">Kill the overlap bug</b>: "REVIEW RUNNING" badge collides with the agent name because the badge is absolutely positioned over a flexless container. The chip + who-line are separate grid cells — collision structurally impossible.</li>
+    <li><b>Title is the biggest text in the row</b>, single line, ellipsized, always present (data already exists — feature.title).</li>
+    <li><b>Plain-language phases</b> (building / in review / testing / waiting on you / lining up to ship) with the cockpit's color language — never RAW BADGE TEXT like "WORK RUNNING".</li>
+    <li><b>Needs-you group pinned first</b> with amber accents; then stage groups ordered by pipeline position; rows sorted by last activity.</li>
+    <li><b>Cost per issue with session count</b>, right-aligned, never truncated ("$28.80 · 4 sessions", not "$28.8").</li>
+    <li><b>Row click → issue cockpit.</b> Avatar shows the primary model initials, ring color = phase.</li>
+    <li><b>Above the fold stays</b>: the 5-stat strip + CI health are good — keep, but stat cards link (Active→pipeline list, Spend→Costs page).</li>
+  </ol></div>
+</div>
+</body>
+</html>

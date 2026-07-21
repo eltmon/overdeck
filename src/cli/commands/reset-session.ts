@@ -6,9 +6,13 @@ import { getWorkAgentLifecycleStateSync } from '../../lib/work-agent-lifecycle.j
 import { resolveIssueIdSync } from '../../lib/issue-id.js';
 
 export async function resetSessionCommand(id: string): Promise<void> {
-  // Support "agent-xxx" prefix, or just the issue ID
-  const issueId = resolveIssueIdSync(id);
-  const agentId = `agent-${issueId.toLowerCase()}`;
+  // A full "agent-…" id (e.g. agent-min-880-review) targets that agent
+  // directly — rebuilding from the issue id would silently drop role
+  // suffixes and clear the wrong agent's session (PAN-2948). A bare issue
+  // id keeps targeting the work agent.
+  const agentId = id.startsWith('agent-')
+    ? id
+    : `agent-${resolveIssueIdSync(id).toLowerCase()}`;
 
   const state = getAgentStateSync(agentId);
   if (!state) {

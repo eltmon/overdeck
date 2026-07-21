@@ -55,22 +55,24 @@ export function parseGitHubReposSync(): GitHubRepoConfig[] {
     }
   }
 
-  // 2. Auto-derive from projects.yaml (if no explicit GITHUB_REPOS)
-  if (repos.length === 0) {
-    try {
-      const { projects } = loadProjectsConfigSync();
-      for (const [key, project] of Object.entries(projects)) {
-        if (project.github_repo) {
-          const [owner, repo] = project.github_repo.split('/');
-          // Derive prefix: linear_team if set, otherwise uppercase project key
-          const prefix = getIssuePrefix(project) || key.toUpperCase().replace(/-/g, '');
-          if (owner && repo && prefix) {
-            repos.push({ owner, repo, prefix: prefix.toUpperCase() });
-          }
+  // 2. Auto-derive from projects.yaml — ALWAYS merged, env wins per-prefix.
+  // PAN-2449: the old behavior skipped projects.yaml entirely whenever
+  // GITHUB_REPOS yielded any entry, silently hiding correctly-registered
+  // GitHub projects (LEX-1 resolved against the wrong tracker entirely).
+  const envPrefixes = new Set(repos.map(r => r.prefix));
+  try {
+    const { projects } = loadProjectsConfigSync();
+    for (const [key, project] of Object.entries(projects)) {
+      if (project.github_repo) {
+        const [owner, repo] = project.github_repo.split('/');
+        // Derive prefix: linear_team if set, otherwise uppercase project key
+        const prefix = (getIssuePrefix(project) || key.toUpperCase().replace(/-/g, '')).toUpperCase();
+        if (owner && repo && prefix && !envPrefixes.has(prefix)) {
+          repos.push({ owner, repo, prefix });
         }
       }
-    } catch { /* ignore */ }
-  }
+    }
+  } catch { /* ignore */ }
 
   return repos;
 }

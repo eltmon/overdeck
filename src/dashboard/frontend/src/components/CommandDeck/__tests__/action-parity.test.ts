@@ -1,11 +1,16 @@
 import { describe, expect, it } from 'vitest';
 
-import { ISSUE_ACTIONS, type IssueActionKey } from '../../../lib/issueActions';
+import {
+  ISSUE_ACTIONS,
+  ZONE_B_SESSION_ACTIONS,
+  type IssueActionKey,
+  type NonIssueActionKey,
+} from '../../../lib/issueActions';
 
 const issueActionKeys = new Set(ISSUE_ACTIONS.map((action) => action.key));
 
 const legacyIssueActionMap: Record<string, IssueActionKey | null> = {
-  'Review & Test': 'reviewTest',
+  'Review & Test': 'requestReview',
   Recover: 'recoverReview',
   'Stop agent': 'stopAgent',
   'Start agent': 'startAgent',
@@ -20,7 +25,7 @@ const legacyIssueActionMap: Record<string, IssueActionKey | null> = {
   'Restart agent': 'restartAgent',
   'Restart from plan': 'restartFromPlan',
   'Reset issue': 'resetIssue',
-  Beads: 'beads',
+  Tasks: 'tasks',
   Transcripts: 'transcripts',
   Discussions: 'discussions',
   Upload: 'upload',
@@ -30,19 +35,27 @@ const legacyIssueActionMap: Record<string, IssueActionKey | null> = {
   'Status review': 'statusReview',
   'Copy settings': 'copySettings',
   Open: 'open',
-  'Inspect bead': 'inspectBead',
+  'Inspect task': 'inspectTask',
   Untroubled: 'untroubled',
 };
 
-const nonIssueScopedActionLabels = [
-  'Merge',
-  'Stop session',
-  'View terminal',
-  'View State.md',
-  'View vBRIEF',
-  'Copy Session ID',
-  'Copy tmux command',
-] as const;
+const zoneBSessionActionKeys = [
+  'stopSession',
+  'viewTerminal',
+  'pauseSession',
+  'resumeFocusedSession',
+  'restartSession',
+  'replaySession',
+  'openStateDir',
+  'viewState',
+  'viewFocusedXbrief',
+  'copySessionId',
+  'copyTmuxCommand',
+  'viewJsonl',
+  'exportSessionMetadata',
+  'exportRoundHistory',
+  'deepWipe',
+] as const satisfies readonly NonIssueActionKey[];
 
 describe('Command Deck action parity', () => {
   it.each(Object.entries(legacyIssueActionMap))(
@@ -53,8 +66,15 @@ describe('Command Deck action parity', () => {
     },
   );
 
-  it('documents non-issue-scoped actions that stay outside ISSUE_ACTIONS', () => {
-    expect(nonIssueScopedActionLabels).toContain('Merge');
-    expect(nonIssueScopedActionLabels).toContain('Stop session');
+  it('keeps every Zone B session action executable and outside ISSUE_ACTIONS', () => {
+    expect(ZONE_B_SESSION_ACTIONS.map((action) => action.key)).toEqual(
+      zoneBSessionActionKeys,
+    );
+
+    for (const action of ZONE_B_SESSION_ACTIONS) {
+      expect(action.ownerSurface, action.key).toBe('ZoneBActionStrip');
+      expect(action.scope, action.key).toBe('session');
+      expect(issueActionKeys.has(action.key as IssueActionKey), action.key).toBe(false);
+    }
   });
 });

@@ -29,11 +29,13 @@ describe('loadCloisterConfig', () => {
     mockedWriteFileSync.mockReset();
   });
 
-  it('defines conservative close-out defaults', () => {
+  it('defines close-out defaults with auto close-out ON (destructive options off)', () => {
     expect(DEFAULT_CLOISTER_CONFIG.close_out).toEqual({
       remove_workspace: false,
       delete_feature_branch: false,
-      auto: false,
+      // Auto close-out must default ON — merged issues otherwise sit in
+      // "awaiting close-out" forever leaking Docker stacks and branches.
+      auto: true,
       auto_delay_minutes: 60,
     });
   });
@@ -44,6 +46,9 @@ describe('loadCloisterConfig', () => {
       stage1_minutes: 20,
       stage2_minutes: 45,
       stage3_minutes: 90,
+      flywheel_stage1_minutes: 20,
+      flywheel_stage2_minutes: 24,
+      flywheel_stage3_minutes: 28,
     });
   });
 
@@ -62,6 +67,9 @@ describe('loadCloisterConfig', () => {
       stage1_minutes: 20,
       stage2_minutes: 45,
       stage3_minutes: 90,
+      flywheel_stage1_minutes: 20,
+      flywheel_stage2_minutes: 24,
+      flywheel_stage3_minutes: 28,
     });
   });
 
@@ -76,6 +84,26 @@ describe('loadCloisterConfig', () => {
       stage1_minutes: 10,
       stage2_minutes: 45,
       stage3_minutes: 90,
+      flywheel_stage1_minutes: 20,
+      flywheel_stage2_minutes: 24,
+      flywheel_stage3_minutes: 28,
+    });
+  });
+
+  it('deep-merges a partial flywheel stuck-remediation override', () => {
+    mockedExistsSync.mockReturnValue(true);
+    mockedReadFileSync.mockReturnValue('[stuck_remediation]\nflywheel_stage3_minutes = 30\n');
+
+    const config = loadCloisterConfigSync();
+
+    expect(config.stuck_remediation).toEqual({
+      enabled: true,
+      stage1_minutes: 20,
+      stage2_minutes: 45,
+      stage3_minutes: 90,
+      flywheel_stage1_minutes: 20,
+      flywheel_stage2_minutes: 24,
+      flywheel_stage3_minutes: 30,
     });
   });
 

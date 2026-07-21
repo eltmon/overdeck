@@ -1,0 +1,48 @@
+# Pipeline Membership
+
+Pipeline membership is an exception queue: an issue is in the pipeline when its durable state is not provably a clean terminal state. This definition keeps active work and lifecycle drift visible while excluding untouched backlog and correctly closed work.
+
+## Durable lenses
+
+`gatherProjectLensSignals()` builds membership from six durable signals. For the pull-request and branch lenses, a convention branch is either `feature/<id>` or `strike/<id>`:
+
+1. An open pull request for the convention branch.
+2. A merged pull request, which is the merge oracle for squash merges.
+3. A convention branch plus its unmerged relationship to `main`, evaluated with git.
+4. Whether the tracker issue is open.
+5. The current pipeline phase label, when present.
+6. A durable xBRIEF spec on `overdeck-state`.
+
+An xBRIEF makes an otherwise untouched open issue `planned_backlog` because its recorded code paths age. An open issue with a live `strike/` branch and no PR also surfaces as `planned_backlog`, so active strike work enters the pipeline before its PR opens. Landing detection requires positive evidence (PAN-2887): a branch contained in `main` counts as landed only when its tip sits off `main`'s first-parent line (its unique commits arrived via a merge). A freshly-created branch pointing at a `main` commit has zero unique work and is `planned_backlog` — every `pan start` passes through that state until the first commit. Known blind spot: a fast-forward-landed branch is indistinguishable from a fresh pointer and classifies as backlog (visible and safe) rather than limbo. A `planned` label is only a phase hint; it never substitutes for the durable spec lens. Pull-request lenses are capability-gated: projects without `github_repo` still gather tracker state, configured repository branches, and xBRIEF specs instead of resolving to an empty membership set.
+
+Agent state, tmux sessions, workspaces, and `review_status` are L5 liveness annotations. They never decide membership. This is why the resolver returns the same answer with a fresh, empty `overdeck.db`. Resource discovery may temporarily retain a live-resource row when a project's durable membership lookup is unavailable; it leaves membership annotations unset and does not treat a successful empty result as unavailable.
+
+## Buckets
+
+| Bucket | Meaning |
+| --- | --- |
+| `in_flight` | The issue is open and has an open PR. |
+| `zombie_pr` | The issue is closed but its PR remains open and needs reconciliation. |
+| `post_merge_limbo` | Work is merged — a merged PR exists, or the branch's unique commits are contained in `main` via merge lineage (positive non-PR evidence, PAN-2887) — but the issue remains open. |
+| `planned_backlog` | An open issue has a convention branch (unmerged work, or a fresh zero-ahead branch with no unique commits yet — PAN-2887) or a durable xBRIEF but no open PR. |
+| `clean_terminal` | The issue is closed with no open PR, or it is open but has never started and has no durable plan. It is outside the pipeline. |
+
+### Display filtering (PAN-2822)
+
+The dashboard Issues pane has a display-only toggle for rows whose `planned_backlog` membership comes from the L6 durable-spec lens. The preference is visible by default and persists under the localStorage key `overdeck.ui.showPlannedBacklog`; disabling it hides only rows with the derived `specOnlyPlanned` DTO field set to `true`. Rows classified through the unmerged-branch or ready-label reasons remain visible.
+
+The toggle does not change `resolvePipelineMembership()` or any membership or resource API response. The server derives `specOnlyPlanned` from `PLANNED_BACKLOG_SPEC_ONLY_REASON`, and list surfaces apply the preference after receiving the unchanged resource data.
+
+`labelDrift` is `stale_present` when a phase label survives a terminal/closed lifecycle and `stale_absent` when an open PR has no phase label. It is `null` when the label agrees or no drift rule applies.
+
+## Read doors
+
+All consumers use one of these representations of the same verdict:
+
+- Library: `resolvePipelineMembership()` in `src/lib/pipeline-membership.ts`, with signals from `gatherProjectLensSignals()` in `src/lib/pipeline-membership-gather.ts`.
+- Dashboard API: `GET /api/pipeline/membership?project=<project-key>`, backed by the cached membership service. `POST /api/pipeline/membership/refresh?project=<project-key>` is the operator-initiated retry: it forces a re-gather via `refreshMembershipSnapshotsForProjects()` (PAN-2972) and returns the fresh snapshot, because re-reading a cold snapshot can never heal it.
+- Issue DTO: total `pipelineMembership` with `available`, `inPipeline`, `bucket`, and `labelDrift`, used by the dashboard frontend. `available: false` means durable membership could not be resolved; a successful lookup with no candidate is explicitly `clean_terminal`.
+
+Dashboard GET requests are snapshot-only. The membership API returns the last-good snapshot immediately or a fast `503` while its first background refresh is still loading; it never gathers tracker or git evidence inside a GET. When a background refresh fails on a cold cache, the failure is logged and recorded on the snapshot, and the `503` body carries the real cause (`Pipeline membership refresh failed: …`) instead of a permanent "loading" (PAN-2972). The frontend Retry button POSTs to the refresh route rather than refetching the GET. Membership is also advisory to issue rendering: loading and failure leave the issue tree and its actions mounted, with a status message or explicit Retry alongside them. Lifecycle events invalidate the affected query, so there is no interval membership poll.
+
+No command, route, view, or skill may reconstruct membership from tracker state, workspaces, agents, tmux, or review rows. `scripts/lint-pipeline-membership.sh` enforces delegation for the six migrated consumers and rejects disposable-state imports in the resolver/gatherer boundary. Run `bash scripts/lint-pipeline-membership.sh --self-test` to verify that the guard detects seeded legacy and L5 violations.

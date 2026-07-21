@@ -223,10 +223,12 @@ function destroyTray() {
 */
 const BASE_PORT = 7825;
 const MAX_RESTART_DELAY_MS = 3e4;
+const MAX_RESTART_ATTEMPTS = 8;
 const SIGTERM_GRACE_MS = 3e3;
 let serverProcess = null;
 let restartAttempt = 0;
 let restartTimer = null;
+let waitInterval = null;
 let quitting = false;
 let onReadyCallback = null;
 function randomHex(bytes) {
@@ -236,6 +238,8 @@ function resolvePort() {
 	return BASE_PORT + restartAttempt % 10;
 }
 function startServer(onReady) {
+	quitting = false;
+	restartAttempt = 0;
 	onReadyCallback = onReady;
 	spawnServer();
 }
@@ -252,14 +256,16 @@ function spawnServer() {
 	const child = node_child_process.spawn(process.execPath, [entry], {
 		env: {
 			...process.env,
+			API_PORT: String(port),
 			OVERDECK_PORT: String(port),
+			OVERDECK_FRONTEND_DIR: resolveServerStaticDir() ?? void 0,
 			OVERDECK_AUTH_TOKEN: authToken,
 			OVERDECK_MODE: "desktop",
 			OVERDECK_NO_BROWSER: "1",
 			TERM: process.env.TERM || "xterm-256color",
 			COLORTERM: process.env.COLORTERM || "truecolor",
 			LANG: process.env.LANG || "en_US.UTF-8",
-			ELECTRON_RUN_AS_NODE: void 0
+			ELECTRON_RUN_AS_NODE: "1"
 		},
 		stdio: [
 			"ignore",
@@ -276,8 +282,9 @@ function spawnServer() {
 	});
 	child.on("spawn", () => {
 		console.log(`[desktop/server] spawned pid=${child.pid} port=${port}`);
-		waitForServer(`http://127.0.0.1:${port}`, () => {
-			console.log(`[desktop/server] ready on port ${port}`);
+		waitForServer(`http://127.0.0.1:${port}`, (healthy) => {
+			console.log(`[desktop/server] ready on port ${port} (healthy=${String(healthy)})`);
+			if (healthy) restartAttempt = 0;
 			onReadyCallback?.(port, `ws://127.0.0.1:${port}`);
 		});
 	});
@@ -293,24 +300,32 @@ function spawnServer() {
 	});
 }
 function waitForServer(url, callback, maxMs = 3e4) {
+	if (waitInterval) clearInterval(waitInterval);
 	const start = Date.now();
 	const interval = setInterval(() => {
 		if (Date.now() - start > maxMs) {
 			clearInterval(interval);
-			callback();
+			if (waitInterval === interval) waitInterval = null;
+			callback(false);
 			return;
 		}
 		fetch(url + "/api/health", { signal: AbortSignal.timeout(1e3) }).then((r) => {
 			if (r.ok) {
 				clearInterval(interval);
-				callback();
+				if (waitInterval === interval) waitInterval = null;
+				callback(true);
 			}
 		}).catch(() => {});
 	}, 500);
+	waitInterval = interval;
 }
 function scheduleRestart() {
 	if (quitting) return;
 	restartAttempt++;
+	if (restartAttempt > MAX_RESTART_ATTEMPTS) {
+		console.error(`[desktop/server] server failed ${MAX_RESTART_ATTEMPTS} consecutive times — giving up. Use the app menu's dashboard restart to retry.`);
+		return;
+	}
 	const delay = Math.min(1e3 * Math.pow(2, restartAttempt - 1), MAX_RESTART_DELAY_MS);
 	console.log(`[desktop/server] restarting in ${delay}ms (attempt ${restartAttempt})`);
 	restartTimer = setTimeout(() => {
@@ -324,6 +339,10 @@ function stopServer() {
 		clearTimeout(restartTimer);
 		restartTimer = null;
 	}
+	if (waitInterval) {
+		clearInterval(waitInterval);
+		waitInterval = null;
+	}
 	const child = serverProcess;
 	if (!child) return;
 	serverProcess = null;
@@ -336,194 +355,184 @@ function stopServer() {
 }
 //#endregion
 //#region src/updater.ts
-/**
-* Auto-updater service using electron-updater.
-*
-* Handles automatic background checks for updates, downloads, and installation.
-* Uses GitHub Releases as the update server.
-*/
+/** Native desktop updater backed by electron-updater and exact GitHub releases. */
+const OVERDECK_DASHBOARD_PROTOCOL_VERSION = 1;
+const OVERDECK_AGENT_PROTOCOL_VERSION = 1;
 const FOUR_HOURS_MS = 14400 * 1e3;
+const DOWNLOAD_RETRY_MS = [
+	0,
+	1e3,
+	4e3
+];
+const RELEASES_URL = "https://api.github.com/repos/eltmon/overdeck/releases";
 let checkIntervalId = null;
 let initialized = false;
+let channel = "stable";
 let currentStatus = {
-	checking: false,
-	available: false,
-	downloaded: false,
-	version: null,
-	error: null
+	phase: "idle",
+	installMode: "desktop",
+	channel: "stable",
+	currentVersion: electron.app.getVersion(),
+	targetVersion: null,
+	releaseName: null,
+	releaseNotes: null,
+	releaseUrl: null,
+	publishedAt: null,
+	progressPercent: null,
+	error: null,
+	lastCheckedAt: null,
+	compatibility: "unknown",
+	currentDashboardProtocol: OVERDECK_DASHBOARD_PROTOCOL_VERSION,
+	currentAgentProtocol: OVERDECK_AGENT_PROTOCOL_VERSION,
+	targetDashboardProtocol: null,
+	targetAgentProtocol: null
 };
-let statusCallbacks = [];
-/**
-* Register a callback to receive update status changes.
-*/
+const statusCallbacks = [];
 function onUpdateStatusChange(callback) {
 	statusCallbacks.push(callback);
+	return () => {
+		const index = statusCallbacks.indexOf(callback);
+		if (index >= 0) statusCallbacks.splice(index, 1);
+	};
 }
-/**
-* Notify all listeners of status change
-*/
-function notifyStatusChange() {
-	for (const cb of statusCallbacks) cb(currentStatus);
+function publish(patch) {
+	currentStatus = {
+		...currentStatus,
+		...patch
+	};
+	for (const callback of statusCallbacks) callback(currentStatus);
+	for (const win of electron.BrowserWindow.getAllWindows()) if (!win.isDestroyed()) win.webContents.send("update-status", currentStatus);
 }
-/**
-* Send update event to all browser windows
-*/
-function broadcastToRenderers(channel, ...args) {
-	for (const win of electron.BrowserWindow.getAllWindows()) if (!win.isDestroyed()) win.webContents.send(channel, ...args);
+function manifestName() {
+	const prefix = channel === "canary" ? "beta" : "latest";
+	if (process.platform === "darwin") return `${prefix}-mac.yml`;
+	if (process.platform === "linux") return `${prefix}-linux.yml`;
+	return `${prefix}.yml`;
 }
-/**
-* Initialize the auto-updater service.
-* Sets up event handlers and starts periodic update checks.
-*/
-function initializeAutoUpdater(channel = "latest") {
-	if (initialized) {
-		console.log("[updater] Already initialized, skipping...");
-		return;
-	}
-	initialized = true;
+async function configureExactReleaseFeed() {
+	const response = await fetch(RELEASES_URL, {
+		headers: { accept: "application/vnd.github+json" },
+		signal: AbortSignal.timeout(1e4)
+	});
+	if (!response.ok) throw new Error(`GitHub Releases returned ${response.status}`);
+	const release = (await response.json()).find((item) => channel === "canary" ? item.prerelease : !item.prerelease);
+	if (!release) throw new Error(`No ${channel} desktop release is published`);
+	const manifest = release.assets?.find((asset) => asset.name === manifestName());
+	if (!manifest) throw new Error(`${release.tag_name} is missing ${manifestName()}`);
+	const manifestResponse = await fetch(manifest.browser_download_url, { signal: AbortSignal.timeout(1e4) });
+	if (!manifestResponse.ok) throw new Error(`Update manifest returned ${manifestResponse.status}`);
+	const manifestText = await manifestResponse.text();
+	const dashboardProtocol = Number(manifestText.match(/^overdeckDashboardProtocol:\s*(\d+)/m)?.[1]) || null;
+	const agentProtocol = Number(manifestText.match(/^overdeckAgentProtocol:\s*(\d+)/m)?.[1]) || null;
+	publish({
+		releaseName: release.name ?? `Overdeck ${release.tag_name}`,
+		releaseNotes: release.body ?? "Release notes are not available for this release.",
+		releaseUrl: release.html_url ?? null,
+		publishedAt: release.published_at ?? null,
+		targetDashboardProtocol: dashboardProtocol,
+		targetAgentProtocol: agentProtocol,
+		compatibility: dashboardProtocol === OVERDECK_DASHBOARD_PROTOCOL_VERSION && agentProtocol === OVERDECK_AGENT_PROTOCOL_VERSION ? "compatible" : "unknown"
+	});
 	electron_updater.autoUpdater.setFeedURL({
-		provider: "github",
-		owner: "eltmon",
-		repo: "overdeck"
+		provider: "generic",
+		url: `https://github.com/eltmon/overdeck/releases/download/${release.tag_name}`
 	});
-	electron_updater.autoUpdater.channel = channel;
+	electron_updater.autoUpdater.channel = channel === "canary" ? "beta" : "latest";
+}
+function initializeAutoUpdater(requestedChannel = "latest") {
+	if (initialized) return;
+	initialized = true;
+	channel = requestedChannel === "canary" || requestedChannel === "beta" ? "canary" : "stable";
+	publish({ channel });
 	electron_updater.autoUpdater.autoDownload = false;
-	electron_updater.autoUpdater.autoInstallOnAppQuit = true;
-	electron_updater.autoUpdater.on("checking-for-update", () => {
-		currentStatus = {
-			...currentStatus,
-			checking: true,
-			error: null
-		};
-		notifyStatusChange();
-		broadcastToRenderers("update-status", currentStatus);
-		console.log("[updater] Checking for update...");
-	});
-	electron_updater.autoUpdater.on("update-available", (info) => {
-		currentStatus = {
-			checking: false,
-			available: true,
-			downloaded: false,
-			version: info.version,
-			error: null
-		};
-		notifyStatusChange();
-		broadcastToRenderers("update-status", currentStatus);
-		console.log(`[updater] Update available: ${info.version}`);
-	});
-	electron_updater.autoUpdater.on("update-not-available", (info) => {
-		currentStatus = {
-			checking: false,
-			available: false,
-			downloaded: false,
-			version: info.version,
-			error: null
-		};
-		notifyStatusChange();
-		broadcastToRenderers("update-status", currentStatus);
-		console.log(`[updater] Update not available. Current version: ${info.version}`);
-	});
-	electron_updater.autoUpdater.on("download-progress", (progressObj) => {
-		const percent = progressObj.percent.toFixed(1);
-		currentStatus = {
-			...currentStatus,
-			checking: false
-		};
-		notifyStatusChange();
-		broadcastToRenderers("update-download-progress", {
-			percent,
-			transferred: progressObj.transferred,
-			total: progressObj.total
-		});
-		console.log(`[updater] Download progress: ${percent}%`);
-	});
-	electron_updater.autoUpdater.on("update-downloaded", (info) => {
-		currentStatus = {
-			checking: false,
-			available: true,
-			downloaded: true,
-			version: info.version,
-			error: null
-		};
-		notifyStatusChange();
-		broadcastToRenderers("update-status", currentStatus);
-		broadcastToRenderers("update-downloaded", { version: info.version });
-		console.log(`[updater] Update downloaded: ${info.version}`);
-	});
-	electron_updater.autoUpdater.on("error", (err) => {
-		currentStatus = {
-			checking: false,
-			available: false,
-			downloaded: false,
-			version: null,
-			error: err.message
-		};
-		notifyStatusChange();
-		broadcastToRenderers("update-status", currentStatus);
-		console.error("[updater] Error:", err.message);
-	});
+	electron_updater.autoUpdater.autoInstallOnAppQuit = false;
+	electron_updater.autoUpdater.on("checking-for-update", () => publish({
+		phase: "checking",
+		error: null
+	}));
+	electron_updater.autoUpdater.on("update-available", (info) => publish({
+		phase: "available",
+		targetVersion: info.version,
+		progressPercent: null,
+		error: null,
+		lastCheckedAt: (/* @__PURE__ */ new Date()).toISOString()
+	}));
+	electron_updater.autoUpdater.on("update-not-available", (info) => publish({
+		phase: "current",
+		targetVersion: info.version,
+		progressPercent: null,
+		error: null,
+		lastCheckedAt: (/* @__PURE__ */ new Date()).toISOString()
+	}));
+	electron_updater.autoUpdater.on("download-progress", (progress) => publish({
+		phase: "downloading",
+		progressPercent: Math.round(progress.percent * 10) / 10
+	}));
+	electron_updater.autoUpdater.on("update-downloaded", (info) => publish({
+		phase: "ready",
+		targetVersion: info.version,
+		progressPercent: 100,
+		error: null
+	}));
+	electron_updater.autoUpdater.on("error", (error) => publish({
+		phase: "error",
+		error: error.message
+	}));
 	setTimeout(() => {
 		checkForUpdates();
-	}, 3e3);
+	}, 5e3);
 	startPeriodicChecks();
 }
-/**
-* Start periodic update checks every 4 hours.
-*/
 function startPeriodicChecks() {
-	if (checkIntervalId !== null) return;
-	checkIntervalId = setInterval(() => {
+	checkIntervalId ??= setInterval(() => {
 		checkForUpdates();
 	}, FOUR_HOURS_MS);
-	console.log("[updater] Started periodic update checks (every 4 hours)");
 }
-/**
-* Check for updates manually.
-* Returns a promise that resolves when the check completes.
-*/
 async function checkForUpdates() {
-	if (currentStatus.checking) {
-		console.log("[updater] Already checking for update, skipping...");
-		return;
-	}
+	if (currentStatus.phase === "checking") return getUpdateStatus();
+	publish({
+		phase: "checking",
+		error: null
+	});
 	try {
-		console.log("[updater] Starting update check...");
+		await configureExactReleaseFeed();
 		await electron_updater.autoUpdater.checkForUpdates();
-	} catch (err) {
-		console.error("[updater] Check for updates failed:", err);
+	} catch (error) {
+		publish({
+			phase: "error",
+			error: error instanceof Error ? error.message : String(error),
+			lastCheckedAt: (/* @__PURE__ */ new Date()).toISOString()
+		});
 	}
+	return getUpdateStatus();
 }
-/**
-* Download the available update.
-*/
 async function downloadUpdate() {
-	if (!currentStatus.available) {
-		console.log("[updater] No update available to download");
-		return;
+	if (currentStatus.phase !== "available") return getUpdateStatus();
+	for (let attempt = 0; attempt < DOWNLOAD_RETRY_MS.length; attempt += 1) {
+		const delay = DOWNLOAD_RETRY_MS[attempt] ?? 0;
+		if (delay > 0) await new Promise((resolve) => setTimeout(resolve, delay));
+		try {
+			publish({
+				phase: "downloading",
+				error: null,
+				progressPercent: 0
+			});
+			await electron_updater.autoUpdater.downloadUpdate();
+			return getUpdateStatus();
+		} catch (error) {
+			if (attempt === DOWNLOAD_RETRY_MS.length - 1) publish({
+				phase: "error",
+				error: error instanceof Error ? error.message : String(error)
+			});
+		}
 	}
-	try {
-		console.log("[updater] Starting update download...");
-		await electron_updater.autoUpdater.downloadUpdate();
-	} catch (err) {
-		console.error("[updater] Download update failed:", err);
-	}
+	return getUpdateStatus();
 }
-/**
-* Quit and install the downloaded update.
-*/
 function quitAndInstall() {
-	if (!currentStatus.downloaded) {
-		console.log("[updater] No update downloaded to install");
-		return;
-	}
-	console.log("[updater] Quitting and installing update...");
-	electron_updater.autoUpdater.quitAndInstall();
+	if (currentStatus.phase === "ready") electron_updater.autoUpdater.quitAndInstall(false, true);
 }
-/**
-* Get current update status.
-*/
 function getUpdateStatus() {
-	return currentStatus;
+	return { ...currentStatus };
 }
 //#endregion
 //#region src/menu.ts
@@ -654,10 +663,15 @@ function buildMenuTemplate() {
 			{
 				label: "Check for Updates...",
 				click: () => {
-					checkForUpdates();
+					showOrCreateWindow();
+					dispatchMenuAction("open-updater");
 				}
 			},
 			{ type: "separator" },
+			{
+				label: "Flywheel Documentation",
+				click: () => void electron.shell.openExternal("https://github.com/eltmon/overdeck/blob/main/docs/FLYWHEEL.md")
+			},
 			{
 				label: "Overdeck on GitHub",
 				click: () => void electron.shell.openExternal("https://github.com/eltmon/overdeck")
@@ -690,7 +704,7 @@ function configureApplicationMenu() {
 		});
 	});
 	onUpdateStatusChange((status) => {
-		if (status.downloaded && !updateDownloaded) {
+		if (status.phase === "ready" && !updateDownloaded) {
 			updateDownloaded = true;
 			rebuildMenu();
 		}
@@ -880,7 +894,8 @@ const IPC = {
 	GET_UPDATE_STATUS: "pan:get-update-status",
 	CHECK_FOR_UPDATES: "pan:check-for-updates",
 	DOWNLOAD_UPDATE: "pan:download-update",
-	QUIT_AND_INSTALL: "pan:quit-and-install"
+	QUIT_AND_INSTALL: "pan:quit-and-install",
+	RESTART_DASHBOARD: "pan:restart-dashboard"
 };
 let mainWindow = null;
 let serverPort = 0;
@@ -888,6 +903,8 @@ let serverUrl = "";
 let serverWsUrl = "";
 let isQuitting = false;
 const terminalWindows = /* @__PURE__ */ new Map();
+if (!electron.app.requestSingleInstanceLock()) electron.app.exit(0);
+electron.app.on("second-instance", () => showOrCreateWindow());
 function resolveResourcePath(fileName) {
 	const candidates = [
 		node_path.join(process.resourcesPath ?? "", "resources", fileName),
@@ -915,6 +932,7 @@ function resolveServerStaticDir() {
 }
 function resolveWindowUrl() {
 	if (isDevelopment) return process.env.VITE_DEV_SERVER_URL;
+	if (serverUrl) return serverUrl;
 	return `${DESKTOP_SCHEME}://app/index.html`;
 }
 function createTerminalWindow(sessionName, title) {
@@ -997,6 +1015,17 @@ function registerIpcHandlers() {
 	});
 	electron.ipcMain.on(IPC.QUIT_AND_INSTALL, () => {
 		quitAndInstall();
+	});
+	electron.ipcMain.handle(IPC.RESTART_DASHBOARD, async () => {
+		console.log("[main] manual dashboard restart requested");
+		stopServer();
+		await new Promise((resolve) => setTimeout(resolve, 500));
+		startServer((port, wsUrl) => {
+			serverPort = port;
+			serverUrl = `http://127.0.0.1:${port}`;
+			serverWsUrl = wsUrl;
+			console.log(`[main] dashboard restarted on ${serverUrl}`);
+		});
 	});
 }
 function createWindow() {
@@ -1083,6 +1112,10 @@ electron.app.on("ready", () => {
 		serverPort = port;
 		serverUrl = `http://127.0.0.1:${port}`;
 		serverWsUrl = wsUrl;
+		if (mainWindow && !mainWindow.isDestroyed()) {
+			mainWindow.loadURL(resolveWindowUrl());
+			return;
+		}
 		mainWindow = createWindow();
 		handleAutoStartNag();
 	});

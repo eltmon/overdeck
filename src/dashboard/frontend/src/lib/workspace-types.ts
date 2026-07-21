@@ -1,7 +1,7 @@
 import type { GitStatus } from '../types';
 
 export interface StatusHistoryEntry {
-  type: 'review' | 'test' | 'merge' | 'inspect' | 'uat' | 'verification';
+  type: 'review' | 'test' | 'merge' | 'inspect' | 'uat' | 'verification' | 'release';
   status: string;
   timestamp: string;
   notes?: string;
@@ -9,13 +9,13 @@ export interface StatusHistoryEntry {
 
 export interface ReviewStatus {
   issueId: string;
-  reviewStatus: 'pending' | 'reviewing' | 'passed' | 'failed' | 'blocked';
+  reviewStatus: 'pending' | 'reviewing' | 'passed' | 'failed' | 'blocked' | 'skipped';
   testStatus: 'pending' | 'testing' | 'passed' | 'failed' | 'skipped' | 'dispatch_failed';
   mergeStatus?: 'pending' | 'queued' | 'merging' | 'verifying' | 'merged' | 'failed';
   inspectStatus?: 'pending' | 'inspecting' | 'passed' | 'failed' | 'error';
   inspectNotes?: string;
   inspectStartedAt?: string;
-  inspectBeadId?: string;
+  inspectTaskId?: string;
   uatStatus?: 'pending' | 'testing' | 'passed' | 'failed';
   uatNotes?: string;
   verificationStatus?: 'pending' | 'running' | 'passed' | 'failed' | 'skipped';
@@ -26,6 +26,8 @@ export interface ReviewStatus {
   testNotes?: string;
   mergeNotes?: string;
   mergeRetryCount?: number;
+  releaseStatus?: 'pending' | 'releasing' | 'passed' | 'failed' | 'partial' | 'rolled_back' | 'skipped';
+  releaseNotes?: string;
   updatedAt: string;
   /** Timestamp when the current/last review fan-out was dispatched. */
   reviewSpawnedAt?: string;
@@ -63,7 +65,18 @@ export interface WorkspaceStackHealth {
 }
 
 export interface PendingOperation {
-  type: 'approve' | 'close' | 'containerize' | 'start' | 'review' | 'merge';
+  type:
+    | 'approve'
+    | 'close'
+    | 'containerize'
+    | 'start'
+    | 'review'
+    | 'merge'
+    | 'rebuild-stack'
+    | 'start-stack'
+    | 'stop-stack'
+    | 'restart-stack'
+    | 'reap-workspace';
   issueId: string;
   startedAt: string;
   status: 'pending' | 'running' | 'completed' | 'failed';
@@ -103,8 +116,8 @@ export interface WorkspaceInfo {
   services?: { name: string; url?: string }[];
   planningState?: {
     hasPlan: boolean;
-    hasBeads: boolean;
-    beadsCount: number;
+    hasTasks: boolean;
+    tasksCount: number;
     planningComplete: boolean;
     workspacePath?: string;
   };

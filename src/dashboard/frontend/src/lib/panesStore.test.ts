@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import {
   usePanesStore,
+  closeConversationPanes,
   selectPanesForWorkspace,
   selectActivePaneId,
   selectActivePane,
@@ -217,5 +218,38 @@ describe('selectActivePane', () => {
 
   it('returns null before ensureHome runs', () => {
     expect(selectActivePane('never-seen')(usePanesStore.getState())).toBeNull()
+  })
+})
+
+describe('closeConversationPanes (archived conversations must not leave tabs)', () => {
+  it('closes agent panes bound to the conversation across hydrated workspaces', () => {
+    const store = usePanesStore.getState()
+    store.ensureHome(WS)
+    store.ensureHome(WS2)
+    const keep = store.addPane(WS, { paneType: 'agent', label: 'Other', conversationId: 'conv-other' })
+    store.addPane(WS, { paneType: 'agent', label: 'Archived', conversationId: 'conv-archived' })
+    store.addPane(WS2, { paneType: 'agent', label: 'Archived', conversationId: 'conv-archived' })
+
+    closeConversationPanes('conv-archived')
+
+    expect(panes(WS).some((p) => p.conversationId === 'conv-archived')).toBe(false)
+    expect(panes(WS2).some((p) => p.conversationId === 'conv-archived')).toBe(false)
+    expect(panes(WS).some((p) => p.paneId === keep)).toBe(true)
+  })
+
+  it('sweeps persisted panes of workspaces not hydrated this session', () => {
+    localStorage.setItem(
+      'pan-panes:cold-workspace',
+      JSON.stringify([
+        { paneId: 'h', paneType: 'home', label: 'Home', createdAt: 1, isPermanent: true },
+        { paneId: 'a', paneType: 'agent', label: 'Archived', createdAt: 2, conversationId: 'conv-archived' },
+        { paneId: 'b', paneType: 'agent', label: 'Other', createdAt: 3, conversationId: 'conv-other' },
+      ]),
+    )
+
+    closeConversationPanes('conv-archived')
+
+    const persisted = JSON.parse(localStorage.getItem('pan-panes:cold-workspace') ?? '[]') as WorkspacePane[]
+    expect(persisted.map((p) => p.paneId)).toEqual(['h', 'b'])
   })
 })

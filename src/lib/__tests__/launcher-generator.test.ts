@@ -297,6 +297,8 @@ describe('generateLauncherScript', () => {
       unset GEMINI_API_KEY
       unset API_TIMEOUT_MS
       unset CLAUDE_CODE_API_KEY_HELPER_TTL_MS
+      unset CLAUDE_CODE_AUTO_COMPACT_WINDOW
+      unset CLAUDE_CODE_MAX_CONTEXT_TOKENS
       export ANTHROPIC_BASE_URL="http://proxy"
       export CAVEMAN_DEFAULT_MODE="active"
       prompt=$(cat '/tmp/prompt.md')
@@ -383,6 +385,8 @@ describe('generateLauncherScript', () => {
       unset GEMINI_API_KEY
       unset API_TIMEOUT_MS
       unset CLAUDE_CODE_API_KEY_HELPER_TTL_MS
+      unset CLAUDE_CODE_AUTO_COMPACT_WINDOW
+      unset CLAUDE_CODE_MAX_CONTEXT_TOKENS
       export ANTHROPIC_BASE_URL="http://proxy"
       prompt=$(cat '/tmp/identity.md')
       exec claude --dangerously-skip-permissions --permission-mode bypassPermissions --session-id 'sess-xyz' --model 'claude-sonnet-4-6' "$prompt"
@@ -757,18 +761,21 @@ describe('generateLauncherScript', () => {
     expect(script).toContain("exec node '/tmp/pan'\\''s supervisor.js' claude");
   });
 
-  it('ignores supervisor wrapping for Pi launchers and review sub-role launchers', () => {
+  it('ignores supervisor wrapping for ohmypi launchers and review sub-role launchers', () => {
     const piScript = generateLauncherScriptSync({
       ...DEFAULT_CONFIG,
       role: 'work',
-      harness: 'pi',
+      harness: 'ohmypi',
       piExtensionPath: '/x/dist/index.js',
       piFifoPath: '/x/rpc.in',
       piSessionDir: '/x/sessions',
       useSupervisor: true,
       supervisorScriptPath: '/opt/pty-supervisor.js',
     });
-    expect(piScript).toContain('exec pi --mode rpc');
+    // PAN-2108: rpc path runs omp without `exec` so the launcher bash survives
+    // to record omp's exit; the supervisor is still skipped for ohmypi.
+    expect(piScript).toContain('omp --mode rpc');
+    expect(piScript).not.toContain('exec omp');
     expect(piScript).not.toContain('pty-supervisor.js');
 
     const reviewScript = generateLauncherScriptSync({
@@ -901,131 +908,88 @@ describe('generateLauncherWrapper', () => {
   });
 });
 
-describe('generateLauncherScript — Pi harness (PAN-636)', () => {
-  it('emits pi --mode rpc with --no-context-files, --extension, and stdin from fifo (AC1, AC2, AC4)', () => {
+describe('generateLauncherScript — ohmypi harness (PAN-1989)', () => {
+  // ─── ohmypi harness tests ──────────────────────────────────────────────────
+
+  it('ohmypi: emits omp --mode rpc with --extension, no --no-context-files, and stdin from fifo (AC1)', () => {
     const script = generateLauncherScriptSync({
       ...DEFAULT_CONFIG,
       role: 'work',
-      harness: 'pi',
+      harness: 'ohmypi',
       model: 'anthropic/claude-sonnet-4-6',
-      piExtensionPath: '/abs/packages/pi-extension/dist/index.js',
-      piFifoPath: '/home/u/.overdeck/agents/agent-pan-636/rpc.in',
-      piSessionDir: '/home/u/.overdeck/agents/agent-pan-636/sessions',
-      // Pi has no permission system — these flags must be DROPPED (AC4).
-      permissionFlags: ['--dangerously-skip-permissions', '--permission-mode', 'bypassPermissions'],
+      piExtensionPath: '/abs/packages/ohmypi-extension/dist/index.js',
+      piFifoPath: '/home/u/.overdeck/agents/agent-pan-1989/rpc.in',
+      piSessionDir: '/home/u/.overdeck/agents/agent-pan-1989/sessions',
       promptFile: '/tmp/prompt.txt',
     });
-    // AC4: no claude permission flags leak into the pi command line.
-    expect(script).not.toMatch(/--dangerously-skip-permissions/);
-    expect(script).not.toMatch(/--permission-mode/);
-    // AC1: rpc + extension + no-context-files all present.
-    expect(script).toMatch(/pi --mode rpc/);
-    expect(script).toMatch(/--no-context-files/);
-    expect(script).toMatch(/--extension '\/abs\/packages\/pi-extension\/dist\/index\.js'/);
-    // AC2: stdin redirected from the fifo via bash read-write redirection so
-    // opening the FIFO does not block before Pi can write its ready marker.
-    expect(script).toMatch(/<> '\/home\/u\/\.overdeck\/agents\/agent-pan-636\/rpc\.in'/);
-    // Defensive: read-only redirection would deadlock; assert it is NOT used.
-    expect(script).not.toMatch(/[^<]< '\/home\/u\/\.overdeck\/agents\/agent-pan-636\/rpc\.in'/);
-    expect(script).toMatchInlineSnapshot(`
-      "#!/bin/bash
-      unset TMUX TMUX_PANE STY
-      command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
-      export SKIP_DOCS_INDEX=1
-      cd -- '/workspace/project'
-      prompt=$(cat '/tmp/prompt.txt')
-      exec pi --mode rpc --model 'anthropic/claude-sonnet-4-6' --session-dir '/home/u/.overdeck/agents/agent-pan-636/sessions' --extension '/abs/packages/pi-extension/dist/index.js' --no-context-files --append-system-prompt "$prompt" <> '/home/u/.overdeck/agents/agent-pan-636/rpc.in'
-      "
-    `);
+    // Binary is omp, not pi. PAN-2108: the rpc path no longer uses `exec` so the
+    // launcher bash outlives omp and can record its exit (silent-death trace).
+    expect(script).toMatch(/\bomp --mode rpc/);
+    expect(script).not.toMatch(/exec omp/);
+    expect(script).not.toMatch(/exec pi --mode/);
+    // --no-context-files REMOVED in omp (docs/ohmypi-contract.md).
+    expect(script).not.toMatch(/--no-context-files/);
+    // Extension and session-dir still present.
+    expect(script).toMatch(/--extension '\/abs\/packages\/ohmypi-extension\/dist\/index.js'/);
+    expect(script).toMatch(/--session-dir '\/home\/u\/\.overdeck\/agents\/agent-pan-1989\/sessions'/);
+    // FIFO redirection is `<>` (non-blocking), same as pi.
+    expect(script).toMatch(/<> '\/home\/u\/\.overdeck\/agents\/agent-pan-1989\/rpc\.in'/);
+    expect(script).toMatch(/>> '\/home\/u\/\.overdeck\/agents\/agent-pan-1989\/output\.log' 2>&1/);
+    // PAN-2108: omp's exit code + timestamp recorded to exit-status on death, and
+    // the launcher exits with omp's code so `#{pane_exit_status}` reflects it too.
+    expect(script).toMatch(/__omp_exit=\$\?/);
+    expect(script).toMatch(/> '\/home\/u\/\.overdeck\/agents\/agent-pan-1989\/exit-status'/);
+    expect(script).toMatch(/exit \$__omp_exit/);
   });
 
-  it('uses non-deadlocking <> FIFO redirection so Pi can emit ready.json before any writer attaches (PAN-1055 regression)', () => {
-    const script = generateLauncherScriptSync({
-      ...DEFAULT_CONFIG,
-      agentType: 'work',
-      harness: 'pi',
-      model: 'anthropic/claude-sonnet-4-6',
-      piExtensionPath: '/abs/ext.js',
-      piFifoPath: '/tmp/agent-x/rpc.in',
-      piSessionDir: '/tmp/agent-x/sessions',
-    });
-    // Bash `< fifo` blocks until a writer opens the FIFO. That deadlocked Pi
-    // conversation/fork launches because Pi could not exec — and could not
-    // write ready.json — until something else opened the FIFO for write.
-    // Bash `<> fifo` opens the FIFO read/write and never blocks.
-    expect(script).toMatch(/<> '\/tmp\/agent-x\/rpc\.in'/);
-    expect(script).not.toMatch(/[^<]< '\/tmp\/agent-x\/rpc\.in'/);
-  });
-
-  it('appends --session for resumeSessionId on pi launchers', () => {
+  it('ohmypi: uses --resume (not --session) for resumeSessionId (AC1, contract)', () => {
     const script = generateLauncherScriptSync({
       ...DEFAULT_CONFIG,
       role: 'work',
       spawnMode: 'resume',
-      harness: 'pi',
+      harness: 'ohmypi',
       model: 'gpt-5.4-mini',
       piExtensionPath: '/x/dist/index.js',
       piFifoPath: '/x/rpc.in',
       piSessionDir: '/x/sessions',
-      resumeSessionId: 'sess-pi-123',
+      resumeSessionId: 'sess-omp-456',
     });
-    expect(script).toMatch(/--session 'sess-pi-123'/);
-    expect(script).toMatch(/exec pi --mode rpc --model 'openai-codex\/gpt-5.4-mini'/);
+    expect(script).toMatch(/--resume 'sess-omp-456'/);
+    expect(script).not.toMatch(/--session 'sess-omp-456'/);
   });
 
-  it('throws when pi launcher is missing required path config', () => {
-    // piSessionDir is the universal requirement (rpc + tui both need it)
-    expect(() =>
-      generateLauncherScriptSync({
-        ...DEFAULT_CONFIG,
-        role: 'work',
-        harness: 'pi',
-        model: 'gpt-5.4-mini',
-      }),
-    ).toThrow(/piSessionDir/);
-
-    // rpc-mode (default) additionally requires piExtensionPath and piFifoPath.
-    expect(() =>
-      generateLauncherScriptSync({
-        ...DEFAULT_CONFIG,
-        agentType: 'work',
-        harness: 'pi',
-        model: 'gpt-5.4-mini',
-        piSessionDir: '/x/sessions',
-        // missing piExtensionPath
-      }),
-    ).toThrow(/piExtensionPath/);
-
-    expect(() =>
-      generateLauncherScriptSync({
-        ...DEFAULT_CONFIG,
-        agentType: 'work',
-        harness: 'pi',
-        model: 'gpt-5.4-mini',
-        piSessionDir: '/x/sessions',
-        piExtensionPath: '/x/dist/index.js',
-        // missing piFifoPath
-      }),
-    ).toThrow(/piFifoPath/);
+  it('ohmypi: wrapWithSupervisor skips supervisor wrapping for ohmypi harness (AC3)', () => {
+    const script = generateLauncherScriptSync({
+      ...DEFAULT_CONFIG,
+      role: 'work',
+      harness: 'ohmypi',
+      piExtensionPath: '/x/dist/index.js',
+      piFifoPath: '/x/rpc.in',
+      piSessionDir: '/x/sessions',
+      useSupervisor: true,
+      supervisorScriptPath: '/opt/pty-supervisor.js',
+    });
+    expect(script).toMatch(/\bomp --mode rpc/);
+    expect(script).not.toMatch(/exec omp/);
+    expect(script).not.toContain('pty-supervisor.js');
   });
 
-  it('pi tui mode launcher omits --mode rpc and FIFO redirect', () => {
+  it('ohmypi: tui mode omits --mode rpc and FIFO redirect (AC2)', () => {
     const script = generateLauncherScriptSync({
       ...DEFAULT_CONFIG,
       agentType: 'conversation',
-      harness: 'pi',
+      harness: 'ohmypi',
       piMode: 'tui',
       model: 'gpt-5.4-mini',
       piSessionDir: '/x/sessions',
       piExtensionPath: '/x/dist/index.js',
     });
-    // No --mode rpc flag
     expect(script).not.toMatch(/--mode rpc/);
-    // No FIFO redirect (`<>`)
     expect(script).not.toMatch(/<> /);
-    // Still has --session-dir and --extension
     expect(script).toMatch(/--session-dir '\/x\/sessions'/);
     expect(script).toMatch(/--extension '\/x\/dist\/index.js'/);
+    expect(script).not.toMatch(/--no-context-files/);
+    expect(script).toMatch(/\bomp\b/);
   });
 
   // ─── Codex harness tests (PAN-1574) ───────────────────────────────────────────
@@ -1087,6 +1051,112 @@ describe('generateLauncherScript — Pi harness (PAN-636)', () => {
     });
     expect(script).toMatch(/^exec node '\/dist\/pty-supervisor\.js' codex -m 'codex-4o'$/m);
     expect(script).not.toMatch(/codex exec/);
+  });
+
+  it('codex app-server mode launches the host without the PTY supervisor', () => {
+    const script = generateLauncherScriptSync({
+      ...DEFAULT_CONFIG,
+      role: 'work',
+      harness: 'codex',
+      codexMode: 'app-server',
+      spawnMode: 'conversation',
+      useSupervisor: true,
+      supervisorScriptPath: '/dist/pty-supervisor.js',
+    });
+    expect(script).toMatch(/^node '.+\/dist\/codex-app-server-host\.js'$/m);
+    expect(script).not.toMatch(/pty-supervisor/);
+    expect(script).not.toMatch(/codex exec/);
+    expect(script).not.toMatch(/ -m /);
+  });
+
+  it('codex app-server mode resumes by thread id', () => {
+    const script = generateLauncherScriptSync({
+      ...DEFAULT_CONFIG,
+      role: 'work',
+      harness: 'codex',
+      codexMode: 'app-server',
+      resumeSessionId: '019ee5e7-thread-abc',
+    });
+    expect(script).toMatch(/^exec node '.+\/dist\/codex-app-server-host\.js' --resume '019ee5e7-thread-abc'$/m);
+  });
+
+  it('acp mode launches the authenticated host in an isolated provider environment', () => {
+    const script = generateLauncherScriptSync({
+      ...DEFAULT_CONFIG,
+      role: 'work',
+      harness: 'acp',
+      acpAgentId: 'agent-pan-2858',
+      acpProvider: 'kimi',
+      acpWorkspace: '/workspace/project',
+      acpBinaryPath: '/opt/kimi code/bin/kimi',
+      acpContextFile: '/home/user/.overdeck/agents/agent-pan-2858/acp-context.md',
+      model: 'kimi-for-coding',
+      resumeSessionId: 'kimi-session-2858',
+      overdeckEnv: { agentId: 'agent-pan-2858' },
+      unsetProviderEnv: true,
+      useSupervisor: true,
+      supervisorScriptPath: '/dist/pty-supervisor.js',
+    });
+
+    expect(script).toMatch(/export OVERDECK_AGENT_ID='agent-pan-2858'/);
+    expect(script).toMatch(
+      /^exec node '.+\/dist\/acp-host\.js' --agent 'agent-pan-2858' --provider 'kimi' --workspace '\/workspace\/project' --binary-path '\/opt\/kimi code\/bin\/kimi' --resume 'kimi-session-2858' --model 'kimi-for-coding' --context-file '\/home\/user\/\.overdeck\/agents\/agent-pan-2858\/acp-context\.md'$/m,
+    );
+    expect(script).toContain('unset ANTHROPIC_API_KEY');
+    expect(script).toContain('unset ANTHROPIC_BASE_URL');
+    expect(script).toContain('unset ANTHROPIC_AUTH_TOKEN');
+    expect(script).not.toMatch(/export ANTHROPIC_(?:API_KEY|BASE_URL|AUTH_TOKEN)=/);
+    expect(script).not.toContain('initial-prompt');
+    expect(script).not.toContain('--append-system-prompt-file');
+    expect(script).not.toContain('pty-supervisor');
+  });
+
+  it('acp mode refuses to launch without the preflight-resolved binary path', () => {
+    expect(() => generateLauncherScriptSync({
+      ...DEFAULT_CONFIG,
+      role: 'work',
+      harness: 'acp',
+      acpAgentId: 'agent-pan-2858',
+      acpProvider: 'kimi',
+      acpWorkspace: '/workspace/project',
+      model: 'kimi-for-coding',
+    })).toThrow('acp launcher requires acpBinaryPath');
+  });
+
+  it('codex tui escape hatch preserves the previous conversation command byte-for-byte', () => {
+    const legacy = generateLauncherScriptSync({
+      ...DEFAULT_CONFIG,
+      role: 'work',
+      harness: 'codex',
+      codexMode: 'tui',
+      spawnMode: 'conversation',
+      useSupervisor: true,
+      supervisorScriptPath: '/dist/pty-supervisor.js',
+    });
+    const escapeHatch = generateLauncherScriptSync({
+      ...DEFAULT_CONFIG,
+      role: 'work',
+      harness: 'codex',
+      codexMode: 'tui',
+      spawnMode: 'conversation',
+      useSupervisor: true,
+      supervisorScriptPath: '/dist/pty-supervisor.js',
+    });
+    expect(escapeHatch).toBe(legacy);
+    expect(escapeHatch).toMatch(/^node '\/dist\/pty-supervisor\.js' codex -c project_doc_max_bytes=0$/m);
+  });
+
+  it('codex plan launchers do not receive Claude-only append-system-prompt flags', () => {
+    const script = generateLauncherScriptSync({
+      ...DEFAULT_CONFIG,
+      role: 'plan',
+      harness: 'codex',
+      model: 'gpt-5.5',
+      codexMode: 'work-tui',
+      appendSystemPromptFiles: ['/workspace/project/.pan/context.md'],
+    });
+    expect(script).toMatch(/^codex -m 'gpt-5\.5'$/m);
+    expect(script).not.toMatch(/--append-system-prompt-file/);
   });
 
   it('codex conversation (tui) mode disables project AGENTS.md without supervisor', () => {
@@ -1175,11 +1245,9 @@ describe('pi model provider qualification (PAN-1799)', () => {
     const { qualifyPiModel } = await import('../providers.js');
     expect(qualifyPiModel('kimi-k2.6')).toBe('kimi-coding/kimi-k2.6');
   });
-  it('qualifies openai models with openai-codex; unknown ids inherit the anthropic default (parity with conversations)', async () => {
+  it('qualifies openai models with openai-codex and rejects unknown model ids', async () => {
     const { qualifyPiModel } = await import('../providers.js');
     expect(qualifyPiModel('gpt-5.5')).toBe('openai-codex/gpt-5.5');
-    // getProviderForModelSync falls back to anthropic for unknown ids — the
-    // same behavior conversations.ts has always had for pi model resolution.
-    expect(qualifyPiModel('totally-unknown-model')).toBe('anthropic/totally-unknown-model');
+    expect(() => qualifyPiModel('totally-unknown-model')).toThrow('Unknown model "totally-unknown-model".');
   });
 });

@@ -1,6 +1,6 @@
 # DNS Setup for Overdeck
 
-Overdeck uses local domain names for HTTPS development. This guide explains how to configure DNS resolution for `pan.localhost` and wildcard domains.
+Overdeck uses local domain names for HTTPS development. This guide explains how to configure DNS resolution for `overdeck.localhost` and wildcard domains.
 
 ## Automatic Setup (Recommended)
 
@@ -16,7 +16,7 @@ The DNS sync method is stored in `config.toml`:
 ```toml
 [traefik]
 enabled = true
-domain = "pan.localhost"
+domain = "overdeck.localhost"
 dns_sync_method = "wsl2hosts"  # or "hosts_file" or "dnsmasq"
 ```
 
@@ -31,7 +31,7 @@ If you need to configure DNS manually or troubleshoot, see below.
 Add this line to `/etc/hosts`:
 
 ```bash
-127.0.0.1 pan.localhost
+127.0.0.1 overdeck.localhost
 ```
 
 **Edit the file:**
@@ -43,7 +43,7 @@ sudo vim /etc/hosts
 
 **Verify:**
 ```bash
-ping pan.localhost
+ping overdeck.localhost
 # Should respond from 127.0.0.1
 ```
 
@@ -73,8 +73,8 @@ sudo tee /etc/dnsmasq.d/overdeck.conf > /dev/null <<EOF
 # Resolve all *.localhost domains to 127.0.0.1
 address=/localhost/127.0.0.1
 
-# Resolve pan.localhost specifically
-address=/pan.localhost/127.0.0.1
+# Resolve overdeck.localhost specifically
+address=/overdeck.localhost/127.0.0.1
 EOF
 
 # Restart dnsmasq
@@ -90,10 +90,10 @@ EOF
 
 **Verify:**
 ```bash
-nslookup pan.localhost
+nslookup overdeck.localhost
 # Should resolve to 127.0.0.1
 
-nslookup feature-pan-4.pan.localhost
+nslookup feature-pan-4.overdeck.localhost
 # Should also resolve to 127.0.0.1
 ```
 
@@ -103,14 +103,14 @@ If you don't need wildcard support, use `/etc/hosts`:
 
 ```bash
 # Add to WSL /etc/hosts
-echo "127.0.0.1 pan.localhost" | sudo tee -a /etc/hosts
+echo "127.0.0.1 overdeck.localhost" | sudo tee -a /etc/hosts
 
 # Also add to Windows hosts file
 # (Run PowerShell as Administrator)
-Add-Content -Path C:\Windows\System32\drivers\etc\hosts -Value "127.0.0.1 pan.localhost"
+Add-Content -Path C:\Windows\System32\drivers\etc\hosts -Value "127.0.0.1 overdeck.localhost"
 ```
 
-**Limitation:** This won't work for wildcard domains like `feature-pan-4.pan.localhost`.
+**Limitation:** This won't work for wildcard domains like `feature-pan-4.overdeck.localhost`.
 
 ## Wildcard Domain Support
 
@@ -119,8 +119,8 @@ Add-Content -Path C:\Windows\System32\drivers\etc\hosts -Value "127.0.0.1 pan.lo
 Good news! Modern browsers automatically resolve `*.localhost` to `127.0.0.1` without any configuration.
 
 This means domains like:
-- `feature-pan-4.pan.localhost`
-- `api-feature-pan-4.pan.localhost`
+- `feature-pan-4.overdeck.localhost`
+- `api-feature-pan-4.overdeck.localhost`
 - Any `*.localhost` subdomain
 
 ...will automatically work in your browser.
@@ -161,11 +161,11 @@ sudo systemctl restart NetworkManager  # If using NetworkManager
 
 ## Troubleshooting
 
-### "pan.localhost" doesn't resolve
+### "overdeck.localhost" doesn't resolve
 
 1. **Check /etc/hosts:**
    ```bash
-   cat /etc/hosts | grep pan.localhost
+   cat /etc/hosts | grep overdeck.localhost
    ```
 
 2. **Clear DNS cache:**
@@ -182,7 +182,7 @@ sudo systemctl restart NetworkManager  # If using NetworkManager
 
 3. **Test with curl:**
    ```bash
-   curl -k https://pan.localhost
+   curl -k https://overdeck.localhost
    # Should connect (even if certificate error)
    ```
 
@@ -192,7 +192,7 @@ You need to sync `/etc/hosts` to Windows:
 
 ```bash
 # From WSL, update Windows hosts file
-grep pan.localhost /etc/hosts | sudo tee -a /mnt/c/Windows/System32/drivers/etc/hosts
+grep overdeck.localhost /etc/hosts | sudo tee -a /mnt/c/Windows/System32/drivers/etc/hosts
 ```
 
 Or use the dnsmasq approach (Option 1 above).

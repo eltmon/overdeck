@@ -1,11 +1,12 @@
 import { Effect } from 'effect';
 import { execFile } from 'node:child_process';
 import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { promisify } from 'node:util';
 import { Readable } from 'node:stream';
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { fileURLToPath } from 'node:url';
+import { describe, it, expect, vi, beforeEach, afterEach, beforeAll, afterAll } from 'vitest';
 import { Command } from 'commander';
 import type { FlywheelStats, FlywheelStatus } from '@overdeck/contracts';
 import { getFlywheelRunDir, readFlywheelLaunchMetadata, subscribeLatestFlywheelStatus, writeFlywheelLaunchMetadata, writeLatestFlywheelStatus } from '../../../dashboard/server/services/flywheel-run-state.js';
@@ -88,7 +89,7 @@ const mockLoadConfig = vi.hoisted(() => () => ({
   config: {
     roles: {
       flywheel: {
-        harness: 'pi',
+        harness: 'claude-code',
         model: 'claude-sonnet-4-6',
         effort: 'low',
         maxAgents: 3,
@@ -105,6 +106,32 @@ vi.mock('../../../lib/config-yaml.js', () => ({
   resolveModel: () => 'claude-sonnet-4-6',
 }));
 
+// Harness is provider-default-only (PAN-1984): the flywheel start path derives it from the
+// model via resolveHarness, NOT from the per-role config. Mock it so this unit test doesn't
+// shell out to `command -v`; the real derivation is covered by harness-resolve.test.ts.
+vi.mock('../../../lib/harness-resolve.js', () => ({
+  resolveHarness: vi.fn(async () => 'claude-code'),
+}));
+
+const mergeBackendMocks = vi.hoisted(() => ({
+  getMergeBackendStatus: vi.fn(async () => ({
+    available: true,
+    mode: 'gh-cli' as const,
+    detail: 'gh CLI is authenticated',
+  })),
+}));
+
+vi.mock('../../../lib/github-app.js', () => mergeBackendMocks);
+
+const substrateBugWeightsMocks = vi.hoisted(() => ({
+  listSubstrateBugWeights: vi.fn(async () => []),
+}));
+
+vi.mock('../../../lib/overdeck/substrate-bug-weights-service.js', () => substrateBugWeightsMocks);
+
+import {
+  flywheelWeightsCommand,
+} from '../flywheel-surfaces.js';
 import {
   emitStatusCommand,
   flywheelAbortCommand,
@@ -216,6 +243,23 @@ describe('formatFlywheelStateReport', () => {
   });
 });
 
+// PAN-2658 regression guard: this suite exercises code that runs `git commit`
+// on docs/FLYWHEEL-STATE.md in its cwd. A missing cwd once fell back to
+// process.cwd() and committed into the real repository (main commit
+// 3647150337). Fail loudly if any test in this file moves the real repo HEAD.
+const realRepoRoot = dirname(dirname(dirname(dirname(dirname(fileURLToPath(import.meta.url))))));
+let realRepoHeadBefore: string | null = null;
+
+beforeAll(async () => {
+  realRepoHeadBefore = await git(realRepoRoot, ['rev-parse', 'HEAD']).catch(() => null);
+});
+
+afterAll(async () => {
+  if (!realRepoHeadBefore) return;
+  const headAfter = await git(realRepoRoot, ['rev-parse', 'HEAD']).catch(() => null);
+  expect(headAfter, 'flywheel tests must never create commits in the real repository (PAN-2658)').toBe(realRepoHeadBefore);
+});
+
 describe('flywheel CLI commands', () => {
   let tempDir: string;
   let logSpy: ReturnType<typeof vi.spyOn>;
@@ -240,6 +284,11 @@ describe('flywheel CLI commands', () => {
     flywheelLifecycleMocks.resumeFlywheel.mockClear();
     flywheelLifecycleMocks.spawnFlywheel.mockClear();
     flywheelLifecycleMocks.stopAgentProgram.mockClear();
+    mergeBackendMocks.getMergeBackendStatus.mockResolvedValue({
+      available: true,
+      mode: 'gh-cli',
+      detail: 'gh CLI is authenticated',
+    });
     logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
   });
@@ -312,7 +361,24 @@ describe('flywheel CLI commands', () => {
     expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Active agents: 0/8'));
     expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('RAM: 1024 MiB used / 4096 MiB total'));
     expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Last tick: 2026-05-18T12:00:00.000Z'));
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Merge backend: gh-cli (gh CLI is authenticated)'));
     expect(process.exitCode).toBeUndefined();
+  });
+
+  it('renders an unavailable merge backend in human-readable active run status', async () => {
+    mergeBackendMocks.getMergeBackendStatus.mockResolvedValue({
+      available: false,
+      mode: 'none',
+      detail: 'No GitHub App credentials or gh CLI authentication found',
+    });
+    flywheelLifecycleMocks.activeRunId = 'RUN-1';
+    await writeLatestFlywheelStatus(validStatus);
+
+    await flywheelStatusCommand({});
+
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining(
+      'Merge backend: UNAVAILABLE - No GitHub App credentials or gh CLI authentication found',
+    ));
   });
 
   it('emits raw FlywheelStatus JSON with --json', async () => {
@@ -326,6 +392,11 @@ describe('flywheel CLI commands', () => {
     expect(JSON.parse(output)).toEqual({
       ...validStatus,
       system: { ...validStatus.system, agentsActive: 0 },
+      mergeBackend: {
+        available: true,
+        mode: 'gh-cli',
+        detail: 'gh CLI is authenticated',
+      },
     });
   });
 
@@ -429,7 +500,7 @@ describe('flywheel CLI commands', () => {
       runId: 'RUN-1',
       briefPath: join(tempDir, 'docs', 'flywheel-brief.md'),
       workspace: tempDir,
-      harness: 'pi',
+      harness: 'claude-code',
       model: 'claude-sonnet-4-6',
       effort: 'low',
       maxAgents: 3,
@@ -446,7 +517,7 @@ describe('flywheel CLI commands', () => {
       briefPath: join(tempDir, 'docs', 'flywheel-brief.md'),
       briefDisplayPath: 'docs/flywheel-brief.md',
     });
-    expect(latest.orchestrator).toMatchObject({ harness: 'pi', model: 'claude-sonnet-4-6', effort: 'low' });
+    expect(latest.orchestrator).toMatchObject({ harness: 'claude-code', model: 'claude-sonnet-4-6', effort: 'low' });
     expect(latest.system.agentsCap).toBe(3);
     expect(latest.agents[0]?.id).toBe('flywheel-orchestrator');
     expect(logSpy).toHaveBeenCalledWith('Flywheel started: RUN-1');
@@ -542,7 +613,7 @@ describe('flywheel CLI commands', () => {
     expect(flywheelLifecycleMocks.resumeFlywheel).toHaveBeenCalledWith(expect.objectContaining({
       workspace: repoDir,
       briefPath,
-      harness: 'pi',
+      harness: 'claude-code',
       model: 'claude-sonnet-4-6',
       effort: 'low',
       maxAgents: 3,
@@ -777,7 +848,7 @@ describe('flywheel CLI commands', () => {
     flywheelLifecycleMocks.sessionExists = true;
     await writeLatestFlywheelStatus(validStatus);
 
-    await flywheelStopCommand();
+    await flywheelStopCommand({ cwd: repoDir });
 
     expect(flywheelLifecycleMocks.stoppedAgents).toContain('flywheel-orchestrator');
     const runReport = await readFile(join(tempDir, 'flywheel', 'runs', 'RUN-1', 'report.md'), 'utf8');
@@ -788,10 +859,121 @@ describe('flywheel CLI commands', () => {
   });
 
   it('treats stop with nothing active as an idempotent notice', async () => {
-    await flywheelStopCommand();
+    await flywheelStopCommand({ cwd: tempDir });
 
     expect(flywheelLifecycleMocks.stoppedAgents).toEqual([]);
     expect(logSpy).toHaveBeenCalledWith('No flywheel run is active and nothing is left to report.');
     expect(process.exitCode).toBeUndefined();
+  });
+});
+
+describe('flywheelWeightsCommand', () => {
+  let logSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    logSpy.mockRestore();
+    substrateBugWeightsMocks.listSubstrateBugWeights.mockReset();
+  });
+
+  it('prints an aligned table ordered by weight desc', async () => {
+    substrateBugWeightsMocks.listSubstrateBugWeights.mockResolvedValue([
+      {
+        issueId: 'PAN-HEAVY',
+        severity: 'P0',
+        filedBy: 'agent',
+        affectedCriteria: [1],
+        weight: 4.8,
+        weightReason: 'Criterion 1 is red',
+      },
+      {
+        issueId: 'PAN-LIGHT',
+        severity: 'P2',
+        filedBy: 'operator',
+        affectedCriteria: [3],
+        weight: 1.2,
+        weightReason: 'Criterion 3 is green',
+      },
+    ]);
+
+    await flywheelWeightsCommand();
+
+    expect(substrateBugWeightsMocks.listSubstrateBugWeights).toHaveBeenCalledWith('30d');
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('PAN-HEAVY'));
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('PAN-LIGHT'));
+    const calls = logSpy.mock.calls.map((c) => c[0] as string);
+    const heavyIndex = calls.findIndex((c) => c.includes('PAN-HEAVY'));
+    const lightIndex = calls.findIndex((c) => c.includes('PAN-LIGHT'));
+    expect(heavyIndex).toBeLessThan(lightIndex);
+  });
+
+  it('emits JSON with --json', async () => {
+    substrateBugWeightsMocks.listSubstrateBugWeights.mockResolvedValue([
+      {
+        issueId: 'PAN-1',
+        severity: 'P1',
+        filedBy: 'agent',
+        affectedCriteria: [1],
+        weight: 2.5,
+        weightReason: 'Criterion 1 is yellow',
+      },
+    ]);
+
+    await flywheelWeightsCommand({ json: true });
+
+    expect(logSpy).toHaveBeenCalledWith(
+      JSON.stringify(
+        [
+          {
+            issueId: 'PAN-1',
+            severity: 'P1',
+            filedBy: 'agent',
+            affectedCriteria: [1],
+            weight: 2.5,
+            weightReason: 'Criterion 1 is yellow',
+          },
+        ],
+        null,
+        2,
+      ),
+    );
+  });
+
+  it('filters to --issue case-insensitively', async () => {
+    substrateBugWeightsMocks.listSubstrateBugWeights.mockResolvedValue([
+      {
+        issueId: 'PAN-TARGET',
+        severity: 'P1',
+        filedBy: 'agent',
+        affectedCriteria: [1],
+        weight: 2.5,
+        weightReason: 'Criterion 1 is yellow',
+      },
+      {
+        issueId: 'PAN-OTHER',
+        severity: 'P2',
+        filedBy: 'agent',
+        affectedCriteria: [2],
+        weight: 1.5,
+        weightReason: 'Criterion 2 is green',
+      },
+    ]);
+
+    await flywheelWeightsCommand({ issue: 'pan-target' });
+
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('PAN-TARGET'));
+    const calls = logSpy.mock.calls.map((c) => c[0] as string);
+    expect(calls.some((c) => c.includes('PAN-OTHER'))).toBe(false);
+  });
+
+  it('passes --window through to the service', async () => {
+    substrateBugWeightsMocks.listSubstrateBugWeights.mockResolvedValue([]);
+
+    await flywheelWeightsCommand({ window: '7d' });
+
+    expect(substrateBugWeightsMocks.listSubstrateBugWeights).toHaveBeenCalledWith('7d');
   });
 });

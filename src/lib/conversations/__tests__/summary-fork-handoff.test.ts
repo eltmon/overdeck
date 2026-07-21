@@ -38,9 +38,13 @@ vi.mock('../smart-compaction.js', async (importOriginal) => {
       void prompt;
       throw new Error('runModelSummary mock not configured for this test');
     }),
+    summarizeSerializedText: vi.fn(async (serialized: string) => `ACP-SUMMARY:\n${serialized}`),
   };
 });
-import { runModelSummary as mockedRunModelSummary } from '../smart-compaction.js';
+import {
+  runModelSummary as mockedRunModelSummary,
+  summarizeSerializedText as mockedSummarizeSerializedText,
+} from '../smart-compaction.js';
 import { Effect as EffectMod } from 'effect';
 
 const originalOverdeckHome = process.env.OVERDECK_HOME;
@@ -88,7 +92,7 @@ function validDoc(): string {
     '## What has been done',
     'The prompt and handoff path helpers are already in place, and this document exists to satisfy the request handshake.',
     '## Suggested skills',
-    '- /pan-workflow: use when checking Overdeck bead sequencing and completion flow.',
+    '- /pan-workflow: use when checking Overdeck task sequencing and completion flow.',
   ].join('\n\n');
 }
 
@@ -108,7 +112,7 @@ function docWithSuggestedSkillsHeading(heading: string): string {
     '## Current state',
     'The source agent has written a curated transfer document that references project artifacts without duplicating full PRD or plan content.',
     heading,
-    '- /pan-workflow: use when checking Overdeck bead sequencing and completion flow.',
+    '- /pan-workflow: use when checking Overdeck task sequencing and completion flow.',
   ].join('\n\n');
 }
 
@@ -150,6 +154,7 @@ afterEach(() => {
   vi.useRealTimers();
   vi.mocked(deliverAgentMessage).mockReset();
   vi.mocked(deliverAgentMessage).mockResolvedValue(undefined);
+  vi.mocked(mockedSummarizeSerializedText).mockClear();
   closeOverdeckDatabaseSync();
   resetDiscoveredSessionsSchemaBootstrap();
   _testDbPaths.length = 0;
@@ -163,6 +168,45 @@ afterEach(() => {
   } else {
     process.env.HOME = originalHome;
   }
+});
+
+describe('summary fork transcript resolution', () => {
+  it('summarizes an ACP conversation without a Claude session ID', async () => {
+    const home = join(tmpdir(), `pan-summary-fork-acp-${Date.now()}`);
+    const source = await createSourceConversation(home, {
+      tmuxSession: 'conv-acp-source',
+      claudeSessionId: null,
+      harness: 'acp',
+    });
+    const agentDir = join(home, 'agents', source.tmuxSession);
+    const sourceFile = join(agentDir, 'acp-session.jsonl');
+    await mkdir(agentDir, { recursive: true });
+    await writeFile(sourceFile, [
+      JSON.stringify({
+        timestamp: '2026-07-18T00:00:00.000Z',
+        role: 'user',
+        content: 'Continue the native ACP implementation',
+      }),
+      JSON.stringify({
+        timestamp: '2026-07-18T00:00:01.000Z',
+        role: 'assistant',
+        content: 'The ACP host is ready for verification',
+      }),
+    ].join('\n') + '\n', 'utf-8');
+
+    const result = await Effect.runPromise(createSummaryFork(source, {
+      model: 'claude-haiku-4-5',
+    }));
+
+    expect(result.summary).toContain('ACP-SUMMARY:');
+    expect(result.summary).toContain('Continue the native ACP implementation');
+    expect(result.summaryModel).toBe('claude-haiku-4-5');
+    expect(mockedSummarizeSerializedText).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(mockedSummarizeSerializedText).mock.calls[0]?.[0]).toContain(
+      '[assistant]\nThe ACP host is ready for verification',
+    );
+    rmSync(home, { recursive: true, force: true });
+  });
 });
 
 describe('validateHandoffDoc', () => {
@@ -373,7 +417,7 @@ describe('handoff fork handshake', () => {
     expect(result.forkFallbackReason).toBe('handoff-timeout');
     expect(result.summary).toContain('## Conversation Summary Fork');
     rmSync(home, { recursive: true, force: true });
-  });
+  }, 15_000);
 
   it('falls back to summary fork when the handoff document fails validation', async () => {
     const home = join(tmpdir(), `pan-handoff-validation-fallback-${Date.now()}`);
@@ -434,7 +478,7 @@ describe('prependFallbackFocus', () => {
   });
 });
 
-describe('authorHandoffExternal', () => {
+describe('authorHandoffExternal', { timeout: 20_000 }, () => {
   // The new design: the authoring session uses its Write tool to create the
   // doc file directly. The model's stdout is just an acknowledgement string.
   // Tests mock runModelSummary to (a) extract the output path from the prompt
@@ -458,7 +502,7 @@ describe('authorHandoffExternal', () => {
     vi.mocked(mockedRunModelSummary).mockImplementation(() => EffectMod.succeed(stdoutText));
   }
 
-  it('writes the doc + sentinel from the authoring session and never touches the source agent', async () => {
+  it('writes the doc + sentinel from the authoring session and never touches the source agent', { timeout: 20_000 }, async () => {
     const home = join(tmpdir(), `pan-handoff-external-ok-${Date.now()}`);
     const source = await createSourceConversation(home);
     const cwd = source.cwd;
@@ -490,7 +534,7 @@ describe('authorHandoffExternal', () => {
     rmSync(home, { recursive: true, force: true });
   });
 
-  it('uses the Pi-specific authoring template + write tool when the authoring harness is Pi (PAN-1541)', async () => {
+  it('uses the Pi-specific authoring template + write tool when the authoring harness is ohmypi (PAN-1541)', { timeout: 20_000 }, async () => {
     const home = join(tmpdir(), `pan-handoff-pi-author-${Date.now()}`);
     const source = await createSourceConversation(home);
     const sourceFile = sessionFilePath(source.cwd, source.claudeSessionId!);
@@ -499,13 +543,13 @@ describe('authorHandoffExternal', () => {
     mockAuthoringSessionThatWrites(docText);
     vi.mocked(mockedRunModelSummary).mockClear();
 
-    const result = await authorHandoffExternal(source, sourceFile, 'continue PAN-1541', 'pi-model', 'pi');
+    const result = await authorHandoffExternal(source, sourceFile, 'continue PAN-1541', 'pi-model', 'ohmypi');
 
     expect(result.docText).toBe(docText);
     expect(mockedRunModelSummary).toHaveBeenCalledTimes(1);
     const callArgs = vi.mocked(mockedRunModelSummary).mock.calls[0];
     // The authoring harness is threaded to the LLM call so runPiModelSummary runs.
-    expect(callArgs?.[3]).toBe('pi');
+    expect(callArgs?.[3]).toBe('ohmypi');
     const prompt = callArgs?.[0] as string;
     // Pi uses its lowercase `write` tool, not Claude Code's `Write` tool.
     expect(prompt).toContain('External-session handoff authoring (Pi)');

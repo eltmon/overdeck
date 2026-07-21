@@ -33,6 +33,7 @@ import type {
 import { initEventStore } from '../event-store.js';
 import type { StoredEvent } from '../event-store.js';
 import { setAgentRuntimeMirror, getRuntimeSnapshot as getMirrorSnapshot, markAgentStateServiceInProcess } from '../../../lib/agent-runtime-mirror.js';
+import { appendSessionIdToHistory } from '../../../lib/session-history.js';
 
 // ─── Event filtering ──────────────────────────────────────────────────────────
 
@@ -127,6 +128,17 @@ export const AgentStateServiceLive = Layer.effect(
     // No unsubscribe — the service lives for the whole dashboard process.
     store.subscribe((ev) => {
       if (!isRuntimeEvent(ev)) return;
+      // PAN-1989: durably mirror a newly-learned Claude session id to the
+      // agent's sessions.json. This is the single convergence point — every
+      // model_set, hook-emitted or server-emitted, flows through here — so the
+      // resume pointer is persisted to disk the instant it is known, instead of
+      // living only in the in-memory snapshot that a restart/reboot discards.
+      if (ev.type === 'agent.model_set') {
+        const payload = (ev as { payload?: { agentId?: string; claudeSessionId?: string } }).payload;
+        if (payload?.agentId && payload.claudeSessionId) {
+          appendSessionIdToHistory(payload.agentId, payload.claudeSessionId);
+        }
+      }
       Effect.runFork(applyEventToRef(ref, ev));
     });
 

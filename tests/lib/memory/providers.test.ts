@@ -38,6 +38,7 @@ describe('memory extraction providers', () => {
   afterEach(() => {
     delete process.env.OVERDECK_MEMORY_PROVIDER;
     delete process.env.OVERDECK_MEMORY_MODEL;
+    vi.restoreAllMocks();
   });
 
   it('round-trips a stub provider through the registry', async () => {
@@ -76,6 +77,7 @@ describe('memory extraction providers', () => {
   });
 
   it('routes cliproxy extraction through the local Anthropic-compatible messages endpoint', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     const fetchFn = vi.fn(async () => new Response(JSON.stringify({
       id: 'msg-1',
       content: [{ type: 'text', text: '{"summary":"cliproxy ok"}' }],
@@ -94,5 +96,6 @@ describe('memory extraction providers', () => {
       usage: { input: 10, output: 4 },
     });
     expect(result.cost.usd).toBeGreaterThan(0);
+    expect(warn).not.toHaveBeenCalled();
   });
 });

@@ -9,12 +9,13 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { mkdir, readFile, writeFile } from 'fs/promises';
 import { join } from 'path';
 import { Effect } from 'effect';
-import type { ModelId, AnthropicModel, OpenAIModel, GoogleModel, KimiModel, MimoModel, GrokModel } from './settings.js';
+import type { ModelId, GrokModel } from './settings.js';
 import type { RuntimeName } from './runtimes/types.js';
 import { FsError } from './errors.js';
 import { getOpenAICompatibleProxyBaseUrl } from './openai-compatible-proxy.js';
+import { MODEL_DEPRECATIONS } from './model-capabilities.js';
 
-export type ProviderName = 'anthropic' | 'kimi' | 'openai' | 'google' | 'minimax' | 'zai' | 'mimo' | 'openrouter' | 'nous' | 'dashscope' | 'xai';
+export type ProviderName = 'anthropic' | 'kimi' | 'openai' | 'google' | 'minimax' | 'zai' | 'mimo' | 'openrouter' | 'nous' | 'dashscope' | 'xai' | 'groq' | 'cerebras' | 'mistral';
 
 /**
  * Provider configuration
@@ -65,7 +66,7 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     displayName: 'Anthropic',
     compatibility: 'direct',
     defaultHarness: 'claude-code',
-    models: ['claude-fable-5', 'claude-opus-4-8', 'claude-opus-4-7', 'claude-opus-4-6', 'claude-sonnet-4-6', 'claude-sonnet-4-5', 'claude-haiku-4-5'],
+    models: ['claude-fable-5', 'claude-opus-4-8', 'claude-opus-4-7', 'claude-opus-4-6', 'claude-sonnet-5', 'claude-sonnet-4-6', 'claude-sonnet-4-5', 'claude-haiku-4-5'],
     tested: true,
     description: 'Native Claude API',
   },
@@ -74,11 +75,18 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     name: 'kimi',
     displayName: 'Kimi (Moonshot AI)',
     compatibility: 'direct',
-    defaultHarness: 'pi',
-    models: ['kimi-k2.7-code', 'kimi-k2.6', 'kimi-k2.5', 'kimi-k2', 'K2.6-code-preview'],
+    // claude-code, not ohmypi (PAN-2102). omp v16.1.16 renamed Kimi's provider
+    // (kimi-coding → kimi-code), changed its model ids (kimi-k2.7-code →
+    // kimi-for-coding), and switched it to OAuth, so omp can no longer launch a
+    // Kimi work agent — it exits immediately and the tmux session orphans. Kimi
+    // exposes an Anthropic-compatible endpoint (api.kimi.com/coding + sk-kimi-*
+    // token), so claude-code talks to it natively — no omp, no CLIProxy, no
+    // 200k-window deadlock.
+    defaultHarness: 'claude-code',
+    models: ['k3', 'k3[1m]', 'kimi-k2.7-code', 'kimi-k2.6', 'kimi-k2.5', 'kimi-k2', 'K2.6-code-preview'],
     tierModels: { opus: 'kimi-k2.6', sonnet: 'kimi-k2.5', haiku: 'kimi-k2' },
     tested: true,
-    description: 'Route directly to Kimi Anthropic-compatible endpoints; sk-kimi-* keys use the coding endpoint, platform keys use Moonshot.',
+    description: 'Route directly to Kimi Anthropic-compatible endpoints via claude-code; sk-kimi-* keys use the coding endpoint, platform keys use Moonshot.',
   },
 
   openai: {
@@ -86,17 +94,17 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     displayName: 'OpenAI',
     compatibility: 'direct',
     defaultHarness: 'codex',
-    models: ['gpt-5.5', 'gpt-5.4', 'gpt-5.4-mini', 'gpt-5.3-codex', 'gpt-5.3-codex-spark', 'gpt-5.2'],
-    tierModels: { opus: 'gpt-5.5', sonnet: 'gpt-5.4', haiku: 'gpt-5.4-mini' },
+    models: ['gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna', 'gpt-5.5', 'gpt-5.4', 'gpt-5.4-mini', 'gpt-5.3-codex', 'gpt-5.3-codex-spark', 'gpt-5.2'],
+    tierModels: { opus: 'gpt-5.6-sol', sonnet: 'gpt-5.4', haiku: 'gpt-5.4-mini' },
     tested: true,
-    description: 'Route through the local CLIProxyAPI Anthropic-compatible sidecar using Codex/ChatGPT subscription auth.',
+    description: 'First-party Codex CLI harness (default) using ChatGPT-subscription or API-key auth. The local CLIProxyAPI sidecar remains a legacy alternate for routing GPT models into claude-code.',
   },
 
   google: {
     name: 'google',
     displayName: 'Google (Gemini)',
     compatibility: 'direct',
-    defaultHarness: 'pi',
+    defaultHarness: 'ohmypi',
     models: ['gemini-3.1-pro-preview', 'gemini-3-flash-preview', 'gemini-3.1-flash-lite-preview'],
     tierModels: { opus: 'gemini-3.1-pro-preview', sonnet: 'gemini-3-flash-preview', haiku: 'gemini-3.1-flash-lite-preview' },
     tested: true,
@@ -107,7 +115,7 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     name: 'minimax',
     displayName: 'MiniMax',
     compatibility: 'direct',
-    defaultHarness: 'pi',
+    defaultHarness: 'ohmypi',
     baseUrl: 'https://api.minimax.io/anthropic',
     authType: 'static',
     models: ['minimax-m2.7', 'minimax-m2.7-highspeed', 'MiniMax-M3'],
@@ -121,7 +129,7 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     name: 'zai',
     displayName: 'Z.AI',
     compatibility: 'direct',
-    defaultHarness: 'pi',
+    defaultHarness: 'ohmypi',
     baseUrl: 'https://api.z.ai/api/anthropic',
     authType: 'static',
     models: ['glm-5.2', 'glm-5.1', 'glm-4.7', 'glm-4.7-flash'],
@@ -135,7 +143,7 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     name: 'mimo',
     displayName: 'Xiaomi MiMo',
     compatibility: 'direct',
-    defaultHarness: 'pi',
+    defaultHarness: 'ohmypi',
     baseUrl: 'https://token-plan-sgp.xiaomimimo.com/anthropic',
     authType: 'static',
     models: ['mimo-v2.5-pro', 'mimo-v2.5'],
@@ -149,7 +157,7 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     name: 'openrouter',
     displayName: 'OpenRouter',
     compatibility: 'direct',
-    defaultHarness: 'pi',
+    defaultHarness: 'ohmypi',
     baseUrl: 'https://openrouter.ai/api/v1',
     authType: 'static',
     models: [], // Dynamic models fetched from OpenRouter API; IDs contain '/'
@@ -161,7 +169,7 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     name: 'nous',
     displayName: 'Nous Portal',
     compatibility: 'direct',
-    defaultHarness: 'pi',
+    defaultHarness: 'ohmypi',
     baseUrl: getOpenAICompatibleProxyBaseUrl('nous'),
     authType: 'static',
     models: ['qwen/qwen3.6-plus'],
@@ -175,7 +183,7 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     name: 'dashscope',
     displayName: 'Alibaba DashScope',
     compatibility: 'direct',
-    defaultHarness: 'pi',
+    defaultHarness: 'ohmypi',
     baseUrl: getOpenAICompatibleProxyBaseUrl('dashscope'),
     authType: 'static',
     models: ['qwen3-max', 'qwen3-coder-plus', 'qwen3-plus', 'qwen3.7-max'],
@@ -189,13 +197,52 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     name: 'xai',
     displayName: 'xAI (Grok)',
     compatibility: 'direct',
-    defaultHarness: 'pi',
+    defaultHarness: 'ohmypi',
     baseUrl: 'https://api.x.ai/v1',
     authType: 'static',
     models: ['grok-build-0.1'] as GrokModel[],
     tierModels: { opus: 'grok-build-0.1', sonnet: 'grok-build-0.1', haiku: 'grok-build-0.1' },
     tested: false,
     description: 'Route directly to xAI Anthropic-compatible endpoint using XAI_API_KEY. Model: grok-build-0.1 (256K ctx, $1/M in, $2/M out).',
+  },
+
+  groq: {
+    name: 'groq',
+    displayName: 'Groq',
+    compatibility: 'direct',
+    defaultHarness: 'ohmypi',
+    authType: 'static',
+    models: ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant', 'qwen-qwq-32b', 'gemma2-9b-it'],
+    haikuModel: 'llama-3.1-8b-instant',
+    tierModels: { opus: 'llama-3.3-70b-versatile', sonnet: 'llama-3.3-70b-versatile', haiku: 'llama-3.1-8b-instant' },
+    tested: false,
+    description: 'Route via omp using GROQ_API_KEY. Ultra-low-latency inference on open-weight models.',
+  },
+
+  cerebras: {
+    name: 'cerebras',
+    displayName: 'Cerebras',
+    compatibility: 'direct',
+    defaultHarness: 'ohmypi',
+    authType: 'static',
+    models: ['llama3.3-70b', 'llama3.1-70b', 'llama3.1-8b'],
+    haikuModel: 'llama3.1-8b',
+    tierModels: { opus: 'llama3.3-70b', sonnet: 'llama3.1-70b', haiku: 'llama3.1-8b' },
+    tested: false,
+    description: 'Route via omp using CEREBRAS_API_KEY. Hardware-accelerated inference on Cerebras wafer-scale chips.',
+  },
+
+  mistral: {
+    name: 'mistral',
+    displayName: 'Mistral AI',
+    compatibility: 'direct',
+    defaultHarness: 'ohmypi',
+    authType: 'static',
+    models: ['mistral-large-latest', 'mistral-small-latest', 'codestral-latest'],
+    haikuModel: 'mistral-small-latest',
+    tierModels: { opus: 'mistral-large-latest', sonnet: 'mistral-large-latest', haiku: 'mistral-small-latest' },
+    tested: false,
+    description: 'Route via omp using MISTRAL_API_KEY.',
   },
 };
 
@@ -204,6 +251,56 @@ export function getBuiltInDefaultHarness(provider: ProviderName | string): Runti
     return PROVIDERS[provider as ProviderName].defaultHarness;
   }
   return 'claude-code';
+}
+
+export class UnknownModelError extends Error {
+  constructor(modelId: string, suggestion?: string) {
+    super(`Unknown model "${modelId}".${suggestion ? ` Did you mean "${suggestion}"?` : ''}`);
+    this.name = 'UnknownModelError';
+  }
+}
+
+function knownModelIds(): string[] {
+  return Array.from(new Set([
+    ...Object.values(PROVIDERS).flatMap((provider) => provider.models.map(String)),
+    ...Object.keys(MODEL_DEPRECATIONS),
+    ...Object.values(MODEL_DEPRECATIONS).map(String),
+  ]));
+}
+
+function editDistance(a: string, b: string): number {
+  const previous = Array.from({ length: b.length + 1 }, (_, index) => index);
+  const current = new Array<number>(b.length + 1);
+  for (let i = 1; i <= a.length; i += 1) {
+    current[0] = i;
+    for (let j = 1; j <= b.length; j += 1) {
+      current[j] = Math.min(
+        previous[j] + 1,
+        current[j - 1] + 1,
+        previous[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1),
+      );
+    }
+    previous.splice(0, previous.length, ...current);
+  }
+  return previous[b.length];
+}
+
+function nearestKnownModelId(modelId: string): string | undefined {
+  const normalizedInput = modelId.toLowerCase();
+  const compactInput = normalizedInput.replace(/[^a-z0-9]/g, '');
+  let best: { model: string; distance: number } | undefined;
+  for (const candidate of knownModelIds()) {
+    const normalizedCandidate = candidate.toLowerCase();
+    const distance = Math.min(
+      editDistance(normalizedInput, normalizedCandidate),
+      editDistance(compactInput, normalizedCandidate.replace(/[^a-z0-9]/g, '')),
+    );
+    if (!best || distance < best.distance) {
+      best = { model: candidate, distance };
+    }
+  }
+  if (!best) return undefined;
+  return best.distance <= Math.max(2, Math.floor(modelId.length / 3)) ? best.model : undefined;
 }
 
 /**
@@ -223,13 +320,13 @@ export function getProviderForModelSync(modelId: ModelId | string): ProviderConf
   }
 
   // Check Anthropic models
-  if (['claude-fable-5', 'claude-opus-4-8', 'claude-opus-4-7', 'claude-opus-4-6', 'claude-sonnet-4-6', 'claude-sonnet-4-5', 'claude-haiku-4-5'].includes(modelId)) {
+  if (['claude-fable-5', 'claude-opus-4-8', 'claude-opus-4-7', 'claude-opus-4-6', 'claude-sonnet-5', 'claude-sonnet-4-6', 'claude-sonnet-4-5', 'claude-haiku-4-5'].includes(modelId)) {
     return PROVIDERS.anthropic;
   }
 
   // Check OpenAI models — supported set + retired IDs (still routed so the
   // deprecation-migration path can fire warnings before remap).
-  if (['gpt-5.5', 'gpt-5.4', 'gpt-5.4-mini', 'gpt-5.3-codex', 'gpt-5.3-codex-spark', 'gpt-5.2', 'gpt-5.5-pro', 'gpt-5.4-pro', 'o3', 'o4-mini', 'o3-deep-research', 'gpt-4o', 'gpt-4o-mini'].includes(modelId)) {
+  if (['gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna', 'gpt-5.5', 'gpt-5.4', 'gpt-5.4-mini', 'gpt-5.3-codex', 'gpt-5.3-codex-spark', 'gpt-5.2', 'gpt-5.5-pro', 'gpt-5.4-pro', 'o3', 'o4-mini', 'o3-deep-research', 'gpt-4o', 'gpt-4o-mini'].includes(modelId)) {
     return PROVIDERS.openai;
   }
 
@@ -244,7 +341,7 @@ export function getProviderForModelSync(modelId: ModelId | string): ProviderConf
   }
 
   // Check Kimi models
-  if (['kimi-k2.7-code', 'kimi-k2.6', 'kimi-k2.5', 'kimi-k2', 'K2.6-code-preview'].includes(modelId)) {
+  if (['k3', 'k3[1m]', 'kimi-k2.7-code', 'kimi-k2.6', 'kimi-k2.5', 'kimi-k2', 'K2.6-code-preview'].includes(modelId)) {
     return PROVIDERS.kimi;
   }
 
@@ -263,8 +360,22 @@ export function getProviderForModelSync(modelId: ModelId | string): ProviderConf
     return PROVIDERS.mimo;
   }
 
-  // Default to Anthropic if unknown
-  return PROVIDERS.anthropic;
+  // Check Groq models
+  if (['llama-3.3-70b-versatile', 'llama-3.1-8b-instant', 'qwen-qwq-32b', 'gemma2-9b-it'].includes(modelId)) {
+    return PROVIDERS.groq;
+  }
+
+  // Check Cerebras models
+  if (['llama3.3-70b', 'llama3.1-70b', 'llama3.1-8b'].includes(modelId)) {
+    return PROVIDERS.cerebras;
+  }
+
+  // Check Mistral models
+  if (['mistral-large-latest', 'mistral-small-latest', 'codestral-latest'].includes(modelId)) {
+    return PROVIDERS.mistral;
+  }
+
+  throw new UnknownModelError(String(modelId), nearestKnownModelId(String(modelId)));
 }
 
 /**
@@ -330,6 +441,12 @@ export function getProviderEnvSync(
     env.GEMINI_API_KEY = apiKey;
   } else if (provider.name === 'xai') {
     env.XAI_API_KEY = apiKey;
+  } else if (provider.name === 'groq') {
+    env.GROQ_API_KEY = apiKey;
+  } else if (provider.name === 'cerebras') {
+    env.CEREBRAS_API_KEY = apiKey;
+  } else if (provider.name === 'mistral') {
+    env.MISTRAL_API_KEY = apiKey;
   }
 
   // MiniMax, Z.AI, and MiMo recommend longer timeouts

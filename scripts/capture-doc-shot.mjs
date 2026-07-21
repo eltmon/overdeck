@@ -18,7 +18,7 @@
  *                      "images/specialists/01-board-hero"
  *
  * Options:
- *   --base <url>       Dashboard base URL (default: https://pan.localhost)
+ *   --base <url>       Dashboard base URL (default: https://overdeck.localhost)
  *   --selector <css>   Screenshot only this element instead of the viewport
  *   --full-page        Capture the full scrollable page
  *   --width <n>        Viewport width  (default: 1440)
@@ -45,7 +45,7 @@ const THEMES = ['light', 'dark'];
 function parseArgs(argv) {
   const positional = [];
   const opts = {
-    base: 'https://pan.localhost',
+    base: 'https://overdeck.localhost',
     selector: null,
     fullPage: false,
     width: 1440,
@@ -86,7 +86,7 @@ function parseArgs(argv) {
 
 async function captureTheme(browser, theme, opts) {
   const context = await browser.newContext({
-    ignoreHTTPSErrors: true, // pan.localhost uses a local mkcert certificate
+    ignoreHTTPSErrors: true, // overdeck.localhost uses a local mkcert certificate
     viewport: { width: opts.width, height: opts.height },
     deviceScaleFactor: opts.scale,
     colorScheme: theme,

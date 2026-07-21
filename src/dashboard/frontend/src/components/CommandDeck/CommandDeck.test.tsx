@@ -1,9 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import { CommandDeck } from './index';
 import { useCommandDeckSelection } from '../../lib/commandDeckSelection';
 import { usePanesStore } from '../../lib/panesStore';
+import { usePlannedBacklogVisibility } from '../../hooks/usePlannedBacklogVisibility';
 
 vi.mock('./styles/command-deck.module.css', () => ({
   default: {
@@ -18,10 +20,17 @@ vi.mock('./styles/command-deck.module.css', () => ({
     segmentButton: 'segmentButton',
     segmentButtonActive: 'segmentButtonActive',
     segmentCount: 'segmentCount',
+    treeFilterRow: 'treeFilterRow',
+    treeFilterButton: 'treeFilterButton',
+    treeFilterButtonActive: 'treeFilterButtonActive',
     projectTree: 'projectTree',
     resizeHandle: 'resizeHandle',
     content: 'content',
     contentEmpty: 'contentEmpty',
+    unknownProject: 'unknownProject',
+    unknownProjectList: 'unknownProjectList',
+    unknownProjectRetry: 'unknownProjectRetry',
+    unknownProjectBack: 'unknownProjectBack',
     featureHeader: 'featureHeader',
     featureTitle: 'featureTitle',
     featureId: 'featureId',
@@ -30,6 +39,11 @@ vi.mock('./styles/command-deck.module.css', () => ({
     skeletonList: 'skeletonList',
     skeletonItem: 'skeletonItem',
     emptyProject: 'emptyProject',
+    membershipStatus: 'membershipStatus',
+    membershipError: 'membershipError',
+    membershipErrorContent: 'membershipErrorContent',
+    membershipErrorDetail: 'membershipErrorDetail',
+    membershipErrorRetry: 'membershipErrorRetry',
     sidebarFooter: 'sidebarFooter',
     versionLabel: 'versionLabel',
   },
@@ -47,8 +61,51 @@ vi.mock('./SessionView/IssueHeader', () => ({
   ),
 }));
 
+interface RegisteredProjectFixture {
+  key: string;
+  name?: string;
+  path: string;
+}
+
+const defaultRegisteredProjects: RegisteredProjectFixture[] = [
+  { key: 'test-key', name: 'test-project', path: '/path/to/test-project' },
+  { key: 'other-project', name: 'Other Project', path: '/path/to/other-project' },
+];
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((res) => {
+    resolve = res;
+  });
+  return { promise, resolve };
+}
+
+let latestStageProps: any;
+let resourceProjectsResponse: unknown;
+let registeredProjectsResponse: unknown | Promise<unknown> = defaultRegisteredProjects;
+let registeredProjectsRequestError: Error | null = null;
+let pipelineMembershipResponse: { ok: boolean; body: unknown } = {
+  ok: true,
+  body: [],
+};
+let conversationCreateResponse: { ok: boolean; body: unknown } = {
+  ok: true,
+  body: { id: 3, name: 'created-conv', title: 'Agent' },
+};
+
+vi.mock('sonner', () => ({
+  toast: {
+    error: vi.fn(),
+    info: vi.fn(),
+    success: vi.fn(),
+  },
+}));
+
 vi.mock('../Stage', () => ({
-  Stage: (props: any) => <div data-testid="stage" data-deck={props.deckKey} />,
+  Stage: (props: any) => {
+    latestStageProps = props;
+    return <div data-testid="stage" data-deck={props.deckKey} />;
+  },
 }));
 
 // CommandDeck calls useConfirm() at render; the test doesn't mount a DialogProvider,
@@ -79,7 +136,11 @@ vi.mock('./ProjectTree/ProjectNode', () => ({
   ProjectNode: (props: any) => {
     // Simulate tab switch to projects when rendered
     return (
-      <div data-testid="project-node" data-selected={props.selectedProject === props.name ? 'true' : 'false'}>
+      <div
+        data-testid="project-node"
+        data-project-key={props.projectKey}
+        data-selected={props.selectedProject === props.name ? 'true' : 'false'}
+      >
         <button data-testid={`project-${props.name}`} onClick={() => props.onSelectProject?.(props.name)}>
           {props.name}
         </button>
@@ -171,8 +232,8 @@ vi.mock('../../lib/wsTransport', () => ({
   }),
 }));
 
-vi.mock('../BeadsDialog', () => ({
-  BeadsDialog: () => <div data-testid="beads-dialog" />,
+vi.mock('../TasksDialog', () => ({
+  TasksDialog: () => <div data-testid="tasks-dialog" />,
 }));
 
 // Mock lucide-react icons
@@ -193,11 +254,17 @@ function renderCommandDeck(props?: Partial<React.ComponentProps<typeof CommandDe
   // Provide minimal fetch mocks for the hooks
   vi.stubGlobal(
     'fetch',
-    vi.fn(async (url: string) => {
+    vi.fn(async (url: string, init?: RequestInit) => {
+      if (url === '/api/conversations' && init?.method === 'POST') {
+        return {
+          ok: conversationCreateResponse.ok,
+          json: async () => conversationCreateResponse.body,
+        };
+      }
       if (url === '/api/issues/resource-allocated') {
         return {
           ok: true,
-          json: async () => [
+          json: async () => resourceProjectsResponse ?? [
             {
               issueId: 'PAN-821',
               title: 'Test Feature',
@@ -218,21 +285,26 @@ function renderCommandDeck(props?: Partial<React.ComponentProps<typeof CommandDe
                 remoteBranchCount: 0,
                 tmuxSessionCount: 0,
                 prs: [],
-                hasVbrief: false,
-                hasBeads: false,
+                hasXbrief: false,
+                hasTasks: false,
                 dockerContainerCount: 0,
+                conversations: [],
               },
             },
           ],
         };
       }
       if (url === '/api/registered-projects') {
+        if (registeredProjectsRequestError) throw registeredProjectsRequestError;
         return {
           ok: true,
-          json: async () => [
-            { key: 'test-project', name: 'test-project', path: '/path/to/test-project' },
-            { key: 'other-project', name: 'other-project', path: '/path/to/other-project' },
-          ],
+          json: async () => registeredProjectsResponse,
+        };
+      }
+      if (url.startsWith('/api/pipeline/membership?project=')) {
+        return {
+          ok: pipelineMembershipResponse.ok,
+          json: async () => pipelineMembershipResponse.body,
         };
       }
       if (url === '/api/conversations') {
@@ -369,8 +441,21 @@ function renderCommandDeck(props?: Partial<React.ComponentProps<typeof CommandDe
 describe('CommandDeck — project-scoped deck (PAN-1561)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    latestStageProps = undefined;
+    resourceProjectsResponse = undefined;
+    registeredProjectsResponse = defaultRegisteredProjects;
+    registeredProjectsRequestError = null;
+    pipelineMembershipResponse = {
+      ok: true,
+      body: [],
+    };
+    conversationCreateResponse = {
+      ok: true,
+      body: { id: 3, name: 'created-conv', title: 'Agent' },
+    };
     useCommandDeckSelection.getState().clearAll();
     usePanesStore.setState({ panesByWorkspace: {}, activePaneByWorkspace: {} });
+    usePlannedBacklogVisibility.setState({ showPlannedBacklog: true });
     localStorage.clear();
   });
 
@@ -392,6 +477,234 @@ describe('CommandDeck — project-scoped deck (PAN-1561)', () => {
     const stage = screen.getByTestId('stage');
     expect(stage).toHaveAttribute('data-deck', 'test-project');
     expect(screen.getByTestId('activity-feed')).toHaveAttribute('data-issues', 'PAN-821');
+  });
+
+  it('keeps the issue rail rendered while selected-project membership is unavailable', async () => {
+    resourceProjectsResponse = [];
+    pipelineMembershipResponse = {
+      ok: false,
+      body: { error: 'Pipeline membership snapshot failed to load' },
+    };
+    renderCommandDeck({ selectedProject: 'test-project' });
+
+    expect(await screen.findByTestId('project-node')).toHaveAttribute('data-project-key', 'test-key');
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent(
+      'Pipeline membership determines which issues appear here. It could not be loaded for test-project, so this issue list may be incomplete.',
+    );
+    expect(alert).toHaveTextContent('Pipeline membership snapshot failed to load');
+    expect(fetch).toHaveBeenCalledWith('/api/pipeline/membership?project=test-key');
+
+    pipelineMembershipResponse = { ok: true, body: [] };
+    fireEvent.click(screen.getByRole('button', { name: 'Retry membership' }));
+
+    await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument());
+    expect(screen.getByTestId('project-node')).toHaveAttribute('data-project-key', 'test-key');
+  });
+
+  it('toggles spec-only planned issues across the tree, count, and project home', async () => {
+    resourceProjectsResponse = [
+      {
+        issueId: 'PAN-821',
+        title: 'Active feature',
+        projectName: 'test-project',
+        branch: 'feature/pan-821',
+        status: 'running',
+        stateLabel: 'In Progress',
+        agentStatus: 'active',
+        hasPlanning: true,
+        hasPrd: true,
+        hasState: true,
+        isShadow: false,
+      },
+      {
+        issueId: 'PAN-2822',
+        title: 'Spec-only planned feature',
+        projectName: 'test-project',
+        branch: 'feature/pan-2822',
+        status: 'idle',
+        stateLabel: 'Planned',
+        agentStatus: null,
+        hasPlanning: true,
+        hasPrd: true,
+        hasState: false,
+        isShadow: false,
+        specOnlyPlanned: true,
+      },
+    ];
+    renderCommandDeck({ selectedProject: 'test-project' });
+
+    expect(await screen.findByTestId('feature-PAN-821')).toBeInTheDocument();
+    expect(screen.getByTestId('feature-PAN-2822')).toBeInTheDocument();
+
+    const toggle = screen.getByTestId('planned-backlog-toggle');
+    const issuesHeader = screen.getByText('Issues').parentElement!;
+    expect(toggle).toHaveClass('treeFilterButtonActive');
+    expect(within(issuesHeader).getByText('2')).toBeInTheDocument();
+    const initialHomeFeatures = latestStageProps.renderHome({}).props.features.map((feature: any) => feature.issueId);
+    expect(initialHomeFeatures).toHaveLength(2);
+    expect(initialHomeFeatures).toEqual(expect.arrayContaining(['PAN-821', 'PAN-2822']));
+
+    fireEvent.click(toggle);
+
+    await waitFor(() => expect(screen.queryByTestId('feature-PAN-2822')).not.toBeInTheDocument());
+    expect(screen.getByTestId('feature-PAN-821')).toBeInTheDocument();
+    expect(toggle).not.toHaveClass('treeFilterButtonActive');
+    expect(within(issuesHeader).getByText('1')).toBeInTheDocument();
+    expect(latestStageProps.renderHome({}).props.features.map((feature: any) => feature.issueId)).toEqual([
+      'PAN-821',
+    ]);
+
+    fireEvent.click(toggle);
+
+    expect(await screen.findByTestId('feature-PAN-2822')).toBeInTheDocument();
+    expect(toggle).toHaveClass('treeFilterButtonActive');
+    expect(within(issuesHeader).getByText('2')).toBeInTheDocument();
+  });
+
+  it('passes the immutable registration key to the project tree node', async () => {
+    renderCommandDeck({ selectedProject: 'Other Project' });
+
+    expect(await screen.findByTestId('project-node')).toHaveAttribute(
+      'data-project-key',
+      'other-project',
+    );
+  });
+
+  it('renders an unknown-project state instead of a deck for an unregistered slug', async () => {
+    renderCommandDeck({ selectedProject: 'missing-project' });
+
+    expect(await screen.findByRole('heading', { name: 'Unknown project' })).toBeInTheDocument();
+    expect(screen.getByText('missing-project')).toBeInTheDocument();
+    expect(screen.queryByTestId('stage')).not.toBeInTheDocument();
+  });
+
+  it('rejects a resource-derived project that is not registered', async () => {
+    registeredProjectsResponse = [defaultRegisteredProjects[1]!];
+    renderCommandDeck({ selectedProject: 'test-project' });
+
+    expect(await screen.findByRole('heading', { name: 'Unknown project' })).toBeInTheDocument();
+    expect(screen.queryByTestId('stage')).not.toBeInTheDocument();
+  });
+
+  it('accepts a selected project that matches a registered key', async () => {
+    renderCommandDeck({ selectedProject: 'test-key' });
+
+    expect(await screen.findByTestId('stage')).toHaveAttribute('data-deck', 'test-key');
+    expect(screen.queryByRole('heading', { name: 'Unknown project' })).not.toBeInTheDocument();
+  });
+
+  it('accepts a selected project that matches a registered name', async () => {
+    renderCommandDeck({ selectedProject: 'test-project' });
+
+    expect(await screen.findByTestId('stage')).toHaveAttribute('data-deck', 'test-project');
+    expect(screen.queryByRole('heading', { name: 'Unknown project' })).not.toBeInTheDocument();
+  });
+
+  it('does not mount the project deck while resource projects are unresolved', async () => {
+    const pendingProjects = deferred<unknown[]>();
+    resourceProjectsResponse = pendingProjects.promise;
+    renderCommandDeck({ selectedProject: 'test-project' });
+
+    expect(screen.getByRole('status')).toHaveTextContent('Loading project…');
+    expect(screen.queryByTestId('stage')).not.toBeInTheDocument();
+
+    await act(async () => {
+      pendingProjects.resolve([]);
+      await pendingProjects.promise;
+    });
+    expect(await screen.findByTestId('stage')).toHaveAttribute('data-deck', 'test-project');
+  });
+
+  it('does not flash the unknown-project state while registered projects are unresolved', async () => {
+    const pendingProjects = deferred<RegisteredProjectFixture[]>();
+    registeredProjectsResponse = pendingProjects.promise;
+    renderCommandDeck({ selectedProject: 'missing-project' });
+
+    expect(screen.getByRole('status')).toHaveTextContent('Loading project…');
+    expect(screen.queryByRole('heading', { name: 'Unknown project' })).not.toBeInTheDocument();
+    expect(screen.queryByTestId('stage')).not.toBeInTheDocument();
+
+    await act(async () => {
+      pendingProjects.resolve(defaultRegisteredProjects);
+      await pendingProjects.promise;
+    });
+    expect(await screen.findByRole('heading', { name: 'Unknown project' })).toBeInTheDocument();
+  });
+
+  it('shows a retryable error when registered projects cannot be loaded', async () => {
+    registeredProjectsRequestError = new Error('Project registry unavailable');
+    renderCommandDeck({ selectedProject: 'test-project' });
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Couldn’t load projects');
+    expect(screen.queryByRole('heading', { name: 'Unknown project' })).not.toBeInTheDocument();
+    expect(screen.queryByTestId('stage')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('activity-feed')).not.toBeInTheDocument();
+
+    registeredProjectsRequestError = null;
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+
+    expect(await screen.findByTestId('stage')).toHaveAttribute('data-deck', 'test-project');
+  });
+
+  it('treats a malformed registered-project response as a load failure', async () => {
+    registeredProjectsResponse = { projects: defaultRegisteredProjects };
+    renderCommandDeck({ selectedProject: 'test-project' });
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Couldn’t load projects');
+    expect(screen.queryByRole('heading', { name: 'Unknown project' })).not.toBeInTheDocument();
+    expect(screen.queryByTestId('stage')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('activity-feed')).not.toBeInTheDocument();
+  });
+
+  it('navigates from the unknown-project state to a registered project or the deck root', async () => {
+    const onSelectProject = vi.fn();
+    renderCommandDeck({ selectedProject: 'missing-project', onSelectProject });
+    await screen.findByRole('heading', { name: 'Unknown project' });
+
+    fireEvent.click(screen.getByRole('button', { name: 'test-project' }));
+    expect(onSelectProject).toHaveBeenCalledWith('test-project');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Back to Command Deck' }));
+    expect(onSelectProject).toHaveBeenCalledWith(null);
+  });
+
+  it('returns the created conversation name and opens its agent pane', async () => {
+    renderCommandDeck({ selectedProject: 'test-project' });
+    await screen.findByTestId('stage');
+
+    let result: unknown;
+    await act(async () => {
+      result = await latestStageProps.onCreateConversation('claude-code');
+    });
+
+    expect(result).toEqual({ name: 'created-conv' });
+    expect(panes('test-project')).toEqual(expect.arrayContaining([
+      expect.objectContaining({ paneType: 'agent', conversationId: 'created-conv' }),
+    ]));
+  });
+
+  it('returns the server error while preserving the existing error signals', async () => {
+    conversationCreateResponse = {
+      ok: false,
+      body: { error: 'Unknown project: overdeck' },
+    };
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    renderCommandDeck({ selectedProject: 'test-project' });
+    await screen.findByTestId('stage');
+
+    let result: unknown;
+    await act(async () => {
+      result = await latestStageProps.onCreateConversation('claude-code');
+    });
+
+    expect(result).toEqual({ error: 'Unknown project: overdeck' });
+    expect(toast.error).toHaveBeenCalledWith('Unknown project: overdeck');
+    expect(consoleError).toHaveBeenCalledWith(
+      '[CommandDeck] Failed to create conversation:',
+      expect.objectContaining({ message: 'Unknown project: overdeck' }),
+    );
+    consoleError.mockRestore();
   });
 
   it('opens an issue tab in the deck when a tree issue is selected', async () => {
@@ -416,5 +729,30 @@ describe('CommandDeck — project-scoped deck (PAN-1561)', () => {
 
     fireEvent.click(screen.getByTestId('conv-test'));
     expect(panes('test-project').some(p => p.paneType === 'agent' && p.conversationId === 'test-conv')).toBe(true);
+  });
+
+  it('re-syncs the /conv URL when an already-selected conversation is clicked again', async () => {
+    // Repro: open a conversation (URL → /conv/1), navigate to another page so the
+    // URL leaves /conv (convId prop is null) while the deck keeps the conversation
+    // selected, then click that same row again. Because `selectedConversation`
+    // does not change value, the state→URL sync effect never re-runs — so the
+    // click handler itself must drive onConvIdChange or the URL stays on
+    // /command-deck/<project>.
+    const onConvIdChange = vi.fn();
+    renderCommandDeck({ selectedProject: 'test-project', convId: null, onConvIdChange });
+    await screen.findAllByTestId('project-node');
+
+    // First click selects + opens the conversation and writes /conv/1. Retry
+    // until the conversations query has settled so the id lookup resolves.
+    await waitFor(() => {
+      fireEvent.click(screen.getByTestId('conv-test'));
+      expect(onConvIdChange).toHaveBeenCalledWith('1');
+    });
+
+    // The conversation is now selected but convId is still null (URL moved away).
+    // Re-clicking the same row must restore /conv/1 even though state is unchanged.
+    onConvIdChange.mockClear();
+    fireEvent.click(screen.getByTestId('conv-test'));
+    await waitFor(() => expect(onConvIdChange).toHaveBeenCalledWith('1'));
   });
 });

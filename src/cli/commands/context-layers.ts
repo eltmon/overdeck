@@ -14,7 +14,7 @@ import { spawnSync } from 'child_process';
 import { existsSync, mkdirSync, readFileSync } from 'fs';
 import { join } from 'path';
 import inquirer from 'inquirer';
-import type { Harness } from '@overdeck/contracts';
+import { CONTEXT_PREVIEW_HARNESSES, type Harness } from '@overdeck/contracts';
 import {
   globalContextFile,
   projectContextFile,
@@ -30,6 +30,7 @@ import {
 import { syncContextLayersSync } from '../../lib/sync.js';
 import { isDevMode } from '../../lib/paths.js';
 import { findProjectByPathSync, registerProjectSync } from '../../lib/projects.js';
+import { getHarnessBehavior } from '../../lib/runtimes/behavior.js';
 
 type LayerName = 'global' | 'project' | 'workspace';
 
@@ -38,6 +39,24 @@ interface ContextOptions {
   harness?: string;
   json?: boolean;
   yes?: boolean;
+}
+
+function contextDiffHarnesses(rawHarness: string | undefined): Harness[] {
+  const allHarnesses = [...CONTEXT_PREVIEW_HARNESSES];
+  if (!rawHarness) return allHarnesses;
+  const harness = rawHarness === 'claude' ? 'claude-code' : rawHarness;
+  switch (harness) {
+    case 'claude-code':
+    case 'pi':
+    case 'ohmypi':
+    case 'codex':
+    case 'acp':
+      break;
+    default:
+      return allHarnesses;
+  }
+  const contextLayerKind = getHarnessBehavior(harness as Parameters<typeof getHarnessBehavior>[0]).contextLayerKind;
+  return allHarnesses.filter((candidate) => getHarnessBehavior(candidate).contextLayerKind === contextLayerKind);
 }
 
 /** Resolve the registered project whose tree contains `cwd`, or null. */
@@ -147,6 +166,10 @@ export async function contextSyncCommand(): Promise<void> {
   for (const name of result.projectsWritten) {
     console.log(chalk.green(`✓ Rendered project layer → ${name}/CLAUDE.md`));
   }
+  for (const cleanup of result.legacyBeadsCleanups) {
+    console.log(chalk.green(`✓ Removed legacy generated Beads references → ${cleanup.file}`));
+    console.log(chalk.dim(`  Backup: ${cleanup.backupPath}`));
+  }
   for (const err of result.errors) {
     console.log(chalk.red(`  ✗ ${err}`));
   }
@@ -156,14 +179,7 @@ export async function contextSyncCommand(): Promise<void> {
 // ─── pan context diff ─────────────────────────────────────────────────────
 
 export async function contextDiffCommand(options: ContextOptions = {}): Promise<void> {
-  const harnesses: Harness[] =
-    options.harness === 'claude' || options.harness === 'claude-code'
-      ? ['claude-code']
-      : options.harness === 'pi'
-        ? ['pi']
-        : options.harness === 'codex'
-          ? ['codex']
-          : ['claude-code', 'pi', 'codex'];
+  const harnesses = contextDiffHarnesses(options.harness);
 
   for (const harness of harnesses) {
     const rendered = renderGlobalLayer(harness, isDevMode());

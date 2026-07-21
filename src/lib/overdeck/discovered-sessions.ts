@@ -52,6 +52,7 @@ function overdeckDb() {
 export interface DiscoveredSession {
   id: number;
   jsonlPath: string;
+  harness: string;
   sessionId: string | null;
   workspacePath: string | null;
   workspaceHash: string | null;
@@ -68,6 +69,10 @@ export interface DiscoveredSession {
   tags: string[];
   summary: string | null;
   summaryDetailed: string | null;
+  /** Tracked conversation this session belongs to (matched by session id), or null. */
+  conversationId: string | null;
+  conversationName: string | null;
+  conversationTitle: string | null;
   enrichmentLevel: 0 | 1 | 2 | 3;
   enrichmentModel: string | null;
   enrichedAt: string | null;
@@ -81,6 +86,7 @@ export interface DiscoveredSession {
 }
 
 export interface ConversationFilter {
+  harness?: string;
   workspacePath?: string;
   primaryModel?: string;
   managed?: boolean;
@@ -134,6 +140,7 @@ function rowToSession(row: Record<string, unknown>): DiscoveredSession {
   return {
     id: row['id'] as number,
     jsonlPath: row['jsonl_path'] as string,
+    harness: (row['harness'] as string | null) ?? 'claude-code',
     sessionId: (row['session_id'] as string | null) ?? null,
     workspacePath: (row['workspace_path'] as string | null) ?? null,
     workspaceHash: (row['workspace_hash'] as string | null) ?? null,
@@ -150,6 +157,9 @@ function rowToSession(row: Record<string, unknown>): DiscoveredSession {
     tags: parseJsonArray(row['tags']),
     summary: (row['summary'] as string | null) ?? null,
     summaryDetailed: (row['summary_detailed'] as string | null) ?? null,
+    conversationId: (row['conversation_id'] as string | null) ?? null,
+    conversationName: (row['conversation_name'] as string | null) ?? null,
+    conversationTitle: (row['conversation_title'] as string | null) ?? null,
     enrichmentLevel: ((row['enrichment_level'] as number) ?? 0) as 0 | 1 | 2 | 3,
     enrichmentModel: (row['enrichment_model'] as string | null) ?? null,
     enrichedAt: toIso(row['enriched_at'] as number | null),
@@ -183,11 +193,12 @@ function arrayIndexCondition(target: ArrayIndexTarget, sessionIdExpression: stri
   };
 }
 
-function buildFilterSql(filter: ConversationFilter, tableAlias?: string): { where: string; params: unknown[] } {
+export function buildFilterSql(filter: ConversationFilter, tableAlias?: string): { where: string; params: unknown[] } {
   const conditions: string[] = [];
   const params: unknown[] = [];
   const col = (name: string) => tableAlias ? `${tableAlias}.${name}` : name;
 
+  if (filter.harness !== undefined) { conditions.push(`${col('harness')} = ?`); params.push(filter.harness); }
   if (filter.workspacePath !== undefined) { conditions.push(`${col('workspace_path')} = ?`); params.push(filter.workspacePath); }
   if (filter.primaryModel !== undefined) { conditions.push(`${col('primary_model')} = ?`); params.push(filter.primaryModel); }
   if (filter.managed === true) conditions.push(`${col('overdeck_managed')} = 1`);
@@ -216,10 +227,47 @@ function buildFilterSql(filter: ConversationFilter, tableAlias?: string): { wher
 
 // ─── Read operations ──────────────────────────────────────────────────────────
 
+/**
+ * Fill in conversation refs for any sessions whose `sessionId` matches a tracked
+ * conversation (via conversation_files.locator → conversations). One batched query
+ * for the whole list — no N+1. Sessions with no matching conversation are returned
+ * unchanged (conversation refs stay null).
+ */
+function attachConversationRefs(sessions: DiscoveredSession[]): DiscoveredSession[] {
+  const ids = [...new Set(sessions.map((s) => s.sessionId).filter((x): x is string => !!x))];
+  if (ids.length === 0) return sessions;
+  const placeholders = ids.map(() => '?').join(',');
+  const rows = overdeckDb()
+    .prepare(
+      `SELECT cf.locator AS sid, c.id AS conversationId, c.name AS conversationName, c.title AS title
+       FROM conversation_files cf
+       JOIN conversations c ON c.id = cf.conversation_id
+       WHERE cf.locator IN (${placeholders})`,
+    )
+    .all(...ids) as { sid: string; conversationId: string; conversationName: string; title: string | null }[];
+  if (rows.length === 0) return sessions;
+  const byId = new Map<string, { conversationId: string; conversationName: string; title: string | null }>();
+  for (const r of rows) if (!byId.has(r.sid)) byId.set(r.sid, {
+    conversationId: r.conversationId,
+    conversationName: r.conversationName,
+    title: r.title,
+  });
+  return sessions.map((s) =>
+    s.sessionId && byId.has(s.sessionId)
+      ? {
+          ...s,
+          conversationId: byId.get(s.sessionId)!.conversationId,
+          conversationName: byId.get(s.sessionId)!.conversationName,
+          conversationTitle: byId.get(s.sessionId)!.title,
+        }
+      : s,
+  );
+}
+
 export function getDiscoveredSessionById(id: number): DiscoveredSession | null {
   const db = overdeckDb();
   const row = db.prepare(`SELECT * FROM discovered_sessions WHERE id = ?`).get(id) as Record<string, unknown> | undefined;
-  return row ? rowToSession(row) : null;
+  return row ? attachConversationRefs([rowToSession(row)])[0]! : null;
 }
 
 export function findDiscoveredSessions(filter: ConversationFilter = {}): DiscoveredSession[] {
@@ -232,7 +280,7 @@ export function findDiscoveredSessions(filter: ConversationFilter = {}): Discove
   const rows = db.prepare(
     `SELECT * FROM discovered_sessions ${where} ORDER BY last_ts DESC NULLS LAST ${limit} ${offset}`,
   ).all(...params) as Record<string, unknown>[];
-  return rows.map(rowToSession);
+  return attachConversationRefs(rows.map(rowToSession));
 }
 
 export function countDiscoveredSessions(filter: ConversationFilter = {}): number {
@@ -320,6 +368,14 @@ export function getDiscoveredSessionByJsonlPath(jsonlPath: string): DiscoveredSe
   return row ? rowToSession(row) : null;
 }
 
+export function getDiscoveredSessionBySessionId(sessionId: string): DiscoveredSession | null {
+  const db = overdeckDb();
+  const row = db.prepare(
+    `SELECT * FROM discovered_sessions WHERE session_id = ? ORDER BY scanned_at DESC, id DESC LIMIT 1`,
+  ).get(sessionId) as Record<string, unknown> | undefined;
+  return row ? rowToSession(row) : null;
+}
+
 export function findDiscoveredSessionIds(filter: ConversationFilter = {}): number[] {
   const db = overdeckDb();
   const { where, params } = buildFilterSql(filter);
@@ -352,6 +408,7 @@ export function findEnrichedSessionIdsMissingEmbedding(model: string): number[] 
 
 export interface UpsertDiscoveredSessionOpts {
   jsonlPath: string;
+  harness: string;
   sessionId?: string | null;
   workspacePath?: string | null;
   workspaceHash?: string | null;
@@ -442,16 +499,17 @@ export function upsertDiscoveredSession(opts: UpsertDiscoveredSessionOpts): Disc
 
   db.prepare(
     `INSERT INTO discovered_sessions (
-       jsonl_path, session_id, workspace_path, workspace_hash,
+       jsonl_path, harness, session_id, workspace_path, workspace_hash,
        message_count, first_ts, last_ts, models_used, primary_model,
        token_input, token_output, estimated_cost,
        tools_used, files_touched, tags,
        overdeck_managed, pan_issue_id, pan_agent_id,
        file_size, file_mtime, scanned_at
      ) VALUES (
-       ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+       ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
      )
      ON CONFLICT(jsonl_path) DO UPDATE SET
+       harness            = excluded.harness,
        session_id         = excluded.session_id,
        workspace_path     = excluded.workspace_path,
        workspace_hash     = excluded.workspace_hash,
@@ -474,6 +532,7 @@ export function upsertDiscoveredSession(opts: UpsertDiscoveredSessionOpts): Disc
        scanned_at         = excluded.scanned_at`,
   ).run(
     opts.jsonlPath,
+    opts.harness ?? 'claude-code',
     opts.sessionId ?? null,
     opts.workspacePath ?? null,
     opts.workspaceHash ?? null,
@@ -578,7 +637,7 @@ export function searchFtsSessions(
        ORDER BY sessions_fts.rank
        LIMIT ? OFFSET ?`,
     ).all(...params, query, limit, offset) as Record<string, unknown>[];
-    return rows.map(rowToSession);
+    return attachConversationRefs(rows.map(rowToSession));
   } catch {
     return [];
   }

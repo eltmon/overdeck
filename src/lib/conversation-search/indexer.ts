@@ -38,6 +38,7 @@ export interface ConversationIndexResult {
   filesIndexed: number;
   chunksIndexed: number;
   chunksSkipped: number;
+  sessionsPruned: number;
   errors: Array<{ filePath: string; message: string }>;
   disabled: boolean;
   unavailableReason?: string;
@@ -48,6 +49,7 @@ const EMPTY_RESULT: ConversationIndexResult = {
   filesIndexed: 0,
   chunksIndexed: 0,
   chunksSkipped: 0,
+  sessionsPruned: 0,
   errors: [],
   disabled: false,
 };
@@ -73,6 +75,7 @@ export async function indexConversationSearch(
   }
 
   try {
+    result.sessionsPruned = await pruneStaleIndexedSessions(owned.db, files);
     let processed = 0;
     for (const filePath of files) {
       throwIfAborted(options.signal);
@@ -270,6 +273,27 @@ async function discoverConversationJsonlFiles(roots: string[], signal?: AbortSig
   return files.sort();
 }
 
+/**
+ * Drop index rows whose JSONL transcript no longer exists on disk. Without this,
+ * chunks and cursors outlive deleted sessions forever and palette search surfaces
+ * hits that 404 when opened. Cursor paths are absolute, so the check is exact;
+ * a session id still present in the discovered set keeps its chunks (the file was
+ * moved or renamed, not deleted).
+ */
+async function pruneStaleIndexedSessions(db: EmbeddingsDbHandle, files: string[]): Promise<number> {
+  const liveSessionIds = new Set(files.map(sessionIdFromPath));
+  let pruned = 0;
+  for (const cursorPath of db.listFileCursors()) {
+    const exists = await fs.stat(cursorPath).then(() => true, () => false);
+    if (exists) continue;
+    db.deleteCursor(cursorPath);
+    if (liveSessionIds.has(sessionIdFromPath(cursorPath))) continue;
+    db.deleteSession(sessionIdFromPath(cursorPath));
+    pruned += 1;
+  }
+  return pruned;
+}
+
 async function collectJsonlFiles(dir: string, files: string[], signal?: AbortSignal): Promise<void> {
   throwIfAborted(signal);
   let entries: import('node:fs').Dirent[];
@@ -316,7 +340,7 @@ function defaultConversationRoots(): string[] {
   return [join(homedir(), '.claude', 'projects')];
 }
 
-function sessionIdFromPath(filePath: string): string {
+export function sessionIdFromPath(filePath: string): string {
   return basename(filePath).replace(/\.jsonl$/, '');
 }
 

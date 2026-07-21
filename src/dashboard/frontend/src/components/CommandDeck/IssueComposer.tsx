@@ -13,10 +13,12 @@ import { useCallback, useMemo } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { SendHorizontal, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import posthog from 'posthog-js';
 import type { SessionNode as SessionNodeType } from '@overdeck/contracts';
 import type { StartAgentResponse } from '../../types';
 import { useCommandDeckSelection } from '../../lib/commandDeckSelection';
 import { isCodexBlockedResponse, setPendingCodexSpawn } from '../../lib/pending-codex-spawn';
+import { openRecoveryForStartBlock, StartBlockHandoff } from '../../lib/resumeRecovery';
 
 interface IssueComposerProps {
   issueId: string;
@@ -89,16 +91,25 @@ export function IssueComposer({ issueId, sessions }: IssueComposerProps) {
           setPendingCodexSpawn(lastRequestBody);
           throw new Error(data.hint || data.error || 'Codex authentication expired — re-authenticate to continue');
         }
+        // Start-block 409s open the recovery dialog — the CLI text never toasts.
+        if (openRecoveryForStartBlock(res.status, data, issueId)) throw new StartBlockHandoff();
         throw new Error(data.error || data.hint || 'Failed to start agent');
       }
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (_data, message) => {
+      posthog.capture('agent_spawned', {
+        issue_id: issueId,
+        spawn_mode: mode.kind,
+        has_message: Boolean(message),
+      });
       clearDraft(issueId);
       void queryClient.invalidateQueries({ queryKey: ['agents'] });
       setTimeout(() => queryClient.invalidateQueries({ queryKey: ['agents'] }), 2000);
     },
     onError: (err: Error) => {
+      if (err instanceof StartBlockHandoff) return;
+      posthog.captureException(err, { issue_id: issueId });
       toast.error(err.message, { duration: 8000 });
     },
   });

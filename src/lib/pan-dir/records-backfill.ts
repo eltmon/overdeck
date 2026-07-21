@@ -2,7 +2,7 @@
  * PAN-1908: one-time backfill of per-issue permanent records.
  *
  * Builds a record for every in-flight issue (anything with a review_status
- * row, an agents-table row, or a `.pan/continues/<issue>.vbrief.json` file)
+ * row, an agents-table row, or a `.pan/continues/<issue>.{xbrief,vbrief}.json` file)
  * and writes it into the declared infra repo. Re-running is safe: records
  * whose content has not changed are skipped, and unchanged commits are
  * suppressed by the auto-commit diff check.
@@ -13,6 +13,8 @@ import { readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { listOverdeckAgentStatesSync } from '../overdeck/agent-state-sync.js';
 import { getAllReviewStatusesFromDb } from '../overdeck/review-status-sync.js';
+import { resolveStateReadHomeSync } from '../state-read-home.js';
+import { isXBriefFilename, XBRIEF_FILENAME_SUFFIXES } from '../xbrief/lifecycle.js';
 import {
   getProjectSync,
   loadProjectsConfigSync,
@@ -22,12 +24,13 @@ import {
 } from '../projects.js';
 import {
   buildIssueRecord,
-  getIssueRecordPath,
-  queueIssueRecordCommit,
   readIssueRecord,
-  writeIssueRecordSync,
   type PanIssueRecord,
 } from './records.js';
+import { getIssueRecordBasePath } from './record.js';
+import { updateIssueRecord } from './record-update.js';
+import { flushAutoCommits } from './auto-commit.js';
+import { Effect } from 'effect';
 
 export interface BackfillRecordsResult {
   processed: number;
@@ -51,14 +54,19 @@ function getProjectRoot(project: ProjectConfig): string {
 
 async function collectContinueIssueIds(project: ProjectConfig): Promise<Set<string>> {
   const ids = new Set<string>();
-  const continuesDir = join(getProjectRoot(project), '.pan', 'continues');
+  const stateHome = resolveStateReadHomeSync(project);
+  const continuesDir = stateHome.migrated
+    ? join(stateHome.root, 'continues')
+    : join(stateHome.root, '.pan', 'continues');
   if (!existsSync(continuesDir)) return ids;
 
   try {
     const entries = await readdir(continuesDir, { withFileTypes: true });
     for (const entry of entries) {
-      if (!entry.isFile()) continue;
-      const match = entry.name.match(/^([a-z0-9]+-\d+)\.vbrief\.json$/i);
+      if (!entry.isFile() || !isXBriefFilename(entry.name)) continue;
+      const suffix = XBRIEF_FILENAME_SUFFIXES.find((candidate) => entry.name.endsWith(candidate));
+      if (!suffix) continue;
+      const match = entry.name.slice(0, -suffix.length).match(/^([a-z0-9]+-\d+)$/i);
       if (!match) continue;
       ids.add(match[1].toUpperCase());
     }
@@ -153,17 +161,23 @@ async function backfillIssue(
       return { action: 'failed', reason: 'infra repo is not a git checkout' };
     }
 
-    const existing = await readIssueRecord(project, issueId);
-    const reviewStatus = getAllReviewStatusesFromDb()[issueId.toUpperCase()] ?? null;
-    const record = await buildIssueRecord(project, issueId, { reviewStatus });
+    return await (async () => {
+      const existing = await readIssueRecord(project, issueId);
+      const reviewStatus = getAllReviewStatusesFromDb()[issueId.toUpperCase()] ?? null;
+      const record = await buildIssueRecord(project, issueId, { reviewStatus });
 
-    if (!opts.force && existing && normalizeRecordForCompare(existing) === normalizeRecordForCompare(record)) {
-      return { action: 'skipped', reason: 'record unchanged' };
-    }
+      if (!opts.force && existing && normalizeRecordForCompare(existing) === normalizeRecordForCompare(record)) {
+        return { action: 'skipped', reason: 'record unchanged' };
+      }
 
-    const recordPath = writeIssueRecordSync(project, issueId, record);
-    queueIssueRecordCommit(project, issueId, recordPath);
-    return { action: 'written' };
+      await updateIssueRecord(project, issueId, () => record);
+      const commitRoot = getIssueRecordBasePath(project, issueId);
+      const flushed = await Effect.runPromise(flushAutoCommits(commitRoot));
+      if (flushed.pushed === false) {
+        throw new Error(flushed.reason ?? `record for ${issueId} was committed but not pushed`);
+      }
+      return { action: 'written' };
+    })();
   } catch (err) {
     return { action: 'failed', reason: (err as Error).message };
   }

@@ -1,0 +1,173 @@
+/* Decisions — see DecisionsPanel.tsx for the color-discipline rationale.
+   Tokens only; no hardcoded hex. */
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 12px;
+}
+
+.empty {
+  padding: 20px 12px;
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.groupHead {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.groupTitle {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.groupCount {
+  font-family: 'SF Mono', 'SFMono-Regular', Consolas, monospace;
+  font-size: 10.5px;
+  color: var(--muted-foreground);
+  font-variant-numeric: tabular-nums;
+}
+
+.groupHint {
+  margin-left: auto;
+  font-size: 10.5px;
+  color: var(--muted-foreground);
+}
+
+/* Neutral by default; the left border carries status, the badge carries kind. */
+.row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 11px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-left: 2px solid color-mix(in srgb, var(--warning) 55%, transparent);
+  border-radius: var(--radius-sm);
+}
+
+.row:hover {
+  border-color: color-mix(in srgb, var(--foreground) 18%, transparent);
+}
+
+/* The agent has stopped dead — the only red on the surface. */
+.rowBlocking {
+  border-left-color: var(--destructive);
+}
+
+.rowMain {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  flex: 1;
+}
+
+.rowTop {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+
+.badge {
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 6px;
+  border-radius: var(--radius-sm);
+  font-size: 10.5px;
+  font-weight: 500;
+  white-space: nowrap;
+  color: var(--warning-foreground);
+  background: color-mix(in srgb, var(--warning) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--warning) 32%, transparent);
+}
+
+.badgeBlocking {
+  color: var(--destructive-foreground);
+  background: color-mix(in srgb, var(--destructive) 8%, transparent);
+  border-color: color-mix(in srgb, var(--destructive) 32%, transparent);
+}
+
+.subject {
+  font-family: 'SF Mono', 'SFMono-Regular', Consolas, monospace;
+  font-size: 11px;
+  color: var(--muted-foreground);
+}
+
+/* Taxonomy, not signal → neutral. */
+.chip {
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 6px;
+  border-radius: var(--radius-sm);
+  font-size: 10.5px;
+  color: var(--muted-foreground);
+  border: 1px solid var(--border);
+}
+
+.prompt {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10.5px;
+  color: var(--muted-foreground);
+  flex-wrap: wrap;
+}
+
+.mono {
+  font-family: 'SF Mono', 'SFMono-Regular', Consolas, monospace;
+}
+
+.answer {
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--foreground);
+  background: var(--card-2, var(--muted));
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 4px 10px;
+  cursor: pointer;
+  flex: none;
+  align-self: center;
+}
+
+.answer:hover {
+  border-color: color-mix(in srgb, var(--foreground) 28%, transparent);
+}
+
+.count {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: var(--radius-sm);
+  font-family: 'SF Mono', 'SFMono-Regular', Consolas, monospace;
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--warning-foreground);
+  background: color-mix(in srgb, var(--warning) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--warning) 32%, transparent);
+}

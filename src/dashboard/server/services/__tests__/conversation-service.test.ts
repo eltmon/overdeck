@@ -256,6 +256,23 @@ describe('parseConversationMessages', () => {
     expect(result.byteOffset).toBe(0);
   });
 
+  it('returns an empty result (does not throw) when the session file does not exist yet', async () => {
+    // A live subscriber may attach the instant a conversation row exists, before
+    // the runtime has written its first JSONL line. parseConversationMessages must
+    // treat a missing file as an empty transcript so the subscription stays healthy
+    // and self-populates once the file appears (the reload bug fix).
+    const enoent = Object.assign(new Error('ENOENT: no such file'), { code: 'ENOENT' });
+    mockStat.mockRejectedValueOnce(enoent);
+
+    const { parseConversationMessages } = await import('../conversation-service.js');
+    const result = await parseConversationMessages('/fake/not-written-yet.jsonl');
+
+    expect(result.messages).toEqual([]);
+    expect(result.workLog).toEqual([]);
+    expect(result.byteOffset).toBe(0);
+    expect(result.streaming).toBe(false);
+  });
+
   it('parses a user text message', async () => {
     const lines = [
       {
@@ -320,7 +337,7 @@ describe('parseConversationMessages', () => {
         origin: { kind: 'channel', server: 'overdeck-bridge' },
         message: {
           role: 'user',
-          content: '<channel source="overdeck-bridge" caller="conversation-message">\nCheck the vBRIEF spec\n</channel>',
+          content: '<channel source="overdeck-bridge" caller="conversation-message">\nCheck the xBRIEF spec\n</channel>',
         },
       },
     ];
@@ -333,7 +350,7 @@ describe('parseConversationMessages', () => {
     expect(result.messages[0]).toMatchObject({
       id: 'u-channel',
       role: 'user',
-      text: 'Check the vBRIEF spec',
+      text: 'Check the xBRIEF spec',
     });
   });
 
@@ -682,6 +699,36 @@ describe('parseConversationMessages', () => {
 
     expect(result.messages).toHaveLength(1);
     expect(result.messages[0]).toMatchObject({ id: 'u-2', text: 'Second message' });
+  });
+
+  it('parses the complete initial transcript when the file exceeds the read cap', async () => {
+    const firstLine = makeJsonlLine({
+      type: 'user',
+      uuid: 'u-1',
+      timestamp: '2024-01-01T00:00:00.000Z',
+      message: { content: [{ type: 'text', text: 'First message' }] },
+    });
+    const lateLine = makeJsonlLine({
+      type: 'user',
+      uuid: 'u-late',
+      timestamp: '2024-01-01T00:00:01.000Z',
+      message: { content: [{ type: 'text', text: 'Message past 10MB' }] },
+    });
+    const fillerLine = makeJsonlLine({
+      type: 'system',
+      timestamp: '2024-01-01T00:00:00.500Z',
+      payload: 'x'.repeat(1024 * 1024),
+    });
+    const content = `${firstLine}\n${Array.from({ length: 11 }, () => fillerLine).join('\n')}\n${lateLine}\n`;
+    const buffer = Buffer.from(content);
+    mockReadFile.mockResolvedValue(buffer);
+
+    const { parseConversationMessages } = await import('../conversation-service.js');
+    const result = await parseConversationMessages('/fake/session.jsonl');
+
+    expect(buffer.length).toBeGreaterThan(10 * 1024 * 1024);
+    expect(result.byteOffset).toBe(buffer.length);
+    expect(result.messages.map((message) => message.id)).toEqual(['u-1', 'u-late']);
   });
 
   it('pairs parallel tool calls when tool_results arrive in reverse order', async () => {

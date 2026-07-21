@@ -19,15 +19,18 @@ import {
   emitActivityEntrySync,
   type EmitActivityOptions,
 } from '../../../lib/activity-logger.js';
-import { readRestartStatus, type RestartStatus } from '../../../lib/restart-status.js';
+import { readRestartStatus, writeRestartStatus, type RestartStatus } from '../../../lib/restart-status.js';
 import { getSetting, setSetting } from '../../../lib/overdeck/control-settings.js';
 import { getConversationByTmuxSession } from '../../../lib/overdeck/conversations.js';
+import { isSupervisorUnitFailed, SUPERVISOR_UNIT_NAME } from '../../../lib/systemd.js';
 
 export const RESTART_ANNOUNCER_LAST_TS_KEY = 'restart_announcer.last_announced_ts';
 const POLL_MS = 15_000;
 const BOOTSTRAP_POLL_MS = 1_000;
 const BOOTSTRAP_FAST_POLL_COUNT = 30;
 const ANNOUNCE_MAX_AGE_MS = 60 * 60_000;
+const SUPERVISOR_UNIT_FAILED_REASON = 'supervisor-unit-failed';
+let supervisorUnitFailureEpisodeActive = false;
 
 /** Minimal conversation shape the announcer needs from the initiator's tmux session. */
 export type InitiatorConversationResolver = (tmuxSession: string) => { id: number; title?: string | null } | null;
@@ -120,22 +123,72 @@ export function describeRestart(
 
 export interface RestartAnnouncerDeps {
   readStatus?: () => Promise<RestartStatus | null>;
+  writeStatus?: (status: RestartStatus) => Promise<void>;
+  readSupervisorUnitFailed?: () => Promise<boolean>;
   emit?: (options: EmitActivityOptions) => void;
   getLastAnnounced?: () => string | null;
   setLastAnnounced?: (ts: string) => void;
   now?: () => number;
 }
 
+function isSupervisorUnitFailureStatus(status: RestartStatus | null): status is RestartStatus {
+  return status?.trigger === 'watchdog'
+    && status.success === false
+    && status.gaveUp === true
+    && status.reason === SUPERVISOR_UNIT_FAILED_REASON;
+}
+
+function buildSupervisorUnitFailureStatus(ts: string): RestartStatus {
+  return {
+    ts,
+    trigger: 'watchdog',
+    success: false,
+    durationMs: 0,
+    attempts: 3,
+    gaveUp: true,
+    reason: SUPERVISOR_UNIT_FAILED_REASON,
+    error: `${SUPERVISOR_UNIT_NAME} is in failed state; the systemd restart limit was reached and manual intervention is required`,
+    pid: process.pid,
+  };
+}
+
+async function syncSupervisorUnitFailureStatus(
+  deps: Required<Pick<RestartAnnouncerDeps, 'readStatus' | 'writeStatus' | 'readSupervisorUnitFailed' | 'now'>>,
+): Promise<void> {
+  const failed = await deps.readSupervisorUnitFailed().catch(() => false);
+  if (!failed) {
+    supervisorUnitFailureEpisodeActive = false;
+    return;
+  }
+
+  const current = await deps.readStatus();
+  if (isSupervisorUnitFailureStatus(current)) {
+    supervisorUnitFailureEpisodeActive = true;
+    return;
+  }
+
+  if (supervisorUnitFailureEpisodeActive) return;
+
+  await deps.writeStatus(buildSupervisorUnitFailureStatus(new Date(deps.now()).toISOString()));
+  supervisorUnitFailureEpisodeActive = true;
+}
+
 /** One announce pass. Exported for tests. Returns true if an entry was emitted. */
 export async function announceNewRestart(deps: RestartAnnouncerDeps = {}): Promise<boolean> {
   const readStatus = deps.readStatus
     ?? (() => Effect.runPromise(readRestartStatus()).catch(() => null));
+  const writeStatus = deps.writeStatus
+    ?? ((status: RestartStatus) => Effect.runPromise(writeRestartStatus(status)));
+  const readSupervisorUnitFailed = deps.readSupervisorUnitFailed
+    ?? (() => isSupervisorUnitFailed());
   const emit = deps.emit ?? emitActivityEntrySync;
   const getLastAnnounced = deps.getLastAnnounced
     ?? (() => getSetting(RESTART_ANNOUNCER_LAST_TS_KEY));
   const setLastAnnounced = deps.setLastAnnounced
     ?? ((ts: string) => setSetting(RESTART_ANNOUNCER_LAST_TS_KEY, ts));
   const now = deps.now ?? Date.now;
+
+  await syncSupervisorUnitFailureStatus({ readStatus, writeStatus, readSupervisorUnitFailed, now });
 
   const status = await readStatus();
   if (!status) return false;

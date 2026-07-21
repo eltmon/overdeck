@@ -38,8 +38,7 @@ const lifecycleMocks = vi.hoisted(() => ({
 
 const inspectMocks = vi.hoisted(() => ({
   spawnInspectAgent: vi.fn(),
-  getDiffBase: vi.fn(),
-  getDiffStats: vi.fn(),
+  getInspectDiffContext: vi.fn(),
 }));
 
 const trackerMocks = vi.hoisted(() => ({
@@ -119,8 +118,16 @@ vi.mock('../../../lib/cloister/inspect-agent.js', () => ({
 }));
 
 vi.mock('../../../lib/cloister/inspect-checkpoints.js', () => ({
-  getDiffBase: inspectMocks.getDiffBase,
-  getDiffStats: inspectMocks.getDiffStats,
+  getInspectDiffContext: inspectMocks.getInspectDiffContext,
+}));
+
+vi.mock('../../../lib/xbrief/io.js', () => ({
+  readWorkspacePlanSync: vi.fn(() => ({
+    plan: {
+      id: 'PAN-9999',
+      items: [{ id: 'workspace-abc' }],
+    },
+  })),
 }));
 
 vi.mock('../../../lib/tracker-utils.js', () => ({
@@ -213,10 +220,14 @@ describe('resolveBareNumericIdSync rollout (PAN-1173)', () => {
     lifecycleMocks.closeOut.mockReturnValue(Effect.succeed({ success: true, steps: [] }));
     inspectMocks.spawnInspectAgent.mockReset();
     inspectMocks.spawnInspectAgent.mockReturnValue(Effect.succeed({ success: true, tmuxSession: 'inspect-1', runId: 'run-1' }));
-    inspectMocks.getDiffBase.mockReset();
-    inspectMocks.getDiffBase.mockReturnValue(Effect.succeed('abcdef123456'));
-    inspectMocks.getDiffStats.mockReset();
-    inspectMocks.getDiffStats.mockReturnValue(Effect.succeed('1 file changed'));
+    inspectMocks.getInspectDiffContext.mockReset();
+    inspectMocks.getInspectDiffContext.mockReturnValue(Effect.succeed({
+      currentHead: 'fedcba987654',
+      checkpoint: 'abcdef12',
+      diffStats: '1 file changed',
+      diffCommand: 'git diff abcdef123456...HEAD',
+      repos: [],
+    }));
     trackerMocks.resolveTrackerTypeSync.mockReset();
     trackerMocks.resolveTrackerTypeSync.mockReturnValue('rally');
     trackerMocks.isGitHubIssueSync.mockReset();
@@ -240,7 +251,7 @@ describe('resolveBareNumericIdSync rollout (PAN-1173)', () => {
     });
     vi.stubGlobal('fetch', vi.fn(async () => ({
       ok: true,
-      json: async () => ({ success: true, message: 'ok' }),
+      text: async () => JSON.stringify({ success: true, message: 'ok' }),
     })));
     delete process.env.OVERDECK_AGENT_ID;
     logSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
@@ -315,13 +326,16 @@ describe('resolveBareNumericIdSync rollout (PAN-1173)', () => {
 
     expect(issueIdMocks.resolveBareNumericIdSync).toHaveBeenCalledWith('9999');
     expect(projectMocks.resolveProjectFromIssueSync).toHaveBeenCalledWith('PAN-9999');
-    expect(lifecycleMocks.closeOut).toHaveBeenCalledWith(expect.objectContaining({ issueId: 'PAN-9999' }));
+    expect(lifecycleMocks.closeOut).toHaveBeenCalledWith(
+      expect.objectContaining({ issueId: 'PAN-9999' }),
+      expect.objectContaining({ dodAcceptedRows: [] }),
+    );
   });
 
   it('resolves bare numeric input before pan inspect resolves the project', async () => {
     const { inspectCommand } = await import('../inspect.js');
 
-    await inspectCommand('9999', { bead: 'workspace-abc' });
+    await inspectCommand('9999', { item: 'workspace-abc' });
 
     expect(issueIdMocks.resolveBareNumericIdSync).toHaveBeenCalledWith('9999');
     expect(projectMocks.resolveProjectFromIssueSync).toHaveBeenCalledWith('PAN-9999');
@@ -346,6 +360,33 @@ describe('resolveBareNumericIdSync rollout (PAN-1173)', () => {
     expect(issueIdMocks.resolveBareNumericIdSync).toHaveBeenCalledWith('9999');
     expect(projectMocks.resolveProjectFromIssueSync).toHaveBeenCalledWith('PAN-9999');
     expect(fetch).toHaveBeenCalledWith('http://dashboard.test/api/specialists/overdeck/PAN-9999/review/restart', expect.any(Object));
+  });
+
+  it('does not fail pan review restart when an accepted response is not JSON', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      ok: true,
+      text: async () => 'true unexpected trailer',
+    })));
+    const { reviewRestartCommand } = await import('../review-restart.js');
+
+    await reviewRestartCommand('9999');
+
+    expect(errorSpy).not.toHaveBeenCalled();
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Review restarted for PAN-9999'));
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('non-JSON response'));
+  });
+
+  it('prints non-JSON pan review restart failures without a JSON parse error', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      ok: false,
+      text: async () => 'true unexpected trailer',
+    })));
+    const { reviewRestartCommand } = await import('../review-restart.js');
+
+    await expect(reviewRestartCommand('9999')).rejects.toThrow('process.exit:1');
+
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('true unexpected trailer'));
+    expect(errorSpy).not.toHaveBeenCalledWith(expect.stringContaining('Unexpected non-whitespace character'));
   });
 
   it('prints the shared unresolved-ID error path for pan kill', async () => {

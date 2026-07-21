@@ -63,6 +63,7 @@ const jwtWithClaims = (claims: Record<string, unknown>) =>
   `${base64urlJson({ alg: 'none', typ: 'JWT' })}.${base64urlJson(claims)}.signature`;
 
 let tmpRoot = '';
+let originalHome: string | undefined;
 
 beforeEach(async () => {
   vi.useFakeTimers();
@@ -70,6 +71,11 @@ beforeEach(async () => {
   tmpRoot = await mkdtemp(join(tmpdir(), 'pan-codex-auth-'));
   mockCliproxy.authDir = join(tmpRoot, 'auth');
   mockCliproxy.logPath = join(tmpRoot, 'cliproxy.log');
+  // PAN-2285: the merged status also probes the native ~/.codex/auth.json.
+  // Point HOME at the (empty) temp root so these cliproxy-store tests are not
+  // polluted by the developer's real native credential.
+  originalHome = process.env.HOME;
+  process.env.HOME = tmpRoot;
 });
 
 afterEach(async () => {
@@ -78,6 +84,8 @@ afterEach(async () => {
   tmpRoot = '';
   mockCliproxy.authDir = '';
   mockCliproxy.logPath = '';
+  if (originalHome === undefined) delete process.env.HOME;
+  else process.env.HOME = originalHome;
 });
 
 const writeCodexFixture = async (logLines: string[] = []) => {
@@ -98,14 +106,14 @@ const writeCodexFixture = async (logLines: string[] = []) => {
 const readCodexStatus = () => Effect.runPromise(checkCodexAuthStatus());
 
 describe('checkCodexAuthStatus', () => {
-  it('reports missing when the cliproxy codex credential file is absent', async () => {
-    await expect(readCodexStatus()).resolves.toEqual({ status: 'missing' });
+  it('reports missing when both the cliproxy and native codex credential files are absent', async () => {
+    await expect(readCodexStatus()).resolves.toMatchObject({ status: 'missing' });
   });
 
   it('reports valid for a future-expiring JWT when the log shows no auth failures', async () => {
     await writeCodexFixture();
 
-    await expect(readCodexStatus()).resolves.toEqual({
+    await expect(readCodexStatus()).resolves.toMatchObject({
       status: 'valid',
       email: EMAIL,
       expiresAt: '2026-06-02T04:40:00.000Z',
@@ -194,5 +202,164 @@ describe('evaluateBurnedFromLog', () => {
 
     const stale = evalLog([reusedCodeBurnBlock('2026-06-02 01:00:00')], { now: ms('2026-06-02T03:40:00Z') });
     expect(stale.status).toBe('valid'); // > 1h old, no cutoff → staleness backstop
+  });
+});
+
+// ─── PAN-2285: native store probe, pane-burn classifier, registry, combine ─────
+
+import {
+  classifyNativeCodexAuth,
+  paneShowsCodexAuthBurn,
+  applyCodexAuthBurnFlag,
+  codexAuthBurnFlaggedAtMs,
+  filterCodexAuthBurnedAgentIds,
+  combineCodexAuthStatuses,
+  CODEX_AUTH_BURNED_REASON_PREFIX,
+  type CodexAuthBurnFlagState,
+} from '../codex-auth.js';
+
+function makeJwt(payload: Record<string, unknown>): string {
+  const enc = (o: unknown) => Buffer.from(JSON.stringify(o)).toString('base64url');
+  return `${enc({ alg: 'none', typ: 'JWT' })}.${enc(payload)}.sig`;
+}
+
+describe('classifyNativeCodexAuth (PAN-2285)', () => {
+  const now = ms('2026-07-14T00:00:00Z');
+
+  it('reports missing when the file is absent (raw === null)', () => {
+    expect(classifyNativeCodexAuth(null, now).status).toBe('missing');
+  });
+
+  it('reports unknown on malformed JSON', () => {
+    expect(classifyNativeCodexAuth('{not json', now).status).toBe('unknown');
+  });
+
+  it('reports valid for a future-exp access token and extracts email from the id token', () => {
+    const raw = JSON.stringify({
+      last_refresh: '2026-07-13T13:49:33Z',
+      tokens: {
+        access_token: makeJwt({ exp: Math.floor(now / 1000) + 3600 }),
+        id_token: makeJwt({ email: 'user@example.com' }),
+      },
+    });
+    const res = classifyNativeCodexAuth(raw, now);
+    expect(res.status).toBe('valid');
+    expect(res.email).toBe('user@example.com');
+    expect(res.lastRefresh).toBe('2026-07-13T13:49:33Z');
+  });
+
+  it('reports expired for a past-exp access token', () => {
+    const raw = JSON.stringify({
+      tokens: { access_token: makeJwt({ exp: Math.floor(now / 1000) - 60 }) },
+    });
+    expect(classifyNativeCodexAuth(raw, now).status).toBe('expired');
+  });
+
+  it('treats API-key mode (OPENAI_API_KEY set, no OAuth tokens) as valid', () => {
+    const raw = JSON.stringify({ OPENAI_API_KEY: 'sk-abc', tokens: {} });
+    expect(classifyNativeCodexAuth(raw, now).status).toBe('valid');
+  });
+
+  it('reports unknown when there is neither an OAuth token nor an API key', () => {
+    expect(classifyNativeCodexAuth(JSON.stringify({ tokens: {} }), now).status).toBe('unknown');
+  });
+});
+
+describe('paneShowsCodexAuthBurn (PAN-2285)', () => {
+  it('matches each revoked-token marker', () => {
+    expect(paneShowsCodexAuthBurn('… could not be refreshed because your refresh token was revoked')).toBe(true);
+    expect(paneShowsCodexAuthBurn('MCP error 401: token_invalidated')).toBe(true);
+    expect(paneShowsCodexAuthBurn('error: token_revoked')).toBe(true);
+  });
+
+  it('does not match a clean pane', () => {
+    expect(paneShowsCodexAuthBurn('❯ working on the task, all good')).toBe(false);
+  });
+});
+
+describe('persisted codex burn flag (PAN-2285)', () => {
+  const FLAG_NOW = ms('2026-07-15T02:00:00Z');
+
+  it('applyCodexAuthBurnFlag flags a fresh state (troubled + stamped reason) once', () => {
+    const state: CodexAuthBurnFlagState = {};
+    expect(applyCodexAuthBurnFlag(state, FLAG_NOW)).toBe(true);
+    expect(state.troubled).toBe(true);
+    expect(state.troubledAt).toBe('2026-07-15T02:00:00.000Z');
+    expect(state.lastFailureReason).toMatch(/^codex-auth-burned\[2026-07-15T02:00:00\.000Z\]/);
+    expect(state.lastFailureAt).toBe('2026-07-15T02:00:00.000Z');
+    // Second flag is a no-op — the writer patrol must not re-stamp every tick.
+    expect(applyCodexAuthBurnFlag(state, FLAG_NOW + 60_000)).toBe(false);
+    expect(state.lastFailureReason).toContain('2026-07-15T02:00:00.000Z');
+  });
+
+  it('applyCodexAuthBurnFlag preserves an earlier troubledAt (agent already troubled for another reason)', () => {
+    const state: CodexAuthBurnFlagState = { troubled: true, troubledAt: '2026-07-14T00:00:00.000Z', lastFailureReason: 'resume failed' };
+    expect(applyCodexAuthBurnFlag(state, FLAG_NOW)).toBe(true);
+    expect(state.troubledAt).toBe('2026-07-14T00:00:00.000Z');
+    // …which is exactly why the flag time is stamped into the reason instead.
+    expect(codexAuthBurnFlaggedAtMs(state)).toBe(FLAG_NOW);
+  });
+
+  it('codexAuthBurnFlaggedAtMs returns null once the agent is untroubled (flag must not linger)', () => {
+    const state: CodexAuthBurnFlagState = {};
+    applyCodexAuthBurnFlag(state, FLAG_NOW);
+    // pan untroubled / resume → applyAgentUntroubled clears troubled + failure fields.
+    delete state.troubled;
+    delete state.troubledAt;
+    delete state.lastFailureReason;
+    delete state.lastFailureAt;
+    expect(codexAuthBurnFlaggedAtMs(state)).toBeNull();
+    // And the agent can be flagged again on a later, genuine re-burn.
+    expect(applyCodexAuthBurnFlag(state, FLAG_NOW + 1000)).toBe(true);
+  });
+
+  it('codexAuthBurnFlaggedAtMs falls back to troubledAt for legacy unstamped reasons', () => {
+    const state: CodexAuthBurnFlagState = {
+      troubled: true,
+      troubledAt: '2026-07-15T01:56:55.000Z',
+      lastFailureReason: `${CODEX_AUTH_BURNED_REASON_PREFIX}: Codex refresh token was revoked — re-authenticate`,
+    };
+    expect(codexAuthBurnFlaggedAtMs(state)).toBe(ms('2026-07-15T01:56:55Z'));
+  });
+
+  it('codexAuthBurnFlaggedAtMs ignores troubled agents with unrelated failure reasons', () => {
+    expect(codexAuthBurnFlaggedAtMs({ troubled: true, lastFailureReason: 'resume failed 3x' })).toBeNull();
+    expect(codexAuthBurnFlaggedAtMs({ troubled: true })).toBeNull();
+  });
+
+  it('filterCodexAuthBurnedAgentIds keeps flags at/after the native write and drops stale ones (re-login heals)', () => {
+    const burned: CodexAuthBurnFlagState & { id: string } = { id: 'agent-a' };
+    applyCodexAuthBurnFlag(burned, FLAG_NOW);
+    const healthy: CodexAuthBurnFlagState & { id: string } = { id: 'agent-b' };
+
+    // Native store untouched since the flag → active.
+    expect(filterCodexAuthBurnedAgentIds([burned, healthy], FLAG_NOW - 60_000)).toEqual(['agent-a']);
+    // Native store rewritten AFTER the flag (global `codex login`) → stale, banner clears.
+    expect(filterCodexAuthBurnedAgentIds([burned, healthy], FLAG_NOW + 60_000)).toEqual([]);
+  });
+});
+
+describe('combineCodexAuthStatuses (PAN-2285)', () => {
+  const valid = { status: 'valid', email: '', expiresAt: '' } as CodexAuthStatus;
+  const expired = { status: 'expired', email: '', expiresAt: '' } as CodexAuthStatus;
+  const burned = { status: 'burned', email: '', expiresAt: '' } as CodexAuthStatus;
+  const missing = { status: 'missing' } as CodexAuthStatus;
+
+  it('native valid + cliproxy missing → valid', () => {
+    expect(combineCodexAuthStatuses(valid, missing).status).toBe('valid');
+  });
+
+  it('native expired + cliproxy valid → expired (banner fires)', () => {
+    expect(combineCodexAuthStatuses(expired, valid).status).toBe('expired');
+  });
+
+  it('native missing + cliproxy burned → burned (gpt-5.5 path preserved)', () => {
+    const res = combineCodexAuthStatuses(missing, burned);
+    expect(res.status).toBe('burned');
+    expect(res.source).toBe('cliproxy');
+  });
+
+  it('both missing → missing (no banner)', () => {
+    expect(combineCodexAuthStatuses(missing, missing).status).toBe('missing');
   });
 });

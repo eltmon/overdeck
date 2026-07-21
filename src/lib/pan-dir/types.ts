@@ -1,13 +1,15 @@
 import type {
-  VBriefDocument,
-  VBriefEdge,
-  VBriefItem,
-  VBriefItemStatus,
-  VBriefPlan,
-} from '../vbrief/types.js'
-import type { ContinueSessionEntry, ContinueState } from '../vbrief/continue-state.js'
+  XBriefDocument,
+  XBriefEdge,
+  XBriefItem,
+  XBriefItemStatus,
+  XBriefPlan,
+} from '../xbrief/types.js'
+import type { ContinueSessionEntry, ContinueState } from '../xbrief/continue-state.js'
 
 export const PAN_DIRNAME = '.pan'
+export const WORKSPACE_RUNTIME_DIRNAME = '.overdeck'
+export const LEGACY_WORKSPACE_RUNTIME_DIRNAME = '.pan'
 export const PAN_SPECS_DIRNAME = 'specs'
 export const PAN_DRAFTS_DIRNAME = 'drafts'
 export const PAN_CONTINUES_DIRNAME = 'continues'
@@ -26,7 +28,7 @@ export const PAN_SPEC_STATUSES = [
   'cancelled',
 ] as const satisfies readonly PanSpecStatus[]
 
-export interface PanSpecDocument extends VBriefDocument {
+export interface PanSpecDocument extends XBriefDocument {
   status: PanSpecStatus
 }
 
@@ -76,7 +78,7 @@ export function isPanSpecStatus(value: unknown): value is PanSpecStatus {
   return typeof value === 'string' && PAN_SPEC_STATUSES.includes(value as PanSpecStatus)
 }
 
-export function asPanSpecDocument(doc: VBriefDocument, status: PanSpecStatus): PanSpecDocument {
+export function asPanSpecDocument(doc: XBriefDocument, status: PanSpecStatus): PanSpecDocument {
   return {
     ...doc,
     status,
@@ -90,9 +92,9 @@ export function asPanSpecDocument(doc: VBriefDocument, status: PanSpecStatus): P
 export type {
   ContinueState,
   ContinueSessionEntry,
-  VBriefDocument,
-  VBriefEdge,
-  VBriefItem,
-  VBriefItemStatus,
-  VBriefPlan,
+  XBriefDocument,
+  XBriefEdge,
+  XBriefItem,
+  XBriefItemStatus,
+  XBriefPlan,
 }

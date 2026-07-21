@@ -122,7 +122,7 @@ kanban framing · free-app-BYO-subscription pricing.
 | Model-agnostic routing per pipeline role + harness policy | GitHub Agent HQ picks agents manually | "Right model per stage, automatically" |
 | Cost tracking / token-spend governance | Enterprise control planes only | "CFO view" pairs with multi-model routing |
 | Local-first + open source + full pipeline | Gas Town (no dashboard/pipeline polish); Manaflow (no pipeline) | "Autonomous *and* yours" |
-| Immutable plan artifacts feeding agents (vBRIEF/beads) | Gas Town beads; Entire Checkpoints (post-hoc provenance) | Governance/traceability story — Entire's $60M seed shows the market pays for it |
+| Immutable plan artifacts feeding agents (xBRIEF/beads) | Gas Town beads; Entire Checkpoints (post-hoc provenance) | Governance/traceability story — Entire's $60M seed shows the market pays for it |
 | Merge train for agent fleets | Gas Town merge queue (no gates) | Solves the failure mode every parallel-agent tool creates |
 
 **Where Overdeck is behind:** cross-agent persistent memory (Subspace's whole

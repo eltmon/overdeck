@@ -1,7 +1,4 @@
 all-up
-beads
-beads-completion-check
-beads-overdeck-guide
 benchmark
 bug-fix
 check-merged
@@ -21,6 +18,7 @@ improve-codebase-architecture
 incident-response
 knowledge-capture
 myn-standards
+okf
 onboard-codebase
 overdeck
 ovr
@@ -30,6 +28,7 @@ pan-admin-config
 pan-admin-hooks
 pan-admin-tldr
 pan-admin-tracker
+pan-agent-activity
 pan-approve
 pan-close
 pan-code-review
@@ -45,9 +44,11 @@ pan-fly
 pan-flywheel
 pan-handoff
 pan-help
+pan-hygiene
 pan-install
 pan-issues
 pan-kill
+pan-knowledge
 pan-logs
 pan-map
 pan-memory
@@ -59,20 +60,24 @@ pan-pause
 pan-plan
 pan-projects
 pan-quickstart
+pan-recap
 pan-release
 pan-reload
 pan-reopen
 pan-resources
 pan-restart
 pan-review
+pan-rollout
 pan-show
 pan-skill-creator
 pan-start
 pan-status
 pan-stop-all-agents
 pan-subagent-creator
+pan-swarm
 pan-sync
 pan-sync-main
+pan-task
 pan-tell
 pan-test-config
 pan-tldr
@@ -104,3 +109,4 @@ workspace-add-repo
 workspace-status
 write-spec
 write-vbrief
+write-xbrief

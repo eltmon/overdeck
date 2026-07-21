@@ -1,46 +1,69 @@
 import { exec } from 'node:child_process';
-import { access, readFile } from 'node:fs/promises';
-import { cpus, freemem, loadavg, totalmem, homedir, platform } from 'node:os';
-import { join } from 'node:path';
+import { readFile } from 'node:fs/promises';
+import { cpus, freemem, loadavg, totalmem, platform } from 'node:os';
 import { promisify } from 'node:util';
 
-import type { DashboardSnapshot } from '@overdeck/contracts';
+import {
+  projectLegacySystemHealthSummary,
+  type AgentHealthSnapshot,
+  type HealthReason,
+  type HealthState,
+  type SpecialistLifecycle,
+  type SystemHealthSnapshot as SharedSystemHealthSnapshot,
+} from '@overdeck/contracts';
 
 import { Effect } from 'effect';
 import { layer as nodeServicesLayer } from '@effect/platform-node/NodeServices';
 
+import { getRuntimeSnapshot } from '../../../lib/agent-runtime-mirror.js';
 import { listRunningAgents, getAgentRuntimeState, type AgentState } from '../../../lib/agents.js';
+import { classifyAgentHealth } from '../../../lib/agents/health.js';
 import { resolveProjectFromIssueSync } from '../../../lib/projects.js';
-import { listPaneValues } from '../../../lib/tmux.js';
+import { isSmeeConfiguredSync, isSmeeProcessRunningSync } from '../../../lib/smee.js';
+import { descendantPidsForSession, getRuntimeCensus } from '../../../lib/runtime-census.js';
 import { DockerStatsCollector, type ContainerStats } from '../../../lib/docker-stats.js';
+import {
+  readReviewStatusMap,
+  type WarmIdleStatusShape,
+} from '../../../lib/cloister/review-status-source.js';
+import { getBuildInfo } from '../../../lib/deploy/build-info.js';
+import {
+  SYSTEM_HEALTH_DEFAULTS,
+  resolveSystemHealthConfig,
+  type EffectiveSystemHealthConfig,
+  type SystemHealthThresholds,
+} from '../../../lib/system-health/config.js';
+import { createHostHealthCollector } from '../../../lib/system-health/collector.js';
+import { evaluateHostPressure } from '../../../lib/system-health/evaluate.js';
+import {
+  createSystemHealthSampler,
+  type AssessmentFreshness,
+  type RawHealthAssessment,
+  type SystemHealthSampler,
+} from '../../../lib/system-health/sampler.js';
+import type { HostMetricSample } from '../../../lib/system-health/types.js';
+import {
+  computeBuildStaleness,
+  type BuildStaleness,
+} from '../../../lib/deploy/staleness.js';
 import { initEventStore } from '../event-store.js';
+import { getDashboardIdentity } from '../identity.js';
+import {
+  acceptedReasons,
+  agentLifecycle,
+  hostMetrics,
+  overallHealthState,
+  runtimeHealthState,
+  serviceHealth,
+  stateToLegacySeverity,
+  type SystemHealthSeverity,
+} from './system-health-v2.js';
 
 const execAsync = promisify(exec);
-const DEFAULT_HEALTH_POLL_SECONDS = 15;
-const DEFAULT_RESOURCE_CONFIG = {
-  memoryWarnGb: 4,
-  memoryBlockGb: 2,
-  agentWarnCount: 8,
-  agentBlockCount: 10,
-};
 const KB = 1024;
 const GIB = 1024 ** 3;
-const GLOBAL_CONFIG_PATH = join(homedir(), '.overdeck', 'config.yaml');
 
-type SystemHealthSeverity = 'normal' | 'warning' | 'critical';
-
-interface SystemHealthThresholds {
-  memoryAvailableWarningBytes: number;
-  memoryAvailableCriticalBytes: number;
-  swapUsedWarningPercent: number;
-  swapUsedCriticalPercent: number;
-  cpuLoadWarningPerCore: number;
-  cpuLoadCriticalPerCore: number;
-  overcommitWarningPercent: number;
-  overcommitCriticalPercent: number;
-}
-
-interface ProcMemorySnapshot {
+export interface ProcMemorySnapshot {
   memTotal: number;
   memAvailable: number;
   memFree: number;
@@ -55,22 +78,24 @@ interface CpuSample {
   total: number;
 }
 
-interface ProcessRow {
-  pid: number;
-  ppid: number;
-  rssKb: number;
-  command: string;
-}
-
 export interface HealthAgentProcess {
   id: string;
   issueId: string;
+  role?: string;
   kind: 'work' | 'planning' | 'specialist' | 'other';
   status: AgentState['status'];
+  lifecycle: SpecialistLifecycle;
   tmuxActive: boolean;
   memoryBytes: number;
   memoryGb: number;
   currentIssue?: string;
+}
+
+export interface AgentAdmissionCandidate {
+  role?: string;
+  status: AgentState['status'];
+  startedAt?: string;
+  tmuxActive: boolean;
 }
 
 export interface HealthLeakedSpecialist {
@@ -99,9 +124,19 @@ export interface HealthConsumer {
   };
 }
 
-export interface SystemHealthSnapshot {
+export interface SmeeRelayHealth {
+  configured: boolean;
+  running: boolean;
+  status: 'not_configured' | 'running' | 'stopped' | 'unknown';
+  message: string;
+}
+
+interface CollectedSystemHealthSnapshot {
   severity: SystemHealthSeverity;
   updatedAt: string;
+  admission: {
+    admittedWorkAgentCount: number;
+  };
   summary: {
     cpuPercent: number;
     loadAverage1m: number;
@@ -113,6 +148,8 @@ export interface SystemHealthSnapshot {
     swapTotalBytes: number;
     swapUsedBytes: number;
     swapUsedPercent: number;
+    committedMemoryBytes: number;
+    commitLimitBytes: number;
     overcommitPercent: number;
     agentCount: number;
     workAgentCount: number;
@@ -129,23 +166,75 @@ export interface SystemHealthSnapshot {
   agents: HealthAgentProcess[];
   leakedSpecialists: HealthLeakedSpecialist[];
   topConsumers: HealthConsumer[];
+  smeeRelay: SmeeRelayHealth;
+  deployStaleness: BuildStaleness | null;
+}
+
+export interface SystemHealthSnapshot extends CollectedSystemHealthSnapshot {
+  state: HealthState;
+  structuredReasons: HealthReason[];
+  freshness: AssessmentFreshness;
+  transitionVersion: number;
+}
+
+interface CollectedSystemHealthBundle {
+  accepted: SharedSystemHealthSnapshot;
+  compatibility: CollectedSystemHealthSnapshot;
+}
+
+export interface SystemHealthEvidenceSnapshot {
+  accepted: SharedSystemHealthSnapshot;
+  compatibility: SystemHealthSnapshot;
 }
 
 let dockerStatsCollector: DockerStatsCollector | null = null;
 let previousCpuSample: CpuSample | null = null;
 let previousCpuSampleAt = 0;
-let cachedHealth: SystemHealthSnapshot | null = null;
-let cacheExpiresAt = 0;
-let inflightRefresh: Promise<SystemHealthSnapshot> | null = null;
-let previousSeverity: SystemHealthSeverity | null = null;
-let candidateSeverity: SystemHealthSeverity | null = null;
-let candidateCount = 0;
-const HYSTERESIS_POLLS = 3;
+const hostHealthCollector = createHostHealthCollector();
+let previousHostMetricSample: HostMetricSample | undefined;
+let systemHealthSampler: SystemHealthSampler<CollectedSystemHealthBundle> | null = null;
 let eventStorePromise: ReturnType<typeof initEventStore> | null = null;
-let cachedResourceConfig = DEFAULT_RESOURCE_CONFIG;
-let cachedPollSeconds = DEFAULT_HEALTH_POLL_SECONDS;
+let cachedSystemHealthConfig: EffectiveSystemHealthConfig | null = null;
 let resourceConfigLoadedAt = 0;
 let resourceConfigInflight: Promise<void> | null = null;
+let cachedDeployStaleness: BuildStaleness | null = null;
+let hasCachedDeployStaleness = false;
+let deployStalenessCacheExpiresAt = 0;
+let deployStalenessInflight: Promise<BuildStaleness | null> | null = null;
+let computeBuildStalenessFn = computeBuildStaleness;
+const DEPLOY_STALENESS_TTL_MS = 60_000;
+
+export async function getDeployStaleness(): Promise<BuildStaleness | null> {
+  if (hasCachedDeployStaleness && Date.now() < deployStalenessCacheExpiresAt) {
+    return cachedDeployStaleness;
+  }
+
+  if (!deployStalenessInflight) {
+    deployStalenessInflight = computeBuildStalenessFn({
+      repoRoot: getDashboardIdentity().repoRoot,
+      buildCommit: getBuildInfo().buildCommit,
+    }).catch(() => null).then((result) => {
+      cachedDeployStaleness = result;
+      hasCachedDeployStaleness = true;
+      deployStalenessCacheExpiresAt = Date.now() + DEPLOY_STALENESS_TTL_MS;
+      return result;
+    }).finally(() => {
+      deployStalenessInflight = null;
+    });
+  }
+
+  return deployStalenessInflight;
+}
+
+export function _resetDeployStalenessForTests(
+  compute: typeof computeBuildStaleness = computeBuildStaleness,
+): void {
+  cachedDeployStaleness = null;
+  hasCachedDeployStaleness = false;
+  deployStalenessCacheExpiresAt = 0;
+  deployStalenessInflight = null;
+  computeBuildStalenessFn = compute;
+}
 
 function getDockerStatsCollector(): DockerStatsCollector {
   if (!dockerStatsCollector) {
@@ -164,6 +253,26 @@ function bytesToGb(bytes: number): number {
 function toPercent(part: number, total: number): number {
   if (total <= 0) return 0;
   return Math.round((part / total) * 1000) / 10;
+}
+
+const AGENT_STARTUP_GRACE_MS = 5 * 60 * 1000;
+
+export function countAdmittedWorkAgents(
+  agents: readonly AgentAdmissionCandidate[],
+  nowMs = Date.now(),
+): number {
+  return agents.filter((agent) => {
+    if (agent.role !== 'work') return false;
+    if (agent.status !== 'running' && agent.status !== 'starting') return false;
+    if (agent.tmuxActive) return true;
+    if (agent.status !== 'starting' || !agent.startedAt) return false;
+
+    const startedAtMs = Date.parse(agent.startedAt);
+    const ageMs = nowMs - startedAtMs;
+    return Number.isFinite(startedAtMs)
+      && ageMs >= 0
+      && ageMs < AGENT_STARTUP_GRACE_MS;
+  }).length;
 }
 
 export function classifyAgentKind(
@@ -186,45 +295,14 @@ export function classifyAgentKind(
   return 'other';
 }
 
-function resolveFiniteNumber(value: string | undefined, fallback: number): number {
-  if (value == null || value.trim() === '') return fallback;
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : fallback;
-}
-
 export async function readGlobalResourceConfig(): Promise<void> {
-  let next = DEFAULT_RESOURCE_CONFIG;
-  try {
-    await access(GLOBAL_CONFIG_PATH);
-    const raw = await readFile(GLOBAL_CONFIG_PATH, 'utf-8');
-    const memoryWarnMatch = raw.match(/^\s*memory_warn_gb:\s*(\d+(?:\.\d+)?)\s*$/m);
-    const memoryBlockMatch = raw.match(/^\s*memory_block_gb:\s*(\d+(?:\.\d+)?)\s*$/m);
-    const agentWarnMatch = raw.match(/^\s*agent_warn_count:\s*(\d+(?:\.\d+)?)\s*$/m);
-    const agentBlockMatch = raw.match(/^\s*agent_block_count:\s*(\d+(?:\.\d+)?)\s*$/m);
-    const pollSecondsMatch = raw.match(/^\s*poll_seconds:\s*(\d+(?:\.\d+)?)\s*$/m);
-
-    next = {
-      memoryWarnGb: resolveFiniteNumber(memoryWarnMatch?.[1], DEFAULT_RESOURCE_CONFIG.memoryWarnGb),
-      memoryBlockGb: resolveFiniteNumber(memoryBlockMatch?.[1], DEFAULT_RESOURCE_CONFIG.memoryBlockGb),
-      agentWarnCount: Math.max(1, Math.floor(resolveFiniteNumber(agentWarnMatch?.[1], DEFAULT_RESOURCE_CONFIG.agentWarnCount))),
-      agentBlockCount: Math.max(1, Math.floor(resolveFiniteNumber(agentBlockMatch?.[1], DEFAULT_RESOURCE_CONFIG.agentBlockCount))),
-    };
-    cachedPollSeconds = Math.max(1, Math.floor(resolveFiniteNumber(process.env['PAN_HEALTH_POLL_SECONDS'], resolveFiniteNumber(pollSecondsMatch?.[1], DEFAULT_HEALTH_POLL_SECONDS))));
-  } catch {
-    cachedPollSeconds = Math.max(1, Math.floor(resolveFiniteNumber(process.env['PAN_HEALTH_POLL_SECONDS'], DEFAULT_HEALTH_POLL_SECONDS)));
-  }
-
-  cachedResourceConfig = {
-    memoryWarnGb: resolveFiniteNumber(process.env['PAN_MEMORY_WARN_GB'], next.memoryWarnGb),
-    memoryBlockGb: resolveFiniteNumber(process.env['PAN_MEMORY_BLOCK_GB'], next.memoryBlockGb),
-    agentWarnCount: Math.max(1, Math.floor(resolveFiniteNumber(process.env['PAN_AGENT_WARN_COUNT'], next.agentWarnCount))),
-    agentBlockCount: Math.max(1, Math.floor(resolveFiniteNumber(process.env['PAN_AGENT_BLOCK_COUNT'], next.agentBlockCount))),
-  };
+  cachedSystemHealthConfig = resolveSystemHealthConfig();
   resourceConfigLoadedAt = Date.now();
 }
 
 async function ensureResourceConfigLoaded(): Promise<void> {
-  const ttl = Math.max(5_000, cachedPollSeconds * 1000);
+  const pollSeconds = cachedSystemHealthConfig?.pollSeconds ?? SYSTEM_HEALTH_DEFAULTS.pollSeconds;
+  const ttl = Math.max(5_000, pollSeconds * 1000);
   if (resourceConfigLoadedAt > 0 && Date.now() - resourceConfigLoadedAt < ttl) return;
   if (!resourceConfigInflight) {
     resourceConfigInflight = readGlobalResourceConfig().finally(() => {
@@ -235,25 +313,15 @@ async function ensureResourceConfigLoaded(): Promise<void> {
 }
 
 export function getResourceConfig() {
-  return cachedResourceConfig;
+  cachedSystemHealthConfig ??= resolveSystemHealthConfig();
+  return cachedSystemHealthConfig.resources;
 }
 
 function getHealthPollTtlMs(): number {
-  return Math.max(1, cachedPollSeconds) * 1000;
-}
-
-function defaultThresholds(): SystemHealthThresholds {
-  const resources = getResourceConfig();
-  return {
-    memoryAvailableWarningBytes: resources.memoryWarnGb * GIB,
-    memoryAvailableCriticalBytes: resources.memoryBlockGb * GIB,
-    swapUsedWarningPercent: Number(process.env['PAN_HEALTH_SWAP_WARN_PERCENT'] ?? 20),
-    swapUsedCriticalPercent: Number(process.env['PAN_HEALTH_SWAP_CRITICAL_PERCENT'] ?? 50),
-    cpuLoadWarningPerCore: Number(process.env['PAN_HEALTH_LOAD_WARN_PER_CORE'] ?? 1),
-    cpuLoadCriticalPerCore: Number(process.env['PAN_HEALTH_LOAD_CRITICAL_PER_CORE'] ?? 1.5),
-    overcommitWarningPercent: Number(process.env['PAN_HEALTH_OVERCOMMIT_WARN_PERCENT'] ?? 150),
-    overcommitCriticalPercent: Number(process.env['PAN_HEALTH_OVERCOMMIT_CRITICAL_PERCENT'] ?? 200),
-  };
+  return Math.max(
+    1,
+    cachedSystemHealthConfig?.pollSeconds ?? SYSTEM_HEALTH_DEFAULTS.pollSeconds,
+  ) * 1000;
 }
 
 async function readProcMemoryLinux(): Promise<ProcMemorySnapshot> {
@@ -320,7 +388,7 @@ async function readProcMemoryDarwin(): Promise<ProcMemorySnapshot> {
   };
 }
 
-async function readProcMemory(): Promise<ProcMemorySnapshot> {
+export async function readProcMemory(): Promise<ProcMemorySnapshot> {
   return platform() === 'darwin' ? readProcMemoryDarwin() : readProcMemoryLinux();
 }
 
@@ -368,79 +436,19 @@ async function readCpuPercent(): Promise<number> {
   return Math.round(((totalDelta - idleDelta) / totalDelta) * 1000) / 10;
 }
 
-async function readProcessTable(): Promise<Map<number, ProcessRow>> {
-  const { stdout } = await execAsync('ps -eo pid=,ppid=,rss=,args=', {
-    encoding: 'utf-8',
-    timeout: 10_000,
-  });
-
-  const rows = new Map<number, ProcessRow>();
-  for (const line of stdout.split('\n')) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
-    const match = trimmed.match(/^(\d+)\s+(\d+)\s+(\d+)\s+(.+)$/);
-    if (!match) continue;
-    const pid = Number(match[1]);
-    const ppid = Number(match[2]);
-    const rssKb = Number(match[3]);
-    const command = match[4] ?? '';
-    if (!Number.isFinite(pid) || !Number.isFinite(ppid) || !Number.isFinite(rssKb)) continue;
-    rows.set(pid, { pid, ppid, rssKb, command });
-  }
-  return rows;
-}
-
-function getDescendantPids(rootPid: number, processes: Map<number, ProcessRow>): Set<number> {
-  const descendants = new Set<number>();
-  const queue = [rootPid];
-
-  while (queue.length > 0) {
-    const pid = queue.shift();
-    if (!pid || descendants.has(pid)) continue;
-    descendants.add(pid);
-
-    for (const process of processes.values()) {
-      if (process.ppid === pid && !descendants.has(process.pid)) {
-        queue.push(process.pid);
-      }
-    }
-  }
-
-  return descendants;
-}
-
-function sumProcessMemory(descendants: Set<number>, processes: Map<number, ProcessRow>): number {
-  let totalRssKb = 0;
-  for (const pid of descendants) {
-    totalRssKb += processes.get(pid)?.rssKb ?? 0;
-  }
-  return totalRssKb * KB;
-}
-
 function buildLeakedSpecialists(
-  snapshot: DashboardSnapshot | undefined,
-  runningAgents: HealthAgentProcess[],
+  agents: readonly HealthAgentProcess[],
 ): HealthLeakedSpecialist[] {
-  if (!snapshot) return [];
-
-  const activeWorkIssues = new Set(
-    runningAgents
-      .filter((agent) => agent.kind === 'work' && agent.status !== 'stopped' && agent.tmuxActive)
-      .map((agent) => agent.issueId.toUpperCase()),
-  );
-
-  type SpecialistSnapshot = { isRunning?: boolean; currentIssue?: string | null; name?: string };
-  return (snapshot.specialists as readonly SpecialistSnapshot[])
-    .filter((specialist) => specialist.isRunning && !!specialist.currentIssue)
-    .filter((specialist) => !activeWorkIssues.has((specialist.currentIssue ?? '').toUpperCase()))
-    .map((specialist) => ({
-      name: specialist.name ?? '',
-      currentIssue: specialist.currentIssue ?? '',
-      reason: `Specialist is active for ${specialist.currentIssue} but no running work agent exists for that issue.`,
+  return agents
+    .filter((agent) => agent.kind === 'specialist' && agent.lifecycle === 'orphaned')
+    .map((agent) => ({
+      name: agent.id,
+      currentIssue: agent.currentIssue ?? agent.issueId,
+      reason: `Advancing session remains live after ${agent.issueId} merged.`,
     }));
 }
 
-function evaluateSeverity(
+export function evaluateSeverity(
   thresholds: SystemHealthThresholds,
   data: {
     availableMemoryBytes: number;
@@ -448,6 +456,7 @@ function evaluateSeverity(
     loadPerCore1m: number;
     overcommitPercent: number;
     leakedSpecialistCount: number;
+    smeeRelay: SmeeRelayHealth;
   },
 ): { severity: SystemHealthSeverity; reasons: string[] } {
   const criticalReasons: string[] = [];
@@ -481,6 +490,10 @@ function evaluateSeverity(
     warningReasons.push(`${data.leakedSpecialistCount} leaked specialist session${data.leakedSpecialistCount === 1 ? '' : 's'} detected.`);
   }
 
+  if (data.smeeRelay.configured && !data.smeeRelay.running) {
+    warningReasons.push('smee-client webhook relay is configured but not running.');
+  }
+
   if (criticalReasons.length > 0) {
     return { severity: 'critical', reasons: criticalReasons.concat(warningReasons) };
   }
@@ -490,47 +503,139 @@ function evaluateSeverity(
   return { severity: 'normal', reasons: [] };
 }
 
-async function collectAgentProcesses(): Promise<HealthAgentProcess[]> {
-  const agents = await Effect.runPromise(listRunningAgents());
-  const activeAgents = agents.filter((agent) => agent.status !== 'stopped');
-  const processTable = await readProcessTable().catch(() => new Map<number, ProcessRow>());
-
-  return Promise.all(
-    activeAgents.map(async (agent) => {
-      const runtimeState = await Effect.runPromise(getAgentRuntimeState(agent.id)).catch(() => null);
-      // PAN-977 round-12 high-2: panePid cache field was removed from
-      // AgentRuntimeState; always query tmux for the current pane PID.
-      const panePidValue = (await Effect.runPromise(listPaneValues(agent.id, '#{pane_pid}')))[0];
-      const panePid = Number(panePidValue ?? '0');
-      const descendants = Number.isFinite(panePid) && panePid > 0
-        ? getDescendantPids(panePid, processTable)
-        : new Set<number>();
-      const memoryBytes = descendants.size > 0 ? sumProcessMemory(descendants, processTable) : 0;
-
+function collectSmeeRelayHealth(): SmeeRelayHealth {
+  try {
+    if (!isSmeeConfiguredSync()) {
       return {
+        configured: false,
+        running: false,
+        status: 'not_configured',
+        message: 'Not configured',
+      };
+    }
+
+    const running = isSmeeProcessRunningSync();
+    return running
+      ? {
+          configured: true,
+          running: true,
+          status: 'running',
+          message: 'Running',
+        }
+      : {
+          configured: true,
+          running: false,
+          status: 'stopped',
+          message: 'Configured but not running',
+        };
+  } catch (err) {
+    return {
+      configured: false,
+      running: false,
+      status: 'unknown',
+      message: err instanceof Error ? err.message : 'Status check failed',
+    };
+  }
+}
+
+function reviewStatusMap(): ReadonlyMap<string, WarmIdleStatusShape> {
+  return new Map(Object.entries(readReviewStatusMap() ?? {}));
+}
+
+async function collectAgentProcesses(): Promise<{
+  agents: HealthAgentProcess[];
+  healthAgents: AgentHealthSnapshot[];
+  admittedWorkAgentCount: number;
+}> {
+  const registeredAgents = await Effect.runPromise(listRunningAgents());
+  const nowMs = Date.now();
+  const admittedWorkAgentCount = countAdmittedWorkAgents(registeredAgents, nowMs);
+  const activeAgents = registeredAgents.filter((agent) => agent.status !== 'stopped');
+  const liveSessions = new Set(
+    registeredAgents.filter((agent) => agent.tmuxActive).map((agent) => agent.id),
+  );
+  const runtimeCensus = await getRuntimeCensus();
+  const reviewStatuses = reviewStatusMap();
+
+  const collected = await Promise.all(
+    activeAgents.map(async (agent) => {
+      const [runtimeState, runtimeSnapshot] = await Promise.all([
+        Effect.runPromise(getAgentRuntimeState(agent.id)).catch(() => null),
+        Effect.runPromise(getRuntimeSnapshot(agent.id)).catch(() => null),
+      ]);
+      const descendants = descendantPidsForSession(runtimeCensus, agent.id);
+      const memoryBytes = [...descendants].reduce(
+        (sum, pid) => sum + (runtimeCensus.processesByPid.get(pid)?.rssBytes ?? 0),
+        0,
+      );
+      const lifecycle = agentLifecycle(
+        agent.role,
+        agent.issueId,
+        agent.tmuxActive,
+        reviewStatuses,
+      );
+      const process = {
         id: agent.id,
         issueId: agent.issueId,
+        role: agent.role,
         kind: classifyAgentKind(agent.id, agent.role),
         status: agent.status,
+        lifecycle,
         tmuxActive: agent.tmuxActive,
         memoryBytes,
         memoryGb: bytesToGb(memoryBytes),
         currentIssue: runtimeState?.currentIssue,
       } satisfies HealthAgentProcess;
+      const health = classifyAgentHealth({
+        agentId: agent.id,
+        persisted: {
+          status: 'available',
+          value: {
+            id: agent.id,
+            issueId: agent.issueId,
+            role: agent.role,
+            status: agent.status,
+            startedAt: agent.startedAt,
+            lastActivity: agent.lastActivity,
+            kickoffDelivered: agent.kickoffDelivered,
+            paused: agent.paused,
+            stoppedByUser: agent.stoppedByUser,
+            stoppedByPause: agent.stoppedByPause,
+            consecutiveFailures: agent.consecutiveFailures,
+          },
+        },
+        runtime: runtimeHealthState(runtimeSnapshot),
+        liveSessions,
+        reviewLifecycle: lifecycle,
+        nowMs,
+      });
+
+      return {
+        process,
+        health: {
+          ...health,
+          memoryBytes,
+          memoryGb: bytesToGb(memoryBytes),
+          ...(runtimeState?.currentIssue ? { currentIssue: runtimeState.currentIssue } : {}),
+        } satisfies AgentHealthSnapshot,
+      };
     }),
   );
+
+  return {
+    agents: collected.map((entry) => entry.process),
+    healthAgents: collected.map((entry) => entry.health),
+    admittedWorkAgentCount,
+  };
 }
 
 function buildTopConsumers(
   agents: HealthAgentProcess[],
   containers: ContainerStats[],
-  leakedSpecialists: HealthLeakedSpecialist[],
 ): HealthConsumer[] {
-  const leakedByName = new Map(leakedSpecialists.map((item) => [item.name, item]));
-
   const agentConsumers = agents.map((agent) => {
     const isSpecialist = agent.kind === 'specialist';
-    const leaked = leakedByName.has(agent.id.replace(/^specialist-/, '')) || leakedByName.has(agent.id);
+    const leaked = agent.lifecycle === 'orphaned';
     const currentIssue = agent.currentIssue ?? agent.issueId;
     const resolved = currentIssue ? resolveProjectFromIssueSync(currentIssue) : null;
     const specialistType = isSpecialist
@@ -576,133 +681,245 @@ function buildTopConsumers(
   } satisfies HealthConsumer));
 
   return [...agentConsumers, ...containerConsumers]
-    .sort((a, b) => b.memoryBytes - a.memoryBytes)
-    .slice(0, 10);
+    .sort((a, b) => b.memoryBytes - a.memoryBytes);
 }
 
-async function refreshSystemHealth(snapshot?: DashboardSnapshot): Promise<SystemHealthSnapshot> {
+function createMeasuringSnapshot(): CollectedSystemHealthBundle {
+  cachedSystemHealthConfig ??= resolveSystemHealthConfig();
+  const updatedAt = new Date().toISOString();
+  const smeeRelay = collectSmeeRelayHealth();
+  const services = serviceHealth(smeeRelay);
+  const base: Omit<SharedSystemHealthSnapshot, 'summary'> = {
+    version: 2,
+    state: 'measuring',
+    updatedAt,
+    nextPollMs: cachedSystemHealthConfig.pollSeconds * 1000,
+    host: {
+      state: 'measuring',
+      platform: hostHealthCollector.platform,
+      reasons: [{
+        code: 'host.sampler.measuring',
+        domain: 'host',
+        severity: 'info',
+        message: 'System health is collecting the initial three samples.',
+      }],
+      metrics: {
+        cpuPercent: null,
+        loadAverage1m: null,
+        loadPerCore1m: null,
+        totalMemoryBytes: null,
+        usedMemoryBytes: null,
+        availableMemoryBytes: null,
+        memoryUsedPercent: null,
+        memoryPressureSomeAvg10: null,
+        memoryPressureFullAvg10: null,
+        memoryPressureFreePercent: null,
+        swapTotalBytes: null,
+        swapUsedBytes: null,
+        swapUsedPercent: null,
+        swapActivityBytesPerMinute: null,
+        committedMemoryBytes: null,
+        commitLimitBytes: null,
+        virtualCommitmentPercent: null,
+      },
+    },
+    admission: {
+      state: 'unavailable',
+      availableMemoryBytes: null,
+      admittedWorkAgentCount: 0,
+      reasons: [{
+        code: 'admission.sampler.measuring',
+        domain: 'admission',
+        severity: 'info',
+        message: 'Admission capacity is unavailable until the initial health sample is accepted.',
+      }],
+    },
+    agents: [],
+    services,
+    topConsumers: [],
+  };
+  const accepted = { ...base, summary: projectLegacySystemHealthSummary(base) };
+
+  return {
+    accepted,
+    compatibility: {
+      severity: 'normal',
+      updatedAt,
+      admission: { admittedWorkAgentCount: 0 },
+      summary: accepted.summary,
+      thresholds: cachedSystemHealthConfig.thresholds,
+      reasons: accepted.host.reasons.map((reason) => reason.message),
+      agents: [],
+      leakedSpecialists: [],
+      topConsumers: [],
+      smeeRelay,
+      deployStaleness: null,
+    },
+  };
+}
+
+export async function collectSystemHealth(): Promise<CollectedSystemHealthBundle> {
   await ensureResourceConfigLoaded();
-  const [memory, loadAverage1m, cpuPercent, agents, containers] = await Promise.all([
-    readProcMemory(),
-    readLoadAverage(),
-    readCpuPercent(),
+  const [sample, agentProcesses, containers, deployStaleness] = await Promise.all([
+    hostHealthCollector.sample(previousHostMetricSample),
     collectAgentProcesses(),
     Promise.resolve(getDockerStatsCollector().getStats()),
+    getDeployStaleness(),
   ]);
+  previousHostMetricSample = sample;
 
-  const thresholds = defaultThresholds();
-  const coreCount = Math.max(cpus().length, 1);
-  const loadPerCore1m = Math.round((loadAverage1m / coreCount) * 100) / 100;
-  const usedMemoryBytes = Math.max(memory.memTotal - memory.memAvailable, 0);
-  const swapUsedBytes = Math.max(memory.swapTotal - memory.swapFree, 0);
-  const overcommitPercent = toPercent(memory.committedAs, memory.memTotal);
-  const leakedSpecialists = buildLeakedSpecialists(snapshot, agents);
-  const evaluation = evaluateSeverity(thresholds, {
-    availableMemoryBytes: memory.memAvailable,
-    swapUsedPercent: toPercent(swapUsedBytes, memory.swapTotal),
-    loadPerCore1m,
-    overcommitPercent,
-    leakedSpecialistCount: leakedSpecialists.length,
-  });
-
-  const containerMemoryBytes = containers.reduce((sum, container) => sum + container.memoryUsage, 0);
-  const workAgentCount = agents.filter((agent) => agent.kind === 'work').length;
-  const planningAgentCount = agents.filter((agent) => agent.kind === 'planning').length;
-  const specialistSessionCount = agents.filter((agent) => agent.kind === 'specialist').length;
-  const swapUsedPercent = toPercent(swapUsedBytes, memory.swapTotal);
-  const overdeckMemoryBytes = agents.reduce((sum, agent) => sum + agent.memoryBytes, 0) + containerMemoryBytes;
-  const overdeckMemoryPercent = toPercent(overdeckMemoryBytes, memory.memTotal);
-
-  const sortedAgents = [...agents].sort((a, b) => b.memoryBytes - a.memoryBytes);
-
-  // Hysteresis: require HYSTERESIS_POLLS consecutive polls at a new severity
-  // before actually transitioning. Prevents flapping when metrics hover near thresholds.
-  let effectiveSeverity: SystemHealthSeverity;
-  if (previousSeverity == null) {
-    effectiveSeverity = evaluation.severity;
-  } else if (evaluation.severity === previousSeverity) {
-    candidateSeverity = null;
-    candidateCount = 0;
-    effectiveSeverity = previousSeverity;
-  } else if (evaluation.severity === candidateSeverity) {
-    candidateCount++;
-    effectiveSeverity = candidateCount >= HYSTERESIS_POLLS ? evaluation.severity : previousSeverity;
-    if (effectiveSeverity !== previousSeverity) {
-      candidateSeverity = null;
-      candidateCount = 0;
-    }
-  } else {
-    candidateSeverity = evaluation.severity;
-    candidateCount = 1;
-    effectiveSeverity = previousSeverity;
-  }
-
-  const result: SystemHealthSnapshot = {
-    severity: effectiveSeverity,
-    updatedAt: new Date().toISOString(),
-    summary: {
-      cpuPercent,
-      loadAverage1m,
-      loadPerCore1m,
-      totalMemoryBytes: memory.memTotal,
-      usedMemoryBytes,
-      availableMemoryBytes: memory.memAvailable,
-      memoryUsedPercent: toPercent(usedMemoryBytes, memory.memTotal),
-      swapTotalBytes: memory.swapTotal,
-      swapUsedBytes,
-      swapUsedPercent,
-      overcommitPercent,
-      agentCount: agents.length,
-      workAgentCount,
-      planningAgentCount,
-      specialistSessionCount,
-      leakedSpecialistCount: leakedSpecialists.length,
-      containerCount: containers.length,
-      containerMemoryBytes,
-      overdeckMemoryBytes,
-      overdeckMemoryPercent,
+  const config = cachedSystemHealthConfig!;
+  const host = evaluateHostPressure(sample, config.thresholds);
+  const smeeRelay = collectSmeeRelayHealth();
+  const services = serviceHealth(smeeRelay);
+  const consumers = buildTopConsumers(agentProcesses.agents, containers);
+  const state = overallHealthState(host.state, agentProcesses.healthAgents, services);
+  const reasons = acceptedReasons(state, host.reasons, agentProcesses.healthAgents, services);
+  const updatedAt = new Date(sample.sampledAtMs).toISOString();
+  const base: Omit<SharedSystemHealthSnapshot, 'summary'> = {
+    version: 2,
+    state,
+    updatedAt,
+    nextPollMs: config.pollSeconds * 1000,
+    host: {
+      state: host.state,
+      platform: sample.platform,
+      reasons: host.reasons,
+      metrics: hostMetrics(sample),
     },
-    thresholds,
-    reasons: evaluation.reasons,
-    agents: sortedAgents,
-    leakedSpecialists,
-    topConsumers: buildTopConsumers(sortedAgents, containers, leakedSpecialists),
+    admission: {
+      ...host.admission,
+      admittedWorkAgentCount: agentProcesses.admittedWorkAgentCount,
+    },
+    agents: agentProcesses.healthAgents,
+    services,
+    topConsumers: consumers,
   };
+  const accepted = { ...base, summary: projectLegacySystemHealthSummary(base) };
+  const sortedAgents = [...agentProcesses.agents]
+    .sort((left, right) => right.memoryBytes - left.memoryBytes);
+  const leakedSpecialists = buildLeakedSpecialists(sortedAgents);
 
-  if (previousSeverity && previousSeverity !== result.severity) {
-    try {
-      const store = eventStorePromise ??= initEventStore();
-      await (await store).appendAsync({
-        type: 'system.health_severity_changed',
-        timestamp: result.updatedAt,
-        payload: {
-          previousSeverity,
-          severity: result.severity,
-          reasons: result.reasons,
-          leakedSpecialistCount: leakedSpecialists.length,
-        },
-      } as never);
-    } catch (err) {
-      console.error('[system-health] Failed to append severity transition event:', err);
-    }
-  }
-
-  previousSeverity = result.severity;
-  cachedHealth = result;
-  cacheExpiresAt = Date.now() + getHealthPollTtlMs();
-  return result;
+  return {
+    accepted,
+    compatibility: {
+      severity: stateToLegacySeverity(state),
+      updatedAt,
+      admission: {
+        admittedWorkAgentCount: agentProcesses.admittedWorkAgentCount,
+      },
+      summary: accepted.summary,
+      thresholds: config.thresholds,
+      reasons: reasons.map((reason) => reason.message),
+      agents: sortedAgents,
+      leakedSpecialists,
+      topConsumers: consumers.slice(0, 10),
+      smeeRelay,
+      deployStaleness,
+    },
+  };
 }
 
-export async function getSystemHealthSnapshot(snapshot?: DashboardSnapshot): Promise<SystemHealthSnapshot> {
-  if (cachedHealth && Date.now() < cacheExpiresAt) {
-    return cachedHealth;
-  }
+async function collectRawSystemHealth(): Promise<RawHealthAssessment<CollectedSystemHealthBundle>> {
+  const bundle = await collectSystemHealth();
+  const reasons = acceptedReasons(
+    bundle.accepted.state,
+    bundle.accepted.host.reasons,
+    bundle.accepted.agents,
+    bundle.accepted.services,
+  );
+  return {
+    status: 'valid',
+    assessment: {
+      state: bundle.accepted.state,
+      reasons,
+      metrics: bundle,
+      sampledAt: bundle.accepted.updatedAt,
+    },
+  };
+}
 
-  if (!inflightRefresh) {
-    inflightRefresh = refreshSystemHealth(snapshot).finally(() => {
-      inflightRefresh = null;
+export function buildSystemHealthTransitionPayload(
+  transition: {
+    version: number;
+    previousState: HealthState;
+    state: HealthState;
+    reasonCodes: string[];
+    acceptedAt: string;
+  },
+  leakedSpecialistCount: number,
+) {
+  return {
+    version: 2 as const,
+    transitionVersion: transition.version,
+    previousSeverity: stateToLegacySeverity(transition.previousState),
+    severity: stateToLegacySeverity(transition.state),
+    previousState: transition.previousState,
+    state: transition.state,
+    reasons: transition.reasonCodes,
+    reasonCodes: transition.reasonCodes,
+    acceptedAt: transition.acceptedAt,
+    leakedSpecialistCount,
+  };
+}
+
+async function publishSystemHealthTransition(
+  transition: {
+    version: number;
+    previousState: HealthState;
+    state: HealthState;
+    reasonCodes: string[];
+    acceptedAt: string;
+  },
+): Promise<void> {
+  const accepted = systemHealthSampler?.getSnapshot();
+  try {
+    const store = eventStorePromise ??= initEventStore();
+    await (await store).appendAsync({
+      type: 'system.health_severity_changed',
+      timestamp: transition.acceptedAt,
+      payload: buildSystemHealthTransitionPayload(
+        transition,
+        accepted?.metrics.accepted.summary.leakedSpecialistCount ?? 0,
+      ),
+    } as never);
+  } catch (err) {
+    console.error('[system-health] Failed to append accepted transition event:', err);
+  }
+}
+
+function getSystemHealthSampler(): SystemHealthSampler<CollectedSystemHealthBundle> {
+  if (!systemHealthSampler) {
+    const config = cachedSystemHealthConfig ?? resolveSystemHealthConfig();
+    cachedSystemHealthConfig = config;
+    systemHealthSampler = createSystemHealthSampler({
+      collect: collectRawSystemHealth,
+      measuringMetrics: createMeasuringSnapshot,
+      pollIntervalMs: config.pollSeconds * 1000,
+      onTransition: publishSystemHealthTransition,
     });
   }
+  return systemHealthSampler;
+}
 
-  return inflightRefresh;
+export async function getSystemHealthEvidenceSnapshot(): Promise<SystemHealthEvidenceSnapshot> {
+  const assessment = getSystemHealthSampler().getSnapshot();
+  return {
+    accepted: assessment.metrics.accepted,
+    compatibility: {
+      ...assessment.metrics.compatibility,
+      state: assessment.state,
+      structuredReasons: assessment.reasons,
+      freshness: assessment.freshness,
+      transitionVersion: assessment.transitionVersion,
+    },
+  };
+}
+
+export async function getAcceptedSystemHealthSnapshot(): Promise<SharedSystemHealthSnapshot> {
+  return (await getSystemHealthEvidenceSnapshot()).accepted;
+}
+
+export async function getSystemHealthSnapshot(): Promise<SystemHealthSnapshot> {
+  return (await getSystemHealthEvidenceSnapshot()).compatibility;
 }

@@ -11,6 +11,7 @@ import { join } from 'path';
 import { Effect } from 'effect';
 import { ConfigError, FsError } from '../errors.js';
 import { OVERDECK_HOME } from '../paths.js';
+import type { TieredExecutionConfig } from '../agents/tier-table.js';
 
 const CLOISTER_CONFIG_FILE = join(OVERDECK_HOME, 'cloister.toml');
 
@@ -40,6 +41,9 @@ export interface StuckRemediationConfig {
   stage1_minutes: number;
   stage2_minutes: number;
   stage3_minutes: number;
+  flywheel_stage1_minutes: number;
+  flywheel_stage2_minutes: number;
+  flywheel_stage3_minutes: number;
 }
 
 /**
@@ -70,11 +74,68 @@ export interface ConcurrencyConfig {
    */
   reserved_advancing_slots: number;
   /**
+   * Dedicated swarm-slot reserve, isolated from `max_work_agents` and
+   * `reserved_advancing_slots` (PAN-2212). Swarm slot dispatch draws only from this
+   * reserve, so a busy pipeline never starves the swarm — and swarm slots never
+   * starve review/test in reverse. Default 3.
+   */
+  reserved_swarm_slots: number;
+  /**
    * When true, operator-started work agents (no flywheelRunId) are exempt from
    * the emergency brake/governor reaping so the operator's deliberate spawns are
    * not trimmed to satisfy the cap. Defaults to true (PAN-1812).
    */
   exempt_operator_started?: boolean;
+  /**
+   * PAN-2504: memory-DRIVEN work-agent admission. When true, the work-agent
+   * ceiling is derived from live free memory — admit until the next agent's
+   * estimated footprint would breach the governor's SOFT reserve — instead of
+   * the fixed `max_work_agents` count. This lets a big box fill toward its
+   * memory budget rather than idling at a hardcoded 6. Defaults to false
+   * (opt-in): unset installs keep the count-based cap. Requires the memory
+   * governor to have published a cached verdict; falls back to the count cap
+   * until then.
+   */
+  memory_driven?: boolean;
+  /**
+   * Safety upper bound on concurrent work agents when `memory_driven` is on —
+   * caps the memory-derived ceiling so a mis-estimated footprint can't march the
+   * box to hundreds of agents. Default 24.
+   */
+  memory_driven_max_work_agents?: number;
+  /**
+   * Per-work-agent RSS estimate (GB) used for the memory-driven budget:
+   * additional slots = floor((availableBytes - softReserve) / work_footprint_gb).
+   * Conservative by design (over-estimating admits fewer). Default 2, matching
+   * `resources.governorFootprintDefaultWorkGb`.
+   */
+  work_footprint_gb?: number;
+  /**
+   * PAN-2507: preemptive pipeline scheduler. When true, a blocked advancing
+   * (review/test/ship) dispatch may YIELD an idle work agent — pause it
+   * (resumable, session preserved) to free the slot/memory, dispatch the
+   * advancing role, and auto-resume the yielded agent oldest-first once
+   * capacity returns. Defaults to false (opt-in): unset installs keep the
+   * static defer-until-attrition behavior at every dispatch site.
+   */
+  preemption?: boolean;
+  /**
+   * PAN-2507: anti-thrash cap on how many work agents may be in the yielded
+   * (scheduler-paused) state at once. Default 3.
+   */
+  max_yielded?: number;
+  /**
+   * PAN-2507: anti-thrash cooldown (seconds) — an agent resumed from a yield
+   * may not be re-yielded until this many seconds have elapsed since its
+   * resume. Default 600.
+   */
+  yield_cooldown_secs?: number;
+}
+
+export type SwarmInferCompletionMode = 'off' | 'nudge' | 'auto';
+
+export interface SwarmConfig {
+  infer_completion: SwarmInferCompletionMode;
 }
 
 /**
@@ -82,6 +143,8 @@ export interface ConcurrencyConfig {
  */
 export interface StartupConfig {
   auto_start: boolean; // Start Cloister when dashboard starts
+  reconciliation_grace_secs: number; // Boot reconciliation grace window before default resume
+  reconciliation_max_candidate_age_secs: number; // Max age for stopped agents to appear in boot reconciliation
 }
 
 /**
@@ -213,13 +276,20 @@ export interface AutoRestartConfig {
 }
 
 /**
- * Cost limits configuration
+ * Cost limits configuration — OPT-IN, no defaults.
+ *
+ * Cost-limit checking runs only when the operator sets `cost_limits` in
+ * config.yaml. There is deliberately no default: the original hardcoded
+ * $10/$25/$100 caps were never operator-chosen, sat permanently exceeded
+ * (real spend runs 10-30x higher), and produced pure alert noise
+ * (PAN-2319, PAN-2642). The progress-aware cost-bleed circuit breaker
+ * (PAN-1868) is the intended always-on guard, not flat dollar caps.
  */
 export interface CostLimitsConfig {
-  per_agent_usd: number;
-  per_issue_usd: number;
-  daily_total_usd: number;
-  alert_threshold: number; // Fraction (0.0-1.0) at which to start alerting
+  per_agent_usd?: number; // per-agent spend today (USD); unset or 0 = not checked
+  per_issue_usd?: number; // per-issue spend today (USD); unset or 0 = not checked
+  daily_total_usd?: number; // total spend today (USD); unset or 0 = not checked
+  alert_threshold?: number; // Fraction (0.0-1.0) at which to start warning; default 0.8
 }
 
 /**
@@ -254,6 +324,11 @@ export interface OrphanProposedReconcilerConfig {
   minAttemptIntervalMs: number;
 }
 
+export interface DeployConfig {
+  auto_deploy: boolean;
+  debounce_minutes: number;
+}
+
 /**
  * Complete Cloister configuration
  */
@@ -264,9 +339,11 @@ export interface CloisterConfig {
   stuck_remediation?: StuckRemediationConfig;
   monitoring: MonitoringConfig;
   concurrency?: ConcurrencyConfig;
+  swarm?: SwarmConfig;
   notifications?: NotificationConfig;
   specialists?: SpecialistsConfig;
   model_selection?: ModelSelectionConfig;
+  tiered_execution?: TieredExecutionConfig;
   handoffs?: HandoffConfig;
   cost_tracking?: CostTrackingConfig;
   auto_restart?: AutoRestartConfig;
@@ -274,6 +351,7 @@ export interface CloisterConfig {
   retention?: RetentionConfig;
   close_out?: CloseOutConfig;
   orphanProposedReconciler?: OrphanProposedReconcilerConfig;
+  deploy: DeployConfig;
 }
 
 /**
@@ -282,6 +360,8 @@ export interface CloisterConfig {
 export const DEFAULT_CLOISTER_CONFIG: CloisterConfig = {
   startup: {
     auto_start: true,
+    reconciliation_grace_secs: 120,
+    reconciliation_max_candidate_age_secs: 240,
   },
   thresholds: {
     stale: 5,
@@ -300,15 +380,32 @@ export const DEFAULT_CLOISTER_CONFIG: CloisterConfig = {
     stage1_minutes: 20,
     stage2_minutes: 45,
     stage3_minutes: 90,
+    flywheel_stage1_minutes: 20,
+    flywheel_stage2_minutes: 24,
+    flywheel_stage3_minutes: 28,
   },
   monitoring: {
     check_interval: 60, // 1 minute
     heartbeat_sources: ['jsonl_mtime', 'tmux_activity', 'git_activity'],
   },
+  deploy: {
+    auto_deploy: true,
+    debounce_minutes: 5,
+  },
   concurrency: {
     max_work_agents: 6,
     reserved_advancing_slots: 3,
+    reserved_swarm_slots: 3,
     exempt_operator_started: true,
+    memory_driven: false,
+    memory_driven_max_work_agents: 24,
+    work_footprint_gb: 2,
+    preemption: false,
+    max_yielded: 3,
+    yield_cooldown_secs: 600,
+  },
+  swarm: {
+    infer_completion: 'auto',
   },
   notifications: {
     slack_webhook: undefined,
@@ -355,6 +452,12 @@ export const DEFAULT_CLOISTER_CONFIG: CloisterConfig = {
       // providerHarnesses, and built-in provider defaults in order.
     },
   },
+  tiered_execution: {
+    enabled: false,
+    tiers: {},
+    supervisor: undefined,
+    replay_threshold: 0.5,
+  },
   handoffs: {
     auto_triggers: {
       stuck_escalation: {
@@ -383,12 +486,7 @@ export const DEFAULT_CLOISTER_CONFIG: CloisterConfig = {
     max_retries: 3,
     backoff_seconds: [30, 60, 120], // 30s, 1m, 2m
   },
-  cost_limits: {
-    per_agent_usd: 10.0,
-    per_issue_usd: 25.0,
-    daily_total_usd: 100.0,
-    alert_threshold: 0.8, // Alert at 80%
-  },
+  // cost_limits: intentionally no default — checking is opt-in (see CostLimitsConfig).
   retention: {
     agent_state_days: 7,
     reviewer_state_days: 1,
@@ -397,7 +495,12 @@ export const DEFAULT_CLOISTER_CONFIG: CloisterConfig = {
   close_out: {
     remove_workspace: false,
     delete_feature_branch: false,
-    auto: false,
+    // Auto close-out is ON by default: without it merged issues sit in
+    // "awaiting close-out (verify on main)" forever and their Docker stacks,
+    // branches, and agent state leak. Correct operation must not depend on an
+    // operator discovering an opt-in flag; `auto = false` remains an explicit
+    // opt-out escape hatch for debugging.
+    auto: true,
     auto_delay_minutes: 60,
   },
   orphanProposedReconciler: {

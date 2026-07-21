@@ -34,4 +34,28 @@ describe('Definition of Ready (PAN-1966)', () => {
   it('getPipelineIssuePhase: open backlog issue with no ready signal → todo (hidden from pipeline)', () => {
     expect(getPipelineIssuePhase(backlogIssue())).toBe('todo');
   });
+
+  it('does not use server membership as a lane-assignment signal', () => {
+    const withoutMembership = backlogIssue();
+    const withMembership = backlogIssue({
+      pipelineMembership: { inPipeline: true, bucket: 'post_merge_limbo', labelDrift: null },
+    });
+    expect(getPipelineIssuePhase(withMembership)).toBe(getPipelineIssuePhase(withoutMembership));
+    expect(getPipelineIssuePhase(withMembership)).toBe('todo');
+
+    const readyWithoutMembership = backlogIssue({ labels: ['ready'] });
+    const readyWithMembership = backlogIssue({
+      labels: ['ready'],
+      pipelineMembership: { inPipeline: false, bucket: 'clean_terminal', labelDrift: 'stale_present' },
+    });
+    expect(getPipelineIssuePhase(readyWithMembership)).toBe(getPipelineIssuePhase(readyWithoutMembership));
+    expect(getPipelineIssuePhase(readyWithMembership)).toBe('ready');
+  });
+
+  it('preserves in-flight lane assignment when membership is attached', () => {
+    const membership = { inPipeline: true, bucket: 'in_flight' as const, labelDrift: null };
+    expect(getPipelineIssuePhase(backlogIssue({ state: 'in_progress', pipelineMembership: membership }))).toBe('work');
+    expect(getPipelineIssuePhase(backlogIssue({ state: 'in_review', pipelineMembership: membership }))).toBe('review');
+    expect(getPipelineIssuePhase(backlogIssue({ mergeStatus: 'queued', pipelineMembership: membership }))).toBe('ship');
+  });
 });

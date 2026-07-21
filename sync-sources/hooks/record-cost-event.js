@@ -2,20 +2,23 @@
 import { createRequire } from "node:module";
 import { appendFileSync, chmodSync, closeSync, copyFileSync, existsSync, fstatSync, mkdirSync, openSync, readFileSync, readSync, statSync, writeFileSync } from "fs";
 import { exec, execFile, execFileSync } from "child_process";
-import { dirname, join, sep } from "path";
-import { homedir } from "os";
+import { dirname, join, resolve, sep } from "path";
+import { homedir, totalmem } from "os";
 import { fileURLToPath } from "url";
 import * as NFS from "node:fs";
-import { existsSync as existsSync$1, mkdirSync as mkdirSync$1, readFileSync as readFileSync$1, writeFileSync as writeFileSync$1 } from "node:fs";
+import { appendFileSync as appendFileSync$1, closeSync as closeSync$1, existsSync as existsSync$1, fsyncSync, mkdirSync as mkdirSync$1, openSync as openSync$1, readFileSync as readFileSync$1, renameSync, rmSync, writeFileSync as writeFileSync$1 } from "node:fs";
 import * as Path from "node:path";
-import { dirname as dirname$1, isAbsolute, join as join$1 } from "node:path";
-import { readFile } from "node:fs/promises";
+import { basename, dirname as dirname$1, isAbsolute, join as join$1, resolve as resolve$1 } from "node:path";
+import { mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import * as OS from "node:os";
+import { hostname } from "node:os";
 import * as NodeChildProcess from "node:child_process";
+import { execFile as execFile$1 } from "node:child_process";
 import * as Crypto from "node:crypto";
 import * as NodeUrl from "node:url";
-import { mkdir, writeFile } from "fs/promises";
-import { promisify } from "util";
+import { mkdir as mkdir$1, writeFile as writeFile$1 } from "fs/promises";
+import { promisify } from "node:util";
+import { promisify as promisify$1 } from "util";
 //#region \0rolldown/runtime.js
 var __commonJSMin = (cb, mod) => () => (mod || (cb((mod = { exports: {} }).exports, mod), cb = null), mod.exports);
 var __require = /* @__PURE__ */ createRequire(import.meta.url);
@@ -2905,7 +2908,7 @@ const isNone = isNone$1;
 * @category Pattern matching
 * @since 2.0.0
 */
-const match$1 = /* @__PURE__ */ dual(2, (self, { onNone, onSome }) => isNone(self) ? onNone() : onSome(self.value));
+const match$3 = /* @__PURE__ */ dual(2, (self, { onNone, onSome }) => isNone(self) ? onNone() : onSome(self.value));
 /**
 * Extracts the value from a `Some`, or evaluates a fallback thunk on `None`.
 *
@@ -4550,7 +4553,7 @@ const weeks = (weeks) => make$7(weeks * 6048e5);
 * @category getters
 * @since 2.0.0
 */
-const toMillis = (self) => match(fromInputUnsafe(self), {
+const toMillis = (self) => match$2(fromInputUnsafe(self), {
 	onMillis: identity,
 	onNanos: (nanos) => Number(nanos) / 1e6,
 	onInfinity: () => Infinity,
@@ -4613,7 +4616,7 @@ const toNanosUnsafe = (input) => {
 * @category pattern matching
 * @since 2.0.0
 */
-const match = /* @__PURE__ */ dual(2, (self, options) => {
+const match$2 = /* @__PURE__ */ dual(2, (self, options) => {
 	switch (self.value._tag) {
 		case "Millis": return options.onMillis(self.value.millis);
 		case "Nanos": return options.onNanos(self.value.nanos);
@@ -5724,6 +5727,11 @@ const matchEffect$2 = /* @__PURE__ */ dual(2, (self, options) => matchCauseEffec
 	onSuccess: options.onSuccess
 }));
 /** @internal */
+const match$1 = /* @__PURE__ */ dual(2, (self, options) => matchEffect$2(self, {
+	onFailure: (error) => sync$1(() => options.onFailure(error)),
+	onSuccess: (value) => sync$1(() => options.onSuccess(value))
+}));
+/** @internal */
 const exit = (self) => effectIsExit(self) ? exitSucceed(self) : exitPrimitive(self);
 const exitPrimitive = /* @__PURE__ */ makePrimitive({
 	op: "Exit",
@@ -5740,6 +5748,11 @@ const exitPrimitive = /* @__PURE__ */ makePrimitive({
 });
 /** @internal */
 const timeoutOrElse$1 = /* @__PURE__ */ dual(2, (self, options) => raceFirst$1(self, flatMap$1(sleep(options.duration), options.orElse)));
+/** @internal */
+const timeout$1 = /* @__PURE__ */ dual(2, (self, duration) => timeoutOrElse$1(self, {
+	duration,
+	orElse: () => fail$3(new TimeoutError())
+}));
 /** @internal */
 const ScopeTypeId = "~effect/Scope";
 /** @internal */
@@ -6095,6 +6108,26 @@ const runForkWith = (context) => (effect, options) => {
 /** @internal */
 const runFork$1 = /* @__PURE__ */ runForkWith(/* @__PURE__ */ empty$2());
 /** @internal */
+const runPromiseExitWith = (context) => {
+	const runFork = runForkWith(context);
+	return (effect, options) => {
+		const fiber = runFork(effect, options);
+		return new Promise((resolve) => {
+			fiber.addObserver((exit) => resolve(exit));
+		});
+	};
+};
+/** @internal */
+const runPromiseWith = (context) => {
+	const runPromiseExit = runPromiseExitWith(context);
+	return (effect, options) => runPromiseExit(effect, options).then((exit) => {
+		if (exit._tag === "Failure") throw causeSquash(exit.cause);
+		return exit.value;
+	});
+};
+/** @internal */
+const runPromise$1 = /* @__PURE__ */ runPromiseWith(/* @__PURE__ */ empty$2());
+/** @internal */
 const runSyncExitWith = (context) => {
 	const runFork = runForkWith(context);
 	return (effect) => {
@@ -6205,7 +6238,15 @@ const processOrPerformanceNow = /* @__PURE__ */ function() {
 const clockWith = (f) => withFiber((fiber) => f(fiber.getRef(ClockRef)));
 /** @internal */
 const sleep = (duration) => clockWith((clock) => clock.sleep(fromInputUnsafe(duration)));
-TaggedError$1("TimeoutError");
+/** @internal */
+const TimeoutErrorTypeId = "~effect/Cause/TimeoutError";
+/** @internal */
+var TimeoutError = class extends TaggedError$1("TimeoutError") {
+	[TimeoutErrorTypeId] = TimeoutErrorTypeId;
+	constructor(message) {
+		super({ message });
+	}
+};
 TaggedError$1("IllegalArgumentError");
 TaggedError$1("ExceededCapacityError");
 /** @internal */
@@ -6461,6 +6502,46 @@ const tracerLogger = /* @__PURE__ */ loggerMake(({ cause, fiber, logLevel, messa
 * @since 2.0.0
 */
 const fail$2 = causeFail;
+/**
+* Collapses a `Cause` into a single `unknown` value, picking the "most
+* important" failure in this order:
+*
+* **When to use**
+*
+* Use to collapse a structured cause to the single value that synchronous and
+* promise runners would throw.
+*
+* **Details**
+*
+* 1. First `Fail` error (the `E` value)
+* 2. First `Die` defect
+* 3. A generic `Error("All fibers interrupted without error")` for interrupt-only causes
+* 4. A generic `Error("Empty cause")` for `empty`
+*
+* This is the function used by `Effect.runPromise` and `Effect.runSync` to
+* decide what to throw.
+*
+* **Gotchas**
+*
+* This function is lossy. Use {@link prettyErrors} or iterate `cause.reasons`
+* when you need all failures.
+*
+* **Example** (squashing a cause)
+*
+* ```ts
+* import { Cause } from "effect"
+*
+* console.log(Cause.squash(Cause.fail("error")))    // "error"
+* console.log(Cause.squash(Cause.die("defect")))    // "defect"
+* ```
+*
+* @see {@link prettyErrors} — non-lossy conversion to `Array<Error>`
+* @see {@link pretty} — human-readable string rendering
+*
+* @category destructors
+* @since 2.0.0
+*/
+const squash = causeSquash;
 /**
 * Returns a `Result` whose success value is the first typed error value `E`
 * from a `Fail` reason in the cause. If the cause has no `Fail` reason,
@@ -6924,7 +7005,7 @@ const makeUnsafe$1 = scopeMakeUnsafe;
 * @category combinators
 * @since 4.0.0
 */
-const provide$1 = provideScope;
+const provide$3 = provideScope;
 /**
 * Registers a finalizer effect on a scope.
 *
@@ -7191,9 +7272,124 @@ var MemoMapImpl = class {
 * @since 4.0.0
 */
 const makeMemoMapUnsafe = () => new MemoMapImpl();
-(class extends Service()("effect/Layer/CurrentMemoMap") {
+/**
+* Context service for the current `MemoMap` used in layer construction.
+*
+* **When to use**
+*
+* Use when building custom layer operations that need to access the current
+* memoization map from the fiber context.
+*
+* **Details**
+*
+* This service wraps a `MemoMap` as a `Context.Service`, making it available
+* for dependency injection during layer construction.
+*
+* @see {@link MemoMap} the memoization map type wrapped by this service
+*
+* @category models
+* @since 3.13.0
+*/
+var CurrentMemoMap = class extends Service()("effect/Layer/CurrentMemoMap") {
 	static getOrCreate = /* @__PURE__ */ getOrElse(this, makeMemoMapUnsafe);
-});
+};
+/**
+* Builds a layer into an `Effect` value, using the specified `MemoMap` to memoize
+* the layer construction.
+*
+* **Example** (Building layers with an explicit memo map)
+*
+* ```ts
+* import { Context, Effect, Layer } from "effect"
+*
+* class Database extends Context.Service<Database, {
+*   readonly query: (sql: string) => Effect.Effect<string>
+* }>()("Database") {}
+*
+* class Logger extends Context.Service<Logger, {
+*   readonly log: (msg: string) => Effect.Effect<void>
+* }>()("Logger") {}
+*
+* // Build layers with explicit memoization control
+* const program = Effect.gen(function*() {
+*   const memoMap = yield* Layer.makeMemoMap
+*   const scope = yield* Effect.scope
+*
+*   // Build database layer with memoization
+*   const dbLayer = Layer.succeed(Database, {
+*     query: Effect.fn("Database.query")((sql: string) => Effect.succeed("result"))
+*   })
+*   const dbContext = yield* Layer.buildWithMemoMap(dbLayer, memoMap, scope)
+*
+*   // Build logger layer with same memoization (reuses memo if same layer)
+*   const loggerLayer = Layer.succeed(Logger, {
+*     log: Effect.fn("Logger.log")((msg: string) => Effect.sync(() => console.log(msg)))
+*   })
+*   const loggerContext = yield* Layer.buildWithMemoMap(
+*     loggerLayer,
+*     memoMap,
+*     scope
+*   )
+*
+*   return {
+*     database: Context.get(dbContext, Database),
+*     logger: Context.get(loggerContext, Logger)
+*   }
+* })
+* ```
+*
+* @category memo map
+* @since 2.0.0
+*/
+const buildWithMemoMap = /* @__PURE__ */ dual(3, (self, memoMap, scope) => provideService(map$4(self.build(memoMap, scope), add(CurrentMemoMap, memoMap)), CurrentMemoMap, memoMap));
+/**
+* Builds a layer using an explicit scope.
+*
+* **When to use**
+*
+* Use to control the lifetime of layer resources with a scope supplied by the
+* caller.
+*
+* **Details**
+*
+* Resources created by the layer are released when the supplied scope is
+* closed, unless a resource extends its own scope.
+*
+* **Example** (Building a layer with an explicit scope)
+*
+* ```ts
+* import { Context, Effect, Layer, Scope } from "effect"
+*
+* class Database extends Context.Service<Database, {
+*   readonly query: (sql: string) => Effect.Effect<string>
+* }>()("Database") {}
+*
+* // Build a layer with explicit scope control
+* const program = Effect.gen(function*() {
+*   const scope = yield* Effect.scope
+*
+*   const dbLayer = Layer.effect(Database, Effect.gen(function*() {
+*     console.log("Initializing database...")
+*     yield* Scope.addFinalizer(
+*       scope,
+*       Effect.sync(() => console.log("Database closed"))
+*     )
+*     return { query: Effect.fn("Database.query")((sql: string) => Effect.succeed(`Result: ${sql}`)) }
+*   }))
+*
+*   // Build with specific scope - resources tied to this scope
+*   const context = yield* Layer.buildWithScope(dbLayer, scope)
+*   const database = Context.get(context, Database)
+*
+*   return yield* database.query("SELECT * FROM users")
+*   // Database will be closed when scope is closed
+* })
+* ```
+*
+* @category destructors
+* @since 2.0.0
+*/
+const buildWithScope = /* @__PURE__ */ dual(2, (self, scope) => withFiber((fiber) => buildWithMemoMap(self, CurrentMemoMap.getOrCreate(fiber.context), scope)));
 /**
 * Constructs a layer that provides a single service from an already available
 * value.
@@ -7351,7 +7547,7 @@ const effectImpl = (service, effect) => effectContext(map$4(effect, (value) => m
 * @category constructors
 * @since 2.0.0
 */
-const effectContext = (effect) => fromBuildMemo((_, scope) => provide$1(effect, scope));
+const effectContext = (effect) => fromBuildMemo((_, scope) => provide$3(effect, scope));
 const mergeAllEffect = (layers, memoMap, scope) => {
 	const parentScope = forkUnsafe(scope, "parallel");
 	return forEach$2(layers, (layer) => layer.build(memoMap, forkUnsafe(parentScope, "sequential")), { concurrency: layers.length }).pipe(map$4((context) => mergeAll$1(...context)));
@@ -7481,7 +7677,7 @@ const provideWith = (self, that, f) => fromBuild((memoMap, scope) => flatMap$1(A
 * @category utils
 * @since 2.0.0
 */
-const provide = /* @__PURE__ */ dual(2, (self, that) => provideWith(self, that, identity));
+const provide$2 = /* @__PURE__ */ dual(2, (self, that) => provideWith(self, that, identity));
 /**
 * Provides a base class for yieldable errors.
 *
@@ -7737,6 +7933,11 @@ const matchEffect$1 = /* @__PURE__ */ dual(2, (self, options) => matchCauseEffec
 		return !isFailure(halt) ? options.onDone(halt.success.value) : options.onFailure(halt.failure);
 	}
 }));
+//#endregion
+//#region ../../node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/dist/internal/layer.js
+const provideLayer = (self, layer, options) => scopedWith$1((scope) => flatMap$1(options?.local ? buildWithMemoMap(layer, makeMemoMapUnsafe(), scope) : buildWithScope(layer, scope), (context) => provideContext(self, context)));
+/** @internal */
+const provide$1 = /* @__PURE__ */ dual((args) => isEffect(args[0]), (self, source, options) => isContext(source) ? provideContext(self, source) : provideLayer(self, Array.isArray(source) ? mergeAll(...source) : source, options));
 //#endregion
 //#region ../../node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/dist/Effect.js
 /**
@@ -8753,6 +8954,65 @@ const orDie = orDie$1;
 */
 const ignore = ignore$1;
 /**
+* Adds a time limit to an effect, triggering a timeout if the effect exceeds
+* the duration.
+*
+* **When to use**
+*
+* Use when exceeding the time limit should be represented as a typed
+* failure. Use `timeoutOption` when a timeout should become `Option.none`, and
+* `timeoutOrElse` when you want to run a fallback effect.
+*
+* **Details**
+*
+* The `timeout` function allows you to specify a time limit for an
+* effect's execution. If the effect does not complete within the given time, a
+* `TimeoutException` is raised. This can be useful for controlling how long
+* your program waits for a task to finish, ensuring that it doesn't hang
+* indefinitely if the task takes too long.
+*
+* **Gotchas**
+*
+* If the timeout wins, the source effect is interrupted.
+*
+* **Example** (Failing when work takes too long)
+*
+* ```ts
+* import { Effect } from "effect"
+*
+* const task = Effect.gen(function*() {
+*   console.log("Start processing...")
+*   yield* Effect.sleep("2 seconds") // Simulates a delay in processing
+*   console.log("Processing complete.")
+*   return "Result"
+* })
+*
+* // Output will show a TimeoutException as the task takes longer
+* // than the specified timeout duration
+* const timedEffect = task.pipe(Effect.timeout("1 second"))
+*
+* Effect.runPromiseExit(timedEffect).then(console.log)
+* // Output:
+* // Start processing...
+* // {
+* //   _id: 'Exit',
+* //   _tag: 'Failure',
+* //   cause: {
+* //     _id: 'Cause',
+* //     _tag: 'Fail',
+* //     failure: { _tag: 'TimeoutException' }
+* //   }
+* // }
+* ```
+*
+* @see {@link timeoutOption} for returning `Option.none` on timeout.
+* @see {@link timeoutOrElse} for a version that allows specifying both success and timeout handlers.
+*
+* @category delays & timeouts
+* @since 2.0.0
+*/
+const timeout = timeout$1;
+/**
 * Applies a timeout to an effect, with a fallback effect executed if the timeout is reached.
 *
 * **When to use**
@@ -8839,6 +9099,59 @@ const timeoutOrElse = timeoutOrElse$1;
 */
 const raceFirst = raceFirst$1;
 /**
+* Handles both success and failure cases of an effect without performing side
+* effects.
+*
+* **When to use**
+*
+* Use when this is useful for structuring your code to respond differently to success or
+* failure without triggering side effects.
+*
+* **Details**
+*
+* `match` lets you define custom handlers for both success and failure
+* scenarios. You provide separate functions to handle each case, allowing you
+* to process the result if the effect succeeds, or handle the error if the
+* effect fails.
+*
+* **Example** (Matching success and failure values)
+*
+* ```ts
+* import { Data, Effect } from "effect"
+*
+* class ExampleError extends Data.TaggedError("ExampleError")<{ readonly message: string }> {}
+*
+* const success: Effect.Effect<number, ExampleError> = Effect.succeed(42)
+*
+* const program1 = Effect.match(success, {
+*   onFailure: (error) => `failure: ${error.message}`,
+*   onSuccess: (value) => `success: ${value}`
+* })
+*
+* // Run and log the result of the successful effect
+* Effect.runPromise(program1).then(console.log)
+* // Output: "success: 42"
+*
+* const failure: Effect.Effect<number, ExampleError> = Effect.fail(
+*   new ExampleError({ message: "Uh oh!" })
+* )
+*
+* const program2 = Effect.match(failure, {
+*   onFailure: (error) => `failure: ${error.message}`,
+*   onSuccess: (value) => `success: ${value}`
+* })
+*
+* // Run and log the result of the failed effect
+* Effect.runPromise(program2).then(console.log)
+* // Output: "failure: Uh oh!"
+* ```
+*
+* @see {@link matchEffect} if you need to perform side effects in the handlers.
+* @category pattern matching
+* @since 2.0.0
+*/
+const match = match$1;
+/**
 * Handles both success and failure by running effectful handlers.
 *
 * **When to use**
@@ -8898,6 +9211,41 @@ const raceFirst = raceFirst$1;
 * @since 2.0.0
 */
 const matchEffect = matchEffect$2;
+/**
+* Provides dependencies to an effect using layers or a context. Use `options.local`
+* to build the layer every time; by default, layers are shared between provide
+* calls.
+*
+* **Example** (Providing dependencies with a layer)
+*
+* ```ts
+* import { Context, Effect, Layer } from "effect"
+*
+* interface Database {
+*   readonly query: (sql: string) => Effect.Effect<string>
+* }
+*
+* const Database = Context.Service<Database>("Database")
+*
+* const DatabaseLive = Layer.succeed(Database)({
+*   query: Effect.fn("Database.query")((sql: string) => Effect.succeed(`Result for: ${sql}`))
+* })
+*
+* const program = Effect.gen(function*() {
+*   const db = yield* Database
+*   return yield* db.query("SELECT * FROM users")
+* })
+*
+* const provided = Effect.provide(program, DatabaseLive)
+*
+* Effect.runPromise(provided).then(console.log)
+* // Output: "Result for: SELECT * FROM users"
+* ```
+*
+* @category environment
+* @since 2.0.0
+*/
+const provide = provide$1;
 /**
 * Optionally accesses a service from the environment.
 *
@@ -9266,6 +9614,43 @@ const forkScoped = forkScoped$1;
 * @since 2.0.0
 */
 const runFork = runFork$1;
+/**
+* Executes an effect and returns the result as a `Promise`.
+*
+* **When to use**
+*
+* Use when you need to execute an effect and work with the
+* result using `Promise` syntax, typically for compatibility with other
+* promise-based code.
+*
+* If the effect succeeds, the promise will resolve with the result. If the
+* effect fails, the promise will reject with an error.
+*
+* **Example** (Running a successful effect as a Promise)
+*
+* ```ts
+* import { Effect } from "effect"
+*
+* Effect.runPromise(Effect.succeed(1)).then(console.log)
+* // Output: 1
+* ```
+*
+* **Example** (Running effects as promises)
+*
+* ```ts
+* //Example: Handling a Failing Effect as a Rejected Promise
+* import { Effect } from "effect"
+*
+* Effect.runPromise(Effect.fail("my error")).catch(console.error)
+* // Output:
+* // (FiberFailure) Error: my error
+* ```
+*
+* @see {@link runPromiseExit} for a version that returns an `Exit` type instead of rejecting.
+* @category running effects
+* @since 2.0.0
+*/
+const runPromise = runPromise$1;
 /**
 * Executes an effect synchronously and returns its success value.
 *
@@ -10732,7 +11117,7 @@ const toTransform = (channel) => channel.transform;
 const asyncQueue = (scope, f, options) => make$4({
 	capacity: options?.bufferSize,
 	strategy: options?.strategy
-}).pipe(tap((queue) => addFinalizer(scope, shutdown(queue))), tap((queue) => forkIn(provide$1(f(queue), scope), scope)));
+}).pipe(tap((queue) => addFinalizer(scope, shutdown(queue))), tap((queue) => forkIn(provide$3(f(queue), scope), scope)));
 /**
 * Creates a `Channel` that interacts with a callback function using a queue, emitting arrays.
 *
@@ -11099,7 +11484,7 @@ const unwrap$2 = (channel) => fromTransform$1((upstream, scope) => {
 	let pull;
 	return succeed(suspend$2(() => {
 		if (pull) return pull;
-		return channel.pipe(provide$1(scope), flatMap((channel) => toTransform(channel)(upstream, scope)), flatMap((pull_) => pull = pull_));
+		return channel.pipe(provide$3(scope), flatMap((channel) => toTransform(channel)(upstream, scope)), flatMap((pull_) => pull = pull_));
 	}));
 });
 const runWith = (self, f, onHalt) => suspend$2(() => {
@@ -11130,7 +11515,7 @@ const runWith = (self, f, onHalt) => suspend$2(() => {
 * @category execution
 * @since 4.0.0
 */
-const runFold = /* @__PURE__ */ dual(3, (self, initial, f) => suspend$2(() => {
+const runFold$1 = /* @__PURE__ */ dual(3, (self, initial, f) => suspend$2(() => {
 	let state = initial();
 	return runWith(self, (pull) => whileLoop({
 		while: constTrue,
@@ -12101,10 +12486,38 @@ const run = /* @__PURE__ */ dual(2, (self, sink) => scopedWith((scope) => toPull
 * @category destructors
 * @since 2.0.0
 */
-const runCollect = (self) => runFold(self.channel, () => [], (acc, chunk) => {
+const runCollect = (self) => runFold$1(self.channel, () => [], (acc, chunk) => {
 	for (let i = 0; i < chunk.length; i++) acc.push(chunk[i]);
 	return acc;
 });
+/**
+* Runs the stream and folds elements using a pure reducer.
+*
+* **Example** (Folding stream values)
+*
+* ```ts
+* import { Console, Effect, Stream } from "effect"
+*
+* const program = Effect.gen(function*() {
+*   const total = yield* Stream.runFold(
+*     Stream.make(1, 2, 3),
+*     () => 0,
+*     (acc, n) => acc + n
+*   )
+*   yield* Console.log(total)
+* })
+*
+* Effect.runPromise(program)
+* // 6
+* ```
+*
+* @category destructors
+* @since 2.0.0
+*/
+const runFold = /* @__PURE__ */ dual(3, (self, initial, f) => runFold$1(self.channel, initial, (acc, arr) => {
+	for (let i = 0; i < arr.length; i++) acc = f(acc, arr[i]);
+	return acc;
+}));
 /**
 * Concatenates all emitted strings into a single string.
 *
@@ -12126,7 +12539,7 @@ const runCollect = (self) => runFold(self.channel, () => [], (acc, chunk) => {
 * @category destructors
 * @since 2.0.0
 */
-const mkString = (self) => runFold(self.channel, () => "", (acc, chunk) => acc + chunk.join(""));
+const mkString = (self) => runFold$1(self.channel, () => "", (acc, chunk) => acc + chunk.join(""));
 //#endregion
 //#region ../../node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/dist/FileSystem.js
 /**
@@ -12315,7 +12728,7 @@ const make$3 = (impl) => FileSystem.of({
 		return fromPull(succeed(flatMap(suspend$2(() => {
 			if (bytesToRead !== void 0 && bytesToRead <= totalBytesRead) return done$1();
 			return bytesToRead !== void 0 && bytesToRead - totalBytesRead < chunkSize ? file.readAlloc(bytesToRead - totalBytesRead) : readChunk;
-		}), match$1({
+		}), match$3({
 			onNone: () => done$1(),
 			onSome: (buf) => {
 				totalBytesRead += BigInt(buf.length);
@@ -12561,6 +12974,7 @@ join(OVERDECK_HOME, "certs");
 join(CONFIG_DIR, "config.toml");
 join(CONFIG_DIR, "settings.json");
 const CLAUDE_DIR = join(homedir(), ".claude");
+join(homedir(), ".agents", "skills");
 join(homedir(), ".codex"), join(homedir(), ".cursor"), join(homedir(), ".gemini"), join(homedir(), ".opencode");
 join(CLAUDE_DIR, "skills"), join(CLAUDE_DIR, "commands"), join(CLAUDE_DIR, "agents");
 join(join(OVERDECK_HOME, "templates"), "claude-md", "sections");
@@ -12589,7 +13003,7 @@ const packageRoot = resolvePackageRootForDir(currentDir);
 * nothing in the repo layout signalled which dirs were sync sources.
 */
 const SYNC_SOURCES_ROOT = join(packageRoot, "sync-sources");
-join(SYNC_SOURCES_ROOT, "skills"), join(SYNC_SOURCES_ROOT, "dev-skills"), join(SYNC_SOURCES_ROOT, "agents"), join(SYNC_SOURCES_ROOT, "rules"), join(SYNC_SOURCES_ROOT, "hooks"), join(SYNC_SOURCES_ROOT, "hooks", "git-hooks"), join(SYNC_SOURCES_ROOT, "templates"), join(SYNC_SOURCES_ROOT, "templates", "traefik"), join(SYNC_SOURCES_ROOT, "templates", "claude-md", "sections");
+join(SYNC_SOURCES_ROOT, "skills"), join(SYNC_SOURCES_ROOT, "dev-skills"), join(SYNC_SOURCES_ROOT, "agents"), join(SYNC_SOURCES_ROOT, "rules"), join(SYNC_SOURCES_ROOT, "hooks"), join(SYNC_SOURCES_ROOT, "hooks", "git-hooks"), join(SYNC_SOURCES_ROOT, "templates"), join(SYNC_SOURCES_ROOT, "plugins.json"), join(SYNC_SOURCES_ROOT, "templates", "traefik"), join(SYNC_SOURCES_ROOT, "templates", "claude-md", "sections");
 join(OVERDECK_HOME, "agent-definitions");
 join(OVERDECK_HOME, "rules");
 join(OVERDECK_HOME, ".manifest.json");
@@ -12605,7 +13019,8 @@ TaggedError("VcsError");
 TaggedError("VcsTimeoutError");
 TaggedError("FsError");
 TaggedError("FsNotFoundError");
-TaggedError("GitError");
+/** A git command exited with a non-zero code. */
+var GitError = class extends TaggedError("GitError") {};
 TaggedError("MergeConflictError");
 /** A tmux command failed. */
 var TmuxError = class extends TaggedError("TmuxError") {};
@@ -12650,6 +13065,16 @@ const DEFAULT_PRICING = [
 		cacheReadPer1k: 5e-4,
 		cacheWrite5mPer1k: .00625,
 		cacheWrite1hPer1k: .01,
+		currency: "USD"
+	},
+	{
+		provider: "anthropic",
+		model: "claude-sonnet-5",
+		inputPer1k: .002,
+		outputPer1k: .01,
+		cacheReadPer1k: 2e-4,
+		cacheWrite5mPer1k: .0025,
+		cacheWrite1hPer1k: .004,
 		currency: "USD"
 	},
 	{
@@ -12724,6 +13149,30 @@ const DEFAULT_PRICING = [
 	},
 	{
 		provider: "openai",
+		model: "gpt-5.6-sol",
+		inputPer1k: .005,
+		outputPer1k: .03,
+		cacheReadPer1k: 5e-4,
+		currency: "USD"
+	},
+	{
+		provider: "openai",
+		model: "gpt-5.6-terra",
+		inputPer1k: .0025,
+		outputPer1k: .015,
+		cacheReadPer1k: 25e-5,
+		currency: "USD"
+	},
+	{
+		provider: "openai",
+		model: "gpt-5.6-luna",
+		inputPer1k: .001,
+		outputPer1k: .006,
+		cacheReadPer1k: 1e-4,
+		currency: "USD"
+	},
+	{
+		provider: "openai",
 		model: "gpt-5.5",
 		inputPer1k: .005,
 		outputPer1k: .03,
@@ -12758,6 +13207,14 @@ const DEFAULT_PRICING = [
 		model: "gpt-5.4-pro",
 		inputPer1k: .03,
 		outputPer1k: .18,
+		currency: "USD"
+	},
+	{
+		provider: "openai",
+		model: "gpt-4.1-nano",
+		inputPer1k: 1e-4,
+		outputPer1k: 4e-4,
+		cacheReadPer1k: 25e-6,
 		currency: "USD"
 	},
 	{
@@ -12888,6 +13345,45 @@ const DEFAULT_PRICING = [
 		inputPer1k: 3e-4,
 		outputPer1k: .0012,
 		currency: "USD"
+	},
+	{
+		provider: "custom",
+		model: "glm-5.2",
+		inputPer1k: .0014,
+		outputPer1k: .0044,
+		cacheReadPer1k: 1e-4,
+		currency: "USD"
+	},
+	{
+		provider: "custom",
+		model: "glm-5.1",
+		inputPer1k: .0014,
+		outputPer1k: .0044,
+		cacheReadPer1k: 1e-4,
+		currency: "USD"
+	},
+	{
+		provider: "custom",
+		model: "glm-4.7",
+		inputPer1k: 5e-4,
+		outputPer1k: .002,
+		cacheReadPer1k: 5e-5,
+		currency: "USD"
+	},
+	{
+		provider: "custom",
+		model: "glm-4.7-flash",
+		inputPer1k: 1e-4,
+		outputPer1k: 5e-4,
+		currency: "USD"
+	},
+	{
+		provider: "custom",
+		model: "kimi-k2.7-code",
+		inputPer1k: 95e-5,
+		outputPer1k: .004,
+		cacheReadPer1k: 19e-5,
+		currency: "USD"
 	}
 ];
 /**
@@ -12898,7 +13394,7 @@ function calculateCostSync(usage, pricing) {
 	let inputMultiplier = 1;
 	let outputMultiplier = 1;
 	const totalInputTokens = usage.inputTokens + (usage.cacheReadTokens || 0) + (usage.cacheWriteTokens || 0);
-	if ((pricing.model === "claude-sonnet-4" || pricing.model === "claude-sonnet-4-6") && totalInputTokens > 2e5) {
+	if (pricing.model === "claude-sonnet-4" && totalInputTokens > 2e5) {
 		inputMultiplier = 2;
 		outputMultiplier = 1.5;
 	}
@@ -18334,7 +18830,7 @@ const makeTempFileFactory = (method) => {
 		const directory = yield* makeDirectory(options);
 		const random = Crypto.randomBytes(6).toString("hex");
 		const name = Path.join(directory, options?.suffix ? `${random}${options.suffix}` : random);
-		yield* writeFile$1(name, new Uint8Array(0));
+		yield* writeFile$2(name, new Uint8Array(0));
 		return name;
 	});
 };
@@ -18441,7 +18937,7 @@ const watchNode = (path) => callback((queue) => acquireRelease(sync(() => {
 	return watcher;
 }), (watcher) => sync(() => watcher.close())));
 const watch = (backend, path) => stat$1(path).pipe(map$3((stat) => backend.pipe(flatMap$2((_) => _.register(path, stat)), getOrElse$1(() => watchNode(path)))), unwrap);
-const writeFile$1 = (path, data, options) => callback$1((resume, signal) => {
+const writeFile$2 = (path, data, options) => callback$1((resume, signal) => {
 	try {
 		NFS.writeFile(path, data, {
 			signal,
@@ -18481,7 +18977,7 @@ const makeFileSystem = /* @__PURE__ */ map$3(/* @__PURE__ */ serviceOption(Watch
 	watch(path) {
 		return watch(backend, path);
 	},
-	writeFile: writeFile$1
+	writeFile: writeFile$2
 }));
 //#endregion
 //#region ../../node_modules/.bun/@effect+platform-node@4.0.0-beta.73/node_modules/@effect/platform-node/dist/NodeFileSystem.js
@@ -18611,8 +19107,6 @@ const layer = /* @__PURE__ */ succeed$1(Path$1)({
 	fromFileUrl,
 	toFileUrl
 });
-layer$4.pipe(provide(mergeAll(layer$2, layer)));
-Promise.resolve();
 //#endregion
 //#region ../../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/nodes/identity.js
 var require_identity = /* @__PURE__ */ __commonJSMin(((exports) => {
@@ -25313,6 +25807,49 @@ function listProjectsSync() {
 		config: projectConfig
 	}));
 }
+/**
+* Find project by workspace path.
+* Matches any project whose root path is an ancestor of the given path.
+* Used to resolve the tracker (GitHub/GitLab) from a workspace directory.
+*/
+function findProjectByPathSync(workspacePath) {
+	const config = loadProjectsConfigSync();
+	const normalizedTarget = resolve(workspacePath);
+	for (const [, projectConfig] of Object.entries(config.projects)) {
+		const normalizedProject = resolve(projectConfig.path);
+		if (normalizedTarget === normalizedProject || normalizedTarget.startsWith(normalizedProject + "/")) return projectConfig;
+	}
+	return null;
+}
+/**
+* Resolve the correct project path for an issue based on labels
+*
+* @param project - The project config
+* @param labels - Array of label names from the Linear issue
+* @returns The resolved path (may differ from project.path based on routing rules)
+*/
+/**
+* PAN-1908: resolve the infra-repo checkout path and records subdir for a project.
+*
+* - monorepo / missing pan_records: repoPath = project.path, recordsPath = .pan
+* - polyrepo with pan_records.repo: look up named repo in workspace.repos[]
+* - pan_records.repo = ".": repoPath = project.path
+*/
+function resolveInfraRepo(project) {
+	const recordsPath = project.pan_records?.path ?? ".pan";
+	const repoName = project.pan_records?.repo;
+	if (!repoName || repoName === ".") return {
+		repoPath: project.path,
+		recordsPath
+	};
+	const repos = project.workspace?.repos ?? [];
+	const matching = repos.find((r) => r.name === repoName);
+	if (!matching) throw new Error(`Project pan_records.repo "${repoName}" not found in workspace.repos. Available repos: ${repos.map((r) => r.name).join(", ") || "none"}`);
+	return {
+		repoPath: resolve(project.path, matching.path),
+		recordsPath
+	};
+}
 function resolveProjectPath(project, labels = []) {
 	if (!project.issue_routing || project.issue_routing.length === 0) return project.path;
 	const normalizedLabels = labels.map((l) => l.toLowerCase());
@@ -25367,6 +25904,605 @@ function resolveProjectFromIssueSync(issueId, labels = []) {
 	}
 	return null;
 }
+//#endregion
+//#region ../../src/lib/project-key.ts
+/**
+* Resolve the state-worktree key for a project (PAN-2372).
+*
+* An explicitly passed key wins; otherwise the registered projects.yaml key for
+* this path; otherwise the path basename as a fallback for unregistered
+* projects. This is the single source of truth for the registered-key lookup —
+* reused by both the async state-home door (`state-home.ts`) and the sync read
+* door (`resolveStateReadHomeSync` in `state-read-home.ts`) so they cannot
+* disagree on which state worktree a project lives in.
+*
+* It lives in its own module (rather than `state-home.ts`) so that importing it
+* from the lightweight sync-read door does not transitively pull
+* `child_process` / `state-plane` via the heavier `state-home` module — that
+* coupling previously broke tests that partially mock `child_process`. It
+* imports {@link listProjectsSync} from `projects.js`, so a `vi.mock` of
+* `projects.js` still steers the registry.
+*/
+function projectKey(project, explicit) {
+	if (explicit) return explicit;
+	const projectPath = resolve$1(project.path);
+	return (listProjectsSync() ?? []).find(({ config }) => resolve$1(config.path) === projectPath)?.key ?? basename(projectPath);
+}
+//#endregion
+//#region ../../src/lib/state-read-home.ts
+const STATE_BRANCH = "overdeck-state";
+function validMarker(value) {
+	if (!value || typeof value !== "object") return false;
+	const marker = value;
+	return typeof marker.sourceMainSha === "string" && /^[0-9a-f]{40}$/i.test(marker.sourceMainSha) && typeof marker.stateBranchSha === "string" && /^[0-9a-f]{40}$/i.test(marker.stateBranchSha) && typeof marker.completedAt === "string" && Number.isFinite(Date.parse(marker.completedAt)) && Number.isInteger(marker.version) && Number(marker.version) >= 1;
+}
+function resolveStateReadHomeSync(project, projectKey$1) {
+	const root = join$1(getOverdeckHome(), "state", projectKey(project, projectKey$1));
+	try {
+		if (validMarker(JSON.parse(readFileSync$1(join$1(root, "migration-complete.json"), "utf8")))) return {
+			root,
+			migrated: true
+		};
+	} catch {}
+	try {
+		return {
+			root: resolveInfraRepo(project).repoPath,
+			migrated: false
+		};
+	} catch {
+		return {
+			root: project.path,
+			migrated: false
+		};
+	}
+}
+//#endregion
+//#region ../../src/lib/state-migration-lock.ts
+function stateMigrationLockPath(projectKey) {
+	return join$1(getOverdeckHome(), "locks", "state-migration", `${projectKey}.lock`);
+}
+function isStateMigrationLocked(projectKey) {
+	const path = stateMigrationLockPath(projectKey);
+	mkdirSync$1(dirname$1(path), { recursive: true });
+	try {
+		closeSync$1(openSync$1(path, "wx"));
+		rmSync(path);
+		return false;
+	} catch {
+		return true;
+	}
+}
+//#endregion
+//#region ../../src/lib/state-plane.ts
+const execFileAsync$1 = promisify(execFile$1);
+const STATE_PLANE_PATHS = [
+	".pan/records/",
+	".pan/continues/",
+	".pan/continue.json",
+	".pan/specs/",
+	".pan/test/",
+	".pan/review/",
+	".pan/feedback/",
+	".tasks/"
+];
+function isStatePlanePath(relativePath) {
+	const normalized = relativePath.trim().replace(/\\/g, "/");
+	return STATE_PLANE_PATHS.some((statePath) => {
+		if (statePath.endsWith("/")) return normalized === statePath.slice(0, -1) || normalized.startsWith(statePath);
+		return normalized === statePath;
+	});
+}
+async function isStatePlaneOnlyDiff(baseSha, tipSha, repoRoot) {
+	const { stdout } = await execFileAsync$1("git", [
+		"diff",
+		"--name-only",
+		baseSha,
+		tipSha
+	], {
+		cwd: repoRoot,
+		encoding: "utf-8"
+	});
+	return stdout.split("\n").map((line) => line.trim()).filter(Boolean).every(isStatePlanePath);
+}
+//#endregion
+//#region ../../src/lib/pan-dir/auto-commit.ts
+/**
+* Auto-commit helper for operational state files (.pan/, .beads/).
+*
+* Background: planning and work agents continuously write to .pan/continues/,
+* .pan/specs/, .pan/drafts/, and .beads/issues.jsonl on the project root.
+* Without this helper those writes accumulate uncommitted on `main`, requiring
+* periodic manual "chore: sync workspace state" passes from the operator and
+* making the project repo stay perpetually dirty.
+*
+* This module exposes a serialized write-through commit primitive that pan-dir
+* writers call after they update a file. Commits are:
+*   - scheduled on the next event-loop turn so every state update reaches git + origin
+*   - serialized within a process so the git index is never contested
+*   - best-effort for synchronous callers: failures are logged and reported by flushes
+*   - main-only: feature branches have their own commit cadence owned by agents
+*
+* Cross-machine concern: when an agent's state is canonical on `main`, moving
+* the agent between machines becomes "stop on A, pull on B, resume on B." The
+* sync-state-via-commit shape this helper produces is the substrate for that.
+*/
+const spawnerLayer = layer$4.pipe(provide$2(mergeAll(layer$2, layer)));
+const DEFAULT_STATE_GIT_TIMEOUT_MS = 3e4;
+const DEFAULT_STATE_PUSH_TIMEOUT_MS = 3e4;
+const DEFAULT_STATE_FLUSH_TIMEOUT_MS = 6e4;
+function parsePositiveInteger(value, fallback) {
+	if (!value) return fallback;
+	const parsed = Number(value);
+	if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
+	return parsed;
+}
+/**
+* Paths that must never enter a pipeline auto-commit, regardless of gitignore
+* state. Mirrors the exclusion list in src/lib/cloister/merge-agent.ts.
+*/
+const AUTO_COMMIT_EXCLUDED_PATHS = [
+	".pan/kickoff.md",
+	".pan/continue.json",
+	".pan/handoff-*.md",
+	".pan/spec.vbrief.json",
+	".claude/rules/",
+	".claude/skills/"
+];
+function isAutoCommitExcludedPath(relativePath) {
+	const normalized = relativePath.replace(/\\/g, "/");
+	for (const pattern of AUTO_COMMIT_EXCLUDED_PATHS) if (pattern.endsWith("/")) {
+		if (normalized.startsWith(pattern) || normalized === pattern.slice(0, -1)) return true;
+	} else if (pattern.includes("*")) {
+		if (new RegExp("^" + pattern.replace(/\./g, "\\.").replace(/\*/g, "[^/]*") + "$").test(normalized)) return true;
+	} else if (normalized === pattern) return true;
+	return false;
+}
+const pending = /* @__PURE__ */ new Map();
+const active = /* @__PURE__ */ new Map();
+const serializers = /* @__PURE__ */ new Map();
+/** Run a git subcommand. Fails with GitError on non-zero exit. */
+function runGitRaw(args, cwd) {
+	return gen(function* () {
+		const handle = yield* make$1("git", [...args], {
+			cwd,
+			env: { HUSKY: "0" },
+			extendEnv: true
+		});
+		const stdoutBuf = yield* runFold(handle.stdout, () => Buffer.alloc(0), (acc, chunk) => Buffer.concat([acc, Buffer.from(chunk)]));
+		const stderrBuf = yield* runFold(handle.stderr, () => Buffer.alloc(0), (acc, chunk) => Buffer.concat([acc, Buffer.from(chunk)]));
+		const exitCode = yield* handle.exitCode;
+		if (exitCode !== 0) return yield* fail(new GitError({
+			command: ["git", ...args],
+			stderr: stderrBuf.toString("utf-8"),
+			exitCode
+		}));
+		return {
+			stdout: stdoutBuf.toString("utf-8"),
+			stderr: stderrBuf.toString("utf-8"),
+			exitCode
+		};
+	}).pipe(scoped, provide(spawnerLayer));
+}
+function runGit(args, cwd) {
+	return runGitWithTimeout(args, cwd, parsePositiveInteger(process.env.OVERDECK_STATE_GIT_TIMEOUT_MS, DEFAULT_STATE_GIT_TIMEOUT_MS));
+}
+function runGitWithTimeout(args, cwd, timeoutMs) {
+	return runGitRaw(args, cwd).pipe(timeout(millis(timeoutMs)), catchCause((cause) => fail(causeToGitError(cause, args))));
+}
+function causeToGitError(cause, args) {
+	const squashed = squash(cause);
+	if (isGitError(squashed)) return squashed;
+	return new GitError({
+		command: ["git", ...args],
+		stderr: String(squashed),
+		exitCode: -1,
+		cause
+	});
+}
+function isGitError(value) {
+	return typeof value === "object" && value !== null && "_tag" in value && value._tag === "GitError";
+}
+/**
+* Queue an auto-commit for one or more files. Returns immediately; the
+* serialized commit-and-push starts on the next timer turn. Callers whose
+* success depends on remote durability must also await flushAutoCommits().
+*
+* PAN-1908: `repoRoot` allows committing files to a different git checkout
+* than the project root (e.g., a declared infra repo for per-issue permanent
+* records). When omitted, commits go to `projectRoot` as before.
+*/
+function queueAutoCommit(opts) {
+	const { projectRoot, paths, subject } = opts;
+	let { repoRoot } = opts;
+	if (paths.length === 0) return;
+	let expectedBranch = "main";
+	if (repoRoot && existsSync(join(repoRoot, "migration-complete.json"))) expectedBranch = STATE_BRANCH;
+	const project = findProjectByPathSync(projectRoot);
+	if (project) {
+		const key = listProjectsSync().find(({ config }) => config.path === project.path)?.key;
+		if (key && isStateMigrationLocked(key)) {
+			console.warn(`[pan-dir/auto-commit] refusing state write while migration lock is held for ${key}`);
+			return;
+		}
+		const stateHome = resolveStateReadHomeSync(project);
+		if (stateHome.migrated) {
+			repoRoot = stateHome.root;
+			expectedBranch = STATE_BRANCH;
+		}
+	}
+	const existing = pending.get(projectRoot);
+	if (existing) {
+		paths.forEach((p) => existing.paths.add(p));
+		existing.subjects.push(subject);
+		existing.repoRoot ??= repoRoot;
+		if (expectedBranch === "overdeck-state") existing.expectedBranch = STATE_BRANCH;
+		return;
+	}
+	pending.set(projectRoot, {
+		paths: new Set(paths),
+		subjects: [subject],
+		timer: setTimeout(() => void flushInner(projectRoot), 0),
+		repoRoot,
+		expectedBranch
+	});
+}
+/**
+* Force a flush of every pending or active commit that targets the same Git
+* checkout as `projectRoot`. Callers may pass either a logical project root or
+* the effective Git root; the Effect resolves only after every matching writer
+* has settled.
+*/
+function flushAutoCommits(projectRoot, signal) {
+	return promise(() => flushPromise(projectRoot, signal));
+}
+function flushPromise(projectRoot, signal) {
+	const gitRoot = pending.get(projectRoot)?.repoRoot ?? active.get(projectRoot)?.gitRoot ?? projectRoot;
+	const matching = /* @__PURE__ */ new Set();
+	for (const [queuedProjectRoot, batch] of pending) {
+		if ((batch.repoRoot ?? queuedProjectRoot) !== gitRoot) continue;
+		clearTimeout(batch.timer);
+		const started = flushInner(queuedProjectRoot);
+		if (started) matching.add(started);
+	}
+	for (const activeFlush of active.values()) if (activeFlush.gitRoot === gitRoot) matching.add(activeFlush);
+	if (matching.size === 0) {
+		signal?.throwIfAborted();
+		return Promise.resolve({
+			committed: false,
+			reason: "no pending"
+		});
+	}
+	return waitForFlushes(gitRoot, [...matching], signal);
+}
+function flushInner(projectRoot) {
+	const batch = pending.get(projectRoot);
+	if (!batch) return active.get(projectRoot);
+	pending.delete(projectRoot);
+	return startSerializedFlush(projectRoot, batch.repoRoot ?? projectRoot, doBoundedCommit(projectRoot, batch));
+}
+function startSerializedFlush(projectRoot, gitRoot, operation) {
+	const prior = serializers.get(gitRoot) ?? Promise.resolve();
+	const controller = new AbortController();
+	const promise = prior.then(() => {
+		controller.signal.throwIfAborted();
+		return runPromise(operation, { signal: controller.signal });
+	});
+	const activeFlush = {
+		controller,
+		gitRoot,
+		promise
+	};
+	active.set(projectRoot, activeFlush);
+	const tail = promise.catch(() => void 0);
+	serializers.set(gitRoot, tail);
+	promise.then(() => clearActiveFlush(projectRoot, activeFlush, tail), () => clearActiveFlush(projectRoot, activeFlush, tail));
+	return activeFlush;
+}
+async function waitForFlushes(gitRoot, activeFlushes, signal) {
+	const completion = Promise.all(activeFlushes.map((flush) => flush.promise)).then(combineFlushResults);
+	if (!signal) return completion;
+	if (signal.aborted) {
+		await abortAndSettleGitRoot(gitRoot, signal.reason);
+		throw signal.reason;
+	}
+	return new Promise((resolve, reject) => {
+		let completed = false;
+		const onAbort = () => {
+			if (completed) return;
+			completed = true;
+			signal.removeEventListener("abort", onAbort);
+			abortAndSettleGitRoot(gitRoot, signal.reason).then(() => reject(signal.reason), reject);
+		};
+		signal.addEventListener("abort", onAbort, { once: true });
+		completion.then((result) => {
+			if (completed) return;
+			completed = true;
+			signal.removeEventListener("abort", onAbort);
+			resolve(result);
+		}, (error) => {
+			if (completed) return;
+			completed = true;
+			signal.removeEventListener("abort", onAbort);
+			reject(error);
+		});
+		if (signal.aborted) onAbort();
+	});
+}
+function combineFlushResults(results) {
+	if (results.length === 1) return results[0];
+	const combined = { committed: results.some((result) => result.committed) };
+	const committed = results.filter((result) => result.committed);
+	if (committed.some((result) => result.pushed === false)) combined.pushed = false;
+	else if (committed.length > 0 && committed.every((result) => result.pushed === true)) combined.pushed = true;
+	if (results.some((result) => result.errored)) combined.errored = true;
+	const reasons = results.flatMap((result) => result.reason ? [result.reason] : []);
+	if (reasons.length > 0) combined.reason = reasons.join("; ");
+	return combined;
+}
+async function abortAndSettleGitRoot(gitRoot, reason) {
+	const matching = [...active.values()].filter((flush) => flush.gitRoot === gitRoot);
+	for (const flush of matching) flush.controller.abort(reason);
+	await Promise.allSettled(matching.map((flush) => flush.promise));
+}
+function clearActiveFlush(projectRoot, activeFlush, tail) {
+	if (active.get(projectRoot) === activeFlush) active.delete(projectRoot);
+	if (serializers.get(activeFlush.gitRoot) === tail) serializers.delete(activeFlush.gitRoot);
+}
+function doBoundedCommit(projectRoot, batch) {
+	return boundStateFlush(doCommit(projectRoot, batch));
+}
+function boundStateFlush(operation, timeoutMs = parsePositiveInteger(process.env.OVERDECK_STATE_FLUSH_TIMEOUT_MS, DEFAULT_STATE_FLUSH_TIMEOUT_MS)) {
+	return operation.pipe(timeout(millis(timeoutMs)), catchCause((cause) => {
+		const reason = `state writer timed out after ${timeoutMs / 1e3}s: ${String(squash(cause))}`;
+		console.warn(`[pan-dir/auto-commit] ${reason}`);
+		return succeed({
+			committed: false,
+			errored: true,
+			reason
+		});
+	}));
+}
+function doCommit(projectRoot, batch) {
+	const gitRoot = batch.repoRoot ?? projectRoot;
+	return gen(function* () {
+		if (!existsSync(join(gitRoot, ".git"))) {
+			if (batch.expectedBranch === "overdeck-state") {
+				console.warn(`[pan-dir/auto-commit] refusing state write: state worktree is missing at ${gitRoot}`);
+				return {
+					committed: false,
+					reason: `state worktree missing: ${gitRoot}`
+				};
+			}
+			return {
+				committed: false,
+				reason: "not a git repo"
+			};
+		}
+		const branchResult = yield* runGit([
+			"rev-parse",
+			"--abbrev-ref",
+			"HEAD"
+		], gitRoot).pipe(matchEffect({
+			onSuccess: (r) => succeed(r.stdout.trim()),
+			onFailure: (err) => succeed({
+				committed: false,
+				errored: true,
+				reason: `branch check failed: ${err.stderr || err._tag}`
+			})
+		}));
+		if (typeof branchResult !== "string") return branchResult;
+		const expectedBranch = batch.expectedBranch;
+		if (branchResult !== expectedBranch) return {
+			committed: false,
+			reason: expectedBranch === "main" ? `not on main (${branchResult})` : `expected ${expectedBranch}, found ${branchResult}`
+		};
+		const branch = branchResult;
+		yield* runGit([
+			"fetch",
+			"origin",
+			expectedBranch
+		], gitRoot).pipe(matchEffect({
+			onSuccess: () => void_,
+			onFailure: () => void_
+		}));
+		const relativePaths = Array.from(batch.paths).map((p) => relativizeToRoot(p, gitRoot)).filter((p) => !isAutoCommitExcludedPath(p));
+		if (relativePaths.length === 0) return {
+			committed: false,
+			reason: "all paths excluded from auto-commit"
+		};
+		const addOk = yield* runGit([
+			"add",
+			"--",
+			...relativePaths
+		], gitRoot).pipe(matchEffect({
+			onSuccess: () => succeed(true),
+			onFailure: (err) => {
+				console.warn(`[pan-dir/auto-commit] failed for ${branch}: ${err.stderr || err._tag}`);
+				return succeed({
+					committed: false,
+					errored: true,
+					reason: err.stderr || err._tag
+				});
+			}
+		}));
+		if (typeof addOk !== "boolean") return addOk;
+		if (yield* runGit([
+			"diff",
+			"--cached",
+			"--quiet",
+			"--",
+			...relativePaths
+		], gitRoot).pipe(matchEffect({
+			onSuccess: () => succeed(true),
+			onFailure: () => succeed(false)
+		}))) return {
+			committed: false,
+			reason: "no diff"
+		};
+		const commitOk = yield* runGit([
+			"commit",
+			"-m",
+			batch.subjects.length === 1 ? batch.subjects[0] : `chore(state): batch update ${relativePaths.length} pan/beads file(s)`,
+			"--",
+			...relativePaths
+		], gitRoot).pipe(matchEffect({
+			onSuccess: () => succeed(true),
+			onFailure: (err) => {
+				console.warn(`[pan-dir/auto-commit] failed for ${branch}: ${err.stderr || err._tag}`);
+				return succeed({
+					committed: false,
+					errored: true,
+					reason: err.stderr || err._tag
+				});
+			}
+		}));
+		if (typeof commitOk !== "boolean") return commitOk;
+		const push = yield* maybePushStateCommit(gitRoot, branch);
+		if (push && !push.pushed) return {
+			committed: true,
+			pushed: false,
+			reason: push.reason
+		};
+		return {
+			committed: true,
+			pushed: push?.pushed
+		};
+	});
+}
+function maybePushStateCommit(gitRoot, branch) {
+	return runGit([
+		"remote",
+		"get-url",
+		"origin"
+	], gitRoot).pipe(matchEffect({
+		onFailure: () => succeed(null),
+		onSuccess: () => pushStateBranch(gitRoot, branch)
+	}));
+}
+function pushStateBranch(gitRoot, branch) {
+	if (branch === "main") return pushOriginMain(gitRoot, branch, false);
+	const timeoutMs = parsePositiveInteger(process.env.OVERDECK_STATE_PUSH_TIMEOUT_MS, DEFAULT_STATE_PUSH_TIMEOUT_MS);
+	return runGitWithTimeout([
+		"push",
+		"origin",
+		branch
+	], gitRoot, timeoutMs).pipe(matchEffect({
+		onSuccess: () => succeed({ pushed: true }),
+		onFailure: (err) => {
+			const message = err.stderr || err._tag;
+			warnAutoPush(branch, `push failed: ${message}`);
+			return succeed({
+				pushed: false,
+				reason: `push failed: ${message}`
+			});
+		}
+	}));
+}
+function pushOriginMain(gitRoot, branch, retry) {
+	return runGitWithTimeout([
+		"push",
+		"origin",
+		"main"
+	], gitRoot, parsePositiveInteger(process.env.OVERDECK_STATE_PUSH_TIMEOUT_MS, DEFAULT_STATE_PUSH_TIMEOUT_MS)).pipe(matchEffect({
+		onSuccess: () => succeed({ pushed: true }),
+		onFailure: (err) => {
+			const message = err.stderr || err._tag;
+			if (!retry && isNonFastForwardPushError(message)) return rebaseLegacyMainAndRetry(gitRoot, branch);
+			warnAutoPush(branch, `push failed: ${message}`);
+			return succeed({
+				pushed: false,
+				reason: `push failed: ${message}`
+			});
+		}
+	}));
+}
+function rebaseLegacyMainAndRetry(gitRoot, branch) {
+	const timeoutMs = parsePositiveInteger(process.env.OVERDECK_STATE_PUSH_TIMEOUT_MS, DEFAULT_STATE_PUSH_TIMEOUT_MS);
+	return gen(function* () {
+		if (!(yield* runGitWithTimeout([
+			"fetch",
+			"origin",
+			"main"
+		], gitRoot, timeoutMs).pipe(match({
+			onSuccess: () => true,
+			onFailure: () => false
+		}))) || !(yield* isWorkingTreeClean(gitRoot, branch))) return {
+			pushed: false,
+			reason: "push rejected and reconciliation preconditions failed"
+		};
+		if (!(yield* areLocalAheadCommitsStatePlaneOnly(gitRoot, branch))) {
+			warnAutoPush(branch, "non-fast-forward push rejected and at least one local-ahead commit is not state-plane-only; leaving local main ahead of origin/main");
+			return {
+				pushed: false,
+				reason: "push rejected with non-state local commits"
+			};
+		}
+		if (yield* runGitWithTimeout(["rebase", "origin/main"], gitRoot, timeoutMs).pipe(match({
+			onSuccess: () => true,
+			onFailure: () => false
+		}))) return yield* pushOriginMain(gitRoot, branch, true);
+		return {
+			pushed: false,
+			reason: "push rejected and state rebase failed"
+		};
+	});
+}
+function areLocalAheadCommitsStatePlaneOnly(gitRoot, branch) {
+	const timeoutMs = parsePositiveInteger(process.env.OVERDECK_STATE_PUSH_TIMEOUT_MS, DEFAULT_STATE_PUSH_TIMEOUT_MS);
+	return gen(function* () {
+		const commits = yield* runGitWithTimeout([
+			"rev-list",
+			"--reverse",
+			"origin/main..main"
+		], gitRoot, timeoutMs).pipe(match({
+			onSuccess: (result) => result.stdout.split("\n").map((line) => line.trim()).filter(Boolean),
+			onFailure: (err) => {
+				warnAutoPush(branch, `local-ahead commit list failed: ${err.stderr || err._tag}`);
+				return null;
+			}
+		}));
+		if (commits === null) return false;
+		for (const commit of commits) {
+			const parent = yield* runGitWithTimeout([
+				"rev-list",
+				"--parents",
+				"-n",
+				"1",
+				commit
+			], gitRoot, timeoutMs).pipe(match({
+				onSuccess: (result) => result.stdout.trim().split(/\s+/)[1] ?? null,
+				onFailure: () => null
+			}));
+			if (!parent) return false;
+			if (!(yield* promise(() => isStatePlaneOnlyDiff(parent, commit, gitRoot)).pipe(catchCause(() => succeed(false))))) return false;
+		}
+		return true;
+	});
+}
+function isWorkingTreeClean(gitRoot, branch) {
+	return runGit(["status", "--porcelain"], gitRoot).pipe(match({
+		onSuccess: (result) => {
+			const clean = result.stdout.trim().length === 0;
+			if (!clean) warnAutoPush(branch, "non-fast-forward push rejected and working tree is dirty; leaving local main ahead of origin/main");
+			return clean;
+		},
+		onFailure: (err) => {
+			warnAutoPush(branch, `working-tree cleanliness check failed: ${err.stderr || err._tag}`);
+			return false;
+		}
+	}));
+}
+function isNonFastForwardPushError(message) {
+	return /non-fast-forward|fetch first|failed to push some refs|rejected/i.test(message);
+}
+function warnAutoPush(branch, message) {
+	console.warn(`[pan-dir/auto-commit] auto-push warning for ${branch}: ${message}`);
+}
+function relativizeToRoot(absOrRel, projectRoot) {
+	const rootPrefix = projectRoot.endsWith(sep) ? projectRoot : projectRoot + sep;
+	if (absOrRel.startsWith(rootPrefix)) return absOrRel.slice(rootPrefix.length);
+	return absOrRel;
+}
 const RECORD_DIRNAME = "records";
 /** Workspace path for an issue, or null if no project is configured. */
 function getIssueWorkspacePath(issueId) {
@@ -25381,26 +26517,109 @@ function getIssueWorkspacePath(issueId) {
 * (used in tests and non-worktree contexts).
 */
 function getIssueRecordPath(project, issueId) {
-	return join$1(getIssueRecordBasePath(project, issueId), ".pan", RECORD_DIRNAME, `${issueId.toLowerCase()}.json`);
+	const stateHome = resolveStateReadHomeSync(project);
+	return join$1(stateHome.migrated ? join$1(stateHome.root, RECORD_DIRNAME) : join$1(getIssueRecordBasePath(project, issueId), ".pan", RECORD_DIRNAME), `${issueId.toLowerCase()}.json`);
 }
 /** Base directory for an issue record: workspace if it exists, else project root. */
 function getIssueRecordBasePath(project, issueId) {
 	const workspacePath = getIssueWorkspacePath(issueId);
 	return workspacePath && existsSync$1(workspacePath) ? workspacePath : project.path;
 }
+/**
+* Synchronous whole-record writer. Keep this call atomic: async
+* read-modify-write flows must take `withIssueRecordLock` before reading and
+* must not split this write behind an await.
+*/
+/**
+* PAN-2466 no-loss guard: callers that fail to read the existing record fall
+* back to a fresh template with an EMPTY closeOut, and writing that template
+* destroys accumulated usage/cost history (observed on six records 2026-07-07).
+* At the write door, if the incoming closeOut carries no data but the on-disk
+* record's does, keep the on-disk closeOut. Genuine closeOut updates (any
+* usage/merges/totals content) always win.
+*/
+function preserveCloseOutSync(path, record) {
+	const incoming = record.closeOut;
+	if (!(!incoming || Object.keys(incoming.usage?.byStage ?? {}).length === 0 && Object.keys(incoming.usage?.totals ?? {}).length === 0 && (incoming.merges ?? []).length === 0 && !incoming.dodGate) || !existsSync$1(path)) return record;
+	try {
+		const disk = JSON.parse(readFileSync$1(path, "utf-8")).closeOut;
+		if (disk && (Object.keys(disk.usage?.byStage ?? {}).length > 0 || Object.keys(disk.usage?.totals ?? {}).length > 0 || (disk.merges ?? []).length > 0 || Boolean(disk.dodGate))) {
+			console.warn(`[record] Preserving populated closeOut for ${record.issueId} — incoming write carried an empty closeOut (PAN-2466 guard)`);
+			return {
+				...record,
+				closeOut: disk
+			};
+		}
+	} catch {}
+	return record;
+}
+/**
+* FR-2 (PAN-2372): before a record write, if the existing file is non-empty and
+* fails JSON.parse, preserve the corrupt bytes as a sidecar rather than
+* silently overwriting them. A truncated/malformed record (the "empty/malformed
+* at char 0" symptom that stranded PAN-2253) used to be quietly replaced by the
+* next write, destroying every accumulated statusOverride. Non-empty + unparseable
+* is the only case sidecarred — an absent or empty file is a normal fresh write.
+*/
+function preserveCorruptRecordSync(path) {
+	let raw;
+	try {
+		raw = readFileSync$1(path, "utf-8");
+	} catch {
+		return;
+	}
+	if (raw.length === 0) return;
+	try {
+		JSON.parse(raw);
+		return;
+	} catch {}
+	const sidecar = `${path}.corrupt-${Date.now()}`;
+	try {
+		renameSync(path, sidecar);
+		console.warn(`[record] Preserved corrupt record at ${sidecar} (existing file failed JSON.parse before write)`);
+	} catch (error) {
+		console.warn(`[record] Could not preserve corrupt record at ${path}: ${error instanceof Error ? error.message : String(error)}`);
+	}
+}
+/**
+* FR-1 (PAN-2372): atomic, verified record write. Writes to a same-directory
+* temp file, atomically renames it into place, then read-back verifies the
+* renamed file parses as JSON. A mid-write crash can no longer truncate the
+* record in place (rename is atomic); a write that somehow produces unparseable
+* bytes throws instead of leaving a corrupt record for readers to silently
+* fabricate over. Modeled on writePlanFileAtomic (src/lib/xbrief/dag-cli.ts:101).
+*/
+function writeRecordFileAtomicSync(path, record) {
+	preserveCorruptRecordSync(path);
+	const tmp = `${path}.${process.pid}.${Date.now()}.tmp`;
+	writeFileSync$1(tmp, JSON.stringify(record, null, 2), "utf-8");
+	const tmpFd = openSync$1(tmp, "r");
+	try {
+		fsyncSync(tmpFd);
+	} finally {
+		closeSync$1(tmpFd);
+	}
+	renameSync(tmp, path);
+	const dirFd = openSync$1(dirname$1(path), "r");
+	try {
+		fsyncSync(dirFd);
+	} finally {
+		closeSync$1(dirFd);
+	}
+	JSON.parse(readFileSync$1(path, "utf-8"));
+}
 function writeIssueRecordSync(project, issueId, record) {
 	const path = getIssueRecordPath(project, issueId);
 	const dir = dirname$1(path);
 	if (!existsSync$1(dir)) mkdirSync$1(dir, { recursive: true });
 	const now = (/* @__PURE__ */ new Date()).toISOString();
-	const next = {
-		...record,
+	writeRecordFileAtomicSync(path, {
+		...preserveCloseOutSync(path, record),
 		issueId: issueId.toUpperCase(),
 		schemaVersion: 2,
 		created: record.created || now,
 		updated: now
-	};
-	writeFileSync$1(path, JSON.stringify(next, null, 2), "utf-8");
+	});
 	return path;
 }
 function readIssueRecordSync(project, issueId) {
@@ -25411,6 +26630,3045 @@ function readIssueRecordSync(project, issueId) {
 	} catch {
 		return null;
 	}
+}
+function queueIssueRecordCommit(project, issueId, recordPath) {
+	const basePath = getIssueRecordBasePath(project, issueId);
+	queueAutoCommit({
+		projectRoot: basePath,
+		repoRoot: basePath,
+		paths: [recordPath],
+		subject: `chore(records): update ${issueId.toUpperCase()} per-issue record`
+	});
+	return basePath;
+}
+/** Synchronous variant of ensureIssueRecord. */
+function ensureIssueRecordSync(project, issueId) {
+	const path = getIssueRecordPath(project, issueId);
+	try {
+		const raw = readFileSync$1(path, "utf-8");
+		return JSON.parse(raw);
+	} catch {
+		const now = (/* @__PURE__ */ new Date()).toISOString();
+		return {
+			issueId: issueId.toUpperCase(),
+			schemaVersion: 2,
+			created: now,
+			updated: now,
+			pipeline: {
+				issueId: issueId.toUpperCase(),
+				reviewStatus: "pending",
+				testStatus: "pending",
+				readyForMerge: false,
+				updatedAt: now
+			},
+			closeOut: {
+				usage: {
+					byStage: {},
+					totals: {}
+				},
+				merges: [],
+				ranOn: hostname()
+			}
+		};
+	}
+}
+//#endregion
+//#region ../../src/lib/pan-dir/fs-lock.ts
+/** Cross-process per-issue record locking (PAN-2648 CD-2). */
+const RECORD_LOCK_RETRY_DELAYS_MS = [
+	5,
+	10,
+	20,
+	40,
+	80,
+	160,
+	320,
+	360
+];
+var RecordLockError = class extends Error {
+	constructor(lockPath, owner) {
+		super(`The per-issue record lock at ${lockPath} is held by ${owner}. Retry the command after that writer finishes.`);
+		this.lockPath = lockPath;
+		this.owner = owner;
+		this.name = "RecordLockError";
+	}
+};
+function safeSegment(value) {
+	return value.trim().toLowerCase().replace(/[^a-z0-9._-]+/g, "-");
+}
+function recordLockPath(project, issueId) {
+	const configuredKey = listProjectsSync().find(({ config }) => config.path === project.path)?.key;
+	const projectKey = safeSegment(configuredKey ?? project.name ?? project.path) || "unknown-project";
+	return join$1(getOverdeckHome(), "locks", "records", projectKey, `${issueId.toUpperCase()}.lock`);
+}
+function isPidDead(pid) {
+	if (!pid || pid <= 0 || pid === process.pid) return false;
+	try {
+		process.kill(pid, 0);
+		return false;
+	} catch (error) {
+		return error.code === "ESRCH";
+	}
+}
+async function sweepRecordTmpFiles(recordPath) {
+	try {
+		const dir = dirname$1(recordPath);
+		const base = recordPath.slice(dir.length + 1);
+		const entries = await readdir(dir);
+		await Promise.all(entries.filter((entry) => entry.startsWith(`${base}.`) && entry.endsWith(".tmp")).map((entry) => rm(join$1(dir, entry), { force: true })));
+	} catch {}
+}
+async function readOwner(lockPath) {
+	try {
+		const owner = JSON.parse(await readFile(join$1(lockPath, "owner.json"), "utf8"));
+		return {
+			description: `${owner.writerId ?? "unknown writer"} pid=${owner.pid ?? "unknown"} acquiredAt=${owner.acquiredAt ?? "unknown"}`,
+			pid: owner.pid
+		};
+	} catch {
+		return { description: "unknown writer" };
+	}
+}
+async function acquireRecordLock(lockPath, options) {
+	await mkdir(dirname$1(lockPath), {
+		recursive: true,
+		mode: 448
+	});
+	const delays = options.retryDelaysMs ?? RECORD_LOCK_RETRY_DELAYS_MS;
+	let lastOwner = "unknown writer";
+	for (let attempt = 0; attempt <= delays.length; attempt += 1) {
+		try {
+			await mkdir(lockPath, { mode: 448 });
+			const owner = {
+				writerId: options.writerId,
+				pid: process.pid,
+				acquiredAt: (/* @__PURE__ */ new Date()).toISOString()
+			};
+			try {
+				await writeFile(join$1(lockPath, "owner.json"), JSON.stringify(owner, null, 2), "utf8");
+			} catch (error) {
+				try {
+					await rm(lockPath, {
+						recursive: true,
+						force: true
+					});
+				} catch {}
+				throw error;
+			}
+			await sweepRecordTmpFiles(options.recordPath);
+			return owner;
+		} catch (error) {
+			if (error.code !== "EEXIST") throw error;
+			const owner = await readOwner(lockPath);
+			lastOwner = owner.description;
+			if (isPidDead(owner.pid)) {
+				await rm(lockPath, {
+					recursive: true,
+					force: true
+				});
+				continue;
+			}
+		}
+		const delay = delays[attempt];
+		if (delay === void 0) break;
+		await new Promise((resolve) => setTimeout(resolve, delay));
+	}
+	throw new RecordLockError(lockPath, lastOwner);
+}
+async function releaseRecordLock(lockPath) {
+	await rm(lockPath, {
+		recursive: true,
+		force: true
+	});
+}
+async function withRecordFsLock(project, issueId, options, operation) {
+	const lockPath = recordLockPath(project, issueId);
+	await acquireRecordLock(lockPath, options);
+	try {
+		return await operation();
+	} finally {
+		await releaseRecordLock(lockPath);
+	}
+}
+//#endregion
+//#region ../../src/lib/pan-dir/record-update.ts
+/** The single locked read-modify-write door for per-issue records. */
+async function updateIssueRecord(project, issueId, mutator, options = {}) {
+	const normalizedIssueId = issueId.toUpperCase();
+	const recordPath = getIssueRecordPath(project, normalizedIssueId);
+	const writerId = options.writerId ?? process.env.OVERDECK_AGENT_ID ?? `process-${process.pid}@${hostname()}`;
+	const commit = { flush: void 0 };
+	const record = await withRecordFsLock(project, normalizedIssueId, {
+		writerId,
+		recordPath
+	}, async () => {
+		const current = readIssueRecordSync(project, normalizedIssueId) ?? ensureIssueRecordSync(project, normalizedIssueId);
+		const next = await mutator(current) ?? current;
+		const path = writeIssueRecordSync(project, normalizedIssueId, next);
+		if (options.autoCommit !== false) commit.flush = runPromise(flushAutoCommits(queueIssueRecordCommit(project, normalizedIssueId, path)));
+		return readIssueRecordSync(project, normalizedIssueId) ?? next;
+	});
+	if (commit.flush) {
+		const flushed = await commit.flush;
+		if (flushed.pushed === false) throw new Error(`Failed to push ${normalizedIssueId} state: ${flushed.reason ?? "unknown push failure"}`);
+		if (!flushed.committed && !["no diff", "no pending"].includes(flushed.reason ?? "")) throw new Error(`Failed to commit ${normalizedIssueId} state: ${flushed.reason ?? "unknown commit failure"}`);
+	}
+	return record;
+}
+//#endregion
+//#region ../../src/lib/config-yaml/schema.ts
+const COMPLIANCE_MODES = [
+	"off",
+	"advisory",
+	"enforcing"
+];
+const PARENT_MODEL_REF = "parent";
+/**
+* Canonical workhorse slot list. Anything outside this set is rejected by
+* config-load validation (PAN-1048 review feedback 003 / REQ-18).
+*/
+const WORKHORSE_SLOTS = [
+	"expensive",
+	"mid",
+	"cheap"
+];
+const ROLE_EFFORTS = [
+	"low",
+	"medium",
+	"high",
+	"xhigh",
+	"max"
+];
+//#endregion
+//#region ../../src/lib/model-capabilities.ts
+/**
+* Model ID deprecation mapping
+*
+* Maps deprecated model IDs to their current replacements.
+* When a model ID changes (e.g., claude-opus-4-5 → claude-opus-4-6),
+* add the mapping here to enable automatic migration.
+*
+* Strategy: Single-hop only. Only add models here when the provider has
+* actually retired them — not just because a newer version exists.
+*/
+const MODEL_DEPRECATIONS = {
+	"claude-opus-4-5": "claude-opus-4-7",
+	"claude-sonnet-4-5": "claude-sonnet-4-6",
+	"gpt-5.2-codex": "gpt-5.3-codex",
+	"gpt-5.5-mini": "gpt-5.4-mini",
+	"gpt-5.5-nano": "gpt-5.4-mini",
+	"gpt-5.4-nano": "gpt-5.4-mini",
+	"gpt-5.5-pro": "gpt-5.5",
+	"gpt-5.4-pro": "gpt-5.4",
+	"o3": "gpt-5.4",
+	"o3-deep-research": "gpt-5.4",
+	"o4-mini": "gpt-5.4-mini",
+	"gpt-4o": "gpt-5.4",
+	"gpt-4o-mini": "gpt-5.4-mini",
+	"gemini-3-pro-preview": "gemini-3.1-pro-preview",
+	"gemini-3-flash": "gemini-3-flash-preview",
+	"gemini-2.5-pro": "gemini-3.1-pro-preview",
+	"gemini-2.5-flash": "gemini-3-flash-preview",
+	"kimi-k2": "kimi-k2.5",
+	"glm-4.7": "glm-5.1",
+	"glm-4.7-flash": "glm-5.1"
+};
+/**
+* Resolve a model ID to its current version
+*
+* If the model ID is deprecated, returns the replacement.
+* Otherwise, returns the model ID unchanged.
+*
+* @param modelId - Model ID to resolve (may be deprecated)
+* @returns Current model ID
+*/
+function resolveModelIdSync(modelId) {
+	return MODEL_DEPRECATIONS[modelId] || modelId;
+}
+/**
+* Conservative effective ceiling for Codex/ChatGPT subscription models routed
+* through CLIProxy into Claude Code. Claude Code's native auto-compact path does
+* not know the proxied model's larger marketing window; the harness status line
+* reports a 200.0k budget for gpt-5.5 sessions, and PAN-1615 observed hard
+* `input exceeds the context window` 400s instead of a native pre-ceiling
+* compaction. See the context-overflow recovery note in
+* `src/lib/cloister/deacon.ts` for why the deacon owns this recovery path.
+*
+* PAN-1672: 200k is gpt-5.5's *marketing* window, not its effective one via
+* CLIProxy — the backend 400s with `input exceeds the context window` well
+* before 85% of 200k (≈170k) is reached, so proactive compaction (keyed to this
+* budget at CONTEXT_PROACTIVE_COMPACT_HIGH_WATER_PERCENT) never fires in time
+* and agents hard-wedge. Set a conservative effective ceiling so the 85%
+* high-water (≈127.5k) lands comfortably below the real failure zone. Tune up
+* if gpt-5.5's true CLIProxy window is later measured to be higher.
+*/
+const CLIPROXY_CODEX_CONTEXT_WINDOW = 15e4;
+/**
+* Master capability database
+*
+* Scores are based on:
+* - Public benchmarks (HumanEval, SWE-bench, MBPP)
+* - Community consensus
+* - Practical experience
+*
+* These are baseline scores - run Kimi 2.5 research to refine.
+*/
+const MODEL_CAPABILITIES = {
+	"claude-fable-5": {
+		model: "claude-fable-5",
+		provider: "anthropic",
+		displayName: "Claude Fable 5",
+		costPer1MTokens: 90,
+		contextWindow: 2e5,
+		skills: {
+			"code-generation": 99,
+			"code-review": 99,
+			debugging: 99,
+			planning: 99,
+			documentation: 97,
+			testing: 96,
+			security: 99,
+			performance: 95,
+			synthesis: 99,
+			speed: 42,
+			"context-length": 95
+		},
+		effortLevels: [
+			"low",
+			"medium",
+			"high",
+			"xhigh",
+			"max"
+		],
+		notes: "Mythos-class flagship (June 2026). Tuned for long-horizon autonomous work spanning millions of tokens. Beats Opus 4.8 across effort levels; same effort set (high is the default, xhigh between high and max). Adaptive thinking always on. Premium pricing (~2× Opus 4.8) — opt-in for the most demanding planning/coding."
+	},
+	"claude-opus-4-8": {
+		model: "claude-opus-4-8",
+		provider: "anthropic",
+		displayName: "Claude Opus 4.8",
+		costPer1MTokens: 45,
+		contextWindow: 2e5,
+		skills: {
+			"code-generation": 98,
+			"code-review": 99,
+			debugging: 98,
+			planning: 99,
+			documentation: 96,
+			testing: 95,
+			security: 99,
+			performance: 93,
+			synthesis: 99,
+			speed: 40,
+			"context-length": 95
+		},
+		effortLevels: [
+			"low",
+			"medium",
+			"high",
+			"xhigh",
+			"max"
+		],
+		notes: "Successor to Opus 4.7 and current flagship. Same effort levels (xhigh between high and max). Best for deepest reasoning and long-horizon coding tasks. Scores provisional — verify against benchmarks."
+	},
+	"claude-opus-4-7": {
+		model: "claude-opus-4-7",
+		provider: "anthropic",
+		displayName: "Claude Opus 4.7",
+		costPer1MTokens: 45,
+		contextWindow: 2e5,
+		skills: {
+			"code-generation": 98,
+			"code-review": 99,
+			debugging: 98,
+			planning: 99,
+			documentation: 96,
+			testing: 94,
+			security: 99,
+			performance: 92,
+			synthesis: 99,
+			speed: 38,
+			"context-length": 95
+		},
+		effortLevels: [
+			"low",
+			"medium",
+			"high",
+			"xhigh",
+			"max"
+		],
+		notes: "Successor to Opus 4.6. Adds the xhigh effort level (between high and max) for extended thinking. Best for deepest reasoning and long-horizon coding tasks."
+	},
+	"claude-opus-4-6": {
+		model: "claude-opus-4-6",
+		provider: "anthropic",
+		displayName: "Claude Opus 4.6",
+		costPer1MTokens: 45,
+		contextWindow: 2e5,
+		skills: {
+			"code-generation": 96,
+			"code-review": 98,
+			debugging: 97,
+			planning: 99,
+			documentation: 95,
+			testing: 92,
+			security: 98,
+			performance: 90,
+			synthesis: 98,
+			speed: 40,
+			"context-length": 95
+		},
+		effortLevels: [
+			"low",
+			"medium",
+			"high",
+			"max"
+		],
+		notes: "Successor to Opus 4.5. Same pricing, 1M context available (opt-in beta). Best for planning, security, complex reasoning."
+	},
+	"claude-sonnet-5": {
+		model: "claude-sonnet-5",
+		provider: "anthropic",
+		displayName: "Claude Sonnet 5",
+		costPer1MTokens: 6,
+		contextWindow: 1e6,
+		skills: {
+			"code-generation": 96,
+			"code-review": 96,
+			debugging: 94,
+			planning: 92,
+			documentation: 94,
+			testing: 94,
+			security: 90,
+			performance: 90,
+			synthesis: 92,
+			speed: 70,
+			"context-length": 95
+		},
+		effortLevels: [
+			"low",
+			"medium",
+			"high"
+		],
+		notes: "Current Sonnet generation (June 2026). Balanced native Anthropic model for implementation, review, testing, and routine agent work. 1M context at standard pricing; introductory pricing through 2026-08-31 is $2/M input and $10/M output, then $3/M input and $15/M output from 2026-09-01. Scores are provisional until benchmarks are verified."
+	},
+	"claude-sonnet-4-6": {
+		model: "claude-sonnet-4-6",
+		provider: "anthropic",
+		displayName: "Claude Sonnet 4.6",
+		costPer1MTokens: 9,
+		contextWindow: 2e5,
+		skills: {
+			"code-generation": 94,
+			"code-review": 94,
+			debugging: 92,
+			planning: 90,
+			documentation: 92,
+			testing: 92,
+			security: 88,
+			performance: 88,
+			synthesis: 90,
+			speed: 70,
+			"context-length": 95
+		},
+		effortLevels: [
+			"low",
+			"medium",
+			"high"
+		],
+		notes: "Successor to Sonnet 4.5. Same pricing tier. Improved coding and reasoning."
+	},
+	"claude-sonnet-4-5": {
+		model: "claude-sonnet-4-5",
+		provider: "anthropic",
+		displayName: "Claude Sonnet 4.5",
+		costPer1MTokens: 9,
+		contextWindow: 2e5,
+		skills: {
+			"code-generation": 92,
+			"code-review": 92,
+			debugging: 90,
+			planning: 88,
+			documentation: 90,
+			testing: 90,
+			security: 85,
+			performance: 85,
+			synthesis: 88,
+			speed: 70,
+			"context-length": 95
+		},
+		notes: "Best value: 77.2% SWE-bench at 1/5th Opus cost. Beats GPT-5 Codex."
+	},
+	"claude-haiku-4-5": {
+		model: "claude-haiku-4-5",
+		provider: "anthropic",
+		displayName: "Claude Haiku 4.5",
+		costPer1MTokens: 4,
+		contextWindow: 2e5,
+		skills: {
+			"code-generation": 75,
+			"code-review": 72,
+			debugging: 70,
+			planning: 65,
+			documentation: 75,
+			testing: 70,
+			security: 60,
+			performance: 65,
+			synthesis: 68,
+			speed: 95,
+			"context-length": 95
+		},
+		notes: "Fast and cheap, good for simple tasks and exploration"
+	},
+	"gpt-5.4": {
+		model: "gpt-5.4",
+		provider: "openai",
+		displayName: "GPT-5.4",
+		costPer1MTokens: 8.75,
+		contextWindow: 105e4,
+		minTier: "plus",
+		skills: {
+			"code-generation": 96,
+			"code-review": 92,
+			debugging: 94,
+			planning: 92,
+			documentation: 90,
+			testing: 92,
+			security: 88,
+			performance: 90,
+			synthesis: 92,
+			speed: 60,
+			"context-length": 100
+		},
+		notes: "OpenAI flagship (March 2026). 1.05M context, 128K max output. Strong coding and reasoning."
+	},
+	"gpt-5.4-mini": {
+		model: "gpt-5.4-mini",
+		provider: "openai",
+		displayName: "GPT-5.4 Mini",
+		costPer1MTokens: 1,
+		contextWindow: 4e5,
+		minTier: "free",
+		skills: {
+			"code-generation": 82,
+			"code-review": 78,
+			debugging: 76,
+			planning: 72,
+			documentation: 80,
+			testing: 76,
+			security: 68,
+			performance: 72,
+			synthesis: 75,
+			speed: 90,
+			"context-length": 90
+		},
+		notes: "Fast and efficient. 400K context. Available in ChatGPT Free/Plus tiers."
+	},
+	"o3": {
+		model: "o3",
+		provider: "openai",
+		displayName: "O3",
+		costPer1MTokens: 5,
+		contextWindow: 2e5,
+		minTier: "plus",
+		skills: {
+			"code-generation": 90,
+			"code-review": 95,
+			debugging: 98,
+			planning: 95,
+			documentation: 88,
+			testing: 88,
+			security: 92,
+			performance: 92,
+			synthesis: 95,
+			speed: 25,
+			"context-length": 95
+		},
+		notes: "Deep reasoning model. Excels at complex debugging, math, scientific reasoning."
+	},
+	"o4-mini": {
+		model: "o4-mini",
+		provider: "openai",
+		displayName: "O4 Mini",
+		costPer1MTokens: 2.75,
+		contextWindow: 2e5,
+		minTier: "plus",
+		skills: {
+			"code-generation": 85,
+			"code-review": 90,
+			debugging: 94,
+			planning: 88,
+			documentation: 84,
+			testing: 85,
+			security: 86,
+			performance: 88,
+			synthesis: 88,
+			speed: 70,
+			"context-length": 90
+		},
+		notes: "Compact reasoning model (April 2025). Fast, cost-efficient, tool-use capable."
+	},
+	"gpt-5.4-pro": {
+		model: "gpt-5.4-pro",
+		provider: "openai",
+		displayName: "GPT-5.4 Pro",
+		costPer1MTokens: 105,
+		contextWindow: 105e4,
+		minTier: "pro",
+		skills: {
+			"code-generation": 98,
+			"code-review": 98,
+			debugging: 98,
+			planning: 99,
+			documentation: 96,
+			testing: 96,
+			security: 96,
+			performance: 95,
+			synthesis: 99,
+			speed: 45,
+			"context-length": 100
+		},
+		notes: "Most advanced OpenAI model. Enhanced reasoning and agentic capabilities over GPT-5.4. Pro subscribers only."
+	},
+	"gpt-5.6-sol": {
+		model: "gpt-5.6-sol",
+		provider: "openai",
+		displayName: "GPT-5.6 Sol",
+		costPer1MTokens: 17.5,
+		contextWindow: CLIPROXY_CODEX_CONTEXT_WINDOW,
+		minTier: "plus",
+		skills: {
+			"code-generation": 98,
+			"code-review": 95,
+			debugging: 97,
+			planning: 96,
+			documentation: 93,
+			testing: 95,
+			security: 92,
+			performance: 93,
+			synthesis: 95,
+			speed: 65,
+			"context-length": 95
+		},
+		notes: "OpenAI flagship (July 2026). New default. Successor to GPT-5.5 with improved agentic/shell coding. Effective Claude Code/CLIProxy ceiling is 150K (CLIPROXY_CODEX_CONTEXT_WINDOW), 1M marketing context."
+	},
+	"gpt-5.6-terra": {
+		model: "gpt-5.6-terra",
+		provider: "openai",
+		displayName: "GPT-5.6 Terra",
+		costPer1MTokens: 8.75,
+		contextWindow: CLIPROXY_CODEX_CONTEXT_WINDOW,
+		minTier: "plus",
+		skills: {
+			"code-generation": 97,
+			"code-review": 94,
+			debugging: 96,
+			planning: 95,
+			documentation: 92,
+			testing: 94,
+			security: 91,
+			performance: 92,
+			synthesis: 94,
+			speed: 70,
+			"context-length": 95
+		},
+		notes: "OpenAI balanced tier (July 2026). GPT-5.5-competitive at roughly half the cost. Effective Claude Code/CLIProxy ceiling is 150K (CLIPROXY_CODEX_CONTEXT_WINDOW), 1M marketing context."
+	},
+	"gpt-5.6-luna": {
+		model: "gpt-5.6-luna",
+		provider: "openai",
+		displayName: "GPT-5.6 Luna",
+		costPer1MTokens: 3.5,
+		contextWindow: CLIPROXY_CODEX_CONTEXT_WINDOW,
+		minTier: "plus",
+		skills: {
+			"code-generation": 82,
+			"code-review": 78,
+			debugging: 76,
+			planning: 72,
+			documentation: 80,
+			testing: 76,
+			security: 68,
+			performance: 72,
+			synthesis: 75,
+			speed: 90,
+			"context-length": 90
+		},
+		notes: "OpenAI fastest/cheapest tier (July 2026). Successor to GPT-5.4 Mini's market position. Effective Claude Code/CLIProxy ceiling is 150K (CLIPROXY_CODEX_CONTEXT_WINDOW), 1M marketing context."
+	},
+	"gpt-5.5": {
+		model: "gpt-5.5",
+		provider: "openai",
+		displayName: "GPT-5.5",
+		costPer1MTokens: 10.5,
+		contextWindow: CLIPROXY_CODEX_CONTEXT_WINDOW,
+		minTier: "plus",
+		skills: {
+			"code-generation": 97,
+			"code-review": 94,
+			debugging: 96,
+			planning: 95,
+			documentation: 92,
+			testing: 94,
+			security: 91,
+			performance: 92,
+			synthesis: 94,
+			speed: 65,
+			"context-length": 95
+		},
+		notes: "OpenAI flagship (April 2026). Successor to GPT-5.4 with improved reasoning and coding. Effective Claude Code/CLIProxy ceiling is 150K (CLIPROXY_CODEX_CONTEXT_WINDOW), 128K max output."
+	},
+	"gpt-5.5-pro": {
+		model: "gpt-5.5-pro",
+		provider: "openai",
+		displayName: "GPT-5.5 Pro",
+		costPer1MTokens: 119,
+		contextWindow: 105e4,
+		minTier: "pro",
+		skills: {
+			"code-generation": 99,
+			"code-review": 99,
+			debugging: 99,
+			planning: 99,
+			documentation: 97,
+			testing: 97,
+			security: 97,
+			performance: 96,
+			synthesis: 99,
+			speed: 50,
+			"context-length": 100
+		},
+		notes: "Most advanced OpenAI model. Enhanced reasoning and agentic capabilities over GPT-5.5. Pro subscribers only."
+	},
+	"gpt-5.3-codex": {
+		model: "gpt-5.3-codex",
+		provider: "openai",
+		displayName: "GPT-5.3 Codex",
+		costPer1MTokens: 7.875,
+		contextWindow: 4e5,
+		skills: {
+			"code-generation": 96,
+			"code-review": 95,
+			debugging: 94,
+			planning: 90,
+			documentation: 88,
+			testing: 90,
+			security: 86,
+			performance: 88,
+			synthesis: 92,
+			speed: 75,
+			"context-length": 90
+		},
+		notes: "Industry-leading agentic coding model (2026). Available via Codex CLI/IDE/cloud and the Responses API."
+	},
+	"gpt-5.2": {
+		model: "gpt-5.2",
+		provider: "openai",
+		displayName: "GPT-5.2",
+		costPer1MTokens: 5.625,
+		contextWindow: 2e5,
+		skills: {
+			"code-generation": 88,
+			"code-review": 86,
+			debugging: 84,
+			planning: 82,
+			documentation: 84,
+			testing: 82,
+			security: 78,
+			performance: 80,
+			synthesis: 84,
+			speed: 70,
+			"context-length": 85
+		},
+		notes: "Previous-generation general-purpose model (Oct 2025). Positioned by OpenAI for long-running agent workloads — strong candidate for orchestrator/flywheel roles."
+	},
+	"gpt-5.3-codex-spark": {
+		model: "gpt-5.3-codex-spark",
+		provider: "openai",
+		displayName: "GPT-5.3 Codex Spark",
+		costPer1MTokens: 7.875,
+		contextWindow: 128e3,
+		skills: {
+			"code-generation": 92,
+			"code-review": 86,
+			debugging: 84,
+			planning: 78,
+			documentation: 82,
+			testing: 88,
+			security: 76,
+			performance: 82,
+			synthesis: 84,
+			speed: 98,
+			"context-length": 72
+		},
+		notes: "Ultra-fast coding research preview (Feb 2026). Text-only, 128K context, ChatGPT-Pro-only. Candidate for work.inspect / high-volume code scans when a Pro account is available."
+	},
+	"o3-deep-research": {
+		model: "o3-deep-research",
+		provider: "openai",
+		displayName: "O3 Deep Research (deprecated)",
+		costPer1MTokens: 5,
+		contextWindow: 2e5,
+		skills: {
+			"code-generation": 88,
+			"code-review": 95,
+			debugging: 98,
+			planning: 95,
+			documentation: 88,
+			testing: 88,
+			security: 92,
+			performance: 92,
+			synthesis: 95,
+			speed: 25,
+			"context-length": 95
+		}
+	},
+	"gpt-4o": {
+		model: "gpt-4o",
+		provider: "openai",
+		displayName: "GPT-4o",
+		costPer1MTokens: 7.5,
+		contextWindow: 128e3,
+		skills: {
+			"code-generation": 82,
+			"code-review": 80,
+			debugging: 78,
+			planning: 76,
+			documentation: 80,
+			testing: 76,
+			security: 74,
+			performance: 74,
+			synthesis: 80,
+			speed: 75,
+			"context-length": 75
+		}
+	},
+	"gpt-4o-mini": {
+		model: "gpt-4o-mini",
+		provider: "openai",
+		displayName: "GPT-4o Mini",
+		costPer1MTokens: .6,
+		contextWindow: 128e3,
+		skills: {
+			"code-generation": 68,
+			"code-review": 64,
+			debugging: 60,
+			planning: 56,
+			documentation: 66,
+			testing: 60,
+			security: 52,
+			performance: 56,
+			synthesis: 62,
+			speed: 92,
+			"context-length": 75
+		}
+	},
+	"gemini-3.1-pro-preview": {
+		model: "gemini-3.1-pro-preview",
+		provider: "google",
+		displayName: "Gemini 3.1 Pro",
+		costPer1MTokens: 7,
+		contextWindow: 1e6,
+		skills: {
+			"code-generation": 93,
+			"code-review": 90,
+			debugging: 88,
+			planning: 88,
+			documentation: 90,
+			testing: 88,
+			security: 82,
+			performance: 88,
+			synthesis: 92,
+			speed: 75,
+			"context-length": 100
+		},
+		notes: "Google flagship (March 2026). Replaces Gemini 3 Pro (shut down). Strong agentic and coding capabilities."
+	},
+	"gemini-3-flash-preview": {
+		model: "gemini-3-flash-preview",
+		provider: "google",
+		displayName: "Gemini 3 Flash Preview",
+		costPer1MTokens: .4,
+		contextWindow: 1e6,
+		skills: {
+			"code-generation": 80,
+			"code-review": 75,
+			debugging: 72,
+			planning: 68,
+			documentation: 76,
+			testing: 72,
+			security: 60,
+			performance: 70,
+			synthesis: 75,
+			speed: 96,
+			"context-length": 100
+		},
+		notes: "Fast and cheap with 1M context. Strong reasoning and agentic capabilities."
+	},
+	"gemini-3.1-flash-lite-preview": {
+		model: "gemini-3.1-flash-lite-preview",
+		provider: "google",
+		displayName: "Gemini 3.1 Flash Lite",
+		costPer1MTokens: .9,
+		contextWindow: 1e6,
+		skills: {
+			"code-generation": 72,
+			"code-review": 68,
+			debugging: 65,
+			planning: 60,
+			documentation: 70,
+			testing: 65,
+			security: 52,
+			performance: 62,
+			synthesis: 68,
+			speed: 98,
+			"context-length": 100
+		},
+		notes: "Most cost-efficient Google model. Great for high-volume, latency-sensitive workloads."
+	},
+	"gemini-3-pro-preview": {
+		model: "gemini-3-pro-preview",
+		provider: "google",
+		displayName: "Gemini 3 Pro (deprecated)",
+		costPer1MTokens: 7,
+		contextWindow: 1e6,
+		skills: {
+			"code-generation": 93,
+			"code-review": 90,
+			debugging: 88,
+			planning: 88,
+			documentation: 90,
+			testing: 88,
+			security: 82,
+			performance: 88,
+			synthesis: 92,
+			speed: 75,
+			"context-length": 100
+		}
+	},
+	"gemini-2.5-pro": {
+		model: "gemini-2.5-pro",
+		provider: "google",
+		displayName: "Gemini 2.5 Pro (deprecated)",
+		costPer1MTokens: 7,
+		contextWindow: 1e6,
+		skills: {
+			"code-generation": 90,
+			"code-review": 88,
+			debugging: 86,
+			planning: 86,
+			documentation: 88,
+			testing: 86,
+			security: 80,
+			performance: 86,
+			synthesis: 90,
+			speed: 70,
+			"context-length": 100
+		}
+	},
+	"gemini-2.5-flash": {
+		model: "gemini-2.5-flash",
+		provider: "google",
+		displayName: "Gemini 2.5 Flash (deprecated)",
+		costPer1MTokens: .4,
+		contextWindow: 1e6,
+		skills: {
+			"code-generation": 78,
+			"code-review": 74,
+			debugging: 70,
+			planning: 66,
+			documentation: 74,
+			testing: 70,
+			security: 58,
+			performance: 68,
+			synthesis: 74,
+			speed: 94,
+			"context-length": 100
+		}
+	},
+	"kimi-k2.7-code": {
+		model: "kimi-k2.7-code",
+		provider: "kimi",
+		displayName: "Kimi K2.7 Code",
+		costPer1MTokens: 2.5,
+		contextWindow: 262144,
+		skills: {
+			"code-generation": 95,
+			"code-review": 93,
+			debugging: 93,
+			planning: 90,
+			documentation: 90,
+			testing: 90,
+			security: 85,
+			performance: 88,
+			synthesis: 94,
+			speed: 75,
+			"context-length": 98
+		},
+		notes: "Moonshot/Kimi's coding-first open-weight model (June 2026). 1T MoE / 32B active, multimodal, extended thinking modes. API id `kimi-k2.7-code`. Source: https://platform.moonshot.ai/docs/pricing/chat"
+	},
+	"kimi-k2.6": {
+		model: "kimi-k2.6",
+		provider: "kimi",
+		displayName: "Kimi K2.6",
+		costPer1MTokens: 1.6,
+		contextWindow: 256e3,
+		skills: {
+			"code-generation": 94,
+			"code-review": 92,
+			debugging: 92,
+			planning: 90,
+			documentation: 90,
+			testing: 90,
+			security: 85,
+			performance: 88,
+			synthesis: 94,
+			speed: 75,
+			"context-length": 98
+		},
+		notes: "Kimi's smartest model (April 2026). Native multimodal, superior agentic coding, and autonomous agent execution. Replaces K2.6-code-preview."
+	},
+	"kimi-k2.5": {
+		model: "kimi-k2.5",
+		provider: "kimi",
+		displayName: "Kimi K2.5",
+		costPer1MTokens: 1.6,
+		contextWindow: 256e3,
+		skills: {
+			"code-generation": 92,
+			"code-review": 90,
+			debugging: 90,
+			planning: 88,
+			documentation: 88,
+			testing: 88,
+			security: 82,
+			performance: 85,
+			synthesis: 92,
+			speed: 75,
+			"context-length": 98
+		},
+		notes: "Best open-source coding model. 5x cheaper than GPT-5.2. Excellent for frontend dev and multi-agent orchestration."
+	},
+	"K2.6-code-preview": {
+		model: "K2.6-code-preview",
+		provider: "kimi",
+		displayName: "K2.6-code-preview",
+		costPer1MTokens: 1.6,
+		contextWindow: 256e3,
+		skills: {
+			"code-generation": 92,
+			"code-review": 90,
+			debugging: 90,
+			planning: 88,
+			documentation: 88,
+			testing: 88,
+			security: 82,
+			performance: 85,
+			synthesis: 92,
+			speed: 75,
+			"context-length": 98
+		},
+		notes: "Kimi coding preview model."
+	},
+	"kimi-k2": {
+		model: "kimi-k2",
+		provider: "kimi",
+		displayName: "Kimi K2 (deprecated)",
+		costPer1MTokens: 1.6,
+		contextWindow: 128e3,
+		skills: {
+			"code-generation": 88,
+			"code-review": 86,
+			debugging: 86,
+			planning: 84,
+			documentation: 84,
+			testing: 84,
+			security: 78,
+			performance: 80,
+			synthesis: 88,
+			speed: 72,
+			"context-length": 80
+		},
+		notes: "65.8% SWE-bench. Superseded by Kimi K2.5."
+	},
+	"minimax-m2.7": {
+		model: "minimax-m2.7",
+		provider: "minimax",
+		displayName: "MiniMax M2.7",
+		costPer1MTokens: 1.5,
+		contextWindow: 204800,
+		skills: {
+			"code-generation": 90,
+			"code-review": 88,
+			debugging: 88,
+			planning: 85,
+			documentation: 85,
+			testing: 86,
+			security: 80,
+			performance: 82,
+			synthesis: 90,
+			speed: 80,
+			"context-length": 92
+		},
+		notes: "10B active params, 56.22% SWE-Pro, 1495 ELO GDPval-AA. $0.06/M blended with auto-cache."
+	},
+	"minimax-m2.7-highspeed": {
+		model: "minimax-m2.7-highspeed",
+		provider: "minimax",
+		displayName: "MiniMax M2.7 Highspeed",
+		costPer1MTokens: 1.5,
+		contextWindow: 204800,
+		skills: {
+			"code-generation": 90,
+			"code-review": 88,
+			debugging: 88,
+			planning: 85,
+			documentation: 85,
+			testing: 86,
+			security: 80,
+			performance: 82,
+			synthesis: 90,
+			speed: 92,
+			"context-length": 92
+		},
+		notes: "Identical quality to M2.7, 100 tps (3x Opus speed). Best for high-throughput agent work."
+	},
+	"MiniMax-M3": {
+		model: "MiniMax-M3",
+		provider: "minimax",
+		displayName: "MiniMax M3",
+		costPer1MTokens: 1.5,
+		contextWindow: 1024e3,
+		skills: {
+			"code-generation": 93,
+			"code-review": 90,
+			debugging: 90,
+			planning: 88,
+			documentation: 88,
+			testing: 88,
+			security: 82,
+			performance: 85,
+			synthesis: 92,
+			speed: 80,
+			"context-length": 100
+		},
+		notes: "MSA (MiniMax Sparse Attention), 1M context, native multimodal, top-tier coding/agentic. Same pricing as M2.7."
+	},
+	"glm-5.2": {
+		model: "glm-5.2",
+		provider: "zai",
+		displayName: "GLM-5.2",
+		costPer1MTokens: 2.9,
+		contextWindow: 1e6,
+		effortLevels: ["high", "max"],
+		supportsImages: false,
+		skills: {
+			"code-generation": 85,
+			"code-review": 83,
+			debugging: 83,
+			planning: 81,
+			documentation: 80,
+			testing: 80,
+			security: 77,
+			performance: 77,
+			synthesis: 82,
+			speed: 84,
+			"context-length": 75
+		},
+		notes: "Z.AI GLM-5.2 flagship via Anthropic-compatible API. Supports only high and max effort levels. Scores provisional — verify against benchmarks."
+	},
+	"glm-5.1": {
+		model: "glm-5.1",
+		provider: "zai",
+		displayName: "GLM-5.1",
+		costPer1MTokens: 2.9,
+		contextWindow: 2e5,
+		supportsImages: false,
+		skills: {
+			"code-generation": 82,
+			"code-review": 80,
+			debugging: 80,
+			planning: 78,
+			documentation: 78,
+			testing: 78,
+			security: 75,
+			performance: 75,
+			synthesis: 80,
+			speed: 85,
+			"context-length": 75
+		},
+		notes: "Z.AI GLM-5.1 model via Anthropic-compatible API. Previous flagship; retained alongside GLM-5.2."
+	},
+	"glm-4.7": {
+		model: "glm-4.7",
+		provider: "zai",
+		displayName: "GLM-4.7 (deprecated)",
+		costPer1MTokens: 1.5,
+		contextWindow: 2e5,
+		skills: {
+			"code-generation": 88,
+			"code-review": 85,
+			debugging: 84,
+			planning: 82,
+			documentation: 80,
+			testing: 82,
+			security: 78,
+			performance: 80,
+			synthesis: 84,
+			speed: 80,
+			"context-length": 92
+		},
+		notes: "Top open-source model for agentic coding. 73.8% SWE-bench, 200K context."
+	},
+	"glm-4.7-flash": {
+		model: "glm-4.7-flash",
+		provider: "zai",
+		displayName: "GLM-4.7 Flash (deprecated)",
+		costPer1MTokens: .3,
+		contextWindow: 2e5,
+		skills: {
+			"code-generation": 78,
+			"code-review": 74,
+			debugging: 72,
+			planning: 70,
+			documentation: 72,
+			testing: 72,
+			security: 68,
+			performance: 70,
+			synthesis: 74,
+			speed: 95,
+			"context-length": 92
+		},
+		notes: "Fast and affordable GLM model for quick iterations. 200K context."
+	},
+	"mimo-v2.5-pro": {
+		model: "mimo-v2.5-pro",
+		provider: "mimo",
+		displayName: "MiMo V2.5 Pro",
+		costPer1MTokens: 2,
+		contextWindow: 1048576,
+		supportsImages: false,
+		skills: {
+			"code-generation": 88,
+			"code-review": 86,
+			debugging: 86,
+			planning: 84,
+			documentation: 84,
+			testing: 84,
+			security: 80,
+			performance: 82,
+			synthesis: 88,
+			speed: 78,
+			"context-length": 100
+		},
+		notes: "Xiaomi MiMo flagship reasoning model. Enhanced agent efficiency, 1M context window."
+	},
+	"mimo-v2.5": {
+		model: "mimo-v2.5",
+		provider: "mimo",
+		displayName: "MiMo V2.5",
+		costPer1MTokens: 1,
+		contextWindow: 262144,
+		supportsImages: true,
+		skills: {
+			"code-generation": 82,
+			"code-review": 80,
+			debugging: 80,
+			planning: 78,
+			documentation: 78,
+			testing: 78,
+			security: 74,
+			performance: 76,
+			synthesis: 82,
+			speed: 85,
+			"context-length": 96
+		},
+		notes: "Xiaomi MiMo multimodal model. 262K context, strong agentic and coding capabilities."
+	},
+	"qwen/qwen3.6-plus": {
+		model: "qwen/qwen3.6-plus",
+		provider: "nous",
+		displayName: "Qwen 3.6 Plus (Nous Portal)",
+		costPer1MTokens: 0,
+		contextWindow: 1048576,
+		skills: {
+			"code-generation": 94,
+			"code-review": 92,
+			debugging: 92,
+			planning: 92,
+			documentation: 90,
+			testing: 90,
+			security: 88,
+			performance: 88,
+			synthesis: 92,
+			speed: 74,
+			"context-length": 100
+		},
+		notes: "Qwen 3.6 Plus via Nous Portal. Free for a limited time; 1M-token context according to public launch material."
+	},
+	"qwen3-max": {
+		model: "qwen3-max",
+		provider: "dashscope",
+		displayName: "Qwen3 Max (DashScope)",
+		costPer1MTokens: 0,
+		contextWindow: 262144,
+		skills: {
+			"code-generation": 95,
+			"code-review": 93,
+			debugging: 93,
+			planning: 94,
+			documentation: 91,
+			testing: 91,
+			security: 89,
+			performance: 89,
+			synthesis: 94,
+			speed: 72,
+			"context-length": 98
+		},
+		notes: "Routed direct to Alibaba DashScope (Singapore intl / ap-southeast-1) via DASHSCOPE_API_KEY. Pricing placeholder pending Alibaba intl endpoint pricing."
+	},
+	"qwen3-coder-plus": {
+		model: "qwen3-coder-plus",
+		provider: "dashscope",
+		displayName: "Qwen3 Coder Plus (DashScope)",
+		costPer1MTokens: 0,
+		contextWindow: 262144,
+		skills: {
+			"code-generation": 96,
+			"code-review": 94,
+			debugging: 94,
+			planning: 91,
+			documentation: 90,
+			testing: 92,
+			security: 89,
+			performance: 90,
+			synthesis: 92,
+			speed: 74,
+			"context-length": 98
+		},
+		notes: "Routed direct to Alibaba DashScope (Singapore intl / ap-southeast-1) via DASHSCOPE_API_KEY. Pricing placeholder pending Alibaba intl endpoint pricing."
+	},
+	"qwen3-plus": {
+		model: "qwen3-plus",
+		provider: "dashscope",
+		displayName: "Qwen3 Plus (DashScope)",
+		costPer1MTokens: 0,
+		contextWindow: 131072,
+		skills: {
+			"code-generation": 88,
+			"code-review": 86,
+			debugging: 86,
+			planning: 84,
+			documentation: 84,
+			testing: 84,
+			security: 80,
+			performance: 82,
+			synthesis: 88,
+			speed: 82,
+			"context-length": 96
+		},
+		notes: "Routed direct to Alibaba DashScope (Singapore intl / ap-southeast-1) via DASHSCOPE_API_KEY. Pricing placeholder pending Alibaba intl endpoint pricing."
+	},
+	"qwen3.7-max": {
+		model: "qwen3.7-max",
+		provider: "dashscope",
+		displayName: "Qwen3.7 Max (DashScope)",
+		costPer1MTokens: 0,
+		contextWindow: 262144,
+		skills: {
+			"code-generation": 96,
+			"code-review": 94,
+			debugging: 94,
+			planning: 95,
+			documentation: 92,
+			testing: 92,
+			security: 90,
+			performance: 90,
+			synthesis: 95,
+			speed: 70,
+			"context-length": 98
+		},
+		notes: "Canonical DashScope ID verified from Qwen Cloud docs on 2026-05-22. Routed direct to Alibaba DashScope (Singapore intl / ap-southeast-1) via DASHSCOPE_API_KEY. Pricing placeholder pending Alibaba intl endpoint pricing."
+	},
+	"grok-build-0.1": {
+		model: "grok-build-0.1",
+		provider: "xai",
+		displayName: "Grok Build 0.1",
+		costPer1MTokens: 1.5,
+		contextWindow: 256e3,
+		supportsImages: true,
+		skills: {
+			"code-generation": 90,
+			"code-review": 88,
+			debugging: 88,
+			planning: 87,
+			documentation: 85,
+			testing: 86,
+			security: 82,
+			performance: 84,
+			synthesis: 88,
+			speed: 82,
+			"context-length": 97
+		},
+		notes: "xAI's agentic coding model (May 2026). 256K context, $1/M in / $2/M out / $0.20/M cached. Reasoning always active. API id `grok-build-0.1` at https://api.x.ai/v1 (Anthropic-compatible). Sources: openrouter.ai/x-ai/grok-build-0.1/api, x.ai/news/grok-build-cli."
+	}
+};
+/**
+* Effort levels a model accepts, or `undefined` when not enumerated for that
+* model (treat undefined as "no model-specific restriction"). Resolves
+* deprecated IDs first so callers can pass raw config refs.
+*/
+function getModelEffortLevelsSync(model) {
+	return MODEL_CAPABILITIES[resolveModelIdSync(String(model))]?.effortLevels;
+}
+//#endregion
+//#region ../../src/lib/config-yaml/roles.ts
+const DEFAULT_WORKHORSES = {
+	expensive: "claude-opus-4-8",
+	mid: "claude-sonnet-5",
+	cheap: "claude-haiku-4-5"
+};
+const DEFAULT_ROLES = {
+	plan: { model: "workhorse:expensive" },
+	work: {
+		model: "workhorse:mid",
+		sub: {
+			inspect: { model: "workhorse:cheap" },
+			"inspect-deep": { model: "workhorse:mid" }
+		}
+	},
+	review: {
+		model: "workhorse:expensive",
+		mode: "quick",
+		sub: {
+			security: { model: "workhorse:expensive" },
+			correctness: { model: "workhorse:mid" },
+			performance: { model: "workhorse:mid" },
+			requirements: { model: "workhorse:mid" },
+			synthesis: { model: "workhorse:expensive" }
+		}
+	},
+	test: { model: "workhorse:mid" },
+	ship: { model: "workhorse:mid" },
+	strike: { model: "workhorse:expensive" },
+	sequencer: { model: "workhorse:expensive" },
+	knowledge: { model: "workhorse:expensive" },
+	flywheel: {
+		model: "claude-opus-4-8",
+		effort: "high",
+		minAgents: 20,
+		maxAgents: 30,
+		scope: "pan-only"
+	}
+};
+function cloneRoles(roles) {
+	const cloned = {};
+	for (const [role, roleConfig] of Object.entries(roles)) cloned[role] = {
+		...roleConfig,
+		model: Array.isArray(roleConfig.model) ? [...roleConfig.model] : roleConfig.model,
+		sub: roleConfig.sub ? { ...roleConfig.sub } : void 0
+	};
+	return cloned;
+}
+function isWorkhorseRef(ref) {
+	return ref.startsWith("workhorse:");
+}
+function workhorseSlotFromRef(ref) {
+	return ref.slice(10);
+}
+function derefWorkhorse(ref, config, fieldPath = "model") {
+	if (ref === "parent") throw new Error(`config.yaml: ${fieldPath} cannot be ${PARENT_MODEL_REF}; ${PARENT_MODEL_REF} is a resolve-only sub-role sentinel`);
+	if (!isWorkhorseRef(ref)) return resolveModelIdSync(ref);
+	const slot = workhorseSlotFromRef(ref);
+	const resolved = config.workhorses?.[slot];
+	if (!resolved) throw new Error(`config.yaml: ${fieldPath} references ${ref} but workhorses.${slot} is not defined`);
+	if (isWorkhorseRef(resolved)) throw new Error(`config.yaml: workhorses.${slot} cannot reference another workhorse`);
+	return resolveModelIdSync(resolved);
+}
+function mergeRoleConfig(result, config) {
+	if (!config?.workhorses && !config?.roles) return;
+	if (config.workhorses) {
+		const unknownSlots = Object.keys(config.workhorses).filter((slot) => !WORKHORSE_SLOTS.includes(slot));
+		if (unknownSlots.length > 0) throw new Error(`config.yaml: unknown workhorse slot${unknownSlots.length > 1 ? "s" : ""} ` + unknownSlots.map((s) => `workhorses.${s}`).join(", ") + `. Valid slots: ${WORKHORSE_SLOTS.join(", ")}.`);
+		result.workhorses = {
+			...result.workhorses ?? {},
+			...config.workhorses
+		};
+	}
+	if (config.roles) {
+		result.roles = { ...result.roles ?? {} };
+		for (const [role, roleConfig] of Object.entries(config.roles)) {
+			const existing = result.roles[role];
+			const sub = {
+				...existing?.sub ?? {},
+				...roleConfig.sub ?? {}
+			};
+			const mergedRoleConfig = {
+				...existing,
+				...roleConfig,
+				sub: Object.keys(sub).length > 0 ? sub : void 0
+			};
+			if (roleConfig.maxAgents !== void 0 && roleConfig.minAgents === void 0 && mergedRoleConfig.minAgents !== void 0 && mergedRoleConfig.minAgents > roleConfig.maxAgents) mergedRoleConfig.minAgents = roleConfig.maxAgents;
+			result.roles[role] = mergedRoleConfig;
+		}
+	}
+}
+function validateRoleFields(role, roleConfig) {
+	if (Array.isArray(roleConfig.model)) {
+		if (roleConfig.model.length === 0) throw new Error(`config.yaml: roles.${role}.model distribution must be a non-empty array`);
+		for (let i = 0; i < roleConfig.model.length; i++) {
+			const entry = roleConfig.model[i];
+			if (!entry.model || typeof entry.model !== "string") throw new Error(`config.yaml: roles.${role}.model[${i}].model must be a non-empty string`);
+			if (!Number.isInteger(entry.weight) || entry.weight <= 0) throw new Error(`config.yaml: roles.${role}.model[${i}].weight must be a positive integer`);
+		}
+	}
+	if (roleConfig.autonomousModel !== void 0 && typeof roleConfig.autonomousModel !== "string") throw new Error(`config.yaml: roles.${role}.autonomousModel must be a scalar model reference`);
+	if (roleConfig.harness !== void 0 && roleConfig.harness !== "claude-code" && roleConfig.harness !== "ohmypi" && roleConfig.harness !== "codex" && roleConfig.harness !== "acp") throw new Error(`config.yaml: roles.${role}.harness must be claude-code, ohmypi, codex, or acp`);
+	if (roleConfig.effort !== void 0 && !ROLE_EFFORTS.includes(roleConfig.effort)) throw new Error(`config.yaml: roles.${role}.effort must be one of ${ROLE_EFFORTS.join(", ")}`);
+	if (roleConfig.mode !== void 0 && roleConfig.mode !== "quick" && roleConfig.mode !== "full" && roleConfig.mode !== "none") throw new Error(`config.yaml: roles.${role}.mode must be quick, full, or none`);
+	if (roleConfig.reReviewScope !== void 0 && roleConfig.reReviewScope !== "all" && roleConfig.reReviewScope !== "changed" && roleConfig.reReviewScope !== "blockers") throw new Error(`config.yaml: roles.${role}.reReviewScope must be all, changed, or blockers`);
+	if (roleConfig.maxAgents !== void 0 && (!Number.isInteger(roleConfig.maxAgents) || roleConfig.maxAgents < 1)) throw new Error(`config.yaml: roles.${role}.maxAgents must be a positive integer`);
+	if (roleConfig.minAgents !== void 0 && (!Number.isInteger(roleConfig.minAgents) || roleConfig.minAgents < 0)) throw new Error(`config.yaml: roles.${role}.minAgents must be a non-negative integer`);
+	if (roleConfig.minAgents !== void 0 && roleConfig.maxAgents !== void 0 && roleConfig.minAgents > roleConfig.maxAgents) throw new Error(`config.yaml: roles.${role}.minAgents (${roleConfig.minAgents}) cannot exceed maxAgents (${roleConfig.maxAgents})`);
+	if (roleConfig.scope !== void 0 && roleConfig.scope !== "pan-only" && roleConfig.scope !== "all-tracked-projects") throw new Error(`config.yaml: roles.${role}.scope must be pan-only or all-tracked-projects`);
+}
+function validateRoleModelRefs(config) {
+	for (const [slot, ref] of Object.entries(config.workhorses ?? {})) {
+		if (ref === "parent") throw new Error(`config.yaml: workhorses.${slot} cannot be ${PARENT_MODEL_REF}; ${PARENT_MODEL_REF} is valid only for sub-role models`);
+		if (isWorkhorseRef(ref)) throw new Error(`config.yaml: workhorses.${slot} cannot reference another workhorse`);
+		resolveModelIdSync(ref);
+	}
+	for (const [role, roleConfig] of Object.entries(config.roles ?? {})) {
+		validateRoleFields(role, roleConfig);
+		if (typeof roleConfig.autonomousModel === "string") derefWorkhorse(roleConfig.autonomousModel, config, `roles.${role}.autonomousModel`);
+		if (Array.isArray(roleConfig.model)) for (let i = 0; i < roleConfig.model.length; i++) derefWorkhorse(roleConfig.model[i].model, config, `roles.${role}.model[${i}].model`);
+		else if (roleConfig.model) {
+			const resolvedModel = derefWorkhorse(roleConfig.model, config, `roles.${role}.model`);
+			if (roleConfig.effort !== void 0) {
+				const supported = getModelEffortLevelsSync(resolvedModel);
+				if (supported !== void 0 && !supported.includes(roleConfig.effort)) throw new Error(`config.yaml: roles.${role}.effort '${roleConfig.effort}' is not supported by ${resolvedModel} (supported: ${supported.join(", ")})`);
+			}
+		}
+		for (const [subRole, subConfig] of Object.entries(roleConfig.sub ?? {})) if (subConfig.model && subConfig.model !== "parent") derefWorkhorse(subConfig.model, config, `roles.${role}.sub.${subRole}.model`);
+	}
+}
+//#endregion
+//#region ../../src/lib/background-ai/registry.ts
+/**
+* Background AI feature registry — pure data, no dependencies (PAN-1583).
+*
+* Kept dependency-free so `config-yaml.ts` can import the feature list and
+* defaults without creating an import cycle with the enablement gate in
+* `features.ts` (which imports `config-yaml`).
+*/
+/** Every background AI feature Overdeck can run automatically. */
+const BACKGROUND_AI_FEATURES = [
+	"conversationTitles",
+	"titleRefinement",
+	"memoryExtraction",
+	"memoryQueryExpansion",
+	"conversationEnrichment",
+	"sessionEmbeddings",
+	"summaryFork",
+	"ttsSummarizer"
+];
+/**
+* Feature metadata. The `defaultEnabled` values mirror the historical
+* behavior of each subsystem so introducing the registry changes nothing
+* until the user flips a toggle:
+*   - sessionEmbeddings defaults OFF  (conversations.embeddings default false)
+*   - ttsSummarizer defaults OFF      (ttsSummarizer.enabled default false)
+*   - everything else defaults ON.
+*/
+const BACKGROUND_AI_FEATURE_META = [
+	{
+		key: "conversationTitles",
+		label: "Conversation titles",
+		description: "Generate a title for a new conversation from its first message.",
+		defaultEnabled: true
+	},
+	{
+		key: "titleRefinement",
+		label: "Title refinement",
+		description: "Refine a conversation title once the first assistant reply arrives.",
+		defaultEnabled: true
+	},
+	{
+		key: "memoryExtraction",
+		label: "Memory extraction",
+		description: "Extract structured observations from running agent transcripts.",
+		defaultEnabled: true
+	},
+	{
+		key: "memoryQueryExpansion",
+		label: "Memory query expansion",
+		description: "Expand memory search queries into related terms for better recall.",
+		defaultEnabled: true
+	},
+	{
+		key: "conversationEnrichment",
+		label: "Conversation enrichment",
+		description: "Summarize and tag discovered sessions for search and display.",
+		defaultEnabled: true
+	},
+	{
+		key: "sessionEmbeddings",
+		label: "Session embeddings",
+		description: "Build embedding vectors for semantic conversation search.",
+		defaultEnabled: false
+	},
+	{
+		key: "summaryFork",
+		label: "Summary fork / compaction",
+		description: "Summarize a transcript on compaction or handoff fallback.",
+		defaultEnabled: true
+	},
+	{
+		key: "ttsSummarizer",
+		label: "TTS activity narration",
+		description: "Summarize recent activity into spoken narration utterances.",
+		defaultEnabled: false
+	}
+];
+/** The default per-feature enablement map (used by config normalization). */
+function defaultBackgroundAiFeatures() {
+	const out = {};
+	for (const meta of BACKGROUND_AI_FEATURE_META) out[meta.key] = meta.defaultEnabled;
+	return out;
+}
+//#endregion
+//#region ../../src/lib/openai-compatible-proxy.ts
+const HOST = "127.0.0.1";
+const PORT = 12436;
+TaggedError("OpenAICompatibleProxyError");
+function getOpenAICompatibleProxyBaseUrl(provider) {
+	return `http://${HOST}:${PORT}/${provider}`;
+}
+//#endregion
+//#region ../../src/lib/providers.ts
+const PROVIDERS = {
+	anthropic: {
+		name: "anthropic",
+		displayName: "Anthropic",
+		compatibility: "direct",
+		defaultHarness: "claude-code",
+		models: [
+			"claude-fable-5",
+			"claude-opus-4-8",
+			"claude-opus-4-7",
+			"claude-opus-4-6",
+			"claude-sonnet-5",
+			"claude-sonnet-4-6",
+			"claude-sonnet-4-5",
+			"claude-haiku-4-5"
+		],
+		tested: true,
+		description: "Native Claude API"
+	},
+	kimi: {
+		name: "kimi",
+		displayName: "Kimi (Moonshot AI)",
+		compatibility: "direct",
+		defaultHarness: "claude-code",
+		models: [
+			"kimi-k2.7-code",
+			"kimi-k2.6",
+			"kimi-k2.5",
+			"kimi-k2",
+			"K2.6-code-preview"
+		],
+		tierModels: {
+			opus: "kimi-k2.6",
+			sonnet: "kimi-k2.5",
+			haiku: "kimi-k2"
+		},
+		tested: true,
+		description: "Route directly to Kimi Anthropic-compatible endpoints via claude-code; sk-kimi-* keys use the coding endpoint, platform keys use Moonshot."
+	},
+	openai: {
+		name: "openai",
+		displayName: "OpenAI",
+		compatibility: "direct",
+		defaultHarness: "codex",
+		models: [
+			"gpt-5.6-sol",
+			"gpt-5.6-terra",
+			"gpt-5.6-luna",
+			"gpt-5.5",
+			"gpt-5.4",
+			"gpt-5.4-mini",
+			"gpt-5.3-codex",
+			"gpt-5.3-codex-spark",
+			"gpt-5.2"
+		],
+		tierModels: {
+			opus: "gpt-5.6-sol",
+			sonnet: "gpt-5.4",
+			haiku: "gpt-5.4-mini"
+		},
+		tested: true,
+		description: "First-party Codex CLI harness (default) using ChatGPT-subscription or API-key auth. The local CLIProxyAPI sidecar remains a legacy alternate for routing GPT models into claude-code."
+	},
+	google: {
+		name: "google",
+		displayName: "Google (Gemini)",
+		compatibility: "direct",
+		defaultHarness: "ohmypi",
+		models: [
+			"gemini-3.1-pro-preview",
+			"gemini-3-flash-preview",
+			"gemini-3.1-flash-lite-preview"
+		],
+		tierModels: {
+			opus: "gemini-3.1-pro-preview",
+			sonnet: "gemini-3-flash-preview",
+			haiku: "gemini-3.1-flash-lite-preview"
+		},
+		tested: true,
+		description: "Route via local CLIProxyAPI Gemini backend using GOOGLE_API_KEY"
+	},
+	minimax: {
+		name: "minimax",
+		displayName: "MiniMax",
+		compatibility: "direct",
+		defaultHarness: "ohmypi",
+		baseUrl: "https://api.minimax.io/anthropic",
+		authType: "static",
+		models: [
+			"minimax-m2.7",
+			"minimax-m2.7-highspeed",
+			"MiniMax-M3"
+		],
+		haikuModel: "minimax-m2.7-highspeed",
+		tierModels: {
+			opus: "MiniMax-M3",
+			sonnet: "minimax-m2.7",
+			haiku: "minimax-m2.7-highspeed"
+		},
+		tested: true,
+		description: "Route directly to MiniMax Anthropic-compatible endpoint using MINIMAX_API_KEY."
+	},
+	zai: {
+		name: "zai",
+		displayName: "Z.AI",
+		compatibility: "direct",
+		defaultHarness: "ohmypi",
+		baseUrl: "https://api.z.ai/api/anthropic",
+		authType: "static",
+		models: [
+			"glm-5.2",
+			"glm-5.1",
+			"glm-4.7",
+			"glm-4.7-flash"
+		],
+		haikuModel: "glm-4.7-flash",
+		tierModels: {
+			opus: "glm-5.2",
+			sonnet: "glm-4.7",
+			haiku: "glm-4.7-flash"
+		},
+		tested: true,
+		description: "Route directly to Z.AI Anthropic-compatible endpoint using ZHIPU_API_KEY."
+	},
+	mimo: {
+		name: "mimo",
+		displayName: "Xiaomi MiMo",
+		compatibility: "direct",
+		defaultHarness: "ohmypi",
+		baseUrl: "https://token-plan-sgp.xiaomimimo.com/anthropic",
+		authType: "static",
+		models: ["mimo-v2.5-pro", "mimo-v2.5"],
+		haikuModel: "mimo-v2.5",
+		tierModels: {
+			opus: "mimo-v2.5-pro",
+			sonnet: "mimo-v2.5-pro",
+			haiku: "mimo-v2.5"
+		},
+		tested: true,
+		description: "Route directly to Xiaomi MiMo Anthropic-compatible endpoint using MIMO_API_KEY."
+	},
+	openrouter: {
+		name: "openrouter",
+		displayName: "OpenRouter",
+		compatibility: "direct",
+		defaultHarness: "ohmypi",
+		baseUrl: "https://openrouter.ai/api/v1",
+		authType: "static",
+		models: [],
+		tested: true,
+		description: "Route directly to OpenRouter Anthropic-compatible endpoint; slash-containing model IDs pass through unchanged."
+	},
+	nous: {
+		name: "nous",
+		displayName: "Nous Portal",
+		compatibility: "direct",
+		defaultHarness: "ohmypi",
+		baseUrl: getOpenAICompatibleProxyBaseUrl("nous"),
+		authType: "static",
+		models: ["qwen/qwen3.6-plus"],
+		haikuModel: "qwen/qwen3.6-plus",
+		tierModels: {
+			opus: "qwen/qwen3.6-plus",
+			sonnet: "qwen/qwen3.6-plus",
+			haiku: "qwen/qwen3.6-plus"
+		},
+		tested: true,
+		description: "Route Nous Portal OpenAI-compatible models through Overdeck's local Anthropic-compatible adapter using NOUS_API_KEY."
+	},
+	dashscope: {
+		name: "dashscope",
+		displayName: "Alibaba DashScope",
+		compatibility: "direct",
+		defaultHarness: "ohmypi",
+		baseUrl: getOpenAICompatibleProxyBaseUrl("dashscope"),
+		authType: "static",
+		models: [
+			"qwen3-max",
+			"qwen3-coder-plus",
+			"qwen3-plus",
+			"qwen3.7-max"
+		],
+		haikuModel: "qwen3-plus",
+		tierModels: {
+			opus: "qwen3-max",
+			sonnet: "qwen3-coder-plus",
+			haiku: "qwen3-plus"
+		},
+		tested: false,
+		description: "Route Alibaba DashScope Qwen models through Overdeck's local Anthropic-compatible adapter using DASHSCOPE_API_KEY against the Singapore intl endpoint (ap-southeast-1)."
+	},
+	xai: {
+		name: "xai",
+		displayName: "xAI (Grok)",
+		compatibility: "direct",
+		defaultHarness: "ohmypi",
+		baseUrl: "https://api.x.ai/v1",
+		authType: "static",
+		models: ["grok-build-0.1"],
+		tierModels: {
+			opus: "grok-build-0.1",
+			sonnet: "grok-build-0.1",
+			haiku: "grok-build-0.1"
+		},
+		tested: false,
+		description: "Route directly to xAI Anthropic-compatible endpoint using XAI_API_KEY. Model: grok-build-0.1 (256K ctx, $1/M in, $2/M out)."
+	},
+	groq: {
+		name: "groq",
+		displayName: "Groq",
+		compatibility: "direct",
+		defaultHarness: "ohmypi",
+		authType: "static",
+		models: [
+			"llama-3.3-70b-versatile",
+			"llama-3.1-8b-instant",
+			"qwen-qwq-32b",
+			"gemma2-9b-it"
+		],
+		haikuModel: "llama-3.1-8b-instant",
+		tierModels: {
+			opus: "llama-3.3-70b-versatile",
+			sonnet: "llama-3.3-70b-versatile",
+			haiku: "llama-3.1-8b-instant"
+		},
+		tested: false,
+		description: "Route via omp using GROQ_API_KEY. Ultra-low-latency inference on open-weight models."
+	},
+	cerebras: {
+		name: "cerebras",
+		displayName: "Cerebras",
+		compatibility: "direct",
+		defaultHarness: "ohmypi",
+		authType: "static",
+		models: [
+			"llama3.3-70b",
+			"llama3.1-70b",
+			"llama3.1-8b"
+		],
+		haikuModel: "llama3.1-8b",
+		tierModels: {
+			opus: "llama3.3-70b",
+			sonnet: "llama3.1-70b",
+			haiku: "llama3.1-8b"
+		},
+		tested: false,
+		description: "Route via omp using CEREBRAS_API_KEY. Hardware-accelerated inference on Cerebras wafer-scale chips."
+	},
+	mistral: {
+		name: "mistral",
+		displayName: "Mistral AI",
+		compatibility: "direct",
+		defaultHarness: "ohmypi",
+		authType: "static",
+		models: [
+			"mistral-large-latest",
+			"mistral-small-latest",
+			"codestral-latest"
+		],
+		haikuModel: "mistral-small-latest",
+		tierModels: {
+			opus: "mistral-large-latest",
+			sonnet: "mistral-large-latest",
+			haiku: "mistral-small-latest"
+		},
+		tested: false,
+		description: "Route via omp using MISTRAL_API_KEY."
+	}
+};
+var UnknownModelError = class extends Error {
+	constructor(modelId, suggestion) {
+		super(`Unknown model "${modelId}".${suggestion ? ` Did you mean "${suggestion}"?` : ""}`);
+		this.name = "UnknownModelError";
+	}
+};
+function knownModelIds$1() {
+	return Array.from(new Set([
+		...Object.values(PROVIDERS).flatMap((provider) => provider.models.map(String)),
+		...Object.keys(MODEL_DEPRECATIONS),
+		...Object.values(MODEL_DEPRECATIONS).map(String)
+	]));
+}
+function editDistance(a, b) {
+	const previous = Array.from({ length: b.length + 1 }, (_, index) => index);
+	const current = new Array(b.length + 1);
+	for (let i = 1; i <= a.length; i += 1) {
+		current[0] = i;
+		for (let j = 1; j <= b.length; j += 1) current[j] = Math.min(previous[j] + 1, current[j - 1] + 1, previous[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+		previous.splice(0, previous.length, ...current);
+	}
+	return previous[b.length];
+}
+function nearestKnownModelId(modelId) {
+	const normalizedInput = modelId.toLowerCase();
+	const compactInput = normalizedInput.replace(/[^a-z0-9]/g, "");
+	let best;
+	for (const candidate of knownModelIds$1()) {
+		const normalizedCandidate = candidate.toLowerCase();
+		const distance = Math.min(editDistance(normalizedInput, normalizedCandidate), editDistance(compactInput, normalizedCandidate.replace(/[^a-z0-9]/g, "")));
+		if (!best || distance < best.distance) best = {
+			model: candidate,
+			distance
+		};
+	}
+	if (!best) return void 0;
+	return best.distance <= Math.max(2, Math.floor(modelId.length / 3)) ? best.model : void 0;
+}
+/**
+* Get provider for a given model ID
+*/
+function getProviderForModelSync(modelId) {
+	if (["qwen/qwen3.6-plus"].includes(modelId)) return PROVIDERS.nous;
+	if ([
+		"qwen3-max",
+		"qwen3-coder-plus",
+		"qwen3-plus",
+		"qwen3.7-max"
+	].includes(modelId)) return PROVIDERS.dashscope;
+	if (modelId.includes("/")) return PROVIDERS.openrouter;
+	if ([
+		"claude-fable-5",
+		"claude-opus-4-8",
+		"claude-opus-4-7",
+		"claude-opus-4-6",
+		"claude-sonnet-5",
+		"claude-sonnet-4-6",
+		"claude-sonnet-4-5",
+		"claude-haiku-4-5"
+	].includes(modelId)) return PROVIDERS.anthropic;
+	if ([
+		"gpt-5.6-sol",
+		"gpt-5.6-terra",
+		"gpt-5.6-luna",
+		"gpt-5.5",
+		"gpt-5.4",
+		"gpt-5.4-mini",
+		"gpt-5.3-codex",
+		"gpt-5.3-codex-spark",
+		"gpt-5.2",
+		"gpt-5.5-pro",
+		"gpt-5.4-pro",
+		"o3",
+		"o4-mini",
+		"o3-deep-research",
+		"gpt-4o",
+		"gpt-4o-mini"
+	].includes(modelId)) return PROVIDERS.openai;
+	if ([
+		"gemini-3.1-pro-preview",
+		"gemini-3.1-flash-lite-preview",
+		"gemini-3-pro-preview",
+		"gemini-3-flash-preview",
+		"gemini-2.5-pro",
+		"gemini-2.5-flash"
+	].includes(modelId)) return PROVIDERS.google;
+	if ([
+		"minimax-m2.7",
+		"minimax-m2.7-highspeed",
+		"MiniMax-M3"
+	].includes(modelId)) return PROVIDERS.minimax;
+	if ([
+		"kimi-k2.7-code",
+		"kimi-k2.6",
+		"kimi-k2.5",
+		"kimi-k2",
+		"K2.6-code-preview"
+	].includes(modelId)) return PROVIDERS.kimi;
+	if (["grok-build-0.1"].includes(modelId)) return PROVIDERS.xai;
+	if ([
+		"glm-5.2",
+		"glm-5.1",
+		"glm-4.7",
+		"glm-4.7-flash"
+	].includes(modelId)) return PROVIDERS.zai;
+	if (["mimo-v2.5-pro", "mimo-v2.5"].includes(modelId)) return PROVIDERS.mimo;
+	if ([
+		"llama-3.3-70b-versatile",
+		"llama-3.1-8b-instant",
+		"qwen-qwq-32b",
+		"gemma2-9b-it"
+	].includes(modelId)) return PROVIDERS.groq;
+	if ([
+		"llama3.3-70b",
+		"llama3.1-70b",
+		"llama3.1-8b"
+	].includes(modelId)) return PROVIDERS.cerebras;
+	if ([
+		"mistral-large-latest",
+		"mistral-small-latest",
+		"codestral-latest"
+	].includes(modelId)) return PROVIDERS.mistral;
+	throw new UnknownModelError(String(modelId), nearestKnownModelId(String(modelId)));
+}
+//#endregion
+//#region ../../src/lib/harness-policy.ts
+const ALLOWED = { allowed: true };
+const OHMYPI_ANTHROPIC_SUBSCRIPTION_BLOCK = {
+	allowed: false,
+	reason: "Claude Code subscription Terms of Service restrict Anthropic models to the Claude Code harness — ohmypi cannot run Anthropic models under subscription auth. To proceed, switch the Anthropic provider to API-key auth, or pick a non-Anthropic model for ohmypi."
+};
+OHMYPI_ANTHROPIC_SUBSCRIPTION_BLOCK.reason;
+const SUBSCRIPTION_ONLY_MODEL_BLOCK = {
+	allowed: false,
+	reason: "This OpenAI model needs a ChatGPT/Codex subscription sign-in — it is not served by the plain OpenAI API key. Run `codex login` on the host (workspace containers inherit the host sign-in), or pick a different model."
+};
+/** Models that are gated to ChatGPT subscription auth only (no API-key path). */
+const SUBSCRIPTION_ONLY_OPENAI_MODELS = new Set([
+	"gpt-5.5",
+	"gpt-5.6-sol",
+	"gpt-5.6-terra",
+	"gpt-5.6-luna"
+]);
+/**
+* Check whether a (model, authMode) pair is allowed, independent of harness.
+* Use this in pickers to lock model options that the current auth setup can't reach.
+*/
+function canUseModelWithAuthSync(model, authMode) {
+	if (getProviderForModelSync(model).name === "openai" && SUBSCRIPTION_ONLY_OPENAI_MODELS.has(model) && authMode === "api-key") return SUBSCRIPTION_ONLY_MODEL_BLOCK;
+	return ALLOWED;
+}
+function canUseHarnessSync(harness, model, authMode) {
+	const modelAuth = canUseModelWithAuthSync(model, authMode);
+	if (!modelAuth.allowed) return modelAuth;
+	if (harness === "claude-code") return ALLOWED;
+	if (harness === "codex") return ALLOWED;
+	if (harness === "ohmypi") {
+		if (getProviderForModelSync(model).name === "anthropic" && authMode === "subscription") return OHMYPI_ANTHROPIC_SUBSCRIPTION_BLOCK;
+		return ALLOWED;
+	}
+	return ALLOWED;
+}
+//#endregion
+//#region ../../src/lib/agents/tier-table.ts
+const TIERED_EXECUTION_DIFFICULTIES = [
+	"trivial",
+	"simple",
+	"medium",
+	"complex",
+	"expert"
+];
+const TIERED_EXECUTION_SUBSCRIPTIONS = [
+	"all",
+	"flagged",
+	"sampled"
+];
+const TIERED_EXECUTION_ITEM_KINDS = [
+	"docs",
+	"api",
+	"backend",
+	"frontend",
+	"infra",
+	"test",
+	"refactor",
+	"design",
+	"spike"
+];
+const TIERED_EXECUTION_CALLOUT_POLICIES = [
+	"off",
+	"notify",
+	"corroborate"
+];
+const TIERED_EXECUTION_COMPACTION_REROUTE_POLICIES = ["off", "on"];
+var TieredExecutionConfigError = class extends Error {
+	constructor(message) {
+		super(message);
+		this.name = "TieredExecutionConfigError";
+	}
+};
+const DEFAULT_TIERED_EXECUTION_CONFIG = {
+	enabled: false,
+	tiers: {},
+	supervisor: void 0,
+	by_kind: {},
+	byKind: {},
+	feed: {
+		callouts: "off",
+		exclude: [],
+		exclude_subjects: [],
+		max_diff_bytes: null
+	},
+	escalation: {
+		enabled: false,
+		retries_at_tier: 0,
+		max_promotions: 0,
+		flounder_budget_minutes: {}
+	},
+	compaction_reroute: "off",
+	replay_threshold: .5,
+	difficultyToTier: {}
+};
+function isRuntimeName(value) {
+	return value === "claude-code" || value === "ohmypi" || value === "codex" || value === "acp";
+}
+function isDifficulty(value) {
+	return TIERED_EXECUTION_DIFFICULTIES.includes(value);
+}
+function isSubscription(value) {
+	return TIERED_EXECUTION_SUBSCRIPTIONS.includes(value);
+}
+function isItemKind(value) {
+	return TIERED_EXECUTION_ITEM_KINDS.includes(value);
+}
+function isCalloutPolicy(value) {
+	return TIERED_EXECUTION_CALLOUT_POLICIES.includes(value);
+}
+function isCompactionReroutePolicy(value) {
+	return TIERED_EXECUTION_COMPACTION_REROUTE_POLICIES.includes(value);
+}
+function knownModelIds() {
+	const ids = /* @__PURE__ */ new Set();
+	for (const provider of Object.values(PROVIDERS)) for (const model of provider.models) ids.add(model);
+	return ids;
+}
+function validateHarness(harness, path) {
+	if (!isRuntimeName(harness)) throw new TieredExecutionConfigError(`${path}.harness '${harness}' is unknown; expected claude-code, ohmypi, codex, or acp`);
+}
+function validateModel(model, path) {
+	const resolved = resolveModelIdSync(model);
+	if (!knownModelIds().has(resolved) && !resolved.includes("/")) throw new TieredExecutionConfigError(`${path}.model '${model}' is unknown`);
+	return resolved;
+}
+function validateModelHarnessPolicy(model, harness, path, context) {
+	const provider = getProviderForModelSync(model);
+	const authMode = context.providerAuth?.[provider.name];
+	const decision = canUseHarnessSync(harness, model, authMode);
+	if (!decision.allowed) throw new TieredExecutionConfigError(`${path} is not allowed: ${decision.reason ?? "harness policy rejected this model/harness/auth combination"}`);
+}
+function normalizeTieredExecutionConfig(config) {
+	return {
+		enabled: config?.enabled ?? false,
+		tiers: config?.tiers ?? {},
+		supervisor: config?.supervisor,
+		by_kind: config?.by_kind ?? {},
+		feed: config?.feed,
+		escalation: config?.escalation,
+		compaction_reroute: config?.compaction_reroute ?? "off",
+		replay_threshold: config?.replay_threshold ?? .5
+	};
+}
+function validateStringArray(value, path) {
+	if (value === void 0) return [];
+	if (!Array.isArray(value) || !value.every((item) => typeof item === "string")) throw new TieredExecutionConfigError(`${path} must be an array of strings`);
+	return [...value];
+}
+function validateNonNegativeInteger(value, path, defaultValue) {
+	if (value === void 0) return defaultValue;
+	if (!Number.isInteger(value) || value < 0) throw new TieredExecutionConfigError(`${path} must be a non-negative integer`);
+	return value;
+}
+function validateFeedConfig(config) {
+	const callouts = config?.callouts ?? "off";
+	if (!isCalloutPolicy(callouts)) throw new TieredExecutionConfigError(`tiered_execution.feed.callouts must be one of ${TIERED_EXECUTION_CALLOUT_POLICIES.join(", ")}`);
+	const maxDiffBytes = config?.max_diff_bytes ?? null;
+	if (maxDiffBytes !== null && (!Number.isInteger(maxDiffBytes) || maxDiffBytes <= 0)) throw new TieredExecutionConfigError("tiered_execution.feed.max_diff_bytes must be a positive integer or null");
+	return {
+		callouts,
+		exclude: validateStringArray(config?.exclude, "tiered_execution.feed.exclude"),
+		exclude_subjects: validateStringArray(config?.exclude_subjects, "tiered_execution.feed.exclude_subjects"),
+		max_diff_bytes: maxDiffBytes
+	};
+}
+function validateEscalationConfig(config) {
+	const flounderBudget = {};
+	for (const [difficulty, budget] of Object.entries(config?.flounder_budget_minutes ?? {})) {
+		if (!isDifficulty(difficulty)) throw new TieredExecutionConfigError(`tiered_execution.escalation.flounder_budget_minutes contains unknown difficulty '${difficulty}'`);
+		if (!Number.isFinite(budget) || budget <= 0) throw new TieredExecutionConfigError(`tiered_execution.escalation.flounder_budget_minutes.${difficulty} must be positive`);
+		flounderBudget[difficulty] = budget;
+	}
+	return {
+		enabled: config?.enabled ?? false,
+		retries_at_tier: validateNonNegativeInteger(config?.retries_at_tier, "tiered_execution.escalation.retries_at_tier", 0),
+		max_promotions: validateNonNegativeInteger(config?.max_promotions, "tiered_execution.escalation.max_promotions", 0),
+		flounder_budget_minutes: flounderBudget
+	};
+}
+function validateTieredExecutionConfig(rawConfig, context = {}) {
+	const config = normalizeTieredExecutionConfig(rawConfig);
+	const feed = validateFeedConfig(config.feed);
+	const escalation = validateEscalationConfig(config.escalation);
+	if (!isCompactionReroutePolicy(config.compaction_reroute ?? "off")) throw new TieredExecutionConfigError(`tiered_execution.compaction_reroute must be one of ${TIERED_EXECUTION_COMPACTION_REROUTE_POLICIES.join(", ")}`);
+	const compactionReroute = config.compaction_reroute ?? "off";
+	if (!(config.enabled || Object.keys(config.tiers).length > 0 || Object.keys(config.by_kind ?? {}).length > 0 || config.supervisor !== void 0)) return {
+		...DEFAULT_TIERED_EXECUTION_CONFIG,
+		feed,
+		escalation,
+		compaction_reroute: compactionReroute
+	};
+	if (typeof config.replay_threshold !== "number" || config.replay_threshold <= 0 || config.replay_threshold > 1) throw new TieredExecutionConfigError("tiered_execution.replay_threshold must be a number > 0 and <= 1");
+	const difficultyOwners = {};
+	const normalizedTiers = {};
+	for (const [tierName, tier] of Object.entries(config.tiers)) {
+		const path = `tiered_execution.tiers.${tierName}`;
+		const rawDistribution = tier.distribution;
+		let normalizedDistribution;
+		let model;
+		let harness;
+		if (rawDistribution !== void 0) {
+			if (!Array.isArray(rawDistribution) || rawDistribution.length === 0) throw new TieredExecutionConfigError(`${path}.distribution must be a non-empty array of {model, harness, weight}`);
+			normalizedDistribution = rawDistribution.map((entry, index) => {
+				const entryPath = `${path}.distribution[${index}]`;
+				const candidate = entry;
+				validateHarness(candidate.harness, entryPath);
+				const entryModel = validateModel(candidate.model, entryPath);
+				validateModelHarnessPolicy(entryModel, candidate.harness, entryPath, context);
+				if (!Number.isInteger(candidate.weight) || candidate.weight <= 0) throw new TieredExecutionConfigError(`${entryPath}.weight must be a positive integer`);
+				return {
+					model: entryModel,
+					harness: candidate.harness,
+					weight: candidate.weight
+				};
+			});
+			const total = normalizedDistribution.reduce((sum, entry) => sum + entry.weight, 0);
+			if (total !== 100) throw new TieredExecutionConfigError(`${path}.distribution weights must total exactly 100 (got ${total})`);
+			const representative = normalizedDistribution.reduce((best, entry) => entry.weight > best.weight ? entry : best);
+			if (tier.model !== void 0 && tier.model !== representative.model || tier.harness !== void 0 && tier.harness !== representative.harness) throw new TieredExecutionConfigError(`${path} must declare either model/harness or distribution, not both`);
+			model = representative.model;
+			harness = representative.harness;
+		} else {
+			validateHarness(tier.harness, path);
+			model = validateModel(tier.model, path);
+			validateModelHarnessPolicy(model, tier.harness, path, context);
+			harness = tier.harness;
+		}
+		if (!Array.isArray(tier.difficulties) || tier.difficulties.length === 0) throw new TieredExecutionConfigError(`${path}.difficulties must contain at least one difficulty`);
+		const difficulties = [];
+		for (const difficulty of tier.difficulties) {
+			if (!isDifficulty(difficulty)) throw new TieredExecutionConfigError(`${path}.difficulties contains unknown difficulty '${difficulty}'`);
+			difficulties.push(difficulty);
+			difficultyOwners[difficulty] = [...difficultyOwners[difficulty] ?? [], tierName];
+		}
+		normalizedTiers[tierName] = {
+			model,
+			harness,
+			difficulties,
+			...normalizedDistribution ? { distribution: normalizedDistribution } : {}
+		};
+	}
+	const difficultyToTier = {};
+	for (const difficulty of TIERED_EXECUTION_DIFFICULTIES) {
+		const owners = difficultyOwners[difficulty] ?? [];
+		if (owners.length === 0) throw new TieredExecutionConfigError(`tiered_execution difficulty '${difficulty}' is not mapped to any tier`);
+		if (owners.length > 1) throw new TieredExecutionConfigError(`tiered_execution difficulty '${difficulty}' is mapped to multiple tiers: ${owners.join(", ")}`);
+		difficultyToTier[difficulty] = owners[0];
+	}
+	const byKind = {};
+	for (const [kind, tierName] of Object.entries(config.by_kind ?? {})) {
+		if (!isItemKind(kind)) throw new TieredExecutionConfigError(`tiered_execution.by_kind contains unknown item kind '${kind}'`);
+		if (!normalizedTiers[tierName]) throw new TieredExecutionConfigError(`tiered_execution.by_kind.${kind} references unknown tier '${tierName}'`);
+		byKind[kind] = tierName;
+	}
+	if (!config.supervisor) throw new TieredExecutionConfigError("tiered_execution.supervisor is required when tiered execution tiers are configured");
+	validateHarness(config.supervisor.harness, "tiered_execution.supervisor");
+	const supervisorModel = validateModel(config.supervisor.model, "tiered_execution.supervisor");
+	validateModelHarnessPolicy(supervisorModel, config.supervisor.harness, "tiered_execution.supervisor", context);
+	if (!isSubscription(config.supervisor.subscribe)) throw new TieredExecutionConfigError(`tiered_execution.supervisor.subscribe must be one of ${TIERED_EXECUTION_SUBSCRIPTIONS.join(", ")}`);
+	return {
+		enabled: config.enabled,
+		tiers: normalizedTiers,
+		supervisor: {
+			model: supervisorModel,
+			harness: config.supervisor.harness,
+			subscribe: config.supervisor.subscribe,
+			owns_inspection: config.supervisor.owns_inspection ?? true
+		},
+		by_kind: byKind,
+		byKind,
+		feed,
+		escalation,
+		compaction_reroute: compactionReroute,
+		replay_threshold: config.replay_threshold,
+		difficultyToTier
+	};
+}
+//#endregion
+//#region ../../src/lib/config-yaml/defaults.ts
+/**
+* PAN-2500: default deacon memory-governor reserves as fractions of total RAM,
+* with absolute floors (small boxes still get a workable reserve). Computed
+* once at module load — totalmem() is stable for the process lifetime.
+*/
+function computeGovernorReserveDefaultsGb() {
+	const totalGb = totalmem() / 1024 ** 3;
+	return {
+		soft: Math.max(.15 * totalGb, 8),
+		hard: Math.max(.08 * totalGb, 4),
+		recovery: Math.max(.25 * totalGb, 12)
+	};
+}
+const GOVERNOR_RESERVE_DEFAULTS_GB = computeGovernorReserveDefaultsGb();
+const DEFAULT_DOCS_TRIGGER_REGEXES = [
+	"pan",
+	"overdeck",
+	"cloister",
+	"deacon",
+	"workspace",
+	"specialist",
+	"harness",
+	"vbrief",
+	"workhorse"
+];
+const DEFAULT_CONFIG = {
+	swarm: {
+		mode: "off",
+		maxSlots: 3,
+		autoAdvance: true
+	},
+	tmux: { configMode: "managed" },
+	enabledProviders: new Set(["anthropic"]),
+	defaultConversationModel: "claude-sonnet-5",
+	apiKeys: {},
+	providerAuth: {},
+	providerPlan: {},
+	providerHarnesses: {},
+	openrouterFavorites: [],
+	workhorses: { ...DEFAULT_WORKHORSES },
+	roles: cloneRoles(DEFAULT_ROLES),
+	tieredExecution: { ...DEFAULT_TIERED_EXECUTION_CONFIG },
+	overrides: {},
+	geminiThinkingLevel: 3,
+	trackerKeys: {},
+	conversations: {
+		compactionModel: "claude-haiku-4-5",
+		manualCompactMode: "claude-code",
+		richCompaction: true,
+		titleModel: "claude-haiku-4-5",
+		watchDirs: ["~/Projects"],
+		scanMaxParallel: null,
+		embeddings: false,
+		embeddingProvider: "openai",
+		embeddingModel: "text-embedding-3-small",
+		embeddingAutoOnDeep: true,
+		enrichment: {
+			quickModel: null,
+			deepModel: null,
+			maxParallel: 4,
+			costConfirmThreshold: 1
+		}
+	},
+	docs: {
+		enabled: true,
+		promptInjectionEnabled: true,
+		cliEnabled: true,
+		trigger: {
+			regexes: DEFAULT_DOCS_TRIGGER_REGEXES,
+			caseSensitive: false
+		},
+		corpus: {
+			docs: true,
+			skills: true,
+			rules: true,
+			claudeMd: true,
+			prds: false,
+			prdStatuses: ["active", "planned"],
+			maxChunkTokens: 500
+		},
+		budget: {
+			injectionRate: 1,
+			turnWindow: 10,
+			maxTokensPerInjection: 3e3,
+			maxChunksPerInjection: 5,
+			bypassClassifierThreshold: .85
+		},
+		embedding: {
+			provider: "local",
+			model: "gte-small",
+			dimensions: 384
+		},
+		classifier: {
+			enabled: false,
+			provider: "anthropic",
+			model: "claude-haiku-4-5",
+			threshold: .85,
+			timeoutMs: 1500
+		}
+	},
+	conversationSearch: {
+		enabled: false,
+		provider: "openai",
+		model: "text-embedding-3-small",
+		apiKeyRef: void 0,
+		dbPath: join(homedir(), ".overdeck", "conversations", "embeddings.db")
+	},
+	memory: {
+		extraction: { fallbackChain: [] },
+		observationsEnabled: true,
+		promptTimeInjectionEnabled: true,
+		knowledgeIndexEnabled: true,
+		rollupPendingThreshold: 4,
+		sidebarRefreshIntervalMs: 1e4,
+		workerConcurrency: 4
+	},
+	backgroundAi: {
+		cheapMode: true,
+		features: defaultBackgroundAiFeatures()
+	},
+	compliance: { mode: "advisory" },
+	registry: { classification: {
+		enabled: true,
+		provider: "cliproxy",
+		model: "gpt-4.1-nano",
+		perDayCostCapUsd: 1
+	} },
+	knowledge: { postMergeAutoRetro: false },
+	shadow: {
+		enabled: false,
+		trackers: {
+			linear: false,
+			github: false,
+			gitlab: false,
+			rally: false
+		}
+	},
+	caveman: {
+		enabled: false,
+		abTest: false,
+		modes: {
+			work: "full",
+			review: "review",
+			test: "full",
+			merge: "full"
+		}
+	},
+	rtk: { enabled: false },
+	tldr: { enabled: true },
+	tts: {
+		enabled: false,
+		lifecycle: true,
+		voice: "",
+		volume: 1,
+		rate: 1,
+		maxChars: 140,
+		dropInfoWhenFull: true,
+		daemonPort: 8787,
+		daemonHost: "127.0.0.1",
+		daemonAutoStart: false,
+		voiceMap: {},
+		mutedSources: [],
+		utteranceTemplates: {},
+		mutedIssues: []
+	},
+	ttsSummarizer: {
+		enabled: false,
+		model: "gpt-5.4-mini",
+		batchWindowSeconds: 15
+	},
+	resources: {
+		memoryWarnGb: 4,
+		memoryBlockGb: 2,
+		agentWarnCount: 8,
+		agentBlockCount: 10,
+		governorSoftReserveGb: GOVERNOR_RESERVE_DEFAULTS_GB.soft,
+		governorHardReserveGb: GOVERNOR_RESERVE_DEFAULTS_GB.hard,
+		governorRecoveryReserveGb: GOVERNOR_RESERVE_DEFAULTS_GB.recovery,
+		governorFootprintDefaultWorkGb: 2,
+		governorFootprintDefaultReviewGb: 1,
+		governorFootprintDefaultTestGb: 1
+	},
+	issues: { closedWindowDays: 14 },
+	experimental: {
+		experimentalFeatures: false,
+		claudeCodeChannels: false,
+		claudeCodeChannelsMcp: false,
+		streamdownRenderer: false,
+		showHarnessModelPermutations: false
+	},
+	claude: { permissionMode: "bypass" },
+	codex: {
+		permissionMode: "auto-review",
+		transport: "app-server"
+	}
+};
+/**
+* Path to global config file
+*/
+const GLOBAL_CONFIG_PATH = join(homedir(), ".overdeck", "config.yaml");
+//#endregion
+//#region ../../src/lib/config-yaml/domain-mergers.ts
+function isComplianceMode(value) {
+	return typeof value === "string" && COMPLIANCE_MODES.includes(value);
+}
+function isFeatureRegistryClassificationProvider(value) {
+	return value === "anthropic" || value === "cliproxy";
+}
+const VALID_RESILIENCY_TIERS = ["ephemeral", "durable"];
+function isResiliencyTier(value) {
+	return typeof value === "string" && VALID_RESILIENCY_TIERS.includes(value);
+}
+/**
+* Merge remote work-agent provisioning settings from a single config source.
+*/
+function mergeRemoteConfig(result, config) {
+	const remote = config?.remote;
+	if (!remote) return;
+	if (remote.resiliency_tier !== void 0) {
+		if (!isResiliencyTier(remote.resiliency_tier)) throw new Error(`config.yaml: remote.resiliency_tier must be one of ${VALID_RESILIENCY_TIERS.join(", ")}`);
+		result.remote = {
+			...result.remote ?? { maxConcurrentAgents: 0 },
+			resiliencyTier: remote.resiliency_tier
+		};
+	}
+	if (remote.max_concurrent_agents !== void 0) {
+		if (typeof remote.max_concurrent_agents !== "number" || !Number.isInteger(remote.max_concurrent_agents) || remote.max_concurrent_agents < 0) throw new Error("config.yaml: remote.max_concurrent_agents must be a non-negative integer");
+		result.remote = {
+			...result.remote ?? { resiliencyTier: "ephemeral" },
+			maxConcurrentAgents: remote.max_concurrent_agents
+		};
+	}
+}
+/**
+* Merge shadow configuration from multiple sources
+*/
+function mergeShadowConfig(result, config) {
+	if (!config?.shadow) return;
+	if (config.shadow.enabled !== void 0) result.enabled = config.shadow.enabled;
+	if (config.shadow.trackers) {
+		if (config.shadow.trackers.linear !== void 0) result.trackers.linear = config.shadow.trackers.linear;
+		if (config.shadow.trackers.github !== void 0) result.trackers.github = config.shadow.trackers.github;
+		if (config.shadow.trackers.gitlab !== void 0) result.trackers.gitlab = config.shadow.trackers.gitlab;
+		if (config.shadow.trackers.rally !== void 0) result.trackers.rally = config.shadow.trackers.rally;
+	}
+}
+/**
+* Merge caveman configuration from a single config source into the result.
+*/
+function mergeCavemanConfig(result, config) {
+	const caveman = config?.agents?.caveman;
+	if (!caveman) return;
+	if (caveman.enabled !== void 0) result.enabled = caveman.enabled;
+	if (caveman.ab_test !== void 0) result.abTest = caveman.ab_test;
+	if (caveman.work !== void 0) result.modes.work = caveman.work;
+	if (caveman.review !== void 0) result.modes.review = caveman.review;
+	if (caveman.test !== void 0) result.modes.test = caveman.test;
+	if (caveman.merge !== void 0) result.modes.merge = caveman.merge;
+}
+function mergeRtkConfig(result, config) {
+	const rtk = config?.agents?.rtk;
+	if (!rtk) return;
+	if (rtk.enabled !== void 0) result.enabled = rtk.enabled;
+}
+function mergeTldrConfig(result, config) {
+	const tldr = config?.agents?.tldr;
+	if (!tldr) return;
+	if (tldr.enabled !== void 0) result.enabled = tldr.enabled;
+}
+function cloneDocsConfig(config) {
+	return {
+		enabled: config.enabled,
+		promptInjectionEnabled: config.promptInjectionEnabled,
+		cliEnabled: config.cliEnabled,
+		trigger: {
+			regexes: [...config.trigger.regexes],
+			caseSensitive: config.trigger.caseSensitive
+		},
+		corpus: {
+			docs: config.corpus.docs,
+			skills: config.corpus.skills,
+			rules: config.corpus.rules,
+			claudeMd: config.corpus.claudeMd,
+			prds: config.corpus.prds,
+			prdStatuses: [...config.corpus.prdStatuses],
+			maxChunkTokens: config.corpus.maxChunkTokens
+		},
+		budget: { ...config.budget },
+		embedding: { ...config.embedding },
+		classifier: { ...config.classifier }
+	};
+}
+function mergeDocsConfig(result, config) {
+	const docs = config?.docs;
+	if (!docs) return;
+	if (docs.enabled !== void 0) result.enabled = docs.enabled;
+	if (docs.prompt_injection !== void 0) result.promptInjectionEnabled = docs.prompt_injection;
+	if (docs.cli !== void 0) result.cliEnabled = docs.cli;
+	if (docs.trigger) {
+		if (docs.trigger.regexes !== void 0) result.trigger.regexes = [...docs.trigger.regexes];
+		if (docs.trigger.case_sensitive !== void 0) result.trigger.caseSensitive = docs.trigger.case_sensitive;
+	}
+	if (docs.corpus) {
+		if (docs.corpus.docs !== void 0) result.corpus.docs = docs.corpus.docs;
+		if (docs.corpus.skills !== void 0) result.corpus.skills = docs.corpus.skills;
+		if (docs.corpus.rules !== void 0) result.corpus.rules = docs.corpus.rules;
+		if (docs.corpus.claude_md !== void 0) result.corpus.claudeMd = docs.corpus.claude_md;
+		if (docs.corpus.prds !== void 0) result.corpus.prds = docs.corpus.prds;
+		if (docs.corpus.prd_statuses !== void 0) result.corpus.prdStatuses = [...docs.corpus.prd_statuses];
+		if (docs.corpus.max_chunk_tokens !== void 0) result.corpus.maxChunkTokens = docs.corpus.max_chunk_tokens;
+	}
+	if (docs.budget) {
+		if (docs.budget.injection_rate !== void 0) result.budget.injectionRate = docs.budget.injection_rate;
+		if (docs.budget.turn_window !== void 0) result.budget.turnWindow = docs.budget.turn_window;
+		if (docs.budget.max_tokens_per_injection !== void 0) result.budget.maxTokensPerInjection = docs.budget.max_tokens_per_injection;
+		if (docs.budget.max_chunks_per_injection !== void 0) result.budget.maxChunksPerInjection = docs.budget.max_chunks_per_injection;
+		if (docs.budget.bypass_classifier_threshold !== void 0) result.budget.bypassClassifierThreshold = docs.budget.bypass_classifier_threshold;
+	}
+	if (docs.embedding) {
+		if (docs.embedding.provider !== void 0) result.embedding.provider = docs.embedding.provider;
+		if (docs.embedding.model !== void 0) result.embedding.model = docs.embedding.model;
+		if (docs.embedding.dimensions !== void 0) result.embedding.dimensions = docs.embedding.dimensions;
+	}
+	if (docs.classifier) {
+		if (docs.classifier.enabled !== void 0) result.classifier.enabled = docs.classifier.enabled;
+		if (docs.classifier.provider !== void 0) result.classifier.provider = docs.classifier.provider;
+		if (docs.classifier.model !== void 0) result.classifier.model = docs.classifier.model;
+		if (docs.classifier.threshold !== void 0) result.classifier.threshold = docs.classifier.threshold;
+		if (docs.classifier.timeout_ms !== void 0) result.classifier.timeoutMs = docs.classifier.timeout_ms;
+	}
+}
+function mergeTtsConfig(result, config) {
+	const tts = config?.tts;
+	if (!tts) return;
+	if (tts.enabled !== void 0) result.enabled = tts.enabled;
+	if (tts.lifecycle !== void 0) result.lifecycle = tts.lifecycle;
+	if (tts.voice !== void 0) result.voice = tts.voice;
+	if (tts.statusVoice !== void 0) result.statusVoice = tts.statusVoice;
+	if (tts.volume !== void 0) result.volume = tts.volume;
+	if (tts.rate !== void 0) result.rate = tts.rate;
+	if (tts.maxChars !== void 0) result.maxChars = tts.maxChars;
+	if (tts.dropInfoWhenFull !== void 0) result.dropInfoWhenFull = tts.dropInfoWhenFull;
+	if (tts.daemonPort !== void 0) result.daemonPort = tts.daemonPort;
+	if (tts.daemonHost !== void 0) result.daemonHost = tts.daemonHost;
+	if (tts.daemon?.autoStart !== void 0) result.daemonAutoStart = tts.daemon.autoStart;
+	if (tts.voiceMap !== void 0) result.voiceMap = { ...tts.voiceMap };
+	if (tts.mutedSources !== void 0) result.mutedSources = [...tts.mutedSources];
+	if (tts.utteranceTemplates !== void 0) result.utteranceTemplates = { ...tts.utteranceTemplates };
+	if (tts.mutedIssues !== void 0) result.mutedIssues = [...tts.mutedIssues];
+}
+//#endregion
+//#region ../../src/lib/config-yaml/merge.ts
+/**
+* Normalize a provider config (handle both boolean and object forms)
+*/
+function normalizeProviderConfig(providerConfig, fallbackKey) {
+	if (providerConfig === void 0) return { enabled: false };
+	if (typeof providerConfig === "boolean") return {
+		enabled: providerConfig,
+		api_key: fallbackKey
+	};
+	return {
+		enabled: providerConfig.enabled,
+		api_key: providerConfig.api_key || fallbackKey,
+		harness: providerConfig.harness,
+		auth: providerConfig.auth,
+		plan: providerConfig.plan
+	};
+}
+function validateProviderHarness(provider, harness) {
+	if (harness !== void 0 && harness !== "claude-code" && harness !== "ohmypi" && harness !== "codex" && harness !== "acp") throw new Error(`config.yaml: models.providers.${provider}.harness must be claude-code, ohmypi, codex, or acp`);
+}
+function applyProviderHarness(result, provider, harness) {
+	validateProviderHarness(provider, harness);
+	if (harness !== void 0) result.providerHarnesses[provider] = harness;
+}
+/**
+* Resolve environment variables in config values.
+* If the env var is not set, returns the original reference (e.g., "$OPENAI_API_KEY")
+* so the UI can show that it's configured via env var but not resolved.
+*/
+function resolveEnvVar(value) {
+	if (!value) return void 0;
+	return value.replace(/\$\{?([A-Z_][A-Z0-9_]*)\}?/g, (match, varName) => {
+		const envValue = process.env[varName];
+		return envValue !== void 0 ? envValue : match;
+	});
+}
+/**
+* Merge multiple configs with precedence: project > global > defaults
+*/
+let lastTieredInvalidReasonWarned;
+function degradeInvalidTieredExecution(result, err) {
+	if (!(err instanceof TieredExecutionConfigError)) throw err;
+	if (lastTieredInvalidReasonWarned !== err.message) {
+		lastTieredInvalidReasonWarned = err.message;
+		console.error(`[config] tiered_execution is INVALID — tiered staffing disabled until fixed: ${err.message}`);
+	}
+	result.tieredExecutionInvalid = { reason: err.message };
+	result.tieredExecution = {
+		...DEFAULT_TIERED_EXECUTION_CONFIG,
+		enabled: false
+	};
+}
+function mergeConfigs(...configs) {
+	const result = {
+		...DEFAULT_CONFIG,
+		swarm: { ...DEFAULT_CONFIG.swarm },
+		tmux: { ...DEFAULT_CONFIG.tmux },
+		enabledProviders: new Set(DEFAULT_CONFIG.enabledProviders),
+		providerHarnesses: { ...DEFAULT_CONFIG.providerHarnesses },
+		workhorses: { ...DEFAULT_WORKHORSES },
+		roles: cloneRoles(DEFAULT_ROLES),
+		tieredExecution: { ...DEFAULT_TIERED_EXECUTION_CONFIG },
+		memory: {
+			extraction: {
+				...DEFAULT_CONFIG.memory.extraction,
+				fallbackChain: [...DEFAULT_CONFIG.memory.extraction.fallbackChain]
+			},
+			observationsEnabled: DEFAULT_CONFIG.memory.observationsEnabled,
+			promptTimeInjectionEnabled: DEFAULT_CONFIG.memory.promptTimeInjectionEnabled,
+			knowledgeIndexEnabled: DEFAULT_CONFIG.memory.knowledgeIndexEnabled,
+			rollupPendingThreshold: DEFAULT_CONFIG.memory.rollupPendingThreshold,
+			sidebarRefreshIntervalMs: DEFAULT_CONFIG.memory.sidebarRefreshIntervalMs,
+			workerConcurrency: DEFAULT_CONFIG.memory.workerConcurrency
+		},
+		backgroundAi: {
+			cheapMode: DEFAULT_CONFIG.backgroundAi.cheapMode,
+			features: { ...DEFAULT_CONFIG.backgroundAi.features }
+		},
+		compliance: { mode: DEFAULT_CONFIG.compliance.mode },
+		registry: { classification: { ...DEFAULT_CONFIG.registry.classification } },
+		knowledge: { ...DEFAULT_CONFIG.knowledge },
+		shadow: {
+			enabled: DEFAULT_CONFIG.shadow.enabled,
+			trackers: { ...DEFAULT_CONFIG.shadow.trackers }
+		},
+		caveman: {
+			enabled: DEFAULT_CONFIG.caveman.enabled,
+			abTest: DEFAULT_CONFIG.caveman.abTest,
+			modes: { ...DEFAULT_CONFIG.caveman.modes }
+		},
+		rtk: { enabled: DEFAULT_CONFIG.rtk.enabled },
+		docs: cloneDocsConfig(DEFAULT_CONFIG.docs),
+		conversationSearch: { ...DEFAULT_CONFIG.conversationSearch },
+		tts: {
+			enabled: DEFAULT_CONFIG.tts.enabled,
+			lifecycle: DEFAULT_CONFIG.tts.lifecycle,
+			voice: DEFAULT_CONFIG.tts.voice,
+			volume: DEFAULT_CONFIG.tts.volume,
+			rate: DEFAULT_CONFIG.tts.rate,
+			maxChars: DEFAULT_CONFIG.tts.maxChars,
+			dropInfoWhenFull: DEFAULT_CONFIG.tts.dropInfoWhenFull,
+			daemonPort: DEFAULT_CONFIG.tts.daemonPort,
+			daemonHost: DEFAULT_CONFIG.tts.daemonHost,
+			daemonAutoStart: DEFAULT_CONFIG.tts.daemonAutoStart,
+			voiceMap: { ...DEFAULT_CONFIG.tts.voiceMap },
+			mutedSources: [...DEFAULT_CONFIG.tts.mutedSources],
+			utteranceTemplates: { ...DEFAULT_CONFIG.tts.utteranceTemplates },
+			mutedIssues: [...DEFAULT_CONFIG.tts.mutedIssues]
+		},
+		ttsSummarizer: {
+			enabled: DEFAULT_CONFIG.ttsSummarizer.enabled,
+			model: DEFAULT_CONFIG.ttsSummarizer.model,
+			batchWindowSeconds: DEFAULT_CONFIG.ttsSummarizer.batchWindowSeconds
+		},
+		resources: {
+			memoryWarnGb: DEFAULT_CONFIG.resources.memoryWarnGb,
+			memoryBlockGb: DEFAULT_CONFIG.resources.memoryBlockGb,
+			agentWarnCount: DEFAULT_CONFIG.resources.agentWarnCount,
+			agentBlockCount: DEFAULT_CONFIG.resources.agentBlockCount,
+			governorSoftReserveGb: DEFAULT_CONFIG.resources.governorSoftReserveGb,
+			governorHardReserveGb: DEFAULT_CONFIG.resources.governorHardReserveGb,
+			governorRecoveryReserveGb: DEFAULT_CONFIG.resources.governorRecoveryReserveGb,
+			governorFootprintDefaultWorkGb: DEFAULT_CONFIG.resources.governorFootprintDefaultWorkGb,
+			governorFootprintDefaultReviewGb: DEFAULT_CONFIG.resources.governorFootprintDefaultReviewGb,
+			governorFootprintDefaultTestGb: DEFAULT_CONFIG.resources.governorFootprintDefaultTestGb
+		},
+		issues: { closedWindowDays: DEFAULT_CONFIG.issues.closedWindowDays },
+		experimental: {
+			experimentalFeatures: DEFAULT_CONFIG.experimental.experimentalFeatures,
+			claudeCodeChannels: DEFAULT_CONFIG.experimental.claudeCodeChannels,
+			claudeCodeChannelsMcp: DEFAULT_CONFIG.experimental.claudeCodeChannelsMcp,
+			streamdownRenderer: DEFAULT_CONFIG.experimental.streamdownRenderer,
+			showHarnessModelPermutations: DEFAULT_CONFIG.experimental.showHarnessModelPermutations
+		},
+		claude: { permissionMode: DEFAULT_CONFIG.claude.permissionMode },
+		codex: {
+			permissionMode: DEFAULT_CONFIG.codex.permissionMode,
+			transport: DEFAULT_CONFIG.codex.transport
+		}
+	};
+	const explicitlyDisabled = /* @__PURE__ */ new Set();
+	const validConfigs = configs.filter((c) => c !== null);
+	for (const config of validConfigs.reverse()) {
+		if (config.swarm) result.swarm = {
+			...result.swarm,
+			...config.swarm
+		};
+		if (config.models?.providers) {
+			const providers = config.models.providers;
+			const legacyKeys = config.api_keys || {};
+			const anthropic = normalizeProviderConfig(providers.anthropic, void 0);
+			applyProviderHarness(result, "anthropic", anthropic.harness);
+			if (anthropic.enabled) {
+				result.enabledProviders.add("anthropic");
+				if (anthropic.auth) result.providerAuth.anthropic = anthropic.auth;
+				if (anthropic.plan) result.providerPlan.anthropic = anthropic.plan;
+			} else if (providers.anthropic !== void 0) {
+				explicitlyDisabled.add("anthropic");
+				result.enabledProviders.delete("anthropic");
+			}
+			const openai = normalizeProviderConfig(providers.openai, legacyKeys.openai);
+			applyProviderHarness(result, "openai", openai.harness);
+			if (openai.enabled) {
+				result.enabledProviders.add("openai");
+				if (openai.api_key) result.apiKeys.openai = resolveEnvVar(openai.api_key);
+				if (openai.auth) result.providerAuth.openai = openai.auth;
+				if (openai.plan) result.providerPlan.openai = openai.plan;
+			} else if (providers.openai !== void 0) explicitlyDisabled.add("openai");
+			const google = normalizeProviderConfig(providers.google, legacyKeys.google);
+			applyProviderHarness(result, "google", google.harness);
+			if (google.enabled) {
+				result.enabledProviders.add("google");
+				if (google.api_key) result.apiKeys.google = resolveEnvVar(google.api_key);
+				if (google.auth) result.providerAuth.google = google.auth;
+				if (google.plan) result.providerPlan.google = google.plan;
+			} else if (providers.google !== void 0) explicitlyDisabled.add("google");
+			const minimax = normalizeProviderConfig(providers.minimax, legacyKeys.minimax);
+			applyProviderHarness(result, "minimax", minimax.harness);
+			if (minimax.enabled) {
+				result.enabledProviders.add("minimax");
+				if (minimax.api_key) result.apiKeys.minimax = resolveEnvVar(minimax.api_key);
+			} else if (providers.minimax !== void 0) explicitlyDisabled.add("minimax");
+			const zai = normalizeProviderConfig(providers.zai, legacyKeys.zai);
+			applyProviderHarness(result, "zai", zai.harness);
+			if (zai.enabled) {
+				result.enabledProviders.add("zai");
+				if (zai.api_key) result.apiKeys.zai = resolveEnvVar(zai.api_key);
+			} else if (providers.zai !== void 0) explicitlyDisabled.add("zai");
+			const kimi = normalizeProviderConfig(providers.kimi, legacyKeys.kimi);
+			applyProviderHarness(result, "kimi", kimi.harness);
+			if (kimi.enabled) {
+				result.enabledProviders.add("kimi");
+				if (kimi.api_key) result.apiKeys.kimi = resolveEnvVar(kimi.api_key);
+			} else if (providers.kimi !== void 0) explicitlyDisabled.add("kimi");
+			const openrouter = normalizeProviderConfig(providers.openrouter, legacyKeys.openrouter);
+			applyProviderHarness(result, "openrouter", openrouter.harness);
+			if (openrouter.enabled) {
+				result.enabledProviders.add("openrouter");
+				if (openrouter.api_key) result.apiKeys.openrouter = resolveEnvVar(openrouter.api_key);
+			} else if (providers.openrouter !== void 0) explicitlyDisabled.add("openrouter");
+			const mimo = normalizeProviderConfig(providers.mimo, legacyKeys.mimo);
+			applyProviderHarness(result, "mimo", mimo.harness);
+			if (mimo.enabled) {
+				result.enabledProviders.add("mimo");
+				if (mimo.api_key) result.apiKeys.mimo = resolveEnvVar(mimo.api_key);
+			} else if (providers.mimo !== void 0) explicitlyDisabled.add("mimo");
+			const nous = normalizeProviderConfig(providers.nous, legacyKeys.nous);
+			applyProviderHarness(result, "nous", nous.harness);
+			if (nous.enabled) {
+				result.enabledProviders.add("nous");
+				if (nous.api_key) result.apiKeys.nous = resolveEnvVar(nous.api_key);
+			} else if (providers.nous !== void 0) explicitlyDisabled.add("nous");
+			const dashscope = normalizeProviderConfig(providers.dashscope, legacyKeys.dashscope);
+			applyProviderHarness(result, "dashscope", dashscope.harness);
+			if (dashscope.enabled) {
+				result.enabledProviders.add("dashscope");
+				if (dashscope.api_key) result.apiKeys.dashscope = resolveEnvVar(dashscope.api_key);
+			} else if (providers.dashscope !== void 0) explicitlyDisabled.add("dashscope");
+		}
+		if (config.tmux?.config_mode) result.tmux.configMode = config.tmux.config_mode;
+		if (config.conversations?.compaction_model) result.conversations.compactionModel = resolveModelIdSync(config.conversations.compaction_model);
+		if (config.conversations?.manual_compact_mode) result.conversations.manualCompactMode = config.conversations.manual_compact_mode;
+		if (config.conversations?.rich_compaction !== void 0) result.conversations.richCompaction = config.conversations.rich_compaction;
+		if (config.conversations?.title_model) result.conversations.titleModel = resolveModelIdSync(config.conversations.title_model);
+		if (config.conversations?.watch_dirs) result.conversations.watchDirs = config.conversations.watch_dirs;
+		if (config.conversations?.scan_max_parallel !== void 0) result.conversations.scanMaxParallel = config.conversations.scan_max_parallel;
+		if (config.conversations?.embeddings !== void 0) result.conversations.embeddings = config.conversations.embeddings;
+		if (config.conversations?.embedding_provider) {
+			result.conversations.embeddingProvider = config.conversations.embedding_provider;
+			if (config.conversations.embedding_provider === "ollama" && !config.conversations.embedding_model) result.conversations.embeddingModel = "nomic-embed-text";
+		}
+		if (config.conversations?.embedding_model) result.conversations.embeddingModel = config.conversations.embedding_model;
+		if (config.conversations?.embedding_auto_on_deep !== void 0) result.conversations.embeddingAutoOnDeep = config.conversations.embedding_auto_on_deep;
+		if (config.conversations?.enrichment?.quick_model !== void 0) result.conversations.enrichment.quickModel = config.conversations.enrichment.quick_model;
+		if (config.conversations?.enrichment?.deep_model !== void 0) result.conversations.enrichment.deepModel = config.conversations.enrichment.deep_model;
+		if (config.conversations?.enrichment?.max_parallel !== void 0) result.conversations.enrichment.maxParallel = config.conversations.enrichment.max_parallel;
+		if (config.conversations?.enrichment?.cost_confirm_threshold !== void 0) result.conversations.enrichment.costConfirmThreshold = config.conversations.enrichment.cost_confirm_threshold;
+		if (config.memory) {
+			if (config.memory.extraction) result.memory.extraction = {
+				...result.memory.extraction,
+				...config.memory.extraction.provider !== void 0 ? { provider: config.memory.extraction.provider } : {},
+				...config.memory.extraction.model !== void 0 ? { model: config.memory.extraction.model } : {},
+				...config.memory.extraction.per_day_cost_cap_usd !== void 0 ? { perDayCostCapUsd: config.memory.extraction.per_day_cost_cap_usd } : {},
+				...config.memory.extraction.fallback_chain !== void 0 ? { fallbackChain: config.memory.extraction.fallback_chain } : {}
+			};
+			if (config.memory.features?.observations !== void 0) result.memory.observationsEnabled = config.memory.features.observations;
+			if (config.memory.features?.prompt_time_injection !== void 0) result.memory.promptTimeInjectionEnabled = config.memory.features.prompt_time_injection;
+			if (config.memory.features?.knowledge_index !== void 0) result.memory.knowledgeIndexEnabled = config.memory.features.knowledge_index;
+			if (config.memory.rollup_pending_threshold !== void 0) result.memory.rollupPendingThreshold = config.memory.rollup_pending_threshold;
+			if (config.memory.sidebar_refresh_interval_ms !== void 0) result.memory.sidebarRefreshIntervalMs = config.memory.sidebar_refresh_interval_ms;
+			if (config.memory.worker_concurrency !== void 0) result.memory.workerConcurrency = config.memory.worker_concurrency;
+		}
+		if (config.compliance?.mode !== void 0) {
+			if (!isComplianceMode(config.compliance.mode)) throw new Error(`config.yaml: compliance.mode must be ${COMPLIANCE_MODES.join(", ")}`);
+			result.compliance.mode = config.compliance.mode;
+		}
+		if (config.planning?.default_mode !== void 0) result.planning = { defaultMode: config.planning.default_mode };
+		if (config.registry?.classification) {
+			const classification = config.registry.classification;
+			if (classification.enabled !== void 0) result.registry.classification.enabled = classification.enabled;
+			if (classification.provider !== void 0) {
+				if (!isFeatureRegistryClassificationProvider(classification.provider)) throw new Error("config.yaml: registry.classification.provider must be anthropic or cliproxy");
+				result.registry.classification.provider = classification.provider;
+			}
+			if (classification.model !== void 0) result.registry.classification.model = classification.model;
+			if (classification.per_day_cost_cap_usd !== void 0) {
+				if (typeof classification.per_day_cost_cap_usd !== "number" || classification.per_day_cost_cap_usd < 0) throw new Error("config.yaml: registry.classification.per_day_cost_cap_usd must be a non-negative number");
+				result.registry.classification.perDayCostCapUsd = classification.per_day_cost_cap_usd;
+			}
+		}
+		if (config.openrouter?.favorites) result.openrouterFavorites = config.openrouter.favorites;
+		mergeRoleConfig(result, config);
+		if (config.tiered_execution) try {
+			result.tieredExecution = validateTieredExecutionConfig(config.tiered_execution, { providerAuth: result.providerAuth });
+			result.tieredExecutionInvalid = void 0;
+		} catch (err) {
+			degradeInvalidTieredExecution(result, err);
+		}
+		if (config.api_keys) {
+			if (config.api_keys.openai) {
+				result.apiKeys.openai = resolveEnvVar(config.api_keys.openai);
+				if (!explicitlyDisabled.has("openai")) result.enabledProviders.add("openai");
+			}
+			if (config.api_keys.voyage) result.apiKeys.voyage = resolveEnvVar(config.api_keys.voyage);
+			if (config.api_keys.google) {
+				result.apiKeys.google = resolveEnvVar(config.api_keys.google);
+				if (!explicitlyDisabled.has("google")) result.enabledProviders.add("google");
+			}
+			if (config.api_keys.minimax) {
+				result.apiKeys.minimax = resolveEnvVar(config.api_keys.minimax);
+				if (!explicitlyDisabled.has("minimax")) result.enabledProviders.add("minimax");
+			}
+			if (config.api_keys.zai) {
+				result.apiKeys.zai = resolveEnvVar(config.api_keys.zai);
+				if (!explicitlyDisabled.has("zai")) result.enabledProviders.add("zai");
+			}
+			if (config.api_keys.kimi) {
+				result.apiKeys.kimi = resolveEnvVar(config.api_keys.kimi);
+				if (!explicitlyDisabled.has("kimi")) result.enabledProviders.add("kimi");
+			}
+			if (config.api_keys.openrouter) {
+				result.apiKeys.openrouter = resolveEnvVar(config.api_keys.openrouter);
+				if (!explicitlyDisabled.has("openrouter")) result.enabledProviders.add("openrouter");
+			}
+			if (config.api_keys.mimo) {
+				result.apiKeys.mimo = resolveEnvVar(config.api_keys.mimo);
+				if (!explicitlyDisabled.has("mimo")) result.enabledProviders.add("mimo");
+			}
+			if (config.api_keys.nous) {
+				result.apiKeys.nous = resolveEnvVar(config.api_keys.nous);
+				if (!explicitlyDisabled.has("nous")) result.enabledProviders.add("nous");
+			}
+			if (config.api_keys.dashscope) {
+				result.apiKeys.dashscope = resolveEnvVar(config.api_keys.dashscope);
+				if (!explicitlyDisabled.has("dashscope")) result.enabledProviders.add("dashscope");
+			}
+		}
+		if (config.models?.overrides) result.overrides = {
+			...result.overrides,
+			...config.models.overrides
+		};
+		if (config.models?.gemini_thinking_level) result.geminiThinkingLevel = config.models.gemini_thinking_level;
+		if (config.models?.default_conversation_model) result.defaultConversationModel = config.models.default_conversation_model;
+		if (config.tracker_keys) {
+			if (config.tracker_keys.linear) result.trackerKeys.linear = resolveEnvVar(config.tracker_keys.linear);
+			if (config.tracker_keys.github) result.trackerKeys.github = resolveEnvVar(config.tracker_keys.github);
+			if (config.tracker_keys.gitlab) result.trackerKeys.gitlab = resolveEnvVar(config.tracker_keys.gitlab);
+			if (config.tracker_keys.rally) result.trackerKeys.rally = resolveEnvVar(config.tracker_keys.rally);
+		}
+		mergeShadowConfig(result.shadow, config);
+		mergeCavemanConfig(result.caveman, config);
+		mergeRtkConfig(result.rtk, config);
+		mergeTldrConfig(result.tldr, config);
+		mergeDocsConfig(result.docs, config);
+		mergeTtsConfig(result.tts, config);
+		if (config.tts?.summarizer) {
+			const s = config.tts.summarizer;
+			if (s.enabled !== void 0) result.ttsSummarizer.enabled = s.enabled;
+			if (s.model) result.ttsSummarizer.model = resolveModelIdSync(s.model);
+			if (s.batch_window_seconds !== void 0) result.ttsSummarizer.batchWindowSeconds = s.batch_window_seconds;
+		}
+		if (config.background_ai) {
+			if (typeof config.background_ai.cheap_mode === "boolean") result.backgroundAi.cheapMode = config.background_ai.cheap_mode;
+			if (config.background_ai.features) for (const feature of BACKGROUND_AI_FEATURES) {
+				const value = config.background_ai.features[feature];
+				if (typeof value === "boolean") result.backgroundAi.features[feature] = value;
+			}
+		}
+		if (config.resources) {
+			if (typeof config.resources.memory_warn_gb === "number") result.resources.memoryWarnGb = config.resources.memory_warn_gb;
+			if (typeof config.resources.memory_block_gb === "number") result.resources.memoryBlockGb = config.resources.memory_block_gb;
+			if (typeof config.resources.agent_warn_count === "number") result.resources.agentWarnCount = config.resources.agent_warn_count;
+			if (typeof config.resources.agent_block_count === "number") result.resources.agentBlockCount = config.resources.agent_block_count;
+			if (typeof config.resources.governor_soft_reserve_gb === "number") result.resources.governorSoftReserveGb = config.resources.governor_soft_reserve_gb;
+			if (typeof config.resources.governor_hard_reserve_gb === "number") result.resources.governorHardReserveGb = config.resources.governor_hard_reserve_gb;
+			if (typeof config.resources.governor_recovery_reserve_gb === "number") result.resources.governorRecoveryReserveGb = config.resources.governor_recovery_reserve_gb;
+			if (typeof config.resources.governor_footprint_default_work_gb === "number") result.resources.governorFootprintDefaultWorkGb = config.resources.governor_footprint_default_work_gb;
+			if (typeof config.resources.governor_footprint_default_review_gb === "number") result.resources.governorFootprintDefaultReviewGb = config.resources.governor_footprint_default_review_gb;
+			if (typeof config.resources.governor_footprint_default_test_gb === "number") result.resources.governorFootprintDefaultTestGb = config.resources.governor_footprint_default_test_gb;
+			if (result.resources.governorRecoveryReserveGb <= result.resources.governorSoftReserveGb) result.resources.governorRecoveryReserveGb = result.resources.governorSoftReserveGb + 1;
+		}
+		if (config.issues) {
+			if (typeof config.issues.closed_window_days === "number") result.issues.closedWindowDays = config.issues.closed_window_days;
+		}
+		if (config.knowledge) {
+			if (typeof config.knowledge.post_merge_auto_retro === "boolean") result.knowledge.postMergeAutoRetro = config.knowledge.post_merge_auto_retro;
+		}
+		if (config.experimental) {
+			if (typeof config.experimental.experimentalFeatures === "boolean") result.experimental.experimentalFeatures = config.experimental.experimentalFeatures;
+			if (typeof config.experimental.claudeCodeChannels === "boolean") result.experimental.claudeCodeChannels = config.experimental.claudeCodeChannels;
+			if (typeof config.experimental.claudeCodeChannelsMcp === "boolean") result.experimental.claudeCodeChannelsMcp = config.experimental.claudeCodeChannelsMcp;
+			if (typeof config.experimental.streamdownRenderer === "boolean") result.experimental.streamdownRenderer = config.experimental.streamdownRenderer;
+			if (typeof config.experimental.showHarnessModelPermutations === "boolean") result.experimental.showHarnessModelPermutations = config.experimental.showHarnessModelPermutations;
+		}
+		if (config.claude && (config.claude.permissionMode === "auto" || config.claude.permissionMode === "bypass")) result.claude.permissionMode = config.claude.permissionMode;
+		if (config.codex && (config.codex.permissionMode === "read-only" || config.codex.permissionMode === "workspace" || config.codex.permissionMode === "auto-review" || config.codex.permissionMode === "full-access")) result.codex.permissionMode = config.codex.permissionMode;
+		if (config.codex && (config.codex.transport === "app-server" || config.codex.transport === "tui")) result.codex.transport = config.codex.transport;
+		mergeRemoteConfig(result, config);
+		if (config.conversationSearch) {
+			const cs = config.conversationSearch;
+			if (typeof cs.enabled === "boolean") result.conversationSearch.enabled = cs.enabled;
+			if (cs.provider !== void 0) result.conversationSearch.provider = cs.provider;
+			if (cs.model !== void 0) result.conversationSearch.model = cs.model;
+			if (cs.apiKeyRef !== void 0) result.conversationSearch.apiKeyRef = cs.apiKeyRef;
+			if (cs.dbPath !== void 0) result.conversationSearch.dbPath = cs.dbPath;
+		}
+	}
+	validateRoleModelRefs(result);
+	if (!result.tieredExecutionInvalid) try {
+		result.tieredExecution = validateTieredExecutionConfig(result.tieredExecution, { providerAuth: result.providerAuth });
+	} catch (err) {
+		degradeInvalidTieredExecution(result, err);
+	}
+	return {
+		config: result,
+		explicitlyDisabled
+	};
 }
 //#endregion
 //#region ../../node_modules/.bun/js-yaml@4.1.1/node_modules/js-yaml/dist/js-yaml.mjs
@@ -27443,1476 +31701,7 @@ var jsYaml = {
 	safeDump: renamed("safeDump", "dump")
 };
 //#endregion
-//#region ../../src/lib/model-capabilities.ts
-/**
-* Model ID deprecation mapping
-*
-* Maps deprecated model IDs to their current replacements.
-* When a model ID changes (e.g., claude-opus-4-5 → claude-opus-4-6),
-* add the mapping here to enable automatic migration.
-*
-* Strategy: Single-hop only. Only add models here when the provider has
-* actually retired them — not just because a newer version exists.
-*/
-const MODEL_DEPRECATIONS = {
-	"claude-opus-4-5": "claude-opus-4-7",
-	"claude-sonnet-4-5": "claude-sonnet-4-6",
-	"gpt-5.2-codex": "gpt-5.3-codex",
-	"gpt-5.5-mini": "gpt-5.4-mini",
-	"gpt-5.5-nano": "gpt-5.4-mini",
-	"gpt-5.4-nano": "gpt-5.4-mini",
-	"gpt-5.5-pro": "gpt-5.5",
-	"gpt-5.4-pro": "gpt-5.4",
-	"o3": "gpt-5.4",
-	"o3-deep-research": "gpt-5.4",
-	"o4-mini": "gpt-5.4-mini",
-	"gpt-4o": "gpt-5.4",
-	"gpt-4o-mini": "gpt-5.4-mini",
-	"gemini-3-pro-preview": "gemini-3.1-pro-preview",
-	"gemini-3-flash": "gemini-3-flash-preview",
-	"gemini-2.5-pro": "gemini-3.1-pro-preview",
-	"gemini-2.5-flash": "gemini-3-flash-preview",
-	"kimi-k2": "kimi-k2.5",
-	"glm-4.7": "glm-5.1",
-	"glm-4.7-flash": "glm-5.1"
-};
-/**
-* Resolve a model ID to its current version
-*
-* If the model ID is deprecated, returns the replacement.
-* Otherwise, returns the model ID unchanged.
-*
-* @param modelId - Model ID to resolve (may be deprecated)
-* @returns Current model ID
-*/
-function resolveModelIdSync(modelId) {
-	return MODEL_DEPRECATIONS[modelId] || modelId;
-}
-/**
-* Master capability database
-*
-* Scores are based on:
-* - Public benchmarks (HumanEval, SWE-bench, MBPP)
-* - Community consensus
-* - Practical experience
-*
-* These are baseline scores - run Kimi 2.5 research to refine.
-*/
-const MODEL_CAPABILITIES = {
-	"claude-fable-5": {
-		model: "claude-fable-5",
-		provider: "anthropic",
-		displayName: "Claude Fable 5",
-		costPer1MTokens: 90,
-		contextWindow: 2e5,
-		skills: {
-			"code-generation": 99,
-			"code-review": 99,
-			debugging: 99,
-			planning: 99,
-			documentation: 97,
-			testing: 96,
-			security: 99,
-			performance: 95,
-			synthesis: 99,
-			speed: 42,
-			"context-length": 95
-		},
-		effortLevels: [
-			"low",
-			"medium",
-			"high",
-			"xhigh",
-			"max"
-		],
-		notes: "Mythos-class flagship (June 2026). Tuned for long-horizon autonomous work spanning millions of tokens. Beats Opus 4.8 across effort levels; same effort set (high is the default, xhigh between high and max). Adaptive thinking always on. Premium pricing (~2× Opus 4.8) — opt-in for the most demanding planning/coding."
-	},
-	"claude-opus-4-8": {
-		model: "claude-opus-4-8",
-		provider: "anthropic",
-		displayName: "Claude Opus 4.8",
-		costPer1MTokens: 45,
-		contextWindow: 2e5,
-		skills: {
-			"code-generation": 98,
-			"code-review": 99,
-			debugging: 98,
-			planning: 99,
-			documentation: 96,
-			testing: 95,
-			security: 99,
-			performance: 93,
-			synthesis: 99,
-			speed: 40,
-			"context-length": 95
-		},
-		effortLevels: [
-			"low",
-			"medium",
-			"high",
-			"xhigh",
-			"max"
-		],
-		notes: "Successor to Opus 4.7 and current flagship. Same effort levels (xhigh between high and max). Best for deepest reasoning and long-horizon coding tasks. Scores provisional — verify against benchmarks."
-	},
-	"claude-opus-4-7": {
-		model: "claude-opus-4-7",
-		provider: "anthropic",
-		displayName: "Claude Opus 4.7",
-		costPer1MTokens: 45,
-		contextWindow: 2e5,
-		skills: {
-			"code-generation": 98,
-			"code-review": 99,
-			debugging: 98,
-			planning: 99,
-			documentation: 96,
-			testing: 94,
-			security: 99,
-			performance: 92,
-			synthesis: 99,
-			speed: 38,
-			"context-length": 95
-		},
-		effortLevels: [
-			"low",
-			"medium",
-			"high",
-			"xhigh",
-			"max"
-		],
-		notes: "Successor to Opus 4.6. Adds the xhigh effort level (between high and max) for extended thinking. Best for deepest reasoning and long-horizon coding tasks."
-	},
-	"claude-opus-4-6": {
-		model: "claude-opus-4-6",
-		provider: "anthropic",
-		displayName: "Claude Opus 4.6",
-		costPer1MTokens: 45,
-		contextWindow: 2e5,
-		skills: {
-			"code-generation": 96,
-			"code-review": 98,
-			debugging: 97,
-			planning: 99,
-			documentation: 95,
-			testing: 92,
-			security: 98,
-			performance: 90,
-			synthesis: 98,
-			speed: 40,
-			"context-length": 95
-		},
-		effortLevels: [
-			"low",
-			"medium",
-			"high",
-			"max"
-		],
-		notes: "Successor to Opus 4.5. Same pricing, 1M context available (opt-in beta). Best for planning, security, complex reasoning."
-	},
-	"claude-sonnet-4-6": {
-		model: "claude-sonnet-4-6",
-		provider: "anthropic",
-		displayName: "Claude Sonnet 4.6",
-		costPer1MTokens: 9,
-		contextWindow: 2e5,
-		skills: {
-			"code-generation": 94,
-			"code-review": 94,
-			debugging: 92,
-			planning: 90,
-			documentation: 92,
-			testing: 92,
-			security: 88,
-			performance: 88,
-			synthesis: 90,
-			speed: 70,
-			"context-length": 95
-		},
-		effortLevels: [
-			"low",
-			"medium",
-			"high"
-		],
-		notes: "Successor to Sonnet 4.5. Same pricing tier. Improved coding and reasoning."
-	},
-	"claude-sonnet-4-5": {
-		model: "claude-sonnet-4-5",
-		provider: "anthropic",
-		displayName: "Claude Sonnet 4.5",
-		costPer1MTokens: 9,
-		contextWindow: 2e5,
-		skills: {
-			"code-generation": 92,
-			"code-review": 92,
-			debugging: 90,
-			planning: 88,
-			documentation: 90,
-			testing: 90,
-			security: 85,
-			performance: 85,
-			synthesis: 88,
-			speed: 70,
-			"context-length": 95
-		},
-		notes: "Best value: 77.2% SWE-bench at 1/5th Opus cost. Beats GPT-5 Codex."
-	},
-	"claude-haiku-4-5": {
-		model: "claude-haiku-4-5",
-		provider: "anthropic",
-		displayName: "Claude Haiku 4.5",
-		costPer1MTokens: 4,
-		contextWindow: 2e5,
-		skills: {
-			"code-generation": 75,
-			"code-review": 72,
-			debugging: 70,
-			planning: 65,
-			documentation: 75,
-			testing: 70,
-			security: 60,
-			performance: 65,
-			synthesis: 68,
-			speed: 95,
-			"context-length": 95
-		},
-		notes: "Fast and cheap, good for simple tasks and exploration"
-	},
-	"gpt-5.4": {
-		model: "gpt-5.4",
-		provider: "openai",
-		displayName: "GPT-5.4",
-		costPer1MTokens: 8.75,
-		contextWindow: 105e4,
-		minTier: "plus",
-		skills: {
-			"code-generation": 96,
-			"code-review": 92,
-			debugging: 94,
-			planning: 92,
-			documentation: 90,
-			testing: 92,
-			security: 88,
-			performance: 90,
-			synthesis: 92,
-			speed: 60,
-			"context-length": 100
-		},
-		notes: "OpenAI flagship (March 2026). 1.05M context, 128K max output. Strong coding and reasoning."
-	},
-	"gpt-5.4-mini": {
-		model: "gpt-5.4-mini",
-		provider: "openai",
-		displayName: "GPT-5.4 Mini",
-		costPer1MTokens: 1,
-		contextWindow: 4e5,
-		minTier: "free",
-		skills: {
-			"code-generation": 82,
-			"code-review": 78,
-			debugging: 76,
-			planning: 72,
-			documentation: 80,
-			testing: 76,
-			security: 68,
-			performance: 72,
-			synthesis: 75,
-			speed: 90,
-			"context-length": 90
-		},
-		notes: "Fast and efficient. 400K context. Available in ChatGPT Free/Plus tiers."
-	},
-	"o3": {
-		model: "o3",
-		provider: "openai",
-		displayName: "O3",
-		costPer1MTokens: 5,
-		contextWindow: 2e5,
-		minTier: "plus",
-		skills: {
-			"code-generation": 90,
-			"code-review": 95,
-			debugging: 98,
-			planning: 95,
-			documentation: 88,
-			testing: 88,
-			security: 92,
-			performance: 92,
-			synthesis: 95,
-			speed: 25,
-			"context-length": 95
-		},
-		notes: "Deep reasoning model. Excels at complex debugging, math, scientific reasoning."
-	},
-	"o4-mini": {
-		model: "o4-mini",
-		provider: "openai",
-		displayName: "O4 Mini",
-		costPer1MTokens: 2.75,
-		contextWindow: 2e5,
-		minTier: "plus",
-		skills: {
-			"code-generation": 85,
-			"code-review": 90,
-			debugging: 94,
-			planning: 88,
-			documentation: 84,
-			testing: 85,
-			security: 86,
-			performance: 88,
-			synthesis: 88,
-			speed: 70,
-			"context-length": 90
-		},
-		notes: "Compact reasoning model (April 2025). Fast, cost-efficient, tool-use capable."
-	},
-	"gpt-5.4-pro": {
-		model: "gpt-5.4-pro",
-		provider: "openai",
-		displayName: "GPT-5.4 Pro",
-		costPer1MTokens: 105,
-		contextWindow: 105e4,
-		minTier: "pro",
-		skills: {
-			"code-generation": 98,
-			"code-review": 98,
-			debugging: 98,
-			planning: 99,
-			documentation: 96,
-			testing: 96,
-			security: 96,
-			performance: 95,
-			synthesis: 99,
-			speed: 45,
-			"context-length": 100
-		},
-		notes: "Most advanced OpenAI model. Enhanced reasoning and agentic capabilities over GPT-5.4. Pro subscribers only."
-	},
-	"gpt-5.5": {
-		model: "gpt-5.5",
-		provider: "openai",
-		displayName: "GPT-5.5",
-		costPer1MTokens: 10.5,
-		contextWindow: 15e4,
-		minTier: "plus",
-		skills: {
-			"code-generation": 97,
-			"code-review": 94,
-			debugging: 96,
-			planning: 95,
-			documentation: 92,
-			testing: 94,
-			security: 91,
-			performance: 92,
-			synthesis: 94,
-			speed: 65,
-			"context-length": 95
-		},
-		notes: "OpenAI flagship (April 2026). Successor to GPT-5.4 with improved reasoning and coding. Effective Claude Code/CLIProxy ceiling is 150K (CLIPROXY_CODEX_CONTEXT_WINDOW), 128K max output."
-	},
-	"gpt-5.5-pro": {
-		model: "gpt-5.5-pro",
-		provider: "openai",
-		displayName: "GPT-5.5 Pro",
-		costPer1MTokens: 119,
-		contextWindow: 105e4,
-		minTier: "pro",
-		skills: {
-			"code-generation": 99,
-			"code-review": 99,
-			debugging: 99,
-			planning: 99,
-			documentation: 97,
-			testing: 97,
-			security: 97,
-			performance: 96,
-			synthesis: 99,
-			speed: 50,
-			"context-length": 100
-		},
-		notes: "Most advanced OpenAI model. Enhanced reasoning and agentic capabilities over GPT-5.5. Pro subscribers only."
-	},
-	"gpt-5.3-codex": {
-		model: "gpt-5.3-codex",
-		provider: "openai",
-		displayName: "GPT-5.3 Codex",
-		costPer1MTokens: 7.875,
-		contextWindow: 4e5,
-		skills: {
-			"code-generation": 96,
-			"code-review": 95,
-			debugging: 94,
-			planning: 90,
-			documentation: 88,
-			testing: 90,
-			security: 86,
-			performance: 88,
-			synthesis: 92,
-			speed: 75,
-			"context-length": 90
-		},
-		notes: "Industry-leading agentic coding model (2026). Available via Codex CLI/IDE/cloud and the Responses API."
-	},
-	"gpt-5.2": {
-		model: "gpt-5.2",
-		provider: "openai",
-		displayName: "GPT-5.2",
-		costPer1MTokens: 5.625,
-		contextWindow: 2e5,
-		skills: {
-			"code-generation": 88,
-			"code-review": 86,
-			debugging: 84,
-			planning: 82,
-			documentation: 84,
-			testing: 82,
-			security: 78,
-			performance: 80,
-			synthesis: 84,
-			speed: 70,
-			"context-length": 85
-		},
-		notes: "Previous-generation general-purpose model (Oct 2025). Positioned by OpenAI for long-running agent workloads — strong candidate for orchestrator/flywheel roles."
-	},
-	"gpt-5.3-codex-spark": {
-		model: "gpt-5.3-codex-spark",
-		provider: "openai",
-		displayName: "GPT-5.3 Codex Spark",
-		costPer1MTokens: 7.875,
-		contextWindow: 128e3,
-		skills: {
-			"code-generation": 92,
-			"code-review": 86,
-			debugging: 84,
-			planning: 78,
-			documentation: 82,
-			testing: 88,
-			security: 76,
-			performance: 82,
-			synthesis: 84,
-			speed: 98,
-			"context-length": 72
-		},
-		notes: "Ultra-fast coding research preview (Feb 2026). Text-only, 128K context, ChatGPT-Pro-only. Candidate for work.inspect / high-volume code scans when a Pro account is available."
-	},
-	"o3-deep-research": {
-		model: "o3-deep-research",
-		provider: "openai",
-		displayName: "O3 Deep Research (deprecated)",
-		costPer1MTokens: 5,
-		contextWindow: 2e5,
-		skills: {
-			"code-generation": 88,
-			"code-review": 95,
-			debugging: 98,
-			planning: 95,
-			documentation: 88,
-			testing: 88,
-			security: 92,
-			performance: 92,
-			synthesis: 95,
-			speed: 25,
-			"context-length": 95
-		}
-	},
-	"gpt-4o": {
-		model: "gpt-4o",
-		provider: "openai",
-		displayName: "GPT-4o",
-		costPer1MTokens: 7.5,
-		contextWindow: 128e3,
-		skills: {
-			"code-generation": 82,
-			"code-review": 80,
-			debugging: 78,
-			planning: 76,
-			documentation: 80,
-			testing: 76,
-			security: 74,
-			performance: 74,
-			synthesis: 80,
-			speed: 75,
-			"context-length": 75
-		}
-	},
-	"gpt-4o-mini": {
-		model: "gpt-4o-mini",
-		provider: "openai",
-		displayName: "GPT-4o Mini",
-		costPer1MTokens: .6,
-		contextWindow: 128e3,
-		skills: {
-			"code-generation": 68,
-			"code-review": 64,
-			debugging: 60,
-			planning: 56,
-			documentation: 66,
-			testing: 60,
-			security: 52,
-			performance: 56,
-			synthesis: 62,
-			speed: 92,
-			"context-length": 75
-		}
-	},
-	"gemini-3.1-pro-preview": {
-		model: "gemini-3.1-pro-preview",
-		provider: "google",
-		displayName: "Gemini 3.1 Pro",
-		costPer1MTokens: 7,
-		contextWindow: 1e6,
-		skills: {
-			"code-generation": 93,
-			"code-review": 90,
-			debugging: 88,
-			planning: 88,
-			documentation: 90,
-			testing: 88,
-			security: 82,
-			performance: 88,
-			synthesis: 92,
-			speed: 75,
-			"context-length": 100
-		},
-		notes: "Google flagship (March 2026). Replaces Gemini 3 Pro (shut down). Strong agentic and coding capabilities."
-	},
-	"gemini-3-flash-preview": {
-		model: "gemini-3-flash-preview",
-		provider: "google",
-		displayName: "Gemini 3 Flash Preview",
-		costPer1MTokens: .4,
-		contextWindow: 1e6,
-		skills: {
-			"code-generation": 80,
-			"code-review": 75,
-			debugging: 72,
-			planning: 68,
-			documentation: 76,
-			testing: 72,
-			security: 60,
-			performance: 70,
-			synthesis: 75,
-			speed: 96,
-			"context-length": 100
-		},
-		notes: "Fast and cheap with 1M context. Strong reasoning and agentic capabilities."
-	},
-	"gemini-3.1-flash-lite-preview": {
-		model: "gemini-3.1-flash-lite-preview",
-		provider: "google",
-		displayName: "Gemini 3.1 Flash Lite",
-		costPer1MTokens: .9,
-		contextWindow: 1e6,
-		skills: {
-			"code-generation": 72,
-			"code-review": 68,
-			debugging: 65,
-			planning: 60,
-			documentation: 70,
-			testing: 65,
-			security: 52,
-			performance: 62,
-			synthesis: 68,
-			speed: 98,
-			"context-length": 100
-		},
-		notes: "Most cost-efficient Google model. Great for high-volume, latency-sensitive workloads."
-	},
-	"gemini-3-pro-preview": {
-		model: "gemini-3-pro-preview",
-		provider: "google",
-		displayName: "Gemini 3 Pro (deprecated)",
-		costPer1MTokens: 7,
-		contextWindow: 1e6,
-		skills: {
-			"code-generation": 93,
-			"code-review": 90,
-			debugging: 88,
-			planning: 88,
-			documentation: 90,
-			testing: 88,
-			security: 82,
-			performance: 88,
-			synthesis: 92,
-			speed: 75,
-			"context-length": 100
-		}
-	},
-	"gemini-2.5-pro": {
-		model: "gemini-2.5-pro",
-		provider: "google",
-		displayName: "Gemini 2.5 Pro (deprecated)",
-		costPer1MTokens: 7,
-		contextWindow: 1e6,
-		skills: {
-			"code-generation": 90,
-			"code-review": 88,
-			debugging: 86,
-			planning: 86,
-			documentation: 88,
-			testing: 86,
-			security: 80,
-			performance: 86,
-			synthesis: 90,
-			speed: 70,
-			"context-length": 100
-		}
-	},
-	"gemini-2.5-flash": {
-		model: "gemini-2.5-flash",
-		provider: "google",
-		displayName: "Gemini 2.5 Flash (deprecated)",
-		costPer1MTokens: .4,
-		contextWindow: 1e6,
-		skills: {
-			"code-generation": 78,
-			"code-review": 74,
-			debugging: 70,
-			planning: 66,
-			documentation: 74,
-			testing: 70,
-			security: 58,
-			performance: 68,
-			synthesis: 74,
-			speed: 94,
-			"context-length": 100
-		}
-	},
-	"kimi-k2.7-code": {
-		model: "kimi-k2.7-code",
-		provider: "kimi",
-		displayName: "Kimi K2.7 Code",
-		costPer1MTokens: 2.5,
-		contextWindow: 262144,
-		skills: {
-			"code-generation": 95,
-			"code-review": 93,
-			debugging: 93,
-			planning: 90,
-			documentation: 90,
-			testing: 90,
-			security: 85,
-			performance: 88,
-			synthesis: 94,
-			speed: 75,
-			"context-length": 98
-		},
-		notes: "Moonshot/Kimi's coding-first open-weight model (June 2026). 1T MoE / 32B active, multimodal, extended thinking modes. API id `kimi-k2.7-code`. Source: https://platform.moonshot.ai/docs/pricing/chat"
-	},
-	"kimi-k2.6": {
-		model: "kimi-k2.6",
-		provider: "kimi",
-		displayName: "Kimi K2.6",
-		costPer1MTokens: 1.6,
-		contextWindow: 256e3,
-		skills: {
-			"code-generation": 94,
-			"code-review": 92,
-			debugging: 92,
-			planning: 90,
-			documentation: 90,
-			testing: 90,
-			security: 85,
-			performance: 88,
-			synthesis: 94,
-			speed: 75,
-			"context-length": 98
-		},
-		notes: "Kimi's smartest model (April 2026). Native multimodal, superior agentic coding, and autonomous agent execution. Replaces K2.6-code-preview."
-	},
-	"kimi-k2.5": {
-		model: "kimi-k2.5",
-		provider: "kimi",
-		displayName: "Kimi K2.5",
-		costPer1MTokens: 1.6,
-		contextWindow: 256e3,
-		skills: {
-			"code-generation": 92,
-			"code-review": 90,
-			debugging: 90,
-			planning: 88,
-			documentation: 88,
-			testing: 88,
-			security: 82,
-			performance: 85,
-			synthesis: 92,
-			speed: 75,
-			"context-length": 98
-		},
-		notes: "Best open-source coding model. 5x cheaper than GPT-5.2. Excellent for frontend dev and multi-agent orchestration."
-	},
-	"K2.6-code-preview": {
-		model: "K2.6-code-preview",
-		provider: "kimi",
-		displayName: "K2.6-code-preview",
-		costPer1MTokens: 1.6,
-		contextWindow: 256e3,
-		skills: {
-			"code-generation": 92,
-			"code-review": 90,
-			debugging: 90,
-			planning: 88,
-			documentation: 88,
-			testing: 88,
-			security: 82,
-			performance: 85,
-			synthesis: 92,
-			speed: 75,
-			"context-length": 98
-		},
-		notes: "Kimi coding preview model."
-	},
-	"kimi-k2": {
-		model: "kimi-k2",
-		provider: "kimi",
-		displayName: "Kimi K2 (deprecated)",
-		costPer1MTokens: 1.6,
-		contextWindow: 128e3,
-		skills: {
-			"code-generation": 88,
-			"code-review": 86,
-			debugging: 86,
-			planning: 84,
-			documentation: 84,
-			testing: 84,
-			security: 78,
-			performance: 80,
-			synthesis: 88,
-			speed: 72,
-			"context-length": 80
-		},
-		notes: "65.8% SWE-bench. Superseded by Kimi K2.5."
-	},
-	"minimax-m2.7": {
-		model: "minimax-m2.7",
-		provider: "minimax",
-		displayName: "MiniMax M2.7",
-		costPer1MTokens: 1.5,
-		contextWindow: 204800,
-		skills: {
-			"code-generation": 90,
-			"code-review": 88,
-			debugging: 88,
-			planning: 85,
-			documentation: 85,
-			testing: 86,
-			security: 80,
-			performance: 82,
-			synthesis: 90,
-			speed: 80,
-			"context-length": 92
-		},
-		notes: "10B active params, 56.22% SWE-Pro, 1495 ELO GDPval-AA. $0.06/M blended with auto-cache."
-	},
-	"minimax-m2.7-highspeed": {
-		model: "minimax-m2.7-highspeed",
-		provider: "minimax",
-		displayName: "MiniMax M2.7 Highspeed",
-		costPer1MTokens: 1.5,
-		contextWindow: 204800,
-		skills: {
-			"code-generation": 90,
-			"code-review": 88,
-			debugging: 88,
-			planning: 85,
-			documentation: 85,
-			testing: 86,
-			security: 80,
-			performance: 82,
-			synthesis: 90,
-			speed: 92,
-			"context-length": 92
-		},
-		notes: "Identical quality to M2.7, 100 tps (3x Opus speed). Best for high-throughput agent work."
-	},
-	"MiniMax-M3": {
-		model: "MiniMax-M3",
-		provider: "minimax",
-		displayName: "MiniMax M3",
-		costPer1MTokens: 1.5,
-		contextWindow: 1024e3,
-		skills: {
-			"code-generation": 93,
-			"code-review": 90,
-			debugging: 90,
-			planning: 88,
-			documentation: 88,
-			testing: 88,
-			security: 82,
-			performance: 85,
-			synthesis: 92,
-			speed: 80,
-			"context-length": 100
-		},
-		notes: "MSA (MiniMax Sparse Attention), 1M context, native multimodal, top-tier coding/agentic. Same pricing as M2.7."
-	},
-	"glm-5.2": {
-		model: "glm-5.2",
-		provider: "zai",
-		displayName: "GLM-5.2",
-		costPer1MTokens: 2.9,
-		contextWindow: 1e6,
-		effortLevels: ["high", "max"],
-		supportsImages: false,
-		skills: {
-			"code-generation": 85,
-			"code-review": 83,
-			debugging: 83,
-			planning: 81,
-			documentation: 80,
-			testing: 80,
-			security: 77,
-			performance: 77,
-			synthesis: 82,
-			speed: 84,
-			"context-length": 75
-		},
-		notes: "Z.AI GLM-5.2 flagship via Anthropic-compatible API. Supports only high and max effort levels. Scores provisional — verify against benchmarks."
-	},
-	"glm-5.1": {
-		model: "glm-5.1",
-		provider: "zai",
-		displayName: "GLM-5.1",
-		costPer1MTokens: 2.9,
-		contextWindow: 2e5,
-		supportsImages: false,
-		skills: {
-			"code-generation": 82,
-			"code-review": 80,
-			debugging: 80,
-			planning: 78,
-			documentation: 78,
-			testing: 78,
-			security: 75,
-			performance: 75,
-			synthesis: 80,
-			speed: 85,
-			"context-length": 75
-		},
-		notes: "Z.AI GLM-5.1 model via Anthropic-compatible API. Previous flagship; retained alongside GLM-5.2."
-	},
-	"glm-4.7": {
-		model: "glm-4.7",
-		provider: "zai",
-		displayName: "GLM-4.7 (deprecated)",
-		costPer1MTokens: 1.5,
-		contextWindow: 2e5,
-		skills: {
-			"code-generation": 88,
-			"code-review": 85,
-			debugging: 84,
-			planning: 82,
-			documentation: 80,
-			testing: 82,
-			security: 78,
-			performance: 80,
-			synthesis: 84,
-			speed: 80,
-			"context-length": 92
-		},
-		notes: "Top open-source model for agentic coding. 73.8% SWE-bench, 200K context."
-	},
-	"glm-4.7-flash": {
-		model: "glm-4.7-flash",
-		provider: "zai",
-		displayName: "GLM-4.7 Flash (deprecated)",
-		costPer1MTokens: .3,
-		contextWindow: 2e5,
-		skills: {
-			"code-generation": 78,
-			"code-review": 74,
-			debugging: 72,
-			planning: 70,
-			documentation: 72,
-			testing: 72,
-			security: 68,
-			performance: 70,
-			synthesis: 74,
-			speed: 95,
-			"context-length": 92
-		},
-		notes: "Fast and affordable GLM model for quick iterations. 200K context."
-	},
-	"mimo-v2.5-pro": {
-		model: "mimo-v2.5-pro",
-		provider: "mimo",
-		displayName: "MiMo V2.5 Pro",
-		costPer1MTokens: 2,
-		contextWindow: 1048576,
-		supportsImages: false,
-		skills: {
-			"code-generation": 88,
-			"code-review": 86,
-			debugging: 86,
-			planning: 84,
-			documentation: 84,
-			testing: 84,
-			security: 80,
-			performance: 82,
-			synthesis: 88,
-			speed: 78,
-			"context-length": 100
-		},
-		notes: "Xiaomi MiMo flagship reasoning model. Enhanced agent efficiency, 1M context window."
-	},
-	"mimo-v2.5": {
-		model: "mimo-v2.5",
-		provider: "mimo",
-		displayName: "MiMo V2.5",
-		costPer1MTokens: 1,
-		contextWindow: 262144,
-		supportsImages: true,
-		skills: {
-			"code-generation": 82,
-			"code-review": 80,
-			debugging: 80,
-			planning: 78,
-			documentation: 78,
-			testing: 78,
-			security: 74,
-			performance: 76,
-			synthesis: 82,
-			speed: 85,
-			"context-length": 96
-		},
-		notes: "Xiaomi MiMo multimodal model. 262K context, strong agentic and coding capabilities."
-	},
-	"qwen/qwen3.6-plus": {
-		model: "qwen/qwen3.6-plus",
-		provider: "nous",
-		displayName: "Qwen 3.6 Plus (Nous Portal)",
-		costPer1MTokens: 0,
-		contextWindow: 1048576,
-		skills: {
-			"code-generation": 94,
-			"code-review": 92,
-			debugging: 92,
-			planning: 92,
-			documentation: 90,
-			testing: 90,
-			security: 88,
-			performance: 88,
-			synthesis: 92,
-			speed: 74,
-			"context-length": 100
-		},
-		notes: "Qwen 3.6 Plus via Nous Portal. Free for a limited time; 1M-token context according to public launch material."
-	},
-	"qwen3-max": {
-		model: "qwen3-max",
-		provider: "dashscope",
-		displayName: "Qwen3 Max (DashScope)",
-		costPer1MTokens: 0,
-		contextWindow: 262144,
-		skills: {
-			"code-generation": 95,
-			"code-review": 93,
-			debugging: 93,
-			planning: 94,
-			documentation: 91,
-			testing: 91,
-			security: 89,
-			performance: 89,
-			synthesis: 94,
-			speed: 72,
-			"context-length": 98
-		},
-		notes: "Routed direct to Alibaba DashScope (Singapore intl / ap-southeast-1) via DASHSCOPE_API_KEY. Pricing placeholder pending Alibaba intl endpoint pricing."
-	},
-	"qwen3-coder-plus": {
-		model: "qwen3-coder-plus",
-		provider: "dashscope",
-		displayName: "Qwen3 Coder Plus (DashScope)",
-		costPer1MTokens: 0,
-		contextWindow: 262144,
-		skills: {
-			"code-generation": 96,
-			"code-review": 94,
-			debugging: 94,
-			planning: 91,
-			documentation: 90,
-			testing: 92,
-			security: 89,
-			performance: 90,
-			synthesis: 92,
-			speed: 74,
-			"context-length": 98
-		},
-		notes: "Routed direct to Alibaba DashScope (Singapore intl / ap-southeast-1) via DASHSCOPE_API_KEY. Pricing placeholder pending Alibaba intl endpoint pricing."
-	},
-	"qwen3-plus": {
-		model: "qwen3-plus",
-		provider: "dashscope",
-		displayName: "Qwen3 Plus (DashScope)",
-		costPer1MTokens: 0,
-		contextWindow: 131072,
-		skills: {
-			"code-generation": 88,
-			"code-review": 86,
-			debugging: 86,
-			planning: 84,
-			documentation: 84,
-			testing: 84,
-			security: 80,
-			performance: 82,
-			synthesis: 88,
-			speed: 82,
-			"context-length": 96
-		},
-		notes: "Routed direct to Alibaba DashScope (Singapore intl / ap-southeast-1) via DASHSCOPE_API_KEY. Pricing placeholder pending Alibaba intl endpoint pricing."
-	},
-	"qwen3.7-max": {
-		model: "qwen3.7-max",
-		provider: "dashscope",
-		displayName: "Qwen3.7 Max (DashScope)",
-		costPer1MTokens: 0,
-		contextWindow: 262144,
-		skills: {
-			"code-generation": 96,
-			"code-review": 94,
-			debugging: 94,
-			planning: 95,
-			documentation: 92,
-			testing: 92,
-			security: 90,
-			performance: 90,
-			synthesis: 95,
-			speed: 70,
-			"context-length": 98
-		},
-		notes: "Canonical DashScope ID verified from Qwen Cloud docs on 2026-05-22. Routed direct to Alibaba DashScope (Singapore intl / ap-southeast-1) via DASHSCOPE_API_KEY. Pricing placeholder pending Alibaba intl endpoint pricing."
-	},
-	"grok-build-0.1": {
-		model: "grok-build-0.1",
-		provider: "xai",
-		displayName: "Grok Build 0.1",
-		costPer1MTokens: 1.5,
-		contextWindow: 256e3,
-		supportsImages: true,
-		skills: {
-			"code-generation": 90,
-			"code-review": 88,
-			debugging: 88,
-			planning: 87,
-			documentation: 85,
-			testing: 86,
-			security: 82,
-			performance: 84,
-			synthesis: 88,
-			speed: 82,
-			"context-length": 97
-		},
-		notes: "xAI's agentic coding model (May 2026). 256K context, $1/M in / $2/M out / $0.20/M cached. Reasoning always active. API id `grok-build-0.1` at https://api.x.ai/v1 (Anthropic-compatible). Sources: openrouter.ai/x-ai/grok-build-0.1/api, x.ai/news/grok-build-cli."
-	}
-};
-/**
-* Effort levels a model accepts, or `undefined` when not enumerated for that
-* model (treat undefined as "no model-specific restriction"). Resolves
-* deprecated IDs first so callers can pass raw config refs.
-*/
-function getModelEffortLevelsSync(model) {
-	return MODEL_CAPABILITIES[resolveModelIdSync(String(model))]?.effortLevels;
-}
-//#endregion
-//#region ../../src/lib/background-ai/registry.ts
-/**
-* Background AI feature registry — pure data, no dependencies (PAN-1583).
-*
-* Kept dependency-free so `config-yaml.ts` can import the feature list and
-* defaults without creating an import cycle with the enablement gate in
-* `features.ts` (which imports `config-yaml`).
-*/
-/** Every background AI feature Overdeck can run automatically. */
-const BACKGROUND_AI_FEATURES = [
-	"conversationTitles",
-	"titleRefinement",
-	"memoryExtraction",
-	"memoryQueryExpansion",
-	"conversationEnrichment",
-	"sessionEmbeddings",
-	"summaryFork",
-	"ttsSummarizer"
-];
-/**
-* Feature metadata. The `defaultEnabled` values mirror the historical
-* behavior of each subsystem so introducing the registry changes nothing
-* until the user flips a toggle:
-*   - sessionEmbeddings defaults OFF  (conversations.embeddings default false)
-*   - ttsSummarizer defaults OFF      (ttsSummarizer.enabled default false)
-*   - everything else defaults ON.
-*/
-const BACKGROUND_AI_FEATURE_META = [
-	{
-		key: "conversationTitles",
-		label: "Conversation titles",
-		description: "Generate a title for a new conversation from its first message.",
-		defaultEnabled: true
-	},
-	{
-		key: "titleRefinement",
-		label: "Title refinement",
-		description: "Refine a conversation title once the first assistant reply arrives.",
-		defaultEnabled: true
-	},
-	{
-		key: "memoryExtraction",
-		label: "Memory extraction",
-		description: "Extract structured observations from running agent transcripts.",
-		defaultEnabled: true
-	},
-	{
-		key: "memoryQueryExpansion",
-		label: "Memory query expansion",
-		description: "Expand memory search queries into related terms for better recall.",
-		defaultEnabled: true
-	},
-	{
-		key: "conversationEnrichment",
-		label: "Conversation enrichment",
-		description: "Summarize and tag discovered sessions for search and display.",
-		defaultEnabled: true
-	},
-	{
-		key: "sessionEmbeddings",
-		label: "Session embeddings",
-		description: "Build embedding vectors for semantic conversation search.",
-		defaultEnabled: false
-	},
-	{
-		key: "summaryFork",
-		label: "Summary fork / compaction",
-		description: "Summarize a transcript on compaction or handoff fallback.",
-		defaultEnabled: true
-	},
-	{
-		key: "ttsSummarizer",
-		label: "TTS activity narration",
-		description: "Summarize recent activity into spoken narration utterances.",
-		defaultEnabled: false
-	}
-];
-/** The default per-feature enablement map (used by config normalization). */
-function defaultBackgroundAiFeatures() {
-	const out = {};
-	for (const meta of BACKGROUND_AI_FEATURE_META) out[meta.key] = meta.defaultEnabled;
-	return out;
-}
-//#endregion
-//#region ../../src/lib/config-yaml.ts
-/**
-* YAML Configuration Loader
-*
-* Loads and merges configuration from:
-* 1. Global config: ~/.overdeck/config.yaml
-* 2. Per-project config: .pan.yaml (project root, falls back to .overdeck.yaml with deprecation warning)
-*
-* Uses smart (capability-based) model selection - no legacy presets.
-*/
-const COMPLIANCE_MODES = [
-	"off",
-	"advisory",
-	"enforcing"
-];
-function isComplianceMode(value) {
-	return typeof value === "string" && COMPLIANCE_MODES.includes(value);
-}
-function isFeatureRegistryClassificationProvider(value) {
-	return value === "anthropic" || value === "cliproxy";
-}
-const VALID_RESILIENCY_TIERS = ["ephemeral", "durable"];
-function isResiliencyTier(value) {
-	return typeof value === "string" && VALID_RESILIENCY_TIERS.includes(value);
-}
-/**
-* Merge remote work-agent provisioning settings from a single config source.
-*/
-function mergeRemoteConfig(result, config) {
-	const remote = config?.remote;
-	if (!remote) return;
-	if (remote.resiliency_tier !== void 0) {
-		if (!isResiliencyTier(remote.resiliency_tier)) throw new Error(`config.yaml: remote.resiliency_tier must be one of ${VALID_RESILIENCY_TIERS.join(", ")}`);
-		result.remote = {
-			...result.remote ?? { maxConcurrentAgents: 0 },
-			resiliencyTier: remote.resiliency_tier
-		};
-	}
-	if (remote.max_concurrent_agents !== void 0) {
-		if (typeof remote.max_concurrent_agents !== "number" || !Number.isInteger(remote.max_concurrent_agents) || remote.max_concurrent_agents < 0) throw new Error("config.yaml: remote.max_concurrent_agents must be a non-negative integer");
-		result.remote = {
-			...result.remote ?? { resiliencyTier: "ephemeral" },
-			maxConcurrentAgents: remote.max_concurrent_agents
-		};
-	}
-}
-const PARENT_MODEL_REF = "parent";
-/**
-* Canonical workhorse slot list. Anything outside this set is rejected by
-* config-load validation (PAN-1048 review feedback 003 / REQ-18).
-*/
-const WORKHORSE_SLOTS = [
-	"expensive",
-	"mid",
-	"cheap"
-];
-const ROLE_EFFORTS = [
-	"low",
-	"medium",
-	"high",
-	"xhigh",
-	"max"
-];
-const DEFAULT_WORKHORSES = {
-	expensive: "claude-opus-4-8",
-	mid: "claude-sonnet-4-6",
-	cheap: "claude-haiku-4-5"
-};
-const DEFAULT_ROLES = {
-	plan: { model: "workhorse:expensive" },
-	work: {
-		model: "workhorse:mid",
-		sub: {
-			inspect: { model: "workhorse:cheap" },
-			"inspect-deep": { model: "workhorse:mid" }
-		}
-	},
-	review: {
-		model: "workhorse:expensive",
-		sub: {
-			security: { model: "workhorse:expensive" },
-			correctness: { model: "workhorse:mid" },
-			performance: { model: "workhorse:mid" },
-			requirements: { model: "workhorse:mid" },
-			synthesis: { model: "workhorse:expensive" }
-		}
-	},
-	test: { model: "workhorse:mid" },
-	ship: { model: "workhorse:mid" },
-	strike: { model: "workhorse:expensive" },
-	sequencer: { model: "workhorse:expensive" },
-	flywheel: {
-		model: "claude-opus-4-8",
-		effort: "high",
-		minAgents: 20,
-		maxAgents: 30,
-		scope: "pan-only"
-	}
-};
-function cloneRoles(roles) {
-	const cloned = {};
-	for (const [role, roleConfig] of Object.entries(roles)) cloned[role] = {
-		...roleConfig,
-		sub: roleConfig.sub ? { ...roleConfig.sub } : void 0
-	};
-	return cloned;
-}
-/**
-* Default configuration (used when no config files exist)
-*/
-const DEFAULT_DOCS_TRIGGER_REGEXES = [
-	"pan",
-	"overdeck",
-	"cloister",
-	"deacon",
-	"workspace",
-	"specialist",
-	"harness",
-	"bd",
-	"beads",
-	"vbrief",
-	"workhorse"
-];
-const DEFAULT_CONFIG = {
-	tmux: { configMode: "managed" },
-	enabledProviders: new Set(["anthropic"]),
-	apiKeys: {},
-	providerAuth: {},
-	providerPlan: {},
-	providerHarnesses: {},
-	openrouterFavorites: [],
-	workhorses: { ...DEFAULT_WORKHORSES },
-	roles: cloneRoles(DEFAULT_ROLES),
-	overrides: {},
-	geminiThinkingLevel: 3,
-	trackerKeys: {},
-	conversations: {
-		compactionModel: "claude-haiku-4-5",
-		manualCompactMode: "claude-code",
-		richCompaction: true,
-		titleModel: "claude-haiku-4-5",
-		watchDirs: ["~/Projects"],
-		scanMaxParallel: null,
-		embeddings: false,
-		embeddingProvider: "openai",
-		embeddingModel: "text-embedding-3-small",
-		embeddingAutoOnDeep: true,
-		enrichment: {
-			quickModel: null,
-			deepModel: null,
-			maxParallel: 4,
-			costConfirmThreshold: 1
-		}
-	},
-	docs: {
-		enabled: true,
-		promptInjectionEnabled: true,
-		cliEnabled: true,
-		trigger: {
-			regexes: DEFAULT_DOCS_TRIGGER_REGEXES,
-			caseSensitive: false
-		},
-		corpus: {
-			docs: true,
-			skills: true,
-			rules: true,
-			claudeMd: true,
-			prds: false,
-			prdStatuses: ["active", "planned"],
-			maxChunkTokens: 500
-		},
-		budget: {
-			injectionRate: 1,
-			turnWindow: 10,
-			maxTokensPerInjection: 3e3,
-			maxChunksPerInjection: 5,
-			bypassClassifierThreshold: .85
-		},
-		embedding: {
-			provider: "local",
-			model: "gte-small",
-			dimensions: 384
-		},
-		classifier: {
-			enabled: false,
-			provider: "anthropic",
-			model: "claude-haiku-4-5",
-			threshold: .85,
-			timeoutMs: 1500
-		}
-	},
-	conversationSearch: {
-		enabled: false,
-		provider: "openai",
-		model: "text-embedding-3-small",
-		apiKeyRef: void 0,
-		dbPath: join(homedir(), ".overdeck", "conversations", "embeddings.db")
-	},
-	memory: {
-		extraction: { fallbackChain: [] },
-		observationsEnabled: true,
-		promptTimeInjectionEnabled: true,
-		rollupPendingThreshold: 4,
-		sidebarRefreshIntervalMs: 1e4,
-		workerConcurrency: 4
-	},
-	backgroundAi: {
-		cheapMode: true,
-		features: defaultBackgroundAiFeatures()
-	},
-	compliance: { mode: "advisory" },
-	registry: { classification: {
-		enabled: true,
-		provider: "cliproxy",
-		model: "gpt-4.1-nano",
-		perDayCostCapUsd: 1
-	} },
-	shadow: {
-		enabled: false,
-		trackers: {
-			linear: false,
-			github: false,
-			gitlab: false,
-			rally: false
-		}
-	},
-	caveman: {
-		enabled: false,
-		abTest: false,
-		modes: {
-			work: "full",
-			review: "review",
-			test: "full",
-			merge: "full"
-		}
-	},
-	rtk: { enabled: false },
-	tldr: { enabled: true },
-	tts: {
-		enabled: false,
-		lifecycle: true,
-		voice: "",
-		volume: 1,
-		rate: 1,
-		maxChars: 140,
-		dropInfoWhenFull: true,
-		daemonPort: 8787,
-		daemonHost: "127.0.0.1",
-		daemonAutoStart: false,
-		voiceMap: {},
-		mutedSources: [],
-		utteranceTemplates: {},
-		mutedIssues: []
-	},
-	ttsSummarizer: {
-		enabled: false,
-		model: "gpt-5.4-mini",
-		batchWindowSeconds: 15
-	},
-	resources: {
-		memoryWarnGb: 4,
-		memoryBlockGb: 2,
-		agentWarnCount: 8,
-		agentBlockCount: 10
-	},
-	experimental: {
-		experimentalFeatures: false,
-		claudeCodeChannels: false,
-		claudeCodeChannelsMcp: false,
-		streamdownRenderer: false,
-		showHarnessModelPermutations: false
-	},
-	claude: { permissionMode: "auto" },
-	codex: { permissionMode: "auto-review" }
-};
-/**
-* Path to global config file
-*/
-const GLOBAL_CONFIG_PATH = join(homedir(), ".overdeck", "config.yaml");
-/**
-* Normalize a provider config (handle both boolean and object forms)
-*/
-function normalizeProviderConfig(providerConfig, fallbackKey) {
-	if (providerConfig === void 0) return { enabled: false };
-	if (typeof providerConfig === "boolean") return {
-		enabled: providerConfig,
-		api_key: fallbackKey
-	};
-	return {
-		enabled: providerConfig.enabled,
-		api_key: providerConfig.api_key || fallbackKey,
-		harness: providerConfig.harness,
-		auth: providerConfig.auth,
-		plan: providerConfig.plan
-	};
-}
-function validateProviderHarness(provider, harness) {
-	if (harness !== void 0 && harness !== "claude-code" && harness !== "pi" && harness !== "codex") throw new Error(`config.yaml: models.providers.${provider}.harness must be claude-code, pi, or codex`);
-}
-function applyProviderHarness(result, provider, harness) {
-	validateProviderHarness(provider, harness);
-	if (harness !== void 0) result.providerHarnesses[provider] = harness;
-}
-/**
-* Resolve environment variables in config values.
-* If the env var is not set, returns the original reference (e.g., "$OPENAI_API_KEY")
-* so the UI can show that it's configured via env var but not resolved.
-*/
-function resolveEnvVar(value) {
-	if (!value) return void 0;
-	return value.replace(/\$\{?([A-Z_][A-Z0-9_]*)\}?/g, (match, varName) => {
-		const envValue = process.env[varName];
-		return envValue !== void 0 ? envValue : match;
-	});
-}
+//#region ../../src/lib/config-yaml/load.ts
 /**
 * Load and parse a YAML config file
 */
@@ -28966,493 +31755,6 @@ function loadProjectConfig() {
 */
 function loadGlobalConfig() {
 	return loadYamlFile(GLOBAL_CONFIG_PATH);
-}
-/**
-* Merge shadow configuration from multiple sources
-*/
-function mergeShadowConfig(result, config) {
-	if (!config?.shadow) return;
-	if (config.shadow.enabled !== void 0) result.enabled = config.shadow.enabled;
-	if (config.shadow.trackers) {
-		if (config.shadow.trackers.linear !== void 0) result.trackers.linear = config.shadow.trackers.linear;
-		if (config.shadow.trackers.github !== void 0) result.trackers.github = config.shadow.trackers.github;
-		if (config.shadow.trackers.gitlab !== void 0) result.trackers.gitlab = config.shadow.trackers.gitlab;
-		if (config.shadow.trackers.rally !== void 0) result.trackers.rally = config.shadow.trackers.rally;
-	}
-}
-/**
-* Merge caveman configuration from a single config source into the result.
-*/
-function mergeCavemanConfig(result, config) {
-	const caveman = config?.agents?.caveman;
-	if (!caveman) return;
-	if (caveman.enabled !== void 0) result.enabled = caveman.enabled;
-	if (caveman.ab_test !== void 0) result.abTest = caveman.ab_test;
-	if (caveman.work !== void 0) result.modes.work = caveman.work;
-	if (caveman.review !== void 0) result.modes.review = caveman.review;
-	if (caveman.test !== void 0) result.modes.test = caveman.test;
-	if (caveman.merge !== void 0) result.modes.merge = caveman.merge;
-}
-function mergeRtkConfig(result, config) {
-	const rtk = config?.agents?.rtk;
-	if (!rtk) return;
-	if (rtk.enabled !== void 0) result.enabled = rtk.enabled;
-}
-function mergeTldrConfig(result, config) {
-	const tldr = config?.agents?.tldr;
-	if (!tldr) return;
-	if (tldr.enabled !== void 0) result.enabled = tldr.enabled;
-}
-function cloneDocsConfig(config) {
-	return {
-		enabled: config.enabled,
-		promptInjectionEnabled: config.promptInjectionEnabled,
-		cliEnabled: config.cliEnabled,
-		trigger: {
-			regexes: [...config.trigger.regexes],
-			caseSensitive: config.trigger.caseSensitive
-		},
-		corpus: {
-			docs: config.corpus.docs,
-			skills: config.corpus.skills,
-			rules: config.corpus.rules,
-			claudeMd: config.corpus.claudeMd,
-			prds: config.corpus.prds,
-			prdStatuses: [...config.corpus.prdStatuses],
-			maxChunkTokens: config.corpus.maxChunkTokens
-		},
-		budget: { ...config.budget },
-		embedding: { ...config.embedding },
-		classifier: { ...config.classifier }
-	};
-}
-function mergeDocsConfig(result, config) {
-	const docs = config?.docs;
-	if (!docs) return;
-	if (docs.enabled !== void 0) result.enabled = docs.enabled;
-	if (docs.prompt_injection !== void 0) result.promptInjectionEnabled = docs.prompt_injection;
-	if (docs.cli !== void 0) result.cliEnabled = docs.cli;
-	if (docs.trigger) {
-		if (docs.trigger.regexes !== void 0) result.trigger.regexes = [...docs.trigger.regexes];
-		if (docs.trigger.case_sensitive !== void 0) result.trigger.caseSensitive = docs.trigger.case_sensitive;
-	}
-	if (docs.corpus) {
-		if (docs.corpus.docs !== void 0) result.corpus.docs = docs.corpus.docs;
-		if (docs.corpus.skills !== void 0) result.corpus.skills = docs.corpus.skills;
-		if (docs.corpus.rules !== void 0) result.corpus.rules = docs.corpus.rules;
-		if (docs.corpus.claude_md !== void 0) result.corpus.claudeMd = docs.corpus.claude_md;
-		if (docs.corpus.prds !== void 0) result.corpus.prds = docs.corpus.prds;
-		if (docs.corpus.prd_statuses !== void 0) result.corpus.prdStatuses = [...docs.corpus.prd_statuses];
-		if (docs.corpus.max_chunk_tokens !== void 0) result.corpus.maxChunkTokens = docs.corpus.max_chunk_tokens;
-	}
-	if (docs.budget) {
-		if (docs.budget.injection_rate !== void 0) result.budget.injectionRate = docs.budget.injection_rate;
-		if (docs.budget.turn_window !== void 0) result.budget.turnWindow = docs.budget.turn_window;
-		if (docs.budget.max_tokens_per_injection !== void 0) result.budget.maxTokensPerInjection = docs.budget.max_tokens_per_injection;
-		if (docs.budget.max_chunks_per_injection !== void 0) result.budget.maxChunksPerInjection = docs.budget.max_chunks_per_injection;
-		if (docs.budget.bypass_classifier_threshold !== void 0) result.budget.bypassClassifierThreshold = docs.budget.bypass_classifier_threshold;
-	}
-	if (docs.embedding) {
-		if (docs.embedding.provider !== void 0) result.embedding.provider = docs.embedding.provider;
-		if (docs.embedding.model !== void 0) result.embedding.model = docs.embedding.model;
-		if (docs.embedding.dimensions !== void 0) result.embedding.dimensions = docs.embedding.dimensions;
-	}
-	if (docs.classifier) {
-		if (docs.classifier.enabled !== void 0) result.classifier.enabled = docs.classifier.enabled;
-		if (docs.classifier.provider !== void 0) result.classifier.provider = docs.classifier.provider;
-		if (docs.classifier.model !== void 0) result.classifier.model = docs.classifier.model;
-		if (docs.classifier.threshold !== void 0) result.classifier.threshold = docs.classifier.threshold;
-		if (docs.classifier.timeout_ms !== void 0) result.classifier.timeoutMs = docs.classifier.timeout_ms;
-	}
-}
-function mergeTtsConfig(result, config) {
-	const tts = config?.tts;
-	if (!tts) return;
-	if (tts.enabled !== void 0) result.enabled = tts.enabled;
-	if (tts.lifecycle !== void 0) result.lifecycle = tts.lifecycle;
-	if (tts.voice !== void 0) result.voice = tts.voice;
-	if (tts.statusVoice !== void 0) result.statusVoice = tts.statusVoice;
-	if (tts.volume !== void 0) result.volume = tts.volume;
-	if (tts.rate !== void 0) result.rate = tts.rate;
-	if (tts.maxChars !== void 0) result.maxChars = tts.maxChars;
-	if (tts.dropInfoWhenFull !== void 0) result.dropInfoWhenFull = tts.dropInfoWhenFull;
-	if (tts.daemonPort !== void 0) result.daemonPort = tts.daemonPort;
-	if (tts.daemonHost !== void 0) result.daemonHost = tts.daemonHost;
-	if (tts.daemon?.autoStart !== void 0) result.daemonAutoStart = tts.daemon.autoStart;
-	if (tts.voiceMap !== void 0) result.voiceMap = { ...tts.voiceMap };
-	if (tts.mutedSources !== void 0) result.mutedSources = [...tts.mutedSources];
-	if (tts.utteranceTemplates !== void 0) result.utteranceTemplates = { ...tts.utteranceTemplates };
-	if (tts.mutedIssues !== void 0) result.mutedIssues = [...tts.mutedIssues];
-}
-function isWorkhorseRef(ref) {
-	return ref.startsWith("workhorse:");
-}
-function workhorseSlotFromRef(ref) {
-	return ref.slice(10);
-}
-function derefWorkhorse(ref, config, fieldPath = "model") {
-	if (ref === "parent") throw new Error(`config.yaml: ${fieldPath} cannot be ${PARENT_MODEL_REF}; ${PARENT_MODEL_REF} is a resolve-only sub-role sentinel`);
-	if (!isWorkhorseRef(ref)) return resolveModelIdSync(ref);
-	const slot = workhorseSlotFromRef(ref);
-	const resolved = config.workhorses?.[slot];
-	if (!resolved) throw new Error(`config.yaml: ${fieldPath} references ${ref} but workhorses.${slot} is not defined`);
-	if (isWorkhorseRef(resolved)) throw new Error(`config.yaml: workhorses.${slot} cannot reference another workhorse`);
-	return resolveModelIdSync(resolved);
-}
-function mergeRoleConfig(result, config) {
-	if (!config?.workhorses && !config?.roles) return;
-	if (config.workhorses) {
-		const unknownSlots = Object.keys(config.workhorses).filter((slot) => !WORKHORSE_SLOTS.includes(slot));
-		if (unknownSlots.length > 0) throw new Error(`config.yaml: unknown workhorse slot${unknownSlots.length > 1 ? "s" : ""} ` + unknownSlots.map((s) => `workhorses.${s}`).join(", ") + `. Valid slots: ${WORKHORSE_SLOTS.join(", ")}.`);
-		result.workhorses = {
-			...result.workhorses ?? {},
-			...config.workhorses
-		};
-	}
-	if (config.roles) {
-		result.roles = { ...result.roles ?? {} };
-		for (const [role, roleConfig] of Object.entries(config.roles)) {
-			const existing = result.roles[role];
-			const sub = {
-				...existing?.sub ?? {},
-				...roleConfig.sub ?? {}
-			};
-			const mergedRoleConfig = {
-				...existing,
-				...roleConfig,
-				sub: Object.keys(sub).length > 0 ? sub : void 0
-			};
-			if (roleConfig.maxAgents !== void 0 && roleConfig.minAgents === void 0 && mergedRoleConfig.minAgents !== void 0 && mergedRoleConfig.minAgents > roleConfig.maxAgents) mergedRoleConfig.minAgents = roleConfig.maxAgents;
-			result.roles[role] = mergedRoleConfig;
-		}
-	}
-}
-function validateRoleFields(role, roleConfig) {
-	if (roleConfig.harness !== void 0 && roleConfig.harness !== "claude-code" && roleConfig.harness !== "pi" && roleConfig.harness !== "codex") throw new Error(`config.yaml: roles.${role}.harness must be claude-code, pi, or codex`);
-	if (roleConfig.effort !== void 0 && !ROLE_EFFORTS.includes(roleConfig.effort)) throw new Error(`config.yaml: roles.${role}.effort must be one of ${ROLE_EFFORTS.join(", ")}`);
-	if (roleConfig.maxAgents !== void 0 && (!Number.isInteger(roleConfig.maxAgents) || roleConfig.maxAgents < 1)) throw new Error(`config.yaml: roles.${role}.maxAgents must be a positive integer`);
-	if (roleConfig.minAgents !== void 0 && (!Number.isInteger(roleConfig.minAgents) || roleConfig.minAgents < 0)) throw new Error(`config.yaml: roles.${role}.minAgents must be a non-negative integer`);
-	if (roleConfig.minAgents !== void 0 && roleConfig.maxAgents !== void 0 && roleConfig.minAgents > roleConfig.maxAgents) throw new Error(`config.yaml: roles.${role}.minAgents (${roleConfig.minAgents}) cannot exceed maxAgents (${roleConfig.maxAgents})`);
-	if (roleConfig.scope !== void 0 && roleConfig.scope !== "pan-only" && roleConfig.scope !== "all-tracked-projects") throw new Error(`config.yaml: roles.${role}.scope must be pan-only or all-tracked-projects`);
-}
-function validateRoleModelRefs(config) {
-	for (const [slot, ref] of Object.entries(config.workhorses ?? {})) {
-		if (ref === "parent") throw new Error(`config.yaml: workhorses.${slot} cannot be ${PARENT_MODEL_REF}; ${PARENT_MODEL_REF} is valid only for sub-role models`);
-		if (isWorkhorseRef(ref)) throw new Error(`config.yaml: workhorses.${slot} cannot reference another workhorse`);
-		resolveModelIdSync(ref);
-	}
-	for (const [role, roleConfig] of Object.entries(config.roles ?? {})) {
-		validateRoleFields(role, roleConfig);
-		if (roleConfig.model) {
-			const resolvedModel = derefWorkhorse(roleConfig.model, config, `roles.${role}.model`);
-			if (roleConfig.effort !== void 0) {
-				const supported = getModelEffortLevelsSync(resolvedModel);
-				if (supported !== void 0 && !supported.includes(roleConfig.effort)) throw new Error(`config.yaml: roles.${role}.effort '${roleConfig.effort}' is not supported by ${resolvedModel} (supported: ${supported.join(", ")})`);
-			}
-		}
-		for (const [subRole, subConfig] of Object.entries(roleConfig.sub ?? {})) if (subConfig.model && subConfig.model !== "parent") derefWorkhorse(subConfig.model, config, `roles.${role}.sub.${subRole}.model`);
-	}
-}
-/**
-* Merge multiple configs with precedence: project > global > defaults
-*/
-function mergeConfigs(...configs) {
-	const result = {
-		...DEFAULT_CONFIG,
-		tmux: { ...DEFAULT_CONFIG.tmux },
-		enabledProviders: new Set(DEFAULT_CONFIG.enabledProviders),
-		providerHarnesses: { ...DEFAULT_CONFIG.providerHarnesses },
-		workhorses: { ...DEFAULT_WORKHORSES },
-		roles: cloneRoles(DEFAULT_ROLES),
-		memory: {
-			extraction: {
-				...DEFAULT_CONFIG.memory.extraction,
-				fallbackChain: [...DEFAULT_CONFIG.memory.extraction.fallbackChain]
-			},
-			observationsEnabled: DEFAULT_CONFIG.memory.observationsEnabled,
-			promptTimeInjectionEnabled: DEFAULT_CONFIG.memory.promptTimeInjectionEnabled,
-			rollupPendingThreshold: DEFAULT_CONFIG.memory.rollupPendingThreshold,
-			sidebarRefreshIntervalMs: DEFAULT_CONFIG.memory.sidebarRefreshIntervalMs,
-			workerConcurrency: DEFAULT_CONFIG.memory.workerConcurrency
-		},
-		backgroundAi: {
-			cheapMode: DEFAULT_CONFIG.backgroundAi.cheapMode,
-			features: { ...DEFAULT_CONFIG.backgroundAi.features }
-		},
-		compliance: { mode: DEFAULT_CONFIG.compliance.mode },
-		registry: { classification: { ...DEFAULT_CONFIG.registry.classification } },
-		shadow: {
-			enabled: DEFAULT_CONFIG.shadow.enabled,
-			trackers: { ...DEFAULT_CONFIG.shadow.trackers }
-		},
-		caveman: {
-			enabled: DEFAULT_CONFIG.caveman.enabled,
-			abTest: DEFAULT_CONFIG.caveman.abTest,
-			modes: { ...DEFAULT_CONFIG.caveman.modes }
-		},
-		rtk: { enabled: DEFAULT_CONFIG.rtk.enabled },
-		docs: cloneDocsConfig(DEFAULT_CONFIG.docs),
-		conversationSearch: { ...DEFAULT_CONFIG.conversationSearch },
-		tts: {
-			enabled: DEFAULT_CONFIG.tts.enabled,
-			lifecycle: DEFAULT_CONFIG.tts.lifecycle,
-			voice: DEFAULT_CONFIG.tts.voice,
-			volume: DEFAULT_CONFIG.tts.volume,
-			rate: DEFAULT_CONFIG.tts.rate,
-			maxChars: DEFAULT_CONFIG.tts.maxChars,
-			dropInfoWhenFull: DEFAULT_CONFIG.tts.dropInfoWhenFull,
-			daemonPort: DEFAULT_CONFIG.tts.daemonPort,
-			daemonHost: DEFAULT_CONFIG.tts.daemonHost,
-			daemonAutoStart: DEFAULT_CONFIG.tts.daemonAutoStart,
-			voiceMap: { ...DEFAULT_CONFIG.tts.voiceMap },
-			mutedSources: [...DEFAULT_CONFIG.tts.mutedSources],
-			utteranceTemplates: { ...DEFAULT_CONFIG.tts.utteranceTemplates },
-			mutedIssues: [...DEFAULT_CONFIG.tts.mutedIssues]
-		},
-		ttsSummarizer: {
-			enabled: DEFAULT_CONFIG.ttsSummarizer.enabled,
-			model: DEFAULT_CONFIG.ttsSummarizer.model,
-			batchWindowSeconds: DEFAULT_CONFIG.ttsSummarizer.batchWindowSeconds
-		},
-		resources: {
-			memoryWarnGb: DEFAULT_CONFIG.resources.memoryWarnGb,
-			memoryBlockGb: DEFAULT_CONFIG.resources.memoryBlockGb,
-			agentWarnCount: DEFAULT_CONFIG.resources.agentWarnCount,
-			agentBlockCount: DEFAULT_CONFIG.resources.agentBlockCount
-		},
-		experimental: {
-			experimentalFeatures: DEFAULT_CONFIG.experimental.experimentalFeatures,
-			claudeCodeChannels: DEFAULT_CONFIG.experimental.claudeCodeChannels,
-			claudeCodeChannelsMcp: DEFAULT_CONFIG.experimental.claudeCodeChannelsMcp,
-			streamdownRenderer: DEFAULT_CONFIG.experimental.streamdownRenderer,
-			showHarnessModelPermutations: DEFAULT_CONFIG.experimental.showHarnessModelPermutations
-		},
-		claude: { permissionMode: DEFAULT_CONFIG.claude.permissionMode },
-		codex: { permissionMode: DEFAULT_CONFIG.codex.permissionMode }
-	};
-	const explicitlyDisabled = /* @__PURE__ */ new Set();
-	const validConfigs = configs.filter((c) => c !== null);
-	for (const config of validConfigs.reverse()) {
-		if (config.models?.providers) {
-			const providers = config.models.providers;
-			const legacyKeys = config.api_keys || {};
-			const anthropic = normalizeProviderConfig(providers.anthropic, void 0);
-			applyProviderHarness(result, "anthropic", anthropic.harness);
-			if (anthropic.enabled) result.enabledProviders.add("anthropic");
-			else if (providers.anthropic !== void 0) {
-				explicitlyDisabled.add("anthropic");
-				result.enabledProviders.delete("anthropic");
-			}
-			const openai = normalizeProviderConfig(providers.openai, legacyKeys.openai);
-			applyProviderHarness(result, "openai", openai.harness);
-			if (openai.enabled) {
-				result.enabledProviders.add("openai");
-				if (openai.api_key) result.apiKeys.openai = resolveEnvVar(openai.api_key);
-				if (openai.auth) result.providerAuth.openai = openai.auth;
-				if (openai.plan) result.providerPlan.openai = openai.plan;
-			} else if (providers.openai !== void 0) explicitlyDisabled.add("openai");
-			const google = normalizeProviderConfig(providers.google, legacyKeys.google);
-			applyProviderHarness(result, "google", google.harness);
-			if (google.enabled) {
-				result.enabledProviders.add("google");
-				if (google.api_key) result.apiKeys.google = resolveEnvVar(google.api_key);
-				if (google.auth) result.providerAuth.google = google.auth;
-				if (google.plan) result.providerPlan.google = google.plan;
-			} else if (providers.google !== void 0) explicitlyDisabled.add("google");
-			const minimax = normalizeProviderConfig(providers.minimax, legacyKeys.minimax);
-			applyProviderHarness(result, "minimax", minimax.harness);
-			if (minimax.enabled) {
-				result.enabledProviders.add("minimax");
-				if (minimax.api_key) result.apiKeys.minimax = resolveEnvVar(minimax.api_key);
-			} else if (providers.minimax !== void 0) explicitlyDisabled.add("minimax");
-			const zai = normalizeProviderConfig(providers.zai, legacyKeys.zai);
-			applyProviderHarness(result, "zai", zai.harness);
-			if (zai.enabled) {
-				result.enabledProviders.add("zai");
-				if (zai.api_key) result.apiKeys.zai = resolveEnvVar(zai.api_key);
-			} else if (providers.zai !== void 0) explicitlyDisabled.add("zai");
-			const kimi = normalizeProviderConfig(providers.kimi, legacyKeys.kimi);
-			applyProviderHarness(result, "kimi", kimi.harness);
-			if (kimi.enabled) {
-				result.enabledProviders.add("kimi");
-				if (kimi.api_key) result.apiKeys.kimi = resolveEnvVar(kimi.api_key);
-			} else if (providers.kimi !== void 0) explicitlyDisabled.add("kimi");
-			const openrouter = normalizeProviderConfig(providers.openrouter, legacyKeys.openrouter);
-			applyProviderHarness(result, "openrouter", openrouter.harness);
-			if (openrouter.enabled) {
-				result.enabledProviders.add("openrouter");
-				if (openrouter.api_key) result.apiKeys.openrouter = resolveEnvVar(openrouter.api_key);
-			} else if (providers.openrouter !== void 0) explicitlyDisabled.add("openrouter");
-			const mimo = normalizeProviderConfig(providers.mimo, legacyKeys.mimo);
-			applyProviderHarness(result, "mimo", mimo.harness);
-			if (mimo.enabled) {
-				result.enabledProviders.add("mimo");
-				if (mimo.api_key) result.apiKeys.mimo = resolveEnvVar(mimo.api_key);
-			} else if (providers.mimo !== void 0) explicitlyDisabled.add("mimo");
-			const nous = normalizeProviderConfig(providers.nous, legacyKeys.nous);
-			applyProviderHarness(result, "nous", nous.harness);
-			if (nous.enabled) {
-				result.enabledProviders.add("nous");
-				if (nous.api_key) result.apiKeys.nous = resolveEnvVar(nous.api_key);
-			} else if (providers.nous !== void 0) explicitlyDisabled.add("nous");
-			const dashscope = normalizeProviderConfig(providers.dashscope, legacyKeys.dashscope);
-			applyProviderHarness(result, "dashscope", dashscope.harness);
-			if (dashscope.enabled) {
-				result.enabledProviders.add("dashscope");
-				if (dashscope.api_key) result.apiKeys.dashscope = resolveEnvVar(dashscope.api_key);
-			} else if (providers.dashscope !== void 0) explicitlyDisabled.add("dashscope");
-		}
-		if (config.tmux?.config_mode) result.tmux.configMode = config.tmux.config_mode;
-		if (config.conversations?.compaction_model) result.conversations.compactionModel = resolveModelIdSync(config.conversations.compaction_model);
-		if (config.conversations?.manual_compact_mode) result.conversations.manualCompactMode = config.conversations.manual_compact_mode;
-		if (config.conversations?.rich_compaction !== void 0) result.conversations.richCompaction = config.conversations.rich_compaction;
-		if (config.conversations?.title_model) result.conversations.titleModel = resolveModelIdSync(config.conversations.title_model);
-		if (config.conversations?.watch_dirs) result.conversations.watchDirs = config.conversations.watch_dirs;
-		if (config.conversations?.scan_max_parallel !== void 0) result.conversations.scanMaxParallel = config.conversations.scan_max_parallel;
-		if (config.conversations?.embeddings !== void 0) result.conversations.embeddings = config.conversations.embeddings;
-		if (config.conversations?.embedding_provider) {
-			result.conversations.embeddingProvider = config.conversations.embedding_provider;
-			if (config.conversations.embedding_provider === "ollama" && !config.conversations.embedding_model) result.conversations.embeddingModel = "nomic-embed-text";
-		}
-		if (config.conversations?.embedding_model) result.conversations.embeddingModel = config.conversations.embedding_model;
-		if (config.conversations?.embedding_auto_on_deep !== void 0) result.conversations.embeddingAutoOnDeep = config.conversations.embedding_auto_on_deep;
-		if (config.conversations?.enrichment?.quick_model !== void 0) result.conversations.enrichment.quickModel = config.conversations.enrichment.quick_model;
-		if (config.conversations?.enrichment?.deep_model !== void 0) result.conversations.enrichment.deepModel = config.conversations.enrichment.deep_model;
-		if (config.conversations?.enrichment?.max_parallel !== void 0) result.conversations.enrichment.maxParallel = config.conversations.enrichment.max_parallel;
-		if (config.conversations?.enrichment?.cost_confirm_threshold !== void 0) result.conversations.enrichment.costConfirmThreshold = config.conversations.enrichment.cost_confirm_threshold;
-		if (config.memory) {
-			if (config.memory.extraction) result.memory.extraction = {
-				...result.memory.extraction,
-				...config.memory.extraction.provider !== void 0 ? { provider: config.memory.extraction.provider } : {},
-				...config.memory.extraction.model !== void 0 ? { model: config.memory.extraction.model } : {},
-				...config.memory.extraction.per_day_cost_cap_usd !== void 0 ? { perDayCostCapUsd: config.memory.extraction.per_day_cost_cap_usd } : {},
-				...config.memory.extraction.fallback_chain !== void 0 ? { fallbackChain: config.memory.extraction.fallback_chain } : {}
-			};
-			if (config.memory.features?.observations !== void 0) result.memory.observationsEnabled = config.memory.features.observations;
-			if (config.memory.features?.prompt_time_injection !== void 0) result.memory.promptTimeInjectionEnabled = config.memory.features.prompt_time_injection;
-			if (config.memory.rollup_pending_threshold !== void 0) result.memory.rollupPendingThreshold = config.memory.rollup_pending_threshold;
-			if (config.memory.sidebar_refresh_interval_ms !== void 0) result.memory.sidebarRefreshIntervalMs = config.memory.sidebar_refresh_interval_ms;
-			if (config.memory.worker_concurrency !== void 0) result.memory.workerConcurrency = config.memory.worker_concurrency;
-		}
-		if (config.compliance?.mode !== void 0) {
-			if (!isComplianceMode(config.compliance.mode)) throw new Error(`config.yaml: compliance.mode must be ${COMPLIANCE_MODES.join(", ")}`);
-			result.compliance.mode = config.compliance.mode;
-		}
-		if (config.registry?.classification) {
-			const classification = config.registry.classification;
-			if (classification.enabled !== void 0) result.registry.classification.enabled = classification.enabled;
-			if (classification.provider !== void 0) {
-				if (!isFeatureRegistryClassificationProvider(classification.provider)) throw new Error("config.yaml: registry.classification.provider must be anthropic or cliproxy");
-				result.registry.classification.provider = classification.provider;
-			}
-			if (classification.model !== void 0) result.registry.classification.model = classification.model;
-			if (classification.per_day_cost_cap_usd !== void 0) {
-				if (typeof classification.per_day_cost_cap_usd !== "number" || classification.per_day_cost_cap_usd < 0) throw new Error("config.yaml: registry.classification.per_day_cost_cap_usd must be a non-negative number");
-				result.registry.classification.perDayCostCapUsd = classification.per_day_cost_cap_usd;
-			}
-		}
-		if (config.openrouter?.favorites) result.openrouterFavorites = config.openrouter.favorites;
-		mergeRoleConfig(result, config);
-		if (config.api_keys) {
-			if (config.api_keys.openai) {
-				result.apiKeys.openai = resolveEnvVar(config.api_keys.openai);
-				if (!explicitlyDisabled.has("openai")) result.enabledProviders.add("openai");
-			}
-			if (config.api_keys.voyage) result.apiKeys.voyage = resolveEnvVar(config.api_keys.voyage);
-			if (config.api_keys.google) {
-				result.apiKeys.google = resolveEnvVar(config.api_keys.google);
-				if (!explicitlyDisabled.has("google")) result.enabledProviders.add("google");
-			}
-			if (config.api_keys.minimax) {
-				result.apiKeys.minimax = resolveEnvVar(config.api_keys.minimax);
-				if (!explicitlyDisabled.has("minimax")) result.enabledProviders.add("minimax");
-			}
-			if (config.api_keys.zai) {
-				result.apiKeys.zai = resolveEnvVar(config.api_keys.zai);
-				if (!explicitlyDisabled.has("zai")) result.enabledProviders.add("zai");
-			}
-			if (config.api_keys.kimi) {
-				result.apiKeys.kimi = resolveEnvVar(config.api_keys.kimi);
-				if (!explicitlyDisabled.has("kimi")) result.enabledProviders.add("kimi");
-			}
-			if (config.api_keys.openrouter) {
-				result.apiKeys.openrouter = resolveEnvVar(config.api_keys.openrouter);
-				if (!explicitlyDisabled.has("openrouter")) result.enabledProviders.add("openrouter");
-			}
-			if (config.api_keys.mimo) {
-				result.apiKeys.mimo = resolveEnvVar(config.api_keys.mimo);
-				if (!explicitlyDisabled.has("mimo")) result.enabledProviders.add("mimo");
-			}
-			if (config.api_keys.nous) {
-				result.apiKeys.nous = resolveEnvVar(config.api_keys.nous);
-				if (!explicitlyDisabled.has("nous")) result.enabledProviders.add("nous");
-			}
-			if (config.api_keys.dashscope) {
-				result.apiKeys.dashscope = resolveEnvVar(config.api_keys.dashscope);
-				if (!explicitlyDisabled.has("dashscope")) result.enabledProviders.add("dashscope");
-			}
-		}
-		if (config.models?.overrides) result.overrides = {
-			...result.overrides,
-			...config.models.overrides
-		};
-		if (config.models?.gemini_thinking_level) result.geminiThinkingLevel = config.models.gemini_thinking_level;
-		if (config.models?.default_conversation_model) result.defaultConversationModel = config.models.default_conversation_model;
-		if (config.tracker_keys) {
-			if (config.tracker_keys.linear) result.trackerKeys.linear = resolveEnvVar(config.tracker_keys.linear);
-			if (config.tracker_keys.github) result.trackerKeys.github = resolveEnvVar(config.tracker_keys.github);
-			if (config.tracker_keys.gitlab) result.trackerKeys.gitlab = resolveEnvVar(config.tracker_keys.gitlab);
-			if (config.tracker_keys.rally) result.trackerKeys.rally = resolveEnvVar(config.tracker_keys.rally);
-		}
-		mergeShadowConfig(result.shadow, config);
-		mergeCavemanConfig(result.caveman, config);
-		mergeRtkConfig(result.rtk, config);
-		mergeTldrConfig(result.tldr, config);
-		mergeDocsConfig(result.docs, config);
-		mergeTtsConfig(result.tts, config);
-		if (config.tts?.summarizer) {
-			const s = config.tts.summarizer;
-			if (s.enabled !== void 0) result.ttsSummarizer.enabled = s.enabled;
-			if (s.model) result.ttsSummarizer.model = resolveModelIdSync(s.model);
-			if (s.batch_window_seconds !== void 0) result.ttsSummarizer.batchWindowSeconds = s.batch_window_seconds;
-		}
-		if (config.background_ai) {
-			if (typeof config.background_ai.cheap_mode === "boolean") result.backgroundAi.cheapMode = config.background_ai.cheap_mode;
-			if (config.background_ai.features) for (const feature of BACKGROUND_AI_FEATURES) {
-				const value = config.background_ai.features[feature];
-				if (typeof value === "boolean") result.backgroundAi.features[feature] = value;
-			}
-		}
-		if (config.resources) {
-			if (typeof config.resources.memory_warn_gb === "number") result.resources.memoryWarnGb = config.resources.memory_warn_gb;
-			if (typeof config.resources.memory_block_gb === "number") result.resources.memoryBlockGb = config.resources.memory_block_gb;
-			if (typeof config.resources.agent_warn_count === "number") result.resources.agentWarnCount = config.resources.agent_warn_count;
-			if (typeof config.resources.agent_block_count === "number") result.resources.agentBlockCount = config.resources.agent_block_count;
-		}
-		if (config.experimental) {
-			if (typeof config.experimental.experimentalFeatures === "boolean") result.experimental.experimentalFeatures = config.experimental.experimentalFeatures;
-			if (typeof config.experimental.claudeCodeChannels === "boolean") result.experimental.claudeCodeChannels = config.experimental.claudeCodeChannels;
-			if (typeof config.experimental.claudeCodeChannelsMcp === "boolean") result.experimental.claudeCodeChannelsMcp = config.experimental.claudeCodeChannelsMcp;
-			if (typeof config.experimental.streamdownRenderer === "boolean") result.experimental.streamdownRenderer = config.experimental.streamdownRenderer;
-			if (typeof config.experimental.showHarnessModelPermutations === "boolean") result.experimental.showHarnessModelPermutations = config.experimental.showHarnessModelPermutations;
-		}
-		if (config.claude && (config.claude.permissionMode === "auto" || config.claude.permissionMode === "bypass")) result.claude.permissionMode = config.claude.permissionMode;
-		if (config.codex && (config.codex.permissionMode === "read-only" || config.codex.permissionMode === "workspace" || config.codex.permissionMode === "auto-review" || config.codex.permissionMode === "full-access")) result.codex.permissionMode = config.codex.permissionMode;
-		mergeRemoteConfig(result, config);
-		if (config.conversationSearch) {
-			const cs = config.conversationSearch;
-			if (typeof cs.enabled === "boolean") result.conversationSearch.enabled = cs.enabled;
-			if (cs.provider !== void 0) result.conversationSearch.provider = cs.provider;
-			if (cs.model !== void 0) result.conversationSearch.model = cs.model;
-			if (cs.apiKeyRef !== void 0) result.conversationSearch.apiKeyRef = cs.apiKeyRef;
-			if (cs.dbPath !== void 0) result.conversationSearch.dbPath = cs.dbPath;
-		}
-	}
-	validateRoleModelRefs(result);
-	return {
-		config: result,
-		explicitlyDisabled
-	};
 }
 /**
 * Detect deprecated model IDs in config overrides
@@ -29674,7 +31976,7 @@ function buildChildEnvSync(baseEnv = process.env, overrides) {
 Object.fromEntries([...PROVIDER_ENV_KEYS].map((k) => [k, ""]));
 //#endregion
 //#region ../../src/lib/tmux.ts
-const execFileAsync = promisify(execFile);
+const execFileAsync = promisify$1(execFile);
 const MANAGED_TMUX_SERVER_UNIT = "overdeck-tmux-server";
 const SERVER_ALIVE_POLL_MS = 50;
 const SERVER_ALIVE_TIMEOUT_MS = 5e3;
@@ -29704,7 +32006,7 @@ function getManagedTmuxSocketName() {
 	return process.env.OVERDECK_TMUX_SOCKET_NAME ?? "overdeck";
 }
 async function ensureManagedTmuxDirAsync() {
-	await mkdir(getTmuxDir(), { recursive: true });
+	await mkdir$1(getTmuxDir(), { recursive: true });
 }
 /**
 * True when a tmux server is already answering on the managed socket.
@@ -29894,6 +32196,8 @@ function ensureOverdeckTmuxServerSync(cleanEnv) {
 				MANAGED_TMUX_SERVER_UNIT,
 				"--collect",
 				"--quiet",
+				"--service-type=forking",
+				"--property=ManagedOOMPreference=avoid",
 				"tmux",
 				...args
 			], {
@@ -29961,7 +32265,7 @@ async function reloadManagedTmuxConfigAsync() {
 async function ensureManagedTmuxConfigAsync() {
 	if (tmuxContextPrepared) return;
 	await ensureManagedTmuxDirAsync();
-	await writeFile(getManagedTmuxConfigPath(), MANAGED_TMUX_CONFIG_CONTENT, "utf-8");
+	await writeFile$1(getManagedTmuxConfigPath(), MANAGED_TMUX_CONFIG_CONTENT, "utf-8");
 	await reloadManagedTmuxConfigAsync();
 	tmuxContextPrepared = true;
 }
@@ -30058,7 +32362,196 @@ function getOverdeckDatabasePath() {
 	return join$1(getOverdeckHome(), "overdeck.db");
 }
 //#endregion
+//#region ../../src/lib/overdeck/schema-audit.ts
+const EMPTY_TOP_UP_EXPECTATIONS = {
+	columns: [],
+	indexes: []
+};
+function splitTableDefinitions(body) {
+	const definitions = [];
+	let start = 0;
+	let depth = 0;
+	let quote = null;
+	for (let index = 0; index < body.length; index += 1) {
+		const character = body[index];
+		if (quote) {
+			if (character === quote && body[index - 1] !== "\\") quote = null;
+			continue;
+		}
+		if (character === "'" || character === "\"" || character === "`") {
+			quote = character;
+			continue;
+		}
+		if (character === "(") depth += 1;
+		if (character === ")") depth -= 1;
+		if (character === "," && depth === 0) {
+			definitions.push(body.slice(start, index).trim());
+			start = index + 1;
+		}
+	}
+	definitions.push(body.slice(start).trim());
+	return definitions.filter(Boolean);
+}
+function parseOverdeckSchemaExpectations(migrationSql, topUps = EMPTY_TOP_UP_EXPECTATIONS) {
+	const tables = /* @__PURE__ */ new Map();
+	const indexes = /* @__PURE__ */ new Set();
+	for (const statement of migrationSql.split("--> statement-breakpoint")) {
+		const trimmed = statement.trim();
+		const tableMatch = trimmed.match(/^CREATE TABLE(?: IF NOT EXISTS)?\s+`([^`]+)`\s*\(([\s\S]*)\)\s*;?$/i);
+		if (tableMatch) {
+			const [, tableName, body] = tableMatch;
+			const columns = /* @__PURE__ */ new Set();
+			for (const definition of splitTableDefinitions(body)) {
+				const columnMatch = definition.match(/^`([^`]+)`\s+/);
+				if (columnMatch) columns.add(columnMatch[1]);
+			}
+			tables.set(tableName, columns);
+			continue;
+		}
+		const indexMatch = trimmed.match(/^CREATE (?:UNIQUE )?INDEX(?: IF NOT EXISTS)?\s+`([^`]+)`\s+ON\s+`[^`]+`/i);
+		if (indexMatch) indexes.add(indexMatch[1]);
+	}
+	for (const { table, column } of topUps.columns) {
+		const columns = tables.get(table) ?? /* @__PURE__ */ new Set();
+		columns.add(column);
+		tables.set(table, columns);
+	}
+	for (const index of topUps.indexes) indexes.add(index);
+	return {
+		tables,
+		indexes
+	};
+}
+function readOverdeckSchemaExpectationsSync(topUps = EMPTY_TOP_UP_EXPECTATIONS) {
+	return parseOverdeckSchemaExpectations(readFileSync$1(OVERDECK_MIGRATION_PATH, "utf8"), topUps);
+}
+function quoteIdentifier(identifier) {
+	return `"${identifier.replaceAll("\"", "\"\"")}"`;
+}
+function auditOverdeckSchemaSync(db, topUps = EMPTY_TOP_UP_EXPECTATIONS) {
+	const expected = readOverdeckSchemaExpectationsSync(topUps);
+	const artifacts = db.prepare(`
+      SELECT type, name
+      FROM sqlite_master
+      WHERE type IN ('table', 'index')
+        AND name NOT LIKE 'sqlite_%'
+    `).all();
+	const actualTables = new Set(artifacts.filter((artifact) => artifact.type === "table").map((artifact) => artifact.name));
+	const actualIndexes = new Set(artifacts.filter((artifact) => artifact.type === "index").map((artifact) => artifact.name));
+	const missingTables = [...expected.tables.keys()].filter((table) => !actualTables.has(table)).sort();
+	const missingIndexes = [...expected.indexes].filter((index) => !actualIndexes.has(index)).sort();
+	const missingColumns = [];
+	for (const [table, expectedColumns] of expected.tables) {
+		if (!actualTables.has(table)) continue;
+		const actualColumns = new Set(db.prepare(`PRAGMA table_info(${quoteIdentifier(table)})`).all().map((column) => column.name));
+		for (const column of expectedColumns) if (!actualColumns.has(column)) missingColumns.push({
+			table,
+			column
+		});
+	}
+	missingColumns.sort((left, right) => left.table === right.table ? left.column.localeCompare(right.column) : left.table.localeCompare(right.table));
+	return {
+		missingTables,
+		missingIndexes,
+		missingColumns
+	};
+}
+//#endregion
 //#region ../../src/lib/overdeck/infra.ts
+/**
+* Runtime infrastructure for the canonical overdeck.db cache.
+* Schema top-ups tolerate idempotency errors, log unexpected failures without
+* blocking boot, and getOverdeckDatabaseSync follows them with a report-only
+* schema audit that warns about drift without mutating the database.
+*/
+const OVERDECK_SCHEMA_TOP_UP_EXPECTATIONS = {
+	columns: [
+		{
+			table: "discovered_sessions",
+			column: "harness"
+		},
+		{
+			table: "flywheel_substrate_bugs",
+			column: "affected_criteria"
+		},
+		{
+			table: "review_status",
+			column: "release_status"
+		},
+		{
+			table: "review_status",
+			column: "release_notes"
+		},
+		{
+			table: "review_status",
+			column: "inspect_owner_session"
+		},
+		{
+			table: "review_status",
+			column: "strike_ready_head"
+		},
+		{
+			table: "review_status",
+			column: "strike_ready_at"
+		},
+		{
+			table: "review_status",
+			column: "strike_landing_state"
+		},
+		{
+			table: "review_status",
+			column: "strike_recovery_count"
+		},
+		{
+			table: "review_status",
+			column: "strike_landing_attempts"
+		},
+		{
+			table: "agents",
+			column: "yielded_by_scheduler"
+		},
+		{
+			table: "agents",
+			column: "review_discovery_pending"
+		},
+		{
+			table: "agents",
+			column: "review_context_manifest_path"
+		},
+		{
+			table: "agents",
+			column: "review_discovery_ready_at"
+		},
+		{
+			table: "agents",
+			column: "review_convoy_forked_at"
+		},
+		{
+			table: "agents",
+			column: "review_fork_cache_checked"
+		},
+		{
+			table: "agents",
+			column: "review_forked_from_parent"
+		},
+		{
+			table: "agents",
+			column: "yielded_at"
+		},
+		{
+			table: "agents",
+			column: "last_yield_resume_at"
+		}
+	],
+	indexes: [
+		"cost_session_id_idx",
+		"idx_cost_agent_id",
+		"idx_cost_issue_upper",
+		"release_sets_project_idx",
+		"release_set_components_issue_component_idx",
+		"release_set_components_issue_order_idx"
+	]
+};
 const overdeckEvents = sqliteTable("events", {
 	sequence: integer("sequence").primaryKey({ autoIncrement: true }),
 	type: text("type").notNull(),
@@ -30076,6 +32569,103 @@ function runOverdeckMigrationSync(db) {
 		if (trimmed) db.exec(trimmed);
 	}
 }
+/**
+* Run one idempotent schema top-up without hiding unexpected SQLite failures.
+* Only duplicate DDL is silent; missing tables and other failures are logged so
+* schema drift remains observable without blocking later top-ups or startup.
+*/
+function runSchemaTopUp(db, statement) {
+	try {
+		db.exec(statement);
+	} catch (error) {
+		const message = error instanceof Error ? error.message : String(error);
+		if (/duplicate column name|already exists/i.test(message)) return;
+		console.error(`[schema] top-up failed: ${statement}\n${message}`);
+	}
+}
+/**
+* Idempotent schema top-ups for databases created before a field/index existed
+* in the init migration. The init migration only runs on a fresh database.
+* PAN-2220: the conversation ledger-cost query joins cost_events on session_id;
+* without this index SQLite builds an automatic index on every query (~76ms → 7ms).
+*/
+function ensureRuntimeIndexesSync(db) {
+	runSchemaTopUp(db, "ALTER TABLE `discovered_sessions` ADD COLUMN `harness` text");
+	runSchemaTopUp(db, "UPDATE `discovered_sessions` SET `harness` = 'claude-code' WHERE `harness` IS NULL");
+	runSchemaTopUp(db, "ALTER TABLE `review_status` ADD COLUMN `release_status` text");
+	runSchemaTopUp(db, "ALTER TABLE `review_status` ADD COLUMN `release_notes` text");
+	runSchemaTopUp(db, "ALTER TABLE `review_status` ADD COLUMN `inspect_owner_session` text");
+	runSchemaTopUp(db, "ALTER TABLE `review_status` ADD COLUMN `strike_ready_head` text");
+	runSchemaTopUp(db, "ALTER TABLE `review_status` ADD COLUMN `strike_ready_at` integer");
+	runSchemaTopUp(db, "ALTER TABLE `review_status` ADD COLUMN `strike_landing_state` text");
+	runSchemaTopUp(db, "ALTER TABLE `review_status` ADD COLUMN `strike_recovery_count` integer DEFAULT 0");
+	runSchemaTopUp(db, "ALTER TABLE `review_status` ADD COLUMN `strike_landing_attempts` text");
+	ensureReleaseSetTablesSync(db);
+	runSchemaTopUp(db, "ALTER TABLE `flywheel_substrate_bugs` ADD COLUMN `affected_criteria` text");
+	runSchemaTopUp(db, "CREATE INDEX IF NOT EXISTS `cost_session_id_idx` ON `cost_events` (`session_id`)");
+	runSchemaTopUp(db, "CREATE INDEX IF NOT EXISTS `idx_cost_agent_id` ON `cost_events` (`agent_id`, `ts`)");
+	runSchemaTopUp(db, "CREATE INDEX IF NOT EXISTS `idx_cost_issue_upper` ON `cost_events` (UPPER(`issue_id`))");
+	runSchemaTopUp(db, "ALTER TABLE `agents` ADD COLUMN `yielded_by_scheduler` integer");
+	runSchemaTopUp(db, "ALTER TABLE `agents` ADD COLUMN `review_discovery_pending` integer");
+	runSchemaTopUp(db, "ALTER TABLE `agents` ADD COLUMN `review_context_manifest_path` text");
+	runSchemaTopUp(db, "ALTER TABLE `agents` ADD COLUMN `review_discovery_ready_at` integer");
+	runSchemaTopUp(db, "ALTER TABLE `agents` ADD COLUMN `review_convoy_forked_at` integer");
+	runSchemaTopUp(db, "ALTER TABLE `agents` ADD COLUMN `review_fork_cache_checked` integer");
+	runSchemaTopUp(db, "ALTER TABLE `agents` ADD COLUMN `review_forked_from_parent` integer");
+	runSchemaTopUp(db, "ALTER TABLE `agents` ADD COLUMN `yielded_at` integer");
+	runSchemaTopUp(db, "ALTER TABLE `agents` ADD COLUMN `last_yield_resume_at` integer");
+}
+/**
+* Idempotent schema top-up for release set tables (PAN-399). Existing overdeck.db
+* files created before the release-set feature need these tables added without
+* requiring a full migration reset.
+*/
+function ensureReleaseSetTablesSync(db) {
+	db.exec(`
+    CREATE TABLE IF NOT EXISTS \`release_sets\` (
+      \`issue_id\` text PRIMARY KEY NOT NULL,
+      \`project_key\` text NOT NULL,
+      \`project_path\` text NOT NULL,
+      \`workspace_type\` text NOT NULL,
+      \`status\` text DEFAULT 'pending' NOT NULL,
+      \`created_at\` integer NOT NULL,
+      \`updated_at\` integer NOT NULL,
+      FOREIGN KEY (\`issue_id\`) REFERENCES \`issues\`(\`id\`) ON UPDATE no action ON DELETE no action
+    )
+  `);
+	db.exec("CREATE INDEX IF NOT EXISTS `release_sets_project_idx` ON `release_sets` (`project_key`,`updated_at`)");
+	db.exec(`
+    CREATE TABLE IF NOT EXISTS \`release_set_components\` (
+      \`id\` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+      \`issue_id\` text NOT NULL,
+      \`component_key\` text NOT NULL,
+      \`provider\` text,
+      \`trigger\` text NOT NULL,
+      \`release_order\` integer DEFAULT 0 NOT NULL,
+      \`required\` integer DEFAULT true NOT NULL,
+      \`status\` text DEFAULT 'pending' NOT NULL,
+      \`health_status\` text,
+      \`version_status\` text,
+      \`smoke_status\` text,
+      \`rollback_status\` text,
+      \`notes\` text,
+      FOREIGN KEY (\`issue_id\`) REFERENCES \`release_sets\`(\`issue_id\`) ON UPDATE no action ON DELETE cascade
+    )
+  `);
+	db.exec("CREATE UNIQUE INDEX IF NOT EXISTS `release_set_components_issue_component_idx` ON `release_set_components` (`issue_id`,`component_key`)");
+	db.exec("CREATE INDEX IF NOT EXISTS `release_set_components_issue_order_idx` ON `release_set_components` (`issue_id`,`release_order`,`component_key`)");
+}
+function warnSchemaDriftSync(db) {
+	try {
+		const report = auditOverdeckSchemaSync(db, OVERDECK_SCHEMA_TOP_UP_EXPECTATIONS);
+		for (const table of report.missingTables) console.warn(`[schema-audit] missing table: ${table}`);
+		for (const index of report.missingIndexes) console.warn(`[schema-audit] missing index: ${index}`);
+		for (const { table, column } of report.missingColumns) console.warn(`[schema-audit] missing column: ${table}.${column}`);
+	} catch (error) {
+		const message = error instanceof Error ? error.message : String(error);
+		console.warn(`[schema-audit] audit failed: ${message}`);
+	}
+}
 function getOverdeckDatabaseSync(dbPath = getOverdeckDatabasePath()) {
 	if (overdeckDbSync?.path === dbPath) return overdeckDbSync.db;
 	if (overdeckDbSync) {
@@ -30089,6 +32679,8 @@ function getOverdeckDatabaseSync(dbPath = getOverdeckDatabasePath()) {
 	db.pragma("foreign_keys = ON");
 	db.pragma("synchronous = NORMAL");
 	runOverdeckMigrationSync(db);
+	ensureRuntimeIndexesSync(db);
+	warnSchemaDriftSync(db);
 	overdeckDbSync = {
 		path: dbPath,
 		db
@@ -30180,7 +32772,10 @@ effect(EventBus, gen(function* () {
 }));
 var Records = class extends Service()("overdeck/Records") {};
 succeed$1(Records, Records.of({
-	writeIssue: (project, issueId, record) => sync(() => writeIssueRecordSync(project, issueId, record)),
+	writeIssue: (project, issueId, record) => promise(async () => {
+		await updateIssueRecord(project, issueId, () => record);
+		return getIssueRecordPath(project, issueId);
+	}),
 	readIssue: (project, issueId) => sync(() => readIssueRecordSync(project, issueId)),
 	readSpec: (planRef) => sync(() => {
 		const path = isAbsolute(planRef) ? planRef : join$1(packageRoot, planRef);
@@ -30205,7 +32800,63 @@ succeed$1(Tmux, Tmux.of({
 Service()("overdeck/Forge");
 Service()("overdeck/Projects");
 var CostArchive = class extends Service()("overdeck/CostArchive") {};
-succeed$1(CostArchive, CostArchive.of({ append: (_event) => void_ }));
+function costArchivePath() {
+	return join$1(getOverdeckHome(), "costs", "events.jsonl");
+}
+function archiveKey(event) {
+	if (typeof event.requestId === "string" && event.requestId.length > 0) return `request:${event.requestId}`;
+	const source = typeof event.sourceFile === "string" ? event.sourceFile : typeof event.source === "string" ? event.source : null;
+	return source ? `source:${source}` : null;
+}
+function toCostArchiveEvent(event) {
+	return {
+		ts: event.ts instanceof Date ? event.ts.toISOString() : typeof event.ts === "string" ? event.ts : (/* @__PURE__ */ new Date()).toISOString(),
+		type: "cost",
+		agentId: typeof event.agentId === "string" ? event.agentId : "unknown",
+		issueId: typeof event.issueId === "string" ? event.issueId : "UNKNOWN",
+		sessionType: typeof event.sessionType === "string" ? event.sessionType : "unknown",
+		provider: typeof event.provider === "string" ? event.provider : "unknown",
+		model: typeof event.model === "string" ? event.model : "unknown",
+		input: typeof event.input === "number" ? event.input : 0,
+		output: typeof event.output === "number" ? event.output : 0,
+		cacheRead: typeof event.cacheRead === "number" ? event.cacheRead : 0,
+		cacheWrite: typeof event.cacheWrite === "number" ? event.cacheWrite : 0,
+		cost: typeof event.cost === "number" ? event.cost : 0,
+		...typeof event.requestId === "string" ? { requestId: event.requestId } : {},
+		...typeof event.sessionId === "string" ? { sessionId: event.sessionId } : {},
+		...typeof event.sourceFile === "string" ? { source: event.sourceFile } : {},
+		...Array.isArray(event.warnings) ? { warnings: event.warnings } : {}
+	};
+}
+succeed$1(CostArchive, CostArchive.of((() => {
+	let seen = null;
+	const loadSeen = () => {
+		if (seen) return seen;
+		seen = /* @__PURE__ */ new Set();
+		const path = costArchivePath();
+		if (!existsSync$1(path)) return seen;
+		const content = readFileSync$1(path, "utf8");
+		for (const line of content.split("\n")) {
+			if (!line.trim()) continue;
+			try {
+				const key = archiveKey(JSON.parse(line));
+				if (key) seen.add(key);
+			} catch {}
+		}
+		return seen;
+	};
+	return { append: (event) => sync(() => {
+		const normalized = toCostArchiveEvent(event);
+		const key = archiveKey(normalized);
+		const archiveSeen = loadSeen();
+		if (key && archiveSeen.has(key)) return;
+		const path = costArchivePath();
+		mkdirSync$1(dirname$1(path), { recursive: true });
+		if (!existsSync$1(path)) writeFileSync$1(path, "", "utf8");
+		appendFileSync$1(path, `${JSON.stringify(normalized)}\n`, "utf8");
+		if (key) archiveSeen.add(key);
+	}) };
+})()));
 Service()("overdeck/MemorySearch");
 Service()("overdeck/MemoryFiles");
 //#endregion
@@ -30433,7 +33084,7 @@ function captureTldrMetricsSync(workspacePath) {
 	} catch {}
 	return metrics;
 }
-promisify(exec);
+promisify$1(exec);
 //#endregion
 //#region record-cost-event.ts
 /**

@@ -57,8 +57,8 @@ export interface StageProps {
   /** Working directory for new drawer terminals (the project path). */
   terminalCwd?: string
   /** Create a conversation for the deck's project (for the "+" New conversation
-   * action); returns the new conversation name. */
-  onCreateConversation?: (agentId: string, message?: string) => Promise<string | undefined>
+   * action); returns the new conversation name or creation error. */
+  onCreateConversation?: (agentId: string, message?: string) => Promise<{ name: string } | { error: string }>
   /** Render the permanent HOME tab (project-scoped). */
   renderHome: (api: StageApi) => ReactNode
   /** Render an `issue` tab's body for the given issue id. */
@@ -330,8 +330,8 @@ export function Stage({ deckKey, conversations = [], resolveSession, terminalCwd
         label: 'New conversation',
         icon: Bot,
         onSelect: () => {
-          void onCreateConversation('claude-code').then((name) => {
-            if (name) openOrFocusAgentPane(name, 'Agent')
+          void onCreateConversation('claude-code').then((result) => {
+            if ('name' in result) openOrFocusAgentPane(result.name, 'Agent')
           })
         },
       })

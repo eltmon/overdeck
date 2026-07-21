@@ -2,11 +2,12 @@ import * as React from 'react';
 import { motion } from 'framer-motion';
 import { X } from 'lucide-react';
 import { CanvasTerminal } from './CanvasTerminal';
-import { BeadsKanban } from './BeadsKanban';
+import { TasksKanban } from './TasksKanban';
 import { FileActivityTree } from './FileActivityTree';
 import { AgentTimeline } from './AgentTimeline';
 import { ActionBar } from './ActionBar';
 import { useDashboardStore, selectAgentOutput, selectAgentById } from '../../lib/store';
+import { useAgentOutputSubscription } from '../../hooks/useAgentOutputSubscription';
 import type { Agent } from '../../types';
 
 interface FocusViewProps {
@@ -28,6 +29,7 @@ function InfoRow({ label, value }: { label: string; value: string }) {
 }
 
 export function AgentFocusView({ agent, onClose }: FocusViewProps) {
+  useAgentOutputSubscription(agent.id);
   const terminalLines = useDashboardStore(selectAgentOutput(agent.id));
   const liveAgent = useDashboardStore(selectAgentById(agent.id));
   const liveStatus = liveAgent?.status ?? agent.status;
@@ -98,7 +100,7 @@ export function AgentFocusView({ agent, onClose }: FocusViewProps) {
         </div>
 
         <div className="flex gap-4 flex-1 min-h-0 overflow-hidden">
-          {/* Left: terminal + beads + actions */}
+          {/* Left: terminal + tasks + actions */}
           <div className="flex flex-col gap-3 flex-1 min-w-0">
             {/* Large canvas terminal (30 lines) */}
             <div className="shrink-0">
@@ -108,12 +110,12 @@ export function AgentFocusView({ agent, onClose }: FocusViewProps) {
               <CanvasTerminal lines={terminalLines} rows={12} fontSize={11} className="rounded-lg" />
             </div>
 
-            {/* Beads kanban */}
+            {/* Tasks kanban */}
             <div className="shrink-0">
               <div className="text-xs font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'var(--gv-text-dim)' }}>
                 Tasks
               </div>
-              <BeadsKanban agentId={agent.id} workspace={agent.workspace} />
+              <TasksKanban agentId={agent.id} workspace={agent.workspace} />
             </div>
 
             {/* Action bar */}

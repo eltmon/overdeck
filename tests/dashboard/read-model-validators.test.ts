@@ -229,4 +229,26 @@ describe('toReviewStatusSnapshot', () => {
     expect(snapshot.verificationCycleCount).toBe(2)
     expect(snapshot.prUrl).toContain('/pull/486')
   })
+
+  it('projects planning auto-handoff failures for dashboard issue lists', () => {
+    const stuckDetails = JSON.stringify({
+      workAgentSkipReason: 'guardrails',
+      workAgentError: 'Workspace has uncommitted changes',
+    })
+    const snapshot = toReviewStatusSnapshot({
+      issueId: 'PAN-2860',
+      reviewStatus: 'pending',
+      testStatus: 'pending',
+      readyForMerge: false,
+      updatedAt: '2026-07-17T00:00:00.000Z',
+      stuck: true,
+      stuckReason: 'planning_auto_handoff_failed',
+      stuckAt: '2026-07-17T00:00:00.000Z',
+      stuckDetails,
+    })
+
+    expect(snapshot.stuck).toBe(true)
+    expect(snapshot.stuckReason).toBe('planning_auto_handoff_failed')
+    expect(snapshot.stuckDetails).toBe(stuckDetails)
+  })
 })

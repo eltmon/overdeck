@@ -13,11 +13,12 @@
 import { getDatabase, DatabaseError } from './index.js';
 import type { ConversationFilter } from './discovered-sessions-db.js';
 import type { RuntimeName } from '../runtimes/types.js';
+import { normalizeHarness } from '../overdeck/conversations.js';
 export { DatabaseError };
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-export type TitleSource = 'auto' | 'ai' | 'ai-refined' | 'manual' | 'default';
+export type TitleSource = 'auto' | 'ai' | 'ai-refined' | 'ai-explicit' | 'manual' | 'default';
 
 export interface ForkRequest {
   parentConversationName: string;
@@ -139,7 +140,7 @@ function rowToConversation(row: Record<string, unknown>): Conversation {
     effort: (row['effort'] as string | null) ?? null,
     forkStatus: (row['fork_status'] as string | null) ?? null,
     forkError: (row['fork_error'] as string | null) ?? null,
-    harness: (row['harness'] === 'pi' || row['harness'] === 'claude-code' || row['harness'] === 'codex') ? row['harness'] as RuntimeName : null,
+    harness: normalizeHarness(row['harness'] as string | null),
     deliveryMethod: (row['delivery_method'] === 'auto' || row['delivery_method'] === 'channels' || row['delivery_method'] === 'tmux')
       ? row['delivery_method'] as 'auto' | 'channels' | 'tmux'
       : null,
@@ -845,4 +846,3 @@ export function removeFavorite(type: FavoriteType, itemId: string): void {
   const db = getDatabase();
   db.prepare(`DELETE FROM favorites WHERE type = ? AND item_id = ?`).run(type, itemId);
 }
-

@@ -8,13 +8,15 @@ import {
   saveConfig,
   loadState,
   saveState,
+  resetPatrolHeartbeatForStartup,
   checkMassDeath,
   isDeaconRunning,
   getDeaconStatus,
+  assessDeaconPatrolFreshness,
   type DeaconConfig,
   type DeaconState,
 } from '../../../src/lib/cloister/deacon.js';
-import { existsSync, unlinkSync, mkdirSync } from 'fs';
+import { existsSync, unlinkSync, mkdirSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { OVERDECK_HOME } from '../../../src/lib/paths.js';
 
@@ -151,6 +153,66 @@ describe('Deacon State Management', () => {
     expect(final.specialists['review-agent']).toBeDefined();
     expect(final.specialists['merge-agent']).toBeDefined();
   });
+
+  it('does not let an older patrol heartbeat clobber a newer persisted heartbeat', () => {
+    const first: DeaconState = {
+      specialists: {},
+      patrolCycle: 11,
+      recentDeaths: [],
+      lastPatrol: '2026-07-03T05:44:06.000Z',
+    };
+    saveState(first);
+
+    const staleEndOfCycle: DeaconState = {
+      specialists: {},
+      patrolCycle: 10,
+      recentDeaths: [],
+      lastPatrol: '2026-07-03T05:43:06.000Z',
+      containerRestarts: {
+        workspace: {
+          count: 1,
+          firstRestart: '2026-07-03T05:43:10.000Z',
+          lastRestart: '2026-07-03T05:43:10.000Z',
+        },
+      },
+    };
+    saveState(staleEndOfCycle);
+
+    const loaded = loadState();
+    expect(loaded.lastPatrol).toBe('2026-07-03T05:44:06.000Z');
+    expect(loaded.containerRestarts?.workspace?.count).toBe(1);
+  });
+
+  it('clears persisted lastPatrol for dashboard startup without losing state', () => {
+    const state: DeaconState = {
+      specialists: {
+        'review-agent': {
+          specialistName: 'review-agent',
+          consecutiveFailures: 1,
+          forceKillCount: 0,
+        },
+      },
+      patrolCycle: 7,
+      recentDeaths: ['2026-06-24T08:00:00.000Z'],
+      lastPatrol: '2026-06-24T08:01:00.000Z',
+    };
+    saveState(state);
+
+    resetPatrolHeartbeatForStartup();
+
+    const loaded = loadState();
+    expect(loaded.lastPatrol).toBeUndefined();
+    expect(loaded.patrolCycle).toBe(7);
+    expect(loaded.recentDeaths).toEqual(['2026-06-24T08:00:00.000Z']);
+    expect(loaded.specialists['review-agent']).toEqual(state.specialists['review-agent']);
+  });
+
+  it('schedules patrol ticks through the in-flight guard', () => {
+    const source = readFileSync(join(process.cwd(), 'src/lib/cloister/deacon.ts'), 'utf-8');
+    expect(source).toContain('const deaconPatrolGuard = createInFlightGuard();');
+    expect(source).toContain("runScheduledPatrol('interval');");
+    expect(source).toContain("patrol ${source} skipped — previous patrol still in flight");
+  });
 });
 
 describe('checkMassDeath', () => {
@@ -273,5 +335,40 @@ describe('Deacon Status', () => {
 
   it('should report not running initially', () => {
     expect(isDeaconRunning()).toBe(false);
+  });
+
+  it('classifies patrol freshness from the persisted heartbeat', () => {
+    const nowMs = Date.parse('2026-06-23T09:32:00.000Z');
+    const fresh = assessDeaconPatrolFreshness({
+      isRunning: true,
+      lastPatrol: '2026-06-23T09:30:30.000Z',
+      patrolIntervalMs: 60_000,
+      nowMs,
+    });
+    expect(fresh.status).toBe('running');
+    expect(fresh.secondsSinceLastPatrol).toBe(90);
+    expect(fresh.staleAfterSeconds).toBe(180);
+
+    const stale = assessDeaconPatrolFreshness({
+      isRunning: true,
+      lastPatrol: '2026-06-23T09:28:30.000Z',
+      patrolIntervalMs: 60_000,
+      nowMs,
+    });
+    expect(stale.status).toBe('stale');
+    expect(stale.secondsSinceLastPatrol).toBe(210);
+
+    expect(assessDeaconPatrolFreshness({
+      isRunning: true,
+      patrolIntervalMs: 60_000,
+      nowMs,
+    }).status).toBe('starting');
+
+    expect(assessDeaconPatrolFreshness({
+      isRunning: false,
+      lastPatrol: '2026-06-23T09:31:00.000Z',
+      patrolIntervalMs: 60_000,
+      nowMs,
+    }).status).toBe('stopped');
   });
 });

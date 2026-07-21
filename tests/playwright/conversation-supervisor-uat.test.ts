@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { writeFile as writeFileAsync } from 'node:fs/promises';
 import { createServer as createHttpServer, type IncomingMessage, type Server as HttpServer, type ServerResponse } from 'node:http';
 import { createServer as createNetServer, type Server as NetServer } from 'node:net';
@@ -141,7 +141,14 @@ async function closeBridge(server: NetServer): Promise<void> {
 }
 
 function removeTempDir(path: string): void {
-  rmSync(path, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 });
+  rmSync(path, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 });
+}
+
+function ensurePtySupervisorArtifact(): void {
+  const artifact = join(process.cwd(), 'dist', 'pty-supervisor.js');
+  if (existsSync(artifact)) return;
+  mkdirSync(join(process.cwd(), 'dist'), { recursive: true });
+  writeFileSync(artifact, '#!/usr/bin/env node\n');
 }
 
 async function runTmux(args: string[]): Promise<string> {
@@ -194,6 +201,35 @@ async function createSupervisorBackedTmuxSession(agentId: string): Promise<void>
   }));
   tmuxSessions.add(agentId);
   await startFakeSupervisor(agentId, fifoPath);
+}
+
+async function createPlainTmuxSession(agentId: string): Promise<void> {
+  if (!actualTmux) throw new Error('tmux module not initialized');
+  const script = [
+    `for i in $(seq 1 160); do printf 'scrollback-line-%03d\\n' "$i"; done`,
+    `printf 'Codex app-server ready\\n'`,
+    `while true; do sleep 60; done`,
+  ].join('; ');
+  await Effect.runPromise(actualTmux.createSession(agentId, workspace, `bash -lc ${shellQuote(script)}`, {
+    env: { TERM: 'xterm-256color' },
+    width: 80,
+    height: 24,
+  }));
+  tmuxSessions.add(agentId);
+}
+
+async function killFakeTmuxSession(session: string): Promise<void> {
+  if (actualTmux) {
+    try {
+      await Effect.runPromise(actualTmux.killSession(session));
+    } catch {
+      // cleanup is idempotent when the session is already gone
+    }
+  }
+  const existing = sessions.get(session);
+  if (existing) await closeBridge(existing.bridge);
+  sessions.delete(session);
+  tmuxSessions.delete(session);
 }
 
 async function startFakeSupervisor(agentId: string, fifoPath: string): Promise<void> {
@@ -278,6 +314,11 @@ async function cleanupConversationThroughApi(conversation: { name: string }): Pr
   }, conversation);
 }
 
+async function expectSupervisorBackedSession(session: string): Promise<void> {
+  await expect.poll(() => sessions.has(session), { timeout: 30_000 }).toBe(true);
+  await expect.poll(() => tmuxSessionExists(session), { timeout: 30_000 }).toBe(true);
+}
+
 async function startRealConversationRoutes(): Promise<void> {
   const { conversationsRouteLayer } = await import('../../src/dashboard/server/routes/conversations.js');
   const { setupTerminalWebSocket } = await import('../../src/dashboard/server/ws-terminal.js');
@@ -324,6 +365,7 @@ async function startRealConversationRoutes(): Promise<void> {
 
 beforeEach(async () => {
   vi.resetModules();
+  ensurePtySupervisorArtifact();
   tmpHome = mkdtempSync(join(tmpdir(), 'pan-playwright-uat-'));
   fakeHome = mkdtempSync(join(tmpdir(), 'pan-playwright-home-'));
   workspace = mkdtempSync(join(tmpdir(), 'pan-playwright-workspace-'));
@@ -365,23 +407,31 @@ beforeEach(async () => {
       ...actual,
       createSessionSync: vi.fn(),
       createSession: vi.fn((session: string) => Effect.promise(async () => {
-        await createSupervisorBackedTmuxSession(session);
+        if (existsSync(join(tmpHome, 'agents', session, 'pty-token'))) {
+          await createSupervisorBackedTmuxSession(session);
+        } else {
+          await createPlainTmuxSession(session);
+        }
       })),
       killSessionSync: vi.fn(),
       killSession: vi.fn((session: string) => Effect.promise(async () => {
-        try {
-          await Effect.runPromise(actual.killSession(session));
-        } catch {
-          // cleanup is idempotent when the session is already gone
-        }
-        const existing = sessions.get(session);
-        if (existing) await closeBridge(existing.bridge);
-        sessions.delete(session);
-        tmuxSessions.delete(session);
+        await killFakeTmuxSession(session);
       })),
       waitForClaudePrompt: vi.fn(() => Effect.succeed(Promise.resolve(true))),
     };
   });
+
+  vi.doMock('../../src/lib/runtimes/tmux-cli.js', () => ({
+    tmuxCreateSession: vi.fn(async (session: string) => {
+      await createPlainTmuxSession(session);
+    }),
+    tmuxKillSession: vi.fn(async (session: string) => {
+      await killFakeTmuxSession(session);
+    }),
+    tmuxSessionExists: vi.fn(async (session: string) => {
+      return tmuxSessionExists(session);
+    }),
+  }));
 
   const { resetDatabase } = await import('../../src/lib/database/index.js');
   resetDatabase();
@@ -389,7 +439,7 @@ beforeEach(async () => {
   browser = await chromium.launch();
   context = await browser.newContext();
   page = await context.newPage();
-});
+}, 30_000);
 
 afterEach(async () => {
   await page?.close().catch(() => undefined);
@@ -421,11 +471,13 @@ afterEach(async () => {
   vi.doUnmock('../../src/lib/agents.js');
   vi.doUnmock('../../src/lib/harness-resolve.js');
   vi.doUnmock('../../src/lib/tmux.js');
+  vi.doUnmock('../../src/lib/runtimes/tmux-cli.js');
 });
 
 describe('conversation supervisor Playwright UAT', () => {
-  it('resumes Codex conversations through the real route with codex resume', async () => {
-    await page.goto(baseUrl);
+  it('resumes Codex app-server conversations through the real route', async () => {
+    const response = await page.goto(baseUrl, { waitUntil: 'domcontentloaded' });
+    if (!response?.ok()) throw new Error('page.goto returned ' + response?.status() + ' for ' + baseUrl);
     const conversation = await page.evaluate(async () => {
       return await (window as any).api('/api/conversations', {
         method: 'POST',
@@ -433,8 +485,7 @@ describe('conversation supervisor Playwright UAT', () => {
         body: JSON.stringify({ model: 'gpt-5.5', harness: 'codex' }),
       }) as { name: string; tmuxSession: string };
     });
-    await expect.poll(() => sessions.has(conversation.tmuxSession)).toBe(true);
-    await expect.poll(() => tmuxSessionExists(conversation.tmuxSession)).toBe(true);
+    await expect.poll(() => tmuxSessionExists(conversation.tmuxSession), { timeout: 30_000 }).toBe(true);
 
     const threadId = '019eaaec-4dfa-7ab1-90ba-9104d16534d1';
     writeCodexRollout(conversation.tmuxSession, threadId);
@@ -448,18 +499,20 @@ describe('conversation supervisor Playwright UAT', () => {
     await page.evaluate(async (conv) => {
       await (window as any).api('/api/conversations/' + conv.name + '/resume', { method: 'POST' });
     }, conversation);
-    await expect.poll(() => sessions.has(conversation.tmuxSession)).toBe(true);
-    await expect.poll(() => tmuxSessionExists(conversation.tmuxSession)).toBe(true);
+    await expect.poll(() => tmuxSessionExists(conversation.tmuxSession), { timeout: 30_000 }).toBe(true);
 
     const launcher = launcherFor(conversation.tmuxSession);
-    expect(launcher).toContain(`codex resume -c project_doc_max_bytes=0 '${threadId}'`);
-    expect(launcher).not.toContain('codex -c project_doc_max_bytes=0\n');
+    expect(launcher).toContain(`/dist/codex-app-server-host.js' --model 'gpt-5.5' --resume '${threadId}'`);
+    expect(launcher).not.toContain('pty-supervisor.js');
+    expect(launcher).not.toContain('codex exec resume');
 
     await cleanupConversationThroughApi(conversation);
   }, 45_000);
 
   it('delivers through real conversation routes and keeps plain forks off Channels MCP', async () => {
-    await page.goto(baseUrl);
+    const response = await page.goto(baseUrl, { waitUntil: 'domcontentloaded' });
+    if (!response?.ok()) throw new Error('page.goto returned ' + response?.status() + ' for ' + baseUrl);
+    await page.locator('#create').waitFor({ state: 'visible', timeout: 15_000 });
     await page.locator('#create').click();
     await expect.poll(async () => {
       const state = await page.evaluate(() => ({ current: (window as any).current, error: (window as any).lastError }));
@@ -467,8 +520,7 @@ describe('conversation supervisor Playwright UAT', () => {
       return state.current;
     }).not.toBeNull();
     const parent = await page.evaluate(() => (window as any).current as { name: string; tmuxSession: string; cwd: string; claudeSessionId: string });
-    await expect.poll(() => sessions.has(parent.tmuxSession)).toBe(true);
-    await expect.poll(() => tmuxSessionExists(parent.tmuxSession)).toBe(true);
+    await expectSupervisorBackedSession(parent.tmuxSession);
 
     await page.locator('#openTerminal').click();
     await expect.poll(() => page.evaluate(() => (window as any).terminalReady)).toBe(true);
@@ -485,8 +537,7 @@ describe('conversation supervisor Playwright UAT', () => {
     await page.locator('#fork').click();
     await expect.poll(() => page.evaluate(() => (window as any).fork)).not.toBeNull();
     const forkConversation = await page.evaluate(() => (window as any).fork as { name: string; tmuxSession: string });
-    await expect.poll(() => sessions.has(forkConversation.tmuxSession)).toBe(true);
-    await expect.poll(() => tmuxSessionExists(forkConversation.tmuxSession)).toBe(true);
+    await expectSupervisorBackedSession(forkConversation.tmuxSession);
 
     const launcher = launcherFor(forkConversation.tmuxSession);
     expect(launcher).toContain('pty-supervisor.js');

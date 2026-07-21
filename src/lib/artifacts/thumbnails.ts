@@ -106,7 +106,7 @@ async function renderArtifactThumbnailWithPlaywright(input: {
 }
 
 function defaultRawArtifactUrl(slug: string): string {
-  const domain = process.env.PAN_ARTIFACT_DOMAIN ?? 'pan.localhost';
+  const domain = process.env.PAN_ARTIFACT_DOMAIN ?? 'overdeck.localhost';
   return `https://artifacts.${domain}/a/${slug}`;
 }
 

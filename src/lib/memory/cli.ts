@@ -7,14 +7,10 @@ import { runMemoryFtsTransaction, withMemoryFtsDatabase } from './fts-db.js';
 import { resolveExtractionProviderSelection } from './providers/index.js';
 import { getMemoryRollupPendingThreshold, loadMemorySettings } from './settings.js';
 import {
-  ensureDir,
   ensureParentDir,
-  resolveIssueMemoryRoot,
   resolveMemoryRoot,
   resolveObservationsFile,
   resolvePendingDir,
-  resolveRagRunsFile,
-  resolveStatusFile,
   resolveSummariesDir,
 } from './paths.js';
 import { getMemoryHealthPath, type MemoryHealthSnapshot } from './health.js';

@@ -3,7 +3,7 @@ import * as NodeFileSystem from '@effect/platform-node/NodeFileSystem'
 import { FsError } from '../errors.js'
 
 import type { PanSessionEntry } from './types.js'
-import { getWorkspacePanPaths, ensureWorkspacePanDir } from './continue.js'
+import { getReadableWorkspacePanPaths, ensureWorkspacePanDir } from './continue.js'
 
 export function appendSession(
   workspacePath: string,
@@ -38,7 +38,7 @@ export function readSessions(
 ): Effect.Effect<PanSessionEntry[], FsError> {
   return Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem
-    const { sessionsPath } = getWorkspacePanPaths(workspacePath)
+    const { sessionsPath } = getReadableWorkspacePanPaths(workspacePath)
     const exists = yield* fs.exists(sessionsPath).pipe(Effect.catch(() => Effect.succeed(false)))
     if (!exists) return []
     const raw = yield* fs.readFileString(sessionsPath, 'utf-8').pipe(

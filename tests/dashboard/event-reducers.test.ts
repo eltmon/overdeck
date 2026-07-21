@@ -62,8 +62,8 @@ describe('INITIAL_READ_MODEL_STATE', () => {
 // ─── syncSnapshot ────────────────────────────────────────────────────────────
 
 describe('syncSnapshot', () => {
-  // DashboardSnapshot only contains: sequence, agents, specialists, reviewStatuses, resources, timestamp
-  // agentOutput, recentActivity, shadowInference are NOT part of the snapshot — they arrive via events
+  // DashboardSnapshot carries bootstrap state; high-volume output and shadow
+  // inference still arrive via events.
   const snapshot: DashboardSnapshot = {
     sequence: 10,
     agents: [baseAgent],
@@ -94,6 +94,16 @@ describe('syncSnapshot', () => {
     const snapshotWithIssues = { ...snapshot, issues: [{ id: 'PAN-1' }, { id: 'PAN-2' }] } as any
     const state = syncSnapshot(makeState(), snapshotWithIssues)
     expect(state.issuesRaw).toHaveLength(2)
+  })
+
+  it('seeds recentActivity from the snapshot', () => {
+    const state = syncSnapshot(makeState(), {
+      ...snapshot,
+      recentActivity: [{ id: 'activity-1', timestamp: '2026-06-11T23:24:05.000Z', message: 'Restarted' }],
+    })
+    expect(state.recentActivity).toEqual([
+      { id: 'activity-1', timestamp: '2026-06-11T23:24:05.000Z', message: 'Restarted' },
+    ])
   })
 
   it('hydrates conversation progress fields from snapshot', () => {
@@ -298,6 +308,95 @@ describe('applyEvent — agent.status_changed', () => {
     })
     expect(next.turnDiffSummariesByAgentId['agent-1']).toBeUndefined()
   })
+
+  // PAN-2633 — pending-input wipe must be gated on tmux liveness for idle-alive agents.
+  const agentWithPendingInput: AgentSnapshot = {
+    ...baseAgent,
+    hasPendingQuestion: true,
+    pendingQuestionCount: 1,
+    pendingQuestionPrompt: 'Approve this plan?',
+    pendingQuestionReason: 'plan-approval',
+    pendingInputCount: 2,
+    pendingInputKinds: ['auq', 'plan'],
+    pendingAskUserQuestion: { question: 'Approve this plan?', options: [{ label: 'Yes', value: 'yes' }] } as any,
+    pendingProposedPlan: { planId: 'plan-1', title: 'Plan' } as any,
+  }
+
+  it('preserves pending-input fields on stopped status when tmux session is live', () => {
+    const state = makeState({ agentsById: { 'agent-1': agentWithPendingInput } })
+    const next = applyEvent(state, {
+      type: 'agent.status_changed',
+      sequence: 5,
+      timestamp: ts(),
+      payload: { agentId: 'agent-1', status: 'stopped', hasLiveTmuxSession: true },
+    })
+    const agent = next.agentsById['agent-1']!
+    expect(agent.hasPendingQuestion).toBe(true)
+    expect(agent.pendingQuestionCount).toBe(1)
+    expect(agent.pendingQuestionPrompt).toBe('Approve this plan?')
+    expect(agent.pendingQuestionReason).toBe('plan-approval')
+    expect(agent.pendingInputCount).toBe(2)
+    expect(agent.pendingInputKinds).toEqual(['auq', 'plan'])
+    expect(agent.pendingAskUserQuestion).toEqual(agentWithPendingInput.pendingAskUserQuestion)
+    expect(agent.pendingProposedPlan).toEqual(agentWithPendingInput.pendingProposedPlan)
+  })
+
+  it('deletes pending-input fields on stopped status when tmux session is not live', () => {
+    const state = makeState({ agentsById: { 'agent-1': agentWithPendingInput } })
+    const next = applyEvent(state, {
+      type: 'agent.status_changed',
+      sequence: 5,
+      timestamp: ts(),
+      payload: { agentId: 'agent-1', status: 'stopped', hasLiveTmuxSession: false },
+    })
+    const agent = next.agentsById['agent-1']!
+    expect(agent.hasPendingQuestion).toBeUndefined()
+    expect(agent.pendingQuestionCount).toBeUndefined()
+    expect(agent.pendingQuestionPrompt).toBeUndefined()
+    expect(agent.pendingQuestionReason).toBeUndefined()
+    expect(agent.pendingInputCount).toBeUndefined()
+    expect(agent.pendingInputKinds).toBeUndefined()
+    expect(agent.pendingAskUserQuestion).toBeUndefined()
+    expect(agent.pendingProposedPlan).toBeUndefined()
+  })
+
+  it('deletes pending-input fields on stopped status when hasLiveTmuxSession is absent', () => {
+    const state = makeState({ agentsById: { 'agent-1': agentWithPendingInput } })
+    const next = applyEvent(state, {
+      type: 'agent.status_changed',
+      sequence: 5,
+      timestamp: ts(),
+      payload: { agentId: 'agent-1', status: 'stopped' },
+    })
+    const agent = next.agentsById['agent-1']!
+    expect(agent.hasPendingQuestion).toBeUndefined()
+    expect(agent.pendingQuestionCount).toBeUndefined()
+    expect(agent.pendingQuestionPrompt).toBeUndefined()
+    expect(agent.pendingQuestionReason).toBeUndefined()
+    expect(agent.pendingInputCount).toBeUndefined()
+    expect(agent.pendingInputKinds).toBeUndefined()
+    expect(agent.pendingAskUserQuestion).toBeUndefined()
+    expect(agent.pendingProposedPlan).toBeUndefined()
+  })
+
+  it('preserves pending-input fields while running regardless of hasLiveTmuxSession', () => {
+    const state = makeState({ agentsById: { 'agent-1': agentWithPendingInput } })
+    const next = applyEvent(state, {
+      type: 'agent.status_changed',
+      sequence: 5,
+      timestamp: ts(),
+      payload: { agentId: 'agent-1', status: 'running', hasLiveTmuxSession: false },
+    })
+    const agent = next.agentsById['agent-1']!
+    expect(agent.hasPendingQuestion).toBe(true)
+    expect(agent.pendingQuestionCount).toBe(1)
+    expect(agent.pendingQuestionPrompt).toBe('Approve this plan?')
+    expect(agent.pendingQuestionReason).toBe('plan-approval')
+    expect(agent.pendingInputCount).toBe(2)
+    expect(agent.pendingInputKinds).toEqual(['auq', 'plan'])
+    expect(agent.pendingAskUserQuestion).toEqual(agentWithPendingInput.pendingAskUserQuestion)
+    expect(agent.pendingProposedPlan).toEqual(agentWithPendingInput.pendingProposedPlan)
+  })
 })
 
 describe('applyEvent — agent.turn_diff_completed', () => {
@@ -495,6 +594,20 @@ describe('applyEvent — activity.updated', () => {
       payload: { events } as any,
     })
     expect(state.recentActivity).toHaveLength(50)
+  })
+})
+
+// ─── applyEvent — conversation.title_changed ─────────────────────────────────
+
+describe('applyEvent — conversation.title_changed', () => {
+  it('increments conversationsListRevision', () => {
+    const state = applyEvent(makeState({ conversationsListRevision: 7 }), {
+      type: 'conversation.title_changed',
+      sequence: 32,
+      timestamp: ts(),
+      payload: { conversationName: 'conv-1', title: 'New title', titleSource: 'auto' },
+    })
+    expect(state.conversationsListRevision).toBe(8)
   })
 })
 

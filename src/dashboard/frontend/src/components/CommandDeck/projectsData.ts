@@ -4,6 +4,8 @@
  * workspace) read this via the same react-query key `command-deck-projects`,
  * so the network request is deduped and both surfaces agree on the list.
  */
+import { compareIssueIds } from '@overdeck/contracts';
+import { dashboardMutationJsonHeaders } from '../../lib/wsTransport';
 import type { ProjectFeature } from './ProjectTree/ProjectNode';
 
 /** Sentinel deck key for the "No project" bucket — conversations/terminals not
@@ -29,9 +31,18 @@ export function isUnscopedConversation(
 }
 
 export interface ProjectData {
+  key: string;
   name: string;
   path: string;
   features: ProjectFeature[];
+}
+
+export function filterSpecOnlyPlanned(
+  features: ProjectFeature[],
+  showPlannedBacklog: boolean,
+): ProjectFeature[] {
+  if (showPlannedBacklog) return features;
+  return features.filter((feature) => feature.specOnlyPlanned !== true);
 }
 
 export function groupProjects(issues: ProjectFeature[]): ProjectData[] {
@@ -45,6 +56,7 @@ export function groupProjects(issues: ProjectFeature[]): ProjectData[] {
     }
 
     grouped.set(issue.projectName, {
+      key: issue.projectName,
       name: issue.projectName,
       path: issue.projectName,
       features: [issue],
@@ -54,9 +66,40 @@ export function groupProjects(issues: ProjectFeature[]): ProjectData[] {
   return [...grouped.values()]
     .map((project) => ({
       ...project,
-      features: [...project.features].sort((a, b) => a.issueId.localeCompare(b.issueId)),
+      features: [...project.features].sort((a, b) => compareIssueIds(a.issueId, b.issueId)),
     }))
     .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+export async function fetchProjectPipelineMembership(projectKey: string): Promise<true> {
+  const response = await fetch(`/api/pipeline/membership?project=${encodeURIComponent(projectKey)}`);
+  if (response.ok) return true;
+  throw new Error(await readMembershipError(response));
+}
+
+/**
+ * PAN-2972 — operator-initiated retry. A cold snapshot can only be healed by a
+ * re-gather, so the retry button POSTs to the refresh route instead of
+ * re-reading the same cold snapshot.
+ */
+export async function refreshProjectPipelineMembership(projectKey: string): Promise<true> {
+  const response = await fetch(
+    `/api/pipeline/membership/refresh?project=${encodeURIComponent(projectKey)}`,
+    { method: 'POST', headers: await dashboardMutationJsonHeaders() },
+  );
+  if (response.ok) return true;
+  throw new Error(await readMembershipError(response));
+}
+
+async function readMembershipError(response: Response): Promise<string> {
+  let message = 'Pipeline membership could not be loaded';
+  try {
+    const body = await response.json() as { error?: unknown };
+    if (typeof body.error === 'string') message = body.error;
+  } catch {
+    // Keep the operator-facing fallback when the server returns a non-JSON error.
+  }
+  return message;
 }
 
 export async function fetchProjects(): Promise<ProjectData[]> {
@@ -73,12 +116,13 @@ export async function fetchProjects(): Promise<ProjectData[]> {
   // Start with projects that have qualifying issues
   const projectMap = new Map(groupProjects(issues).map(p => [p.name, p]));
 
-  // Add registered projects that have no qualifying issues (empty features list)
+  // Preserve stable keys when registered projects already have grouped issues.
   for (const proj of registered) {
     const name = proj.name ?? proj.key;
-    if (!projectMap.has(name)) {
-      projectMap.set(name, { name, path: proj.path, features: [] });
-    }
+    const existing = projectMap.get(name);
+    projectMap.set(name, existing
+      ? { ...existing, key: proj.key, path: proj.path }
+      : { key: proj.key, name, path: proj.path, features: [] });
   }
 
   return [...projectMap.values()].sort((a, b) => a.name.localeCompare(b.name));

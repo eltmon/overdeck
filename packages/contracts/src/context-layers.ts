@@ -2,7 +2,7 @@ import { Schema } from "effect"
 import type { Harness } from "./types"
 
 export const CONTEXT_LAYER_KINDS = ["global", "project", "workspace"] as const
-export const CONTEXT_PREVIEW_HARNESSES = ["claude-code", "pi", "codex"] as const satisfies readonly Harness[]
+export const CONTEXT_PREVIEW_HARNESSES = ["claude-code", "ohmypi", "codex", "acp"] as const satisfies readonly Harness[]
 
 export const ContextLayerKind = Schema.Literals(CONTEXT_LAYER_KINDS)
 export type ContextLayerKind = typeof ContextLayerKind.Type
@@ -137,8 +137,9 @@ export type ContextPreviewRequest = typeof ContextPreviewRequest.Type
 
 export const ContextHarnessPreviews = Schema.Struct({
   "claude-code": Schema.String,
-  pi: Schema.String,
+  ohmypi: Schema.String,
   codex: Schema.String,
+  acp: Schema.String,
   fullPrompt: Schema.String,
 })
 export type ContextHarnessPreviews = typeof ContextHarnessPreviews.Type

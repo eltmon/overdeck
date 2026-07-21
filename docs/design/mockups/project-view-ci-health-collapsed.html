@@ -1,0 +1,600 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Project view CI health mockup</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #ffffff;
+      --surface: #ffffff;
+      --surface-2: #f8fafc;
+      --line: #dde2ea;
+      --line-strong: #cbd5e1;
+      --text: #1f2937;
+      --muted: #667085;
+      --muted-2: #8792a2;
+      --blue: #2563eb;
+      --blue-soft: #eff6ff;
+      --green: #059669;
+      --green-soft: #ecfdf5;
+      --amber: #d97706;
+      --amber-soft: #fff7ed;
+      --red: #dc2626;
+      --red-soft: #fff1f2;
+      --chip: #f3f4f6;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: #f3f4f6;
+      color: var(--text);
+      display: grid;
+      place-items: start center;
+      padding: 28px;
+    }
+
+    .frame {
+      width: 638px;
+      min-height: 920px;
+      background: var(--bg);
+      border: 1px solid var(--line);
+      overflow: hidden;
+    }
+
+    .browser-edge {
+      height: 22px;
+      border-bottom: 1px solid var(--line);
+      background: #fbfbfc;
+    }
+
+    .page {
+      padding: 22px 18px 28px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 28px;
+      line-height: 1.1;
+      font-weight: 750;
+      letter-spacing: 0;
+    }
+
+    .branch {
+      margin-top: 12px;
+      color: var(--muted);
+      font-size: 13px;
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .stats {
+      margin-top: 18px;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .chip {
+      min-height: 30px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 5px 10px;
+      background: var(--chip);
+      color: #344054;
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .chip.ci {
+      background: var(--amber-soft);
+      border-color: #fed7aa;
+      color: #9a3412;
+      font-weight: 650;
+    }
+
+    .add { color: var(--green); font-weight: 700; }
+    .del { color: var(--red); font-weight: 700; }
+
+    .launcher {
+      margin-top: 20px;
+      height: 45px;
+      border: 1.5px solid #2563ff;
+      border-radius: 11px;
+      display: flex;
+      align-items: center;
+      padding: 0 13px;
+      color: var(--muted-2);
+      font-size: 13px;
+    }
+
+    .actions {
+      margin-top: 20px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .button {
+      height: 35px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 0 13px;
+      background: #fff;
+      color: #344054;
+      font-size: 13px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 560;
+    }
+
+    .button.secondary {
+      color: var(--muted);
+      font-weight: 500;
+    }
+
+    .health-band {
+      margin-top: 20px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #fff;
+      overflow: hidden;
+    }
+
+    .health-main {
+      padding: 11px 12px;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .health-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: var(--amber);
+      box-shadow: 0 0 0 3px var(--amber-soft);
+    }
+
+    .health-sub {
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .ci-summary {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      color: #9a3412;
+      background: var(--amber-soft);
+      border: 1px solid #fed7aa;
+      border-radius: 999px;
+      padding: 4px 9px;
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .check-strip {
+      border-top: 1px solid var(--line);
+      padding: 8px 12px;
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+      background: var(--surface-2);
+    }
+
+    .check {
+      min-width: 0;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      padding: 7px 8px;
+      background: #fff;
+    }
+
+    .check label {
+      display: block;
+      color: var(--muted);
+      font-size: 10px;
+      line-height: 1.1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .check b {
+      display: block;
+      margin-top: 3px;
+      font-size: 12px;
+      line-height: 1.1;
+    }
+
+    .check.fail b { color: var(--red); }
+    .check.warn b { color: var(--amber); }
+    .check.pass b { color: var(--green); }
+
+    .cockpit-stack {
+      margin-top: 14px;
+      display: grid;
+      gap: 8px;
+    }
+
+    details.cockpit {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #fff;
+      overflow: hidden;
+    }
+
+    details.cockpit > summary {
+      list-style: none;
+      cursor: pointer;
+      padding: 12px;
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      gap: 9px;
+      align-items: center;
+    }
+
+    details.cockpit > summary::-webkit-details-marker { display: none; }
+
+    .chev {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .summary-title {
+      font-size: 13px;
+      font-weight: 720;
+      min-width: 0;
+    }
+
+    .summary-title span {
+      color: var(--muted);
+      font-weight: 500;
+      margin-left: 6px;
+    }
+
+    .summary-metrics {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .mini {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 3px 7px;
+      background: #f8fafc;
+      color: #475467;
+      font-size: 11px;
+      font-weight: 650;
+      white-space: nowrap;
+    }
+
+    .mini.red { color: var(--red); background: var(--red-soft); border-color: #fecdd3; }
+    .mini.green { color: var(--green); background: var(--green-soft); border-color: #bbf7d0; }
+    .mini.blue { color: var(--blue); background: var(--blue-soft); border-color: #bfdbfe; }
+
+    .cockpit-body {
+      border-top: 1px solid var(--line);
+      padding: 12px;
+      display: grid;
+      gap: 12px;
+      background: #fbfcfd;
+    }
+
+    .settings {
+      border: 1px solid var(--line);
+      border-radius: 9px;
+      padding: 11px;
+      background: #fff;
+    }
+
+    .kicker {
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+      margin-bottom: 9px;
+    }
+
+    .seg {
+      display: inline-flex;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      overflow: hidden;
+      vertical-align: middle;
+      margin-left: 8px;
+    }
+
+    .seg span {
+      padding: 5px 9px;
+      border-left: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 650;
+    }
+
+    .seg span:first-child {
+      border-left: 0;
+      background: var(--amber-soft);
+      color: #9a3412;
+    }
+
+    .phase {
+      border: 1px solid var(--line);
+      border-radius: 9px;
+      overflow: hidden;
+      background: #fff;
+    }
+
+    .phase-head {
+      padding: 9px 10px;
+      border-top: 2px solid var(--amber);
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .phase-head.work { border-top-color: var(--blue); }
+
+    .issue-row {
+      display: grid;
+      grid-template-columns: 74px 1fr auto;
+      gap: 10px;
+      align-items: center;
+      padding: 10px;
+      border-top: 1px solid var(--line);
+      font-size: 12px;
+    }
+
+    .issue-row:first-of-type { border-top: 0; }
+
+    .issue-id {
+      color: #667085;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 11px;
+    }
+
+    .issue-title {
+      min-width: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      color: #344054;
+    }
+
+    .badge {
+      border-radius: 999px;
+      padding: 3px 7px;
+      font-size: 10px;
+      font-weight: 720;
+      background: var(--red-soft);
+      color: var(--red);
+      border: 1px solid #fecdd3;
+      white-space: nowrap;
+    }
+
+    .badge.work {
+      background: var(--blue-soft);
+      color: var(--blue);
+      border-color: #bfdbfe;
+    }
+
+    .section-label {
+      margin-top: 18px;
+      margin-bottom: 9px;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 650;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+    }
+
+    .conversation {
+      border: 1px solid var(--line);
+      border-radius: 9px;
+      padding: 12px;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      margin-top: 8px;
+      background: #fff;
+    }
+
+    .conversation b {
+      display: block;
+      font-size: 13px;
+      line-height: 1.25;
+    }
+
+    .conversation span {
+      display: block;
+      margin-top: 5px;
+      color: var(--muted-2);
+      font-size: 12px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .time {
+      color: var(--muted);
+      font-size: 11px;
+      white-space: nowrap;
+    }
+
+    .note {
+      width: 638px;
+      margin: 12px auto 0;
+      color: #475467;
+      font-size: 12px;
+      line-height: 1.45;
+    }
+  </style>
+</head>
+<body>
+  <div>
+    <main class="frame">
+      <div class="browser-edge"></div>
+      <section class="page" aria-label="Mocked project home">
+        <h1># panopticon-cli</h1>
+        <div class="branch">⌘ main</div>
+
+        <div class="stats">
+          <span class="chip">◷ —</span>
+          <span class="chip">⇆ <span class="add">+0</span> <span class="del">−0</span></span>
+          <span class="chip">▣ 0 files</span>
+          <span class="chip">▱ 63 convos</span>
+          <span class="chip">$ $1222.78</span>
+          <span class="chip ci">CI 2 failing</span>
+        </div>
+
+        <div class="launcher">Ask, run, or search...</div>
+
+        <div class="actions">
+          <div class="button">✹ Claude Code</div>
+          <div class="button">◎ Codex</div>
+          <div class="button secondary">＋ More Agents</div>
+          <div class="button">⌁ Terminal</div>
+          <div class="button">◉ Web</div>
+        </div>
+
+        <section class="health-band" aria-label="Current CI health">
+          <div class="health-main">
+            <div>
+              <div class="health-title"><span class="dot"></span>Current CI health</div>
+              <div class="health-sub">Latest project checks from active PRs · 1 blocked issue, 2 required checks failing</div>
+            </div>
+            <div class="ci-summary">Needs attention</div>
+          </div>
+          <div class="check-strip">
+            <div class="check fail"><label>Required checks</label><b>2 failing</b></div>
+            <div class="check warn"><label>Mergeability</label><b>3 blocked</b></div>
+            <div class="check pass"><label>Ship-ready</label><b>0 clear</b></div>
+            <div class="check pass"><label>Work agents</label><b>1 running</b></div>
+          </div>
+        </section>
+
+        <div class="cockpit-stack" aria-label="Collapsed project details">
+          <details class="cockpit">
+            <summary>
+              <span class="chev">▸</span>
+              <div class="summary-title">Project settings <span>Auto-merge default follows Auto</span></div>
+              <div class="summary-metrics">
+                <span class="mini">Auto</span>
+                <span class="mini">Global fallback available</span>
+              </div>
+            </summary>
+            <div class="cockpit-body">
+              <div class="settings">
+                <div class="kicker">Project settings</div>
+                Auto-merge default
+                <span class="seg"><span>Auto</span><span>Hold for UAT</span><span>Global default</span></span>
+                <div style="margin-top:8px;color:var(--muted);font-size:11px">Applies to issues with no explicit per-issue auto-merge setting.</div>
+              </div>
+            </div>
+          </details>
+
+          <details class="cockpit">
+            <summary>
+              <span class="chev">▸</span>
+              <div class="summary-title">Review <span>blocked items waiting on CI or mergeability</span></div>
+              <div class="summary-metrics">
+                <span class="mini red">3 blocked</span>
+                <span class="mini red">2 CI</span>
+              </div>
+            </summary>
+            <div class="cockpit-body">
+              <div class="phase">
+                <div class="phase-head">Review <span class="mini red">3</span></div>
+                <div class="issue-row">
+                  <div class="issue-id">PAN-1901</div>
+                  <div class="issue-title">Required checks are failing</div>
+                  <div class="badge">CI BLOCKED</div>
+                </div>
+                <div class="issue-row">
+                  <div class="issue-id">PAN-1919</div>
+                  <div class="issue-title">Merge conflict with target branch</div>
+                  <div class="badge">MERGE BLOCKED</div>
+                </div>
+              </div>
+            </div>
+          </details>
+
+          <details class="cockpit">
+            <summary>
+              <span class="chev">▸</span>
+              <div class="summary-title">Work <span>active implementation lanes</span></div>
+              <div class="summary-metrics">
+                <span class="mini blue">1 running</span>
+                <span class="mini green">$0</span>
+              </div>
+            </summary>
+            <div class="cockpit-body">
+              <div class="phase">
+                <div class="phase-head work">Work <span class="mini blue">1</span></div>
+                <div class="issue-row">
+                  <div class="issue-id">PAN-2057</div>
+                  <div class="issue-title">In progress · active work agent</div>
+                  <div class="badge work">WORK RUNNING</div>
+                </div>
+              </div>
+            </div>
+          </details>
+        </div>
+
+        <div class="section-label">Today</div>
+        <div class="conversation">
+          <div><b>Project row click behavior history</b><span>Project row click behavior history</span></div>
+          <div class="time">34m ago</div>
+        </div>
+        <div class="conversation">
+          <div><b>Agent unavailable message replaces startup prompt</b><span>Agent unavailable message replaces startup prompt</span></div>
+          <div class="time">35m ago</div>
+        </div>
+        <div class="conversation">
+          <div><b>New conversation</b><span>New conversation</span></div>
+          <div class="time">41m ago</div>
+        </div>
+        <div class="conversation">
+          <div><b>Dashboard traefik-domain stale config</b><span>Dashboard traefik-domain stale config</span></div>
+          <div class="time">47m ago</div>
+        </div>
+        <div class="conversation">
+          <div><b>Blocked: Cannot view image to proceed with implementation</b><span>Blocked: Cannot view image to proceed with implementation</span></div>
+          <div class="time">7h ago</div>
+        </div>
+      </section>
+    </main>
+    <p class="note">Mockup intent: keep the current project HOME workflow intact, add CI as a first-scan health band, and move the existing lower project overview/settings/pipeline content above conversations as a collapsed cockpit disclosure.</p>
+  </div>
+</body>
+</html>

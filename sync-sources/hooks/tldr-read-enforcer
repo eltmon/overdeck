@@ -248,6 +248,20 @@ except:
   fi
 fi
 
+# Observability: if BOTH TLDR invocations exited non-zero, the binary itself
+# is broken (dead interpreter, bad shebang after a rename, etc.) — NOT a file
+# with nothing to summarize. The hook still bypasses (exit 0 below) so the
+# agent's Read succeeds, but record it so a broken TLDR install surfaces
+# instead of silently degrading every Read to full-file. A dead binary is
+# otherwise indistinguishable from "no content" (this is exactly how a stale
+# shebang after the panopticon-cli → overdeck rename went unnoticed).
+if [ "${TLDR_EXIT:-0}" -ne 0 ] && [ "${EXTRACT_EXIT:-0}" -ne 0 ]; then
+  FAIL_LOG="$PROJECT_DIR/.tldr/failures.log"
+  mkdir -p "$(dirname "$FAIL_LOG")" 2>/dev/null
+  printf '%s binary_fail context_exit=%s extract_exit=%s %s\n' \
+    "$(date +%s)" "$TLDR_EXIT" "$EXTRACT_EXIT" "$REL_PATH" >> "$FAIL_LOG" 2>/dev/null
+fi
+
 # Bypass: both context and extract failed or produced nothing useful
 if [ -z "$TLDR_OUTPUT" ]; then
   exit 0

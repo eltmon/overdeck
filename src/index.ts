@@ -9,5 +9,6 @@ export * from './lib/providers.js';
 export * from './lib/settings.js';
 export * from './lib/docs/corpus.js';
 export * from './lib/docs/index-builder.js';
+export * from './lib/docs/injection.js';
 export * from './lib/docs/query.js';
 export * from './lib/docs/state.js';

@@ -11,6 +11,7 @@ import { resolveProjectFromIssueSync } from '../projects.js';
 import { getReviewStatusSync } from '../review-status.js';
 import { PAN_DIRNAME } from '../pan-dir/types.js';
 import { writeFeedbackFile } from './feedback-writer.js';
+import { resolveIssueFeedbackTarget, surfaceIssueFeedbackNeedsYou } from './feedback-target.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -22,6 +23,7 @@ export interface DeliverReviewVerdictFeedbackOptions {
   notes?: string;
   workspacePath?: string;
   prUrl?: string;
+  slotItemId?: string;
 }
 
 export interface DeliverReviewVerdictFeedbackResult {
@@ -71,17 +73,28 @@ function buildReviewFeedbackBody(opts: {
   return `# Review ${verdictLabel} for ${opts.issueId}\n\n${synthesis}${sourceLine}\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n\`pan review request ${opts.issueId} -m "Fixed review issues"\``;
 }
 
-async function postPrComment(prUrl: string | undefined, body: string): Promise<boolean> {
+// PAN-2518: the PR-comment POST is advisory — the review verdict is already
+// durable (setReviewStatusSync + writeFeedbackFile) before we get here. A `gh
+// api` call that STALLS (not rejects) on a network hiccup must never block the
+// caller: `pan admin specialists done` is shelled out from the review agent's
+// own session, so a hung POST leaves that agent waiting on a never-returning
+// command and the issue stalls in-review. A bounded timeout turns a stall into
+// a rejection the caller already swallows.
+const PR_COMMENT_TIMEOUT_MS = 15_000;
+
+export async function postPrComment(prUrl: string | undefined, body: string): Promise<boolean> {
   const parsed = parseGitHubPrUrl(prUrl);
   if (!parsed) return false;
 
   await execFileAsync(
     'gh',
     ['api', `repos/${parsed.owner}/${parsed.repo}/issues/${parsed.number}/comments`, '--field', `body=${body}`],
-    { encoding: 'utf-8' },
+    { encoding: 'utf-8', timeout: PR_COMMENT_TIMEOUT_MS, killSignal: 'SIGKILL' },
   );
   return true;
-}async function deliverReviewVerdictFeedbackPromise(
+}
+
+async function deliverReviewVerdictFeedbackPromise(
   opts: DeliverReviewVerdictFeedbackOptions,
 ): Promise<DeliverReviewVerdictFeedbackResult> {
   const issueId = opts.issueId.toUpperCase();
@@ -118,13 +131,47 @@ async function postPrComment(prUrl: string | undefined, body: string): Promise<b
 
   let agentMessageSent = false;
   if (fileResult.success && fileResult.filePath) {
-    const agentId = `agent-${issueId.toLowerCase()}`;
     const message = `SPECIALIST FEEDBACK: review-agent reported ${opts.verdict.toUpperCase()} for ${issueId}.\n\nMUST READ: ${fileResult.filePath}\n\nUse your Read tool to open this file, read every line, then fix ALL review findings. Do NOT stop at the prompt.`;
     try {
-      await messageAgent(agentId, message);
-      agentMessageSent = true;
+      // PAN-2209/PAN-2461: resolveIssueFeedbackTarget's built-in resurrection ladder
+      // (unpause pipeline pauses, clear troubled gates, resume stopped agents) handles
+      // every non-live target; no local reviver override.
+      const target = await resolveIssueFeedbackTarget(issueId, {
+        itemId: opts.slotItemId,
+      });
+      if ('agentId' in target) {
+        try {
+          // PAN-2668: a blocked/failed review verdict owes rework — re-drive a
+          // stopped-by-user agent with a completed handoff instead of queueing.
+          await messageAgent(target.agentId, message, 'internal', { owesRework: true });
+          agentMessageSent = true;
+        } catch (err) {
+          // PAN-2228: a resolved-but-unreachable target is a real delivery failure,
+          // not a shrug. Surface it as needs-you so the stall is visible instead of
+          // the issue silently parking with an unread feedback file.
+          const reason = err instanceof Error ? err.message : String(err);
+          console.warn(`[review-verdict-feedback] Could not message ${target.agentId}; feedback file remains available: ${reason}`);
+          try {
+            await surfaceIssueFeedbackNeedsYou(issueId, `Feedback delivery to ${target.agentId} failed: ${reason}`, {
+              specialist: 'review-agent',
+              feedbackPath: fileResult.filePath,
+              slotItemId: opts.slotItemId,
+            });
+          } catch { /* best-effort — the warn above still records the failure */ }
+        }
+      } else {
+        try {
+          await surfaceIssueFeedbackNeedsYou(issueId, target.reason, {
+            specialist: 'review-agent',
+            feedbackPath: fileResult.filePath,
+            slotItemId: opts.slotItemId,
+          });
+        } catch (err) {
+          console.warn(`[review-verdict-feedback] Could not mark ${issueId} as needing human attention; feedback file remains available: ${err instanceof Error ? err.message : String(err)}`);
+        }
+      }
     } catch (err) {
-      console.log(`[review-verdict-feedback] Could not message ${agentId}; feedback file remains available: ${err instanceof Error ? err.message : String(err)}`);
+      console.warn(`[review-verdict-feedback] Could not resolve a feedback target for ${issueId}; feedback file remains available: ${err instanceof Error ? err.message : String(err)}`);
     }
   } else if (!fileResult.success) {
     console.error(`[review-verdict-feedback] Failed to write feedback file for ${issueId}: ${fileResult.error}`);

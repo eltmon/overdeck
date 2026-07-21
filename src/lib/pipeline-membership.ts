@@ -13,28 +13,35 @@
  *   terminal state. The pipeline is everything that needs attention to reach a
  *   correct, consistent end state — not just the happy-path in-flight set.
  *
- * Built from durable lenses only (L1–L4), so membership survives the cutover and
+ * Built from durable lenses only (L1–L4 + L6-spec), so membership survives the cutover and
  * a fresh `~/.overdeck` (no `state.json`) by construction:
  *
  *   L1  open PR              · L1-merged  a merged PR exists (the merge oracle)
  *   L2  unmerged branch      · `git merge-tree` vs main (blind to squash — always
  *                              paired with L1-merged, which wins)
  *   L3  issue open           · L4  current-phase label
+ *   L6-spec  xBRIEF exists   · durable plan on the `overdeck-state` branch
  *
  * L5 (agents / DB / state.json) is a *liveness accelerator* only — it can
  * annotate "is an agent running right now," but it NEVER decides membership.
  */
 
-/** Durable lens signals for one issue. Gather these from GitHub + git, never L5. */
+/** Durable lens signals for one issue. Gather these from the tracker, forge, and git, never L5. */
+import type { PipelineBucket } from '@overdeck/contracts';
+
+export type { PipelineBucket } from '@overdeck/contracts';
+
+export const PLANNED_BACKLOG_SPEC_ONLY_REASON = 'open issue with an xBRIEF spec but no branch/PR — planned work whose plan encodes code paths that age; needs starting or re-planning';
+
 export interface IssueLensSignals {
   issueId: string;
-  /** L3 — the GitHub issue state is open. */
+  /** L3 — the tracker issue state is open. */
   issueOpen: boolean;
-  /** L1 — an open PR whose head branch is `feature/<id>`. */
+  /** L1 — an open PR whose head branch is `feature/<id>` or `strike/<id>`. */
   hasOpenPr: boolean;
   /** L1-merged — a merged PR exists for this issue/branch (the squash-merge oracle). */
   hasMergedPr: boolean;
-  /** A `feature/<id-lowercase>` convention branch exists (local or remote). */
+  /** A `feature/<id-lowercase>` or `strike/<id-lowercase>` convention branch exists (local or remote). */
   hasConventionBranch: boolean;
   /**
    * L2 — `git merge-tree` reports the branch is NOT in main (commit lineage).
@@ -42,16 +49,21 @@ export interface IssueLensSignals {
    * the resolver always trusts {@link hasMergedPr} over this.
    */
   branchUnmerged: boolean;
+  /**
+   * L2-work — positive non-PR merge evidence (PAN-2887): a convention branch is
+   * contained in main AND its tip sits OFF main's first-parent line, i.e. the
+   * branch carried unique commits that arrived via a merge. A branch whose tip
+   * IS a first-parent main commit is just a pointer at main (freshly created or
+   * never started) — zero unique work, NOT evidence anything landed.
+   */
+  hasMergedBranchWork: boolean;
   /** L4 — current-phase label (in-review/in-progress/planned/verifying-on-main/…), else null. */
   phaseLabel: string | null;
+  /** L6-spec — a durable xBRIEF spec exists on `overdeck-state`; gather via `findSpecByIssue`, never the DB. */
+  hasXbriefSpec: boolean;
+  /** Durable Definition-of-Ready signal from the issue's `ready` label. */
+  explicitlyReady: boolean;
 }
-
-export type PipelineBucket =
-  | 'in_flight'
-  | 'zombie_pr'
-  | 'post_merge_limbo'
-  | 'planned_backlog'
-  | 'clean_terminal';
 
 export interface PipelineMembership {
   issueId: string;
@@ -60,6 +72,8 @@ export interface PipelineMembership {
   bucket: PipelineBucket;
   /** Human-readable reason(s) the issue landed in its bucket. */
   reasons: string[];
+  /** Whether the durable phase label disagrees with the issue/PR lifecycle. */
+  labelDrift: 'stale_present' | 'stale_absent' | null;
   /** The durable lenses as evaluated for this issue (for display / debugging). */
   lenses: {
     L1_openPr: boolean;
@@ -92,13 +106,23 @@ export function resolvePipelineMembership(s: IssueLensSignals): PipelineMembersh
     L3_issueOpen: s.issueOpen,
     L4_phaseLabel: s.phaseLabel,
   };
-  const result = (bucket: PipelineBucket, reason: string): PipelineMembership => ({
-    issueId: s.issueId,
-    inPipeline: bucket !== 'clean_terminal',
-    bucket,
-    reasons: [reason],
-    lenses,
-  });
+  const result = (bucket: PipelineBucket, reason: string): PipelineMembership => {
+    // Canonical phase labels from STALE_PIPELINE_LABELS in label-reconciler.ts:
+    // verifying-on-main, planning, in-progress, in-review, in-planning.
+    const labelDrift = s.phaseLabel !== null && (bucket === 'clean_terminal' || !s.issueOpen)
+      ? 'stale_present'
+      : s.issueOpen && s.hasOpenPr && s.phaseLabel === null
+        ? 'stale_absent'
+        : null;
+    return {
+      issueId: s.issueId,
+      inPipeline: bucket !== 'clean_terminal',
+      bucket,
+      reasons: [reason],
+      labelDrift,
+      lenses,
+    };
+  };
 
   if (!s.issueOpen) {
     // Closed ⇒ terminal, regardless of lingering state — except an open PR, which
@@ -120,13 +144,31 @@ export function resolvePipelineMembership(s: IssueLensSignals): PipelineMembersh
     return result('post_merge_limbo', 'open issue with a merged PR — merged but never closed out; run close-out');
   }
   if (branchLive) {
-    return result('planned_backlog', 'open issue with an unmerged feature branch but no PR — needs a PR or disposition');
+    return result('planned_backlog', 'open issue with an unmerged convention branch (feature/ or strike/) but no PR — needs a PR or disposition');
   }
   if (s.hasConventionBranch) {
-    // Branch exists, L2 says it is already in main, but no merged PR was found —
-    // work landed via a non-PR path (merge-agent / direct commit, §2e); the open
-    // issue still needs closing out.
-    return result('post_merge_limbo', 'open issue whose branch is already in main but with no merged PR — landed via a non-PR path; run close-out');
+    if (s.hasMergedBranchWork) {
+      // Branch exists, its unique commits are contained in main (merge lineage),
+      // but no merged PR was found — work landed via a non-PR path (merge-agent /
+      // direct commit, §2e); the open issue still needs closing out.
+      return result('post_merge_limbo', 'open issue whose branch work is contained in main but with no merged PR — landed via a non-PR path; run close-out');
+    }
+    // PAN-2887: a contained branch with NO unique commits is a branch that was
+    // created and never (or not yet) worked — every `pan start` sits here from
+    // workspace prep until the first commit. Absence of unmerged work is NOT
+    // evidence of a landing; only hasMergedBranchWork is. (Known blind spot:
+    // a fast-forward-landed branch is indistinguishable from a fresh pointer
+    // and classifies as backlog — visible and safe, unlike false close-out.)
+    return result('planned_backlog', 'open issue with a convention branch but no unique commits — created, work not yet landed; needs work or disposition');
+  }
+  if (s.hasXbriefSpec) {
+    return result(
+      'planned_backlog',
+      PLANNED_BACKLOG_SPEC_ONLY_REASON,
+    );
+  }
+  if (s.explicitlyReady) {
+    return result('planned_backlog', 'open issue carries the explicit ready label — ready to start');
   }
   return result('clean_terminal', 'open issue with no branch and no PR — backlog, never started');
 }

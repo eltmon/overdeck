@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -116,10 +116,15 @@ describe('initCodexHome', () => {
     const config = readNode(join(codexDir, 'config.toml'), 'utf8')
     // approval_policy is a flat top-level string, not an [approval] table.
     expect(config).toContain('approval_policy = "never"')
-    // No TOML table sections — Codex deserializes these keys as scalars, and a
-    // `[model]` table breaks config load with "invalid type: map, expected a
+    // No TOML table sections for scalar keys — Codex deserializes these as scalars,
+    // and a `[model]` table breaks config load with "invalid type: map, expected a
     // string in `model`" (PAN-1574 regression).
     expect(config).not.toMatch(/^\[(model|approval|notify)\]/m)
+    // PAN-2521: suppress the blocking "Approaching rate limits — switch model?" TUI
+    // nudge that freezes an unattended pipeline agent's pane.
+    expect(config).toContain('[notice]')
+    expect(config).toContain('hide_rate_limit_model_nudge = true')
+    expect(config).not.toContain('[mcp_servers')
   })
 
   it('pre-seeds folder trust and autonomy so the TUI skips its first-run wizard', () => {
@@ -139,32 +144,159 @@ describe('initCodexHome', () => {
     expect(config).toContain('trust_level = "trusted"')
   })
 
-  it('seeds auth.json from the global ~/.codex so the TUI skips sign-in onboarding', () => {
+  it('writes stdio MCP servers with escaped args, environment, and quoted names', () => {
+    const codexDir = join(ctx.codexHome, 'agent-init-mcp')
+    initCodexHome(codexDir, {
+      mcpServers: {
+        playwright: { type: 'stdio', command: 'npx', args: ['-y', '@playwright/mcp@0.0.78'] },
+        'quoted.server': {
+          type: 'stdio',
+          command: 'path\\to"command',
+          args: ['arg\\with"quotes'],
+          env: { 'API"KEY': 'value\\path' },
+        },
+      },
+    })
+
+    const { readFileSync: readNode } = require('node:fs')
+    const config = readNode(join(codexDir, 'config.toml'), 'utf8')
+    expect(config).toContain('[mcp_servers.playwright]\ncommand = "npx"\nargs = ["-y", "@playwright/mcp@0.0.78"]')
+    expect(config).toContain('[mcp_servers."quoted.server"]')
+    expect(config).toContain('command = "path\\\\to\\"command"')
+    expect(config).toContain('args = ["arg\\\\with\\"quotes"]')
+    expect(config).toContain('env = { "API\\"KEY" = "value\\\\path" }')
+  })
+
+  it('omits unsupported MCP servers and warns with their name', () => {
+    const codexDir = join(ctx.codexHome, 'agent-init-mcp-unsupported')
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+
+    initCodexHome(codexDir, { mcpServers: { remote: { type: 'http', command: 'proxy' } } })
+
+    const { readFileSync: readNode } = require('node:fs')
+    const config = readNode(join(codexDir, 'config.toml'), 'utf8')
+    expect(config).not.toContain('[mcp_servers')
+    expect(warn).toHaveBeenCalledWith('[codex] skipping MCP server "remote" — only stdio command servers are provisioned into codex config')
+    warn.mockRestore()
+  })
+
+  it('rejects mutable npx MCP package selectors', () => {
+    const codexDir = join(ctx.codexHome, 'agent-init-mcp-mutable')
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+
+    initCodexHome(codexDir, {
+      mcpServers: { playwright: { type: 'stdio', command: 'npx', args: ['-y', '@playwright/mcp@latest'] } },
+    })
+
+    const { readFileSync: readNode } = require('node:fs')
+    const config = readNode(join(codexDir, 'config.toml'), 'utf8')
+    expect(config).not.toContain('[mcp_servers.playwright]')
+    expect(warn).toHaveBeenCalledWith('[codex] skipping MCP server "playwright" — npx MCP packages must use an exact immutable version')
+    warn.mockRestore()
+  })
+
+  it('symlinks auth.json to the global ~/.codex so all agents share one token family (PAN-2285)', () => {
     // The fake HOME is the test base; withFakeCodexHome() points CODEX_HOME at
     // <base>/.codex, which is also where homedir()/.codex resolves. Drop a fake
     // global credential there.
-    const { writeFileSync: writeNode, readFileSync: readNode, existsSync: existsNode } = require('node:fs')
-    writeNode(join(ctx.codexHome, 'auth.json'), '{"tokens":{"access_token":"global"}}')
+    const { writeFileSync: writeNode, readFileSync: readNode, existsSync: existsNode, lstatSync: lstatNode, realpathSync: realpathNode } = require('node:fs')
+    const globalAuth = join(ctx.codexHome, 'auth.json')
+    writeNode(globalAuth, '{"tokens":{"access_token":"global"}}')
 
     const codexDir = join(ctx.agentsHome, 'agent-init-auth')
     initCodexHome(codexDir)
 
     const seeded = join(codexDir, 'auth.json')
     expect(existsNode(seeded)).toBe(true)
+    // It is a symlink pointing at the global file, not a copy.
+    expect(lstatNode(seeded).isSymbolicLink()).toBe(true)
+    expect(realpathNode(seeded)).toBe(realpathNode(globalAuth))
+    // Reading through the link yields the global token.
     expect(JSON.parse(readNode(seeded, 'utf8')).tokens.access_token).toBe('global')
   })
 
-  it('does not clobber an existing per-agent auth.json (refreshed token survives resume)', () => {
-    const { writeFileSync: writeNode, readFileSync: readNode, mkdirSync: mkdirNode } = require('node:fs')
-    writeNode(join(ctx.codexHome, 'auth.json'), '{"tokens":{"access_token":"global-stale"}}')
+  it('migrates an existing stale regular-file auth.json copy to the symlink (PAN-2285/PAN-2639)', () => {
+    const { writeFileSync: writeNode, readFileSync: readNode, mkdirSync: mkdirNode, lstatSync: lstatNode } = require('node:fs')
+    const globalAuth = join(ctx.codexHome, 'auth.json')
+    writeNode(globalAuth, '{"tokens":{"access_token":"global-fresh"}}')
 
-    const codexDir = join(ctx.agentsHome, 'agent-init-auth-resume')
+    const codexDir = join(ctx.agentsHome, 'agent-init-auth-migrate')
     mkdirNode(codexDir, { recursive: true })
-    writeNode(join(codexDir, 'auth.json'), '{"tokens":{"access_token":"home-fresh"}}')
+    // A pre-PAN-2285 deployed home has a stale regular-file copy (the revoked
+    // token family that wedged the agent).
+    writeNode(join(codexDir, 'auth.json'), '{"tokens":{"access_token":"home-stale-revoked"}}')
 
-    initCodexHome(codexDir) // resume — must not overwrite the home's own token
+    initCodexHome(codexDir) // resume — must migrate the stale copy to the symlink
 
-    expect(JSON.parse(readNode(join(codexDir, 'auth.json'), 'utf8')).tokens.access_token).toBe('home-fresh')
+    const seeded = join(codexDir, 'auth.json')
+    expect(lstatNode(seeded).isSymbolicLink()).toBe(true)
+    // Now resolves to the fresh global token — the wedge is healed.
+    expect(JSON.parse(readNode(seeded, 'utf8')).tokens.access_token).toBe('global-fresh')
+  })
+
+  it('leaves the home without auth.json when the global ~/.codex has none (onboarding prompts)', () => {
+    const { existsSync: existsNode, rmSync: rmNode } = require('node:fs')
+    // Ensure no global credential exists.
+    rmNode(join(ctx.codexHome, 'auth.json'), { force: true })
+
+    const codexDir = join(ctx.agentsHome, 'agent-init-auth-none')
+    initCodexHome(codexDir)
+
+    expect(existsNode(join(codexDir, 'auth.json'))).toBe(false)
+  })
+
+  it('symlinks rules/ to the global Codex execpolicy layer', () => {
+    const { lstatSync: lstatNode, realpathSync: realpathNode } = require('node:fs')
+    const globalRules = join(ctx.codexHome, 'rules')
+    mkdirSync(globalRules, { recursive: true })
+    writeFileSync(join(globalRules, 'default.rules'), 'prefix_rule(pattern=["gh", "issue", "view"], decision="allow")\n')
+
+    const codexDir = join(ctx.agentsHome, 'agent-init-rules')
+    initCodexHome(codexDir)
+
+    const seeded = join(codexDir, 'rules')
+    expect(lstatNode(seeded).isSymbolicLink()).toBe(true)
+    expect(realpathNode(seeded)).toBe(realpathNode(globalRules))
+  })
+
+  it('preserves an existing per-agent rules directory', () => {
+    const { lstatSync: lstatNode, readFileSync: readNode } = require('node:fs')
+    const globalRules = join(ctx.codexHome, 'rules')
+    mkdirSync(globalRules, { recursive: true })
+    writeFileSync(join(globalRules, 'default.rules'), 'prefix_rule(pattern=["gh"], decision="allow")\n')
+
+    const codexDir = join(ctx.agentsHome, 'agent-init-rules-existing')
+    const agentRules = join(codexDir, 'rules')
+    mkdirSync(agentRules, { recursive: true })
+    writeFileSync(join(agentRules, 'local.rules'), 'prefix_rule(pattern=["git", "status"], decision="allow")\n')
+
+    initCodexHome(codexDir)
+
+    expect(lstatNode(agentRules).isSymbolicLink()).toBe(false)
+    expect(readNode(join(agentRules, 'local.rules'), 'utf8')).toContain('git", "status')
+  })
+
+  it('leaves rules/ absent when the global Codex rule layer does not exist', () => {
+    const { existsSync: existsNode } = require('node:fs')
+    const codexDir = join(ctx.agentsHome, 'agent-init-rules-none')
+
+    initCodexHome(codexDir)
+
+    expect(existsNode(join(codexDir, 'rules'))).toBe(false)
+  })
+
+  it('is idempotent — a second init leaves the existing symlink in place (PAN-2285)', () => {
+    const { writeFileSync: writeNode, lstatSync: lstatNode, realpathSync: realpathNode } = require('node:fs')
+    const globalAuth = join(ctx.codexHome, 'auth.json')
+    writeNode(globalAuth, '{"tokens":{"access_token":"global"}}')
+
+    const codexDir = join(ctx.agentsHome, 'agent-init-auth-idem')
+    initCodexHome(codexDir)
+    initCodexHome(codexDir)
+
+    const seeded = join(codexDir, 'auth.json')
+    expect(lstatNode(seeded).isSymbolicLink()).toBe(true)
+    expect(realpathNode(seeded)).toBe(realpathNode(globalAuth))
   })
 
   it('always rewrites config.toml so permission-mode changes apply on resume', () => {

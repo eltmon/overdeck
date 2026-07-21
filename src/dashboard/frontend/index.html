@@ -4,6 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Overdeck</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="preload" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=DM+Sans:ital,opsz,wght@0,9..40,300..800;1,9..40,300..800&display=swap" as="style" />
@@ -54,15 +55,58 @@
          instant main.tsx sets window.__panMounted. */
       (function () {
         var acting = false;
+        var failingResource = '';
+        var lastReloadKey = 'pan.recovery.lastReload';
+        var reloadCountKey = 'pan.recovery.reloadCount';
+        var reloadWindowMs = 15000;
+        var maxConsecutiveReloads = 3;
         function setMsg(text) {
           var boot = document.getElementById('pan-boot');
           if (boot && boot.lastChild && boot.lastChild.nodeType === 3) boot.lastChild.textContent = text;
         }
+        function sameOriginResource(t) {
+          if (!t || (t.tagName !== 'SCRIPT' && t.tagName !== 'LINK')) return null;
+          var rawUrl = t.tagName === 'SCRIPT' ? t.src : t.href;
+          if (!rawUrl) return null;
+          try {
+            var url = new URL(rawUrl, window.location.href);
+            return url.origin === window.location.origin ? url.href : null;
+          } catch (_) {
+            return null;
+          }
+        }
+        function showManualRecovery() {
+          var boot = document.getElementById('pan-boot');
+          if (!boot) return;
+          boot.textContent = '';
+          var message = document.createElement('span');
+          message.textContent = 'The dashboard stopped automatic recovery after repeated load failures.' +
+            (failingResource ? ' Failing resource: ' + failingResource : '');
+          var button = document.createElement('button');
+          button.type = 'button';
+          button.textContent = 'Reload dashboard';
+          button.onclick = function () { window.location.reload(); };
+          boot.appendChild(message);
+          boot.appendChild(button);
+        }
+        function reloadOrStop() {
+          var now = Date.now();
+          var lastReload = Number(sessionStorage.getItem(lastReloadKey) || '0');
+          var previousCount = Number(sessionStorage.getItem(reloadCountKey) || '0');
+          var count = now - lastReload < reloadWindowMs ? previousCount + 1 : 1;
+          sessionStorage.setItem(lastReloadKey, String(now));
+          sessionStorage.setItem(reloadCountKey, String(count));
+          if (count > maxConsecutiveReloads) {
+            showManualRecovery();
+            return;
+          }
+          window.location.reload();
+        }
         // Poll until BOTH a fresh index.html AND the bundle it references are
         // actually serveable, then reload exactly once. Verifying the bundle
-        // before reloading means the reload can never land on a stuck page — it
-        // simply waits out the server restart (or an in-progress rebuild) and
-        // recovers cleanly. No give-up state, no reload loop.
+        // before reloading means a normal restart waits for the fresh bundle.
+        // Repeated failures in one tab stop at a manual-reload state instead of
+        // looping forever on a resource that cannot heal.
         function whenServeableThenReload(n) {
           if (window.__panMounted) return;
           fetch('/', { cache: 'no-store' })
@@ -79,18 +123,19 @@
                 var sm = all[i].match(/src="([^"]+)"/);
                 if (sm && sm[1].indexOf('/@vite/') === -1 && sm[1].indexOf('@react-refresh') === -1) { src = sm[1]; break; }
               }
-              if (!src) { window.location.reload(); return; } // can't locate bundle; just reload
+              if (!src) { reloadOrStop(); return; } // can't locate bundle; just reload
               return fetch(src, { method: 'HEAD', cache: 'no-store' }).then(function (b) {
-                if (b.ok) window.location.reload(); else throw 0;
+                if (b.ok) reloadOrStop(); else throw 0;
               });
             })
             .catch(function () {
               setTimeout(function () { whenServeableThenReload(n + 1); }, Math.min(500 + n * 250, 3000));
             });
         }
-        function recover() {
+        function recover(resource) {
           if (acting || window.__panMounted) return;
           acting = true;
+          failingResource = resource || '';
           setMsg('Reconnecting to the dashboard…');
           whenServeableThenReload(0);
         }
@@ -99,8 +144,8 @@
         // surfaces as a capture-phase window error on the element. No blanket
         // timeout — a slow-but-fine mount must never trigger a reload.
         window.addEventListener('error', function (e) {
-          var t = e && e.target;
-          if (t && (t.tagName === 'SCRIPT' || t.tagName === 'LINK')) recover();
+          var resource = sameOriginResource(e && e.target);
+          if (resource) recover(resource);
         }, true);
       })();
     </script>

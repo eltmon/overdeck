@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Resources — Machine Room (next-gen mockup)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=DM+Sans:ital,opsz,wght@0,9..40,300..800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0b0e14;--card:#11151f;--card2:#0e1219;--border:#1e2430;--border-hi:#2c3547;
+    --fg:#e6e9ef;--muted:#8b93a5;--faint:#5b6373;
+    --teal:#2dd4bf;--blue:#3b82f6;--violet:#8b5cf6;--amber:#f59e0b;--red:#ef4444;--green:#34d399;
+  }
+  *{box-sizing:border-box}
+  body{background:var(--bg);color:var(--fg);font:14px/1.45 "DM Sans",system-ui,sans-serif;margin:0;padding:28px 32px;max-width:1480px}
+  h1{font:600 17px "Space Grotesk";margin:0}
+  h2{font:600 13px "Space Grotesk";margin:0;letter-spacing:.02em;text-transform:uppercase;color:var(--muted)}
+  .mono{font-family:"DM Mono",monospace}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px}
+  .chip{display:inline-flex;align-items:center;gap:6px;font-size:11px;padding:2px 9px;border-radius:99px;white-space:nowrap}
+  .chip i{width:6px;height:6px;border-radius:99px;display:inline-block}
+  @keyframes p{0%,100%{opacity:1}50%{opacity:.35}}
+  .c-run{background:rgba(52,211,153,.10);color:#6ee7b7}.c-run i{background:var(--green);animation:p 2s infinite}
+  .c-warn{background:rgba(245,158,11,.14);color:#fcd34d}.c-warn i{background:var(--amber);animation:p 1.2s infinite}
+  .c-bad{background:rgba(239,68,68,.14);color:#fca5a5}.c-bad i{background:var(--red);animation:p .9s infinite}
+  .c-idle{background:rgba(139,147,165,.10);color:var(--muted)}.c-idle i{background:var(--muted)}
+  .c-pause{background:rgba(139,92,246,.12);color:#c4b5fd}.c-pause i{background:var(--violet)}
+  .c-work{background:rgba(59,130,246,.12);color:#93c5fd}.c-work i{background:var(--blue);animation:p 2s infinite}
+  .c-review{background:rgba(139,92,246,.12);color:#c4b5fd}.c-review i{background:var(--violet);animation:p 2s infinite}
+  .c-uat{background:rgba(245,158,11,.14);color:#fcd34d}.c-uat i{background:var(--amber)}
+  .c-merged{background:rgba(52,211,153,.10);color:#6ee7b7}.c-merged i{background:var(--green)}
+
+  /* ── header vitals ── */
+  .vitals{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin:18px 0}
+  .vital{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:12px 14px;position:relative;overflow:hidden}
+  .vital .k{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+  .vital .v{font:600 19px "Space Grotesk";margin-top:2px}
+  .vital .v small{font:500 11px "DM Sans";color:var(--muted)}
+  .vital .sub{font-size:10.5px;color:var(--faint);margin-top:1px}
+  .bar{height:5px;border-radius:99px;background:#1a2130;margin-top:8px;overflow:hidden}
+  .bar b{display:block;height:100%;border-radius:99px}
+  .spark{position:absolute;right:10px;top:12px;width:64px;height:26px;opacity:.9}
+  .gate-open{border-color:rgba(52,211,153,.35)} .gate-soft{border-color:rgba(245,158,11,.45)}
+
+  /* ── reclaim advisor ── */
+  .advisor{border:1px solid rgba(45,212,191,.35);background:linear-gradient(180deg,rgba(45,212,191,.05),transparent);border-radius:14px;padding:14px 16px;margin-bottom:20px}
+  .advisor header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+  .advisor h2{color:var(--teal);text-transform:none;font-size:13.5px}
+  .advisor .total{font:600 15px "Space Grotesk";color:var(--teal)}
+  .adv-row{display:grid;grid-template-columns:1fr auto auto;gap:12px;align-items:center;padding:7px 10px;border-radius:10px;font-size:12.5px}
+  .adv-row:hover{background:rgba(255,255,255,.02)}
+  .adv-row .why{color:var(--muted);font-size:11px}
+  .adv-row .amt{font:600 12.5px "Space Grotesk";color:var(--fg);text-align:right}
+
+  /* ── buttons ── */
+  .btn{font:500 11px "DM Sans";padding:4px 11px;border-radius:8px;border:1px solid var(--border-hi);background:#161b26;color:var(--fg);cursor:pointer}
+  .btn:hover{border-color:#3b4burgundy557;background:#1a2130}
+  .btn.primary{background:rgba(45,212,191,.12);border-color:rgba(45,212,191,.4);color:#7ff0e0}
+  .btn.danger{background:rgba(239,68,68,.08);border-color:rgba(239,68,68,.3);color:#fca5a5}
+  .btn.ghost{background:transparent;border-color:transparent;color:var(--muted)}
+  .btn.ghost:hover{color:var(--fg)}
+
+  /* ── section layout ── */
+  section{margin-bottom:22px}
+  section>header{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:10px}
+  section>header .meta{font-size:11px;color:var(--faint)}
+
+  /* ── stack cards ── */
+  .stack{border:1px solid var(--border);border-radius:14px;background:var(--card);margin-bottom:10px;overflow:hidden}
+  .stack>.head{display:grid;grid-template-columns:minmax(260px,1.2fr) 170px 150px 150px 110px auto;gap:14px;align-items:center;padding:12px 16px;cursor:pointer}
+  .stack>.head:hover{background:rgba(255,255,255,.015)}
+  .stack .issue{display:flex;flex-direction:column;gap:2px;min-width:0}
+  .stack .issue .id{font:500 11.5px "DM Mono";color:var(--muted)}
+  .stack .issue .title{font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .meter{display:flex;flex-direction:column;gap:3px}
+  .meter .lbl{display:flex;justify-content:space-between;font-size:10.5px;color:var(--muted)}
+  .meter .lbl b{color:var(--fg);font:600 11px "Space Grotesk"}
+  .stack .svc{border-top:1px solid var(--border);padding:8px 16px;display:grid;grid-template-columns:minmax(160px,.8fr) 90px 170px 170px 110px auto;gap:14px;align-items:center;font-size:12px;background:var(--card2)}
+  .stack .svc .nm{font-family:"DM Mono";font-size:11.5px;color:var(--muted)}
+  .stack .hint{border-top:1px solid var(--border);padding:8px 16px;font-size:11.5px;display:flex;align-items:center;gap:10px;justify-content:space-between}
+  .hint.reclaim{color:#7ff0e0;background:rgba(45,212,191,.04)}
+  .hint.warn{color:#fcd34d;background:rgba(245,158,11,.05)}
+  .actions{display:flex;gap:6px;justify-content:flex-end}
+  .limit-amber b{background:linear-gradient(90deg,var(--amber),#fbbf24)!important}
+  .limit-red b{background:linear-gradient(90deg,var(--red),#f87171)!important}
+
+  /* agents + services tables */
+  .trow{display:grid;gap:14px;align-items:center;padding:9px 14px;border:1px solid var(--border);border-radius:10px;margin-bottom:7px;background:rgba(255,255,255,.012);font-size:12.5px}
+  .trow:hover{border-color:var(--border-hi)}
+  .agents .trow{grid-template-columns:minmax(200px,1fr) 120px 100px 90px 90px 110px auto}
+  .svcs .trow{grid-template-columns:minmax(200px,1fr) 140px 120px 140px auto}
+  .procs .trow{grid-template-columns:minmax(200px,1fr) 100px 110px 1fr auto}
+  .tname{font-family:"DM Mono";font-size:11.5px}
+  .tsub{font-size:10.5px;color:var(--faint)}
+  .num{font:600 12px "Space Grotesk";text-align:right}
+  .num small{display:block;font:400 9.5px "DM Sans";color:var(--faint)}
+
+  /* history */
+  .history{display:grid;grid-template-columns:1fr 300px;gap:16px}
+  .annot{font-size:11.5px;padding:7px 10px;border-radius:9px;border:1px solid var(--border);margin-bottom:6px;display:flex;gap:8px;align-items:baseline}
+  .annot .t{font-family:"DM Mono";font-size:10.5px;color:var(--faint);flex-shrink:0}
+  .legend{display:flex;gap:14px;font-size:10.5px;color:var(--muted);margin-top:8px}
+  .legend i{width:8px;height:8px;border-radius:2px;display:inline-block;margin-right:5px;vertical-align:-1px}
+
+  .topbar{display:flex;align-items:center;justify-content:space-between;gap:16px}
+  .topbar .right{display:flex;gap:8px;align-items:center;font-size:11px;color:var(--muted)}
+  .search{background:var(--card);border:1px solid var(--border);border-radius:9px;padding:5px 12px;color:var(--muted);font-size:12px;width:220px}
+  .seg{display:inline-flex;border:1px solid var(--border);border-radius:9px;overflow:hidden}
+  .seg span{padding:4px 12px;font-size:11px;color:var(--muted);cursor:pointer}
+  .seg span.on{background:#1a2130;color:var(--fg)}
+  .kbd{font:500 10px "DM Mono";border:1px solid var(--border-hi);border-radius:5px;padding:1px 5px;color:var(--faint)}
+  .forecast{display:flex;align-items:center;gap:14px;font-size:12px;color:var(--muted);border:1px dashed var(--border-hi);border-radius:12px;padding:10px 14px;margin-top:10px}
+  .rules{font-size:12px;color:var(--muted);columns:2;column-gap:32px}
+  .rules li{margin-bottom:6px;break-inside:avoid}.rules b{color:var(--fg)}
+</style>
+</head>
+<body>
+
+<!-- ═══════════ TOP BAR ═══════════ -->
+<div class="topbar">
+  <div>
+    <h1>Machine Room</h1>
+    <div style="font-size:11.5px;color:var(--muted);margin-top:2px">Everything consuming this machine — live, attributed, reclaimable · <span class="mono" style="color:var(--faint)">auto-refresh 5s ●</span></div>
+  </div>
+  <div class="right">
+    <input class="search" value="" placeholder="Filter by issue, container, process…  /">
+    <div class="seg"><span class="on">By workspace</span><span>By kind</span><span>Flat</span></div>
+    <span class="kbd">S</span> stop · <span class="kbd">P</span> pause · <span class="kbd">L</span> logs
+  </div>
+</div>
+
+<!-- ═══════════ HOST VITALS ═══════════ -->
+<div class="vitals">
+  <div class="vital">
+    <div class="k">CPU · 24 cores</div>
+    <div class="v">38% <small>load 21.9 → 13.6</small></div>
+    <div class="sub">spike 04:32 attributed ↓</div>
+    <svg class="spark" viewBox="0 0 64 26"><polyline points="0,20 8,19 16,21 24,18 32,4 40,7 48,14 56,17 64,18" fill="none" stroke="#3b82f6" stroke-width="1.5"/></svg>
+    <div class="bar"><b style="width:38%;background:linear-gradient(90deg,var(--blue),#60a5fa)"></b></div>
+  </div>
+  <div class="vital">
+    <div class="k">Memory</div>
+    <div class="v">39.2 <small>/ 62 GB</small></div>
+    <div class="sub">23 GB available · swap 0.4/8 GB</div>
+    <svg class="spark" viewBox="0 0 64 26"><polyline points="0,10 12,9 24,8 32,5 40,6 48,11 56,12 64,12" fill="none" stroke="#8b5cf6" stroke-width="1.5"/></svg>
+    <div class="bar"><b style="width:63%;background:linear-gradient(90deg,var(--violet),#a78bfa)"></b></div>
+  </div>
+  <div class="vital">
+    <div class="k">Disk · nvme0</div>
+    <div class="v">712 <small>/ 953 GB</small></div>
+    <div class="sub">241 GB free · 61 GB reclaimable</div>
+    <div class="bar"><b style="width:75%;background:linear-gradient(90deg,var(--teal),#5eead4)"></b></div>
+  </div>
+  <div class="vital">
+    <div class="k">Docker</div>
+    <div class="v">31 <small>containers · 14 running</small></div>
+    <div class="sub">6 stacks · 12 networks / 31 pool</div>
+    <div class="bar"><b style="width:39%;background:linear-gradient(90deg,var(--blue),#60a5fa)"></b></div>
+  </div>
+  <div class="vital">
+    <div class="k">Agents</div>
+    <div class="v">19 <small>sessions · 11 active</small></div>
+    <div class="sub">burn $14.2/h est · 3 idle >15m</div>
+    <div class="bar"><b style="width:55%;background:linear-gradient(90deg,var(--violet),#a78bfa)"></b></div>
+  </div>
+  <div class="vital gate-soft">
+    <div class="k">Spawn Gate</div>
+    <div class="v" style="color:#fcd34d">SOFT</div>
+    <div class="sub">memory pressure warning — new agents need acknowledgement</div>
+    <div class="bar"><b style="width:70%;background:linear-gradient(90deg,var(--amber),#fbbf24)"></b></div>
+  </div>
+</div>
+
+<!-- ═══════════ RECLAIM ADVISOR ═══════════ -->
+<div class="advisor">
+  <header>
+    <h2>⟳ Reclaim advisor — safe to free right now</h2>
+    <div><span class="total">11.4 GB RAM · 61 GB disk</span> &nbsp;<button class="btn primary">Reclaim all safe</button></div>
+  </header>
+  <div class="adv-row">
+    <div>Stack <span class="mono">myn-feature-min-854</span> — <span class="why">MIN-854 merged 2h ago, post-merge teardown never ran</span></div>
+    <div class="amt">2.4 GB RAM</div><div class="actions"><button class="btn">Stop stack</button></div>
+  </div>
+  <div class="adv-row">
+    <div>Stack <span class="mono">myn-feature-min-860</span> — <span class="why">MIN-860 merged 1h ago</span></div>
+    <div class="amt">2.6 GB RAM</div><div class="actions"><button class="btn">Stop stack</button></div>
+  </div>
+  <div class="adv-row">
+    <div>Workspace TLDR venvs ×7 — <span class="why">.venv copies for closed-issue workspaces (PAN-1674)</span></div>
+    <div class="amt">52.5 GB disk</div><div class="actions"><button class="btn">Delete venvs</button></div>
+  </div>
+  <div class="adv-row">
+    <div>Dangling volumes ×9 + build cache — <span class="why">from deep-wiped workspaces</span></div>
+    <div class="amt">8.7 GB disk</div><div class="actions"><button class="btn">Prune</button></div>
+  </div>
+  <div class="adv-row">
+    <div>Exited containers ×17 — <span class="why">init-fe one-shots, finished UAT runners</span></div>
+    <div class="amt">6.4 GB RAM if restarted · 0.9 GB disk</div><div class="actions"><button class="btn">Remove</button></div>
+  </div>
+</div>
+
+<!-- ═══════════ WORKSPACE STACKS ═══════════ -->
+<section>
+  <header><h2>Workspace stacks</h2><div class="meta">grouped by issue · aggregate first, expand for services · totals: 11.2 GB RAM · 41% of one core avg</div></header>
+
+  <!-- min-857 : UAT hold -->
+  <div class="stack">
+    <div class="head">
+      <div class="issue">
+        <span class="id">MIN-857 · myn-feature-min-857 · 5 services</span>
+        <span class="title">Gemini voice UX overhaul</span>
+      </div>
+      <div><span class="chip c-uat"><i></i>awaiting your UAT</span></div>
+      <div class="meter"><div class="lbl"><span>CPU</span><b>4.2%</b></div><div class="bar"><b style="width:4%;background:var(--blue)"></b></div></div>
+      <div class="meter"><div class="lbl"><span>RAM</span><b>2.9 GB</b></div><div class="bar"><b style="width:29%;background:var(--violet)"></b></div></div>
+      <div class="num">14 GB<small>volumes+layers</small></div>
+      <div class="actions"><button class="btn primary">Open UAT ↗</button><button class="btn">Pause</button><button class="btn ghost">⋯</button></div>
+    </div>
+    <div class="hint warn">⏸ Idle 3.1h while holding 2.9 GB — <b>&nbsp;Pause freezes it at ~0 CPU and resumes in seconds (no Java cold-start)&nbsp;</b><span style="flex:1"></span><button class="btn">Pause until UAT</button></div>
+  </div>
+
+  <!-- min-729 : hot -->
+  <div class="stack">
+    <div class="head" style="border-left:3px solid var(--amber)">
+      <div class="issue">
+        <span class="id">MIN-729 · myn-feature-min-729 · 5 services</span>
+        <span class="title">Strikethrough animation remainder</span>
+      </div>
+      <div><span class="chip c-work"><i></i>agent working</span></div>
+      <div class="meter"><div class="lbl"><span>CPU</span><b>142%</b></div><div class="bar"><b style="width:60%;background:linear-gradient(90deg,var(--amber),#fbbf24)"></b></div></div>
+      <div class="meter limit-amber"><div class="lbl"><span>RAM</span><b>3.8 / 4 GB ⚠</b></div><div class="bar"><b style="width:95%"></b></div></div>
+      <div class="num">11 GB<small>volumes+layers</small></div>
+      <div class="actions"><button class="btn">Logs</button><button class="btn">Restart api</button><button class="btn ghost">⋯</button></div>
+    </div>
+    <div class="svc">
+      <span class="nm">api (java 21)</span><span><span class="chip c-warn"><i></i>at limit</span></span>
+      <div class="meter"><div class="lbl"><span>CPU</span><b>139%</b></div><div class="bar"><b style="width:58%;background:var(--amber)"></b></div></div>
+      <div class="meter limit-amber"><div class="lbl"><span>RAM</span><b>3.8/4 GB</b></div><div class="bar"><b style="width:95%"></b></div></div>
+      <div class="num">2 OOM<small>last 24h</small></div>
+      <div class="actions"><button class="btn">Raise limit</button><button class="btn">Logs</button></div>
+    </div>
+    <div class="svc">
+      <span class="nm">fe (node 20)</span><span><span class="chip c-run"><i></i>healthy</span></span>
+      <div class="meter"><div class="lbl"><span>CPU</span><b>2.1%</b></div><div class="bar"><b style="width:2%;background:var(--blue)"></b></div></div>
+      <div class="meter"><div class="lbl"><span>RAM</span><b>410 MB</b></div><div class="bar"><b style="width:7%;background:var(--violet)"></b></div></div>
+      <div class="num">—</div><div class="actions"><button class="btn">Logs</button></div>
+    </div>
+    <div class="hint warn">⚠ api hit its 4 GB memory limit twice today (OOM-kill risk). Suggested: raise limit to 5 GB or profile the leak. <span style="flex:1"></span><button class="btn">Create issue</button></div>
+  </div>
+
+  <!-- min-861 -->
+  <div class="stack">
+    <div class="head">
+      <div class="issue">
+        <span class="id">MIN-861 · myn-feature-min-861 · 5 services</span>
+        <span class="title">Smartwatch notifications</span>
+      </div>
+      <div><span class="chip c-review"><i></i>review fix-loop</span></div>
+      <div class="meter"><div class="lbl"><span>CPU</span><b>18%</b></div><div class="bar"><b style="width:18%;background:var(--blue)"></b></div></div>
+      <div class="meter"><div class="lbl"><span>RAM</span><b>2.5 GB</b></div><div class="bar"><b style="width:25%;background:var(--violet)"></b></div></div>
+      <div class="num">12 GB<small>volumes+layers</small></div>
+      <div class="actions"><button class="btn">Stop</button><button class="btn">Pause</button><button class="btn ghost">⋯</button></div>
+    </div>
+  </div>
+
+  <!-- merged, reclaimed-collapsed example -->
+  <div class="stack" style="opacity:.55">
+    <div class="head">
+      <div class="issue">
+        <span class="id">MIN-854 · myn-feature-min-854 · stopped 09:12</span>
+        <span class="title">Fizzy-style notification tray</span>
+      </div>
+      <div><span class="chip c-merged"><i></i>merged · stack stopped</span></div>
+      <div class="meter"><div class="lbl"><span>CPU</span><b>0%</b></div><div class="bar"><b style="width:0%"></b></div></div>
+      <div class="meter"><div class="lbl"><span>RAM</span><b>0 GB</b></div><div class="bar"><b style="width:0%"></b></div></div>
+      <div class="num">14 GB<small>disk still held</small></div>
+      <div class="actions"><button class="btn">Start</button><button class="btn danger">Tear down · frees 14 GB</button></div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ AGENTS ═══════════ -->
+<section class="agents">
+  <header><h2>Agents</h2><div class="meta">tmux sessions with their full process trees · burn = live cost rate from the cost door</div></header>
+  <div class="trow">
+    <div><span class="tname">agent-pan-2388-slot-1</span><div class="tsub">PAN-2388 · cost capture, slot 1 · gpt-5.5 / codex</div></div>
+    <div><span class="chip c-work"><i></i>working · 2m idle</span></div>
+    <div class="num">61%<small>CPU</small></div>
+    <div class="num">1.1 GB<small>RAM</small></div>
+    <div class="num">$2.10/h<small>burn</small></div>
+    <div class="num">$38.42<small>total</small></div>
+    <div class="actions"><button class="btn">Terminal</button><button class="btn">Pause</button></div>
+  </div>
+  <div class="trow">
+    <div><span class="tname">agent-pan-2341-test</span><div class="tsub">PAN-2341 · test specialist · kimi-k2.7 / claude-code</div></div>
+    <div><span class="chip c-warn"><i></i>vitest fan-out ×10</span></div>
+    <div class="num">740%<small>CPU peak</small></div>
+    <div class="num">3.2 GB<small>RAM</small></div>
+    <div class="num">$0.85/h<small>burn</small></div>
+    <div class="num">$4.11<small>total</small></div>
+    <div class="actions"><button class="btn">Terminal</button><button class="btn">Logs</button></div>
+  </div>
+  <div class="trow" style="opacity:.7">
+    <div><span class="tname">planning-lex-1</span><div class="tsub">LEX-1 · planning · claude-fable-5 · operator session</div></div>
+    <div><span class="chip c-idle"><i></i>idle 22m</span></div>
+    <div class="num">0.4%<small>CPU</small></div>
+    <div class="num">610 MB<small>RAM</small></div>
+    <div class="num">$0/h<small>burn</small></div>
+    <div class="num">$61.03<small>total</small></div>
+    <div class="actions"><button class="btn">Terminal</button><button class="btn">Stop</button></div>
+  </div>
+</section>
+
+<!-- ═══════════ CORE SERVICES ═══════════ -->
+<section class="svcs">
+  <header><h2>Core services</h2><div class="meta">the substrate itself — restart carefully</div></header>
+  <div class="trow">
+    <div><span class="tname">dashboard server</span><div class="tsub">node 22 · dist/dashboard/server.js · up 4h 12m</div></div>
+    <div><span class="chip c-run"><i></i>healthy</span></div>
+    <div class="num">6.2%<small>CPU</small></div>
+    <div class="num">p99 8ms<small>event loop</small></div>
+    <div class="actions"><button class="btn">Restart</button><button class="btn">Logs</button></div>
+  </div>
+  <div class="trow">
+    <div><span class="tname">deacon patrols</span><div class="tsub">in-process · last tick 31s ago · 14 patrols green</div></div>
+    <div><span class="chip c-run"><i></i>ticking</span></div>
+    <div class="num">—</div><div class="num">0 stuck<small>reconciled 3</small></div>
+    <div class="actions"><button class="btn">Freeze</button></div>
+  </div>
+  <div class="trow">
+    <div><span class="tname">traefik · smee · pty-supervisors ×11 · tldr daemon</span><div class="tsub">support fleet, aggregated</div></div>
+    <div><span class="chip c-run"><i></i>all healthy</span></div>
+    <div class="num">3.1%<small>CPU</small></div>
+    <div class="num">1.9 GB<small>RAM</small></div>
+    <div class="actions"><button class="btn ghost">Expand</button></div>
+  </div>
+</section>
+
+<!-- ═══════════ HOST PROCESSES ═══════════ -->
+<section class="procs">
+  <header><h2>Host processes (outside Docker)</h2><div class="meta">top offenders · everything attributed, no mystery load</div></header>
+  <div class="trow">
+    <div><span class="tname">chrome ×14 renderers</span><div class="tsub">your browser</div></div>
+    <div class="num">22%<small>CPU</small></div>
+    <div class="num">7.8 GB<small>RAM</small></div>
+    <div style="font-size:11px;color:var(--faint)">heaviest tab: overdeck.localhost (1.5 GB)</div>
+    <div class="actions"></div>
+  </div>
+  <div class="trow">
+    <div><span class="tname">vitest workers (transient)</span><div class="tsub">spawned by agent-pan-2341-test · exited 04:39</div></div>
+    <div class="num">0%<small>now · 740% peak</small></div>
+    <div class="num">0 GB<small>freed 3.2 GB</small></div>
+    <div style="font-size:11px;color:var(--faint)">caused the 04:32 load-45 spike ← attributed</div>
+    <div class="actions"></div>
+  </div>
+</section>
+
+<!-- ═══════════ HISTORY + FORECAST ═══════════ -->
+<section>
+  <header><h2>Last 24h — usage with attribution</h2><div class="meta">every spike explains itself · click annotation to jump to the culprit</div></header>
+  <div class="history">
+    <div class="card" style="padding:14px">
+      <svg viewBox="0 0 800 180" style="width:100%;height:180px">
+        <defs>
+          <linearGradient id="g1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3b82f6" stop-opacity=".5"/><stop offset="1" stop-color="#3b82f6" stop-opacity=".05"/></linearGradient>
+          <linearGradient id="g2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8b5cf6" stop-opacity=".5"/><stop offset="1" stop-color="#8b5cf6" stop-opacity=".05"/></linearGradient>
+        </defs>
+        <polygon fill="url(#g2)" points="0,180 0,120 60,118 120,115 180,110 240,105 300,100 360,96 420,92 480,60 540,70 600,95 660,88 720,92 800,90 800,180"/>
+        <polygon fill="url(#g1)" points="0,180 0,150 60,148 120,150 180,145 240,140 300,138 360,132 420,128 480,30 540,55 600,120 660,110 720,118 800,120 800,180"/>
+        <line x1="480" y1="20" x2="480" y2="180" stroke="#f59e0b" stroke-width="1" stroke-dasharray="3 3"/>
+        <text x="486" y="30" fill="#fcd34d" font-size="10" font-family="DM Mono">04:32 load 45</text>
+      </svg>
+      <div class="legend"><span><i style="background:#3b82f6"></i>CPU (stacked by group)</span><span><i style="background:#8b5cf6"></i>Memory</span><span><i style="background:#f59e0b"></i>annotation</span></div>
+    </div>
+    <div>
+      <div class="annot"><span class="t">04:32</span><span><b style="color:#fcd34d">Load 45 spike</b> — vitest ×10 workers (agent-pan-2341-test) + mvn compile (min-862 gate)</span></div>
+      <div class="annot"><span class="t">08:36</span><span>min-729 stack cold-start — api warmed for 4m at 139% CPU</span></div>
+      <div class="annot"><span class="t">09:12</span><span style="color:#7ff0e0">Reclaimed 9 GB — merged stacks min-854/min-860 stopped</span></div>
+      <div class="annot"><span class="t">09:41</span><span>Spawn gate → SOFT (memory 63%, threshold 60%)</span></div>
+    </div>
+  </div>
+  <div class="forecast">
+    <b style="font:600 12px 'Space Grotesk';color:var(--fg)">Capacity forecast</b>
+    Starting M4 + M5 (2 MYN stacks) ≈ <b style="color:var(--fg)">+5.2 GB RAM, +0.4 load</b> → fits (23 GB free). Starting them plus 3 work agents → spawn gate stays SOFT.
+    <span style="flex:1"></span><button class="btn">Simulate…</button>
+  </div>
+</section>
+
+<!-- ═══════════ DESIGN RULES ═══════════ -->
+<div class="card">
+  <h2 style="margin-bottom:10px">Design rules (binding for implementation)</h2>
+  <ul class="rules">
+    <li><b>Attribution over telemetry.</b> Every number names its owner (issue, agent, service). A spike without a culprit is a bug in this page.</li>
+    <li><b>Reclaim advisor is the hero.</b> The page's #1 job is answering "what can I free right now?" — computed from pipeline state (merged/closed issues → their stacks/volumes/venvs are reclaim candidates).</li>
+    <li><b>Stack = unit of thought.</b> Containers group under their issue's stack; aggregate line first, services on expand. Never a flat container list by default.</li>
+    <li><b>Full verb set:</b> Start / <b>Stop</b> / <b>Pause (docker pause — freeze without cold-start)</b> / Restart / Logs / Terminal / Tear down (with reclaim estimate) on stacks and services. Tear-down is typed-confirm.</li>
+    <li><b>Pipeline-aware chips</b> reuse the phase language (working / review / awaiting UAT / merged) — resources and pipeline never disagree.</li>
+    <li><b>Limits are first-class:</b> a container near its memory limit shows amber at 85%, red + OOM count at 95%, with "raise limit" and "create issue" affordances.</li>
+    <li><b>Spawn gate visibility:</b> the same guardrail state that blocks agent spawns (OPEN/SOFT/BLOCKED) is shown with its reason — no more mystery 409s.</li>
+    <li><b>History explains itself:</b> 24h chart with event annotations (spikes, reclaims, gate flips) sourced from the events table.</li>
+    <li><b>Forecast before you act:</b> starting a stack/agent shows its predicted footprint against free headroom (learned from past runs of the same stack).</li>
+    <li><b>Live via existing WS events</b>, 5s stats poll; all numbers from the read door (`/api/resources` extended) — no new state plane.</li>
+    <li><b>Keyboard-first:</b> / filter, S stop, P pause, L logs on the focused row; rows are focusable.</li>
+    <li><b>Idle honesty:</b> anything holding >1 GB while idle >2h gets the pause hint. The page nags so the operator doesn't have to notice.</li>
+  </ul>
+</div>
+
+</body>
+</html>

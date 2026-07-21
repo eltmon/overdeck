@@ -15,4 +15,14 @@ describe('model capabilities', () => {
     expect(gpt55.notes).toContain('150K');
     expect(gpt55.notes).not.toContain('200K');
   });
+
+  it.each(['gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna'] as const)(
+    'locks %s contextWindow to the CLIProxy Codex ceiling',
+    (model) => {
+      const capability = MODEL_CAPABILITIES[model];
+      expect(capability).toBeDefined();
+      expect(capability.contextWindow).toBe(CLIPROXY_CODEX_CONTEXT_WINDOW);
+      expect(capability.contextWindow).toBe(150_000);
+    },
+  );
 });

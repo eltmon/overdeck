@@ -5,6 +5,8 @@ import { useDashboardStore } from '../../lib/store';
 import { bucketByTime, type TimeBucketKey } from '../../lib/timeBuckets';
 import { formatRelativeTime } from '../../lib/formatRelativeTime';
 import { NotificationClassBadge } from '../NotificationClassBadge';
+import { ActionStatusChip } from '../ActionStatusChip';
+import { FreshnessChip } from '../primitives/FreshnessChip';
 
 const BUCKET_LABELS: Record<TimeBucketKey, string> = {
   justNow: 'Just Now',
@@ -88,6 +90,7 @@ export function ActivityFeedSidebar({ issueId, issueIds, now = new Date() }: Act
     [idsKey, issueIds, issueId],
   );
   const observations = useDashboardStore(selectActionObservations);
+  const snapshotTimestamp = useDashboardStore((s) => s.snapshotTimestamp);
   const buckets = useMemo(
     () => bucketByTime(observations, (observation) => observation.timestamp, now),
     [observations, now],
@@ -96,7 +99,10 @@ export function ActivityFeedSidebar({ issueId, issueIds, now = new Date() }: Act
   return (
     <aside data-testid="activity-feed-sidebar" className="flex h-full min-h-0 flex-col gap-3 p-3">
       <div className="shrink-0">
-        <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Activity</h3>
+        <div className="flex items-baseline justify-between gap-2">
+          <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Activity</h3>
+          <FreshnessChip timestamp={snapshotTimestamp} />
+        </div>
         <p className="mt-1 text-xs text-muted-foreground/80">Recent workspace action updates</p>
       </div>
 
@@ -125,8 +131,9 @@ export function ActivityFeedSidebar({ issueId, issueIds, now = new Date() }: Act
                         <div className="flex items-start gap-2">
                           <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
                           <div className="min-w-0 flex-1">
-                            <p className="truncate font-medium text-foreground">{observation.actionStatus}</p>
+                            <p className="truncate font-medium text-foreground" title={observation.summary}>{observation.summary}</p>
                             <div className="mt-1 flex min-w-0 items-center gap-1 text-[10px] text-muted-foreground">
+                              {observation.actionStatus ? <ActionStatusChip status={observation.actionStatus} /> : null}
                               <span className="truncate">{observation.workspaceId} · {observation.issueId}</span>
                               <span aria-hidden="true">·</span>
                               <time dateTime={observation.timestamp} className="shrink-0">

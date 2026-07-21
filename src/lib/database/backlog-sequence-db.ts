@@ -4,6 +4,9 @@ import { getDatabase } from './index.js';
 import { parseSequenceMd } from '../backlog/sequence-io.js';
 import type { SequenceDoc, SequenceNode } from '../backlog/types.js';
 
+type BacklogSequenceRow = ReturnType<typeof getBacklogSequence>[number];
+type BacklogSequenceRowWithEpic = BacklogSequenceRow & { isEpic: boolean };
+
 export function upsertBacklogSequence(projectKey: string, doc: SequenceDoc): void {
   const db = getDatabase();
   const stmt = db.prepare(`
@@ -81,7 +84,7 @@ export function rebuildBacklogSequenceFromMd(projectRoot: string): void {
 }
 
 export function getBacklogSequenceForRoot(projectRoot: string): {
-  nodes: ReturnType<typeof getBacklogSequence>;
+  nodes: BacklogSequenceRowWithEpic[];
   edges: Array<{ from: string; to: string; type: string }>;
 } {
   const seqPath = join(projectRoot, '.pan', 'backlog', 'sequence.md');
@@ -92,8 +95,12 @@ export function getBacklogSequenceForRoot(projectRoot: string): {
     if (result.ok) {
       const projectKey = result.doc.project;
       upsertBacklogSequence(projectKey, result.doc);
+      const isEpicByIssue = new Map(result.doc.nodes.map((n) => [n.issue, n.isEpic === true]));
       return {
-        nodes: getBacklogSequence(projectKey),
+        nodes: getBacklogSequence(projectKey).map((r) => ({
+          ...r,
+          isEpic: isEpicByIssue.get(r.issueId) ?? false,
+        })),
         edges: result.doc.edges.map((e) => ({ from: e.from, to: e.to, type: e.type })),
       };
     }
@@ -104,7 +111,10 @@ export function getBacklogSequenceForRoot(projectRoot: string): {
     .prepare('SELECT DISTINCT project_key FROM backlog_sequence LIMIT 1')
     .get() as { project_key: string } | undefined;
   if (!row) return { nodes: [], edges: [] };
-  return { nodes: getBacklogSequence(row.project_key), edges: [] };
+  return {
+    nodes: getBacklogSequence(row.project_key).map((r) => ({ ...r, isEpic: false })),
+    edges: [],
+  };
 }
 
 export function getBacklogSequence(projectKey: string): Array<{

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { Issue } from '../../tracker/interface.js';
@@ -102,26 +102,26 @@ describe('collectOpenBacklog', () => {
   it('ready=false when specs dir exists but no spec for this issue', async () => {
     const specsDir = join(tmpDir, '.pan', 'specs');
     mkdirSync(specsDir, { recursive: true });
-    writeFileSync(join(specsDir, '2026-01-01-PAN-99-some-other.vbrief.json'), '{}');
+    writeFileSync(join(specsDir, '2026-01-01-PAN-99-some-other.xbrief.json'), '{}');
     const result = await collectOpenBacklog(tmpDir, [makeIssue({ ref: 'PAN-1' })]);
     expect(result.manifest[0].ready).toBe(false);
   });
 
-  it('ready=false when spec exists but workspace beads are missing', async () => {
+  it('ready=true when a spec exists without a legacy workspace task store', async () => {
     const specsDir = join(tmpDir, '.pan', 'specs');
     mkdirSync(specsDir, { recursive: true });
-    writeFileSync(join(specsDir, '2026-01-01-PAN-1-my-feature.vbrief.json'), '{}');
+    writeFileSync(join(specsDir, '2026-01-01-PAN-1-my-feature.xbrief.json'), '{}');
     const result = await collectOpenBacklog(tmpDir, [makeIssue({ ref: 'PAN-1' })]);
-    expect(result.manifest[0].ready).toBe(false);
+    expect(result.manifest[0].ready).toBe(true);
   });
 
-  it('ready=true when spec and workspace beads both exist', async () => {
+  it('ready=true when spec and workspace tasks both exist', async () => {
     const specsDir = join(tmpDir, '.pan', 'specs');
     mkdirSync(specsDir, { recursive: true });
-    writeFileSync(join(specsDir, '2026-01-01-PAN-1-my-feature.vbrief.json'), '{}');
-    const beadsDir = join(tmpDir, 'workspaces', 'feature-pan-1', '.beads');
-    mkdirSync(beadsDir, { recursive: true });
-    writeFileSync(join(beadsDir, 'issues.jsonl'), '');
+    writeFileSync(join(specsDir, '2026-01-01-PAN-1-my-feature.xbrief.json'), '{}');
+    const tasksDir = join(tmpDir, 'workspaces', 'feature-pan-1', '.tasks');
+    mkdirSync(tasksDir, { recursive: true });
+    writeFileSync(join(tasksDir, 'issues.jsonl'), '');
     const result = await collectOpenBacklog(tmpDir, [makeIssue({ ref: 'PAN-1' })]);
     expect(result.manifest[0].ready).toBe(true);
   });

@@ -2,10 +2,12 @@ import type { AgentStatus } from '@overdeck/contracts';
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 import { Play, X, AlertTriangle, Loader2, CheckCircle } from 'lucide-react';
-import { useDashboardStore, selectAgents } from '../lib/store';
+import { useDashboardStore, selectAgents, selectIssues } from '../lib/store';
 import { classifyDashboardAgent } from '../lib/agent-classifier';
 import { Agent, type StartAgentResponse } from '../types';
 import { isCodexBlockedResponse, setPendingCodexSpawn } from '../lib/pending-codex-spawn';
+import { recoveryFromBody, useResumeRecovery } from '../lib/resumeRecovery';
+import { AgentPillPopoverRow, describeAgentStop, relativeTime } from './AgentPillPopoverRow';
 
 interface RestartResult {
   issueId: string;
@@ -13,8 +15,37 @@ interface RestartResult {
   error?: string;
 }
 
+// A stopped plan/review/test/ship agent whose issue has reached one of these
+// statuses has finished its stage — the pipeline already moved past it, the
+// record just never got marked completed. Counting it produces a phantom
+// "stopped" entry (e.g. a planning agent for an issue that's now In Review, or
+// a review agent for an issue already merged-and-verifying). Work agents are
+// intentionally not re-classified here; conversation agents never reach this
+// path (PIPELINE_ROLES excludes them).
+const SPECIALIST_ROLES = new Set(['plan', 'review', 'test', 'ship']);
+const ISSUE_ADVANCED_STATUSES = new Set([
+  'in_review',
+  'verifying_on_main',
+  'done',
+  'canceled',
+  'merged',
+  'closed',
+]);
+
 export function StoppedAgentsBanner({ variant = 'banner' }: { variant?: 'banner' | 'pill' } = {}) {
   const agents = useDashboardStore(selectAgents) as unknown as Agent[];
+  const issues = useDashboardStore(selectIssues) as Array<Record<string, unknown>>;
+
+  // issueId (upper-cased) → canonicalStatus, for the advanced-past-role check below.
+  const issueStatusById = new Map<string, string>();
+  const issueTitleById = new Map<string, string>();
+  for (const issue of issues) {
+    const id = typeof issue['identifier'] === 'string' ? (issue['identifier'] as string).toUpperCase() : null;
+    const status = typeof issue['canonicalStatus'] === 'string' ? (issue['canonicalStatus'] as string) : null;
+    const title = typeof issue['title'] === 'string' ? (issue['title'] as string) : null;
+    if (id && status) issueStatusById.set(id, status);
+    if (id && title) issueTitleById.set(id, title);
+  }
 
   // Show toast when an agent hits an API error (resolution transitions to 'api_error')
   const prevApiErrorAgentsRef = useRef<Set<string>>(new Set());
@@ -50,6 +81,12 @@ export function StoppedAgentsBanner({ variant = 'banner' }: { variant?: 'banner'
     if (a.lifecycle?.isCompleted) return false;
     if (!a.role) return false;
     if (!PIPELINE_ROLES.has(a.role)) return false;
+    // Drop phantom stops: a stopped plan/review/test/ship agent whose issue has
+    // advanced past that stage is finished, not waiting for the operator.
+    if (SPECIALIST_ROLES.has(a.role)) {
+      const issueStatus = issueStatusById.get(a.issueId.toUpperCase());
+      if (issueStatus && ISSUE_ADVANCED_STATUSES.has(issueStatus)) return false;
+    }
     // Only show recently-active agents — old state files are historical debris
     const lastActivity = a.lastActivity ? new Date(a.lastActivity).getTime() : 0;
     const startedAt = a.startedAt ? new Date(a.startedAt).getTime() : 0;
@@ -101,6 +138,7 @@ export function StoppedAgentsBanner({ variant = 'banner' }: { variant?: 'banner'
     setResults(null);
 
     const restartResults: RestartResult[] = [];
+    let handoffOpened = false;
 
     for (const agent of stoppedAgents) {
       if (!agent.issueId) continue;
@@ -136,6 +174,18 @@ export function StoppedAgentsBanner({ variant = 'banner' }: { variant?: 'banner'
           if (isCodexBlockedResponse(res, data)) {
             setPendingCodexSpawn(lastRequestBody);
             restartResults.push({ issueId: agent.issueId, success: false, error: data.hint || data.error || 'Codex authentication expired — re-authenticate to continue' });
+            continue;
+          }
+          const recovery = res.status === 409 ? recoveryFromBody(data) : null;
+          if (recovery) {
+            // A start-block is a choice, not a failure — open the recovery
+            // dialog for the first blocked issue and mark blocked rows plainly;
+            // the server's CLI-instruction text never reaches the list.
+            if (!handoffOpened) {
+              useResumeRecovery.getState().openRecovery({ ...recovery, issueId: agent.issueId });
+              handoffOpened = true;
+            }
+            restartResults.push({ issueId: agent.issueId, success: false, error: 'Needs your choice — Resume or Start fresh' });
             continue;
           }
           restartResults.push({ issueId: agent.issueId, success: false, error: data.error || data.hint || res.statusText });
@@ -181,18 +231,29 @@ export function StoppedAgentsBanner({ variant = 'banner' }: { variant?: 'banner'
           {stoppedAgents.length} stopped
         </button>
         {popoverOpen && (
-          <div className="absolute right-0 top-full z-50 mt-1.5 w-72 rounded-lg border border-border bg-card p-3 shadow-xl">
+          <div
+            data-testid="stopped-agents-popover"
+            className="absolute right-0 top-full z-50 mt-1.5 w-80 rounded-lg border border-border bg-card p-3 shadow-xl"
+          >
             <div className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-warning-foreground">
               <AlertTriangle className="h-3.5 w-3.5" />
-              {stoppedAgents.length} agent{stoppedAgents.length > 1 ? 's' : ''} stopped
+              {stoppedAgents.length} stopped · pipeline agents, last 7 days
             </div>
-            <div className="mb-3 max-h-40 overflow-y-auto">
-              {stoppedAgents.map((a) => (
-                <div key={a.id} className="flex items-center justify-between py-0.5 text-xs">
-                  <span className="font-mono text-foreground">{a.issueId || a.id}</span>
-                  {a.role && <span className="text-muted-foreground">{a.role}</span>}
-                </div>
-              ))}
+            <div className="mb-3 max-h-64 overflow-y-auto">
+              {stoppedAgents.map((agent) => {
+                const lastActivity = agent.lastActivity ? Date.parse(agent.lastActivity) : 0;
+                const startedAt = agent.startedAt ? Date.parse(agent.startedAt) : 0;
+                const activityAt = new Date(Math.max(lastActivity, startedAt)).toISOString();
+                return (
+                  <AgentPillPopoverRow
+                    key={agent.id}
+                    agent={agent}
+                    title={agent.issueId ? issueTitleById.get(agent.issueId.toUpperCase()) : undefined}
+                    contextLine={`${describeAgentStop(agent)} · ${relativeTime(activityAt, Date.now())}`}
+                    onNavigate={() => setPopoverOpen(false)}
+                  />
+                );
+              })}
             </div>
             {results && (
               <div className="mb-2 text-xs">

@@ -13,22 +13,20 @@ import type { TokenUsage, RuntimeName } from '../runtimes/types.js';
 import type { ComplexityLevel } from './complexity.js';
 import type { AgentState } from '../agents.js';
 import { renderPrompt } from './prompts.js';
-import { resolveProjectFromIssueSync } from '../projects.js';
-import { resolveVBriefDir } from '../vbrief/lifecycle.js';
-import { readContinueStateSync, type ContinueState } from '../vbrief/continue-state.js';
-import { readWorkspaceContinue } from '../pan-dir/index.js';
-import { withBdMutex } from '../bd-mutex.js';
+import type { ContinueState } from '../xbrief/continue-state.js';
+import { getProjectConfigFromWorkspacePath, readRecordContinueViewSync, resolveProjectForIssue } from '../pan-dir/record.js';
+import { readWorkspacePlanSync } from '../xbrief/io.js';
 
 const execAsync = promisify(exec);
 
 /**
  * Beads task snapshot for handoff
  */
-export interface BeadsTask {
+export interface HandoffTask {
   id: string;
   title: string;
   description?: string;
-  status: 'open' | 'in_progress' | 'closed';
+  status: string;
   priority: number;
   labels?: string[];
   complexity?: ComplexityLevel;
@@ -58,10 +56,10 @@ export interface HandoffContext {
   uncommittedFiles?: string[];
   lastCommit?: string;
 
-  // Beads state
-  activeBeadsTasks?: BeadsTask[];
-  remainingTasks?: BeadsTask[];
-  completedTasks?: BeadsTask[];
+  // Task state
+  activeTasks?: HandoffTask[];
+  remainingTasks?: HandoffTask[];
+  completedTasks?: HandoffTask[];
 
   // AI summaries
   whatWasDone?: string;
@@ -101,8 +99,7 @@ export interface HandoffContext {
   // Capture git state
   await captureGitState(context, agentState.workspace);
 
-  // Capture beads tasks
-  await captureBeadsTasks(context, agentState.issueId);
+  captureTasks(context, agentState.workspace);
 
   return context;
 }
@@ -116,29 +113,14 @@ async function captureFiles(
   issueId: string,
 ): Promise<void> {
   try {
-    // Read the live workspace continue state first, then migration fallbacks.
-    let continueState: ContinueState | null = null;
+    // Read continue context from the per-issue record (PAN-1919).
     try {
-      continueState = await Effect.runPromise(readWorkspaceContinue(workspace));
-    } catch { /* ignore */ }
-    if (!continueState) {
-      const resolved = resolveProjectFromIssueSync(issueId);
-      if (resolved) {
-        for (const dir of ['active', 'proposed', 'completed', 'cancelled'] as const) {
-          try {
-            const lifecycleDir = resolveVBriefDir(resolved.projectPath, dir);
-            const cs = readContinueStateSync(lifecycleDir, issueId);
-            if (cs) {
-              continueState = cs;
-              break;
-            }
-          } catch { /* ignore */ }
-        }
+      const project = resolveProjectForIssue(issueId) ?? getProjectConfigFromWorkspacePath(workspace);
+      const recordView = readRecordContinueViewSync(project, issueId);
+      if (recordView) {
+        context.continueState = recordView as unknown as ContinueState;
       }
-    }
-    if (continueState) {
-      context.continueState = continueState;
-    }
+    } catch { /* ignore */ }
 
     // Read CLAUDE.md if it exists
     const claudeMd = join(workspace, 'CLAUDE.md');
@@ -184,25 +166,23 @@ async function captureGitState(context: HandoffContext, workspace: string): Prom
 }
 
 /**
- * Capture beads tasks state
+ * Capture merged xBRIEF task state.
  */
-async function captureBeadsTasks(context: HandoffContext, issueId: string): Promise<void> {
+function captureTasks(context: HandoffContext, workspace: string): void {
   try {
-    // List all tasks with this issue's label
-    const label = issueId.toLowerCase();
-    const { stdout: output } = await execAsync(`bd list --json -l ${label}`, {
-      encoding: 'utf-8',
-    });
-
-    const tasks: BeadsTask[] = JSON.parse(output);
-
-    // Categorize tasks
-    context.activeBeadsTasks = tasks.filter(t => t.status === 'in_progress');
-    context.remainingTasks = tasks.filter(t => t.status === 'open');
-    context.completedTasks = tasks.filter(t => t.status === 'closed');
+    const plan = readWorkspacePlanSync(workspace);
+    const tasks: HandoffTask[] = (plan?.plan.items ?? []).map((item) => ({
+      id: item.id,
+      title: item.title,
+      status: item.status,
+      priority: typeof item.priority === 'number' ? item.priority : 0,
+    }));
+    context.activeTasks = tasks.filter((task) => task.status === 'running');
+    context.remainingTasks = tasks.filter((task) => !['completed', 'cancelled'].includes(task.status));
+    context.completedTasks = tasks.filter((task) => task.status === 'completed');
   } catch (error) {
-    console.error('Error capturing beads tasks:', error);
-    context.activeBeadsTasks = [];
+    console.error('Error capturing tasks:', error);
+    context.activeTasks = [];
     context.remainingTasks = [];
     context.completedTasks = [];
   }
@@ -245,7 +225,7 @@ export function serializeHandoffContext(context: HandoffContext): string {
     lines.push('');
   }
 
-  // Beads tasks
+  // Tasks
   if (context.completedTasks && context.completedTasks.length > 0) {
     lines.push('## Completed Tasks');
     lines.push('');
@@ -255,10 +235,10 @@ export function serializeHandoffContext(context: HandoffContext): string {
     lines.push('');
   }
 
-  if (context.activeBeadsTasks && context.activeBeadsTasks.length > 0) {
+  if (context.activeTasks && context.activeTasks.length > 0) {
     lines.push('## Active Tasks');
     lines.push('');
-    context.activeBeadsTasks.forEach(task => {
+    context.activeTasks.forEach(task => {
       lines.push(`- [ ] ${task.title} (${task.id}) - IN PROGRESS`);
     });
     lines.push('');
@@ -275,7 +255,7 @@ export function serializeHandoffContext(context: HandoffContext): string {
 
   // Continue file content (structured planning state)
   if (context.continueState) {
-    lines.push('## Current State (continue.vbrief.json)');
+    lines.push('## Current State (.overdeck/continue.json)');
     lines.push('');
     lines.push('```json');
     lines.push(JSON.stringify(context.continueState, null, 2));

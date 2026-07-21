@@ -1,6 +1,6 @@
 import { Effect } from 'effect';
 /**
- * PAN-382: pan inspect <issueId> --bead <beadId>
+ * PAN-382: pan inspect <issueId> --bead <itemId>
  *
  * Triggers the inspect specialist to verify a completed bead
  * matches its specification and architectural constraints.
@@ -11,19 +11,24 @@ import chalk from 'chalk';
 import { resolveProjectFromIssueSync } from '../../lib/projects.js';
 import { resolveBareNumericIdSync } from '../../lib/issue-id.js';
 import { spawnInspectAgent, type InspectContext } from '../../lib/cloister/inspect-agent.js';
-import { getDiffBase, getDiffStats } from '../../lib/cloister/inspect-checkpoints.js';
+import { getInspectDiffContext } from '../../lib/cloister/inspect-checkpoints.js';
+import { readWorkspacePlanSync } from '../../lib/xbrief/io.js';
 
 interface InspectOptions {
-  bead: string;
+  item: string;
   workspace?: string;
   deep?: boolean;
+}
+
+interface ResolvedInspectItem {
+  itemId: string;
 }
 
 export function registerInspectCommand(program: Command): void {
   program
     .command('inspect <issueId>')
-    .description('Request inspection of a completed bead before proceeding to the next')
-    .requiredOption('--bead <beadId>', 'Bead ID to inspect')
+    .description('Request inspection of a completed xBRIEF item before proceeding to the next')
+    .requiredOption('--item <itemId>', 'xBRIEF item ID to inspect')
     .option('--workspace <path>', 'Workspace path (auto-detected if not provided)')
     .option('--deep', 'Use the deep inspection sub-role')
     .action(async (issueId: string, options: InspectOptions) => {
@@ -34,6 +39,13 @@ export function registerInspectCommand(program: Command): void {
         process.exit(1);
       }
     });
+}
+
+export async function resolveInspectItem(itemId: string, workspacePath: string): Promise<ResolvedInspectItem> {
+  const doc = readWorkspacePlanSync(workspacePath);
+  if (!doc) throw new Error(`The xBRIEF is missing or unreadable in ${workspacePath}.`);
+  if (!doc.plan.items.some(item => item.id === itemId)) throw new Error(`Item "${itemId}" does not exist in the xBRIEF for ${doc.plan.id}.`);
+  return { itemId };
 }
 
 export async function inspectCommand(id: string, options: InspectOptions): Promise<void> {
@@ -73,20 +85,23 @@ export async function inspectCommand(id: string, options: InspectOptions): Promi
     process.exit(1);
   }
 
-  // Show what we're inspecting
-  const diffBase = await Effect.runPromise(getDiffBase(project.projectKey, normalizedIssueId, workspacePath));
-  const diffStats = await Effect.runPromise(getDiffStats(workspacePath, diffBase));
+  const resolvedItem = await resolveInspectItem(options.item, workspacePath);
+
+  // Show what we're inspecting from the actual code repo(s), not a polyrepo wrapper.
+  const diffContext = await Effect.runPromise(
+    getInspectDiffContext(project.projectKey, normalizedIssueId, workspacePath),
+  );
 
   console.log('');
   console.log(chalk.bold('Requesting inspection'));
   console.log(chalk.dim(`  Issue:     ${normalizedIssueId}`));
-  console.log(chalk.dim(`  Bead:      ${options.bead}`));
+  console.log(chalk.dim(`  Item:      ${options.item}`));
   console.log(chalk.dim(`  Depth:     ${options.deep ? 'deep' : 'fast'}`));
   console.log(chalk.dim(`  Workspace: ${workspacePath}`));
-  console.log(chalk.dim(`  Diff from: ${diffBase.substring(0, 8)}`));
+  console.log(chalk.dim(`  Diff from: ${diffContext.checkpoint}`));
   console.log('');
   console.log(chalk.dim('Diff scope:'));
-  console.log(chalk.dim(diffStats.split('\n').map(l => `  ${l}`).join('\n')));
+  console.log(chalk.dim(diffContext.diffStats.split('\n').map(l => `  ${l}`).join('\n')));
   console.log('');
 
   // Spawn the inspect specialist
@@ -94,7 +109,7 @@ export async function inspectCommand(id: string, options: InspectOptions): Promi
     projectKey: project.projectKey,
     projectPath: project.projectPath,
     issueId: normalizedIssueId,
-    beadId: options.bead,
+    itemId: resolvedItem.itemId,
     workspace: workspacePath,
     branch: `feature/${normalizedIssueId.toLowerCase()}`,
   };
@@ -108,10 +123,10 @@ export async function inspectCommand(id: string, options: InspectOptions): Promi
     }
 
     console.log(chalk.green('✓ Inspect specialist spawned'));
-    console.log(chalk.dim(`  Session: ${result.tmuxSession}`));
-    console.log(chalk.dim(`  Run ID:  ${result.runId}`));
+    if (result.tmuxSession) console.log(chalk.dim(`  Session: ${result.tmuxSession}`));
+    if (result.runId) console.log(chalk.dim(`  Run ID:  ${result.runId}`));
     console.log('');
-    console.log(chalk.yellow('The inspect specialist is reviewing your bead.'));
+    console.log(chalk.yellow('The inspect specialist is reviewing your item.'));
     console.log(chalk.yellow('Wait for the result — it will be delivered to your session via pan tell.'));
   } else {
     console.error(chalk.red(`✗ Failed to spawn inspect specialist: ${result.message}`));

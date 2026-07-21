@@ -10,6 +10,7 @@ const { mockExecAsync } = vi.hoisted(() => ({
 
 vi.mock('child_process', () => ({
   exec: vi.fn(),
+  execFile: vi.fn(),
 }));
 
 vi.mock('util', async (importOriginal) => {
@@ -24,6 +25,7 @@ import { Effect } from 'effect';
 import {
   movePrd as movePrdProgram,
   findWorkspacePath,
+  inferBranchFromWorkspace,
   archiveWorkspaceArtifacts as archiveWorkspaceArtifactsProgram,
 } from '../../../../src/lib/lifecycle/archive-planning.js';
 
@@ -68,6 +70,23 @@ describe('archive-planning', () => {
 
       const result = findWorkspacePath(testDir, 'pan-100');
       expect(result).toBe(wsPath);
+    });
+  });
+
+  describe('inferBranchFromWorkspace', () => {
+    it('should return strike/<id> for strike workspaces', () => {
+      const result = inferBranchFromWorkspace('/proj/workspaces/feature-pan-2258-strike', 'pan-2258');
+      expect(result).toBe('strike/pan-2258');
+    });
+
+    it('should return feature/<id> for non-strike workspaces', () => {
+      const result = inferBranchFromWorkspace('/proj/workspaces/feature-pan-2258', 'pan-2258');
+      expect(result).toBe('feature/pan-2258');
+    });
+
+    it('should return feature/<numeric> for legacy numeric workspaces', () => {
+      const result = inferBranchFromWorkspace('/proj/workspaces/feature-2258', '2258');
+      expect(result).toBe('feature/2258');
     });
   });
 

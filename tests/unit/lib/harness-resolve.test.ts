@@ -5,7 +5,8 @@ const mocks = vi.hoisted(() => ({
   loadConfigSync: vi.fn(),
   canUseHarnessSync: vi.fn(),
   getProviderAuthMode: vi.fn(),
-  exec: vi.fn(),
+  configuredHarnessBinaryPath: vi.fn(),
+  resolveHarnessBinary: vi.fn(),
 }));
 
 vi.mock('../../../src/lib/config-yaml.js', () => ({
@@ -24,8 +25,10 @@ vi.mock('../../../src/lib/agents.js', () => ({
   getProviderAuthMode: mocks.getProviderAuthMode,
 }));
 
-vi.mock('child_process', () => ({
-  exec: mocks.exec,
+vi.mock('../../../src/lib/harness-binary.js', () => ({
+  configuredHarnessBinaryPath: mocks.configuredHarnessBinaryPath,
+  harnessBinaryName: (harness: RuntimeName) => harness === 'ohmypi' ? 'omp' : harness === 'codex' ? 'codex' : harness === 'acp' ? 'kimi' : 'claude',
+  resolveHarnessBinary: mocks.resolveHarnessBinary,
 }));
 
 function setConfig(config: { roles?: Record<string, { harness?: RuntimeName }>; providerHarnesses?: Record<string, RuntimeName> }) {
@@ -38,16 +41,7 @@ function setConfig(config: { roles?: Record<string, { harness?: RuntimeName }>; 
 }
 
 function setBinaryAvailable(available: boolean) {
-  mocks.exec.mockImplementation((_command: string, optionsOrCallback: unknown, maybeCallback?: unknown) => {
-    const callback = typeof optionsOrCallback === 'function' ? optionsOrCallback : maybeCallback;
-    if (typeof callback !== 'function') return {} as never;
-    if (available) {
-      callback(null, '/usr/bin/harness\n', '');
-    } else {
-      callback(new Error('not found'), '', '');
-    }
-    return {} as never;
-  });
+  mocks.resolveHarnessBinary.mockResolvedValue(available ? '/usr/bin/harness' : null);
 }
 
 async function loadSubject() {
@@ -63,6 +57,7 @@ describe('resolveHarness', () => {
     vi.clearAllMocks();
     setConfig({});
     setBinaryAvailable(true);
+    mocks.configuredHarnessBinaryPath.mockReturnValue(undefined);
     mocks.getProviderAuthMode.mockResolvedValue(undefined);
     mocks.canUseHarnessSync.mockReturnValue({ allowed: true });
     infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
@@ -79,13 +74,13 @@ describe('resolveHarness', () => {
 
     // Both the explicit per-spawn harness AND the per-role harness are ignored —
     // the per-provider configured default (openai → codex) wins regardless.
-    setConfig({ roles: { work: { harness: 'pi' } }, providerHarnesses: { openai: 'codex' } });
+    setConfig({ roles: { work: { harness: 'ohmypi' } }, providerHarnesses: { openai: 'codex' } });
     await expect(resolveHarness({ explicit: 'claude-code', role: 'work', model: 'gpt-5.5' })).resolves.toBe('codex');
     await expect(resolveHarness({ role: 'work', model: 'gpt-5.5' })).resolves.toBe('codex');
 
     // A different per-provider default still wins over any explicit input.
-    setConfig({ providerHarnesses: { openai: 'pi' } });
-    await expect(resolveHarness({ explicit: 'claude-code', model: 'gpt-5.5' })).resolves.toBe('pi');
+    setConfig({ providerHarnesses: { openai: 'ohmypi' } });
+    await expect(resolveHarness({ explicit: 'claude-code', model: 'gpt-5.5' })).resolves.toBe('ohmypi');
 
     // No config → built-in provider default.
     setConfig({});
@@ -98,9 +93,17 @@ describe('resolveHarness', () => {
 
     await expect(resolveHarness({ model: 'claude-sonnet-4-6' })).resolves.toBe('claude-code');
     await expect(resolveHarness({ model: 'gpt-5.5' })).resolves.toBe('codex');
-    await expect(resolveHarness({ model: 'kimi-k2.6' })).resolves.toBe('pi');
-    await expect(resolveHarness({ model: 'gemini-3.1-pro-preview' })).resolves.toBe('pi');
-    await expect(resolveHarness({ model: 'glm-5.1' })).resolves.toBe('pi');
+    await expect(resolveHarness({ model: 'kimi-k2.6' })).resolves.toBe('claude-code');
+    await expect(resolveHarness({ model: 'gemini-3.1-pro-preview' })).resolves.toBe('ohmypi');
+    await expect(resolveHarness({ model: 'glm-5.1' })).resolves.toBe('ohmypi');
+  });
+
+  it('rejects unknown model ids before choosing a harness', async () => {
+    const { resolveHarness } = await loadSubject();
+
+    await expect(resolveHarness({ model: 'glm5.2' })).rejects.toThrow('Unknown model "glm5.2". Did you mean "glm-5.2"?');
+    expect(mocks.canUseHarnessSync).not.toHaveBeenCalled();
+    expect(mocks.resolveHarnessBinary).not.toHaveBeenCalled();
   });
 
   it('passes the resolved provider-default winner through the harness policy gate', async () => {
@@ -109,12 +112,12 @@ describe('resolveHarness', () => {
     const { resolveHarness } = await loadSubject();
 
     // claude-sonnet-4-6 → provider default claude-code; the gate denies it and it cannot
-    // fall back to itself, so resolution throws. An ignored explicit 'pi' does not change
+    // fall back to itself, so resolution throws. An ignored explicit 'ohmypi' does not change
     // which harness is gated.
-    await expect(resolveHarness({ explicit: 'pi', model: 'claude-sonnet-4-6' })).rejects.toThrow('blocked');
+    await expect(resolveHarness({ explicit: 'ohmypi', model: 'claude-sonnet-4-6' })).rejects.toThrow('blocked');
 
     expect(mocks.canUseHarnessSync).toHaveBeenCalledWith('claude-code', 'claude-sonnet-4-6', 'subscription');
-    expect(mocks.exec).not.toHaveBeenCalled();
+    expect(mocks.resolveHarnessBinary).not.toHaveBeenCalled();
   });
 
   it('falls back to claude-code when a native model’s provider-default harness is policy-denied (only after checking the fallback)', async () => {
@@ -124,24 +127,24 @@ describe('resolveHarness', () => {
       .mockReturnValueOnce({ allowed: true });
     // anthropic's per-provider default is set to pi; pi is denied → since claude-code is
     // anthropic's NATIVE harness, falling back to it is safe.
-    setConfig({ providerHarnesses: { anthropic: 'pi' } });
+    setConfig({ providerHarnesses: { anthropic: 'ohmypi' } });
     const { resolveHarness } = await loadSubject();
 
     await expect(resolveHarness({ model: 'claude-sonnet-4-6' })).resolves.toBe('claude-code');
 
-    expect(mocks.canUseHarnessSync).toHaveBeenNthCalledWith(1, 'pi', 'claude-sonnet-4-6', 'subscription');
+    expect(mocks.canUseHarnessSync).toHaveBeenNthCalledWith(1, 'ohmypi', 'claude-sonnet-4-6', 'subscription');
     expect(mocks.canUseHarnessSync).toHaveBeenNthCalledWith(2, 'claude-code', 'claude-sonnet-4-6', 'subscription');
-    expect(warnSpy).toHaveBeenCalledWith('harness pi denied for anthropic: pi denied — falling back to native claude-code');
+    expect(warnSpy).toHaveBeenCalledWith('harness ohmypi denied for anthropic: pi denied — falling back to native claude-code');
   });
 
   it('does not fall back when the model itself is denied by auth policy', async () => {
     mocks.getProviderAuthMode.mockResolvedValue('api-key');
     const { resolveHarness } = await loadSubject();
 
-    await expect(resolveHarness({ model: 'gpt-5.5' })).rejects.toThrow('GPT-5.5 needs a ChatGPT/Codex subscription sign-in');
+    await expect(resolveHarness({ model: 'gpt-5.5' })).rejects.toThrow('needs a ChatGPT/Codex subscription sign-in');
 
     expect(mocks.canUseHarnessSync).not.toHaveBeenCalled();
-    expect(mocks.exec).not.toHaveBeenCalled();
+    expect(mocks.resolveHarnessBinary).not.toHaveBeenCalled();
   });
 
   it('refuses to silently fall back to claude-code when a non-native model’s harness binary is missing (PAN-1871)', async () => {
@@ -153,7 +156,7 @@ describe('resolveHarness', () => {
     // binary must fail loudly rather than degrade onto claude-code/CLIProxy.
     await expect(resolveHarness({ model: 'gpt-5.5' })).rejects.toThrow('has no installed codex binary at spawn');
 
-    expect(mocks.exec).toHaveBeenCalledWith('command -v codex', expect.any(Function));
+    expect(mocks.resolveHarnessBinary).toHaveBeenCalledWith('codex', undefined);
   });
 
   it('logs the built-in provider-default notice once per provider', async () => {
@@ -166,6 +169,6 @@ describe('resolveHarness', () => {
 
     expect(infoSpy).toHaveBeenCalledTimes(2);
     expect(infoSpy).toHaveBeenNthCalledWith(1, 'harness codex chosen by provider default — override in Settings → Providers');
-    expect(infoSpy).toHaveBeenNthCalledWith(2, 'harness pi chosen by provider default — override in Settings → Providers');
+    expect(infoSpy).toHaveBeenNthCalledWith(2, 'harness claude-code chosen by provider default — override in Settings → Providers');
   });
 });

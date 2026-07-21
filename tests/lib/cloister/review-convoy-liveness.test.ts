@@ -49,6 +49,8 @@ vi.mock('../../../src/lib/projects.js', () => ({
 
 vi.mock('../../../src/lib/lifecycle/archive-planning.js', () => ({
   findWorkspacePath: (...args: unknown[]) => mocks.findWorkspacePath(...args),
+  inferBranchFromWorkspace: (workspacePath: string, issueLower: string) =>
+    workspacePath.endsWith('-strike') ? `strike/${issueLower}` : `feature/${issueLower}`,
 }));
 
 vi.mock('../../../src/lib/tmux.js', async () => {
@@ -93,6 +95,9 @@ vi.mock('../../../src/lib/cloister/review-agent.js', () => ({
 vi.mock('../../../src/lib/cloister/concurrency.js', () => ({
   resetPatrolDispatchBudget: () => {},
   tryReserveAdvancingSlot: (...args: unknown[]) => mocks.tryReserveAdvancingSlot(...args),
+  releaseAdvancingSlot: vi.fn(),
+  tryReserveSwarmSlot: () => true,
+  releaseSwarmSlot: vi.fn(),
   canDispatchAdvancing: () => true,
   getConcurrencyLimits: () => ({ maxWorkAgents: 6, reservedAdvancingSlots: 3, totalCeiling: 9 }),
   countRunningAgents: () => ({ work: 0, advancing: 0, total: 0 }),

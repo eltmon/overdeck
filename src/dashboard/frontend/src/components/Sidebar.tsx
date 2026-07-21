@@ -1,16 +1,18 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import {
-  Eye, Home, LayoutGrid, Bot, Server,
+  Home, LayoutGrid, Bot, Server,
   Terminal, BarChart3, DollarSign, HeartPulse, Cpu, Settings,
   Zap, Compass, GitBranch, GitMerge, ChevronsLeft, ChevronsRight, Sun, Moon, Menu,
-  Hammer, Loader2, History, Mic, FileText, ChevronDown, ChevronRight, MoreHorizontal, Shield, ListOrdered,
+  Hammer, Loader2, History, Mic, FileText, BookOpen, ChevronDown, ChevronRight, MoreHorizontal, Shield, ListOrdered,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { fetchProjects, isUnscopedConversation, NO_PROJECT_KEY, NO_PROJECT_LABEL, type RegisteredProjectLite } from './CommandDeck/projectsData';
+import { fetchProjects, filterSpecOnlyPlanned, isUnscopedConversation, NO_PROJECT_KEY, NO_PROJECT_LABEL, type RegisteredProjectLite } from './CommandDeck/projectsData';
+import { OverdeckMark } from './OverdeckMark';
 import { fetchConversations } from './CommandDeck/ConversationList';
 import { FreshnessIndicator } from './FreshnessIndicator';
 import { useTheme } from '../hooks/useTheme';
+import { usePlannedBacklogVisibility } from '../hooks/usePlannedBacklogVisibility';
 import { useDashboardStore, selectIssues, selectAgents } from '../lib/store';
 import { getPipelineIssuePhase } from '../lib/pipeline-state';
 import { fetchExperimentalFeaturesEnabled, isExperimentalTab } from '../lib/experimentalFeatures';
@@ -115,6 +117,7 @@ const MORE_GROUPS: NavGroup[] = [
   {
     label: 'System',
     items: [
+      { id: 'knowledge' as Tab, label: 'Knowledge', icon: BookOpen },
       { id: 'skills' as Tab, label: 'Skills', icon: Cpu },
       { id: 'context' as Tab, label: 'Context', icon: FileText },
       { id: 'settings' as Tab, label: 'Settings', icon: Settings },
@@ -135,9 +138,11 @@ interface SidebarProps {
   onSelectProject?: (projectName: string) => void;
   /** PAN-1970: open the New Project modal. */
   onNewProject?: () => void;
+  /** Open the shared updater dialog from the version affordance. */
+  onOpenUpdater?: () => void;
 }
 
-export function Sidebar({ activeTab, onTabChange, onSearchOpen, selectedProject = null, onSelectProject, onNewProject }: SidebarProps) {
+export function Sidebar({ activeTab, onTabChange, onSearchOpen, selectedProject = null, onSelectProject, onNewProject, onOpenUpdater }: SidebarProps) {
   const { theme, toggleTheme } = useTheme();
   const [collapsed, setCollapsed] = useState(() => {
     return localStorage.getItem(SIDEBAR_STORAGE_KEY) === 'true';
@@ -161,6 +166,7 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen, selectedProject 
     queryFn: fetchProjects,
     refetchInterval: 30000,
   });
+  const showPlannedBacklog = usePlannedBacklogVisibility((state) => state.showPlannedBacklog);
 
   // PAN-1561: the "No project" bucket appears once a conversation exists that
   // isn't under any registered project. These queries share keys with the
@@ -356,20 +362,18 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen, selectedProject 
         {/* ─── Header: Logo + Collapse button ─── */}
         <div className="flex items-center justify-between h-12 px-3 shrink-0 border-b border-border">
           {!collapsed && (
-            <button
-              onClick={() => onTabChange('home')}
-              className="flex items-center gap-2 hover:opacity-80 transition-opacity min-w-0"
-              title="Go to Home"
-            >
-              <Eye className="w-5 h-5 text-primary shrink-0" />
-              {/* PAN-698: Space Grotesk is reserved for the sidebar wordmark only */}
+            <div className="flex items-center gap-2 min-w-0">
+            <button onClick={() => onTabChange('home')} className="flex items-center gap-2 hover:opacity-80 transition-opacity min-w-0" title="Go to Home">
+              <OverdeckMark className="w-5 h-5 text-primary shrink-0" />
+              {/* PAN-698: Space Grotesk is used for the sidebar wordmark, drawer title, and Command Deck tree head */}
               <span className="text-base font-semibold text-foreground font-display truncate">
                 Overdeck
               </span>
-              {versionData?.version && (
-                <span className="text-[10px] text-muted-foreground font-normal">v{versionData.version}</span>
-              )}
             </button>
+            {versionData?.version && (
+              <button onClick={onOpenUpdater} className="rounded px-1 py-0.5 text-[10px] font-normal text-muted-foreground hover:bg-primary/10 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" title="Click to update Overdeck to the latest version" aria-label={`Overdeck version ${versionData.version}. Click to check for updates.`}>v{versionData.version}</button>
+            )}
+            </div>
           )}
           {collapsed && (
             <button
@@ -377,7 +381,7 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen, selectedProject 
               className="flex items-center justify-center w-full hover:opacity-80 transition-opacity"
               title="Go to Home"
             >
-              <Eye className="w-5 h-5 text-primary" />
+              <OverdeckMark className="w-5 h-5 text-primary" />
             </button>
           )}
           {!collapsed && (
@@ -423,7 +427,8 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen, selectedProject 
               ) : (
                 projects.map((project) => {
                   const isActive = activeTab === 'command-deck' && selectedProject === project.name;
-                  const hasActivity = project.features.length > 0;
+                  const visibleFeatures = filterSpecOnlyPlanned(project.features, showPlannedBacklog);
+                  const hasActivity = visibleFeatures.length > 0;
                   return (
                     <button
                       key={project.path}
@@ -443,8 +448,8 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen, selectedProject 
                         aria-hidden="true"
                       />
                       <span className="truncate">{project.name}</span>
-                      {project.features.length > 0 && (
-                        <span className="ml-auto text-[11px] text-muted-foreground">{project.features.length}</span>
+                      {visibleFeatures.length > 0 && (
+                        <span className="ml-auto text-[11px] text-muted-foreground">{visibleFeatures.length}</span>
                       )}
                     </button>
                   );
@@ -637,6 +642,15 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen, selectedProject 
                     {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
                   </button>
                 </div>
+              </div>
+              <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                <span>Lens:</span>
+                <kbd className="px-1 py-0.5 rounded bg-muted text-muted-foreground">g</kbd>
+                <span>+</span>
+                <kbd className="px-1 py-0.5 rounded bg-muted text-muted-foreground" title="Pipeline">p</kbd>
+                <kbd className="px-1 py-0.5 rounded bg-muted text-muted-foreground" title="Board">b</kbd>
+                <kbd className="px-1 py-0.5 rounded bg-muted text-muted-foreground" title="Agents">a</kbd>
+                <kbd className="px-1 py-0.5 rounded bg-muted text-muted-foreground" title="Command Deck">c</kbd>
               </div>
               <div className="flex items-center gap-1.5">
                 <span className={`text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded ${

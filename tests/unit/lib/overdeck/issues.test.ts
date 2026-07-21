@@ -25,6 +25,7 @@ import type { PanIssueRecord } from '../../../../src/lib/pan-dir/record.js';
 import type { ProjectConfig } from '../../../../src/lib/projects.js';
 
 let tempDirs: string[] = [];
+const DB_INTEGRATION_TIMEOUT_MS = 10_000;
 
 function makeTempDir(): string {
   const dir = mkdtempSync(join(tmpdir(), 'pan-overdeck-issues-'));
@@ -116,7 +117,7 @@ describe('overdeck Issues vertical slice', () => {
     } finally {
       raw.close();
     }
-  });
+  }, DB_INTEGRATION_TIMEOUT_MS);
 
   it('keeps skipped tests in the derived ready-for-merge list', async () => {
     const dbPath = makeDbPath();

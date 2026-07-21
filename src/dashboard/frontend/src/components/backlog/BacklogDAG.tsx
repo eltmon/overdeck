@@ -1,15 +1,17 @@
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react';
-import { dashboardMutationJsonHeaders } from '../../lib/wsTransport';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { PickupGateControls } from './PickupGateControls';
+import { useQuery } from '@tanstack/react-query';
 import ReactFlow, {
   type Node,
   type Edge,
   Background,
   BackgroundVariant,
   Controls,
+  Handle,
   useNodesState,
   useEdgesState,
   MarkerType,
+  Position,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import dagre from '@dagrejs/dagre';
@@ -23,12 +25,17 @@ export interface PipelineState {
   vetoed: boolean;
   blocksMain: boolean;
   inPipeline: boolean;
+  /** PAN-2059: operator released the reviewed plan for pickup. */
+  released: boolean;
+  /** PAN-2059: AI raised a written objection in place of planning. */
+  objection: boolean;
   gate: 'auto' | 'promote' | 'vetoed';
 }
 
 export interface SequenceNode {
   issueId: string;
   title?: string;
+  isEpic?: boolean;
   /** PAN-2006 pipeline state from the shared classifier (editor controls). */
   state?: PipelineState;
   rank: number;
@@ -128,6 +135,7 @@ function IssueNode({ data }: { data: IssueNodeData }) {
   if (node.condition === 'needs-refinement') cls.push('cond-refine');
   if (node.condition === 'stale') cls.push('cond-stale');
   if (node.gate === 'blocked') cls.push('gate-blocked');
+  if (node.isEpic) cls.push('epic');
   // gate=ready on an in-flight issue is the sequencer auto-PINNING active work, not an
   // operator promotion — only badge a real (idle) operator promote.
   const isPromoted = node.gate === 'ready' && !node.inPipeline;
@@ -135,6 +143,7 @@ function IssueNode({ data }: { data: IssueNodeData }) {
 
   return (
     <div className={cls.join(' ')} onClick={() => onSelect(node)}>
+      <Handle type="target" position={Position.Top} className="edge-handle" />
       <div className="row1">
         <span className="rank">#{node.rank}</span>
         <span className="iid">{node.issueId}</span>
@@ -147,10 +156,12 @@ function IssueNode({ data }: { data: IssueNodeData }) {
         {node.inPipeline && <span className="chip verb work"><span className="pulsedot" />in pipeline</span>}
         {node.condition === 'needs-refinement' && <span className="chip refine">⚠ REFINE</span>}
         {node.condition === 'stale' && <span className="chip stale">⊘ STALE</span>}
+        {node.isEpic && <span className="chip epic">EPIC</span>}
         {node.ready && <span className="chip ready">✓ READY</span>}
         {node.hasPrd && <span className="chip prd">PRD</span>}
         <span className="score">{node.score}</span>
       </div>
+      <Handle type="source" position={Position.Bottom} className="edge-handle" />
     </div>
   );
 }
@@ -172,9 +183,13 @@ function sequenceToFlow(
   }));
 
   const rawEdges: Edge[] = edges.map((e, i) => {
-    // 'unblocks' = hard dependency (solid); 'informs' = advisory (dashed, tinted).
-    const isDashed = e.type === 'informs';
-    const color = isDashed
+    // 'unblocks' = hard dependency (solid); 'informs' = advisory (dashed, tinted);
+    // 'contains' = epic membership (separate presentation, not a blocking edge).
+    const isInforms = e.type === 'informs';
+    const isContains = e.type === 'contains';
+    const color = isContains
+      ? 'color-mix(in srgb, var(--primary) 58%, transparent)'
+      : isInforms
       ? 'color-mix(in srgb, var(--info) 60%, transparent)'
       : 'color-mix(in srgb, var(--muted-foreground) 55%, transparent)';
     return {
@@ -185,8 +200,8 @@ function sequenceToFlow(
       markerEnd: { type: MarkerType.ArrowClosed, width: 14, height: 14, color },
       style: {
         stroke: color,
-        strokeWidth: 1.5,
-        strokeDasharray: isDashed ? '5 4' : undefined,
+        strokeWidth: isContains ? 1.2 : 1.5,
+        strokeDasharray: isInforms ? '5 4' : isContains ? '2 5' : undefined,
       },
     };
   });
@@ -203,20 +218,6 @@ const IMP_SWATCH: Record<string, string> = {
   high: 'var(--warning)',
   medium: 'var(--color-neutral-400)',
   low: 'color-mix(in srgb, var(--muted-foreground) 55%, transparent)',
-};
-
-// Planning-policy hint shown under the segmented control (verbatim from the mockup).
-const PLAN_HINT: Record<string, string> = {
-  interactive: 'Interactive: a human drives planning — a HARD gate. The Flywheel surfaces it as needs-you and never auto-runs it.',
-  skip: 'Skip: no planning — pan start --auto straight to work (trivial/tiny/urgent).',
-  auto: 'Auto: the AI plans it end-to-end (pan plan --auto).',
-};
-
-// Pickup-gate hint shown under the segmented control (verbatim from the mockup).
-const GATE_HINT: Record<string, string> = {
-  ready: 'Promote: jump the queue ahead of rank (and auto-plan it if it has no spec yet).',
-  blocked: 'Vetoed: an absolute NO — never auto-picked, planned, or struck, even to unblock the pipeline.',
-  auto: 'Auto: normal eligibility (Ready · Planned · not parked · not vetoed).',
 };
 
 type FlagKind = 'pipeline' | 'refine' | 'stale' | 'ready' | 'prd' | 'none';
@@ -252,75 +253,10 @@ function panelChipStyle(kind: FlagKind): CSSProperties {
 const META_GRID: CSSProperties = { display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '7px 14px', fontSize: 12 };
 const META_KEY: CSSProperties = { color: 'var(--muted-foreground)' };
 const META_VAL: CSSProperties = { color: 'var(--foreground)', textAlign: 'right' };
-const SECTION_LABEL: CSSProperties = { fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--muted-foreground)', marginBottom: 7 };
-const SECTION_HINT: CSSProperties = { fontSize: 12, color: 'var(--muted-foreground)', marginTop: 7, lineHeight: 1.45 };
-
-function SegControl({
-  value,
-  options,
-  onChange,
-}: {
-  value: string;
-  options: Array<{ value: string; label: string; activeColor?: string }>;
-  onChange: (v: string) => void;
-}) {
-  return (
-    <div style={{ display: 'flex', borderRadius: 4, overflow: 'hidden', border: '1px solid var(--color-border)' }}>
-      {options.map((opt) => {
-        const isActive = value === opt.value;
-        return (
-          <button
-            key={opt.value}
-            onClick={() => onChange(opt.value)}
-            style={{
-              flex: 1,
-              padding: '3px 6px',
-              fontSize: 10,
-              fontWeight: isActive ? 700 : 400,
-              border: 'none',
-              cursor: 'pointer',
-              background: isActive ? (opt.activeColor ?? '#3b82f6') : 'var(--color-surface)',
-              color: isActive ? '#fff' : 'var(--color-fg-muted)',
-              transition: 'all 0.15s',
-            }}
-          >
-            {opt.label}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-// PAN-2006: a labelled on/off switch for the editor drawer's pipeline-state controls.
-function ToggleRow({ label, hint, on, color, onChange }: {
-  label: string; hint: string; on: boolean; color: string; onChange: (v: boolean) => void;
-}) {
-  return (
-    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, margin: '9px 0' }}>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 12, fontWeight: 500 }}>{label}</div>
-        <div style={{ fontSize: 10, color: 'var(--muted-foreground)', lineHeight: 1.4, marginTop: 2 }}>{hint}</div>
-      </div>
-      <button
-        onClick={() => onChange(!on)}
-        aria-pressed={on}
-        style={{
-          flexShrink: 0, width: 38, height: 22, borderRadius: 12, border: 'none', cursor: 'pointer', position: 'relative',
-          background: on ? `color-mix(in srgb, ${color} 60%, transparent)` : 'var(--input)', transition: 'background 0.15s',
-        }}
-      >
-        <span style={{ position: 'absolute', top: 2, left: on ? 18 : 2, width: 18, height: 18, borderRadius: '50%', background: '#fff', transition: 'left 0.15s', boxShadow: '0 1px 2px rgba(0,0,0,0.4)' }} />
-      </button>
-    </div>
-  );
-}
 
 export interface RationaleSidePanelProps {
   node: SequenceNode;
   onClose: () => void;
-  onGateChange: (issueId: string, gate: string) => Promise<void>;
-  onPlanningChange: (issueId: string, planning: string) => Promise<void>;
   /** PAN-2005: open the issue in the browser / overlay / cockpit panel. */
   onIssueAction?: (issueId: string, mode: 'browser' | 'modal' | 'panel') => void;
 }
@@ -348,53 +284,8 @@ const NAV_BTN: CSSProperties = {
 export function RationaleSidePanel({
   node,
   onClose,
-  onGateChange,
-  onPlanningChange,
   onIssueAction,
 }: RationaleSidePanelProps) {
-  const [gate, setGate] = useState(node.gate);
-  const [planning, setPlanning] = useState(node.planning);
-  const [busy, setBusy] = useState(false);
-  const [ready, setReady] = useState(!!node.state?.ready);
-  const [parked, setParked] = useState(!!node.state?.parked);
-  const [blocksMain, setBlocksMain] = useState(!!node.state?.blocksMain);
-  const planned = !!node.state?.planned;
-
-  useEffect(() => {
-    setGate(node.gate);
-    setPlanning(node.planning);
-    setReady(!!node.state?.ready);
-    setParked(!!node.state?.parked);
-    setBlocksMain(!!node.state?.blocksMain);
-  }, [node.issueId, node.gate, node.planning, node.state]);
-
-  async function handleGateChange(v: string) {
-    setGate(v);
-    setBusy(true);
-    try { await onGateChange(node.issueId, v); } finally { setBusy(false); }
-  }
-
-  async function handlePlanningChange(v: string) {
-    setPlanning(v);
-    setBusy(true);
-    try { await onPlanningChange(node.issueId, v); } finally { setBusy(false); }
-  }
-
-  // PAN-2006 WI-10: toggle ready / parked / blocks-main labels via the editor write-door.
-  async function toggleLabel(field: 'ready' | 'parked' | 'blocksMain', value: boolean) {
-    if (field === 'ready') setReady(value);
-    if (field === 'parked') setParked(value);
-    if (field === 'blocksMain') setBlocksMain(value);
-    setBusy(true);
-    try {
-      await fetch('/api/backlog/sequence/labels', {
-        method: 'POST',
-        headers: await dashboardMutationJsonHeaders(),
-        body: JSON.stringify({ issueId: node.issueId, [field]: value }),
-      });
-    } finally { setBusy(false); }
-  }
-
   const flags = buildPanelFlags(node);
   const clampedScore = Math.max(0, Math.min(100, node.score));
 
@@ -469,66 +360,14 @@ export function RationaleSidePanel({
         </div>
       )}
 
-      {/* Pipeline state — operator controls (PAN-2006) */}
-      {node.state && (
-        <div style={{ borderTop: '1px solid var(--border)', paddingTop: 13, marginBottom: 13 }}>
-          <div style={SECTION_LABEL}>Pipeline state · operator controls {busy && '…'}</div>
-          <ToggleRow
-            label="Ready" color="var(--success)" on={ready}
-            hint="Definition of Ready — when off, the Flywheel won't auto-pick it (the entry gate)."
-            onChange={(v) => toggleLabel('ready', v)}
-          />
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '9px 0' }}>
-            <span style={{ fontSize: 12, fontWeight: 500 }}>Planned</span>
-            <span style={{
-              fontSize: 10, fontWeight: 500, padding: '1px 6px', borderRadius: 5, border: '1px solid',
-              ...(planned
-                ? { color: 'var(--info-foreground)', borderColor: 'color-mix(in srgb, var(--info) 34%, transparent)', background: 'color-mix(in srgb, var(--info) 9%, transparent)' }
-                : { color: 'var(--warning-foreground)', borderColor: 'color-mix(in srgb, var(--warning) 34%, transparent)', background: 'color-mix(in srgb, var(--warning) 9%, transparent)' }),
-            }}>{planned ? '✓ has spec + beads' : '✗ no spec'}</span>
-            <span style={{ fontSize: 10, color: 'var(--muted-foreground)' }}>derived</span>
-          </div>
-          <ToggleRow
-            label="Blocks main 🔴" color="var(--destructive)" on={blocksMain}
-            hint="Flywheel prioritizes / strikes it even with auto-pickup off (never if vetoed)."
-            onChange={(v) => toggleLabel('blocksMain', v)}
-          />
-          <ToggleRow
-            label="Park" color="var(--warning)" on={parked}
-            hint="Defer — needs human design/discussion; excluded from auto-pickup, reversible."
-            onChange={(v) => toggleLabel('parked', v)}
-          />
-        </div>
-      )}
-
-      {/* Planning policy */}
+      {/* Backlog pickup controls — Plan → Release, AI objection, pipeline state,
+          planning, pickup gate. Shared component (PAN-2059), identical to the one
+          on the issue cockpit + overlay. */}
       <div style={{ borderTop: '1px solid var(--border)', paddingTop: 13, marginBottom: 13 }}>
-        <div style={SECTION_LABEL}>Planning · AI-suggested, operator-overridable</div>
-        <SegControl
-          value={planning}
-          options={[
-            { value: 'skip', label: 'Skip' },
-            { value: 'auto', label: 'Auto' },
-            { value: 'interactive', label: '⚑ Interactive', activeColor: '#b45309' },
-          ]}
-          onChange={handlePlanningChange}
+        <PickupGateControls
+          issueId={node.issueId}
+          onOpenIssueBrowser={onIssueAction ? (id) => onIssueAction(id, 'browser') : undefined}
         />
-        <div style={SECTION_HINT}>{PLAN_HINT[planning] ?? ''}</div>
-      </div>
-
-      {/* Pickup gate */}
-      <div style={{ marginBottom: 13 }}>
-        <div style={SECTION_LABEL}>Pickup gate · operator {busy && '…'}</div>
-        <SegControl
-          value={gate}
-          options={[
-            { value: 'auto', label: 'Auto' },
-            { value: 'ready', label: '📌 Promote', activeColor: '#15803d' },
-            { value: 'blocked', label: '⛔ Vetoed', activeColor: '#b91c1c' },
-          ]}
-          onChange={handleGateChange}
-        />
-        <div style={SECTION_HINT}>{GATE_HINT[gate] ?? ''}</div>
       </div>
 
       {/* AI rationale */}
@@ -550,8 +389,6 @@ interface BacklogDAGProps {
   className?: string;
   selectedNodeId?: string | null;
   onSelectNode?: (n: SequenceNode | null) => void;
-  onGateChange?: (issueId: string, gate: string) => Promise<void>;
-  onPlanningChange?: (issueId: string, planning: string) => Promise<void>;
   /** PAN-2005: open the selected issue in the browser / overlay / cockpit panel. */
   onIssueAction?: (issueId: string, mode: 'browser' | 'modal' | 'panel') => void;
 }
@@ -561,11 +398,8 @@ export function BacklogDAG({
   className,
   selectedNodeId,
   onSelectNode,
-  onGateChange,
-  onPlanningChange,
   onIssueAction,
 }: BacklogDAGProps) {
-  const queryClient = useQueryClient();
   const [internalSelectedNode, setInternalSelectedNode] = useState<SequenceNode | null>(null);
 
   // If external control is provided, use it; otherwise use internal state
@@ -609,27 +443,6 @@ export function BacklogDAG({
     }
   }, [data.nodes, data.edges, handleSelect, setNodes, setEdges, internalSelectedNode, isControlled]);
 
-  const defaultGateChange = async (issueId: string, gate: string) => {
-    await fetch('/api/backlog/sequence/gate', {
-      method: 'POST',
-      headers: await dashboardMutationJsonHeaders(),
-      body: JSON.stringify({ issueId, gate }),
-    });
-    queryClient.invalidateQueries({ queryKey: ['backlog-sequence'] });
-  };
-
-  const defaultPlanningChange = async (issueId: string, planning: string) => {
-    await fetch('/api/backlog/sequence/planning', {
-      method: 'POST',
-      headers: await dashboardMutationJsonHeaders(),
-      body: JSON.stringify({ issueId, planning }),
-    });
-    queryClient.invalidateQueries({ queryKey: ['backlog-sequence'] });
-  };
-
-  const handleGateChange = onGateChange ?? defaultGateChange;
-  const handlePlanningChange = onPlanningChange ?? defaultPlanningChange;
-
   return (
     <div
       className={`bk-dag-root${className ? ` ${className}` : ''}`}
@@ -639,6 +452,7 @@ export function BacklogDAG({
         /* ── Backlog DAG nodes — ported from docs/design/mockups/backlog-sequencer-scaled-opus.html, scoped to .bk-dag-root ── */
         .bk-dag-root .react-flow { background: transparent; }
         .bk-dag-root .react-flow__node { cursor: pointer; }
+        .bk-dag-root .edge-handle { opacity: 0; pointer-events: none; }
         .bk-dag-root .node {
           background: var(--card); border: 1px solid var(--border);
           border-left: 4px solid var(--heat, var(--muted-foreground));
@@ -670,6 +484,14 @@ export function BacklogDAG({
         .bk-dag-root .node.pipe.cond-stale { opacity: 1; filter: none; }
         .bk-dag-root .node.gate-blocked { opacity: .82; }
         .bk-dag-root .node.gate-promoted { border-top: 2px solid color-mix(in srgb, var(--primary) 60%, transparent); }
+        .bk-dag-root .node.epic {
+          border-style: dashed;
+          border-width: 1.5px;
+          border-left-width: 5px;
+          border-color: color-mix(in srgb, var(--primary) 42%, var(--border));
+          border-left-color: color-mix(in srgb, var(--primary) 72%, var(--foreground));
+          background: color-mix(in srgb, var(--primary) 6%, var(--card));
+        }
         .bk-dag-root .node .row1 { display: flex; align-items: center; gap: 7px; }
         .bk-dag-root .node .rank { font-family: ui-monospace, "SF Mono", monospace; font-size: 11px; font-weight: 500; color: var(--foreground); background: var(--accent); border: 1px solid var(--border); border-radius: 4px; padding: 0 5px; line-height: 17px; }
         .bk-dag-root .node .iid { font-family: ui-monospace, "SF Mono", monospace; font-size: 11px; color: var(--muted-foreground); }
@@ -681,6 +503,7 @@ export function BacklogDAG({
         .bk-dag-root .chip.ready { color: var(--success-foreground); border-color: color-mix(in srgb, var(--success) 32%, transparent); background: color-mix(in srgb, var(--success) 8%, transparent); }
         .bk-dag-root .chip.refine { color: var(--warning-foreground); border-color: color-mix(in srgb, var(--warning) 32%, transparent); background: color-mix(in srgb, var(--warning) 8%, transparent); }
         .bk-dag-root .chip.stale { color: var(--muted-foreground); border-color: var(--border); background: var(--accent); }
+        .bk-dag-root .chip.epic { color: var(--foreground); border-color: color-mix(in srgb, var(--primary) 44%, transparent); background: color-mix(in srgb, var(--primary) 12%, transparent); }
         .bk-dag-root .chip.promoted { color: var(--foreground); border-color: color-mix(in srgb, var(--primary) 50%, transparent); background: color-mix(in srgb, var(--primary) 14%, transparent); }
         .bk-dag-root .chip.held { color: var(--warning-foreground); border-color: color-mix(in srgb, var(--warning) 40%, transparent); background: color-mix(in srgb, var(--warning) 10%, transparent); }
         .bk-dag-root .chip.verb { display: inline-flex; align-items: center; gap: 3px; }
@@ -713,8 +536,6 @@ export function BacklogDAG({
         <RationaleSidePanel
           node={selectedNode}
           onClose={handleClose}
-          onGateChange={handleGateChange}
-          onPlanningChange={handlePlanningChange}
           onIssueAction={onIssueAction}
         />
       )}

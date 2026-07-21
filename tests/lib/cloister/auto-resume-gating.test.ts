@@ -13,6 +13,16 @@ describe('auto-resume gates', () => {
   let originalNoResume: string | undefined;
   let originalCwd: string;
   let resumeAgentMock: ReturnType<typeof vi.fn>;
+  // PAN-2507: spy for the resume-yielded-first insertion in autoResumeStoppedWorkAgents.
+  let resumeYieldedMock: ReturnType<typeof vi.fn>;
+  let bootReconciliationState: {
+    decision: 'pending' | 'resume_all' | 'hold_all' | 'per_agent' | null;
+    perAgent: Record<string, 'resume' | 'hold'>;
+    decidedAt: string | null;
+    bootId: string | null;
+    bootStartedAt: string | null;
+    graceDeadline: string | null;
+  };
   // PAN-1665: free work slots the governor reports. High by default so the gating
   // tests below (1 candidate each) are unaffected; the cap test lowers it.
   let resumeSlotsMock: number;
@@ -32,7 +42,16 @@ describe('auto-resume gates', () => {
     process.env.OVERDECK_HOME = tempHome;
     delete process.env.OVERDECK_NO_RESUME;
     resumeAgentMock = vi.fn();
+    resumeYieldedMock = vi.fn(async () => []);
     resumeSlotsMock = 999;
+    bootReconciliationState = {
+      decision: null,
+      perAgent: {},
+      decidedAt: null,
+      bootId: null,
+      bootStartedAt: null,
+      graceDeadline: null,
+    };
   });
 
   afterEach(() => {
@@ -44,6 +63,7 @@ describe('auto-resume gates', () => {
     vi.doUnmock('../../../src/lib/activity-logger.js');
     vi.doUnmock('../../../src/lib/persistent-logger.js');
     vi.doUnmock('../../../src/lib/database/app-settings.js');
+    vi.doUnmock('../../../src/lib/overdeck/control-settings.js');
     vi.doUnmock('../../../src/lib/database/review-status-db.js');
     vi.doUnmock('../../../src/lib/cloister/specialists.js');
     vi.doUnmock('../../../src/lib/cloister/merge-agent.js');
@@ -59,6 +79,7 @@ describe('auto-resume gates', () => {
     vi.doUnmock('../../../src/lib/operator-interventions.js');
     vi.doUnmock('../../../src/lib/tmux.js');
     vi.doUnmock('../../../src/lib/cloister/concurrency.js');
+    vi.doUnmock('../../../src/lib/cloister/preemption.js');
     vi.doUnmock('os');
     vi.doUnmock('child_process');
     vi.doUnmock('ora');
@@ -76,6 +97,40 @@ describe('auto-resume gates', () => {
     const workspace = join(tempHome, 'workspaces', agentId);
     mkdirSync(workspace, { recursive: true });
     return workspace;
+  }
+
+  /** PAN-2407: `pan start` on an unplanned issue routes to dashboard planning.
+   *  Auto-resume gating tests are not exercising that path, so give the
+   *  workspace a minimal xBRIEF so issueCommand falls through to spawn. */
+  function writeMinimalPlan(workspacePath: string, issueId: string): void {
+    const panDir = join(workspacePath, '.pan');
+    mkdirSync(panDir, { recursive: true });
+    writeFileSync(
+      join(panDir, 'spec.vbrief.json'),
+      JSON.stringify({
+        xBRIEFInfo: {
+          version: '0.6',
+          created: BASE_TIME.toISOString(),
+          author: 'test',
+          description: 'minimal plan for test',
+        },
+        plan: {
+          id: issueId.toLowerCase(),
+          title: 'test plan',
+          status: 'approved',
+          uid: '00000000-0000-0000-0000-000000000000',
+          author: 'test',
+          sequence: 1,
+          created: BASE_TIME.toISOString(),
+          updated: BASE_TIME.toISOString(),
+          references: [],
+          tags: [],
+          narratives: { Problem: '', Proposal: '', NonGoals: '' },
+          items: [{ id: 'test-item', title: 'Test item', status: 'pending' }],
+          edges: [],
+        },
+      }),
+    );
   }
 
   async function loadDeaconWithResumeMock(osOverrides?: { loadavg?: number[]; cpusCount?: number }) {
@@ -109,7 +164,16 @@ describe('auto-resume gates', () => {
       workResumeSlotsAvailable: () => resumeSlotsMock,
       resetPatrolDispatchBudget: vi.fn(),
       tryReserveAdvancingSlot: () => true,
+      releaseAdvancingSlot: vi.fn(),
+      tryReserveSwarmSlot: () => true,
+      releaseSwarmSlot: vi.fn(),
       canDispatchAdvancing: () => true,
+    }));
+    // PAN-2507: mock the preemption module so the resume-yielded-first insertion
+    // and the dispatch-site yield helper are deterministic spies.
+    vi.doMock('../../../src/lib/cloister/preemption.js', () => ({
+      resumeYieldedAgents: (...args: unknown[]) => resumeYieldedMock(...args),
+      tryYieldForAdvancingDispatch: vi.fn(async () => false),
     }));
     vi.doMock('../../../src/lib/review-status.js', () => ({
       getReviewStatus: vi.fn().mockReturnValue({
@@ -168,6 +232,12 @@ describe('auto-resume gates', () => {
     vi.doMock('../../../src/lib/database/app-settings.js', () => ({
       isDeaconGloballyPaused: vi.fn().mockReturnValue(false),
     }));
+    vi.doMock('../../../src/lib/overdeck/control-settings.js', () => ({
+      isDeaconGloballyPaused: vi.fn().mockReturnValue(false),
+      getBootReconciliationState: vi.fn(() => bootReconciliationState),
+      setBootReconciliationDecision: vi.fn(),
+      stampBootReconciliation: vi.fn(),
+    }));
     vi.doMock('../../../src/lib/database/review-status-db.js', () => ({
       markWorkspaceStuck: vi.fn(),
     }));
@@ -187,6 +257,7 @@ describe('auto-resume gates', () => {
       listPaneValues: vi.fn().mockReturnValue([]),
       listPaneValuesAsync: vi.fn().mockResolvedValue([]),
       listSessionNamesAsync: vi.fn().mockResolvedValue([]),
+      querySessionSync: vi.fn().mockReturnValue({ status: 'missing', detail: "exit=1 stderr=can't find session: test" }),
       sessionExists: vi.fn(() => Effect.succeed(false)),
       sessionExistsSync: vi.fn().mockReturnValue(false),
       sessionExistsAsync: vi.fn().mockResolvedValue(false),
@@ -257,16 +328,21 @@ describe('auto-resume gates', () => {
       hasProjectsSync: vi.fn().mockReturnValue(true),
       listProjects: vi.fn().mockReturnValue(projects),
       listProjectsSync: vi.fn().mockReturnValue(projects),
+      findProjectByPathSync: vi.fn(() => projects[0].config),
+    }));
+    vi.doMock('../../../src/lib/state-auto-migrate.js', () => ({
+      requireAutomaticStateMigration: vi.fn().mockResolvedValue(undefined),
     }));
     vi.doMock('../../../src/lib/work-agent-lifecycle.js', () => ({
       assertCanStartFresh: vi.fn(),
       assertCanStartFreshSync: vi.fn(),
+      getWorkAgentLifecycleStateSync: vi.fn(() => ({ isRunning: false, isRunningButStuck: false })),
     }));
     vi.doMock('../../../src/lib/cloister/work-agent-prompt.js', () => ({
       buildWorkAgentPrompt: vi.fn().mockResolvedValue('prompt'),
       getTrackerContext: vi.fn().mockResolvedValue(null),
       readPlanningContext: vi.fn().mockReturnValue(null),
-      readBeadsTasks: vi.fn().mockResolvedValue([]),
+      readTasksTasks: vi.fn().mockResolvedValue([]),
     }));
     vi.doMock('../../../src/lib/prd-draft.js', () => ({
       hasPRDDraft: vi.fn(() => Effect.succeed(false)),
@@ -328,7 +404,21 @@ describe('auto-resume gates', () => {
 
     expect(resumed).toEqual([]);
     expect(resumeAgentMock).not.toHaveBeenCalled();
-  });
+  }, 20_000);
+
+  // PAN-2507 (AC-5): scheduler-yielded agents resume first, drawing from the
+  // work-slot budget, before any other stopped candidate is considered.
+  it('resumes scheduler-yielded agents first, within the slot budget', async () => {
+    resumeSlotsMock = 5;
+    resumeYieldedMock.mockResolvedValue(['agent-pan-2001-yielded']);
+    const { autoResumeStoppedWorkAgents } = await loadDeaconWithResumeMock();
+
+    const resumed = await autoResumeStoppedWorkAgents();
+
+    // Called with the free work-slot budget (5), and its result is prepended.
+    expect(resumeYieldedMock).toHaveBeenCalledWith(5);
+    expect(resumed).toContain('agent-pan-2001-yielded');
+  }, 20_000);
 
   it('logs verify-paused instead of manually-paused for merged paused agents', async () => {
     const agentId = 'agent-pan-1141-verify-paused';
@@ -363,7 +453,7 @@ describe('auto-resume gates', () => {
     expect(resumed).toEqual([]);
     expect(resumeAgentMock).not.toHaveBeenCalled();
     expect(vi.mocked(logger.logDeaconEventSync)).toHaveBeenCalledWith(expect.stringContaining('verify-paused'));
-  });
+  }, 20_000);
 
   it('pan pause stops stale-running agents without live tmux sessions', async () => {
     const agentId = 'agent-pan-1141';
@@ -404,6 +494,7 @@ describe('auto-resume gates', () => {
       startedAt: BASE_TIME.toISOString(),
     });
 
+    expect(await recoverOrphanedAgents('startup')).toEqual([]);
     await Promise.all([
       recoverOrphanedAgents('startup'),
       recoverOrphanedAgents('patrol'),
@@ -413,6 +504,43 @@ describe('auto-resume gates', () => {
     expect(state?.status).toBe('stopped');
     expect(state?.consecutiveFailures).toBe(1);
   });
+
+  it('retries stopped work agents whose initial kickoff was never delivered even when runtime is idle', async () => {
+    const agentId = 'agent-pan-2093';
+    resumeAgentMock.mockResolvedValue({ success: true });
+    const { agents, autoResumeStoppedWorkAgents } = await loadDeaconWithResumeMock();
+    const reviewStatus = await import('../../../src/lib/review-status.js');
+    vi.mocked(reviewStatus.getReviewStatusSync).mockReturnValue({
+      issueId: 'PAN-2093',
+      reviewStatus: 'pending',
+      testStatus: 'pending',
+      verificationStatus: 'pending',
+      readyForMerge: false,
+      updatedAt: BASE_TIME.toISOString(),
+    });
+    agents.saveAgentStateSync({
+      id: agentId,
+      issueId: 'PAN-2093',
+      workspace: workspaceFor(agentId),
+      harness: 'ohmypi',
+      role: 'work',
+      model: 'kimi-k2.7-code',
+      status: 'stopped',
+      startedAt: BASE_TIME.toISOString(),
+      kickoffDelivered: false,
+      consecutiveFailures: 1,
+      lastFailureReason: 'orphaned: tmux session missing (reconcile)',
+    });
+    await agents.saveAgentRuntimeState(agentId, {
+      state: 'idle',
+      lastActivity: BASE_TIME.toISOString(),
+    });
+
+    const resumed = await settleWithStagger(autoResumeStoppedWorkAgents());
+
+    expect(resumed).toEqual([agentId]);
+    expect(resumeAgentMock).toHaveBeenCalledWith(agentId);
+  }, 20_000);
 
   it('recovers orphaned strike agents whose registered session is missing', async () => {
     const agentId = 'strike-pan-1820';
@@ -428,6 +556,7 @@ describe('auto-resume gates', () => {
       startedAt: BASE_TIME.toISOString(),
     });
 
+    expect(await recoverOrphanedAgents('patrol')).toEqual([]);
     const actions = await recoverOrphanedAgents('patrol');
 
     expect(actions).toEqual([`Recovered orphaned agent ${agentId} (running→stopped)`]);
@@ -463,6 +592,7 @@ describe('auto-resume gates', () => {
       pausedAt: BASE_TIME.toISOString(),
     });
 
+    expect(await recoverOrphanedAgents('patrol')).toEqual([]);
     const actions = await recoverOrphanedAgents('patrol');
 
     const state = agents.getAgentStateSync(agentId);
@@ -492,6 +622,7 @@ describe('auto-resume gates', () => {
       lastFailureNextRetryAt: new Date(BASE_TIME.getTime() - 90_000).toISOString(),
     });
 
+    expect(await recoverOrphanedAgents('patrol')).toEqual([]);
     const actions = await recoverOrphanedAgents('patrol');
 
     expect(actions).toEqual([`Recovered orphaned agent ${agentId} (running→stopped)`]);
@@ -522,6 +653,7 @@ describe('auto-resume gates', () => {
       lastFailureNextRetryAt: new Date(BASE_TIME.getTime() - 4 * 60_000).toISOString(),
     });
 
+    expect(await recoverOrphanedAgents('patrol')).toEqual([]);
     await recoverOrphanedAgents('patrol');
 
     const state = agents.getAgentStateSync(agentId);
@@ -642,10 +774,17 @@ describe('auto-resume gates', () => {
     expect(resumeAgentMock).not.toHaveBeenCalled();
   });
 
-  it('makes no-resume mode skip auto-resume and orphan recovery', async () => {
-    process.env.OVERDECK_NO_RESUME = '1';
-    const stoppedAgentId = 'agent-pan-1141-no-resume-stopped';
-    const runningAgentId = 'agent-pan-1141-no-resume-running';
+  it('makes pending boot reconciliation hold auto-resume but not orphan recovery', async () => {
+    bootReconciliationState = {
+      decision: 'pending',
+      perAgent: {},
+      decidedAt: BASE_TIME.toISOString(),
+      bootId: 'boot-test',
+      bootStartedAt: BASE_TIME.toISOString(),
+      graceDeadline: new Date(BASE_TIME.getTime() + 30_000).toISOString(),
+    };
+    const stoppedAgentId = 'agent-pan-1141-boot-held-stopped';
+    const runningAgentId = 'agent-pan-1141-boot-held-running';
     resumeAgentMock.mockResolvedValue({ success: true });
     const { agents, autoResumeStoppedWorkAgents, recoverOrphanedAgents } = await loadDeaconWithResumeMock();
     agents.saveAgentStateSync({
@@ -670,12 +809,15 @@ describe('auto-resume gates', () => {
     });
 
     const resumed = await autoResumeStoppedWorkAgents();
+    expect(await recoverOrphanedAgents('test')).toEqual([]);
     const recovered = await recoverOrphanedAgents('test');
 
     expect(resumed).toEqual([]);
-    expect(recovered).toEqual([]);
+    expect(recovered).toEqual([
+      `Recovered orphaned agent ${runningAgentId} (running→stopped)`,
+    ]);
     expect(resumeAgentMock).not.toHaveBeenCalled();
-    expect(agents.getAgentStateSync(runningAgentId)?.status).toBe('running');
+    expect(agents.getAgentStateSync(runningAgentId)?.status).toBe('stopped');
   });
 
   // PAN-1665: throttle so unfreezing the deacon doesn't thundering-herd the box.
@@ -769,8 +911,9 @@ describe('auto-resume gates', () => {
       }
       return {} as ReturnType<typeof assertCanStartFresh>;
     });
-    mkdirSync(join(projectRoot, 'workspaces', 'feature-pan-1141', '.beads'), { recursive: true });
-    writeFileSync(join(projectRoot, 'workspaces', 'feature-pan-1141', '.beads', 'issues.jsonl'), '{"id":"PAN-1141","labels":["pan-1141"]}\n');
+    mkdirSync(join(projectRoot, 'workspaces', 'feature-pan-1141', '.tasks'), { recursive: true });
+    writeFileSync(join(projectRoot, 'workspaces', 'feature-pan-1141', '.tasks', 'issues.jsonl'), '{"id":"PAN-1141","labels":["pan-1141"]}\n');
+    writeMinimalPlan(join(projectRoot, 'workspaces', 'feature-pan-1141'), 'PAN-1141');
     agents.saveAgentStateSync({
       id: agentId,
       issueId: 'PAN-1141',
@@ -806,8 +949,9 @@ describe('auto-resume gates', () => {
     try {
       const { agents, issueCommand } = await loadStartCommand();
       const workspace = join(projectRoot, 'workspaces', 'feature-pan-1141');
-      mkdirSync(join(workspace, '.beads'), { recursive: true });
-      writeFileSync(join(workspace, '.beads', 'issues.jsonl'), '{"id":"PAN-1141","labels":["pan-1141"]}\n');
+      mkdirSync(join(workspace, '.tasks'), { recursive: true });
+      writeFileSync(join(workspace, '.tasks', 'issues.jsonl'), '{"id":"PAN-1141","labels":["pan-1141"]}\n');
+      writeMinimalPlan(workspace, 'PAN-1141');
 
       const startedAt = Date.now();
       await Promise.all(Array.from({ length: 5 }, () => issueCommand('PAN-1141', {

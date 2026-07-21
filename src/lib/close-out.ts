@@ -22,10 +22,69 @@ import { findPrdAtStatusSync, canonicalPrdSubdirSync } from './prd-locations.js'
 import { killSession, sessionExistsSync, listSessionNames } from './tmux.js';
 import { loadReviewStatuses } from './review-status.js';
 import { getLinearApiKey } from './lifecycle/types.js';
-import { WORKFLOW_LABELS } from './lifecycle/close-issue.js';
+import { POST_MERGE_RESIDUE_LABELS, WORKFLOW_LABELS } from './lifecycle/close-issue.js';
+import { findWorkspacePath } from './lifecycle/archive-planning.js';
+import { teardownWorkspaceDockerByNamePromise } from './workspace-manager/docker.js';
 import { extractNumberSync, extractPrefixSync, normalizeIssueIdSync } from './issue-id.js';
 
 const execAsync = promisify(exec);
+
+// Planning/pipeline artifact paths ignored when deciding whether a branch
+// still holds unmerged CODE. `.pan/` is the current artifact home (PAN-967);
+// `.planning/` and `docs/prds/` are legacy; `.overdeck/` is workspace runtime.
+const ARTIFACT_PATH_PREFIXES = ['.pan/', '.planning/', 'docs/prds/', '.overdeck/'];
+const ARTIFACT_EXCLUSIONS = ARTIFACT_PATH_PREFIXES
+  .map((prefix) => `':!${prefix.slice(0, -1)}'`)
+  .join(' ');
+
+/**
+ * Squash-merge detection via the forge. A squash-merged branch is never an
+ * ancestor of main and its three-dot diff never empties (the pre-squash
+ * commits stay visible against the merge-base), so pure-git checks report it
+ * unmerged forever. The merged PR is the authoritative record: if a merged PR
+ * has this branch as head, its merge commit landed on main, and the branch has
+ * no post-merge code commits, the branch is merged. Returns false on any
+ * failure (no gh, GitLab remote, no PR) so callers fall through conservatively.
+ */
+async function isSquashMergedViaPr(
+  branchName: string,
+  tipRef: string,
+  projectPath: string,
+): Promise<boolean> {
+  try {
+    const { stdout } = await execAsync(
+      `gh pr list --head "${branchName}" --state merged --json headRefOid,mergeCommit --limit 1`,
+      { cwd: projectPath, encoding: 'utf-8', timeout: 15000 },
+    );
+    const prs = JSON.parse(stdout) as Array<{ headRefOid?: string; mergeCommit?: { oid?: string } }>;
+    const pr = prs[0];
+    if (!pr?.headRefOid || !pr.mergeCommit?.oid) return false;
+
+    // The PR's merge commit must actually be on main.
+    await execAsync(`git merge-base --is-ancestor ${pr.mergeCommit.oid} main`, {
+      cwd: projectPath,
+      encoding: 'utf-8',
+    });
+
+    const { stdout: tipSha } = await execAsync(`git rev-parse "${tipRef}"`, {
+      cwd: projectPath,
+      encoding: 'utf-8',
+    });
+    if (tipSha.trim() === pr.headRefOid) return true;
+
+    // Commits after the merged PR head: merged only if they touch artifacts alone.
+    const { stdout: filesOut } = await execAsync(
+      `git log ${pr.headRefOid}..${tipRef} --name-only --pretty=format:`,
+      { cwd: projectPath, encoding: 'utf-8' },
+    );
+    const files = filesOut.split('\n').map((line) => line.trim()).filter(Boolean);
+    return files.every((file) =>
+      ARTIFACT_PATH_PREFIXES.some((prefix) => file.startsWith(prefix)),
+    );
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Check if a feature branch has been merged into main.
@@ -35,7 +94,7 @@ const execAsync = promisify(exec);
  * Also checks review-status.json as authoritative — the merge specialist
  * validates the merge before setting mergeStatus to 'merged'.
  */
-async function isBranchMerged(
+export async function isBranchMerged(
   branchName: string,
   projectPath: string,
 ): Promise<{ status: 'merged' | 'unmerged' | 'no-branch'; message: string }> {
@@ -82,7 +141,7 @@ async function isBranchMerged(
       // the code was squash-merged and only planning files remain on the branch.
       try {
         const { stdout: codeDiff } = await execAsync(
-          `git diff main...${branchName} -- ':!.planning' ':!docs/prds' ':!.overdeck/prompts' 2>/dev/null || true`,
+          `git diff main...${branchName} -- ${ARTIFACT_EXCLUSIONS} 2>/dev/null || true`,
           { cwd: projectPath, encoding: 'utf-8' },
         );
         if (!codeDiff.trim()) {
@@ -90,6 +149,14 @@ async function isBranchMerged(
         }
       } catch {
         // diff failed — fall through to unmerged report
+      }
+
+      // The three-dot diff can never go empty for a squash-merged branch unless
+      // main was merged back into it afterwards — the pre-squash commits stay
+      // visible relative to the merge-base forever. Ask the forge: a merged PR
+      // whose head is this branch, with no post-merge code commits, IS merged.
+      if (await isSquashMergedViaPr(branchName, branchName, projectPath)) {
+        return { status: 'merged', message: `Merged PR found for ${branchName} (squash merge)` };
       }
 
       const { stdout: unmerged } = await execAsync(
@@ -122,7 +189,7 @@ async function isBranchMerged(
       // Squash-merge detection for remote branch
       try {
         const { stdout: codeDiff } = await execAsync(
-          `git diff main...origin/${branchName} -- ':!.planning' ':!docs/prds' ':!.overdeck/prompts' 2>/dev/null || true`,
+          `git diff main...origin/${branchName} -- ${ARTIFACT_EXCLUSIONS} 2>/dev/null || true`,
           { cwd: projectPath, encoding: 'utf-8' },
         );
         if (!codeDiff.trim()) {
@@ -130,6 +197,10 @@ async function isBranchMerged(
         }
       } catch {
         // diff failed — fall through
+      }
+
+      if (await isSquashMergedViaPr(branchName, `origin/${branchName}`, projectPath)) {
+        return { status: 'merged', message: `Merged PR found for ${branchName} (squash merge)` };
       }
 
       const { stdout: remoteUnmerged } = await execAsync(
@@ -289,15 +360,33 @@ const CLOSED_OUT_COLOR = '1d4ed8';async function executeCloseOutPromise(ctx: Clo
       }
     } catch { /* tmux server may not be running */ }
 
-    // Stop Docker containers
-    if (workspacePath && existsSync(workspacePath)) {
-      try {
-        const { stopWorkspaceDocker } = await import('./workspace-manager.js');
-        await Effect.runPromise(stopWorkspaceDocker(workspacePath, issueLower));
+    // Stop Docker containers (name-based, works even if workspace dir is gone)
+    try {
+      const teardownResult = await teardownWorkspaceDockerByNamePromise(issueLower);
+      if (teardownResult.networkRemoved) {
         cleaned = true;
-      } catch { /* Docker may not be running */ }
+        steps.push({
+          name: 'Docker stack removed',
+          status: 'passed',
+          message: `Stopped and removed Docker stack for ${issueLower}`,
+        });
+      } else {
+        steps.push({
+          name: 'Docker stack removed',
+          status: 'skipped',
+          message: `Warning: Docker network overdeck-feature-${issueLower}_devnet is still present; the closed-issue reaper will retry`,
+        });
+      }
+    } catch (err) {
+      steps.push({
+        name: 'Docker stack removed',
+        status: 'skipped',
+        message: `Warning: Docker teardown failed: ${(err as Error).message}; the closed-issue reaper will retry`,
+      });
+    }
 
-      // Remove git worktree
+    // Remove git worktree
+    if (workspacePath && existsSync(workspacePath)) {
       try {
         await execAsync(`git worktree remove "${workspacePath}" --force`, { cwd: ctx.projectPath });
         cleaned = true;
@@ -456,6 +545,12 @@ const CLOSED_OUT_COLOR = '1d4ed8';async function executeCloseOutPromise(ctx: Clo
           { encoding: 'utf-8' }
         );
       }
+      for (const label of POST_MERGE_RESIDUE_LABELS) {
+        await execAsync(
+          `gh issue edit ${ctx.number} --repo ${ctx.owner}/${ctx.repo} --remove-label "${label}" 2>/dev/null || true`,
+          { encoding: 'utf-8' }
+        );
+      }
       steps.push({ name: 'Apply closed-out label', status: 'passed', message: `Added '${CLOSED_OUT_LABEL}' label` });
     } else {
       // Linear: add label if possible
@@ -488,7 +583,10 @@ const CLOSED_OUT_COLOR = '1d4ed8';async function executeCloseOutPromise(ctx: Clo
               }
               if (labelId) {
                 const existingLabels = await issue.labels();
-                const labelIds = existingLabels.nodes.map(l => l.id);
+                const residueLabelNames = new Set(POST_MERGE_RESIDUE_LABELS);
+                const labelIds = existingLabels.nodes
+                  .filter(l => !residueLabelNames.has(l.name))
+                  .map(l => l.id);
                 if (!labelIds.includes(labelId)) {
                   labelIds.push(labelId);
                   await issue.update({ labelIds });
@@ -504,7 +602,16 @@ const CLOSED_OUT_COLOR = '1d4ed8';async function executeCloseOutPromise(ctx: Clo
     steps.push({ name: 'Apply closed-out label', status: 'skipped', message: `Warning: ${(err as Error).message}` });
   }
 
-  // Step 8: Clear review status
+  // Step 8: Mark the durable pipeline journal terminal before clearing the DB cache.
+  try {
+    const { markRecordPipelineClosedOutSync } = await import('./pan-dir/records.js');
+    markRecordPipelineClosedOutSync({ name: 'inferred', path: ctx.projectPath }, ctx.issueId.toUpperCase());
+    steps.push({ name: 'Mark pipeline terminal', status: 'passed', message: 'Pipeline journal marked closed-out' });
+  } catch (err) {
+    steps.push({ name: 'Mark pipeline terminal', status: 'skipped', message: `Warning: ${(err as Error).message}` });
+  }
+
+  // Step 9: Clear review status
   try {
     // Dynamically import to avoid circular dependency with server
     const { clearReviewStatus } = await import('./review-status.js');
@@ -531,24 +638,6 @@ const CLOSED_OUT_COLOR = '1d4ed8';async function executeCloseOutPromise(ctx: Clo
   }
 
   return { success: true, issueId: ctx.issueId, steps };
-}
-
-/**
- * Find the workspace path for an issue.
- */
-function findWorkspacePath(projectPath: string, issueLower: string): string | null {
-  const workspacePath = join(projectPath, 'workspaces', issueLower);
-  if (existsSync(workspacePath)) return workspacePath;
-
-  // Try worktree-based path
-  const worktreePath = join(projectPath, '.worktrees', issueLower);
-  if (existsSync(worktreePath)) return worktreePath;
-
-  // Try feature branch naming convention
-  const featurePath = join(dirname(projectPath), `feature-${issueLower}`);
-  if (existsSync(featurePath)) return featurePath;
-
-  return null;
 }
 
 // ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
@@ -579,4 +668,3 @@ export const executeCloseOut = (
         cause,
       }),
   });
-

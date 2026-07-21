@@ -1,4 +1,7 @@
 import { Effect } from 'effect';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
@@ -51,7 +54,8 @@ vi.mock('../../src/lib/cliproxy.js', () => ({
   startCliproxy: vi.fn(),
 }));
 
-import { getProviderEnvForModel, getAgentRuntimeBaseCommand, getProviderExportsForModel } from '../../src/lib/agents.js';
+import { generateLauncherScriptSync } from '../../src/lib/launcher-generator.js';
+import { buildSpawnEnvForModel, getProviderEnvForModel, getAgentRuntimeBaseCommand, getProviderExportsForModel, roleAgentDefinitionPath } from '../../src/lib/agents.js';
 
 describe('agents auth routing', () => {
   beforeEach(() => {
@@ -74,7 +78,7 @@ describe('agents auth routing', () => {
       if (model.startsWith('minimax-')) {
         return { name: 'minimax', displayName: 'MiniMax', compatibility: 'direct', authType: 'static' };
       }
-      if (model.startsWith('kimi-')) {
+      if (model.startsWith('kimi-') || model === 'k3' || model === 'k3[1m]') {
         return { name: 'kimi', displayName: 'Kimi', compatibility: 'direct', authType: 'static' };
       }
       if (model.startsWith('glm-')) {
@@ -180,9 +184,9 @@ describe('agents auth routing', () => {
     );
   });
 
-  it('launches Kimi models directly with Claude Code', async () => {
-    expect(await getAgentRuntimeBaseCommand('kimi-k2.6')).toBe(
-      "claude --permission-mode bypassPermissions --model 'kimi-k2.6'"
+  it.each(['kimi-k2.6', 'k3', 'k3[1m]'])('launches Kimi model %s directly with Claude Code', async (model) => {
+    expect(await getAgentRuntimeBaseCommand(model)).toBe(
+      `claude --permission-mode bypassPermissions --model '${model}'`
     );
   });
 
@@ -205,9 +209,31 @@ describe('agents auth routing', () => {
   });
 
   it('keeps role agent definition and --name for direct Kimi launches', async () => {
-    expect(await getAgentRuntimeBaseCommand('kimi-k2.6', 'agent-pan-964', 'roles/work.md')).toBe(
-      "claude --agent roles/work.md --model 'kimi-k2.6' --name agent-pan-964"
-    );
+    const command = await getAgentRuntimeBaseCommand('kimi-k2.6', 'agent-pan-964', 'roles/work.md');
+
+    expect(command).toMatch(/^claude --permission-mode bypassPermissions /);
+    expect(command).toMatch(/--append-system-prompt-file '[^']*role-prompts\/work\.md'/);
+    expect(command).toContain('--effort high');
+    expect(command).toContain("--model 'kimi-k2.6'");
+    expect(command).toContain('--name agent-pan-964');
+  });
+
+  it('resolves role definition files from the package root when launched outside the overdeck repo', async () => {
+    const originalCwd = process.cwd();
+    const otherProject = mkdtempSync(join(tmpdir(), 'pan-other-project-'));
+    try {
+      process.chdir(otherProject);
+
+      const command = await getAgentRuntimeBaseCommand('kimi-k2.6', 'agent-pan-2479', roleAgentDefinitionPath('work'));
+
+      expect(command).not.toContain('--agent roles/work.md');
+      expect(command).toMatch(/--append-system-prompt-file '[^']*role-prompts\/work\.md'/);
+      expect(command).toContain('--effort high');
+      expect(command).toContain('--name agent-pan-2479');
+    } finally {
+      process.chdir(originalCwd);
+      rmSync(otherProject, { recursive: true, force: true });
+    }
   });
 
   it('clears stale provider env before exporting Anthropic settings', async () => {
@@ -223,6 +249,8 @@ describe('agents auth routing', () => {
         'unset ANTHROPIC_DEFAULT_SONNET_MODEL',
         'unset ANTHROPIC_SMALL_FAST_MODEL',
         'unset CLAUDE_CODE_SUBAGENT_MODEL',
+        'unset CLAUDE_CODE_AUTO_COMPACT_WINDOW',
+        'unset CLAUDE_CODE_MAX_CONTEXT_TOKENS',
         'unset OPENAI_API_KEY',
         'unset GEMINI_API_KEY',
         'unset API_TIMEOUT_MS',
@@ -246,5 +274,142 @@ describe('agents auth routing', () => {
     expect(result).toContain('unset ANTHROPIC_API_KEY');
     expect(result).toContain('export ANTHROPIC_BASE_URL="http://127.0.0.1:8317"');
     expect(result).toContain('export ANTHROPIC_AUTH_TOKEN="overdeck-local-cliproxy-key"');
+  });
+
+  it.each(['gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna'])(
+    'applies the 372K Claude Code context policy to %s launchers and direct spawns',
+    async (model) => {
+      mockOpenAIAuthStatus.mockReturnValue({ loggedIn: true });
+
+      const providerExports = await getProviderExportsForModel(model);
+      expect(providerExports).toContain('unset CLAUDE_CODE_MAX_CONTEXT_TOKENS');
+      expect(providerExports).toContain('unset CLAUDE_CODE_AUTO_COMPACT_WINDOW');
+      expect(providerExports).toContain('export CLAUDE_CODE_MAX_CONTEXT_TOKENS="372000"');
+      expect(providerExports).toContain('export CLAUDE_CODE_AUTO_COMPACT_WINDOW="372000"');
+
+      const launcher = generateLauncherScriptSync({
+        role: 'work',
+        workingDir: '/workspace/project',
+        providerExports,
+        baseCommand: `claude --agent pan-work-agent --model '${model}'`,
+      });
+      expect(launcher).toContain('export CLAUDE_CODE_MAX_CONTEXT_TOKENS="372000"');
+      expect(launcher).toContain('export CLAUDE_CODE_AUTO_COMPACT_WINDOW="372000"');
+
+      const spawnEnv = await buildSpawnEnvForModel(model, {
+        CLAUDE_CODE_MAX_CONTEXT_TOKENS: '999999',
+        CLAUDE_CODE_AUTO_COMPACT_WINDOW: '999999',
+      });
+      expect(spawnEnv.CLAUDE_CODE_MAX_CONTEXT_TOKENS).toBe('372000');
+      expect(spawnEnv.CLAUDE_CODE_AUTO_COMPACT_WINDOW).toBe('372000');
+    },
+  );
+
+  it('preserves the conservative GPT-5.5 auto-compaction policy without a maximum override', async () => {
+    mockOpenAIAuthStatus.mockReturnValue({ loggedIn: true });
+
+    const providerExports = await getProviderExportsForModel('gpt-5.5');
+    expect(providerExports).toContain('unset CLAUDE_CODE_MAX_CONTEXT_TOKENS');
+    expect(providerExports).not.toContain('export CLAUDE_CODE_MAX_CONTEXT_TOKENS');
+    expect(providerExports).toContain('export CLAUDE_CODE_AUTO_COMPACT_WINDOW="150000"');
+
+    const spawnEnv = await buildSpawnEnvForModel('gpt-5.5', {
+      CLAUDE_CODE_MAX_CONTEXT_TOKENS: '372000',
+      CLAUDE_CODE_AUTO_COMPACT_WINDOW: '372000',
+    });
+    expect(spawnEnv.CLAUDE_CODE_MAX_CONTEXT_TOKENS).toBeUndefined();
+    expect(spawnEnv.CLAUDE_CODE_AUTO_COMPACT_WINDOW).toBe('150000');
+  });
+
+  it('exports the registry context window as Claude Code auto-compact window for Kimi K2.7', async () => {
+    mockLoadYamlConfig.mockReturnValue({
+      config: {
+        apiKeys: { kimi: 'kimi-test-key' },
+        providerAuth: {},
+      },
+    });
+
+    const providerExports = await getProviderExportsForModel('kimi-k2.7-code');
+    expect(providerExports).toContain('unset CLAUDE_CODE_MAX_CONTEXT_TOKENS');
+    expect(providerExports).not.toContain('export CLAUDE_CODE_MAX_CONTEXT_TOKENS');
+    expect(providerExports).toContain('unset CLAUDE_CODE_AUTO_COMPACT_WINDOW');
+    expect(providerExports).toContain('export CLAUDE_CODE_AUTO_COMPACT_WINDOW="262144"');
+
+    const launcher = generateLauncherScriptSync({
+      role: 'work',
+      workingDir: '/workspace/project',
+      providerExports,
+      baseCommand: "claude --agent pan-work-agent --model 'kimi-k2.7-code'",
+    });
+
+    expect(launcher).toContain('export CLAUDE_CODE_AUTO_COMPACT_WINDOW="262144"');
+    expect(launcher).toContain("exec claude --agent pan-work-agent --model 'kimi-k2.7-code'");
+  });
+
+  it.each([
+    ['k3', '262144'],
+    ['k3[1m]', '1048576'],
+  ])('exports both Claude Code context limits for %s', async (model, contextWindow) => {
+    mockLoadYamlConfig.mockReturnValue({
+      config: {
+        apiKeys: { kimi: 'kimi-test-key' },
+        providerAuth: {},
+      },
+    });
+
+    const providerExports = await getProviderExportsForModel(model);
+    expect(providerExports).toContain('unset CLAUDE_CODE_AUTO_COMPACT_WINDOW');
+    expect(providerExports).toContain('unset CLAUDE_CODE_MAX_CONTEXT_TOKENS');
+    expect(providerExports).toContain(`export CLAUDE_CODE_AUTO_COMPACT_WINDOW="${contextWindow}"`);
+    expect(providerExports).toContain(`export CLAUDE_CODE_MAX_CONTEXT_TOKENS="${contextWindow}"`);
+
+    const launcher = generateLauncherScriptSync({
+      role: 'work',
+      workingDir: '/workspace/project',
+      providerExports,
+      baseCommand: `claude --agent pan-work-agent --model '${model}'`,
+    });
+
+    expect(launcher).toContain(`export CLAUDE_CODE_AUTO_COMPACT_WINDOW="${contextWindow}"`);
+    expect(launcher).toContain(`export CLAUDE_CODE_MAX_CONTEXT_TOKENS="${contextWindow}"`);
+    expect(launcher).toContain(`exec claude --agent pan-work-agent --model '${model}'`);
+  });
+
+  it('sanitizes and sets both context limits for programmatic K3 spawns', async () => {
+    mockLoadYamlConfig.mockReturnValue({
+      config: {
+        apiKeys: { kimi: 'kimi-test-key' },
+        providerAuth: {},
+      },
+    });
+
+    const env = await buildSpawnEnvForModel('k3[1m]', {
+      PATH: '/usr/bin',
+      CLAUDE_CODE_AUTO_COMPACT_WINDOW: '200000',
+      CLAUDE_CODE_MAX_CONTEXT_TOKENS: '200000',
+    });
+
+    expect(env).toMatchObject({
+      PATH: '/usr/bin',
+      CLAUDE_CODE_AUTO_COMPACT_WINDOW: '1048576',
+      CLAUDE_CODE_MAX_CONTEXT_TOKENS: '1048576',
+    });
+  });
+
+  it('clears inherited Claude Code context overrides for Anthropic launchers and direct spawns', async () => {
+    const providerExports = await getProviderExportsForModel('claude-sonnet-4-6');
+    expect(providerExports).toContain('unset CLAUDE_CODE_MAX_CONTEXT_TOKENS');
+    expect(providerExports).toContain('unset CLAUDE_CODE_AUTO_COMPACT_WINDOW');
+    expect(providerExports).not.toContain('export CLAUDE_CODE_MAX_CONTEXT_TOKENS');
+    expect(providerExports).not.toContain('export CLAUDE_CODE_AUTO_COMPACT_WINDOW');
+
+    const spawnEnv = await buildSpawnEnvForModel('claude-sonnet-4-6', {
+      CLAUDE_CODE_MAX_CONTEXT_TOKENS: '372000',
+      CLAUDE_CODE_AUTO_COMPACT_WINDOW: '372000',
+      KEEP_ME: 'yes',
+    });
+    expect(spawnEnv.CLAUDE_CODE_MAX_CONTEXT_TOKENS).toBeUndefined();
+    expect(spawnEnv.CLAUDE_CODE_AUTO_COMPACT_WINDOW).toBeUndefined();
+    expect(spawnEnv.KEEP_ME).toBe('yes');
   });
 });

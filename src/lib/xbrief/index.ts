@@ -1,0 +1,59 @@
+/**
+ * xBRIEF Module
+ *
+ * Overdeck's structured planning format based on the xBRIEF v0.8 spec.
+ * See: https://github.com/deftai/xBRIEF
+ *
+ * All date fields MUST use RFC 3339 date-time format ("2025-09-01T00:00:00Z"),
+ * NOT plain dates ("2025-09-01"). Use toRFC3339() to convert if needed.
+ */
+
+// Types
+export type {
+  XBriefDocument,
+  XBriefPlan,
+  XBriefItem,
+  XBriefSubItem,
+  XBriefEdge,
+  XBriefEdgeType,
+  XBriefItemStatus,
+  XBriefPriority,
+  XBriefDifficulty,
+  XBriefItemKind,
+} from './types.js';
+
+// Date helpers
+export { DEFAULT_XBRIEF_ITEM_KIND, isRFC3339DateTime, resolveXBriefItemKind, toRFC3339 } from './types.js';
+
+// Builder
+export { PlanBuilder, planBuilder } from './builder.js';
+
+// I/O (from PAN-388 agent's implementation)
+export {
+  findPlanSync,
+  readPlanSync,
+  readWorkspacePlanSync,
+  updateItemStatus,
+  updateSubItemStatus,
+} from './io.js';
+
+// Effect-typed IO variants (PAN-1249)
+export {
+  readPlan,
+  findPlan,
+  readWorkspacePlan,
+  XBriefMergeConflictTaggedError,
+  XBriefInvalidFormatError,
+} from './io.js';
+export type { XBriefReadError } from './io.js';
+
+export { getDispatchableItems, getTaskGraphView } from './dag.js';
+
+// Acceptance Criteria
+export {
+  extractAcceptanceCriteriaSync,
+  extractACFromDocument,
+  formatAcceptanceCriteria,
+  checkAllCriteriaCompletedSync,
+} from './acceptance-criteria.js';
+export type { AcceptanceCriterion, ACCompletionResult } from './acceptance-criteria.js';

@@ -57,4 +57,17 @@ describe('sendGracefulRestartWarning', () => {
     await vi.advanceTimersByTimeAsync(GRACEFUL_RESTART_GRACE_MS);
     await result;
   });
+
+  it('preserves the missing-harness path without sending Escape', async () => {
+    const { GRACEFUL_RESTART_GRACE_MS, sendGracefulRestartWarning } = await import('../../src/lib/graceful-restart.js');
+
+    const result = sendGracefulRestartWarning('agent-pan-1787', undefined, '/tmp/workspace');
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(tmuxMocks.sendEscapeKeyAsync).not.toHaveBeenCalled();
+    expect(tmuxMocks.sendKeys).toHaveBeenCalledWith('agent-pan-1787', expect.stringContaining('Restarting in 60s'));
+
+    await vi.advanceTimersByTimeAsync(GRACEFUL_RESTART_GRACE_MS);
+    await result;
+  });
 });

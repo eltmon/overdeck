@@ -65,7 +65,12 @@ pan handoff source-conv --cwd /path/to/project
 pan handoff source-conv --model claude-opus-4-7 wire the Stripe webhook into checkout
 pan handoff source-conv --author external --author-model claude-haiku-4-5 cheap clean handoff
 pan handoff source-conv --author source uses-source-agent-and-pollutes-its-context
+pan handoff source-conv --issue PAN-1234 continue the API wiring
 ```
+
+## Issue association
+
+Use `--issue <id>` to attach the new conversation to a specific issue (e.g. `PAN-1234`). The flag is validated; an invalid ID rejects the request and creates no conversation. When `--issue` is omitted, the new conversation inherits the source conversation's issue association, if any.
 
 ## When to use
 

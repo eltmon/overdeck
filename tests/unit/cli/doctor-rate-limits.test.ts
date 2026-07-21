@@ -17,7 +17,7 @@ describe('checkTrackerRateLimits', () => {
 
     const doctor = await import('../../../src/cli/commands/doctor.js');
     checkTrackerRateLimits = doctor.checkTrackerRateLimits;
-  });
+  }, 15_000);
 
   afterEach(() => {
     vi.unstubAllEnvs();

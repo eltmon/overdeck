@@ -19,6 +19,7 @@ import {
   type ChartData,
   type ChartOptions,
 } from 'chart.js';
+import { costBucketLabel } from '../lib/cost-bucket-labels';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, LineController, Filler, Tooltip);
 
@@ -199,6 +200,7 @@ function TrendChart({ trends }: { trends: DailyTrend[] }) {
 // ============== Issue Detail Modal ==============
 
 function IssueDetailModal({ issueId, onClose }: { issueId: string; onClose: () => void }) {
+  const displayIssueId = costBucketLabel(issueId);
   const { data: detail, isLoading } = useQuery({
     queryKey: ['cost-issue-detail', issueId],
     queryFn: () => fetchIssueDetail(issueId),
@@ -218,7 +220,7 @@ function IssueDetailModal({ issueId, onClose }: { issueId: string; onClose: () =
         <div className="flex items-center justify-between p-6 border-b border-border">
           <div className="flex items-center gap-3">
             <BarChart3 className="w-5 h-5 text-primary" />
-            <h2 className="text-xl font-bold text-foreground font-mono">{issueId}</h2>
+            <h2 className="text-xl font-bold text-foreground font-mono">{displayIssueId}</h2>
           </div>
           <button onClick={onClose} className="text-muted-foreground hover:text-foreground transition-colors">
             <X className="w-5 h-5" />
@@ -478,6 +480,7 @@ function IssuesTabContent({ costs, globalTrends }: { costs: CostsResponse; globa
           <div className="space-y-2 max-h-[600px] overflow-auto">
             {costs.issues.map((issue) => {
               const budgetPercent = issue.budget ? (issue.totalCost / issue.budget) * 100 : 0;
+              const displayIssueId = costBucketLabel(issue.issueId);
 
               return (
                 <div
@@ -491,7 +494,7 @@ function IssuesTabContent({ costs, globalTrends }: { costs: CostsResponse; globa
                 >
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
-                      <span className="text-foreground font-mono font-semibold">{issue.issueId}</span>
+                      <span className="text-foreground font-mono font-semibold">{displayIssueId}</span>
                       {issue.budgetWarning && <AlertTriangle className="w-4 h-4 text-warning" />}
                     </div>
                     <div className="flex items-center gap-2">
@@ -539,7 +542,7 @@ function IssuesTabContent({ costs, globalTrends }: { costs: CostsResponse; globa
           {selectedIssueData ? (
             <>
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-xl font-semibold text-foreground">{selectedIssueData.issueId} Details</h3>
+                <h3 className="text-xl font-semibold text-foreground">{costBucketLabel(selectedIssueData.issueId)} Details</h3>
                 <button
                   onClick={() => setModalIssue(selectedIssueData.issueId)}
                   className="text-xs text-primary hover:text-primary/80 flex items-center gap-1"

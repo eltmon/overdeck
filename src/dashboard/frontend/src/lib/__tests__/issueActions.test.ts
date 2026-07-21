@@ -1,7 +1,11 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
+  GROUP_LABELS,
+  GROUP_ORDER,
   ISSUE_ACTIONS,
+  PROJECT_TREE_CONTEXT_ACTIONS,
+  ZONE_B_SESSION_ACTIONS,
   deriveIssueActionPhase,
   getEnabledActions,
   getPhasePrimaryActions,
@@ -28,21 +32,21 @@ const prdActionKeys: readonly IssueActionKey[] = [
   'untroubled',
   'recoverAgent',
   'resumeSession',
-  'switchModel',
   'syncMain',
-  'inspectBead',
+  'inspectTask',
   'reopen',
   'closeOut',
   'wipe',
   'destroyWorkspace',
   'open',
   'resetIssue',
+  'resetToPlanned',
   'viewPr',
 ];
 
 const preservedActionKeys: readonly IssueActionKey[] = [
   'cancel',
-  'beads',
+  'tasks',
   'inference',
   'discussions',
   'transcripts',
@@ -55,7 +59,6 @@ const preservedActionKeys: readonly IssueActionKey[] = [
   'completeWorkReset',
   'restartFromPlan',
   'restartAgent',
-  'reviewTest',
 ];
 
 const baseState: IssueActionState = {
@@ -64,7 +67,7 @@ const baseState: IssueActionState = {
   lifecycle: null,
   workspace: { exists: true, path: '/tmp/workspace' },
   hasPlan: false,
-  hasBeads: false,
+  hasTasks: false,
   issueCanonicalState: 'todo',
   isMerged: false,
 };
@@ -100,9 +103,26 @@ describe('ISSUE_ACTIONS', () => {
     expect(registered.size).toBe(ISSUE_ACTIONS.length);
   });
 
+  it('exports every action group once in the fixed six-group order (C-ACTIONS)', () => {
+    expect(GROUP_ORDER).toEqual([
+      'communicate',
+      'lifecycle',
+      'recover',
+      'inspect',
+      'navigation',
+      'danger',
+    ]);
+    expect(new Set(GROUP_ORDER).size).toBe(GROUP_ORDER.length);
+    expect(Object.keys(GROUP_LABELS)).toEqual(GROUP_ORDER);
+    for (const action of ISSUE_ACTIONS) {
+      expect(GROUP_ORDER, action.key).toContain(action.group);
+    }
+  });
+
   it('fully describes every registry entry', () => {
     for (const action of ISSUE_ACTIONS) {
       expect(action.label.trim(), action.key).not.toBe('');
+      expect(action.description.trim(), action.key).not.toBe('');
       expect(action, action.key).toHaveProperty('panVerb');
       expect(action, action.key).toHaveProperty('endpoint');
       expect(typeof action.enabledWhen, action.key).toBe('function');
@@ -112,11 +132,81 @@ describe('ISSUE_ACTIONS', () => {
     }
   });
 
+  it('discriminates issue entries from executable non-issue entries by scope', () => {
+    expect(ISSUE_ACTIONS.every((entry) => entry.scope === 'issue')).toBe(true);
+
+    for (const action of [...PROJECT_TREE_CONTEXT_ACTIONS, ...ZONE_B_SESSION_ACTIONS]) {
+      expect(action.scope, action.key).not.toBe('issue');
+      expect(action.description.trim(), action.key).not.toBe('');
+      expect(typeof action.enabledWhen, action.key).toBe('function');
+      expect(typeof action.invoke, action.key).toBe('function');
+      expect(['safe', 'dialog', 'destructive'], action.key).toContain(action.kind);
+      expect(action, action.key).toHaveProperty('confirm');
+    }
+  });
+
+  it('executes callback-backed session actions through surface-provided context', async () => {
+    const onViewTerminal = vi.fn();
+    const viewTerminal = ZONE_B_SESSION_ACTIONS.find((entry) => entry.key === 'viewTerminal');
+    if (!viewTerminal) throw new Error('Missing viewTerminal action');
+
+    const context = {
+      sessionId: 'agent-pan-1610',
+      tmuxSession: 'agent-pan-1610',
+      onViewTerminal,
+    };
+
+    expect(viewTerminal.enabledWhen(context)).toBe(true);
+    await viewTerminal.invoke(context);
+    expect(onViewTerminal).toHaveBeenCalledWith('agent-pan-1610');
+  });
+
+  it('enables restart only for focused work sessions', () => {
+    const restartSession = ZONE_B_SESSION_ACTIONS.find((entry) => entry.key === 'restartSession');
+    if (!restartSession) throw new Error('Missing restartSession action');
+
+    expect(restartSession.enabledWhen({
+      sessionId: 'agent-pan-1610',
+      sessionType: 'work',
+      onRestartSession: vi.fn(),
+    })).toBe(true);
+    expect(restartSession.enabledWhen({
+      sessionId: 'planning-pan-1610',
+      sessionType: 'planning',
+      onRestartSession: vi.fn(),
+    })).toBe(false);
+  });
+
+  it('exports focused-session metadata without requiring a JSONL transcript', async () => {
+    const onExportSessionMetadata = vi.fn();
+    const exportMetadata = ZONE_B_SESSION_ACTIONS.find(
+      (entry) => entry.key === 'exportSessionMetadata',
+    );
+    if (!exportMetadata) throw new Error('Missing exportSessionMetadata action');
+    const context = {
+      sessionId: 'agent-pan-1610',
+      hasJsonl: false,
+      onExportSessionMetadata,
+    };
+
+    expect(exportMetadata.enabledWhen(context)).toBe(true);
+    await exportMetadata.invoke(context);
+    expect(onExportSessionMetadata).toHaveBeenCalledWith('agent-pan-1610');
+  });
+
+  it('derives confirmation copy for destructive non-issue actions from invocation context', () => {
+    const stopSession = ZONE_B_SESSION_ACTIONS.find((entry) => entry.key === 'stopSession');
+    const deepWipe = PROJECT_TREE_CONTEXT_ACTIONS.find((entry) => entry.key === 'deepWipe');
+
+    expect(stopSession?.confirm?.message({ sessionId: 'agent-pan-1610' })).toBe('Stop session agent-pan-1610?');
+    expect(deepWipe?.confirm?.message({ issueId: 'PAN-1610' })).toContain('PAN-1610');
+  });
+
   it('filters enabled actions without mutating registry order', () => {
     const enabled = keys(getEnabledActions({
       ...baseState,
       hasPlan: true,
-      hasBeads: true,
+      hasTasks: true,
       hasInference: true,
       hasDiscussions: true,
       hasTranscripts: true,
@@ -124,7 +214,7 @@ describe('ISSUE_ACTIONS', () => {
       lifecycle: { canResumeSession: true },
     }));
 
-    expect(enabled).toContain('beads');
+    expect(enabled).toContain('tasks');
     expect(enabled).toContain('inference');
     expect(enabled).toContain('discussions');
     expect(enabled).toContain('transcripts');
@@ -134,18 +224,22 @@ describe('ISSUE_ACTIONS', () => {
   });
 
   it('declares real CLI verbs only for issue-scoped pan commands', () => {
+    expect(action('doneWork').label).toBe('Done — mark work complete & start review');
+    expect(action('restartReview').label).toBe('Re-run review on latest commit');
+    expect(action('recoverReview').label).toBe('Reset stalled review state');
+    expect(action('purgeReview').label).toBe('Remove review sessions & reset');
     expect(action('requestReview').panVerb).toBe('review request');
     expect(action('restartReview').panVerb).toBe('review restart');
     expect(action('recoverReview').panVerb).toBe('review reset');
     expect(action('stopAgent').panVerb).toBe('kill');
     expect(action('resetIssue').panVerb).toBeNull();
+    expect(action('resetToPlanned').panVerb).toBe('reset-to-planned');
     expect(action('restartFromPlan').panVerb).toBeNull();
     expect(action('restartAgent').panVerb).toBeNull();
     expect(action('completeWorkReset').panVerb).toBeNull();
     expect(action('completeWorkReset').kind).toBe('destructive');
     expect(action('completeWorkReset').group).toBe('danger');
     expect(action('completeWorkReset').endpoint).toBe('/api/agents/:agentId/restart-fresh');
-    expect(action('reviewTest').panVerb).toBe('review request');
   });
 
   it('aligns PRD action kinds for lifecycle and navigation actions', () => {
@@ -162,6 +256,7 @@ describe('ISSUE_ACTIONS', () => {
     expect(action('closeOut').kind).toBe('destructive');
     expect(action('wipe').kind).toBe('destructive');
     expect(action('resetIssue').kind).toBe('destructive');
+    expect(action('resetToPlanned').kind).toBe('destructive');
     expect(action('cancel').kind).toBe('destructive');
   });
 
@@ -175,7 +270,6 @@ describe('ISSUE_ACTIONS', () => {
     expect(action('tell').enabledWhen(stopped)).toBe(false);
     expect(action('stopAgent').enabledWhen(stopped)).toBe(false);
     expect(action('pause').enabledWhen(stopped)).toBe(false);
-    expect(action('switchModel').enabledWhen(stopped)).toBe(false);
     expect(action('recoverAgent').enabledWhen(stopped)).toBe(true);
     expect(action('resumeSession').enabledWhen(stopped)).toBe(true);
   });
@@ -205,15 +299,15 @@ describe('ISSUE_ACTIONS', () => {
     const canStart: IssueActionState = {
       ...baseState,
       hasPlan: true,
-      hasBeads: true,
+      hasTasks: true,
       agent: { status: 'stopped', role: 'work' },
     };
     expect(action('rebuildAndStart').enabledWhen(canStart)).toBe(true);
     // rebuild operates on the workspace's Docker stack → requires a workspace
     expect(action('rebuildAndStart').enabledWhen({ ...canStart, workspace: { exists: false, path: undefined } })).toBe(false);
-    // mirrors canStartAgent: needs plan + beads, a stopped agent, not merged
+    // mirrors canStartAgent: needs plan + tasks, a stopped agent, not merged
     expect(action('rebuildAndStart').enabledWhen({ ...canStart, hasPlan: false })).toBe(false);
-    expect(action('rebuildAndStart').enabledWhen({ ...canStart, hasBeads: false })).toBe(false);
+    expect(action('rebuildAndStart').enabledWhen({ ...canStart, hasTasks: false })).toBe(false);
     expect(action('rebuildAndStart').enabledWhen({ ...canStart, agent: { status: 'running', role: 'work' } })).toBe(false);
     expect(action('rebuildAndStart').enabledWhen({ ...canStart, isMerged: true })).toBe(false);
   });
@@ -221,7 +315,7 @@ describe('ISSUE_ACTIONS', () => {
   it('points rebuildAndStart at the chained workspace endpoint as a safe action', () => {
     expect(action('rebuildAndStart').endpoint).toBe('/api/workspaces/:id/rebuild-and-start');
     expect(action('rebuildAndStart').kind).toBe('safe');
-    expect(action('rebuildAndStart').group).toBe('workspace');
+    expect(action('rebuildAndStart').group).toBe('recover');
   });
 });
 
@@ -236,7 +330,7 @@ describe('getPhasePrimaryActions', () => {
     ['SHIP_RUNNING', { ...baseState, agent: { status: 'running', role: 'ship' }, reviewStatus: reviewStatus({ mergeStatus: 'merging' }) }, ['tell', 'recoverAgent']],
     ['CHANGES_REQUESTED', { ...baseState, reviewStatus: reviewStatus({ reviewStatus: 'blocked' }) }, ['open', 'requestReview']],
     ['STUCK', { ...baseState, agent: { status: 'failed', role: 'work' }, reviewStatus: reviewStatus({ testStatus: 'failed' }) }, ['recoverAgent', 'tell']],
-    ['READY_TO_MERGE', { ...baseState, reviewStatus: reviewStatus({ reviewStatus: 'passed', testStatus: 'passed', readyForMerge: true }), hasPr: true }, ['viewPr']],
+    ['READY_TO_MERGE', { ...baseState, reviewStatus: reviewStatus({ reviewStatus: 'passed', testStatus: 'passed', readyForMerge: true }), hasPr: true }, ['merge', 'viewPr']],
     ['MERGED', { ...baseState, isMerged: true, reviewStatus: reviewStatus({ mergeStatus: 'merged' }) }, ['closeOut']],
   ];
 

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from '@effect/vitest'
 import { Effect } from 'effect'
-import { existsSync, mkdtempSync, rmSync } from 'fs'
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { tmpdir } from 'os'
 
@@ -8,6 +8,7 @@ import {
   PAN_CONTEXT_FILENAME,
   PAN_CONTINUE_FILENAME,
   PAN_DIRNAME,
+  WORKSPACE_RUNTIME_DIRNAME,
   PAN_FEEDBACK_DIRNAME,
   PAN_SESSIONS_FILENAME,
   PAN_SPEC_FILENAME,
@@ -26,15 +27,12 @@ import {
   readSessions,
   readSpec,
   readWorkspaceContext,
-  readWorkspaceContinue,
   updateSpecStatus,
   writeFeedback,
   writeSpec,
   writeWorkspaceContext,
-  writeWorkspaceContinue,
-  type WorkspaceContinueState,
 } from '../index.js'
-import type { VBriefDocument } from '../../vbrief/types.js'
+import type { XBriefDocument } from '../../xbrief/types.js'
 
 let TEST_DIR: string
 
@@ -48,9 +46,9 @@ afterEach(() => {
   }
 })
 
-function makeDoc(issueId: string, title: string, status = 'draft'): VBriefDocument {
+function makeDoc(issueId: string, title: string, status = 'draft'): XBriefDocument {
   return {
-    vBRIEFInfo: {
+    xBRIEFInfo: {
       version: '0.5',
       created: '2026-05-04T00:00:00Z',
       updated: '2026-05-04T00:00:00Z',
@@ -64,22 +62,6 @@ function makeDoc(issueId: string, title: string, status = 'draft'): VBriefDocume
       created: '2026-05-04T00:00:00Z',
       updated: '2026-05-04T00:00:00Z',
     },
-  }
-}
-
-function makeContinue(issueId: string): WorkspaceContinueState {
-  return {
-    version: '1',
-    issueId,
-    created: '2026-05-04T00:00:00.000Z',
-    updated: '2026-05-04T00:00:00.000Z',
-    gitState: { branch: `feature/${issueId.toLowerCase()}` },
-    decisions: [],
-    hazards: [],
-    resumePoint: null,
-    beadsMapping: {},
-    sessionHistory: [],
-    feedback: [],
   }
 }
 
@@ -104,18 +86,18 @@ describe('ensureWorkspacePanDir / getWorkspacePanPaths', () => {
   it.effect('creates workspace .pan and feedback directory', () =>
     Effect.gen(function* () {
       const paths = yield* ensureWorkspacePanDir(TEST_DIR)
-      expect(paths.specPath).toBe(join(TEST_DIR, PAN_DIRNAME, PAN_SPEC_FILENAME))
-      expect(paths.continuePath).toBe(join(TEST_DIR, PAN_DIRNAME, PAN_CONTINUE_FILENAME))
-      expect(paths.sessionsPath).toBe(join(TEST_DIR, PAN_DIRNAME, PAN_SESSIONS_FILENAME))
-      expect(paths.feedbackDir).toBe(join(TEST_DIR, PAN_DIRNAME, PAN_FEEDBACK_DIRNAME))
-      expect(paths.contextPath).toBe(join(TEST_DIR, PAN_DIRNAME, PAN_CONTEXT_FILENAME))
+      expect(paths.specPath).toBe(join(TEST_DIR, WORKSPACE_RUNTIME_DIRNAME, PAN_SPEC_FILENAME))
+      expect(paths.continuePath).toBe(join(TEST_DIR, WORKSPACE_RUNTIME_DIRNAME, PAN_CONTINUE_FILENAME))
+      expect(paths.sessionsPath).toBe(join(TEST_DIR, WORKSPACE_RUNTIME_DIRNAME, PAN_SESSIONS_FILENAME))
+      expect(paths.feedbackDir).toBe(join(TEST_DIR, WORKSPACE_RUNTIME_DIRNAME, PAN_FEEDBACK_DIRNAME))
+      expect(paths.contextPath).toBe(join(TEST_DIR, WORKSPACE_RUNTIME_DIRNAME, PAN_CONTEXT_FILENAME))
       expect(existsSync(paths.feedbackDir)).toBe(true)
     }),
   )
 
   it('returns stable workspace paths', () => {
     const paths = getWorkspacePanPaths(TEST_DIR)
-    expect(paths.panDir).toBe(join(TEST_DIR, PAN_DIRNAME))
+    expect(paths.panDir).toBe(join(TEST_DIR, WORKSPACE_RUNTIME_DIRNAME))
   })
 })
 
@@ -123,7 +105,7 @@ describe('spec helpers', () => {
   it.effect('writes and reads a pan spec document', () =>
     Effect.gen(function* () {
       const paths = yield* ensurePanDirs(TEST_DIR)
-      const path = join(paths.specsDir, '2026-05-04-PAN-967-unified-pan-directory.vbrief.json')
+      const path = join(paths.specsDir, '2026-05-04-PAN-967-unified-pan-directory.xbrief.json')
       yield* writeSpec(path, asPanSpecDocument(makeDoc('PAN-967', 'Unified .pan Directory'), 'proposed'))
 
       const read = yield* readSpec(path)
@@ -132,15 +114,69 @@ describe('spec helpers', () => {
     }),
   )
 
+  it.effect('reads a v0.8 xBRIEFInfo pan spec document with top-level status', () =>
+    Effect.gen(function* () {
+      const paths = yield* ensurePanDirs(TEST_DIR)
+      const path = join(paths.specsDir, '2026-06-30-PAN-2426-xbrief-v08.xbrief.json')
+      writeFileSync(
+        path,
+        JSON.stringify(
+          {
+            xBRIEFInfo: {
+              version: '0.8',
+              created: '2026-06-30T00:00:00Z',
+              updated: '2026-06-30T00:00:00Z',
+            },
+            status: 'active',
+            plan: {
+              id: 'PAN-2426',
+              title: 'xBRIEF v0.8',
+              status: 'active',
+              items: [],
+              edges: [],
+            },
+          },
+          null,
+          2,
+        ),
+        'utf-8',
+      )
+
+      const read = yield* readSpec(path)
+      expect(read.status).toBe('active')
+      expect(read.xBRIEFInfo.version).toBe('0.8')
+      expect(read.plan.id).toBe('PAN-2426')
+    }),
+  )
+
+  it.effect('reads and normalizes a legacy vBRIEFInfo envelope', () =>
+    Effect.gen(function* () {
+      const paths = yield* ensurePanDirs(TEST_DIR)
+      const path = join(paths.specsDir, '2026-05-04-PAN-453-legacy-envelope.vbrief.json')
+      writeFileSync(
+        path,
+        JSON.stringify({
+          vBRIEFInfo: { version: '0.5', created: '2026-05-04T00:00:00Z' },
+          status: 'proposed',
+          plan: { id: 'PAN-453', title: 'Legacy envelope', status: 'proposed', items: [], edges: [] },
+        }),
+      )
+
+      const read = yield* readSpec(path)
+      expect(read.xBRIEFInfo.version).toBe('0.5')
+      expect(read).not.toHaveProperty('vBRIEFInfo')
+    }),
+  )
+
   it.effect('lists specs and filters by root status', () =>
     Effect.gen(function* () {
       const paths = yield* ensurePanDirs(TEST_DIR)
       yield* writeSpec(
-        join(paths.specsDir, '2026-05-04-PAN-1-first.vbrief.json'),
+        join(paths.specsDir, '2026-05-04-PAN-1-first.xbrief.json'),
         asPanSpecDocument(makeDoc('PAN-1', 'First Plan'), 'proposed'),
       )
       yield* writeSpec(
-        join(paths.specsDir, '2026-05-04-PAN-2-second.vbrief.json'),
+        join(paths.specsDir, '2026-05-04-PAN-2-second.xbrief.json'),
         asPanSpecDocument(makeDoc('PAN-2', 'Second Plan'), 'active'),
       )
 
@@ -154,11 +190,11 @@ describe('spec helpers', () => {
   it.effect('finds a spec by issue and updates root status in place', () =>
     Effect.gen(function* () {
       const paths = yield* ensurePanDirs(TEST_DIR)
-      const path = join(paths.specsDir, '2026-05-04-PAN-967-unified-pan-directory.vbrief.json')
+      const path = join(paths.specsDir, '2026-05-04-PAN-967-unified-pan-directory.xbrief.json')
       yield* writeSpec(path, asPanSpecDocument(makeDoc('PAN-967', 'Unified .pan Directory'), 'proposed'))
 
       const found = yield* findSpecByIssue(TEST_DIR, 'pan-967')
-      expect(found?.filename).toBe('2026-05-04-PAN-967-unified-pan-directory.vbrief.json')
+      expect(found?.filename).toBe('2026-05-04-PAN-967-unified-pan-directory.xbrief.json')
 
       const updated = yield* updateSpecStatus(TEST_DIR, 'PAN-967', 'active')
       expect(updated?.status).toBe('active')
@@ -166,29 +202,68 @@ describe('spec helpers', () => {
       expect(reread.status).toBe('active')
     }),
   )
-})
 
-describe('continue helpers', () => {
-  it.effect('round-trips workspace continue state and preserves created timestamp', () =>
+  it.effect('findSpecByIssue parses only files whose filename matches the issue (PAN-2216)', () =>
     Effect.gen(function* () {
-      const first = yield* writeWorkspaceContinue(TEST_DIR, makeContinue('PAN-967'))
-      yield* Effect.promise(() => new Promise((resolve) => setTimeout(resolve, 5)))
-      const second = yield* writeWorkspaceContinue(TEST_DIR, {
-        ...first,
-        decisions: [{ id: 'D1', summary: 'Use .pan', recordedAt: '2026-05-04T01:00:00Z' }],
-      })
-
-      const read = yield* readWorkspaceContinue(TEST_DIR)
-      expect(read?.issueId).toBe('PAN-967')
-      expect(read?.created).toBe(first.created)
-      expect(new Date(second.updated).getTime()).toBeGreaterThan(new Date(first.updated).getTime())
+      const paths = yield* ensurePanDirs(TEST_DIR)
+      yield* writeSpec(
+        join(paths.specsDir, '2026-05-04-PAN-1-target.xbrief.json'),
+        asPanSpecDocument(makeDoc('PAN-1', 'Target'), 'proposed'),
+      )
+      // A corrupt spec for a DIFFERENT issue: the old implementation parsed
+      // every file in the directory per lookup (and warned about this one);
+      // the filename-first implementation must never open it.
+      const fs = yield* Effect.promise(() => import('fs/promises'))
+      yield* Effect.promise(() =>
+        fs.writeFile(join(paths.specsDir, '2026-05-04-PAN-2-corrupt.xbrief.json'), 'not json{', 'utf-8'),
+      )
+      const warnings: string[] = []
+      const originalWarn = console.warn
+      console.warn = (msg: string) => warnings.push(String(msg))
+      try {
+        const found = yield* findSpecByIssue(TEST_DIR, 'PAN-1')
+        expect(found?.issueId).toBe('PAN-1')
+        expect(warnings.filter((w) => w.includes('PAN-2-corrupt'))).toEqual([])
+      } finally {
+        console.warn = originalWarn
+      }
     }),
   )
 
-  it.effect('returns null when workspace continue file is missing', () =>
+  it.effect('findSpecByIssue prefers the xBRIEF extension when both variants exist', () =>
     Effect.gen(function* () {
-      const result = yield* readWorkspaceContinue(TEST_DIR)
-      expect(result).toBeNull()
+      const paths = yield* ensurePanDirs(TEST_DIR)
+      yield* writeSpec(
+        join(paths.specsDir, '2026-05-04-PAN-4-plan.vbrief.json'),
+        asPanSpecDocument(makeDoc('PAN-4', 'Legacy extension'), 'proposed'),
+      )
+      yield* writeSpec(
+        join(paths.specsDir, '2026-05-04-PAN-4-plan.xbrief.json'),
+        asPanSpecDocument(makeDoc('PAN-4', 'Canonical extension'), 'active'),
+      )
+
+      const found = yield* findSpecByIssue(TEST_DIR, 'pan-4')
+      expect(found?.filename).toBe('2026-05-04-PAN-4-plan.xbrief.json')
+      expect(found?.status).toBe('active')
+    }),
+  )
+
+  it.effect('findSpecByIssue returns the lexicographically-first spec when several match', () =>
+    Effect.gen(function* () {
+      const paths = yield* ensurePanDirs(TEST_DIR)
+      // Two specs for the same issue (e.g., a re-plan left a superseded file).
+      // Order must match the old listSpecs()-based behavior: filename ascending.
+      yield* writeSpec(
+        join(paths.specsDir, '2026-06-01-PAN-3-newer.xbrief.json'),
+        asPanSpecDocument(makeDoc('PAN-3', 'Newer'), 'proposed'),
+      )
+      yield* writeSpec(
+        join(paths.specsDir, '2026-05-01-PAN-3-older.xbrief.json'),
+        asPanSpecDocument(makeDoc('PAN-3', 'Older'), 'proposed'),
+      )
+
+      const found = yield* findSpecByIssue(TEST_DIR, 'pan-3')
+      expect(found?.filename).toBe('2026-05-01-PAN-3-older.xbrief.json')
     }),
   )
 })

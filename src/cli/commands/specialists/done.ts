@@ -21,6 +21,10 @@ import {
 
 interface DoneOptions {
   status: 'passed' | 'failed' | 'blocked';
+  /** xBRIEF item receiving an inspect verdict. Required for inspect. */
+  item?: string;
+  /** PAN-1862 (FR-6): "security=passed,correctness=blocked" per-reviewer verdicts. */
+  reviewers?: string;
   notes?: string;
 }
 
@@ -53,6 +57,38 @@ export async function doneCommand(
     process.exit(1);
   }
 
+  if (specialist === 'inspect') {
+    if (!options.item) throw new Error('--item is required for inspect verdicts');
+
+    const { resolveProjectFromIssueSync } = await import('../../../lib/projects.js');
+    const { readWorkspacePlanSync } = await import('../../../lib/xbrief/io.js');
+    const { join } = await import('node:path');
+    const project = resolveProjectFromIssueSync(normalizedIssueId);
+    const workspacePath = project && join(project.projectPath, 'workspaces', `feature-${normalizedIssueId.toLowerCase()}`);
+    const plan = workspacePath ? readWorkspacePlanSync(workspacePath) : undefined;
+    if (!plan?.plan.items.some(item => item.id === options.item)) {
+      throw new Error(`Item "${options.item}" does not exist in the xBRIEF for ${normalizedIssueId}`);
+    }
+
+    const baseUrl = (process.env.OVERDECK_DASHBOARD_URL || process.env.DASHBOARD_URL || 'http://localhost:3011').replace(/\/$/, '');
+    const response = await fetch(`${baseUrl}/api/specialists/done`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        specialist,
+        issueId: normalizedIssueId,
+        itemId: options.item,
+        status: options.status,
+        notes: options.notes,
+      }),
+    });
+    if (!response.ok) {
+      throw new Error(`Could not record inspect verdict (${response.status}): ${await response.text()}`);
+    }
+    console.log(chalk.green(`✓ Inspection ${options.status} for ${normalizedIssueId} item ${options.item}`));
+    return;
+  }
+
   // Build the atomic update — setReviewStatus handles history, SQLite,
   // computed readyForMerge, and JSON persistence in one call.
   // This eliminates the read-modify-write race that caused duplicate
@@ -63,14 +99,35 @@ export async function doneCommand(
     case 'review':
       update.reviewStatus = options.status as ReviewStatus['reviewStatus'];
       if (options.notes) update.reviewNotes = options.notes;
-      if (options.status === 'passed') {
-        // Snapshot the workspace HEAD into reviewedAtCommit — the same way the
-        // /api/specialists/done HTTP route does. The synthesis agent signals
-        // via this CLI path, so without this the snapshot never happens:
-        // canSkipTests can't fire and the deacon's post-review-commit drift
-        // detection goes blind, jamming the issue at passed-but-no-anchor.
-        // Included in `update` so it lands atomically before setReviewStatus
-        // evaluates canSkipTests.
+      // PAN-1862 (FR-6): persist per-reviewer verdicts so selective re-review
+      // (reviewersToRerun) can skip provably-clean reviewers next cycle. The
+      // synthesis agent passes --reviewers "security=passed,correctness=blocked".
+      // Anchored to the workspace HEAD recorded below; malformed entries are
+      // dropped with a warning rather than failing the verdict write.
+      if (options.reviewers) {
+        const verdicts: NonNullable<ReviewStatus['reviewerVerdicts']> = {};
+        for (const pair of options.reviewers.split(',')) {
+          const [subRole, verdict] = pair.split('=').map(t => t.trim().toLowerCase());
+          if (subRole && (verdict === 'passed' || verdict === 'blocked')) {
+            verdicts[subRole] = { status: verdict };
+          } else if (pair.trim()) {
+            console.warn(chalk.yellow(`  ⚠ Ignoring malformed --reviewers entry: "${pair.trim()}" (want subRole=passed|blocked)`));
+          }
+        }
+        if (Object.keys(verdicts).length > 0) update.reviewerVerdicts = verdicts;
+      }
+      // Snapshot the workspace HEAD — the same way the /api/specialists/done HTTP
+      // route does. The synthesis agent signals via this CLI path, so without this
+      // the snapshot never happens: canSkipTests can't fire and the deacon's
+      // post-review-commit drift detection goes blind, jamming the issue at
+      // passed-but-no-anchor. Runs for passed verdicts (reviewedAtCommit) AND for
+      // any verdict carrying --reviewers: per-reviewer verdicts need their atCommit
+      // anchor on a BLOCKED aggregate too — that is exactly the cycle whose clean
+      // reviewers selective re-review wants to skip next time (PAN-1862 FR-6/NFR-1).
+      // A bare blocked verdict (no --reviewers) skips the git probe so the durable
+      // write stays synchronous ahead of feedback delivery (PAN-2524).
+      if (options.status === 'passed' || update.reviewerVerdicts) {
+        let workspaceHead: string | undefined;
         try {
           const { resolveProjectFromIssueSync } = await import('../../../lib/projects.js');
           const { existsSync } = await import('node:fs');
@@ -83,15 +140,22 @@ export async function doneCommand(
               `feature-${normalizedIssueId.toLowerCase()}`,
             );
             if (existsSync(workspacePath)) {
-              const { getWorkspaceGitInfo } = await import('../../../lib/git-utils.js');
-              const { HEAD } = await Effect.runPromise(getWorkspaceGitInfo(workspacePath));
-              if (HEAD) update.reviewedAtCommit = HEAD;
+              // PAN-2948: polyrepo-aware — snapshots sub-repo heads, not the wrapper.
+              const { snapshotWorkspaceHeadsPromise } = await import('../../../lib/git-utils.js');
+              const snapshot = await snapshotWorkspaceHeadsPromise(normalizedIssueId, workspacePath);
+              if (snapshot) workspaceHead = snapshot;
             }
           }
         } catch (err) {
           const message = err instanceof Error ? err.message : String(err);
-          console.warn(chalk.yellow(`  ⚠ Could not snapshot reviewedAtCommit: ${message}`));
+          console.warn(chalk.yellow(`  ⚠ Could not snapshot workspace HEAD: ${message}`));
         }
+        if (workspaceHead && update.reviewerVerdicts) {
+          for (const v of Object.values(update.reviewerVerdicts)) if (v) v.atCommit = workspaceHead;
+        }
+        if (workspaceHead && options.status === 'passed') update.reviewedAtCommit = workspaceHead;
+      }
+      if (options.status === 'passed') {
         // Clear any stale verificationStatus='failed' so the override unblocks
         // readyForMerge. A human passing review assumes responsibility for the gate.
         update.verificationStatus = 'passed';
@@ -131,7 +195,7 @@ export async function doneCommand(
       if (options.notes) update.inspectNotes = options.notes;
       if (options.status === 'passed') {
         console.log(chalk.green(`✓ Inspection passed for ${normalizedIssueId}`));
-        console.log(chalk.dim('  Agent can proceed to next bead'));
+        console.log(chalk.dim('  Agent can proceed to the next xBRIEF task'));
       } else {
         console.log(chalk.yellow(`✗ Inspection blocked for ${normalizedIssueId}`));
         console.log(chalk.dim('  Agent must fix issues and re-request inspection'));
@@ -164,14 +228,34 @@ export async function doneCommand(
   const status = setReviewStatusSync(normalizedIssueId, update);
 
   if (specialist === 'review' && (options.status === 'blocked' || options.status === 'failed')) {
+    // PAN-2518: the verdict is already durable (setReviewStatusSync above). Feedback
+    // delivery (PR comment, agent messaging, needs-you surfacing) is advisory and
+    // shells out to network + tmux, any of which can STALL. `pan admin specialists
+    // done` is run from inside the review agent's own session, so a hung delivery
+    // leaves that agent waiting on a never-returning command and the issue stalls
+    // in-review. Bound the whole step in wall-clock time so the CLI always exits;
+    // a missed comment/message is recovered by the deacon feedback janitor.
+    const FEEDBACK_DELIVERY_TIMEOUT_MS = 30_000;
     try {
       const { deliverReviewVerdictFeedback } = await import('../../../lib/cloister/review-verdict-feedback.js');
-      await Effect.runPromise(deliverReviewVerdictFeedback({
+      const delivery = Effect.runPromise(deliverReviewVerdictFeedback({
         issueId: normalizedIssueId,
         verdict: options.status,
         notes: options.notes,
         prUrl: status.prUrl,
       }));
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const timeout = new Promise<never>((_, reject) => {
+        timer = setTimeout(
+          () => reject(new Error(`feedback delivery timed out after ${FEEDBACK_DELIVERY_TIMEOUT_MS}ms`)),
+          FEEDBACK_DELIVERY_TIMEOUT_MS,
+        );
+      });
+      try {
+        await Promise.race([delivery, timeout]);
+      } finally {
+        if (timer) clearTimeout(timer);
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       console.warn(chalk.yellow(`Could not deliver review feedback: ${message}`));
@@ -202,32 +286,27 @@ export async function doneCommand(
   }
   console.log(`  Ready:  ${status.readyForMerge ? chalk.green('Yes') : chalk.dim('No')}`);
 
-  // PAN-1716: a completed advancing-role (review/test/ship) session sits idle at
-  // its Claude prompt forever after recording its verdict, counting against the
-  // PAN-1665 advancing ceiling and eventually livelocking the pipeline. The
-  // /api/specialists/done HTTP route already kills the session (PAN-846); this CLI
-  // override path never did. Reap the role's session(s) — including the review
-  // convoy sub-sessions — now that the verdict is persisted. This is the LAST
-  // action: `pan specialists done` is usually run from inside the role's own tmux
-  // session, so killing it terminates this process; all state writes and feedback
-  // delivery above have already completed.
-  const advancingRole =
-    specialist === 'review' ? 'review' :
-    specialist === 'test' ? 'test' :
-    specialist === 'ship' ? 'ship' : null;
-  if (advancingRole) {
-    try {
-      const { listSessionNames, killSession } = await import('../../../lib/tmux.js');
-      const { sessionsToReapForRole } = await import('../../../lib/cloister/reap-terminal-sessions.js');
-      const alive = await Effect.runPromise(listSessionNames());
-      const targets = sessionsToReapForRole(normalizedIssueId, advancingRole, alive);
-      for (const session of targets) {
-        await Effect.runPromise(killSession(session)).catch(() => {});
-      }
-    } catch {
-      // Best effort — the deacon janitor reaps any missed terminal session.
-    }
-  }
+  // PAN-2579 (warm-by-default lifecycle): the PAN-1716 reap-on-verdict step that
+  // used to run here is GONE. The session stays alive so the next cycle resumes
+  // it with its context intact (fast re-review). Warm-idle advancing sessions no
+  // longer count against the PAN-1665 ceiling (countRunningAgents excludes them)
+  // and the memory governor sheds them first under HARD pressure — eviction is
+  // the governor's job, never a side effect of recording a verdict.
+}
+
+/** CLI boundary: durable work finishes before forcing exit past stray open handles. */
+export async function doneAndExitCommand(
+  specialist: string,
+  issueId: string,
+  options: DoneOptions,
+): Promise<never> {
+  await doneCommand(specialist, issueId, options);
+  // PAN-2689: setReviewStatusSync's journal write is fire-and-forget; in this
+  // short-lived process an immediate exit kills it — and in a sandbox (readonly
+  // DB) that write is the ONLY durable copy of the verdict. Drain it first.
+  const { flushReviewStatusJournalWrites } = await import('../../../lib/overdeck/review-status-record-sync.js');
+  await flushReviewStatusJournalWrites();
+  process.exit(0);
 }
 
 function formatStatus(status: string): string {

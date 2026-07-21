@@ -7,6 +7,7 @@ import { Effect } from 'effect';
 import * as self from './smart-compaction.js';
 import { buildSpawnEnvForModel, getProviderEnvForModel } from '../agents.js';
 import { getClaudePermissionFlagsSync } from '../claude-permissions.js';
+import { getHarnessBehavior } from '../runtimes/behavior.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import { FsError, ProcessSpawnError } from '../errors.js';
 import { recordBackgroundAiCost } from '../background-ai/cost.js';
@@ -36,7 +37,6 @@ function recordSummaryForkCost(model: string, envelope: Record<string, unknown>)
 
 const SUMMARY_TIMEOUT_MS = 60_000;
 const FORK_SUMMARY_TIMEOUT_MS = 300_000;
-
 const DEFAULT_SUMMARY_MODEL = 'claude-haiku-4-5-20251001';
 
 export interface CompactionOptions {
@@ -644,7 +644,7 @@ async function runPiModelSummary(prompt: string, model: string, timeoutMs?: numb
   const effectiveTimeout = timeoutMs ?? SUMMARY_TIMEOUT_MS;
   const spawnEnv = await buildSpawnEnvForModel(model);
 
-  const child = spawn('pi', [
+  const child = spawn('omp', [
     '--mode', 'rpc',
     '--model', model,
     '--session-dir', sessionDir,
@@ -696,10 +696,10 @@ async function runPiModelSummary(prompt: string, model: string, timeoutMs?: numb
   const useModel = model || DEFAULT_SUMMARY_MODEL;
   console.log(`[claude-invoke] purpose=smart-summary | model=${useModel} | harness=${harness} | source=smart-compaction.ts:runModelSummary | promptChars=${prompt.length} | timeoutMs=${timeoutMs ?? SUMMARY_TIMEOUT_MS}`);
 
-  if (harness === 'pi') {
-    // Pi runs in rpc mode and auto-executes tools, so it needs no allowlist.
+  if (getHarnessBehavior(harness).deliveryKind === 'rpc-fifo') {
+    // Pi/omp runs in rpc mode and auto-executes tools, so it needs no allowlist.
     const summary = await runPiModelSummary(prompt, useModel, timeoutMs);
-    console.log(`[claude-invoke] SUCCESS purpose=smart-summary | model=${useModel} | harness=pi | outputChars=${summary.length}`);
+    console.log(`[claude-invoke] SUCCESS purpose=smart-summary | model=${useModel} | harness=${harness} | outputChars=${summary.length}`);
     return summary;
   }
 
@@ -871,6 +871,7 @@ async function generateTurnPrefixSummary(
 // — code-heavy content tokenizes denser than the 4-chars/token heuristic.
 const CHUNK_BUDGET_CHARS_BY_MODEL: Record<string, number> = {
   'claude-haiku-4-5-20251001': 300_000,   // ~75k tokens content, 200k window
+  'claude-sonnet-5': 1_200_000,           // ~300k tokens content, 1M window
   'claude-sonnet-4-6': 1_200_000,         // ~300k tokens content, 1M window
   'claude-fable-5': 1_200_000,            // ~300k tokens content, large window
   'claude-opus-4-8': 1_200_000,           // ~300k tokens content, 1M window
@@ -1007,7 +1008,6 @@ async function generateSmartSummaryPromise(options: CompactionOptions): Promise<
   // Forks summarize the entire conversation (no "kept" recent portion);
   // compaction keeps recent entries verbatim and only summarizes older history.
   const keepRecentTokens = options.keepRecentTokens ?? (isFork ? Number.MAX_SAFE_INTEGER : 20000);
-  const reserveTokens = options.reserveTokens ?? 16384;
   const model = options.model || DEFAULT_SUMMARY_MODEL;
   const richMode = options.richMode ?? false;
   const includeThinking = options.includeThinkingInSummary ?? true;
@@ -1161,7 +1161,7 @@ export function runModelSummary(
     try: () => runModelSummaryPromise(prompt, model, timeoutMs, harness, allowedTools),
     catch: (cause) =>
       new ProcessSpawnError({
-        command: harness === 'pi' ? 'pi' : 'claude',
+        command: getHarnessBehavior(harness).deliveryKind === 'rpc-fifo' ? getHarnessBehavior(harness).executableName : 'claude',
         args: ['-p', model ?? 'default'],
         message: cause instanceof Error ? cause.message : String(cause),
         cause,

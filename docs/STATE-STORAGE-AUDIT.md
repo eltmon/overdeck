@@ -8,10 +8,11 @@ and what should the storage model actually be.
 
 > **Resolution note:** The authoritative-source questions raised here were settled by
 > [PAN-1908](https://github.com/eltmon/overdeck/issues/1908): agent runtime state now lives in the SQLite `agents` table in
-> `~/.overdeck/panopticon.db`, durable per-issue records live in the git-backed infra repo
+> `~/.overdeck/overdeck.db` (renamed from `panopticon.db` by [PAN-1952](https://github.com/eltmon/overdeck/issues/1952)), durable per-issue records live in the git-backed infra repo
 > under `.pan/` records, and tmux on the `overdeck` socket remains the liveness oracle. See
 > [AGENT-STATE-PLANES.md](./AGENT-STATE-PLANES.md) for the current model. This audit is kept
 > as historical context for the design rationale, but its Pass 2 action items are superseded.
+> References to `panopticon.db` in the body below reflect the name at audit time (2026-06-14).
 
 ## Confidence legend
 
@@ -119,7 +120,7 @@ frequently and are largely meaningless on another machine. **Many are recovery s
 | `merge_step` | transient merge-progress marker |
 | `stuck` / `stuck_at` / `stuck_reason` / `stuck_details` | machine-observed failure markers |
 | `deacon_ignored` / `deacon_ignored_at` / `deacon_ignored_reason` | human override (durable-ish — **[P2]** classify) |
-| `inspect_started_at` / `inspect_bead_id` | transient inspect markers |
+| `inspect_started_at` / `inspect_task_id` | transient inspect markers |
 
 Roughly **~20 durable / ~20 ephemeral.** The ephemeral half is precisely the set of fields
 added over time (PAN-653 `stuck*`, PAN-699 `test_retry`, PAN-794 `review_retry`/`recovery_started`,
@@ -145,7 +146,7 @@ individual-developer tool. Specifics:
   queries) plus the ephemeral scratch. On boot, if the cache is missing/stale, **rebuild it
   from the JSON files.** A cache wipe becomes a non-event; a JSON wipe is git-recoverable.
 
-This is the "git-backed store + SQLite index" pattern — the same shape beads already uses
+This is the "git-backed store + SQLite index" pattern — the same shape tasks already uses
 (git JSONL truth + derived index).
 
 ### 4b. Why per-issue files are required (not one JSON)

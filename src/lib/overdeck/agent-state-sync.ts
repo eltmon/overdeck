@@ -20,6 +20,9 @@ type OverdeckAgentRow = {
   kickoff_delivered: number | null;
   paused: number | null;
   paused_reason: string | null;
+  yielded_by_scheduler: number | null;
+  yielded_at: number | null;
+  last_yield_resume_at: number | null;
   troubled: number | null;
   channels_enabled: number | null;
   consecutive_failures: number | null;
@@ -41,6 +44,15 @@ type OverdeckAgentRow = {
   review_deadline_at: number | null;
   review_monitor_signaled: string | null;
   review_retry_attempt: number | null;
+  // PAN-2585: PAN-1862 discovery-fork state. These were state.json-only, which made
+  // them write-only under the PAN-1908 DB-first reader — the discovery-ready signal
+  // and the deacon's stalled-discovery backstop could never see them.
+  review_discovery_pending: number | null;
+  review_context_manifest_path: string | null;
+  review_discovery_ready_at: number | null;
+  review_convoy_forked_at: number | null;
+  review_fork_cache_checked: number | null;
+  review_forked_from_parent: number | null;
   updated_at: number;
 };
 
@@ -63,6 +75,9 @@ export const AGENT_COLUMNS_FOR_DB = [
   'kickoff_delivered',
   'paused',
   'paused_reason',
+  'yielded_by_scheduler',
+  'yielded_at',
+  'last_yield_resume_at',
   'troubled',
   'channels_enabled',
   'consecutive_failures',
@@ -84,6 +99,12 @@ export const AGENT_COLUMNS_FOR_DB = [
   'review_deadline_at',
   'review_monitor_signaled',
   'review_retry_attempt',
+  'review_discovery_pending',
+  'review_context_manifest_path',
+  'review_discovery_ready_at',
+  'review_convoy_forked_at',
+  'review_fork_cache_checked',
+  'review_forked_from_parent',
   'updated_at',
 ] as const;
 
@@ -129,6 +150,9 @@ function overdeckRowToAgentState(row: OverdeckAgentRow): AgentState {
     kickoffDelivered: boolFromInteger(row.kickoff_delivered),
     paused: boolFromInteger(row.paused),
     pausedReason: row.paused_reason ?? undefined,
+    yieldedByScheduler: boolFromInteger(row.yielded_by_scheduler),
+    yieldedAt: isoFromMillis(row.yielded_at),
+    lastYieldResumeAt: isoFromMillis(row.last_yield_resume_at),
     troubled: boolFromInteger(row.troubled),
     consecutiveFailures: row.consecutive_failures ?? undefined,
     firstFailureInRunAt: isoFromMillis(row.first_failure_in_run_at),
@@ -154,6 +178,12 @@ function overdeckRowToAgentState(row: OverdeckAgentRow): AgentState {
     reviewDeadlineAt: isoFromMillis(row.review_deadline_at),
     reviewMonitorSignaled: (row.review_monitor_signaled ?? undefined) as AgentState['reviewMonitorSignaled'],
     reviewRetryAttempt: row.review_retry_attempt ?? undefined,
+    reviewDiscoveryPending: boolFromInteger(row.review_discovery_pending),
+    reviewContextManifestPath: row.review_context_manifest_path ?? undefined,
+    reviewDiscoveryReadyAt: isoFromMillis(row.review_discovery_ready_at) ?? undefined,
+    reviewConvoyForkedAt: isoFromMillis(row.review_convoy_forked_at) ?? undefined,
+    reviewForkCacheChecked: boolFromInteger(row.review_fork_cache_checked),
+    reviewForkedFromParent: boolFromInteger(row.review_forked_from_parent),
   };
 }
 
@@ -178,6 +208,9 @@ export function stateToOverdeckParamsForDb(state: AgentState, updatedAt: number)
     state.kickoffDelivered == null ? null : (state.kickoffDelivered ? 1 : 0),
     state.paused == null ? null : (state.paused ? 1 : 0),
     state.pausedReason ?? null,
+    state.yieldedByScheduler == null ? null : (state.yieldedByScheduler ? 1 : 0),
+    millisFromIso(state.yieldedAt),
+    millisFromIso(state.lastYieldResumeAt),
     state.troubled == null ? null : (state.troubled ? 1 : 0),
     state.channelsEnabled == null ? null : (state.channelsEnabled ? 1 : 0),
     state.consecutiveFailures ?? null,
@@ -199,6 +232,12 @@ export function stateToOverdeckParamsForDb(state: AgentState, updatedAt: number)
     millisFromIso(state.reviewDeadlineAt),
     state.reviewMonitorSignaled ?? null,
     state.reviewRetryAttempt ?? null,
+    state.reviewDiscoveryPending == null ? null : (state.reviewDiscoveryPending ? 1 : 0),
+    state.reviewContextManifestPath ?? null,
+    millisFromIso(state.reviewDiscoveryReadyAt),
+    millisFromIso(state.reviewConvoyForkedAt),
+    state.reviewForkCacheChecked == null ? null : (state.reviewForkCacheChecked ? 1 : 0),
+    state.reviewForkedFromParent == null ? null : (state.reviewForkedFromParent ? 1 : 0),
     updatedAt,
   ];
 }
@@ -227,4 +266,3 @@ export function saveOverdeckAgentStateSync(state: AgentState): void {
     `INSERT OR REPLACE INTO agents (${AGENT_COLUMNS_FOR_DB.join(', ')}) VALUES (${AGENT_COLUMNS_FOR_DB.map(() => '?').join(', ')})`,
   ).run(...stateToOverdeckParamsForDb(state, updatedAt));
 }
-

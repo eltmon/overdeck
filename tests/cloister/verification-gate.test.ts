@@ -13,6 +13,14 @@ const execMock = vi.hoisted(() =>
   vi.fn<[string, any?], Promise<{ stdout: string; stderr: string }>>()
     .mockResolvedValue({ stdout: '', stderr: '' })
 );
+const admissionMocks = vi.hoisted(() => ({
+  release: vi.fn(async () => undefined),
+  acquire: vi.fn(),
+}));
+
+vi.mock('../../src/lib/cloister/quality-gate-admission.js', () => ({
+  acquireQualityGateAdmission: admissionMocks.acquire,
+}));
 
 vi.mock('child_process', () => {
   const kCustom = Symbol.for('nodejs.util.promisify.custom');
@@ -24,14 +32,27 @@ vi.mock('child_process', () => {
       .catch((err: any) => callback(err, err.stdout || '', err.stderr || ''));
   }
 
-  (exec as any)[kCustom] = execMock;
+  (exec as any)[kCustom] = (cmd: string, options?: any) => {
+    const promise = execMock(cmd, options) as ReturnType<typeof execMock> & { child?: { pid: number } };
+    promise.child = { pid: 12345 };
+    return promise;
+  };
 
-  return { exec };
+  return { exec, execFile: vi.fn() };
 });
 
 import { runQualityGates, DEFAULT_GATES } from '../../src/lib/cloister/validation.js';
 
 const workspacePath = '/tmp/test-workspace';
+
+beforeEach(() => {
+  admissionMocks.release.mockClear();
+  admissionMocks.acquire.mockReset();
+  admissionMocks.acquire.mockResolvedValue({
+    admittedAt: '2026-07-19T00:00:00.000Z',
+    release: admissionMocks.release,
+  });
+});
 
 describe('DEFAULT_GATES', () => {
   it('defines typecheck, lint, and change-scoped test gates', () => {
@@ -52,13 +73,17 @@ describe('runQualityGates — SSH remote support', () => {
   });
 
   it('uses SSH prefix for remote workspaces', async () => {
+    const onAdmissionPhase = vi.fn();
     await Effect.runPromise(runQualityGates(DEFAULT_GATES, workspacePath, 'pre_push', {
       isRemote: true,
       vmName: 'my-vm',
+      onAdmissionPhase,
     }));
 
     const calls = execMock.mock.calls.map(c => c[0] as string);
     expect(calls.every(cmd => cmd.startsWith('fly ssh console -a'))).toBe(true);
+    expect(admissionMocks.acquire).not.toHaveBeenCalled();
+    expect(onAdmissionPhase).toHaveBeenCalledWith(expect.objectContaining({ phase: 'running' }));
   });
 
   it('does not set cwd for remote workspaces', async () => {
@@ -77,6 +102,8 @@ describe('runQualityGates — SSH remote support', () => {
     const calls = execMock.mock.calls;
     expect(calls.every(c => !(c[0] as string).startsWith('ssh'))).toBe(true);
     expect(calls.every(c => c[1]?.cwd === workspacePath)).toBe(true);
+    expect(admissionMocks.acquire).toHaveBeenCalledTimes(3);
+    expect(admissionMocks.release).toHaveBeenCalledTimes(3);
   });
 
   it('throws when isRemote is true but vmName is missing', async () => {
@@ -138,15 +165,18 @@ describe('runQualityGates — SSH remote support', () => {
     expect(cmd).toContain(`cd ${workspacePath}/frontend &&`);
   });
 
-  it('passes 5-minute timeout to each execAsync call for SSH', async () => {
+  it('passes the per-gate command timeout to each execAsync call for SSH', async () => {
     await Effect.runPromise(runQualityGates(DEFAULT_GATES, workspacePath, 'pre_push', {
       isRemote: true,
       vmName: 'my-vm',
     }));
 
-    const FIVE_MINUTES_MS = 5 * 60 * 1000;
+    // Must match the per-gate command timeout in validation.ts (PAN-1989: raised to 20m
+    // so a near-total-rename changeset whose `vitest --changed` selects ~the whole suite
+    // can finish instead of being killed mid-run).
+    const PER_GATE_TIMEOUT_MS = 20 * 60 * 1000;
     for (const call of execMock.mock.calls) {
-      expect(call[1]).toMatchObject({ timeout: FIVE_MINUTES_MS });
+      expect(call[1]).toMatchObject({ timeout: PER_GATE_TIMEOUT_MS });
     }
   });
 
@@ -206,6 +236,72 @@ describe('runQualityGates — DEFAULT_GATES fallback behavior', () => {
     expect(results).toHaveLength(1);
     expect(results[0].name).toBe('typecheck');
     expect(results[0].passed).toBe(false);
+  });
+});
+
+describe('runQualityGates — CPU admission lifecycle', () => {
+  beforeEach(() => {
+    execMock.mockReset();
+    execMock.mockResolvedValue({ stdout: '', stderr: '' });
+  });
+
+  it('re-enters admission for each retry and releases every lease', async () => {
+    const onAdmissionPhase = vi.fn();
+    execMock
+      .mockRejectedValueOnce(Object.assign(new Error('flaky'), { stdout: '', stderr: '' }))
+      .mockResolvedValueOnce({ stdout: 'ok', stderr: '' });
+
+    const results = await Effect.runPromise(runQualityGates({
+      test: { command: 'npm test', retry: 1 },
+    }, workspacePath, 'pre_push', { issueId: 'PAN-1', onAdmissionPhase }));
+
+    expect(results[0]?.passed).toBe(true);
+    expect(admissionMocks.acquire).toHaveBeenCalledTimes(2);
+    expect(admissionMocks.release).toHaveBeenCalledTimes(2);
+    expect(onAdmissionPhase.mock.calls.map(([state]) => state.phase))
+      .toEqual(['queued', 'running', 'queued', 'running']);
+  });
+
+  it('releases admission after a terminal gate failure', async () => {
+    execMock.mockRejectedValueOnce(Object.assign(new Error('failed'), { stdout: '', stderr: '' }));
+
+    const results = await Effect.runPromise(runQualityGates({
+      test: { command: 'npm test' },
+    }, workspacePath));
+
+    expect(results[0]?.passed).toBe(false);
+    expect(admissionMocks.release).toHaveBeenCalledOnce();
+  });
+
+  it('releases admission when the gate command times out', async () => {
+    execMock.mockRejectedValueOnce(Object.assign(new Error('timed out'), {
+      code: 'ETIMEDOUT', stdout: '', stderr: '',
+    }));
+
+    const results = await Effect.runPromise(runQualityGates({
+      test: { command: 'npm test' },
+    }, workspacePath));
+
+    expect(results[0]?.passed).toBe(false);
+    expect(admissionMocks.release).toHaveBeenCalledOnce();
+  });
+
+  it('bypasses admission for HTTP health gates', async () => {
+    vi.useFakeTimers();
+    execMock.mockResolvedValue({ stdout: '200', stderr: '' });
+    const onAdmissionPhase = vi.fn();
+    try {
+      const resultPromise = Effect.runPromise(runQualityGates({
+        health: { type: 'http_health', phase: 'post_push', command: '', url: 'https://example.test', wait: 0.001 },
+      }, workspacePath, 'post_push', { onAdmissionPhase }));
+      await vi.advanceTimersByTimeAsync(1);
+      const results = await resultPromise;
+      expect(results[0]?.passed).toBe(true);
+      expect(admissionMocks.acquire).not.toHaveBeenCalled();
+      expect(onAdmissionPhase).toHaveBeenCalledWith(expect.objectContaining({ phase: 'running' }));
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

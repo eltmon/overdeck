@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { Component, useEffect, useMemo, useState, type ReactNode } from 'react';
 
-import { useCostStream, type CostEvent } from '../../hooks/useCostStream';
 import { isAgentProblemStatus, isAgentRunningStatus } from '../../lib/pipeline-state';
 import { isAwaitingInput } from '../../lib/pendingInput';
 import { useSharedTick } from '../../lib/useSharedTick';
 import { formatRelativeTime } from '../../lib/formatRelativeTime';
-import { useDashboardStore, selectAgents, selectIssues } from '../../lib/store';
+import { useDashboardStore, selectAgents, selectIssues, selectPendingPermissionAgentIds } from '../../lib/store';
 import { cn } from '../../lib/utils';
 import type { Agent, Issue } from '../../types';
 import AgentCard, { type AgentCardRole } from '../primitives/AgentCard';
@@ -14,6 +14,7 @@ import TopBar from '../primitives/TopBar';
 import Button from '../primitives/Button';
 import type { VerbBadgeProps } from '../primitives/VerbBadge';
 import { IssueActionMenu } from '../IssueActionMenu';
+import { StartAgentCta } from '../issue-view';
 
 const ROLE_ORDER = {
   plan: 0,
@@ -24,6 +25,7 @@ const ROLE_ORDER = {
   ship: 5,
   flywheel: 6,
   sequencer: 7,
+  knowledge: 8,
 } satisfies Record<AgentCardRole, number>;
 
 const FLEET_STATUSES = new Set<Agent['status']>(['healthy', 'warning', 'stuck', 'stalled', 'starting', 'running', 'failed', 'error', 'unknown']);
@@ -44,6 +46,19 @@ type FilterOption = {
 type AgentsViewMode = 'grid' | 'table' | 'timeline';
 const VIEW_MODES: AgentsViewMode[] = ['grid', 'table', 'timeline'];
 
+type CostSummaryResponse = {
+  today?: {
+    totalCost?: number;
+    totalTokens?: number;
+  };
+};
+
+async function fetchCostSummary(): Promise<CostSummaryResponse> {
+  const res = await fetch('/api/costs/summary');
+  if (!res.ok) throw new Error('Failed to fetch cost summary');
+  return res.json();
+}
+
 function readViewMode(): AgentsViewMode {
   if (typeof window === 'undefined') return 'grid';
   const params = new URLSearchParams(window.location.search);
@@ -60,13 +75,6 @@ function replaceViewUrl(view: AgentsViewMode) {
     url.searchParams.set('view', view);
   }
   window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
-}
-
-function sumIssueCostEvents(events: CostEvent[] | undefined) {
-  return (events ?? []).reduce(
-    (totals, event) => ({ cost: totals.cost + event.cost, tokens: totals.tokens + event.tokens }),
-    { cost: 0, tokens: 0 },
-  );
 }
 
 function agentRole(agent: Agent): AgentCardRole {
@@ -86,7 +94,31 @@ function issueProjectOption(issue: Issue | undefined): FilterOption {
   return { id: issue?.project?.id ?? issue?.project?.name ?? issue?.sourceRepo ?? issue?.source ?? name, name };
 }
 
-function compactModel(model: string) {
+
+/** PAN-2384: one malformed agent row must never take down the whole fleet
+ * view — exactly when agents are spawning is when the operator looks here.
+ * A row that throws renders a single broken-card placeholder instead. */
+class AgentCardBoundary extends Component<{ agentId: string; children: ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+  render() {
+    if (this.state.failed) {
+      return (
+        <div className="rounded-[18px] border border-border bg-card px-4 py-6 text-xs text-muted-foreground">
+          Agent card failed to render ({this.props.agentId}) — see console; the rest of the fleet is unaffected.
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+function compactModel(model: string | null | undefined) {
+  // PAN-2384: agent rows can lack a model during their spawn window despite
+  // the type — a partial row must never crash the fleet view.
+  if (!model) return 'model pending';
   return model.replace(/^claude-/, '').replace(/-202\d{5,8}$/, '');
 }
 
@@ -129,11 +161,14 @@ function stuckHours(agent: Agent, now: Date) {
   return Math.max(0, Math.floor((now.getTime() - sinceTime) / 3_600_000));
 }
 
-function verbBadgeForAgent(agent: Agent, now: Date): VerbBadgeProps {
+function verbBadgeForAgent(agent: Agent, now: Date, pendingPermissionAgentIds?: ReadonlySet<string>): VerbBadgeProps {
+  if (agent.status === 'unknown' && agent.hasLiveTmuxSession === false) {
+    return { variant: 'UNREACHABLE' };
+  }
   if (isAgentProblemStatus(agent.status) || agent.troubled) {
     return { variant: 'STUCK · Nh', hours: stuckHours(agent, now) };
   }
-  if (isAwaitingInput(agent)) return { variant: 'INPUT' };
+  if (isAwaitingInput(agent, pendingPermissionAgentIds)) return { variant: 'INPUT' };
 
   switch (agent.role) {
     case 'plan':
@@ -145,6 +180,7 @@ function verbBadgeForAgent(agent: Agent, now: Date): VerbBadgeProps {
       return { variant: 'SHIP RUNNING' };
     case 'strike':
       return { variant: 'STRIKE RUNNING' };
+    case 'knowledge':
     case 'work':
     default:
       return { variant: 'WORK RUNNING' };
@@ -157,6 +193,7 @@ function agentPhase(agent: Agent): AgentPhaseFilter {
   if (role === 'test') return 'review';
   if (role === 'flywheel') return 'work';
   if (role === 'sequencer') return 'work';
+  if (role === 'knowledge') return 'work';
   if (role === 'strike') return 'strike';
   return role;
 }
@@ -259,12 +296,17 @@ function DropdownFilter({ label, selected, options, onToggle }: {
 export function FleetAgentsView({ onNavigateToIssues }: { onNavigateToIssues?: () => void } = {}) {
   const now = useSharedTick();
   const agents = useDashboardStore(selectAgents) as Agent[];
+  const pendingPermissionAgentIds = useDashboardStore(selectPendingPermissionAgentIds);
   const issues = useDashboardStore(selectIssues) as Issue[];
   const agentOutputById = useDashboardStore((state) => state.agentOutputById);
   const openIssue = useDashboardStore((state) => state.openIssue);
   const [filter, setFilter] = useState(readFilterState);
   const [viewMode, setViewMode] = useState<AgentsViewMode>(readViewMode);
-  const { eventsByIssue } = useCostStream({ limit: 500 });
+  const { data: costSummary } = useQuery({
+    queryKey: ['agents-fleet-cost-summary'],
+    queryFn: fetchCostSummary,
+    refetchInterval: 30_000,
+  });
 
   useEffect(() => {
     const handlePopState = () => {
@@ -309,6 +351,7 @@ export function FleetAgentsView({ onNavigateToIssues }: { onNavigateToIssues?: (
   const modelOptions = useMemo(() => {
     const map = new Map<string, FilterOption>();
     for (const agent of fleetAgents) {
+      if (!agent.model) continue; // PAN-2384: spawn-window rows have no model yet
       if (!map.has(agent.model)) map.set(agent.model, { id: agent.model, name: compactModel(agent.model) });
     }
     return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
@@ -334,17 +377,8 @@ export function FleetAgentsView({ onNavigateToIssues }: { onNavigateToIssues?: (
       const sum = finiteDurations.reduce((total, t) => total + Math.max(0, now.getTime() - t), 0);
       return sum / finiteDurations.length;
     })();
-    const costIssueIds = new Set(fleetAgents.map((agent) => issueKey(agent.issueId)).filter(Boolean));
-    const { cost24h, tokens24h } = Array.from(costIssueIds).reduce(
-      (totals, issueId) => {
-        const issueTotals = sumIssueCostEvents(eventsByIssue[issueId] ?? eventsByIssue[issueId.toUpperCase()]);
-        return {
-          cost24h: totals.cost24h + issueTotals.cost,
-          tokens24h: totals.tokens24h + issueTotals.tokens,
-        };
-      },
-      { cost24h: 0, tokens24h: 0 },
-    );
+    const cost24h = costSummary?.today?.totalCost ?? 0;
+    const tokens24h = costSummary?.today?.totalTokens ?? 0;
 
     return [
       { id: 'running', eyebrow: 'Running', value: runningAgents.length, sub: 'live agents', icon: <MetricIcon label="▶" />, signal: 'info' as const },
@@ -362,7 +396,7 @@ export function FleetAgentsView({ onNavigateToIssues }: { onNavigateToIssues?: (
       { id: 'runtime', eyebrow: 'Avg runtime', value: formatDuration(avgRuntime), sub: 'running agents', icon: <MetricIcon label="⏱" />, signal: 'review' as const },
       { id: 'queue', eyebrow: 'Queue', value: queuedAgents.length, sub: 'starting agents', icon: <MetricIcon label="…" />, signal: 'warning' as const },
     ];
-  }, [eventsByIssue, fleetAgents, now]);
+  }, [costSummary, fleetAgents, now]);
 
   function updateFilter(next: AgentsFilterState) {
     setFilter(next);
@@ -466,8 +500,8 @@ export function FleetAgentsView({ onNavigateToIssues }: { onNavigateToIssues?: (
                 const runtime = formatDuration(now.getTime() - new Date(agent.startedAt).getTime());
 
                 return (
+                  <AgentCardBoundary key={agent.id} agentId={agent.id}>
                   <AgentCard
-                    key={agent.id}
                     id={agent.id}
                     name={agent.issueId ?? agent.id}
                     role={role}
@@ -482,14 +516,18 @@ export function FleetAgentsView({ onNavigateToIssues }: { onNavigateToIssues?: (
                       { label: 'Last heard', value: lastHeard },
                     ]}
                     streamLines={output.slice(-16)}
-                    verbBadge={verbBadgeForAgent(agent, now)}
+                    verbBadge={verbBadgeForAgent(agent, now, pendingPermissionAgentIds)}
                     stuck={stuck}
                     stuckMessage={agent.lastFailureReason ?? agent.error ?? 'Agent requires attention.'}
                     onOpenIssue={agent.issueId ? () => openAgentIssue(agent.issueId!) : undefined}
                     actionMenu={agent.issueId ? (
-                      <IssueActionMenu issueId={agent.issueId} mode="overflow-only" agentScopeOnly className="inline-flex" />
+                      <div className="inline-flex items-center gap-2">
+                        <StartAgentCta issueId={agent.issueId} density="rail" surface="inline" />
+                        <IssueActionMenu issueId={agent.issueId} mode="overflow-only" agentScopeOnly className="inline-flex" />
+                      </div>
                     ) : undefined}
                   />
+                  </AgentCardBoundary>
                 );
               })}
             </div>

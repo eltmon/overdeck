@@ -2,14 +2,15 @@ import chalk from 'chalk';
 import { existsSync } from 'fs';
 import { getConversationById, getConversationByName } from '../../lib/overdeck/conversations.js';
 import { resolveCurrentConversation } from '../../lib/conversations/current.js';
+import { parseIssueIdSync } from '../../lib/issue-id.js';
 import { forkConversationViaServer, ForkServerError, isForkResultInProgress } from './fork-client.js';
 import { sessionFilePath } from '../../lib/paths.js';
-import type { RuntimeName } from '../../lib/runtimes/types.js';
 
 interface HandoffOptions {
   model?: string;
   harness?: string;
   cwd?: string;
+  issue?: string;
   author?: string;
   authorModel?: string;
   authorHarness?: string;
@@ -24,12 +25,13 @@ function resolveConversation(convRef: string) {
 
 const SELF_REFS = new Set(['self', '.', 'current', 'me']);
 
-function validateHarness(harness: string | undefined): RuntimeName | undefined {
-  if (harness === undefined || harness === 'claude-code' || harness === 'pi' || harness === 'codex') {
-    return harness;
-  }
-  console.log(chalk.yellow(`Invalid harness: ${harness}. Expected claude-code, pi, or codex.`));
-  process.exit(1);
+function looksLikeBareFocusText(convRef: string, focusArgs: string[]): boolean {
+  return focusArgs.length > 0 || /\s/.test(convRef) || /[.!?]/.test(convRef) || /^[A-Z]/.test(convRef);
+}
+
+function printIgnoredHarnessNotice(flag: '--harness' | '--author-harness', harness: string | undefined): void {
+  if (harness === undefined) return;
+  console.log(chalk.yellow(`${flag} is provider-default-only (PAN-1984); ignoring "${harness}".`));
 }
 
 export async function handoffCommand(
@@ -49,6 +51,11 @@ export async function handoffCommand(
       console.log(chalk.gray('  Pass an explicit conversation id or name, e.g. `pan handoff 371`.'));
     } else {
       console.log(chalk.yellow(`Conversation not found: ${convRef}`));
+      if (looksLikeBareFocusText(convRef, focusArgs)) {
+        const focusPreview = [convRef, ...focusArgs].join(' ').trim();
+        console.log(chalk.gray('  If that was focus text for the current conversation, pass `self` before it:'));
+        console.log(chalk.gray(`  pan handoff self "${focusPreview}"`));
+      }
     }
     process.exit(1);
   }
@@ -67,15 +74,24 @@ export async function handoffCommand(
     console.log(chalk.gray('  e.g. "Read .pan/handoff-brief.md FIRST and follow it exactly. <one-line goal>".'));
     process.exit(1);
   }
-  const harness = validateHarness(options.harness);
-  const authorHarness = validateHarness(options.authorHarness);
+  printIgnoredHarnessNotice('--harness', options.harness);
+  printIgnoredHarnessNotice('--author-harness', options.authorHarness);
   const author = options.author === 'source' ? 'source' : 'external';
   if (options.author !== undefined && options.author !== 'source' && options.author !== 'external') {
     console.log(chalk.yellow(`Invalid --author: ${options.author}. Expected source or external.`));
     process.exit(1);
   }
+  let issueId: string | undefined;
+  if (options.issue !== undefined) {
+    const parsed = parseIssueIdSync(options.issue.trim());
+    if (!parsed) {
+      console.log(chalk.yellow(`Invalid --issue: ${options.issue}. Expected an issue ID like PAN-123.`));
+      process.exit(1);
+    }
+    issueId = parsed.raw;
+  }
   console.log(chalk.gray(`Creating handoff from conversation: ${conv.name} (${conv.title || 'untitled'})`));
-  console.log(chalk.gray(`  Author: ${author}${author === 'external' ? ` (model=${options.authorModel ?? 'default'}, harness=${authorHarness ?? 'claude-code'})` : ' (in-source agent)'}`));
+  console.log(chalk.gray(`  Author: ${author}${author === 'external' ? ` (model=${options.authorModel ?? 'default'}, harness=provider-default)` : ' (in-source agent)'}`));
   if (focus) {
     console.log(chalk.gray(`  Focus: ${focus}`));
   }
@@ -89,12 +105,11 @@ export async function handoffCommand(
     newConv = await forkConversationViaServer(conv.name, {
       model: options.model,
       cwd: options.cwd,
-      harness,
+      issueId,
       forkMode: 'handoff',
       focus,
       handoffAuthor: author,
       handoffAuthorModel: options.authorModel,
-      handoffAuthorHarness: authorHarness,
     });
   } catch (err) {
     if (err instanceof ForkServerError) {
@@ -106,11 +121,11 @@ export async function handoffCommand(
 
   if (newConv.forkStatus === 'failed') {
     console.log(chalk.red(`Handoff failed: ${newConv.forkError ?? 'unknown error'}`));
-    console.log(chalk.gray(`  Conv ID: ${newConv.id} (Dashboard: https://pan.localhost/conv/${newConv.id})`));
+    console.log(chalk.gray(`  Conv ID: ${newConv.id} (Dashboard: https://overdeck.localhost/conv/${newConv.id})`));
     process.exit(1);
   }
   if (isForkResultInProgress(newConv)) {
-    console.log(chalk.yellow(`Handoff is still in progress — watch https://pan.localhost/conv/${newConv.id}`));
+    console.log(chalk.yellow(`Handoff is still in progress — watch https://overdeck.localhost/conv/${newConv.id}`));
     console.log(chalk.gray(`  Conv ID: ${newConv.id}`));
     console.log(chalk.gray(`  Session: ${newConv.tmuxSession}${newConv.sessionAlive ? ' (live)' : ''}`));
     process.exit(1);
@@ -124,8 +139,9 @@ export async function handoffCommand(
   console.log(chalk.gray(`  Session: ${newConv.tmuxSession}${newConv.sessionAlive ? ' (live)' : ''}`));
   console.log(chalk.gray(`  Model: ${newConv.model || 'default'}`));
   console.log(chalk.gray(`  Harness: ${newConv.harness || 'claude-code'}`));
+  console.log(chalk.gray(`  Issue: ${newConv.issueId ?? 'none'}${options.issue ? ' (from --issue)' : ''}`));
   if (newConv.handoffDocPath) {
     console.log(chalk.gray(`  Handoff doc: ${newConv.handoffDocPath}`));
   }
-  console.log(chalk.gray(`  Dashboard: https://pan.localhost/conv/${newConv.id}`));
+  console.log(chalk.gray(`  Dashboard: https://overdeck.localhost/conv/${newConv.id}`));
 }

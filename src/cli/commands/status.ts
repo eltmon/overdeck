@@ -12,7 +12,7 @@ import {
   getWorkspaceStackHealth,
   inferIssueIdFromStackContainerName,
 } from '../../lib/workspace/stack-health.js';
-import { readRestartStatus, type RestartStatus } from '../../lib/restart-status.js';
+import { detectConcurrentRestartWriters, readRestartEvents, readRestartStatus, type RestartStatus } from '../../lib/restart-status.js';
 
 interface StatusOptions {
   json?: boolean;
@@ -38,13 +38,39 @@ function formatRestartDuration(durationMs: number): string {
   return `${(durationMs / 1000).toFixed(1)}s`;
 }
 
-function renderRestartStatus(status: RestartStatus | null): void {
-  if (!status) return;
+export function formatRestartStatusLines(status: RestartStatus | null, events: RestartStatus[]): string[] {
+  if (!status) return [];
   const marker = status.success ? chalk.green('✓ ok') : chalk.red(status.gaveUp ? '⚠ FAILED — watchdog gave up' : '⚠ FAILED');
-  const base = `Last dashboard restart: ${marker} (${status.trigger}, ${formatRestartAge(status.ts)}, ${formatRestartDuration(status.durationMs)})`;
-  console.log(base);
+  let base = `Last dashboard restart: ${marker} (${status.trigger}, ${formatRestartAge(status.ts)}, ${formatRestartDuration(status.durationMs)}`;
+  if (status.pid !== undefined) {
+    base += `, pid ${status.pid}`;
+  }
+  if (status.initiator) {
+    base += `, ${status.initiator}`;
+  }
+  base += ')';
+  const lines: string[] = [base];
   if (status.error) {
-    console.log(`  ${chalk.dim(status.error)}`);
+    lines.push(`  ${chalk.dim(status.error)}`);
+  }
+  const statusTs = new Date(status.ts).getTime();
+  const windowEvents = events.filter((event) => {
+    const eventTs = new Date(event.ts).getTime();
+    return Number.isFinite(eventTs) && Math.abs(eventTs - statusTs) <= 60_000;
+  });
+  const concurrent = detectConcurrentRestartWriters(windowEvents);
+  if (concurrent.length > 0) {
+    const descriptions = concurrent
+      .map((event) => `pid ${event.pid ?? 'unknown'}${event.initiator ? ` (${event.initiator})` : ''}`)
+      .join(', ');
+    lines.push(chalk.yellow(`⚠ Concurrent restart writers detected: ${descriptions}`));
+  }
+  return lines;
+}
+
+function renderRestartStatus(status: RestartStatus | null, events: RestartStatus[]): void {
+  for (const line of formatRestartStatusLines(status, events)) {
+    console.log(line);
   }
   console.log('');
 }
@@ -97,7 +123,9 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
     return;
   }
 
-  const restartStatus = await Effect.runPromise(readRestartStatus());
+  const [restartStatus, restartEvents] = await Effect.runPromise(
+    Effect.all([readRestartStatus(), readRestartEvents()]),
+  );
 
   // Filter out invalid agent states (missing required fields)
   const agents = listRunningAgentsSync().filter(agent =>
@@ -145,7 +173,7 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
     return;
   }
 
-  renderRestartStatus(restartStatus);
+  renderRestartStatus(restartStatus, restartEvents);
 
   if (agents.length === 0 && brokenStacksWithoutAgent.length === 0) {
     console.log(chalk.dim('No running agents.'));

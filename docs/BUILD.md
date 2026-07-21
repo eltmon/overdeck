@@ -166,10 +166,13 @@ The `apps/desktop` workspace builds the native Electron app using tsdown (for ma
 |---------|-------------|
 | `npm run build` (from `apps/desktop/`) | Compiles main.ts + preload.ts via tsdown → `dist-electron/` |
 | `dist:linux` | Packages as Linux AppImage (x64) |
-| `dist:mac` | Packages as macOS DMG (arm64 + x64 universal) |
+| `dist:mac` | Packages as macOS DMG + Squirrel.Mac ZIP (arm64) |
+| `dist:win` | Packages as Windows NSIS installer (x64) |
 | `npm run dev` | Parallel: tsdown watch + Electron launcher |
 
 Run all commands from `apps/desktop/` (or use workspace syntax: `bun run --cwd apps/desktop ...`).
+
+Each `dist:*` command also stamps the generated `latest*.yml`/`beta*.yml` manifest with the dashboard and agent protocol versions. The release workflow uploads those manifests, native packages, ZIP, and blockmaps together; missing manifests fail the packaging command before a release can be created.
 
 ### tsdown Config (`apps/desktop/tsdown.config.ts`)
 

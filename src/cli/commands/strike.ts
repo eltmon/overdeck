@@ -1,19 +1,23 @@
 import chalk from 'chalk';
 import ora from 'ora';
 import { existsSync, mkdirSync } from 'fs';
+import { rm } from 'fs/promises';
 import { join } from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 
-import { spawnAgent } from '../../lib/agents.js';
+import { Effect } from 'effect';
+
+import { getAgentRuntimeState, spawnAgent, stopAgent } from '../../lib/agents.js';
 import { resolveProjectFromIssueSync } from '../../lib/projects.js';
+import { sessionExists } from '../../lib/tmux.js';
 import type { RoleEffort } from '../../lib/config-yaml.js';
 
 const execAsync = promisify(exec);
 
 export interface StrikeOptions {
   model?: string;
-  harness?: 'claude-code' | 'pi' | 'codex';
+  harness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp';
   effort?: RoleEffort;
   dryRun?: boolean;
 }
@@ -24,6 +28,25 @@ interface StrikePlan {
   branch: string;
   sessionName: string;
   projectRoot: string;
+}
+
+async function registeredWorktreeBranch(projectRoot: string, workspace: string): Promise<string | null | undefined> {
+  const { stdout } = await execAsync('git worktree list --porcelain', { cwd: projectRoot });
+  let currentPath: string | null = null;
+  let foundWorkspace = false;
+
+  for (const line of stdout.split('\n')) {
+    if (line.startsWith('worktree ')) {
+      currentPath = line.slice('worktree '.length);
+      if (currentPath === workspace) foundWorkspace = true;
+      continue;
+    }
+    if (currentPath === workspace && line.startsWith('branch ')) {
+      return line.slice('branch '.length).replace(/^refs\/heads\//, '');
+    }
+  }
+
+  return foundWorkspace ? null : undefined;
 }
 
 /**
@@ -52,8 +75,18 @@ function planStrike(issueId: string): StrikePlan {
  * If the worktree already exists, reuse it (no-op).
  */
 async function ensureStrikeWorktree(plan: StrikePlan): Promise<void> {
-  if (existsSync(plan.workspace)) {
+  const registeredBranch = await registeredWorktreeBranch(plan.projectRoot, plan.workspace);
+  if (registeredBranch === plan.branch) {
     return;
+  }
+  if (registeredBranch !== undefined) {
+    const actual = registeredBranch ?? 'a detached HEAD';
+    throw new Error(
+      `Strike workspace ${plan.workspace} is registered on ${actual}, expected ${plan.branch}. Refusing to reuse the wrong worktree.`,
+    );
+  }
+  if (existsSync(plan.workspace)) {
+    await rm(plan.workspace, { recursive: true, force: true });
   }
   mkdirSync(join(plan.workspace, '..'), { recursive: true });
 
@@ -103,12 +136,43 @@ function buildStrikePrompt(plan: StrikePlan): string {
     `1. Read the issue body for ${plan.issueId} (use \`gh issue view\` or your tracker tool).`,
     '2. Implement the fix in this workspace, scoped to the actual change requested.',
     '3. Commit on the strike branch with a clear message.',
-    '4. Rebase onto `origin/main`, then merge fast-forward to `main` and push.',
-    '5. Verify ON main with `npm run typecheck && npm test`.',
-    '6. Report the result. Do NOT call `pan done` — strike does not enter the review pipeline.',
+    '4. Rebase onto `origin/main`:',
+    '   ```bash',
+    '   git fetch origin main',
+    '   git rebase origin/main',
+    '   ```',
+    '5. Run the full workspace quality gates before signaling readiness:',
+    '   ```bash',
+    '   npm run typecheck && npm run lint && npm test',
+    '   ```',
+    '6. Push ONLY the strike branch:',
+    '   ```bash',
+    `   git push origin ${plan.branch}`,
+    '   ```',
+    '7. Signal readiness, then stop:',
+    '   ```bash',
+    `   pan strike-ready ${plan.issueId}`,
+    '   ```',
+    '   This durable signal is the only completion handoff. Do not send a Flywheel message or issue comment.',
+    '',
+    'The Deacon owns landing the strike through the server merge door and the post-merge handoff. Do NOT switch to `main`. Do NOT merge into `main`. Do NOT push `origin main`. Do NOT call `pan done`. Do NOT call `pan done <id> --strike`.',
     '',
     'If mid-strike you discover the issue is broader than a precision fix, abort, do not push, and report why so the issue can run through the normal pipeline instead.',
   ].join('\n');
+}
+
+async function clearIdlePriorStrike(plan: StrikePlan): Promise<boolean> {
+  const hasExistingSession = await Effect.runPromise(sessionExists(plan.sessionName));
+  if (!hasExistingSession) return false;
+
+  const runtimeState = await Effect.runPromise(getAgentRuntimeState(plan.sessionName));
+  const replaceableStates = new Set(['idle', 'suspended', 'stopped']);
+  if (runtimeState && !replaceableStates.has(runtimeState.state)) {
+    throw new Error(`Agent ${plan.sessionName} already running. Use 'pan tell' to message it.`);
+  }
+
+  await Effect.runPromise(stopAgent(plan.sessionName));
+  return true;
 }
 
 async function runOne(issueId: string, options: StrikeOptions): Promise<void> {
@@ -130,8 +194,11 @@ async function runOne(issueId: string, options: StrikeOptions): Promise<void> {
 
     spinner.text = `Preparing strike workspace for ${plan.issueId}...`;
     await ensureStrikeWorktree(plan);
+    const replacedPriorSession = await clearIdlePriorStrike(plan);
 
-    spinner.text = `Spawning strike agent for ${plan.issueId}...`;
+    spinner.text = replacedPriorSession
+      ? `Replacing idle prior strike session for ${plan.issueId}...`
+      : `Spawning strike agent for ${plan.issueId}...`;
     const prompt = buildStrikePrompt(plan);
     const agent = await spawnAgent({
       issueId: plan.issueId,
@@ -190,4 +257,7 @@ export async function strikeCommand(ids: string[], options: StrikeOptions = {}):
 export const __testInternals = {
   planStrike,
   buildStrikePrompt,
+  clearIdlePriorStrike,
+  ensureStrikeWorktree,
+  registeredWorktreeBranch,
 };

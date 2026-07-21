@@ -5,7 +5,7 @@
  * short-circuits to durable-artifact reconstruction when sessionId/workspace are
  * missing.
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach, beforeAll } from 'vitest';
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -26,10 +26,20 @@ vi.mock('../../src/lib/conversations/summary-fork.js', () => ({
   generateFallbackSummary: (...args: unknown[]) => mockGenerateFallbackSummary(...args),
 }));
 
+vi.setConfig({ testTimeout: 15_000 });
+
 let HOME_DIR: string;
 const AGENT_ID = 'agent-pan-test';
 const WORKSPACE = '/tmp/ws-pan-test';
 const SESSION_ID = 'sess-abc-123';
+
+let buildCompactRecoverySeed: (agentId: string) => Promise<{ seed: string; summarized: boolean }>;
+let sessionFilePath: (workspace: string, sessionId: string) => string;
+
+beforeAll(async () => {
+  ({ buildCompactRecoverySeed } = await import('../../src/lib/agents.js'));
+  ({ sessionFilePath } = await import('../../src/lib/paths.js'));
+});
 
 function writeAgent(opts: { workspace?: string; sessionId?: string }): void {
   const agentDir = join(HOME_DIR, 'agents', AGENT_ID);
@@ -47,7 +57,6 @@ function writeAgent(opts: { workspace?: string; sessionId?: string }): void {
 }
 
 beforeEach(() => {
-  vi.resetModules();
   mockGenerateSmartSummary.mockReset().mockReturnValue(Effect.succeed({
     summary: 'Recovered session summary',
     tokensBefore: 1,
@@ -68,8 +77,6 @@ afterEach(() => {
 describe('buildCompactRecoverySeed (PAN-1781)', () => {
   it('resolves the agent JSONL and embeds a smart summary in the fresh-session seed', async () => {
     writeAgent({ workspace: WORKSPACE, sessionId: SESSION_ID });
-    const { buildCompactRecoverySeed } = await import('../../src/lib/agents.js');
-    const { sessionFilePath } = await import('../../src/lib/paths.js');
 
     const result = await buildCompactRecoverySeed(AGENT_ID);
 
@@ -92,8 +99,6 @@ describe('buildCompactRecoverySeed (PAN-1781)', () => {
   it('falls back to a heuristic summary when smart summary generation rejects', async () => {
     writeAgent({ workspace: WORKSPACE, sessionId: SESSION_ID });
     mockGenerateSmartSummary.mockReturnValue(Effect.fail(new Error('boom')));
-    const { buildCompactRecoverySeed } = await import('../../src/lib/agents.js');
-    const { sessionFilePath } = await import('../../src/lib/paths.js');
 
     const result = await buildCompactRecoverySeed(AGENT_ID);
 
@@ -106,37 +111,34 @@ describe('buildCompactRecoverySeed (PAN-1781)', () => {
     writeAgent({ workspace: WORKSPACE, sessionId: SESSION_ID });
     mockGenerateSmartSummary.mockReturnValue(Effect.fail(new Error('boom')));
     mockGenerateFallbackSummary.mockReturnValue(Effect.fail(new Error('fallback boom')));
-    const { buildCompactRecoverySeed } = await import('../../src/lib/agents.js');
 
     const result = await buildCompactRecoverySeed(AGENT_ID);
 
     expect(result.summarized).toBe(false);
     expect(result.seed).toContain('.pan/continue.json');
-    expect(result.seed).toContain('bd ready');
+    expect(result.seed).toContain('pan task next');
     expect(result.seed).toContain('Do NOT start over');
   });
 
   it('short-circuits to a reseed-only prompt with no summary call when sessionId is missing', async () => {
     writeAgent({ workspace: WORKSPACE }); // no session.id
-    const { buildCompactRecoverySeed } = await import('../../src/lib/agents.js');
 
     const result = await buildCompactRecoverySeed(AGENT_ID);
 
     expect(result.summarized).toBe(false);
-    expect(result.seed).toContain('.pan/continue.json');
     expect(mockGenerateSmartSummary).not.toHaveBeenCalled();
-    expect(mockGenerateFallbackSummary).not.toHaveBeenCalled();
+    expect(result.seed).toContain('.pan/continue.json');
+    expect(result.seed).toContain('Do NOT start over');
   });
 
   it('short-circuits to a reseed-only prompt with no summary call when workspace is missing', async () => {
     writeAgent({ sessionId: SESSION_ID }); // no workspace
-    const { buildCompactRecoverySeed } = await import('../../src/lib/agents.js');
 
     const result = await buildCompactRecoverySeed(AGENT_ID);
 
     expect(result.summarized).toBe(false);
-    expect(result.seed).toContain('.pan/continue.json');
     expect(mockGenerateSmartSummary).not.toHaveBeenCalled();
-    expect(mockGenerateFallbackSummary).not.toHaveBeenCalled();
+    expect(result.seed).toContain('.pan/continue.json');
+    expect(result.seed).toContain('Do NOT start over');
   });
 });

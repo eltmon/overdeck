@@ -29,15 +29,40 @@ pan start PAN-123 --force  # Clear a paused agent gate and start anyway
 pan start PAN-123 --host   # Break-glass: bypass workspace Docker stack-health gate
 pan start PAN-123 --fresh  # Drop the saved session and start a new one (e.g. switch model)
 pan start PAN-123 --harness codex  # Explicitly use the Codex harness
+pan start PAN-123 --model gpt-5.6-sol --swarm off --review-mode full
+pan start PAN-123 --review-model gpt-5.6-sol  # Pin the convoy review model
 pan start PAN-123 --remote --tier durable  # Remote Fly.io workspace with persistent volume
 pan start PAN-123 --remote --tier ephemeral  # Remote Fly.io workspace that winds down on stale heartbeat
 ```
 
 ## What It Does
 
-Creates a git worktree at `workspaces/feature-<id>/`, installs dependencies, then spawns
-an autonomous Claude Code agent in a tmux session (`agent-<id>`). The agent loads the
-issue spec, creates a plan, and begins implementation.
+`pan start <id>` is the single paved-road entry point: it takes an issue from whatever
+state it is in to running work.
+
+- **No plan exists** — `pan start` auto-plans (non-interactive), materializes xBRIEF tasks, and
+  starts the work agent when planning finalizes.
+- **Plan exists** — `pan start` creates the workspace if needed and spawns the work agent
+  from the existing xBRIEF and xBRIEF tasks.
+- **Already running** — `pan start` exits 0 with a no-op message naming `pan tell <id>` for
+  messaging and the tmux attach command.
+
+Planning depth is controlled by `--plan`:
+
+```bash
+pan start PAN-1071 --plan interactive   # Q&A planning first, then work
+pan start PAN-1071 --plan auto          # non-interactive planning, then work (default)
+pan start PAN-1071 --plan skip          # synthesize a minimal xBRIEF and xBRIEF tasks, then work
+```
+
+The default planning mode comes from `planning.default_mode` in `~/.overdeck/config.yaml`;
+the shipped default is `auto`. The legacy `--auto` flag is deprecated and is now an alias
+for `--plan skip`.
+
+Start-time policy flags are persisted on the issue before planning or work begins. `--model`
+sets the durable work-model override used by later respawns, `--swarm` accepts `off`, `auto`,
+or `always`, `--review-mode` accepts `quick`, `full`, or `none`, and `--review-model` pins the
+model used by the review convoy. Omitted flags leave existing and inherited policy untouched.
 
 If an agent is paused, `pan start <id>` refuses to spawn until you run `pan unpause <id>`.
 Use `--force` only when you intentionally want to clear that pause gate and start anyway.
@@ -52,6 +77,29 @@ saved session and start a brand-new one — for example, to relaunch a stopped a
 different model, where the existing session can't resume under different provider routing.
 `--fresh` is non-destructive: it clears only the resume pointer, never the JSONL transcript,
 and refuses while the agent is still running (stop it first with `pan kill <id>`).
+
+## Slow or hanging workspace prep
+
+Workspace preparation bounds its slow external phases with these default budgets:
+
+| Phase | Budget | Timeout behavior |
+| --- | ---: | --- |
+| `state-reconcile` | 60s | Fail fast |
+| `sync-main` | 240s | Warn and continue to spawn |
+| `tracker-context` | 60s | Warn, use empty tracker context, and continue to spawn |
+| `spawn` | 600s | Fail fast |
+
+Ora spinner text updates render only on a TTY, so non-interactive callers receive plain
+progress lines and a heartbeat every 15 seconds while a phase is still running:
+
+```text
+[prep] still running: sync-main (45s elapsed)
+```
+
+A fail-fast timeout exits with the step name and budget. A degraded timeout warns and keeps
+preparation moving toward agent spawn. Supervisors that invoke `pan start` non-interactively
+should allow an outer budget of at least 300 seconds under load; RUN-35 completed after earlier
+120-second and 200-second supervisors timed out while workspace preparation was still making progress.
 
 ## When to Use
 

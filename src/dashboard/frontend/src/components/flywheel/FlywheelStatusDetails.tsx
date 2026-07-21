@@ -100,19 +100,42 @@ function SuggestionPriorityBadge({ priority }: { priority: FlywheelSuggestion['p
   );
 }
 
+function WeightBadge({ weight }: { weight: number }) {
+  return (
+    <span
+      className={cn(
+        'inline-flex rounded border px-2 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wide',
+        'bg-info/15 text-info-foreground border-info/30',
+      )}
+      title="Substrate-bug weight by affected v1.0 criterion"
+      data-testid="suggestion-weight-badge"
+    >
+      weight {weight}
+    </span>
+  );
+}
+
 function sortSuggestions(suggestions: ReadonlyArray<FlywheelSuggestion>): FlywheelSuggestion[] {
   return suggestions
     .map((suggestion, index) => ({ suggestion, index }))
     .sort((left, right) => {
+      if (left.suggestion.filedBy !== right.suggestion.filedBy) {
+        if (left.suggestion.filedBy === 'operator') return -1;
+        if (right.suggestion.filedBy === 'operator') return 1;
+      }
       const priorityDiff = SUGGESTION_PRIORITY_ORDER[left.suggestion.priority] - SUGGESTION_PRIORITY_ORDER[right.suggestion.priority];
-      return priorityDiff === 0 ? left.index - right.index : priorityDiff;
+      if (priorityDiff !== 0) return priorityDiff;
+      const leftWeight = left.suggestion.weight ?? 0;
+      const rightWeight = right.suggestion.weight ?? 0;
+      if (rightWeight !== leftWeight) return rightWeight - leftWeight;
+      return left.index - right.index;
     })
     .map(({ suggestion }) => suggestion);
 }
 
-function Section({ title, children }: { title: string; children: ReactNode }) {
+function Section({ title, children, id }: { title: string; children: ReactNode; id?: string }) {
   return (
-    <section className="rounded-lg border border-border bg-card/60 p-4">
+    <section id={id} className="rounded-lg border border-border bg-card/60 p-4">
       <h3 className="mb-3 text-sm font-semibold text-foreground">{title}</h3>
       {children}
     </section>
@@ -140,6 +163,7 @@ export function FlywheelStatusDetails({ status, onNavigateAgent, onNavigateIssue
                     <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                       {suggestion.action}
                     </span>
+                    {suggestion.weight !== undefined && <WeightBadge weight={suggestion.weight} />}
                     {issueId && (
                       <button type="button" className="font-mono text-xs font-medium text-primary hover:underline" onClick={() => navigateIssue(issueId)}>
                         {issueId}
@@ -147,6 +171,11 @@ export function FlywheelStatusDetails({ status, onNavigateAgent, onNavigateIssue
                     )}
                   </div>
                   <p className="mt-2 text-sm text-foreground">{suggestion.rationale}</p>
+                  {suggestion.weightReason && (
+                    <p className="mt-1 text-xs text-muted-foreground" data-testid="suggestion-weight-reason">
+                      {suggestion.weightReason}
+                    </p>
+                  )}
                 </div>
               );
             })}
@@ -268,7 +297,7 @@ export function FlywheelStatusDetails({ status, onNavigateAgent, onNavigateIssue
           </dl>
         </Section>
 
-        <Section title="Open Questions for the Next Tick">
+        <Section title="Open Questions for the Next Tick" id="flywheel-open-questions">
           {status.openQuestions.length > 0 ? (
             <ul className="list-disc space-y-2 pl-5 text-sm text-foreground">
               {status.openQuestions.map((question) => <li key={question}>{question}</li>)}

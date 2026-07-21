@@ -28,7 +28,7 @@ docker compose logs -f app
 |---------|-----|------|
 | Next.js Dev | http://localhost:3000 | 3000 |
 
-With Traefik: https://app.pan.localhost
+With Traefik: https://app.overdeck.localhost
 
 ## Environment Variables
 
@@ -36,7 +36,7 @@ Create a `.env` file:
 
 ```bash
 APP_PORT=3000
-HOSTNAME=myapp.pan.localhost
+HOSTNAME=myapp.overdeck.localhost
 COMPOSE_PROJECT_NAME=myapp
 
 # Next.js env vars

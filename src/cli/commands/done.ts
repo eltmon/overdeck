@@ -1,6 +1,7 @@
 import chalk from 'chalk';
 import ora from 'ora';
 import { saveAgentRuntimeState } from '../../lib/agents.js';
+import type { AgentState } from '../../lib/agents.js';
 import { existsSync, writeFileSync, readFileSync, mkdirSync, unlinkSync } from 'fs';
 import { exec } from 'child_process';
 import { promisify } from 'util';
@@ -13,13 +14,39 @@ import { emitActivityEntrySync, emitActivityTtsSync } from '../../lib/activity-l
 import { shouldSkipTrackerUpdate } from '../../lib/shadow-mode.js';
 import { updateShadowState } from '../../lib/shadow-state.js';
 import { cleanupWorkflowLabels, getLinearStateName, findLinearStateByName } from '../../core/state-mapping.js';
-import { Effect } from 'effect';
+import { Effect, Layer } from 'effect';
+import * as NodeChildProcessSpawner from '@effect/platform-node/NodeChildProcessSpawner';
+import * as NodeFileSystem from '@effect/platform-node/NodeFileSystem';
+import * as NodePath from '@effect/platform-node/NodePath';
 import { getLinearApiKey } from '../../lib/shadow-utils.js';
 import { extractNumberSync, resolveIssueIdSync } from '../../lib/issue-id.js';
-import { getWorkspacePanPaths, readWorkspaceContinue, writeWorkspaceContinue } from '../../lib/pan-dir/index.js';
-import { restoreTrackedBeadsExport } from '../../lib/bd-mutex.js';
+import { getWorkspacePanPaths } from '../../lib/pan-dir/index.js';
 import { resolveProjectFromIssueSync } from '../../lib/projects.js';
+import { resolveStateReadHomeSync, shouldCommitLegacyWorkspaceArtifacts } from '../../lib/state-read-home.js';
+import { findWorkspacePath } from '../../lib/lifecycle/archive-planning.js';
+import { changedFilesVsMain } from '../../lib/flywheel-merge-order.js';
+import {
+  appendSessionEntrySync,
+  getProjectConfigFromWorkspacePath,
+  readIssueRecordSync,
+  readRecordContinueViewSync,
+  resolveProjectForIssue,
+  writeRecordDecisionsSync,
+  writeRecordScopeDriftSync,
+} from '../../lib/pan-dir/record.js';
+import { updateIssueRecord } from '../../lib/pan-dir/record-update.js';
 import type { MergeSet } from '../../lib/merge-set.js';
+import { readWorkspacePlanSync } from '../../lib/xbrief/io.js';
+import { compileGlob } from '../../lib/xbrief/dag.js';
+import type { ScopeDriftRecord } from '../../lib/xbrief/continue-state.js';
+import type { XBriefDocument } from '../../lib/xbrief/types.js';
+import { hasOnlyPipelineStateChangesSinceCommit } from '../../lib/pipeline-state-paths.js';
+import { persistDoneReviewIntent } from './done-review-intent.js';
+import { verifyStrikeBranchMergedIntoMain } from './strike-merge-verification.js';
+
+const childProcessLayer = NodeChildProcessSpawner.layer.pipe(
+  Layer.provide(Layer.mergeAll(NodeFileSystem.layer, NodePath.layer)),
+);
 
 interface DoneOptions {
   comment?: string;
@@ -33,6 +60,49 @@ interface DoneOptions {
    * entry and exit cleanly.
    */
   strike?: boolean;
+}
+
+interface SlotCompletionContext {
+  agentId: string;
+  agentState: AgentState | null;
+  slotIndex: number;
+  slotItemId?: string;
+  workspacePath: string | null;
+}
+
+function parseSlotAgentId(input: string): { issueId: string; agentId: string; slotIndex: number } | null {
+  const match = /^agent-([a-z]+-\d+)-slot-(\d+)$/i.exec(input.trim());
+  if (!match) return null;
+  const slotIndex = Number(match[2]);
+  if (!Number.isInteger(slotIndex) || slotIndex < 1) return null;
+  return {
+    issueId: match[1].toUpperCase(),
+    agentId: `agent-${match[1].toLowerCase()}-slot-${slotIndex}`,
+    slotIndex,
+  };
+}
+
+function parseSlotIndexFromAgentId(agentId: string): number | null {
+  const match = /^agent-[a-z]+-\d+-slot-(\d+)$/i.exec(agentId);
+  if (!match) return null;
+  const slotIndex = Number(match[1]);
+  return Number.isInteger(slotIndex) && slotIndex >= 1 ? slotIndex : null;
+}
+
+function parseSlotWorkspacePath(issueId: string, workspacePath: string): { slotIndex: number } | null {
+  const escapedIssue = issueId.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const match = new RegExp(`(?:^|/)feature-${escapedIssue}-slot-(\\d+)/?$`).exec(workspacePath);
+  if (!match) return null;
+  const slotIndex = Number(match[1]);
+  return Number.isInteger(slotIndex) && slotIndex >= 1 ? { slotIndex } : null;
+}
+
+function isSlotAgentState(agentState: AgentState | null): agentState is AgentState {
+  return !!agentState && (
+    typeof agentState.slotIndex === 'number' ||
+    /^agent-[a-z]+-\d+-slot-\d+$/i.test(agentState.id) ||
+    /-slot-\d+\/?$/.test(agentState.workspace)
+  );
 }
 
 async function updateLinearToInReview(apiKey: string, issueIdentifier: string, comment?: string): Promise<boolean> {
@@ -116,7 +186,7 @@ async function updateGitHubToInReview(issueId: string, comment?: string): Promis
 
     // Get current labels
     const labelsRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/issues/${number}/labels`, {
-      headers,
+      headers, signal: AbortSignal.timeout(15_000),
     });
     const currentLabels = labelsRes.ok ? (await labelsRes.json() as any[]).map((l: any) => l.name) : [];
 
@@ -131,14 +201,14 @@ async function updateGitHubToInReview(issueId: string, comment?: string): Promis
 
     // Update labels (set all at once to replace)
     await fetch(`https://api.github.com/repos/${owner}/${repo}/issues/${number}/labels`, {
-      method: 'PUT', headers,
+      method: 'PUT', headers, signal: AbortSignal.timeout(15_000),
       body: JSON.stringify({ labels: targetLabels }),
     });
 
     // Add completion comment
     if (comment) {
       await fetch(`https://api.github.com/repos/${owner}/${repo}/issues/${number}/comments`, {
-        method: 'POST', headers,
+        method: 'POST', headers, signal: AbortSignal.timeout(15_000),
         body: JSON.stringify({ body: `🤖 **Agent completed work:**\n\n${comment}` }),
       });
     }
@@ -152,25 +222,17 @@ async function updateGitHubToInReview(issueId: string, comment?: string): Promis
 
 export async function recordTestWaiver(workspacePath: string, reason: string): Promise<void> {
   try {
-    const continueState = await Effect.runPromise(readWorkspaceContinue(workspacePath));
-    if (!continueState) return;
-
+    const issueId = workspacePath.match(/feature-([a-z]+-\d+)$/i)?.[1]?.toUpperCase();
+    if (!issueId) return;
+    const project = resolveProjectForIssue(issueId) ?? getProjectConfigFromWorkspacePath(workspacePath);
+    const existing = readRecordContinueViewSync(project, issueId);
     const now = new Date().toISOString();
-    await Effect.runPromise(
-      writeWorkspaceContinue(workspacePath, {
-        ...continueState,
-        decisions: [
-          ...continueState.decisions,
-          {
-            id: 'D-test-waived',
-            summary: `Test gate waived: ${reason}`,
-            recordedAt: now,
-          },
-        ],
-      }),
-    );
+    writeRecordDecisionsSync(project, issueId, [
+      ...(existing?.decisions ?? []),
+      { id: 'D-test-waived', summary: `Test gate waived: ${reason}`, recordedAt: now },
+    ]);
   } catch (err: any) {
-    console.warn(`[pan done] Failed to record test waiver in continue state (non-fatal): ${err?.message ?? err}`);
+    console.warn(`[pan done] Failed to record test waiver in record (non-fatal): ${err?.message ?? err}`);
   }
 }
 
@@ -178,6 +240,65 @@ export function augmentCommentWithWaiver(comment: string | undefined, waiverReas
   const waiverText = `Test gate waived: ${waiverReason}`;
   if (!comment) return waiverText;
   return `${comment}\n\n${waiverText}`;
+}
+
+function pathMatchesDeclaredScope(filePath: string, declaredScope: string[]): boolean {
+  return declaredScope.some((pattern) => {
+    const compiled = compileGlob(pattern);
+    return compiled.regex.test(filePath) || compiled.exactDirectory === filePath;
+  });
+}
+
+function declaredScopeMatchesChangedFile(pattern: string, actualChangedFiles: string[]): boolean {
+  const compiled = compileGlob(pattern);
+  return actualChangedFiles.some((filePath) => compiled.regex.test(filePath) || compiled.exactDirectory === filePath);
+}
+
+export function declaredScopeUnion(doc: XBriefDocument): string[] {
+  return Array.from(
+    new Set(
+      doc.plan.items.flatMap((item) => item.metadata?.files_scope ?? []),
+    ),
+  ).sort();
+}
+
+export function computeScopeDrift(
+  doc: XBriefDocument,
+  actualChangedFiles: Iterable<string>,
+  recordedAt: string,
+): ScopeDriftRecord | null {
+  const declaredScope = declaredScopeUnion(doc);
+  if (declaredScope.length === 0) return null;
+
+  const actual = Array.from(new Set(actualChangedFiles)).sort();
+  return {
+    outsideDeclaredScope: actual.filter((filePath) => !pathMatchesDeclaredScope(filePath, declaredScope)),
+    declaredScopeUntouched: declaredScope.filter((pattern) => !declaredScopeMatchesChangedFile(pattern, actual)),
+    declaredScope,
+    actualChangedFiles: actual,
+    recordedAt,
+  };
+}
+
+async function recordScopeDriftForDone(
+  issueId: string,
+  workspacePath: string,
+): Promise<ScopeDriftRecord | undefined> {
+  try {
+    const plan = readWorkspacePlanSync(workspacePath);
+    if (!plan) return undefined;
+    const actualChangedFiles = await Effect.runPromise(
+      changedFilesVsMain('HEAD', workspacePath, 'origin/main').pipe(Effect.provide(childProcessLayer)),
+    );
+    const drift = computeScopeDrift(plan, actualChangedFiles, new Date().toISOString());
+    if (!drift) return undefined;
+    const project = resolveProjectForIssue(issueId) ?? getProjectConfigFromWorkspacePath(workspacePath);
+    writeRecordScopeDriftSync(project, issueId, drift);
+    return drift;
+  } catch (err: any) {
+    console.warn(`[pan done] Failed to record scope drift for ${issueId} (non-fatal): ${err?.message ?? err}`);
+    return undefined;
+  }
 }
 
 async function isMergeSetMergedIntoTargets(
@@ -213,21 +334,184 @@ async function isMergeSetMergedIntoTargets(
   return true;
 }
 
+async function resolveDoneWorkspace(
+  issueId: string,
+  agentId: string,
+): Promise<{ agentState: AgentState | null; workspacePath: string | null }> {
+  const { getAgentStateSync } = await import('../../lib/agents.js');
+  const agentState = getAgentStateSync(agentId) ?? null;
+  const agentWorkspace = agentState?.workspace;
+  if (agentWorkspace && existsSync(agentWorkspace)) {
+    return { agentState, workspacePath: agentWorkspace };
+  }
+
+  const cwdSlot = parseSlotWorkspacePath(issueId, process.cwd());
+  if (cwdSlot) {
+    const slotAgentId = `agent-${issueId.toLowerCase()}-slot-${cwdSlot.slotIndex}`;
+    const slotAgentState = getAgentStateSync(slotAgentId) ?? null;
+    return { agentState: slotAgentState, workspacePath: process.cwd() };
+  }
+
+  const resolved = resolveProjectFromIssueSync(issueId);
+  const workspacePath = resolved
+    ? findWorkspacePath(resolved.projectPath, issueId.toLowerCase())
+    : null;
+
+  return { agentState, workspacePath };
+}
+
+async function resolveSlotCompletionContext(
+  issueId: string,
+  agentId: string,
+  slotInput: { agentId: string; slotIndex: number } | null,
+): Promise<SlotCompletionContext | null> {
+  const { getAgentStateSync } = await import('../../lib/agents.js');
+
+  if (slotInput) {
+    const agentState = getAgentStateSync(slotInput.agentId) ?? null;
+    return {
+      agentId: slotInput.agentId,
+      agentState,
+      slotIndex: slotInput.slotIndex,
+      slotItemId: agentState?.slotItemId,
+      workspacePath: agentState?.workspace ?? null,
+    };
+  }
+
+  const agentState = getAgentStateSync(agentId) ?? null;
+  if (isSlotAgentState(agentState)) {
+    const slotIndex =
+      agentState.slotIndex ??
+      parseSlotIndexFromAgentId(agentState.id) ??
+      parseSlotWorkspacePath(issueId, agentState.workspace)?.slotIndex;
+    if (!slotIndex) return null;
+    return {
+      agentId: agentState.id,
+      agentState,
+      slotIndex,
+      slotItemId: agentState.slotItemId,
+      workspacePath: agentState.workspace,
+    };
+  }
+
+  const cwdSlot = parseSlotWorkspacePath(issueId, process.cwd());
+  if (!cwdSlot) return null;
+
+  const slotAgentId = `agent-${issueId.toLowerCase()}-slot-${cwdSlot.slotIndex}`;
+  const slotAgentState = getAgentStateSync(slotAgentId) ?? null;
+  return {
+    agentId: slotAgentId,
+    agentState: slotAgentState,
+    slotIndex: cwdSlot.slotIndex,
+    slotItemId: slotAgentState?.slotItemId,
+    workspacePath: slotAgentState?.workspace ?? process.cwd(),
+  };
+}
+
+export async function completeSlotWork(issueId: string, slot: SlotCompletionContext, comment?: string): Promise<void> {
+  const now = new Date().toISOString();
+  const { saveAgentStateSync } = await import('../../lib/agents.js');
+
+  // PAN-2372 WI-3 / FR-4, FR-5: durably record this slot's completion and verify
+  // it persisted BEFORE any runtime-state write — see persistAndVerifySwarmSlotCompletion.
+  // statusOverrides are intentionally NOT written here; the coordinator (WI-4)
+  // derives item completion from this marker.
+  const { persistAndVerifySwarmSlotCompletion } = await import('../../lib/cloister/deacon-swarm-record.js');
+  const workspacePath = slot.workspacePath ?? process.cwd();
+  const persisted = await persistAndVerifySwarmSlotCompletion(workspacePath, issueId, {
+    slotIndex: slot.slotIndex,
+    itemId: slot.slotItemId,
+    agentId: slot.agentId,
+    completedAt: now,
+  });
+  if (!persisted) {
+    console.error(chalk.red(
+      `✗ Slot ${slot.slotIndex} completion did NOT persist to ${issueId}'s record — ` +
+      `refusing to mark the slot done. Re-run \`pan done ${slot.agentId}\` so the ` +
+      `swarm coordinator can observe this slot as completed.`,
+    ));
+    process.exit(1);
+  }
+
+  if (slot.agentState) {
+    slot.agentState.status = 'stopped';
+    slot.agentState.stoppedByUser = true;
+    slot.agentState.lastActivity = now;
+    saveAgentStateSync(slot.agentState);
+  }
+
+  saveAgentRuntimeState(slot.agentId, {
+    state: 'idle',
+    resolution: 'completed',
+    resolutionCount: 1,
+    resolutionUpdatedAt: now,
+    lastActivity: now,
+  });
+
+  emitActivityEntrySync({
+    source: 'work-agent',
+    level: 'info',
+    issueId,
+    message: `${slot.agentId} slot work complete — awaiting swarm verification and merge`,
+  });
+
+  console.log(chalk.green(`✓ Slot ${slot.slotIndex} work complete for ${issueId}`));
+  if (slot.slotItemId) {
+    console.log(chalk.dim(`  Item: ${slot.slotItemId}`));
+  }
+  if (comment) {
+    console.log(chalk.dim(`  Comment: ${comment}`));
+  }
+  console.log(chalk.dim('  Swarm coordination will verify and merge this slot before issue-level review.'));
+}
+
 export async function doneCommand(id: string, options: DoneOptions = {}): Promise<void> {
   // Support both "pan done MIN-123" and "pan done agent-min-123"
-  const issueId = resolveIssueIdSync(id);
-  const agentId = `agent-${issueId.toLowerCase()}`;
+  const slotInput = parseSlotAgentId(id);
+  const issueId = slotInput?.issueId ?? resolveIssueIdSync(id);
+  const agentId = slotInput?.agentId ?? `agent-${issueId.toLowerCase()}`;
 
   // Strike-agent shape: the strike already merged to main and verified there,
-  // so there is no review pipeline to dispatch. Emit an activity event and exit.
+  // so there is no review pipeline to dispatch. Run the same post-merge
+  // lifecycle handoff the PR merge path uses, after verifying the strike branch
+  // is actually contained in origin/main.
   if (options.strike) {
+    const resolved = resolveProjectFromIssueSync(issueId);
+    if (!resolved?.projectPath) {
+      console.error(chalk.red(`Could not resolve project for ${issueId}; cannot run strike post-merge handoff.`));
+      process.exit(1);
+    }
+
+    const branchName = `strike/${issueId.toLowerCase()}`;
+    try {
+      const reason = await verifyStrikeBranchMergedIntoMain(issueId, resolved.projectPath);
+      console.log(chalk.green(`✓ Verified strike merge: ${reason}`));
+
+      const { postMergeLifecycle } = await import('../../lib/cloister/merge-agent.js');
+      await postMergeLifecycle(issueId, resolved.projectPath, branchName, {
+        skipDeploy: true,
+        allowVerifiedNoPrMerge: true,
+        markReviewPassed: true,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(chalk.red(`Strike post-merge handoff refused for ${issueId}: ${message}`));
+      process.exit(1);
+    }
+
     emitActivityEntrySync({
       source: 'strike',
       level: 'info',
       issueId,
-      message: `Strike ${issueId} reported done${options.comment ? `: ${options.comment}` : ''}`,
+      message: `Strike ${issueId} post-merge handoff completed${options.comment ? `: ${options.comment}` : ''}`,
     });
-    console.log(chalk.green(`✓ Strike ${issueId} acknowledged (review pipeline skipped)`));
+    console.log(chalk.green(`✓ Strike ${issueId} handed off to verifying-on-main (review pipeline skipped)`));
+    return;
+  }
+
+  const slotCompletion = await resolveSlotCompletionContext(issueId, agentId, slotInput);
+  if (slotCompletion) {
+    await completeSlotWork(issueId, slotCompletion, options.comment);
     return;
   }
 
@@ -287,17 +571,26 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
     }
   }
 
+  // PAN-2207: clear stale deacon recovery tombstone before pre-flight.
+  try {
+    const project = resolveProjectForIssue(issueId) ?? getProjectConfigFromWorkspacePath(process.cwd());
+    await updateIssueRecord(project, issueId, (record) => {
+      if (!record.pipeline.panDoneRecoveredAt) return;
+      const { panDoneRecoveredAt: _, ...pipeline } = record.pipeline;
+      return { ...record, pipeline };
+    });
+  } catch (e: any) {
+    console.warn(`[pan done] Failed to clear recovery tombstone (non-fatal): ${e?.message ?? e}`);
+  }
+
   // Pre-flight completion checks (unless --force)
   if (!options.force) {
-    const { getAgentStateSync } = await import('../../lib/agents.js');
-    const agentState = getAgentStateSync(agentId);
-    const workspacePath = agentState?.workspace;
-
+    const { workspacePath } = await resolveDoneWorkspace(issueId, agentId);
     if (workspacePath && existsSync(workspacePath)) {
-      // Commit any stale workspace orchestration artifacts from a previous interrupted
-      // pan done run so the uncommitted-changes gate in runPreflightChecks doesn't
-      // reject them.
-      try {
+      const doneProject = (() => { try { return resolveProjectForIssue(issueId); } catch { return null; } })();
+      const migratedState = resolveStateReadHomeSync(doneProject ?? getProjectConfigFromWorkspacePath(workspacePath)).migrated;
+      // Commit stale orchestration artifacts so preflight does not reject them.
+      if (shouldCommitLegacyWorkspaceArtifacts(migratedState)) try {
         const { stdout: preDirty } = await execAsync(
           'git status --porcelain .pan/',
           { cwd: workspacePath, encoding: 'utf-8' }
@@ -330,7 +623,7 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
         return;
       }
 
-      try {
+      if (shouldCommitLegacyWorkspaceArtifacts(migratedState)) try {
         const { stdout: postDirty } = await execAsync(
           'git status --porcelain .pan/',
           { cwd: workspacePath, encoding: 'utf-8' }
@@ -366,9 +659,7 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
     // `--ours`. Any other conflicts abort the rebase and surface a clear
     // error; the agent must resolve them and re-run `pan done`.
     {
-      const { getAgentStateSync } = await import('../../lib/agents.js');
-      const rebaseAgentState = getAgentStateSync(agentId);
-      const rebaseWorkspacePath = rebaseAgentState?.workspace;
+      const { workspacePath: rebaseWorkspacePath } = await resolveDoneWorkspace(issueId, agentId);
 
       if (rebaseWorkspacePath && existsSync(rebaseWorkspacePath)) {
         const { ensureMergeSetForIssueSync } = await import('../../lib/merge-set.js');
@@ -412,7 +703,111 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
     let shadowModeActive = false;
     const isGitHubIssue = issueId.startsWith('PAN-');
 
-    // Step 1: Update status (either tracker or shadow)
+    // Step 1: Create review artifacts immediately and persist merge-set state.
+    const { saveAgentStateSync } = await import('../../lib/agents.js');
+    const { agentState: existingState, workspacePath } = await resolveDoneWorkspace(issueId, agentId);
+
+    if (!workspacePath || !existsSync(workspacePath)) {
+      throw new Error(`Workspace not found for ${issueId}; cannot create review artifact set`);
+    }
+
+    const scopeDrift = await recordScopeDriftForDone(issueId, workspacePath);
+
+    spinner.text = 'Creating review artifacts...';
+    const { createReviewArtifactsForIssue } = await import('../../lib/review-artifacts.js');
+    const { setReviewStatusSync } = await import('../../lib/review-status.js');
+    let artifactResult;
+    try {
+      artifactResult = await Effect.runPromise(createReviewArtifactsForIssue(issueId, workspacePath));
+    } catch (artifactErr: any) {
+      // PAN-2207: GraphQL/App rate limit → REST-only PR lookup fallback.
+      // PAN-2465: the fallback runs `gh pr list` in the workspace ROOT, but a
+      // polyrepo workspace root has no git remotes (the real repos are the
+      // subdirectories, often not even on GitHub) — the gh call then crashes
+      // with "no git remotes found", masking the original artifact error and
+      // making agents loop `pan done` against a red herring. Guard the
+      // fallback: any failure rethrows the ORIGINAL artifact error.
+      let existingPrUrl = '';
+      try {
+        const { stdout } = await execAsync(
+          `gh pr list --head feature/${issueId.toLowerCase()} --state open --json url --jq '.[0].url'`,
+          { cwd: workspacePath, encoding: 'utf-8' }
+        );
+        existingPrUrl = stdout.trim();
+      } catch (fallbackErr: any) {
+        console.log(chalk.dim(`  (REST PR-lookup fallback unavailable here: ${String(fallbackErr?.message ?? fallbackErr).split('\n')[0]})`));
+        throw artifactErr;
+      }
+      if (!existingPrUrl) throw artifactErr;
+      console.log(chalk.yellow(`  ⚠ Review artifact creation failed, but found existing PR via REST fallback: ${existingPrUrl}`));
+      artifactResult = { mergeSet: null, artifacts: [{ repoKey: 'primary', created: false, skipped: false, url: existingPrUrl }] };
+    }
+    const primaryArtifact = artifactResult.mergeSet?.repos.find(repo => !!repo.artifactUrl);
+    const reviewArtifactUrl = primaryArtifact?.artifactUrl
+      ?? artifactResult.artifacts.find(artifact => !artifact.skipped && artifact.url)?.url;
+
+    const createdArtifacts = artifactResult.artifacts.filter(artifact => !artifact.skipped && artifact.url);
+    if (createdArtifacts.length > 0) {
+      console.log(chalk.green(`  ✓ Created review artifact set (${createdArtifacts.length} repo${createdArtifacts.length === 1 ? '' : 's'})`));
+    } else {
+      console.log(chalk.yellow('  ⚠ No changed repos detected for review artifact creation'));
+    }
+
+    // Step 2: Guard against actually-merged issues (e.g. merge completed in
+    // background while agent was finishing up). Review status is cached state and
+    // can be stale after re-submission, so verify git ancestry before skipping.
+    const { getReviewStatusSync } = await import('../../lib/review-status.js');
+    const currentStatus = getReviewStatusSync(issueId);
+    if (currentStatus?.mergeStatus === 'merged') {
+      const actuallyMerged = await isMergeSetMergedIntoTargets(workspacePath, artifactResult.mergeSet);
+      if (actuallyMerged) {
+        spinner.succeed(`Work complete: ${issueId} (already merged — skipping review pipeline)`);
+        console.log(chalk.green(`  ✓ Issue was already merged — no review pipeline triggered`));
+        console.log('');
+        return;
+      }
+
+      console.log(chalk.yellow(`  ⚠ Stored merge status for ${issueId} was stale; re-running review pipeline.`));
+    }
+
+    // Step 2b: Guard against no-op re-submission. If review already passed and
+    // HEAD hasn't changed since the review snapshot, skip re-review entirely.
+    // This prevents agents from accidentally cycling the pipeline after approval.
+    if (currentStatus?.reviewStatus === 'passed' && currentStatus?.reviewedAtCommit) {
+      const { getWorkspaceGitInfo } = await import('../../lib/git-utils.js');
+      try {
+        const { HEAD } = await Effect.runPromise(getWorkspaceGitInfo(workspacePath));
+        if (HEAD === currentStatus.reviewedAtCommit) {
+          spinner.succeed(`Work complete: ${issueId} (review already passed at ${HEAD.slice(0, 8)} — no new commits, skipping re-review)`);
+          console.log(chalk.green(`  ✓ Review already passed and no new commits detected. Pipeline continues normally.`));
+          console.log('');
+          return;
+        }
+        if (await hasOnlyPipelineStateChangesSinceCommit(workspacePath, currentStatus.reviewedAtCommit, HEAD)) {
+          spinner.succeed(`Work complete: ${issueId} (review still valid — only pipeline state changed since ${currentStatus.reviewedAtCommit.slice(0, 8)})`);
+          console.log(chalk.green(`  ✓ Review/test verdicts remain valid because post-verdict commits only touched pipeline state.`));
+          console.log('');
+          return;
+        }
+        console.log(chalk.yellow(`  ⚠ New commits since review passed (${currentStatus.reviewedAtCommit.slice(0, 8)} → ${HEAD.slice(0, 8)}). Re-running review pipeline.`));
+      } catch {
+        // Git info unavailable — proceed with normal flow rather than blocking
+      }
+    }
+
+    // Step 3: Persist the concrete review-request intent before any tracker,
+    // runtime, marker, cache, notification, or HTTP progression. If the state
+    // branch push loses a remote-ref race, updateIssueRecord reconciles it; if
+    // durability still fails, the command exits before all later pipeline progression.
+    const reviewRequestedAt = new Date().toISOString();
+    await persistDoneReviewIntent(issueId, workspacePath, {
+      reviewRequestedAt,
+      scopeDrift,
+      prUrl: reviewArtifactUrl,
+    });
+
+    // Step 4: Update status (either tracker or shadow) only after the canonical
+    // request is durable.
     const skipTrackerUpdate = await Effect.runPromise(shouldSkipTrackerUpdate(issueId));
 
     if (skipTrackerUpdate) {
@@ -421,7 +816,6 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
       await Effect.runPromise(updateShadowState(issueId, 'in_review', 'pan done'));
       console.log(chalk.cyan(`  👻 Shadow mode: status updated locally`));
     } else if (isGitHubIssue) {
-      // GitHub issue - update labels
       spinner.text = 'Updating GitHub labels...';
       trackerUpdated = await updateGitHubToInReview(issueId, options.comment);
       if (trackerUpdated) {
@@ -444,52 +838,36 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
       }
     }
 
-    // Step 2: Create review artifacts immediately and persist merge-set state.
-    const { getAgentStateSync, saveAgentStateSync } = await import('../../lib/agents.js');
-    const existingState = getAgentStateSync(agentId);
-    const workspacePath = existingState?.workspace;
+    // Publish the already-durable intent to the rebuildable cache and pipeline
+    // event stream. The setter's redundant journal write is safe because its
+    // newer-wins merge cannot erase the request persisted above.
+    setReviewStatusSync(issueId, {
+      reviewStatus: 'pending',
+      testStatus: 'pending',
+      mergeStatus: 'pending',
+      readyForMerge: false,
+      verificationStatus: 'pending',
+      verificationCycleCount: 0,
+      autoRequeueCount: 0,
+      reviewRequestedAt,
+      scopeDrift,
+      prUrl: reviewArtifactUrl,
+    });
 
-    if (!workspacePath || !existsSync(workspacePath)) {
-      throw new Error(`Workspace not found for ${issueId}; cannot create review artifact set`);
-    }
-
-    spinner.text = 'Creating review artifacts...';
-    const { createReviewArtifactsForIssue } = await import('../../lib/review-artifacts.js');
-    const { setReviewStatusSync } = await import('../../lib/review-status.js');
-    const artifactResult = await Effect.runPromise(createReviewArtifactsForIssue(issueId, workspacePath));
-    const primaryArtifact = artifactResult.mergeSet?.repos.find(repo => !!repo.artifactUrl);
-    if (primaryArtifact?.artifactUrl) {
-      setReviewStatusSync(issueId, { prUrl: primaryArtifact.artifactUrl });
-    }
-
-    const createdArtifacts = artifactResult.artifacts.filter(artifact => !artifact.skipped && artifact.url);
-    if (createdArtifacts.length > 0) {
-      console.log(chalk.green(`  ✓ Created review artifact set (${createdArtifacts.length} repo${createdArtifacts.length === 1 ? '' : 's'})`));
-    } else {
-      console.log(chalk.yellow('  ⚠ No changed repos detected for review artifact creation'));
-    }
-
-    // Step 3: Update agent state to stopped (so it appears in dashboard agents list).
-    // The completed marker and review artifact state represent standby/review handoff;
-    // state.json now keeps only stable role identity, not transient phases.
+    // Step 5: Update agent state and completion markers after durability.
     if (existingState) {
       existingState.status = 'stopped';
       existingState.stoppedByUser = true;
       existingState.lastActivity = new Date().toISOString();
       saveAgentStateSync(existingState);
     }
-    // Also update runtime state to idle
     saveAgentRuntimeState(agentId, {
       state: 'idle',
       lastActivity: new Date().toISOString(),
     });
 
-    // Step 4: Write completion marker
     mkdirSync(join(AGENTS_DIR, agentId), { recursive: true });
     const completedFile = join(AGENTS_DIR, agentId, 'completed');
-    // Re-runs of `pan done` (e.g. after a review feedback round) must reset the
-    // cloister's processed-marker, otherwise checkCompletionMarkers() at
-    // service.ts:670 sees `completed.processed` exist and skips the new trigger.
     const processedMarker = join(AGENTS_DIR, agentId, 'completed.processed');
     if (existsSync(processedMarker)) {
       try { unlinkSync(processedMarker); } catch {}
@@ -500,81 +878,16 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
       comment: options.comment,
     }));
 
-    // Append 'end' session entry to workspace continue state.
     try {
-      const continueState = await Effect.runPromise(readWorkspaceContinue(workspacePath));
-      if (continueState) {
-        const now = new Date().toISOString();
-        await Effect.runPromise(writeWorkspaceContinue(workspacePath, {
-          ...continueState,
-          sessionHistory: [
-            ...continueState.sessionHistory,
-            {
-              timestamp: now,
-              reason: 'end',
-              note: options.comment || 'Agent signaled work complete',
-            },
-          ],
-        }));
-      }
+      const project = resolveProjectForIssue(issueId) ?? getProjectConfigFromWorkspacePath(workspacePath);
+      appendSessionEntrySync(project, issueId, {
+        timestamp: new Date().toISOString(),
+        reason: 'end',
+        note: options.comment || 'Agent signaled work complete',
+      });
     } catch (continueErr: any) {
-      console.warn(`[pan done] Failed to append end entry to continue state (non-fatal): ${continueErr?.message ?? continueErr}`);
+      console.warn(`[pan done] Failed to append end entry to record (non-fatal): ${continueErr?.message ?? continueErr}`);
     }
-
-    // Step 4b: Guard against actually-merged issues (e.g. merge completed in
-    // background while agent was finishing up). Review status is cached state and
-    // can be stale after re-submission, so verify git ancestry before skipping.
-    const { getReviewStatusSync } = await import('../../lib/review-status.js');
-    const currentStatus = getReviewStatusSync(issueId);
-    if (currentStatus?.mergeStatus === 'merged') {
-      const actuallyMerged = await isMergeSetMergedIntoTargets(workspacePath, artifactResult.mergeSet);
-      if (actuallyMerged) {
-        spinner.succeed(`Work complete: ${issueId} (already merged — skipping review pipeline)`);
-        console.log(chalk.green(`  ✓ Issue was already merged — no review pipeline triggered`));
-        console.log('');
-        return;
-      }
-
-      console.log(chalk.yellow(`  ⚠ Stored merge status for ${issueId} was stale; re-running review pipeline.`));
-    }
-
-    // Step 4c: Guard against no-op re-submission. If review already passed and
-    // HEAD hasn't changed since the review snapshot, skip re-review entirely.
-    // This prevents agents from accidentally cycling the pipeline after approval.
-    if (currentStatus?.reviewStatus === 'passed' && currentStatus?.reviewedAtCommit) {
-      const { getWorkspaceGitInfo } = await import('../../lib/git-utils.js');
-      try {
-        const { HEAD } = await Effect.runPromise(getWorkspaceGitInfo(workspacePath));
-        if (HEAD === currentStatus.reviewedAtCommit) {
-          spinner.succeed(`Work complete: ${issueId} (review already passed at ${HEAD.slice(0, 8)} — no new commits, skipping re-review)`);
-          console.log(chalk.green(`  ✓ Review already passed and no new commits detected. Pipeline continues normally.`));
-          console.log('');
-          return;
-        }
-        console.log(chalk.yellow(`  ⚠ New commits since review passed (${currentStatus.reviewedAtCommit.slice(0, 8)} → ${HEAD.slice(0, 8)}). Re-running review pipeline.`));
-      } catch {
-        // Git info unavailable — proceed with normal flow rather than blocking
-      }
-    }
-
-    // Atomically initialize review status AND record the durable "review requested" intent so the
-    // pipeline can proceed even if the dashboard is offline. PAN-1988 auto-heal: `reviewRequestedAt`
-    // is journaled (always writable, even sandboxed) BEFORE the HTTP trigger below. If that trigger
-    // never lands (dashboard reloading, dropped event, frozen deacon), the host notices the
-    // un-serviced request on the next status read and dispatches review (reconcile-on-read). The
-    // HTTP trigger is the fast path; this intent is the durable backstop.
-    setReviewStatusSync(issueId, {
-      reviewStatus: 'pending',
-      testStatus: 'pending',
-      mergeStatus: 'pending',
-      readyForMerge: false,
-      verificationStatus: 'pending',
-      verificationCycleCount: 0,
-      autoRequeueCount: 0,
-      reviewRequestedAt: new Date().toISOString(),
-    });
-
-    await Effect.runPromise(restoreTrackedBeadsExport(workspacePath));
 
     spinner.succeed(`Work complete: ${issueId}`);
     emitActivityEntrySync({
@@ -614,7 +927,7 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
       const dashboardUrl = getDashboardApiUrlSync();
 
       // Check if dashboard is running. Use fetch() so https:// URLs work
-      // (e.g. when DASHBOARD_URL points at https://pan.localhost via Traefik).
+      // (e.g. when DASHBOARD_URL points at https://overdeck.localhost via Traefik).
       const checkDashboard = async (): Promise<boolean> => {
         try {
           const controller = new AbortController();
@@ -706,9 +1019,7 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
       console.log(chalk.dim(`  Could not auto-trigger review: ${error.message}`));
     }
 
-    await Effect.runPromise(restoreTrackedBeadsExport(workspacePath));
     await new Promise((resolve) => setTimeout(resolve, 1000));
-    await Effect.runPromise(restoreTrackedBeadsExport(workspacePath));
 
   } catch (error: any) {
     spinner.fail(error.message);

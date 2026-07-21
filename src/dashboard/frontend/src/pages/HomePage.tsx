@@ -2,10 +2,13 @@ import { useMemo } from 'react';
 import { AlertTriangle } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { NotificationClassBadge } from '../components/NotificationClassBadge';
-import type { AgentSnapshot, FeatureRegistryEntry, MemoryHealthSnapshot, MemoryObservation, MemoryStatus, ReviewStatusSnapshot } from '@overdeck/contracts';
+import { ActionStatusChip } from '../components/ActionStatusChip';
+import { compareIssueIds, type AgentSnapshot, type FeatureRegistryEntry, type MemoryHealthSnapshot, type MemoryObservation, type MemoryStatus, type ReviewStatusSnapshot } from '@overdeck/contracts';
 import { WorkspaceStatusCard, type WorkspaceStatusStats } from '../components/CommandDeck/WorkspaceStatusCard';
-import { fetchProjects, type ProjectData } from '../components/CommandDeck/projectsData';
+import { fetchProjects, filterSpecOnlyPlanned, type ProjectData } from '../components/CommandDeck/projectsData';
+import { usePlannedBacklogVisibility } from '../hooks/usePlannedBacklogVisibility';
 import { useDashboardStore, selectLatestMemoryFailure } from '../lib/store';
+import { ModeToggle } from '../components/simple/parts';
 import { formatRelativeTime } from '../lib/formatRelativeTime';
 import { bucketByTime, type TimeBucketKey } from '../lib/timeBuckets';
 import type { Issue } from '../types';
@@ -112,6 +115,7 @@ export function HomePage({ onOpenWorkspaceHome, onNewProject, onSelectProject, o
     retry: false,
   });
   const projects: ProjectData[] = projectsQuery.data ?? [];
+  const showPlannedBacklog = usePlannedBacklogVisibility((state) => state.showPlannedBacklog);
   const issuesRaw = useDashboardStore((state) => state.issuesRaw);
   const statusByIssueId = useDashboardStore((state) => state.statusByIssueId);
   const observationsByIssueId = useDashboardStore((state) => state.observationsByIssueId);
@@ -138,11 +142,16 @@ export function HomePage({ onOpenWorkspaceHome, onNewProject, onSelectProject, o
     <div className="h-full w-full overflow-y-auto bg-background">
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 p-6">
         <header className="rounded-xl border border-border bg-card p-6 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">Overdeck Home</p>
-          <h1 className="mt-2 text-3xl font-semibold text-foreground">System briefing</h1>
-          <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
-            A live landing page for current workspace context, cross-workspace ownership, and memory-first guidance.
-          </p>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">Overdeck Home</p>
+              <h1 className="mt-2 text-3xl font-semibold text-foreground">System briefing</h1>
+              <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
+                A live landing page for current workspace context, cross-workspace ownership, and memory-first guidance.
+              </p>
+            </div>
+            <ModeToggle />
+          </div>
         </header>
 
         <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5" aria-label="Home summary">
@@ -245,7 +254,8 @@ export function HomePage({ onOpenWorkspaceHome, onNewProject, onSelectProject, o
             ) : projects.length > 0 ? (
               <ul className="divide-y divide-border rounded-lg border border-border">
                 {projects.map((project) => {
-                  const hasActivity = project.features.length > 0;
+                  const visibleFeatures = filterSpecOnlyPlanned(project.features, showPlannedBacklog);
+                  const hasActivity = visibleFeatures.length > 0;
                   return (
                     <li key={project.path}>
                       <button
@@ -260,7 +270,7 @@ export function HomePage({ onOpenWorkspaceHome, onNewProject, onSelectProject, o
                         />
                         <span className="truncate">{project.name}</span>
                         {hasActivity && (
-                          <span className="ml-auto text-xs text-muted-foreground">{project.features.length}</span>
+                          <span className="ml-auto text-xs text-muted-foreground">{visibleFeatures.length}</span>
                         )}
                       </button>
                     </li>
@@ -380,12 +390,14 @@ function explainMemoryFailure(failure: MemoryHealthSnapshot): string {
 function HomeActivityFeedItem({ observation, now }: { observation: MemoryObservation & { actionStatus: string }; now: Date }) {
   return (
     <li className="rounded-lg border border-border bg-background p-3 text-xs">
-      <p className="font-semibold text-foreground">{observation.actionStatus}</p>
+      <div className="flex items-center gap-2">
+        <ActionStatusChip status={observation.actionStatus} />
+        <p className="font-semibold text-foreground">{observation.summary}</p>
+      </div>
       <p className="mt-1 text-[10px] text-muted-foreground">
         {observation.workspaceId} · {observation.issueId} · <time dateTime={observation.timestamp}>{formatRelativeTime(observation.timestamp, now)}</time>
       </p>
-      <p className="mt-2 text-sm text-foreground">{observation.summary}</p>
-      {observation.narrative ? <p className="mt-1 text-xs leading-5 text-muted-foreground">{observation.narrative}</p> : null}
+      {observation.narrative ? <p className="mt-2 text-xs leading-5 text-muted-foreground">{observation.narrative}</p> : null}
       {observation.files.length > 0 ? (
         <div className="mt-3 flex flex-wrap gap-1" aria-label="Files">
           {observation.files.map((file) => (
@@ -473,7 +485,9 @@ function isRunningAgent(agent: AgentSnapshot): boolean {
 }
 
 function isGatedAgent(agent: AgentSnapshot): boolean {
-  return agent.paused === true || agent.troubled === true || (agent.consecutiveFailures ?? 0) > 0;
+  return agent.paused === true ||
+    agent.troubled === true ||
+    (agent.status !== 'stopped' && (agent.consecutiveFailures ?? 0) > 0);
 }
 
 function isRecentMerge(status: ReviewStatusSnapshot, now: Date): boolean {
@@ -518,7 +532,7 @@ function buildHomeWorkspaceCards({
     if (agent.issueId && isActiveWorkspaceAgent(agent)) issueIds.add(agent.issueId);
   }
 
-  return [...issueIds].sort().map((issueId) => {
+  return [...issueIds].sort(compareIssueIds).map((issueId) => {
     const status = statusByIssueId[issueId];
     const observations = observationsByIssueId[issueId] ?? [];
     return {

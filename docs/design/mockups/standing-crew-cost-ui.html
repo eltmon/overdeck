@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Mockup — Standing Crew cost panel + issue-tree line items</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0e1116; --panel:#161b22; --panel2:#1c2230; --line:#2a3140;
+    --text:#e6e9ef; --dim:#8b94a7; --faint:#5c6577;
+    --teal:#2dd4bf; --amber:#f5b04c; --red:#ef6a6a; --blue:#6ea8fe; --violet:#b18cff;
+  }
+  *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 "DM Sans",sans-serif;padding:28px;}
+  h1{font:600 20px "Space Grotesk";margin:0 0 4px} .sub{color:var(--dim);margin-bottom:22px;font-size:13px}
+  .tabs{display:flex;gap:8px;margin-bottom:18px}
+  .tab{padding:7px 14px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--dim);cursor:pointer;font-weight:500}
+  .tab.on{color:var(--text);border-color:var(--teal);}
+  .view{display:none}.view.on{display:block}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px;margin-bottom:16px}
+  .rowhead{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:14px}
+  .rowhead h2{font:600 15px "Space Grotesk";margin:0} .rowhead .meta{color:var(--dim);font-size:12px}
+  /* rollup strip */
+  .strip{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}
+  .kpi{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+  .kpi .l{color:var(--dim);font-size:11px;text-transform:uppercase;letter-spacing:.06em}
+  .kpi .v{font:600 22px "Space Grotesk";margin-top:2px}
+  .kpi .d{color:var(--faint);font-size:11px;margin-top:2px}
+  /* stacked output-token bar */
+  .stack{display:flex;height:14px;border-radius:7px;overflow:hidden;margin:10px 0 6px}
+  .stack div{height:100%}
+  .legend{display:flex;gap:16px;color:var(--dim);font-size:12px;flex-wrap:wrap}
+  .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px;vertical-align:1px}
+  /* crew table */
+  table{width:100%;border-collapse:collapse}
+  th{font:500 11px "DM Sans";text-transform:uppercase;letter-spacing:.06em;color:var(--faint);text-align:left;padding:8px 10px;border-bottom:1px solid var(--line)}
+  td{padding:11px 10px;border-bottom:1px solid var(--line);vertical-align:middle}
+  tr:last-child td{border-bottom:none}
+  .who{display:flex;align-items:center;gap:10px}
+  .st{width:8px;height:8px;border-radius:50%}
+  .st.run{background:var(--blue);animation:pulse 2s infinite}
+  .st.idle{background:var(--faint)} .st.done{background:var(--teal)}
+  @keyframes pulse{50%{opacity:.35}}
+  .name{font-weight:600} .modelid{font-family:"DM Mono";font-size:12px;color:var(--dim)}
+  .rank{font-size:10px;border:1px solid var(--line);border-radius:4px;padding:2px 6px;color:var(--dim);text-transform:uppercase;letter-spacing:.05em}
+  .rank.sup{border-color:var(--violet);color:var(--violet)}
+  .num{font-family:"DM Mono";font-size:13px;text-align:right}
+  .cost{font-weight:600;text-align:right;font-family:"DM Mono"}
+  .sharebar{background:var(--panel2);border-radius:4px;height:6px;width:120px;overflow:hidden}
+  .sharebar div{height:100%;border-radius:4px}
+  .chip{font-size:11px;border-radius:4px;padding:2px 7px}
+  .chip.esc{background:rgba(245,176,76,.12);color:var(--amber)}
+  .chip.blk{background:rgba(239,106,106,.12);color:var(--red)}
+  .chip.ok{background:rgba(45,212,191,.10);color:var(--teal)}
+  .foot{color:var(--faint);font-size:12px;margin-top:10px}
+  /* tree view */
+  .tree{font-size:13.5px}
+  .trow{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px}
+  .trow:hover{background:var(--panel2)}
+  .trow .ind{width:22px;color:var(--faint);text-align:center}
+  .trow .lbl{flex:1;display:flex;align-items:center;gap:9px}
+  .trow .cost{width:90px}
+  .trow .tok{width:110px;color:var(--dim);font-family:"DM Mono";font-size:12px;text-align:right}
+  .lvl1{margin-left:22px}.lvl2{margin-left:44px}
+  .badge{font-size:10px;border:1px solid var(--line);border-radius:4px;padding:1px 6px;color:var(--dim);text-transform:uppercase}
+  .total{border-top:1px solid var(--line);margin-top:6px;padding-top:10px;font-weight:600}
+  .note{background:rgba(110,168,254,.07);border:1px solid rgba(110,168,254,.25);border-radius:10px;padding:12px 14px;color:var(--dim);font-size:12.5px;margin-bottom:16px}
+  .note b{color:var(--text)}
+</style>
+</head>
+<body>
+<h1>Standing Crew — cost &amp; roster panel <span style="color:var(--faint);font-weight:400">(mockup)</span></h1>
+<div class="sub">Issue <b style="color:var(--text)">PAN-2383</b> · feat(dashboard): editable per-issue Standing Crew toggle · tiered: <span style="color:var(--teal)">on (issue override)</span></div>
+
+<div class="tabs">
+  <div class="tab on" onclick="sw(0)">Crew panel (issue view)</div>
+  <div class="tab" onclick="sw(1)">Issue tree line items (pan issue view)</div>
+</div>
+
+<!-- ══════════ VIEW 0: CREW PANEL ══════════ -->
+<div class="view on" id="v0">
+  <div class="strip">
+    <div class="kpi"><div class="l">Issue cost</div><div class="v">$16.41</div><div class="d">all crew + specialists</div></div>
+    <div class="kpi"><div class="l">Output tokens by cheap tiers</div><div class="v">78%</div><div class="d">frontier wrote 22% · supervised 100%</div></div>
+    <div class="kpi"><div class="l">Supervisor verdicts</div><div class="v">7 <span style="font-size:13px;color:var(--teal)">pass</span> · 1 <span style="font-size:13px;color:var(--red)">blocked</span></div><div class="d">subscribe: all</div></div>
+    <div class="kpi"><div class="l">Escalations</div><div class="v">1</div><div class="d">api-write-door: cheap → standard</div></div>
+  </div>
+
+  <div class="card">
+    <div class="rowhead"><h2>Output-token share</h2><div class="meta">who wrote the expensive tokens</div></div>
+    <div class="stack">
+      <div style="width:41%;background:var(--teal)"></div>
+      <div style="width:37%;background:var(--blue)"></div>
+      <div style="width:19%;background:var(--amber)"></div>
+      <div style="width:3%;background:var(--violet)"></div>
+    </div>
+    <div class="legend">
+      <span><i class="dot" style="background:var(--teal)"></i>cheap · Haiku 4.5 · 41%</span>
+      <span><i class="dot" style="background:var(--blue)"></i>standard · GPT-5.5 · 37%</span>
+      <span><i class="dot" style="background:var(--amber)"></i>frontier · Opus 4.8 · 19%</span>
+      <span><i class="dot" style="background:var(--violet)"></i>supervisor · Fable 5 · 3%</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="rowhead"><h2>The crew</h2><div class="meta">one row per standing member · click a row → conversation view</div></div>
+    <table>
+      <tr><th>Member</th><th>Model · harness</th><th>Beads</th><th style="text-align:right">Tokens in / out</th><th style="text-align:right">Cache read</th><th style="text-align:right">Cost</th><th>Share</th><th>Events</th></tr>
+      <tr>
+        <td><div class="who"><span class="st done"></span><span class="name">cheap</span><span class="rank">tier</span></div></td>
+        <td><span class="modelid">claude-haiku-4-5 · claude-code</span></td>
+        <td>3 done</td><td class="num">2.1M / 148k</td><td class="num">14.2M</td>
+        <td class="cost">$1.79</td>
+        <td><div class="sharebar"><div style="width:11%;background:var(--teal)"></div></div></td>
+        <td><span class="chip ok">clean</span></td>
+      </tr>
+      <tr>
+        <td><div class="who"><span class="st run"></span><span class="name">standard</span><span class="rank">tier</span></div></td>
+        <td><span class="modelid">gpt-5.5 · codex</span></td>
+        <td>4 done</td><td class="num">3.4M / 132k</td><td class="num">9.8M</td>
+        <td class="cost">$2.10</td>
+        <td><div class="sharebar"><div style="width:13%;background:var(--blue)"></div></div></td>
+        <td><span class="chip esc">+1 escalated in</span></td>
+      </tr>
+      <tr>
+        <td><div class="who"><span class="st done"></span><span class="name">frontier</span><span class="rank">tier</span></div></td>
+        <td><span class="modelid">claude-opus-4-8 · claude-code</span></td>
+        <td>1 done</td><td class="num">1.9M / 69k</td><td class="num">11.1M</td>
+        <td class="cost">$9.64</td>
+        <td><div class="sharebar"><div style="width:59%;background:var(--amber)"></div></div></td>
+        <td><span class="chip ok">clean</span></td>
+      </tr>
+      <tr>
+        <td><div class="who"><span class="st idle"></span><span class="name">supervisor</span><span class="rank sup">review-only</span></div></td>
+        <td><span class="modelid">claude-fable-5 · claude-code</span></td>
+        <td>8 reviewed</td><td class="num">1.2M / 11k</td><td class="num">6.4M</td>
+        <td class="cost">$2.88</td>
+        <td><div class="sharebar"><div style="width:17%;background:var(--violet)"></div></div></td>
+        <td><span class="chip blk">1 blocked</span></td>
+      </tr>
+    </table>
+    <div class="foot">Feed: 8 commits broadcast to 3 listeners · ingestion cost $0.14 total (0.9% of issue) — listening is nearly free, and now you can prove it.</div>
+  </div>
+</div>
+
+<!-- ══════════ VIEW 1: ISSUE TREE ══════════ -->
+<div class="view" id="v1">
+  <div class="note">Today the tree shows only the <b>rolled-up</b> cost on the issue row. Mock: every line item carries its own right-aligned cost + token column, and <b>every crew member is a first-class row</b> — including the supervisor and the review/test specialists.</div>
+  <div class="card tree">
+    <div class="trow"><span class="ind">▾</span><span class="lbl"><span class="name">PAN-2383</span> editable per-issue Standing Crew toggle <span class="badge">in review</span></span><span class="tok">8.6M / 360k</span><span class="cost">$16.41</span></div>
+    <div class="trow lvl1"><span class="ind">▾</span><span class="lbl">standing crew <span class="badge">tiered: on</span></span><span class="tok">7.4M / 349k</span><span class="cost">$13.53</span></div>
+    <div class="trow lvl2"><span class="ind">·</span><span class="lbl"><span class="st done"></span>cheap — slot 2 <span class="modelid">haiku-4-5</span></span><span class="tok">2.1M / 148k</span><span class="cost">$1.79</span></div>
+    <div class="trow lvl2"><span class="ind">·</span><span class="lbl"><span class="st run"></span>standard — slot 1 <span class="modelid">gpt-5.5 · codex</span></span><span class="tok">3.4M / 132k</span><span class="cost">$2.10</span></div>
+    <div class="trow lvl2"><span class="ind">·</span><span class="lbl"><span class="st done"></span>frontier — slot 3 <span class="modelid">opus-4-8</span></span><span class="tok">1.9M / 69k</span><span class="cost">$9.64</span></div>
+    <div class="trow lvl2"><span class="ind">·</span><span class="lbl"><span class="st idle"></span>supervisor <span class="modelid">fable-5</span> <span class="badge">review-only</span></span><span class="tok">1.2M / 11k</span><span class="cost">$2.88</span></div>
+    <div class="trow lvl1"><span class="ind">▾</span><span class="lbl">specialists</span><span class="tok">1.1M / 9k</span><span class="cost">$2.88</span></div>
+    <div class="trow lvl2"><span class="ind">·</span><span class="lbl"><span class="st run"></span>review convoy <span class="modelid">4 reviewers</span></span><span class="tok">830k / 7k</span><span class="cost">$2.31</span></div>
+    <div class="trow lvl2"><span class="ind">·</span><span class="lbl"><span class="st idle"></span>test specialist</span><span class="tok">240k / 2k</span><span class="cost">$0.41</span></div>
+    <div class="trow lvl2"><span class="ind">·</span><span class="lbl"><span class="st idle"></span>planning <span class="modelid">opus-4-8</span> <span class="badge">ended</span></span><span class="tok">310k / 12k</span><span class="cost">$0.16</span></div>
+    <div class="trow total"><span class="ind"></span><span class="lbl">issue total (matches Costs page drill)</span><span class="tok">8.6M / 360k</span><span class="cost">$16.41</span></div>
+  </div>
+  <div class="foot">Numbers are illustrative but shaped from the real PAN-2383 run (haiku $1.79 / opus $12.78 actuals; gpt-5.5 shown as it WILL read once PAN-2387/2388 fix codex attribution). Invariant: tree total == crew + specialists == Costs page. Every row click opens that member's conversation view — including the supervisor's, where its verdicts and (post-PAN-2385) the commit-feed deliveries are visible in the transcript.</div>
+</div>
+
+<script>function sw(i){document.querySelectorAll('.tab').forEach((t,j)=>t.classList.toggle('on',j===i));document.querySelectorAll('.view').forEach((v,j)=>v.classList.toggle('on',j===i));}</script>
+</body>
+</html>

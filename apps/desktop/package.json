@@ -1,6 +1,6 @@
 {
   "name": "@overdeck/desktop",
-  "version": "0.30.2",
+  "version": "0.45.23",
   "description": "Overdeck Command Deck — AI agent monitoring desktop app",
   "publishConfig": {
     "access": "public"
@@ -18,7 +18,9 @@
     "bin",
     "dist-electron",
     "server",
-    "resources"
+    "resources",
+    "drizzle",
+    "sync-sources"
   ],
   "engines": {
     "node": ">=22.0.0"
@@ -32,10 +34,10 @@
     "prepublishOnly": "node scripts/build-for-publish.mjs",
     "start": "bun run scripts/start-electron.mjs",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run --passWithNoTests",
-    "dist:linux": "electron-builder --linux AppImage --publish never",
-    "dist:mac": "electron-builder --mac dmg --universal --publish never",
-    "dist:win": "electron-builder --win nsis --publish never",
+    "test": "vitest run --configLoader runner --passWithNoTests",
+    "dist:linux": "node scripts/prepare-server-resources.mjs && electron-builder --linux AppImage --publish never && node scripts/smoke-appimage-cli.mjs && node scripts/stamp-update-manifests.mjs",
+    "dist:mac": "node scripts/prepare-server-resources.mjs && electron-builder --mac dmg zip --arm64 --publish never && node scripts/stamp-update-manifests.mjs",
+    "dist:win": "node scripts/prepare-server-resources.mjs && electron-builder --win nsis --publish never && node scripts/stamp-update-manifests.mjs",
     "postinstall": "electron-rebuild -f -w node-pty 2>/dev/null; exit 0"
   },
   "dependencies": {
@@ -43,18 +45,20 @@
     "electron-updater": "^6.8.3"
   },
   "devDependencies": {
+    "@electron/notarize": "^2.5.0",
     "@overdeck/contracts": "workspace:*",
     "@types/node": "^22.0.0",
     "electron": "40.6.0",
     "electron-builder": "^25.1.8",
-    "electron-rebuild": "^3.2.9",
     "tsdown": "^0.21.7",
     "typescript": "^5.7.3",
-    "vitest": "^4.0.18"
+    "vitest": "^4.0.18",
+    "@electron/rebuild": "^4.2.0"
   },
   "build": {
     "appId": "com.overdeck.app",
     "productName": "Overdeck",
+    "generateUpdatesFilesForAllChannels": true,
     "publish": {
       "provider": "github",
       "owner": "eltmon",
@@ -66,12 +70,32 @@
     ],
     "extraResources": [
       {
-        "from": "../../dist/dashboard/server.js",
-        "to": "server/server.js"
+        "from": "drizzle",
+        "to": "drizzle"
       },
       {
-        "from": "../../dist/dashboard/public",
-        "to": "server/public"
+        "from": "sync-sources",
+        "to": "sync-sources"
+      },
+      {
+        "from": "cli",
+        "to": "dist",
+        "filter": [
+          "**/*",
+          "!**/*.map"
+        ]
+      },
+      {
+        "from": "cli/package.json",
+        "to": "package.json"
+      },
+      {
+        "from": "server",
+        "to": "server",
+        "filter": [
+          "**/*",
+          "!**/*.map"
+        ]
       },
       {
         "from": "resources",
@@ -95,13 +119,17 @@
         {
           "target": "dmg",
           "arch": [
-            "arm64",
-            "x64"
+            "arm64"
           ]
         }
       ],
       "icon": "resources/icon.png",
-      "category": "public.app-category.developer-tools"
+      "category": "public.app-category.developer-tools",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist",
+      "notarize": false
     },
     "dmg": {
       "title": "Overdeck",
@@ -122,6 +150,7 @@
       "oneClick": false,
       "allowToChangeInstallationDirectory": true
     },
-    "afterPack": "scripts/afterPack.cjs"
+    "afterPack": "scripts/afterPack.cjs",
+    "afterSign": "scripts/notarize.cjs"
   }
 }

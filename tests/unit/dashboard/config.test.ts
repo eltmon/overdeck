@@ -6,7 +6,11 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 import { Effect } from 'effect';
+import { parse as parseYaml } from 'yaml';
 import { ServerConfig, ServerConfigLayer, ServerConfigError } from '../../../src/dashboard/server/config.js';
 
 // Prevent loadOverdeckEnv from loading ~/.overdeck.env during tests
@@ -16,9 +20,31 @@ vi.mock('../../../src/lib/env-loader.js', () => ({
   loadOverdeckEnvSync: () => ({ loaded: [], skipped: [] }),
 }));
 
+// Make dashboard identity deterministic so the guard results do not depend on
+// whether the suite is executed from a workspaces/feature-* checkout.
+const identityMock = vi.hoisted(() => ({
+  current: { repoRoot: '/home/test/Projects/overdeck', mode: 'primary' as const },
+}));
+vi.mock('../../../src/dashboard/server/identity.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../src/dashboard/server/identity.js')>();
+  return { ...actual, getDashboardIdentity: () => identityMock.current };
+});
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 type EnvSnapshot = Record<string, string | undefined>;
+
+interface DevcontainerCompose {
+  services?: {
+    frontend?: {
+      environment?: string[];
+    };
+    server?: {
+      environment?: string[];
+      labels?: string[];
+    };
+  };
+}
 
 function captureEnv(keys: string[]): EnvSnapshot {
   return Object.fromEntries(keys.map((k) => [k, process.env[k]]));
@@ -43,6 +69,7 @@ const ENV_KEYS = [
   'DASHBOARD_URL',
   'OVERDECK_HOME',
   'OVERDECK_WORKSPACE_DASHBOARD_ALLOW_PRIMARY',
+  'OVERDECK_AGENT_ID',
 ];
 
 let envSnapshot: EnvSnapshot;
@@ -51,7 +78,7 @@ beforeEach(() => {
   envSnapshot = captureEnv(ENV_KEYS);
   // Clear all relevant env vars so each test starts from a clean baseline
   for (const k of ENV_KEYS) delete process.env[k];
-  process.env['OVERDECK_WORKSPACE_DASHBOARD_ALLOW_PRIMARY'] = '1';
+  identityMock.current = { repoRoot: '/home/test/Projects/overdeck', mode: 'primary' };
 });
 
 afterEach(() => {
@@ -65,6 +92,23 @@ async function getConfig() {
       ServerConfigLayer,
     ),
   );
+}
+
+function readDevcontainerTemplate(): DevcontainerCompose {
+  const template = readFileSync(
+    resolve(process.cwd(), 'infra/.devcontainer-template/docker-compose.devcontainer.yml.template'),
+    'utf-8',
+  );
+  const rendered = template.replace(/{{[A-Z_]+}}/g, (placeholder) => {
+    const key = placeholder.slice(2, -2);
+    return key === 'PROJECTS_DIR' ? '/home/test/Projects' : `test-${key.toLowerCase()}`;
+  });
+  return parseYaml(rendered) as DevcontainerCompose;
+}
+
+function envValue(environment: string[] | undefined, name: string): string | undefined {
+  const prefix = `${name}=`;
+  return environment?.find((entry) => entry.startsWith(prefix))?.slice(prefix.length);
 }
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
@@ -99,6 +143,32 @@ describe('ServerConfig', () => {
       process.env['API_PORT'] = 'not-a-number';
       await expect(getConfig()).rejects.toThrow(ServerConfigError);
     });
+
+    it('accepts the workspace devcontainer server env in peer mode', async () => {
+      identityMock.current = { repoRoot: '/workspaces/overdeck', mode: 'peer' };
+      const compose = readDevcontainerTemplate();
+      const serverEnv = compose.services?.server?.environment ?? [];
+      const frontendEnv = compose.services?.frontend?.environment ?? [];
+      const serverPort = envValue(serverEnv, 'PORT');
+      const proxyTarget = envValue(frontendEnv, 'VITE_PROXY_TARGET');
+
+      expect(serverPort).toBeDefined();
+      expect(serverPort).not.toBe('3011');
+      expect(proxyTarget).toBe(`http://server:${serverPort}`);
+      expect(compose.services?.server?.labels ?? []).toContain(
+        `traefik.http.services.pan-api-test-feature_folder.loadbalancer.server.port=${serverPort}`,
+      );
+
+      for (const entry of serverEnv) {
+        const separator = entry.indexOf('=');
+        if (separator === -1) continue;
+        process.env[entry.slice(0, separator)] = entry.slice(separator + 1);
+      }
+      delete process.env['OVERDECK_WORKSPACE_DASHBOARD_ALLOW_PRIMARY'];
+
+      const cfg = await getConfig();
+      expect(cfg.port).toBe(Number(serverPort));
+    });
   });
 
   describe('host', () => {
@@ -111,6 +181,49 @@ describe('ServerConfig', () => {
       process.env['HOST'] = '127.0.0.1';
       const cfg = await getConfig();
       expect(cfg.host).toBe('127.0.0.1');
+    });
+  });
+
+  describe('workspace primary override identity gate', () => {
+    beforeEach(() => {
+      // The identity gate only fires when the escape hatch is requested.
+      process.env['OVERDECK_WORKSPACE_DASHBOARD_ALLOW_PRIMARY'] = '1';
+    });
+
+    it.each(['agent-pan-2545', 'planning-pan-2545', 'flywheel-orchestrator', 'strike-pan-2485', 'future-role-pan-1'])(
+      'refuses the primary-port escape hatch for pipeline identity %s',
+      async (agentId) => {
+        process.env['OVERDECK_AGENT_ID'] = agentId;
+
+        await expect(getConfig()).rejects.toThrow(
+          `Refusing host dashboard port override for pipeline-role identity`,
+        );
+      },
+    );
+
+    it.each([undefined, 'conv-20260709-6371'])(
+      'allows the primary-port escape hatch for operator identity %s',
+      async (agentId) => {
+        if (agentId === undefined) delete process.env['OVERDECK_AGENT_ID'];
+        else process.env['OVERDECK_AGENT_ID'] = agentId;
+
+        await expect(getConfig()).resolves.toMatchObject({ port: 3011 });
+      },
+    );
+
+    it('refuses the primary-port escape hatch from a linked worktree', async () => {
+      const repoRoot = mkdtempSync(join(tmpdir(), 'pan-config-linked-worktree-'));
+      try {
+        writeFileSync(join(repoRoot, '.git'), 'gitdir: /primary/.git/worktrees/handoff\n');
+        identityMock.current = { repoRoot, mode: 'primary' };
+        process.env['OVERDECK_AGENT_ID'] = 'conv-20260709-6371';
+
+        await expect(getConfig()).rejects.toThrow(
+          `Refusing to bind host dashboard port 3011 from repoRoot=${repoRoot}`,
+        );
+      } finally {
+        rmSync(repoRoot, { recursive: true, force: true });
+      }
     });
   });
 
@@ -175,6 +288,64 @@ describe('ServerConfig', () => {
       process.env['DASHBOARD_URL'] = 'https://example.com';
       const cfg = await getConfig();
       expect(cfg.dashboardUrl).toBe('https://example.com');
+    });
+  });
+
+  describe('host dashboard port guard override', () => {
+    it('refuses host port from a workspace checkout even when override is set', async () => {
+      identityMock.current = {
+        repoRoot: '/home/test/Projects/overdeck/workspaces/feature-pan-1917',
+        mode: 'primary',
+      };
+      process.env['OVERDECK_WORKSPACE_DASHBOARD_ALLOW_PRIMARY'] = '1';
+      await expect(getConfig()).rejects.toThrow(ServerConfigError);
+    });
+
+    it('allows non-workspace peer to bind host port when override is set', async () => {
+      identityMock.current = { repoRoot: '/home/test/Projects/overdeck', mode: 'peer' };
+      process.env['OVERDECK_WORKSPACE_DASHBOARD_ALLOW_PRIMARY'] = '1';
+      const cfg = await getConfig();
+      expect(cfg.port).toBe(3011);
+    });
+
+    it('refusal message never names the override env var', async () => {
+      identityMock.current = {
+        repoRoot: '/home/test/Projects/overdeck/workspaces/feature-pan-1917',
+        mode: 'primary',
+      };
+      process.env['OVERDECK_WORKSPACE_DASHBOARD_ALLOW_PRIMARY'] = '1';
+      await expect(getConfig()).rejects.toThrow();
+      try {
+        await getConfig();
+      } catch (err) {
+        expect(String(err)).not.toContain('OVERDECK_WORKSPACE_DASHBOARD_ALLOW_PRIMARY');
+      }
+
+      identityMock.current = { repoRoot: '/home/test/Projects/overdeck', mode: 'peer' };
+      delete process.env['OVERDECK_WORKSPACE_DASHBOARD_ALLOW_PRIMARY'];
+      await expect(getConfig()).rejects.toThrow();
+      try {
+        await getConfig();
+      } catch (err) {
+        expect(String(err)).not.toContain('OVERDECK_WORKSPACE_DASHBOARD_ALLOW_PRIMARY');
+      }
+
+      process.env['OVERDECK_WORKSPACE_DASHBOARD_ALLOW_PRIMARY'] = '1';
+      process.env['OVERDECK_AGENT_ID'] = 'agent-pan-2545';
+      await expect(getConfig()).rejects.toThrow();
+      try {
+        await getConfig();
+      } catch (err) {
+        expect(String(err)).not.toContain('OVERDECK_WORKSPACE_DASHBOARD_ALLOW_PRIMARY');
+      }
+    });
+
+    it('refuses host port from a workspace checkout without override', async () => {
+      identityMock.current = {
+        repoRoot: '/home/test/Projects/overdeck/workspaces/feature-pan-1917',
+        mode: 'primary',
+      };
+      await expect(getConfig()).rejects.toThrow(ServerConfigError);
     });
   });
 });

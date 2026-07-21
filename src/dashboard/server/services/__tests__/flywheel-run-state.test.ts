@@ -131,11 +131,28 @@ describe('flywheel run state', () => {
     await writeLatestFlywheelStatus(makeStatus('RUN-3', '2026-05-18T11:00:00.000Z'), { overdeckHome });
     await writeFile(join(overdeckHome, 'flywheel', 'runs', 'RUN-2', 'report.md'), '# Report\n');
     await writeFile(join(overdeckHome, 'flywheel', 'runs', 'RUN-3', 'aborted.json'), '{}\n');
+    // RUN-1 is the live (active, unpaused) run → 'running'.
+    appSettingsMocks.activeRunId = 'RUN-1';
 
     await expect(listFlywheelRuns({ overdeckHome })).resolves.toEqual([
       { id: 'RUN-2', startedAt: '2026-05-18T12:00:00.000Z', status: 'complete' },
       { id: 'RUN-3', startedAt: '2026-05-18T11:00:00.000Z', status: 'aborted' },
       { id: 'RUN-1', startedAt: '2026-05-18T10:00:00.000Z', status: 'running' },
+    ]);
+  });
+
+  // PAN-2108: an orphaned run (no terminal marker, not the active run) was an
+  // abandoned orchestrator — it must NOT report 'running' (that lit the sidebar
+  // "live" badge for every stale run forever).
+  it('reports an orphaned non-active run without terminal markers as aborted, not running', async () => {
+    await writeLatestFlywheelStatus(makeStatus('RUN-1', '2026-05-18T10:00:00.000Z'), { overdeckHome });
+    await writeLatestFlywheelStatus(makeStatus('RUN-2', '2026-05-18T12:00:00.000Z'), { overdeckHome });
+    // RUN-2 is the only live run; RUN-1 has no markers and is not active.
+    appSettingsMocks.activeRunId = 'RUN-2';
+
+    await expect(listFlywheelRuns({ overdeckHome })).resolves.toEqual([
+      { id: 'RUN-2', startedAt: '2026-05-18T12:00:00.000Z', status: 'running' },
+      { id: 'RUN-1', startedAt: '2026-05-18T10:00:00.000Z', status: 'aborted' },
     ]);
   });
 

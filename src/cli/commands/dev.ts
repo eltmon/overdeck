@@ -46,7 +46,7 @@ function readConfig() {
   const configFile = join(process.env.HOME || '', '.overdeck', 'config.toml');
   const defaults = {
     traefikEnabled: false,
-    traefikDomain: 'pan.localhost',
+    traefikDomain: 'overdeck.localhost',
     dashboardPort: 3010,
     dashboardApiPort: 3011,
   };

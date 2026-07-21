@@ -1,15 +1,20 @@
-/**
- * @vitest-environment jsdom
- */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
+import { installStrictFetchMock } from '../../test-utils/strictFetchMock';
 import { useTheme } from '../useTheme';
 
 describe('useTheme', () => {
   let mockLocalStorage: Record<string, string>;
   let mockClassList: Set<string>;
+  let fetchControl: ReturnType<typeof installStrictFetchMock>;
 
   beforeEach(() => {
+    fetchControl = installStrictFetchMock(({ method, url }) => {
+      if (method === 'PUT' && url === '/api/settings/ui-theme') {
+        return Response.json({ ok: true });
+      }
+      return undefined;
+    });
     mockLocalStorage = {};
     global.localStorage = {
       getItem: vi.fn((key: string) => mockLocalStorage[key] || null),
@@ -60,7 +65,9 @@ describe('useTheme', () => {
     useTheme.setState({ theme: 'dark', resolvedTheme: 'dark' });
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    await fetchControl.assertNoUnexpectedRequests();
+    vi.unstubAllGlobals();
     vi.clearAllMocks();
     mockClassList.clear();
   });

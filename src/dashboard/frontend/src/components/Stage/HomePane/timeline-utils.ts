@@ -2,6 +2,8 @@ export interface TimelineConversation {
   /** Conversation id used to open/focus the agent pane. */
   id: string
   agentLabel?: string
+  model?: string | null
+  harness?: string | null
   /** Activity time — ms epoch or ISO string. */
   timestamp: number | string
   preview?: string

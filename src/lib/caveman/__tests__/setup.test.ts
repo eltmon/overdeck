@@ -186,12 +186,12 @@ describe('vendored JS files — syntax and load validation', () => {
     // Copy to a temp dir with no package.json → Node treats .js as CommonJS
     const tmpDir = mkdtempSync(join(tmpdir(), 'caveman-load-'));
     try {
-      copyFileSync(join(cavemanSrcDir, 'caveman-config.js'), join(tmpDir, 'caveman-config.js'));
+      copyFileSync(join(cavemanSrcDir, 'caveman-config.js'), join(tmpDir, 'caveman-config.cjs'));
       const result = spawnSync(
         process.execPath,
         [
           '-e',
-          `const m = require('./caveman-config.js');
+          `const m = require('./caveman-config.cjs');
 const keys = Object.keys(m).sort();
 process.stdout.write(JSON.stringify(keys));`,
         ],

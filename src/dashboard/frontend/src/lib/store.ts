@@ -57,6 +57,7 @@ export interface DashboardStore extends DashboardState {
    */
   seedRecentActivity(entries: unknown[]): void
   openIssue(issueId: string, tab?: string): void
+  openIssueFromRoute(issueId: string, parentPath: string, routePath: string): void
   closeIssue(): void
   setDrawerTab(tab: string): void
   syncDrawerFromUrl(): void
@@ -126,6 +127,8 @@ function readDrawerFromUrl(): DrawerState {
   }
 }
 
+let directIssueRoute: { parentPath: string; routePath: string } | null = null
+
 export const useDashboardStore = create<DashboardStore>((set) => ({
   ...initialState,
 
@@ -157,15 +160,32 @@ export const useDashboardStore = create<DashboardStore>((set) => ({
       return { recentActivity: merged }
     }),
 
-  openIssue: (issueId, tab = 'overview') => {
+  openIssue: (issueId, tab = 'conversation') => {
+    directIssueRoute = null
     const drawer = { issueId, tab }
     replaceDrawerUrl(drawer)
     set({ drawer })
   },
 
+  openIssueFromRoute: (issueId, parentPath, routePath) => {
+    directIssueRoute = { parentPath, routePath }
+    // PAN-2908 C-DETAIL: the drawer opens conversation-first — but an explicit
+    // ?tab= in the URL is a deep-link and always wins.
+    const urlTab = typeof window !== 'undefined'
+      ? new URLSearchParams(window.location.search).get('tab')
+      : null
+    set({ drawer: { issueId, tab: urlTab || 'conversation' } })
+  },
+
   closeIssue: () => {
     const drawer = { issueId: null, tab: 'overview' }
-    replaceDrawerUrl(drawer)
+    if (typeof window !== 'undefined' && directIssueRoute?.routePath === window.location.pathname) {
+      window.history.replaceState(null, '', directIssueRoute.parentPath)
+      directIssueRoute = null
+    } else {
+      directIssueRoute = null
+      replaceDrawerUrl(drawer)
+    }
     set({ drawer })
   },
 
@@ -177,7 +197,10 @@ export const useDashboardStore = create<DashboardStore>((set) => ({
     }),
 
   syncDrawerFromUrl: () =>
-    set({ drawer: readDrawerFromUrl() }),
+    set(() => {
+      directIssueRoute = null
+      return { drawer: readDrawerFromUrl() }
+    }),
 }))
 
 // ─── Selector memoization helpers ─────────────────────────────────────────────
@@ -297,6 +320,43 @@ export const selectAgentsWithPendingAskUserQuestion = memoizeArraySelector<
 )
 
 /**
+ * PAN-1520 (FR-1) — agents with a pending ExitPlanMode plan payload, oldest
+ * first. Feeds the PlanApprovalDialog the same way the AUQ selector feeds
+ * AskUserQuestionDialog.
+ */
+export const selectAgentsWithPendingProposedPlan = memoizeArraySelector<
+  DashboardState,
+  'agentsById',
+  AgentSnapshot[]
+>(
+  'agentsById',
+  (agentsById) =>
+    Object.values(agentsById)
+      .filter((a) => a.pendingProposedPlan != null)
+      .sort((a, b) => {
+        const aTime = a.pendingProposedPlan?.askedAt ?? ''
+        const bTime = b.pendingProposedPlan?.askedAt ?? ''
+        return aTime === bTime ? a.id.localeCompare(b.id) : aTime.localeCompare(bTime)
+      }),
+)
+
+/**
+ * PAN-1520 (FR-6) — the ONE shared accessor for "does this agent have a
+ * pending channel permission request?". Card-level surfaces combine this with
+ * `isAwaitingInput(agent)` so a permission-only agent lights the same
+ * indicator; deriving it per-component from the raw request map is what
+ * caused the card/needs-you drift this fixes.
+ */
+export const selectPendingPermissionAgentIds = memoizeArraySelector<
+  DashboardState,
+  'channelPermissionRequestsById',
+  ReadonlySet<string>
+>(
+  'channelPermissionRequestsById',
+  (permsById) => new Set(Object.values(permsById ?? {}).map((p) => p.agentId)),
+)
+
+/**
  * PAN-1520 — a single agent-or-conversation subject that is blocked waiting on
  * the operator, across EVERY surface (AskUserQuestion, ExitPlanMode,
  * EnterPlanMode, session-resume, and PermissionRequest). This is what the
@@ -315,6 +375,8 @@ export interface PendingInputSubject {
   kinds: string[]
   /** AUQ payload when an AskUserQuestion is among the kinds (for the dialog). */
   pendingAskUserQuestion?: AgentSnapshot['pendingAskUserQuestion']
+  /** Plan payload when an ExitPlanMode approval is among the kinds (FR-5 routing). */
+  pendingProposedPlan?: AgentSnapshot['pendingProposedPlan']
   /** Outstanding permission requests for this agent (for routing/labels). */
   permissionRequestIds: string[]
   /** Oldest blocking timestamp for stable ordering. */
@@ -378,6 +440,7 @@ export const selectPendingInputSubjects = deriveMemo<
       if (!waiting) continue
       const since =
         a.pendingAskUserQuestion?.askedAt ??
+        a.pendingProposedPlan?.askedAt ??
         agentPerms.map((p) => p.createdAt).sort()[0] ??
         ''
       subjects.push({
@@ -385,6 +448,7 @@ export const selectPendingInputSubjects = deriveMemo<
         issueId: a.issueId,
         kinds,
         pendingAskUserQuestion: a.pendingAskUserQuestion,
+        pendingProposedPlan: a.pendingProposedPlan,
         permissionRequestIds: agentPerms.map((p) => p.requestId),
         since,
       })

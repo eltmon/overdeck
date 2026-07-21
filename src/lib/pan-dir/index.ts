@@ -3,6 +3,8 @@ export {
   PAN_CONTINUE_FILENAME,
   PAN_CONTINUES_DIRNAME,
   PAN_DIRNAME,
+  WORKSPACE_RUNTIME_DIRNAME,
+  LEGACY_WORKSPACE_RUNTIME_DIRNAME,
   PAN_DRAFTS_DIRNAME,
   PAN_FEEDBACK_DIRNAME,
   PAN_SESSIONS_FILENAME,
@@ -30,6 +32,7 @@ export {
   readSpec,
   updateSpecStatus,
   writeSpec,
+  writeSpecDocument,
   writeSpecForIssue,
   buildPanSpecFilename,
   buildPanSpecPath,
@@ -37,14 +40,15 @@ export {
 
 export {
   ensureWorkspacePanDir,
+  getLegacyWorkspacePanPaths,
+  getReadableWorkspacePanPaths,
   getWorkspacePanPaths,
-  readWorkspaceContinue,
-  writeWorkspaceContinue,
 } from './continue.js'
 
 export { appendSession, readSessions } from './sessions.js'
 export { clearFeedback, readFeedback, writeFeedback } from './feedback.js'
 export {
+  checkPrdGateSync,
   deleteIssueDraft,
   getDraftPath,
   getDraftsDir,
@@ -52,16 +56,11 @@ export {
   getIssueDraftPath,
   hasIssueDraft,
   listIssueDrafts,
+  MIN_PRD_LINES,
+  promoteWorkspacePrdDraft,
   readIssueDraft,
   writeIssueDraft,
+  type PrdGateResult,
+  type PromoteWorkspacePrdDraftResult,
 } from './drafts.js'
 export { readWorkspaceContext, writeWorkspaceContext } from './context.js'
-export {
-  deleteContinueFile,
-  getContinueFilePath,
-  getContinuesDir,
-  hasContinueFile,
-  listContinueFiles,
-  readContinueFile,
-  writeContinueFile,
-} from './continues.js'

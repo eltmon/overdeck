@@ -42,6 +42,8 @@ export interface EmitActivityOptions {
   issueId?: string;
   /** Dashboard route the feed navigates to on click (e.g. /conv/<name>, /flywheel). */
   link?: string;
+  /** PAN-1862 (FR-12): also fire a desktop notification for this entry. */
+  desktop?: boolean;
 }
 
 export interface EmitDetailedOptions {
@@ -116,6 +118,7 @@ export function emitActivityEntrySync(options: EmitActivityOptions): void {
       details: options.details,
       issueId: options.issueId,
       link: options.link,
+      desktop: options.desktop,
     },
   });
 }

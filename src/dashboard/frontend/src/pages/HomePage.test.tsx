@@ -1,10 +1,11 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AgentSnapshot, FeatureRegistryEntry, MemoryObservation, MemoryStatus } from '@overdeck/contracts';
 import { INITIAL_READ_MODEL_STATE } from '@overdeck/contracts';
 
 import { HomePage } from './HomePage';
+import { usePlannedBacklogVisibility } from '../hooks/usePlannedBacklogVisibility';
 import { useDashboardStore } from '../lib/store';
 
 function makeEntry(overrides: Partial<FeatureRegistryEntry> = {}): FeatureRegistryEntry {
@@ -118,6 +119,8 @@ function renderHomePage(props: Parameters<typeof HomePage>[0] = {}) {
 
 beforeEach(() => {
   resetDashboardStore();
+  usePlannedBacklogVisibility.setState({ showPlannedBacklog: true });
+  localStorage.clear();
 });
 
 afterEach(() => {
@@ -139,7 +142,9 @@ describe('HomePage', () => {
         running: makeAgent({ id: 'running', status: 'running' }),
         liveStopped: makeAgent({ id: 'liveStopped', status: 'stopped', hasLiveTmuxSession: true }),
         paused: makeAgent({ id: 'paused', status: 'stopped', paused: true }),
-        troubled: makeAgent({ id: 'troubled', status: 'stopped', consecutiveFailures: 2 }),
+        troubled: makeAgent({ id: 'troubled', status: 'stopped', troubled: true, consecutiveFailures: 2 }),
+        failedAgent: makeAgent({ id: 'failedAgent', status: 'failed', consecutiveFailures: 1 }),
+        staleStoppedFailure: makeAgent({ id: 'staleStoppedFailure', status: 'stopped', consecutiveFailures: 1 }),
       },
       reviewStatusByIssueId: {
         recentMerge: { issueId: 'PAN-1', mergeStatus: 'merged', updatedAt: '2026-05-25T00:00:00.000Z' },
@@ -155,7 +160,7 @@ describe('HomePage', () => {
     renderHomePage({ now: new Date('2026-05-25T12:00:00.000Z') });
 
     expect(summaryCard('Running agents')).toHaveTextContent('2');
-    expect(summaryCard('Paused / troubled')).toHaveTextContent('2');
+    expect(summaryCard('Paused / troubled')).toHaveTextContent('3');
     expect(summaryCard('Merged today')).toHaveTextContent('1');
     expect(summaryCard('Needs verification')).toHaveTextContent('2');
     expect(await screen.findByText('$12.35')).toBeInTheDocument();
@@ -322,6 +327,40 @@ describe('HomePage', () => {
 
     fireEvent.click(projectButton);
     expect(onSelectProject).toHaveBeenCalledWith('overdeck');
+  });
+
+  it('filters spec-only planned rows from project activity counts', async () => {
+    vi.stubGlobal('fetch', homeFetchStub({
+      '/api/issues/resource-allocated': [{
+        issueId: 'PAN-2822',
+        title: 'Planned visibility toggle',
+        projectName: 'overdeck',
+        branch: '',
+        status: 'idle',
+        stateLabel: 'Idle',
+        agentStatus: null,
+        hasPlanning: true,
+        hasPrd: true,
+        hasState: false,
+        isShadow: false,
+        specOnlyPlanned: true,
+      }],
+      '/api/registered-projects': [{ key: 'overdeck', name: 'overdeck', path: '/home/eltmon/Projects/overdeck' }],
+    }));
+
+    renderHomePage();
+
+    const projectButton = await screen.findByTestId('home-project-overdeck');
+    const activityDot = projectButton.querySelector('[aria-hidden="true"]');
+    expect(within(projectButton).getByText('1')).toBeInTheDocument();
+    expect(activityDot).toHaveClass('bg-primary');
+
+    act(() => {
+      usePlannedBacklogVisibility.setState({ showPlannedBacklog: false });
+    });
+
+    expect(within(projectButton).queryByText('1')).not.toBeInTheDocument();
+    expect(activityDot).toHaveClass('bg-muted-foreground/30');
   });
 
   it('shows a no-projects empty state with a new-project CTA (PAN-1969)', async () => {

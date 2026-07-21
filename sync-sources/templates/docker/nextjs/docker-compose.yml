@@ -20,7 +20,7 @@ services:
       - app-network
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME:-nextjs}.rule=Host(`${HOSTNAME:-app.pan.localhost}`)"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME:-nextjs}.rule=Host(`${HOSTNAME:-app.overdeck.localhost}`)"
       - "traefik.http.services.${COMPOSE_PROJECT_NAME:-nextjs}.loadbalancer.server.port=3000"
 
 networks:

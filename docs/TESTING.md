@@ -14,6 +14,28 @@ How to run tests and write new ones for Overdeck.
 
 Frontend tests run separately: `cd src/dashboard/frontend && npm test`.
 
+## Frontend suite performance (PAN-2045)
+
+Measured with `cd src/dashboard/frontend && /usr/bin/time npx vitest run --configLoader runner`.
+
+| Date | Measurement | Environment | Test files | Test cases | Wall-clock |
+|------|-------------|-------------|------------|------------|------------|
+| 2026-07-16 | Before | jsdom | 214 | 2,008 | 26.94 s |
+| 2026-07-16 | After | happy-dom (`threads` pool) | 214 | 2,008 | 21.85 s |
+
+The after result is the better of two green runs under the committed configuration (25.92 s and 21.85 s wall-clock).
+
+The frontend suite now uses happy-dom with Vitest's `threads` pool. happy-dom removes jsdom overhead, and thread workers produced the fastest stable result while preserving Vitest's default per-file isolation.
+
+The migration fixed these divergence classes:
+
+- IssueMissionControl tests now own every rendered request with a strict local fetch stub, cancel QueryClient work before unmounting, and fail on unexpected endpoints. Query garbage collection and retries remain disabled. The pre-change solo hang did not reproduce on 2026-07-16, but this removes the retained query/request lifecycle identified by PAN-1918 part 1; wiring the complete frontend suite into CI remains PAN-1918's scope.
+- happy-dom CSS differences are covered with behavior-equivalent assertions for custom properties, outline longhands, phase colors, and WebKit line clamping.
+- Accessible-name checks retain role-based queries while allowing the text boundaries that happy-dom computes around highlighted command text.
+- Missing browser APIs, including `window.prompt` and `window.confirm`, use guarded fallbacks only when the environment does not provide them. Canvas/xterm setup order and the asynchronous Streamdown renderer test cover the remaining render/configuration mismatches.
+
+`isolate: false` was evaluated during the 2026-06-25 strike and caused widespread cross-test state bleed, so it is rejected. Future performance work should keep isolation enabled rather than casually retrying that setting.
+
 ## Test Structure
 
 ```

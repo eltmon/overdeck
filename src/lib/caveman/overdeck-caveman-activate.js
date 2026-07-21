@@ -38,7 +38,7 @@ const overdeckOverrides = `
 
 ## Overdeck Overrides (non-negotiable)
 
-continue.vbrief.json updates: ALWAYS use full prose for narrative fields (decisions[].rationale, hazards[].mitigation, approach, sessionHistory[].note). Crash recovery and specialist context depend on complete information in these fields.
+.overdeck/continue.json updates: ALWAYS use full prose for narrative fields (decisions[].rationale, hazards[].mitigation, approach, sessionHistory[].note). Crash recovery and specialist context depend on complete information in these fields.
 
 .planning/feedback/ files: ALWAYS write at full prose. The work agent that reads this file needs complete context to understand what to fix.
 

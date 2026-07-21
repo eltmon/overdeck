@@ -89,15 +89,15 @@ describe('dashboard context route helpers', () => {
       drafts: [
         {
           target: { kind: 'project', projectKey: 'overdeck' },
-          content: 'shared {{#harness:claude}}claude-only{{/harness:claude}}{{#harness:pi}}pi-only{{/harness:pi}}',
+          content: 'shared {{#harness:claude}}claude-only{{/harness:claude}}{{#harness:ohmypi}}ohmypi-only{{/harness:ohmypi}}',
         },
       ],
     }, panHome);
 
     expect(response.previews['claude-code']).toContain('shared claude-only');
-    expect(response.previews['claude-code']).not.toContain('pi-only');
-    expect(response.previews.pi).toContain('shared pi-only');
-    expect(response.previews.pi).not.toContain('claude-only');
+    expect(response.previews['claude-code']).not.toContain('ohmypi-only');
+    expect(response.previews.ohmypi).toContain('shared ohmypi-only');
+    expect(response.previews.ohmypi).not.toContain('claude-only');
     expect(response.previews.fullPrompt).toContain('Private harness base prompt');
     expect(response.previews.fullPrompt).toContain('Unavailable');
     expect(await readFile(join(panHome, 'context', 'global.md'), 'utf-8')).toBe('global context');

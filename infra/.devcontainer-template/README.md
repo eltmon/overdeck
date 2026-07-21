@@ -44,8 +44,8 @@ When `pan workspace create PAN-XXX` is run:
 
 | Service | Description | URL |
 |---------|-------------|-----|
-| frontend | Vite dev server with HMR | `https://{{FEATURE_FOLDER}}.pan.localhost` |
-| server | Express API with tsx watch | `https://api-{{FEATURE_FOLDER}}.pan.localhost` |
+| frontend | Vite dev server with HMR | `https://{{FEATURE_FOLDER}}.overdeck.localhost` |
+| server | Express API with tsx watch | `https://api-{{FEATURE_FOLDER}}.overdeck.localhost` |
 | dev | VS Code attach container | - |
 
 ## Usage
@@ -67,7 +67,7 @@ cd workspaces/feature-pan-xxx/
 pan workspace create PAN-103
 
 # Access the feature
-open https://feature-pan-103.pan.localhost
+open https://feature-pan-103.overdeck.localhost
 ```
 
 ### VS Code Dev Containers
@@ -80,7 +80,7 @@ open https://feature-pan-103.pan.localhost
 - Docker
 - Overdeck Traefik running (`~/.overdeck/traefik/`)
 - `overdeck` Docker network created
-- Wildcard certs for `*.pan.localhost`
+- Wildcard certs for `*.overdeck.localhost`
 
 ## Resolved Issues (PAN-109)
 

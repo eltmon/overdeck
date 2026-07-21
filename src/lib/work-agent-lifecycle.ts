@@ -195,7 +195,13 @@ async function getWorkAgentLifecycleStateSnapshot(agentOrIssueId: string): Promi
     runtimeState: runtime,
     agentStatus,
     canStartFresh: (!hasLiveTmuxSession || (hasLiveTmuxSession && isStopped)) && (!requiresSessionResetBeforeFreshStart || isOrphaned),
-    canResumeSession: !isRunning && hasResumableBackingState && (isStopped || isCrashed),
+    // A live, actively-running agent (isRunning=true, isRunningButStuck=false) is already in
+    // session — no resume needed. Stuck agents (isRunning=true, isRunningButStuck=true) must
+    // use the dedicated isRunningButStuck flag at call sites; canResumeSession stays false for
+    // them so `isRunning` and `canResumeSession` are never simultaneously true.
+    // PAN-2908: the async snapshot used to omit hasSavedSession here — every stopped agent with
+    // a workspace looked resumable, so the CTA offered Resume with nothing to resume (PAN-806).
+    canResumeSession: !isRunning && hasSavedSession && hasResumableBackingState && (isStopped || isCrashed),
     canRestartWithContext: hasAgentState && hasWorkspace,
     canResetSession: hasSavedSession && hasResumableBackingState,
     requiresSessionResetBeforeFreshStart,

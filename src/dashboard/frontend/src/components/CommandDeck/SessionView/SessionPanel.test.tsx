@@ -4,6 +4,9 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactElement } from 'react';
 import type { SessionNode as SessionNodeType } from '@overdeck/contracts';
 import { SessionPanel } from './SessionPanel';
+import { installStrictFetchMock } from '../../../test-utils/strictFetchMock';
+
+let fetchControl: ReturnType<typeof installStrictFetchMock>;
 
 // SessionPanel renders SessionPanelBranchChip, which uses react-query. Wrap
 // every render in a fresh QueryClientProvider so the hook has a client.
@@ -54,6 +57,12 @@ vi.mock('../RoundCard', () => ({
   ),
 }));
 
+vi.mock('./SessionResumeButton', () => ({
+  SessionResumeButton: ({ issueId }: { issueId: string }) => (
+    <div data-testid="session-resume-button">{issueId}</div>
+  ),
+}));
+
 function makeSession(overrides?: Partial<SessionNodeType>): SessionNodeType {
   return {
     type: 'work',
@@ -70,11 +79,18 @@ function makeSession(overrides?: Partial<SessionNodeType>): SessionNodeType {
 
 describe('SessionPanel', () => {
   beforeEach(() => {
+    fetchControl = installStrictFetchMock(({ method, url }) => {
+      if (method === 'GET' && url.endsWith('/git-info')) return Response.json({});
+      if (method === 'GET' && url === '/api/models/resolve') return Response.json({});
+      return undefined;
+    });
     localStorage.clear();
     vi.restoreAllMocks();
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    await fetchControl.assertNoUnexpectedRequests();
+    vi.unstubAllGlobals();
     localStorage.clear();
   });
 
@@ -82,6 +98,11 @@ describe('SessionPanel', () => {
     render(<SessionPanel session={makeSession()} />);
     expect(screen.getByText('Conversation')).toBeInTheDocument();
     expect(screen.getByText('Terminal')).toBeInTheDocument();
+  });
+
+  it('mounts the canonical resume action even when session status is stale-running', () => {
+    render(<SessionPanel issueId="MIN-865" session={makeSession({ status: 'running', presence: 'ended' })} />);
+    expect(screen.getByTestId('session-resume-button')).toHaveTextContent('MIN-865');
   });
 
   it('defaults to conversation view', () => {

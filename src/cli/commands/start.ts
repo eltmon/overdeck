@@ -1,37 +1,37 @@
 import chalk from 'chalk';
 import ora, { type Ora } from 'ora';
 import { existsSync, readFileSync } from 'fs';
-import { join, dirname } from 'path';
+import { join, dirname, resolve } from 'path';
 import { homedir } from 'os';
 import { createInterface } from 'readline/promises';
 import { promisify } from 'util';
-import { exec, execFile, execFileSync } from 'child_process';
+import { exec, execFile } from 'child_process';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
 import { clearAgentPausedSync, getAgentStateSync, spawnAgent } from '../../lib/agents.js';
+import { describeConflictingWorkAgents } from '../../lib/work-agent-conflicts.js';
 import { ROLE_EFFORTS, resolveModel as resolveRoleModel, loadConfigSync as loadYamlConfig, type RoleEffort } from '../../lib/config-yaml.js';
 import { getModelEffortLevelsSync } from '../../lib/model-capabilities.js';
 import { syncMainIntoWorkspace } from '../../lib/cloister/merge-agent.js';
-import { resolveProjectFromIssueSync, hasProjectsSync, listProjectsSync, ProjectConfig } from '../../lib/projects.js';
+import { resolveProjectFromIssueSync, hasProjectsSync } from '../../lib/projects.js';
 import { hasPRDDraft, getPRDDraftPathSync } from '../../lib/prd-draft.js';
 import { isGitHubIssueSync, resolveGitHubIssueSync } from '../../lib/tracker-utils.js';
 import { Effect } from 'effect';
 import { getLinearApiKey } from '../../lib/shadow-utils.js';
-import { getWorkspacePanPaths } from '../../lib/pan-dir/index.js';
+import { getReadableWorkspacePanPaths } from '../../lib/pan-dir/index.js';
 import type { RuntimeName } from '../../lib/runtimes/types.js';
-import { findPlanSync } from '../../lib/vbrief/io.js';
-import { writeAutoStartVBrief, type AutoSynthesizeIssueInput } from '../../lib/vbrief/auto-synthesize.js';
-import { createBeadsFromVBrief } from '../../lib/vbrief/beads.js';
-import { transitionVBriefOnMain, updatePlanStatus } from '../../lib/vbrief/lifecycle-io.js';
+import { findPlanSync, readWorkspacePlanSync } from '../../lib/xbrief/io.js';
+import { findSpecByIssue } from '../../lib/pan-dir/specs.js';
+import { writeAutoStartXBrief, type AutoSynthesizeIssueInput } from '../../lib/xbrief/auto-synthesize.js';
+import { transitionXBriefOnMain, updatePlanStatus } from '../../lib/xbrief/lifecycle-io.js';
+import { resolveIssueWorkModel } from '../../lib/agents/staffing.js';
 import {
-  BdTransientFailure,
-  isTransientBdError,
-  runBdWithRetry,
-  type RunBdWithRetryOptions,
-} from '../../lib/bd-process-lock.js';
-
-export const RETRYABLE_BD_LOCK_EXIT_CODE = 75;
+  buildStartPlanningBody,
+  printPlanningConnectionError,
+  streamPlanningSession,
+} from './planning-stream.js';
+import { createPlanningProgress, createPrepProgress, runStartPrepStep, runStateReconcile, warnSyncMainFailure } from './start-prep-progress.js';
 
 /**
  * Check if an issue ID is a Linear issue (has team prefix like MIN-, PAN-, etc.)
@@ -78,23 +78,19 @@ async function updateLinearToInProgress(apiKey: string, issueIdentifier: string)
 
 import { shouldSkipTrackerUpdate, getShadowModeStatus } from '../../lib/shadow-mode.js';
 import { createShadowState, updateShadowState } from '../../lib/shadow-state.js';
-import { loadConfigSync } from '../../lib/config.js';
+import { getDashboardApiUrlSync, loadConfigSync } from '../../lib/config.js';
 import {
   loadWorkspaceMetadataSync,
   findRemoteWorkspaceMetadataSync,
 } from '../../lib/remote/workspace-metadata.js';
-import {
-  spawnRemoteAgent,
-  isRemoteAgentRunning,
-  createFlyProviderFromConfig,
-  checkRemoteSpendCap,
-} from '../../lib/remote/index.js';
-import { isRemoteAvailable } from '../../lib/remote/index.js';
+import { spawnRemoteAgent, isRemoteAgentRunning, createFlyProviderFromConfig, checkRemoteSpendCap, isRemoteAvailable } from '../../lib/remote/index.js';
 import type { RemoteWorkspaceMetadata } from '../../lib/remote/interface.js';
 import type { SpawnRemoteAgentOptions } from '../../lib/remote/remote-agents.js';
-import { assertCanStartFreshSync } from '../../lib/work-agent-lifecycle.js';
+import { assertCanStartFreshSync, getWorkAgentLifecycleStateSync } from '../../lib/work-agent-lifecycle.js';
 import { normalizeModelOverrideSync } from '../../lib/model-validation.js';
-
+import { resolvePlanningMode, type PlanningMode } from './planning-mode.js';
+import { requireAutomaticStateMigration } from '../../lib/state-auto-migrate.js';
+import { applyStartPolicyOptions } from './start-policy-overrides.js';
 interface IssueOptions {
   model: string;
   /** PAN-636 — explicit coding-agent harness override. Omit to use resolver defaults. */
@@ -107,6 +103,9 @@ interface IssueOptions {
   local?: boolean;
   /** Remote workspace resiliency tier override: ephemeral | durable. */
   tier?: string;
+  /** Explicit planning-depth flag: interactive | auto | skip. */
+  plan?: string;
+  /** Legacy auto-skip-planning flag; deprecated — use --plan skip instead. */
   auto?: boolean;
   host?: boolean;
   yes?: boolean;
@@ -114,6 +113,8 @@ interface IssueOptions {
   /** Drop the saved Claude session pointer (non-destructive) and start a brand-new
    *  session — the one-step "restart fresh" path, e.g. to switch a stopped agent's model. */
   fresh?: boolean;
+  /** Resolved planning mode for this start invocation. Set by issueCommand. */
+  planningMode?: PlanningMode;
 }
 
 /**
@@ -173,8 +174,8 @@ async function resolveExplicitHarnessFlag(
     return undefined;
   }
 
-  if (harness !== 'claude-code' && harness !== 'pi' && harness !== 'codex') {
-    process.stderr.write(`Invalid --harness value: ${harness}. Expected 'claude-code', 'pi', or 'codex'.\n`);
+  if (harness !== 'claude-code' && harness !== 'ohmypi' && harness !== 'codex' && harness !== 'acp') {
+    process.stderr.write(`Invalid --harness value: ${harness}. Expected 'claude-code', 'ohmypi', 'codex', or 'acp'.\n`);
     process.exit(1);
   }
 
@@ -588,102 +589,10 @@ import {
   buildWorkAgentPrompt,
   getTrackerContext,
   readPlanningContext,
-  readBeadsTasks,
 } from '../../lib/cloister/work-agent-prompt.js';
 
-export type BeadsTaskCountResult = {
-  count: number;
-  source: 'bd' | 'jsonl-fallback';
-  transientFailure?: unknown;
-};
-
-function countBeadsTasksFromJsonl(workspacePath: string, label?: string): number {
-  const jsonlPath = join(workspacePath, '.beads', 'issues.jsonl');
-  if (!existsSync(jsonlPath)) return 0;
-  if (!label) return readFileSync(jsonlPath, 'utf-8').split('\n').filter((line) => line.trim()).length;
-
-  let count = 0;
-  for (const line of readFileSync(jsonlPath, 'utf-8').split('\n')) {
-    if (!line.trim()) continue;
-    try {
-      const entry = JSON.parse(line);
-      const labels: string[] = Array.isArray(entry.labels) ? entry.labels : [];
-      if (labels.some((candidate) => candidate.toLowerCase() === label || candidate.toLowerCase() === `workspace:${label}`)) {
-        count += 1;
-      }
-    } catch { /* skip malformed lines */ }
-  }
-  return count;
-}
-
 /**
- * Check whether a workspace has beads tasks (planning must create them before work begins).
- * Uses `bd list` to query the beads database directly (storage-backend agnostic).
- * Exported for testing.
- */
-export function countBeadsTasksDetailed(workspacePath: string, issueId?: string): BeadsTaskCountResult {
-  const label = issueId?.toLowerCase();
-  try {
-    const args = label
-      ? ['list', '--json', '-l', label, '--status', 'all', '--limit', '0']
-      : ['list', '--json', '--limit', '0'];
-    const output = execFileSync('bd', args, {
-      cwd: workspacePath,
-      encoding: 'utf-8',
-      timeout: 10000,
-      stdio: ['pipe', 'pipe', 'pipe'],
-    });
-    const tasks = JSON.parse(output.trim() || '[]');
-    return { count: Array.isArray(tasks) ? tasks.length : 0, source: 'bd' };
-  } catch (error) {
-    return {
-      count: countBeadsTasksFromJsonl(workspacePath, label),
-      source: 'jsonl-fallback',
-      transientFailure: isTransientBdError(error) ? error : undefined,
-    };
-  }
-}
-
-export function countBeadsTasks(workspacePath: string, issueId?: string): number {
-  return countBeadsTasksDetailed(workspacePath, issueId).count;
-}
-
-export async function countBeadsTasksDetailedWithRetry(
-  workspacePath: string,
-  issueId?: string,
-  retryOptions: Omit<RunBdWithRetryOptions, 'workspacePath'> = {},
-): Promise<BeadsTaskCountResult> {
-  const label = issueId?.toLowerCase();
-  try {
-    const args = label
-      ? ['list', '--json', '-l', label, '--status', 'all', '--limit', '0']
-      : ['list', '--json', '--limit', '0'];
-    const { stdout } = await runBdWithRetry(
-      `pan start beads count ${issueId ?? 'all'}`,
-      () => execFileAsync('bd', args, {
-        cwd: workspacePath,
-        encoding: 'utf-8',
-        timeout: 10000,
-      }),
-      { ...retryOptions, workspacePath },
-    );
-    const tasks = JSON.parse(stdout.trim() || '[]');
-    return { count: Array.isArray(tasks) ? tasks.length : 0, source: 'bd' };
-  } catch (error) {
-    return {
-      count: countBeadsTasksFromJsonl(workspacePath, label),
-      source: 'jsonl-fallback',
-      transientFailure: error instanceof BdTransientFailure || isTransientBdError(error) ? error : undefined,
-    };
-  }
-}
-
-export function hasBeadsTasks(workspacePath: string, issueId?: string): boolean {
-  return countBeadsTasks(workspacePath, issueId) > 0;
-}
-
-/**
- * Validate that the resolved vBRIEF belongs to the current issue.
+ * Validate that the resolved xBRIEF belongs to the current issue.
  * Uses findPlan (resolves main-side spec first, then workspace fallback).
  */
 function validatePlanMatchesIssue(workspacePath: string, issueId: string): { valid: boolean; wrongIssue?: string } {
@@ -708,39 +617,6 @@ function validatePlanMatchesIssue(workspacePath: string, issueId: string): { val
   return { valid: true };
 }
 
-function withTransientFailure<T extends object>(result: T, transientFailure: unknown): T & { transientFailure?: unknown } {
-  if (transientFailure === undefined) return result;
-  return { ...result, transientFailure };
-}
-
-type BeadsPlanValidation = { valid: boolean; beadCount: number; planItemCount: number; transientFailure?: unknown };
-
-function validateBeadsMatchPlanFromCount(workspacePath: string, beadCountResult: BeadsTaskCountResult): BeadsPlanValidation {
-  const planPath = findPlanSync(workspacePath);
-  const beadCount = beadCountResult.count;
-  if (!planPath) return withTransientFailure({ valid: true, beadCount, planItemCount: 0 }, beadCountResult.transientFailure);
-
-  try {
-    const raw = readFileSync(planPath, 'utf-8');
-    const parsed = JSON.parse(raw);
-    const planItemCount = Array.isArray(parsed?.plan?.items) ? parsed.plan.items.length : 0;
-    if (planItemCount === 0) return withTransientFailure({ valid: true, beadCount, planItemCount }, beadCountResult.transientFailure);
-    return withTransientFailure({ valid: beadCount === planItemCount, beadCount, planItemCount }, beadCountResult.transientFailure);
-  } catch {
-    return withTransientFailure({ valid: true, beadCount, planItemCount: 0 }, beadCountResult.transientFailure);
-  }
-}
-
-export function validateBeadsMatchPlan(workspacePath: string, issueId: string): BeadsPlanValidation {
-  return validateBeadsMatchPlanFromCount(workspacePath, countBeadsTasksDetailed(workspacePath, issueId));
-}
-
-async function validateBeadsMatchPlanWithRetry(
-  workspacePath: string,
-  issueId: string,
-): Promise<BeadsPlanValidation> {
-  return validateBeadsMatchPlanFromCount(workspacePath, await countBeadsTasksDetailedWithRetry(workspacePath, issueId));
-}
 
 /**
  * Validate that the continue file belongs to the current issue.
@@ -751,7 +627,7 @@ async function validateBeadsMatchPlanWithRetry(
  */
 function validateAndCleanStateFile(workspacePath: string, issueId: string): { valid: boolean; removed: boolean; wrongIssue?: string } {
   const upperId = issueId.toUpperCase();
-  const { continuePath } = getWorkspacePanPaths(workspacePath);
+  const { continuePath } = getReadableWorkspacePanPaths(workspacePath);
 
   if (!existsSync(continuePath)) {
     return { valid: true, removed: false };
@@ -807,19 +683,47 @@ async function failPostCreateValidation(options: PostCreateValidationFailureOpti
   process.exit(1);
 }
 
-function transientBeadsFailureMessage(issueId: string, cause?: unknown): string {
-  if (cause instanceof BdTransientFailure) {
-    return `Beads database was temporarily locked while checking ${issueId}; retried ${cause.attempts} times`;
+async function repairMainBranchWorkspace(workspace: string, normalizedId: string): Promise<string | null> {
+  const featureBranch = `feature/${normalizedId}`;
+
+  try {
+    const [{ stdout: topLevel }, { stdout: status }] = await Promise.all([
+      execFileAsync('git', ['rev-parse', '--show-toplevel'], { cwd: workspace, encoding: 'utf-8' }),
+      execFileAsync('git', ['status', '--porcelain'], { cwd: workspace, encoding: 'utf-8' }),
+    ]);
+
+    if (resolve(topLevel.trim()) !== resolve(workspace)) return null;
+    if (status.trim().length > 0) return null;
+
+    const { stdout: matchingBranches } = await execFileAsync('git', ['branch', '--list', featureBranch], {
+      cwd: workspace,
+      encoding: 'utf-8',
+    });
+    const branchExists = matchingBranches
+      .split('\n')
+      .map((line) => line.replace(/^[*+\s]+/, '').trim())
+      .includes(featureBranch);
+
+    await execFileAsync('git', branchExists ? ['switch', featureBranch] : ['switch', '-c', featureBranch], {
+      cwd: workspace,
+      encoding: 'utf-8',
+    });
+    return featureBranch;
+  } catch {
+    return null;
   }
-  return `Beads database was temporarily locked while checking ${issueId}`;
 }
 
-function failTransientBeadsValidation(spinner: Ora, issueId: string, cause?: unknown): never {
-  spinner.fail(transientBeadsFailureMessage(issueId, cause));
-  console.log('');
-  console.log(chalk.yellow('The beads database is being used by another Overdeck process.'));
-  console.log(chalk.dim(`This is retryable; re-run ${chalk.cyan(`pan start ${issueId}`)} shortly.`));
-  process.exit(RETRYABLE_BD_LOCK_EXIT_CODE);
+/** PAN-2410: --fresh means fresh STAFFING, not just a fresh session. Never
+ * inherit the dead agent's recorded model — with no explicit --model the
+ * tier/role resolvers run against current config. A plain restart (no
+ * --fresh) keeps the recorded staffing, by design. */
+export function resolveSpawnModel(
+  explicitModel: string | undefined,
+  fresh: boolean | undefined,
+  recordedModel: string | undefined,
+): string | undefined {
+  return explicitModel || (fresh ? undefined : recordedModel);
 }
 
 export async function issueCommand(id: string, options: IssueOptions): Promise<void> {
@@ -835,10 +739,15 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     process.exit(1);
   }
 
+  // Normalize issue ID (MIN-648 -> min-648 for tmux session name)
+  const normalizedId = id.toLowerCase();
+  const agentId = `agent-${normalizedId}`;
+  const existingAgentState = getAgentStateSync(agentId);
+  const spawnModel = resolveSpawnModel(options.model ?? resolveIssueWorkModel(id.toUpperCase()), options.fresh, existingAgentState?.model);
   // PAN-636 — validate only an explicit --harness flag up front. Flagless
   // spawns intentionally forward undefined so spawnAgent's resolveHarness()
   // applies role/provider defaults after model resolution.
-  const requestedHarness = await resolveExplicitHarnessFlag(options.harness, options.model);
+  const requestedHarness = await resolveExplicitHarnessFlag(options.harness, spawnModel);
 
   // PAN-1845: validate --tier early so an invalid tier fails before any
   // workspace setup. The CLI flag overrides config.remote.resiliency_tier for
@@ -860,7 +769,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
       process.stderr.write(`Invalid --effort value: ${resolvedEffort}. Expected one of ${ROLE_EFFORTS.join(', ')}.\n`);
       process.exit(1);
     }
-    const workModel = resolveRoleModel('work', options.model || undefined, yamlConfig);
+    const workModel = resolveRoleModel('work', spawnModel || undefined, yamlConfig);
     const supportedEfforts = getModelEffortLevelsSync(workModel);
     if (supportedEfforts !== undefined && !supportedEfforts.includes(resolvedEffort)) {
       process.stderr.write(`Effort '${resolvedEffort}' is not supported by ${workModel} (supported: ${supportedEfforts.join(', ')}).\n`);
@@ -868,10 +777,28 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     }
   }
 
-  // Normalize issue ID (MIN-648 -> min-648 for tmux session name)
-  const normalizedId = id.toLowerCase();
-  const agentId = `agent-${normalizedId}`;
-  const existingAgentState = getAgentStateSync(agentId);
+  // Resolve planning mode for pan start (PAN-2407): explicit --plan wins over
+  // legacy --auto, then config.planning.default_mode, then shipped default 'auto'.
+  let resolvedPlanningMode: PlanningMode;
+  try {
+    const planningResolution = resolvePlanningMode({
+      planFlag: options.plan,
+      legacyAuto: options.auto,
+      configDefault: yamlConfig.planning?.defaultMode,
+    });
+    resolvedPlanningMode = planningResolution.mode;
+    for (const warning of planningResolution.warnings) {
+      console.warn(warning);
+    }
+  } catch (error) {
+    process.stderr.write(chalk.red(`${error instanceof Error ? error.message : String(error)}\n`));
+    process.exit(1);
+  }
+  options.planningMode = resolvedPlanningMode;
+  // Preserve legacy behavior until route-unplanned-to-planning bead fully wires
+  // resolved mode into the spawn path.
+  options.auto = resolvedPlanningMode === 'skip';
+
   const shouldClearPauseBeforeSpawn = existingAgentState?.paused === true && options.force === true;
   if (existingAgentState?.paused === true && !options.force) {
     process.stderr.write(chalk.red(`Agent ${agentId} is paused and will not be started.\n`));
@@ -891,26 +818,131 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     process.exit(1);
   }
 
+  // No-op with exit 0 when the work agent is already live and running.
+  // Paused/troubled cases are handled above; stopped-but-resumable cases are
+  // left for assertCanStartFreshSync below so the user sees the resume/fresh
+  // guidance unchanged (hazard H2).
+  const lifecycleState = getWorkAgentLifecycleStateSync(agentId);
+  if (lifecycleState.isRunning && !lifecycleState.isRunningButStuck) {
+    console.log(chalk.green(`Work agent for ${id} is already running.`));
+    console.log('');
+    console.log(chalk.dim('Message it:'), chalk.cyan(`pan tell ${id} "..."`));
+    console.log(chalk.dim('Attach:  '), chalk.cyan(`tmux -L overdeck attach -t ${agentId}`));
+    process.exitCode = 0;
+    return;
+  }
+  const conflict = describeConflictingWorkAgents(id, agentId);
+  if (conflict) {
+    process.stderr.write(chalk.red(conflict));
+    process.exit(1);
+  }
   const spinner = ora(`Preparing workspace for ${id}...`).start();
-
+  const prep = createPrepProgress(spinner);
   try {
-
-    // Determine workspace location preference
     const locationPreference = determineWorkspaceLocation(options);
-
     // Log project resolution info
     const resolved = resolveProjectFromIssueSync(id);
+    if (resolved) spinner.text = `Resolved project: ${resolved.projectName} (${resolved.projectPath})`;
+    const { workspacePath, isRemote } = findWorkspaceWithLocation(id, locationPreference);
+
+    // Overflow scale-out (PAN-1676): a FRESH issue (no workspace anywhere, no
+    // explicit --local) routes to a fly.io machine when the local work pool is
+    // already at max_work_agents and remote.overflow_to_remote is enabled.
+    // Compute this before the PAN-2407 planning route so the start-planning
+    // request reports the resolved workspace location (local vs remote).
+    let overflowToRemote = false;
+    if (!isRemote && !workspacePath && !options.local && locationPreference !== 'local') {
+      const overflowConfig = loadConfigSync().remote;
+      if (overflowConfig?.enabled && overflowConfig.overflow_to_remote) {
+        const { getConcurrencyLimits, countRunningAgents } = await import('../../lib/cloister/concurrency.js');
+        const limits = getConcurrencyLimits();
+        const counts = countRunningAgents();
+        if (counts.work >= limits.maxWorkAgents) {
+          overflowToRemote = true;
+          console.log(chalk.cyan(
+            `Local work pool full (${counts.work}/${limits.maxWorkAgents}) — overflowing ${id} to a remote fly.io machine.`
+          ));
+        }
+      }
+    }
+    const effectiveRemote = isRemote || overflowToRemote || (locationPreference === 'remote' && !workspacePath);
     if (resolved) {
-      spinner.text = `Resolved project: ${resolved.projectName} (${resolved.projectPath})`;
+      const reconcileState = async (signal: AbortSignal) => {
+        spinner.text = `Reconciling permanent state for ${resolved.projectName}...`;
+        await requireAutomaticStateMigration(resolved, signal);
+        await applyStartPolicyOptions(resolved, id, options, options.dryRun === true, signal);
+      };
+      await runStateReconcile(prep, spinner, effectiveRemote, reconcileState);
     }
 
-    // Find workspace (local or remote based on preference)
-    const { workspacePath, isRemote } = findWorkspaceWithLocation(id, locationPreference);
+    // PAN-2407: route unplanned issues to the start-planning endpoint before
+    // any workspace creation or remote provisioning.
+    const projectRoot = findProjectRoot(id);
+    const existingPlan = workspacePath && !isRemote
+      ? findPlanSync(workspacePath)
+      : await Effect.runPromise(findSpecByIssue(projectRoot, id));
+
+    if (!existingPlan) {
+      if (resolvedPlanningMode === 'auto' || resolvedPlanningMode === 'interactive') {
+        if (options.dryRun) {
+          spinner.info(`Would start ${resolvedPlanningMode} planning session for ${id} (work agent auto-starts on finalize)`);
+          return;
+        }
+
+        spinner.text = `Starting ${resolvedPlanningMode} planning session for ${id}...`;
+        let sessionName = '';
+        try {
+          const response = await fetch(
+            `${getDashboardApiUrlSync()}/api/issues/${encodeURIComponent(id)}/start-planning`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: buildStartPlanningBody({
+                auto: resolvedPlanningMode === 'auto',
+                autoStart: true,
+                probe: false,
+                model: options.model,
+                harness: options.harness,
+                effort: options.effort,
+                workspaceLocation: effectiveRemote ? 'remote' : 'local',
+              }),
+            },
+          );
+
+          if (!response.ok) {
+            let message = `Planning failed (${response.status})`;
+            try {
+              const data = (await response.json()) as { error?: string; hint?: string };
+              message = data.error || data.hint || message;
+            } catch {
+              const text = await response.text().catch(() => '');
+              if (text) message = text;
+            }
+            throw new Error(message);
+          }
+
+          await streamPlanningSession(response, {
+            issueId: id,
+            ...createPlanningProgress(spinner, (name) => { sessionName = name; }),
+          });
+
+          spinner.succeed(
+            `${resolvedPlanningMode === 'auto' ? 'Auto-planning' : 'Planning'} session started for ${id}${sessionName ? ` (${sessionName})` : ''}. The work agent will start automatically after planning finalizes.`,
+          );
+          return;
+        } catch (error) {
+          spinner.fail(error instanceof Error ? error.message : String(error));
+          printPlanningConnectionError(id);
+          process.exit(1);
+        }
+      }
+      // mode === 'skip': fall through to the existing auto-synthesize path.
+    }
 
     // --fresh: wipe the work agent's state directory under
     // ~/.overdeck/agents/agent-<id>/ (PAN-1985) so the start below opens a
     // brand-new session against a clean dir. The new agent reads
-    // .pan/continue.json, the vBRIEF, the beads, and the branch state to
+    // .pan/continue.json, the xBRIEF, the beads, and the branch state to
     // pick up where the prior run left off.
     //
     // Operator note: --fresh is the deliberate override for harness/model
@@ -918,7 +950,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     // different harness) and for "I want a clean work run" recovery. The
     // NORMAL review flow continues the same session across re-dispatches
     // (PAN-1862); --fresh is the escape hatch that pays the re-research
-    // cost. Workspace, vBRIEF, beads, .pan/continue.json, .pan/feedback/,
+    // cost. Workspace, xBRIEF, beads, .pan/continue.json, .pan/feedback/,
     // branch, and commit history are all left untouched.
     //
     // Refuses if a live tmux session is alive (the wipe would race with it).
@@ -955,39 +987,20 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
       }
     }
 
-    // Overflow scale-out (PAN-1676): a FRESH issue (no workspace anywhere, no
-    // explicit --local) routes to a fly.io machine when the local work pool is
-    // already at max_work_agents and remote.overflow_to_remote is enabled.
-    let overflowToRemote = false;
-    if (!isRemote && !workspacePath && !options.local && locationPreference !== 'local') {
-      const overflowConfig = loadConfigSync().remote;
-      if (overflowConfig?.enabled && overflowConfig.overflow_to_remote) {
-        const { getConcurrencyLimits, countRunningAgents } = await import('../../lib/cloister/concurrency.js');
-        const limits = getConcurrencyLimits();
-        const counts = countRunningAgents();
-        if (counts.work >= limits.maxWorkAgents) {
-          overflowToRemote = true;
-          console.log(chalk.cyan(
-            `Local work pool full (${counts.work}/${limits.maxWorkAgents}) — overflowing ${id} to a remote fly.io machine.`
-          ));
-        }
-      }
-    }
-
     // Handle remote workspace
-    if (isRemote || overflowToRemote || (locationPreference === 'remote' && !workspacePath)) {
+    if (effectiveRemote) {
       await handleRemoteWorkspace(id, options, spinner, shouldClearPauseBeforeSpawn);
       return;
     }
 
     // Handle local workspace
-    const projectRoot = findProjectRoot(id);
     let workspace = workspacePath;
     const workspaceExisted = !!workspace;
     let workspaceCreatedThisRun = false;
+    let skipSyncMainForUnsafeWorkspace = false;
 
     if (!workspace) {
-      spinner.text = `Creating workspace for ${id}...`;
+      prep.update(`Creating workspace for ${id}...`);
       const expectedWorkspacePath = join(projectRoot, 'workspaces', `feature-${normalizedId}`);
       try {
         const nodeDir = dirname(process.execPath);
@@ -1003,34 +1016,51 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
       }
     }
 
+    if (workspaceExisted) {
+      try {
+        const { execSync } = await import('child_process');
+        const branch = execSync('git branch --show-current', {
+          cwd: workspace,
+          encoding: 'utf8'
+        }).trim();
+        if (branch === 'main' || branch === 'master') {
+          const repairedBranch = await repairMainBranchWorkspace(workspace, normalizedId);
+          if (repairedBranch) {
+            prep.update(`Moved clean workspace to branch: ${repairedBranch}`);
+          } else {
+            skipSyncMainForUnsafeWorkspace = true;
+            prep.update(`Workspace is on ${branch} branch; skipping sync-main until validation runs`);
+          }
+        }
+      } catch {
+        // Let the post-sync verification below surface the canonical warning.
+      }
+    }
+
     // If workspace was created during planning, main may have moved forward.
     // Fetch and merge latest main before the agent starts working.
-    if (workspaceExisted) {
-      spinner.text = 'Syncing latest main into workspace...';
+    if (workspaceExisted && !skipSyncMainForUnsafeWorkspace) {
+      prep.update('Syncing latest main into workspace...');
       let syncConflictFiles: string[] | undefined;
       try {
-        const syncResult = await syncMainIntoWorkspace(workspace, id);
-        if (syncResult.success) {
-          if (syncResult.alreadyUpToDate) {
-            spinner.text = 'Workspace already up to date with main';
+        await runStartPrepStep(prep, spinner, 'sync-main', async (signal) => {
+          const syncResult = await syncMainIntoWorkspace(workspace, id, signal);
+          if (syncResult.success) {
+            prep.update(syncResult.alreadyUpToDate ? 'Workspace already up to date with main' : `Synced main into workspace (${syncResult.commitCount ?? 0} commit(s))`);
           } else {
-            spinner.text = `Synced main into workspace (${syncResult.commitCount ?? 0} commit(s))`;
+            syncConflictFiles = syncResult.conflictFiles;
+            const conflictHint = syncConflictFiles?.length ? ` Conflicts: ${syncConflictFiles.join(', ')}.` : '';
+            spinner.warn(`Could not sync main: ${syncResult.reason || 'unknown reason'}${conflictHint}`);
           }
-        } else {
-          syncConflictFiles = syncResult.conflictFiles;
-          const conflictHint = syncConflictFiles?.length
-            ? ` Conflicts: ${syncConflictFiles.join(', ')}.`
-            : '';
-          spinner.warn(`Could not sync main: ${syncResult.reason || 'unknown reason'}${conflictHint}`);
-        }
-      } catch (syncErr: any) {
-        spinner.warn(`Sync main failed: ${syncErr.message}`);
+        });
+      } catch (syncErr: unknown) {
+        warnSyncMainFailure(spinner, syncErr);
       }
 
       // PAN-1872: a sync-main conflict must not strand the issue. Continue
       // spawning the work agent so it can resolve the conflicts and re-submit.
       if (syncConflictFiles && syncConflictFiles.length > 0) {
-        spinner.text = `Preparing agent to resolve ${syncConflictFiles.length} sync-main conflict(s)...`;
+        prep.update(`Preparing agent to resolve ${syncConflictFiles.length} sync-main conflict(s)...`);
       }
     }
 
@@ -1058,7 +1088,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
               }).trim();
               if (subBranch !== 'main' && subBranch !== 'master' && subBranch.length > 0) {
                 hasFeatureBranch = true;
-                spinner.text = `Found polyrepo workspace — sub-repo ${entry} on branch: ${subBranch}`;
+                prep.update(`Found polyrepo workspace — sub-repo ${entry} on branch: ${subBranch}`);
                 break;
               }
             }
@@ -1066,32 +1096,37 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
         } catch { /* ignore sub-repo check errors */ }
 
         if (!hasFeatureBranch) {
-          await failPostCreateValidation({
-            spinner,
-            issueId: id,
-            projectRoot,
-            workspaceCreatedThisRun,
-            message: `Workspace is on ${branch} branch`,
-            printDetails: () => {
-              console.log('');
-              console.log(chalk.red('CRITICAL: Work agents must NOT run on main/master branch.'));
-              console.log(chalk.red('This bypasses the entire review/test/merge workflow.'));
-              console.log('');
-              console.log(chalk.bold('To fix:'));
-              console.log(`  1. Create a proper workspace: ${chalk.cyan(`pan workspace ${id}`)}`);
-              console.log(`  2. Or checkout a feature branch: ${chalk.cyan(`git checkout -b feature/${normalizedId}`)}`);
-            },
-          });
+          const repairedBranch = await repairMainBranchWorkspace(workspace, normalizedId);
+          if (repairedBranch) {
+            prep.update(`Moved clean workspace to branch: ${repairedBranch}`);
+          } else {
+            await failPostCreateValidation({
+              spinner,
+              issueId: id,
+              projectRoot,
+              workspaceCreatedThisRun,
+              message: `Workspace is on ${branch} branch`,
+              printDetails: () => {
+                console.log('');
+                console.log(chalk.red('CRITICAL: Work agents must NOT run on main/master branch.'));
+                console.log(chalk.red('This bypasses the entire review/test/merge workflow.'));
+                console.log('');
+                console.log(chalk.bold('To fix:'));
+                console.log(`  1. Create a proper workspace: ${chalk.cyan(`pan workspace ${id}`)}`);
+                console.log(`  2. Or checkout a feature branch: ${chalk.cyan(`git checkout -b feature/${normalizedId}`)}`);
+              },
+            });
+          }
         }
       } else {
-        spinner.text = `Found workspace on branch: ${branch}`;
+        prep.update(`Found workspace on branch: ${branch}`);
       }
     } catch (e) {
       // If git check fails, continue but warn
       spinner.warn('Could not verify branch - ensure you are NOT on main');
     }
 
-    spinner.text = `Found workspace: ${workspace}`;
+    prep.update(`Found workspace: ${workspace}`);
 
     if (options.dryRun) {
       spinner.info('Dry run mode');
@@ -1103,12 +1138,12 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
 
       // Show what context would be included
       const planningContext = await readPlanningContext(workspace);
-      const beadsTasks = await readBeadsTasks(workspace, projectRoot, id);
+      const taskCount = readWorkspacePlanSync(workspace)?.plan.items.length ?? 0;
       const hasPreWorkspacePRD = await Effect.runPromise(hasPRDDraft(id));
       console.log('');
       console.log(chalk.bold('Context:'));
       console.log(`  Planning:   ${planningContext ? 'Found (.pan/continue.json)' : 'None'}`);
-      console.log(`  Beads:      ${beadsTasks.length} tasks`);
+      console.log(`  Tasks:      ${taskCount} checklist items`);
       if (hasPreWorkspacePRD) {
         console.log(`  Pre-workspace PRD: ${chalk.green('✓')} ${getPRDDraftPathSync(id)}`);
       }
@@ -1116,7 +1151,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     }
 
     // Validate continue file belongs to this issue (prevent cross-contamination from git merges)
-    spinner.text = 'Validating workspace state...';
+    prep.update('Validating workspace state...');
     const stateValidation = validateAndCleanStateFile(workspace, id);
     if (stateValidation.removed) {
       spinner.warn(`Cleaned stale planning state from ${stateValidation.wrongIssue}`);
@@ -1153,178 +1188,68 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     }
 
     if (options.auto && !findPlanSync(workspace)) {
-      spinner.text = `Synthesizing minimal vBRIEF for ${id}...`;
+      prep.update(`Synthesizing minimal xBRIEF for ${id}...`);
       const issue = await fetchIssueForAutoStart(id);
-      await Effect.runPromise(writeAutoStartVBrief(projectRoot, workspace, issue));
-      const recovery = await Effect.runPromise(createBeadsFromVBrief(workspace));
-      if (recovery.created.length === 0) {
-        await failPostCreateValidation({
-          spinner,
-          issueId: id,
-          projectRoot,
-          workspaceCreatedThisRun,
-          message: `Auto-start synthesized a vBRIEF but no beads were created for ${id}`,
-          printDetails: () => {
-            if (recovery.errors.length > 0) console.log(chalk.dim(`  Errors: ${recovery.errors.join(', ')}`));
-          },
-        });
-      }
+      await Effect.runPromise(writeAutoStartXBrief(projectRoot, workspace, issue));
     }
 
-    // SAFEGUARD: Require beads tasks before work begins (matches dashboard start-agent enforcement)
-    const beadsTaskCount = await countBeadsTasksDetailedWithRetry(workspace, id);
-    if (beadsTaskCount.transientFailure && beadsTaskCount.count === 0) {
-      failTransientBeadsValidation(spinner, id, beadsTaskCount.transientFailure);
-    }
-    if (beadsTaskCount.count === 0) {
-      // If no planning was done, this is a simple issue — auto-create a bead so the agent can start
-      const hasPlanningState = findPlanSync(workspace) !== null;
-      if (!hasPlanningState) {
-        spinner.text = `Auto-creating bead for simple issue ${id}...`;
-        try {
-          const { execSync } = require('child_process');
-          execSync(`bd create "${id}: Implement issue" --type task -l "${id.toLowerCase()},difficulty:simple"`, {
-            cwd: workspace,
-            encoding: 'utf-8',
-            timeout: 10000,
-            stdio: ['pipe', 'pipe', 'pipe'],
-          });
-        } catch (bdErr) {
-          await failPostCreateValidation({
-            spinner,
-            issueId: id,
-            projectRoot,
-            workspaceCreatedThisRun,
-            message: `No beads tasks found for ${id} and auto-create failed`,
-            printDetails: () => {},
-          });
-        }
-      } else {
-        // Planning was done but no beads — attempt auto-recovery from vBRIEF (matches dashboard agents.ts path)
-        spinner.text = `No beads found — attempting recovery from vBRIEF plan...`;
-        try {
-          const { createBeadsFromVBrief } = await import('../../lib/vbrief/beads.js');
-          const recovery = await Effect.runPromise(createBeadsFromVBrief(workspace));
-          if (recovery.created.length > 0) {
-            spinner.succeed(`Recovered ${recovery.created.length} beads from vBRIEF plan`);
-          } else if (recovery.transientFailure) {
-            failTransientBeadsValidation(spinner, id, recovery.transientFailure);
-          } else {
-            await failPostCreateValidation({
-              spinner,
-              issueId: id,
-              projectRoot,
-              workspaceCreatedThisRun,
-              message: `No beads tasks found for ${id} and recovery from vBRIEF failed`,
-              printDetails: () => {
-                if (recovery.errors.length > 0) {
-                  console.log(chalk.dim(`  Errors: ${recovery.errors.join(', ')}`));
-                }
-                console.log('');
-                console.log(chalk.red(`Planning must create a task breakdown before work begins.`));
-                console.log(chalk.dim(`Run planning again and ensure it creates beads with "bd create".`));
-                console.log('');
-                console.log(chalk.bold('To re-run planning:'));
-                console.log(`  ${chalk.cyan(`Open the dashboard and click 'Plan' for ${id}`)}`);
-              },
-            });
-          }
-        } catch (recoveryErr: any) {
-          await failPostCreateValidation({
-            spinner,
-            issueId: id,
-            projectRoot,
-            workspaceCreatedThisRun,
-            message: `No beads tasks found for ${id}`,
-            printDetails: () => {
-              console.log(chalk.dim(`  Recovery error: ${recoveryErr.message}`));
-              console.log('');
-              console.log(chalk.bold('To re-run planning:'));
-              console.log(`  ${chalk.cyan(`pan plan ${id}`)}`);
-            },
-          });
-        }
-      }
-    }
-
-    let beadCoverage = await validateBeadsMatchPlanWithRetry(workspace, id);
-    if (beadCoverage.transientFailure) {
-      failTransientBeadsValidation(spinner, id, beadCoverage.transientFailure);
-    }
-    if (!beadCoverage.valid) {
-      // PAN-1512: partial materialization recovery. createBeadsFromVBrief clears
-      // existing beads for the issue before recreating from spec, so it's safe to
-      // call when some beads exist but the count mismatches the spec — typical
-      // when planning was killed mid-materialization or hit a transient bd error.
-      spinner.text = `Beads count off (${beadCoverage.beadCount}/${beadCoverage.planItemCount}) — rematerializing from vBRIEF...`;
-      try {
-        const recovery = await Effect.runPromise(createBeadsFromVBrief(workspace));
-        if (recovery.success && recovery.created.length > 0) {
-          spinner.succeed(`Rematerialized ${recovery.created.length} beads from vBRIEF plan`);
-          beadCoverage = await validateBeadsMatchPlanWithRetry(workspace, id);
-          if (beadCoverage.transientFailure) {
-            failTransientBeadsValidation(spinner, id, beadCoverage.transientFailure);
-          }
-        }
-      } catch (recoveryErr) {
-        // Fall through to the existing failure path below
-      }
-    }
-    if (!beadCoverage.valid) {
+    if (!findPlanSync(workspace)) {
       await failPostCreateValidation({
         spinner,
         issueId: id,
         projectRoot,
         workspaceCreatedThisRun,
-        message: `Beads count (${beadCoverage.beadCount}) does not match vBRIEF plan items (${beadCoverage.planItemCount}) for ${id}`,
+        message: `The required xBRIEF checklist for ${id} is missing or unreadable`,
         printDetails: () => {
-          console.log('');
-          console.log(chalk.red('Work agents require one bead per vBRIEF plan item.'));
-          console.log(chalk.dim('Re-run planning finalization so beads are materialized from the current vBRIEF before starting work.'));
+          console.log(chalk.dim(`Run \`pan plan ${id}\` and finalize a readable implementation plan before starting work.`));
         },
       });
     }
 
-    spinner.text = 'Building agent prompt with planning context...';
-    const trackerContext = await getTrackerContext(id, workspace);
+    prep.update('Building agent prompt with planning context...');
+    const trackerContext = await runStartPrepStep(prep, spinner, 'tracker-context', (signal) => getTrackerContext(id, workspace, signal), '');
     const prompt = await buildWorkAgentPrompt({ issueId: id, env: 'LOCAL', workspacePath: workspace, projectRoot, trackerContext });
-
-    spinner.text = 'Spawning agent...';
+    prep.update('Spawning agent...');
 
     // `pan start --host --yes` does not attach to the work-agent tmux session.
     // After spawnAgent finishes session creation, this command only prints the
-    // details below and exits; any remaining pre-spawn delay is bd/tracker/prompt
-    // work, with bd contention now bounded by the retry/lock helpers above.
+    // details below and exits; any remaining pre-spawn delay is tracker/prompt work.
     if (shouldClearPauseBeforeSpawn) {
       clearAgentPausedSync(agentId);
     }
 
-    const agent = await spawnAgent({
+    const agent = await runStartPrepStep(prep, spinner, 'spawn', () => spawnAgent({
       issueId: id,
       workspace,
       harness: requestedHarness,
-      model: options.model,
+      model: spawnModel,
       role: 'work',
       prompt,
       allowHost: options.host,
       effort: resolvedEffort,
-    });
+    }));
+
+    if (agent.role === 'work' && agent.kickoffDelivered === false) {
+      spinner.fail(`Agent spawned but kickoff delivery was not confirmed: ${agent.id}`);
+      for (const line of ['', chalk.red(`Kickoff delivery did not land for ${agent.id}.`), chalk.dim('The live session is preserved and the agent may be idle until the kickoff lands.'), chalk.dim('Deacon will retry delivery after the stuck threshold, or you can send a manual message now:'), `  pan tell ${id} "continue from your kickoff brief"`]) console.log(line);
+      process.exitCode = 1; return;
+    }
 
     spinner.succeed(`Agent spawned: ${agent.id}`);
 
     try {
-      const transition = await Effect.runPromise(transitionVBriefOnMain(
+      const transition = await Effect.runPromise(transitionXBriefOnMain(
         projectRoot,
         id,
         'active',
         'approved',
-        `scope: approve ${id.toUpperCase()} vBRIEF`,
+        `scope: approve ${id.toUpperCase()} xBRIEF`,
       ));
       if (transition.moved) {
-        console.log(chalk.green(`  ✓ vBRIEF moved ${transition.fromDir} → active`));
+        console.log(chalk.green(`  ✓ xBRIEF moved ${transition.fromDir} → active`));
       }
     } catch (err: any) {
-      console.warn(chalk.dim(`  ⚠ Could not update main vBRIEF lifecycle: ${err?.message ?? String(err)}`));
+      console.warn(chalk.dim(`  ⚠ Could not update main xBRIEF lifecycle: ${err?.message ?? String(err)}`));
     }
 
     const spawnedPlanPath = findPlanSync(workspace);
@@ -1332,21 +1257,17 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
       try {
         updatePlanStatus(spawnedPlanPath, 'running');
       } catch (err: any) {
-        console.warn(chalk.dim(`  ⚠ Could not set workspace vBRIEF status=running: ${err?.message ?? String(err)}`));
+        console.warn(chalk.dim(`  ⚠ Could not set workspace xBRIEF status=running: ${err?.message ?? String(err)}`));
       }
     }
 
-    // Check shadow mode
     const skipTrackerUpdate = await Effect.runPromise(shouldSkipTrackerUpdate(id, options.shadow));
 
     if (skipTrackerUpdate) {
-      // Create shadow state instead of updating tracker
       await Effect.runPromise(createShadowState(id, 'open', 'pan start'));
       await Effect.runPromise(updateShadowState(id, 'in_progress', 'pan start'));
       console.log(chalk.cyan(`  👻 Shadow mode: tracking status locally`));
     }
-    // Note: tracker transition for local agents is handled by spawnAgent() → transitionIssueToInProgress()
-    // No duplicate transition needed here.
 
     console.log('');
     console.log(chalk.bold('Agent Details:'));
@@ -1356,15 +1277,13 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     console.log(`  Model:      ${agent.model}`);
     console.log(`  Role:       ${agent.role}`);
     if (resolvedEffort) console.log(`  Effort:     ${resolvedEffort}`);
-
-    // Show context info
     const planningContext = await readPlanningContext(workspace);
-    const beadsTasks = await readBeadsTasks(workspace, projectRoot, id);
-    if (planningContext || beadsTasks.length > 0) {
+    const taskCount = readWorkspacePlanSync(workspace)?.plan.items.length ?? 0;
+    if (planningContext || taskCount > 0) {
       console.log('');
       console.log(chalk.bold('Context Loaded:'));
       if (planningContext) console.log(`  Planning:   ${chalk.green('✓')} continue.json`);
-      if (beadsTasks.length > 0) console.log(`  Beads:      ${chalk.green('✓')} ${beadsTasks.length} tasks`);
+      if (taskCount > 0) console.log(`  Tasks:      ${chalk.green('✓')} ${taskCount} checklist items`);
     }
 
     console.log('');
@@ -1379,8 +1298,4 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
   }
 }
 
-export const __testInternals = {
-  failPostCreateValidation,
-  failTransientBeadsValidation,
-  resolveExplicitHarnessFlag,
-};
+export const __testInternals = { failPostCreateValidation, repairMainBranchWorkspace, resolveExplicitHarnessFlag, runStartPrepStep };

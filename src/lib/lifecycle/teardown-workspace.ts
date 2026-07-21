@@ -11,13 +11,14 @@
  */
 
 import { existsSync } from 'fs';
-import { appendFile, readFile, rm, writeFile } from 'fs/promises';
+import { readFile, rm } from 'fs/promises';
 import { join, basename, dirname } from 'path';
 import { homedir } from 'os';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { Effect } from 'effect';
 import { AGENTS_DIR } from '../paths.js';
+import { pidsWithCwdUnder } from '../process-cwd.js';
 import { killSession, sessionExists, listSessionNames } from '../tmux.js';
 import type { LifecycleContext, StepResult, TeardownOptions } from './types.js';
 import { stepOk, stepSkipped, stepFailed } from './types.js';
@@ -199,12 +200,11 @@ function killOrphanedProcesses(workspacePath: string): Effect.Effect<StepResult>
 async function killOrphanedProcessesImpl(workspacePath: string): Promise<StepResult> {
   const step = 'teardown:orphaned-processes';
   try {
-    // Find PIDs with cwd matching the workspace path
-    const { stdout } = await execAsync(
-      `lsof +D "${workspacePath}" -t 2>/dev/null || true`,
-      { encoding: 'utf-8', timeout: 10000 },
-    );
-    const pids = stdout.trim().split('\n').filter(Boolean).map(p => p.trim()).filter(p => /^\d+$/.test(p));
+    // Find PIDs with cwd inside the workspace. NEVER select by open files
+    // (`lsof +D`): Bun's hardlinked node_modules make the dashboard and every
+    // conversation's PTY supervisor appear to hold files "in" any workspace
+    // via mmap'd native addons — see src/lib/process-cwd.ts.
+    const pids = await pidsWithCwdUnder(workspacePath);
 
     if (pids.length === 0) {
       return stepSkipped(step, ['No orphaned processes found']);
@@ -234,135 +234,6 @@ async function killOrphanedProcessesImpl(workspacePath: string): Promise<StepRes
     return stepOk(step, [`Killed ${hostPids.length} orphaned process(es)`]);
   } catch {
     return stepSkipped(step, ['Orphaned process cleanup failed (non-fatal)']);
-  }
-}
-
-/**
- * Sync workspace beads to the project-root beads database before workspace deletion.
- */
-function syncWorkspaceBeads(
-  projectPath: string,
-  workspacePath: string,
-  issueLower: string,
-): Effect.Effect<StepResult> {
-  return Effect.tryPromise({
-    try: () => syncWorkspaceBeadsImpl(projectPath, workspacePath, issueLower),
-    catch: (err) => err,
-  }).pipe(
-    Effect.catch((err) =>
-      Effect.succeed(stepFailed('teardown:sync-beads', `Failed to sync workspace beads: ${(err as Error).message}`)),
-    ),
-  );
-}
-
-async function syncWorkspaceBeadsImpl(
-  projectPath: string,
-  workspacePath: string,
-  issueLower: string,
-): Promise<StepResult> {
-  const step = 'teardown:sync-beads';
-  const workspaceBeadsDir = join(workspacePath, '.beads');
-
-  if (!existsSync(workspaceBeadsDir)) {
-    return stepSkipped(step, ['No .beads directory in workspace']);
-  }
-
-  try {
-    // Export workspace beads to JSONL
-    await execAsync(
-      'bd export --output .beads/issues-export.jsonl 2>&1 || true',
-      { cwd: workspacePath, encoding: 'utf-8', timeout: 15000 }
-    );
-
-    const exportPath = join(workspacePath, '.beads', 'issues-export.jsonl');
-    if (!existsSync(exportPath)) {
-      await execAsync('bd export --output .beads/issues.jsonl 2>&1 || true', { cwd: workspacePath, encoding: 'utf-8', timeout: 15000 });
-    }
-
-    // Import workspace beads into project-root database
-    // Use bd import if available, otherwise copy JSONL entries
-    try {
-      await execAsync(
-        `bd import "${join(workspacePath, '.beads', 'issues.jsonl')}" 2>&1 || true`,
-        { cwd: projectPath, encoding: 'utf-8', timeout: 15000 }
-      );
-      return stepOk(step, [`Synced workspace beads to project root for ${issueLower}`]);
-    } catch {
-      // bd import may not exist — try manual JSONL merge
-      const wsJsonl = join(workspacePath, '.beads', 'issues.jsonl');
-      const projJsonl = join(projectPath, '.beads', 'issues.jsonl');
-
-      if (existsSync(wsJsonl) && existsSync(projJsonl)) {
-        const wsContent = await readFile(wsJsonl, 'utf-8');
-        const issuePattern = issueLower.replace('-', '[-_]');
-        const relevantLines = wsContent.split('\n').filter(
-          line => line.trim() && new RegExp(issuePattern, 'i').test(line)
-        );
-        if (relevantLines.length > 0) {
-          await appendFile(projJsonl, '\n' + relevantLines.join('\n'));
-          return stepOk(step, [`Appended ${relevantLines.length} beads entries for ${issueLower} to project JSONL`]);
-        }
-      }
-      return stepSkipped(step, ['No beads to sync or import not available']);
-    }
-  } catch (err) {
-    return stepFailed(step, `Failed to sync workspace beads: ${(err as Error).message}`);
-  }
-}
-
-/**
- * Clear beads for this issue from the project-root .beads/issues.jsonl.
- */
-function clearProjectBeads(
-  projectPath: string,
-  issueLower: string,
-): Effect.Effect<StepResult> {
-  return Effect.tryPromise({
-    try: () => clearProjectBeadsImpl(projectPath, issueLower),
-    catch: (err) => err,
-  }).pipe(
-    Effect.catch((err) =>
-      Effect.succeed(stepFailed('teardown:clear-beads', `Failed to clear beads: ${(err as Error).message}`)),
-    ),
-  );
-}
-
-async function clearProjectBeadsImpl(
-  projectPath: string,
-  issueLower: string,
-): Promise<StepResult> {
-  const step = 'teardown:clear-beads';
-  const projJsonl = join(projectPath, '.beads', 'issues.jsonl');
-
-  if (!existsSync(projJsonl)) {
-    return stepSkipped(step, ['No .beads/issues.jsonl in project root']);
-  }
-
-  try {
-    const content = await readFile(projJsonl, 'utf-8');
-    const lines = content.split('\n');
-    const issueUpper = issueLower.toUpperCase();
-    const before = lines.length;
-    // Remove lines that reference this issue (by ID in the title or issue field)
-    const filtered = lines.filter(line => {
-      if (!line.trim()) return true; // keep blank lines
-      try {
-        const entry = JSON.parse(line);
-        const title = (entry.title || '').toUpperCase();
-        const issue = (entry.issue || '').toUpperCase();
-        return !title.includes(issueUpper) && issue !== issueUpper;
-      } catch {
-        return true; // keep unparseable lines
-      }
-    });
-    const removed = before - filtered.length;
-    if (removed > 0) {
-      await writeFile(projJsonl, filtered.join('\n'));
-      return stepOk(step, [`Removed ${removed} beads entries for ${issueLower} from project JSONL`]);
-    }
-    return stepSkipped(step, [`No beads entries found for ${issueLower}`]);
-  } catch (err) {
-    return stepFailed(step, `Failed to clear beads: ${(err as Error).message}`);
   }
 }
 
@@ -488,6 +359,10 @@ async function deleteBranchesImpl(
   const step = 'teardown:branches';
   const branchName = `feature/${issueLower}`;
   const details: string[] = [];
+  const localSlots = await execAsync(`git for-each-ref --format="%(refname:short)" "refs/heads/feature/${issueLower}-slot-*"`, { cwd: projectPath, encoding: 'utf-8' })
+    .then(({ stdout }) => stdout.trim().split('\n').filter(Boolean)).catch(() => [] as string[]);
+  const remoteSlots = await execAsync(`git ls-remote --heads origin "feature/${issueLower}-slot-*"`, { cwd: projectPath, encoding: 'utf-8' })
+    .then(({ stdout }) => stdout.trim().split('\n').map(line => line.split('refs/heads/')[1]).filter((name): name is string => Boolean(name))).catch(() => [] as string[]);
 
   // Delete local branch
   try {
@@ -497,12 +372,26 @@ async function deleteBranchesImpl(
     details.push(`Local branch ${branchName} not found (already deleted)`);
   }
 
+  for (const slotBranch of localSlots) {
+    try {
+      await execAsync(`git branch -D ${JSON.stringify(slotBranch)}`, { cwd: projectPath, encoding: 'utf-8' });
+      details.push(`Deleted local branch ${slotBranch}`);
+    } catch { details.push(`Failed to delete local branch ${slotBranch}`); }
+  }
+
   // Delete remote branch
   try {
     await execAsync(`git push origin --delete "${branchName}"`, { cwd: projectPath, encoding: 'utf-8' });
     details.push(`Deleted remote branch ${branchName}`);
   } catch {
     details.push(`Remote branch ${branchName} not found (already deleted)`);
+  }
+
+  for (const slotBranch of remoteSlots) {
+    try {
+      await execAsync(`git push origin --delete ${JSON.stringify(slotBranch)}`, { cwd: projectPath, encoding: 'utf-8' });
+      details.push(`Deleted remote branch ${slotBranch}`);
+    } catch { details.push(`Failed to delete remote branch ${slotBranch}`); }
   }
 
   return stepOk(step, details);
@@ -813,13 +702,6 @@ export function teardownWorkspace(
       // 5b. Kill orphaned host processes (Vite, node) that survive Docker teardown
       if (shouldDeleteWorkspace) {
         results.push(yield* killOrphanedProcesses(workspacePath));
-      }
-
-      // 6. Beads lifecycle: sync or clear depending on context (PAN-412)
-      if (opts.clearBeads) {
-        results.push(yield* clearProjectBeads(ctx.projectPath, issueLower));
-      } else if (shouldDeleteWorkspace) {
-        results.push(yield* syncWorkspaceBeads(ctx.projectPath, workspacePath, issueLower));
       }
 
       // 7-8: Project-specific cleanup (tunnel, Hume)

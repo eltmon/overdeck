@@ -58,7 +58,10 @@ describe('BucketSection', () => {
     const onSelect = vi.fn();
     render(<BucketSection label="Just Now" items={[git, activity, conversation]} onSelect={onSelect} now={now} />);
 
-    const buttons = screen.getAllByRole('button');
+    // Activity cards also render a copy control; this asserts the card rows themselves.
+    const buttons = screen
+      .getAllByRole('button')
+      .filter((button) => button.getAttribute('data-testid') !== 'activity-feed-copy');
     expect(buttons.map((button) => button.textContent)).toEqual([
       'Git card messagePAN-13893m ago',
       'Activity card headlineworkspace-a · PAN-1389·4m agoEvent',

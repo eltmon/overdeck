@@ -6,6 +6,11 @@ vi.mock('../review-agent.js', () => ({
   spawnReviewSubRoleForIssue: mockSpawnReviewSubRole,
 }));
 
+vi.mock('../merge-verification.js', () => ({
+  shouldSkipDispatchAsMerged: vi.fn(async () => ({ skip: false, reason: 'open' })),
+  verifyMergedBeforeLifecycle: vi.fn(),
+}));
+
 const mockDeliverReviewVerdictFeedback = vi.hoisted(() => vi.fn());
 vi.mock('../review-verdict-feedback.js', async () => {
   const { Effect } = await import('effect');
@@ -107,9 +112,16 @@ vi.mock('../../../lib/tmux.js', async () => {
   };
 });
 vi.mock('../../paths.js', () => ({
+  getOverdeckHome: () => '/tmp/test-overdeck',
   OVERDECK_HOME: '/tmp/test-overdeck',
   AGENTS_DIR: '/tmp/test-agents',
+  COSTS_DIR: '/tmp/test-costs',
   packageRoot: '/tmp/test-package-root',
+  PROJECT_DOCS_SUBDIR: 'docs',
+  PROJECT_PRDS_SUBDIR: 'prds',
+  PROJECT_PRDS_ACTIVE_SUBDIR: 'active',
+  PROJECT_PRDS_PLANNED_SUBDIR: 'planned',
+  PROJECT_PRDS_COMPLETED_SUBDIR: 'completed',
 }));
 vi.mock('fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('fs')>();
@@ -130,10 +142,21 @@ vi.mock('fs', async (importOriginal) => {
   };
 });
 
-const execMock = vi.hoisted(() => vi.fn());
+// exec/execFile must invoke their callbacks or promisified callers hang the
+// test to timeout (PAN-1862's fallback-verdict HEAD probe, PAN-2948's
+// snapshotWorkspaceHeadsPromise). Fail fast; the production code treats a
+// failed probe as "no anchor" and proceeds down the conservative path.
+const execMock = vi.hoisted(() => vi.fn((_cmd: unknown, opts: unknown, cb?: unknown) => {
+  const callback = (typeof opts === 'function' ? opts : cb) as ((err: Error) => void) | undefined;
+  callback?.(new Error('exec unavailable in tests'));
+}));
 vi.mock('child_process', async (importOriginal) => {
   const actual = await importOriginal<typeof import('child_process')>();
-  return { ...actual, exec: execMock, execFile: vi.fn() };
+  const execFileMock = vi.fn((_cmd: unknown, _args: unknown, opts: unknown, cb?: unknown) => {
+    const callback = (typeof opts === 'function' ? opts : cb) as ((err: Error) => void) | undefined;
+    callback?.(new Error('execFile unavailable in tests'));
+  });
+  return { ...actual, exec: execMock, execFile: execFileMock };
 });
 
 import { checkInspectAgentTimeouts, cleanupOrphanedReviewSessions, monitorReviewConvoySignals } from '../deacon.js';
@@ -431,6 +454,16 @@ describe('monitorReviewConvoySignals', () => {
     expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-880', {
       reviewStatus: 'blocked',
       reviewNotes: '[correctness] Missing null check — `src/example.ts:42`',
+      // PAN-1862 (FR-6): the fallback synthesis persists per-reviewer verdicts so
+      // the next cycle's selective re-review can skip provably-clean reviewers.
+      // No atCommit here — the mocked execFile fails the HEAD probe, and an
+      // unanchored verdict simply re-runs next cycle (fail toward quality).
+      reviewerVerdicts: {
+        security: { status: 'passed', findingsPath: `${reviewDir}/security.md` },
+        correctness: { status: 'blocked', findingsPath: `${reviewDir}/correctness.md` },
+        performance: { status: 'passed', findingsPath: `${reviewDir}/performance.md` },
+        requirements: { status: 'passed', findingsPath: `${reviewDir}/requirements.md` },
+      },
     });
     expect(mockDeliverReviewVerdictFeedback).toHaveBeenCalledWith({
       issueId: 'PAN-880',
@@ -701,7 +734,7 @@ describe('checkInspectAgentTimeouts', () => {
     vi.useRealTimers();
   });
 
-  it('marks a timed-out inspecting bead as error, kills the inspect session, and tells the parent exactly once', async () => {
+  it('marks a timed-out inspecting task as error, kills the inspect session, and tells the parent exactly once', async () => {
     vi.mocked((await import('../../review-status.js')).loadReviewStatuses)
       .mockReturnValueOnce({
         'PAN-1616': {
@@ -751,7 +784,7 @@ describe('checkInspectAgentTimeouts', () => {
     );
   });
 
-  it('marks an inspecting bead as error when its inspect session has disappeared', async () => {
+  it('keeps a live standing supervisor inspection active without probing a dedicated inspect session', async () => {
     vi.mocked((await import('../../review-status.js')).loadReviewStatuses).mockReturnValue({
       'PAN-1616': {
         issueId: 'PAN-1616',
@@ -760,6 +793,67 @@ describe('checkInspectAgentTimeouts', () => {
         inspectStatus: 'inspecting',
         inspectStartedAt: '2026-06-05T12:11:30.000Z',
         inspectBeadId: 'workspace-sposy',
+        inspectOwnerSession: 'agent-pan-1616-review-supervisor',
+        updatedAt: '2026-06-05T12:11:30.000Z',
+        readyForMerge: false,
+      },
+    } as any);
+    mockSessionExistsAsync.mockImplementation((name: string) => (
+      Effect.succeed(name === 'agent-pan-1616-review-supervisor') as any
+    ));
+
+    const actions = await checkInspectAgentTimeouts();
+
+    expect(actions).toEqual([]);
+    expect(mockSessionExistsAsync).toHaveBeenCalledTimes(1);
+    expect(mockSessionExistsAsync).toHaveBeenCalledWith('agent-pan-1616-review-supervisor');
+    expect(mockSetReviewStatus).not.toHaveBeenCalled();
+    expect(mockKillSessionAsync).not.toHaveBeenCalled();
+    expect(mockMessageAgent).not.toHaveBeenCalled();
+  });
+
+  it('fails loudly when the recorded standing supervisor owner has disappeared', async () => {
+    vi.mocked((await import('../../review-status.js')).loadReviewStatuses).mockReturnValue({
+      'PAN-1616': {
+        issueId: 'PAN-1616',
+        reviewStatus: 'pending',
+        testStatus: 'pending',
+        inspectStatus: 'inspecting',
+        inspectStartedAt: '2026-06-05T12:11:30.000Z',
+        inspectBeadId: 'workspace-sposy',
+        inspectOwnerSession: 'agent-pan-1616-review-supervisor',
+        updatedAt: '2026-06-05T12:11:30.000Z',
+        readyForMerge: false,
+      },
+    } as any);
+    mockSessionExistsAsync.mockReturnValue(Effect.succeed(false) as any);
+
+    const actions = await checkInspectAgentTimeouts();
+
+    expect(actions).toEqual([
+      'Inspection watchdog tripped for PAN-1616 bead workspace-sposy: tmux session agent-pan-1616-review-supervisor exited before producing a verdict',
+    ]);
+    expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-1616', expect.objectContaining({
+      inspectStatus: 'error',
+      inspectNotes: expect.stringContaining('agent-pan-1616-review-supervisor'),
+    }));
+    expect(mockKillSessionAsync).not.toHaveBeenCalled();
+    expect(mockMessageAgent).toHaveBeenCalledWith(
+      'agent-pan-1616',
+      expect.stringContaining('tmux session agent-pan-1616-review-supervisor exited'),
+      'deacon:inspect-watchdog',
+    );
+  });
+
+  it('marks an inspecting task as error when its inspect session has disappeared', async () => {
+    vi.mocked((await import('../../review-status.js')).loadReviewStatuses).mockReturnValue({
+      'PAN-1616': {
+        issueId: 'PAN-1616',
+        reviewStatus: 'pending',
+        testStatus: 'pending',
+        inspectStatus: 'inspecting',
+        inspectStartedAt: '2026-06-05T12:11:30.000Z',
+          inspectBeadId: 'workspace-sposy',
         updatedAt: '2026-06-05T12:11:30.000Z',
         readyForMerge: false,
       },

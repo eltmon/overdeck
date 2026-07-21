@@ -13,10 +13,16 @@ let packageRootDir: string;
 let createSessionMock: ReturnType<typeof vi.fn>;
 let sendRawKeystrokeMock: ReturnType<typeof vi.fn>;
 let resolveHarnessMock: ReturnType<typeof vi.fn>;
+let prepareHarnessLaunchMock: ReturnType<typeof vi.fn>;
 let emitAgentEventMock: ReturnType<typeof vi.fn>;
+let ensureLifecycleHooksMock: ReturnType<typeof vi.fn>;
+let deliverAgentMessageMock: ReturnType<typeof vi.fn>;
+let waitForPromptReadyMock: ReturnType<typeof vi.fn>;
+let stopAgentMock: ReturnType<typeof vi.fn>;
 let capturePaneText: string;
 let channelsMcpEnabled: boolean;
 let activeFlywheelRunId: string | null;
+const HEAVY_HOOK_TIMEOUT_MS = 20_000;
 
 function baseState(partial: Partial<AgentState> = {}): AgentState {
   return {
@@ -43,18 +49,44 @@ function mockSpawnDependencies(): void {
   createSessionMock = vi.fn(() => undefined);
   sendRawKeystrokeMock = vi.fn(() => Effect.void);
   emitAgentEventMock = vi.fn(() => Effect.succeed(true));
+  ensureLifecycleHooksMock = vi.fn(async () => undefined);
+  deliverAgentMessageMock = vi.fn(async () => ({ ok: true, path: 'acp' }));
+  waitForPromptReadyMock = vi.fn(async () => true);
+  stopAgentMock = vi.fn(() => Effect.void);
   resolveHarnessMock = vi.fn(async ({ explicit, model }: { explicit?: string; model: string }) => {
     if (explicit) return explicit;
     if (model === 'gpt-5.5') return 'codex';
-    if (model === 'kimi-k2.6') return 'pi';
+    if (model === 'kimi-k2.6') return 'ohmypi';
     return 'claude-code';
   });
+  prepareHarnessLaunchMock = vi.fn(async (harness: string) => ({
+    binaryPath: `/home/test/.local/bin/${harness === 'claude-code' ? 'claude' : harness === 'ohmypi' ? 'omp' : 'codex'}`,
+    pathExport: `export PATH='/home/test/.local/bin':"$PATH"`,
+  }));
 
   vi.doMock('../harness-resolve.js', () => ({
     resolveHarness: resolveHarnessMock,
   }));
+  vi.doMock('../harness-binary.js', () => ({
+    prepareHarnessLaunch: prepareHarnessLaunchMock,
+  }));
   vi.doMock('../agent-runtime.js', () => ({
     emitAgentEvent: emitAgentEventMock,
+  }));
+  vi.doMock('../agents/hook-readiness.js', () => ({
+    ensureLifecycleHooksBeforeLaunch: ensureLifecycleHooksMock,
+  }));
+  vi.doMock('../agents/delivery.js', async (importOriginal) => ({
+    ...((await importOriginal()) as typeof import('../agents/delivery.js')),
+    deliverAgentMessage: deliverAgentMessageMock,
+  }));
+  vi.doMock('../agents/runtime-command.js', async (importOriginal) => ({
+    ...((await importOriginal()) as typeof import('../agents/runtime-command.js')),
+    waitForPromptReady: waitForPromptReadyMock,
+  }));
+  vi.doMock('../agents/termination.js', async (importOriginal) => ({
+    ...((await importOriginal()) as typeof import('../agents/termination.js')),
+    stopAgent: stopAgentMock,
   }));
   vi.doMock('../agent-runtime-mirror.js', () => ({
     getRuntimeSnapshot: vi.fn(() => Effect.succeed(null)),
@@ -62,6 +94,9 @@ function mockSpawnDependencies(): void {
   }));
   vi.doMock('../runtimes/codex.js', () => ({
     initCodexHome: vi.fn(),
+  }));
+  vi.doMock('../codex-auth.js', () => ({
+    assertCodexNativeAuthForSpawn: vi.fn(),
   }));
   vi.doMock('../runtimes/pi-fifo.js', () => ({
     PiNotReady: class PiNotReady extends Error {
@@ -108,7 +143,10 @@ function mockSpawnDependencies(): void {
   vi.doMock('../workspace/stack-health.js', () => ({
     getWorkspaceStackHealth: vi.fn(() => Effect.succeed({ healthy: true, reasons: [], lastObserved: null })),
   }));
-  vi.doMock('../beads-query.js', () => ({ assertIssueHasBeads: vi.fn(() => Effect.succeed(undefined)) }));
+  vi.doMock('../xbrief/io.js', async (importOriginal) => ({
+    ...((await importOriginal()) as typeof import('../xbrief/io.js')),
+    readWorkspacePlanSync: vi.fn(() => ({ plan: { items: [{ id: 'item-1' }] } })),
+  }));
   vi.doMock('../activity-logger.js', () => ({
     emitActivityEntrySync: vi.fn(),
     emitActivityTtsSync: vi.fn(),
@@ -180,18 +218,24 @@ beforeEach(() => {
   delete process.env.PAN_DOCKER;
   delete process.env.OVERDECK_DOCKER_WORKSPACE;
   mockSpawnDependencies();
-});
+}, HEAVY_HOOK_TIMEOUT_MS);
 
 afterEach(() => {
   vi.doUnmock('../harness-resolve.js');
+  vi.doUnmock('../harness-binary.js');
   vi.doUnmock('../agent-runtime.js');
+  vi.doUnmock('../agents/hook-readiness.js');
+  vi.doUnmock('../agents/delivery.js');
+  vi.doUnmock('../agents/runtime-command.js');
+  vi.doUnmock('../agents/termination.js');
   vi.doUnmock('../agent-runtime-mirror.js');
   vi.doUnmock('../runtimes/codex.js');
+  vi.doUnmock('../codex-auth.js');
   vi.doUnmock('../runtimes/pi-fifo.js');
   vi.doUnmock('../paths.js');
   vi.doUnmock('../tmux.js');
   vi.doUnmock('../workspace/stack-health.js');
-  vi.doUnmock('../beads-query.js');
+  vi.doUnmock('../xbrief/io.js');
   vi.doUnmock('../activity-logger.js');
   vi.doUnmock('../cloister/work-agent-prompt.js');
   vi.doUnmock('../config-yaml.js');
@@ -208,7 +252,7 @@ afterEach(() => {
   rmSync(tmpHome, { recursive: true, force: true });
   rmSync(workspace, { recursive: true, force: true });
   rmSync(packageRootDir, { recursive: true, force: true });
-});
+}, HEAVY_HOOK_TIMEOUT_MS);
 
 describe('spawnAgent PTY supervisor wiring', () => {
   it('decides supervisor eligibility from Docker and harness only', async () => {
@@ -303,11 +347,51 @@ describe('spawnAgent PTY supervisor wiring', () => {
     expect(launcher).not.toContain('--mcp-config');
     expect(launcher).not.toContain('--dangerously-load-development-channels');
     expect(sendRawKeystrokeMock).not.toHaveBeenCalled();
+    expect(ensureLifecycleHooksMock).toHaveBeenCalledWith('agent-pan-1405', 'claude-code');
+    expect(ensureLifecycleHooksMock.mock.invocationCallOrder[0]).toBeLessThan(
+      createSessionMock.mock.invocationCallOrder[0],
+    );
     expect(createSessionMock).toHaveBeenCalledWith(
       'agent-pan-1405',
       workspace,
       `bash ${join(agentDir, 'launcher.sh')}`,
       expect.any(Object),
+    );
+  });
+
+  it('pins and persists a fresh Claude work-agent session before hooks run', async () => {
+    writeSupervisorArtifact();
+    const { spawnAgent } = await import('../agents.js');
+
+    const state = await spawnAgent({
+      issueId: 'PAN-1409',
+      workspace,
+      role: 'work',
+      model: 'claude-sonnet-4-6',
+    });
+
+    const agentDir = join(tmpHome, 'agents', 'agent-pan-1409');
+    const persisted = JSON.parse(readFileSync(join(agentDir, 'state.json'), 'utf8')) as AgentState;
+    const sessionId = readFileSync(join(agentDir, 'session.id'), 'utf8').trim();
+    const history = JSON.parse(readFileSync(join(agentDir, 'sessions.json'), 'utf8')) as string[];
+    const launcher = readFileSync(join(agentDir, 'launcher.sh'), 'utf8');
+    const lifecycle = readFileSync(join(agentDir, 'lifecycle.log'), 'utf8');
+
+    expect(sessionId).toMatch(/^[0-9a-f-]{36}$/);
+    expect(state.sessionId).toBe(sessionId);
+    expect(persisted.sessionId).toBe(sessionId);
+    expect(history).toEqual([sessionId]);
+    expect(launcher).toContain(`--session-id '${sessionId}'`);
+    expect(lifecycle).toContain(`session identity allocated: harness=claude-code sessionId=${sessionId}`);
+    expect(lifecycle).toContain('pointerPersisted=true historyPersisted=true');
+    expect(lifecycle).toContain(`launcher session pinned: sessionId=${sessionId}`);
+    expect(emitAgentEventMock).toHaveBeenCalledWith(
+      'agent-pan-1409',
+      expect.objectContaining({
+        kind: 'model_set',
+        claudeSessionId: sessionId,
+        sessionHarness: 'claude-code',
+      }),
     );
   });
 
@@ -331,9 +415,15 @@ describe('spawnAgent PTY supervisor wiring', () => {
       });
 
       expect(openaiState.harness).toBe('codex');
-      expect(kimiState.harness).toBe('pi');
+      expect(openaiState.lastActivity).toBeUndefined();
+      expect(openaiState.costSoFar).toBeUndefined();
+      expect(kimiState.harness).toBe('ohmypi');
+      expect(kimiState.lastActivity).toEqual(expect.any(String));
+      expect(kimiState.costSoFar).toBe(0);
       expect(resolveHarnessMock).toHaveBeenCalledWith({ explicit: undefined, role: 'work', model: 'gpt-5.5' });
       expect(resolveHarnessMock).toHaveBeenCalledWith({ explicit: undefined, role: 'work', model: 'kimi-k2.6' });
+      expect(prepareHarnessLaunchMock).toHaveBeenCalledWith('codex');
+      expect(prepareHarnessLaunchMock).toHaveBeenCalledWith('ohmypi');
     } finally {
       delete process.env.KIMI_API_KEY;
     }
@@ -409,6 +499,25 @@ describe('spawnAgent PTY supervisor wiring', () => {
     );
   });
 
+  it('stops and rejects a non-flywheel ACP role when its initial prompt fails', async () => {
+    deliverAgentMessageMock.mockRejectedValueOnce(new Error('provider rejected prompt'));
+    const { spawnRun } = await import('../agents.js');
+
+    await expect(spawnRun('PAN-1405', 'review', {
+      workspace,
+      model: 'kimi-k2.6',
+      harness: 'acp',
+      prompt: 'review the change',
+    })).rejects.toThrow('Agent agent-pan-1405-review kickoff delivery failed: provider rejected prompt');
+
+    expect(waitForPromptReadyMock).toHaveBeenCalledWith('agent-pan-1405-review', 'acp', 30);
+    expect(stopAgentMock).toHaveBeenCalledWith('agent-pan-1405-review');
+    const persisted = JSON.parse(
+      readFileSync(join(tmpHome, 'agents', 'agent-pan-1405-review', 'state.json'), 'utf8'),
+    ) as AgentState;
+    expect(persisted.status).toBe('starting');
+  });
+
   it('preserves role-run session origin on resume by not rewriting origin fields', async () => {
     const { spawnRun } = await import('../agents.js');
 
@@ -476,6 +585,25 @@ describe('spawnAgent PTY supervisor wiring', () => {
     expect(launcher).not.toContain('OVERDECK_FLYWHEEL_AGENT_ROLE');
     expect(sessionOptions.env.OVERDECK_FLYWHEEL_RUN_ID).toBeUndefined();
     expect(sessionOptions.env.OVERDECK_FLYWHEEL_AGENT_ROLE).toBeUndefined();
+  });
+
+  it('spawns a knowledge role as a specialist live session without requiring a work checklist', async () => {
+    writeSupervisorArtifact();
+    const { spawnRun } = await import('../agents.js');
+
+    const state = await spawnRun('PAN-2468', 'knowledge', {
+      workspace,
+      model: 'claude-sonnet-4-6',
+    });
+
+    expect(state.id).toBe('agent-pan-2468-knowledge');
+    expect(state.role).toBe('knowledge');
+    expect(createSessionMock).toHaveBeenCalledWith(
+      'agent-pan-2468-knowledge',
+      workspace,
+      expect.stringContaining('launcher.sh'),
+      expect.any(Object),
+    );
   });
 
   it('writes Channels MCP config and bridge token when the MCP override is enabled', async () => {

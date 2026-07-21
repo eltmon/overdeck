@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import type { ViewMode } from '../chat/ConversationPanel'
 import type { Conversation } from '../CommandDeck/ConversationList'
 import { HomePane } from './HomePane'
@@ -12,8 +12,10 @@ import { dispatchLauncherIntent } from './HomePane/launcherActions'
 import { readLastUsedAgent, writeLastUsedAgent } from './HomePane/launcherOrdering'
 import type { TimelineConversation } from './HomePane/timeline-utils'
 import type { StageApi } from './types'
+import { ProjectReleasePanel } from './HomePane/ProjectReleasePanel'
 import { ProjectOverview, projectTotalCost, type IssueCostBreakdown } from '../CommandDeck/ProjectOverview'
 import type { ProjectFeature } from '../CommandDeck/ProjectTree/ProjectNode'
+import styles from './stage.module.css'
 
 export interface ProjectHomeProps {
   /** Project key/name shown as `# <projectName>`. */
@@ -24,9 +26,8 @@ export interface ProjectHomeProps {
   branch?: string
   /** Conversations already scoped to this project. */
   conversations?: Conversation[]
-  /** Create a conversation for this project, returning the new conversation's
-   * name so the deck can open an agent tab on it. */
-  onCreateConversation?: (agentId: string, message?: string, viewMode?: ViewMode) => Promise<string | undefined>
+  /** Create a conversation for this project, returning its name or creation error. */
+  onCreateConversation?: (agentId: string, message?: string, viewMode?: ViewMode) => Promise<{ name: string } | { error: string }>
   /** Project issues/features — when present, the project cockpit (hero metrics,
    * stuck callout, pipeline swimlanes, cost cards) renders as the primary body
    * (S4). Absent during load / for the no-project deck → sparse fallback. */
@@ -60,11 +61,15 @@ export function ProjectHome({
   onSelectFeature,
   api,
 }: ProjectHomeProps) {
+  const [launchBusy, setLaunchBusy] = useState(false)
+  const [launchError, setLaunchError] = useState<string | null>(null)
   const timelineConversations: TimelineConversation[] = useMemo(
     () =>
       conversations.map((c) => ({
         id: c.name,
         agentLabel: c.title ?? c.model ?? 'Agent',
+        model: c.model,
+        harness: c.harness,
         timestamp: c.lastAttachedAt ?? c.createdAt,
         preview: c.title ?? undefined,
       })),
@@ -88,13 +93,23 @@ export function ProjectHome({
   }
 
   const onAgentSelected = async (id: string, message?: string) => {
+    if (launchBusy) return
     writeLastUsedAgent(api.deckKey, id)
-    const conversationName = await onCreateConversation?.(id, message, 'terminal')
-    if (conversationName) api.openOrFocusAgentPane(conversationName, 'Agent')
+    setLaunchError(null)
+    setLaunchBusy(true)
+    try {
+      const result = await onCreateConversation?.(id, message, 'terminal')
+      if (result && 'name' in result) api.openOrFocusAgentPane(result.name, 'Agent')
+      if (result && 'error' in result) setLaunchError(result.error)
+    } finally {
+      setLaunchBusy(false)
+    }
   }
 
   const launcher = (
     <Launcher
+      busy={launchBusy}
+      errorText={launchError ?? undefined}
       lastUsedAgentId={readLastUsedAgent(api.deckKey)}
       onSelect={(intent, query) =>
         dispatchLauncherIntent(intent, query, {
@@ -115,10 +130,22 @@ export function ProjectHome({
   // Clicking an issue card opens its cockpit tab. Falls back to the sparse
   // launch composition during load.
   if (features && features.length > 0 && onSelectFeature) {
+    const timeline = (
+      <Timeline
+        conversations={timelineConversations}
+        onOpen={(id) => {
+          const conv = conversations.find((c) => c.name === id)
+          api.openOrFocusAgentPane(id, conv?.title ?? 'Agent')
+        }}
+      />
+    )
+
     return (
       <HomePane
         workspaceId={api.deckKey}
         openPane={api.openPane}
+        wide
+        detailFirst
         header={
           <>
             <WorkspaceHeader variant="project" name={projectName} branch={branch} />
@@ -143,24 +170,28 @@ export function ProjectHome({
             }
           />
         }
-        timeline={
-          <Timeline
-            conversations={timelineConversations}
-            onOpen={(id) => {
-              const conv = conversations.find((c) => c.name === id)
-              api.openOrFocusAgentPane(id, conv?.title ?? 'Agent')
-            }}
-          />
-        }
         detail={
-          <ProjectOverview
-            projectName={projectName}
-            projectKey={projectKey}
-            features={features}
-            issueCosts={issueCosts ?? {}}
-            issueCostDetails={issueCostDetails}
-            onSelectFeature={onSelectFeature}
-          />
+          <div className={styles.projectHomeColumns}>
+            <div className={styles.projectHomeStages}>
+              <ProjectReleasePanel projectKey={projectKey ?? projectName} />
+              <ProjectOverview
+                projectName={projectName}
+                projectKey={projectKey}
+                features={features}
+                issueCosts={issueCosts ?? {}}
+                issueCostDetails={issueCostDetails}
+                onSelectFeature={onSelectFeature}
+                onOpenCosts={openCosts}
+                onOpenAgents={() => {
+                  window.history.pushState({ tab: 'agents' }, '', '/agents')
+                  window.dispatchEvent(new PopStateEvent('popstate'))
+                }}
+              />
+            </div>
+            <aside className={styles.projectHomeConversations} aria-label="Project conversations">
+              {timeline}
+            </aside>
+          </div>
         }
       />
     )

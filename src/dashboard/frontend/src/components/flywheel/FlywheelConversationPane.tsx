@@ -27,7 +27,7 @@ interface FlywheelRunDetail extends FlywheelRunSummary {
 }
 
 interface FlywheelRoleConfig {
-  harness?: 'claude-code' | 'pi' | 'codex';
+  harness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp';
   model?: string;
   effort?: 'low' | 'medium' | 'high';
   maxAgents?: number;
@@ -426,7 +426,13 @@ export function FlywheelConversationPane({ onOpenSettings }: FlywheelConversatio
           viewMode === 'terminal' ? (
             <XTerminal sessionName={FLYWHEEL_CONVERSATION_NAME} />
           ) : (
-            <ConversationPanel conversation={conversation} embedded />
+            <ConversationPanel
+              conversation={conversation}
+              embedded
+              onEmbeddedResume={!conversation.sessionAlive ? () => startMutation.mutate() : undefined}
+              embeddedResumeLabel={startMutation.isPending ? 'Starting…' : 'Start New Run'}
+              onSendFailed={() => void queryClient.invalidateQueries({ queryKey: ['conversation', FLYWHEEL_CONVERSATION_NAME] })}
+            />
           )
         ) : (
           <div className="flex h-full flex-col items-center justify-center p-8 text-center">

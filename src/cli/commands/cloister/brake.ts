@@ -8,14 +8,20 @@
  */
 
 import chalk from 'chalk';
-import { emergencyBrake, getConcurrencyLimits } from '../../../lib/cloister/concurrency.js';
+import { cloisterApi } from './api.js';
+import { getConcurrencyLimits } from '../../../lib/cloister/concurrency.js';
 
 interface BrakeOptions {
   json?: boolean;
 }
 
 export async function brakeCommand(options: BrakeOptions): Promise<void> {
-  const result = emergencyBrake();
+  const result = await cloisterApi<{
+    before: number;
+    cap: number;
+    remaining: number;
+    stopped: string[];
+  }>('/api/cloister/brake', { method: 'POST' });
 
   if (options.json) {
     console.log(JSON.stringify(result, null, 2));

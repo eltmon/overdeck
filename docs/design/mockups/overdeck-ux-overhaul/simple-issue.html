@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>One Issue — Simple Mode — Overdeck UX Overhaul</title>
+<link rel="stylesheet" href="shared.css">
+<script src="shared.js" defer></script>
+<style>
+  .topbar { display: flex; align-items: center; gap: 14px; padding: 12px 26px; border-bottom: 1px solid var(--border); }
+  .mode-toggle { display: inline-flex; border: 1px solid var(--input); border-radius: var(--radius-lg); overflow: hidden; margin-left: auto; }
+  .mode-toggle button { padding: 6px 14px; font-size: 12px; font-weight: 500; background: none; border: none; color: var(--muted-foreground); }
+  .mode-toggle button.active { background: var(--accent); color: var(--foreground); }
+
+  .page { max-width: 780px; margin: 0 auto; padding: 24px 26px 90px; }
+  .back { font-size: 12.5px; color: var(--muted-foreground); }
+  .back:hover { color: var(--foreground); }
+  .issue-head { margin-top: 14px; display: flex; align-items: flex-start; gap: 12px; }
+  .issue-head .kicker { font-size: 12px; color: var(--muted-foreground); display: flex; gap: 8px; align-items: center; }
+  .issue-head h1 { font-size: 21px; font-weight: 500; margin-top: 4px; line-height: 1.3; }
+
+  .status-card { margin-top: 16px; border-radius: var(--radius-2xl); padding: 16px 18px; border: 1px solid var(--border); background: var(--card); }
+  .status-card.working { border-color: color-mix(in srgb, var(--info) 32%, transparent); }
+  .status-card.needs { border-color: color-mix(in srgb, var(--warning) 40%, transparent); }
+  .status-card.ready { border-color: color-mix(in srgb, var(--success) 40%, transparent); }
+  .status-line { display: flex; gap: 12px; align-items: center; }
+  .status-icon { width: 32px; height: 32px; border-radius: 50%; flex: none; display: flex; align-items: center; justify-content: center; font-size: 14px; }
+  .status-icon.blue { background: color-mix(in srgb, var(--info) 12%, transparent); color: var(--info-foreground); }
+  .status-icon.amber { background: color-mix(in srgb, var(--warning) 12%, transparent); color: var(--warning-foreground); }
+  .status-icon.green { background: color-mix(in srgb, var(--success) 12%, transparent); color: var(--success-foreground); }
+  .status-title { font-size: 15px; font-weight: 500; }
+  .status-sub { font-size: 12.5px; color: var(--muted-foreground); margin-top: 2px; }
+  .status-actions { display: flex; gap: 8px; margin-top: 14px; align-items: center; flex-wrap: wrap; }
+  .status-actions .btn { height: 38px; font-size: 13.5px; padding: 0 18px; }
+  .why-link { font-size: 12px; color: var(--muted-foreground); margin-left: auto; }
+
+  .steps { display: flex; margin-top: 20px; }
+  .step { flex: 1; text-align: center; position: relative; padding-top: 14px; }
+  .step::before { content: ''; position: absolute; top: 5px; left: 0; right: 0; height: 2px; background: var(--muted); }
+  .step:first-child::before { left: 50%; } .step:last-child::before { right: 50%; }
+  .step .s-dot { position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: 12px; height: 12px; border-radius: 50%; background: var(--muted); border: 2px solid var(--border); }
+  .step.done .s-dot, .step.done::before { background: var(--success); }
+  .step.done .s-dot { border-color: transparent; }
+  .step.now .s-dot { background: var(--info); border-color: transparent; box-shadow: 0 0 0 3px color-mix(in srgb, var(--info) 25%, transparent); }
+  .step.now::before { background: var(--success); }
+  .step .s-name { font-size: 11.5px; color: var(--muted-foreground); }
+  .step.done .s-name { color: var(--success-foreground); }
+  .step.now .s-name { color: var(--foreground); font-weight: 500; }
+
+  /* ── The conversation, in plain dress ── */
+  .conv-section { margin-top: 22px; }
+  .conv-head { display: flex; align-items: baseline; gap: 10px; }
+  .conv-head h2 { font-size: 14px; font-weight: 500; }
+  .conv-head .live { font-size: 11px; color: var(--info-foreground); display: inline-flex; gap: 5px; align-items: center; }
+  .conv-head .live i { width: 6px; height: 6px; border-radius: 50%; background: var(--info); animation: badge-pulse 1.6s infinite; }
+  .conv-feed { margin-top: 10px; display: flex; flex-direction: column; gap: 10px; }
+  .msg { max-width: 92%; }
+  .msg.agent { align-self: flex-start; }
+  .msg.you { align-self: flex-end; max-width: 80%; }
+  .msg .m-meta { font-size: 10.5px; color: var(--muted-foreground); margin-bottom: 3px; }
+  .msg.you .m-meta { text-align: right; }
+  .msg .m-body { border: 1px solid var(--border); border-radius: var(--radius-xl); padding: 10px 14px; font-size: 13px; line-height: 1.55; background: var(--card); }
+  .msg.you .m-body { background: color-mix(in srgb, var(--primary) 14%, var(--card)); border-color: color-mix(in srgb, var(--primary) 32%, transparent); }
+  .msg .m-body code { font-family: 'SF Mono', ui-monospace, monospace; font-size: 11.5px; background: rgb(0 0 0 / 30%); padding: 1px 5px; border-radius: 4px; }
+  .doing { border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 8px 12px; font-size: 11.5px; color: var(--muted-foreground); display: flex; flex-direction: column; gap: 4px; }
+  .doing .d-row { display: flex; gap: 8px; align-items: center; }
+  .doing .d-row .mono { font-size: 11px; }
+  .doing .ok { color: var(--success-foreground); }
+
+  .composer { margin-top: 12px; display: flex; gap: 8px; align-items: center; background: var(--card); border: 1px solid var(--input); border-radius: var(--radius-xl); padding: 8px 8px 8px 14px; }
+  .composer:focus-within { border-color: var(--ring); }
+  .composer input { flex: 1; background: none; border: none; outline: none; color: var(--foreground); font-family: inherit; font-size: 13.5px; }
+  .composer .send { width: 34px; height: 34px; border-radius: var(--radius-md); background: var(--primary); color: #fff; border: none; font-size: 14px; }
+  .composer-hint { font-size: 11px; color: var(--muted-foreground); margin-top: 6px; padding-left: 4px; }
+
+  .section { margin-top: 28px; }
+  .section > h2 { font-size: 14px; font-weight: 500; }
+  .timeline { margin-top: 10px; }
+  .t-row { display: grid; grid-template-columns: 18px 1fr auto; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px; align-items: start; }
+  .t-row:last-child { border-bottom: none; }
+  .t-row .t-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted-foreground); margin-top: 5px; opacity: .5; }
+  .t-row.hi .t-dot { background: var(--success); opacity: 1; }
+  .t-row .t-when { font-size: 11.5px; color: var(--muted-foreground); }
+
+  details.advanced { margin-top: 30px; border: 1px solid var(--border); border-radius: var(--radius-xl); background: var(--card); }
+  details.advanced summary { padding: 12px 16px; cursor: pointer; font-size: 13px; color: var(--muted-foreground); list-style: none; display: flex; align-items: center; gap: 8px; }
+  details.advanced summary:hover { color: var(--foreground); }
+  details.advanced summary::before { content: '▸'; transition: transform 150ms; }
+  details.advanced[open] summary::before { transform: rotate(90deg); }
+  details.advanced .adv-body { padding: 0 16px 14px; font-size: 12.5px; color: var(--muted-foreground); line-height: 1.7; }
+  .adv-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+
+  .help-row { margin-top: 26px; text-align: center; font-size: 12.5px; color: var(--muted-foreground); }
+  .help-row a { color: var(--info-foreground); }
+  [data-show] { display: none; }
+  body[data-state="working"] [data-show="working"], body[data-state="needs"] [data-show="needs"],
+  body[data-state="ready"] [data-show="ready"], body[data-state="done"] [data-show="done"] { display: block; }
+  .state-switch { display: inline-flex; gap: 4px; }
+  .state-switch button { padding: 4px 10px; font-size: 11px; border-radius: var(--radius-md); border: 1px solid var(--input); background: none; color: var(--muted-foreground); }
+  .state-switch button.active { background: var(--accent); color: var(--foreground); }
+</style>
+</head>
+<body data-state="working">
+
+<div class="mock-banner">
+  <span class="tag">Mockup 3 of 7 · Simple mode</span>
+  <span class="crumbs"><a href="index.html">UX Overhaul</a> → <a href="simple-home.html">My work</a> → <b>One issue</b></span>
+  <span style="margin-left:auto;display:flex;gap:10px;align-items:center">
+    <span style="font-size:11px">Preview the four states:</span>
+    <span class="state-switch">
+      <button data-s="working" class="active">Working</button>
+      <button data-s="needs">Needs you</button>
+      <button data-s="ready">Ready</button>
+      <button data-s="done">Done</button>
+    </span>
+  </span>
+</div>
+
+<div class="topbar">
+  <span class="wordmark" style="font-size:15px">◎ Overdeck</span>
+  <div class="mode-toggle">
+    <button class="active">Simple</button>
+    <button onclick="location.href='issue-detail.html'">Advanced</button>
+  </div>
+</div>
+
+<div class="page">
+  <a class="back" href="simple-home.html">← My work</a>
+
+  <div class="issue-head">
+    <div>
+      <div class="kicker"><span class="mono">MIN-879</span><span>·</span><span>Mind Your Now</span></div>
+      <h1>Set up PostHog product analytics</h1>
+    </div>
+  </div>
+
+  <div class="steps">
+    <div class="step done" data-step="1"><span class="s-dot"></span><div class="s-name">Started</div></div>
+    <div class="step" data-step="2"><span class="s-dot"></span><div class="s-name">Writing code</div></div>
+    <div class="step" data-step="3"><span class="s-dot"></span><div class="s-name">Checking</div></div>
+    <div class="step" data-step="4"><span class="s-dot"></span><div class="s-name">Ready</div></div>
+  </div>
+
+  <!-- STATUS CARD per state -->
+  <div class="status-card working" data-show="working">
+    <div class="status-line">
+      <div class="status-icon blue">◐</div>
+      <div>
+        <div class="status-title">The agent is writing the code.</div>
+        <div class="status-sub">Started 34 minutes ago · usually about 2 hours · you don't need to do anything.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="status-card needs" data-show="needs">
+    <div class="status-line">
+      <div class="status-icon amber">?</div>
+      <div>
+        <div class="status-title">It needs one decision from you.</div>
+        <div class="status-sub">Answer below — the agent picks up right where it stopped.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="status-card ready" data-show="ready">
+    <div class="status-line">
+      <div class="status-icon green">✓</div>
+      <div>
+        <div class="status-title">Done and checked — ready to merge.</div>
+        <div class="status-sub">13 of 13 tasks · review approved · all tests pass. Nothing merges by itself.</div>
+      </div>
+    </div>
+    <div class="status-actions">
+      <button class="btn" style="background:var(--success);color:#04120c">Merge to main</button>
+      <button class="btn ghost">See what changed (3 files)</button>
+    </div>
+  </div>
+
+  <div class="status-card" data-show="done">
+    <div class="status-line">
+      <div class="status-icon green">✓</div>
+      <div>
+        <div class="status-title">Merged to main. This task is complete.</div>
+        <div class="status-sub">Merged 2 hours ago · verified working on main · total cost $4.18.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ THE CONVERSATION — first-class in simple mode too ══ -->
+  <div class="conv-section" data-show="working">
+    <div class="conv-head"><h2>What it's saying and doing</h2><span class="live"><i></i>live</span></div>
+    <div class="conv-feed">
+      <div class="msg agent">
+        <div class="m-meta">the agent · 2:41 PM</div>
+        <div class="m-body">Plan is set — 13 tasks. I'm putting PostHog behind an env flag so local dev doesn't send events. Starting on the provider now.</div>
+      </div>
+      <div class="doing">
+        <div class="d-row"><span>◌</span><span>thinking — checking how the backend loads env config</span></div>
+        <div class="d-row"><span class="ok">✓</span><span>wrote <span class="mono">analytics/provider.ts</span></span></div>
+        <div class="d-row"><span class="ok">✓</span><span>finished task 4 of 13 — "add PostHog provider behind env flag"</span></div>
+      </div>
+      <div class="msg agent">
+        <div class="m-meta">the agent · just now</div>
+        <div class="m-body">Task 4 done. Next: page-view tracking in the router.</div>
+      </div>
+    </div>
+    <div class="composer">
+      <input placeholder="Say something to the agent… (steer it, correct it, ask why)">
+      <button class="send">➤</button>
+    </div>
+    <div class="composer-hint">Talking to it never interrupts the work — it reads you between tasks.</div>
+  </div>
+
+  <div class="conv-section" data-show="needs">
+    <div class="conv-head"><h2>It's asking you</h2><span class="live" style="color:var(--warning-foreground)"><i style="background:var(--warning)"></i>waiting 12 min</span></div>
+    <div class="conv-feed">
+      <div class="msg agent">
+        <div class="m-meta">the agent · 12 min ago</div>
+        <div class="m-body">Before I wire up events: should product analytics go to the <b>existing PostHog project</b>, or a <b>new one for this app</b>? The existing one mixes dev and prod data today.</div>
+      </div>
+      <div class="msg you">
+        <div class="m-meta">you · typing…</div>
+        <div class="m-body" style="opacity:.55">New project — I'll invite you to it. Use project "myn-app".</div>
+      </div>
+    </div>
+    <div class="composer" style="border-color:color-mix(in srgb, var(--warning) 40%, transparent)">
+      <input placeholder="Type your answer…">
+      <button class="send" style="background:var(--warning);color:#201400">➤</button>
+    </div>
+    <div class="composer-hint">One sentence is enough. It continues immediately after you answer.</div>
+  </div>
+
+  <div class="conv-section" data-show="ready">
+    <div class="conv-head"><h2>How it went</h2></div>
+    <div class="conv-feed">
+      <div class="msg agent">
+        <div class="m-meta">the agent · 4:02 PM</div>
+        <div class="m-body">All 13 tasks are done and the branch is pushed. Review approved it, and every check passes — <code>typecheck</code>, <code>lint</code>, all 51 tests. Summary of what changed is in <code>review.md</code>.</div>
+      </div>
+      <div class="doing">
+        <div class="d-row"><span class="ok">✓</span><span>13 of 13 tasks</span></div>
+        <div class="d-row"><span class="ok">✓</span><span>review approved</span></div>
+        <div class="d-row"><span class="ok">✓</span><span>all checks pass</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- What happened -->
+  <div class="section" data-show="working">
+    <h2>What happened</h2>
+    <div class="timeline">
+      <div class="t-row hi"><span class="t-dot"></span><span>You handed this off with a short description</span><span class="t-when">2:14 PM</span></div>
+      <div class="t-row hi"><span class="t-dot"></span><span>A plan was written and approved automatically — 13 tasks</span><span class="t-when">2:21 PM</span></div>
+      <div class="t-row hi"><span class="t-dot"></span><span>The agent started writing code</span><span class="t-when">2:22 PM</span></div>
+    </div>
+  </div>
+
+  <details class="advanced">
+    <summary>Advanced — the machinery behind this task</summary>
+    <div class="adv-body">
+      For operators. Everything here also exists in the Advanced view; simple mode just keeps it out of your way.
+      <div class="adv-chips">
+        <span class="label-chip">agent-min-879 · sonnet-5</span>
+        <span class="label-chip">workspace ws-min-879</span>
+        <span class="label-chip">branch feature/min-879</span>
+        <span class="label-chip">typecheck pass · lint pass</span>
+        <span class="label-chip">$1.86 so far</span>
+      </div>
+      <div style="margin-top:10px"><a href="issue-detail.html" style="color:var(--info-foreground)">Open the full operator view →</a> &nbsp;·&nbsp; <a href="actions.html" style="color:var(--info-foreground)">All actions (43) →</a></div>
+    </div>
+  </details>
+
+  <div class="help-row">Something look wrong? <a href="#">Get help</a> — a human sees these.</div>
+</div>
+
+<script>
+const stepsByState = { working: 2, needs: 2, ready: 4, done: 4 };
+function applyState(s) {
+  document.body.dataset.state = s;
+  document.querySelectorAll('.state-switch button').forEach(x => x.classList.toggle('active', x.dataset.s === s));
+  const now = stepsByState[s];
+  document.querySelectorAll('.step').forEach(st => {
+    const n = +st.dataset.step;
+    st.classList.toggle('done', n < now || s === 'done' || s === 'ready');
+    st.classList.toggle('now', n === now && s !== 'done' && s !== 'ready');
+  });
+}
+document.querySelectorAll('.state-switch button').forEach(b => b.addEventListener('click', () => applyState(b.dataset.s)));
+applyState('working');
+</script>
+</body>
+</html>

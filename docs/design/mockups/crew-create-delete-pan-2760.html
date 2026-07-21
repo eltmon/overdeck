@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Crew create &amp; delete — PAN-2760 (Tiered Execution settings)</title>
+</head>
+<body>
+<style>
+  :root {
+    --pan-scheme: light;
+    --background: #ffffff;
+    --foreground: #1f2937;
+    --card: #ffffff;
+    --card-2: #f7f7f8;
+    --popover: #ffffff;
+    --primary: oklch(0.488 0.217 264);
+    --primary-foreground: #ffffff;
+    --muted: color-mix(in srgb, black 4%, transparent);
+    --muted-foreground: #6b7280;
+    --border: color-mix(in srgb, black 8%, transparent);
+    --input: color-mix(in srgb, black 10%, transparent);
+    --destructive: #ef4444;
+    --destructive-foreground: #b91c1c;
+    --warning: #f59e0b;
+    --warning-foreground: #b45309;
+    --success: #10b981;
+    --success-foreground: #047857;
+    --signal-cost: #06b6d4;
+    --signal-cost-foreground: #0e7490;
+    --shadow-card: 0 1px 3px rgba(0,0,0,.07), 0 4px 14px rgba(0,0,0,.05);
+    --crew-a: #0d9488; --crew-b: #4f46e5; --crew-c: #9333ea; --crew-d: #b45309; --crew-e: #047857;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --pan-scheme: dark;
+      --background: #080b10; --foreground: #e5e7eb; --card: #0c1018; --card-2: #10151f; --popover: #0c1018;
+      --primary: oklch(0.588 0.217 264); --primary-foreground: #ffffff;
+      --muted: color-mix(in srgb, white 4%, transparent); --muted-foreground: #9ca3af;
+      --border: color-mix(in srgb, white 6%, transparent); --input: color-mix(in srgb, white 8%, transparent);
+      --destructive: #f87171; --destructive-foreground: #fca5a5;
+      --warning: #f59e0b; --warning-foreground: #fbbf24;
+      --success: #10b981; --success-foreground: #34d399;
+      --signal-cost: #06b6d4; --signal-cost-foreground: #22d3ee;
+      --shadow-card: none;
+      --crew-a: #2dd4bf; --crew-b: #818cf8; --crew-c: #c084fc; --crew-d: #fbbf24; --crew-e: #34d399;
+    }
+  }
+  :root[data-theme="dark"] {
+    --pan-scheme: dark;
+    --background: #080b10; --foreground: #e5e7eb; --card: #0c1018; --card-2: #10151f; --popover: #0c1018;
+    --primary: oklch(0.588 0.217 264); --primary-foreground: #ffffff;
+    --muted: color-mix(in srgb, white 4%, transparent); --muted-foreground: #9ca3af;
+    --border: color-mix(in srgb, white 6%, transparent); --input: color-mix(in srgb, white 8%, transparent);
+    --destructive: #f87171; --destructive-foreground: #fca5a5;
+    --warning: #f59e0b; --warning-foreground: #fbbf24;
+    --success: #10b981; --success-foreground: #34d399;
+    --signal-cost: #06b6d4; --signal-cost-foreground: #22d3ee;
+    --shadow-card: none;
+    --crew-a: #2dd4bf; --crew-b: #818cf8; --crew-c: #c084fc; --crew-d: #fbbf24; --crew-e: #34d399;
+  }
+  :root[data-theme="light"] {
+    --pan-scheme: light;
+    --background: #ffffff; --foreground: #1f2937; --card: #ffffff; --card-2: #f7f7f8; --popover: #ffffff;
+    --primary: oklch(0.488 0.217 264); --primary-foreground: #ffffff;
+    --muted: color-mix(in srgb, black 4%, transparent); --muted-foreground: #6b7280;
+    --border: color-mix(in srgb, black 8%, transparent); --input: color-mix(in srgb, black 10%, transparent);
+    --destructive: #ef4444; --destructive-foreground: #b91c1c;
+    --warning: #f59e0b; --warning-foreground: #b45309;
+    --success: #10b981; --success-foreground: #047857;
+    --signal-cost: #06b6d4; --signal-cost-foreground: #0e7490;
+    --shadow-card: 0 1px 3px rgba(0,0,0,.07), 0 4px 14px rgba(0,0,0,.05);
+    --crew-a: #0d9488; --crew-b: #4f46e5; --crew-c: #9333ea; --crew-d: #b45309; --crew-e: #047857;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--background); color: var(--foreground);
+    font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+    font-weight: 500; font-size: 14px; line-height: 1.55; color-scheme: var(--pan-scheme);
+  }
+  .mono { font-family: ui-monospace, 'SF Mono', 'Cascadia Mono', Menlo, monospace; }
+  .page { max-width: 920px; margin: 0 auto; padding: 40px 24px 96px; }
+  header.doc { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; margin-bottom: 6px; }
+  h1 { font-size: 21px; font-weight: 500; margin: 0; letter-spacing: -0.01em; text-wrap: balance; }
+  .doc-sub { color: var(--muted-foreground); font-size: 13px; margin: 0 0 36px; max-width: 66ch; }
+  .doc-sub .mono { font-size: 12px; }
+  h2 { font-size: 12px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.09em; color: var(--muted-foreground); margin: 44px 0 12px; }
+  p.note { color: var(--muted-foreground); font-size: 13px; max-width: 68ch; margin: 10px 0; }
+  p.note strong { color: var(--foreground); font-weight: 500; }
+  button.theme-toggle { background: none; border: 1px solid var(--border); border-radius: 6px; color: var(--muted-foreground); font: inherit; font-size: 12px; padding: 3px 10px; cursor: pointer; }
+  button.theme-toggle:hover { color: var(--foreground); }
+
+  .frame { background: var(--card); border: 1px solid var(--border); border-radius: 10px; box-shadow: var(--shadow-card); padding: 18px 20px; }
+
+  .callouts { margin: 14px 0 0; padding: 0; list-style: none; font-size: 13px; color: var(--muted-foreground); max-width: 70ch; display: grid; gap: 7px; }
+  .callouts li { padding-left: 22px; position: relative; }
+  .callouts li::before {
+    content: attr(data-n); position: absolute; left: 0; top: 2px; width: 15px; height: 15px; border-radius: 3px; font-size: 10px;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: color-mix(in srgb, var(--destructive) 8%, transparent);
+    border: 1px solid color-mix(in srgb, var(--destructive) 32%, transparent);
+    color: var(--destructive-foreground);
+  }
+  .callouts.good li::before {
+    background: color-mix(in srgb, var(--success) 8%, transparent);
+    border-color: color-mix(in srgb, var(--success) 32%, transparent);
+    color: var(--success-foreground);
+  }
+  .callouts strong { color: var(--foreground); font-weight: 500; }
+
+  .scenarios { display: flex; gap: 6px; margin: 0 0 12px; flex-wrap: wrap; }
+  .scenarios span { font-size: 11px; color: var(--muted-foreground); align-self: center; margin-right: 2px; }
+  .scenarios button { border: 1px solid var(--border); background: none; border-radius: 5px; color: var(--muted-foreground); font: inherit; font-size: 11px; padding: 2px 9px; cursor: pointer; }
+  .scenarios button:hover { color: var(--foreground); background: var(--muted); }
+  .scenarios button.on { color: var(--foreground); border-color: color-mix(in srgb, var(--primary) 45%, transparent); }
+
+  .board { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0; border: 1px solid var(--border); border-radius: 9px; overflow: hidden; }
+  .bcol { padding: 10px 11px 12px; border-left: 1px solid var(--border); border-top: 3px solid transparent; background: var(--card); }
+  .bcol:first-child { border-left: none; }
+  .bcol .d { font-size: 11px; letter-spacing: .07em; text-transform: uppercase; }
+  .bcol .dsub { font-size: 10px; color: var(--muted-foreground); margin-bottom: 8px; }
+  .bcol select { width: 100%; border-radius: 5px; border: 1px solid var(--input); background: var(--popover); color: var(--foreground); padding: 3px 6px; font: inherit; font-size: 11px; }
+  .bcol .who { font-size: 10.5px; color: var(--muted-foreground); margin-top: 7px; line-height: 1.45; min-height: 30px; }
+  .bcol .cost { font-size: 10.5px; color: var(--signal-cost-foreground); font-variant-numeric: tabular-nums; margin-top: 3px; }
+  .boarderr { font-size: 11.5px; color: var(--destructive-foreground); margin: 8px 2px 0; }
+
+  .rosterhead { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-bottom: 8px; }
+  .rosterhead .hint { font-size: 11px; color: var(--muted-foreground); margin-left: auto; }
+  .addbtn { font: inherit; font-size: 11.5px; border: 1px solid color-mix(in srgb, var(--primary) 40%, transparent); border-radius: 5px; background: none; color: var(--foreground); padding: 3px 11px; cursor: pointer; white-space: nowrap; }
+  .addbtn:hover { background: color-mix(in srgb, var(--primary) 7%, transparent); }
+  .addbtn:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+
+  .prompt { border: 1px solid color-mix(in srgb, var(--primary) 35%, transparent); border-radius: 9px; background: var(--card); padding: 11px 13px; margin-bottom: 8px; }
+  .prompt .q { font-size: 12.5px; margin-bottom: 8px; }
+  .prompt .q small { color: var(--muted-foreground); font-size: 11px; }
+  .prompt .opts { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+  .pbtn { font: inherit; font-size: 11.5px; border: 1px solid var(--border); border-radius: 5px; background: none; color: var(--foreground); padding: 4px 10px; cursor: pointer; text-align: left; }
+  .pbtn small { display: block; font-size: 10px; color: var(--muted-foreground); }
+  .pbtn:hover:not(:disabled) { background: var(--muted); border-color: color-mix(in srgb, var(--primary) 45%, transparent); }
+  .pbtn:disabled { opacity: .45; cursor: not-allowed; }
+  .pbtn:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+  .cancelbtn { font: inherit; font-size: 11px; border: none; background: none; color: var(--muted-foreground); cursor: pointer; padding: 4px 6px; margin-left: auto; }
+  .cancelbtn:hover { color: var(--foreground); }
+  .promptnote { font-size: 10.5px; color: var(--muted-foreground); margin-top: 8px; }
+
+  .crew { border: 1px solid var(--border); border-radius: 9px; background: var(--card); margin-bottom: 8px; overflow: hidden; }
+  .crew-head { display: flex; align-items: center; gap: 10px; padding: 10px 13px; cursor: pointer; }
+  .crew-head:hover { background: var(--muted); }
+  .crew-head:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+  .cdot { width: 9px; height: 9px; border-radius: 3px; flex: none; }
+  .cname { font-size: 13px; }
+  .cwho { font-size: 11px; color: var(--muted-foreground); }
+  .cowns { font-size: 11px; color: var(--muted-foreground); margin-left: auto; }
+  .ccost { font-size: 11px; color: var(--signal-cost-foreground); font-variant-numeric: tabular-nums; width: 78px; text-align: right; }
+  .caret { color: var(--muted-foreground); font-size: 10px; width: 12px; }
+  .edithint { font-size: 10px; color: var(--muted-foreground); opacity: 0; transition: opacity .12s; }
+  .crew-head:hover .edithint, .crew-head:focus-visible .edithint { opacity: 1; }
+  @media (prefers-reduced-motion: reduce) { .edithint { transition: none; } }
+  .xrm { flex: none; font: inherit; font-size: 11px; line-height: 1; border: 1px solid transparent; border-radius: 5px; background: none; color: var(--muted-foreground); padding: 4px 7px; cursor: pointer; }
+  .xrm:hover { color: var(--destructive-foreground); border-color: color-mix(in srgb, var(--destructive) 35%, transparent); background: color-mix(in srgb, var(--destructive) 6%, transparent); }
+  .xrm:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+  .crew-body { display: none; border-top: 1px solid var(--border); padding: 12px 13px; background: var(--card-2); }
+  .crew.open .crew-body { display: block; }
+  .crewerr { border-top: 1px solid var(--border); padding: 8px 13px; font-size: 11.5px; color: var(--destructive-foreground); background: color-mix(in srgb, var(--destructive) 5%, transparent); }
+  .crewprompt { border-top: 1px solid color-mix(in srgb, var(--primary) 35%, transparent); padding: 10px 13px; background: var(--card-2); }
+  .crewprompt .q { font-size: 12px; margin-bottom: 7px; }
+  .fgrid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 10px; }
+  label.f { display: block; }
+  label.f input, label.f select { width: 100%; margin-top: 3px; border-radius: 5px; border: 1px solid var(--input); background: var(--popover); color: var(--foreground); padding: 3px 7px; font: inherit; font-size: 11.5px; }
+  .flbl { font-size: 10.5px; color: var(--muted-foreground); margin-bottom: 3px; display: block; }
+  .mixbar { display: flex; height: 8px; border-radius: 4px; overflow: hidden; border: 1px solid var(--border); margin: 4px 0 10px; }
+  .mixbar div { height: 100%; opacity: .8; }
+  .mixnote { font-size: 10.5px; color: var(--muted-foreground); }
+  .smallbtn { font: inherit; font-size: 11px; border: 1px solid var(--border); border-radius: 5px; background: none; color: var(--foreground); padding: 3px 10px; cursor: pointer; }
+  .smallbtn:hover { background: var(--muted); }
+  .smallbtn.danger { color: var(--destructive-foreground); border-color: color-mix(in srgb, var(--destructive) 35%, transparent); }
+  .footbtns { display: flex; gap: 8px; justify-content: flex-end; margin-top: 10px; }
+  .warnchip { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; border-radius: 3px; padding: 1px 6px;
+    background: color-mix(in srgb, var(--warning) 8%, transparent);
+    border: 1px solid color-mix(in srgb, var(--warning) 32%, transparent);
+    color: var(--warning-foreground); }
+  .empty { border: 1px dashed var(--border); border-radius: 9px; padding: 14px; font-size: 12px; color: var(--muted-foreground); display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+  .chip { display: inline-flex; align-items: center; gap: 5px; height: 20px; padding: 0 7px; border-radius: 3px; font-size: 11px;
+    background: color-mix(in srgb, var(--primary) 8%, transparent);
+    border: 1px solid color-mix(in srgb, var(--primary) 32%, transparent); }
+  .chip button { background: none; border: none; color: var(--muted-foreground); cursor: pointer; font-size: 10px; padding: 0; }
+  .kindline { font-size: 11.5px; color: var(--muted-foreground); margin-top: 14px; }
+
+  table.audit { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 6px; }
+  table.audit th, table.audit td { text-align: left; padding: 6px 10px 6px 0; border-bottom: 1px solid var(--border); vertical-align: top; }
+  table.audit th { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted-foreground); }
+
+  /* current-state sketch */
+  .cur { font-size: 12px; }
+  .cur .box { border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; margin-bottom: 10px; }
+  .cur .dgrid { display:grid; grid-template-columns:repeat(5,1fr); gap:6px; }
+  .cur .dgrid > div { background: var(--card-2); border-radius: 6px; padding: 6px 8px; }
+  .cur .dgrid .t { font-size: 11px; }
+  .cur select { width: 100%; border-radius: 5px; border: 1px solid var(--input); background: var(--popover); color: var(--foreground); padding: 2px 6px; font: inherit; font-size: 10.5px; margin-top: 4px; }
+  .cur .rowline { display: flex; align-items: center; gap: 8px; border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; margin-bottom: 6px; font-size: 12px; }
+  .cur .rowline .dim { color: var(--muted-foreground); font-size: 11px; }
+</style>
+
+<div class="page">
+  <header class="doc">
+    <h1>Crew create &amp; delete, made discoverable</h1>
+    <button class="theme-toggle" id="themeToggle" type="button">Toggle theme</button>
+  </header>
+  <p class="doc-sub">PAN-2760 · Settings → Tiered Execution (<span class="mono">TieredExecutionSection.tsx</span>). Create, update, and delete all exist today, but an operator looking straight at the panel concluded none of them did. This proposal adds an <strong>Add crew</strong> button to the roster and a <strong>remove</strong> affordance to every collapsed row — both keeping creation and assignment (or deletion and hand-off) one atomic gesture, so no crew can ever exist in the silently-discarded zero-difficulty state. Everything in the proposed section is clickable.</p>
+
+  <h2>Current — why nothing looks creatable or deletable</h2>
+  <div class="frame cur">
+    <div class="box">
+      <div style="font-size:12px;margin-bottom:6px"><b>Who handles each difficulty?</b></div>
+      <div class="dgrid">
+        <div><div class="t">trivial</div><select disabled><option>Kimi K2.7 Code</option></select></div>
+        <div><div class="t">simple</div><select disabled><option>Kimi K2.7 Code</option></select></div>
+        <div><div class="t">medium</div><select disabled><option>4-model mix</option></select></div>
+        <div><div class="t">complex</div><select disabled><option>4-model mix</option></select></div>
+        <div><div class="t">expert</div><select disabled><option value="new">+ new crew…&nbsp;&nbsp;← the only create entry point, at the bottom of a picker</option></select></div>
+      </div>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:baseline;margin:12px 0 6px">
+      <b style="font-size:13px">The crews</b>
+      <span class="dim" style="font-size:11px;color:var(--muted-foreground)">click a crew to edit · new crews start on Haiku 4.5, never a frontier model</span>
+    </div>
+    <div class="rowline"><span style="color:var(--muted-foreground);font-size:10px">▸</span> Kimi K2.7 Code <span class="dim" style="margin-left:auto">handles trivial · simple</span><span style="color:var(--signal-cost-foreground);font-size:11px">≈ $2.5/1M</span></div>
+    <div class="rowline"><span style="color:var(--muted-foreground);font-size:10px">▸</span> 4-model mix <span class="dim" style="margin-left:auto">handles medium · complex · expert</span><span style="color:var(--signal-cost-foreground);font-size:11px">≈ $11.4/1M</span></div>
+  </div>
+  <ul class="callouts">
+    <li data-n="1"><strong>Create hides inside a picker.</strong> The only way to make a crew is the <span class="mono">+ new crew…</span> option at the bottom of each difficulty dropdown. A control that reads as “which crew handles medium?” is also the only door to creation, and nothing near the roster header suggests a crew can be made at all.</li>
+    <li data-n="2"><strong>The empty state teaches the trick in prose.</strong> “Choose ‘+ new crew…’ on the board to create the first crew.” When copy has to explain where an interaction hides, the affordance isn’t carrying itself.</li>
+    <li data-n="3"><strong>Remove requires knowing the row expands — and then it always refuses.</strong> The Remove button lives inside the expanded row, and every saved crew owns at least one difficulty, so pressing it can only ever print “assign these difficulties to another crew first.” The real delete gesture today is reassigning difficulties on the board until the crew silently evaporates. Nobody would guess that.</li>
+  </ul>
+
+  <h2>Proposed — try it</h2>
+  <div class="scenarios">
+    <span>Preview a state:</span>
+    <button type="button" data-sc="live" class="on">Your config today</button>
+    <button type="button" data-sc="one">One crew</button>
+    <button type="button" data-sc="none">No crews yet</button>
+  </div>
+
+  <div class="frame">
+    <div style="font-size:13px;margin-bottom:8px"><b>Who handles each difficulty?</b> <span style="font-size:11px;color:var(--muted-foreground)">— unchanged, including “+ new crew…”</span></div>
+    <div class="board" id="board"></div>
+    <div class="boarderr" id="boarderr" hidden></div>
+
+    <div style="margin-top:18px">
+      <div class="rosterhead">
+        <span style="font-size:13px"><b>The crews</b></span>
+        <span class="hint">new crews start on Haiku 4.5, never a frontier model</span>
+        <button type="button" class="addbtn" id="addbtn">+ Add crew</button>
+      </div>
+      <div id="addprompt"></div>
+      <div id="crews"></div>
+      <div class="kindline" id="kindline"></div>
+      <div class="chips" id="kindchips"></div>
+    </div>
+  </div>
+  <p class="note" style="margin-top:10px">Supervisor, kind-override add controls, and the Advanced disclosures are unchanged and omitted here — this mockup covers only the surfaces PAN-2760 touches. The kind-override chips are shown because they gate deletion.</p>
+
+  <ul class="callouts good">
+    <li data-n="1"><strong>“+ Add crew” asks for a difficulty before it creates anything.</strong> Creation and assignment stay one gesture — the invariant the whole save path depends on (<span class="mono">serializeCrews</span> drops any crew owning zero difficulties). A crew that “handles nothing” never exists, so nothing can silently vanish on save. Picking a difficulty that would strand a kind-routed crew is blocked inline, same guard as the board.</li>
+    <li data-n="2"><strong>Every collapsed row carries × remove — and removing hands the work off, mirroring create.</strong> Since every saved crew owns a difficulty, a bare delete would always dead-end. Instead, × on a crew that owns difficulties asks who takes them over, then reassigns and removes in one gesture. The kind-override guard still blocks with its existing message, and the last crew can’t be removed (every difficulty needs one).</li>
+    <li data-n="3"><strong>Rows now read as editable.</strong> Hovering a collapsed row highlights it and shows an “edit” cue next to the caret — the disclosure is no longer a secret. The Remove button inside the expanded body stays (no-loss) and routes through the same hand-off flow.</li>
+    <li data-n="4"><strong>The empty state is a button, not a lesson.</strong> “Add crew” works directly from the empty roster; the first crew takes every difficulty, exactly like the board’s first-crew behavior today.</li>
+  </ul>
+
+  <h2>Guard behavior — unchanged rules, better doors</h2>
+  <table class="audit">
+    <tr><th>Situation</th><th>What happens</th></tr>
+    <tr><td>× remove on a crew holding kind overrides</td><td>Blocked with the existing message: “Move or remove the … kind overrides before removing this crew.” (Try it: remove the docs chip first, then × works.)</td></tr>
+    <tr><td>× remove on the only crew</td><td>Blocked: every difficulty needs a crew. Add another crew first, or turn tiered execution off.</td></tr>
+    <tr><td>× remove on a crew owning difficulties</td><td>Inline hand-off prompt: “Give trivial · simple to …” — pick a crew, difficulties reassign, crew is removed. One gesture, no intermediate invalid state.</td></tr>
+    <tr><td>“Add crew” difficulty that is a kind-routed crew’s last one</td><td>That difficulty is disabled in the prompt with the existing final-difficulty guard message.</td></tr>
+    <tr><td>New crew defaults</td><td>Haiku 4.5 on the provider-default harness — never a frontier model. Unchanged.</td></tr>
+  </table>
+
+  <p class="note" style="margin-top:20px"><strong>Implementation shape:</strong> pure presentation-layer change in <span class="mono">TieredExecutionSection.tsx</span> / <span class="mono">CrewRow.tsx</span>. No schema change, no new persisted state — the hand-off remove is one <span class="mono">writeCrews(crews minus one, reassigned assign)</span> call, and roster create reuses the board’s existing create-and-assign path. <span class="mono">docs/design/mockups/tiered-execution-redesign-pan-2684.html</span> gets updated to match, since the mockup is the spec and currently encodes the bug.</p>
+</div>
+
+<script>
+  document.getElementById('themeToggle').addEventListener('click', () => {
+    const root = document.documentElement;
+    const dark = root.dataset.theme ? root.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+    root.dataset.theme = dark ? 'light' : 'dark';
+  });
+
+  const $ = (id) => document.getElementById(id);
+  const DIFFS = ['trivial','simple','medium','complex','expert'];
+  const DSUB = {trivial:'typo-level fixes', simple:'small scoped edits', medium:'typical tasks', complex:'multi-file work', expert:'judgment calls'};
+  const CATALOG = {
+    'claude-sonnet-5':{n:'Claude Sonnet 5',c:6,p:'anthropic'},
+    'claude-haiku-4-5':{n:'Claude Haiku 4.5',c:1,p:'anthropic'},
+    'gpt-5.5':{n:'GPT-5.5',c:17.5,p:'openai'},
+    'glm-5.2':{n:'GLM-5.2',c:1.4,p:'zai'},
+    'kimi-k2.7-code':{n:'Kimi K2.7 Code',c:2.5,p:'kimi'},
+    'minimax-m3':{n:'MiniMax M3',c:1.2,p:'minimax'},
+  };
+  const PROVIDER_HARNESS = {anthropic:'claude-code',openai:'codex',kimi:'ohmypi',zai:'ohmypi',minimax:'ohmypi'};
+  const CREW_COLORS = ['var(--crew-a)','var(--crew-b)','var(--crew-c)','var(--crew-d)','var(--crew-e)'];
+
+  const SCENARIOS = {
+    live: () => ({
+      nextId: 3,
+      crews: [
+        {id:1, model:'kimi-k2.7-code', harness:'claude-code', mix:false, dist:[]},
+        {id:2, model:'gpt-5.5', harness:'codex', mix:true, dist:[
+          {model:'gpt-5.5',weight:25},{model:'glm-5.2',weight:25},{model:'kimi-k2.7-code',weight:25},{model:'minimax-m3',weight:25}]},
+      ],
+      assign: {trivial:1, simple:1, medium:2, complex:2, expert:2},
+      kinds: {docs:1},
+    }),
+    one: () => ({
+      nextId: 2,
+      crews: [{id:1, model:'claude-sonnet-5', harness:'auto', mix:false, dist:[]}],
+      assign: {trivial:1, simple:1, medium:1, complex:1, expert:1},
+      kinds: {},
+    }),
+    none: () => ({ nextId: 1, crews: [], assign: {}, kinds: {} }),
+  };
+
+  let S;
+  function loadScenario(name) {
+    S = { ...SCENARIOS[name](), open:{}, addOpen:false, removeFor:null, errors:{}, boardErr:null };
+    document.querySelectorAll('.scenarios button').forEach(b => b.classList.toggle('on', b.dataset.sc === name));
+    render();
+  }
+
+  const autoHarness = (m) => PROVIDER_HARNESS[CATALOG[m]?.p] || 'claude-code';
+  const mismatch = (c) => !c.mix && c.harness !== 'auto' && c.harness !== autoHarness(c.model);
+  const blended = (c) => c.mix
+    ? c.dist.reduce((s,e) => s + (CATALOG[e.model]?.c ?? 0) * e.weight, 0) / 100
+    : (CATALOG[c.model]?.c ?? 0);
+  const crewLabel = (c) => c.mix ? c.dist.length + '-model mix' : (CATALOG[c.model]?.n ?? c.model);
+  const crewById = (id) => S.crews.find(c => c.id === id);
+  const owns = (id) => DIFFS.filter(d => S.assign[d] === id);
+  const kindsOf = (id) => Object.entries(S.kinds).filter(([,v]) => v === id).map(([k]) => k);
+  const rosterIndex = (id) => S.crews.findIndex(c => c.id === id);
+  const crewColor = (id) => CREW_COLORS[Math.max(0, rosterIndex(id)) % CREW_COLORS.length];
+
+  // A difficulty can't be taken from a crew when it's that crew's LAST difficulty
+  // and the crew is kind-routed — the existing final-difficulty guard.
+  function takeGuard(diff, takerId) {
+    const ownerId = S.assign[diff];
+    if (ownerId == null || ownerId === takerId) return null;
+    const k = kindsOf(ownerId);
+    if (owns(ownerId).length === 1 && k.length > 0) {
+      return 'Move or remove the ' + k.join(', ') + ' kind override' + (k.length > 1 ? 's' : '') + ' before reassigning this crew’s final difficulty.';
+    }
+    return null;
+  }
+
+  function createCrew(diff) {
+    const id = S.nextId++;
+    S.crews.push({id, model:'claude-haiku-4-5', harness:'auto', mix:false, dist:[]});
+    if (S.crews.length === 1) DIFFS.forEach(d => S.assign[d] = id);
+    else if (diff) S.assign[diff] = id;
+    S.open = {[id]: true};
+    S.addOpen = false;
+    render();
+  }
+
+  function requestRemove(id) {
+    S.errors = {}; S.removeFor = null; S.boardErr = null;
+    const k = kindsOf(id);
+    if (k.length) {
+      S.errors[id] = 'Move or remove the ' + k.join(', ') + ' kind override' + (k.length > 1 ? 's' : '') + ' before removing this crew.';
+    } else if (S.crews.length === 1) {
+      S.errors[id] = 'This is the only crew, and every difficulty needs one. Add another crew first — or turn tiered execution off.';
+    } else {
+      S.removeFor = id;
+    }
+    render();
+  }
+
+  function doRemove(id, heirId) {
+    owns(id).forEach(d => S.assign[d] = heirId);
+    S.crews = S.crews.filter(c => c.id !== id);
+    delete S.open[id];
+    S.removeFor = null;
+    render();
+  }
+
+  function render() {
+    // board
+    $('board').innerHTML = DIFFS.map(d => {
+      const id = S.assign[d], c = id != null ? crewById(id) : null;
+      return `<div class="bcol" style="border-top-color:${c ? crewColor(id) : 'transparent'}">
+        <div class="d">${d}</div>
+        <div class="dsub">${DSUB[d]}</div>
+        <select data-assign="${d}" aria-label="crew for ${d}">
+          ${c ? '' : '<option value="" selected>—</option>'}
+          ${S.crews.map(cc => `<option value="${cc.id}" ${cc.id===id?'selected':''}>${crewLabel(cc)}</option>`).join('')}
+          <option value="new">+ new crew…</option>
+        </select>
+        <div class="who">${c ? crewLabel(c) : 'Choose a crew'}</div>
+        <div class="cost">${c ? '≈ $' + blended(c).toFixed(1) + '/1M' : '—'}</div>
+      </div>`;
+    }).join('');
+    $('board').querySelectorAll('select').forEach(s => s.onchange = () => {
+      const d = s.dataset.assign;
+      S.boardErr = null;
+      if (s.value === 'new') {
+        const guard = takeGuard(d, null);
+        if (guard) { S.boardErr = guard; render(); return; }
+        createCrew(d);
+        return;
+      }
+      const target = Number(s.value);
+      const guard = takeGuard(d, target);
+      if (guard) { S.boardErr = guard; render(); return; }
+      S.assign[d] = target;
+      render();
+    });
+    $('boarderr').hidden = !S.boardErr;
+    $('boarderr').textContent = S.boardErr ?? '';
+
+    // add prompt
+    $('addbtn').style.display = S.crews.length === 0 ? 'none' : '';
+    $('addprompt').innerHTML = S.addOpen ? `
+      <div class="prompt" role="group" aria-label="New crew difficulty">
+        <div class="q">The new crew starts on <b>Haiku 4.5</b>. Which difficulty does it take over? <small>— a crew always handles at least one, so nothing unsaved can linger</small></div>
+        <div class="opts">
+          ${DIFFS.map(d => {
+            const guard = takeGuard(d, null);
+            const owner = S.assign[d] != null ? crewById(S.assign[d]) : null;
+            return `<button type="button" class="pbtn" data-take="${d}" ${guard ? 'disabled title="' + guard + '"' : ''}>${d}<small>${guard ? 'blocked — kind-routed crew’s last difficulty' : owner ? 'now ' + crewLabel(owner) : 'unassigned'}</small></button>`;
+          }).join('')}
+          <button type="button" class="cancelbtn" data-cancel-add>cancel</button>
+        </div>
+      </div>` : '';
+    $('addprompt').querySelectorAll('[data-take]').forEach(b => b.onclick = () => createCrew(b.dataset.take));
+    const cancelAdd = $('addprompt').querySelector('[data-cancel-add]');
+    if (cancelAdd) cancelAdd.onclick = () => { S.addOpen = false; render(); };
+
+    // crews
+    if (S.crews.length === 0) {
+      $('crews').innerHTML = `<div class="empty">
+        <span>No crews yet — every difficulty needs one before tiered execution can route work.</span>
+        <button type="button" class="addbtn" data-first>+ Add crew</button>
+        <span style="font-size:10.5px">Your first crew takes every difficulty; reassign on the board afterwards.</span>
+      </div>`;
+      $('crews').querySelector('[data-first]').onclick = () => createCrew(null);
+    } else {
+      $('crews').innerHTML = S.crews.map(c => {
+        const o = owns(c.id), k = kindsOf(c.id);
+        const handles = [...o, ...k.map(x => x + ' override')];
+        const others = S.crews.filter(x => x.id !== c.id);
+        return `<div class="crew ${S.open[c.id] ? 'open' : ''}">
+          <div class="crew-head" data-crew="${c.id}" tabindex="0" role="button" aria-expanded="${!!S.open[c.id]}">
+            <span class="caret">${S.open[c.id] ? '▾' : '▸'}</span>
+            <span class="edithint">edit</span>
+            <span class="cdot" style="background:${crewColor(c.id)}"></span>
+            <span class="cname">${crewLabel(c)}</span>
+            ${mismatch(c) ? '<span class="warnchip">⚠ harness overrides provider default — PAN-1865</span>' : ''}
+            <span class="cowns">${handles.length ? 'handles ' + handles.join(' · ') : 'handles nothing'}</span>
+            <span class="ccost">≈ $${blended(c).toFixed(1)}/1M</span>
+            <button type="button" class="xrm" data-rm="${c.id}" aria-label="Remove crew ${crewLabel(c)}">× remove</button>
+          </div>
+          ${S.errors[c.id] ? `<div class="crewerr">${S.errors[c.id]}</div>` : ''}
+          ${S.removeFor === c.id ? `<div class="crewprompt">
+            <div class="q">Removing <b>${crewLabel(c)}</b> — give <b>${o.join(' · ')}</b> to:</div>
+            <div class="opts" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+              ${others.map(x => `<button type="button" class="pbtn" data-heir="${c.id}:${x.id}">${crewLabel(x)}<small>≈ $${blended(x).toFixed(1)}/1M</small></button>`).join('')}
+              <button type="button" class="cancelbtn" data-cancel-rm>cancel</button>
+            </div>
+          </div>` : ''}
+          <div class="crew-body">
+            ${c.mix ? `
+              <div class="mixbar">${c.dist.map((e,j) => `<div style="width:${e.weight}%;background:${CREW_COLORS[j % CREW_COLORS.length]}"></div>`).join('')}</div>
+              <div class="mixnote">${c.dist.map(e => (CATALOG[e.model]?.n ?? e.model) + ' ' + e.weight + '%').join(' · ')} — crew editor unchanged, abbreviated in this mockup</div>
+            ` : `
+              <div class="fgrid">
+                <label class="f"><span class="flbl">Model</span><select data-cm="${c.id}">${Object.entries(CATALOG).map(([mid,m]) => `<option value="${mid}" ${mid===c.model?'selected':''}>${m.n} — $${m.c}/1M</option>`).join('')}</select></label>
+                <label class="f"><span class="flbl">Harness</span><select data-ch="${c.id}">
+                  <option value="auto" ${c.harness==='auto'?'selected':''}>auto (${autoHarness(c.model)})</option>
+                  ${['claude-code','ohmypi','codex'].map(h => `<option value="${h}" ${c.harness===h?'selected':''}>${h}</option>`).join('')}
+                </select></label>
+              </div>
+            `}
+            <div class="footbtns">
+              <button type="button" class="smallbtn danger" data-rm="${c.id}">Remove crew</button>
+            </div>
+          </div>
+        </div>`;
+      }).join('');
+
+      $('crews').querySelectorAll('.crew-head').forEach(h => {
+        const id = Number(h.dataset.crew);
+        const toggle = () => { S.open[id] = !S.open[id]; render(); };
+        h.onclick = toggle;
+        h.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } };
+      });
+      $('crews').querySelectorAll('[data-rm]').forEach(b => b.onclick = (e) => { e.stopPropagation(); requestRemove(Number(b.dataset.rm)); });
+      $('crews').querySelectorAll('[data-heir]').forEach(b => b.onclick = () => {
+        const [dead, heir] = b.dataset.heir.split(':').map(Number);
+        doRemove(dead, heir);
+      });
+      const cancelRm = $('crews').querySelector('[data-cancel-rm]');
+      if (cancelRm) cancelRm.onclick = () => { S.removeFor = null; render(); };
+      $('crews').querySelectorAll('[data-cm]').forEach(s => s.onchange = () => { crewById(Number(s.dataset.cm)).model = s.value; render(); });
+      $('crews').querySelectorAll('[data-ch]').forEach(s => s.onchange = () => { crewById(Number(s.dataset.ch)).harness = s.value; render(); });
+    }
+
+    // kind chips
+    const entries = Object.entries(S.kinds);
+    $('kindline').textContent = entries.length
+      ? entries.length + ' kind override' + (entries.length > 1 ? 's' : '') + ' — a crew holding one can’t be removed until the override moves:'
+      : 'No kind overrides — all kinds follow difficulty routing.';
+    $('kindchips').innerHTML = entries.map(([kind, id]) => {
+      const c = crewById(id);
+      return `<span class="chip">${kind} → ${c ? crewLabel(c) : '?'}<button type="button" data-unkind="${kind}" aria-label="Remove ${kind} override">×</button></span>`;
+    }).join('');
+    $('kindchips').querySelectorAll('[data-unkind]').forEach(b => b.onclick = () => { delete S.kinds[b.dataset.unkind]; S.errors = {}; render(); });
+  }
+
+  $('addbtn').onclick = () => { S.addOpen = !S.addOpen; S.removeFor = null; S.errors = {}; render(); };
+  document.querySelectorAll('.scenarios button').forEach(b => b.onclick = () => loadScenario(b.dataset.sc));
+  loadScenario('live');
+</script>
+</body>
+</html>

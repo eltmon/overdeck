@@ -13,6 +13,8 @@ import {
   type UseQueryResult,
 } from '@tanstack/react-query';
 import type { StatusHistoryEntry } from '../../../lib/workspace-types';
+import type { SettingsConfig } from '../../Settings/types';
+import type { XBriefDocument } from '../../xbrief/types';
 
 export type { StatusHistoryEntry };
 
@@ -74,6 +76,11 @@ export interface ActivitySection {
   tmuxSession?: string;
   role?: string;
   roundMetadata?: ReviewerRoundMetadata;
+  endedAt?: string | null;
+  planningComplete?: boolean;
+  awaitingInput?: boolean;
+  awaitingInputPrompt?: string;
+  awaitingInputReason?: string;
 }
 
 export interface ActivityResponse {
@@ -153,6 +160,34 @@ export function usePlanningQuery(
   });
 }
 
+export function useWorkspacePlanQuery(
+  issueId: string,
+  options?: Omit<UseQueryOptions<XBriefDocument | null>, 'queryKey' | 'queryFn'>,
+): UseQueryResult<XBriefDocument | null> {
+  return useQuery({
+    queryKey: ['workspace-plan', issueId],
+    queryFn: async () => {
+      const res = await fetch(`/api/workspaces/${issueId}/plan`);
+      if (res.status === 404) return null;
+      if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText} — /api/workspaces/${issueId}/plan`);
+      return res.json() as Promise<XBriefDocument>;
+    },
+    refetchInterval: 30_000,
+    ...options,
+  });
+}
+
+export function useSettingsQuery(
+  options?: Omit<UseQueryOptions<SettingsConfig>, 'queryKey' | 'queryFn'>,
+): UseQueryResult<SettingsConfig> {
+  return useQuery({
+    queryKey: ['settings'],
+    queryFn: () => fetchJson<SettingsConfig>('/api/settings'),
+    staleTime: 30_000,
+    ...options,
+  });
+}
+
 export function useActivityQuery(issueId: string): UseQueryResult<ActivityResponse> {
   return useQuery({
     queryKey: ['command-deck-activity', issueId, 'summary'],
@@ -179,10 +214,13 @@ export interface ReviewStatusData {
   verificationNotes?: string;
   verificationCycleCount?: number;
   verificationMaxCycles?: number;
+  uatStatus?: 'pending' | 'testing' | 'passed' | 'failed';
   testNotes?: string;
   reviewNotes?: string;
   mergeNotes?: string;
   mergeRetryCount?: number;
+  releaseStatus?: 'pending' | 'releasing' | 'passed' | 'failed' | 'partial' | 'rolled_back' | 'skipped';
+  releaseNotes?: string;
   readyForMerge: boolean;
   updatedAt: string;
   /** PAN-905: GitHub-native merge blocker reasons */
@@ -191,8 +229,53 @@ export interface ReviewStatusData {
   queuePosition?: number | null;
   /** PAN-366: Which specialist is active or will handle this issue */
   activeSpecialist?: 'review' | 'test' | 'merge' | null;
-  /** Chronological review/test/merge/verify status transitions (S3 History tab). */
+  /** Chronological review/test/merge/verify/release status transitions (S3 History tab). */
   history?: StatusHistoryEntry[];
+}
+
+export interface ReleaseComponentState {
+  componentKey: string;
+  provider?: string;
+  trigger: 'auto' | 'manual' | 'skip';
+  releaseOrder: number;
+  required: boolean;
+  status: 'pending' | 'releasing' | 'passed' | 'failed' | 'skipped' | 'blocked' | 'rolled_back';
+  healthStatus?: 'pending' | 'running' | 'passed' | 'failed' | 'skipped';
+  versionStatus?: 'pending' | 'running' | 'passed' | 'failed' | 'skipped';
+  smokeStatus?: 'pending' | 'running' | 'passed' | 'failed' | 'skipped';
+  rollbackStatus?: 'pending' | 'running' | 'passed' | 'failed' | 'skipped' | 'rolled_back';
+  notes?: string;
+}
+
+export interface ReleaseSetData {
+  issueId: string;
+  projectKey: string;
+  projectPath: string;
+  workspaceType: 'monorepo' | 'polyrepo';
+  status: 'pending' | 'releasing' | 'passed' | 'failed' | 'partial' | 'rolled_back' | 'skipped';
+  createdAt: string;
+  updatedAt: string;
+  components: ReleaseComponentState[];
+}
+
+export function useReleaseSetQuery(
+  issueId: string,
+  options?: Omit<UseQueryOptions<ReleaseSetData | null>, 'queryKey' | 'queryFn'>,
+): UseQueryResult<ReleaseSetData | null> {
+  return useQuery({
+    queryKey: ['release-set', issueId],
+    queryFn: async () => {
+      const res = await fetch(`/api/workspaces/${issueId}/release`);
+      if (res.status === 404) return null;
+      if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText} — /api/workspaces/${issueId}/release`);
+      return res.json() as Promise<ReleaseSetData>;
+    },
+    refetchInterval: (query) => {
+      const status = query.state.data?.status;
+      return status === 'releasing' ? 5_000 : 30_000;
+    },
+    ...options,
+  });
 }
 
 export interface BlockerReason {
@@ -207,6 +290,34 @@ export function useReviewStatusQuery(issueId: string): UseQueryResult<ReviewStat
     queryKey: ['review-status', issueId],
     queryFn: () => fetchJson<ReviewStatusData>(`/api/review/${issueId}/status`),
     refetchInterval: 30_000,
+  });
+}
+
+export interface ShipLogEntry {
+  ts: string;
+  line: string;
+}
+
+export interface ShipLogData {
+  issueId: string;
+  mergeStatus: string | null;
+  mergeStep: string | null;
+  log: {
+    startedAt: string;
+    updatedAt: string;
+    step?: string;
+    lines: ShipLogEntry[];
+  } | null;
+}
+
+export function useShipLogQuery(issueId: string): UseQueryResult<ShipLogData> {
+  return useQuery({
+    queryKey: ['ship-log', issueId],
+    queryFn: () => fetchJson<ShipLogData>(`/api/issues/${issueId}/ship-log`),
+    refetchInterval: (query) => {
+      const s = query.state.data?.mergeStatus;
+      return s === 'merging' || s === 'verifying' ? 2_000 : 15_000;
+    },
   });
 }
 
@@ -397,7 +508,20 @@ export interface WorkspaceStackHealth {
 }
 
 export interface WorkspacePendingOperation {
-  type: 'approve' | 'close' | 'containerize' | 'start' | 'review' | 'merge' | 'clean' | 'refresh-db' | 'rebuild-stack';
+  type:
+    | 'approve'
+    | 'close'
+    | 'containerize'
+    | 'start'
+    | 'review'
+    | 'merge'
+    | 'clean'
+    | 'refresh-db'
+    | 'rebuild-stack'
+    | 'start-stack'
+    | 'stop-stack'
+    | 'restart-stack'
+    | 'reap-workspace';
   issueId?: string;
   startedAt: string;
   status: 'pending' | 'running' | 'completed' | 'failed';

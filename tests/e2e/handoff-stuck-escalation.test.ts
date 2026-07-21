@@ -66,7 +66,7 @@ describe('E2E: Stuck Escalation Handoff', () => {
   });
 
   it.skip('should preserve agent context during stuck escalation handoff', async () => {
-    // TODO: Test that STATE.md, git state, and beads tasks are preserved
+    // TODO: Test that STATE.md, git state, and tasks tasks are preserved
 
     expect(true).toBe(true); // Placeholder
   });

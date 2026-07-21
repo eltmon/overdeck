@@ -112,7 +112,7 @@ The planning phase is separate from the issue-agent implementation loop.
 
 | Work type | When it runs | Typical default | Why you might override it |
 |-----------|--------------|-----------------|---------------------------|
-| `planning-agent` | Up-front planning and vBRIEF generation | capability-based, usually `claude-opus-4-6` | Use Gemini Pro for cheaper large-context planning or GPT-5.4 for a more code-shaped planning style |
+| `planning-agent` | Up-front planning and xBRIEF generation | capability-based, usually `claude-opus-4-6` | Use Gemini Pro for cheaper large-context planning or GPT-5.4 for a more code-shaped planning style |
 | `status-review` | Executive-style planning progress summaries in Mission Control | `claude-sonnet-4-6` | Raise to Opus if you want deeper requirement-to-progress analysis |
 
 ### Guidance

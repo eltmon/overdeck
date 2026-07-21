@@ -1,0 +1,87 @@
+#!/bin/bash
+# ~/.overdeck/bin/tmux-send-keys-guard  (PAN-1084)
+#
+# PreToolUse hook on Bash — prevents work agents from self-approving permission
+# prompts (or any other input) in another agent's tmux session by blocking
+# `tmux send-keys` and `tmux paste-buffer` that target a session other than
+# their own.
+#
+# The work-agent prompt already forbids interacting with permission prompts via
+# tmux keystrokes. This hook is the mechanical enforcement: it rewrites the
+# Bash command to a failing no-op when it would write to a non-self session.
+#
+# Never breaks Claude Code: on any error the hook exits 0 silently and lets the
+# original command through.
+
+set +e
+
+INPUT=$(cat 2>/dev/null || echo '{}')
+
+# Only enforce for work agents (agent-<prefix>-<number>). Planning, test, review,
+# inspect, strike, flywheel, conversation, and human sessions must keep normal
+# tmux behavior — this guard is not meant for them.
+case "${OVERDECK_AGENT_ID:-}" in
+  agent-*[0-9]) : ;;
+  *) exit 0 ;;
+esac
+
+if ! command -v jq >/dev/null 2>&1; then
+  # Without jq we cannot safely parse the payload. Allow the call.
+  exit 0
+fi
+
+TOOL_NAME=$(printf '%s' "$INPUT" | jq -r '.tool_name // ""' 2>/dev/null)
+if [ "$TOOL_NAME" != "Bash" ]; then
+  exit 0
+fi
+
+COMMAND=$(printf '%s' "$INPUT" | jq -r '.tool_input.command // ""' 2>/dev/null)
+if [ -z "$COMMAND" ]; then
+  exit 0
+fi
+
+# Only guard tmux subcommands that write keystrokes/buffers to a target pane.
+if ! printf '%s' "$COMMAND" | grep -qE '\btmux\b.*\b(send-keys|paste-buffer)\b'; then
+  exit 0
+fi
+
+# Determine this agent's own tmux session name.
+SELF_SESSION=""
+if [ -n "${OVERDECK_AGENT_ID:-}" ]; then
+  SELF_SESSION="$OVERDECK_AGENT_ID"
+elif [ -n "${TMUX:-}" ]; then
+  SELF_SESSION=$(tmux display-message -p '#S' 2>/dev/null)
+fi
+
+# Extract the explicit -t target, if any. `tmux send-keys` / `tmux paste-buffer`
+# without `-t` target the current pane (self), so those are allowed.
+TARGET=$(printf '%s' "$COMMAND" | grep -oE -- '-t[[:space:]]+[^[:space:]]+' | tail -n1 | sed -E 's/^-t[[:space:]]+//' 2>/dev/null)
+if [ -z "$TARGET" ]; then
+  exit 0
+fi
+
+# Normalize session names for comparison. tmux pane targets look like
+# "session:window.pane" or "session.window-pane"; the session is the prefix.
+TARGET_SESSION=$(printf '%s' "$TARGET" | sed -E 's/[:.].*$//' 2>/dev/null)
+
+if [ -n "$SELF_SESSION" ] && [ "$TARGET_SESSION" = "$SELF_SESSION" ]; then
+  exit 0
+fi
+
+# Target is explicitly another session (or we cannot determine self). Rewrite
+# to a failing command so the agent sees a clear error and cannot silently
+# drive another session.
+BLOCKED_REASON="BLOCKED: tmux send-keys/paste-buffer targeting another tmux session (${TARGET_SESSION}) is forbidden (PAN-1084). Capture the pane with tmux -L overdeck capture-pane -t <session> -p and surface the issue via pan tell instead."
+
+jq -n \
+  --arg reason "$BLOCKED_REASON" \
+  '{
+    hookSpecificOutput: {
+      hookEventName: "PreToolUse",
+      updatedInput: {
+        command: ("printf '\''%s\\n'\'' \"" + $reason + "\" >&2; false")
+      }
+    }
+  }'
+
+exit 0

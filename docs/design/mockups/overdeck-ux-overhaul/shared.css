@@ -1,0 +1,271 @@
+/* Overdeck UX overhaul mockups — shared tokens & primitives.
+   Tokens copied from src/dashboard/frontend/src/index.css (.dark block).
+   Typography canon: DM Sans for ALL UI prose · SF Mono for identifiers ·
+   Space Grotesk ONLY for the Overdeck wordmark · weight 500 (medium) max. */
+
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500&family=Space+Grotesk:wght@500;600&display=swap');
+
+[data-theme="light"] {
+  color-scheme: light;
+  --radius: 0.625rem;
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: 14px;
+  --radius-2xl: 18px;
+
+  --background: #f7f7f5;
+  --foreground: #1f2937;
+  --card: #ffffff;
+  --card-2: #fafaf9;
+  --card-foreground: #1f2937;
+  --popover: #ffffff;
+  --popover-foreground: #1f2937;
+
+  --primary: oklch(0.488 0.217 264);
+  --primary-foreground: #ffffff;
+  --secondary: color-mix(in srgb, black 4%, transparent);
+  --secondary-foreground: #1f2937;
+  --accent: color-mix(in srgb, black 4%, transparent);
+  --accent-foreground: #1f2937;
+  --muted: color-mix(in srgb, black 4%, transparent);
+  --muted-foreground: #6b7280;
+  --border: color-mix(in srgb, black 8%, transparent);
+  --input: color-mix(in srgb, black 10%, transparent);
+  --ring: oklch(0.488 0.217 264);
+
+  --destructive: #ef4444;
+  --destructive-foreground: #b91c1c;
+  --info: #3b82f6;
+  --info-foreground: #1d4ed8;
+  --success: #10b981;
+  --success-foreground: #047857;
+  --warning: #f59e0b;
+  --warning-foreground: #b45309;
+  --signal-review: #a855f7;
+  --signal-review-foreground: #7e22ce;
+  --signal-cost: #06b6d4;
+  --signal-cost-foreground: #0e7490;
+
+  --phase-todo: #9ca3af;
+  --phase-plan: #a855f7;
+  --phase-work: #3b82f6;
+  --phase-review: #f59e0b;
+  --phase-test: #f59e0b;
+  --phase-ship: #a855f7;
+  --phase-done: #10b981;
+}
+
+:root:not([data-theme="light"]), [data-theme="dark"] {
+  color-scheme: dark;
+  --radius: 0.625rem;
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: 14px;
+  --radius-2xl: 18px;
+
+  --background: #080b10;
+  --foreground: #e5e7eb;
+  --card: #0c1018;
+  --card-2: #10151f;
+  --card-foreground: #e5e7eb;
+  --popover: #0c1018;
+  --popover-foreground: #e5e7eb;
+
+  --primary: oklch(0.588 0.217 264);
+  --primary-foreground: #ffffff;
+  --secondary: color-mix(in srgb, white 6%, transparent);
+  --secondary-foreground: #e5e7eb;
+  --accent: color-mix(in srgb, white 8%, transparent);
+  --accent-foreground: #e5e7eb;
+  --muted: color-mix(in srgb, white 4%, transparent);
+  --muted-foreground: #9ca3af;
+  --border: color-mix(in srgb, white 6%, transparent);
+  --input: color-mix(in srgb, white 8%, transparent);
+  --ring: oklch(0.588 0.217 264);
+
+  --destructive: #f87171;
+  --destructive-foreground: #fca5a5;
+  --info: #3b82f6;
+  --info-foreground: #60a5fa;
+  --success: #10b981;
+  --success-foreground: #34d399;
+  --warning: #f59e0b;
+  --warning-foreground: #fbbf24;
+  --signal-review: #a855f7;
+  --signal-review-foreground: #c084fc;
+  --signal-cost: #06b6d4;
+  --signal-cost-foreground: #22d3ee;
+
+  --phase-todo: #6b7280;
+  --phase-plan: #a855f7;
+  --phase-work: #3b82f6;
+  --phase-review: #f59e0b;
+  --phase-test: #f59e0b;
+  --phase-ship: #a855f7;
+  --phase-done: #10b981;
+}
+
+/* Light-mode surface discipline: cards are borderless, lifted by ambient shadow */
+[data-theme="light"] .card,
+[data-theme="light"] .issue-card,
+[data-theme="light"] .ncard,
+[data-theme="light"] .wcard,
+[data-theme="light"] .diag-card,
+[data-theme="light"] .arch-card,
+[data-theme="light"] .principle,
+[data-theme="light"] .screen-link,
+[data-theme="light"] .flow-card,
+[data-theme="light"] .rule,
+[data-theme="light"] .state-card,
+[data-theme="light"] .rollup-card,
+[data-theme="light"] .status-card,
+[data-theme="light"] .msg .m-body,
+[data-theme="light"] .turn.agent .bubble,
+[data-theme="light"] .needs-card,
+[data-theme="light"] .gate,
+[data-theme="light"] .spec-chip,
+[data-theme="light"] .agent-card {
+  border-color: transparent;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 4%), 0 4px 16px rgb(0 0 0 / 5%);
+}
+[data-theme="light"] .peek,
+[data-theme="light"] .dock-item,
+[data-theme="light"] .issue-detail,
+[data-theme="light"] .action-menu,
+[data-theme="light"] .menu-demo {
+  box-shadow: 0 12px 40px rgb(0 0 0 / 12%);
+}
+[data-theme="light"] .scrim { background: rgb(0 0 0 / 18%); }
+[data-theme="light"] .backdrop { filter: blur(2px); opacity: 0.5; }
+[data-theme="light"] .mock-banner { background: #ffffff; }
+/* Code/stream panels stay dark in both themes (terminal convention) */
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: 'DM Sans', system-ui, sans-serif;
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+}
+.mono { font-family: 'SF Mono', ui-monospace, 'Cascadia Code', Menlo, monospace; }
+.wordmark { font-family: 'Space Grotesk', sans-serif; font-weight: 600; letter-spacing: -0.01em; }
+strong, b { font-weight: 500; }
+h1, h2, h3, h4 { font-weight: 500; }
+a { color: inherit; text-decoration: none; }
+button { font-family: inherit; cursor: pointer; }
+
+/* ── Badges: 8% bg / 32% border, rounded-sm, h-5, no pills ── */
+.badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  height: 20px; padding: 0 6px;
+  font-size: 10px; font-weight: 500; letter-spacing: 0.05em; text-transform: uppercase;
+  border-radius: var(--radius-sm); border: 1px solid;
+  white-space: nowrap;
+}
+.badge .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.badge.pulse .dot { animation: badge-pulse 1.6s ease-out infinite; }
+@keyframes badge-pulse {
+  0% { box-shadow: 0 0 0 0 currentColor; opacity: 1; }
+  80% { opacity: 0.5; }
+  100% { box-shadow: 0 0 0 6px transparent; opacity: 1; }
+}
+.badge.info     { background: color-mix(in srgb, var(--info) 8%, transparent);     border-color: color-mix(in srgb, var(--info) 32%, transparent);     color: var(--info-foreground); }
+.badge.warning  { background: color-mix(in srgb, var(--warning) 8%, transparent);  border-color: color-mix(in srgb, var(--warning) 32%, transparent);  color: var(--warning-foreground); }
+.badge.success  { background: color-mix(in srgb, var(--success) 8%, transparent);  border-color: color-mix(in srgb, var(--success) 32%, transparent);  color: var(--success-foreground); }
+.badge.danger   { background: color-mix(in srgb, var(--destructive) 8%, transparent); border-color: color-mix(in srgb, var(--destructive) 32%, transparent); color: var(--destructive-foreground); }
+.badge.review   { background: color-mix(in srgb, var(--signal-review) 8%, transparent); border-color: color-mix(in srgb, var(--signal-review) 32%, transparent); color: var(--signal-review-foreground); }
+.badge.neutral  { background: transparent; border-color: var(--border); color: var(--muted-foreground); }
+
+/* Taxonomy labels are ALWAYS neutral */
+.label-chip {
+  display: inline-flex; align-items: center; height: 18px; padding: 0 6px;
+  font-size: 10px; font-weight: 500; color: var(--muted-foreground);
+  background: var(--muted); border: 1px solid var(--border); border-radius: var(--radius-sm);
+}
+
+/* ── Buttons ── */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  height: 32px; padding: 0 14px;
+  font-size: 12px; font-weight: 500;
+  border-radius: var(--radius-lg); border: 1px solid transparent;
+  background: var(--primary); color: var(--primary-foreground);
+  transition: background 200ms ease-in-out, border-color 200ms, color 200ms;
+}
+.btn:hover { filter: brightness(1.1); }
+.btn.ghost { background: transparent; border-color: var(--input); color: var(--muted-foreground); }
+.btn.ghost:hover { background: var(--accent); color: var(--foreground); filter: none; }
+.btn.sm { height: 28px; padding: 0 10px; font-size: 11px; }
+.btn.danger-ghost { background: transparent; border-color: color-mix(in srgb, var(--destructive) 32%, transparent); color: var(--destructive-foreground); }
+.btn.danger-ghost:hover { background: color-mix(in srgb, var(--destructive) 8%, transparent); }
+
+/* ── Cards ── */
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+}
+.card-pad { padding: 14px; }
+.section-label {
+  font-size: 11px; font-weight: 500; text-transform: uppercase;
+  letter-spacing: 0.12em; color: var(--muted-foreground);
+}
+
+/* ── Phase rail (ONE lifecycle vocabulary, used at every density) ── */
+.phase-rail { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 0; }
+.phase-step { position: relative; padding: 10px 12px 8px; border-top: 2px solid transparent; }
+.phase-step::before {
+  content: ''; position: absolute; top: -2px; left: 0; right: 0; height: 2px;
+  background: var(--muted); opacity: 0.6;
+}
+.phase-step.done::before    { background: var(--success); }
+.phase-step.current::before { background: var(--signal-review); }
+.phase-step .p-name { font-size: 10px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted-foreground); }
+.phase-step.done .p-name { color: var(--success-foreground); }
+.phase-step.current .p-name { color: var(--signal-review-foreground); }
+.phase-step .p-meta { font-size: 11px; color: var(--muted-foreground); margin-top: 2px; }
+.phase-step.current .p-meta { color: var(--foreground); }
+.phase-step .p-sub { font-size: 10px; color: var(--muted-foreground); opacity: 0.8; }
+
+/* Mini phase dots for cards/rows */
+.phase-dots { display: inline-flex; gap: 4px; align-items: center; }
+.phase-dots i { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); border: 1px solid var(--border); }
+.phase-dots i.done { background: var(--success); border-color: transparent; }
+.phase-dots i.current { background: var(--signal-review); border-color: transparent; box-shadow: 0 0 0 2px color-mix(in srgb, var(--signal-review) 32%, transparent); }
+
+/* ── Mockup scaffolding (NOT part of the design — page furniture) ── */
+.mock-banner {
+  position: sticky; top: 0; z-index: 100;
+  display: flex; align-items: center; gap: 14px;
+  padding: 8px 16px;
+  background: #131720; border-bottom: 1px solid var(--border);
+  font-size: 12px; color: var(--muted-foreground);
+}
+.mock-banner .crumbs { display: flex; gap: 6px; align-items: center; }
+.mock-banner a { color: var(--info-foreground); }
+.mock-banner a:hover { text-decoration: underline; }
+.mock-banner .tag {
+  font-size: 10px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--warning-foreground); background: color-mix(in srgb, var(--warning) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--warning) 32%, transparent);
+  padding: 2px 6px; border-radius: var(--radius-sm);
+}
+.annotation {
+  border: 1px dashed color-mix(in srgb, var(--signal-cost) 40%, transparent);
+  background: color-mix(in srgb, var(--signal-cost) 5%, transparent);
+  border-radius: var(--radius-md);
+  padding: 8px 12px; font-size: 11.5px; color: var(--muted-foreground);
+}
+.annotation b, .annotation strong { color: var(--signal-cost-foreground); font-weight: 500; }
+.callout-num {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px; border-radius: 50%;
+  background: var(--signal-cost); color: #00181d;
+  font-size: 10px; font-weight: 500; flex: none;
+}

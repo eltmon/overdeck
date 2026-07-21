@@ -7,7 +7,27 @@
     "strict": true,
     "skipLibCheck": true,
     "outDir": "dist",
-    "rootDir": "../../.."
+    "rootDir": "../../..",
+    "lib": [
+      "ES2022",
+      "ES2023.Array"
+    ],
+    "typeRoots": [
+      "../../../node_modules/@types",
+      "./node_modules/@types"
+    ],
+    "resolveJsonModule": true,
+    "forceConsistentCasingInFileNames": true
   },
-  "include": ["*.ts", "services/**/*.ts", "routes/**/*.ts"]
+  "include": [
+    "*.ts",
+    "services/**/*.ts",
+    "routes/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "**/*.test.ts",
+    "**/__tests__/**"
+  ]
 }

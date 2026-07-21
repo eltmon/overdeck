@@ -43,7 +43,7 @@ export interface Conversation {
   /** Model used for this conversation. Null until backfilled from session file. */
   model?: string | null;
   /** Harness used to spawn this conversation. */
-  harness?: 'claude-code' | 'pi' | 'codex' | null;
+  harness?: 'claude-code' | 'pi' | 'ohmypi' | 'codex' | 'acp' | null;
   /** Effort level used when spawning this conversation. */
   effort?: string | null;
   /** Async fork provisioning status. Null = not a fork or completed. */
@@ -82,6 +82,12 @@ export interface Conversation {
       options: ReadonlyArray<{ label: string; description?: string }>;
     }>;
   };
+  /** True when this conversation had activity but its transcript file no longer
+   *  exists on disk — its history was lost (e.g. 2026-07-05 conv-* dir cleanup). */
+  transcriptMissing?: boolean;
+  /** True when the live session is parked on a boot-blocking TUI screen (Claude
+   *  first-run onboarding, trust dialog) that only the terminal can answer. */
+  needsTerminal?: boolean;
 }
 
 // ─── Sort types ───────────────────────────────────────────────────────────────

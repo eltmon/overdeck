@@ -1,9 +1,11 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import { toastResumeOutcome } from '../../lib/resumeOutcome';
 import { useDashboardStore } from '../../lib/store';
 import { useTheme } from '../../hooks/useTheme';
 import { useConversationUiState } from '../../hooks/useConversationUiState';
+import { markTerminalClick, useNeedsTerminalAutoSwitch, type ViewMode } from './useNeedsTerminalAutoSwitch';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Circle, Copy, Check, Loader2, Pencil, Terminal, FileCode, Search, Globe, Wrench, Zap, Folder, GitBranchPlus, GitFork, CheckCircle2, AlertCircle, Archive, Sparkles, Info, RefreshCw, FileText, ExternalLink, RotateCcw, ArrowRight, MoreVertical, Star, Share2, Download, Square } from 'lucide-react';
+import { Circle, Copy, Check, Loader2, Pencil, Terminal, FileCode, Search, Globe, Wrench, Zap, Folder, GitBranchPlus, GitFork, CheckCircle2, AlertCircle, Archive, Sparkles, Info, RefreshCw, FileText, FileX, ExternalLink, RotateCcw, ArrowRight, MoreVertical, Star, Share2, Download, Square } from 'lucide-react';
 import { toast } from 'sonner';
 import { XTerminal } from '../XTerminal';
 import type { Conversation } from '../CommandDeck/ConversationList';
@@ -31,6 +33,7 @@ import { parseDiffRouteSearch } from '../../lib/diffRouteSearch';
 import { useConfirm } from '../DialogProvider';
 import { useConversationMutations } from '../CommandDeck/useConversationMutations';
 import { ForkModal } from '../CommandDeck/ForkModal';
+import { closeConversationPanes } from '../../lib/panesStore';
 import { conversationMessagesQueryKey, useConversationMessagesStream } from './useConversationMessagesStream';
 import styles from '../CommandDeck/styles/command-deck.module.css';
 
@@ -67,7 +70,7 @@ const PHASE_ICONS = {
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export type ViewMode = 'conversation' | 'terminal';
+export type { ViewMode } from './useNeedsTerminalAutoSwitch';
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -98,6 +101,16 @@ interface ConversationPanelProps {
    */
   hideToolCalls?: boolean;
   onToggleHideToolCalls?: () => void;
+  /** When provided in embedded mode, shows a resume/action bar instead of the
+   *  composer. Use when the session is ended and the parent wants a custom CTA. */
+  onEmbeddedResume?: () => void;
+  /** Label for the embedded resume button. Defaults to "Resume Session". */
+  embeddedResumeLabel?: string;
+  /** Hide the composer entirely — the parent renders its own way to talk to
+   *  the agent (e.g. simple mode's jargon-free steering composer). */
+  hideComposer?: boolean;
+  /** Called when a message POST fails — use to trigger a conversation refetch. */
+  onSendFailed?: () => void;
 }
 
 // ─── API helpers ──────────────────────────────────────────────────────────────
@@ -144,6 +157,10 @@ export function ConversationPanel({
   onTargetMessageHandled,
   hideToolCalls: controlledHideToolCalls,
   onToggleHideToolCalls,
+  onEmbeddedResume,
+  embeddedResumeLabel,
+  hideComposer = false,
+  onSendFailed,
 }: ConversationPanelProps) {
   const [resumed, setResumed] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -155,7 +172,7 @@ export function ConversationPanel({
   const [selectedModel, setSelectedModel] = useState<string>(() => conversation.model || getDefaultConversationModel());
   // See ComposerFooter for rationale — never seed an existing conversation's
   // harness from the global localStorage default.
-  const [selectedHarness, setSelectedHarness] = useState<Harness>(() => conversation.harness ?? 'claude-code');
+  const [selectedHarness, setSelectedHarness] = useState<Harness>(() => (conversation.harness === 'pi' ? 'ohmypi' : conversation.harness) ?? 'claude-code');
   const [editingTitle, setEditingTitle] = useState(false);
   const [draftTitle, setDraftTitle] = useState('');
   const titleInputRef = useRef<HTMLInputElement>(null);
@@ -188,7 +205,7 @@ export function ConversationPanel({
 
   useEffect(() => {
     if (conversation.harness && conversation.harness !== selectedHarness) {
-      setSelectedHarness(conversation.harness);
+      setSelectedHarness(conversation.harness === 'pi' ? 'ohmypi' : conversation.harness);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversation.harness]);
@@ -212,7 +229,7 @@ export function ConversationPanel({
   const { data: messagesData, isLoading: messagesLoading } = useQuery({
     queryKey: messagesQueryKey,
     queryFn: async ({ signal }) => {
-      const fetched = await fetchMessages(conversation.name, signal);
+      const fetched = await fetchMessages(conversation.name, signal, agentId);
       // If the WS subscription became active while this HTTP request was in
       // flight, prefer the streamed cache ONLY when it is at least as complete
       // as this HTTP backfill. When the WS snapshot has not arrived yet (or was
@@ -232,6 +249,11 @@ export function ConversationPanel({
   const headerMessages = messagesData?.messages ?? [];
   const headerWorkLog = messagesData?.workLog ?? [];
   const headerLastMsg = headerMessages[headerMessages.length - 1];
+  const canSwitchConversationModel =
+    !agentId &&
+    !conversation.sessionAlive &&
+    !conversation.claudeSessionId &&
+    headerMessages.length === 0;
   // Spin unless truly idle: idle = last message is a completed assistant turn (completedAt set).
   // Empty history, last-user, and in-progress assistant (no completedAt) all mean still working.
   // PAN-1635: a trailing user/incomplete-assistant entry only implies "working" while it's
@@ -358,16 +380,16 @@ export function ConversationPanel({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['conversations'] });
       queryClient.invalidateQueries({ queryKey: conversationMessagesQueryKey(conversation.name) });
+      // PAN-2975: the resume bar reports the actual outcome too.
+      toastResumeOutcome(conversation.name);
       setResumed(true);
     },
   });
 
   const switchModelMutation = useMutation({
     mutationFn: ({ model, harness }: { model: string; harness: Harness }) => {
-      const endpoint = agentId
-        ? `/api/agents/${encodeURIComponent(agentId)}/switch-model`
-        : `/api/conversations/${encodeURIComponent(conversation.name)}/switch-model`;
-      return fetch(endpoint, {
+      if (agentId) throw new Error('Agent models are locked after spawn');
+      return fetch(`/api/conversations/${encodeURIComponent(conversation.name)}/switch-model`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ model, harness }),
@@ -378,6 +400,21 @@ export function ConversationPanel({
       saveStoredHarness(harness);
       queryClient.invalidateQueries({ queryKey: ['conversations'] });
       queryClient.invalidateQueries({ queryKey: conversationMessagesQueryKey(conversation.name) });
+    },
+  });
+
+  const abortMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch(`/api/conversations/${encodeURIComponent(conversation.name)}/abort`, {
+        method: 'POST',
+      });
+      if (!res.ok) {
+        const body = await res.text().catch(() => '');
+        throw new Error(`Failed to stop turn (${res.status})${body ? `: ${body}` : ''}`);
+      }
+    },
+    onError: (err: Error) => {
+      toast.error(err.message, { duration: 6000 });
     },
   });
 
@@ -476,6 +513,8 @@ export function ConversationPanel({
     try {
       await fetch(`/api/conversations/${encodeURIComponent(conversation.name)}/archive`, { method: 'POST' });
       queryClient.invalidateQueries({ queryKey: ['conversations'] });
+      // An archived conversation leaves the list — close its deck tab(s) too.
+      closeConversationPanes(conversation.name);
       onArchived?.();
     } catch (err) {
       console.error('[ConversationPanel] Archive failed:', err);
@@ -505,15 +544,7 @@ export function ConversationPanel({
   }, [messagesData, conversation.title, conversation.name]);
 
   const handleViewMode = useCallback((mode: ViewMode) => {
-    if (mode === 'terminal') {
-      const w = window as unknown as { __panTerminalClickAt?: number };
-      w.__panTerminalClickAt = performance.now();
-      try {
-        if (localStorage.getItem('OVERDECK_TERMINAL_PROFILE') === '1') {
-          console.log(`[xterm-click] conv=${conversation.name} t=${w.__panTerminalClickAt.toFixed(1)}`);
-        }
-      } catch { /* ignore */ }
-    }
+    if (mode === 'terminal') markTerminalClick(conversation.name);
     onViewModeChange?.(mode);
   }, [onViewModeChange, conversation.name]);
 
@@ -577,6 +608,7 @@ export function ConversationPanel({
   // terminal mode, do not mount xterm beside the diff; that opens/reopens the PTY
   // and looks like a reconnect loop when the user only asked to inspect a diff.
   const effectiveViewMode = diffOpen ? 'conversation' : viewMode;
+  useNeedsTerminalAutoSwitch(!!conversation.needsTerminal && showTerminal, viewMode, onViewModeChange);
 
   const isForkingHeader = !!conversation.forkStatus && conversation.forkStatus !== 'failed';
   const isForkFailedHeader = conversation.forkStatus === 'failed';
@@ -592,6 +624,7 @@ export function ConversationPanel({
     ? 'var(--info)'
     : 'var(--muted-foreground)';
   const statusLabel = isForkingHeader ? 'forking' : isSpawningHeader ? 'starting' : isForkFailedHeader || isSpawnFailed ? 'failed' : conversation.sessionAlive ? 'active' : 'ended';
+  const showPiAbort = isWorking && (conversation.harness === 'ohmypi' || conversation.harness === 'pi');
   return (
     <div className={styles.conversationTerminal}>
       {/* Header — hidden in embedded mode (ZoneB already shows session info).
@@ -638,6 +671,15 @@ export function ConversationPanel({
                   <span className={`${styles.conversationTerminalTitleText} ${retitleMutation.isPending ? styles.titleRegenerating : ''}`}>
                     {conversation.title ?? conversation.name}
                   </span>
+                  {conversation.transcriptMissing && (
+                    <span
+                      title="Transcript missing — this conversation had activity, but its history file no longer exists on disk. The history cannot be recovered."
+                      aria-label="Transcript missing"
+                      style={{ display: 'inline-flex', alignItems: 'center', color: 'var(--warning)', flexShrink: 0 }}
+                    >
+                      <FileX size={13} />
+                    </span>
+                  )}
                   <button
                     className={styles.conversationTitleEditBtn}
                     onClick={startEditingTitle}
@@ -690,6 +732,19 @@ export function ConversationPanel({
                 <Wrench size={14} />
                 <span>Tools</span>
               </button>
+
+              {showPiAbort && (
+                <button
+                  className={`${styles.conversationAboutToggle} ${abortMutation.isPending ? styles.conversationAboutToggleActive : ''}`}
+                  onClick={() => abortMutation.mutate()}
+                  disabled={abortMutation.isPending}
+                  title="Stop current turn"
+                  aria-label="Stop current turn"
+                >
+                  {abortMutation.isPending ? <Loader2 size={14} className={styles.spinnerIcon} /> : <Square size={14} />}
+                  <span>{abortMutation.isPending ? 'Stopping…' : 'Stop'}</span>
+                </button>
+              )}
 
               {/* Copy link */}
               <button
@@ -943,7 +998,7 @@ export function ConversationPanel({
       )}
 
       {/* Body — conversation + optional diff panel */}
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
         <div className={styles.conversationTerminalBody}>
           {/* Terminal: only mounted when actively viewing (xterm.js crashes with visibility:hidden) */}
           {showTerminal && effectiveViewMode === 'terminal' && (
@@ -953,9 +1008,12 @@ export function ConversationPanel({
           {(effectiveViewMode === 'conversation' || !showTerminal) && (
             <ConversationView
               conversation={conversation}
-              onResume={!embedded && !showTerminal && !isSpawningHeader ? handleResume : undefined}
+              onResume={onEmbeddedResume ?? (!embedded && !showTerminal && !isSpawningHeader ? handleResume : undefined)}
               onArchive={!embedded ? handleArchive : undefined}
               resumePending={resumeMutation.isPending}
+              resumeLabel={embeddedResumeLabel}
+              hideComposer={hideComposer}
+              onSendFailed={onSendFailed}
               roundMarkers={roundMarkers}
               roundMetadata={roundMetadata}
               turnDiffSummaryByAssistantMessageId={turnDiffSummaryByAssistantMessageId}
@@ -964,6 +1022,7 @@ export function ConversationPanel({
               agentId={agentId}
               hideToolCalls={hideToolCalls}
               workingPhase={isWorking ? workingPhase : undefined}
+              agentBusy={isWorking}
               streamMessagesEnabled={streamMessagesEnabled}
               messagesData={messagesData}
               messagesLoading={messagesLoading}
@@ -976,11 +1035,14 @@ export function ConversationPanel({
                   value={selectedModel}
                   harness={selectedHarness}
                   liveConversation={conversation.sessionAlive}
+                  disabled={!canSwitchConversationModel}
                   onHarnessChange={(harness) => {
+                    if (!canSwitchConversationModel) return;
                     setSelectedHarness(harness);
                     switchModelMutation.mutate({ model: selectedModel, harness });
                   }}
                   onChange={(modelId) => {
+                    if (!canSwitchConversationModel) return;
                     setSelectedModel(modelId);
                     switchModelMutation.mutate({ model: modelId, harness: selectedHarness });
                   }}
@@ -1107,12 +1169,19 @@ interface MessagesResponse {
   error?: string;
 }
 
-async function fetchMessages(name: string, signal?: AbortSignal): Promise<MessagesResponse> {
+export async function fetchMessages(name: string, signal?: AbortSignal, agentId?: string): Promise<MessagesResponse> {
   // PAN-1705: timeout + React Query's abort signal so a request in flight
   // during a server restart rejects (and retries) instead of pinning the
   // panel on "Loading…" forever, and switching conversations cancels the
   // previous conversation's fetch.
   const res = await fetchWithTimeout(`/api/conversations/${encodeURIComponent(name)}/messages`, { signal });
+  // An agent the store knows (queued specialist, wiped workspace, cleaned
+  // session file) 404s here — that means "no saved history", not an incident.
+  // Render the honest empty state instead of the warning card. Real user
+  // conversations (no agentId) keep the failure card + Retry.
+  if (res.status === 404 && agentId) {
+    return { messages: [], workLog: [], streaming: false };
+  }
   if (!res.ok) throw new Error('Failed to fetch messages');
   return res.json();
 }
@@ -1122,6 +1191,12 @@ interface ConversationViewProps {
   onResume?: () => void;
   onArchive?: () => void;
   resumePending?: boolean;
+  /** Override label for the resume button. Defaults to "Resume Session". */
+  resumeLabel?: string;
+  /** Hide the composer — the parent renders its own way to talk to the agent. */
+  hideComposer?: boolean;
+  /** Called when a message POST fails. */
+  onSendFailed?: () => void;
   /** ModelPicker component to render next to the Resume button */
   modelPicker?: React.ReactNode;
   /** Optional round-divider markers forwarded to the MessagesTimeline. */
@@ -1137,6 +1212,8 @@ interface ConversationViewProps {
   hideToolCalls?: boolean;
   /** Current working phase — drives the working indicator icon. */
   workingPhase?: WorkingPhase;
+  /** True when the agent is currently mid-turn. */
+  agentBusy?: boolean;
   /** True when the shared conversation-messages cache is fed by the WS stream. */
   streamMessagesEnabled?: boolean;
   messagesData?: MessagesResponse;
@@ -1149,7 +1226,7 @@ interface ConversationViewProps {
 
 export type { FailedMessage } from './chat-types';
 
-function ConversationView({ conversation, onResume, onArchive, resumePending, modelPicker, roundMarkers, roundMetadata, turnDiffSummaryByAssistantMessageId, onOpenTurnDiff, resolvedTheme, agentId, hideToolCalls, workingPhase, streamMessagesEnabled, messagesData, messagesLoading, targetMessageId, targetMessageIndex, targetMessageNonce, onTargetMessageHandled }: ConversationViewProps) {
+function ConversationView({ conversation, onResume, onArchive, resumePending, resumeLabel, hideComposer = false, onSendFailed: onSendFailedProp, modelPicker, roundMarkers, roundMetadata, turnDiffSummaryByAssistantMessageId, onOpenTurnDiff, resolvedTheme, agentId, hideToolCalls, workingPhase, agentBusy = false, streamMessagesEnabled, messagesData, messagesLoading, targetMessageId, targetMessageIndex, targetMessageNonce, onTargetMessageHandled }: ConversationViewProps) {
   const isCompacting = useDashboardStore((s) => s.conversationsCompactingByName?.[conversation.name] ?? false);
   // Optimistic sent messages and the failed-send retry outbox live in the
   // module-level composerStore, keyed by conversation name. ConversationView is
@@ -1161,10 +1238,11 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, mo
   const optimisticBaseCount = useConversationOptimisticBaseCount(conversation.name);
   const failedMessages = useConversationFailed(conversation.name);
   const addOptimistic = useComposerStore((s) => s.addOptimistic);
+  const acknowledgeOptimistic = useComposerStore((s) => s.acknowledgeOptimistic);
   const clearOptimistic = useComposerStore((s) => s.clearOptimistic);
   const failSend = useComposerStore((s) => s.failSend);
-  const addFailed = useComposerStore((s) => s.addFailed);
   const removeFailed = useComposerStore((s) => s.removeFailed);
+  const retryFailed = useComposerStore((s) => s.retryFailed);
   const queryClient = useQueryClient();
 
   // When forkStatus transitions from non-null to null (fork completed),
@@ -1209,32 +1287,23 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, mo
     addOptimistic(conversation.name, text, serverMessages.length);
   }, [addOptimistic, conversation.name, serverMessages.length]);
 
+  const handleMessageAcknowledged = useCallback((text: string) => {
+    if (conversation.harness !== 'ohmypi' && conversation.harness !== 'pi') return;
+    acknowledgeOptimistic(conversation.name, text);
+  }, [acknowledgeOptimistic, conversation.harness, conversation.name]);
+
   // Called by ComposerFooter when POST fails — move optimistic to failed outbox.
   const handleSendFailed = useCallback((text: string) => {
     failSend(conversation.name, text);
-  }, [failSend, conversation.name]);
+    onSendFailedProp?.();
+  }, [failSend, conversation.name, onSendFailedProp]);
 
-  const handleRetryFailed = useCallback(async (failedId: string, text: string) => {
-    // Remove from failed list and re-send
-    removeFailed(conversation.name, failedId);
-    try {
-      const endpoint = agentId
-        ? `/api/agents/${encodeURIComponent(agentId)}/message`
-        : `/api/conversations/${encodeURIComponent(conversation.name)}/message`;
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: text }),
-      });
-      if (!res.ok) {
-        const body = await res.text().catch(() => '');
-        throw new Error(`Failed to send message (${res.status})${body ? `: ${body}` : ''}`);
-      }
-    } catch {
-      // Re-add to failed list on retry failure
-      addFailed(conversation.name, text);
-    }
-  }, [conversation.name, agentId, removeFailed, addFailed]);
+  // Retry funnels through the same store action a first send uses, so the text
+  // becomes an optimistic "Sending…" bubble (covered by the stall/compaction
+  // safety net) instead of being removed from the outbox into the void.
+  const handleRetryFailed = useCallback((failedId: string, text: string) => {
+    void retryFailed(conversation.name, failedId, text, serverMessages.length, agentId);
+  }, [retryFailed, conversation.name, serverMessages.length, agentId]);
 
   const handleDiscardFailed = useCallback((failedId: string) => {
     removeFailed(conversation.name, failedId);
@@ -1282,7 +1351,15 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, mo
   const isSpawning = !conversation.sessionAlive && !conversation.endedAt && !isSpawnFailed && !isForking;
   const isDiscovering = streamMessagesEnabled && data?.discovering === true && messages.length === 0;
   const isFirstMessage = !isLoading && !isDiscovering && messages.length === 0 && conversation.sessionAlive;
-  const isOrphaned = !isLoading && !isDiscovering && messages.length === 0 && !conversation.sessionAlive && !isSpawnFailed && !isSpawning;
+  // A failed /messages fetch leaves `data` undefined — that is NOT the same as a
+  // successful empty response. Rendering it as "no saved history" (the old
+  // behavior) falsely tells the user their history is gone, e.g. during a
+  // server-restart window (2026-07-05 incident). Ended conversations have no
+  // refetchInterval, so without a retry surface the error state would persist.
+  const messagesFetchFailed =
+    !isLoading && !isDiscovering && !streamMessagesEnabled && data == null &&
+    !isSpawning && !isSpawnFailed && !isForking;
+  const isOrphaned = !isLoading && !isDiscovering && data != null && messages.length === 0 && !conversation.sessionAlive && !isSpawnFailed && !isSpawning;
 
   // Spin unless truly idle: idle = last message is a completed assistant turn (completedAt set).
   // Note: `completedAt` is reliably set server-side for all terminal stop reasons via
@@ -1321,6 +1398,23 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, mo
           </p>
           <p className={styles.conversationEmptyStateSubtitle}>{data.error}</p>
         </div>
+      ) : messagesFetchFailed ? (
+        <div className={styles.conversationEmptyState}>
+          <p className={styles.conversationEmptyStateTitle} style={{ color: 'var(--warning)' }}>
+            ⚠ Couldn&apos;t load history
+          </p>
+          <p className={styles.conversationEmptyStateSubtitle}>
+            The request for this conversation&apos;s messages failed — the saved history may still be intact.
+          </p>
+          <div style={{ display: 'flex', gap: 8, marginTop: 12, alignItems: 'center' }}>
+            <button
+              className={styles.conversationArchiveBtnLarge}
+              onClick={() => queryClient.invalidateQueries({ queryKey: conversationMessagesQueryKey(conversation.name) })}
+            >
+              Retry
+            </button>
+          </div>
+        </div>
       ) : isSpawning ? (
         <div className={styles.conversationEmptyState}>
           <p className={styles.conversationEmptyStateTitle}>
@@ -1347,15 +1441,26 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, mo
         />
       ) : isOrphaned ? (
         <div className={styles.conversationEmptyState}>
-          <p className={styles.conversationEmptyStateSubtitle}>
-            This conversation has no saved history. The session may have ended before any messages were exchanged.
-          </p>
+          {conversation.transcriptMissing ? (
+            <>
+              <p className={styles.conversationEmptyStateTitle} style={{ color: 'var(--warning)' }}>
+                ⚠ Transcript missing
+              </p>
+              <p className={styles.conversationEmptyStateSubtitle}>
+                This conversation had activity, but its transcript file no longer exists on disk. The history cannot be recovered.
+              </p>
+            </>
+          ) : (
+            <p className={styles.conversationEmptyStateSubtitle}>
+              This conversation has no saved history. The session may have ended before any messages were exchanged.
+            </p>
+          )}
           <div style={{ display: 'flex', gap: 8, marginTop: 12, alignItems: 'center' }}>
             {onResume && (
               <>
                 {modelPicker}
                 <button className={styles.conversationResumeBtn} onClick={onResume} disabled={resumePending}>
-                  {resumePending ? 'Resuming…' : 'Resume Session'}
+                  {resumePending ? 'Resuming…' : (resumeLabel ?? 'Resume Session')}
                 </button>
               </>
             )}
@@ -1423,16 +1528,18 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, mo
             onClick={onResume}
             disabled={resumePending}
           >
-            {resumePending ? 'Resuming…' : 'Resume Session'}
+            {resumePending ? 'Resuming…' : (resumeLabel ?? 'Resume Session')}
           </button>
         </div>
-      ) : (
+      ) : hideComposer ? null : (
         <ComposerFooter
           conversation={conversation}
           onSend={handleMessageSent}
+          onSendAcknowledged={handleMessageAcknowledged}
           onSendFailed={handleSendFailed}
           agentId={agentId}
           contextWindowUsage={contextWindowUsage}
+          agentBusy={agentBusy}
         />
       )}
     </div>

@@ -79,6 +79,9 @@ export function setReviewStatusSync(
   if (update.mergeStatus && update.mergeStatus !== existing.mergeStatus) {
     history.push({ type: 'merge', status: update.mergeStatus, timestamp: now });
   }
+  if (update.releaseStatus && update.releaseStatus !== existing.releaseStatus) {
+    history.push({ type: 'release', status: update.releaseStatus, timestamp: now, notes: update.releaseNotes });
+  }
   while (history.length > 10) history.shift();
 
   // PAN-1650: readyForMerge is EVENT-DRIVEN — derived from the gate state on every

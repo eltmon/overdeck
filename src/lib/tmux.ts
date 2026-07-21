@@ -11,10 +11,15 @@ import { loadConfigSync, type TmuxConfigMode } from './config-yaml.js';
 import { buildChildEnvSync } from './child-env.js';
 import { TmuxError } from './errors.js';
 import { getUiTheme, TERMINAL_BG } from './ui-theme.js';
+import { paneTreeHasHarnessProcess } from './tmux-process-tree.js';
+
+export { paneTreeHasHarnessProcess } from './tmux-process-tree.js';
 
 const execFileAsync = promisify(execFile);
 
 const VALID_SESSION_NAME_RE = /^[a-zA-Z0-9._-]+$/;
+const DEFAULT_TMUX_WINDOW_COLS = 200;
+const DEFAULT_TMUX_WINDOW_ROWS = 50;
 
 function validateSessionName(name: string): void {
   if (!VALID_SESSION_NAME_RE.test(name)) {
@@ -289,9 +294,19 @@ export function ensureOverdeckTmuxServerSync(cleanEnv: NodeJS.ProcessEnv): void 
   const args = ['-L', getManagedTmuxSocketName(), '-f', getManagedTmuxConfigPath(), 'start-server'];
   const startedBySystemd = (() => {
     try {
+      // start-server daemonizes, so the unit must be Type=forking: under the
+      // default Type=simple the founding client's exit deactivates the unit and
+      // the cgroup kill murders the forked server (PAN-1798, 5 dead foundings/boot).
       execFileSync(
         'systemd-run',
-        ['--user', '--unit', MANAGED_TMUX_SERVER_UNIT, '--collect', '--quiet', 'tmux', ...args],
+        [
+          '--user', '--unit', MANAGED_TMUX_SERVER_UNIT, '--collect', '--quiet', '--service-type=forking',
+          // PAN-2500 kernel-oom-net: deprioritize the tmux server for systemd-oomd
+          // so a memory-governor miss degrades gracefully instead of wiping every
+          // agent process at once (#2390).
+          '--property=ManagedOOMPreference=avoid',
+          'tmux', ...args,
+        ],
         { stdio: 'ignore', env: cleanEnv },
       );
       return true;
@@ -469,14 +484,9 @@ function buildNewSessionArgs(
   initialCommand?: string,
   options?: { env?: Record<string, string>; width?: number; height?: number }
 ): string[] {
-  const args = ['new-session', '-d', '-s', name, '-c', cwd];
-
-  if (options?.width !== undefined) {
-    args.push('-x', String(options.width));
-  }
-  if (options?.height !== undefined) {
-    args.push('-y', String(options.height));
-  }
+  const width = options?.width ?? DEFAULT_TMUX_WINDOW_COLS;
+  const height = options?.height ?? DEFAULT_TMUX_WINDOW_ROWS;
+  const args = ['new-session', '-d', '-s', name, '-c', cwd, '-x', String(width), '-y', String(height)];
   if (options?.env) {
     for (const [key, value] of Object.entries(options.env)) {
       args.push('-e', `${key}=${value}`);
@@ -520,6 +530,13 @@ export interface TmuxSession {
   created: Date;
   attached: boolean;
   windows: number;
+}
+
+export interface TmuxPaneRecord {
+  sessionName: string;
+  panePid: number;
+  paneDead: boolean;
+  paneDeadStatus: number | null;
 }
 
 export function listSessionsSync(): TmuxSession[] {
@@ -583,15 +600,38 @@ export function exactPaneTarget(name: string): string {
   return `=${name}:`;
 }
 
-export function sessionExistsSync(name: string): boolean {
+export type SessionQueryResult =
+  | { status: 'exists' }
+  | { status: 'missing'; detail: string }
+  | { status: 'error'; detail: string };
+
+function sessionQueryFailure(cause: unknown): Exclude<SessionQueryResult, { status: 'exists' }> {
+  const error = cause as NodeJS.ErrnoException & { stderr?: string | Buffer; status?: number };
+  const stderr = String(error.stderr ?? '').trim();
+  const detail = [
+    `exit=${error.status ?? 'unknown'}`,
+    error.code ? `code=${error.code}` : '',
+    stderr ? `stderr=${stderr}` : '',
+    error.message ? `message=${error.message}` : '',
+  ].filter(Boolean).join(' ');
+  return error.status === 1 && /can't find session:/i.test(stderr)
+    ? { status: 'missing', detail }
+    : { status: 'error', detail };
+}
+
+export function querySessionSync(name: string): SessionQueryResult {
   try {
-    tmuxExecSync(['has-session', '-t', exactSession(name)], { stdio: 'ignore' });
-    return true;
-  } catch {
-    return false;
+    // Explicit stdio — without it execFileSync echoes the routine "can't find session" stderr of dead-session probes into the server log.
+    tmuxExecSync(['has-session', '-t', exactSession(name)], { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'pipe'] });
+    return { status: 'exists' };
+  } catch (cause) {
+    return sessionQueryFailure(cause);
   }
 }
 
+export function sessionExistsSync(name: string): boolean {
+  return querySessionSync(name).status === 'exists';
+}
 
 /**
  * @deprecated Legacy sync function — blocks the event loop. Use `createSession` instead.
@@ -601,7 +641,7 @@ export function createSessionSync(
   name: string,
   cwd: string,
   initialCommand?: string,
-  options?: { env?: Record<string, string> }
+  options?: { env?: Record<string, string>; width?: number; height?: number }
 ): void {
   // PAN-1798: every spawn path must ensure the shared server lives in its
   // dedicated unit before creating a session, so no client becomes the founder.
@@ -627,11 +667,11 @@ export function createSessionSync(
   tmuxExecSync(buildNewSessionArgs(name, cwd, initialCommand, options));
 }
 
-
 export function killSessionSync(name: string): void {
   // Exact-match target — a bare name prefix-matches and would kill e.g.
   // `agent-pan-977-review` when asked to kill `agent-pan-977`.
-  tmuxExecSync(['kill-session', '-t', exactSession(name)]);
+  // Explicit stdio — killing a maybe-dead session is routine; see querySessionSync.
+  tmuxExecSync(['kill-session', '-t', exactSession(name)], { stdio: ['ignore', 'pipe', 'pipe'] });
 }
 
 
@@ -684,7 +724,7 @@ export function capturePaneSync(sessionName: string, lines: number = 50): string
   }
 }
 
-async function capturePaneText(
+export async function capturePaneText(
   sessionName: string,
   lines: number = 50,
   options?: { escapeSequences?: boolean }
@@ -718,49 +758,6 @@ async function listPaneValuesText(target: string, format: string): Promise<strin
   } catch {
     return [];
   }
-}
-
-/**
- * Process names that mean a launcher session is a keep-alive *corpse*, not a
- * live harness. Launchers end with `while true; do sleep 60; done`
- * (src/lib/launcher-generator.ts), so after the harness process (Claude/Pi/…)
- * exits the tmux session stays alive running that loop — its process tree is
- * then only the hosting shell and `sleep`, never the harness, which surfaces
- * as `node`/`claude`/the runtime binary.
- */
-const KEEPALIVE_FOREGROUND_COMMANDS = new Set(['sleep', 'bash', 'sh', 'dash', 'zsh', 'ash']);
-
-/**
- * Pure tree walk behind isHarnessProcessAlive, exported for tests: true when
- * any process in the pane's tree (the pane pids themselves or any descendant)
- * is something other than a shell or `sleep`. `psTable` is `ps -eo
- * pid=,ppid=,comm=` output.
- */
-export function paneTreeHasHarnessProcess(panePids: number[], psTable: string): boolean {
-  const childrenByPpid = new Map<number, number[]>();
-  const commByPid = new Map<number, string>();
-  for (const line of psTable.split('\n')) {
-    const match = line.trim().match(/^(\d+)\s+(\d+)\s+(.+)$/);
-    if (!match) continue;
-    const pid = Number(match[1]);
-    const ppid = Number(match[2]);
-    commByPid.set(pid, match[3].trim());
-    const siblings = childrenByPpid.get(ppid);
-    if (siblings) siblings.push(pid);
-    else childrenByPpid.set(ppid, [pid]);
-  }
-  const queue = [...panePids];
-  const seen = new Set<number>();
-  while (queue.length > 0) {
-    const pid = queue.pop()!;
-    if (seen.has(pid)) continue;
-    seen.add(pid);
-    const comm = commByPid.get(pid);
-    if (comm && !KEEPALIVE_FOREGROUND_COMMANDS.has(comm)) return true;
-    const children = childrenByPpid.get(pid);
-    if (children) queue.push(...children);
-  }
-  return false;
 }
 
 /**
@@ -827,8 +824,7 @@ const TERMINAL_API_ERROR_PATTERNS: Array<{
   kind: TerminalApiErrorKind;
   summary: string;
 }> = [
-  // Order matters: more specific quota/usage messages first so we surface the
-  // most actionable summary even when both a 403 and a quota line are present.
+  // Specific quota messages precede generic status codes to preserve the actionable diagnosis.
   { re: /usage limit for this billing cycle/i, kind: 'quota_exhausted', summary: 'Provider quota exhausted (billing cycle limit reached)' },
   { re: /reached your usage limit/i,           kind: 'quota_exhausted', summary: 'Provider quota exhausted (usage limit reached)' },
   { re: /(?:^|[^a-z])quota[^a-z].{0,40}(?:exceeded|exhausted|reached)/i, kind: 'quota_exhausted', summary: 'Provider quota exhausted' },
@@ -837,6 +833,7 @@ const TERMINAL_API_ERROR_PATTERNS: Array<{
   { re: /Please run \/login/i,                 kind: 'login_required',  summary: 'Provider login required' },
   { re: /authentication_error/i,               kind: 'auth_failed',     summary: 'Provider authentication failed' },
   { re: /API Error:\s*401\b/i,                 kind: 'auth_failed',     summary: 'Provider rejected request (401 unauthorized)' },
+  { re: /API Error:\s*402\b|unable to verify your membership benefits/i, kind: 'permission_denied', summary: 'Provider rejected request (402 account or membership required)' },
   { re: /permission_error/i,                   kind: 'permission_denied', summary: 'Provider returned permission_error' },
   { re: /API Error:\s*403\b/i,                 kind: 'permission_denied', summary: 'Provider rejected request (403 forbidden)' },
 ];
@@ -983,6 +980,36 @@ export const listSessionNames = (): Effect.Effect<readonly string[], TmuxError> 
     catch: (cause) => toTmuxError('list-session-names', cause),
   });
 
+export function parseTmuxPaneRecords(output: string): TmuxPaneRecord[] {
+  return output.split('\n').flatMap((line) => {
+    if (!line) return [];
+    const [sessionName = '', panePidRaw = '', paneDeadRaw = '', paneDeadStatusRaw = ''] = line.split('\t');
+    const panePid = Number.parseInt(panePidRaw, 10);
+    if (!sessionName || !Number.isInteger(panePid) || panePid <= 0) return [];
+    const paneDeadStatus = Number.parseInt(paneDeadStatusRaw, 10);
+    return [{
+      sessionName,
+      panePid,
+      paneDead: paneDeadRaw === '1',
+      paneDeadStatus: Number.isInteger(paneDeadStatus) ? paneDeadStatus : null,
+    }];
+  });
+}
+
+export const listAllPaneRecords = (): Effect.Effect<readonly TmuxPaneRecord[], TmuxError> =>
+  Effect.tryPromise({
+    try: async () => {
+      const { stdout } = await tmuxExecAsync([
+        'list-panes',
+        '-a',
+        '-F',
+        '#{session_name}\t#{pane_pid}\t#{pane_dead}\t#{pane_dead_status}',
+      ], { encoding: 'utf-8' });
+      return parseTmuxPaneRecords(String(stdout));
+    },
+    catch: (cause) => toTmuxError('list-all-pane-records', cause),
+  });
+
 export const getWindowDimensions = (
   sessionName: string,
 ): Effect.Effect<{ cols: number; rows: number } | null, TmuxError> =>
@@ -1019,6 +1046,21 @@ export const sessionExists = (
       }
     },
     catch: (cause) => toTmuxError('session-exists', cause),
+  });
+
+export const querySession = (
+  name: string,
+): Effect.Effect<SessionQueryResult, TmuxError> =>
+  Effect.tryPromise({
+    try: async () => {
+      try {
+        await tmuxExecAsync(['has-session', '-t', exactSession(name)], { encoding: 'utf-8' });
+        return { status: 'exists' } as const;
+      } catch (cause) {
+        return sessionQueryFailure(cause);
+      }
+    },
+    catch: (cause) => toTmuxError('query-session', cause),
   });
 
 export const createSession = (
@@ -1093,6 +1135,17 @@ export const sendRawKeystroke = (
     catch: (cause) => toTmuxError('send-raw-key', cause),
   });
 
+export async function sendKeysAsync(
+  sessionName: string,
+  key: string,
+  caller?: string,
+): Promise<void> {
+  validateSessionName(sessionName);
+  const target = exactPaneTarget(sessionName);
+  logSendKeys(sessionName, key, caller ?? 'send-keys-async');
+  await tmuxExecAsync(['send-keys', '-t', target, key], { encoding: 'utf-8' });
+}
+
 export async function sendEscapeKeyAsync(sessionName: string, times = 1): Promise<void> {
   validateSessionName(sessionName);
   const target = exactPaneTarget(sessionName);
@@ -1105,6 +1158,7 @@ export async function sendEscapeKeyAsync(sessionName: string, times = 1): Promis
   }
 }
 
+export function deliveryVerifyLine(content: string): string { const lines = content.split('\n'); return ([...lines].reverse().find(line => line.trim().length >= 3) ?? lines[lines.length - 1])?.trim() ?? ''; }
 export const sendKeys = (
   sessionName: string,
   keys: string,
@@ -1124,8 +1178,7 @@ export const sendKeys = (
         await tmuxExecAsync(['load-buffer', '-b', bufferName, tmpFile], { encoding: 'utf-8' });
         await tmuxExecAsync(['paste-buffer', '-b', bufferName, '-p', '-t', sessionName], { encoding: 'utf-8' });
 
-        const lines = keys.split('\n');
-        const verifyLine = ([...lines].reverse().find(l => l.trim().length >= 3) ?? lines[lines.length - 1])?.trim() ?? '';
+        const verifyLine = deliveryVerifyLine(keys);
         // 1.5s per attempt × 2 attempts = 3s worst case. The previous 8s × 2 = 16s
         // caused user-visible "Enter not sent" lag whenever the 10-line tail check
         // missed the verify line (e.g. tall Claude input box or wrapped paste).

@@ -9,6 +9,7 @@ import { FlywheelStatusDetails } from '../components/flywheel/FlywheelStatusDeta
 import { MergeQueueCard } from '../components/flywheel/MergeQueueCard';
 import { RailCard } from '../components/flywheel/RailCard';
 import { MergePolicySection } from '../components/MergePolicySection';
+import { consumePendingReveal, subscribeRevealOpenQuestions } from '../lib/flywheelReveal';
 import { subscribeFlywheelStatus } from '../lib/wsTransport';
 
 interface FlywheelPageProps {
@@ -291,7 +292,9 @@ function PendingAutoMergesBanner({ onNavigateIssue }: { onNavigateIssue?: (issue
 
 export function FlywheelPage({ onOpenSettings, onNavigateAgent, onNavigateIssue }: FlywheelPageProps) {
   const [status, setStatus] = useState<FlywheelStatus | null>(null);
+  const [statusUnreachable, setStatusUnreachable] = useState(false);
   const [activeTab, setActiveTab] = useState<FlywheelLeftTab>('status');
+  const [openQuestionsRevealPending, setOpenQuestionsRevealPending] = useState(false);
   const [leftWidth, setLeftWidth] = useState<number>(getStoredSplitWidth);
   const [nowMs, setNowMs] = useState(() => Date.now());
   const leftWidthRef = useRef(leftWidth);
@@ -375,9 +378,15 @@ export function FlywheelPage({ onOpenSettings, onNavigateAgent, onNavigateIssue 
     const refreshCurrentStatus = async () => {
       try {
         const current = await fetchCurrentFlywheelStatus();
-        if (!cancelled) setStatus(current);
+        if (!cancelled) {
+          setStatus(current);
+          setStatusUnreachable(false);
+        }
       } catch {
-        // The RPC subscription remains authoritative while the dashboard restarts.
+        // The RPC subscription remains authoritative while the dashboard restarts —
+        // but a failed fetch is NOT evidence of "no run". Flag it so the empty
+        // state says "can't reach the server" instead of "No active run" (PAN-2805).
+        if (!cancelled) setStatusUnreachable(true);
       }
     };
     void refreshCurrentStatus();
@@ -393,6 +402,29 @@ export function FlywheelPage({ onOpenSettings, onNavigateAgent, onNavigateIssue 
       unsubscribe();
     };
   }, []);
+
+  useEffect(() => {
+    const revealOpenQuestions = () => {
+      setActiveTab('status');
+      setOpenQuestionsRevealPending(true);
+    };
+    if (consumePendingReveal()) revealOpenQuestions();
+    return subscribeRevealOpenQuestions(() => {
+      consumePendingReveal();
+      revealOpenQuestions();
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!openQuestionsRevealPending || activeTab !== 'status') return;
+    const frame = requestAnimationFrame(() => {
+      const target = document.getElementById('flywheel-open-questions');
+      if (!target) return;
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      setOpenQuestionsRevealPending(false);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [activeTab, effectiveStatus, openQuestionsRevealPending]);
 
   const freshness = effectiveStatus ? getLastTickFreshness(effectiveStatus.lastTickAt, nowMs) : null;
 
@@ -477,6 +509,13 @@ export function FlywheelPage({ onOpenSettings, onNavigateAgent, onNavigateIssue 
                     <div>
                       <p className="text-sm font-medium text-foreground">Run paused — <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">pan flywheel resume</code> to continue.</p>
                       <p className="mt-2 text-xs text-muted-foreground">The orchestrator is paused; its run state is preserved. The status pane will repopulate when it resumes.</p>
+                    </div>
+                  </div>
+                ) : statusUnreachable ? (
+                  <div className="flex min-h-[200px] items-center justify-center rounded-xl border border-dashed border-border bg-card/40 p-6 text-center">
+                    <div>
+                      <p className="text-sm font-medium text-foreground">Can&apos;t reach the orchestrator — reconnecting…</p>
+                      <p className="mt-2 text-xs text-muted-foreground">The dashboard isn&apos;t answering status requests right now. The run state is unknown, not gone; this pane retries every few seconds.</p>
                     </div>
                   </div>
                 ) : (

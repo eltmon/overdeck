@@ -8,6 +8,10 @@
 
 set +e
 
+# Capture stdin once, early, so later background work cannot consume it and the
+# hook can forward the session_id to the turn-complete title-refinement endpoint.
+INPUT=$(cat 2>/dev/null || echo '{}')
+
 # Log first-thing so we have empirical evidence the hook fired, regardless of
 # whether anything downstream succeeded. Silent failures in pan_resolve_agent_id
 # used to leave zero trace, making "did the Stop hook even fire?" impossible to
@@ -39,16 +43,15 @@ BODY="{\"kind\":\"activity\",\"activity\":\"idle\",\"timestamp\":\"$TS\"}"
 pan_emit_event "$AGENT_ID" "$BODY"
 
 # ── API error detection (all agent types) ────────────────────────────────
-# If the agent stopped because of a transient API error, nudge it to retry.
-# This runs before chaining to specialist/work-agent hooks because it
-# applies universally. 5-minute cooldown per agent.
+# Run before the turn-complete notification so a Stop caused by a transient
+# API error is not treated as a completed assistant turn.
 LOG_DIR="$HOME/.overdeck/logs"
 mkdir -p "$LOG_DIR"
+API_ERROR_DETECTED=false
 API_ERROR_NUDGE_FILE="$HOME/.overdeck/agents/$AGENT_ID/.last-api-error-nudge"
 
 OUTPUT=$(tmux capture-pane -t "$AGENT_ID" -p -S -100 2>/dev/null || echo "")
 if [ -n "$OUTPUT" ]; then
-  API_ERROR_DETECTED=false
   for pattern in \
     "API Error: The server had an error while processing your request" \
     "API Error: Overloaded" \
@@ -63,32 +66,62 @@ if [ -n "$OUTPUT" ]; then
       break
     fi
   done
+fi
 
-  if [ "$API_ERROR_DETECTED" = "true" ]; then
-    SHOULD_NUDGE=true
-    if [ -f "$API_ERROR_NUDGE_FILE" ]; then
-      LAST_API_NUDGE=$(cat "$API_ERROR_NUDGE_FILE" 2>/dev/null || echo "0")
-      NOW=$(date +%s)
-      if [ $(( NOW - LAST_API_NUDGE )) -lt 300 ]; then
-        SHOULD_NUDGE=false
+# PAN-1644: notify the dashboard that a turn completed, so it can progressively
+# refine the conversation title. Skip this when an API error caused the Stop.
+# Fire-and-forget: the dashboard may be down or busy; the stop-hook must still
+# exit 0 and chain to downstream hooks.
+if [ "$API_ERROR_DETECTED" != "true" ]; then
+  INTERNAL_TOKEN="${OVERDECK_INTERNAL_TOKEN:-}"
+  if [ -z "$INTERNAL_TOKEN" ]; then
+    TOKEN_PATH="${OVERDECK_HOME:-$HOME/.overdeck}/internal-token"
+    if [ -f "$TOKEN_PATH" ]; then
+      INTERNAL_TOKEN=$(cat "$TOKEN_PATH" 2>/dev/null || true)
+    fi
+  fi
+
+  if command -v jq >/dev/null 2>&1; then
+    SESSION_ID=$(printf '%s' "$INPUT" | jq -r '(.session_id // "")' 2>/dev/null)
+    if [ -z "$SESSION_ID" ]; then
+      SESSION_ID="${CLAUDE_SESSION_ID:-}"
+    fi
+    if [ -n "$SESSION_ID" ]; then
+      TURN_COMPLETE_BODY=$(jq -n --arg session_id "$SESSION_ID" '{session_id: $session_id}' 2>/dev/null)
+      if [ -n "$TURN_COMPLETE_BODY" ]; then
+        curl -s -m 1 -X POST -H 'Content-Type: application/json' -H "x-overdeck-internal-token: $INTERNAL_TOKEN" --data "$TURN_COMPLETE_BODY" "$PAN_DASHBOARD_URL/api/hooks/turn-complete" >/dev/null 2>&1 || true
       fi
     fi
+  fi
+fi
 
-    if [ "$SHOULD_NUDGE" = "true" ]; then
-      mkdir -p "$(dirname "$API_ERROR_NUDGE_FILE")"
-      date +%s > "$API_ERROR_NUDGE_FILE" 2>/dev/null || true
-
-      echo "[$(date -Iseconds)] stop-hook: $AGENT_ID api_error detected — nudging retry" \
-        >> "$LOG_DIR/hooks.log" 2>/dev/null || true
-
-      tmpfile=$(mktemp)
-      echo "You stopped due to a transient API error. This is a temporary server issue, not a problem with your work. Continue from where you left off. Do NOT start over — pick up exactly where you stopped." > "$tmpfile"
-      tmux load-buffer "$tmpfile" 2>/dev/null
-      tmux paste-buffer -t "$AGENT_ID" 2>/dev/null
-      sleep 0.3
-      tmux send-keys -t "$AGENT_ID" C-m 2>/dev/null
-      rm -f "$tmpfile"
+# If the agent stopped because of a transient API error, nudge it to retry.
+# This runs before chaining to specialist/work-agent hooks because it
+# applies universally. 5-minute cooldown per agent.
+if [ "$API_ERROR_DETECTED" = "true" ]; then
+  SHOULD_NUDGE=true
+  if [ -f "$API_ERROR_NUDGE_FILE" ]; then
+    LAST_API_NUDGE=$(cat "$API_ERROR_NUDGE_FILE" 2>/dev/null || echo "0")
+    NOW=$(date +%s)
+    if [ $(( NOW - LAST_API_NUDGE )) -lt 300 ]; then
+      SHOULD_NUDGE=false
     fi
+  fi
+
+  if [ "$SHOULD_NUDGE" = "true" ]; then
+    mkdir -p "$(dirname "$API_ERROR_NUDGE_FILE")"
+    date +%s > "$API_ERROR_NUDGE_FILE" 2>/dev/null || true
+
+    echo "[$(date -Iseconds)] stop-hook: $AGENT_ID api_error detected — nudging retry" \
+      >> "$LOG_DIR/hooks.log" 2>/dev/null || true
+
+    tmpfile=$(mktemp)
+    echo "You stopped due to a transient API error. This is a temporary server issue, not a problem with your work. Continue from where you left off. Do NOT start over — pick up exactly where you stopped." > "$tmpfile"
+    tmux load-buffer "$tmpfile" 2>/dev/null
+    tmux paste-buffer -t "$AGENT_ID" 2>/dev/null
+    sleep 0.3
+    tmux send-keys -t "$AGENT_ID" C-m 2>/dev/null
+    rm -f "$tmpfile"
   fi
 fi
 

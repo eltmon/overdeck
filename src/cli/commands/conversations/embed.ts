@@ -53,6 +53,7 @@ export async function embedAction(
     sessionIds: ids.length > 0 ? ids : undefined,
     provider,
     model,
+    autoInstall: true,
     maxParallel,
     regenerate,
     onProgress: (p) => {

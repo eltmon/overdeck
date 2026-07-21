@@ -43,18 +43,23 @@ export const MODELS_BY_PROVIDER: Record<string, ProviderDef> = {
       { id: 'claude-opus-4-8' as ModelId, name: 'Claude Opus 4.8', icon: Gem, tier: 'premium', costPer1MTokens: 45, capabilities: ['reasoning', 'code', 'vision', 'agentic'], description: 'Most capable — current flagship, xhigh/max effort, deepest reasoning' },
       { id: 'claude-opus-4-7' as ModelId, name: 'Claude Opus 4.7', icon: Gem, tier: 'premium', costPer1MTokens: 45, capabilities: ['reasoning', 'code', 'vision', 'agentic'], description: 'Previous flagship — xhigh/max effort, deepest reasoning' },
       { id: 'claude-opus-4-6' as ModelId, name: 'Claude Opus 4.6', icon: Gem, tier: 'premium', costPer1MTokens: 45, capabilities: ['reasoning', 'code', 'vision', 'agentic'], description: 'Previous Opus, strong reasoning and planning' },
-      { id: 'claude-sonnet-4-6' as ModelId, name: 'Claude Sonnet 4.6', icon: Sparkles, tier: 'balanced', costPer1MTokens: 9, capabilities: ['reasoning', 'code', 'vision', 'agentic'], description: 'Latest Sonnet — fast, capable, great for implementation' },
+      { id: 'claude-sonnet-5' as ModelId, name: 'Claude Sonnet 5', icon: Sparkles, tier: 'balanced', costPer1MTokens: 6, capabilities: ['reasoning', 'code', 'vision', 'agentic', 'large-context'], description: 'Current Sonnet — 1M context, intro pricing through Aug 31, 2026' },
+      { id: 'claude-sonnet-4-6' as ModelId, name: 'Claude Sonnet 4.6', icon: Sparkles, tier: 'balanced', costPer1MTokens: 9, capabilities: ['reasoning', 'code', 'vision', 'agentic'], description: 'Previous Sonnet — fast, capable, great for implementation' },
       { id: 'claude-haiku-4-5' as ModelId, name: 'Claude Haiku 4.5', icon: Zap, tier: 'fast', costPer1MTokens: 1, capabilities: ['fast', 'cost-efficient', 'code'], description: 'Fastest, ideal for simple tasks' },
     ],
   },
   openai: {
     name: 'OpenAI',
-    // Trimmed 2026-05-23 to match OpenAI's Codex CLI published list.
+    // Trimmed 2026-05-23 to match OpenAI's Codex CLI published list;
+    // 2026-07-09 addendum adds the gpt-5.6 family without dropping anything.
     // Dropped: gpt-5.5-pro, gpt-5.4-pro, gpt-5.5-mini, gpt-5.5-nano,
     // gpt-5.4-nano, o3, o4-mini, gpt-4o, gpt-4o-mini.
     // Saved configs referencing dropped IDs are migrated by MODEL_DEPRECATIONS
     // in src/lib/model-capabilities.ts and warned-on by settings-api.ts.
     models: [
+      { id: 'gpt-5.6-sol' as ModelId, name: 'GPT-5.6 Sol', icon: Gem, tier: 'premium', costPer1MTokens: 17.5, capabilities: ['reasoning', 'code', 'vision', 'agentic', 'large-context'], description: 'OpenAI flagship (July 2026), new default. 1M context, $5 in / $30 out per 1M.' },
+      { id: 'gpt-5.6-terra' as ModelId, name: 'GPT-5.6 Terra', icon: Sparkles, tier: 'balanced', costPer1MTokens: 8.75, capabilities: ['reasoning', 'code', 'vision', 'agentic', 'large-context'], description: 'OpenAI balanced tier (July 2026). GPT-5.5-competitive at 2x lower cost. 1M context, $2.50 in / $15 out per 1M.' },
+      { id: 'gpt-5.6-luna' as ModelId, name: 'GPT-5.6 Luna', icon: Zap, tier: 'fast', costPer1MTokens: 3.5, capabilities: ['fast', 'cost-efficient', 'code'], description: 'OpenAI fastest/cheapest tier (July 2026). 1M context, $1 in / $6 out per 1M.' },
       { id: 'gpt-5.5' as ModelId, name: 'GPT-5.5', icon: Gem, tier: 'premium', costPer1MTokens: 17.5, capabilities: ['reasoning', 'code', 'vision', 'agentic', 'large-context'], description: 'OpenAI flagship (April 2026). 1.05M context, $5 in / $30 out per 1M.' },
       { id: 'gpt-5.4' as ModelId, name: 'GPT-5.4', icon: Sparkles, tier: 'balanced', costPer1MTokens: 8.75, capabilities: ['reasoning', 'code', 'vision', 'agentic', 'large-context'], description: 'Balanced GPT-5.4. 1.05M context, strong coding.' },
       { id: 'gpt-5.4-mini' as ModelId, name: 'GPT-5.4 Mini', icon: FlaskConical, tier: 'fast', costPer1MTokens: 2.625, capabilities: ['fast', 'cost-efficient', 'code'], description: 'Fast and efficient. 400K context. $0.75 in / $4.50 out.' },
@@ -73,6 +78,8 @@ export const MODELS_BY_PROVIDER: Record<string, ProviderDef> = {
   kimi: {
     name: 'Kimi (Moonshot)',
     models: [
+      { id: 'k3' as ModelId, name: 'Kimi K3', icon: Gem, tier: 'premium', costPer1MTokens: 9, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Kimi flagship coding model (July 2026). Always-thinking 2.8T MoE, 256K context.' },
+      { id: 'k3[1m]' as ModelId, name: 'Kimi K3 (1M)', icon: Gem, tier: 'premium', costPer1MTokens: 9, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Kimi K3 coding endpoint with the full 1,048,576-token context window.' },
       { id: 'kimi-k2.7-code' as ModelId, name: 'Kimi K2.7 Code', icon: Layers, tier: 'premium', costPer1MTokens: 2.5, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Kimi coding-first flagship (June 2026). 1T MoE, multimodal, 262K context.' },
       { id: 'kimi-k2.6' as ModelId, name: 'Kimi K2.6', icon: Layers, tier: 'premium', costPer1MTokens: 1.6, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Kimi smartest model (April 2026). Native multimodal, superior agentic coding.' },
       { id: 'kimi-k2.5' as ModelId, name: 'Kimi K2.5', icon: Layers, tier: 'premium', costPer1MTokens: 1.6, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Best open-source coding, 256K context, 76.8% SWE-bench' },

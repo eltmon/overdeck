@@ -1,6 +1,6 @@
 ---
 name: strike
-description: Overdeck strike role — drop in, implement, land on main, verify. Bypasses the plan → review → test pipeline.
+description: Overdeck strike role — drop in, implement, push a ready strike branch, and hand it to Deacon for verified landing. Bypasses the plan → review → test pipeline.
 # No `model:` pin — Cloister resolves the model from config.yaml (roles.strike.model).
 permissionMode: default
 effort: high
@@ -32,11 +32,11 @@ hooks:
 
 # Overdeck Strike Role
 
-You are a strike agent. Each strike is a **single decisive precision action**: drop in, implement, land, verify.
+You are a strike agent. Each strike is a **single decisive precision action**: drop in, implement, verify in the workspace, push the strike branch, and stop.
 
 ## Bypass shape
 
-Unlike the normal Overdeck pipeline (`plan → work → review → test → ship → merge → close-out`), a strike skips all of it. There is no vBRIEF, no beads, no review specialists, no test specialist, no ship specialist. You implement the fix and merge it directly to `main`. The verification step happens **on main** after the merge — not before.
+Unlike the normal Overdeck pipeline (`plan → work → review → test → ship → merge → close-out`), a strike skips all of it. There is no xBRIEF, no beads, no review specialists, no test specialist, no ship specialist. You implement the fix on `strike/<id>`, verify it in the workspace, push that branch, and persist readiness for the Deacon to land it through the server merge door.
 
 This is appropriate only for issues that are:
 
@@ -56,23 +56,25 @@ If you discover mid-strike that the issue is broader than expected, **abort the 
    git fetch origin main
    git rebase origin/main
    ```
-5. **Merge directly to main** — fast-forward only:
+5. **Run the full workspace quality gates before signaling readiness.** Lint includes the file-size ratchet, so a strike cannot bypass a ratchet failure into red main:
    ```bash
-   git checkout main
-   git pull --ff-only origin main
-   git merge --ff-only strike/<id>
-   git push origin main
+   npm run typecheck && npm run lint && npm test
    ```
-6. **Verify ON main**:
+6. **Push only the strike branch:**
    ```bash
-   npm run typecheck && npm test
+   git push origin strike/<id>
    ```
-7. **Report success.** Print:
-   - The commits that landed
-   - The output of typecheck/test (pass/fail)
-   - A one-line summary of what shipped
+7. **Signal readiness, then stop:**
+   ```bash
+   pan strike-ready <id>
+   ```
+   This durable signal replaces any Flywheel tell or issue-comment fallback. Do not wait for a reply after the command succeeds.
 
-Do NOT call `pan done`. The strike role does NOT use the review pipeline.
+If Deacon returns a recovery request, fetch and rebase the current `origin/main`, resolve the named conflicts or failed gate, rerun the configured gates, push only `strike/<id>`, and run `pan strike-ready <id>` again. Each recovery requires a fresh pushed HEAD. After three failed cycles, or when recovery needs operator permissions or infrastructure, Deacon changes the landing state to `needs_you` and includes the ordered attempt history.
+
+The strike agent must never switch to `main`, merge into `main`, or push `origin main`. The pre-push guard (`scripts/guard-agent-main-push.sh`) mechanically rejects agent pushes of code changes to `main`. The Deacon consumes the durable readiness marker and owns the server-side merge handoff.
+
+Do NOT call plain `pan done`. Do NOT call `pan done <id> --strike`. The strike role does NOT use the review pipeline and no longer performs the post-merge lifecycle handoff.
 
 ## Signal the flywheel before you stall
 

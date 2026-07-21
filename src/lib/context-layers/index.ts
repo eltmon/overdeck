@@ -26,8 +26,12 @@ export {
   globalAgentsDir,
   projectContextDir,
   projectContextFile,
+  legacyProjectContextFile,
+  resolveProjectContextFile,
   workspaceContextDir,
   workspaceContextFile,
+  legacyWorkspaceContextFile,
+  resolveWorkspaceContextFile,
   piGlobalContextFile,
   codexGlobalContextFile,
   GLOBAL_STARTER,
@@ -52,13 +56,21 @@ export {
   REGION_BEGIN,
   REGION_END,
   applyManagedRegion,
+  stripBeadsManagedRegion,
   hasManagedRegion,
   userContentOutsideRegion,
   renderGlobalLayer,
   renderProjectLayer,
 } from './render.js';
 
-export { type WorkspaceContextInput, assembleWorkspaceContext } from './assemble.js';
+export {
+  type WorkspaceContextInput,
+  PROJECT_LAYER_START,
+  PROJECT_LAYER_END,
+  assembleWorkspaceContext,
+  workspaceContextWithoutProjectLayer,
+} from './assemble.js';
+export { type LegacyBeadsCleanup, cleanLegacyBeadsTargetSync } from './legacy-beads-cleanup.js';
 
 export {
   type DevrootMigrationResult,

@@ -5,21 +5,42 @@ Companion to `docs/overdeck-db-erd.excalidraw`. Source of truth:
 `src/lib/overdeck/*.ts` Drizzle definitions). Generated alongside
 `docs/overdeck-db-erd.mmd` (Mermaid `erDiagram`, the reviewable intermediate).
 
+## Schema changes
+
+Every new `overdeck.db` column or index must land in both
+`drizzle/overdeck/0000_overdeck_init.sql`, for fresh databases, and the
+`ensureRuntimeIndexesSync` top-ups in `src/lib/overdeck/infra.ts`, for existing
+databases. The init migration never runs again after the `agents` table exists,
+so changing only the migration leaves existing installations behind. Runtime
+top-ups silence duplicate DDL, log missing-table and other unexpected failures,
+and continue so later top-ups and startup can still complete.
+
+Startup runs the report-only audit in `src/lib/overdeck/schema-audit.ts` after
+the top-ups. It reads SQLite schema metadata, never mutates the database, and
+writes one `[schema-audit]` warning for each missing expected table, index, or
+column; extra artifacts are allowed because other modules add their own tables.
+
+`overdeck.db` uses this init-plus-top-up model and does not use
+`PRAGMA user_version`. The legacy `panopticon.db` migration ladder in
+`src/lib/database/schema.ts` has different semantics: duplicate DDL is
+idempotent, but any unexpected migration error is logged and rethrown before
+`user_version` can advance past the failed step.
+
 ## Rendered counts
 
 | Thing | Count |
 |---|---|
-| Tables (boxes) | **32** |
-| Columns | **347** |
-| Indexes shown | **39** (5 unique, 3 partial) |
+| Tables (boxes) | **30** |
+| Columns | **338** |
+| Indexes shown | **36** (5 unique, 3 partial) |
 | Declared `FOREIGN KEY`/`REFERENCES` | **19** (17 drawn solid + 2 self-refs documented) |
 | Logical `*_id` references (dashed) | **8** |
 | Relationship arrows drawn | **25** |
 
 Every `CREATE TABLE`, every column, every `REFERENCES`, and every
 `CREATE INDEX` in the migration is represented in the diagram (verified by a
-mechanical cross-check pass: 32/32 table titles, 0 column-count mismatches,
-19/19 FK clauses, 39/39 indexes).
+mechanical cross-check pass: 30/30 table titles, 0 column-count mismatches,
+19/19 FK clauses, 36/36 indexes).
 
 Notation inside each box: `PK`/`FK` marker, `name`, `TYPE`, then `NN`
 (NOT NULL), `UQ` (inline unique), `AUTO` (autoincrement). Indexes listed under
@@ -39,8 +60,8 @@ vs **17 TEXT** with no consistent rule:
   `cost_events.ts`, `events.timestamp`, `health_events.timestamp`,
   `status_history.timestamp`, `conversation_files.created_at`,
   `merge_queue.queued_at/started_at`, `merge_sets.created_at/updated_at`,
-  `pending_auto_merges.*`, `reset_markers.*`, `review_runs.*`,
-  `review_run_agents.deadline_at`, `transcript_checkpoints.*`,
+  `pending_auto_merges.*`, `review_runs.*`, `review_run_agents.deadline_at`,
+  `transcript_checkpoints.*`,
   `uat_generations.*`, `app_settings.updated_at`, `issue_policy.updated_at`,
   `favorites.created_at`, `transcripts.first_ts/last_ts/scanned_at`.
 - **TEXT (ISO-8601 strings)** — **all** of `review_status.*_at`,
@@ -118,13 +139,13 @@ Pick one convention.
 Two key styles, both valid, and the FK types **do** match their targets:
 
 - **Natural TEXT primary keys**: `agents.id`, `conversations.id`, `issues.id`,
-  `issue_policy.issue_id`, `merge_sets.issue_id`, `observation_index.id`,
-  `review_runs.run_id`, `review_status.issue_id`, `transcripts.backing_file_path`,
+  `issue_policy.issue_id`, `merge_sets.issue_id`, `review_runs.run_id`,
+  `review_status.issue_id`, `transcripts.backing_file_path`,
   `transcript_checkpoints.session_id`, `uat_generations.name`,
   `flywheel_substrate_bugs.issue_id`, `app_settings.key`.
 - **Surrogate INTEGER AUTOINCREMENT**: `conversation_files`,
   `cost_events`, `events`, `health_events`, `merge_queue`, `merge_set_repos`,
-  `pending_auto_merges`, `reset_markers`, `review_run_agents`, `status_history`,
+  `pending_auto_merges`, `review_run_agents`, `status_history`,
   `uat_generation_resolutions`, `discovered_sessions`, `git_operations`.
 - **Composite primary keys**: `favorites (type, item_id)`,
   `discovered_session_tags (session_id, tag)`,
@@ -174,7 +195,7 @@ matches `conversations.id` TEXT; `merge_set_repos.issue_id` TEXT matches
   isn't mistaken for one): `events.payload`, `health_events.metadata`,
   `issues.blockers`, `review_status.inspect_notes/verification_notes/…`,
   `discovered_sessions.tools_used/files_touched/tags/models_used`,
-  `observation_index.observation_path_jsonl`, `uat_generation_resolutions.issue_ids/files`,
+  `uat_generation_resolutions.issue_ids/files`,
   `agents.role_run_head` / `agents.fork_request`-style fields. These are JSON
   payloads serialized into TEXT by design.
 

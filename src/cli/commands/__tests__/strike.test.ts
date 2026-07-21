@@ -1,9 +1,49 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Command } from 'commander';
+import { Effect } from 'effect';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'fs';
+import { tmpdir } from 'os';
+import { join } from 'path';
+import { spawnSync } from 'child_process';
+
+const agentMocks = vi.hoisted(() => ({
+  getAgentRuntimeState: vi.fn(),
+  spawnAgent: vi.fn(),
+  stopAgent: vi.fn(),
+}));
+
+const tmuxMocks = vi.hoisted(() => ({
+  sessionExists: vi.fn(),
+}));
+
+vi.mock('../../../lib/agents.js', () => ({
+  getAgentRuntimeState: agentMocks.getAgentRuntimeState,
+  spawnAgent: agentMocks.spawnAgent,
+  stopAgent: agentMocks.stopAgent,
+}));
+
+vi.mock('../../../lib/tmux.js', () => ({
+  sessionExists: tmuxMocks.sessionExists,
+}));
 
 import { strikeCommand, __testInternals } from '../strike.js';
 
+function git(cwd: string, args: string[]): string {
+  const result = spawnSync('git', args, { cwd, encoding: 'utf8' });
+  if (result.status !== 0) {
+    throw new Error(`git ${args.join(' ')} failed: ${result.stderr || result.stdout}`);
+  }
+  return result.stdout;
+}
+
 describe('strikeCommand', () => {
+  beforeEach(() => {
+    agentMocks.getAgentRuntimeState.mockReset();
+    agentMocks.spawnAgent.mockReset();
+    agentMocks.stopAgent.mockReset();
+    tmuxMocks.sessionExists.mockReset();
+  });
+
   it('exports a function', () => {
     expect(typeof strikeCommand).toBe('function');
   });
@@ -44,8 +84,97 @@ describe('strikeCommand', () => {
     expect(prompt).toContain('PAN-1234');
     expect(prompt).toContain('strike/pan-1234');
     expect(prompt).toContain('/tmp/feature-pan-1234-strike');
-    expect(prompt).toContain('merge fast-forward to `main`');
-    // Strike must explicitly not call pan done
+    expect(prompt).not.toMatch(/merge fast-forward/);
+    expect(prompt).not.toMatch(/push\s+origin\s+main/);
+    expect(prompt).toContain('git push origin strike/pan-1234');
+    expect(prompt).toContain('pan strike-ready PAN-1234');
+    expect(prompt).not.toContain('pan tell flywheel-orchestrator');
+    // Strike must explicitly not call the normal review-pipeline form.
     expect(prompt).toContain('Do NOT call `pan done`');
+  });
+
+  it('clears an idle prior strike session so the issue can be struck again', async () => {
+    const fakePlan = {
+      issueId: 'PAN-2022',
+      workspace: '/tmp/feature-pan-2022-strike',
+      branch: 'strike/pan-2022',
+      sessionName: 'strike-pan-2022',
+      projectRoot: '/tmp/project',
+    };
+    tmuxMocks.sessionExists.mockReturnValue(Effect.succeed(true));
+    agentMocks.getAgentRuntimeState.mockReturnValue(Effect.succeed({
+      state: 'idle',
+      lastActivity: '2026-06-24T00:00:00.000Z',
+    }));
+    agentMocks.stopAgent.mockReturnValue(Effect.void);
+
+    await expect(__testInternals.clearIdlePriorStrike(fakePlan)).resolves.toBe(true);
+
+    expect(agentMocks.stopAgent).toHaveBeenCalledWith('strike-pan-2022');
+  });
+
+  it('clears a prior strike session with no runtime state so the issue can be struck again', async () => {
+    const fakePlan = {
+      issueId: 'PAN-2058',
+      workspace: '/tmp/feature-pan-2058-strike',
+      branch: 'strike/pan-2058',
+      sessionName: 'strike-pan-2058',
+      projectRoot: '/tmp/project',
+    };
+    tmuxMocks.sessionExists.mockReturnValue(Effect.succeed(true));
+    agentMocks.getAgentRuntimeState.mockReturnValue(Effect.succeed(null));
+    agentMocks.stopAgent.mockReturnValue(Effect.void);
+
+    await expect(__testInternals.clearIdlePriorStrike(fakePlan)).resolves.toBe(true);
+
+    expect(agentMocks.stopAgent).toHaveBeenCalledWith('strike-pan-2058');
+  });
+
+  it('does not clear an active prior strike session', async () => {
+    const fakePlan = {
+      issueId: 'PAN-2022',
+      workspace: '/tmp/feature-pan-2022-strike',
+      branch: 'strike/pan-2022',
+      sessionName: 'strike-pan-2022',
+      projectRoot: '/tmp/project',
+    };
+    tmuxMocks.sessionExists.mockReturnValue(Effect.succeed(true));
+    agentMocks.getAgentRuntimeState.mockReturnValue(Effect.succeed({
+      state: 'active',
+      lastActivity: '2026-06-24T00:00:00.000Z',
+    }));
+
+    await expect(__testInternals.clearIdlePriorStrike(fakePlan)).rejects.toThrow(/already running/);
+
+    expect(agentMocks.stopAgent).not.toHaveBeenCalled();
+  });
+
+  it('replaces a stale strike directory with a registered worktree on the strike branch', async () => {
+    const repo = mkdtempSync(join(tmpdir(), 'pan-strike-repo-'));
+    const origin = mkdtempSync(join(tmpdir(), 'pan-strike-origin-'));
+    git(repo, ['init', '-b', 'main']);
+    writeFileSync(join(repo, 'README.md'), 'base\n', 'utf8');
+    git(repo, ['add', 'README.md']);
+    git(repo, ['-c', 'user.name=Test', '-c', 'user.email=test@example.com', 'commit', '-m', 'initial']);
+    git(origin, ['init', '--bare']);
+    git(repo, ['remote', 'add', 'origin', origin]);
+    git(repo, ['push', '-u', 'origin', 'main']);
+
+    const workspace = join(repo, 'workspaces', 'feature-pan-2061-strike');
+    mkdirSync(workspace, { recursive: true });
+    writeFileSync(join(workspace, 'stale.txt'), 'not a worktree\n', 'utf8');
+
+    await __testInternals.ensureStrikeWorktree({
+      issueId: 'PAN-2061',
+      workspace,
+      branch: 'strike/pan-2061',
+      sessionName: 'strike-pan-2061',
+      projectRoot: repo,
+    });
+
+    expect(existsSync(join(workspace, 'stale.txt'))).toBe(false);
+    expect(readFileSync(join(workspace, '.git'), 'utf8')).toContain('gitdir:');
+    expect(git(workspace, ['branch', '--show-current']).trim()).toBe('strike/pan-2061');
+    expect(git(repo, ['worktree', 'list', '--porcelain'])).toContain(`worktree ${workspace}\n`);
   });
 });

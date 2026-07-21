@@ -1,6 +1,7 @@
 import { EventEmitter } from 'node:events';
+import { promisify } from 'node:util';
 import { Effect } from 'effect';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   acquireRestartLock: vi.fn(),
@@ -9,12 +10,20 @@ const mocks = vi.hoisted(() => ({
   restartDashboard: vi.fn(),
   stopDashboard: vi.fn(),
   writeRestartStatus: vi.fn(),
+  refuseNonPrimaryDashboardCwd: vi.fn(),
   resolveBundledServerPath: vi.fn(),
+  resolvePrimaryDashboardIdentity: vi.fn(),
   spawnDashboardDetached: vi.fn(),
+  exec: vi.fn(),
   spawn: vi.fn(),
   statSync: vi.fn(),
+  fsAccess: vi.fn(),
+  fsRm: vi.fn(),
+  fsCp: vi.fn(),
+  fsRename: vi.fn(),
   readDevSupervisorMarker: vi.fn(),
   devSupervisorRefusalLines: vi.fn(),
+  agentRestartBlockReason: vi.fn(),
 }));
 
 // reloadCommand refuses to run when a `pan dev` supervisor marker is present.
@@ -29,6 +38,10 @@ vi.mock('../../../lib/dev-supervisor.js', () => ({
 vi.mock('../../../lib/restart-lock.js', () => ({
   acquireRestartLock: mocks.acquireRestartLock,
   readRestartLockHolder: mocks.readRestartLockHolder,
+}));
+
+vi.mock('../../../lib/deploy/agent-restart-gate.js', () => ({
+  agentRestartBlockReason: mocks.agentRestartBlockReason,
 }));
 
 vi.mock('../../../lib/platform-lifecycle.js', () => ({
@@ -50,16 +63,30 @@ vi.mock('../../../lib/restart-status.js', () => ({
 }));
 
 vi.mock('../restart.js', () => ({
+  refuseNonPrimaryDashboardCwd: mocks.refuseNonPrimaryDashboardCwd,
   resolveBundledServerPath: mocks.resolveBundledServerPath,
+  resolvePrimaryDashboardIdentity: mocks.resolvePrimaryDashboardIdentity,
   spawnDashboardDetached: mocks.spawnDashboardDetached,
 }));
 
-vi.mock('child_process', () => ({
-  spawn: mocks.spawn,
-}));
+vi.mock('child_process', () => {
+  const exec = mocks.exec as typeof mocks.exec & { [promisify.custom]?: unknown };
+  exec[promisify.custom] = (command: string, options: { cwd?: string }) => mocks.exec(command, options);
+  return {
+    exec,
+    spawn: mocks.spawn,
+  };
+});
 
 vi.mock('fs', async (importActual) => ({
   ...(await importActual<typeof import('fs')>()),
+  promises: {
+    ...(await importActual<typeof import('fs')>()).promises,
+    access: mocks.fsAccess,
+    rm: mocks.fsRm,
+    cp: mocks.fsCp,
+    rename: mocks.fsRename,
+  },
   statSync: mocks.statSync,
 }));
 
@@ -77,26 +104,82 @@ function mockSpawnExits(opts: { install?: number; build?: number } = {}): void {
   });
 }
 
+function mockExecByCommand(handlers: Record<string, Array<{ stdout?: string; code?: number; stderr?: string }>>): void {
+  const remaining = new Map(Object.entries(handlers).map(([command, results]) => [command, [...results]]));
+  mocks.exec.mockImplementation(async (command: string) => {
+    const queue = remaining.get(command);
+    const result = queue?.shift();
+    if (!result) {
+      throw new Error(`Unexpected exec command: ${command}`);
+    }
+    if (typeof result.code === 'number' && result.code !== 0) {
+      const error = new Error(result.stderr || `Command failed: ${command}`) as Error & { code: number; stderr?: string };
+      error.code = result.code;
+      error.stderr = result.stderr;
+      throw error;
+    }
+    return { stdout: result.stdout ?? '', stderr: result.stderr ?? '' };
+  });
+}
+
+const originalAgentId = process.env.OVERDECK_AGENT_ID;
+const originalHome = process.env.HOME;
+const originalPath = process.env.PATH;
+
+function restoreEnv(): void {
+  if (originalAgentId === undefined) delete process.env.OVERDECK_AGENT_ID;
+  else process.env.OVERDECK_AGENT_ID = originalAgentId;
+  if (originalHome === undefined) delete process.env.HOME;
+  else process.env.HOME = originalHome;
+  if (originalPath === undefined) delete process.env.PATH;
+  else process.env.PATH = originalPath;
+}
+
 describe('reloadCommand', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.exitCode = undefined;
+    delete process.env.OVERDECK_AGENT_ID;
+    process.env.HOME = '/home/test';
+    process.env.PATH = '/usr/bin:/bin';
+    vi.spyOn(process, 'cwd').mockReturnValue('/repo');
     vi.spyOn(console, 'error').mockImplementation(() => {});
     vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
     mocks.acquireRestartLock.mockReturnValue(Effect.succeed({ release: vi.fn(() => Promise.resolve()) }));
     mocks.readRestartLockHolder.mockReturnValue(Effect.succeed(null));
     mocks.readPlatformConfig.mockReturnValue({
       dashboardPort: 3010,
       dashboardApiPort: 3011,
       traefikEnabled: false,
-      traefikDomain: 'pan.localhost',
+      traefikDomain: 'overdeck.localhost',
       traefikDir: '/tmp/traefik',
     });
     mocks.restartDashboard.mockReturnValue(Effect.succeed(undefined));
     mocks.writeRestartStatus.mockReturnValue(Effect.succeed(undefined));
+    mocks.refuseNonPrimaryDashboardCwd.mockReturnValue(false);
     mocks.resolveBundledServerPath.mockReturnValue('/tmp/server.js');
+    mocks.resolvePrimaryDashboardIdentity.mockReturnValue({ repoRoot: '/repo', mode: 'primary' });
     mocks.readDevSupervisorMarker.mockReturnValue(null);
     mocks.devSupervisorRefusalLines.mockReturnValue([]);
+    mocks.agentRestartBlockReason.mockResolvedValue(null);
+    mocks.fsAccess.mockImplementation(async (path: string) => {
+      if (path === '/usr/bin/bun') return;
+      throw Object.assign(new Error(`ENOENT: ${path}`), { code: 'ENOENT' });
+    });
+    mocks.fsRm.mockResolvedValue(undefined);
+    mocks.fsCp.mockResolvedValue(undefined);
+    mocks.fsRename.mockResolvedValue(undefined);
+    mockExecByCommand({
+      "git 'rev-parse' '--show-toplevel'": [{ stdout: '/repo\n' }],
+      "git 'fetch' 'origin' 'main'": [{ stdout: '' }],
+      "git 'merge-base' '--is-ancestor' 'origin/main' 'HEAD'": [{ stdout: '' }],
+    });
+  });
+
+  afterEach(() => {
+    restoreEnv();
+    process.exitCode = undefined;
   });
 
   it('signals a running pan dev supervisor (SIGUSR2) instead of refusing or restarting (PAN-1662)', async () => {
@@ -110,6 +193,7 @@ describe('reloadCommand', () => {
 
     await reloadCommand({});
 
+    expect(mocks.acquireRestartLock).toHaveBeenCalledWith('pan reload');
     expect(killSpy).toHaveBeenCalledWith(424242, 'SIGUSR2');
     // It signals the dev supervisor to hot-restart in place — it must NOT run a
     // production restart or refuse with a non-zero exit code.
@@ -118,6 +202,96 @@ describe('reloadCommand', () => {
     expect(process.exitCode).toBeUndefined();
 
     killSpy.mockRestore();
+  });
+
+  it('refuses to signal pan dev when the restart lock is already held', async () => {
+    mocks.readDevSupervisorMarker.mockReturnValue({
+      pid: 424242,
+      dashboardPort: 3010,
+      apiPort: 3011,
+      startedAt: '2026-06-07T00:00:00.000Z',
+    });
+    mocks.acquireRestartLock.mockReturnValue(Effect.succeed(null));
+    mocks.readRestartLockHolder.mockReturnValue(
+      Effect.succeed({ pid: 777777, caller: 'pan reload', ts: Date.now() }),
+    );
+    const killSpy = vi.spyOn(process, 'kill').mockImplementation(() => true);
+
+    await reloadCommand({});
+
+    expect(killSpy).not.toHaveBeenCalled();
+    expect(mocks.restartDashboard).not.toHaveBeenCalled();
+    expect(mocks.spawn).not.toHaveBeenCalled();
+    expect(mocks.writeRestartStatus).toHaveBeenCalledWith(
+      expect.objectContaining({ success: false, error: expect.stringContaining('restart in progress') }),
+    );
+    expect(process.exitCode).toBe(2);
+
+    killSpy.mockRestore();
+  });
+
+  it('refuses the detached path when the restart lock is already held', async () => {
+    mocks.acquireRestartLock.mockReturnValue(Effect.succeed(null));
+    mocks.readRestartLockHolder.mockReturnValue(
+      Effect.succeed({ pid: 777777, caller: 'pan reload', ts: Date.now() }),
+    );
+
+    await reloadCommand({});
+
+    expect(mocks.restartDashboard).not.toHaveBeenCalled();
+    expect(mocks.spawn).not.toHaveBeenCalled();
+    expect(mocks.writeRestartStatus).toHaveBeenCalledWith(
+      expect.objectContaining({ success: false, error: expect.stringContaining('restart in progress') }),
+    );
+    expect(process.exitCode).toBe(2);
+  });
+
+  it('refuses a blocked agent reload before acquiring the restart lock or building', async () => {
+    process.env.OVERDECK_AGENT_ID = 'agent-pan-2772';
+    mocks.agentRestartBlockReason.mockResolvedValue('Restart refused by active deployment gate.');
+
+    await reloadCommand({});
+
+    expect(mocks.agentRestartBlockReason).toHaveBeenCalledWith({
+      initiator: 'agent-pan-2772',
+      force: false,
+    });
+    expect(console.error).toHaveBeenCalledWith('Restart refused by active deployment gate.');
+    expect(process.exitCode).toBe(1);
+    expect(mocks.acquireRestartLock).not.toHaveBeenCalled();
+    expect(mocks.spawn).not.toHaveBeenCalled();
+    expect(mocks.restartDashboard).not.toHaveBeenCalled();
+  });
+
+  it('allows --force to proceed through the agent reload gate', async () => {
+    process.env.OVERDECK_AGENT_ID = 'agent-pan-2772';
+
+    await reloadCommand({ force: true, skipBuild: true });
+
+    expect(mocks.agentRestartBlockReason).toHaveBeenCalledWith({
+      initiator: 'agent-pan-2772',
+      force: true,
+    });
+    expect(mocks.acquireRestartLock).toHaveBeenCalledWith('pan reload');
+    expect(mocks.restartDashboard).toHaveBeenCalledTimes(1);
+  });
+
+  it('skips the agent reload gate when no initiator is present', async () => {
+    await reloadCommand({ skipBuild: true });
+
+    expect(mocks.agentRestartBlockReason).not.toHaveBeenCalled();
+    expect(mocks.acquireRestartLock).toHaveBeenCalledWith('pan reload');
+    expect(mocks.restartDashboard).toHaveBeenCalledTimes(1);
+  });
+
+  it('warns that a proceeding agent reload disconnects live sessions', async () => {
+    process.env.OVERDECK_AGENT_ID = 'agent-pan-2772';
+
+    await reloadCommand({ skipBuild: true });
+
+    expect(console.log).toHaveBeenCalledWith(expect.stringContaining(
+      'disconnect every live conversation and terminal until clients reconnect',
+    ));
   });
 
   it('runs bun install before the build, then restartDashboard, on success', async () => {
@@ -130,21 +304,67 @@ describe('reloadCommand', () => {
 
     // Deps are installed before the build so a rebase-added runtime dep can't
     // produce a server bundle that boot-crashes (ERR_MODULE_NOT_FOUND).
-    expect(mocks.spawn).toHaveBeenCalledWith('bun', ['install'], expect.objectContaining({ stdio: 'inherit' }));
-    expect(mocks.spawn).toHaveBeenCalledWith('npm', ['run', 'build'], expect.objectContaining({ stdio: 'inherit' }));
-    const installOrder = mocks.spawn.mock.calls.findIndex(([c]) => c === 'bun');
+    expect(mocks.exec).toHaveBeenCalledWith("git 'rev-parse' '--show-toplevel'", expect.objectContaining({ cwd: '/repo' }));
+    expect(mocks.exec).toHaveBeenCalledWith("git 'fetch' 'origin' 'main'", expect.objectContaining({ cwd: '/repo' }));
+    expect(mocks.exec).toHaveBeenCalledWith("git 'merge-base' '--is-ancestor' 'origin/main' 'HEAD'", expect.objectContaining({ cwd: '/repo' }));
+    expect(mocks.exec).not.toHaveBeenCalledWith(expect.stringContaining("'worktree' 'add'"), expect.anything());
+    expect(mocks.spawn).toHaveBeenCalledWith('/usr/bin/bun', ['install'], expect.objectContaining({ cwd: '/repo', stdio: 'inherit' }));
+    expect(mocks.spawn).toHaveBeenCalledWith('npm', ['run', 'build'], expect.objectContaining({ cwd: '/repo', stdio: 'inherit' }));
+    const installOrder = mocks.spawn.mock.calls.findIndex(([c]) => c === '/usr/bin/bun');
     const buildOrder = mocks.spawn.mock.calls.findIndex(([c, a]) => c === 'npm' && a[1] === 'build');
     expect(installOrder).toBeLessThan(buildOrder);
     expect(mocks.restartDashboard).toHaveBeenCalledTimes(1);
     expect(process.exitCode).toBeUndefined();
   });
 
+  it('falls back to ~/.bun/bin/bun when the inherited PATH does not contain bun', async () => {
+    process.env.HOME = '/home/service';
+    mocks.fsAccess.mockImplementation(async (path: string) => {
+      if (path === '/home/service/.bun/bin/bun') return;
+      throw Object.assign(new Error(`ENOENT: ${path}`), { code: 'ENOENT' });
+    });
+    mocks.statSync
+      .mockReturnValueOnce({ mtimeMs: 1000 })
+      .mockReturnValueOnce({ mtimeMs: 2000 });
+    mockSpawnExits();
+
+    await reloadCommand({});
+
+    expect(mocks.fsAccess).toHaveBeenCalledWith('/usr/bin/bun', expect.any(Number));
+    expect(mocks.fsAccess).toHaveBeenCalledWith('/bin/bun', expect.any(Number));
+    expect(mocks.fsAccess).toHaveBeenCalledWith('/home/service/.bun/bin/bun', expect.any(Number));
+    expect(mocks.spawn).toHaveBeenCalledWith(
+      '/home/service/.bun/bin/bun',
+      ['install'],
+      expect.objectContaining({ cwd: '/repo', stdio: 'inherit' }),
+    );
+    expect(mocks.restartDashboard).toHaveBeenCalledTimes(1);
+    expect(process.exitCode).toBeUndefined();
+  });
+
+  it('reports a clear error when bun is absent from PATH and ~/.bun/bin', async () => {
+    process.env.HOME = '/home/service';
+    mocks.fsAccess.mockRejectedValue(Object.assign(new Error('ENOENT'), { code: 'ENOENT' }));
+    mocks.statSync.mockReturnValue({ mtimeMs: 1000 });
+
+    await reloadCommand({});
+
+    expect(mocks.spawn).not.toHaveBeenCalled();
+    expect(mocks.restartDashboard).not.toHaveBeenCalled();
+    expect(mocks.writeRestartStatus).toHaveBeenCalledWith(expect.objectContaining({
+      success: false,
+      error: expect.stringContaining('bun executable not found in PATH or at /home/service/.bun/bin/bun'),
+    }));
+    expect(process.exitCode).toBe(1);
+  });
+
   it('aborts without building or restarting when bun install fails', async () => {
+    mocks.statSync.mockReturnValue({ mtimeMs: 1000 });
     mockSpawnExits({ install: 1 });
 
     await reloadCommand({});
 
-    expect(mocks.spawn).toHaveBeenCalledWith('bun', ['install'], expect.objectContaining({ stdio: 'inherit' }));
+    expect(mocks.spawn).toHaveBeenCalledWith('/usr/bin/bun', ['install'], expect.objectContaining({ stdio: 'inherit' }));
     expect(mocks.spawn).not.toHaveBeenCalledWith('npm', ['run', 'build'], expect.anything());
     expect(mocks.restartDashboard).not.toHaveBeenCalled();
     expect(mocks.spawnDashboardDetached).not.toHaveBeenCalled();
@@ -161,5 +381,109 @@ describe('reloadCommand', () => {
     expect(mocks.stopDashboard).not.toHaveBeenCalled();
     expect(mocks.spawnDashboardDetached).not.toHaveBeenCalled();
     expect(process.exitCode).toBe(1);
+  });
+
+  it('builds from a detached origin/main worktree and swaps dist when primary HEAD is stale', async () => {
+    const repoRoot = '/repo';
+    const buildWorktree = `${repoRoot.replace(/\/[^/]+$/, '')}/.pan-reload-build-${process.pid}`;
+    mocks.statSync
+      .mockReturnValueOnce({ mtimeMs: 1000 })
+      .mockReturnValueOnce({ mtimeMs: 2000 });
+    mockExecByCommand({
+      "git 'rev-parse' '--show-toplevel'": [{ stdout: `${repoRoot}\n` }],
+      "git 'fetch' 'origin' 'main'": [{ stdout: '' }],
+      "git 'merge-base' '--is-ancestor' 'origin/main' 'HEAD'": [{ code: 1 }],
+      "git 'rev-parse' '--short' 'origin/main'": [{ stdout: '0973c8c\n' }],
+      [`git 'worktree' 'add' '--detach' '${buildWorktree}' 'origin/main'`]: [{ stdout: '' }],
+      [`git 'worktree' 'remove' '--force' '${buildWorktree}'`]: [{ stdout: '' }],
+    });
+    mockSpawnExits();
+
+    await reloadCommand({});
+
+    expect(mocks.spawn).toHaveBeenCalledWith('/usr/bin/bun', ['install'], expect.objectContaining({ cwd: buildWorktree }));
+    expect(mocks.spawn).toHaveBeenCalledWith('npm', ['run', 'build'], expect.objectContaining({ cwd: buildWorktree }));
+    expect(mocks.fsCp).toHaveBeenCalledWith(`${buildWorktree}/dist`, `${repoRoot}/dist.incoming`, { recursive: true });
+    expect(mocks.fsRename).toHaveBeenCalledWith(`${repoRoot}/dist`, `${repoRoot}/dist.old.${process.pid}`);
+    expect(mocks.fsRename).toHaveBeenCalledWith(`${repoRoot}/dist.incoming`, `${repoRoot}/dist`);
+    expect(mocks.exec).toHaveBeenCalledWith(
+      `git 'worktree' 'remove' '--force' '${buildWorktree}'`,
+      expect.objectContaining({ cwd: repoRoot }),
+    );
+    expect(console.log).toHaveBeenCalledWith(expect.stringContaining('0973c8c'));
+    expect(mocks.restartDashboard).toHaveBeenCalledTimes(1);
+    expect(process.exitCode).toBeUndefined();
+  });
+
+  it('cleans up the detached worktree and preserves the running server when worktree build fails', async () => {
+    const repoRoot = '/repo';
+    const buildWorktree = `${repoRoot.replace(/\/[^/]+$/, '')}/.pan-reload-build-${process.pid}`;
+    mocks.statSync.mockReturnValue({ mtimeMs: 1000 });
+    mockExecByCommand({
+      "git 'rev-parse' '--show-toplevel'": [{ stdout: `${repoRoot}\n` }],
+      "git 'fetch' 'origin' 'main'": [{ stdout: '' }],
+      "git 'merge-base' '--is-ancestor' 'origin/main' 'HEAD'": [{ code: 1 }],
+      "git 'rev-parse' '--short' 'origin/main'": [{ stdout: '0973c8c\n' }],
+      [`git 'worktree' 'add' '--detach' '${buildWorktree}' 'origin/main'`]: [{ stdout: '' }],
+      [`git 'worktree' 'remove' '--force' '${buildWorktree}'`]: [{ stdout: '' }],
+    });
+    mockSpawnExits({ build: 1 });
+
+    await reloadCommand({});
+
+    expect(mocks.exec).toHaveBeenCalledWith(
+      `git 'worktree' 'remove' '--force' '${buildWorktree}'`,
+      expect.objectContaining({ cwd: repoRoot }),
+    );
+    expect(mocks.fsRm).toHaveBeenCalledWith(buildWorktree, { recursive: true, force: true });
+    expect(mocks.restartDashboard).not.toHaveBeenCalled();
+    expect(mocks.writeRestartStatus).toHaveBeenCalledWith(
+      expect.objectContaining({ success: false, error: expect.stringContaining('Build failed') }),
+    );
+    expect(process.exitCode).toBe(1);
+  });
+
+  it('does not restart the dashboard when git fetch fails', async () => {
+    mocks.statSync.mockReturnValue({ mtimeMs: 1000 });
+    mockExecByCommand({
+      "git 'rev-parse' '--show-toplevel'": [{ stdout: '/repo\n' }],
+      "git 'fetch' 'origin' 'main'": [{ code: 128, stderr: 'fetch failed' }],
+    });
+
+    await reloadCommand({});
+
+    expect(mocks.spawn).not.toHaveBeenCalled();
+    expect(mocks.restartDashboard).not.toHaveBeenCalled();
+    expect(mocks.writeRestartStatus).toHaveBeenCalledWith(
+      expect.objectContaining({ success: false, error: expect.stringContaining('fetch failed') }),
+    );
+    expect(process.exitCode).toBe(1);
+  });
+
+  it('resolves a workspace cwd to the primary repo root before building and restarting', async () => {
+    vi.mocked(process.cwd).mockReturnValue('/repo/workspaces/feature-pan-2095/subdir');
+    mocks.statSync
+      .mockReturnValueOnce({ mtimeMs: 1000 })
+      .mockReturnValueOnce({ mtimeMs: 2000 });
+    mockExecByCommand({
+      "git 'rev-parse' '--show-toplevel'": [{ stdout: '/repo/workspaces/feature-pan-2095\n' }],
+      "git 'fetch' 'origin' 'main'": [{ stdout: '' }],
+      "git 'merge-base' '--is-ancestor' 'origin/main' 'HEAD'": [{ stdout: '' }],
+    });
+    mockSpawnExits();
+
+    await reloadCommand({});
+
+    expect(mocks.exec).toHaveBeenCalledWith(
+      "git 'rev-parse' '--show-toplevel'",
+      expect.objectContaining({ cwd: '/repo/workspaces/feature-pan-2095/subdir' }),
+    );
+    expect(mocks.exec).toHaveBeenCalledWith("git 'fetch' 'origin' 'main'", expect.objectContaining({ cwd: '/repo' }));
+    expect(mocks.spawn).toHaveBeenCalledWith('/usr/bin/bun', ['install'], expect.objectContaining({ cwd: '/repo' }));
+    expect(mocks.restartDashboard).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.any(Function),
+      expect.objectContaining({ expectedIdentity: { repoRoot: '/repo', mode: 'primary' } }),
+    );
   });
 });

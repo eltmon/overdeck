@@ -1,9 +1,24 @@
-import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render as rtlRender, screen, within } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import type { ReactElement } from 'react';
 import type { MemoryObservation } from '@overdeck/contracts';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useDashboardStore } from '../../../lib/store';
+import { installStrictFetchMock } from '../../../test-utils/strictFetchMock';
 import { SESSION_FEED_TAB_STORAGE_KEY, SessionFeedSidebar } from '../SessionFeedSidebar';
 import type { ConversationSessionFeedEntry, GitSessionFeedEntry } from '../types';
+
+// The sidebar's pending-input count now spans two domains: agents from the read
+// model and conversations from the REST door, which it reads via react-query.
+// Every call site renders through a provider so the union can be fetched.
+let queryClients: QueryClient[] = [];
+let fetchControl: ReturnType<typeof installStrictFetchMock>;
+
+function render(ui: ReactElement) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  queryClients.push(client);
+  return rtlRender(<QueryClientProvider client={client}>{ui}</QueryClientProvider>);
+}
 
 const hookSources = vi.hoisted(() => ({
   conversations: { entries: [] as ConversationSessionFeedEntry[], isLoading: false, error: null as Error | null },
@@ -22,7 +37,9 @@ vi.mock('../useGitFeed', () => ({
 
 const now = new Date('2026-05-23T01:05:00.000Z');
 
-function observation(id: string, timestamp: string, actionStatus: string | null, issueId = 'PAN-1389'): MemoryObservation {
+// The descriptive text is the observation `summary` (rendered as the headline);
+// `actionStatus` holds the terse lifecycle token rendered as a chip (PAN-2040).
+function observation(id: string, timestamp: string, summary: string, issueId = 'PAN-1389'): MemoryObservation {
   return {
     id,
     timestamp,
@@ -35,9 +52,9 @@ function observation(id: string, timestamp: string, actionStatus: string | null,
     agentHarness: 'claude-code',
     gitBranch: `feature/${issueId.toLowerCase()}`,
     sourceTranscriptOffset: 1,
-    actionStatus,
+    actionStatus: 'in_progress',
     narrative: 'Narrative',
-    summary: 'Summary',
+    summary,
     files: [],
     tags: [],
     tokens: { prompt: 1, completion: 1, total: 2 },
@@ -77,6 +94,13 @@ function conversationEntry(overrides: Partial<ConversationSessionFeedEntry> = {}
 
 describe('SessionFeedSidebar', () => {
   beforeEach(() => {
+    queryClients = [];
+    fetchControl = installStrictFetchMock(({ method, url }) => {
+      if (method === 'GET' && url === '/api/conversations/pending-input') {
+        return Response.json([]);
+      }
+      return undefined;
+    });
     window.history.pushState(null, '', '/');
     window.localStorage.clear();
     hookSources.conversations = { entries: [], isLoading: false, error: null };
@@ -86,6 +110,14 @@ describe('SessionFeedSidebar', () => {
     hookSources.useConversationFeed.mockClear();
     hookSources.useGitFeed.mockClear();
     useDashboardStore.setState({ observationsByIssueId: {}, recentActivity: [] });
+  });
+
+  afterEach(async () => {
+    cleanup();
+    await Promise.all(queryClients.map((client) => client.cancelQueries()));
+    queryClients.forEach((client) => client.clear());
+    await fetchControl.assertNoUnexpectedRequests();
+    vi.unstubAllGlobals();
   });
 
   it('renders the six tabs in reference order and calls onClose', () => {
@@ -171,10 +203,10 @@ describe('SessionFeedSidebar', () => {
 
     const section = screen.getByText('Just Now').closest('section');
     expect(section).not.toBeNull();
-    const entries = within(section as HTMLElement).getAllByRole('button');
-    expect(entries.map((button) => button.textContent)).toEqual([
-      'Newer activityfeature-pan-1389 · PAN-1389·1m agoMemory',
-      'Older activityfeature-pan-1389 · PAN-1389·3m agoMemory',
+    const entries = within(section as HTMLElement).getAllByTestId('activity-feed-card');
+    expect(entries.map((entryEl) => entryEl.textContent)).toEqual([
+      'Newer activityin_progressfeature-pan-1389 · PAN-1389·1m agoMemory',
+      'Older activityin_progressfeature-pan-1389 · PAN-1389·3m agoMemory',
     ]);
     const badgeRow = within(entries[0]).getByTestId('notification-class-memory').parentElement;
     expect(badgeRow).toHaveTextContent('feature-pan-1389 · PAN-1389');
@@ -190,7 +222,7 @@ describe('SessionFeedSidebar', () => {
           timestamp: '2026-05-23T01:04:00.000Z',
           source: 'work',
           level: 'info',
-          message: 'Work agent committed bead-3',
+          message: 'Work agent committed task-3',
           details: null,
           issueId: 'PAN-1507',
         },
@@ -201,7 +233,7 @@ describe('SessionFeedSidebar', () => {
     fireEvent.click(screen.getByRole('tab', { name: 'Activity' }));
 
     expect(screen.queryByTestId('session-feed-empty-activity')).toBeNull();
-    expect(screen.getByText('Work agent committed bead-3')).toBeTruthy();
+    expect(screen.getByText('Work agent committed task-3')).toBeTruthy();
   });
 
   it('updates the Activity tab when observations change without remounting', () => {
@@ -296,7 +328,7 @@ describe('SessionFeedSidebar', () => {
           timestamp: '2026-05-23T01:03:00.000Z',
           source: 'work',
           level: 'info',
-          message: 'Work agent committed bead-3',
+          message: 'Work agent committed task-3',
           details: null,
           issueId: 'OTHER-99',
         },
@@ -309,7 +341,7 @@ describe('SessionFeedSidebar', () => {
 
     // The restart (system-wide) survives the scope filter; the work entry does not.
     expect(screen.getByText(/Dashboard restarted via pan reload/)).toBeTruthy();
-    expect(screen.queryByText('Work agent committed bead-3')).toBeNull();
+    expect(screen.queryByText('Work agent committed task-3')).toBeNull();
   });
 
   it('navigates restart entries to their initiator conversation via the link field', () => {

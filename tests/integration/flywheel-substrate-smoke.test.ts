@@ -1,12 +1,22 @@
 import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
+import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { chromium, type Browser, type BrowserContext, type Page } from 'playwright';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { FlywheelStats } from '@overdeck/contracts';
 import { runGhIssueTrailerHook } from '../../sync-sources/hooks/gh-issue-trailer-hook.ts';
 
 const projectRoot = resolve(__dirname, '../..');
+const require = createRequire(import.meta.url);
+const frontendRoot = join(projectRoot, 'src/dashboard/frontend');
+const packageResolutionRoots = [
+  frontendRoot,
+  projectRoot,
+  join(projectRoot, 'node_modules/.bun/node_modules'),
+  resolve(projectRoot, '../..'),
+  resolve(projectRoot, '../../node_modules/.bun/node_modules'),
+];
 
 let tempDirs: string[] = [];
 let previousOverdeckHome: string | undefined;
@@ -14,6 +24,14 @@ let browser: Browser | undefined;
 let context: BrowserContext | undefined;
 let page: Page | undefined;
 let viteServer: { close: () => Promise<void>; httpServer?: { address: () => unknown } } | undefined;
+
+function resolvePackage(specifier: string): string {
+  return require.resolve(specifier, { paths: packageResolutionRoots });
+}
+
+function resolvePackageDir(specifier: string): string {
+  return dirname(resolvePackage(`${specifier}/package.json`));
+}
 
 function payload(command: string): string {
   return JSON.stringify({ tool_name: 'Bash', tool_input: { command } });
@@ -42,17 +60,17 @@ async function makeOverdeckHome(): Promise<string> {
 }
 
 async function openFlywheelStatsPage(stats: FlywheelStats): Promise<void> {
-  const { createServer } = await import('../../src/dashboard/frontend/node_modules/vite/dist/node/index.js');
+  const { createServer } = await import(resolvePackage('vite'));
   const root = await mkdtemp(join(tmpdir(), 'pan-flywheel-stats-page-'));
   tempDirs.push(root);
   await mkdir(join(root, 'src'), { recursive: true });
   await mkdir(join(root, 'node_modules'), { recursive: true });
   await symlink(resolve(projectRoot, 'src/dashboard/frontend/src'), join(root, 'src', 'dashboard-frontend'), 'dir');
-  await symlink(resolve(projectRoot, 'src/dashboard/frontend/node_modules/react'), join(root, 'node_modules', 'react'), 'dir');
-  await symlink(resolve(projectRoot, 'src/dashboard/frontend/node_modules/react-dom'), join(root, 'node_modules', 'react-dom'), 'dir');
-  await symlink(resolve(projectRoot, 'node_modules/.bun/scheduler@0.23.2/node_modules/scheduler'), join(root, 'node_modules', 'scheduler'), 'dir');
-  await symlink(resolve(projectRoot, 'node_modules/.bun/loose-envify@1.4.0/node_modules/loose-envify'), join(root, 'node_modules', 'loose-envify'), 'dir');
-  await symlink(resolve(projectRoot, 'src/dashboard/frontend/node_modules/lucide-react'), join(root, 'node_modules', 'lucide-react'), 'dir');
+  await symlink(resolvePackageDir('react'), join(root, 'node_modules', 'react'), 'dir');
+  await symlink(resolvePackageDir('react-dom'), join(root, 'node_modules', 'react-dom'), 'dir');
+  await symlink(resolvePackageDir('scheduler'), join(root, 'node_modules', 'scheduler'), 'dir');
+  await symlink(resolvePackageDir('loose-envify'), join(root, 'node_modules', 'loose-envify'), 'dir');
+  await symlink(resolvePackageDir('lucide-react'), join(root, 'node_modules', 'lucide-react'), 'dir');
   await writeFile(join(root, 'index.html'), '<!doctype html><html><body><div id="root"></div><script type="module" src="/src/main.ts"></script></body></html>');
   await writeFile(join(root, 'src', 'wsTransport.ts'), 'export function subscribeFlywheelStatus() { return () => undefined; }\n');
   await writeFile(join(root, 'src', 'reactQuery.ts'), `
@@ -96,6 +114,31 @@ async function openFlywheelStatsPage(stats: FlywheelStats): Promise<void> {
   await writeFile(join(root, 'src', 'FlywheelStatusDetails.ts'), 'import React from \'react\'; export function FlywheelStatusDetails() { return React.createElement(\'div\'); }\n');
   await writeFile(join(root, 'src', 'MergeQueueCard.ts'), 'import React from \'react\'; export function MergeQueueCard() { return React.createElement(\'div\'); }\n');
   await writeFile(join(root, 'src', 'MergePolicySection.ts'), 'import React from \'react\'; export function MergePolicySection() { return React.createElement(\'div\'); }\n');
+  await writeFile(join(root, 'src', 'scheduler.ts'), `
+    export const unstable_ImmediatePriority = 1;
+    export const unstable_UserBlockingPriority = 2;
+    export const unstable_NormalPriority = 3;
+    export const unstable_LowPriority = 4;
+    export const unstable_IdlePriority = 5;
+    export function unstable_now() { return Date.now(); }
+    export function unstable_scheduleCallback(_priority: number, callback: () => void) {
+      const id = setTimeout(callback, 0);
+      return { id };
+    }
+    export function unstable_cancelCallback(task: { id?: ReturnType<typeof setTimeout> } | null) {
+      if (task?.id !== undefined) clearTimeout(task.id);
+    }
+    export function unstable_shouldYield() { return false; }
+    export function unstable_requestPaint() {}
+    export function unstable_getCurrentPriorityLevel() { return unstable_NormalPriority; }
+    export function unstable_runWithPriority(_priority: number, callback: () => unknown) { return callback(); }
+    export function unstable_next(callback: () => unknown) { return callback(); }
+    export function unstable_wrapCallback(callback: () => unknown) { return callback; }
+    export function unstable_continueExecution() {}
+    export function unstable_pauseExecution() {}
+    export function unstable_getFirstCallbackNode() { return null; }
+    export function unstable_forceFrameRate() {}
+  `);
   await writeFile(join(root, 'src', 'main.ts'), `
     import React from 'react';
     import { createRoot } from 'react-dom/client';
@@ -123,9 +166,14 @@ async function openFlywheelStatsPage(stats: FlywheelStats): Promise<void> {
       jsxFactory: 'React.createElement',
       jsxFragment: 'React.Fragment',
     },
+    optimizeDeps: {
+      force: true,
+      include: ['react', 'react-dom/client', 'scheduler'],
+    },
     resolve: {
       preserveSymlinks: true,
       alias: [
+        { find: 'scheduler', replacement: join(root, 'src', 'scheduler.ts') },
         { find: '@tanstack/react-query', replacement: join(root, 'src', 'reactQuery.ts') },
         { find: /(^|\/)lib\/wsTransport$/, replacement: join(root, 'src', 'wsTransport.ts') },
         { find: /(^|\/)components\/flywheel\/FlywheelConversationPane$/, replacement: join(root, 'src', 'FlywheelConversationPane.ts') },
@@ -270,7 +318,7 @@ describe('flywheel substrate bug smoke', () => {
       const query = url.searchParams.get('q') ?? '';
       if (url.pathname === '/search/issues' && query.includes('is:issue')) {
         return response({
-          items: query.includes('author:panopticon-agent[bot]')
+          items: query.includes('Flywheel-Filed-By:')
             ? [{
               number: 2001,
               title: 'Substrate bug',
@@ -278,7 +326,7 @@ describe('flywheel substrate bug smoke', () => {
               created_at: '2026-05-25T12:10:00.000Z',
               updated_at: '2026-05-25T12:10:00.000Z',
               labels: [{ name: 'substrate' }, { name: 'P1' }],
-              user: { login: 'panopticon-agent[bot]' },
+              user: { login: 'eltmon' },
             }]
             : [],
         });

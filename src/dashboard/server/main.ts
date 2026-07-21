@@ -5,6 +5,8 @@
  * Usage (prod):  node dist/dashboard/server.js
  */
 
+// PAN-2593: MUST stay the first import — fixes child PATH before anything spawns.
+import './path-env.js';
 import { Effect } from 'effect';
 import { initDashboardLogFile } from './server-log-file.js';
 import { ServerConfigLayer } from './config.js';
@@ -12,6 +14,20 @@ import { runServer } from './server.js';
 import { startSharedIssueService, getSharedIssueService } from './services/issue-service-singleton.js';
 import { startAgentEnrichmentService, stopAgentEnrichmentService } from './services/agent-enrichment-service.js';
 import { startMergeBlockerReconcileService } from './services/merge-blocker-reconcile-service.js';
+import { startResourceRefreshTriggers } from './services/resource-refresh-triggers.js';
+import {
+  enqueueProjectsResourceRefresh,
+  getProjectResourceRefreshQueueState,
+  startProjectResourceConvergence,
+  stopProjectResourceRefreshQueue,
+  whenProjectResourceRefreshIdle,
+} from './services/project-resource-refresh-queue.js';
+import { whenDashboardListening } from './dashboard-listening.js';
+import {
+  shouldStartStaleCheckRetriggerService,
+  startStaleCheckRetriggerService,
+  stopStaleCheckRetriggerService,
+} from './services/stale-check-retrigger-service.js';
 import { startAgentOutputService, stopAgentOutputService } from './services/agent-output-service.js';
 import { startConversationLifecycleService, stopConversationLifecycleService } from './services/conversation-lifecycle.js';
 import { startRestartAnnouncer, stopRestartAnnouncer } from './services/restart-announcer.js';
@@ -28,12 +44,11 @@ import { ensureInternalTokenSync } from '../../lib/internal-token.js';
 import { clearStuckMergeStatuses, fixStuckReadyForMerge, fixStuckCommentedReviews, getReviewStatusSync, loadReviewStatuses, clearReviewStatus } from '../../lib/review-status.js';
 import { reconcileStaleGitHubBlockers } from '../../lib/webhook-handlers.js';
 import { enrichReviewStatus } from '../../lib/review-status-enrichment.js';
-import { recoverStuckForks, waitForInFlightForkPipelines } from './routes/conversations.js';
+import { recoverStuckForks, waitForInFlightForkPipelines } from '../../lib/overdeck/conversation-forks.js';
 import { getEventStore, initEventStore } from './event-store.js';
 import { emitActivityEntrySync, emitActivityTtsSync } from '../../lib/activity-logger.js';
-import { getCloisterService } from '../../lib/cloister/service.js';
 import { shouldAutoStart } from '../../lib/cloister/config.js';
-import { setAgentStoppedNotifier, setAgentStatusChangedNotifier, setMergeReadyNotifier } from '../../lib/cloister/deacon.js';
+import { applyBootReconciliationDecision, setAgentStoppedNotifier, setAgentStatusChangedNotifier, setMergeReadyNotifier } from '../../lib/cloister/deacon.js';
 import { getAgentState, type AgentState } from '../../lib/agents.js';
 import { saveAgentStateAndEmitEvent } from './services/agent-projection.js';
 import { resumeQueuedMerges } from './services/merge-queue-service.js';
@@ -41,6 +56,7 @@ import { mkdir } from 'node:fs/promises';
 import { getOverdeckHome } from '../../lib/paths.js';
 import { ensureManagedTmuxContextOnce } from '../../lib/tmux.js';
 import { startCliproxyWatchdog } from './routes/cliproxy.js';
+import { startResourcesSnapshotService } from './routes/resources/snapshot.js';
 import { cleanupOrphanedConversationAttachments } from './services/conversation-attachments.js';
 import { closeMemoryFtsDatabases } from '../../lib/memory/fts-db.js';
 import { startTranscriptPoller, stopTranscriptPoller, syncTranscriptPollerRegistry } from '../../lib/memory/poller.js';
@@ -48,9 +64,16 @@ import { reconcileAgentMemory, reconcileStaleTranscriptCheckpoints } from '../..
 import { clearQueryExpansionCache } from '../../lib/memory/query-expansion.js';
 import { cleanupClosedIssueAgentDirectories } from '../../lib/agent-directory-cleanup.js';
 import { startAutoMergeExecutor, stopAutoMergeExecutor } from './services/auto-merge-executor.js';
+import { warnIfAutonomousMergeBackendUnavailable } from './services/merge-backend-health.js';
+import { warnIfAppCannotMerge } from './services/merge-app-scopes-health.js';
 import { startConversationSearchWatcher, stopConversationSearchWatcher } from './services/conversation-search-watcher.js';
 import { closeConversationSearchService } from './services/conversation-search-service.js';
+import { startCostReconcileService, stopCostReconcileService } from './services/cost-reconcile-service.js';
+import { startEventLoopMonitor, stopEventLoopMonitor } from './services/event-loop-monitor.js';
 import { formatBootGateState, resolveBootGates } from '../../lib/boot-gates.js';
+import { startBootReconciliation } from '../../lib/cloister/boot-reconciliation.js';
+import { startDeaconChild, stopDeaconChild } from './services/deacon-supervisor.js';
+import { stopAllKnowledgeViewers } from './services/knowledge-viewer.js';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { Layer } from 'effect';
@@ -59,6 +82,11 @@ import { getOverdeckDatabasePath } from '../../lib/overdeck/paths.js';
 import { ProjectsLive } from '../../lib/overdeck/config.js';
 import { RecordsLive, TmuxLive } from '../../lib/overdeck/infra.js';
 import { getAgentSessionsSync } from '../../lib/tmux.js';
+import { isSmeeConfiguredSync, startSmeeProcessSync } from '../../lib/smee.js';
+import { flushAllPendingAutoCommits } from '../../lib/pan-dir/auto-commit.js';
+import { listProjectsSync } from '../../lib/projects.js';
+import { ensureAutomaticStateMigration, decideDeaconBootGate } from '../../lib/state-auto-migrate.js';
+import { broadcastServerRestarting } from './ws-terminal.js';
 
 declare const Bun: unknown;
 
@@ -67,6 +95,12 @@ declare const Bun: unknown;
 // record (including conversation-message 500 causes) survives `serve`/npx and
 // the desktop app, not just detached `pan up`.
 initDashboardLogFile();
+// Boot-timing anchor: performance.now() here is ms since process start, so this
+// first line's value is the cost of loading/evaluating the bundled module graph
+// (everything before the first statement runs). Combined with the per-line
+// timestamps in dashboard.log and the "Listening" line, it makes the whole
+// spawn→listen window attributable. See server.ts for the matching listen mark.
+console.log(`[boot-timing] module graph loaded at +${Math.round(performance.now())}ms (since process start)`);
 console.log(`[overdeck] Boot gates: ${formatBootGateState(resolveBootGates())}`);
 
 // Ensure OVERDECK_HOME exists before any service that needs it (e.g. CacheService opening cache.db)
@@ -76,7 +110,6 @@ await mkdir(getOverdeckHome(), { recursive: true });
 // Generates and persists a random token at <OVERDECK_HOME>/internal-token (mode 0600)
 // on first start; reused on subsequent starts. Used by /api/internal/pipeline/notify.
 ensureInternalTokenSync();
-
 
 // Prepare the managed tmux context exactly once, before any code path can spawn
 // tmux. After this call `buildTmuxArgs`, `buildTmuxCommandString`, and
@@ -88,6 +121,37 @@ await ensureManagedTmuxContextOnce();
 await initTrackerConfigCache().catch(err => {
   console.log('[tracker-config] Warning: failed to cache .overdeck.env:', err.message);
 });
+
+// A normal boot creates an EMPTY overdeck.db (fresh-install semantics). There is
+// NO legacy seed / db↔db migration — overdeck state is JSON/git-backed (PAN-1983).
+try {
+  const overdeckDbPath = getOverdeckDatabasePath();
+  if (!existsSync(overdeckDbPath)) {
+    createOverdeckDatabase({ dbPath: overdeckDbPath });
+    console.log(`[overdeck] Created overdeck.db at ${overdeckDbPath}`);
+  }
+} catch (err) {
+  // Non-fatal: dashboard continues with whatever data is in overdeck.db.
+  console.warn('[overdeck] Overdeck db init failed (non-fatal):', err);
+}
+
+// Bind the HTTP socket before starting any background service or the Deacon.
+// A bind failure is retried by server.ts and then terminates this process through
+// Effect's Node runtime; no headless orchestrator is allowed to survive it.
+const main = runServer.pipe(Effect.provide(ServerConfigLayer)) as Effect.Effect<never, unknown>;
+if (typeof Bun !== 'undefined') {
+  const { runMain } = await import('@effect/platform-bun/BunRuntime');
+  runMain(main as never);
+} else {
+  const { runMain } = await import('@effect/platform-node/NodeRuntime');
+  runMain(main as never);
+}
+await whenDashboardListening();
+
+startEventLoopMonitor();
+console.log('[overdeck] Event loop delay monitor started');
+void warnIfAutonomousMergeBackendUnavailable();
+void warnIfAppCannotMerge();
 
 // Start the shared IssueDataService — fire and forget.
 // It loads SQLite-cached data instantly and pushes an initial snapshot,
@@ -138,8 +202,8 @@ if (isPeerDashboard) {
 startAgentEnrichmentService();
 console.log('[overdeck] AgentEnrichmentService started');
 
-// Start background agent output poller — emits agent.output_received domain events
-// so DrawerActiveAgent and other consumers receive live stream excerpts.
+// Enable demand-driven agent output capture. The poller starts only while an
+// RPC or public SSE subscriber has expressed output interest.
 startAgentOutputService();
 console.log('[overdeck] AgentOutputService started');
 
@@ -148,6 +212,33 @@ console.log('[overdeck] AgentOutputService started');
 // Awaiting-Merge queue (and its live MERGE button) before any click.
 startMergeBlockerReconcileService();
 console.log('[overdeck] MergeBlockerReconcileService started');
+
+if (shouldStartStaleCheckRetriggerService()) {
+  startStaleCheckRetriggerService();
+  console.log('[overdeck] StaleCheckRetriggerService started');
+}
+
+// Desktop installs never run `pan install`, so provision the Claude Code hook
+// bundle (auto-approve, heartbeat, cost, lifecycle) at boot (PAN-2595).
+// Idempotent + delta-only; skips (with a logged reason) rather than failing
+// the boot, and never overwrites an unparseable settings.json (PAN-1137).
+if (process.env.OVERDECK_MODE === 'desktop') {
+  void (async () => {
+    try {
+      const { provisionClaudeHooks } = await import('../../lib/claude-hooks-provision.js');
+      const result = await provisionClaudeHooks();
+      if (!result.ok) {
+        console.warn(`[overdeck] Claude hook provisioning skipped: ${result.reason}`);
+      } else if (result.changed) {
+        console.log(`[overdeck] Claude hooks provisioned: ${result.binariesSynced} scripts, registered ${result.registered.length} hook(s)${result.pruned.length ? `, pruned ${result.pruned.length} stale` : ''}`);
+      } else {
+        console.log('[overdeck] Claude hooks already provisioned (no settings change)');
+      }
+    } catch (err) {
+      console.warn('[overdeck] Claude hook provisioning failed:', err instanceof Error ? err.message : String(err));
+    }
+  })();
+}
 
 // Wire up pipeline notifier → domain events.
 // Library code (review-status.ts) calls notifyPipeline() on every status change.
@@ -348,10 +439,12 @@ setAgentStoppedNotifier((agentId) => {
         } as any);
         // PAN-1908: write-through projection — agents-row upsert + lifecycle
         // event append in one SQLite transaction.
+        // PAN-2633: heartbeat_dead means the deacon has determined the tmux
+        // session is gone, so assert hasLiveTmuxSession: false explicitly.
         saveAgentStateAndEmitEvent(state, {
           type: 'agent.status_changed',
           timestamp: new Date().toISOString(),
-          payload: buildAgentStatusChangedPayload(state),
+          payload: buildAgentStatusChangedPayload(state, undefined, false),
         });
         return;
       }
@@ -405,13 +498,20 @@ console.log('[overdeck] Merge-ready notifier → domain events wired');
 startConversationLifecycleService();
 console.log('[overdeck] ConversationLifecycleService started');
 
-startSubstrateBugPoller();
+if (isPeerDashboard) {
+  console.log('[overdeck] SubstrateBugPoller skipped — peer dashboard does not poll trackers');
+} else {
+  startSubstrateBugPoller();
+}
 
 // PAN-1737 UAT batch trains: keep one assembled, testable batch ready at all
 // times (gated per-tick on flywheel.merge_train_enabled; no-op without an
 // active flywheel run).
-startUatTrainReconciler();
-console.log('[overdeck] UAT batch-train reconciler started');
+if (startUatTrainReconciler()) {
+  console.log('[overdeck] UAT batch-train reconciler started');
+} else {
+  console.log('[overdeck] UAT batch-train reconciler skipped — non-primary dashboard process');
+}
 
 // Start cleanup for orphaned conversation attachments (1 min interval)
 const attachmentCleanupTimer = setInterval(() => {
@@ -431,13 +531,49 @@ void reconcileStaleTranscriptCheckpoints({ log: (message) => console.log(message
 startTranscriptPoller();
 console.log('[overdeck] Memory transcript poller started');
 
+startCostReconcileService();
+console.log('[overdeck] Cost reconciler started');
+
 const conversationSearchWatcher = startConversationSearchWatcher();
 console.log(conversationSearchWatcher
   ? '[overdeck] Conversation search watcher started'
   : '[overdeck] Conversation search watcher skipped (conversationSearch.enabled=false)');
 
+let stopResourceRefreshServices = () => undefined;
+
 void (async () => {
   const store = await initEventStore();
+  // Request serving comes first. Resource convergence starts only after the
+  // Node 22 server has bound its socket, then all boot/event/periodic work flows
+  // through the same non-overlapping project queue.
+  void whenDashboardListening().then(async () => {
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    const stopTriggers = startResourceRefreshTriggers();
+    const stopConvergence = startProjectResourceConvergence();
+    const stopResourcesSnapshot = startResourcesSnapshotService();
+    stopResourceRefreshServices = () => {
+      stopTriggers();
+      stopConvergence();
+      stopResourcesSnapshot();
+      stopProjectResourceRefreshQueue();
+    };
+    console.log('[overdeck] Project resource refresh queue and resources snapshot service started');
+
+    const warmStart = Date.now();
+    enqueueProjectsResourceRefresh(
+      listProjectsSync().map((entry) => entry.config),
+      'boot-warm',
+    );
+    await whenProjectResourceRefreshIdle();
+    const queueState = getProjectResourceRefreshQueueState();
+    if (queueState.lastError) {
+      console.warn('[overdeck] Boot cache warm completed with errors:', queueState.lastError);
+    } else {
+      console.log(`[overdeck] Boot cache warm complete in ${Math.round((Date.now() - warmStart) / 1000)}s`);
+    }
+  }).catch((err) => {
+    console.warn('[overdeck] Resource refresh startup failed:', err instanceof Error ? err.message : String(err));
+  });
   store.subscribe((event) => {
     if (event.type === 'agent.stopped' || event.type === 'agent.heartbeat_dead') {
       const agentId = typeof (event.payload as { agentId?: unknown }).agentId === 'string'
@@ -461,6 +597,20 @@ void (async () => {
 startCliproxyWatchdog();
 console.log('[overdeck] CLIProxy watchdog started (30s interval)');
 
+if (isPeerDashboard) {
+  console.log('[overdeck] smee-client webhook relay skipped — peer dashboard (OVERDECK_DISABLE_DEACON=1)');
+} else if (isSmeeConfiguredSync()) {
+  try {
+    startSmeeProcessSync();
+    console.log('[overdeck] smee-client webhook relay ensured');
+  } catch (err) {
+    console.warn('[overdeck] Failed to ensure smee-client webhook relay:', err instanceof Error ? err.message : String(err));
+    emitActivityEntrySync({ source: 'dashboard', level: 'warn', message: `Failed to ensure smee-client webhook relay: ${err instanceof Error ? err.message : String(err)}` });
+  }
+} else {
+  console.log('[overdeck] smee-client webhook relay not configured');
+}
+
 // Clean up pollers on graceful shutdown
 const emitShutdownActivity = () => {
   try {
@@ -482,6 +632,12 @@ const handleShutdownSignal = async (signal: NodeJS.Signals) => {
   if (shuttingDown) return;
   shuttingDown = true;
   console.log(`[overdeck] received ${signal} (pid=${process.pid} ppid=${process.ppid}) — shutting down`);
+  try {
+    const notifiedClients = broadcastServerRestarting();
+    console.log(`[overdeck] notified ${notifiedClients} terminal client(s) of restart`);
+  } catch (err) {
+    console.warn('[overdeck] failed to notify terminal clients of restart:', err);
+  }
   emitShutdownActivity();
   const forkGrace = await waitForInFlightForkPipelines(10_000);
   if (forkGrace.count > 0) {
@@ -492,6 +648,7 @@ const handleShutdownSignal = async (signal: NodeJS.Signals) => {
     }
   }
   clearInterval(attachmentCleanupTimer);
+  stopResourceRefreshServices();
   stopAgentEnrichmentService();
   stopAgentOutputService();
   stopConversationLifecycleService();
@@ -500,8 +657,24 @@ const handleShutdownSignal = async (signal: NodeJS.Signals) => {
   stopTtsSummarizer();
   stopTtsPlayback();
   stopAutoMergeExecutor();
+  stopEventLoopMonitor();
   stopTranscriptPoller();
+  stopCostReconcileService();
+  stopStaleCheckRetriggerService();
   stopRestartAnnouncer();
+  await stopAllKnowledgeViewers().catch((err) => console.warn('[knowledge-viewer] shutdown failed:', err?.message ?? err));
+  await stopDeaconChild().catch((err) => console.warn('[deacon-supervisor] child shutdown failed:', err?.message ?? err));
+  try {
+    // Reap only quality-gate trees owned by this dashboard process. Normal
+    // verification runs in a detached supervised worker, whose process-local
+    // registry is intentionally outside this shutdown boundary.
+    const { killAllGateProcessGroups } = await import('../../lib/cloister/validation.js');
+    const reaped = killAllGateProcessGroups();
+    if (reaped > 0) console.log(`[overdeck] reaped ${reaped} in-flight gate process group(s)`);
+  } catch (err) {
+    console.warn('[overdeck] gate process reap failed:', err);
+  }
+  await Effect.runPromise(flushAllPendingAutoCommits()).catch((err) => console.warn('[pan-dir/auto-commit] shutdown flush failed:', err));
   await stopConversationSearchWatcher().catch((err) => console.warn('[conversation-search] watcher shutdown failed:', err));
   closeConversationSearchService();
   closeMemoryFtsDatabases();
@@ -584,16 +757,67 @@ if (process.env.OVERDECK_DISABLE_AUTO_MERGE === '1') {
   console.log('[overdeck] Auto-merge executor started');
 }
 
+try {
+  // Preserve running statuses backed by a live supervised worker. Reset only
+  // orphaned runs whose worker died without recording a terminal result.
+  const { reconcileInterruptedVerifications } = await import('../../lib/cloister/verification-runner.js');
+  const interrupted = reconcileInterruptedVerifications();
+  if (interrupted > 0) console.log(`[overdeck] recovered ${interrupted} orphaned verification worker(s)`);
+} catch (err) {
+  console.warn('[overdeck] interrupted-verification reconciliation failed:', err);
+}
+
 if (process.env.OVERDECK_DISABLE_DEACON === '1') {
   console.log('[overdeck] Cloister auto-start SKIPPED (OVERDECK_DISABLE_DEACON=1)');
   emitActivityEntrySync({ source: 'dashboard', level: 'warn', message: 'Cloister auto-start skipped via OVERDECK_DISABLE_DEACON — deacon is not running' });
 } else if (shouldAutoStart()) {
-  getCloisterService().start().catch((err) => {
-    console.error('[overdeck] Cloister auto-start failed:', err);
-    emitActivityEntrySync({ source: 'dashboard', level: 'error', message: `Cloister auto-start failed: ${err instanceof Error ? err.message : String(err)}` });
-  });
-  console.log('[overdeck] Cloister auto-starting (startup.auto_start=true)');
-  emitActivityEntrySync({ source: 'dashboard', level: 'info', message: 'Cloister auto-starting on dashboard boot' });
+  // Per-project state-migration gate (PAN-2676). One blocked project — a dirty
+  // operator checkout, a dirty state worktree — must NOT take the whole Deacon
+  // down. The Deacon starts whenever at least one project is usable; blocked
+  // projects are already kept out of NEW pipeline work by the state write door
+  // (requireAutomaticStateMigration at `pan start`), so here we only decide
+  // Deacon start and report the excluded projects loudly.
+  const migrations = [];
+  for (const { key, config } of listProjectsSync()) {
+    if (!existsSync(config.path)) continue;
+    migrations.push(await ensureAutomaticStateMigration(key, config));
+  }
+  const gate = decideDeaconBootGate(migrations);
+
+  // Name each blocked project WITH its human-readable prerequisite.
+  for (const blocked of gate.blockedProjects) {
+    console.error(`[state-migration] ${blocked.notice}`);
+    emitActivityEntrySync({ source: 'dashboard', level: 'error', message: blocked.notice });
+  }
+
+  if (gate.startDeacon) {
+    if (gate.blockedProjects.length > 0) {
+      const excluded = gate.blockedProjects.map((b) => b.projectKey).join(', ');
+      const summary = `Deacon is starting for ${gate.usableProjects.length} usable project(s) (${gate.usableProjects.join(', ')}). `
+        + `${gate.blockedProjects.length} project(s) are EXCLUDED from orchestration until fixed: ${excluded}. `
+        + 'Each excluded project has an unavailable permanent-state plane, so Overdeck will not spawn or write new pipeline work for it; the Deacon runs normally for the usable projects. '
+        + 'Resolve each prerequisite listed above, then run "pan sync".';
+      console.error(`[overdeck] ${summary}`);
+      emitActivityEntrySync({ source: 'dashboard', level: 'error', message: summary });
+    }
+    const reconciliation = startBootReconciliation({ onGraceExpired: async () => { await applyBootReconciliationDecision(); } });
+    if (reconciliation.decision !== 'pending') {
+      void applyBootReconciliationDecision();
+    }
+    startDeaconChild().catch((err) => {
+      console.error('[overdeck] Cloister auto-start failed:', err);
+      emitActivityEntrySync({ source: 'dashboard', level: 'error', message: `Cloister auto-start failed: ${err instanceof Error ? err.message : String(err)}` });
+    });
+    console.log('[overdeck] Cloister auto-starting (startup.auto_start=true)');
+    emitActivityEntrySync({ source: 'dashboard', level: 'info', message: 'Cloister auto-starting on dashboard boot' });
+  } else {
+    // All projects blocked: refuse to start, as before.
+    const excluded = gate.blockedProjects.map((b) => b.projectKey).join(', ');
+    const summary = `Deacon auto-start refused: all ${gate.blockedProjects.length} project(s) have an unavailable permanent-state plane (${excluded}). `
+      + 'No pipeline work can run until at least one project\'s prerequisite (listed above) is resolved; then run "pan sync".';
+    console.error(`[overdeck] ${summary}`);
+    emitActivityEntrySync({ source: 'dashboard', level: 'error', message: summary });
+  }
 }
 
 /**
@@ -630,30 +854,4 @@ async function pruneClosedIssueReviewStatuses(): Promise<void> {
   if (removed > 0) {
     console.log(`[overdeck] Pruned ${removed} stale review-status entr${removed === 1 ? 'y' : 'ies'} for closed issues`);
   }
-}
-
-// ── Overdeck boot: create overdeck.db if needed ──────────────────────────────
-// A normal boot creates an EMPTY overdeck.db (fresh-install semantics). There is
-// NO legacy seed / db↔db migration — overdeck state is JSON/git-backed (PAN-1983).
-await (async () => {
-  try {
-    const overdeckDbPath = getOverdeckDatabasePath();
-    if (!existsSync(overdeckDbPath)) {
-      createOverdeckDatabase({ dbPath: overdeckDbPath });
-      console.log(`[overdeck] Created overdeck.db at ${overdeckDbPath}`);
-    }
-  } catch (err) {
-    // Non-fatal: dashboard continues with whatever data is in overdeck.db.
-    console.warn('[overdeck] Overdeck db init failed (non-fatal):', err);
-  }
-})();
-
-const main = runServer.pipe(Effect.provide(ServerConfigLayer)) as Effect.Effect<never, unknown>;
-
-if (typeof Bun !== 'undefined') {
-  const { runMain } = await import('@effect/platform-bun/BunRuntime');
-  runMain(main as never);
-} else {
-  const { runMain } = await import('@effect/platform-node/NodeRuntime');
-  runMain(main as never);
 }

@@ -8,25 +8,25 @@ import { renderForHarness, validateTemplate } from '../../../src/lib/context-lay
 describe('renderForHarness', () => {
   it('keeps always-on content for every harness', () => {
     expect(renderForHarness('Always here.', 'claude-code')).toBe('Always here.');
-    expect(renderForHarness('Always here.', 'pi')).toBe('Always here.');
+    expect(renderForHarness('Always here.', 'ohmypi')).toBe('Always here.');
   });
 
-  it('keeps a claude block for claude-code and drops it for pi', () => {
+  it('keeps a claude block for claude-code and drops it for ohmypi', () => {
     const c = 'A\n{{#harness:claude}}\nclaude-only\n{{/harness:claude}}\nB';
     expect(renderForHarness(c, 'claude-code')).toContain('claude-only');
-    expect(renderForHarness(c, 'pi')).not.toContain('claude-only');
+    expect(renderForHarness(c, 'ohmypi')).not.toContain('claude-only');
   });
 
-  it('keeps a pi block for pi and drops it for claude-code', () => {
-    const c = '{{#harness:pi}}pi-only{{/harness:pi}}';
-    expect(renderForHarness(c, 'pi')).toContain('pi-only');
-    expect(renderForHarness(c, 'claude-code')).not.toContain('pi-only');
+  it('keeps an ohmypi block for ohmypi and drops it for claude-code', () => {
+    const c = '{{#harness:ohmypi}}ohmypi-only{{/harness:ohmypi}}';
+    expect(renderForHarness(c, 'ohmypi')).toContain('ohmypi-only');
+    expect(renderForHarness(c, 'claude-code')).not.toContain('ohmypi-only');
   });
 
-  it('renders a stacked claude+pi block for both harnesses (union)', () => {
-    const c = '{{#harness:claude}}{{#harness:pi}}\nshared\n{{/harness:claude}}{{/harness:pi}}';
+  it('renders a stacked claude+ohmypi block for both harnesses (union)', () => {
+    const c = '{{#harness:claude}}{{#harness:ohmypi}}\nshared\n{{/harness:claude}}{{/harness:ohmypi}}';
     expect(renderForHarness(c, 'claude-code')).toContain('shared');
-    expect(renderForHarness(c, 'pi')).toContain('shared');
+    expect(renderForHarness(c, 'ohmypi')).toContain('shared');
   });
 
   it('strips every harness marker from the output', () => {
@@ -42,7 +42,7 @@ describe('renderForHarness', () => {
   });
 
   it('collapses blank-line runs left by a removed block', () => {
-    const c = 'A\n\n{{#harness:pi}}\npi\n{{/harness:pi}}\n\nB';
+    const c = 'A\n\n{{#harness:ohmypi}}\nohmypi\n{{/harness:ohmypi}}\n\nB';
     expect(renderForHarness(c, 'claude-code')).not.toMatch(/\n{3,}/);
   });
 });

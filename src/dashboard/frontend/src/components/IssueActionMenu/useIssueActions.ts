@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 
 import { useAlert, useConfirm } from '../DialogProvider';
 import {
@@ -13,6 +14,8 @@ import {
 } from '../../lib/issueActions';
 import { refreshDashboardState } from '../../lib/refresh-dashboard-state';
 import { dashboardMutationJsonHeaders } from '../../lib/wsTransport';
+import { recoveryFromBody, useResumeRecovery } from '../../lib/resumeRecovery';
+import { toastResumeOutcome } from '../../lib/resumeOutcome';
 import { selectAgents, selectIssues, selectReviewStatus, useDashboardStore } from '../../lib/store';
 import type { WorkspaceInfo } from '../../lib/workspace-types';
 import { STATUS_LABELS, type Agent, type Issue, type WorkAgentLifecycle } from '../../types';
@@ -46,37 +49,70 @@ export type UseIssueActionsResult = IssueActionLayout & {
   phase: PipelinePhase;
   activeDialog: IssueActionDialogState;
   closeDialog: () => void;
-  submitDialogAction: (action: IssueActionEntry, body?: Record<string, unknown>, selectedBeadId?: string | null) => void;
+  submitDialogAction: (action: IssueActionEntry, body?: Record<string, unknown>, selectedTaskId?: string | null) => void;
   isActionPending: (key: IssueActionKey) => boolean;
 };
 
 type PostActionInput = {
   action: IssueActionEntry;
   body?: Record<string, unknown>;
-  selectedBeadId?: string | null;
+  selectedTaskId?: string | null;
 };
+
+type AlertFn = ReturnType<typeof useAlert>;
 
 function activeAgentForIssue(agents: Agent[], issueId: string) {
   const issueAgents = agents.filter((agent) => agent.issueId?.toLowerCase() === issueId.toLowerCase());
-  return issueAgents.find((agent) => !['stopped', 'failed', 'dead', 'error', 'stuck'].includes(agent.status)) ?? issueAgents[0];
+  const live = issueAgents.find((agent) => !['stopped', 'failed', 'dead', 'error', 'stuck'].includes(agent.status));
+  if (live) return live;
+  // All stopped: prefer the canonical WORK agent (agent-<issue>) over whichever
+  // stopped specialist happens to sort first — issueAgents[0] was routinely the
+  // planning agent, so agent actions (resume/reset session) evaluated against
+  // an agent that never has a resumable session (2026-07-14, MIN-865).
+  const workAgentId = `agent-${issueId.toLowerCase()}`;
+  return issueAgents.find((agent) => agent.id?.toLowerCase() === workAgentId) ?? issueAgents[0];
 }
 
-async function responseError(response: Response, fallback: string) {
-  const text = await response.text();
+async function responseError(response: Response, fallback: string, preRead?: { text: string; parsed: unknown }) {
+  const text = preRead?.text ?? (await response.text());
   if (!text) return fallback;
-  try {
-    const parsed = JSON.parse(text) as { error?: string; message?: string; hint?: string };
-    return parsed.error ?? parsed.message ?? parsed.hint ?? fallback;
-  } catch {
-    return text.length < 200 ? text : fallback;
-  }
+  const parsed = preRead ? (preRead.parsed as { error?: string; message?: string; hint?: string }) : (() => { try { return JSON.parse(text) as { error?: string; message?: string; hint?: string }; } catch { return null; } })();
+  if (parsed) return parsed.error ?? parsed.message ?? parsed.hint ?? fallback;
+  return text.length < 200 ? text : fallback;
 }
 
-function interpolateEndpoint(endpoint: string, issueId: string, agent: Agent | undefined, state: IssueActionState, selectedBeadId?: string | null) {
+function interpolateEndpoint(endpoint: string, issueId: string, agent: Agent | undefined, state: IssueActionState, selectedTaskId?: string | null) {
   return endpoint
     .replace(':id', encodeURIComponent(issueId))
     .replace(':agentId', encodeURIComponent(agent?.id ?? ''))
-    .replace(':beadId', encodeURIComponent(selectedBeadId ?? state.selectedBeadId ?? ''));
+    .replace(':taskId', encodeURIComponent(selectedTaskId ?? state.selectedTaskId ?? ''));
+}
+
+const untroubledAction = ISSUE_ACTIONS.find((action) => action.key === 'untroubled');
+
+export async function clearTroubledGateForAgent(
+  agentId: string,
+  queryClient: QueryClient,
+  alert: AlertFn,
+): Promise<void> {
+  if (!untroubledAction?.endpoint) {
+    throw new Error('Clear troubled gate action is not registered');
+  }
+
+  const response = await fetch(untroubledAction.endpoint.replace(':agentId', encodeURIComponent(agentId)), {
+    method: 'POST',
+    credentials: 'include',
+    headers: await dashboardMutationJsonHeaders(),
+    body: '{}',
+  });
+  if (!response.ok) {
+    const message = await responseError(response, `Failed to run ${untroubledAction.label}`);
+    void alert({ message, variant: 'error' });
+    throw new Error(message);
+  }
+
+  await refreshDashboardState(queryClient);
+  void alert({ message: `Cleared troubled state for ${agentId}`, variant: 'success' });
 }
 
 function bodyForAction(action: IssueActionEntry, issueId: string, issue: Issue | undefined) {
@@ -90,11 +126,13 @@ function bodyForAction(action: IssueActionEntry, issueId: string, issue: Issue |
       return { issueId, projectId: issue?.project?.id };
     case 'resetIssue':
       return { deleteWorkspace: true };
+    case 'wipe':
+      return { deleteWorkspace: true };
     case 'cancel':
       return { wipeWorkspace: true };
     case 'completeWorkReset':
       return { spawn: false };
-    case 'inspectBead':
+    case 'inspectTask':
       return { deep: false };
     case 'doneWork':
       return { message: `If implementation is complete, run: pan done ${issueId} -c "Implementation complete". If work remains, continue the current task.` };
@@ -115,7 +153,6 @@ function disabledReasonForAction(action: IssueActionEntry) {
     case 'tell':
     case 'stopAgent':
     case 'pause':
-    case 'switchModel':
       return 'This action requires a running agent.';
     case 'resumeSession':
     case 'resetSession':
@@ -125,11 +162,11 @@ function disabledReasonForAction(action: IssueActionEntry) {
     case 'requestReview':
       return 'Review can be requested after workspace work is idle and not already in review.';
     case 'restartReview':
-      return 'Restart review is available while review, test, or merge work is active or failed.';
+      return 'Re-run review is available while review, test, or merge work is active or failed.';
     case 'recoverReview':
-      return 'Recover review is available only when the review pipeline is blocked or failed.';
-    case 'inspectBead':
-      return 'Select a bead before requesting inspection.';
+      return 'Reset stalled review state is available only when the review pipeline is blocked or failed.';
+    case 'inspectTask':
+      return 'Select a task before requesting inspection.';
     case 'viewPr':
       return 'No pull request URL is available yet.';
     case 'open':
@@ -138,8 +175,8 @@ function disabledReasonForAction(action: IssueActionEntry) {
     case 'copySettings':
     case 'destroyWorkspace':
       return 'This action requires an existing workspace.';
-    case 'beads':
-      return 'No plan or beads are available for this issue yet.';
+    case 'tasks':
+      return 'No plan or tasks are available for this issue yet.';
     case 'inference':
       return 'No inference artifact is available for this issue.';
     case 'discussions':
@@ -148,6 +185,10 @@ function disabledReasonForAction(action: IssueActionEntry) {
       return 'No transcript artifact is available for this issue.';
     case 'closeOut':
       return 'Close out is available only after merge verification.';
+    case 'merge':
+      return 'Merge is available once review has approved and the PR is mergeable.';
+    case 'upload':
+      return 'Transcript upload is temporarily unavailable while its endpoint is rebuilt.';
     case 'reopen':
       return 'Reopen is available only for done or canceled issues.';
     case 'unpause':
@@ -164,14 +205,13 @@ const dialogActionKeys = new Set<IssueActionKey>([
   'autoPlan',
   'startSkipPlanning',
   'tell',
-  'switchModel',
-  'inspectBead',
+  'inspectTask',
   'open',
   'upload',
 ]);
 
 const artifactTabs: Partial<Record<IssueActionKey, string>> = {
-  beads: 'beads',
+  tasks: 'tasks',
   inference: 'inference',
   discussions: 'discussions',
   transcripts: 'conversation',
@@ -187,7 +227,9 @@ function destructiveMessage(action: IssueActionEntry, issueId: string) {
     case 'destroyWorkspace':
       return `Destroy the workspace for ${issueId}?\n\nThis removes workspace resources but leaves the issue record intact.`;
     case 'resetIssue':
-      return `Reset ${issueId}?\n\nThis stops any running agent, deletes the workspace and feature branch, clears beads and vBRIEF state, and moves the issue back to Todo.`;
+      return `Reset ${issueId}?\n\nThis stops any running agent, deletes the workspace and feature branch, clears tasks and xBRIEF state, and moves the issue back to Todo.`;
+    case 'resetToPlanned':
+      return `Reset ${issueId} to planned?\n\nThis stops issue agents and clears task progress and claims, saved sessions, completion markers, pipeline verdicts, retries, and merge-queue state. It preserves the workspace, branch, commits, and finalized xBRIEF, returns the issue to open + planned, and does not start an agent.`;
     case 'cancel':
       return `Cancel ${issueId}?\n\nThis cancels the issue and wipes the workspace state for the abandoned run.`;
     case 'resetSession':
@@ -196,9 +238,9 @@ function destructiveMessage(action: IssueActionEntry, issueId: string) {
     case 'restartAgent':
       return `Restart work for ${issueId}?\n\nThis stops the current agent path and starts a replacement run from existing context.`;
     case 'completeWorkReset':
-      return `Complete work reset for ${issueId}?\n\nThis will delete the work agent's state (sessions, activity, logs) but keep the workspace, vBRIEF, beads, and commit history. The agent will not be re-spawned — click Start when you're ready.`;
+      return `Complete work reset for ${issueId}?\n\nThis will delete the work agent's state (sessions, activity, logs) but keep the workspace, xBRIEF, tasks, and commit history. The agent will not be re-spawned — click Start when you're ready.`;
     case 'purgeReview':
-      return `Complete review reset for ${issueId}?\n\nThis kills and removes ALL review agents for the issue — the review agent plus any leftover sub-reviewers — and resets the review/test/merge status. Agent state and tmux sessions are removed; transcripts and work are untouched. A fresh review can then run clean.`;
+      return `Remove review sessions and reset ${issueId}?\n\nThis kills and removes ALL review agents for the issue — the review agent plus any leftover sub-reviewers — and resets the review/test/merge status. Agent state and tmux sessions are removed; transcripts and work are untouched. A fresh review can then run clean.`;
     default:
       return `${action.label} for ${issueId}?`;
   }
@@ -214,11 +256,28 @@ export function useIssueActions(issueId: string): UseIssueActionsResult {
   const openIssue = useDashboardStore((state) => state.openIssue);
   const [activeDialog, setActiveDialog] = useState<IssueActionDialogState>(null);
   const [pendingKey, setPendingKey] = useState<IssueActionKey | null>(null);
+  const openRecovery = useResumeRecovery((s) => s.openRecovery);
 
   const issue = useMemo(() => issues.find((candidate) => candidate.identifier.toLowerCase() === issueId.toLowerCase()), [issueId, issues]);
   const agent = useMemo(() => activeAgentForIssue(agents, issueId), [agents, issueId]);
 
-  const lifecycle = agent?.lifecycle;
+  // The WS-fed agents store carries no lifecycle, so agent?.lifecycle is
+  // usually undefined here — which silently disabled resumeSession/resetSession
+  // everywhere this hook powers (2026-07-14, MIN-865). For a stopped agent,
+  // fall back to the endpoint purpose-built for this question.
+  const stoppedAgentId = agent && ['stopped', 'failed', 'dead', 'error', 'stuck'].includes(agent.status) ? agent.id : null;
+  const lifecycleFallback = useQuery({
+    queryKey: ['agent-lifecycle', stoppedAgentId],
+    queryFn: async () => {
+      const res = await fetch(`/api/agents/${encodeURIComponent(stoppedAgentId ?? '')}/has-session`);
+      if (!res.ok) throw new Error(`has-session failed: ${res.status}`);
+      const data = await res.json() as { lifecycle?: WorkAgentLifecycle };
+      return data.lifecycle ?? null;
+    },
+    enabled: !!stoppedAgentId && !agent?.lifecycle,
+    staleTime: 15_000,
+  });
+  const lifecycle = agent?.lifecycle ?? lifecycleFallback.data ?? undefined;
 
   const workspace = useMemo<WorkspaceInfo | undefined>(() => {
     if (!issue?.workspacePath) return undefined;
@@ -233,7 +292,7 @@ export function useIssueActions(issueId: string): UseIssueActionsResult {
       lifecycle: lifecycle ?? agent?.lifecycle ?? null,
       workspace: workspaceInfo,
       hasPlan: issue?.hasPlan ?? false,
-      hasBeads: issue?.hasBeads ?? false,
+      hasTasks: issue?.hasTasks ?? false,
       hasInference: false,
       hasTranscripts: false,
       hasDiscussions: false,
@@ -248,20 +307,39 @@ export function useIssueActions(issueId: string): UseIssueActionsResult {
   const phase = useMemo(() => deriveIssueActionPhase(state), [state]);
 
   const postActionMutation = useMutation({
-    mutationFn: async ({ action, body, selectedBeadId }: PostActionInput) => {
+    mutationFn: async ({ action, body, selectedTaskId }: PostActionInput) => {
       if (!action.endpoint) return { success: true };
       const payload = body ?? bodyForAction(action, issueId, issue);
-      const response = await fetch(interpolateEndpoint(action.endpoint, issueId, agent, state, selectedBeadId), {
+      const response = await fetch(interpolateEndpoint(action.endpoint, issueId, agent, state, selectedTaskId), {
         method: 'POST',
         credentials: 'include',
         headers: await dashboardMutationJsonHeaders(),
         body: payload ? JSON.stringify(payload) : '{}',
       });
-      if (!response.ok) throw new Error(await responseError(response, `Failed to run ${action.label}`));
+      if (!response.ok) {
+        const text = await response.text();
+        let parsed: unknown = null;
+        try { parsed = JSON.parse(text); } catch { /* not JSON */ }
+        // A 409 carrying a resumable lifecycle is a CHOICE, not an error —
+        // surface the Resume / Start fresh dialog instead of a raw alert.
+        const recovery = response.status === 409 ? recoveryFromBody(parsed) : null;
+        if (recovery) {
+          openRecovery({ ...recovery, issueId });
+          return { success: false, recovery: true };
+        }
+        throw new Error(await responseError(response, `Failed to run ${action.label}`, { text, parsed }));
+      }
       return response.json().catch(() => ({ success: true }));
     },
-    onSuccess: async () => {
+    onSuccess: async (_data, { action }) => {
       await refreshDashboardState(queryClient);
+      if (action.key === 'unpause') {
+        toast.success(`${issueId} unpaused — deacon resumes it on the next patrol`);
+      }
+      if (action.key === 'resumeSession' && agent?.id) {
+        // PAN-2975: every resume affordance reports the actual outcome.
+        toastResumeOutcome(agent.id);
+      }
     },
     onError: (error: Error) => {
       alert({ message: error.message, variant: 'error' });
@@ -269,9 +347,9 @@ export function useIssueActions(issueId: string): UseIssueActionsResult {
     onSettled: () => setPendingKey(null),
   });
 
-  const submitDialogAction = useCallback((action: IssueActionEntry, body?: Record<string, unknown>, selectedBeadId?: string | null) => {
+  const submitDialogAction = useCallback((action: IssueActionEntry, body?: Record<string, unknown>, selectedTaskId?: string | null) => {
     setPendingKey(action.key);
-    postActionMutation.mutate({ action, body, selectedBeadId });
+    postActionMutation.mutate({ action, body, selectedTaskId });
   }, [postActionMutation]);
 
   const isActionPending = useCallback((key: IssueActionKey) => pendingKey === key && postActionMutation.isPending, [pendingKey, postActionMutation.isPending]);
@@ -298,6 +376,18 @@ export function useIssueActions(issueId: string): UseIssueActionsResult {
         confirmLabel: action.label,
         variant: 'destructive',
         requiredText: action.label,
+      });
+      if (!confirmed) return;
+    }
+
+    // Merge is safe-kind but irreversible-ish: keep the old MergeButton's
+    // confirm step (C-ACTIONS — same guard, one registry path).
+    if (action.key === 'merge') {
+      const confirmed = await confirm({
+        title: 'Merge to main',
+        message: `Merge ${issueId} into main?\n\nThe branch is approved and checks are green. This cannot be un-merged automatically.`,
+        confirmLabel: 'Merge to main',
+        variant: 'default',
       });
       if (!confirmed) return;
     }

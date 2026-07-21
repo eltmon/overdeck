@@ -9,12 +9,8 @@
  * no Schema crashes. This is the T3Code pattern.
  */
 
-import { existsSync } from 'fs';
-import { join } from 'path';
 import { Effect, Layer, Context } from 'effect';
-import { getSharedDb } from './event-store.js';
 import type { DashboardSnapshot, DomainEvent, TurnDiffSummary } from '@overdeck/contracts';
-import { AGENTS_DIR } from '../../lib/paths.js';
 import {
   type ReadModelState,
   INITIAL_READ_MODEL_STATE,
@@ -23,15 +19,30 @@ import {
   isTerminalTurnDiffSummaryStatus,
   trimTurnDiffSummaries,
 } from '@overdeck/contracts';
-import type { AgentSnapshot, AgentStatus, Role, AgentResolution, ReviewStatusSnapshot, ReviewStatusValue, TestStatusValue, UatStatusValue, MergeStatusValue, VerificationStatusValue, ResourceStats } from '@overdeck/contracts';
+import type { AgentSnapshot, AgentStatus, Role, AgentResolution, ReviewStatusSnapshot, ReviewStatusValue, TestStatusValue, UatStatusValue, MergeStatusValue, VerificationStatusValue } from '@overdeck/contracts';
 import type { ReviewStatus } from '../../lib/review-status.js';
-import { logDeaconEventSync } from '../../lib/persistent-logger.js';
 import { listOverdeckAgentStatesSync } from '../../lib/overdeck/agent-state-sync.js';
 import { computeQueuePositionFromStatusSync } from '../../lib/queue-position.js'
 import { AgentsResolver, type Agent as OverdeckAgent } from '../../lib/overdeck/agents.js';
 
 // ─── Exported async helpers (used by bootstrap Effect + tests) ───────────────
 
+const MAX_SNAPSHOT_ACTIVITY_ENTRIES = 50;
+
+type DashboardSnapshotWithActivity = DashboardSnapshot & {
+  recentActivity?: unknown[];
+};
+
+export function activityEntriesFromStoredEvents(
+  events: ReadonlyArray<{ timestamp: string; payload: unknown }>,
+): unknown[] {
+  return events.slice(0, MAX_SNAPSHOT_ACTIVITY_ENTRIES).map((event) => {
+    const entry = event.payload && typeof event.payload === 'object'
+      ? event.payload as Record<string, unknown>
+      : {};
+    return { id: entry.id, timestamp: event.timestamp, ...entry };
+  });
+}
 
 
 // PAN-1510: bootstrap previously only seeded `issuesRaw` from the projection
@@ -207,14 +218,14 @@ function cleanIssues(issues: unknown[]): unknown[] {
 // ─── Value validators for strict literal types ──────────────────────────────
 
 const VALID_AGENT_STATUSES = new Set<AgentStatus>(["starting", "running", "stopped", "error", "unknown"]);
-const VALID_ROLES = new Set<Role>(["plan", "work", "review", "test", "ship", "flywheel", "strike", "sequencer"]);
+const VALID_ROLES = new Set<Role>(["plan", "work", "review", "test", "ship", "flywheel", "strike", "sequencer", "knowledge"]);
 const VALID_RESOLUTIONS = new Set<AgentResolution>(["working", "done", "needs_input", "stuck", "completed", "unclear", "abandoned", "api_error"]);
 type SpecialistAgentName = 'review-agent' | 'test-agent' | 'merge-agent' | 'inspect-agent' | 'uat-agent';
 type SpecialistLifecycleState = 'active' | 'sleeping' | 'uninitialized';
 
 const VALID_SPECIALIST_NAMES = new Set<SpecialistAgentName>(["review-agent", "test-agent", "merge-agent", "inspect-agent", "uat-agent"]);
 const VALID_SPECIALIST_LIFECYCLE_STATES = new Set<SpecialistLifecycleState>(["active", "sleeping", "uninitialized"]);
-const VALID_REVIEW_STATUSES = new Set<ReviewStatusValue>(["pending", "reviewing", "passed", "failed", "blocked"]);
+const VALID_REVIEW_STATUSES = new Set<ReviewStatusValue>(["pending", "reviewing", "passed", "failed", "blocked", "skipped"]);
 const VALID_TEST_STATUSES = new Set<TestStatusValue>(["pending", "testing", "passed", "failed", "skipped", "dispatch_failed"]);
 const VALID_UAT_STATUSES = new Set<UatStatusValue>(["pending", "testing", "passed", "failed"]);
 const VALID_MERGE_STATUSES = new Set<MergeStatusValue>(["pending", "queued", "merging", "verifying", "merged", "failed"]);
@@ -304,6 +315,8 @@ export function toReviewStatusSnapshot(status: ReviewStatusSnapshotInput): Revie
     uatStatus: toUatStatus(status.uatStatus),
     uatNotes: status.uatNotes || undefined,
     mergeStatus: toMergeStatus(status.mergeStatus),
+    releaseStatus: status.releaseStatus ?? undefined,
+    releaseNotes: status.releaseNotes || undefined,
     verificationStatus: toVerificationStatus(status.verificationStatus),
     verificationNotes: status.verificationNotes || undefined,
     verificationCycleCount: typeof status.verificationCycleCount === 'number' ? status.verificationCycleCount : undefined,
@@ -315,7 +328,9 @@ export function toReviewStatusSnapshot(status: ReviewStatusSnapshotInput): Revie
     stuckAt: status.stuckAt || undefined,
     stuckDetails: status.stuckDetails || undefined,
     reviewedAtCommit: status.reviewedAtCommit || undefined,
-    reviewSpawnedAt: status.reviewSpawnedAt || undefined,
+    reviewSpawnedAt: typeof status.reviewSpawnedAt === 'number'
+      ? new Date(status.reviewSpawnedAt).toISOString()
+      : status.reviewSpawnedAt || undefined,
     testRetryCount: typeof status.testRetryCount === 'number' ? status.testRetryCount : undefined,
     reviewRetryCount: typeof status.reviewRetryCount === 'number' ? status.reviewRetryCount : undefined,
     recoveryStartedAt: status.recoveryStartedAt || undefined,
@@ -340,7 +355,7 @@ export function toReviewStatusSnapshot(status: ReviewStatusSnapshotInput): Revie
 
 export interface ReadModelServiceShape {
   /** Return the current read model state as a DashboardSnapshot. */
-  readonly getSnapshot: Effect.Effect<DashboardSnapshot>;
+  readonly getSnapshot: Effect.Effect<DashboardSnapshotWithActivity>;
   /** Return a single pending channel permission request without rebuilding a full snapshot. */
   readonly getChannelPermissionRequest: (
     requestId: string,
@@ -370,8 +385,8 @@ function overdeckStatusToLegacy(
   status: OverdeckAgent['status'],
 ): AgentStatus {
   if (status === 'crashed') return 'error';
-  // 'idle' = agent is alive but waiting (tool-call paused, AUQ, etc.)
-  if (status === 'idle') return 'running';
+  // 'idle'/'waiting' = agent is alive but waiting (tool-call paused, AUQ, etc.)
+  if (status === 'idle' || status === 'waiting') return 'running';
   return status; // 'starting' | 'running' | 'stopped' are 1:1
 }
 
@@ -418,7 +433,7 @@ export const ReadModelServiceLive = Layer.effect(
       }));
     }
 
-    function buildSnapshot(): DashboardSnapshot {
+    function buildSnapshot(): DashboardSnapshotWithActivity {
       // turnDiffSummariesByAgentId is intentionally excluded from the snapshot.
       //
       // Per-agent checkpoint history can grow to thousands of turns × hundreds
@@ -440,6 +455,7 @@ export const ReadModelServiceLive = Layer.effect(
         agentRuntimeById: state.agentRuntimeById,
         channelPermissionRequests: Object.values(state.channelPermissionRequestsById ?? {}),
         issues: state.issuesRaw,
+        recentActivity: state.recentActivity,
         resources: state.resources ?? undefined,
         memory: {
           observationsByIssueId: state.observationsByIssueId,
@@ -460,7 +476,7 @@ export const ReadModelServiceLive = Layer.effect(
       state = applyEventReducer(state, event);
     };
 
-    const getSnapshot: Effect.Effect<DashboardSnapshot> = Effect.gen(function* () {
+    const getSnapshot: Effect.Effect<DashboardSnapshotWithActivity> = Effect.gen(function* () {
       // Refresh issues from the shared issue service before building snapshot.
       // IssueDataService polls trackers in the background; its cached issues are
       // the freshest available without blocking on API calls.
@@ -536,11 +552,16 @@ export const ReadModelServiceLive = Layer.effect(
 
       // ── Sequence from event store (labels the snapshot, not a replay source) ─
       let sequence = 0;
+      let recentActivity: unknown[] = [];
       try {
         const { getEventStore } = yield* Effect.promise(
           () => import('./event-store.js'),
         );
-        sequence = getEventStore().getLatestSequence();
+        const eventStore = getEventStore();
+        sequence = eventStore.getLatestSequence();
+        recentActivity = activityEntriesFromStoredEvents(
+          eventStore.queryByType('activity.entry', MAX_SNAPSHOT_ACTIVITY_ENTRIES),
+        );
       } catch {
         // Event store may not be initialized yet
       }
@@ -551,6 +572,7 @@ export const ReadModelServiceLive = Layer.effect(
         agentsById,
         reviewStatusByIssueId: result.reviewStatusByIssueId,
         issuesRaw: [],
+        recentActivity,
       };
 
       console.log(
@@ -667,6 +689,7 @@ export const ReadModelServiceLive = Layer.effect(
         // strand fresh issues — the subsequent `pushSnapshot` would either
         // hit a null callback or be skipped by `issuesChanged()` because
         // `lastFetchedIssues` already matched the new GitHub fetch.
+        const mergeT0 = performance.now();
         const currentIssues = cleanIssues(issueService.getIssues());
         if (currentIssues.length > 0 || state.issuesRaw.length === 0) {
           const newIssues = discoverNewIssues(state.issuesRaw, currentIssues);
@@ -685,6 +708,7 @@ export const ReadModelServiceLive = Layer.effect(
             issuesRaw: mergeIssuesByIdentifier(state.issuesRaw, currentIssues),
           };
         }
+        console.log(`[boot-timing] ReadModel bootstrap merge completed at +${Math.round(performance.now() - mergeT0)}ms`);
 
         // Wire live issue updates — when IssueDataService polls new data,
         // update the read model directly AND emit to event store for

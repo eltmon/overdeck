@@ -34,6 +34,7 @@ import type {
   AgentRuntime,
   AgentRuntimeSync,
   AgentRuntimeError,
+  HarnessBehavior,
   Heartbeat,
   TokenUsage,
   CostBreakdown,
@@ -41,8 +42,10 @@ import type {
   SpawnConfig,
   Agent,
 } from './types.js'
+import { OHMYPI_BEHAVIOR } from './behavior.js'
 import { sessionExists, killSession, createSession, listSessionsSync } from '../tmux.js'
 import { parsePiSessionSync } from '../cost-parsers/pi-parser.js'
+import { prepareHarnessLaunch } from '../harness-binary.js'
 import { generateLauncherScriptSync } from '../launcher-generator.js'
 import { createPiFifo, destroyPiFifoSync, writePiCommandSync, piFifoPaths, PiNotReady } from './pi-fifo.js'
 import { ProcessSpawnError, ProcessTimeoutError, TmuxError } from '../errors.js'
@@ -134,8 +137,14 @@ function resolveLatestPiSessionId(agentId: string): string | null {
   return parsed?.sessionId ?? null
 }
 
-export class PiRuntimeSync implements AgentRuntimeSync {
-  readonly name = 'pi' as const
+// PAN-1989: Pi is legacy; no longer implements AgentRuntimeSync (removed from
+// RuntimeName union). Class is kept for backward-compat exports only.
+export class PiRuntimeSync {
+  readonly name: string = 'pi'
+
+  getHarnessBehavior(): HarnessBehavior {
+    return OHMYPI_BEHAVIOR
+  }
 
   /** Resolve the latest Pi session JSONL for an agent. Pi nests files under
    *  <agentDir>/sessions/<encoded-cwd>/<timestamp>_<id>.jsonl, but we tolerate
@@ -249,7 +258,9 @@ export class PiRuntimeSync implements AgentRuntimeSync {
     if (!existsSync(readyPathFor(agentId))) {
       throw new PiNotReady(`Pi agent ${agentId}: ready.json not present yet`)
     }
-    writePiCommandSync(agentId, { id: randomUUID(), type: 'prompt', message })
+    // steer: Pi delivers immediately when idle and queues mid-turn; a bare
+    // prompt is rejected with AgentBusyError while a run is active.
+    writePiCommandSync(agentId, { id: randomUUID(), type: 'prompt', message, streamingBehavior: 'steer' })
   }
 
   /**
@@ -324,6 +335,7 @@ export class PiRuntimeSync implements AgentRuntimeSync {
       throw new Error('PiRuntime.spawnAgent requires piExtensionPath in config')
     }
 
+    const harnessLaunch = await prepareHarnessLaunch('ohmypi')
     const agentId = config.agentId
     const dir = agentDirFor(agentId)
     const sessionDir = piSessionDirFor(agentId)
@@ -359,7 +371,7 @@ export class PiRuntimeSync implements AgentRuntimeSync {
     const launcherScript = generateLauncherScriptSync({
       role: 'work',
       workingDir: config.workspace,
-      harness: 'pi',
+      harness: 'ohmypi',
       piExtensionPath,
       piFifoPath: fifoPath,
       piSessionDir: sessionDir,
@@ -368,6 +380,7 @@ export class PiRuntimeSync implements AgentRuntimeSync {
       resumeSessionId,
       overdeckEnv: { agentId },
       setTerminalEnv: true,
+      extraEnvExports: [harnessLaunch.pathExport],
       trapHup: true,
     })
 
@@ -385,7 +398,7 @@ export class PiRuntimeSync implements AgentRuntimeSync {
     return {
       id: agentId,
       sessionId: readyData?.sessionId ?? 'unknown',
-      runtime: 'pi',
+      runtime: 'ohmypi',
       model: config.model ?? 'unknown',
       workspace: config.workspace,
       startedAt: new Date(),
@@ -439,8 +452,9 @@ export function createPiRuntimeSync(): PiRuntimeSync {
  * TmuxError). PiSpawnTimeout is preserved as the legacy Error class; Effect
  * callers receive ProcessTimeoutError instead.
  */
-export class PiRuntime implements AgentRuntime {
-  readonly name = 'pi' as const
+// PAN-1989: legacy — does not implement AgentRuntime (see PiRuntimeSync comment above).
+export class PiRuntime {
+  readonly name: string = 'pi'
   private readonly inner: PiRuntimeSync
 
   constructor(inner: PiRuntimeSync = new PiRuntimeSync()) {
@@ -449,6 +463,9 @@ export class PiRuntime implements AgentRuntime {
 
   getSessionPath(agentId: string): string | null {
     return this.inner.getSessionPath(agentId)
+  }
+  getHarnessBehavior(): HarnessBehavior {
+    return this.inner.getHarnessBehavior()
   }
   getLastActivity(agentId: string): Date | null {
     return this.inner.getLastActivity(agentId)

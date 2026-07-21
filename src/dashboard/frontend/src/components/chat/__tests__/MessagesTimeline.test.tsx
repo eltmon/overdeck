@@ -54,6 +54,24 @@ function makeMessage(id: string, role: ChatMessage['role'], offsetMs: number, te
 }
 
 describe('MessagesTimeline — search', () => {
+  it('clears the Sending indicator for acknowledged optimistic messages', () => {
+    render(
+      <MessagesTimeline
+        messages={[
+          {
+            ...makeMessage('optimistic-ack', 'user', 0, 'acked message'),
+            acknowledged: true,
+          },
+        ]}
+        workLog={[]}
+        streaming={false}
+      />,
+    );
+
+    expect(screen.getByText('acked message')).toBeInTheDocument();
+    expect(screen.queryByText('Sending…')).not.toBeInTheDocument();
+  });
+
   it('handles target-message scroll requests once per target key', async () => {
     const messages: ChatMessage[] = [
       makeMessage('u1', 'user', 0, 'hello'),
@@ -122,8 +140,12 @@ describe('MessagesTimeline — search', () => {
     const highlighted = screen.getByText('needle');
     expect(highlighted).toHaveAttribute('data-conversation-search-highlight', 'true');
     expect(highlighted).toHaveClass('bg-amber-300/40');
-    expect(highlighted.closest('[data-search-row-id]'))
-      .toHaveStyle({ outline: '2px solid var(--color-primary)' });
+    const highlightedRow = highlighted.closest('[data-search-row-id]') as HTMLElement;
+    const expectedOutline = document.createElement('div');
+    expectedOutline.style.outline = '2px solid var(--color-primary)';
+    expect(highlightedRow.style.outlineWidth).toBe(expectedOutline.style.outlineWidth);
+    expect(highlightedRow.style.outlineStyle).toBe(expectedOutline.style.outlineStyle);
+    expect(highlightedRow.style.outlineColor).toBe(expectedOutline.style.outlineColor);
 
     fireEvent.keyDown(window, { key: 'Escape' });
     expect(screen.queryByRole('textbox', { name: 'Search conversation' })).toBeNull();

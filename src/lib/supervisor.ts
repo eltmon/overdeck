@@ -42,6 +42,15 @@ function isProcessAlive(pid: number): boolean {
   }
 }
 
+/** Sync sleep that yields the thread (never busy-spin, never execSync). */
+function sleepMs(ms: number): void {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
+const STOP_POLL_MS = 50;
+const STOP_SIGKILL_MS = 1500;
+const STOP_TOTAL_MS = 2000;
+
 function readSupervisorPid(): number | null {
   try {
     if (!existsSync(SUPERVISOR_PID_PATH)) return null;
@@ -57,7 +66,7 @@ export function isSupervisorRunningSync(): boolean {
   return pid !== null && isProcessAlive(pid);
 }
 
-function resolveSupervisorBundle(): string {
+export function resolveSupervisorBundle(): string {
   // Always the built bundle (dist/supervisor/server.js) so import resolution
   // works under Node 22. Resolve from packageRoot — robust across every
   // invocation context (CLI bundle in dist/, dashboard server in
@@ -120,6 +129,25 @@ export function startSupervisorProcessSync(): void {
   }
 
   writeFileSync(SUPERVISOR_PID_PATH, String(child.pid));
+
+  // Give the child a moment to either come up or crash (e.g. port still held).
+  sleepMs(150);
+  if (!isProcessAlive(child.pid)) {
+    const message = `[supervisor] child ${child.pid} exited immediately; the supervisor port may still be held by a previous instance`;
+    console.error(message);
+    try {
+      unlinkSync(SUPERVISOR_PID_PATH);
+    } catch {
+      // ignore
+    }
+    try {
+      closeSync(logFd);
+    } catch {
+      // ignore
+    }
+    throw new Error(message);
+  }
+
   child.unref();
   try {
     closeSync(logFd);
@@ -135,6 +163,19 @@ export function stopSupervisorProcessSync(): void {
       process.kill(pid, 'SIGTERM');
     } catch {
       // already dead
+    }
+    let sentKill = false;
+    for (let waited = 0; waited < STOP_TOTAL_MS; waited += STOP_POLL_MS) {
+      if (!isProcessAlive(pid)) break;
+      if (!sentKill && waited >= STOP_SIGKILL_MS) {
+        try {
+          process.kill(pid, 'SIGKILL');
+        } catch {
+          // already dead
+        }
+        sentKill = true;
+      }
+      sleepMs(STOP_POLL_MS);
     }
   }
   try {

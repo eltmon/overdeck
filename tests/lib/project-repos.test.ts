@@ -1,4 +1,7 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import type { ProjectConfig, ResolvedProject } from '../../src/lib/projects.js';
 
 const projectsMocks = vi.hoisted(() => ({
@@ -19,11 +22,15 @@ vi.mock('../../src/lib/projects.js', async () => {
 });
 
 import {
+  computeWorkspaceRepoRootsSync,
   inferProjectForgeSync,
   normalizeForgeSync,
   resolveConfiguredReposSync,
   resolveProjectReposForIssueSync,
+  type ResolvedProjectRepo,
 } from '../../src/lib/project-repos.js';
+
+type ResolvedRepoT = ResolvedProjectRepo;
 
 describe('project-repos', () => {
   it('normalizes forge values from config-friendly strings', () => {
@@ -119,5 +126,78 @@ describe('project-repos', () => {
       repoPath: '/tmp/myn/api',
       forge: 'gitlab',
     });
+  });
+});
+
+describe('computeWorkspaceRepoRootsSync', () => {
+  const makeRepo = (repoKey: string, overrides: Partial<ResolvedRepoT> = {}): ResolvedRepoT => ({
+    projectKey: 'mind-your-now',
+    projectPath: '/tmp/myn',
+    repoKey,
+    repoPath: `/tmp/myn/${repoKey}`,
+    forge: 'gitlab',
+    sourceBranch: 'feature/min-999',
+    targetBranch: 'main',
+    mergeOrder: 0,
+    required: true,
+    ...overrides,
+  });
+
+  let workspace: string;
+
+  beforeEach(() => {
+    workspace = mkdtempSync(join(tmpdir(), 'pan-repo-roots-'));
+  });
+
+  afterEach(() => {
+    rmSync(workspace, { recursive: true, force: true });
+  });
+
+  it('maps polyrepo sub-repos with .git present to workspace-nested roots', () => {
+    mkdirSync(join(workspace, 'fe', '.git'), { recursive: true });
+    mkdirSync(join(workspace, 'api', '.git'), { recursive: true });
+    mkdirSync(join(workspace, 'infra'), { recursive: true }); // no .git — skipped
+
+    const roots = computeWorkspaceRepoRootsSync(
+      [makeRepo('fe'), makeRepo('api'), makeRepo('infra'), makeRepo('docs', { required: false })],
+      'MIN-999',
+      workspace
+    );
+
+    expect(roots).toEqual([
+      expect.objectContaining({ repoKey: 'fe', dir: join(workspace, 'fe'), sourceBranch: 'feature/min-999', targetBranch: 'main', isPolyrepo: true }),
+      expect.objectContaining({ repoKey: 'api', dir: join(workspace, 'api'), isPolyrepo: true }),
+    ]);
+  });
+
+  it('treats a worktree .git file as a valid sub-repo marker', () => {
+    mkdirSync(join(workspace, 'fe'), { recursive: true });
+    writeFileSync(join(workspace, 'fe', '.git'), 'gitdir: /tmp/myn/frontend/.git/worktrees/fe\n');
+
+    const roots = computeWorkspaceRepoRootsSync([makeRepo('fe'), makeRepo('api')], 'MIN-999', workspace);
+    expect(roots).toEqual([
+      expect.objectContaining({ repoKey: 'fe', dir: join(workspace, 'fe'), isPolyrepo: true }),
+    ]);
+  });
+
+  it('falls back to the workspace root when no polyrepo sub-repo is on disk', () => {
+    const roots = computeWorkspaceRepoRootsSync([makeRepo('fe'), makeRepo('api')], 'MIN-999', workspace);
+    expect(roots).toEqual([
+      expect.objectContaining({ repoKey: 'fe', dir: workspace, isPolyrepo: false }),
+    ]);
+  });
+
+  it('resolves a monorepo (single configured repo) to the workspace root', () => {
+    const roots = computeWorkspaceRepoRootsSync([makeRepo('overdeck', { targetBranch: 'develop' })], 'PAN-1', workspace);
+    expect(roots).toEqual([
+      expect.objectContaining({ repoKey: 'overdeck', dir: workspace, sourceBranch: 'feature/min-999', targetBranch: 'develop', isPolyrepo: false }),
+    ]);
+  });
+
+  it('defaults sensibly when repo resolution returned null', () => {
+    const roots = computeWorkspaceRepoRootsSync(null, 'MIN-999', workspace);
+    expect(roots).toEqual([
+      expect.objectContaining({ repoKey: 'min-999', dir: workspace, sourceBranch: 'feature/min-999', targetBranch: 'main', isPolyrepo: false }),
+    ]);
   });
 });

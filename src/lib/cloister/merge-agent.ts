@@ -2,7 +2,7 @@
  * Merge Agent - Automatic merge conflict resolution using Claude Code
  */
 
-import { readFileSync, writeFileSync, existsSync, mkdirSync, appendFileSync } from 'fs';
+import { existsSync, mkdirSync, appendFileSync } from 'fs';
 import { writeFile } from 'fs/promises';
 import { join, dirname, basename, relative } from 'path';
 import { fileURLToPath } from 'url';
@@ -10,9 +10,23 @@ import { spawn, exec } from 'child_process';
 import { promisify } from 'util';
 import { Effect } from 'effect';
 import { capturePane, killSession, listSessionNames, sendKeys, sessionExists } from '../tmux.js';
-import { emitActivityEntrySync, emitActivityTtsSync, emitDashboardLifecycleSync } from '../activity-logger.js';
+import { emitActivityEntrySync, emitActivityTtsSync } from '../activity-logger.js';
+import { loadConfigSync } from '../config-yaml.js';
+import { shouldRestartForPostMerge } from './merge-agent-step0.js';
+import {
+  ensureSyncGitQuiescent,
+  probeGitOperationHeads,
+  runSyncGitCommand,
+  SyncGitCommandAbortError,
+  SyncGitCommandTimeoutError,
+} from './sync-main-git.js';
 
 const execAsync = promisify(exec);
+
+const SYNC_GIT_FETCH_TIMEOUT_MS = 60_000;
+const SYNC_GIT_MERGE_TIMEOUT_MS = 120_000;
+const SYNC_GIT_COMMIT_TIMEOUT_MS = 60_000;
+const SYNC_GIT_STATUS_TIMEOUT_MS = 30_000;
 
 /**
  * Paths that must never enter a pipeline auto-commit, regardless of gitignore
@@ -37,7 +51,6 @@ export const AUTO_COMMIT_EXCLUDED_PATHS = [
 const SYNC_MAIN_MAIN_PREFERRED_PATHS = [
   '.pan/continues',
   '.pan/specs',
-  '.beads',
 ];
 
 export function isSyncMainMainPreferredPath(relativePath: string): boolean {
@@ -83,43 +96,49 @@ function parseStatusPath(line: string): string {
  */
 export async function autoCommitWorkspaceChangesBeforeSync(
   projectPath: string,
+  issueId?: string,
+  signal?: AbortSignal,
 ): Promise<{ success: boolean; committed: boolean; reason?: string }> {
+  const run = (command: string, timeout = SYNC_GIT_STATUS_TIMEOUT_MS) =>
+    runSyncGitCommand(command, { cwd: projectPath, timeout, signal });
   try {
-    const { stdout: statusOut } = await execAsync('git status --porcelain', {
-      cwd: projectPath,
-      encoding: 'utf-8',
-    });
-    if (!statusOut.trim()) {
-      return { success: true, committed: false, reason: 'no uncommitted changes' };
+    const operationHeads = await probeGitOperationHeads(projectPath, SYNC_GIT_STATUS_TIMEOUT_MS, signal);
+    if (!operationHeads.success) return { success: false, committed: false, reason: operationHeads.reason };
+    if (operationHeads.present.length > 0) {
+      return { success: false, committed: false, reason: `Refusing to auto-commit while ${operationHeads.present[0]} exists; finish or abort the in-progress Git operation first` };
     }
 
-    // PAN-1819: plain `git add -A` respects .gitignore; never use -f.
-    await execAsync('git add -A', { cwd: projectPath, encoding: 'utf-8' });
-
-    // Belt-and-suspenders: unstage excluded paths regardless of ignore state.
-    const resetPaths = AUTO_COMMIT_EXCLUDED_PATHS.map((p) =>
-      p.endsWith('/') ? p.slice(0, -1) : p
-    ).join(' ');
-    await execAsync(`git reset HEAD -- ${resetPaths}`, {
-      cwd: projectPath,
-      encoding: 'utf-8',
-    });
-
-    const { stdout: diffStat } = await execAsync('git diff --cached --stat', {
-      cwd: projectPath,
-      encoding: 'utf-8',
-    });
-    if (!diffStat.trim()) {
-      return { success: true, committed: false, reason: 'only excluded/ignored changes remain' };
+    try {
+      const { stdout: conflictMarkers } = await run("git grep -n -I -E '^(<<<<<<<( |$)|=======$|>>>>>>>( |$))' -- .");
+      if (conflictMarkers.trim()) {
+        const files = [...new Set(conflictMarkers.trim().split('\n').map((line) => line.split(':', 1)[0]))];
+        return { success: false, committed: false, reason: `Refusing to auto-commit conflict markers in: ${files.join(', ')}` };
+      }
+    } catch (error: any) {
+      if (error?.code !== 1) return { success: false, committed: false, reason: `Failed to scan for conflict markers: ${error.message}` };
     }
 
-    await execAsync('git commit -m "chore: auto-commit before sync with main"', {
-      cwd: projectPath,
-      encoding: 'utf-8',
-    });
+    const { stdout: statusOut } = await run('git status --porcelain');
+    if (!statusOut.trim()) return { success: true, committed: false, reason: 'no uncommitted changes' };
+
+    await run('git add -A');
+    const resetPaths = AUTO_COMMIT_EXCLUDED_PATHS.map((p) => p.endsWith('/') ? p.slice(0, -1) : p).join(' ');
+    await run(`git reset HEAD -- ${resetPaths}`);
+
+    const { stdout: diffStat } = await run('git diff --cached --stat');
+    if (!diffStat.trim()) return { success: true, committed: false, reason: 'only excluded/ignored changes remain' };
+
+    const commitMessage = issueId ? `chore: auto-commit before sync with main (${issueId})` : 'chore: auto-commit before sync with main';
+    await run(`git commit -m "${commitMessage}"`, SYNC_GIT_COMMIT_TIMEOUT_MS);
     return { success: true, committed: true };
   } catch (error: any) {
-    return { success: false, committed: false, reason: `Failed to auto-commit: ${error.message}` };
+    if (error instanceof SyncGitCommandAbortError || error instanceof SyncGitCommandTimeoutError) {
+      await ensureSyncGitQuiescent(projectPath, false);
+    }
+    const reason = error instanceof SyncGitCommandTimeoutError && error.command.startsWith('git commit ')
+      ? `Auto-commit git commit timed out after ${SYNC_GIT_COMMIT_TIMEOUT_MS / 1_000}s`
+      : `Failed to auto-commit: ${error.message}`;
+    return { success: false, committed: false, reason };
   }
 }
 
@@ -130,15 +149,14 @@ import {
 } from '../paths.js';
 import { resolveGitHubIssueSync } from '../tracker-utils.js';
 
-import { resolveProjectFromIssueSync } from '../projects.js';
-import { restoreTrackedBeadsExport } from '../beads-restore.js';
-import { runMergeValidation, autoRevertMerge, runQualityGates } from './validation.js';
+import { runQualityGates } from './validation.js';
 import { loadProjectsConfigSync } from '../projects.js';
 import { cleanupStaleLocks } from '../git-utils.js';
-import { gitPush, gitForcePush, MainDivergedError } from '../git/operations.js';
-import { markWorkspaceStuck, setReviewStatusSync } from '../review-status.js';
+import { gitPush, MainDivergedError } from '../git/operations.js';
+import { getReviewStatusSync, markWorkspaceStuck, setReviewStatusSync } from '../review-status.js';
 import { appendGitOperationSync, type GitOperationType } from '../git-activity.js';
 import { recordFeatureRegistryLifecycle } from '../registry/feature-registry-population.js';
+import { verifyMergedBeforeLifecycle, type PostMergeLifecycleOptions } from './merge-verification.js';
 
 const SPECIALISTS_DIR = join(OVERDECK_HOME, 'specialists');
 const MERGE_HISTORY_DIR = join(SPECIALISTS_DIR, 'merge-agent');
@@ -186,12 +204,10 @@ interface MergeHistoryEntry {
 /**
  * Timeout for merge agent in milliseconds (15 minutes)
  */
-const MERGE_TIMEOUT_MS = 15 * 60 * 1000;
-
 /**
  * Notify TLDR daemon to reindex changed files after merge
  */
-export async function notifyTldrDaemon(projectPath: string, sourceBranch: string): Promise<void> {
+export async function notifyTldrDaemon(projectPath: string, _sourceBranch: string): Promise<void> {
   try {
     console.log(`[merge-agent] Notifying TLDR daemon to reindex changed files...`);
 
@@ -252,7 +268,7 @@ export async function notifyTldrDaemon(projectPath: string, sourceBranch: string
 /**
  * Post-merge handoff: mark merged work as verifying on main and free runtime resources.
  *
- * Leaves the issue, workspace, vBRIEF, branches, and agent state dirs intact.
+ * Leaves the issue, workspace, xBRIEF, branches, and agent state dirs intact.
  * The explicit close-out ceremony performs final archival and destructive cleanup.
  *
  * IDEMPOTENT: Safe to call multiple times for the same issueId. Tracks completed
@@ -274,41 +290,12 @@ function shellQuote(value: string): string {
   return `'${value.replace(/'/g, `'"'"'`)}'`;
 }
 
-async function verifyMergedBeforeLifecycle(issueId: string, projectPath: string, sourceBranch?: string): Promise<{ merged: boolean; reason: string }> {
-  // PAN-1531: single merge oracle — GitHub PR API is the authoritative answer
-  // for "is this PR merged." The prior ancestor-of-main and diff-fallback
-  // heuristics were retired because they produced "the oracles disagree"
-  // bugs (PAN-1024) and made the meaning of "merged" muddy. For non-GitHub
-  // projects the operator confirms manually.
-  const branchName = sourceBranch?.trim() || `feature/${issueId.toLowerCase()}`;
-  const quotedBranch = shellQuote(branchName);
-
-  const ghResolved = resolveGitHubIssueSync(issueId);
-  if (!ghResolved.isGitHub) {
-    return { merged: false, reason: `Non-GitHub project for ${issueId}; merge state cannot be auto-verified` };
-  }
-
-  const { owner, repo } = ghResolved;
-  try {
-    const { stdout } = await execAsync(
-      `gh pr list --repo ${shellQuote(`${owner}/${repo}`)} --state all --head ${quotedBranch} --json number,mergedAt,mergeCommit --limit 5`,
-      { cwd: projectPath },
-    );
-    const prs = JSON.parse(stdout || '[]') as Array<{ number: number; mergedAt: string | null; mergeCommit: unknown | null }>;
-    const mergedPr = prs.find((pr) => pr.mergedAt || pr.mergeCommit);
-    if (mergedPr) {
-      return { merged: true, reason: `GitHub PR #${mergedPr.number} is merged` };
-    }
-    if (prs.length === 0) {
-      return { merged: true, reason: `No PR found for ${branchName}; assuming post-merge cleanup already removed the source ref` };
-    }
-    return { merged: false, reason: `GitHub PR for ${branchName} is open and not merged` };
-  } catch (err: any) {
-    return { merged: false, reason: `Unable to verify merge state for ${branchName} via GitHub PR API: ${err?.message?.slice(0, 200) || 'unknown'}` };
-  }
-}
-
-export async function postMergeLifecycle(issueId: string, projectPath: string, sourceBranch?: string, options?: { skipDeploy?: boolean }): Promise<void> {
+export async function postMergeLifecycle(
+  issueId: string,
+  projectPath: string,
+  sourceBranch?: string,
+  options?: PostMergeLifecycleOptions,
+): Promise<void> {
   // PAN-1517: the per-slot swarm runtime is gone. Slot branches no longer exist
   // — parallelism is an in-context concern owned by the work agent (see
   // roles/work.md "Parallel work via subagents"). postMergeLifecycle fires only
@@ -345,7 +332,7 @@ export async function postMergeLifecycle(issueId: string, projectPath: string, s
       // Spec unreadable — proceed; the guard is best-effort.
     }
 
-    const mergeVerification = await verifyMergedBeforeLifecycle(issueId, projectPath, sourceBranch);
+    const mergeVerification = await verifyMergedBeforeLifecycle(issueId, projectPath, sourceBranch, options);
     if (!mergeVerification.merged) {
       console.warn(`[merge-agent] Refusing post-merge lifecycle for ${issueId}: ${mergeVerification.reason}`);
       return;
@@ -354,19 +341,17 @@ export async function postMergeLifecycle(issueId: string, projectPath: string, s
 
     // Set mergeStatus='merged' after verifying the branch or PR actually landed.
     try {
-      setReviewStatusSync(issueId, { mergeStatus: 'merged', readyForMerge: false });
+      setReviewStatusSync(issueId, {
+        mergeStatus: 'merged',
+        readyForMerge: false,
+        ...(options?.markReviewPassed ? { reviewStatus: 'passed' as const } : {}),
+      });
       console.log(`[merge-agent] ✓ mergeStatus set to 'merged' for ${issueId}`);
     } catch (err: any) {
       console.warn(`[merge-agent] Could not set mergeStatus: ${err.message}`);
     }
 
-    // Step 0: Write pending lifecycle file and spawn detached deploy script.
-    // The deploy script rebuilds dist/, kills this server, and starts a fresh process.
-    // The fresh process reads the pending file on startup and runs the lifecycle steps
-    // with correct module chunk references (no ERR_MODULE_NOT_FOUND after merge).
-    //
-    // Skip this step when we ARE the fresh process (called from processPendingLifecycle) —
-    // dynamic imports already resolve correctly and spawning again would create an infinite loop.
+    // Step 0: restart only when the running build is stale and the deploy window is safe.
     if (!options?.skipDeploy) {
       const pendingFile = join(OVERDECK_HOME, 'pending-post-merge.json');
       let repoRoot = __dirname.includes('/src/')
@@ -382,7 +367,7 @@ export async function postMergeLifecycle(issueId: string, projectPath: string, s
       }
       const deployScript = join(repoRoot, 'scripts', 'post-merge-deploy.sh');
 
-      try {
+      if (await shouldRestartForPostMerge(repoRoot)) try {
         const pendingData = JSON.stringify({
           issueId,
           projectPath,
@@ -454,18 +439,11 @@ export async function postMergeLifecycle(issueId: string, projectPath: string, s
       throw err;
     }
 
-    // 2. Compact old beads (via lifecycle module)
-    try {
-      const { compactBeads } = await import('../lifecycle/compact-beads.js');
-      // PAN-1249: compactBeads returns Effect<StepResult>; bridge to Promise.
-      const beadsResult = await Effect.runPromise(compactBeads({ issueId, projectPath }));
-      if (beadsResult.success && !beadsResult.skipped) {
-        console.log(`[merge-agent] ✓ ${beadsResult.details?.join('; ')}`);
-        logActivity('beads_compaction_complete', beadsResult.details?.join('; ') || 'Beads compacted');
-      }
-    } catch (err) {
-      console.warn(`[merge-agent] Beads compaction failed: ${err}`);
-    }
+    // Release verification runs asynchronously so post-merge cleanup is not
+    // delayed by a slow external deploy. Status is still reported via review-status.
+    triggerPostMergeReleaseIfConfigured(issueId, projectPath).catch((err) => {
+      console.warn(`[merge-agent] Async post-merge release trigger failed for ${issueId}: ${err instanceof Error ? err.message : String(err)}`);
+    });
 
     // 3. Pause work/planning agents and kill their tmux panes to free resources.
     try {
@@ -570,6 +548,7 @@ export async function postMergeLifecycle(issueId: string, projectPath: string, s
     }
 
     await notifyTldrDaemon(projectPath, sourceBranch ?? '');
+    await maybeSpawnPostMergeKnowledgeRetro(issueId, projectPath);
 
     // Mark completed BEFORE logging — prevents re-entry even if the log line triggers something
     _completedPostMerge.add(issueId);
@@ -582,6 +561,45 @@ export async function postMergeLifecycle(issueId: string, projectPath: string, s
   });
   _postMergeInFlight.set(issueId, run);
   return run;
+}
+
+export async function triggerPostMergeReleaseIfConfigured(issueId: string, projectPath: string): Promise<void> {
+  const currentStatus = getReviewStatusSync(issueId)?.releaseStatus;
+  if (currentStatus && currentStatus !== 'pending') {
+    console.log(`[merge-agent] Release already started or completed for ${issueId} (${currentStatus}), skipping`);
+    return;
+  }
+
+  const { resolveProjectFromIssueSync, getProjectSync } = await import('../projects.js');
+  const resolved = resolveProjectFromIssueSync(issueId);
+  const project = resolved ? getProjectSync(resolved.projectKey) : null;
+
+  if (!project?.release) {
+    setReviewStatusSync(issueId, {
+      releaseStatus: 'skipped',
+      releaseNotes: 'No release config found for project.',
+    });
+    console.log(`[merge-agent] No release config for ${issueId}; marked release skipped`);
+    return;
+  }
+
+  const { runRelease } = await import('../release/release-engine.js');
+  try {
+    await runRelease(issueId, projectPath);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.warn(`[merge-agent] Post-merge release trigger failed for ${issueId}: ${message}`);
+    try {
+      setReviewStatusSync(issueId, {
+        releaseStatus: 'failed',
+        releaseNotes: `Post-merge release trigger failed: ${message}`,
+      });
+    } catch (statusErr: any) {
+      console.warn(`[merge-agent] Could not persist release trigger failure: ${statusErr?.message ?? statusErr}`);
+    }
+    // Release failures are surfaced through release status; the merge itself
+    // has already completed and must not be marked failed (review feedback).
+  }
 }
 
 async function transitionIssueToVerifyingOnMain(issueId: string, projectPath: string): Promise<void> {
@@ -661,6 +679,39 @@ async function killPostMergeRoleSessions(issueId: string): Promise<void> {
   }
 }
 
+function isPostMergeKnowledgeRetroEnabled(): boolean {
+  try {
+    return loadConfigSync().config.knowledge?.postMergeAutoRetro === true;
+  } catch (err) {
+    console.warn(`[merge-agent] Could not read knowledge post-merge retro config: ${err}`);
+    return false;
+  }
+}
+
+async function maybeSpawnPostMergeKnowledgeRetro(issueId: string, projectPath: string): Promise<void> {
+  if (!isPostMergeKnowledgeRetroEnabled()) return;
+
+  try {
+    const child = spawn('pan', ['knowledge', issueId, '--retro'], {
+      cwd: projectPath,
+      detached: true,
+      stdio: 'ignore',
+    });
+    child.once?.('error', (err) => {
+      const message = err instanceof Error ? err.message : String(err);
+      console.warn(`[merge-agent] Post-merge knowledge retro spawn failed for ${issueId}: ${message}`);
+      logActivity('knowledge_retro_error', `Post-merge knowledge retro spawn failed for ${issueId}: ${message}`, issueId);
+    });
+    child.unref();
+    console.log(`[merge-agent] Spawned post-merge knowledge retro for ${issueId} (pid ${child.pid})`);
+    logActivity('knowledge_retro_spawned', `Spawned post-merge knowledge retro for ${issueId}`, issueId);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.warn(`[merge-agent] Post-merge knowledge retro spawn failed for ${issueId}: ${message}`);
+    logActivity('knowledge_retro_error', `Post-merge knowledge retro spawn failed for ${issueId}: ${message}`, issueId);
+  }
+}
+
 /**
  * Reset postMergeLifecycle completion tracking for an issue (used by reopen).
  */
@@ -672,7 +723,7 @@ export function resetPostMergeState(issueId: string): void {
 /**
  * Parse result markers from agent output
  */
-function parseAgentOutput(output: string): MergeResult {
+export function parseAgentOutput(output: string): MergeResult {
   const lines = output.split('\n');
 
   let mergeResult: 'SUCCESS' | 'FAILURE' | null = null;
@@ -825,18 +876,18 @@ function parseAgentOutput(output: string): MergeResult {
 /**
  * Get conflict files from git status (async)
  */
-async function getConflictFiles(projectPath: string): Promise<string[]> {
-  try {
-    const { stdout: status } = await execAsync('git diff --name-only --diff-filter=U', {
-      cwd: projectPath,
-      encoding: 'utf-8',
-    });
+function isSyncGitTermination(error: unknown): boolean {
+  return error instanceof SyncGitCommandAbortError || error instanceof SyncGitCommandTimeoutError;
+}
 
-    return status
-      .split('\n')
-      .map((line) => line.trim())
-      .filter((line) => line.length > 0);
+async function getConflictFiles(projectPath: string, signal?: AbortSignal): Promise<string[]> {
+  try {
+    const { stdout: status } = await runSyncGitCommand('git diff --name-only --diff-filter=U', {
+      cwd: projectPath, timeout: SYNC_GIT_STATUS_TIMEOUT_MS, signal,
+    });
+    return status.split('\n').map((line) => line.trim()).filter(Boolean);
   } catch (error) {
+    if (isSyncGitTermination(error)) throw error;
     console.error('Failed to get conflict files:', error);
     return [];
   }
@@ -845,55 +896,42 @@ async function getConflictFiles(projectPath: string): Promise<string[]> {
 async function resolveMainPreferredSyncConflicts(
   projectPath: string,
   conflictFiles: string[],
+  signal?: AbortSignal,
 ): Promise<{ success: boolean; reason?: string }> {
   if (conflictFiles.length === 0 || !conflictFiles.every(isSyncMainMainPreferredPath)) {
     return { success: false, reason: 'conflicts include non-pipeline-owned files' };
   }
 
+  const run = (command: string, timeout = SYNC_GIT_STATUS_TIMEOUT_MS) =>
+    runSyncGitCommand(command, { cwd: projectPath, timeout, signal });
   try {
     for (const path of SYNC_MAIN_MAIN_PREFERRED_PATHS) {
-      await execAsync(`git rm -r --quiet --ignore-unmatch -- ${path}`, {
-        cwd: projectPath,
-        encoding: 'utf-8',
+      await run(`git rm -r --quiet --ignore-unmatch -- ${path}`);
+      await run(`git checkout origin/main -- ${path}`).catch((error) => {
+        if (isSyncGitTermination(error)) throw error;
+        // The path may not exist on origin/main. The preceding git rm records
+        // main's deletion for this pipeline-owned path.
       });
-      await execAsync(`git checkout origin/main -- ${path}`, {
-        cwd: projectPath,
-        encoding: 'utf-8',
-      }).catch(() => {
-        // The path may not exist on origin/main. In that case, the preceding
-        // git rm records main's deletion for this pipeline-owned path.
-      });
-      await execAsync(`git add -A -- ${path}`, {
-        cwd: projectPath,
-        encoding: 'utf-8',
-      });
+      await run(`git add -A -- ${path}`);
     }
 
-    const remainingConflicts = await getConflictFiles(projectPath);
+    const remainingConflicts = await getConflictFiles(projectPath, signal);
     if (remainingConflicts.length > 0) {
-      return {
-        success: false,
-        reason: `Unresolved conflicts remain: ${remainingConflicts.join(', ')}`,
-      };
+      return { success: false, reason: `Unresolved conflicts remain: ${remainingConflicts.join(', ')}` };
     }
 
-    await execAsync('git commit --no-edit', {
-      cwd: projectPath,
-      encoding: 'utf-8',
-    });
+    await run('git commit --no-edit', SYNC_GIT_COMMIT_TIMEOUT_MS);
     return { success: true };
   } catch (error: any) {
-    return {
-      success: false,
-      reason: `Failed to auto-resolve pipeline-owned conflicts: ${error.message}`,
-    };
+    if (isSyncGitTermination(error)) throw error;
+    return { success: false, reason: `Failed to auto-resolve pipeline-owned conflicts: ${error.message}` };
   }
 }
 
 /**
  * Log merge to history
  */
-function logMergeHistory(context: MergeConflictContext, result: MergeResult, sessionId?: string): void {
+export function logMergeHistory(context: MergeConflictContext, result: MergeResult, sessionId?: string): void {
   // Ensure history directory exists
   if (!existsSync(MERGE_HISTORY_DIR)) {
     mkdirSync(MERGE_HISTORY_DIR, { recursive: true });
@@ -970,7 +1008,7 @@ function announceMerge(
 /**
  * Capture tmux output and look for result markers (async)
  */
-async function captureTmuxOutput(sessionName: string): Promise<string> {
+export async function captureTmuxOutput(sessionName: string): Promise<string> {
   try {
     return await Effect.runPromise(capturePane(sessionName));
   } catch {
@@ -1035,14 +1073,14 @@ export function scanGitPatterns(
 /**
  * Check if specialist-merge-agent tmux session is running (async)
  */
-async function isMergeAgentRunning(): Promise<boolean> {
+export async function isMergeAgentRunning(): Promise<boolean> {
   return Effect.runPromise(sessionExists('specialist-merge-agent'));
 }
 
 /**
  * Send a message to an agent's tmux session (async)
  */
-async function sendMessageToAgent(issueId: string, message: string): Promise<boolean> {
+export async function sendMessageToAgent(issueId: string, message: string): Promise<boolean> {
   // Agent sessions are typically named agent-{issueId} (lowercase)
   const sessionName = `agent-${issueId.toLowerCase()}`;
 
@@ -1070,7 +1108,7 @@ async function sendMessageToAgent(issueId: string, message: string): Promise<boo
 // defaultWorkspaceForIssue) removed. Rebase is now performed in-process via
 // rebaseFeatureBranch() in src/lib/cloister/merge-rebase.ts. See docs/MERGE-WORKFLOW.md.
 
-async function salvageStrandedMerge(
+export async function salvageStrandedMerge(
   projectPath: string,
   targetBranch: string,
   headBefore: string,
@@ -1170,6 +1208,23 @@ export async function scanForConflictMarkers(projectPath: string): Promise<strin
   }
 }
 
+async function collectSyncMergeStats(projectPath: string, signal?: AbortSignal): Promise<Pick<SyncMainResult, 'commitCount' | 'changedFiles'>> {
+  const run = (command: string) => runSyncGitCommand(command, {
+    cwd: projectPath, timeout: SYNC_GIT_STATUS_TIMEOUT_MS, signal,
+  });
+  let changedFiles: string[] = [];
+  let commitCount = 0;
+  try {
+    const { stdout } = await run('git diff --name-only ORIG_HEAD HEAD 2>/dev/null || git diff --name-only HEAD~1 HEAD');
+    changedFiles = stdout.trim().split('\n').filter(Boolean);
+  } catch (error) { if (isSyncGitTermination(error)) throw error; }
+  try {
+    const { stdout } = await run('git log ORIG_HEAD..HEAD --oneline 2>/dev/null || echo ""');
+    commitCount = stdout.trim().split('\n').filter(Boolean).length;
+  } catch (error) { if (isSyncGitTermination(error)) throw error; }
+  return { changedFiles, commitCount };
+}
+
 /**
  * Sync the latest main branch into a workspace's feature branch.
  *
@@ -1183,41 +1238,29 @@ export async function scanForConflictMarkers(projectPath: string): Promise<strin
 export async function syncMainIntoWorkspace(
   projectPath: string,
   issueId: string,
+  signal?: AbortSignal,
 ): Promise<SyncMainResult> {
   console.log(`[sync-main] Starting sync of main into workspace for ${issueId}`);
   logActivity('sync_main_start', `Starting sync for ${issueId}`);
+  const run = (command: string, timeout = SYNC_GIT_STATUS_TIMEOUT_MS) =>
+    runSyncGitCommand(command, { cwd: projectPath, timeout, signal });
+  let mergeStarted = false;
 
-  // PAN-1158 safety net: a workspace bd dolt DB that briefly went empty can
-  // leave `.beads/issues.jsonl` reported as deleted by `git status`. The
-  // auto-commit below would then propagate that deletion onto the feature
-  // branch. Restore the tracked export first so the auto-commit only sees
-  // intentional changes.
-  await Effect.runPromise(restoreTrackedBeadsExport(projectPath));
-
-  // Pre-flight: auto-commit uncommitted changes before merge
-  console.log(`[sync-main] Checking for uncommitted changes...`);
-  logActivity('sync_main_auto_commit', `Auto-committing uncommitted changes before sync`);
-  const autoCommit = await autoCommitWorkspaceChangesBeforeSync(projectPath);
-  if (!autoCommit.success) {
-    const message = autoCommit.reason || 'Failed to auto-commit uncommitted changes';
-    console.error(`[sync-main] ${message}`);
-    logActivity('sync_main_blocked', message);
-    return { success: false, reason: message };
-  }
-  if (autoCommit.committed) {
-    console.log(`[sync-main] Auto-commit successful`);
-  }
-
-  // Verify no non-excluded uncommitted changes remain.
   try {
-    const { stdout: postCommitStatus } = await execAsync('git status --porcelain', {
-      cwd: projectPath,
-      encoding: 'utf-8',
-    });
+    console.log(`[sync-main] Checking for uncommitted changes...`);
+    logActivity('sync_main_auto_commit', `Auto-committing uncommitted changes before sync`);
+    const autoCommit = await autoCommitWorkspaceChangesBeforeSync(projectPath, issueId, signal);
+    if (!autoCommit.success) {
+      const message = autoCommit.reason || 'Failed to auto-commit uncommitted changes';
+      console.error(`[sync-main] ${message}`);
+      logActivity('sync_main_blocked', message);
+      return { success: false, reason: message };
+    }
+    if (autoCommit.committed) console.log(`[sync-main] Auto-commit successful`);
+
+    const { stdout: postCommitStatus } = await run('git status --porcelain');
     if (postCommitStatus.trim()) {
-      const remainingNonExcluded = postCommitStatus
-        .trim()
-        .split('\n')
+      const remainingNonExcluded = postCommitStatus.trim().split('\n')
         .filter((line) => !isAutoCommitExcludedPath(parseStatusPath(line)));
       if (remainingNonExcluded.length > 0) {
         const message = 'Uncommitted changes remain after auto-commit — aborting sync';
@@ -1226,121 +1269,84 @@ export async function syncMainIntoWorkspace(
         return { success: false, reason: message };
       }
     }
-  } catch (error: any) {
-    return { success: false, reason: `Failed to check git status: ${error.message}` };
-  }
 
-  // Clean up stale git lock files
-  try {
-    const lockCleanup = await Effect.runPromise(cleanupStaleLocks(projectPath));
-    if (lockCleanup.found.length > 0) {
-      console.log(`[sync-main] Found ${lockCleanup.found.length} lock file(s)`);
+    try {
+      const lockCleanup = await Effect.runPromise(cleanupStaleLocks(projectPath, { signal, processProbeTimeoutMs: SYNC_GIT_STATUS_TIMEOUT_MS }));
+      if (lockCleanup.found.length > 0) console.log(`[sync-main] Found ${lockCleanup.found.length} lock file(s)`);
       if (lockCleanup.removed.length > 0) {
-        console.log(`[sync-main] Cleaned up ${lockCleanup.removed.length} stale lock file(s)`);
-        logActivity('git_lock_cleanup', `Removed ${lockCleanup.removed.length} stale lock file(s)`);
+        console.log(`[sync-main] Cleaned up ${lockCleanup.removed.length} stale lock file(s)`); logActivity('git_lock_cleanup', `Removed ${lockCleanup.removed.length} stale lock file(s)`);
       }
-      if (lockCleanup.errors.some((e: { file: string; error: string }) => e.error.includes('Git processes are running'))) {
-        const message = 'Git processes are still running — cannot safely start sync';
-        console.error(`[sync-main] ${message}`);
-        logActivity('sync_main_blocked', message);
+      if (lockCleanup.errors.length > 0) {
+        const details = lockCleanup.errors.map(({ file, error }) => `${file}: ${error}`).join('; ');
+        const message = `Cannot safely start sync: ${details}`;
+        console.error(`[sync-main] ${message}`); logActivity('sync_main_blocked', message);
         return { success: false, reason: message };
       }
+    } catch (lockError) {
+      const cause = lockError instanceof Error ? lockError.message : String(lockError);
+      const message = `Cannot verify Git lock state: ${cause}`;
+      console.error(`[sync-main] ${message}`); logActivity('sync_main_blocked', message);
+      return { success: false, reason: message };
     }
-  } catch (lockErr: any) {
-    console.warn(`[sync-main] Lock cleanup warning: ${lockErr.message} (continuing)`);
-  }
-
-  // Fetch latest main
-  try {
     console.log(`[sync-main] Fetching origin/main...`);
-    await execAsync('git fetch origin main', { cwd: projectPath, encoding: 'utf-8' });
-  } catch (error: any) {
-    return { success: false, reason: `Failed to fetch origin/main: ${error.message}` };
-  }
-
-  // Attempt the merge
-  let mergeOutput = '';
-  let hasConflicts = false;
-  try {
-    const result = await execAsync('git merge origin/main', { cwd: projectPath, encoding: 'utf-8' });
-    mergeOutput = (result.stdout || '') + (result.stderr || '');
-  } catch (error: any) {
-    mergeOutput = (error.stdout || '') + (error.stderr || '');
-    hasConflicts = true;
-  }
-
-  // Already up to date?
-  if (mergeOutput.includes('Already up to date') || mergeOutput.includes('Already up-to-date')) {
-    console.log(`[sync-main] Already up to date`);
-    logActivity('sync_main_noop', `${issueId} already up to date with main`);
-    return { success: true, alreadyUpToDate: true };
-  }
-
-  if (!hasConflicts) {
-    // Clean merge — collect stats
-    console.log(`[sync-main] Clean merge completed`);
-    logActivity('sync_main_success', `Clean merge of main into ${issueId}`);
-
-    let changedFiles: string[] = [];
-    let commitCount = 0;
     try {
-      const { stdout: diffFiles } = await execAsync(
-        'git diff --name-only ORIG_HEAD HEAD 2>/dev/null || git diff --name-only HEAD~1 HEAD',
-        { cwd: projectPath, encoding: 'utf-8' },
-      );
-      changedFiles = diffFiles.trim().split('\n').filter(f => f.length > 0);
-    } catch { /* non-fatal */ }
-    try {
-      const { stdout: logOut } = await execAsync(
-        'git log ORIG_HEAD..HEAD --oneline 2>/dev/null || echo ""',
-        { cwd: projectPath, encoding: 'utf-8' },
-      );
-      commitCount = logOut.trim().split('\n').filter(l => l.length > 0).length;
-    } catch { /* non-fatal */ }
+      await run('git fetch origin main', SYNC_GIT_FETCH_TIMEOUT_MS);
+    } catch (error) {
+      if (isSyncGitTermination(error)) throw error;
+      return { success: false, reason: `Failed to fetch origin/main: ${(error as Error).message}` };
+    }
 
-    return { success: true, commitCount, changedFiles };
+    let mergeOutput = '';
+    let hasConflicts = false;
+    try {
+      mergeStarted = true;
+      const result = await run('git merge origin/main', SYNC_GIT_MERGE_TIMEOUT_MS);
+      mergeStarted = false;
+      mergeOutput = (result.stdout || '') + (result.stderr || '');
+    } catch (error: any) {
+      if (isSyncGitTermination(error)) throw error;
+      mergeOutput = (error.stdout || '') + (error.stderr || '');
+      hasConflicts = true;
+    }
+
+    if (mergeOutput.includes('Already up to date') || mergeOutput.includes('Already up-to-date')) {
+      console.log(`[sync-main] Already up to date`);
+      logActivity('sync_main_noop', `${issueId} already up to date with main`);
+      return { success: true, alreadyUpToDate: true };
+    }
+
+    if (!hasConflicts) {
+      console.log(`[sync-main] Clean merge completed`);
+      logActivity('sync_main_success', `Clean merge of main into ${issueId}`);
+      return { success: true, ...await collectSyncMergeStats(projectPath, signal) };
+    }
+
+    const conflictFiles = await getConflictFiles(projectPath, signal);
+    const mainPreferredResolution = await resolveMainPreferredSyncConflicts(projectPath, conflictFiles, signal);
+    if (mainPreferredResolution.success) {
+      mergeStarted = false;
+      console.log(`[sync-main] Auto-resolved ${conflictFiles.length} pipeline-owned conflict(s) with origin/main`);
+      logActivity('sync_main_auto_resolved_conflicts', `Auto-resolved ${conflictFiles.length} pipeline-owned conflict(s) in ${issueId} with origin/main`);
+      return { success: true, ...await collectSyncMergeStats(projectPath, signal) };
+    }
+
+    console.log(`[sync-main] ${conflictFiles.length} conflict(s); aborting merge for manual resolution`);
+    logActivity('sync_main_conflicts', `${conflictFiles.length} conflict(s) in ${issueId}: ${conflictFiles.join(', ')}`);
+    await ensureSyncGitQuiescent(projectPath, true);
+    mergeStarted = false;
+    return {
+      success: false,
+      conflictFiles,
+      reason: `Sync-main produced ${conflictFiles.length} conflict(s) in ${issueId}: ${conflictFiles.join(', ')}. Resolve manually in the workspace, then re-run sync-main.`,
+    };
+  } catch (error) {
+    if (!isSyncGitTermination(error)) throw error;
+    await ensureSyncGitQuiescent(projectPath, mergeStarted);
+    return {
+      success: false,
+      reason: error instanceof SyncGitCommandTimeoutError ? error.message : 'Sync-main cancelled after reaching its preparation deadline',
+    };
   }
-
-  // PAN-1531: sync-main conflict case — surface to operator instead of
-  // delegating to an LLM ship role. Abort the merge so the working tree is
-  // clean, then return the conflict files for the caller to display.
-  const conflictFiles = await getConflictFiles(projectPath);
-  const mainPreferredResolution = await resolveMainPreferredSyncConflicts(projectPath, conflictFiles);
-  if (mainPreferredResolution.success) {
-    console.log(`[sync-main] Auto-resolved ${conflictFiles.length} pipeline-owned conflict(s) with origin/main`);
-    logActivity('sync_main_auto_resolved_conflicts', `Auto-resolved ${conflictFiles.length} pipeline-owned conflict(s) in ${issueId} with origin/main`);
-
-    let changedFiles: string[] = [];
-    let commitCount = 0;
-    try {
-      const { stdout: diffFiles } = await execAsync(
-        'git diff --name-only ORIG_HEAD HEAD 2>/dev/null || git diff --name-only HEAD~1 HEAD',
-        { cwd: projectPath, encoding: 'utf-8' },
-      );
-      changedFiles = diffFiles.trim().split('\n').filter(f => f.length > 0);
-    } catch { /* non-fatal */ }
-    try {
-      const { stdout: logOut } = await execAsync(
-        'git log ORIG_HEAD..HEAD --oneline 2>/dev/null || echo ""',
-        { cwd: projectPath, encoding: 'utf-8' },
-      );
-      commitCount = logOut.trim().split('\n').filter(l => l.length > 0).length;
-    } catch { /* non-fatal */ }
-
-    return { success: true, commitCount, changedFiles };
-  }
-
-  console.log(`[sync-main] ${conflictFiles.length} conflict(s); aborting merge for manual resolution`);
-  logActivity('sync_main_conflicts', `${conflictFiles.length} conflict(s) in ${issueId}: ${conflictFiles.join(', ')}`);
-
-  try { await execAsync('git merge --abort', { cwd: projectPath, encoding: 'utf-8' }); } catch { /* non-fatal */ }
-
-  return {
-    success: false,
-    conflictFiles,
-    reason: `Sync-main produced ${conflictFiles.length} conflict(s) in ${issueId}: ${conflictFiles.join(', ')}. Resolve manually in the workspace, then re-run sync-main.`,
-  };
-
 }
 
 /**

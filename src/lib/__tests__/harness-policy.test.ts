@@ -16,34 +16,48 @@ const MODEL_BY_PROVIDER = {
   openrouter: 'qwen/qwen3.6-plus:free',
 } as const
 
-const HARNESSES: RuntimeName[] = ['claude-code', 'pi', 'codex']
+const HARNESSES: Array<RuntimeName | 'pi'> = ['claude-code', 'pi', 'ohmypi', 'codex', 'acp']
+const HARNESSES_WITHOUT_ACP = HARNESSES.filter((harness) => harness !== 'acp')
 const PROVIDERS = Object.keys(MODEL_BY_PROVIDER) as Array<keyof typeof MODEL_BY_PROVIDER>
 const AUTH_MODES: Array<AuthMode | undefined> = ['api-key', 'subscription', undefined]
 
 describe('canUseHarness', () => {
-  it('blocks Pi + Anthropic + subscription with a non-empty human-readable reason', () => {
-    const decision = canUseHarnessSync('pi', MODEL_BY_PROVIDER.anthropic, 'subscription')
+  it('AC(PAN-1989): blocks ohmypi + Anthropic + subscription with a non-empty human-readable reason', () => {
+    const decision = canUseHarnessSync('ohmypi', MODEL_BY_PROVIDER.anthropic, 'subscription')
     expect(decision.allowed).toBe(false)
     expect(decision.reason).toBeTruthy()
     expect(decision.reason!.length).toBeGreaterThan(20)
-    expect(decision.reason!.toLowerCase()).toContain('pi')
+    expect(decision.reason!.toLowerCase()).toContain('ohmypi')
     expect(decision.reason!.toLowerCase()).toContain('anthropic')
   })
 
-  it('allows Pi + Anthropic + api-key', () => {
-    expect(canUseHarnessSync('pi', MODEL_BY_PROVIDER.anthropic, 'api-key')).toEqual({ allowed: true })
+  it('AC(PAN-2528): ohmypi + Anthropic + subscription reason names the Claude Code subscription Terms of Service', () => {
+    const decision = canUseHarnessSync('ohmypi', MODEL_BY_PROVIDER.anthropic, 'subscription')
+    expect(decision.allowed).toBe(false)
+    expect(decision.reason).toContain('Terms of Service')
   })
 
-  it('allows Pi + Anthropic + undefined authMode (no subscription engaged)', () => {
-    expect(canUseHarnessSync('pi', MODEL_BY_PROVIDER.anthropic, undefined)).toEqual({ allowed: true })
+  it('AC(PAN-2528): the ohmypi subscription-block reason still tells the user how to proceed', () => {
+    const decision = canUseHarnessSync('ohmypi', MODEL_BY_PROVIDER.anthropic, 'subscription')
+    const reason = decision.reason!.toLowerCase()
+    expect(reason).toContain('api-key')
+    expect(reason).toContain('non-anthropic')
+  })
+
+  it('allows ohmypi + Anthropic + api-key', () => {
+    expect(canUseHarnessSync('ohmypi', MODEL_BY_PROVIDER.anthropic, 'api-key')).toEqual({ allowed: true })
+  })
+
+  it('allows ohmypi + Anthropic + undefined authMode (no subscription engaged)', () => {
+    expect(canUseHarnessSync('ohmypi', MODEL_BY_PROVIDER.anthropic, undefined)).toEqual({ allowed: true })
   })
 
   it.each(['openai', 'google', 'minimax', 'openrouter'] as const)(
-    'allows Pi + non-Anthropic (%s) on every authMode',
+    'allows ohmypi + non-Anthropic (%s) on every authMode',
     provider => {
       const model = MODEL_BY_PROVIDER[provider]
       for (const authMode of AUTH_MODES) {
-        expect(canUseHarnessSync('pi', model, authMode)).toEqual({ allowed: true })
+        expect(canUseHarnessSync('ohmypi', model, authMode)).toEqual({ allowed: true })
       }
     },
   )
@@ -62,10 +76,28 @@ describe('canUseHarness', () => {
     }
   })
 
+  it.each(PROVIDERS)('allows pi (legacy) + %s on every authMode (normalizer converts pi→ohmypi before policy check)', provider => {
+    const model = MODEL_BY_PROVIDER[provider]
+    for (const authMode of AUTH_MODES) {
+      expect(canUseHarnessSync('pi', model, authMode)).toEqual({ allowed: true })
+    }
+  })
+
   it('explicitly allows canUseHarnessSync("codex", ...) — no ToS block', () => {
     expect(canUseHarnessSync('codex', MODEL_BY_PROVIDER.anthropic, 'subscription')).toEqual({ allowed: true })
     expect(canUseHarnessSync('codex', MODEL_BY_PROVIDER.openai, 'api-key')).toEqual({ allowed: true })
     expect(canUseHarnessSync('codex', MODEL_BY_PROVIDER.anthropic, undefined)).toEqual({ allowed: true })
+  })
+
+  it('allows ACP + Kimi under API-key and subscription-backed OAuth auth', () => {
+    expect(canUseHarnessSync('acp', 'kimi-k2.7-code', 'api-key')).toEqual({ allowed: true })
+    expect(canUseHarnessSync('acp', 'kimi-k2.7-code', 'subscription')).toEqual({ allowed: true })
+  })
+
+  it.each(PROVIDERS)('blocks ACP + unsupported %s provider', (provider) => {
+    const decision = canUseHarnessSync('acp', MODEL_BY_PROVIDER[provider], 'subscription')
+    expect(decision.allowed).toBe(false)
+    expect(decision.reason).toContain('Kimi')
   })
 
   it('blocks gpt-5.5 + api-key on every harness (subscription-only model)', () => {
@@ -77,30 +109,61 @@ describe('canUseHarness', () => {
     }
   })
 
-  it('allows gpt-5.5 + subscription on every harness', () => {
-    for (const harness of HARNESSES) {
+  it('allows gpt-5.5 + subscription on every supported non-ACP harness', () => {
+    for (const harness of HARNESSES_WITHOUT_ACP) {
       expect(canUseHarnessSync(harness, 'gpt-5.5', 'subscription')).toEqual({ allowed: true })
     }
   })
 
-  it('allows gpt-5.5 + undefined authMode (no auth context engaged)', () => {
-    for (const harness of HARNESSES) {
+  it('allows gpt-5.5 + undefined authMode on every supported non-ACP harness', () => {
+    for (const harness of HARNESSES_WITHOUT_ACP) {
       expect(canUseHarnessSync(harness, 'gpt-5.5', undefined)).toEqual({ allowed: true })
     }
   })
 
-  it('covers the full 3 x 5 x 3 matrix with explicit per-cell expectations', () => {
-    const cells: Array<{ harness: RuntimeName; provider: string; authMode: AuthMode | undefined; allowed: boolean }> = []
+  it.each(['gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna'] as const)(
+    'blocks %s + api-key on every harness (subscription-only model)',
+    (model) => {
+      for (const harness of HARNESSES) {
+        const decision = canUseHarnessSync(harness, model, 'api-key')
+        expect(decision.allowed).toBe(false)
+        expect(decision.reason).toBeTruthy()
+        expect(decision.reason!.toLowerCase()).toContain('subscription')
+      }
+    },
+  )
+
+  it.each(['gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna'] as const)(
+    'allows %s + subscription on every supported non-ACP harness',
+    (model) => {
+      for (const harness of HARNESSES_WITHOUT_ACP) {
+        expect(canUseHarnessSync(harness, model, 'subscription')).toEqual({ allowed: true })
+      }
+    },
+  )
+
+  it.each(['gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna'] as const)(
+    'allows %s + undefined authMode on every supported non-ACP harness',
+    (model) => {
+      for (const harness of HARNESSES_WITHOUT_ACP) {
+        expect(canUseHarnessSync(harness, model, undefined)).toEqual({ allowed: true })
+      }
+    },
+  )
+
+  it('covers the full 5 x 5 x 3 matrix including Kimi-only ACP policy', () => {
+    const cells: Array<{ harness: RuntimeName | 'pi'; provider: string; authMode: AuthMode | undefined; allowed: boolean }> = []
     for (const harness of HARNESSES) {
       for (const provider of PROVIDERS) {
         for (const authMode of AUTH_MODES) {
           const isBlockedCell =
-            harness === 'pi' && provider === 'anthropic' && authMode === 'subscription'
+            (harness === 'ohmypi' && provider === 'anthropic' && authMode === 'subscription')
+            || harness === 'acp'
           cells.push({ harness, provider, authMode, allowed: !isBlockedCell })
         }
       }
     }
-    expect(cells).toHaveLength(3 * 5 * 3)
+    expect(cells).toHaveLength(5 * 5 * 3)
     for (const cell of cells) {
       const model = MODEL_BY_PROVIDER[cell.provider as keyof typeof MODEL_BY_PROVIDER]
       const decision = canUseHarnessSync(cell.harness, model, cell.authMode)

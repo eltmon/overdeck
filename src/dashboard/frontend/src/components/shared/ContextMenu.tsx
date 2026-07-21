@@ -5,11 +5,16 @@ export const ContextMenuRoot = Primitive.Root;
 export const ContextMenuTrigger = Primitive.Trigger;
 export const ContextMenuPortal = Primitive.Portal;
 
-export function ContextMenuContent({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+export function ContextMenuContent({
+  children,
+  className = '',
+  ...props
+}: React.ComponentPropsWithoutRef<typeof Primitive.Content>) {
   return (
     <Primitive.Portal>
       <Primitive.Content
-        className={`z-[1000] min-w-[168px] overflow-hidden rounded-md border border-border bg-card p-1 shadow-lg ${className}`}
+        {...props}
+        className={`z-[1000] max-h-[70vh] min-w-[168px] overflow-x-hidden overflow-y-auto rounded-md border border-border bg-card p-1 shadow-lg ${className}`}
       >
         {children}
       </Primitive.Content>
@@ -19,18 +24,13 @@ export function ContextMenuContent({ children, className = '' }: { children: Rea
 
 export function ContextMenuItem({
   children,
-  onSelect,
-  disabled,
-}: {
-  children: React.ReactNode;
-  onSelect?: () => void;
-  disabled?: boolean;
-}) {
+  className = '',
+  ...props
+}: React.ComponentPropsWithoutRef<typeof Primitive.Item>) {
   return (
     <Primitive.Item
-      disabled={disabled}
-      onSelect={onSelect}
-      className="relative flex cursor-pointer select-none items-center rounded px-3 py-1.5 text-xs text-foreground outline-none transition-colors data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-40"
+      {...props}
+      className={`relative flex cursor-pointer select-none items-center rounded px-3 py-1.5 text-xs text-foreground outline-none transition-colors data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-40 ${className}`}
     >
       {children}
     </Primitive.Item>
@@ -39,18 +39,13 @@ export function ContextMenuItem({
 
 export function ContextMenuDestructiveItem({
   children,
-  onSelect,
-  disabled,
-}: {
-  children: React.ReactNode;
-  onSelect?: () => void;
-  disabled?: boolean;
-}) {
+  className = '',
+  ...props
+}: React.ComponentPropsWithoutRef<typeof Primitive.Item>) {
   return (
     <Primitive.Item
-      disabled={disabled}
-      onSelect={onSelect}
-      className="relative flex cursor-pointer select-none items-center rounded px-3 py-1.5 text-xs text-destructive outline-none transition-colors data-[highlighted]:bg-destructive/10 data-[highlighted]:text-destructive data-[disabled]:pointer-events-none data-[disabled]:opacity-40"
+      {...props}
+      className={`relative flex cursor-pointer select-none items-center rounded px-3 py-1.5 text-xs text-destructive outline-none transition-colors data-[highlighted]:bg-destructive/10 data-[highlighted]:text-destructive data-[disabled]:pointer-events-none data-[disabled]:opacity-40 ${className}`}
     >
       {children}
     </Primitive.Item>

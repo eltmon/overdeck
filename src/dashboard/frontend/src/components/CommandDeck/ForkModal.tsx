@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { X, GitBranchPlus, HelpCircle } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import posthog from 'posthog-js';
 import {
   getDefaultConversationModel,
   FALLBACK_DEFAULT_CONVERSATION_MODEL,
@@ -141,10 +142,17 @@ export function ForkModal({ conversation, initialMode, initialFocus, onConfirm, 
   const { groups, compactionModel, harnessPolicy } = useAvailableModels();
   const defaultModel = getDefaultConversationModel() || FALLBACK_DEFAULT_CONVERSATION_MODEL;
 
-  // Intent is the user-facing choice (3 options). The 4th legacy mode
+  // Intent is the user-facing choice (up to 3 options). The 4th legacy mode
   // ("fast-summary") is an advanced toggle under the summary intent.
+  // ACP transcripts are portable only through summary/handoff adapters; the
+  // server rejects an exact-copy fork from an ACP source.
+  const sourceSupportsPlainFork = conversation.harness !== 'acp';
   const initialIntent: ForkIntent =
-    initialMode === 'plain' ? 'plain' : initialMode === 'handoff' ? 'handoff' : 'summary';
+    initialMode === 'plain' && sourceSupportsPlainFork
+      ? 'plain'
+      : initialMode === 'handoff'
+        ? 'handoff'
+        : 'summary';
   const [intent, setIntent] = useState<ForkIntent>(initialIntent);
   const [fastSummary, setFastSummary] = useState(initialMode === 'fast-summary');
 
@@ -153,7 +161,7 @@ export function ForkModal({ conversation, initialMode, initialFocus, onConfirm, 
   // so plain forks force launchHarness back to claude-code. Summary and handoff
   // forks inject portable text after spawn, so Pi launch is fine there subject
   // to the canonical harness policy (ToS gate).
-  const [launchHarness, setLaunchHarness] = useState<Harness>(conversation.harness || 'claude-code');
+  const [launchHarness, setLaunchHarness] = useState<Harness>((conversation.harness === 'pi' ? 'ohmypi' : conversation.harness) || 'claude-code');
   const [summaryModel, setSummaryModel] = useState(compactionModel);
   const [summaryHarness, setSummaryHarness] = useState<Harness>('claude-code');
   useEffect(() => {
@@ -231,7 +239,9 @@ export function ForkModal({ conversation, initialMode, initialFocus, onConfirm, 
   const intentOptions: { value: ForkIntent; label: string; hint: string }[] = [
     { value: 'summary', label: 'Fresh summary', hint: 'An LLM distills the prior context into a seed message. Best for most cases.' },
     { value: 'handoff', label: 'Agent handoff', hint: 'An agent writes a handoff document — richer, captures dead ends and next steps.' },
-    { value: 'plain', label: 'Exact copy', hint: 'Carry over the raw history verbatim. Same model only.' },
+    ...(sourceSupportsPlainFork
+      ? [{ value: 'plain' as const, label: 'Exact copy', hint: 'Carry over the raw history verbatim. Same model only.' }]
+      : []),
   ];
 
   return (
@@ -503,21 +513,29 @@ export function ForkModal({ conversation, initialMode, initialFocus, onConfirm, 
             className={styles.forkConfirmBtn}
             disabled={confirmDisabled}
             title={handoffUnavailable ? 'Source-authored handoff requires a running source conversation' : undefined}
-            onClick={() => onConfirm(
-              conversation,
-              launchModel,
-              summaryModel,
-              apiForkMode,
-              localSummaryOnly,
-              isSummaryFork && !fastSummary && includeThinkingInSummary,
-              forkTitle.trim() || undefined,
-              launchHarness,
-              summaryHarness,
-              handoffFocusValue,
-              isHandoffFork ? handoffAuthor : undefined,
-              isHandoffFork && handoffAuthor === 'external' ? summaryModel : undefined,
-              isHandoffFork && handoffAuthor === 'external' ? summaryHarness : undefined,
-            )}
+            onClick={() => {
+              posthog.capture('conversation_forked', {
+                fork_intent: intent,
+                fork_mode: apiForkMode,
+                fast_summary: localSummaryOnly,
+                launch_harness: launchHarness,
+              });
+              onConfirm(
+                conversation,
+                launchModel,
+                summaryModel,
+                apiForkMode,
+                localSummaryOnly,
+                isSummaryFork && !fastSummary && includeThinkingInSummary,
+                forkTitle.trim() || undefined,
+                launchHarness,
+                summaryHarness,
+                handoffFocusValue,
+                isHandoffFork ? handoffAuthor : undefined,
+                isHandoffFork && handoffAuthor === 'external' ? summaryModel : undefined,
+                isHandoffFork && handoffAuthor === 'external' ? summaryHarness : undefined,
+              );
+            }}
           >
             <GitBranchPlus size={13} />
             {isPending ? 'Continuing…' : 'Continue'}

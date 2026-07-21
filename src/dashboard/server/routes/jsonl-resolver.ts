@@ -10,7 +10,8 @@
  *
  * For claude-code agents the JSONL filename is the *Claude session ID* (a UUID
  * written by Claude Code itself), NOT the agent/tmux name. Lookup order:
- *   1. session.id     — single UUID written by auto-suspend
+ *   1. session.id     — UUID pinned before fresh work-agent launch and updated
+ *                       by auto-suspend/resume flows
  *   2. sessions.json  — array of UUIDs the agent has used; the heartbeat hook
  *                       APPENDS new IDs and dedupes, so once a session has been
  *                       seen its array index never moves. After a `pan resume`
@@ -30,7 +31,9 @@ import { Effect } from 'effect';
 import { getAgentRuntimeState, getAgentStateSync } from '../../../lib/agents.js';
 import { encodeClaudeProjectDir, getOverdeckHome } from '../../../lib/paths.js';
 import { getAgentWorkspace } from '../../../lib/agent-enrichment.js';
-import { readRollbackAgentHarnessFromDir } from '../../../lib/overdeck/agent-rollback-state.js';
+import { getHarnessBehavior } from '../../../lib/runtimes/behavior.js';
+import type { HarnessName } from '../../../lib/runtimes/types.js';
+import { logAgentLifecycleSync } from '../../../lib/persistent-logger.js';
 
 export interface ResolveJsonlPathOptions {
   /** Override the ~/.overdeck/agents directory (test hook). */
@@ -39,6 +42,26 @@ export interface ResolveJsonlPathOptions {
   claudeProjectsDirOverride?: string;
   /** Override the runtime-state lookup (test hook). */
   getRuntimeStateAsync?: (agentId: string) => Promise<{ claudeSessionId?: string } | null>;
+  /** Override forensic logging (test hook). */
+  logDiagnostic?: (agentId: string, message: string) => void;
+}
+
+// Command Deck polling can resolve the same session repeatedly. Keep forensic
+// logging useful by writing only when the resolution outcome changes.
+const transcriptResolutionSignatures = new Map<string, string>();
+
+function logTranscriptResolution(
+  agentId: string,
+  signature: string,
+  message: string,
+  opts: ResolveJsonlPathOptions,
+): void {
+  const signatureKey = `${agentId}:${opts.agentsDirOverride ?? 'live'}`;
+  if (transcriptResolutionSignatures.get(signatureKey) === signature) return;
+  transcriptResolutionSignatures.set(signatureKey, signature);
+  const logger = opts.logDiagnostic
+    ?? (opts.agentsDirOverride ? undefined : logAgentLifecycleSync);
+  logger?.(agentId, `transcript resolution: ${message}`);
 }
 
 async function pathExists(p: string): Promise<boolean> {
@@ -47,6 +70,10 @@ async function pathExists(p: string): Promise<boolean> {
 
 async function readOptional(p: string): Promise<string | null> {
   return readFile(p, 'utf-8').catch(() => null);
+}
+
+function behaviorForHarness(harness: string | null | undefined) {
+  return getHarnessBehavior(harness as HarnessName | null | undefined);
 }
 
 /**
@@ -121,8 +148,8 @@ export async function resolveClaudeSessionId(
   const agentsRoot = opts.agentsDirOverride ?? join(getOverdeckHome(), 'agents');
   const agentDir = join(agentsRoot, agentId);
 
-  // 1. session.id — single UUID written by auto-suspend. Authoritative when
-  //    present (only one session is alive when suspend writes this file).
+  // 1. session.id — UUID pinned before fresh work-agent launch and updated by
+  //    suspend/resume flows. Authoritative when present.
   const sessionIdRaw = await readOptional(join(agentDir, 'session.id'));
   const sessionIdTrimmed = sessionIdRaw?.trim();
   if (sessionIdTrimmed) return sessionIdTrimmed;
@@ -189,15 +216,85 @@ export async function readLauncherPinnedSessionId(
   return null;
 }
 
-/** Read the harness recorded in the agent's state.json, or null when absent. */
+/**
+ * Read the harness + workspace recorded for an agent, honoring the test
+ * override dir. Used by resolveAgentHarness / agentHasClaudeTranscript so the
+ * stale-harness self-correction runs identically in prod and under test.
+ */
+async function readRecordedState(
+  agentId: string,
+  opts: ResolveJsonlPathOptions,
+): Promise<{ harness: string | null; workspace?: string }> {
+  if (opts.agentsDirOverride) {
+    try {
+      const raw = await readFile(join(opts.agentsDirOverride, agentId, 'state.json'), 'utf8');
+      const s = JSON.parse(raw) as { harness?: unknown; workspace?: unknown };
+      return {
+        harness: typeof s.harness === 'string' ? s.harness : null,
+        workspace: typeof s.workspace === 'string' ? s.workspace : undefined,
+      };
+    } catch {
+      return { harness: null };
+    }
+  }
+  const st = getAgentStateSync(agentId);
+  return { harness: st?.harness ?? null, workspace: st?.workspace };
+}
+
+/**
+ * Resolve the harness for transcript routing. Reads state.json, then
+ * self-corrects when the recorded value is stale.
+ *
+ * Trust an explicit non-default harness (codex / pi / ohmypi / acp) — it was chosen
+ * by resolveHarness at spawn time and is not the generic fallback. The
+ * 'claude-code' default, however, goes stale in one observed case: a
+ * wipe-and-respawn that changed the provider-default harness left state.json
+ * carrying the pre-respawn 'claude-code' while the fresh launch was
+ * codex/ohmypi. The resolver then took the claude-code branch, found no
+ * claudeSessionId, and the dashboard showed "No conversation data available"
+ * for a live agent whose real transcript sat untouched under codex-home.
+ *
+ * Self-correction (claude-code/null recorded only): if the agent has NO
+ * claude-code transcript on disk but DOES have a codex rollout / pi session,
+ * the on-disk runtime wins — those artifacts are written only by that runtime,
+ * so this cannot surface a wrong transcript. When a claude-code transcript IS
+ * present it always wins, so a past codex run's codex-home can't shadow a
+ * current claude-code session.
+ */
 export async function resolveAgentHarness(
   agentId: string,
   opts: ResolveJsonlPathOptions = {},
 ): Promise<string | null> {
-  if (opts.agentsDirOverride) {
-    return readRollbackAgentHarnessFromDir(opts.agentsDirOverride, agentId);
+  const recorded = (await readRecordedState(agentId, opts)).harness;
+  if (recorded === 'codex' || recorded === 'pi' || recorded === 'ohmypi' || recorded === 'acp') {
+    return recorded;
   }
-  return getAgentStateSync(agentId)?.harness ?? null;
+  // 'claude-code' (or null) is the default that can go stale. Correct it from
+  // on-disk artifacts only when no claude-code transcript exists for the agent.
+  if (await agentHasClaudeTranscript(agentId, opts)) {
+    return recorded ?? 'claude-code';
+  }
+  if (await resolveAcpTranscriptPath(agentId, opts)) return 'acp';
+  if (await resolveCodexRolloutPath(agentId, opts)) return 'codex';
+  if (await resolvePiSessionPath(agentId, opts)) return 'ohmypi';
+  return recorded;
+}
+
+/**
+ * Whether the agent has a resolvable claude-code transcript on disk. Used by
+ * resolveAgentHarness to decide if a claude-code recording is still live
+ * (vs. a stale default that should be corrected to codex/ohmypi).
+ */
+async function agentHasClaudeTranscript(
+  agentId: string,
+  opts: ResolveJsonlPathOptions = {},
+): Promise<boolean> {
+  const sessionId = await resolveClaudeSessionId(agentId, opts);
+  if (!sessionId) return false;
+  const workspace = (await readRecordedState(agentId, opts)).workspace;
+  if (!workspace) return false;
+  const projectsRoot = opts.claudeProjectsDirOverride ?? join(homedir(), '.claude', 'projects');
+  return pathExists(join(projectsRoot, encodeClaudeProjectDir(workspace), `${sessionId}.jsonl`));
 }
 
 /**
@@ -228,6 +325,16 @@ export async function resolveCodexRolloutPath(
   return findLatestRollout(codexHome);
 }
 
+/** Resolve the normalized transcript written by the persistent ACP host. */
+export async function resolveAcpTranscriptPath(
+  agentId: string,
+  opts: ResolveJsonlPathOptions = {},
+): Promise<string | null> {
+  const agentsRoot = opts.agentsDirOverride ?? join(getOverdeckHome(), 'agents');
+  const transcriptPath = join(agentsRoot, agentId, 'acp-session.jsonl');
+  return await pathExists(transcriptPath) ? transcriptPath : null;
+}
+
 /**
  * Resolve the pi/kimi session JSONL (PAN-1908). Pi writes its session transcript
  * as `<iso-ts>_<session-id>.jsonl` either in the agent dir's `sessions/` subdir
@@ -241,7 +348,12 @@ export async function resolvePiSessionPath(
 ): Promise<string | null> {
   const agentsRoot = opts.agentsDirOverride ?? join(getOverdeckHome(), 'agents');
   const agentDir = join(agentsRoot, agentId);
-  const NON_TRANSCRIPT = new Set(['cost-events.jsonl', 'activity.jsonl']);
+  const NON_TRANSCRIPT = new Set([
+    'acp-session.jsonl',
+    'cost-events.jsonl',
+    'activity.jsonl',
+    'pending-events.jsonl',
+  ]);
   let best: { path: string; mtime: number } | null = null;
   for (const dir of [join(agentDir, 'sessions'), agentDir]) {
     let entries: string[];
@@ -277,19 +389,49 @@ export async function resolveJsonlPath(
   // Dispatch on the recorded harness so a stale session.id from an earlier
   // claude-code run of the same agent id can't shadow the codex transcript.
   const harness = await resolveAgentHarness(agentId, opts);
-  if (harness === 'codex') {
+  const behavior = behaviorForHarness(harness);
+  if (behavior.transcriptKind === 'codex-rollout-jsonl') {
     return resolveCodexRolloutPath(agentId, opts);
   }
-  if (harness === 'pi') {
+  if (behavior.transcriptKind === 'ohmypi-jsonl') {
     return resolvePiSessionPath(agentId, opts);
+  }
+  if (behavior.transcriptKind === 'acp-jsonl') {
+    return resolveAcpTranscriptPath(agentId, opts);
   }
 
   const claudeSessionId = await resolveClaudeSessionId(agentId, opts);
-  if (!claudeSessionId) return null;
+  if (!claudeSessionId) {
+    logTranscriptResolution(
+      agentId,
+      `missing-session-id:${harness ?? 'unknown'}`,
+      `failed harness=${harness ?? 'unknown'} reason=no-session-id `
+        + 'checked=session.id,sessions.json,runtime-state',
+      opts,
+    );
+    return null;
+  }
 
+  const recordedWorkspace = (await readRecordedState(agentId, opts)).workspace;
+  const effectiveWorkspacePath = recordedWorkspace ?? workspacePath;
   const projectsRoot = opts.claudeProjectsDirOverride ?? join(homedir(), '.claude', 'projects');
-  const encodedDir = encodeClaudeProjectDir(workspacePath);
+  const encodedDir = encodeClaudeProjectDir(effectiveWorkspacePath);
   const jsonlPath = join(projectsRoot, encodedDir, `${claudeSessionId}.jsonl`);
-  if (await pathExists(jsonlPath)) return jsonlPath;
+  if (await pathExists(jsonlPath)) {
+    logTranscriptResolution(
+      agentId,
+      `resolved:${jsonlPath}`,
+      `resolved harness=${harness ?? 'claude-code'} sessionId=${claudeSessionId} path=${jsonlPath}`,
+      opts,
+    );
+    return jsonlPath;
+  }
+  logTranscriptResolution(
+    agentId,
+    `missing-jsonl:${jsonlPath}`,
+    `failed harness=${harness ?? 'claude-code'} reason=jsonl-missing sessionId=${claudeSessionId} `
+      + `workspace=${effectiveWorkspacePath} expectedPath=${jsonlPath}`,
+    opts,
+  );
   return null;
 }

@@ -318,8 +318,8 @@ export async function buildReviewerNodes(
   // convoy lanes ONLY when extended review actually runs. Otherwise any
   // agent-<id>-review-<subRole> record is a ghost from a prior convoy run and would
   // render as a dead phantom lane under the issue. Single seam shared with the spawn
-  // side: isExtendedReviewEnabled() (review-agent.ts). Flip it to revive lanes.
-  if (!isExtendedReviewEnabled()) return [];
+  // side: isExtendedReviewEnabled(issueId) (review-agent.ts).
+  if (!isExtendedReviewEnabled(opts.issueId)) return [];
 
   const agentsRoot = opts.agentsDirOverride ?? join(homedir(), '.overdeck', 'agents');
 
@@ -352,6 +352,12 @@ export async function buildReviewerNodes(
         : false;
       const inProgressThisRound = isLive && latestReviewRunDir !== null && !latestRunOutputExists;
 
+      // PAN-2690 — codex reviewers stay alive at their prompt after the notify
+      // hook signals REVIEWER_READY. The marker is cleared before every new
+      // convoy round, so its presence means this live session is warm-idle for
+      // the current round rather than actively reviewing.
+      const isWarmIdle = isLive && existsSync(join(agentsRoot, sessionId, 'reviewer-signaled'));
+
       // Determine if the reviewer is genuinely working or just a zombie session.
       // A reviewer is a zombie when: tmux is alive, the latest archived round
       // artifact says completed/failed, AND no newer round directory has
@@ -383,7 +389,7 @@ export async function buildReviewerNodes(
       if (hasApiError) {
         presence = 'idle';
       } else if (isLive && !isZombie) {
-        presence = (opts.status === 'running' || inProgressThisRound) ? 'active' : 'idle';
+        presence = !isWarmIdle && (opts.status === 'running' || inProgressThisRound) ? 'active' : 'idle';
       } else {
         // Zombie or dead — treat as ended so terminal won't try to connect
         presence = isZombie ? 'idle' : 'ended';

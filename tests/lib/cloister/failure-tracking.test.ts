@@ -36,6 +36,7 @@ describe('agent failure tracking and auto-resume backoff', () => {
     vi.doUnmock('../../../src/lib/activity-logger.js');
     vi.doUnmock('../../../src/lib/persistent-logger.js');
     vi.doUnmock('../../../src/lib/database/app-settings.js');
+    vi.doUnmock('../../../src/lib/overdeck/control-settings.js');
     vi.doUnmock('../../../src/lib/database/review-status-db.js');
     vi.doUnmock('../../../src/lib/cloister/specialists.js');
     vi.doUnmock('../../../src/lib/tmux.js');
@@ -91,6 +92,9 @@ describe('agent failure tracking and auto-resume backoff', () => {
       workResumeSlotsAvailable: () => 999,
       resetPatrolDispatchBudget: vi.fn(),
       tryReserveAdvancingSlot: () => true,
+      releaseAdvancingSlot: vi.fn(),
+      tryReserveSwarmSlot: () => true,
+      releaseSwarmSlot: vi.fn(),
       canDispatchAdvancing: () => true,
     }));
     vi.doMock('../../../src/lib/agents.js', async (importOriginal) => {
@@ -147,6 +151,19 @@ describe('agent failure tracking and auto-resume backoff', () => {
     vi.doMock('../../../src/lib/database/app-settings.js', () => ({
       isDeaconGloballyPaused: vi.fn().mockReturnValue(false),
     }));
+    vi.doMock('../../../src/lib/overdeck/control-settings.js', () => ({
+      isDeaconGloballyPaused: vi.fn().mockReturnValue(false),
+      getBootReconciliationState: vi.fn().mockReturnValue({
+        decision: null,
+        perAgent: {},
+        decidedAt: null,
+        bootId: null,
+        bootStartedAt: null,
+        graceDeadline: null,
+      }),
+      setBootReconciliationDecision: vi.fn(),
+      stampBootReconciliation: vi.fn(),
+    }));
     vi.doMock('../../../src/lib/database/review-status-db.js', () => ({
       markWorkspaceStuck: vi.fn(),
     }));
@@ -192,7 +209,9 @@ describe('agent failure tracking and auto-resume backoff', () => {
       startedAt: BASE_TIME.toISOString(),
     });
 
-    const resumed = await autoResumeStoppedWorkAgents();
+    const resumePromise = autoResumeStoppedWorkAgents();
+    await vi.runAllTimersAsync();
+    const resumed = await resumePromise;
     const state = agents.getAgentStateSync(agentId);
 
     expect(resumed).toEqual([]);

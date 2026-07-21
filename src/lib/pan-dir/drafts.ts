@@ -1,8 +1,9 @@
 import { join, basename } from 'path'
+import { existsSync, readFileSync } from 'node:fs'
 import { Effect, FileSystem, Option } from 'effect'
 import * as NodeFileSystem from '@effect/platform-node/NodeFileSystem'
 import { FsError } from '../errors.js'
-import { queueAutoCommit } from './auto-commit.js'
+import { flushAutoCommits, queueAutoCommit } from './auto-commit.js'
 
 import { getProjectPanPaths, ensurePanDirs } from './specs.js'
 
@@ -61,6 +62,21 @@ export function writeIssueDraft(
       paths: [path],
       subject: `chore(state): update PRD draft for ${issueId.toUpperCase()}`,
     })
+    // Commit+push synchronously through the door. queueAutoCommit alone defers
+    // via setTimeout(0), which a short-lived CLI (e.g. a planning agent that
+    // writes the draft and exits) never fires, stranding the draft as a dirty
+    // state-worktree file (PAN-2677). Mirror the spec door: fail loudly if a
+    // configured origin did not accept the push.
+    const flushed = yield* flushAutoCommits(projectRoot)
+    if (flushed.errored || flushed.pushed === false) {
+      return yield* Effect.fail(
+        new FsError({
+          path,
+          operation: 'pushDraft',
+          cause: new Error(flushed.reason ?? 'PRD draft commit was not pushed'),
+        }),
+      )
+    }
     return path
   }).pipe(Effect.provide(NodeFileSystem.layer))
 }
@@ -134,4 +150,129 @@ export function getIssueDraftInfo(
       modified: mtime,
     }
   }).pipe(Effect.provide(NodeFileSystem.layer))
+}
+
+/**
+ * Minimum line count for a PRD draft to satisfy the PRD-first gate (PAN-2234).
+ * A found-but-thinner draft fails the gate with reason 'too-short'.
+ */
+export const MIN_PRD_LINES = 20
+
+export interface PrdGateResult {
+  ok: boolean
+  path?: string
+  lineCount?: number
+  reason?: 'missing' | 'too-short'
+  searched?: string[]
+}
+
+/**
+ * Sync PRD-first gate predicate (PAN-2234). The surrounding module uses the
+ * Effect FileSystem for read/write/list paths; this predicate is deliberately a
+ * plain sync node:fs read so the CLI caller (`pan plan finalize`) and the
+ * complete-planning route can call it inline in a sync flow. No child-process
+ * sync (no execSync) — fs-sync only, per the repo's server-code rule.
+ *
+ * Search order (first existing file wins): projectRoot uppercase → projectRoot
+ * lowercase → workspacePath uppercase → workspacePath lowercase. A null/empty
+ * root skips its candidates. Non-trivial means at least MIN_PRD_LINES lines.
+ */
+export function checkPrdGateSync(args: {
+  projectRoot?: string | null
+  workspacePath?: string | null
+  issueId: string
+}): PrdGateResult {
+  const { projectRoot, workspacePath, issueId } = args
+  const upperFile = `${issueId.toUpperCase()}.md`
+  const lowerFile = `${issueId.toLowerCase()}.md`
+  const searched: string[] = []
+  const candidates: string[] = []
+  if (projectRoot) {
+    candidates.push(join(getDraftsDir(projectRoot), upperFile))
+    candidates.push(getDraftPath(projectRoot, lowerFile))
+  }
+  if (workspacePath) {
+    const wsDrafts = join(workspacePath, '.pan', 'drafts')
+    candidates.push(join(wsDrafts, upperFile))
+    candidates.push(join(wsDrafts, lowerFile))
+  }
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) {
+      let content = ''
+      try {
+        content = readFileSync(candidate, 'utf-8')
+      } catch {
+        // Treat an unreadable file as missing; surface the path so the caller
+        // can diagnose, but fall through to the searched list.
+        searched.push(candidate)
+        continue
+      }
+      const lineCount = content.split('\n').length
+      if (lineCount >= MIN_PRD_LINES) {
+        return { ok: true, path: candidate, lineCount }
+      }
+      return { ok: false, reason: 'too-short', path: candidate, lineCount }
+    }
+    searched.push(candidate)
+  }
+  return { ok: false, reason: 'missing', searched }
+}
+
+export interface PromoteWorkspacePrdDraftResult {
+  promoted: boolean
+  reason: 'promoted' | 'canonical-exists' | 'no-workspace-draft'
+  /** Canonical draft path (written by this call, or already present). */
+  path?: string
+  /** Workspace file the content was promoted from. */
+  source?: string
+}
+
+/**
+ * Promote a workspace-authored PRD draft to the canonical drafts/ location on
+ * the state plane. Planning agents author the PRD at
+ * `<workspace>/.pan/drafts/<ISSUE>.md`; the PRD-first gate accepts it there,
+ * but the workspace is disposable — without this promotion the PRD is lost on
+ * workspace teardown and invisible at the canonical location (the PAN-2858
+ * defect). Runs at complete-planning, after the PRD gate.
+ *
+ * No-loss rule: an existing canonical draft is never overwritten — the
+ * canonical copy may carry operator edits the workspace copy predates.
+ */
+export function promoteWorkspacePrdDraft(args: {
+  projectRoot: string
+  workspacePath: string
+  issueId: string
+}): Effect.Effect<PromoteWorkspacePrdDraftResult, FsError> {
+  return Effect.suspend(() => {
+    const { projectRoot, workspacePath, issueId } = args
+    const upperFile = `${issueId.toUpperCase()}.md`
+    const lowerFile = `${issueId.toLowerCase()}.md`
+    const draftsDir = getDraftsDir(projectRoot)
+    for (const canonical of [join(draftsDir, upperFile), join(draftsDir, lowerFile)]) {
+      if (existsSync(canonical)) {
+        return Effect.succeed<PromoteWorkspacePrdDraftResult>({
+          promoted: false,
+          reason: 'canonical-exists',
+          path: canonical,
+        })
+      }
+    }
+    const wsDrafts = join(workspacePath, '.pan', 'drafts')
+    const source = [join(wsDrafts, upperFile), join(wsDrafts, lowerFile)].find((p) => existsSync(p))
+    if (!source) {
+      return Effect.succeed<PromoteWorkspacePrdDraftResult>({
+        promoted: false,
+        reason: 'no-workspace-draft',
+      })
+    }
+    let content: string
+    try {
+      content = readFileSync(source, 'utf-8')
+    } catch (cause) {
+      return Effect.fail(new FsError({ path: source, operation: 'readFileString', cause }))
+    }
+    return writeIssueDraft(projectRoot, issueId, content).pipe(
+      Effect.map((path): PromoteWorkspacePrdDraftResult => ({ promoted: true, reason: 'promoted', path, source })),
+    )
+  })
 }

@@ -1,10 +1,9 @@
 /**
  * Real git + store wiring for the UAT generation engine (PAN-1737).
  *
- * Unlike the PAN-1691 candidate session (tmpdir worktree, removed after push),
- * generation worktrees are PERSISTENT under `<projectRoot>/workspaces/` — the
- * live UAT stack serves from them, and the folder name yields the Traefik
- * host (`uat-<label>-<codename>-<mmdd>.pan.localhost`) via the standard
+ * Generation worktrees are PERSISTENT under `<projectRoot>/workspaces/` — the
+ * live UAT stack serves from them, and the deterministic daily folder name yields the Traefik
+ * host (`uat-<label>-<codename>-<mmdd>.overdeck.localhost`) via the standard
  * FEATURE_FOLDER devcontainer template.
  *
  * Pure I/O — exercised live; the orchestrator (uat-generation-engine.ts) holds
@@ -116,7 +115,7 @@ export function buildUatGenerationGitDeps(projectRoot: string): GenerationGitDep
     },
 
     push: async (branchName) => {
-      await runGit(['push', '-u', 'origin', safeBranchName(branchName, 'uat')], worktreePath);
+      await runGit(['push', '-u', '--force-with-lease', 'origin', safeBranchName(branchName, 'uat')], worktreePath);
     },
   };
 }

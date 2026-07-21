@@ -13,10 +13,10 @@
  *     expected feature branch. Reports drift and missing-workspace state
  *     because both are silent failure modes today.
  *
- * Cache: in-memory, 30s TTL, keyed by absolute path. Cache entries are
- * invalidated when the mtime of <path>/.git/HEAD changes, so a checkout
- * under a live conversation is picked up on the next list call without
- * waiting for TTL.
+ * Cache: in-memory, keyed by absolute path and invalidated when the mtime of
+ * <path>/.git/HEAD changes. Every read still stats HEAD, so a checkout under a
+ * live conversation is picked up immediately without periodically respawning
+ * two git processes for every unchanged workspace.
  *
  * All I/O is async (execFile / fs.promises). No execSync, no readFileSync.
  */
@@ -28,7 +28,6 @@ import { promisify } from 'node:util';
 
 const execFileAsync = promisify(execFile);
 
-const GIT_INFO_TTL_MS = 30_000;
 const GIT_INFO_TIMEOUT_MS = 2_000;
 
 export interface ConversationGitInfo {
@@ -49,7 +48,6 @@ export interface AgentGitInfo {
 
 interface CacheEntry {
   value: ConversationGitInfo;
-  expiresAt: number;
   headMtimeMs: number;
 }
 
@@ -135,25 +133,23 @@ async function readGitInfoFresh(absPath: string): Promise<ConversationGitInfo> {
 }
 
 /**
- * Resolve branch + worktree status for a conversation cwd. Cached for
- * GIT_INFO_TTL_MS, invalidated on HEAD mtime change.
+ * Resolve branch + worktree status for a conversation cwd. Cached until the
+ * HEAD mtime changes.
  */
 export async function resolveConversationGitInfo(absPath: string): Promise<ConversationGitInfo> {
-  const now = Date.now();
   const headMtimeMs = await readHeadMtimeMs(absPath);
   if (headMtimeMs === null) {
     return { branch: null, isWorktree: false };
   }
 
   const cached = cache.get(absPath);
-  if (cached && cached.expiresAt > now && cached.headMtimeMs === headMtimeMs) {
+  if (cached && cached.headMtimeMs === headMtimeMs) {
     return cached.value;
   }
 
   const value = await readGitInfoFresh(absPath);
   cache.set(absPath, {
     value,
-    expiresAt: now + GIT_INFO_TTL_MS,
     headMtimeMs,
   });
   return value;

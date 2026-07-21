@@ -20,7 +20,7 @@
  *   build the door over `odb.dbLayer` (a `makeDbLive` pointed at THIS test db)
  *   instead of the bundled `*DoorLive` (whose Db is import-time-fixed).
  */
-import { mkdtempSync, rmSync } from 'node:fs';
+import { copyFileSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { Layer } from 'effect';
@@ -48,6 +48,20 @@ export interface OverdeckTestDb {
 }
 
 let savedHome: { present: boolean; value: string | undefined } = { present: false, value: undefined };
+let templateDb: { dir: string; path: string } | null = null;
+
+function getTemplateDbPath(): string {
+  if (templateDb) return templateDb.path;
+
+  const dir = mkdtempSync(join(tmpdir(), 'pan-overdeck-test-template-'));
+  const dbPath = join(dir, 'overdeck-template.db');
+  createOverdeckDatabase({ dbPath });
+  templateDb = { dir, path: dbPath };
+  process.once('exit', () => {
+    if (templateDb) rmSync(templateDb.dir, { recursive: true, force: true });
+  });
+  return dbPath;
+}
 
 /**
  * `beforeEach`: fresh temp `OVERDECK_HOME`, an empty schema-applied
@@ -66,7 +80,7 @@ export function setupOverdeckTestDb(): OverdeckTestDb {
   process.env.OVERDECK_HOME = home;
 
   const dbPath = join(home, 'overdeck.db');
-  createOverdeckDatabase({ dbPath });
+  copyFileSync(getTemplateDbPath(), dbPath);
 
   return {
     home,

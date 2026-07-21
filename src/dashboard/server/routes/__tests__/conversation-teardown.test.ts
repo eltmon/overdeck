@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { conversationRuntimeRootPids } from '../conversations.js';
+import { conversationRuntimeRootPids } from '../../../../lib/overdeck/conversation-runtime.js';
 import { findManagedServerPidSync } from '../../../../lib/tmux.js';
 
 vi.mock('node:os', async (importOriginal) => {

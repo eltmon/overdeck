@@ -31,6 +31,7 @@ export interface ForkViaServerOptions {
   summaryHarness?: RuntimeName;
   title?: string;
   focus?: string;
+  issueId?: string;
   handoffAuthor?: 'source' | 'external';
   handoffAuthorModel?: string;
   handoffAuthorHarness?: RuntimeName;
@@ -49,6 +50,7 @@ export interface ForkResultConv {
   handoffDocPath?: string | null;
   sessionAlive?: boolean;
   status?: string;
+  issueId?: string | null;
 }
 
 export class ForkServerError extends Error {}
@@ -61,7 +63,7 @@ export function isForkResultInProgress(conv: ForkResultConv): boolean {
  * Loopback base URL for the dashboard API. Mirrors the resolution used by other
  * CLI→server callers (`src/lib/agent-runtime.ts`): prefer an explicit override,
  * otherwise hit the local API on 127.0.0.1 over plain HTTP. We deliberately do
- * NOT fall back to `DASHBOARD_URL` (which can be the Traefik `https://pan.localhost`
+ * NOT fall back to `DASHBOARD_URL` (which can be the Traefik `https://overdeck.localhost`
  * origin) — a self-signed TLS hop would just make a loopback call fail.
  */
 function dashboardBaseUrl(): string {
@@ -86,6 +88,7 @@ export async function forkConversationViaServer(
   if (opts.summaryHarness) body['summaryHarness'] = opts.summaryHarness;
   if (opts.title) body['title'] = opts.title;
   if (opts.focus) body['focus'] = opts.focus;
+  if (opts.issueId) body['issueId'] = opts.issueId;
   if (opts.handoffAuthor) body['handoffAuthor'] = opts.handoffAuthor;
   if (opts.handoffAuthorModel) body['handoffAuthorModel'] = opts.handoffAuthorModel;
   if (opts.handoffAuthorHarness) body['handoffAuthorHarness'] = opts.handoffAuthorHarness;

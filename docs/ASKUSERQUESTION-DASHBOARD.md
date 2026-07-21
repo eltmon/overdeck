@@ -1,5 +1,12 @@
 # AskUserQuestion in the dashboard — pipeline, the 2026-05-31 outage, and the "Needs you" recovery
 
+> **Scope note (PAN-1520):** AUQ is one kind in the unified pending-input
+> subsystem — plan approval, permission requests, session-resume, and
+> rate-limit modals share the same indicator, needs-you list, notification,
+> and reopen routing. The subsystem overview lives in
+> [PENDING-INPUT.md](PENDING-INPUT.md); this file remains the AUQ-specific
+> debugging field guide.
+
 This documents how an agent's **AskUserQuestion** (AUQ) becomes a clickable
 dialog in the dashboard, the two root-cause bugs that silently broke it, and the
 "Needs you" recovery surface added so a dismissed question is never stranded.
@@ -62,6 +69,25 @@ and `isAskUserQuestionHookDenyToolResult` keys on that exact marker. **If you
 reword the hook's reason, keep the `(PAN-1520)` string** or detection breaks and
 the popup silently stops appearing. The operator's next plain-text answer turn
 clears the "denied-awaiting-user" state.
+
+## The marker contract (PAN-2530)
+
+The hook's emitted `permissionDecisionReason` is a load-bearing contract with the
+pending-input detector in `src/lib/agent-enrichment.ts`. It must contain **both**:
+
+1. The literal marker `(PAN-1520)`.
+2. The stable operative phrase `surfaced to the operator`.
+
+`isAskUserQuestionHookDenyToolResult` treats a deny-style `tool_result` as still
+pending if it sees **either** signal, so an old transcript that only has `PAN-1520`
+keeps matching and a future copy-edit that accidentally drops one signal cannot
+silently flip a deny into an answered state. The contract is enforced by
+`tests/lib/auq-hook-detector-contract.test.ts`, which executes the real hook with a
+synthetic PreToolUse payload and asserts the detector recognizes its output.
+
+If you change the REASON string in `sync-sources/hooks/ask-user-question-hook`,
+keep both signals or update the contract test. Dropping both breaks the
+AskUserQuestion popup and the "Needs you" recovery surface.
 
 ## The two root-cause bugs (fixed 2026-05-31, commit `360edc268`)
 
@@ -198,6 +224,55 @@ subsequent polls, no further activity or TTS events fire.
 
 This is kind-agnostic: it fires for AUQ, plan-mode approval, session-resume, and
 the new rate-limit modal.
+
+## Decisions — the canonical operator-decision surface (PAN-2765)
+
+Everything above enumerates decisions from `agentsById`, which the store fills
+from the event pipeline. Conversations never arrive that way: they are not rows
+in the agents table (verified — no live `conv-*` session appears in
+`listRunningAgents`), and reach the frontend over REST from
+`/api/conversations/pending-input`. Until PAN-2765 only the modal read that door,
+so a question from a conversation or the flywheel was invisible to "Needs you"
+and to everything built on it.
+
+`frontend/src/lib/useDecisions.ts` joins the two domains above both doors and is
+now the only enumeration of what is waiting on the operator. Read it — never
+`selectPendingInputSubjects` directly — or a decision will be visible in one
+surface and missing from another. `usePendingInputSubjects()` is the drop-in
+replacement carrying the same shape, so existing dedup and dismissed logic keeps
+working. `DecisionsPanel` groups by consequence (Blocking work / Waiting) rather
+than by kind, because that is what the operator triages on.
+
+### The `agentTurnEnded` kind
+
+An agent that simply finished its turn is waiting on the operator just as surely
+as one holding an open AUQ, but it writes no tool_use, so nothing above detects
+it. `computeAgentEnrichment` adds `agentTurnEnded` when an **interactive** role
+(`plan`, or any `conv-` agent) reaches runtime state `idle`. The role gate is the
+whole point: a `work` agent going idle is between tasks, not asking anything, and
+flagging it would make the list noise. `describePendingInput(['agentTurnEnded'])`
+renders as *Answer the agent*.
+
+### Scans are cached by mtime, never skipped
+
+`computeAgentEnrichment` used to take a `skipJsonlScan` flag, which made it
+report "no pending question" from a scan that never ran — and a blocked agent
+freezes its JSONL mtime, so once latched it stayed latched. It now takes
+`cachedScan` instead: the poller keeps `{ mtime, scan }` per agent and hands the
+previous scan back when the mtime is unchanged. The scan result is always
+present; only the re-read is skipped.
+
+### A transcript belongs to one agent
+
+A Claude project dir is keyed on **cwd**, so every session that ever ran in the
+same cwd shares one directory. Agents whose cwd is the primary repo — the
+flywheel orchestrator, conversations, `--cwd <repo>` handoffs — sit alongside
+each other's transcripts there. `getAgentJsonlPath` therefore resolves the
+agent's **own** pinned session id (`getLatestSessionIdSync`) and only falls back
+to `getActiveSessionPath`'s freshest-wins when the agent has no transcript of its
+own in that dir (codex and omp keep history elsewhere). Freshest-wins alone
+attributes whichever session wrote last to whoever asks: the live flywheel was
+observed reporting an operator conversation's open question as its own.
 
 ## Gotchas for future debugging
 

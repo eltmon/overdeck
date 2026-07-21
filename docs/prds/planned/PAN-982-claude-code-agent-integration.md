@@ -80,7 +80,7 @@ Agent system prompt (markdown body)...
 | `OVERDECK_AGENT_ID` / `OVERDECK_ISSUE_ID` / `OVERDECK_SESSION_TYPE` | Read by hooks (heartbeat, cost recorder, stop-hook). No frontmatter mechanism for custom env vars. |
 | `TERM` / `COLORTERM` / `LANG` / `LC_ALL` | Terminal env setup. Not agent-specific. |
 | `unset TMUX TMUX_PANE STY` | Prevents nested tmux warnings. Shell hygiene. |
-| mkcert CA trust (`NODE_EXTRA_CA_CERTS`) | TLS setup for `pan.localhost`. |
+| mkcert CA trust (`NODE_EXTRA_CA_CERTS`) | TLS setup for `overdeck.localhost`. |
 | Keep-alive loop (`while true; do sleep 60; done`) | Planning agent stays alive after Claude exits. No frontmatter equivalent. |
 | `script -qfaec` wrapper | Specialist dispatch capture. Shell-level wrapping. |
 | Caveman exports | Compressed-output mode via env vars. |

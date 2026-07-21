@@ -34,7 +34,7 @@ interface OverlayResult {
 /**
  * Permission deny patterns for Overdeck shared infrastructure. Work agents have
  * NO legitimate reason to delete or modify these — they're the orchestration substrate
- * that the agent itself depends on. Without these guards a vBRIEF action like
+ * that the agent itself depends on. Without these guards an xBRIEF action like
  * "delete the legacy .claude/agents/pan-*-agent.md files" can convince an agent
  * to brick its own runtime and every other running agent's runtime (PAN-1048
  * incident, 2026-05-09).

@@ -5,22 +5,47 @@ import { useQuery } from '@tanstack/react-query';
 // pick up work (waves + lanes) from GET /api/backlog/forecast, which is computed by
 // the shared pickup module (single source of truth — never diverges from the Flywheel).
 
-interface PipelineState {
+export interface PipelineState {
   ready: boolean; planned: boolean; parked: boolean; vetoed: boolean;
-  blocksMain: boolean; inPipeline: boolean; gate: 'auto' | 'promote' | 'vetoed';
+  blocksMain: boolean; inPipeline: boolean; released: boolean; objection: boolean;
+  gate: 'auto' | 'promote' | 'vetoed';
 }
-interface ForecastNode {
+export interface ForecastNode {
   issue: string; rank: number; size: string; state: PipelineState;
   title: string; importance: string; score: number; why: string;
 }
-interface LaneBlock extends ForecastNode { lane: number; start: number; end: number; }
-interface ForecastStats {
-  total: number; inFlight: number; ready: number; planned: number; pickable: number;
-  needsPlanning: number; parked: number; vetoed: number; blocksMain: number;
+export interface LaneBlock extends ForecastNode { lane: number; start: number; end: number; }
+export interface ForecastStats {
+  total: number; inFlight: number; ready: number; planned: number; released: number;
+  objection: number; pickable: number; needsPlanning: number; needsRelease: number;
+  parked: number; vetoed: number; blocksMain: number;
 }
-interface ForecastResponse {
+export interface ForecastResponse {
   n: number; stats: ForecastStats | null; inFlight: ForecastNode[];
   waves: ForecastNode[][]; lanes: { blocks: LaneBlock[]; makespan: number }; cohort: string[];
+  epics?: Array<{ issue: string; title: string }>;
+  contains?: Array<{ epic: string; child: string }>;
+}
+
+export interface WaveEpicGroup {
+  epic: string | null;
+  cards: ForecastNode[];
+}
+
+export function groupWaveByEpic(cards: readonly ForecastNode[], childToEpic: ReadonlyMap<string, string>): WaveEpicGroup[] {
+  const usedEpics = new Set<string>();
+  const groups: WaveEpicGroup[] = [];
+  for (const card of cards) {
+    const epic = childToEpic.get(card.issue);
+    if (!epic) {
+      groups.push({ epic: null, cards: [card] });
+      continue;
+    }
+    if (usedEpics.has(epic)) continue;
+    usedEpics.add(epic);
+    groups.push({ epic, cards: cards.filter((candidate) => childToEpic.get(candidate.issue) === epic) });
+  }
+  return groups;
 }
 
 const IMP_CLASS: Record<string, string> = { critical: 'crit', high: 'high', medium: 'medium', low: 'low' };
@@ -31,18 +56,27 @@ function Chips({ s }: { s: PipelineState }) {
       {s.inPipeline && <span className="bkf-chip run"><span className="bkf-dot" />in flight</span>}
       {s.blocksMain && <span className="bkf-chip blocksmain">🔴 blocks main</span>}
       {s.vetoed && <span className="bkf-chip vetoed">⛔ vetoed</span>}
+      {s.objection && <span className="bkf-chip objection">🛑 objection</span>}
       {s.parked && <span className="bkf-chip parked">⏸ parked</span>}
       {s.ready && <span className="bkf-chip ready">✓ ready</span>}
       {s.planned && <span className="bkf-chip planned">planned</span>}
-      {!s.planned && !s.parked && !s.vetoed && <span className="bkf-chip needsplan">needs plan</span>}
+      {s.planned && s.released && <span className="bkf-chip released">▶ released</span>}
+      {s.planned && !s.released && !s.parked && !s.vetoed && !s.objection && !s.inPipeline && <span className="bkf-chip needsrelease">needs release</span>}
+      {!s.planned && !s.parked && !s.vetoed && !s.objection && <span className="bkf-chip needsplan">needs plan</span>}
     </div>
   );
 }
 
-function Card({ n, onSelect }: { n: ForecastNode; onSelect?: (id: string) => void }) {
+function EpicTag({ epicId, epicTitle }: { epicId?: string; epicTitle?: string }) {
+  if (!epicId) return null;
+  return <span className="bkf-epictag" title={epicTitle || epicId}>▣ {epicId}</span>;
+}
+
+function Card({ n, onSelect, epicId, epicTitle }: { n: ForecastNode; onSelect?: (id: string) => void; epicId?: string; epicTitle?: string }) {
   const cls = ['bkf-card', IMP_CLASS[n.importance] ?? 'medium'];
   if (n.state.inPipeline) cls.push('pipe');
   if (n.state.blocksMain) cls.push('blocksmain');
+  if (n.state.objection) cls.push('objection');
   if (n.state.parked) cls.push('parked');
   if (n.state.vetoed) cls.push('vetoed');
   return (
@@ -53,6 +87,7 @@ function Card({ n, onSelect }: { n: ForecastNode; onSelect?: (id: string) => voi
         <span className="bkf-sz">{n.size}</span>
       </div>
       <div className="bkf-ttl">{n.title || n.why || n.issue}</div>
+      <EpicTag epicId={epicId} epicTitle={epicTitle} />
       <Chips s={n.state} />
     </div>
   );
@@ -76,6 +111,10 @@ export function BacklogForecast({ className, n = 5, onSelectIssue }: { className
 
   const stats = data.stats;
   const unit = Math.max(36, Math.floor(900 / Math.max(data.lanes.makespan, 1)));
+  const epics = data.epics ?? [];
+  const contains = data.contains ?? [];
+  const childToEpic = new Map(contains.map((entry) => [entry.child, entry.epic]));
+  const epicTitle = new Map(epics.map((entry) => [entry.issue, entry.title]));
 
   return (
     <div className={className} style={{ height: '100%', overflow: 'auto', padding: '16px 20px' }}>
@@ -89,6 +128,9 @@ export function BacklogForecast({ className, n = 5, onSelectIssue }: { className
           <Stat k="Planned" v={stats.planned} c="info" />
           <Stat k="Pickable" v={stats.pickable} c="go" />
           <Stat k="Needs planning" v={stats.needsPlanning} c="warn" />
+          <Stat k="Needs release" v={stats.needsRelease} c="warn" />
+          <Stat k="Released" v={stats.released} c="go" />
+          <Stat k="Objection" v={stats.objection} c="danger" />
           <Stat k="Parked" v={stats.parked} c="" />
           <Stat k="Vetoed" v={stats.vetoed} c="" />
           <Stat k="Blocks main" v={stats.blocksMain} c="danger" />
@@ -106,20 +148,40 @@ export function BacklogForecast({ className, n = 5, onSelectIssue }: { className
           <div className="bkf-wcol now">
             <div className="bkf-wh">▶ Running now <span className="c">{data.inFlight.length}</span></div>
             <div className="bkf-wstack">
-              {data.inFlight.map((nn) => <Card key={nn.issue} n={nn} onSelect={onSelectIssue} />)}
+              {data.inFlight.map((nn) => {
+                const epic = childToEpic.get(nn.issue);
+                return <Card key={nn.issue} n={nn} onSelect={onSelectIssue} epicId={epic} epicTitle={epic ? epicTitle.get(epic) : undefined} />;
+              })}
               {data.inFlight.length === 0 && <div className="bkf-empty">nothing in flight</div>}
             </div>
           </div>
           {data.waves.map((w, i) => (
             <div key={i} className="bkf-wcol">
               <div className="bkf-wh">Wave <span className="c">{i + 1}</span></div>
-              <div className="bkf-wstack">{w.map((nn) => <Card key={nn.issue} n={nn} onSelect={onSelectIssue} />)}</div>
+              <div className="bkf-wstack">
+                {groupWaveByEpic(w, childToEpic).map((group, groupIndex) => (
+                  <div key={group.epic ?? `orphan-${group.cards[0]?.issue ?? groupIndex}`} className={group.epic ? 'bkf-epicrun' : undefined}>
+                    {group.epic && (
+                      <div className="bkf-epichead" title={epicTitle.get(group.epic) || group.epic}>
+                        ▣ {group.epic}{epicTitle.get(group.epic) ? ` · ${epicTitle.get(group.epic)}` : ''}
+                      </div>
+                    )}
+                    <div className="bkf-wstack">
+                      {group.cards.map((nn) => {
+                        const epic = childToEpic.get(nn.issue);
+                        return <Card key={nn.issue} n={nn} onSelect={onSelectIssue} epicId={epic} epicTitle={epic ? epicTitle.get(epic) : undefined} />;
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           ))}
           {data.waves.length === 0 && (
             <div className="bkf-emptywaves">
-              No auto-pickable work. An issue must be <b>Ready</b> (marked workable) <b>and Planned</b> (has a spec + beads)
-              to enter a wave. Mark issues Ready, or plan the ones in <b>Needs planning</b>.
+              No auto-pickable work. An issue must be <b>Ready</b> (marked workable), <b>Planned</b> (has a spec + tasks),
+              <b>and Released</b> (operator reviewed the plan and released it for pickup — PAN-2059) to enter a wave.
+              Plan the ones in <b>Needs planning</b>, then <b>Release</b> the ones in <b>Needs release</b>.
             </div>
           )}
         </div>
@@ -136,6 +198,7 @@ export function BacklogForecast({ className, n = 5, onSelectIssue }: { className
                   <div key={b.issue} className={`bkf-blk ${IMP_CLASS[b.importance] ?? 'medium'}`}
                     style={{ left: b.start * unit, width: (b.end - b.start) * unit - 4 }} title={b.title} onClick={() => onSelectIssue?.(b.issue)}>
                     <div className="bkf-bi">#{b.rank} {b.issue}</div>
+                    <EpicTag epicId={childToEpic.get(b.issue)} epicTitle={childToEpic.get(b.issue) ? epicTitle.get(childToEpic.get(b.issue)!) : undefined} />
                     <div className="bkf-bt">{b.title || b.issue}</div>
                   </div>
                 ))}
@@ -172,6 +235,8 @@ const BKF_CSS = `
   .bkf-wh .c { font-family:ui-monospace,monospace; color:var(--foreground); font-weight: 500; }
   .bkf-wcol.now .bkf-wh { color:var(--info-foreground); }
   .bkf-wstack { display:flex; flex-direction:column; gap:8px; }
+  .bkf-epicrun { display:flex; flex-direction:column; gap:7px; }
+  .bkf-epichead { font-size:9.5px; font-weight:500; letter-spacing:.04em; color:var(--muted-foreground); border-left:3px solid color-mix(in srgb,var(--primary) 55%,transparent); padding-left:7px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .bkf-empty { font-size:11px; color:var(--muted-foreground); font-style:italic; }
   .bkf-emptywaves { flex:1; font-size:12.5px; color:var(--muted-foreground); line-height:1.6; border:1px dashed var(--border); border-radius:10px; padding:18px; max-width:560px; }
   .bkf-card { background:var(--card); border:1px solid var(--border); border-left:4px solid var(--heat,var(--muted-foreground)); border-radius:9px; padding:8px 10px; display:flex; flex-direction:column; gap:6px; cursor:pointer; box-shadow:0 1px 2px rgba(0,0,0,.3); }
@@ -179,6 +244,7 @@ const BKF_CSS = `
   .bkf-card.crit{--heat:var(--destructive);} .bkf-card.high{--heat:var(--warning);} .bkf-card.medium{--heat:color-mix(in srgb,var(--color-neutral-400) 80%,transparent);} .bkf-card.low{--heat:color-mix(in srgb,var(--muted-foreground) 55%,transparent);}
   .bkf-card.pipe { box-shadow:0 0 0 1.5px var(--info),0 0 12px color-mix(in srgb,var(--info) 40%,transparent); }
   .bkf-card.blocksmain { box-shadow:0 0 0 1.5px var(--destructive),0 0 12px color-mix(in srgb,var(--destructive) 35%,transparent); }
+  .bkf-card.objection { box-shadow:0 0 0 1.5px color-mix(in srgb,var(--destructive) 70%,transparent),0 0 12px color-mix(in srgb,var(--destructive) 30%,transparent); }
   .bkf-card.parked { opacity:.6; border-style:dashed; }
   .bkf-card.vetoed { opacity:.5; filter:grayscale(.5); border-style:dashed; }
   .bkf-r1 { display:flex; align-items:center; gap:6px; }
@@ -186,6 +252,7 @@ const BKF_CSS = `
   .bkf-iid { font-family:ui-monospace,monospace; font-size:10px; color:var(--muted-foreground); }
   .bkf-sz { margin-left:auto; font-size:8.5px; font-weight: 500; color:var(--muted-foreground); border:1px solid var(--border); border-radius:4px; padding:0 5px; }
   .bkf-ttl { font-size:11px; font-weight:500; line-height:1.3; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; color:var(--foreground); }
+  .bkf-epictag { align-self:flex-start; font-size:8.5px; font-weight:500; letter-spacing:.04em; padding:1px 5px; border-radius:4px; border:1px solid color-mix(in srgb,var(--primary) 38%,transparent); color:var(--foreground); background:color-mix(in srgb,var(--primary) 10%,transparent); max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .bkf-chips { display:flex; gap:4px; flex-wrap:wrap; }
   .bkf-chip { font-size:8.5px; font-weight: 500; padding:1px 5px; border-radius:4px; border:1px solid; }
   .bkf-chip.run { color:var(--info-foreground); border-color:color-mix(in srgb,var(--info) 32%,transparent); background:color-mix(in srgb,var(--info) 9%,transparent); display:inline-flex; gap:3px; align-items:center; }
@@ -194,13 +261,16 @@ const BKF_CSS = `
   .bkf-chip.parked { color:var(--warning-foreground); border-color:color-mix(in srgb,var(--warning) 34%,transparent); background:color-mix(in srgb,var(--warning) 9%,transparent); }
   .bkf-chip.vetoed { color:var(--muted-foreground); border-color:var(--border); background:var(--accent); }
   .bkf-chip.blocksmain { color:var(--destructive-foreground); border-color:color-mix(in srgb,var(--destructive) 38%,transparent); background:color-mix(in srgb,var(--destructive) 9%,transparent); }
+  .bkf-chip.objection { color:var(--destructive-foreground); border-color:color-mix(in srgb,var(--destructive) 40%,transparent); background:color-mix(in srgb,var(--destructive) 11%,transparent); }
+  .bkf-chip.released { color:var(--success-foreground); border-color:color-mix(in srgb,var(--success) 40%,transparent); background:color-mix(in srgb,var(--success) 12%,transparent); }
+  .bkf-chip.needsrelease { color:var(--muted-foreground); border-color:color-mix(in srgb,var(--warning) 30%,transparent); background:color-mix(in srgb,var(--warning) 7%,transparent); }
   .bkf-chip.needsplan { color:var(--muted-foreground); border-color:var(--border); background:var(--accent); }
   .bkf-dot { width:5px; height:5px; border-radius:50%; background:currentColor; }
   .bkf-gantt { border:1px solid var(--border); border-radius:12px; background:color-mix(in srgb,var(--background) 92%,var(--color-white)); padding:14px 16px; }
   .bkf-lane { display:flex; align-items:center; height:48px; }
   .bkf-ll { width:82px; flex:0 0 auto; font-family:ui-monospace,monospace; font-size:11px; color:var(--muted-foreground); }
   .bkf-track { position:relative; flex:1; height:100%; border-left:1px dashed var(--border); }
-  .bkf-blk { position:absolute; top:6px; height:36px; border-radius:8px; border:1px solid var(--border); border-left:4px solid var(--heat,var(--muted-foreground)); background:var(--card); padding:4px 8px; box-sizing:border-box; overflow:hidden; cursor:pointer; }
+  .bkf-blk { position:absolute; top:6px; min-height:36px; border-radius:8px; border:1px solid var(--border); border-left:4px solid var(--heat,var(--muted-foreground)); background:var(--card); padding:4px 8px; box-sizing:border-box; overflow:hidden; cursor:pointer; }
   .bkf-blk.crit{--heat:var(--destructive);} .bkf-blk.high{--heat:var(--warning);} .bkf-blk.medium{--heat:color-mix(in srgb,var(--color-neutral-400) 80%,transparent);}
   .bkf-bi { font-family:ui-monospace,monospace; font-size:9.5px; color:var(--muted-foreground); }
   .bkf-bt { font-size:10px; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }

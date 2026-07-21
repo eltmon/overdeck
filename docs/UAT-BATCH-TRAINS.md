@@ -12,7 +12,7 @@ Read this with:
 
 - [`FLYWHEEL.md`](./FLYWHEEL.md) — the orchestrator that drives the ready-set the trains assemble from.
 - [`MERGE-WORKFLOW.md`](./MERGE-WORKFLOW.md) — the per-issue merge state machine, which remains the escape hatch.
-- [`../.pan/drafts/PAN-1737.md`](../.pan/drafts/PAN-1737.md) — the originating PRD (full design rationale).
+- [`drafts/PAN-1737.md` on `overdeck-state`](https://github.com/eltmon/overdeck/blob/overdeck-state/drafts/PAN-1737.md) — the originating PRD (full design rationale; on disk: `${OVERDECK_HOME}/state/overdeck/drafts/PAN-1737.md`).
 - [`../docs/design/pan-1737-uat-batch-trains.html`](./design/pan-1737-uat-batch-trains.html) — the approved 3-state mockup.
 
 ## The problem it solves
@@ -35,7 +35,7 @@ tree once, continuously, and automatically.
 | **Held out** | A feature excluded from a generation because its conflict could not be resolved confidently (or the agent timed out). Shown on the card with the reason; retried in later generations once the conflicting predecessor merges or its branch changes. |
 | **Generation chain** | Generations accumulate newest-first (`sea-monkey` → `brass-donkey` → `copper-fox`…). The newest **ready** generation is current; older ready/superseded ones stay testable and promotable. Append-only — lifecycle is status flips, never row deletion, so the chain is an audit trail. |
 | **Promote** | The merge. Merging a generation lands its exact tree on main (one no-ff merge), so main receives precisely what was tested — conflict resolutions included. |
-| **UAT stack** | A live dashboard stack serving a generation's branch at `uat-<label>-<codename>-<mmdd>.pan.localhost`, spun on demand from the generation's worktree. **Hard max 2 concurrent.** |
+| **UAT stack** | A live dashboard stack serving a generation's branch at `uat-<label>-<codename>-<mmdd>.overdeck.localhost`, spun on demand from the generation's worktree. **Hard max 2 concurrent.** |
 
 ## Lifecycle
 
@@ -122,7 +122,7 @@ generations invalidate (main moved) and the reconciler rebuilds.
 
 `ensureUatStack` renders the devcontainer on the generation worktree — the folder
 name `uat-<label>-<codename>-<mmdd>` yields the Traefik host
-`uat-<label>-<codename>-<mmdd>.pan.localhost` via the standard `FEATURE_FOLDER`
+`uat-<label>-<codename>-<mmdd>.overdeck.localhost` via the standard `FEATURE_FOLDER`
 template — and runs `docker compose up`. **At most 2 UAT stacks run at once**:
 Docker's default address pool fits ~31 bridge networks, and orphaned UAT stacks
 would eventually block *all* workspace creation. Starting a third tears down the
@@ -134,7 +134,7 @@ past the cap), and invalidation/promotion always tear a generation's stack down
 
 | Route | Purpose |
 | --- | --- |
-| `GET /api/flywheel/uat-generations` | The generation chain, newest first: per generation the members (with PR links and **per-member acceptance criteria** from the shared vBRIEF extractor `src/lib/vbrief/acceptance-criteria.ts` — the same source as the AwaitingMerge UAT plan, no second parser), held-out reasons, conflict resolutions, and live-stack `{status, frontendUrl}`. Returns `[]` when no flywheel run is active. |
+| `GET /api/flywheel/uat-generations` | The generation chain, newest first: per generation the members (with PR links and **per-member acceptance criteria** from the shared xBRIEF extractor `src/lib/xbrief/acceptance-criteria.ts` — the same source as the AwaitingMerge UAT plan, no second parser), held-out reasons, conflict resolutions, and live-stack `{status, frontendUrl}`. Returns `[]` when no flywheel run is active. |
 | `POST /api/flywheel/uat-generations/:name/stack` | Ensure the generation's live stack (idempotent); returns the frontend URL and any evicted stacks. |
 | `POST /api/flywheel/uat-generations/:name/promote` | Promote (merge) the tested generation to main. |
 | `POST /api/flywheel/assemble-uat` | Force a reconcile/rebuild of the current generation (repurposed from the PAN-1691 one-shot assemble). |

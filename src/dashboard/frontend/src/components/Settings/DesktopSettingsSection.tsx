@@ -142,7 +142,7 @@ export function DesktopSettingsSection() {
         {saving && <Loader2 className="w-4 h-4 animate-spin text-muted-foreground shrink-0" />}
       </h2>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 @xl:grid-cols-3 gap-6">
 
         {/* Tray */}
         <div className="bg-card border border-border rounded-xl p-5 shadow-sm">

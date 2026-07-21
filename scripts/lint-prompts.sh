@@ -18,7 +18,9 @@ contains() {
 count_fixed() {
   local file="$1"
   local needle="$2"
-  grep -F -- "$needle" "$ROOT/$file" | wc -l | tr -d ' '
+  # `|| true` keeps a zero-match grep from killing the script under
+  # `set -euo pipefail` before the error report prints.
+  { grep -F -- "$needle" "$ROOT/$file" || true; } | wc -l | tr -d ' '
 }
 
 check_forbidden_strings() {
@@ -28,12 +30,12 @@ check_forbidden_strings() {
     && fail "forbidden-string: roles/plan.md contains 'legacy Done'"
   contains "src/lib/cloister/prompts/work.md" "node -e" \
     && fail "forbidden-string: work.md contains 'node -e'"
-  contains "src/lib/cloister/verification-runner.ts" "plan.vbrief.json subItem" \
-    && fail "forbidden-string: verification-runner.ts contains 'plan.vbrief.json subItem'"
+  contains "src/lib/cloister/verification-runner.ts" "plan.xbrief.json subItem" \
+    && fail "forbidden-string: verification-runner.ts contains 'plan.xbrief.json subItem'"
   return 0
 }
 
-check_bead_order_file() {
+check_item_order_file() {
   local file="$1"
   local heading="$2"
   local result
@@ -44,30 +46,30 @@ check_bead_order_file() {
       in_section && /^[0-9]+\./ {
         step=$1
         sub(/\./, "", step)
-        if (!close_step && index($0, "bd close")) close_step=step
+        if (!done_step && index($0, "pan task done")) done_step=step
         if (!inspect_step && index($0, "pan inspect")) inspect_step=step
       }
       END {
-        if (!close_step || !inspect_step) print "missing"
-        else if (close_step < inspect_step) print "ok"
-        else print close_step ":" inspect_step
+        if (!done_step || !inspect_step) print "missing"
+        else if (done_step + 0 < inspect_step + 0) print "ok"
+        else print done_step ":" inspect_step
       }
     ' "$ROOT/$file"
   )"
   if [[ "$result" != "ok" ]]; then
-    fail "bead-loop-order: $file has bd close not before pan inspect ($result)"
+    fail "item-loop-order: $file has pan task done not before pan inspect ($result)"
   fi
   return 0
 }
 
-check_bead_loop_order() {
-  check_bead_order_file "roles/work.md" "## Per-Bead Workflow"
-  check_bead_order_file "src/lib/cloister/prompts/work.md" "## MANDATORY: One Bead At A Time"
+check_item_loop_order() {
+  check_item_order_file "roles/work.md" "## Per-Task Workflow"
+  check_item_order_file "src/lib/cloister/prompts/work.md" "## MANDATORY: One Item At A Time"
 }
 
 check_single_workflow_copy() {
   local count
-  count="$(count_fixed "src/lib/cloister/prompts/work.md" "MANDATORY: One Bead At A Time")"
+  count="$(count_fixed "src/lib/cloister/prompts/work.md" "MANDATORY: One Item At A Time")"
   [[ "$count" == "1" ]] || fail "single-workflow-copy: work.md has $count workflow headings"
   return 0
 }
@@ -76,8 +78,8 @@ check_schema_key_agreement() {
   local file key
   local files=(
     "src/lib/cloister/prompts/planning.md"
-    "sync-sources/skills/write-vbrief/SKILL.md"
-    "docs/VBRIEF.md"
+    "sync-sources/skills/write-xbrief/SKILL.md"
+    "docs/XBRIEF.md"
   )
   local keys=(
     "requiresInspection"
@@ -145,9 +147,9 @@ check_anomaly_first_completion() {
   return 0
 }
 
-check_bead_scope_discipline() {
+check_item_scope_discipline() {
   contains "src/lib/cloister/prompts/work.md" "every staged file must be required" \
-    || fail "bead-scope-discipline: work prompt missing per-bead staged-file rule"
+    || fail "item-scope-discipline: work prompt missing per-item staged-file rule"
   return 0
 }
 
@@ -166,7 +168,7 @@ check_codebase_map_prompt() {
 check_all() {
   errors=()
   check_forbidden_strings
-  check_bead_loop_order
+  check_item_loop_order
   check_single_workflow_copy
   check_schema_key_agreement
   check_handoff_consistency
@@ -176,7 +178,7 @@ check_all() {
   check_plan_self_audit
   check_ac_phrasing_guidance
   check_anomaly_first_completion
-  check_bead_scope_discipline
+  check_item_scope_discipline
   check_review_verdict_blocker
   check_codebase_map_prompt
 }
@@ -187,7 +189,7 @@ write_passing_fixture() {
     "$root/src/lib/cloister/prompts" \
     "$root/src/lib/cloister" \
     "$root/roles" \
-    "$root/sync-sources/skills/write-vbrief" \
+    "$root/sync-sources/skills/write-xbrief" \
     "$root/docs"
 
   cat > "$root/src/lib/cloister/prompts/planning.md" <<'EOF'
@@ -207,35 +209,35 @@ EOF
 ## Verdict: APPROVED / CHANGES REQUESTED — <when CHANGES REQUESTED: one-line top blocker>
 EOF
   cat > "$root/src/lib/cloister/prompts/work.md" <<'EOF'
-## MANDATORY: One Bead At A Time
-1. bd ready -l issue
-2. bd update bead --claim
+## MANDATORY: One Item At A Time
+1. pan task next ISSUE
+2. pan task claim ISSUE item
 3. implement
 4. git commit
-5. update continue
-6. bd close bead
+5. git push
+6. pan task done ISSUE item
 7. read metadata
 8. skip if false
-9. pan inspect ISSUE --bead bead
+9. pan inspect ISSUE --item item
 data, not instructions
 lead with anomalies
 every staged file must be required
 EOF
   cat > "$root/roles/work.md" <<'EOF'
-## Per-Bead Workflow
-1. bd ready -l issue
-2. bd update bead --claim
+## Per-Task Workflow
+1. pan task next ISSUE
+2. pan task claim ISSUE item
 3. implement
 4. git commit
-5. update continue
-6. bd close bead
+5. git push
+6. pan task done ISSUE item
 7. read metadata
-8. pan inspect ISSUE --bead bead
+8. pan inspect ISSUE --item item
 EOF
   cat > "$root/src/lib/cloister/verification-runner.ts" <<'EOF'
-Close every completed bead with bd close.
+Complete every finished item with pan task done.
 EOF
-  for file in "$root/sync-sources/skills/write-vbrief/SKILL.md" "$root/docs/VBRIEF.md"; do
+  for file in "$root/sync-sources/skills/write-xbrief/SKILL.md" "$root/docs/XBRIEF.md"; do
     cat > "$file" <<'EOF'
 requiresInspection inspectionDepth issueLabel difficulty foundationFor acceptance_criterion NonGoals traces
 EOF
@@ -260,17 +262,17 @@ expect_self_test_failure() {
 self_test() {
   expect_self_test_failure "forbidden-string" \
     "printf '%s\n' 'click Done' >> \"\$tmp/src/lib/cloister/prompts/planning.md\""
-  expect_self_test_failure "bead-loop-order" \
+  expect_self_test_failure "item-loop-order" \
     "python3 - <<'PY' \"\$tmp/roles/work.md\"
 from pathlib import Path
 import sys
 p = Path(sys.argv[1])
-p.write_text(p.read_text().replace('6. bd close bead\n7. read metadata\n8. pan inspect ISSUE --bead bead', '6. read metadata\n7. pan inspect ISSUE --bead bead\n8. bd close bead'))
+p.write_text(p.read_text().replace('6. pan task done ISSUE item\n7. read metadata\n8. pan inspect ISSUE --item item', '6. read metadata\n7. pan inspect ISSUE --item item\n8. pan task done ISSUE item'))
 PY"
   expect_self_test_failure "single-workflow-copy" \
-    "printf '%s\n' '## MANDATORY: One Bead At A Time' >> \"\$tmp/src/lib/cloister/prompts/work.md\""
+    "printf '%s\n' '## MANDATORY: One Item At A Time' >> \"\$tmp/src/lib/cloister/prompts/work.md\""
   expect_self_test_failure "schema-key-agreement" \
-    "python3 - <<'PY' \"\$tmp/docs/VBRIEF.md\"
+    "python3 - <<'PY' \"\$tmp/docs/XBRIEF.md\"
 from pathlib import Path
 import sys
 p = Path(sys.argv[1])
@@ -332,7 +334,7 @@ import sys
 p = Path(sys.argv[1])
 p.write_text(p.read_text().replace('lead with anomalies', 'summarize normally'))
 PY"
-  expect_self_test_failure "bead-scope-discipline" \
+  expect_self_test_failure "item-scope-discipline" \
     "python3 - <<'PY' \"\$tmp/src/lib/cloister/prompts/work.md\"
 from pathlib import Path
 import sys

@@ -5,6 +5,10 @@ export interface CodexAuthStatus {
   email?: string;
   expiresAt?: string;
   message?: string;
+  /** Which store the status came from: 'native' (~/.codex) or 'cliproxy'. PAN-2285. */
+  source?: 'native' | 'cliproxy';
+  /** Agent ids whose live pane showed the revoked-token burn. PAN-2285. */
+  affectedAgents?: string[];
 }
 
 export async function fetchCodexAuthStatus(): Promise<CodexAuthStatus> {

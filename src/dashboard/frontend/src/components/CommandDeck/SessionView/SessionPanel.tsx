@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useState, useMemo, useCallback, useEffect, useLayoutEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { GitFork, TriangleAlert, AlertCircle, TerminalSquare, MessagesSquare, Wrench } from 'lucide-react';
 import type { SessionNode as SessionNodeType } from '@overdeck/contracts';
@@ -8,9 +8,13 @@ import type { RoundMarker } from '../../chat/MessagesTimeline';
 import { ChatMarkdown } from '../../chat/ChatMarkdown';
 import { XTerminal } from '../../XTerminal';
 import { AwaitingInputIndicator } from '../../AwaitingInputIndicator';
+import { useAskUserQuestionUiStore } from '../../../lib/askUserQuestionUiStore';
+import { useDashboardStore, selectPendingPermissionAgentIds } from '../../../lib/store';
 import { RoundCard } from '../RoundCard';
 import type { RoundData, RoundVerdict } from '../RoundCard';
 import { ReviewSummary } from './ReviewSummary';
+import { SessionResumeButton } from './SessionResumeButton';
+import { VerificationGatesPanel } from './VerificationGatesPanel';
 import { useResolvedModels, resolveWorkTypeKey } from '../../../lib/useResolvedModels';
 import { useConversationUiState } from '../../../hooks/useConversationUiState';
 import styles from '../styles/command-deck.module.css';
@@ -215,6 +219,11 @@ export function SessionPanel({ session, issueId, roundMarkers, reviewers }: Sess
   // agent and matches the standalone conversation view's key for the same
   // session. (PAN-XXXX)
   const { hideToolCalls, toggleHideToolCalls } = useConversationUiState(session.sessionId);
+  // PAN-1520 (FR-6) — permission requests live in a separate store slice from
+  // the server-computed session.awaitingInput; merge via the shared selector.
+  const pendingPermissionAgentIds = useDashboardStore(selectPendingPermissionAgentIds);
+  const hasPendingPermission = pendingPermissionAgentIds.has(session.sessionId);
+  const requestAskUserQuestionReopen = useAskUserQuestionUiStore((s) => s.requestReopen);
   const [view, setView] = useState<PanelView>(() => {
     const stored = readView(session.sessionId);
     // Default review sessions without JSONL to summary tab; with JSONL default
@@ -288,12 +297,45 @@ export function SessionPanel({ session, issueId, roundMarkers, reviewers }: Sess
   const roundData = useMemo(() => deriveRoundData(session.roundMetadata), [session.roundMetadata]);
   const hasFindings = roundData.length > 0;
 
+  // PAN-1991 #8: the raw-transcript path (TUI / pi agents, no JSONL) has no
+  // auto-scroll. Land at the newest line when an agent is opened, and stick to
+  // the bottom as the transcript grows unless the operator scrolled up. (The
+  // JSONL/ConversationPanel path already resets via MessagesTimeline.)
+  const transcriptRef = useRef<HTMLDivElement>(null);
+  const transcriptPinnedRef = useRef(true);
+  const prevTranscriptSessionRef = useRef<string | null>(null);
+  const onTranscriptScroll = useCallback(() => {
+    const el = transcriptRef.current;
+    if (!el) return;
+    transcriptPinnedRef.current = el.scrollHeight - el.clientHeight - el.scrollTop < 48;
+  }, []);
+  useLayoutEffect(() => {
+    const el = transcriptRef.current;
+    if (!el) return;
+    if (prevTranscriptSessionRef.current !== session.sessionId) {
+      prevTranscriptSessionRef.current = session.sessionId;
+      transcriptPinnedRef.current = true;
+    }
+    if (!transcriptPinnedRef.current) return;
+    el.scrollTop = el.scrollHeight;
+    const raf = requestAnimationFrame(() => {
+      if (transcriptRef.current) transcriptRef.current.scrollTop = transcriptRef.current.scrollHeight;
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [session.sessionId, session.transcript, view]);
+
   return (
     <div className={styles.sessionPanel}>
       {/* View toggle — slim tab bar (info already shown in ZoneB) */}
       <div className={styles.sessionPanelHeader}>
-        {session.awaitingInput && (
-          <AwaitingInputIndicator kinds={['askUserQuestion']} />
+        {(session.awaitingInput || hasPendingPermission) && (
+          // Clicking re-opens the dialog for this session — the modal can be
+          // dismissed or lost, and the operator needs a way back to the
+          // question without hunting for it.
+          <AwaitingInputIndicator
+            kinds={hasPendingPermission ? ['permissionRequest'] : ['askUserQuestion']}
+            onClick={() => requestAskUserQuestionReopen(session.sessionId)}
+          />
         )}
         <SessionPanelBranchChip sessionId={session.sessionId} />
         <div className={styles.sessionPanelToggle}>
@@ -341,11 +383,21 @@ export function SessionPanel({ session, issueId, roundMarkers, reviewers }: Sess
         {session.deliveryMethod !== undefined && (
           <DeliveryMethodToggle sessionId={session.sessionId} deliveryMethod={session.deliveryMethod} />
         )}
+        {issueId && session.type === 'work' && (
+          <SessionResumeButton issueId={issueId} />
+        )}
       </div>
 
       {/* View content */}
       <div className={styles.sessionPanelContent}>
-        {view === 'conversation' && (
+        {view === 'conversation' && session.type === 'lint' ? (
+          // Test/Lint gate node (PAN-2665): no JSONL/tmux backing — render the
+          // live-polling gate view instead of a conversation.
+          <VerificationGatesPanel
+            issueId={(issueId ?? session.sessionId.replace(/^lint-/, '')).toUpperCase()}
+            fallbackTranscript={session.transcript}
+          />
+        ) : view === 'conversation' && (
           hasJsonl && synthesizedConversation ? (
             <ConversationPanel
               conversation={synthesizedConversation}
@@ -358,7 +410,7 @@ export function SessionPanel({ session, issueId, roundMarkers, reviewers }: Sess
               onToggleHideToolCalls={toggleHideToolCalls}
             />
           ) : hasTranscript ? (
-            <div className={styles.sessionPanelTranscript}>
+            <div ref={transcriptRef} onScroll={onTranscriptScroll} className={styles.sessionPanelTranscript}>
               <ChatMarkdown text={session.transcript!} isStreaming={false} cwd={undefined} />
             </div>
           ) : (
@@ -405,8 +457,8 @@ export function SessionPanel({ session, issueId, roundMarkers, reviewers }: Sess
         )}
 
         {view === 'terminal' && (
-          session.harness === 'pi' ? (
-            // Pi agents run as `pi --mode rpc`: there is no interactive TUI. The
+          (session.harness === 'ohmypi' || session.harness === 'pi') ? (
+            // ohmypi/Pi agents run as `omp --mode rpc`: there is no interactive TUI. The
             // tmux pane carries the raw JSON-RPC wire protocol (one JSON object
             // per streamed event), which is unreadable as a terminal. Point the
             // operator at the Conversation tab, which renders the same transcript

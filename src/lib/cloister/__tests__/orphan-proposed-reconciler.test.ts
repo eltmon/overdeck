@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { Effect } from 'effect';
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
@@ -11,11 +12,24 @@ const reviewStatusStore = vi.hoisted(() => ({
   getReviewStatusSync: vi.fn(() => null),
 }));
 
+const githubAppMocks = vi.hoisted(() => ({
+  isGitHubAppConfigured: vi.fn(() => false),
+  listPullRequestsForHead: vi.fn(() => Effect.succeed([])),
+}));
+
+const trackerUtilsMocks = vi.hoisted(() => ({
+  resolveGitHubIssueSync: vi.fn(() => ({ isGitHub: true, owner: 'eltmon', repo: 'overdeck', number: 3603 })),
+}));
+
 const childProcessMocks = vi.hoisted(() => ({
   exec: vi.fn((_command: string, _options: unknown, callback: (error: Error | null, stdout: string, stderr: string) => void) => {
     callback(null, '[]', '');
     return {} as never;
   }),
+}));
+
+const internalTokenMocks = vi.hoisted(() => ({
+  getInternalTokenSync: vi.fn(() => 'test-internal-token'),
 }));
 
 vi.mock('child_process', async (importOriginal) => {
@@ -27,25 +41,67 @@ vi.mock('../../activity-logger.js', () => ({
   emitActivityEntrySync: activityLogger.emitActivityEntrySync,
 }));
 
+vi.mock('../../internal-token.js', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../../internal-token.js')>(),
+  getInternalTokenSync: internalTokenMocks.getInternalTokenSync,
+}));
+
 vi.mock('../../review-status.js', () => ({
   getReviewStatusSync: reviewStatusStore.getReviewStatusSync,
 }));
 
+vi.mock('../../github-app.js', () => ({
+  isGitHubAppConfigured: githubAppMocks.isGitHubAppConfigured,
+  listPullRequestsForHead: githubAppMocks.listPullRequestsForHead,
+}));
+
+vi.mock('../../tracker-utils.js', () => ({
+  resolveGitHubIssueSync: trackerUtilsMocks.resolveGitHubIssueSync,
+}));
+
+vi.mock('../../tasks/presence.js', () => ({
+  // The reconciler counts tasks through the cached bulk-snapshot door
+  // (PAN-2640); mock that boundary so the JSONL fixtures (including
+  // redirect-backed stores) keep driving the tests without any caching.
+  readTasksForIssueCached: async (workspacePath: string, issueId: string) => {
+    try {
+      const fs = await import('node:fs/promises');
+      let tasksPath = join(workspacePath, '.tasks', 'issues.jsonl');
+      if (!existsSync(tasksPath)) {
+        const redirect = (await fs.readFile(join(workspacePath, '.tasks', 'redirect'), 'utf8')).trim();
+        tasksPath = join(workspacePath, redirect, 'issues.jsonl');
+      }
+      const raw = await fs.readFile(tasksPath, 'utf8');
+      const value = raw.split('\n').filter(Boolean).map((line) => JSON.parse(line)).filter((task) =>
+        task.labels?.some((label: string) => label.toLowerCase() === issueId.toLowerCase()));
+      return { ok: true, value };
+    } catch { return { ok: true, value: [] }; }
+  },
+}));
+
+import { INTERNAL_TOKEN_HEADER } from '../../internal-token.js';
 import {
   clearOrphanProposedAttemptCooldowns,
   findOrphanProposedSpecsForReconciler,
   hasReviewPipelinePresence,
   reconcileOrphanProposedSpecs,
   spawnWorkAgentThroughAgentsEndpoint,
+  triggerRebuildAndStart,
 } from '../orphan-proposed-reconciler.js';
 
 let testDir: string;
 
-function writeSpec(projectPath: string, issueId: string, status: string, planItemCount = 2): void {
+function writeSpec(
+  projectPath: string,
+  issueId: string,
+  status: string,
+  planItemCount = 2,
+  extension: 'vbrief' | 'xbrief' = 'vbrief',
+): void {
   const specsDir = join(projectPath, '.pan', 'specs');
   mkdirSync(specsDir, { recursive: true });
-  writeFileSync(join(specsDir, `${issueId}.vbrief.json`), JSON.stringify({
-    vBRIEFInfo: { version: '0.5', created: '2026-05-25T00:00:00.000Z' },
+  writeFileSync(join(specsDir, `${issueId}.${extension}.json`), JSON.stringify({
+    xBRIEFInfo: { version: '0.5', created: '2026-05-25T00:00:00.000Z' },
     plan: {
       id: issueId,
       title: issueId,
@@ -56,32 +112,32 @@ function writeSpec(projectPath: string, issueId: string, status: string, planIte
   }, null, 2));
 }
 
-function writeBeads(projectPath: string, issueId: string, beadCount = 2): void {
-  const beadsDir = join(projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`, '.beads');
-  mkdirSync(beadsDir, { recursive: true });
-  const lines = Array.from({ length: beadCount }, (_, index) => JSON.stringify({
+function writeTasks(projectPath: string, issueId: string, taskCount = 2): void {
+  const tasksDir = join(projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`, '.tasks');
+  mkdirSync(tasksDir, { recursive: true });
+  const lines = Array.from({ length: taskCount }, (_, index) => JSON.stringify({
     _type: 'issue',
     id: `workspace-${issueId.toLowerCase()}-${index + 1}`,
-    title: `${issueId} bead ${index + 1}`,
+    title: `${issueId} task ${index + 1}`,
     labels: [issueId.toLowerCase()],
   }));
-  writeFileSync(join(beadsDir, 'issues.jsonl'), lines.join('\n'));
+  writeFileSync(join(tasksDir, 'issues.jsonl'), lines.join('\n'));
 }
 
-function writeRedirectBeads(projectPath: string, issueId: string, beadCount = 2): void {
+function writeRedirectTasks(projectPath: string, issueId: string, taskCount = 2): void {
   const workspacePath = join(projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`);
-  const workspaceBeadsDir = join(workspacePath, '.beads');
-  const sharedBeadsDir = join(projectPath, '.beads');
-  mkdirSync(workspaceBeadsDir, { recursive: true });
-  mkdirSync(sharedBeadsDir, { recursive: true });
-  const lines = Array.from({ length: beadCount }, (_, index) => JSON.stringify({
+  const workspaceTasksDir = join(workspacePath, '.tasks');
+  const sharedTasksDir = join(projectPath, '.tasks');
+  mkdirSync(workspaceTasksDir, { recursive: true });
+  mkdirSync(sharedTasksDir, { recursive: true });
+  const lines = Array.from({ length: taskCount }, (_, index) => JSON.stringify({
     _type: 'issue',
     id: `shared-${issueId.toLowerCase()}-${index + 1}`,
-    title: `${issueId} bead ${index + 1}`,
+    title: `${issueId} task ${index + 1}`,
     labels: [issueId.toLowerCase()],
   }));
-  writeFileSync(join(workspaceBeadsDir, 'redirect'), '../../.beads');
-  writeFileSync(join(sharedBeadsDir, 'issues.jsonl'), lines.join('\n'));
+  writeFileSync(join(workspaceTasksDir, 'redirect'), '../../.tasks');
+  writeFileSync(join(sharedTasksDir, 'issues.jsonl'), lines.join('\n'));
 }
 
 describe('orphan proposed spec reconciler', () => {
@@ -90,6 +146,12 @@ describe('orphan proposed spec reconciler', () => {
     activityLogger.emitActivityEntrySync.mockReset();
     reviewStatusStore.getReviewStatusSync.mockReset();
     reviewStatusStore.getReviewStatusSync.mockReturnValue(null);
+    githubAppMocks.isGitHubAppConfigured.mockReset();
+    githubAppMocks.isGitHubAppConfigured.mockReturnValue(false);
+    githubAppMocks.listPullRequestsForHead.mockReset();
+    githubAppMocks.listPullRequestsForHead.mockReturnValue(Effect.succeed([]));
+    trackerUtilsMocks.resolveGitHubIssueSync.mockReset();
+    trackerUtilsMocks.resolveGitHubIssueSync.mockReturnValue({ isGitHub: true, owner: 'eltmon', repo: 'overdeck', number: 3603 });
     childProcessMocks.exec.mockReset();
     childProcessMocks.exec.mockImplementation((_command: string, _options: unknown, callback: (error: Error | null, stdout: string, stderr: string) => void) => {
       callback(null, '[]', '');
@@ -128,7 +190,7 @@ describe('orphan proposed spec reconciler', () => {
     const projectPath = join(testDir, 'project');
     mkdirSync(projectPath, { recursive: true });
     writeSpec(projectPath, 'PAN-3401', 'proposed');
-    writeBeads(projectPath, 'PAN-3401');
+    writeTasks(projectPath, 'PAN-3401');
     const spawnWorkAgent = vi.fn(async () => ({ spawned: true, agentId: 'agent-pan-3401' }));
     const getReviewStatusForIssue = vi.fn(() => ({
       reviewStatus: 'passed' as const,
@@ -159,8 +221,8 @@ describe('orphan proposed spec reconciler', () => {
   it('keeps all-pending review status rows eligible as candidates', async () => {
     const projectPath = join(testDir, 'project');
     mkdirSync(projectPath, { recursive: true });
-    writeSpec(projectPath, 'PAN-3402', 'proposed');
-    writeBeads(projectPath, 'PAN-3402');
+    writeSpec(projectPath, 'PAN-3402', 'proposed', 2, 'xbrief');
+    writeTasks(projectPath, 'PAN-3402');
 
     await expect(findOrphanProposedSpecsForReconciler({
       projects: [{ key: 'overdeck', config: { name: 'Overdeck CLI', path: projectPath } }],
@@ -175,7 +237,7 @@ describe('orphan proposed spec reconciler', () => {
     })).resolves.toEqual([
       expect.objectContaining({
         issueId: 'PAN-3402',
-        beadCount: 2,
+        taskCount: 2,
         planItemCount: 2,
       }),
     ]);
@@ -185,7 +247,7 @@ describe('orphan proposed spec reconciler', () => {
     const projectPath = join(testDir, 'project');
     mkdirSync(projectPath, { recursive: true });
     writeSpec(projectPath, 'PAN-3403', 'proposed');
-    writeBeads(projectPath, 'PAN-3403');
+    writeTasks(projectPath, 'PAN-3403');
     reviewStatusStore.getReviewStatusSync.mockReturnValue({
       reviewStatus: 'passed',
       testStatus: 'pending',
@@ -208,13 +270,13 @@ describe('orphan proposed spec reconciler', () => {
     const projectPath = join(testDir, 'project');
     mkdirSync(projectPath, { recursive: true });
     writeSpec(projectPath, 'PAN-3001', 'proposed');
-    writeBeads(projectPath, 'PAN-3001');
+    writeTasks(projectPath, 'PAN-3001');
     writeSpec(projectPath, 'PAN-3002', 'proposed');
-    writeBeads(projectPath, 'PAN-3002');
+    writeTasks(projectPath, 'PAN-3002');
     writeSpec(projectPath, 'PAN-3003', 'proposed');
-    writeBeads(projectPath, 'PAN-3003');
+    writeTasks(projectPath, 'PAN-3003');
     writeSpec(projectPath, 'PAN-3004', 'completed');
-    writeBeads(projectPath, 'PAN-3004');
+    writeTasks(projectPath, 'PAN-3004');
 
     await expect(findOrphanProposedSpecsForReconciler({
       projects: [{ key: 'overdeck', config: { name: 'Overdeck CLI', path: projectPath } }],
@@ -228,7 +290,7 @@ describe('orphan proposed spec reconciler', () => {
         projectKey: 'overdeck',
         projectName: 'Overdeck CLI',
         issueId: 'PAN-3001',
-        beadCount: 2,
+        taskCount: 2,
         planItemCount: 2,
       }),
     ]);
@@ -238,7 +300,7 @@ describe('orphan proposed spec reconciler', () => {
     const projectPath = join(testDir, 'project');
     mkdirSync(projectPath, { recursive: true });
     writeSpec(projectPath, 'PAN-3501', 'proposed');
-    writeBeads(projectPath, 'PAN-3501');
+    writeTasks(projectPath, 'PAN-3501');
 
     await expect(findOrphanProposedSpecsForReconciler({
       projects: [{ key: 'overdeck', config: { name: 'Overdeck CLI', path: projectPath } }],
@@ -252,7 +314,7 @@ describe('orphan proposed spec reconciler', () => {
     const projectPath = join(testDir, 'project');
     mkdirSync(projectPath, { recursive: true });
     writeSpec(projectPath, 'PAN-3501', 'proposed');
-    writeBeads(projectPath, 'PAN-3501');
+    writeTasks(projectPath, 'PAN-3501');
 
     await expect(findOrphanProposedSpecsForReconciler({
       projects: [{ key: 'overdeck', config: { name: 'Overdeck CLI', path: projectPath } }],
@@ -264,11 +326,11 @@ describe('orphan proposed spec reconciler', () => {
     ]);
   });
 
-  it('detects proposed orphan specs with redirect-backed beads stores', async () => {
+  it('detects proposed orphan specs with redirect-backed tasks stores', async () => {
     const projectPath = join(testDir, 'project');
     mkdirSync(projectPath, { recursive: true });
     writeSpec(projectPath, 'PAN-3005', 'proposed');
-    writeRedirectBeads(projectPath, 'PAN-3005');
+    writeRedirectTasks(projectPath, 'PAN-3005');
 
     await expect(findOrphanProposedSpecsForReconciler({
       projects: [{ key: 'overdeck', config: { name: 'Overdeck CLI', path: projectPath } }],
@@ -278,7 +340,7 @@ describe('orphan proposed spec reconciler', () => {
     })).resolves.toEqual([
       expect.objectContaining({
         issueId: 'PAN-3005',
-        beadCount: 2,
+        taskCount: 2,
         planItemCount: 2,
       }),
     ]);
@@ -288,7 +350,7 @@ describe('orphan proposed spec reconciler', () => {
     const projectPath = join(testDir, 'project');
     mkdirSync(projectPath, { recursive: true });
     writeSpec(projectPath, 'PAN-3101', 'proposed');
-    writeBeads(projectPath, 'PAN-3101');
+    writeTasks(projectPath, 'PAN-3101');
     const spawnWorkAgent = vi.fn(async () => ({ spawned: true, agentId: 'agent-pan-3101' }));
     const projects = [{ key: 'overdeck', config: { name: 'Overdeck CLI', path: projectPath } }];
 
@@ -319,7 +381,7 @@ describe('orphan proposed spec reconciler', () => {
     const projectPath = join(testDir, 'project');
     mkdirSync(projectPath, { recursive: true });
     writeSpec(projectPath, 'PAN-3601', 'proposed');
-    writeBeads(projectPath, 'PAN-3601');
+    writeTasks(projectPath, 'PAN-3601');
     const spawnWorkAgent = vi.fn(async () => ({ spawned: true, agentId: 'agent-pan-3601' }));
     const hasOpenPrForBranch = vi.fn(async () => true);
 
@@ -343,7 +405,7 @@ describe('orphan proposed spec reconciler', () => {
     const projectPath = join(testDir, 'project');
     mkdirSync(projectPath, { recursive: true });
     writeSpec(projectPath, 'PAN-3602', 'proposed');
-    writeBeads(projectPath, 'PAN-3602');
+    writeTasks(projectPath, 'PAN-3602');
     const spawnWorkAgent = vi.fn(async () => ({ spawned: true, agentId: 'agent-pan-3602' }));
     const hasOpenPrForBranch = vi.fn(async () => {
       throw new Error('gh unavailable');
@@ -367,7 +429,7 @@ describe('orphan proposed spec reconciler', () => {
     const projectPath = join(testDir, 'project');
     mkdirSync(projectPath, { recursive: true });
     writeSpec(projectPath, 'PAN-3603', 'proposed');
-    writeBeads(projectPath, 'PAN-3603');
+    writeTasks(projectPath, 'PAN-3603');
     childProcessMocks.exec.mockImplementation((_command: string, _options: unknown, callback: (error: Error | null, stdout: string, stderr: string) => void) => {
       callback(null, '[{"number":1707}]', '');
       return {} as never;
@@ -392,11 +454,38 @@ describe('orphan proposed spec reconciler', () => {
     expect(activityLogger.emitActivityEntrySync).not.toHaveBeenCalled();
   });
 
+  it('checks open PRs with GitHub App REST when configured', async () => {
+    const projectPath = join(testDir, 'project');
+    mkdirSync(projectPath, { recursive: true });
+    writeSpec(projectPath, 'PAN-3604', 'proposed');
+    writeTasks(projectPath, 'PAN-3604');
+    githubAppMocks.isGitHubAppConfigured.mockReturnValue(true);
+    trackerUtilsMocks.resolveGitHubIssueSync.mockReturnValue({ isGitHub: true, owner: 'eltmon', repo: 'overdeck', number: 3604 });
+    githubAppMocks.listPullRequestsForHead.mockReturnValue(Effect.succeed([
+      { number: 1708, state: 'open', merged: false, mergedAt: null, mergeCommit: null },
+    ]));
+    const spawnWorkAgent = vi.fn(async () => ({ spawned: true, agentId: 'agent-pan-3604' }));
+
+    await expect(reconcileOrphanProposedSpecs({
+      projects: [{ key: 'overdeck', config: { name: 'Overdeck CLI', path: projectPath } }],
+      tmuxSessionNames: [],
+      getAgentStateForIssue: async () => null,
+      closedIssueIds: new Set(),
+      now: new Date('2026-05-25T20:00:00.000Z'),
+      config: { enabled: true, minAttemptIntervalMs: 5 * 60 * 1000 },
+      spawnWorkAgent,
+    })).resolves.toEqual(['Skipped orphan proposed spec PAN-3604: open-pr']);
+
+    expect(spawnWorkAgent).not.toHaveBeenCalled();
+    expect(githubAppMocks.listPullRequestsForHead).toHaveBeenCalledWith('eltmon', 'overdeck', 'feature/pan-3604', 'open');
+    expect(childProcessMocks.exec).not.toHaveBeenCalled();
+  });
+
   it('surfaces only the actioned spawn outcome in the activity feed, with a human-readable message (PAN-1626)', async () => {
     const projectPath = join(testDir, 'project');
     mkdirSync(projectPath, { recursive: true });
     writeSpec(projectPath, 'PAN-3151', 'proposed');
-    writeBeads(projectPath, 'PAN-3151');
+    writeTasks(projectPath, 'PAN-3151');
 
     await reconcileOrphanProposedSpecs({
       projects: [{ key: 'overdeck', config: { name: 'Overdeck CLI', path: projectPath } }],
@@ -433,7 +522,7 @@ describe('orphan proposed spec reconciler', () => {
     const projectPath = join(testDir, 'project');
     mkdirSync(projectPath, { recursive: true });
     writeSpec(projectPath, 'PAN-3153', 'proposed');
-    writeBeads(projectPath, 'PAN-3153');
+    writeTasks(projectPath, 'PAN-3153');
 
     const spawnWorkAgent = vi.fn(async () => ({
       spawned: false,
@@ -467,7 +556,7 @@ describe('orphan proposed spec reconciler', () => {
     const projectPath = join(testDir, 'project');
     mkdirSync(projectPath, { recursive: true });
     writeSpec(projectPath, 'PAN-3152', 'proposed');
-    writeBeads(projectPath, 'PAN-3152');
+    writeTasks(projectPath, 'PAN-3152');
 
     const baseOpts = {
       projects: [{ key: 'overdeck', config: { name: 'Overdeck CLI', path: projectPath } }],
@@ -512,7 +601,48 @@ describe('orphan proposed spec reconciler', () => {
     const [url, init] = fetchMock.mock.calls[0];
     expect(String(url)).toBe('http://127.0.0.1:3011/api/agents');
     expect(init?.method).toBe('POST');
-    expect(init?.headers).toMatchObject({ origin: 'http://127.0.0.1:3011' });
+    expect(init?.headers).toMatchObject({
+      origin: 'http://127.0.0.1:3011',
+      [INTERNAL_TOKEN_HEADER]: 'test-internal-token',
+    });
     expect(JSON.parse(String(init?.body))).toEqual({ issueId: 'PAN-3301', role: 'work' });
+  });
+
+  it('classifies unauthorized spawn responses explicitly', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ error: 'unauthorized' }), { status: 401 })));
+
+    await expect(spawnWorkAgentThroughAgentsEndpoint('PAN-3301', 'http://127.0.0.1:3011')).resolves.toEqual({
+      spawned: false,
+      skippedReason: 'unauthorized',
+      error: 'unauthorized',
+    });
+  });
+
+  // PAN-2520: the deacon dead-end path invokes rebuild-and-start when a respawn
+  // defers on stack-unhealthy, so the stack gets rebuilt instead of looping forever.
+  it('posts to the rebuild-and-start endpoint on stack-unhealthy recovery', async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ success: true, activityId: 'act-1' }), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(triggerRebuildAndStart('PAN-3301', 'http://127.0.0.1:3011')).resolves.toEqual({ triggered: true });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(String(url)).toBe('http://127.0.0.1:3011/api/workspaces/PAN-3301/rebuild-and-start');
+    expect(init?.method).toBe('POST');
+    expect(init?.headers).toMatchObject({
+      origin: 'http://127.0.0.1:3011',
+      [INTERNAL_TOKEN_HEADER]: 'test-internal-token',
+    });
+  });
+
+  it('reports a failed rebuild-and-start without throwing', async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ error: 'boom' }), { status: 500 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(triggerRebuildAndStart('PAN-3301', 'http://127.0.0.1:3011')).resolves.toEqual({
+      triggered: false,
+      error: 'boom',
+    });
   });
 });

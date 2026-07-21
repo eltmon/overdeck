@@ -12,25 +12,30 @@
  * invariant) while still making it portable via `git push`.
  */
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync, promises as fsp } from 'node:fs';
+import { closeSync, existsSync, fsyncSync, mkdirSync, openSync, readFileSync, renameSync, writeFileSync, promises as fsp } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { hostname } from 'node:os';
 
 import { queueAutoCommit } from './auto-commit.js';
+import { resolveStateReadHomeSync } from '../state-read-home.js'; import type { StrikeLandingStatus } from '../strike-landing.js';
 import {
   getProjectSync,
   resolveProjectFromIssueSync,
   type ProjectConfig,
 } from '../projects.js';
 import type { RuntimeName } from '../runtimes/types.js';
+import type { ReviewMode } from '../config-yaml.js';
 import type {
-  ContinueBeadsMapping,
   ContinueDecision,
   ContinueFeedbackEntry,
   ContinueHazard,
   ContinueResumePoint,
   ContinueSessionEntry,
-} from '../vbrief/continue-state.js';
+  ScopeDriftRecord,
+} from '../xbrief/continue-state.js';
+import type { PanIssueTasksRecord } from './record-task-types.js';
+import type { DodRowResult } from '../lifecycle/dod.js';
+export type { PanIssueTasksRecord, TaskClaim, TaskClaimHistoryEntry } from './record-task-types.js';
 
 // ─── Schema ───────────────────────────────────────────────────────────────────
 
@@ -55,15 +60,99 @@ export interface PanIssueCloseOutRecord {
   merges: string[];
   ranOn: string;
   closedAt?: string;
+  dodGate?: {
+    evaluatedAt: string;
+    rows: DodRowResult[];
+    accepted: string[];
+  };
 }
 
-export interface PanIssuePipelineRecord {
+export interface PanIssueSwarmFailedMergeBlock {
+  issueId: string;
+  itemId: string;
+  slotIndex: number;
+  branch?: string;
+  note: string;
+}
+
+export interface PanIssueSwarmSlotAssignment {
+  slotIndex: number;
+  itemId: string;
+  agentId?: string;
+  branch?: string;
+  assignedAt?: string;
+}
+
+export interface PanIssueSwarmSupersededAttempt {
+  slotIndex: number;
+  itemId: string;
+  agentId?: string;
+  branch?: string;
+  archivedBranch?: string;
+  archivedWorktree?: string;
+  reason: string;
+  supersededAt: string;
+}
+
+/**
+ * PAN-2372 WI-3 / FR-4: durable per-slot completion marker. A slot's `pan done`
+ * writes one of these keyed by `String(slotIndex)` so the swarm coordinator can
+ * tell a finished slot from one still working — without relying on the
+ * runtime-only agent-state plane, which is exactly what was being lost.
+ */
+export interface PanIssueSwarmSlotCompletion {
+  slotIndex: number;
+  itemId?: string;
+  agentId: string;
+  completedAt: string;
+}
+
+export interface PanIssueSwarmRecord {
+  /** Per-issue policy overrides; unset fields inherit from project/global. */
+  policy?: {
+    mode?: 'off' | 'auto' | 'always';
+    maxSlots?: number;
+    autoAdvance?: boolean;
+  };
+  finalizedAt?: string;
+  /**
+   * @deprecated Read for migration only; new blocks live in `failedMergeBlocks`
+   * keyed by `String(slotIndex)`. `writeSwarmFailedMergeBlock` folds this into
+   * the map and clears it on first write.
+   */
+  failedMergeBlock?: PanIssueSwarmFailedMergeBlock;
+  slotAssignments?: PanIssueSwarmSlotAssignment[];
+  supersededAttempts?: PanIssueSwarmSupersededAttempt[];
+  /**
+   * Keyed by `String(slotIndex)`. The coordinator (WI-4) consumes this to mark
+   * a slot durable-ready; merge/requeue clears the key (clearSwarmSlotCompletion).
+   */
+  slotCompletions?: Record<string, PanIssueSwarmSlotCompletion>;
+  /**
+   * PAN-2364: failed-merge and stalled-slot recovery blocks keyed by
+   * `String(slotIndex)`. The legacy singular `failedMergeBlock` above is folded
+   * into this map on first write.
+   */
+  failedMergeBlocks?: Record<string, PanIssueSwarmFailedMergeBlock>;
+}
+
+export interface PanIssueRecoveryTrip {
+  issue: string;
+  recoveryPath: string;
+  obligationGeneration: string;
+  tripCount: number;
+  open: boolean;
+  needsYouEmittedAt?: string;
+}
+
+export interface PanIssuePipelineRecord extends StrikeLandingStatus {
   issueId: string;
   reviewStatus: string;
   testStatus: string;
   verificationStatus?: string;
   inspectStatus?: string;
   mergeStatus?: string;
+  releaseStatus?: string;
   readyForMerge: boolean;
   reviewNotes?: string;
   testNotes?: string;
@@ -78,10 +167,19 @@ export interface PanIssuePipelineRecord {
   lastVerifiedCommit?: string;
   /** PAN-1988 auto-heal: durable "the work agent finished and wants review" intent (set by `pan done`). */
   reviewRequestedAt?: string;
+  /** PAN-2587: dispatch anchor — journaled so a journal overlay cannot revert the
+   * status to pre-dispatch while the request timestamp survives (dispatch-loop fuel). */
+  reviewSpawnedAt?: string;
+  /** PAN-1762: advisory files_scope drift recorded at pan done. */
+  scopeDrift?: ScopeDriftRecord;
   autoMerge?: boolean;
   deaconIgnored?: boolean;
   deaconIgnoredAt?: string;
   deaconIgnoredReason?: string;
+  /** PAN-2207: durable tombstone set when deacon recovers a stuck-pending completion; cleared by re-run of `pan done`. */
+  panDoneRecoveredAt?: string;
+  closedOut?: boolean;
+  closedOutAt?: string;
   reviewerVerdicts?: unknown;
   updatedAt: string;
 }
@@ -90,7 +188,7 @@ export interface PanIssuePipelineRecord {
  * Single durable record per issue. Contains the superset of data previously
  * scattered across project continue, workspace continue, and state.json:
  *
- *   - decisions / hazards / resumePoint / beadsMapping / sessionHistory /
+ *   - decisions / hazards / resumePoint / sessionHistory /
  *     feedback (from continues)
  *   - statusOverrides (from workspace continue)
  *   - harness / model (from state.json)
@@ -107,14 +205,27 @@ export interface PanIssueRecord {
   harness?: RuntimeName;
   /** Agent model (from state.json; PAN-1919). */
   model?: string;
+  /** Per-issue review mode override; beats project/global config. */
+  reviewMode?: ReviewMode;
+  /** PAN-1874: per-issue re-review scope override; beats project/global config. */
+  reReviewScope?: 'all' | 'changed' | 'blockers';
+  /** Per-issue convoy model override; beats roles.review for every reviewer. */
+  reviewModel?: string;
+  /** Per-issue tiered execution override; beats plan-metadata and global config. */
+  tieredExecutionOverride?: 'on' | 'off';
+  /** PAN-2674: per-issue work-model override; beats tier table and roles.work. */
+  workModel?: string;
 
   decisions?: ContinueDecision[];
   hazards?: ContinueHazard[];
   resumePoint?: ContinueResumePoint | null;
-  beadsMapping?: ContinueBeadsMapping;
   statusOverrides?: Record<string, string>;
+  tasks?: PanIssueTasksRecord;
   sessionHistory?: ContinueSessionEntry[];
   feedback?: ContinueFeedbackEntry[];
+  scopeDrift?: ScopeDriftRecord;
+  swarm?: PanIssueSwarmRecord;
+  recoveryTrips?: PanIssueRecoveryTrip[];
 
   pipeline: PanIssuePipelineRecord;
   closeOut: PanIssueCloseOutRecord;
@@ -131,10 +242,22 @@ export function getIssueWorkspacePath(issueId: string): string | null {
 }
 
 /**
- * Record path for an issue within a specific workspace directory.
- * Lives at `<workspacePath>/.pan/records/<issueId-lowercase>.json`.
+ * Record path for an issue reached from a workspace directory. When the issue
+ * resolves to a registered project, delegates to {@link getIssueRecordPath}
+ * (canonical, migration-aware) so every workspace-door caller converges on the
+ * SAME record as the canonical door — including a migrated project, whose
+ * record lives at `${OVERDECK_HOME}/state/<project>/records/` rather than the
+ * slot worktree (FR-3, PAN-2372 WI-2).
+ *
+ * When no project can be resolved for the issue, falls back directly to
+ * `<workspace>/.pan/records/<issue>.json` — byte-identical to the pre-PAN-2372
+ * behavior, and intentionally NOT routed through `getIssueRecordPath` (which
+ * would need migration/infra-repo resolution for a project that does not
+ * exist). Proven by `record-rehome.test.ts`.
  */
 export function getIssueRecordPathForWorkspace(workspacePath: string, issueId: string): string {
+  const project = resolveProjectForIssue(issueId);
+  if (project) return getIssueRecordPath(project, issueId);
   return join(workspacePath, '.pan', RECORD_DIRNAME, `${issueId.toLowerCase()}.json`);
 }
 
@@ -145,7 +268,11 @@ export function getIssueRecordPathForWorkspace(workspacePath: string, issueId: s
  * (used in tests and non-worktree contexts).
  */
 export function getIssueRecordPath(project: ProjectConfig, issueId: string): string {
-  return join(getIssueRecordBasePath(project, issueId), '.pan', RECORD_DIRNAME, `${issueId.toLowerCase()}.json`);
+  const stateHome = resolveStateReadHomeSync(project);
+  const recordsDir = stateHome.migrated
+    ? join(stateHome.root, RECORD_DIRNAME)
+    : join(getIssueRecordBasePath(project, issueId), '.pan', RECORD_DIRNAME);
+  return join(recordsDir, `${issueId.toLowerCase()}.json`);
 }
 
 /** Base directory for an issue record: workspace if it exists, else project root. */
@@ -155,6 +282,106 @@ export function getIssueRecordBasePath(project: ProjectConfig, issueId: string):
 }
 
 // ─── Read / write ─────────────────────────────────────────────────────────────
+
+/**
+ * Synchronous whole-record writer. Keep this call atomic: async
+ * read-modify-write flows must take `withIssueRecordLock` before reading and
+ * must not split this write behind an await.
+ */
+/**
+ * PAN-2466 no-loss guard: callers that fail to read the existing record fall
+ * back to a fresh template with an EMPTY closeOut, and writing that template
+ * destroys accumulated usage/cost history (observed on six records 2026-07-07).
+ * At the write door, if the incoming closeOut carries no data but the on-disk
+ * record's does, keep the on-disk closeOut. Genuine closeOut updates (any
+ * usage/merges/totals content) always win.
+ */
+function preserveCloseOutSync(path: string, record: PanIssueRecord): PanIssueRecord {
+  const incoming = record.closeOut;
+  const incomingEmpty =
+    !incoming ||
+    (Object.keys(incoming.usage?.byStage ?? {}).length === 0 &&
+      Object.keys(incoming.usage?.totals ?? {}).length === 0 &&
+      (incoming.merges ?? []).length === 0 &&
+      !incoming.dodGate);
+  if (!incomingEmpty || !existsSync(path)) return record;
+  try {
+    const onDisk = JSON.parse(readFileSync(path, 'utf-8')) as PanIssueRecord;
+    const disk = onDisk.closeOut;
+    const diskHasData =
+      disk &&
+      (Object.keys(disk.usage?.byStage ?? {}).length > 0 ||
+        Object.keys(disk.usage?.totals ?? {}).length > 0 ||
+        (disk.merges ?? []).length > 0 ||
+        Boolean(disk.dodGate));
+    if (diskHasData) {
+      console.warn(`[record] Preserving populated closeOut for ${record.issueId} — incoming write carried an empty closeOut (PAN-2466 guard)`);
+      return { ...record, closeOut: disk };
+    }
+  } catch {
+    // Unreadable on-disk record — nothing to preserve.
+  }
+  return record;
+}
+
+/**
+ * FR-2 (PAN-2372): before a record write, if the existing file is non-empty and
+ * fails JSON.parse, preserve the corrupt bytes as a sidecar rather than
+ * silently overwriting them. A truncated/malformed record (the "empty/malformed
+ * at char 0" symptom that stranded PAN-2253) used to be quietly replaced by the
+ * next write, destroying every accumulated statusOverride. Non-empty + unparseable
+ * is the only case sidecarred — an absent or empty file is a normal fresh write.
+ */
+function preserveCorruptRecordSync(path: string): void {
+  let raw: string;
+  try {
+    raw = readFileSync(path, 'utf-8');
+  } catch {
+    return; // No existing file — nothing to preserve.
+  }
+  if (raw.length === 0) return; // Empty file is a normal fresh-write state, not corruption.
+  try {
+    JSON.parse(raw);
+    return; // Existing file parses — the rename below atomically replaces it.
+  } catch {
+    // Non-empty and unparseable — fall through to sidecar.
+  }
+  const sidecar = `${path}.corrupt-${Date.now()}`;
+  try {
+    renameSync(path, sidecar);
+    console.warn(`[record] Preserved corrupt record at ${sidecar} (existing file failed JSON.parse before write)`);
+  } catch (error) {
+    console.warn(`[record] Could not preserve corrupt record at ${path}: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+/**
+ * FR-1 (PAN-2372): atomic, verified record write. Writes to a same-directory
+ * temp file, atomically renames it into place, then read-back verifies the
+ * renamed file parses as JSON. A mid-write crash can no longer truncate the
+ * record in place (rename is atomic); a write that somehow produces unparseable
+ * bytes throws instead of leaving a corrupt record for readers to silently
+ * fabricate over. Modeled on writePlanFileAtomic (src/lib/xbrief/dag-cli.ts:101).
+ */
+function writeRecordFileAtomicSync(path: string, record: PanIssueRecord): void {
+  preserveCorruptRecordSync(path);
+  const tmp = `${path}.${process.pid}.${Date.now()}.tmp`;
+  writeFileSync(tmp, JSON.stringify(record, null, 2), 'utf-8');
+  const tmpFd = openSync(tmp, 'r');
+  try {
+    fsyncSync(tmpFd);
+  } finally {
+    closeSync(tmpFd);
+  }
+  renameSync(tmp, path);
+  const dirFd = openSync(dirname(path), 'r');
+  try {
+    fsyncSync(dirFd);
+  } finally {
+    closeSync(dirFd);
+  }
+  JSON.parse(readFileSync(path, 'utf-8')); // read-back verification; throws if the renamed file is unparseable
+}
 
 export function writeIssueRecordSync(
   project: ProjectConfig,
@@ -168,13 +395,51 @@ export function writeIssueRecordSync(
   }
   const now = new Date().toISOString();
   const next: PanIssueRecord = {
-    ...record,
+    ...preserveCloseOutSync(path, record),
     issueId: issueId.toUpperCase(),
     schemaVersion: RECORD_SCHEMA_VERSION,
     created: record.created || now,
     updated: now,
   };
-  writeFileSync(path, JSON.stringify(next, null, 2), 'utf-8');
+  writeRecordFileAtomicSync(path, next);
+  return path;
+}
+
+/**
+ * Workspace-scoped synchronous whole-record writer. Keep this call atomic: async
+ * read-modify-write flows must take `withIssueRecordLock` before reading and
+ * must not split this write behind an await.
+ */
+export function writeIssueRecordForWorkspaceSync(
+  workspacePath: string,
+  issueId: string,
+  record: PanIssueRecord,
+): string {
+  // FR-3 (PAN-2372 WI-2): resolve the owning project so the write lands on the
+  // canonical (migration-aware) record path, not a slot-local one. A null result
+  // means the issue is unregistered; the path resolver then falls back to the
+  // workspace .pan/records/ dir and we do NOT queue a state commit (no owning
+  // project to commit on behalf of).
+  const resolvedProject = resolveProjectForIssue(issueId);
+  const path = getIssueRecordPathForWorkspace(workspacePath, issueId);
+  const dir = dirname(path);
+  if (!existsSync(dir)) {
+    mkdirSync(dir, { recursive: true });
+  }
+  const now = new Date().toISOString();
+  const next: PanIssueRecord = {
+    ...preserveCloseOutSync(path, record),
+    issueId: issueId.toUpperCase(),
+    schemaVersion: RECORD_SCHEMA_VERSION,
+    created: record.created || now,
+    updated: now,
+  };
+  writeRecordFileAtomicSync(path, next);
+  if (resolvedProject) {
+    // Re-homed swarm writes must travel to overdeck-state like every canonical
+    // write, or a migrated-project record written here would never be committed.
+    queueIssueRecordCommit(resolvedProject, issueId, path);
+  }
   return path;
 }
 
@@ -201,13 +466,23 @@ export function readIssueRecordSync(project: ProjectConfig, issueId: string): Pa
   }
 }
 
+export function readIssueRecordForWorkspaceSync(workspacePath: string, issueId: string): PanIssueRecord | null {
+  const path = getIssueRecordPathForWorkspace(workspacePath, issueId);
+  try {
+    const raw = readFileSync(path, 'utf-8');
+    return JSON.parse(raw) as PanIssueRecord;
+  } catch {
+    return null;
+  }
+}
+
 // ─── Commit helper ────────────────────────────────────────────────────────────
 
 export function queueIssueRecordCommit(
   project: ProjectConfig,
   issueId: string,
   recordPath: string,
-): void {
+): string {
   const basePath = getIssueRecordBasePath(project, issueId);
   queueAutoCommit({
     projectRoot: basePath,
@@ -215,6 +490,7 @@ export function queueIssueRecordCommit(
     paths: [recordPath],
     subject: `chore(records): update ${issueId.toUpperCase()} per-issue record`,
   });
+  return basePath;
 }
 
 // ─── Owner-URI lease (ported from PAN-1908 records.ts) ─────────────────────────
@@ -452,6 +728,253 @@ export function writeAgentHarnessModelSync(
   const record = existing ?? ensureIssueRecordSync(project, issueId);
   record.harness = harness;
   record.model = model;
+  const recordPath = writeIssueRecordSync(project, issueId, record);
+  if (opts.autoCommit !== false) {
+    queueIssueRecordCommit(project, issueId, recordPath);
+  }
+}
+
+// ─── Continue read-view ───────────────────────────────────────────────────────
+
+/**
+ * ContinueState-shaped projection of the per-issue record. Returned by
+ * readRecordContinueViewSync so old continue callers can switch with minimal
+ * churn. Returns null when no record file exists.
+ */
+export interface RecordContinueView {
+  decisions: ContinueDecision[];
+  hazards: ContinueHazard[];
+  resumePoint: ContinueResumePoint | null;
+  sessionHistory: ContinueSessionEntry[];
+  feedback: ContinueFeedbackEntry[];
+  scopeDrift?: ScopeDriftRecord;
+}
+
+export function readRecordContinueViewSync(
+  project: ProjectConfig,
+  issueId: string,
+): RecordContinueView | null {
+  const record = readIssueRecordSync(project, issueId);
+  if (!record) return null;
+  return {
+    decisions: record.decisions ?? [],
+    hazards: record.hazards ?? [],
+    resumePoint: record.resumePoint ?? null,
+    sessionHistory: record.sessionHistory ?? [],
+    feedback: record.feedback ?? [],
+    scopeDrift: record.scopeDrift,
+  };
+}
+
+// ─── Continue mutation helpers (sync) ────────────────────────────────────────
+
+/** Append a session-history entry to the per-issue record (sync). */
+export function appendSessionEntrySync(
+  project: ProjectConfig,
+  issueId: string,
+  entry: ContinueSessionEntry,
+): void {
+  const record = ensureIssueRecordSync(project, issueId);
+  record.sessionHistory = [...(record.sessionHistory ?? []), entry];
+  const recordPath = writeIssueRecordSync(project, issueId, record);
+  queueIssueRecordCommit(project, issueId, recordPath);
+}
+
+/** Append a feedback entry to the per-issue record (sync). */
+export function appendFeedbackEntrySync(
+  project: ProjectConfig,
+  issueId: string,
+  entry: ContinueFeedbackEntry,
+): void {
+  const record = ensureIssueRecordSync(project, issueId);
+  record.feedback = [...(record.feedback ?? []), entry];
+  const recordPath = writeIssueRecordSync(project, issueId, record);
+  queueIssueRecordCommit(project, issueId, recordPath);
+}
+
+/** Clear all feedback entries in the per-issue record (sync). */
+export function clearRecordFeedbackSync(
+  project: ProjectConfig,
+  issueId: string,
+): void {
+  const record = ensureIssueRecordSync(project, issueId);
+  record.feedback = [];
+  const recordPath = writeIssueRecordSync(project, issueId, record);
+  queueIssueRecordCommit(project, issueId, recordPath);
+}
+
+/** Record advisory scope prediction drift in the per-issue record (sync). */
+export function writeRecordScopeDriftSync(
+  project: ProjectConfig,
+  issueId: string,
+  scopeDrift: ScopeDriftRecord,
+): void {
+  const record = ensureIssueRecordSync(project, issueId);
+  record.scopeDrift = scopeDrift;
+  const recordPath = writeIssueRecordSync(project, issueId, record);
+  queueIssueRecordCommit(project, issueId, recordPath);
+}
+
+/** Write tiered execution override into the per-issue record (sync). Passing null clears the override. */
+export function writeRecordTieredExecutionOverrideSync(
+  project: ProjectConfig,
+  issueId: string,
+  override: 'on' | 'off' | null,
+): void {
+  const record = ensureIssueRecordSync(project, issueId);
+  if (override === null) {
+    delete record.tieredExecutionOverride;
+  } else {
+    record.tieredExecutionOverride = override;
+  }
+  const recordPath = writeIssueRecordSync(project, issueId, record);
+  queueIssueRecordCommit(project, issueId, recordPath);
+}
+
+/** Write tiered execution override into the per-issue record (async). Passing null clears the override. */
+export async function writeRecordTieredExecutionOverride(
+  project: ProjectConfig,
+  issueId: string,
+  override: 'on' | 'off' | null,
+): Promise<void> {
+  const record = await ensureIssueRecord(project, issueId);
+  if (override === null) {
+    delete record.tieredExecutionOverride;
+  } else {
+    record.tieredExecutionOverride = override;
+  }
+  const recordPath = writeIssueRecordSync(project, issueId, record);
+  queueIssueRecordCommit(project, issueId, recordPath);
+}
+
+/** Mark the durable pipeline journal as terminal after close-out (sync). */
+export function markRecordPipelineClosedOutSync(
+  project: ProjectConfig,
+  issueId: string,
+): void {
+  const record = ensureIssueRecordSync(project, issueId);
+  const now = new Date().toISOString();
+  record.pipeline.closedOut = true;
+  record.pipeline.closedOutAt = now;
+  record.pipeline.readyForMerge = false;
+  record.pipeline.verificationStatus = undefined;
+  record.pipeline.mergeStatus = 'merged';
+  record.pipeline.updatedAt = now;
+  const recordPath = writeIssueRecordSync(project, issueId, record);
+  queueIssueRecordCommit(project, issueId, recordPath);
+}
+
+/** Persist the completed Definition-of-Done gate through the issue record write door. */
+export function writeCloseOutDodGateSync(
+  project: ProjectConfig,
+  issueId: string,
+  dodGate: NonNullable<PanIssueCloseOutRecord['dodGate']>,
+): void {
+  const record = ensureIssueRecordSync(project, issueId);
+  record.closeOut.dodGate = dodGate;
+  const recordPath = writeIssueRecordSync(project, issueId, record);
+  queueIssueRecordCommit(project, issueId, recordPath);
+}
+
+export async function writeCloseOutDodGate(project: ProjectConfig, issueId: string, dodGate: NonNullable<PanIssueCloseOutRecord['dodGate']>): Promise<void> {
+  const recordPath = getIssueRecordPath(project, issueId);
+  const record = await readIssueRecord(project, issueId);
+  if (!record) throw new Error(`Issue record not found for ${issueId}`);
+  record.closeOut.dodGate = dodGate;
+  record.updated = new Date().toISOString(); await fsp.mkdir(dirname(recordPath), { recursive: true });
+  const tmp = `${recordPath}.${process.pid}.${Date.now()}.tmp`;
+  await fsp.writeFile(tmp, JSON.stringify(record, null, 2), 'utf-8'); const tmpHandle = await fsp.open(tmp, 'r');
+  try { await tmpHandle.sync(); } finally { await tmpHandle.close(); }
+  await fsp.rename(tmp, recordPath); const dirHandle = await fsp.open(dirname(recordPath), 'r');
+  try { await dirHandle.sync(); } finally { await dirHandle.close(); }
+  JSON.parse(await fsp.readFile(recordPath, 'utf-8')); queueIssueRecordCommit(project, issueId, recordPath);
+}
+// ─── Continue field setters ───────────────────────────────────────────────────
+
+/** Write decisions into the per-issue record (sync). */
+export function writeRecordDecisionsSync(
+  project: ProjectConfig,
+  issueId: string,
+  decisions: ContinueDecision[],
+  opts: WriteStatusOverrideOptions = {},
+): void {
+  const record = ensureIssueRecordSync(project, issueId);
+  record.decisions = decisions;
+  const recordPath = writeIssueRecordSync(project, issueId, record);
+  if (opts.autoCommit !== false) {
+    queueIssueRecordCommit(project, issueId, recordPath);
+  }
+}
+
+/** Write decisions into the per-issue record (async). */
+export async function writeRecordDecisions(
+  project: ProjectConfig,
+  issueId: string,
+  decisions: ContinueDecision[],
+  opts: WriteStatusOverrideOptions = {},
+): Promise<void> {
+  const record = await ensureIssueRecord(project, issueId);
+  record.decisions = decisions;
+  const recordPath = writeIssueRecordSync(project, issueId, record);
+  if (opts.autoCommit !== false) {
+    queueIssueRecordCommit(project, issueId, recordPath);
+  }
+}
+
+/** Write hazards into the per-issue record (sync). */
+export function writeRecordHazardsSync(
+  project: ProjectConfig,
+  issueId: string,
+  hazards: ContinueHazard[],
+  opts: WriteStatusOverrideOptions = {},
+): void {
+  const record = ensureIssueRecordSync(project, issueId);
+  record.hazards = hazards;
+  const recordPath = writeIssueRecordSync(project, issueId, record);
+  if (opts.autoCommit !== false) {
+    queueIssueRecordCommit(project, issueId, recordPath);
+  }
+}
+
+/** Write hazards into the per-issue record (async). */
+export async function writeRecordHazards(
+  project: ProjectConfig,
+  issueId: string,
+  hazards: ContinueHazard[],
+  opts: WriteStatusOverrideOptions = {},
+): Promise<void> {
+  const record = await ensureIssueRecord(project, issueId);
+  record.hazards = hazards;
+  const recordPath = writeIssueRecordSync(project, issueId, record);
+  if (opts.autoCommit !== false) {
+    queueIssueRecordCommit(project, issueId, recordPath);
+  }
+}
+
+/** Write resumePoint into the per-issue record (sync). */
+export function writeRecordResumePointSync(
+  project: ProjectConfig,
+  issueId: string,
+  resumePoint: ContinueResumePoint | null,
+  opts: WriteStatusOverrideOptions = {},
+): void {
+  const record = ensureIssueRecordSync(project, issueId);
+  record.resumePoint = resumePoint;
+  const recordPath = writeIssueRecordSync(project, issueId, record);
+  if (opts.autoCommit !== false) {
+    queueIssueRecordCommit(project, issueId, recordPath);
+  }
+}
+
+/** Write resumePoint into the per-issue record (async). */
+export async function writeRecordResumePoint(
+  project: ProjectConfig,
+  issueId: string,
+  resumePoint: ContinueResumePoint | null,
+  opts: WriteStatusOverrideOptions = {},
+): Promise<void> {
+  const record = await ensureIssueRecord(project, issueId);
+  record.resumePoint = resumePoint;
   const recordPath = writeIssueRecordSync(project, issueId, record);
   if (opts.autoCommit !== false) {
     queueIssueRecordCommit(project, issueId, recordPath);

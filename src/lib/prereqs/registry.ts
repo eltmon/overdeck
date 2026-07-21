@@ -4,16 +4,18 @@
  * requiring a heavy `pan install` step before first use.
  */
 
-import { exec, execSync } from "node:child_process";
+import { exec, execFile } from "node:child_process";
 import { existsSync } from "node:fs";
 import { mkdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
+import chalk from "chalk";
 import { Effect } from "effect";
 import { detectPlatform } from "../platform.js";
 
 const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 export const PREREQ_REGISTRY = {
   addGitHubProject: ["gh"],
@@ -21,7 +23,7 @@ export const PREREQ_REGISTRY = {
   spawnAgent: ["tmux"],
   openInteractiveTerminal: ["ttyd"],
   enableHttps: ["mkcert", "docker", "traefik"],
-  enableBeads: ["bd"],
+  runClaudeCodeHooks: ["jq"],
   useClaudeCodeRoutedAgents: [],
   useOxAgents: ["ox"],
 } as const;
@@ -34,28 +36,110 @@ export const INSTALLABLE_TOOLS: readonly PrereqTool[] = [
   "tmux",
   "ttyd",
   "mkcert",
-  "bd",
+  "jq",
   "ox",
 ];
 
-function checkCommand(cmd: string): boolean {
+async function checkCommand(cmd: string, args: string[] = ["--version"]): Promise<boolean> {
   try {
-    execSync(`which ${cmd}`, { stdio: "pipe" });
+    await execFileAsync(cmd, args, { timeout: 10_000 });
     return true;
   } catch {
     return false;
   }
 }
 
+export type LinuxPackageManager = "pacman" | "dnf" | "zypper" | "apk" | "apt-get";
+type LinuxPackageTool = "tmux" | "jq";
+type CommandAvailable = (command: string) => Promise<boolean>;
+
+const LINUX_PACKAGE_MANAGERS: readonly LinuxPackageManager[] = [
+  "pacman",
+  "dnf",
+  "zypper",
+  "apk",
+  "apt-get",
+];
+
+export async function detectLinuxPackageManager(
+  commandAvailable: CommandAvailable = checkCommand,
+): Promise<LinuxPackageManager | null> {
+  for (const packageManager of LINUX_PACKAGE_MANAGERS) {
+    if (await commandAvailable(packageManager)) return packageManager;
+  }
+  return null;
+}
+
+export function getLinuxInstallCommand(
+  tool: LinuxPackageTool,
+  packageManager: LinuxPackageManager,
+): string {
+  switch (packageManager) {
+    case "pacman":
+      return `sudo pacman -S --noconfirm ${tool}`;
+    case "dnf":
+      return `sudo dnf install -y ${tool}`;
+    case "zypper":
+      return `sudo zypper install -y ${tool}`;
+    case "apk":
+      return `sudo apk add ${tool}`;
+    case "apt-get":
+      return `sudo apt-get update && sudo apt-get install -y ${tool}`;
+  }
+}
+
+export function getLinuxManualInstallHint(
+  tool: LinuxPackageTool,
+  packageManager: LinuxPackageManager | null,
+): string {
+  if (packageManager) return getLinuxInstallCommand(tool, packageManager);
+  const downloadUrl =
+    tool === "jq"
+      ? "https://jqlang.github.io/jq/download/"
+      : "https://github.com/tmux/tmux/wiki/Installing";
+  return `${tool} — download from ${downloadUrl}`;
+}
+
+async function installLinuxPackage(tool: LinuxPackageTool): Promise<void> {
+  const packageManager = await detectLinuxPackageManager();
+  if (!packageManager) {
+    throw new Error(
+      `No supported Linux package manager found. Install ${getLinuxManualInstallHint(tool, null)}`,
+    );
+  }
+  await execAsync(getLinuxInstallCommand(tool, packageManager), { timeout: 120000 });
+}
+
+async function getManualInstallHint(tool: LinuxPackageTool): Promise<string> {
+  const plat = await Effect.runPromise(detectPlatform());
+  if (plat === "darwin") return `brew install ${tool}`;
+  return getLinuxManualInstallHint(tool, await detectLinuxPackageManager());
+}
+
 export async function isToolInstalled(tool: PrereqTool): Promise<boolean> {
+  if (tool === "docker") {
+    return checkCommand("docker", ["info"]);
+  }
   if (tool === "traefik") {
-    // Traefik is Docker-based; we check for the Docker network instead
-    return checkCommand("docker");
+    try {
+      const { stdout } = await execFileAsync(
+        "docker",
+        ["inspect", "--format", "{{.State.Running}}", "overdeck-traefik"],
+        { timeout: 10_000 },
+      );
+      return stdout.trim() === "true";
+    } catch {
+      return false;
+    }
   }
   if (tool === "ttyd") {
     return (
-      checkCommand("ttyd") || existsSync(join(homedir(), "bin", "ttyd"))
+      await checkCommand("ttyd", ["--version"]) || existsSync(join(homedir(), "bin", "ttyd"))
     );
+  }
+  if (tool === "tmux") {
+    // tmux has no --version; it only accepts -V (and exits 1 on --version).
+    return checkCommand("tmux", ["-V"]);
   }
   return checkCommand(tool);
 }
@@ -89,8 +173,8 @@ export async function installTool(tool: PrereqTool): Promise<InstallResult> {
         return await installTtyd();
       case "mkcert":
         return await installMkcert();
-      case "bd":
-        return await installBeads();
+      case "jq":
+        return await installJq();
       case "ox":
         return await installOx();
       default:
@@ -109,6 +193,39 @@ export async function installTool(tool: PrereqTool): Promise<InstallResult> {
   }
 }
 
+/**
+ * Boot-time host-tool guarantee for `pan up`. tmux is fatal — no agent or
+ * conversation session runs without it, so a failed install exits the process.
+ * Optional integrations are best-effort. Already-present tools are silent no-ops.
+ */
+export async function ensureHostTools(): Promise<void> {
+  const tools: Array<{ tool: LinuxPackageTool; label: string; fatal: boolean }> = [
+    { tool: "tmux", label: "tmux", fatal: true },
+    { tool: "jq", label: "jq", fatal: false },
+  ];
+  for (const { tool, label, fatal } of tools) {
+    if (await isToolInstalled(tool)) continue;
+    console.log(chalk.yellow(`  ${label} not found. Installing...`));
+    const result = await installTool(tool);
+    if (result.success) {
+      console.log(chalk.green(`  ✓ ${result.message}`));
+      continue;
+    }
+    console.error(
+      fatal
+        ? chalk.red(`  ✗ Failed to install ${label}: ${result.message}`)
+        : chalk.yellow(`  ⚠ Failed to install ${label}: ${result.message}`),
+    );
+    const manual = await getManualInstallHint(tool);
+    const context =
+      tool === "jq"
+        ? " — the Claude Code hooks (auto-approve, live status, cost tracking) need it."
+        : "";
+    console.error(chalk.dim(`  Install manually: ${manual}${context}`));
+    if (fatal) process.exit(1);
+  }
+}
+
 // ─── Per-tool installers ──────────────────────────────────────────────────────
 
 async function installTmux(): Promise<InstallResult> {
@@ -116,9 +233,7 @@ async function installTmux(): Promise<InstallResult> {
   if (plat === "darwin") {
     await execAsync("brew install tmux", { timeout: 120000 });
   } else {
-    await execAsync("sudo apt-get update && sudo apt-get install -y tmux", {
-      timeout: 120000,
-    });
+    await installLinuxPackage("tmux");
   }
   return { tool: "tmux", success: true, message: "tmux installed" };
 }
@@ -178,32 +293,14 @@ async function installMkcert(): Promise<InstallResult> {
   };
 }
 
-async function installBeads(): Promise<InstallResult> {
+async function installJq(): Promise<InstallResult> {
   const plat = await Effect.runPromise(detectPlatform());
   if (plat === "darwin") {
-    try {
-      await execAsync("brew install gastownhall/beads/bd", {
-        timeout: 120000,
-      });
-      return {
-        tool: "bd",
-        success: true,
-        message: "beads installed via Homebrew",
-      };
-    } catch {
-      // fall through to curl script
-    }
+    await execAsync("brew install jq", { timeout: 120000 });
+  } else {
+    await installLinuxPackage("jq");
   }
-
-  await execAsync(
-    "curl -sSL https://raw.githubusercontent.com/gastownhall/beads/main/scripts/install.sh | bash",
-    { timeout: 120000 }
-  );
-  return {
-    tool: "bd",
-    success: true,
-    message: "beads installed via install script",
-  };
+  return { tool: "jq", success: true, message: "jq installed" };
 }
 
 async function installOx(): Promise<InstallResult> {

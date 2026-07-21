@@ -8,6 +8,7 @@ import {
 import type { ForgeType } from './forge.js';
 import { resolveProjectFromIssueSync } from './projects.js';
 import { resolveProjectReposFromResolvedIssueSync } from './project-repos.js';
+import { resolveIssueIdSync } from './issue-id.js';
 
 export type MergeSetStatus = 'draft' | 'reviewing' | 'ready' | 'merging' | 'merged' | 'failed';
 export type MergeSetGateStatus = 'pending' | 'running' | 'passed' | 'failed' | 'blocked' | 'skipped';
@@ -43,11 +44,11 @@ export interface MergeSet {
 }
 
 export function upsertMergeSetSync(mergeSet: MergeSet): void {
-  dbUpsert(mergeSet);
+  dbUpsert({ ...mergeSet, issueId: resolveIssueIdSync(mergeSet.issueId) });
 }
 
 export function getMergeSetSync(issueId: string): MergeSet | null {
-  return getMergeSetFromDb(issueId);
+  return getMergeSetFromDb(resolveIssueIdSync(issueId));
 }
 
 export function getAllMergeSetsSync(projectKey?: string): MergeSet[] {
@@ -55,7 +56,7 @@ export function getAllMergeSetsSync(projectKey?: string): MergeSet[] {
 }
 
 export function deleteMergeSetSync(issueId: string): void {
-  dbDelete(issueId);
+  dbDelete(resolveIssueIdSync(issueId));
 }
 
 export function buildMergeSetForIssueSync(issueId: string, labels: string[] = []): MergeSet | null {

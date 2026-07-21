@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import type { MemoryObservation, MemoryStatus } from '@overdeck/contracts';
 import { WorkspaceStatusCard } from './WorkspaceStatusCard';
@@ -48,7 +48,13 @@ function observation(id: string, timestamp: string, actionStatus: string | null)
 }
 
 describe('WorkspaceStatusCard', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it('renders a phase icon colored by the memory status phase', () => {
+    const colorSetter = vi.spyOn(CSSStyleDeclaration.prototype, 'color', 'set');
+
     render(
       <WorkspaceStatusCard
         issue={issue}
@@ -59,9 +65,12 @@ describe('WorkspaceStatusCard', () => {
       />,
     );
 
-    expect(screen.getByTestId('workspace-status-phase-icon')).toHaveAttribute('data-phase', 'verifying');
+    const phaseIcon = screen.getByTestId('workspace-status-phase-icon');
+    expect(phaseIcon).toHaveAttribute('data-phase', 'verifying');
     expect(screen.getByTestId('workspace-status-phase-label')).toHaveTextContent('Verifying');
-    expect(screen.getByTestId('workspace-status-phase-icon').getAttribute('style')).toContain('var(--warning');
+    expect(colorSetter.mock.calls.some(
+      ([color], index) => color === 'var(--warning, #f59e0b)' && colorSetter.mock.contexts[index] === phaseIcon.style,
+    )).toBe(true);
   });
 
   it('line-clamps the summary to three lines', () => {
@@ -76,9 +85,14 @@ describe('WorkspaceStatusCard', () => {
     );
 
     const summary = screen.getByTestId('workspace-status-summary');
+    const webkitStyle = summary.style as CSSStyleDeclaration & {
+      WebkitLineClamp: number | string;
+      WebkitBoxOrient: string;
+    };
     expect(summary).toHaveTextContent(status.summary);
-    expect(summary.getAttribute('style')).toContain('-webkit-line-clamp: 3');
-    expect(summary.getAttribute('style')).toContain('overflow: hidden');
+    expect(String(webkitStyle.WebkitLineClamp)).toBe('3');
+    expect(webkitStyle.WebkitBoxOrient).toBe('vertical');
+    expect(summary.style.overflow).toBe('hidden');
   });
 
   it('renders the latest three observations with non-null actionStatus', () => {

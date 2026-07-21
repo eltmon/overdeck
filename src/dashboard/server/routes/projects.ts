@@ -1,10 +1,5 @@
 import { jsonResponse } from "../http-helpers.js";
-/**
- * Projects route module — Effect HttpRouter.Layer (PAN-821)
- *
- * Implements:
- *   GET /api/projects/:projectKey/session-tree
- */
+/** Projects route module — Effect HttpRouter.Layer (PAN-821). */
 
 import { access, readFile, readdir, mkdir, stat, realpath } from 'node:fs/promises';
 import { join, isAbsolute, sep, resolve, normalize, dirname, relative } from 'node:path';
@@ -14,7 +9,16 @@ import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
 import { httpHandler } from './http-handler.js';
-import { resolveProjectFromIssueSync, listProjectsSync, getProjectSync, setProjectAutoMergeDefaultSync } from '../../../lib/projects.js';
+import { postProjectRenameRoute } from './project-rename.js';
+import { resolveProjectFromIssueSync, listProjectsSync, getProjectSync, setProjectAutoMergeDefaultSync, setProjectSwarmPolicySync } from '../../../lib/projects.js';
+import { resolveSwarmPolicy } from '../../../lib/swarm-policy.js';
+import type { SwarmPolicyLayer } from '../../../lib/swarm-policy.js';
+import { readIssueRecordSync } from '../../../lib/pan-dir/record.js';
+import { updateIssueRecord } from '../../../lib/pan-dir/record-update.js';
+import { loadConfigSync } from '../../../lib/config-yaml.js';
+import { resolveImplicitStaffing } from '../../../lib/agents/staffing.js';
+import { resolveTieredExecutionBlock } from '../../../lib/agents/tier-table.js';
+import { normalizeModelOverrideSync } from '../../../lib/model-validation.js';
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 import { registerProjectFromPath, DuplicateProjectError } from '../../../lib/project-registration.js';
@@ -26,17 +30,21 @@ import { listSessionNames } from '../../../lib/tmux.js';
 import { withConcurrencyLimit } from '../../../lib/concurrency.js';
 import { IssueDataService } from '../services/issue-data-service.js';
 import { ReadModelService } from '../read-model.js';
-import type { AgentSnapshot, SessionNode, SessionNodePresence, SessionNodeType } from '@overdeck/contracts';
+import { compareIssueIds, type AgentSnapshot, type SessionNode, type SessionNodePresence, type SessionNodeType } from '@overdeck/contracts';
 import { normalizeAgentStatus } from '../services/agent-status.js';
+import { buildLintSessionNode } from './command-deck-lint-node.js';
 import { deriveSessionPresence } from '../services/session-presence.js';
-import { getAgentRuntimeState, getAgentStateSync } from '../../../lib/agents.js';
+import { getAgentDir, getAgentRuntimeState, getAgentStateSync } from '../../../lib/agents.js';
+import { enrichSessionsWithModelOrigin } from '../services/model-origin-enrich.js';
 import { detectAwaitingInputForAgent, type AwaitingInputDetection } from '../../../lib/agent-input-detection.js';
 import { getTmuxSessionName } from '../../../lib/cloister/specialists.js';
 import { getReviewStatusSync } from '../review-status.js';
 import { resolveJsonlPath } from './jsonl-resolver.js';
 import { buildReviewerNodes, readSynthesisRounds, type ReviewerRoundMetadata } from './reviewer-tree.js';
-import { PAN_CONTINUE_FILENAME, PAN_DIRNAME } from '../../../lib/pan-dir/index.js';
+import { PAN_CONTINUE_FILENAME, PAN_DIRNAME, WORKSPACE_RUNTIME_DIRNAME } from '../../../lib/pan-dir/index.js';
+import { isPlanningComplete } from '../../../lib/xbrief/io.js';
 import { findSpecByIssueThroughOverdeck } from '../../../lib/overdeck/specs.js';
+import { findSpecByIssue } from '../../../lib/pan-dir/specs.js';
 import { getOverdeckHome } from '../../../lib/paths.js';
 
 // ─── Shared IssueDataService (via singleton) ────────────────────────────────
@@ -62,7 +70,7 @@ async function readOptional(p: string): Promise<string | null> {
 
 function mapSessionType(type: string): SessionNodeType {
   const validTypes: SessionNodeType[] = [
-    'planning', 'work', 'strike', 'review', 'reviewer', 'test', 'merge', 'legacy',
+    'planning', 'work', 'knowledge', 'strike', 'review', 'reviewer', 'test', 'merge', 'legacy',
   ];
   return (validTypes.includes(type as SessionNodeType) ? type : 'legacy') as SessionNodeType;
 }
@@ -117,7 +125,17 @@ function escapeRegExp(value: string): string {
 }
 
 function getSlotWorkSessionPattern(issueLower: string): RegExp {
-  return new RegExp(`^agent-${escapeRegExp(issueLower)}-(\\d+)$`, 'i');
+  return new RegExp(`^agent-${escapeRegExp(issueLower)}-slot-(\\d+)$`, 'i');
+}
+
+function issueIdsWithLiveTmuxSessions(sessionNames: ReadonlySet<string>): Set<string> {
+  const issueIds = new Set<string>();
+  for (const sessionName of sessionNames) {
+    const match = /^(?:planning|strike)-([a-z]+-\d+)$|^agent-([a-z]+-\d+)(?:-plan)?$/i.exec(sessionName);
+    const issueId = match?.[1] ?? match?.[2];
+    if (issueId) issueIds.add(issueId.toLowerCase());
+  }
+  return issueIds;
 }
 
 export function getSlotWorkSessionNumber(sessionId: string, issueLower: string): number | null {
@@ -132,9 +150,9 @@ export function getSessionTreeWorkspacePath(
   projectPath: string,
   sessionId: string,
 ): string {
+  if (sessionId.toLowerCase() === `strike-${issueLower.toLowerCase()}`) return join(projectPath, 'workspaces', `feature-${issueLower}-strike`);
   const slotNumber = getSlotWorkSessionNumber(sessionId, issueLower);
-  if (slotNumber === null) return baseWorkspacePath;
-  return join(projectPath, 'workspaces', `feature-${issueLower}-slot-${slotNumber}`);
+  return slotNumber === null ? baseWorkspacePath : join(projectPath, 'workspaces', `feature-${issueLower}-slot-${slotNumber}`);
 }
 
 export function compareSessionTreeSessionIds(a: string, b: string, issueLower: string): number {
@@ -155,15 +173,42 @@ export function compareSessionTreeSessionIds(a: string, b: string, issueLower: s
   return aId.localeCompare(bId);
 }
 
-/** Read the pause gate from an agent's state (PAN-1779): specialist
- *  sessions are built from review history, not state, so the gate must be
- *  looked up separately for them. Returns {} when not paused. */
-function readSessionPauseFields(
+/** Read agent-state gates for session nodes that are otherwise built from
+ *  history or runtime projection rather than directly from state. */
+async function readSessionGateFields(
   sessionId: string,
-): { paused?: true; pausedReason?: string; pausedAt?: string } {
-  const s = getAgentStateSync(sessionId);
-  if (!s || s.paused !== true) return {};
-  return { paused: true, pausedReason: s.pausedReason, pausedAt: s.pausedAt };
+  state = getAgentStateSync(sessionId),
+): Promise<{
+  paused?: true;
+  pausedReason?: string;
+  pausedAt?: string;
+  troubled?: true;
+  troubledAt?: string;
+  troubledReason?: string;
+  consecutiveFailures?: number;
+  queuedMailCount?: number;
+}> {
+  const s = state;
+  if (!s) return {};
+  return {
+    paused: s.paused === true ? true : undefined,
+    pausedReason: s.paused === true ? s.pausedReason : undefined,
+    pausedAt: s.paused === true ? s.pausedAt : undefined,
+    troubled: s.troubled === true ? true : undefined,
+    troubledAt: s.troubled === true ? s.troubledAt : undefined,
+    troubledReason: s.troubled === true ? s.lastFailureReason : undefined,
+    consecutiveFailures: s.troubled === true ? s.consecutiveFailures : undefined,
+    queuedMailCount: s.troubled === true ? await countQueuedMail(sessionId) : undefined,
+  };
+}
+
+async function countQueuedMail(agentId: string): Promise<number> {
+  try {
+    const entries = await readdir(join(getAgentDir(agentId), 'mail'), { withFileTypes: true });
+    return entries.filter((entry) => entry.isFile() && entry.name.endsWith('.md')).length;
+  } catch {
+    return 0;
+  }
 }
 
 async function collectSessionTreeNodes(
@@ -177,12 +222,25 @@ async function collectSessionTreeNodes(
   const agentsDir = join(getOverdeckHome(), 'agents');
   const agentId = `agent-${issueLower}`;
   const planningAgentId = `planning-${issueLower}`;
+  const planRunAgentId = `agent-${issueLower}-plan`;
   const strikeAgentId = `strike-${issueLower}`;
+  const knowledgeAgentId = `agent-${issueLower}-knowledge`;
   const slotWorkSessionPattern = getSlotWorkSessionPattern(issueLower);
   const sections: SessionNode[] = [];
   let hasPlanningSection = false;
 
-  const candidateSessionIds = new Set<string>([planningAgentId, agentId, strikeAgentId]);
+  // Resolve once per request: canonical spec exists and planning has finished.
+  const planningFinished = await Effect.runPromise(
+    isPlanningComplete(workspacePath).pipe(Effect.orElseSucceed(() => false)),
+  );
+
+  const candidateSessionIds = new Set<string>([
+    planningAgentId,
+    agentId,
+    planRunAgentId,
+    strikeAgentId,
+    knowledgeAgentId,
+  ]);
   const agentEntries = await readdir(agentsDir, { withFileTypes: true }).catch(() => []);
 
   for (const entry of agentEntries) {
@@ -205,9 +263,15 @@ async function collectSessionTreeNodes(
     if (!state) continue;
 
     try {
-      const isPlanning = checkId.startsWith('planning-');
+      const isPlanning = checkId.startsWith('planning-') || state.role === 'plan';
       const isStrike = checkId.startsWith('strike-');
-      const sectionType = isPlanning ? 'planning' : isStrike ? 'strike' : 'work';
+      const sectionType: SessionNodeType = isPlanning
+        ? 'planning'
+        : isStrike
+          ? 'strike'
+          : state.role === 'knowledge'
+            ? 'knowledge'
+            : 'work';
       if (isPlanning) hasPlanningSection = true;
       const rtState = await Effect.runPromise(getAgentRuntimeState(checkId));
       const presence = await deriveSessionPresence(checkId, rtState, context.tmuxSessionNames);
@@ -219,13 +283,24 @@ async function collectSessionTreeNodes(
           : null;
       const sessionWorkspacePath = getSessionTreeWorkspacePath(issueLower, workspacePath, projectPath, checkId);
       const jsonlPath = await resolveJsonlPath(checkId, sessionWorkspacePath);
+
+      // Terminal-end signal: endedAt is populated only when the session has
+      // actually ended. duration is preserved as elapsed seconds for existing UI.
+      const tmuxAlive = context.tmuxSessionNames.has(checkId);
+      const sessionEnded = rtState?.state === 'suspended'
+        || presence === 'ended'
+        || (!!state.stoppedAt && !tmuxAlive);
+      const endedAt = sessionEnded
+        ? (state.stoppedAt || state.lastActivity || state.startedAt)
+        : undefined;
+
       sections.push({
         type: sectionType,
         sessionId: checkId,
-        tmuxSession: sectionType === 'work' || sectionType === 'planning' || sectionType === 'strike' ? checkId : undefined,
+        tmuxSession: sectionType === 'work' || sectionType === 'planning' || sectionType === 'strike' || sectionType === 'knowledge' ? checkId : undefined,
         model: state.model || 'unknown',
         startedAt: state.startedAt || new Date().toISOString(),
-        endedAt: undefined,
+        endedAt,
         duration: state.startedAt
           ? (() => {
               const ms = Date.now() - new Date(state.startedAt).getTime();
@@ -243,15 +318,47 @@ async function collectSessionTreeNodes(
         awaitingInput: awaitingInput !== null,
         awaitingInputPrompt: awaitingInput?.prompt,
         awaitingInputReason: awaitingInput?.reason,
+        pendingInputKinds: context.agentSnapshotsById?.get(checkId)?.pendingInputKinds,
         hasJsonl: !!jsonlPath,
         harness: state.harness,
         deliveryMethod: state.deliveryMethod,
-        paused: state.paused === true ? true : undefined,
-        pausedReason: state.paused === true ? state.pausedReason : undefined,
-        pausedAt: state.paused === true ? state.pausedAt : undefined,
+        planningComplete: isPlanning ? planningFinished : undefined,
+        ...await readSessionGateFields(checkId, state),
       });
     } catch {
       // skip malformed state
+    }
+  }
+
+  // Synthesize a planning node for a live tmux planning session even when the
+  // agent state dir is missing or unreadable. This catches the PAN-2597 case
+  // where only planning-<issue> (or agent-<issue>-plan) exists in tmux.
+  if (!hasPlanningSection) {
+    const planningTmuxId = context.tmuxSessionNames.has(planningAgentId)
+      ? planningAgentId
+      : context.tmuxSessionNames.has(planRunAgentId)
+        ? planRunAgentId
+        : null;
+    if (planningTmuxId) {
+      const jsonlPath = await resolveJsonlPath(planningTmuxId, workspacePath);
+      const jsonlStat = jsonlPath ? await stat(jsonlPath).catch(() => null) : null;
+      const stableStartedAt = jsonlStat
+        ? (jsonlStat.birthtimeMs > 0 ? jsonlStat.birthtime : jsonlStat.mtime).toISOString()
+        : new Date(0).toISOString();
+      const presence = await deriveSessionPresence(planningTmuxId, null, context.tmuxSessionNames);
+      sections.push({
+        type: 'planning',
+        sessionId: planningTmuxId,
+        model: 'unknown',
+        startedAt: stableStartedAt,
+        duration: null,
+        status: 'running',
+        presence,
+        hasJsonl: !!jsonlPath,
+        tmuxSession: planningTmuxId,
+        planningComplete: planningFinished,
+      });
+      hasPlanningSection = true;
     }
   }
 
@@ -278,6 +385,24 @@ async function collectSessionTreeNodes(
   }
 
   const centralStatus = getReviewStatusSync(issueId.toUpperCase());
+
+  // Lint node (PAN-2665): the verification quality-gate run, shown between
+  // Work and Review (TYPE_PRIORITY orders it client-side). Unlike agent nodes
+  // this one has no JSONL/tmux backing, so SessionPanel renders its transcript
+  // — include it here (bounded: gate table + ≤2KB tail per failing gate).
+  const lintSection = buildLintSessionNode({
+    workspacePath,
+    issueLower,
+    includeTranscripts: true,
+    centralStatus: centralStatus ?? null,
+  });
+  if (lintSection) {
+    sections.push({
+      ...lintSection,
+      status: normalizeAgentStatus(lintSection.status),
+    });
+  }
+
   if (centralStatus?.history && centralStatus.history.length > 0) {
     const reviewEntries = centralStatus.history.filter((entry) => entry.type === 'review');
     const latestReview = reviewEntries[reviewEntries.length - 1];
@@ -303,7 +428,7 @@ async function collectSessionTreeNodes(
         roundMetadata: synthesisRoundMetadata as SessionNode['roundMetadata'],
         hasJsonl: !!orchestratorJsonlPath,
         tmuxSession: orchestratorSessionName,
-        ...readSessionPauseFields(orchestratorSessionName),
+        ...await readSessionGateFields(orchestratorSessionName),
       });
       const reviewerNodes = await buildReviewerNodes({
         issueId,
@@ -338,7 +463,7 @@ async function collectSessionTreeNodes(
         presence: testIsLive ? (latestTest.status === 'testing' ? 'active' : 'idle') : 'ended',
         hasJsonl: !!testJsonlPath,
         tmuxSession: testIsLive ? testSessionName : undefined,
-        ...readSessionPauseFields(testSessionName),
+        ...await readSessionGateFields(testSessionName),
       });
     }
 
@@ -361,10 +486,14 @@ async function collectSessionTreeNodes(
         presence: shipIsLive ? (latestMerge.status === 'merging' ? 'active' : 'idle') : 'ended',
         hasJsonl: !!shipJsonlPath,
         tmuxSession: shipIsLive ? shipSessionName : undefined,
-        ...readSessionPauseFields(shipSessionName),
+        ...await readSessionGateFields(shipSessionName),
       });
     }
   }
+
+  // PAN-2053: attach read-only model-origin so the right-click MODEL inspector works
+  // in the project tree, not just the activity cockpit. Shared helper with command-deck.
+  enrichSessionsWithModelOrigin(sections, issueId);
 
   return sections.filter((s) => !isStaleLegacySession(s));
 }
@@ -467,6 +596,7 @@ export async function fetchProjectSessionTree(
   // Reuse shared request-scoped data when provided; otherwise fetch lazily.
   const sharedTmuxSessionNames = sharedContext?.tmuxSessionNames
     ?? new Set((await Effect.runPromise(listSessionNames()).catch(() => [] as string[])).filter(s => s.trim()));
+  const liveTmuxIssueIds = issueIdsWithLiveTmuxSessions(sharedTmuxSessionNames);
 
   const effectiveSharedContext: SessionTreeContext = {
     tmuxSessionNames: sharedTmuxSessionNames,
@@ -494,16 +624,24 @@ export async function fetchProjectSessionTree(
     const results = await Effect.runPromise(withConcurrencyLimit(
       featureCandidates.map((c) => Effect.promise(async () => {
         const agentDir = join(getOverdeckHome(), 'agents', `agent-${c.issueLower}`);
+        const planningAgentDir = join(getOverdeckHome(), 'agents', `planning-${c.issueLower}`);
+        const planRunAgentDir = join(getOverdeckHome(), 'agents', `agent-${c.issueLower}-plan`);
         const panDir = join(workspacesDir, c.name, PAN_DIRNAME);
-        const [hasAgent, hasPlanning] = await Promise.all([
+        const overdeckDir = join(workspacesDir, c.name, WORKSPACE_RUNTIME_DIRNAME);
+        const hasIssueTmux = liveTmuxIssueIds.has(c.issueLower);
+        const [hasAgent, hasPlanning, hasPlanningAgent, hasPlanRunAgent, hasOverdeck] = await Promise.all([
           pathExists(agentDir),
           pathExists(panDir),
+          pathExists(planningAgentDir),
+          pathExists(planRunAgentDir),
+          pathExists(overdeckDir),
         ]);
-        if (!hasAgent && !hasPlanning) return null;
+        const hasAnySignal = hasAgent || hasPlanning || hasPlanningAgent || hasPlanRunAgent || hasOverdeck || hasIssueTmux;
+        if (!hasAnySignal) return null;
         try {
           const workspacePath = join(workspacesDir, c.name);
           const sessions = await collectSessionTreeNodes(c.issueId, workspacePath, projectPath, effectiveSharedContext);
-          if (sessions.length === 0) return null;
+          if (sessions.length === 0 && !hasAnySignal) return null;
           const title = await resolveFeatureTitle(c.issueId, c.issueLower, issueTitles, project);
           return { issueId: c.issueId, title, sessions };
         } catch (err) {
@@ -518,7 +656,7 @@ export async function fetchProjectSessionTree(
   }
 
   // Sort features by issueId for stable ordering
-  features.sort((a, b) => a.issueId.localeCompare(b.issueId));
+  features.sort((a, b) => compareIssueIds(a.issueId, b.issueId));
 
   return { projectKey, features };
 }
@@ -575,6 +713,27 @@ const readProjectJsonBody = Effect.gen(function* () {
   try { return text ? JSON.parse(text) : {}; } catch { return {}; }
 });
 
+// ─── Route: GET /api/projects/:projectKey/release-status ─────────────────────
+// PAN-2555: release/publish pipeline visibility — npm dist-tags, release
+// workflow runs with job-level detail (partial failures), latest GitHub
+// Release. Accepts the deck's name-or-key identifiers; read-only.
+const getProjectReleaseStatusRoute = HttpRouter.add(
+  'GET',
+  '/api/projects/:projectKey/release-status',
+  httpHandler(Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const projectKey = params['projectKey'] ?? '';
+    const result = yield* Effect.tryPromise({
+      try: async () => {
+        const { fetchProjectReleaseStatus } = await import('../../../lib/overdeck/project-pipelines.js');
+        return fetchProjectReleaseStatus(projectKey);
+      },
+      catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
+    });
+    return jsonResponse(result);
+  })),
+);
+
 // ─── Route: GET /api/projects/:projectKey/auto-merge-default ─────────────────
 const getProjectAutoMergeDefaultRoute = HttpRouter.add(
   'GET',
@@ -605,6 +764,99 @@ const postProjectAutoMergeDefaultRoute = HttpRouter.add(
     return jsonResponse({ value: v });
   })),
 );
+
+const getProjectSwarmPolicyRoute = HttpRouter.add('GET', '/api/projects/:projectKey/swarm-policy', httpHandler(Effect.gen(function* () {
+  const key = (yield* HttpRouter.params)['projectKey'] ?? '';
+  const config = getProjectSync(key);
+  if (!config) return jsonResponse({ error: 'Project not found' }, { status: 404 });
+  return jsonResponse({ configured: config.swarm ? { mode: config.swarm.mode, maxSlots: config.swarm.maxSlots, autoAdvance: config.swarm.autoAdvance } : null });
+})));
+const postProjectSwarmPolicyRoute = HttpRouter.add('POST', '/api/projects/:projectKey/swarm-policy', httpHandler(Effect.gen(function* () {
+  const key = (yield* HttpRouter.params)['projectKey'] ?? '';
+  if (!getProjectSync(key)) return jsonResponse({ error: 'Project not found' }, { status: 404 });
+  const body = (yield* readProjectJsonBody) as { value?: { mode?: unknown; maxSlots?: unknown; autoAdvance?: unknown } | null };
+  if (body.value !== null && body.value?.mode !== undefined && !['off', 'auto', 'always'].includes(String(body.value.mode))) return jsonResponse({ error: 'invalid swarm mode' }, { status: 400 });
+  const value = body.value === null ? null : {
+    ...(body.value?.mode !== undefined ? { mode: String(body.value.mode) as SwarmPolicyLayer['mode'] } : {}),
+    ...(typeof body.value?.maxSlots === 'number' ? { maxSlots: body.value.maxSlots } : {}),
+    ...(typeof body.value?.autoAdvance === 'boolean' ? { autoAdvance: body.value.autoAdvance } : {}),
+  };
+  setProjectSwarmPolicySync(key, value); return jsonResponse({ configured: value });
+})));
+const getIssueSwarmPolicyRoute = HttpRouter.add('GET', '/api/issues/:issueId/swarm-policy', httpHandler(Effect.gen(function* () {
+  const issueId = ((yield* HttpRouter.params)['issueId'] ?? '').toUpperCase();
+  const resolved = resolveProjectFromIssueSync(issueId); const project = resolved ? getProjectSync(resolved.projectKey) : undefined;
+  if (!project) return jsonResponse({ error: 'Issue project not found' }, { status: 404 });
+  return jsonResponse({ configured: readIssueRecordSync(project, issueId)?.swarm?.policy ?? null, resolved: resolveSwarmPolicy(issueId) });
+})));
+const postIssueSwarmPolicyRoute = HttpRouter.add('POST', '/api/issues/:issueId/swarm-policy', httpHandler(Effect.gen(function* () {
+  const issueId = ((yield* HttpRouter.params)['issueId'] ?? '').toUpperCase(); const body = (yield* readProjectJsonBody) as { value?: SwarmPolicyLayer | null };
+  const resolved = resolveProjectFromIssueSync(issueId); const project = resolved ? getProjectSync(resolved.projectKey) : undefined;
+  if (!project) return jsonResponse({ error: 'Issue project not found' }, { status: 404 });
+  const record = readIssueRecordSync(project, issueId); if (!record) return jsonResponse({ error: 'Issue record not found' }, { status: 404 });
+  yield* Effect.promise(() => updateIssueRecord(project, issueId, (current) => ({ ...current, swarm: { ...current.swarm, policy: body.value ?? undefined } })));
+  return jsonResponse({ configured: body.value ?? null, resolved: resolveSwarmPolicy(issueId) });
+})));
+
+function getIssueStaffingPayload(
+  project: NonNullable<ReturnType<typeof getProjectSync>>,
+  issueId: string,
+  planMetadata: { [key: string]: unknown } | undefined,
+) {
+  const record = readIssueRecordSync(project, issueId);
+  const config = loadConfigSync().config;
+  const block = resolveTieredExecutionBlock(
+    config.tieredExecution,
+    planMetadata,
+    record?.tieredExecutionOverride ?? null,
+  );
+  const implicit = resolveImplicitStaffing(config, `work:${issueId.toLowerCase()}`);
+  // PAN-2686: recordedModel reflects the most recent work-agent run, so prefer
+  // the live agent state over the permanent record (which can lag a
+  // restart-fresh respawn). The mid-spawn placeholder is not authoritative.
+  const liveModel = getAgentStateSync(`agent-${issueId.toLowerCase()}`)?.model;
+  return {
+    override: { workModel: record?.workModel ?? null },
+    tieredExecution: block,
+    resolved: {
+      model: record?.workModel ?? implicit.model,
+      tiered: block.effective,
+      source: record?.workModel ? 'issue' : 'default',
+      recordedModel: (liveModel && liveModel !== 'pending-work-spawn' ? liveModel : undefined) ?? record?.model ?? null,
+    },
+  };
+}
+
+const getIssueStaffingRoute = HttpRouter.add('GET', '/api/issues/:issueId/staffing', httpHandler(Effect.gen(function* () {
+  const issueId = ((yield* HttpRouter.params)['issueId'] ?? '').toUpperCase();
+  const resolved = resolveProjectFromIssueSync(issueId);
+  const project = resolved ? getProjectSync(resolved.projectKey) : undefined;
+  if (!project) return jsonResponse({ error: 'Issue project not found' }, { status: 404 });
+  const spec = yield* findSpecByIssue(project.path, issueId).pipe(
+    Effect.catch(() => Effect.succeed(null)),
+  );
+  return jsonResponse(getIssueStaffingPayload(project, issueId, spec?.document.plan.metadata));
+})));
+
+const postIssueStaffingRoute = HttpRouter.add('POST', '/api/issues/:issueId/staffing', httpHandler(Effect.gen(function* () {
+  const issueId = ((yield* HttpRouter.params)['issueId'] ?? '').toUpperCase();
+  const body = (yield* readProjectJsonBody) as { workModel?: unknown };
+  const resolved = resolveProjectFromIssueSync(issueId);
+  const project = resolved ? getProjectSync(resolved.projectKey) : undefined;
+  if (!project) return jsonResponse({ error: 'Issue project not found' }, { status: 404 });
+  if (!readIssueRecordSync(project, issueId)) return jsonResponse({ error: 'Issue record not found' }, { status: 404 });
+  let workModel: string | undefined;
+  try {
+    workModel = normalizeModelOverrideSync(body.workModel);
+  } catch (error) {
+    return jsonResponse({ error: error instanceof Error ? error.message : String(error) }, { status: 400 });
+  }
+  yield* Effect.promise(() => updateIssueRecord(project, issueId, (record) => { record.workModel = workModel; }));
+  const spec = yield* findSpecByIssue(project.path, issueId).pipe(
+    Effect.catch(() => Effect.succeed(null)),
+  );
+  return jsonResponse(getIssueStaffingPayload(project, issueId, spec?.document.plan.metadata));
+})));
 
 // ─── Home-boundary guard (shared by POST /api/projects and GET /api/fs/list-dirs) ──
 
@@ -779,8 +1031,16 @@ const postProjectsRoute = HttpRouter.add(
 export const projectsRouteLayer = Layer.mergeAll(
   getProjectSessionTreeRoute,
   getAllSessionTreesRoute,
+  getProjectReleaseStatusRoute,
   getProjectAutoMergeDefaultRoute,
   postProjectAutoMergeDefaultRoute,
+  postProjectRenameRoute,
+  getProjectSwarmPolicyRoute,
+  postProjectSwarmPolicyRoute,
+  getIssueSwarmPolicyRoute,
+  postIssueSwarmPolicyRoute,
+  getIssueStaffingRoute,
+  postIssueStaffingRoute,
   postProjectsRoute,
 );
 

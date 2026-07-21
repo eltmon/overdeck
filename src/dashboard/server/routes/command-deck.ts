@@ -34,15 +34,18 @@ import { EventStoreService } from '../services/domain-services.js';
 import { ReadModelService } from '../read-model.js';
 
 import { getAgentRuntimeState, getAgentStateSync, listRunningAgents } from '../../../lib/agents.js';
+import type { ModelOriginData } from '../../../lib/config-yaml.js';
+import { enrichSessionsWithModelOrigin } from '../services/model-origin-enrich.js';
 import { detectAwaitingInputForAgent, detectAwaitingInputFromPaneSync, type AwaitingInputDetection } from '../../../lib/agent-input-detection.js';
 import { syncCacheSync, getCostsForIssueSync } from '../../../lib/costs/index.js';
 import { capturePane, listSessionNames } from '../../../lib/tmux.js';
+import { buildLintSessionNode } from './command-deck-lint-node.js';
 import { withConcurrencyLimit } from '../../../lib/concurrency.js';
 import type { AgentSnapshot, SessionNodePresence } from '@overdeck/contracts';
 import { deriveSessionPresence } from '../services/session-presence.js';
 import { resolveIssueHeadlineCost } from '../services/issue-cost-resolver.js';
 import { getCachedRunningAgents } from '../services/running-agents-cache.js';
-import { findPrdAtStatusSync, type PrdLocation } from '../../../lib/prd-locations.js';
+import { findPrdAnywhereSync, type PrdLocation } from '../../../lib/prd-locations.js';
 import { resolveProjectFromIssueSync, listProjectsSync } from '../../../lib/projects.js';
 import { extractPrefixSync, parseIssueIdSync } from '../../../lib/issue-id.js';
 import { loadSettingsApi } from '../../../lib/settings-api.js';
@@ -51,6 +54,7 @@ import { getReviewStatusSync } from '../review-status.js';
 import { getGitHubConfig } from '../services/tracker-config.js';
 import { LinearClient } from '../services/linear-client.js';
 import { IssueDataService } from '../services/issue-data-service.js';
+import { loadConfigSync as loadYamlConfig } from '../../../lib/config-yaml.js';
 import { getSharedIssueService } from '../services/issue-service-singleton.js';
 import {
   getCachedResourceAllocatedIssues,
@@ -61,7 +65,7 @@ import { httpHandler } from './http-handler.js';
 import { resolveJsonlPath } from './jsonl-resolver.js';
 import { buildReviewerNodes, readSynthesisRounds, type ReviewerRoundMetadata } from './reviewer-tree.js';
 import { PAN_CONTINUE_FILENAME, PAN_DIRNAME } from '../../../lib/pan-dir/types.js';
-import { readWorkspacePlan } from '../../../lib/vbrief/io.js';
+import { isPlanningComplete, readWorkspacePlan } from '../../../lib/xbrief/io.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -263,19 +267,28 @@ export async function fetchActivityDataWithContext(
     awaitingInputReason?: string;
     hasJsonl?: boolean;
     roundMetadata?: ReviewerRoundMetadata;
+    modelOrigin?: ModelOriginData;
+    planningComplete?: boolean;
   }> = [];
 
   // Shared workspace path for JSONL resolution (PAN-821)
   const projectPath = getProjectPath(issuePrefix);
   const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
 
+  // Resolve once per request: canonical spec exists and planning has finished.
+  const planningFinished = await Effect.runPromise(
+    isPlanningComplete(workspacePath).pipe(Effect.orElseSucceed(() => false)),
+  );
+
   const agentId = `agent-${issueLower}`;
   const planningAgentId = `planning-${issueLower}`;
+  const planRunAgentId = `agent-${issueLower}-plan`;
+  const knowledgeAgentId = `agent-${issueLower}-knowledge`;
   const agentsDir = join(homedir(), '.overdeck', 'agents');
 
   let hasPlanningSection = false;
 
-  for (const checkId of [planningAgentId, agentId]) {
+  for (const checkId of [planningAgentId, agentId, planRunAgentId, knowledgeAgentId]) {
     const agentDir = join(agentsDir, checkId);
     if (!await pathExists(agentDir)) continue;
 
@@ -283,8 +296,8 @@ export async function fetchActivityDataWithContext(
     if (!state) continue;
 
     try {
-      const isPlanning = checkId.startsWith('planning-');
-      const sectionType = isPlanning ? 'planning' : 'work';
+      const isPlanning = checkId.startsWith('planning-') || state.role === 'plan';
+      const sectionType = isPlanning ? 'planning' : checkId.endsWith('-knowledge') ? 'knowledge' : 'work';
       if (isPlanning) hasPlanningSection = true;
 
       let transcript = '';
@@ -327,11 +340,22 @@ export async function fetchActivityDataWithContext(
       // Only expose interactive terminal for work/planning sessions (PAN-821 review)
       const exposeInteractiveTerminal = sectionType === 'work' || sectionType === 'planning';
 
+      // Terminal-end signal: endedAt is populated only when the session has
+      // actually ended. duration is preserved as elapsed seconds for existing UI.
+      const tmuxAlive = tmuxSessionNames.has(checkId);
+      const sessionEnded = rtState?.state === 'suspended'
+        || presence === 'ended'
+        || (!!state.stoppedAt && !tmuxAlive);
+      const endedAt = sessionEnded
+        ? (state.stoppedAt || state.lastActivity || state.startedAt)
+        : undefined;
+
       sections.push({
         type: sectionType,
         sessionId: checkId,
         model: state.model || 'unknown',
         startedAt: state.startedAt || new Date().toISOString(),
+        endedAt,
         duration: state.startedAt ? (() => {
           const ms = Date.now() - new Date(state.startedAt).getTime();
           return Number.isNaN(ms) ? null : Math.floor(ms / 1000);
@@ -351,6 +375,7 @@ export async function fetchActivityDataWithContext(
         hasJsonl: !!jsonlPath,
         harness: state.harness,
         tmuxSession: exposeInteractiveTerminal ? checkId : undefined,
+        planningComplete: sectionType === 'planning' ? planningFinished : undefined,
       });
     } catch { /* skip malformed state */ }
   }
@@ -381,6 +406,12 @@ export async function fetchActivityDataWithContext(
 
   // Build specialist sections from review-status history
   const centralStatus = getReviewStatusSync(issueId.toUpperCase());
+
+  // Lint node (PAN-2665): the verification quality-gate run that gates review
+  // dispatch, rendered between Work and Review in the tree.
+  const lintSection = buildLintSessionNode({ workspacePath, issueLower, includeTranscripts, centralStatus: centralStatus ?? null });
+  if (lintSection) sections.push(lintSection);
+
   if (centralStatus?.history && centralStatus.history.length > 0) {
     const tasksDir = join(homedir(), '.overdeck', 'specialists', 'tasks');
     const taskFilesByType: Record<string, string[]> = { review: [], test: [], merge: [] };
@@ -517,7 +548,7 @@ export async function fetchActivityDataWithContext(
         const orchestratorJsonlPath = await resolveJsonlPath(orchestratorSessionName, workspacePath);
         // PAN-1832: surface the ACTUAL review agent's model/harness (e.g. after a
         // restart onto pi/glm-5.2) instead of a hardcoded 'specialist' label that
-        // the frontend then back-fills with the role-default model (gpt-5.5).
+        // the frontend then back-fills with the role-default model (gpt-5.6-sol).
         const orchestratorState = getAgentStateSync(orchestratorSessionName);
         sections.push({
           type: 'review',
@@ -612,6 +643,11 @@ export async function fetchActivityDataWithContext(
     if (!b.startedAt) return -1;
     return a.startedAt.localeCompare(b.startedAt);
   });
+
+  // PAN-2053: attach the read-only model-origin (weighted-distribution + FNV-1a
+  // derivation) for the right-click MODEL inspector. Shared with the project tree
+  // (projects.ts) so both surfaces stay in lock-step.
+  enrichSessionsWithModelOrigin(sections, issueId);
 
   // Cost breakdown — TTL-cached to avoid re-scanning cost events on every 5s poll (PAN-830 review high-4).
   let costByStage: Record<string, { cost: number; tokens: number }> = {};
@@ -730,7 +766,7 @@ async function fetchPlanningData(
   const hasPlanningDir = await pathExists(planningDir);
   const hasPanContinue = await pathExists(panContinuePath);
 
-  // Acceptance criteria progress from vBRIEF plan (PAN-847)
+  // Acceptance criteria progress from xBRIEF plan (PAN-847)
   // Pipeline mirror corroboration (PAN-977)
   try {
     const doc = await Effect.runPromise(readWorkspacePlan(workspacePath));
@@ -746,10 +782,10 @@ async function fetchPlanningData(
       }
       result.pipelineMirror = doc.plan.metadata?.pipeline;
     }
-  } catch { /* no vBRIEF plan */ }
+  } catch { /* no xBRIEF plan */ }
 
   if (!hasPlanningDir && !hasPanContinue) {
-    const prd = await readPrdContent(findPrdAtStatusSync(projectPath, issueId, 'active'));
+    const prd = await readPrdContent(findPrdAnywhereSync(projectPath, issueId));
     if (prd) {
       result.prd = prd;
       result.hasPrd = true;
@@ -784,13 +820,13 @@ async function fetchPlanningData(
   }
 
   if (!result.prd) {
-    for (const status of ['active', 'planned', 'completed'] as const) {
-      const content = await readPrdContent(findPrdAtStatusSync(projectPath, issueId, status));
-      if (content) {
-        result.prd = content;
-        result.hasPrd = true;
-        break;
-      }
+    // findPrdAnywhereSync covers legacy docs/prds roots and canonical
+    // drafts/<issue>.md on overdeck-state, which the status-only loop missed,
+    // so promoted PRDs were invisible here.
+    const content = await readPrdContent(findPrdAnywhereSync(projectPath, issueId));
+    if (content) {
+      result.prd = content;
+      result.hasPrd = true;
     }
   }
 
@@ -1000,7 +1036,7 @@ ${issueContext ? `\n${issueContext}\n` : ''}
 - Review: ${reviewStatus}
 - Tests: ${testStatus}
 
-## Planning Context (continue.vbrief.json)
+## Planning Context (.overdeck/continue.json)
 ${state ? state.slice(0, 4000) : '(No planning state available)'}
 
 ## Files Changed
@@ -1041,14 +1077,13 @@ Be specific: reference actual file names, function names, requirement text, disc
 
   const apiSettings = loadSettingsApi();
   const statusModelId = (apiSettings.models?.overrides as Record<string, string>)?.['status-review']
-    || 'claude-sonnet-4-6';
+    || 'claude-sonnet-5';
   const { command: cliCmd, args: cliArgs } = getAgentCommandSync(statusModelId);
   const modelFlag = cliArgs.length > 0 ? ` ${cliArgs.join(' ')}` : '';
   const promptFile = join(planningDir, '.status-review-prompt.tmp');
 
   // Build provider env vars for non-Anthropic models
   const { getProviderForModelSync, getProviderEnvSync } = await import('../../../lib/providers.js');
-  const { loadConfigSync: loadYamlConfig } = await import('../../../lib/config-yaml.js');
   let providerEnvStr = '';
   let providerEnv: Record<string, string> = {};
   const statusProvider = getProviderForModelSync(statusModelId);

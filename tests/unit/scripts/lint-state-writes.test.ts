@@ -3,6 +3,9 @@ import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { fileURLToPath } from 'node:url';
+
+const SCRIPT_PATH = fileURLToPath(new URL('../../../scripts/lint-state-writes.sh', import.meta.url));
 
 const SCRIPT_SOURCE = new URL('../../../scripts/lint-state-writes.sh', import.meta.url);
 
@@ -130,5 +133,46 @@ describe('lint-state-writes.sh', () => {
     const { ok, output } = runLint(root);
     expect(ok).toBe(true);
     expect(output).toContain('✓ state-write lint passed');
+  });
+
+  // PAN-1919: legacy lists must be empty after continue module retirement.
+  it('CONTINUE_EXCLUDES list is empty (only test/md pattern exclusions remain)', () => {
+    const scriptSrc = readFileSync(SCRIPT_PATH, 'utf-8');
+    // Extract the CONTINUE_EXCLUDES array body
+    const match = scriptSrc.match(/CONTINUE_EXCLUDES=\(([\s\S]*?)\)/);
+    expect(match).not.toBeNull();
+    const body = match![1];
+    // Only the two structural exclusions (tests + .md) should remain
+    const entries = body.split('\n').map((l) => l.trim()).filter((l) => l.startsWith("':!"));
+    const legacy = entries.filter(
+      (e) => !e.includes('__tests__') && !e.includes('.md'),
+    );
+    expect(legacy).toHaveLength(0);
+  });
+
+  it('PAN_DIR_LEGACY list is empty', () => {
+    const scriptSrc = readFileSync(SCRIPT_PATH, 'utf-8');
+    const match = scriptSrc.match(/PAN_DIR_LEGACY=\(([\s\S]*?)\)/);
+    expect(match).not.toBeNull();
+    const body = match![1];
+    const entries = body.split('\n').map((l) => l.trim()).filter((l) => l.startsWith("':!"));
+    expect(entries).toHaveLength(0);
+  });
+
+  it('lint is NOT fooled by a continue write wrapped in a continuePath alias', () => {
+    const root = makeTempRepo();
+    installScript(root);
+
+    mkdirSync(join(root, 'src', 'lib'), { recursive: true });
+    // Uses "continuePath" in a writeFileSync — should be caught by rule 3
+    writeFileSync(
+      join(root, 'src', 'lib', 'sneaky.ts'),
+      `import { writeFileSync } from 'node:fs';\nexport function sneakyWrite(continuePath: string) {\n  writeFileSync(continuePath, '{}');\n}\n`,
+    );
+
+    commitAll(root);
+    const { ok, output } = runLint(root);
+    expect(ok).toBe(false);
+    expect(output).toContain('ad-hoc write to the workspace/project continue file');
   });
 });

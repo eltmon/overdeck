@@ -21,6 +21,7 @@ import { getConversationsConfigSync } from '../../config-yaml.js';
 import type { RuntimeConversationsConfig } from '../../config-yaml.js';
 import type { EmbeddingProviderName } from './providers.js';
 import { recordBackgroundAiCost } from '../../background-ai/cost.js';
+import { ensureOllama } from '../../ollama.js';
 
 /** Embedding price in USD per 1K tokens. Local providers (ollama) are free.
  * Unknown models record 0 cost (tokens are still tracked). */
@@ -46,6 +47,8 @@ export interface EmbedSessionsOptions {
   provider?: EmbeddingProviderName;
   /** Override model from config */
   model?: string;
+  /** Auto-install Ollama when the local provider is selected */
+  autoInstall?: boolean;
   /** Override Ollama base URL */
   ollamaBaseUrl?: string;
   /** Max concurrent embedding tasks */
@@ -56,6 +59,8 @@ export interface EmbedSessionsOptions {
   config?: RuntimeConversationsConfig;
   /** Injected embed function for testing */
   embedFn?: typeof embed;
+  /** Injected Ollama ensure helper for testing */
+  ensureOllamaFn?: typeof ensureOllama;
   /** Progress callback */
   onProgress?: (progress: EmbedProgress) => void;
 }
@@ -134,6 +139,15 @@ export async function embedSessions(opts: EmbedSessionsOptions = {}): Promise<Em
   const model = opts.model ?? (opts.provider || provider !== config.embeddingProvider ? providerDefaultModel : config.embeddingModel);
   const maxParallel = opts.maxParallel ?? config.enrichment.maxParallel;
   const embedFn = opts.embedFn ?? embed;
+  const ensureOllamaFn = opts.ensureOllamaFn ?? ensureOllama;
+
+  if (provider === 'ollama') {
+    await ensureOllamaFn({
+      autoInstall: opts.autoInstall ?? true,
+      baseUrl: opts.ollamaBaseUrl,
+      model,
+    });
+  }
 
   const sessionIds = selectSessionIdsForEmbedding(opts.sessionIds, model, opts.regenerate === true);
 

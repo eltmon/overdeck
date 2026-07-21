@@ -43,7 +43,7 @@ Parity mapping is resolved for `workspace-9a7q`: every legacy row below is now e
 | Reviewer summary | `InspectorPanel.tsx` reviewer summary block | Drawer `DrawerReviewSpecialists` covers reviewer role states. | Covered |
 | Review pipeline stepper and notes | `ReviewPipelineSection.tsx` | Drawer `DrawerVerificationGates`, `DrawerReviewSpecialists`, `PhaseTimeline`, and `DrawerActivityRail` cover step/state/history; verbose notes are out of scope for the compact drawer and remain available through Command Deck activity/conversation surfaces. | Covered / Out of scope |
 | Pull request link and status | `InspectorPanel.tsx` PR block | Drawer action bar `View PR`, Command Deck resource `PrNode`, and Pipeline Ship filters cover PR status and navigation. | Covered |
-| Links to issue and PRD | `InspectorPanel.tsx` links block | Drawer Plan/Files tabs and Command Deck overview/VBrief/Beads tabs are the redesigned artifact surfaces. | Covered |
+| Links to issue and PRD | `InspectorPanel.tsx` links block | Drawer Plan/Files tabs and Command Deck overview/XBrief/Beads tabs are the redesigned artifact surfaces. | Covered |
 | Cost summary | `InspectorPanel.tsx`, `IssueCostData` | Pipeline/Agents metric strips and Command Deck `CostsTab` cover issue/fleet costs; the PRD points canonical cost precision to Costs. | Covered |
 | Corrupted workspace warning | `InspectorPanel.tsx`, `WorkspaceInfo.corrupted` | Command Deck workspace/resource tree is the redesigned workspace-health destination. | Covered |
 | Service URLs | `InspectorPanel.tsx`, `WorkspaceInfo.services` | Command Deck resources own workspace/service drill-down; service URL lists in the drawer are out of scope for PAN-1148's compact issue detail. | Covered / Out of scope |
@@ -68,7 +68,7 @@ Parity mapping is resolved for `workspace-9a7q`: every legacy row below is now e
 | Feature-only Plan action | `ActionsSection.tsx` | Out of scope for PAN-1148: planning creation is not listed in the new issue-detail action bar or operations lens PRD; existing planning workflows remain outside the retired inspector surface. | Out of scope |
 | Resume message input | `ActionsSection.tsx` | Drawer active-agent Tell input and Command Deck Zone A resume message textarea. | Covered |
 | Action error/success states | `ActionsSection.tsx` | Drawer action bar uses dialog alerts; Command Deck action mutations/toasts cover command feedback. | Covered |
-| Artifact links for Plan, vBRIEF, and Beads | `ActionsSection.tsx`, `ArtifactLinks` | Drawer tabs include Plan/Beads/Files; Command Deck includes VBrief/Beads/Activity/Costs tabs and `viewVbrief`. | Covered |
+| Artifact links for Plan, xBRIEF, and Beads | `ActionsSection.tsx`, `ArtifactLinks` | Drawer tabs include Plan/Beads/Files; Command Deck includes XBrief/Beads/Activity/Costs tabs and `viewXbrief`. | Covered |
 | Danger Zone reopen action | `ActionsSection.tsx` | Command Deck Zone A `reopen`. | Covered |
 | Danger Zone restart from plan action | `ActionsSection.tsx`, `RestartFromPlanButton` | Command Deck Zone A `restartFromPlan`. | Covered |
 | Danger Zone reset issue action | `ActionsSection.tsx`, `ResetIssueButton` | Drawer action bar `Reset` and Command Deck Zone A `resetIssue` retain destructive confirmation semantics. | Covered |

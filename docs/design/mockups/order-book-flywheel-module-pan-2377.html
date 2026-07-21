@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Flywheel run page — Order Book module (PAN-2377)</title>
+</head>
+<body>
+<style>
+  :root {
+    --pan-scheme: dark; --background: #080b10; --foreground: #e5e7eb; --card: #0c1018; --card-2: #10151f;
+    --primary: oklch(0.588 0.217 264); --muted: color-mix(in srgb, white 4%, transparent); --muted-foreground: #9ca3af; --faint: #6b7280;
+    --border: color-mix(in srgb, white 6%, transparent); --input: color-mix(in srgb, white 8%, transparent);
+    --destructive: #f87171; --destructive-foreground: #fca5a5;
+    --warning: #f59e0b; --warning-foreground: #fbbf24;
+    --success: #10b981; --success-foreground: #34d399;
+    --info: #3b82f6; --info-foreground: #60a5fa; --review: #a855f7; --review-foreground: #c084fc; --shadow-card: none;
+  }
+  :root[data-theme="light"] {
+    --pan-scheme: light; --background: #ffffff; --foreground: #1f2937; --card: #ffffff; --card-2: #f7f7f8;
+    --primary: oklch(0.488 0.217 264); --muted: color-mix(in srgb, black 4%, transparent); --muted-foreground: #6b7280; --faint: #9ca3af;
+    --border: color-mix(in srgb, black 8%, transparent); --input: color-mix(in srgb, black 10%, transparent);
+    --destructive: #ef4444; --destructive-foreground: #b91c1c; --warning-foreground: #b45309;
+    --success-foreground: #047857; --info-foreground: #1d4ed8; --review-foreground: #7e22ce;
+    --shadow-card: 0 1px 3px rgba(0,0,0,.07), 0 4px 14px rgba(0,0,0,.05);
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--background); color: var(--foreground); color-scheme: var(--pan-scheme);
+    font-family: "DM Sans", ui-sans-serif, system-ui, sans-serif; font-weight: 500; font-size: 13.5px; line-height: 1.55; }
+  .mono { font-family: "SF Mono", ui-monospace, Menlo, monospace; }
+  .page { max-width: 1020px; margin: 0 auto; padding: 34px 24px 90px; }
+  header.doc { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; margin-bottom: 4px; }
+  h1 { font-size: 20px; font-weight: 500; margin: 0; letter-spacing: -0.01em; }
+  .doc-sub { color: var(--muted-foreground); font-size: 13px; margin: 0 0 22px; max-width: 76ch; }
+  .toolbtns { display: flex; gap: 8px; }
+  button.tool { background: none; border: 1px solid var(--border); border-radius: 6px; color: var(--muted-foreground); font: inherit; font-size: 12px; padding: 3px 10px; cursor: pointer; }
+  button.tool.on { color: var(--foreground); border-color: color-mix(in srgb, var(--primary) 45%, transparent); }
+
+  .badge { display: inline-flex; align-items: center; gap: 5px; height: 20px; padding: 0 7px; border-radius: 3px; font-size: 10.5px; letter-spacing: .03em;
+    border: 1px solid var(--border); color: var(--muted-foreground); background: var(--muted); }
+  .badge.amber { background: color-mix(in srgb, var(--warning) 8%, transparent); border-color: color-mix(in srgb, var(--warning) 32%, transparent); color: var(--warning-foreground); }
+  .badge.blue  { background: color-mix(in srgb, var(--info) 8%, transparent); border-color: color-mix(in srgb, var(--info) 32%, transparent); color: var(--info-foreground); }
+  .badge.green { background: color-mix(in srgb, var(--success) 8%, transparent); border-color: color-mix(in srgb, var(--success) 32%, transparent); color: var(--success-foreground); }
+  .badge.purple{ background: color-mix(in srgb, var(--review) 8%, transparent); border-color: color-mix(in srgb, var(--review) 32%, transparent); color: var(--review-foreground); }
+
+  .app { border: 1px solid var(--border); border-radius: 12px; background: var(--card); box-shadow: var(--shadow-card); overflow: hidden; }
+  .appbar { display: flex; align-items: center; gap: 12px; padding: 11px 16px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+  .crumb { color: var(--faint); font-size: 12px; }
+  .crumb b { color: var(--foreground); font-weight: 500; font-size: 14px; }
+  .spacer { flex: 1; }
+  .stat { font-size: 11.5px; color: var(--muted-foreground); }
+  .stat .mono { color: var(--foreground); font-size: 11px; }
+
+  /* existing flywheel modules, sketched faint to keep focus on the new one */
+  .ghost { padding: 12px 16px; border-bottom: 1px solid var(--border); color: var(--faint); font-size: 12px; }
+  .ghost h2 { font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: .08em; margin: 0 0 6px; color: var(--faint); }
+  .ghost .line { padding: 2px 0; }
+  .ghost .line .mono { font-size: 11px; }
+
+  /* the new module */
+  .module { padding: 14px 16px 18px; }
+  .modhead { display: flex; align-items: baseline; gap: 10px; margin-bottom: 10px; }
+  .modhead h2 { font-size: 12px; font-weight: 500; text-transform: uppercase; letter-spacing: .08em; color: var(--muted-foreground); margin: 0; }
+  .modhead a { color: var(--muted-foreground); font-size: 11.5px; text-decoration: none; border-bottom: 1px solid var(--border); }
+  .modhead .spacer { flex: 1; }
+
+  .banner { display: flex; gap: 10px; align-items: flex-start; border-radius: 8px; padding: 10px 13px; margin-bottom: 12px; font-size: 12.5px;
+    background: color-mix(in srgb, var(--warning) 8%, transparent); border: 1px solid color-mix(in srgb, var(--warning) 32%, transparent); }
+  .banner .glyph { color: var(--warning-foreground); flex: 0 0 auto; }
+  .banner .msg { color: var(--muted-foreground); }
+  .banner .msg b { color: var(--warning-foreground); font-weight: 500; }
+  .banner .msg .who { color: var(--faint); font-size: 11.5px; }
+  .banner button { margin-left: auto; flex: 0 0 auto; background: none; border: 1px solid color-mix(in srgb, var(--warning) 32%, transparent); border-radius: 6px; color: var(--warning-foreground); font: inherit; font-size: 11.5px; padding: 3px 10px; cursor: pointer; align-self: center; }
+  .banner.open-state { background: var(--muted); border-color: var(--border); }
+  .banner.open-state .glyph, .banner.open-state .msg b { color: var(--foreground); }
+  .banner.open-state button { border-color: var(--input); color: var(--muted-foreground); }
+
+  .drainbar { display: flex; align-items: center; gap: 10px; margin: 2px 0 12px; }
+  .track { flex: 1; height: 5px; border-radius: 3px; background: var(--muted); overflow: hidden; display: flex; }
+  .track .done { background: var(--success); height: 100%; }
+  .track .active { background: var(--info); height: 100%; }
+  .drainbar .n { font-size: 11.5px; color: var(--muted-foreground); }
+  .drainbar .n .mono { color: var(--foreground); font-size: 11px; }
+
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  @media (max-width: 780px) { .cols { grid-template-columns: 1fr; } }
+  .lanecard { border: 1px solid var(--border); border-radius: 9px; background: var(--card); }
+  .lanecard h3 { display: flex; align-items: baseline; gap: 7px; font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: .08em; color: var(--muted-foreground); margin: 0; padding: 8px 12px; border-bottom: 1px solid var(--border); }
+  .lanecard h3 .rule { text-transform: none; letter-spacing: 0; color: var(--faint); font-size: 11px; }
+  .lanecard h3 .slot { margin-left: auto; text-transform: none; letter-spacing: 0; font-size: 11px; }
+  .nextup { padding: 9px 12px; }
+  .nu-label { font-size: 10.5px; text-transform: uppercase; letter-spacing: .07em; color: var(--faint); margin-bottom: 3px; }
+  .nu-row { display: flex; align-items: center; gap: 8px; font-size: 12.5px; }
+  .nu-row .ord { color: var(--faint); font-size: 11px; }
+  .nu-row .id { font-size: 11.5px; }
+  .nu-row .t { flex: 1; color: var(--muted-foreground); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .nu-cond { font-size: 11.5px; color: var(--faint); margin-top: 5px; padding-left: 2px; }
+  .nu-cond .ok { color: var(--success-foreground); }
+  .nu-cond .no { color: var(--warning-foreground); }
+  .queue { border-top: 1px solid var(--border); padding: 7px 12px 9px; }
+  .q-row { display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: var(--faint); padding: 2px 0; }
+  .q-row .id { font-size: 11px; color: var(--muted-foreground); }
+  .empty { padding: 10px 12px; font-size: 12px; color: var(--faint); font-style: italic; }
+
+  /* annotations */
+  .ann { display: none; margin: 22px 0 0; padding: 0; list-style: none; font-size: 13px; color: var(--muted-foreground); max-width: 76ch; }
+  body.annotate .ann { display: grid; gap: 8px; }
+  .ann li { padding-left: 24px; position: relative; }
+  .ann li::before { content: attr(data-n); position: absolute; left: 0; top: 2px; width: 16px; height: 16px; border-radius: 3px; font-size: 10px;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: color-mix(in srgb, var(--primary) 8%, transparent);
+    border: 1px solid color-mix(in srgb, var(--primary) 32%, transparent); color: var(--foreground); }
+  .ann strong { color: var(--foreground); font-weight: 500; }
+  .marker { display: none; position: absolute; width: 16px; height: 16px; border-radius: 3px; font-size: 10px; align-items: center; justify-content: center;
+    background: color-mix(in srgb, var(--primary) 12%, var(--card)); border: 1px solid color-mix(in srgb, var(--primary) 40%, transparent); color: var(--foreground); z-index: 2; }
+  body.annotate .marker { display: inline-flex; }
+  .rel { position: relative; }
+</style>
+
+<div class="page">
+  <header class="doc">
+    <h1>Flywheel run page — Order Book module</h1>
+    <div class="toolbtns">
+      <button class="tool" id="annToggle" type="button">Annotations</button>
+      <button class="tool" id="themeToggle" type="button">Toggle theme</button>
+    </div>
+  </header>
+  <p class="doc-sub">PAN-2377 · the run page gains one module answering the shepherd's three questions: is pickup on hold, what would I pick next per lane, and how drained is the book. Surrounding run-page modules are sketched faint — only the Order Book module is new. Use the banner's button to demo the DRAIN ⇄ OPEN states.</p>
+
+  <div class="app">
+    <div class="appbar">
+      <span class="crumb">Flywheel / <b>RUN-63</b></span>
+      <span class="badge blue">● running · tick 87</span>
+      <span class="spacer"></span>
+      <span class="stat">orchestrator <span class="mono">conv-512</span> · heartbeat <span class="mono">4m ago</span></span>
+    </div>
+
+    <div class="ghost">
+      <h2>Pipeline (existing module — unchanged)</h2>
+      <div class="line"><span class="mono">PAN-2820</span> · verifying on main · deploy pending</div>
+      <div class="line"><span class="mono">PAN-2821</span> · needs operator decision (PAN-2232 follow-up PR)</div>
+    </div>
+
+    <!-- ══ NEW: Order Book module ══ -->
+    <div class="module rel">
+      <span class="marker" style="top:12px;left:2px">1</span>
+      <div class="modhead">
+        <h2>Order book</h2>
+        <a href="#">master-plan-cicd-and-refactoring →</a>
+        <span class="spacer"></span>
+        <span class="badge" id="postureBadge" style="background:color-mix(in srgb, var(--warning) 8%, transparent);border-color:color-mix(in srgb, var(--warning) 32%, transparent);color:var(--warning-foreground)">◼ DRAIN</span>
+      </div>
+
+      <div class="banner rel" id="banner">
+        <span class="marker" style="top:-8px;left:-8px">2</span>
+        <span class="glyph" id="bGlyph">⏸</span>
+        <span class="msg" id="bMsg"><b>Pickup on hold.</b> This run shepherds in-flight work to done but will not pick up anything new from the book. <span class="who">Set by operator 2026-07-16 — «hold pickup until PAN-2820 verifies on main».</span></span>
+        <button id="bBtn" onclick="flip()">Demo: open pickup</button>
+      </div>
+
+      <div class="drainbar rel">
+        <span class="marker" style="top:-8px;left:-8px">3</span>
+        <span class="n"><span class="mono">13</span>/<span class="mono">17</span> landed</span>
+        <div class="track"><div class="done" style="width:76%"></div><div class="active" id="activeSeg" style="width:0%"></div></div>
+        <span class="n" id="restN"><span class="mono">4</span> held</span>
+      </div>
+
+      <div class="cols rel">
+        <span class="marker" style="top:-8px;right:-6px">4</span>
+        <!-- Lane A -->
+        <div class="lanecard">
+          <h3>Lane A <span class="rule">· parallel</span><span class="slot" id="slotA">0 in flight</span></h3>
+          <div class="nextup">
+            <div class="nu-label">Next up</div>
+            <div class="nu-row">
+              <span class="ord mono">A13</span><span class="id mono">PAN-2445</span>
+              <span class="t">Autonomous-dispatch hardening</span>
+              <span class="badge" id="a13badge">held</span>
+            </div>
+            <div class="nu-cond" id="a13cond"><span class="no">✕ posture DRAIN</span> · <span class="ok">✓ no prereqs</span> · <span class="ok">✓ PRD current</span></div>
+          </div>
+          <div class="queue"><div class="q-row" style="font-style:italic">last item in Lane A — lane drains when it lands</div></div>
+        </div>
+
+        <!-- Lane B -->
+        <div class="lanecard">
+          <h3>Lane B <span class="rule">· strictly serial</span><span class="slot" id="slotB">slot free</span></h3>
+          <div class="nextup">
+            <div class="nu-label">Next up</div>
+            <div class="nu-row">
+              <span class="ord mono">B11</span><span class="id mono">PAN-2233</span>
+              <span class="t">Decompose merge-agent.ts</span>
+              <span class="badge" id="b11badge">held</span>
+            </div>
+            <div class="nu-cond" id="b11cond"><span class="no">✕ posture DRAIN</span> · <span class="ok">✓ B slot free</span> · <span class="ok">✓ A8 landed</span> · <span class="no">⚠ re-verify PRD at pickup</span></div>
+          </div>
+          <div class="queue">
+            <div class="nu-label" style="padding:2px 0 3px">Then, in order</div>
+            <div class="q-row"><span class="mono">B12</span><span class="id mono">PAN-2190</span><span>merge-ops.ts decomposition · after B11 + green main</span></div>
+            <div class="q-row"><span class="mono">B13</span><span class="id mono">PAN-2189</span><span>deacon.ts · PRD authored after B12</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="ghost" style="border-top:1px solid var(--border)">
+      <h2>Recent activity (existing module — unchanged)</h2>
+      <div class="line">tick 86 · PAN-2232 follow-up isolated as PR#2821, needs operator decision</div>
+      <div class="line">tick 85 · dashboard restored, PAN-2232 re-review reconciled</div>
+      <div class="line">tick 84 · PAN-2232 merged (11 total)</div>
+    </div>
+  </div>
+
+  <ul class="ann">
+    <li data-n="1"><strong>One module, three answers.</strong> The run page already shows pipeline and activity; the new module adds only what the book contributes: posture, next-up per lane, drain progress. It links to the full Order Book page rather than duplicating item detail — the run page stays the shepherd's cockpit, the book page stays the operator's editor.</li>
+    <li data-n="2"><strong>The hold banner leads and is amber</strong> — pickup-on-hold is an operator-imposed gate (amber = human holding), and it's the first thing the run's own status must not contradict. It carries who set it and why, so the flywheel's "why am I idle?" is answered on the surface the operator is already watching. When posture is OPEN the banner collapses into a neutral one-liner; an open gate is not a signal.</li>
+    <li data-n="3"><strong>Drain progress is a single track:</strong> emerald = landed (outcome), blue segment = currently in pipeline (machine working), the unfilled remainder = held. No third color for "held" — the rest state is the track itself.</li>
+    <li data-n="4"><strong>Next-up shows the eligibility predicate, not just the item.</strong> Each condition renders ✓/✕ so the operator can see exactly which gate blocks pickup (posture, B-slot occupancy, prereqs, PRD state). This is the mechanical version of the master plan's "rules for the drip orchestrator" — the runtime enforces them, the module shows them.</li>
+  </ul>
+</div>
+
+<script>
+  document.getElementById('themeToggle').onclick = () => {
+    const r = document.documentElement;
+    r.dataset.theme = r.dataset.theme === 'light' ? 'dark' : 'light';
+  };
+  document.getElementById('annToggle').onclick = (e) => {
+    document.body.classList.toggle('annotate');
+    e.target.classList.toggle('on');
+  };
+  let drain = true;
+  function flip() {
+    drain = !drain;
+    const pb = document.getElementById('postureBadge'), banner = document.getElementById('banner');
+    if (drain) {
+      pb.textContent = '◼ DRAIN';
+      pb.style.cssText = 'background:color-mix(in srgb, var(--warning) 8%, transparent);border-color:color-mix(in srgb, var(--warning) 32%, transparent);color:var(--warning-foreground)';
+      banner.classList.remove('open-state');
+      document.getElementById('bGlyph').textContent = '⏸';
+      document.getElementById('bMsg').innerHTML = '<b>Pickup on hold.</b> This run shepherds in-flight work to done but will not pick up anything new from the book. <span class="who">Set by operator 2026-07-16 — «hold pickup until PAN-2820 verifies on main».</span>';
+      document.getElementById('bBtn').textContent = 'Demo: open pickup';
+      setLane('a13', 'held', '<span class="no">✕ posture DRAIN</span> · <span class="ok">✓ no prereqs</span> · <span class="ok">✓ PRD current</span>', false);
+      setLane('b11', 'held', '<span class="no">✕ posture DRAIN</span> · <span class="ok">✓ B slot free</span> · <span class="ok">✓ A8 landed</span> · <span class="no">⚠ re-verify PRD at pickup</span>', false);
+      document.getElementById('slotA').textContent = '0 in flight';
+      document.getElementById('slotB').textContent = 'slot free';
+      document.getElementById('activeSeg').style.width = '0%';
+      document.getElementById('restN').innerHTML = '<span class="mono">4</span> held';
+    } else {
+      pb.textContent = 'OPEN';
+      pb.style.cssText = '';
+      banner.classList.add('open-state');
+      document.getElementById('bGlyph').textContent = '▸';
+      document.getElementById('bMsg').innerHTML = '<b>Pickup open.</b> The run pulls the next eligible item per lane rules — Lane A freely, Lane B one at a time. Book drains → run auto-reports and returns to normal scope.';
+      document.getElementById('bBtn').textContent = 'Demo: hold pickup';
+      setLane('a13', 'pipeline', '<span class="ok">✓ picked up · planning (agent-pan-2445)</span>', true);
+      setLane('b11', 'pipeline', '<span class="ok">✓ picked up · PRD re-verify in progress (agent-pan-2233)</span>', true);
+      document.getElementById('slotA').textContent = '1 in flight';
+      document.getElementById('slotB').innerHTML = 'slot: <span class="mono" style="font-size:11px">B11</span>';
+      document.getElementById('activeSeg').style.width = '12%';
+      document.getElementById('restN').innerHTML = '<span class="mono">2</span> held';
+    }
+  }
+  function setLane(key, state, condHtml, blue) {
+    const b = document.getElementById(key + 'badge');
+    b.className = blue ? 'badge blue' : 'badge';
+    b.textContent = blue ? '● in pipeline' : 'held';
+    document.getElementById(key + 'cond').innerHTML = condHtml;
+  }
+</script>
+</body>
+</html>

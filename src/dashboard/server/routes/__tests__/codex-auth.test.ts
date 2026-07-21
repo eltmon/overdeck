@@ -8,6 +8,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const mockCliproxy = vi.hoisted(() => ({
   authDir: '',
   logPath: '',
+  homeDir: '',
+}));
+
+vi.mock('os', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('os')>()),
+  homedir: () => mockCliproxy.homeDir,
 }));
 
 vi.mock('../../../../lib/cliproxy.js', async () => {
@@ -27,6 +33,10 @@ vi.mock('../../../../lib/cliproxy.js', async () => {
     getCliproxyLogPath: () => mockCliproxy.logPath,
   };
 });
+
+vi.mock('../../../../lib/agents/queries.js', () => ({
+  listAgentStates: () => [],
+}));
 
 import { codexAuthRouteLayer } from '../codex-auth.js';
 
@@ -49,6 +59,7 @@ beforeEach(async () => {
   vi.useFakeTimers();
   vi.setSystemTime(new Date(NOW));
   tmpRoot = await mkdtemp(join(tmpdir(), 'pan-codex-auth-route-'));
+  mockCliproxy.homeDir = tmpRoot;
   mockCliproxy.authDir = join(tmpRoot, 'auth');
   mockCliproxy.logPath = join(tmpRoot, 'cliproxy.log');
 });
@@ -59,6 +70,7 @@ afterEach(async () => {
   tmpRoot = '';
   mockCliproxy.authDir = '';
   mockCliproxy.logPath = '';
+  mockCliproxy.homeDir = '';
 });
 
 const writeCodexFixture = async (logLines: string[] = []) => {
@@ -101,6 +113,7 @@ describe('GET /api/settings/codex-auth', () => {
       status: 'burned',
       email: EMAIL,
       expiresAt: '2026-06-02T04:40:00.000Z',
+      source: 'cliproxy',
     });
   });
 
@@ -114,6 +127,7 @@ describe('GET /api/settings/codex-auth', () => {
       status: 'valid',
       email: EMAIL,
       expiresAt: '2026-06-02T04:40:00.000Z',
+      source: 'cliproxy',
     });
   });
 });

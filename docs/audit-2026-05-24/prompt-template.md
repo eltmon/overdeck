@@ -16,7 +16,7 @@ You are doing a pass-3 deep audit of a closed GitHub issue from `eltmon/overdeck
 
 4. **Default to REOPEN when in doubt.** "Plausibly satisfies" is not enough. "Mostly works" is not enough.
 
-5. **For UI ACs**: use the Playwright MCP tools (`mcp__playwright__browser_navigate`, `_snapshot`, `_take_screenshot`) to verify rendering. The dashboard is at `https://pan.localhost`. Save any screenshots to `/tmp/audit-pass3/screenshots/PAN-{ISSUE_NUM}-<view>.png` so they can be attached to the issue comment.
+5. **For UI ACs**: use the Playwright MCP tools (`mcp__playwright__browser_navigate`, `_snapshot`, `_take_screenshot`) to verify rendering. The dashboard is at `https://overdeck.localhost`. Save any screenshots to `/tmp/audit-pass3/screenshots/PAN-{ISSUE_NUM}-<view>.png` so they can be attached to the issue comment.
 
 6. **Tool access**: you have full shell access. Use `gh`, `git`, `curl`, `grep`, `cat`, `pan` CLI commands directly. Working dir: `/home/eltmon/Projects/overdeck`. Main HEAD: `c173152f7`.
 
@@ -39,7 +39,7 @@ Your output is a structured markdown comment ready to post to the GitHub issue. 
 2. ...
 
 ### UI reproduction (if any UI in the AC)
-1. Open https://pan.localhost
+1. Open https://overdeck.localhost
 2. Click <X>
 3. See <Y>
 [screenshot: /tmp/audit-pass3/screenshots/PAN-{ISSUE_NUM}-<view>.png]

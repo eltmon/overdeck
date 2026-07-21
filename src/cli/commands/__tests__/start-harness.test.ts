@@ -96,7 +96,7 @@ describe('pan start --harness flag (PAN-636)', () => {
     expect(written).toMatch(/Invalid --harness value: cursor/)
   })
 
-  it('rejects --harness pi + Anthropic model + subscription auth with non-zero exit and reason on stderr', async () => {
+  it('rejects --harness pi (invalid value) with non-zero exit and reason on stderr', async () => {
     const { issueCommand } = await import('../start.js')
     await expect(
       issueCommand('PAN-X', {
@@ -107,7 +107,6 @@ describe('pan start --harness flag (PAN-636)', () => {
 
     const written = stderrSpy.mock.calls.map(call => String(call[0])).join('')
     expect(written.toLowerCase()).toContain('pi')
-    expect(written.toLowerCase()).toContain('anthropic')
   })
 
   it('prompts for interactive --host --yes instead of silently accepting it', async () => {

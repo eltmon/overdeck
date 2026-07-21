@@ -111,14 +111,14 @@ DOMAINS = [
         ["discovered_sessions", "discovered_session_tags", "discovered_session_tools",
          "discovered_session_files", "session_embeddings"]),
     ("UAT", "#f3d9fa", ["uat_generations", "uat_generation_members", "uat_generation_resolutions"]),
-    ("EVENTS & MEMORY", "#c3fae8", ["events", "health_events", "observation_index", "reset_markers"]),
+    ("EVENTS & MEMORY", "#c3fae8", ["events", "health_events"]),
     ("RECONSTRUCTION", "#e9ecef", ["transcripts", "transcript_checkpoints"]),
     ("INFRA & CONTROL", "#fff3bf", ["app_settings", "git_operations", "flywheel_substrate_bugs"]),
 ]
 
-# sanity: all 32 tables grouped exactly once
+# sanity: all 30 tables grouped exactly once
 grouped = [t for _, _, ts in DOMAINS for t in ts]
-assert len(grouped) == 32, f"grouped {len(grouped)}"
+assert len(grouped) == 30, f"grouped {len(grouped)}"
 assert set(grouped) == set(table_order), f"missing: {set(table_order)-set(grouped)} extra: {set(grouped)-set(table_order)}"
 
 # ---------- column line rendering ----------
@@ -222,7 +222,7 @@ def text_el(x, y, w, text, size, color="#343a40", align="left"):
 elements_out.append(text_el(0, -104, 900,
     "OVERDECK DATABASE SCHEMA — ERD", 26, "#0b7285"))
 elements_out.append(text_el(0, -64, 1100,
-    "drizzle/overdeck/0000_overdeck_init.sql  ·  32 tables  ·  types shown (PK / FK / NN / UQ) for review",
+    "drizzle/overdeck/0000_overdeck_init.sql  ·  30 tables  ·  types shown (PK / FK / NN / UQ) for review",
     14, "#495057"))
 elements_out.append(text_el(0, -40, 1100,
     "solid arrow = declared FOREIGN KEY   ·   dashed arrow = logical *_id reference   ·   box color = domain",

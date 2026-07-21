@@ -9,7 +9,7 @@
  */
 
 import { WebSocket } from 'ws';
-import type * as pty from '@homebridge/node-pty-prebuilt-multiarch';
+import type * as pty from '@lydell/node-pty';
 
 /** A shared PTY hub: one PTY process serving multiple WebSocket clients. */
 export interface PtyHub {

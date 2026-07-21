@@ -6,22 +6,25 @@
  * are implemented via TerminalService (dual-runtime PTY, B20).
  */
 
-import { Effect, Layer, Queue, Schedule, Stream } from 'effect';
+import { Effect, Layer, Queue, Schedule, Schema, Stream } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { RpcSerialization, RpcServer } from 'effect/unstable/rpc';
-import { PanRpcGroup, PanRpcError, WS_METHODS } from '@overdeck/contracts';
+import { DomainEvent as DomainEventSchema, PanRpcGroup, PanRpcError, WS_METHODS } from '@overdeck/contracts';
 import { PanOpen } from './services/open.js';
 import { EventStoreService } from './services/domain-services.js';
 import { ReadModelService, type ReadModelServiceShape } from './read-model.js';
 import { TerminalService } from './services/terminal-service.js';
+import { shouldBroadcastDashboardEvent, streamAgentOutput } from './services/agent-output-stream.js';
 import { getConversationByName } from '../../lib/overdeck/conversations.js';
-import { contextUsageFromParseResult, gateSnapshotEmission, parseConversationMessages, watchConversation, type ParseState, type ParseResult } from './services/conversation-service.js';
+import { contextUsageFromParseResult, gateSnapshotEmission, parseConversationMessages, parseEntireConversation, watchConversation, type ParseState, type ParseResult } from './services/conversation-service.js';
 import { isPiSessionFile, parsePiConversationMessages } from './services/pi-conversation-parser.js';
+import { isOhmypiSessionFile, parseOhmypiConversationMessages } from './services/ohmypi-conversation-parser.js';
 import { parseCodexConversationMessages } from './services/codex-conversation-parser.js';
-import { resolveAgentHarness, resolvePiSessionPath, resolveCodexRolloutPath, readLauncherPinnedSessionId } from './routes/jsonl-resolver.js';
+import { parseAcpConversationMessages } from './services/acp-conversation-parser.js';
+import { resolveAgentHarness, resolvePiSessionPath, resolveCodexRolloutPath, resolveAcpTranscriptPath, readLauncherPinnedSessionId } from './routes/jsonl-resolver.js';
 import { watch as fsWatch } from 'node:fs';
 import { sessionFilePath } from '../../lib/paths.js';
-import { listSessionNames } from '../../lib/tmux.js';
+import { getRuntimeCensus } from '../../lib/runtime-census.js';
 import { listProjectsSync } from '../../lib/projects.js';
 import type { AgentStatus, ConversationEvent, DomainEvent, EmbedProgressEvent, EnrichCompleteEvent, EnrichProgressEvent, ScanCompleteEvent, ScanProgressEvent, ScanStartedEvent, SessionNodePresence, SessionTreeDelta, SystemHeartbeatEvent } from '@overdeck/contracts';
 import type { StoredEvent } from './event-store.js';
@@ -31,12 +34,15 @@ import { CostThresholdError } from '../../lib/conversations/enrichment/index.js'
 import { getConversationsConfig } from '../../lib/config-yaml.js';
 import type { RuntimeConversationsConfig } from '../../lib/config-yaml.js';
 import type { ConversationFilter, DiscoveredSession } from '../../lib/overdeck/discovered-sessions.js';
+import type { SessionsFeedRow } from '../../lib/overdeck/sessions-feed.js';
 import { validateOrigin } from './routes/origin-validation.js';
 import { jsonResponse } from './http-helpers.js';
 import { runDashboardDbJob } from './services/dashboard-db-task.js';
 import { readCurrentLatestFlywheelStatus, subscribeLatestFlywheelStatus } from './services/flywheel-run-state.js';
 import { readWorkspaceFileEffect } from './services/read-workspace-file.js';
 import { resolveFilePathExistsEffect } from './services/resolve-file-path-exists.js';
+import { getHarnessBehavior } from '../../lib/runtimes/behavior.js';
+import { normalizeSessionsFeedFilter, toDiscoveredSessionSnapshot, toSessionsFeedRowSnapshot } from './services/sessions-feed-rpc.js';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -47,6 +53,21 @@ function storedToDomainEvent(stored: StoredEvent): DomainEvent {
     timestamp: stored.timestamp,
     payload: stored.payload,
   } as DomainEvent;
+}
+
+// An event whose type/shape is missing from the contracts DomainEvent union
+// must never reach RPC stream encoding — one bad event fails the encode and
+// kills the subscription stream (merged heartbeats included) for every client,
+// wedging the dashboard in a permanent "Reconnecting…" loop (same failure
+// class as PAN-2225). Validate at the boundary: drop loudly instead.
+const isKnownDomainEvent = Schema.is(DomainEventSchema);
+function passesDomainEventSchema(event: unknown): event is DomainEvent {
+  if (isKnownDomainEvent(event)) return true;
+  const candidate = event as { type?: unknown; sequence?: unknown };
+  console.error(
+    `[ws-rpc] dropping domain event that fails DomainEvent schema validation — add it to the contracts union: type=${String(candidate.type)} seq=${String(candidate.sequence)}`,
+  );
+  return false;
 }
 
 function createSystemHeartbeatEvent(): SystemHeartbeatEvent {
@@ -153,10 +174,18 @@ function streamFullParseSnapshots(
   );
 }
 
-function streamResolvedFullParseSnapshots(
+export function streamResolvedFullParseSnapshots(
   resolve: () => Promise<string | null>,
   parse: (file: string) => Promise<ParseResult>,
   model: string | null,
+  // When true, "no transcript file resolved yet" is treated as an EMPTY (ready)
+  // conversation rather than a still-discovering one. Interactive pi/codex
+  // conversations write no transcript until their first turn, so a brand-new
+  // one that is alive and simply waiting for the user's first message would
+  // otherwise sit on "Discovering conversation…" forever. resolve() returns
+  // null ONLY when no transcript exists on disk (a resumed conversation already
+  // has its file), so emitting an empty snapshot here never blanks real history.
+  unresolvedMeansEmpty = false,
 ): Stream.Stream<ConversationEvent, PanRpcError> {
   return Stream.callback<ConversationEvent, PanRpcError>((queue) =>
     Effect.acquireRelease(
@@ -169,6 +198,23 @@ function streamResolvedFullParseSnapshots(
         let parsing = false;
         let pendingReparse = false;
         let sessionFile: string | null = null;
+        // Whether we've already emitted the empty/ready snapshot for an
+        // unresolved interactive conversation, so the 2s discovery poll doesn't
+        // re-offer it on every tick.
+        let announcedEmpty = false;
+        // Lock onto a transcript only once we've actually parsed content from it.
+        // A brand-new pi/codex conversation can briefly resolve to an empty
+        // placeholder transcript while the real session is written under a
+        // different (session-id) filename. The old code stopped discovery at the
+        // FIRST resolved file and tailed that empty file forever — so the panel
+        // showed the empty "How can I help you?" state until a manual refresh
+        // re-subscribed. We keep re-resolving (and switch to the newest file)
+        // until content appears, which also covers a watcher that misses appends.
+        let hasContent = false;
+
+        const stopDiscovery = () => {
+          if (discoveryTimer) { clearInterval(discoveryTimer); discoveryTimer = null; }
+        };
 
         const offer = (event: ConversationEvent) => {
           try {
@@ -184,6 +230,11 @@ function streamResolvedFullParseSnapshots(
           parsing = true;
           try {
             const result = await parse(sessionFile);
+            if (result.messages.length > 0 && !hasContent) {
+              // Real content arrived — lock onto this file and stop polling.
+              hasContent = true;
+              stopDiscovery();
+            }
             offer({
               kind: 'messages' as const,
               messages: result.messages,
@@ -206,28 +257,51 @@ function streamResolvedFullParseSnapshots(
           }
         };
 
+        const watchFile = (file: string) => {
+          try {
+            watcher = fsWatch(file, () => {
+              if (debounce) return;
+              debounce = setTimeout(() => { debounce = null; void emit(); }, 300);
+            });
+          } catch {
+            // If the watcher can't attach, the discovery poll still re-parses.
+          }
+        };
+
         const tryResolve = async (): Promise<void> => {
-          if (stopped || resolving || sessionFile) return;
+          if (stopped || resolving || hasContent) return;
           resolving = true;
           try {
             const resolved = await resolve();
             if (!resolved) {
-              offer({ kind: 'discovering' });
+              // No transcript on disk yet. For an interactive conversation that
+              // means it is brand-new and waiting for its first turn — show the
+              // ready (empty) state like claude-code, not an endless
+              // "Discovering…" spinner. Emit once; keep polling so the first
+              // turn's transcript switches us to showing real content.
+              if (unresolvedMeansEmpty) {
+                if (!sessionFile && !announcedEmpty) {
+                  announcedEmpty = true;
+                  offer({ kind: 'messages', messages: [], workLog: [], streaming: false, snapshot: true });
+                }
+                return;
+              }
+              // Only announce "discovering" before we've ever resolved a file, so
+              // we don't blank an already-shown (empty) snapshot.
+              if (!sessionFile) offer({ kind: 'discovering' });
               return;
             }
-            sessionFile = resolved;
-            if (discoveryTimer) {
-              clearInterval(discoveryTimer);
-              discoveryTimer = null;
-            }
-            await emit();
-            try {
-              watcher = fsWatch(resolved, () => {
-                if (debounce) return;
-                debounce = setTimeout(() => { debounce = null; void emit(); }, 300);
-              });
-            } catch {
-              // If the watcher can't attach, the initial snapshot still rendered.
+            if (resolved !== sessionFile) {
+              // First resolution, or a newer transcript appeared — point the
+              // watcher at it and re-parse.
+              if (watcher) { try { watcher.close(); } catch { /* ignore */ } watcher = null; }
+              sessionFile = resolved;
+              await emit();
+              if (!stopped) watchFile(resolved);
+            } else {
+              // Same (still-empty) file resolved — re-parse in case it grew
+              // without firing a watch event (some FS/watch combos miss appends).
+              await emit();
             }
           } finally {
             resolving = false;
@@ -235,7 +309,9 @@ function streamResolvedFullParseSnapshots(
         };
 
         await tryResolve();
-        if (!sessionFile) {
+        if (!hasContent) {
+          // Keep polling until the transcript has real content. Cheap readdir+stat
+          // every 2s; self-stops via stopDiscovery() the moment content is parsed.
           discoveryTimer = setInterval(() => { void tryResolve(); }, 2000);
         }
 
@@ -251,6 +327,41 @@ function streamResolvedFullParseSnapshots(
       (handle) => Effect.sync(() => handle.stop()),
     ),
   );
+}
+
+type FullParseSnapshotStream = Stream.Stream<ConversationEvent, PanRpcError>;
+
+function ohmypiSnapshotParser(harness: unknown): (file: string) => Promise<ParseResult> {
+  switch (harness) {
+    case 'pi':
+      return parsePiConversationMessages;
+    default:
+      return parseOhmypiConversationMessages;
+  }
+}
+
+export function streamHarnessFullParseSnapshots(
+  sessionName: string,
+  harness: unknown,
+  model: string | null,
+  unresolvedMeansEmpty = false,
+): FullParseSnapshotStream | null {
+  const behavior = getHarnessBehavior(harness as Parameters<typeof getHarnessBehavior>[0]);
+  const streamResolved = (
+    resolve: () => Promise<string | null>,
+    parse: (file: string) => Promise<ParseResult>,
+  ) => streamResolvedFullParseSnapshots(resolve, parse, model, unresolvedMeansEmpty);
+
+  if (behavior.transcriptKind === 'ohmypi-jsonl') {
+    return streamResolved(() => resolvePiSessionPath(sessionName), ohmypiSnapshotParser(harness));
+  }
+  if (behavior.transcriptKind === 'codex-rollout-jsonl') {
+    return streamResolved(() => resolveCodexRolloutPath(sessionName), parseCodexConversationMessages);
+  }
+  if (behavior.transcriptKind === 'acp-jsonl') {
+    return streamResolved(() => resolveAcpTranscriptPath(sessionName), parseAcpConversationMessages);
+  }
+  return null;
 }
 
 function buildAgentIssueLookup(agents: readonly AgentIssueRecord[]): AgentIssueLookup {
@@ -318,37 +429,6 @@ export function filterDomainEventForIssue(event: DomainEvent, issueId: string, a
   return null;
 }
 
-function toDiscoveredSessionSnapshot(session: DiscoveredSession) {
-  return {
-    id: session.id,
-    jsonlPath: session.jsonlPath,
-    sessionId: session.sessionId ?? undefined,
-    workspacePath: session.workspacePath ?? undefined,
-    workspaceHash: session.workspaceHash ?? undefined,
-    messageCount: session.messageCount,
-    firstTs: session.firstTs ?? undefined,
-    lastTs: session.lastTs ?? undefined,
-    modelsUsed: session.modelsUsed,
-    primaryModel: session.primaryModel ?? undefined,
-    tokenInput: session.tokenInput,
-    tokenOutput: session.tokenOutput,
-    estimatedCost: session.estimatedCost,
-    toolsUsed: session.toolsUsed,
-    filesTouched: session.filesTouched,
-    tags: session.tags,
-    summary: session.summary ?? undefined,
-    summaryDetailed: session.summaryDetailed ?? undefined,
-    enrichmentLevel: session.enrichmentLevel,
-    enrichmentModel: session.enrichmentModel ?? undefined,
-    enrichedAt: session.enrichedAt ?? undefined,
-    enrichmentFailed: session.enrichmentFailed,
-    overdeckManaged: session.overdeckManaged,
-    panIssueId: session.panIssueId ?? undefined,
-    panAgentId: session.panAgentId ?? undefined,
-    scannedAt: session.scannedAt,
-  };
-}
-
 const DEFAULT_CONVERSATION_LIMIT = 50;
 const MAX_CONVERSATION_LIMIT = 500;
 
@@ -397,6 +477,7 @@ function normalizeConversationPagination(limit: number | undefined, offset: numb
 }
 
 function normalizeConversationFilter(input: {
+  readonly harness?: string;
   readonly workspacePath?: string;
   readonly primaryModel?: string;
   readonly managed?: boolean;
@@ -418,6 +499,7 @@ function normalizeConversationFilter(input: {
   readonly offset?: number;
 }): ConversationFilter {
   return {
+    harness: input.harness,
     workspacePath: input.workspacePath,
     primaryModel: input.primaryModel,
     managed: input.managed,
@@ -589,9 +671,9 @@ function startSharedPresencePoller(): void {
 
   const tick = async () => {
     try {
-      const sessions = await Effect.runPromise(listSessionNames());
-      const current = new Set(sessions.filter(s => s.trim()));
-
+      const census = await getRuntimeCensus();
+      if (!census.available) return;
+      const current = new Set(census.sessionNames);
       for (const s of sharedPresencePoller.knownSessions) {
         if (!current.has(s)) {
           const issueId = extractIssueIdFromSession(s);
@@ -673,9 +755,6 @@ const PanRpcLayer = PanRpcGroup.toLayer(
     const terminalService = yield* TerminalService;
     const panOpen = yield* PanOpen;
 
-    // PAN-1249: handler set is incomplete — missing routes are stubbed by other code paths.
-    // Suppress the exhaustiveness check until the missing handlers are reintegrated.
-    // @ts-expect-error — missing handlers (getWorkspaceDetail, startPlanning, startAgent, deepWipe, etc.)
     return PanRpcGroup.of({
       // ── subscribeDomainEvents ────────────────────────────────────────────────
       [WS_METHODS.subscribeDomainEvents]: (_input) => {
@@ -684,7 +763,9 @@ const PanRpcLayer = PanRpcGroup.toLayer(
           Stream.map(createSystemHeartbeatEvent),
         );
         return eventStore.streamEvents.pipe(
+          Stream.filter(shouldBroadcastDashboardEvent),
           Stream.map(storedToDomainEvent),
+          Stream.filter(passesDomainEventSchema),
           Stream.merge(heartbeats),
         );
       },
@@ -708,7 +789,9 @@ const PanRpcLayer = PanRpcGroup.toLayer(
       [WS_METHODS.subscribeIssueEvents]: (input) => {
         console.log(`[ws-rpc] subscribeIssueEvents invoked issueId=${input.issueId}`);
         return eventStore.streamEvents.pipe(
+          Stream.filter(shouldBroadcastDashboardEvent),
           Stream.map(storedToDomainEvent),
+          Stream.filter(passesDomainEventSchema),
           Stream.mapEffect((event) =>
             getCachedAgentIssueLookup(readModel).pipe(
               Effect.map((lookup) => filterDomainEventForIssue(event, input.issueId, lookup)),
@@ -724,19 +807,7 @@ const PanRpcLayer = PanRpcGroup.toLayer(
 
       // ── subscribeAgentOutput — live agent stdout lines ───────────────────────
       // Filtered view of the domain event stream for a specific agent
-      [WS_METHODS.subscribeAgentOutput]: (input) =>
-        eventStore.streamEvents.pipe(
-          Stream.filter(
-            (e) => e.type === 'agent.output_received' &&
-              (e.payload as Record<string, unknown>)['agentId'] === input.agentId,
-          ),
-          Stream.flatMap((e) => {
-            const payload = e.payload as { agentId: string; lines: string[] };
-            return Stream.fromIterable(
-              payload.lines.map((line) => ({ agentId: payload.agentId, line })),
-            );
-          }),
-        ),
+      [WS_METHODS.subscribeAgentOutput]: (input) => streamAgentOutput(eventStore, input.agentId),
 
       // ── getSnapshot — returns clean read model data (PAN-433) ─────────────────
       [WS_METHODS.getSnapshot]: (_input) =>
@@ -761,7 +832,7 @@ const PanRpcLayer = PanRpcGroup.toLayer(
       // ── replayEvents ─────────────────────────────────────────────────────────
       [WS_METHODS.replayEvents]: (input) =>
         eventStore.readFrom(input.fromSequence).pipe(
-          Effect.map((stored) => stored.map(storedToDomainEvent)),
+          Effect.map((stored) => stored.map(storedToDomainEvent).filter(passesDomainEventSchema)),
           Effect.mapError(
             (cause) =>
               new PanRpcError({
@@ -798,22 +869,10 @@ const PanRpcLayer = PanRpcGroup.toLayer(
             // tailing their transcript and pushing full snapshots. Claude agent
             // sessions keep the HTTP-poll path — the front-end gate only enables
             // streaming for pi/codex here.
-            if (!conv && /^(agent-|planning-|specialist-)/.test(input.conversationName)) {
+            if (!conv && /^(agent-|planning-|specialist-|strike-|inspect-)|^(flywheel-orchestrator|conv-flywheel-orchestrator)$/.test(input.conversationName)) {
               const harness = yield* Effect.promise(() => resolveAgentHarness(input.conversationName));
-              if (harness === 'pi') {
-                return streamResolvedFullParseSnapshots(
-                  () => resolvePiSessionPath(input.conversationName),
-                  parsePiConversationMessages,
-                  null,
-                );
-              }
-              if (harness === 'codex') {
-                return streamResolvedFullParseSnapshots(
-                  () => resolveCodexRolloutPath(input.conversationName),
-                  parseCodexConversationMessages,
-                  null,
-                );
-              }
+              const stream = streamHarnessFullParseSnapshots(input.conversationName, harness, null);
+              if (stream) return stream;
               return conversationDiscoveringStream();
             }
 
@@ -821,23 +880,10 @@ const PanRpcLayer = PanRpcGroup.toLayer(
               return conversationDiscoveringStream();
             }
 
-            if (conv.harness === 'pi') {
-              return streamResolvedFullParseSnapshots(
-                () => resolvePiSessionPath(conv.tmuxSession),
-                parsePiConversationMessages,
-                conv.model ?? null,
-              );
-            }
+            const stream = streamHarnessFullParseSnapshots(conv.tmuxSession, conv.harness, conv.model ?? null, true);
+            if (stream) return stream;
 
-            if (conv.harness === 'codex') {
-              return streamResolvedFullParseSnapshots(
-                () => resolveCodexRolloutPath(conv.tmuxSession),
-                parseCodexConversationMessages,
-                conv.model ?? null,
-              );
-            }
-
-            if (conv.harness !== 'claude-code' && conv.harness != null) {
+            if (getHarnessBehavior(conv.harness).transcriptKind !== 'claude-jsonl') {
               return conversationDiscoveringStream();
             }
 
@@ -885,15 +931,10 @@ const PanRpcLayer = PanRpcGroup.toLayer(
                     }
                   };
 
-                  // Pass an explicit empty ParseState so pending tool_use entries
-                  // remain in parser state for the watcher instead of being flushed
-                  // and cleared by the non-incremental display path.
-                  const initialState: ParseState = {
-                    pendingToolUse: new Map(),
-                    unresolvedResults: new Map(),
-                    lastSequence: 0,
-                  };
-                  const initial = await parseConversationMessages(sessionFile, 0, initialState);
+                  // Parse the complete existing transcript before subscribing to
+                  // appends. Keep pending tool_use entries in parser state for the
+                  // watcher instead of flushing them into the display-only work log.
+                  const initial = await parseEntireConversation(sessionFile, { flushPendingToolUse: false });
                   let currentByteOffset = initial.byteOffset;
                   let currentContextUsage = contextUsageFromParseResult(initial, model);
                   // Per-subscription high-water mark of the largest full transcript
@@ -1114,6 +1155,24 @@ const PanRpcLayer = PanRpcGroup.toLayer(
           const { sessions, total } = await runDashboardDbJob<{ sessions: DiscoveredSession[]; total: number }>('listDiscoveredSessions', filter);
           return { sessions: sessions.map(toDiscoveredSessionSnapshot), count: sessions.length, total };
         }),
+
+      [WS_METHODS.listSessionsFeed]: (input) =>
+        Effect.promise(async () => {
+          const result = await runDashboardDbJob<{ rows: SessionsFeedRow[]; nextCursor: string | null }>(
+            'listSessionsFeed',
+            normalizeSessionsFeedFilter(input),
+          );
+          return {
+            rows: result.rows.map(toSessionsFeedRowSnapshot),
+            nextCursor: result.nextCursor,
+          };
+        }),
+
+      [WS_METHODS.getSessionsFeedFacets]: (input) =>
+        Effect.promise(async () => runDashboardDbJob(
+          'getSessionsFeedFacets',
+          normalizeSessionsFeedFilter(input),
+        )),
 
       [WS_METHODS.getDiscoveredSession]: (input) =>
         Effect.promise(async () => {

@@ -15,6 +15,7 @@ import { createEventStore, type DbAdapter } from '../../../src/dashboard/server/
 import {
   EventStoreService,
   EventStoreServiceShape,
+  mapDomainEventToDetailed,
 } from '../../../src/dashboard/server/services/domain-services.js';
 
 // ─── Test DB setup ────────────────────────────────────────────────────────────
@@ -71,6 +72,36 @@ function runWithService<A>(eff: Effect.Effect<A, unknown, EventStoreService>): P
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
 describe('EventStoreService', () => {
+  describe('mapDomainEventToDetailed', () => {
+    it('does not emit activity entries for zero-cost events', () => {
+      const detailed = mapDomainEventToDetailed({
+        sequence: 1,
+        type: 'cost.event_recorded',
+        timestamp: new Date().toISOString(),
+        payload: { issueId: 'PAN-1989', agentId: 'agent-pan-1989', cost: 0 },
+      });
+
+      expect(detailed).toBeNull();
+    });
+
+    it('emits activity entries for nonzero cost events', () => {
+      const detailed = mapDomainEventToDetailed({
+        sequence: 1,
+        type: 'cost.event_recorded',
+        timestamp: new Date().toISOString(),
+        payload: { issueId: 'PAN-1989', agentId: 'agent-pan-1989', cost: 0.015 },
+      });
+
+      expect(detailed).toMatchObject({
+        source: 'costs',
+        level: 'info',
+        message: 'Cost event: $0.01 for agent-pan-1989',
+        issueId: 'PAN-1989',
+        triggeringEvent: 'cost.event_recorded',
+      });
+    });
+  });
+
   describe('append', () => {
     it('returns a positive sequence number', async () => {
       const seq = await runWithService(

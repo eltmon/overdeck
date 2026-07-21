@@ -18,14 +18,16 @@ allowed-tools:
 
 # Overdeck Planning Lifecycle
 
-`pan plan <id>` starts a planning session for an issue. Use `--auto` when the user wants the planning agent to run non-interactively and infer defensible defaults. Use `--probe` when the plan needs an adversarial pre-finalize self-pass; `--effort high` enables the same probe instructions automatically. Use `--auto-start` only when an autonomous orchestrator should start the work agent after planning finalizes.
+`pan plan <id>` is the plan-ONLY verb: it starts a planning session for an issue and produces a PRD and xBRIEF, but it does not start the work agent. Use `pan start <id>` when you want planning and work in one command.
+
+Use `--auto` when the user wants the planning agent to run non-interactively and infer defensible defaults. Use `--probe` when the plan needs an adversarial pre-finalize self-pass; `--effort high` enables the same probe instructions automatically.
 
 ## Available commands
 
 ```bash
 pan plan <id> [--auto] [--auto-start] [--probe] [--model <model>] [--harness claude-code|pi|codex] [--effort low|medium|high] [--local|--remote]
-pan plan finalize [-w <path>] [--json] [--no-promote] [--no-quality-lint]
-pan plan done <id>
+pan plan finalize [-w <path>] [--json] [--no-promote] [--no-quality-lint] [--no-prd]
+pan plan done <id> [--no-prd]
 ```
 
 ## Starting planning
@@ -62,10 +64,12 @@ pan plan PAN-1071 --probe
 ## Auto-start after planning
 
 ```bash
-pan plan PAN-1071 --auto --auto-start
+pan start PAN-1071
 ```
 
-`--auto-start` stamps `autoSpawnOnFinalize: true` into the planning agent state so `pan plan finalize` can start the work agent after it promotes the plan. This is an explicit autonomy opt-in for flywheel/orchestrator flows; default human planning leaves the issue in Planned until `pan start <id>` or Start Agent.
+`pan start <id>` is the paved-road way to plan (non-interactively by default) and start the work agent in one command. The work agent auto-starts after planning finalizes.
+
+The legacy `--auto-start` flag on `pan plan <id>` is deprecated and kept only through the deprecation window. It stamped `autoSpawnOnFinalize: true` into the planning agent state so `pan plan finalize` could start the work agent after it promoted the plan; use `pan start <id>` instead.
 
 ## Finalizing (`pan plan finalize`)
 
@@ -78,12 +82,16 @@ pan plan finalize
 What it does:
 
 1. Reads `.pan/spec.vbrief.json` from the current workspace (walks up if needed).
-2. Materializes each `plan.items[]` entry into a corresponding bead, respecting declared dependencies.
+2. Validates the tasks already stored in `plan.items[]`, including their declared dependencies.
 3. Flips the spec's `plan.status` from `draft` to `proposed`.
 4. Calls the dashboard's complete-planning endpoint to promote the canonical spec into `<projectRoot>/.pan/specs/`, commit it on main, push, transition the tracker state to Planned, and terminate the planning session — same flow as `pan plan done` and the dashboard Done button.
-5. Returns a summary of beads created and promotion status, or JSON with `--json`.
+5. Returns a summary of finalized xBRIEF tasks and promotion status, or JSON with `--json`.
 
-Use `-w <path>` to point at another workspace. Use `--no-promote` to leave the spec at `status=proposed` without promoting (rare; for humans who want to review the plan in the dashboard before clicking Done). Finalize runs vBRIEF quality lint by default; use `--no-quality-lint` only as a loud one-run emergency bypass when the plan must be promoted despite known quality issues.
+Use `-w <path>` to point at another workspace. Use `--no-promote` to leave the spec at `status=proposed` without promoting (rare; for humans who want to review the plan in the dashboard before clicking Done). Finalize runs xBRIEF quality lint by default; use `--no-quality-lint` only as a loud one-run emergency bypass when the plan must be promoted despite known quality issues.
+
+### PRD-first gate
+
+Finalize and complete-planning refuse to promote a plan unless a **PRD draft** of at least 20 lines exists for the issue. `roles/plan.md` has always required the PRD as the first artifact; this gate makes it mechanical. The gate searches, in order, for `<ISSUE-ID>.md` (uppercase then lowercase) under `<projectRoot>/.pan/drafts/` then `<workspace>/.pan/drafts/`; the first existing file with ≥20 lines satisfies it. A found-but-thinner draft fails with its line count; a fully missing draft fails naming the canonical path to write. `pan start <id> --auto` is structurally exempt (it synthesizes a minimal xBRIEF and never POSTs complete-planning, so the gate cannot block it). Use `--no-prd` (on `finalize` or `done`) only for a genuinely trivial issue that went through interactive planning anyway — it prints a yellow `⚠ PRD gate SKIPPED` warning and tells the endpoint to skip the check too.
 
 ## Completing planning (`pan plan done`)
 
@@ -93,17 +101,16 @@ Use `-w <path>` to point at another workspace. Use `--no-promote` to leave the s
 pan plan done PAN-1071
 ```
 
-This promotes the workspace vBRIEF to `<projectRoot>/.pan/specs/`, syncs beads, and transitions the tracker state to Planned.
+This promotes the workspace xBRIEF to `<projectRoot>/.pan/specs/`, syncs xBRIEF tasks, and transitions the tracker state to Planned. It is subject to the same PRD-first gate as `finalize`; pass `--no-prd` only for a genuinely trivial issue.
 
 ## Related commands
 
-- `pan start <id>` — start implementation from an existing vBRIEF and beads.
-- `pan start <id> --auto` — skip planning and synthesize a minimal vBRIEF/beads from the issue title/body before starting work.
+- `pan start <id>` — the paved road: plan (if needed) and start implementation in one command.
 - `pan tell <id> <message>` — send feedback to a running planning or work agent.
 - `pan kill <id>` — stop a planning or work agent without deleting the workspace.
 
 ## See also
 
 - `roles/plan.md` — planning role prompt.
-- `docs/VBRIEF.md` — vBRIEF schema, artifact locations, lifecycle states.
+- `docs/XBRIEF.md` — xBRIEF schema, artifact locations, lifecycle states.
 - `docs/SKILLS-CONVENTION.md` — skill/CLI naming convention.

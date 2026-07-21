@@ -8,7 +8,7 @@ import { Command } from 'commander';
 import { listCommand } from './list.js';
 import { wakeCommand } from './wake.js';
 import { resetCommand } from './reset.js';
-import { doneCommand } from './done.js';
+import { doneAndExitCommand } from './done.js';
 import { logsCommand, cleanupLogsCommand } from './logs.js';
 
 export function registerSpecialistsCommands(program: Command): void {
@@ -38,13 +38,30 @@ export function registerSpecialistsCommands(program: Command): void {
     .option('--all', 'Reset ALL specialists (wipe all context)')
     .action(resetCommand);
 
+  // pan specialists discovery-ready review <issueId> — PAN-1862 Phase A signal
+  specialists
+    .command('discovery-ready <type> <issueId>')
+    .description('Signal that the review parent finished shared discovery — forks + launches the convoy (PAN-1862)')
+    .action(async (type: string, issueId: string) => {
+      if (type !== 'review') {
+        console.error(`discovery-ready only applies to the review specialist (got '${type}')`);
+        process.exit(1);
+      }
+      const { handleReviewDiscoveryReady } = await import('../../../lib/cloister/review-agent.js');
+      const result = await handleReviewDiscoveryReady(issueId, { source: 'cli-signal' });
+      console.log(result.message);
+      process.exit(result.success ? 0 : 1);
+    });
+
   // pan specialists done <type> <issueId> --status <passed|failed|blocked> [--notes "..."]
   specialists
     .command('done <type> <issueId>')
     .description('Signal specialist completion (deterministic status update)')
     .requiredOption('--status <status>', 'Result status: passed, failed, or review-only blocked')
+    .option('--item <itemId>', 'xBRIEF item ID (required for inspect verdicts)')
     .option('--notes <notes>', 'Optional notes about the result')
-    .action(doneCommand);
+    .option('--reviewers <verdicts>', 'PAN-1862 (review only): per-reviewer verdicts, e.g. "security=passed,correctness=blocked"')
+    .action(doneAndExitCommand);
 
   // pan specialists logs <project> <type> [runId]
   specialists

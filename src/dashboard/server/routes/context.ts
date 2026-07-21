@@ -23,17 +23,22 @@ import {
 import { Effect, Layer, Schema } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
+import { workspaceContextWithoutProjectLayer } from '../../../lib/context-layers/assemble.js';
 import { renderForHarness, validateTemplate } from '../../../lib/context-layers/harness.js';
 import {
   globalContextFile as defaultGlobalContextFile,
   projectContextFile,
+  resolveProjectContextFile,
   workspaceContextFile,
+  resolveWorkspaceContextFile,
   codexGlobalContextFile,
 } from '../../../lib/context-layers/layers.js';
 import { hasManagedRegion, userContentOutsideRegion } from '../../../lib/context-layers/render.js';
 import { CLAUDE_DIR, getOverdeckHome, isDevMode, SYNC_SOURCES } from '../../../lib/paths.js';
 import { listProjects, type ProjectConfig } from '../../../lib/projects.js';
 import { operatorInterventionEvent } from '../../../lib/operator-interventions.js';
+import { panCliInvocation } from '../../../lib/pan-cli-invocation.js';
+import { getHarnessBehavior } from '../../../lib/runtimes/behavior.js';
 import { jsonResponse } from '../http-helpers.js';
 import { EventStoreService } from '../services/domain-services.js';
 import { httpHandler } from './http-handler.js';
@@ -66,7 +71,7 @@ type DashboardContextSyncResponse = ContextSyncResponse & {
 
 type RuleScope = 'universal' | 'dev';
 
-const PREVIEW_HARNESSES: readonly Harness[] = ['claude-code', 'pi', 'codex'];
+const PREVIEW_HARNESSES: readonly Harness[] = ['claude-code', 'ohmypi', 'codex', 'acp'];
 const FRONTMATTER_RE = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/;
 const execFileAsync = promisify(execFile);
 const decodePreviewRequest = Schema.decodeUnknownSync(ContextPreviewRequest);
@@ -264,13 +269,13 @@ async function buildSyncTargets(projects: ProjectEntry[]): Promise<ContextSyncTa
   ];
 
   for (const { key, config } of projects) {
-    const projectMd = await readOptionalFile(projectContextFile(config.path));
+    const projectMd = await readOptionalFile(resolveProjectContextFile(config.path));
     if (!projectMd.exists) continue; // no project.md → sync leaves this project's files alone
     targets.push(
       await describeSyncTarget('claude-code', 'project', key, `${config.name} · CLAUDE.md`, join(config.path, 'CLAUDE.md')),
     );
     targets.push(
-      await describeSyncTarget('pi', 'project', key, `${config.name} · AGENTS.md`, join(config.path, 'AGENTS.md')),
+      await describeSyncTarget('ohmypi', 'project', key, `${config.name} · AGENTS.md`, join(config.path, 'AGENTS.md')),
     );
   }
 
@@ -287,14 +292,14 @@ export async function buildContextLayerState(
   ];
 
   for (const project of catalog.projects) {
-    resolvedLayers.push(await layerRecord(projectContextFile(project.config.path), {
+    resolvedLayers.push(await layerRecord(resolveProjectContextFile(project.config.path), {
       kind: 'project',
       projectKey: project.key,
     }));
   }
 
   for (const workspace of catalog.workspaces) {
-    resolvedLayers.push(await layerRecord(workspaceContextFile(workspace.path), {
+    resolvedLayers.push(await layerRecord(resolveWorkspaceContextFile(workspace.path), {
       kind: 'workspace',
       projectKey: workspace.projectKey,
       workspacePath: workspace.path,
@@ -377,7 +382,11 @@ async function renderBundledRulesAsync(harness: Harness): Promise<string> {
 function renderLayerSections(layers: readonly ResolvedLayer[], drafts: ReadonlyMap<string, string>, harness: Harness): string {
   return layers
     .map((layer) => {
-      const rendered = renderForHarness(contentForLayer(layer, drafts), harness).trim();
+      const raw = contentForLayer(layer, drafts);
+      const effective = harness === 'acp' && layer.kind === 'workspace'
+        ? workspaceContextWithoutProjectLayer(raw)
+        : raw;
+      const rendered = renderForHarness(effective, harness).trim();
       const label = layer.kind === 'global'
         ? 'Global layer'
         : layer.kind === 'project'
@@ -389,7 +398,7 @@ function renderLayerSections(layers: readonly ResolvedLayer[], drafts: ReadonlyM
 }
 
 async function previewForHarness(layers: readonly ResolvedLayer[], drafts: ReadonlyMap<string, string>, harness: Harness): Promise<string> {
-  const title = harness === 'claude-code' ? 'Claude Code' : harness === 'codex' ? 'Codex' : 'Pi';
+  const title = getHarnessBehavior(harness).displayName;
   return [
     `# Overdeck injected context preview (${title})`,
     renderLayerSections(layers, drafts, harness),
@@ -407,18 +416,22 @@ function fullPromptPreview(previews: Record<Harness, string>): string {
     '',
     previews['claude-code'] || '(no rendered context)',
     '',
-    '## Overdeck-controlled Pi bundle',
+    '## Overdeck-controlled oh-my-pi bundle',
     '',
-    previews.pi || '(no rendered context)',
+    previews.ohmypi || '(no rendered context)',
     '',
     '## Overdeck-controlled Codex bundle',
     '',
     previews.codex || '(no rendered context)',
     '',
+    '## Overdeck-controlled ACP bundle',
+    '',
+    previews.acp || '(no rendered context)',
+    '',
     '## Runtime-only sections',
     '',
     '- Memory retrieval: injected at agent spawn when enabled; unavailable in this layer editor preview.',
-    '- Issue briefing and vBRIEF excerpts: injected per agent run; unavailable until a specific issue/session is selected.',
+    '- Issue briefing and xBRIEF excerpts: injected per agent run; unavailable until a specific issue/session is selected.',
     '- Status and tool output: produced during the live session; not part of static context layers.',
   ].join('\n');
 }
@@ -477,8 +490,9 @@ export async function previewContextLayers(
     operation: 'preview',
     previews: {
       'claude-code': previews['claude-code'],
-      pi: previews.pi,
+      ohmypi: previews.ohmypi,
       codex: previews.codex,
+      acp: previews.acp,
       fullPrompt: fullPromptPreview(previews),
     },
     diagnostics: diagnosticsForLayers(layers, drafts),
@@ -542,7 +556,8 @@ export async function saveContextLayer(
 }
 
 async function runPanContextSync(): Promise<ContextSyncCommandResult> {
-  const { stdout, stderr } = await execFileAsync('pan', ['context', 'sync'], {
+  const invocation = panCliInvocation(['context', 'sync']);
+  const { stdout, stderr } = await execFileAsync(invocation.command, invocation.args, {
     encoding: 'utf-8',
   });
   return { stdout, stderr };

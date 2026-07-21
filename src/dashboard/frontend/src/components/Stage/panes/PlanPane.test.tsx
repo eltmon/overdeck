@@ -5,14 +5,14 @@ import { PlanPane } from './PlanPane'
 import type { StageContext } from '../types'
 import type { WorkspacePane } from '../../../lib/panesStore'
 
-vi.mock('../../CommandDeck/ZoneCOverviewTabs/VBriefTab', () => ({
-  VBriefTab: ({ issueId }: { issueId: string }) => (
-    <div data-testid="vbrieftab" data-issue={issueId} />
+vi.mock('../../CommandDeck/ZoneCOverviewTabs/XBriefTab', () => ({
+  XBriefTab: ({ issueId }: { issueId: string }) => (
+    <div data-testid="xbrieftab" data-issue={issueId} />
   ),
 }))
-vi.mock('../../CommandDeck/ZoneCOverviewTabs/BeadsTab', () => ({
-  BeadsTab: ({ issueId }: { issueId: string }) => (
-    <div data-testid="beadstab" data-issue={issueId} />
+vi.mock('../../CommandDeck/ZoneCOverviewTabs/TasksTab', () => ({
+  TasksTab: ({ issueId }: { issueId: string }) => (
+    <div data-testid="taskstab" data-issue={issueId} />
   ),
 }))
 
@@ -20,16 +20,16 @@ const ctx: StageContext = { workspaceId: 'PAN-1549', openPane: () => {} }
 const pane: WorkspacePane = { paneId: 'p', paneType: 'plan', label: 'Plan', createdAt: 1 }
 
 describe('PlanPane', () => {
-  it('renders VBriefTab for the workspace issue by default', () => {
+  it('renders XBriefTab for the workspace issue by default', () => {
     render(<PlanPane pane={pane} ctx={ctx} />)
-    expect(screen.getByTestId('vbrieftab')).toHaveAttribute('data-issue', 'PAN-1549')
-    expect(screen.queryByTestId('beadstab')).toBeNull()
+    expect(screen.getByTestId('xbrieftab')).toHaveAttribute('data-issue', 'PAN-1549')
+    expect(screen.queryByTestId('taskstab')).toBeNull()
   })
 
-  it('toggles to BeadsTab', () => {
+  it('toggles to TasksTab', () => {
     render(<PlanPane pane={pane} ctx={ctx} />)
-    fireEvent.click(screen.getByRole('tab', { name: 'Beads' }))
-    expect(screen.getByTestId('beadstab')).toHaveAttribute('data-issue', 'PAN-1549')
-    expect(screen.queryByTestId('vbrieftab')).toBeNull()
+    fireEvent.click(screen.getByRole('tab', { name: 'Tasks' }))
+    expect(screen.getByTestId('taskstab')).toHaveAttribute('data-issue', 'PAN-1549')
+    expect(screen.queryByTestId('xbrieftab')).toBeNull()
   })
 })

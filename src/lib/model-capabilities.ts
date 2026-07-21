@@ -8,7 +8,7 @@
  * Scores: 0-100 where 100 = best in class
  * Cost: $/1M tokens (input + output average)
  *
- * Last updated: 2026-01-29
+ * Last updated: 2026-06-30
  * Sources:
  * - SWE-bench Verified leaderboard (vals.ai)
  * - LiveCodeBench v6
@@ -271,6 +271,31 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
     notes: 'Successor to Opus 4.5. Same pricing, 1M context available (opt-in beta). Best for planning, security, complex reasoning.',
   },
 
+  'claude-sonnet-5': {
+    model: 'claude-sonnet-5',
+    provider: 'anthropic',
+    displayName: 'Claude Sonnet 5',
+    // Introductory pricing through 2026-08-31: $2/M input, $10/M output.
+    // Standard pricing starts 2026-09-01: $3/M input, $15/M output.
+    costPer1MTokens: 6.0,
+    contextWindow: 1000000,
+    skills: {
+      'code-generation': 96,
+      'code-review': 96,
+      debugging: 94,
+      planning: 92,
+      documentation: 94,
+      testing: 94,
+      security: 90,
+      performance: 90,
+      synthesis: 92,
+      speed: 70,
+      'context-length': 95,
+    },
+    effortLevels: ['low', 'medium', 'high'],
+    notes: 'Current Sonnet generation (June 2026). Balanced native Anthropic model for implementation, review, testing, and routine agent work. 1M context at standard pricing; introductory pricing through 2026-08-31 is $2/M input and $10/M output, then $3/M input and $15/M output from 2026-09-01. Scores are provisional until benchmarks are verified.',
+  },
+
   'claude-sonnet-4-6': {
     model: 'claude-sonnet-4-6',
     provider: 'anthropic',
@@ -455,6 +480,75 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
       'context-length': 100,
     },
     notes: 'Most advanced OpenAI model. Enhanced reasoning and agentic capabilities over GPT-5.4. Pro subscribers only.',
+  },
+
+  'gpt-5.6-sol': {
+    model: 'gpt-5.6-sol',
+    provider: 'openai',
+    displayName: 'GPT-5.6 Sol',
+    costPer1MTokens: 17.5, // $5.00 in / $30.00 out
+    contextWindow: CLIPROXY_CODEX_CONTEXT_WINDOW,
+    minTier: 'plus',
+    skills: {
+      'code-generation': 98,
+      'code-review': 95,
+      debugging: 97,
+      planning: 96,
+      documentation: 93,
+      testing: 95,
+      security: 92,
+      performance: 93,
+      synthesis: 95,
+      speed: 65,
+      'context-length': 95,
+    },
+    notes: 'OpenAI flagship (July 2026). New default. Successor to GPT-5.5 with improved agentic/shell coding. Effective Claude Code/CLIProxy ceiling is 150K (CLIPROXY_CODEX_CONTEXT_WINDOW), 1M marketing context.',
+  },
+
+  'gpt-5.6-terra': {
+    model: 'gpt-5.6-terra',
+    provider: 'openai',
+    displayName: 'GPT-5.6 Terra',
+    costPer1MTokens: 8.75, // $2.50 in / $15.00 out
+    contextWindow: CLIPROXY_CODEX_CONTEXT_WINDOW,
+    minTier: 'plus',
+    skills: {
+      'code-generation': 97,
+      'code-review': 94,
+      debugging: 96,
+      planning: 95,
+      documentation: 92,
+      testing: 94,
+      security: 91,
+      performance: 92,
+      synthesis: 94,
+      speed: 70,
+      'context-length': 95,
+    },
+    notes: 'OpenAI balanced tier (July 2026). GPT-5.5-competitive at roughly half the cost. Effective Claude Code/CLIProxy ceiling is 150K (CLIPROXY_CODEX_CONTEXT_WINDOW), 1M marketing context.',
+  },
+
+  'gpt-5.6-luna': {
+    model: 'gpt-5.6-luna',
+    provider: 'openai',
+    displayName: 'GPT-5.6 Luna',
+    costPer1MTokens: 3.5, // $1.00 in / $6.00 out
+    contextWindow: CLIPROXY_CODEX_CONTEXT_WINDOW,
+    minTier: 'plus',
+    skills: {
+      'code-generation': 82,
+      'code-review': 78,
+      debugging: 76,
+      planning: 72,
+      documentation: 80,
+      testing: 76,
+      security: 68,
+      performance: 72,
+      synthesis: 75,
+      speed: 90,
+      'context-length': 90,
+    },
+    notes: "OpenAI fastest/cheapest tier (July 2026). Successor to GPT-5.4 Mini's market position. Effective Claude Code/CLIProxy ceiling is 150K (CLIPROXY_CODEX_CONTEXT_WINDOW), 1M marketing context.",
   },
 
   'gpt-5.5': {
@@ -656,9 +750,9 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
   'gemini-2.5-pro': { model: 'gemini-2.5-pro', provider: 'google', displayName: 'Gemini 2.5 Pro (deprecated)', costPer1MTokens: 7.0, contextWindow: 1000000, skills: { 'code-generation': 90, 'code-review': 88, debugging: 86, planning: 86, documentation: 88, testing: 86, security: 80, performance: 86, synthesis: 90, speed: 70, 'context-length': 100 } },
   'gemini-2.5-flash': { model: 'gemini-2.5-flash', provider: 'google', displayName: 'Gemini 2.5 Flash (deprecated)', costPer1MTokens: 0.4, contextWindow: 1000000, skills: { 'code-generation': 78, 'code-review': 74, debugging: 70, planning: 66, documentation: 74, testing: 70, security: 58, performance: 68, synthesis: 74, speed: 94, 'context-length': 100 } },
 
-  // ═══════════════════════════════════════════════════════════════════════════
   // KIMI MODELS
-  // ═══════════════════════════════════════════════════════════════════════════
+  'k3': { model: 'k3', provider: 'kimi', displayName: 'Kimi K3', costPer1MTokens: 9, contextWindow: 262144, skills: { 'code-generation': 95, 'code-review': 93, debugging: 93, planning: 90, documentation: 90, testing: 90, security: 85, performance: 88, synthesis: 94, speed: 70, 'context-length': 98 }, notes: 'Kimi K3 coding endpoint alias. 2.8T MoE, always-thinking, 256K context. Source: https://www.kimi.com/code/docs/en/third-party-tools/other-coding-agents.html' },
+  'k3[1m]': { model: 'k3[1m]', provider: 'kimi', displayName: 'Kimi K3 (1M)', costPer1MTokens: 9, contextWindow: 1048576, skills: { 'code-generation': 95, 'code-review': 93, debugging: 93, planning: 90, documentation: 90, testing: 90, security: 85, performance: 88, synthesis: 94, speed: 70, 'context-length': 100 }, notes: 'Kimi K3 coding endpoint 1M alias. 2.8T MoE, always-thinking, 1,048,576-token context. Source: https://www.kimi.com/code/docs/en/third-party-tools/other-coding-agents.html' },
 
   'kimi-k2.7-code': {
     model: 'kimi-k2.7-code',

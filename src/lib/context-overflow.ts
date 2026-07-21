@@ -6,6 +6,7 @@
 export const CONTEXT_OVERFLOW_PATTERNS = [
   'input exceeds the context window',
   'exceeds the context window of this model',
+  'exceeded model token limit',
 ];
 
 export const CONTEXT_OVERFLOW_TAIL_LINES = 40;
@@ -27,8 +28,9 @@ export function isContextOverflowError(err: unknown): boolean {
 }
 
 export function isContextOverflowTail(output: string): boolean {
-  const recentTail = output.split('\n').slice(-CONTEXT_OVERFLOW_TAIL_LINES).join('\n');
-  return CONTEXT_OVERFLOW_PATTERNS.some(pattern => recentTail.includes(pattern));
+  const recentTail = output.split('\n').slice(-CONTEXT_OVERFLOW_TAIL_LINES).join('\n').toLowerCase();
+  const patterns = [...CONTEXT_OVERFLOW_PATTERNS, 'prompt is too long'];
+  return patterns.some(pattern => recentTail.includes(pattern.toLowerCase()));
 }
 
 /**
@@ -55,7 +57,7 @@ export function buildCompactRecoverySeedMessage(issueId: string, summary: string
   lines.push(
     'Reconstruct your exact work-in-progress from durable artifacts:',
     '1. Read .pan/continue.json for resumePoint, decisions, hazards, feedback, and sessionHistory.',
-    '2. Run `bd ready` for your open beads and `bd show <id>` for the bead you are working on.',
+    '2. Run `pan task next` for the next open item and `pan task show <issue> <item>` for its current state.',
     '3. Inspect `git status` and `git diff` for uncommitted work already on disk.',
     'Then continue from that reconstructed state and complete the next required bead — do not wait for further instructions.',
   );

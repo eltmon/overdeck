@@ -25,6 +25,7 @@ vi.mock('../config-yaml.js', () => ({
     flywheel: 'claude-opus-4-7',
     strike: 'workhorse:expensive',
     sequencer: 'workhorse:expensive',
+    knowledge: 'workhorse:expensive',
   },
   DEFAULT_WORKHORSES: {
     expensive: 'claude-opus-4-7',
@@ -39,6 +40,7 @@ vi.mock('../config-yaml.js', () => ({
     ship: { model: 'workhorse:mid' },
     strike: { model: 'workhorse:expensive' },
     sequencer: { model: 'workhorse:expensive' },
+    knowledge: { model: 'workhorse:expensive' },
     flywheel: { model: 'claude-opus-4-7', effort: 'high', maxAgents: 8, scope: 'pan-only' },
   },
   ROLE_EFFORTS: ['low', 'medium', 'high', 'xhigh', 'max'],
@@ -103,6 +105,7 @@ function baseConfig(overrides: Record<string, unknown> = {}) {
       providerPlan: {},
       providerHarnesses: {},
       openrouterFavorites: [],
+      defaultConversationModel: 'claude-sonnet-4-6',
       trackerKeys: {},
       tmux: { configMode: 'managed' },
       conversations: {
@@ -153,29 +156,25 @@ describe('getDefaultConversationModelApi', () => {
     mockLoadConfig.mockReturnValue(baseConfig());
   });
 
-  it('defaults to Claude Sonnet when OpenAI is not enabled', async () => {
+  it('returns the explicitly configured default conversation model', async () => {
+    mockLoadConfig.mockReturnValue(baseConfig({ defaultConversationModel: 'claude-haiku-4-5' }));
+
     const { getDefaultConversationModelApi } = await import('../settings-api.js');
 
-    expect(getDefaultConversationModelApi()).toBe('claude-sonnet-4-6');
-    expect(mockResolveModelId).toHaveBeenCalledWith('claude-sonnet-4-6');
+    expect(getDefaultConversationModelApi()).toBe('claude-haiku-4-5');
+    expect(mockResolveModelId).toHaveBeenCalledWith('claude-haiku-4-5');
   });
 
-  it('defaults to GPT-5.5 when OpenAI is enabled', async () => {
-    mockLoadConfig.mockReturnValue(baseConfig({ enabledProviders: new Set(['anthropic', 'openai']) }));
+  it('returns undefined when default_conversation_model is unset (PAN-2589: Settings must still render)', async () => {
+    mockLoadConfig.mockReturnValue(baseConfig({
+      enabledProviders: new Set(['anthropic', 'openai']),
+      defaultConversationModel: undefined,
+    }));
 
     const { getDefaultConversationModelApi } = await import('../settings-api.js');
 
-    expect(getDefaultConversationModelApi()).toBe('gpt-5.5');
-    expect(mockResolveModelId).toHaveBeenCalledWith('gpt-5.5');
-  });
-
-  it('defaults to Qwen3 Coder Plus when only DashScope is enabled', async () => {
-    mockLoadConfig.mockReturnValue(baseConfig({ enabledProviders: new Set(['dashscope']) }));
-
-    const { getDefaultConversationModelApi } = await import('../settings-api.js');
-
-    expect(getDefaultConversationModelApi()).toBe('qwen3-coder-plus');
-    expect(mockResolveModelId).toHaveBeenCalledWith('qwen3-coder-plus');
+    expect(getDefaultConversationModelApi()).toBeUndefined();
+    expect(mockResolveModelId).not.toHaveBeenCalled();
   });
 });
 
@@ -252,29 +251,30 @@ describe('loadSettingsApi', () => {
       },
       test: { model: 'workhorse:mid' },
       ship: { model: 'workhorse:mid' },
+      knowledge: { model: 'workhorse:expensive' },
       flywheel: { model: 'claude-opus-4-7', effort: 'high', maxAgents: 8, scope: 'pan-only' },
     });
     expect(settings.models).not.toHaveProperty('overrides');
   });
 
   it('exposes built-in provider harness defaults separately from overrides', async () => {
-    mockLoadConfig.mockReturnValue(baseConfig({ providerHarnesses: { openai: 'pi' } }));
+    mockLoadConfig.mockReturnValue(baseConfig({ providerHarnesses: { openai: 'ohmypi' } }));
 
     const { loadSettingsApi } = await import('../settings-api.js');
     const settings = loadSettingsApi();
 
-    expect(settings.models.provider_harnesses).toEqual({ openai: 'pi' });
+    expect(settings.models.provider_harnesses).toEqual({ openai: 'ohmypi' });
     expect(settings.models.provider_default_harnesses).toEqual({
       anthropic: 'claude-code',
       openai: 'codex',
-      google: 'pi',
-      minimax: 'pi',
-      zai: 'pi',
-      kimi: 'pi',
-      mimo: 'pi',
-      openrouter: 'pi',
-      nous: 'pi',
-      dashscope: 'pi',
+      google: 'ohmypi',
+      minimax: 'ohmypi',
+      zai: 'ohmypi',
+      kimi: 'claude-code', // PAN-2102: omp can no longer launch Kimi; default to native claude-code
+      mimo: 'ohmypi',
+      openrouter: 'ohmypi',
+      nous: 'ohmypi',
+      dashscope: 'ohmypi',
     });
   });
 
@@ -304,7 +304,7 @@ describe('loadSettingsApi', () => {
     });
 
     await Effect.runPromise(setRoleConfig('flywheel', {
-      harness: 'pi',
+      harness: 'ohmypi',
       model: 'claude-sonnet-4-6',
       effort: 'medium',
       maxAgents: 4,
@@ -313,13 +313,13 @@ describe('loadSettingsApi', () => {
 
     const written = String(mockWriteFile.mock.calls[0]?.[1]);
     expect(written).toContain('flywheel:');
-    expect(written).toContain('harness: pi');
+    expect(written).toContain('harness: ohmypi');
     expect(written).toContain('maxAgents: 4');
   });
 
   it('removes role harness overrides when saved as null or empty', async () => {
     mockLoadConfig.mockReturnValue(baseConfig({
-      roles: { work: { model: 'workhorse:mid', harness: 'pi' } },
+      roles: { work: { model: 'workhorse:mid', harness: 'ohmypi' } },
     }));
     const { loadSettingsApi, saveSettingsApi, setRoleConfig } = await import('../settings-api.js');
     const settings = loadSettingsApi();
@@ -336,7 +336,7 @@ describe('loadSettingsApi', () => {
     } as never));
 
     let written = String(mockWriteFile.mock.calls[0]?.[1]);
-    expect(written).not.toContain('harness: pi');
+    expect(written).not.toContain('harness: ohmypi');
     expect(written).not.toContain('harness: null');
 
     mockWriteFile.mockClear();
@@ -346,7 +346,7 @@ describe('loadSettingsApi', () => {
     } as never));
 
     written = String(mockWriteFile.mock.calls[0]?.[1]);
-    expect(written).not.toContain('harness: pi');
+    expect(written).not.toContain('harness: ohmypi');
     expect(written).not.toContain('harness: ""');
   });
 
@@ -487,20 +487,20 @@ describe('saveSettingsApi', () => {
       ...settings,
       models: {
         ...settings.models,
-        provider_harnesses: { openai: 'pi' },
+        provider_harnesses: { openai: 'ohmypi' },
       },
     }));
 
     const written = String(mockWriteFile.mock.calls[0]?.[1]);
     expect(written).toContain('openai:');
-    expect(written).toContain('harness: pi');
+    expect(written).toContain('harness: ohmypi');
 
-    mockLoadConfig.mockReturnValue(baseConfig({ providerHarnesses: { openai: 'pi' } }));
-    expect(loadSettingsApi().models.provider_harnesses?.openai).toBe('pi');
+    mockLoadConfig.mockReturnValue(baseConfig({ providerHarnesses: { openai: 'ohmypi' } }));
+    expect(loadSettingsApi().models.provider_harnesses?.openai).toBe('ohmypi');
   });
 
   it('removes provider harness overrides when saved as empty or absent', async () => {
-    mockLoadConfig.mockReturnValue(baseConfig({ providerHarnesses: { openai: 'pi' } }));
+    mockLoadConfig.mockReturnValue(baseConfig({ providerHarnesses: { openai: 'ohmypi' } }));
     const { loadSettingsApi, saveSettingsApi } = await import('../settings-api.js');
     const settings = loadSettingsApi();
 
@@ -513,7 +513,7 @@ describe('saveSettingsApi', () => {
     }));
 
     let written = String(mockWriteFile.mock.calls[0]?.[1]);
-    expect(written).not.toContain('harness: pi');
+    expect(written).not.toContain('harness: ohmypi');
     expect(written).not.toContain('harness: ""');
 
     mockWriteFile.mockClear();
@@ -526,7 +526,7 @@ describe('saveSettingsApi', () => {
     }));
 
     written = String(mockWriteFile.mock.calls[0]?.[1]);
-    expect(written).not.toContain('harness: pi');
+    expect(written).not.toContain('harness: ohmypi');
   });
 
   it('round-trips parent sub-role model refs through saved and loaded settings', async () => {
@@ -793,7 +793,7 @@ describe('validateSettingsApi', () => {
     });
 
     expect(result.valid).toBe(false);
-    expect(result.errors).toContain('roles.flywheel.harness must be claude-code, pi, codex, null, or empty string');
+    expect(result.errors).toContain('roles.flywheel.harness must be claude-code, ohmypi, codex, acp, null, or empty string');
     expect(result.errors).toContain('roles.flywheel.effort must be one of low, medium, high, xhigh, max');
     expect(result.errors).toContain('roles.flywheel.maxAgents must be a positive integer');
     expect(result.errors).toContain('roles.flywheel.scope must be pan-only or all-tracked-projects');

@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { resolvePlanningSessionHarness } from '../spawn-planning-session.js';
 
 const mocks = vi.hoisted(() => ({
   resolveHarness: vi.fn(),
@@ -14,8 +15,6 @@ describe('resolvePlanningSessionHarness', () => {
       if (explicit) return explicit;
       return model === 'gpt-5.5' ? 'codex' : 'claude-code';
     });
-
-    const { resolvePlanningSessionHarness } = await import('../spawn-planning-session.js');
 
     await expect(resolvePlanningSessionHarness('gpt-5.5')).resolves.toBe('codex');
     await expect(resolvePlanningSessionHarness('gpt-5.5', 'pi')).resolves.toBe('pi');

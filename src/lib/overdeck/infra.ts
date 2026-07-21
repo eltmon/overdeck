@@ -1,4 +1,10 @@
-import { existsSync, mkdirSync, readFileSync } from 'node:fs';
+/**
+ * Runtime infrastructure for the canonical overdeck.db cache.
+ * Schema top-ups tolerate idempotency errors, log unexpected failures without
+ * blocking boot, and getOverdeckDatabaseSync follows them with a report-only
+ * schema audit that warns about drift without mutating the database.
+ */
+import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { readFile } from 'node:fs/promises';
 import { isAbsolute, join } from 'node:path';
@@ -15,14 +21,51 @@ import {
   type SqliteScalar,
 } from '../database/driver.js';
 import {
+  getIssueRecordPath,
   readIssueRecordSync,
-  writeIssueRecordSync,
   type PanIssueRecord,
 } from '../pan-dir/record.js';
+import { updateIssueRecord } from '../pan-dir/record-update.js';
 import type { ProjectConfig } from '../projects.js';
 import { packageRoot, getOverdeckHome } from '../paths.js';
 import { sessionExists as tmuxSessionExists, killSession as tmuxKillSession, getAgentSessions } from '../tmux.js';
 import { getOverdeckDatabasePath, OVERDECK_MIGRATION_PATH } from './paths.js';
+import {
+  auditOverdeckSchemaSync,
+  type SchemaTopUpExpectations,
+} from './schema-audit.js';
+
+export const OVERDECK_SCHEMA_TOP_UP_EXPECTATIONS: SchemaTopUpExpectations = {
+  columns: [
+    { table: 'discovered_sessions', column: 'harness' },
+    { table: 'flywheel_substrate_bugs', column: 'affected_criteria' },
+    { table: 'review_status', column: 'release_status' },
+    { table: 'review_status', column: 'release_notes' },
+    { table: 'review_status', column: 'inspect_owner_session' },
+    { table: 'review_status', column: 'strike_ready_head' },
+    { table: 'review_status', column: 'strike_ready_at' },
+    { table: 'review_status', column: 'strike_landing_state' },
+    { table: 'review_status', column: 'strike_recovery_count' },
+    { table: 'review_status', column: 'strike_landing_attempts' },
+    { table: 'agents', column: 'yielded_by_scheduler' },
+    { table: 'agents', column: 'review_discovery_pending' },
+    { table: 'agents', column: 'review_context_manifest_path' },
+    { table: 'agents', column: 'review_discovery_ready_at' },
+    { table: 'agents', column: 'review_convoy_forked_at' },
+    { table: 'agents', column: 'review_fork_cache_checked' },
+    { table: 'agents', column: 'review_forked_from_parent' },
+    { table: 'agents', column: 'yielded_at' },
+    { table: 'agents', column: 'last_yield_resume_at' },
+  ],
+  indexes: [
+    'cost_session_id_idx',
+    'idx_cost_agent_id',
+    'idx_cost_issue_upper',
+    'release_sets_project_idx',
+    'release_set_components_issue_component_idx',
+    'release_set_components_issue_order_idx',
+  ],
+};
 
 export const overdeckEvents = sqliteTable('events', {
   sequence: integer('sequence').primaryKey({ autoIncrement: true }),
@@ -59,6 +102,120 @@ function runOverdeckMigrationSync(db: SqliteDatabase): void {
   }
 }
 
+/**
+ * Run one idempotent schema top-up without hiding unexpected SQLite failures.
+ * Only duplicate DDL is silent; missing tables and other failures are logged so
+ * schema drift remains observable without blocking later top-ups or startup.
+ */
+export function runSchemaTopUp(db: SqliteDatabase, statement: string): void {
+  try {
+    db.exec(statement);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (/duplicate column name|already exists/i.test(message)) return;
+    console.error(`[schema] top-up failed: ${statement}\n${message}`);
+  }
+}
+
+/**
+ * Idempotent schema top-ups for databases created before a field/index existed
+ * in the init migration. The init migration only runs on a fresh database.
+ * PAN-2220: the conversation ledger-cost query joins cost_events on session_id;
+ * without this index SQLite builds an automatic index on every query (~76ms → 7ms).
+ */
+function ensureRuntimeIndexesSync(db: SqliteDatabase): void {
+  runSchemaTopUp(db, 'ALTER TABLE `discovered_sessions` ADD COLUMN `harness` text');
+  runSchemaTopUp(db, "UPDATE `discovered_sessions` SET `harness` = 'claude-code' WHERE `harness` IS NULL");
+  runSchemaTopUp(db, 'ALTER TABLE `review_status` ADD COLUMN `release_status` text');
+  runSchemaTopUp(db, 'ALTER TABLE `review_status` ADD COLUMN `release_notes` text');
+  runSchemaTopUp(db, 'ALTER TABLE `review_status` ADD COLUMN `inspect_owner_session` text');
+  runSchemaTopUp(db, 'ALTER TABLE `review_status` ADD COLUMN `strike_ready_head` text');
+  runSchemaTopUp(db, 'ALTER TABLE `review_status` ADD COLUMN `strike_ready_at` integer');
+  runSchemaTopUp(db, 'ALTER TABLE `review_status` ADD COLUMN `strike_landing_state` text');
+  runSchemaTopUp(db, 'ALTER TABLE `review_status` ADD COLUMN `strike_recovery_count` integer DEFAULT 0');
+  runSchemaTopUp(db, 'ALTER TABLE `review_status` ADD COLUMN `strike_landing_attempts` text');
+  ensureReleaseSetTablesSync(db);
+  // PAN-1491: existing overdeck.db files created before substrate-bug weights need
+  // the new `affected_criteria` column added idempotently.
+  runSchemaTopUp(db, 'ALTER TABLE `flywheel_substrate_bugs` ADD COLUMN `affected_criteria` text');
+  runSchemaTopUp(db, 'CREATE INDEX IF NOT EXISTS `cost_session_id_idx` ON `cost_events` (`session_id`)');
+  runSchemaTopUp(db, 'CREATE INDEX IF NOT EXISTS `idx_cost_agent_id` ON `cost_events` (`agent_id`, `ts`)');
+  runSchemaTopUp(db, 'CREATE INDEX IF NOT EXISTS `idx_cost_issue_upper` ON `cost_events` (UPPER(`issue_id`))');
+  // PAN-2507: preemptive-scheduler yield attribution on agents. The init
+  // migration only runs on a fresh DB, so existing overdeck.db files need these
+  // columns added idempotently here.
+  runSchemaTopUp(db, 'ALTER TABLE `agents` ADD COLUMN `yielded_by_scheduler` integer');
+  // PAN-2585: PAN-1862 discovery-fork state — was state.json-only (write-only under
+  // the DB-first reader), which blinded the discovery-ready signal and its backstop.
+  runSchemaTopUp(db, 'ALTER TABLE `agents` ADD COLUMN `review_discovery_pending` integer');
+  runSchemaTopUp(db, 'ALTER TABLE `agents` ADD COLUMN `review_context_manifest_path` text');
+  runSchemaTopUp(db, 'ALTER TABLE `agents` ADD COLUMN `review_discovery_ready_at` integer');
+  runSchemaTopUp(db, 'ALTER TABLE `agents` ADD COLUMN `review_convoy_forked_at` integer');
+  runSchemaTopUp(db, 'ALTER TABLE `agents` ADD COLUMN `review_fork_cache_checked` integer');
+  runSchemaTopUp(db, 'ALTER TABLE `agents` ADD COLUMN `review_forked_from_parent` integer');
+  runSchemaTopUp(db, 'ALTER TABLE `agents` ADD COLUMN `yielded_at` integer');
+  runSchemaTopUp(db, 'ALTER TABLE `agents` ADD COLUMN `last_yield_resume_at` integer');
+}
+
+/**
+ * Idempotent schema top-up for release set tables (PAN-399). Existing overdeck.db
+ * files created before the release-set feature need these tables added without
+ * requiring a full migration reset.
+ */
+function ensureReleaseSetTablesSync(db: SqliteDatabase): void {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS \`release_sets\` (
+      \`issue_id\` text PRIMARY KEY NOT NULL,
+      \`project_key\` text NOT NULL,
+      \`project_path\` text NOT NULL,
+      \`workspace_type\` text NOT NULL,
+      \`status\` text DEFAULT 'pending' NOT NULL,
+      \`created_at\` integer NOT NULL,
+      \`updated_at\` integer NOT NULL,
+      FOREIGN KEY (\`issue_id\`) REFERENCES \`issues\`(\`id\`) ON UPDATE no action ON DELETE no action
+    )
+  `);
+  db.exec('CREATE INDEX IF NOT EXISTS \`release_sets_project_idx\` ON \`release_sets\` (\`project_key\`,\`updated_at\`)');
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS \`release_set_components\` (
+      \`id\` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+      \`issue_id\` text NOT NULL,
+      \`component_key\` text NOT NULL,
+      \`provider\` text,
+      \`trigger\` text NOT NULL,
+      \`release_order\` integer DEFAULT 0 NOT NULL,
+      \`required\` integer DEFAULT true NOT NULL,
+      \`status\` text DEFAULT 'pending' NOT NULL,
+      \`health_status\` text,
+      \`version_status\` text,
+      \`smoke_status\` text,
+      \`rollback_status\` text,
+      \`notes\` text,
+      FOREIGN KEY (\`issue_id\`) REFERENCES \`release_sets\`(\`issue_id\`) ON UPDATE no action ON DELETE cascade
+    )
+  `);
+  db.exec('CREATE UNIQUE INDEX IF NOT EXISTS \`release_set_components_issue_component_idx\` ON \`release_set_components\` (\`issue_id\`,\`component_key\`)');
+  db.exec('CREATE INDEX IF NOT EXISTS \`release_set_components_issue_order_idx\` ON \`release_set_components\` (\`issue_id\`,\`release_order\`,\`component_key\`)');
+}
+
+function warnSchemaDriftSync(db: SqliteDatabase): void {
+  try {
+    const report = auditOverdeckSchemaSync(db, OVERDECK_SCHEMA_TOP_UP_EXPECTATIONS);
+    for (const table of report.missingTables) {
+      console.warn(`[schema-audit] missing table: ${table}`);
+    }
+    for (const index of report.missingIndexes) {
+      console.warn(`[schema-audit] missing index: ${index}`);
+    }
+    for (const { table, column } of report.missingColumns) {
+      console.warn(`[schema-audit] missing column: ${table}.${column}`);
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(`[schema-audit] audit failed: ${message}`);
+  }
+}
+
 export function getOverdeckDatabaseSync(dbPath = getOverdeckDatabasePath()): SqliteDatabase {
   if (overdeckDbSync?.path === dbPath) {
     return overdeckDbSync.db;
@@ -79,6 +236,8 @@ export function getOverdeckDatabaseSync(dbPath = getOverdeckDatabasePath()): Sql
   db.pragma('foreign_keys = ON');
   db.pragma('synchronous = NORMAL');
   runOverdeckMigrationSync(db);
+  ensureRuntimeIndexesSync(db);
+  warnSchemaDriftSync(db);
   overdeckDbSync = { path: dbPath, db };
   return db;
 }
@@ -254,7 +413,10 @@ export class Records extends Context.Service<Records, RecordsServiceShape>()('ov
 export const RecordsLive = Layer.succeed(
   Records,
   Records.of({
-    writeIssue: (project, issueId, record) => Effect.sync(() => writeIssueRecordSync(project, issueId, record)),
+    writeIssue: (project, issueId, record) => Effect.promise(async () => {
+      await updateIssueRecord(project, issueId, () => record);
+      return getIssueRecordPath(project, issueId);
+    }),
     readIssue: (project, issueId) => Effect.sync(() => readIssueRecordSync(project, issueId)),
     readSpec: (planRef) =>
       Effect.sync(() => {
@@ -321,11 +483,86 @@ export interface CostArchiveServiceShape {
 
 export class CostArchive extends Context.Service<CostArchive, CostArchiveServiceShape>()('overdeck/CostArchive') {}
 
+function costArchivePath(): string {
+  return join(getOverdeckHome(), 'costs', 'events.jsonl');
+}
+
+function archiveKey(event: { requestId?: unknown; sourceFile?: unknown; source?: unknown }): string | null {
+  if (typeof event.requestId === 'string' && event.requestId.length > 0) return `request:${event.requestId}`;
+  const source = typeof event.sourceFile === 'string'
+    ? event.sourceFile
+    : typeof event.source === 'string'
+      ? event.source
+      : null;
+  return source ? `source:${source}` : null;
+}
+
+function toCostArchiveEvent(event: Record<string, unknown>): Record<string, unknown> {
+  const ts = event.ts instanceof Date
+    ? event.ts.toISOString()
+    : typeof event.ts === 'string'
+      ? event.ts
+      : new Date().toISOString();
+
+  return {
+    ts,
+    type: 'cost',
+    agentId: typeof event.agentId === 'string' ? event.agentId : 'unknown',
+    issueId: typeof event.issueId === 'string' ? event.issueId : 'UNKNOWN',
+    sessionType: typeof event.sessionType === 'string' ? event.sessionType : 'unknown',
+    provider: typeof event.provider === 'string' ? event.provider : 'unknown',
+    model: typeof event.model === 'string' ? event.model : 'unknown',
+    input: typeof event.input === 'number' ? event.input : 0,
+    output: typeof event.output === 'number' ? event.output : 0,
+    cacheRead: typeof event.cacheRead === 'number' ? event.cacheRead : 0,
+    cacheWrite: typeof event.cacheWrite === 'number' ? event.cacheWrite : 0,
+    cost: typeof event.cost === 'number' ? event.cost : 0,
+    ...(typeof event.requestId === 'string' ? { requestId: event.requestId } : {}),
+    ...(typeof event.sessionId === 'string' ? { sessionId: event.sessionId } : {}),
+    ...(typeof event.sourceFile === 'string' ? { source: event.sourceFile } : {}),
+    ...(Array.isArray(event.warnings) ? { warnings: event.warnings } : {}),
+  };
+}
+
 export const CostArchiveLive = Layer.succeed(
   CostArchive,
-  CostArchive.of({
-    append: (_event) => Effect.void,
-  }),
+  CostArchive.of((() => {
+    let seen: Set<string> | null = null;
+
+    const loadSeen = () => {
+      if (seen) return seen;
+      seen = new Set<string>();
+      const path = costArchivePath();
+      if (!existsSync(path)) return seen;
+      const content = readFileSync(path, 'utf8');
+      for (const line of content.split('\n')) {
+        if (!line.trim()) continue;
+        try {
+          const parsed = JSON.parse(line) as Record<string, unknown>;
+          const key = archiveKey(parsed);
+          if (key) seen.add(key);
+        } catch {
+          // Ignore malformed historical lines; readers do the same.
+        }
+      }
+      return seen;
+    };
+
+    return {
+      append: (event) => Effect.sync(() => {
+        const normalized = toCostArchiveEvent(event as Record<string, unknown>);
+        const key = archiveKey(normalized);
+        const archiveSeen = loadSeen();
+        if (key && archiveSeen.has(key)) return;
+
+        const path = costArchivePath();
+        mkdirSync(dirname(path), { recursive: true });
+        if (!existsSync(path)) writeFileSync(path, '', 'utf8');
+        appendFileSync(path, `${JSON.stringify(normalized)}\n`, 'utf8');
+        if (key) archiveSeen.add(key);
+      }),
+    };
+  })()),
 );
 
 export type FtsStatement = Readonly<{

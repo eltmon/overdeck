@@ -25,6 +25,38 @@ export interface InFlightGuard {
   isInFlight(key: string): boolean;
 }
 
+/**
+ * Per-key promise coalescer — the awaited sibling of {@link createInFlightGuard}.
+ * While a task for `key` is in flight, later callers receive the SAME promise
+ * instead of starting a second run. PAN-2695: two review dispatches 225ms apart
+ * raced fresh-spawn vs resume — the second saw the first's milliseconds-old
+ * agent state, "resumed" a parent session that was still booting, and killed it
+ * with the synthesis kickoff undelivered.
+ */
+export interface PromiseCoalescer<T> {
+  /** Run `task` for `key`, or return the promise of the run already in flight. */
+  run(key: string, task: () => Promise<T>): Promise<T>;
+  /** True while a task for `key` is in flight. */
+  isInFlight(key: string): boolean;
+}
+
+export function createPromiseCoalescer<T>(): PromiseCoalescer<T> {
+  const inFlight = new Map<string, Promise<T>>();
+  return {
+    run(key, task) {
+      const existing = inFlight.get(key);
+      if (existing) return existing;
+      const p = task();
+      inFlight.set(key, p);
+      p.catch(() => {}).finally(() => inFlight.delete(key));
+      return p;
+    },
+    isInFlight(key) {
+      return inFlight.has(key);
+    },
+  };
+}
+
 export function createInFlightGuard(): InFlightGuard {
   const inFlight = new Set<string>();
   return {

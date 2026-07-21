@@ -7,7 +7,7 @@
  */
 import { useMemo, useState } from 'react';
 import { ChevronDown, ChevronRight, Zap } from 'lucide-react';
-import type { ReviewStatusSnapshot } from '@overdeck/contracts';
+import { compareIssueIds, type ReviewStatusSnapshot } from '@overdeck/contracts';
 import { useDashboardStore } from '../lib/store';
 import { AutoMergeToggle } from './AutoMergeToggle';
 
@@ -48,7 +48,7 @@ export function MergePolicySection({ onNavigateIssue }: { onNavigateIssue?: (iss
   const [collapsed, setCollapsed] = useState(false);
   const rows = Object.values(byId)
     .filter(isActive)
-    .sort((a, b) => a.issueId.localeCompare(b.issueId));
+    .sort((a, b) => compareIssueIds(a.issueId, b.issueId));
 
   if (rows.length === 0) return null;
 

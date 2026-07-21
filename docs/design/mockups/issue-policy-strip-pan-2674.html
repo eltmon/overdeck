@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Issue Policy Strip — per-issue staffing overrides (PAN-2674)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0b0e14;--card:#11151f;--card2:#0e1219;--panel:#141a24;--border:#1e2430;--border-hi:#2c3547;
+    --fg:#e6e9ef;--muted:#8b93a5;--faint:#5b6373;
+    --teal:#2dd4bf;--blue:#3b82f6;--violet:#8b5cf6;--amber:#f59e0b;--red:#ef4444;--green:#34d399;--cyan:#22d3ee;
+  }
+  *{box-sizing:border-box}
+  body{background:var(--bg);color:var(--fg);font:14px/1.5 "DM Sans",system-ui,sans-serif;font-weight:500;margin:0;padding:24px 28px;max-width:1240px}
+  h1{font:600 20px "Space Grotesk";margin:0 0 3px}
+  h2{font:600 15px "Space Grotesk";margin:26px 0 10px}
+  .sub{color:var(--muted);font-size:12.5px;margin-bottom:20px}
+  .sub a{color:var(--blue);text-decoration:none}
+  .mono{font-family:"DM Mono",monospace}
+
+  /* ── issue header bar (cockpit mount, faithful to IssueMissionControl) ── */
+  .hdrwrap{border:1px solid var(--border);border-radius:12px;background:var(--card);padding:0;overflow:hidden}
+  .hdr{display:flex;align-items:center;gap:18px;padding:12px 16px;flex-wrap:wrap}
+  .hdr .idblock{min-width:120px}
+  .hdr .crumb{font-size:10.5px;color:var(--faint)}
+  .hdr .iid{font-family:"DM Mono";font-size:13px;color:var(--fg)}
+  .stat{text-align:left}
+  .stat .k{font:500 8.5px "DM Mono";letter-spacing:.08em;text-transform:uppercase;color:var(--faint)}
+  .stat .v{font-family:"DM Mono";font-size:11.5px;color:var(--muted);margin-top:1px}
+  .stat .v.cost{color:var(--cyan);font-variant-numeric:tabular-nums}
+  .spacer{flex:1}
+
+  /* the policy strip */
+  .strip{display:flex;align-items:center;gap:6px}
+  .strip select{
+    appearance:none;-webkit-appearance:none;
+    background:var(--panel) url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="8" height="5" viewBox="0 0 8 5"><path d="M0 0l4 5 4-5z" fill="%238b93a5"/></svg>') no-repeat right 7px center;
+    border:1px solid var(--border-hi);border-radius:6px;color:var(--fg);
+    font:500 11px "DM Sans";padding:4px 20px 4px 8px;cursor:pointer;max-width:220px}
+  .strip select:focus{outline:none;border-color:var(--blue)}
+  .strip select.overridden{border-color:rgba(59,130,246,.55)}
+  .newtag{font:500 8px "DM Mono";letter-spacing:.06em;text-transform:uppercase;color:var(--blue);border:1px solid rgba(59,130,246,.4);border-radius:4px;padding:1px 4px;margin-left:2px}
+
+  .badge{display:inline-flex;align-items:center;gap:5px;height:20px;padding:0 8px;border-radius:4px;font-size:11px}
+  .badge.merged{background:rgba(52,211,153,.08);border:1px solid rgba(52,211,153,.32);color:#a7f3d0}
+  .actions{border:1px solid var(--border-hi);border-radius:6px;padding:4px 10px;font-size:11px;color:var(--fg);background:var(--panel);cursor:pointer}
+
+  /* restart affordance */
+  .restartbar{display:none;align-items:center;gap:10px;border-top:1px solid rgba(245,158,11,.32);background:rgba(245,158,11,.06);padding:9px 16px;font-size:12px}
+  .restartbar.show{display:flex}
+  .restartbar .msg{color:#fcd34d}
+  .restartbar .msg small{display:block;color:var(--muted);font-size:10.5px}
+  .restartbar button{background:var(--amber);border:none;border-radius:6px;color:#1a1206;font:500 11px "DM Sans";padding:5px 12px;cursor:pointer;flex:none}
+  .restartbar .dismiss{background:none;border:none;color:var(--faint);font-size:11px;cursor:pointer}
+
+  /* resolution readout */
+  .readout{border:1px solid var(--border);border-radius:12px;background:var(--card2);padding:14px 16px;margin-top:14px}
+  .readout table{width:100%;border-collapse:collapse;font-size:12px}
+  .readout th,.readout td{text-align:left;padding:6px 10px;border-bottom:1px solid var(--border)}
+  .readout th{font:600 9.5px "Space Grotesk";text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+  .readout tr:last-child td{border-bottom:none}
+  .src{font:500 9px "DM Mono";letter-spacing:.05em;text-transform:uppercase;border-radius:4px;padding:1px 6px}
+  .src.default{background:rgba(139,147,165,.12);color:var(--muted)}
+  .src.issue{background:rgba(59,130,246,.14);color:#93c5fd}
+  td .mono{font-size:11.5px}
+
+  /* density mapping */
+  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;align-items:start}
+  .dens{border:1px solid var(--border);border-radius:10px;background:var(--card2);padding:12px}
+  .dens .k{font:600 9.5px "DM Mono";letter-spacing:.08em;text-transform:uppercase;color:var(--faint)}
+  .dens .n{font:600 14px "Space Grotesk";margin:4px 0 6px}
+  .dens p{font-size:11px;color:var(--muted);margin:0 0 8px}
+  .minirow{display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+  .chip{font:500 9px "DM Mono";border:1px solid var(--border-hi);border-radius:4px;padding:2px 6px;color:var(--muted);background:var(--panel)}
+  .chip.ov{border-color:rgba(59,130,246,.5);color:#93c5fd}
+  .note{font-size:11px;color:var(--faint);margin-top:8px}
+  .note .mono{font-size:10px}
+
+  .deltas{font-size:11.5px;color:var(--muted);border-left:2px solid var(--border);padding-left:12px;margin-top:10px}
+  .deltas li{margin-bottom:4px}
+  .toast{position:fixed;bottom:18px;right:18px;background:var(--panel);border:1px solid var(--border-hi);border-radius:8px;padding:8px 14px;font-size:11.5px;color:var(--fg);opacity:0;transition:opacity .25s;pointer-events:none}
+  .toast.show{opacity:1}
+</style>
+</head>
+<body>
+
+<h1>Issue Policy Strip — per-issue staffing overrides</h1>
+<div class="sub">
+  PAN-2674 · extends the PAN-1874 review dropdowns with <b>work model</b> and <b>swarm mode</b> selects ·
+  one shared component (<span class="mono">IssuePolicyStrip</span>) staged for the PAN-2499
+  <span class="mono">components/issue-view/</span> kit. Interactive: change the selects below.
+</div>
+
+<!-- ═══ A · the header, cockpit mount ═══ -->
+<h2>A · Issue header (cockpit / console mounts) — MIN-857 example</h2>
+<div class="hdrwrap">
+  <div class="hdr">
+    <div class="idblock">
+      <div class="crumb">mind-your-now / Issues</div>
+      <div class="iid">MIN-857</div>
+    </div>
+    <div class="stat"><div class="k">Branch</div><div class="v">feature/min-857</div></div>
+    <div class="stat"><div class="k">PR / CI</div><div class="v">no PR</div></div>
+    <div class="stat"><div class="k">Cost</div><div class="v cost">$255.28</div></div>
+    <div class="spacer"></div>
+    <span class="strip" title="Per-issue policy overrides — beat project/global config, persist on the issue record">
+      <select id="review" aria-label="Review mode for this issue">
+        <option value="">review: default (full)</option>
+        <option value="quick">review: quick</option>
+        <option value="full">review: full convoy</option>
+        <option value="none">review: none</option>
+      </select>
+      <select id="rereview" aria-label="Re-review scope for this issue">
+        <option value="">re-review: default (changed)</option>
+        <option value="changed">re-review: changed</option>
+        <option value="all">re-review: all</option>
+        <option value="blockers">re-review: blockers</option>
+      </select>
+      <select id="work" aria-label="Work model for this issue">
+        <option value="">work: default (gpt-5.5)</option>
+        <option value="claude-opus-4-8">work: opus-4-8</option>
+        <option value="claude-sonnet-5">work: sonnet-5</option>
+        <option value="claude-haiku-4-5">work: haiku-4-5</option>
+        <option value="gpt-5.5">work: gpt-5.5</option>
+        <option value="kimi-k2.7-code">work: kimi-k2.7-code</option>
+      </select><span class="newtag">new</span>
+      <select id="swarm" aria-label="Swarm mode for this issue">
+        <option value="">swarm: default (off)</option>
+        <option value="off">swarm: off</option>
+        <option value="auto">swarm: auto</option>
+        <option value="always">swarm: always</option>
+      </select><span class="newtag">new</span>
+    </span>
+    <span class="badge merged">✓ Merged</span>
+    <button class="actions">⌘ Actions ▾</button>
+  </div>
+  <div class="restartbar" id="restartbar">
+    <div class="msg">
+      Work-model override differs from the recorded agent session.
+      <small>The override applies to the <b>next</b> spawn. To apply it now: stop the agent and start a fresh session (<span class="mono">pan kill · pan start --fresh</span>). Running agents are never auto-restarted.</small>
+    </div>
+    <button id="restartbtn">Restart agent with new staffing</button>
+    <button class="dismiss" id="dismissbtn">Later</button>
+  </div>
+</div>
+
+<!-- ═══ B · resolution readout ═══ -->
+<h2>B · What will run — resolved values &amp; source layer</h2>
+<div class="readout">
+  <table>
+    <thead><tr><th>Knob</th><th>Resolved value</th><th>Source layer</th><th>Consumed by</th></tr></thead>
+    <tbody>
+      <tr><td>review mode</td><td class="mono" id="r-review">full</td><td><span class="src default" id="s-review">default</span></td><td class="mono">review dispatch (PAN-1874)</td></tr>
+      <tr><td>re-review scope</td><td class="mono" id="r-rereview">changed</td><td><span class="src default" id="s-rereview">default</span></td><td class="mono">re-review convoy</td></tr>
+      <tr><td>work model</td><td class="mono" id="r-work">gpt-5.5</td><td><span class="src default" id="s-work">default</span></td><td class="mono">resolveStaffing() — every spawn path</td></tr>
+      <tr><td>swarm mode</td><td class="mono" id="r-swarm">off</td><td><span class="src default" id="s-swarm">default</span></td><td class="mono">resolveSwarmPolicy() — deacon advance</td></tr>
+    </tbody>
+  </table>
+  <div class="note">Precedence per knob: <span class="mono">cli &gt; issue &gt; project &gt; global &gt; built-in</span>.
+  “default” in an option label always shows the value the merged project/global config resolves to,
+  so the operator sees what will actually run before overriding. CLI parity:
+  <span class="mono">pan staffing MIN-857 --model opus-4-8 --swarm off</span>.</div>
+</div>
+
+<!-- ═══ C · PAN-2499 density mapping ═══ -->
+<h2>C · PAN-2499 densities — one component, three mounts</h2>
+<div class="grid3">
+  <div class="dens">
+    <div class="k">density · rail</div>
+    <div class="n">Summary chips</div>
+    <p>The rail row is too narrow for selects. Overridden knobs render as read-only chips; clicking one expands in place to cockpit (PAN-2499 interaction model).</p>
+    <div class="minirow">
+      <span class="chip">MIN-857</span>
+      <span class="chip ov" id="railwork" style="display:none">work: opus-4-8</span>
+      <span class="chip ov" id="railswarm" style="display:none">swarm: off</span>
+      <span class="chip" id="railnone">no overrides</span>
+    </div>
+    <div class="note">Chips appear only when an override is set — the rail stays quiet by default.</div>
+  </div>
+  <div class="dens">
+    <div class="k">density · cockpit</div>
+    <div class="n">Full strip in header</div>
+    <p>Exactly the strip in section A — the four compact selects beside ✓&nbsp;Merged / Actions, where <span class="mono">ReviewPolicyControl</span> mounts today (<span class="mono">IssueMissionControl.tsx:768</span>).</p>
+    <div class="minirow"><span class="chip">review ▾</span><span class="chip">re-review ▾</span><span class="chip ov">work ▾</span><span class="chip ov">swarm ▾</span></div>
+  </div>
+  <div class="dens">
+    <div class="k">density · console</div>
+    <div class="n">Strip + restart affordance</div>
+    <p>Same strip; the console (drawer) additionally hosts the restart bar. The drawer's existing <span class="mono">DrawerSwarmPolicy</span> section is <b>superseded</b> by the strip — retired via the PAN-2499 no-loss audit, never silently.</p>
+    <div class="minirow"><span class="chip">strip</span><span class="chip">restart bar</span><span class="chip" style="text-decoration:line-through">DrawerSwarmPolicy</span></div>
+  </div>
+</div>
+
+<h2>Conformance deltas</h2>
+<ul class="deltas">
+  <li>Fonts here are Google-hosted DM Sans / DM Mono / Space Grotesk stand-ins for the app's DM Sans + SF Mono; production uses the real tokens from <span class="mono">index.css</span> (this file hand-rolls dark values, same as the PAN-2499 binding mockup).</li>
+  <li>Restart bar uses <span class="mono">--warning</span> semantics (amber = a human must act); the blue border on an overridden select uses <span class="mono">--primary</span> (machine-affecting configuration), one signal per control.</li>
+  <li>“new” tags are mockup annotations only — not shipped UI.</li>
+</ul>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+  const defaults = { review: 'full', rereview: 'changed', work: 'gpt-5.5', swarm: 'off' };
+  const agentRecordedModel = 'gpt-5.5'; // what the saved session ran on
+
+  function toast(msg){ const t=$('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'), 2200); }
+
+  function sync(knob){
+    const sel = $(knob);
+    const val = sel.value || defaults[knob];
+    const overridden = !!sel.value;
+    sel.classList.toggle('overridden', overridden);
+    $('r-'+knob).textContent = val;
+    const s = $('s-'+knob);
+    s.textContent = overridden ? 'issue' : 'default';
+    s.className = 'src ' + (overridden ? 'issue' : 'default');
+  }
+
+  function refresh(changed){
+    ['review','rereview','work','swarm'].forEach(sync);
+    // re-review select only meaningful when review resolves to full (matches ReviewPolicyControl)
+    const reviewResolved = $('review').value || defaults.review;
+    $('rereview').style.display = reviewResolved === 'full' ? '' : 'none';
+    // restart affordance: work override set and differs from the recorded agent session
+    const workResolved = $('work').value || defaults.work;
+    $('restartbar').classList.toggle('show', !!$('work').value && workResolved !== agentRecordedModel);
+    // rail chips
+    const w = $('work').value, sw = $('swarm').value;
+    $('railwork').style.display = w ? '' : 'none';
+    $('railwork').textContent = 'work: ' + (w||'').replace('claude-','');
+    $('railswarm').style.display = sw ? '' : 'none';
+    $('railswarm').textContent = 'swarm: ' + sw;
+    $('railnone').style.display = (w || sw) ? 'none' : '';
+    if (changed) toast('Saved override on issue record — POST /api/issues/MIN-857/' + (changed==='swarm'?'swarm-policy':'staffing'));
+  }
+
+  ['review','rereview','work','swarm'].forEach(k => $(k).addEventListener('change', () => refresh(k)));
+  $('restartbtn').addEventListener('click', () => { toast('pan kill MIN-857 && pan start MIN-857 --fresh   (model resolves from the new override)'); $('restartbar').classList.remove('show'); });
+  $('dismissbtn').addEventListener('click', () => $('restartbar').classList.remove('show'));
+  refresh();
+</script>
+</body>
+</html>

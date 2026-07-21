@@ -21,7 +21,7 @@ services:
       - app-network
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME:-app}-frontend.rule=Host(`${HOSTNAME:-app.pan.localhost}`)"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME:-app}-frontend.rule=Host(`${HOSTNAME:-app.overdeck.localhost}`)"
       - "traefik.http.services.${COMPOSE_PROJECT_NAME:-app}-frontend.loadbalancer.server.port=5173"
 
   backend:
@@ -48,7 +48,7 @@ services:
       - app-network
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME:-app}-api.rule=Host(`api.${HOSTNAME:-app.pan.localhost}`)"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME:-app}-api.rule=Host(`api.${HOSTNAME:-app.overdeck.localhost}`)"
       - "traefik.http.services.${COMPOSE_PROJECT_NAME:-app}-api.loadbalancer.server.port=3001"
 
   postgres:

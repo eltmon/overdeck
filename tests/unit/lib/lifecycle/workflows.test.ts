@@ -11,10 +11,26 @@ import { tmpdir } from 'os';
 vi.setConfig({ testTimeout: 30_000 });
 
 // Use vi.hoisted to avoid initialization order issues
-const { mockExecAsync, mockClearReviewStatus, mockResetPostMergeState } = vi.hoisted(() => ({
+const {
+  mockExecAsync,
+  mockClearReviewStatus,
+  mockResetPostMergeState,
+  mockMarkRecordPipelineClosedOutSync,
+  mockWriteCloseOutDodGateSync,
+  mockSweepOrphanedTasks,
+  mockEvaluateDodGate,
+} = vi.hoisted(() => ({
   mockExecAsync: vi.fn().mockResolvedValue({ stdout: '', stderr: '' }),
   mockClearReviewStatus: vi.fn(),
   mockResetPostMergeState: vi.fn(),
+  mockMarkRecordPipelineClosedOutSync: vi.fn(),
+  mockWriteCloseOutDodGateSync: vi.fn(),
+  mockSweepOrphanedTasks: vi.fn().mockResolvedValue({ ok: true, closedIds: [], skipped: 0 }),
+  mockEvaluateDodGate: vi.fn(),
+}));
+
+vi.mock('../../../../src/lib/lifecycle/dod-gate.js', () => ({
+  evaluateDodGate: mockEvaluateDodGate,
 }));
 
 vi.mock('child_process', () => ({
@@ -62,6 +78,20 @@ vi.mock('../../../../src/lib/review-status.js', () => ({
   clearReviewStatus: mockClearReviewStatus,
 }));
 
+vi.mock('../../../../src/lib/pan-dir/record.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../../src/lib/pan-dir/record.js')>();
+  return {
+    ...actual,
+    getProjectConfigFromWorkspacePath: vi.fn((workspacePath: string) => ({ name: 'inferred', path: workspacePath })),
+    markRecordPipelineClosedOutSync: mockMarkRecordPipelineClosedOutSync,
+    writeCloseOutDodGate: mockWriteCloseOutDodGateSync,
+  };
+});
+
+vi.mock('../../../../src/lib/lifecycle/orphaned-tasks-sweep.js', () => ({
+  sweepOrphanedTasks: mockSweepOrphanedTasks,
+}));
+
 vi.mock('../../../../src/lib/cloister/merge-agent.js', () => ({
   resetPostMergeState: mockResetPostMergeState,
 }));
@@ -96,11 +126,11 @@ const findSpecByIssue = (projectRoot: string, issueId: string) =>
   Effect.runPromise(findSpecByIssueProgram(projectRoot, issueId) as Effect.Effect<any, any, never>);
 const writeSpecForIssue = (projectRoot: string, doc: any, status: any, filename?: string) =>
   Effect.runPromise(writeSpecForIssueProgram(projectRoot, doc, status, filename) as Effect.Effect<any, any, never>);
-import type { VBriefDocument } from '../../../../src/lib/vbrief/types.js';
+import type { XBriefDocument } from '../../../../src/lib/xbrief/types.js';
 
-function makeVBrief(issueId: string, status = 'running'): VBriefDocument {
+function makeXBrief(issueId: string, status = 'running'): XBriefDocument {
   return {
-    vBRIEFInfo: { version: '0.5', created: '2026-05-18T00:00:00Z' },
+    xBRIEFInfo: { version: '0.5', created: '2026-05-18T00:00:00Z' },
     plan: {
       id: issueId,
       title: `Plan for ${issueId}`,
@@ -124,6 +154,15 @@ function successfulTracker() {
   } as any;
 }
 
+function mockCurrentGitHubLabels(labels = ['verifying-on-main', 'needs-close-out', 'merged', 'ready']) {
+  mockExecAsync.mockImplementation(async (command: string) => {
+    if (command.includes('gh issue view') && command.includes('--json labels')) {
+      return { stdout: JSON.stringify(labels), stderr: '' };
+    }
+    return { stdout: '', stderr: '' };
+  });
+}
+
 describe('workflows', () => {
   let testDir: string;
 
@@ -134,9 +173,30 @@ describe('workflows', () => {
     mkdirSync(OVERDECK_HOME, { recursive: true });
 
     vi.clearAllMocks();
+    mockEvaluateDodGate.mockResolvedValue({
+      passed: true,
+      misses: [],
+      accepted: [],
+      rows: [
+        ['review', 1], ['tests', 2], ['verification', 3], ['merged', 4],
+        ['post-merge', 5], ['main-verify', 6], ['deploy', 7],
+      ].map(([id, num]) => ({
+        id,
+        num,
+        title: `${id} title`,
+        expected: `${id} expected`,
+        observed: `${id} observed`,
+        status: 'pass',
+      })),
+    });
     process.env.HOME = testDir;
     delete process.env.LINEAR_API_KEY;
-    mockExecAsync.mockResolvedValue({ stdout: '', stderr: '' });
+    mockExecAsync.mockImplementation(async (command: string) => {
+      if (command.includes('gh issue view') && command.includes('--json labels')) {
+        return { stdout: JSON.stringify(['verifying-on-main', 'needs-close-out', 'merged', 'ready']), stderr: '' };
+      }
+      return { stdout: '', stderr: '' };
+    });
   });
 
   afterEach(() => {
@@ -164,7 +224,7 @@ describe('workflows', () => {
       expect(result.duration).toBeGreaterThanOrEqual(0);
     });
 
-    it('should include archive, close, teardown, beads, and clear-review steps', async () => {
+    it('should include archive, close, teardown, tasks, and clear-review steps', async () => {
       const ctx = {
         issueId: 'PAN-100',
         projectPath: testDir,
@@ -181,12 +241,12 @@ describe('workflows', () => {
       expect(stepNames.some(s => s === 'clear-review-status')).toBe(true);
     });
 
-    it('should skip beads compaction when skipBeadsCompaction is true', async () => {
+    it('should skip tasks compaction when skipTasksCompaction is true', async () => {
       const ctx = { issueId: 'PAN-100', projectPath: testDir };
-      const result = await approve(ctx, { skipBeadsCompaction: true });
+      const result = await approve(ctx, { skipTasksCompaction: true });
 
       const stepNames = result.steps.map(s => s.step);
-      expect(stepNames.some(s => s.startsWith('compact-beads'))).toBe(false);
+      expect(stepNames.some(s => s.startsWith('compact-tasks'))).toBe(false);
     });
   });
 
@@ -217,6 +277,61 @@ describe('workflows', () => {
   });
 
   describe('closeOut', () => {
+    it('blocks before cleanup when the Definition-of-Done gate misses', async () => {
+      mockEvaluateDodGate.mockResolvedValueOnce({
+        passed: false,
+        misses: ['deploy'],
+        accepted: [],
+        rows: [{
+          id: 'deploy', num: 7, title: 'Deployed', expected: 'live build includes merge',
+          observed: 'live build is stale', status: 'miss',
+        }],
+      });
+      const tracker = successfulTracker();
+      const result = await closeOut({ issueId: 'PAN-100', projectPath: testDir }, { tracker });
+
+      expect(result.success).toBe(false);
+      expect(result.steps.at(-1)).toMatchObject({
+        step: 'close-out:dod-gate',
+        error: expect.stringContaining('--accept-deploy'),
+      });
+      expect(result.steps.some(step => step.step.startsWith('archive-planning:'))).toBe(false);
+      expect(tracker.transitionIssue).not.toHaveBeenCalled();
+    });
+
+    it('proceeds when a missed row carries an explicit acceptance', async () => {
+      mockEvaluateDodGate.mockResolvedValueOnce({
+        passed: true,
+        misses: ['deploy'],
+        accepted: ['deploy'],
+        rows: [{
+          id: 'deploy', num: 7, title: 'Deployed', expected: 'live build includes merge',
+          observed: 'live build is stale', status: 'miss',
+          acceptedBy: { flag: '--accept-deploy', by: 'operator', at: '2026-07-15T13:00:00Z' },
+        }],
+      });
+      const result = await closeOut(
+        { issueId: 'PAN-100', projectPath: testDir },
+        { tracker: successfulTracker(), dodAcceptedRows: ['deploy'], dodAcceptedBy: 'operator' },
+      );
+
+      expect(result.steps.find(step => step.step === 'dod:deploy')).toMatchObject({
+        success: true,
+        skipped: true,
+        details: expect.arrayContaining([expect.stringContaining('MISS accepted via --accept-deploy by operator')]),
+      });
+      expect(result.steps.some(step => step.step.startsWith('archive-planning:'))).toBe(true);
+      expect(mockWriteCloseOutDodGateSync).toHaveBeenCalledWith(
+        expect.anything(),
+        'PAN-100',
+        expect.objectContaining({
+          rows: expect.arrayContaining([expect.objectContaining({ id: 'teardown', status: 'pass' })]),
+          accepted: ['deploy'],
+        }),
+      );
+      expect(result.steps.find(step => step.step === 'close-out:record-dod-gate')).toMatchObject({ success: true });
+    });
+
     it('should verify branch merged before proceeding', async () => {
       // Mock git branch check — branch doesn't exist (squash-merged)
       mockExecAsync.mockResolvedValue({ stdout: '', stderr: '' });
@@ -227,6 +342,195 @@ describe('workflows', () => {
       expect(verifyStep.step).toBe('close-out:verify-merged');
       expect(verifyStep.success).toBe(true);
       expect(verifyStep.details).toEqual(['Branch already cleaned up (squash-merged)']);
+    });
+
+    it('accepts a squash-merged GitHub PR when the branch tip matches the merged PR head', async () => {
+      mockExecAsync.mockImplementation(async (command: string) => {
+        if (command.startsWith('git branch --list')) {
+          return { stdout: '  feature/pan-100\n', stderr: '' };
+        }
+        if (command.startsWith('git merge-base --is-ancestor')) {
+          throw new Error('not an ancestor after squash merge');
+        }
+        if (command.startsWith('git diff main...feature/pan-100')) {
+          return { stdout: 'diff --git a/src/example.ts b/src/example.ts\n', stderr: '' };
+        }
+        if (command.startsWith('gh pr list')) {
+          return {
+            stdout: '[{"number":2182,"mergedAt":"2026-07-02T12:00:00Z","headRefOid":"abc123","url":"https://github.com/eltmon/overdeck/pull/2182"}]',
+            stderr: '',
+          };
+        }
+        if (command.startsWith('git rev-parse feature/pan-100')) {
+          return { stdout: 'abc123\n', stderr: '' };
+        }
+        if (command.startsWith('git log main..feature/pan-100')) {
+          throw new Error('should not count ancestry-only unmerged commits after GitHub squash confirmation');
+        }
+        return { stdout: '', stderr: '' };
+      });
+
+      const ctx = {
+        issueId: 'PAN-100',
+        projectPath: testDir,
+        github: { owner: 'eltmon', repo: 'overdeck', number: 100 },
+      };
+      const verifyStep = await Effect.runPromise(__testInternals.verifyBranchMerged(ctx));
+
+      expect(verifyStep.step).toBe('close-out:verify-merged');
+      expect(verifyStep.success).toBe(true);
+      expect(verifyStep.details).toEqual(['PR #2182 is squash-merged and feature/pan-100 matches the merged PR head']);
+    });
+
+    it('rejects a squash-merged GitHub PR when the branch tip no longer matches the merged PR head', async () => {
+      mockExecAsync.mockImplementation(async (command: string) => {
+        if (command.startsWith('git branch --list')) {
+          return { stdout: '  feature/pan-100\n', stderr: '' };
+        }
+        if (command.startsWith('git merge-base --is-ancestor')) {
+          throw new Error('not an ancestor after squash merge');
+        }
+        if (command.startsWith('git diff main...feature/pan-100')) {
+          return { stdout: 'diff --git a/src/example.ts b/src/example.ts\n', stderr: '' };
+        }
+        if (command.startsWith('gh pr list')) {
+          return {
+            stdout: '[{"number":2182,"mergedAt":"2026-07-02T12:00:00Z","headRefOid":"merged-head","url":"https://github.com/eltmon/overdeck/pull/2182"}]',
+            stderr: '',
+          };
+        }
+        if (command.startsWith('git rev-parse feature/pan-100')) {
+          return { stdout: 'newer-branch-tip\n', stderr: '' };
+        }
+        if (command.startsWith('git log --no-merges')) {
+          return { stdout: 'unmerged-commit\n', stderr: '' };
+        }
+        if (command === 'git merge-base --is-ancestor unmerged-commit origin/main') {
+          throw new Error('commit is not on main');
+        }
+        if (command.startsWith('git diff --name-only')) {
+          // PAN-2406 predicate: report a real source file so the state-plane
+          // exemption does NOT apply and the strict rejection is exercised.
+          return { stdout: 'src/example.ts\n', stderr: '' };
+        }
+        if (command.startsWith('git log main..feature/pan-100')) {
+          throw new Error('should fail immediately on mismatched merged PR head');
+        }
+        return { stdout: '', stderr: '' };
+      });
+
+      const ctx = {
+        issueId: 'PAN-100',
+        projectPath: testDir,
+        github: { owner: 'eltmon', repo: 'overdeck', number: 100 },
+      };
+      const verifyStep = await Effect.runPromise(__testInternals.verifyBranchMerged(ctx));
+
+      expect(verifyStep.step).toBe('close-out:verify-merged');
+      expect(verifyStep.success).toBe(false);
+      expect(verifyStep.error).toBe('feature/pan-100 has 1 commit(s) after merged PR #2182 that are not on origin/main: unmerged-commit');
+    });
+
+    it('accepts a squash-merged PR when the branch later merged commits already on main', async () => {
+      mockExecAsync.mockImplementation(async (command: string) => {
+        if (command.startsWith('git branch --list')) {
+          return { stdout: '  feature/pan-100\n', stderr: '' };
+        }
+        if (command.startsWith('git merge-base --is-ancestor feature/pan-100 main')) {
+          throw new Error('not an ancestor after squash merge');
+        }
+        if (command.startsWith('git diff main...feature/pan-100')) {
+          return { stdout: 'diff --git a/src/example.ts b/src/example.ts\n', stderr: '' };
+        }
+        if (command.startsWith('gh pr list')) {
+          return {
+            stdout: '[{"number":2182,"mergedAt":"2026-07-02T12:00:00Z","headRefOid":"merged-head","url":"https://github.com/eltmon/overdeck/pull/2182"}]',
+            stderr: '',
+          };
+        }
+        if (command.startsWith('git rev-parse feature/pan-100')) {
+          return { stdout: 'local-tip-after-main-merge\n', stderr: '' };
+        }
+        if (command.startsWith('git log --no-merges')) {
+          return { stdout: 'main-commit-a\nmain-commit-b\n', stderr: '' };
+        }
+        if (command.startsWith('git merge-base --is-ancestor main-commit-')) {
+          return { stdout: '', stderr: '' };
+        }
+        return { stdout: '', stderr: '' };
+      });
+
+      const ctx = {
+        issueId: 'PAN-100',
+        projectPath: testDir,
+        github: { owner: 'eltmon', repo: 'overdeck', number: 100 },
+      };
+      const verifyStep = await Effect.runPromise(__testInternals.verifyBranchMerged(ctx));
+
+      expect(verifyStep.success).toBe(true);
+      expect(verifyStep.details).toEqual([
+        'PR #2182 is squash-merged; all 2 post-PR non-merge commit(s) on feature/pan-100 are already on origin/main',
+      ]);
+    });
+
+    it('rejects local squash-merge success when the remote branch has advanced past the merged PR head', async () => {
+      mockExecAsync.mockImplementation(async (command: string) => {
+        if (command.startsWith('git branch --list')) {
+          return { stdout: '  feature/pan-100\n', stderr: '' };
+        }
+        if (command.startsWith('git merge-base --is-ancestor')) {
+          throw new Error('not an ancestor after squash merge');
+        }
+        if (command.startsWith('git diff main...feature/pan-100')) {
+          return { stdout: 'diff --git a/src/example.ts b/src/example.ts\n', stderr: '' };
+        }
+        if (command.startsWith('gh pr list')) {
+          return {
+            stdout: '[{"number":2182,"mergedAt":"2026-07-02T12:00:00Z","headRefOid":"merged-head","url":"https://github.com/eltmon/overdeck/pull/2182"}]',
+            stderr: '',
+          };
+        }
+        if (command.startsWith('git rev-parse feature/pan-100')) {
+          return { stdout: 'merged-head\n', stderr: '' };
+        }
+        if (command.startsWith('git ls-remote --heads origin')) {
+          return { stdout: 'remote-sha\trefs/heads/feature/pan-100\n', stderr: '' };
+        }
+        if (command.startsWith('git fetch origin feature/pan-100')) {
+          return { stdout: '', stderr: '' };
+        }
+        if (command.startsWith('git diff main...origin/feature/pan-100')) {
+          return { stdout: 'diff --git a/src/remote.ts b/src/remote.ts\n', stderr: '' };
+        }
+        if (command.startsWith('git diff --name-only')) {
+          // PAN-2406 predicate: real source divergence keeps this a rejection.
+          return { stdout: 'src/example.ts\n', stderr: '' };
+        }
+        if (command.startsWith('git rev-parse origin/feature/pan-100')) {
+          return { stdout: 'advanced-remote-head\n', stderr: '' };
+        }
+        if (command.startsWith('git log --no-merges')) {
+          return { stdout: 'remote-unmerged-commit\n', stderr: '' };
+        }
+        if (command === 'git merge-base --is-ancestor remote-unmerged-commit origin/main') {
+          throw new Error('commit is not on main');
+        }
+        if (command.startsWith('git log main..origin/feature/pan-100')) {
+          throw new Error('should fail immediately on mismatched remote merged PR head');
+        }
+        return { stdout: '', stderr: '' };
+      });
+
+      const ctx = {
+        issueId: 'PAN-100',
+        projectPath: testDir,
+        github: { owner: 'eltmon', repo: 'overdeck', number: 100 },
+      };
+      const verifyStep = await Effect.runPromise(__testInternals.verifyBranchMerged(ctx));
+
+      expect(verifyStep.step).toBe('close-out:verify-merged');
+      expect(verifyStep.success).toBe(false);
+      expect(verifyStep.error).toBe('origin/feature/pan-100 has 1 commit(s) after merged PR #2182 that are not on origin/main: remote-unmerged-commit');
     });
 
     it('should abort if archive fails', async () => {
@@ -261,15 +565,18 @@ describe('workflows', () => {
       expect(result.steps.find(s => s.step === 'teardown:branches')).toBeDefined();
     });
 
-    it('should delete the workspace, complete vBRIEF, close GitHub, and swap verifying labels during configured close-out', async () => {
+    it('should delete the workspace, complete xBRIEF, close GitHub, and swap verifying labels during configured close-out', async () => {
       writeFileSync(
         join(OVERDECK_HOME, 'cloister.toml'),
         '[close_out]\nremove_workspace = true\ndelete_feature_branch = false\nauto = false\nauto_delay_minutes = 60\n',
       );
       const wsPath = join(testDir, 'workspaces', 'feature-pan-100');
       mkdirSync(wsPath, { recursive: true });
-      await writeSpecForIssue(testDir, makeVBrief('PAN-100'), 'active');
+      await writeSpecForIssue(testDir, makeXBrief('PAN-100'), 'active');
       mockExecAsync.mockImplementation(async (command: string) => {
+        if (command.includes('gh issue view') && command.includes('--json labels')) {
+          return { stdout: JSON.stringify(['verifying-on-main', 'needs-close-out', 'merged', 'ready']), stderr: '' };
+        }
         if (command.startsWith('git worktree remove')) {
           rmSync(wsPath, { recursive: true, force: true });
         }
@@ -295,19 +602,19 @@ describe('workflows', () => {
       expect(commands.some(command => command.includes('--remove-label "needs-close-out"'))).toBe(true);
     });
 
-    it('should complete vBRIEF status and prune checkpoint refs during close-out', async () => {
-      await writeSpecForIssue(testDir, makeVBrief('PAN-100'), 'active');
+    it('should complete xBRIEF status and prune checkpoint refs during close-out', async () => {
+      await writeSpecForIssue(testDir, makeXBrief('PAN-100'), 'active');
 
       const ctx = { issueId: 'PAN-100', projectPath: testDir };
       const result = await closeOut(ctx, { tracker: successfulTracker() });
 
-      const vbriefIdx = result.steps.findIndex(s => s.step === 'close-out:vbrief-completed');
+      const xbriefIdx = result.steps.findIndex(s => s.step === 'close-out:vbrief-completed');
       const teardownIdx = result.steps.findIndex(s => s.step === 'teardown:checkpoint-refs');
       const closeIdx = result.steps.findIndex(s => s.step === 'close-issue:transition');
-      expect(vbriefIdx).toBeGreaterThanOrEqual(0);
+      expect(xbriefIdx).toBeGreaterThanOrEqual(0);
       expect(teardownIdx).toBeGreaterThanOrEqual(0);
       expect(closeIdx).toBeGreaterThanOrEqual(0);
-      expect(vbriefIdx).toBeLessThan(teardownIdx);
+      expect(xbriefIdx).toBeLessThan(teardownIdx);
       expect(teardownIdx).toBeLessThan(closeIdx);
 
       const commands = mockExecAsync.mock.calls.map(([command, args]) => ({ command: String(command), args }));
@@ -318,6 +625,56 @@ describe('workflows', () => {
       expect(spec?.status).toBe('completed');
       expect(spec?.document.plan.status).toBe('completed');
       expect(mockResetPostMergeState).toHaveBeenCalledWith('PAN-100');
+    });
+
+    it('marks the durable pipeline terminal before clearing review status', async () => {
+      const ctx = { issueId: 'PAN-100', projectPath: testDir };
+
+      const result = await closeOut(ctx, { tracker: successfulTracker() });
+
+      const markerIdx = result.steps.findIndex(s => s.step === 'close-out:mark-pipeline-terminal');
+      const clearIdx = result.steps.findIndex(s => s.step === 'clear-review-status');
+      expect(markerIdx).toBeGreaterThanOrEqual(0);
+      expect(clearIdx).toBeGreaterThanOrEqual(0);
+      expect(markerIdx).toBeLessThan(clearIdx);
+      expect(mockMarkRecordPipelineClosedOutSync).toHaveBeenCalledWith(
+        { name: 'inferred', path: testDir },
+        'PAN-100',
+      );
+    });
+
+    it('fails close-out and preserves review status when the DoD audit cannot persist', async () => {
+      mockWriteCloseOutDodGateSync.mockImplementationOnce(() => {
+        throw new Error('state push unavailable');
+      });
+      const ctx = { issueId: 'PAN-100', projectPath: testDir };
+
+      const result = await closeOut(ctx, { tracker: successfulTracker() });
+
+      expect(result.success).toBe(false);
+      expect(result.steps.find(step => step.step === 'close-out:record-dod-gate')).toMatchObject({
+        success: false,
+        error: expect.stringContaining('state push unavailable'),
+      });
+      expect(result.steps.find(step => step.step === 'close-out:abort')?.error).toContain('audit could not be persisted');
+      expect(result.steps.some(step => step.step === 'clear-review-status')).toBe(false);
+      expect(mockClearReviewStatus).not.toHaveBeenCalled();
+    });
+
+    it('preserves close-out success when the durable pipeline marker fails', async () => {
+      mockMarkRecordPipelineClosedOutSync.mockImplementationOnce(() => {
+        throw new Error('record unavailable');
+      });
+      const ctx = { issueId: 'PAN-100', projectPath: testDir };
+
+      const result = await closeOut(ctx, { tracker: successfulTracker() });
+
+      const marker = result.steps.find(s => s.step === 'close-out:mark-pipeline-terminal');
+      expect(marker?.success).toBe(true);
+      expect(marker?.skipped).toBe(true);
+      expect(marker?.details?.[0]).toContain('record unavailable');
+      expect(result.steps.some(s => s.step === 'clear-review-status')).toBe(true);
+      expect(result.success).toBe(true);
     });
 
     it('should abort before closing the tracker issue on teardown failure', async () => {
@@ -358,6 +715,8 @@ describe('workflows', () => {
     });
 
     it('should remove verifying labels when applying the closed-out label', async () => {
+      mockCurrentGitHubLabels();
+
       const ctx = {
         issueId: 'PAN-100',
         projectPath: testDir,
@@ -371,6 +730,7 @@ describe('workflows', () => {
       expect(commands.some(command => command.includes('--remove-label "verifying-on-main"'))).toBe(true);
       expect(commands.some(command => command.includes('--remove-label "needs-close-out"'))).toBe(true);
     });
+
   });
 
   describe('deepWipe', () => {
@@ -464,50 +824,27 @@ describe('workflows', () => {
     });
   });
 
-  describe('beads lifecycle (PAN-412)', () => {
-    it('approve should NOT clear beads (preserves them for history)', async () => {
-      const beadsDir = join(testDir, '.beads');
-      mkdirSync(beadsDir, { recursive: true });
+  describe('tasks lifecycle (PAN-412)', () => {
+    it('approve should NOT clear tasks (preserves them for history)', async () => {
+      const tasksDir = join(testDir, '.tasks');
+      mkdirSync(tasksDir, { recursive: true });
       writeFileSync(
-        join(beadsDir, 'issues.jsonl'),
+        join(tasksDir, 'issues.jsonl'),
         JSON.stringify({ id: 'b1', title: 'PAN-100: Task', status: 'closed' }) + '\n'
       );
 
       const ctx = { issueId: 'PAN-100', projectPath: testDir };
       const result = await approve(ctx);
 
-      // clear-beads step should not appear
-      const clearStep = result.steps.find(s => s.step === 'teardown:clear-beads');
+      // clear-tasks step should not appear
+      const clearStep = result.steps.find(s => s.step === 'teardown:clear-tasks');
       expect(clearStep).toBeUndefined();
 
-      // Beads JSONL should still contain the entry
-      const content = readFileSync(join(beadsDir, 'issues.jsonl'), 'utf-8');
+      // Tasks JSONL should still contain the entry
+      const content = readFileSync(join(tasksDir, 'issues.jsonl'), 'utf-8');
       expect(content).toContain('PAN-100');
     });
 
-    it('deepWipe should clear beads for the issue', async () => {
-      const beadsDir = join(testDir, '.beads');
-      const wsPath = join(testDir, 'workspaces', 'pan-100');
-      mkdirSync(beadsDir, { recursive: true });
-      mkdirSync(wsPath, { recursive: true });
-      writeFileSync(
-        join(beadsDir, 'issues.jsonl'),
-        JSON.stringify({ id: 'b1', title: 'PAN-100: Task', status: 'closed' }) + '\n' +
-        JSON.stringify({ id: 'b2', title: 'PAN-200: Other', status: 'open' }) + '\n'
-      );
-
-      const ctx = { issueId: 'PAN-100', projectPath: testDir };
-      const result = await deepWipe(ctx);
-
-      const clearStep = result.steps.find(s => s.step === 'teardown:clear-beads');
-      expect(clearStep).toBeDefined();
-      expect(clearStep!.success).toBe(true);
-
-      // PAN-100 should be gone, PAN-200 preserved
-      const content = readFileSync(join(beadsDir, 'issues.jsonl'), 'utf-8');
-      expect(content).not.toContain('PAN-100');
-      expect(content).toContain('PAN-200');
-    });
   });
 
   describe('step ordering', () => {
@@ -523,11 +860,20 @@ describe('workflows', () => {
       }
     });
 
-    it('closeOut should run verify-merged first', async () => {
+    it('closeOut should run the Definition-of-Done gate first', async () => {
       const ctx = { issueId: 'PAN-100', projectPath: testDir };
       const result = await closeOut(ctx);
 
-      expect(result.steps[0].step).toBe('close-out:verify-merged');
+      expect(result.steps[0].step).toBe('dod:review');
+      expect(result.steps.slice(0, 7).map(step => step.step)).toEqual([
+        'dod:review',
+        'dod:tests',
+        'dod:verification',
+        'dod:merged',
+        'dod:post-merge',
+        'dod:main-verify',
+        'dod:deploy',
+      ]);
     });
   });
 });

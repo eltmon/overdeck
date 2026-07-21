@@ -57,10 +57,16 @@ vi.mock('../../../lib/formatRelativeTime', () => ({
 vi.mock('../../shared/ModelPicker/ModelPicker', () => ({
   HARNESS_OPTIONS: [
     { id: 'claude-code', label: 'Claude Code', description: 'Default Claude Code CLI harness' },
-    { id: 'pi', label: 'Pi', description: 'Alternative harness for non-Anthropic models' },
+    { id: 'ohmypi', label: 'oh-my-pi', description: 'Alternative harness for non-Anthropic models (omp binary)' },
   ],
   canUsePickerHarness: () => ({ allowed: true }),
   useAvailableModels: () => ({ groups: [] }),
+}));
+
+vi.mock('../ZoneCOverviewTabs/queries', () => ({
+  useIssueCostsQuery: () => ({ data: { sessions: [] } }),
+  useReviewStatusQuery: () => ({ data: null }),
+  useWorkspaceQuery: () => ({ data: null }),
 }));
 
 vi.mock('../../shared/ContextMenu', () => ({
@@ -276,6 +282,86 @@ describe('SessionNode', () => {
     expect(screen.getByText('Work').closest('button')?.querySelector('.sessionIconRunning')).toBeTruthy();
   });
 
+  it('renders ended sessions with stale working activity as dead, not live (PAN-1739)', () => {
+    runtimeById['planning-dead'] = {
+      activity: 'working',
+      lastActivity: '2026-05-06T11:55:00.000Z',
+    };
+
+    render(
+      <SessionNode
+        session={makeSession({
+          sessionId: 'planning-dead',
+          type: 'planning',
+          presence: 'ended',
+          status: 'stopped',
+          duration: 22 * 60,
+        })}
+      />,
+    );
+
+    const row = screen.getByText('Planning').closest('button');
+    expect(row?.querySelector('.sessionIconRunning')).toBeNull();
+    expect(row?.querySelector('[data-status="active"]')).toBeNull();
+    expect(screen.queryByText('22m')).toBeNull();
+  });
+
+  it('derives ended status dots from presence instead of stale working activity (PAN-1739)', () => {
+    runtimeById['reviewer-dead'] = {
+      activity: 'working',
+      lastActivity: '2026-05-06T11:55:00.000Z',
+    };
+
+    render(
+      <SessionNode
+        session={makeSession({
+          sessionId: 'reviewer-dead',
+          type: 'reviewer',
+          role: 'security',
+          presence: 'ended',
+          status: 'stopped',
+        })}
+      />,
+    );
+
+    expect(screen.getByTestId('status-dot')).toHaveAttribute('data-status', 'ended');
+  });
+
+  it('renders registered swarm slots as distinct openable terminal rows', () => {
+    render(
+      <div>
+        <SessionNode
+          issueId="PAN-2203"
+          onViewTerminal={vi.fn()}
+          session={makeSession({
+            sessionId: 'agent-pan-2203-slot-1',
+            tmuxSession: 'agent-pan-2203-slot-1',
+            type: 'work',
+          })}
+        />
+        <SessionNode
+          issueId="PAN-2203"
+          onViewTerminal={vi.fn()}
+          session={makeSession({
+            sessionId: 'agent-pan-2203-slot-2',
+            tmuxSession: 'agent-pan-2203-slot-2',
+            type: 'work',
+          })}
+        />
+      </div>,
+    );
+
+    expect(screen.getByText('Slot 1')).toHaveAttribute(
+      'title',
+      'Registered swarm slot 1 for this issue. Model: sonnet-4-6. Session: agent-pan-2203-slot-1.',
+    );
+    expect(screen.getByText('Slot 2')).toHaveAttribute(
+      'title',
+      'Registered swarm slot 2 for this issue. Model: sonnet-4-6. Session: agent-pan-2203-slot-2.',
+    );
+    expect(screen.getAllByText('View Terminal')).toHaveLength(2);
+  });
+
   it('renders no status pill for quietly-stopped sessions (PAN-1779)', () => {
     render(
       <SessionNode
@@ -364,10 +450,10 @@ describe('SessionNode', () => {
       </div>,
     );
 
-    expect(screen.getAllByText('Restart review')).toHaveLength(2);
+    expect(screen.getAllByText('Re-run review on latest commit')).toHaveLength(2);
   });
 
-  it('labels the review coordinator restart as Restart review (quick review has no convoy to "restart all")', () => {
+  it('labels the review coordinator restart as a re-run on the latest commit', () => {
     render(
       <SessionNode
         issueId="PAN-1381"
@@ -380,7 +466,7 @@ describe('SessionNode', () => {
       />,
     );
 
-    expect(screen.getByText('Restart review')).toBeInTheDocument();
+    expect(screen.getByText('Re-run review on latest commit')).toBeInTheDocument();
   });
 
   it('uses Start for ended test and ship nodes and Restart for live test and ship nodes', () => {
@@ -460,5 +546,55 @@ describe('SessionNode', () => {
     // was misleading). The model is now shown inside the submenu as a
     // 'Currently: ...' status label.
     expect(screen.getByText('Restart')).toBeInTheDocument();
+  });
+});
+
+/**
+ * PAN-2765 — a planning session can sit for half an hour with a question on
+ * screen. Without this indicator the node reads as merely idle, which is how the
+ * live PAN-2760 planning agent went unanswered for 36 minutes.
+ */
+describe('SessionNode awaiting-input indicator', () => {
+  it('renders a clickable indicator when the session is awaiting input', () => {
+    render(
+      <SessionNode
+        session={makeSession({
+          type: 'planning',
+          sessionId: 'planning-pan-2760',
+          awaitingInput: true,
+          pendingInputKinds: ['agentTurnEnded'],
+        })}
+        issueId="PAN-2760"
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: /Answer the agent/i })).toBeTruthy();
+  });
+
+  it('names the specific wait when a real question is open', () => {
+    render(
+      <SessionNode
+        session={makeSession({
+          type: 'planning',
+          sessionId: 'planning-pan-2761',
+          awaitingInput: true,
+          pendingInputKinds: ['askUserQuestion'],
+        })}
+        issueId="PAN-2761"
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: /Question waiting/i })).toBeTruthy();
+  });
+
+  it('renders no indicator when the session is not awaiting input', () => {
+    render(
+      <SessionNode
+        session={makeSession({ type: 'planning', sessionId: 'planning-pan-2762' })}
+        issueId="PAN-2762"
+      />,
+    );
+
+    expect(screen.queryByRole('button', { name: /waiting|Answer the agent/i })).toBeNull();
   });
 });

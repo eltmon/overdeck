@@ -25,6 +25,8 @@ interface TestDeps {
   emitted: EmitActivityOptions[];
   deps: {
     readStatus: () => Promise<RestartStatus | null>;
+    readSupervisorUnitFailed: () => Promise<boolean>;
+    writeStatus: (status: RestartStatus) => Promise<void>;
     emit: (options: EmitActivityOptions) => void;
     getLastAnnounced: () => string | null;
     setLastAnnounced: (ts: string) => void;
@@ -42,6 +44,8 @@ function makeDeps(initial: RestartStatus | null = watchdogSuccess): TestDeps {
     emitted,
     deps: {
       readStatus: async () => status,
+      readSupervisorUnitFailed: async () => false,
+      writeStatus: async (next) => { status = next; },
       emit: (options) => emitted.push(options),
       getLastAnnounced: () => stored,
       setLastAnnounced: (ts) => { stored = ts; },
@@ -198,6 +202,61 @@ describe('announceNewRestart', () => {
     expect(await announceNewRestart(t.deps)).toBe(true);
     expect(t.emitted).toHaveLength(1);
     expect(t.lastAnnounced()).toBe(RESTART_TS);
+  });
+
+  it('emits one supervisor give-up entry when the systemd unit is failed', async () => {
+    const t = makeDeps(null);
+    const written: RestartStatus[] = [];
+
+    expect(await announceNewRestart({
+      ...t.deps,
+      readSupervisorUnitFailed: async () => true,
+      writeStatus: async (status) => {
+        written.push(status);
+        t.setStatus(status);
+      },
+    })).toBe(true);
+
+    expect(written).toHaveLength(1);
+    expect(written[0]).toMatchObject({
+      trigger: 'watchdog',
+      success: false,
+      gaveUp: true,
+      reason: 'supervisor-unit-failed',
+    });
+    expect(written[0].error).toContain('overdeck-supervisor.service');
+    expect(t.emitted).toHaveLength(1);
+    expect(t.emitted[0].level).toBe('error');
+    expect(t.emitted[0].message).toContain('GAVE UP');
+    expect(t.emitted[0].message).toContain('manual intervention required');
+
+    expect(await announceNewRestart({
+      ...t.deps,
+      readSupervisorUnitFailed: async () => true,
+      writeStatus: async (status) => {
+        written.push(status);
+        t.setStatus(status);
+      },
+    })).toBe(false);
+
+    expect(written).toHaveLength(1);
+    expect(t.emitted).toHaveLength(1);
+  });
+
+  it('does not emit a supervisor give-up entry when the systemd unit is not failed', async () => {
+    const t = makeDeps(null);
+    const writeStatus = vi.fn(async (status: RestartStatus) => {
+      t.setStatus(status);
+    });
+
+    expect(await announceNewRestart({
+      ...t.deps,
+      readSupervisorUnitFailed: async () => false,
+      writeStatus,
+    })).toBe(false);
+
+    expect(writeStatus).not.toHaveBeenCalled();
+    expect(t.emitted).toHaveLength(0);
   });
 });
 

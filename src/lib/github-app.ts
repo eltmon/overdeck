@@ -13,12 +13,14 @@ import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 import { createSign } from 'crypto';
-import { exec } from 'child_process';
+import { exec, execFile } from 'child_process';
 import { promisify } from 'util';
 import { Effect } from 'effect';
 import { GitHubApiError, ConfigError, FsError } from './errors.js';
+import { withConcurrencyLimitPromise } from './concurrency.js';
 
 const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 const APP_DIR = join(homedir(), '.overdeck', 'github-app');
 
@@ -31,6 +33,19 @@ export interface GitHubAppConfig {
 export interface InstallationToken {
   token: string;
   expiresAt: string; // ISO timestamp
+  permissions?: Record<string, string>;
+}
+
+/**
+ * Detects the GitHub App 403 "Resource not accessible by integration" error
+ * thrown when the installation lacks a required permission (e.g.
+ * contents:write or pull_requests:write) for the merge endpoint.
+ */
+export function isIntegrationPermissionError(message: string): boolean {
+  return (
+    message.includes('403') &&
+    message.includes('Resource not accessible by integration')
+  );
 }
 
 export interface GitHubPullRequestRef {
@@ -59,6 +74,28 @@ export interface GitHubPullRequestHeadState extends GitHubPullRequestRef {
   headSha: string;
 }
 
+export interface GitHubPullRequestForHead {
+  number: number;
+  state: 'open' | 'closed';
+  merged: boolean;
+  mergedAt: string | null;
+  mergeCommit: string | null;
+  url?: string;
+}
+
+export interface GitHubIssueState {
+  state: 'open' | 'closed';
+}
+
+export interface GitHubOpenIssueLabels {
+  number: number;
+  labels: string[];
+}
+
+export interface GitHubIssueLabels extends GitHubOpenIssueLabels {
+  state: 'open' | 'closed';
+}
+
 export type GitHubCiCheckRunsVerdict = 'green' | 'pending' | 'red';
 
 export interface GitHubCiCheckRunSummary {
@@ -84,6 +121,71 @@ export interface GitHubCiCheckRunsState {
   failedRuns: GitHubCiCheckRunSummary[];
 }
 
+export type MergeBackendStatus = {
+  available: boolean;
+  mode: 'app' | 'gh-cli' | 'none';
+  detail: string;
+};
+
+export interface MergeBackendStatusDeps {
+  isConfigured?: () => boolean;
+  checkGhAuth?: () => Promise<boolean>;
+}
+
+export type AppCanMergeResult = {
+  configured: boolean;
+  canMerge?: boolean;
+  missing?: string[];
+  detail: string;
+};
+
+export interface VerifyAppCanMergeDeps {
+  isConfigured?: () => boolean;
+  generateToken?: () => Promise<InstallationToken>;
+}
+
+/**
+ * Verify the configured GitHub App installation has the permissions required
+ * to merge pull requests via the API.
+ */
+export async function verifyAppCanMerge(
+  deps: VerifyAppCanMergeDeps = {}
+): Promise<AppCanMergeResult> {
+  const isConfigured = deps.isConfigured ?? isGitHubAppConfigured;
+  if (!isConfigured()) {
+    return { configured: false, detail: 'GitHub App is not configured' };
+  }
+
+  const generateToken = deps.generateToken ?? (async () =>
+    Effect.runPromise(generateInstallationToken()));
+
+  const token = await generateToken();
+  const permissions = token.permissions ?? {};
+  const missing: string[] = [];
+  if (permissions.pull_requests !== 'write') {
+    missing.push('pull_requests:write');
+  }
+  if (permissions.contents !== 'write') {
+    missing.push('contents:write');
+  }
+
+  if (missing.length === 0) {
+    return {
+      configured: true,
+      canMerge: true,
+      missing: [],
+      detail: 'GitHub App installation has merge permissions',
+    };
+  }
+
+  return {
+    configured: true,
+    canMerge: false,
+    missing,
+    detail: `GitHub App installation is missing required permissions: ${missing.join(', ')}`,
+  };
+}
+
 type GitHubCheckRunApiResponse = {
   check_runs?: Array<{
     id?: number;
@@ -103,6 +205,41 @@ export function isGitHubAppConfigured(): boolean {
     existsSync(join(APP_DIR, 'private-key.pem')) &&
     existsSync(join(APP_DIR, 'installation-id'))
   );
+}
+
+async function defaultCheckGhAuth(): Promise<boolean> {
+  try {
+    await execFileAsync('gh', ['auth', 'status'], { timeout: 5000 });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function getMergeBackendStatus(deps: MergeBackendStatusDeps = {}): Promise<MergeBackendStatus> {
+  const isConfigured = deps.isConfigured ?? isGitHubAppConfigured;
+  if (isConfigured()) {
+    return {
+      available: true,
+      mode: 'app',
+      detail: 'GitHub App credentials are configured',
+    };
+  }
+
+  const checkGhAuth = deps.checkGhAuth ?? defaultCheckGhAuth;
+  if (await checkGhAuth()) {
+    return {
+      available: true,
+      mode: 'gh-cli',
+      detail: 'gh CLI is authenticated',
+    };
+  }
+
+  return {
+    available: false,
+    mode: 'none',
+    detail: 'No GitHub App credentials or gh CLI authentication found',
+  };
 }
 
 /**
@@ -165,10 +302,15 @@ function generateJWT(appId: string, privateKey: string): string {
     throw new Error(`Failed to generate installation token: ${response.status} ${text}`);
   }
 
-  const data = await response.json() as { token: string; expires_at: string };
+  const data = await response.json() as {
+    token: string;
+    expires_at: string;
+    permissions?: Record<string, string>;
+  };
   return {
     token: data.token,
     expiresAt: data.expires_at,
+    permissions: data.permissions,
   };
 }
 
@@ -247,6 +389,20 @@ async function githubApiAllCheckRunPages(path: string): Promise<NonNullable<GitH
   return allRuns;
 }
 
+async function githubApiAllPages<T>(path: string): Promise<T[]> {
+  const token = await getInstallationAccessToken();
+  const allItems: T[] = [];
+  let nextPath: string | null = withPerPage(path, 100);
+
+  while (nextPath) {
+    const { data, headers } = await githubApiWithToken<T[]>(token, nextPath);
+    allItems.push(...data);
+    nextPath = nextPathFromLinkHeader(headers.get('link'));
+  }
+
+  return allItems;
+}
+
 export function parsePullRequestRef(input: {
   url?: string;
   id?: string;
@@ -316,7 +472,7 @@ function summarizeCiCheckRuns(
   };
 }
 
-async function getCiCheckRunsStatePromise(
+export async function getCiCheckRunsStatePromise(
   owner: string,
   repo: string,
   sha: string,
@@ -407,7 +563,96 @@ async function getPullRequestHeadStatePromise(
     merged: pull.merged === true,
     headSha: pull.head?.sha || '',
   };
-}async function mergePullRequestWithAppPromise(
+}
+
+export async function listPullRequestsForHeadPromise(
+  owner: string,
+  repo: string,
+  branch: string,
+  state: 'open' | 'closed' | 'all',
+): Promise<GitHubPullRequestForHead[]> {
+  const params = new URLSearchParams({
+    head: `${owner}:${branch}`,
+    state,
+  });
+  const pulls = await githubApi<Array<{
+    number: number;
+    html_url?: string;
+    state: 'open' | 'closed';
+    merged?: boolean;
+    merged_at?: string | null;
+    merge_commit_sha?: string | null;
+  }>>(`/repos/${owner}/${repo}/pulls?${params.toString()}`);
+
+  return pulls.map((pull) => ({
+    number: pull.number,
+    state: pull.state,
+    merged: pull.merged === true || pull.merged_at != null,
+    mergedAt: pull.merged_at ?? null,
+    mergeCommit: pull.merge_commit_sha ?? null,
+    url: pull.html_url,
+  }));
+}
+
+export async function getIssueStatePromise(
+  owner: string,
+  repo: string,
+  number: number,
+): Promise<GitHubIssueState> {
+  const issue = await githubApi<{ state: 'open' | 'closed' }>(`/repos/${owner}/${repo}/issues/${number}`);
+  return { state: issue.state };
+}
+
+export async function listOpenIssuesWithLabelsPromise(
+  owner: string,
+  repo: string,
+): Promise<GitHubOpenIssueLabels[]> {
+  const issues = await githubApiAllPages<{
+    number: number;
+    pull_request?: unknown;
+    labels?: Array<string | { name?: string | null }>;
+  }>(`/repos/${owner}/${repo}/issues?state=open`);
+
+  return issues
+    .filter((issue) => issue.pull_request == null)
+    .map((issue) => ({
+      number: issue.number,
+      labels: (issue.labels ?? [])
+        .map((label) => typeof label === 'string' ? label : label.name)
+        .filter((name): name is string => typeof name === 'string' && name.length > 0),
+    }));
+}
+
+export async function listIssuesWithAnyLabelPromise(
+  owner: string,
+  repo: string,
+  labels: readonly string[],
+): Promise<GitHubIssueLabels[]> {
+  const byNumber = new Map<number, GitHubIssueLabels>();
+  const issueGroups = await withConcurrencyLimitPromise(labels.map((label) => async () =>
+    githubApiAllPages<{
+      number: number;
+      state: 'open' | 'closed';
+      pull_request?: unknown;
+      labels?: Array<string | { name?: string | null }>;
+    }>(`/repos/${owner}/${repo}/issues?state=all&labels=${encodeURIComponent(label)}`)
+  ), 3);
+  for (const issues of issueGroups) {
+    for (const issue of issues) {
+      if (issue.pull_request != null) continue;
+      byNumber.set(issue.number, {
+        number: issue.number,
+        state: issue.state,
+        labels: (issue.labels ?? [])
+          .map((value) => typeof value === 'string' ? value : value.name)
+          .filter((name): name is string => typeof name === 'string' && name.length > 0),
+      });
+    }
+  }
+  return [...byNumber.values()];
+}
+
+async function mergePullRequestWithAppPromise(
   owner: string,
   repo: string,
   number: number,
@@ -474,6 +719,7 @@ export async function configureWorkspaceForBot(
   const { exec } = await import('child_process');
   const { promisify } = await import('util');
   const { writeFileSync } = await import('fs');
+  const { resolve } = await import('path');
   const execAsync = promisify(exec);
   const { name, email } = getBotIdentity();
 
@@ -484,7 +730,9 @@ export async function configureWorkspaceForBot(
   // Use git credential store with a workspace-local credential file.
   // Token is refreshed at workspace creation (~1hr TTL). For long sessions,
   // call refreshWorkspaceToken() to get a fresh one.
-  const credFile = join(workspacePath, '.git', 'pan-credentials');
+  const { stdout: gitDirOutput } = await execAsync('git rev-parse --git-dir', { cwd: workspacePath, encoding: 'utf-8' });
+  const gitDir = resolve(workspacePath, gitDirOutput.trim());
+  const credFile = join(gitDir, 'pan-credentials');
   writeFileSync(credFile, `https://x-access-token:${token}@github.com\n`, { mode: 0o600 });
 
   // Set remote to HTTPS and configure credential store
@@ -660,6 +908,39 @@ export const getPullRequestHeadState = (
   Effect.tryPromise({
     try: () => getPullRequestHeadStatePromise(owner, repo, number),
     catch: apiCatch('getPullRequestHeadState'),
+  });
+
+/** Effect-native listPullRequestsForHead — App REST head lookup, no GraphQL. */
+export const listPullRequestsForHead = (
+  owner: string,
+  repo: string,
+  branch: string,
+  state: 'open' | 'closed' | 'all',
+): Effect.Effect<GitHubPullRequestForHead[], GitHubApiError> =>
+  Effect.tryPromise({
+    try: () => listPullRequestsForHeadPromise(owner, repo, branch, state),
+    catch: apiCatch('listPullRequestsForHead'),
+  });
+
+/** Effect-native getIssueState — App REST issue state lookup, no GraphQL. */
+export const getIssueState = (
+  owner: string,
+  repo: string,
+  number: number,
+): Effect.Effect<GitHubIssueState, GitHubApiError> =>
+  Effect.tryPromise({
+    try: () => getIssueStatePromise(owner, repo, number),
+    catch: apiCatch('getIssueState'),
+  });
+
+/** Effect-native listOpenIssuesWithLabels — paginated App REST issue labels. */
+export const listOpenIssuesWithLabels = (
+  owner: string,
+  repo: string,
+): Effect.Effect<GitHubOpenIssueLabels[], GitHubApiError> =>
+  Effect.tryPromise({
+    try: () => listOpenIssuesWithLabelsPromise(owner, repo),
+    catch: apiCatch('listOpenIssuesWithLabels'),
   });
 
 /**

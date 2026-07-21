@@ -33,7 +33,7 @@ All 7 planned tasks completed:
   - `traefik.yml` with Docker provider for workspace containers
   - `dynamic/overdeck.yml` with dashboard routing
   - `README.md` with usage instructions
-- Generates wildcard mkcert certificates: `*.pan.localhost`, `*.localhost`
+- Generates wildcard mkcert certificates: `*.overdeck.localhost`, `*.localhost`
 - Adds `[traefik]` section to config.toml
 - Supports `--minimal` flag to skip Traefik
 
@@ -77,8 +77,8 @@ All 7 planned tasks completed:
 
 | URL | Proxies To | Description |
 |-----|------------|-------------|
-| `https://pan.localhost` | `http://host.docker.internal:3001` | Dashboard frontend |
-| `https://pan.localhost/api/*` | `http://host.docker.internal:3002` | Dashboard API |
+| `https://overdeck.localhost` | `http://host.docker.internal:3001` | Dashboard frontend |
+| `https://overdeck.localhost/api/*` | `http://host.docker.internal:3002` | Dashboard API |
 | `http://localhost:8080` | Traefik container | Traefik dashboard |
 | `http://localhost:3001` | Dashboard frontend | Port-based fallback |
 | `http://localhost:3002` | Dashboard API | Port-based fallback |
@@ -86,7 +86,7 @@ All 7 planned tasks completed:
 ## Architecture Decisions
 
 1. **Traefik runs in Docker only** - Dashboard remains on host for simpler development
-2. **Wildcard certificates** - Single cert covers `*.pan.localhost` and `*.localhost`
+2. **Wildcard certificates** - Single cert covers `*.overdeck.localhost` and `*.localhost`
 3. **Inline configuration** - Traefik configs written during install for easier maintenance
 4. **Minimal mode** - `--minimal` flag skips Traefik for environments without Docker
 5. **Graceful degradation** - Port-based routing always works as fallback
@@ -133,7 +133,7 @@ pan up
 ## Known Limitations
 
 1. **Docker required** - Traefik mode requires Docker daemon running
-2. **DNS manual setup** - User must add `pan.localhost` to `/etc/hosts` (documented)
+2. **DNS manual setup** - User must add `overdeck.localhost` to `/etc/hosts` (documented)
 3. **WSL2 complexity** - Requires dnsmasq for wildcard DNS on WSL2 (documented)
 4. **No automation** - E2E tests can't run without Docker daemon in workspace
 

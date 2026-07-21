@@ -10,6 +10,8 @@ import {
 import { getConversationByName } from '../../../lib/overdeck/conversations.js';
 import { getSetting, setSetting } from '../../../lib/overdeck/control-settings.js';
 import type { ConversationFilter } from '../../../lib/overdeck/discovered-sessions.js';
+import { getSessionsFeedFacets, listSessionsFeed } from '../../../lib/overdeck/sessions-feed.js';
+import type { SessionsFeedFilter } from '../../../lib/overdeck/sessions-feed.js';
 import { searchSessions } from '../../../lib/conversations/search.js';
 import type { SearchQuery } from '../../../lib/conversations/search.js';
 import { scan } from '../../../lib/conversations/scanner.js';
@@ -18,10 +20,13 @@ import { enrichSessions, CostThresholdError } from '../../../lib/conversations/e
 import type { EnrichOptions } from '../../../lib/conversations/enrichment/index.js';
 import { embedSessions } from '../../../lib/conversations/embeddings/index.js';
 import type { EmbedSessionsOptions } from '../../../lib/conversations/embeddings/index.js';
+import { listSubstrateBugWeights } from '../../../lib/overdeck/substrate-bug-weights-service.js';
 
 type DashboardDbOperation =
   | 'getDiscoveredStats'
   | 'listDiscoveredSessions'
+  | 'listSessionsFeed'
+  | 'getSessionsFeedFacets'
   | 'getDiscoveredSessionById'
   | 'aggregateDiscoveredSessionCost'
   | 'aggregateDiscoveredSessionCostBy'
@@ -33,6 +38,7 @@ type DashboardDbOperation =
   | 'getConversationByName'
   | 'getSetting'
   | 'setSetting'
+  | 'listSubstrateBugWeights'
   | 'getArtifactBySlug'
   | 'listArtifactsForWorkspaceOrIssue'
   | 'unshareArtifactBySlug';
@@ -70,6 +76,10 @@ async function runJob(
         total: countDiscoveredSessions({ ...filter, limit: undefined, offset: undefined }),
       };
     }
+    case 'listSessionsFeed':
+      return listSessionsFeed(payload as SessionsFeedFilter);
+    case 'getSessionsFeedFacets':
+      return getSessionsFeedFacets(payload as SessionsFeedFilter);
     case 'getDiscoveredSessionById':
       return getDiscoveredSessionById(payload as number);
     case 'aggregateDiscoveredSessionCost':
@@ -84,7 +94,7 @@ async function runJob(
     case 'enrichSessions':
       return enrichSessions({ ...(payload as EnrichOptions), onProgress: emitProgress });
     case 'embedSessions':
-      return embedSessions({ ...(payload as EmbedSessionsOptions), onProgress: emitProgress });
+      return embedSessions({ ...(payload as EmbedSessionsOptions), autoInstall: true, onProgress: emitProgress });
     case 'getConversationByName':
       return getConversationByName(payload as string);
     case 'getSetting':
@@ -93,6 +103,10 @@ async function runJob(
       const input = payload as { key: string; value: string };
       setSetting(input.key, input.value);
       return null;
+    }
+    case 'listSubstrateBugWeights': {
+      const input = payload as { window: string; limit: number; offset: number };
+      return listSubstrateBugWeights(input.window, { limit: input.limit, offset: input.offset });
     }
     case 'getArtifactBySlug': {
       const { getArtifactBySlugJob } = await import('./artifact-index-jobs.js');

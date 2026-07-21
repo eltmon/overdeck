@@ -12,6 +12,12 @@
 import { homedir } from 'node:os';
 import { Effect, Layer, Context } from 'effect';
 import { loadOverdeckEnvSync } from '../../lib/env-loader.js';
+import {
+  getDashboardIdentity,
+  isNonPrimaryCheckoutRoot,
+  readHostDashboardApiPort,
+  shouldRefuseHostDashboardPort,
+} from './identity.js';
 
 // ─── Config shape ──────────────────────────────────────────────────────────────
 
@@ -69,21 +75,44 @@ export const ServerConfigLayer = Layer.effect(
       throw new ServerConfigError('API_PORT', `Invalid port value: "${portStr}"`);
     }
 
-    // PAN-1416 canonical-path guard. A dashboard started from a workspace cwd
-    // (`workspaces/feature-pan-XXX/`) must NEVER bind the primary port 3011 unless
-    // the operator explicitly opts in. Without this guard, a workspace dashboard
-    // started for Playwright UAT can hijack pan.localhost when the canonical
-    // dashboard is restarting, leaving the user looking at stale workspace code.
-    const cwdIsWorkspace = /\/workspaces\/feature-pan-/i.test(process.cwd());
-    const portWasExplicit = !!(process.env['API_PORT'] ?? process.env['PORT']);
-    const overrideAllowed = process.env['OVERDECK_WORKSPACE_DASHBOARD_ALLOW_PRIMARY'] === '1';
-    if (cwdIsWorkspace && !portWasExplicit && !overrideAllowed) {
+    // A host-side peer dashboard or workspace checkout must never bind the host
+    // dashboard API port. Workspace-container peers use an isolated network
+    // namespace, so the identity guard allows their canonical compose port.
+    //
+    // The override is an operator-only escape hatch for a deliberately-stopped
+    // canonical dashboard. It must never let a workspace checkout seize the host
+    // port (PAN-2322: UAT agents used it to hijack :3011 on 2026-07-03 and 2026-07-07).
+    // The refusal message deliberately does not name the env var — agents read it.
+    const identity = getDashboardIdentity();
+    const hostDashboardApiPort = readHostDashboardApiPort();
+    const overrideRequested = process.env['OVERDECK_WORKSPACE_DASHBOARD_ALLOW_PRIMARY'] === '1';
+    const agentId = process.env['OVERDECK_AGENT_ID'];
+    const nonConversationUsingOverride =
+      overrideRequested && agentId !== undefined && !agentId.startsWith('conv-');
+    if (nonConversationUsingOverride) {
       const msg = (
-        `Refusing to bind primary port ${port} from workspace cwd ${process.cwd()} ` +
-        `(PAN-1416). Workspace dashboards must set API_PORT to a non-primary port. ` +
-        `To override (e.g. when the canonical dashboard is deliberately stopped), set ` +
-        `OVERDECK_WORKSPACE_DASHBOARD_ALLOW_PRIMARY=1.`
+        `Refusing host dashboard port override for pipeline-role identity ` +
+        `OVERDECK_AGENT_ID=${agentId}. Work, planning, review, and flywheel agents must never bind ` +
+        `the host dashboard port; use the workspace container endpoint instead. Only an operator-supervised ` +
+        `conversation (conv-*) or a process with no agent identity may use this emergency override.`
       );
+      console.error(`[overdeck] ${msg}`);
+      throw new ServerConfigError('API_PORT', msg);
+    }
+    const overrideAllowed = overrideRequested && !isNonPrimaryCheckoutRoot(identity.repoRoot);
+    if (
+      shouldRefuseHostDashboardPort({
+        repoRoot: identity.repoRoot,
+        mode: identity.mode,
+        port,
+        hostDashboardApiPort,
+      }) &&
+      !overrideAllowed
+    ) {
+      const msg =
+        `Refusing to bind host dashboard port ${port} from repoRoot=${identity.repoRoot} ` +
+        `mode=${identity.mode}. Peer/workspace dashboards must set PORT or API_PORT ` +
+        `to a non-host port.`;
       console.error(`[overdeck] ${msg}`);
       throw new ServerConfigError('API_PORT', msg);
     }

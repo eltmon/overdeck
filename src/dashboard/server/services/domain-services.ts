@@ -56,7 +56,7 @@ function shouldRefreshSessionContext(type: string): boolean {
     type.startsWith('system.health_');
 }
 
-function mapDomainEventToDetailed(event: StoredEvent): {
+export function mapDomainEventToDetailed(event: StoredEvent): {
   source: string;
   level: 'info' | 'warn' | 'error' | 'success';
   message: string;
@@ -150,8 +150,11 @@ function mapDomainEventToDetailed(event: StoredEvent): {
         issueId,
         triggeringEvent: event.type,
       };
-    case 'cost.event_recorded':
+    case 'cost.event_recorded': {
+      const cost = Number(p['cost']);
+      if (Number.isFinite(cost) && cost <= 0) return null;
       return { source: 'costs', level: 'info', message: `Cost event: $${(p['cost'] as number)?.toFixed?.(2) ?? p['cost']} for ${p['agentId']}`, issueId, triggeringEvent: event.type };
+    }
     default:
       return null;
   }

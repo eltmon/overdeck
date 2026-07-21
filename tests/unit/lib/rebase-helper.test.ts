@@ -1,15 +1,21 @@
-import { Effect } from 'effect';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { Effect } from 'effect';
 import type { MergeSet } from '../../../src/lib/merge-set.js';
 
-const { execAsyncMock } = vi.hoisted(() => ({
-  execAsyncMock: vi.fn(),
-}));
+const execMock = vi.hoisted(() => vi.fn());
 
 vi.mock('node:child_process', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:child_process')>();
-  const exec = vi.fn();
-  (exec as any)[Symbol.for('nodejs.util.promisify.custom')] = execAsyncMock;
+  const kCustom = Symbol.for('nodejs.util.promisify.custom');
+
+  function exec(command: string, optionsOrCallback: any, maybeCallback?: any) {
+    const callback = typeof optionsOrCallback === 'function' ? optionsOrCallback : maybeCallback;
+    execMock(command, typeof optionsOrCallback === 'object' ? optionsOrCallback : undefined)
+      .then(({ stdout = '', stderr = '' }) => callback(null, stdout, stderr))
+      .catch((error: any) => callback(error, error.stdout || '', error.stderr || ''));
+  }
+
+  (exec as any)[kCustom] = execMock;
   return { ...actual, exec };
 });
 
@@ -21,49 +27,90 @@ vi.mock('node:fs', async (importOriginal) => {
 import { rebaseAndPushRepos } from '../../../src/lib/rebase-helper.js';
 
 const mergeSet: MergeSet = {
-  issueId: 'PAN-806',
-  projectKey: 'overdeck',
-  projectPath: '/project',
-  workspaceType: 'monorepo',
-  status: 'draft',
-  createdAt: '2026-07-21T00:00:00.000Z',
-  updatedAt: '2026-07-21T00:00:00.000Z',
+  issueId: 'MIN-882',
+  projectKey: 'mind-your-now',
+  projectPath: '/projects/mind-your-now',
+  workspaceType: 'polyrepo',
+  status: 'ready',
+  createdAt: '2026-07-20T00:00:00.000Z',
+  updatedAt: '2026-07-20T00:00:00.000Z',
   repos: [{
-    repoKey: 'overdeck',
-    repoPath: '/project',
-    forge: 'github',
-    sourceBranch: 'feature/pan-806',
+    repoKey: 'api',
+    repoPath: '/projects/mind-your-now/api',
+    forge: 'gitlab',
+    sourceBranch: 'feature/min-882',
     targetBranch: 'main',
-    reviewStatus: 'pending',
-    testStatus: 'pending',
+    reviewStatus: 'passed',
+    testStatus: 'passed',
     rebaseStatus: 'pending',
     verificationStatus: 'pending',
-    mergeStatus: 'pending',
+    mergeStatus: 'ready',
     mergeOrder: 0,
     required: true,
   }],
 };
 
-function resolved(stdout = ''): Promise<{ stdout: string; stderr: string }> {
-  return Promise.resolve({ stdout, stderr: '' });
-}
+beforeEach(() => {
+  vi.clearAllMocks();
+  execMock.mockImplementation(async (command: string) => {
+    if (command.startsWith('git fetch origin')) return { stdout: '', stderr: '' };
+    if (command === 'git merge-base HEAD origin/main') return { stdout: 'base-sha\n', stderr: '' };
+    if (command === 'git rev-parse origin/main') return { stdout: 'base-sha\n', stderr: '' };
+    if (command === 'git rev-parse origin/feature/min-882') return { stdout: 'feature-sha\n', stderr: '' };
+    if (command === 'git rev-parse HEAD') return { stdout: 'feature-sha\n', stderr: '' };
+    if (command.startsWith('git push')) throw new Error(`unexpected push: ${command}`);
+    throw new Error(`unexpected command: ${command}`);
+  });
+});
 
 function optionsFor(command: string): Record<string, any> {
-  const call = execAsyncMock.mock.calls.find(([calledCommand]) => calledCommand === command);
+  const call = execMock.mock.calls.find(([calledCommand]) => calledCommand === command);
   expect(call, `expected execAsync call for ${command}`).toBeDefined();
   return call![1];
 }
 
 describe('rebaseAndPushRepos', () => {
-  beforeEach(() => {
-    execAsyncMock.mockReset();
+  it('does not push when an up-to-date branch is already published', async () => {
+    const result = await Effect.runPromise(rebaseAndPushRepos('/workspace', mergeSet));
+
+    expect(result).toEqual({
+      success: true,
+      results: [{ repoKey: 'api', outcome: 'already-current' }],
+    });
+    expect(execMock.mock.calls.map(([command]) => command)).not.toEqual(
+      expect.arrayContaining([expect.stringMatching(/^git push/)]),
+    );
+  });
+
+  it('uses a plain push for an unpublished commit on an up-to-date branch', async () => {
+    execMock.mockImplementation(async (command: string) => {
+      if (command.startsWith('git fetch origin')) return { stdout: '', stderr: '' };
+      if (command === 'git merge-base HEAD origin/main') return { stdout: 'base-sha\n', stderr: '' };
+      if (command === 'git rev-parse origin/main') return { stdout: 'base-sha\n', stderr: '' };
+      if (command === 'git rev-parse origin/feature/min-882') return { stdout: 'remote-sha\n', stderr: '' };
+      if (command === 'git rev-parse HEAD') return { stdout: 'local-sha\n', stderr: '' };
+      if (command === 'git push origin HEAD:refs/heads/feature/min-882') return { stdout: '', stderr: '' };
+      throw new Error(`unexpected command: ${command}`);
+    });
+
+    const result = await Effect.runPromise(rebaseAndPushRepos('/workspace', mergeSet));
+
+    expect(result.success).toBe(true);
+    expect(execMock).toHaveBeenCalledWith(
+      'git push origin HEAD:refs/heads/feature/min-882',
+      expect.objectContaining({ cwd: '/workspace/api' }),
+    );
+    expect(execMock.mock.calls.map(([command]) => command).join('\n')).not.toContain('--force');
   });
 
   it('sets the pan git-op sentinel alongside GIT_EDITOR for rebase', async () => {
-    execAsyncMock.mockImplementation((command: string) => {
-      if (command === 'git merge-base HEAD origin/main') return resolved('old-base\n');
-      if (command === 'git rev-parse origin/main') return resolved('target-head\n');
-      return resolved();
+    execMock.mockImplementation(async (command: string) => {
+      if (command.startsWith('git fetch origin')) return { stdout: '', stderr: '' };
+      if (command === 'git merge-base HEAD origin/main') return { stdout: 'old-base\n', stderr: '' };
+      if (command === 'git rev-parse origin/main') return { stdout: 'target-head\n', stderr: '' };
+      if (command === 'git rebase origin/main') return { stdout: '', stderr: '' };
+      if (command.startsWith('git push')) return { stdout: '', stderr: '' };
+      throw new Error(`unexpected command: ${command}`);
     });
 
     const result = await Effect.runPromise(rebaseAndPushRepos('/workspace', mergeSet));
@@ -76,12 +123,16 @@ describe('rebaseAndPushRepos', () => {
   });
 
   it('sets the pan git-op sentinel alongside GIT_EDITOR for rebase --continue', async () => {
-    execAsyncMock.mockImplementation((command: string) => {
-      if (command === 'git merge-base HEAD origin/main') return resolved('old-base\n');
-      if (command === 'git rev-parse origin/main') return resolved('target-head\n');
-      if (command === 'git rebase origin/main') return Promise.reject(new Error('conflict'));
-      if (command === 'git status --porcelain') return resolved('UU .pan/continue.json\n');
-      return resolved();
+    execMock.mockImplementation(async (command: string) => {
+      if (command.startsWith('git fetch origin')) return { stdout: '', stderr: '' };
+      if (command === 'git merge-base HEAD origin/main') return { stdout: 'old-base\n', stderr: '' };
+      if (command === 'git rev-parse origin/main') return { stdout: 'target-head\n', stderr: '' };
+      if (command === 'git rebase origin/main') throw new Error('conflict');
+      if (command === 'git status --porcelain') return { stdout: 'UU .pan/continue.json\n', stderr: '' };
+      if (command.startsWith('git checkout --ours') || command.startsWith('git add ')) return { stdout: '', stderr: '' };
+      if (command === 'git rebase --continue') return { stdout: '', stderr: '' };
+      if (command.startsWith('git push')) return { stdout: '', stderr: '' };
+      throw new Error(`unexpected command: ${command}`);
     });
 
     const result = await Effect.runPromise(rebaseAndPushRepos('/workspace', mergeSet));
@@ -94,12 +145,15 @@ describe('rebaseAndPushRepos', () => {
   });
 
   it('sets the pan git-op sentinel for rebase abort and merge fallback', async () => {
-    execAsyncMock.mockImplementation((command: string) => {
-      if (command === 'git merge-base HEAD origin/main') return resolved('old-base\n');
-      if (command === 'git rev-parse origin/main') return resolved('target-head\n');
-      if (command === 'git rebase origin/main') return Promise.reject(new Error('conflict'));
-      if (command === 'git status --porcelain') return resolved('UU src/index.ts\n');
-      return resolved();
+    execMock.mockImplementation(async (command: string) => {
+      if (command.startsWith('git fetch origin')) return { stdout: '', stderr: '' };
+      if (command === 'git merge-base HEAD origin/main') return { stdout: 'old-base\n', stderr: '' };
+      if (command === 'git rev-parse origin/main') return { stdout: 'target-head\n', stderr: '' };
+      if (command === 'git rebase origin/main') throw new Error('conflict');
+      if (command === 'git status --porcelain') return { stdout: 'UU src/index.ts\n', stderr: '' };
+      if (command === 'git rebase --abort' || command === 'git merge origin/main') return { stdout: '', stderr: '' };
+      if (command.startsWith('git push')) return { stdout: '', stderr: '' };
+      throw new Error(`unexpected command: ${command}`);
     });
 
     const result = await Effect.runPromise(rebaseAndPushRepos('/workspace', mergeSet));

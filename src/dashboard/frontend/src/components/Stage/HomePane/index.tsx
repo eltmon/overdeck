@@ -6,30 +6,34 @@ export interface HomePaneProps {
   workspaceId: WorkspaceId
   /** Open + activate another pane (used by docks, launcher, timeline). */
   openPane: (spec: PaneSpec) => void
-  // Section content slots — filled by later beads (workspace-header, launcher,
+  // Section content slots — filled by later tasks (workspace-header, launcher,
   // agent-dock, action-dock, timeline, homepane-sections). Optional so the
-  // scaffold renders standalone until those beads land.
+  // scaffold renders standalone until those tasks land.
   header?: ReactNode
   launcher?: ReactNode
   agentDock?: ReactNode
   actionDock?: ReactNode
   timeline?: ReactNode
   detail?: ReactNode
+  wide?: boolean
+  detailFirst?: boolean
 }
 
-/** Section render order — matches the pan-1549 mockup top-to-bottom. */
-const SECTIONS = ['header', 'launcher', 'agentDock', 'actionDock', 'timeline', 'detail'] as const
+/** Section render order — project detail/cockpit content sits above conversations. */
+const SECTIONS = ['header', 'launcher', 'agentDock', 'actionDock', 'detail', 'timeline'] as const
+const DETAIL_FIRST_SECTIONS = ['header', 'detail', 'launcher', 'agentDock', 'actionDock', 'timeline'] as const
 
 /**
- * HomePane — the permanent paneType='home' body (PAN-1549). This bead lays out
+ * HomePane — the permanent paneType='home' body (PAN-1549). This task lays out
  * the section scaffold (WorkspaceHeader, Launcher, AgentDock, ActionDock,
- * Timeline, detail) in a constrained content column. The sections themselves
- * are populated by later beads; each renders into its named slot here.
+ * detail, Timeline) in a constrained content column. The sections themselves
+ * are populated by later tasks; each renders into its named slot here.
  */
 export function HomePane(props: HomePaneProps) {
+  const sections = props.detailFirst ? DETAIL_FIRST_SECTIONS : SECTIONS
   return (
-    <div className={styles.home}>
-      {SECTIONS.map((name) => (
+    <div className={props.wide ? `${styles.home} ${styles.homeWide}` : styles.home}>
+      {sections.map((name) => (
         <section key={name} data-section={name} className={styles.homeSection}>
           {props[name]}
         </section>

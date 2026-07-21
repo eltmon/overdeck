@@ -23,6 +23,7 @@ describe('work-agent-stop-hook structured channel replies', () => {
   let claudeLog: string
   let curlLog: string
   let runtimeJson: string
+  let reviewStatusJson: string
   let hookScriptPath: string
 
   beforeEach(() => {
@@ -34,11 +35,24 @@ describe('work-agent-stop-hook structured channel replies', () => {
     claudeLog = join(tempRoot, 'claude.log')
     curlLog = join(tempRoot, 'curl.log')
     runtimeJson = join(tempRoot, 'runtime.json')
+    reviewStatusJson = join(tempRoot, 'review-status-api.json')
     hookScriptPath = join(tempRoot, 'work-agent-stop-hook')
 
     mkdirSync(homeDir, { recursive: true })
     mkdirSync(mockBin, { recursive: true })
     mkdirSync(join(homeDir, '.overdeck', 'agents', AGENT_ID), { recursive: true })
+    writeFileSync(
+      reviewStatusJson,
+      JSON.stringify({
+        issueId: 'PAN-986',
+        reviewStatus: 'pending',
+        testStatus: 'pending',
+        mergeStatus: 'pending',
+        readyForMerge: false,
+        updatedAt: '2026-05-07T14:40:00.000Z',
+      }),
+      'utf-8',
+    )
 
     writeFileSync(hookScriptPath, readFileSync(SCRIPT_PATH, 'utf-8'), 'utf-8')
     chmodSync(hookScriptPath, 0o755)
@@ -67,6 +81,10 @@ args="$*"
 printf '%s\n' "$args" >> "$MOCK_CURL_LOG"
 if [[ "$args" == *"/runtime"* ]]; then
   cat "$MOCK_RUNTIME_JSON"
+  exit 0
+fi
+if [[ "$args" == *"/api/review/"*"/status"* ]]; then
+  cat "$MOCK_REVIEW_STATUS_JSON"
   exit 0
 fi
 if [[ "$args" == *"/heartbeat"* ]]; then
@@ -114,6 +132,22 @@ exit 99
     rmSync(tempRoot, { recursive: true, force: true })
   })
 
+  function hookEnv(): NodeJS.ProcessEnv {
+    return {
+      ...process.env,
+      HOME: homeDir,
+      PATH: `${mockBin}:${process.env.PATH ?? ''}`,
+      OVERDECK_AGENT_ID: AGENT_ID,
+      OVERDECK_DASHBOARD_URL: 'http://mocked-dashboard.local',
+      MOCK_RUNTIME_JSON: runtimeJson,
+      MOCK_REVIEW_STATUS_JSON: reviewStatusJson,
+      MOCK_HEARTBEAT_LOG: heartbeatLog,
+      MOCK_TMUX_LOG: tmuxLog,
+      MOCK_CLAUDE_LOG: claudeLog,
+      MOCK_CURL_LOG: curlLog,
+    }
+  }
+
   async function runHook(replyKind: 'done' | 'needs_input', summary: string): Promise<void> {
     writeFileSync(
       runtimeJson,
@@ -136,18 +170,7 @@ exit 99
     )
 
     await execFileAsync('bash', [hookScriptPath], {
-      env: {
-        ...process.env,
-        HOME: homeDir,
-        PATH: `${mockBin}:${process.env.PATH ?? ''}`,
-        OVERDECK_AGENT_ID: AGENT_ID,
-        OVERDECK_DASHBOARD_URL: 'http://mocked-dashboard.local',
-        MOCK_RUNTIME_JSON: runtimeJson,
-        MOCK_HEARTBEAT_LOG: heartbeatLog,
-        MOCK_TMUX_LOG: tmuxLog,
-        MOCK_CLAUDE_LOG: claudeLog,
-        MOCK_CURL_LOG: curlLog,
-      },
+      env: hookEnv(),
       timeout: 10_000,
     })
   }
@@ -183,5 +206,33 @@ exit 99
       .split('\n')
       .filter(line => line.includes('/runtime'))
     expect(runtimeRequests).toHaveLength(1)
+  })
+
+  it('uses the API-backed review status instead of stale review-status.json for active pipeline detection', async () => {
+    writeFileSync(join(homeDir, '.overdeck', 'review-status.json'), '{}', 'utf-8')
+    writeFileSync(
+      reviewStatusJson,
+      JSON.stringify({
+        issueId: 'PAN-986',
+        reviewStatus: 'passed',
+        testStatus: 'passed',
+        mergeStatus: 'queued',
+        readyForMerge: true,
+        updatedAt: '2026-05-07T14:40:00.000Z',
+      }),
+      'utf-8',
+    )
+
+    await execFileAsync('bash', [hookScriptPath], {
+      env: hookEnv(),
+      timeout: 10_000,
+    })
+
+    const curlRequests = readFileSync(curlLog, 'utf-8')
+    expect(curlRequests).toContain('/api/review/PAN-986/status')
+    const hooksLog = readFileSync(join(homeDir, '.overdeck', 'logs', 'hooks.log'), 'utf-8')
+    expect(hooksLog).toContain('skipped — actively in specialist pipeline')
+    expect(existsSync(heartbeatLog)).toBe(false)
+    expect(existsSync(claudeLog)).toBe(false)
   })
 })

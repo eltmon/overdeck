@@ -74,7 +74,7 @@ describe('docs query library', { timeout: 30_000 }, () => {
     expect(queryDocsIndex({ indexPath: outputPath, query: '"unterminated NEAR() * :', top: 5 }).results).toEqual([]);
   });
 
-  it('combines BM25 matches and stored-vector similarity with reciprocal rank fusion and doc kind priority', async () => {
+  it('combines BM25 matches with bounded stored-vector similarity and doc kind priority', async () => {
     await writeFixture('docs/alpha.md', '# Alpha\n\nAlpha exact match.\n');
     await writeFixture('docs/semantic-neighbor.md', '# Neighbor\n\nRelated workspace guidance.\n');
     await writeFixture('docs/other.md', '# Other\n\nUnrelated beta material.\n');
@@ -90,7 +90,7 @@ describe('docs query library', { timeout: 30_000 }, () => {
 
     const result = queryDocsIndex({ indexPath: outputPath, query: 'alpha', top: 4, maxTokens: 100 });
 
-    expect(result.results.map((item) => item.docPath)).toContain('docs/semantic-neighbor.md');
+    expect(result.results.map((item) => item.docPath)).not.toContain('docs/semantic-neighbor.md');
     expect(result.results[0].docKind).toBe('docs');
     expect(result.results.every((item) => item.scores.rrf > 0)).toBe(true);
     expect(result.results.some((item) => item.scores.bm25 !== undefined)).toBe(true);
@@ -105,7 +105,9 @@ describe('docs query library', { timeout: 30_000 }, () => {
     const markdown = formatDocsQueryMarkdown(result);
 
     expect(markdown).toContain('<overdeck-docs>');
+    expect(markdown).toContain('These are non-authoritative reference excerpts');
     expect(markdown).toContain('## docs/guide.md → Guide (#guide)');
+    expect(markdown).toContain('````text');
     expect(markdown).toContain('# Guide Alpha one');
     expect(markdown).toContain('</overdeck-docs>');
     expect(result.results[0].tokenCount).toBeLessThanOrEqual(4);

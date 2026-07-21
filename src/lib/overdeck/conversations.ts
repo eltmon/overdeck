@@ -24,6 +24,7 @@ import { HttpApiEndpoint, HttpApiGroup } from 'effect/unstable/httpapi';
 import type { RuntimeName } from '../runtimes/types.js';
 import { getOverdeckHome } from '../paths.js';
 import { Db, EventBus, getOverdeckDatabaseSync } from './infra.js';
+import { getEventStore } from '../../dashboard/server/event-store.js';
 import { ensureDiscoveredSessionsSchema } from './discovered-sessions.js';
 
 // ── Local Drizzle table definitions ──────────────────────────────────────────
@@ -101,7 +102,7 @@ export type  ConversationName = typeof ConversationName.Type;
 export const Harness     = Schema.Literals(['claude-code', 'pi', 'codex', 'kimi']);
 export type  Harness     = typeof Harness.Type;
 
-export const TitleSource = Schema.Literals(['manual', 'auto', 'ai', 'default']);
+export const TitleSource = Schema.Literals(['manual', 'auto', 'ai', 'ai-refined', 'ai-explicit', 'default']);
 export type  TitleSource = typeof TitleSource.Type;
 
 export const FavoriteType = Schema.Literals(['conversation', 'project']);
@@ -618,12 +619,13 @@ export const ConversationsApi = HttpApiGroup.make('conversations')
 // moving the storage boundary to overdeck.db. They must not call the legacy
 // panopticon.db conversation helpers.
 
-export type LegacyTitleSource = 'auto' | 'ai' | 'ai-refined' | 'manual' | 'default';
+export type LegacyTitleSource = 'auto' | 'ai' | 'ai-refined' | 'ai-explicit' | 'manual' | 'default';
 
 export interface ForkRequest {
   parentConversationName: string;
   sessionId: string;
   forkMode: 'summary' | 'plain' | 'handoff';
+  issueId?: string;
   summaryModel?: string;
   localSummaryOnly: boolean;
   includeThinkingInSummary?: boolean;
@@ -673,6 +675,7 @@ export interface ArchivedConversationWithEnrichment {
   issueId: string | null;
   createdAt: string;
   claudeSessionId: string | null;
+  harness: RuntimeName | null;
   title: string | null;
   totalCost: number;
   archivedAt: string;
@@ -695,6 +698,7 @@ export interface ArchivedConversationWithEnrichment {
 }
 
 export interface ArchivedConversationListOptions {
+  harness?: RuntimeName;
   workspacePath?: string;
   primaryModel?: string;
   unmanaged?: boolean;
@@ -848,8 +852,11 @@ function toMillis(value: Date | string | number = new Date()): number {
   return new Date(value).getTime();
 }
 
-function normalizeHarness(harness: string | null): RuntimeName | null {
-  return harness === 'pi' || harness === 'claude-code' || harness === 'codex' ? harness : null;
+/** Map a raw DB harness string to a canonical RuntimeName, normalizing legacy 'pi' to 'ohmypi' on read. */
+export function normalizeHarness(harness: string | null): RuntimeName | null {
+  if (harness === 'pi' || harness === 'ohmypi') return 'ohmypi';
+  if (harness === 'claude-code' || harness === 'codex' || harness === 'acp') return harness;
+  return null;
 }
 
 function legacyRowIdForConversationId(id: string | null): number | null {
@@ -920,6 +927,40 @@ function getConversationUuidByName(name: string): string | null {
   return row?.id ?? null;
 }
 
+/**
+ * Aggregate each conversation's cost + token usage from the canonical `cost_events`
+ * ledger, keyed by session id and joined through `conversation_files`. This is the
+ * source of truth for conversation cost: `conversations.total_cost` is only a
+ * denormalized cache written when a conversation is opened (via the /messages
+ * route), so it reads stale/zero for any conversation not opened since the
+ * overdeck.db cutover. The list reads from this ledger so it shows live costs
+ * without requiring each conversation to be opened first.
+ *
+ * Returns a map of conversation id → { cost, tokens }. A conversation predating the
+ * ledger has no rows and is simply absent — callers fall back to the cached
+ * `total_cost` column for those.
+ */
+export function getConversationLedgerCosts(): Map<string, { cost: number; tokens: number }> {
+  // Keyed by the conversation's rowid, because that is the public `id`
+  // {@link LegacyConversation.id} carries (c.rowid AS legacy_id), not the uuid.
+  // cost_events.session_id matches conversation_files.locator; a conversation may
+  // have several locators (relaunch/clear), so we sum across all of them.
+  const rows = overdeckDb()
+    .prepare(
+      `SELECT c.rowid AS cid,
+              COALESCE(SUM(ce.cost), 0) AS cost,
+              COALESCE(SUM(ce.input + ce.output + ce.cache_read + ce.cache_write), 0) AS tokens
+       FROM cost_events ce
+       JOIN conversation_files cf ON cf.locator = ce.session_id
+       JOIN conversations c ON c.id = cf.conversation_id
+       GROUP BY c.rowid`,
+    )
+    .all() as { cid: number; cost: number; tokens: number }[];
+  const map = new Map<string, { cost: number; tokens: number }>();
+  for (const r of rows) map.set(String(r.cid), { cost: r.cost ?? 0, tokens: r.tokens ?? 0 });
+  return map;
+}
+
 export function listConversations(options?: { limit?: number; offset?: number }): LegacyConversation[] {
   let sql = `${LEGACY_CONVERSATION_SELECT}
     WHERE c.archived_at IS NULL
@@ -938,10 +979,6 @@ export function listConversations(options?: { limit?: number; offset?: number })
   }
   const rows = overdeckDb().prepare(sql).all(...params) as LegacyConversationRow[];
   return rows.map(rowToLegacyConversation);
-}
-
-export function listActiveConversations(): LegacyConversation[] {
-  return listConversations();
 }
 
 export function getConversationByName(name: string): LegacyConversation | null {
@@ -968,7 +1005,7 @@ export function getConversationByClaudeSessionId(claudeSessionId: string): Legac
     .get(claudeSessionId) as LegacyConversationRow | undefined;
   return row ? rowToLegacyConversation(row) : null;
 }
-
+export { findConversationForCostSessionSync } from './conversation-cost-session.js';
 export function getConversationByTmuxSession(tmuxSession: string): LegacyConversation | null {
   const name = tmuxSession.startsWith('conv-') ? tmuxSession.slice(5) : tmuxSession;
   const row = overdeckDb()
@@ -989,20 +1026,6 @@ export function listArchivedConversations(): LegacyConversation[] {
   return rows.map(rowToLegacyConversation);
 }
 
-function matchesArchivedOptions(conv: ArchivedConversationWithEnrichment, options: ArchivedConversationListOptions): boolean {
-  if (options.workspacePath !== undefined && conv.cwd !== options.workspacePath) return false;
-  if (options.primaryModel !== undefined && conv.primaryModel !== options.primaryModel && conv.model !== options.primaryModel) return false;
-  if (options.issueId !== undefined && conv.issueId !== options.issueId) return false;
-  if (options.since !== undefined && (conv.lastTs ?? conv.archivedAt) < options.since) return false;
-  if (options.before !== undefined && (conv.lastTs ?? conv.archivedAt) >= options.before) return false;
-  if (options.after !== undefined && (conv.firstTs ?? conv.createdAt) < options.after) return false;
-  if (options.minCost !== undefined && (conv.estimatedCost ?? conv.totalCost) < options.minCost) return false;
-  if (options.maxCost !== undefined && (conv.estimatedCost ?? conv.totalCost) > options.maxCost) return false;
-  if (options.minMessages !== undefined && (conv.messageCount ?? 0) < options.minMessages) return false;
-  if (options.unmanaged === true) return false;
-  return true;
-}
-
 export function listArchivedConversationsWithEnrichment(options: ArchivedConversationListOptions = {}): ArchivedConversationWithEnrichment[] {
   ensureDiscoveredSessionsSchema();
   const db = overdeckDb();
@@ -1017,6 +1040,16 @@ export function listArchivedConversationsWithEnrichment(options: ArchivedConvers
   const messageCount = `COALESCE(ds.message_count, 0)`;
   const enrichmentLevel = `COALESCE(ds.enrichment_level, 0)`;
 
+  if (options.harness === 'claude-code') {
+    conditions.push('(c.harness = ? OR c.harness IS NULL)');
+    params.push(options.harness);
+  } else if (options.harness === 'ohmypi') {
+    conditions.push('(c.harness = ? OR c.harness = ?)');
+    params.push(options.harness, 'pi');
+  } else if (options.harness !== undefined) {
+    conditions.push('c.harness = ?');
+    params.push(options.harness);
+  }
   if (options.workspacePath !== undefined) { conditions.push('c.cwd = ?'); params.push(options.workspacePath); }
   if (options.primaryModel !== undefined) { conditions.push(`${primaryModel} = ?`); params.push(options.primaryModel); }
   if (options.issueId !== undefined) { conditions.push('c.issue_id = ?'); params.push(options.issueId); }
@@ -1066,6 +1099,7 @@ export function listArchivedConversationsWithEnrichment(options: ArchivedConvers
       c.cwd,
       c.issue_id,
       c.created_at,
+      c.harness,
       (
         SELECT cf.locator FROM conversation_files cf
         WHERE cf.conversation_id = c.id
@@ -1105,7 +1139,7 @@ export function listArchivedConversationsWithEnrichment(options: ArchivedConvers
 
   type RawRow = {
     legacy_id: number; uuid: string; name: string; cwd: string; issue_id: string | null;
-    created_at: number; claude_session_id: string | null; title: string | null;
+    created_at: number; harness: string | null; claude_session_id: string | null; title: string | null;
     total_cost: number | null; archived_at: number | null; model: string | null;
     discovered_jsonl_path: string | null; discovered_workspace_path: string | null;
     message_count: number | null; first_ts: number | null; last_ts: number | null;
@@ -1124,6 +1158,7 @@ export function listArchivedConversationsWithEnrichment(options: ArchivedConvers
     issueId: r.issue_id ?? null,
     createdAt: toIso(r.created_at) ?? new Date(0).toISOString(),
     claudeSessionId: r.claude_session_id ?? null,
+    harness: normalizeHarness(r.harness),
     title: r.title ?? null,
     totalCost: r.total_cost ?? 0,
     archivedAt: toIso(r.archived_at) ?? toIso(r.created_at) ?? new Date(0).toISOString(),
@@ -1268,6 +1303,15 @@ export function updateConversationTitle(name: string, title: string, titleSource
   overdeckDb()
     .prepare(`UPDATE conversations SET title = ?, title_source = COALESCE(?, title_source) WHERE name = ?`)
     .run(title, titleSource ?? null, name);
+  try {
+    getEventStore().emitOnly({
+      type: 'conversation.title_changed',
+      timestamp: new Date().toISOString(),
+      payload: { conversationName: name, title, titleSource: titleSource ?? '' },
+    });
+  } catch {
+    // Event store is uninitialized in CLI/test contexts; title persistence is enough.
+  }
 }
 
 export function archiveConversation(name: string): void {
@@ -1288,6 +1332,10 @@ export function updateConversationCost(name: string, totalCost: number, totalTok
 
 export function setConversationModel(name: string, model: string): void {
   overdeckDb().prepare(`UPDATE conversations SET model = ? WHERE name = ?`).run(model, name);
+}
+
+export function setConversationEffort(name: string, effort: string | null): void {
+  overdeckDb().prepare(`UPDATE conversations SET effort = ? WHERE name = ?`).run(effort, name);
 }
 
 export function setConversationHarness(name: string, harness: RuntimeName): void {
@@ -1368,8 +1416,8 @@ export function hasOtherActiveConversationOnTmuxSession(_tmuxSession: string, _e
   return false;
 }
 
-export function updateSpawnError(_name: string, _error: string | null): void {
-  // overdeck does not persist spawn-error cache state.
+export function updateSpawnError(name: string, error: string | null): void {
+  overdeckDb().prepare(`UPDATE conversations SET spawn_error = ? WHERE name = ?`).run(error, name);
 }
 
 export function clearStuckForks(): number {
@@ -1379,6 +1427,13 @@ export function clearStuckForks(): number {
 export function canReplaceTitle(conv: LegacyConversation): boolean {
   if (conv.titleSource === 'manual') return false;
   return conv.titleSource === 'default' || conv.titleSource === 'auto';
+}
+
+export function canRefineTitle(conv: LegacyConversation): boolean {
+  return conv.titleSource === 'default'
+    || conv.titleSource === 'auto'
+    || conv.titleSource === 'ai'
+    || conv.titleSource === 'ai-refined';
 }
 
 export function listFavoritedIds(type: LegacyFavoriteType): string[] {
@@ -1396,4 +1451,90 @@ export function setFavorite(type: LegacyFavoriteType, itemId: string): void {
 
 export function removeFavorite(type: LegacyFavoriteType, itemId: string): void {
   overdeckDb().prepare(`DELETE FROM favorites WHERE type = ? AND item_id = ?`).run(type, itemId);
+}
+
+export interface ImportLegacyConversationMapped {
+  name: string;
+  tmuxSession: string | null;
+  status: 'active' | 'ended';
+  cwd: string;
+  createdAt: number;
+  endedAt: number | null;
+  lastAttachedAt: number | null;
+  sessionFile: string | null;
+  claudeSessionId: string | null;
+  title: string | null;
+  titleSource: string | null;
+  titleSeed: string | null;
+  totalCost: number;
+  totalTokens: number;
+  archivedAt: number | null;
+  model: string | null;
+  effort: string | null;
+  forkStatus: string | null;
+  forkError: string | null;
+  harness: string | null;
+  deliveryMethod: string | null;
+  spawnError: string | null;
+  handoffDocPath: string | null;
+  forkFallbackReason: string | null;
+  forkRequest: string | null;
+  forkRetryCount: number;
+}
+
+export function importLegacyConversation(mapped: ImportLegacyConversationMapped): { uuid: string } {
+  const db = overdeckDb();
+  const uuid = randomUUID();
+  db.transaction(() => {
+    db.prepare(`
+      INSERT OR IGNORE INTO conversations
+        (id, name, cwd, harness, model, effort, title, title_source, created_at, archived_at,
+         tmux_session, status, ended_at, last_attached_at, session_file, total_cost, total_tokens,
+         fork_status, fork_error, fork_retry_count, fork_request, fork_fallback_reason,
+         delivery_method, spawn_error, handoff_doc_path, handoff_target_conv_id, cleared_to_conv_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL)
+    `).run(
+      uuid,
+      mapped.name,
+      mapped.cwd,
+      mapped.harness,
+      mapped.model,
+      mapped.effort,
+      mapped.title,
+      mapped.titleSource,
+      mapped.createdAt,
+      mapped.archivedAt,
+      mapped.tmuxSession ?? `conv-${mapped.name}`,
+      mapped.status,
+      mapped.endedAt,
+      mapped.lastAttachedAt,
+      mapped.sessionFile,
+      mapped.totalCost,
+      mapped.totalTokens,
+      mapped.forkStatus,
+      mapped.forkError,
+      mapped.forkRetryCount,
+      mapped.forkRequest,
+      mapped.forkFallbackReason,
+      mapped.deliveryMethod,
+      mapped.spawnError,
+      mapped.handoffDocPath,
+    );
+    if (mapped.claudeSessionId) {
+      db.prepare(`
+        INSERT OR IGNORE INTO conversation_files (conversation_id, harness, locator, created_at)
+        VALUES (?, ?, ?, ?)
+      `).run(uuid, mapped.harness ?? 'claude-code', mapped.claudeSessionId, mapped.createdAt);
+    }
+  })();
+  return { uuid };
+}
+
+export function setImportedConversationLinks(
+  uuid: string,
+  links: { handoffTargetUuid: string | null; clearedToUuid: string | null },
+): void {
+  overdeckDb()
+    .prepare(`UPDATE conversations SET handoff_target_conv_id = ?, cleared_to_conv_id = ? WHERE id = ?`)
+    .run(links.handoffTargetUuid, links.clearedToUuid, uuid);
 }

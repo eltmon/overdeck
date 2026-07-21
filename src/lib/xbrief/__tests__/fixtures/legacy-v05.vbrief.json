@@ -1,0 +1,21 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-01-01T00:00:00Z",
+    "author": "legacy/planner",
+    "description": "Legacy vBRIEF envelope fixture"
+  },
+  "plan": {
+    "id": "PAN-LEGACY",
+    "title": "Legacy envelope compatibility",
+    "status": "proposed",
+    "items": [
+      {
+        "id": "legacy-item",
+        "title": "Load the legacy envelope",
+        "status": "pending"
+      }
+    ],
+    "edges": []
+  }
+}

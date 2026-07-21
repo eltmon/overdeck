@@ -5,19 +5,40 @@ import { Effect } from 'effect';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Mock the conversations-db module
-const mockListActiveConversations = vi.fn();
+const mockListConversations = vi.fn();
 const mockMarkConversationEnded = vi.fn();
+const mockMarkConversationRunning = vi.fn();
 const mockCleanupUnreferencedConversationAttachments = vi.fn();
 const mockListSessionNames = vi.fn();
 const mockIsHarnessProcessAlive = vi.fn();
+const mockListPaneValues = vi.fn();
+const mockGetRuntimeCensus = vi.fn();
+const mockRefreshRuntimeCensus = vi.fn();
 const mockCreateConversation = vi.fn();
 const mockGetConversationByClaudeSessionId = vi.fn();
 const mockGetConversationByName = vi.fn();
 const mockSetClearedToConvId = vi.fn();
 
+async function buildRuntimeCensusMock() {
+  const sessions = await Effect.runPromise(mockListSessionNames());
+  const panesBySession = new Map<string, Array<{ paneDeadStatus: number | null }>>();
+  for (const session of sessions) {
+    const values = await Effect.runPromise(mockListPaneValues(session));
+    panesBySession.set(session, values.map((value: string) => ({
+      paneDeadStatus: Number.isFinite(Number(value)) ? Number(value) : null,
+    })));
+  }
+  return {
+    available: true,
+    sessionNames: new Set(sessions),
+    panesBySession,
+  };
+}
+
 vi.mock('../../../../lib/overdeck/conversations.js', () => ({
-  listActiveConversations: mockListActiveConversations,
+  listConversations: mockListConversations,
   markConversationEnded: mockMarkConversationEnded,
+  markConversationRunning: mockMarkConversationRunning,
   createConversation: mockCreateConversation,
   getConversationByClaudeSessionId: mockGetConversationByClaudeSessionId,
   getConversationByName: mockGetConversationByName,
@@ -40,6 +61,14 @@ vi.mock('../conversation-attachments.js', () => ({
 vi.mock('../../../../lib/tmux.js', () => ({
   listSessionNames: mockListSessionNames,
   isHarnessProcessAlive: mockIsHarnessProcessAlive,
+  listPaneValues: mockListPaneValues,
+}));
+
+vi.mock('../../../../lib/runtime-census.js', () => ({
+  getRuntimeCensus: mockGetRuntimeCensus,
+  refreshRuntimeCensus: mockRefreshRuntimeCensus,
+  runtimeCensusHasHarnessProcess: (_census: unknown, sessionName: string) =>
+    mockIsHarnessProcessAlive(sessionName),
 }));
 
 const mockIsRespawnPending = vi.fn();
@@ -57,13 +86,17 @@ describe('ConversationLifecycleService — pollConversations', () => {
     // Default: harness alive in sessions that exist (corpse cases set false explicitly).
     mockIsHarnessProcessAlive.mockResolvedValue(true);
     mockIsRespawnPending.mockReturnValue(false);
+    // Default: no dead-pane status available (corpse-diagnostics cases set it).
+    mockListPaneValues.mockReturnValue(Effect.succeed([]));
+    mockGetRuntimeCensus.mockImplementation(buildRuntimeCensusMock);
+    mockRefreshRuntimeCensus.mockImplementation(buildRuntimeCensusMock);
   });
 
   it('marks active conversations as ended when session is not in tmux list', async () => {
     // No claudeSessionId on the conversation → sessionFile should resolve to null
     // (production computes sessionFile via sessionFilePath(cwd, claudeSessionId)
     // and falls back to null when claudeSessionId is missing).
-    mockListActiveConversations.mockReturnValue([
+    mockListConversations.mockReturnValue([
       { name: 'gone-session', tmuxSession: 'conv-gone-session', status: 'active', cwd: '/tmp/work', claudeSessionId: null },
     ]);
     mockListSessionNames.mockReturnValue(Effect.succeed([])); // no sessions alive
@@ -72,15 +105,30 @@ describe('ConversationLifecycleService — pollConversations', () => {
 
     await pollConversations();
 
-    expect(mockListSessionNames).toHaveBeenCalledTimes(1);
+    expect(mockListSessionNames).toHaveBeenCalledTimes(2);
     expect(mockMarkConversationEnded).toHaveBeenCalledWith('gone-session');
     expect(mockCleanupUnreferencedConversationAttachments).toHaveBeenCalledWith(
       expect.objectContaining({ name: 'gone-session', sessionFile: null }),
     );
   });
 
+  it('rechecks the bulk census before ending a session that resumed during the poll', async () => {
+    mockListConversations.mockReturnValue([
+      { name: 'raced', tmuxSession: 'conv-raced', status: 'active', cwd: '/tmp/work', claudeSessionId: null },
+    ]);
+    mockListSessionNames
+      .mockReturnValueOnce(Effect.succeed([]))
+      .mockReturnValueOnce(Effect.succeed(['conv-raced']));
+
+    const { pollConversations } = await import('../conversation-lifecycle.js');
+    await pollConversations();
+
+    expect(mockListSessionNames).toHaveBeenCalledTimes(2);
+    expect(mockMarkConversationEnded).not.toHaveBeenCalled();
+  });
+
   it('does NOT mark conversations as ended when session is in tmux list', async () => {
-    mockListActiveConversations.mockReturnValue([
+    mockListConversations.mockReturnValue([
       { name: 'alive-session', tmuxSession: 'conv-alive-session', status: 'active' },
     ]);
     mockListSessionNames.mockReturnValue(Effect.succeed(['conv-alive-session']));
@@ -93,9 +141,8 @@ describe('ConversationLifecycleService — pollConversations', () => {
     expect(mockCleanupUnreferencedConversationAttachments).not.toHaveBeenCalled();
   });
 
-  it('uses listActiveConversations so ended sessions are already filtered out', async () => {
-    mockListActiveConversations.mockReturnValue([
-      // listActiveConversations only returns active conversations
+  it('fetches the list exactly once per poll', async () => {
+    mockListConversations.mockReturnValue([
       { name: 'active-session', tmuxSession: 'conv-active-session', status: 'active' },
     ]);
     mockListSessionNames.mockReturnValue(Effect.succeed(['conv-active-session']));
@@ -104,12 +151,58 @@ describe('ConversationLifecycleService — pollConversations', () => {
 
     await pollConversations();
 
-    expect(mockListActiveConversations).toHaveBeenCalledTimes(1);
+    expect(mockListConversations).toHaveBeenCalledTimes(1);
+    expect(mockMarkConversationEnded).not.toHaveBeenCalled();
+  });
+
+  it('skips already-ended conversations whose session is gone — no re-mark, no re-cleanup (PAN-2215)', async () => {
+    mockListConversations.mockReturnValue([
+      {
+        name: 'dead-long-ago',
+        tmuxSession: 'conv-dead-long-ago',
+        status: 'ended',
+        cwd: '/tmp/work',
+        claudeSessionId: null,
+        createdAt: '2026-05-24T19:00:00.000Z',
+      },
+    ]);
+    mockListSessionNames.mockReturnValue(Effect.succeed([])); // no sessions alive
+
+    const { pollConversations } = await import('../conversation-lifecycle.js');
+
+    await pollConversations();
+
+    expect(mockMarkConversationEnded).not.toHaveBeenCalled();
+    expect(mockMarkConversationRunning).not.toHaveBeenCalled();
+    expect(mockCleanupUnreferencedConversationAttachments).not.toHaveBeenCalled();
+    // The skip is O(1) — no per-row re-read either.
+    expect(mockGetConversationByName).not.toHaveBeenCalled();
+  });
+
+  it('resurrects an ended conversation whose session and harness are alive (PAN-1972)', async () => {
+    mockListConversations.mockReturnValue([
+      {
+        name: 'latched-ended',
+        tmuxSession: 'conv-latched-ended',
+        status: 'ended',
+        cwd: '/tmp/work',
+        claudeSessionId: null,
+        createdAt: '2026-05-24T19:00:00.000Z',
+      },
+    ]);
+    mockListSessionNames.mockReturnValue(Effect.succeed(['conv-latched-ended']));
+    mockIsHarnessProcessAlive.mockResolvedValue(true);
+
+    const { pollConversations } = await import('../conversation-lifecycle.js');
+
+    await pollConversations();
+
+    expect(mockMarkConversationRunning).toHaveBeenCalledWith('latched-ended');
     expect(mockMarkConversationEnded).not.toHaveBeenCalled();
   });
 
   it('handles empty conversation list without errors', async () => {
-    mockListActiveConversations.mockReturnValue([]);
+    mockListConversations.mockReturnValue([]);
 
     const { pollConversations } = await import('../conversation-lifecycle.js');
 
@@ -118,7 +211,7 @@ describe('ConversationLifecycleService — pollConversations', () => {
   });
 
   it('marks only gone sessions when multiple active conversations', async () => {
-    mockListActiveConversations.mockReturnValue([
+    mockListConversations.mockReturnValue([
       { name: 'alive', tmuxSession: 'conv-alive', status: 'active', sessionFile: '/tmp/alive.jsonl' },
       { name: 'gone', tmuxSession: 'conv-gone', status: 'active', sessionFile: '/tmp/gone.jsonl' },
     ]);
@@ -128,7 +221,7 @@ describe('ConversationLifecycleService — pollConversations', () => {
 
     await pollConversations();
 
-    expect(mockListSessionNames).toHaveBeenCalledTimes(1);
+    expect(mockListSessionNames).toHaveBeenCalledTimes(2);
     expect(mockMarkConversationEnded).toHaveBeenCalledTimes(1);
     expect(mockMarkConversationEnded).toHaveBeenCalledWith('gone');
     expect(mockCleanupUnreferencedConversationAttachments).toHaveBeenCalledTimes(1);
@@ -138,7 +231,7 @@ describe('ConversationLifecycleService — pollConversations', () => {
   });
 
   it('marks a session that is alive but whose harness process has exited (keep-alive corpse)', async () => {
-    mockListActiveConversations.mockReturnValue([
+    mockListConversations.mockReturnValue([
       { name: 'corpse', tmuxSession: 'conv-corpse', status: 'active', cwd: '/tmp/work', claudeSessionId: null },
     ]);
     // tmux session IS in the alive list, but the harness process is dead — only
@@ -154,8 +247,75 @@ describe('ConversationLifecycleService — pollConversations', () => {
     expect(mockMarkConversationEnded).toHaveBeenCalledWith('corpse');
   });
 
+  it('logs one summary line per poll tick with sub-counts for sessions gone and keep-alive corpses', async () => {
+    const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    mockListConversations.mockReturnValue([
+      { name: 'gone-1', tmuxSession: 'conv-gone-1', status: 'active', cwd: '/tmp/work', claudeSessionId: null },
+      { name: 'gone-2', tmuxSession: 'conv-gone-2', status: 'active', cwd: '/tmp/work', claudeSessionId: null },
+      { name: 'corpse', tmuxSession: 'conv-corpse', status: 'active', cwd: '/tmp/work', claudeSessionId: null },
+      { name: 'alive', tmuxSession: 'conv-alive', status: 'active', cwd: '/tmp/work', claudeSessionId: null },
+    ]);
+    mockListSessionNames.mockReturnValue(Effect.succeed(['conv-corpse', 'conv-alive']));
+    mockIsHarnessProcessAlive.mockImplementation(async (session: string) => session === 'conv-alive');
+
+    const { pollConversations } = await import('../conversation-lifecycle.js');
+
+    await pollConversations();
+
+    expect(mockMarkConversationEnded).toHaveBeenCalledTimes(3);
+    expect(mockMarkConversationEnded).toHaveBeenCalledWith('gone-1');
+    expect(mockMarkConversationEnded).toHaveBeenCalledWith('gone-2');
+    expect(mockMarkConversationEnded).toHaveBeenCalledWith('corpse');
+
+    const summaryCalls = consoleSpy.mock.calls.filter(
+      ([msg]) => typeof msg === 'string' && msg.startsWith('[conversation-lifecycle] marked'),
+    );
+    expect(summaryCalls).toHaveLength(1);
+    expect(summaryCalls[0][0]).toMatch(/marked 3 conversation\(s\) ended \(2 session\(s\) gone, 1 keep-alive corpses\)/);
+
+    consoleSpy.mockRestore();
+  });
+
+  it('captures pane exit status + output.log tail when marking a keep-alive corpse (PAN-2099)', async () => {
+    const home = mkdtempSync(join(tmpdir(), 'odh-'));
+    const prevHome = process.env.OVERDECK_HOME;
+    process.env.OVERDECK_HOME = home;
+    const agentDir = join(home, 'agents', 'conv-diag');
+    mkdirSync(agentDir, { recursive: true });
+    writeFileSync(
+      join(agentDir, 'output.log'),
+      'earlier noise line\n[Uncaught Exception] Error: ENOSPC: no space left on device, write\nPane is dead (status 1)\n',
+    );
+
+    mockListConversations.mockReturnValue([
+      { name: 'diag', tmuxSession: 'conv-diag', status: 'active', cwd: '/tmp/work', claudeSessionId: null },
+    ]);
+    mockListSessionNames.mockReturnValue(Effect.succeed(['conv-diag']));
+    mockIsHarnessProcessAlive.mockResolvedValue(false);
+    mockListPaneValues.mockReturnValue(Effect.succeed(['1']));
+    mockCleanupUnreferencedConversationAttachments.mockResolvedValue(undefined);
+
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    let loggedLines: string[] = [];
+    try {
+      const { pollConversations } = await import('../conversation-lifecycle.js');
+      await pollConversations();
+      loggedLines = logSpy.mock.calls.map((c) => String(c[0]));
+    } finally {
+      logSpy.mockRestore();
+      if (prevHome === undefined) delete process.env.OVERDECK_HOME;
+      else process.env.OVERDECK_HOME = prevHome;
+    }
+
+    expect(mockMarkConversationEnded).toHaveBeenCalledWith('diag');
+    const corpseLine = loggedLines.find((l) => l.includes('keep-alive corpse'));
+    expect(corpseLine).toBeDefined();
+    expect(corpseLine).toContain('exitStatus=1');
+    expect(corpseLine).toContain('ENOSPC');
+  });
+
   it('does NOT mark a corpse ended while a respawn is in flight for its session', async () => {
-    mockListActiveConversations.mockReturnValue([
+    mockListConversations.mockReturnValue([
       { name: 'reviving', tmuxSession: 'conv-reviving', status: 'active', cwd: '/tmp/work', claudeSessionId: null },
     ]);
     mockListSessionNames.mockReturnValue(Effect.succeed(['conv-reviving']));
@@ -174,7 +334,7 @@ describe('ConversationLifecycleService — pollConversations', () => {
     // Poll-start snapshot: old conversation, harness looks dead (launcher shell
     // still foreground mid-respawn). By mark time, the resume has bumped
     // last_attached_at — the conversation was just revived.
-    mockListActiveConversations.mockReturnValue([
+    mockListConversations.mockReturnValue([
       {
         name: 'resumed', tmuxSession: 'conv-resumed', status: 'active', cwd: '/tmp/work',
         claudeSessionId: null, createdAt: '2026-06-09T04:04:38.330Z', lastAttachedAt: null,
@@ -197,7 +357,7 @@ describe('ConversationLifecycleService — pollConversations', () => {
 
   it('still marks a corpse ended when the re-read shows no recent spawn/attach signal', async () => {
     const stale = '2026-06-09T04:04:38.330Z';
-    mockListActiveConversations.mockReturnValue([
+    mockListConversations.mockReturnValue([
       {
         name: 'true-corpse', tmuxSession: 'conv-true-corpse', status: 'active', cwd: '/tmp/work',
         claudeSessionId: null, createdAt: stale, lastAttachedAt: stale,
@@ -217,8 +377,8 @@ describe('ConversationLifecycleService — pollConversations', () => {
     expect(mockMarkConversationEnded).toHaveBeenCalledWith('true-corpse');
   });
 
-  it('does not throw when listActiveConversations errors', async () => {
-    mockListActiveConversations.mockImplementation(() => { throw new Error('DB error'); });
+  it('does not throw when listConversations errors', async () => {
+    mockListConversations.mockImplementation(() => { throw new Error('DB error'); });
 
     const { pollConversations } = await import('../conversation-lifecycle.js');
     await expect(pollConversations()).resolves.toBeUndefined();
@@ -307,7 +467,7 @@ describe('ConversationLifecycleService — detectOrphanedClaudeCodeSessions (PAN
       lastAttachedAt: '2026-05-24T19:48:00.000Z',
     };
 
-    mockListActiveConversations.mockReturnValue([parent]);
+    mockListConversations.mockReturnValue([parent]);
     mockListSessionNames.mockReturnValue(Effect.succeed(['conv-parent']));
     mockGetConversationByClaudeSessionId.mockImplementation((id: string) =>
       id === parentSessionId ? parent : null,
@@ -350,7 +510,7 @@ describe('ConversationLifecycleService — detectOrphanedClaudeCodeSessions (PAN
       Date.parse('2026-05-24T19:50:30.000Z'),
     );
 
-    mockListActiveConversations.mockReturnValue([
+    mockListConversations.mockReturnValue([
       { id: 1, name: 'p', tmuxSession: 'conv-p', status: 'active', cwd, claudeSessionId: 'parent-uuid', harness: 'claude-code', title: null },
     ]);
     mockListSessionNames.mockReturnValue(Effect.succeed(['conv-p']));
@@ -378,7 +538,7 @@ describe('ConversationLifecycleService — detectOrphanedClaudeCodeSessions (PAN
     );
 
     // No active conversation has this cwd
-    mockListActiveConversations.mockReturnValue([]);
+    mockListConversations.mockReturnValue([]);
     mockListSessionNames.mockReturnValue(Effect.succeed([]));
     mockGetConversationByClaudeSessionId.mockReturnValue(null);
 
@@ -404,7 +564,7 @@ describe('ConversationLifecycleService — detectOrphanedClaudeCodeSessions (PAN
       Date.parse('2026-05-24T19:50:30.000Z'),
     );
 
-    mockListActiveConversations.mockReturnValue([
+    mockListConversations.mockReturnValue([
       { id: 1, name: 'p', tmuxSession: 'conv-p', status: 'active', cwd, claudeSessionId: parent, harness: 'claude-code', title: 'parent' },
     ]);
     mockListSessionNames.mockReturnValue(Effect.succeed(['conv-p']));
@@ -413,6 +573,72 @@ describe('ConversationLifecycleService — detectOrphanedClaudeCodeSessions (PAN
     const { pollConversations } = await import('../conversation-lifecycle.js');
     await pollConversations();
 
+    expect(mockCreateConversation).not.toHaveBeenCalled();
+  });
+
+  it('excludes ended conversations from orphan detection so their cwd is never scanned (PAN-2215)', async () => {
+    const orphan = 'abcdabcd-7777-7777-7777-abcdabcdabcd';
+    writeJsonl(
+      `${orphan}.jsonl`,
+      [
+        {
+          type: 'user',
+          message: { role: 'user', content: '<command-name>/clear</command-name>' },
+          timestamp: '2026-05-24T19:50:00.000Z',
+        },
+      ],
+      Date.parse('2026-05-24T19:50:30.000Z'),
+    );
+
+    // The only conversation rooted at this cwd is ended — its project dir must
+    // not be readdir'd or have its transcripts opened.
+    mockListConversations.mockReturnValue([
+      { id: 1, name: 'was-here', tmuxSession: 'conv-was-here', status: 'ended', cwd, claudeSessionId: 'gone-uuid', harness: 'claude-code', title: null, createdAt: '2026-05-24T19:00:00.000Z' },
+    ]);
+    mockListSessionNames.mockReturnValue(Effect.succeed([]));
+    mockGetConversationByClaudeSessionId.mockReturnValue(null);
+
+    const { pollConversations } = await import('../conversation-lifecycle.js');
+    await pollConversations();
+
+    expect(mockGetConversationByClaudeSessionId).not.toHaveBeenCalled();
+    expect(mockCreateConversation).not.toHaveBeenCalled();
+  });
+
+  it('scans a definitively-non-orphan transcript only once per boot (PAN-2215 seen-cache)', async () => {
+    const parent = '99999999-8888-8888-8888-999999999999';
+    const peer = '12121212-3434-3434-3434-121212121212';
+
+    writeJsonl(
+      `${parent}.jsonl`,
+      [{ type: 'user', message: { role: 'user', content: 'hi' }, timestamp: '2026-05-24T19:30:00.000Z' }],
+      Date.parse('2026-05-24T19:48:00.000Z'),
+    );
+    // Six full lines with no /clear sentinel → the null verdict is definitive
+    // (the 5-line detection window is provably complete), so the second poll
+    // must skip this file entirely — no DB lookup, no file open.
+    writeJsonl(
+      `${peer}.jsonl`,
+      Array.from({ length: 6 }, (_, i) => ({
+        type: 'user',
+        message: { role: 'user', content: `line ${i}` },
+        timestamp: '2026-05-24T19:50:00.000Z',
+      })),
+      Date.parse('2026-05-24T19:50:30.000Z'),
+    );
+
+    mockListConversations.mockReturnValue([
+      { id: 1, name: 'p', tmuxSession: 'conv-p', status: 'active', cwd, claudeSessionId: parent, harness: 'claude-code', title: 'parent' },
+    ]);
+    mockListSessionNames.mockReturnValue(Effect.succeed(['conv-p']));
+    mockGetConversationByClaudeSessionId.mockImplementation((id: string) => (id === parent ? { id: 1 } : null));
+
+    const { pollConversations } = await import('../conversation-lifecycle.js');
+    await pollConversations();
+    await pollConversations();
+
+    const peerLookups = mockGetConversationByClaudeSessionId.mock.calls.filter(([id]) => id === peer);
+    expect(peerLookups).toHaveLength(1);
     expect(mockCreateConversation).not.toHaveBeenCalled();
   });
 });

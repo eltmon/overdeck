@@ -70,8 +70,8 @@ function normalizedHost(value: string | undefined): string | null {
 }
 
 function artifactDomain(baseDomain?: string): string {
-  const host = (baseDomain ?? process.env.PAN_ARTIFACT_DOMAIN ?? 'pan.localhost').replace(/^https?:\/\//, '').split('/', 1)[0]?.toLowerCase();
-  if (!host) return 'pan.localhost';
+  const host = (baseDomain ?? process.env.PAN_ARTIFACT_DOMAIN ?? 'overdeck.localhost').replace(/^https?:\/\//, '').split('/', 1)[0]?.toLowerCase();
+  if (!host) return 'overdeck.localhost';
   return host.startsWith('[') ? host : host.split(':', 1)[0] ?? host;
 }
 
@@ -84,7 +84,7 @@ function getPublishedSnapshotPath(slug: string): string {
 }
 
 function resolveArtifactUrls(slug: string, baseDomain?: string) {
-  const domain = baseDomain ?? process.env.PAN_ARTIFACT_DOMAIN ?? 'pan.localhost';
+  const domain = baseDomain ?? process.env.PAN_ARTIFACT_DOMAIN ?? 'overdeck.localhost';
   return {
     wrapperUrl: `https://${domain}/s/${slug}`,
     rawUrl: `https://artifacts.${domain}/a/${slug}`,
@@ -290,7 +290,7 @@ const getArtifactThumbnailRoute = HttpRouter.add(
     }
 
     const response = yield* HttpServerResponse.file(result.path).pipe(
-      Effect.catchAll(() => Effect.succeed(HttpServerResponse.text('', { status: 204 }))),
+      Effect.catch(() => Effect.succeed(HttpServerResponse.text('', { status: 204 }))),
     );
     return HttpServerResponse.setHeader(response, 'Cache-Control', 'public, max-age=31536000, immutable');
   })),

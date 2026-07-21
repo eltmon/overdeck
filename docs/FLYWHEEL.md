@@ -12,7 +12,7 @@ Read this with:
 
 ## Awaiting Merge UAT context
 
-The Awaiting Merge page is the operator's human UAT gate. Each merge-ready card includes a collapsed **What to test / Expected changes** section sourced from `GET /api/workspaces/:issueId/uat-context`: vBRIEF acceptance criteria become the UAT checklist, vBRIEF deliverables describe the expected behavior change, and the workspace git diff supplies the changed-file summary. If vBRIEF or git data is unavailable, the card falls back to the issue description and a subtle "No file changes available" note instead of blanking the gate.
+The Awaiting Merge page is the operator's human UAT gate. Each merge-ready card includes a collapsed **What to test / Expected changes** section sourced from `GET /api/workspaces/:issueId/uat-context`: xBRIEF acceptance criteria become the UAT checklist, xBRIEF deliverables describe the expected behavior change, and the workspace git diff supplies the changed-file summary. If xBRIEF or git data is unavailable, the card falls back to the issue description and a subtle "No file changes available" note instead of blanking the gate.
 
 ## Status vs State
 
@@ -81,6 +81,7 @@ Substrate bug issues filed during a Flywheel run carry a trailer block at the bo
 Flywheel-Run-Id: RUN-123
 Flywheel-Filed-By: agent
 Flywheel-Discovered-In: PAN-1487
+Flywheel-Affects-Criterion: 1,4
 ```
 
 `Flywheel-Run-Id` identifies the active Flywheel orchestrator run that exposed the bug. The hook only injects the block when the run id matches the canonical `RUN-<number>` form.
@@ -89,9 +90,31 @@ Flywheel-Discovered-In: PAN-1487
 
 `Flywheel-Discovered-In` names the pipeline issue whose run exposed the substrate bug. It is resolved from the filing agent's Overdeck state at `${OVERDECK_HOME}/agents/<agent-id>/state.json`; the line is omitted when no issue id is available.
 
-The `gh-issue-trailer-hook` Claude Code PreToolUse Bash hook injects the trailer into `gh issue create` calls before later Bash filters run. It handles inline `--body`, `--body-file <path>`, and `--body-file -` stdin bodies, and it leaves commands unchanged when a `Flywheel-Run-Id:` line already exists.
+`Flywheel-Affects-Criterion` is an optional, author-supplied line naming the v1.0 readiness criterion (or criteria) the bug degrades. Use the criterion numbers from **Reading the Stats panel** above (1–7), comma-separated. Add this line when the affected criterion is known; omit it when the impact is unclear. The dashboard and `pan flywheel weights` use this line to compute a weight for the bug so the bottleneck criterion rises in the suggestion order.
 
-Telemetry consumes these trailers as the bridge between GitHub issues and local Flywheel stats. The substrate-bug poller reads candidate GitHub issues, parses the trailer block, stores each issue in the substrate-bug projection, and uses `Flywheel-Discovered-In` for substrate-attributable failure metrics.
+The `gh-issue-trailer-hook` Claude Code PreToolUse Bash hook injects the provenance lines (`Flywheel-Run-Id`, `Flywheel-Filed-By`, and `Flywheel-Discovered-In`) into `gh issue create` calls before later Bash filters run. It handles inline `--body`, `--body-file <path>`, and `--body-file -` stdin bodies, and it leaves commands unchanged when a `Flywheel-Run-Id:` line already exists. `Flywheel-Affects-Criterion` is semantic and must be supplied by the filer in the issue body; the hook does not derive it from environment variables.
+
+Telemetry consumes these trailers as the bridge between GitHub issues and local Flywheel stats. The substrate-bug poller reads candidate GitHub issues, parses the trailer block, stores each issue in the substrate-bug projection, and uses `Flywheel-Discovered-In` for substrate-attributable failure metrics. `Flywheel-Affects-Criterion` feeds the weight model described below.
+
+## Metric-aware prioritization
+
+Substrate bugs are not all equally urgent: a bug that degrades a v1.0 criterion currently in the red is a bigger blocker than one that touches a green criterion. The Flywheel ranks substrate-bug suggestions within the substrate-hardening tier using a numeric **weight** derived from the bug's declared affected criteria and the latest telemetry.
+
+A substrate bug declares affected criteria with the `Flywheel-Affects-Criterion: N[,M]` trailer line documented above, using the criterion numbers from **Reading the Stats panel** (1–7). Labels of the form `affects-criterion-N` are also accepted as a fallback.
+
+The weight formula is intentionally simple:
+
+- For each affected criterion, if the latest 30-day telemetry shows that criterion as **red** (failing its ready threshold), the bug gets a large status-driven bonus.
+- If the criterion is **yellow** (close to threshold), it gets a smaller bonus.
+- Green criteria contribute no bonus.
+- When telemetry is **insufficient** for a criterion, that criterion contributes zero.
+- Each criterion also contributes its normalized current-value distance from target, so a criterion farther from readiness ranks above a closer criterion with the same status.
+
+The result is a single number (`weight`) and a human-readable `weightReason` such as `Criterion 4 (MTTR) is red`. The orchestrator runs `pan flywheel weights --json` each tick, keeps operator-filed bugs first, and then orders each filing-source group by weight descending; equal weights use the oldest filing time first. Higher-weight bugs are surfaced first within their filing-source group, but weight **only re-orders within the tier** — it never overrides red-main/P0 work or filters or displaces operator-injected items.
+
+`pan flywheel weights [--window <dur>] [--issue <id>] [--json]` is the sandbox-safe CLI surface for the same data the dashboard uses. Without `--json` it prints a table; with `--json` it emits the full weighted rows. The dashboard renders the weight as a badge on each substrate-bug suggestion in the Status panel, alongside the `weightReason`, and sorts by operator precedence, then priority, then weight.
+
+The dashboard HTTP endpoint `GET /api/flywheel/substrate-bug-weights` requires dashboard authentication and accepts the same `?window=<dur>` duration grammar as the CLI. Omitted, malformed, or non-positive values fall back to `30d`; valid values longer than **365 days** are canonicalized to `365d` before entering the shared database-worker queue, while shorter values retain their normalized duration. The service independently enforces the same 365-day cap as defense in depth.
 
 ## Lifecycle
 
@@ -107,6 +130,12 @@ The Flywheel lifecycle is exposed as `pan flywheel` commands and mirrored by das
 | `pan flywheel report` | Writes the per-run report under the run directory and commits any pending changes to `docs/FLYWHEEL-STATE.md`. |
 
 Cloister owns the singleton gate. Only one Flywheel run may be active for a Overdeck home at a time. If a second start request arrives, it should fail with a clear active-run response instead of spawning a competing orchestrator. Pause and resume operate on that same saved run record, not on a new run.
+
+### Autonomous planning permission and staffing
+
+The reactive lifecycle scheduler treats permission and staffing as separate operator controls. With `flywheel.auto_pickup_backlog` off, an issue in stale `in_planning` state receives no autonomous planning spawn unless it has the case-insensitive `released` label; enabling auto-pickup grants that permission. Parked, vetoed, and objection labels still block dispatch, and unavailable tracker labels fail closed. A refusal emits a warning and a durable needs-you trip instead of silently starting work.
+
+After permission passes, the scheduler reuses a model recorded on the current or legacy planning agent, then tries the optional scalar `roles.plan.autonomousModel`. If neither resolves, it records a needs-you refusal; it never falls through to the ordinary `roles.plan.model`. The operator can authorize autonomous planning by fixing the labels or pickup posture and configure its staffing with `roles.plan.autonomousModel`, or bypass this autonomous path deliberately with `pan plan`.
 
 For local stack startup, Deacon/Cloister should be running before starting or resuming the Flywheel; see [`OVERDECK_DEV_SOP.md`](./OVERDECK_DEV_SOP.md#deacon-and-flywheel-startup-order).
 
@@ -130,7 +159,7 @@ reconciler assembles them into rolling **UAT batch trains** — throwaway `uat/*
 branches off main that bundle as many ready features as possible, resolving
 cross-feature conflicts inside the batch, so a human can UAT the combined result
 and **promote the batch** (merge exactly what they tested) in one action. Each
-generation can serve a live stack at `uat-<codename>.pan.localhost`.
+generation can serve a live stack at `uat-<codename>.overdeck.localhost`.
 
 This is the primary merge path for a flywheel run; the per-issue merge (see
 [`MERGE-WORKFLOW.md`](./MERGE-WORKFLOW.md)) remains the escape hatch. The full
@@ -172,6 +201,16 @@ A useful brief includes:
 The default brief lives at [`docs/flywheel-brief.md`](./flywheel-brief.md). Custom brief paths must stay inside the project root. The brief API rejects absolute or relative paths that escape the repository.
 
 Do not put secrets, machine-local paths, or one-time session state in a brief. Put durable operating rules in the brief and transient run state in the Flywheel run directory.
+
+## Prompt-regression protection
+
+`roles/flywheel.md` and `docs/flywheel-brief.md` are load-bearing safety surfaces: the author/assignee gate, the `vetoed`-is-absolute rule, the saturation cap, and the `auto_pickup_backlog` switch exist only in prose. The following protection is in place to catch accidental prompt drift:
+
+- **Deterministic rail tests** in [`tests/unit/evals/prompt-rails.test.ts`](../tests/unit/evals/prompt-rails.test.ts) assert the load-bearing text is still present and run in the default `npm test` path.
+- **Live-model golden-scenario evals** in [`evals/flywheel-launch.eval.ts`](../evals/flywheel-launch.eval.ts) verify the role still produces launch decisions (not just reports) given fixture board states, including the author-gate negative case. They require `OVERDECK_EVAL_MODEL` and do not run in blocking CI.
+- **CI prompt gate** — any PR that diffs `roles/*.md` or `docs/flywheel-brief.md` must include a `Prompt-Change:` trailer in at least one commit. The check is enforced by [`scripts/check-prompt-change-trailer.sh`](../scripts/check-prompt-change-trailer.sh) via the `prompt-gate` CI job and `npm run lint`.
+
+When you change flywheel doctrine, update the rail tests and add a `Prompt-Change:` trailer explaining the behavioral impact. Do not rely on prose alone to preserve safety behavior across edits.
 
 ## Skill → CLI → API → UI map
 

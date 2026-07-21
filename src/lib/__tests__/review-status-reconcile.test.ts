@@ -9,7 +9,9 @@ vi.mock('../cloister/review-verdict-feedback.js', () => ({ deliverReviewVerdictF
 // setReviewStatusSync deterministically without touching SQLite or the filesystem.
 const db = vi.hoisted(() => ({
   upsert: vi.fn(),
+  delete: vi.fn(),
   getFromDb: vi.fn(),
+  getManyFromDb: vi.fn(),
 }));
 const journal = vi.hoisted(() => ({
   readJournalStatusSync: vi.fn(),
@@ -20,9 +22,9 @@ const journal = vi.hoisted(() => ({
 vi.mock('../overdeck/review-status-sync.js', () => ({
   upsertReviewStatusSync: db.upsert,
   getReviewStatusFromDbSync: db.getFromDb,
-  deleteReviewStatus: vi.fn(),
+  deleteReviewStatus: db.delete,
   getAllReviewStatusesFromDb: vi.fn(() => ({})),
-  getReviewStatusesFromDb: vi.fn(() => ({})),
+  getReviewStatusesFromDb: db.getManyFromDb,
   markWorkspaceStuck: vi.fn(),
   clearWorkspaceStuck: vi.fn(),
   setDeaconIgnored: vi.fn(),
@@ -37,7 +39,7 @@ const notifier = vi.hoisted(() => ({ notify: vi.fn() }));
 vi.mock('../pipeline-notifier.js', () => ({ notifyPipelineSync: notifier.notify }));
 vi.mock('../activity-logger.js', () => ({ emitActivityEntrySync: vi.fn(), emitActivityTtsSync: vi.fn() }));
 
-import { getReviewStatusSync, setReviewStatusSync } from '../review-status.js';
+import { getReviewStatusSync, loadReadyForMergeFlags, resetPipelineVerdictsForWorkStartSync, setReviewStatusSync } from '../review-status.js';
 
 const dbRow = (over: Partial<ReviewStatus> = {}): ReviewStatus => ({
   issueId: 'PAN-1866',
@@ -51,6 +53,7 @@ const dbRow = (over: Partial<ReviewStatus> = {}): ReviewStatus => ({
 describe('getReviewStatusSync — journal→DB reconcile (PAN-1988)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    db.getManyFromDb.mockReturnValue({});
     journal.enrichReviewNotesFromRecordSync.mockImplementation((_id: string, s: ReviewStatus) => s);
   });
 
@@ -70,6 +73,33 @@ describe('getReviewStatusSync — journal→DB reconcile (PAN-1988)', () => {
     expect(result?.updatedAt).toBe('2026-06-20T07:22:21.788Z');
     // The cache was reconciled (host write) so bulk/merge-gate readers catch up.
     expect(db.upsert).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns null for a closed-out journal with stale active durable status', () => {
+    db.getFromDb.mockReturnValue(dbRow({
+      reviewStatus: 'passed',
+      testStatus: 'passed',
+      verificationStatus: 'running',
+      mergeStatus: 'pending',
+      updatedAt: '2026-06-20T07:00:00.000Z',
+    }));
+    journal.readJournalStatusSync.mockReturnValue({
+      updatedAt: '2026-06-20T07:22:21.788Z',
+      durable: {
+        reviewStatus: 'passed',
+        testStatus: 'passed',
+        verificationStatus: 'running',
+        mergeStatus: 'pending',
+        closedOut: true,
+        closedOutAt: '2026-06-20T07:22:21.788Z',
+      },
+    });
+
+    const result = getReviewStatusSync('PAN-1866');
+
+    expect(result).toBeNull();
+    expect(db.delete).toHaveBeenCalledWith('PAN-1866');
+    expect(db.upsert).not.toHaveBeenCalled();
   });
 
   it('does not reconcile when the DB is current — overlays feedback from the journal', () => {
@@ -154,6 +184,46 @@ describe('getReviewStatusSync — journal→DB reconcile (PAN-1988)', () => {
     expect(() => getReviewStatusSync('PAN-1866')).not.toThrow();
     expect(getReviewStatusSync('PAN-1866')?.reviewStatus).toBe('blocked');
   });
+
+  it('loads ready-for-merge flags from one DB batch plus per-candidate journal overlay', () => {
+    db.getManyFromDb.mockReturnValue({
+      'PAN-1866': dbRow({
+        issueId: 'PAN-1866',
+        reviewStatus: 'reviewing',
+        testStatus: 'pending',
+        updatedAt: '2026-06-20T07:00:00.000Z',
+        readyForMerge: false,
+      }),
+      'PAN-1867': dbRow({
+        issueId: 'PAN-1867',
+        reviewStatus: 'passed',
+        testStatus: 'passed',
+        mergeStatus: 'pending',
+        updatedAt: '2026-06-20T07:30:00.000Z',
+        readyForMerge: true,
+      }),
+    });
+    journal.readJournalStatusSync.mockImplementation((issueId: string) => {
+      if (issueId === 'PAN-1866') {
+        return {
+          updatedAt: '2026-06-20T07:22:21.788Z',
+          durable: { reviewStatus: 'passed', testStatus: 'passed', mergeStatus: 'pending' },
+        };
+      }
+      return null;
+    });
+
+    const flags = loadReadyForMergeFlags(['pan-1866', 'PAN-1867', 'PAN-1867']);
+
+    expect(db.getManyFromDb).toHaveBeenCalledTimes(1);
+    expect(db.getManyFromDb).toHaveBeenCalledWith(['PAN-1866', 'PAN-1867']);
+    expect(journal.readJournalStatusSync).toHaveBeenCalledWith('PAN-1866');
+    expect(journal.readJournalStatusSync).toHaveBeenCalledWith('PAN-1867');
+    expect(flags).toEqual(new Map([
+      ['PAN-1866', true],
+      ['PAN-1867', true],
+    ]));
+  });
 });
 
 describe('setReviewStatusSync — host-owned write + journal-preserving merge (PAN-1988)', () => {
@@ -193,5 +263,187 @@ describe('setReviewStatusSync — host-owned write + journal-preserving merge (P
     const journaled = journal.updateIssueRecordForReviewStatusSync.mock.calls.at(-1)![1] as ReviewStatus;
     expect(journaled.reviewNotes).toBe('must-not-be-erased'); // NOT nulled by the partial update
     expect(journaled.testStatus).toBe('passed');
+  });
+});
+
+describe('resetPipelineVerdictsForWorkStartSync', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    journal.enrichReviewNotesFromRecordSync.mockImplementation((_id: string, s: ReviewStatus) => s);
+    journal.readJournalStatusSync.mockReturnValue(null);
+  });
+
+  it('resets stale merged pipeline state before a work agent starts', () => {
+    db.getFromDb.mockReturnValue(dbRow({
+      reviewStatus: 'passed',
+      testStatus: 'passed',
+      mergeStatus: 'merged',
+      verificationStatus: 'passed',
+      readyForMerge: true,
+      autoRequeueCount: 2,
+      verificationCycleCount: 1,
+      reviewRetryCount: 1,
+      testRetryCount: 1,
+      mergeRetryCount: 1,
+      recoveryStartedAt: '2026-06-20T07:00:00.000Z',
+      reviewedAtCommit: 'abc123',
+      lastVerifiedCommit: 'abc123',
+    }));
+
+    const result = resetPipelineVerdictsForWorkStartSync('PAN-1866');
+
+    expect(result).toMatchObject({
+      reviewStatus: 'pending',
+      testStatus: 'pending',
+      mergeStatus: 'pending',
+      verificationStatus: 'pending',
+      readyForMerge: false,
+      autoRequeueCount: 0,
+      verificationCycleCount: 0,
+      reviewRetryCount: 0,
+      testRetryCount: 0,
+      mergeRetryCount: 0,
+    });
+    expect(result?.recoveryStartedAt).toBeUndefined();
+    expect(result?.reviewedAtCommit).toBeUndefined();
+    expect(result?.lastVerifiedCommit).toBeUndefined();
+    expect(journal.updateIssueRecordForReviewStatusSync).toHaveBeenCalledTimes(1);
+  });
+
+  it('does nothing when pipeline verdicts are already pending', () => {
+    const pending = dbRow({
+      reviewStatus: 'pending',
+      testStatus: 'pending',
+      mergeStatus: 'pending',
+      verificationStatus: 'pending',
+      readyForMerge: false,
+      autoRequeueCount: 0,
+      verificationCycleCount: 0,
+      reviewRetryCount: 0,
+      testRetryCount: 0,
+      mergeRetryCount: 0,
+      recoveryStartedAt: undefined,
+      reviewedAtCommit: undefined,
+      lastVerifiedCommit: undefined,
+    });
+    db.getFromDb.mockReturnValue(pending);
+
+    const result = resetPipelineVerdictsForWorkStartSync('PAN-1866');
+
+    expect(result).toBeNull();
+    expect(journal.updateIssueRecordForReviewStatusSync).not.toHaveBeenCalled();
+    expect(db.upsert).not.toHaveBeenCalled();
+  });
+});
+
+describe('setReviewStatusSync — terminal-verdict clobber guard (PAN-2578)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    journal.readJournalStatusSync.mockReturnValue(null);
+    journal.enrichReviewNotesFromRecordSync.mockImplementation((_id: string, s: ReviewStatus) => s);
+  });
+
+  it('rejects a bare reviewing write over a blocked verdict (the PAN-399 race)', () => {
+    db.getFromDb.mockReturnValue(dbRow({ reviewStatus: 'blocked', reviewSpawnedAt: '2026-07-11T10:36:56.000Z' }));
+
+    const result = setReviewStatusSync('PAN-1866', { reviewStatus: 'reviewing' });
+
+    expect(result.reviewStatus).toBe('blocked');
+    expect(journal.updateIssueRecordForReviewStatusSync).not.toHaveBeenCalled();
+    expect(db.upsert).not.toHaveBeenCalled();
+  });
+
+  it('rejects a bare reviewing write over a failed verdict', () => {
+    db.getFromDb.mockReturnValue(dbRow({ reviewStatus: 'failed' }));
+
+    const result = setReviewStatusSync('PAN-1866', { reviewStatus: 'reviewing' });
+
+    expect(result.reviewStatus).toBe('failed');
+    expect(db.upsert).not.toHaveBeenCalled();
+  });
+
+  it('allows blocked → reviewing when the write starts a new cycle (carries reviewSpawnedAt)', () => {
+    db.getFromDb.mockReturnValue(dbRow({ reviewStatus: 'blocked', reviewSpawnedAt: '2026-07-11T10:36:56.000Z' }));
+
+    const result = setReviewStatusSync('PAN-1866', {
+      reviewStatus: 'reviewing',
+      reviewSpawnedAt: '2026-07-11T11:00:00.000Z',
+    });
+
+    expect(result.reviewStatus).toBe('reviewing');
+    expect(result.reviewSpawnedAt).toBe('2026-07-11T11:00:00.000Z');
+    expect(db.upsert).toHaveBeenCalled();
+  });
+
+  it('still allows a terminal verdict to be recorded over reviewing (the normal flow)', () => {
+    db.getFromDb.mockReturnValue(dbRow({ reviewStatus: 'reviewing' }));
+
+    const result = setReviewStatusSync('PAN-1866', { reviewStatus: 'blocked', reviewNotes: 'findings' });
+
+    expect(result.reviewStatus).toBe('blocked');
+    expect(db.upsert).toHaveBeenCalled();
+  });
+});
+
+
+describe("reviewStatus 'skipped' — review mode none (PAN-1862 FR-14/FR-16)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    journal.readJournalStatusSync.mockReturnValue(null);
+    journal.enrichReviewNotesFromRecordSync.mockImplementation((_id: string, s: ReviewStatus) => s);
+  });
+
+  it('a skipped review + skipped test passes the readyForMerge gate', () => {
+    db.getFromDb.mockReturnValue(dbRow({ reviewStatus: 'pending', testStatus: 'skipped' }));
+
+    const result = setReviewStatusSync('PAN-1866', { reviewStatus: 'skipped' });
+
+    expect(result.reviewStatus).toBe('skipped');
+    expect(result.readyForMerge).toBe(true);
+  });
+
+  it('recording skipped emits the same review.approved lifecycle event as passed', () => {
+    db.getFromDb.mockReturnValue(dbRow({ reviewStatus: 'pending', testStatus: 'pending' }));
+
+    setReviewStatusSync('PAN-1866', { reviewStatus: 'skipped', reviewSpawnedAt: '2026-07-11T12:00:00.000Z' });
+
+    expect(notifier.notify).toHaveBeenCalledWith(expect.objectContaining({ type: 'review.approved', issueId: 'PAN-1866' }));
+  });
+
+  it('a skipped review does NOT pass the gate while tests are still pending', () => {
+    db.getFromDb.mockReturnValue(dbRow({ reviewStatus: 'pending', testStatus: 'pending' }));
+
+    const result = setReviewStatusSync('PAN-1866', { reviewStatus: 'skipped' });
+
+    expect(result.readyForMerge).toBe(false);
+  });
+});
+
+describe('reviewerVerdicts map merge (PAN-1862 FR-6)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    journal.readJournalStatusSync.mockReturnValue(null);
+    journal.enrichReviewNotesFromRecordSync.mockImplementation((_id: string, s: ReviewStatus) => s);
+  });
+
+  it('a partial verdict update merges with carried-forward entries instead of replacing them', () => {
+    db.getFromDb.mockReturnValue(dbRow({
+      reviewStatus: 'blocked',
+      reviewerVerdicts: {
+        security: { status: 'passed', atCommit: 'aaaa1111' },
+        correctness: { status: 'blocked', atCommit: 'aaaa1111' },
+      },
+    }));
+
+    const result = setReviewStatusSync('PAN-1866', {
+      reviewStatus: 'passed',
+      reviewSpawnedAt: '2026-07-11T13:00:00.000Z',
+      reviewerVerdicts: { correctness: { status: 'passed', atCommit: 'bbbb2222' } },
+    });
+
+    expect(result.reviewerVerdicts).toEqual({
+      security: { status: 'passed', atCommit: 'aaaa1111' },     // carried forward, untouched
+      correctness: { status: 'passed', atCommit: 'bbbb2222' },  // updated by this cycle
+    });
   });
 });

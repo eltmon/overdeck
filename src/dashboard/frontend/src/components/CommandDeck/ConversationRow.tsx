@@ -1,12 +1,13 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useDashboardStore } from '../../lib/store';
-import { Circle, Archive, Copy, Check, X, Pencil, Sparkles, Star, Loader2, Terminal, FileCode, Search, Globe, Wrench, Zap, GitBranch, GitBranchPlus, GitFork, AlertCircle, Scissors, TriangleAlert, FileText, ExternalLink, Share2, MoreVertical } from 'lucide-react';
+import { Circle, Archive, Copy, Check, X, Pencil, Sparkles, Star, Loader2, Terminal, FileCode, Search, Globe, Wrench, Zap, GitBranch, GitBranchPlus, GitFork, AlertCircle, Scissors, TriangleAlert, FileText, FileX, ExternalLink, Share2, MoreVertical } from 'lucide-react';
 import { toolNameToPhase, getPhaseLabel, isSpinnerPhase } from '../../lib/workingPhase';
 import { useConfirm } from '../DialogProvider';
 import { useNow } from '../../hooks/useNow';
 import { formatRelativeTime } from '../../lib/formatRelativeTime';
-import { describePendingInput } from '../../lib/pendingInput';
+import { AwaitingInputIndicator } from '../AwaitingInputIndicator';
+import { useAskUserQuestionUiStore } from '../../lib/askUserQuestionUiStore';
 import type { Conversation } from './ConversationList';
 import type { ConversationMutations } from './useConversationMutations';
 import styles from './styles/command-deck.module.css';
@@ -28,7 +29,8 @@ function shortModel(model: string): string {
 
 function shortHarness(harness: NonNullable<Conversation['harness']>): string {
   if (harness === 'claude-code') return 'Claude Code';
-  if (harness === 'pi') return 'Pi';
+  if (harness === 'ohmypi') return 'oh-my-pi';
+  if (harness === 'pi') return 'oh-my-pi';
   return 'Codex';
 }
 
@@ -129,6 +131,7 @@ export function ConversationRow({
 
   const isCompacting = useDashboardStore((s) => s.conversationsCompactingByName?.[conv.name] ?? false);
   const isAwaitingPermission = useDashboardStore((s) => s.conversationsAwaitingPermissionByName?.[conv.name] ?? false);
+  const requestAskUserQuestionReopen = useAskUserQuestionUiStore((s) => s.requestReopen);
 
   const isNested = variant === 'nested';
   const iconSize = isNested ? 10 : 11;
@@ -229,6 +232,15 @@ export function ConversationRow({
           <span>Fallback: {conv.forkFallbackReason}</span>
         </span>
       )}
+      {conv.transcriptMissing && (
+        <span
+          className={styles.conversationForkFailed}
+          title="Transcript missing — this conversation had activity, but its history file no longer exists on disk. The history cannot be recovered."
+        >
+          <FileX size={10} />
+          <span>No transcript</span>
+        </span>
+      )}
     </>
   );
 
@@ -289,16 +301,15 @@ export function ConversationRow({
           />
         </span>
       ) : (conv.pendingInputCount ?? 0) > 0 ? (
-        // PAN-1520 — conv has an open AskUserQuestion/plan-mode/etc. Show the
-        // same triangle-alert affordance as the permission case so operators
-        // can spot the row from a distance.
-        <span title={describePendingInput(conv.pendingInputKinds)} style={{ display: 'contents' }}>
-          <TriangleAlert
-            size={spinnerSize}
-            className={styles.conversationPermissionAlert}
-            aria-label={`Conversation ${conv.name} is awaiting input`}
-          />
-        </span>
+        // PAN-1520 — conv has an open AskUserQuestion/plan-mode/etc. Pulses so
+        // the row is spottable from a distance, and clicking it re-opens the
+        // dialog: dismissing (or losing) the modal must never strand the
+        // question with no way back to it.
+        <AwaitingInputIndicator
+          kinds={conv.pendingInputKinds}
+          size={spinnerSize}
+          onClick={() => requestAskUserQuestionReopen(conv.name)}
+        />
       ) : conv.isWorking ? (
         <WorkingSpinner
           size={spinnerSize}

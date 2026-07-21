@@ -5,6 +5,9 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Effect } from 'effect';
+import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 const mockGetAgentStateSync = vi.fn();
 const mockSaveAgentState = vi.fn();
@@ -15,14 +18,17 @@ const mockResetAgentFailureCount = vi.fn();
 const mockMarkAgentRunningState = vi.fn();
 const mockSessionExists = vi.fn();
 const mockSessionExistsSync = vi.fn();
+const mockQuerySessionSync = vi.fn();
 const mockKillSession = vi.fn();
 const mockListPaneValues = vi.fn();
 const mockGetReviewStatusSync = vi.fn();
 const mockGetAgentRuntimeStateSync = vi.fn();
+const mockReconcileLiveWorkSpawnPlaceholder = vi.fn();
 const mockWorkResumeSlotsAvailable = vi.fn();
 const mockCountRunningAgents = vi.fn();
 const mockGetConcurrencyLimits = vi.fn();
 const mockIsIssueClosed = vi.fn();
+const mockExistingPaths = vi.hoisted(() => new Set<string>());
 
 vi.mock('effect', async (importOriginal) => {
   const actual = await importOriginal<typeof import('effect')>();
@@ -34,6 +40,7 @@ vi.mock('node:fs', async (importOriginal) => {
   return {
     ...actual,
     existsSync: (path: string) => {
+      if (mockExistingPaths.has(path)) return true;
       if (path === '/tmp/workspace') return true;
       if (path.startsWith('/tmp/agents/')) return false;
       return actual.existsSync(path);
@@ -68,9 +75,14 @@ vi.mock('../../../lib/agents.js', () => ({
 vi.mock('../../../lib/tmux.js', () => ({
   sessionExists: (...args: unknown[]) => Effect.succeed(mockSessionExists(...args)),
   sessionExistsSync: (...args: unknown[]) => mockSessionExistsSync(...args),
+  querySessionSync: (...args: unknown[]) => mockQuerySessionSync(...args),
   killSession: (...args: unknown[]) => Effect.succeed(mockKillSession(...args)),
   killSessionSync: (...args: unknown[]) => mockKillSession(...args),
   listPaneValues: (...args: unknown[]) => Effect.succeed(mockListPaneValues(...args)),
+}));
+
+vi.mock('../../../lib/agents/placeholder-reconciliation.js', () => ({
+  reconcileLiveWorkSpawnPlaceholder: (...args: unknown[]) => mockReconcileLiveWorkSpawnPlaceholder(...args),
 }));
 
 vi.mock('../../../lib/review-status.js', () => ({
@@ -84,6 +96,9 @@ vi.mock('../../../lib/cloister/concurrency.js', () => ({
   getConcurrencyLimits: () => mockGetConcurrencyLimits(),
   resetPatrolDispatchBudget: vi.fn(),
   tryReserveAdvancingSlot: () => true,
+  releaseAdvancingSlot: vi.fn(),
+  tryReserveSwarmSlot: () => true,
+  releaseSwarmSlot: vi.fn(),
   canDispatchAdvancing: () => true,
 }));
 
@@ -113,6 +128,19 @@ vi.mock('../no-resume-mode.js', () => ({
   getNoResumeMode: () => ({ active: false, since: null }),
 }));
 
+// PAN-2974: the boot-reconciliation decision is controllable per test.
+// Default null preserves the pre-existing behavior for every other case here.
+const mocks = {
+  bootState: { decision: null as string | null },
+};
+vi.mock('../../../lib/overdeck/control-settings.js', async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  return {
+    ...actual,
+    getBootReconciliationState: vi.fn(() => ({ ...mocks.bootState })),
+  };
+});
+
 import {
   handleAgentStoppedEvent,
   handleAgentHeartbeatDeadEvent,
@@ -133,8 +161,12 @@ function makeState(overrides: Record<string, unknown> = {}) {
 }
 
 describe('PAN-1908 reactive liveness handlers', () => {
+  let tempDir: string;
+
   beforeEach(() => {
     vi.clearAllMocks();
+    tempDir = mkdtempSync(join(tmpdir(), 'pan-1908-liveness-'));
+    mocks.bootState.decision = null;
     mockGetAgentStateSync.mockReturnValue(null);
     mockSaveAgentState.mockReturnValue(Effect.void);
     mockResumeAgent.mockResolvedValue({ success: true });
@@ -143,18 +175,22 @@ describe('PAN-1908 reactive liveness handlers', () => {
     mockMarkAgentRunningState.mockImplementation((s: any) => { s.status = 'running'; });
     mockSessionExists.mockResolvedValue(false);
     mockSessionExistsSync.mockReturnValue(false);
+    mockQuerySessionSync.mockReturnValue({ status: 'missing', detail: 'exit=1 stderr=can\'t find session: agent' });
     mockKillSession.mockResolvedValue(undefined);
     mockListPaneValues.mockResolvedValue(['0']);
     mockGetReviewStatusSync.mockReturnValue(undefined);
     mockGetAgentRuntimeStateSync.mockReturnValue(null);
+    mockReconcileLiveWorkSpawnPlaceholder.mockResolvedValue(null);
     mockWorkResumeSlotsAvailable.mockReturnValue(6);
     mockCountRunningAgents.mockReturnValue({ work: 0, advancing: 0, total: 0 });
     mockGetConcurrencyLimits.mockReturnValue({ maxWorkAgents: 6, reservedAdvancingSlots: 3, totalCeiling: 9 });
     mockIsIssueClosed.mockResolvedValue(false);
+    mockExistingPaths.clear();
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
+    rmSync(tempDir, { recursive: true, force: true });
   });
 
   describe('handleAgentStoppedEvent', () => {
@@ -176,6 +212,75 @@ describe('PAN-1908 reactive liveness handlers', () => {
       });
 
       const result = await handleAgentStoppedEvent('agent-pan-1908');
+
+      expect(result).toBe('agent-pan-1908');
+      expect(mockResumeAgent).toHaveBeenCalledWith('agent-pan-1908');
+    });
+
+    // PAN-2974 root cause A: while the boot-reconciliation decision is pending
+    // (or hold_all), the EVENT path holds every stopped work agent — not just
+    // the ones in the pending-hold set (2026-07-21 MIN-882 resumed ungated).
+    it('holds a stopped work agent while the boot decision is pending, even outside the pending-hold set', async () => {
+      mocks.bootState.decision = 'pending';
+      mockGetAgentStateSync.mockReturnValue(makeState());
+      mockGetReviewStatusSync.mockReturnValue({
+        issueId: 'PAN-1908',
+        reviewStatus: 'blocked',
+        testStatus: 'pending',
+        verificationStatus: 'pending',
+        readyForMerge: false,
+      });
+
+      const result = await handleAgentStoppedEvent('agent-pan-1908');
+
+      expect(result).toBeNull();
+      expect(mockResumeAgent).not.toHaveBeenCalled();
+    });
+
+    it('holds a stopped work agent while the boot decision is hold_all', async () => {
+      mocks.bootState.decision = 'hold_all';
+      mockGetAgentStateSync.mockReturnValue(makeState());
+      mockGetReviewStatusSync.mockReturnValue({
+        issueId: 'PAN-1908',
+        reviewStatus: 'blocked',
+        testStatus: 'pending',
+      });
+
+      const result = await handleAgentStoppedEvent('agent-pan-1908');
+
+      expect(result).toBeNull();
+      expect(mockResumeAgent).not.toHaveBeenCalled();
+    });
+
+    it('resumes normally once a decision is made (no pending window)', async () => {
+      mocks.bootState.decision = 'resume_all';
+      mockGetAgentStateSync.mockReturnValue(makeState());
+      mockGetReviewStatusSync.mockReturnValue({
+        issueId: 'PAN-1908',
+        reviewStatus: 'blocked',
+        testStatus: 'pending',
+        verificationStatus: 'pending',
+        readyForMerge: false,
+      });
+
+      const result = await handleAgentStoppedEvent('agent-pan-1908');
+
+      expect(result).toBe('agent-pan-1908');
+      expect(mockResumeAgent).toHaveBeenCalledWith('agent-pan-1908');
+    });
+
+    it('does not gate the batch path (skipGlobalGates) on the pending window — the batch owns its own gate', async () => {
+      mocks.bootState.decision = 'pending';
+      mockGetAgentStateSync.mockReturnValue(makeState());
+      mockGetReviewStatusSync.mockReturnValue({
+        issueId: 'PAN-1908',
+        reviewStatus: 'blocked',
+        testStatus: 'pending',
+        verificationStatus: 'pending',
+        readyForMerge: false,
+      });
+
+      const result = await handleAgentStoppedEvent('agent-pan-1908', { skipGlobalGates: true });
 
       expect(result).toBe('agent-pan-1908');
       expect(mockResumeAgent).toHaveBeenCalledWith('agent-pan-1908');
@@ -205,12 +310,91 @@ describe('PAN-1908 reactive liveness handlers', () => {
       expect(result).toBeNull();
       expect(mockResumeAgent).not.toHaveBeenCalled();
     });
+
+    it('skips a stopped work agent whose workspace is missing', async () => {
+      mockGetAgentStateSync.mockReturnValue(makeState({ workspace: '/tmp/missing-workspace' }));
+
+      const result = await handleAgentStoppedEvent('agent-pan-1908');
+
+      expect(result).toBeNull();
+      expect(mockResumeAgent).not.toHaveBeenCalled();
+    });
+
+    it('skips a stopped work agent whose review status is already merged', async () => {
+      mockGetAgentStateSync.mockReturnValue(makeState());
+      mockGetReviewStatusSync.mockReturnValue({
+        issueId: 'PAN-1908',
+        reviewStatus: 'passed',
+        testStatus: 'passed',
+        mergeStatus: 'merged',
+        readyForMerge: false,
+      });
+
+      const result = await handleAgentStoppedEvent('agent-pan-1908');
+
+      expect(result).toBeNull();
+      expect(mockResumeAgent).not.toHaveBeenCalled();
+    });
+
+    it('reconciles a live tmux session before applying merged terminal skips', async () => {
+      const state = makeState();
+      mockGetAgentStateSync.mockReturnValue(state);
+      mockGetReviewStatusSync.mockReturnValue({
+        issueId: 'PAN-1908',
+        reviewStatus: 'passed',
+        testStatus: 'passed',
+        mergeStatus: 'merged',
+        readyForMerge: false,
+      });
+      mockSessionExists.mockResolvedValue(true);
+
+      const result = await handleAgentStoppedEvent('agent-pan-1908');
+
+      expect(result).toBeNull();
+      expect(mockMarkAgentRunningState).toHaveBeenCalledWith(state);
+      expect(mockSaveAgentState).toHaveBeenCalledWith(state);
+      expect(mockResumeAgent).not.toHaveBeenCalled();
+    });
+
+    it('skips a completed done-handoff agent when review and test passed', async () => {
+      mockExistingPaths.add('/tmp/agents/agent-pan-1908/completed');
+      mockGetAgentStateSync.mockReturnValue(makeState());
+      mockGetReviewStatusSync.mockReturnValue({
+        issueId: 'PAN-1908',
+        reviewStatus: 'passed',
+        testStatus: 'passed',
+        readyForMerge: false,
+      });
+
+      const result = await handleAgentStoppedEvent('agent-pan-1908');
+
+      expect(result).toBeNull();
+      expect(mockResumeAgent).not.toHaveBeenCalled();
+    });
+
+    it('resumes a completed done-handoff agent when review is blocked', async () => {
+      mockExistingPaths.add('/tmp/agents/agent-pan-1908/completed.processed');
+      mockGetAgentStateSync.mockReturnValue(makeState({ stoppedByUser: true }));
+      mockGetReviewStatusSync.mockReturnValue({
+        issueId: 'PAN-1908',
+        reviewStatus: 'blocked',
+        testStatus: 'passed',
+        verificationStatus: 'pending',
+        readyForMerge: false,
+      });
+
+      const result = await handleAgentStoppedEvent('agent-pan-1908');
+
+      expect(result).toBe('agent-pan-1908');
+      expect(mockResumeAgent).toHaveBeenCalledWith('agent-pan-1908');
+    });
   });
 
   describe('handleAgentHeartbeatDeadEvent', () => {
     it('marks a running work agent stopped and records failure', async () => {
       mockGetAgentStateSync.mockReturnValue(makeState({ status: 'running' }));
 
+      expect(await handleAgentHeartbeatDeadEvent('agent-pan-1908', 'patrol')).toEqual([]);
       const actions = await handleAgentHeartbeatDeadEvent('agent-pan-1908');
 
       expect(actions.length).toBeGreaterThan(0);
@@ -218,6 +402,86 @@ describe('PAN-1908 reactive liveness handlers', () => {
       const saved = mockSaveAgentState.mock.calls[0][0];
       expect(saved.status).toBe('stopped');
       expect(mockRecordAgentFailure).toHaveBeenCalled();
+    });
+
+    // PAN-1718: a work agent that orphans before its kickoff was delivered never
+    // came up healthy. The reconciler re-dispatches it as a fresh start, so the
+    // failure counter must ACCUMULATE (not reset) across cycles — otherwise it
+    // oscillates 1→0→1 and never trips the troubled gate, crash-looping forever.
+    it('accumulates (does not reset) failures for a pre-kickoff work-agent launch crash', async () => {
+      mockGetAgentStateSync.mockReturnValue(makeState({ status: 'running', kickoffDelivered: false }));
+
+      expect(await handleAgentHeartbeatDeadEvent('agent-pan-1908', 'patrol')).toEqual([]);
+      const actions = await handleAgentHeartbeatDeadEvent('agent-pan-1908');
+
+      expect(actions.length).toBeGreaterThan(0);
+      expect(mockRecordAgentFailure).toHaveBeenCalled();
+      expect(mockRecordAgentFailure.mock.calls[0][1]).toContain('launch crash');
+      expect(mockResetAgentFailureCount).not.toHaveBeenCalled();
+    });
+
+    // The complement: a work agent that DID deliver its kickoff and later orphans
+    // is a healthy run that died — it should get a clean retry (counter reset).
+    it('resets failures for a normal work-agent orphan that already delivered its kickoff', async () => {
+      mockGetAgentStateSync.mockReturnValue(makeState({ status: 'running', kickoffDelivered: true }));
+
+      expect(await handleAgentHeartbeatDeadEvent('agent-pan-1908', 'patrol')).toEqual([]);
+      const actions = await handleAgentHeartbeatDeadEvent('agent-pan-1908');
+
+      expect(actions.length).toBeGreaterThan(0);
+      expect(mockResetAgentFailureCount).toHaveBeenCalled();
+      expect(mockRecordAgentFailure.mock.calls[0][1]).toContain('orphaned: tmux session missing');
+    });
+
+    it('marks a review sub-role with a completed report stopped without recording orphan failure', async () => {
+      const outputPath = join(tempDir, 'security.md');
+      writeFileSync(outputPath, '## Findings\n\nNone.\n');
+      mockGetAgentStateSync.mockReturnValue(makeState({
+        id: 'agent-pan-1908-review-security',
+        role: 'review',
+        status: 'running',
+        startedAt: '2026-06-15T00:00:00.000Z',
+        reviewSubRole: 'security',
+        reviewRunId: 'agent-pan-1908-review-abcd1234',
+        reviewOutputPath: outputPath,
+        reviewSynthesisAgentId: 'agent-pan-1908-review',
+      }));
+
+      expect(await handleAgentHeartbeatDeadEvent('agent-pan-1908-review-security', 'patrol')).toEqual([]);
+      const actions = await handleAgentHeartbeatDeadEvent('agent-pan-1908-review-security');
+
+      expect(actions.length).toBeGreaterThan(0);
+      expect(mockSaveAgentState).toHaveBeenCalled();
+      const saved = mockSaveAgentState.mock.calls[0][0];
+      expect(saved.status).toBe('stopped');
+      expect(mockRecordAgentFailure).not.toHaveBeenCalled();
+      expect(mockResetAgentFailureCount).not.toHaveBeenCalled();
+    });
+
+    it('marks a review synthesis agent with synthesis.md stopped without recording orphan failure', async () => {
+      const workspace = join(tempDir, 'workspace');
+      const reviewRunId = 'agent-pan-1908-review-abcd1234';
+      const reviewDir = join(workspace, '.pan', 'review', reviewRunId);
+      mkdirSync(reviewDir, { recursive: true });
+      writeFileSync(join(reviewDir, 'synthesis.md'), '## Verdict: APPROVED\n\nReady.\n');
+      mockGetAgentStateSync.mockReturnValue(makeState({
+        id: 'agent-pan-1908-review',
+        role: 'review',
+        status: 'running',
+        workspace,
+        startedAt: '2026-06-15T00:00:00.000Z',
+        reviewRunId,
+      }));
+
+      expect(await handleAgentHeartbeatDeadEvent('agent-pan-1908-review', 'patrol')).toEqual([]);
+      const actions = await handleAgentHeartbeatDeadEvent('agent-pan-1908-review');
+
+      expect(actions.length).toBeGreaterThan(0);
+      expect(mockSaveAgentState).toHaveBeenCalled();
+      const saved = mockSaveAgentState.mock.calls[0][0];
+      expect(saved.status).toBe('stopped');
+      expect(mockRecordAgentFailure).not.toHaveBeenCalled();
+      expect(mockResetAgentFailureCount).not.toHaveBeenCalled();
     });
 
     it('skips agents that are already stopped', async () => {
@@ -229,13 +493,43 @@ describe('PAN-1908 reactive liveness handlers', () => {
       expect(mockSaveAgentState).not.toHaveBeenCalled();
     });
 
+    it('self-heals a live pending-work-spawn placeholder from its pinned launcher', async () => {
+      const state = makeState({ status: 'starting', model: 'pending-work-spawn' });
+      mockGetAgentStateSync.mockReturnValue(state);
+      mockSessionExistsSync.mockReturnValue(true);
+      mockQuerySessionSync.mockReturnValue({ status: 'exists' });
+      mockReconcileLiveWorkSpawnPlaceholder.mockResolvedValue(
+        'Reconciled agent-pan-1908 placeholder to running (claude-code/gpt-5.6-sol)',
+      );
+
+      const actions = await handleAgentHeartbeatDeadEvent('agent-pan-1908');
+
+      expect(actions).toEqual([
+        'Reconciled agent-pan-1908 placeholder to running (claude-code/gpt-5.6-sol)',
+      ]);
+      expect(mockReconcileLiveWorkSpawnPlaceholder).toHaveBeenCalledWith(
+        state,
+        expect.any(Function),
+      );
+    });
+
     it('skips running agents with a live tmux session', async () => {
       mockGetAgentStateSync.mockReturnValue(makeState({ status: 'running' }));
       mockSessionExistsSync.mockReturnValue(true);
+      mockQuerySessionSync.mockReturnValue({ status: 'exists' });
 
       const actions = await handleAgentHeartbeatDeadEvent('agent-pan-1908');
 
       expect(actions).toEqual([]);
+      expect(mockSaveAgentState).not.toHaveBeenCalled();
+    });
+
+    it('does not reap on a tmux query error or a single confirmed miss', async () => {
+      mockGetAgentStateSync.mockReturnValue(makeState({ status: 'running' }));
+      mockQuerySessionSync.mockReturnValueOnce({ status: 'error', detail: 'exit=unknown code=ETIMEDOUT' });
+
+      expect(await handleAgentHeartbeatDeadEvent('agent-pan-1908', 'patrol')).toEqual([]);
+      expect(await handleAgentHeartbeatDeadEvent('agent-pan-1908', 'patrol')).toEqual([]);
       expect(mockSaveAgentState).not.toHaveBeenCalled();
     });
   });

@@ -2,36 +2,47 @@ import React from 'react';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { DialogProvider } from './components/DialogProvider';
 import App, {
   SESSION_FEED_SIDEBAR_OPEN_STORAGE_KEY,
   buildConversationUrl,
+  getCommandDeckProjectRouteFromPath,
   getConversationRouteState,
   getConversationViewModeFromSearch,
   getConvIdFromPath,
+  getSessionKeyFromSearch,
   parseConversationViewModes,
   serializeConversationViewModes,
 } from './App';
+import { useDashboardStore } from './lib/store';
 
 const {
   mockDashboardState,
   mockOpenIssue,
+  mockOpenIssueFromRoute,
   mockRefreshDashboardState,
   mockToastError,
   mockToastInfo,
   mockToastSuccess,
 } = vi.hoisted(() => {
   const mockOpenIssue = vi.fn();
+  const mockOpenIssueFromRoute = vi.fn();
 
   return {
     mockOpenIssue,
+    mockOpenIssueFromRoute,
     mockDashboardState: {
       agents: [],
+      agentsById: {},
       issues: [{ identifier: 'PAN-123', url: 'https://example.com/issues/PAN-123' }],
       dashboardLifecycle: { active: false },
       channelPermissionRequestsById: {},
       agentsWithPendingAskUserQuestion: [],
+      agentsWithPendingProposedPlan: [],
       drawer: { issueId: null, tab: 'overview' },
       openIssue: mockOpenIssue,
+      openIssueFromRoute: mockOpenIssueFromRoute,
+      syncDrawerFromUrl: vi.fn(),
     },
     mockRefreshDashboardState: vi.fn().mockResolvedValue(undefined),
     mockToastError: vi.fn(),
@@ -106,32 +117,45 @@ vi.mock('sonner', () => ({
   },
 }));
 vi.mock('./lib/store', () => ({
-  useDashboardStore: vi.fn((selector?: unknown) => {
-    if (typeof selector === 'function') {
-      return selector(mockDashboardState);
-    }
-    return [];
-  }),
+  useDashboardStore: Object.assign(
+    vi.fn((selector?: unknown) => {
+      if (typeof selector === 'function') {
+        return selector(mockDashboardState);
+      }
+      return [];
+    }),
+    { setState: vi.fn() },
+  ),
   selectAgents: (state: { agents: unknown[] }) => state.agents,
   selectChannelPermissionRequests: (state: { channelPermissionRequestsById?: Record<string, unknown> }) =>
     Object.values(state.channelPermissionRequestsById ?? {}),
+  selectPendingInputSubjects: () => [],
   selectIssues: (state: { issues: unknown[] }) => state.issues,
   selectDashboardLifecycle: (state: { dashboardLifecycle: { active: boolean } }) => state.dashboardLifecycle,
+  selectPendingInputSubjects: () => [],
   selectAgentsWithPendingAskUserQuestion: (state: { agentsWithPendingAskUserQuestion?: unknown[] }) =>
     state.agentsWithPendingAskUserQuestion ?? [],
+  selectAgentsWithPendingProposedPlan: (state: { agentsById?: Record<string, unknown> }) =>
+    Object.values(state.agentsById ?? {}).filter((a) => (a as { pendingProposedPlan?: unknown }).pendingProposedPlan != null),
+  selectPendingInputSubjects: () => [],
+  selectMemoryObservations: () => () => [],
 }));
 vi.mock('./lib/refresh-dashboard-state', () => ({
   refreshDashboardState: mockRefreshDashboardState,
 }));
 vi.mock('./components/CommandDeck', () => ({
-  CommandDeck: ({ conversationViewMode, onConversationViewModeChange }: {
+  CommandDeck: ({ conversationViewMode, onConversationViewModeChange, selectedProject, onSelectProject }: {
     conversationViewMode?: 'conversation' | 'terminal';
     onConversationViewModeChange?: (mode: 'conversation' | 'terminal') => void;
+    selectedProject?: string | null;
+    onSelectProject?: (project: string | null) => void;
   }) => (
     <div>
       <div data-testid="view-mode">{conversationViewMode}</div>
+      <div data-testid="selected-project">{selectedProject ?? ''}</div>
       <button onClick={() => onConversationViewModeChange?.('terminal')}>Terminal</button>
       <button onClick={() => onConversationViewModeChange?.('conversation')}>Conversation</button>
+      <button onClick={() => onSelectProject?.('panopticon-cli')}>Select panopticon</button>
     </div>
   ),
 }));
@@ -160,25 +184,34 @@ function renderApp() {
 
   render(
     <QueryClientProvider client={client}>
-      <App />
+      <DialogProvider>
+        <App />
+      </DialogProvider>
     </QueryClientProvider>,
   );
 }
 
 beforeEach(() => {
   mockDashboardState.agents = []
+  mockDashboardState.agentsById = {}
   mockDashboardState.issues = [{ identifier: 'PAN-123', url: 'https://example.com/issues/PAN-123' }]
   mockDashboardState.dashboardLifecycle = { active: false }
   mockDashboardState.channelPermissionRequestsById = {}
   mockDashboardState.agentsWithPendingAskUserQuestion = []
+  mockDashboardState.agentsWithPendingProposedPlan = []
   mockDashboardState.drawer = { issueId: null, tab: 'overview' }
   mockDashboardState.openIssue = mockOpenIssue
+  mockDashboardState.openIssueFromRoute = mockOpenIssueFromRoute
+  mockDashboardState.syncDrawerFromUrl.mockClear()
   mockOpenIssue.mockClear()
+  mockOpenIssueFromRoute.mockClear()
   mockRefreshDashboardState.mockClear()
   mockToastError.mockClear()
   mockToastInfo.mockClear()
   mockToastSuccess.mockClear()
+  useDashboardStore.setState.mockClear()
   window.localStorage.removeItem(SESSION_FEED_SIDEBAR_OPEN_STORAGE_KEY)
+  window.localStorage.removeItem('overdeck:last-tab')
 })
 
 describe('conversation route helpers', () => {
@@ -196,6 +229,20 @@ describe('conversation route helpers', () => {
     expect(getConvIdFromPath('/conv/123')).toBe('123');
     expect(getConvIdFromPath('/conv/20260523-1234')).toBe('20260523-1234');
     expect(getConvIdFromPath('/command-deck')).toBeNull();
+  });
+
+  it('extracts sessions page selection keys from search params', () => {
+    expect(getSessionKeyFromSearch('?session=discovered:4123')).toBe('discovered:4123');
+    expect(getSessionKeyFromSearch('?session=managed-archived:87')).toBe('managed-archived:87');
+    expect(getSessionKeyFromSearch('?session=managed-archived:not-a-number')).toBeNull();
+    expect(getSessionKeyFromSearch('?session=other:87')).toBeNull();
+  });
+
+  it('extracts command deck project routes without swallowing issue cockpit routes', () => {
+    expect(getCommandDeckProjectRouteFromPath('/command-deck/panopticon-cli')).toBe('panopticon-cli');
+    expect(getCommandDeckProjectRouteFromPath('/command-deck/panopticon%20cli')).toBe('panopticon cli');
+    expect(getCommandDeckProjectRouteFromPath('/command-deck/panopticon-cli/PAN-1')).toBeNull();
+    expect(getCommandDeckProjectRouteFromPath('/command-deck')).toBeNull();
   });
 
   it('serializes and parses per-conversation terminal view memory', () => {
@@ -351,6 +398,22 @@ describe('App primary routing', () => {
     expect(screen.getByTestId('pipeline-view')).toBeInTheDocument();
   });
 
+  it('restores the selected project from a command deck project URL', () => {
+    window.history.replaceState(null, '', '/command-deck/panopticon-cli');
+    renderApp();
+    expect(screen.getByTestId('selected-project')).toHaveTextContent('panopticon-cli');
+  });
+
+  it('updates the URL when a command deck project is selected', () => {
+    window.history.replaceState(null, '', '/command-deck');
+    renderApp();
+
+    fireEvent.click(screen.getByText('Select panopticon'));
+
+    expect(window.location.pathname).toBe('/command-deck/panopticon-cli');
+    expect(screen.getByTestId('selected-project')).toHaveTextContent('panopticon-cli');
+  });
+
   it('marks the parent surface when the drawer is open', () => {
     mockDashboardState.drawer = { issueId: 'PAN-123', tab: 'overview' };
     window.history.replaceState(null, '', '/');
@@ -368,6 +431,42 @@ describe('App primary routing', () => {
     window.history.replaceState(null, '', '/context');
     renderApp();
     expect(screen.getByTestId('context-page')).toBeInTheDocument();
+  });
+
+  it('opens the issue drawer on /issues/:id without rewriting the URL', async () => {
+    window.history.replaceState(null, '', '/issues/PAN-1234');
+    renderApp();
+
+    expect(window.location.pathname).toBe('/issues/PAN-1234');
+    expect(window.location.search).toBe('');
+    await waitFor(() => expect(mockOpenIssueFromRoute).toHaveBeenCalledWith('PAN-1234', '/pipeline', '/issues/PAN-1234'));
+  });
+
+  it('defaults /issues/:id to Pipeline when no last tab is stored', () => {
+    window.history.replaceState(null, '', '/issues/PAN-1234');
+    renderApp();
+
+    expect(screen.getByTestId('pipeline-view')).toBeInTheDocument();
+  });
+
+  it('restores the last surface on /issues/:id', () => {
+    window.localStorage.setItem('overdeck:last-tab', 'kanban');
+    window.history.replaceState(null, '', '/issues/PAN-1234');
+    renderApp();
+
+    expect(screen.getByText('Open issue')).toBeInTheDocument();
+  });
+
+  it('handles browser back/forward to /issues/:id', async () => {
+    window.history.replaceState(null, '', '/pipeline');
+    renderApp();
+    useDashboardStore.setState.mockClear();
+
+    window.history.pushState(null, '', '/issues/PAN-999');
+    window.dispatchEvent(new PopStateEvent('popstate'));
+
+    expect(window.location.pathname).toBe('/issues/PAN-999');
+    await waitFor(() => expect(mockOpenIssueFromRoute).toHaveBeenCalledWith('PAN-999', '/pipeline', '/issues/PAN-999'));
   });
 
   it('redirects direct experimental routes to Home when experimental features are off', async () => {
@@ -528,3 +627,70 @@ describe('App channel permission requests', () => {
     expect(mockToastSuccess).toHaveBeenCalledWith('Denied permission request for agent-987')
   })
 })
+
+describe('App global lens chord shortcuts', () => {
+  beforeEach(() => {
+    window.history.replaceState(null, '', '/');
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === '/api/version') {
+        return new Response(JSON.stringify({ version: '0.5.0' }), { status: 200 });
+      }
+      if (url === '/api/tracker-status') {
+        return new Response(JSON.stringify({ primary: 'github', configured: [] }), { status: 200 });
+      }
+      if (url === '/api/confirmations') {
+        return new Response(JSON.stringify([]), { status: 200 });
+      }
+      return new Response(JSON.stringify([]), { status: 200 });
+    }));
+  });
+
+  it('navigates to Pipeline with g p', () => {
+    renderApp();
+    fireEvent.keyDown(document, { key: 'g' });
+    fireEvent.keyDown(document, { key: 'p' });
+    expect(window.location.pathname).toBe('/pipeline');
+  });
+
+  it('navigates to Board with g b', () => {
+    renderApp();
+    fireEvent.keyDown(document, { key: 'g' });
+    fireEvent.keyDown(document, { key: 'b' });
+    expect(window.location.pathname).toBe('/board');
+  });
+
+  it('navigates to Agents with g a', () => {
+    renderApp();
+    fireEvent.keyDown(document, { key: 'g' });
+    fireEvent.keyDown(document, { key: 'a' });
+    expect(window.location.pathname).toBe('/agents');
+  });
+
+  it('navigates to Command Deck with g c', () => {
+    renderApp();
+    fireEvent.keyDown(document, { key: 'g' });
+    fireEvent.keyDown(document, { key: 'c' });
+    expect(window.location.pathname).toBe('/command-deck');
+  });
+
+  it('does not trigger the chord when focus is inside an input', () => {
+    renderApp();
+    const input = document.createElement('input');
+    document.body.appendChild(input);
+    input.focus();
+    fireEvent.keyDown(input, { key: 'g' });
+    fireEvent.keyDown(input, { key: 'p' });
+    expect(window.location.pathname).toBe('/');
+    document.body.removeChild(input);
+  });
+
+  it('cancels the chord on an unbound second key', () => {
+    renderApp();
+    fireEvent.keyDown(document, { key: 'g' });
+    fireEvent.keyDown(document, { key: 'q' });
+    expect(window.location.pathname).toBe('/');
+    fireEvent.keyDown(document, { key: 'p' });
+    expect(window.location.pathname).toBe('/');
+  });
+});

@@ -19,7 +19,7 @@ allowed-tools:
 server is a single Node 22 process running the pre-built
 `dist/dashboard/server.js` — it serves the API, the WebSocket endpoints, and
 the built frontend all on **port 3011**. With Traefik enabled, the dashboard
-is reachable at `https://pan.localhost`.
+is reachable at `https://overdeck.localhost`.
 
 Never run the dashboard under Bun or via tsx — see the dashboard-Node22-only
 rule. If the dist is stale after server code changes, run `npm run build`
@@ -39,8 +39,8 @@ first (or use `/pan-reload`, which builds then restarts).
    - Serves the built React frontend
    - Starts Cloister/Deacon orchestration unless `--no-deacon`
 2. **Traefik** (optional, if enabled)
-   - Reverse proxy for `https://pan.localhost` and workspace domains
-     (`feature-pan-XXX.pan.localhost`)
+   - Reverse proxy for `https://overdeck.localhost` and workspace domains
+     (`feature-pan-XXX.overdeck.localhost`)
 
 In **dev mode** (`pan dev`, not `pan up`), the Vite frontend dev server runs
 separately on port 3010 and proxies API calls to the server on 3011.
@@ -62,7 +62,46 @@ pan up --no-deacon
 
 # Disable agent auto-resume for this boot
 pan up --no-resume
+
+# Start services without opening the app/browser
+pan up --no-open
 ```
+
+## Identity guard
+
+`pan up` refuses to run when the current directory is inside a non-primary
+checkout: either a workspace worktree or any linked Git worktree, including a
+handoff worktree. It exits with code 2 and names the primary checkout where the
+command must run.
+
+After startup, the health gate verifies both `repoRoot` and `mode` from
+`GET /api/health`. If another server holds the port, the command reports
+`port held by non-primary server (cwd=…, mode=…)`; a 200 response from the wrong
+server is a failure, not a successful start.
+
+## Desktop App
+
+`pan up` opens the Overdeck Electron desktop app if it is installed in one of
+the supported locations. Otherwise it falls back to the default browser.
+
+### Install the desktop app
+
+- **Linux**
+  - Download the AppImage and place it at `~/Applications/Overdeck*.AppImage`.
+  - Or create a symlink at one of:
+    - `~/.local/bin/overdeck`
+    - `~/.local/share/applications/overdeck`
+    - `/usr/local/bin/overdeck`
+    - `/opt/overdeck/overdeck`
+- **macOS**
+  - Copy `Overdeck.app` to `/Applications` or `~/Applications`.
+- **Windows**
+  - Install to `%LOCALAPPDATA%\Programs\overdeck\Overdeck.exe`.
+
+When a supported install is found, `pan up` launches the app window. Without an
+install, `pan up` opens the dashboard in your default browser. Use
+`pan up --no-open` for scripted or headless starts that should not open a
+window.
 
 ## Step-by-Step Workflow
 
@@ -88,7 +127,7 @@ pan up
 curl -s http://127.0.0.1:3011/api/health   # {"status":"ok",...}
 ```
 
-Then open `https://pan.localhost` (Traefik) or `http://localhost:3011`.
+Then open `https://overdeck.localhost` (Traefik) or `http://localhost:3011`.
 
 ### Step 4: Check logs (if issues)
 
@@ -135,6 +174,6 @@ Run `npm run build` first, or use `/pan-reload`.
 
 ## More Information
 
-- Dashboard URL: `https://pan.localhost` (Traefik) or `http://localhost:3011`
+- Dashboard URL: `https://overdeck.localhost` (Traefik) or `http://localhost:3011`
 - Logs: `~/.overdeck/logs/`
 - Run `pan up --help` for current options

@@ -30,7 +30,7 @@ Start the dashboard server (Node 22, bundled) and the Vite frontend dev server (
 ## Architecture
 
 ```
-Browser → https://pan.localhost (Traefik)
+Browser → https://overdeck.localhost (Traefik)
          ↓
   Vite dev server (port 3010) ── HMR, serves React with hot reload
          ↓ proxies /api/* and /ws/*
@@ -65,7 +65,7 @@ export OVERDECK_DEV=1
 
 This is read by `generateOverdeckTraefikConfig()` (src/lib/traefik.ts) so the
 Traefik dynamic config routes the frontend to Vite (port 3010) instead of the
-bundled Node server (3011). Without this, https://pan.localhost serves the
+bundled Node server (3011). Without this, https://overdeck.localhost serves the
 production-mode static build and you do not get HMR. Export it before any
 subsequent step that may regenerate the Traefik config (notably any `pan up` or
 `pan install` invocation in this shell).
@@ -181,7 +181,7 @@ fi
 Print:
 - Server: `http://localhost:3011` (API)
 - Frontend: `http://localhost:3010` (Vite HMR)
-- Traefik: `https://pan.localhost` (if enabled, proxies to Vite on 3010)
+- Traefik: `https://overdeck.localhost` (if enabled, proxies to Vite on 3010)
 - Server log: `/tmp/overdeck-server.log`
 - Frontend log: `/tmp/overdeck-frontend.log`
 

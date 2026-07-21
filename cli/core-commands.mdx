@@ -23,7 +23,7 @@ pan install --minimal
 
 This command:
 - Installs ttyd (web terminal)
-- Installs beads CLI (task tracking)
+- Installs the tools Overdeck needs for managed workspaces
 - Optionally sets up Traefik and mkcert for HTTPS
 - Creates necessary configuration directories
 - Sets up git hooks for registered projects
@@ -69,6 +69,17 @@ Checks:
 
 Returns a health report with recommendations for any issues found.
 
+## pan hygiene
+
+Audit commits, working-tree changes, pull requests, agents, tmux sessions,
+merged branches, stale workspaces, and disk headroom in one report. See the
+[Hygiene Check](/cli/hygiene) reference for safe-fix semantics.
+
+```bash
+pan hygiene
+pan hygiene --strict
+```
+
 ## pan up
 
 Start the Overdeck dashboard and services.
@@ -87,8 +98,8 @@ Starts:
 - **Traefik** - Reverse proxy (if installed)
 
 With HTTPS enabled:
-- Dashboard: https://pan.localhost
-- Traefik UI: https://traefik.pan.localhost:8080
+- Dashboard: https://overdeck.localhost
+- Traefik UI: https://traefik.overdeck.localhost:8080
 
 The dashboard provides:
 - Kanban board of issues

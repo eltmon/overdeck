@@ -109,7 +109,7 @@ describe('removeLegacySkills070', () => {
   it('leaves non-legacy skills untouched when removing legacy ones', () => {
     makeLegacySkill('pan-plan-finalize');  // legacy
     makeLegacySkill('pan-plan');            // KEEP — new 0.7.0 skill
-    makeLegacySkill('beads');               // unrelated
+    makeLegacySkill('tasks');               // unrelated
     makeLegacySkill('bug-fix');             // unrelated
 
     const result = removeLegacySkills070Sync();
@@ -117,7 +117,7 @@ describe('removeLegacySkills070', () => {
     expect(result).toEqual(['pan-plan-finalize']);
     expect(existsSync(join(mockClaudeSkills, 'pan-plan-finalize'))).toBe(false);
     expect(existsSync(join(mockClaudeSkills, 'pan-plan'))).toBe(true);
-    expect(existsSync(join(mockClaudeSkills, 'beads'))).toBe(true);
+    expect(existsSync(join(mockClaudeSkills, 'tasks'))).toBe(true);
     expect(existsSync(join(mockClaudeSkills, 'bug-fix'))).toBe(true);
   });
 

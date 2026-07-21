@@ -3,7 +3,7 @@ export type NodeImportance = 'critical' | 'high' | 'medium' | 'low';
 export type NodeCondition = 'ok' | 'needs-refinement' | 'stale';
 export type NodeGate = 'auto' | 'ready' | 'blocked';
 export type NodePlanning = 'skip' | 'auto' | 'interactive';
-export type EdgeType = 'unblocks' | 'informs';
+export type EdgeType = 'unblocks' | 'informs' | 'contains';
 export type EdgeSource = 'github-ref' | 'operator' | 'ai-inferred';
 export type PassMode = 'creation' | 'incremental' | 'review';
 
@@ -19,6 +19,12 @@ export type SequenceNode = {
   rationale?: string;
   gate: NodeGate;
   planning: NodePlanning;
+  /**
+   * True when this issue is an epic (a container of child issues), not directly
+   * workable. Epics are excluded from the auto-pickable queue; their children
+   * carry the work. Membership is expressed via `contains` edges (epic → child).
+   */
+  isEpic?: boolean;
 };
 
 export type SequenceEdge = {
@@ -49,7 +55,7 @@ const NODE_IMPORTANCES = new Set<string>(['critical', 'high', 'medium', 'low']);
 const NODE_CONDITIONS = new Set<string>(['ok', 'needs-refinement', 'stale']);
 const NODE_GATES = new Set<string>(['auto', 'ready', 'blocked']);
 const NODE_PLANNINGS = new Set<string>(['skip', 'auto', 'interactive']);
-const EDGE_TYPES = new Set<string>(['unblocks', 'informs']);
+const EDGE_TYPES = new Set<string>(['unblocks', 'informs', 'contains']);
 const EDGE_SOURCES = new Set<string>(['github-ref', 'operator', 'ai-inferred']);
 const PASS_MODES = new Set<string>(['creation', 'incremental', 'review']);
 
@@ -70,6 +76,7 @@ function validateNode(n: Record<string, unknown>, i: number): { ok: true; node: 
   if (typeof n.gate !== 'string' || !NODE_GATES.has(n.gate)) return err(`nodes[${i}].gate invalid: ${n.gate}`);
   if (typeof n.planning !== 'string' || !NODE_PLANNINGS.has(n.planning)) return err(`nodes[${i}].planning invalid: ${n.planning}`);
   if (n.rationale !== undefined && typeof n.rationale !== 'string') return err(`nodes[${i}].rationale must be string`);
+  if (n.isEpic !== undefined && typeof n.isEpic !== 'boolean') return err(`nodes[${i}].isEpic must be boolean`);
   return {
     ok: true,
     node: {
@@ -84,6 +91,7 @@ function validateNode(n: Record<string, unknown>, i: number): { ok: true; node: 
       rationale: n.rationale as string | undefined,
       gate: n.gate as NodeGate,
       planning: n.planning as NodePlanning,
+      isEpic: typeof n.isEpic === 'boolean' ? n.isEpic : undefined,
     },
   };
 }

@@ -3,12 +3,12 @@ import chalk from 'chalk';
 import { execFileSync, execSync } from 'child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { dirname, join } from 'path';
-import { fileURLToPath } from 'url';
 
 type ReleaseChannel = 'stable' | 'canary';
 
 type PackageJson = {
   version: string;
+  name?: string;
   [key: string]: unknown;
 };
 
@@ -22,11 +22,13 @@ type ReleaseNotesOptions = {
   write?: string;
 };
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-const packageJsonPath = join(__dirname, '..', '..', 'package.json');
-const desktopPackageJsonPath = join(__dirname, '..', '..', 'apps', 'desktop', 'package.json');
-const contractsPackageJsonPath = join(__dirname, '..', '..', 'packages', 'contracts', 'package.json');
+export function resolveReleaseManifestPaths(repoRoot: string) {
+  return {
+    core: join(repoRoot, 'package.json'),
+    desktop: join(repoRoot, 'apps', 'desktop', 'package.json'),
+    contracts: join(repoRoot, 'packages', 'contracts', 'package.json'),
+  };
+}
 
 export function registerReleaseCommands(program: Command): void {
   const release = program
@@ -65,32 +67,32 @@ export function registerReleaseCommands(program: Command): void {
     );
 }
 
-function readPackageJson(): PackageJson {
-  return JSON.parse(readFileSync(packageJsonPath, 'utf-8')) as PackageJson;
+function readPackageJson(repoRoot: string): PackageJson {
+  return JSON.parse(readFileSync(resolveReleaseManifestPaths(repoRoot).core, 'utf-8')) as PackageJson;
 }
 
-function writePackageJson(pkg: PackageJson): void {
-  writeFileSync(packageJsonPath, `${JSON.stringify(pkg, null, 2)}\n`);
+function writePackageJson(repoRoot: string, pkg: PackageJson): void {
+  writeFileSync(resolveReleaseManifestPaths(repoRoot).core, `${JSON.stringify(pkg, null, 2)}\n`);
 }
 
-function readDesktopPackageJson(): PackageJson {
-  return JSON.parse(readFileSync(desktopPackageJsonPath, 'utf-8')) as PackageJson;
+function readDesktopPackageJson(repoRoot: string): PackageJson {
+  return JSON.parse(readFileSync(resolveReleaseManifestPaths(repoRoot).desktop, 'utf-8')) as PackageJson;
 }
 
-function writeDesktopPackageJson(pkg: PackageJson): void {
-  writeFileSync(desktopPackageJsonPath, `${JSON.stringify(pkg, null, 2)}\n`);
+function writeDesktopPackageJson(repoRoot: string, pkg: PackageJson): void {
+  writeFileSync(resolveReleaseManifestPaths(repoRoot).desktop, `${JSON.stringify(pkg, null, 2)}\n`);
 }
 
-function readContractsPackageJson(): PackageJson {
-  return JSON.parse(readFileSync(contractsPackageJsonPath, 'utf-8')) as PackageJson;
+function readContractsPackageJson(repoRoot: string): PackageJson {
+  return JSON.parse(readFileSync(resolveReleaseManifestPaths(repoRoot).contracts, 'utf-8')) as PackageJson;
 }
 
-function writeContractsPackageJson(pkg: PackageJson): void {
-  writeFileSync(contractsPackageJsonPath, `${JSON.stringify(pkg, null, 2)}\n`);
+function writeContractsPackageJson(repoRoot: string, pkg: PackageJson): void {
+  writeFileSync(resolveReleaseManifestPaths(repoRoot).contracts, `${JSON.stringify(pkg, null, 2)}\n`);
 }
 
-function getCurrentVersion(): string {
-  return readPackageJson().version;
+function getCurrentVersion(repoRoot: string): string {
+  return readPackageJson(repoRoot).version;
 }
 
 function run(command: string, cwd: string): string {
@@ -128,6 +130,16 @@ function getLatestTag(repoRoot: string): string | null {
   }
 }
 
+function getRemoteStateBranchSha(repoRoot: string): string | undefined {
+  try {
+    const output = run('git ls-remote --heads origin refs/heads/overdeck-state', repoRoot);
+    const sha = output.split(/\s+/)[0];
+    return /^[0-9a-f]{40}$/i.test(sha) ? sha : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 function getCommitSubjects(repoRoot: string, range: string): string[] {
   try {
     const output = run(`git log ${range} --pretty=format:%s`, repoRoot);
@@ -140,30 +152,92 @@ function getCommitSubjects(repoRoot: string, range: string): string[] {
   }
 }
 
-function buildReleaseNotesMarkdown(params: {
+/** Commit subjects that are pure pipeline bookkeeping — never user-facing. */
+const RELEASE_NOTE_NOISE: RegExp[] = [
+  /^chore\((records|state|beads|tasks)\)/,
+  /^chore: (reconcile|integrate)/,
+  /^chore\(state\): update spec/,
+  /^docs: run-\d+/,
+  /^Merge /,
+  /per-issue record$/,
+];
+
+function isReleaseNoteNoise(subject: string): boolean {
+  return RELEASE_NOTE_NOISE.some((re) => re.test(subject));
+}
+
+/** Strip a conventional-commit `type(scope):` prefix and capitalize for readability. */
+function humanizeSubject(subject: string): string {
+  const match = subject.match(/^\w+(\([^)]*\))?!?:\s*(.*)$/);
+  const body = match ? match[2] : subject;
+  return body.length > 0 ? body[0].toUpperCase() + body.slice(1) : body;
+}
+
+/**
+ * Turn a flat list of commit subjects into grouped, de-noised release
+ * highlights: Features / Fixes / Performance, with everything else collapsed
+ * into a single "internal changes" count. Drops bookkeeping commits entirely so
+ * the changelog reads for a human, not a git log.
+ */
+export function groupCommitSubjects(entries: string[]): string {
+  const features: string[] = [];
+  const fixes: string[] = [];
+  const perf: string[] = [];
+  let internal = 0;
+  const seen = new Set<string>();
+
+  for (const subject of entries) {
+    if (isReleaseNoteNoise(subject)) continue;
+    const key = subject.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+
+    if (/^(feat|Add )/.test(subject)) features.push(humanizeSubject(subject));
+    else if (/^(fix|Fix )/.test(subject)) fixes.push(humanizeSubject(subject));
+    else if (/^perf/.test(subject)) perf.push(humanizeSubject(subject));
+    else internal += 1;
+  }
+
+  const sections: string[] = [];
+  const addSection = (title: string, items: string[]) => {
+    if (items.length > 0) sections.push(`### ${title}\n${items.map((i) => `- ${i}`).join('\n')}`);
+  };
+  addSection('Features', features);
+  addSection('Fixes', fixes);
+  addSection('Performance', perf);
+  if (internal > 0) {
+    sections.push(`_Plus ${internal} internal change${internal === 1 ? '' : 's'} (refactors, tests, tooling)._`);
+  }
+
+  return sections.length > 0 ? sections.join('\n\n') : '- No user-facing changes in the selected range.';
+}
+
+export function buildReleaseNotesMarkdown(params: {
   channel: ReleaseChannel;
   version: string;
   from: string | null;
   to: string;
   entries: string[];
+  packageName: string;
+  stateBranchSha?: string;
 }): string {
-  const { channel, version, from, to, entries } = params;
+  const { channel, version, from, to, entries, packageName, stateBranchSha } = params;
   const range = from ? `${from}...${to}` : to;
-  const installCommand = channel === 'stable'
-    ? 'npm install -g @overdeck/core'
-    : `npm install -g @overdeck/core@${channel}`;
+  // Pin the package name (passed in from package.json) and the exact version, so a release's
+  // notes install THAT release. The package was renamed across history
+  // (panopticon-cli -> @panctl/cli -> @overdeck/core); never hardcode it here.
+  const installCommand = `npm install -g ${packageName}@${version}`;
 
-  const bullets = entries.length > 0
-    ? entries.map((entry) => `- ${entry}`).join('\n')
-    : '- No commit subjects found in the selected range.';
+  const highlights = groupCommitSubjects(entries);
 
   return `## Summary
 - Release ${version} (${channel})
 - Built from ${range}
 - Published intentionally from main via tag promotion
+${stateBranchSha ? `- State snapshot: overdeck-state ${stateBranchSha}\n` : ''}
 
 ## Highlights
-${bullets}
+${highlights}
 
 ## Breaking changes
 - None explicitly called out in commit subjects. Review the full changelog before upgrading across versions.
@@ -269,9 +343,9 @@ function runPreflight(repoRoot: string, opts: { skipTests?: boolean } = {}): Pre
   // still tracked. Mirror that here so we catch leaks BEFORE tagging, not
   // after the release workflow fails.
   //
-  // PAN-967 retired the `.planning/` directory in favour of `vbrief/`
+  // PAN-967 retired the `.planning/` directory in favour of tracked planning artifacts
   // (proposed, active, completed, cancelled). Only `.planning/` is legacy;
-  // `vbrief/` is the current lifecycle and is tracked intentionally — listing
+  // Legacy `vbrief/` lifecycle archives are tracked intentionally — listing
   // it here used to false-flag every release with "233 file(s) tracked".
   const trackedLegacyPlanning = (() => {
     try {
@@ -349,7 +423,7 @@ function runPreflight(repoRoot: string, opts: { skipTests?: boolean } = {}): Pre
 
 async function releaseCheckCommand(): Promise<void> {
   const repoRoot = getRepoRoot();
-  const currentVersion = getCurrentVersion();
+  const currentVersion = getCurrentVersion(repoRoot);
   const latestTag = getLatestTag(repoRoot);
 
   console.log(chalk.bold('Overdeck Release Check\n'));
@@ -376,10 +450,10 @@ async function releaseCreateCommand(
   opts: { skipTests?: boolean } = {}
 ): Promise<void> {
   const repoRoot = getRepoRoot();
-  const currentVersion = getCurrentVersion();
+  const currentVersion = getCurrentVersion(repoRoot);
   const previousTag = getLatestTag(repoRoot);
   const resolvedVersion = version ?? inferNextVersion(channel, currentVersion);
-  const pkg = readPackageJson();
+  const pkg = readPackageJson(repoRoot);
   const tagName = `v${resolvedVersion}`;
   const releaseNotesPath = join(repoRoot, '.release', `${tagName}.md`);
 
@@ -408,15 +482,15 @@ async function releaseCreateCommand(
   }
 
   pkg.version = resolvedVersion;
-  writePackageJson(pkg);
+  writePackageJson(repoRoot, pkg);
 
-  const desktopPkg = readDesktopPackageJson();
+  const desktopPkg = readDesktopPackageJson(repoRoot);
   desktopPkg.version = resolvedVersion;
-  writeDesktopPackageJson(desktopPkg);
+  writeDesktopPackageJson(repoRoot, desktopPkg);
 
-  const contractsPkg = readContractsPackageJson();
+  const contractsPkg = readContractsPackageJson(repoRoot);
   contractsPkg.version = resolvedVersion;
-  writeContractsPackageJson(contractsPkg);
+  writeContractsPackageJson(repoRoot, contractsPkg);
 
   const entries = getCommitSubjects(repoRoot, previousTag ? `${previousTag}..HEAD` : 'HEAD');
   const releaseNotes = buildReleaseNotesMarkdown({
@@ -425,6 +499,8 @@ async function releaseCreateCommand(
     from: previousTag,
     to: tagName,
     entries,
+    packageName: pkg.name ?? '@overdeck/core',
+    stateBranchSha: channel === 'stable' ? getRemoteStateBranchSha(repoRoot) : undefined,
   });
 
   writeTextFile(releaseNotesPath, releaseNotes);
@@ -486,6 +562,7 @@ async function releaseNotesCommand(
     from: resolvedFrom,
     to: resolvedTo,
     entries,
+    packageName: readPackageJson(repoRoot).name ?? '@overdeck/core',
   });
 
   if (options.write) {

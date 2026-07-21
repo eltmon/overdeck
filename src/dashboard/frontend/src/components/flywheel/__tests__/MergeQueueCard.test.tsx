@@ -51,7 +51,7 @@ const READY_GEN = {
   ],
   heldOut: [],
   resolutions: [{ issueIds: ['PAN-2', 'PAN-1'], files: ['src/x.ts'], commitSha: 'r1' }],
-  stack: { status: 'absent', frontendUrl: 'https://uat-pan-otter-0610.pan.localhost' },
+  stack: { status: 'absent', frontendUrl: 'https://uat-pan-otter-0610.overdeck.localhost' },
 };
 
 const SUPERSEDED_GEN = {
@@ -61,7 +61,7 @@ const SUPERSEDED_GEN = {
   createdAt: '2026-06-10T01:00:00.000Z',
   members: [READY_GEN.members[0]],
   resolutions: [],
-  stack: { status: 'running', frontendUrl: 'https://uat-pan-sea-monkey-0610.pan.localhost' },
+  stack: { status: 'running', frontendUrl: 'https://uat-pan-sea-monkey-0610.overdeck.localhost' },
 };
 
 const ASSEMBLING_GEN = {
@@ -97,6 +97,38 @@ describe('empty state', () => {
     renderCard();
     expect(await screen.findByText(/No features are ready to merge/)).toBeTruthy();
   });
+
+  it('warns when the merge backend is unavailable', async () => {
+    mockFetch({
+      'uat-generations': [],
+      'merge-queue': [],
+      'merge-backend': {
+        available: false,
+        mode: 'none',
+        detail: 'No GitHub App credentials or gh CLI authentication found',
+      },
+    });
+    renderCard();
+
+    expect(await screen.findByText(/Merge backend unavailable/)).toBeTruthy();
+    expect(screen.getByText(/autonomous merge disabled/)).toBeTruthy();
+  });
+
+  it('does not warn when the merge backend is available', async () => {
+    mockFetch({
+      'uat-generations': [],
+      'merge-queue': [],
+      'merge-backend': {
+        available: true,
+        mode: 'gh-cli',
+        detail: 'gh CLI is authenticated',
+      },
+    });
+    renderCard();
+
+    expect(await screen.findByText(/No features are ready to merge/)).toBeTruthy();
+    expect(screen.queryByText(/Merge backend unavailable/)).toBeNull();
+  });
 });
 
 describe('steady state', () => {
@@ -114,7 +146,7 @@ describe('steady state', () => {
     // stack button states: absent → start; running → link
     expect(screen.getByText(/Start & open UAT frontend/)).toBeTruthy();
     const openLink = screen.getByText('▶ Open').closest('a');
-    expect(openLink?.getAttribute('href')).toBe('https://uat-pan-sea-monkey-0610.pan.localhost');
+    expect(openLink?.getAttribute('href')).toBe('https://uat-pan-sea-monkey-0610.overdeck.localhost');
 
     // what-to-UAT: per-member ACs, no-steps fallback, touchpoint item
     expect(screen.getByText('Inspector opens in <1s')).toBeTruthy();

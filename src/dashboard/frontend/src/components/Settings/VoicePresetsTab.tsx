@@ -139,7 +139,7 @@ export function VoicePresetsTab() {
         <span className="text-xs tabular-nums text-muted-foreground">{Math.round(volume * 100)}%</span>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+      <div className="grid gap-3 @lg:grid-cols-2 @2xl:grid-cols-3">
         {CUSTOM_VOICE_PRESETS.map((preset) => {
           const isSelected = selectedPreset === preset.id;
           const genderLabel = preset.gender === 'M' ? 'Male voice' : 'Female voice';

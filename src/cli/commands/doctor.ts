@@ -1,7 +1,7 @@
 import chalk from 'chalk';
 import { Effect } from 'effect';
 import type { AgentStatus } from '@overdeck/contracts';
-import { existsSync, readdirSync, readFileSync, statSync } from 'fs';
+import { existsSync, readdirSync, readFileSync, statSync, promises as fsp } from 'fs';
 import { exec, execSync } from 'child_process';
 import { promisify } from 'util';
 import { getAgentSessionsSync, listSessionNamesSync } from '../../lib/tmux.js';
@@ -14,18 +14,24 @@ import {
   COMMANDS_DIR,
   AGENTS_DIR,
   CLAUDE_DIR,
-  packageRoot,
+  ohmypiExtensionCandidates,
 } from '../../lib/paths.js';
 import { cleanupClosedIssueAgentDirectories } from '../../lib/agent-directory-cleanup.js';
 import { normalizeAgentId, getAgentStateSync } from '../../lib/agents.js';
-import { readPiCodexCredential } from '../../lib/pi-codex-auth.js';
+import { readOhmypiCodexCredential } from '../../lib/ohmypi-codex-auth.js';
 import { getDashboardApiUrlSync } from '../../lib/config.js';
 import { CacheService } from '../../dashboard/server/services/cache-service.js';
 import { classifyDashboardAgent } from '../../dashboard/frontend/src/lib/agent-classifier.js';
-
-// Minimum supported Pi binary version for the Pi harness (PAN-636).
-// Bump in lockstep with packages/pi-extension API surface compatibility.
-export const SUPPORTED_PI_VERSION_MIN = '0.73.0';
+import { getMainDivergence, type MainDivergence } from '../../lib/state-plane.js';
+import {
+  checkSystemPrerequisite,
+  type PrerequisiteProbe,
+  type PrerequisiteResolver,
+} from '../../lib/system-prerequisites.js';
+import { checkStateWorktrees } from './doctor-state-worktree.js';
+import { isXBriefFilename } from '../../lib/xbrief/lifecycle.js';
+// Minimum supported omp harness version (PAN-1989); its lineage differs from pi and was baselined at 16.1.16.
+export const SUPPORTED_OMP_VERSION_MIN = '16.1.0';
 
 const execAsync = promisify(exec);
 
@@ -38,6 +44,27 @@ function compareSemver(a: string, b: string): number {
     if (da !== db) return da - db;
   }
   return 0;
+}
+
+export async function checkKimi(
+  probe?: PrerequisiteProbe,
+  resolver?: PrerequisiteResolver,
+): Promise<CheckResult[]> {
+  const kimi = await checkSystemPrerequisite('kimi', probe, resolver);
+  if (!kimi.found) {
+    return [{
+      name: kimi.name,
+      status: 'warn',
+      message: 'Not installed (optional ACP harness)',
+      fix: `Install: ${kimi.install.linux}`,
+    }];
+  }
+
+  return [{
+    name: kimi.name,
+    status: 'ok',
+    message: kimi.version ?? 'Installed (version unknown)',
+  }];
 }
 
 export function checkCodex(): CheckResult[] {
@@ -71,91 +98,92 @@ function readCodexVersion(): string | null {
   }
 }
 
-export function checkPi(strict: boolean): CheckResult[] {
+function readOmpVersion(): string | null {
+  // omp prints `omp/X.Y.Z` to stdout. Merge stderr for safety.
+  try {
+    const out = execSync('omp --version 2>&1', { encoding: 'utf-8', stdio: 'pipe' }).trim();
+    // Match `omp/X.Y.Z` or a bare semver.
+    const m = out.match(/omp\/(\d+\.\d+\.\d+)/) ?? out.match(/(\d+\.\d+\.\d+)/);
+    return m ? m[1] : null;
+  } catch {
+    return null;
+  }
+}
+
+export function checkOhmypi(strict: boolean): CheckResult[] {
   const out: CheckResult[] = [];
-  if (!checkCommand('pi')) {
+  if (!checkCommand('omp')) {
     out.push({
-      name: 'Pi Coding Agent',
+      name: 'oh-my-pi (omp)',
       status: strict ? 'error' : 'warn',
-      message: 'Not installed (optional alternative harness)',
-      fix: 'Install: npm install -g @mariozechner/pi-coding-agent',
+      message: 'Not installed (ohmypi harness unavailable)',
+      fix: 'Install: npm install -g @oh-my-pi/pi-coding-agent',
     });
     return out;
   }
 
-  const version = readPiVersion();
+  const version = readOmpVersion();
   if (!version) {
     out.push({
-      name: 'Pi Coding Agent',
+      name: 'oh-my-pi (omp)',
       status: 'warn',
-      message: 'Detected but `pi --version` did not return a version string',
-      fix: 'Reinstall: npm install -g @mariozechner/pi-coding-agent',
+      message: 'Detected but `omp --version` did not return a version string',
+      fix: 'Reinstall: npm install -g @oh-my-pi/pi-coding-agent@latest',
     });
-  } else if (compareSemver(version, SUPPORTED_PI_VERSION_MIN) < 0) {
+  } else if (compareSemver(version, SUPPORTED_OMP_VERSION_MIN) < 0) {
     out.push({
-      name: 'Pi Coding Agent',
-      status: 'error',
-      message: `v${version} (too old — requires >= ${SUPPORTED_PI_VERSION_MIN})`,
-      fix: 'Upgrade: npm install -g @mariozechner/pi-coding-agent@latest',
+      name: 'oh-my-pi (omp)',
+      status: strict ? 'error' : 'warn',
+      message: `v${version} (too old — requires >= ${SUPPORTED_OMP_VERSION_MIN})`,
+      fix: 'Upgrade: npm install -g @oh-my-pi/pi-coding-agent@latest',
     });
   } else {
     out.push({
-      name: 'Pi Coding Agent',
+      name: 'oh-my-pi (omp)',
       status: 'ok',
       message: `v${version}`,
     });
   }
 
-  const extensionDist = join(packageRoot, 'packages', 'pi-extension', 'dist', 'index.js');
-  if (!existsSync(extensionDist)) {
+  const extensionCandidates = ohmypiExtensionCandidates();
+  const extensionPresent = extensionCandidates.some((p) => existsSync(p));
+  if (!extensionPresent) {
     out.push({
-      name: 'Pi Extension Bundle',
+      name: 'ohmypi Extension Bundle',
       status: 'warn',
-      message: 'packages/pi-extension/dist/index.js not found',
-      fix: 'Build it: cd packages/pi-extension && npm run build',
+      message: 'ohmypi extension bundle not found',
+      fix: 'Build it: npm run build:ohmypi-extension && npm run build (or, in a checkout: cd packages/ohmypi-extension && npm run build)',
     });
   } else {
     out.push({
-      name: 'Pi Extension Bundle',
+      name: 'ohmypi Extension Bundle',
       status: 'ok',
-      message: 'packages/pi-extension/dist/index.js present',
+      message: 'ohmypi extension bundle present',
     });
   }
 
-  // ChatGPT/Codex (openai-codex) OAuth used by GPT-5.x Pi conversations. Only
-  // surfaced when a credential exists — users who never use codex aren't
-  // bothered. Expiry is a sync read; `pan pi-auth status` does the live
-  // refresh check.
-  const codexCred = readPiCodexCredential();
+  // ChatGPT/Codex (openai-codex) OAuth used by GPT-5.x ohmypi conversations.
+  // Only surfaced when a credential exists. Expiry is a sync read;
+  // `pan ohmypi-auth status` does the live refresh check.
+  const codexCred = readOhmypiCodexCredential();
   if (codexCred) {
     const mins = Math.round((codexCred.expires - Date.now()) / 60_000);
     if (mins > 1) {
       out.push({
-        name: 'Pi ChatGPT/Codex auth',
+        name: 'ohmypi ChatGPT/Codex auth',
         status: 'ok',
         message: `openai-codex token valid (${mins > 120 ? `~${Math.round(mins / 60)}h` : `~${mins}m`})`,
       });
     } else {
       out.push({
-        name: 'Pi ChatGPT/Codex auth',
+        name: 'ohmypi ChatGPT/Codex auth',
         status: 'warn',
         message: 'openai-codex token expired',
-        fix: 'Refresh/re-auth: pan pi-auth status (auto-refresh) or pan pi-auth login',
+        fix: 'Refresh/re-auth: pan ohmypi-auth status (auto-refresh) or pan ohmypi-auth login',
       });
     }
   }
   return out;
-}
-
-function readPiVersion(): string | null {
-  // Pi prints its version to stderr, not stdout — merge both streams.
-  try {
-    const out = execSync('pi --version 2>&1', { encoding: 'utf-8', stdio: 'pipe' }).trim();
-    const m = out.match(/(\d+\.\d+\.\d+)/);
-    return m ? m[1] : null;
-  } catch {
-    return null;
-  }
 }
 
 export interface CheckResult {
@@ -212,6 +240,78 @@ function checkComposeLabelDrift(): ComposeDriftEntry[] {
   } catch {
     return [];
   }
+}
+
+/**
+ * PAN-2510: warn when overdeck-feature-*_devnet networks are close to exhausting
+ * Docker's default bridge pool, or when /etc/docker/daemon.json lacks a wider
+ * default-address-pools configuration. Advisory only — we never edit daemon.json.
+ */
+const DEFAULT_DOCKER_BRIDGE_POOL_LIMIT = 31;
+const DEVNET_POOL_WARNING_THRESHOLD = DEFAULT_DOCKER_BRIDGE_POOL_LIMIT - 5;
+const DAEMON_JSON_PATH = '/etc/docker/daemon.json';
+
+const DEFAULT_ADDRESS_POOLS_SNIPPET = `{
+  "default-address-pools": [
+    { "base": "10.200.0.0/16", "size": 24 }
+  ]
+}`;
+
+async function readDockerDaemonJson(): Promise<{ 'default-address-pools'?: unknown[] } | null> {
+  try {
+    const text = await fsp.readFile(DAEMON_JSON_PATH, 'utf-8');
+    return JSON.parse(text) as { 'default-address-pools'?: unknown[] };
+  } catch {
+    return null;
+  }
+}
+
+export async function checkDevnetNetworkPool(): Promise<CheckResult[]> {
+  if (!checkCommand('docker')) {
+    return [];
+  }
+
+  const [networkResult, daemonConfig] = await Promise.all([
+    execAsync(`docker network ls --format '{{.Name}}'`).catch(() => ({ stdout: '' })),
+    readDockerDaemonJson(),
+  ]);
+
+  const devnetNetworks = networkResult.stdout
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((name) => /^overdeck-feature-.*_devnet$/.test(name));
+
+  const devnetCount = devnetNetworks.length;
+  const hasPools = daemonConfig?.['default-address-pools'] !== undefined;
+  const results: CheckResult[] = [];
+
+  if (devnetCount >= DEVNET_POOL_WARNING_THRESHOLD) {
+    results.push({
+      name: 'Docker devnet pool',
+      status: 'warn',
+      message: `${devnetCount} overdeck-feature-*_devnet networks exist; Docker's default bridge pool is ~${DEFAULT_DOCKER_BRIDGE_POOL_LIMIT} networks`,
+      fix: `Widen the pool by adding default-address-pools to ${DAEMON_JSON_PATH}, then restart Docker:\n${DEFAULT_ADDRESS_POOLS_SNIPPET}`,
+    });
+  }
+
+  if (!hasPools) {
+    results.push({
+      name: 'Docker default-address-pools',
+      status: 'warn',
+      message: `${DAEMON_JSON_PATH} does not declare default-address-pools`,
+      fix: `Add a wider pool to ${DAEMON_JSON_PATH} and restart Docker:\n${DEFAULT_ADDRESS_POOLS_SNIPPET}`,
+    });
+  }
+
+  if (results.length === 0) {
+    results.push({
+      name: 'Docker devnet pool',
+      status: 'ok',
+      message: `${devnetCount} devnet networks; default-address-pools is configured`,
+    });
+  }
+
+  return results;
 }
 
 function countItems(path: string): number {
@@ -453,7 +553,7 @@ export function checkStoppedListClassification(options: {
   };
 }
 
-type OrphanProposedSpecReason = 'beads-zero' | 'beads-mismatch' | 'no-agent-no-reason';
+type OrphanProposedSpecReason = 'no-agent-no-reason';
 
 type DoctorProjectEntry = { key: string; config: Pick<ProjectConfig, 'name' | 'path'> };
 
@@ -462,7 +562,6 @@ export interface OrphanProposedSpec {
   projectName: string;
   issueId: string;
   reason: OrphanProposedSpecReason;
-  beadCount: number;
   planItemCount: number;
 }
 
@@ -477,45 +576,6 @@ function readJsonFile(path: string): any | null {
     return JSON.parse(readFileSync(path, 'utf-8'));
   } catch {
     return null;
-  }
-}
-
-function resolveBeadsIssuesPath(projectPath: string, issueId: string): string | null {
-  const workspacePath = join(projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`);
-  const beadsDir = join(workspacePath, '.beads');
-  const localIssuesPath = join(beadsDir, 'issues.jsonl');
-  if (existsSync(localIssuesPath)) return localIssuesPath;
-
-  const redirectPath = join(beadsDir, 'redirect');
-  if (!existsSync(redirectPath)) return null;
-  try {
-    const redirected = readFileSync(redirectPath, 'utf-8').trim();
-    if (!redirected) return null;
-    return join(isAbsolute(redirected) ? redirected : resolve(workspacePath, redirected), 'issues.jsonl');
-  } catch {
-    return null;
-  }
-}
-
-function countBeadsForIssue(projectPath: string, issueId: string): number {
-  const beadsPath = resolveBeadsIssuesPath(projectPath, issueId);
-  if (!beadsPath || !existsSync(beadsPath)) return 0;
-  try {
-    return readFileSync(beadsPath, 'utf-8')
-      .split('\n')
-      .filter(Boolean)
-      .filter((line) => {
-        try {
-          const record = JSON.parse(line) as { _type?: unknown; labels?: unknown };
-          return record._type === 'issue'
-            && Array.isArray(record.labels)
-            && record.labels.some((label) => typeof label === 'string' && label.toLowerCase() === issueId.toLowerCase());
-        } catch {
-          return false;
-        }
-      }).length;
-  } catch {
-    return 0;
   }
 }
 
@@ -544,25 +604,19 @@ export function findOrphanProposedSpecs(options: {
     if (!existsSync(specsDir)) continue;
 
     for (const entry of readdirSync(specsDir, { withFileTypes: true })) {
-      if (!entry.isFile() || !entry.name.endsWith('.vbrief.json')) continue;
+      if (!entry.isFile() || !isXBriefFilename(entry.name)) continue;
       const spec = readJsonFile(join(specsDir, entry.name));
       if (spec?.plan?.status !== 'proposed') continue;
       const issueId = normalizeDoctorIssueId(spec.plan?.id);
       if (!issueId || hasInFlightAgent(issueId, agentsDir, tmuxSessionNames)) continue;
 
       const planItemCount = Array.isArray(spec.plan?.items) ? spec.plan.items.length : 0;
-      const beadCount = countBeadsForIssue(config.path, issueId);
-      const reason: OrphanProposedSpecReason = beadCount === 0
-        ? 'beads-zero'
-        : beadCount !== planItemCount
-          ? 'beads-mismatch'
-          : 'no-agent-no-reason';
+      const reason: OrphanProposedSpecReason = 'no-agent-no-reason';
       orphans.push({
         projectKey: key,
         projectName: config.name,
         issueId,
         reason,
-        beadCount,
         planItemCount,
       });
     }
@@ -572,14 +626,7 @@ export function findOrphanProposedSpecs(options: {
 }
 
 function orphanProposedHint(reason: OrphanProposedSpecReason): string {
-  switch (reason) {
-    case 'beads-zero':
-      return 'free disk if needed, then re-run planning so beads are materialized before promotion';
-    case 'beads-mismatch':
-      return 're-run planning or inspect bd errors; spec items and bead tasks diverged';
-    case 'no-agent-no-reason':
-      return 'retry spawn with `pan start <id>` after checking stack health; use `--host` only for an explicit operator bypass';
-  }
+  return 'retry spawn with `pan start <id>` after checking stack health; use `--host` only for an explicit operator bypass';
 }
 
 export function checkOrphanProposedSpecs(options: {
@@ -603,7 +650,7 @@ export function checkOrphanProposedSpecs(options: {
   }
 
   const summary = [...grouped.entries()]
-    .map(([project, items]) => `${project}: ${items.map((item) => `${item.issueId} ${item.reason} (${item.beadCount}/${item.planItemCount} beads)`).join(', ')}`)
+    .map(([project, items]) => `${project}: ${items.map((item) => `${item.issueId} ${item.reason} (${item.planItemCount} plan items)`).join(', ')}`)
     .join('; ');
   const fixes = [...new Set(orphans.map((orphan) => `${orphan.reason}: ${orphanProposedHint(orphan.reason)}`))];
 
@@ -613,6 +660,30 @@ export function checkOrphanProposedSpecs(options: {
     message: `${orphans.length} orphan proposed spec${orphans.length === 1 ? '' : 's'} detected by project: ${summary}`,
     fix: fixes.join('\n  '),
   };
+}
+
+export async function checkMainDivergence(
+  projects: DoctorProjectEntry[] = listProjectsSync(),
+  measure: (repoPath: string) => Promise<MainDivergence> = getMainDivergence,
+): Promise<CheckResult[]> {
+  const checks: CheckResult[] = [];
+
+  for (const project of projects) {
+    const projectPath = project.config.path;
+    const projectLabel = `${project.key} (${project.config.name})`;
+    const divergence = await measure(projectPath);
+    const status = divergence.ahead > 1 || divergence.behind > 0 ? 'warn' : 'ok';
+    checks.push({
+      name: `Main Divergence: ${projectLabel}`,
+      status,
+      message: `local main ahead ${divergence.ahead}, behind ${divergence.behind} relative to origin/main`,
+      fix: status === 'warn'
+        ? 'Push state commits with `git push origin main`; pan reload builds from origin/main, so stale origin/main can deploy stale code.'
+        : undefined,
+    });
+  }
+
+  return checks;
 }
 
 export interface DoctorOptions {
@@ -644,7 +715,6 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<void> 
   // Check optional commands
   const optionalCommands = [
     { cmd: 'gh', name: 'GitHub CLI', fix: 'Install: gh auth login' },
-    { cmd: 'bd', name: 'Beads CLI', fix: 'Install beads for task tracking' },
     { cmd: 'docker', name: 'Docker', fix: 'Install Docker for workspace containers' },
   ];
 
@@ -656,13 +726,16 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<void> 
     }
   }
 
-  // Pi Coding Agent (alternative harness — PAN-636).
-  // Pi is optional: missing → warn (or error under --strict). When installed, version
-  // is compared against SUPPORTED_PI_VERSION_MIN and the bundled extension is checked.
-  for (const c of checkPi(options.strict ?? false)) checks.push(c);
+  // oh-my-pi / omp (ohmypi harness — PAN-1989, replaces pi PAN-636).
+  // omp is optional: missing → warn (or error under --strict). When installed, version
+  // is compared against SUPPORTED_OMP_VERSION_MIN and the bundled extension is checked.
+  for (const c of checkOhmypi(options.strict ?? false)) checks.push(c);
 
   // Codex CLI (alternative harness — PAN-1574). Optional: missing → warn.
   for (const c of checkCodex()) checks.push(c);
+
+  // Kimi Code CLI (ACP harness). Resolve the same configured executable used at launch.
+  for (const c of await checkKimi()) checks.push(c);
 
   // Check Overdeck directories
   const directories = [
@@ -765,8 +838,8 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<void> 
     dashboardAgents: await getDashboardAgentRowsForDoctor(),
   }));
   checks.push(checkOrphanProposedSpecs());
-
-  // Check smee-client webhook relay
+  checks.push(...await checkMainDivergence());
+  checks.push(...await checkStateWorktrees());
   try {
     const { isSmeeProcessRunningSync } = await import('../../lib/smee.js');
     const smeeUrlPath = join(homedir(), '.overdeck', 'github-app', 'smee-url');
@@ -818,6 +891,9 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<void> 
       });
     }
   }
+
+  // Check Docker devnet network pool exhaustion (PAN-2510)
+  for (const c of await checkDevnetNetworkPool()) checks.push(c);
 
   // Check for legacy command invocations in shell rc files (PAN-705)
   const legacyPatterns = [

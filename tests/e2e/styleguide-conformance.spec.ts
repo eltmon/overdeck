@@ -1,7 +1,9 @@
+import { existsSync } from 'node:fs';
+import { lstat, mkdir, readFile, symlink, unlink } from 'node:fs/promises';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { chromium, type Browser, type BrowserContext, type Page } from 'playwright';
 import { createRequire } from 'node:module';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import type { AddressInfo } from 'node:net';
 
 type ViteDevServer = {
@@ -14,6 +16,97 @@ const require = createRequire(import.meta.url);
 let vite: ViteDevServer;
 let browser: Browser;
 let baseUrl: string;
+let linkedFrontendNodeModules = false;
+const linkedFrontendPackages: string[] = [];
+const projectRoot = process.cwd();
+const frontendRoot = join(projectRoot, 'src/dashboard/frontend');
+const bootReconciliationSourceFiles = [
+  join(frontendRoot, 'src/components/BootReconciliationModal.tsx'),
+  join(frontendRoot, 'src/components/GraceCountdown.tsx'),
+];
+const forbiddenBootReconciliationColorClass = /\b(?:bg|text|border)-(?:neutral|orange|emerald|gray|zinc|sky|red)-|\btext-(?:white|black)\b/g;
+const packageResolutionRoots = [
+  frontendRoot,
+  projectRoot,
+  join(projectRoot, 'node_modules/.bun/node_modules'),
+  resolve(projectRoot, '../..'),
+  resolve(projectRoot, '../../node_modules/.bun/node_modules'),
+];
+
+function resolvePackage(specifier: string): string {
+  return require.resolve(specifier, { paths: packageResolutionRoots });
+}
+
+function resolvePackageDir(specifier: string): string {
+  if (specifier === '@overdeck/contracts') {
+    return join(projectRoot, 'packages/contracts');
+  }
+  try {
+    const packageJsonPath = resolvePackage(`${specifier}/package.json`);
+    return packageJsonPath.slice(0, -'/package.json'.length);
+  } catch {
+    try {
+      const entryPath = resolvePackage(specifier);
+      const nodeModulesPart = `/node_modules/${specifier}/`;
+      const index = entryPath.lastIndexOf(nodeModulesPart);
+      if (index !== -1) return entryPath.slice(0, index + nodeModulesPart.length - 1);
+    } catch {
+      // Fall through to filesystem probing below.
+    }
+    for (const root of packageResolutionRoots) {
+      const packagePath = join(root, ...specifier.split('/'));
+      if (existsSync(packagePath)) return packagePath;
+    }
+    throw new Error(`Unable to resolve package root for ${specifier}`);
+  }
+}
+
+function resolvePackageStoreRoot(): string {
+  for (const root of packageResolutionRoots) {
+    try {
+      require.resolve('react/package.json', { paths: [root] });
+      return root;
+    } catch {
+      // Try the next candidate.
+    }
+  }
+  throw new Error('Unable to resolve frontend package store root');
+}
+
+async function ensureFrontendNodeModules(): Promise<void> {
+  const nodeModulesPath = join(frontendRoot, 'node_modules');
+  try {
+    await lstat(nodeModulesPath);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+    await symlink(resolvePackageStoreRoot(), nodeModulesPath, 'dir');
+    linkedFrontendNodeModules = true;
+    return;
+  }
+
+  const packageJson = JSON.parse(await readFile(join(frontendRoot, 'package.json'), 'utf8')) as {
+    dependencies?: Record<string, string>;
+    devDependencies?: Record<string, string>;
+  };
+  const dependencies = Object.keys({
+    ...packageJson.dependencies,
+    ...packageJson.devDependencies,
+  });
+  for (const dependency of dependencies) {
+    const packagePath = join(nodeModulesPath, ...dependency.split('/'));
+    try {
+      await lstat(packagePath);
+      continue;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+    }
+    if (dependency.startsWith('@')) {
+      await mkdir(join(nodeModulesPath, dependency.split('/')[0]), { recursive: true });
+    }
+    await symlink(resolvePackageDir(dependency), packagePath, 'dir');
+    linkedFrontendPackages.push(packagePath);
+  }
+}
 
 const renderPoll = { timeout: 10_000, interval: 100 };
 const now = '2026-05-18T00:00:00.000Z';
@@ -60,7 +153,17 @@ const feature = {
   isShadow: false,
   cost: 1.25,
   readyForMerge: false,
-  sessions: [{ sessionId: 'agent-pan-1148', type: 'work', role: 'work', presence: 'active' }],
+  sessions: [{
+    sessionId: 'agent-pan-1148',
+    type: 'work',
+    role: 'work',
+    presence: 'active',
+    troubled: true,
+    troubledReason: 'Review handoff failed',
+    troubledAt: now,
+    consecutiveFailures: 0,
+    queuedMailCount: 2,
+  }],
   resourceSources: ['workspace', 'branch'],
   resourceDetails: {
     hasWorkspace: true,
@@ -68,7 +171,7 @@ const feature = {
     remoteBranchCount: 1,
     tmuxSessionCount: 1,
     prs: [],
-    hasVbrief: true,
+    hasXbrief: true,
     hasBeads: true,
     dockerContainerCount: 0,
   },
@@ -94,8 +197,9 @@ async function newContext(): Promise<BrowserContext> {
   const context = await browser.newContext();
   await context.addInitScript(({ snapshotFixture, featureFixture }) => {
     localStorage.setItem('pan-snapshot-cache-v1', JSON.stringify({ data: snapshotFixture, timestamp: new Date().toISOString() }));
-    window.fetch = async (input: RequestInfo | URL) => {
+    window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.pathname + input.search : input.url;
+      const method = init?.method ?? (input instanceof Request ? input.method : 'GET');
       const path = new URL(url, window.location.origin).pathname;
       const search = new URL(url, window.location.origin).search;
       const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), {
@@ -107,6 +211,7 @@ async function newContext(): Promise<BrowserContext> {
       if (path === '/api/version') return json({ version: 'test', supervisorUrl: null });
       if (path === '/api/tracker-status') return json({ primary: 'github', configured: [] });
       if (path === '/api/confirmations') return json([]);
+      if (path === '/api/boot-reconciliation') return json({ decision: null, perAgent: {}, decidedAt: null, bootId: null, graceDeadline: null, set: [] });
       if (path === '/api/cloister/status') return json({
         running: true,
         lastCheck: new Date().toISOString(),
@@ -178,6 +283,29 @@ async function newContext(): Promise<BrowserContext> {
         topSpenders: { agents: [{ agentId: 'agent-pan-1148', cost: 1.25 }], issues: [{ issueId: 'PAN-1148', cost: 1.25 }] },
       });
       if (path === '/api/issues/resource-allocated') return json([featureFixture]);
+      if (path === '/api/agents/agent-pan-1148/untroubled') {
+        const win = window as typeof window & { __troubledClearRequests?: Array<{ path: string; method: string }> };
+        win.__troubledClearRequests = win.__troubledClearRequests ?? [];
+        win.__troubledClearRequests.push({ path, method });
+        return json({ ok: true });
+      }
+      if (path === '/api/backlog/issue-state') return json({
+        issueId: new URL(url, window.location.origin).searchParams.get('issueId') ?? 'PAN-1148',
+        state: {
+          ready: true,
+          planned: true,
+          parked: false,
+          vetoed: false,
+          blocksMain: false,
+          inPipeline: true,
+          released: true,
+          objection: false,
+          gate: 'auto',
+        },
+        gate: 'auto',
+        planning: 'auto',
+        inSequence: false,
+      });
       if (path === '/api/registered-projects') return json([{ key: 'pan', name: 'Overdeck', path: '/tmp/overdeck' }]);
       if (path === '/api/session-trees') return json({ trees: [] });
       if (path === '/api/conversations/pending-input') return json([]);
@@ -185,6 +313,7 @@ async function newContext(): Promise<BrowserContext> {
       if (path === '/api/conversations/pending-input') return json([]);
       if (path === '/api/git-activity') return json([]);
       if (path === '/api/conversations/cost' || path === '/api/conversations/cost/by-workspace') return json({ totalCost: 0, entries: [] });
+      if (path === '/api/flywheel/current') return json(null);
       if (path === '/api/flywheel/runs') return json([]);
       return json(search ? { search } : {});
     };
@@ -200,9 +329,9 @@ async function openRoute(path: string): Promise<{ context: BrowserContext; page:
 }
 
 beforeAll(async () => {
-  const frontendRoot = join(process.cwd(), 'src/dashboard/frontend');
-  const vitePath = require.resolve('vite', { paths: [frontendRoot] });
-  const reactPath = require.resolve('@vitejs/plugin-react', { paths: [frontendRoot] });
+  await ensureFrontendNodeModules();
+  const vitePath = resolvePackage('vite');
+  const reactPath = resolvePackage('@vitejs/plugin-react');
   const { createServer } = await import(vitePath) as { createServer: (options: Record<string, unknown>) => Promise<ViteDevServer> };
   const { default: react } = await import(reactPath) as { default: () => unknown };
   vite = await createServer({
@@ -255,7 +384,9 @@ beforeAll(async () => {
       name: 'styleguide-empty-index-css',
       enforce: 'pre',
       transform(_code: string, id: string) {
-        return id.endsWith('/src/index.css') ? { code: '', map: null } : null;
+        return id.endsWith('/src/index.css')
+          ? { code: '.font-display { font-family: "Space Grotesk", system-ui, sans-serif; }', map: null }
+          : null;
       },
     }],
     server: { host: '127.0.0.1', port: 0, watch: null },
@@ -270,9 +401,24 @@ beforeAll(async () => {
 afterAll(async () => {
   await browser?.close();
   await vite?.close();
+  await Promise.all(linkedFrontendPackages.map((packagePath) => unlink(packagePath)));
+  if (linkedFrontendNodeModules) {
+    await unlink(join(frontendRoot, 'node_modules'));
+  }
 });
 
 describe('styleguide rendered surface conformance', () => {
+  it('keeps boot reconciliation countdown surfaces on semantic color tokens', async () => {
+    const violations: string[] = [];
+    for (const file of bootReconciliationSourceFiles) {
+      const source = await readFile(file, 'utf8');
+      const matches = source.match(forbiddenBootReconciliationColorClass) ?? [];
+      violations.push(...matches.map((match) => `${file}: ${match}`));
+    }
+
+    expect(violations).toEqual([]);
+  });
+
   it('renders shared primitives on Pipeline, Board, Command Deck, and Agents routes', async () => {
     const pipeline = await openRoute('/pipeline');
     await expect.poll(() => pipeline.page.locator('[data-component="top-bar"]').count(), renderPoll).toBeGreaterThan(0);
@@ -354,5 +500,79 @@ describe('styleguide rendered surface conformance', () => {
     expect(isInViewport).toBe(true);
 
     await context.close();
+  }, 45_000);
+
+  it('renders and clears a troubled Command Deck badge for the exact session', async () => {
+    const { context, page } = await openRoute('/command-deck');
+    await page.getByText('Overdeck', { exact: true }).nth(1).click();
+
+    const featureRow = page.locator('[data-component="feature-item"][data-issue-id="PAN-1148"]');
+    await expect.poll(() => featureRow.count(), renderPoll).toBe(1);
+    const badge = featureRow.locator('[data-testid="feature-troubled"]');
+    await expect.poll(() => badge.count(), renderPoll).toBe(1);
+    await expect.poll(() => badge.innerText(), renderPoll).toContain('Troubled · 2 queued');
+
+    const title = await badge.getAttribute('title');
+    expect(title).toContain('Session: agent-pan-1148.');
+    expect(title).toContain('Reason: Review handoff failed.');
+    expect(title).toContain('Failures: 0.');
+    expect(title).toContain('Likely spurious: troubled with 0 failures.');
+
+    const overlapFree = await badge.evaluate((node) => {
+      const badgeRect = node.getBoundingClientRect();
+      const row = node.closest('[data-component="feature-item"]');
+      const rowRect = row?.getBoundingClientRect();
+      if (!rowRect) return false;
+      return (
+        badgeRect.width > 0 &&
+        badgeRect.height > 0 &&
+        badgeRect.left >= rowRect.left &&
+        badgeRect.right <= rowRect.right &&
+        badgeRect.top >= rowRect.top &&
+        badgeRect.bottom <= rowRect.bottom
+      );
+    });
+    expect(overlapFree).toBe(true);
+
+    if (process.env.PAN_2257_CAPTURE_TROUBLED_BADGE === '1') {
+      await featureRow.screenshot({ path: '/tmp/pan-2257-troubled-badge.png' });
+    }
+
+    await badge.click();
+    await expect.poll(() => page.evaluate(() => {
+      const win = window as typeof window & { __troubledClearRequests?: Array<{ path: string; method: string }> };
+      return win.__troubledClearRequests ?? [];
+    }), renderPoll).toEqual([{ path: '/api/agents/agent-pan-1148/untroubled', method: 'POST' }]);
+
+    await context.close();
+  }, 45_000);
+
+  it('enforces visual contracts from the style guide (grid, badge tokens, drawer title font)', async () => {
+    const { context, page } = await openRoute('/pipeline');
+    const row = page.locator('[data-component="issue-row"][data-issue-id="PAN-1148"]');
+    await expect.poll(() => row.count(), renderPoll).toBe(1);
+    const grid = await row.evaluate((node) => window.getComputedStyle(node).gridTemplateColumns);
+    expect(grid).toBe('14px 78px 14px 1fr 220px 84px 26px');
+
+    const badges = page.locator('[data-component="verb-badge"]');
+    await expect.poll(() => badges.count(), renderPoll).toBeGreaterThan(0);
+    const badgeClass = await badges.first().getAttribute('class');
+    expect(badgeClass).toMatch(/\bbadge-bg-/);
+    expect(badgeClass).toMatch(/\bbadge-border-/);
+    await context.close();
+
+    const drawer = await openRoute('/pipeline?issue=PAN-1148&tab=overview');
+    const drawerTitle = drawer.page.locator('[data-testid="issue-drawer"] h2');
+    await expect.poll(() => drawerTitle.count(), renderPoll).toBe(1);
+    const drawerFont = await drawerTitle.evaluate((node) => window.getComputedStyle(node).fontFamily);
+    expect(drawerFont.split(',')[0]?.replace(/["']/g, '').trim()).toBe('Space Grotesk');
+    await drawer.context.close();
+
+    const commandDeck = await openRoute('/command-deck');
+    const treeTitle = commandDeck.page.getByTestId('command-deck-tree-title').first();
+    await expect.poll(() => treeTitle.count(), renderPoll).toBe(1);
+    const treeTitleFont = await treeTitle.evaluate((node) => window.getComputedStyle(node).fontFamily);
+    expect(treeTitleFont.split(',')[0]?.replace(/["']/g, '').trim()).toBe('Space Grotesk');
+    await commandDeck.context.close();
   }, 45_000);
 });

@@ -51,7 +51,10 @@ export async function resetReviewCommand(id: string, options: ResetReviewOptions
       // left `pan start` pointing at a dead command (its refusal recommends exactly
       // this). Needed e.g. to switch a stopped agent's model, where the saved session
       // can't be resumed under different provider routing.
-      await resetSessionCommand(id);
+      // PAN-2948: in the review namespace the saved session to clear is the
+      // REVIEWER's — passing the bare issue id targeted the work agent, so the
+      // reviewer's stale session survived and the next dispatch resumed it.
+      await resetSessionCommand(`agent-${issueId.toLowerCase()}-review`);
     }
 
   } catch (error: any) {

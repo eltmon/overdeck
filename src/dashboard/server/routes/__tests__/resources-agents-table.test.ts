@@ -11,7 +11,8 @@ import { Effect } from 'effect';
 // ─── Module mocks ─────────────────────────────────────────────────────────────
 
 const mockListAgentStates = vi.hoisted(() => vi.fn());
-const mockListSessionsSync = vi.hoisted(() => vi.fn());
+const mockListSessions = vi.hoisted(() => vi.fn());
+const mockListPaneValues = vi.hoisted(() => vi.fn());
 const mockGetStats = vi.hoisted(() => vi.fn());
 
 vi.mock('../../../../lib/agents.js', () => ({
@@ -19,7 +20,16 @@ vi.mock('../../../../lib/agents.js', () => ({
 }));
 
 vi.mock('../../../../lib/tmux.js', () => ({
-  listSessionsSync: mockListSessionsSync,
+  listSessions: () => Effect.succeed(mockListSessions()),
+  listPaneValues: (...args: unknown[]) => Effect.succeed(mockListPaneValues(...args)),
+}));
+
+vi.mock('../../../../lib/runtime-census.js', () => ({
+  getRuntimeCensus: async () => ({
+    sessionNames: new Set(mockListSessions().map((session: { name: string }) => session.name)),
+    processesByPid: new Map(),
+  }),
+  panePidsForSession: (_census: unknown, sessionName: string) => mockListPaneValues(sessionName),
 }));
 
 vi.mock('../../../../lib/docker-stats.js', () => ({
@@ -37,6 +47,15 @@ vi.mock('../../../../lib/docker-stats.js', () => ({
 // ─── Import after mocks ───────────────────────────────────────────────────────
 
 import { getResourcesEffect, getDockerStatsCollector } from '../resources.js';
+import { parseProcessTable } from '../resources/agents-stats.js';
+
+describe('parseProcessTable compatibility', () => {
+  it('preserves the exported four-column ps parser', () => {
+    expect(parseProcessTable('100 1 2.5 2048')).toEqual([
+      { pid: 100, ppid: 1, cpuPercent: 2.5, rssBytes: 2048 * 1024 },
+    ]);
+  });
+});
 
 async function runResourcesEffect(): Promise<{
   status: number;
@@ -51,7 +70,8 @@ async function runResourcesEffect(): Promise<{
 describe('GET /api/resources (agents table)', () => {
   beforeEach(() => {
     mockListAgentStates.mockReturnValue([]);
-    mockListSessionsSync.mockReturnValue([]);
+    mockListSessions.mockReturnValue([]);
+    mockListPaneValues.mockReturnValue([]);
     mockGetStats.mockReturnValue([]);
   });
 
@@ -72,7 +92,7 @@ describe('GET /api/resources (agents table)', () => {
         role: 'review',
       },
     ]);
-    mockListSessionsSync.mockReturnValue([{ name: 'agent-pan-1908' }]);
+    mockListSessions.mockReturnValue([{ name: 'agent-pan-1908' }]);
 
     const { status, body } = await runResourcesEffect();
 
@@ -92,7 +112,7 @@ describe('GET /api/resources (agents table)', () => {
       { id: 'agent-2', status: 'stopped' },
       { id: 'agent-3', status: 'error' },
     ]);
-    mockListSessionsSync.mockReturnValue([]);
+    mockListSessions.mockReturnValue([]);
 
     const { body } = await runResourcesEffect();
     const ids = (body.agents as Record<string, unknown>[]).map((a) => a.id);
@@ -106,7 +126,7 @@ describe('GET /api/resources (agents table)', () => {
     mockListAgentStates.mockReturnValue([
       { id: 'agent-orphan', status: 'running' },
     ]);
-    mockListSessionsSync.mockReturnValue([]);
+    mockListSessions.mockReturnValue([]);
 
     const { body } = await runResourcesEffect();
 
@@ -126,7 +146,14 @@ describe('GET /api/resources (agents table)', () => {
     const { body } = await runResourcesEffect();
 
     expect(body.containers).toEqual([
-      { name: 'container-1', cpu: '10%', mem: '100MiB', status: 'running' },
+      {
+        name: 'container-1',
+        cpu: '10%',
+        mem: '100MiB',
+        status: 'running',
+        memLimitBytes: null,
+        oomKills24h: 0,
+      },
     ]);
   });
 });

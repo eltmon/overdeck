@@ -9,20 +9,12 @@
 #   - src/lib/pan-dir/records.ts       — record builder / backfill
 #   - src/lib/pan-dir/specs.ts         — immutable plan single-writer (PAN-1124)
 #   - src/lib/pan-dir/auto-commit.ts   — commit fan-in helper
+#   - src/lib/pan-dir/fs-lock.ts       — record lock ownership metadata
 #   - src/lib/pan-dir/drafts.ts        — PRD drafts (human/agent narrative)
 #   - src/lib/pan-dir/context.ts       — context-layer config
+#   - src/lib/pan-dir/feedback.ts      — workspace feedback delivery surface (D6)
+#   - src/lib/pan-dir/sessions.ts      — workspace session log surface (D6)
 #   - src/lib/agents.ts writeAgentStateJsonSync — state.json writer
-#
-# Legacy exceptions (known scattered state writes not yet routed to the record
-# writer; tracked for follow-up):
-#   - src/lib/pan-dir/continue.ts, continues.ts
-#   - src/lib/pan-dir/feedback.ts, sessions.ts
-#   - src/lib/vbrief/io.ts, continue-state.ts, lifecycle-io.ts
-#   - src/lib/vbrief/dag.ts
-#   - src/lib/planning/spawn-planning-session.ts
-#   - src/lib/cloister/feedback-writer.ts
-#   - src/cli/commands/done.ts
-#   - src/dashboard/server/routes/agents.ts
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -44,15 +36,13 @@ PAN_DIR_APPROVED=(
   ':!src/lib/pan-dir/records.ts'
   ':!src/lib/pan-dir/specs.ts'
   ':!src/lib/pan-dir/auto-commit.ts'
+  ':!src/lib/pan-dir/fs-lock.ts'
   ':!src/lib/pan-dir/drafts.ts'
   ':!src/lib/pan-dir/context.ts'
-)
-PAN_DIR_LEGACY=(
-  ':!src/lib/pan-dir/continue.ts'
-  ':!src/lib/pan-dir/continues.ts'
   ':!src/lib/pan-dir/feedback.ts'
   ':!src/lib/pan-dir/sessions.ts'
 )
+PAN_DIR_LEGACY=()
 
 candidates=$(
   { git grep -nE -e 'writeFileString' -e 'writeFileSync' -e 'writeFile\(' -e '\.rename\(' -e 'renameSync' \
@@ -115,19 +105,9 @@ if [[ -n "$func_start" ]]; then
 fi
 
 # ── Rule 3: continue-file literal guard (scans ALL of src/) ──
-# Known off-pan-dir continue writers are allowlisted as legacy exceptions; any
-# new file that writes to the continue file fails.
+# All legacy continue writers have been retired (PAN-1919). Any new write to
+# .pan/continue.json or .pan/continues/ is a hard failure.
 CONTINUE_EXCLUDES=(
-  ':!src/lib/pan-dir/continue.ts'
-  ':!src/lib/pan-dir/continues.ts'
-  ':!src/lib/vbrief/io.ts'
-  ':!src/lib/vbrief/continue-state.ts'
-  ':!src/lib/vbrief/lifecycle-io.ts'
-  ':!src/lib/vbrief/dag.ts'
-  ':!src/lib/planning/spawn-planning-session.ts'
-  ':!src/lib/cloister/feedback-writer.ts'
-  ':!src/cli/commands/done.ts'
-  ':!src/dashboard/server/routes/agents.ts'
   ':!src/**/__tests__/*'
   ':!*.md'
 )
@@ -148,8 +128,27 @@ if [[ -n "$cont_violations" ]]; then
   exit 1
 fi
 
-echo "✓ state-write lint passed (single write surface intact)"
 if [[ -n "${legacy_violations:-}" ]]; then
   echo "⚠ legacy pan-dir writers still present — route to record.ts when possible:"
   echo "$legacy_violations"
 fi
+
+# ── Rule 4: migrated checkout state-path recreation guard (PAN-2541 FR-12a) ──
+# This deliberately scans path construction adjacent to a raw write primitive;
+# the allowlist is the reviewed read/write-door boundary.
+STATE_ALLOWLIST='scripts/state-write-allowlist.txt'
+mapfile -t state_excludes < <(sed '/^[[:space:]]*$/d; s#^#:!#' "$STATE_ALLOWLIST")
+state_candidates=$(
+  { git grep -nE \
+      "(writeFileSync|writeFileString|writeFile\\(|mkdirSync|makeDirectory|renameSync|\\.rename\\().*(\\.pan[/\\\"']|\\.beads[/\\\"'])" \
+      -- 'src/**' 'scripts/**' "${state_excludes[@]}" ':!src/**/__tests__/**' ':!scripts/lint-state-writes.sh'; } || true
+)
+state_violations=$(printf '%s\n' "$state_candidates" | comment_filter)
+if [[ -n "$state_violations" ]]; then
+  echo "✗ direct state-plane write construction outside the approved doors:" >&2
+  echo "$state_violations" >&2
+  echo "Route the mutation through a domain writer or review scripts/state-write-allowlist.txt." >&2
+  exit 1
+fi
+
+echo "✓ state-write lint passed (single write surface intact)"

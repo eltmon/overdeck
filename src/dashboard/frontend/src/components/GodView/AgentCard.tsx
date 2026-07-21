@@ -1,12 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useSharedTick } from '../../lib/useSharedTick';
 import { formatRelativeTime } from '../../lib/formatRelativeTime';
 import { describePendingInput, isAwaitingInput } from '../../lib/pendingInput';
 import { motion } from 'framer-motion';
 import { Clock, GitBranch, Cpu, AlertTriangle, CheckCircle, XCircle, Minus, Radio } from 'lucide-react';
 import { CanvasTerminal } from './CanvasTerminal';
-import { selectGodViewAgentOutput, selectGodViewAgentStatuses } from '../../hooks/useGodViewSocket';
-import { useDashboardStore } from '../../lib/store';
+import { selectGodViewAgentStatuses } from '../../hooks/useGodViewSocket';
+import { useDashboardStore, selectAgentOutput, selectPendingPermissionAgentIds } from '../../lib/store';
+import { useAgentOutputSubscription } from '../../hooks/useAgentOutputSubscription';
 import type { Agent } from '../../types';
 
 interface AgentCardProps {
@@ -80,10 +81,31 @@ function LastHeardCounter({ lastActivity }: { lastActivity?: string }) {
 }
 
 export function AgentCard({ agent, onClick, 'data-agent-id': dataAgentId }: AgentCardProps) {
-  const agentOutput = useDashboardStore(selectGodViewAgentOutput);
   const agentStatuses = useDashboardStore(selectGodViewAgentStatuses);
-  const terminalLines = agentOutput[agent.id] || [];
+  const pendingPermissionAgentIds = useDashboardStore(selectPendingPermissionAgentIds);
+  const terminalLines = useDashboardStore(selectAgentOutput(agent.id));
   const liveStatus = agentStatuses[agent.id] || agent.status;
+  const cardRef = useRef<HTMLDivElement>(null);
+  const [isOutputVisible, setIsOutputVisible] = useState(false);
+
+  useEffect(() => {
+    const element = cardRef.current;
+    if (!element) return;
+    if (typeof IntersectionObserver === 'undefined') {
+      setIsOutputVisible(true);
+      return;
+    }
+    const observer = new IntersectionObserver(
+      ([entry]) => setIsOutputVisible(entry?.isIntersecting ?? false),
+      { rootMargin: '200px' },
+    );
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+  useAgentOutputSubscription(
+    agent.id,
+    isOutputVisible && liveStatus !== 'dead' && liveStatus !== 'stopped',
+  );
 
   const roleColor = agent.role ? ROLE_COLORS[agent.role] || 'var(--gv-blue)' : 'var(--gv-blue)';
 
@@ -102,6 +124,7 @@ export function AgentCard({ agent, onClick, 'data-agent-id': dataAgentId }: Agen
 
   return (
     <motion.div
+      ref={cardRef}
       data-agent-id={dataAgentId || agent.id}
       layout
       initial={{ opacity: 0, scale: 0.95 }}
@@ -196,11 +219,15 @@ export function AgentCard({ agent, onClick, 'data-agent-id': dataAgentId }: Agen
 
       {/* PAN-1520 — unified pending-input indicator (covers AskUserQuestion,
           PermissionRequest, ExitPlanMode, EnterPlanMode in one pulse). */}
-      {isAwaitingInput(agent) && (
+      {isAwaitingInput(agent, pendingPermissionAgentIds) && (
         <div
           className="absolute top-1 right-1 w-2 h-2 rounded-full"
           style={{ backgroundColor: 'var(--gv-amber)', animation: 'gv-pulse 1s ease-in-out infinite' }}
-          title={describePendingInput(agent.pendingInputKinds)}
+          title={describePendingInput(
+            pendingPermissionAgentIds.has(agent.id) && !agent.pendingInputKinds?.includes('permissionRequest')
+              ? [...(agent.pendingInputKinds ?? []), 'permissionRequest']
+              : agent.pendingInputKinds,
+          )}
         />
       )}
     </motion.div>

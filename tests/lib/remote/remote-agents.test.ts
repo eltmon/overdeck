@@ -162,7 +162,7 @@ describe('ephemeral watchdog behavior', () => {
       staleThresholdSeconds: thresholdSeconds,
       logFile,
     });
-    const scriptPath = join(tmpDir, `watchdog-${thresholdSeconds}-${intervalSeconds}.js`);
+    const scriptPath = join(tmpDir, `watchdog-${thresholdSeconds}-${intervalSeconds}.cjs`);
     writeFileSync(scriptPath, script);
     delete require.cache[scriptPath];
     const mod = require(scriptPath);

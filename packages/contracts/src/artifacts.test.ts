@@ -62,8 +62,8 @@ const validation = {
 } satisfies typeof ArtifactValidationResult.Encoded
 
 const urls = {
-  wrapperUrl: "https://pan.localhost/s/k3p9m2qr",
-  rawUrl: "https://artifacts.pan.localhost/a/k3p9m2qr",
+  wrapperUrl: "https://overdeck.localhost/s/k3p9m2qr",
+  rawUrl: "https://artifacts.overdeck.localhost/a/k3p9m2qr",
 }
 
 describe("artifact contracts", () => {
@@ -121,7 +121,7 @@ describe("artifact contracts", () => {
           urls,
           status: "pending_changes",
           pendingChanges: true,
-          thumbnailUrl: "https://pan.localhost/api/artifacts/k3p9m2qr/thumbnail",
+          thumbnailUrl: "https://overdeck.localhost/api/artifacts/k3p9m2qr/thumbnail",
         },
       ],
     })
@@ -131,7 +131,7 @@ describe("artifact contracts", () => {
       artifacts: listResponse.artifacts,
     })
 
-    expect(createResponse.urls.rawUrl).toBe("https://artifacts.pan.localhost/a/k3p9m2qr")
+    expect(createResponse.urls.rawUrl).toBe("https://artifacts.overdeck.localhost/a/k3p9m2qr")
     expect(listResponse.artifacts[0].status).toBe("pending_changes")
     expect(workspaceResponse.artifacts).toHaveLength(1)
   })

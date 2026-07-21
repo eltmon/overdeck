@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Tools as panes — spec (item #10)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --radius:.625rem; --radius-sm:calc(var(--radius) - 4px);
+    --background:#fff; --foreground:#1f2937; --card:#fff; --card-2:#f5f6f8; --accent:color-mix(in srgb, black 4%, transparent);
+    --muted-foreground:#6b7280; --border:color-mix(in srgb, black 8%, transparent);
+    --primary:oklch(.488 .217 264); --primary-foreground:#fff; --info-foreground:#1d4ed8;
+    --success-foreground:#047857; --destructive-foreground:#b91c1c; --signal-cost-foreground:#0e7490;
+    --mono:"DM Mono", ui-monospace, monospace;
+  }
+  *{box-sizing:border-box} html,body{margin:0}
+  body{background:var(--card-2);color:var(--foreground);font-family:"DM Sans",system-ui,sans-serif;font-weight:500;font-size:13px;line-height:1.45;-webkit-font-smoothing:antialiased}
+  .mono{font-family:var(--mono)} .muted{color:var(--muted-foreground)}
+  .wrap{max-width:1080px;margin:24px auto;padding:0 22px 50px}
+  h1{font-size:16px;margin:0 0 4px} .sub{color:var(--muted-foreground);font-size:12.5px;margin-bottom:8px;max-width:820px}
+  .lbl{font-size:10px;text-transform:uppercase;letter-spacing:.09em;color:var(--muted-foreground);margin:20px 0 8px;display:flex;align-items:center;gap:8px}
+  .pill2{font-size:9px;border:1px solid var(--border);border-radius:5px;padding:1px 6px} .pill2.bad{color:var(--destructive-foreground)} .pill2.ok{color:var(--success-foreground)}
+
+  /* nav strips */
+  .strip{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:8px 11px;display:flex;flex-wrap:wrap;gap:3px;align-items:center}
+  .t{padding:6px 11px;border-radius:8px;font-size:12.5px;color:var(--muted-foreground);white-space:nowrap;border:1px solid transparent}
+  .t.active{background:var(--accent);color:var(--foreground)}
+  .t.tool{color:color-mix(in srgb,var(--muted-foreground) 60%,transparent);text-decoration:line-through}
+  .t .b{font-size:9.5px} .t .add{color:var(--success-foreground)} .t .del{color:var(--destructive-foreground)} .t .cost{color:var(--signal-cost-foreground)} .t .x{color:var(--destructive-foreground)}
+  .spacer{margin-left:auto}
+  .vsep{width:1px;align-self:stretch;background:var(--border);margin:2px 7px}
+  /* tool icon-buttons (right of nav) */
+  .tool-btn{display:inline-flex;align-items:center;gap:5px;padding:5px 9px;border-radius:8px;border:1px solid var(--border);background:var(--card);font-size:11.5px;color:var(--muted-foreground);cursor:pointer}
+  .tool-btn:hover{background:var(--accent);color:var(--foreground)}
+  .tool-btn .ic{font-size:12px}
+  .tool-btn .arrow{font-size:9px;opacity:.6}
+
+  /* the split-pane result */
+  .deck{border:1px solid var(--border);border-radius:14px;overflow:hidden;background:var(--card)}
+  .panebar{display:flex;align-items:center;gap:4px;background:var(--card-2);border-bottom:1px solid var(--border);padding:5px 8px;font-size:11.5px}
+  .panetab{display:inline-flex;align-items:center;gap:7px;padding:4px 10px;border-radius:7px;color:var(--muted-foreground)}
+  .panetab.active{background:var(--card);border:1px solid var(--border);color:var(--foreground)}
+  .panetab .close{opacity:.5}
+  .split{display:grid;grid-template-columns:1fr 1fr;min-height:240px}
+  .pane{padding:12px 14px} .pane+.pane{border-left:1px solid var(--border)}
+  .paneh{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted-foreground);margin-bottom:8px}
+  .mini-nav{display:flex;gap:3px;flex-wrap:wrap;margin-bottom:10px}
+  .mini-nav .t{font-size:11px;padding:4px 8px}
+  .frow{display:grid;grid-template-columns:16px 1fr auto;gap:7px;align-items:center;padding:3px 4px;border-radius:6px;font-size:12px}
+  .frow:hover{background:var(--accent)} .frow .ft{font-size:8px;font-family:var(--mono);color:var(--muted-foreground);border:1px solid var(--border);border-radius:3px;text-align:center;padding:1px 0}
+  .frow .c{font-size:10px;font-family:var(--mono);color:var(--muted-foreground)}
+  .term{background:#10141c;color:#cbd5e1;font-family:var(--mono);font-size:10.5px;border-radius:8px;padding:10px;line-height:1.7}
+  .term .p{color:#6ee7b7}
+
+  .notes{margin-top:22px;border:1px solid var(--border);border-radius:14px;padding:14px 16px;background:var(--card)}
+  .notes h3{margin:0 0 10px;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted-foreground)}
+  .moves{display:grid;grid-template-columns:170px 1fr;gap:5px 14px;font-size:12.5px} .moves .f{color:var(--foreground)} .moves .t{color:var(--muted-foreground)}
+  .q{border:1px solid color-mix(in srgb,var(--primary) 30%,transparent);background:color-mix(in srgb,var(--primary) 5%,var(--card));border-radius:14px;padding:14px 16px;margin-top:14px}
+  .q h3{margin:0 0 8px;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--info-foreground)} .q li{font-size:12.5px;margin:7px 0}
+  code{font-family:var(--mono);font-size:11.5px;background:var(--accent);padding:1px 5px;border-radius:5px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Tools as panes — item #10</h1>
+  <div class="sub">The last three tab-strip entries (Conversation · Files · Terminal) aren't content groups — they're tools. #10 moves them out of the tab row into a small tools cluster that opens them as <b>deck panes</b> (the panes system already exists: <code>addPane</code>, <code>FilesPane</code>, <code>TerminalPane</code>). The nav is then a clean 7 content-groups.</div>
+
+  <div class="lbl"><span class="pill2 bad">before</span> 7 content groups + 3 tools jammed into one row</div>
+  <div class="strip">
+    <span class="t active">Overview</span><span class="t">Code <span class="b"><span class="add">+5039</span> <span class="del">−42</span></span></span><span class="t">PRD / Plan</span><span class="t">Timeline</span><span class="t">Discussion</span><span class="t">Costs <span class="b cost">$8</span></span><span class="t">Artifacts</span>
+    <span class="t tool">Conversation</span><span class="t tool">Files</span><span class="t tool">Terminal</span>
+  </div>
+
+  <div class="lbl"><span class="pill2 ok">after</span> clean 7-group nav · tools become pane-openers on the right</div>
+  <div class="strip">
+    <span class="t active">Overview</span><span class="t">Code <span class="b"><span class="add">+5039</span> <span class="del">−42</span></span></span><span class="t">PRD / Plan</span><span class="t">Timeline</span><span class="t">Discussion</span><span class="t">Costs <span class="b cost">$8</span></span><span class="t">Artifacts</span>
+    <span class="spacer"></span><span class="vsep"></span>
+    <button class="tool-btn"><span class="ic">📁</span> Files <span class="arrow">⤢</span></button>
+    <button class="tool-btn"><span class="ic">⌨</span> Terminal <span class="arrow">⤢</span></button>
+    <button class="tool-btn"><span class="ic">🌐</span> Web <span class="arrow">⤢</span></button>
+  </div>
+  <div class="muted" style="font-size:11px;margin-top:6px">The ⤢ marks “opens a deck pane” (not a content switch). Conversation is dropped — you reach a conversation by selecting an agent in the lane (already true); the issue-level composer is handled per the decision below.</div>
+
+  <div class="lbl">what happens on click — Files opens beside the cockpit (deck pane)</div>
+  <div class="deck">
+    <div class="panebar">
+      <span class="panetab active">▣ PAN-1919</span>
+      <span class="panetab">📁 Files <span class="close">×</span></span>
+      <span class="muted" style="margin-left:auto;font-size:10px">+ pane</span>
+    </div>
+    <div class="split">
+      <div class="pane">
+        <div class="paneh">Issue cockpit</div>
+        <div class="mini-nav"><span class="t active">Overview</span><span class="t">Code</span><span class="t">Timeline</span><span class="t">…</span></div>
+        <div class="muted" style="font-size:11.5px">● Work agent is working · Next: re-review</div>
+      </div>
+      <div class="pane">
+        <div class="paneh">📁 Files — workspace</div>
+        <div class="frow"><span class="ft">TS</span><span>src/lib/sequencer/rank.ts</span><span class="c">M</span></div>
+        <div class="frow"><span class="ft">TS</span><span>src/dashboard/server/routes/…</span><span class="c">M</span></div>
+        <div class="frow"><span class="ft">{}</span><span>package.json</span><span class="c">M</span></div>
+        <div class="frow"><span class="ft">MD</span><span>docs/VBRIEF.md</span><span class="c">A</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="muted" style="font-size:11px;margin-top:6px">Terminal opens the same way (its pane is the live tmux <code>XTerminal</code>); Web opens a browser pane. Each is a real, closable deck pane — resizable, can sit beside the cockpit or pop to its own tab.</div>
+
+  <div class="notes">
+    <h3>No-loss — every tool keeps its function, just not as a content tab</h3>
+    <div class="moves">
+      <span class="f">Files tab</span><span class="t">→ Files tool-button → <code>FilesPane</code> (the tab was already just an “open pane” card)</span>
+      <span class="f">Terminal tab</span><span class="t">→ Terminal tool-button → <code>TerminalPane</code> / terminal drawer (also already an “open pane” card)</span>
+      <span class="f">Conversation tab</span><span class="t">→ select an agent in the lane shows its conversation; the issue-level composer → see decision</span>
+    </div>
+  </div>
+
+  <div class="q">
+    <h3>Decisions before I build</h3>
+    <ul>
+      <li><b>1. Files &amp; Terminal:</b> drop from the tab row, add the right-aligned tool-buttons that open deck panes (mechanism already wired via <code>onOpenPane</code>). This part is trivial + lossless. Good?</li>
+      <li><b>2. Conversation — the one judgment call.</b> The “Conversation” tab today holds the <i>issue-level</i> launcher + agent dock + timeline (how you start/talk to agents at the issue level), which is <b>not</b> the same as clicking one agent. Options:
+        <br>&nbsp;&nbsp;<b>(a)</b> Make it a tool-button too → opens the issue conversation as a pane <i>(my recommendation — consistent with “tools are panes”)</i>.
+        <br>&nbsp;&nbsp;<b>(b)</b> Fold the composer into the lane/Overview as a slim “Launch / message” bar, drop the tab.
+        <br>&nbsp;&nbsp;<b>(c)</b> Keep Conversation as the one remaining tab (only Files/Terminal leave).</li>
+      <li><b>3. Tool set:</b> Files · Terminal · Web (browser). Add Commits/Docs too, or keep to these three?</li>
+    </ul>
+  </div>
+</div>
+</body>
+</html>

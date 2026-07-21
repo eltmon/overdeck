@@ -24,8 +24,8 @@ vi.mock('./CommandDeck/ActivityView', () => ({
   ),
 }));
 
-vi.mock('./BeadsTasksPanel', () => ({
-  BeadsTasksPanel: () => <div data-testid="beads-tasks-panel" />,
+vi.mock('./TasksPanel', () => ({
+  TasksPanel: () => <div data-testid="tasks-tasks-panel" />,
 }));
 
 vi.mock('./PlanSetupScreen', () => ({

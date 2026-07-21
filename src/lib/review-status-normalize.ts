@@ -5,7 +5,8 @@ export function normalizeReviewStatusSync(status: ReviewStatus): ReviewStatus {
   const shouldClearMergeNotes = status.mergeStatus === 'verifying' || status.mergeStatus === 'merged';
   const shouldClearReadyForMerge =
     status.mergeStatus === 'merged' ||
-    status.reviewStatus !== 'passed' ||
+    // PAN-1862 (FR-16): a skipped review (mode none) passes the gate like passed.
+    (status.reviewStatus !== 'passed' && status.reviewStatus !== 'skipped') ||
     (status.testStatus !== 'passed' && status.testStatus !== 'skipped') ||
     (status.uatStatus !== undefined && status.uatStatus !== 'passed') ||
     ((status.blockerReasons?.length ?? 0) > 0);

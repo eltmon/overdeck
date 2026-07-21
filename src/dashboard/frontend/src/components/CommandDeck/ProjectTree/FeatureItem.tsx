@@ -2,32 +2,37 @@ import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useLiveFlash } from '../../../lib/useLiveFlash';
 import {
   Loader2, AlertTriangle, CheckCircle2, Circle, Eye, Layers, GitMerge,
-  ChevronRight, ChevronDown, FolderOpen, FileText, Trash2, GitBranch,
-  BookText, Bug, Container, Radio, Workflow,
+  ChevronRight, ChevronDown, FolderOpen, GitBranch,
+  BookText, Bug, Container, Radio, Workflow, MessageSquare,
 } from 'lucide-react';
 import type { SessionNode as SessionNodeType } from '@overdeck/contracts';
 import type { ProjectFeature, ProjectFeatureResourceIdentifiers, ResourceSource } from './ProjectNode';
 import type { Harness } from '../../shared/ModelPicker';
-import { SessionNode } from './SessionNode';
-import { type StatusDotStatus } from '../StatusDot';
 import { ResourcesGroup } from './ResourcesGroup';
-import { UatStackStatus, getUatStackSummary } from '../UatStackStatus';
+import { getUatStackSummary } from '../UatStackStatus';
+import { UatStackTreeGroup } from './UatStackTreeGroup';
 import { useWorkspaceQuery } from '../ZoneCOverviewTabs/queries';
+import { createUatActionHandler } from './uat-action-handlers';
+import { ContextMenuRoot, ContextMenuTrigger } from '../../shared/ContextMenu';
 import {
-  ContextMenuRoot,
-  ContextMenuTrigger,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuDestructiveItem,
-  ContextMenuSeparator,
-  ContextMenuLabel,
-} from '../../shared/ContextMenu';
-import { IssueActionDialogHost, useIssueActions, type IssueActionView } from '../../IssueActionMenu';
+  IssueActionContextMenu,
+  IssueActionDialogHost,
+  useIssueActions,
+} from '../../IssueActionMenu';
+import { IssuePeek } from '../../issue-detail/IssuePeek';
+import { useConvoDock } from '../../../lib/convoDock';
+import { PROJECT_TREE_CONTEXT_ACTIONS, type NonIssueActionContext } from '../../../lib/issueActions';
 import { parseContainerServiceName } from '../../../lib/resource-utils';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { MergeButton } from '../../MergeButton';
+import { TroubledBadges } from './TroubledBadges';
+import { IssueView, IssueViewFullscreenButton, RailShipProgress } from '../../issue-view/IssueView';
+import { StartAgentCta } from '../../issue-view/StartAgentCta';
+import { ExpandableSessionNode } from './ExpandableSessionNode';
+import { SessionNode } from './SessionNode';
+import { useDashboardStore } from '../../../lib/store';
+import { computeDominantStatus, sessionsNeedAttention } from './sessionAggregates';
 import styles from '../styles/command-deck.module.css';
-
 export type TreeSessionFilter = 'all' | 'alive' | 'failed';
 
 interface FeatureItemProps {
@@ -52,10 +57,7 @@ interface FeatureItemProps {
   onOpenPlanDialog?: (issueId: string) => void;
   containerStats?: Record<string, { id: string; name: string; cpuPercent: number; memoryUsage: number; status: 'running' | 'stopped' | 'unhealthy' | 'restarting' }>;
 }
-
-// ContextMenuState removed — migrated to Radix UI ContextMenu
-
-const RESOURCE_ICON_ORDER: ResourceSource[] = ['workspace', 'branch', 'tmux', 'remote-agent', 'vbrief', 'beads', 'pr', 'docker'];
+const RESOURCE_ICON_ORDER: ResourceSource[] = ['workspace', 'branch', 'tmux', 'remote-agent', 'vbrief', 'tasks', 'pr', 'docker'];
 
 function resourceColor(_feature: ProjectFeature): string {
   // v1.2 color restraint: resources are infrastructure facts, not status —
@@ -83,9 +85,9 @@ function resourceSummary(feature: ProjectFeature, source: ResourceSource): { lab
     case 'tmux':
       return details.tmuxSessionCount > 0 ? { label: 'tmux', detail: `${details.tmuxSessionCount} session${details.tmuxSessionCount === 1 ? '' : 's'}` } : null;
     case 'vbrief':
-      return details.hasVbrief ? { label: 'vBRIEF', detail: 'present' } : null;
-    case 'beads':
-      return details.hasBeads ? { label: 'beads', detail: 'present' } : null;
+      return details.hasXbrief ? { label: 'xBRIEF', detail: 'present' } : null;
+    case 'tasks':
+      return details.hasTasks ? { label: 'tasks', detail: 'present' } : null;
     case 'pr':
       return details.prs.length > 0
         ? {
@@ -117,7 +119,7 @@ function ResourceIcon({ source, feature }: { source: ResourceSource; feature: Pr
     : source === 'branch' ? <GitBranch {...props} />
       : source === 'tmux' ? <Radio {...props} />
         : source === 'vbrief' ? <BookText {...props} />
-          : source === 'beads' ? <Bug {...props} />
+          : source === 'tasks' ? <Bug {...props} />
             : source === 'pr' ? <Workflow {...props} />
               : <Container {...props} />;
   return (
@@ -205,8 +207,8 @@ function ResourceStrip({
       rows.push({ key: 'remote-agent', label: `fly.io: ${details.remoteAgent.vmName} · ${details.remoteAgent.status} · ${details.remoteAgent.model}` });
     }
 
-    if (details.hasVbrief) rows.push({ key: 'vbrief', label: 'vBRIEF present' });
-    if (details.hasBeads) rows.push({ key: 'beads', label: 'beads present' });
+    if (details.hasXbrief) rows.push({ key: 'vbrief', label: 'xBRIEF present' });
+    if (details.hasTasks) rows.push({ key: 'tasks', label: 'tasks present' });
     for (const pr of identifiers?.prs ?? details.prs) {
       rows.push({ key: `pr-${pr.number}`, label: `PR: #${pr.number} ${pr.title} (${formatPrState(pr)})` });
     }
@@ -324,8 +326,9 @@ function formatRoleList(roles: readonly string[]): string {
   return `${roles.slice(0, -1).join(', ')}, and ${roles[roles.length - 1]}`;
 }
 
-function isWorkOrSpecialistSession(session: SessionNodeType): boolean {
+export function isWorkOrSpecialistSession(session: SessionNodeType): boolean {
   return session.type === 'work'
+    || session.type === 'knowledge'
     || session.type === 'strike'
     || session.type === 'planning'
     || session.type === 'review'
@@ -536,8 +539,8 @@ function getFeatureStateTitle(feature: ProjectFeature, aggregateSessions: readon
   const contextParts = [
     feature.hasPrd ? 'PRD' : null,
     feature.hasState ? 'continue file' : null,
-    feature.resourceDetails?.hasVbrief ? 'vBRIEF' : null,
-    feature.resourceDetails?.hasBeads ? 'beads' : null,
+    feature.resourceDetails?.hasXbrief ? 'xBRIEF' : null,
+    feature.resourceDetails?.hasTasks ? 'tasks' : null,
   ].filter((part): part is string => part !== null);
   const contextSuffix = contextParts.length > 0 ? ` Context present: ${contextParts.join(', ')}.` : '';
 
@@ -569,13 +572,14 @@ function getFeatureStateTitle(feature: ProjectFeature, aggregateSessions: readon
 const TYPE_PRIORITY: Record<string, number> = {
   work: 0,
   strike: 1,
-  review: 2,
-  test: 3,
-  reviewer: 4,
-  planning: 5,
-  ship: 6,
-  merge: 7,
-  legacy: 8,
+  lint: 2,
+  review: 3,
+  test: 4,
+  reviewer: 5,
+  planning: 6,
+  ship: 7,
+  merge: 8,
+  legacy: 9,
 };
 
 const PRESENCE_PRIORITY: Record<string, number> = {
@@ -632,26 +636,6 @@ function defaultExpandedFromState(stateLabel: string): boolean {
   return s.includes('progress') || s.includes('review') || s.includes('testing') || s.includes('verifying');
 }
 
-/** Compute the dominant session presence for the feature row StatusDot.
- *  Priority: active > thinking > waiting > idle > ended. */
-function computeDominantStatus(sessions: readonly SessionNodeType[]): StatusDotStatus {
-  let hasIdle = false;
-  let hasThinking = false;
-  let hasWaiting = false;
-  for (const s of sessions) {
-    if (s.awaitingInput === true) hasWaiting = true;
-    if (s.presence === 'active' && s.awaitingInput !== true) return 'active';
-    if (s.presence === 'idle') hasIdle = true;
-    const st = (s.status || '').toLowerCase();
-    if (st.includes('thinking')) hasThinking = true;
-    if (st.includes('waiting')) hasWaiting = true;
-  }
-  if (hasThinking) return 'thinking';
-  if (hasWaiting) return 'waiting';
-  if (hasIdle) return 'idle';
-  return 'ended';
-}
-
 /** Whether a session passes the tree filter. */
 export function sessionMatchesFilter(session: SessionNodeType, filter: TreeSessionFilter): boolean {
   if (filter === 'all') return true;
@@ -669,32 +653,10 @@ interface FeatureContextMenuProps {
   hasJsonl: boolean;
   onOpenStateDir?: (sessionId: string) => void;
   onViewJsonl?: (sessionId: string) => void;
-  onDeepWipe?: (issueId: string) => void;
   onStopSession?: (sessionId: string) => void;
   onResumeSession?: (sessionId: string) => void;
   onRestartSession?: (sessionId: string, issueId: string, sessionType?: string, role?: string, model?: string, harness?: Harness) => void;
   onOpenPlanDialog?: (issueId: string) => void;
-}
-
-function FeatureIssueActionItems({ views }: { views: IssueActionView[] }) {
-  return (
-    <>
-      {views.map((view) => {
-        const label = view.isPending ? `${view.action.label}…` : view.action.label;
-        const disabled = !view.enabled || view.isPending;
-        const props = {
-          key: view.action.key,
-          disabled,
-          onSelect: () => view.invoke(),
-        };
-
-        if (view.action.kind === 'destructive' || view.action.group === 'danger') {
-          return <ContextMenuDestructiveItem {...props}>{label}</ContextMenuDestructiveItem>;
-        }
-        return <ContextMenuItem {...props}>{label}</ContextMenuItem>;
-      })}
-    </>
-  );
 }
 
 function FeatureContextMenu({
@@ -703,55 +665,22 @@ function FeatureContextMenu({
   hasJsonl,
   onOpenStateDir,
   onViewJsonl,
-  onDeepWipe,
 }: FeatureContextMenuProps) {
   const issueActions = useIssueActions(feature.issueId);
-  const issueActionViews = useMemo(
-    () => [...issueActions.primary, ...issueActions.secondary, ...issueActions.overflow],
-    [issueActions.primary, issueActions.secondary, issueActions.overflow],
-  );
-
-  const handleDeepWipe = useCallback(() => {
-    if (!onDeepWipe) return;
-    const confirmed = window.confirm(
-      `Deep wipe will destroy all data for ${feature.issueId} including workspace, state, and git branches. This cannot be undone.\n\nAre you absolutely sure?`,
-    );
-    if (confirmed) {
-      onDeepWipe(feature.issueId);
-    }
-  }, [feature.issueId, onDeepWipe]);
-
-  const hasUtilityActions = (workSessionId && (onOpenStateDir || (hasJsonl && onViewJsonl))) || onDeepWipe;
+  const actionContext = {
+    sessionId: workSessionId ?? undefined,
+    hasJsonl,
+    onOpenStateDir,
+    onViewJsonl,
+  } satisfies NonIssueActionContext;
+  const nonIssueActions = PROJECT_TREE_CONTEXT_ACTIONS
+    .filter((action) => action.ownerSurface === 'FeatureItem' && action.scope === 'session-artifact')
+    .filter((action) => action.enabledWhen(actionContext))
+    .map((action) => ({ action, context: actionContext }));
 
   return (
     <>
-      <ContextMenuContent>
-        <ContextMenuLabel>Issue actions</ContextMenuLabel>
-        <FeatureIssueActionItems views={issueActionViews} />
-
-        {hasUtilityActions ? <ContextMenuSeparator /> : null}
-
-        {workSessionId && onOpenStateDir && (
-          <ContextMenuItem onSelect={() => onOpenStateDir(workSessionId)}>
-            <FolderOpen size={12} className="mr-2" />
-            Open State Dir
-          </ContextMenuItem>
-        )}
-
-        {hasJsonl && workSessionId && onViewJsonl && (
-          <ContextMenuItem onSelect={() => onViewJsonl(workSessionId)}>
-            <FileText size={12} className="mr-2" />
-            View JSONL
-          </ContextMenuItem>
-        )}
-
-        {onDeepWipe && (
-          <ContextMenuDestructiveItem onSelect={handleDeepWipe}>
-            <Trash2 size={12} className="mr-2" />
-            Deep Wipe
-          </ContextMenuDestructiveItem>
-        )}
-      </ContextMenuContent>
+      <IssueActionContextMenu actions={issueActions} nonIssueActions={nonIssueActions} data-section="FeatureContextMenu (issue-row right-click)" />
       <IssueActionDialogHost issueId={feature.issueId} actions={issueActions} />
     </>
   );
@@ -801,7 +730,7 @@ function ReviewGroup({
       }`;
 
   return (
-    <div>
+    <div data-section="ReviewGroup">
       <SessionNode
         session={parent}
         subtitle={summary}
@@ -921,6 +850,9 @@ const PIPE_CLASS: Record<PipeSegState, string> = {
 };
 
 export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, onSelectSession, title, cost, filter = 'all', onStopSession, onViewTerminal, onPauseSession, onResumeSession, onUnpauseSession, onRestartSession, onDeepWipe, onOpenStateDir, onViewJsonl, onCleanupOrphanedResources, onOpenPlanDialog, containerStats }: FeatureItemProps) {
+  const queryClient = useQueryClient();
+  const openIssue = useDashboardStore((state) => state.openIssue);
+  const addToDock = useConvoDock((s) => s.add);
   const trimmedTitle = title?.trim() ?? '';
   const displayTitle = trimmedTitle || '(untitled)';
   const titleClassName = trimmedTitle
@@ -931,7 +863,6 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
     const persisted = readExpanded(feature.issueId);
     return persisted ?? defaultExpandedFromState(feature.stateLabel);
   });
-
   const [detailIdentifiers, setDetailIdentifiers] = useState<ProjectFeatureResourceIdentifiers | null>(null);
 
   useEffect(() => {
@@ -966,8 +897,6 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
     Boolean(feature.resourceDetails.remoteAgent)
   );
 
-  // Derive best session once per data change instead of on every click (PAN-821 review)
-  // Respect the tree filter so auto-select picks a visible session.
   const visibleSessions = useMemo(
     () => feature.sessions?.filter((session) => sessionMatchesFilter(session, filter)) ?? [],
     [feature.sessions, filter],
@@ -983,6 +912,10 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
     [visibleSessions],
   );
 
+  const issueConversations = feature.resourceDetails?.conversations ?? [];
+  const hasConversations = issueConversations.length > 0;
+  const hasExpandableChildren = hasVisibleSessions || hasConversations;
+
   const workSession = feature.sessions?.find((s) => s.type === 'work');
   const workSessionId = workSession?.sessionId ?? bestSessionId ?? null;
 
@@ -990,6 +923,7 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
   // deliberately parked and must never read as generic "stopped".
   const pausedSession = feature.sessions?.find((s) => s.paused === true);
   const pausedAge = formatPausedAge(pausedSession?.pausedAt);
+  const troubledSessions = feature.sessions?.filter((s) => s.troubled === true) ?? [];
 
   const aggregateSessions = feature.sessions?.filter(isWorkOrSpecialistSession) ?? [];
   const activityState = getAggregateActivityState(aggregateSessions);
@@ -1033,15 +967,17 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
   const stackPending = workspace?.pendingOperation?.status === 'running' && (
     workspace.pendingOperation.type === 'containerize' ||
     workspace.pendingOperation.type === 'start' ||
-    workspace.pendingOperation.type === 'rebuild-stack'
+    workspace.pendingOperation.type === 'rebuild-stack' ||
+    workspace.pendingOperation.type === 'start-stack' ||
+    workspace.pendingOperation.type === 'stop-stack' ||
+    workspace.pendingOperation.type === 'restart-stack' ||
+    workspace.pendingOperation.type === 'reap-workspace'
   );
   const uatStackSummary = getUatStackSummary({
     containers: workspace?.containers,
     stackHealth: workspace?.stackHealth,
     pending: stackPending,
   });
-
-  // Live flash when dominant status or visible session count changes (blocker-8)
   const flashKey = `${feature.issueId}:${dominantStatus ?? 'none'}:${visibleSessions.length}:${activityState}`;
   const flashClass = useLiveFlash(flashKey, 'anim-row-flash', 600);
 
@@ -1066,13 +1002,20 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
 
   return (
     <ContextMenuRoot>
-      <div
-        className={`${styles.featureItemWrapper} ${edgeClass} ${isSelected ? styles.featureItemWrapperSelected : ''} ${flashClass}`}
+      <IssueView
+        issueId={feature.issueId}
+        density={expanded ? 'cockpit' : 'rail'}
+        className={`${styles.featureItemWrapper} ${edgeClass} ${sessionsNeedAttention(aggregateSessions) ? styles.featureItemWrapperNeedsAttention : ''} ${isSelected ? styles.featureItemWrapperSelected : ''} ${flashClass}`}
+        data-needs-attention={sessionsNeedAttention(aggregateSessions) ? 'true' : undefined}
         data-component="feature-item"
         data-issue-id={feature.issueId}
       >
-        <div className={styles.featureItemRow}>
-          {hasVisibleSessions ? (
+        <div data-section="Filter bar">
+        {/* PAN-2908 C-CONVO: deck rows carry the hover peek too — same glance
+            depth as pipeline rows and board cards. */}
+        <IssuePeek issueId={feature.issueId} onDock={addToDock}>
+        <div data-section="Feature (issue) row" className={styles.featureItemRow}>
+          {hasExpandableChildren ? (
             <button
               className={styles.featureItemCaret}
               onClick={handleToggleExpanded}
@@ -1084,6 +1027,7 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
           ) : (
             <span className={styles.featureItemCaretPlaceholder} />
           )}
+          {expanded && <IssueViewFullscreenButton className={styles.featureItemCaret} onClick={() => openIssue(feature.issueId)} />}
           <ContextMenuTrigger asChild>
             <button
               className={`${styles.featureItem} ${isSelected ? styles.featureItemSelected : ''}`}
@@ -1106,8 +1050,11 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
             )}
           </span>
           <span className={styles.featureMetaLine}>
+          {/* PAN-2975: the resume affordance lives INSIDE the row's meta line
+              as a badge-like chip — never a detached block above the card. */}
+          <StartAgentCta issueId={feature.issueId} density="rail" surface="chip" />
           {!feature.isRally && aggregateBadges.length > 0 && (
-            <span className={styles.featureBadgeGroup}>
+            <span data-section="Badges" className={styles.featureBadgeGroup}>
               {aggregateBadges.map((badge) => (
                 <span
                   key={badge.key}
@@ -1119,6 +1066,7 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
               ))}
             </span>
           )}
+          <TroubledBadges sessions={troubledSessions} />
           {pausedSession && (
             <span className={styles.featureBadgeGroup} data-testid="feature-paused">
               <span
@@ -1184,12 +1132,12 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
             </span>
           )}
           {feature.readyForMerge && (
-            <MergeButton
+            <span data-section="MergeButton"><MergeButton
               issueId={feature.issueId}
               variant="card"
               reviewStatus={{ readyForMerge: true }}
               onClick={(e) => e.stopPropagation()}
-            />
+            /></span>
           )}
           {trainInfo && (
             <span
@@ -1209,7 +1157,7 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
               {uatStackSummary.active ? 'UAT starting' : 'UAT healthy'}
             </span>
           )}
-          <span className={styles.featurePipe} data-testid="feature-pipe" title="plan · work · review · test · ship">
+          <span data-section="Pipeline pips" className={styles.featurePipe} data-testid="feature-pipe" title="plan · work · review · test · ship">
             {pipeline.map((seg, i) => (
               <i key={PIPE_ORDER[i]} className={PIPE_CLASS[seg] ? styles[PIPE_CLASS[seg] as keyof typeof styles] as string : undefined} />
             ))}
@@ -1218,9 +1166,18 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
         </button>
       </ContextMenuTrigger>
       </div>
-      <ResourceStrip feature={feature} onCleanupOrphanedResources={onCleanupOrphanedResources} />
+        </IssuePeek>
+      </div>
+      <div data-section="ResourceStrip"><ResourceStrip feature={feature} onCleanupOrphanedResources={onCleanupOrphanedResources} /></div>
+      {feature.resourceDetails?.hasTasks && feature.taskTotals && (
+        <button type="button" data-section="Tasks summary" className={styles.featureBadge} onClick={(event) => { event.stopPropagation(); onSelect?.(); }} title="Open issue tasks">
+          tasks {feature.taskTotals.closed}/{feature.taskTotals.total}</button>
+      )}
 
-      {expanded && hasVisibleSessions && (
+      {expanded && (
+        <div data-section="ShipDoorTreeRow"><RailShipProgress issueId={feature.issueId} onClick={() => onSelect?.()} /></div>
+      )}
+      {expanded && hasExpandableChildren && (
         <div className={styles.sessionList}>
           {(() => {
             const reviewerChildren = visibleSessions.filter(s => s.type === 'reviewer');
@@ -1231,7 +1188,7 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
 
             return (
               <>
-                {sortedNonReviewers.map(session => {
+                {hasVisibleSessions && sortedNonReviewers.map(session => {
                   if (session.type === 'review') {
                     return (
                       <ReviewGroup
@@ -1254,7 +1211,7 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
                     );
                   }
                   return (
-                    <SessionNode
+                    <ExpandableSessionNode
                       key={session.sessionId}
                       session={session}
                       issueId={feature.issueId}
@@ -1273,6 +1230,20 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
                     />
                   );
                 })}
+                {hasConversations && <div data-section="Conversation rows">{issueConversations.map(conv => (
+                  <a
+                    key={`conv-${conv.id}`}
+                    href={`/conv/${conv.id}`}
+                    className={styles.sessionNode}
+                    data-testid={`conversation-${conv.id}`}
+                    title={conv.title ?? conv.name}
+                  >
+                    <span className={styles.sessionIconSlot}><MessageSquare size={12} /></span>
+                    <span className={styles.sessionLabel}>{conv.title || 'Conversation'}</span>
+                    <span className={`${styles.sessionStatus} ${styles[`sessionStatus_${conv.status}`] ?? ''}`}>{conv.status}</span>
+                    <span className={styles.sessionModel}>#{conv.id}</span>
+                  </a>
+                ))}</div>}
               </>
             );
           })()}
@@ -1280,25 +1251,17 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
       )}
 
       {shouldShowUatStack && uatStackSummary && (
-        <div className={styles.uatStackTreeGroup}>
-          <div className={styles.uatStackTreeHeader}>
-            <ChevronDown size={12} />
-            <span>UAT environment</span>
-            <span className={styles.uatStackTreeSummary}>{uatStackSummary.label.replace(/^UAT stack\s*/i, '')}</span>
-          </div>
-          <UatStackStatus
-            containers={workspace?.containers}
-            stackHealth={workspace?.stackHealth}
-            frontendUrl={workspace?.frontendUrl}
-            apiUrl={workspace?.apiUrl}
-            pending={stackPending}
-            density="compact"
-          />
-        </div>
+        <div data-section="StackDrawer / UatStackTreeGroup"><UatStackTreeGroup
+          summary={uatStackSummary}
+          workspace={workspace}
+          pending={Boolean(stackPending)}
+          storageKey={`${getExpandedKey(feature.issueId)}:uat`}
+          onActionSelect={createUatActionHandler({ issueId: feature.issueId, workspace, queryClient })}
+        /></div>
       )}
 
       {expanded && hasResources && detailIdentifiers && (
-        <ResourcesGroup
+        <div data-section="ResourcesGroup"><ResourcesGroup
           issueId={feature.issueId}
           defaultExpanded={aggregateSessions.length > 0 && activityState !== 'stopped'}
           containers={(detailIdentifiers.dockerContainerNames ?? []).map((name) => {
@@ -1322,16 +1285,15 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
             state: pr.state,
             isDraft: pr.isDraft,
           }))}
-        />
+        /></div>
       )}
-    </div>
+    </IssueView>
     <FeatureContextMenu
       feature={feature}
       workSessionId={workSessionId}
       hasJsonl={hasJsonl}
       onOpenStateDir={onOpenStateDir}
       onViewJsonl={onViewJsonl}
-      onDeepWipe={onDeepWipe}
       onStopSession={onStopSession}
       onResumeSession={onResumeSession}
       onRestartSession={onRestartSession}

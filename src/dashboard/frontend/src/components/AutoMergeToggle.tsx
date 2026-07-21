@@ -14,6 +14,7 @@ import { useState } from 'react';
 import { Zap, Lock } from 'lucide-react';
 import { toast } from 'sonner';
 import { useQuery } from '@tanstack/react-query';
+import posthog from 'posthog-js';
 import { useDashboardStore } from '../lib/store';
 
 async function postAutoMerge(issueId: string, autoMerge: boolean): Promise<void> {
@@ -92,6 +93,7 @@ export function AutoMergeToggle({
     try {
       await postAutoMerge(issueId, next);
       patchStore(issueId, next);
+      posthog.capture('auto_merge_toggled', { issue_id: issueId, auto_merge: next, variant });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to update auto-merge');
     } finally {

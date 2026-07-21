@@ -6,10 +6,25 @@ import { existsSync, readdirSync, readFileSync, writeFileSync, statSync, symlink
 import { homedir } from 'os';
 import { join } from 'path';
 import { loadConfigSync } from '../../lib/config.js';
-import { parseVBriefFilename } from '../../lib/vbrief/lifecycle.js';
+import { isXBriefFilename, parseXBriefFilename } from '../../lib/xbrief/lifecycle.js';
 import { resolveGitHubIssueSync } from '../../lib/tracker-utils.js';
 import { createBackupSync } from '../../lib/backup.js';
-import { planSyncSync, executeSyncSync, refreshCacheSync, migrateStalePersonalContentSync, removeLegacySkills070Sync, planHooksSyncSync, syncHooksSync, syncStatuslineSync, mirrorProjectSkillsSync, syncPiSettingsSync, syncContextLayersSync } from '../../lib/sync.js';
+import {
+  planSyncSync,
+  executeSyncSync,
+  refreshCacheSync,
+  migrateStalePersonalContentSync,
+  removeLegacySkills070Sync,
+  planHooksSyncSync,
+  syncHooksSync,
+  syncStatuslineSync,
+  mirrorProjectSkillsSync,
+  syncPiSettingsSync,
+  syncContextLayersSync,
+  isStartupSyncNeededSync,
+  writeSyncManifestSync,
+} from '../../lib/sync.js';
+import { executeAgentSkillsSync, planAgentSkillsSync } from '../../lib/harness-skill-sync.js';
 import { SYNC_TARGET, SYNC_SOURCES, isDevMode } from '../../lib/paths.js';
 import { checkDevrootDeprecation } from '../../lib/config.js';
 import { listProjectsSync } from '../../lib/projects.js';
@@ -18,6 +33,10 @@ import { cleanupAgentDirectories } from '../../lib/agent-directory-cleanup.js';
 import { migrateOverdeckToPanSync } from '../../lib/workspace-manager.js';
 import { runMultiToolSyncSync, resolveAlsoSyncToolsSync } from '../../lib/multi-tool-sync.js';
 import { ensurePlaywrightIsolationSync, ensureExcalidrawMcpSync } from '../../lib/claude-mcp.js';
+import { resolveProjectContextFile } from '../../lib/context-layers/layers.js';
+import { provisionClaudeHooks } from '../../lib/claude-hooks-provision.js';
+import { provisionClaudePlugins } from '../../lib/claude-plugins-provision.js';
+import { ensureAutomaticStateMigration, formatAutomaticStateMigrationBlock } from '../../lib/state-auto-migrate.js';
 
 // Bundled git hooks distributed to registered projects (PAN-1201: sync-sources/).
 const BUNDLED_GIT_HOOKS_DIR = SYNC_SOURCES.gitHooks;
@@ -37,14 +56,47 @@ interface SyncOptions {
   force?: boolean;
   diff?: boolean;
   backupOnly?: boolean;
+  ifChanged?: boolean;
 }
 
 export async function syncCommand(options: SyncOptions): Promise<void> {
+  const timings: Array<{ phase: string; ms: number }> = [];
+  function time<T>(phase: string, fn: () => T): T {
+    const start = performance.now();
+    try {
+      return fn();
+    } finally {
+      timings.push({ phase, ms: Math.round(performance.now() - start) });
+    }
+  }
+  async function timeAsync<T>(phase: string, fn: () => Promise<T>): Promise<T> {
+    const start = performance.now();
+    try {
+      return await fn();
+    } finally {
+      timings.push({ phase, ms: Math.round(performance.now() - start) });
+    }
+  }
+  function printTimings(): void {
+    if (timings.length === 0) return;
+    const summary = timings.map((t) => `${t.phase}=${t.ms}ms`).join(', ');
+    console.log(chalk.dim(`[sync-timing] ${summary}`));
+  }
+
   // PAN-1201: warn once if the deprecated sync.devroot is still configured.
   const devrootWarning = checkDevrootDeprecation();
   if (devrootWarning) {
     console.log(chalk.yellow(devrootWarning));
     console.log('');
+  }
+
+  // Startup-only shortcut: skip the expensive full sync when inputs are unchanged.
+  if (options.ifChanged && !options.force) {
+    const gate = isStartupSyncNeededSync();
+    if (!gate.needed) {
+      console.log(chalk.dim('[sync] skipped — inputs unchanged'));
+      return;
+    }
   }
 
   // Dry run mode
@@ -79,17 +131,29 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
       console.log(
         `  ${chalk.green(`${count('new')} new`)}, ` +
           `${chalk.blue(`${count('symlink')} update`)}, ` +
+          `${chalk.cyan(`${count('adopted')} adopted (legacy pre-manifest installs)`)}, ` +
           `${chalk.dim(`${count('exists')} unchanged`)}, ` +
           `${chalk.yellow(`${count('conflict')} user-modified (skipped)`)}`,
       );
     }
     console.log('');
 
+    console.log(chalk.cyan('~/.agents/skills/ (Codex + Pi + Oh My Pi):'));
+    const agentSkillPlan = planAgentSkillsSync();
+    const agentCount = (s: string) => agentSkillPlan.filter((i) => i.status === s).length;
+    console.log(
+      `  ${chalk.green(`${agentCount('new')} new`)}, ` +
+        `${chalk.blue(`${agentCount('symlink')} update`)}, ` +
+        `${chalk.dim(`${agentCount('exists')} unchanged or user-owned`)}, ` +
+        `${chalk.yellow(`${agentCount('conflict')} user-modified (skipped)`)}`,
+    );
+    console.log('');
+
     // Context layers → CLAUDE.md managed regions
     console.log(chalk.cyan('context layers → CLAUDE.md:'));
     console.log(`  ${chalk.blue('↻')} global → ~/.claude/CLAUDE.md ${chalk.dim('(managed region)')}`);
     for (const { config } of listProjectsSync()) {
-      if (existsSync(join(config.path, '.pan', 'context', 'project.md'))) {
+      if (existsSync(resolveProjectContextFile(config.path))) {
         console.log(
           `  ${chalk.blue('↻')} ${config.name} → ${join(config.path, 'CLAUDE.md')} ${chalk.dim('(managed region)')}`,
         );
@@ -146,11 +210,12 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
 
     console.log('');
     console.log(chalk.dim('Run without --dry-run to apply changes.'));
+    printTimings();
     return;
   }
 
   // Run one-time migration: strip legacy sync targets from config.toml
-  const syncMigration = migrateSyncTargetsSync();
+  const syncMigration = time('migrate-sync-targets', () => migrateSyncTargetsSync());
   if (syncMigration.migrated) {
     if (syncMigration.hadNonClaudeTargets) {
       console.log(chalk.yellow('Config updated: removed non-Claude sync targets (Overdeck now syncs to Claude Code only).'));
@@ -158,13 +223,13 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
   }
 
   // Run one-time migration: remove Overdeck-managed symlinks from legacy runtime dirs
-  const cleanupResult = cleanupLegacyRuntimeSymlinksSync();
+  const cleanupResult = time('cleanup-legacy-runtimes', () => cleanupLegacyRuntimeSymlinksSync());
   if (cleanupResult.cleaned.length > 0) {
     console.log(chalk.dim(`Removed ${cleanupResult.total} legacy runtime symlink(s): ${cleanupResult.cleaned.join(', ')}`));
   }
 
   // One-time migration: remove Overdeck symlinks from ~/.claude/ (devroot replaces this)
-  const migration = migrateStalePersonalContentSync();
+  const migration = time('migrate-stale-personal', () => migrateStalePersonalContentSync());
   if (migration.removedSymlinks.length > 0) {
     console.log(chalk.cyan(`Migrated: removed ${migration.removedSymlinks.length} Overdeck symlink(s) from ~/.claude/`));
     if (migration.preservedUserContent.length > 0) {
@@ -173,7 +238,7 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
   }
 
   // 0.7.0 upgrade: remove renamed/deleted legacy skills from ~/.claude/skills/
-  const removedLegacy = removeLegacySkills070Sync();
+  const removedLegacy = time('remove-legacy-skills', () => removeLegacySkills070Sync());
   if (removedLegacy.length > 0) {
     console.log(chalk.dim(`Removed ${removedLegacy.length} legacy skill(s) from upgrade to 0.7.0: ${removedLegacy.join(', ')}`));
   }
@@ -182,7 +247,7 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
 
   // Create backup if enabled
   if (config.sync.backup_before_sync) {
-    const spinner = ora('Creating backup...').start();
+    const backupSpinner = ora('Creating backup...').start();
 
     const backupDirs = [
       SYNC_TARGET.skills,
@@ -190,32 +255,41 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
       SYNC_TARGET.agents,
     ];
 
-    const backup = createBackupSync(backupDirs);
+    const backup = time('backup', () => createBackupSync(backupDirs));
 
     if (backup.targets.length > 0) {
-      spinner.succeed(`Backup created: ${backup.timestamp}`);
+      backupSpinner.succeed(`Backup created: ${backup.timestamp}`);
     } else {
-      spinner.info('No existing content to backup');
+      backupSpinner.info('No existing content to backup');
     }
 
     if (options.backupOnly) {
+      printTimings();
       return;
     }
   }
 
   // Refresh cache from repo source
   const cacheSpinner = ora('Refreshing cache from repo...').start();
-  const cacheResult = refreshCacheSync();
+  const cacheResult = time('refresh-cache', () => refreshCacheSync());
   const cacheParts = [];
   if (cacheResult.skills.copied > 0) cacheParts.push(`${cacheResult.skills.copied} skills`);
   if (cacheResult.agents.copied > 0) cacheParts.push(`${cacheResult.agents.copied} agents`);
   if (cacheResult.rules.copied > 0) cacheParts.push(`${cacheResult.rules.copied} rules`);
   cacheSpinner.succeed(`Cache refreshed: ${cacheParts.length > 0 ? cacheParts.join(', ') : 'up to date'}`);
 
-  // Distribute bundled skills + agents into the user's Claude Code home.
-  const spinner = ora('Distributing skills and agents to ~/.claude/...').start();
-  const result = executeSyncSync({ force: options.force, diff: options.diff });
-  const totalSynced = result.created.length + result.updated.length;
+  // Distribute bundled skills + agents to Claude and native skill bundles to
+  // the Agent Skills standard home used by Codex, Pi, and Oh My Pi.
+  const spinner = ora('Distributing skills across agent harnesses...').start();
+  const result = time('execute-sync', () => executeSyncSync({ force: options.force, diff: options.diff }));
+  const agentSkillsResult = time('execute-agent-skills-sync', () =>
+    executeAgentSkillsSync({ force: options.force, diff: options.diff }),
+  );
+  const totalSynced = result.created.length + result.updated.length + result.adopted.length;
+  const totalAgentSkillsSynced = agentSkillsResult.created.length + agentSkillsResult.updated.length;
+  const adoptionSummary = result.adopted.length > 0
+    ? `, ${result.adopted.length} adopted (legacy pre-manifest installs)`
+    : '';
 
   // Show diffs if requested
   if (result.diffs.length > 0) {
@@ -237,29 +311,32 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
     }
   }
 
-  if (result.conflicts.length > 0 && !options.force) {
-    spinner.warn(`Synced ${totalSynced} items to ~/.claude/, ${result.conflicts.length} user-modified (skipped)`);
+  if (result.conflicts.length + agentSkillsResult.conflicts.length > 0 && !options.force) {
+    spinner.warn(`Synced ${totalSynced} Claude items and ${totalAgentSkillsSynced} shared skill files${adoptionSummary}, ${result.conflicts.length + agentSkillsResult.conflicts.length} user-modified (skipped)`);
     console.log('');
     console.log(chalk.yellow('Modified since Overdeck installed:'));
-    for (const name of result.conflicts) {
+    for (const name of [...result.conflicts, ...agentSkillsResult.conflicts.map((name) => `~/.agents/skills/${name}`)]) {
       console.log(chalk.dim(`  - ${name}`));
     }
     console.log('');
     console.log(chalk.dim('Use --force to overwrite, --diff to see changes.'));
-  } else if (result.skipped.length > 0) {
-    spinner.succeed(`Synced ${totalSynced} items to ~/.claude/ (${result.skipped.length} unchanged or user-owned)`);
+  } else if (result.skipped.length + agentSkillsResult.skipped.length > 0) {
+    spinner.succeed(`Synced ${totalSynced} Claude items and ${totalAgentSkillsSynced} shared skill files${adoptionSummary} (${result.skipped.length + agentSkillsResult.skipped.length} unchanged or user-owned)`);
   } else {
-    spinner.succeed(`Synced ${totalSynced} items to ~/.claude/`);
+    spinner.succeed(`Synced ${totalSynced} Claude items and ${totalAgentSkillsSynced} shared skill files${adoptionSummary}`);
   }
 
   // Render the layered context into harness CLAUDE.md files (PAN-1201).
   const ctxSpinner = ora('Rendering context layers...').start();
-  const ctx = syncContextLayersSync();
+  const ctx = time('context-layers', () => syncContextLayersSync());
   const ctxParts: string[] = [];
   if (ctx.globalStubCreated) ctxParts.push('seeded global.md');
   if (ctx.globalWritten) ctxParts.push('~/.claude/CLAUDE.md');
   if (ctx.projectsWritten.length > 0) {
     ctxParts.push(`${ctx.projectsWritten.length} project file(s)`);
+  }
+  if (ctx.legacyBeadsCleanups.length > 0) {
+    ctxParts.push(`${ctx.legacyBeadsCleanups.length} legacy Beads reference file(s) cleaned`);
   }
   if (ctx.errors.length > 0) {
     ctxSpinner.warn(`Context layers rendered with ${ctx.errors.length} error(s)`);
@@ -268,6 +345,11 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
     ctxSpinner.succeed(`Context layers rendered: ${ctxParts.join(', ')}`);
   } else {
     ctxSpinner.info('Context layers already up to date');
+  }
+
+  for (const cleanup of ctx.legacyBeadsCleanups) {
+    console.log(chalk.green(`  ✓ Removed legacy generated Beads references: ${cleanup.file}`));
+    console.log(chalk.dim(`    Backup: ${cleanup.backupPath}`));
   }
 
   // One-time notice: a managed region was added to a file that already had
@@ -294,7 +376,7 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
 
   // Sync hooks (bin scripts)
   const hooksSpinner = ora('Syncing hooks...').start();
-  const hooksResult = syncHooksSync();
+  const hooksResult = time('sync-hooks', () => syncHooksSync());
 
   if (hooksResult.errors.length > 0) {
     hooksSpinner.warn(`Synced ${hooksResult.synced.length} hooks, ${hooksResult.errors.length} errors`);
@@ -307,45 +389,59 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
     hooksSpinner.info('No hooks to sync');
   }
 
-  // Ensure beads database exists for each registered project (first-time setup guard).
-  // bd install puts the binary in PATH, but bd init must be run once per project to
-  // create the Dolt database. Without it, workspace beads creation silently fails.
+  // Registration is as important as copying the scripts. Repair the complete
+  // global hook table on every explicit sync so upgrades cannot leave an old
+  // heartbeat hook present while SessionStart is still missing.
+  const hookRegistrationSpinner = ora('Registering Claude Code hooks...').start();
+  const hookProvision = await timeAsync('register-claude-hooks', () => provisionClaudeHooks());
+  if (!hookProvision.ok) {
+    hookRegistrationSpinner.warn(`Claude Code hooks unavailable: ${hookProvision.reason}`);
+  } else if (hookProvision.changed) {
+    hookRegistrationSpinner.succeed(`Registered ${hookProvision.registered.length} Claude Code hook(s)`);
+  } else {
+    hookRegistrationSpinner.info('Claude Code hooks already registered');
+  }
+
+  // Bundled Claude Code plugins (sync-sources/plugins.json) install through
+  // the `claude plugin` CLI — they are marketplace bundles, not copyable files.
+  const pluginSpinner = ora('Provisioning Claude Code plugins...').start();
+  const pluginProvision = await timeAsync('provision-claude-plugins', () => provisionClaudePlugins());
+  if (!pluginProvision.ok) {
+    pluginSpinner.warn(`Claude Code plugins unavailable: ${pluginProvision.reason}`);
+  } else if (pluginProvision.errors.length > 0) {
+    pluginSpinner.warn(`Installed ${pluginProvision.installed.length} Claude Code plugin(s), ${pluginProvision.errors.length} error(s)`);
+    for (const error of pluginProvision.errors) {
+      console.log(chalk.red(`  ✗ ${error}`));
+    }
+  } else if (pluginProvision.installed.length > 0) {
+    pluginSpinner.succeed(`Installed Claude Code plugin(s): ${pluginProvision.installed.join(', ')}`);
+  } else if (pluginProvision.alreadyInstalled.length > 0) {
+    pluginSpinner.info('Claude Code plugins already installed');
+  } else {
+    pluginSpinner.info('No bundled Claude Code plugins declared');
+  }
+
   const projects = listProjectsSync();
-  if (projects.length > 0 && checkCommand('bd')) {
-    for (const { key, config } of projects) {
-      if (!existsSync(config.path)) continue;
-      const mainBeadsDir = join(config.path, '.beads');
-      if (!existsSync(mainBeadsDir)) continue; // Project hasn't used beads yet — skip
-      // Test connectivity. If the database is missing, auto-init.
-      try {
-        execSync('bd list --json --limit 0 2>&1', { cwd: config.path, stdio: 'pipe', timeout: 8000 });
-      } catch (e: any) {
-        const msg = String(e?.stdout ?? e?.stderr ?? e?.message ?? '');
-        if (msg.includes('database') && (msg.includes('not found') || msg.includes('not exist') || msg.includes('defaulting'))) {
-          const beadsSpinner = ora(`Initializing beads database for ${config.name}...`).start();
-          try {
-            const prefix = (key || config.name).toLowerCase().replace(/[^a-z0-9-]/g, '-');
-            execSync(`bd init --prefix ${prefix}`, { cwd: config.path, stdio: 'pipe', timeout: 20000 });
-            try { execSync('git config beads.role contributor', { cwd: config.path, stdio: 'pipe' }); } catch { /* non-fatal */ }
-            beadsSpinner.succeed(`Beads database initialized for ${config.name} (prefix: ${prefix})`);
-          } catch {
-            beadsSpinner.warn(`Could not auto-initialize beads for ${config.name} — run: cd ${config.path} && bd init`);
-          }
-        }
-      }
+  for (const { key, config } of projects) {
+    if (!existsSync(config.path)) continue;
+    const migrationSpinner = ora(`Reconciling permanent state for ${config.name}...`).start();
+    const migration = await ensureAutomaticStateMigration(key, config);
+    if (migration.status === 'ready') {
+      migrationSpinner.succeed(`Permanent state ready for ${config.name}`);
+    } else {
+      migrationSpinner.warn(formatAutomaticStateMigrationBlock(migration));
     }
   }
 
-
-  // Check jq availability (required by statusline, beads, specialists)
+  // Check jq availability (required by statusline and specialists)
   if (!checkCommand('jq')) {
     console.log(chalk.yellow('\n  ⚠ jq not found — statusline and other features need it'));
-    console.log(chalk.dim('    Install: apt install jq / brew install jq\n'));
+    console.log(chalk.dim('    Install without sudo: curl -fsSL https://overdeck.ai/install | sh\n'));
   }
 
   // Sync statusline to all runtimes
   const statuslineSpinner = ora('Syncing statusline...').start();
-  const statuslineResult = syncStatuslineSync();
+  const statuslineResult = time('sync-statusline', () => syncStatuslineSync());
 
   if (statuslineResult.errors.length > 0) {
     statuslineSpinner.warn(`Synced statusline to ${statuslineResult.synced.length} runtime(s), ${statuslineResult.errors.length} error(s)`);
@@ -505,33 +601,6 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
     }
   }
 
-  // Ensure beads database exists for each registered project (first-time setup guard).
-  // bd install puts the binary in PATH, but bd init must be run once per project to
-  // create the Dolt database. Without it, workspace beads creation silently fails.
-  if (projects.length > 0 && checkCommand('bd')) {
-    for (const { key, config } of projects) {
-      if (!existsSync(config.path)) continue;
-      const mainBeadsDir = join(config.path, '.beads');
-      if (!existsSync(mainBeadsDir)) continue; // Project hasn't used beads yet — skip
-      // Test connectivity. If the database is missing, auto-init.
-      try {
-        execSync('bd list --json --limit 0 2>&1', { cwd: config.path, stdio: 'pipe', timeout: 8000 });
-      } catch (e: any) {
-        const msg = String(e?.stdout ?? e?.stderr ?? e?.message ?? '');
-        if (msg.includes('database') && (msg.includes('not found') || msg.includes('not exist') || msg.includes('defaulting'))) {
-          const beadsSpinner = ora(`Initializing beads database for ${config.name}...`).start();
-          try {
-            const prefix = (key || config.name).toLowerCase().replace(/[^a-z0-9-]/g, '-');
-            execSync(`bd init --prefix ${prefix}`, { cwd: config.path, stdio: 'pipe', timeout: 20000 });
-            beadsSpinner.succeed(`Beads database initialized for ${config.name} (prefix: ${prefix})`);
-          } catch {
-            beadsSpinner.warn(`Could not auto-initialize beads for ${config.name} — run: cd ${config.path} && bd init`);
-          }
-        }
-      }
-    }
-  }
-
   // Pi harness — point Pi's settings file at ~/.claude/skills so it sees the
   // same skills tree we just synced. No-op when Pi is not on PATH (PAN-636).
   const piResult = syncPiSettingsSync();
@@ -575,9 +644,9 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
     }
   }
 
-  // vBRIEF state disagreement audit (PAN-946: workspace-9ny)
+  // xBRIEF state disagreement audit (PAN-946: workspace-9ny)
   try {
-    const auditSpinner = ora('Running vBRIEF state audit...').start();
+    const auditSpinner = ora('Running xBRIEF state audit...').start();
     const disagreements: Array<{ issueId: string; problem: string; fix: string }> = [];
     const hasGh = checkCommand('gh');
 
@@ -587,13 +656,13 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
       const activeDir = join(config.path, 'vbrief', 'active');
       const completedDir = join(config.path, 'vbrief', 'completed');
 
-      // (1) vBRIEF in active/ but tracker says closed
+      // (1) xBRIEF in active/ but tracker says closed
       if (existsSync(activeDir)) {
         const activeFiles = readdirSync(activeDir).filter(
-          f => f.endsWith('.vbrief.json') && !f.startsWith('continue-')
+          f => isXBriefFilename(f) && !f.startsWith('continue-')
         );
         for (const file of activeFiles) {
-          const parsed = parseVBriefFilename(file);
+          const parsed = parseXBriefFilename(file);
           if (!parsed) continue;
           const issueId = parsed.issueId.toUpperCase();
           const ghInfo = resolveGitHubIssueSync(issueId);
@@ -606,7 +675,7 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
               if (state.toLowerCase() === 'closed') {
                 disagreements.push({
                   issueId,
-                  problem: 'vBRIEF in active/ but GitHub issue is closed',
+                  problem: 'xBRIEF in active/ but GitHub issue is closed',
                   fix: `pan scope complete ${issueId}`,
                 });
               }
@@ -615,36 +684,36 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
         }
       }
 
-      // (2) vBRIEF in completed/ but workspace still exists
+      // (2) xBRIEF in completed/ but workspace still exists
       if (existsSync(completedDir)) {
         const completedFiles = readdirSync(completedDir).filter(
-          f => f.endsWith('.vbrief.json') && !f.startsWith('continue-')
+          f => isXBriefFilename(f) && !f.startsWith('continue-')
         );
         for (const file of completedFiles) {
-          const parsed = parseVBriefFilename(file);
+          const parsed = parseXBriefFilename(file);
           if (!parsed) continue;
           const issueId = parsed.issueId.toUpperCase();
           const workspacePath = join(config.path, 'workspaces', `feature-${issueId.toLowerCase()}`);
           if (existsSync(workspacePath)) {
             disagreements.push({
               issueId,
-              problem: 'vBRIEF in completed/ but workspace worktree still exists',
+              problem: 'xBRIEF in completed/ but workspace worktree still exists',
               fix: `pan close ${issueId}`,
             });
           }
         }
       }
 
-      // (3) tracker shows in-progress but no vBRIEF in active/ (scanning worktrees)
+      // (3) tracker shows in-progress but no xBRIEF in active/ (scanning worktrees)
       const workspacesDir = join(config.path, 'workspaces');
       if (existsSync(workspacesDir)) {
         let activeIssueIds = new Set<string>();
         if (existsSync(activeDir)) {
           activeIssueIds = new Set(
             readdirSync(activeDir)
-              .filter(f => f.endsWith('.vbrief.json') && !f.startsWith('continue-'))
+              .filter(f => isXBriefFilename(f) && !f.startsWith('continue-'))
               .map(f => {
-                const parsed = parseVBriefFilename(f);
+                const parsed = parseXBriefFilename(f);
                 return parsed ? parsed.issueId.toUpperCase() : '';
               })
               .filter(Boolean)
@@ -670,13 +739,13 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
             } catch { /* skip if gh fails — fall through to heuristic */ }
           }
 
-          // Flag if tracker is open OR if we couldn't check tracker (workspace without active vBRIEF is always suspicious)
+          // Flag if tracker is open OR if we couldn't check tracker (workspace without active xBRIEF is always suspicious)
           if (trackerOpen || !ghInfo.isGitHub || !hasGh) {
             disagreements.push({
               issueId: worktreeIssueId,
               problem: trackerOpen
-                ? 'Tracker shows open but no vBRIEF in active/'
-                : 'Workspace exists but no vBRIEF in active/',
+                ? 'Tracker shows open but no xBRIEF in active/'
+                : 'Workspace exists but no xBRIEF in active/',
               fix: `pan scope approve ${worktreeIssueId}`,
             });
           }
@@ -685,15 +754,20 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
     }
 
     if (disagreements.length === 0) {
-      auditSpinner.succeed('vBRIEF state audit passed — no disagreements');
+      auditSpinner.succeed('xBRIEF state audit passed — no disagreements');
     } else {
-      auditSpinner.warn(`Found ${disagreements.length} vBRIEF state disagreement(s)`);
+      auditSpinner.warn(`Found ${disagreements.length} xBRIEF state disagreement(s)`);
       for (const d of disagreements) {
         console.log(chalk.yellow(`  ⚠ ${d.issueId}: ${d.problem}`));
         console.log(chalk.dim(`    Fix: ${d.fix}`));
       }
     }
   } catch (auditErr: any) {
-    console.warn(`[pan sync] vBRIEF audit failed (non-fatal): ${auditErr?.message ?? auditErr}`);
+    console.warn(`[pan sync] xBRIEF audit failed (non-fatal): ${auditErr?.message ?? auditErr}`);
   }
+
+  // Record the input hash so a future startup sync can skip when nothing changed.
+  time('write-sync-manifest', () => writeSyncManifestSync());
+
+  printTimings();
 }

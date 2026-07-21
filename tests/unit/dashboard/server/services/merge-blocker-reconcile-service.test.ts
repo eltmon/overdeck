@@ -117,10 +117,7 @@ describe('merge-blocker reconcile service', () => {
     await Promise.resolve();
   });
 
-  it('skips rows with only non-mergeability blockers', async () => {
-    // The selective DB query should never return this row, but the service
-    // must still behave correctly if it does: only mergeability blockers trigger
-    // a re-verification.
+  it('re-verifies failing_checks blockers even when they make the row not ready', async () => {
     mockGetMergeBlockerReconcileCandidates.mockReturnValue(candidatesEffect([
       candidate({
         issueId: 'PAN-2',
@@ -133,7 +130,7 @@ describe('merge-blocker reconcile service', () => {
 
     await __reconcileOnceForTests();
 
-    expect(mockRefreshMergeStateFromGitHub).not.toHaveBeenCalled();
+    expect(mockRefreshMergeStateFromGitHub).toHaveBeenCalledWith('PAN-2', 'eltmon/overdeck', 2);
   });
 
   it('keeps ready-with-no-blockers behavior unchanged', async () => {

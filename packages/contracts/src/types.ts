@@ -5,6 +5,21 @@ import { Schema } from "effect"
 export const IssueId = Schema.String
 export type IssueId = typeof IssueId.Type
 
+export type PipelineBucket =
+  | "in_flight"
+  | "zombie_pr"
+  | "post_merge_limbo"
+  | "planned_backlog"
+  | "clean_terminal"
+
+/** Server-computed pipeline membership attached to dashboard issue DTOs. */
+export interface IssuePipelineMembership {
+  available?: boolean
+  inPipeline: boolean
+  bucket: PipelineBucket
+  labelDrift: "stale_present" | "stale_absent" | null
+}
+
 export const AgentId = Schema.String
 export type AgentId = typeof AgentId.Type
 
@@ -18,13 +33,13 @@ export type SequenceNumber = typeof SequenceNumber.Type
 export const AgentStatus = Schema.Literals(["starting", "running", "stopped", "error", "unknown"])
 export type AgentStatus = typeof AgentStatus.Type
 
-export const Role = Schema.Literals(["plan", "work", "review", "test", "ship", "flywheel", "strike", "sequencer"])
+export const Role = Schema.Literals(["plan", "work", "review", "test", "ship", "flywheel", "strike", "sequencer", "knowledge"])
 export type Role = typeof Role.Type
 
 export const AgentResolution = Schema.Literals(["working", "done", "needs_input", "stuck", "completed", "unclear", "abandoned", "api_error"])
 export type AgentResolution = typeof AgentResolution.Type
 
-export const ReviewStatusValue = Schema.Literals(["pending", "reviewing", "passed", "failed", "blocked"])
+export const ReviewStatusValue = Schema.Literals(["pending", "reviewing", "passed", "failed", "blocked", "skipped"])
 export type ReviewStatusValue = typeof ReviewStatusValue.Type
 
 export const TestStatusValue = Schema.Literals(["pending", "testing", "passed", "failed", "skipped", "dispatch_failed"])
@@ -36,26 +51,34 @@ export type UatStatusValue = typeof UatStatusValue.Type
 export const MergeStatusValue = Schema.Literals(["pending", "queued", "merging", "verifying", "merged", "failed"])
 export type MergeStatusValue = typeof MergeStatusValue.Type
 
+export const ReleaseStatusValue = Schema.Literals(["pending", "releasing", "passed", "failed", "partial", "rolled_back", "skipped"])
+export type ReleaseStatusValue = typeof ReleaseStatusValue.Type
+
 export const VerificationStatusValue = Schema.Literals(["pending", "running", "passed", "failed", "skipped"])
 export type VerificationStatusValue = typeof VerificationStatusValue.Type
 
-// ─── Harness (PAN-636) ────────────────────────────────────────────────────────
+// ─── Harness (PAN-636, PAN-1989) ─────────────────────────────────────────────
 // Identifies which coding-agent harness an agent is running under.
 // AgentSnapshot.runtime is left as Schema.optional(Schema.String) for forward
 // compatibility (events from older readers may carry unknown values), but every
 // consumer that branches on harness MUST go through getHarness() so unknown or
 // legacy values normalize to 'claude-code'.
+//
+// PAN-1989 retired 'pi'; legacy DB rows read as 'ohmypi' via getHarness().
+// All new write sites use canonical harness literals.
 
-export type Harness = 'claude-code' | 'pi' | 'codex'
+export type Harness = 'claude-code' | 'ohmypi' | 'codex' | 'acp'
 
-const KNOWN_HARNESSES: ReadonlySet<string> = new Set<Harness>(['claude-code', 'pi', 'codex'])
+const KNOWN_HARNESSES: ReadonlySet<string> = new Set<Harness>(['claude-code', 'ohmypi', 'codex', 'acp'])
 
 /**
  * Normalize a snapshot's runtime field to a known Harness value.
  * Unknown or missing values fall back to 'claude-code' (the default harness).
+ * Legacy 'pi' values are normalized to 'ohmypi' on read (PAN-1989).
  */
 export function getHarness(snapshot: { runtime?: string | undefined } | null | undefined): Harness {
   const raw = snapshot?.runtime
+  if (raw === 'pi') return 'ohmypi'
   if (raw && KNOWN_HARNESSES.has(raw)) {
     return raw as Harness
   }
@@ -317,6 +340,13 @@ export const AgentSnapshot = Schema.Struct({
       })),
     })),
   })),
+  // PAN-1520 (FR-1) — plan markdown for a pending ExitPlanMode so the operator
+  // can approve/reject from a dashboard modal instead of only the terminal.
+  pendingProposedPlan: Schema.optional(Schema.Struct({
+    toolUseId: Schema.String,
+    askedAt: Schema.String,
+    plan: Schema.String,
+  })),
   resolution: Schema.optional(AgentResolution),
   resolutionCount: Schema.optional(Schema.Number),
   // PAN-800 — bumped on every runtime event so subscribers can cheaply detect
@@ -334,6 +364,8 @@ export const ReviewStatusSnapshot = Schema.Struct({
   uatStatus: Schema.optional(UatStatusValue),
   uatNotes: Schema.optional(Schema.String),
   mergeStatus: Schema.optional(MergeStatusValue),
+  releaseStatus: Schema.optional(ReleaseStatusValue),
+  releaseNotes: Schema.optional(Schema.String),
   verificationStatus: Schema.optional(VerificationStatusValue),
   verificationNotes: Schema.optional(Schema.String),
   verificationCycleCount: Schema.optional(Schema.Number),
@@ -466,6 +498,7 @@ export const DashboardSnapshot = Schema.Struct({
   specialists: Schema.Array(Schema.Unknown),
   reviewStatuses: Schema.Array(ReviewStatusSnapshot),
   issues: Schema.Array(Schema.Unknown),  // Issues are complex — pass through unvalidated
+  recentActivity: Schema.optional(Schema.Array(Schema.Unknown)),
   resources: Schema.optional(Schema.Unknown),
   memory: Schema.optional(Schema.Unknown),
   agentRuntimeById: Schema.optional(Schema.Record(Schema.String, AgentRuntimeSnapshot)),
@@ -509,7 +542,9 @@ export type SessionNodePresence = typeof SessionNodePresence.Type
 export const SessionNodeType = Schema.Literals([
   "planning",
   "work",
+  "knowledge",
   "strike",
+  "lint",
   "review",
   "reviewer",
   "test",
@@ -541,6 +576,33 @@ export const ReviewerRoundMetadata = Schema.Struct({
 })
 export type ReviewerRoundMetadata = typeof ReviewerRoundMetadata.Type
 
+// One row of a percentage-distribution model origin (PAN-2053). `lo`/`hi` are the
+// half-open bucket band [lo, hi) the entry owns; `chosen` marks the selected one.
+export const ModelOriginEntry = Schema.Struct({
+  model: Schema.String,
+  weight: Schema.Number,
+  lo: Schema.Number,
+  hi: Schema.Number,
+  chosen: Schema.Boolean,
+})
+export type ModelOriginEntry = typeof ModelOriginEntry.Type
+
+// Read-only "which model & why" derivation shown in the agent right-click MODEL
+// inspector (PAN-2053). Present only when the agent's role uses a percentage
+// distribution; absent for scalar/single-model roles.
+export const ModelOrigin = Schema.Struct({
+  // The exact spawn key whose bucket selected the model (`${role}:${issueId}`).
+  spawnKey: Schema.String,
+  // The chosen model id.
+  resolved: Schema.String,
+  // Deterministic bucket for this key, in [0, total).
+  bucket: Schema.Number,
+  // Number of buckets = sum of weights (100 when the distribution is percentages).
+  total: Schema.Number,
+  distribution: Schema.Array(ModelOriginEntry),
+})
+export type ModelOrigin = typeof ModelOrigin.Type
+
 export const SessionNode = Schema.Struct({
   type: SessionNodeType,
   role: Schema.optional(Schema.String),
@@ -554,6 +616,7 @@ export const SessionNode = Schema.Struct({
   harness: Schema.optional(Schema.String),
   startedAt: Schema.String,
   endedAt: Schema.optional(Schema.String),
+  planningComplete: Schema.optional(Schema.Boolean),
   duration: Schema.NullOr(Schema.Number),
   status: AgentStatus,
   hasJsonl: Schema.optional(Schema.Boolean),
@@ -562,6 +625,8 @@ export const SessionNode = Schema.Struct({
   awaitingInput: Schema.optional(Schema.Boolean),
   awaitingInputPrompt: Schema.optional(Schema.String),
   awaitingInputReason: Schema.optional(Schema.String),
+  /** Which blocking surfaces are open — names the wait in the node's indicator. */
+  pendingInputKinds: Schema.optional(Schema.Array(Schema.String)),
   roundMetadata: Schema.optional(ReviewerRoundMetadata),
   deliveryMethod: Schema.optional(Schema.Literals(['auto', 'channels', 'tmux'])),
   // Pause gate (PAN-1779 issue-tree redesign): a paused agent is deliberately
@@ -570,6 +635,16 @@ export const SessionNode = Schema.Struct({
   paused: Schema.optional(Schema.Boolean),
   pausedReason: Schema.optional(Schema.String),
   pausedAt: Schema.optional(Schema.String),
+  // Troubled gate (PAN-2257): message delivery queues mail while this is true,
+  // so session-tree rows need the gate state and its queue count.
+  troubled: Schema.optional(Schema.Boolean),
+  troubledAt: Schema.optional(Schema.String),
+  troubledReason: Schema.optional(Schema.String),
+  consecutiveFailures: Schema.optional(Schema.Number),
+  queuedMailCount: Schema.optional(Schema.Number),
+  // PAN-2053: read-only model-origin for the right-click MODEL inspector. Set
+  // only when the agent's role uses a weighted model distribution.
+  modelOrigin: Schema.optional(ModelOrigin),
 })
 export type SessionNode = typeof SessionNode.Type
 
@@ -592,6 +667,7 @@ export type ProjectSessionTree = typeof ProjectSessionTree.Type
 export const DiscoveredSessionSnapshot = Schema.Struct({
   id: Schema.Number,
   jsonlPath: Schema.String,
+  harness: Schema.optional(Schema.String),
   sessionId: Schema.optional(Schema.String),
   workspacePath: Schema.optional(Schema.String),
   workspaceHash: Schema.optional(Schema.String),
@@ -608,6 +684,11 @@ export const DiscoveredSessionSnapshot = Schema.Struct({
   tags: Schema.Array(Schema.String),
   summary: Schema.optional(Schema.String),
   summaryDetailed: Schema.optional(Schema.String),
+  // Tracked conversation this session belongs to, when the session id matches a
+  // conversation in the DB (joined via conversation_files).
+  conversationId: Schema.optional(Schema.String),
+  conversationName: Schema.optional(Schema.String),
+  conversationTitle: Schema.optional(Schema.String),
   enrichmentLevel: Schema.Number,
   enrichmentModel: Schema.optional(Schema.String),
   enrichedAt: Schema.optional(Schema.String),
@@ -619,8 +700,73 @@ export const DiscoveredSessionSnapshot = Schema.Struct({
 })
 export type DiscoveredSessionSnapshot = typeof DiscoveredSessionSnapshot.Type
 
+// ─── Unified Sessions Feed (PAN-1917) ────────────────────────────────────────
+
+export const SessionsFeedSource = Schema.Literals(['discovered', 'managed-archived'])
+export type SessionsFeedSource = typeof SessionsFeedSource.Type
+
+export const SessionsFeedRowSnapshot = Schema.Struct({
+  id: Schema.Number,
+  source: SessionsFeedSource,
+  discoveredId: Schema.optional(Schema.Number),
+  jsonlPath: Schema.optional(Schema.String),
+  sessionId: Schema.optional(Schema.String),
+  workspacePath: Schema.optional(Schema.String),
+  messageCount: Schema.Number,
+  firstTs: Schema.optional(Schema.String),
+  lastTs: Schema.optional(Schema.String),
+  primaryModel: Schema.optional(Schema.String),
+  tokenInput: Schema.Number,
+  tokenOutput: Schema.Number,
+  estimatedCost: Schema.Number,
+  tags: Schema.Array(Schema.String),
+  summary: Schema.optional(Schema.String),
+  enrichmentLevel: Schema.Number,
+  enrichmentFailed: Schema.Boolean,
+  overdeckManaged: Schema.Boolean,
+  panIssueId: Schema.optional(Schema.String),
+  archivedAt: Schema.optional(Schema.String),
+  conversationId: Schema.optional(Schema.String),
+  conversationName: Schema.optional(Schema.String),
+  conversationTitle: Schema.optional(Schema.String),
+  harness: Schema.optional(Schema.String),
+})
+export type SessionsFeedRowSnapshot = typeof SessionsFeedRowSnapshot.Type
+
+const SessionsFeedFacetBucketString = Schema.Struct({
+  value: Schema.String,
+  count: Schema.Number,
+})
+
+const SessionsFeedFacetBucketNumber = Schema.Struct({
+  value: Schema.Number,
+  count: Schema.Number,
+})
+
+export const SessionsFeedFacetsSnapshot = Schema.Struct({
+  primaryModels: Schema.Array(SessionsFeedFacetBucketString),
+  tags: Schema.Array(SessionsFeedFacetBucketString),
+  tools: Schema.Array(SessionsFeedFacetBucketString),
+  files: Schema.Array(SessionsFeedFacetBucketString),
+  enrichmentLevels: Schema.Array(SessionsFeedFacetBucketNumber),
+  timeBuckets: Schema.Array(Schema.Struct({
+    value: Schema.Literals(['24h', '7d', '30d', 'older']),
+    count: Schema.Number,
+  })),
+  costBuckets: Schema.Array(Schema.Struct({
+    value: Schema.Literals(['<$0.10', '$0.10-1', '$1-10', '>$10']),
+    count: Schema.Number,
+  })),
+  sources: Schema.Array(Schema.Struct({
+    value: SessionsFeedSource,
+    count: Schema.Number,
+  })),
+})
+export type SessionsFeedFacetsSnapshot = typeof SessionsFeedFacetsSnapshot.Type
+
 /** Filter parameters for conversation search */
 export const ConversationFilter = Schema.Struct({
+  harness: Schema.optional(Schema.String),
   workspacePath: Schema.optional(Schema.String),
   primaryModel: Schema.optional(Schema.String),
   managed: Schema.optional(Schema.Boolean),

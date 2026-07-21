@@ -10,7 +10,7 @@
  *   3. Rotate previous archives to prevent overwrite
  */
 
-import { existsSync } from 'fs';
+import { existsSync, readdirSync } from 'fs';
 import { mkdir, cp, rename } from 'fs/promises';
 import { join, dirname } from 'path';
 import { exec } from 'child_process';
@@ -47,6 +47,10 @@ const execAsync = promisify(exec);
 export function findAllWorkspacePaths(projectPath: string, issueLower: string): string[] {
   // e.g. "pan-488" → "488" for legacy workspaces named feature-488
   const numericSuffix = issueLower.replace(/^[a-z]+-/, '');
+  const workspaceRoot = join(projectPath, 'workspaces');
+  const slotWorkspaces = existsSync(workspaceRoot)
+    ? readdirSync(workspaceRoot).filter(name => name.startsWith(`feature-${issueLower}-slot-`)).map(name => join(workspaceRoot, name))
+    : [];
   const candidates = [
     join(projectPath, 'workspaces', `feature-${issueLower}`),
     // Strike worktrees (`pan strike`) use the `-strike` suffix (PAN-1721)
@@ -55,6 +59,7 @@ export function findAllWorkspacePaths(projectPath: string, issueLower: string): 
     join(projectPath, 'workspaces', issueLower),
     join(projectPath, '.worktrees', issueLower),
     join(dirname(projectPath), `feature-${issueLower}`),
+    ...slotWorkspaces,
   ];
   return candidates.filter((p) => existsSync(p));
 }
@@ -66,6 +71,17 @@ export function findAllWorkspacePaths(projectPath: string, issueLower: string): 
  */
 export function findWorkspacePath(projectPath: string, issueLower: string): string | null {
   return findAllWorkspacePaths(projectPath, issueLower)[0] ?? null;
+}
+
+/**
+ * Infer the git branch for an issue from its resolved workspace path.
+ * Strike workspaces (path ends in `-strike`) use `strike/<id>`; every other
+ * workspace uses `feature/<id>`. PAN-2270: review-dispatch callers must derive
+ * the branch this way instead of hardcoding `feature/${issueLower}`.
+ */
+export function inferBranchFromWorkspace(workspacePath: string, issueLower: string): string {
+  if (workspacePath.endsWith('-strike')) return `strike/${issueLower}`;
+  return `feature/${issueLower}`;
 }
 
 /**
@@ -119,7 +135,7 @@ async function movePrdImpl(
 
   const formatLabel = source.format === 'subdir' ? 'PRD subdirectory' : 'PRD';
 
-  // For the legacy `flat` format the PRD is a single `.md` file, but the vBRIEF
+  // For the legacy `flat` format the PRD is a single `.md` file, but the xBRIEF
   // JSON sidecar (`<id>-plan.vbrief.json`) lives next to it and was historically
   // left behind in active/ after merge (PAN-487). Detect it here so we can move
   // it alongside the `.md`. The `subdir` format already moves both files because
@@ -152,7 +168,7 @@ async function movePrdImpl(
     if (pushToRemote) {
       await execAsync('git push', { cwd: ctx.projectPath });
     }
-    const sidecarNote = resolvedSidecarSource ? ' (with vBRIEF sidecar)' : '';
+    const sidecarNote = resolvedSidecarSource ? ' (with xBRIEF sidecar)' : '';
     return stepOk(step, [`Moved ${formatLabel} from active/ to completed/ via git mv${sidecarNote}`]);
   } catch {
     // git mv failed — fall back to plain copy. cp handles both file and directory.
@@ -254,12 +270,6 @@ async function archiveWorkspaceArtifactsImpl(
   if (existsSync(prdFile)) {
     await cp(prdFile, join(archiveDir, 'prd.md'))
     details.push('Archived workspace prd.md')
-  }
-
-  const beadsDir = join(workspacePath, '.beads')
-  if (existsSync(beadsDir)) {
-    await cp(beadsDir, join(archiveDir, '.beads'), { recursive: true })
-    details.push('Archived .beads/')
   }
 
   details.push(`Archived to ${archiveDir}`);

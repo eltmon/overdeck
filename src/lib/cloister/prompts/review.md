@@ -59,7 +59,7 @@ Use TLDR to navigate quickly, then use full Reads for the actual files and exact
 **IMPORTANT:** DO NOT run tests. You are the REVIEW agent — the test-agent runs tests in the next step.
 
 {{#ACCEPTANCE_CRITERIA}}
-## Acceptance Criteria (from vBRIEF plan) — MANDATORY GATE
+## Acceptance Criteria (from xBRIEF plan) — MANDATORY GATE
 
 Every acceptance criterion below MUST be verifiable in the code. If ANY criterion is not met, you MUST request changes.
 
@@ -155,7 +155,7 @@ Do NOT flag:
 ### 2. No Blocking Operations
 - **NEVER `execSync` or `spawnSync` in server/dashboard code** — blocks Node event loop, freezes UI
 - Must use `execAsync` (promisified `exec`) or async `spawn`
-- Same rule for all shell commands: tmux, git, bd, docker, etc.
+- Same rule for all shell commands: tmux, git, docker, etc.
 - Only exception: one-time startup code before server listens
 
 ### 3. No Dead Code

@@ -11,17 +11,28 @@ import { join } from 'path';
 const mockUnref = vi.hoisted(() => vi.fn());
 const mockSpawnChild = vi.hoisted(() => ({ pid: 12345, unref: mockUnref }));
 const mockSpawn = vi.hoisted(() => vi.fn(() => mockSpawnChild));
-const mockExecAsync = vi.hoisted(() => vi.fn(async (cmd: string) => {
-  if (cmd.includes('git rev-parse --verify')) return { stdout: 'deadbeef\n', stderr: '' };
-  if (cmd.includes('git merge-base --is-ancestor')) return { stdout: '', stderr: '' };
-  if (cmd.includes('git diff origin/main...')) return { stdout: '', stderr: '' };
-  // PAN-1531: verifyMergedBeforeLifecycle is now PR-API-only. Tests rely on
-  // postMergeLifecycle proceeding past verification, so the gh pr list mock
-  // must report the PR as merged.
-  if (cmd.includes('gh pr list')) return { stdout: '[{"number":444,"mergedAt":"2026-04-27T00:00:00Z","mergeCommit":{"oid":"deadbeef"}}]', stderr: '' };
-  return { stdout: '', stderr: '' };
-}));
+const { defaultExecAsync, mockExecAsync } = vi.hoisted(() => {
+  const defaultExecAsync = async (cmd: string) => {
+    if (cmd.includes('git rev-parse --verify')) return { stdout: 'deadbeef\n', stderr: '' };
+    if (cmd.includes('git merge-base --is-ancestor')) return { stdout: '', stderr: '' };
+    if (cmd.includes('git diff origin/main...')) return { stdout: '', stderr: '' };
+    // PAN-1531: verifyMergedBeforeLifecycle is now PR-API-only. Tests rely on
+    // postMergeLifecycle proceeding past verification, so the gh pr list mock
+    // must report the PR as merged.
+    if (cmd.includes('gh pr list')) return { stdout: '[{"number":444,"state":"closed","mergedAt":"2026-04-27T00:00:00Z"}]', stderr: '' };
+    return { stdout: '', stderr: '' };
+  };
+  return {
+    defaultExecAsync,
+    mockExecAsync: vi.fn(defaultExecAsync),
+  };
+});
 const mockCreateResetMarker = vi.hoisted(() => vi.fn(async (input: unknown) => ({ id: 'reset-1', ...(input as Record<string, unknown>) })));
+const mockSetReviewStatusSync = vi.hoisted(() => vi.fn());
+const mockLoadConfigSync = vi.hoisted(() => vi.fn(() => ({ config: { knowledge: { postMergeAutoRetro: false } } })));
+const mockIsGitHubAppConfigured = vi.hoisted(() => vi.fn(() => false));
+const mockListPullRequestsForHead = vi.hoisted(() => vi.fn(() => Effect.succeed([])));
+const mockShouldRestartForPostMerge = vi.hoisted(() => vi.fn(async () => true));
 const mockExec = vi.hoisted(() => vi.fn((cmd: string, optionsOrCb?: any, maybeCb?: any) => {
   const callback = typeof optionsOrCb === 'function' ? optionsOrCb : maybeCb;
   if (typeof callback === 'function') {
@@ -83,6 +94,7 @@ vi.mock('../../../src/lib/tmux.js', () => ({
 vi.mock('../../../src/lib/paths.js', () => ({
   OVERDECK_HOME: '/tmp/overdeck-test',
   AGENTS_DIR: '/tmp/overdeck-test/agents',
+  COSTS_DIR: '/tmp/overdeck-test/costs',
   getOverdeckHome: vi.fn(() => '/tmp/overdeck-test'),
   PROJECT_DOCS_SUBDIR: 'docs',
   PROJECT_PRDS_SUBDIR: 'prds',
@@ -105,9 +117,15 @@ vi.mock('../../../src/lib/cloister/specialists.js', () => ({
   isRunning: vi.fn().mockResolvedValue(false),
 }));
 
+vi.mock('../../../src/lib/cloister/merge-agent-step0.js', () => ({
+  shouldRestartForPostMerge: mockShouldRestartForPostMerge,
+}));
+
 vi.mock('../../../src/lib/projects.js', () => ({
   resolveProjectFromIssue: vi.fn().mockReturnValue(null),
   resolveProjectFromIssueSync: vi.fn().mockReturnValue(null),
+  getProjectSync: vi.fn().mockReturnValue(null),
+  findProjectByPathSync: vi.fn().mockReturnValue(null),
   loadProjectsConfig: vi.fn().mockReturnValue({ projects: {} }),
   loadProjectsConfigSync: vi.fn().mockReturnValue({ projects: {} }),
 }));
@@ -125,7 +143,11 @@ vi.mock('../../../src/lib/activity-log.js', () => ({
 vi.mock('../../../src/lib/review-status.js', () => ({
   getReviewStatusSync: vi.fn().mockReturnValue(null),
   setReviewStatus: vi.fn(),
-  setReviewStatusSync: vi.fn(),
+  setReviewStatusSync: mockSetReviewStatusSync,
+}));
+
+vi.mock('../../../src/lib/config-yaml.js', () => ({
+  loadConfigSync: mockLoadConfigSync,
 }));
 
 vi.mock('../../../src/lib/memory/cli.js', () => ({
@@ -134,6 +156,11 @@ vi.mock('../../../src/lib/memory/cli.js', () => ({
 
 vi.mock('../../../src/lib/git-utils.js', () => ({
   cleanupStaleLocks: vi.fn().mockResolvedValue({ found: [], removed: [], errors: [] }),
+}));
+
+vi.mock('../../../src/lib/github-app.js', () => ({
+  isGitHubAppConfigured: mockIsGitHubAppConfigured,
+  listPullRequestsForHead: mockListPullRequestsForHead,
 }));
 
 // ── Subject ───────────────────────────────────────────────────────────────────
@@ -147,6 +174,10 @@ const PENDING_FILE = '/tmp/overdeck-test/pending-post-merge.json';
 describe('postMergeLifecycle — step 0 deploy handoff', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockExecAsync.mockImplementation(defaultExecAsync);
+    mockIsGitHubAppConfigured.mockReturnValue(false);
+    mockListPullRequestsForHead.mockReturnValue(Effect.succeed([]));
+    mockShouldRestartForPostMerge.mockResolvedValue(true);
     resetPostMergeState(ISSUE_ID);
     mockWriteFile.mockResolvedValue(undefined);
     mockSpawn.mockReturnValue(mockSpawnChild);
@@ -166,6 +197,39 @@ describe('postMergeLifecycle — step 0 deploy handoff', () => {
     expect(parsed.sourceBranch).toBe(SOURCE_BRANCH);
     expect(typeof parsed.timestamp).toBe('number');
     expect(parsed.timestamp).toBeGreaterThan(0);
+  });
+
+  it('uses GitHub App REST to verify the source branch is merged when configured', async () => {
+    mockIsGitHubAppConfigured.mockReturnValue(true);
+    mockListPullRequestsForHead.mockReturnValue(Effect.succeed([
+      {
+        number: 444,
+        state: 'closed',
+        merged: true,
+        mergedAt: '2026-04-27T00:00:00Z',
+        mergeCommit: 'deadbeef',
+      },
+    ]));
+
+    await postMergeLifecycle(ISSUE_ID, PROJECT_PATH, SOURCE_BRANCH);
+
+    expect(mockListPullRequestsForHead).toHaveBeenCalledWith('test', 'test', SOURCE_BRANCH, 'all');
+    expect(mockExecAsync).not.toHaveBeenCalledWith(expect.stringContaining('gh pr list'));
+    expect(mockWriteFile).toHaveBeenCalledOnce();
+  });
+
+  it('recognizes a MERGED-state PR from the gh CLI fallback', async () => {
+    mockExecAsync.mockImplementation(async (cmd: string) => {
+      if (cmd.includes('gh pr list')) {
+        return { stdout: '[{"number":444,"state":"MERGED","mergedAt":"2026-04-27T00:00:00Z"}]', stderr: '' };
+      }
+      return defaultExecAsync(cmd);
+    });
+
+    await postMergeLifecycle(ISSUE_ID, PROJECT_PATH, SOURCE_BRANCH);
+
+    expect(mockWriteFile).toHaveBeenCalledOnce();
+    expect(mockSpawn).toHaveBeenCalledOnce();
   });
 
   it('defaults sourceBranch to empty string when not provided', async () => {
@@ -209,6 +273,89 @@ describe('postMergeLifecycle — step 0 deploy handoff', () => {
     // If lifecycle ran in-process, it would try to dynamic import lifecycle modules.
     // Since we only mocked spawn and writeFile, reaching this point means it returned early.
     expect(mockSpawn).toHaveBeenCalledOnce();
+  });
+
+  it('refuses post-merge lifecycle when no PR exists for the branch', async () => {
+    mockExecAsync.mockImplementation(async (cmd: string) => {
+      if (cmd.includes('gh pr list')) return { stdout: '[]', stderr: '' };
+      return { stdout: '', stderr: '' };
+    });
+
+    await postMergeLifecycle(ISSUE_ID, PROJECT_PATH, SOURCE_BRANCH);
+
+    expect(mockWriteFile).not.toHaveBeenCalled();
+    expect(mockSpawn).not.toHaveBeenCalled();
+  });
+
+  it('allows no-PR lifecycle only when the caller verified the merge separately', async () => {
+    mockExecAsync.mockImplementation(async (cmd: string) => {
+      if (cmd.includes('gh pr list')) return { stdout: '[]', stderr: '' };
+      return { stdout: '', stderr: '' };
+    });
+
+    await postMergeLifecycle(ISSUE_ID, PROJECT_PATH, SOURCE_BRANCH, {
+      allowVerifiedNoPrMerge: true,
+    });
+
+    expect(mockWriteFile).toHaveBeenCalledOnce();
+    expect(mockSpawn).toHaveBeenCalledOnce();
+  });
+
+  it('accepts an open PR when caller verified the member ref is on origin/main', async () => {
+    mockExecAsync.mockImplementation(async (cmd: string) => {
+      if (cmd.includes('gh pr list')) {
+        return { stdout: '[{"number":444,"mergedAt":null,"mergeCommit":null}]', stderr: '' };
+      }
+      if (cmd.includes("git merge-base --is-ancestor 'member-sha' origin/main")) {
+        return { stdout: '', stderr: '' };
+      }
+      return { stdout: '', stderr: '' };
+    });
+
+    await postMergeLifecycle(ISSUE_ID, PROJECT_PATH, SOURCE_BRANCH, {
+      verifiedMergedRef: 'member-sha',
+    });
+
+    expect(mockWriteFile).toHaveBeenCalledOnce();
+    expect(mockSpawn).toHaveBeenCalledOnce();
+  });
+
+  it('refuses an open PR when caller verified ref is not on origin/main', async () => {
+    mockExecAsync.mockImplementation(async (cmd: string) => {
+      if (cmd.includes('gh pr list')) {
+        return { stdout: '[{"number":444,"mergedAt":null,"mergeCommit":null}]', stderr: '' };
+      }
+      if (cmd.includes("git merge-base --is-ancestor 'member-sha' origin/main")) {
+        throw new Error('not ancestor');
+      }
+      return { stdout: '', stderr: '' };
+    });
+
+    await postMergeLifecycle(ISSUE_ID, PROJECT_PATH, SOURCE_BRANCH, {
+      verifiedMergedRef: 'member-sha',
+    });
+
+    expect(mockWriteFile).not.toHaveBeenCalled();
+    expect(mockSpawn).not.toHaveBeenCalled();
+  });
+
+  it('persists reviewStatus passed in the merge status write when requested', async () => {
+    await postMergeLifecycle(ISSUE_ID, PROJECT_PATH, SOURCE_BRANCH, { markReviewPassed: true });
+
+    expect(mockSetReviewStatusSync).toHaveBeenCalledWith(ISSUE_ID, {
+      mergeStatus: 'merged',
+      readyForMerge: false,
+      reviewStatus: 'passed',
+    });
+  });
+
+  it('does not persist reviewStatus passed by default', async () => {
+    await postMergeLifecycle(ISSUE_ID, PROJECT_PATH, SOURCE_BRANCH);
+
+    expect(mockSetReviewStatusSync).toHaveBeenCalledWith(ISSUE_ID, {
+      mergeStatus: 'merged',
+      readyForMerge: false,
+    });
   });
 
   // The in-process fallback path exercises several real dynamic imports and
@@ -273,6 +420,7 @@ describe('postMergeLifecycle — step 0 deploy handoff', () => {
 describe('postMergeLifecycle — repoRoot derivation', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockExecAsync.mockImplementation(defaultExecAsync);
     resetPostMergeState(ISSUE_ID);
     mockWriteFile.mockResolvedValue(undefined);
     mockSpawn.mockReturnValue(mockSpawnChild);

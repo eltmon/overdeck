@@ -9,7 +9,7 @@ When implementing a new feature:
 
 ## 1. Understand Requirements
 - Read the Linear/GitHub issue thoroughly
-- Check for an associated PRD draft at `<projectRoot>/.pan/drafts/<ISSUE-ID>.md` and the workspace vBRIEF at `.pan/spec.vbrief.json`
+- Check for an associated PRD draft at `<projectRoot>/.pan/drafts/<ISSUE-ID>.md` and the workspace xBRIEF at `.pan/spec.vbrief.json`
 - Identify acceptance criteria
 - Clarify ambiguities BEFORE coding
 

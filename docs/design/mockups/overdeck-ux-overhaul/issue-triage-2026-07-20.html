@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Issue triage — superseded by the UX overhaul (review before closing)</title>
+<style>
+  :root {
+    --bg: #080b10; --card: #0e1420; --card2: #111a2a; --border: #1e2a3d;
+    --fg: #dbe4f0; --muted: #7d8ca3; --primary: #5b8def; --success: #34c98e;
+    --warning: #e5b545; --danger: #e5635e; --info: #56b8e0;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--fg); font: 14px/1.55 "DM Sans", system-ui, sans-serif; padding: 32px 20px 120px; }
+  .wrap { max-width: 980px; margin: 0 auto; }
+  h1 { font-size: 24px; font-weight: 600; letter-spacing: -0.01em; }
+  h2 { font-size: 16px; font-weight: 700; margin: 30px 0 10px; display: flex; align-items: center; gap: 10px; }
+  .sub { color: var(--muted); margin-top: 6px; max-width: 80ch; }
+  .count { font-size: 11px; font-weight: 700; padding: 1px 8px; border-radius: 10px; background: var(--card2); border: 1px solid var(--border); color: var(--muted); }
+  .issue { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; margin-top: 10px; display: grid; grid-template-columns: 28px 1fr; gap: 10px; align-items: start; }
+  .issue input[type="checkbox"] { margin-top: 4px; width: 15px; height: 15px; accent-color: var(--primary); }
+  .issue .num { font-family: ui-monospace, monospace; font-weight: 700; color: var(--primary); }
+  .issue .title { font-weight: 600; }
+  .issue .why { color: var(--muted); font-size: 12.5px; margin-top: 3px; }
+  .issue .ev { color: var(--success); font-size: 12px; margin-top: 5px; }
+  .issue .ev a { color: var(--info); }
+  .tag { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; padding: 2px 7px; border-radius: 4px; margin-left: 8px; vertical-align: 2px; }
+  .tag.flag { background: #5b8def18; color: var(--primary); border: 1px solid #5b8def44; }
+  .tag.junk { background: #e5635e18; color: var(--danger); border: 1px solid #e5635e44; }
+  .tag.fixed { background: #34c98e18; color: var(--success); border: 1px solid #34c98e44; }
+  .tag.keep { background: #e5b54518; color: var(--warning); border: 1px solid #e5b54544; }
+  .tag.pipe { background: #a78bfa18; color: #a78bfa; border: 1px solid #a78bfa44; }
+  .btn { background: var(--primary); color: #fff; border: none; border-radius: 8px; padding: 9px 18px; font-weight: 600; cursor: pointer; font-size: 14px; }
+  .btn.ghost { background: transparent; border: 1px solid var(--border); color: var(--muted); }
+  .btnrow { display: flex; gap: 10px; margin-top: 26px; align-items: center; position: sticky; bottom: 16px; }
+  .hint { color: var(--muted); font-size: 11.5px; }
+  #out { display: none; margin-top: 18px; background: var(--card); border: 1px solid var(--primary); border-radius: 12px; padding: 14px; }
+  #out.show { display: block; }
+  #cmds { width: 100%; min-height: 170px; background: var(--bg); color: var(--fg); border: 1px solid var(--border); border-radius: 8px; padding: 10px; font: 12px/1.6 ui-monospace, monospace; }
+  a { color: var(--primary); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Issue triage — what the overhaul supersedes</h1>
+  <p class="sub">Reviewed all <b>~290 open issues</b> against the shipped work (simple mode, unified IssueDetail at drawer + cockpit densities, one action menu, one vocabulary, board rebuild, freshness, peeks/dock, theme + verdict cards, and the bug fixes). Tick what you want closed; the composer builds the <code>gh</code> commands with close-reasons. Nothing here touches issues other agents are actively working.</p>
+
+  <h2>① Close — delivered by this initiative <span class="count">6</span></h2>
+
+  <label class="issue"><input type="checkbox" data-close="2908" data-reason="All seven contracts delivered at acceptance (simple mode v3, unified IssueDetail at drawer+cockpit, one action model, one vocabulary, board at 26 cards first-render, freshness, conversation access) plus C-VERB verdict cards and the theme gate, per the PRD's status lines and the operator's amendments. Gates in CI; 2300+ tests green; deployed."><div><span class="num">#2908</span> <span class="title">Make overdeck not suck</span><span class="tag flag">flagship — your call</span><div class="why">The tracking issue for the whole overhaul. Every contract is at acceptance per its own PRD, including your amendments (no tree rail, no turn collapse).</div><div class="ev">Evidence: <a href="https://github.com/eltmon/overdeck/issues/2908#issuecomment-5022740547">status comments</a> · docs/prds/planned/overdeck-ux-overhaul.md rev 4</div></div></label>
+
+  <label class="issue"><input type="checkbox" data-close="2937" data-reason="Fixed: menu open state moved to a shared single-open store (lib/menuOpenState.ts) immune to live re-renders; test-setup resets it; IssueDrawer tests cover the open/close lifecycle."><div><span class="num">#2937</span> <span class="title">Board right-click context menu can close when live data ticks re-render the card</span><span class="tag fixed">fixed</span><div class="why">Root cause was open state in local useState lost on remount. Now a zustand slice; WS ticks can't close the menu.</div><div class="ev">Evidence: commit 6ff938f942</div></div></label>
+
+  <label class="issue"><input type="checkbox" data-close="2946" data-reason="Fixed: null runtime state guarded in the deacon's first-completion pass (src/lib/cloister/deacon-merge.ts); patrols no longer crash on 'Cannot read lastActivity of null'."><div><span class="num">#2946</span> <span class="title">Deacon crashes on null lastActivity in checkFirstCompletionAgents every patrol</span><span class="tag fixed">fixed</span><div class="why">Same commit as #2937; the guard is in and patrols run clean.</div><div class="ev">Evidence: commit 6ff938f942</div></div></label>
+
+  <label class="issue"><input type="checkbox" data-close="1991" data-reason="Superseded and delivered: the cockpit route now renders the ONE IssueDetail at page density — conversation-first default, binding tab set + cockpit's own Overview and appended extras (Code/Timeline/Discussion/Costs/Ship), session-tree lane collapsed behind a toggle. The incremental rollout's end state was reached through the UX overhaul (PRD overdeck-ux-overhaul.md, operator decisions 2026-07-20)."><div><span class="num">#1991</span> <span class="title">Issue cockpit redesign — incremental rollout (tracking)</span><span class="tag flag">superseded</span><div class="why">The old incremental checklist got absorbed: the cockpit is now the one IssueDetail at page density, verified live on PAN-2377.</div><div class="ev">Evidence: commit 235f56e576 · live capture cockpit-AFTER-page-density.png</div></div></label>
+
+  <label class="issue"><input type="checkbox" data-close="2556" data-reason="Delivered: 'Restart agent' is a first-class registry entry (lib/issueActions.ts:639, /api/agents/:agentId/restart) and renders in the issue action menu at work-running (snapshot-pinned in IssueDrawer.test.tsx)."><div><span class="num">#2556</span> <span class="title">Add a per-issue 'Restart agent' action — the restartAgent type exists but isn't wired into the issue menu</span><span class="tag fixed">delivered</span><div class="why">It IS wired into the issue menu now — registry entry, danger group, enabled whenever an agent exists.</div><div class="ev">Evidence: lib/issueActions.ts:639 · WORK_RUNNING menu snapshot</div></div></label>
+
+  <label class="issue"><input type="checkbox" data-close="2660" data-reason="Delivered: 'Reset to planned' is a first-class registry entry (lib/issueActions.ts:624, /api/issues/:id/reset-to-planned) and renders in the issue action menu (snapshot-pinned in IssueDrawer.test.tsx)."><div><span class="num">#2660</span> <span class="title">Add safe Reset to planned action to the issue actions menu</span><span class="tag fixed">delivered</span><div class="why">Same — present in the registry and in the rendered menu.</div><div class="ev">Evidence: lib/issueActions.ts:624</div></div></label>
+
+  <h2>② Close — junk / test artifacts <span class="count">2</span></h2>
+
+  <label class="issue"><input type="checkbox" data-close="2947" data-reason="Smoke-test artifact from the discuss-then-file flow verification (2026-07-20). No implementation expected."><div><span class="num">#2947</span> <span class="title">testing 1 2 3</span><span class="tag junk">test junk</span><div class="why">Test artifact; its text was used as the smoke-test prompt. Nothing to do.</div></div></label>
+
+  <label class="issue"><input type="checkbox" data-close="2949" data-reason="Disposable smoke-test issue for the discuss-then-file conversation flow — its own body says 'close when the test is complete'. The flow is verified (composer seeds discussion, agent files on request)."><div><span class="num">#2949</span> <span class="title">Test issue — discuss-then-file flow smoke test</span><span class="tag junk">test junk</span><div class="why">Filed by the flow's own smoke test; body says close when done. It's done.</div></div></label>
+
+  <h2>③ Close — already fixed elsewhere, just not closed <span class="count">1</span></h2>
+
+  <label class="issue"><input type="checkbox" data-close="2820" data-reason="Root-caused and fixed per the issue's own thread (unhandled rejection in boot-time lens gather). Current main boots cleanly — verified across repeated production restarts today (health 200, session-mint 200)."><div><span class="num">#2820</span> <span class="title">CRITICAL: main HEAD dashboard build stalls in boot before HTTP listen</span><span class="tag fixed">fixed per thread</span><div class="why">The thread's last comment says root-caused and fixed; main has booted cleanly through ~15 production restarts today.</div></div></label>
+
+  <h2>④ Keep open — NOT superseded (near-misses, so you can veto) <span class="count">12</span></h2>
+
+  <div class="issue"><div>·</div><div><span class="num">#2950</span> <span class="title">Refactor god files back under file-size ceilings after the UX overhaul</span><span class="tag keep">keep</span><div class="why">Filed BY this initiative as the debt companion — baselines were raised per your gate-guard direction; the refactor is intentionally future work, not done.</div></div></div>
+  <div class="issue"><div>·</div><div><span class="num">#2957</span> <span class="title">npm run build intermittently produces stale frontend bundles</span><span class="tag keep">keep</span><div class="why">Filed by this initiative; root cause untouched (I verify bundle freshness markers after every build instead).</div></div></div>
+  <div class="issue"><div>·</div><div><span class="num">#2936</span> <span class="title">Handle loop.max_steps_exceeded</span><span class="tag keep">keep</span><div class="why">Filed at your request (you hit it); agent-runtime work, not started.</div></div></div>
+  <div class="issue"><div>·</div><div><span class="num">#2968</span> <span class="title">Adopt the interactive decision page as the default way to present operator decisions</span><span class="tag keep">keep</span><div class="why">The pattern was validated once (decisions-2962-2967.html → you answered it). Productizing it as the default flow is its own task.</div></div></div>
+  <div class="issue"><div>·</div><div><span class="num">#2651</span> <span class="title">Simplify lifecycle reconciliation and add a safe post-planning reset</span><span class="tag keep">half done</span><div class="why">The reset half is delivered (resetToPlanned in the menu). The reconciliation simplification is cloister work, untouched.</div></div></div>
+  <div class="issue"><div>·</div><div><span class="num">#2394</span> <span class="title">conv-* agent-dir cleanup destroyed ohmypi/codex transcripts</span><span class="tag keep">keep</span><div class="why">Rendering is hardened (404 → honest 'no saved history' instead of the warning card). Preventing the destruction is the incident's real root cause — open.</div></div></div>
+  <div class="issue"><div>·</div><div><span class="num">#2895</span> <span class="title">Resume path retries a session whose JSONL is missing instead of falling back to fresh</span><span class="tag keep">keep</span><div class="why">Server-side resume-fallback behavior; my fix was frontend rendering only.</div></div></div>
+  <div class="issue"><div>·</div><div><span class="num">#2046</span> <span class="title">Conversation view does not surface terminal command responses</span><span class="tag keep">keep</span><div class="why">Command-response rendering in the timeline — not touched by the overhaul.</div></div></div>
+  <div class="issue"><div>·</div><div><span class="num">#2091</span> <span class="title">Delete dead IssueCockpitBody cockpit subtree</span><span class="tag keep">quick win</span><div class="why">Confirmed dead (IssueCockpitBody.tsx has 0 importers) but still on disk. Not superseded — just delete it anytime.</div></div></div>
+  <div class="issue"><div>·</div><div><span class="num">#2334 / #2335</span> <span class="title">Definition of Ready + full backlog junk review</span><span class="tag keep">keep</span><div class="why">This page covers supersession only; #2335 wants a full categorized review of all ~290 issues.</div></div></div>
+  <div class="issue"><div>·</div><div><span class="num">#2422 / #2337 / #2932</span> <span class="title">Build/boot robustness trio</span><span class="tag keep">keep</span><div class="why">My build-then-restart ritual mitigates them; the underlying atomicity/boot-wedge root causes are open.</div></div></div>
+  <div class="issue"><div>·</div><div><span class="num">#2377 · #2066 · #2858 · #2876 · #2599 · #2838</span> <span class="title">In-flight issues (in-review / in-progress)</span><span class="tag pipe">pipeline</span><div class="why">Being worked by other agents right now — untouched by this review.</div></div></div>
+
+  <div class="btnrow">
+    <button class="btn" onclick="compose()">Compose close commands</button>
+    <span class="hint">Generates <code>gh issue close</code> lines with reasons — review, paste, done. Unticked = keep open.</span>
+  </div>
+
+  <div id="out">
+    <b>Close commands</b> <span class="hint">— paste into a shell (review each first)</span>
+    <textarea id="cmds" readonly></textarea>
+    <div class="btnrow" style="position:static">
+      <button class="btn ghost" onclick="copyCmds()">Copy</button>
+    </div>
+  </div>
+</div>
+
+<script>
+function compose() {
+  const picked = [...document.querySelectorAll('input[type="checkbox"]:checked')];
+  const lines = picked.length ? [] : ['# (nothing ticked — no close commands)'];
+  for (const cb of picked) {
+    const n = cb.dataset.close, reason = cb.dataset.reason.replace(/"/g, '\\"');
+    lines.push(`gh issue close ${n} --comment "${reason}"`);
+  }
+  document.getElementById('cmds').value = lines.join('\n');
+  document.getElementById('out').classList.add('show');
+}
+function copyCmds() {
+  const t = document.getElementById('cmds');
+  t.select();
+  navigator.clipboard.writeText(t.value).catch(() => document.execCommand('copy'));
+}
+</script>
+</body>
+</html>

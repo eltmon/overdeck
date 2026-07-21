@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Order Book page — PAN-2377</title>
+</head>
+<body>
+<style>
+  :root {
+    --pan-scheme: dark; --background: #080b10; --foreground: #e5e7eb; --card: #0c1018; --card-2: #10151f;
+    --primary: oklch(0.588 0.217 264); --muted: color-mix(in srgb, white 4%, transparent); --muted-foreground: #9ca3af; --faint: #6b7280;
+    --border: color-mix(in srgb, white 6%, transparent); --input: color-mix(in srgb, white 8%, transparent);
+    --destructive: #f87171; --destructive-foreground: #fca5a5;
+    --warning: #f59e0b; --warning-foreground: #fbbf24;
+    --success: #10b981; --success-foreground: #34d399;
+    --info: #3b82f6; --info-foreground: #60a5fa; --shadow-card: none;
+  }
+  :root[data-theme="light"] {
+    --pan-scheme: light; --background: #ffffff; --foreground: #1f2937; --card: #ffffff; --card-2: #f7f7f8;
+    --primary: oklch(0.488 0.217 264); --muted: color-mix(in srgb, black 4%, transparent); --muted-foreground: #6b7280; --faint: #9ca3af;
+    --border: color-mix(in srgb, black 8%, transparent); --input: color-mix(in srgb, black 10%, transparent);
+    --destructive: #ef4444; --destructive-foreground: #b91c1c;
+    --warning-foreground: #b45309; --success-foreground: #047857; --info-foreground: #1d4ed8;
+    --shadow-card: 0 1px 3px rgba(0,0,0,.07), 0 4px 14px rgba(0,0,0,.05);
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--background); color: var(--foreground); color-scheme: var(--pan-scheme);
+    font-family: "DM Sans", ui-sans-serif, system-ui, sans-serif; font-weight: 500; font-size: 13.5px; line-height: 1.55; }
+  .mono { font-family: "SF Mono", ui-monospace, Menlo, monospace; }
+  .page { max-width: 1180px; margin: 0 auto; padding: 34px 24px 90px; }
+  header.doc { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; margin-bottom: 4px; }
+  h1 { font-size: 20px; font-weight: 500; margin: 0; letter-spacing: -0.01em; }
+  .doc-sub { color: var(--muted-foreground); font-size: 13px; margin: 0 0 22px; max-width: 76ch; }
+  .toolbtns { display: flex; gap: 8px; }
+  button.tool { background: none; border: 1px solid var(--border); border-radius: 6px; color: var(--muted-foreground); font: inherit; font-size: 12px; padding: 3px 10px; cursor: pointer; }
+  button.tool.on { color: var(--foreground); border-color: color-mix(in srgb, var(--primary) 45%, transparent); }
+
+  /* badge formula: 8% bg / 32% border */
+  .badge { display: inline-flex; align-items: center; gap: 5px; height: 20px; padding: 0 7px; border-radius: 3px; font-size: 10.5px; letter-spacing: .03em; font-weight: 500;
+    border: 1px solid var(--border); color: var(--muted-foreground); background: var(--muted); }
+  .badge.amber { background: color-mix(in srgb, var(--warning) 8%, transparent); border-color: color-mix(in srgb, var(--warning) 32%, transparent); color: var(--warning-foreground); }
+  .badge.blue  { background: color-mix(in srgb, var(--info) 8%, transparent); border-color: color-mix(in srgb, var(--info) 32%, transparent); color: var(--info-foreground); }
+  .badge.green { background: color-mix(in srgb, var(--success) 8%, transparent); border-color: color-mix(in srgb, var(--success) 32%, transparent); color: var(--success-foreground); }
+  .badge.fg { color: var(--foreground); }
+
+  /* app frame */
+  .app { border: 1px solid var(--border); border-radius: 12px; background: var(--card); box-shadow: var(--shadow-card); overflow: hidden; }
+  .appbar { display: flex; align-items: center; gap: 12px; padding: 11px 16px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+  .crumb { color: var(--faint); font-size: 12px; }
+  .crumb b { color: var(--foreground); font-weight: 500; font-size: 14px; }
+  .spacer { flex: 1; }
+  .stat { font-size: 11.5px; color: var(--muted-foreground); }
+  .stat .mono { color: var(--foreground); font-size: 11px; }
+
+  /* posture control */
+  .posture { display: flex; align-items: center; gap: 10px; padding: 10px 16px; border-bottom: 1px solid var(--border); background: var(--card-2); flex-wrap: wrap; }
+  .seg { display: inline-flex; border: 1px solid var(--input); border-radius: 7px; overflow: hidden; }
+  .seg button { appearance: none; border: 0; background: transparent; color: var(--muted-foreground); font: inherit; font-size: 12px; padding: 5px 14px; cursor: pointer; }
+  .seg button + button { border-left: 1px solid var(--input); }
+  .seg button.on-drain { color: var(--warning-foreground); background: color-mix(in srgb, var(--warning) 8%, transparent); }
+  .seg button.on-open { color: var(--foreground); background: var(--muted); }
+  .posture .why { font-size: 12px; color: var(--muted-foreground); max-width: 62ch; }
+  .posture .why b { color: var(--foreground); font-weight: 500; }
+
+  /* lanes */
+  .lanes { display: grid; grid-template-columns: 1fr 1fr; gap: 0; }
+  @media (max-width: 900px) { .lanes { grid-template-columns: 1fr; } }
+  .lane { padding: 14px 16px 18px; min-width: 0; }
+  .lane + .lane { border-left: 1px solid var(--border); }
+  @media (max-width: 900px) { .lane + .lane { border-left: 0; border-top: 1px solid var(--border); } }
+  .lanehead { display: flex; align-items: baseline; gap: 8px; margin-bottom: 4px; }
+  .lanehead h2 { font-size: 12px; font-weight: 500; text-transform: uppercase; letter-spacing: .08em; color: var(--muted-foreground); margin: 0; }
+  .lanehead .rule { font-size: 11.5px; color: var(--faint); }
+  .lanehead .count { margin-left: auto; font-size: 11px; color: var(--muted-foreground); }
+  .item { border: 1px solid var(--border); border-radius: 8px; margin-top: 8px; background: var(--card); overflow: hidden; }
+  .item.pipeline { border-left: 2px solid color-mix(in srgb, var(--info) 60%, transparent); }
+  .irow { display: flex; align-items: center; gap: 9px; padding: 8px 11px; cursor: pointer; font-size: 12.5px; }
+  .irow:hover { background: var(--muted); }
+  .irow .ord { color: var(--faint); font-size: 11px; width: 30px; flex: 0 0 auto; }
+  .irow .id { color: var(--foreground); font-size: 11.5px; width: 76px; flex: 0 0 auto; }
+  .irow .t { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted-foreground); }
+  .irow .caret { color: var(--faint); font-size: 10px; }
+  .detail { display: none; border-top: 1px solid var(--border); padding: 9px 12px 11px; background: var(--card-2); font-size: 12px; color: var(--muted-foreground); }
+  .item.open .detail { display: block; }
+  .detail dl { margin: 0; display: grid; grid-template-columns: 96px 1fr; gap: 3px 10px; }
+  .detail dt { color: var(--faint); font-size: 11px; }
+  .detail dd { margin: 0; }
+  .detail .acts { display: flex; gap: 8px; margin-top: 9px; }
+  .detail .acts button { background: none; border: 1px solid var(--input); border-radius: 6px; color: var(--muted-foreground); font: inherit; font-size: 11.5px; padding: 3px 10px; cursor: pointer; }
+  .detail .acts button.primary { color: var(--foreground); border-color: color-mix(in srgb, var(--primary) 45%, transparent); }
+  .addrow { margin-top: 10px; border: 1px dashed var(--input); border-radius: 8px; padding: 7px 11px; color: var(--faint); font-size: 12px; cursor: pointer; }
+  .addrow:hover { color: var(--muted-foreground); border-color: color-mix(in srgb, var(--primary) 45%, transparent); }
+
+  /* history */
+  .history { border-top: 1px solid var(--border); padding: 12px 16px 16px; }
+  .history h2 { font-size: 12px; font-weight: 500; text-transform: uppercase; letter-spacing: .08em; color: var(--muted-foreground); margin: 0 0 2px; cursor: pointer; }
+  .hrow { display: flex; align-items: center; gap: 9px; padding: 5px 0; font-size: 12px; color: var(--faint); border-top: 1px solid var(--border); }
+  .hrow:first-of-type { border-top: 0; }
+  .hrow .ord { width: 30px; flex: 0 0 auto; font-size: 11px; }
+  .hrow .id { width: 76px; flex: 0 0 auto; font-size: 11px; color: var(--muted-foreground); }
+  .hrow .t { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .hrow .when { font-size: 10.5px; }
+  .hrow .ok { color: var(--success-foreground); font-size: 11px; }
+
+  /* annotations */
+  .ann { display: none; margin: 22px 0 0; padding: 0; list-style: none; font-size: 13px; color: var(--muted-foreground); max-width: 76ch; }
+  body.annotate .ann { display: grid; gap: 8px; }
+  .ann li { padding-left: 24px; position: relative; }
+  .ann li::before { content: attr(data-n); position: absolute; left: 0; top: 2px; width: 16px; height: 16px; border-radius: 3px; font-size: 10px;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: color-mix(in srgb, var(--primary) 8%, transparent);
+    border: 1px solid color-mix(in srgb, var(--primary) 32%, transparent); color: var(--foreground); }
+  .ann strong { color: var(--foreground); font-weight: 500; }
+  .marker { display: none; position: absolute; width: 16px; height: 16px; border-radius: 3px; font-size: 10px; align-items: center; justify-content: center;
+    background: color-mix(in srgb, var(--primary) 12%, var(--card)); border: 1px solid color-mix(in srgb, var(--primary) 40%, transparent); color: var(--foreground); z-index: 2; }
+  body.annotate .marker { display: inline-flex; }
+  .rel { position: relative; }
+</style>
+
+<div class="page">
+  <header class="doc">
+    <h1>Order Book — operator special orders</h1>
+    <div class="toolbtns">
+      <button class="tool" id="annToggle" type="button">Annotations</button>
+      <button class="tool" id="themeToggle" type="button">Toggle theme</button>
+    </div>
+  </header>
+  <p class="doc-sub">PAN-2377 · dedicated page. The order book is the operator's curated campaign — distinct from the model-ranked backlog sequencer. Membership = release for the pickup gate; the global posture decides whether the flywheel may pick anything new up at all. Data below is the real book as of 2026-07-17: 13 of 17 landed, 4 held, posture DRAIN.</p>
+
+  <div class="app">
+    <div class="appbar rel">
+      <span class="marker" style="top:10px;left:2px">1</span>
+      <span class="crumb">Flywheel / <b>Order book</b> <span class="mono" style="font-size:11px;color:var(--faint)">master-plan-cicd-and-refactoring</span></span>
+      <span class="badge" title="Book lifecycle">campaign · active</span>
+      <span class="spacer"></span>
+      <span class="stat"><span class="mono">13</span>/<span class="mono">17</span> landed · <span class="mono">0</span> in pipeline · <span class="mono">4</span> held</span>
+      <span class="stat">bound to run <span class="mono">RUN-63</span></span>
+    </div>
+
+    <div class="posture rel">
+      <span class="marker" style="top:8px;left:2px">2</span>
+      <span style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted-foreground)">Pickup posture</span>
+      <div class="seg" id="seg">
+        <button id="btnDrain" class="on-drain">◼ DRAIN</button>
+        <button id="btnOpen">OPEN</button>
+      </div>
+      <span class="why" id="postureWhy"><b>Drain:</b> the flywheel shepherds in-flight work to done but picks up <b>nothing new</b> from this book. Set by operator 2026-07-16 · «hold pickup until PAN-2820 verifies on main».</span>
+    </div>
+
+    <div class="lanes">
+      <!-- Lane A -->
+      <div class="lane rel">
+        <span class="marker" style="top:38px;right:14px">3</span>
+        <div class="lanehead">
+          <h2>Lane A</h2><span class="rule">parallel-safe · overlap freely</span>
+          <span class="count">1 remaining</span>
+        </div>
+
+        <div class="item" data-id="PAN-2445">
+          <div class="irow" onclick="toggleItem(this)">
+            <span class="ord mono">A13</span>
+            <span class="id mono">PAN-2445</span>
+            <span class="t">Autonomous-dispatch hardening — spawns respect pickup posture</span>
+            <span class="badge">held</span>
+            <span class="caret">▸</span>
+          </div>
+          <div class="detail">
+            <dl>
+              <dt>Status</dt><dd>Held — waiting on operator release, then eligible the moment posture is OPEN.</dd>
+              <dt>Prereqs</dt><dd>none</dd>
+              <dt>Re-verify</dt><dd>no — PRD is preventive policy + tests; anchors stable</dd>
+              <dt>PRD</dt><dd class="mono" style="font-size:11px">drafts/pan-2445.md · Verified-Against: main @ 41c0de</dd>
+              <dt>Why in book</dt><dd>Operator-added 2026-07-06 — closes the silent-Fable-staffing hole on autonomous paths.</dd>
+            </dl>
+            <div class="acts"><button class="primary">Release item</button><button>Open issue</button><button>Move to Lane B</button><button>Remove from book</button></div>
+          </div>
+        </div>
+
+        <div class="addrow" onclick="this.textContent='［demo］ opens issue search — adding never dispatches; the book is a plan until posture is OPEN'">＋ Add special order to Lane A…</div>
+      </div>
+
+      <!-- Lane B -->
+      <div class="lane rel">
+        <span class="marker" style="top:38px;right:14px">4</span>
+        <div class="lanehead">
+          <h2>Lane B</h2><span class="rule">strictly serial · exactly one in flight</span>
+          <span class="count">3 remaining</span>
+        </div>
+
+        <div class="item" id="b11" data-id="PAN-2233">
+          <div class="irow" onclick="toggleItem(this)">
+            <span class="ord mono">B11</span>
+            <span class="id mono">PAN-2233</span>
+            <span class="t">Decompose cloister/merge-agent.ts (1,414 lines)</span>
+            <span class="badge amber" title="PRD must be re-checked against current main before dispatch">re-verify</span>
+            <span class="badge" id="b11status">held</span>
+            <span class="caret">▸</span>
+          </div>
+          <div class="detail">
+            <dl>
+              <dt>Status</dt><dd id="b11line">Held · next in Lane B — first pick when posture opens and the B slot is free.</dd>
+              <dt>Prereqs</dt><dd>A8 <span class="mono" style="font-size:11px">PAN-2297</span> <span style="color:var(--success-foreground)">✓ landed</span> · in-flight-guard test must stay green</dd>
+              <dt>Re-verify</dt><dd>yes — PRD written 07-02; B1–B10 touched its neighborhood. Planner walks the “Re-verify at execution” section first.</dd>
+              <dt>PRD</dt><dd class="mono" style="font-size:11px">drafts/pan-2233.md · Verified-Against: main @ 9e8d80</dd>
+            </dl>
+            <div class="acts"><button class="primary">Release item</button><button>Open issue</button><button>Re-verify PRD now</button><button>Remove from book</button></div>
+          </div>
+        </div>
+
+        <div class="item" data-id="PAN-2190">
+          <div class="irow" onclick="toggleItem(this)">
+            <span class="ord mono">B12</span>
+            <span class="id mono">PAN-2190</span>
+            <span class="t">Decompose routes/workspaces/merge-ops.ts (1,925 lines)</span>
+            <span class="badge amber">re-verify</span>
+            <span class="badge">held</span>
+            <span class="caret">▸</span>
+          </div>
+          <div class="detail">
+            <dl>
+              <dt>Status</dt><dd>Held · serial position 2 — blocked until B11 is closed out and main is green on origin.</dd>
+              <dt>Prereqs</dt><dd>B11 closed out · main CI green (TENET-10)</dd>
+              <dt>PRD</dt><dd class="mono" style="font-size:11px">drafts/pan-2190.md · re-verify required</dd>
+            </dl>
+            <div class="acts"><button class="primary">Release item</button><button>Open issue</button><button>Remove from book</button></div>
+          </div>
+        </div>
+
+        <div class="item" data-id="PAN-2189">
+          <div class="irow" onclick="toggleItem(this)">
+            <span class="ord mono">B13</span>
+            <span class="id mono">PAN-2189</span>
+            <span class="t">Decompose deacon.ts (3,394 lines)</span>
+            <span class="badge amber" style="color:var(--destructive-foreground);background:color-mix(in srgb, var(--destructive) 8%, transparent);border-color:color-mix(in srgb, var(--destructive) 32%, transparent)">no PRD</span>
+            <span class="badge">held</span>
+            <span class="caret">▸</span>
+          </div>
+          <div class="detail">
+            <dl>
+              <dt>Status</dt><dd>Held · serial position 3. PRD deliberately unwritten — its seams shift as B11–B12 land. Cannot be released until a PRD exists or it is marked “plan at pickup”.</dd>
+              <dt>Prereqs</dt><dd>B12 closed out · PRD authored fresh</dd>
+            </dl>
+            <div class="acts"><button class="primary" disabled style="opacity:.45;cursor:default">Release item</button><button>Open issue</button><button>Author PRD…</button></div>
+          </div>
+        </div>
+
+        <div class="addrow">＋ Add special order to Lane B (cloister-adjacent work)…</div>
+      </div>
+    </div>
+
+    <!-- landed history -->
+    <div class="history rel">
+      <span class="marker" style="top:10px;right:14px">5</span>
+      <h2 id="histHead" onclick="document.getElementById('hist').style.display = document.getElementById('hist').style.display==='none'?'block':'none'">▾ Landed — 13 items (history)</h2>
+      <div id="hist">
+        <div class="hrow"><span class="ord mono">B10</span><span class="id mono">PAN-2232</span><span class="t">Decompose cloister/specialists.ts</span><span class="ok">✓ landed</span><span class="when mono">07-16</span></div>
+        <div class="hrow"><span class="ord mono">B9</span><span class="id mono">PAN-2149</span><span class="t">Decompose cloister/service.ts</span><span class="ok">✓ landed</span><span class="when mono">07-14</span></div>
+        <div class="hrow"><span class="ord mono">A10</span><span class="id mono">PAN-2420</span><span class="t">GitHub App merge-door hardening</span><span class="ok">✓ landed</span><span class="when mono">07-11</span></div>
+        <div class="hrow"><span class="ord mono">A8</span><span class="id mono">PAN-2297</span><span class="t">Baseline auto-lower in post-merge-deploy.sh</span><span class="ok">✓ landed</span><span class="when mono">07-09</span></div>
+        <div class="hrow"><span class="ord mono">A1</span><span class="id mono">PAN-2373</span><span class="t">Flake policy — de-risks every later verification run</span><span class="ok">✓ landed</span><span class="when mono">07-05</span></div>
+        <div class="hrow" style="border-top:1px solid var(--border)"><span class="ord"></span><span class="id"></span><span class="t" style="font-style:italic">… 8 more (A2–A7, A9, A11–A12, B0–B8 collapsed in this mockup)</span><span class="when"></span></div>
+      </div>
+    </div>
+  </div>
+
+  <ul class="ann">
+    <li data-n="1"><strong>The book is a first-class page, not prose.</strong> Today the order book is a markdown file the model must honor; here every item is a row with mechanical status. The header states the three numbers that matter — landed, in pipeline, held — and which run the book is bound to.</li>
+    <li data-n="2"><strong>Posture is the single most prominent control, and it is amber on DRAIN</strong> because amber = a human is holding the gate (style-guide semantics: amber means a human must act). OPEN is deliberately neutral — an open gate is the rest state, not a signal. The control always shows who set it and why; flipping it is the operator's one-click release of the whole plan (pre-released semantics: membership = release, posture = the master valve).</li>
+    <li data-n="3"><strong>Lane A and Lane B are columns with their rule in the header, not a shared list.</strong> Lane semantics are the feature: A overlaps freely, B is one-in-flight. Held/released rows are neutral; only in-pipeline (blue = machine working) and landed (emerald = outcome) ever carry color — one colored signal per row max.</li>
+    <li data-n="4"><strong>Serial position is explained in the row detail, not implied.</strong> B12's detail says exactly what blocks it (B11 closed out + green main). B13 shows the no-PRD block with a disabled Release — the validation lives on the item, where the operator acts.</li>
+    <li data-n="5"><strong>Landed items stay in the book as history</strong> (emerald ✓, muted rows, collapsible). The book doubles as the campaign's record — 13/17 tells the drain story at a glance, and the completed run's retro links from here.</li>
+  </ul>
+
+  <ul class="ann" style="margin-top:12px">
+    <li data-n="✎"><strong>Interactive in this mockup:</strong> click any item row to expand its detail · DRAIN/OPEN segmented control flips posture copy · “Landed” header collapses history · theme toggle.</li>
+  </ul>
+</div>
+
+<script>
+  document.getElementById('themeToggle').onclick = () => {
+    const r = document.documentElement;
+    r.dataset.theme = r.dataset.theme === 'light' ? 'dark' : 'light';
+  };
+  document.getElementById('annToggle').onclick = (e) => {
+    document.body.classList.toggle('annotate');
+    e.target.classList.toggle('on');
+  };
+  function toggleItem(row) {
+    const it = row.closest('.item');
+    it.classList.toggle('open');
+    row.querySelector('.caret').textContent = it.classList.contains('open') ? '▾' : '▸';
+  }
+  // posture demo
+  const btnDrain = document.getElementById('btnDrain'), btnOpen = document.getElementById('btnOpen');
+  const why = document.getElementById('postureWhy');
+  btnDrain.onclick = () => setPosture('drain');
+  btnOpen.onclick = () => setPosture('open');
+  function setPosture(p) {
+    const drain = p === 'drain';
+    btnDrain.className = drain ? 'on-drain' : '';
+    btnOpen.className = drain ? '' : 'on-open';
+    btnDrain.textContent = drain ? '◼ DRAIN' : 'DRAIN';
+    why.innerHTML = drain
+      ? '<b>Drain:</b> the flywheel shepherds in-flight work to done but picks up <b>nothing new</b> from this book. Set by operator 2026-07-16 · «hold pickup until PAN-2820 verifies on main».'
+      : '<b>Open:</b> the flywheel may pick up the next eligible item per lane rules — Lane A freely, Lane B one at a time. First pick: <span class="mono" style="font-size:11px">PAN-2233</span> (B11).';
+    // demo: opening the gate shows B11 flip to in-pipeline
+    const st = document.getElementById('b11status'), line = document.getElementById('b11line'), item = document.getElementById('b11');
+    if (drain) {
+      st.className = 'badge'; st.textContent = 'held'; item.classList.remove('pipeline');
+      line.textContent = 'Held · next in Lane B — first pick when posture opens and the B slot is free.';
+    } else {
+      st.className = 'badge blue'; st.textContent = '● in pipeline'; item.classList.add('pipeline');
+      line.textContent = 'In pipeline — picked up by RUN-63 · planning re-verify in progress (agent-pan-2233).';
+    }
+  }
+</script>
+</body>
+</html>

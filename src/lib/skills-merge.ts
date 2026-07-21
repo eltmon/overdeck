@@ -6,7 +6,6 @@ import {
   readFileSync,
   writeFileSync,
   copyFileSync,
-  statSync,
 } from 'fs';
 import { join, relative, dirname } from 'path';
 import { SKILLS_DIR, CACHE_AGENTS_DIR, CACHE_RULES_DIR } from './paths.js';
@@ -17,7 +16,6 @@ import {
   hashFileSync,
   setManifestEntry,
   compareFileToManifest,
-  type Manifest,
 } from './manifest.js';
 import { FsError } from './errors.js';
 
@@ -83,13 +81,13 @@ export function mergeSkillsIntoWorkspaceSync(workspacePath: string): MergeResult
   mkdirSync(join(claudeDir, 'agents'), { recursive: true });
 
   // Sources to copy: category → source cache directory
-  const sources: Array<{ category: string; sourceDir: string; targetSubdir: string }> = [
-    { category: 'skills', sourceDir: SKILLS_DIR, targetSubdir: 'skills' },
-    { category: 'agents', sourceDir: CACHE_AGENTS_DIR, targetSubdir: 'agents' },
-    { category: 'rules', sourceDir: CACHE_RULES_DIR, targetSubdir: 'rules' },
+  const sources: Array<{ sourceDir: string; targetSubdir: string }> = [
+    { sourceDir: SKILLS_DIR, targetSubdir: 'skills' },
+    { sourceDir: CACHE_AGENTS_DIR, targetSubdir: 'agents' },
+    { sourceDir: CACHE_RULES_DIR, targetSubdir: 'rules' },
   ];
 
-  for (const { category, sourceDir, targetSubdir } of sources) {
+  for (const { sourceDir, targetSubdir } of sources) {
     if (!existsSync(sourceDir)) continue;
 
     const prefix = targetSubdir ? `${targetSubdir}/` : '';

@@ -5,9 +5,12 @@ import { formatBucketLabel, groupByContiguousLabel } from '../../lib/sessionFeed
 import { BucketSection } from './BucketSection';
 import type { SessionFeedEntry, SessionFeedTab } from './types';
 import { useMergedFeed } from './useMergedFeed';
-import { useDashboardStore, selectPendingInputSubjects, selectIssues } from '../../lib/store';
+import { useDashboardStore, selectIssues } from '../../lib/store';
+import { usePendingInputSubjects } from '../../lib/useDecisions';
+import { DecisionsPanel } from '../DecisionsPanel';
 import { describePendingInput } from '../../lib/pendingInput';
 import { useAskUserQuestionUiStore } from '../../lib/askUserQuestionUiStore';
+import { LoadingBoundary } from '../primitives/LoadingBoundary';
 
 // ActivityPanel.tsx is the raw activity log; CommandDeck/ActivityFeedSidebar.tsx is per-issue observations; this SessionFeedSidebar is the cross-session feed.
 export const SESSION_FEED_TAB_STORAGE_KEY = 'overdeck.ui.sessionFeedSidebarTab';
@@ -71,7 +74,9 @@ export function SessionFeedSidebar({ onClose, onSelect = navigateToFeedEntry, no
   }, [scope]);
 
   // Pending-input subjects drive the "Needs you" count badge on the scope switch.
-  const pendingSubjects = useDashboardStore(selectPendingInputSubjects);
+  // Conversations live behind a different door than agents; this union is the
+  // only enumeration that sees both, so the count cannot under-report.
+  const pendingSubjects = usePendingInputSubjects();
   const needsCount = scopeSwitcher ? pendingSubjects.length : 0;
 
   // Resolve the effective scope of the underlying feed. Without the switcher we
@@ -125,7 +130,14 @@ export function SessionFeedSidebar({ onClose, onSelect = navigateToFeedEntry, no
         </div>
       )}
 
-      <NeedsYouSection issueIds={effIssueIds} unscoped={effUnscoped} showEmpty={scopeSwitcher && scope === 'needs'} />
+      {scopeSwitcher && scope === 'needs' ? (
+        // The dedicated Decisions view: grouped by consequence, and deliberately
+        // NOT filtered by dismissal — dismissing a dialog must never lose the
+        // decision, which is the whole point of having somewhere to find it again.
+        <DecisionsPanel />
+      ) : (
+        <NeedsYouSection issueIds={effIssueIds} unscoped={effUnscoped} />
+      )}
 
       {showFeed && (
         <>
@@ -171,13 +183,17 @@ export function SessionFeedSidebar({ onClose, onSelect = navigateToFeedEntry, no
  * Activity) unless `unscoped` (home Activity Feed). PAN-1395 / PAN-1520.
  */
 function NeedsYouSection({ issueIds, unscoped, showEmpty = false }: { issueIds?: readonly string[]; unscoped?: boolean; showEmpty?: boolean }) {
-  const subjects = useDashboardStore(selectPendingInputSubjects);
+  const subjects = usePendingInputSubjects();
   const issues = useDashboardStore(selectIssues);
   const requestReopen = useAskUserQuestionUiStore((s) => s.requestReopen);
   // PAN-1563 — honor the same answered/dismissed state the dialog uses so an
   // answered or dismissed item disappears from here too, not just the modal.
   const answeredToolUseIds = useAskUserQuestionUiStore((s) => s.answeredToolUseIds);
   const dismissedSubjectIds = useAskUserQuestionUiStore((s) => s.dismissedSubjectIds);
+  // PAN-1520 (FR-5/FR-7) — plan-approval marks are tracked separately so a
+  // dismissed AUQ never hides a pending plan on the same subject.
+  const resolvedPlanToolUseIds = useAskUserQuestionUiStore((s) => s.resolvedPlanToolUseIds);
+  const dismissedPlanSubjectIds = useAskUserQuestionUiStore((s) => s.dismissedPlanSubjectIds);
 
   // Resolve a friendly title per issue id so the entry reads like a human label
   // (e.g. the issue title) rather than the raw id. PAN-1520.
@@ -214,19 +230,28 @@ function NeedsYouSection({ issueIds, unscoped, showEmpty = false }: { issueIds?:
     }> = [];
     for (const subject of scoped) {
       const toolUseId = subject.pendingAskUserQuestion?.toolUseId;
-      if (toolUseId && answeredToolUseIds.has(toolUseId)) continue;
-      if (dismissedSubjectIds.has(subject.agentId)) continue;
+      const planToolUseId = subject.pendingProposedPlan?.toolUseId;
+      const auqResolved = !toolUseId || answeredToolUseIds.has(toolUseId) || dismissedSubjectIds.has(subject.agentId);
+      const planResolved = !planToolUseId || resolvedPlanToolUseIds.has(planToolUseId) || dismissedPlanSubjectIds.has(subject.agentId);
+      // Keep the row while ANY of its surfaces is still unresolved. A subject
+      // whose only kinds carry no payload (sessionResume, rateLimit,
+      // permissionRequest) uses the AUQ dismissal like before.
+      const hasPayload = Boolean(toolUseId || planToolUseId);
+      if (hasPayload ? (auqResolved && planResolved) : dismissedSubjectIds.has(subject.agentId)) continue;
       const q = subject.pendingAskUserQuestion;
       const count = q?.questions?.length ?? 0;
-      const detail = q?.questions?.[0]?.question ?? describePendingInput(subject.kinds);
+      const detail =
+        (!auqResolved ? q?.questions?.[0]?.question : undefined) ??
+        (!planResolved && planToolUseId ? 'Plan awaiting your approval — click to review' : undefined) ??
+        describePendingInput(subject.kinds);
       const label = (subject.issueId && titleByIssueId.get(subject.issueId)) || subject.issueId || subject.agentId;
-      const dedupKey = toolUseId ?? `${subject.issueId ?? subject.agentId}::${label}::${detail}`;
+      const dedupKey = (!auqResolved ? toolUseId : undefined) ?? (!planResolved ? planToolUseId : undefined) ?? `${subject.issueId ?? subject.agentId}::${label}::${detail}`;
       if (seen.has(dedupKey)) continue;
       seen.add(dedupKey);
       out.push({ key: dedupKey, agentId: subject.agentId, label, detail, count, title: describePendingInput(subject.kinds) });
     }
     return out;
-  }, [scoped, answeredToolUseIds, dismissedSubjectIds, titleByIssueId]);
+  }, [scoped, answeredToolUseIds, dismissedSubjectIds, resolvedPlanToolUseIds, dismissedPlanSubjectIds, titleByIssueId]);
 
   // Keep the section mounted while any raw subject exists so AnimatePresence can
   // animate the last answered/dismissed card out before the box collapses.
@@ -308,7 +333,7 @@ function FeedTabContent({ tab, onSelect, now, issueIds, unscoped }: { tab: Wired
   const isEmpty = tab === 'all' ? scopedAll.length === 0 : scopedEntries.length === 0;
 
   if (feed.error) return <p className="text-xs text-destructive">{feed.error.message}</p>;
-  if (feed.isLoading) return <p className="text-xs text-muted-foreground">Loading activity…</p>;
+  if (feed.isLoading) return <LoadingBoundary label="The activity feed" timeoutMs={8000}><p className="text-xs text-muted-foreground">Loading activity…</p></LoadingBoundary>;
   if (isEmpty) {
     return (
       <div data-testid={`session-feed-empty-${tab}`} className="rounded-lg border border-dashed border-border p-4 text-center text-xs text-muted-foreground">

@@ -18,12 +18,12 @@
  */
 export function needsReviewDispatch(params: {
   reviewRequestedAt?: string;
-  reviewSpawnedAt?: string;
+  reviewSpawnedAt?: string | number;
   reviewStatus?: string;
   mergeStatus?: string;
 }): boolean {
   if (!params.reviewRequestedAt) return false;
   if (params.reviewStatus === 'reviewing') return false;
   if (params.mergeStatus === 'merged') return false;
-  return !params.reviewSpawnedAt || params.reviewRequestedAt > params.reviewSpawnedAt;
+  return !params.reviewSpawnedAt || Date.parse(params.reviewRequestedAt) > new Date(params.reviewSpawnedAt).getTime();
 }

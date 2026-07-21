@@ -13,7 +13,7 @@ scope word alone determines the destination:
 | --- | --- | --- |
 | **universal rule** | every machine, every project | bundled rule: `sync-sources/rules/<name>.md` in overdeck, `scope: universal` |
 | **dev rule** | Overdeck development only | bundled rule: `sync-sources/rules/<name>.md`, `scope: dev` |
-| **project rule** | one project | `<projectRoot>/.pan/context/project.md` (project layer) |
+| **project rule** | one project | `<projectRoot>/.overdeck/context/project.md` (project layer) |
 | **machine rule** | this machine only | `~/.overdeck/context/global.md` (global layer) |
 
 After writing any of them, run `pan sync`. Changes reach **new** sessions only.
@@ -25,3 +25,8 @@ context files**; never edit them directly.
 Translate vague or ad-hoc terms ("global context template", "the CLAUDE.md
 template") into one of the four scopes above, and confirm the routing when the
 universal-vs-project choice is ambiguous.
+
+Context is code-owned and does not live on the state branch. Permanent project
+state for migrated projects lives on `overdeck-state` (on disk at
+`${OVERDECK_HOME}/state/<project>/`); unmigrated projects alone retain the
+legacy `<projectRoot>/.pan/` state surface until cutover.

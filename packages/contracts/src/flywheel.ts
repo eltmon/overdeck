@@ -6,7 +6,7 @@ export type FlywheelRunId = typeof FlywheelRunId.Type
 export const FlywheelHttpUrl = Schema.String.check(Schema.isPattern(/^https?:\/\/\S+$/i))
 export type FlywheelHttpUrl = typeof FlywheelHttpUrl.Type
 
-export const FlywheelHarness = Schema.Literals(["claude-code", "pi", "codex"])
+export const FlywheelHarness = Schema.Literals(["claude-code", "pi", "ohmypi", "codex", "acp"])
 export interface FlywheelOrchestrator {
   harness: typeof FlywheelHarness.Type
   model: string
@@ -180,6 +180,9 @@ export interface FlywheelSuggestion {
   issueId?: string | undefined
   rationale: string
   priority: FlywheelSuggestionPriority
+  filedBy?: "agent" | "operator" | undefined
+  weight?: number | undefined
+  weightReason?: string | undefined
 }
 
 export const FlywheelSuggestion = Schema.Struct({
@@ -187,6 +190,9 @@ export const FlywheelSuggestion = Schema.Struct({
   issueId: Schema.optional(Schema.String),
   rationale: Schema.String,
   priority: FlywheelSuggestionPriority,
+  filedBy: Schema.optional(Schema.Literals(["agent", "operator"])),
+  weight: Schema.optional(Schema.Number),
+  weightReason: Schema.optional(Schema.String),
 })
 
 export interface FlywheelSystemStatus {

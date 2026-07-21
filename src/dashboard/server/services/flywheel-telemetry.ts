@@ -39,7 +39,7 @@ export type Criterion6ComplexityBucket = 'simple' | 'medium' | 'complex';
 
 export interface Criterion6PipelineRun {
   metrics: PipelineRunMetrics;
-  beadsCount?: number;
+  tasksCount?: number;
   planItemsCount?: number;
 }
 
@@ -351,7 +351,7 @@ export function complexityBucketForItemCount(itemCount: number): Criterion6Compl
 }
 
 function bucketForRun(run: Criterion6PipelineRun): Criterion6ComplexityBucket | null {
-  return complexityBucketForItemCount(run.beadsCount ?? run.planItemsCount ?? 0);
+  return complexityBucketForItemCount(run.tasksCount ?? run.planItemsCount ?? 0);
 }
 
 function totalPipelineMs(metrics: PipelineRunMetrics): number | null {

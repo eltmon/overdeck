@@ -5,23 +5,23 @@ import { refreshDashboardState } from '../lib/refresh-dashboard-state';
 interface ArtifactLinksProps {
   issueId: string;
   hasPlan: boolean;
-  hasBeads: boolean;
-  beadsCount?: number;  // Deprecated — use hasBeads
-  onViewBeads: () => void;
-  onViewVBrief: () => void;
+  hasTasks: boolean;
+  tasksCount?: number;  // Deprecated — use hasTasks
+  onViewTasks: () => void;
+  onViewXBrief: () => void;
   variant: 'card' | 'inspector';
 }
 
 export function ArtifactLinks({
   issueId,
   hasPlan,
-  hasBeads,
-  onViewBeads,
-  onViewVBrief,
+  hasTasks,
+  onViewTasks,
+  onViewXBrief,
   variant,
 }: ArtifactLinksProps) {
   const queryClient = useQueryClient();
-  const needsTaskGeneration = hasPlan && !hasBeads;
+  const needsTaskGeneration = hasPlan && !hasTasks;
 
   const generateTasksMutation = useMutation({
     mutationFn: async () => {
@@ -43,19 +43,19 @@ export function ArtifactLinks({
     if (needsTaskGeneration) {
       if (!generateTasksMutation.isPending) generateTasksMutation.mutate();
     } else {
-      onViewBeads();
+      onViewTasks();
     }
   };
 
-  const handleVBriefClick = (e?: React.MouseEvent) => {
+  const handleXBriefClick = (e?: React.MouseEvent) => {
     e?.stopPropagation();
-    onViewVBrief();
+    onViewXBrief();
   };
 
   if (variant === 'inspector') {
     return (
       <>
-        {(hasBeads || needsTaskGeneration) && (
+        {(hasTasks || needsTaskGeneration) && (
           <button
             onClick={() => handleTasksClick()}
             disabled={generateTasksMutation.isPending}
@@ -71,11 +71,11 @@ export function ArtifactLinks({
         )}
         {hasPlan && (
           <button
-            onClick={() => handleVBriefClick()}
+            onClick={() => handleXBriefClick()}
             className="flex items-center gap-1.5 text-signal-review hover:text-signal-review/80"
           >
             <ScrollText className="w-3 h-3" />
-            <span>vBRIEF</span>
+            <span>xBRIEF</span>
           </button>
         )}
       </>
@@ -85,7 +85,7 @@ export function ArtifactLinks({
   // card variant — compact chips
   return (
     <>
-      {(hasBeads || needsTaskGeneration) && (
+      {(hasTasks || needsTaskGeneration) && (
         <button
           onClick={(e) => handleTasksClick(e)}
           disabled={generateTasksMutation.isPending}
@@ -94,7 +94,7 @@ export function ArtifactLinks({
               ? 'text-destructive hover:text-destructive/80 font-medium'
               : 'text-success hover:text-success/80'
           }`}
-          title={needsTaskGeneration ? 'Generate beads from vBRIEF plan' : 'Tasks'}
+          title={needsTaskGeneration ? 'Generate tasks from xBRIEF plan' : 'Tasks'}
         >
           {generateTasksMutation.isPending ? (
             <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -106,12 +106,12 @@ export function ArtifactLinks({
       )}
       {hasPlan && (
         <button
-          onClick={(e) => handleVBriefClick(e)}
+          onClick={(e) => handleXBriefClick(e)}
           className="flex items-center gap-1 text-xs text-success hover:text-success/80 transition-colors"
-          title="vBRIEF"
+          title="xBRIEF"
         >
           <ScrollText className="w-3.5 h-3.5" />
-          vBRIEF
+          xBRIEF
         </button>
       )}
     </>

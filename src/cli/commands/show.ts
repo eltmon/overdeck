@@ -19,9 +19,10 @@ import { contextCommand } from './context.js';
 import { healthCommand } from './health.js';
 import { getShadowState } from '../../lib/shadow-state.js';
 import { pingAgent } from '../../lib/health.js';
-import { getAgentCVSync } from '../../lib/cv.js';
-import { getAgentRuntimeStateSync } from '../../lib/agents.js';
+import { readAgentCVSync } from '../../lib/cv.js';
+import { getAgentRuntimeStateSync, getAgentStateSync } from '../../lib/agents.js';
 import { resolveBareNumericIdSync } from '../../lib/issue-id.js';
+import { getReviewStatusSync } from '../../lib/review-status.js';
 
 interface ShowOptions {
   shadow?: boolean;
@@ -71,11 +72,15 @@ export async function showCommand(id: string, options: ShowOptions = {}): Promis
   if (health) return healthCommand('ping', issueId, { json });
 
   const shadowState = await Effect.runPromise(getShadowState(issueId));
-  const healthData = await Effect.runPromise(
-    pingAgent(agentId).pipe(Effect.catch(() => Effect.succeed(null))),
-  );
   const runtimeState = getAgentRuntimeStateSync(agentId);
-  const cvData = getAgentCVSync(agentId);
+  const agentState = getAgentStateSync(agentId);
+  const healthData = agentState || runtimeState
+    ? await Effect.runPromise(
+      pingAgent(agentId).pipe(Effect.catch(() => Effect.succeed(null))),
+    )
+    : null;
+  const cvData = readAgentCVSync(agentId);
+  const pipelineStatus = getReviewStatusSync(issueId);
 
   if (json) {
     console.log(JSON.stringify({
@@ -84,6 +89,7 @@ export async function showCommand(id: string, options: ShowOptions = {}): Promis
       shadow: shadowState,
       health: healthData,
       cv: cvData,
+      pipeline: pipelineStatus,
     }, null, 2));
     return;
   }
@@ -99,6 +105,15 @@ export async function showCommand(id: string, options: ShowOptions = {}): Promis
     console.log(`  ${chalk.dim('shadow')}   ${shadowState.shadowStatus}${driftMarker}  ${chalk.dim('·')} shadowed ${relativeTime(shadowState.shadowedAt)}`);
   } else {
     console.log(`  ${chalk.dim('shadow')}   ${chalk.dim('(not shadowed)')}`);
+  }
+
+  if (pipelineStatus?.stuck) {
+    let detail = '';
+    try {
+      const parsed = JSON.parse(pipelineStatus.stuckDetails ?? '{}') as { workAgentError?: unknown };
+      if (typeof parsed.workAgentError === 'string') detail = `  ${chalk.dim('·')} ${parsed.workAgentError}`;
+    } catch { /* malformed legacy details are non-fatal */ }
+    console.log(`  ${chalk.dim('pipeline')} ${chalk.red('blocked')}  ${chalk.dim('·')} ${pipelineStatus.stuckReason ?? 'stuck'}${detail}`);
   }
 
   // Health line
@@ -123,8 +138,8 @@ export async function showCommand(id: string, options: ShowOptions = {}): Promis
   }
 
   // CV line (stats summary)
-  const stats = cvData.stats;
-  if (stats.totalIssues > 0) {
+  const stats = cvData?.stats;
+  if (stats && stats.totalIssues > 0) {
     const successPct = (stats.successRate * 100).toFixed(0);
     const avg = stats.avgDuration > 0 ? `${stats.avgDuration}m avg` : '—';
     const completedCount = stats.successCount + stats.failureCount + stats.abandonedCount;
@@ -138,7 +153,7 @@ export async function showCommand(id: string, options: ShowOptions = {}): Promis
   }
 
   // Recent CV entries (up to 3)
-  const recent = cvData.recentWork?.slice(-3).reverse() ?? [];
+  const recent = cvData?.recentWork?.slice(-3).reverse() ?? [];
   if (recent.length > 0) {
     console.log('');
     console.log(chalk.dim('  recent:'));

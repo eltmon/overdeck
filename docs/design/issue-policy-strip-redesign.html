@@ -1,0 +1,553 @@
+<title>Issue policy strip — redesign proposal</title>
+<style>
+  :root {
+    --pan-scheme: light;
+    --background: #ffffff;
+    --foreground: #1f2937;
+    --card: #ffffff;
+    --card-2: #f7f7f8;
+    --popover: #ffffff;
+    --primary: oklch(0.488 0.217 264);
+    --primary-foreground: #ffffff;
+    --muted: color-mix(in srgb, black 4%, transparent);
+    --muted-foreground: #6b7280;
+    --border: color-mix(in srgb, black 8%, transparent);
+    --input: color-mix(in srgb, black 10%, transparent);
+    --destructive: #ef4444;
+    --destructive-foreground: #b91c1c;
+    --warning: #f59e0b;
+    --warning-foreground: #b45309;
+    --success: #10b981;
+    --success-foreground: #047857;
+    --signal-cost: #06b6d4;
+    --signal-cost-foreground: #0e7490;
+    --shadow-card: 0 1px 3px rgba(0,0,0,.07), 0 4px 14px rgba(0,0,0,.05);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --pan-scheme: dark;
+      --background: #080b10;
+      --foreground: #e5e7eb;
+      --card: #0c1018;
+      --card-2: #10151f;
+      --popover: #0c1018;
+      --primary: oklch(0.588 0.217 264);
+      --primary-foreground: #ffffff;
+      --muted: color-mix(in srgb, white 4%, transparent);
+      --muted-foreground: #9ca3af;
+      --border: color-mix(in srgb, white 6%, transparent);
+      --input: color-mix(in srgb, white 8%, transparent);
+      --destructive: #f87171;
+      --destructive-foreground: #fca5a5;
+      --warning: #f59e0b;
+      --warning-foreground: #fbbf24;
+      --success: #10b981;
+      --success-foreground: #34d399;
+      --signal-cost: #06b6d4;
+      --signal-cost-foreground: #22d3ee;
+      --shadow-card: none;
+    }
+  }
+  :root[data-theme="dark"] {
+    --pan-scheme: dark;
+    --background: #080b10;
+    --foreground: #e5e7eb;
+    --card: #0c1018;
+    --card-2: #10151f;
+    --popover: #0c1018;
+    --primary: oklch(0.588 0.217 264);
+    --primary-foreground: #ffffff;
+    --muted: color-mix(in srgb, white 4%, transparent);
+    --muted-foreground: #9ca3af;
+    --border: color-mix(in srgb, white 6%, transparent);
+    --input: color-mix(in srgb, white 8%, transparent);
+    --destructive: #f87171;
+    --destructive-foreground: #fca5a5;
+    --warning: #f59e0b;
+    --warning-foreground: #fbbf24;
+    --success: #10b981;
+    --success-foreground: #34d399;
+    --signal-cost: #06b6d4;
+    --signal-cost-foreground: #22d3ee;
+    --shadow-card: none;
+  }
+  :root[data-theme="light"] {
+    --pan-scheme: light;
+    --background: #ffffff;
+    --foreground: #1f2937;
+    --card: #ffffff;
+    --card-2: #f7f7f8;
+    --popover: #ffffff;
+    --primary: oklch(0.488 0.217 264);
+    --primary-foreground: #ffffff;
+    --muted: color-mix(in srgb, black 4%, transparent);
+    --muted-foreground: #6b7280;
+    --border: color-mix(in srgb, black 8%, transparent);
+    --input: color-mix(in srgb, black 10%, transparent);
+    --destructive: #ef4444;
+    --destructive-foreground: #b91c1c;
+    --warning: #f59e0b;
+    --warning-foreground: #b45309;
+    --success: #10b981;
+    --success-foreground: #047857;
+    --signal-cost: #06b6d4;
+    --signal-cost-foreground: #0e7490;
+    --shadow-card: 0 1px 3px rgba(0,0,0,.07), 0 4px 14px rgba(0,0,0,.05);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--background);
+    color: var(--foreground);
+    font-family: 'DM Sans', ui-sans-serif, system-ui, -apple-system, sans-serif;
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 1.55;
+    color-scheme: var(--pan-scheme);
+  }
+  .mono { font-family: 'SF Mono', ui-monospace, 'Cascadia Mono', 'JetBrains Mono', monospace; }
+
+  .page { max-width: 920px; margin: 0 auto; padding: 40px 24px 96px; }
+  header.doc { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; margin-bottom: 6px; }
+  h1 { font-size: 21px; font-weight: 500; margin: 0; letter-spacing: -0.01em; text-wrap: balance; }
+  .doc-sub { color: var(--muted-foreground); font-size: 13px; margin: 0 0 36px; max-width: 62ch; }
+  .doc-sub .mono { font-size: 12px; }
+  h2 { font-size: 12px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.09em; color: var(--muted-foreground); margin: 44px 0 12px; }
+  p.note { color: var(--muted-foreground); font-size: 13px; max-width: 68ch; margin: 10px 0; }
+  p.note strong { color: var(--foreground); font-weight: 500; }
+
+  button.theme-toggle {
+    background: none; border: 1px solid var(--border); border-radius: 6px;
+    color: var(--muted-foreground); font: inherit; font-size: 12px;
+    padding: 3px 10px; cursor: pointer;
+  }
+  button.theme-toggle:hover { color: var(--foreground); }
+
+  /* ---- shared frame that mimics the issue header ---- */
+  .frame {
+    background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+    box-shadow: var(--shadow-card); padding: 18px 20px; overflow: visible;
+  }
+  .issue-top { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+  .crumbs { font-size: 11px; color: var(--muted-foreground); }
+  .issue-meta { display: flex; gap: 18px; font-size: 11px; color: var(--muted-foreground); white-space: nowrap; }
+  .issue-meta b { display: block; font-weight: 500; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; }
+  .issue-meta .cost { color: var(--signal-cost-foreground); font-variant-numeric: tabular-nums; }
+  .issue-id { font-size: 11px; color: var(--muted-foreground); margin-bottom: 2px; }
+  .issue-title { font-size: 16px; letter-spacing: -0.01em; margin: 0 0 10px; max-width: 46ch; text-wrap: balance; }
+  .issue-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .phase-badge {
+    display: inline-flex; align-items: center; height: 20px; padding: 0 7px;
+    border-radius: 3px; font-size: 10px; letter-spacing: 0.07em;
+    background: color-mix(in srgb, var(--warning) 8%, transparent);
+    border: 1px solid color-mix(in srgb, var(--warning) 32%, transparent);
+    color: var(--warning-foreground);
+  }
+
+  /* ---- CURRENT strip (faithful recreation) ---- */
+  .current-strip { display: flex; flex-wrap: wrap; gap: 4px; }
+  .current-strip select {
+    border-radius: 4px; border: 1px solid var(--border); background: var(--popover);
+    color: var(--foreground); padding: 2px 6px; font: inherit; font-size: 11px;
+  }
+  .callouts { margin: 14px 0 0; padding: 0; list-style: none; font-size: 13px; color: var(--muted-foreground); max-width: 70ch; display: grid; gap: 7px; }
+  .callouts li { padding-left: 22px; position: relative; }
+  .callouts li::before {
+    content: attr(data-n); position: absolute; left: 0; top: 2px;
+    width: 15px; height: 15px; border-radius: 3px; font-size: 10px;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: color-mix(in srgb, var(--destructive) 8%, transparent);
+    border: 1px solid color-mix(in srgb, var(--destructive) 32%, transparent);
+    color: var(--destructive-foreground);
+  }
+  .callouts strong { color: var(--foreground); font-weight: 500; }
+
+  /* ---- PROPOSED strip ---- */
+  .policy-anchor { position: relative; display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .policies-btn {
+    display: inline-flex; align-items: center; gap: 6px; height: 22px; padding: 0 8px;
+    border-radius: 4px; border: 1px solid var(--border); background: none;
+    color: var(--muted-foreground); font: inherit; font-size: 11px; cursor: pointer;
+  }
+  .policies-btn:hover { color: var(--foreground); background: var(--muted); }
+  .policies-btn svg { width: 11px; height: 11px; }
+  .policies-btn .count {
+    display: none; min-width: 14px; height: 14px; padding: 0 3px; border-radius: 3px;
+    font-size: 9px; align-items: center; justify-content: center;
+    background: color-mix(in srgb, var(--primary) 12%, transparent);
+    color: var(--primary);
+  }
+  .policies-btn.has-overrides { color: var(--foreground); }
+  .policies-btn.has-overrides .count { display: inline-flex; }
+
+  .chip {
+    display: inline-flex; align-items: center; gap: 5px; height: 20px; padding: 0 7px;
+    border-radius: 3px; font-size: 11px; cursor: pointer;
+    background: color-mix(in srgb, var(--primary) 8%, transparent);
+    border: 1px solid color-mix(in srgb, var(--primary) 32%, transparent);
+    color: var(--foreground);
+  }
+  .chip .k { color: var(--muted-foreground); }
+  .chip.warn {
+    background: color-mix(in srgb, var(--warning) 8%, transparent);
+    border-color: color-mix(in srgb, var(--warning) 32%, transparent);
+    color: var(--warning-foreground);
+  }
+
+  .panel {
+    position: absolute; top: calc(100% + 6px); left: 0; z-index: 20; width: 400px;
+    background: var(--popover); border: 1px solid var(--border); border-radius: 8px;
+    box-shadow: 0 8px 30px rgba(0,0,0,.28); padding: 14px 16px 12px; display: none;
+  }
+  .panel.open { display: block; }
+  .panel h3 {
+    margin: 0 0 8px; font-size: 10px; font-weight: 500; text-transform: uppercase;
+    letter-spacing: 0.09em; color: var(--muted-foreground);
+  }
+  .panel h3:not(:first-child) { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border); }
+  .prow { display: grid; grid-template-columns: 92px 1fr; align-items: center; gap: 10px; margin: 8px 0; }
+  .prow > label { font-size: 12px; color: var(--muted-foreground); display: flex; align-items: center; gap: 5px; }
+  .ovr-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--primary); opacity: 0; transition: opacity .12s; }
+  .prow.overridden .ovr-dot { opacity: 1; }
+  .prow.overridden > label { color: var(--foreground); }
+
+  .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 5px; overflow: hidden; }
+  .seg button {
+    border: none; background: none; color: var(--muted-foreground); font: inherit; font-size: 11px;
+    padding: 3px 9px; cursor: pointer; border-left: 1px solid var(--border);
+  }
+  .seg button:first-child { border-left: none; }
+  .seg button:hover { color: var(--foreground); background: var(--muted); }
+  .seg button.on { background: color-mix(in srgb, var(--primary) 12%, transparent); color: var(--foreground); }
+  .seg button .dflt { color: var(--muted-foreground); font-size: 10px; }
+
+  .panel select {
+    width: 100%; border-radius: 5px; border: 1px solid var(--border); background: var(--popover);
+    color: var(--foreground); padding: 3px 8px; font: inherit; font-size: 11.5px;
+  }
+  .prow .resetcell { display: flex; align-items: center; gap: 8px; }
+  .reset {
+    border: none; background: none; color: var(--muted-foreground); font: inherit; font-size: 10.5px;
+    cursor: pointer; padding: 0; text-decoration: underline; text-underline-offset: 2px; visibility: hidden;
+  }
+  .prow.overridden .reset { visibility: visible; }
+  .reset:hover { color: var(--foreground); }
+
+  .restart-note {
+    margin-top: 12px; padding: 8px 10px; border-radius: 6px; font-size: 11.5px;
+    background: color-mix(in srgb, var(--warning) 8%, transparent);
+    border: 1px solid color-mix(in srgb, var(--warning) 32%, transparent);
+    color: var(--warning-foreground); display: none;
+  }
+  .restart-note.show { display: block; }
+  .restart-note button {
+    margin-top: 6px; border-radius: 4px; padding: 2px 8px; font: inherit; font-size: 11px; cursor: pointer;
+    background: none; border: 1px solid color-mix(in srgb, var(--warning) 45%, transparent);
+    color: var(--warning-foreground);
+  }
+  .restart-note button:hover { background: color-mix(in srgb, var(--warning) 10%, transparent); }
+
+  .panel-foot { display: flex; justify-content: space-between; align-items: center; margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--border); }
+  .panel-foot .hint { font-size: 10.5px; color: var(--muted-foreground); }
+  .panel-foot .reset-all { visibility: hidden; border: none; background: none; color: var(--muted-foreground); font: inherit; font-size: 11px; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+  .panel-foot .reset-all:hover { color: var(--foreground); }
+  .panel-foot .reset-all.show { visibility: visible; }
+
+  .scenarios { display: flex; gap: 6px; margin: 0 0 12px; flex-wrap: wrap; }
+  .scenarios span { font-size: 11px; color: var(--muted-foreground); align-self: center; margin-right: 2px; }
+  .scenarios button {
+    border: 1px solid var(--border); background: none; border-radius: 5px; color: var(--muted-foreground);
+    font: inherit; font-size: 11px; padding: 2px 9px; cursor: pointer;
+  }
+  .scenarios button:hover { color: var(--foreground); background: var(--muted); }
+  .scenarios button.on { color: var(--foreground); border-color: color-mix(in srgb, var(--primary) 45%, transparent); }
+
+  table.naming { border-collapse: collapse; font-size: 12.5px; margin-top: 6px; }
+  table.naming th, table.naming td { text-align: left; padding: 5px 22px 5px 0; border-bottom: 1px solid var(--border); font-weight: 500; }
+  table.naming th { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted-foreground); }
+  table.naming td.old { color: var(--muted-foreground); text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--destructive) 55%, transparent); }
+</style>
+
+<div class="page">
+  <header class="doc">
+    <h1>Issue policy strip — redesign proposal</h1>
+    <button class="theme-toggle" id="themeToggle" type="button">Toggle theme</button>
+  </header>
+  <p class="doc-sub">The per-issue policy strip (<span class="mono">IssuePolicyStrip.tsx</span>, PAN-2674) currently renders five look-alike native selects in the issue header. This mockup proposes collapsing it to a single <em>Policies</em> control that shows overrides only. Everything below is clickable.</p>
+
+  <h2>Current — what ships today</h2>
+  <div class="frame">
+    <div class="issue-top">
+      <div class="crumbs">mind-your-now / Issues</div>
+      <div class="issue-meta">
+        <div><b>Branch</b><span class="mono">feature/min-865</span></div>
+        <div><b>PR / CI</b>no PR</div>
+        <div><b>Cost</b><span class="cost">$186.88</span></div>
+      </div>
+    </div>
+    <div class="issue-id mono">MIN-865</div>
+    <p class="issue-title">Desktop home: Upcoming Events as 1-day calendar with prev/next navigation + toggle to list view</p>
+    <div class="issue-row">
+      <span class="phase-badge">REVIEWING</span>
+      <span class="current-strip">
+        <select><option>review: default (full)</option></select>
+        <select><option>re-review: default (changed)</option></select>
+        <select><option>reviewers: default (unconfigured)</option></select>
+        <select><option>work: default (tiered)</option></select>
+        <select><option>swarm: default (off)</option></select>
+      </span>
+    </div>
+  </div>
+  <ul class="callouts">
+    <li data-n="1"><strong>Three controls start with “review”</strong> — review mode, re-review scope, reviewer model — so the row reads as “review review review” and you have to parse each one to know which is which.</li>
+    <li data-n="2"><strong>Everything shouts its default.</strong> Nearly every issue runs on all defaults, yet five selects permanently announce “default (…)”. Settings noise is displayed as if it were status.</li>
+    <li data-n="3"><strong>“default (unconfigured)” is meaningless</strong> — it leaks the internal null instead of saying what actually happens (each reviewer role uses its configured model).</li>
+    <li data-n="4"><strong>Native selects with labels baked into options</strong> — ragged widths, 11px cramped text, and the label repeats inside every option (“reviewers: GPT-5.5”).</li>
+  </ul>
+
+  <h2>Proposed — overrides-only strip + grouped panel</h2>
+  <p class="note">Collapsed, the strip is one quiet <strong>Policies</strong> button. Chips appear only for values you actually overrode; an all-defaults issue shows no policy noise at all. The panel groups the five knobs under <strong>Review</strong> and <strong>Work</strong>, with the resolved default folded into each control’s “Default” position.</p>
+  <div class="scenarios">
+    <span>Preview a state:</span>
+    <button type="button" id="scDefaults" class="on">All defaults</button>
+    <button type="button" id="scOverrides">Work model + quick review overridden</button>
+  </div>
+  <div class="frame" style="overflow: visible;">
+    <div class="issue-top">
+      <div class="crumbs">mind-your-now / Issues</div>
+      <div class="issue-meta">
+        <div><b>Branch</b><span class="mono">feature/min-865</span></div>
+        <div><b>PR / CI</b>no PR</div>
+        <div><b>Cost</b><span class="cost">$186.88</span></div>
+      </div>
+    </div>
+    <div class="issue-id mono">MIN-865</div>
+    <p class="issue-title">Desktop home: Upcoming Events as 1-day calendar with prev/next navigation + toggle to list view</p>
+    <div class="issue-row">
+      <span class="phase-badge">REVIEWING</span>
+      <span class="policy-anchor" id="anchor">
+        <button type="button" class="policies-btn" id="policiesBtn">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round">
+            <line x1="2" y1="4.5" x2="14" y2="4.5"/><circle cx="6" cy="4.5" r="1.7" fill="var(--popover)"/>
+            <line x1="2" y1="11.5" x2="14" y2="11.5"/><circle cx="10.5" cy="11.5" r="1.7" fill="var(--popover)"/>
+          </svg>
+          Policies
+          <span class="count" id="ovrCount">0</span>
+        </button>
+        <span id="chips"></span>
+
+        <div class="panel" id="panel">
+          <h3>Review</h3>
+          <div class="prow" data-key="reviewMode">
+            <label><span class="ovr-dot"></span>Mode</label>
+            <div class="resetcell">
+              <div class="seg" data-seg="reviewMode"></div>
+              <button type="button" class="reset">reset</button>
+            </div>
+          </div>
+          <div class="prow" data-key="reReview" id="reReviewRow">
+            <label><span class="ovr-dot"></span>Re-review</label>
+            <div class="resetcell">
+              <div class="seg" data-seg="reReview"></div>
+              <button type="button" class="reset">reset</button>
+            </div>
+          </div>
+          <div class="prow" data-key="reviewModel">
+            <label><span class="ovr-dot"></span>Model</label>
+            <div class="resetcell">
+              <select data-sel="reviewModel"></select>
+              <button type="button" class="reset">reset</button>
+            </div>
+          </div>
+
+          <h3>Work</h3>
+          <div class="prow" data-key="workModel">
+            <label><span class="ovr-dot"></span>Model</label>
+            <div class="resetcell">
+              <select data-sel="workModel"></select>
+              <button type="button" class="reset">reset</button>
+            </div>
+          </div>
+          <div class="prow" data-key="swarm">
+            <label><span class="ovr-dot"></span>Swarm</label>
+            <div class="resetcell">
+              <div class="seg" data-seg="swarm"></div>
+              <button type="button" class="reset">reset</button>
+            </div>
+          </div>
+
+          <div class="restart-note" id="restartNote">
+            The work-model override applies to the next spawn; the running agent keeps its current model until restarted.
+            <br><button type="button" id="restartBtn">Restart agent with new staffing</button>
+            <span id="restartMsg"></span>
+          </div>
+
+          <div class="panel-foot">
+            <span class="hint">Overrides apply to this issue only.</span>
+            <button type="button" class="reset-all" id="resetAll">Reset all to defaults</button>
+          </div>
+        </div>
+      </span>
+    </div>
+  </div>
+
+  <h2>What changed, and why</h2>
+  <p class="note"><strong>Status vs settings.</strong> The header shows state you need at a glance; policy knobs are settings you touch rarely. Settings move behind one affordance, and only <em>deviations</em> from default surface as chips — so a glance tells you “this issue is special” instead of re-reading five defaults on every issue.</p>
+  <p class="note"><strong>One “review” instead of three.</strong> Grouping under a Review heading turns “review / re-review / reviewers” into Mode / Re-review / Model. The reviewer-model control also stops saying “unconfigured” — its default reads <em>per-role default</em>, which is what actually happens.</p>
+  <p class="note"><strong>Default is a position, not a caption.</strong> Each control’s first position is “Default · <em>resolved value</em>”, so the effective value stays visible without every control captioning itself. Overridden rows get a dot, a reset link, and a chip outside; the amber restart notice appears only when the override actually requires a restart (amber = a human must act).</p>
+  <table class="naming">
+    <tr><th>Today</th><th>Proposed</th></tr>
+    <tr><td class="old">review: default (full)</td><td>Review → Mode: Default · full / Quick / Full / None</td></tr>
+    <tr><td class="old">re-review: default (changed)</td><td>Review → Re-review: Default · changed / Changed / All / Blockers</td></tr>
+    <tr><td class="old">reviewers: default (unconfigured)</td><td>Review → Model: Default · per-role default / …models</td></tr>
+    <tr><td class="old">work: default (tiered)</td><td>Work → Model: Default · tiered / …models</td></tr>
+    <tr><td class="old">swarm: default (off)</td><td>Work → Swarm: Default · off / Off / Auto / Always</td></tr>
+  </table>
+  <p class="note" style="margin-top:16px;">Implementation stays thin: same five endpoints, same override/resolved payloads — this is a presentation-layer change to <span class="mono">IssuePolicyStrip.tsx</span> plus a small popover. No API or state-model work.</p>
+</div>
+
+<script>
+  // Theme toggle (mirrors the artifact viewer's data-theme stamping)
+  document.getElementById('themeToggle').addEventListener('click', () => {
+    const root = document.documentElement;
+    const dark = root.dataset.theme
+      ? root.dataset.theme === 'dark'
+      : matchMedia('(prefers-color-scheme: dark)').matches;
+    root.dataset.theme = dark ? 'light' : 'dark';
+  });
+
+  const resolved = { reviewMode: 'full', reReview: 'changed', reviewModel: null, workModel: 'tiered', swarm: 'off' };
+  const labels = {
+    reviewMode: { chip: 'review', opts: [['quick','Quick'],['full','Full'],['none','None']] },
+    reReview:   { chip: 're-review', opts: [['changed','Changed'],['all','All'],['blockers','Blockers']] },
+    reviewModel:{ chip: 'review model' },
+    workModel:  { chip: 'work' },
+    swarm:      { chip: 'swarm', opts: [['off','Off'],['auto','Auto'],['always','Always']] },
+  };
+  const models = ['Sonnet 5', 'Opus 4.8', 'Haiku 4.5', 'GPT-5.5', 'Kimi K2'];
+  let override = { reviewMode: null, reReview: null, reviewModel: null, workModel: null, swarm: null };
+
+  const panel = document.getElementById('panel');
+  const btn = document.getElementById('policiesBtn');
+  btn.addEventListener('click', (e) => { e.stopPropagation(); panel.classList.toggle('open'); });
+  panel.addEventListener('click', (e) => e.stopPropagation());
+  document.addEventListener('click', () => panel.classList.remove('open'));
+
+  function defaultLabel(key) {
+    if (key === 'reviewModel') return 'per-role default';
+    return resolved[key];
+  }
+
+  // Build segmented controls
+  document.querySelectorAll('.seg').forEach((seg) => {
+    const key = seg.dataset.seg;
+    const dflt = document.createElement('button');
+    dflt.type = 'button';
+    dflt.dataset.val = '';
+    dflt.innerHTML = 'Default <span class="dflt">· ' + defaultLabel(key) + '</span>';
+    seg.appendChild(dflt);
+    labels[key].opts.forEach(([val, name]) => {
+      const b = document.createElement('button');
+      b.type = 'button'; b.dataset.val = val; b.textContent = name;
+      seg.appendChild(b);
+    });
+    seg.addEventListener('click', (e) => {
+      const b = e.target.closest('button'); if (!b) return;
+      override[key] = b.dataset.val || null;
+      render();
+    });
+  });
+
+  // Build model selects
+  document.querySelectorAll('select[data-sel]').forEach((sel) => {
+    const key = sel.dataset.sel;
+    const d = document.createElement('option');
+    d.value = ''; d.textContent = 'Default · ' + defaultLabel(key);
+    sel.appendChild(d);
+    models.forEach((m) => {
+      const o = document.createElement('option'); o.value = m; o.textContent = m; sel.appendChild(o);
+    });
+    sel.addEventListener('change', () => { override[key] = sel.value || null; render(); });
+  });
+
+  // Reset links
+  document.querySelectorAll('.prow').forEach((row) => {
+    row.querySelector('.reset').addEventListener('click', () => { override[row.dataset.key] = null; render(); });
+  });
+  document.getElementById('resetAll').addEventListener('click', () => {
+    override = { reviewMode: null, reReview: null, reviewModel: null, workModel: null, swarm: null };
+    render();
+  });
+  document.getElementById('restartBtn').addEventListener('click', () => {
+    document.getElementById('restartMsg').textContent = ' Fresh restart requested.';
+  });
+
+  // Scenario shortcuts
+  const scDefaults = document.getElementById('scDefaults');
+  const scOverrides = document.getElementById('scOverrides');
+  scDefaults.addEventListener('click', () => {
+    override = { reviewMode: null, reReview: null, reviewModel: null, workModel: null, swarm: null };
+    scDefaults.classList.add('on'); scOverrides.classList.remove('on');
+    render();
+  });
+  scOverrides.addEventListener('click', () => {
+    override = { reviewMode: 'quick', reReview: null, reviewModel: null, workModel: 'GPT-5.5', swarm: null };
+    scOverrides.classList.add('on'); scDefaults.classList.remove('on');
+    panel.classList.add('open');
+    render();
+  });
+
+  function render() {
+    const keys = Object.keys(override);
+    const active = keys.filter((k) => override[k] !== null);
+
+    // effective review mode drives re-review row visibility
+    const effMode = override.reviewMode ?? resolved.reviewMode;
+    document.getElementById('reReviewRow').style.display = effMode === 'full' ? '' : 'none';
+
+    // rows
+    document.querySelectorAll('.prow').forEach((row) => {
+      row.classList.toggle('overridden', override[row.dataset.key] !== null);
+    });
+    // segs
+    document.querySelectorAll('.seg').forEach((seg) => {
+      const key = seg.dataset.seg;
+      seg.querySelectorAll('button').forEach((b) => {
+        b.classList.toggle('on', (override[key] ?? '') === b.dataset.val);
+      });
+    });
+    // selects
+    document.querySelectorAll('select[data-sel]').forEach((sel) => {
+      sel.value = override[sel.dataset.sel] ?? '';
+    });
+    // chips
+    const chips = document.getElementById('chips');
+    chips.innerHTML = '';
+    active.forEach((k) => {
+      const c = document.createElement('span');
+      c.className = 'chip';
+      c.innerHTML = '<span class="k">' + labels[k].chip + ' ·</span> ' + override[k];
+      c.addEventListener('click', (e) => { e.stopPropagation(); panel.classList.add('open'); });
+      chips.appendChild(c);
+    });
+    // restart pending
+    const restartNeeded = override.workModel !== null;
+    document.getElementById('restartNote').classList.toggle('show', restartNeeded);
+    if (restartNeeded) {
+      const c = document.createElement('span');
+      c.className = 'chip warn';
+      c.textContent = 'restart pending';
+      c.addEventListener('click', (e) => { e.stopPropagation(); panel.classList.add('open'); });
+      chips.appendChild(c);
+    } else {
+      document.getElementById('restartMsg').textContent = '';
+    }
+    // button state
+    btn.classList.toggle('has-overrides', active.length > 0);
+    document.getElementById('ovrCount').textContent = String(active.length);
+    // reset all
+    document.getElementById('resetAll').classList.toggle('show', active.length > 0);
+  }
+  render();
+</script>

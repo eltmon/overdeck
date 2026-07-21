@@ -6,7 +6,7 @@
  */
 
 import { Effect } from 'effect';
-import { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync, readdirSync } from 'fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync } from 'fs';
 import { join } from 'path';
 import { COSTS_DIR } from './paths.js';
 import { FsError } from './errors.js';
@@ -91,6 +91,10 @@ export const DEFAULT_PRICING: ModelPricing[] = [
   { provider: 'anthropic', model: 'claude-opus-4-8', inputPer1k: 0.005, outputPer1k: 0.025, cacheReadPer1k: 0.0005, cacheWrite5mPer1k: 0.00625, cacheWrite1hPer1k: 0.01, currency: 'USD' },
   // Anthropic - 4.7 series
   { provider: 'anthropic', model: 'claude-opus-4-7', inputPer1k: 0.005, outputPer1k: 0.025, cacheReadPer1k: 0.0005, cacheWrite5mPer1k: 0.00625, cacheWrite1hPer1k: 0.01, currency: 'USD' },
+  // Anthropic - Sonnet 5 introductory pricing through 2026-08-31.
+  // Standard pricing starts 2026-09-01: input 0.003, output 0.015,
+  // cache read 0.0003, 5m write 0.00375, 1h write 0.006 per 1K tokens.
+  { provider: 'anthropic', model: 'claude-sonnet-5', inputPer1k: 0.002, outputPer1k: 0.010, cacheReadPer1k: 0.0002, cacheWrite5mPer1k: 0.0025, cacheWrite1hPer1k: 0.004, currency: 'USD' },
   // Anthropic - 4.6 series (API IDs use dashes: claude-opus-4-6, claude-sonnet-4-6, claude-haiku-4-5)
   { provider: 'anthropic', model: 'claude-opus-4-6', inputPer1k: 0.005, outputPer1k: 0.025, cacheReadPer1k: 0.0005, cacheWrite5mPer1k: 0.00625, cacheWrite1hPer1k: 0.01, currency: 'USD' },
   { provider: 'anthropic', model: 'claude-sonnet-4-6', inputPer1k: 0.003, outputPer1k: 0.015, cacheReadPer1k: 0.0003, cacheWrite5mPer1k: 0.00375, cacheWrite1hPer1k: 0.006, currency: 'USD' },
@@ -102,11 +106,15 @@ export const DEFAULT_PRICING: ModelPricing[] = [
   // Anthropic - Legacy
   { provider: 'anthropic', model: 'claude-haiku-3', inputPer1k: 0.00025, outputPer1k: 0.00125, cacheReadPer1k: 0.00003, cacheWrite5mPer1k: 0.0003, cacheWrite1hPer1k: 0.0005, currency: 'USD' },
   // OpenAI — prices per developers.openai.com/api/docs/pricing (May 2026)
+  { provider: 'openai', model: 'gpt-5.6-sol', inputPer1k: 0.005, outputPer1k: 0.030, cacheReadPer1k: 0.0005, currency: 'USD' },
+  { provider: 'openai', model: 'gpt-5.6-terra', inputPer1k: 0.0025, outputPer1k: 0.015, cacheReadPer1k: 0.00025, currency: 'USD' },
+  { provider: 'openai', model: 'gpt-5.6-luna', inputPer1k: 0.001, outputPer1k: 0.006, cacheReadPer1k: 0.0001, currency: 'USD' },
   { provider: 'openai', model: 'gpt-5.5', inputPer1k: 0.005, outputPer1k: 0.030, cacheReadPer1k: 0.0005, currency: 'USD' },
   { provider: 'openai', model: 'gpt-5.5-pro', inputPer1k: 0.030, outputPer1k: 0.180, currency: 'USD' },
   { provider: 'openai', model: 'gpt-5.4', inputPer1k: 0.0025, outputPer1k: 0.015, cacheReadPer1k: 0.00025, currency: 'USD' },
   { provider: 'openai', model: 'gpt-5.4-mini', inputPer1k: 0.00075, outputPer1k: 0.0045, cacheReadPer1k: 0.000075, currency: 'USD' },
   { provider: 'openai', model: 'gpt-5.4-pro', inputPer1k: 0.030, outputPer1k: 0.180, currency: 'USD' },
+  { provider: 'openai', model: 'gpt-4.1-nano', inputPer1k: 0.0001, outputPer1k: 0.0004, cacheReadPer1k: 0.000025, currency: 'USD' },
   { provider: 'openai', model: 'gpt-5.3-codex', inputPer1k: 0.00175, outputPer1k: 0.014, cacheReadPer1k: 0.000175, currency: 'USD' },
   { provider: 'openai', model: 'codex-4o', inputPer1k: 0.00175, outputPer1k: 0.014, cacheReadPer1k: 0.000175, currency: 'USD' },
   { provider: 'openai', model: 'codex-4o-mini', inputPer1k: 0.00075, outputPer1k: 0.0045, cacheReadPer1k: 0.000075, currency: 'USD' },
@@ -127,6 +135,21 @@ export const DEFAULT_PRICING: ModelPricing[] = [
   { provider: 'custom', model: 'MiniMax-M2.7', inputPer1k: 0.0003, outputPer1k: 0.0012, currency: 'USD' },
   { provider: 'custom', model: 'MiniMax-M2.7-highspeed', inputPer1k: 0.0003, outputPer1k: 0.0012, currency: 'USD' },
   { provider: 'custom', model: 'MiniMax-M3', inputPer1k: 0.0003, outputPer1k: 0.0012, currency: 'USD' },
+  // Z.AI (GLM) — PAN-1935: previously absent, so pi-harness GLM agents recorded $0 cost.
+  // GLM-5.x: $1.4/M in, $4.4/M out (docs.z.ai/guides/overview/pricing). cacheRead set to
+  // ~7% of input to approximate Z.AI's context-cache discount — verify upstream and refine.
+  { provider: 'custom', model: 'glm-5.2', inputPer1k: 0.0014, outputPer1k: 0.0044, cacheReadPer1k: 0.0001, currency: 'USD' },
+  { provider: 'custom', model: 'glm-5.1', inputPer1k: 0.0014, outputPer1k: 0.0044, cacheReadPer1k: 0.0001, currency: 'USD' },
+  // GLM-4.7: approximate in/out split of the $1.5/M blended average — verify upstream.
+  { provider: 'custom', model: 'glm-4.7', inputPer1k: 0.0005, outputPer1k: 0.002, cacheReadPer1k: 0.00005, currency: 'USD' },
+  { provider: 'custom', model: 'glm-4.7-flash', inputPer1k: 0.0001, outputPer1k: 0.0005, currency: 'USD' },
+  // Moonshot Kimi K2.7 Code (platform.moonshot.ai/docs/pricing/chat):
+  // $0.95/M in (cache-miss), $4.00/M out, $0.19/M in (cache-hit). PAN-1935.
+  { provider: 'custom', model: 'kimi-k2.7-code', inputPer1k: 0.00095, outputPer1k: 0.004, cacheReadPer1k: 0.00019, currency: 'USD' },
+  // Kimi K3 coding endpoint aliases: $3/M cache-miss input, $15/M output,
+  // $0.30/M cache-hit input. Both aliases share pricing; only context differs.
+  { provider: 'custom', model: 'k3', inputPer1k: 0.003, outputPer1k: 0.015, cacheReadPer1k: 0.0003, currency: 'USD' },
+  { provider: 'custom', model: 'k3[1m]', inputPer1k: 0.003, outputPer1k: 0.015, cacheReadPer1k: 0.0003, currency: 'USD' },
 ];
 
 // ============== Cost Calculation ==============
@@ -139,13 +162,14 @@ export function calculateCostSync(usage: TokenUsage, pricing: ModelPricing): num
   let inputMultiplier = 1;
   let outputMultiplier = 1;
 
-  // Long-context pricing for Sonnet 4/4.5 (>200K total input tokens)
+  // Long-context pricing for retired Sonnet 4 (>200K total input tokens).
+  // Sonnet 4.6 and Sonnet 5 include their full 1M context at standard pricing.
   // Total input includes: inputTokens + cacheReadTokens + cacheWriteTokens
   const totalInputTokens = usage.inputTokens
     + (usage.cacheReadTokens || 0)
     + (usage.cacheWriteTokens || 0);
 
-  if ((pricing.model === 'claude-sonnet-4' || pricing.model === 'claude-sonnet-4-6')
+  if (pricing.model === 'claude-sonnet-4'
       && totalInputTokens > 200000) {
     inputMultiplier = 2;    // $6/MTok vs $3/MTok
     outputMultiplier = 1.5; // $22.50/MTok vs $15/MTok

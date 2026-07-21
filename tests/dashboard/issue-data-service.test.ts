@@ -238,6 +238,59 @@ describe('IssueDataService - getIssues cycle filter', () => {
         mergeStatus: 'merged',
       });
     });
+
+    it('should resolve done issues with stale merge status to merged when review cache is empty', () => {
+      const issues = [
+        { id: '1', identifier: 'PAN-2258', status: 'Done', state: 'done', mergeStatus: 'pending', updatedAt: new Date().toISOString() },
+      ];
+      injectIssues(issues);
+      // @ts-ignore - injecting review-status cache for a hot-path unit test
+      service.reviewStatusesCache = {};
+
+      const result = service.getIssues({ cycle: 'all' });
+
+      expect(result[0]).toMatchObject({
+        identifier: 'PAN-2258',
+        status: 'Done',
+        state: 'done',
+        mergeStatus: 'merged',
+      });
+    });
+
+    it('should preserve canceled issues with stale merge status when review cache is empty', () => {
+      const issues = [
+        { id: '1', identifier: 'PAN-2259', status: 'Canceled', mergeStatus: 'pending', updatedAt: new Date().toISOString() },
+      ];
+      injectIssues(issues);
+      // @ts-ignore - injecting review-status cache for a hot-path unit test
+      service.reviewStatusesCache = {};
+
+      const result = service.getIssues({ cycle: 'all' });
+
+      expect(result[0]).toMatchObject({
+        identifier: 'PAN-2259',
+        status: 'Canceled',
+        mergeStatus: 'pending',
+      });
+    });
+
+    it('should not synthesize merge status for done issues without a base merge status', () => {
+      const issues = [
+        { id: '1', identifier: 'PAN-2260', status: 'Done', state: 'done', updatedAt: new Date().toISOString() },
+      ];
+      injectIssues(issues);
+      // @ts-ignore - injecting review-status cache for a hot-path unit test
+      service.reviewStatusesCache = {};
+
+      const result = service.getIssues({ cycle: 'all' });
+
+      expect(result[0]).toMatchObject({
+        identifier: 'PAN-2260',
+        status: 'Done',
+        state: 'done',
+      });
+      expect(result[0].mergeStatus).toBeUndefined();
+    });
   });
 });
 

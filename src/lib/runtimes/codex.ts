@@ -13,16 +13,19 @@
  * kill-agent, cost-parser, notify-heartbeat).
  */
 
-import { existsSync, readFileSync, statSync, writeFileSync, readdirSync, mkdirSync, copyFileSync, chmodSync, openSync, readSync, closeSync } from 'node:fs'
-import { join, basename } from 'node:path'
+import { existsSync, readFileSync, statSync, writeFileSync, readdirSync, mkdirSync, copyFileSync, chmodSync, openSync, readSync, closeSync, lstatSync, readlinkSync, symlinkSync, unlinkSync } from 'node:fs'
+import { dirname, join, basename } from 'node:path'
 import { homedir } from 'node:os'
 import { promisify } from 'node:util'
 import { exec } from 'node:child_process'
+import { request as httpRequest } from 'node:http'
 import { Effect } from 'effect'
+import yaml from 'js-yaml'
 import type {
   AgentRuntime,
   AgentRuntimeSync,
   AgentRuntimeError,
+  HarnessBehavior,
   Heartbeat,
   TokenUsage,
   CostBreakdown,
@@ -30,14 +33,33 @@ import type {
   SpawnConfig,
   Agent,
 } from './types.js'
-import { sessionExists, killSession, listSessionsSync, createSession } from '../tmux.js'
+import { CODEX_BEHAVIOR } from './behavior.js'
+import { tmuxCreateSession, tmuxKillSession, tmuxSessionExists } from './tmux-cli.js'
 import { TmuxError, ProcessSpawnError, ProcessTimeoutError } from '../errors.js'
+import { prepareHarnessLaunch } from '../harness-binary.js'
 import { parseCodexSessionSync } from '../cost-parsers/codex-parser.js'
 
 const execAsync = promisify(exec)
 
 function shellQuote(value: string): string {
   return `'${value.replace(/'/g, `'\\''`)}'`
+}
+
+function escapeTomlBasicString(value: string): string {
+  return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+}
+
+function hasImmutableNpxPackageSelector(args: string[] | undefined): boolean {
+  const selector = args?.find(arg => !arg.startsWith('-'))
+  if (!selector) return false
+  return /^(?:@[^/]+\/[^@]+|[^@/][^@]*)@\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(selector)
+}
+
+export interface CodexMcpServerDef {
+  type?: string
+  command?: string
+  args?: string[]
+  env?: Record<string, string>
 }
 
 function overdeckDir(): string {
@@ -52,8 +74,116 @@ function agentDirFor(agentId: string): string {
   return join(agentsDir(), agentId)
 }
 
+function appServerSocketPathFor(agentId: string): string {
+  return join(overdeckDir(), 'sockets', `appserver-${agentId}.sock`)
+}
+
+function appServerTokenPathFor(agentId: string): string {
+  return join(agentDirFor(agentId), 'appserver-token')
+}
+
 function threadIdPathFor(agentId: string): string {
   return join(agentDirFor(agentId), 'codex-thread-id')
+}
+
+function readAppServerToken(agentId: string): string | null {
+  const tokenPath = appServerTokenPathFor(agentId)
+  if (!existsSync(tokenPath)) return null
+  try {
+    return readFileSync(tokenPath, 'utf-8').trim() || null
+  } catch {
+    return null
+  }
+}
+
+async function postAppServerInterrupt(agentId: string): Promise<void> {
+  const socketPath = appServerSocketPathFor(agentId)
+  const token = readAppServerToken(agentId)
+  if (!existsSync(socketPath) || !token) return
+  const payload = JSON.stringify({ op: 'interrupt' })
+  await new Promise<void>((resolve, reject) => {
+    let settled = false
+    const timeout = setTimeout(() => {
+      if (settled) return
+      settled = true
+      req.destroy(new Error(`app-server interrupt timed out after 2000ms`))
+      reject(new Error(`app-server interrupt timed out after 2000ms`))
+    }, 2_000)
+    const finishErr = (error: Error) => {
+      if (settled) return
+      settled = true
+      clearTimeout(timeout)
+      reject(error)
+    }
+    const finishOk = () => {
+      if (settled) return
+      settled = true
+      clearTimeout(timeout)
+      resolve()
+    }
+    const req = httpRequest(
+      {
+        socketPath,
+        path: '/',
+        method: 'POST',
+        agent: false,
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(payload),
+          'X-Overdeck-Bridge-Token': token,
+        },
+      },
+      (res) => {
+        res.resume()
+        res.on('end', () => {
+          const status = res.statusCode ?? 0
+          if (status >= 200 && status < 300) finishOk()
+          else finishErr(new Error(`app-server interrupt returned HTTP ${status}`))
+        })
+      },
+    )
+    req.on('error', finishErr)
+    req.write(payload)
+    req.end()
+  })
+}
+
+function codexTransport(): 'app-server' | 'tui' {
+  return readCodexTransportFromConfig() === 'tui' ? 'tui' : 'app-server'
+}
+
+function readCodexTransportFromConfig(): unknown {
+  const configs = [
+    join(homedir(), '.overdeck', 'config.yaml'),
+    ...projectConfigPaths(),
+  ]
+  for (let index = configs.length - 1; index >= 0; index -= 1) {
+    const transport = readCodexTransportFromYaml(configs[index]!)
+    if (transport === 'app-server' || transport === 'tui') return transport
+  }
+  return undefined
+}
+
+function projectConfigPaths(): string[] {
+  let currentDir = process.cwd()
+  while (true) {
+    if (existsSync(join(currentDir, '.git'))) {
+      return [join(currentDir, '.overdeck.yaml'), join(currentDir, '.pan.yaml')]
+    }
+    const parent = dirname(currentDir)
+    if (parent === currentDir) return []
+    currentDir = parent
+  }
+}
+
+function readCodexTransportFromYaml(filePath: string): unknown {
+  if (!existsSync(filePath)) return undefined
+  try {
+    const parsed = yaml.load(readFileSync(filePath, 'utf-8')) as { codex?: { transport?: unknown } } | null
+    return parsed?.codex?.transport
+  } catch {
+    return undefined
+  }
 }
 
 /** Resolve $CODEX_HOME: env var → ~/.codex fallback. */
@@ -163,6 +293,7 @@ export interface InitCodexHomeOpts {
   approvalPolicy?: string
   sandboxMode?: string
   approvalsReviewer?: string
+  mcpServers?: Record<string, CodexMcpServerDef>
 }
 
 /**
@@ -171,6 +302,7 @@ export interface InitCodexHomeOpts {
  *     config.toml   — Codex settings (approval_policy, sandbox_mode, project
  *                     trust, notify hooks)
  *     AGENTS.md     — Populated by context-layering bead; placeholder for now
+ *     rules/        — Symlink to the user's global Codex execpolicy rules
  *     sessions/     — Codex writes rollout JSONL here
  */
 export function initCodexHome(codexHomeDir: string, opts: InitCodexHomeOpts = {}): void {
@@ -202,31 +334,71 @@ export function initCodexHome(codexHomeDir: string, opts: InitCodexHomeOpts = {}
     if (existsSync(notifyHookPath)) {
       lines.push(`notify = ["node", "${notifyHookPath}"]`)
     }
+    // PAN-2521: suppress Codex's blocking "Approaching rate limits — switch to
+    // <cheaper model>?" TUI nudge. It renders a modal select prompt that freezes
+    // the pane: an unattended pipeline agent can't answer it, stops emitting tool
+    // calls, and the issue stalls (observed wedging a review pane). Pipeline agents
+    // must run on their configured model, so the nudge is pure downside here.
+    // `[notice] hide_rate_limit_model_nudge` is the Codex config knob that hides it
+    // (equivalent to the prompt's "never show again" option).
+    lines.push('', '[notice]', 'hide_rate_limit_model_nudge = true')
     if (opts.trustedDir) {
       // Pre-seed folder trust so the TUI skips its first-run autonomy wizard.
       // TOML basic-string key: escape backslashes and double-quotes in the path.
-      const escaped = opts.trustedDir.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+      const escaped = escapeTomlBasicString(opts.trustedDir)
       lines.push('', `[projects."${escaped}"]`, 'trust_level = "trusted"')
+    }
+    for (const [name, definition] of Object.entries(opts.mcpServers ?? {})) {
+      if (definition.type !== 'stdio' || typeof definition.command !== 'string' || definition.command.length === 0) {
+        console.warn(`[codex] skipping MCP server "${name}" — only stdio command servers are provisioned into codex config`)
+        continue
+      }
+      if (definition.command === 'npx' && !hasImmutableNpxPackageSelector(definition.args)) {
+        console.warn(`[codex] skipping MCP server "${name}" — npx MCP packages must use an exact immutable version`)
+        continue
+      }
+
+      const escapedName = escapeTomlBasicString(name)
+      const sectionKey = /^[A-Za-z0-9_-]+$/.test(name) ? name : `"${escapedName}"`
+      lines.push('', `[mcp_servers.${sectionKey}]`)
+      lines.push(`command = "${escapeTomlBasicString(definition.command)}"`)
+      const args = definition.args?.filter((arg): arg is string => typeof arg === 'string') ?? []
+      if (args.length > 0) {
+        lines.push(`args = [${args.map(arg => `"${escapeTomlBasicString(arg)}"`).join(', ')}]`)
+      }
+      const env = Object.entries(definition.env ?? {}).filter((entry): entry is [string, string] => typeof entry[1] === 'string')
+      if (env.length > 0) {
+        const values = env.map(([key, value]) => `"${escapeTomlBasicString(key)}" = "${escapeTomlBasicString(value)}"`)
+        lines.push(`env = { ${values.join(', ')} }`)
+      }
     }
     lines.push('')
     writeFileSync(configPath, lines.join('\n'), { mode: 0o600 })
   }
 
   // Seed auth so Codex skips its blocking sign-in onboarding on a fresh home.
-  // Copy the global ~/.codex/auth.json once, only when this home has none —
-  // Codex keeps its own copy refreshed thereafter, so on resume we must not
-  // clobber a newer token with a staler global one. Best-effort: if the user
-  // has never signed in to Codex globally there is nothing to copy, and the
-  // onboarding will (correctly) prompt for a real first-time login.
+  // PAN-2285: symlink the per-agent auth.json to the global ~/.codex/auth.json
+  // instead of copying it. A copy forks the OAuth refresh-token family — OpenAI
+  // rotates refresh tokens on every refresh, so once the global side rotates
+  // (re-login or natural refresh) every stale per-agent copy is revoked and its
+  // agent wedges forever in a 401 `token_invalidated` loop (PAN-2285/PAN-2639).
+  // The codex CLI persists a refresh in place (open+truncate+write via
+  // FileAuthStorage::save in codex-rs/login/src/auth/storage.rs — no temp-file
+  // rename), so writing through the symlink updates the global file and the
+  // symlink survives: all agents share one refresh chain and a global
+  // `codex login` heals everyone. Best-effort: if the user has never signed in
+  // to Codex globally there is nothing to link, and onboarding will (correctly)
+  // prompt for a real first-time login.
+  const globalCodexHome = join(homedir(), '.codex')
   const homeAuthPath = join(codexHomeDir, 'auth.json')
-  if (!existsSync(homeAuthPath)) {
-    const globalAuthPath = join(homedir(), '.codex', 'auth.json')
-    if (existsSync(globalAuthPath)) {
-      copyFileSync(globalAuthPath, homeAuthPath)
-      // auth.json holds OAuth access/refresh tokens — keep it private.
-      try { chmodSync(homeAuthPath, 0o600) } catch { /* best-effort */ }
-    }
-  }
+  const globalAuthPath = join(globalCodexHome, 'auth.json')
+  seedCodexAuthSymlink(homeAuthPath, globalAuthPath)
+
+  // Managed sessions use an isolated CODEX_HOME, so Codex would otherwise skip
+  // the user's native execpolicy layer at ~/.codex/rules and ask again in every
+  // agent home. Link the directory rather than copying it so rule amendments
+  // accepted in one persistent session remain available to later sessions.
+  seedCodexRulesSymlink(join(codexHomeDir, 'rules'), join(globalCodexHome, 'rules'))
 
   const agentsMdPath = join(codexHomeDir, 'AGENTS.md')
   if (!existsSync(agentsMdPath)) {
@@ -239,6 +411,81 @@ export function initCodexHome(codexHomeDir: string, opts: InitCodexHomeOpts = {}
     } else {
       writeFileSync(agentsMdPath, '# Overdeck Agent Instructions\n\n<!-- run `pan sync` to populate -->\n', { mode: 0o644 })
     }
+  }
+}
+
+/**
+ * Point a per-agent CODEX_HOME/auth.json at the global ~/.codex/auth.json via a
+ * symlink so every agent shares one OAuth refresh-token family (PAN-2285).
+ *
+ * Idempotent and migration-safe:
+ *   - global auth.json missing        → do nothing (onboarding prompts, as before)
+ *   - home auth.json already the right → nothing
+ *     symlink to global
+ *   - home auth.json a regular-file    → remove the stale disposable copy and
+ *     copy or a wrong symlink            replace it with the symlink (this is the
+ *                                        in-place migration for already-deployed
+ *                                        homes; removing a per-agent copy loses
+ *                                        nothing — the global file is the source
+ *                                        of truth)
+ *
+ * Exported for unit testing over temp dirs. Privacy: a symlink's permissions
+ * follow its target (the global file is 0600), so no chmod is needed here.
+ */
+export function seedCodexAuthSymlink(homeAuthPath: string, globalAuthPath: string): void {
+  if (!existsSync(globalAuthPath)) return
+
+  // If the home path is already a symlink pointing at the global file, we're done.
+  let currentLink: string | null = null
+  try {
+    if (lstatSync(homeAuthPath).isSymbolicLink()) {
+      currentLink = readlinkSync(homeAuthPath)
+    }
+  } catch {
+    currentLink = null
+  }
+  if (currentLink === globalAuthPath) return
+
+  // Anything else present at homeAuthPath (a stale copy or a wrong symlink) is a
+  // disposable per-agent artifact — remove it so we can install the symlink.
+  try {
+    if (existsSync(homeAuthPath) || currentLink !== null) {
+      unlinkSync(homeAuthPath)
+    }
+  } catch {
+    // If we cannot remove it, fall through: the symlink create below will throw
+    // and we swallow it, leaving the existing file in place (no worse than today).
+  }
+
+  try {
+    symlinkSync(globalAuthPath, homeAuthPath)
+  } catch {
+    // Best-effort: if the symlink cannot be created (permissions, race), leave the
+    // home without auth.json — codex onboarding prompts, which is the safe default.
+  }
+}
+
+/**
+ * Share user-approved Codex execpolicy rules with an isolated managed home.
+ * Existing per-agent rule state is preserved rather than replaced: rules can
+ * authorize out-of-sandbox execution, so Overdeck must never silently discard
+ * or redirect a rule directory it did not create.
+ */
+export function seedCodexRulesSymlink(homeRulesPath: string, globalRulesPath: string): void {
+  if (!existsSync(globalRulesPath)) return
+
+  try {
+    const homeRules = lstatSync(homeRulesPath)
+    if (homeRules.isSymbolicLink() && readlinkSync(homeRulesPath) === globalRulesPath) return
+    return
+  } catch {
+    // The managed home has no rules path yet; install the native user rule layer.
+  }
+
+  try {
+    symlinkSync(globalRulesPath, homeRulesPath, 'dir')
+  } catch {
+    // Best-effort: without the link, Codex safely falls back to prompting.
   }
 }
 
@@ -376,6 +623,10 @@ export function findLatestRollout(codexHomeDir: string): string | null {
 export class CodexRuntimeSync implements AgentRuntimeSync {
   readonly name = 'codex' as const
 
+  getHarnessBehavior(): HarnessBehavior {
+    return CODEX_BEHAVIOR
+  }
+
   getSessionPath(agentId: string): string | null {
     const threadId = readThreadId(agentId)
     if (!threadId) return null
@@ -434,20 +685,6 @@ export class CodexRuntimeSync implements AgentRuntimeSync {
       }
     }
 
-    // Tier 3: tmux session creation time.
-    try {
-      const sess = listSessionsSync().find(s => s.name === agentId)
-      if (sess) {
-        return {
-          timestamp: sess.created,
-          agentId,
-          source: 'tmux',
-          confidence: 'low',
-        }
-      }
-    } catch {
-      // ignore
-    }
     return null
   }
 
@@ -492,7 +729,8 @@ export class CodexRuntimeSync implements AgentRuntimeSync {
   /**
    * Kill a Codex agent via a SIGTERM→SIGKILL escalation ladder.
    *
-   *   1. Send Ctrl-C to the tmux pane (interrupt running task).
+   *   1. App-server transport: POST interrupt to the host socket. TUI transport:
+   *      send Ctrl-C to the tmux pane.
    *   2. Wait up to 2s for the session to disappear.
    *   3. SIGTERM the codex process group via pkill.
    *   4. Wait up to 5s for the session to disappear.
@@ -502,11 +740,20 @@ export class CodexRuntimeSync implements AgentRuntimeSync {
    * JSONL-is-sacred rule.
    */
   async killAgent(agentId: string): Promise<void> {
-    // Step 1: interrupt the running task.
-    try {
-      await execAsync(`tmux -L overdeck send-keys -t ${shellQuote(agentId)} C-c 2>/dev/null || true`)
-    } catch {
-      // ignore
+    // Step 1: interrupt the running task. App-server has a structured
+    // interrupt op; the C-c keystroke is only for the legacy TUI escape hatch.
+    if (codexTransport() === 'app-server') {
+      try {
+        await postAppServerInterrupt(agentId)
+      } catch {
+        // Best effort: the SIGTERM ladder below still tears down the session.
+      }
+    } else {
+      try {
+        await execAsync(`tmux -L overdeck send-keys -t ${shellQuote(agentId)} C-c 2>/dev/null || true`)
+      } catch {
+        // ignore
+      }
     }
 
     // Step 2: poll up to 2s.
@@ -530,12 +777,13 @@ export class CodexRuntimeSync implements AgentRuntimeSync {
     if (await pollUntilSessionGone(agentId, 5_000)) return
 
     // Step 5: SIGKILL via kill-session.
-    if (await Effect.runPromise(sessionExists(agentId))) {
-      await Effect.runPromise(killSession(agentId))
+    if (await tmuxSessionExists(agentId)) {
+      await tmuxKillSession(agentId)
     }
   }
 
   async spawnAgent(config: SpawnConfig & { codexHome?: string; codexSandboxMode?: string }): Promise<Agent> {
+    const harnessLaunch = await prepareHarnessLaunch('codex')
     const agentId = config.agentId
 
     // Per-agent CODEX_HOME: ~/.overdeck/agents/<id>/codex-home
@@ -546,7 +794,7 @@ export class CodexRuntimeSync implements AgentRuntimeSync {
 
     // 2. Build the codex exec command — shell-quote every interpolated value.
     const sandbox = toCodexSandboxValue(config.codexSandboxMode)
-    const tokens: string[] = ['codex', 'exec']
+    const tokens: string[] = [shellQuote(harnessLaunch.binaryPath), 'exec']
     if (config.model) tokens.push('-m', shellQuote(config.model))
     tokens.push('-c', 'approval_policy=never')
     tokens.push('-s', shellQuote(sandbox))
@@ -556,12 +804,10 @@ export class CodexRuntimeSync implements AgentRuntimeSync {
     const fullCmd = `CODEX_HOME=${shellQuote(codexHomeDir)} ${tokens.join(' ')}`
 
     // 3. Launch the tmux session on the overdeck socket.
-    await Effect.runPromise(createSession(agentId, config.workspace, fullCmd, {
-      env: {
-        OVERDECK_AGENT_ID: agentId,
-        CODEX_HOME: codexHomeDir,
-      },
-    }))
+    await tmuxCreateSession(agentId, config.workspace, fullCmd, {
+      OVERDECK_AGENT_ID: agentId,
+      CODEX_HOME: codexHomeDir,
+    })
 
     // 4. Wait for the rollout JSONL to appear (readiness signal).
     const rolloutPath = await waitForCodexRollout(codexHomeDir, SPAWN_READY_TIMEOUT_MS)
@@ -594,14 +840,14 @@ export class CodexRuntimeSync implements AgentRuntimeSync {
   }
 
   async isRunning(agentId: string): Promise<boolean> {
-    return await Effect.runPromise(sessionExists(agentId))
+    return await tmuxSessionExists(agentId)
   }
 }
 
 async function pollUntilSessionGone(agentId: string, timeoutMs: number): Promise<boolean> {
   const deadline = Date.now() + timeoutMs
   while (Date.now() < deadline) {
-    if (!(await Effect.runPromise(sessionExists(agentId)))) return true
+    if (!(await tmuxSessionExists(agentId))) return true
     await new Promise(r => setTimeout(r, 100))
   }
   return false
@@ -661,6 +907,9 @@ export class CodexRuntime implements AgentRuntime {
 
   getSessionPath(agentId: string): string | null {
     return this.inner.getSessionPath(agentId)
+  }
+  getHarnessBehavior(): HarnessBehavior {
+    return this.inner.getHarnessBehavior()
   }
   getLastActivity(agentId: string): Date | null {
     return this.inner.getLastActivity(agentId)

@@ -23,16 +23,18 @@ import {
   renderProjectLayer,
   applyManagedRegion,
   hasManagedRegion,
+  cleanLegacyBeadsTargetSync,
+  type LegacyBeadsCleanup,
   piGlobalContextFile,
   codexGlobalContextFile,
 } from './context-layers/index.js';
 import { backupFileSync, createBackupTimestamp } from './backup.js';
-
+export { isStartupSyncNeededSync, writeSyncManifestSync } from './sync-startup-gate.js';
 export interface SyncItem {
   name: string;
   sourcePath: string;
   targetPath: string;
-  status: 'new' | 'exists' | 'conflict' | 'symlink';
+  status: 'new' | 'exists' | 'conflict' | 'symlink' | 'adopted';
 }
 
 export interface SyncPlan {
@@ -365,7 +367,7 @@ export function planSyncSync(): SyncPlan {
       } else if (status.action === 'user-owned') {
         // Identical content sitting at the target from a previous Overdeck
         // era is not a conflict — it would simply be adopted on the real run.
-        syncStatus = hashFileSync(targetFile) === hashFileSync(file.absolutePath) ? 'exists' : 'conflict';
+        syncStatus = hashFileSync(targetFile) === hashFileSync(file.absolutePath) ? 'exists' : 'adopted';
       }
 
       bucket.push({
@@ -392,6 +394,7 @@ export interface SyncOptions {
 export interface SyncResult {
   created: string[];
   updated: string[];
+  adopted: string[];
   skipped: string[];
   conflicts: string[];
   diffs: Array<{ path: string; sourceContent: string; targetContent: string }>;
@@ -410,12 +413,15 @@ export interface SyncResult {
  * absent from the manifest (a prior Overdeck era, or a fresh ~/.claude)
  * is *adopted* when its content is byte-identical to our source — recorded
  * into the manifest so future syncs can update it. A target file that
- * differs is genuinely user-owned and is left untouched.
+ * differs at an Overdeck-shipped source path is a legacy pre-manifest
+ * install; it is overwritten, recorded in the manifest, and reported as
+ * adopted.
  */
 export function executeSyncSync(options: SyncOptions = {}): SyncResult {
   const result: SyncResult = {
     created: [],
     updated: [],
+    adopted: [],
     skipped: [],
     conflicts: [],
     diffs: [],
@@ -481,12 +487,19 @@ export function executeSyncSync(options: SyncOptions = {}): SyncResult {
       case 'user-owned': {
         // Target file exists but is absent from the manifest. If its content
         // is byte-identical to our source, it is ours (a prior era) — adopt
-        // it so future syncs can manage it. Otherwise it is genuinely
-        // user-authored: never touch it.
+        // it so future syncs can manage it. If it differs at a bundled source
+        // path, it is a legacy pre-manifest Overdeck install: overwrite and
+        // record it explicitly so the operator sees the adoption.
         if (hashFileSync(targetFile) === hashFileSync(file.absolutePath)) {
           setManifestEntry(manifest, file.relativePath, hashFileSync(targetFile), 'overdeck');
+          result.skipped.push(file.relativePath);
+        } else {
+          mkdirSync(dirname(targetFile), { recursive: true });
+          copyFileSync(file.absolutePath, targetFile);
+          const hash = hashFileSync(targetFile);
+          setManifestEntry(manifest, file.relativePath, hash, 'overdeck');
+          result.adopted.push(file.relativePath);
         }
-        result.skipped.push(file.relativePath);
         break;
       }
     }
@@ -498,12 +511,8 @@ export function executeSyncSync(options: SyncOptions = {}): SyncResult {
   return result;
 }
 
-/** A target file whose pre-existing hand-authored content was backed up the
- *  first time `pan sync` injected a managed region into it. */
 export interface ContextFirstInjection {
-  /** The target file (e.g. ~/.claude/CLAUDE.md, <root>/AGENTS.md). */
   file: string;
-  /** Where the pre-existing content was snapshotted before injection. */
   backupPath: string;
 }
 
@@ -518,9 +527,8 @@ export interface ContextLayerSyncResult {
   piGlobalWritten: boolean;
   /** True when ~/.overdeck/context/codex-global.md was written this run. */
   codexGlobalWritten: boolean;
-  /** Files where a managed region was injected into pre-existing content for
-   *  the first time this run (each backed up first). */
   firstInjections: ContextFirstInjection[];
+  legacyBeadsCleanups: LegacyBeadsCleanup[];
   errors: string[];
 }
 
@@ -566,6 +574,7 @@ export function syncContextLayersSync(): ContextLayerSyncResult {
     piGlobalWritten: false,
     codexGlobalWritten: false,
     firstInjections: [],
+    legacyBeadsCleanups: [],
     errors: [],
   };
   // One backup dir for every first-injection this run.
@@ -583,9 +592,9 @@ export function syncContextLayersSync(): ContextLayerSyncResult {
     result.errors.push(`global: ${err?.message ?? err}`);
   }
 
-  // PAN-1566: Global layer → ~/.overdeck/context/pi-global.md
+  // PAN-1566/PAN-1989: Global layer → ~/.overdeck/context/pi-global.md (ohmypi harness)
   try {
-    const piManaged = renderGlobalLayer('pi', isDevMode());
+    const piManaged = renderGlobalLayer('ohmypi', isDevMode());
     const piGlobalFile = piGlobalContextFile();
     const existingPi = existsSync(piGlobalFile) ? readFileSync(piGlobalFile, 'utf-8') : '';
     if (piManaged.trim() !== existingPi.trim()) {
@@ -613,15 +622,17 @@ export function syncContextLayersSync(): ContextLayerSyncResult {
     result.errors.push(`codex-global: ${err?.message ?? err}`);
   }
 
-  // Project layers → <projectRoot>/CLAUDE.md (claude-code) + <projectRoot>/AGENTS.md (pi).
-  // No project.md → both renders are empty → leave the project's files alone.
+  // Clean stale agent instructions in every project; Beads itself remains installed.
   for (const { config } of listProjectsSync()) {
     if (!existsSync(config.path)) continue;
     try {
-      const claudeManaged = renderProjectLayer(config.path, 'claude-code');
-      const piManaged = renderProjectLayer(config.path, 'pi');
-      if (!claudeManaged && !piManaged) continue;
       let wrote = false;
+      for (const name of ['CLAUDE.md', 'AGENTS.md']) {
+        const cleanup = cleanLegacyBeadsTargetSync(join(config.path, name), backupTimestamp);
+        if (cleanup) result.legacyBeadsCleanups.push(cleanup);
+      }
+      const claudeManaged = renderProjectLayer(config.path, 'claude-code');
+      const piManaged = renderProjectLayer(config.path, 'ohmypi');
       if (claudeManaged) {
         wrote = writeManagedTargetSync(join(config.path, 'CLAUDE.md'), claudeManaged, result, backupTimestamp) || wrote;
       }

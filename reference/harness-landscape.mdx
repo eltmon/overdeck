@@ -10,12 +10,13 @@ extensibility mechanism each one exposes, and what that means for future
 features.
 
 <Note>
-**This is a planning survey, not a support matrix.** Overdeck supports exactly
-two harnesses today — `claude-code` and `pi` (see [Harnesses](/configuration/harnesses)
-for the operational guide). Every other harness on this page is surveyed for
-*evaluation*; it is **not integrated**. Facts are current as of May 2026 and
-should be re-verified before any decision. Items flagged **⚠ verify** could not
-be cleanly confirmed.
+**This is a planning survey, not a support matrix.** Overdeck supports four
+harnesses today — `claude-code`, `ohmypi`, `codex`, and native `acp` (see
+[Harnesses](/configuration/harnesses) for the operational guide). Kimi Code CLI
+is the first agent wired through ACP; other tools on this page remain surveyed
+for evaluation until their provider adapters land. Facts are current as of May
+2026 unless a profile says otherwise and should be re-verified before any
+decision. Items flagged **⚠ verify** could not be cleanly confirmed.
 </Note>
 
 ## Why this document exists
@@ -62,13 +63,13 @@ are not competitors — a mature setup uses all three.
   bundled code). By early 2026, ~32 tools read `SKILL.md` — skills are portable
   across harnesses with no modification.
 - **MCP** — the live-tool-connection protocol. Near-universal, with one notable
-  holdout (Pi).
+  holdout (ohmypi/omp).
 
 <Info>
 **Why this matters for Overdeck:** `SKILL.md` portability means Overdeck's
 own `skills/` tree is *already* harness-agnostic. The same skill directories
 `pan sync` writes to `~/.claude/skills/` are loadable, unmodified, by Codex,
-Gemini CLI, Cursor, OpenCode, Goose, Amp, Crush, and Pi. Adding a harness does
+Gemini CLI, Cursor, OpenCode, Goose, Amp, Crush, and ohmypi. Adding a harness does
 **not** mean re-authoring skills — it means teaching that harness where to read
 them.
 </Info>
@@ -78,13 +79,35 @@ them.
 | Harness | Status | Runtime adapter |
 | --- | --- | --- |
 | `claude-code` | **Supported** (default) | none needed — drop-in `claude` |
-| `pi` | **Supported** (alternative) | `src/lib/runtimes/pi.ts` + vendored `packages/pi-extension/` |
+| `ohmypi` | **Supported** (alternative) | `src/lib/runtimes/ohmypi.ts` + vendored `packages/ohmypi-extension/` |
+| `codex` | **Supported** (alternative) | `src/lib/runtimes/codex.ts` |
+| `acp` | **Supported** (Kimi first) | `src/lib/runtimes/acp.ts` + vendored `packages/effect-acp/` |
 
-Everything else in this document is **not supported** — surveyed for planning.
-One nuance: Overdeck already authenticates **ChatGPT-subscription OAuth
-tokens** via CLIProxy to drive GPT *models*. That is model routing, not a Codex
-*harness* integration — but it lowers the auth cost of adding the Codex CLI
-harness later.
+The native `acp` harness is a reusable protocol integration, but version one
+registers only Kimi Code CLI as a selectable ACP provider. The remaining
+profiles are surveyed for planning unless their status explicitly says
+supported.
+
+## ACP-capable agents
+
+Overdeck now speaks [Agent Client Protocol](https://agentclientprotocol.com/)
+natively, so adding another ACP-speaking CLI no longer requires inventing a
+new transport, event stream, permission channel, or session lifecycle. It does
+still require a provider adapter that names the executable, arguments, and
+authentication method; Overdeck fails loudly rather than treating protocol
+compatibility as automatic support.
+
+| ACP agent | Overdeck status | Next integration work |
+| --- | --- | --- |
+| **Kimi Code CLI** | **Wired now** through `kimi acp` | None for version one; run interactive `/login` once before use. |
+| **Cursor CLI** | ACP-reachable next | Register its executable, launch arguments, and authentication mapping. |
+| **Grok CLI** | ACP-reachable next | Register its executable, launch arguments, and authentication mapping. |
+| **Google Gemini CLI** | ACP-reachable next | Register its executable, launch arguments, and authentication mapping. |
+
+Kimi is therefore a supported agent through the `acp` harness. Cursor, Grok,
+and Gemini remain candidates: their ACP support reduces the adapter to
+provider-specific startup and auth, but they are not selectable until those
+adapters and probes land.
 
 ## Harness profiles
 
@@ -117,39 +140,37 @@ and should be re-checked before any decision.
 - **Why it's the default:** required for Anthropic-subscription users; the
   largest agent/skill/plugin surface; Overdeck's pipeline prompts assume it.
 
-### Pi Coding Agent — Supported (alternative)
+### oh-my-pi (ohmypi) — Supported (alternative)
 
-- **Vendor / model:** Mario Zechner ("badlogic"). **30+ providers** via its
+- **Vendor / model:** oh-my-pi project (`@oh-my-pi/pi-coding-agent`, binary `omp`). **30+ providers** via its
   `pi-ai` layer — subscription auth for Anthropic, OpenAI, GitHub Copilot;
   API-key for ~25 more (Gemini, Vertex, Bedrock, Groq, Cerebras, xAI,
   OpenRouter, MiniMax, DashScope, …).
 - **OSS / license:** MIT. TypeScript / Node.
-- **Repo / package:** `github.com/badlogic/pi-mono`. **⚠ verify:** the project
-  is mirrored under `earendil-works/pi` and current docs name the package
-  `@earendil-works/pi-coding-agent`; Overdeck's [Harnesses](/configuration/harnesses)
-  guide and `doctor.ts` still reference `@mariozechner/pi-coding-agent`. Confirm
-  the canonical install target on the next Pi version bump.
+- **Install:** `npm install -g @oh-my-pi/pi-coding-agent` — provides the `omp` binary.
 - **Extensibility:**
-  - **Skills** — reads `SKILL.md`. Discovery: `~/.pi/agent/skills/`,
-    `.pi/skills/`, `~/.agents/skills/`, `.agents/skills/`, `skills/` in
+  - **Skills** — reads `SKILL.md`. Discovery: `~/.omp/agent/skills/`,
+    `.omp/skills/`, `~/.agents/skills/`, `.agents/skills/`, `skills/` in
     `package.json`, the `skills` array in `settings.json`, **and the repeatable
     `--skill <path>` CLI flag.** The `settings.json` `skills` array accepts
-    arbitrary directories — Overdeck already exploits this by writing
-    `~/.pi/agent/settings.json` with `"skills": ["~/.claude/skills"]`.
+    arbitrary directories — Overdeck exploits this by writing
+    `~/.omp/agent/settings.json` with `"skills": ["~/.claude/skills"]`.
   - **Extensions** — TypeScript modules subscribing to a rich lifecycle-event
     bus (`session_start`, `tool_execution_end`, `agent_start/end`, …); loaded by
     auto-discovery, `settings.json`, or `--extension`. Overdeck vendors one at
-    `packages/pi-extension/`.
-  - **No MCP** — a deliberate design stance. Pi tells users to wrap CLI tools as
+    `packages/ohmypi-extension/`.
+  - **No MCP** — a deliberate design stance. omp tells users to wrap CLI tools as
     skills instead. The only path to MCP is a custom extension.
   - **AGENTS.md** read by default.
-- **Headless:** `pi --mode rpc` — JSONL command/event protocol over stdin/stdout
+- **Headless:** `omp --mode rpc` — JSONL command/event protocol over stdin/stdout
   (Overdeck delivers commands via a named-pipe `mkfifo`).
 - **Why it's supported:** multi-provider without CLIProxy; named-pipe RPC is
-  faster than tmux paste-buffer; the only ToS-blocked cell is `pi` + Anthropic
+  faster than tmux paste-buffer; the only ToS-blocked cell is `ohmypi` + Anthropic
   model + Anthropic subscription auth.
+- **Implementation files:** `src/lib/runtimes/ohmypi.ts`, `src/lib/runtimes/ohmypi-fifo.ts`,
+  `src/lib/cost-parsers/ohmypi-parser.ts`, `packages/ohmypi-extension/`.
 
-### OpenAI Codex CLI — Not supported (strong candidate)
+### OpenAI Codex CLI — Supported
 
 - **Vendor / model:** OpenAI. OpenAI-centric (GPT-5.4, GPT-5.3-Codex); `--oss`
   flag runs open-weight models on local Ollama/LM Studio/MLX. Non-OpenAI cloud
@@ -168,10 +189,16 @@ and should be re-checked before any decision.
 - **Headless / RPC:** `codex exec` non-interactive; `--json` newline-delimited
   event stream; `--output-schema` for validated output; `codex mcp-server` for
   stdio orchestration. Among the strongest headless interfaces in the field.
-- **Why a candidate:** Apache-2.0, native AGENTS.md + skills, excellent headless
-  story, and Overdeck's ChatGPT-subscription auth already exists. The Codex
-  *harness* would let GPT-subscription users run a first-party OpenAI agent loop
-  instead of CLIProxy-routing GPT into Claude Code.
+- **Why it's supported:** Apache-2.0, native AGENTS.md + skills, excellent
+  headless story, and Overdeck's ChatGPT-subscription auth already exists. The
+  Codex harness gives GPT-subscription users a first-party OpenAI agent loop
+  (GPT-5.6 Sol as the current flagship, GPT-5.5 as the previous flagship and still
+  supported, and the rest of the GPT model family) instead of CLIProxy-routing GPT
+  into Claude Code. Work agents run as live, attachable TUI sessions
+  (`codexMode: work-tui`) under the PTY supervisor — never one-shot `codex exec`.
+- **Implementation files:** `src/lib/runtimes/codex.ts`,
+  `src/lib/cost-parsers/codex-parser.ts` (per-agent thread-id pinning at
+  `~/.overdeck/agents/<id>/codex-thread-id` for session introspection).
 
 ### Google Gemini CLI — Not supported (candidate)
 
@@ -455,7 +482,7 @@ open feature request ([anthropics/claude-code#34235](https://github.com/anthropi
 
 1. **Skill portability is real and already paid for.** Overdeck's `skills/`
    tree is `SKILL.md`-format. Codex, Gemini CLI, Cursor, OpenCode, Goose, Amp,
-   Warp, and Pi all read `SKILL.md`, and most read `.claude/skills/` directly.
+   Warp, and ohmypi all read `SKILL.md`, and most read `.claude/skills/` directly.
    Adding any of them is a *runtime adapter* problem, not a *skill re-authoring*
    problem. **Aider is the lone exception** — no skills, no MCP, no JSON output;
    not worth pursuing.
@@ -475,15 +502,15 @@ open feature request ([anthropics/claude-code#34235](https://github.com/anthropi
    - **Continue Agents** — `config.yaml` bundles of models + rules + tools.
    - **Gemini CLI `/skills enable/disable`** — true per-session skill toggling.
 
-   Claude Code and Pi have no native bundle object, but **can synthesize one**:
-   Claude Code via `--plugin-dir`, Pi via repeatable `--skill`. The
+   Claude Code and ohmypi have no native bundle object, but **can synthesize one**:
+   Claude Code via `--plugin-dir`, ohmypi via repeatable `--skill`. The
    [template-conversations proposal](/reference/template-conversations) builds
    on those. "Adding a harness specifically for its bundle primitive" is
    therefore a *real option* — Goose is the candidate if Overdeck wants the
    primitive native rather than synthesized.
 
-4. **MCP is near-universal; Pi is the exception.** Any feature that assumes MCP
-   availability must account for Pi rejecting MCP by design.
+4. **MCP is near-universal; ohmypi is the exception.** Any feature that assumes MCP
+   availability must account for ohmypi rejecting MCP by design.
 
 5. **Headless quality varies and gates orchestration.** Codex, Gemini CLI,
    Cursor, and Amp have first-class JSON/stream interfaces. Aider has none.
@@ -493,8 +520,8 @@ open feature request ([anthropics/claude-code#34235](https://github.com/anthropi
    spend. A harness without a machine-readable interface is expensive for
    Overdeck to drive, regardless of how good its model access is.
 
-6. **Re-verify before deciding.** Flagged ⚠ items — Warp's license, Pi's
-   canonical package name, OpenCode/Crush licenses and headless schemas, Cline's
+6. **Re-verify before deciding.** Flagged ⚠ items — Warp's license,
+   OpenCode/Crush licenses and headless schemas, Cline's
    `SKILL.md` support, the Agent Skills spec date — must be confirmed against
    primary sources at decision time. This document is a snapshot of a
    fast-moving field.
@@ -504,7 +531,7 @@ open feature request ([anthropics/claude-code#34235](https://github.com/anthropi
 Primary documentation consulted (May 2026):
 
 - Claude Code — [code.claude.com/docs](https://code.claude.com/docs/en/skills)
-- Pi — [pi-mono](https://github.com/badlogic/pi-mono)
+- oh-my-pi — [oh-my-pi/pi-coding-agent](https://github.com/oh-my-pi/pi-coding-agent)
 - Codex CLI — [openai/codex](https://github.com/openai/codex),
   [developers.openai.com/codex](https://developers.openai.com/codex/cli)
 - Gemini CLI — [google-gemini/gemini-cli](https://github.com/google-gemini/gemini-cli)

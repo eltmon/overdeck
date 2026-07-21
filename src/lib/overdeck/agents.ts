@@ -7,11 +7,11 @@ import { and, eq } from 'drizzle-orm';
 import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import { HttpApiEndpoint, HttpApiGroup } from 'effect/unstable/httpapi';
 
-import { Db, EventBus, Records, Tmux } from './infra.js';
+import { Db, EventBus, Records, Tmux, getOverdeckDatabaseSync } from './infra.js';
 import { IssueId } from './issues.js';
-import { getOverdeckDatabaseSync } from './infra.js';
 import { getOverdeckHome } from '../paths.js';
 import type { AgentState } from '../agents.js';
+export { getIssueStageSync, isTerminalIssueStage } from './issue-stage-sync.js';
 
 // ── Local table definitions (mirrors overdeck-schema.ts — no FK/index annotations here) ─
 
@@ -57,10 +57,15 @@ export type AgentId = typeof AgentId.Type;
 // Must match VALID_ROLES_SYNC (and the roles actually written to the agents
 // table). PAN-1979: a too-narrow Role enum crashed the AgentsResolver list
 // decode on real `strike`/`flywheel` rows, taking down dashboard boot.
-export const Role = Schema.Literals(['work', 'review', 'plan', 'ship', 'test', 'flywheel', 'strike', 'sequencer']);
+export const Role = Schema.Literals(['work', 'review', 'plan', 'ship', 'test', 'flywheel', 'strike', 'sequencer', 'knowledge']);
 export type Role = typeof Role.Type;
 
-export const Status = Schema.Literals(['starting', 'running', 'idle', 'stopped', 'crashed']);
+// PAN-1979: a too-narrow Role enum crashed the AgentsResolver list decode
+// on real `strike`/`flywheel` rows, taking down dashboard boot. Same class for
+// Status: planning writes 'error' on spawn failure (spawn-planning-session.ts),
+// and flywheel surfaces can persist 'waiting'; both must decode or a single
+// lifecycle row bricks dashboard boot.
+export const Status = Schema.Literals(['starting', 'running', 'waiting', 'idle', 'stopped', 'crashed', 'error']);
 export type Status = typeof Status.Type;
 
 export const DeliveryMethod = Schema.Literals(['auto', 'supervisor', 'channels', 'tmux']);
@@ -161,6 +166,35 @@ const decodeAgentRow = (row: unknown): Agent =>
       : row,
   );
 
+// A single undecodable row must never brick dashboard boot. The SHARED runtime
+// `agents` table holds rows written by feature-branch agents running ahead of
+// main (a role/status main doesn't know yet — e.g. PAN-2468's `knowledge`
+// specialist, on feature/pan-2468 only, registered in overdeck.db). `list` is a
+// boot-critical read, so it skips+logs rows it can't decode instead of throwing;
+// PAN-1979 widened the Role enum reactively, but the enum always lags whatever a
+// branch invents. `get(id)` stays strict to surface a genuine decode bug.
+const warnedUndecodableAgentRows = new Set<string>();
+export const decodeAgentRowsLenient = (rows: readonly unknown[]): Agent[] => {
+  const out: Agent[] = [];
+  for (const row of rows) {
+    try {
+      out.push(decodeAgentRow(row));
+    } catch (err) {
+      const id =
+        row && typeof row === 'object' && 'id' in row
+          ? String((row as { id: unknown }).id)
+          : '<unknown>';
+      if (!warnedUndecodableAgentRows.has(id)) {
+        warnedUndecodableAgentRows.add(id);
+        console.warn(
+          `[agents] skipping undecodable agent row ${id}: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+    }
+  }
+  return out;
+};
+
 const validateModel = (model: string): Effect.Effect<string, InvalidModel> =>
   model.trim().length > 0
     ? Effect.succeed(model.trim())
@@ -207,7 +241,7 @@ export const AgentsResolverLive = Layer.effect(
             : db.q.select().from(overdeckAgents),
         );
 
-        return rows.map((r) => decodeAgentRow(r));
+        return decodeAgentRowsLenient(rows);
       });
 
     const isAlive = (id: AgentId) => tmux.sessionExists(id);
@@ -680,7 +714,10 @@ const OVERDECK_AGENT_COLUMNS = [
   'phase', 'role_run_head', 'flywheel_run_id', 'cost_so_far',
   'review_sub_role', 'review_run_id', 'review_synthesis_agent_id',
   'review_output_path', 'review_deadline_at', 'review_monitor_signaled',
-  'review_retry_attempt', 'updated_at',
+  'review_retry_attempt',
+  'review_discovery_pending', 'review_context_manifest_path', 'review_discovery_ready_at',
+  'review_convoy_forked_at', 'review_fork_cache_checked', 'review_forked_from_parent',
+  'updated_at',
 ] as const;
 
 /** Convert an ISO timestamp string or null → Unix ms INTEGER or null. */
@@ -739,6 +776,12 @@ function agentStateToOverdeckRow(state: AgentState): unknown[] {
     toMs(state.reviewDeadlineAt),
     state.reviewMonitorSignaled ?? null,
     state.reviewRetryAttempt ?? null,
+    toBit(state.reviewDiscoveryPending),
+    state.reviewContextManifestPath ?? null,
+    toMs(state.reviewDiscoveryReadyAt),
+    toMs(state.reviewConvoyForkedAt),
+    toBit(state.reviewForkCacheChecked),
+    toBit(state.reviewForkedFromParent),
     Date.now(),
   ];
 }
@@ -762,7 +805,7 @@ function listLiveTmuxSessionNamesSync(): Set<string> {
   }
 }
 
-const VALID_ROLES_SYNC = new Set<string>(['plan', 'work', 'review', 'test', 'ship', 'flywheel', 'strike', 'sequencer']);
+const VALID_ROLES_SYNC = new Set<string>(['plan', 'work', 'review', 'test', 'ship', 'flywheel', 'strike', 'sequencer', 'knowledge']);
 
 function parseAgentStateJsonSync(content: string, fallbackId: string): AgentState | null {
   let parsed: Partial<AgentState>;

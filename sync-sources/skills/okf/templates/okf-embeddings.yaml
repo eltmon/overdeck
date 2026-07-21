@@ -1,0 +1,17 @@
+okf_embeddings_version: "0.1"
+default_profile: local
+
+profiles:
+  local:
+    provider: ollama
+    model: nomic-embed-text
+    dim: 768
+    endpoint: http://localhost:11434
+    share: true
+
+chunking:
+  strategy: concept
+  max_tokens: 512
+
+hash: sha256
+vectors_dir: embeddings

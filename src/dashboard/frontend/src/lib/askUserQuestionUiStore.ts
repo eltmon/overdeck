@@ -47,6 +47,20 @@ interface AskUserQuestionUiState {
   reconcileAnswered: (liveToolUseIds: Set<string>) => void
   /** Drop dismissed ids no longer live server-side (called from App's reconcile). */
   reconcileDismissed: (liveSubjectIds: Set<string>) => void
+
+  // PAN-1520 (FR-3/FR-7) — the same three concerns for the plan-approval
+  // dialog, tracked separately so dismissing an AUQ never hides a pending
+  // plan on the same subject (and vice versa).
+  /** ExitPlanMode toolUseIds the operator optimistically resolved. */
+  resolvedPlanToolUseIds: Set<string>
+  /** subject ids whose plan dialog was minimized without resolving. */
+  dismissedPlanSubjectIds: Set<string>
+  markPlanResolved: (toolUseId: string) => void
+  unmarkPlanResolved: (toolUseId: string) => void
+  markPlanDismissed: (subjectId: string) => void
+  undismissPlan: (subjectId: string) => void
+  reconcilePlanResolved: (liveToolUseIds: Set<string>) => void
+  reconcilePlanDismissed: (liveSubjectIds: Set<string>) => void
 }
 
 function withAdded(prev: Set<string>, id: string): Set<string> {
@@ -94,4 +108,19 @@ export const useAskUserQuestionUiStore = create<AskUserQuestionUiState>((set) =>
     set((s) => ({ answeredToolUseIds: withIntersection(s.answeredToolUseIds, liveToolUseIds) })),
   reconcileDismissed: (liveSubjectIds) =>
     set((s) => ({ dismissedSubjectIds: withIntersection(s.dismissedSubjectIds, liveSubjectIds) })),
+
+  resolvedPlanToolUseIds: new Set<string>(),
+  dismissedPlanSubjectIds: new Set<string>(),
+  markPlanResolved: (toolUseId) =>
+    set((s) => ({ resolvedPlanToolUseIds: withAdded(s.resolvedPlanToolUseIds, toolUseId) })),
+  unmarkPlanResolved: (toolUseId) =>
+    set((s) => ({ resolvedPlanToolUseIds: withRemoved(s.resolvedPlanToolUseIds, toolUseId) })),
+  markPlanDismissed: (subjectId) =>
+    set((s) => ({ dismissedPlanSubjectIds: withAdded(s.dismissedPlanSubjectIds, subjectId) })),
+  undismissPlan: (subjectId) =>
+    set((s) => ({ dismissedPlanSubjectIds: withRemoved(s.dismissedPlanSubjectIds, subjectId) })),
+  reconcilePlanResolved: (liveToolUseIds) =>
+    set((s) => ({ resolvedPlanToolUseIds: withIntersection(s.resolvedPlanToolUseIds, liveToolUseIds) })),
+  reconcilePlanDismissed: (liveSubjectIds) =>
+    set((s) => ({ dismissedPlanSubjectIds: withIntersection(s.dismissedPlanSubjectIds, liveSubjectIds) })),
 }))

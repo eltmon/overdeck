@@ -7,6 +7,7 @@ import { Effect, Data } from 'effect';
 import {
   getPullRequestState,
   isGitHubAppConfigured,
+  listPullRequestsForHead,
   mergePullRequestWithApp,
   parsePullRequestRef,
   type GitHubPullRequestState,
@@ -124,11 +125,29 @@ function buildGitLabReviewTarget(input: Pick<MergeReviewArtifactInput | CommentO
   return input.id || input.url || '';
 }
 
+function parseRepository(repository: string | undefined): { owner: string; repo: string } | null {
+  const [owner, repo] = (repository ?? '').split('/');
+  return owner && repo ? { owner, repo } : null;
+}
+
 async function getExistingGitHubArtifact(
   branchName: string,
   cwd?: string,
   repository?: string
 ): Promise<CreateReviewArtifactResult | null> {
+  const parsedRepo = parseRepository(repository);
+  if (isGitHubAppConfigured() && parsedRepo) {
+    const prs = await Effect.runPromise(listPullRequestsForHead(parsedRepo.owner, parsedRepo.repo, branchName, 'all'));
+    const pr = prs[0];
+    if (!pr) return null;
+    return {
+      forge: 'github',
+      created: false,
+      url: pr.url ?? `https://github.com/${parsedRepo.owner}/${parsedRepo.repo}/pull/${pr.number}`,
+      id: String(pr.number),
+    };
+  }
+
   const { stdout } = await execAsync(
     `gh pr view ${branchName}${buildRepositoryFlag(repository)} --json url,number 2>/dev/null || true`,
     { cwd, encoding: 'utf-8' }
@@ -151,7 +170,7 @@ async function getExistingGitLabArtifact(
   repository?: string
 ): Promise<CreateReviewArtifactResult | null> {
   const { stdout } = await execAsync(
-    `glab mr list --source-branch ${branchName}${buildRepositoryFlag(repository)} --state opened --json iid,web_url 2>/dev/null || true`,
+    `glab mr list --source-branch ${branchName}${buildRepositoryFlag(repository)} --output json 2>/dev/null || true`,
     { cwd, encoding: 'utf-8' }
   );
   const trimmed = stdout.trim();
@@ -313,10 +332,24 @@ const gitlabForgeAdapter: ForgeAdapter = {
 
     const bodyEnv = input.body ? { PAN_MR_BODY: input.body } : {};
     const bodyFlag = input.body ? ' --description "$PAN_MR_BODY"' : '';
-    const { stdout } = await execAsync(
-      `glab mr create --source-branch ${input.sourceBranch} --target-branch ${input.targetBranch} --title "${input.title}"${bodyFlag}${buildRepositoryFlag(input.repository)}`,
-      { cwd: input.cwd, encoding: 'utf-8', env: { ...process.env, ...bodyEnv }, shell: '/bin/bash' }
-    );
+    let stdout: string;
+    try {
+      ({ stdout } = await execAsync(
+        `glab mr create --source-branch ${input.sourceBranch} --target-branch ${input.targetBranch} --title "${input.title}"${bodyFlag}${buildRepositoryFlag(input.repository)}`,
+        { cwd: input.cwd, encoding: 'utf-8', env: { ...process.env, ...bodyEnv }, shell: '/bin/bash' }
+      ));
+    } catch (error: any) {
+      const message = String(error?.message ?? error);
+      if (message.includes('409') && message.includes('open merge request already exists')) {
+        const existingAfterConflict = await getExistingGitLabArtifact(
+          input.sourceBranch,
+          input.cwd,
+          input.repository,
+        );
+        if (existingAfterConflict) return existingAfterConflict;
+      }
+      throw error;
+    }
     const url = stdout.trim().split('\n').pop()?.trim() || stdout.trim();
     const created = await getExistingGitLabArtifact(input.sourceBranch, input.cwd, input.repository);
     return {

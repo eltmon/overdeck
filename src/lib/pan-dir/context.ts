@@ -3,13 +3,15 @@ import { Effect, FileSystem } from 'effect'
 import * as NodeFileSystem from '@effect/platform-node/NodeFileSystem'
 import { FsError } from '../errors.js'
 
-import { getWorkspacePanPaths, ensureWorkspacePanDir } from './continue.js'
+import { getWorkspacePanPaths, getLegacyWorkspacePanPaths, ensureWorkspacePanDir } from './continue.js'
 
 export function readWorkspaceContext(workspacePath: string): Effect.Effect<string | null, FsError> {
   return Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem
-    const { contextPath } = getWorkspacePanPaths(workspacePath)
-    const exists = yield* fs.exists(contextPath).pipe(Effect.catch(() => Effect.succeed(false)))
+    const canonical = getWorkspacePanPaths(workspacePath).contextPath
+    const canonicalExists = yield* fs.exists(canonical).pipe(Effect.catch(() => Effect.succeed(false)))
+    const contextPath = canonicalExists ? canonical : getLegacyWorkspacePanPaths(workspacePath).contextPath
+    const exists = canonicalExists || (yield* fs.exists(contextPath).pipe(Effect.catch(() => Effect.succeed(false))))
     if (!exists) return null
     return yield* fs.readFileString(contextPath, 'utf-8').pipe(
       Effect.mapError((cause) => new FsError({ path: contextPath, operation: 'readFileString', cause })),

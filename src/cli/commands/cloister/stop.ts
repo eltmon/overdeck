@@ -5,16 +5,16 @@
  */
 
 import chalk from 'chalk';
-import { getCloisterService } from '../../../lib/cloister/service.js';
+import { cloisterApi } from './api.js';
 
 interface StopOptions {
   emergency?: boolean;
 }
 
 export async function stopCommand(options: StopOptions): Promise<void> {
-  const service = getCloisterService();
+  const status = await cloisterApi<{ running: boolean }>('/api/cloister/status');
 
-  if (!service.isRunning() && !options.emergency) {
+  if (!status.running && !options.emergency) {
     console.log(chalk.yellow('⚠️  Cloister is not running'));
     return;
   }
@@ -24,7 +24,8 @@ export async function stopCommand(options: StopOptions): Promise<void> {
     console.log(chalk.red.bold('🚨 EMERGENCY STOP - Killing all agents'));
     console.log(chalk.dim('   This will terminate all running agent sessions'));
 
-    const killedAgents = service.emergencyStop();
+    const response = await cloisterApi<{ killedAgents: string[] }>('/api/cloister/emergency-stop', { method: 'POST' });
+    const killedAgents = response.killedAgents;
 
     console.log('');
     console.log(chalk.green(`✓ Killed ${killedAgents.length} agent(s):`));
@@ -33,7 +34,7 @@ export async function stopCommand(options: StopOptions): Promise<void> {
     }
   } else {
     // Normal stop - just stop monitoring
-    service.stop();
+    await cloisterApi('/api/cloister/stop', { method: 'POST' });
     console.log(chalk.green('✓ Cloister stopped'));
     console.log(chalk.dim('  Agents are still running'));
   }

@@ -18,16 +18,23 @@ import { Effect } from 'effect';
  */
 
 import chalk from 'chalk';
-import { spawn } from 'child_process';
-import { dirname, join } from 'path';
+import { execFileSync, spawn } from 'child_process';
+import { dirname, join, parse, resolve, sep } from 'path';
 import { fileURLToPath } from 'url';
-import { existsSync } from 'fs';
+import { existsSync, mkdirSync } from 'fs';
+import {
+  isNonPrimaryCheckoutRoot,
+  isWorkspaceRepoRoot,
+  primaryRootFromLinkedWorktree,
+} from '../../dashboard/server/identity.js';
 
 import { acquireRestartLock, readRestartLockHolder, type RestartLockHandle } from '../../lib/restart-lock.js';
 import { writeRestartStatus } from '../../lib/restart-status.js';
 import { applyBootGateEnv, formatBootGateState, resolveBootGates, type BootGateOptions } from '../../lib/boot-gates.js';
+import { agentRestartBlockReason } from '../../lib/deploy/agent-restart-gate.js';
 
 import {
+  DASHBOARD_LOG_FILE,
   openDashboardLogStdio,
   readPlatformConfigSync,
   restartDashboard,
@@ -38,6 +45,7 @@ import {
   StageError,
   waitForDashboardHealth,
   stopDashboard,
+  type DashboardSpawnHandle,
   type PlatformConfig,
 } from '../../lib/platform-lifecycle.js';
 
@@ -67,6 +75,37 @@ function resolveScope(options: RestartOptions): 'dashboard' | 'cliproxy' | 'trae
   return (flags[0] as any) || 'dashboard';
 }
 
+export function resolveGitRepoRoot(cwd: string): string | null {
+  let candidate = resolve(cwd);
+  const filesystemRoot = parse(candidate).root;
+  while (true) {
+    if (existsSync(join(candidate, '.git'))) return candidate;
+    if (candidate === filesystemRoot) return null;
+    candidate = dirname(candidate);
+  }
+}
+
+export function refuseNonPrimaryDashboardCwd(cwd: string, verb: string): boolean {
+  if (existsSync('/.dockerenv')) return false;
+
+  const repoRoot = resolveGitRepoRoot(cwd);
+  if (!repoRoot) return false;
+
+  const isWorkspace = isWorkspaceRepoRoot(repoRoot);
+  if (!isNonPrimaryCheckoutRoot(repoRoot)) return false;
+
+  const primaryRepoRoot = primaryRootFromLinkedWorktree(repoRoot) ??
+    (isWorkspace ? dirname(dirname(repoRoot)) : null);
+  const primaryGuidance = primaryRepoRoot
+    ? ` Run this command from the primary checkout at ${primaryRepoRoot}.`
+    : '';
+  console.error(chalk.red(
+    `Refusing to ${verb} the host dashboard from non-primary checkout ${repoRoot}.${primaryGuidance}`,
+  ));
+  process.exitCode = 2;
+  return true;
+}
+
 function resolveNode22(): string {
   const nvmNode = '/home/eltmon/.config/nvm/versions/node/v22.22.0/bin/node';
   if (existsSync(nvmNode)) return nvmNode;
@@ -81,6 +120,14 @@ type DashboardBundleCandidate = {
 function dashboardBundleCandidates(): DashboardBundleCandidate[] {
   const currentDir = dirname(fileURLToPath(import.meta.url));
   return [
+    {
+      // Code-split CLI chunk living directly in dist/ (tsdown chunk layout can
+      // place this module at dist/<chunk>.js — PAN-2820: all relative-parent
+      // candidates missed and pan restart stopped the server then failed to
+      // respawn it).
+      path: join(currentDir, 'dashboard', 'server.js'),
+      preferred: currentDir.endsWith(sep + 'dist'),
+    },
     {
       path: join(currentDir, '..', 'dashboard', 'server.js'),
       preferred: currentDir.endsWith(join('dist', 'cli')),
@@ -112,11 +159,18 @@ export function resolveBundledServerPath(): string {
     ?? candidates[0].path;
 }
 
+export function resolvePrimaryDashboardIdentity(): { repoRoot: string; mode: 'primary' } {
+  return {
+    repoRoot: resolve(resolveBundledServerPath(), '..', '..', '..'),
+    mode: 'primary',
+  };
+}
+
 function searchedBundlePaths(): string[] {
   return uniqueBundleCandidates().map(candidate => candidate.path);
 }
 
-export function spawnDashboardDetached(config: PlatformConfig, opts?: BootGateOptions): void {
+export function spawnDashboardDetached(config: PlatformConfig, opts?: BootGateOptions): DashboardSpawnHandle {
   const serverPath = resolveBundledServerPath();
   if (!existsSync(serverPath)) {
     throw new StageError({
@@ -125,18 +179,104 @@ export function spawnDashboardDetached(config: PlatformConfig, opts?: BootGateOp
     });
   }
   const env = applyBootGateEnv({ ...process.env }, opts);
+  const traefikEnv = config.traefikEnabled
+    ? {
+        DASHBOARD_URL: `https://${config.traefikDomain}`,
+        OVERDECK_TRAEFIK_ENABLED: '1',
+        OVERDECK_TRAEFIK_DOMAIN: config.traefikDomain,
+        OVERDECK_TRUSTED_ORIGINS: [process.env.OVERDECK_TRUSTED_ORIGINS, `https://${config.traefikDomain}`].filter(Boolean).join(','),
+      }
+    : {};
+  const fullEnv = {
+    ...env,
+    ...traefikEnv,
+    DASHBOARD_PORT: String(config.dashboardPort),
+    API_PORT: String(config.dashboardApiPort),
+    PORT: String(config.dashboardApiPort),
+    OVERDECK_MODE: 'production',
+  };
+  const identity = resolvePrimaryDashboardIdentity();
+
+  // PAN-2804: a plain detached spawn stays in the INVOKER's cgroup — a
+  // watchdog-spawned dashboard dies when overdeck-supervisor.service restarts,
+  // and a conversation/flywheel-spawned one dies with that tmux pane's scope.
+  // Run the server in its own transient systemd unit (same isolation the
+  // shared tmux server gets, PAN-1798) so its lifecycle belongs to nobody.
+  const systemdHandle = spawnDashboardSystemdUnit(serverPath, fullEnv, identity.repoRoot);
+  if (systemdHandle) return systemdHandle;
+
   const child = spawn(resolveNode22(), [serverPath], {
+    cwd: identity.repoRoot,
     detached: true,
     stdio: openDashboardLogStdio(),
-    env: {
-      ...env,
-      DASHBOARD_PORT: String(config.dashboardPort),
-      API_PORT: String(config.dashboardApiPort),
-      PORT: String(config.dashboardApiPort),
-      OVERDECK_MODE: 'production',
-    },
+    env: fullEnv,
   });
   child.unref();
+  console.warn(
+    '[dashboard] WARNING (PAN-2804): could not start the dashboard via systemd-run. ' +
+      'It shares the invoking process tree\'s cgroup; restarting that unit/scope will kill it.',
+  );
+  return {
+    stop: () => {
+      if (!child.pid) return;
+      try {
+        process.kill(child.pid, 'SIGTERM');
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'ESRCH') throw error;
+      }
+    },
+  };
+}
+
+/** Valid systemd --setenv names; skips exported bash functions etc. */
+const ENV_NAME_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
+function spawnDashboardSystemdUnit(
+  serverPath: string,
+  fullEnv: Record<string, string | undefined>,
+  repoRoot: string,
+): DashboardSpawnHandle | null {
+  if (process.platform !== 'linux') return null;
+  try {
+    mkdirSync(dirname(DASHBOARD_LOG_FILE), { recursive: true });
+    const unitName = `overdeck-dashboard-${Date.now()}`;
+    const setenvArgs = Object.entries(fullEnv)
+      .filter(([k, v]) => v !== undefined && ENV_NAME_RE.test(k))
+      .flatMap(([k, v]) => ['--setenv', `${k}=${v}`]);
+    execFileSync(
+      'systemd-run',
+      [
+        '--user', '--unit', unitName,
+        '--collect', '--quiet',
+        // The dashboard is the orchestrator — shed agents before it (PAN-2500).
+        '--property=ManagedOOMPreference=avoid',
+        `--property=StandardOutput=append:${DASHBOARD_LOG_FILE}`,
+        `--property=StandardError=append:${DASHBOARD_LOG_FILE}`,
+        // /api/health identity derives repoRoot from the server's cwd; keep it.
+        `--property=WorkingDirectory=${repoRoot}`,
+        ...setenvArgs,
+        resolveNode22(), serverPath,
+      ],
+      { stdio: 'ignore' },
+    );
+    return {
+      stop: () => {
+        const unit = `${unitName}.service`;
+        try {
+          execFileSync('systemctl', ['--user', 'stop', unit], { stdio: 'ignore' });
+        } catch (stopError) {
+          try {
+            execFileSync('systemctl', ['--user', 'is-active', '--quiet', unit], { stdio: 'ignore' });
+          } catch {
+            return; // The unit already exited and was collected.
+          }
+          throw stopError;
+        }
+      },
+    };
+  } catch {
+    return null;
+  }
 }
 
 async function recordRestartStatus(startedAt: number, success: boolean, error?: string): Promise<void> {
@@ -162,9 +302,23 @@ async function reportHeldRestartLock(startedAt: number): Promise<void> {
   process.exitCode = 2;
 }
 
+export async function shouldRunManualSupervisorCycle(env: NodeJS.ProcessEnv = process.env): Promise<boolean> {
+  if (env.OVERDECK_SKIP_SUPERVISOR_CYCLE === '1') return false;
+
+  try {
+    const { systemdUserAvailable, isSupervisorUnitActive } = await import('../../lib/systemd.js');
+    return !(await systemdUserAvailable() && await isSupervisorUnitActive());
+  } catch {
+    return true;
+  }
+}
+
 export async function restartCommand(options: RestartOptions): Promise<void> {
   const startedAt = Date.now();
   const scope = resolveScope(options);
+  if ((scope === 'dashboard' || scope === 'full') && refuseNonPrimaryDashboardCwd(process.cwd(), 'restart')) {
+    return;
+  }
   const config = readPlatformConfigSync();
   const healthTimeoutMs = options.healthTimeout
     ? parseInt(options.healthTimeout, 10)
@@ -190,6 +344,22 @@ export async function restartCommand(options: RestartOptions): Promise<void> {
 
   const lockInherited = process.env.OVERDECK_RESTART_LOCK_HELD === '1';
   const needsRestartLock = (scope === 'dashboard' || scope === 'full') && !lockInherited;
+  const restartInitiator = process.env.OVERDECK_AGENT_ID;
+  if (needsRestartLock && restartInitiator) {
+    const restartBlock = await agentRestartBlockReason({
+      initiator: restartInitiator,
+      force: options.force === true,
+    });
+    if (restartBlock) {
+      console.error(restartBlock);
+      process.exitCode = 1;
+      return;
+    }
+    console.log(chalk.yellow(
+      '  This agent-issued restart will disconnect every live conversation and terminal until clients reconnect.',
+    ));
+  }
+
   let restartLock: RestartLockHandle | null = null;
   if (needsRestartLock) {
     restartLock = await Effect.runPromise(acquireRestartLock('pan restart'));
@@ -202,7 +372,7 @@ export async function restartCommand(options: RestartOptions): Promise<void> {
   try {
     switch (scope) {
       case 'dashboard': {
-        if (process.env.OVERDECK_SKIP_SUPERVISOR_CYCLE !== '1') {
+        if (await shouldRunManualSupervisorCycle()) {
           try {
             const { stopSupervisorProcessSync, startSupervisorProcessSync } = await import('../../lib/supervisor.js');
             stopSupervisorProcessSync();
@@ -212,6 +382,7 @@ export async function restartCommand(options: RestartOptions): Promise<void> {
 
         await Effect.runPromise(restartDashboard(config, () => spawnDashboardDetached(config, options), {
           healthTimeoutMs,
+          expectedIdentity: resolvePrimaryDashboardIdentity(),
         }));
         await recordRestartStatus(startedAt, true);
         console.log(chalk.green('✓ Dashboard restarted and healthy'));
@@ -325,10 +496,16 @@ async function runFullRestart(
     installCliproxy: cliproxy.installCliproxySync,
   }));
 
-  spawnDashboardDetached(config, opts.bootGateOptions);
-  await Effect.runPromise(waitForDashboardHealth(config.dashboardApiPort, {
-    timeoutMs: opts.healthTimeoutMs,
-  }));
+  const spawnedDashboard = spawnDashboardDetached(config, opts.bootGateOptions);
+  try {
+    await Effect.runPromise(waitForDashboardHealth(config.dashboardApiPort, {
+      timeoutMs: opts.healthTimeoutMs,
+      expectedIdentity: resolvePrimaryDashboardIdentity(),
+    }));
+  } catch (error) {
+    await spawnedDashboard.stop();
+    throw error;
+  }
 
   try {
     const { startSupervisorProcessSync } = await import('../../lib/supervisor.js');

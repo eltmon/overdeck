@@ -183,6 +183,58 @@
   padding: 2px 0;
 }
 
+.membershipStatus {
+  margin: 4px 8px;
+  color: var(--muted-foreground);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.membershipError {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 8px;
+  padding: 10px;
+  color: var(--destructive);
+  background: color-mix(in srgb, var(--destructive) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--destructive) 24%, transparent);
+  border-radius: 6px;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.membershipError > svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.membershipErrorContent p {
+  margin: 0;
+}
+
+.membershipErrorContent .membershipErrorDetail {
+  margin-top: 6px;
+  color: var(--muted-foreground);
+  overflow-wrap: anywhere;
+}
+
+.membershipErrorRetry {
+  margin-top: 8px;
+  padding: 3px 7px;
+  border: 1px solid color-mix(in srgb, var(--destructive) 32%, transparent);
+  border-radius: 4px;
+  color: var(--destructive);
+  background: transparent;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.membershipErrorRetry:hover {
+  background: color-mix(in srgb, var(--destructive) 10%, transparent);
+}
+
 /* Project Node */
 .projectNode {
   margin-bottom: 4px;
@@ -371,6 +423,13 @@
   background: color-mix(in srgb, var(--warning) 8%, transparent);
   color: var(--warning-foreground, var(--warning));
   border-color: color-mix(in srgb, var(--warning) 32%, transparent);
+}
+
+.featureBadge_troubled {
+  background: color-mix(in srgb, var(--warning) 16%, transparent);
+  color: var(--warning-foreground, var(--warning));
+  border-color: color-mix(in srgb, var(--warning) 46%, transparent);
+  font-weight: 700;
 }
 
 .featureBadge_stopped {
@@ -611,6 +670,14 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* PAN-2765 — a descendant session is waiting on the operator. Amber = a human
+   must act. This tints the row rather than taking the left border, which
+   already carries pipeline status. Declared before .featureItemWrapperSelected
+   so an explicit selection still wins at equal specificity. */
+.featureItemWrapperNeedsAttention {
+  background: color-mix(in srgb, var(--warning) 8%, transparent);
 }
 
 .featureItemWrapperSelected {
@@ -1327,6 +1394,59 @@
   flex: 1;
   color: var(--muted-foreground);
   font-size: 14px;
+}
+
+.unknownProject {
+  display: flex;
+  max-width: 440px;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+}
+
+.unknownProject svg {
+  opacity: 0.3;
+}
+
+.unknownProject h2,
+.unknownProject p {
+  margin: 0;
+}
+
+.unknownProject h2 {
+  color: var(--foreground);
+  font-size: 18px;
+}
+
+.unknownProjectList {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+
+.unknownProjectList button,
+.unknownProjectRetry,
+.unknownProjectBack {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--card);
+  color: var(--foreground);
+  padding: 7px 12px;
+  cursor: pointer;
+}
+
+.unknownProjectList button:hover,
+.unknownProjectRetry:hover,
+.unknownProjectBack:hover {
+  background: var(--accent);
+}
+
+.unknownProjectBack {
+  border-color: transparent;
+  background: transparent;
+  color: var(--muted-foreground);
 }
 
 /* Activity feed column (PAN-1561, column 4) */
@@ -2758,6 +2878,8 @@
 /* Conversation Terminal Panel */
 .conversationTerminal {
   flex: 1;
+  min-width: 0;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -2988,6 +3110,8 @@
 
 .conversationTerminalBody {
   flex: 1;
+  min-width: 0;
+  min-height: 0;
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -4351,6 +4475,19 @@
 .composerImageRemoveButton:hover {
   background: var(--accent);
   color: var(--foreground);
+}
+
+.composerFileThumb {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--muted);
+  color: var(--muted-foreground);
+}
+
+.composerFileSize {
+  margin-left: 4px;
+  color: var(--muted-foreground);
 }
 
 /* Spinner animation for uploading images */
@@ -5867,19 +6004,30 @@
 .uatStackTreeGroup {
   margin-top: 2px;
   border-top: 1px solid var(--divider);
-  padding: 4px 8px 6px 28px;
+  padding-top: 4px;
 }
 
 .uatStackTreeHeader {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 3px 0;
+  padding: 3px 8px 3px 28px;
+  cursor: pointer;
   font-size: 11px;
   font-weight: 500;
   color: var(--muted-foreground);
   text-transform: uppercase;
   letter-spacing: 0.05em;
+  user-select: none;
+  appearance: none;
+  background: none;
+  border: none;
+  width: 100%;
+  text-align: left;
+}
+
+.uatStackTreeHeader:hover {
+  background: var(--accent);
 }
 
 .uatStackTreeSummary {
@@ -5888,6 +6036,110 @@
   color: var(--muted-foreground);
   text-transform: none;
   letter-spacing: normal;
+}
+
+.uatStackActions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.uatStackActionButton {
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--background);
+  color: var(--muted-foreground);
+  padding: 1px 6px;
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1.5;
+  text-transform: none;
+  letter-spacing: 0;
+  cursor: pointer;
+}
+
+.uatStackActionButton:hover {
+  background: var(--accent);
+  color: var(--foreground);
+}
+
+.uatStackActionPrimary {
+  border-color: color-mix(in srgb, var(--success) 32%, transparent);
+  background: color-mix(in srgb, var(--success) 10%, transparent);
+  color: var(--success-foreground);
+}
+
+.uatStackActionDanger {
+  border-color: color-mix(in srgb, var(--destructive) 32%, transparent);
+  background: color-mix(in srgb, var(--destructive) 10%, transparent);
+  color: var(--destructive);
+}
+
+.uatStackActionMuted {
+  color: var(--muted-foreground);
+}
+
+.uatStackTreeBody {
+  padding: 2px 0 4px;
+}
+
+.uatStackTreeReason {
+  margin: 2px 8px 4px 40px;
+  font-size: 11px;
+  color: var(--muted-foreground);
+}
+
+.uatStackContainerRow {
+  display: grid;
+  grid-template-columns: 8px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 8px 2px 40px;
+  font-size: 11px;
+  cursor: default;
+}
+
+.uatStackContainerRow:hover {
+  background: var(--accent);
+}
+
+.uatStackContainerDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--muted-foreground);
+}
+
+.uatStackContainerDotHealthy {
+  background: var(--success);
+}
+
+.uatStackContainerDotStarting {
+  background: var(--warning);
+}
+
+.uatStackContainerDotUnhealthy {
+  background: var(--destructive);
+}
+
+.uatStackContainerDotStopped {
+  background: var(--muted-foreground);
+}
+
+.uatStackContainerName {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+  color: var(--foreground);
+}
+
+.uatStackContainerState {
+  min-width: 0;
+  font-size: 10.5px;
+  white-space: nowrap;
 }
 
 .containerNode {

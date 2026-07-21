@@ -125,11 +125,20 @@ export interface QualityGateConfig {
   container?: boolean;
   /** Container name pattern (supports {{FEATURE_FOLDER}} etc.) */
   container_name?: string;
+  /** PAN-2461: rerun the gate up to N times on failure before recording it as
+   *  failed — CI-parity for suites with known order-dependent flakes. */
+  retry?: number;
 }
 
-export interface DatabaseConfig {
+export interface DatabaseConfig extends Record<string, unknown> {
+  /** Built-in database provisioner implementation */
+  provisioner?: 'flyway-postgres';
+  /** Database name used by workspace database commands */
+  name: string;
   /** Path to seed file for database initialization */
   seed_file?: string;
+  /** Optional SQL query to verify a seed after loading */
+  seedVerifyQuery?: string;
   /** Command to run after loading seed (e.g., sanitization script) */
   seed_command?: string;
   /** Command to create snapshots from external source (e.g., kubectl exec pg_dump) */

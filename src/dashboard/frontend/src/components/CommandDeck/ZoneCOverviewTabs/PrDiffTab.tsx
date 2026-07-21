@@ -11,12 +11,13 @@
  *
  * Empty case: "No PR yet for feature/<id>". Error case: surface gh error inline.
  *
- * Backend lands in pan-9yn5 (this bead). Polls every 30s — same cadence as costs.
+ * Backend lands in pan-9yn5 (this task). Polls every 30s — same cadence as costs.
  */
 
 import { useMemo, useRef } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { usePrDiffQuery, usePrQuery, type PullRequestData } from './queries';
+import { LoadingBoundary } from '../../primitives/LoadingBoundary';
 
 const DIFF_LINE_HEIGHT = 17; // font-size 11 × line-height 1.5, rounded up
 
@@ -126,7 +127,7 @@ export function PrDiffTab({ issueId }: PrDiffTabProps) {
         data-testid="prdiff-tab-loading"
         style={{ padding: 16, fontSize: 12, color: 'var(--muted-foreground)' }}
       >
-        Loading pull request…
+        <LoadingBoundary label="The pull request"><span>Loading pull request…</span></LoadingBoundary>
       </div>
     );
   }

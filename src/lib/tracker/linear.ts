@@ -49,6 +49,28 @@ function linearCall<A>(
   });
 }
 
+interface RawListedIssueNode {
+  id: string;
+  identifier: string;
+  title: string;
+  description?: string | null;
+  url: string;
+  priority?: number | null;
+  dueDate?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  state?: { type?: string | null } | null;
+  assignee?: { name?: string | null } | null;
+  labels?: { nodes?: Array<{ name?: string | null }> | null } | null;
+}
+
+interface RawListIssuesResponse {
+  issues?: {
+    nodes?: RawListedIssueNode[];
+    pageInfo?: { hasNextPage?: boolean; endCursor?: string | null } | null;
+  } | null;
+}
+
 export class LinearTracker implements IssueTracker {
   readonly name: TrackerType = 'linear';
   private client: LinearClient;
@@ -69,35 +91,58 @@ export class LinearTracker implements IssueTracker {
     const team = filters?.team ?? this.defaultTeam;
     const self = this;
 
-    return linearCall('listIssues', () =>
-      self.client.issues({
-        first: filters?.limit ?? 50,
-        filter: {
-          team: team ? { key: { eq: team } } : undefined,
-          state: filters?.state
-            ? { type: { eq: self.reverseMapState(filters.state) } }
-            : filters?.includeClosed
-              ? undefined
-              : { type: { neq: 'completed' } },
-          labels: filters?.labels?.length
-            ? { name: { in: filters.labels } }
-            : undefined,
-          assignee: filters?.assignee
-            ? { name: { containsIgnoreCase: filters.assignee } }
-            : undefined,
-        },
-      }),
-    ).pipe(
-      Effect.flatMap((result) =>
-        linearCall('listIssues:normalize', async () => {
-          const issues: Issue[] = [];
-          for (const node of result.nodes) {
-            issues.push(await self.normalizeIssue(node));
+    return linearCall('listIssues', async () => {
+      const limit = filters?.limit;
+      const filter = {
+        team: team ? { key: { eq: team } } : undefined,
+        state: filters?.state
+          ? { type: { eq: self.reverseMapState(filters.state) } }
+          : filters?.includeClosed
+            ? undefined
+            : { type: { neq: 'completed' } },
+        labels: filters?.labels?.length
+          ? { name: { in: filters.labels } }
+          : undefined,
+        assignee: filters?.assignee
+          ? { name: { containsIgnoreCase: filters.assignee } }
+          : undefined,
+      };
+
+      // One raw GraphQL request per page with state/assignee/labels inlined.
+      // The SDK connection walk (client.issues + normalizeIssue) lazy-loads
+      // those three relations as separate API requests PER ISSUE, so an
+      // includeClosed full-team listing cost pages + 3N requests — one
+      // mind-your-now membership gather burned Linear's entire 2500/hr
+      // budget (PAN-2880).
+      const query = `query ListIssues($filter: IssueFilter, $first: Int!, $after: String) {
+        issues(filter: $filter, first: $first, after: $after) {
+          nodes {
+            id identifier title description url priority dueDate createdAt updatedAt
+            state { type } assignee { name } labels { nodes { name } }
           }
-          return issues;
-        }),
-      ),
-    );
+          pageInfo { hasNextPage endCursor }
+        }
+      }`;
+
+      const nodes: RawListedIssueNode[] = [];
+      let after: string | null = null;
+      do {
+        const first = Math.min(limit === undefined ? 50 : limit - nodes.length, 50);
+        const response: { data?: RawListIssuesResponse } = await self.client.client.rawRequest<RawListIssuesResponse, Record<string, unknown>>(
+          query,
+          { filter, first, after },
+        );
+        const page: RawListIssuesResponse['issues'] = response.data?.issues;
+        if (!page?.nodes || !Array.isArray(page.nodes)) {
+          throw new Error('Incomplete Linear issues response');
+        }
+        nodes.push(...page.nodes);
+        after = page.pageInfo?.hasNextPage && page.pageInfo.endCursor ? page.pageInfo.endCursor : null;
+      } while (after !== null && (limit === undefined || nodes.length < limit));
+
+      const bounded = limit === undefined ? nodes : nodes.slice(0, limit);
+      return bounded.map((node) => self.normalizeListedIssue(node));
+    });
   }
 
   getIssue(
@@ -350,6 +395,25 @@ export class LinearTracker implements IssueTracker {
   getChildIssues(_parentId: string): Effect.Effect<Issue[], never> {
     // Linear does not expose parent-child issue hierarchy via its public API
     return Effect.succeed([]);
+  }
+
+  /** Map a raw-GraphQL listed node (relations already inlined) — no lazy SDK loads. */
+  private normalizeListedIssue(node: RawListedIssueNode): Issue {
+    return {
+      id: node.id,
+      ref: node.identifier,
+      title: node.title,
+      description: node.description ?? '',
+      state: this.mapState(node.state?.type ?? 'backlog'),
+      labels: node.labels?.nodes?.flatMap((label) => (label.name ? [label.name] : [])) ?? [],
+      assignee: node.assignee?.name ?? undefined,
+      url: node.url,
+      tracker: 'linear',
+      priority: node.priority ?? undefined,
+      dueDate: node.dueDate ?? undefined,
+      createdAt: node.createdAt,
+      updatedAt: node.updatedAt,
+    };
   }
 
   private async normalizeIssue(linearIssue: any): Promise<Issue> {

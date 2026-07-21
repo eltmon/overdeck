@@ -1,7 +1,7 @@
 /**
  * Lifecycle workflows — Compose atomic operations into complete workflows.
  *
- * approve()  — Post-merge: archive + close + teardown + compact-beads
+ * approve()  — Post-merge: archive + close + teardown
  * close()    — Simple close: close-issue + teardown
  * closeOut() — Full ceremony: verify-merged + archive + teardown + close + label + clear-status
  * deepWipe() — Destructive: teardown(deleteBranches) + delete agent state + reset issue
@@ -21,15 +21,23 @@ import type {
   ApproveOptions,
   DeepWipeOptions,
   ArchiveOptions,
+  CloseOutOptions,
 } from './types.js';
 import { stepOk, stepSkipped, stepFailed, getLinearApiKey } from './types.js';
 import { archivePlanning, findWorkspacePath } from './archive-planning.js';
 import { closeIssue, type CloseIssueOptions } from './close-issue.js';
 import { teardownWorkspace } from './teardown-workspace.js';
-import { compactBeads } from './compact-beads.js';
 import { loadCloisterConfig } from '../cloister/config.js';
 import { extractNumberSync, extractPrefixSync } from '../issue-id.js';
 import { recordFeatureRegistryLifecycle } from '../registry/feature-registry-population.js';
+import {
+  getProjectConfigFromWorkspacePath,
+  markRecordPipelineClosedOutSync,
+  writeCloseOutDodGate,
+} from '../pan-dir/record.js';
+import { pruneStoppedAgentsForIssue } from '../cloister/agent-gc.js';
+import { evaluateDodGate } from './dod-gate.js';
+import { acceptFlagFor, DOD_ROWS, type DodGateResult } from './dod.js';
 
 const execAsync = promisify(exec);
 
@@ -46,6 +54,7 @@ function buildResult(
   issueId: string,
   steps: StepResult[],
   startTime: number,
+  dodGate?: DodGateResult,
 ): WorkflowResult {
   return {
     workflow,
@@ -53,6 +62,7 @@ function buildResult(
     success: steps.every(s => s.success),
     steps,
     duration: Date.now() - startTime,
+    ...(dodGate ? { dodGate } : {}),
   };
 }
 
@@ -93,12 +103,6 @@ export function approve(
     // 3. Teardown workspace (delete branches — merge is complete)
     const teardownSteps = yield* teardownWorkspace(ctx, { deleteBranches: true });
     allSteps.push(...teardownSteps);
-
-    // 4. Compact beads (non-blocking — failure doesn't affect workflow success)
-    if (!opts.skipBeadsCompaction) {
-      const beadsResult = yield* compactBeads(ctx);
-      allSteps.push(beadsResult);
-    }
 
     // 5. Clear review status
     const clearResult = yield* clearReviewStatusStep(ctx.issueId);
@@ -147,7 +151,7 @@ export function close(
  *
  * 1. Verify branch merged (hard fail if not — must pass before any cleanup)
  * 2. Move PRD + archive workspace artifacts (hard fail if archiving fails)
- * 3. Mark vBRIEF completed
+ * 3. Mark xBRIEF completed
  * 4. Clean up workspace (tmux, TLDR, Docker, worktree)
  * 5. Clean up agent state
  * 6. Close issue on tracker
@@ -156,17 +160,42 @@ export function close(
  */
 export function closeOut(
   ctx: LifecycleContext,
-  opts: CloseIssueOptions & ArchiveOptions = {},
+  opts: CloseIssueOptions & ArchiveOptions & CloseOutOptions = {},
 ): Effect.Effect<WorkflowResult> {
   return Effect.gen(function* () {
     const start = Date.now();
     const allSteps: StepResult[] = [];
 
-    // 1. Verify branch merged (hard fail — must pass before we archive or clean up)
-    const mergeVerify = yield* verifyBranchMerged(ctx);
-    allSteps.push(mergeVerify);
-    if (!mergeVerify.success && !mergeVerify.skipped) {
-      return buildResult('close-out', ctx.issueId, allSteps, start);
+    // 1. Evaluate every pre-teardown Definition-of-Done row before any cleanup.
+    const dodGate = yield* Effect.promise(() => evaluateDodGate(ctx, {
+      acceptedRows: opts.dodAcceptedRows,
+      acceptedBy: opts.dodAcceptedBy,
+      verifyMerged: verifyBranchMergedImpl,
+    }));
+    for (const row of dodGate.rows) {
+      const details = [`expected: ${row.expected}`, `observed: ${row.observed}`];
+      if (row.acceptedBy) {
+        allSteps.push(stepSkipped(`dod:${row.id}`, [
+          ...details,
+          `MISS accepted via ${row.acceptedBy.flag} by ${row.acceptedBy.by} at ${row.acceptedBy.at}`,
+        ]));
+      } else if (row.status === 'skip') {
+        allSteps.push(stepSkipped(`dod:${row.id}`, details));
+      } else if (row.status === 'pass') {
+        allSteps.push(stepOk(`dod:${row.id}`, details));
+      } else {
+        allSteps.push(stepFailed(`dod:${row.id}`, row.observed, details));
+      }
+    }
+    if (!dodGate.passed) {
+      const flags = dodGate.rows
+        .filter(row => row.status === 'miss' && !row.acceptedBy)
+        .map(row => `${row.id} (${acceptFlagFor(DOD_ROWS.find(def => def.id === row.id)!)})`);
+      allSteps.push(stepFailed(
+        'close-out:dod-gate',
+        `Definition-of-Done gate blocked close-out: ${flags.join(', ')}. Re-run with the named --accept-<row> flag to record an explicit override.`,
+      ));
+      return buildResult('close-out', ctx.issueId, allSteps, start, dodGate);
     }
 
     // 2. Move PRD + archive workspace artifacts
@@ -177,18 +206,18 @@ export function closeOut(
     const archiveFailed = archiveSteps.some(s => !s.success && !s.skipped);
     if (archiveFailed) {
       allSteps.push(stepFailed('close-out:abort', 'Stopped — archiving failed, workspace preserved'));
-      return buildResult('close-out', ctx.issueId, allSteps, start);
+      return buildResult('close-out', ctx.issueId, allSteps, start, dodGate);
     }
 
-    // 3. Mark the vBRIEF completed on main before teardown removes local state.
-    const vbriefStep = yield* Effect.promise(() => completeVBriefStep(ctx));
-    allSteps.push(vbriefStep);
-    if (!vbriefStep.success && !vbriefStep.skipped) {
-      allSteps.push(stepFailed('close-out:abort', 'Stopped — vBRIEF completion failed, workspace preserved'));
-      return buildResult('close-out', ctx.issueId, allSteps, start);
+    // 3. Mark the xBRIEF completed on main before teardown removes local state.
+    const xbriefStep = yield* Effect.promise(() => completeXBriefStep(ctx));
+    allSteps.push(xbriefStep);
+    if (!xbriefStep.success && !xbriefStep.skipped) {
+      allSteps.push(stepFailed('close-out:abort', 'Stopped — xBRIEF completion failed, workspace preserved'));
+      return buildResult('close-out', ctx.issueId, allSteps, start, dodGate);
     }
 
-    // 4+5. Teardown workspace + agent state
+    // 5+6. Teardown workspace + agent state
     const closeOutConfig = (yield* Effect.promise(() => Effect.runPromise(loadCloisterConfig()))).close_out;
     const teardownSteps = yield* teardownWorkspace(ctx, {
       deleteWorkspace: closeOutConfig?.remove_workspace ?? false,
@@ -197,8 +226,15 @@ export function closeOut(
     allSteps.push(...teardownSteps);
     if (hasBlockingFailure(teardownSteps)) {
       allSteps.push(stepFailed('close-out:abort', 'Stopped — teardown failed, tracker issue and review status preserved'));
-      return buildResult('close-out', ctx.issueId, allSteps, start);
+      return buildResult('close-out', ctx.issueId, allSteps, start, dodGate);
     }
+
+    const teardownDef = DOD_ROWS.find(row => row.id === 'teardown')!;
+    dodGate.rows.push({
+      ...teardownDef,
+      status: 'pass',
+      observed: teardownSteps.flatMap(step => step.details ?? []).join('; ') || 'close-out teardown completed',
+    });
 
     // 6+7. Close issue + apply label
     const closeSteps = yield* closeIssue(ctx, {
@@ -209,18 +245,70 @@ export function closeOut(
     allSteps.push(...closeSteps);
     if (hasBlockingFailure(closeSteps)) {
       allSteps.push(stepFailed('close-out:abort', 'Stopped — issue close failed, review status preserved'));
-      return buildResult('close-out', ctx.issueId, allSteps, start);
+      return buildResult('close-out', ctx.issueId, allSteps, start, dodGate);
     }
 
-    // 8. Clear review status
+    // 8. Mark durable pipeline terminal before clearing the DB cache.
+    const markTerminal = yield* markPipelineClosedOutStep(ctx);
+    allSteps.push(markTerminal);
+    const recordDodGate = yield* recordDodGateStep(ctx, dodGate);
+    allSteps.push(recordDodGate);
+    if (!recordDodGate.success) {
+      allSteps.push(stepFailed('close-out:abort', 'Stopped — Definition-of-Done audit could not be persisted; review status preserved'));
+      return buildResult('close-out', ctx.issueId, allSteps, start, dodGate);
+    }
+    if (markTerminal.success) {
+      const pruned = pruneStoppedAgentsForIssue(ctx.issueId);
+      allSteps.push(pruned.preserved.length > 0
+        ? stepSkipped('close-out:prune-agent-rows', [`WARNING: preserved live/non-stopped agents: ${pruned.preserved.join(', ')}`])
+        : stepOk('close-out:prune-agent-rows', [`Pruned ${pruned.removed.length} stopped agent row(s)`]));
+    }
+
+    // 9. Clear review status
     const clearResult = yield* clearReviewStatusStep(ctx.issueId);
     allSteps.push(clearResult);
 
     yield* Effect.promise(() => resetPostMergeStateForIssue(ctx.issueId));
     yield* Effect.promise(() => recordFeatureRegistryLifecycle({ issueId: ctx.issueId, status: 'archived' }));
 
-    return buildResult('close-out', ctx.issueId, allSteps, start);
+    return buildResult('close-out', ctx.issueId, allSteps, start, dodGate);
   });
+}
+
+function markPipelineClosedOutStep(ctx: LifecycleContext): Effect.Effect<StepResult> {
+  const step = 'close-out:mark-pipeline-terminal';
+  return Effect.try({
+    try: () => {
+      const project = getProjectConfigFromWorkspacePath(ctx.projectPath);
+      markRecordPipelineClosedOutSync(project, ctx.issueId.toUpperCase());
+      return stepOk(step, ['Marked durable pipeline journal closed-out']);
+    },
+    catch: (err) => err,
+  }).pipe(
+    Effect.catch((err) =>
+      Effect.succeed(stepSkipped(step, [`Pipeline terminal marker failed (non-fatal): ${(err as Error).message ?? String(err)}`])),
+    ),
+  );
+}
+
+function recordDodGateStep(ctx: LifecycleContext, dodGate: DodGateResult): Effect.Effect<StepResult> {
+  const step = 'close-out:record-dod-gate';
+  return Effect.tryPromise({
+    try: async () => {
+      const project = getProjectConfigFromWorkspacePath(ctx.projectPath);
+      await writeCloseOutDodGate(project, ctx.issueId.toUpperCase(), {
+        evaluatedAt: new Date().toISOString(),
+        rows: dodGate.rows,
+        accepted: dodGate.accepted,
+      });
+      return stepOk(step, ['Recorded Definition-of-Done gate with 8 rows']);
+    },
+    catch: (err) => err,
+  }).pipe(
+    Effect.catch((err) =>
+      Effect.succeed(stepFailed(step, `Definition-of-Done gate record failed: ${(err as Error).message ?? String(err)}`)),
+    ),
+  );
 }
 
 /**
@@ -271,7 +359,6 @@ function destructiveResetWorkflow(
     const teardownSteps = yield* teardownWorkspace(ctx, {
       deleteWorkspace,
       deleteBranches,
-      clearBeads: true,
       workspaceConfig: opts.workspaceConfig,
       projectName: opts.projectName,
     });
@@ -345,30 +432,30 @@ export function cancelIssueWorkflow(
 
 // --- Internal helpers ---
 
-async function completeVBriefStep(ctx: LifecycleContext): Promise<StepResult> {
+async function completeXBriefStep(ctx: LifecycleContext): Promise<StepResult> {
   const step = 'close-out:vbrief-completed';
   try {
-    const { transitionVBriefOnMain } = await import('../vbrief/lifecycle-io.js');
-    const result = await Effect.runPromise(transitionVBriefOnMain(
+    const { transitionXBriefOnMain } = await import('../xbrief/lifecycle-io.js');
+    const result = await Effect.runPromise(transitionXBriefOnMain(
       ctx.projectPath,
       ctx.issueId,
       'completed',
       'completed',
-      `scope: complete ${ctx.issueId.toUpperCase()} vBRIEF`,
+      `scope: complete ${ctx.issueId.toUpperCase()} xBRIEF`,
     ));
     const details = [
-      result.moved ? 'Updated vBRIEF lifecycle to completed' : 'vBRIEF lifecycle already completed',
+      result.moved ? 'Updated xBRIEF lifecycle to completed' : 'xBRIEF lifecycle already completed',
       result.statusUpdated ? 'Updated plan.status to completed' : 'plan.status already completed',
     ];
-    if (result.committed) details.push('Committed vBRIEF completion on main');
+    if (result.committed) details.push('Committed xBRIEF completion on main');
     return stepOk(step, details);
   } catch (err) {
     const cause = (err as { cause?: unknown }).cause ?? err;
     const message = cause instanceof Error ? cause.message : String(cause);
-    if (message.includes('No vBRIEF found')) {
-      return stepSkipped(step, [`No vBRIEF found for ${ctx.issueId}`]);
+    if (message.includes('No xBRIEF found')) {
+      return stepSkipped(step, [`No xBRIEF found for ${ctx.issueId}`]);
     }
-    return stepFailed(step, `vBRIEF completion failed: ${message}`);
+    return stepFailed(step, `xBRIEF completion failed: ${message}`);
   }
 }
 
@@ -386,7 +473,7 @@ function verifyBranchMerged(ctx: LifecycleContext): Effect.Effect<StepResult> {
   );
 }
 
-async function verifyBranchMergedImpl(ctx: LifecycleContext): Promise<StepResult> {
+export async function verifyBranchMergedImpl(ctx: LifecycleContext): Promise<StepResult> {
   const step = 'close-out:verify-merged';
   const issueLower = ctx.issueId.toLowerCase();
   const branchName = `feature/${issueLower}`;
@@ -418,7 +505,12 @@ async function verifyBranchMergedImpl(ctx: LifecycleContext): Promise<StepResult
           `git merge-base --is-ancestor ${branchName} main`,
           { cwd: ctx.projectPath, encoding: 'utf-8' },
         );
-        return stepOk(step, ['All commits merged to main']);
+        const remoteCheck = await verifyRemoteBranchIfPresent(ctx, branchName);
+        if (remoteCheck && !remoteCheck.success) return remoteCheck;
+        return stepOk(step, [
+          'All commits merged to main',
+          ...(remoteCheck?.details ?? []),
+        ]);
       } catch {
         // --is-ancestor fails for squash merges where the branch still exists.
         try {
@@ -427,11 +519,27 @@ async function verifyBranchMergedImpl(ctx: LifecycleContext): Promise<StepResult
             { cwd: ctx.projectPath, encoding: 'utf-8' },
           );
           if (!codeDiff.trim()) {
-            return stepOk(step, ['Code changes squash-merged to main (only planning artifacts remain on branch)']);
+            const remoteCheck = await verifyRemoteBranchIfPresent(ctx, branchName);
+            if (remoteCheck && !remoteCheck.success) return remoteCheck;
+            return stepOk(step, [
+              'Code changes squash-merged to main (only planning artifacts remain on branch)',
+              ...(remoteCheck?.details ?? []),
+            ]);
           }
         } catch {
           // diff failed — fall through to unmerged report
         }
+
+        const githubMerged = await verifySquashMergedPrByBranch(ctx, branchName, branchName);
+        if (githubMerged?.success) {
+          const remoteCheck = await verifyRemoteBranchIfPresent(ctx, branchName);
+          if (remoteCheck && !remoteCheck.success) return remoteCheck;
+          return stepOk(step, [
+            ...(githubMerged.details ?? []),
+            ...(remoteCheck?.details ?? []),
+          ]);
+        }
+        if (githubMerged) return githubMerged;
 
         const { stdout: unmerged } = await execAsync(
           `git log main..${branchName} --oneline 2>/dev/null || true`,
@@ -465,54 +573,194 @@ async function verifyBranchMergedImpl(ctx: LifecycleContext): Promise<StepResult
 
     if (remoteBranch.trim()) {
       await execAsync(`git fetch origin ${branchName}`, { cwd: ctx.projectPath }).catch(() => {});
-      try {
-        await execAsync(
-          `git merge-base --is-ancestor origin/${branchName} main`,
-          { cwd: ctx.projectPath, encoding: 'utf-8' },
-        );
-        return stepOk(step, ['Remote branch fully merged']);
-      } catch {
-        // Squash-merge detection for remote branch
-        try {
-          const { stdout: codeDiff } = await execAsync(
-            `git diff main...origin/${branchName} -- ':!.planning' ':!docs/prds' ':!.overdeck/prompts' 2>/dev/null || true`,
-            { cwd: ctx.projectPath, encoding: 'utf-8' },
-          );
-          if (!codeDiff.trim()) {
-            return stepOk(step, ['Remote code changes squash-merged to main (only planning artifacts remain on branch)']);
-          }
-        } catch {
-          // diff failed — fall through
-        }
-
-        const { stdout: remoteUnmerged } = await execAsync(
-          `git log main..origin/${branchName} --oneline 2>/dev/null || true`,
-          { cwd: ctx.projectPath, encoding: 'utf-8' },
-        );
-        const count = remoteUnmerged.trim() ? remoteUnmerged.trim().split('\n').length : 0;
-
-        if (ctx.github) {
-          try {
-            const { stdout: issueState } = await execAsync(
-              `gh issue view ${ctx.github.number} --repo ${ctx.github.owner}/${ctx.github.repo} --json state --jq '.state'`,
-              { cwd: ctx.projectPath, encoding: 'utf-8' },
-            );
-            if (issueState.trim().toUpperCase() === 'CLOSED') {
-              return stepSkipped(step, [`Issue already closed on GitHub; ${count} unmerged commit(s) remain on remote ${branchName}`]);
-            }
-          } catch {
-            // gh check failed — fall through to hard fail
-          }
-        }
-
-        return stepFailed(step, `${count} unmerged commit(s) on remote ${branchName}.`);
-      }
+      const remoteCheck = await verifyRemoteBranchIfPresent(ctx, branchName);
+      if (remoteCheck) return remoteCheck;
     }
 
     // No branch at all — assume squash-merged and branch deleted
     return stepOk(step, ['Branch already cleaned up (squash-merged)']);
   } catch (err) {
     return stepFailed(step, `Could not verify merge: ${(err as Error).message}`);
+  }
+}
+
+type GitHubMergedPr = {
+  number?: number;
+  mergedAt?: string | null;
+  headRefOid?: string | null;
+  url?: string | null;
+};
+
+async function verifyRemoteBranchIfPresent(
+  ctx: LifecycleContext,
+  branchName: string,
+): Promise<StepResult | null> {
+  const step = 'close-out:verify-merged';
+  const remoteRef = `origin/${branchName}`;
+
+  const { stdout: remoteBranch } = await execAsync(
+    `git ls-remote --heads origin "${branchName}" 2>/dev/null || true`,
+    { cwd: ctx.projectPath, encoding: 'utf-8' },
+  );
+  if (!remoteBranch.trim()) return null;
+
+  await execAsync(`git fetch origin ${branchName}`, { cwd: ctx.projectPath }).catch(() => {});
+
+  try {
+    await execAsync(
+      `git merge-base --is-ancestor ${remoteRef} main`,
+      { cwd: ctx.projectPath, encoding: 'utf-8' },
+    );
+    return stepOk(step, ['Remote branch fully merged']);
+  } catch {
+    // Squash-merge detection for remote branch
+    try {
+      const { stdout: codeDiff } = await execAsync(
+        `git diff main...${remoteRef} -- ':!.planning' ':!docs/prds' ':!.overdeck/prompts' 2>/dev/null || true`,
+        { cwd: ctx.projectPath, encoding: 'utf-8' },
+      );
+      if (!codeDiff.trim()) {
+        return stepOk(step, ['Remote code changes squash-merged to main (only planning artifacts remain on branch)']);
+      }
+    } catch {
+      // diff failed — fall through
+    }
+
+    const githubMerged = await verifySquashMergedPrByBranch(ctx, branchName, remoteRef);
+    if (githubMerged) return githubMerged;
+
+    const { stdout: remoteUnmerged } = await execAsync(
+      `git log main..${remoteRef} --oneline 2>/dev/null || true`,
+      { cwd: ctx.projectPath, encoding: 'utf-8' },
+    );
+    const count = remoteUnmerged.trim() ? remoteUnmerged.trim().split('\n').length : 0;
+
+    if (ctx.github) {
+      try {
+        const { stdout: issueState } = await execAsync(
+          `gh issue view ${ctx.github.number} --repo ${ctx.github.owner}/${ctx.github.repo} --json state --jq '.state'`,
+          { cwd: ctx.projectPath, encoding: 'utf-8' },
+        );
+        if (issueState.trim().toUpperCase() === 'CLOSED') {
+          return stepSkipped(step, [`Issue already closed on GitHub; ${count} unmerged commit(s) remain on remote ${branchName}`]);
+        }
+      } catch {
+        // gh check failed — fall through to hard fail
+      }
+    }
+
+    return stepFailed(step, `${count} unmerged commit(s) on remote ${branchName}.`);
+  }
+}
+
+async function verifySquashMergedPrByBranch(
+  ctx: LifecycleContext,
+  branchName: string,
+  branchRef: string,
+): Promise<StepResult | null> {
+  if (!ctx.github) return null;
+
+  const step = 'close-out:verify-merged';
+  const { owner, repo } = ctx.github;
+
+  try {
+    const { stdout: prJson } = await execAsync(
+      `gh pr list --repo ${owner}/${repo} --state merged --head ${JSON.stringify(branchName)} --json number,mergedAt,headRefOid,url`,
+      { cwd: ctx.projectPath, encoding: 'utf-8' },
+    );
+    const prs = JSON.parse(prJson) as GitHubMergedPr[];
+    const mergedPr = prs
+      .filter((pr) => (
+        typeof pr.mergedAt === 'string'
+        && pr.mergedAt.length > 0
+        && typeof pr.headRefOid === 'string'
+        && pr.headRefOid.length > 0
+      ))
+      .sort((a, b) => Date.parse(String(b.mergedAt)) - Date.parse(String(a.mergedAt)))[0];
+    if (!mergedPr?.headRefOid) return null;
+
+    const { stdout: tipShaRaw } = await execAsync(
+      `git rev-parse ${branchRef} 2>/dev/null`,
+      { cwd: ctx.projectPath, encoding: 'utf-8' },
+    );
+    const tipSha = tipShaRaw.trim();
+    if (!tipSha) return null;
+
+    if (tipSha === mergedPr.headRefOid) {
+      const prLabel = typeof mergedPr.number === 'number' ? `PR #${mergedPr.number}` : 'GitHub PR';
+      return stepOk(step, [`${prLabel} is squash-merged and ${branchRef} matches the merged PR head`]);
+    }
+
+    // A workspace may merge a newer main after its PR head was pushed. Ignore
+    // those merge commits and allow close-out when every post-PR commit is
+    // already on origin/main; only branch-unique work is unsafe to discard.
+    let commitsNotOnMain: string[] | null = null;
+    try {
+      const { stdout: commitsRaw } = await execAsync(
+        `git log --no-merges --format=%H ${mergedPr.headRefOid}..${tipSha}`,
+        { cwd: ctx.projectPath, encoding: 'utf-8' },
+      );
+      const commits = commitsRaw.split('\n').map((sha) => sha.trim()).filter(Boolean);
+      const unmerged: string[] = [];
+      for (const commit of commits) {
+        try {
+          await execAsync(
+            `git merge-base --is-ancestor ${commit} origin/main`,
+            { cwd: ctx.projectPath, encoding: 'utf-8' },
+          );
+        } catch {
+          unmerged.push(commit);
+        }
+      }
+      if (unmerged.length === 0) {
+        const prLabel = typeof mergedPr.number === 'number' ? `PR #${mergedPr.number}` : 'GitHub PR';
+        return stepOk(step, [
+          `${prLabel} is squash-merged; all ${commits.length} post-PR non-merge commit(s) on ${branchRef} are already on origin/main`,
+        ]);
+      }
+
+      commitsNotOnMain = unmerged;
+    } catch { /* containment check failure falls through to the state-plane policy */ }
+
+    // PAN-2406 / state-plane policy rule 3: commits after the merged head that
+    // touch ONLY legacy state-plane paths under .pan/ are pipeline exhaust —
+    // e.g. 'chore: record merge status' — and must not block close-out.
+    try {
+      const { stdout: deltaRaw } = await execAsync(
+        `git diff --name-only ${mergedPr.headRefOid}..${tipSha}`,
+        { cwd: ctx.projectPath, encoding: 'utf-8' },
+      );
+      let deltaFiles = deltaRaw.split('\n').map((f) => f.trim()).filter(Boolean);
+      let statePlaneOnly = deltaFiles.length > 0 && deltaFiles.every((f) =>
+        f.startsWith('.pan/'));
+      if (!statePlaneOnly) {
+        // Branch may have merged main INTO itself after the PR merged — the
+        // two-dot delta then contains main's own files. Judge only changes
+        // UNIQUE to the branch (three-dot vs origin/main): if those are
+        // state-plane-only, everything real is already on main.
+        const { stdout: uniqueRaw } = await execAsync(
+          `git diff --name-only origin/main...${tipSha}`,
+          { cwd: ctx.projectPath, encoding: 'utf-8' },
+        );
+        deltaFiles = uniqueRaw.split('\n').map((f) => f.trim()).filter(Boolean);
+        statePlaneOnly = deltaFiles.every((f) =>
+          f.startsWith('.pan/'));
+      }
+      if (statePlaneOnly) {
+        const prLabel = typeof mergedPr.number === 'number' ? `PR #${mergedPr.number}` : 'GitHub PR';
+        return stepOk(step, [
+          `${prLabel} is squash-merged; ${branchRef} is ahead only by state-plane commits (${deltaFiles.length} file(s): .pan) — accepted per state-plane policy`,
+        ]);
+      }
+    } catch { /* diff failure falls through to the strict rejection below */ }
+
+    const prLabel = typeof mergedPr.number === 'number' ? `PR #${mergedPr.number}` : 'merged GitHub PR';
+    if (commitsNotOnMain) {
+      return stepFailed(step, `${branchRef} has ${commitsNotOnMain.length} commit(s) after merged ${prLabel} that are not on origin/main: ${commitsNotOnMain.join(', ')}`);
+    }
+    return stepFailed(step, `${branchRef} does not match the head commit of merged ${prLabel}; inspect before closing out.`);
+  } catch {
+    return null;
   }
 }
 
@@ -639,7 +887,7 @@ async function clearReviewStatusStepImpl(issueId: string): Promise<StepResult> {
 }
 
 export const __testInternals = {
-  completeVBriefStep,
+  completeXBriefStep,
   verifyBranchMerged,
 };
 

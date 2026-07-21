@@ -18,7 +18,7 @@ interface TerminalPanelProps {
   onSessionEnded?: (sessionName: string) => void;
 }
 
-function popoutTerminal(sessionName: string, title: string): void {
+export function popoutTerminal(sessionName: string, title: string): void {
   const bridge = window.overdeckBridge;
   if (bridge?.isDesktopApp?.()) {
     bridge.openTerminalWindow(sessionName, title);

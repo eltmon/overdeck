@@ -23,21 +23,30 @@ interface AwaitingInputIndicatorProps {
 
 export function AwaitingInputIndicator({ kinds, size = 14, onClick, className }: AwaitingInputIndicatorProps) {
   const label = describePendingInput(kinds);
+  // The pulse is the whole point of the affordance — it is what catches the eye
+  // across the room. It must not be dropped just because the icon is clickable;
+  // a clickable indicator is the one the operator most needs to notice.
   const icon = (
     <TriangleAlert
       size={size}
-      className={`text-amber-500 ${onClick ? '' : 'animate-pulse'} ${className ?? ''}`}
+      className={`text-amber-500 animate-pulse ${className ?? ''}`}
       aria-hidden="true"
     />
   );
 
   if (onClick) {
+    const reopenLabel = `${label} — click to answer`;
     return (
       <button
         type="button"
-        onClick={onClick}
-        title={label}
-        aria-label={label}
+        onClick={(e) => {
+          // Rows are themselves clickable (select/navigate); reopening the
+          // dialog must not also trigger the row's own handler.
+          e.stopPropagation();
+          onClick();
+        }}
+        title={reopenLabel}
+        aria-label={reopenLabel}
         className="inline-flex items-center justify-center rounded p-0.5 text-amber-500 transition-colors hover:bg-amber-500/15"
       >
         {icon}

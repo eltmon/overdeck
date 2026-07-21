@@ -56,13 +56,34 @@ function mockFetch() {
     const currentIssue = useDashboardStore.getState().issuesRaw.find((candidate) => candidate.identifier === 'PAN-1');
     if (url.endsWith('/artifacts')) return Response.json({ artifacts: [] });
     if (url.endsWith('/plan')) return Response.json(null);
+    if (url.includes('/api/backlog/issue-state')) return Response.json({
+      issueId: 'PAN-1',
+      state: {
+        ready: false,
+        planned: currentIssue?.hasPlan ?? false,
+        parked: false,
+        vetoed: false,
+        blocksMain: false,
+        inPipeline: false,
+        released: false,
+        objection: false,
+        gate: 'auto',
+      },
+      gate: 'auto',
+      planning: 'auto',
+      inSequence: false,
+    });
     if (url.includes('/planning-state')) return Response.json({
       hasPlan: currentIssue?.hasPlan ?? false,
-      hasBeads: currentIssue?.hasBeads ?? false,
-      beadsCount: currentIssue?.hasBeads ? 1 : 0,
+      hasTasks: currentIssue?.hasTasks ?? false,
+      tasksCount: currentIssue?.hasTasks ? 1 : 0,
       planningComplete: currentIssue?.planningComplete ?? currentIssue?.hasPlan ?? false,
     });
-    if (url.includes('/api/workspaces/')) return Response.json({ exists: true, issueId: 'PAN-1', path: currentIssue?.workspacePath ?? '/tmp/pan-1' });
+    if (url.includes('/api/review/') && url.endsWith('/status')) {
+      const rs = useDashboardStore.getState().reviewStatusByIssueId['PAN-1'];
+      return Response.json(rs ?? { issueId: 'PAN-1', reviewStatus: 'pending', testStatus: 'pending', readyForMerge: false, updatedAt: new Date().toISOString() });
+    }
+    if (url.includes('/api/workspaces/')) return Response.json({ exists: true, issueId: 'PAN-1', hasDocker: true, path: currentIssue?.workspacePath ?? '/tmp/pan-1' });
     if (url.includes('/has-session')) return Response.json({ lifecycle: { canResumeSession: false } });
     return Response.json({ success: true });
   });
@@ -78,10 +99,10 @@ function drawerUi(queryClient: QueryClient) {
   );
 }
 
-function renderDrawer(beads: TestBead[] = []) {
-  if (beads.length > 0) {
+function renderDrawer(tasks: TestBead[] = []) {
+  if (tasks.length > 0) {
     useDashboardStore.setState({
-      issuesRaw: [{ ...issue, beads }],
+      issuesRaw: [{ ...issue, tasks }],
     } as Parameters<typeof useDashboardStore.setState>[0]);
   }
   const queryClient = createQueryClient();
@@ -93,10 +114,13 @@ function drawerActionBar() {
 }
 
 function drawerIssueActionIds() {
-  return Array.from(drawerActionBar().querySelectorAll('button[data-testid^="issue-action-"]'))
-    .filter((button) => button.getAttribute('data-testid') !== 'issue-action-overflow-button')
+  const ids = Array.from(drawerActionBar().querySelectorAll('button[data-testid^="issue-action-"]'))
+    .filter((button) => !['issue-action-overflow-button', 'issue-action-explain-toggle'].includes(button.getAttribute('data-testid') ?? ''))
     .filter((button) => !(button as HTMLButtonElement).disabled)
     .map((button) => button.getAttribute('data-testid'));
+  // Primaries render in the strip AND in the menu's phase/group sections — the
+  // snapshot records each action once.
+  return [...new Set(ids)];
 }
 
 describe('IssueDrawer', () => {
@@ -146,7 +170,7 @@ describe('IssueDrawer', () => {
   });
 
   it('renders drawer tabs with active underline count chips and URL sync', () => {
-    useDashboardStore.getState().openIssue('PAN-1');
+    useDashboardStore.getState().openIssue('PAN-1', 'overview');
 
     renderDrawer([
       { id: 'done', title: 'Done bead', status: 'closed', createdAt: '2026-05-18T00:00:00.000Z', closedAt: '2026-05-18T00:01:00.000Z' },
@@ -157,8 +181,8 @@ describe('IssueDrawer', () => {
     expect(screen.getByTestId('drawer-tab-overview')).toHaveClass('py-[10px]', 'text-[13px]', 'font-medium', 'text-foreground');
     expect(within(screen.getByTestId('drawer-tab-overview')).getByTestId('drawer-tab-active-underline')).toHaveClass('left-[14px]', 'right-[14px]', 'h-[2px]', 'bg-primary');
     expect(screen.getByTestId('drawer-tab-plan')).toHaveClass('text-muted-foreground', 'hover:text-foreground');
-    expect(within(screen.getByTestId('drawer-tab-beads')).getByTestId('drawer-tab-beads-count')).toHaveTextContent('1/2');
-    expect(screen.getByTestId('drawer-tab-beads-count')).toHaveClass('font-mono', 'text-[10px]', 'px-[5px]');
+    expect(within(screen.getByTestId('drawer-tab-tasks')).getByTestId('drawer-tab-tasks-count')).toHaveTextContent('1/2');
+    expect(screen.getByTestId('drawer-tab-tasks-count')).toHaveClass('font-mono', 'text-[10px]', 'px-[5px]');
 
     fireEvent.click(screen.getByTestId('drawer-tab-files'));
 
@@ -196,8 +220,8 @@ describe('IssueDrawer', () => {
       status: 'pending_changes',
       pendingChanges: true,
       urls: {
-        wrapperUrl: 'https://pan.localhost/s/slugone1',
-        rawUrl: 'https://artifacts.pan.localhost/a/slugone1',
+        wrapperUrl: 'https://overdeck.localhost/s/slugone1',
+        rawUrl: 'https://artifacts.overdeck.localhost/a/slugone1',
       },
       thumbnailUrl: '/api/artifacts/slugone1/thumbnail',
     };
@@ -216,8 +240,8 @@ describe('IssueDrawer', () => {
       status: 'unshared',
       pendingChanges: false,
       urls: {
-        wrapperUrl: 'https://pan.localhost/s/slugtwo2',
-        rawUrl: 'https://artifacts.pan.localhost/a/slugtwo2',
+        wrapperUrl: 'https://overdeck.localhost/s/slugtwo2',
+        rawUrl: 'https://artifacts.overdeck.localhost/a/slugtwo2',
       },
     };
 
@@ -255,11 +279,11 @@ describe('IssueDrawer', () => {
 
     expect(within(firstCard).getByRole('link', { name: 'Open Wrapper' })).toHaveAttribute(
       'href',
-      'https://pan.localhost/s/slugone1',
+      'https://overdeck.localhost/s/slugone1',
     );
 
     fireEvent.click(within(firstCard).getByRole('button', { name: 'Copy Link' }));
-    await waitFor(() => expect(writeText).toHaveBeenCalledWith('https://pan.localhost/s/slugone1'));
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith('https://overdeck.localhost/s/slugone1'));
     expect(within(firstCard).getByRole('button', { name: 'Copied' })).toBeInTheDocument();
 
     fireEvent.click(within(firstCard).getByRole('button', { name: 'Unshare' }));
@@ -300,7 +324,7 @@ describe('IssueDrawer', () => {
   });
 
   it('subscribes to issue-filtered drawer events and applies them to the store', () => {
-    useDashboardStore.getState().openIssue('PAN-1');
+    useDashboardStore.getState().openIssue('PAN-1', 'overview');
 
     renderDrawer();
 
@@ -321,13 +345,33 @@ describe('IssueDrawer', () => {
   });
 
   it('renders the open-in picker for an existing drawer workspace', async () => {
-    const fetchMock = vi.spyOn(window, 'fetch').mockResolvedValue(new Response(JSON.stringify({
-      exists: true,
-      issueId: 'PAN-1',
-      path: '/tmp/pan-workspace',
-    }), { status: 200 }));
+    const fetchMock = vi.spyOn(window, 'fetch').mockImplementation(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('/api/backlog/issue-state')) return Response.json({
+        issueId: 'PAN-1',
+        state: {
+          ready: false,
+          planned: false,
+          parked: false,
+          vetoed: false,
+          blocksMain: false,
+          inPipeline: false,
+          released: false,
+          objection: false,
+          gate: 'auto',
+        },
+        gate: 'auto',
+        planning: 'auto',
+        inSequence: false,
+      });
+      return Response.json({
+        exists: true,
+        issueId: 'PAN-1',
+        path: '/tmp/pan-workspace',
+      });
+    });
     wsTransportMock.getAvailableEditors.mockResolvedValue({ editors: ['cursor', 'vscode'] });
-    useDashboardStore.getState().openIssue('PAN-1');
+    useDashboardStore.getState().openIssue('PAN-1', 'overview');
 
     renderDrawer();
 
@@ -353,7 +397,7 @@ describe('IssueDrawer', () => {
       exists: false,
       issueId: 'PAN-1',
     }), { status: 200 }));
-    useDashboardStore.getState().openIssue('PAN-1');
+    useDashboardStore.getState().openIssue('PAN-1', 'overview');
 
     renderDrawer();
 
@@ -366,7 +410,7 @@ describe('IssueDrawer', () => {
     vi.useFakeTimers();
     const unsubscribe = vi.fn();
     wsTransportMock.subscribe.mockReturnValue(unsubscribe);
-    useDashboardStore.getState().openIssue('PAN-1');
+    useDashboardStore.getState().openIssue('PAN-1', 'overview');
 
     const first = renderDrawer();
 
@@ -418,7 +462,7 @@ describe('IssueDrawer', () => {
     const scroller = document.createElement('div');
     scroller.scrollTop = 120;
     document.body.appendChild(scroller);
-    useDashboardStore.getState().openIssue('PAN-1');
+    useDashboardStore.getState().openIssue('PAN-1', 'overview');
 
     const { queryClient, rerender } = renderDrawer();
     fireEvent.click(screen.getByTestId('issue-drawer-scrim'));
@@ -428,7 +472,7 @@ describe('IssueDrawer', () => {
     });
     expect(scroller.scrollTop).toBe(120);
 
-    useDashboardStore.getState().openIssue('PAN-1');
+    useDashboardStore.getState().openIssue('PAN-1', 'overview');
     rerender(drawerUi(queryClient));
     fireEvent.keyDown(window, { key: 'Escape' });
 
@@ -534,27 +578,33 @@ describe('IssueDrawer', () => {
         },
       },
     } as Parameters<typeof useDashboardStore.setState>[0]);
-    useDashboardStore.getState().openIssue('PAN-1');
+    useDashboardStore.getState().openIssue('PAN-1', 'overview');
 
     renderDrawer();
 
-    expect(screen.getByTestId('drawer-phase-timeline')).toHaveClass('grid-cols-6');
-    expect(screen.getByText('Triaged')).toBeInTheDocument();
-    expect(screen.getByText('Planned')).toBeInTheDocument();
-    expect(screen.getByText('Implemented')).toBeInTheDocument();
-    expect(screen.getByText('Reviewed')).toBeInTheDocument();
-    expect(screen.getByText('Shipping')).toBeInTheDocument();
-    expect(screen.getByText('Merged')).toBeInTheDocument();
-    expect(within(screen.getByTestId('drawer-phase-triaged')).getByTestId('drawer-phase-accent-done')).toHaveClass('bg-success');
-    expect(within(screen.getByTestId('drawer-phase-reviewed')).getByTestId('drawer-phase-accent-done')).toHaveClass('bg-success');
-    expect(within(screen.getByTestId('drawer-phase-shipping')).getByTestId('drawer-phase-accent-current')).toHaveClass('bg-signal-review');
-    expect(within(screen.getByTestId('drawer-phase-merged')).getByTestId('drawer-phase-accent-upcoming')).toHaveClass('bg-transparent');
-    expect(within(screen.getByTestId('drawer-phase-shipping')).getByText('05/18')).toHaveClass('font-medium', 'text-foreground');
-    expect(within(screen.getByTestId('drawer-phase-merged')).getByText('—')).toHaveClass('text-muted-foreground');
+    // PAN-2908 C-VOCAB: the drawer renders the shared six-phase rail.
+    const timeline = screen.getByTestId('drawer-phase-timeline');
+    expect(within(timeline).getByText('Plan')).toBeInTheDocument();
+    expect(within(timeline).getByText('Work')).toBeInTheDocument();
+    expect(within(timeline).getByText('Review')).toBeInTheDocument();
+    expect(within(timeline).getByText('Test')).toBeInTheDocument();
+    expect(within(timeline).getByText('Ship')).toBeInTheDocument();
+    expect(within(timeline).getByText('Done')).toBeInTheDocument();
+    const steps = timeline.querySelectorAll('[data-component="phase-rail"] > button');
+    expect(steps).toHaveLength(6);
+    // Fixture: review passed, ready to merge → plan..test done, ship current, done pending.
+    expect(steps[0].getAttribute('data-state')).toBe('done');
+    expect(steps[3].getAttribute('data-state')).toBe('done');
+    expect(steps[4].getAttribute('data-state')).toBe('current');
+    expect(steps[5].getAttribute('data-state')).toBe('pending');
+    // Legacy when-stamps are preserved as meta where the old timeline had them.
+    expect(within(steps[4] as HTMLElement).getByText('05/18')).toBeInTheDocument();
+    expect(within(steps[5] as HTMLElement).getByText('—')).toBeInTheDocument();
   });
 
-  it('renders verification gates from drawer data with PRD border tones', () => {
+  it('renders verification gates from drawer data with PRD border tones', async () => {
     useDashboardStore.setState({
+      issuesRaw: [{ ...issue, workspacePath: '/tmp/pan-1' }],
       reviewStatusByIssueId: {
         'PAN-1': {
           issueId: 'PAN-1',
@@ -568,21 +618,23 @@ describe('IssueDrawer', () => {
         },
       },
     } as Parameters<typeof useDashboardStore.setState>[0]);
-    useDashboardStore.getState().openIssue('PAN-1');
+    useDashboardStore.getState().openIssue('PAN-1', 'overview');
 
     renderDrawer();
 
-    expect(screen.getByTestId('drawer-verification-gates')).toBeInTheDocument();
-    expect(screen.getByTestId('drawer-verification-gates').lastElementChild).toHaveClass('grid-cols-4', 'gap-[8px]');
-    expect(screen.getByTestId('drawer-verification-gate-typecheck')).toHaveClass('drawer-gate-border-pass', 'text-success-foreground');
-    expect(within(screen.getByTestId('drawer-verification-gate-typecheck')).getByText('pass')).toHaveClass('text-[14px]', 'font-medium');
-    expect(screen.getByTestId('drawer-verification-gate-lint')).toHaveClass('drawer-gate-border-fail', 'text-destructive-foreground');
-    expect(within(screen.getByTestId('drawer-verification-gate-lint')).getByText('lint')).toHaveClass('font-mono', 'text-[10px]', 'text-muted-foreground');
-    expect(screen.getByTestId('drawer-verification-gate-test')).toHaveClass('badge-border-muted', 'text-muted-foreground');
-    expect(screen.getByTestId('drawer-verification-gate-uat')).toHaveClass('badge-border-info', 'text-info-foreground');
+    await waitFor(() => expect(screen.getByTestId('verification-gate-typecheck')).toHaveAttribute('data-gate-status', 'passed'));
+
+    expect(screen.getByTestId('verification-gates')).toBeInTheDocument();
+    expect(screen.getByTestId('verification-gates').lastElementChild).toHaveClass('grid-cols-4', 'gap-[8px]');
+    expect(screen.getByTestId('verification-gate-typecheck')).toHaveClass('border-success/40', 'bg-success/10', 'text-success-foreground');
+    expect(within(screen.getByTestId('verification-gate-typecheck')).getByText('pass')).toHaveClass('text-[14px]', 'font-medium');
+    expect(screen.getByTestId('verification-gate-lint')).toHaveClass('border-destructive/40', 'bg-destructive/10', 'text-destructive-foreground');
+    expect(within(screen.getByTestId('verification-gate-lint')).getByText('lint')).toHaveClass('font-mono', 'text-[10px]', 'text-muted-foreground');
+    expect(screen.getByTestId('verification-gate-test')).toHaveClass('border-muted', 'text-muted-foreground');
+    expect(screen.getByTestId('verification-gate-uat')).toHaveClass('border-info/40', 'bg-info/10', 'text-info-foreground');
   });
 
-  it('renders active agent card with stream excerpt and sends tell input', async () => {
+  it('renders active agent card without the deleted stream excerpt and sends tell input', async () => {
     const fetchMock = vi.spyOn(window, 'fetch').mockResolvedValue({ ok: true, json: async () => ({ success: true }) } as Response);
     useDashboardStore.setState({
       agentsById: {
@@ -603,18 +655,20 @@ describe('IssueDrawer', () => {
         'agent-PAN-1': ['Implementing drawer card'],
       },
     } as Parameters<typeof useDashboardStore.setState>[0]);
-    useDashboardStore.getState().openIssue('PAN-1');
+    useDashboardStore.getState().openIssue('PAN-1', 'overview');
 
     renderDrawer();
 
-    expect(screen.getByTestId('drawer-active-agent')).toHaveClass('border-l-[3px]', 'border-l-signal-review');
+    expect(screen.getByTestId('active-agent-panel')).toHaveClass('border-l-[3px]', 'border-l-signal-review');
     expect(screen.getByText('agent-PAN-1')).toHaveClass('font-mono', 'text-[13px]');
     expect(screen.getByText('WORK RUNNING').closest('[data-component="verb-badge"]')).toHaveClass('text-[9px]');
-    expect(screen.getByText(/GPT-5\.5 · .* · spend loading/)).toHaveClass('text-right', 'font-mono');
-    expect(screen.getByTestId('drawer-active-agent-stream')).toHaveClass('bg-[rgb(0_0_0_/_32%)]', 'text-[11px]', 'max-h-[180px]', 'overflow-auto');
-    expect(within(screen.getByTestId('drawer-active-agent-stream')).getByText('Implementing drawer card')).toBeInTheDocument();
+    expect(screen.getByText(/GPT-5\.5 · claude-code · spend loading/)).toHaveClass('text-right', 'font-mono');
+    // PAN-2908 C-DETAIL: the stream-excerpt box and its "No recent stream
+    // output" state are deleted — the conversation pane is the live view.
+    expect(screen.queryByTestId('active-agent-panel-stream')).not.toBeInTheDocument();
+    expect(screen.queryByText('No recent stream output')).not.toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText('Tell active agent'), { target: { value: 'Please continue' } });
+    fireEvent.change(screen.getByLabelText('Tell agent-PAN-1'), { target: { value: 'Please continue' } });
     fireEvent.click(screen.getByRole('button', { name: 'Send' }));
 
     await waitFor(() => {
@@ -623,10 +677,10 @@ describe('IssueDrawer', () => {
         body: JSON.stringify({ message: 'Please continue' }),
       }));
     });
-    expect(screen.getByLabelText('Tell active agent')).toHaveValue('');
+    expect(screen.getByLabelText('Tell agent-PAN-1')).toHaveValue('');
   });
 
-  it('renders action bar with the shared hybrid menu and pinned merge control', () => {
+  it('renders action bar with the shared primary-strip menu and pinned merge control', async () => {
     useDashboardStore.setState({
       issuesRaw: [{ ...issue, status: 'In Review', state: 'in_review', hasPlan: true, workspacePath: '/tmp/pan-1' }],
       reviewStatusByIssueId: {
@@ -641,7 +695,7 @@ describe('IssueDrawer', () => {
         },
       },
     } as Parameters<typeof useDashboardStore.setState>[0]);
-    useDashboardStore.getState().openIssue('PAN-1');
+    useDashboardStore.getState().openIssue('PAN-1', 'overview');
 
     renderDrawer();
 
@@ -650,8 +704,13 @@ describe('IssueDrawer', () => {
     expect(screen.getByTestId('issue-action-overflow-button')).toBeInTheDocument();
     expect(screen.getByTestId('issue-action-pin-spacer')).toBeInTheDocument();
     expect(screen.getByTestId('issue-action-viewPr')).toHaveTextContent('View PR');
-    expect(screen.getByTestId('merge-btn')).toBeEnabled();
-    expect(screen.getByTestId('merge-btn')).toHaveClass('bg-success', 'text-success-foreground');
+    // Merge is a first-class registry action in the primary strip (no bespoke pin).
+    await waitFor(() => {
+      const mergeButton = screen.getByTestId('issue-action-merge');
+      expect(mergeButton).toBeEnabled();
+      expect(screen.getByTestId('issue-action-menu')).toContainElement(mergeButton);
+      expect(screen.queryByTestId('merge-btn')).toBeNull();
+    });
     expect(screen.queryByTestId('drawer-action-reset')).toBeNull();
     expect(screen.queryByTestId('drawer-action-stop')).toBeNull();
   });
@@ -674,13 +733,19 @@ describe('IssueDrawer', () => {
         },
       },
     } as Parameters<typeof useDashboardStore.setState>[0]);
-    useDashboardStore.getState().openIssue('PAN-1');
+    useDashboardStore.getState().openIssue('PAN-1', 'overview');
 
     const first = renderDrawer();
     fireEvent.click(screen.getByTestId('issue-action-overflow-button'));
+    fireEvent.click(screen.getByRole('menuitem', { name: /Danger \(\d+ available\)/ }));
     const actionSets: Record<string, (string | null)[]> = {
       WORK_RUNNING: drawerIssueActionIds(),
     };
+    // PAN-2937: menu open state is global (survives unmount by design, so WS
+    // ticks can't close it). A real user can't reach this unmount with the
+    // menu still open — the overlay eats outside clicks — so close it before
+    // tearing down, mirroring the only reachable flow.
+    fireEvent.click(screen.getByTestId('issue-action-overflow-button'));
     first.unmount();
     resetDrawerIssueSubscriptionForTest();
 
@@ -700,53 +765,50 @@ describe('IssueDrawer', () => {
         },
       },
     } as Parameters<typeof useDashboardStore.setState>[0]);
-    useDashboardStore.getState().openIssue('PAN-1');
+    useDashboardStore.getState().openIssue('PAN-1', 'overview');
 
     renderDrawer();
     fireEvent.click(screen.getByTestId('issue-action-overflow-button'));
+    fireEvent.click(screen.getByRole('menuitem', { name: /Danger \(\d+ available\)/ }));
     actionSets.READY_TO_MERGE = drawerIssueActionIds();
 
     expect(actionSets).toMatchInlineSnapshot(`
       {
         "READY_TO_MERGE": [
-          "issue-action-startAgent",
+          "issue-action-merge",
           "issue-action-syncMain",
-          "issue-action-inspectBead",
+          "issue-action-copySettings",
+          "issue-action-tasks",
+          "issue-action-syncDiscussions",
+          "issue-action-statusReview",
           "issue-action-open",
           "issue-action-wipe",
           "issue-action-destroyWorkspace",
           "issue-action-resetIssue",
+          "issue-action-resetToPlanned",
           "issue-action-cancel",
-          "issue-action-beads",
-          "issue-action-upload",
-          "issue-action-syncDiscussions",
-          "issue-action-statusReview",
-          "issue-action-copySettings",
           "issue-action-restartFromPlan",
-          "issue-action-reviewTest",
           "issue-action-viewPr",
         ],
         "WORK_RUNNING": [
           "issue-action-tell",
           "issue-action-doneWork",
-          "issue-action-stopAgent",
-          "issue-action-pause",
-          "issue-action-switchModel",
           "issue-action-syncMain",
-          "issue-action-inspectBead",
-          "issue-action-wipe",
-          "issue-action-destroyWorkspace",
-          "issue-action-open",
-          "issue-action-resetIssue",
-          "issue-action-cancel",
-          "issue-action-beads",
-          "issue-action-upload",
+          "issue-action-copySettings",
+          "issue-action-tasks",
           "issue-action-syncDiscussions",
           "issue-action-statusReview",
-          "issue-action-copySettings",
+          "issue-action-open",
+          "issue-action-stopAgent",
+          "issue-action-pause",
+          "issue-action-wipe",
+          "issue-action-destroyWorkspace",
+          "issue-action-resetIssue",
+          "issue-action-resetToPlanned",
+          "issue-action-cancel",
+          "issue-action-completeWorkReset",
           "issue-action-restartFromPlan",
           "issue-action-restartAgent",
-          "issue-action-reviewTest",
         ],
       }
     `);
@@ -780,11 +842,12 @@ describe('IssueDrawer', () => {
         },
       },
     } as Parameters<typeof useDashboardStore.setState>[0]);
-    useDashboardStore.getState().openIssue('PAN-1');
+    useDashboardStore.getState().openIssue('PAN-1', 'overview');
 
     renderDrawer();
 
     fireEvent.click(screen.getByTestId('issue-action-overflow-button'));
+    fireEvent.click(screen.getByRole('menuitem', { name: /Danger \(\d+ available\)/ }));
     fireEvent.click(screen.getByTestId('issue-action-resetIssue'));
     const resetDialog = await screen.findByRole('alertdialog');
     fireEvent.change(within(resetDialog).getByLabelText('Confirmation text'), { target: { value: 'Reset issue' } });
@@ -799,13 +862,14 @@ describe('IssueDrawer', () => {
     });
 
     fireEvent.click(screen.getByTestId('issue-action-overflow-button'));
+    fireEvent.click(screen.getByRole('menuitem', { name: /Danger \(\d+ available\)/ }));
     fireEvent.click(screen.getByTestId('issue-action-stopAgent'));
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith('/api/agents/agent-PAN-1/stop', expect.objectContaining({ method: 'POST' }));
     });
 
-    fireEvent.click(screen.getByTestId('merge-btn'));
-    fireEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Merge' }));
+    fireEvent.click(screen.getByTestId('issue-action-merge'));
+    fireEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Merge to main' }));
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith('/api/issues/PAN-1/merge', expect.objectContaining({ method: 'POST' }));
     });
@@ -823,7 +887,7 @@ describe('IssueDrawer', () => {
         },
       },
     } as Parameters<typeof useDashboardStore.setState>[0]);
-    useDashboardStore.getState().openIssue('PAN-1');
+    useDashboardStore.getState().openIssue('PAN-1', 'overview');
 
     renderDrawer();
 
@@ -833,41 +897,20 @@ describe('IssueDrawer', () => {
   });
 
   it('renders active agent placeholder when no agent is active', () => {
-    useDashboardStore.getState().openIssue('PAN-1');
+    useDashboardStore.getState().openIssue('PAN-1', 'overview');
 
     renderDrawer();
 
-    expect(screen.getByTestId('drawer-active-agent')).toBeInTheDocument();
+    expect(screen.getByTestId('active-agent-panel')).toBeInTheDocument();
     expect(screen.getByText('No active agent.')).toHaveClass('text-muted-foreground');
   });
 
-  it('renders drawer beads list from drawer data with done and current states', () => {
-    useDashboardStore.getState().openIssue('PAN-1');
-
-    renderDrawer([
-      {
-        id: 'workspace-done',
-        title: 'PAN-1: Completed bead',
-        status: 'closed',
-        createdAt: '2026-05-18T00:00:00.000Z',
-        closedAt: '2026-05-18T00:05:00.000Z',
-      },
-      {
-        id: 'workspace-current',
-        title: 'PAN-1: Current bead',
-        status: 'in_progress',
-        createdAt: '2026-05-18T00:00:00.000Z',
-        updatedAt: '2026-05-18T00:03:00.000Z',
-      },
-    ]);
-
-    expect(screen.getByTestId('drawer-beads-list')).toBeInTheDocument();
-    expect(screen.getByText('Completed bead')).toHaveClass('line-through', 'decoration-[rgba(255,255,255,0.18)]');
-    expect(screen.getByText('workspace-done')).toHaveClass('font-mono', 'text-[10px]', 'text-muted-foreground');
-    expect(screen.getByText('5m')).toHaveClass('font-mono', 'text-[10px]', 'tabular-nums');
-    expect(screen.getByTestId('drawer-bead-status-done')).toHaveClass('bg-success', 'text-white', 'text-[9px]');
-    expect(screen.getByTestId('drawer-bead-status-current')).toHaveClass('relative');
-    expect(screen.getByTestId('drawer-bead-status-current').firstElementChild).toHaveClass('drawer-bead-current-ping', 'border-[1.5px]', 'border-info');
+  it('renders console inventory markers on the real overview shell', () => {
+    useDashboardStore.getState().openIssue('PAN-1', 'overview');
+    const { container } = renderDrawer();
+    for (const section of ['DrawerActionBar', 'PhaseTimeline', 'DrawerTabs', 'DrawerPickupSection / PickupGateControls', 'DrawerWorkspaceSection', 'UatEnvironmentPanel', 'IssuePolicyStrip / PoliciesControl', 'DrawerActiveAgent', 'DrawerPausedBanner', 'DrawerVerificationGates', 'SpecialistStrip', 'DrawerTasksList', 'DrawerActivityRail / DrawerActivityPanel', 'StartAgentCta']) {
+      expect(container.querySelector(`[data-section="${section}"]`), section).toBeInTheDocument();
+    }
   });
 
   it('renders four review specialist rows from drawer data with status dots', () => {
@@ -881,26 +924,27 @@ describe('IssueDrawer', () => {
           updatedAt: '2026-05-18T00:00:00.000Z',
           reviewSessionNames: ['agent-pan-1-review-security'],
           reviewSubStatuses: {
-            'review.security': 'running',
-            'review.correctness': 'done',
-            'review.performance': 'failed',
+            security: 'running',
+            correctness: 'done',
+            performance: 'failed',
           } as never,
         },
       },
     } as Parameters<typeof useDashboardStore.setState>[0]);
-    useDashboardStore.getState().openIssue('PAN-1');
+    useDashboardStore.getState().openIssue('PAN-1', 'overview');
 
     renderDrawer();
 
-    expect(screen.getByTestId('drawer-review-specialists')).toBeInTheDocument();
-    expect(screen.getByText('review.security')).toBeInTheDocument();
-    expect(screen.getByText('review.correctness')).toBeInTheDocument();
-    expect(screen.getByText('review.performance')).toBeInTheDocument();
-    expect(screen.getByText('review.requirements')).toBeInTheDocument();
-    expect(screen.getByTestId('drawer-review-specialist-dot-run')).toHaveClass('bg-info');
-    expect(screen.getByTestId('drawer-review-specialist-dot-done')).toHaveClass('bg-success');
-    expect(screen.getByTestId('drawer-review-specialist-dot-fail')).toHaveClass('bg-destructive');
-    expect(screen.getByTestId('drawer-review-specialist-dot-idle')).toHaveClass('bg-muted-foreground');
+    // PAN-2908 C-DETAIL: specialists render via the shared SpecialistStrip
+    // (clickable — each chip opens that specialist's conversation).
+    const strip = document.querySelector('[data-component="specialist-strip"]');
+    expect(strip).not.toBeNull();
+    expect(strip!.querySelector('[data-specialist="security"]')).not.toBeNull();
+    expect(strip!.querySelector('[data-specialist="correctness"]')).not.toBeNull();
+    expect(strip!.querySelector('[data-specialist="performance"]')).not.toBeNull();
+    expect(strip!.querySelector('[data-specialist="requirements"]')).not.toBeNull();
+    expect(strip!.querySelector('[data-specialist="security"]')!.getAttribute('data-status')).toBe('running');
+    expect(strip!.querySelector('[data-specialist="correctness"]')!.getAttribute('data-status')).toBe('done');
   });
 
   it('renders the Conversation tab with the no-agent empty state', () => {
@@ -910,7 +954,8 @@ describe('IssueDrawer', () => {
 
     const panel = screen.getByTestId('drawer-tab-panel-conversation');
     expect(panel).toBeInTheDocument();
-    expect(within(panel).getByText(/No agent session for this issue yet/)).toBeInTheDocument();
+    expect(within(panel).getByText(/Nothing here yet — no agent has started/)).toBeInTheDocument();
+    expect(within(panel).getByText(/Start work and the live conversation appears here/)).toBeInTheDocument();
   });
 
   it('renders the Terminal tab with the no-agent empty state', () => {
@@ -924,7 +969,7 @@ describe('IssueDrawer', () => {
   });
 
   it('switches to the Conversation and Terminal tabs from the tab strip', () => {
-    useDashboardStore.getState().openIssue('PAN-1');
+    useDashboardStore.getState().openIssue('PAN-1', 'overview');
 
     renderDrawer();
 
@@ -934,4 +979,71 @@ describe('IssueDrawer', () => {
     fireEvent.click(screen.getByTestId('drawer-tab-terminal'));
     expect(screen.getByTestId('drawer-tab-panel-terminal')).toBeInTheDocument();
   });
+describe('conversation switching (PAN-2908 C-DETAIL)', () => {
+  const switchingAgent = (id: string, role: string, status = 'running') => ({
+    id,
+    issueId: 'PAN-1',
+    runtime: 'claude-code',
+    harness: 'claude-code',
+    model: 'gpt-5.5',
+    status,
+    role,
+    startedAt: '2026-05-18T00:00:00.000Z',
+    consecutiveFailures: 0,
+    killCount: 0,
+  });
+
+  function seedWithAgents() {
+    useDashboardStore.setState({
+      issuesRaw: [{ ...issue, status: 'In Review', state: 'in_review', hasPlan: true, workspacePath: '/tmp/pan-1' }],
+      agentsById: {
+        'agent-pan-1': switchingAgent('agent-pan-1', 'work', 'stopped'),
+        'agent-pan-1-review': switchingAgent('agent-pan-1-review', 'review'),
+        'agent-pan-1-review-security': switchingAgent('agent-pan-1-review-security', 'review'),
+      },
+      reviewStatusByIssueId: {
+        'PAN-1': {
+          issueId: 'PAN-1',
+          reviewStatus: 'reviewing',
+          reviewSubStatuses: { security: 'running', correctness: 'done' } as never,
+          updatedAt: '2026-05-18T00:00:00.000Z',
+        },
+      },
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+  }
+
+  it('opens conversation-first by default', () => {
+    useDashboardStore.getState().openIssue('PAN-1');
+    expect(useDashboardStore.getState().drawer.tab).toBe('conversation');
+  });
+
+  it('clicking a rail phase opens that phase agent in the conversation tab', () => {
+    seedWithAgents();
+    useDashboardStore.getState().openIssue('PAN-1', 'overview');
+    renderDrawer();
+
+    const reviewStep = document.querySelector('[data-component="phase-rail"] [data-phase="review"]') as HTMLButtonElement;
+    expect(reviewStep.disabled).toBe(false);
+    fireEvent.click(reviewStep);
+
+    expect(useDashboardStore.getState().drawer.tab).toBe('conversation');
+    const select = screen.getByLabelText('Select agent session') as HTMLSelectElement;
+    expect(select.value).toBe('agent-pan-1-review');
+  });
+
+  it('clicking a specialist chip opens THAT specialist conversation', () => {
+    seedWithAgents();
+    useDashboardStore.getState().openIssue('PAN-1', 'overview');
+    renderDrawer();
+
+    const chip = document.querySelector('[data-specialist="security"]') as HTMLButtonElement;
+    expect(chip.disabled).toBe(false);
+    fireEvent.click(chip);
+
+    expect(useDashboardStore.getState().drawer.tab).toBe('conversation');
+    const select = screen.getByLabelText('Select agent session') as HTMLSelectElement;
+    expect(select.value).toBe('agent-pan-1-review-security');
+  });
+});
+
 });

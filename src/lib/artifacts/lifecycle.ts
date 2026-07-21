@@ -207,14 +207,14 @@ function parseAgentRole(value: string | undefined): ArtifactMetadata['agentRole'
 }
 
 function parseAgentHarness(value: string | undefined): ArtifactMetadata['agentHarness'] {
-  if (value === 'claude-code' || value === 'pi' || value === 'codex' || value === 'user') {
+  if (value === 'claude-code' || value === 'pi' || value === 'ohmypi' || value === 'codex' || value === 'acp' || value === 'user') {
     return value;
   }
   return null;
 }
 
 function resolveArtifactUrls(slug: string, options: ArtifactLifecycleOptions): ArtifactUrls {
-  const domain = options.baseDomain ?? process.env.PAN_ARTIFACT_DOMAIN ?? 'pan.localhost';
+  const domain = options.baseDomain ?? process.env.PAN_ARTIFACT_DOMAIN ?? 'overdeck.localhost';
   return {
     wrapperUrl: `https://${domain}/s/${slug}`,
     rawUrl: `https://artifacts.${domain}/a/${slug}`,

@@ -12,6 +12,7 @@ import { jsonResponse } from "../http-helpers.js";
  */
 
 import { randomBytes } from 'node:crypto';
+import { join } from 'node:path';
 
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
@@ -30,11 +31,11 @@ import {
 import { getClaudeAuthStatus } from '../../../lib/claude-auth.js';
 import { setUiTheme } from '../../../lib/ui-theme.js';
 import { getOpenAIAuthStatus } from '../../../lib/openai-auth.js';
-import { getProviderForModelSync, PROVIDERS, getKimiAnthropicBaseUrl } from '../../../lib/providers.js';
+import { PROVIDERS, getKimiAnthropicBaseUrl } from '../../../lib/providers.js';
 import { OpenRouterService } from '../services/openrouter-service.js';
 import { httpHandler } from './http-handler.js';
 import { getProviderAuthMode, getProviderEnvForModel } from '../../../lib/agents.js';
-import { canUseHarnessSync } from '../../../lib/harness-policy.js';
+import { buildHarnessPolicyDecisions } from '../../../lib/harness-policy-decisions.js';
 import {
   detectProviderEnvConflicts,
 } from '../../../lib/claude-settings-overlay.js';
@@ -47,6 +48,8 @@ import { getConversationSearchConfigSync } from '../../../lib/config-yaml.js';
 import { dimensionsForModel, openEmbeddingsDb } from '../../../lib/overdeck/conversations-search.js';
 import { createConversationEmbeddingProvider } from '../../../lib/conversation-search/embedding-provider.js';
 import { estimateFullReindexConversationSearchCost, fullReindexConversationSearch } from '../../../lib/conversation-search/indexer.js';
+import { getLegacyHome } from '../../../lib/paths.js';
+import { previewLegacyConversations, importLegacyConversations } from '../../../lib/overdeck/legacy-import.js';
 
 // ─── Local helpers ────────────────────────────────────────────────────────────
 
@@ -102,6 +105,9 @@ const readJsonBody = Effect.gen(function* () {
 export const MODEL_API_IDS: Record<string, { apiModel: string; endpoint?: string }> = {
   // OpenAI models — gpt-5.x are real OpenAI model IDs (identity map).
   // Codex sign-in routes through CLIProxy; API key routes direct.
+  'gpt-5.6-sol': { apiModel: 'gpt-5.6-sol' },
+  'gpt-5.6-terra': { apiModel: 'gpt-5.6-terra' },
+  'gpt-5.6-luna': { apiModel: 'gpt-5.6-luna' },
   'gpt-5.5-pro': { apiModel: 'gpt-5.5-pro' },
   'gpt-5.5': { apiModel: 'gpt-5.5' },
   'gpt-5.4-pro': { apiModel: 'gpt-5.4-pro' },
@@ -1028,21 +1034,12 @@ const getHarnessPolicyRoute = HttpRouter.add(
         return jsonResponse({ error: 'Valid models parameter is required' }, { status: 400 });
       }
 
-      const decisions: Record<string, Record<string, { allowed: boolean; reason?: string }>> = {};
-      const authModeByProvider = new Map<string, Awaited<ReturnType<typeof getProviderAuthMode>>>();
-      for (const model of Array.from(new Set(models))) {
-        const providerName = getProviderForModelSync(model).name;
-        let authMode = authModeByProvider.get(providerName);
-        if (!authModeByProvider.has(providerName)) {
-          authMode = await getProviderAuthMode(model);
-          authModeByProvider.set(providerName, authMode);
-        }
-        decisions[model] = {
-          'claude-code': canUseHarnessSync('claude-code', model, authMode),
-          pi: canUseHarnessSync('pi', model, authMode),
-          codex: canUseHarnessSync('codex', model, authMode),
-        };
-      }
+      // The per-model loop is factored into a pure helper
+      // (src/lib/harness-policy-decisions.ts) so it can be unit-tested
+      // without an Effect HTTP server. The helper emits 'ohmypi' decisions
+      // — the prior 'pi' key was silently dropping the ToS block that
+      // pickers query under 'ohmypi' (PAN-2528).
+      const decisions = await buildHarnessPolicyDecisions(models, getProviderAuthMode);
       return jsonResponse({ decisions });
     });
   })),
@@ -1076,6 +1073,46 @@ const getProviderEnvConflictsRoute = HttpRouter.add(
 );
 
 
+const getLegacyImportPreviewRoute = HttpRouter.add(
+  'GET',
+  '/api/settings/legacy-import/conversations',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    return yield* Effect.try({
+      try: () => {
+        const urlPath = new URL(request.url, 'http://localhost').searchParams.get('path');
+        const defaultPath = join(getLegacyHome(), 'panopticon.db');
+        const resolvedPath = urlPath?.trim() || defaultPath;
+        const preview = previewLegacyConversations(resolvedPath);
+        if (!preview.found) {
+          return jsonResponse({ found: false, defaultPath, message: `No legacy database found at ${resolvedPath}` });
+        }
+        return jsonResponse({ found: true, path: resolvedPath, conversations: preview.rows });
+      },
+      catch: (err) => jsonResponse({ error: err instanceof Error ? err.message : String(err) }, { status: 500 }),
+    });
+  })),
+);
+
+const postLegacyImportRoute = HttpRouter.add(
+  'POST',
+  '/api/settings/legacy-import/conversations',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const authError = rejectUnsafeDashboardMutationRequest(request);
+    if (authError) return authError;
+    const body = yield* readJsonBody;
+    return yield* Effect.try({
+      try: () => {
+        const { path, names } = body as { path: string; names: string[] };
+        const result = importLegacyConversations(path, names);
+        return jsonResponse(result);
+      },
+      catch: (err) => jsonResponse({ error: err instanceof Error ? err.message : String(err) }, { status: 500 }),
+    });
+  })),
+);
+
 // ─── Compose all routes into a single Layer ───────────────────────────────────
 
 export const settingsRouteLayer = Layer.mergeAll(
@@ -1099,6 +1136,8 @@ export const settingsRouteLayer = Layer.mergeAll(
   postOpenRouterTestKeyRoute,
   getHarnessPolicyRoute,
   getProviderEnvConflictsRoute,
+  getLegacyImportPreviewRoute,
+  postLegacyImportRoute,
 );
 
 export default settingsRouteLayer;

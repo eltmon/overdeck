@@ -38,8 +38,8 @@ describe('settings', () => {
 
       // Default model configuration per DEFAULT_SETTINGS
       expect(defaults.models.specialists.review_agent).toBe('claude-opus-4-6');
-      expect(defaults.models.specialists.test_agent).toBe('claude-sonnet-4-6');
-      expect(defaults.models.specialists.merge_agent).toBe('claude-sonnet-4-6');
+      expect(defaults.models.specialists.test_agent).toBe('claude-sonnet-5');
+      expect(defaults.models.specialists.merge_agent).toBe('claude-sonnet-5');
       expect(defaults.api_keys).toEqual({});
     });
 
@@ -425,6 +425,7 @@ describe('settings', () => {
         'claude-opus-4-8',
         'claude-opus-4-7',
         'claude-opus-4-6',
+        'claude-sonnet-5',
         'claude-sonnet-4-6',
         'claude-haiku-4-5',
       ]);
@@ -451,6 +452,9 @@ describe('settings', () => {
       const available = getAvailableModelsSync(settings);
 
       expect(available.openai).toEqual([
+        'gpt-5.6-sol',
+        'gpt-5.6-terra',
+        'gpt-5.6-luna',
         'gpt-5.5',
         'gpt-5.4',
         'gpt-5.4-mini',
@@ -494,7 +498,7 @@ describe('settings', () => {
 
       const available = getAvailableModelsSync(settings);
 
-      expect(available.kimi).toEqual(['kimi-k2.7-code', 'kimi-k2.6', 'kimi-k2.5', 'K2.6-code-preview']);
+      expect(available.kimi).toEqual(['k3', 'k3[1m]', 'kimi-k2.7-code', 'kimi-k2.6', 'kimi-k2.5', 'K2.6-code-preview']);
     });
 
     it('should return xAI models when XAI_API_KEY is configured', async () => {

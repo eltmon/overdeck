@@ -223,7 +223,7 @@ export function ConversationActionMenu({ conversation, mutations, position, onCl
                 Hand off to new conversation
               </button>
             )}
-            {conversation.claudeSessionId && conversation.harness !== 'pi' && (
+            {conversation.claudeSessionId && conversation.harness !== 'pi' && conversation.harness !== 'ohmypi' && (
               <button
                 role="menuitem"
                 className={styles.headerMenuItem}

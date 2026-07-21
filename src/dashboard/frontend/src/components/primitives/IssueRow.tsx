@@ -3,6 +3,8 @@ import type { KeyboardEvent, ReactNode } from 'react';
 import { cn } from '../../lib/utils';
 import { trackerIssueUrl } from '../../lib/issueLinks';
 import PhaseGlyph, { type PhaseGlyphPhase } from './PhaseGlyph';
+import { IssuePeek } from '../issue-detail/IssuePeek';
+import { useConvoDock } from '../../lib/convoDock';
 
 export type IssueRowVariant = 'pipeline' | 'command-deck';
 export type IssueRowPriority = 'urgent' | 'high' | 'medium' | 'low';
@@ -43,19 +45,22 @@ export type IssueRowProps = {
   ledger?: IssueRowLedger;
   assignee?: IssueRowAssignee;
   variant?: IssueRowVariant;
+  /** PAN-1234: keyboard navigation focus indicator. */
+  focused?: boolean;
   onOpen?: (issueId: string) => void;
   onContextMenu?: () => void;
+  /** PAN-2908 C-CONVO: hover quick-look peek (level 1 · glance). */
+  peek?: boolean;
   actionMenu?: ReactNode;
   className?: string;
 };
 
 const GRID_TEMPLATES = {
-  // Title + agent columns are flexible (minmax) so the row fits narrow
-  // containers — e.g. the project cockpit pane (~470px) — instead of the fixed
-  // 220px agent forcing the title `1fr` to 0px and overlapping ("scramble").
-  // In wide containers (Pipeline/Kanban) they grow to roughly the old sizes.
-  pipeline: '14px 78px 14px minmax(96px, 1.6fr) minmax(0, 220px) minmax(0, 84px) 30px',
-  'command-deck': '14px 78px 14px minmax(96px, 1.6fr) minmax(0, 220px) minmax(0, 84px) 26px',
+  // PAN-1234: visual contract from PRD §4.1 — fixed columns keep the row
+  // geometry predictable and testable. The action menu is positioned
+  // absolutely so it does not add an implicit eighth column.
+  pipeline: '14px 78px 14px 1fr 220px 84px 26px',
+  'command-deck': '14px 78px 14px 1fr 220px 84px 26px',
 } satisfies Record<IssueRowVariant, string>;
 
 const ROW_CLASSES = {
@@ -106,16 +111,18 @@ export default function IssueRow({
   ledger,
   assignee,
   variant = 'pipeline',
+  focused = false,
   onOpen,
   onContextMenu,
   actionMenu,
   className,
+  peek = false,
 }: IssueRowProps) {
   const avatarName = assignee?.name ?? issueId;
   const avatarTone = AVATAR_TONE_CLASSES[hashString(avatarName) % AVATAR_TONE_CLASSES.length];
   const hasLedger = Boolean(ledger?.runtime || ledger?.cost);
   const hasAgent = Boolean(agent?.name);
-  const gridTemplateColumns = actionMenu ? `${GRID_TEMPLATES[variant]} 30px` : GRID_TEMPLATES[variant];
+  const gridTemplateColumns = GRID_TEMPLATES[variant];
   const open = () => onOpen?.(issueId);
   const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     if (event.target !== event.currentTarget) return;
@@ -124,7 +131,8 @@ export default function IssueRow({
     open();
   };
 
-  return (
+  const addToDock = useConvoDock((state) => state.add);
+  const row = (
     <div
       role="button"
       tabIndex={0}
@@ -137,6 +145,7 @@ export default function IssueRow({
         'group relative grid w-full items-center border-b border-border text-left transition-colors duration-200 last:border-b-0 hover:bg-accent before:absolute before:bottom-[8px] before:left-[10px] before:top-[8px] before:w-[2px] before:rounded-[2px]',
         ROW_CLASSES[variant],
         PRIORITY_BORDER_CLASSES[priority],
+        focused && 'ring-2 ring-primary z-10',
         className,
       )}
       style={{ gridTemplateColumns }}
@@ -232,13 +241,22 @@ export default function IssueRow({
       </span>
       {actionMenu ? (
         <span
-          data-component="issue-row-action-menu"
-          className="opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
+          className="absolute right-[22px] top-1/2 -translate-y-1/2"
           onClick={(event) => event.stopPropagation()}
         >
-          {actionMenu}
+          <span
+            data-component="issue-row-action-menu"
+            className="opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
+          >
+            {actionMenu}
+          </span>
         </span>
       ) : null}
     </div>
   );
+  return peek ? (
+    <IssuePeek issueId={issueId} onDock={addToDock}>
+      {row}
+    </IssuePeek>
+  ) : row;
 }

@@ -41,6 +41,24 @@ For the common rebuild-and-restart path, use `pan reload`.
 pan reload
 ```
 
+## Production-bundle boot and performance verification
+
+A dashboard boot-path change is not ready for the live server until the built Node 22 bundle boots on a throwaway port. Typecheck and unit tests do not execute the Effect layer bootstrap, so they cannot prove that imports, layers, listeners, and post-listen warmers compose at runtime.
+
+Build first, then start `dist/dashboard/server.js` under Node 22 with an isolated `OVERDECK_HOME`, `OVERDECK_DISABLE_DEACON=1`, `OVERDECK_NO_RESUME=1`, and a non-live port. Verify that `/api/health` responds and that the log order is `Dashboard listening` → `Project resource refresh queue started` → `Boot cache warm complete`. The health response must arrive even if the resource warm is still running.
+
+Run the performance harness against that PID and port:
+
+```bash
+node scripts/verify-dashboard-performance.mjs \
+  --pid <throwaway-pid> \
+  --base-url http://127.0.0.1:<throwaway-port> \
+  --duration 65 \
+  --assert
+```
+
+The targets and architecture are documented in [DASHBOARD-PERFORMANCE.md](./DASHBOARD-PERFORMANCE.md). Do not restart the live dashboard into an untested boot-path change. After the throwaway boot is green, use the normal deploy owner; a manual restart that needs an explicit wait uses `pan restart --dashboard --health-timeout 120000` because the flag is milliseconds and the minimum boot-path allowance is 120 seconds.
+
 ## Restart behavior guarantees
 
 `pan reload` builds before it touches the running dashboard. If the build fails, the old dashboard keeps running and the command exits non-zero. If the build succeeds, `pan reload` restarts only the dashboard and waits for `/api/health`.
@@ -52,6 +70,59 @@ The supervisor watchdog polls the dashboard API health endpoint every 10 seconds
 The supervisor also polls the Qwen TTS daemon every 10 seconds when TTS is enabled or `tts.daemon.autoStart` is true. After two failed health checks it runs the same daemon start path as `pan tts start`, with a three-restart cap in a ten-minute rolling window.
 
 The latest restart outcome is written to `${OVERDECK_HOME}/restart-status.json`. `pan status` renders that state, including failures and watchdog give-up alarms.
+
+`pan up`, `pan reload`, and dashboard-starting `pan restart` scopes refuse to run from a non-primary checkout, including workspace and handoff worktrees. They exit with code 2 and name the primary checkout to use. Their post-boot health gates also require `/api/health` to report the expected `repoRoot` and `mode`; a 200 response from a different server fails as `port held by non-primary server (cwd=…, mode=…)`. This prevents the workspace-peer port-squatting incident class tracked by [PAN-2252](https://github.com/eltmon/overdeck/issues/2252).
+
+## Automatic deployment after merges
+
+Production builds embed their Git commit and build time. Deacon compares that commit with
+`origin/main` every fifth patrol cycle, counting only commits that touch build inputs such as
+`src/`, `packages/`, `package.json`, `bun.lock`, and `tsdown.config.ts`. `/api/health` exposes the
+running `buildCommit`; the app header shows `build stale ×N` when newer build-input commits exist.
+
+The post-merge lifecycle and Deacon share the same deploy safety window. They defer while
+verification, merging, another restart, a pending post-merge lifecycle, or `pan dev` is active.
+Deacon also requires the `CI` workflow for the exact `origin/main` tip to complete successfully;
+pending, failed, or unreadable CI state defers deployment. It then waits for the merge debounce interval,
+so a merge train produces one rebuild and restart instead of one per merge.
+
+Configure the behavior in Cloister config:
+
+```yaml
+deploy:
+  auto_deploy: true       # default: rebuild and restart when the safety window clears
+  debounce_minutes: 5     # default: wait for origin/main to settle
+```
+
+Set `deploy.auto_deploy: false` for signal-only mode. Staleness remains visible in system health
+and the header, but Deacon does not start a deployment. On Linux, Deacon runs the reload in a
+transient systemd user unit with rate-limited failure recovery, so stopping the old dashboard cannot
+kill the reload through the dashboard's cgroup. Patrol reloads stamp `deploy-patrol` as the restart
+initiator instead of inheriting the identity that launched the current dashboard. Deployment output
+and retry failures are appended to `~/.overdeck/logs/auto-deploy.log`.
+
+`pan reload` remains the manual deployment door. It builds first, preserves the running dashboard
+when the build fails, restarts the Node 22 bundle after a successful build, and waits for health.
+
+## Dashboard recovery guardian
+
+The local recovery model has two tiers. The `overdeck-supervisor.service` systemd user unit keeps the supervisor sidecar alive, and the supervisor keeps the dashboard alive by polling health and running `pan restart --dashboard` when the dashboard is down. Systemd owns only the supervisor, not the dashboard process, so dashboard recovery still flows through the existing watchdog logic and avoids a second owner fighting the restart path.
+
+On Linux hosts with a working per-user systemd manager, `pan up` installs and starts `overdeck-supervisor.service` through `systemctl --user`. A supervisor crash or SIGKILL is treated as a unit failure and systemd restarts it according to the unit's restart policy. `pan down` is the stay-down latch: it stops `overdeck-supervisor.service` cleanly, and systemd does not restart a unit that the operator deliberately stopped.
+
+Useful operator commands:
+
+```bash
+systemctl --user status overdeck-supervisor.service
+systemctl --user stop overdeck-supervisor.service
+systemctl --user start overdeck-supervisor.service
+```
+
+Use `systemctl --user status overdeck-supervisor.service` to see whether the guardian is running, restarting, or failed. Use `systemctl --user stop overdeck-supervisor.service` only for an intentional stay-down state; use `pan up` or `systemctl --user start overdeck-supervisor.service` to re-arm the guardian afterward.
+
+On hosts without a usable `systemctl --user` session, including macOS, CI, non-systemd Linux, and most containers, Overdeck falls back to the detached supervisor process used before the systemd unit. That fallback still protects the dashboard while the supervisor is alive, but it does not give the supervisor an external guardian.
+
+This is not cold-boot recovery. The unit is not a boot-time bring-up mechanism, and it does not enable user lingering or start Traefik, cliproxy, or the dashboard after a machine reboot from nothing. After reboot, use `pan up` to start the normal stack. The restart-under-load path also depends on #2286; until that prerequisite is in place, a watchdog-triggered dashboard restart may still fail under heavy startup latency.
 
 ## Failure triage
 
@@ -79,10 +150,6 @@ less ~/.overdeck/logs/dashboard.log
 ```
 
 The dashboard log contains startup failures, runtime exceptions, and health-check failures from the bundled server process.
-
-## Known limitations
-
-The supervisor can still die. This issue adds dashboard watchdog behavior inside the supervisor, but it does not add a separate process manager that restarts the supervisor itself. If both dashboard and supervisor are unreachable, recover from the CLI with `pan up` or `pan restart --full` after checking the logs above.
 
 ## Process and port topology
 

@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync, existsSync, utimesSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { execFileSync } from 'node:child_process';
 import {
   clearTestVerdictArtifact,
   decideUnsignaledTestAction,
@@ -26,6 +27,22 @@ describe('test-verdict artifact (PAN-1681)', () => {
     writeFileSync(p, typeof obj === 'string' ? obj : JSON.stringify(obj), 'utf8');
   }
 
+  describe('repository tracking guard (PAN-2325)', () => {
+    it('keeps the deterministic verdict artifact ignored and untracked', () => {
+      const ignored = execFileSync('git', ['check-ignore', '.pan/test/result.json'], {
+        cwd: process.cwd(),
+        encoding: 'utf8',
+      }).trim();
+      const tracked = execFileSync('git', ['ls-files', '.pan/test/result.json'], {
+        cwd: process.cwd(),
+        encoding: 'utf8',
+      }).trim();
+
+      expect(ignored).toBe('.pan/test/result.json');
+      expect(tracked).toBe('');
+    });
+  });
+
   describe('readTestVerdictArtifact', () => {
     it('returns null when the file is absent', () => {
       expect(readTestVerdictArtifact(ws)).toBeNull();
@@ -34,6 +51,14 @@ describe('test-verdict artifact (PAN-1681)', () => {
     it('reads a passed verdict with notes', () => {
       writeArtifact({ status: 'passed', notes: 'all 6 gates green' });
       expect(readTestVerdictArtifact(ws)).toEqual({ status: 'passed', notes: 'all 6 gates green' });
+    });
+
+    it('recovers a workspace verdict artifact even though .pan/test is gitignored (PAN-2325)', () => {
+      writeArtifact({ status: 'passed', notes: 'workspace-local recovery survives ignore rule' });
+      expect(readTestVerdictArtifact(ws)).toEqual({
+        status: 'passed',
+        notes: 'workspace-local recovery survives ignore rule',
+      });
     });
 
     it('reads a failed verdict', () => {

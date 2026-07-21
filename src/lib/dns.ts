@@ -252,6 +252,6 @@ export function removeDnsEntry(method: DnsSyncMethod, hostname: string): boolean
  * Ensure the base Overdeck domain is resolvable.
  * Called during `pan install` and `pan up`.
  */
-export function ensureBaseDomain(method: DnsSyncMethod, domain: string = 'pan.localhost'): boolean {
+export function ensureBaseDomain(method: DnsSyncMethod, domain: string = 'overdeck.localhost'): boolean {
   return addDnsEntry(method, domain);
 }

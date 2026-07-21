@@ -234,17 +234,26 @@ async function fileExists(path: string): Promise<boolean> {
   }
 }
 
-async function deriveRunStatus(runDir: string, runId: string): Promise<FlywheelRunStatus> {
+async function deriveRunStatus(runDir: string, runId: string, activeRunId: string | null): Promise<FlywheelRunStatus> {
   if (await fileExists(join(runDir, 'aborted.json'))) return 'aborted';
   if (await fileExists(join(runDir, 'report.md'))) return 'complete';
-  if (isFlywheelGloballyPaused() && getFlywheelActiveRunId() === runId) return 'paused';
-  return 'running';
+  // PAN-2108: only the CURRENT active run can be live. A run that is no longer the
+  // active run but has no terminal marker was abandoned — its orchestrator died or
+  // was killed before writing report.md/aborted.json. It is NOT running; reporting
+  // it as such lit the sidebar "live" badge for every stale run forever. Treat an
+  // orphaned non-active run as aborted.
+  if (activeRunId !== runId) return 'aborted';
+  return isFlywheelGloballyPaused() ? 'paused' : 'running';
 }
 
-async function summarizeRun(runId: string, options: FlywheelRunStateOptions): Promise<FlywheelRunSummary> {
+async function summarizeRun(
+  runId: string,
+  options: FlywheelRunStateOptions,
+  activeRunId: string | null,
+): Promise<FlywheelRunSummary> {
   const runDir = getFlywheelRunDir(runId, options);
   const latest = await readLatestFlywheelStatus(runId, options);
-  const status = await deriveRunStatus(runDir, runId);
+  const status = await deriveRunStatus(runDir, runId, activeRunId);
   return {
     id: runId,
     startedAt: latest?.startedAt ?? '',
@@ -281,7 +290,8 @@ export async function listFlywheelRuns(options: FlywheelRunListOptions = {}): Pr
     throw error;
   }
   const runIds = selectLatestRunIds(entries, normalizeLimit(options.limit));
-  const summaries = await mapWithConcurrency(runIds, RUN_SUMMARY_CONCURRENCY, (runId) => summarizeRun(runId, options));
+  const activeRunId = getFlywheelActiveRunId();
+  const summaries = await mapWithConcurrency(runIds, RUN_SUMMARY_CONCURRENCY, (runId) => summarizeRun(runId, options, activeRunId));
   return summaries.sort((a, b) => b.startedAt.localeCompare(a.startedAt));
 }
 
@@ -304,11 +314,12 @@ function withLiveAgentsActive(latest: FlywheelStatus, liveCount: number): Flywhe
   };
 }
 
-export async function getFlywheelRunDetail(runId: string, options: FlywheelRunStateOptions = {}): Promise<FlywheelRunDetail | null> {
+export async function getFlywheelRunDetail(runId: string, options: FlywheelCurrentStatusOptions = {}): Promise<FlywheelRunDetail | null> {
   const runDir = getFlywheelRunDir(runId, options);
   const latest = await readLatestFlywheelStatus(runId, options);
   if (!latest) return null;
-  const status = await deriveRunStatus(runDir, runId);
+  const activeRunId = options.activeRunId !== undefined ? options.activeRunId : getFlywheelActiveRunId();
+  const status = await deriveRunStatus(runDir, runId, activeRunId);
   const reportPath = join(runDir, 'report.md');
   const openedPrPath = join(runDir, 'opened-pr.json');
   // PAN-1528: overlay the live work-agent count so the field reflects reality
@@ -356,7 +367,8 @@ export async function resolveLiveFlywheelRunId(options: FlywheelRunStateOptions 
     return null;
   }
   const runDir = getFlywheelRunDir(candidate, options);
-  const status = await deriveRunStatus(runDir, candidate);
+  // `candidate` is the active run id (read above), so pass it as activeRunId.
+  const status = await deriveRunStatus(runDir, candidate, candidate);
   if (status === 'complete' || status === 'aborted') {
     clearFlywheelGate();
     return null;

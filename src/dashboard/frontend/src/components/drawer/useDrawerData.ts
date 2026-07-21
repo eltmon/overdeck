@@ -26,12 +26,12 @@ export type DrawerReviewSpecialist = {
   duration: string;
 };
 
-export type DrawerBeadStatus = 'open' | 'current' | 'done';
+export type DrawerTaskStatus = 'open' | 'current' | 'done';
 
-export type DrawerBeadItem = {
+export type DrawerTaskItem = {
   id: string;
   title: string;
-  status: DrawerBeadStatus;
+  status: DrawerTaskStatus;
   duration: string;
 };
 
@@ -48,10 +48,8 @@ export type DrawerPhaseTimelineState = 'done' | 'current' | 'upcoming';
 
 export type DrawerPhaseTimelineStep = {
   id: 'triaged' | 'planned' | 'implemented' | 'reviewed' | 'shipping' | 'merged';
-  label: string;
   state: DrawerPhaseTimelineState;
   when: string;
-  sub: string;
 };
 
 type ActivityEntry = {
@@ -66,7 +64,7 @@ type ActivityEntry = {
   triggeringEvent?: string | null;
 };
 
-type BeadTask = {
+type TaskTask = {
   id?: string;
   title?: string;
   name?: string;
@@ -77,9 +75,8 @@ type BeadTask = {
   closedAt?: string;
 };
 
-type IssueWithBeads = Issue & {
-  beads?: BeadTask[];
-  tasks?: BeadTask[];
+type IssueWithTasks = Issue & {
+  tasks?: TaskTask[];
 };
 
 type DrawerIssueSubscription = {
@@ -106,7 +103,7 @@ export type DrawerData = {
   issue: Issue | null;
   agents: Agent[];
   reviewStatus?: ReviewStatusSnapshot;
-  beads: DrawerBeadItem[];
+  tasks: DrawerTaskItem[];
   reviewSpecialists: DrawerReviewSpecialist[];
   verificationGates: DrawerVerificationGate[];
   phaseTimeline: DrawerPhaseTimelineStep[];
@@ -202,7 +199,7 @@ function reviewSpecialists(reviewStatus: ReviewStatusSnapshot | undefined): Draw
   });
 }
 
-function beadStatus(status: string | undefined): DrawerBeadStatus {
+function taskStatus(status: string | undefined): DrawerTaskStatus {
   if (status === 'closed') return 'done';
   if (status === 'in_progress') return 'current';
   return 'open';
@@ -230,25 +227,25 @@ function escapeRegExp(s: string) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-function beadTitle(bead: BeadTask, issueId: string) {
-  const title = bead.title ?? bead.name ?? bead.id ?? 'Untitled bead';
+function taskTitle(task: TaskTask, issueId: string) {
+  const title = task.title ?? task.name ?? task.id ?? 'Untitled task';
   return title.replace(new RegExp(`^${escapeRegExp(issueId)}:\\s*`, 'i'), '');
 }
 
-function issueBeads(issue: Issue | null): BeadTask[] | undefined {
+function issueTasks(issue: Issue | null): TaskTask[] | undefined {
   if (!issue) return undefined;
-  const issueWithBeads = issue as IssueWithBeads;
-  return issueWithBeads.beads ?? issueWithBeads.tasks;
+  const issueWithTasks = issue as IssueWithTasks;
+  return issueWithTasks.tasks ?? issueWithTasks.tasks;
 }
 
-function normalizeBeads(tasks: BeadTask[] | undefined, issueId: string): DrawerBeadItem[] {
-  return (tasks ?? []).map((bead) => {
-    const status = beadStatus(bead.status);
+function normalizeTasks(tasks: TaskTask[] | undefined, issueId: string): DrawerTaskItem[] {
+  return (tasks ?? []).map((task) => {
+    const status = taskStatus(task.status);
     return {
-      id: bead.id ?? bead.title ?? 'bead',
-      title: beadTitle(bead, issueId),
+      id: task.id ?? task.title ?? 'task',
+      title: taskTitle(task, issueId),
       status,
-      duration: formatDuration(bead.startedAt ?? bead.createdAt, bead.closedAt ?? bead.updatedAt),
+      duration: formatDuration(task.startedAt ?? task.createdAt, task.closedAt ?? task.updatedAt),
     };
   });
 }
@@ -319,13 +316,15 @@ function phaseTimeline(issue: Issue | null, reviewStatus: ReviewStatusSnapshot |
   const currentIndex = merged ? -1 : shippingCurrent ? 4 : reviewedCurrent ? 3 : implementedCurrent ? 2 : plannedCurrent ? 1 : 0;
   const done = [Boolean(issue), plannedDone, implementedDone, reviewedDone, merged, merged];
 
+  // PAN-2908 C-VOCAB: ids carry the legacy when-stamps only — the six-phase
+  // rail maps them (LEGACY_WHEN_TO_PHASE); the legacy labels are gone.
   const steps = [
-    { id: 'triaged' as const, label: 'Triaged', when: formatWhen(issue?.createdAt), sub: 'issue' },
-    { id: 'planned' as const, label: 'Planned', when: formatWhen(issue?.updatedAt), sub: 'plan' },
-    { id: 'implemented' as const, label: 'Implemented', when: formatWhen(reviewStatus?.updatedAt), sub: 'work' },
-    { id: 'reviewed' as const, label: 'Reviewed', when: formatWhen(reviewStatus?.reviewSpawnedAt ?? reviewStatus?.updatedAt), sub: 'review' },
-    { id: 'shipping' as const, label: 'Shipping', when: formatWhen(reviewStatus?.updatedAt), sub: 'ship' },
-    { id: 'merged' as const, label: 'Merged', when: formatWhen(issue?.completedAt ?? (merged ? reviewStatus?.updatedAt : undefined)), sub: 'done' },
+    { id: 'triaged' as const, when: formatWhen(issue?.createdAt) },
+    { id: 'planned' as const, when: formatWhen(issue?.updatedAt) },
+    { id: 'implemented' as const, when: formatWhen(reviewStatus?.updatedAt) },
+    { id: 'reviewed' as const, when: formatWhen(reviewStatus?.reviewSpawnedAt ?? reviewStatus?.updatedAt) },
+    { id: 'shipping' as const, when: formatWhen(reviewStatus?.updatedAt) },
+    { id: 'merged' as const, when: formatWhen(issue?.completedAt ?? (merged ? reviewStatus?.updatedAt : undefined)) },
   ];
   return steps.map((step, index) => ({
     ...step,
@@ -336,7 +335,7 @@ function phaseTimeline(issue: Issue | null, reviewStatus: ReviewStatusSnapshot |
 /**
  * useIssueData — the pure, parameterized core of useDrawerData. Computes the
  * same issue projection (phaseTimeline, verificationGates, reviewSpecialists,
- * beads, activity) for ANY issueId, WITHOUT touching the global `drawer` slice
+ * tasks, activity) for ANY issueId, WITHOUT touching the global `drawer` slice
  * — so the Command Deck issue cockpit (S2) can reuse PhaseTimeline /
  * VerificationGates / etc. without popping the legacy IssueDrawer overlay or
  * rewriting the URL. `useDrawerData()` is now a thin wrapper that passes the
@@ -389,7 +388,7 @@ export function useIssueData(issueIdArg: string | null): DrawerData {
 
   return useMemo(() => {
     if (!drawerIssueId) {
-      return { issue: null, agents: [], reviewStatus: undefined, beads: [], reviewSpecialists: [], verificationGates: [], phaseTimeline: [], activityRail: [], activityFull: [] };
+      return { issue: null, agents: [], reviewStatus: undefined, tasks: [], reviewSpecialists: [], verificationGates: [], phaseTimeline: [], activityRail: [], activityFull: [] };
     }
 
     const issue = issues.find((candidate) => issueMatches(candidate, drawerIssueId)) ?? null;
@@ -420,7 +419,7 @@ export function useIssueData(issueIdArg: string | null): DrawerData {
       issue,
       agents: issueAgents,
       reviewStatus,
-      beads: normalizeBeads(issueBeads(issue), drawerIssueId),
+      tasks: normalizeTasks(issueTasks(issue), drawerIssueId),
       reviewSpecialists: reviewSpecialists(reviewStatus),
       verificationGates: verificationGates(reviewStatus),
       phaseTimeline: phaseTimeline(issue, reviewStatus),

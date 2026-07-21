@@ -21,6 +21,7 @@ vi.mock('../tmux.js', () => ({
   sessionExists: vi.fn(),
   sessionExistsSync: vi.fn(),
   sessionExists: vi.fn(() => Effect.succeed(false)),
+  isPaneDead: vi.fn(() => Effect.succeed(false)),
   getAgentSessions: vi.fn(),
   getAgentSessionsSync: vi.fn(),
   getAgentSessions: vi.fn(() => Effect.succeed([])),
@@ -45,8 +46,12 @@ vi.mock('../paths.js', async (importOriginal) => {
 
 import { BRIDGE_TOKEN_HEADER, writeBridgeTokenSync } from '../bridge-token.js';
 import { PTY_TOKEN_HEADER, writePtyToken } from '../pty-token.js';
-import { deliverAgentMessage, deliverAgentPermissionDecision, deliverResumeMessageWithTranscriptConfirmation, type AgentState } from '../agents.js';
+import { deliverAgentMessage, deliverAgentPermissionDecision, deliverInitialPromptWithRetry, deliverResumeMessageWithTranscriptConfirmation, getAgentDir, type AgentState } from '../agents.js';
 import { sendKeys } from '../tmux.js';
+import {
+  SUPERVISOR_CLIENT_MARGIN_MS,
+  supervisorInjectionBudgetMs,
+} from '../channels/injection-budget.js';
 
 function writeAgentState(agentId: string, partial: Partial<AgentState>): void {
   const dir = join(stateDir, agentId);
@@ -186,6 +191,302 @@ describe('resume auto-continue transcript confirmation', () => {
   });
 });
 
+describe('initial kickoff transcript confirmation', () => {
+  const baseState: AgentState = {
+    id: 'agent-kickoff-confirm',
+    issueId: 'PAN-TEST',
+    workspace: '/tmp/workspace',
+    harness: 'claude-code',
+    role: 'work',
+    model: 'claude-opus-4-7',
+    status: 'running',
+    startedAt: new Date().toISOString(),
+    sessionId: 'session-1',
+  };
+
+  const baseOptions = {
+    timeoutMs: 300,
+    intervalMs: 100,
+    settleDelayMs: 0,
+    waitForReady: vi.fn(async () => true),
+    sessionExists: vi.fn(async () => true),
+  };
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('returns kickoff-not-confirmed after ok delivery when no user record lands', async () => {
+    vi.useFakeTimers();
+    const snapshot = vi.fn(async (_workspace: string, _sessionId: string, options?: { fromByteOffset?: number }) => ({
+      sessionFile: '/tmp/session.jsonl',
+      userRecordCount: 0,
+      fileSize: 100,
+      rangeStartByte: options?.fromByteOffset ?? 0,
+      readOffset: options?.fromByteOffset ?? 100,
+    }));
+    const deliver = vi.fn(async () => ({ ok: true, path: 'supervisor' as const }));
+
+    const result = deliverInitialPromptWithRetry(
+      baseState.id,
+      'kickoff',
+      'test:initial-kickoff',
+      undefined,
+      {
+        ...baseOptions,
+        getState: vi.fn(async () => baseState),
+        deliver,
+        snapshot,
+      },
+    );
+
+    await vi.waitFor(() => expect(deliver).toHaveBeenCalledTimes(1));
+    await vi.advanceTimersByTimeAsync(300);
+    await vi.waitFor(() => expect(deliver).toHaveBeenCalledTimes(2));
+    await vi.advanceTimersByTimeAsync(300);
+
+    await expect(result).resolves.toMatchObject({
+      ok: false,
+      failure: 'kickoff-not-confirmed',
+    });
+    expect(deliver).toHaveBeenCalledTimes(2);
+  });
+
+  it('returns ok on first delivery when a new user record lands', async () => {
+    let userRecordCount = 0;
+    const snapshot = vi.fn(async () => ({
+      sessionFile: '/tmp/session.jsonl',
+      userRecordCount,
+      fileSize: 100,
+      rangeStartByte: 0,
+      readOffset: 100,
+    }));
+    const deliver = vi.fn(async () => {
+      userRecordCount = 1;
+      return { ok: true, path: 'supervisor' as const };
+    });
+
+    await expect(deliverInitialPromptWithRetry(
+      baseState.id,
+      'kickoff',
+      'test:initial-kickoff',
+      undefined,
+      {
+        ...baseOptions,
+        getState: vi.fn(async () => baseState),
+        deliver,
+        snapshot,
+      },
+    )).resolves.toMatchObject({ ok: true, path: 'supervisor' });
+    expect(deliver).toHaveBeenCalledTimes(1);
+  });
+
+  it('skips transcript confirmation for ohmypi and preserves delivery result behavior', async () => {
+    const snapshot = vi.fn(async () => ({ sessionFile: '/tmp/session.jsonl', userRecordCount: 0 }));
+    const deliver = vi.fn(async () => ({ ok: true, path: 'tmux' as const }));
+
+    await expect(deliverInitialPromptWithRetry(
+      baseState.id,
+      'kickoff',
+      'test:initial-kickoff',
+      undefined,
+      {
+        ...baseOptions,
+        getState: vi.fn(async () => ({ ...baseState, harness: 'ohmypi' })),
+        deliver,
+        snapshot,
+      },
+    )).resolves.toMatchObject({ ok: true, path: 'tmux' });
+    expect(deliver).toHaveBeenCalledTimes(1);
+    expect(snapshot).not.toHaveBeenCalled();
+  });
+
+  it('delivers work-agent codex kickoff as a short pointer to .pan/kickoff.md', async () => {
+    const workspace = mkdtempSync(join(tmpdir(), 'pan-codex-kickoff-'));
+    const fullPrompt = 'Full work instructions for PAN-2275';
+    const deliver = vi.fn(async () => ({ ok: true, path: 'tmux' as const }));
+    const snapshot = vi.fn(async () => ({ sessionFile: '/tmp/session.jsonl', userRecordCount: 0 }));
+
+    try {
+      await expect(deliverInitialPromptWithRetry(
+        baseState.id,
+        fullPrompt,
+        'test:codex-planning-kickoff',
+        undefined,
+        {
+          ...baseOptions,
+          getState: vi.fn(async () => ({ ...baseState, harness: 'codex', role: 'work', workspace })),
+          deliver,
+          snapshot,
+        },
+      )).resolves.toMatchObject({ ok: true, path: 'tmux' });
+
+      expect(readFileSync(join(workspace, '.pan', 'kickoff.md'), 'utf-8')).toBe(fullPrompt);
+      expect(deliver).toHaveBeenCalledWith(
+        baseState.id,
+        expect.stringContaining('Read that file in full now'),
+        'test:codex-planning-kickoff',
+        undefined,
+      );
+      expect(deliver.mock.calls[0]?.[1]).toContain('`.pan/kickoff.md`');
+      expect(deliver.mock.calls[0]?.[1]).not.toContain(fullPrompt);
+      expect(snapshot).not.toHaveBeenCalled();
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
+  });
+
+  it.each([
+    'spawnAgent:initial-prompt',
+    'deacon:redeliver-undelivered-kickoff',
+  ])('routes a Codex kickoff through auto delivery for %s when state selected the PTY supervisor', async (caller) => {
+    const workspace = mkdtempSync(join(tmpdir(), 'pan-codex-appserver-kickoff-'));
+    const deliver = vi.fn(async () => ({ ok: true, path: 'app-server' as const }));
+
+    try {
+      await expect(deliverInitialPromptWithRetry(
+        baseState.id,
+        'Full work instructions for PAN-2771',
+        caller,
+        undefined,
+        {
+          ...baseOptions,
+          getState: vi.fn(async () => ({
+            ...baseState,
+            harness: 'codex',
+            role: 'work',
+            workspace,
+            deliveryMethod: 'supervisor',
+          })),
+          deliver,
+          snapshot: vi.fn(),
+        },
+      )).resolves.toMatchObject({ ok: true, path: 'app-server' });
+
+      expect(deliver).toHaveBeenCalledWith(
+        baseState.id,
+        expect.stringContaining('Read that file in full now'),
+        caller,
+        'auto',
+      );
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps strict PTY supervisor delivery for Claude Code kickoffs', async () => {
+    const deliver = vi.fn(async () => ({ ok: true, path: 'supervisor' as const }));
+    let userRecordCount = 0;
+    const snapshot = vi.fn(async () => ({
+      sessionFile: '/tmp/session.jsonl',
+      userRecordCount: userRecordCount++,
+      fileSize: 100,
+      rangeStartByte: 0,
+      readOffset: 100,
+    }));
+
+    await expect(deliverInitialPromptWithRetry(
+      baseState.id,
+      'Claude Code kickoff',
+      'spawnAgent:initial-prompt',
+      'supervisor',
+      {
+        ...baseOptions,
+        getState: vi.fn(async () => baseState),
+        deliver,
+        snapshot,
+      },
+    )).resolves.toMatchObject({ ok: true, path: 'supervisor' });
+
+    expect(deliver).toHaveBeenCalledWith(
+      baseState.id,
+      'Claude Code kickoff',
+      'spawnAgent:initial-prompt',
+      'supervisor',
+    );
+  });
+
+  it('does not overwrite a work kickoff when delivering a codex role prompt in the same workspace', async () => {
+    const workspace = mkdtempSync(join(tmpdir(), 'pan-codex-role-kickoff-'));
+    const existingWorkPrompt = 'Full work instructions for PAN-2318';
+    const rolePrompt = 'CODE REVIEW for PAN-2318';
+    const agentId = 'agent-pan-2318-review';
+    const deliver = vi.fn(async () => ({ ok: true, path: 'tmux' as const }));
+    const snapshot = vi.fn(async () => ({ sessionFile: '/tmp/session.jsonl', userRecordCount: 0 }));
+
+    try {
+      mkdirSync(join(workspace, '.pan'), { recursive: true });
+      writeFileSync(join(workspace, '.pan', 'kickoff.md'), existingWorkPrompt, 'utf-8');
+
+      await expect(deliverInitialPromptWithRetry(
+        agentId,
+        rolePrompt,
+        'test:codex-review-kickoff',
+        undefined,
+        {
+          ...baseOptions,
+          getState: vi.fn(async () => ({ ...baseState, id: agentId, harness: 'codex', role: 'review', workspace })),
+          deliver,
+          snapshot,
+        },
+      )).resolves.toMatchObject({ ok: true, path: 'tmux' });
+
+      expect(readFileSync(join(workspace, '.pan', 'kickoff.md'), 'utf-8')).toBe(existingWorkPrompt);
+      expect(readFileSync(join(getAgentDir(agentId), 'kickoff.md'), 'utf-8')).toBe(rolePrompt);
+      expect(deliver.mock.calls[0]?.[1]).toContain(join(getAgentDir(agentId), 'kickoff.md'));
+      expect(deliver.mock.calls[0]?.[1]).not.toContain(rolePrompt);
+      expect(snapshot).not.toHaveBeenCalled();
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
+  });
+
+  it('does not count a pre-existing user record as kickoff landing', async () => {
+    vi.useFakeTimers();
+    const snapshot = vi.fn(async (_workspace: string, _sessionId: string, options?: { fromByteOffset?: number }) => (
+      options?.fromByteOffset === undefined
+        ? {
+          sessionFile: '/tmp/session.jsonl',
+          userRecordCount: 1,
+          fileSize: 100,
+          rangeStartByte: 0,
+          readOffset: 100,
+        }
+        : {
+          sessionFile: '/tmp/session.jsonl',
+          userRecordCount: 0,
+          fileSize: 100,
+          rangeStartByte: options.fromByteOffset,
+          readOffset: options.fromByteOffset,
+        }
+    ));
+    const deliver = vi.fn(async () => ({ ok: true, path: 'supervisor' as const }));
+
+    const result = deliverInitialPromptWithRetry(
+      baseState.id,
+      'kickoff',
+      'test:initial-kickoff',
+      undefined,
+      {
+        ...baseOptions,
+        getState: vi.fn(async () => baseState),
+        deliver,
+        snapshot,
+      },
+    );
+
+    await vi.waitFor(() => expect(deliver).toHaveBeenCalledTimes(1));
+    await vi.advanceTimersByTimeAsync(300);
+    await vi.waitFor(() => expect(deliver).toHaveBeenCalledTimes(2));
+    await vi.advanceTimersByTimeAsync(300);
+
+    await expect(result).resolves.toMatchObject({
+      ok: false,
+      failure: 'kickoff-not-confirmed',
+    });
+  });
+});
+
 describe('channel bridge delivery', () => {
   beforeEach(() => {
     tmpHome = mkdtempSync(join(tmpdir(), 'pan-deliver-'));
@@ -315,6 +616,56 @@ describe('channel bridge delivery', () => {
     }
   });
 
+  it('scales the supervisor socket timeout with a 30 KB payload', async () => {
+    const agentId = 'conv-supervisor-large-timeout';
+    await writePtyToken(agentId);
+    const message = 'x'.repeat(30 * 1_024);
+    const expectedTimeout = supervisorInjectionBudgetMs(message.length) + SUPERVISOR_CLIENT_MARGIN_MS;
+    const timeoutSpy = vi.spyOn(globalThis, 'setTimeout');
+    const server = await startFakeBridge(join(socketDir, `pty-${agentId}.sock`), {
+      status: 200,
+      body: 'ok',
+    });
+
+    try {
+      await expect(deliverAgentMessage(agentId, message, 'large-timeout-test')).resolves.toEqual({
+        ok: true,
+        path: 'supervisor',
+      });
+      expect(timeoutSpy).toHaveBeenCalledWith(expect.any(Function), expectedTimeout);
+    } finally {
+      timeoutSpy.mockRestore();
+      await new Promise<void>((r) => server.close(() => r()));
+    }
+  });
+
+  it('keeps a 30 KB delivery on the supervisor tier when it responds just under budget', async () => {
+    vi.useFakeTimers();
+    const agentId = 'conv-supervisor-large-delayed';
+    await writePtyToken(agentId);
+    const message = 'x'.repeat(30 * 1_024);
+    const supervisorBudget = supervisorInjectionBudgetMs(message.length);
+    const capture: { lastBody?: string } = {};
+    const server = await startFakeBridge(join(socketDir, `pty-${agentId}.sock`), {
+      status: 200,
+      body: 'ok',
+      delayMs: supervisorBudget - 1,
+      capture,
+    });
+
+    try {
+      const delivered = deliverAgentMessage(agentId, message, 'large-delayed-test');
+      await vi.waitFor(() => expect(capture.lastBody).toBeDefined());
+      await vi.advanceTimersByTimeAsync(supervisorBudget - 1);
+
+      await expect(delivered).resolves.toEqual({ ok: true, path: 'supervisor' });
+      expect(vi.mocked(sendKeys)).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+      await new Promise<void>((r) => server.close(() => r()));
+    }
+  });
+
   it('supervisor missing: falls through to channels when channels are enabled', async () => {
     const agentId = 'agent-supervisor-missing';
     writeAgentState(agentId, { channelsEnabled: true });
@@ -420,11 +771,13 @@ describe('channel bridge delivery', () => {
     writeAgentState(agentId, { channelsEnabled: true });
     await writePtyToken(agentId);
     writeBridgeTokenSync(agentId);
+    const message = 'timeout fallback';
+    const clientTimeout = supervisorInjectionBudgetMs(message.length) + SUPERVISOR_CLIENT_MARGIN_MS;
     const capture: { lastBody?: string } = {};
     const supervisor = await startFakeBridge(join(socketDir, `pty-${agentId}.sock`), {
       status: 200,
       body: 'late',
-      delayMs: 9_000,
+      delayMs: clientTimeout + 1_000,
       capture,
     });
     const channel = await startFakeBridge(join(socketDir, `agent-${agentId}.sock`), {
@@ -433,9 +786,9 @@ describe('channel bridge delivery', () => {
     });
     vi.useFakeTimers();
     try {
-      const delivered = deliverAgentMessage(agentId, 'timeout fallback', 'caller-timeout');
+      const delivered = deliverAgentMessage(agentId, message, 'caller-timeout');
       await vi.waitFor(() => expect(capture.lastBody).toBeDefined());
-      await vi.advanceTimersByTimeAsync(8_100);
+      await vi.advanceTimersByTimeAsync(clientTimeout + 100);
       await expect(delivered).resolves.toEqual({ ok: true, path: 'channels' });
       expect(vi.mocked(sendKeys)).not.toHaveBeenCalled();
       expect(readDeliveryLog(agentId).at(-1)).toMatchObject({ path: 'channel' });

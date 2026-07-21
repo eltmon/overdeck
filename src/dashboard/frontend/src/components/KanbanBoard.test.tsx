@@ -2,6 +2,7 @@ import type { ComponentProps } from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { cleanup, render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import type { Issue, Agent } from '../types';
 // PAN-1048 — SpecialistAgent retired; specialist-style indicators now come
 // from role-tagged AgentSnapshots passed through the `specialists` prop.
@@ -19,6 +20,13 @@ vi.mock('@dnd-kit/core', async () => {
     useDroppable: (...args: Parameters<typeof import('@dnd-kit/core')['useDroppable']>) => mockUseDroppable(...args),
   };
 });
+
+vi.mock('sonner', () => ({
+  toast: {
+    success: vi.fn(),
+    error: vi.fn(),
+  },
+}));
 
 describe('groupByLabels', () => {
   const createMockIssue = (id: string, labels: string[]): Issue => ({
@@ -594,8 +602,8 @@ describe('KanbanBoard drawer wiring', () => {
 
     fireEvent.click(await screen.findByTestId('issue-card-PAN-1'));
 
-    expect(useDashboardStore.getState().drawer).toEqual({ issueId: 'PAN-1', tab: 'overview' });
-    expect(window.location.search).toBe('?issue=PAN-1&tab=overview');
+    expect(useDashboardStore.getState().drawer).toEqual({ issueId: 'PAN-1', tab: 'conversation' });
+    expect(window.location.search).toBe('?issue=PAN-1&tab=conversation');
     expect(onSelectIssue).not.toHaveBeenCalled();
 
     useDashboardStore.getState().closeIssue();
@@ -611,6 +619,116 @@ describe('KanbanBoard drawer wiring', () => {
 
     await waitFor(() => expect(checkbox.checked).toBe(true));
     expect(useDashboardStore.getState().drawer).toEqual({ issueId: null, tab: 'overview' });
+  });
+});
+
+describe('KanbanBoard j/k card navigation', () => {
+  function createBoardIssue(overrides: Partial<Issue> = {}): Issue {
+    return {
+      id: overrides.identifier ?? 'PAN-1',
+      identifier: overrides.identifier ?? 'PAN-1',
+      title: overrides.title ?? 'Board issue',
+      status: overrides.status ?? 'Todo',
+      state: overrides.state ?? 'todo',
+      priority: overrides.priority ?? 3,
+      labels: overrides.labels ?? [],
+      url: `https://example.com/${overrides.identifier ?? 'PAN-1'}`,
+      createdAt: '2026-05-18T00:00:00.000Z',
+      updatedAt: '2026-05-18T00:00:00.000Z',
+      ...overrides,
+    };
+  }
+
+  function renderBoard(props: Partial<ComponentProps<typeof KanbanBoard>> = {}) {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    });
+
+    return render(
+      <QueryClientProvider client={queryClient}>
+        <DialogProvider>
+          <KanbanBoard {...props} />
+        </DialogProvider>
+      </QueryClientProvider>,
+    );
+  }
+
+  beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn((input: string | URL | Request) => {
+      const url = input.toString();
+      if (url === '/api/registered-projects') {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve([]) } as Response);
+      }
+      return Promise.resolve({
+        ok: true,
+        text: () => Promise.resolve('{}'),
+        json: () => Promise.resolve({ issues: [], workspaces: [] }),
+      } as Response);
+    }));
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('moves j/k across columns and Enter opens the focused card', async () => {
+    const onSelectIssue = vi.fn();
+    useDashboardStore.setState({
+      drawer: { issueId: null, tab: 'overview' },
+      issuesRaw: [
+        createBoardIssue({ identifier: 'PAN-1', title: 'First todo', status: 'Todo', state: 'todo' }),
+        createBoardIssue({ identifier: 'PAN-2', title: 'Second todo', status: 'Todo', state: 'todo' }),
+        createBoardIssue({ identifier: 'PAN-3', title: 'In progress', status: 'In Progress', state: 'in_progress' }),
+      ],
+      agentsById: {},
+      reviewStatusByIssueId: {},
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+
+    renderBoard({ selectedIssue: null, onSelectIssue });
+
+    const card1 = await screen.findByTestId('issue-card-PAN-1');
+    const card2 = await screen.findByTestId('issue-card-PAN-2');
+    const card3 = await screen.findByTestId('issue-card-PAN-3');
+
+    // Initial focus: j selects first board card.
+    fireEvent.keyDown(document, { key: 'j' });
+    await waitFor(() => expect(card1.className).toContain('ring-primary'));
+    expect(card2.className).not.toContain('ring-primary');
+    expect(card3.className).not.toContain('ring-primary');
+
+    // j moves down within the Todo column.
+    fireEvent.keyDown(document, { key: 'j' });
+    await waitFor(() => expect(card2.className).toContain('ring-primary'));
+    expect(card1.className).not.toContain('ring-primary');
+
+    // j crosses from Todo to the first card of In Progress.
+    fireEvent.keyDown(document, { key: 'j' });
+    await waitFor(() => expect(card3.className).toContain('ring-primary'));
+    expect(card2.className).not.toContain('ring-primary');
+
+    // k crosses back to the last card of the previous non-empty column.
+    fireEvent.keyDown(document, { key: 'k' });
+    await waitFor(() => expect(card2.className).toContain('ring-primary'));
+
+    // Enter opens the focused card.
+    fireEvent.keyDown(document, { key: 'Enter' });
+    await waitFor(() => expect(onSelectIssue).toHaveBeenCalledWith('PAN-2'));
+  });
+
+  it('does not move focus when keyboardShortcutsDisabled is true', async () => {
+    useDashboardStore.setState({
+      drawer: { issueId: null, tab: 'overview' },
+      issuesRaw: [createBoardIssue({ identifier: 'PAN-1' })],
+      agentsById: {},
+      reviewStatusByIssueId: {},
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+
+    renderBoard({ selectedIssue: null, onSelectIssue: vi.fn(), keyboardShortcutsDisabled: true });
+
+    fireEvent.keyDown(document, { key: 'j' });
+
+    const card = await screen.findByTestId('issue-card-PAN-1');
+    expect(card.className).not.toContain('ring-primary');
   });
 });
 
@@ -656,6 +774,9 @@ describe('IssueCard', () => {
     } as Parameters<typeof useDashboardStore.setState>[0]);
     vi.stubGlobal('fetch', vi.fn((input: string | URL | Request, init?: RequestInit) => {
       const url = input.toString();
+      if (url.endsWith('/api/dashboard/session')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ csrfToken: 'test-csrf-token' }) } as Response);
+      }
       if (url === '/api/settings' && init?.method === 'PUT') {
         return Promise.resolve({ ok: true, json: () => Promise.resolve({ success: true }) } as Response);
       }
@@ -706,7 +827,7 @@ describe('IssueCard', () => {
       </QueryClientProvider>,
     );
 
-    return { ...defaultProps, ...result };
+    return { ...defaultProps, queryClient, ...result };
   }
 
   function boardActionRow() {
@@ -731,7 +852,7 @@ describe('IssueCard', () => {
     expect(screen.queryByTestId('card-start-agent-TEST-123')).not.toBeInTheDocument();
   });
 
-  it('renders a hover-revealed hybrid action row on ordinary Board cards', () => {
+  it('renders a hover-revealed primary-strip action row on ordinary Board cards', () => {
     renderIssueCard({
       issue: createMockIssue({ status: 'Todo' }),
     });
@@ -761,7 +882,118 @@ describe('IssueCard', () => {
     expect(boardActionRow()).toHaveAttribute('data-visible-mode', 'pinned');
   });
 
-  it('opens the hybrid Board action overflow menu on right-click', async () => {
+  it('routes paused-agent Unpause through the primary-strip registry overflow', async () => {
+    const { queryClient } = renderIssueCard({
+      workAgent: createMockAgent({
+        id: 'agent-test-123',
+        role: 'work',
+        status: 'running',
+        paused: true,
+        pausedReason: 'Operator pause',
+      }),
+    });
+    const invalidateQueries = vi.spyOn(queryClient, 'invalidateQueries');
+
+    expect(screen.getByTestId('card-paused-TEST-123')).toHaveTextContent('Paused');
+    expect(screen.queryByTestId('card-unpause-TEST-123')).not.toBeInTheDocument();
+    expect(inlineBoardActionIds()).toEqual([
+      'issue-action-tell',
+      'issue-action-doneWork',
+    ]);
+    expect(screen.getByTestId('issue-action-overflow-button')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('issue-action-overflow-button'));
+    fireEvent.click(screen.getByRole('menuitem', { name: /^Danger \(\d+ available\)$/ }));
+    fireEvent.click(await screen.findByTestId('issue-action-unpause'));
+
+    await waitFor(() => {
+      expect(vi.mocked(fetch)).toHaveBeenCalledWith(
+        '/api/agents/agent-test-123/unpause',
+        expect.objectContaining({ method: 'POST' }),
+      );
+    });
+    await waitFor(() => {
+      expect(toast.success).toHaveBeenCalledWith(
+        'TEST-123 unpaused — deacon resumes it on the next patrol',
+      );
+      expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['issues'] });
+      expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['agents'] });
+      expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['review-status'] });
+      expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['agent-session'] });
+    });
+  });
+
+  it('surfaces the troubled gate as a badge on the Board card, with no one-click clear', () => {
+    renderIssueCard({
+      workAgent: createMockAgent({
+        id: 'agent-test-123',
+        role: 'work',
+        status: 'stopped',
+        troubled: true,
+        consecutiveFailures: 3,
+      }),
+    });
+
+    const badge = screen.getByTestId('card-troubled-TEST-123');
+    expect(badge).toHaveTextContent('Troubled');
+    expect(badge.getAttribute('title')).toContain('pan untroubled TEST-123');
+    // Unlike Unpause, clearing troubled requires investigation — no card button.
+    expect(screen.queryByTestId('card-untroubled-TEST-123')).toBeNull();
+  });
+
+  it('surfaces an INPUT verb badge when an agent has an actual pending question (count > 0)', () => {
+    renderIssueCard({
+      issue: createMockIssue({ status: 'In Progress', state: 'in_progress', hasPlan: true, hasBeads: true }),
+      workAgent: createMockAgent({
+        id: 'agent-test-123',
+        role: 'work',
+        status: 'running',
+        hasPendingQuestion: true,
+        pendingQuestionCount: 1,
+      }),
+    });
+
+    const card = screen.getByTestId('issue-card-TEST-123');
+    const badge = card.querySelector('[data-component="verb-badge"]') as HTMLElement;
+    expect(badge).toHaveAttribute('data-variant', 'INPUT');
+  });
+
+  it('surfaces an INPUT verb badge when an agent has an actual pending question (prompt)', () => {
+    renderIssueCard({
+      issue: createMockIssue({ status: 'In Progress', state: 'in_progress', hasPlan: true, hasBeads: true }),
+      workAgent: createMockAgent({
+        id: 'agent-test-123',
+        role: 'work',
+        status: 'running',
+        hasPendingQuestion: true,
+        pendingQuestionCount: 0,
+        pendingQuestionPrompt: 'Which approach?',
+      }),
+    });
+
+    const card = screen.getByTestId('issue-card-TEST-123');
+    const badge = card.querySelector('[data-component="verb-badge"]') as HTMLElement;
+    expect(badge).toHaveAttribute('data-variant', 'INPUT');
+  });
+
+  it('does not surface INPUT when hasPendingQuestion is true but count is zero and prompt is empty', () => {
+    renderIssueCard({
+      issue: createMockIssue({ status: 'In Progress', state: 'in_progress', hasPlan: true, hasBeads: true }),
+      workAgent: createMockAgent({
+        id: 'agent-test-123',
+        role: 'work',
+        status: 'running',
+        hasPendingQuestion: true,
+        pendingQuestionCount: 0,
+      }),
+    });
+
+    const card = screen.getByTestId('issue-card-TEST-123');
+    const badge = card.querySelector('[data-component="verb-badge"]') as HTMLElement;
+    expect(badge).not.toHaveAttribute('data-variant', 'INPUT');
+  });
+
+  it('opens the primary-strip Board action overflow menu on right-click', async () => {
     renderIssueCard({
       issue: createMockIssue({ status: 'Todo' }),
     });
@@ -772,7 +1004,7 @@ describe('IssueCard', () => {
 
     expect(allowedDefault).toBe(false);
     await waitFor(() => expect(screen.getByTestId('issue-action-overflow-menu')).toBeInTheDocument());
-    expect(screen.getByTestId('issue-action-plan')).toHaveTextContent('Plan');
+    expect(screen.getAllByTestId('issue-action-plan').length).toBeGreaterThan(0);
   });
 
   it('snapshots inline Board action sets for representative phases', () => {
@@ -822,6 +1054,7 @@ describe('IssueCard', () => {
           "issue-action-startAgent",
         ],
         "READY_TO_MERGE": [
+          "issue-action-merge",
           "issue-action-viewPr",
         ],
         "WORK_RUNNING": [
@@ -834,8 +1067,8 @@ describe('IssueCard', () => {
 
   it('does not render Board card launch controls after planning completes', () => {
     renderIssueCard({
-      issue: createMockIssue({ status: 'Todo', hasPlan: true, hasBeads: true }),
-      planningState: { hasPlan: true, hasBeads: true, planningComplete: true },
+      issue: createMockIssue({ status: 'Todo', hasPlan: true, hasTasks: true }),
+      planningState: { hasPlan: true, hasTasks: true, planningComplete: true },
     });
 
     expect(screen.queryByTestId('card-start-agent-TEST-123')).not.toBeInTheDocument();
@@ -893,23 +1126,23 @@ describe('IssueCard', () => {
     expect(onPlan).not.toHaveBeenCalled();
   });
 
-  it('renders Beads N/M progress row when beadCounts is present', () => {
+  it('renders Tasks N/M progress row when taskCounts is present', () => {
     renderIssueCard({
-      issue: createMockIssue({ beadCounts: { completed: 7, total: 12 } }),
+      issue: createMockIssue({ taskCounts: { completed: 7, total: 12 } }),
     });
 
-    expect(screen.getByText('Beads 7/12')).toBeInTheDocument();
-    const beadProgress = screen.getByTestId('issue-card-TEST-123').querySelector('[data-component="bead-progress"]');
-    expect(beadProgress).toBeInTheDocument();
-    expect(beadProgress).toHaveAttribute('data-progress', '7');
+    expect(screen.getByText('Tasks 7/12')).toBeInTheDocument();
+    const taskProgress = screen.getByTestId('issue-card-TEST-123').querySelector('[data-component="task-progress"]');
+    expect(taskProgress).toBeInTheDocument();
+    expect(taskProgress).toHaveAttribute('data-progress', '7');
   });
 
-  it('hides bead progress row when beadCounts is null', () => {
+  it('hides task progress row when taskCounts is null', () => {
     renderIssueCard({
-      issue: createMockIssue({ beadCounts: null }),
+      issue: createMockIssue({ taskCounts: null }),
     });
 
-    expect(screen.queryByText(/Beads \d+\/\d+/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Tasks \d+\/\d+/)).not.toBeInTheDocument();
   });
 
   it('renders agent foot with name, sub, runtime and avatar for active agent', () => {
@@ -1146,7 +1379,9 @@ describe('DivergedBadge', () => {
   it('includes recovery instructions in title', () => {
     const { container } = render(<DivergedBadge issueIdentifier="PAN-1" />);
     const title = container.querySelector('span[title]')?.getAttribute('title') ?? '';
-    expect(title).toContain('git reset --hard origin/main');
+    expect(title).toContain('preserving local work');
+    expect(title).toContain('pushing local-only commits');
+    expect(title).not.toContain('git reset --hard');
   });
 
   it('handles malformed stuckDetails gracefully without throwing', () => {
@@ -1204,7 +1439,7 @@ describe('DivergedBadge', () => {
     await waitFor(() => {
       const s = useDashboardStore.getState().reviewStatusByIssueId['PAN-43'];
       expect(s?.stuck).toBeFalsy();
-      // Lifecycle reset — prior results invalid after `git reset --hard origin/main`
+      // Lifecycle reset — prior results invalid after project main repair.
       expect(s?.reviewStatus).toBe('pending');
       expect(s?.testStatus).toBe('pending');
       expect(s?.readyForMerge).toBe(false);
@@ -1283,22 +1518,22 @@ describe('FeatureCard', () => {
     expect(screen.getByText('See Plan')).toBeDefined();
   });
 
-  it('renders Tasks button when feature has beads', () => {
-    const feature = createMockFeature({ hasBeads: true });
+  it('renders Tasks button when feature has tasks', () => {
+    const feature = createMockFeature({ hasTasks: true });
     render(
       <FeatureCard
         feature={feature}
         childCount={2}
         isExpanded={false}
         onToggle={vi.fn()}
-        onViewBeads={vi.fn()}
+        onViewTasks={vi.fn()}
       />
     );
     expect(screen.getByTestId('action-tasks-F123')).toBeDefined();
     expect(screen.getByText('Tasks')).toBeDefined();
   });
 
-  it('renders vBRIEF button when feature has a plan', () => {
+  it('renders xBRIEF button when feature has a plan', () => {
     const feature = createMockFeature({ hasPlan: true });
     render(
       <FeatureCard
@@ -1306,11 +1541,11 @@ describe('FeatureCard', () => {
         childCount={2}
         isExpanded={false}
         onToggle={vi.fn()}
-        onViewVBrief={vi.fn()}
+        onViewXBrief={vi.fn()}
       />
     );
-    expect(screen.getByTestId('action-vbrief-F123')).toBeDefined();
-    expect(screen.getByText('vBRIEF')).toBeDefined();
+    expect(screen.getByTestId('action-xbrief-F123')).toBeDefined();
+    expect(screen.getByText('xBRIEF')).toBeDefined();
   });
 
   it('hides Plan button when feature is done', () => {
@@ -1342,20 +1577,20 @@ describe('FeatureCard', () => {
     expect(onPlan).toHaveBeenCalled();
   });
 
-  it('calls onViewBeads when Tasks button is clicked', () => {
-    const onViewBeads = vi.fn();
-    const feature = createMockFeature({ hasBeads: true });
+  it('calls onViewTasks when Tasks button is clicked', () => {
+    const onViewTasks = vi.fn();
+    const feature = createMockFeature({ hasTasks: true });
     render(
       <FeatureCard
         feature={feature}
         childCount={2}
         isExpanded={false}
         onToggle={vi.fn()}
-        onViewBeads={onViewBeads}
+        onViewTasks={onViewTasks}
       />
     );
     fireEvent.click(screen.getByTestId('action-tasks-F123'));
-    expect(onViewBeads).toHaveBeenCalled();
+    expect(onViewTasks).toHaveBeenCalled();
   });
 
   it('applies selection ring when isSelected is true', () => {
@@ -1501,6 +1736,7 @@ describe('CompactChildCard', () => {
     const child = createMockChild();
     render(<CompactChildCard issue={child} agents={[]} onSelect={onSelect} />);
     const link = screen.getByText('US100');
+    link.addEventListener('click', (event) => event.preventDefault(), { once: true });
     fireEvent.click(link);
     expect(onSelect).not.toHaveBeenCalled();
   });

@@ -24,6 +24,7 @@ import {
   postFlywheelStatusPayload,
   resolveFlywheelBriefPath,
 } from '../flywheel.js';
+import { getMergeBackendPayload } from '../flywheel-merge-backend.js';
 import { initEventStore } from '../../event-store.js';
 import { readCurrentLatestFlywheelStatus, subscribeLatestFlywheelStatus, writeLatestFlywheelStatus } from '../../services/flywheel-run-state.js';
 import { requireFlywheelBrief as requireDashboardFlywheelBrief } from '../../services/flywheel-actions.js';
@@ -41,13 +42,20 @@ import { AUTO_MERGE_COOLDOWN_MS } from '../../../../lib/cloister/auto-merge-conf
 import { markBlocked, markFailed, scheduleAutoMergeWithResult, transitionToMerging } from '../../../../lib/overdeck/merge-sync.js';
 
 const uatTrainMocks = vi.hoisted(() => ({
-  postUatGenerationStackPayload: vi.fn(async () => ({ ok: true as const, frontendUrl: 'https://uat-pan-otter-0610.pan.localhost', evicted: [] })),
+  getUatCandidatePayload: vi.fn(async () => ({ branchName: 'uat/pan-otter-0610', bundled: ['PAN-1'], status: 'ready' as const })),
+  postUatGenerationStackPayload: vi.fn(async () => ({ ok: true as const, frontendUrl: 'https://uat-pan-otter-0610.overdeck.localhost', evicted: [] })),
   postUatGenerationPromotePayload: vi.fn(async () => ({ success: true as const, generation: 'uat/pan-otter-0610', mergeSha: 'merge-sha', members: ['PAN-1'], postMergeStarted: ['PAN-1'], invalidated: [] })),
   runUatTrainReconcile: vi.fn(async () => ({ action: 'assembled' as const, invalidated: [] })),
 }));
 
 vi.mock('../../services/uat-train.js', () => uatTrainMocks);
 vi.mock('../specialists.js', () => ({ firePostMergeLifecycle: vi.fn(() => true) }));
+
+const substrateBugWeightsMocks = vi.hoisted(() => ({
+  listSubstrateBugWeights: vi.fn(async () => []),
+}));
+
+vi.mock('../../../../lib/overdeck/substrate-bug-weights-service.js', () => substrateBugWeightsMocks);
 
 interface RouteResult {
   status: number;
@@ -282,6 +290,139 @@ describe('flywheel stats payload helper', () => {
   });
 });
 
+describe('GET /api/flywheel/substrate-bug-weights', () => {
+  const requestSubstrateBugWeights = (path: string) => requestFlywheelRoute(path, {
+    headers: { [INTERNAL_TOKEN_HEADER]: 'test-token' },
+  });
+
+  beforeEach(() => {
+    process.env.OVERDECK_INTERNAL_TOKEN = 'test-token';
+    _resetInternalTokenCacheForTests();
+  });
+
+  afterEach(() => {
+    substrateBugWeightsMocks.listSubstrateBugWeights.mockReset();
+    delete process.env.OVERDECK_INTERNAL_TOKEN;
+    _resetInternalTokenCacheForTests();
+  });
+
+  it('rejects unauthenticated requests before queueing work', async () => {
+    const result = await requestFlywheelRoute('/api/flywheel/substrate-bug-weights');
+
+    expect(result).toEqual({ status: 401, body: { error: 'unauthorized' } });
+    expect(substrateBugWeightsMocks.listSubstrateBugWeights).not.toHaveBeenCalled();
+  });
+
+  it('returns weighted substrate bugs from the service', async () => {
+    substrateBugWeightsMocks.listSubstrateBugWeights.mockResolvedValue([
+      {
+        issueId: 'PAN-HEAVY',
+        severity: 'P0',
+        filedBy: 'agent',
+        affectedCriteria: [1],
+        weight: 4.8,
+        weightReason: 'Criterion 1 is red',
+      },
+      {
+        issueId: 'PAN-LIGHT',
+        severity: 'P2',
+        filedBy: 'operator',
+        affectedCriteria: [3],
+        weight: 1.2,
+        weightReason: 'Criterion 3 is green',
+      },
+    ]);
+
+    const result = await requestSubstrateBugWeights('/api/flywheel/substrate-bug-weights');
+
+    expect(result.status).toBe(200);
+    expect(result.body).toEqual([
+      {
+        issueId: 'PAN-HEAVY',
+        severity: 'P0',
+        filedBy: 'agent',
+        affectedCriteria: [1],
+        weight: 4.8,
+        weightReason: 'Criterion 1 is red',
+      },
+      {
+        issueId: 'PAN-LIGHT',
+        severity: 'P2',
+        filedBy: 'operator',
+        affectedCriteria: [3],
+        weight: 1.2,
+        weightReason: 'Criterion 3 is green',
+      },
+    ]);
+    expect(substrateBugWeightsMocks.listSubstrateBugWeights).toHaveBeenCalledWith('30d', expect.objectContaining({ limit: 50, offset: 0 }));
+  });
+
+  it('passes any valid duration window to the service', async () => {
+    substrateBugWeightsMocks.listSubstrateBugWeights.mockResolvedValue([]);
+
+    const seven = await requestSubstrateBugWeights('/api/flywheel/substrate-bug-weights?window=7d');
+    expect(seven.status).toBe(200);
+    expect(substrateBugWeightsMocks.listSubstrateBugWeights).toHaveBeenLastCalledWith('7d', expect.objectContaining({ limit: 50, offset: 0 }));
+
+    const custom = await requestSubstrateBugWeights('/api/flywheel/substrate-bug-weights?window=14d');
+    expect(custom.status).toBe(200);
+    expect(substrateBugWeightsMocks.listSubstrateBugWeights).toHaveBeenLastCalledWith('14d', expect.objectContaining({ limit: 50, offset: 0 }));
+
+    const hours = await requestSubstrateBugWeights('/api/flywheel/substrate-bug-weights?window=12h');
+    expect(hours.status).toBe(200);
+    expect(substrateBugWeightsMocks.listSubstrateBugWeights).toHaveBeenLastCalledWith('12h', expect.objectContaining({ limit: 50, offset: 0 }));
+  });
+
+  it('canonicalizes shared-parser-valid durations before queueing work', async () => {
+    substrateBugWeightsMocks.listSubstrateBugWeights.mockResolvedValue([]);
+
+    const huge = await requestSubstrateBugWeights('/api/flywheel/substrate-bug-weights?window=999999d');
+    expect(huge.status).toBe(200);
+    expect(substrateBugWeightsMocks.listSubstrateBugWeights).toHaveBeenLastCalledWith('365d', expect.objectContaining({ limit: 50, offset: 0 }));
+
+    const overMax = await requestSubstrateBugWeights('/api/flywheel/substrate-bug-weights?window=366d');
+    expect(overMax.status).toBe(200);
+    expect(substrateBugWeightsMocks.listSubstrateBugWeights).toHaveBeenLastCalledWith('365d', expect.objectContaining({ limit: 50, offset: 0 }));
+
+    const normalized = await requestSubstrateBugWeights('/api/flywheel/substrate-bug-weights?window=0365d');
+    expect(normalized.status).toBe(200);
+    expect(substrateBugWeightsMocks.listSubstrateBugWeights).toHaveBeenLastCalledWith('365d', expect.objectContaining({ limit: 50, offset: 0 }));
+  });
+
+  it('falls back to the default window for malformed, empty, or non-positive values', async () => {
+    substrateBugWeightsMocks.listSubstrateBugWeights.mockResolvedValue([]);
+    const malformed = await requestSubstrateBugWeights('/api/flywheel/substrate-bug-weights?window=abc');
+    expect(malformed.status).toBe(200);
+    expect(substrateBugWeightsMocks.listSubstrateBugWeights).toHaveBeenLastCalledWith('30d', expect.objectContaining({ limit: 50, offset: 0 }));
+
+    const empty = await requestSubstrateBugWeights('/api/flywheel/substrate-bug-weights?window=');
+    expect(empty.status).toBe(200);
+    expect(substrateBugWeightsMocks.listSubstrateBugWeights).toHaveBeenLastCalledWith('30d', expect.objectContaining({ limit: 50, offset: 0 }));
+
+    const zero = await requestSubstrateBugWeights('/api/flywheel/substrate-bug-weights?window=0d');
+    expect(zero.status).toBe(200);
+    expect(substrateBugWeightsMocks.listSubstrateBugWeights).toHaveBeenLastCalledWith('30d', expect.objectContaining({ limit: 50, offset: 0 }));
+  });
+
+  it('uses the default window when no window param is provided', async () => {
+    substrateBugWeightsMocks.listSubstrateBugWeights.mockResolvedValue([]);
+
+    const result = await requestSubstrateBugWeights('/api/flywheel/substrate-bug-weights');
+
+    expect(result.status).toBe(200);
+    expect(substrateBugWeightsMocks.listSubstrateBugWeights).toHaveBeenCalledWith('30d', expect.objectContaining({ limit: 50, offset: 0 }));
+  });
+
+  it('clamps limit between 1 and the maximum and parses offset', async () => {
+    substrateBugWeightsMocks.listSubstrateBugWeights.mockResolvedValue([]);
+
+    const result = await requestSubstrateBugWeights('/api/flywheel/substrate-bug-weights?limit=500&offset=10');
+
+    expect(result.status).toBe(200);
+    expect(substrateBugWeightsMocks.listSubstrateBugWeights).toHaveBeenCalledWith('30d', expect.objectContaining({ limit: 100, offset: 10 }));
+  });
+});
+
 describe('flywheel config routes', () => {
   let overdeckHome: string;
 
@@ -354,6 +495,33 @@ describe('flywheel config routes', () => {
       headers: { 'Content-Type': 'application/json', origin: 'http://localhost:3011' },
       body: JSON.stringify({ auto_pickup_backlog: 'yes' }),
     })).resolves.toEqual({ status: 400, body: { error: 'auto_pickup_backlog must be a boolean' } });
+  });
+});
+
+describe('flywheel merge backend route', () => {
+  it('returns the merge backend helper result', async () => {
+    await expect(getMergeBackendPayload({
+      getStatus: async () => ({
+        available: true,
+        mode: 'gh-cli',
+        detail: 'gh CLI is authenticated',
+      }),
+    })).resolves.toEqual({
+      available: true,
+      mode: 'gh-cli',
+      detail: 'gh CLI is authenticated',
+    });
+  });
+
+  it('accepts GET requests without an Origin header', async () => {
+    const result = await requestFlywheelRoute('/api/flywheel/merge-backend');
+
+    expect(result.status).toBe(200);
+    expect(result.body).toMatchObject({
+      available: expect.any(Boolean),
+      mode: expect.stringMatching(/^(app|gh-cli|none)$/),
+      detail: expect.any(String),
+    });
   });
 });
 
@@ -539,6 +707,12 @@ describe('flywheel auto-merge routes', () => {
     await expect(postAutoMergeSchedulePayload({ issueId: 'PAN-1486' }, eligibleDeps({
       isEligible: async () => ({ eligible: false, reason: 'CI checks failing on PR HEAD deadbeef' }),
     }))).resolves.toEqual({ status: 422, body: { error: 'CI checks failing on PR HEAD deadbeef' } });
+  });
+
+  it('returns 422 when auto-merge eligibility reports a GitHub PR-state read failure', async () => {
+    await expect(postAutoMergeSchedulePayload({ issueId: 'PAN-1486' }, eligibleDeps({
+      isEligible: async () => ({ eligible: false, reason: 'GitHub PR state lookup failed: gh auth required' }),
+    }))).resolves.toEqual({ status: 422, body: { error: 'GitHub PR state lookup failed: gh auth required' } });
   });
 
   it('returns active pending auto-merges sorted by scheduled merge time', async () => {
@@ -799,9 +973,11 @@ describe('flywheel run payload helpers', () => {
     await writeLatestFlywheelStatus(makeStatus('RUN-1', '2026-05-18T10:00:00.000Z'), { overdeckHome });
     await writeLatestFlywheelStatus(makeStatus('RUN-2', '2026-05-18T12:00:00.000Z'), { overdeckHome });
 
+    // PAN-2108: with no active run set, both are orphaned (no terminal marker,
+    // not the active run) → aborted. This test asserts sort order, not status.
     await expect(getFlywheelRunsPayload({ overdeckHome })).resolves.toEqual([
-      { id: 'RUN-2', startedAt: '2026-05-18T12:00:00.000Z', status: 'running' },
-      { id: 'RUN-1', startedAt: '2026-05-18T10:00:00.000Z', status: 'running' },
+      { id: 'RUN-2', startedAt: '2026-05-18T12:00:00.000Z', status: 'aborted' },
+      { id: 'RUN-1', startedAt: '2026-05-18T10:00:00.000Z', status: 'aborted' },
     ]);
   });
 
@@ -811,7 +987,7 @@ describe('flywheel run payload helpers', () => {
     await mkdir(join(overdeckHome, 'flywheel', 'runs', 'not-a-run'), { recursive: true });
 
     await expect(getFlywheelRunsPayload({ overdeckHome, limit: 1 })).resolves.toEqual([
-      { id: 'RUN-2', startedAt: '2026-05-18T12:00:00.000Z', status: 'running' },
+      { id: 'RUN-2', startedAt: '2026-05-18T12:00:00.000Z', status: 'aborted' },
     ]);
   });
 
@@ -886,6 +1062,22 @@ describe('postFlywheelMergeNextPayload (PAN-1691 merge next N / ship batch)', ()
   });
 });
 
+describe('UAT read routes', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('returns the active UAT candidate', async () => {
+    await expect(requestFlywheelRoute('/api/flywheel/uat-candidate'))
+      .resolves.toEqual({
+        status: 200,
+        body: { branchName: 'uat/pan-otter-0610', bundled: ['PAN-1'], status: 'ready' },
+      });
+
+    expect(uatTrainMocks.getUatCandidatePayload).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('UAT mutation route auth', () => {
   beforeEach(() => {
     process.env.OVERDECK_INTERNAL_TOKEN = 'test-token';
@@ -928,7 +1120,7 @@ describe('UAT mutation route auth', () => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', [INTERNAL_TOKEN_HEADER]: 'test-token' },
       body: '{}',
-    })).resolves.toEqual({ status: 200, body: { frontendUrl: 'https://uat-pan-otter-0610.pan.localhost', evicted: [] } });
+    })).resolves.toEqual({ status: 200, body: { frontendUrl: 'https://uat-pan-otter-0610.overdeck.localhost', evicted: [] } });
 
     expect(uatTrainMocks.postUatGenerationStackPayload).toHaveBeenCalledWith('uat/pan-otter-0610');
   });

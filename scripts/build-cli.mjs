@@ -9,6 +9,13 @@ const promptsDir = join(distDir, 'prompts');
 const cliPromptsDir = join(distDir, 'cli', 'prompts');
 const preservedRoot = join(projectRoot, '.tmp', `overdeck-dashboard-${process.pid}-${Date.now()}`);
 const preservedDashboardDir = join(preservedRoot, 'dashboard');
+const cliBuildHeapFlag = '--max-old-space-size=12288';
+
+const nodeOptionsForCliBuild = (nodeOptions = '') => (
+  nodeOptions.includes('--max-old-space-size=')
+    ? nodeOptions
+    : `${nodeOptions} ${cliBuildHeapFlag}`.trim()
+);
 
 const moveDirSync = (src, dst) => {
   try {
@@ -78,13 +85,54 @@ const copyCloisterPrompts = () => {
   copyMatching(cloisterPromptsSrc, cliPromptsDir, (name) => name.endsWith('.md'));
 };
 
+const runNpmScript = (scriptName) => {
+  const result = spawnSync('npm', ['run', scriptName], {
+    cwd: projectRoot,
+    stdio: 'inherit',
+    shell: process.platform === 'win32',
+  });
+  if (result.status !== 0) {
+    throw new Error(`[build-cli] ${scriptName} failed with exit code ${result.status ?? 'null'}`);
+  }
+};
+
+// PAN-1989: ship the vendored pi/ohmypi extension bundles inside dist/ so
+// packed installs (npm pack) include them — package.json's `files` array ships
+// dist/ but NOT packages/. Runtime resolution (src/lib/paths.ts) looks for these
+// copies first, falling back to the raw packages/ build in a dev checkout.
+const copyExtensionBundles = () => {
+  const extDstDir = join(distDir, 'extensions');
+  mkdirSync(extDstDir, { recursive: true });
+  const bundles = [
+    ['ohmypi-extension/dist/index.js', 'ohmypi.js', 'build:ohmypi-extension'],
+    ['pi-extension/dist/index.js', 'pi.js', 'build:pi-extension'],
+  ];
+  for (const [src, dst, buildScript] of bundles) {
+    const srcPath = join(projectRoot, 'packages', src);
+    if (!existsSync(srcPath)) {
+      runNpmScript(buildScript);
+    }
+    if (!existsSync(srcPath)) {
+      throw new Error(
+        `[build-cli] extension bundle missing after ${buildScript}: ${srcPath}`,
+      );
+    }
+    cpSync(srcPath, join(extDstDir, dst));
+  }
+};
+
 try {
   if (existsSync(dashboardDir)) {
     mkdirSync(preservedRoot, { recursive: true });
     moveDirSync(dashboardDir, preservedDashboardDir);
   }
 
-  const build = spawnSync('tsdown', { cwd: projectRoot, stdio: 'inherit', shell: true });
+  const build = spawnSync('tsdown', {
+    cwd: projectRoot,
+    env: { ...process.env, NODE_OPTIONS: nodeOptionsForCliBuild(process.env.NODE_OPTIONS) },
+    stdio: 'inherit',
+    shell: true,
+  });
   if (build.status !== 0) {
     restoreDashboard();
     process.exit(build.status ?? 1);
@@ -94,6 +142,7 @@ try {
 
   copyCloisterPrompts();
   copyCavemanAssets();
+  copyExtensionBundles();
 } finally {
   rmSync(preservedRoot, { recursive: true, force: true });
 }

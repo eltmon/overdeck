@@ -12,9 +12,9 @@ See [PAN-1048](./prds/planned/PAN-1048-role-primitive.md) for the migration's mo
 
 | Role | File | Purpose |
 |------|------|---------|
-| `plan` | `roles/plan.md` | Read issue, research codebase, write vBRIEF, create beads |
-| `work` | `roles/work.md` | Claim beads, write code, commit per bead, self-inspect (Jidoka) |
-| `strike` | `roles/strike.md` | Precision drop-in. Implements an isolated fix and merges directly to main, then verifies on main. Bypasses the plan/work/review/test pipeline and server-side shipping. |
+| `plan` | `roles/plan.md` | Read issue, research codebase, write xBRIEF, create xBRIEF tasks |
+| `work` | `roles/work.md` | Claim xBRIEF tasks, write code, commit per bead, self-inspect (Jidoka) |
+| `strike` | `roles/strike.md` | Precision drop-in. Implements an isolated fix on `strike/<id>`, pushes the branch, and signals the spawner to review and land it. Bypasses the plan/work/review/test pipeline and server-side shipping. |
 | `review` | `roles/review.md` | Read manifest, gather convoy findings, approve or request changes |
 | `test` | `roles/test.md` | Run project test suite + Playwright UAT, report failures |
 
@@ -24,7 +24,29 @@ and the human Merge button performs the final GitHub squash. The `ship` token
 survives only as the merge-specialist identity for model routing, historical
 activity attribution, and old session records.
 
-A **Run** is a process playing a role: `(role, model, harness)`. Runs are ephemeral — they spawn, do one role's worth of work, update the tracker, and exit. There is no long-lived agent holding state.
+A **Run** is a process playing a role: `(role, model, harness)`. A run's *work* is scoped — it does one role's worth of work and records its verdict — but its *session* is not disposable. See the session-lifecycle policy below.
+
+## Session lifecycle: warm by default (PAN-2579)
+
+Role sessions are **warm by default**: they persist after recording their verdict, until issue close-out. A session for an issue's role should be absent only for two reasons:
+
+1. **Reboot** — the machine or dashboard restarted and the session did not survive.
+2. **Resource relief** — the memory governor (PAN-2500) or preemptive scheduler (PAN-2507) evicted or yielded it to free capacity for a blocked part of the pipeline. See [RESOURCE-GOVERNOR.md](./RESOURCE-GOVERNOR.md).
+
+Consequences:
+
+- **Dispatch resumes before it spawns.** Every dispatch path (review request, re-review, test run, rework handoff) first looks for a live warm session for that role + issue and messages/resumes it; cold-spawning is the fallback for the absent case.
+- **Review agents (and convoy sub-reviewers) stay warm after a verdict** so a re-review after a BLOCKED → fix cycle resumes reviewers that already hold context from the previous pass, cutting re-review latency (PAN-1862 is the convoy-warm-reuse design).
+- **BLOCKED feedback goes agent-to-agent.** The review agent's `pan admin specialists done review --status blocked` delivers feedback directly to the live work agent (`deliverReviewVerdictFeedback` → `messageAgent`); the deacon is a recovery backstop, not the primary path.
+- **Idle-warm sessions are free capacity**, not load: they must not count against the advancing-role concurrency ceiling, and they are the first thing the governor sheds under memory pressure.
+
+Health reporting follows the same lifecycle semantics. `warm` describes a reusable session lifecycle,
+not a fault; idle and intentionally stopped sessions are neutral `idle`, and an agent awaiting operator
+input is neutral `waiting` rather than stalled. A specialist is reclaimable/leaked only when its
+lifecycle is `orphaned`; a warm or merely idle session is retained capacity and must not be labeled as a
+leak.
+
+> **Implementation status (2026-07-11, landed):** reap-on-verdict is gone — `pan specialists done` (CLI and HTTP route) records the verdict and leaves the session alive; the deacon's terminal/idle-terminal advancing reapers are removed (only MERGED-issue sessions still reap). `countRunningAgents()` excludes warm-idle advancing sessions from the ceiling, the memory governor sheds them first under HARD pressure, and the review dispatch guard distinguishes finished-idle (warm-reuse for a newer request) from actively-reviewing (PAN-1131). Convoy-wide warm re-review landed with PAN-1862: selective re-review resumes only the in-scope sub-reviewers (carried verdicts become stub reports), and first-cycle reviewers fork the parent's discovery session for warm-cache sharing — see [REVIEW-AGENT-ARCHITECTURE.md](./REVIEW-AGENT-ARCHITECTURE.md).
 
 ---
 
@@ -37,10 +59,10 @@ Role responsibilities during this phase:
 | Role | Behavior |
 |------|----------|
 | server-side shipping | `rebaseFeatureBranch()` prepares the branch and PAN-1650's review-status gate derives `readyForMerge` for the human Merge button. No agent is spawned. |
-| merge handoff | `postMergeLifecycle()` marks `mergeStatus: "merged"`, applies `verifying-on-main`, frees runtime resources, and preserves workspace/state/vBRIEF/branches. |
+| merge handoff | `postMergeLifecycle()` marks `mergeStatus: "merged"`, applies `verifying-on-main`, frees runtime resources, and preserves workspace/state/xBRIEF/branches. |
 | `work` / `plan` | Remain paused so the operator can unpause for regression follow-up if verification fails. |
 | `review` / `test` | Their sessions may be killed after merge; the merged code is now evaluated on `main`, not by reusing pre-merge role sessions. |
-| close-out | `pan close <id>` or the dashboard Close Out action performs the final vBRIEF completion, archival, optional teardown/branch deletion, tracker close, and review-status clearing. |
+| close-out | `pan close <id>` or the dashboard Close Out action performs the final xBRIEF completion, archival, optional teardown/branch deletion, tracker close, and review-status clearing. |
 
 If `close_out.auto=true`, Deacon may run close-out automatically after `close_out.auto_delay_minutes`; otherwise close-out is an explicit operator ceremony.
 
@@ -72,6 +94,28 @@ Under the Claude Code harness, the agent runner invokes `claude --agent roles/<r
 For a Role with no Claude-specific frontmatter (the review convoy sub-roles), the file is a pure prompt template. The orchestrator reads it and inlines the body into the spawn message — no `--agent` flag, no auto-discovery.
 
 **Source of truth. Never deleted. Lives in the repo.**
+
+### Role MCP servers
+
+Top-level role files declare MCP servers in `mcpServers`, a YAML list of single-key maps. For example, `roles/test.md` declares Playwright as:
+
+```yaml
+mcpServers:
+  - playwright:
+      type: stdio
+      command: npx
+      args:
+        - "-y"
+        - "@playwright/mcp@0.0.78"
+```
+
+Executable npm MCP declarations must use an exact version. npm checks the package's registry-published integrity digest, and Codex skips mutable tags, ranges, and unversioned `npx` selectors.
+
+Overdeck renders this declaration for each harness:
+
+- **Claude Code** gets a generated `--mcp-config` JSON file and an `mcp__<name>` entry in `--allowedTools` (PAN-2090).
+- **Codex** gets `[mcp_servers.<name>]` entries in the agent's `codex-home/config.toml`. Overdeck rewrites the entries on spawn, resume, and recovery so relaunching a role preserves its tools (PAN-2698).
+- **ohmypi** cannot provision role MCP servers. Overdeck logs a spawn-time warning that names every unavailable server.
 
 ### 2. Overdeck pipeline agent — `agents/pan-*-agent.md`
 

@@ -14,6 +14,13 @@
 # additionalContext, so the agent restates the choice to the operator as
 # regular text and waits for a normal response.
 #
+# This hook's REASON string is a load-bearing contract with
+# src/lib/agent-enrichment.ts. It MUST contain both the literal '(PAN-1520)' marker
+# and the stable phrase 'surfaced to the operator'. The detector accepts either
+# signal, but a future copy-edit that drops both will silently break pending-input
+# detection and the dashboard AskUserQuestion popup. Update
+# tests/lib/auq-hook-detector-contract.test.ts if the contract changes.
+#
 # Never breaks Claude Code: on any error the hook exits 0 silently (which
 # lets the original AskUserQuestion call through — preserving the prior
 # behaviour rather than introducing a new hang).

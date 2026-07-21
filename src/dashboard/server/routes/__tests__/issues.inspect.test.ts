@@ -39,8 +39,8 @@ type JsonBody = Record<string, unknown>;
 
 let projectPath: string;
 
-async function postInspect(issueId: string, beadId: string, body?: JsonBody, headers: Record<string, string> = {}) {
-  const request = HttpServerRequest.fromWeb(new Request(`http://localhost/api/issues/${issueId}/beads/${beadId}/inspect`, {
+async function postInspect(issueId: string, itemId: string, body?: JsonBody, headers: Record<string, string> = {}) {
+  const request = HttpServerRequest.fromWeb(new Request(`http://localhost/api/issues/${issueId}/tasks/${itemId}/inspect`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', [INTERNAL_TOKEN_HEADER]: 'test-token', ...headers },
     body: body ? JSON.stringify(body) : undefined,
@@ -62,7 +62,7 @@ async function createWorkspace(issueId: string) {
   await mkdir(join(projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`), { recursive: true });
 }
 
-describe('POST /api/issues/:id/beads/:beadId/inspect', () => {
+describe('POST /api/issues/:id/tasks/:itemId/inspect', () => {
   beforeEach(async () => {
     process.env.OVERDECK_INTERNAL_TOKEN = 'test-token';
     _resetInternalTokenCacheForTests();
@@ -88,7 +88,7 @@ describe('POST /api/issues/:id/beads/:beadId/inspect', () => {
     if (projectPath) await rm(projectPath, { recursive: true, force: true });
   });
 
-  it('spawns a fast inspect agent for a valid workspace and bead', async () => {
+  it('spawns a fast inspect agent for a valid workspace and task', async () => {
     await createWorkspace('PAN-1331');
 
     const result = await postInspect('PAN-1331', 'workspace-f1q5');
@@ -103,7 +103,7 @@ describe('POST /api/issues/:id/beads/:beadId/inspect', () => {
       projectKey: 'overdeck',
       projectPath,
       issueId: 'PAN-1331',
-      beadId: 'workspace-f1q5',
+      itemId: 'workspace-f1q5',
       workspace: join(projectPath, 'workspaces', 'feature-pan-1331'),
       branch: 'feature/pan-1331',
     }, { deep: false });
@@ -118,13 +118,13 @@ describe('POST /api/issues/:id/beads/:beadId/inspect', () => {
     expect(spawnInspectAgentMock).not.toHaveBeenCalled();
   });
 
-  it('rejects bead IDs that are not command-safe identifiers', async () => {
+  it('rejects task IDs that are not command-safe identifiers', async () => {
     await createWorkspace('PAN-1331');
 
     const result = await postInspect('PAN-1331', encodeURIComponent('workspace-f1q5;touch-pwned'));
 
     expect(result.status).toBe(400);
-    expect(result.body).toEqual({ error: 'Invalid bead ID' });
+    expect(result.body).toEqual({ error: 'Invalid item ID' });
     expect(spawnInspectAgentMock).not.toHaveBeenCalled();
   });
 
@@ -154,7 +154,7 @@ describe('POST /api/issues/:id/beads/:beadId/inspect', () => {
     expect(result.status).toBe(200);
     expect(spawnInspectAgentMock).toHaveBeenCalledWith(expect.objectContaining({
       issueId: 'PAN-1331',
-      beadId: 'workspace-f1q5',
+      itemId: 'workspace-f1q5',
     }), { deep: true });
   });
 });

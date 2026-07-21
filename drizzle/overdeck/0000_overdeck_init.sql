@@ -16,6 +16,9 @@ CREATE TABLE `agents` (
 	`kickoff_delivered` integer,
 	`paused` integer,
 	`paused_reason` text,
+	`yielded_by_scheduler` integer,
+	`yielded_at` integer,
+	`last_yield_resume_at` integer,
 	`troubled` integer,
 	`channels_enabled` integer,
 	`consecutive_failures` integer DEFAULT 0,
@@ -37,6 +40,12 @@ CREATE TABLE `agents` (
 	`review_deadline_at` integer,
 	`review_monitor_signaled` text,
 	`review_retry_attempt` integer,
+	`review_discovery_pending` integer,
+	`review_context_manifest_path` text,
+	`review_discovery_ready_at` integer,
+	`review_convoy_forked_at` integer,
+	`review_fork_cache_checked` integer,
+	`review_forked_from_parent` integer,
 	`updated_at` integer NOT NULL,
 	FOREIGN KEY (`issue_id`) REFERENCES `issues`(`id`) ON UPDATE no action ON DELETE no action
 );
@@ -113,7 +122,10 @@ CREATE TABLE `cost_events` (
 --> statement-breakpoint
 CREATE INDEX `cost_issue_idx` ON `cost_events` (`issue_id`);--> statement-breakpoint
 CREATE INDEX `cost_ts_idx` ON `cost_events` (`ts`);--> statement-breakpoint
+CREATE INDEX `cost_session_id_idx` ON `cost_events` (`session_id`);--> statement-breakpoint
 CREATE UNIQUE INDEX `cost_request_id_idx` ON `cost_events` (`request_id`) WHERE request_id IS NOT NULL;--> statement-breakpoint
+CREATE INDEX `idx_cost_agent_id` ON `cost_events` (`agent_id`,`ts`);--> statement-breakpoint
+CREATE INDEX `idx_cost_issue_upper` ON `cost_events` (UPPER(`issue_id`));--> statement-breakpoint
 CREATE TABLE `events` (
 	`sequence` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
 	`type` text NOT NULL,
@@ -210,13 +222,37 @@ CREATE TABLE `merge_sets` (
 );
 --> statement-breakpoint
 CREATE INDEX `merge_sets_project_idx` ON `merge_sets` (`project_key`,`updated_at`);--> statement-breakpoint
-CREATE TABLE `observation_index` (
-	`id` text PRIMARY KEY NOT NULL,
-	`observation_path_jsonl` text NOT NULL,
-	`byte_offset` integer NOT NULL
+CREATE TABLE `release_sets` (
+	`issue_id` text PRIMARY KEY NOT NULL,
+	`project_key` text NOT NULL,
+	`project_path` text NOT NULL,
+	`workspace_type` text NOT NULL,
+	`status` text DEFAULT 'pending' NOT NULL,
+	`created_at` integer NOT NULL,
+	`updated_at` integer NOT NULL,
+	FOREIGN KEY (`issue_id`) REFERENCES `issues`(`id`) ON UPDATE no action ON DELETE no action
 );
 --> statement-breakpoint
-CREATE INDEX `observation_index_path_offset_idx` ON `observation_index` (`observation_path_jsonl`,`byte_offset`);--> statement-breakpoint
+CREATE INDEX `release_sets_project_idx` ON `release_sets` (`project_key`,`updated_at`);--> statement-breakpoint
+CREATE TABLE `release_set_components` (
+	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+	`issue_id` text NOT NULL,
+	`component_key` text NOT NULL,
+	`provider` text,
+	`trigger` text NOT NULL,
+	`release_order` integer DEFAULT 0 NOT NULL,
+	`required` integer DEFAULT true NOT NULL,
+	`status` text DEFAULT 'pending' NOT NULL,
+	`health_status` text,
+	`version_status` text,
+	`smoke_status` text,
+	`rollback_status` text,
+	`notes` text,
+	FOREIGN KEY (`issue_id`) REFERENCES `release_sets`(`issue_id`) ON UPDATE no action ON DELETE cascade
+);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `release_set_components_issue_component_idx` ON `release_set_components` (`issue_id`,`component_key`);--> statement-breakpoint
+CREATE INDEX `release_set_components_issue_order_idx` ON `release_set_components` (`issue_id`,`release_order`,`component_key`);--> statement-breakpoint
 CREATE TABLE `pending_auto_merges` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
 	`issue_id` text NOT NULL,
@@ -235,17 +271,6 @@ CREATE TABLE `pending_auto_merges` (
 --> statement-breakpoint
 CREATE INDEX `pending_auto_merges_issue_idx` ON `pending_auto_merges` (`issue_id`);--> statement-breakpoint
 CREATE UNIQUE INDEX `pending_auto_merges_active_issue_idx` ON `pending_auto_merges` (`issue_id`) WHERE status IN ('pending','merging');--> statement-breakpoint
-CREATE TABLE `reset_markers` (
-	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
-	`scope` text NOT NULL,
-	`scope_id` text NOT NULL,
-	`from_timestamp` integer NOT NULL,
-	`reason` text,
-	`created_at` integer NOT NULL
-);
---> statement-breakpoint
-CREATE INDEX `reset_markers_scope_idx` ON `reset_markers` (`scope`,`scope_id`,`from_timestamp`);--> statement-breakpoint
-CREATE INDEX `reset_markers_created_at_idx` ON `reset_markers` (`created_at`);--> statement-breakpoint
 CREATE TABLE `review_run_agents` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
 	`run_id` text NOT NULL,
@@ -286,6 +311,7 @@ CREATE TABLE `review_status` (
 	`inspect_notes` text,
 	`inspect_started_at` integer,
 	`inspect_bead_id` text,
+	`inspect_owner_session` text,
 	`verification_status` text,
 	`verification_notes` text,
 	`verification_cycle_count` integer DEFAULT 0,
@@ -293,6 +319,8 @@ CREATE TABLE `review_status` (
 	`review_notes` text,
 	`test_notes` text,
 	`merge_notes` text,
+	`release_status` text,
+	`release_notes` text,
 	`updated_at` integer NOT NULL,
 	`ready_for_merge` integer DEFAULT 0 NOT NULL,
 	`auto_requeue_count` integer DEFAULT 0,
@@ -316,7 +344,12 @@ CREATE TABLE `review_status` (
 	`blocker_reasons` text,
 	`last_verified_commit` text,
 	`merge_step` text,
-	`auto_merge` integer
+	`auto_merge` integer,
+	`strike_ready_head` text,
+	`strike_ready_at` integer,
+	`strike_landing_state` text,
+	`strike_recovery_count` integer DEFAULT 0,
+	`strike_landing_attempts` text
 );
 --> statement-breakpoint
 CREATE INDEX `review_status_updated_idx` ON `review_status` (`updated_at`);--> statement-breakpoint
@@ -407,6 +440,7 @@ CREATE INDEX `uat_status_idx` ON `uat_generations` (`status`);--> statement-brea
 CREATE TABLE `discovered_sessions` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
 	`jsonl_path` text NOT NULL UNIQUE,
+	`harness` text,
 	`session_id` text,
 	`workspace_path` text,
 	`workspace_hash` text,
@@ -487,6 +521,7 @@ CREATE TABLE `flywheel_substrate_bugs` (
 	`filed_by` text NOT NULL,
 	`discovered_in_issue_id` text,
 	`severity` text NOT NULL DEFAULT 'P2',
+	`affected_criteria` text,
 	`status` text NOT NULL DEFAULT 'open',
 	`fix_merged_at` integer,
 	`fix_commit_sha` text,

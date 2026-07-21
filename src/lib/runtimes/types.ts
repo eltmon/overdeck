@@ -1,3 +1,25 @@
+import type {
+  HarnessBehavior,
+  HarnessContextLayerKind,
+  HarnessDeliveryKind,
+  HarnessFeedKind,
+  HarnessLaunchCommandKind,
+  HarnessReadinessKind,
+  HarnessSessionIdSource,
+  HarnessTranscriptKind,
+} from '@overdeck/contracts';
+
+export type {
+  HarnessBehavior,
+  HarnessContextLayerKind,
+  HarnessDeliveryKind,
+  HarnessFeedKind,
+  HarnessLaunchCommandKind,
+  HarnessReadinessKind,
+  HarnessSessionIdSource,
+  HarnessTranscriptKind,
+};
+
 /**
  * Cloister Runtime Abstraction
  *
@@ -13,11 +35,19 @@
 /**
  * Supported runtime types for agent execution.
  *
- * PAN-636 widened this union to include 'pi' alongside Claude Code. Reads of
- * AgentSnapshot.runtime should go through getHarness() from @overdeck/contracts
- * so unknown or legacy values normalize to 'claude-code'.
+ * PAN-636 widened this union to include 'pi' alongside Claude Code.
+ * PAN-1989 narrowed the set back to three values: 'pi' is no longer a writable
+ * RuntimeName. Legacy 'pi' strings from DB / state.json are normalized to 'ohmypi'
+ * by normalizeHarness() on read. normalizeHarness still accepts the raw string
+ * 'pi' as input so old rows round-trip safely.
  */
-export type RuntimeName = 'claude-code' | 'pi' | 'codex';
+export type RuntimeName = 'claude-code' | 'ohmypi' | 'codex' | 'acp';
+
+/**
+ * Legacy harness strings that can still appear in persisted state or older
+ * call sites while PAN-1989 normalization moves them onto current runtimes.
+ */
+export type HarnessName = RuntimeName | 'pi';
 
 /**
  * Health state of an agent
@@ -117,6 +147,11 @@ export interface AgentRuntimeSync {
    * Runtime identifier
    */
   readonly name: RuntimeName;
+
+  /**
+   * Return the stable behavior matrix for this runtime.
+   */
+  getHarnessBehavior(): HarnessBehavior;
 
   /**
    * Get the path to the session file/directory for an agent
@@ -253,6 +288,7 @@ export type AgentRuntimeError =
  */
 export interface AgentRuntime {
   readonly name: RuntimeName;
+  getHarnessBehavior(): HarnessBehavior;
   getSessionPath(agentId: string): string | null;
   getLastActivity(agentId: string): Date | null;
   getHeartbeat(agentId: string): Heartbeat | null;

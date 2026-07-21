@@ -28,12 +28,20 @@ vi.mock('../../paths.js', async (importOriginal) => ({
   encodeClaudeProjectDir: (p: string) => p,
 }))
 
-import { RuntimeRegistry, setGlobalRegistry, getGlobalRegistry } from '../index.js'
-import type { AgentRuntimeSync } from '../types.js'
+import {
+  AcpRuntimeSync,
+  RuntimeRegistry,
+  setGlobalRegistry,
+  getGlobalRegistry,
+  getHarnessBehavior,
+} from '../index.js'
+import type { AgentRuntimeSync, HarnessBehavior } from '../types.js'
 
-function stubRuntime(name: 'claude-code' | 'pi'): AgentRuntimeSync {
+function stubRuntime(name: 'claude-code' | 'ohmypi' | 'codex' | 'acp'): AgentRuntimeSync {
+  const behavior = getHarnessBehavior(name)
   return {
     name,
+    getHarnessBehavior: () => behavior,
     getSessionPath: () => null,
     getLastActivity: () => null,
     getHeartbeat: () => null,
@@ -65,6 +73,12 @@ function writeAgentState(agentId: string, fields: Record<string, unknown>): void
   )
 }
 
+describe('global runtime registry', () => {
+  it('registers the real ACP runtime by default', () => {
+    expect(getGlobalRegistry().get('acp')).toBeInstanceOf(AcpRuntimeSync)
+  })
+})
+
 describe('RuntimeRegistry.getRuntimeForAgent dispatches by state.harness (PAN-636)', () => {
   let savedRegistry: ReturnType<typeof getGlobalRegistry> | null = null
 
@@ -72,16 +86,33 @@ describe('RuntimeRegistry.getRuntimeForAgent dispatches by state.harness (PAN-63
     savedRegistry = getGlobalRegistry()
     const fresh = new RuntimeRegistry()
     fresh.register(stubRuntime('claude-code'))
-    fresh.register(stubRuntime('pi'))
+    fresh.register(stubRuntime('ohmypi'))
+    fresh.register(stubRuntime('codex'))
+    fresh.register(stubRuntime('acp'))
     setGlobalRegistry(fresh)
   })
   afterEach(() => {
     if (savedRegistry) setGlobalRegistry(savedRegistry)
   })
 
-  it('returns the pi runtime when state.harness === "pi" (AC1)', () => {
+  it('normalizes legacy pi harness to ohmypi runtime (PAN-1989)', () => {
     writeAgentState('agent-pi-1', { harness: 'pi' })
-    expect(getGlobalRegistry().getRuntimeForAgent('agent-pi-1')?.name).toBe('pi')
+    expect(getGlobalRegistry().getRuntimeForAgent('agent-pi-1')?.name).toBe('ohmypi')
+  })
+
+  it('returns the ohmypi runtime when state.harness === "ohmypi" (PAN-1989)', () => {
+    writeAgentState('agent-ohmypi-1', { harness: 'ohmypi' })
+    expect(getGlobalRegistry().getRuntimeForAgent('agent-ohmypi-1')?.name).toBe('ohmypi')
+  })
+
+  it('returns the codex runtime when state.harness === "codex" (PAN-1574)', () => {
+    writeAgentState('agent-codex-1', { harness: 'codex' })
+    expect(getGlobalRegistry().getRuntimeForAgent('agent-codex-1')?.name).toBe('codex')
+  })
+
+  it('returns the acp runtime when state.harness === "acp"', () => {
+    writeAgentState('agent-acp-1', { harness: 'acp' })
+    expect(getGlobalRegistry().getRuntimeForAgent('agent-acp-1')?.name).toBe('acp')
   })
 
   it('returns the claude-code runtime when state.harness === "claude-code" (AC1)', () => {
@@ -101,6 +132,117 @@ describe('RuntimeRegistry.getRuntimeForAgent dispatches by state.harness (PAN-63
 
   it('returns null when no agent state exists', () => {
     expect(getGlobalRegistry().getRuntimeForAgent('agent-unknown')).toBeNull()
+  })
+})
+
+function pickBehaviorFields(behavior: HarnessBehavior): Record<string, unknown> {
+  return {
+    executableName: behavior.executableName,
+    processNames: behavior.processNames,
+    launchCommandKind: behavior.launchCommandKind,
+    deliveryKind: behavior.deliveryKind,
+    readinessKind: behavior.readinessKind,
+    transcriptKind: behavior.transcriptKind,
+    sessionIdSource: behavior.sessionIdSource,
+    contextLayerKind: behavior.contextLayerKind,
+    feedKind: behavior.feedKind,
+    supportsPtySupervisor: behavior.supportsPtySupervisor,
+    supportsChannelsBridge: behavior.supportsChannelsBridge,
+    supportsConversationStreaming: behavior.supportsConversationStreaming,
+    supportsPatchProjection: behavior.supportsPatchProjection,
+    usesRpcFifo: behavior.usesRpcFifo,
+    usesCodexHome: behavior.usesCodexHome,
+    injectsPromptTimeMemory: behavior.injectsPromptTimeMemory,
+    workAgentMode: behavior.workAgentMode,
+    readyTimeoutSeconds: behavior.readyTimeoutSeconds,
+  }
+}
+
+describe('getHarnessBehavior', () => {
+  it('preserves Claude Code behavior switches', () => {
+    expect(pickBehaviorFields(getHarnessBehavior('claude-code'))).toEqual({
+      executableName: 'claude',
+      processNames: ['claude'],
+      launchCommandKind: 'claude-code',
+      deliveryKind: 'pty-supervisor',
+      readinessKind: 'claude-session-signal',
+      transcriptKind: 'claude-jsonl',
+      sessionIdSource: 'launcher-session-id',
+      contextLayerKind: 'claude',
+      feedKind: 'claude_code',
+      supportsPtySupervisor: true,
+      supportsChannelsBridge: true,
+      supportsConversationStreaming: false,
+      supportsPatchProjection: true,
+      usesRpcFifo: false,
+      usesCodexHome: false,
+      injectsPromptTimeMemory: false,
+      workAgentMode: 'claude-code',
+      readyTimeoutSeconds: 30,
+    })
+  })
+
+  it('normalizes legacy pi to ohmypi behavior switches', () => {
+    expect(getHarnessBehavior('pi')).toBe(getHarnessBehavior('ohmypi'))
+    expect(pickBehaviorFields(getHarnessBehavior('ohmypi'))).toMatchObject({
+      executableName: 'omp',
+      processNames: ['omp'],
+      deliveryKind: 'rpc-fifo',
+      readinessKind: 'ohmypi-ready-file',
+      transcriptKind: 'ohmypi-jsonl',
+      sessionIdSource: 'transcript-jsonl',
+      contextLayerKind: 'pi',
+      feedKind: 'pi',
+      supportsPtySupervisor: false,
+      supportsChannelsBridge: false,
+      supportsConversationStreaming: true,
+      usesRpcFifo: true,
+      readyTimeoutSeconds: 120,
+    })
+  })
+
+  it('preserves Codex behavior switches', () => {
+    expect(pickBehaviorFields(getHarnessBehavior('codex'))).toMatchObject({
+      executableName: 'codex',
+      processNames: ['codex'],
+      launchCommandKind: 'codex-work-tui',
+      deliveryKind: 'codex-exec-resume',
+      readinessKind: 'codex-tui-prompt',
+      transcriptKind: 'codex-rollout-jsonl',
+      sessionIdSource: 'codex-thread-id',
+      contextLayerKind: 'codex',
+      feedKind: 'codex',
+      supportsPtySupervisor: true,
+      supportsChannelsBridge: false,
+      supportsConversationStreaming: true,
+      supportsPatchProjection: true,
+      usesCodexHome: true,
+      workAgentMode: 'codex-work-tui',
+      readyTimeoutSeconds: 30,
+    })
+  })
+
+  it('defines dedicated ACP behavior switches', () => {
+    expect(pickBehaviorFields(getHarnessBehavior('acp'))).toEqual({
+      executableName: 'acp-host',
+      processNames: ['acp-host', 'kimi'],
+      launchCommandKind: 'acp-host',
+      deliveryKind: 'acp-host-rpc',
+      readinessKind: 'acp-host-ready',
+      transcriptKind: 'acp-jsonl',
+      sessionIdSource: 'acp-session-id',
+      contextLayerKind: 'acp',
+      feedKind: 'acp',
+      supportsPtySupervisor: false,
+      supportsChannelsBridge: false,
+      supportsConversationStreaming: true,
+      supportsPatchProjection: false,
+      usesRpcFifo: false,
+      usesCodexHome: false,
+      injectsPromptTimeMemory: false,
+      workAgentMode: 'acp-host',
+      readyTimeoutSeconds: 30,
+    })
   })
 })
 

@@ -14,25 +14,31 @@
  * spawn-only.
  */
 
-import { readFile, readdir, stat } from 'fs/promises';
+import { readFile, readdir, stat, open } from 'fs/promises';
 import { createReadStream, existsSync } from 'fs';
 import { createInterface } from 'readline';
 import { homedir } from 'os';
 import { join } from 'path';
-import { Effect } from 'effect';
 import {
   createConversation,
   getConversationByClaudeSessionId,
   getConversationByName,
-  listActiveConversations,
+  listConversations,
   markConversationEnded,
   markConversationRunning,
   setClearedToConvId,
   type LegacyConversation as Conversation,
 } from '../../../lib/overdeck/conversations.js';
-import { listSessionNames, isHarnessProcessAlive } from '../../../lib/tmux.js';
+import {
+  getRuntimeCensus,
+  refreshRuntimeCensus,
+  runtimeCensusHasHarnessProcess,
+  type RuntimeCensus,
+} from '../../../lib/runtime-census.js';
 import { isRespawnPending } from './pending-respawn.js';
-import { encodeClaudeProjectDir, sessionFilePath } from '../../../lib/paths.js';
+import { encodeClaudeProjectDir, sessionFilePath, getOverdeckHome } from '../../../lib/paths.js';
+import { getHarnessBehavior } from '../../../lib/runtimes/behavior.js';
+import type { HarnessName } from '../../../lib/runtimes/types.js';
 import { cleanupUnreferencedConversationAttachments, runInBatches } from './conversation-attachments.js';
 
 const POLL_INTERVAL_MS = 10_000;
@@ -45,12 +51,63 @@ const SPAWN_GRACE_PERIOD_MS = 30_000;
 // (PAN-1972): a `pan start`-spawned work agent does NOT pass
 // `registerConversation` (only the flywheel does), so without backfill it has
 // no row and the work tab renders "No conversation data available for this
-// session." review/test/ship get rows at spawn; this is the self-healing net.
-const BACKFILL_ROLES = new Set(['work', 'review', 'test', 'ship']);
+// session." Knowledge agents follow the same live-session path. review/test/ship
+// get rows at spawn; this is the self-healing net.
+const BACKFILL_ROLES = new Set(['work', 'review', 'test', 'ship', 'knowledge']);
 
 // Tmux session prefixes that are NOT specialist agents and must be left alone
 // by the backfill pass even if they happen to be missing a row.
 const NON_AGENT_PREFIXES = ['conv-', 'inspect-', 'planning-'];
+
+// PAN-2215: per-boot memo of JSONL transcripts definitively proven NOT to be
+// /clear orphans. Bounded by the number of transcript files on disk (a few
+// thousand paths), and correct forever: the /clear sentinel is written in a
+// transcript's first lines at creation, so a definitive negative never flips.
+const notOrphanJsonlPaths = new Set<string>();
+
+function behaviorForHarness(harness: string | null | undefined) {
+  return getHarnessBehavior(harness as HarnessName | null | undefined);
+}
+
+/**
+ * PAN-2099: read the last `maxBytes` of a file without loading the whole thing.
+ * output.log can grow to many MB; this keeps the corpse-diagnostic path bounded
+ * on the server poll loop.
+ */
+async function tailFile(path: string, maxBytes: number): Promise<string> {
+  const handle = await open(path, 'r');
+  try {
+    const { size } = await handle.stat();
+    const start = Math.max(0, size - maxBytes);
+    const buf = Buffer.alloc(size - start);
+    await handle.read(buf, 0, buf.length, start);
+    return buf.toString('utf8');
+  } finally {
+    await handle.close();
+  }
+}
+
+/**
+ * PAN-2099: gather death evidence for a keep-alive corpse — the pane's exit
+ * status (`#{pane_dead_status}`) and the tail of the agent's output.log. Returns
+ * a "; "-prefixed suffix for the log line, or "" when nothing is available.
+ * Every probe is independently guarded so a diagnostics failure never throws.
+ */
+async function captureCorpseDiagnostics(tmuxSession: string, census: RuntimeCensus): Promise<string> {
+  const parts: string[] = [];
+  const status = (census.panesBySession.get(tmuxSession) ?? [])
+    .map((pane) => pane.paneDeadStatus)
+    .find((value) => value !== null);
+  if (status !== undefined) parts.push(`exitStatus=${status}`);
+  try {
+    const logPath = join(getOverdeckHome(), 'agents', tmuxSession, 'output.log');
+    if (existsSync(logPath)) {
+      const lines = (await tailFile(logPath, 1500)).trim().split('\n').slice(-8).join('\n');
+      if (lines) parts.push(`output.log tail:\n${lines}`);
+    }
+  } catch { /* best-effort */ }
+  return parts.length ? `; ${parts.join('; ')}` : '';
+}
 
 interface AgentStateFile {
   id?: string;
@@ -71,25 +128,37 @@ let pollTimer: ReturnType<typeof setTimeout> | null = null;
  */
 export async function pollConversations(): Promise<void> {
   try {
-    const conversations = listActiveConversations();
+    // Deliberately fetch ALL non-archived rows, not just active ones: the
+    // resurrect check below (PAN-1972) must see 'ended' rows whose tmux session
+    // and harness are still alive so it can flip them back to active. Ended
+    // rows whose session is genuinely gone are skipped in O(1) further down
+    // (PAN-2215) — they must never be re-marked, re-cleaned, or re-scanned.
+    const conversations = listConversations();
     if (conversations.length === 0) return;
 
-    const aliveSessions = new Set(await Effect.runPromise(listSessionNames()));
+    const census = await getRuntimeCensus();
+    if (!census.available) return;
+    const aliveSessions = new Set(census.sessionNames);
+    let revalidationCensus: RuntimeCensus | null = null;
 
     const endedConversations: typeof conversations = [];
+    let sessionGoneCount = 0;
+    let keepAliveCorpseCount = 0;
+    const keepAliveCorpseDiagnostics: string[] = [];
     const now = Date.now();
     for (const conv of conversations) {
       const ageMs = now - new Date(conv.createdAt).getTime();
       // Grace protects a just-spawned conversation: its pane may still be the
       // launcher shell before the harness process takes the foreground.
       if (ageMs < SPAWN_GRACE_PERIOD_MS) continue;
-      const sessionGone = !aliveSessions.has(conv.tmuxSession);
+      let sessionGone = !aliveSessions.has(conv.tmuxSession);
       // Session exists but the harness process has exited — only the launcher
       // keep-alive loop (`while true; do sleep 60; done`) is left. tmux still
       // reports the session, so the gone-check misses it. Mark ended so the
       // dashboard stops showing a dead conversation as active and resume
       // respawns it. PAN-1638.
-      const harnessGone = !sessionGone && !(await isHarnessProcessAlive(conv.tmuxSession));
+      let harnessGone = !sessionGone
+        && !(await runtimeCensusHasHarnessProcess(census, conv.tmuxSession));
       if (!sessionGone && !harnessGone) {
         // PAN-1972: the poller used to be one-directional — it only ever marked
         // conversations 'ended'. A transient blip (a dashboard restart that
@@ -104,6 +173,11 @@ export async function pollConversations(): Promise<void> {
         }
         continue;
       }
+      // PAN-2215: an ended row whose session is gone is already in its terminal
+      // state — nothing to mark and nothing to clean up. Without this skip the
+      // patrol re-marked and re-cleaned every dead conversation on every tick,
+      // pegging the event loop and spamming the log.
+      if (conv.status === 'ended') continue;
       // Re-validate at mark time, not poll-start time. A resume can land
       // between the snapshot above and here (kill → spawn → ready), making the
       // verdict stale: marking then flips a just-revived conversation to
@@ -117,13 +191,42 @@ export async function pollConversations(): Promise<void> {
         fresh.lastAttachedAt ? new Date(fresh.lastAttachedAt).getTime() || 0 : 0,
       );
       if (Date.now() - lastAliveSignalMs < SPAWN_GRACE_PERIOD_MS) continue;
-      console.log(
-        sessionGone
-          ? `[conversation-lifecycle] Session ${conv.tmuxSession} gone — marking ended`
-          : `[conversation-lifecycle] Session ${conv.tmuxSession} alive but harness exited (keep-alive corpse) — marking ended`,
-      );
+
+      revalidationCensus ??= await refreshRuntimeCensus();
+      if (!revalidationCensus.available) continue;
+      sessionGone = !revalidationCensus.sessionNames.has(conv.tmuxSession);
+      harnessGone = !sessionGone
+        && !(await runtimeCensusHasHarnessProcess(revalidationCensus, conv.tmuxSession));
+      if (!sessionGone && !harnessGone) continue;
+
+      if (process.env.DEBUG?.includes('conversation-lifecycle')) {
+        console.log(
+          sessionGone
+            ? `[conversation-lifecycle] Session ${conv.tmuxSession} gone — marking ended`
+            : `[conversation-lifecycle] Session ${conv.tmuxSession} alive but harness exited (keep-alive corpse) — marking ended`,
+        );
+      }
+      if (!sessionGone) {
+        // PAN-2099: a keep-alive corpse means the harness process crashed/exited
+        // while tmux kept the (now dead) pane. Capture the death evidence — pane
+        // exit status + output.log tail — instead of the old reasonless line, so
+        // an ENOSPC/uncaught-exception death is diagnosable from this log alone.
+        const diag = await captureCorpseDiagnostics(conv.tmuxSession, revalidationCensus);
+        if (diag) keepAliveCorpseDiagnostics.push(`${conv.tmuxSession}${diag}`);
+      }
       markConversationEnded(conv.name);
       endedConversations.push(conv);
+      if (sessionGone) sessionGoneCount++;
+      else keepAliveCorpseCount++;
+    }
+
+    if (endedConversations.length > 0) {
+      const diagnosticsSuffix = keepAliveCorpseDiagnostics.length
+        ? `; keep-alive corpse diagnostics: ${keepAliveCorpseDiagnostics.join(' | ')}`
+        : '';
+      console.log(
+        `[conversation-lifecycle] marked ${endedConversations.length} conversation(s) ended (${sessionGoneCount} session(s) gone, ${keepAliveCorpseCount} keep-alive corpses)${diagnosticsSuffix}`,
+      );
     }
     // Batch attachment cleanup to avoid an unbounded fan-out when many
     // conversations end simultaneously (e.g., after server restart).
@@ -141,7 +244,9 @@ export async function pollConversations(): Promise<void> {
 
     // PAN-1458: detect Claude Code /clear orphans and link them to their parent.
     // Reuses the conversations list already fetched above — do not re-query.
-    await detectOrphanedClaudeCodeSessions(conversations);
+    // Active rows only (PAN-2215): ended conversations must not widen the cwd
+    // scan set, and parent attribution is defined over active convs.
+    await detectOrphanedClaudeCodeSessions(conversations.filter((c) => c.status === 'active'));
   } catch (err: unknown) {
     // Don't crash the server on poll errors
     console.error('[conversation-lifecycle] Poll error:', err);
@@ -228,13 +333,13 @@ async function backfillOrphanedSpecialistConversations(aliveSessions: string[]):
  */
 async function detectOrphanedClaudeCodeSessions(activeConvs: Conversation[]): Promise<void> {
   // Group by cwd so we readdir each project dir at most once per tick.
-  // Pi conversations don't use ~/.claude/projects; harness === 'pi' is filtered out.
-  // Legacy rows with harness === null predate the harness column and were all claude-code.
+  // Non-Claude conversations don't use ~/.claude/projects.
+  // Legacy rows with a null harness predate the harness column and were all claude-code.
   const cwdGroups = new Map<string, Conversation[]>();
   for (const conv of activeConvs) {
     if (!conv.cwd) continue;
     if (!conv.claudeSessionId) continue;
-    if (conv.harness === 'pi' || conv.harness === 'codex') continue;
+    if (behaviorForHarness(conv.harness).transcriptKind !== 'claude-jsonl') continue;
     const list = cwdGroups.get(conv.cwd) ?? [];
     list.push(conv);
     cwdGroups.set(conv.cwd, list);
@@ -254,14 +359,23 @@ async function detectOrphanedClaudeCodeSessions(activeConvs: Conversation[]): Pr
     for (const filename of entries) {
       if (!filename.endsWith('.jsonl')) continue;
       const sessionId = filename.slice(0, -'.jsonl'.length);
+      const jsonlPath = join(projectDir, filename);
+
+      // PAN-2215: a transcript already proven not to be a /clear orphan can
+      // never become one (the sentinel lives in the first 5 lines, written at
+      // session creation). Skip before the DB lookup and the file open so
+      // historical transcripts cost one scan per boot, not one per 10s tick.
+      if (notOrphanJsonlPaths.has(jsonlPath)) continue;
 
       // Already linked to a conversation (either as a primary session or via a previous
       // orphan-detect pass that adopted it).
       if (getConversationByClaudeSessionId(sessionId)) continue;
 
-      const jsonlPath = join(projectDir, filename);
-      const firstClearTs = await readFirstClearTimestamp(jsonlPath);
-      if (firstClearTs === null) continue; // not a /clear orphan
+      const { clearTs: firstClearTs, definitive } = await readFirstClearTimestamp(jsonlPath);
+      if (firstClearTs === null) {
+        if (definitive) notOrphanJsonlPaths.add(jsonlPath);
+        continue; // not a /clear orphan
+      }
 
       // Parent attribution: among active convs in this cwd, pick the one whose
       // own JSONL's mtime is the highest value strictly less than firstClearTs.
@@ -343,8 +457,14 @@ async function detectOrphanedClaudeCodeSessions(activeConvs: Conversation[]): Pr
  *
  * Uses a streaming line reader bounded at 5 lines so a multi-megabyte snapshot
  * line at the head of the file doesn't load the whole transcript into memory.
+ *
+ * `definitive` is true when a null verdict can never change: the full 5-line
+ * window was scanned (proven by seeing a 6th line). A shorter file may still
+ * be growing, so its null verdict is provisional and must not be cached.
  */
-async function readFirstClearTimestamp(jsonlPath: string): Promise<number | null> {
+async function readFirstClearTimestamp(
+  jsonlPath: string,
+): Promise<{ clearTs: number | null; definitive: boolean }> {
   const stream = createReadStream(jsonlPath, { encoding: 'utf-8' });
   const rl = createInterface({ input: stream, crlfDelay: Infinity });
   let lineCount = 0;
@@ -368,13 +488,13 @@ async function readFirstClearTimestamp(jsonlPath: string): Promise<number | null
       if (typeof ts !== 'string') continue;
       const ms = new Date(ts).getTime();
       if (Number.isNaN(ms)) continue;
-      return ms;
+      return { clearTs: ms, definitive: true };
     }
   } finally {
     rl.close();
     stream.destroy();
   }
-  return null;
+  return { clearTs: null, definitive: lineCount > 5 };
 }
 
 /**

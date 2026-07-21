@@ -168,6 +168,11 @@ Available methods:
 | `getDesktopSettings()` | Loads current desktop settings from main process |
 | `updateDesktopSetting(key, value)` | Updates a single setting (dotted key, e.g. `"tray.showBadge"`) |
 | `notify(eventType, title, body)` | Triggers a native notification (respects per-event toggle) |
+| `getUpdateStatus()` | Returns the shared updater snapshot |
+| `checkForUpdates()` | Resolves the current channel's exact GitHub release and manifest |
+| `downloadUpdate()` | Downloads and verifies the native update |
+| `quitAndInstall()` | Restarts into an update that has finished downloading |
+| `onUpdateStatus(listener)` | Subscribes to update lifecycle and progress changes |
 
 ---
 
@@ -183,7 +188,23 @@ This is equivalent to `pan up` without the Electron wrapper — useful on headle
 
 ---
 
-## Auto-Updater Channels
+## Updating Overdeck
+
+The version beside the **Overdeck** wordmark is an update control. Hovering it explains the action; clicking it opens the updater and always performs a fresh check. The same dialog opens from **Help → Check for Updates…** in the desktop app.
+
+The dialog shows the installed and target versions, the GitHub release changelog, download/install progress, and the final restart action. If no newer release exists, it confirms that Overdeck is current instead of silently closing. Development checkouts are detected and show a manual-update message rather than modifying the repository.
+
+The action depends on how Overdeck is running:
+
+| Runtime | Update action |
+|---|---|
+| Desktop app | Download the signed native package, then restart into it |
+| Globally installed dashboard | Install the exact published `@overdeck/core` version, run `pan sync`, then restart the dashboard |
+| Development checkout | Report availability only; update through Git |
+
+Release manifests carry dashboard and agent protocol versions. When a release changes the agent protocol and agents are still active, Overdeck may download the update but disables restart until those sessions stop. Compatible updates preserve the dashboard's project, conversation, and agent state.
+
+### Auto-Updater Channels
 
 The desktop app uses `electron-updater` with GitHub Releases as the update server. Updates respect the release channel so stable and canary users never cross-pollute:
 
@@ -198,13 +219,48 @@ The channel is derived automatically from `app.getVersion()` at startup:
 
 This means a user on `v1.0.0` will not be prompted to install `v1.1.0-canary.3`, and a user on `v1.1.0-canary.3` will not be offered `v1.0.0`.
 
-The `beta` channel maps to GitHub prereleases; `latest` maps to full releases. Both are served from the same `eltmon/overdeck` release feed.
+The `beta` channel maps to GitHub prereleases; `latest` maps to full releases. Overdeck resolves the exact matching GitHub release and then gives `electron-updater` a generic release URL. Each release includes the platform manifest and integrity metadata consumed by Squirrel.Mac on macOS, NSIS on Windows, and AppImage updater on Linux.
 
 ---
 
 ## Building the Desktop App
 
 See [BUILD.md § Electron Desktop App](./BUILD.md#electron-desktop-app-appsdesktop) for the full build pipeline.
+
+### Packaged CLI runtime
+
+The packaged app includes a self-contained `pan` CLI runtime at
+`resources/dist/cli/index.js`, together with its reachable build chunks and
+external dependencies. `apps/desktop/package.json` installs the staged runtime
+with this electron-builder resource mapping:
+
+```json
+[
+  { "from": "cli", "to": "dist", "filter": ["**/*", "!**/*.map"] },
+  { "from": "cli/package.json", "to": "package.json" }
+]
+```
+
+The dashboard's `panCliInvocation` helper resolves the entry from
+`packageRoot/dist/cli/index.js`. In a packaged app, `packageRoot` is Electron's
+`resources/` directory, so the normal resolver reaches the packaged runtime
+without a desktop-specific code path. The second resource mapping places the
+generated CLI manifest at `resources/package.json`, where the shared version
+resolver expects the package-root manifest. The preparation script also copies the
+complete `sync-sources/` tree because commands such as `pan sync` need the
+skills, rules, agents, development skills, and hooks payload.
+
+The embedded dashboard server starts under Electron with
+`ELECTRON_RUN_AS_NODE=1`, and every `pan` child inherits that environment. This
+inheritance is what makes `process.execPath` behave as Node when the executable
+is Electron. A packaged `pan` spawn site must preserve the inherited environment
+or explicitly retain `ELECTRON_RUN_AS_NODE=1`; passing a replacement `env`
+without it launches Electron as an application instead of running the CLI.
+
+This staged CLI runtime belongs to the electron-builder packages (AppImage,
+DMG, and NSIS). The npm/npx flavor does not copy it: npm packaging strips
+nested `node_modules`, and its runtime-vendoring work remains part of the
+[PAN-2561](https://github.com/eltmon/overdeck/issues/2561) packaging story.
 
 ---
 

@@ -4,9 +4,12 @@ import { SETTINGS_FILE } from './paths.js';
 import { FsError } from './errors.js';
 
 // Model identifiers
-export type AnthropicModel = 'claude-fable-5' | 'claude-opus-4-8' | 'claude-opus-4-7' | 'claude-opus-4-6' | 'claude-sonnet-4-6' | 'claude-sonnet-4-5' | 'claude-haiku-4-5';
+export type AnthropicModel = 'claude-fable-5' | 'claude-opus-4-8' | 'claude-opus-4-7' | 'claude-opus-4-6' | 'claude-sonnet-5' | 'claude-sonnet-4-6' | 'claude-sonnet-4-5' | 'claude-haiku-4-5';
 export type OpenAIModel =
-  // Supported (Codex CLI catalog, 2026-05-23)
+  // Supported (Codex CLI catalog, 2026-07-09)
+  | 'gpt-5.6-sol'
+  | 'gpt-5.6-terra'
+  | 'gpt-5.6-luna'
   | 'gpt-5.5'
   | 'gpt-5.4'
   | 'gpt-5.4-mini'
@@ -24,7 +27,7 @@ export type OpenAIModel =
   | 'gpt-4o'
   | 'gpt-4o-mini';
 export type GoogleModel = 'gemini-3.1-pro-preview' | 'gemini-3.1-flash-lite-preview' | 'gemini-3-pro-preview' | 'gemini-3-flash-preview' | 'gemini-2.5-pro' | 'gemini-2.5-flash';
-export type KimiModel = 'kimi-k2.7-code' | 'kimi-k2.6' | 'kimi-k2.5' | 'K2.6-code-preview' | 'kimi-k2';
+export type KimiModel = 'k3' | 'k3[1m]' | 'kimi-k2.7-code' | 'kimi-k2.6' | 'kimi-k2.5' | 'K2.6-code-preview' | 'kimi-k2';
 export type MiniMaxModel = 'minimax-m2.7' | 'minimax-m2.7-highspeed' | 'MiniMax-M3';
 export type ZAIModel = 'glm-5.2' | 'glm-5.1' | 'glm-4.7' | 'glm-4.7-flash';
 export type MimoModel = 'mimo-v2.5-pro' | 'mimo-v2.5';
@@ -78,8 +81,8 @@ const DEFAULT_SETTINGS: SettingsConfig = {
   models: {
     specialists: {
       review_agent: 'claude-opus-4-6',
-      test_agent: 'claude-sonnet-4-6',
-      merge_agent: 'claude-sonnet-4-6',
+      test_agent: 'claude-sonnet-5',
+      merge_agent: 'claude-sonnet-5',
     },
     status_review: 'claude-opus-4-6',
     complexity: {
@@ -245,12 +248,13 @@ export function getAvailableModelsSync(settings: SettingsConfig): {
     'claude-opus-4-8',
     'claude-opus-4-7',
     'claude-opus-4-6',
+    'claude-sonnet-5',
     'claude-sonnet-4-6',
     'claude-haiku-4-5',
   ];
 
   const openaiModels: OpenAIModel[] = settings.api_keys.openai
-    ? ['gpt-5.5', 'gpt-5.4', 'gpt-5.4-mini', 'gpt-5.3-codex', 'gpt-5.3-codex-spark', 'gpt-5.2']
+    ? ['gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna', 'gpt-5.5', 'gpt-5.4', 'gpt-5.4-mini', 'gpt-5.3-codex', 'gpt-5.3-codex-spark', 'gpt-5.2']
     : [];
 
   const googleModels: GoogleModel[] = settings.api_keys.google
@@ -258,7 +262,7 @@ export function getAvailableModelsSync(settings: SettingsConfig): {
     : [];
 
   const kimiModels: KimiModel[] = settings.api_keys.kimi
-    ? ['kimi-k2.7-code', 'kimi-k2.6', 'kimi-k2.5', 'K2.6-code-preview']
+    ? ['k3', 'k3[1m]', 'kimi-k2.7-code', 'kimi-k2.6', 'kimi-k2.5', 'K2.6-code-preview']
     : [];
 
   const minimaxModels: MiniMaxModel[] = settings.api_keys.minimax
@@ -314,6 +318,7 @@ export function getClaudeModelFlagSync(modelId: ModelId | string): string {
     'claude-opus-4-8': 'opus',
     'claude-opus-4-7': 'opus',
     'claude-opus-4-6': 'opus',
+    'claude-sonnet-5': 'sonnet',
     'claude-sonnet-4-6': 'sonnet',
     'claude-sonnet-4-5': 'sonnet',
     'claude-haiku-4-5': 'haiku',

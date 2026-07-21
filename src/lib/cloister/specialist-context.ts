@@ -125,7 +125,7 @@ function getDigestModel(projectKey: string, specialistType: string): string {
 
   try {
     const { role, subRole } = roleForSpecialist(specialistType);
-    return resolveModel(role, subRole, loadYamlConfig().config);
+    return resolveModel(role, subRole, loadYamlConfig().config, subRole ? undefined : `${role}:${projectKey}`);
   } catch (error) {
     // Default to Sonnet if can't resolve
     return 'claude-sonnet-4-6';

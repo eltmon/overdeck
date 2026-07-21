@@ -4,48 +4,158 @@
 
 import { existsSync, unlinkSync, readdirSync } from 'fs';
 import { join } from 'path';
-import { exec } from 'child_process';
+import {
+  exec,
+  execFile,
+  type ChildProcess,
+  type ExecException,
+} from 'child_process';
 import { promisify } from 'util';
 import { Effect } from 'effect';
 import { GitError, FsError } from './errors.js';
 
 const execAsync = promisify(exec);
+const DEFAULT_PROCESS_PROBE_TIMEOUT_MS = 30_000;
 
-/**
- * Check if any git processes are currently running in a specific repository
- *
- * This checks if there are git processes with the repository path in their command line.
- * If we can't determine repository-specific processes, we conservatively return false
- * (no processes detected) to allow cleanup to proceed.
- */
-async function hasRunningGitProcesses(repoPath: string): Promise<boolean> {
+export interface StaleLockCleanupOptions {
+  signal?: AbortSignal;
+  processProbeTimeoutMs?: number;
+}
+
+type GitProcessProbeResult =
+  | { status: 'running' | 'idle' }
+  | { status: 'inconclusive'; reason: string };
+
+class ProcessProbeTerminationError extends Error {
+  constructor(
+    public readonly command: string,
+    public readonly kind: 'abort' | 'timeout',
+    public readonly budgetMs: number,
+  ) {
+    super(kind === 'abort'
+      ? `${command} was cancelled`
+      : `${command} timed out after ${budgetMs / 1_000}s`);
+    this.name = 'ProcessProbeTerminationError';
+  }
+}
+
+const execFileDetached = execFile as unknown as (
+  file: string,
+  args: string[],
+  options: { cwd: string; encoding: BufferEncoding; detached: boolean },
+  callback: (error: ExecException | null, stdout: string, stderr: string) => void,
+) => ChildProcess;
+
+function killProcessTree(child: ChildProcess | undefined): void {
+  if (!child?.pid) return;
   try {
-    // Try to find git processes that reference this specific repository
-    // Use fuser to check if any process has the .git directory open (more reliable)
-    try {
-      const gitDir = join(repoPath, '.git');
-      const { stdout } = await execAsync(`fuser "${gitDir}" 2>/dev/null`, {
-        encoding: 'utf-8',
-      });
-      // fuser returns PIDs if any process has the directory open
-      return stdout.trim().length > 0;
-    } catch {
-      // fuser not available or no processes found
-      // Fall back to checking ps for git processes in this directory
-      try {
-        const { stdout } = await execAsync(
-          `ps aux | grep -E "git.*${repoPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}" | grep -v grep`,
-          { encoding: 'utf-8' }
-        );
-        return stdout.trim().length > 0;
-      } catch {
-        // No git processes found for this repo
-        return false;
-      }
-    }
+    if (process.platform === 'win32') child.kill('SIGKILL');
+    else process.kill(-child.pid, 'SIGKILL');
   } catch {
-    // Error checking - conservatively assume no processes
-    return false;
+    try { child.kill('SIGKILL'); } catch { /* process already exited */ }
+  }
+}
+
+function runProcessProbe(
+  file: string,
+  args: string[],
+  repoPath: string,
+  options: Required<Pick<StaleLockCleanupOptions, 'processProbeTimeoutMs'>>
+    & Pick<StaleLockCleanupOptions, 'signal'>,
+): Promise<string> {
+  const command = `${file} ${args.join(' ')}`;
+  if (options.signal?.aborted) {
+    return Promise.reject(new ProcessProbeTerminationError(
+      command,
+      'abort',
+      options.processProbeTimeoutMs,
+    ));
+  }
+
+  return new Promise((resolve, reject) => {
+    let child: ChildProcess | undefined;
+    let termination: 'abort' | 'timeout' | undefined;
+    const terminate = (kind: 'abort' | 'timeout') => {
+      if (termination) return;
+      termination = kind;
+      killProcessTree(child);
+    };
+    const timeout = setTimeout(
+      () => terminate('timeout'),
+      options.processProbeTimeoutMs,
+    );
+    const onAbort = () => terminate('abort');
+    options.signal?.addEventListener('abort', onAbort, { once: true });
+
+    child = execFileDetached(file, args, {
+      cwd: repoPath,
+      encoding: 'utf-8',
+      detached: process.platform !== 'win32',
+    }, (error, stdout, stderr) => {
+      clearTimeout(timeout);
+      options.signal?.removeEventListener('abort', onAbort);
+      if (termination) {
+        reject(Object.assign(new ProcessProbeTerminationError(
+          command,
+          termination,
+          options.processProbeTimeoutMs,
+        ), { stdout, stderr }));
+      } else if (error) {
+        reject(Object.assign(error, { stdout, stderr }));
+      } else {
+        resolve(stdout);
+      }
+    });
+
+    if (options.signal?.aborted) terminate('abort');
+  });
+}
+
+function probeErrorReason(command: string, error: unknown): string {
+  if (error instanceof ProcessProbeTerminationError) return error.message;
+  const message = error instanceof Error ? error.message : String(error);
+  return `${command} failed: ${message}`;
+}
+
+/** Check whether a repository has active Git processes without guessing on probe failure. */
+async function hasRunningGitProcesses(
+  repoPath: string,
+  options: StaleLockCleanupOptions,
+): Promise<GitProcessProbeResult> {
+  const probeOptions = {
+    signal: options.signal,
+    processProbeTimeoutMs:
+      options.processProbeTimeoutMs ?? DEFAULT_PROCESS_PROBE_TIMEOUT_MS,
+  };
+
+  try {
+    const stdout = await runProcessProbe(
+      'fuser',
+      [join(repoPath, '.git')],
+      repoPath,
+      probeOptions,
+    );
+    return { status: stdout.trim() ? 'running' : 'idle' };
+  } catch (error) {
+    const code = (error as { code?: number | string } | null)?.code;
+    if (code === 1) return { status: 'idle' };
+    if (code !== 127 && code !== 'ENOENT') {
+      return { status: 'inconclusive', reason: probeErrorReason('fuser', error) };
+    }
+  }
+
+  try {
+    const stdout = await runProcessProbe(
+      'ps',
+      ['-eo', 'args='],
+      repoPath,
+      probeOptions,
+    );
+    const running = stdout.split('\n').some((line) =>
+      line.includes('git') && line.includes(repoPath));
+    return { status: running ? 'running' : 'idle' };
+  } catch (error) {
+    return { status: 'inconclusive', reason: probeErrorReason('ps', error) };
   }
 }
 
@@ -83,7 +193,12 @@ function findGitLockFiles(repoPath: string): string[] {
   }
 
   return lockFiles;
-}async function cleanupStaleLocksPromise(repoPath: string): Promise<{
+}
+
+async function cleanupStaleLocksPromise(
+  repoPath: string,
+  options: StaleLockCleanupOptions,
+): Promise<{
   found: string[];
   removed: string[];
   errors: Array<{ file: string; error: string }>;
@@ -102,14 +217,19 @@ function findGitLockFiles(repoPath: string): string[] {
     return result;
   }
 
-  // Check if git processes are running for this repository
-  const hasGitProcesses = await hasRunningGitProcesses(repoPath);
+  const processProbe = await hasRunningGitProcesses(repoPath, options);
 
-  if (hasGitProcesses) {
-    // Don't remove locks if git is actively running
+  if (processProbe.status === 'running') {
     result.errors.push({
       file: 'N/A',
       error: 'Git processes are running - not safe to remove locks',
+    });
+    return result;
+  }
+  if (processProbe.status === 'inconclusive') {
+    result.errors.push({
+      file: 'N/A',
+      error: `Could not verify Git process state: ${processProbe.reason}`,
     });
     return result;
   }
@@ -137,7 +257,80 @@ export interface WorkspaceCommitInfo {
   HEAD: string;
   /** Current branch name (e.g. "feature/pan-342") */
   branch: string;
-}async function getWorkspaceGitInfoPromise(workspacePath: string): Promise<WorkspaceCommitInfo> {
+}
+
+export interface WorkspaceHeadAnchorEntry {
+  repoKey: string;
+  sha: string;
+}
+
+export type WorkspaceGitShow = (
+  repoPath: string,
+  sha: string,
+  args: string[],
+) => Promise<string>;
+
+/**
+ * Parse a polyrepo head anchor such as `fe@<sha> api@<sha>`.
+ * Plain single-repo refs return null. Malformed composite anchors fail before
+ * any caller can accidentally pass the whitespace-containing value to git.
+ */
+export function parseWorkspaceHeadAnchor(anchor: string): WorkspaceHeadAnchorEntry[] | null {
+  const normalized = anchor.trim();
+  if (!normalized.includes('@')) {
+    if (/\s/.test(normalized)) {
+      throw new Error(`Invalid workspace head anchor: ${anchor}`);
+    }
+    return null;
+  }
+
+  const entries = normalized.split(/\s+/).map((token) => {
+    const match = /^([^@\s]+)@([0-9a-fA-F]{40,64})$/.exec(token);
+    if (!match) {
+      throw new Error(`Invalid workspace head anchor token '${token}' in '${anchor}'`);
+    }
+    return { repoKey: match[1], sha: match[2] };
+  });
+
+  return entries;
+}
+
+/**
+ * Render `git show` for a single-repo ref or every entry in a polyrepo anchor.
+ * Composite entries are resolved to their nested worktree and labeled using
+ * the same repo-section convention as review and inspect diff summaries.
+ */
+export async function renderWorkspaceGitShowPromise(
+  issueId: string | undefined,
+  workspacePath: string,
+  anchor: string,
+  args: string[],
+  gitShow: WorkspaceGitShow,
+): Promise<string> {
+  const entries = parseWorkspaceHeadAnchor(anchor);
+  if (!entries) return gitShow(workspacePath, anchor.trim(), args);
+  if (!issueId) {
+    throw new Error(`Cannot resolve composite workspace head anchor '${anchor}' without an issue id`);
+  }
+
+  const { resolveWorkspaceRepoRootsSync } = await import('./project-repos.js');
+  const rootsByKey = new Map(
+    resolveWorkspaceRepoRootsSync(issueId, workspacePath).map(root => [root.repoKey, root]),
+  );
+
+  const sections = await Promise.all(entries.map(async ({ repoKey, sha }) => {
+    const root = rootsByKey.get(repoKey);
+    if (!root) {
+      throw new Error(`Composite workspace head anchor repo '${repoKey}' was not found in ${workspacePath}`);
+    }
+    const diff = await gitShow(root.dir, sha, args);
+    return `── ${repoKey} ──\n${diff.trimEnd()}`;
+  }));
+
+  return sections.join('\n');
+}
+
+async function getWorkspaceGitInfoPromise(workspacePath: string): Promise<WorkspaceCommitInfo> {
   try {
     const [headResult, branchResult] = await Promise.all([
       execAsync('git rev-parse HEAD', { cwd: workspacePath }),
@@ -151,14 +344,45 @@ export interface WorkspaceCommitInfo {
     const msg = err instanceof Error ? err.message : String(err);
     throw new Error(`getWorkspaceGitInfo failed for ${workspacePath}: ${msg}`);
   }
-}async function hasStaleLocksPromise(repoPath: string): Promise<boolean> {
+}
+
+/**
+ * Snapshot the code HEAD(s) of a workspace for drift comparison (PAN-2948).
+ *
+ * Monorepo: returns the workspace HEAD SHA (unchanged behavior). Polyrepo:
+ * returns a composite `fe@<sha> api@<sha>` over the sub-repo worktrees —
+ * the wrapper repo at the workspace root is a one-commit artifacts repo whose
+ * SHA never changes, so snapshotting it makes every drift comparison
+ * (reviewedAtCommit vs lastVerifiedCommit, reviewer verdict anchors) report
+ * "no drift" forever. Composite snapshots compare equal iff every sub-repo
+ * head is unchanged; consumers that try to use the anchor as a git ref fail
+ * the ref lookup and fall back to their conservative full-rerun path.
+ */
+export async function snapshotWorkspaceHeadsPromise(issueId: string, workspacePath: string): Promise<string | undefined> {
+  // Dynamic import: project-repos → projects sits above this low-level module
+  // in the layering; a static edge here would risk a require cycle.
+  const { resolveWorkspaceRepoRootsSync } = await import('./project-repos.js');
+  const roots = resolveWorkspaceRepoRootsSync(issueId, workspacePath);
+  const isPolyrepo = roots.some(root => root.isPolyrepo);
+  const heads: string[] = [];
+  for (const root of roots) {
+    try {
+      const { stdout } = await execAsync('git rev-parse HEAD', { cwd: root.dir, encoding: 'utf-8', timeout: 10_000 });
+      const sha = stdout.trim();
+      if (sha) heads.push(isPolyrepo ? `${root.repoKey}@${sha}` : sha);
+    } catch { /* unreadable root — omit from the snapshot */ }
+  }
+  return heads.length > 0 ? heads.join(' ') : undefined;
+}
+
+async function hasStaleLocksPromise(repoPath: string): Promise<boolean> {
   const lockFiles = findGitLockFiles(repoPath);
   if (lockFiles.length === 0) {
     return false;
   }
 
-  const hasGitProcesses = await hasRunningGitProcesses(repoPath);
-  return !hasGitProcesses;
+  const processProbe = await hasRunningGitProcesses(repoPath, {});
+  return processProbe.status === 'idle';
 }
 
 // ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
@@ -171,6 +395,7 @@ export interface WorkspaceCommitInfo {
  */
 export const cleanupStaleLocks = (
   repoPath: string,
+  options: StaleLockCleanupOptions = {},
 ): Effect.Effect<
   {
     found: string[];
@@ -180,7 +405,7 @@ export const cleanupStaleLocks = (
   FsError
 > =>
   Effect.tryPromise({
-    try: () => cleanupStaleLocksPromise(repoPath),
+    try: () => cleanupStaleLocksPromise(repoPath, options),
     catch: (cause) =>
       new FsError({ path: repoPath, operation: 'cleanupStaleLocks', cause }),
   });

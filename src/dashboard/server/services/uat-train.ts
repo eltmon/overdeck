@@ -10,6 +10,7 @@
  * is single-flight per project, so ticks never pile up.
  */
 import { stat } from 'node:fs/promises';
+import { resolve } from 'node:path';
 import { Effect } from 'effect';
 import { layer as nodeServicesLayer } from '@effect/platform-node/NodeServices';
 import {
@@ -31,14 +32,17 @@ import {
   buildUatPromoteGitDeps,
   type PromoteResult,
 } from '../../../lib/cloister/uat-promote.js';
+import { notifyFlywheelOfUatPromote } from '../../../lib/cloister/uat-promote-notify.js';
 import {
   getUatGenerationSync,
   isMergeTrainEnabled,
   listUatGenerationsSync,
   type UatGeneration,
 } from '../../../lib/overdeck/merge-sync.js';
-import { extractACFromDocument } from '../../../lib/vbrief/acceptance-criteria.js';
-import { findVBriefByIssue, readVBriefDocument } from '../../../lib/vbrief/vbrief-index.js';
+import { extractACFromDocument } from '../../../lib/xbrief/acceptance-criteria.js';
+import { findXBriefByIssue, readXBriefDocument } from '../../../lib/xbrief/xbrief-index.js';
+import { findProjectByPathSync } from '../../../lib/projects.js';
+import { getDashboardIdentity } from '../identity.js';
 import { readCurrentFlywheelStatusForDashboard } from './flywheel-actions.js';
 
 const RECONCILE_INTERVAL_MS = 60_000;
@@ -55,8 +59,22 @@ interface AcceptanceCriteriaCacheEntry {
 
 const acceptanceCriteriaByIssue = new Map<string, AcceptanceCriteriaCacheEntry>();
 
+export function resolveUatProjectRoot(cwdPath = process.cwd()): string {
+  const registeredProject = findProjectByPathSync(cwdPath);
+  if (registeredProject) return resolve(registeredProject.path);
+
+  const normalized = resolve(cwdPath);
+  const workspaceMatch = normalized.match(/^(.*)\/workspaces\/feature-[^/]+(?:\/.*)?$/i);
+  return workspaceMatch?.[1] ? resolve(workspaceMatch[1]) : normalized;
+}
+
 function projectRoot(): string {
-  return process.cwd();
+  return resolveUatProjectRoot();
+}
+
+export function canStartUatTrainReconciler(): boolean {
+  const identity = getDashboardIdentity();
+  return identity.mode === 'primary' && resolve(identity.repoRoot) === projectRoot();
 }
 
 /** Ready set in merge order, or null when no flywheel run is active. */
@@ -73,7 +91,7 @@ async function getReadySet(): Promise<ReadyFeature[] | null> {
       Effect.provide(nodeServicesLayer),
     ),
   );
-  return queue.map((item) => ({
+  const fromVerbs: ReadyFeature[] = queue.map((item) => ({
     issueId: item.issueId,
     title: item.title,
     branch: item.branchName,
@@ -81,7 +99,51 @@ async function getReadySet(): Promise<ReadyFeature[] | null> {
     ...(item.prUrl !== undefined ? { prUrl: item.prUrl } : {}),
     conflictsWith: item.conflictsWith,
   }));
+  const swept = await sweepEligibleFeatures(new Set(fromVerbs.map((f) => f.issueId)));
+  return [...fromVerbs, ...swept];
 }
+
+/**
+ * PAN-2484: the verb-based ready set misses merge-eligible issues that entered
+ * the pipeline outside the active flywheel run (operator revivals, strikes,
+ * externally-requested reviews) — those sat at readyForMerge with no train ever
+ * assembling around them. Sweep review status for THIS project's merge-eligible
+ * issues whose feature branch exists and append any the verb set missed. The
+ * flywheel's ordering still leads; swept extras ride at the tail (the assembly
+ * engine's conflict hook owns any cross-feature conflicts).
+ */
+async function sweepEligibleFeatures(alreadyIncluded: ReadySet): Promise<ReadyFeature[]> {
+  try {
+    const { loadReviewStatuses, mergeGateEligibility } = await import('../../../lib/review-status.js');
+    const { resolveProjectFromIssueSync } = await import('../../../lib/projects.js');
+    const { execFile } = await import('node:child_process');
+    const { promisify } = await import('node:util');
+    const execFileAsync = promisify(execFile);
+    const root = projectRoot();
+    const extras: ReadyFeature[] = [];
+    for (const [issueId, rs] of Object.entries(loadReviewStatuses())) {
+      if (alreadyIncluded.has(issueId)) continue;
+      if (rs.readyForMerge !== true) continue;
+      if (!mergeGateEligibility(rs).eligible) continue;
+      const project = resolveProjectFromIssueSync(issueId);
+      if (!project || resolve(project.projectPath) !== root) continue;
+      const branch = `feature/${issueId.toLowerCase()}`;
+      try {
+        await execFileAsync('git', ['show-ref', '--verify', '--quiet', `refs/heads/${branch}`], { cwd: root, timeout: 10_000 });
+      } catch {
+        continue; // no local branch — nothing to assemble
+      }
+      console.log(`[uat-train] ${issueId} is merge-eligible without a flywheel merge verb — swept into the ready set (PAN-2484)`);
+      extras.push({ issueId, title: issueId, branch, conflictsWith: [] });
+    }
+    return extras;
+  } catch (err) {
+    console.warn(`[uat-train] eligibility sweep failed: ${err instanceof Error ? err.message : String(err)}`);
+    return [];
+  }
+}
+
+type ReadySet = Set<string>;
 
 function codenameLabel(features: readonly ReadyFeature[]): string {
   const prefix = features[0]?.issueId.split('-')[0];
@@ -137,8 +199,9 @@ export async function runUatTrainReconcile(options: { force?: boolean } = {}): P
 
 let reconcilerTimer: ReturnType<typeof setInterval> | null = null;
 
-export function startUatTrainReconciler(): void {
-  if (reconcilerTimer) return;
+export function startUatTrainReconciler(): boolean {
+  if (!canStartUatTrainReconciler()) return false;
+  if (reconcilerTimer) return true;
   reconcilerTimer = setInterval(() => {
     void runUatTrainReconcile().catch((err) => {
       console.warn('[uat-train] reconcile tick failed:', err instanceof Error ? err.message : err);
@@ -148,6 +211,7 @@ export function startUatTrainReconciler(): void {
   void runUatTrainReconcile().catch((err) => {
     console.warn('[uat-train] initial reconcile failed:', err instanceof Error ? err.message : err);
   });
+  return true;
 }
 
 export function stopUatTrainReconciler(): void {
@@ -166,7 +230,7 @@ export interface UatGenerationMemberPayload {
   pr?: number;
   prUrl?: string;
   mergeOrder: number;
-  /** What-to-UAT checklist from the issue's vBRIEF spec (shared extractor). */
+  /** What-to-UAT checklist from the issue's xBRIEF spec (shared extractor). */
   acceptanceCriteria: Array<{ title: string; status: string }>;
 }
 
@@ -214,14 +278,14 @@ async function loadAcceptanceCriteriaCache(issueIds: ReadonlySet<string>): Promi
     }
 
     try {
-      const found = await Effect.runPromise(findVBriefByIssue(root, upperIssueId));
+      const found = await Effect.runPromise(findXBriefByIssue(root, upperIssueId));
       if (!found) {
         acceptanceCriteriaByIssue.delete(upperIssueId);
         cache.set(upperIssueId, []);
         return;
       }
       const { mtimeMs } = await stat(found.path);
-      const document = await Effect.runPromise(readVBriefDocument(found.path));
+      const document = await Effect.runPromise(readXBriefDocument(found.path));
       const criteria = extractACFromDocument(document).map((ac) => ({ title: ac.title, status: ac.status }));
       acceptanceCriteriaByIssue.set(upperIssueId, { path: found.path, mtimeMs, criteria });
       cache.set(upperIssueId, criteria);
@@ -271,6 +335,27 @@ export async function getUatGenerationsPayload(): Promise<UatGenerationPayload[]
   return payload;
 }
 
+export interface UatCandidatePayload {
+  branchName: string;
+  bundled: string[];
+  status: 'ready';
+}
+
+/** The authoritative active UAT candidate, if one is ready to test/ship. */
+export async function getUatCandidatePayload(): Promise<UatCandidatePayload | null> {
+  const [candidate] = listUatGenerationsSync({
+    projectRoot: projectRoot(),
+    statuses: ['ready'],
+    limit: 1,
+  });
+  if (!candidate) return null;
+  return {
+    branchName: candidate.name,
+    bundled: candidate.members.map((member) => member.issueId),
+    status: 'ready',
+  };
+}
+
 export async function postUatGenerationStackPayload(name: string): Promise<
   { ok: true; frontendUrl: string; evicted: string[] } | { ok: false; error: string; status: number }
 > {
@@ -290,7 +375,7 @@ export async function postUatGenerationPromotePayload(
 ): Promise<PromoteResult> {
   const root = projectRoot();
   const { reviewRecordEligibility } = await import('../../../lib/flywheel-merge-order.js');
-  return promoteUatGeneration(name, root, {
+  const result = await promoteUatGeneration(name, root, {
     git: buildUatPromoteGitDeps(root),
     store: { ...buildUatGenerationStore(), get: (n) => getUatGenerationSync(n) },
     teardownStack: (gen) => teardownUatStack(gen),
@@ -298,4 +383,6 @@ export async function postUatGenerationPromotePayload(
     memberEligibility: reviewRecordEligibility,
     log: (msg) => console.log(msg),
   });
+  await notifyFlywheelOfUatPromote(result).catch(() => {});
+  return result;
 }

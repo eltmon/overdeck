@@ -9,10 +9,10 @@ import { mkdir, readFile, stat, writeFile } from 'fs/promises';
 import { join, resolve } from 'path';
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
 import { Effect } from 'effect';
-import { ConfigError, ConfigParseError, FsError } from './errors.js';
+import { ConfigParseError, FsError } from './errors.js';
 import { OVERDECK_HOME } from './paths.js';
 import { extractPrefixSync, parseIssueIdSync } from './issue-id.js';
-import type { QualityGateConfig, RepoConfig } from './workspace-config.js';
+import type { DatabaseConfig, QualityGateConfig, RepoConfig } from './workspace-config.js';
 import type { AutoResumeConfig } from './cloister/auto-resume-config.js';
 
 export const PROJECTS_CONFIG_FILE = join(OVERDECK_HOME, 'projects.yaml');
@@ -27,7 +27,7 @@ export interface IssueRoutingRule {
 }
 
 /**
- * PAN-1908: where per-issue permanent records (vBRIEF continue + pipeline +
+ * PAN-1908: where per-issue permanent records (xBRIEF continue + pipeline +
  * close-out + owner lease) are committed in git.
  */
 export interface PanRecordsConfig {
@@ -48,7 +48,7 @@ export interface WorkspaceConfig {
   dns?: { domain: string; entries: string[]; sync_method?: 'wsl2hosts' | 'hosts_file' | 'dnsmasq' };
   ports?: Record<string, { range: [number, number] }>;
   docker?: { traefik?: string; compose_template?: string };
-  database?: { seed_file?: string; container_name?: string; [key: string]: any };
+  database?: DatabaseConfig;
   agent?: { template_dir: string; templates?: Array<{ source: string; target: string }>; copy_dirs?: string[]; symlinks?: string[] };
   env?: { template?: string; secrets_file?: string };
   services?: Array<{ name: string; path: string; start_command: string; docker_command?: string; health_url?: string; port?: number }>;
@@ -93,6 +93,28 @@ export interface SpecialistConfig {
   };
 }
 
+export interface SwarmConfig {
+  /** File paths/globs that are intentionally high-churn and ignored for overlap scheduling. */
+  hotspots?: string[];
+  mode?: 'off' | 'auto' | 'always';
+  maxSlots?: number;
+  autoAdvance?: boolean;
+}
+
+export interface ReleaseComponentConfig {
+  provider?: string;
+  trigger: 'auto' | 'manual' | 'skip';
+  depends_on?: string[];
+  health_url?: string;
+  version_check?: string;
+  smoke_test?: string;
+  rollback?: string;
+}
+
+export interface ReleaseConfig {
+  components: Record<string, ReleaseComponentConfig>;
+}
+
 /**
  * Project configuration
  */
@@ -131,6 +153,10 @@ export interface ProjectConfig {
   specialists?: SpecialistConfig;
   /** Per-project auto-resume failure tracking and backoff overrides */
   autoResume?: Partial<AutoResumeConfig>;
+  /** Path to the project's OKF knowledge bundle. Relative paths resolve from the project path. */
+  knowledge_repo?: string;
+  /** Per-project foreman/swarm settings. */
+  swarm?: SwarmConfig;
   /**
    * PAN-1695: per-project auto-merge default for issues with no explicit
    * per-issue setting. 'auto' = auto-merge when ready, 'hold' = hold for UAT.
@@ -139,12 +165,25 @@ export interface ProjectConfig {
   auto_merge_default?: 'auto' | 'hold';
   /** Quality gates run by merge-agent before pushing (lint, typecheck, prod build, etc.) */
   quality_gates?: Record<string, QualityGateConfig>;
+  /** Release components and rollout checks for coordinated post-merge release. */
+  release?: ReleaseConfig;
+  /**
+   * PAN-2555: publish/release pipeline visibility on the Command Deck.
+   * `npm_packages` lists published package names (inferred from the project
+   * root package.json name when unset and not private); `release_workflow`
+   * names the tag-triggered workflow file (inferred as release.yml when the
+   * file exists in the checkout).
+   */
+  publish?: {
+    npm_packages?: string[];
+    release_workflow?: string;
+  };
   /** Package manager for dependency installation in workspaces (bun, npm, pnpm) */
   package_manager?: 'bun' | 'npm' | 'pnpm';
   /** Local workspace packages that need building before quality gates (e.g., @overdeck/contracts) */
   workspace_packages?: Array<{ path: string; build_command: string }>;
   /**
-   * Directory name for vBRIEF lifecycle directories (proposed/active/completed/cancelled).
+   * Directory name for xBRIEF lifecycle directories (proposed/active/completed/cancelled).
    * Defaults to "vbrief". Relative to the project root.
    */
   vbrief_dir?: string;
@@ -171,6 +210,12 @@ export function getIssuePrefix(config: ProjectConfig): string | undefined {
   return config.issue_prefix;
 }
 
+export function getProjectSwarmHotspots(project: ProjectConfig | null | undefined): string[] {
+  return Array.isArray(project?.swarm?.hotspots)
+    ? project.swarm.hotspots.filter((hotspot): hotspot is string => typeof hotspot === 'string' && hotspot.length > 0)
+    : [];
+}
+
 /**
  * Full projects configuration file
  */
@@ -186,6 +231,25 @@ export interface ResolvedProject {
   projectName: string;
   projectPath: string;
   linearTeam?: string;
+}
+
+export type ProjectRenameErrorReason = 'not-found' | 'empty' | 'conflict';
+
+export class ProjectRenameError extends Error {
+  constructor(
+    readonly reason: ProjectRenameErrorReason,
+    message: string,
+  ) {
+    super(message);
+    this.name = 'ProjectRenameError';
+  }
+}
+
+interface ProjectRenamePlan {
+  key: string;
+  name: string;
+  config: ProjectsConfig;
+  changed: boolean;
 }
 
 // Mtime-based cache: re-parse projects.yaml only when the file changes on disk.
@@ -260,6 +324,68 @@ export function setProjectAutoMergeDefaultSync(key: string, value: 'auto' | 'hol
   const updated: ProjectConfig = { ...config };
   if (value === null) delete updated.auto_merge_default;
   else updated.auto_merge_default = value;
+  registerProjectSync(key, updated);
+}
+
+function prepareProjectRename(
+  config: ProjectsConfig,
+  projectIdentifier: string,
+  newName: string,
+): ProjectRenamePlan | ProjectRenameError {
+  const key = config.projects[projectIdentifier]
+    ? projectIdentifier
+    : Object.entries(config.projects).find(([, project]) => project.name === projectIdentifier)?.[0];
+  if (!key) {
+    return new ProjectRenameError('not-found', `Unknown project: ${projectIdentifier}`);
+  }
+
+  const project = config.projects[key]!;
+  const name = newName.trim();
+  if (!name) {
+    return new ProjectRenameError('empty', 'Project name must not be empty');
+  }
+  if (name === project.name) {
+    return { key, name, config, changed: false };
+  }
+
+  const normalizedName = name.toLowerCase();
+  for (const [otherKey, otherProject] of Object.entries(config.projects)) {
+    if (otherKey === key) continue;
+    if (otherKey.toLowerCase() === normalizedName || otherProject.name.toLowerCase() === normalizedName) {
+      return new ProjectRenameError(
+        'conflict',
+        `Project name '${name}' conflicts with existing project '${otherKey}'`,
+      );
+    }
+  }
+
+  return {
+    key,
+    name,
+    config: {
+      ...config,
+      projects: {
+        ...config.projects,
+        [key]: { ...project, name },
+      },
+    },
+    changed: true,
+  };
+}
+
+export function renameProjectSync(key: string, newName: string): void {
+  const plan = prepareProjectRename(loadProjectsConfigSync(), key, newName);
+  if (plan instanceof ProjectRenameError) throw plan;
+  if (plan.changed) saveProjectsConfigSync(plan.config);
+}
+
+export function setProjectSwarmPolicySync(key: string, value: Omit<SwarmConfig, 'hotspots'> | null): void {
+  const config = getProjectSync(key);
+  if (!config) throw new Error(`Unknown project: ${key}`);
+  const updated: ProjectConfig = { ...config };
+  const hotspots = config.swarm?.hotspots;
+  if (value === null && !hotspots?.length) delete updated.swarm;
+  else updated.swarm = { ...(hotspots?.length ? { hotspots } : {}), ...(value ?? {}) };
   registerProjectSync(key, updated);
 }
 
@@ -678,6 +804,28 @@ export const listProjects = (): Effect.Effect<Array<{ key: string; config: Proje
       Object.entries(config.projects).map(([key, projectConfig]) => ({ key, config: projectConfig })),
     ),
   );
+
+/**
+ * Rename a project's display name by registration key or exact display name.
+ * Loads and persists the registry once so long-lived callers avoid sync I/O.
+ */
+export const renameProject = (
+  projectIdentifier: string,
+  newName: string,
+): Effect.Effect<
+  { key: string; name: string },
+  ProjectRenameError | ConfigParseError | FsError
+> =>
+  Effect.gen(function* () {
+    const plan = prepareProjectRename(
+      yield* loadProjectsConfig(),
+      projectIdentifier,
+      newName,
+    );
+    if (plan instanceof ProjectRenameError) return yield* Effect.fail(plan);
+    if (plan.changed) yield* saveProjectsConfig(plan.config);
+    return { key: plan.key, name: plan.name };
+  });
 
 /** Effect variant of {@link registerProjectSync}. */
 export const registerProject = (key: string, projectConfig: ProjectConfig): Effect.Effect<void, ConfigParseError | FsError> =>

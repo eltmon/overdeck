@@ -1,249 +1,178 @@
-/**
- * Auto-updater service using electron-updater.
- *
- * Handles automatic background checks for updates, downloads, and installation.
- * Uses GitHub Releases as the update server.
- */
+/** Native desktop updater backed by electron-updater and exact GitHub releases. */
 
-import { autoUpdater, UpdateInfo } from "electron-updater";
-import { BrowserWindow } from "electron";
+import { app, BrowserWindow } from 'electron';
+import { autoUpdater, type UpdateInfo } from 'electron-updater';
+import type { UpdateChannel, UpdateSnapshot } from '@overdeck/contracts';
 
-// Auto-updater configuration
+// Keep the Electron entrypoint small: importing the contracts runtime would
+// bundle every schema and Effect dependency. The release-manifest verifier
+// guards these literals against packages/contracts/src/update.ts.
+const OVERDECK_DASHBOARD_PROTOCOL_VERSION = 1;
+const OVERDECK_AGENT_PROTOCOL_VERSION = 1;
+
 const FOUR_HOURS_MS = 4 * 60 * 60 * 1000;
+const DOWNLOAD_RETRY_MS = [0, 1_000, 4_000] as const;
+const RELEASES_URL = 'https://api.github.com/repos/eltmon/overdeck/releases';
 
 let checkIntervalId: ReturnType<typeof setInterval> | null = null;
 let initialized = false;
+let channel: UpdateChannel = 'stable';
 
-// Update state for IPC bridge
-export interface UpdateStatus {
-  checking: boolean;
-  available: boolean;
-  downloaded: boolean;
-  version: string | null;
-  error: string | null;
-}
-
-export let currentStatus: UpdateStatus = {
-  checking: false,
-  available: false,
-  downloaded: false,
-  version: null,
+export let currentStatus: UpdateSnapshot = {
+  phase: 'idle',
+  installMode: 'desktop',
+  channel: 'stable',
+  currentVersion: app.getVersion(),
+  targetVersion: null,
+  releaseName: null,
+  releaseNotes: null,
+  releaseUrl: null,
+  publishedAt: null,
+  progressPercent: null,
   error: null,
+  lastCheckedAt: null,
+  compatibility: 'unknown',
+  currentDashboardProtocol: OVERDECK_DASHBOARD_PROTOCOL_VERSION,
+  currentAgentProtocol: OVERDECK_AGENT_PROTOCOL_VERSION,
+  targetDashboardProtocol: null,
+  targetAgentProtocol: null,
 };
 
-// Callbacks for update events
-type UpdateStatusCallback = (status: UpdateStatus) => void;
-let statusCallbacks: UpdateStatusCallback[] = [];
+type UpdateStatusCallback = (status: UpdateSnapshot) => void;
+const statusCallbacks: UpdateStatusCallback[] = [];
 
-/**
- * Register a callback to receive update status changes.
- */
-export function onUpdateStatusChange(callback: UpdateStatusCallback): void {
+export function onUpdateStatusChange(callback: UpdateStatusCallback): () => void {
   statusCallbacks.push(callback);
+  return () => {
+    const index = statusCallbacks.indexOf(callback);
+    if (index >= 0) statusCallbacks.splice(index, 1);
+  };
 }
 
-/**
- * Notify all listeners of status change
- */
-function notifyStatusChange(): void {
-  for (const cb of statusCallbacks) {
-    cb(currentStatus);
-  }
-}
-
-/**
- * Send update event to all browser windows
- */
-function broadcastToRenderers(channel: string, ...args: unknown[]): void {
+function publish(patch: Partial<UpdateSnapshot>): void {
+  currentStatus = { ...currentStatus, ...patch };
+  for (const callback of statusCallbacks) callback(currentStatus);
   for (const win of BrowserWindow.getAllWindows()) {
-    if (!win.isDestroyed()) {
-      win.webContents.send(channel, ...args);
-    }
+    if (!win.isDestroyed()) win.webContents.send('update-status', currentStatus);
   }
 }
 
-/**
- * Initialize the auto-updater service.
- * Sets up event handlers and starts periodic update checks.
- */
-export function initializeAutoUpdater(channel: string = "latest"): void {
-  if (initialized) {
-    console.log("[updater] Already initialized, skipping...");
-    return;
-  }
-  initialized = true;
+function manifestName(): string {
+  const prefix = channel === 'canary' ? 'beta' : 'latest';
+  if (process.platform === 'darwin') return `${prefix}-mac.yml`;
+  if (process.platform === 'linux') return `${prefix}-linux.yml`;
+  return `${prefix}.yml`;
+}
 
-  // Configure to use GitHub Releases
+async function configureExactReleaseFeed(): Promise<void> {
+  const response = await fetch(RELEASES_URL, { headers: { accept: 'application/vnd.github+json' }, signal: AbortSignal.timeout(10_000) });
+  if (!response.ok) throw new Error(`GitHub Releases returned ${response.status}`);
+  const releases = await response.json() as Array<{
+    tag_name: string;
+    name?: string;
+    body?: string;
+    html_url?: string;
+    published_at?: string;
+    prerelease?: boolean;
+    assets?: Array<{ name: string; browser_download_url: string }>;
+  }>;
+  const release = releases.find((item) => channel === 'canary' ? item.prerelease : !item.prerelease);
+  if (!release) throw new Error(`No ${channel} desktop release is published`);
+  const manifest = release.assets?.find((asset) => asset.name === manifestName());
+  if (!manifest) throw new Error(`${release.tag_name} is missing ${manifestName()}`);
+
+  const manifestResponse = await fetch(manifest.browser_download_url, { signal: AbortSignal.timeout(10_000) });
+  if (!manifestResponse.ok) throw new Error(`Update manifest returned ${manifestResponse.status}`);
+  const manifestText = await manifestResponse.text();
+  const dashboardProtocol = Number(manifestText.match(/^overdeckDashboardProtocol:\s*(\d+)/m)?.[1]) || null;
+  const agentProtocol = Number(manifestText.match(/^overdeckAgentProtocol:\s*(\d+)/m)?.[1]) || null;
+
+  publish({
+    releaseName: release.name ?? `Overdeck ${release.tag_name}`,
+    releaseNotes: release.body ?? 'Release notes are not available for this release.',
+    releaseUrl: release.html_url ?? null,
+    publishedAt: release.published_at ?? null,
+    targetDashboardProtocol: dashboardProtocol,
+    targetAgentProtocol: agentProtocol,
+    compatibility: dashboardProtocol === OVERDECK_DASHBOARD_PROTOCOL_VERSION && agentProtocol === OVERDECK_AGENT_PROTOCOL_VERSION ? 'compatible' : 'unknown',
+  });
   autoUpdater.setFeedURL({
-    provider: "github",
-    owner: "eltmon",
-    repo: "overdeck",
+    provider: 'generic',
+    url: `https://github.com/eltmon/overdeck/releases/download/${release.tag_name}`,
   });
+  autoUpdater.channel = channel === 'canary' ? 'beta' : 'latest';
+}
 
-  // Respect release channel so canary users don't get stable updates and vice versa
-  autoUpdater.channel = channel;
-
-  // Don't auto-download - we want to notify user first
+export function initializeAutoUpdater(requestedChannel: string = 'latest'): void {
+  if (initialized) return;
+  initialized = true;
+  channel = requestedChannel === 'canary' || requestedChannel === 'beta' ? 'canary' : 'stable';
+  publish({ channel });
   autoUpdater.autoDownload = false;
-  autoUpdater.autoInstallOnAppQuit = true;
+  autoUpdater.autoInstallOnAppQuit = false;
 
-  // Set up event handlers
-  autoUpdater.on("checking-for-update", () => {
-    currentStatus = { ...currentStatus, checking: true, error: null };
-    notifyStatusChange();
-    broadcastToRenderers("update-status", currentStatus);
-    console.log("[updater] Checking for update...");
-  });
+  autoUpdater.on('checking-for-update', () => publish({ phase: 'checking', error: null }));
+  autoUpdater.on('update-available', (info: UpdateInfo) => publish({
+    phase: 'available', targetVersion: info.version, progressPercent: null, error: null, lastCheckedAt: new Date().toISOString(),
+  }));
+  autoUpdater.on('update-not-available', (info: UpdateInfo) => publish({
+    phase: 'current', targetVersion: info.version, progressPercent: null, error: null, lastCheckedAt: new Date().toISOString(),
+  }));
+  autoUpdater.on('download-progress', (progress) => publish({
+    phase: 'downloading', progressPercent: Math.round(progress.percent * 10) / 10,
+  }));
+  autoUpdater.on('update-downloaded', (info: UpdateInfo) => publish({
+    phase: 'ready', targetVersion: info.version, progressPercent: 100, error: null,
+  }));
+  autoUpdater.on('error', (error: Error) => publish({ phase: 'error', error: error.message }));
 
-  autoUpdater.on("update-available", (info: UpdateInfo) => {
-    currentStatus = {
-      checking: false,
-      available: true,
-      downloaded: false,
-      version: info.version,
-      error: null,
-    };
-    notifyStatusChange();
-    broadcastToRenderers("update-status", currentStatus);
-    console.log(`[updater] Update available: ${info.version}`);
-  });
-
-  autoUpdater.on("update-not-available", (info: UpdateInfo) => {
-    currentStatus = {
-      checking: false,
-      available: false,
-      downloaded: false,
-      version: info.version,
-      error: null,
-    };
-    notifyStatusChange();
-    broadcastToRenderers("update-status", currentStatus);
-    console.log(`[updater] Update not available. Current version: ${info.version}`);
-  });
-
-  autoUpdater.on("download-progress", (progressObj) => {
-    const percent = progressObj.percent.toFixed(1);
-    currentStatus = { ...currentStatus, checking: false };
-    notifyStatusChange();
-    broadcastToRenderers("update-download-progress", {
-      percent,
-      transferred: progressObj.transferred,
-      total: progressObj.total,
-    });
-    console.log(`[updater] Download progress: ${percent}%`);
-  });
-
-  autoUpdater.on("update-downloaded", (info: UpdateInfo) => {
-    currentStatus = {
-      checking: false,
-      available: true,
-      downloaded: true,
-      version: info.version,
-      error: null,
-    };
-    notifyStatusChange();
-    broadcastToRenderers("update-status", currentStatus);
-    broadcastToRenderers("update-downloaded", { version: info.version });
-    console.log(`[updater] Update downloaded: ${info.version}`);
-  });
-
-  autoUpdater.on("error", (err: Error) => {
-    currentStatus = {
-      checking: false,
-      available: false,
-      downloaded: false,
-      version: null,
-      error: err.message,
-    };
-    notifyStatusChange();
-    broadcastToRenderers("update-status", currentStatus);
-    console.error("[updater] Error:", err.message);
-  });
-
-  // Check for updates on app startup (after a short delay to let the app initialize)
-  setTimeout(() => {
-    checkForUpdates();
-  }, 3000);
-
-  // Start periodic update checks
+  setTimeout(() => { void checkForUpdates(); }, 5_000);
   startPeriodicChecks();
 }
 
-/**
- * Start periodic update checks every 4 hours.
- */
 export function startPeriodicChecks(): void {
-  if (checkIntervalId !== null) return; // Already running
-
-  checkIntervalId = setInterval(() => {
-    checkForUpdates();
-  }, FOUR_HOURS_MS);
-
-  console.log("[updater] Started periodic update checks (every 4 hours)");
+  checkIntervalId ??= setInterval(() => { void checkForUpdates(); }, FOUR_HOURS_MS);
 }
 
-/**
- * Stop periodic update checks.
- */
 export function stopPeriodicChecks(): void {
-  if (checkIntervalId !== null) {
-    clearInterval(checkIntervalId);
-    checkIntervalId = null;
-    console.log("[updater] Stopped periodic update checks");
-  }
+  if (checkIntervalId) clearInterval(checkIntervalId);
+  checkIntervalId = null;
 }
 
-/**
- * Check for updates manually.
- * Returns a promise that resolves when the check completes.
- */
-export async function checkForUpdates(): Promise<void> {
-  if (currentStatus.checking) {
-    console.log("[updater] Already checking for update, skipping...");
-    return;
-  }
-
+export async function checkForUpdates(): Promise<UpdateSnapshot> {
+  if (currentStatus.phase === 'checking') return getUpdateStatus();
+  publish({ phase: 'checking', error: null });
   try {
-    console.log("[updater] Starting update check...");
+    await configureExactReleaseFeed();
     await autoUpdater.checkForUpdates();
-  } catch (err) {
-    console.error("[updater] Check for updates failed:", err);
+  } catch (error) {
+    publish({ phase: 'error', error: error instanceof Error ? error.message : String(error), lastCheckedAt: new Date().toISOString() });
   }
+  return getUpdateStatus();
 }
 
-/**
- * Download the available update.
- */
-export async function downloadUpdate(): Promise<void> {
-  if (!currentStatus.available) {
-    console.log("[updater] No update available to download");
-    return;
+export async function downloadUpdate(): Promise<UpdateSnapshot> {
+  if (currentStatus.phase !== 'available') return getUpdateStatus();
+  for (let attempt = 0; attempt < DOWNLOAD_RETRY_MS.length; attempt += 1) {
+    const delay = DOWNLOAD_RETRY_MS[attempt] ?? 0;
+    if (delay > 0) await new Promise((resolve) => setTimeout(resolve, delay));
+    try {
+      publish({ phase: 'downloading', error: null, progressPercent: 0 });
+      await autoUpdater.downloadUpdate();
+      return getUpdateStatus();
+    } catch (error) {
+      if (attempt === DOWNLOAD_RETRY_MS.length - 1) {
+        publish({ phase: 'error', error: error instanceof Error ? error.message : String(error) });
+      }
+    }
   }
-
-  try {
-    console.log("[updater] Starting update download...");
-    await autoUpdater.downloadUpdate();
-  } catch (err) {
-    console.error("[updater] Download update failed:", err);
-  }
+  return getUpdateStatus();
 }
 
-/**
- * Quit and install the downloaded update.
- */
 export function quitAndInstall(): void {
-  if (!currentStatus.downloaded) {
-    console.log("[updater] No update downloaded to install");
-    return;
-  }
-
-  console.log("[updater] Quitting and installing update...");
-  autoUpdater.quitAndInstall();
+  if (currentStatus.phase === 'ready') autoUpdater.quitAndInstall(false, true);
 }
 
-/**
- * Get current update status.
- */
-export function getUpdateStatus(): UpdateStatus {
-  return currentStatus;
+export function getUpdateStatus(): UpdateSnapshot {
+  return { ...currentStatus };
 }

@@ -28,8 +28,16 @@
 #                Planning's interactivity is the AskUserQuestion DIALOG (decisions
 #                surface to the operator via ask-user-question-hook), NOT per-command
 #                approval. So its routine research is auto-approved like a work agent.
-#   conv-*     → NOT auto-approved here. Conversations have a human at the dashboard
-#                terminal, and today launch under bypass (see PAN-1572 follow-up).
+#   conv-*     → AUTO-APPROVE. Overdeck conversations run autonomously between
+#                operator turns; they used to rely on Claude Code's `--permission-mode
+#                auto` classifier to avoid per-command prompts, but Claude Code
+#                removed `auto` as a valid interactive mode (we now launch every
+#                Overdeck session with `--permission-mode default`). Without this
+#                the conversation stalls on Claude's native "requires approval"
+#                gate for routine commands (e.g. `pan status`). The operator still
+#                sees every command in the dashboard terminal and steers via
+#                `pan tell`; AskUserQuestion is still excluded below so operator
+#                decisions surface as a dialog.
 #   (unset)    → NOT auto-approved. A human's own plain `claude` session keeps
 #                normal prompts.
 #
@@ -58,10 +66,11 @@ fi
 echo "[$(date -Iseconds)] auto-approve-hook: AGENT=${OVERDECK_AGENT_ID:-unset} tool=${TOOL_NAME:-unknown}" \
   >> "$LOG_DIR/auto-approve.log" 2>/dev/null || true
 
-# Overdeck pipeline agents (work + planning). Conversations (human present,
-# currently bypass) and plain human sessions (unset) keep normal prompts.
+# Overdeck pipeline agents (work + planning) AND conversations, which run
+# autonomously between operator turns. Only a plain human `claude` session
+# (OVERDECK_AGENT_ID unset) keeps normal prompts.
 case "${OVERDECK_AGENT_ID:-}" in
-  agent-*|planning-*|flywheel-*|strike-*|inspect-*|sequencer-*) : ;;
+  agent-*|planning-*|flywheel-*|strike-*|inspect-*|sequencer-*|conv-*) : ;;
   *) exit 0 ;;
 esac
 

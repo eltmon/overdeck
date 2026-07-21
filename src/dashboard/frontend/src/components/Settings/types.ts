@@ -4,8 +4,10 @@
 export type Provider = 'anthropic' | 'openai' | 'google' | 'zai' | 'kimi' | 'minimax' | 'mimo' | 'openrouter' | 'nous' | 'dashscope';
 
 export type ModelId = string;
-export type Harness = 'claude-code' | 'pi' | 'codex';
+export type Harness = 'claude-code' | 'ohmypi' | 'codex' | 'acp';
 export type HarnessOverride = Harness | '';
+export type XBriefDifficulty = 'trivial' | 'simple' | 'medium' | 'complex' | 'expert';
+export type XBriefItemKind = 'docs' | 'api' | 'backend' | 'frontend' | 'infra' | 'test' | 'refactor' | 'design' | 'spike';
 
 export interface ProvidersConfig {
   anthropic: boolean;
@@ -85,6 +87,24 @@ export interface TtsConfig {
   mutedIssues?: string[];
 }
 
+export interface VoiceSettings {
+  stt: {
+    provider: 'moonshine' | 'google-cloud';
+    moonshine: { model: string };
+    googleCloud: { apiKey: string; model: string };
+  };
+  autopreso: {
+    provider: 'openai' | 'codex' | 'ollama';
+    model: string;
+  };
+}
+
+export interface VoiceHardwareSettings {
+  inputDevice: string;
+  outputDevice: string;
+  volume: number;
+}
+
 export interface MemorySettingsConfig {
   provider?: 'anthropic' | 'cliproxy';
   model?: string;
@@ -139,7 +159,43 @@ export interface ConversationSearchConfig {
   dbPath?: string;
 }
 
+export interface TieredExecutionConfig {
+  enabled: boolean;
+  tiers: Record<string, {
+    model: ModelId;
+    harness: Harness;
+    difficulties: XBriefDifficulty[];
+    /** PAN-2391: weighted entries this tier spreads tasks across. When
+     * present, model/harness above are the max-weight representative. */
+    distribution?: Array<{ model: ModelId; harness: Harness; weight: number }>;
+  }>;
+  supervisor?: {
+    model: ModelId;
+    harness: Harness;
+    subscribe: 'all' | 'flagged' | 'sampled';
+    owns_inspection?: boolean;
+  };
+  by_kind?: Partial<Record<XBriefItemKind, string>>;
+  byKind?: Partial<Record<XBriefItemKind, string>>;
+  feed?: {
+    callouts: 'off' | 'notify' | 'corroborate';
+    exclude: string[];
+    exclude_subjects: string[];
+    max_diff_bytes: number | null;
+  };
+  escalation?: {
+    enabled: boolean;
+    retries_at_tier: number;
+    max_promotions: number;
+    flounder_budget_minutes: Partial<Record<XBriefDifficulty, number>>;
+  };
+  compaction_reroute?: 'off' | 'on';
+  replay_threshold: number;
+  difficultyToTier?: Partial<Record<XBriefDifficulty, string>>;
+}
+
 export interface SettingsConfig {
+  swarm?: { mode: 'off' | 'auto' | 'always'; maxSlots: number; autoAdvance: boolean };
   workhorses?: WorkhorsesConfig;
   roles?: RolesConfig;
   models: ModelsConfig;
@@ -222,4 +278,5 @@ export interface SettingsConfig {
     resiliency_tier?: 'ephemeral' | 'durable';
     max_concurrent_agents?: number;
   };
+  tiered_execution?: TieredExecutionConfig;
 }

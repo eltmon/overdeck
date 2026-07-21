@@ -1,6 +1,7 @@
 import type { MouseEvent } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { CheckCheck, Loader2 } from 'lucide-react';
+import posthog from 'posthog-js';
 import { useConfirm } from './DialogProvider';
 import { refreshDashboardState } from '../lib/refresh-dashboard-state';
 import { dashboardMutationJsonHeaders } from '../lib/wsTransport';
@@ -9,6 +10,19 @@ interface CloseOutIssueButtonProps {
   issueId: string;
   variant?: 'card' | 'inspector';
   stopPropagation?: boolean;
+}
+
+interface CloseOutErrorPayload {
+  error?: string;
+  dodGate?: {
+    rows?: Array<{ num: number; title: string; observed: string; status: string; acceptedBy?: unknown }>;
+  };
+}
+
+export function closeOutErrorMessage(data: CloseOutErrorPayload): string {
+  const misses = data.dodGate?.rows?.filter(row => row.status === 'miss' && !row.acceptedBy) ?? [];
+  const details = misses.map(row => `${row.num} ${row.title}: ${row.observed}`);
+  return [data.error || 'Close-out failed', ...details].join('\n');
 }
 
 export function CloseOutIssueButton({ issueId, variant = 'card', stopPropagation = true }: CloseOutIssueButtonProps) {
@@ -23,11 +37,12 @@ export function CloseOutIssueButton({ issueId, variant = 'card', stopPropagation
       });
       const data = await res.json();
       if (!res.ok || !data.success) {
-        throw new Error(data.error || 'Close-out failed');
+        throw new Error(closeOutErrorMessage(data));
       }
       return data;
     },
     onSuccess: async () => {
+      posthog.capture('issue_closed_out', { issue_id: issueId, variant });
       await refreshDashboardState(queryClient);
     },
   });
@@ -65,7 +80,7 @@ export function CloseOutIssueButton({ issueId, variant = 'card', stopPropagation
         {closeOutMutation.isPending ? 'Closing out...' : 'Close Out'}
       </button>
       {closeOutMutation.isError && (
-        <span className="text-xs text-destructive-foreground">{(closeOutMutation.error as Error).message}</span>
+        <span className="text-xs whitespace-pre-line text-destructive-foreground">{(closeOutMutation.error as Error).message}</span>
       )}
     </>
   );

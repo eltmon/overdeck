@@ -3,6 +3,7 @@ import { SessionPanel } from '../../CommandDeck/SessionView/SessionPanel'
 import { usePanesStore } from '../../../lib/panesStore'
 import type { PaneWrapperProps } from '../types'
 import styles from '../stage.module.css'
+import { Loader2 } from 'lucide-react'
 
 /**
  * AgentPane — paneType='agent' (PAN-1549). Renders the existing components
@@ -38,6 +39,18 @@ export function AgentPane({ pane, ctx }: PaneWrapperProps) {
           targetMessageNonce: undefined,
         })}
       />
+    )
+  }
+
+  if (pane.agentId || pane.conversationId || pane.isRunning) {
+    return (
+      <div className={styles.placeholder}>
+        <div className={styles.placeholderTitle}>
+          <Loader2 size={14} className="inline-block animate-spin align-[-2px] mr-1.5" />
+          Starting...
+        </div>
+        <div className={styles.placeholderHint}>Waiting for the agent conversation to become available.</div>
+      </div>
     )
   }
 

@@ -172,6 +172,7 @@ describe('buildReviewerNodes (PAN-830)', () => {
       agentsDirOverride: agentsDir,
     });
     expect(nodes).toEqual([]);
+    expect(isExtendedReviewEnabledMock).toHaveBeenCalledWith(ISSUE_ID);
   });
 
   it('returns exactly four convoy nodes without a synthesis child', async () => {
@@ -237,6 +238,27 @@ describe('buildReviewerNodes (PAN-830)', () => {
     });
 
     expect(nodes.every(n => n.presence === 'idle')).toBe(true);
+  });
+
+  it('marks a live reviewer warm-idle after REVIEWER_READY is signaled (PAN-2690)', async () => {
+    const correctness = getReviewerSessionName('correctness', PROJECT_KEY, ISSUE_ID);
+    await mkdir(join(agentsDir, correctness), { recursive: true });
+    await writeFile(join(agentsDir, correctness, 'reviewer-signaled'), '');
+
+    const nodes = await buildReviewerNodes({
+      issueId: ISSUE_ID,
+      projectKey: PROJECT_KEY,
+      workspacePath: WORKSPACE_PATH,
+      tmuxSessionNames: new Set([correctness]),
+      startedAt: '2026-01-01T00:00:00Z',
+      status: 'running',
+      agentsDirOverride: agentsDir,
+    });
+
+    const correctnessNode = nodes.find(n => n.role === 'correctness')!;
+    expect(correctnessNode.status).toBe('running');
+    expect(correctnessNode.presence).toBe('idle');
+    expect(correctnessNode.tmuxSession).toBe(correctness);
   });
 
   it('marks presence "ended" when no tmux session exists', async () => {

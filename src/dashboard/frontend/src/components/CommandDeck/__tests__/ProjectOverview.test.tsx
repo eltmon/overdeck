@@ -1,21 +1,27 @@
-import { beforeEach, describe, expect, it } from 'vitest';
-import { fireEvent, render as rtlRender, screen } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render as rtlRender, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReviewStatusSnapshot } from '@overdeck/contracts';
 import { bucketFeaturePhase, ProjectOverview } from '../ProjectOverview';
+import type { PipelineIssuePhase } from '../../../lib/pipeline-state';
+import { useDashboardStore } from '../../../lib/store';
+import type { ProjectFeature } from '../ProjectTree/ProjectNode';
+import { installStrictFetchMock } from '../../../test-utils/strictFetchMock';
+
+let fetchControl: ReturnType<typeof installStrictFetchMock>;
 
 // ProjectOverview now fetches recent spend via react-query (PAN-1597), so every
 // render must sit under a QueryClientProvider. Shadow render() with a wrapper so
 // existing call sites (and their rerender()) work unchanged.
 function render(ui: Parameters<typeof rtlRender>[0]) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return rtlRender(ui, {
-    wrapper: ({ children }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>,
-  });
+  return {
+    ...rtlRender(ui, {
+      wrapper: ({ children }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>,
+    }),
+    queryClient: client,
+  };
 }
-import type { PipelineIssuePhase } from '../../../lib/pipeline-state';
-import { useDashboardStore } from '../../../lib/store';
-import type { ProjectFeature } from '../ProjectTree/ProjectNode';
 
 function makeFeature(overrides: Partial<ProjectFeature> = {}): ProjectFeature {
   return {
@@ -55,9 +61,12 @@ function expectPhase(
   ).toBe(expected);
 }
 
-function expectBadgeVariant(issueId: string, variant: string) {
-  const row = screen.getByText(issueId).closest('[data-component="issue-row"]') as HTMLElement;
-  expect(row.querySelector('[data-component="verb-badge"]')).toHaveAttribute('data-variant', variant);
+function rowFor(issueId: string): HTMLElement {
+  const row = screen
+    .getAllByTestId('pipeline-row')
+    .find((element) => element.getAttribute('data-issue-id') === issueId);
+  expect(row).toBeTruthy();
+  return row!;
 }
 
 describe('bucketFeaturePhase', () => {
@@ -151,32 +160,177 @@ describe('bucketFeaturePhase', () => {
   it('buckets issues with no active signals as idle', () => {
     expectPhase('todo', {}, undefined);
   });
+});
 
-  it('shows stuck reasons for blocked review and test dispatch failures', () => {
-    useDashboardStore.setState({
-      reviewStatusByIssueId: {
-        'PAN-1': reviewStatus({ issueId: 'PAN-1', reviewStatus: 'blocked' }),
-        'PAN-2': reviewStatus({ issueId: 'PAN-2', testStatus: 'dispatch_failed' }),
-      },
+describe('ProjectOverview', () => {
+  beforeEach(() => {
+    fetchControl = installStrictFetchMock(({ method, url }) => {
+      if (method === 'GET' && url === '/api/costs/summary?project=PAN') {
+        return Response.json({ totalCost: 0 });
+      }
+      if (method === 'GET' && url === '/api/projects/overdeck/auto-merge-default') {
+        return Response.json({ autoMerge: false });
+      }
+      if (method === 'GET' && url === '/api/projects/overdeck/swarm-policy') {
+        return Response.json({});
+      }
+      return undefined;
     });
+    useDashboardStore.setState({ reviewStatusByIssueId: {} });
+  });
 
+  afterEach(async () => {
+    cleanup();
+    await fetchControl.assertNoUnexpectedRequests();
+    vi.unstubAllGlobals();
+  });
+
+  it('opens a selected, pre-filled project name editor from the hero pencil', async () => {
     render(
       <ProjectOverview
-        projectName="overdeck"
-        features={[
-          makeFeature({ issueId: 'PAN-1', title: 'Blocked review' }),
-          makeFeature({ issueId: 'PAN-2', title: 'Dispatch failed' }),
-        ]}
+        projectName="Overdeck"
+        projectKey="overdeck"
+        features={[]}
         issueCosts={{}}
         onSelectFeature={() => {}}
       />,
     );
 
-    expect(screen.getByText('Review blocked')).toBeInTheDocument();
-    expect(screen.getByText('Test dispatch failed')).toBeInTheDocument();
-    expect(screen.queryAllByText('Blocked review')).toHaveLength(1);
-    expect(screen.queryAllByText('Dispatch failed')).toHaveLength(1);
-    expect(screen.queryByRole('region', { name: 'Stuck / blocked pipeline stage' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Rename Overdeck' }));
+    const input = screen.getByRole('textbox', { name: 'Rename Overdeck' }) as HTMLInputElement;
+    expect(input).toHaveValue('Overdeck');
+    await waitFor(() => {
+      expect(input.selectionStart).toBe(0);
+      expect(input.selectionEnd).toBe('Overdeck'.length);
+    });
+  });
+
+  it('renames by project key and invalidates every project-name query', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ key: 'overdeck', name: 'Overdeck App' }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const { queryClient } = render(
+      <ProjectOverview
+        projectName="Overdeck"
+        projectKey="overdeck"
+        features={[]}
+        issueCosts={{}}
+        onSelectFeature={() => {}}
+      />,
+    );
+    const invalidateQueries = vi.spyOn(queryClient, 'invalidateQueries');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Rename Overdeck' }));
+    const input = screen.getByRole('textbox', { name: 'Rename Overdeck' });
+    fireEvent.change(input, { target: { value: 'Overdeck App' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith('/api/projects/overdeck/rename', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: 'Overdeck App' }),
+      });
+    });
+    await waitFor(() => {
+      expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['command-deck-projects'] });
+      expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['registered-projects'] });
+      expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['session-trees'] });
+    });
+  });
+
+  it('cancels project rename on Escape without sending a request', () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    render(
+      <ProjectOverview
+        projectName="Overdeck"
+        projectKey="overdeck"
+        features={[]}
+        issueCosts={{}}
+        onSelectFeature={() => {}}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Rename Overdeck' }));
+    fireEvent.keyDown(screen.getByRole('textbox', { name: 'Rename Overdeck' }), { key: 'Escape' });
+
+    expect(screen.queryByRole('textbox', { name: 'Rename Overdeck' })).not.toBeInTheDocument();
+    expect(fetchMock.mock.calls).not.toContainEqual([
+      '/api/projects/overdeck/rename',
+      expect.any(Object),
+    ]);
+  });
+
+  it('keeps the draft editor open and shows a rename conflict', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ error: "Project name 'Krux' conflicts with existing project 'krux'" }), {
+        status: 409,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    ));
+    render(
+      <ProjectOverview
+        projectName="Overdeck"
+        features={[]}
+        issueCosts={{}}
+        onSelectFeature={() => {}}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Rename Overdeck' }));
+    const input = screen.getByRole('textbox', { name: 'Rename Overdeck' });
+    fireEvent.change(input, { target: { value: 'Krux' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      "Project name 'Krux' conflicts with existing project 'krux'",
+    );
+    expect(screen.getByRole('textbox', { name: 'Rename Overdeck' })).toHaveValue('Krux');
+    expect(fetch).toHaveBeenCalledWith('/api/projects/Overdeck/rename', expect.any(Object));
+  });
+
+  it('renders a project-scoped five-tile hero billboard that updates with feature state', () => {
+    const { rerender } = render(
+      <ProjectOverview
+        projectName="overdeck"
+        features={[
+          makeFeature({ issueId: 'PAN-1', agentStatus: 'running' }),
+          makeFeature({ issueId: 'PAN-2' }),
+        ]}
+        issueCosts={{ 'PAN-1': 1.25, 'PAN-2': 2 }}
+        onSelectFeature={() => {}}
+      />,
+    );
+
+    for (const label of ['Active issues', 'Stuck', 'Agents', 'Ship-ready', 'Spend']) {
+      expect(screen.getAllByText(label).length).toBeGreaterThan(0);
+    }
+    expect(screen.getByText('Active issues').parentElement).toHaveTextContent('2');
+    expect(screen.getByText('Agents').parentElement).toHaveTextContent('1');
+    // No recent-spend query data in tests → Spend falls back to the project total.
+    expect(screen.getByText('Spend').parentElement).toHaveTextContent('$3.25');
+
+    rerender(
+      <ProjectOverview
+        projectName="overdeck"
+        features={[
+          makeFeature({ issueId: 'PAN-1', agentStatus: 'running' }),
+          makeFeature({ issueId: 'PAN-2', agentStatus: 'active' }),
+          makeFeature({ issueId: 'PAN-3', agentStatus: 'running' }),
+        ]}
+        issueCosts={{ 'PAN-1': 1.25, 'PAN-2': 2, 'PAN-3': 4 }}
+        onSelectFeature={() => {}}
+      />,
+    );
+
+    expect(screen.getByText('Active issues').parentElement).toHaveTextContent('3');
+    expect(screen.getByText('Agents').parentElement).toHaveTextContent('3');
+    expect(screen.getByText('Spend').parentElement).toHaveTextContent('$7.25');
   });
 
   it('counts only active work agents in the hero summary', () => {
@@ -202,174 +356,210 @@ describe('bucketFeaturePhase', () => {
     expect(screen.getByText('Agents').parentElement).toHaveTextContent('3');
   });
 
-  it('renders a project-scoped five-tile hero billboard that updates with feature state', () => {
-    const { rerender } = render(
+  it('renders pipeline rows with issue id, title, cost and session count', () => {
+    render(
       <ProjectOverview
         projectName="overdeck"
         features={[
-          makeFeature({ issueId: 'PAN-1', agentStatus: 'running' }),
-          makeFeature({ issueId: 'PAN-2' }),
+          makeFeature({ issueId: 'PAN-1', title: 'First issue' }),
+          makeFeature({
+            issueId: 'PAN-2',
+            title: 'Second issue',
+            sessions: [{ type: 'work', presence: 'active', model: 'claude-sonnet-4-6' }] as ProjectFeature['sessions'],
+          }),
         ]}
-        issueCosts={{ 'PAN-1': 1.25, 'PAN-2': 2 }}
+        issueCosts={{ 'PAN-1': 1.25, 'PAN-2': 12.5 }}
         onSelectFeature={() => {}}
       />,
     );
 
-    // Five project-scoped glance tiles in the hero billboard.
-    for (const label of ['Active issues', 'Stuck', 'Agents', 'Ship-ready', 'Spend']) {
-      expect(screen.getByText(label)).toBeInTheDocument();
-    }
-    expect(screen.getByText('Active issues').parentElement).toHaveTextContent('2');
-    expect(screen.getByText('Agents').parentElement).toHaveTextContent('1');
-    // No recent-spend query data in tests → Spend falls back to the project total.
-    expect(screen.getByText('Spend').parentElement).toHaveTextContent('$3.25');
+    const row1 = rowFor('PAN-1');
+    expect(row1).toHaveTextContent('First issue');
+    expect(row1).toHaveTextContent('$1.25');
+    expect(row1).toHaveTextContent('0 sessions');
 
-    rerender(
-      <ProjectOverview
-        projectName="overdeck"
-        features={[
-          makeFeature({ issueId: 'PAN-1', agentStatus: 'running' }),
-          makeFeature({ issueId: 'PAN-2', agentStatus: 'active' }),
-          makeFeature({ issueId: 'PAN-3', agentStatus: 'running' }),
-        ]}
-        issueCosts={{ 'PAN-1': 1.25, 'PAN-2': 2, 'PAN-3': 4 }}
-        onSelectFeature={() => {}}
-      />,
-    );
-
-    expect(screen.getByText('Active issues').parentElement).toHaveTextContent('3');
-    expect(screen.getByText('Agents').parentElement).toHaveTextContent('3');
-    expect(screen.getByText('Spend').parentElement).toHaveTextContent('$7.25');
+    const row2 = rowFor('PAN-2');
+    expect(row2).toHaveTextContent('Second issue');
+    expect(row2).toHaveTextContent('$12.50');
+    expect(row2).toHaveTextContent('1 sessions');
   });
 
-  it('renders project issues with shared command-deck IssueRow and VerbBadge primitives', () => {
+  it('calls onSelectFeature when a pipeline row is clicked', () => {
+    const onSelectFeature = vi.fn();
+    const feature = makeFeature({ issueId: 'PAN-1', title: 'Click me' });
+    render(
+      <ProjectOverview
+        projectName="overdeck"
+        features={[feature]}
+        issueCosts={{}}
+        onSelectFeature={onSelectFeature}
+      />,
+    );
+
+    fireEvent.click(rowFor('PAN-1'));
+    expect(onSelectFeature).toHaveBeenCalledTimes(1);
+    expect(onSelectFeature).toHaveBeenCalledWith(feature);
+  });
+
+  it('pins needs-you issues first and labels them waiting on you', () => {
+    useDashboardStore.setState({
+      reviewStatusByIssueId: {
+        'PAN-1': reviewStatus({ issueId: 'PAN-1', reviewStatus: 'reviewing' }),
+        'PAN-2': reviewStatus({ issueId: 'PAN-2', readyForMerge: true }),
+      },
+    });
+
+    render(
+      <ProjectOverview
+        projectName="overdeck"
+        features={[
+          makeFeature({ issueId: 'PAN-1', title: 'Reviewing' }),
+          makeFeature({ issueId: 'PAN-2', title: 'Ready', readyForMerge: true }),
+        ]}
+        issueCosts={{}}
+        onSelectFeature={() => {}}
+      />,
+    );
+
+    expect(screen.getByRole('region', { name: /needs you pipeline stage/i })).toHaveTextContent('PAN-2');
+    expect(rowFor('PAN-2')).toHaveTextContent('waiting on you');
+    expect(screen.getByRole('region', { name: /being reviewed pipeline stage/i })).toHaveTextContent('PAN-1');
+  });
+
+  it('pins plan-approval-pending issues first with an amber waiting-on-you chip', () => {
+    render(
+      <ProjectOverview
+        projectName="overdeck"
+        features={[
+          makeFeature({ issueId: 'PAN-1', title: 'In progress', agentStatus: 'running', hasPlanning: true, hasPrd: true, hasState: true }),
+          makeFeature({
+            issueId: 'PAN-2',
+            title: 'Plan approval pending',
+            status: 'open',
+            stateLabel: 'Todo',
+            agentStatus: null,
+            hasPlanning: true,
+            hasPrd: true,
+            hasState: false,
+          }),
+        ]}
+        issueCosts={{}}
+        onSelectFeature={() => {}}
+      />,
+    );
+
+    expect(screen.getByRole('region', { name: /needs you pipeline stage/i })).toHaveTextContent('PAN-2');
+    expect(rowFor('PAN-2')).toHaveTextContent('waiting on you');
+    expect(rowFor('PAN-2')).toHaveTextContent('plan approval pending');
+    expect(screen.getByRole('region', { name: /being built pipeline stage/i })).toHaveTextContent('PAN-1');
+  });
+
+  it('does not treat an active planning session as waiting on you', () => {
+    render(
+      <ProjectOverview
+        projectName="overdeck"
+        features={[
+          makeFeature({
+            issueId: 'PAN-1',
+            title: 'Planning',
+            status: 'open',
+            stateLabel: 'Todo',
+            agentStatus: null,
+            hasPlanning: true,
+            hasPrd: true,
+            hasState: false,
+            sessions: [{ type: 'planning', presence: 'active', model: 'claude-sonnet-4-6' }] as ProjectFeature['sessions'],
+          }),
+        ]}
+        issueCosts={{}}
+        onSelectFeature={() => {}}
+      />,
+    );
+
+    expect(screen.queryByRole('region', { name: /needs you pipeline stage/i })).not.toBeInTheDocument();
+    expect(rowFor('PAN-1')).toHaveTextContent('planning');
+  });
+
+  it('shows stuck reasons as the row subline for blocked issues', () => {
+    useDashboardStore.setState({
+      reviewStatusByIssueId: {
+        'PAN-1': reviewStatus({ issueId: 'PAN-1', reviewStatus: 'blocked' }),
+        'PAN-2': reviewStatus({ issueId: 'PAN-2', testStatus: 'dispatch_failed' }),
+      },
+    });
+
+    render(
+      <ProjectOverview
+        projectName="overdeck"
+        features={[
+          makeFeature({ issueId: 'PAN-1', title: 'Blocked review' }),
+          makeFeature({ issueId: 'PAN-2', title: 'Dispatch failed' }),
+        ]}
+        issueCosts={{}}
+        onSelectFeature={() => {}}
+      />,
+    );
+
+    expect(rowFor('PAN-1')).toHaveTextContent('Review blocked');
+    expect(rowFor('PAN-2')).toHaveTextContent('Test dispatch failed');
+  });
+
+  it('summarizes current CI health from project review state', () => {
+    useDashboardStore.setState({
+      reviewStatusByIssueId: {
+        'PAN-1': reviewStatus({ issueId: 'PAN-1', blockerReasons: [{ type: 'failing_checks', summary: 'Checks failing', details: 'test job failed on main', detectedAt: '2026-06-14T00:00:00Z' }] }),
+        'PAN-2': reviewStatus({ issueId: 'PAN-2', blockerReasons: [{ type: 'merge_conflict', summary: 'Merge conflict', details: 'src/app.ts conflicts', detectedAt: '2026-06-14T00:00:00Z' }] }),
+        'PAN-3': reviewStatus({ issueId: 'PAN-3', readyForMerge: true }),
+      },
+    });
+
+    render(
+      <ProjectOverview
+        projectName="overdeck"
+        features={[
+          makeFeature({ issueId: 'PAN-1', title: 'CI red' }),
+          makeFeature({ issueId: 'PAN-2', title: 'Conflict' }),
+          makeFeature({ issueId: 'PAN-3', title: 'Ready', readyForMerge: true }),
+          makeFeature({ issueId: 'PAN-4', title: 'Work', agentStatus: 'running' }),
+        ]}
+        issueCosts={{}}
+        onSelectFeature={() => {}}
+      />,
+    );
+
+    const ciHealth = screen.getByRole('region', { name: 'Current CI health' });
+    expect(ciHealth).toHaveTextContent('1 failing checks');
+    expect(within(ciHealth).getByText('Required checks').parentElement).toHaveTextContent('1 failing');
+    expect(within(ciHealth).getByText('Mergeability').parentElement).toHaveTextContent('1 blocked');
+    expect(within(ciHealth).getByText('Ship-ready').parentElement).toHaveTextContent('1 clear');
+    expect(within(ciHealth).getByText('Work agents').parentElement).toHaveTextContent('1 running');
+    expect(ciHealth).toHaveTextContent('Blocking details');
+    expect(ciHealth).toHaveTextContent('PAN-1');
+    expect(ciHealth).toHaveTextContent('Checks failing');
+    expect(ciHealth).toHaveTextContent('test job failed on main');
+    expect(ciHealth).toHaveTextContent('PAN-2');
+    expect(ciHealth).toHaveTextContent('Merge conflict');
+    expect(ciHealth).toHaveTextContent('src/app.ts conflicts');
+  });
+
+  it('wires hero stat cards to their optional callbacks', () => {
+    const onOpenCosts = vi.fn();
+    const onOpenAgents = vi.fn();
     render(
       <ProjectOverview
         projectName="overdeck"
         features={[makeFeature({ issueId: 'PAN-1', agentStatus: 'running' })]}
-        issueCosts={{}}
+        issueCosts={{ 'PAN-1': 5 }}
         onSelectFeature={() => {}}
+        onOpenCosts={onOpenCosts}
+        onOpenAgents={onOpenAgents}
       />,
     );
 
-    const row = screen.getByText('PAN-1').closest('[data-component="issue-row"]') as HTMLElement;
-    expect(row).toHaveAttribute('data-variant', 'command-deck');
-    expect(row.querySelector('[data-component="verb-badge"]')).toHaveAttribute('data-variant', 'WORK RUNNING');
-  });
+    fireEvent.click(screen.getByText('Spend').parentElement!);
+    expect(onOpenCosts).toHaveBeenCalledTimes(1);
 
-  it('labels structural merge blockers as merge blocked', () => {
-    useDashboardStore.setState({
-      reviewStatusByIssueId: {
-        'PAN-1': reviewStatus({ issueId: 'PAN-1', blockerReasons: [{ type: 'merge_conflict', summary: 'Merge conflict', detectedAt: '2026-06-14T00:00:00Z' }] }),
-        'PAN-2': reviewStatus({ issueId: 'PAN-2', blockerReasons: [{ type: 'not_mergeable', summary: 'Not mergeable', detectedAt: '2026-06-14T00:00:00Z' }] }),
-      },
-    });
-
-    render(
-      <ProjectOverview
-        projectName="overdeck"
-        features={[
-          makeFeature({ issueId: 'PAN-1', title: 'Conflict' }),
-          makeFeature({ issueId: 'PAN-2', title: 'Not mergeable' }),
-        ]}
-        issueCosts={{}}
-        onSelectFeature={() => {}}
-      />,
-    );
-
-    expectBadgeVariant('PAN-1', 'MERGE BLOCKED');
-    expectBadgeVariant('PAN-2', 'MERGE BLOCKED');
-  });
-
-  it('labels failing checks as CI blocked', () => {
-    useDashboardStore.setState({
-      reviewStatusByIssueId: {
-        'PAN-1': reviewStatus({ issueId: 'PAN-1', blockerReasons: [{ type: 'failing_checks', summary: 'Checks failing', detectedAt: '2026-06-14T00:00:00Z' }] }),
-      },
-    });
-
-    render(
-      <ProjectOverview
-        projectName="overdeck"
-        features={[makeFeature({ issueId: 'PAN-1', title: 'CI red' })]}
-        issueCosts={{}}
-        onSelectFeature={() => {}}
-      />,
-    );
-
-    expectBadgeVariant('PAN-1', 'CI BLOCKED');
-  });
-
-  it('keeps review feedback blockers as changes requested', () => {
-    useDashboardStore.setState({
-      reviewStatusByIssueId: {
-        'PAN-1': reviewStatus({ issueId: 'PAN-1', reviewStatus: 'failed' }),
-        'PAN-2': reviewStatus({ issueId: 'PAN-2', reviewStatus: 'blocked' }),
-        'PAN-3': reviewStatus({ issueId: 'PAN-3', blockerReasons: [{ type: 'changes_requested', summary: 'Changes requested', detectedAt: '2026-06-14T00:00:00Z' }] }),
-      },
-    });
-
-    render(
-      <ProjectOverview
-        projectName="overdeck"
-        features={[
-          makeFeature({ issueId: 'PAN-1', title: 'Review failed' }),
-          makeFeature({ issueId: 'PAN-2', title: 'Review blocked' }),
-          makeFeature({ issueId: 'PAN-3', title: 'Changes requested' }),
-        ]}
-        issueCosts={{}}
-        onSelectFeature={() => {}}
-      />,
-    );
-
-    expectBadgeVariant('PAN-1', 'CHANGES REQUESTED');
-    expectBadgeVariant('PAN-2', 'CHANGES REQUESTED');
-    expectBadgeVariant('PAN-3', 'CHANGES REQUESTED');
-  });
-
-  it('gives structural merge blockers precedence over failing checks', () => {
-    useDashboardStore.setState({
-      reviewStatusByIssueId: {
-        'PAN-1': reviewStatus({
-          issueId: 'PAN-1',
-          blockerReasons: [
-            { type: 'failing_checks', summary: 'Checks failing', detectedAt: '2026-06-14T00:00:00Z' },
-            { type: 'merge_conflict', summary: 'Merge conflict', detectedAt: '2026-06-14T00:00:00Z' },
-          ],
-        }),
-      },
-    });
-
-    render(
-      <ProjectOverview
-        projectName="overdeck"
-        features={[makeFeature({ issueId: 'PAN-1', title: 'Conflict and CI red' })]}
-        issueCosts={{}}
-        onSelectFeature={() => {}}
-      />,
-    );
-
-    expectBadgeVariant('PAN-1', 'MERGE BLOCKED');
-  });
-
-  it('renders partial cost breakdown details without crashing', () => {
-    render(
-      <ProjectOverview
-        projectName="overdeck"
-        features={[makeFeature({ issueId: 'PAN-1' })]}
-        issueCosts={{ 'PAN-1': 1.23 }}
-        issueCostDetails={{
-          'PAN-1': {
-            byModel: undefined as unknown as Record<string, { cost: number; tokens: number }>,
-            byStage: undefined as unknown as Record<string, { cost: number; tokens: number }>,
-          },
-        }}
-        onSelectFeature={() => {}}
-      />,
-    );
-
-    fireEvent.mouseEnter(screen.getAllByText('$1.23')[1]!);
-
-    expect(screen.getAllByText('No cost data')).toHaveLength(2);
+    fireEvent.click(screen.getByText('Agents').parentElement!);
+    expect(onOpenAgents).toHaveBeenCalledTimes(1);
   });
 });

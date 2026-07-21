@@ -1,19 +1,31 @@
 import { Effect } from 'effect';
 import chalk from 'chalk';
-import { spawn } from 'child_process';
-import { statSync } from 'fs';
+import { exec, spawn } from 'child_process';
+import { constants, promises as fs, statSync } from 'fs';
+import { homedir } from 'os';
+import { delimiter, dirname, isAbsolute, join, resolve } from 'path';
+import { promisify } from 'util';
 import { acquireRestartLock, readRestartLockHolder } from '../../lib/restart-lock.js';
 import { readPlatformConfigSync, restartDashboard, StageError } from '../../lib/platform-lifecycle.js';
 import { writeRestartStatus } from '../../lib/restart-status.js';
-import { resolveBundledServerPath, spawnDashboardDetached } from './restart.js';
+import { agentRestartBlockReason } from '../../lib/deploy/agent-restart-gate.js';
+import {
+  refuseNonPrimaryDashboardCwd,
+  resolveBundledServerPath,
+  resolvePrimaryDashboardIdentity,
+  spawnDashboardDetached,
+} from './restart.js';
 
 export interface ReloadOptions {
   skipBuild?: boolean;
   healthTimeout?: string;
   deacon?: boolean;
+  force?: boolean;
 }
 
 class UsageError extends Error {}
+
+const execAsync = promisify(exec);
 
 function parseHealthTimeout(value: string | undefined): number {
   if (!value) return 30_000;
@@ -33,11 +45,43 @@ function dashboardBundleMtimeMs(): number {
   }
 }
 
-function runCommand(command: string, args: string[]): Promise<number> {
+function shellQuote(value: string): string {
+  return `'${value.replace(/'/g, `'\\''`)}'`;
+}
+
+async function runGitAsync(args: string[], cwd: string): Promise<{ stdout: string; stderr: string }> {
+  return execAsync(`git ${args.map(shellQuote).join(' ')}`, {
+    cwd,
+    encoding: 'utf8',
+  });
+}
+
+async function runGitExit(args: string[], cwd: string): Promise<number> {
+  try {
+    await runGitAsync(args, cwd);
+    return 0;
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException & { code?: unknown }).code;
+    if (typeof code === 'number') return code;
+    throw error;
+  }
+}
+
+async function resolvePrimaryRepoRoot(cwd: string): Promise<string> {
+  const repoRoot = (await runGitAsync(['rev-parse', '--show-toplevel'], cwd)).stdout.trim();
+  if (!repoRoot) {
+    throw new Error(`Could not resolve git repository root from ${cwd}`);
+  }
+  const workspaceMatch = repoRoot.match(/^(.+)\/workspaces\/feature-[^/]+$/);
+  return workspaceMatch?.[1] ?? repoRoot;
+}
+
+function runCommand(command: string, args: string[], cwd: string): Promise<number> {
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, {
       stdio: 'inherit',
       env: process.env,
+      cwd,
     });
     child.once('error', reject);
     child.once('close', (code) => resolve(code ?? 1));
@@ -52,12 +96,107 @@ function runCommand(command: string, args: string[]): Promise<number> {
  * `bun install` is idempotent and ~instant on a warm cache, so running it
  * unconditionally before every reload makes "apply my merged changes" safe.
  */
-function runBunInstall(): Promise<number> {
-  return runCommand('bun', ['install']);
+async function resolveBunBinary(cwd: string): Promise<string> {
+  const pathDirectories = (process.env.PATH ?? '')
+    .split(delimiter)
+    .filter(Boolean)
+    .map((directory) => isAbsolute(directory) ? directory : resolve(cwd, directory));
+
+  for (const directory of pathDirectories) {
+    const candidate = join(directory, 'bun');
+    try {
+      await fs.access(candidate, constants.X_OK);
+      return candidate;
+    } catch {
+      // Keep searching the inherited PATH.
+    }
+  }
+
+  const fallback = join(process.env.HOME || homedir(), '.bun', 'bin', 'bun');
+  try {
+    await fs.access(fallback, constants.X_OK);
+    return fallback;
+  } catch {
+    throw new Error(`bun executable not found in PATH or at ${fallback}`);
+  }
 }
 
-function runBuild(): Promise<number> {
-  return runCommand('npm', ['run', 'build']);
+async function runBunInstall(cwd: string): Promise<number> {
+  const bunBinary = await resolveBunBinary(cwd);
+  return runCommand(bunBinary, ['install'], cwd);
+}
+
+function runBuild(cwd: string): Promise<number> {
+  return runCommand('npm', ['run', 'build'], cwd);
+}
+
+async function runInstallAndBuild(cwd: string): Promise<void> {
+  const installExit = await runBunInstall(cwd);
+  if (installExit !== 0) {
+    throw new Error(`bun install failed in ${cwd} — old dashboard left running`);
+  }
+
+  const exitCode = await runBuild(cwd);
+  if (exitCode !== 0) {
+    throw new Error(`Build failed in ${cwd} — old dashboard left running`);
+  }
+}
+
+async function swapBuiltDist(repoRoot: string, buildWorktree: string): Promise<void> {
+  const incomingDist = join(repoRoot, 'dist.incoming');
+  const currentDist = join(repoRoot, 'dist');
+  const oldDist = join(repoRoot, `dist.old.${process.pid}`);
+
+  await fs.rm(incomingDist, { recursive: true, force: true });
+  await fs.cp(join(buildWorktree, 'dist'), incomingDist, { recursive: true });
+  await fs.rm(oldDist, { recursive: true, force: true });
+
+  let movedOldDist = false;
+  try {
+    await fs.rename(currentDist, oldDist);
+    movedOldDist = true;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+  }
+
+  try {
+    await fs.rename(incomingDist, currentDist);
+  } catch (error) {
+    if (movedOldDist) {
+      await fs.rename(oldDist, currentDist).catch(() => undefined);
+    }
+    throw error;
+  }
+
+  await fs.rm(oldDist, { recursive: true, force: true });
+}
+
+async function buildFromOriginMain(repoRoot: string): Promise<void> {
+  await runGitAsync(['fetch', 'origin', 'main'], repoRoot);
+
+  const ancestorExit = await runGitExit(['merge-base', '--is-ancestor', 'origin/main', 'HEAD'], repoRoot);
+  if (ancestorExit === 0) {
+    await runInstallAndBuild(repoRoot);
+    return;
+  }
+  if (ancestorExit !== 1) {
+    throw new Error(`git merge-base --is-ancestor origin/main HEAD exited ${ancestorExit}`);
+  }
+
+  const originMainSha = (await runGitAsync(['rev-parse', '--short', 'origin/main'], repoRoot)).stdout.trim();
+  const buildWorktree = join(dirname(repoRoot), `.pan-reload-build-${process.pid}`);
+
+  console.warn(chalk.yellow(`origin/main (${originMainSha}) is not contained in this worktree HEAD; building from a detached origin/main worktree.`));
+  try {
+    await runGitAsync(['worktree', 'add', '--detach', buildWorktree, 'origin/main'], repoRoot);
+    await runInstallAndBuild(buildWorktree);
+    await swapBuiltDist(repoRoot, buildWorktree);
+    console.log(chalk.green(`✓ Built dashboard from origin/main ${originMainSha}`));
+  } finally {
+    await runGitAsync(['worktree', 'remove', '--force', buildWorktree], repoRoot).catch(() => undefined);
+    await fs.rm(buildWorktree, { recursive: true, force: true }).catch(() => undefined);
+    await fs.rm(join(repoRoot, 'dist.incoming'), { recursive: true, force: true }).catch(() => undefined);
+  }
 }
 
 async function recordReloadStatus(startedAt: number, success: boolean, error?: string): Promise<void> {
@@ -85,29 +224,22 @@ export async function reloadCommand(options: ReloadOptions): Promise<void> {
     return;
   }
 
-  // PAN-1662: when a `pan dev` session owns the dashboard, don't refuse — signal
-  // it (SIGUSR2) to rebuild the server bundle and hot-restart the API child in
-  // place. This applies merged/edited server code without tearing down the
-  // interactive dev session or hijacking it into detached production mode. The
-  // frontend recovers via its graceful reconnect (PAN-1580). This is also the
-  // path the flywheel uses to apply its own merged server changes.
-  {
-    const { readDevSupervisorMarker } = await import('../../lib/dev-supervisor.js');
-    const dev = readDevSupervisorMarker();
-    if (dev) {
-      try {
-        process.kill(dev.pid, 'SIGUSR2');
-        console.log(chalk.green(`✓ Signaled pan dev (pid ${dev.pid}) to rebuild + hot-restart the dashboard server in place.`));
-        console.log(chalk.dim('  Watch the pan dev terminal for "✓ Dashboard server reloaded".'));
-        await recordReloadStatus(startedAt, true, undefined);
-      } catch (err: any) {
-        const msg = `Failed to signal pan dev (pid ${dev.pid}): ${err.message}`;
-        console.error(chalk.red(msg));
-        await recordReloadStatus(startedAt, false, msg);
-        process.exitCode = 2;
-      }
+  if (refuseNonPrimaryDashboardCwd(process.cwd(), 'reload')) return;
+
+  const restartInitiator = process.env.OVERDECK_AGENT_ID;
+  if (restartInitiator) {
+    const restartBlock = await agentRestartBlockReason({
+      initiator: restartInitiator,
+      force: options.force === true,
+    });
+    if (restartBlock) {
+      console.error(restartBlock);
+      process.exitCode = 1;
       return;
     }
+    console.log(chalk.yellow(
+      '  This agent-issued restart will disconnect every live conversation and terminal until clients reconnect.',
+    ));
   }
 
   const lock = await Effect.runPromise(acquireRestartLock('pan reload'));
@@ -121,26 +253,54 @@ export async function reloadCommand(options: ReloadOptions): Promise<void> {
     return;
   }
 
-  const config = readPlatformConfigSync();
   try {
-    if (!options.skipBuild) {
-      // Install first so a merge/rebase that added a runtime dep can't produce a
-      // server bundle that boot-crashes on a missing package (see runBunInstall).
-      const installExit = await runBunInstall();
-      if (installExit !== 0) {
-        const error = 'bun install failed — old dashboard left running';
-        console.error(chalk.red(error));
-        await recordReloadStatus(startedAt, false, error);
-        process.exitCode = 1;
+    // PAN-1662: when a `pan dev` session owns the dashboard, don't refuse — signal
+    // it (SIGUSR2) to rebuild the server bundle and hot-restart the API child in
+    // place. This applies merged/edited server code without tearing down the
+    // interactive dev session or hijacking it into detached production mode. The
+    // frontend recovers via its graceful reconnect (PAN-1580). This is also the
+    // path the flywheel uses to apply its own merged server changes.
+    {
+      const { readDevSupervisorMarker } = await import('../../lib/dev-supervisor.js');
+      const dev = readDevSupervisorMarker();
+      if (dev) {
+        try {
+          process.kill(dev.pid, 'SIGUSR2');
+        } catch (err: any) {
+          const msg = `Failed to signal pan dev (pid ${dev.pid}): ${err.message}`;
+          console.error(chalk.red(msg));
+          await recordReloadStatus(startedAt, false, msg);
+          process.exitCode = 2;
+          return;
+        }
+        console.log(chalk.green(`✓ Signaled pan dev (pid ${dev.pid}) to rebuild + hot-restart the dashboard server in place.`));
+        console.log(chalk.dim('  Watch the pan dev terminal for "✓ Dashboard server reloaded".'));
+        try {
+          await recordReloadStatus(startedAt, true, undefined);
+        } catch (err: any) {
+          const msg = `Reload signaled, but failed to record reload status: ${err.message}`;
+          console.error(chalk.red(msg));
+          process.exitCode = 2;
+          return;
+        }
         return;
       }
+    }
 
+    const config = readPlatformConfigSync();
+    let repoRoot = process.cwd();
+    if (!options.skipBuild) {
       const beforeMtime = dashboardBundleMtimeMs();
-      const exitCode = await runBuild();
-      if (exitCode !== 0) {
-        const error = 'Build failed — old dashboard left running';
-        console.error(chalk.red(error));
-        await recordReloadStatus(startedAt, false, error);
+      try {
+        repoRoot = await resolvePrimaryRepoRoot(process.cwd());
+        await buildFromOriginMain(repoRoot);
+      } catch (error) {
+        const message = (error as Error)?.message || String(error);
+        const reloadError = message.includes('old dashboard left running')
+          ? message
+          : `${message} — old dashboard left running`;
+        console.error(chalk.red(reloadError));
+        await recordReloadStatus(startedAt, false, reloadError);
         process.exitCode = 1;
         return;
       }
@@ -157,6 +317,7 @@ export async function reloadCommand(options: ReloadOptions): Promise<void> {
 
     await Effect.runPromise(restartDashboard(config, () => spawnDashboardDetached(config, { deacon: options.deacon }), {
       healthTimeoutMs,
+      expectedIdentity: resolvePrimaryDashboardIdentity(),
     }));
     await recordReloadStatus(startedAt, true);
     console.log(chalk.green('✓ Dashboard reloaded and healthy'));

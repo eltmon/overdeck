@@ -6,12 +6,20 @@ describe('getHarness', () => {
     expect(getHarness({ runtime: 'claude-code' })).toBe('claude-code')
   })
 
-  it('returns pi when runtime is the canonical literal', () => {
-    expect(getHarness({ runtime: 'pi' })).toBe('pi')
+  it('normalizes legacy pi to ohmypi (PAN-1989)', () => {
+    expect(getHarness({ runtime: 'pi' })).toBe('ohmypi')
+  })
+
+  it('returns ohmypi when runtime is ohmypi', () => {
+    expect(getHarness({ runtime: 'ohmypi' })).toBe('ohmypi')
   })
 
   it('returns codex when runtime is the canonical literal', () => {
     expect(getHarness({ runtime: 'codex' })).toBe('codex')
+  })
+
+  it('returns acp when runtime is the canonical literal', () => {
+    expect(getHarness({ runtime: 'acp' })).toBe('acp')
   })
 
   it('falls back to claude-code for the legacy "claude" wire value', () => {

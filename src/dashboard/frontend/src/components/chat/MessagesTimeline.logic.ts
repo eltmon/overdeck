@@ -123,14 +123,41 @@ export function computeMessageDurationStart(
 /**
  * Convert TimelineEntry[] into MessagesTimelineRow[] for rendering.
  * Consecutive work entries are grouped into a single row.
+ * Compact boundaries are interleaved by timestamp at entry granularity and
+ * split work groups — placing them against grouped rows (whose createdAt is
+ * the group's FIRST entry) pushed every mid-group boundary to the end of the
+ * timeline (PAN-2576).
  * A "working" indicator row is appended when isWorking is true.
  */
 export function deriveMessagesTimelineRows(
   timelineEntries: TimelineEntry[],
   isWorking: boolean,
+  compactBoundaries?: CompactBoundary[],
 ): MessagesTimelineRow[] {
   const rows: MessagesTimelineRow[] = [];
   let i = 0;
+
+  const boundaries = [...(compactBoundaries ?? [])].sort((a, b) =>
+    a.timestamp < b.timestamp ? -1 : a.timestamp > b.timestamp ? 1 : 0,
+  );
+  let boundaryIdx = 0;
+  // Emit every boundary that precedes `createdAt`; entries stamped exactly at
+  // the boundary timestamp stay before it (matches the old insert-before-first-
+  // strictly-greater semantics).
+  const flushBoundariesBefore = (createdAt: string): void => {
+    while (boundaryIdx < boundaries.length && boundaries[boundaryIdx]!.timestamp < createdAt) {
+      const boundary = boundaries[boundaryIdx]!;
+      rows.push({
+        kind: 'compact-boundary',
+        id: `compact-${boundary.id}`,
+        createdAt: boundary.timestamp,
+        boundary,
+      });
+      boundaryIdx++;
+    }
+  };
+  const hasBoundaryBefore = (createdAt: string): boolean =>
+    boundaryIdx < boundaries.length && boundaries[boundaryIdx]!.timestamp < createdAt;
 
   const durationStartByMessageId = computeMessageDurationStart(
     timelineEntries.flatMap((entry) => (entry.kind === 'message' ? [entry.message] : [])),
@@ -138,12 +165,17 @@ export function deriveMessagesTimelineRows(
 
   while (i < timelineEntries.length) {
     const entry = timelineEntries[i]!;
+    flushBoundariesBefore(entry.createdAt);
 
     if (entry.kind === 'work') {
-      // Group consecutive work entries
+      // Group consecutive work entries, breaking at compact boundaries
       const groupedEntries: WorkLogEntry[] = [entry.entry];
       let cursor = i + 1;
-      while (cursor < timelineEntries.length && timelineEntries[cursor]!.kind === 'work') {
+      while (
+        cursor < timelineEntries.length &&
+        timelineEntries[cursor]!.kind === 'work' &&
+        !hasBoundaryBefore(timelineEntries[cursor]!.createdAt)
+      ) {
         groupedEntries.push((timelineEntries[cursor]! as { kind: 'work'; entry: WorkLogEntry }).entry);
         cursor++;
       }
@@ -164,6 +196,19 @@ export function deriveMessagesTimelineRows(
       });
       i++;
     }
+  }
+
+  // Boundaries newer than every entry (e.g. compaction just finished) land at
+  // the end, but still before the working indicator.
+  while (boundaryIdx < boundaries.length) {
+    const boundary = boundaries[boundaryIdx]!;
+    rows.push({
+      kind: 'compact-boundary',
+      id: `compact-${boundary.id}`,
+      createdAt: boundary.timestamp,
+      boundary,
+    });
+    boundaryIdx++;
   }
 
   if (isWorking) {

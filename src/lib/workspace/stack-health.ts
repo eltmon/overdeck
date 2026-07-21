@@ -57,7 +57,8 @@ function normalizeIssue(issueId: string): string {
   // PAN-1872: tolerate an undefined issueId defensively so callers that forward
   // an optional value do not crash with `Cannot read properties of undefined
   // (reading 'toLowerCase')`.
-  return parseIssueIdSync(issueId)?.normalized ?? (issueId ?? '').toLowerCase();
+  if (!issueId) return '';
+  return parseIssueIdSync(issueId)?.normalized ?? issueId.toLowerCase();
 }
 
 function resolveStackProject(issueId: string): WorkspaceStackProject | null {
@@ -111,9 +112,6 @@ function isStackContainer(container: DockerContainerLifecycle, issueId: string):
   return hasNameToken(name, `feature-${normalized}`) || hasNameToken(name, normalized);
 }
 
-function isInitContainer(name: string): boolean {
-  return /(^|[-_])init($|[-_])/.test(name.toLowerCase());
-}
 
 function isSuccessfulOneShotContainer(name: string): boolean {
   return /(^|[-_])(?:init|test-unit)($|[-_])/.test(name.toLowerCase());

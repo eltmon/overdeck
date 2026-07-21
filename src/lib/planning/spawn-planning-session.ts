@@ -28,13 +28,22 @@ import {
 } from '../tmux.js';
 import { createWorkspace } from '../workspace-manager.js';
 import { renderPrompt } from '../cloister/prompts.js';
-import { getAgentRuntimeBaseCommand, getProviderExportsForModel, retrieveSpawnTimeMemoryContext, roleAgentDefinitionPath, saveAgentStateSync, getAgentStateSync } from '../agents.js';
+import { deliverInitialPromptWithRetry, getAgentRuntimeBaseCommand, getProviderExportsForModel, retrieveSpawnTimeMemoryContext, roleAgentDefinitionPath, saveAgentStateSync, getAgentStateSync } from '../agents.js';
+import { getAcpLauncherFields, getCodexLauncherFields, getOhmypiLauncherFields } from '../agents/runtime-command.js';
 import { loadConfigSync, resolveModel } from '../config-yaml.js';
 import { resolveHarness } from '../harness-resolve.js';
+import { prepareHarnessLaunch } from '../harness-binary.js';
+import { getHarnessBehavior } from '../runtimes/behavior.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import { generateLauncherScriptSync } from '../launcher-generator.js';
 import { BLANKED_PROVIDER_ENV } from '../child-env.js';
-import { ensureWorkspacePanDir, getWorkspacePanPaths, writeWorkspaceContext, writeWorkspaceContinue } from '../pan-dir/index.js';
+import { ensureWorkspacePanDir, getWorkspacePanPaths, writeWorkspaceContext } from '../pan-dir/index.js';
+import {
+  appendSessionEntrySync,
+  getIssueRecordPath,
+  getProjectConfigFromWorkspacePath,
+  resolveProjectForIssue,
+} from '../pan-dir/record.js';
 import { workspaceContextFile } from '../context-layers/layers.js';
 import { ensureSessionContextBriefingFile } from '../briefing-freshness.js';
 
@@ -180,6 +189,7 @@ export interface PlanningAgentStateInput {
   model: string;
   harness: RuntimeName;
   workspaceLocation: 'local' | 'remote';
+  auto?: boolean;
   autoSpawnOnFinalize?: boolean;
   startedAt?: string;
 }
@@ -195,6 +205,7 @@ export function buildPlanningAgentState(input: PlanningAgentStateInput): Record<
     role: 'plan',
     harness: input.harness,
     location: input.workspaceLocation,
+    auto: input.auto === true,
     autoSpawnOnFinalize: input.autoSpawnOnFinalize === true,
   };
 }
@@ -314,7 +325,7 @@ ${repos.map((r: any) => `| \`${r.name}/\` | Git worktree for ${r.path} |`).join(
     const storyLines = issue.childStories.map(
       (s) => `- **${s.ref}**: ${s.title} (status: ${s.status})\n  ${s.description || ''}`.trim(),
     );
-    childStoriesSection = `\n## Child Stories\n\n**This Rally Feature has ${issue.childStories.length} child story(ies).** Reference these existing stories during planning — do NOT create new ones.\n\n${storyLines.join('\n\n')}\n\n**Cross-story dependencies:** If any child story must be completed before another, encode this as a \\\`blocks\\\` edge in the vBRIEF plan between the corresponding beads. Use \\\`informs\\\` for softer ordering hints.\n`;
+    childStoriesSection = `\n## Child Stories\n\n**This Rally Feature has ${issue.childStories.length} child story(ies).** Reference these existing stories during planning — do NOT create new ones.\n\n${storyLines.join('\n\n')}\n\n**Cross-story dependencies:** If any child story must be completed before another, encode this as a \\\`blocks\\\` edge in the xBRIEF plan between the corresponding beads. Use \\\`informs\\\` for softer ordering hints.\n`;
   }
 
   const effortSection = effort && effort !== 'medium' ? `
@@ -347,14 +358,15 @@ The user invoked \`pan plan --auto\`. Complete planning end-to-end without askin
 
 - Do not use AskUserQuestion.
 - When normal planning would ask a question, choose the most defensible default and record it in \`plan.autoDecisions[]\` as \`{ "summary": "...", "rationale": "..." }\`.
+- If the issue body, PRD, or comments list options and name a recommended/default/smallest acceptable option, choose that option and record it in \`plan.autoDecisions[]\`; do not ask the operator to choose among already-documented options.
 - Halt only for a genuine contradiction between authoritative inputs, such as the issue body requiring one behavior while a linked PRD requires the opposite. If that happens, write the contradiction into continue.json hazards and stop with a clear escalation message so the dashboard surfaces it.
-- Still produce the same complete vBRIEF and beads via \`pan plan finalize\` when no contradiction exists.
+- Still produce the same complete xBRIEF and beads via \`pan plan finalize\` when no contradiction exists.
 ` : '';
 
   const probeSection = probe || effort === 'high' ? `
 ## Probe Pass (required before finalize)
 
-After drafting the vBRIEF and BEFORE running \`pan plan finalize\`, attack your own plan:
+After drafting the xBRIEF and BEFORE running \`pan plan finalize\`, attack your own plan:
 - For each item: what hidden assumption would make this item wrong? Name it or clear it.
 - Which item could produce two very different diffs that both look "done"? Tighten its
   ACs or set requiresInspection: true.
@@ -393,7 +405,7 @@ If the probe pass changes nothing at all, record one decision: "PROBE: no findin
  * Write workspace `.pan/context.md` for Rally Features so story work agents can
  * reference feature-level context (child stories, description, URL).
  */
-async function claudePlanningSystemPromptFiles(workspacePath: string, harness: 'claude-code' | 'pi' | 'codex'): Promise<string[]> {
+async function claudePlanningSystemPromptFiles(workspacePath: string, harness: 'claude-code' | 'ohmypi' | 'codex' | 'acp'): Promise<string[]> {
   const files: string[] = [];
   const contextFile = workspaceContextFile(workspacePath);
   try {
@@ -404,8 +416,9 @@ async function claudePlanningSystemPromptFiles(workspacePath: string, harness: '
   }
   files.push(await ensureSessionContextBriefingFile());
 
-  // PAN-1566: Pi also receives the rendered global context layer.
-  if (harness === 'pi') {
+  const behavior = getHarnessBehavior(harness);
+  // PAN-1566: Pi/ohmypi also receives the rendered global context layer.
+  if (behavior.contextLayerKind === 'pi') {
     const { piGlobalContextFile } = await import('../context-layers/index.js');
     const globalFile = piGlobalContextFile();
     if (existsSync(globalFile)) {
@@ -415,7 +428,7 @@ async function claudePlanningSystemPromptFiles(workspacePath: string, harness: '
   // PAN-1574: Codex receives its rendered global context layer (codex-global.md).
   // The per-agent CODEX_HOME/AGENTS.md is set up by initCodexHome at spawn time;
   // this file provides context for the planning session before spawn.
-  if (harness === 'codex') {
+  if (behavior.contextLayerKind === 'codex') {
     const { codexGlobalContextFile } = await import('../context-layers/index.js');
     const globalFile = codexGlobalContextFile();
     if (existsSync(globalFile)) {
@@ -484,7 +497,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
     let workspaceCreated = false;
     if (existsSync(workspacePath)) {
       const files = await readdir(workspacePath);
-      workspaceCreated = !files.every((f: string) => f === '.pan' || f === '.beads');
+      workspaceCreated = !files.every((f: string) => f === '.pan');
     }
 
     if (!workspaceCreated) {
@@ -540,7 +553,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
     progress(1, 'Creating workspace', workspaceCreated ? 'Workspace ready' : 'Already exists', 'complete');
 
     // ── Step 2: Prepare planning environment ──────────────────────────────
-    progress(2, 'Preparing planning environment', '.pan/ workspace artifacts');
+    progress(2, 'Preparing planning environment', '.overdeck/ workspace artifacts');
 
     // Kill existing planning session if any
     await Effect.runPromise(killSession(sessionName)).catch(() => {});
@@ -553,7 +566,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
     );
 
     if (existsSync(workspacePanPaths.continuePath)) {
-      console.log('[start-planning] Clearing stale .pan/continue.json');
+      console.log('[start-planning] Clearing stale .overdeck/continue.json');
       await rm(workspacePanPaths.continuePath, { force: true });
     }
 
@@ -584,15 +597,16 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
     let settingsModel: string;
     let modelSource: string;
     if (modelOverride) {
-      settingsModel = 'claude-opus-4-7'; // unused — modelOverride wins
+      settingsModel = modelOverride;
       modelSource = 'modelOverride';
     } else {
-      settingsModel = resolveModel('plan', undefined, loadConfigSync().config);
+      settingsModel = resolveModel('plan', undefined, loadConfigSync().config, `plan:${issue.identifier}`);
       modelSource = 'roles.plan.model';
       console.log(`[start-planning] Model resolution for role=plan: model=${settingsModel} source=${modelSource}`);
     }
     const planningModel = modelOverride || settingsModel;
     const effectiveHarness = await resolvePlanningSessionHarness(planningModel, opts.harness);
+    const harnessLaunch = await prepareHarnessLaunch(effectiveHarness);
     console.log(`[start-planning] Final planning model: ${planningModel} (override=${modelOverride || '(none)'} settings=${settingsModel} source=${modelSource}) harness=${effectiveHarness}`);
 
     // Discover and copy PRD files to workspace
@@ -628,27 +642,14 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
       planningPrompt = await buildPlanningPrompt(issue, workspacePath, planningModel, effort, auto === true, probe === true, memoryContext);
     }
 
-    // Capture planning prompt in workspace .pan/continue.json.
-    await Effect.runPromise(writeWorkspaceContinue(workspacePath, {
-      version: '1',
-      issueId: issue.identifier,
-      created: new Date().toISOString(),
-      updated: new Date().toISOString(),
-      gitState: {},
-      decisions: [],
-      hazards: [],
-      resumePoint: null,
-      beadsMapping: {},
-      sessionHistory: [
-        {
-          reason: 'planning',
-          content: planningPrompt,
-          note: `Planning session started for ${issue.identifier}: ${issue.title}`,
-          timestamp: new Date().toISOString(),
-        },
-      ],
-      feedback: [],
-    }));
+    // Capture planning prompt in per-issue record (PAN-1919: replaces workspace continue.json).
+    const recordProject = resolveProjectForIssue(issue.identifier) ?? getProjectConfigFromWorkspacePath(workspacePath);
+    appendSessionEntrySync(recordProject, issue.identifier, {
+      reason: 'planning',
+      content: planningPrompt,
+      note: `Planning session started for ${issue.identifier}: ${issue.title}`,
+      timestamp: new Date().toISOString(),
+    });
 
     await writeFeatureContext(workspacePath, issue);
 
@@ -657,12 +658,30 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
     // produces a `pi --mode rpc --model <id>` line and skips the --agent flag
     // (Pi has no agent-definition system).
     const cmdWithArgs = await getAgentRuntimeBaseCommand(planningModel, sessionName, roleAgentDefinitionPath('plan'), effectiveHarness);
+    const behavior = getHarnessBehavior(effectiveHarness);
+    const piLauncherFields = behavior.usesRpcFifo
+      ? await getOhmypiLauncherFields(sessionName, planningModel)
+      : {};
+    const codexLauncherFields = behavior.usesCodexHome
+      ? getCodexLauncherFields(sessionName, planningModel, workspacePath, 'plan')
+      : {};
+    const acpLauncherFields = behavior.launchCommandKind === 'acp-host'
+      ? getAcpLauncherFields(
+          sessionName,
+          planningModel,
+          workspacePath,
+          harnessLaunch.binaryPath,
+          'plan',
+        )
+      : {};
 
-    const providerExports = await getProviderExportsForModel(planningModel);
+    const providerExports = behavior.launchCommandKind === 'acp-host'
+      ? undefined
+      : await getProviderExportsForModel(planningModel);
 
     // ── Write launcher script ──────────────────────────────────────────────
-    const continueFilePath = getWorkspacePanPaths(workspacePath).continuePath;
-    const initMessage = `Please read the \`content\` field of the \`planning\` sessionHistory entry in ${continueFilePath} and begin the planning session for ${issue.identifier}: ${issue.title}`;
+    const recordFilePath = getIssueRecordPath(recordProject, issue.identifier);
+    const initMessage = `Please read the \`content\` field of the \`planning\` sessionHistory entry in ${recordFilePath} and begin the planning session for ${issue.identifier}: ${issue.title}`;
     const promptFile = join(agentStateDir, 'init-prompt.txt');
     const launcherScript = join(agentStateDir, 'launcher.sh');
     await writeFile(promptFile, initMessage);
@@ -670,16 +689,21 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
       launcherScript,
       generateLauncherScriptSync({
         role: 'plan',
+        harness: effectiveHarness,
         workingDir: workspacePath,
         setTerminalEnv: true,
         overdeckEnv: { agentId: sessionName, issueId: issue.identifier, sessionType: 'plan' },
         providerExports,
-        promptFile,
+        extraEnvExports: [harnessLaunch.pathExport],
+        promptFile: behavior.launchCommandKind === 'acp-host' ? undefined : promptFile,
         baseCommand: cmdWithArgs,
         appendSystemPromptFiles: await claudePlanningSystemPromptFiles(workspacePath, effectiveHarness),
         trapHup: true,
         debugLog: '/tmp/pan-launcher-debug.log',
         keepAlive: true,
+        ...piLauncherFields,
+        ...codexLauncherFields,
+        ...acpLauncherFields,
       }),
       { mode: 0o755 },
     );
@@ -710,16 +734,17 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
     // 200×50 caused a dimension cascade (200→120→actual) that garbled output.
     // See PAN-417 for the full forensic timeline.
 
-    // ── Update agent state to running ──────────────────────────────────────
+    // Keep the launch non-healthy until every protocol-owned kickoff has completed.
     // PAN-1048 R2: legacy `runtime` field removed; AgentState carries `harness`.
     {
       const baseState = getAgentStateSync(sessionName);
       saveAgentStateSync({
         ...(baseState ?? { id: sessionName, issueId: issue.identifier, workspace: workspacePath, startedAt: new Date().toISOString() }),
         model: planningModel,
-        status: 'running',
+        status: 'starting',
         role: 'plan',
         harness: effectiveHarness,
+        auto: auto === true,
       });
       if (autoSpawnOnFinalize) {
         await writeFile(
@@ -729,6 +754,25 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
       }
     }
 
+    if (behavior.usesCodexHome || behavior.launchCommandKind === 'acp-host') {
+      const delivery = await deliverInitialPromptWithRetry(
+        sessionName,
+        initMessage,
+        'spawnPlanningSession:initial-prompt',
+      );
+      if (!delivery.ok) {
+        const errorMsg = `${behavior.displayName} planning kickoff prompt delivery failed: ${delivery.failure ?? 'unknown error'}`;
+        console.error(`[start-planning] ${errorMsg}`);
+        await Effect.runPromise(killSession(sessionName)).catch(() => {});
+        const existingErrState = getAgentStateSync(sessionName);
+        if (existingErrState) saveAgentStateSync({ ...existingErrState, status: 'error' });
+        progress(5, 'Launching planning session', errorMsg, 'error');
+        return { success: false, error: errorMsg };
+      }
+    }
+
+    const runningState = getAgentStateSync(sessionName);
+    if (runningState) saveAgentStateSync({ ...runningState, status: 'running' });
     progress(5, 'Launching planning session', 'Agent running', 'complete');
 
     console.log(`[start-planning] Started local planning agent ${sessionName}`);

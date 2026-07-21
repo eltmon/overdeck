@@ -32,18 +32,18 @@ export function ScanButton({ isScanning, onScan, lastResult, progress }: Props) 
   return (
     <div className="flex items-center gap-2">
       {progress?.active ? (
-        <span className="text-[10px] text-blue-300 font-mono">
+        <span className="text-[10px] text-primary font-mono">
           {progress.dirsProcessed}/{progress.dirsTotal} files · {progress.sessionsFound} sessions · {(progress.elapsedMs / 1000).toFixed(1)}s
         </span>
       ) : lastResult && !liveScanning && (
-        <span className="text-[10px] text-gray-500">
+        <span className="text-[10px] text-muted-foreground">
           +{lastResult.inserted} ↑{lastResult.updated} ·{(lastResult.durationMs / 1000).toFixed(1)}s
         </span>
       )}
       <button
         onClick={onScan}
         disabled={liveScanning}
-        className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-700 hover:bg-blue-600 disabled:opacity-50 text-white rounded text-xs transition-colors"
+        className="flex items-center gap-1.5 rounded px-3 py-1.5 bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 text-xs transition-colors"
       >
         <RefreshCw className={`h-3.5 w-3.5 ${liveScanning ? 'animate-spin' : ''}`} />
         {liveScanning ? 'Scanning…' : 'Scan'}

@@ -8,9 +8,14 @@ paths:
 ---
 ### Async tmux delivery — `sendKeysAsync` and `load-buffer` + `paste-buffer`
 
+This rule is about **implementing delivery inside Overdeck source code**. To
+send a message to a running agent from your own shell, use `pan tell` (see the
+agent-message-delivery rule) — raw `paste-buffer`/`send-keys` from an agent
+shell is deny-listed.
+
 Use `sendKeysAsync()` from `src/lib/tmux.ts` — never `sendKeys()` (sync).
 
-For tmux message delivery, use the `load-buffer` + `paste-buffer` pattern:
+When code delivers a tmux message, use the `load-buffer` + `paste-buffer` pattern:
 
 1. Write text to temp file
 2. `tmux load-buffer <file>`

@@ -12,9 +12,12 @@ import {
   markWorkspaceStuck as dbMarkStuck,
   clearWorkspaceStuck as dbClearStuck,
 } from './overdeck/review-status-sync.js';
+import { registerReviewStatusMapReader } from './cloister/review-status-source.js';
 import { normalizeReviewStatusSync } from './review-status-normalize.js';
 import { updateIssueRecordForReviewStatusSync, enrichReviewNotesFromRecordSync, readJournalStatusSync } from './overdeck/review-status-record-sync.js';
 import { needsReviewDispatch } from './review-dispatch-decision.js';
+import type { ScopeDriftRecord } from './xbrief/continue-state.js'; import type { StrikeLandingStatus } from './strike-landing.js';
+import type { InspectionStatusFields } from './inspection-status.js';
 
 function emitReactiveLifecycleEvent(type: 'review.approved' | 'test.passed', issueId: string): void {
   try {
@@ -25,7 +28,7 @@ function emitReactiveLifecycleEvent(type: 'review.approved' | 'test.passed', iss
 }
 
 export interface StatusHistoryEntry {
-  type: 'review' | 'test' | 'merge' | 'inspect' | 'uat';
+  type: 'review' | 'test' | 'merge' | 'inspect' | 'uat' | 'release';
   status: string;
   timestamp: string;
   notes?: string;
@@ -38,15 +41,12 @@ export interface BlockerReason {
   detectedAt: string;
 }
 
-export interface ReviewStatus {
+export interface ReviewStatus extends StrikeLandingStatus, InspectionStatusFields {
   issueId: string;
-  reviewStatus: 'pending' | 'reviewing' | 'passed' | 'failed' | 'blocked';
+  reviewStatus: 'pending' | 'reviewing' | 'passed' | 'failed' | 'blocked' | 'skipped';
   testStatus: 'pending' | 'testing' | 'passed' | 'failed' | 'skipped' | 'dispatch_failed';
   mergeStatus?: 'pending' | 'queued' | 'merging' | 'verifying' | 'merged' | 'failed';
-  inspectStatus?: 'pending' | 'inspecting' | 'passed' | 'failed' | 'error';
-  inspectNotes?: string;
-  inspectStartedAt?: string;
-  inspectBeadId?: string;
+  releaseStatus?: 'pending' | 'releasing' | 'passed' | 'failed' | 'partial' | 'rolled_back' | 'skipped';
   uatStatus?: 'pending' | 'testing' | 'passed' | 'failed';
   uatNotes?: string;
   verificationStatus?: 'pending' | 'running' | 'passed' | 'failed' | 'skipped';
@@ -56,6 +56,7 @@ export interface ReviewStatus {
   reviewNotes?: string;
   testNotes?: string;
   mergeNotes?: string;
+  releaseNotes?: string;
   updatedAt: string;
   readyForMerge: boolean;
   /**
@@ -90,8 +91,8 @@ export interface ReviewStatus {
   stuckAt?: string;
   /** PAN-653: JSON details about the stuck event (e.g. {localSha, remoteSha}) */
   stuckDetails?: string;
-  /** PAN-699: timestamp when review agents were dispatched (deacon timeout detection) */
-  reviewSpawnedAt?: string;
+  /** PAN-699: timestamp when review agents were dispatched (ISO in records, epoch millis in SQLite) */
+  reviewSpawnedAt?: string | number;
   /**
    * PAN-1988 auto-heal: durable JOURNAL intent set by `pan done` BEFORE it reaches the dashboard.
    * "The work agent finished and wants review." When this is newer than {@link reviewSpawnedAt}
@@ -113,6 +114,15 @@ export interface ReviewStatus {
   deaconIgnoredAt?: string;
   /** Optional free-form reason shown alongside the ignore toggle. */
   deaconIgnoredReason?: string;
+  /** PAN-1762: advisory files_scope drift recorded at pan done and surfaced to review. */
+  scopeDrift?: ScopeDriftRecord;
+  /**
+   * PAN-1862 (FR-6): per-convoy-reviewer verdicts from the latest full-review cycle,
+   * keyed by sub-role (security/correctness/performance/requirements). Journal-durable
+   * (not a DB column — overlaid on read like reviewRequestedAt). `atCommit` anchors
+   * drift invalidation for selective re-review (reviewersToRerun).
+   */
+  reviewerVerdicts?: Partial<Record<string, { status: 'passed' | 'blocked'; atCommit?: string; findingsPath?: string }>>;
   // PAN-1531: reviewTempStashRef / reviewTempStashMessage / reviewTempStashSequence
   // removed. The review pipeline no longer stashes uncommitted work — the
   // dirty-worktree gate refuses pan done / pan review request before review
@@ -133,11 +143,11 @@ export function verificationSatisfied(status: Pick<ReviewStatus, 'verificationSt
  * failed, UAT ok, merge not started). Extracted so both setReviewStatusSync and the
  * journal→DB reconcile in getReviewStatusSync derive readyForMerge identically.
  */
-function reviewGatesPassedSync(
+export function reviewGatesPassedSync(
   s: Pick<ReviewStatus, 'reviewStatus' | 'testStatus' | 'verificationStatus' | 'uatStatus' | 'mergeStatus'>,
 ): boolean {
   return (
-    s.reviewStatus === 'passed' &&
+    (s.reviewStatus === 'passed' || s.reviewStatus === 'skipped') &&
     (s.testStatus === 'passed' || s.testStatus === 'skipped') &&
     verificationSatisfied(s) &&
     (s.uatStatus === undefined || s.uatStatus === 'passed') &&
@@ -166,7 +176,9 @@ export function mergeGateEligibility(
   status: Pick<ReviewStatus, 'reviewStatus' | 'testStatus' | 'verificationStatus' | 'mergeStatus'> | null,
 ): MergeGateEligibility {
   if (!status) return { eligible: false, reason: 'no review record' };
-  if (status.reviewStatus !== 'passed') return { eligible: false, reason: `review is ${status.reviewStatus}` };
+  if (status.reviewStatus !== 'passed' && status.reviewStatus !== 'skipped') {
+    return { eligible: false, reason: `review is ${status.reviewStatus}` };
+  }
   if (status.testStatus !== 'passed' && status.testStatus !== 'skipped') {
     return { eligible: false, reason: `test is ${status.testStatus}` };
   }
@@ -174,6 +186,9 @@ export function mergeGateEligibility(
   if (status.mergeStatus === 'merged') return { eligible: false, reason: 'already merged' };
   return { eligible: true };
 }
+// PAN-2579: register the cycle-free status-map reader used by concurrency.ts for
+// warm-idle advancing classification (see cloister/review-status-source.ts).
+registerReviewStatusMapReader(() => getAllReviewStatusesFromDb());
 
 const DEFAULT_STATUS_FILE = join(homedir(), '.overdeck', 'review-status.json');
 
@@ -192,6 +207,49 @@ export function loadReviewStatuses(filePath = DEFAULT_STATUS_FILE): Record<strin
 
 export function loadReviewStatusesForIssues(issueIds: string[]): Record<string, ReviewStatus> {
   return getReviewStatusesFromDb(issueIds);
+}
+
+export function loadReadyForMergeFlags(issueIds: string[]): Map<string, boolean> {
+  const normalizedIds = [...new Set(issueIds.map((id) => id.toUpperCase()).filter(Boolean))];
+  const dbStatuses = loadReviewStatusesForIssues(normalizedIds);
+  const flags = new Map<string, boolean>();
+
+  for (const issueId of normalizedIds) {
+    const dbStatus = dbStatuses[issueId] ?? null;
+    const journal = readJournalStatusSync(issueId);
+    let status = dbStatus;
+
+    if (journal) {
+      if ((journal.durable as { closedOut?: boolean }).closedOut === true) {
+        flags.set(issueId, false);
+        continue;
+      }
+
+      if (!dbStatus || (dbStatus.updatedAt ?? '') < journal.updatedAt) {
+        const merged: ReviewStatus = {
+          ...(dbStatus ?? {
+            issueId,
+            reviewStatus: 'pending' as const,
+            testStatus: 'pending' as const,
+            updatedAt: journal.updatedAt,
+            readyForMerge: false,
+          }),
+        };
+        for (const [key, value] of Object.entries(journal.durable)) {
+          if (value !== undefined) (merged as unknown as Record<string, unknown>)[key] = value;
+        }
+        merged.issueId = issueId;
+        merged.updatedAt = journal.updatedAt;
+        const hasBlockers = (merged.blockerReasons?.length ?? 0) > 0;
+        merged.readyForMerge = hasBlockers ? false : reviewGatesPassedSync(merged);
+        status = normalizeReviewStatusSync(merged);
+      }
+    }
+
+    flags.set(issueId, status?.readyForMerge ?? false);
+  }
+
+  return flags;
 }
 
 export function saveReviewStatuses(statuses: Record<string, ReviewStatus>, filePath = DEFAULT_STATUS_FILE): void {
@@ -265,6 +323,26 @@ export function setReviewStatusSync(
     return status as ReviewStatus;
   }
 
+  // PAN-2578: a bare 'reviewing' write must never clobber a terminal blocked/failed verdict.
+  // A review agent can finish FASTER than the dispatch path that spawned it (PAN-399: the
+  // verification gate completed 2 minutes after the agent recorded BLOCKED, and the dispatch
+  // route's redundant `{ reviewStatus: 'reviewing' }` write destroyed the verdict in both the
+  // DB and the journal). Blocked/failed → reviewing is legal ONLY when the caller explicitly
+  // starts a NEW review cycle by carrying reviewSpawnedAt (spawnReviewRoleForIssue does).
+  if (
+    update.reviewStatus === 'reviewing' &&
+    (status.reviewStatus === 'blocked' || status.reviewStatus === 'failed') &&
+    update.reviewSpawnedAt === undefined
+  ) {
+    console.warn(
+      `[review-status] Rejecting stale 'reviewing' write for ${issueId} — a terminal ` +
+      `'${status.reviewStatus}' verdict is already recorded for this review cycle. Only a ` +
+      `new dispatch (carrying reviewSpawnedAt) may re-enter 'reviewing'.`
+    );
+    notifyPipelineSync({ type: 'status_changed', issueId, status: status as ReviewStatus });
+    return status as ReviewStatus;
+  }
+
   // PAN-424: Reject testStatus regression from 'passed' to 'dispatch_failed' or 'failed'.
   // Once tests pass, duplicate dispatch failures must not overwrite the result.
   if (
@@ -277,6 +355,13 @@ export function setReviewStatusSync(
   }
 
   const merged = { ...status, ...update };
+
+  // PAN-1862 (FR-6): reviewerVerdicts is a per-sub-role MAP — a partial update
+  // (synthesis reporting only the reviewers that re-ran this cycle) must merge
+  // with, not replace, the carried-forward entries from prior cycles.
+  if (update.reviewerVerdicts && status.reviewerVerdicts) {
+    merged.reviewerVerdicts = { ...status.reviewerVerdicts, ...update.reviewerVerdicts };
+  }
 
   // Track status transitions in history (last 10 entries)
   const history = [...(status.history || [])];
@@ -292,6 +377,9 @@ export function setReviewStatusSync(
   }
   if (update.mergeStatus && update.mergeStatus !== status.mergeStatus) {
     history.push({ type: 'merge', status: update.mergeStatus, timestamp: now });
+  }
+  if (update.releaseStatus && update.releaseStatus !== status.releaseStatus) {
+    history.push({ type: 'release', status: update.releaseStatus, timestamp: now, notes: update.releaseNotes });
   }
   while (history.length > 10) history.shift();
 
@@ -355,11 +443,11 @@ export function setReviewStatusSync(
     })();
   }
 
-  // PAN-1908 + PAN-1988: the journal record is the SOURCE OF TRUTH for the verdict; the
-  // SQLite row is a rebuildable cache. Write the journal FIRST — it is workspace-local
-  // (<workspace>/.pan/records/<issue>.json), so it succeeds even for a sandboxed agent
-  // (codex workspace-write) that cannot reach ~/.overdeck. Fire-and-forget; queueAutoCommit
-  // debounces bursts into one commit. Do NOT mirror into canonical vBRIEF specs (PAN-1124).
+  // PAN-1908 + PAN-1988: the journal record is the SOURCE OF TRUTH for the verdict; the SQLite
+  // row is a rebuildable cache. Write the journal FIRST. Since PAN-2541 it lives in
+  // ${OVERDECK_HOME}/state/<project>/records/ — unwritable in a sandbox, so the writer falls back
+  // to <workspace>/.overdeck/pipeline-verdict.json (PAN-2583). Fire-and-forget: a short-lived CLI
+  // MUST drain via flushReviewStatusJournalWrites() before exit (PAN-2689). No xBRIEF mirror (PAN-1124).
   updateIssueRecordForReviewStatusSync(issueId, updated);
 
   // The DB cache write is best-effort. A sandboxed agent's write throws SQLITE_READONLY, but
@@ -468,9 +556,11 @@ export function setReviewStatusSync(
 
   // Reactive Cloister owns review→test and test→ship scheduling. setReviewStatus
   // emits the lifecycle event here so API and direct-import callers share one path.
+  // PAN-1862 (FR-14): reviewStatus 'skipped' (review mode none) advances the
+  // lifecycle exactly like an approved review — same event, same downstream.
   if (
-    update.reviewStatus === 'passed' &&
-    status.reviewStatus !== 'passed' &&
+    (update.reviewStatus === 'passed' || update.reviewStatus === 'skipped') &&
+    status.reviewStatus !== 'passed' && status.reviewStatus !== 'skipped' &&
     updated.testStatus === 'pending'
   ) {
     const canSkipTests =
@@ -481,7 +571,12 @@ export function setReviewStatusSync(
     if (canSkipTests) {
       console.log(`[review-status] Skipping test role for ${issueId} — no code drift since verification (HEAD=${updated.reviewedAtCommit!.slice(0, 8)})`);
       emitActivityEntrySync({ source: 'cloister', level: 'info', message: `${issueId} — tests skipped (no code change since verification gate)`, issueId });
-      setReviewStatusSync(issueId, { testStatus: 'passed', testNotes: 'Skipped: no code changed since pre-review verification gate' });
+      setReviewStatusSync(issueId, {
+        testStatus: 'passed',
+        testNotes: 'Skipped: no code changed since pre-review verification gate',
+        verificationStatus: 'passed',
+        verificationNotes: 'Pre-review verification already covered the reviewed commit',
+      });
       void emitReactiveLifecycleEvent('test.passed', issueId);
     } else {
       void emitReactiveLifecycleEvent('review.approved', issueId);
@@ -504,6 +599,52 @@ export function setReviewStatusSync(
   }
 
   return updated;
+}
+export function resetPipelineVerdictsForWorkStartSync(issueId: string, options: { force?: boolean } = {}): ReviewStatus | null {
+  const status = getReviewStatusSync(issueId);
+  if (!status) return null;
+  const isPending =
+    status.reviewStatus === 'pending' &&
+    status.testStatus === 'pending' &&
+    (status.mergeStatus === undefined || status.mergeStatus === 'pending') &&
+    (status.verificationStatus === undefined || status.verificationStatus === 'pending') &&
+    !status.readyForMerge &&
+    status.autoRequeueCount === 0 &&
+    status.verificationCycleCount === 0 &&
+    status.reviewRetryCount === 0 &&
+    status.testRetryCount === 0 &&
+    status.mergeRetryCount === 0 &&
+    status.recoveryStartedAt === undefined &&
+    status.reviewedAtCommit === undefined &&
+    status.lastVerifiedCommit === undefined;
+
+  if (isPending && !options.force) return null;
+
+  return setReviewStatusSync(issueId, {
+    reviewStatus: 'pending',
+    testStatus: 'pending',
+    mergeStatus: 'pending',
+    reviewNotes: undefined,
+    testNotes: undefined,
+    mergeNotes: undefined,
+    readyForMerge: false,
+    autoRequeueCount: 0,
+    verificationStatus: 'pending',
+    verificationNotes: undefined,
+    verificationCycleCount: 0,
+    stuck: false,
+    stuckReason: undefined,
+    stuckAt: undefined,
+    stuckDetails: undefined,
+    reviewRetryCount: 0,
+    testRetryCount: 0,
+    mergeRetryCount: 0,
+    recoveryStartedAt: undefined,
+    reviewedAtCommit: undefined,
+    lastVerifiedCommit: undefined,
+    reviewRequestedAt: undefined, reviewSpawnedAt: undefined,
+    conflictResolutionDispatchedAt: undefined, blockerReasons: undefined, reviewerVerdicts: undefined,
+  });
 }
 
 /**
@@ -576,7 +717,13 @@ async function dispatchReviewHostSide(issueId: string, prUrl?: string): Promise<
     const { spawnReviewRoleForIssue } = await import('./cloister/review-agent.js');
     const result = await Effect.runPromise(spawnReviewRoleForIssue({ issueId, workspace, branch, ...(prUrl ? { prUrl } : {}) }));
     if (result.success) {
-      console.log(`[review-status] auto-dispatched review for ${issueId} from durable journal intent (host-side)`);
+      // PAN-2584: a guard-skip resolves success WITHOUT spawning — logging it as
+      // "auto-dispatched" made an idempotency no-op loop read as forward progress.
+      if (result.message?.startsWith('Review already in progress')) {
+        console.log(`[review-status] review dispatch for ${issueId}: already in progress — no-op (host-side)`);
+      } else {
+        console.log(`[review-status] auto-dispatched review for ${issueId} from durable journal intent (host-side)`);
+      }
     }
   } catch (err) {
     console.warn(`[review-status] host-side review auto-dispatch for ${issueId} did not complete (non-fatal): ${err instanceof Error ? err.message : String(err)}`);
@@ -633,26 +780,26 @@ async function deliverTestFailureToWorkAgentHostSide(issueId: string, status: Re
     const { resolveProjectFromIssueSync } = await import('./projects.js');
     const resolved = resolveProjectFromIssueSync(issueId);
     const workspace = resolved ? join(resolved.projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`) : undefined;
-    const notes = status.testNotes;
-    let feedbackPath: string | undefined;
+    const notes = status.testNotes; let feedbackPath: string | undefined;
     try {
       const { writeFeedbackFile } = await import('./cloister/feedback-writer.js');
       const r = await Effect.runPromise(writeFeedbackFile({
-        issueId,
-        workspacePath: workspace,
-        specialist: 'test-agent',
-        outcome: 'failed',
-        summary: `Tests FAILED for ${issueId}`,
+        issueId, workspacePath: workspace, specialist: 'test-agent', outcome: 'failed', summary: `Tests FAILED for ${issueId}`,
         markdownBody: `# Test failure\n\n${notes ?? 'The test gate reported failures. See .pan/test/result.json and re-run the project test suite.'}\n\n## Required\nFix the failing tests, commit and push, then re-run \`pan done ${issueId}\`.`,
       }));
       if (r.success) feedbackPath = r.filePath;
     } catch { /* non-fatal — the message below still carries the summary */ }
 
-    const agentId = `agent-${issueId.toLowerCase()}`;
     const message = `SPECIALIST FEEDBACK: test-agent reported FAILED for ${issueId}.\n\n${feedbackPath ? `MUST READ: ${feedbackPath}\n\n` : ''}${notes ? `${notes.slice(0, 400)}\n\n` : ''}Fix the failing tests, commit and push, then re-run pan done ${issueId}. Do NOT stop at the prompt.`;
-    const { messageAgent } = await import('./agents.js');
-    await messageAgent(agentId, message);
-    console.log(`[review-status] delivered test failure to the work agent for ${issueId} (host-side)`);
+    const { resolveIssueFeedbackTarget, surfaceIssueFeedbackNeedsYou } = await import('./cloister/feedback-target.js');
+    const target = await resolveIssueFeedbackTarget(issueId);
+    if ('agentId' in target) {
+      const { messageAgent } = await import('./agents.js');
+      await messageAgent(target.agentId, message, 'internal', { owesRework: true });
+      console.log(`[review-status] delivered test failure to ${target.agentId} for ${issueId} (host-side)`);
+    } else {
+      await surfaceIssueFeedbackNeedsYou(issueId, target.reason, { specialist: 'test-agent', feedbackPath });
+    }
   } catch (err) {
     console.warn(`[review-status] host-side test-failure delivery for ${issueId} did not complete (non-fatal): ${err instanceof Error ? err.message : String(err)}`);
   }
@@ -665,6 +812,16 @@ export function getReviewStatusSync(issueId: string): ReviewStatus | null {
   // No journal record → the DB is all we have. (Pre-PAN-1908 issues, or issues whose
   // workspace/record hasn't been created yet.)
   if (!journal) return dbStatus ?? null;
+
+  if ((journal.durable as { closedOut?: boolean }).closedOut === true) {
+    // PAN-2054: closed-out journal records are terminal; stale active DB rows are cache residue.
+    try {
+      dbDelete(issueId);
+    } catch {
+      // Read-only DB (a sandboxed reader) — the host clears residue when it reads. Non-fatal.
+    }
+    return null;
+  }
 
   // PAN-1988 — journal is the source of truth; DB is a rebuildable cache. If the journal is
   // NEWER than the DB row, an agent recorded its verdict to the journal but the DB write
@@ -744,7 +901,6 @@ export function getReviewStatusSync(issueId: string): ReviewStatus | null {
   maybeRecoverTestVerdictHostSide(issueId, enriched);
   return enriched;
 }
-
 
 /**
  * On server startup, clear any mergeStatus stuck at 'merging'.
@@ -957,7 +1113,6 @@ export function setAutoMerge(issueId: string, autoMerge: boolean | null): void {
     console.error(`[review-status] Failed to set autoMerge for ${issueId}:`, err);
   }
 }
-
 
 /** Tagged error for review-status Effect variants. */
 export class ReviewStatusError extends Data.TaggedError('ReviewStatusError')<{

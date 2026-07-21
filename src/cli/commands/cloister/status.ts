@@ -5,16 +5,27 @@
  */
 
 import chalk from 'chalk';
-import { getCloisterService } from '../../../lib/cloister/service.js';
-import { getHealthEmoji, getHealthLabel } from '../../../lib/cloister/health.js';
+import type { CloisterStatus } from '../../../lib/cloister/service.js';
+import { cloisterApi } from './api.js';
 
 interface StatusOptions {
   json?: boolean;
 }
 
+interface DeaconStatusResponse {
+  lastPatrol: null | {
+    cycle: number;
+    timestamp: string;
+    actions: string[];
+    massDeathDetected: boolean;
+  };
+}
+
 export async function statusCommand(options: StatusOptions): Promise<void> {
-  const service = getCloisterService();
-  const status = service.getStatus();
+  const status = await cloisterApi<CloisterStatus>('/api/cloister/status');
+  const deacon = await cloisterApi<DeaconStatusResponse>('/api/deacon/status').catch(() => null);
+  const logs = await cloisterApi<{ logs: Array<{ timestamp: string; level: string; message: string; cycle?: number }> }>('/api/deacon/logs?limit=5')
+    .catch(() => ({ logs: [] }));
 
   if (options.json) {
     console.log(JSON.stringify(status, null, 2));
@@ -24,8 +35,32 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
   console.log(chalk.bold('\n🔔 Cloister Agent Watchdog\n'));
 
   // Service status
-  const runningStatus = status.running ? chalk.green('Running') : chalk.red('Stopped');
+  const patrolStatus = status.patrol?.status;
+  const runningStatus =
+    patrolStatus === 'running'
+      ? chalk.green('Running')
+      : patrolStatus === 'starting'
+        ? chalk.yellow('Starting')
+        : patrolStatus === 'stale'
+          ? chalk.red('Stale')
+          : status.running
+            ? chalk.yellow('Starting')
+            : chalk.red('Stopped');
   console.log(`Status: ${runningStatus}`);
+
+  if (status.patrol) {
+    if (status.patrol.status === 'stale') {
+      const age = status.patrol.secondsSinceLastPatrol;
+      const ageLabel = age === null ? 'unknown age' : `${age}s ago`;
+      console.log(`Patrol heartbeat: ${chalk.red('stale')} (last patrol ${ageLabel}; expected within ${status.patrol.staleAfterSeconds}s)`);
+    } else if (status.patrol.lastPatrol) {
+      const age = status.patrol.secondsSinceLastPatrol;
+      const ageLabel = age === null ? 'unknown age' : `${age}s ago`;
+      console.log(`Patrol heartbeat: ${ageLabel}`);
+    } else if (status.patrol.status === 'starting') {
+      console.log(`Patrol heartbeat: ${chalk.yellow('waiting for first patrol')}`);
+    }
+  }
 
   if (status.lastCheck) {
     const lastCheck = new Date(status.lastCheck);
@@ -49,13 +84,24 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
   if (status.agentsNeedingAttention.length > 0) {
     console.log(chalk.bold('⚠️  Agents Needing Attention:'));
     for (const agentId of status.agentsNeedingAttention) {
-      const health = service.getAgentHealth(agentId);
-      if (health) {
-        const emoji = getHealthEmoji(health.state);
-        const label = getHealthLabel(health.state);
-        const color = health.state === 'warning' ? chalk.hex('#FFA500') : chalk.red;
-        console.log(`  ${emoji} ${color(agentId)} - ${label}`);
-      }
+      console.log(`  ${chalk.yellow(agentId)}`);
+    }
+    console.log('');
+  }
+
+  if (deacon?.lastPatrol) {
+    console.log(chalk.bold('Last Patrol:'));
+    console.log(`  Cycle: ${deacon.lastPatrol.cycle}`);
+    console.log(`  Timestamp: ${deacon.lastPatrol.timestamp}`);
+    console.log(`  Actions: ${deacon.lastPatrol.actions.length}`);
+    console.log('');
+  }
+
+  if (logs.logs.length > 0) {
+    console.log(chalk.bold('Recent Deacon Logs:'));
+    for (const entry of logs.logs) {
+      const cycle = entry.cycle === undefined ? '' : ` #${entry.cycle}`;
+      console.log(`  ${chalk.dim(entry.timestamp)} ${entry.level}${cycle}: ${entry.message}`);
     }
     console.log('');
   }

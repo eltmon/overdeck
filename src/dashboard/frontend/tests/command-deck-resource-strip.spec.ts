@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
 const DASHBOARD_URL = process.env['DASHBOARD_URL'] ?? 'http://localhost:3010';
 
@@ -28,8 +28,8 @@ interface ResourceIssue {
       state: string;
       isDraft: boolean;
     }>;
-    hasVbrief: boolean;
-    hasBeads: boolean;
+    hasXbrief: boolean;
+    hasTasks: boolean;
     dockerContainerCount: number;
   };
 }
@@ -62,7 +62,7 @@ const RESOURCE_ISSUES: ResourceIssue[] = [
     hasState: true,
     isShadow: false,
     readyForMerge: false,
-    resourceSources: ['workspace', 'branch', 'tmux', 'vbrief', 'beads', 'pr', 'docker'],
+    resourceSources: ['workspace', 'branch', 'tmux', 'vbrief', 'tasks', 'pr', 'docker'],
     resourceDetails: {
       hasWorkspace: true,
       localBranchCount: 1,
@@ -82,8 +82,8 @@ const RESOURCE_ISSUES: ResourceIssue[] = [
           isDraft: true,
         },
       ],
-      hasVbrief: true,
-      hasBeads: true,
+      hasXbrief: true,
+      hasTasks: true,
       dockerContainerCount: 1,
     },
   },
@@ -108,8 +108,8 @@ const RESOURCE_ISSUES: ResourceIssue[] = [
       remoteBranchCount: 0,
       tmuxSessionCount: 0,
       prs: [],
-      hasVbrief: false,
-      hasBeads: false,
+      hasXbrief: false,
+      hasTasks: false,
       dockerContainerCount: 0,
     },
   },
@@ -147,6 +147,17 @@ const RESOURCE_DETAIL_IDENTIFIERS: Record<string, ResourceDetailIdentifiers> = {
   },
 };
 
+async function selectSidebarProject(page: Page, projectName: string) {
+  const sidebarProject = page.getByTestId(`sidebar-project-${projectName}`);
+  await expect(sidebarProject).toBeVisible({ timeout: 20_000 });
+
+  // The dashboard recovery overlay is fixed and full-screen. In CI it can
+  // briefly outlive app boot and keep Playwright waiting for an actionable
+  // pointer click even though the sidebar project button has rendered.
+  await page.locator('#pan-recovery-overlay').evaluate((el) => el.remove()).catch(() => {});
+  await sidebarProject.dispatchEvent('click');
+}
+
 test.describe('Command Deck resource strip', () => {
   test('renders concrete resource icons and hover details for resource-allocated issues', async ({ page }) => {
     await page.route('**/api/issues/resource-allocated', async (route) => {
@@ -161,6 +172,13 @@ test.describe('Command Deck resource strip', () => {
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify([{ key: 'overdeck', name: 'overdeck', path: '/tmp/overdeck' }]),
+      });
+    });
+    await page.route('**/api/pipeline/membership**', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify([]),
       });
     });
     await page.route('**/api/issues/*/resource-details', async (route) => {
@@ -208,6 +226,20 @@ test.describe('Command Deck resource strip', () => {
         body: JSON.stringify([]),
       });
     });
+    await page.route('**/api/boot-reconciliation', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          decision: null,
+          perAgent: {},
+          decidedAt: null,
+          bootId: null,
+          graceDeadline: null,
+          set: [],
+        }),
+      });
+    });
 
     await page.goto(`${DASHBOARD_URL}/command-deck`);
 
@@ -217,9 +249,7 @@ test.describe('Command Deck resource strip', () => {
     // load the initial app boot (WS connect + first snapshot) can take several
     // seconds, and a click that races the mount silently no-ops, leaving the
     // rows un-rendered and flaking the first toBeVisible below.
-    const sidebarProject = page.getByTestId('sidebar-project-overdeck');
-    await expect(sidebarProject).toBeVisible({ timeout: 20_000 });
-    await sidebarProject.click();
+    await selectSidebarProject(page, 'overdeck');
 
     const pan862Item = page.locator('[data-component="feature-item"][data-issue-id="PAN-862"]');
     const pan777Item = page.locator('[data-component="feature-item"][data-issue-id="PAN-777"]');
@@ -243,8 +273,8 @@ test.describe('Command Deck resource strip', () => {
     const workspaceIcon = await expectResourceChip('workspace: allocated', 'workspace');
     await expectResourceChip('branch: local 1 · remote 1', 'branch local 1 · remote 1');
     await expectResourceChip('tmux: 2 sessions', 'tmux');
-    await expectResourceChip('vBRIEF: present', 'vBRIEF');
-    await expectResourceChip('beads: present', 'beads');
+    await expectResourceChip('xBRIEF: present', 'xBRIEF');
+    await expectResourceChip('tasks: present', 'tasks');
     await expectResourceChip('PR: #862 (open) · #863 (open, draft)', '#862');
     await expectResourceChip('docker: 1 container', 'stack 1');
     await workspaceIcon.hover();
@@ -254,8 +284,8 @@ test.describe('Command Deck resource strip', () => {
     await expect(pan862Item.getByText('branch (remote): origin/feature/pan-862', { exact: true })).toBeVisible();
     await expect(pan862Item.getByText('tmux: agent-pan-862', { exact: true })).toBeVisible();
     await expect(pan862Item.getByText('tmux: review-pan-862', { exact: true })).toBeVisible();
-    await expect(pan862Item.getByText('vBRIEF present', { exact: true })).toBeVisible();
-    await expect(pan862Item.getByText('beads present', { exact: true })).toBeVisible();
+    await expect(pan862Item.getByText('xBRIEF present', { exact: true })).toBeVisible();
+    await expect(pan862Item.getByText('tasks present', { exact: true })).toBeVisible();
     await expect(pan862Item.getByText('PR: #862 PAN-862 main PR (open)', { exact: true })).toBeVisible();
     await expect(pan862Item.getByText('PR: #863 PAN-862 draft PR (open, draft)', { exact: true })).toBeVisible();
     await expect(pan862Item.getByText('docker: pan-862-db', { exact: true })).toBeVisible();

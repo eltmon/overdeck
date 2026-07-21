@@ -10,6 +10,7 @@ import { readFile } from 'fs/promises';
 import { join } from 'path';
 import { homedir } from 'os';
 import type { IssueTracker } from '../tracker/interface.js';
+import type { DodGateResult, DodRowId } from './dod.js';
 
 export interface StepResult {
   step: string;
@@ -25,6 +26,12 @@ export interface WorkflowResult {
   success: boolean;     // true only if ALL non-skipped steps succeeded
   steps: StepResult[];
   duration: number;     // ms
+  dodGate?: DodGateResult;
+}
+
+export interface CloseOutOptions {
+  dodAcceptedRows?: DodRowId[];
+  dodAcceptedBy?: string;
 }
 
 /** Context shared across lifecycle operations */
@@ -60,9 +67,6 @@ export interface TeardownOptions {
   skipDocker?: boolean;
   /** Delete workspace directory (worktree + files). Default: true */
   deleteWorkspace?: boolean;
-  /** Clear beads for this issue from project root. Default: false.
-   *  Only set to true for destructive wipe — normal completion should preserve beads. */
-  clearBeads?: boolean;
   /** Project-specific workspace config for tunnel/Hume cleanup */
   workspaceConfig?: {
     tunnel?: any;
@@ -83,8 +87,6 @@ export interface ArchiveOptions {
 export interface ApproveOptions {
   /** Skip the merge step (e.g. if already merged). Default: false */
   skipMerge?: boolean;
-  /** Skip beads compaction. Default: false */
-  skipBeadsCompaction?: boolean;
 }
 
 /** Options for the deep-wipe workflow */

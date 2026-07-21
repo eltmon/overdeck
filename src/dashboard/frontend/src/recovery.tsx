@@ -1,4 +1,6 @@
 import React from 'react';
+import posthog from 'posthog-js';
+import packageJson from '../../../../package.json';
 
 /**
  * Front-end self-recovery for dashboard restarts.
@@ -14,24 +16,51 @@ import React from 'react';
  * (raw DOM overlay + fetch) so it still works when a module error has taken
  * React down with it.
  *
- * Strategy: on a module/asset load failure, show a "Reconnecting…" overlay,
- * poll the origin until it serves again, then reload once. A sessionStorage
- * guard prevents a reload storm if the reloaded page fails immediately too.
+ * Strategy: on a same-origin module/asset load failure, show a reconnecting
+ * overlay, poll the origin until it serves again, then reload. Three reloads
+ * within 15 seconds are allowed; the fourth trips a manual-recovery circuit
+ * breaker. Each decision sends `frontend_recovery_reload` to PostHog immediately
+ * with trigger, resource, message, stackHead, reloadCount, and appVersion.
+ * A tripped circuit breaker also sends `frontend_recovery_reload_loop` with the
+ * same properties.
  */
 
 const OVERLAY_ID = 'pan-recovery-overlay';
 const LAST_RELOAD_KEY = 'pan.recovery.lastReload';
+const RELOAD_COUNT_KEY = 'pan.recovery.reloadCount';
+const RELOAD_WINDOW_MS = 15_000;
+const MAX_CONSECUTIVE_RELOADS = 3;
 let reconnecting = false;
 
+export interface RecoveryDetails {
+  trigger:
+    | 'vite_preload_error'
+    | 'asset_load_error'
+    | 'window_module_error'
+    | 'unhandled_rejection'
+    | 'root_error_boundary';
+  resource?: string;
+  message?: string;
+  stackHead?: string;
+}
+
 /** Does this error/reason look like a failed dynamic-import / module-script load? */
-export function isModuleLoadError(reasonOrError: unknown): boolean {
-  let msg = '';
-  if (typeof reasonOrError === 'string') {
-    msg = reasonOrError;
-  } else if (reasonOrError && typeof reasonOrError === 'object' && 'message' in reasonOrError) {
-    msg = String((reasonOrError as { message?: unknown }).message ?? '');
+function errorMessage(reasonOrError: unknown): string {
+  if (typeof reasonOrError === 'string') return reasonOrError;
+  if (reasonOrError && typeof reasonOrError === 'object' && 'message' in reasonOrError) {
+    return String((reasonOrError as { message?: unknown }).message ?? '');
   }
-  msg = msg.toLowerCase();
+  return '';
+}
+
+function stackHead(reasonOrError: unknown): string | undefined {
+  if (!reasonOrError || typeof reasonOrError !== 'object' || !('stack' in reasonOrError)) return undefined;
+  const stack = String((reasonOrError as { stack?: unknown }).stack ?? '');
+  return stack ? stack.split('\n').slice(0, 5).join('\n') : undefined;
+}
+
+export function isModuleLoadError(reasonOrError: unknown): boolean {
+  const msg = errorMessage(reasonOrError).toLowerCase();
   return (
     msg.includes('failed to fetch dynamically imported module') ||
     msg.includes('error loading dynamically imported module') ||
@@ -39,6 +68,56 @@ export function isModuleLoadError(reasonOrError: unknown): boolean {
     msg.includes('module script failed') ||
     msg.includes('dynamically imported module')
   );
+}
+
+export function sameOriginResourceUrl(source: EventTarget | string | null): string | null {
+  let rawUrl: string;
+  if (typeof source === 'string') {
+    rawUrl = source;
+  } else {
+    if (!(source instanceof HTMLElement) || (source.tagName !== 'SCRIPT' && source.tagName !== 'LINK')) {
+      return null;
+    }
+    rawUrl = source.tagName === 'SCRIPT'
+      ? (source as HTMLScriptElement).src
+      : (source as HTMLLinkElement).href;
+  }
+  if (!rawUrl) return null;
+  try {
+    const url = new URL(rawUrl, window.location.href);
+    return url.origin === window.location.origin ? url.href : null;
+  } catch {
+    return null;
+  }
+}
+
+function resourceFromMessage(message: string): string | undefined {
+  const candidate = message.match(/(?:https?:\/\/|\/)[^\s'"<>]+/)?.[0].replace(/[),.;]+$/, '');
+  return candidate ? sameOriginResourceUrl(candidate) ?? undefined : undefined;
+}
+
+export function recordRecoveryReload(now = Date.now()): { count: number; shouldReload: boolean } {
+  const lastReload = Number(sessionStorage.getItem(LAST_RELOAD_KEY) || '0');
+  const previousCount = Number(sessionStorage.getItem(RELOAD_COUNT_KEY) || '0');
+  const count = now - lastReload < RELOAD_WINDOW_MS ? previousCount + 1 : 1;
+  sessionStorage.setItem(LAST_RELOAD_KEY, String(now));
+  sessionStorage.setItem(RELOAD_COUNT_KEY, String(count));
+  return { count, shouldReload: count <= MAX_CONSECUTIVE_RELOADS };
+}
+
+export function captureRecoveryReload(
+  details: RecoveryDetails,
+  decision: { count: number; shouldReload: boolean },
+): void {
+  const properties = {
+    ...details,
+    reloadCount: decision.count,
+    appVersion: packageJson.version,
+  };
+  posthog.capture('frontend_recovery_reload', properties, { send_instantly: true });
+  if (!decision.shouldReload) {
+    posthog.capture('frontend_recovery_reload_loop', properties, { send_instantly: true });
+  }
 }
 
 export function showOverlay(message: string, action?: { label: string; onClick: () => void }): void {
@@ -61,10 +140,12 @@ export function showOverlay(message: string, action?: { label: string; onClick: 
   ].join(';');
   el.innerHTML = `
     <div style="width:34px;height:34px;border:3px solid rgba(255,255,255,0.18);border-top-color:#6aa0ff;border-radius:50%;animation:pan-recovery-spin 0.8s linear infinite"></div>
-    <div>${message}</div>
+    <div data-pan-recovery-message="true"></div>
     ${action ? '<button type="button" data-pan-recovery-action="true" style="padding:8px 18px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:#1b2533;color:#e6e6e6;cursor:pointer;font-size:14px"></button>' : ''}
     <style>@keyframes pan-recovery-spin{to{transform:rotate(360deg)}}</style>
   `;
+  const messageEl = el.querySelector<HTMLElement>('[data-pan-recovery-message="true"]');
+  if (messageEl) messageEl.textContent = message;
   if (action) {
     const button = el.querySelector<HTMLButtonElement>('[data-pan-recovery-action="true"]');
     if (button) {
@@ -83,7 +164,7 @@ export function hideOverlay(): void {
  * Poll the origin until it serves again, then reload. Idempotent: concurrent
  * triggers collapse into a single in-flight reconnect.
  */
-export async function waitForServerThenReload(): Promise<void> {
+export async function waitForServerThenReload(details: RecoveryDetails): Promise<void> {
   if (reconnecting) return;
   reconnecting = true;
   showOverlay('Reconnecting to the dashboard…');
@@ -107,7 +188,16 @@ export async function waitForServerThenReload(): Promise<void> {
   if (Date.now() - lastReload < 4000) {
     await sleep(2000);
   }
-  sessionStorage.setItem(LAST_RELOAD_KEY, String(Date.now()));
+  const decision = recordRecoveryReload();
+  captureRecoveryReload(details, decision);
+  if (!decision.shouldReload) {
+    const resource = details.resource ? ` Failing resource: ${details.resource}` : '';
+    showOverlay(
+      `The dashboard stopped automatic recovery after repeated load failures.${resource}`,
+      { label: 'Reload dashboard', onClick: () => window.location.reload() },
+    );
+    return;
+  }
   window.location.reload();
 }
 
@@ -121,7 +211,14 @@ export function installRecovery(): void {
   // load (the canonical "asset 404 after restart/rebuild" signal).
   window.addEventListener('vite:preloadError', (event) => {
     event.preventDefault();
-    void waitForServerThenReload();
+    const error = (event as Event & { payload?: unknown }).payload;
+    const message = errorMessage(error);
+    void waitForServerThenReload({
+      trigger: 'vite_preload_error',
+      resource: resourceFromMessage(message),
+      message: message || undefined,
+      stackHead: stackHead(error),
+    });
   });
 
   // A failed <script type="module"> or <link> surfaces as a window 'error'
@@ -129,13 +226,24 @@ export function installRecovery(): void {
   window.addEventListener(
     'error',
     (event) => {
-      const target = event.target as HTMLElement | null;
-      if (target && (target.tagName === 'SCRIPT' || target.tagName === 'LINK')) {
-        void waitForServerThenReload();
+      const resource = sameOriginResourceUrl(event.target);
+      if (resource) {
+        void waitForServerThenReload({
+          trigger: 'asset_load_error',
+          resource,
+          message: event.message || 'Module asset failed to load',
+        });
         return;
       }
-      if (isModuleLoadError(event.error ?? event.message)) {
-        void waitForServerThenReload();
+      const error = event.error ?? event.message;
+      if (isModuleLoadError(error)) {
+        const message = errorMessage(error);
+        void waitForServerThenReload({
+          trigger: 'window_module_error',
+          resource: resourceFromMessage(message),
+          message: message || undefined,
+          stackHead: stackHead(error),
+        });
       }
     },
     true,
@@ -144,7 +252,13 @@ export function installRecovery(): void {
   // Unhandled dynamic import() rejections.
   window.addEventListener('unhandledrejection', (event) => {
     if (isModuleLoadError(event.reason)) {
-      void waitForServerThenReload();
+      const message = errorMessage(event.reason);
+      void waitForServerThenReload({
+        trigger: 'unhandled_rejection',
+        resource: resourceFromMessage(message),
+        message: message || undefined,
+        stackHead: stackHead(event.reason),
+      });
     }
   });
 }
@@ -167,7 +281,13 @@ export class RootErrorBoundary extends React.Component<
 
   componentDidCatch(error: unknown): void {
     if (isModuleLoadError(error)) {
-      void waitForServerThenReload();
+      const message = errorMessage(error);
+      void waitForServerThenReload({
+        trigger: 'root_error_boundary',
+        resource: resourceFromMessage(message),
+        message: message || undefined,
+        stackHead: stackHead(error),
+      });
     }
   }
 

@@ -1,20 +1,18 @@
-import { existsSync, readFileSync, readdirSync, statSync } from 'fs';
+import { existsSync, readdirSync, statSync } from 'fs';
 import { join, dirname } from 'path';
 import { Effect } from 'effect';
-import { PAN_DIRNAME } from '../pan-dir/types.js';
-import { readContinueState, type ContinueFeedbackEntry } from '../vbrief/continue-state.js';
+import type { ContinueFeedbackEntry } from '../xbrief/continue-state.js';
 import { renderPrompt } from './prompts.js';
 import { extractTeamPrefix, findProjectByTeamSync } from '../projects.js';
 import { isTldrEnabledSync } from '../config-yaml.js';
-import { getWorkspacePanPaths, readWorkspaceContext, readFeedback, readWorkspaceContinue, writeWorkspaceContext } from '../pan-dir/index.js';
-import { findPlanSync, readWorkspacePlanSync, readPlanSync, readWorkspacePlan } from '../vbrief/io.js';
-import { createActiveSlice, getDispatchableItems } from '../vbrief/dag.js';
-import { extractACFromDocument } from '../vbrief/acceptance-criteria.js';
+import { getReadableWorkspacePanPaths, readWorkspaceContext, readFeedback, writeWorkspaceContext } from '../pan-dir/index.js';
+import { getProjectConfigFromWorkspacePath, readRecordContinueViewSync, resolveProjectForIssue } from '../pan-dir/record.js';
+import { findPlanSync, readWorkspacePlanSync, readPlanSync, readWorkspacePlan } from '../xbrief/io.js';
+import { createActiveSlice, getDispatchableItems } from '../xbrief/dag.js';
 import { loadConfigSync } from '../config.js';
 import { createTrackerFromConfig } from '../tracker/factory.js';
 import { NotImplementedError } from '../tracker/interface.js';
 import type { TrackerType } from '../tracker/interface.js';
-import { queryBeadsForIssue } from '../beads-query.js';
 
 export interface WorkAgentPromptContext {
   issueId: string;
@@ -35,20 +33,15 @@ export async function buildWorkAgentPrompt(ctx: WorkAgentPromptContext): Promise
   const issueId = ctx.issueId ?? '';
   const issueIdLower = issueId.toLowerCase();
 
-  let beadsTasksStr = '';
   let stitchDesignsStr = '';
   let featureContextStr = '';
   let polyrepoContextStr = '';
   let pendingFeedbackStr = '';
+  let recordContextStr = '';
 
   if (!ctx.skipDynamicContext && ctx.projectRoot) {
     const planningContent = await readPlanningContext(ctx.workspacePath);
     const featureContext = await readFeatureContext(ctx.workspacePath, issueId);
-
-    const beadsTasks = await readBeadsTasks(ctx.workspacePath, ctx.projectRoot, issueId);
-    if (beadsTasks.length > 0) {
-      beadsTasksStr = beadsTasks.join('\n');
-    }
 
     const stitchDesigns = extractStitchDesigns(planningContent);
     if (stitchDesigns) {
@@ -64,6 +57,16 @@ export async function buildWorkAgentPrompt(ctx: WorkAgentPromptContext): Promise
 
     polyrepoContextStr = buildPolyrepoContext(issueId, ctx.workspacePath);
     pendingFeedbackStr = await readPendingFeedback(ctx.workspacePath);
+
+    try {
+      const project = { name: 'inferred', path: ctx.projectRoot };
+      const record = readRecordContinueViewSync(project, issueIdLower);
+      if (record) {
+        recordContextStr = JSON.stringify(record, null, 2);
+      }
+    } catch {
+      // Record may not exist yet for a fresh issue — silently skip
+    }
   }
 
   return await Effect.runPromise(renderPrompt({
@@ -76,7 +79,6 @@ export async function buildWorkAgentPrompt(ctx: WorkAgentPromptContext): Promise
       LOCAL: ctx.env === 'LOCAL',
       REMOTE: ctx.env === 'REMOTE',
       PROJECT_ROOT: ctx.projectRoot || '',
-      BEADS_TASKS: beadsTasksStr,
       STITCH_DESIGNS: stitchDesignsStr,
       FEATURE_CONTEXT: featureContextStr,
       POLYREPO_CONTEXT: polyrepoContextStr,
@@ -86,6 +88,7 @@ export async function buildWorkAgentPrompt(ctx: WorkAgentPromptContext): Promise
       // the workspace actually has a TLDR .venv (PAN: tldr configurable toggle).
       TLDR_AVAILABLE: isTldrEnabledSync() && existsSync(join(ctx.workspacePath, '.venv')),
       MEMORY_CONTEXT: ctx.memoryContext || '',
+      RECORD_CONTEXT: recordContextStr,
     },
   }));
 }
@@ -99,13 +102,9 @@ async function buildActiveSliceContext(workspacePath: string, issueId: string): 
       ?? doc.plan.items.find(item => item.status === 'running')
       ?? doc.plan.items.find(item => item.status !== 'completed' && item.status !== 'cancelled' && item.status !== 'blocked');
     if (!nextItem) return '';
-    // PAN-977: continue-state readers internally call `getContinuesDir(projectRoot)`
-    // which appends `.pan/continues/`. Callers must pass the workspace root, NOT the
-    // `.pan` subdirectory, to avoid the double-`.pan` path bug.
     // PAN-1872: guard against an undefined issueId so a malformed context does not
     // mask a sync-main conflict with `Cannot read properties of undefined (reading 'toUpperCase')`.
     const normalizedIssueId = (issueId ?? '').toUpperCase();
-    const cont = await Effect.runPromise(readContinueState(workspacePath, normalizedIssueId));
     const currentItemIds = doc.plan.items
       .filter(item => item.status === 'running' || item.id === nextItem.id)
       .map(item => item.id);
@@ -117,11 +116,11 @@ async function buildActiveSliceContext(workspacePath: string, issueId: string): 
       synthesisOutputs: undefined,
     });
     return [
-      '## Active vBRIEF Slice (Canonical Task Graph)',
+      '## Active xBRIEF Slice (Canonical Task Graph)',
       '',
       slice.prompt,
       '',
-      '_vBRIEF is the canonical task authority during PAN-977 migration; Beads remain a compatibility mirror._',
+      '_The merged xBRIEF is the canonical task authority._',
     ].join('\n');
   } catch {
     return '';
@@ -134,14 +133,13 @@ async function buildActiveSliceContext(workspacePath: string, issueId: string): 
  */
 async function readPendingFeedback(workspacePath: string): Promise<string> {
   const issueId = inferIssueIdFromWorkspace(workspacePath);
-  const projectRoot = join(workspacePath, '..', '..');
-
   const continueEntries: ContinueFeedbackEntry[] = [];
   if (issueId) {
     try {
-      const cont = await Effect.runPromise(readWorkspaceContinue(workspacePath))
-      if (cont?.feedback?.length) {
-        continueEntries.push(...cont.feedback)
+      const project = resolveProjectForIssue(issueId) ?? getProjectConfigFromWorkspacePath(workspacePath);
+      const recordView = readRecordContinueViewSync(project, issueId);
+      if (recordView?.feedback?.length) {
+        continueEntries.push(...recordView.feedback);
       }
     } catch { /* ignore */ }
   }
@@ -212,13 +210,14 @@ const TOTAL_CONTEXT_LIMIT = 2000;
  */
 export async function getTrackerContext(
   issueId: string,
-  workspacePath: string
+  workspacePath: string,
+  signal?: AbortSignal,
 ): Promise<string> {
   let stateMtime: Date | null = null;
 
   // Find continue file mtime via workspace `.pan/continue.json` first, then migration fallbacks.
   try {
-    const workspaceContinuePath = getWorkspacePanPaths(workspacePath).continuePath
+    const workspaceContinuePath = getReadableWorkspacePanPaths(workspacePath).continuePath
     if (existsSync(workspaceContinuePath)) {
       stateMtime = statSync(workspaceContinuePath).mtime
     }
@@ -248,8 +247,8 @@ export async function getTrackerContext(
 
       // Fetch issue and comments in parallel
       const [issue, allComments] = await Promise.all([
-        Effect.runPromise(tracker.getIssue(issueId)),
-        Effect.runPromise(tracker.getComments(issueId)).catch((err: unknown) => {
+        Effect.runPromise(tracker.getIssue(issueId), { signal }),
+        Effect.runPromise(tracker.getComments(issueId), { signal }).catch((err: unknown) => {
           // GitLab throws NotImplementedError; treat as no comments
           if (err instanceof NotImplementedError) return [];
           throw err;
@@ -294,10 +293,8 @@ export async function getTrackerContext(
 
         for (const comment of newComments) {
           let body = comment.body;
-          let commentTruncated = false;
           if (body.length > COMMENT_BODY_LIMIT) {
             body = body.slice(0, COMMENT_BODY_LIMIT) + ' [truncated — read full comment on tracker]';
-            commentTruncated = true;
             truncatedAny = true;
           }
 
@@ -333,6 +330,7 @@ export async function getTrackerContext(
       }
       return result;
     } catch (err: unknown) {
+      if (signal?.aborted) return '';
       // Issue not found in this tracker — try next
       const message = err instanceof Error ? err.message : String(err);
       if (
@@ -359,9 +357,10 @@ export async function readPlanningContext(workspacePath: string): Promise<string
   if (!issueId) return null;
 
   try {
-    const workspaceContinue = await Effect.runPromise(readWorkspaceContinue(workspacePath))
-    if (workspaceContinue) {
-      return JSON.stringify(workspaceContinue, null, 2)
+    const project = resolveProjectForIssue(issueId) ?? getProjectConfigFromWorkspacePath(workspacePath);
+    const recordView = readRecordContinueViewSync(project, issueId);
+    if (recordView) {
+      return JSON.stringify(recordView, null, 2);
     }
   } catch { /* ignore */ }
 
@@ -486,9 +485,9 @@ export async function writeStoryFeatureContext(workspacePath: string, issueId: s
               `## Plan Narratives\n${narrativeSection || '_No narratives found._'}\n\n` +
               `## Cross-Story Dependencies\n${edgesSection || '_No dependency edges found._'}\n\n` +
               `## Related Plan Items\n${itemsSection || '_No plan items found for this story._'}\n\n` +
-              `---\n*Synthesized from parent feature workspace vBRIEF*\n`;
+              `---\n*Synthesized from parent feature workspace xBRIEF*\n`;
           } catch (planErr) {
-            console.warn(`[writeStoryFeatureContext] Could not read parent workspace vBRIEF: ${planErr instanceof Error ? planErr.message : String(planErr)}`);
+            console.warn(`[writeStoryFeatureContext] Could not read parent workspace xBRIEF: ${planErr instanceof Error ? planErr.message : String(planErr)}`);
           }
         }
 
@@ -562,95 +561,6 @@ export function extractStitchDesigns(stateContent: string | null): string | null
 }
 
 /**
- * Extract beads IDs from planning content.
- * Looks for patterns like `overdeck-1dg` in backticks or tables.
- */
-export function extractBeadsIdsFromState(stateContent: string): string[] {
-  const ids: string[] = [];
-
-  const backtickMatches = stateContent.match(/`([a-z]+-[a-z0-9]+)`/g) || [];
-  for (const match of backtickMatches) {
-    const id = match.replace(/`/g, '');
-    if (id.match(/^[a-z]+-[a-z0-9]{2,4}$/)) {
-      ids.push(id);
-    }
-  }
-
-  return [...new Set(ids)];
-}
-
-/**
- * Read beads tasks for an issue from the live Dolt database via `bd list`.
- * Falls back to `.beads/issues.jsonl` in workspacePath, then projectRoot.
- */
-export async function readBeadsTasks(
-  workspacePath: string,
-  projectRoot: string,
-  issueId: string
-): Promise<string[]> {
-  const tasks: string[] = [];
-
-  const acByTitle = buildACLookupByTitle(workspacePath);
-
-  let queryResult = await Effect.runPromise(queryBeadsForIssue(workspacePath, issueId));
-  let beads = queryResult.beads;
-  if (beads.length === 0) {
-    queryResult = await Effect.runPromise(queryBeadsForIssue(projectRoot, issueId));
-    beads = queryResult.beads;
-  }
-
-  for (const bead of beads) {
-    tasks.push(`- [${bead.status || 'open'}] ${bead.title} (${bead.id})`);
-
-    const beadAC = matchBeadToAC(bead.title, acByTitle);
-    for (const ac of beadAC) {
-      const check = ac.status === 'completed' ? 'x' : ' ';
-      tasks.push(`  - [${check}] AC: ${ac.title}`);
-    }
-  }
-
-  return tasks;
-}
-
-/**
- * Build a lookup map from item title (lowercase) → AC sub-items.
- * Used to match beads to their vBRIEF acceptance criteria.
- */
-function buildACLookupByTitle(workspacePath: string): Map<string, Array<{ title: string; status: string }>> {
-  const lookup = new Map<string, Array<{ title: string; status: string }>>();
-  const doc = readWorkspacePlanSync(workspacePath);
-  if (!doc) return lookup;
-
-  const criteria = extractACFromDocument(doc);
-  for (const ac of criteria) {
-    const key = ac.itemTitle.toLowerCase();
-    let list = lookup.get(key);
-    if (!list) {
-      list = [];
-      lookup.set(key, list);
-    }
-    list.push({ title: ac.title, status: ac.status });
-  }
-
-  return lookup;
-}
-
-/**
- * Match a bead title to its AC. Bead titles may have a plan ID prefix
- * (e.g., "PAN-408: Create module") — strip it before matching.
- */
-function matchBeadToAC(
-  beadTitle: string,
-  acByTitle: Map<string, Array<{ title: string; status: string }>>
-): Array<{ title: string; status: string }> {
-  if (acByTitle.size === 0 || !beadTitle) return [];
-
-  // Strip "PAN-XXX: " prefix if present
-  const stripped = beadTitle.replace(/^[A-Z]+-\d+:\s*/, '');
-  return acByTitle.get(stripped.toLowerCase()) || [];
-}
-
-/**
  * Generate polyrepo context section if applicable.
  */
 export function buildPolyrepoContext(issueId: string, workspacePath: string): string {
@@ -677,7 +587,7 @@ export function buildPolyrepoContext(issueId: string, workspacePath: string): st
     // Check which repos actually exist in the workspace
     const existingRepos = readdirSync(workspacePath).filter(f => {
       const fullPath = join(workspacePath, f);
-      return f !== '.claude' && f !== '.pan' && f !== '.beads' && existsSync(fullPath);
+      return f !== '.claude' && f !== '.pan' && existsSync(fullPath);
     });
     visibleRepos = repos.filter(r => existingRepos.includes(r.name));
   }

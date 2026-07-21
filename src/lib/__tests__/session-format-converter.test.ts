@@ -12,9 +12,9 @@ describe('extractCodexTranscript', () => {
     const raw = readFileSync(join(FIXTURE_DIR, 'codex', 'rollout.jsonl'), 'utf-8');
     const turns = extractCodexTranscript(raw);
     expect(turns.length).toBe(3);
-    expect(turns[0]).toEqual({ role: 'user', text: 'Fix the bug in src/lib/foo.ts' });
-    expect(turns[1]).toMatchObject({ role: 'assistant', text: expect.stringContaining('line 42') });
-    expect(turns[2]).toMatchObject({ role: 'assistant', text: expect.stringContaining('optional chain') });
+    expect(turns[0]).toEqual({ role: 'user', text: '[synthetic task]' });
+    expect(turns[1]).toMatchObject({ role: 'assistant', text: '[synthetic agent content]' });
+    expect(turns[2]).toMatchObject({ role: 'assistant', text: '[synthetic agent content]' });
   });
 
   it('skips token_count and unknown event types', () => {

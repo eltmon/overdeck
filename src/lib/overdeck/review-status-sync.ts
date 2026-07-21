@@ -16,8 +16,9 @@ import { getOverdeckDatabaseSync } from './infra.js';
 // ── Timestamp helpers — overdeck stores timestamps as integer epoch-MILLISECONDS;
 //    the ReviewStatus domain type exposes them as ISO strings, so convert at the
 //    storage boundary (PAN-1961). ─────────────────────────────────────────────
-function isoToMs(value: string | null | undefined): number | null {
+function isoToMs(value: string | number | null | undefined): number | null {
   if (!value) return null;
+  if (typeof value === 'number') return value;
   const ms = Date.parse(value);
   return Number.isFinite(ms) ? ms : null;
 }
@@ -36,6 +37,7 @@ interface DbRow {
   inspect_notes: string | null;
   inspect_started_at: number | null;
   inspect_bead_id: string | null;
+  inspect_owner_session: string | null;
   verification_status: string | null;
   verification_notes: string | null;
   verification_cycle_count: number | null;
@@ -43,6 +45,8 @@ interface DbRow {
   review_notes: string | null;
   test_notes: string | null;
   merge_notes: string | null;
+  release_status: string | null;
+  release_notes: string | null;
   updated_at: number;
   ready_for_merge: number;
   auto_requeue_count: number | null;
@@ -67,6 +71,11 @@ interface DbRow {
   last_verified_commit: string | null;
   merge_step: string | null;
   auto_merge: number | null;
+  strike_ready_head: string | null;
+  strike_ready_at: number | null;
+  strike_landing_state: string | null;
+  strike_recovery_count: number | null;
+  strike_landing_attempts: string | null;
 }
 
 function rowToReviewStatus(row: DbRow, history: StatusHistoryEntry[]): ReviewStatus {
@@ -79,6 +88,7 @@ function rowToReviewStatus(row: DbRow, history: StatusHistoryEntry[]): ReviewSta
     inspectNotes: row.inspect_notes ?? undefined,
     inspectStartedAt: msToIso(row.inspect_started_at),
     inspectBeadId: row.inspect_bead_id ?? undefined,
+    inspectOwnerSession: row.inspect_owner_session ?? undefined,
     verificationStatus:
       (row.verification_status as ReviewStatus['verificationStatus']) ?? undefined,
     verificationNotes: row.verification_notes ?? undefined,
@@ -87,6 +97,8 @@ function rowToReviewStatus(row: DbRow, history: StatusHistoryEntry[]): ReviewSta
     reviewNotes: row.review_notes ?? undefined,
     testNotes: row.test_notes ?? undefined,
     mergeNotes: row.merge_notes ?? undefined,
+    releaseStatus: (row.release_status as ReviewStatus['releaseStatus']) ?? undefined,
+    releaseNotes: row.release_notes ?? undefined,
     updatedAt: msToIso(row.updated_at) ?? new Date(0).toISOString(),
     readyForMerge: row.ready_for_merge === 1,
     autoRequeueCount: row.auto_requeue_count ?? undefined,
@@ -116,6 +128,13 @@ function rowToReviewStatus(row: DbRow, history: StatusHistoryEntry[]): ReviewSta
       row.auto_merge === null || row.auto_merge === undefined
         ? undefined
         : row.auto_merge === 1,
+    strikeReadyHead: row.strike_ready_head ?? undefined,
+    strikeReadyAt: msToIso(row.strike_ready_at),
+    strikeLandingState: (row.strike_landing_state as ReviewStatus['strikeLandingState']) ?? undefined,
+    strikeRecoveryCount: row.strike_recovery_count ?? undefined,
+    strikeLandingAttempts: row.strike_landing_attempts
+      ? JSON.parse(row.strike_landing_attempts) as ReviewStatus['strikeLandingAttempts']
+      : undefined,
     history: history.length > 0 ? history : undefined,
   });
 }
@@ -157,18 +176,20 @@ export function upsertReviewStatusSync(status: ReviewStatus): void {
       INSERT INTO review_status (
         issue_id, review_status, test_status, merge_status,
         inspect_status, inspect_notes, inspect_started_at, inspect_bead_id,
-        verification_status, verification_notes,
+        inspect_owner_session, verification_status, verification_notes,
         verification_cycle_count, verification_max_cycles,
-        review_notes, test_notes, merge_notes,
+        review_notes, test_notes, merge_notes, release_status, release_notes,
         updated_at, ready_for_merge, auto_requeue_count, merge_retry_count, pr_url,
         pr_head_sha, pr_number,
         stuck, stuck_reason, stuck_at, stuck_details,
         reviewed_at_commit, review_spawned_at, conflict_resolution_dispatched_at,
         test_retry_count, review_retry_count, recovery_started_at,
         deacon_ignored, deacon_ignored_at, deacon_ignored_reason,
-        blocker_reasons, last_verified_commit, merge_step, auto_merge
+        blocker_reasons, last_verified_commit, merge_step, auto_merge,
+        strike_ready_head, strike_ready_at, strike_landing_state,
+        strike_recovery_count, strike_landing_attempts
       ) VALUES (
-        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
       )
       ON CONFLICT(issue_id) DO UPDATE SET
         review_status = excluded.review_status,
@@ -178,6 +199,7 @@ export function upsertReviewStatusSync(status: ReviewStatus): void {
         inspect_notes = excluded.inspect_notes,
         inspect_started_at = excluded.inspect_started_at,
         inspect_bead_id = excluded.inspect_bead_id,
+        inspect_owner_session = excluded.inspect_owner_session,
         verification_status = excluded.verification_status,
         verification_notes = excluded.verification_notes,
         verification_cycle_count = excluded.verification_cycle_count,
@@ -185,6 +207,8 @@ export function upsertReviewStatusSync(status: ReviewStatus): void {
         review_notes = excluded.review_notes,
         test_notes = excluded.test_notes,
         merge_notes = excluded.merge_notes,
+        release_status = excluded.release_status,
+        release_notes = excluded.release_notes,
         updated_at = excluded.updated_at,
         ready_for_merge = excluded.ready_for_merge,
         auto_requeue_count = excluded.auto_requeue_count,
@@ -208,7 +232,12 @@ export function upsertReviewStatusSync(status: ReviewStatus): void {
         blocker_reasons = excluded.blocker_reasons,
         last_verified_commit = excluded.last_verified_commit,
         merge_step = excluded.merge_step,
-        auto_merge = excluded.auto_merge
+        auto_merge = excluded.auto_merge,
+        strike_ready_head = excluded.strike_ready_head,
+        strike_ready_at = excluded.strike_ready_at,
+        strike_landing_state = excluded.strike_landing_state,
+        strike_recovery_count = excluded.strike_recovery_count,
+        strike_landing_attempts = excluded.strike_landing_attempts
     `).run(
       s.issueId,
       s.reviewStatus,
@@ -218,6 +247,7 @@ export function upsertReviewStatusSync(status: ReviewStatus): void {
       null, // inspect_notes — PAN-1988: feedback text lives in the journal, not the DB cache
       isoToMs(s.inspectStartedAt),
       s.inspectBeadId ?? null,
+      s.inspectOwnerSession ?? null,
       s.verificationStatus ?? null,
       null, // verification_notes — PAN-1988: feedback text lives in the journal, not the DB cache
       s.verificationCycleCount ?? null,
@@ -225,6 +255,8 @@ export function upsertReviewStatusSync(status: ReviewStatus): void {
       null, // review_notes — PAN-1988: feedback text lives in the journal, not the DB cache
       null, // test_notes — PAN-1988: journal-only
       null, // merge_notes — PAN-1988: journal-only
+      s.releaseStatus ?? null,
+      s.releaseNotes ?? null,
       isoToMs(s.updatedAt) ?? Date.now(),
       s.readyForMerge ? 1 : 0,
       s.autoRequeueCount ?? null,
@@ -249,6 +281,11 @@ export function upsertReviewStatusSync(status: ReviewStatus): void {
       s.lastVerifiedCommit ?? null,
       s.mergeStep ?? null,
       s.autoMerge === undefined ? null : s.autoMerge ? 1 : 0,
+      s.strikeReadyHead ?? null,
+      isoToMs(s.strikeReadyAt),
+      s.strikeLandingState ?? null,
+      s.strikeRecoveryCount ?? null,
+      s.strikeLandingAttempts ? JSON.stringify(s.strikeLandingAttempts) : null,
     );
 
     if (s.history && s.history.length > 0) {
@@ -455,6 +492,7 @@ export function getMergeBlockerReconcileCandidatesSync(): MergeBlockerReconcileC
     WHERE ready_for_merge = 1
       OR blocker_reasons LIKE '%merge_conflict%'
       OR blocker_reasons LIKE '%not_mergeable%'
+      OR blocker_reasons LIKE '%failing_checks%'
   `).all() as Array<{
     issue_id: string;
     pr_url: string | null;

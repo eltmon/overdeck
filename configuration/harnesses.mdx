@@ -12,7 +12,7 @@ that runs in tmux. The **model** is what the binary calls. They are picked
 independently per spawn.
 
 <Info>
-**Supported today:** `claude-code` (default) and `pi`. For the wider field of
+**Supported today:** `claude-code` (default), `ohmypi`, `codex`, and `acp`. For the wider field of
 coding-agent harnesses Overdeck could adopt next — and how each one handles
 skills, MCP, and AGENTS.md — see the [Harness Landscape](/reference/harness-landscape).
 </Info>
@@ -20,7 +20,9 @@ skills, MCP, and AGENTS.md — see the [Harness Landscape](/reference/harness-la
 | Harness | Binary | Default for | Notes |
 | --- | --- | --- | --- |
 | `claude-code` | [Anthropic Claude Code](https://github.com/anthropics/claude-code) | All workflows | Default if you don't pick. Required for Anthropic-subscription users. |
-| `pi` | [Pi Coding Agent](https://github.com/badlogic/pi-mono) | Multi-provider work, large workspaces | Adds Pi-style RPC over a named pipe; reads `~/.claude/skills` for skill parity. |
+| `ohmypi` | [oh-my-pi](https://github.com/oh-my-pi/pi-coding-agent) (`omp`) | Multi-provider work, large workspaces | Adds oh-my-pi RPC over a named pipe; reads `~/.claude/skills` for skill parity. |
+| `codex` | [OpenAI Codex CLI](https://github.com/openai/codex) (`codex`) | OpenAI-model work | Uses persistent `codex app-server` sessions by default; requires Codex CLI `0.144.0` or newer. |
+| `acp` | [Kimi Code CLI](https://www.kimi.com/code/docs/en/kimi-code-cli/guides/getting-started.html) (`kimi`) | Opt-in Kimi work | Uses the open Agent Client Protocol over a persistent authenticated host; Kimi is the first wired ACP agent. |
 
 ## Supported harnesses
 
@@ -30,58 +32,179 @@ skills, MCP, and AGENTS.md — see the [Harness Landscape](/reference/harness-la
   `claude` and run.
 - Works with both subscription auth (Claude Code OAuth) and API-key auth.
 - All role runs (`plan`, `work`, `review`, `test`, `ship`) default here.
+- Proxied models use a dedicated Claude Code context policy rather than copying
+  every value from the generic model registry. GPT-5.6 Sol, Terra, and Luna use
+  the current ChatGPT/Codex-client route's `372000`-token capacity for both
+  `CLAUDE_CODE_MAX_CONTEXT_TOKENS` and `CLAUDE_CODE_AUTO_COMPACT_WINDOW`.
+  The maximum tells Claude Code the route's capacity; the auto-compact window is
+  the capacity used by Claude Code's normal proactive compaction calculation,
+  not an instruction to compact at exactly that token count. GPT-5.5 keeps its
+  separately measured conservative `150000` auto-compact policy and Kimi K2.7
+  Code keeps its `262144` auto-compact policy without a maximum override. Kimi
+  K3 exports both values from its model capability: `262144` for `k3` and
+  `1048576` for `k3[1m]`, matching Kimi's Claude Code recipe. Anthropic models
+  receive neither override, so Claude Code's native context behavior remains in
+  control.
 
-### Pi (alternative)
+### oh-my-pi / ohmypi (alternative)
 
-- Adds RPC mode (`pi --mode rpc`) so Overdeck can write structured commands to
-  Pi's stdin via a named pipe (`mkfifo` at `~/.overdeck/agents/<agentId>/rpc.in`).
-- Vendored extension at `packages/pi-extension/` reports lifecycle events:
+- Adds RPC mode (`omp --mode rpc`) so Overdeck can write structured commands to
+  omp's stdin via a named pipe (`mkfifo` at `~/.overdeck/agents/<agentId>/rpc.in`).
+- Vendored extension at `packages/ohmypi-extension/` reports lifecycle events:
   `session_start` writes a `ready.json`, `tool_execution_end` updates a
   heartbeat, and a `/pan-done` slash command writes a completion marker.
 - Multi-provider — drives Anthropic, OpenAI, Google, OpenRouter, Minimax,
-  DashScope through Pi's own provider routing.
+  DashScope through omp's own provider routing.
 
-## Installing Pi
+### OpenAI Codex CLI (alternative)
 
-Pi is **not** auto-installed. Install it once, then run `pan doctor` to confirm.
+- First-party OpenAI agent loop for the GPT model family (GPT-5.6 Sol/Terra/Luna,
+  GPT-5.5, GPT-5.4, GPT-5.3-Codex, …) with ChatGPT-subscription or API-key auth.
+- `gpt-5.6-sol` is the default OpenAI model surfaced by this harness.
+- Work agents use a persistent `codex app-server` child by default. Overdeck
+  talks newline-delimited JSON-RPC over stdio, so message delivery, approvals,
+  readiness, and interruption are structured protocol events rather than TUI
+  keystrokes.
+- Set `codex.transport: tui` as a temporary escape hatch to the legacy live,
+  attachable TUI path (`codexMode: work-tui`) under the PTY supervisor.
+  Both transports are persistent sessions — never one-shot `codex exec`.
+- The app-server transport requires Codex CLI `0.144.0` or newer. Upgrade with
+  your normal Codex CLI install method, then verify with `codex --version`.
+- Runtime adapter at `src/lib/runtimes/codex.ts`; per-agent thread-id pinning
+  enables session introspection and cost parsing
+  (`src/lib/cost-parsers/codex-parser.ts`).
+- Native AGENTS.md and Claude-Code-compatible skills; `pan sync` distributes
+  context layers and skills to it like any other harness.
+- Role-declared MCP servers, such as Playwright for the `test` role, are
+  provisioned as `[mcp_servers.<name>]` entries in the per-agent Codex config
+  so browser UAT can run on Codex.
 
-```bash
-npm install -g @mariozechner/pi-coding-agent
-# or — install from the pi-mono repo:
-#   git clone https://github.com/badlogic/pi-mono && cd pi-mono && ./install.sh
+#### Codex command approvals
 
-pan doctor                 # confirms `pi` is on PATH and reports the version
-pan doctor --strict        # exits non-zero if Pi is missing (good for CI)
+Overdeck gives each managed Codex session an isolated `CODEX_HOME`, but links
+its `rules/` directory to your native `~/.codex/rules/` directory when that
+user rule layer exists. Execpolicy approvals you deliberately persist in Codex
+therefore apply to later Overdeck agents instead of prompting once per managed
+home.
+
+For example, this user rule permits the read-only GitHub query without enabling
+network access for every sandboxed process:
+
+```starlark
+prefix_rule(pattern=["gh", "issue", "view"], decision="allow")
 ```
 
-`pan doctor` also checks that `packages/pi-extension/dist/index.js` exists in the
+An `allow` decision runs every matching command outside the sandbox without a
+prompt, so keep patterns as narrow as the operation permits. In particular:
+
+- `gh issue create` and `gh issue comment` accept file-backed body arguments, so
+  allowing either whole prefix also lets the command read and publish any file
+  the host user can access.
+- A broad `git push` prefix includes force pushes, deletion refspecs, arbitrary
+  remotes, and option reordering. Keep it prompt-gated unless you route the push
+  through a command that validates the remote, branch, and non-force semantics.
+- `[sandbox_workspace_write] network_access = true` enables networking for every
+  process in the workspace sandbox. It is broader than a command rule and is
+  unnecessary when only specific trusted commands need network access.
+
+Inspect a rule before relying on it:
+
+```bash
+codex execpolicy check --pretty \
+  --rules ~/.codex/rules/default.rules \
+  -- gh issue view 1896
+```
+
+See the [Codex rules documentation](https://learn.chatgpt.com/docs/agent-configuration/rules)
+for rule precedence and the full execpolicy syntax.
+
+### Agent Client Protocol / Kimi Code CLI (alternative)
+
+[Agent Client Protocol (ACP)](https://agentclientprotocol.com/) is an open,
+newline-delimited JSON-RPC protocol for driving coding agents as persistent
+child processes. Overdeck's native `acp` harness launches the agent without a
+shell and keeps structured prompts, tool calls, approvals, cancellation, and
+session resume off the terminal keystroke path. Kimi Code CLI is the first ACP
+agent wired into Overdeck; other ACP-capable agents require a provider adapter
+before they can be selected.
+
+Install Kimi Code CLI using its
+[getting-started guide](https://www.kimi.com/code/docs/en/kimi-code-cli/guides/getting-started.html),
+then complete the one-time interactive login before starting an ACP session:
+
+```text
+kimi
+/login
+```
+
+The `kimi acp` subprocess reuses those saved credentials. If `/login` has not
+been completed, Overdeck stops the launch with an authentication-required error
+rather than silently switching harnesses. `pan doctor` probes whether the
+optional `kimi` prerequisite is available on `PATH`.
+
+Kimi remains on its built-in `claude-code` default until you opt its provider
+into ACP in `~/.overdeck/config.yaml`:
+
+```yaml
+providers:
+  kimi:
+    harness: acp
+
+acp:
+  permissionMode: auto
+  kimi:
+    # Optional when `kimi` is already on PATH.
+    binaryPath: /opt/kimi/bin/kimi
+```
+
+The provider setting normalizes internally to `providerHarnesses.kimi: acp`.
+Version one supports only `acp.permissionMode: auto`: Overdeck chooses an
+allow option the ACP agent actually advertised, preferring a session-scoped
+allow and then a one-shot allow. A configured ACP route fails loudly when its
+binary or saved authentication is missing; it never falls back to Claude Code.
+
+Each session runs through the authenticated `acp-host` process, with its socket,
+token, ACP session id, and append-only transcript stored under
+`~/.overdeck/agents/<agentId>/`. The runtime adapter is
+`src/lib/runtimes/acp.ts`; Kimi-specific launch and authentication behavior is
+in `src/lib/acp/kimi.ts`.
+
+## Installing oh-my-pi
+
+oh-my-pi is **not** auto-installed. Install it once, then run `pan doctor` to confirm.
+
+```bash
+npm install -g @oh-my-pi/pi-coding-agent
+
+pan doctor                 # confirms `omp` is on PATH and reports the version
+pan doctor --strict        # exits non-zero if omp is missing (good for CI)
+```
+
+`pan doctor` also checks that `packages/ohmypi-extension/dist/index.js` exists in the
 Overdeck workspace. If it doesn't, run:
 
 ```bash
-cd packages/pi-extension && npm run build
+cd packages/ohmypi-extension && npm run build
 ```
 
-The minimum supported Pi version is pinned in `src/cli/commands/doctor.ts`
-(`SUPPORTED_PI_VERSION_MIN`); upgrade Pi if `pan doctor` reports it as too old.
-
-After installing Pi, run `pan sync` once. Overdeck writes
-`~/.pi/agent/settings.json` with a `skills` array pointing at `~/.claude/skills`
-so Pi loads the same skill tree Claude Code does. Existing keys in
+After installing omp, run `pan sync` once. Overdeck writes
+`~/.omp/agent/settings.json` with a `skills` array pointing at `~/.claude/skills`
+so omp loads the same skill tree Claude Code does. Existing keys in
 `settings.json` are preserved.
 
 ### Provider authentication
 
-Overdeck bridges configured API keys into Pi's environment at launch time,
-so you do **not** need to configure auth separately in Pi for most providers.
-When you spawn a Pi agent with a Kimi, MiniMax, Z.AI, MiMo, OpenRouter, Nous,
+Overdeck bridges configured API keys into omp's environment at launch time,
+so you do **not** need to configure auth separately in omp for most providers.
+When you spawn an ohmypi agent with a Kimi, MiniMax, Z.AI, MiMo, OpenRouter, Nous,
 or DashScope model, Overdeck injects the native provider env var
 (`KIMI_API_KEY`, `MINIMAX_API_KEY`, etc.) automatically from your dashboard
 Settings or `~/.overdeck.env`.
 
 Providers that rely on OAuth / subscription auth (Anthropic, OpenAI Codex)
-still require you to log in through Pi directly (`/login` inside a Pi session)
+still require you to log in through omp directly (`/login` inside an omp session)
 or via Overdeck's dedicated subscription flows (Claude Code OAuth, Codex
-CLIProxy auth).
+CLIProxy auth). Use `pan ohmypi-auth` to manage omp credentials from the CLI.
 
 ## Where you pick the harness
 
@@ -90,11 +213,11 @@ The harness is chosen **per spawn** at four user-initiated surfaces:
 | Surface | How |
 | --- | --- |
 | Plan kickoff (start-planning) | Harness/model picker in the kickoff dialog. |
-| Work agent start (CLI) | `pan start <ISSUE> --harness pi --model <id>`. Default is `claude-code`. |
+| Work agent start (CLI) | `pan start <ISSUE> --harness ohmypi --model <id>`. Default is `claude-code`. |
 | Work agent start (Dashboard) | "Start" button menu lets you pick harness + model before launch. |
 | Conversation panel | Harness/model selector at the top of the panel. |
 
-There is **no per-issue lock** — an issue planned with Pi can have a Claude Code
+There is **no per-issue lock** — an issue planned with ohmypi can have a Claude Code
 review agent on the same PR, and vice versa.
 
 ### Switching harness on a live conversation (experimental)
@@ -133,7 +256,7 @@ There is exactly **one blocked combination**, gated by
 `canUseHarness(harness, model, authMode)` in `src/lib/harness-policy.ts`:
 
 <Warning>
-**Blocked:** `pi` + Anthropic model + Anthropic auth = `subscription`
+**Blocked:** `ohmypi` + Anthropic model + Anthropic auth = `subscription`
 </Warning>
 
 This is required by the Claude Code subscription terms — only the `claude-code`
@@ -143,15 +266,37 @@ OAuth subscription. Everything else is allowed:
 | Harness | Model provider | Anthropic auth mode | Allowed? |
 | --- | --- | --- | --- |
 | claude-code | any | any | ✅ |
-| pi | non-Anthropic (OpenAI/Google/OpenRouter/Minimax/DashScope/...) | any | ✅ |
-| pi | Anthropic | API key | ✅ |
-| pi | Anthropic | subscription | 🚫 |
-| pi | Anthropic | unset (no Anthropic auth) | ✅ |
+| ohmypi | non-Anthropic (OpenAI/Google/OpenRouter/Minimax/DashScope/...) | any | ✅ |
+| ohmypi | Anthropic | API key | ✅ |
+| ohmypi | Anthropic | subscription | 🚫 |
+| ohmypi | Anthropic | unset (no Anthropic auth) | ✅ |
 
 The gate is evaluated at every spawn entry point and at every picker UI so a
 stale Settings selection cannot bypass it. When the pipeline routes a role run
 into the blocked cell, it falls back to `claude-code` and emits a `console.warn`
 rather than failing the whole pipeline.
+
+### What you see in the pickers
+
+The pickers consult the same `canUseHarness(harness, model, authMode)` policy as
+the spawn entry points, so the blocked combination is caught before you click
+**Start**. The UI surfaces the block in two places:
+
+- **Model list:** when the selected harness cannot run a model, that model row
+  is disabled (locked) and its tooltip shows the reason.
+- **Harness list:** when the current model is blocked for a harness, the harness
+  option is `disabled` (non-clickable) and renders the decision reason as
+  visible inline text — not only in the tooltip — so the block is readable
+  without hover.
+
+The inline reason names the restriction as a **Claude Code subscription Terms of
+Service** rule, and tells you how to proceed: switch Anthropic to API-key auth,
+or pick a non-Anthropic model for ohmypi.
+
+This behavior applies in the plan kickoff dialog, work-agent start menu,
+conversation panel, and Settings per-role harness selectors. Blocked clicks are
+inert — they do not fire `onChange` / `onHarnessChange` and do not auto-flip the
+model.
 
 ### Auth mode is exclusive
 
@@ -161,51 +306,58 @@ the environment. Set one or the other, not both.
 
 ## Troubleshooting
 
-### "Pi not on PATH" or wrong version
+### "omp not on PATH" or wrong version
 
-Run `pan doctor`. The Pi check reports OK / missing / too-old with the resolved
+Run `pan doctor`. The ohmypi check reports OK / missing / too-old with the resolved
 version. The fix message includes the install/upgrade command.
 
-### Pi spawns but the agent never reaches "ready"
+### omp spawns but the agent never reaches "ready"
 
 Check `~/.overdeck/agents/<id>/ready.json` — the vendored extension writes this
 on `session_start`. If it never appears:
 
-1. Confirm `packages/pi-extension/dist/index.js` exists (`pan doctor` will warn).
-2. Tail the tmux session: `tmux -L overdeck attach -t agent-<id>`. Pi prints
+1. Confirm `packages/ohmypi-extension/dist/index.js` exists (`pan doctor` will warn).
+2. Tail the tmux session: `tmux -L overdeck attach -t agent-<id>`. omp prints
    stdout to the pane; structural errors show up there.
 3. Verify the named pipe exists at `~/.overdeck/agents/<id>/rpc.in`. If a stale
-   regular file is in its place, `createPiFifo` replaces it on next spawn.
+   regular file is in its place, `createOhmypiFifo` replaces it on next spawn.
 
-### Pi heartbeat is stale but the agent is working
+### ohmypi heartbeat is stale but the agent is working
 
-`PiRuntime.getHeartbeat()` walks three sources in priority order: active
+`OhmypiRuntime.getHeartbeat()` walks three sources in priority order: active
 heartbeat (&lt;60s old) → JSONL session mtime → tmux session created timestamp.
 If your dashboard shows a stale heartbeat, check
-`~/.overdeck/heartbeats/<id>.json` — Pi writes there on every
+`~/.overdeck/heartbeats/<id>.json` — omp writes there on every
 `tool_execution_end`.
+
+### Codex app-server is unavailable or too old
+
+Run `codex --version`. The app-server transport requires Codex CLI `0.144.0`
+or newer and the `codex app-server` subcommand. If the version is too old,
+upgrade Codex CLI and start a fresh session. To keep work moving during a
+rollout, set `codex.transport: tui` to use the legacy TUI transport temporarily.
 
 ## Tradeoffs
 
 ### RPC over named pipe vs tmux paste-buffer
 
-Pi's harness uses a per-agent `mkfifo` (`~/.overdeck/agents/<id>/rpc.in`) for
+ohmypi's harness uses a per-agent `mkfifo` (`~/.overdeck/agents/<id>/rpc.in`) for
 command delivery. Claude Code uses tmux's `load-buffer` + `paste-buffer`
 pattern. The fifo path:
 
 - skips the 300ms paste-render wait Claude Code needs;
-- gives Pi its own structured RPC channel separate from the visible tmux pane;
-- keeps the agent inside tmux for crash isolation and visual attach (Pi's stdout
+- gives omp its own structured RPC channel separate from the visible tmux pane;
+- keeps the agent inside tmux for crash isolation and visual attach (omp's stdout
   still flows into the pane).
 
-The downside: a reader-less fifo throws `ENXIO` immediately, so `writePiCommand`
-returns a typed `PiNotReady` error and the runtime adapter recycles the agent
+The downside: a reader-less fifo throws `ENXIO` immediately, so `writeOhmypiCommand`
+returns a typed `OhmypiNotReady` error and the runtime adapter recycles the agent
 rather than blocking on the open call.
 
-### Multi-provider via Pi vs CLIProxy
+### Multi-provider via ohmypi vs CLIProxy
 
-Both Pi (with native multi-provider routing) and Claude Code (via the CLIProxy
-auth shim) can drive non-Anthropic models. Pi gives you provider routing without
+Both ohmypi (with native multi-provider routing) and Claude Code (via the CLIProxy
+auth shim) can drive non-Anthropic models. ohmypi gives you provider routing without
 an extra middleware process; CLIProxy gives you Claude Code's tooling/UX with
 non-Anthropic providers. Pick by which UX you want — there is no correctness
 difference today.
@@ -214,23 +366,23 @@ difference today.
 
 - **Default to `claude-code`** for Anthropic-subscription users and for roles
   whose instructions rely on Claude Code agent definitions.
-- **Switch to `pi`** when you need a non-Anthropic provider, when you want Pi's
+- **Switch to `ohmypi`** when you need a non-Anthropic provider, when you want omp's
   compact-context behavior, or when you're driving a long-running session where
   the named-pipe RPC is materially faster than paste-buffer delivery.
-- **Mix per role** in Settings if you want, e.g., a Pi work role feeding a
+- **Mix per role** in Settings if you want, e.g., an ohmypi work role feeding a
   Claude Code review role.
 
 ## Implementation
 
-- `src/lib/runtimes/pi.ts` — `PiRuntime` (the `AgentRuntime` adapter for Pi)
-- `src/lib/runtimes/pi-fifo.ts` — `createPiFifo`, `writePiCommand`, `PiNotReady`
-- `src/lib/cost-parsers/pi-parser.ts` — Pi v3 JSONL active-branch walker
+- `src/lib/runtimes/ohmypi.ts` — `OhmypiRuntime` (the `AgentRuntime` adapter for omp)
+- `src/lib/runtimes/ohmypi-fifo.ts` — `createOhmypiFifo`, `writeOhmypiCommandSync`, `OhmypiNotReady`
+- `src/lib/cost-parsers/ohmypi-parser.ts` — omp JSONL active-branch walker
 - `src/lib/harness-policy.ts` — `canUseHarness` ToS gate
-- `packages/pi-extension/` — vendored lifecycle extension Pi loads via `--extension`
+- `packages/ohmypi-extension/` — vendored lifecycle extension omp loads via `--extension`
 
 ## See also
 
-- [Harness Landscape](/reference/harness-landscape) — survey of 13 coding-agent
+- [Harness Landscape](/reference/harness-landscape) — survey of coding-agent
   harnesses and their extensibility mechanisms
 - [Template Conversations](/reference/template-conversations) — proposal for
   loading curated skill bundles into a single conversation

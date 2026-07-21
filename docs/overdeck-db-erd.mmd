@@ -69,8 +69,8 @@ erDiagram
     text cleared_to_conv_id
     text tmux_session
     text status
-    text ended_at
-    text last_attached_at
+    integer ended_at
+    integer last_attached_at
     text session_file
     real total_cost
     integer total_tokens
@@ -175,11 +175,6 @@ erDiagram
     integer created_at
     integer updated_at
   }
-  OBSERVATION_INDEX {
-    text id PK
-    text observation_path_jsonl
-    integer byte_offset
-  }
   PENDING_AUTO_MERGES {
     integer id PK
     text issue_id
@@ -193,14 +188,6 @@ erDiagram
     text failure_reason
     integer cancelled_at
     text cancelled_by
-  }
-  RESET_MARKERS {
-    integer id PK
-    text scope
-    text scope_id
-    integer from_timestamp
-    text reason
-    integer created_at
   }
   REVIEW_RUN_AGENTS {
     integer id PK
@@ -234,7 +221,7 @@ erDiagram
     text merge_status
     text inspect_status
     text inspect_notes
-    text inspect_started_at
+    integer inspect_started_at
     text inspect_bead_id
     text verification_status
     text verification_notes
@@ -243,7 +230,7 @@ erDiagram
     text review_notes
     text test_notes
     text merge_notes
-    text updated_at
+    integer updated_at
     integer ready_for_merge
     integer auto_requeue_count
     integer merge_retry_count
@@ -252,16 +239,16 @@ erDiagram
     integer pr_number
     integer stuck
     text stuck_reason
-    text stuck_at
+    integer stuck_at
     text stuck_details
     text reviewed_at_commit
-    text review_spawned_at
-    text conflict_resolution_dispatched_at
+    integer review_spawned_at
+    integer conflict_resolution_dispatched_at
     integer test_retry_count
     integer review_retry_count
-    text recovery_started_at
+    integer recovery_started_at
     integer deacon_ignored
-    text deacon_ignored_at
+    integer deacon_ignored_at
     text deacon_ignored_reason
     text blocker_reasons
     text last_verified_commit
@@ -344,8 +331,8 @@ erDiagram
     text workspace_path
     text workspace_hash
     integer message_count
-    text first_ts
-    text last_ts
+    integer first_ts
+    integer last_ts
     text models_used
     text primary_model
     integer token_input
@@ -358,14 +345,14 @@ erDiagram
     text summary_detailed
     integer enrichment_level
     text enrichment_model
-    text enriched_at
+    integer enriched_at
     integer enrichment_failed
     integer overdeck_managed
     text pan_issue_id
     text pan_agent_id
     integer file_size
-    text file_mtime
-    text scanned_at
+    integer file_mtime
+    integer scanned_at
   }
   DISCOVERED_SESSION_TAGS {
     integer session_id PK FK
@@ -384,7 +371,7 @@ erDiagram
     text model PK
     integer dim
     blob embedding
-    text created_at
+    integer created_at
   }
   GIT_OPERATIONS {
     integer id PK
@@ -396,19 +383,19 @@ erDiagram
     text remote_sha
     text status
     text error
-    text ts
+    integer ts
   }
   FLYWHEEL_SUBSTRATE_BUGS {
     text issue_id PK
-    text filed_at
+    integer filed_at
     text run_id
     text filed_by
     text discovered_in_issue_id
     text severity
     text status
-    text fix_merged_at
+    integer fix_merged_at
     text fix_commit_sha
-    text updated_at
+    integer updated_at
   }
 
   AGENTS }o--|| ISSUES : issue_id

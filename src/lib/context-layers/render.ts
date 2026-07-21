@@ -10,7 +10,7 @@
 import type { Harness } from '@overdeck/contracts';
 import { renderForHarness } from './harness.js';
 import { renderBundledRules } from './rules.js';
-import { globalContextFile, projectContextFile, readLayerContent } from './layers.js';
+import { globalContextFile, resolveProjectContextFile, readLayerContent } from './layers.js';
 
 /** Opening marker of the Overdeck-managed region in a target CLAUDE.md. */
 export const REGION_BEGIN =
@@ -18,6 +18,19 @@ export const REGION_BEGIN =
 
 /** Closing marker of the Overdeck-managed region. */
 export const REGION_END = '<!-- END OVERDECK CONTEXT -->';
+
+const BEADS_REGION = /<!-- BEGIN BEADS INTEGRATION\b[\s\S]*?<!-- END BEADS INTEGRATION -->\s*/g;
+
+/**
+ * Remove bd's generic agent-policy block before Overdeck renders its canonical
+ * project context. The Beads block's conservative/minimal profiles forbid the
+ * commit and push operations that managed work agents must perform per bead.
+ * Its marker makes the ownership unambiguous; hand-authored content remains.
+ */
+export function stripBeadsManagedRegion(existing: string): string {
+  if (!existing.includes('<!-- BEGIN BEADS INTEGRATION')) return existing;
+  return existing.replace(BEADS_REGION, '').replace(/\n{3,}/g, '\n\n').trimEnd();
+}
 
 /**
  * Insert or replace the Overdeck-managed region inside an existing file.
@@ -28,6 +41,7 @@ export const REGION_END = '<!-- END OVERDECK CONTEXT -->';
  * span between the markers.
  */
 export function applyManagedRegion(existing: string, managed: string): string {
+  existing = stripBeadsManagedRegion(existing);
   const region = `${REGION_BEGIN}\n${managed.trim()}\n${REGION_END}`;
   const beginIdx = existing.indexOf(REGION_BEGIN);
   // Use the LAST end-marker, not the first. Layer content may legitimately
@@ -93,7 +107,7 @@ export function renderGlobalLayer(harness: Harness, includeDevRules: boolean): s
  * `project.md` — sync then leaves that project's CLAUDE.md alone.
  */
 export function renderProjectLayer(projectRoot: string, harness: Harness): string {
-  const raw = readLayerContent(projectContextFile(projectRoot));
+  const raw = readLayerContent(resolveProjectContextFile(projectRoot));
   if (raw.trim().length === 0) return '';
   return renderForHarness(raw, harness).trim();
 }

@@ -7,14 +7,14 @@ class FakeWatcher {
   handlers = new Map<string, Array<(arg: string) => void>>();
   close = vi.fn(async () => undefined);
 
-  on(event: 'add' | 'change' | 'error', callback: (arg: string) => void): this {
+  on(event: 'add' | 'change' | 'unlink' | 'error', callback: (arg: string) => void): this {
     const existing = this.handlers.get(event) ?? [];
     existing.push(callback);
     this.handlers.set(event, existing);
     return this;
   }
 
-  emit(event: 'add' | 'change', filePath: string): void {
+  emit(event: 'add' | 'change' | 'unlink', filePath: string): void {
     for (const handler of this.handlers.get(event) ?? []) handler(filePath);
   }
 }
@@ -45,8 +45,8 @@ describe('conversation search watcher', () => {
 
   it('debounces JSONL changes into incremental index calls after startup scan', async () => {
     const fakeWatcher = new FakeWatcher();
-    const indexAll = vi.fn(async () => ({ filesScanned: 1, filesIndexed: 1, chunksIndexed: 1, chunksSkipped: 0, errors: [], disabled: false }));
-    const indexFile = vi.fn(async () => ({ filesScanned: 1, filesIndexed: 1, chunksIndexed: 1, chunksSkipped: 0, errors: [], disabled: false }));
+    const indexAll = vi.fn(async () => ({ filesScanned: 1, filesIndexed: 1, chunksIndexed: 1, chunksSkipped: 0, sessionsPruned: 0, errors: [], disabled: false }));
+    const indexFile = vi.fn(async () => ({ filesScanned: 1, filesIndexed: 1, chunksIndexed: 1, chunksSkipped: 0, sessionsPruned: 0, errors: [], disabled: false }));
     const watcher = new ConversationSearchWatcher({
       config: config(),
       roots: ['/tmp/conversations'],
@@ -73,20 +73,20 @@ describe('conversation search watcher', () => {
 
   it('coalesces changes for a file while an index call is already in flight', async () => {
     const fakeWatcher = new FakeWatcher();
-    let resolveFirst!: (value: { filesScanned: number; filesIndexed: number; chunksIndexed: number; chunksSkipped: number; errors: []; disabled: false }) => void;
-    const firstResult = new Promise<{ filesScanned: number; filesIndexed: number; chunksIndexed: number; chunksSkipped: number; errors: []; disabled: false }>((resolve) => {
+    let resolveFirst!: (value: { filesScanned: number; filesIndexed: number; chunksIndexed: number; chunksSkipped: number; sessionsPruned: number; errors: []; disabled: false }) => void;
+    const firstResult = new Promise<{ filesScanned: number; filesIndexed: number; chunksIndexed: number; chunksSkipped: number; sessionsPruned: number; errors: []; disabled: false }>((resolve) => {
       resolveFirst = resolve;
     });
     const indexFile = vi
       .fn()
       .mockImplementationOnce(() => firstResult)
-      .mockResolvedValue({ filesScanned: 1, filesIndexed: 1, chunksIndexed: 1, chunksSkipped: 0, errors: [], disabled: false });
+      .mockResolvedValue({ filesScanned: 1, filesIndexed: 1, chunksIndexed: 1, chunksSkipped: 0, sessionsPruned: 0, errors: [], disabled: false });
     const watcher = new ConversationSearchWatcher({
       config: config(),
       roots: ['/tmp/conversations'],
       debounceMs: 25,
       watchFactory: vi.fn(() => fakeWatcher),
-      indexAll: vi.fn(async () => ({ filesScanned: 0, filesIndexed: 0, chunksIndexed: 0, chunksSkipped: 0, errors: [], disabled: false })),
+      indexAll: vi.fn(async () => ({ filesScanned: 0, filesIndexed: 0, chunksIndexed: 0, chunksSkipped: 0, sessionsPruned: 0, errors: [], disabled: false })),
       indexFile,
       maxConcurrentIndexers: 1,
       log: { log: vi.fn(), warn: vi.fn() },
@@ -101,11 +101,39 @@ describe('conversation search watcher', () => {
     await vi.advanceTimersByTimeAsync(25);
     expect(indexFile).toHaveBeenCalledTimes(1);
 
-    resolveFirst({ filesScanned: 1, filesIndexed: 1, chunksIndexed: 1, chunksSkipped: 0, errors: [], disabled: false });
+    resolveFirst({ filesScanned: 1, filesIndexed: 1, chunksIndexed: 1, chunksSkipped: 0, sessionsPruned: 0, errors: [], disabled: false });
     await Promise.resolve();
     await Promise.resolve();
 
     expect(indexFile).toHaveBeenCalledTimes(2);
+  });
+
+  it('prunes the index when a watched JSONL file is deleted', async () => {
+    const fakeWatcher = new FakeWatcher();
+    const removeFile = vi.fn(async () => undefined);
+    const indexFile = vi.fn(async () => ({ filesScanned: 1, filesIndexed: 1, chunksIndexed: 1, chunksSkipped: 0, sessionsPruned: 0, errors: [], disabled: false }));
+    const watcher = new ConversationSearchWatcher({
+      config: config(),
+      roots: ['/tmp/conversations'],
+      debounceMs: 25,
+      watchFactory: vi.fn(() => fakeWatcher),
+      indexAll: vi.fn(async () => ({ filesScanned: 0, filesIndexed: 0, chunksIndexed: 0, chunksSkipped: 0, sessionsPruned: 0, errors: [], disabled: false })),
+      indexFile,
+      removeFile,
+      log: { log: vi.fn(), warn: vi.fn() },
+    });
+
+    watcher.start();
+    // A change lands first and sits in the debounce window; the delete must cancel it.
+    fakeWatcher.emit('change', '/tmp/conversations/session-a.jsonl');
+    fakeWatcher.emit('unlink', '/tmp/conversations/session-a.jsonl');
+    await vi.advanceTimersByTimeAsync(50);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(removeFile).toHaveBeenCalledTimes(1);
+    expect(removeFile).toHaveBeenCalledWith(expect.objectContaining({ filePath: '/tmp/conversations/session-a.jsonl', config: config() }));
+    expect(indexFile).not.toHaveBeenCalled();
   });
 
   it('aborts and awaits startup indexing when stopped', async () => {
@@ -113,8 +141,8 @@ describe('conversation search watcher', () => {
     let startupSignal: AbortSignal | undefined;
     const indexAll = vi.fn(({ signal }: { signal?: AbortSignal }) => {
       startupSignal = signal;
-      return new Promise<{ filesScanned: number; filesIndexed: number; chunksIndexed: number; chunksSkipped: number; errors: []; disabled: false }>((resolve) => {
-        signal?.addEventListener('abort', () => resolve({ filesScanned: 0, filesIndexed: 0, chunksIndexed: 0, chunksSkipped: 0, errors: [], disabled: false }), { once: true });
+      return new Promise<{ filesScanned: number; filesIndexed: number; chunksIndexed: number; chunksSkipped: number; sessionsPruned: number; errors: []; disabled: false }>((resolve) => {
+        signal?.addEventListener('abort', () => resolve({ filesScanned: 0, filesIndexed: 0, chunksIndexed: 0, chunksSkipped: 0, sessionsPruned: 0, errors: [], disabled: false }), { once: true });
       });
     });
     const watcher = new ConversationSearchWatcher({
@@ -150,7 +178,7 @@ describe('conversation search watcher', () => {
       config: config(),
       roots: ['/tmp/conversations'],
       watchFactory,
-      indexAll: vi.fn(async () => ({ filesScanned: 0, filesIndexed: 0, chunksIndexed: 0, chunksSkipped: 0, errors: [], disabled: false })),
+      indexAll: vi.fn(async () => ({ filesScanned: 0, filesIndexed: 0, chunksIndexed: 0, chunksSkipped: 0, sessionsPruned: 0, errors: [], disabled: false })),
       indexFile: vi.fn(),
       log: { log: vi.fn(), warn: vi.fn() },
     });

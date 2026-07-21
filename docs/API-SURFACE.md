@@ -80,7 +80,27 @@ Verdicts (the one piece of state with no durable home — see #1922) are written
 ### 🔴 F. Cost — **five modules**
 `costs.ts` (13) · `GET /api/agents/:id/cost` · `GET /api/metrics/costs` · `GET /api/issues/:id/costs` · `GET /api/specialists/:name/cost`. (And see PAN-1935 — pi/kimi spend isn't even captured.)
 
-### 🟡 G. Health/liveness — `misc` (`/api/health/agents`, `/api/system/health`, `/api/godview/system-health`), `show` (`/:id/health`), `agents` (`health-history`, `cloister-health`, `tmux-alive`, `has-session`), `cloister` (`agents/health`), `metrics` (`stuck`).
+### 🟡 G. Health/liveness
+
+The V2 health routes share accepted domain evidence rather than recollecting it through each endpoint:
+
+| Route | Contract | Status |
+|---|---|---|
+| `GET /api/system/health` | Canonical accepted V2 snapshot: overall state plus host, admission, agent, and service domains. Unavailable measurements are `null`. | Canonical read door |
+| `GET /api/health/agents` | Agent-domain projection using the canonical agent/read-model state and tmux liveness. | Supported projection |
+| `GET /api/deploy/staleness` | Build commit versus `origin/main`; deployment freshness is separate from runtime health. | Canonical deployment read door |
+| `GET /api/godview/system-health` | Legacy God View shape projected from the accepted V2 snapshot. | Compatibility |
+| V2 `summary` field | Legacy aggregate fields projected from V2. Missing measurements become zero only inside this compatibility object. | Compatibility |
+| `GET /api/resources` | Resource and cleanup surface that consumes the same accepted health evidence where health is shown. | Retained surface |
+
+Other liveness endpoints remain in `show` (`/:id/health`), `agents` (`health-history`,
+`cloister-health`, `tmux-alive`, `has-session`), `cloister` (`agents/health`), and `metrics` (`stuck`),
+but they answer narrower per-agent or diagnostic questions rather than replacing the V2 system snapshot.
+
+**Legacy health compatibility exit gate:** do not remove `GET /api/godview/system-health` or the V2
+`summary` projection until every first-party consumer reads the V2 domain fields, the compatibility
+release cycle promised by the contract has elapsed, and a no-loss audit proves that no supported UI,
+CLI, or API consumer still depends on the legacy shape.
 
 ### 🟢 H. Cohesive (single-home, fine as-is)
 - **Conversations** — `conversations.ts` (27)
@@ -122,7 +142,7 @@ recovery breaking. (#1921 is meant to be the single write surface; it is not bui
 
 ```
         SOURCES OF TRUTH   (durable · travel with the repo · survive a DB wipe)
-  GitHub (issue/PR status) · git .pan/records (plans, decisions, verdicts) · JSONL · tmux
+  GitHub (issue/PR status) · git `records/` on `overdeck-state` (plans, decisions, verdicts) · JSONL · tmux
                           │  ▲
                   ONE sync layer   (reconstruction #1920 hydrates ▼ ;  writer mirrors ▲ to git)
                           ▼  │
@@ -141,7 +161,7 @@ recovery breaking. (#1921 is meant to be the single write surface; it is not bui
 ```
 
 **The five rules that make it true:**
-1. Durable truth lives **only** in the sources (GitHub, git `.pan/records`, JSONL, tmux). They travel.
+1. Durable truth lives **only** in the sources (GitHub, git `records/` on `overdeck-state`, JSONL, tmux). They travel.
 2. **One sync layer**: reconstruction (#1920) rebuilds the DB from sources; the writer mirrors writes back
    to git for durability/travel.
 3. The **DB is the one surface** running code uses — a cache, never the truth.

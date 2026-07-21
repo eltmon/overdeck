@@ -15,6 +15,11 @@ vi.mock('../../review-status.js', () => ({
   setReviewStatusSync: vi.fn(),
 }));
 
+vi.mock('../merge-verification.js', () => ({
+  shouldSkipDispatchAsMerged: vi.fn(async () => ({ skip: false, reason: 'open' })),
+  verifyMergedBeforeLifecycle: vi.fn(),
+}));
+
 import { spawnRun } from '../../agents.js';
 import { resolveProjectFromIssueSync } from '../../projects.js';
 import { setReviewStatusSync } from '../../review-status.js';
@@ -40,6 +45,16 @@ describe('test role dispatch', () => {
     expect(prompt).toContain('"testStatus":"passed"');
     expect(prompt).not.toContain('readyForMerge');
     expect(prompt).toContain('Do NOT spawn, wake, or delegate to test-agent or uat-agent specialists');
+  });
+
+  it('points test roles at durable records instead of retired workspace-local planning files', () => {
+    const prompt = buildTestRolePrompt({ issueId: 'PAN-503' });
+
+    expect(prompt).toContain('.pan/records/pan-503.json');
+    expect(prompt).toContain('the canonical xBRIEF under .pan/specs/ for PAN-503');
+    expect(prompt).toContain('Do not require retired workspace-local .pan/continue.json or .pan/spec.vbrief.json files to exist.');
+    expect(prompt).not.toContain('Read .pan/continue.json');
+    expect(prompt).not.toContain('Read .pan/spec.vbrief.json');
   });
 
   it('instructs the test role to write the .pan/test/result.json verdict artifact before POSTing (PAN-1681)', () => {

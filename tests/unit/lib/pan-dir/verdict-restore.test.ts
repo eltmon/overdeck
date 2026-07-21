@@ -73,11 +73,11 @@ beforeEach(() => {
   odb = setupOverdeckTestDb();
   mockUpdateIssueRecordForIssue.mockClear();
   mockRefreshMergeStateFromGitHub.mockClear();
-});
+}, 30_000);
 
 afterEach(() => {
-  testDb.close();
-  teardownOverdeckTestDb(odb);
+  testDb?.close();
+  if (odb) teardownOverdeckTestDb(odb);
 });
 
 // ============== Import after mocks ==============
@@ -128,7 +128,7 @@ describe('restoreReviewStatusFromRecords', () => {
   });
 
   afterEach(() => {
-    rmSync(projectRoot, { recursive: true, force: true });
+    if (projectRoot) rmSync(projectRoot, { recursive: true, force: true });
   });
 
   function writeRecord(issueId: string, pipeline: Record<string, unknown>): void {
@@ -340,6 +340,8 @@ describe('restoreReviewStatusFromRecords', () => {
       'deacon_ignored_at',
       'deacon_ignored_reason',
       'merge_step',
+      'release_status',
+      'release_notes',
     ]);
 
     // Columns re-derived live or computed by the write path after restore

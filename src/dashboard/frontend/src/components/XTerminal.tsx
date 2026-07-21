@@ -4,7 +4,13 @@ import { FitAddon } from '@xterm/addon-fit';
 import { WebglAddon } from '@xterm/addon-webgl';
 import '@xterm/xterm/css/xterm.css';
 import { Sun, Moon, SunMoon } from 'lucide-react';
+import { toast } from 'sonner';
 import { useTheme } from '../hooks/useTheme';
+import {
+  createReconnectJitter,
+  nextReconnectDelay,
+  type ReconnectPolicyState,
+} from '../lib/terminalReconnectPolicy';
 
 // Terminal background, exported so embedders can match the surrounding chrome.
 // Must match TERMINAL_BG in src/lib/ui-theme.ts — new tmux sessions stamp
@@ -73,6 +79,10 @@ interface XTerminalProps {
   embedded?: boolean;
 }
 
+type ConnectionStatus = 'connected' | 'reconnecting' | 'restarting' | 'failed';
+
+const SERVER_RESTARTING_CLOSE_CODE = 4503;
+
 interface TerminalSnapshotMessage {
   type: 'snapshot';
   cols: number;
@@ -96,6 +106,7 @@ interface ContextMenuState {
 
 // Storage key for auto-copy preference
 const AUTOCOPY_STORAGE_KEY = 'overdeck.terminal.autoCopyOnSelect';
+const CTRLV_PASTE_STORAGE_KEY = 'overdeck.terminal.ctrlVPaste';
 
 // Check if platform is Mac
 const isMac = navigator.platform.toLowerCase().includes('mac');
@@ -131,13 +142,16 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
   const terminalInstance = useRef<Terminal | null>(null);
   const fitAddon = useRef<FitAddon | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
-  const reconnectAttempts = useRef(0);
+  const connectionCleanupRef = useRef<(() => void) | null>(null);
+  const reconnectPolicy = useRef<ReconnectPolicyState | null>(null);
+  const [reconnectJitterMs] = useState(() => createReconnectJitter());
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const connectRef = useRef<(() => void) | null>(null);
+  const mountedRef = useRef(false);
   const remoteSize = useRef<{ cols: number; rows: number } | null>(null);
   const requestedSize = useRef<{ cols: number; rows: number } | null>(null);
   const readyForLiveData = useRef(false);
-  const maxReconnectAttempts = 5;
-  const [shouldReconnect, setShouldReconnect] = useState(true);
+  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('connected');
 
   // Auto-copy state from localStorage or prop
   const [autoCopyOnSelect, setAutoCopyOnSelect] = useState(() => {
@@ -145,6 +159,19 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
     const stored = localStorage.getItem(AUTOCOPY_STORAGE_KEY);
     return stored === null ? true : stored === 'true';
   });
+
+  // Ctrl+V-pastes state from localStorage (non-Mac only; Mac pastes with Cmd+V).
+  // Default ON: plain Ctrl+V triggers the browser's native paste. Turned off,
+  // Ctrl+V reaches the pty as a literal ^V (e.g. vim visual-block) and paste
+  // falls back to Ctrl+Shift+V / the context menu.
+  const [ctrlVPaste, setCtrlVPaste] = useState(() => {
+    const stored = localStorage.getItem(CTRLV_PASTE_STORAGE_KEY);
+    return stored == null ? true : stored === 'true';
+  });
+  // Read through a ref inside the custom key handler so toggling the setting
+  // takes effect immediately without tearing down and recreating the terminal.
+  const ctrlVPasteRef = useRef(ctrlVPaste);
+  ctrlVPasteRef.current = ctrlVPaste;
 
   // Context menu state
   const [contextMenu, setContextMenu] = useState<ContextMenuState>({
@@ -170,10 +197,14 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
     }
   }, [autoCopyOnSelect]);
 
-  // Calculate exponential backoff delay: 1s, 2s, 4s, 8s, max 30s
-  const getReconnectDelay = (attempt: number): number => {
-    return Math.min(1000 * Math.pow(2, attempt), 30000);
-  };
+  // Persist Ctrl+V-pastes setting to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem(CTRLV_PASTE_STORAGE_KEY, String(ctrlVPaste));
+    } catch (err) {
+      console.error('Failed to save Ctrl+V paste setting:', err);
+    }
+  }, [ctrlVPaste]);
 
   const getMeasuredSize = useCallback((): { cols: number; rows: number } | null => {
     const term = terminalInstance.current;
@@ -236,10 +267,26 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
     }
   }, []);
 
-  // Paste from clipboard
+  // Paste from clipboard. Used by the right-click context menu, where there is
+  // no native browser `paste` event to lean on (unlike keyboard Ctrl+V/Cmd+V,
+  // which xterm.js handles natively via its helper textarea's `paste` listener —
+  // see handleKeyDown). This path must go through navigator.clipboard.readText(),
+  // which requires the document to be focused (Chrome throws
+  // "NotAllowedError: Document is not focused" otherwise) and is unsupported for
+  // arbitrary page content in Firefox. Re-focus the terminal first, and surface
+  // a visible, actionable error instead of failing silently. (PAN-2529)
   const pasteFromClipboard = useCallback(async () => {
     const term = terminalInstance.current;
     if (!term) return;
+
+    // Restore focus to xterm's helper textarea — clicking a custom context-menu
+    // item moves focus off the document, which makes readText() reject in Chrome.
+    term.focus();
+
+    if (!navigator.clipboard?.readText) {
+      toast.error('Paste unavailable here — use Ctrl+V / Cmd+V to paste into the terminal.');
+      return;
+    }
 
     try {
       const text = await navigator.clipboard.readText();
@@ -249,31 +296,43 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
       }
     } catch (err) {
       console.error('Failed to read from clipboard:', err);
+      toast.error('Could not read the clipboard — use Ctrl+V / Cmd+V to paste into the terminal.');
     }
   }, []);
 
-  // Handle keyboard shortcuts
-  const handleKeyDown = useCallback((event: KeyboardEvent) => {
+  // Handle keyboard shortcuts before xterm converts them into PTY input.
+  const handleKeyEvent = useCallback((event: KeyboardEvent): boolean => {
     const term = terminalInstance.current;
-    if (!term) return;
+    if (!term) return true;
 
     const isCmdOrCtrl = isMac ? event.metaKey : event.ctrlKey;
 
-    // Ctrl+C / Cmd+C: Copy if selection, else send interrupt
-    if (isCmdOrCtrl && event.key.toLowerCase() === 'c') {
-      if (term.hasSelection()) {
-        event.preventDefault();
-        copySelection();
-      }
-      // If no selection, let terminal handle (interrupt signal)
+    // Ctrl+C / Cmd+C: copy an active selection and tell xterm not to send ^C.
+    // Without a selection, return true so Ctrl+C keeps its terminal interrupt
+    // meaning.
+    if (event.type === 'keydown' && isCmdOrCtrl && event.key.toLowerCase() === 'c' && term.hasSelection()) {
+      event.preventDefault();
+      void copySelection();
+      return false;
     }
 
-    // Ctrl+V / Cmd+V: Paste from clipboard
-    if (isCmdOrCtrl && event.key.toLowerCase() === 'v') {
-      event.preventDefault();
-      pasteFromClipboard();
+    // Ctrl+V / Cmd+V: do NOT intercept here. xterm.js handles paste natively
+    // via a `paste` listener on its helper textarea, which works cross-browser
+    // (including Firefox) and needs no clipboard-read permission because it
+    // rides the browser's trusted paste gesture. Calling preventDefault() +
+    // navigator.clipboard.readText() here suppressed that native path and broke
+    // paste wherever readText() is blocked or unfocused. (PAN-2529)
+    // Plain Ctrl+V on Linux/Windows reaches that native path only because the
+    // Returning false tells xterm to skip the keystroke instead of swallowing
+    // it as a literal ^V.
+    if (!isMac && ctrlVPasteRef.current
+      && event.type === 'keydown' && event.ctrlKey && !event.shiftKey && !event.altKey && !event.metaKey
+      && event.key.toLowerCase() === 'v') {
+      return false;
     }
-  }, [copySelection, pasteFromClipboard]);
+
+    return true;
+  }, [copySelection]);
 
   // Handle context menu (right-click)
   const handleContextMenu = useCallback((event: MouseEvent) => {
@@ -294,6 +353,30 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
     event.preventDefault();
     event.stopPropagation();
     return true;
+  }, []);
+
+  const handleForcedSelectionMouseDown = useCallback((event: MouseEvent) => {
+    if (!event.isTrusted || event.button !== 0) return;
+    if (event.shiftKey || event.altKey || event.ctrlKey || event.metaKey) return;
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    event.stopPropagation();
+    const synthetic = new MouseEvent('mousedown', {
+      bubbles: true, cancelable: true, composed: true, view: window,
+      button: event.button, buttons: event.buttons,
+      clientX: event.clientX, clientY: event.clientY,
+      screenX: event.screenX, screenY: event.screenY,
+      detail: event.detail,
+      shiftKey: true,
+    });
+    target.dispatchEvent(synthetic);
+  }, []);
+
+  const handleSelectionContextMouseDown = useCallback((event: MouseEvent) => {
+    if (event.button !== 2 || !terminalInstance.current?.hasSelection()) return;
+    // xterm clears its selection while processing a right-button mousedown.
+    // Keep that event away from xterm so the context menu can still offer Copy.
+    event.stopPropagation();
   }, []);
 
   // Close context menu
@@ -330,18 +413,24 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
     const tProf = performance.now();
     profMark(sessionName, tProf, 'connect() entered');
 
-    // Clear any pending reconnect timer
+    // Clear any pending reconnect timer and dispose the previous connection.
+    // Each retry installs connection-scoped window/document listeners, so the
+    // replacement must tear those down instead of relying on the initial
+    // mount's cleanup closure.
     if (reconnectTimer.current) {
       clearTimeout(reconnectTimer.current);
       reconnectTimer.current = null;
     }
+    const previousConnectionCleanup = connectionCleanupRef.current;
+    connectionCleanupRef.current = null;
+    previousConnectionCleanup?.();
 
     // Ensure container has dimensions before creating terminal
     const container = terminalRef.current;
     if (container.clientWidth === 0 || container.clientHeight === 0) {
       console.warn('XTerminal: Container has no size, retrying in 100ms');
       profMark(sessionName, tProf, 'container 0x0, retry in 100ms');
-      setTimeout(() => connect(), 100);
+      reconnectTimer.current = setTimeout(() => connect(), 100);
       return;
     }
     profMark(sessionName, tProf, 'container sized', `${container.clientWidth}x${container.clientHeight}`);
@@ -351,29 +440,6 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
     // Create terminal instance if it doesn't exist, otherwise reuse
     let term = terminalInstance.current;
     let fit = fitAddon.current;
-    const handleForcedSelectionMouseDown = (event: MouseEvent) => {
-      if (!event.isTrusted) return;
-      if (event.button !== 0) return;
-      if (event.shiftKey || event.altKey || event.ctrlKey || event.metaKey) return;
-      const target = event.target;
-      if (!(target instanceof Element)) return;
-      event.stopPropagation();
-      const synthetic = new MouseEvent('mousedown', {
-        bubbles: true,
-        cancelable: true,
-        composed: true,
-        view: window,
-        button: event.button,
-        buttons: event.buttons,
-        clientX: event.clientX,
-        clientY: event.clientY,
-        screenX: event.screenX,
-        screenY: event.screenY,
-        detail: event.detail,
-        shiftKey: true,
-      });
-      target.dispatchEvent(synthetic);
-    };
 
     if (!term) {
       term = new Terminal({
@@ -437,16 +503,28 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
         }, 300);
       });
 
-      // Add keyboard event listener to terminal element
-      terminalRef.current.addEventListener('keydown', handleKeyDown);
-
       // Add right-click handler
       terminalRef.current.addEventListener('contextmenu', handleContextMenu);
+      terminalRef.current.addEventListener('mousedown', handleSelectionContextMouseDown, true);
 
       // Keep wheel/trackpad gestures contained inside the terminal surface so
       // outer browser/app-shell handlers (like chat-input history navigation)
       // never consume them while the pointer is over the terminal.
       term.attachCustomWheelEventHandler(handleTerminalWheel);
+
+      // Plain Ctrl+V on Linux/Windows: xterm.js would otherwise consume the
+      // keystroke and send a literal ^V (0x16) to the pty, so the browser's
+      // native paste never fires and only Ctrl+Shift+V pastes — while the
+      // context menu already advertises Ctrl+V. Returning false makes xterm
+      // skip the event WITHOUT preventDefault, so the browser delivers its
+      // trusted `paste` event to xterm's helper textarea and the native paste
+      // path handles it (no clipboard-read permission needed — PAN-2529).
+      // Trade-off: the pty app then never receives a literal ^V (e.g. vim
+      // visual-block), so the "Ctrl+V pastes clipboard" terminal setting
+      // (default on, read via ctrlVPasteRef) lets users restore the raw
+      // keystroke. macOS is left alone — Cmd+V is the paste gesture there and
+      // Ctrl+V keeps its terminal meaning.
+      term.attachCustomKeyEventHandler(handleKeyEvent);
 
       // On Linux/non-Mac, xterm only forces selection through mouse-reporting mode
       // when Shift is held. Claude's TUI enables mouse reporting, which makes plain
@@ -528,7 +606,8 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
     // xterm.js parsed the current batch, producing an ever-larger next batch
     // that blocked the main thread and caused multi-second typing lag.
     const queueLiveData = (data: string) => {
-      reconnectAttempts.current = 0;
+      reconnectPolicy.current = null;
+      setConnectionStatus('connected');
       if (!term) return;
       if (DEBUG_TERMINAL) {
         console.log(`XTerminal-debug: WRITE len=${data.length}`);
@@ -589,7 +668,8 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
             readyForLiveData.current = true;
             sendResizeIfNeeded();
           });
-          reconnectAttempts.current = 0;
+          reconnectPolicy.current = null;
+          setConnectionStatus('connected');
           ws.send(JSON.stringify({ type: 'ready' }));
           profMark(sessionName, tProf, 'ready sent');
           return;
@@ -614,11 +694,10 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
     ws.onclose = (event) => {
       console.log('XTerminal: WebSocket closed', event.code, event.reason);
 
-      if (!shouldReconnect) {
-        term!.writeln('\r\n\x1b[33m● Session disconnected\x1b[0m');
-        onDisconnectRef.current?.();
-        return;
-      }
+      // A close callback may already be queued when React unmounts the
+      // component. Ignore it so the stale connection cannot schedule another
+      // socket or update disposed terminal state.
+      if (!mountedRef.current) return;
 
       // 4404 = session not found on the server (tmux session doesn't exist).
       // Do NOT retry — the session is gone. Retrying just hammers the server.
@@ -628,21 +707,29 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
         return;
       }
 
+      // 4503 = the dashboard is intentionally restarting. Retry with the same
+      // patient policy as an unexpected close, but tell the operator it is planned.
+      const retryStatus: ConnectionStatus = event.code === SERVER_RESTARTING_CLOSE_CODE
+        ? 'restarting'
+        : 'reconnecting';
+
       // For normal close (1000) or unexpected close, attempt reconnection.
       // The server sends 1000 when the PTY exits, which can happen if the
       // tmux session is killed and recreated during workspace setup retries.
-      if (reconnectAttempts.current < maxReconnectAttempts) {
-        const delay = getReconnectDelay(reconnectAttempts.current);
-        reconnectAttempts.current += 1;
+      const now = Date.now();
+      const policy = reconnectPolicy.current ?? { attempt: 0, windowStartedAt: now };
+      reconnectPolicy.current = policy;
+      const delay = nextReconnectDelay(policy, now, reconnectJitterMs);
 
-        term!.writeln(`\r\n\x1b[33m● Connection lost — reconnecting to \x1b[1m${sessionName}\x1b[0m\x1b[33m in ${delay / 1000}s (attempt ${reconnectAttempts.current}/${maxReconnectAttempts})...\x1b[0m`);
+      if (delay !== null) {
+        policy.attempt += 1;
+        setConnectionStatus(retryStatus);
 
         reconnectTimer.current = setTimeout(() => {
           connect();
         }, delay);
       } else {
-        term!.writeln(`\r\n\x1b[31m● Could not reconnect to \x1b[1m${sessionName}\x1b[0m\x1b[31m after ${maxReconnectAttempts} attempts.\x1b[0m`);
-        onDisconnectRef.current?.();
+        setConnectionStatus('failed');
       }
     };
 
@@ -668,27 +755,22 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
     };
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
-    return () => {
+    const cleanupConnection = () => {
       window.removeEventListener('resize', handleResize);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
-      terminalRef.current?.removeEventListener('mousedown', handleForcedSelectionMouseDown, true);
-      terminalRef.current?.removeEventListener('contextmenu', handleContextMenu);
-      setShouldReconnect(false);
-      readyForLiveData.current = false;
-      if (reconnectTimer.current) {
-        clearTimeout(reconnectTimer.current);
-      }
-      // Prevent the old ws.onclose handler (which closes over the stale
-      // shouldReconnect value) from scheduling an orphaned reconnect timer
-      // after the component has already remounted.
+      ws.onopen = null;
       ws.onclose = null;
+      ws.onmessage = null;
+      ws.onerror = null;
       ws.close();
-      wsRef.current = null;
-      term?.dispose();
-      terminalInstance.current = null;
-      fitAddon.current = null;
+      if (wsRef.current === ws) {
+        wsRef.current = null;
+        readyForLiveData.current = false;
+      }
     };
-  }, [sessionName, shouldReconnect, autoCopyOnSelect, handleKeyDown, handleContextMenu, handleTerminalWheel, getMeasuredSize, sendResizeIfNeeded]);
+    connectionCleanupRef.current = cleanupConnection;
+  }, [sessionName, token, autoCopyOnSelect, reconnectJitterMs, handleKeyEvent, handleContextMenu, handleTerminalWheel, handleForcedSelectionMouseDown, handleSelectionContextMouseDown, getMeasuredSize, sendResizeIfNeeded]);
+  connectRef.current = connect;
 
   useEffect(() => {
     const tMount = performance.now();
@@ -705,16 +787,30 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
     // cold-path latency win; connect()'s own clientWidth/Height check still
     // covers the rare container-not-yet-sized case via its 100ms retry.
     let cancelled = false;
-    let cleanupFn: (() => void) | undefined;
+    mountedRef.current = true;
     const timer = setTimeout(() => {
-      if (!cancelled) cleanupFn = connect();
+      if (!cancelled) connect();
     }, 0);
     return () => {
       cancelled = true;
+      mountedRef.current = false;
       clearTimeout(timer);
-      cleanupFn?.();
+      if (reconnectTimer.current) {
+        clearTimeout(reconnectTimer.current);
+        reconnectTimer.current = null;
+      }
+      const cleanupConnection = connectionCleanupRef.current;
+      connectionCleanupRef.current = null;
+      cleanupConnection?.();
+      terminalRef.current?.removeEventListener('mousedown', handleForcedSelectionMouseDown, true);
+      terminalRef.current?.removeEventListener('mousedown', handleSelectionContextMouseDown, true);
+      terminalRef.current?.removeEventListener('contextmenu', handleContextMenu);
+      readyForLiveData.current = false;
+      terminalInstance.current?.dispose();
+      terminalInstance.current = null;
+      fitAddon.current = null;
     };
-  }, [connect, sessionName]);
+  }, [connect, sessionName, handleContextMenu, handleForcedSelectionMouseDown, handleSelectionContextMouseDown]);
 
   useEffect(() => {
     const debouncedFit = debounce(() => {
@@ -744,8 +840,14 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
     terminalInstance.current?.focus();
   };
 
+  const handleReconnect = () => {
+    reconnectPolicy.current = null;
+    setConnectionStatus('reconnecting');
+    connectRef.current?.();
+  };
+
   return (
-    <div className="relative w-full h-full">
+    <div className="relative h-full min-h-0 w-full min-w-0 overflow-hidden">
       {/* Top-right controls. The theme toggle is always available (PAN-1520);
           the settings gear is hidden when embedded (the host owns the chrome). */}
       <div className="absolute top-2 right-2 z-10 flex gap-2">
@@ -793,22 +895,65 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
           <p className="text-xs text-muted-foreground mt-2">
             Automatically copy selected text to clipboard
           </p>
+          {!isMac && (
+            <>
+              <label className="flex items-center gap-2 cursor-pointer mt-3">
+                <input
+                  type="checkbox"
+                  checked={ctrlVPaste}
+                  onChange={(e) => setCtrlVPaste(e.target.checked)}
+                  className="w-4 h-4 rounded border-border bg-input text-primary focus:ring-primary"
+                />
+                <span className="text-sm text-muted-foreground">Ctrl+V pastes clipboard</span>
+              </label>
+              <p className="text-xs text-muted-foreground mt-2">
+                Uncheck to send Ctrl+V to the terminal instead (e.g. vim visual-block).
+                Ctrl+Shift+V and right-click always paste.
+              </p>
+            </>
+          )}
         </div>
       )}
 
       {/* Terminal container */}
       <div
         ref={terminalRef}
-        className="absolute inset-0"
+        className="absolute inset-0 xterm-host"
         onClick={handleClick}
         tabIndex={0}
         style={{
-          padding: '8px',
           backgroundColor: effectiveIsDark ? XTERM_BG.dark : XTERM_BG.light,
           overflow: 'hidden',
           outline: 'none',
         }}
       />
+
+      {connectionStatus !== 'connected' && (
+        <div className="pointer-events-none absolute inset-x-0 bottom-4 z-20 flex justify-center px-4">
+          <div
+            role="status"
+            aria-live="polite"
+            className="pointer-events-auto flex items-center gap-3 rounded-lg border border-border bg-card/90 px-4 py-2 text-sm text-muted-foreground shadow-lg backdrop-blur-sm"
+          >
+            <span>
+              {connectionStatus === 'failed'
+                ? 'Connection unavailable.'
+                : connectionStatus === 'restarting'
+                  ? 'Dashboard restarting — reconnecting automatically…'
+                  : 'Connection lost — reconnecting…'}
+            </span>
+            {connectionStatus === 'failed' && (
+              <button
+                type="button"
+                onClick={handleReconnect}
+                className="rounded-md border border-border bg-muted px-3 py-1 text-sm text-foreground transition-colors hover:bg-accent"
+              >
+                Reconnect
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Context menu */}
       {contextMenu.visible && (

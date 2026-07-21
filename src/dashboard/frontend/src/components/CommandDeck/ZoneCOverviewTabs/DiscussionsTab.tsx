@@ -21,6 +21,7 @@
 
 import { useMemo } from 'react';
 import { ChatMarkdown } from '../../chat/ChatMarkdown';
+import { LoadingBoundary } from '../../primitives/LoadingBoundary';
 import {
   useDiscussionsQuery,
   type DiscussionItem,
@@ -223,7 +224,7 @@ export function DiscussionsTab({ issueId }: DiscussionsTabProps) {
         data-testid="discussions-tab-loading"
         style={{ padding: 16, fontSize: 12, color: 'var(--muted-foreground)' }}
       >
-        Loading discussions…
+        <LoadingBoundary label="Discussions"><span>Loading discussions…</span></LoadingBoundary>
       </div>
     );
   }

@@ -3,7 +3,7 @@ import type { ReviewStatusSnapshot } from '@overdeck/contracts';
 
 import { useCostStream, type CostEvent } from '../../hooks/useCostStream';
 import { useDashboardStore, selectAgents, selectIssues } from '../../lib/store';
-import { getPipelineIssuePhase, isAgentRunningStatus, type PipelineIssuePhase } from '../../lib/pipeline-state';
+import { getPipelineIssuePhase, hasActualPendingQuestion, isAgentRunningStatus, type PipelineIssuePhase } from '../../lib/pipeline-state';
 import { useSharedTick } from '../../lib/useSharedTick';
 import { cn } from '../../lib/utils';
 import type { Agent, Issue } from '../../types';
@@ -67,6 +67,19 @@ function comparePipelineIssues(a: Issue, b: Issue) {
   const priorityDelta = priorityRank(b.priority) - priorityRank(a.priority);
   if (priorityDelta !== 0) return priorityDelta;
   return b.updatedAt.localeCompare(a.updatedAt);
+}
+
+function isClosedIssue(issue: Issue) {
+  const state = issue.state ?? issue.status;
+  return issue.stateType === 'completed' || issue.stateType === 'canceled'
+    || state === 'done' || state === 'canceled' || state === 'Canceled'
+    || state === 'Closed' || state === 'Completed' || state === 'completed';
+}
+
+function isOutsidePipeline(issue: Issue) {
+  return issue.pipelineMembership?.available !== false && issue.pipelineMembership
+    ? issue.pipelineMembership.inPipeline !== true
+    : isClosedIssue(issue);
 }
 
 function readFilterState(): PipelineFilterState {
@@ -144,11 +157,6 @@ function filterMatchesShipModifier(filter: PipelineFilterState, reviewStatus?: R
   return true;
 }
 
-function isClosedIssue(issue: Issue) {
-  const state = issue.state ?? issue.status;
-  return issue.stateType === 'completed' || issue.stateType === 'canceled' || state === 'done' || state === 'canceled' || state === 'Canceled' || state === 'Closed' || state === 'Completed';
-}
-
 function isRunningAgent(agent: Agent) {
   return isAgentRunningStatus(agent.status);
 }
@@ -187,6 +195,8 @@ function verbBadgeForPhase(phase: PipelineIssuePhase) {
 type PipelineViewProps = {
   onSearchOpen?: () => void;
   onTabChange?: (tab: string) => void;
+  /** PAN-1234: suppress j/k/Enter shortcuts while search/command palette is open. */
+  keyboardShortcutsDisabled?: boolean;
 };
 
 type PipelineIssueRowProps = {
@@ -196,9 +206,11 @@ type PipelineIssueRowProps = {
   costEvents?: CostEvent[];
   now: Date;
   onOpen: (issueId: string) => void;
+  /** PAN-1234: keyboard navigation focus indicator. */
+  focused?: boolean;
 };
 
-function PipelineIssueRow({ issue, phase, agent, costEvents, now, onOpen }: PipelineIssueRowProps) {
+function PipelineIssueRow({ issue, phase, agent, costEvents, now, onOpen, focused = false }: PipelineIssueRowProps) {
   const [openSignal, setOpenSignal] = useState(0);
   // PAN-1692: per-issue auto-merge policy badge, read from the store snapshot.
   const autoMerge = useDashboardStore(
@@ -211,6 +223,9 @@ function PipelineIssueRow({ issue, phase, agent, costEvents, now, onOpen }: Pipe
       : undefined,
     cost: costSum > 0 ? formatCost(costSum) : undefined,
   };
+  // PAN-1234: override the phase verb with INPUT when the agent has an actual
+  // pending operator question (hasActualPendingQuestion covers count/prompt).
+  const verbBadge = hasActualPendingQuestion(agent) ? <VerbBadge variant="INPUT" /> : verbBadgeForPhase(phase);
 
   return (
     <IssueRow
@@ -220,25 +235,29 @@ function PipelineIssueRow({ issue, phase, agent, costEvents, now, onOpen }: Pipe
       title={issue.title}
       project={issue.project ? { name: issue.project.name } : undefined}
       labels={issue.labels.slice(0, 3)}
-      verbBadge={verbBadgeForPhase(phase)}
+      verbBadge={verbBadge}
       agent={agent ? { name: agent.id, sub: agentSub(agent) } : undefined}
       ledger={ledger}
       assignee={issue.assignee ? { name: issue.assignee.name } : undefined}
+      focused={focused}
       onOpen={onOpen}
       onContextMenu={() => setOpenSignal((value) => value + 1)}
+      peek
       actionMenu={<IssueActionMenu issueId={issue.identifier} mode="overflow-only" className="inline-flex" openSignal={openSignal} />}
       trailingBadge={<AutoMergeToggle issueId={issue.identifier} autoMerge={autoMerge} variant="badge" compact />}
     />
   );
 }
 
-export function PipelineView({ onSearchOpen, onTabChange }: PipelineViewProps = {}) {
+export function PipelineView({ onSearchOpen, onTabChange, keyboardShortcutsDisabled = false }: PipelineViewProps = {}) {
   const issues = useDashboardStore(selectIssues) as Issue[];
   const reviewStatusByIssueId = useDashboardStore((state) => state.reviewStatusByIssueId);
   const agents = useDashboardStore(selectAgents) as unknown as Agent[];
   const openIssue = useDashboardStore((state) => state.openIssue);
   const drawerIssueId = useDashboardStore((state) => state.drawer.issueId);
   const [filter, setFilter] = useState(readFilterState);
+  // PAN-1234: keyboard navigation focus target on the Pipeline lens.
+  const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null);
   const { eventsByIssue } = useCostStream({ limit: 500 });
   const now = useSharedTick(30000);
   const phaseRefs = useRef<Record<PipelineIssuePhase, HTMLElement | null>>({
@@ -304,7 +323,7 @@ export function PipelineView({ onSearchOpen, onTabChange }: PipelineViewProps = 
     };
 
     for (const issue of issues) {
-      if (isClosedIssue(issue)) continue;
+      if (isOutsidePipeline(issue)) continue;
 
       const projectOption = projectOptionForIssue(issue);
       if (filter.projects.length > 0 && (!projectOption || !filter.projects.includes(projectOption.id))) {
@@ -337,9 +356,73 @@ export function PipelineView({ onSearchOpen, onTabChange }: PipelineViewProps = 
     return groups;
   }, [agentByIssueId, filter, issues, reviewStatusByIssueId]);
 
+  const visiblePhases = filter.phase === 'all' ? PHASES : [filter.phase];
+
+  // PAN-1234: ordered list of visible pipeline rows for j/k navigation.
+  const pipelineIssueIds = useMemo(() => {
+    return visiblePhases.flatMap((phase) => groupedIssues[phase].map((issue) => issue.identifier));
+  }, [visiblePhases, groupedIssues]);
+
+  // Drop selection when the selected row leaves the filtered list.
+  useEffect(() => {
+    if (selectedIssueId && !pipelineIssueIds.includes(selectedIssueId)) {
+      setSelectedIssueId(null);
+    }
+  }, [pipelineIssueIds, selectedIssueId]);
+
+  // Scroll the focused row into view when it changes.
+  useEffect(() => {
+    if (!selectedIssueId) return;
+    const row = document.querySelector(`[data-component="issue-row"][data-issue-id="${selectedIssueId}"]`);
+    row?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }, [selectedIssueId]);
+
+  // PAN-1234: j/k row navigation; Enter opens the selected row.
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (keyboardShortcutsDisabled) return;
+      const target = e.target as HTMLElement;
+      const inInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
+      if (inInput || e.defaultPrevented) return;
+      if (e.key !== 'j' && e.key !== 'k' && e.key !== 'Enter') return;
+
+      if (e.key === 'Enter') {
+        if (selectedIssueId) {
+          e.preventDefault();
+          savedScrollTop.current = scrollContainerRef.current?.scrollTop ?? 0;
+          openIssue(selectedIssueId);
+        }
+        return;
+      }
+
+      if (pipelineIssueIds.length === 0) return;
+      e.preventDefault();
+
+      if (!selectedIssueId) {
+        setSelectedIssueId(pipelineIssueIds[0]);
+        return;
+      }
+
+      const index = pipelineIssueIds.indexOf(selectedIssueId);
+      if (index === -1) {
+        setSelectedIssueId(pipelineIssueIds[0]);
+        return;
+      }
+
+      if (e.key === 'j') {
+        setSelectedIssueId(pipelineIssueIds[(index + 1) % pipelineIssueIds.length]);
+      } else {
+        setSelectedIssueId(pipelineIssueIds[(index - 1 + pipelineIssueIds.length) % pipelineIssueIds.length]);
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [keyboardShortcutsDisabled, openIssue, pipelineIssueIds, selectedIssueId]);
+
   const metricTiles = useMemo(() => {
     const activeIssues = issues.filter((issue) => {
-      if (isClosedIssue(issue)) return false;
+      if (isOutsidePipeline(issue)) return false;
       // Active issues = the pipeline set (the rendered lanes), NOT all open
       // issues — raw backlog ('todo') is excluded so the header matches the
       // Definition-of-Ready lanes below (PAN-1966).
@@ -379,8 +462,6 @@ export function PipelineView({ onSearchOpen, onTabChange }: PipelineViewProps = 
       { id: 'spend', eyebrow: 'Spend', value: formatCost(spend), sub: '24h spend', icon: <MetricIcon label="$" />, signal: 'cost' as const },
     ];
   }, [agents, agentByIssueId, eventsByIssue, issues, reviewStatusByIssueId]);
-
-  const visiblePhases = filter.phase === 'all' ? PHASES : [filter.phase];
 
   function updateFilter(next: PipelineFilterState, scrollToPhase?: PipelineIssuePhase) {
     setFilter(next);
@@ -553,6 +634,7 @@ export function PipelineView({ onSearchOpen, onTabChange }: PipelineViewProps = 
                 agent={agentByIssueId.get(issue.identifier.toLowerCase())}
                 costEvents={eventsByIssue[issue.identifier]}
                 now={now}
+                focused={selectedIssueId === issue.identifier}
                 onOpen={(id) => { savedScrollTop.current = scrollContainerRef.current?.scrollTop ?? 0; openIssue(id); }}
               />
             ))}

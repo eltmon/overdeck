@@ -10,6 +10,7 @@ import { setReviewStatusSync } from '../review-status.js';
 import { spawnRun } from '../agents.js';
 import { resolveProjectFromIssueSync } from '../projects.js';
 import { clearTestVerdictArtifact } from './test-verdict.js';
+import { shouldSkipDispatchAsMerged } from './merge-verification.js';
 
 function dashboardApiUrl(): string {
   const apiPort = process.env.API_PORT || process.env.PORT || '3011';
@@ -36,7 +37,7 @@ Run the role-based verification flow for this already-reviewed branch.
 Required steps:
 1. Before every repository command, verify you are in the workspace above with \`pwd\`. If not, stop and switch back to that workspace before continuing.
 2. Work only in the workspace above. Never run build, test, git, or dashboard commands from the main checkout or another worktree.
-3. Read .pan/continue.json, .pan/spec.vbrief.json, issue notes, and project instructions to determine required verification.
+3. Read .pan/records/${options.issueId.toLowerCase()}.json, the canonical xBRIEF under .pan/specs/ for ${options.issueId}, issue notes, and project instructions to determine required verification. Do not require retired workspace-local .pan/continue.json or .pan/spec.vbrief.json files to exist.
 4. Run the configured project gates (at minimum typecheck, lint, and tests when present/applicable).
 5. Decide whether browser UAT is required from acceptance criteria, issue notes, PR notes, or UI/dashboard wording.
 6. If UAT is required, build and run the dashboard from the workspace above, not from main. If a dashboard from another checkout is already running, stop it and start the workspace-built dashboard.
@@ -82,6 +83,13 @@ Boundaries:
     if (workspace) clearTestVerdictArtifact(workspace);
 
     const prompt = buildTestRolePrompt({ issueId, workspace, branch });
+
+    const mergedGuard = await shouldSkipDispatchAsMerged(issueId);
+    if (mergedGuard.skip) {
+      console.log(`[test-dispatch] Skipping test dispatch for ${issueId} — ${mergedGuard.reason}`);
+      return;
+    }
+
     const run = await spawnRun(issueId, 'test', {
       workspace,
       prompt,
@@ -170,6 +178,12 @@ export const dispatchTestAgentAndNotify = (
     if (workspace) yield* Effect.sync(() => clearTestVerdictArtifact(workspace));
 
     const prompt = buildTestRolePrompt({ issueId, workspace, branch });
+
+    const mergedGuard = yield* Effect.promise(() => shouldSkipDispatchAsMerged(issueId));
+    if (mergedGuard.skip) {
+      console.log(`[test-dispatch] Skipping test dispatch for ${issueId} — ${mergedGuard.reason}`);
+      return { delivered: false, notified: false, reason: 'spawn-failed' };
+    }
 
     const spawnProgram: Effect.Effect<DispatchTestAgentResult, never> = Effect.tryPromise({
       try: () => spawnRun(issueId, 'test', { workspace, prompt }),

@@ -7,7 +7,9 @@ import { PROVIDER_BRANDS } from '../shared/branding';
 type RoleId = 'plan' | 'work' | 'review' | 'test' | 'ship' | 'flywheel' | 'strike' | 'sequencer';
 type WorkhorseSlot = 'expensive' | 'mid' | 'cheap';
 type ModelRef = string;
-type Harness = 'claude-code' | 'pi' | 'codex';
+interface WeightedModelRef { model: ModelRef; weight: number; }
+type RoleModelRef = ModelRef | WeightedModelRef[];
+type Harness = 'claude-code' | 'ohmypi' | 'codex' | 'acp';
 type Effort = 'low' | 'medium' | 'high' | 'xhigh' | 'max';
 type FlywheelScope = 'pan-only' | 'all-tracked-projects';
 
@@ -15,10 +17,17 @@ interface RoleSubConfig {
   model?: ModelRef;
 }
 
+type ReviewModeValue = 'quick' | 'full' | 'none';
+type ReReviewScopeValue = 'all' | 'changed' | 'blockers';
+
 interface RoleConfig {
-  model?: ModelRef;
+  model?: RoleModelRef;
   harness?: Harness;
   effort?: Effort;
+  /** PAN-1862: review role only — what kind of review runs (default quick). */
+  mode?: ReviewModeValue;
+  /** PAN-1862: review role only — which convoy reviewers re-run on re-review (default changed). */
+  reReviewScope?: ReReviewScopeValue;
   maxAgents?: number;
   scope?: FlywheelScope;
   sub?: Record<string, RoleSubConfig>;
@@ -26,7 +35,7 @@ interface RoleConfig {
 
 type RolesConfig = Partial<Record<RoleId, RoleConfig>>;
 type WorkhorsesConfig = Partial<Record<WorkhorseSlot, ModelRef>>;
-type RoleConfigPatch = Omit<RoleConfig, 'harness'> & { harness?: Harness | null };
+type RoleConfigPatch = Omit<RoleConfig, 'harness' | 'model'> & { harness?: Harness | null; model?: RoleModelRef; };
 type RolesConfigPayload = Partial<Record<RoleId, RoleConfigPatch>>;
 
 interface SettingsResponse {
@@ -69,7 +78,7 @@ interface RoleDefinition {
 
 const DEFAULT_WORKHORSES: Required<Record<WorkhorseSlot, ModelRef>> = {
   expensive: 'claude-opus-4-8',
-  mid: 'claude-sonnet-4-6',
+  mid: 'claude-sonnet-5',
   cheap: 'claude-haiku-4-5',
 };
 
@@ -90,18 +99,18 @@ const ROLES: RoleDefinition[] = [
     id: 'plan',
     name: 'Plan',
     icon: DraftingCompass,
-    description: 'Researches the issue, writes the vBRIEF, and creates beads.',
+    description: 'Researches the issue, writes the xBRIEF, and creates tasks.',
     defaultModel: 'workhorse:expensive',
   },
   {
     id: 'work',
     name: 'Work',
     icon: Code,
-    description: 'Implements beads in the issue workspace.',
+    description: 'Implements tasks in the issue workspace.',
     defaultModel: 'workhorse:mid',
     subRoles: [
-      { id: 'inspect', name: 'Inspect', description: 'Fast per-bead inspection.', defaultModel: 'workhorse:cheap' },
-      { id: 'inspect-deep', name: 'Inspect Deep', description: 'Deeper inspection for complex bead diffs.', defaultModel: 'workhorse:mid' },
+      { id: 'inspect', name: 'Inspect', description: 'Fast per-task inspection.', defaultModel: 'workhorse:cheap' },
+      { id: 'inspect-deep', name: 'Inspect Deep', description: 'Deeper inspection for complex task diffs.', defaultModel: 'workhorse:mid' },
     ],
   },
   {
@@ -121,7 +130,7 @@ const ROLES: RoleDefinition[] = [
       { id: 'security', name: 'Security', description: 'Security-focused code review.', defaultModel: 'workhorse:expensive' },
       { id: 'correctness', name: 'Correctness', description: 'Logic and behavior validation.', defaultModel: 'workhorse:mid' },
       { id: 'performance', name: 'Performance', description: 'Performance and scalability review.', defaultModel: 'workhorse:mid' },
-      { id: 'requirements', name: 'Requirements', description: 'Acceptance criteria and vBRIEF coverage.', defaultModel: 'workhorse:mid' },
+      { id: 'requirements', name: 'Requirements', description: 'Acceptance criteria and xBRIEF coverage.', defaultModel: 'workhorse:mid' },
       { id: 'synthesis', name: 'Synthesis', description: 'Combines reviewer findings into the final verdict.', defaultModel: 'workhorse:expensive' },
     ],
   },
@@ -173,8 +182,16 @@ async function fetchClaudeAuth(): Promise<ClaudeAuthStatus> {
   return res.json();
 }
 
-function getRoleModel(settings: SettingsResponse | undefined, role: RoleDefinition): ModelRef {
+function getRoleModel(settings: SettingsResponse | undefined, role: RoleDefinition): RoleModelRef {
   return settings?.roles?.[role.id]?.model ?? role.defaultModel;
+}
+
+function distributionSummaryText(entries: WeightedModelRef[]): string {
+  const total = entries.reduce((sum, e) => sum + e.weight, 0);
+  if (total === 0) return 'distribution';
+  return entries
+    .map((e) => `${Math.round((e.weight / total) * 100)}% ${e.model}`)
+    .join(' / ');
 }
 
 function getSubRoleModel(
@@ -285,7 +302,7 @@ async function saveRoleConfig(role: RoleId, patch: RoleConfigPatch, subRole?: st
           ...(currentRole.sub ?? {}),
           [subRole]: {
             ...(currentRole.sub?.[subRole] ?? {}),
-            model: patch.model,
+            model: patch.model as ModelRef,
           },
         },
       }
@@ -389,6 +406,8 @@ function getFlywheelConfig(settings: SettingsResponse | undefined): Pick<RoleCon
 export function RolesPanel() {
   const queryClient = useQueryClient();
   const [expandedRoles, setExpandedRoles] = useState<Partial<Record<RoleId, boolean>>>({});
+  const [distributionMode, setDistributionMode] = useState<Partial<Record<RoleId, boolean>>>({});
+  const [draftDistributions, setDraftDistributions] = useState<Partial<Record<RoleId, WeightedModelRef[]>>>({});
   const settingsQuery = useQuery({
     queryKey: ['settings'],
     queryFn: fetchSettings,
@@ -451,15 +470,57 @@ export function RolesPanel() {
       ) : (
         <div className="space-y-3">
           {ROLES.map((role) => {
-            const roleModel = getRoleModel(settings, role);
-            const tooltip = modelRefTooltip(roleModel, workhorses);
+            const savedRoleModel = getRoleModel(settings, role);
+            const savedIsDistribution = Array.isArray(savedRoleModel);
+            const isInDistributionMode = distributionMode[role.id] ?? savedIsDistribution;
+            const draftRows: WeightedModelRef[] = draftDistributions[role.id] ?? (
+              savedIsDistribution
+                ? (savedRoleModel as WeightedModelRef[])
+                : [{ model: savedRoleModel as ModelRef, weight: 1 }]
+            );
+            const scalarSavedModel = savedIsDistribution ? undefined : savedRoleModel as ModelRef;
+            // When the parent role is a distribution, give sub-roles a concrete representative
+            // so their "Parent" option shows a meaningful inherited model.
+            const parentModelRefForSubRoles: ModelRef | undefined = savedIsDistribution
+              ? (savedRoleModel as WeightedModelRef[]).reduce(
+                  (best, e) => (e.weight > best.weight ? e : best),
+                  (savedRoleModel as WeightedModelRef[])[0],
+                ).model
+              : scalarSavedModel;
+            const tooltip = scalarSavedModel ? modelRefTooltip(scalarSavedModel, workhorses) : undefined;
             const isExpanded = !!expandedRoles[role.id];
             const canExpand = !!role.subRoles?.length;
             const flywheelConfig = role.id === 'flywheel' ? getFlywheelConfig(settings) : null;
+            const draftTotal = draftRows.reduce((s, e) => s + (e.weight > 0 ? e.weight : 0), 0);
+
+            const setDraftRows = (rows: WeightedModelRef[]) =>
+              setDraftDistributions((prev) => ({ ...prev, [role.id]: rows }));
+            const enterDistributionMode = () => {
+              const initial: WeightedModelRef[] = savedIsDistribution
+                ? (savedRoleModel as WeightedModelRef[])
+                : [{ model: savedRoleModel as ModelRef, weight: 1 }];
+              setDraftDistributions((prev) => ({ ...prev, [role.id]: initial }));
+              setDistributionMode((prev) => ({ ...prev, [role.id]: true }));
+            };
+            const exitDistributionMode = () => {
+              const representative = draftRows.reduce(
+                (best, e) => (e.weight > best.weight ? e : best),
+                draftRows[0] ?? { model: role.defaultModel, weight: 0 },
+              ).model;
+              saveMutation.mutate({ role: role.id, patch: { model: representative } });
+              setDistributionMode((prev) => ({ ...prev, [role.id]: false }));
+              setDraftDistributions((prev) => { const n = { ...prev }; delete n[role.id]; return n; });
+            };
+            const saveDistribution = () => {
+              const valid = draftRows.filter((e) => e.weight > 0);
+              if (valid.length === 0) return;
+              saveMutation.mutate({ role: role.id, patch: { model: valid } });
+              setDraftDistributions((prev) => { const n = { ...prev }; delete n[role.id]; return n; });
+            };
 
             return (
               <div key={role.id} data-testid="role-card" className="rounded-lg border border-border bg-background/40 p-3">
-                <div className="flex flex-col gap-3 md:flex-row md:items-start">
+                <div className="flex flex-col gap-3 @2xl:flex-row @2xl:items-start">
                   <div className="flex min-w-0 flex-1 gap-3">
                     <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
                       <role.icon className="w-5 h-5 text-primary" aria-hidden="true" />
@@ -471,7 +532,9 @@ export function RolesPanel() {
                           className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground"
                           title={tooltip}
                         >
-                          Default: {displayModelRef(roleModel)}
+                          {savedIsDistribution
+                            ? `Distribution: ${distributionSummaryText(savedRoleModel as WeightedModelRef[])}`
+                            : `Default: ${displayModelRef(scalarSavedModel!)}`}
                         </span>
                       </div>
                       <p className="mt-1 text-xs leading-snug text-muted-foreground">{role.description}</p>
@@ -492,25 +555,121 @@ export function RolesPanel() {
                       )}
                     </div>
                   </div>
-                  <div className="md:w-80">
+                  <div className="@2xl:w-80 @2xl:shrink-0">
                     <div className="space-y-3">
-                      <ModelPicker
-                        label={`${role.name} model`}
-                        value={roleModel}
-                        workhorses={workhorses}
-                        providerGroups={providerGroups}
-                        providers={settings?.models?.providers}
-                        claudeAuth={claudeAuthQuery.data}
-                        disabled={saveMutation.isPending}
-                        onChange={(modelRef) => saveMutation.mutate({ role: role.id, patch: { model: modelRef } })}
-                      />
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-medium text-foreground">Model</span>
+                        <button
+                          type="button"
+                          className="text-[11px] text-primary hover:text-primary/80 disabled:opacity-50"
+                          disabled={saveMutation.isPending}
+                          onClick={isInDistributionMode ? exitDistributionMode : enterDistributionMode}
+                        >
+                          {isInDistributionMode ? 'Use single model' : 'Use distribution'}
+                        </button>
+                      </div>
+
+                      {isInDistributionMode ? (
+                        <div className="space-y-2" data-testid="distribution-editor">
+                          {draftRows.map((entry, idx) => {
+                            const pct = draftTotal > 0 && entry.weight > 0
+                              ? Math.round((entry.weight / draftTotal) * 100)
+                              : 0;
+                            return (
+                              <div key={idx} className="flex items-center gap-2">
+                                <div className="flex-1 min-w-0">
+                                  <ModelPicker
+                                    label={`Entry ${idx + 1} model`}
+                                    value={entry.model}
+                                    workhorses={workhorses}
+                                    providerGroups={providerGroups}
+                                    providers={settings?.models?.providers}
+                                    claudeAuth={claudeAuthQuery.data}
+                                    disabled={saveMutation.isPending}
+                                    onChange={(m) => {
+                                      const next = [...draftRows];
+                                      next[idx] = { ...entry, model: m };
+                                      setDraftRows(next);
+                                    }}
+                                  />
+                                </div>
+                                <div className="flex items-center gap-1 shrink-0">
+                                  <input
+                                    aria-label={`Weight for entry ${idx + 1}`}
+                                    type="number"
+                                    min={1}
+                                    step={1}
+                                    value={entry.weight}
+                                    disabled={saveMutation.isPending}
+                                    className="w-14 px-2 py-1.5 bg-popover border border-border rounded text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50"
+                                    onChange={(e) => {
+                                      const next = [...draftRows];
+                                      next[idx] = { ...entry, weight: Math.max(1, parseInt(e.target.value, 10) || 1) };
+                                      setDraftRows(next);
+                                    }}
+                                  />
+                                  <span className="text-[11px] text-muted-foreground w-8 text-right">{pct}%</span>
+                                  <button
+                                    type="button"
+                                    aria-label={`Remove entry ${idx + 1}`}
+                                    disabled={saveMutation.isPending || draftRows.length <= 1}
+                                    className="text-muted-foreground hover:text-destructive disabled:opacity-40 text-xs px-1"
+                                    onClick={() => setDraftRows(draftRows.filter((_, i) => i !== idx))}
+                                  >
+                                    ✕
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                          <div className="flex items-center gap-2 pt-1">
+                            <button
+                              type="button"
+                              disabled={saveMutation.isPending}
+                              className="text-[11px] text-primary hover:text-primary/80 disabled:opacity-50"
+                              onClick={() => setDraftRows([...draftRows, { model: role.defaultModel, weight: 1 }])}
+                            >
+                              + Add model
+                            </button>
+                            <span
+                              className={`text-[11px] tabular-nums ${draftTotal === 100 ? 'text-muted-foreground' : 'text-destructive'}`}
+                              data-testid="distribution-total"
+                            >
+                              Total: {draftTotal}% {draftTotal === 100 ? '' : '(must be 100)'}
+                            </span>
+                            <button
+                              type="button"
+                              disabled={saveMutation.isPending || draftTotal !== 100}
+                              className="text-[11px] text-primary hover:text-primary/80 disabled:opacity-50 ml-auto"
+                              onClick={saveDistribution}
+                            >
+                              Save distribution
+                            </button>
+                          </div>
+                          <p className="text-[11px] leading-snug text-muted-foreground">
+                            Percentages must total 100. Selection is deterministic — the same issue always
+                            routes to the same model; change a percentage and only future spawns shift.
+                          </p>
+                        </div>
+                      ) : (
+                        <ModelPicker
+                          label={`${role.name} model`}
+                          value={scalarSavedModel ?? role.defaultModel}
+                          workhorses={workhorses}
+                          providerGroups={providerGroups}
+                          providers={settings?.models?.providers}
+                          claudeAuth={claudeAuthQuery.data}
+                          disabled={saveMutation.isPending}
+                          onChange={(modelRef) => saveMutation.mutate({ role: role.id, patch: { model: modelRef } })}
+                        />
+                      )}
                     </div>
                   </div>
                 </div>
 
                 {flywheelConfig && (
                   <div className="mt-4 border-t border-border pt-3">
-                    <div className="grid gap-3 md:grid-cols-3">
+                    <div className="grid gap-3 @xl:grid-cols-3">
                       <label className="space-y-1.5">
                         <span className="text-xs font-medium text-foreground">Flywheel effort</span>
                         <select
@@ -560,12 +719,74 @@ export function RolesPanel() {
                   </div>
                 )}
 
+                {canExpand && isExpanded && role.id === 'review' && (() => {
+                  // PAN-1862 (FR-10/FR-17): review pipeline controls + the
+                  // model-uniformity warning. Cache-sharing across the convoy
+                  // requires ONE model for synthesis + all four reviewers (the
+                  // prompt cache is per-model); the banner is the operator
+                  // surface for that invariant — full mode only (quick/none
+                  // neither fork nor cache-share).
+                  const reviewMode: ReviewModeValue = settings?.roles?.review?.mode ?? 'quick';
+                  const reReviewScope: ReReviewScopeValue = settings?.roles?.review?.reReviewScope ?? 'changed';
+                  const resolvedReviewModels = (role.subRoles ?? []).map((sr) => ({
+                    id: sr.id,
+                    resolved: resolveModelRef(getSubRoleModel(settings, role, sr), workhorses, parentModelRefForSubRoles),
+                  }));
+                  const uniform = new Set(resolvedReviewModels.map((r) => r.resolved)).size <= 1;
+                  return (
+                    <div className="mt-4 border-t border-border pt-3">
+                      <div className="grid gap-3 @xl:grid-cols-2">
+                        <label className="block">
+                          <span className="mb-1 block text-[11px] font-medium text-muted-foreground">Review mode</span>
+                          <select
+                            value={reviewMode}
+                            onChange={(event) => saveMutation.mutate({ role: role.id, patch: { mode: event.target.value as ReviewModeValue } })}
+                            disabled={saveMutation.isPending}
+                            className="w-full px-3 py-2 bg-popover border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50"
+                          >
+                            <option value="quick">Quick — one reviewer, single combined pass (default)</option>
+                            <option value="full">Full — four-reviewer convoy + synthesis</option>
+                            <option value="none">None — skip AI review (verification gate still runs)</option>
+                          </select>
+                        </label>
+                        {reviewMode === 'full' && (
+                          <label className="block">
+                            <span className="mb-1 block text-[11px] font-medium text-muted-foreground">Re-review scope</span>
+                            <select
+                              value={reReviewScope}
+                              onChange={(event) => saveMutation.mutate({ role: role.id, patch: { reReviewScope: event.target.value as ReReviewScopeValue } })}
+                              disabled={saveMutation.isPending}
+                              className="w-full px-3 py-2 bg-popover border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50"
+                            >
+                              <option value="changed">Changed — blockers + reviewers whose files changed (default)</option>
+                              <option value="all">All — re-run every reviewer each cycle</option>
+                              <option value="blockers">Blockers — re-run only reviewers that blocked</option>
+                            </select>
+                          </label>
+                        )}
+                      </div>
+                      {reviewMode === 'full' && !uniform && (
+                        <div
+                          data-testid="review-model-uniformity-banner"
+                          className="mt-3 rounded-md border border-destructive bg-destructive/10 p-3 text-xs leading-snug text-foreground"
+                        >
+                          <span className="font-semibold text-destructive">Review roles use different models — convoy cache sharing is disabled.</span>{' '}
+                          The prompt cache is per-model, so each reviewer re-reads the full diff and high-risk files
+                          at full input price (~{resolvedReviewModels.length}× the tokens per review). Assign the same
+                          model to synthesis and all four reviewers to enable cache sharing. Current:{' '}
+                          {resolvedReviewModels.map((r) => `${r.id}=${r.resolved}`).join(', ')}.
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+
                 {canExpand && isExpanded && (
                   <div id={`${role.id}-subroles`} className="mt-4 border-t border-border pt-3">
-                    <div className="grid gap-3 md:grid-cols-2">
+                    <div className="grid gap-3 @xl:grid-cols-2">
                       {role.subRoles?.map((subRole) => {
                         const subModel = getSubRoleModel(settings, role, subRole);
-                        const subTooltip = modelRefTooltip(subModel, workhorses, roleModel);
+                        const subTooltip = modelRefTooltip(subModel, workhorses, parentModelRefForSubRoles);
 
                         return (
                           <div key={subRole.id} className="rounded-md border border-border bg-card p-3">
@@ -586,7 +807,7 @@ export function RolesPanel() {
                               providerGroups={providerGroups}
                               providers={settings?.models?.providers}
                               claudeAuth={claudeAuthQuery.data}
-                              parentModelRef={roleModel}
+                              parentModelRef={parentModelRefForSubRoles}
                               disabled={saveMutation.isPending}
                               onChange={(modelRef) => saveMutation.mutate({ role: role.id, subRole: subRole.id, patch: { model: modelRef } })}
                             />

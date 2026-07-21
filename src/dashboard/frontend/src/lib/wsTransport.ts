@@ -26,7 +26,7 @@ function resolveRpcUrl(url?: string): string {
   if (url) return url
   const proto = window.location.protocol === 'https:' ? 'wss' : 'ws'
   // Use VITE_API_URL when available — frontend and API are on different subdomains
-  // (e.g. feature-pan-428.pan.localhost vs api-feature-pan-428.pan.localhost)
+  // (e.g. feature-pan-428.overdeck.localhost vs api-feature-pan-428.overdeck.localhost)
   const apiUrl = import.meta.env.VITE_API_URL
   if (apiUrl) {
     const apiHost = new URL(apiUrl).host

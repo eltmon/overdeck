@@ -16,6 +16,7 @@ import {
   getAgentRollup,
   getDailyTrendsSync as getDailyTrends,
   getCostForIssueSync as getCostForIssueFromDb,
+  getAgentDailyCostSync,
 } from '../overdeck/cost-sync.js';
 
 /**
@@ -182,30 +183,36 @@ export function recordCostSync(agentId: string, cost: number, issueId?: string):
 }
 
 /**
- * Check if any cost limits are being approached or exceeded
+ * Check if any cost limits are being approached or exceeded.
+ *
+ * Opt-in: with no operator-configured `cost_limits` this returns [] without
+ * reading any cost data — there is deliberately no default limit (PAN-2642;
+ * the old invented $10/$25/$100 fallback sat permanently exceeded and
+ * produced pure alert noise, PAN-2319).
  *
  * @param agentId - Agent ID to check
  * @param issueId - Optional issue ID to check
  * @param config - Cost limits configuration
- * @returns Array of alerts (empty if no limits exceeded)
+ * @returns Array of alerts (empty if no limits configured or exceeded)
  */
 export function checkCostLimits(
   agentId: string,
   issueId: string | undefined,
-  config: CostLimitsConfig = loadCloisterConfigSync().cost_limits || {
-    per_agent_usd: 10.0,
-    per_issue_usd: 25.0,
-    daily_total_usd: 100.0,
-    alert_threshold: 0.8,
-  }
+  config: CostLimitsConfig | undefined = loadCloisterConfigSync().cost_limits
 ): CostAlert[] {
   const alerts: CostAlert[] = [];
+  if (!config) return alerts;
+  const alertThreshold = config.alert_threshold ?? 0.8;
+  const perAgentUsd = config.per_agent_usd ?? 0;
+  const perIssueUsd = config.per_issue_usd ?? 0;
+  const dailyTotalUsd = config.daily_total_usd ?? 0;
   const now = new Date().toISOString();
 
-  // Read agent cost from DB (the single source of truth for recorded spend)
-  const agentCost = getAgentRollup().find(r => r.agentId === agentId)?.totalCost ?? 0;
-  if (config.per_agent_usd > 0) {
-    const agentPercent = agentCost / config.per_agent_usd;
+  // Read agent cost from DB (scoped to today, matching the cap's window)
+  // The accumulator should match the cap's window: per-agent daily cap compares daily spend
+  if (perAgentUsd > 0) {
+    const agentCost = getAgentDailyCostSync(agentId);
+    const agentPercent = agentCost / perAgentUsd;
 
     if (agentPercent >= 1.0) {
       alerts.push({
@@ -213,27 +220,28 @@ export function checkCostLimits(
         level: 'limit_reached',
         agentId,
         currentCost: agentCost,
-        limit: config.per_agent_usd,
+        limit: perAgentUsd,
         percentUsed: agentPercent * 100,
         timestamp: now,
       });
-    } else if (agentPercent >= config.alert_threshold) {
+    } else if (agentPercent >= alertThreshold) {
       alerts.push({
         type: 'per_agent',
         level: 'warning',
         agentId,
         currentCost: agentCost,
-        limit: config.per_agent_usd,
+        limit: perAgentUsd,
         percentUsed: agentPercent * 100,
         timestamp: now,
       });
     }
   }
 
-  // Read issue cost from DB
-  if (issueId && config.per_issue_usd > 0) {
-    const issueCost = getCostForIssueFromDb(issueId)?.totalCost ?? 0;
-    const issuePercent = issueCost / config.per_issue_usd;
+  // Read issue cost from DB (scoped to today, matching the cap's window)
+  if (issueId && perIssueUsd > 0) {
+    const issueDailyTrends = getDailyTrends({ days: 1, issueId });
+    const issueCost = issueDailyTrends.reduce((sum, t) => sum + t.totalCost, 0);
+    const issuePercent = issueCost / perIssueUsd;
 
     if (issuePercent >= 1.0) {
       alerts.push({
@@ -241,17 +249,17 @@ export function checkCostLimits(
         level: 'limit_reached',
         issueId,
         currentCost: issueCost,
-        limit: config.per_issue_usd,
+        limit: perIssueUsd,
         percentUsed: issuePercent * 100,
         timestamp: now,
       });
-    } else if (issuePercent >= config.alert_threshold) {
+    } else if (issuePercent >= alertThreshold) {
       alerts.push({
         type: 'per_issue',
         level: 'warning',
         issueId,
         currentCost: issueCost,
-        limit: config.per_issue_usd,
+        limit: perIssueUsd,
         percentUsed: issuePercent * 100,
         timestamp: now,
       });
@@ -259,25 +267,25 @@ export function checkCostLimits(
   }
 
   // Read today's total from DB (sum of today's events)
-  if (config.daily_total_usd > 0) {
+  if (dailyTotalUsd > 0) {
     const dailyTotal = getDailyTrends({ days: 1 }).reduce((sum, t) => sum + t.totalCost, 0);
-    const dailyPercent = dailyTotal / config.daily_total_usd;
+    const dailyPercent = dailyTotal / dailyTotalUsd;
 
     if (dailyPercent >= 1.0) {
       alerts.push({
         type: 'daily_total',
         level: 'limit_reached',
         currentCost: dailyTotal,
-        limit: config.daily_total_usd,
+        limit: dailyTotalUsd,
         percentUsed: dailyPercent * 100,
         timestamp: now,
       });
-    } else if (dailyPercent >= config.alert_threshold) {
+    } else if (dailyPercent >= alertThreshold) {
       alerts.push({
         type: 'daily_total',
         level: 'warning',
         currentCost: dailyTotal,
-        limit: config.daily_total_usd,
+        limit: dailyTotalUsd,
         percentUsed: dailyPercent * 100,
         timestamp: now,
       });

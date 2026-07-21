@@ -1,5 +1,5 @@
 /**
- * Harness policy gate (PAN-636 + PAN-1067).
+ * Harness policy gate (PAN-636 + PAN-1067 + PAN-1989).
  *
  * Single source of truth for "is this {harness, model, authMode} combination
  * allowed?". Every spawn entry point and every harness/model picker UI MUST
@@ -7,18 +7,18 @@
  * setting cannot bypass the rule.
  *
  * Rules:
- *   1. gpt-5.5 requires ChatGPT subscription auth — OpenAI does not expose it
- *      via the standard API-key endpoint. (PAN-1067)
- *   2. Pi running an Anthropic model under Anthropic *subscription* auth is
+ *   1. gpt-5.5 and the gpt-5.6 family require ChatGPT subscription auth — OpenAI
+ *      does not expose them via the standard API-key endpoint. (PAN-1067)
+ *   2. ohmypi running an Anthropic model under Anthropic *subscription* auth is
  *      blocked (Claude Code subscription terms forbid using the Anthropic
- *      subscription with non-Anthropic harnesses).
+ *      subscription with non-Anthropic harnesses). (Formerly applied to 'pi'.)
  *
  * Allowed cells:
  *   - claude-code + any provider + any authMode -> allowed (modulo rule 1)
- *   - pi + non-Anthropic provider + any authMode -> allowed (modulo rule 1)
- *   - pi + Anthropic provider + api-key -> allowed
- *   - pi + Anthropic provider + subscription -> BLOCKED
- *   - pi + Anthropic provider + undefined authMode -> allowed (no
+ *   - ohmypi + non-Anthropic provider + any authMode -> allowed (modulo rule 1)
+ *   - ohmypi + Anthropic provider + api-key -> allowed
+ *   - ohmypi + Anthropic provider + subscription -> BLOCKED
+ *   - ohmypi + Anthropic provider + undefined authMode -> allowed (no
  *     subscription is in play, so the ToS bar is not engaged)
  */
 
@@ -34,22 +34,32 @@ export type HarnessPolicyDecision = {
 
 const ALLOWED: HarnessPolicyDecision = { allowed: true }
 
-const PI_ANTHROPIC_SUBSCRIPTION_BLOCK: HarnessPolicyDecision = {
+const OHMYPI_ANTHROPIC_SUBSCRIPTION_BLOCK: HarnessPolicyDecision = {
   allowed: false,
   reason:
-    'Pi cannot run Anthropic models when authenticated via Claude Code subscription. ' +
-    'Switch the Anthropic provider to API-key auth, or pick a non-Anthropic model for Pi.',
+    'Claude Code subscription Terms of Service restrict Anthropic models to the Claude Code harness — ohmypi cannot run Anthropic models under subscription auth. ' +
+    'To proceed, switch the Anthropic provider to API-key auth, or pick a non-Anthropic model for ohmypi.',
 }
 
-const GPT_5_5_API_KEY_BLOCK: HarnessPolicyDecision = {
+/** Canonical reason returned for the blocked cell (exposed for tests + UI). */
+export const OHMYPI_ANTHROPIC_SUBSCRIPTION_BLOCK_REASON = OHMYPI_ANTHROPIC_SUBSCRIPTION_BLOCK.reason!
+
+const ACP_KIMI_ONLY_BLOCK: HarnessPolicyDecision = {
+  allowed: false,
+  reason: 'ACP currently supports the Kimi provider only. Pick a Kimi model or use the provider\'s supported harness.',
+}
+
+export const ACP_KIMI_ONLY_BLOCK_REASON = ACP_KIMI_ONLY_BLOCK.reason!
+
+const SUBSCRIPTION_ONLY_MODEL_BLOCK: HarnessPolicyDecision = {
   allowed: false,
   reason:
-    'GPT-5.5 needs a ChatGPT/Codex subscription sign-in — it is not served by the plain OpenAI API key. ' +
+    'This OpenAI model needs a ChatGPT/Codex subscription sign-in — it is not served by the plain OpenAI API key. ' +
     'Run `codex login` on the host (workspace containers inherit the host sign-in), or pick a different model.',
 }
 
 /** Models that are gated to ChatGPT subscription auth only (no API-key path). */
-const SUBSCRIPTION_ONLY_OPENAI_MODELS = new Set(['gpt-5.5'])
+const SUBSCRIPTION_ONLY_OPENAI_MODELS = new Set(['gpt-5.5', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna'])
 
 /**
  * Check whether a (model, authMode) pair is allowed, independent of harness.
@@ -61,7 +71,7 @@ export function canUseModelWithAuthSync(
 ): HarnessPolicyDecision {
   const provider = getProviderForModelSync(model)
   if (provider.name === 'openai' && SUBSCRIPTION_ONLY_OPENAI_MODELS.has(model) && authMode === 'api-key') {
-    return GPT_5_5_API_KEY_BLOCK
+    return SUBSCRIPTION_ONLY_MODEL_BLOCK
   }
   return ALLOWED
 }
@@ -83,16 +93,19 @@ export function canUseHarnessSync(
     return ALLOWED
   }
 
-  // harness === 'pi'
-  const provider = getProviderForModelSync(model)
-  if (provider.name !== 'anthropic') {
+  if (harness === 'acp') {
+    return getProviderForModelSync(model).name === 'kimi' ? ALLOWED : ACP_KIMI_ONLY_BLOCK
+  }
+
+  if (harness === 'ohmypi') {
+    const provider = getProviderForModelSync(model)
+    if (provider.name === 'anthropic' && authMode === 'subscription') {
+      return OHMYPI_ANTHROPIC_SUBSCRIPTION_BLOCK
+    }
     return ALLOWED
   }
 
-  if (authMode === 'subscription') {
-    return PI_ANTHROPIC_SUBSCRIPTION_BLOCK
-  }
-
+  // harness === 'pi' (legacy — normalizer converts 'pi' → 'ohmypi' at settings load)
   return ALLOWED
 }
 

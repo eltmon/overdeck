@@ -1,0 +1,4 @@
+Vendored OKF conformance scripts (validate.py, reindex.py, okf_common.py,
+diff_lint.py). Copied from the OKF skill so this bundle validates itself with
+only Python 3 + PyYAML — no external repo checkout. Canonical source:
+sync-sources/skills/okf/scripts/ in the overdeck repo. Refresh via /okf.

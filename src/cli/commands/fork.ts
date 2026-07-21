@@ -74,7 +74,7 @@ export async function forkCommand(
     process.exit(1);
   }
   if (isForkResultInProgress(newConv)) {
-    console.log(chalk.yellow(`${modeLabel.charAt(0).toUpperCase() + modeLabel.slice(1)} is still in progress — watch https://pan.localhost/conv/${newConv.id}`));
+    console.log(chalk.yellow(`${modeLabel.charAt(0).toUpperCase() + modeLabel.slice(1)} is still in progress — watch https://overdeck.localhost/conv/${newConv.id}`));
     console.log(chalk.gray(`  Conv ID: ${newConv.id}`));
     console.log(chalk.gray(`  Session: ${newConv.tmuxSession}${newConv.sessionAlive ? ' (live)' : ''}`));
     process.exit(1);
@@ -84,5 +84,5 @@ export async function forkCommand(
   console.log(chalk.gray(`  Conv ID: ${newConv.id}`));
   console.log(chalk.gray(`  Session: ${newConv.tmuxSession}${newConv.sessionAlive ? ' (live)' : ''}`));
   console.log(chalk.gray(`  Model: ${newConv.model || 'default'}`));
-  console.log(chalk.gray(`  Dashboard: https://pan.localhost/conv/${newConv.id}`));
+  console.log(chalk.gray(`  Dashboard: https://overdeck.localhost/conv/${newConv.id}`));
 }

@@ -7,6 +7,7 @@ import { jsonResponse } from '../http-helpers.js';
 import { FlywheelRunId, FlywheelStats, FlywheelStatus, type FlywheelStats as FlywheelStatsPayload } from '@overdeck/contracts';
 import { emitActivityTtsSync } from '../../../lib/activity-logger.js';
 import { httpHandler } from './http-handler.js';
+import { getSubstrateBugWeightsRoute } from './flywheel-substrate-bug-weights.js';
 import { validateOrigin } from './origin-validation.js';
 import {
   getFlywheelRunDetail,
@@ -45,7 +46,7 @@ import { isAutoMergeEligible, type AutoMergeEligibility } from '../../../lib/clo
 import { shouldHoldForUat, getProjectAutoMergeDefault, type ProjectAutoMergeDefault } from '../../../lib/cloister/auto-merge-policy.js';
 import { parseArtifactRef } from '../../../lib/forge.js';
 import { getReviewStatusSync, type ReviewStatus } from '../../../lib/review-status.js';
-import { getAllReviewStatusesFromDb } from '../../../lib/overdeck/review-status-sync.js';
+import { getMergeBlockersPayload } from '../../../lib/cloister/merge-blockers.js';
 import { resolveProjectFromIssueSync, type ResolvedProject } from '../../../lib/projects.js';
 import {
   cancelPending,
@@ -57,7 +58,7 @@ import {
   type ScheduleAutoMergeInput,
   type ScheduleAutoMergeResult,
 } from '../../../lib/overdeck/merge-sync.js';
-
+import { getMergeBackendRoute } from './flywheel-merge-backend.js';
 const DEFAULT_BRIEF_PATH = 'docs/flywheel-brief.md';
 const FLYWHEEL_CONVERSATION_NAME = 'flywheel-orchestrator';
 const AUTO_MERGE_POLL_LIMIT = 100;
@@ -348,7 +349,6 @@ export async function postAutoMergeSchedulePayload(payload: unknown, deps: AutoM
   if (result.created) (deps.announce ?? announceAutoMergeScheduled)(issueId, result.entry);
   return { status: 200, body: result.entry };
 }
-
 export function getPendingAutoMergePayload(): PendingAutoMerge[] {
   return listActiveAutoMerges(AUTO_MERGE_POLL_LIMIT);
 }
@@ -579,31 +579,8 @@ const getAutoMergeProblemsRoute = HttpRouter.add(
   })),
 );
 
-/**
- * Issues that passed review but are blocked from merging by a GitHub-native
- * reason (conflict, failing CI, not mergeable). PAN-1620: the flywheel polls
- * this per tick and dispatches a rebase fix so a blocked PR does not sit forever
- * waiting on a webhook that may never fire — distinct from auto-merge *scheduling*
- * problems, which live in /auto-merge/problems.
- */
-const MERGE_BLOCKER_TYPES = new Set(['merge_conflict', 'failing_checks', 'not_mergeable']);
-
-export function getMergeBlockersPayload(): Array<{
-  issueId: string;
-  prUrl?: string;
-  reasons: Array<{ type: string; summary: string }>;
-}> {
-  const statuses = getAllReviewStatusesFromDb();
-  const out: Array<{ issueId: string; prUrl?: string; reasons: Array<{ type: string; summary: string }> }> = [];
-  for (const [issueId, status] of Object.entries(statuses)) {
-    if (status.reviewStatus !== 'passed') continue;
-    if (status.mergeStatus === 'merged') continue;
-    const reasons = (status.blockerReasons ?? []).filter((b) => MERGE_BLOCKER_TYPES.has(b.type));
-    if (reasons.length === 0) continue;
-    out.push({ issueId, prUrl: status.prUrl, reasons: reasons.map((b) => ({ type: b.type, summary: b.summary })) });
-  }
-  return out;
-}
+// getMergeBlockersPayload (PAN-1620) moved to src/lib/cloister/merge-blockers.ts so the
+// dashboard route and the sandbox-safe `pan flywheel merge-blockers` CLI share one source.
 
 const getMergeBlockersRoute = HttpRouter.add(
   'GET',
@@ -629,7 +606,7 @@ async function defaultGetOrderedIssueIds(): Promise<string[]> {
 }
 
 async function defaultMergeOne(issueId: string): Promise<{ ok: true } | { ok: false; reason: string }> {
-  const { triggerMerge } = await import('./workspaces.js');
+  const { triggerMerge } = await import('./workspaces/merge-ops.js');
   const r = await triggerMerge(issueId);
   return r.success ? { ok: true } : { ok: false, reason: r.error ?? r.message ?? 'merge failed' };
 }
@@ -649,7 +626,6 @@ export async function postFlywheelMergeNextPayload(payload: unknown, deps: Merge
   const outcomes = await shipMergeBatch(issueIds, { merge: deps.merge ?? defaultMergeOne });
   return { status: 200, body: { outcomes } };
 }
-
 const postAutoMergeScheduleRoute = HttpRouter.add(
   'POST',
   '/api/flywheel/auto-merge/schedule',
@@ -921,6 +897,16 @@ const getUatGenerationsRoute = HttpRouter.add(
   })),
 );
 
+const getUatCandidateRoute = HttpRouter.add(
+  'GET',
+  '/api/flywheel/uat-candidate',
+  httpHandler(Effect.gen(function* () {
+    const { getUatCandidatePayload } = yield* Effect.promise(() => import('../services/uat-train.js'));
+    const payload = yield* Effect.promise(() => getUatCandidatePayload());
+    return jsonResponse(payload);
+  })),
+);
+
 const postUatGenerationStackRoute = HttpRouter.add(
   'POST',
   '/api/flywheel/uat-generations/:name/stack',
@@ -989,16 +975,19 @@ export const flywheelRouteLayer = Layer.mergeAll(
   getFlywheelConversationRoute,
   getFlywheelCurrentRoute,
   getFlywheelStatsRoute,
+  getSubstrateBugWeightsRoute,
   getFlywheelConfigRoute,
   postFlywheelConfigRoute,
   getPendingAutoMergeRoute,
   getAutoMergeProblemsRoute,
   getMergeBlockersRoute,
+  getMergeBackendRoute,
   postAutoMergeScheduleRoute,
   postFlywheelMergeNextRoute,
   deleteAutoMergeRoute,
   getFlywheelMergeQueueRoute,
   getUatGenerationsRoute,
+  getUatCandidateRoute,
   postUatGenerationStackRoute,
   postUatGenerationPromoteRoute,
   postFlywheelAssembleUatRoute,
@@ -1013,5 +1002,4 @@ export const flywheelRouteLayer = Layer.mergeAll(
   getFlywheelBriefRoute,
   postFlywheelBriefRoute,
 );
-
 export default flywheelRouteLayer;

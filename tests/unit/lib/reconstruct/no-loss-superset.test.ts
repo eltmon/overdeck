@@ -46,7 +46,7 @@ vi.mock('../../../../src/dashboard/server/services/issue-service-singleton.js', 
   startSharedIssueService: vi.fn(),
 }));
 
-vi.mock('../../../../src/dashboard/server/routes/issues.js', () => ({
+vi.mock('../../../../src/lib/overdeck/pull-requests.js', () => ({
   fetchIssuePullRequest: vi.fn(),
 }));
 
@@ -57,7 +57,7 @@ import { listProjectsSync } from '../../../../src/lib/projects.js';
 import { readIssueRecord, resolveProjectForIssue } from '../../../../src/lib/pan-dir/record.js';
 import { enumerateInFlightIssuesFromSources } from '../../../../src/lib/reconstruct/enumerate-in-flight.js';
 import { getSharedIssueService, startSharedIssueService } from '../../../../src/dashboard/server/services/issue-service-singleton.js';
-import { fetchIssuePullRequest } from '../../../../src/dashboard/server/routes/issues.js';
+import { fetchIssuePullRequest } from '../../../../src/lib/overdeck/pull-requests.js';
 
 const listRunningAgentsMock = vi.mocked(listRunningAgents);
 const backfillMock = vi.mocked(backfillAgentsFromStateJsonSync);

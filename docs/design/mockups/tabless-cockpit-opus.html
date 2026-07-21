@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Tabless cockpit — spec (item #10, radical)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --radius:.625rem; --radius-sm:calc(var(--radius) - 4px);
+    --background:#fff; --foreground:#1f2937; --card:#fff; --card-2:#f5f6f8; --card-3:#eceef2; --accent:color-mix(in srgb, black 4%, transparent);
+    --muted-foreground:#6b7280; --border:color-mix(in srgb, black 8%, transparent);
+    --primary:oklch(.488 .217 264); --primary-foreground:#fff;
+    --destructive:#ef4444; --destructive-foreground:#b91c1c; --warning:#f59e0b; --warning-foreground:#b45309;
+    --info:#3b82f6; --info-foreground:#1d4ed8; --success:#10b981; --success-foreground:#047857;
+    --signal-cost-foreground:#0e7490; --signal-review:#8b5cf6;
+    --mono:"DM Mono", ui-monospace, monospace;
+  }
+  *{box-sizing:border-box} html,body{margin:0}
+  body{background:var(--card-2);color:var(--foreground);font-family:"DM Sans",system-ui,sans-serif;font-weight:500;font-size:13px;line-height:1.45;-webkit-font-smoothing:antialiased}
+  .mono{font-family:var(--mono)} .muted{color:var(--muted-foreground)}
+  .add{color:var(--success-foreground)} .del{color:var(--destructive-foreground)} .cost{color:var(--signal-cost-foreground)}
+  .wrap{max-width:1280px;margin:22px auto;padding:0 22px 50px}
+  h1{font-size:16px;margin:0 0 4px} .sub{color:var(--muted-foreground);font-size:12.5px;margin-bottom:14px;max-width:880px}
+  .dot{display:inline-block;width:8px;height:8px;border-radius:50%}
+  .ok{background:var(--success)}.bad{background:var(--destructive)}.info{background:var(--info)}.rev{background:var(--signal-review)}.neu{background:var(--muted-foreground)}
+
+  .cockpit{border:1px solid var(--border);border-radius:18px;background:var(--card);overflow:hidden}
+
+  /* header */
+  .hdr{padding:13px 16px;border-bottom:1px solid var(--border)}
+  .hrow{display:flex;align-items:center;gap:12px}
+  .hid{font-family:var(--mono);font-size:11px;color:var(--muted-foreground)}
+  .htitle{font-size:15px}
+  .hpush{margin-left:auto;display:flex;align-items:center;gap:8px}
+  .fact{font-size:11.5px;color:var(--muted-foreground)} .fact b{color:var(--foreground);font-weight:500}
+  .tools{display:flex;gap:4px;margin-left:6px;padding-left:10px;border-left:1px solid var(--border)}
+  .tbtn{display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--muted-foreground);border:1px solid var(--border);border-radius:7px;padding:4px 8px;cursor:pointer;background:var(--card)}
+  .tbtn:hover{background:var(--accent)}
+  .btn{border:1px solid var(--border);background:var(--card);border-radius:8px;padding:5px 11px;font-size:12px;cursor:pointer} .btn.pri{background:var(--primary);color:#fff;border-color:transparent}
+  .pipe{display:flex;gap:6px;margin-top:11px}
+  .seg{flex:1;height:6px;border-radius:99px;background:color-mix(in srgb,var(--muted-foreground) 18%,transparent)} .seg.done{background:var(--success)} .seg.active{background:var(--info)} .seg.bad{background:var(--destructive)}
+  .gates{display:flex;flex-wrap:wrap;gap:7px;margin-top:9px}
+  .gate{display:inline-flex;align-items:center;gap:6px;font-size:10.5px;color:var(--muted-foreground);border:1px solid var(--border);border-radius:7px;padding:3px 7px}
+
+  /* body: lane | center | rail */
+  .body{display:grid;grid-template-columns:200px 1fr 210px}
+  .col{padding:12px} .lane{border-right:1px solid var(--border)} .rail{border-left:1px solid var(--border);background:var(--card-2)}
+  .ch{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted-foreground);margin-bottom:8px}
+  .agent{display:flex;align-items:center;gap:7px;padding:6px 4px;font-size:12px} .agent .m{font-size:9.5px;color:var(--muted-foreground)}
+
+  /* center = scrollspy gutter + stacked sections */
+  .center{padding:0}
+  .centerInner{display:grid;grid-template-columns:118px 1fr}
+  .spy{border-right:1px solid var(--border);padding:14px 8px;position:sticky;top:0;align-self:start}
+  .spy a{display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--muted-foreground);padding:5px 7px;border-radius:7px;text-decoration:none}
+  .spy a .d{width:6px;height:6px;border-radius:50%;background:color-mix(in srgb,var(--muted-foreground) 40%,transparent)}
+  .spy a.on{color:var(--foreground);background:var(--accent)} .spy a.on .d{background:var(--info)}
+  .stack{padding:14px 16px;display:flex;flex-direction:column;gap:12px}
+
+  .sec{border:1px solid var(--border);border-radius:13px;background:var(--card)}
+  .sech{display:flex;align-items:center;gap:9px;padding:10px 13px;cursor:pointer}
+  .sech .ttl{font-size:13px} .sech .meta{margin-left:auto;font-size:11px;color:var(--muted-foreground)} .sech .car{font-size:10px;color:var(--muted-foreground)}
+  .secb{padding:0 13px 13px;border-top:1px solid var(--border);padding-top:11px}
+
+  .spot{border:1px solid color-mix(in srgb,var(--destructive) 34%,transparent);background:color-mix(in srgb,var(--destructive) 6%,var(--card));border-radius:11px;padding:11px 13px;margin-bottom:11px}
+  .spot .l{color:var(--destructive-foreground);font-size:12.5px}
+  .nowline{display:flex;align-items:center;gap:9px;font-size:13px}
+  .chip{font-family:var(--mono);font-size:10.5px;color:var(--info-foreground);border:1px solid color-mix(in srgb,var(--info) 40%,transparent);background:color-mix(in srgb,var(--info) 10%,transparent);border-radius:6px;padding:1px 6px}
+  .links{display:flex;gap:8px;margin-top:10px} .lk{font-size:11px;color:var(--muted-foreground);border:1px solid var(--border);border-radius:7px;padding:4px 9px}
+
+  .cisum{display:flex;align-items:center;gap:8px;font-size:12px;margin-bottom:10px}
+  .frow{display:grid;grid-template-columns:18px 1fr auto;gap:8px;align-items:center;padding:4px 6px;border-radius:7px;font-size:12px} .frow:hover{background:var(--accent)}
+  .ft{font-size:8px;font-family:var(--mono);color:var(--muted-foreground);border:1px solid var(--border);border-radius:3px;text-align:center;padding:1px 0}
+  .fc{font-size:10px;font-family:var(--mono)}
+
+  /* sticky composer */
+  .composer{position:sticky;bottom:0;border-top:1px solid var(--border);background:color-mix(in srgb,var(--card) 92%,transparent);backdrop-filter:blur(6px);padding:10px 16px;display:flex;align-items:center;gap:10px}
+  .composer input{flex:1;border:1px solid var(--border);border-radius:9px;padding:8px 11px;font:inherit;font-size:12px;background:var(--card)}
+  .composer .send{background:var(--primary);color:#fff;border:none;border-radius:8px;padding:7px 13px;font-size:12px}
+
+  .notes{margin-top:22px;border:1px solid var(--border);border-radius:14px;padding:14px 16px;background:var(--card)}
+  .notes h3{margin:0 0 10px;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted-foreground)}
+  .moves{display:grid;grid-template-columns:140px 1fr;gap:5px 14px;font-size:12.5px} .moves .f{color:var(--foreground)} .moves .t{color:var(--muted-foreground)}
+  .q{border:1px solid color-mix(in srgb,var(--primary) 30%,transparent);background:color-mix(in srgb,var(--primary) 5%,var(--card));border-radius:14px;padding:14px 16px;margin-top:14px}
+  .q h3{margin:0 0 8px;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--info-foreground)} .q li{font-size:12.5px;margin:7px 0}
+  code{font-family:var(--mono);font-size:11.5px;background:var(--accent);padding:1px 5px;border-radius:5px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Tabless cockpit — item #10 (radical)</h1>
+  <div class="sub">No tab strip at all. Every tab's content is relocated into one continuous issue screen: a scroll of stacked sections, navigated by a scrollspy gutter (jump + position) instead of tabs. Deep sections collapse so the scroll stays short. Tools open as panes from the header; the issue-level composer is a sticky bar at the bottom.</div>
+
+  <div class="cockpit">
+    <!-- header -->
+    <div class="hdr">
+      <div class="hrow">
+        <span class="hid">PAN-1919</span>
+        <span class="htitle">Consolidate per-issue resume/progress into one git-tracked record</span>
+        <span class="hpush">
+          <span class="fact">⎇ <b class="mono" style="font-size:11px">feature/pan-1919</b></span>
+          <span class="fact">PR <b>#1950</b></span>
+          <span class="fact">Cost <b class="cost">$8.41</b></span>
+          <button class="btn pri">Merge</button>
+          <button class="btn">Actions ▾</button>
+          <span class="tools">
+            <button class="tbtn">📁 Files ⤢</button>
+            <button class="tbtn">⌨ Terminal ⤢</button>
+            <button class="tbtn">🌐 Web ⤢</button>
+          </span>
+        </span>
+      </div>
+      <div class="pipe"><span class="seg done"></span><span class="seg active"></span><span class="seg bad"></span><span class="seg"></span><span class="seg bad"></span><span class="seg"></span><span class="seg"></span></div>
+      <div class="gates">
+        <span class="gate"><span class="dot rev"></span> Review running</span>
+        <span class="gate"><span class="dot ok"></span> Test passed</span>
+        <span class="gate"><span class="dot ok"></span> Verification passed</span>
+        <span class="gate"><span class="dot bad"></span> CI 4/5</span>
+        <span class="gate"><span class="dot ok"></span> PR mergeable</span>
+      </div>
+    </div>
+
+    <!-- body -->
+    <div class="body">
+      <!-- lane -->
+      <div class="col lane">
+        <div class="ch">Agents &amp; steps</div>
+        <div class="agent"><span class="dot ok"></span> Plan <span class="m">· done</span></div>
+        <div class="agent"><span class="dot info"></span> Work <span class="m">· running</span></div>
+        <div class="agent"><span class="dot rev"></span> Review <span class="m">· convoy</span></div>
+        <div class="agent"><span class="dot ok"></span> Verification</div>
+        <div class="agent"><span class="dot neu"></span> Test</div>
+        <div class="agent"><span class="dot neu"></span> Ship</div>
+        <div class="ch" style="margin-top:12px">▸ Stack · <span class="dot ok"></span> healthy</div>
+      </div>
+
+      <!-- center: scrollspy + sections -->
+      <div class="col center">
+        <div class="centerInner">
+          <nav class="spy">
+            <a class="on"><span class="d"></span> Now</a>
+            <a><span class="d"></span> Code</a>
+            <a><span class="d"></span> Plan</a>
+            <a><span class="d"></span> Discussion</a>
+            <a><span class="d"></span> Timeline</a>
+            <a><span class="d"></span> Costs</a>
+            <a><span class="d"></span> Artifacts</a>
+          </nav>
+          <div class="stack">
+            <!-- Now (open) -->
+            <div class="sec">
+              <div class="sech"><span class="car">▾</span><span class="ttl">Now</span><span class="meta">review running</span></div>
+              <div class="secb">
+                <div class="spot"><span class="l">⚠ Review blocked earlier — Correctness: FR-17 human gate bypassed</span></div>
+                <div class="nowline"><span class="dot info"></span> <span class="chip">work · sonnet-4-6</span> is fixing it — last commit 2m ago</div>
+                <div style="font-size:12.5px;margin-top:8px"><span class="muted">Next:</span> work fixes → re-review · <span class="muted">diff</span> <span class="add">+5039</span> <span class="del">−42</span> · 61 files</div>
+                <div class="links"><span class="lk">Open work agent ↗</span><span class="lk">Open diff →</span><span class="lk">Open PR ↗</span></div>
+              </div>
+            </div>
+
+            <!-- Code (open) -->
+            <div class="sec">
+              <div class="sech"><span class="car">▾</span><span class="ttl">Code</span><span class="meta"><span class="add">+5039</span> <span class="del">−42</span> · 61 files</span></div>
+              <div class="secb">
+                <div class="cisum"><span class="dot bad"></span> CI 4/5 · PR #1950 conflicting</div>
+                <div class="frow"><span class="ft">TS</span><span>src/lib/sequencer/writeSequenceMd.ts</span><span class="fc add">+318</span></div>
+                <div class="frow"><span class="ft">TS</span><span>src/lib/sequencer/rank.ts</span><span class="fc"><span class="add">+90</span> <span class="del">−4</span></span></div>
+                <div class="frow"><span class="ft">{}</span><span>package.json</span><span class="fc add">+2</span></div>
+                <div class="muted" style="font-size:11px;margin-top:6px;padding-left:6px">…58 more · click a file for its diff</div>
+              </div>
+            </div>
+
+            <!-- collapsed deep sections -->
+            <div class="sec"><div class="sech"><span class="car">▸</span><span class="ttl">Plan</span><span class="meta">9 items · proposed</span></div></div>
+            <div class="sec"><div class="sech"><span class="car">▸</span><span class="ttl">Discussion</span><span class="meta">4 comments</span></div></div>
+            <div class="sec"><div class="sech"><span class="car">▸</span><span class="ttl">Timeline</span><span class="meta">last: review blocked · 41m</span></div></div>
+            <div class="sec"><div class="sech"><span class="car">▸</span><span class="ttl">Costs</span><span class="meta cost">$8.41</span></div></div>
+            <div class="sec"><div class="sech"><span class="car">▸</span><span class="ttl">Artifacts</span><span class="meta">3</span></div></div>
+          </div>
+        </div>
+        <!-- sticky issue composer (was the Conversation tab's launcher) -->
+        <div class="composer">
+          <span class="muted" style="font-size:11px">Launch / message</span>
+          <input placeholder="Message the agents…" />
+          <button class="send">Send</button>
+        </div>
+      </div>
+
+      <!-- rail -->
+      <div class="col rail">
+        <div class="ch">Beads · 6/9</div>
+        <div style="font-size:11.5px;color:var(--muted-foreground)">▰▰▰▰▰▰▱▱▱</div>
+        <div style="margin-top:10px;font-size:12px"><span class="dot ok"></span> done · 6</div>
+        <div style="font-size:12px"><span class="dot info"></span> now · FR-17 gate</div>
+        <div style="font-size:12px"><span class="dot neu"></span> next · 2</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="notes">
+    <h3>Where each tab went (no-loss)</h3>
+    <div class="moves">
+      <span class="f">Overview</span><span class="t">→ “Now” section (open by default) + the header/lane/rail already carry status</span>
+      <span class="f">Code</span><span class="t">→ “Code” section (open): CI + changed-files tree + diff (#7)</span>
+      <span class="f">PRD / Plan</span><span class="t">→ “Plan” section (collapsed)</span>
+      <span class="f">Discussion</span><span class="t">→ “Discussion” section (collapsed)</span>
+      <span class="f">Timeline</span><span class="t">→ “Timeline” section (collapsed)</span>
+      <span class="f">Costs</span><span class="t">→ “Costs” section (collapsed; total always in the header)</span>
+      <span class="f">Artifacts</span><span class="t">→ “Artifacts” section (collapsed)</span>
+      <span class="f">Conversation</span><span class="t">→ sticky composer at the center bottom + select an agent for its conversation</span>
+      <span class="f">Files / Terminal / Web</span><span class="t">→ header tool-buttons → deck panes</span>
+      <span class="f">Tab navigation</span><span class="t">→ scrollspy gutter (jump + current-position), content all present</span>
+    </div>
+  </div>
+
+  <div class="q">
+    <h3>The trade vs. tabs — decide before I build</h3>
+    <ul>
+      <li><b>Win:</b> everything is one screen, nothing hidden behind a click; the scrollspy shows where you are; deep stuff collapses so it’s not overwhelming.</li>
+      <li><b>Cost:</b> a long scroll vs. instant tab random-access. The scrollspy mitigates it, and Now+Code (the 90% case) are open at the top.</li>
+      <li><b>1. Default-open sections:</b> Now + Code open, the rest collapsed (as shown). Or remember per-issue what you last expanded?</li>
+      <li><b>2. Scrollspy gutter</b> on the center’s left (shown) — or a sticky top jump-bar, or none (pure scroll)?</li>
+      <li><b>3. The sticky composer</b> at the bottom for issue-level launch/message — keep it, or only ever talk to agents by selecting them in the lane?</li>
+    </ul>
+  </div>
+</div>
+</body>
+</html>

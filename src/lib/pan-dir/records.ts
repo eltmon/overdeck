@@ -9,7 +9,8 @@
 
 import { hostname } from 'node:os';
 import { join } from 'node:path';
-import { promises as fsp } from 'node:fs';
+import { existsSync, promises as fsp } from 'node:fs';
+import { PAN_CONTINUES_DIRNAME, PAN_DIRNAME } from './types.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 import {
@@ -18,29 +19,37 @@ import {
 } from '../overdeck/cost-sync.js';
 import { getMergeSetSync } from '../merge-set.js';
 import {
+  findProjectByPathSync,
   getProjectSync,
   resolveProjectFromIssueSync,
   type ProjectConfig,
 } from '../projects.js';
+import { resolveStateReadHomeSync } from '../state-read-home.js';
 import type { ReviewStatus } from '../review-status.js';
+import type { RuntimeName } from '../runtimes/types.js';
 import type {
-  ContinueBeadsMapping,
   ContinueDecision,
   ContinueFeedbackEntry,
   ContinueHazard,
   ContinueResumePoint,
   ContinueSessionEntry,
-} from '../vbrief/continue-state.js';
+  ScopeDriftRecord,
+} from '../xbrief/continue-state.js';
 import {
-  getIssueRecordPath,
-  queueIssueRecordCommit,
+  LEGACY_VBRIEF_FILENAME_SUFFIX,
+  XBRIEF_FILENAME_SUFFIX,
+} from '../xbrief/lifecycle.js';
+import { listOverdeckAgentStatesSync } from '../overdeck/agent-state-sync.js';
+import {
+  getIssueWorkspacePath,
+  RECORD_SCHEMA_VERSION,
   readIssueRecord,
-  writeIssueRecordSync,
+  readIssueRecordSync,
   type PanIssueRecord,
-  type PanIssueCloseOutRecord,
   type PanIssuePipelineRecord,
   type PanIssueUsageRecord,
 } from './record.js';
+import { updateIssueRecord } from './record-update.js';
 
 export type {
   PanIssueRecord,
@@ -57,26 +66,30 @@ interface ContinueFile {
   decisions?: ContinueDecision[];
   hazards?: ContinueHazard[];
   resumePoint?: ContinueResumePoint | null;
-  beadsMapping?: ContinueBeadsMapping;
   sessionHistory?: ContinueSessionEntry[];
   feedback?: ContinueFeedbackEntry[];
   agentModel?: string;
+  scopeDrift?: ScopeDriftRecord;
 }
 
-function projectContinue(raw: ContinueFile | null): Pick<PanIssueRecord, 'decisions' | 'hazards' | 'resumePoint' | 'beadsMapping' | 'sessionHistory' | 'feedback'> {
+function projectContinue(raw: ContinueFile | null): Pick<PanIssueRecord, 'decisions' | 'hazards' | 'resumePoint' | 'sessionHistory' | 'feedback' | 'scopeDrift'> {
   return {
     decisions: raw?.decisions,
     hazards: raw?.hazards,
     resumePoint: raw?.resumePoint,
-    beadsMapping: raw?.beadsMapping,
     sessionHistory: raw?.sessionHistory,
     feedback: raw?.feedback ?? [],
+    scopeDrift: raw?.scopeDrift,
   };
 }
 
 // ─── Pipeline projection ──────────────────────────────────────────────────────
 
-function projectPipeline(issueId: string, status: ReviewStatus | null): PanIssuePipelineRecord {
+function projectPipeline(
+  issueId: string,
+  status: ReviewStatus | null,
+  existing?: PanIssuePipelineRecord,
+): PanIssuePipelineRecord {
   const base: PanIssuePipelineRecord = {
     issueId,
     reviewStatus: status?.reviewStatus ?? 'pending',
@@ -84,7 +97,14 @@ function projectPipeline(issueId: string, status: ReviewStatus | null): PanIssue
     verificationStatus: status?.verificationStatus,
     inspectStatus: status?.inspectStatus,
     mergeStatus: status?.mergeStatus,
+    releaseStatus: status?.releaseStatus ?? 'pending',
     readyForMerge: status?.readyForMerge ?? false,
+    closedOut: existing?.closedOut,
+    closedOutAt: existing?.closedOutAt,
+    // PAN-2587: the tombstone lives only in the record — a rebuild that projects
+    // from ReviewStatus (which has no such field) must not erase it, or the
+    // orphaned-completions patrol re-arms the same issue forever (36x on PAN-399).
+    panDoneRecoveredAt: existing?.panDoneRecoveredAt,
     updatedAt: status?.updatedAt ?? new Date().toISOString(),
   };
 
@@ -104,11 +124,20 @@ function projectPipeline(issueId: string, status: ReviewStatus | null): PanIssue
     reviewedAtCommit: status.reviewedAtCommit,
     lastVerifiedCommit: status.lastVerifiedCommit,
     reviewRequestedAt: status.reviewRequestedAt,
+    reviewSpawnedAt: typeof status.reviewSpawnedAt === 'number'
+      ? new Date(status.reviewSpawnedAt).toISOString()
+      : status.reviewSpawnedAt,
+    scopeDrift: status.scopeDrift,
     autoMerge: status.autoMerge,
     deaconIgnored: status.deaconIgnored,
     deaconIgnoredAt: status.deaconIgnoredAt,
     deaconIgnoredReason: status.deaconIgnoredReason,
     reviewerVerdicts: (status as { reviewerVerdicts?: unknown }).reviewerVerdicts,
+    strikeReadyHead: status.strikeReadyHead,
+    strikeReadyAt: status.strikeReadyAt,
+    strikeLandingState: status.strikeLandingState,
+    strikeRecoveryCount: status.strikeRecoveryCount,
+    strikeLandingAttempts: status.strikeLandingAttempts,
   };
 }
 
@@ -140,12 +169,65 @@ function projectMerges(issueId: string): string[] {
 
 // ─── Record builder ───────────────────────────────────────────────────────────
 
+export function resolveContinuePath(projectRoot: string, issueId: string): string {
+  const project: ProjectConfig = findProjectByPathSync(projectRoot) ?? {
+    name: projectRoot,
+    path: projectRoot,
+  };
+  const stateHome = resolveStateReadHomeSync(project);
+  const continuesDir = stateHome.migrated
+    ? join(stateHome.root, PAN_CONTINUES_DIRNAME)
+    : join(stateHome.root, PAN_DIRNAME, PAN_CONTINUES_DIRNAME);
+  const basePath = join(continuesDir, issueId.toLowerCase());
+  const canonicalPath = `${basePath}${XBRIEF_FILENAME_SUFFIX}`;
+  const legacyPath = `${basePath}${LEGACY_VBRIEF_FILENAME_SUFFIX}`;
+  if (existsSync(canonicalPath)) return canonicalPath;
+  if (existsSync(legacyPath)) return legacyPath;
+  return canonicalPath;
+}
+
 async function readLegacyContinueText(projectRoot: string, issueId: string): Promise<string | null> {
-  const path = join(projectRoot, '.pan', 'continues', `${issueId.toLowerCase()}.vbrief.json`);
   try {
-    return await fsp.readFile(path, 'utf-8');
+    return await fsp.readFile(resolveContinuePath(projectRoot, issueId), 'utf-8');
   } catch {
     return null;
+  }
+}
+
+/** Read workspace continue.json and return its statusOverrides (if any). */
+async function readWorkspaceContinueStatusOverrides(issueId: string): Promise<Record<string, string> | undefined> {
+  const workspacePath = getIssueWorkspacePath(issueId);
+  if (!workspacePath || !existsSync(workspacePath)) return undefined;
+  const continuePath = join(workspacePath, '.pan', 'continue.json');
+  try {
+    const text = await fsp.readFile(continuePath, 'utf-8');
+    const parsed = JSON.parse(text) as { statusOverrides?: Record<string, string> };
+    return parsed.statusOverrides ?? undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Read harness/model for an issue from the overdeck agents table (most recent work agent). */
+function projectAgentHarnessModel(issueId: string): { harness?: RuntimeName; model?: string } {
+  try {
+    const agents = listOverdeckAgentStatesSync().filter(
+      (a) => a.issueId?.toUpperCase() === issueId.toUpperCase(),
+    );
+    const workAgent =
+      agents
+        .filter((a) => a.role === 'work')
+        .sort((a, b) => (b.startedAt ?? '').localeCompare(a.startedAt ?? ''))[0]
+      ?? agents[agents.length - 1];
+    // Mid-spawn placeholder row (spawn routes write model 'pending-work-spawn'
+    // with a defaulted harness) — not authoritative yet.
+    if (workAgent?.model === 'pending-work-spawn') return {};
+    return {
+      harness: workAgent?.harness,
+      model: workAgent?.model ?? undefined,
+    };
+  } catch {
+    return {};
   }
 }
 
@@ -163,15 +245,33 @@ export async function buildIssueRecord(
   const existing = await readIssueRecord(project, issueId);
   const legacyContinueText = await readLegacyContinueText(project.path, issueId);
   const continueSubset = projectContinue(legacyContinueText ? (JSON.parse(legacyContinueText) as ContinueFile) : null);
-  const pipelineRecord = projectPipeline(issueId, opts.reviewStatus ?? null);
+  const pipelineRecord = projectPipeline(issueId, opts.reviewStatus ?? null, existing?.pipeline);
   const usageRecord = projectUsage(issueId);
   const merges = projectMerges(issueId);
 
+  // PAN-1919: fold workspace continue statusOverrides; fall back to existing.
+  const workspaceStatusOverrides = await readWorkspaceContinueStatusOverrides(issueId);
+  const mergedStatusOverrides = workspaceStatusOverrides
+    ? { ...(existing?.statusOverrides ?? {}), ...workspaceStatusOverrides }
+    : existing?.statusOverrides;
+
+  // PAN-2686: live agents-table harness/model wins so a restart-fresh with a
+  // new model refreshes the record; the existing record survives as fallback
+  // when no agent row remains (PAN-1919's rebuild idempotency).
+  const liveHM = projectAgentHarnessModel(issueId);
+  const agentHM = {
+    harness: liveHM.harness ?? existing?.harness,
+    model: liveHM.model ?? existing?.model,
+  };
+
   return {
     issueId: issueId.toUpperCase(),
-    schemaVersion: 1,
+    schemaVersion: RECORD_SCHEMA_VERSION,
     ...continueSubset,
     ...existing,
+    harness: agentHM.harness,
+    model: agentHM.model,
+    statusOverrides: mergedStatusOverrides,
     pipeline: pipelineRecord,
     closeOut: {
       usage: usageRecord,
@@ -186,7 +286,7 @@ export async function buildIssueRecord(
 // Re-export core record I/O from the PAN-1919 single-writer module.
 export {
   getIssueRecordPath,
-  writeIssueRecordSync,
+  markRecordPipelineClosedOutSync,
   readIssueRecord,
   queueIssueRecordCommit,
 } from './record.js';
@@ -201,24 +301,60 @@ export {
 } from './record.js';
 
 /**
+ * PAN-2587: never regress the pipeline block during a whole-record rebuild. A
+ * concurrent writer (e.g. a reviewer's verdict landing between the rebuild's
+ * `existing` snapshot and its write) may have put a NEWER pipeline on disk than
+ * the status the rebuild projects — observed clobbering PAN-399's passed
+ * verdict back to a pre-verdict snapshot. Same newer-wins rule (ISO `updatedAt`
+ * comparison) the journal readers use.
+ */
+export function pickNewerPipeline(
+  rebuilt: PanIssuePipelineRecord,
+  fresh: PanIssuePipelineRecord | undefined,
+): PanIssuePipelineRecord {
+  if (!fresh?.updatedAt || !rebuilt?.updatedAt) return rebuilt;
+  return rebuilt.updatedAt < fresh.updatedAt ? fresh : rebuilt;
+}
+
+/**
  * PAN-1908 / PAN-1919: rebuild and queue the per-issue permanent record for a
  * given issue. Fire-and-forget: failures are logged, never thrown, so
  * review-status writes stay synchronous and fast.
+ *
+ * PAN-2583: returns whether the durable write actually landed, so the caller
+ * can fall back to a sandbox-writable verdict drop when it did not (a sandboxed
+ * reviewer cannot write ${OVERDECK_HOME}/state, and swallowing that here was
+ * how blocked review verdicts silently vanished).
  */
 export async function updateIssueRecordForIssue(
   issueId: string,
   reviewStatus?: ReviewStatus | null,
-): Promise<void> {
+): Promise<boolean> {
   try {
     const resolved = resolveProjectFromIssueSync(issueId);
-    if (!resolved) return;
+    if (!resolved) return false;
     const project = getProjectSync(resolved.projectKey);
-    if (!project) return;
+    if (!project) return false;
 
     const record = await buildIssueRecord(project, issueId, { reviewStatus });
-    const recordPath = writeIssueRecordSync(project, issueId, record);
-    queueIssueRecordCommit(project, issueId, recordPath);
+    await updateIssueRecord(project, issueId, (fresh) => {
+      // buildIssueRecord's `existing` snapshot is read at the top of several awaits;
+      // anything written to the record during that window would be erased by this
+      // whole-record write (lost update). Observed twice on PAN-1791: wiped swarm
+      // slot assignments during the runaway, then wiped item statusOverrides right
+      // after `pan done` — which made every completed item dispatchable again and
+      // re-spawned slots for finished work. Re-read both blocks synchronously
+      // immediately before writing so the freshest values survive the rebuild.
+      if (fresh?.swarm) record.swarm = fresh.swarm;
+      if (fresh?.statusOverrides && Object.keys(fresh.statusOverrides).length > 0) {
+        record.statusOverrides = { ...record.statusOverrides, ...fresh.statusOverrides };
+      }
+      record.pipeline = pickNewerPipeline(record.pipeline, fresh?.pipeline);
+      return record;
+    });
+    return true;
   } catch (err) {
     console.warn(`[pan-dir/records] Failed to update record for ${issueId}: ${(err as Error).message}`);
+    return false;
   }
 }

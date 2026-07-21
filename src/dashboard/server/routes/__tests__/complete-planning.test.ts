@@ -1,13 +1,41 @@
-import { afterEach, describe, expect, it } from 'vitest';
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { mkdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { completePlanningArtifacts, completePlanningAutoSpawn, completePlanningAutoSpawnAndKill, completePlanningFilesToStage } from '../issues.js';
-import { PlanQualityLintError } from '../../../../lib/vbrief/quality-lint.js';
-import type { VBriefDocument } from '../../../../lib/vbrief/types.js';
+
+import { Effect } from 'effect';
+
+const internalTokenMocks = vi.hoisted(() => ({
+  getInternalTokenSync: vi.fn(() => 'test-internal-token'),
+}));
+
+vi.mock('../../../../lib/internal-token.js', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../../../../lib/internal-token.js')>(),
+  getInternalTokenSync: internalTokenMocks.getInternalTokenSync,
+}));
+
+import { INTERNAL_TOKEN_HEADER } from '../../../../lib/internal-token.js';
+import {
+  beginCompletePlanningLease,
+  completePlanningArtifacts,
+  completePlanningAutoSpawn,
+  completePlanningAutoSpawnAndKill,
+  completePlanningFilesToStage,
+  completePlanningWorkspaceGitAddCommands,
+  recordPlanningAutoHandoffFailure,
+  resolveCompletePlanningTerminalStatus,
+} from '../../../../lib/overdeck/planning-promotion.js';
+import { applyStatusOverrides } from '../../../../lib/xbrief/io.js';
+import { lintPlanQuality, PlanQualityLintError } from '../../../../lib/xbrief/quality-lint.js';
+import type { XBriefDocument } from '../../../../lib/xbrief/types.js';
 
 let projectRoot: string | null = null;
+
+const flush = async () => {
+  await Promise.resolve();
+  await Promise.resolve();
+};
 
 function makeProject(issueId: string): { projectPath: string; workspacePath: string } {
   projectRoot = mkdtempSync(join(tmpdir(), 'complete-planning-'));
@@ -15,15 +43,16 @@ function makeProject(issueId: string): { projectPath: string; workspacePath: str
   return { projectPath: projectRoot, workspacePath };
 }
 
-function makeDoc(issueId: string): VBriefDocument {
+function makeDoc(issueId: string): XBriefDocument {
   return {
-    vBRIEFInfo: { version: '0.5', created: '2026-05-16T00:00:00.000Z' },
+    xBRIEFInfo: { version: '0.5', created: '2026-05-16T00:00:00.000Z' },
     plan: {
       id: issueId,
       title: 'First run promotion',
       status: 'draft',
       metadata: {
-        canonicalFilename: '../../outside.vbrief.json',
+        canonicalFilename: '../../outside.xbrief.json',
+        docsJustification: 'Promotion-mechanics fixture; documentation coverage is exercised in the quality-lint suite',
       } as Record<string, unknown>,
       items: [
         {
@@ -31,17 +60,22 @@ function makeDoc(issueId: string): VBriefDocument {
           title: 'Promote spec',
           status: 'pending',
           narrative: { Action: 'Promote the finalized spec into the project planning directory' },
-          metadata: { requiresInspection: false },
+          metadata: {
+            requiresInspection: false,
+            files_scope: ['.pan/spec.vbrief.json'],
+            files_scope_confidence: 'high',
+            readiness: 'ready',
+          },
           subItems: [
             {
               id: 'item-1.ac1',
-              title: 'The project spec directory stores the promoted vBRIEF',
+              title: 'The project spec directory stores the promoted xBRIEF',
               status: 'pending',
               metadata: { kind: 'acceptance_criterion' },
             },
             {
               id: 'item-1.ac2',
-              title: 'The promoted vBRIEF persists proposed status',
+              title: 'The promoted xBRIEF persists proposed status',
               status: 'pending',
               metadata: { kind: 'acceptance_criterion' },
             },
@@ -49,14 +83,19 @@ function makeDoc(issueId: string): VBriefDocument {
         },
         {
           id: 'item-2',
-          title: 'Create beads',
+          title: 'Create tasks',
           status: 'pending',
-          narrative: { Action: 'Materialize one bead task for each finalized plan item' },
-          metadata: { requiresInspection: false },
+          narrative: { Action: 'Materialize one task task for each finalized plan item' },
+          metadata: {
+            requiresInspection: false,
+            files_scope: ['.tasks/issues.jsonl'],
+            files_scope_confidence: 'high',
+            readiness: 'ready',
+          },
           subItems: [
             {
               id: 'item-2.ac1',
-              title: 'The bead materializer creates one task per item',
+              title: 'The task materializer creates one task per item',
               status: 'pending',
               metadata: { kind: 'acceptance_criterion' },
             },
@@ -74,6 +113,80 @@ function makeDoc(issueId: string): VBriefDocument {
   };
 }
 
+function makeFileSizeRatchetDoc(issueId: string, intermediateCommand: string): XBriefDocument {
+  const doc = makeDoc(issueId);
+  doc.plan.title = 'Extract specialist spawn seam';
+  doc.plan.items = [
+    {
+      id: 'wi-1-spawn',
+      title: 'Extract specialist spawn seam',
+      status: 'pending',
+      narrative: {
+        Action: 'Extract specialist spawn helpers from the monolith into a focused source module',
+      },
+      metadata: {
+        requiresInspection: true,
+        foundationFor: ['wi-7-reconcile'],
+        files_scope: [
+          'src/lib/cloister/specialists.ts',
+          'src/lib/cloister/specialists-spawn.ts',
+        ],
+        files_scope_confidence: 'high',
+        readiness: 'sequential',
+        verify_commands: [intermediateCommand],
+      },
+      subItems: [
+        {
+          id: 'wi-1-spawn.ac1',
+          title: `${intermediateCommand} passes from the committed extraction tree`,
+          status: 'pending',
+          metadata: { kind: 'acceptance_criterion' },
+        },
+        {
+          id: 'wi-1-spawn.ac2',
+          title: 'The extracted module preserves specialist spawn behavior',
+          status: 'pending',
+          metadata: { kind: 'acceptance_criterion' },
+        },
+      ],
+    },
+    {
+      id: 'wi-7-reconcile',
+      title: 'Reconcile the file-size ratchet',
+      status: 'pending',
+      narrative: {
+        Action: 'Lower scripts/file-size-baseline.txt for src/lib/cloister/specialists.ts after all extractions finish',
+      },
+      metadata: {
+        requiresInspection: false,
+        files_scope: [
+          'scripts/file-size-baseline.txt',
+          'src/lib/cloister/specialists.ts',
+        ],
+        files_scope_confidence: 'high',
+        readiness: 'sequential',
+        verify_commands: ['npm run lint'],
+      },
+      subItems: [
+        {
+          id: 'wi-7-reconcile.ac1',
+          title: 'scripts/file-size-baseline.txt records the lowered specialists.ts line count',
+          status: 'pending',
+          metadata: { kind: 'acceptance_criterion' },
+        },
+        {
+          id: 'wi-7-reconcile.ac2',
+          title: 'npm run lint passes after the final baseline reconciliation',
+          status: 'pending',
+          metadata: { kind: 'acceptance_criterion' },
+        },
+      ],
+    },
+  ];
+  doc.plan.edges = [{ from: 'wi-1-spawn', to: 'wi-7-reconcile', type: 'blocks' }];
+  return doc;
+}
+
 afterEach(() => {
   if (projectRoot) {
     rmSync(projectRoot, { recursive: true, force: true });
@@ -82,6 +195,56 @@ afterEach(() => {
 });
 
 describe('completePlanningArtifacts', () => {
+  it('serializes concurrent complete-planning attempts for the same issue', async () => {
+    const first = beginCompletePlanningLease('PAN-2247');
+    const second = beginCompletePlanningLease('pan-2247', true);
+
+    expect(first.started).toBe(true);
+    expect(second.started).toBe(false);
+    expect(first.autoSpawnRequested()).toBe(true);
+
+    first.release();
+    await flush();
+
+    const third = beginCompletePlanningLease('PAN-2247');
+    expect(third.started).toBe(true);
+    third.release();
+    await flush();
+  });
+
+  it('stages workspace planning artifacts without force-adding .pan', () => {
+    const issueId = 'PAN-1931';
+    const { workspacePath } = makeProject(issueId);
+    mkdirSync(join(workspacePath, '.pan', 'drafts'), { recursive: true });
+    mkdirSync(join(workspacePath, '.pan', 'specs'), { recursive: true });
+    writeFileSync(join(workspacePath, '.gitignore'), [
+      '.pan/continue.json',
+      '.pan/spec.vbrief.json',
+      '',
+    ].join('\n'));
+    writeFileSync(join(workspacePath, '.pan', 'drafts', 'PAN-1931.md'), '# Draft\n');
+    writeFileSync(join(workspacePath, '.pan', 'specs', 'PAN-1931.xbrief.json'), '{}\n');
+    writeFileSync(join(workspacePath, '.pan', 'continue.json'), '{}\n');
+    writeFileSync(join(workspacePath, '.pan', 'spec.vbrief.json'), '{}\n');
+
+    const commands = completePlanningWorkspaceGitAddCommands(workspacePath);
+    expect(commands).toEqual([
+      ['add', '.pan/'],
+      ['add', '.gitignore'],
+    ]);
+    expect(commands.flat()).not.toContain('-f');
+  });
+
+  it('does not stage workspace state paths after state migration', () => {
+    const { workspacePath } = makeProject('PAN-2541');
+    mkdirSync(join(workspacePath, '.pan'), { recursive: true });
+    mkdirSync(join(workspacePath, '.tasks'), { recursive: true });
+    writeFileSync(join(workspacePath, '.gitignore'), '.overdeck/\n');
+    expect(completePlanningWorkspaceGitAddCommands(workspacePath, true)).toEqual([
+      ['add', '.gitignore'],
+    ]);
+  });
+
   it('includes codebase map changes in the main-side promote commit pathspec', async () => {
     const issueId = 'PAN-1150';
     const { projectPath } = makeProject(issueId);
@@ -94,13 +257,13 @@ describe('completePlanningArtifacts', () => {
       '',
     ].join('\n'));
 
-    expect(completePlanningFilesToStage(projectPath, '2026-06-12-PAN-1150-plan.vbrief.json')).toEqual([
-      '.pan/specs/2026-06-12-PAN-1150-plan.vbrief.json',
+    expect(completePlanningFilesToStage(projectPath, '2026-06-12-PAN-1150-plan.xbrief.json')).toEqual([
+      '.pan/specs/2026-06-12-PAN-1150-plan.xbrief.json',
       '.pan/context/codebase/',
     ]);
   });
 
-  it('promotes a first-run workspace draft and materializes one bead per plan item', async () => {
+  it('promotes a first-run workspace draft and reports one xBRIEF task per plan item', async () => {
     const issueId = 'PAN-1143';
     const { projectPath, workspacePath } = makeProject(issueId);
     await mkdir(join(workspacePath, '.pan'), { recursive: true });
@@ -110,68 +273,17 @@ describe('completePlanningArtifacts', () => {
       projectPath,
       workspacePath,
       issueId,
-      createBeads: async (path) => {
-        expect(path).toBe(workspacePath);
-        return {
-          success: true,
-          created: ['PAN-1143: Promote spec', 'PAN-1143: Create beads'],
-          errors: [],
-          beadIds: new Map(),
-        };
-      },
     });
 
     const specFiles = readdirSync(join(projectPath, '.pan', 'specs'));
     expect(specFiles).toEqual([result.proposed.filename]);
-    expect(result.proposed.filename).toMatch(/^\d{4}-\d{2}-\d{2}-PAN-1143-first-run-promotion\.vbrief\.json$/);
+    expect(result.proposed.filename).toMatch(/^\d{4}-\d{2}-\d{2}-PAN-1143-first-run-promotion\.xbrief\.json$/);
     expect(result.proposed.path).toBe(join(projectPath, '.pan', 'specs', result.proposed.filename));
-    expect(result.beadCount).toBe(2);
+    expect(result.taskCount).toBe(2);
 
     const promoted = JSON.parse(readFileSync(result.proposed.path, 'utf-8'));
     expect(promoted.status).toBe('proposed');
     expect(promoted.plan.status).toBe('proposed');
-  });
-
-  it('does not write a proposed spec when bead materialization does not match the plan item count', async () => {
-    const issueId = 'PAN-1144';
-    const { projectPath, workspacePath } = makeProject(issueId);
-    await mkdir(join(workspacePath, '.pan'), { recursive: true });
-    writeFileSync(join(workspacePath, '.pan', 'spec.vbrief.json'), JSON.stringify(makeDoc(issueId), null, 2));
-
-    await expect(completePlanningArtifacts({
-      projectPath,
-      workspacePath,
-      issueId,
-      createBeads: async () => ({
-        success: true,
-        created: ['PAN-1144: Promote spec'],
-        errors: [],
-        beadIds: new Map(),
-      }),
-    })).rejects.toThrow('created 1 beads for 2 plan items');
-
-    expect(existsSync(join(projectPath, '.pan', 'specs')) ? readdirSync(join(projectPath, '.pan', 'specs')) : []).toEqual([]);
-  });
-
-  it('does not write a proposed spec when bead materialization reports failure', async () => {
-    const issueId = 'PAN-1145';
-    const { projectPath, workspacePath } = makeProject(issueId);
-    await mkdir(join(workspacePath, '.pan'), { recursive: true });
-    writeFileSync(join(workspacePath, '.pan', 'spec.vbrief.json'), JSON.stringify(makeDoc(issueId), null, 2));
-
-    await expect(completePlanningArtifacts({
-      projectPath,
-      workspacePath,
-      issueId,
-      createBeads: async () => ({
-        success: false,
-        created: ['PAN-1145: Promote spec', 'PAN-1145: Create beads'],
-        errors: ['bd daemon unavailable'],
-        beadIds: new Map(),
-      }),
-    })).rejects.toThrow('bd daemon unavailable');
-
-    expect(existsSync(join(projectPath, '.pan', 'specs')) ? readdirSync(join(projectPath, '.pan', 'specs')) : []).toEqual([]);
   });
 
   it('rejects quality lint failures before writing a proposed spec', async () => {
@@ -199,9 +311,6 @@ describe('completePlanningArtifacts', () => {
       projectPath,
       workspacePath,
       issueId,
-      createBeads: async () => {
-        throw new Error('createBeads should not run');
-      },
     })).rejects.toMatchObject({
       name: 'PlanQualityLintError',
       issues: expect.arrayContaining([
@@ -210,6 +319,68 @@ describe('completePlanningArtifacts', () => {
     } satisfies Partial<PlanQualityLintError>);
 
     expect(existsSync(join(projectPath, '.pan', 'specs')) ? readdirSync(join(projectPath, '.pan', 'specs')) : []).toEqual([]);
+  });
+
+  it('re-finalizes an active ratchet-blocked plan without losing stable item progress', async () => {
+    const issueId = 'PAN-2232';
+    const { projectPath, workspacePath } = makeProject(issueId);
+    const specsDir = join(projectPath, '.pan', 'specs');
+    const recordsDir = join(projectPath, '.pan', 'records');
+    const workspacePanDir = join(workspacePath, '.pan');
+    await Promise.all([
+      mkdir(specsDir, { recursive: true }),
+      mkdir(recordsDir, { recursive: true }),
+      mkdir(workspacePanDir, { recursive: true }),
+    ]);
+
+    const canonicalFilename = '2026-07-16-PAN-2232-extract-specialist-spawn-seam.xbrief.json';
+    const canonicalPath = join(specsDir, canonicalFilename);
+    const blockedDoc = makeFileSizeRatchetDoc(issueId, 'npm run lint');
+    writeFileSync(canonicalPath, JSON.stringify({
+      ...blockedDoc,
+      status: 'active',
+      plan: { ...blockedDoc.plan, status: 'active' },
+    }, null, 2));
+
+    const statusOverrides = {
+      'wi-1-spawn': 'running',
+      'wi-1-spawn.ac1': 'completed',
+    };
+    const recordPath = join(recordsDir, 'pan-2232.json');
+    writeFileSync(recordPath, JSON.stringify({ issueId, statusOverrides }, null, 2));
+    const recordBefore = readFileSync(recordPath, 'utf-8');
+
+    expect(lintPlanQuality(blockedDoc)).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        itemId: 'wi-1-spawn',
+        rule: 'deferred-file-size-ratchet',
+      }),
+    ]));
+
+    const repairedDoc = makeFileSizeRatchetDoc(issueId, 'npm run typecheck');
+    expect(lintPlanQuality(repairedDoc).map(issue => issue.rule))
+      .not.toContain('deferred-file-size-ratchet');
+    writeFileSync(
+      join(workspacePanDir, 'spec.vbrief.json'),
+      JSON.stringify(repairedDoc, null, 2),
+    );
+
+    const result = await completePlanningArtifacts({
+      projectPath,
+      workspacePath,
+      issueId,
+    });
+
+    expect(result.proposed).toEqual({ path: canonicalPath, filename: canonicalFilename });
+    expect(readdirSync(specsDir)).toEqual([canonicalFilename]);
+    const promoted = JSON.parse(readFileSync(canonicalPath, 'utf-8')) as XBriefDocument & { status: string };
+    expect(promoted.status).toBe('proposed');
+    expect(promoted.plan.items[0]?.metadata?.verify_commands).toEqual(['npm run typecheck']);
+    expect(readFileSync(recordPath, 'utf-8')).toBe(recordBefore);
+
+    const effective = applyStatusOverrides(promoted, statusOverrides);
+    expect(effective.plan.items[0]?.status).toBe('running');
+    expect(effective.plan.items[0]?.subItems?.[0]?.status).toBe('completed');
   });
 
   it('does not auto-spawn when autoSpawn is omitted', async () => {
@@ -228,7 +399,10 @@ describe('completePlanningArtifacts', () => {
     const fetchImpl: typeof fetch = async (input, init) => {
       expect(String(input)).toBe('http://127.0.0.1:3011/api/agents');
       expect(init?.method).toBe('POST');
-      expect(init?.headers).toMatchObject({ origin: 'http://127.0.0.1:3011' });
+      expect(init?.headers).toMatchObject({
+        origin: 'http://127.0.0.1:3011',
+        [INTERNAL_TOKEN_HEADER]: 'test-internal-token',
+      });
       expect(JSON.parse(String(init?.body))).toEqual({ issueId: 'PAN-1146', role: 'work' });
       return new Response(JSON.stringify({ success: true, agentId: 'agent-pan-1146' }), { status: 200 });
     };
@@ -244,14 +418,82 @@ describe('completePlanningArtifacts', () => {
     });
   });
 
-  it('maps stack-health spawn rejection to a non-fatal autoSpawn skip', async () => {
-    const fetchImpl: typeof fetch = async () => new Response(JSON.stringify({
-      success: false,
-      blocked: true,
-      skipped: true,
-      error: 'Workspace docker stack for PAN-1147 is not healthy: api unhealthy',
-      stackHealth: { healthy: false, reasons: ['api unhealthy'] },
-    }), { status: 422 });
+  it('classifies unauthorized auto-spawn responses and fails the terminal phase', async () => {
+    const result = await completePlanningAutoSpawn({
+      issueId: 'PAN-1146',
+      autoSpawn: true,
+      dashboardOrigin: 'http://127.0.0.1:3011',
+      fetchImpl: async (_input, init) => {
+        expect(init?.headers).toMatchObject({ [INTERNAL_TOKEN_HEADER]: 'test-internal-token' });
+        return new Response(JSON.stringify({ error: 'unauthorized' }), { status: 401 });
+      },
+    });
+
+    expect(result).toEqual({
+      workAgentSpawned: false,
+      workAgentError: 'unauthorized',
+      workAgentSkipReason: 'unauthorized',
+    });
+    expect(resolveCompletePlanningTerminalStatus(true, result)).toBe('failure');
+  });
+
+  it('records a refused auto-handoff as planning failure and pipeline stuck state', async () => {
+    const append = vi.fn(() => Effect.succeed(undefined));
+    const markStuck = vi.fn();
+    const emitActivity = vi.fn();
+
+    await expect(recordPlanningAutoHandoffFailure({
+      issueId: 'PAN-2860',
+      result: {
+        workAgentSpawned: false,
+        workAgentSkipReason: 'guardrails',
+        workAgentError: 'Workspace has uncommitted changes',
+      },
+      eventStore: { append },
+      now: () => '2026-07-17T00:00:00.000Z',
+      markStuck,
+      emitActivity,
+    })).resolves.toBe('Workspace has uncommitted changes');
+
+    expect(append).toHaveBeenCalledWith({
+      type: 'planning.failed',
+      timestamp: '2026-07-17T00:00:00.000Z',
+      payload: {
+        issueId: 'PAN-2860',
+        error: 'Workspace has uncommitted changes',
+        stage: 'auto-handoff',
+        workAgentSkipReason: 'guardrails',
+        workAgentError: 'Workspace has uncommitted changes',
+      },
+    });
+    expect(markStuck).toHaveBeenCalledWith('PAN-2860', 'planning_auto_handoff_failed', {
+      workAgentSkipReason: 'guardrails',
+      workAgentError: 'Workspace has uncommitted changes',
+    });
+    expect(emitActivity).toHaveBeenCalledWith(expect.objectContaining({
+      source: 'plan',
+      level: 'error',
+      issueId: 'PAN-2860',
+      message: expect.stringContaining('work-agent startup failed'),
+    }));
+  });
+
+  it('rebuilds the stack and starts work when the initial auto-spawn finds no healthy stack', async () => {
+    const requests: string[] = [];
+    const fetchImpl: typeof fetch = async (input, init) => {
+      requests.push(String(input));
+      expect(init?.headers).toMatchObject({ [INTERNAL_TOKEN_HEADER]: 'test-internal-token' });
+      if (String(input).endsWith('/api/agents')) {
+        return new Response(JSON.stringify({
+          success: false,
+          blocked: true,
+          skipped: true,
+          error: 'Workspace docker stack for PAN-1147 is not healthy: no containers found',
+          stackHealth: { healthy: false, reasons: ['no containers found'] },
+        }), { status: 422 });
+      }
+      return new Response(JSON.stringify({ success: true, activityId: 'activity-rebuild' }), { status: 200 });
+    };
 
     await expect(completePlanningAutoSpawn({
       issueId: 'PAN-1147',
@@ -259,10 +501,13 @@ describe('completePlanningArtifacts', () => {
       dashboardOrigin: 'http://127.0.0.1:3011',
       fetchImpl,
     })).resolves.toEqual({
-      workAgentSpawned: false,
-      workAgentError: 'Workspace docker stack for PAN-1147 is not healthy: api unhealthy',
-      workAgentSkipReason: 'stack-unhealthy',
+      workAgentSpawned: true,
+      workAgentSession: 'agent-pan-1147',
     });
+    expect(requests).toEqual([
+      'http://127.0.0.1:3011/api/agents',
+      'http://127.0.0.1:3011/api/workspaces/PAN-1147/rebuild-and-start',
+    ]);
   });
 
   it('kills the planning session immediately after autoSpawn succeeds', async () => {

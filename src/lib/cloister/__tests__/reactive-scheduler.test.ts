@@ -1,6 +1,35 @@
 import { Effect } from 'effect';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+const autonomousPlanMock = vi.hoisted(() => ({
+  autoPickupBacklog: false,
+  labels: ['released'] as readonly string[] | null,
+  recordedModel: undefined as string | undefined,
+  autonomousModel: 'workhorse:cheap' as string | undefined,
+}));
+
+vi.mock('../autonomous-plan-dispatch.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../autonomous-plan-dispatch.js')>();
+  return {
+    ...actual,
+    gatherAutonomousPlanDispatchInput: vi.fn(async () => ({
+      autoPickupBacklog: autonomousPlanMock.autoPickupBacklog,
+      labels: autonomousPlanMock.labels,
+      recordedModel: autonomousPlanMock.recordedModel,
+      autonomousModel: autonomousPlanMock.autonomousModel,
+      workhorses: {
+        expensive: 'claude-opus-4-8',
+        mid: 'claude-sonnet-5',
+        cheap: 'claude-haiku-4-5',
+      },
+    })),
+  };
+});
+
+vi.mock('../dead-end-trip.js', () => ({
+  recordDeadEndNeedsYou: vi.fn(async () => undefined),
+}));
+
 vi.mock('../../agents.js', async () => {
   const { Effect } = await import('effect');
   const effectMock = (initial?: unknown) => {
@@ -74,6 +103,11 @@ vi.mock('../issue-closed.js', () => ({
   isIssueClosed: vi.fn(async () => false),
 }));
 
+vi.mock('../merge-verification.js', () => ({
+  shouldSkipDispatchAsMerged: vi.fn(async () => ({ skip: false, reason: 'open' })),
+  verifyMergedBeforeLifecycle: vi.fn(),
+}));
+
 vi.mock('../../activity-logger.js', () => ({
   emitActivityEntry: vi.fn(),
   emitActivityEntrySync: vi.fn(),
@@ -104,6 +138,8 @@ vi.mock('../concurrency.js', () => ({
   resetPatrolDispatchBudget: vi.fn(),
   tryReserveAdvancingSlot: () => true,
   releaseAdvancingSlot: vi.fn(),
+  tryReserveSwarmSlot: () => true,
+  releaseSwarmSlot: vi.fn(),
   describeRunningAgents: () => 'counts: work=0 advancing=0 total=0/9 | advancing=[] work=[]',
 }));
 
@@ -192,13 +228,16 @@ vi.mock('../../tmux.js', async () => {
   return {
   sessionExists: effectMock(false),
   sessionExistsSync: vi.fn(() => false),
+  querySessionSync: vi.fn(() => ({ status: 'missing', detail: 'mock session absent' })),
   killSession: effectMock(undefined),
   killSessionSync: vi.fn(() => undefined),
   };
 });
 
+import { emitActivityEntrySync } from '../../activity-logger.js';
 import { listRunningAgentsSync, listRunningAgents, spawnRun, getAgentState, getAgentStateSync, resumeAgent } from '../../agents.js';
 import { sessionExists, killSession, sessionExistsSync } from '../../tmux.js';
+import { recordDeadEndNeedsYou } from '../dead-end-trip.js';
 import { spawnReviewRoleForIssue } from '../review-agent.js';
 import { dispatchTestAgentAndNotify } from '../test-agent-queue.js';
 import { isIssueClosed } from '../issue-closed.js';
@@ -225,6 +264,10 @@ describe('reactive Cloister scheduler', () => {
     vi.mocked(killSession).mockResolvedValue(undefined);
     vi.mocked(isIssueClosed).mockResolvedValue(false);
     vi.mocked(getReviewStatusSync).mockReturnValue(undefined as any);
+    autonomousPlanMock.autoPickupBacklog = false;
+    autonomousPlanMock.labels = ['released'];
+    autonomousPlanMock.recordedModel = undefined;
+    autonomousPlanMock.autonomousModel = 'workhorse:cheap';
     mockHeadSha = 'newhead1';
   });
 
@@ -242,6 +285,63 @@ describe('reactive Cloister scheduler', () => {
     expect(stateToRole('shipping')).toBeNull();
     expect(stateToRole('closed')).toBeNull();
     expect(stateToRole('canceled')).toBeNull();
+  });
+
+  it('refuses autonomous planning without release and records a warning needs-you trip', async () => {
+    autonomousPlanMock.labels = [];
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+
+    await Effect.runPromise(onIssueStateChange('PAN-503', 'in_planning'));
+
+    const refusalText = 'Autonomous planning dispatch was refused because the issue is not released';
+    expect(spawnRun).not.toHaveBeenCalled();
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining(refusalText));
+    expect(emitActivityEntrySync).toHaveBeenCalledWith({
+      source: 'cloister',
+      level: 'warn',
+      message: expect.stringContaining(refusalText),
+      issueId: 'PAN-503',
+    });
+    expect(recordDeadEndNeedsYou).toHaveBeenCalledWith(
+      'PAN-503',
+      'autonomous-plan-dispatch',
+      'in_planning',
+      expect.stringContaining(refusalText),
+    );
+
+    logSpy.mockRestore();
+  });
+
+  it('passes the concrete configured autonomous planning model to spawnRun', async () => {
+    await Effect.runPromise(onIssueStateChange('PAN-503', 'in_planning'));
+
+    expect(spawnRun).toHaveBeenCalledWith('PAN-503', 'plan', {
+      prompt: expect.stringContaining('PLAN TASK for PAN-503'),
+      model: 'claude-haiku-4-5',
+    });
+  });
+
+  it('prefers the recorded planning model over roles.plan.autonomousModel', async () => {
+    autonomousPlanMock.recordedModel = 'gpt-5.5';
+
+    await Effect.runPromise(onIssueStateChange('PAN-503', 'in_planning'));
+
+    expect(spawnRun).toHaveBeenCalledWith('PAN-503', 'plan', {
+      prompt: expect.stringContaining('PLAN TASK for PAN-503'),
+      model: 'gpt-5.5',
+    });
+  });
+
+  it('keeps work-role dispatch unchanged and does not apply autonomous planning staffing', async () => {
+    autonomousPlanMock.labels = [];
+    autonomousPlanMock.autonomousModel = undefined;
+
+    await Effect.runPromise(onIssueStateChange('PAN-503', 'in_progress'));
+
+    expect(spawnRun).toHaveBeenCalledWith('PAN-503', 'work', {
+      prompt: expect.stringContaining('WORK TASK for PAN-503'),
+    });
+    expect(recordDeadEndNeedsYou).not.toHaveBeenCalled();
   });
 
   it('starts the review role for an issue state transition via the wrapper', async () => {
@@ -521,5 +621,38 @@ describe('reactive Cloister scheduler', () => {
     }));
 
     expect(idleStackReaperMock.handleAgentLifecycleEventForIdleStack).toHaveBeenCalledWith('agent-pan-503');
+  });
+});
+
+describe('PAN-2159: duplicate planner twin on in_planning', () => {
+  it('does not spawn a twin while the canonical planner is freshly starting (tmux session not yet created)', async () => {
+    // The start-planning route writes planning-<issue> state BEFORE the
+    // lifecycle transition; the tmux session is created after it. The guard
+    // must treat this fresh 'starting' state as alive.
+    vi.mocked(getAgentState).mockImplementation(((id: string) => {
+      if (id === 'planning-pan-503') {
+        return { id, issueId: 'PAN-503', role: 'plan', status: 'starting', startedAt: new Date().toISOString() };
+      }
+      return null;
+    }) as never);
+    vi.mocked(sessionExists).mockResolvedValue(false);
+
+    await Effect.runPromise(onIssueStateChange('PAN-503', 'in_planning'));
+
+    expect(spawnRun).not.toHaveBeenCalled();
+  });
+
+  it('still unsticks a stale crashed spawn (starting past the grace window, no session)', async () => {
+    vi.mocked(getAgentState).mockImplementation(((id: string) => {
+      if (id === 'planning-pan-503') {
+        return { id, issueId: 'PAN-503', role: 'plan', status: 'starting', startedAt: new Date(Date.now() - 10 * 60_000).toISOString() };
+      }
+      return null;
+    }) as never);
+    vi.mocked(sessionExists).mockResolvedValue(false);
+
+    await Effect.runPromise(onIssueStateChange('PAN-503', 'in_planning'));
+
+    expect(spawnRun).toHaveBeenCalledWith('PAN-503', 'plan', expect.anything());
   });
 });

@@ -45,7 +45,7 @@ describe('resetReviewCommand (pan review reset)', () => {
       expect.stringContaining('/api/review/PAN-2/reset'),
       expect.objectContaining({ method: 'POST' }),
     );
-    expect(resetSessionMock).toHaveBeenCalledWith('PAN-2');
+    expect(resetSessionMock).toHaveBeenCalledWith('agent-pan-2-review');
   });
 
   it('session: false behaves like default', async () => {

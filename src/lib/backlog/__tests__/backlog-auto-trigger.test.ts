@@ -16,17 +16,19 @@ vi.mock('../sequencer-agent.js', async () => {
   };
 });
 
-import { triggerDebouncedIncrementalPass, stopPeriodicReviewPass } from '../backlog-auto-trigger.js';
+import { triggerDebouncedIncrementalPass, startPeriodicReviewPass, stopPeriodicReviewPass } from '../backlog-auto-trigger.js';
 import { spawnSequencerAgent } from '../sequencer-agent.js';
 
 describe('backlog-auto-trigger', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.clearAllMocks();
+    delete process.env.OVERDECK_NO_RESUME;
   });
   afterEach(() => {
     stopPeriodicReviewPass();
     vi.useRealTimers();
+    delete process.env.OVERDECK_NO_RESUME;
   });
 
   it('calls spawnSequencerAgent after debounce', async () => {
@@ -41,5 +43,30 @@ describe('backlog-auto-trigger', () => {
     triggerDebouncedIncrementalPass('/tmp/proj');
     await vi.runAllTimersAsync();
     expect(spawnSequencerAgent).toHaveBeenCalledTimes(1);
+  });
+
+  // PAN-2396: --no-resume is the full-quiescence escape hatch — no autonomous
+  // sequencer pass may spawn while the boot carries OVERDECK_NO_RESUME.
+  it('suppresses the incremental pass when OVERDECK_NO_RESUME is set', async () => {
+    process.env.OVERDECK_NO_RESUME = '1';
+    triggerDebouncedIncrementalPass('/tmp/proj');
+    await vi.runAllTimersAsync();
+    expect(spawnSequencerAgent).not.toHaveBeenCalled();
+  });
+
+  it('suppresses the periodic review pass when OVERDECK_NO_RESUME is set', async () => {
+    process.env.OVERDECK_NO_RESUME = '1';
+    startPeriodicReviewPass('/tmp/proj', 60_000);
+    await vi.advanceTimersByTimeAsync(120_000);
+    expect(spawnSequencerAgent).not.toHaveBeenCalled();
+  });
+
+  // The gate is checked at FIRE time: a timer scheduled before the operator
+  // exports the env is still suppressed when it fires.
+  it('suppresses an already-scheduled pass when the env appears before it fires', async () => {
+    triggerDebouncedIncrementalPass('/tmp/proj');
+    process.env.OVERDECK_NO_RESUME = '1';
+    await vi.runAllTimersAsync();
+    expect(spawnSequencerAgent).not.toHaveBeenCalled();
   });
 });

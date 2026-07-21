@@ -55,9 +55,8 @@ export function TldrServiceStatus() {
     return (
       <div className="bg-card rounded-lg p-4 border border-border">
         <div className="flex items-center gap-2 text-muted-foreground">
-          <XCircle className="w-4 h-4" />
-          <span className="text-sm">TLDR not configured</span>
-          <span className="text-xs text-muted-foreground ml-auto">Run pan admin tldr start to enable</span>
+          <Database aria-hidden="true" className="w-4 h-4" />
+          <span className="text-sm">TLDR · Not configured (optional)</span>
         </div>
       </div>
     );

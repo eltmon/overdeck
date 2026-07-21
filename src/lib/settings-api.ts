@@ -20,6 +20,7 @@ import {
   type ModelRef,
   type RoleConfig,
   type RolesConfig,
+  type WeightedModelRef,
   type WorkhorsesConfig,
   type WorkhorseSlot,
   type TtsDaemonConfig,
@@ -30,6 +31,7 @@ import {
 } from './config-yaml.js';
 import { ModelId } from './settings.js';
 import type { Role } from './agents.js';
+import { tieredExecutionConfigForSave, validateTieredExecutionSettings, type ApiTieredExecutionConfig } from './settings-api-tiered-execution.js';
 import type { RuntimeName } from './runtimes/types.js';
 import { getBuiltInDefaultHarness } from './providers.js';
 import { defaultBackgroundAiFeatures, type BackgroundAiFeature } from './background-ai/registry.js';
@@ -106,7 +108,6 @@ function sanitizeApiTtsConfig(tts: ApiTtsConfig | undefined): ApiTtsConfig | und
   const errors: string[] = [];
   validateApiTtsConfigFields(tts, errors);
   if (errors.length > 0) throw new Error(errors.join('; '));
-
   return Object.fromEntries(
     API_TTS_KEYS
       .filter((key) => tts[key] !== undefined)
@@ -114,10 +115,8 @@ function sanitizeApiTtsConfig(tts: ApiTtsConfig | undefined): ApiTtsConfig | und
   ) as ApiTtsConfig;
 }
 
-// API format matches frontend SettingsConfig interface
-// Note: No cost_sensitivity - we're opinionated and always pick the best model
-// for each task. Users control cost by which providers they enable.
 export interface ApiSettingsConfig {
+  swarm?: { mode: 'off' | 'auto' | 'always'; maxSlots: number; autoAdvance: boolean };
   workhorses?: WorkhorsesConfig;
   roles?: RolesConfig;
   models: {
@@ -266,6 +265,7 @@ export interface ApiSettingsConfig {
     resiliency_tier?: 'ephemeral' | 'durable';
     max_concurrent_agents?: number;
   };
+  tiered_execution?: ApiTieredExecutionConfig;
   deprecation_warnings?: ApiDeprecationWarning[];
 }
 
@@ -274,27 +274,17 @@ export interface ApiSettingsConfig {
  *
  * Also detects deprecated model IDs in current overrides and returns warnings.
  */
-export function getDefaultConversationModelApi(): ModelId {
+export function getDefaultConversationModelApi(): ModelId | undefined {
   const { config } = loadConfigSync();
 
   if (config.defaultConversationModel) return resolveModelIdSync(config.defaultConversationModel);
-
-  if (config.enabledProviders.has('openai')) return resolveModelIdSync('gpt-5.5');
-  if (config.enabledProviders.has('minimax')) return resolveModelIdSync('minimax-m2.7-highspeed');
-  if (config.enabledProviders.has('google')) return resolveModelIdSync('gemini-3.1-pro-preview');
-  if (config.enabledProviders.has('kimi')) return resolveModelIdSync('kimi-k2.5');
-  if (config.enabledProviders.has('zai')) return resolveModelIdSync('glm-5.2');
-  if (config.enabledProviders.has('mimo')) return resolveModelIdSync('mimo-v2.5-pro');
-  if (config.enabledProviders.has('nous')) return resolveModelIdSync('qwen/qwen3.6-plus');
-  if (config.enabledProviders.has('dashscope')) return resolveModelIdSync('qwen3-coder-plus');
-  if (config.enabledProviders.has('openrouter')) {
-    const fav = config.openrouterFavorites[0];
-    if (fav) return resolveModelIdSync(fav);
-  }
-  return resolveModelIdSync('claude-sonnet-4-6');
+  // Unset is legal (fresh install) — Settings must still render so the operator can set it (PAN-2589).
+  return undefined;
 }
 
-const ROLE_NAMES: readonly Role[] = ['plan', 'work', 'review', 'test', 'ship', 'flywheel', 'strike', 'sequencer'];
+const ROLE_NAMES: readonly Role[] = ['plan', 'work', 'review', 'test', 'ship', 'flywheel', 'strike', 'sequencer', 'knowledge'];
+type AvailableModel = { id: ModelId; name: string; costPer1MTokens: number };
+type AvailableModelsApi = Record<'anthropic' | 'openai' | 'google' | 'minimax' | 'zai' | 'kimi' | 'mimo' | 'openrouter' | 'nous' | 'dashscope', AvailableModel[]>;
 const WORKHORSE_SLOTS: readonly WorkhorseSlot[] = ['expensive', 'mid', 'cheap'];
 const MODEL_PROVIDERS = ['anthropic', 'openai', 'google', 'minimax', 'zai', 'kimi', 'mimo', 'openrouter', 'nous', 'dashscope'] as const;
 type ApiModelProvider = typeof MODEL_PROVIDERS[number];
@@ -426,7 +416,31 @@ function validateModelRef(
   warnings: string[],
   allowWorkhorseRef: boolean,
   allowParentRef = false,
+  allowDistribution = false,
 ): void {
+  if (Array.isArray(ref)) {
+    if (!allowDistribution) {
+      errors.push(`${fieldPath} distribution not allowed here; must be a scalar model reference`);
+      return;
+    }
+    if (ref.length === 0) {
+      errors.push(`${fieldPath} distribution must be a non-empty array`);
+      return;
+    }
+    for (let i = 0; i < ref.length; i++) {
+      const entry = ref[i] as Record<string, unknown>;
+      if (!isRecord(entry)) {
+        errors.push(`${fieldPath}[${i}] must be an object with model and weight`);
+        continue;
+      }
+      if (!Number.isInteger(entry.weight) || (entry.weight as number) <= 0) {
+        errors.push(`${fieldPath}[${i}].weight must be a positive integer`);
+      }
+      validateModelRef(`${fieldPath}[${i}].model`, entry.model, effectiveWorkhorses, errors, warnings, allowWorkhorseRef);
+    }
+    return;
+  }
+
   if (typeof ref !== 'string' || ref.trim() === '') {
     errors.push(`${fieldPath} must be a non-empty model reference`);
     return;
@@ -468,8 +482,8 @@ function validateModelRef(
 
 function validateRoleFields(fieldPath: string, roleConfig: Record<string, unknown>, errors: string[]): void {
   const harness = roleConfig.harness;
-  if (harness !== undefined && harness !== null && harness !== '' && harness !== 'claude-code' && harness !== 'pi' && harness !== 'codex') {
-    errors.push(`${fieldPath}.harness must be claude-code, pi, codex, null, or empty string`);
+  if (harness !== undefined && harness !== null && harness !== '' && harness !== 'claude-code' && harness !== 'ohmypi' && harness !== 'codex' && harness !== 'acp') {
+    errors.push(`${fieldPath}.harness must be claude-code, ohmypi, codex, acp, null, or empty string`);
   }
 
   const effort = roleConfig.effort;
@@ -485,6 +499,16 @@ function validateRoleFields(fieldPath: string, roleConfig: Record<string, unknow
   const scope = roleConfig.scope;
   if (scope !== undefined && scope !== 'pan-only' && scope !== 'all-tracked-projects') {
     errors.push(`${fieldPath}.scope must be pan-only or all-tracked-projects`);
+  }
+
+  // PAN-1862: review pipeline knobs (harmless on other roles; only review reads them).
+  const mode = roleConfig.mode;
+  if (mode !== undefined && mode !== 'quick' && mode !== 'full' && mode !== 'none') {
+    errors.push(`${fieldPath}.mode must be quick, full, or none`);
+  }
+  const reReviewScope = roleConfig.reReviewScope;
+  if (reReviewScope !== undefined && reReviewScope !== 'all' && reReviewScope !== 'changed' && reReviewScope !== 'blockers') {
+    errors.push(`${fieldPath}.reReviewScope must be all, changed, or blockers`);
   }
 }
 
@@ -532,20 +556,35 @@ function validateWorkhorsesAndRoles(settings: ApiSettingsConfig, errors: string[
           continue;
         }
 
-        validateModelRef(`roles.${role}.model`, rawRoleConfig.model, effectiveWorkhorses, errors, warnings, true);
+        validateModelRef(`roles.${role}.model`, rawRoleConfig.model, effectiveWorkhorses, errors, warnings, true, false, true);
         validateRoleFields(`roles.${role}`, rawRoleConfig, errors);
 
         // Model-aware effort: reject levels the role's resolved model doesn't accept.
+        // For a distribution, every entry must support the effort.
         const effort = rawRoleConfig.effort;
         if (typeof effort === 'string' && ROLE_EFFORTS.includes(effort as RoleEffort)) {
           const modelRef = rawRoleConfig.model ?? DEFAULT_ROLES[role]?.model;
-          const resolvedModel = resolveModelRefToId(modelRef, effectiveWorkhorses);
-          if (resolvedModel) {
-            const supported = getModelEffortLevelsSync(resolvedModel);
-            if (supported !== undefined && !supported.includes(effort as RoleEffort)) {
-              errors.push(
-                `roles.${role}.effort '${effort}' is not supported by ${resolvedModel} (supported: ${supported.join(', ')})`,
-              );
+          if (Array.isArray(modelRef)) {
+            for (const entry of modelRef as WeightedModelRef[]) {
+              const resolvedModel = resolveModelRefToId(entry.model, effectiveWorkhorses);
+              if (resolvedModel) {
+                const supported = getModelEffortLevelsSync(resolvedModel);
+                if (supported !== undefined && !supported.includes(effort as RoleEffort)) {
+                  errors.push(
+                    `roles.${role}.effort '${effort}' is not supported by ${resolvedModel} (supported: ${supported.join(', ')})`,
+                  );
+                }
+              }
+            }
+          } else {
+            const resolvedModel = resolveModelRefToId(modelRef, effectiveWorkhorses);
+            if (resolvedModel) {
+              const supported = getModelEffortLevelsSync(resolvedModel);
+              if (supported !== undefined && !supported.includes(effort as RoleEffort)) {
+                errors.push(
+                  `roles.${role}.effort '${effort}' is not supported by ${resolvedModel} (supported: ${supported.join(', ')})`,
+                );
+              }
             }
           }
         }
@@ -632,8 +671,8 @@ export function loadSettingsApi(): ApiSettingsConfig {
     sidebarRefreshIntervalMs: 10_000,
     workerConcurrency: 4,
   };
-
   return {
+    swarm: config.swarm,
     workhorses: seededWorkhorses(config),
     roles: seededRoles(config),
     models: {
@@ -706,7 +745,7 @@ export function loadSettingsApi(): ApiSettingsConfig {
     claude: {
       // Defensive — older test mocks of loadConfig may not include `claude`;
       // production loader always populates it via DEFAULT_CONFIG.
-      permissionMode: config.claude?.permissionMode ?? 'auto',
+      permissionMode: config.claude?.permissionMode ?? 'bypass',
     },
     codex: {
       permissionMode: (config.codex?.permissionMode ?? 'auto-review') as 'read-only' | 'workspace' | 'auto-review' | 'full-access',
@@ -715,6 +754,7 @@ export function loadSettingsApi(): ApiSettingsConfig {
       resiliency_tier: config.remote?.resiliencyTier ?? 'ephemeral',
       max_concurrent_agents: config.remote?.maxConcurrentAgents ?? 0,
     },
+    tiered_execution: config.tieredExecution,
     deprecation_warnings: deprecationWarnings.length > 0 ? deprecationWarnings : undefined,
   };
 }
@@ -736,7 +776,7 @@ async function writeYamlConfigPreservingComments(yamlConfig: YamlConfig): Promis
     doc.contents = parseDocument('{}\n').contents;
   }
   const config = pruneUndefined(yamlConfig);
-
+  doc.setIn(['swarm'], config.swarm ?? { mode: 'off', maxSlots: 3, autoAdvance: true });
   doc.setIn(['workhorses'], config.workhorses ?? {});
   doc.setIn(['roles'], config.roles ?? {});
   doc.setIn(['models', 'providers'], config.models?.providers ?? {});
@@ -766,6 +806,7 @@ async function writeYamlConfigPreservingComments(yamlConfig: YamlConfig): Promis
     ['experimental', config.experimental],
     ['claude', config.claude],
     ['codex', config.codex],
+    ['tiered_execution', config.tiered_execution],
   ];
 
   for (const [key, value] of topLevelSections) {
@@ -815,9 +856,9 @@ function providerConfigForSave(
 
 async function saveSettingsApiPromise(settings: ApiSettingsConfig): Promise<void> {
   const { config: currentConfig } = loadConfigSync();
-
   // Convert API format to YAML format
   const yamlConfig: YamlConfig = {
+    swarm: settings.swarm,
     workhorses: settings.workhorses,
     roles: normalizeRolesConfig(settings.roles),
     models: {
@@ -906,6 +947,7 @@ async function saveSettingsApiPromise(settings: ApiSettingsConfig): Promise<void
       ? { permissionMode: settings.codex.permissionMode }
       : undefined,
     remote: settings.remote,
+    tiered_execution: tieredExecutionConfigForSave(settings.tiered_execution, currentConfig.providerAuth),
   };
 
   await writeYamlConfigPreservingComments(yamlConfig);
@@ -1073,8 +1115,8 @@ export function validateSettingsApi(settings: ApiSettingsConfig): ValidationResu
           errors.push(`Unknown provider harness entry "${provider}"`);
           continue;
         }
-        if (harness !== undefined && harness !== '' && harness !== 'claude-code' && harness !== 'pi' && harness !== 'codex') {
-          errors.push(`models.provider_harnesses.${provider} must be claude-code, pi, codex, or empty string`);
+        if (harness !== undefined && harness !== '' && harness !== 'claude-code' && harness !== 'ohmypi' && harness !== 'codex' && harness !== 'acp') {
+          errors.push(`models.provider_harnesses.${provider} must be claude-code, ohmypi, codex, acp, or empty string`);
         }
       }
     }
@@ -1197,6 +1239,11 @@ export function validateSettingsApi(settings: ApiSettingsConfig): ValidationResu
     }
   }
 
+  if (settings.tiered_execution !== undefined) {
+    const tieredExecutionError = validateTieredExecutionSettings(settings.tiered_execution, loadConfigSync().config.providerAuth);
+    if (tieredExecutionError) errors.push(tieredExecutionError);
+  }
+
   return {
     valid: errors.length === 0,
     errors,
@@ -1207,30 +1254,8 @@ export function validateSettingsApi(settings: ApiSettingsConfig): ValidationResu
 /**
  * Get available models by provider (for model selection UI)
  */
-export function getAvailableModelsApi(): {
-  anthropic: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
-  openai: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
-  google: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
-  minimax: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
-  zai: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
-  kimi: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
-  mimo: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
-  openrouter: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
-  nous: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
-  dashscope: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
-} {
-  const result: {
-    anthropic: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
-    openai: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
-    google: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
-    minimax: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
-    zai: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
-    kimi: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
-    mimo: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
-    openrouter: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
-    nous: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
-    dashscope: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
-  } = {
+export function getAvailableModelsApi(): AvailableModelsApi {
+  const result: AvailableModelsApi = {
     anthropic: [],
     openai: [],
     google: [],
@@ -1286,14 +1311,15 @@ export function getAvailableModelsApi(): {
     }
   }
 
-  // Order OpenAI models with latest family first: 5.5 (current default) → 5.4 → 5.3-codex → 5.2 → o-series → gpt-4o legacy.
+  // Order OpenAI models with latest family first: 5.6-sol (current default) → 5.6-terra → 5.6-luna → 5.5 → 5.4 → 5.3-codex → 5.2 → o-series → gpt-4o legacy.
   const openaiOrder: Record<string, number> = {
-    'gpt-5.5': 0, 'gpt-5.5-pro': 1,
-    'gpt-5.4': 10, 'gpt-5.4-pro': 11, 'gpt-5.4-mini': 12,
-    'gpt-5.3-codex': 20,
-    'gpt-5.2': 30,
-    'o3': 40, 'o4-mini': 41,
-    'gpt-4o': 50, 'gpt-4o-mini': 51,
+    'gpt-5.6-sol': 0, 'gpt-5.6-terra': 1, 'gpt-5.6-luna': 2,
+    'gpt-5.5': 10, 'gpt-5.5-pro': 11,
+    'gpt-5.4': 20, 'gpt-5.4-pro': 21, 'gpt-5.4-mini': 22,
+    'gpt-5.3-codex': 30,
+    'gpt-5.2': 40,
+    'o3': 50, 'o4-mini': 51,
+    'gpt-4o': 60, 'gpt-4o-mini': 61,
   };
   result.openai.sort((a, b) => (openaiOrder[a.id] ?? 99) - (openaiOrder[b.id] ?? 99));
 

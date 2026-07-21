@@ -1,10 +1,18 @@
 #!/usr/bin/env python3
-"""Find a Overdeck conversation by ID, list recent, or inspect session content.
+"""Find an Overdeck conversation by ID, list recent, or inspect session content.
+
+All conversation/session metadata is resolved through the canonical `pan conv`
+CLI (the read door) — never by reading the Overdeck SQLite DB directly. Direct
+DB access broke across the rebrand (the active DB moved from ~/.panopticon to
+~/.overdeck/overdeck.db and the conversations schema changed: UUID ids,
+claude_session_id moved into conversation_files). Routing through `pan conv`
+keeps this skill correct regardless of where the DB lives or how its schema
+evolves. See PAN-2019.
 
 Usage:
     conv-find.py <conv_id>             # Find conversation by numeric ID
-    conv-find.py --recent [N]          # List N most recent conversations (default 20)
-    conv-find.py --search <query>      # Search by title/cwd/model (case-insensitive substring)
+    conv-find.py --recent [N]          # List N recent sessions (default 20)
+    conv-find.py --search <query>      # Search sessions by model/workspace/tools/files
     conv-find.py --jsonl <conv_id>     # Same as <conv_id> but output only the JSONL path
     conv-find.py --summary <conv_id>   # Print recent normalized message summaries
     conv-find.py --json <conv_id>      # Output metadata + session summary as JSON
@@ -12,86 +20,122 @@ Usage:
 
 import argparse
 import json
-import os
-import sqlite3
 import subprocess
 import sys
 from collections import Counter, deque
 from pathlib import Path
 from typing import Any
 
-DB_PATH = os.path.expanduser("~/.overdeck/panopticon.db")
+
+# ─── CLI door helpers ─────────────────────────────────────────────────────────
 
 
-def record_resolver_error(info: dict[str, Any], message: str) -> None:
-    info["_resolver_error"] = message
-    print(message, file=sys.stderr)
+def run_pan_json(args: list[str], *, quiet: bool = False) -> Any:
+    """Run `pan <args>` and return parsed JSON, or None on any failure.
 
-
-def resolve_session_file(info: dict[str, Any]) -> tuple[str | None, str]:
-    """Resolve the transcript JSONL path by delegating to the canonical pan CLI."""
-    conv_id = info.get("id")
-    command = ["pan", "conv", "jsonl", "--json", str(conv_id)]
+    When `quiet`, suppress the stderr diagnostic (used for fallible probes where
+    a miss is an expected branch, not an error to report).
+    """
+    command = ["pan", *args]
     try:
-        result = subprocess.run(
-            command,
-            capture_output=True,
-            check=False,
-            text=True,
-        )
+        result = subprocess.run(command, capture_output=True, check=False, text=True)
     except FileNotFoundError:
-        record_resolver_error(info, "Error: pan command not found; cannot resolve transcript JSONL path.")
-        return None, "unknown"
-
+        if not quiet:
+            print("Error: `pan` command not found on PATH.", file=sys.stderr)
+        return None
     if result.returncode != 0:
-        detail = (result.stderr or result.stdout).strip().splitlines()
-        suffix = f": {detail[0]}" if detail else ""
-        record_resolver_error(info, f"Error: {' '.join(command)} failed{suffix}")
-        return None, "unknown"
-
+        if not quiet:
+            detail = (result.stderr or result.stdout).strip().splitlines()
+            suffix = f": {detail[0]}" if detail else ""
+            print(f"Error: {' '.join(command)} failed{suffix}", file=sys.stderr)
+        return None
     try:
-        payload = json.loads(result.stdout)
+        return json.loads(result.stdout)
     except json.JSONDecodeError:
-        record_resolver_error(info, f"Error: {' '.join(command)} returned malformed JSON.")
-        return None, "unknown"
+        if not quiet:
+            print(f"Error: {' '.join(command)} returned malformed JSON.", file=sys.stderr)
+        return None
 
+
+def resolve_session_file(conv_id: int) -> tuple[str | None, str]:
+    """Resolve the transcript JSONL path via the canonical `pan conv jsonl` door."""
+    payload = run_pan_json(["conv", "jsonl", "--json", str(conv_id)])
+    if not isinstance(payload, dict):
+        return None, "unknown"
     status = payload.get("status")
     if status not in {"ok", "expired", "unknown"}:
-        record_resolver_error(info, f"Error: {' '.join(command)} returned unknown status {status!r}.")
         return None, "unknown"
-
     path = payload.get("path")
-    return path if isinstance(path, str) else None, status
+    return (path if isinstance(path, str) else None), status
 
 
-def get_db():
-    if not os.path.exists(DB_PATH):
-        print(f"Error: Overdeck database not found at {DB_PATH}", file=sys.stderr)
-        sys.exit(1)
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
+def find_conversation(conv_id: int) -> dict[str, Any] | None:
+    """Look up conversation metadata through the canonical `pan conv show` door.
+
+    Post-PAN-2018, `pan conv show --json <id>` resolves as a conversation first
+    and returns a `conversation` block. On older main it returns a flat session
+    object, so we fall back to `pan conv jsonl --json` for the basics.
+    """
+    payload = run_pan_json(["conv", "show", "--json", str(conv_id)], quiet=True)
+    conv = payload.get("conversation") if isinstance(payload, dict) else None
+    if isinstance(conv, dict) and conv.get("id") is not None:
+        return _normalize_conversation(conv)
+
+    # Fallback: derive what we can from the transcript resolver.
+    j = run_pan_json(["conv", "jsonl", "--json", str(conv_id)], quiet=True)
+    if not isinstance(j, dict) or j.get("conversationId") is None:
+        return None
+    return _normalize_conversation({
+        "id": j.get("conversationId"),
+        "claudeSessionId": j.get("claudeSessionId"),
+        "cwd": j.get("cwd"),
+    })
 
 
-def row_to_dict(row: sqlite3.Row) -> dict[str, Any]:
+def _normalize_conversation(c: dict[str, Any]) -> dict[str, Any]:
+    """Map a CLI conversation dict to the snake_case info shape this script prints."""
     return {
-        "id": row["id"],
-        "name": row["name"],
-        "tmux_session": row.get("tmux_session") if hasattr(row, "get") else row["tmux_session"] if "tmux_session" in row.keys() else None,
-        "status": row["status"],
-        "cwd": row["cwd"],
-        "issue_id": row["issue_id"] if "issue_id" in row.keys() else None,
-        "session_file": row["session_file"],
-        "claude_session_id": row["claude_session_id"] if "claude_session_id" in row.keys() else None,
-        "title": row["title"] if "title" in row.keys() else None,
-        "title_source": row["title_source"] if "title_source" in row.keys() else None,
-        "title_seed": row["title_seed"] if "title_seed" in row.keys() else None,
-        "total_cost": row["total_cost"] if "total_cost" in row.keys() else None,
-        "model": row["model"] if "model" in row.keys() else None,
-        "effort": row["effort"] if "effort" in row.keys() else None,
-        "created_at": row["created_at"] if "created_at" in row.keys() else None,
-        "ended_at": row["ended_at"] if "ended_at" in row.keys() else None,
+        "id": c.get("id"),
+        "name": c.get("name"),
+        "tmux_session": c.get("tmuxSession"),
+        "status": c.get("status"),
+        "cwd": c.get("cwd"),
+        "issue_id": c.get("issueId"),
+        "claude_session_id": c.get("claudeSessionId"),
+        "title": c.get("title"),
+        "title_seed": c.get("title"),  # conversations table no longer has title_seed
+        "total_cost": c.get("totalCost"),
+        "model": c.get("model"),
+        "effort": c.get("effort"),
+        "created_at": c.get("createdAt"),
+        "ended_at": c.get("endedAt"),
     }
+
+
+def list_sessions(limit: int = 20) -> list[dict[str, Any]]:
+    payload = run_pan_json(["conv", "list", "--format", "json", "--limit", str(limit)])
+    return payload if isinstance(payload, list) else []
+
+
+def search_sessions(query: str, limit: int = 200) -> list[dict[str, Any]]:
+    """Client-side substring search over discovered sessions (no DB door for search)."""
+    sessions = list_sessions(limit)
+    q = query.lower()
+    matches: list[dict[str, Any]] = []
+    for s in sessions:
+        haystack = " ".join(
+            str(s.get(k, ""))
+            for k in ("primaryModel", "workspacePath", "jsonlPath", "summary", "panIssueId")
+        ).lower()
+        # Also search models used and tools/files touched.
+        for key in ("modelsUsed", "toolsUsed", "filesTouched"):
+            haystack += " " + " ".join(str(x).lower() for x in (s.get(key) or []))
+        if q in haystack:
+            matches.append(s)
+    return matches
+
+
+# ─── Display helpers ──────────────────────────────────────────────────────────
 
 
 def display_title(info: dict[str, Any]) -> str:
@@ -102,76 +146,19 @@ def format_cost(value: Any) -> str:
     return f"${value:.2f}" if value else "N/A"
 
 
-def list_recent(n=20, *, as_json=False):
-    conn = get_db()
-    rows = conn.execute(
-        "SELECT id, name, tmux_session, status, cwd, issue_id, session_file, claude_session_id, "
-        "title, title_source, title_seed, total_cost, model, effort, created_at, ended_at "
-        "FROM conversations ORDER BY id DESC LIMIT ?",
-        (n,),
-    ).fetchall()
-    conn.close()
-
-    items = [row_to_dict(r) for r in rows]
-    if as_json:
-        print(json.dumps(items, indent=2))
-        return
-
-    for info in items:
-        status_icon = "" if info["status"] == "active" else "[E]"
-        print(
-            f"#{info['id']}{status_icon:3s} {info['name']:20s} [{info['status']:6s}] "
-            f"model={info['model'] or '?':20s} cost={format_cost(info['total_cost']):8s} "
-            f"cwd={info['cwd']} "
-            f"title={display_title(info)}"
-        )
+def print_session_row(s: dict[str, Any]) -> None:
+    model = s.get("primaryModel") or "?"
+    cost = format_cost(s.get("estimatedCost"))
+    msgs = s.get("messageCount", 0)
+    cwd = s.get("workspacePath") or "?"
+    last = (s.get("lastTs") or "")[:10]
+    summary = (s.get("summary") or "").strip().splitlines()[0][:48] if s.get("summary") else ""
+    print(f"#{s.get('id')}  {last}  msgs={msgs:<5} model={model:24} cost={cost:9} cwd={cwd}")
+    if summary:
+        print(f"       {summary}")
 
 
-def find_by_id(conv_id):
-    conn = get_db()
-    row = conn.execute(
-        "SELECT id, name, tmux_session, status, cwd, issue_id, session_file, claude_session_id, "
-        "title, title_source, title_seed, total_cost, model, effort, created_at, ended_at "
-        "FROM conversations WHERE id = ?",
-        (conv_id,),
-    ).fetchone()
-    conn.close()
-
-    if not row:
-        print(f"Conversation #{conv_id} not found", file=sys.stderr)
-        sys.exit(1)
-
-    return row_to_dict(row)
-
-
-def search(query, *, as_json=False):
-    conn = get_db()
-    q = f"%{query}%"
-    rows = conn.execute(
-        "SELECT id, name, tmux_session, status, cwd, issue_id, session_file, claude_session_id, "
-        "title, title_source, title_seed, total_cost, model, effort, created_at, ended_at "
-        "FROM conversations "
-        "WHERE title LIKE ? OR cwd LIKE ? OR model LIKE ? OR name LIKE ? "
-        "ORDER BY id DESC LIMIT 50",
-        (q, q, q, q),
-    ).fetchall()
-    conn.close()
-
-    if not rows:
-        print(f"No conversations matching '{query}'", file=sys.stderr)
-        sys.exit(1)
-
-    items = [row_to_dict(r) for r in rows]
-    if as_json:
-        print(json.dumps(items, indent=2))
-        return
-
-    for info in items:
-        print(
-            f"#{info['id']} {info['name']:20s} [{info['status']:6s}] "
-            f"model={info['model'] or '?':20s} cost={format_cost(info['total_cost']):8s} "
-            f"title={display_title(info)}"
-        )
+# ─── Transcript parsing (operates on the resolved JSONL file) ──────────────────
 
 
 def normalize_whitespace(text: str) -> str:
@@ -368,11 +355,14 @@ def print_detailed_summary(summary: dict[str, Any] | None) -> None:
         print(f"  L{item['line']} {item['role']}{tool_part}{text_part}")
 
 
+# ─── Main ─────────────────────────────────────────────────────────────────────
+
+
 def main():
     parser = argparse.ArgumentParser(description="Find Overdeck conversations")
     parser.add_argument("conv_id", nargs="?", type=int, help="Conversation ID to look up")
-    parser.add_argument("--recent", nargs="?", const=20, type=int, help="List N recent conversations")
-    parser.add_argument("--search", type=str, help="Search by title/cwd/model")
+    parser.add_argument("--recent", nargs="?", const=20, type=int, help="List N recent sessions")
+    parser.add_argument("--search", type=str, help="Search sessions by model/workspace/tools/files")
     parser.add_argument("--jsonl", action="store_true", help="Output only the JSONL file path")
     parser.add_argument("--summary", action="store_true", help="Print recent normalized session message summaries")
     parser.add_argument("--json", action="store_true", help="Output machine-readable JSON")
@@ -380,12 +370,35 @@ def main():
     args = parser.parse_args()
 
     if args.recent is not None:
-        list_recent(args.recent if args.recent else 20, as_json=args.json)
-    elif args.search:
-        search(args.search, as_json=args.json)
-    elif args.conv_id:
-        info = find_by_id(args.conv_id)
-        resolved, resolve_status = resolve_session_file(info)
+        sessions = list_sessions(args.recent if args.recent else 20)
+        if args.json:
+            print(json.dumps(sessions, indent=2))
+            return
+        if not sessions:
+            print("No sessions found.")
+            return
+        for s in sessions:
+            print_session_row(s)
+        return
+
+    if args.search:
+        sessions = search_sessions(args.search)
+        if args.json:
+            print(json.dumps(sessions, indent=2))
+            return
+        if not sessions:
+            print(f"No sessions matching '{args.search}'", file=sys.stderr)
+            sys.exit(1)
+        for s in sessions:
+            print_session_row(s)
+        return
+
+    if args.conv_id:
+        info = find_conversation(args.conv_id)
+        if not info:
+            print(f"Conversation #{args.conv_id} not found", file=sys.stderr)
+            sys.exit(1)
+        resolved, resolve_status = resolve_session_file(args.conv_id)
         info["resolved_session_file"] = resolved
         info["session_file_status"] = resolve_status
         summary = get_session_summary(resolved) if resolve_status == "ok" else None
@@ -399,8 +412,8 @@ def main():
                     "Claude Code retention deletes old transcripts.",
                     file=sys.stderr,
                 )
-            elif not info.get("_resolver_error"):
-                print("No claude_session_id or session_file recorded for this conversation.", file=sys.stderr)
+            else:
+                print("No claude_session_id recorded for this conversation.", file=sys.stderr)
             sys.exit(1)
         if args.json:
             payload = {key: value for key, value in info.items() if not key.startswith("_")}
@@ -409,16 +422,16 @@ def main():
             return
 
         print(f"Conversation #{info['id']}")
-        print(f"  Name:          {info['name']}")
-        print(f"  Status:        {info['status']}")
-        print(f"  Model:         {info['model'] or 'N/A'}")
-        print(f"  Effort:        {info['effort'] or 'N/A'}")
-        print(f"  CWD:           {info['cwd']}")
-        print(f"  Issue:         {info['issue_id'] or 'N/A'}")
+        print(f"  Name:          {info.get('name') or 'N/A'}")
+        print(f"  Status:        {info.get('status') or 'N/A'}")
+        print(f"  Model:         {info.get('model') or 'N/A'}")
+        print(f"  Effort:        {info.get('effort') or 'N/A'}")
+        print(f"  CWD:           {info.get('cwd') or 'N/A'}")
+        print(f"  Issue:         {info.get('issue_id') or 'N/A'}")
         print(f"  Title:         {display_title(info)}")
-        print(f"  Cost:          {format_cost(info['total_cost'])}")
-        print(f"  Created:       {info['created_at']}")
-        if info['ended_at']:
+        print(f"  Cost:          {format_cost(info.get('total_cost'))}")
+        print(f"  Created:       {info.get('created_at') or 'N/A'}")
+        if info.get('ended_at'):
             print(f"  Ended:         {info['ended_at']}")
         if resolve_status == "ok":
             print(f"  Session file:  {resolved}")
@@ -432,9 +445,10 @@ def main():
             if args.summary:
                 print()
                 print_detailed_summary(summary)
-    else:
-        parser.print_help()
-        sys.exit(1)
+        return
+
+    parser.print_help()
+    sys.exit(1)
 
 
 if __name__ == "__main__":

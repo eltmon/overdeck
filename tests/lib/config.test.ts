@@ -37,7 +37,7 @@ describe('config', () => {
       expect(config.traefik).toBeDefined();
       expect(config.traefik.enabled).toBe(false);
       expect(config.traefik.dashboard_port).toBe(8080);
-      expect(config.traefik.domain).toBe('pan.localhost');
+      expect(config.traefik.domain).toBe('overdeck.localhost');
     });
 
     it('should include default Linear config', async () => {

@@ -8,7 +8,7 @@
  * view JSONL, deep wipe, replay, export JSONL, export round history).
  */
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { Fragment, useState, useRef, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
@@ -20,12 +20,26 @@ import type { SessionNode as SessionNodeType } from '@overdeck/contracts';
 import { useConfirm } from '../DialogProvider';
 import { refreshDashboardState } from '../../lib/refresh-dashboard-state';
 import { isCodexBlockedResponse, setPendingCodexSpawn } from '../../lib/pending-codex-spawn';
+import { openRecoveryForStartBlock, StartBlockHandoff } from '../../lib/resumeRecovery';
+import {
+  ZONE_B_SESSION_ACTIONS,
+  type NonIssueActionContext,
+  type NonIssueActionEntry,
+  type NonIssueActionKey,
+} from '../../lib/issueActions';
 
 interface ZoneBActionStripProps {
   session: SessionNodeType;
   issueId?: string;
   onViewTerminal?: () => void;
 }
+
+const INLINE_ACTION_KEYS = new Set<NonIssueActionKey>([
+  'pauseSession',
+  'resumeFocusedSession',
+  'stopSession',
+  'viewTerminal',
+]);
 
 export function ZoneBActionStrip({ session, issueId, onViewTerminal }: ZoneBActionStripProps) {
   const confirm = useConfirm();
@@ -115,6 +129,8 @@ export function ZoneBActionStrip({ session, issueId, onViewTerminal }: ZoneBActi
           setPendingCodexSpawn(lastRequestBody);
           throw new Error(data.hint || data.error || 'Codex authentication expired — re-authenticate to continue');
         }
+        // Start-block 409s open the recovery dialog — the CLI text never surfaces raw.
+        if (openRecoveryForStartBlock(res.status, data, targetIssueId)) throw new StartBlockHandoff();
         throw new Error(data.error || data.hint || 'Failed to restart agent');
       }
       return data;
@@ -127,33 +143,16 @@ export function ZoneBActionStrip({ session, issueId, onViewTerminal }: ZoneBActi
     },
   });
 
-  const handleStopSession = async () => {
-    const confirmed = await confirm({
-      title: 'Stop Session',
-      message: `Stop session ${session.sessionId}?`,
-      variant: 'destructive',
-      confirmLabel: 'Stop',
+  const handleStopSession = useCallback(() => {
+    setIsKilling(true);
+    killMutation.mutate(undefined, {
+      onSettled: () => setIsKilling(false),
     });
-    if (confirmed) {
-      setIsKilling(true);
-      killMutation.mutate(undefined, {
-        onSettled: () => setIsKilling(false),
-      });
-    }
-  };
+  }, [killMutation]);
 
-  const handleRestart = async () => {
-    const confirmed = await confirm({
-      title: 'Restart Agent',
-      message: `Stop ${session.sessionId} and start a new work agent?`,
-      variant: 'destructive',
-      confirmLabel: 'Restart',
-    });
-    if (confirmed) {
-      restartMutation.mutate();
-    }
-    setOverflowOpen(false);
-  };
+  const handleRestart = useCallback(() => {
+    restartMutation.mutate();
+  }, [restartMutation]);
 
   const handleOpenStateDir = useCallback(() => {
     const path = `~/.overdeck/agents/${session.sessionId}/`;
@@ -161,36 +160,19 @@ export function ZoneBActionStrip({ session, issueId, onViewTerminal }: ZoneBActi
     setOverflowOpen(false);
   }, [session.sessionId]);
 
-  const handleViewJsonl = useCallback(() => {
-    // The conversation panel already shows the JSONL transcript;
-    // this action is a no-op placeholder that can be wired to a
-    // raw-JSONL viewer if one is added later.
-    setOverflowOpen(false);
-  }, []);
-
-  const handleDeepWipe = useCallback(async () => {
-    if (!issueId) return;
-    const confirmed = await confirm({
-      title: 'Deep Wipe',
-      message: `Deep wipe will destroy all data for ${issueId} including workspace, state, and git branches. This cannot be undone.`,
-      variant: 'destructive',
-      confirmLabel: 'Deep Wipe',
-    });
-    if (confirmed) {
-      try {
-        const res = await fetch(`/api/issues/${issueId}/deep-wipe`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ deleteWorkspace: true }),
-        });
-        if (!res.ok) throw new Error('Failed to deep wipe');
-        await refreshDashboardState(queryClient);
-      } catch {
-        // silently ignore — user can retry
-      }
+  const handleDeepWipe = useCallback(async (targetIssueId: string) => {
+    try {
+      const res = await fetch(`/api/issues/${targetIssueId}/deep-wipe`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ deleteWorkspace: true }),
+      });
+      if (!res.ok) throw new Error('Failed to deep wipe');
+      await refreshDashboardState(queryClient);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to deep wipe');
     }
-    setOverflowOpen(false);
-  }, [issueId, confirm, queryClient]);
+  }, [queryClient]);
 
   const handleExportSessionMetadata = useCallback(() => {
     const blob = new Blob(
@@ -232,11 +214,11 @@ export function ZoneBActionStrip({ session, issueId, onViewTerminal }: ZoneBActi
     setOverflowOpen(false);
   }, [session.sessionId]);
 
-  const handleViewVbrief = useCallback(() => {
+  const handleViewXbrief = useCallback(() => {
     if (issueId) {
       const path = `workspaces/feature-${issueId.toLowerCase()}/.pan/spec.vbrief.json`;
       navigator.clipboard?.writeText(path).catch(() => { /* ignore */ });
-      toast.success('vBRIEF path copied');
+      toast.success('xBRIEF path copied');
     }
     setOverflowOpen(false);
   }, [issueId]);
@@ -255,181 +237,196 @@ export function ZoneBActionStrip({ session, issueId, onViewTerminal }: ZoneBActi
     setOverflowOpen(false);
   }, [session.tmuxSession]);
 
-  const canStop = session.presence === 'active' || session.presence === 'idle' || session.presence === 'suspended';
-  const canPause = session.presence === 'active';
-  const canResume = session.presence === 'suspended';
-  const hasTerminal = !!session.tmuxSession;
+  const actionContext = {
+    sessionId: session.sessionId,
+    issueId,
+    sessionType: session.type,
+    sessionPresence: session.presence,
+    tmuxSession: session.tmuxSession,
+    hasJsonl: session.hasJsonl,
+    roundCount: session.roundMetadata?.roundCount,
+    onStopSession: handleStopSession,
+    onViewTerminal: onViewTerminal ? () => onViewTerminal() : undefined,
+    onPauseSession: () => pauseMutation.mutate(),
+    onResumeSession: () => resumeMutation.mutate(),
+    onRestartSession: handleRestart,
+    onReplaySession: onViewTerminal ? handleReplay : undefined,
+    onOpenStateDir: handleOpenStateDir,
+    onViewState: handleViewState,
+    onViewXbrief: handleViewXbrief,
+    onCopySessionId: handleCopySessionId,
+    onCopyTmuxCommand: handleCopyTmuxCommand,
+    onExportSessionMetadata: handleExportSessionMetadata,
+    onExportRoundHistory: handleExportRoundHistory,
+    onDeepWipe: handleDeepWipe,
+  } satisfies NonIssueActionContext;
+  const availableActions = ZONE_B_SESSION_ACTIONS
+    .filter((action) => action.ownerSurface === 'ZoneBActionStrip' && action.scope === 'session')
+    .filter((action) => action.enabledWhen(actionContext));
+  const actionByKey = new Map(availableActions.map((action) => [action.key, action]));
+  const pauseAction = actionByKey.get('pauseSession');
+  const resumeAction = actionByKey.get('resumeFocusedSession');
+  const stopAction = actionByKey.get('stopSession');
+  const terminalAction = actionByKey.get('viewTerminal');
+  const overflowActions = availableActions.filter((action) => !INLINE_ACTION_KEYS.has(action.key));
   const isPending = killMutation.isPending || pauseMutation.isPending || resumeMutation.isPending || restartMutation.isPending;
 
-  if (!canStop && !hasTerminal && !canPause && !canResume) return null;
+  const invokeAction = async (action: NonIssueActionEntry) => {
+    if (action.confirm) {
+      const confirmed = await confirm({
+        title: action.confirm.title,
+        message: action.confirm.message(actionContext),
+        variant: action.confirm.variant,
+        confirmLabel: action.confirm.confirmLabel,
+      });
+      if (!confirmed) return;
+    }
+    await action.invoke(actionContext);
+  };
+
+  if (availableActions.length === 0) return null;
 
   return (
     <div style={{ display: 'flex', gap: 6, marginLeft: 8 }}>
-      {canPause && (
+      {pauseAction && (
         <button
           data-testid="zone-b-pause"
-          onClick={() => pauseMutation.mutate()}
+          data-action-key={pauseAction.key}
+          onClick={() => { void invokeAction(pauseAction); }}
           disabled={pauseMutation.isPending || isPending}
           className="flex items-center gap-1 px-2 py-1 text-xs rounded hover:bg-accent disabled:opacity-50"
-          title="Pause session"
+          title={pauseAction.description}
         >
           {pauseMutation.isPending ? (
             <Loader2 className="w-3 h-3 animate-spin" />
           ) : (
             <Pause className="w-3 h-3" />
           )}
-          Pause
+          {pauseAction.label}
         </button>
       )}
-      {canResume && (
+      {resumeAction && (
         <button
           data-testid="zone-b-resume"
-          onClick={() => resumeMutation.mutate()}
+          data-action-key={resumeAction.key}
+          onClick={() => { void invokeAction(resumeAction); }}
           disabled={resumeMutation.isPending || isPending}
           className="flex items-center gap-1 px-2 py-1 text-xs rounded hover:bg-accent disabled:opacity-50"
-          title="Resume session"
+          title={resumeAction.description}
         >
           {resumeMutation.isPending ? (
             <Loader2 className="w-3 h-3 animate-spin" />
           ) : (
             <Play className="w-3 h-3" />
           )}
-          Resume
+          {resumeAction.label}
         </button>
       )}
-      {canStop && (
+      {stopAction && (
         <button
           data-testid="zone-b-stop-session"
-          onClick={handleStopSession}
+          data-action-key={stopAction.key}
+          onClick={() => { void invokeAction(stopAction); }}
           disabled={isKilling || killMutation.isPending || isPending}
           className="flex items-center gap-1 px-2 py-1 text-xs text-destructive rounded badge-bg-destructive hover:bg-destructive/20 disabled:opacity-50"
-          title="Stop session"
+          title={stopAction.description}
         >
           {isKilling || killMutation.isPending ? (
             <Loader2 className="w-3 h-3 animate-spin" />
           ) : (
             <Square className="w-3 h-3" />
           )}
-          Stop
+          {stopAction.label}
         </button>
       )}
-      {hasTerminal && onViewTerminal && (
+      {terminalAction && (
         <button
           data-testid="zone-b-view-terminal"
-          onClick={onViewTerminal}
+          data-action-key={terminalAction.key}
+          onClick={() => { void invokeAction(terminalAction); }}
           className="flex items-center gap-1 px-2 py-1 text-xs text-muted-foreground rounded hover:text-foreground hover:bg-accent"
-          title="View terminal"
+          title={terminalAction.description}
         >
           <Terminal className="w-3 h-3" />
-          Terminal
+          {terminalAction.label}
         </button>
       )}
 
       {/* Overflow menu */}
-      <div style={{ position: 'relative' }} ref={overflowRef}>
-        <button
-          data-testid="zone-b-overflow"
-          onClick={() => setOverflowOpen((o) => !o)}
-          className="flex items-center gap-1 px-1 py-1 text-xs text-muted-foreground rounded hover:text-foreground hover:bg-accent"
-          title="More actions"
-        >
-          <MoreHorizontal className="w-3 h-3" />
-        </button>
-        {overflowOpen && (
-          <div
-            style={{
-              position: 'absolute',
-              right: 0,
-              top: '100%',
-              marginTop: 4,
-              zIndex: 1000,
-              background: 'var(--card)',
-              border: '1px solid var(--border)',
-              borderRadius: 6,
-              boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-              padding: '4px 0',
-              minWidth: 160,
-              fontSize: 12,
-            }}
+      {overflowActions.length > 0 ? (
+        <div style={{ position: 'relative' }} ref={overflowRef}>
+          <button
+            data-testid="zone-b-overflow"
+            onClick={() => setOverflowOpen((o) => !o)}
+            className="flex items-center gap-1 px-1 py-1 text-xs text-muted-foreground rounded hover:text-foreground hover:bg-accent"
+            title="More actions"
           >
-            <OverflowItem
-              label="Restart"
-              icon={<RotateCcw className="w-3 h-3" />}
-              onClick={handleRestart}
-            />
-            {onViewTerminal && (
-              <OverflowItem
-                label="Replay"
-                icon={<RotateCcw className="w-3 h-3" />}
-                onClick={handleReplay}
-              />
-            )}
-            <OverflowItem
-              label="Open State Dir"
-              icon={<FolderOpen className="w-3 h-3" />}
-              onClick={handleOpenStateDir}
-            />
-            <OverflowItem
-              label="View State.md"
-              icon={<FileText className="w-3 h-3" />}
-              onClick={handleViewState}
-            />
-            {issueId && (
-              <OverflowItem
-                label="View vBRIEF"
-                icon={<BookText className="w-3 h-3" />}
-                onClick={handleViewVbrief}
-              />
-            )}
-            <OverflowItem
-              label="Copy Session ID"
-              icon={<Copy className="w-3 h-3" />}
-              onClick={handleCopySessionId}
-            />
-            {session.tmuxSession && (
-              <OverflowItem
-                label="Copy tmux command"
-                icon={<ClipboardCopy className="w-3 h-3" />}
-                onClick={handleCopyTmuxCommand}
-              />
-            )}
-            {session.hasJsonl && (
-              <>
-                <OverflowItem
-                  label="View JSONL"
-                  icon={<FileText className="w-3 h-3" />}
-                  onClick={handleViewJsonl}
-                />
-                <OverflowItem
-                  label="Export session metadata"
-                  icon={<Download className="w-3 h-3" />}
-                  onClick={handleExportSessionMetadata}
-                />
-              </>
-            )}
-            {session.roundMetadata && session.roundMetadata.roundCount > 0 && (
-              <OverflowItem
-                label="Export round history JSON"
-                icon={<History className="w-3 h-3" />}
-                onClick={handleExportRoundHistory}
-              />
-            )}
-            {issueId && (
-              <>
-                <MenuDivider />
-                <OverflowItem
-                  label="Deep Wipe"
-                  icon={<Trash2 className="w-3 h-3" />}
-                  variant="danger"
-                  onClick={handleDeepWipe}
-                />
-              </>
-            )}
-          </div>
-        )}
-      </div>
+            <MoreHorizontal className="w-3 h-3" />
+          </button>
+          {overflowOpen && (
+            <div
+              style={{
+                position: 'absolute',
+                right: 0,
+                top: '100%',
+                marginTop: 4,
+                zIndex: 1000,
+                background: 'var(--card)',
+                border: '1px solid var(--border)',
+                borderRadius: 6,
+                boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                padding: '4px 0',
+                minWidth: 160,
+                fontSize: 12,
+              }}
+            >
+              {overflowActions.map((action) => (
+                <Fragment key={action.key}>
+                  {action.key === 'deepWipe' ? <MenuDivider /> : null}
+                  <OverflowItem
+                    actionKey={action.key}
+                    label={action.label}
+                    icon={<ZoneBActionIcon actionKey={action.key} />}
+                    variant={action.kind === 'destructive' ? 'danger' : 'default'}
+                    onClick={() => {
+                      void invokeAction(action).finally(() => setOverflowOpen(false));
+                    }}
+                  />
+                </Fragment>
+              ))}
+            </div>
+          )}
+        </div>
+      ) : null}
     </div>
   );
+}
+
+function ZoneBActionIcon({ actionKey }: { actionKey: NonIssueActionKey }) {
+  switch (actionKey) {
+    case 'restartSession':
+    case 'replaySession':
+      return <RotateCcw className="w-3 h-3" />;
+    case 'openStateDir':
+      return <FolderOpen className="w-3 h-3" />;
+    case 'viewState':
+    case 'viewJsonl':
+      return <FileText className="w-3 h-3" />;
+    case 'viewFocusedXbrief':
+      return <BookText className="w-3 h-3" />;
+    case 'copySessionId':
+      return <Copy className="w-3 h-3" />;
+    case 'copyTmuxCommand':
+      return <ClipboardCopy className="w-3 h-3" />;
+    case 'exportSessionMetadata':
+      return <Download className="w-3 h-3" />;
+    case 'exportRoundHistory':
+      return <History className="w-3 h-3" />;
+    case 'deepWipe':
+      return <Trash2 className="w-3 h-3" />;
+    default:
+      return null;
+  }
 }
 
 function MenuDivider() {
@@ -445,11 +442,13 @@ function MenuDivider() {
 }
 
 function OverflowItem({
+  actionKey,
   label,
   icon,
   variant = 'default',
   onClick,
 }: {
+  actionKey: NonIssueActionKey;
   label: string;
   icon: React.ReactNode;
   variant?: 'default' | 'danger';
@@ -457,6 +456,7 @@ function OverflowItem({
 }) {
   return (
     <button
+      data-action-key={actionKey}
       style={{
         display: 'flex',
         alignItems: 'center',

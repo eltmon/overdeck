@@ -25,7 +25,7 @@
 npx @overdeck/core
 ```
 
-**That's it!** Overdeck starts the browser/server experience and opens the dashboard at https://pan.localhost (or http://localhost:3010 if you skip HTTPS setup).
+**That's it!** Overdeck starts the browser/server experience and opens the dashboard at https://overdeck.localhost (or http://localhost:3010 if you skip HTTPS setup).
 
 For a full local install with reusable `overdeck` and `pan` commands:
 
@@ -46,7 +46,7 @@ npm install -g @overdeck/core && pan install && pan up
    ```
 
    This will:
-   - Install dependencies (ttyd, beads)
+   - Install dependencies (ttyd, tasks)
    - Set up Traefik for local HTTPS
    - Generate SSL certificates (if mkcert is installed)
    - Create `~/.overdeck/` directory structure
@@ -56,18 +56,7 @@ npm install -g @overdeck/core && pan install && pan up
    pan sync
    ```
 
-4. **Initialize beads task tracking** (once per project):
-   ```bash
-   cd /path/to/your-project
-   bd init --prefix <project-name>
-   ```
-   For example: `bd init --prefix overdeck`
-
-   This creates the Dolt database that agents use for task tracking. Without it, agents
-   can't start even if planning succeeds. `pan sync` will attempt this automatically for
-   registered projects, but running it manually once is the safest first-time setup.
-
-5. **Start the dashboard:**
+4. **Start the dashboard:**
    ```bash
    pan up
    ```
@@ -90,7 +79,7 @@ npm install -g @overdeck/core && pan install && pan up
 
 - **mkcert** - For HTTPS certificates (recommended)
 - **Linear API key** - For issue tracking integration
-- **Beads CLI (`bd`)** - For persistent task tracking (auto-installed, upgrade with `pan admin beads upgrade`). Requires `bd init --prefix <project-name>` once per project root after installation.
+- **Task commands (`pan task`)** - Read and update the xBRIEF checklist through Overdeck's built-in task state door.
 - **Google Stitch MCP** - For AI-powered UI design integration
 
 ### Platform Support
@@ -279,8 +268,11 @@ pan down
 # Restart dashboard
 pan restart
 
-# Check system health
+# Check live runtime health of Overdeck services
 pan health
+
+# Check dependencies, installation, configuration, and broader diagnostics
+pan doctor
 
 # View dashboard logs
 pan logs dashboard
@@ -420,7 +412,7 @@ pan workspace create PAN-45
 └── feature-pan-123/
     ├── .planning/          # Planning state
     │   ├── STATE.md        # Current implementation state
-    │   ├── beads.json      # Task tracking
+    │   ├── tasks.json      # Task tracking
     │   └── decisions.log   # Planning decisions
     ├── src/                # Code (git worktree)
     ├── docker-compose.yml  # Optional Docker services

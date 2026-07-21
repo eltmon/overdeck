@@ -1,6 +1,6 @@
 {
   "$schema": "https://mintlify.com/docs.json",
-  "name": "Overdeck — The IDE for the Agent Era",
+  "name": "Overdeck \u2014 The IDE for the Agent Era",
   "theme": "maple",
   "layout": "topnav",
   "colors": {
@@ -63,6 +63,7 @@
             "pages": [
               "cli/overview",
               "cli/core-commands",
+              "cli/hygiene",
               "cli/agent-commands",
               "cli/workspace-commands",
               "cli/convoy-commands"
@@ -84,7 +85,8 @@
               "features/workspaces",
               "features/convoys",
               "features/swarm",
-              "features/merge-batches"
+              "features/merge-batches",
+              "features/tldr"
             ]
           }
         ]
@@ -96,8 +98,10 @@
             "group": "Configuration",
             "pages": [
               "configuration/projects",
+              "configuration/knowledge",
               "configuration/harnesses",
               "configuration/context-layers",
+              "configuration/state-branch",
               "configuration/issue-trackers",
               "configuration/polyrepo",
               "configuration/auto-merge"

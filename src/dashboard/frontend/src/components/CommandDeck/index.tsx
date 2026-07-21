@@ -10,8 +10,9 @@ import { ProjectHome } from '../Stage/ProjectHome';
 import { IssueOverview } from '../Stage/IssueOverview';
 import { SessionFeedSidebar } from '../sessionFeed/SessionFeedSidebar';
 import { usePanesStore } from '../../lib/panesStore';
-import { fetchProjects, isUnscopedConversation, NO_PROJECT_KEY, NO_PROJECT_LABEL } from './projectsData';
-import { BeadsDialog } from '../BeadsDialog';
+import { fetchProjects, filterSpecOnlyPlanned, isUnscopedConversation, NO_PROJECT_KEY, NO_PROJECT_LABEL } from './projectsData';
+import { ProjectMembershipBoundary } from './ProjectMembershipBoundary';
+import { TasksDialog } from '../TasksDialog';
 import { PlanDialog } from '../PlanDialog';
 import { ConversationList, type Conversation } from './ConversationList';
 import { useConversationMutations } from './useConversationMutations';
@@ -21,16 +22,22 @@ import { ModelPicker, loadStoredHarness, loadStoredModel, saveStoredHarness, sav
 import type { Harness } from '../shared/ModelPicker';
 import type { Agent, Issue, StartAgentResponse } from '../../types';
 import { useDashboardStore, selectAgents } from '../../lib/store';
+import { useAgentSetInvalidation } from '../../lib/useAgentSetInvalidation';
 import { useCommandDeckSelection } from '../../lib/commandDeckSelection';
 import { getTransport, type PanRpcProtocolClient } from '../../lib/wsTransport';
 import { refreshDashboardState } from '../../lib/refresh-dashboard-state';
 import { isCodexBlockedResponse, setPendingCodexSpawn } from '../../lib/pending-codex-spawn';
+import { openRecoveryForStartBlock } from '../../lib/resumeRecovery';
 import { getDirectRestartRequest } from '../../lib/restartRouting';
 import { useConfirm } from '../DialogProvider';
 import { WS_METHODS } from '@overdeck/contracts';
 import type { ProjectSessionTree, SessionTreeDelta } from '@overdeck/contracts';
 import styles from './styles/command-deck.module.css';
 import { fetchWithTimeout } from '../../lib/apiFetch';
+import { fetchRegisteredProjects, findRegisteredProject, isKnownProject, ProjectRegistryErrorState, UnknownProjectState } from './UnknownProjectState';
+import { IssuesPaneFilterRow } from './IssuesPaneFilterRow';
+import { usePlannedBacklogVisibility } from '../../hooks/usePlannedBacklogVisibility';
+import { LoadingBoundary } from '../primitives/LoadingBoundary';
 
 async function fetchConversations(): Promise<Conversation[]> {
   const res = await fetchWithTimeout('/api/conversations');
@@ -55,19 +62,6 @@ async function fetchVersion(): Promise<{ version: string }> {
   const res = await fetch('/api/version');
   if (!res.ok) throw new Error('Failed to fetch version');
   return res.json();
-}
-
-interface RegisteredProject {
-  key: string;
-  name: string;
-  path: string;
-}
-
-async function fetchRegisteredProjects(): Promise<RegisteredProject[]> {
-  const res = await fetch('/api/registered-projects');
-  if (!res.ok) throw new Error('Failed to fetch registered projects');
-  const data = await res.json();
-  return Array.isArray(data) ? data : [];
 }
 
 async function fetchAllSessionTrees(projectKeys: string[]): Promise<ProjectSessionTree[]> {
@@ -152,7 +146,7 @@ interface CommandDeckProps {
   selectedProject?: string | null;
   /** PAN-1561: switch the active project (e.g. when a conversation resolves to
    * a different project than the one currently shown). */
-  onSelectProject?: (projectName: string | null) => void;
+  onSelectProject?: (projectName: string | null, opts?: { updateUrl?: boolean }) => void;
   /** PAN-1593: report the selected project's issue prefix (e.g. "PAN") so the
    * app-bar search can scope to it. Null when no single prefix is resolvable. */
   onProjectPrefixChange?: (prefix: string | null) => void;
@@ -166,6 +160,14 @@ interface CommandDeckProps {
 const CONVS_COLLAPSED_KEY = 'mc-convs-collapsed';
 const PROJECTS_COLLAPSED_KEY = 'mc-projects-collapsed';
 const SECTION_SPLIT_KEY = 'mc-section-split';
+
+function ProjectPendingState({ onRetry }: { onRetry: () => void }) {
+  return (
+    <div role="status" className="flex items-center justify-center p-8">
+      <LoadingBoundary label="The project" timeoutMs={8000} onRetry={onRetry}><span>Loading project…</span></LoadingBoundary>
+    </div>
+  )
+}
 
 export function CommandDeck({
   issues = [],
@@ -190,7 +192,7 @@ export function CommandDeck({
     setAwarenessCollapsed(collapsed);
     try { localStorage.setItem('overdeck.ui.awarenessCollapsed', String(collapsed)); } catch { /* ignore */ }
   }, []);
-  const [showBeads, setShowBeads] = useState(false);
+  const [showTasks, setShowTasks] = useState(false);
   const [planDialogIssue, setPlanDialogIssue] = useState<Issue | null>(null);
   const [convsCollapsed, setConvsCollapsed] = useState(() => {
     try { return localStorage.getItem(CONVS_COLLAPSED_KEY) === 'true'; } catch { return false; }
@@ -223,6 +225,7 @@ export function CommandDeck({
   const sectionDragStartSplit = useRef(50);
   const sectionContainerRef = useRef<HTMLDivElement>(null);
   const [treeFilter, setTreeFilter] = useState<TreeSessionFilter>('all');
+  const showPlannedBacklog = usePlannedBacklogVisibility((state) => state.showPlannedBacklog);
   const [sidebarModel, setSidebarModel] = useState<string>(loadStoredModel);
   const [sidebarHarness, setSidebarHarness] = useState<Harness>(loadStoredHarness);
 
@@ -242,8 +245,10 @@ export function CommandDeck({
   const startWidth = useRef(0);
   const currentWidth = useRef(sidebarWidth);
   const queryClient = useQueryClient();
+  // PAN-2893: agent spawn/stop events refetch the projects pane immediately.
+  useAgentSetInvalidation(queryClient);
 
-  const { data: projects = [], isLoading } = useQuery({
+  const { data: projects = [], isLoading, isFetched: projectsFetched } = useQuery({
     queryKey: ['command-deck-projects', projectQueryEpoch],
     queryFn: fetchProjects,
     refetchInterval: 30000,
@@ -255,7 +260,7 @@ export function CommandDeck({
     refetchInterval: 15000,
   });
 
-  const { data: registeredProjects = [] } = useQuery({
+  const { data: registeredProjects = [], isFetched: registeredProjectsFetched, isError: registeredProjectsError, refetch: refetchRegisteredProjects } = useQuery({
     queryKey: ['registered-projects'],
     queryFn: fetchRegisteredProjects,
     staleTime: 60000,
@@ -445,17 +450,22 @@ export function CommandDeck({
     const excludeSet = new Set<number>();
     if (!Array.isArray(registeredProjects) || registeredProjects.length === 0) return { projectConversations: map, excludeConvIds: excludeSet };
 
-    const pathToKey = new Map<string, string>();
+    const pathToKeys = new Map<string, string[]>();
     for (const rp of registeredProjects) {
-      if (rp.path) pathToKey.set(rp.path, rp.key);
+      if (!rp.path) continue;
+      const keys = Array.from(new Set([rp.key, rp.name].filter((key): key is string => Boolean(key))));
+      pathToKeys.set(rp.path.replace(/\/+$/, ''), keys);
     }
 
     for (const conv of conversations) {
       if (!conv.cwd) continue;
-      for (const [projectPath, projectKey] of pathToKey) {
-        if (conv.cwd === projectPath || conv.cwd.startsWith(projectPath + '/')) {
-          if (!map[projectKey]) map[projectKey] = [];
-          map[projectKey].push(conv);
+      const cwd = conv.cwd.replace(/\/+$/, '');
+      for (const [projectPath, projectKeys] of pathToKeys) {
+        if (cwd === projectPath || cwd.startsWith(projectPath + '/')) {
+          for (const projectKey of projectKeys) {
+            if (!map[projectKey]) map[projectKey] = [];
+            map[projectKey].push(conv);
+          }
           excludeSet.add(conv.id);
           break;
         }
@@ -539,27 +549,41 @@ export function CommandDeck({
 
   // On mount or when convId changes (popstate), apply the deep-link: switch to
   // the conversation's project and open it as an agent tab in that deck.
+  const convDeepLinkRetry = useRef({ id: null as string | null, count: 0 });
   useEffect(() => {
     if (!convId || conversations.length === 0) return;
     if (convId === appliedConvId.current) return;
     const conv = conversations.find((c) => String(c.id) === convId || c.name === convId);
-    if (conv) {
-      setSelectedConversation(conv.name);
-      setSelectedFeature(null);
-      const projectName = resolveConversationProjectName(conv) ?? NO_PROJECT_KEY;
-      const target = pendingConversationTarget?.conversationName === conv.name
-        ? {
-            messageId: pendingConversationTarget.messageId,
-            messageIndex: pendingConversationTarget.messageIndex,
-            nonce: pendingConversationTarget.nonce,
-          }
-        : undefined;
-      onSelectProject?.(projectName);
-      openConversationTabIn(projectName, conv.name, pendingConversationTarget?.label ?? conv.title ?? 'Agent', target);
-      if (target) onPendingConversationTargetConsumed?.();
-      appliedConvId.current = convId;
+    if (!conv) {
+      // The deep-link targets a conversation the 10s poll hasn't surfaced yet
+      // (just created). Refresh promptly instead of waiting out the poll —
+      // with a small retry budget so a genuinely-unknown id doesn't loop.
+      if (convDeepLinkRetry.current.id !== convId) convDeepLinkRetry.current = { id: convId, count: 0 };
+      if (convDeepLinkRetry.current.count < 5) {
+        convDeepLinkRetry.current.count += 1;
+        const timer = setTimeout(() => void queryClient.invalidateQueries({ queryKey: ['conversations'] }), 700);
+        return () => clearTimeout(timer);
+      }
+      return;
     }
-  }, [convId, conversations, resolveConversationProjectName, onSelectProject, openConversationTabIn, pendingConversationTarget, onPendingConversationTargetConsumed]);
+    convDeepLinkRetry.current = { id: null, count: 0 };
+    setSelectedConversation(conv.name);
+    setSelectedFeature(null);
+    const projectName = resolveConversationProjectName(conv) ?? NO_PROJECT_KEY;
+    const target = pendingConversationTarget?.conversationName === conv.name
+      ? {
+          messageId: pendingConversationTarget.messageId,
+          messageIndex: pendingConversationTarget.messageIndex,
+          nonce: pendingConversationTarget.nonce,
+        }
+      : undefined;
+    // Opening a conversation: the /conv/<id> route owns the URL, so switch the
+    // deck's project without writing /command-deck/<project> over it.
+    onSelectProject?.(projectName, { updateUrl: false });
+    openConversationTabIn(projectName, conv.name, pendingConversationTarget?.label ?? conv.title ?? 'Agent', target);
+    if (target) onPendingConversationTargetConsumed?.();
+    appliedConvId.current = convId;
+  }, [convId, conversations, queryClient, resolveConversationProjectName, onSelectProject, openConversationTabIn, pendingConversationTarget, onPendingConversationTargetConsumed]);
 
   // Auto-select first conversation on initial load if no deep-link and no feature selected.
   // An `?issue=` deep-link (issue cockpit/drawer, e.g. ?issue=PAN-1908&tab=conversation)
@@ -805,14 +829,14 @@ export function CommandDeck({
 
       if (isDestructiveWorkChange || isDestructiveReview) {
         const confirmTitle = isDestructiveReview
-          ? 'Restart review with new harness/model'
+          ? 'Re-run review on latest commit with new harness/model'
           : 'Restart work agent with new harness/model';
-        const reviewMessage = `This will delete the review agent's state for ${issueId} (sessions, activity, logs) and start a fresh review run with the chosen harness/model.\n\nThe workspace, vBRIEF, beads, and commit history are kept. The review will have to re-research the diff from scratch — this is a deliberate cost of switching harness/model or force-restarting the review.`;
-        const workMessage = `This will delete the work agent's state for ${issueId} (sessions, activity, logs) and start a fresh ${harness ?? currentHarness ?? ''} + ${model ?? currentModel ?? ''} agent.\n\nThe workspace, vBRIEF, beads, and commit history are kept. The new agent will read .pan/continue.json and the branch to continue. The agent will have to re-research the diff from scratch — this is a deliberate cost of switching harness/model.`;
+        const reviewMessage = `This will delete the review agent's state for ${issueId} (sessions, activity, logs) and start a fresh review run with the chosen harness/model.\n\nThe workspace, xBRIEF, tasks, and commit history are kept. The review will have to re-research the diff from scratch — this is a deliberate cost of switching harness/model or force-restarting the review.`;
+        const workMessage = `This will delete the work agent's state for ${issueId} (sessions, activity, logs) and start a fresh ${harness ?? currentHarness ?? ''} + ${model ?? currentModel ?? ''} agent.\n\nThe workspace, xBRIEF, tasks, and commit history are kept. The new agent will read .pan/continue.json and the branch to continue. The agent will have to re-research the diff from scratch — this is a deliberate cost of switching harness/model.`;
         const confirmed = await confirm({
           title: confirmTitle,
           message: isDestructiveReview ? reviewMessage : workMessage,
-          confirmLabel: isDestructiveReview ? 'Restart review' : 'Restart work agent',
+          confirmLabel: isDestructiveReview ? 'Re-run review' : 'Restart work agent',
           variant: 'destructive',
         });
         if (!confirmed) {
@@ -898,6 +922,7 @@ export function CommandDeck({
         });
         if (!resumeRetryRes.ok) {
           const retryData = await resumeRetryRes.json().catch(() => ({})) as { error?: string };
+          if (openRecoveryForStartBlock(resumeRetryRes.status, retryData, issueId)) return;
           throw new Error(retryData.error || 'Failed to restart agent');
         }
         toast.success('Agent restarted');
@@ -907,6 +932,8 @@ export function CommandDeck({
       // Only fall through to start-fresh when there is genuinely no session to resume.
       const noSession = resumeData.lifecycle?.canResumeSession === false && !resumeData.lifecycle?.hasLiveTmuxSession;
       if (!noSession) {
+        // A gate/resumable 409 opens the recovery dialog instead of toasting CLI text.
+        if (openRecoveryForStartBlock(resumeRes.status, resumeData, issueId)) return;
         throw new Error(resumeData.error || 'Failed to resume agent');
       }
 
@@ -938,6 +965,8 @@ export function CommandDeck({
           setPendingCodexSpawn(lastRequestBody);
           throw new Error(data.hint || data.error || 'Codex authentication expired — re-authenticate to continue');
         }
+        // Start-block 409s open the recovery dialog instead of toasting CLI text.
+        if (openRecoveryForStartBlock(res.status, data, issueId)) return;
         throw new Error(data.error || data.hint || 'Failed to start agent');
       }
       if (data.guardrails?.warnings?.length) {
@@ -1017,10 +1046,22 @@ export function CommandDeck({
       const conv = conversations.find((c) => c.name === name);
       // Unscoped conversations live in the No-project bucket.
       const projectName = resolveConversationProjectName(conv) ?? NO_PROJECT_KEY;
-      if (projectName !== selectedProject) onSelectProject?.(projectName);
+      // Opening a conversation: the /conv/<id> route owns the URL, so switch the
+      // deck's project without writing /command-deck/<project> over it.
+      if (projectName !== selectedProject) onSelectProject?.(projectName, { updateUrl: false });
       openConversationTabIn(projectName, name, conv?.title ?? 'Agent');
+      // A click is an explicit intent to open this conversation, so drive the
+      // /conv/<id> URL directly. Re-clicking the already-selected conversation
+      // leaves `selectedConversation` unchanged, so the state->URL sync effect
+      // never re-runs — without this the URL would stay on /command-deck/<project>
+      // (e.g. after navigating to another page and back). prevSelectedRef is kept
+      // in sync so that effect skips the redundant follow-up call.
+      if (conv && onConvIdChange) {
+        prevSelectedRef.current = name;
+        onConvIdChange(String(conv.id));
+      }
     }
-  }, [selectSession, selectedFeature, conversations, resolveConversationProjectName, selectedProject, onSelectProject, openConversationTabIn]);
+  }, [selectSession, selectedFeature, conversations, resolveConversationProjectName, selectedProject, onSelectProject, openConversationTabIn, onConvIdChange]);
 
   const projectConvMutations = useConversationMutations(selectedConversation, handleSelectConversation);
 
@@ -1044,9 +1085,9 @@ export function CommandDeck({
 
   // Create a conversation (optionally scoped to a project) and open it as an
   // agent tab in the current project's deck. Returns the new conversation's
-  // name so the deck's launch components can focus the tab.
+  // name or the creation error so launch components can render the outcome.
   const createConversationForProject = useCallback(
-    async (projectKey?: string, harnessOverride?: Harness, message?: string, viewMode?: ViewMode): Promise<string | undefined> => {
+    async (projectKey?: string, harnessOverride?: Harness, message?: string, viewMode?: ViewMode): Promise<{ name: string } | { error: string }> => {
       try {
         const payload: Record<string, unknown> = {
           model: sidebarModel,
@@ -1076,11 +1117,11 @@ export function CommandDeck({
           prevSelectedRef.current = conv.name;
         }
         queryClient.invalidateQueries({ queryKey: ['conversations'] });
-        return conv.name;
+        return { name: conv.name };
       } catch (err) {
         console.error('[CommandDeck] Failed to create conversation:', err);
         toast.error(err instanceof Error ? err.message : 'Failed to create conversation');
-        return undefined;
+        return { error: err instanceof Error ? err.message : 'Failed to create conversation' };
       }
     },
     [sidebarModel, sidebarHarness, queryClient, onConvIdChange, convsCollapsed, selectedProject, openConversationTabIn],
@@ -1096,11 +1137,11 @@ export function CommandDeck({
   }, [createConversationForProject]);
 
   // Launch-component conversation creator (ProjectHome / IssueOverview): create
-  // a project conversation for the chosen agent and return its name so the deck
-  // can open/focus an agent tab on it.
+  // a project conversation for the chosen agent and return its result so the
+  // caller can open the tab or surface the creation error.
   const createDeckConversation = useCallback(
-    (agentId: string, message?: string, viewMode?: ViewMode): Promise<string | undefined> => {
-      const harness: Harness = agentId === 'codex' ? 'pi' : 'claude-code';
+    (agentId: string, message?: string, viewMode?: ViewMode): Promise<{ name: string } | { error: string }> => {
+      const harness: Harness = agentId === 'codex' ? 'codex' : agentId === 'ohmypi' ? 'ohmypi' : 'claude-code';
       // The No-project bucket creates unscoped conversations (no projectKey).
       const projectKey = selectedProject && selectedProject !== NO_PROJECT_KEY ? selectedProject : undefined;
       return createConversationForProject(projectKey, harness, message, viewMode);
@@ -1201,6 +1242,17 @@ export function CommandDeck({
     if (!selectedProject) return null;
     return projectsWithSessions.find(p => p.name === selectedProject) ?? null;
   }, [projectsWithSessions, selectedProject]);
+  const visibleFeatures = useMemo(
+    () => filterSpecOnlyPlanned(selectedProjectData?.features ?? [], showPlannedBacklog),
+    [selectedProjectData, showPlannedBacklog],
+  );
+
+  const selectedRegisteredProject = useMemo(
+    () => findRegisteredProject(registeredProjects, selectedProject),
+    [registeredProjects, selectedProject],
+  );
+  const isProjectValidationPending = Boolean(selectedProject && (!projectsFetched || !registeredProjectsFetched));
+  const showUnknownProject = Boolean(selectedProject && !isProjectValidationPending && !registeredProjectsError && !isKnownProject(selectedProject, registeredProjects));
 
   // ── Project-scoped deck data (PAN-1561) ──────────────────────────────────────
   // For a real project: its scoped conversations + issue ids. For the special
@@ -1329,34 +1381,25 @@ export function CommandDeck({
             <div className={styles.sectionHeader} onClick={toggleProjectsCollapsed}>
               {projectsCollapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
               <span className={styles.sectionTitle}>Issues</span>
-              <span className={styles.segmentCount}>{selectedProjectData?.features.length ?? 0}</span>
+              <span className={styles.segmentCount}>{visibleFeatures.length}</span>
             </div>
             {!projectsCollapsed && (
               <div className={styles.sectionBody}>
-                <div className={styles.treeFilterRow}>
-                  {(['all', 'alive', 'failed'] as TreeSessionFilter[]).map((f) => (
-                    <button
-                      key={f}
-                      onClick={() => setTreeFilter(f)}
-                      className={`${styles.treeFilterButton} ${treeFilter === f ? styles.treeFilterButtonActive : ''}`}
-                    >
-                      {f === 'all' ? 'All' : f === 'alive' ? 'Alive' : 'Failed'}
-                    </button>
-                  ))}
-                </div>
-                {!selectedProject ? (
-                  <div className={styles.emptyProject}>Select a project to see its issues</div>
-                ) : isLoading && !selectedProjectData ? (
-                  <div className={styles.skeletonList}>
-                    <div className={styles.skeletonItem} style={{ width: '60%' }} />
-                    <div className={styles.skeletonItem} style={{ width: '80%' }} />
-                    <div className={styles.skeletonItem} style={{ width: '45%' }} />
-                  </div>
-                ) : selectedProjectData ? (
-                  <ProjectNode
-                    key={selectedProjectData.path}
+                <IssuesPaneFilterRow
+                  filter={treeFilter}
+                  onFilterChange={setTreeFilter}
+                />
+                <ProjectMembershipBoundary
+                  selectedProject={selectedProject} projectKey={selectedRegisteredProject?.key ?? selectedProjectData?.key}
+                  projectName={selectedProjectData?.name}
+                  loading={isLoading && !selectedProjectData}
+                  disabled={isProjectValidationPending || Boolean(registeredProjectsError) || showUnknownProject}
+                >
+                  {selectedProjectData ? (
+                    <ProjectNode
+                      key={selectedProjectData.path} projectKey={selectedProjectData.key}
                     name={selectedProjectData.name}
-                    features={selectedProjectData.features}
+                    features={visibleFeatures}
                     selectedFeature={selectedFeature}
                     onSelectFeature={handleSelectFeature}
                     onSelectProject={handleSelectProject}
@@ -1380,9 +1423,10 @@ export function CommandDeck({
                     onNewConversation={handleNewProjectConversation}
                     containerStats={containerStats}
                   />
-                ) : (
-                  <div className={styles.emptyProject}>No issues for this project</div>
-                )}
+                  ) : (
+                    <div className={styles.emptyProject}>No issues for this project</div>
+                  )}
+                </ProjectMembershipBoundary>
               </div>
             )}
           </div>
@@ -1416,7 +1460,11 @@ export function CommandDeck({
 
         {/* Content Area — the project-scoped deck (PAN-1561) */}
         <div className={styles.content}>
-          {selectedProject ? (
+          {isProjectValidationPending ? <ProjectPendingState onRetry={() => void refetchRegisteredProjects()} />
+          : registeredProjectsError ? <ProjectRegistryErrorState onRetry={() => void refetchRegisteredProjects()} />
+          : showUnknownProject ? (
+            <UnknownProjectState project={selectedProject!} registeredProjects={registeredProjects} onSelectProject={onSelectProject} />
+          ) : selectedProject ? (
             <Stage
               key={selectedProject}
               deckKey={selectedProject}
@@ -1424,16 +1472,14 @@ export function CommandDeck({
               resolveSession={resolveSession}
               onCreateConversation={createDeckConversation}
               onActiveConversationChange={setSelectedConversation}
-              terminalCwd={
-                registeredProjects.find((rp) => (rp.name ?? rp.key) === selectedProject)?.path
-              }
+              terminalCwd={selectedRegisteredProject?.path}
               renderHome={(api) => (
                 <ProjectHome
                   projectName={isNoProject ? NO_PROJECT_LABEL : selectedProject}
-                  projectKey={registeredProjects.find((rp) => (rp.name ?? rp.key) === selectedProject)?.key}
+                  projectKey={selectedRegisteredProject?.key}
                   conversations={projectConvs}
                   onCreateConversation={createDeckConversation}
-                  features={selectedProjectData?.features}
+                  features={visibleFeatures}
                   issueCosts={issueCosts}
                   issueCostDetails={issueCostDetails}
                   onSelectFeature={(feature) => handleSelectFeature(feature.issueId)}
@@ -1470,7 +1516,7 @@ export function CommandDeck({
         {/* Awareness rail (PAN-1591) — the merged feed: one column with a
             Needs-you / Project / Global scope switcher, replacing the separate
             Project Activity + global Activity Feed columns. */}
-        {selectedProject && (
+        {selectedProject && !isProjectValidationPending && !registeredProjectsError && !showUnknownProject && (
           awarenessCollapsed ? (
             <button
               type="button"
@@ -1496,12 +1542,12 @@ export function CommandDeck({
         )}
       </div>
 
-      {/* Beads Dialog */}
-      {showBeads && selectedFeature && (
-        <BeadsDialog
+      {/* Tasks Dialog */}
+      {showTasks && selectedFeature && (
+        <TasksDialog
           issueId={selectedFeature}
-          isOpen={showBeads}
-          onClose={() => setShowBeads(false)}
+          isOpen={showTasks}
+          onClose={() => setShowTasks(false)}
         />
       )}
 

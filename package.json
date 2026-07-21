@@ -1,6 +1,6 @@
 {
   "name": "@overdeck/core",
-  "version": "0.30.2",
+  "version": "0.45.23",
   "description": "Multi-agent orchestration for AI coding assistants (Claude Code, Codex, Cursor, Gemini CLI)",
   "publishConfig": {
     "access": "public"
@@ -23,16 +23,22 @@
     "url": "https://github.com/eltmon/overdeck.git"
   },
   "homepage": "https://github.com/eltmon/overdeck#readme",
+  "funding": "https://github.com/sponsors/overdeck-ai",
   "bugs": {
     "url": "https://github.com/eltmon/overdeck/issues"
   },
   "type": "module",
+  "trustedDependencies": [
+    "@lydell/node-pty"
+  ],
   "workspaces": {
     "packages": [
       "packages/contracts",
+      "packages/effect-acp",
       "packages/moonshine-linux-x64",
       "packages/qwen-tts-linux-x64",
       "packages/pi-extension",
+      "packages/ohmypi-extension",
       "src/dashboard/server",
       "src/dashboard/frontend",
       "apps/desktop"
@@ -64,15 +70,18 @@
     "LICENSE"
   ],
   "engines": {
-    "node": ">=22.5.0"
+    "node": ">=22.16.0"
   },
   "overrides": {
-    "@effect/platform-node-shared": "4.0.0-beta.73"
+    "@effect/platform-node-shared": "4.0.0-beta.73",
+    "unrun": "0.2.39"
   },
   "scripts": {
     "dev": "tsx watch src/cli/index.ts",
-    "build": "npm run build:contracts && npm run build:pi-extension && npm run build:cli && node scripts/build-post-cli.mjs",
+    "eval": "cd evals && evalite .",
+    "build": "npm run build:contracts && npm run build:pi-extension && npm run build:ohmypi-extension && npm run build:cli && node scripts/build-post-cli.mjs",
     "build:pi-extension": "npm --prefix ./packages/pi-extension run build",
+    "build:ohmypi-extension": "npm --prefix ./packages/ohmypi-extension run build",
     "build:cli": "node scripts/build-cli.mjs",
     "build:docs-index": "node scripts/build-docs-index.mjs",
     "build:contracts": "node scripts/fs-helper.mjs rmrf packages/contracts/dist && npm --prefix ./packages/contracts run build",
@@ -89,30 +98,40 @@
     "build:desktop:mac": "cd apps/desktop && bun run build && bun run dist:mac",
     "build:desktop:win": "cd apps/desktop && bun run build && bun run dist:win",
     "pretypecheck": "npm run build:contracts",
-    "typecheck": "tsc --noEmit && npm run typecheck:hooks",
+    "typecheck": "tsc --noEmit && npm run typecheck:hooks && npm run typecheck:evals && npm run typecheck:dashboard",
     "typecheck:hooks": "tsc --noEmit -p tsconfig.hooks.json",
-    "lint": "eslint src/ && npm run lint:effect && npm run lint:permissions && npm run lint:state-writes && npm run lint:overdeck-boundaries && npm run lint:skills && npm run lint:prompts",
+    "typecheck:evals": "tsc --noEmit -p tsconfig.evals.json",
+    "lint": "eslint src/ --ext .js,.ts,.tsx --no-inline-config && npm run lint:effect && npm run lint:permissions && npm run lint:state-writes && npm run lint:overdeck-boundaries && npm run lint:pipeline-membership && npm run lint:skills && npm run lint:prompts && npm run lint:prompt-trailer && npm run lint:file-size && npm run lint:source-introspection && npm run lint:no-coderabbit-merge-gate && npm run lint:circular && npm run lint:ratchet-audit && npm run lint:quarantine-audit",
+    "lint:pipeline-membership": "bash scripts/lint-pipeline-membership.sh",
+    "lint:circular": "bash scripts/lint-circular-deps.sh",
+    "lint:quarantine-audit": "bash scripts/lint-quarantine-audit.sh",
     "lint:effect": "node scripts/check-effect-versions.mjs",
     "lint:permissions": "bash scripts/lint-permissions.sh",
     "lint:state-writes": "bash scripts/lint-state-writes.sh",
     "lint:overdeck-boundaries": "PAN_OVERDECK_BOUNDARY_LINT=1 bash scripts/lint-overdeck-boundaries.sh",
-    "prelint:skills": "npm run build:contracts && npm run build:cli",
+    "prelint:skills": "npm run build:contracts && npm run build:pi-extension && npm run build:ohmypi-extension && npm run build:cli",
     "lint:skills": "bash scripts/lint-skills.sh",
     "lint:prompts": "bash scripts/lint-prompts.sh",
-    "pretest": "npm run build:contracts && npm run build:pi-extension && npm run build:cli",
-    "test": "vitest run && npm --prefix ./src/dashboard/frontend run test -- src/lib/__tests__/issueActions.test.ts src/lib/__tests__/issueActions.no-actions-lost.test.ts src/lib/__tests__/issueActions.parity.test.tsx",
-    "test:unit": "vitest run tests/unit",
-    "test:integration": "vitest run tests/integration",
-    "test:e2e": "vitest run tests/e2e",
+    "lint:prompt-trailer": "bash scripts/check-prompt-change-trailer.sh",
+    "lint:file-size": "bash scripts/lint-file-size.sh",
+    "lint:source-introspection": "bash scripts/lint-source-introspection.sh",
+    "lint:no-coderabbit-merge-gate": "bash scripts/lint-no-coderabbit-merge-gate.sh",
+    "lint:ratchet-audit": "bash scripts/lint-ratchet-audit.sh",
+    "pretest": "npm run build:contracts && npm run build:pi-extension && npm run build:ohmypi-extension && npm run build:cli",
+    "test": "vitest run --configLoader runner && npm --prefix ./src/dashboard/frontend run test -- src/lib/__tests__/issueActions.test.ts src/lib/__tests__/issueActions.no-actions-lost.test.ts src/lib/__tests__/issueActions.parity.test.tsx",
+    "test:unit": "vitest run --configLoader runner tests/unit",
+    "test:integration": "vitest run --configLoader runner tests/integration",
+    "test:e2e": "vitest run --configLoader runner tests/e2e",
     "test:drizzle-smoke": "tsc --noEmit --target ES2022 --module NodeNext --moduleResolution NodeNext --strict --esModuleInterop --skipLibCheck scripts/drizzle-node-sqlite-smoke.ts && node --import tsx scripts/drizzle-node-sqlite-smoke.ts",
-    "test:overdeck-db": "vitest run tests/unit/scripts/create-overdeck-db.test.ts",
+    "test:overdeck-db": "vitest run --configLoader runner tests/unit/scripts/create-overdeck-db.test.ts",
     "db:overdeck:init": "node --import tsx scripts/create-overdeck-db-cli.ts",
-    "test:coverage": "vitest run --coverage",
+    "test:coverage": "vitest run --configLoader runner --coverage",
     "docs": "typedoc",
     "docs:watch": "typedoc --watch",
     "prepublishOnly": "npm run build",
     "postinstall": "node scripts/postinstall.mjs || true",
-    "prepare": "husky"
+    "prepare": "husky",
+    "typecheck:dashboard": "bash scripts/lint-dashboard-types.sh"
   },
   "dependencies": {
     "@ai-sdk/openai": "^3.0.63",
@@ -122,14 +141,14 @@
     "@effect/platform-node-shared": "4.0.0-beta.73",
     "@effect/vitest": "4.0.0-beta.73",
     "@google-cloud/speech": "^7.3.1",
-    "@homebridge/node-pty-prebuilt-multiarch": "^0.13.1",
+    "@lydell/node-pty": "1.2.0-beta.14",
+    "@huggingface/transformers": "^4.2.0",
     "@iarna/toml": "^2.2.5",
     "@linear/sdk": "^70.0.0",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@octokit/rest": "^22.0.1",
     "@types/mustache": "^4.2.6",
     "@types/ws": "^8.18.1",
-    "@xenova/transformers": "^2.17.2",
     "ai": "^6.0.180",
     "chalk": "^5.6.2",
     "chokidar": "^5.0.0",
@@ -138,6 +157,7 @@
     "drizzle-kit": "^0.31.10",
     "drizzle-orm": "^0.45.2",
     "effect": "4.0.0-beta.73",
+    "effect-acp": "workspace:*",
     "execa": "^8.0.1",
     "inquirer": "^9.3.8",
     "js-yaml": "^4.1.1",
@@ -149,18 +169,24 @@
     "yaml": "^2.8.2"
   },
   "devDependencies": {
-    "@overdeck/contracts": "workspace:*",
     "@commitlint/cli": "^20.5.0",
     "@commitlint/config-conventional": "^20.5.0",
     "@effect/vitest": "catalog:",
+    "@napi-rs/canvas": "^1.0.0",
+    "@overdeck/contracts": "workspace:*",
+    "@total-typescript/ts-reset": "^0.6.1",
     "@types/inquirer": "^9.0.9",
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^20.10.0",
+    "@typescript-eslint/eslint-plugin": "^6.21.0",
     "@typescript-eslint/parser": "6.21.0",
     "@vitest/coverage-v8": "^4.1.6",
-    "@napi-rs/canvas": "^1.0.0",
+    "autoevals": "^0.3.0",
+    "cross-env": "^10.1.0",
     "eslint": "^8.55.0",
+    "evalite": "^0.19.0",
     "husky": "^9.1.7",
+    "madge": "^8",
     "playwright": "^1.59.1",
     "tsdown": "^0.21.7",
     "tsx": "^4.6.2",

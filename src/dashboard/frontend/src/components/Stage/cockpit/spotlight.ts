@@ -49,7 +49,7 @@ export function deriveSpotlight(
       tone: 'blocked',
       title: 'Tests failed',
       detail: rs.testNotes,
-      actionKeys: ['reviewTest', 'recoverReview', 'tell'],
+      actionKeys: ['restartReview', 'recoverReview', 'tell'],
     }
   }
   if (rs.mergeStatus === 'failed') {

@@ -1,7 +1,7 @@
 import type { SettingsConfig } from '../Settings/types';
 
 const SETTINGS_STORAGE_KEY = 'pan-settings-cache';
-export const FALLBACK_DEFAULT_CONVERSATION_MODEL = 'claude-sonnet-4-6';
+export const FALLBACK_DEFAULT_CONVERSATION_MODEL = '';
 
 let defaultConversationModel = FALLBACK_DEFAULT_CONVERSATION_MODEL;
 let settingsRequest: Promise<void> | null = null;

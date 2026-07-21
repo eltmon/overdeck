@@ -28,7 +28,7 @@ docker compose logs -f app
 |---------|-----|------|
 | Vite Dev Server | http://localhost:5173 | 5173 |
 
-With Traefik: https://app.pan.localhost
+With Traefik: https://app.overdeck.localhost
 
 ## Environment Variables
 
@@ -36,7 +36,7 @@ Create a `.env` file:
 
 ```bash
 APP_PORT=5173
-HOSTNAME=myapp.pan.localhost
+HOSTNAME=myapp.overdeck.localhost
 COMPOSE_PROJECT_NAME=myapp
 
 # Pass to Vite

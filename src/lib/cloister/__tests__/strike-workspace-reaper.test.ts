@@ -20,7 +20,10 @@ const PORCELAIN = [
   'worktree /repo/workspaces/feature-pan-300', 'HEAD ddd', 'branch refs/heads/feature/pan-300', '',
 ].join('\n');
 
-function wireExec(aheadByBranch: Record<string, string>): string[] {
+function wireExec(
+  aheadByBranch: Record<string, string>,
+  reflogByBranch: Record<string, string> = {},
+): string[] {
   const calls: string[] = [];
   execMock.mockImplementation((cmd: string, a2: unknown, a3?: unknown) => {
     const cb = (typeof a2 === 'function' ? a2 : a3) as (e: Error | null, r?: { stdout: string; stderr: string }) => void;
@@ -28,6 +31,9 @@ function wireExec(aheadByBranch: Record<string, string>): string[] {
     let stdout = '';
     if (cmd.includes('worktree list --porcelain')) {
       stdout = PORCELAIN;
+    } else if (cmd.includes('--walk-reflogs --count')) {
+      const branch = cmd.split('--walk-reflogs --count')[1].trim().replace(/^"|"$/g, '');
+      stdout = reflogByBranch[branch] ?? '2';
     } else if (cmd.includes('rev-list --count')) {
       const branch = cmd.split('origin/main..')[1].trim();
       stdout = aheadByBranch[branch] ?? '0';
@@ -64,6 +70,46 @@ describe('reapMergedStrikeWorkspaces (PAN-1882)', () => {
     await reapMergedStrikeWorkspaces('/repo');
     expect(calls.some(c => c.includes('worktree remove') && c.includes('feature-pan-100-strike'))).toBe(false);
     expect(calls.some(c => c.includes('rev-list') && c.includes('strike/pan-100'))).toBe(false);
+  });
+
+  it('never reaps a fresh strike branch that has not authored any commits (walk-reflogs <= 1)', async () => {
+    const calls = wireExec({ 'strike/pan-100': '0' }, { 'strike/pan-100': '1' });
+    await reapMergedStrikeWorkspaces('/repo');
+    expect(calls.some(c => c.includes('worktree remove') && c.includes('feature-pan-100-strike'))).toBe(false);
+    expect(calls.some(c => c.includes('branch -D') && c.includes('strike/pan-100'))).toBe(false);
+  });
+
+  it('still reaps a strike branch that authored commits and is now fully merged (walk-reflogs > 1)', async () => {
+    const calls = wireExec({ 'strike/pan-100': '0' }, { 'strike/pan-100': '2' });
+    await reapMergedStrikeWorkspaces('/repo');
+    expect(calls.some(c => c.includes('worktree remove') && c.includes('feature-pan-100-strike'))).toBe(true);
+    expect(calls.some(c => c.includes('branch -D') && c.includes('strike/pan-100'))).toBe(true);
+  });
+
+  it('skips a worktree when the walk-reflogs command fails', async () => {
+    execMock.mockImplementation((cmd: string, a2: unknown, a3?: unknown) => {
+      const cb = (typeof a2 === 'function' ? a2 : a3) as (e: Error | null, r?: { stdout: string; stderr: string }) => void;
+      if (cmd.includes('worktree list --porcelain')) {
+        cb(null, { stdout: PORCELAIN, stderr: '' });
+      } else if (cmd.includes('--walk-reflogs --count')) {
+        cb(new Error('reflog unavailable'), undefined);
+      } else if (cmd.includes('rev-list --count')) {
+        cb(null, { stdout: '0', stderr: '' });
+      } else {
+        cb(null, { stdout: '', stderr: '' });
+      }
+    });
+    await reapMergedStrikeWorkspaces('/repo');
+    expect(execMock).toHaveBeenCalledWith(
+      expect.stringContaining('--walk-reflogs --count'),
+      expect.anything(),
+      expect.any(Function),
+    );
+    expect(execMock).not.toHaveBeenCalledWith(
+      expect.stringContaining('worktree remove'),
+      expect.anything(),
+      expect.any(Function),
+    );
   });
 
   it('never touches feature/* worktrees (only the active pipeline lives there)', async () => {

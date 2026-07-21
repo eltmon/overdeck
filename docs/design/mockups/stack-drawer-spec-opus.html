@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Stack drawer — spec (item #8)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --radius:.625rem; --radius-sm:calc(var(--radius) - 4px);
+    --background:#fff; --foreground:#1f2937; --card:#fff; --card-2:#f7f8fa; --accent:color-mix(in srgb, black 4%, transparent);
+    --muted-foreground:#6b7280; --border:color-mix(in srgb, black 8%, transparent);
+    --primary:oklch(.488 .217 264); --primary-foreground:#fff;
+    --destructive:#ef4444; --destructive-foreground:#b91c1c;
+    --warning:#f59e0b; --warning-foreground:#b45309;
+    --info:#3b82f6; --info-foreground:#1d4ed8; --success:#10b981; --success-foreground:#047857;
+    --signal-cost-foreground:#0e7490; --signal-review:#8b5cf6;
+    --mono:"DM Mono", ui-monospace, SFMono-Regular, monospace;
+  }
+  *{box-sizing:border-box} html,body{margin:0}
+  body{background:var(--card-2);color:var(--foreground);font-family:"DM Sans",system-ui,sans-serif;font-weight:500;font-size:13px;line-height:1.45;-webkit-font-smoothing:antialiased}
+  .mono{font-family:var(--mono)} .muted{color:var(--muted-foreground)}
+  .wrap{max-width:1120px;margin:24px auto;padding:0 22px}
+  h1{font-size:16px;margin:0 0 4px} .sub{color:var(--muted-foreground);font-size:12.5px;margin-bottom:6px;max-width:820px}
+  .lbl{font-size:10px;text-transform:uppercase;letter-spacing:.09em;color:var(--muted-foreground);margin:20px 0 8px}
+  .cols{display:flex;gap:18px;align-items:flex-start;flex-wrap:wrap}
+
+  /* the lane column (~260px, like the cockpit left lane) */
+  .lane{width:264px;border:1px solid var(--border);border-radius:16px;background:var(--card);overflow:hidden}
+  .lane .lh{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted-foreground);padding:10px 13px;border-bottom:1px solid var(--border)}
+  .lane .body{padding:6px}
+  /* abbreviated agent rows */
+  .ag{display:grid;grid-template-columns:14px 1fr auto;gap:8px;align-items:center;padding:7px 8px;border-radius:8px;font-size:12.5px}
+  .ag .i{width:14px;height:14px;border-radius:4px;display:grid;place-items:center;font-size:9px;color:#fff}
+  .ag .meta{font-size:10px;color:var(--muted-foreground)}
+  .ag .st{font-size:10px;color:var(--muted-foreground)}
+  .dot{width:7px;height:7px;border-radius:50%}
+
+  /* the stack drawer */
+  .drawer{margin:6px;border:1px solid var(--border);border-radius:12px;overflow:hidden;background:var(--card)}
+  .dtog{display:flex;align-items:center;gap:8px;width:100%;border:none;background:none;cursor:pointer;font:inherit;color:inherit;padding:9px 11px;font-size:12px}
+  .dtog .car{font-size:9px;color:var(--muted-foreground)}
+  .dtog .ttl{color:var(--muted-foreground);text-transform:uppercase;letter-spacing:.05em;font-size:10px}
+  .dtog .sm{margin-left:auto;font-size:11px;color:var(--muted-foreground);display:flex;align-items:center;gap:5px}
+  .dbody{border-top:1px solid var(--border);padding:8px 10px 10px}
+  .sec{font-size:9.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted-foreground);margin:9px 0 5px}
+  .sec:first-child{margin-top:2px}
+  .rrow{display:flex;align-items:center;gap:7px;padding:3px 0;font-size:12px}
+  .rrow .rmeta{margin-left:auto;font-size:10px;color:var(--muted-foreground);font-family:var(--mono)}
+  .svc{color:var(--info-foreground)}
+  .ctr{display:grid;grid-template-columns:9px 1fr;gap:8px;padding:4px 0;align-items:start}
+  .ctr .nm{font-size:12px} .ctr .l2{font-size:10px;color:var(--muted-foreground);font-family:var(--mono)}
+  .ctr .l2.bad{color:var(--destructive-foreground);font-family:inherit}
+  .git{font-family:var(--mono);font-size:11px}
+  .badge{font-size:9.5px;border-radius:4px;padding:1px 5px;border:1px solid var(--border);color:var(--muted-foreground)}
+  .badge.dirty{color:var(--warning-foreground);border-color:color-mix(in srgb,var(--warning) 32%,transparent);background:color-mix(in srgb,var(--warning) 8%,transparent)}
+  .acts{display:flex;flex-wrap:wrap;gap:5px;margin-top:9px}
+  .btn{border:1px solid var(--border);background:var(--card);border-radius:7px;padding:4px 8px;font-size:11px;cursor:pointer;color:var(--foreground)}
+  .btn.pri{background:var(--primary);color:#fff;border-color:transparent}
+  .health{display:flex;align-items:center;gap:6px;font-size:11px;padding:2px 0}
+
+  .notes{margin-top:22px;border:1px solid var(--border);border-radius:14px;padding:14px 16px;background:var(--card)}
+  .notes h3{margin:0 0 10px;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted-foreground)}
+  .moves{display:grid;grid-template-columns:240px 1fr;gap:5px 14px;font-size:12.5px}
+  .moves .f{color:var(--foreground)} .moves .t{color:var(--muted-foreground)}
+  .q{border:1px solid color-mix(in srgb,var(--info) 32%,transparent);background:color-mix(in srgb,var(--info) 5%,var(--card));border-radius:14px;padding:14px 16px;margin-top:14px}
+  .q h3{margin:0 0 8px;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--info-foreground)} .q li{font-size:12.5px;margin:7px 0}
+  code{font-family:var(--mono);font-size:11.5px;background:var(--accent);padding:1px 5px;border-radius:5px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Stack drawer — item #8</h1>
+  <div class="sub">A collapsible drawer pinned to the bottom of the Agents lane — replaces the placeholder “Resources” summary. Collapsed by default (a one-line health summary); expand for services, containers, git, PRs, and stack actions. Honest to the data: containers expose <b>health / status / uptime / ports</b> (no cpu/mem, no per-container logs); actions are stack-level from the registry (<code>rebuild-stack</code> / <code>containerize</code> / <code>sync-main</code>).</div>
+
+  <div class="lbl">in context — the lane, with the drawer collapsed (default) and expanded</div>
+  <div class="cols">
+
+    <!-- collapsed -->
+    <div class="lane">
+      <div class="lh">Agents &amp; steps</div>
+      <div class="body">
+        <div class="ag"><span class="i" style="background:var(--success)">✓</span><div><div>Plan</div><div class="meta">opus · done</div></div><span class="st">2h</span></div>
+        <div class="ag"><span class="i" style="background:var(--info)">●</span><div><div>Work</div><div class="meta">sonnet-4-6 · running</div></div><span class="st">now</span></div>
+        <div class="ag"><span class="i" style="background:var(--signal-review)">◆</span><div><div>Review</div><div class="meta">convoy · 3</div></div><span class="st">·</span></div>
+      </div>
+      <div class="drawer">
+        <button class="dtog"><span class="car">▸</span><span class="ttl">Stack</span><span class="sm"><span class="dot" style="background:var(--success)"></span> 2 healthy · <span class="mono">main</span> +3 · 1 PR</span></button>
+      </div>
+    </div>
+
+    <!-- expanded, healthy -->
+    <div class="lane">
+      <div class="lh">Agents &amp; steps</div>
+      <div class="body">
+        <div class="ag"><span class="i" style="background:var(--info)">●</span><div><div>Work</div><div class="meta">sonnet-4-6 · running</div></div><span class="st">now</span></div>
+      </div>
+      <div class="drawer">
+        <button class="dtog"><span class="car">▾</span><span class="ttl">Stack</span><span class="sm"><span class="dot" style="background:var(--success)"></span> healthy</span></button>
+        <div class="dbody">
+          <div class="sec">Services</div>
+          <div class="rrow"><span>Frontend</span><span class="rmeta svc">open ↗</span></div>
+          <div class="rrow"><span>API</span><span class="rmeta svc">open ↗</span></div>
+
+          <div class="sec">Containers · 2</div>
+          <div class="ctr"><span class="dot" style="background:var(--success);margin-top:4px"></span><div><div class="nm">frontend</div><div class="l2">up 2h · :5173</div></div></div>
+          <div class="ctr"><span class="dot" style="background:var(--success);margin-top:4px"></span><div><div class="nm">api</div><div class="l2">up 2h · :3011</div></div></div>
+
+          <div class="sec">Git</div>
+          <div class="rrow"><span class="git">feature/pan-1919</span></div>
+          <div class="rrow"><span class="mono" style="font-size:11px">+3 ahead · 0 behind</span><span class="badge dirty rmeta" style="font-family:inherit">dirty</span></div>
+
+          <div class="sec">Pull requests</div>
+          <div class="rrow"><span>#1950</span><span class="rmeta">conflicting</span></div>
+
+          <div class="acts">
+            <button class="btn">Rebuild stack</button>
+            <button class="btn">Sync main</button>
+            <button class="btn">Attach ↗</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- expanded, unhealthy -->
+    <div class="lane">
+      <div class="lh">Agents &amp; steps</div>
+      <div class="body"><div class="ag"><span class="i" style="background:var(--destructive)">!</span><div><div>Work</div><div class="meta">sonnet-4-6 · blocked</div></div><span class="st">·</span></div></div>
+      <div class="drawer">
+        <button class="dtog"><span class="car">▾</span><span class="ttl">Stack</span><span class="sm"><span class="dot" style="background:var(--destructive)"></span> unhealthy</span></button>
+        <div class="dbody">
+          <div class="health"><span class="dot" style="background:var(--destructive)"></span> <span class="muted">api exited (1) — port 3011 in use</span></div>
+          <div class="sec">Containers · 2</div>
+          <div class="ctr"><span class="dot" style="background:var(--success);margin-top:4px"></span><div><div class="nm">frontend</div><div class="l2">up 1h · :5173</div></div></div>
+          <div class="ctr"><span class="dot" style="background:var(--destructive);margin-top:4px"></span><div><div class="nm">api</div><div class="l2 bad">exited (1) · port 3011 in use</div></div></div>
+          <div class="acts"><button class="btn pri">Rebuild stack</button><button class="btn">Attach ↗</button></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- no docker / remote -->
+    <div class="lane">
+      <div class="lh">Agents &amp; steps</div>
+      <div class="body"><div class="ag"><span class="i" style="background:var(--success)">✓</span><div><div>Plan</div><div class="meta">opus · done</div></div><span class="st">3h</span></div></div>
+      <div class="drawer">
+        <button class="dtog"><span class="car">▾</span><span class="ttl">Stack</span><span class="sm"><span class="dot" style="background:var(--muted-foreground)"></span> no containers</span></button>
+        <div class="dbody">
+          <div class="rrow muted" style="font-size:11.5px">This workspace isn’t containerized.</div>
+          <div class="sec">Git</div>
+          <div class="rrow"><span class="git">feature/pan-1224</span><span class="rmeta">+0 · clean</span></div>
+          <div class="acts"><button class="btn pri">Containerize</button><button class="btn">Sync main</button></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="notes">
+    <h3>No-loss audit — everything the old summary &amp; the (dead) WorkspaceCard showed has a home</h3>
+    <div class="moves">
+      <span class="f">Resources summary: containers · PR · branches counts</span><span class="t">→ collapsed summary line + the expanded sections</span>
+      <span class="f">WorkspaceCard: services / frontend·API URLs</span><span class="t">→ Services section (open ↗)</span>
+      <span class="f">WorkspaceCard: containers + stackHealth (UatStackStatus)</span><span class="t">→ Containers section + the health line (reusing UatStackStatus)</span>
+      <span class="f">WorkspaceCard: git ahead/behind/branch/dirty</span><span class="t">→ Git section</span>
+      <span class="f">WorkspaceCard: sync-main / containerize / rebuild-stack actions</span><span class="t">→ Actions row (from the action registry)</span>
+      <span class="f">Pull requests (resourceDetails.prs)</span><span class="t">→ Pull requests section</span>
+      <span class="f">remote / vmName (isRemote)</span><span class="t">→ summary shows the VM; Attach opens it</span>
+    </div>
+  </div>
+
+  <div class="q">
+    <h3>Decisions before I build</h3>
+    <ul>
+      <li><b>1. Placement &amp; default:</b> a collapsible drawer at the bottom of the lane, <b>collapsed by default</b> with a one-line health summary (dot + “2 healthy · main +3 · 1 PR”). Expand for the sections. Good?</li>
+      <li><b>2. Honest data:</b> containers show <b>health · status · uptime · ports</b> only — there’s no cpu/mem or per-container logs/restart in the data, so I won’t fake them. Actions are stack-level (Rebuild stack / Containerize / Sync main / Attach) from the real registry. OK?</li>
+      <li><b>3. Dead code:</b> while here, should I <b>delete</b> the now-orphaned <code>WorkspaceCard</code> / <code>IssueCockpitBody</code> (and its unused sibling cards), or leave them? They’re not mounted anywhere. I’d only remove what's provably unused, in a separate commit.</li>
+    </ul>
+  </div>
+</div>
+</body>
+</html>

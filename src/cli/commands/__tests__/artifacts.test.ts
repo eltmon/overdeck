@@ -50,8 +50,8 @@ const artifact = {
 };
 
 const urls = {
-  wrapperUrl: 'https://pan.localhost/s/slug0001',
-  rawUrl: 'https://artifacts.pan.localhost/a/slug0001',
+  wrapperUrl: 'https://overdeck.localhost/s/slug0001',
+  rawUrl: 'https://artifacts.overdeck.localhost/a/slug0001',
 };
 
 describe('artifact CLI commands', () => {
@@ -249,11 +249,11 @@ describe('artifact CLI commands', () => {
       const url = artifactUrlCommand(filePath, {}, { repository: repo, cwd: home });
       await artifactOpenCommand(filePath, { json: true }, { repository: repo, cwd: home, opener });
 
-      expect(url).toBe('https://pan.localhost/s/slug0001');
-      expect(console.log).toHaveBeenCalledWith('https://pan.localhost/s/slug0001');
-      expect(opener).toHaveBeenCalledWith('https://pan.localhost/s/slug0001');
+      expect(url).toBe('https://overdeck.localhost/s/slug0001');
+      expect(console.log).toHaveBeenCalledWith('https://overdeck.localhost/s/slug0001');
+      expect(opener).toHaveBeenCalledWith('https://overdeck.localhost/s/slug0001');
       const opened = JSON.parse(String(vi.mocked(console.log).mock.calls[1]?.[0]));
-      expect(opened).toEqual({ opened: true, url: 'https://pan.localhost/s/slug0001' });
+      expect(opened).toEqual({ opened: true, url: 'https://overdeck.localhost/s/slug0001' });
     } finally {
       repo.close();
       rmSync(home, { recursive: true, force: true });

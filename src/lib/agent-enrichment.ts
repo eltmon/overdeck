@@ -29,6 +29,7 @@ import {
 import { resolveProjectFromIssueSync } from './projects.js'
 import { getGitHubConfig } from '../dashboard/server/services/tracker-config.js'
 import { extractPrefixSync } from './issue-id.js'
+import { getLatestSessionIdSync } from './agents/activity.js'
 
 const execAsync = promisify(exec)
 
@@ -49,6 +50,10 @@ export type PendingInputKind =
   | 'enterPlanMode'
   | 'sessionResume'
   | 'rateLimit'
+  // An interactive session ended its turn — the operator's move. This is the
+  // only kind for a question asked in prose, which carries no tool call and no
+  // modal, and is therefore invisible to every other detector.
+  | 'agentTurnEnded'
 
 export interface PendingAskUserQuestionSnapshot {
   toolUseId: string
@@ -71,8 +76,22 @@ export interface AgentEnrichment {
   pendingInputCount: number
   pendingInputKinds: PendingInputKind[]
   pendingAskUserQuestion?: PendingAskUserQuestionSnapshot
+  /**
+   * Payload for an outstanding ExitPlanMode. The scan has always produced this
+   * and the poller has always emitted `enrichment.pendingProposedPlan`, but the
+   * field was never on this interface — so it read `undefined` forever and no
+   * plan ever reached the store from the agent path. It compiled because the
+   * root tsconfig excluded the dashboard from typecheck.
+   */
+  pendingProposedPlan?: { toolUseId: string; askedAt: string; plan: string }
   resolution: string
   resolutionCount: number
+  /**
+   * The JSONL scan this enrichment was derived from. The poller caches it per
+   * agent and replays it while the file's mtime is unchanged, so a static
+   * session costs no I/O without anyone having to fabricate an empty scan.
+   */
+  jsonlScan?: PendingInputsScan
 }
 
 // PAN-1520 / PAN-1834 — promote pane-detected blocking surfaces into the
@@ -162,21 +181,47 @@ function getProjectPathByPrefix(issuePrefix: string): string {
     const trimmed = paneCwd.trim()
     if (trimmed && existsSync(trimmed)) return trimmed
   } catch {}
-  const issueId = agentId.replace(/^(agent-|planning-)/, '').toUpperCase()
+  const isStrikeAgent = agentId.startsWith('strike-')
+  const issueId = agentId.replace(/^(agent-|planning-|strike-)/, '').toUpperCase()
   const prefix = extractPrefixSync(issueId)
   if (!prefix) return null
   try {
     const projectPath = getProjectPathByPrefix(prefix)
-    const workspacePath = join(projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`)
-    if (existsSync(workspacePath)) return workspacePath
+    const workspaceNames = isStrikeAgent
+      ? [`feature-${issueId.toLowerCase()}-strike`, `feature-${issueId.toLowerCase()}`]
+      : [`feature-${issueId.toLowerCase()}`]
+    for (const workspaceName of workspaceNames) {
+      const workspacePath = join(projectPath, 'workspaces', workspaceName)
+      if (existsSync(workspacePath)) return workspacePath
+    }
     return projectPath
   } catch {
     return null
   }
-}async function getAgentJsonlPathPromise(agentId: string): Promise<string | null> {
+}/**
+ * Resolve the transcript belonging to THIS agent.
+ *
+ * A Claude project dir is keyed on the cwd, so every session that ever ran in
+ * the same cwd shares one directory. Agents whose cwd is the primary repo — the
+ * flywheel orchestrator, conversations, any `--cwd <repo>` handoff — therefore
+ * sit in a directory alongside each other's transcripts. Picking the freshest
+ * file there attributes whichever session wrote last to whoever asks, so the
+ * flywheel was observed reporting a conversation's open question as its own.
+ *
+ * The agent's own session id is recorded at spawn, so resolve that first and
+ * only fall back to freshest-wins when the agent has no identifiable transcript
+ * of its own (codex/omp keep their history elsewhere, and their thread ids are
+ * not `.jsonl` files here).
+ */
+async function getAgentJsonlPathPromise(agentId: string): Promise<string | null> {
   const workspace = await Effect.runPromise(getAgentWorkspace(agentId))
   if (!workspace) return null
   const projectDir = getClaudeProjectDir(workspace)
+  const sessionId = getLatestSessionIdSync(agentId)
+  if (sessionId) {
+    const ownPath = join(projectDir, `${sessionId}.jsonl`)
+    if (existsSync(ownPath)) return ownPath
+  }
   return await getActiveSessionPath(projectDir)
 }
 
@@ -251,17 +296,20 @@ async function readFileTail(filePath: string, maxBytes: number): Promise<string>
  * answered; the upstream tool was denied to force a plain-text restate.
  */
 const ASK_USER_QUESTION_HOOK_DENY_MARKER = 'PAN-1520'
+const ASK_USER_QUESTION_HOOK_DENY_PHRASE = 'surfaced to the operator'
 
-function isAskUserQuestionHookDenyToolResult(item: { content?: unknown; is_error?: unknown }): boolean {
-  if (item.is_error !== true) return false
-  const content = item.content
-  if (typeof content === 'string') return content.includes(ASK_USER_QUESTION_HOOK_DENY_MARKER)
+function askUserQuestionDenySignalPresent(content: unknown): boolean {
+  const checkString = (text: string) =>
+    text.includes(ASK_USER_QUESTION_HOOK_DENY_MARKER) ||
+    text.includes(ASK_USER_QUESTION_HOOK_DENY_PHRASE)
+
+  if (typeof content === 'string') return checkString(content)
   if (Array.isArray(content)) {
     return content.some((part: unknown) => {
-      if (typeof part === 'string') return part.includes(ASK_USER_QUESTION_HOOK_DENY_MARKER)
+      if (typeof part === 'string') return checkString(part)
       if (part && typeof part === 'object' && 'text' in part) {
         const text = (part as { text?: unknown }).text
-        return typeof text === 'string' && text.includes(ASK_USER_QUESTION_HOOK_DENY_MARKER)
+        return typeof text === 'string' && checkString(text)
       }
       return false
     })
@@ -269,10 +317,21 @@ function isAskUserQuestionHookDenyToolResult(item: { content?: unknown; is_error
   return false
 }
 
+function isAskUserQuestionHookDenyToolResult(item: { content?: unknown; is_error?: unknown }): boolean {
+  if (item.is_error !== true) return false
+  return askUserQuestionDenySignalPresent(item.content)
+}
+
 async function getPendingQuestionsPromise(jsonlPath: string): Promise<PendingQuestion[]> {
   const detection = await scanPendingInputsPromise(jsonlPath)
   return detection.askUserQuestions
 }
+
+export const EMPTY_PENDING_INPUTS_SCAN: PendingInputsScan = Object.freeze({
+  askUserQuestions: [],
+  enterPlanModeOpen: false,
+  exitPlanModePending: false,
+})
 
 export interface PendingInputsScan {
   readonly askUserQuestions: PendingQuestion[]
@@ -280,6 +339,8 @@ export interface PendingInputsScan {
   readonly enterPlanModeOpen: boolean
   /** Outstanding ExitPlanMode tool_use without a matching tool_result (operator approval pending). */
   readonly exitPlanModePending: boolean
+  /** Payload for the outstanding ExitPlanMode, when its plan text is available. */
+  readonly pendingProposedPlan?: { toolUseId: string; askedAt: string; plan: string }
 }
 
 /**
@@ -323,6 +384,8 @@ export async function scanPendingInputsPromise(jsonlPath: string): Promise<Pendi
     const askDeniedAwaitingUser = new Set<string>()
     const exitPlanModeIds = new Set<string>()
     const exitPlanModeAnswered = new Set<string>()
+    const exitPlanModeCalls = new Map<string, { timestamp: string; plan: string }>()
+    let pendingExitPlanId: string | undefined
     const enterPlanModeIds = new Set<string>()
     const exitPlanModeFiredAfterEnter = new Set<string>() // tracks any ExitPlanMode (signals plan-mode session ended)
 
@@ -352,6 +415,9 @@ export async function scanPendingInputsPromise(jsonlPath: string): Promise<Pendi
             } else if (item.name === 'ExitPlanMode' && typeof item.id === 'string') {
               exitPlanModeIds.add(item.id)
               exitPlanModeFiredAfterEnter.add(item.id)
+              const planText = typeof item.input?.plan === 'string' ? item.input.plan : ''
+              exitPlanModeCalls.set(item.id, { timestamp: entry.timestamp || new Date().toISOString(), plan: planText })
+              pendingExitPlanId = item.id
             } else if (item.name === 'EnterPlanMode' && typeof item.id === 'string') {
               enterPlanModeIds.add(item.id)
             }
@@ -381,12 +447,21 @@ export async function scanPendingInputsPromise(jsonlPath: string): Promise<Pendi
 
     const exitPlanModePending = Array.from(exitPlanModeIds).some(id => !exitPlanModeAnswered.has(id))
 
+    // FR-1 — carry the plan payload so the dashboard can promote it to an
+    // approval modal (instead of the plan being visible only in the terminal).
+    const pendingCall = pendingExitPlanId && !exitPlanModeAnswered.has(pendingExitPlanId)
+      ? exitPlanModeCalls.get(pendingExitPlanId)
+      : undefined
+    const pendingProposedPlan = pendingCall
+      ? { toolUseId: pendingExitPlanId!, askedAt: pendingCall.timestamp, plan: pendingCall.plan }
+      : undefined
+
     // EnterPlanMode is "open" only if no ExitPlanMode has fired since the last
     // EnterPlanMode. Approximation: if there are EnterPlanMode ids AND no
     // ExitPlanMode has fired, we're still in plan mode.
     const enterPlanModeOpen = enterPlanModeIds.size > 0 && exitPlanModeFiredAfterEnter.size === 0
 
-    return { askUserQuestions, enterPlanModeOpen, exitPlanModePending }
+    return { askUserQuestions, enterPlanModeOpen, exitPlanModePending, ...(pendingProposedPlan ? { pendingProposedPlan } : {}) }
   } catch {
     return { askUserQuestions: [], enterPlanModeOpen: false, exitPlanModePending: false }
   }
@@ -408,7 +483,7 @@ async function getAgentJsonlMtimePromise(agentId: string): Promise<number | null
   agentId: string,
   startedAt?: string,
   hasActiveSpecialist?: boolean,
-  skipJsonlScan?: boolean,
+  cachedScan?: PendingInputsScan | null,
 ): Promise<AgentEnrichment> {
   const isPlanning = agentId.startsWith('planning-')
 
@@ -425,25 +500,29 @@ async function getAgentJsonlMtimePromise(agentId: string): Promise<number | null
   const runtimeState = await Effect.runPromise(getAgentRuntimeState(agentId))
 
   // Get pending questions + other blocking surfaces, filtered by agent start time.
-  // Skip JSONL scan when mtime is unchanged (optimization for static TUI sessions).
-  let pendingQuestions: PendingQuestion[] = []
-  let enterPlanModeOpen = false
-  let exitPlanModePending = false
-  if (!skipJsonlScan) {
+  // The caller (the enrichment poller) hands back the previous scan while the
+  // JSONL's mtime is unchanged — an unchanged file cannot produce a different
+  // scan, so replaying it costs no I/O and stays truthful. It must never be
+  // replaced by an empty scan: an agent blocked on a question writes nothing,
+  // so its mtime never moves again, and a fabricated "nothing is pending" would
+  // latch permanently and strand the operator's dialog.
+  let scan: PendingInputsScan = EMPTY_PENDING_INPUTS_SCAN
+  if (cachedScan) {
+    scan = cachedScan
+  } else {
     const jsonlPath = await Effect.runPromise(getAgentJsonlPath(agentId))
-    if (jsonlPath) {
-      const scan = await scanPendingInputsPromise(jsonlPath)
-      pendingQuestions = [...scan.askUserQuestions]
-      enterPlanModeOpen = scan.enterPlanModeOpen
-      exitPlanModePending = scan.exitPlanModePending
-    }
-    if (pendingQuestions.length > 0 && startedAt) {
-      const agentStartTime = new Date(startedAt).getTime()
-      pendingQuestions = pendingQuestions.filter(q => {
-        const qTime = new Date(q.timestamp).getTime()
-        return !isNaN(qTime) && qTime >= agentStartTime
-      })
-    }
+    if (jsonlPath) scan = await scanPendingInputsPromise(jsonlPath)
+  }
+
+  let pendingQuestions: PendingQuestion[] = [...scan.askUserQuestions]
+  const enterPlanModeOpen = scan.enterPlanModeOpen
+  const exitPlanModePending = scan.exitPlanModePending
+  if (pendingQuestions.length > 0 && startedAt) {
+    const agentStartTime = new Date(startedAt).getTime()
+    pendingQuestions = pendingQuestions.filter(q => {
+      const qTime = new Date(q.timestamp).getTime()
+      return !isNaN(qTime) && qTime >= agentStartTime
+    })
   }
 
   const questionDetection: AwaitingInputDetection | null = pendingQuestions.length > 0
@@ -478,7 +557,28 @@ async function getAgentJsonlMtimePromise(agentId: string): Promise<number | null
       }
     : null
 
-  const detection = questionDetection ?? runtimeDetection ?? paneDetection ?? fallbackDetection
+  // An interactive session does not finish — it yields the turn. The Stop hook
+  // reports that as `activity: idle`, which until now carried no operator
+  // signal, so an agent that asked its question in prose sat silent: a prose
+  // question writes no AskUserQuestion tool_use and puts no modal in the pane,
+  // so questionDetection, paneDetection and runtimeDetection all miss it.
+  //
+  // Scoped to interactive roles deliberately. A work/review/test agent's idle
+  // can mean between-items or complete; flagging those would flood the surface
+  // and destroy the signal this exists to carry.
+  const isInteractiveRole = role === 'plan' || agentId.startsWith('conv-')
+  const turnEndedWaiting = isInteractiveRole && runtimeState?.state === 'idle'
+  const turnEndedDetection: AwaitingInputDetection | null = turnEndedWaiting
+    ? {
+        reason: 'other',
+        prompt: normalizeAwaitingInputPrompt('Agent finished its turn and is waiting for your reply'),
+      }
+    : null
+
+  // turnEndedDetection is last: a real question or modal describes the wait far
+  // better than the generic turn-end phrasing, so it only speaks when nothing
+  // more specific did.
+  const detection = questionDetection ?? runtimeDetection ?? paneDetection ?? fallbackDetection ?? turnEndedDetection
   const shouldSuppressPendingInput = hasActiveSpecialist === true && !isOwnActiveSpecialist(role)
   const hasPendingQuestion = !shouldSuppressPendingInput && detection !== null
 
@@ -505,6 +605,9 @@ async function getAgentJsonlMtimePromise(agentId: string): Promise<number | null
     }
     if (exitPlanModePending) pendingInputKinds.push('exitPlanMode')
     if (enterPlanModeOpen && !exitPlanModePending) pendingInputKinds.push('enterPlanMode')
+    // Only when nothing more specific is open — an agent parked on a permission
+    // prompt is idle too, and must read as the permission, not as a bare turn-end.
+    if (turnEndedWaiting && pendingInputKinds.length === 0) pendingInputKinds.push('agentTurnEnded')
     // PAN-1520 (covers #1197) — promote pane-detected session-resume dialogs
     // into the unified pending-input set so the indicator fires.
     // PAN-1834 — also promote pane-detected rate-limit / model-switch modals.
@@ -520,8 +623,12 @@ async function getAgentJsonlMtimePromise(agentId: string): Promise<number | null
     pendingInputCount: pendingInputKinds.length,
     pendingInputKinds,
     pendingAskUserQuestion,
+    // Suppressed alongside every other pending surface: when a specialist owns
+    // the issue the work agent is parked, not asking.
+    pendingProposedPlan: shouldSuppressPendingInput ? undefined : scan.pendingProposedPlan,
     resolution: runtimeState?.resolution || 'working',
     resolutionCount: runtimeState?.resolutionCount || 0,
+    jsonlScan: scan,
   }
 }
 
@@ -535,10 +642,10 @@ export const computeAgentEnrichment = (
   agentId: string,
   startedAt?: string,
   hasActiveSpecialist?: boolean,
-  skipJsonlScan?: boolean,
+  cachedScan?: PendingInputsScan | null,
 ): Effect.Effect<AgentEnrichment, FsError> =>
   Effect.tryPromise({
-    try: () => computeAgentEnrichmentPromise(agentId, startedAt, hasActiveSpecialist, skipJsonlScan),
+    try: () => computeAgentEnrichmentPromise(agentId, startedAt, hasActiveSpecialist, cachedScan),
     catch: (cause) =>
       new FsError({
         path: getAgentDir(agentId),

@@ -113,8 +113,6 @@ const installToolRoute = HttpRouter.add(
       );
 
       return jsonResponse(result, { status: result.success ? 200 : 500 });
-
-      return jsonResponse(result, { status: result.success ? 200 : 500 });
     })
   )
 );

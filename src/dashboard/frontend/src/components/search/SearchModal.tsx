@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Command } from 'cmdk';
 import { X, Search, Github } from 'lucide-react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useIsFetching, useQueryClient } from '@tanstack/react-query';
 import { Issue, IssueSource } from '../../types';
 import { useSearch, SearchFilters } from '../../hooks/useSearch';
 import { SearchResults } from './SearchResults';
@@ -34,6 +34,7 @@ export function SearchModal({
   projectPrefix = null,
 }: SearchModalProps) {
   const queryClient = useQueryClient();
+  const issuesAreLoading = useIsFetching({ queryKey: ['issues'] }) > 0;
   const [query, setQuery] = useState('');
   const [filters, setFilters] = useState<SearchFilters>({
     sources: new Set<IssueSource>(),
@@ -222,19 +223,19 @@ export function SearchModal({
               </div>
             )}
 
-            {query.length >= 2 && isSearching && (
+            {query.length >= 2 && (isSearching || issuesAreLoading) && (
               <div className="px-4 py-8 text-center text-sm text-muted-foreground">
                 Searching...
               </div>
             )}
 
-            {query.length >= 2 && !isSearching && !hasResults && (
+            {query.length >= 2 && !isSearching && !issuesAreLoading && !hasResults && (
               <div className="px-4 py-8 text-center text-sm text-muted-foreground">
                 No issues found
               </div>
             )}
 
-            {query.length >= 2 && !isSearching && hasResults && (
+            {query.length >= 2 && !isSearching && !issuesAreLoading && hasResults && (
               <SearchResults
                 groupedResults={groupedResults}
                 onSelect={handleSelect}

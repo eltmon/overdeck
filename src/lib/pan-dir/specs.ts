@@ -2,12 +2,19 @@ import { join } from 'path'
 import { Effect, FileSystem } from 'effect'
 import * as NodeFileSystem from '@effect/platform-node/NodeFileSystem'
 import { FsError } from '../errors.js'
+import { findProjectByPathSync, type ProjectConfig } from '../projects.js'
+import { resolveStateReadHomeSync } from '../state-read-home.js'
 
-import { VBriefMergeConflictError } from '../vbrief/io.js'
-import { generateVBriefFilename, parseVBriefFilename, slugify } from '../vbrief/lifecycle.js'
-import { invalidateVBriefIndex } from '../vbrief/vbrief-index.js'
-import type { VBriefDocument } from '../vbrief/types.js'
-import { deriveProjectRoot, queueAutoCommit } from './auto-commit.js'
+import { normalizeXBriefEnvelope, serializeXBriefDocument, XBriefMergeConflictError } from '../xbrief/io.js'
+import {
+  generateXBriefFilename,
+  parseXBriefFilename,
+  slugify,
+  XBRIEF_FILENAME_SUFFIX,
+} from '../xbrief/lifecycle.js'
+import { invalidateXBriefIndex } from '../xbrief/xbrief-index.js'
+import type { XBriefDocument } from '../xbrief/types.js'
+import { deriveProjectRoot, flushAutoCommits, queueAutoCommit } from './auto-commit.js'
 import {
   PAN_DIRNAME,
   PAN_CONTINUES_DIRNAME,
@@ -23,11 +30,17 @@ import {
 } from './types.js'
 
 function projectPanPaths(projectRoot: string): ProjectPanPaths {
+  const project: ProjectConfig = findProjectByPathSync(projectRoot) ?? {
+    name: projectRoot,
+    path: projectRoot,
+  }
+  const stateHome = resolveStateReadHomeSync(project)
+  const panDir = stateHome.migrated ? stateHome.root : join(stateHome.root, PAN_DIRNAME)
   return {
-    panDir: join(projectRoot, PAN_DIRNAME),
-    specsDir: join(projectRoot, PAN_DIRNAME, PAN_SPECS_DIRNAME),
-    draftsDir: join(projectRoot, PAN_DIRNAME, PAN_DRAFTS_DIRNAME),
-    continuesDir: join(projectRoot, PAN_DIRNAME, PAN_CONTINUES_DIRNAME),
+    panDir,
+    specsDir: join(panDir, PAN_SPECS_DIRNAME),
+    draftsDir: join(panDir, PAN_DRAFTS_DIRNAME),
+    continuesDir: join(panDir, PAN_CONTINUES_DIRNAME),
   }
 }
 
@@ -50,7 +63,7 @@ export function ensurePanDirs(
   }).pipe(Effect.provide(NodeFileSystem.layer))
 }
 
-function mapVBriefPlanStatusToPanSpec(status: unknown): PanSpecStatus | null {
+function mapXBriefPlanStatusToPanSpec(status: unknown): PanSpecStatus | null {
   if (isPanSpecStatus(status)) return status
   if (typeof status !== 'string') return null
   switch (status) {
@@ -68,12 +81,12 @@ function mapVBriefPlanStatusToPanSpec(status: unknown): PanSpecStatus | null {
 
 function parsePanSpecDocumentFromString(raw: string, path: string): PanSpecDocument {
   if (raw.includes('<<<<<<<') && raw.includes('=======') && raw.includes('>>>>>>>')) {
-    throw new VBriefMergeConflictError(path)
+    throw new XBriefMergeConflictError(path)
   }
 
   let parsed: unknown
   try {
-    parsed = JSON.parse(raw)
+    parsed = normalizeXBriefEnvelope(JSON.parse(raw))
   } catch (error) {
     throw new Error(`Invalid JSON in pan spec ${path}: ${(error as Error).message}`)
   }
@@ -88,10 +101,10 @@ function parsePanSpecDocumentFromString(raw: string, path: string): PanSpecDocum
   // every issue in the project (PAN-1015 spec on main → review feedback
   // for PAN-977 silently dropped). Derive root status from plan.status
   // when missing rather than throwing.
-  // Also map vBRIEF legacy statuses (approved, running) → active.
+  // Also map xBRIEF legacy statuses (approved, running) → active.
   if (!isPanSpecStatus(doc.status)) {
     const plan = doc.plan as Record<string, unknown> | undefined
-    const mapped = mapVBriefPlanStatusToPanSpec(plan?.status)
+    const mapped = mapXBriefPlanStatusToPanSpec(plan?.status)
     if (mapped) {
       doc.status = mapped
     } else {
@@ -99,13 +112,17 @@ function parsePanSpecDocumentFromString(raw: string, path: string): PanSpecDocum
     }
   }
 
-  // Validate required vBRIEF shape
-  if (!doc.vBRIEFInfo || !doc.plan) {
+  // Validate required xBRIEF shape and normalize the legacy envelope on read.
+  if ((!doc.xBRIEFInfo && !doc.vBRIEFInfo) || !doc.plan) {
     throw new Error(
-      `Invalid vBRIEF format in ${path}: missing 'vBRIEFInfo' and/or 'plan' top-level keys. ` +
-        `vBRIEF v0.5 requires exactly { "vBRIEFInfo": { "version": "0.5" }, "plan": { ... } }. ` +
-        `See docs/VBRIEF.md for the correct format.`,
+      `Invalid xBRIEF format in ${path}: missing 'xBRIEFInfo' or legacy 'vBRIEFInfo' and/or 'plan' top-level keys. ` +
+        `xBRIEF v0.5-v0.8 requires { "xBRIEFInfo" or legacy "vBRIEFInfo": { "version": "0.5" through "0.8" }, "plan": { ... } }. ` +
+        `See docs/XBRIEF.md for the correct format.`,
     )
+  }
+  if (!doc.xBRIEFInfo && doc.vBRIEFInfo) {
+    doc.xBRIEFInfo = doc.vBRIEFInfo;
+    delete doc.vBRIEFInfo;
   }
 
   return doc as unknown as PanSpecDocument
@@ -140,7 +157,7 @@ export function writeSpec(
     }
     const fs = yield* FileSystem.FileSystem
     const tmp = `${path}.tmp`
-    yield* fs.writeFileString(tmp, JSON.stringify(doc, null, 2)).pipe(
+    yield* fs.writeFileString(tmp, serializeXBriefDocument(doc)).pipe(
       Effect.mapError((cause) => new FsError({ path: tmp, operation: 'writeFileString', cause })),
     )
     yield* fs.rename(tmp, path).pipe(
@@ -164,7 +181,7 @@ function entryFromFile(
   filename: string,
 ): Effect.Effect<PanSpecEntry | null, never> {
   return Effect.gen(function* () {
-    const parts = parseVBriefFilename(filename)
+    const parts = parseXBriefFilename(filename)
     if (!parts) return null
     const path = join(specsDir, filename)
     const document = yield* readSpec(path).pipe(
@@ -218,15 +235,39 @@ export function findSpecByIssue(
   issueId: string,
 ): Effect.Effect<PanSpecEntry | null, FsError> {
   return Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem
+    const { specsDir } = projectPanPaths(projectRoot)
+    const exists = yield* fs.exists(specsDir).pipe(Effect.catch(() => Effect.succeed(false)))
+    if (!exists) return null
+
+    const filenames = yield* fs.readDirectory(specsDir).pipe(
+      Effect.mapError((cause) => new FsError({ path: specsDir, operation: 'readDirectory', cause })),
+    )
+
+    // PAN-2216: the filename already encodes the issue id, so match on it and
+    // parse only the matching file(s). The previous implementation went through
+    // listSpecs(), which read and JSON-parsed EVERY spec in the directory for a
+    // single lookup — ~257 files per call, called once per workspace per
+    // resource-discovery refresh.
     const upperIssueId = issueId.toUpperCase()
-    const all = yield* listSpecs(projectRoot)
-    return all.find((entry) => entry.issueId.toUpperCase() === upperIssueId) ?? null
-  })
+    const matching = filenames
+      .filter((filename) => parseXBriefFilename(filename)?.issueId.toUpperCase() === upperIssueId)
+      .sort((a, b) => {
+        const extensionOrder = Number(!a.endsWith(XBRIEF_FILENAME_SUFFIX)) - Number(!b.endsWith(XBRIEF_FILENAME_SUFFIX))
+        return extensionOrder || a.localeCompare(b)
+      })
+
+    for (const filename of matching) {
+      const entry = yield* entryFromFile(specsDir, filename)
+      if (entry) return entry
+    }
+    return null
+  }).pipe(Effect.provide(NodeFileSystem.layer))
 }
 
 
 export function buildPanSpecFilename(issueId: string, slug: string, createdDate?: Date | string): string {
-  return generateVBriefFilename(issueId, slug, createdDate)
+  return generateXBriefFilename(issueId, slug, createdDate)
 }
 
 export function buildPanSpecPath(
@@ -240,23 +281,36 @@ export function buildPanSpecPath(
 
 export function writeSpecForIssue(
   projectRoot: string,
-  doc: VBriefDocument,
+  doc: XBriefDocument,
   status: PanSpecStatus,
   filename?: string,
 ): Effect.Effect<PanSpecEntry, FsError> {
   return Effect.gen(function* () {
     const paths = yield* ensurePanDirs(projectRoot)
     const specDocument = asPanSpecDocument(doc, status)
-    const nextFilename = filename ?? generateVBriefFilename(doc.plan.id, doc.plan.title)
+    const nextFilename = filename ?? generateXBriefFilename(doc.plan.id, doc.plan.title)
     const path = join(paths.specsDir, nextFilename)
     yield* writeSpec(path, specDocument)
-    invalidateVBriefIndex(projectRoot)
+    queueAutoCommit({
+      projectRoot,
+      paths: [path],
+      subject: `chore(state): update spec for ${doc.plan.id.toUpperCase()} (status=${status})`,
+    })
+    const flushed = yield* flushAutoCommits(projectRoot)
+    if (flushed.errored || flushed.pushed === false) {
+      return yield* Effect.fail(new FsError({
+        path,
+        operation: 'pushSpec',
+        cause: new Error(flushed.reason ?? 'spec commit was not pushed'),
+      }))
+    }
+    invalidateXBriefIndex(projectRoot)
     return {
       path,
       filename: nextFilename,
       issueId: doc.plan.id,
-      slug: parseVBriefFilename(nextFilename)?.slug ?? slugify(doc.plan.title),
-      date: parseVBriefFilename(nextFilename)?.date ?? new Date().toISOString().slice(0, 10),
+      slug: parseXBriefFilename(nextFilename)?.slug ?? slugify(doc.plan.title),
+      date: parseXBriefFilename(nextFilename)?.date ?? new Date().toISOString().slice(0, 10),
       status,
       document: specDocument,
     }
@@ -278,11 +332,58 @@ export function updateSpecStatus(
       status: newStatus,
     }
     yield* writeSpec(existing.path, nextDocument)
-    invalidateVBriefIndex(projectRoot)
+    queueAutoCommit({
+      projectRoot,
+      paths: [existing.path],
+      subject: `chore(state): update spec for ${issueId.toUpperCase()} (status=${newStatus})`,
+    })
+    const flushed = yield* flushAutoCommits(projectRoot)
+    if (flushed.errored || flushed.pushed === false) {
+      return yield* Effect.fail(new FsError({
+        path: existing.path,
+        operation: 'pushSpecStatus',
+        cause: new Error(flushed.reason ?? 'spec status commit was not pushed'),
+      }))
+    }
+    invalidateXBriefIndex(projectRoot)
     return {
       ...existing,
       status: newStatus,
       document: nextDocument,
     }
+  })
+}
+
+/**
+ * Overwrite an existing spec file's full document and commit+push through the
+ * door. Use this — never bare `writeSpec` — when rewriting an existing spec at
+ * a known path (e.g. re-promoting a workspace plan). `writeSpec` only queues a
+ * deferred auto-commit; without the flush a short-lived process exits and
+ * strands the spec as a dirty state-worktree file (PAN-2677). Mirrors
+ * `writeSpecForIssue`/`updateSpecStatus`: fails loudly if a configured origin
+ * did not accept the push.
+ */
+export function writeSpecDocument(
+  projectRoot: string,
+  path: string,
+  doc: PanSpecDocument,
+): Effect.Effect<void, FsError> {
+  return Effect.gen(function* () {
+    yield* writeSpec(path, doc)
+    const issueId = (doc as { plan?: { id?: string } }).plan?.id ?? 'unknown'
+    queueAutoCommit({
+      projectRoot,
+      paths: [path],
+      subject: `chore(state): update spec for ${String(issueId).toUpperCase()} (status=${doc.status})`,
+    })
+    const flushed = yield* flushAutoCommits(projectRoot)
+    if (flushed.errored || flushed.pushed === false) {
+      return yield* Effect.fail(new FsError({
+        path,
+        operation: 'pushSpec',
+        cause: new Error(flushed.reason ?? 'spec commit was not pushed'),
+      }))
+    }
+    invalidateXBriefIndex(projectRoot)
   })
 }

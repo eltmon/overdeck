@@ -35,8 +35,14 @@ export interface MatrixEntry {
 
 export const NO_LOSS_MATRIX: MatrixEntry[] = [
 
+  // ── updater.ts ────────────────────────────────────────────────────────────
+  { surface: 'GET /api/update/status',                        kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Updater service; preserves and extends the existing version surface' },
+  { surface: 'POST /api/update/check',                        kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Updater service; explicit fresh release discovery' },
+  { surface: 'POST /api/update/install',                      kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Updater service; exact-version npm installation' },
+
   // ── admin.ts ──────────────────────────────────────────────────────────────
-  { surface: 'GET /api/admin/tldr/:issueId',              kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'TLDR admin helper; outside 8 remodel domains' },
+  { surface: 'GET /api/admin/tldr/:issueId',                       kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'TLDR admin helper; outside 8 remodel domains' },
+  { surface: 'POST /api/admin/conversations/backfill-titles',    kind: 'http', disposition: 'WRITE',      door: 'ConversationWriter.retitle (deterministic backfill)' },
 
   // ── artifacts.ts (actual paths from codebase) ─────────────────────────────
   { surface: 'GET /a/:slug',                              kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Artifacts short-URL redirect; outside 8 remodel domains' },
@@ -86,7 +92,7 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'GET /api/agents/:id/has-session',                          kind: 'http', disposition: 'READ',       door: 'AgentsResolver.isAlive (duplicate)' },
   { surface: 'POST /api/agents/:id/reset-session',                       kind: 'http', disposition: 'WRITE',      door: 'AgentWriter.switchModel (session-clear)' },
   { surface: 'POST /api/agents/:id/delivery-method',                     kind: 'http', disposition: 'WRITE',      door: 'AgentWriter.setDeliveryMethod' },
-  { surface: 'POST /api/agents/:id/switch-model',                        kind: 'http', disposition: 'WRITE',      door: 'AgentWriter.switchModel' },
+  { surface: 'POST /api/agents/:id/switch-model',                        kind: 'http', disposition: 'DELETE',     door: 'Agent model locked after spawn; route preserved as 409 compatibility rejection' },
   { surface: 'DELETE /api/agents/:id',                                   kind: 'http', disposition: 'WRITE',      door: 'AgentWriter.stop (DELETE alias)' },
   { surface: 'POST /api/agents/:id/stop',                                kind: 'http', disposition: 'WRITE',      door: 'AgentWriter.stop' },
   { surface: 'POST /api/agents/:id/message',                             kind: 'http', disposition: 'RELOCATE',   door: 'DeliveryService.tell' },
@@ -119,6 +125,8 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'GET /api/cloister/config',                  kind: 'http', disposition: 'READ',        door: 'FILE-CONFIG cloister.toml' },
   { surface: 'PUT /api/cloister/config',                  kind: 'http', disposition: 'WRITE',       door: 'FILE-CONFIG cloister.toml' },
   { surface: 'GET /api/cloister/agents/health',           kind: 'http', disposition: 'RELOCATE',    door: 'AgentsResolver.getHealthHistory ×N' },
+  { surface: 'GET /api/boot-reconciliation',              kind: 'http', disposition: 'AGGREGATE',   door: 'BootReconciliationRuntime.getState + AgentsResolver.list' },
+  { surface: 'POST /api/boot-reconciliation/decision',    kind: 'http', disposition: 'WRITE',       door: 'SettingsWriter.bootReconciliationDecision + CloisterRuntime.apply' },
 
   // ── codex-auth.ts ─────────────────────────────────────────────────────────
   { surface: 'GET /api/settings/codex-auth',              kind: 'http', disposition: 'RELOCATE',    door: 'provider-auth' },
@@ -149,7 +157,7 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'POST /api/conversations',                                  kind: 'http', disposition: 'WRITE',       door: 'ConversationWriter.create + ConversationRuntime.spawn' },
   { surface: 'POST /api/conversations/:name/stop',                       kind: 'http', disposition: 'RELOCATE',    door: 'ConversationRuntime.stop' },
   { surface: 'POST /api/conversations/:name/resume',                     kind: 'http', disposition: 'RELOCATE',    door: 'ConversationRuntime.resume' },
-  { surface: 'POST /api/conversations/:name/switch-model',               kind: 'http', disposition: 'WRITE',       door: 'ConversationWriter.setHarness/setModel + RELOCATE respawn' },
+  { surface: 'POST /api/conversations/:name/switch-model',               kind: 'http', disposition: 'WRITE',       door: 'ConversationWriter.setHarness/setModel before first session only' },
   { surface: 'GET /api/conversations/:name/messages',                    kind: 'http', disposition: 'READ',        door: 'TranscriptsResolver.parse' },
   { surface: 'GET /api/conversations/:name/message-locator',             kind: 'http', disposition: 'READ',        door: 'TranscriptsResolver.resolveFile' },
   { surface: 'POST /api/conversations/:name/upload-image',               kind: 'http', disposition: 'RELOCATE',    door: 'ConversationRuntime.stageAttachment' },
@@ -157,6 +165,10 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'POST /api/conversations/:name/message',                    kind: 'http', disposition: 'RELOCATE',    door: 'ConversationRuntime.deliver' },
   { surface: 'POST /api/conversations/:id/codex-approval',               kind: 'http', disposition: 'RELOCATE',    door: 'ConversationRuntime.approve' },
   { surface: 'POST /api/conversations/:name/delivery-method',            kind: 'http', disposition: 'RELOCATE',    door: 'ConversationRuntime.setDeliveryMethod' },
+  { surface: 'POST /api/conversations/:name/thinking-level',             kind: 'http', disposition: 'WRITE',       door: 'ConversationWriter.setEffort + ConversationRuntime.controlChannel' },
+  { surface: 'POST /api/conversations/:name/compact',                    kind: 'http', disposition: 'RELOCATE',    door: 'ConversationRuntime.controlChannel.compact' },
+  { surface: 'POST /api/conversations/:name/abort',                      kind: 'http', disposition: 'RELOCATE',    door: 'ConversationRuntime.piAbortKey (Escape; no durable state)' },
+  { surface: 'POST /api/conversations/:name/control-ack',                kind: 'http', disposition: 'RELOCATE',    door: 'ConversationRuntime.controlAckRegistry (ephemeral ack)' },
   { surface: 'PATCH /api/conversations/:name',                           kind: 'http', disposition: 'WRITE',       door: 'ConversationWriter.retitle' },
   { surface: 'DELETE /api/conversations/:name',                          kind: 'http', disposition: 'WRITE',       door: 'ConversationWriter.archive (idempotent alias)' },
   { surface: 'POST /api/conversations/:name/archive',                    kind: 'http', disposition: 'WRITE',       door: 'ConversationWriter.archive' },
@@ -200,6 +212,7 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'GET /api/discovered-sessions/search',       kind: 'http', disposition: 'READ',        door: 'TranscriptsResolver.search' },
   { surface: 'GET /api/discovered-sessions/cost',         kind: 'http', disposition: 'RELOCATE',    door: 'Cost' },
   { surface: 'GET /api/discovered-sessions/:id',          kind: 'http', disposition: 'READ',        door: 'TranscriptsResolver.get' },
+  { surface: 'GET /api/discovered-sessions/:id/messages', kind: 'http', disposition: 'READ',        door: 'TranscriptsResolver.messagesForDiscoveredSession' },
   { surface: 'POST /api/discovered-sessions/:id/enrich',  kind: 'http', disposition: 'WRITE',       door: 'TranscriptsWriter.enrich(id)' },
   { surface: 'POST /api/discovered-sessions/scan',        kind: 'http', disposition: 'WRITE',       door: 'TranscriptsWriter.scan (rebuild)' },
   { surface: 'POST /api/discovered-sessions/enrich',      kind: 'http', disposition: 'WRITE',       door: 'TranscriptsWriter.enrich' },
@@ -211,6 +224,11 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   // ── events.ts ─────────────────────────────────────────────────────────────
   { surface: 'GET /events/stream',                        kind: 'http', disposition: 'RELOCATE',    door: 'Observability.subscribeDomainEvents (legacy SSE; replaced by RPC stream)' },
   { surface: 'GET /events/version',                       kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Build-version probe; outside 8 remodel domains' },
+
+  // ── internal-events.ts ────────────────────────────────────────────────────
+  { surface: 'POST /api/internal/events',                 kind: 'http', disposition: 'WRITE',       door: 'DomainEventWriter.append (internal deacon bridge)' },
+  { surface: 'GET /api/internal/events/latest',           kind: 'http', disposition: 'READ',        door: 'DomainEventResolver.latestSequence (internal deacon bridge)' },
+  { surface: 'GET /api/internal/events/stream',           kind: 'http', disposition: 'READ',        door: 'DomainEventResolver.stream (internal deacon bridge)' },
 
   // ── feature-registry.ts ───────────────────────────────────────────────────
   { surface: 'GET /api/registry/features',                kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Feature registry; outside 8 remodel domains' },
@@ -226,6 +244,7 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'GET /api/flywheel/auto-merge/pending',                kind: 'http', disposition: 'READ',        door: 'MergeResolver.listAutoMerges({active})' },
   { surface: 'GET /api/flywheel/auto-merge/problems',               kind: 'http', disposition: 'READ',        door: 'MergeResolver.listAutoMerges({problems})' },
   { surface: 'GET /api/flywheel/merge-blockers',                    kind: 'http', disposition: 'READ',        door: 'MergeResolver.listBlockers' },
+  { surface: 'GET /api/flywheel/merge-backend',                     kind: 'http', disposition: 'READ',        door: 'MergeResolver.getMergeBackendStatus' },
   { surface: 'POST /api/flywheel/auto-merge/schedule',              kind: 'http', disposition: 'WRITE',       door: 'MergeWriter.scheduleAutoMerge' },
   { surface: 'POST /api/flywheel/merge-next',                       kind: 'http', disposition: 'WRITE',       door: 'MergeWriter.mergeNext' },
   { surface: 'DELETE /api/flywheel/auto-merge/:id',                 kind: 'http', disposition: 'WRITE',       door: 'MergeWriter.cancelAutoMerge' },
@@ -239,17 +258,21 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'GET /api/flywheel/brief',                             kind: 'http', disposition: 'RELOCATE',    door: 'Orchestration' },
   { surface: 'POST /api/flywheel/brief',                            kind: 'http', disposition: 'RELOCATE',    door: 'Orchestration' },
   { surface: 'GET /api/flywheel/merge-queue',                       kind: 'http', disposition: 'READ',        door: 'MergeResolver.listQueues (duplicate of /api/merge-queue)' },
+  { surface: 'GET /api/flywheel/uat-candidate',                     kind: 'http', disposition: 'READ',        door: 'MergeResolver.getActiveUatCandidate' },
   { surface: 'GET /api/flywheel/uat-generations',                   kind: 'http', disposition: 'READ',        door: 'MergeResolver.listUatGenerations' },
   { surface: 'POST /api/flywheel/uat-generations/:name/stack',      kind: 'http', disposition: 'WRITE',       door: 'MergeWriter.startUatStack' },
   { surface: 'POST /api/flywheel/uat-generations/:name/promote',    kind: 'http', disposition: 'WRITE',       door: 'MergeWriter.promoteUat' },
   { surface: 'POST /api/flywheel/assemble-uat',                     kind: 'http', disposition: 'WRITE',       door: 'MergeWriter.assembleUat' },
   { surface: 'GET /api/flywheel/state',                             kind: 'http', disposition: 'AGGREGATE',   door: 'SettingsResolver.getFlywheelRuntime + run-state' },
+  { surface: 'GET /api/flywheel/substrate-bug-weights',             kind: 'http', disposition: 'AGGREGATE',   door: 'SubstrateBugWeightsService.listSubstrateBugWeights + FlywheelStats' },
 
   // ── hooks.ts ──────────────────────────────────────────────────────────────
   { surface: 'POST /api/memory/inject',                   kind: 'http', disposition: 'READ',        door: 'MemoryResolver.injectPromptTime' },
   { surface: 'POST /api/memory/session/start',            kind: 'http', disposition: 'WRITE',       door: 'MemoryWriter.claimRange (kickoff)' },
   { surface: 'POST /api/memory/turn',                     kind: 'http', disposition: 'WRITE',       door: 'MemoryWriter.extractDelta' },
   { surface: 'POST /api/hooks/permission-event',          kind: 'http', disposition: 'RELOCATE',    door: 'AgentPermissionsWriter' },
+  { surface: 'POST /api/hooks/user-prompt-submit',        kind: 'http', disposition: 'WRITE',       door: 'ConversationWriter.retitle (derivePromptTitle)' },
+  { surface: 'POST /api/hooks/turn-complete',             kind: 'http', disposition: 'WRITE',       door: 'ConversationWriter.retitle + title-refinement service' },
 
   // ── http-handler.ts ───────────────────────────────────────────────────────
   { surface: 'GET /api/foo',                              kind: 'http', disposition: 'DELETE',      door: 'debug/test stub; no production caller' },
@@ -257,6 +280,13 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   // ── issues.ts ─────────────────────────────────────────────────────────────
   { surface: 'GET /api/issues',                                     kind: 'http', disposition: 'READ',        door: 'IssuesResolver.list' },
   { surface: 'GET /api/issues/:id/analyze',                         kind: 'http', disposition: 'DELETE',      door: 'ad-hoc analysis helper; no pipeline branch reads it' },
+  { surface: 'GET /api/issues/:id/ship-log',                        kind: 'http', disposition: 'AGGREGATE',   door: 'ShipLog runtime ring buffer + ReviewStatus merge state' },
+  { surface: 'GET /api/issues/:id/verification',                    kind: 'http', disposition: 'AGGREGATE',   door: 'Verification artifact + ReviewStatus verification state' },
+  { surface: 'GET /api/issues/:issueId/staffing',                   kind: 'http', disposition: 'READ',        door: 'Issue record staffing override + resolved configuration' },
+  { surface: 'POST /api/issues/:issueId/staffing',                  kind: 'http', disposition: 'WRITE',       door: 'Issue record writer updates the work-model override' },
+  { surface: 'GET /api/issues/:id/tasks',                           kind: 'http', disposition: 'READ',        door: 'readWorkspacePlanSync (merged xBRIEF items) + issue record claims' },
+  { surface: 'POST /api/issues/:id/tasks/:itemId/inspect',          kind: 'http', disposition: 'WRITE',       door: 'inspectIssueTask → pan inspect dispatch' },
+  { surface: 'POST /api/issues/:id/reset-to-planned',               kind: 'http', disposition: 'WRITE',       door: 'reset-to-planned lifecycle writer (IssueLifecycle + record door)' },
   { surface: 'GET /api/issues/:id/beads',                           kind: 'http', disposition: 'RELOCATE',    door: 'Beads (out of remodel scope)' },
   { surface: 'GET /api/issues/:id/planning-state',                  kind: 'http', disposition: 'READ',        door: 'IssuesResolver.get (stage + planRef)' },
   { surface: 'GET /api/issues/:id/pr',                              kind: 'http', disposition: 'READ',        door: 'IssuesResolver.get(.pr) + live GitHub for CI' },
@@ -266,6 +296,8 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'GET /api/issues/:id/discussions',                     kind: 'http', disposition: 'RELOCATE',    door: 'live GitHub' },
   { surface: 'GET /api/issues/:id/costs',                           kind: 'http', disposition: 'RELOCATE',    door: 'CostResolver.issueDetail' },
   { surface: 'GET /api/issues/resource-allocated',                  kind: 'http', disposition: 'READ',        door: 'IssuesResolver.list({resourceAllocated:true})' },
+  { surface: 'GET /api/pipeline/membership',                        kind: 'http', disposition: 'READ',        door: 'PipelineMembershipService.getCached()' },
+  { surface: 'POST /api/pipeline/membership/refresh',               kind: 'http', disposition: 'READ',        door: 'refreshMembershipSnapshotsForProjects() — operator retry re-gathers the snapshot cache (PAN-2972); no canonical state written' },
   { surface: 'GET /api/issues/:id/resource-details',                kind: 'http', disposition: 'AGGREGATE',   door: 'IssuesResolver.get + AgentsResolver' },
   { surface: 'POST /api/issues/:id/start-planning',                 kind: 'http', disposition: 'WRITE',       door: 'IssueWriter.advance("planning")' },
   { surface: 'POST /api/issues/:id/abort-planning',                 kind: 'http', disposition: 'WRITE',       door: 'IssueWriter.advance("todo","abort-planning") + AgentWriter.stop' },
@@ -282,8 +314,14 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'POST /api/issues/:id/close-out',                      kind: 'http', disposition: 'WRITE',       door: 'IssueWriter.advance("closed","close-out")' },
   { surface: 'POST /api/issues/bulk-close-out',                     kind: 'http', disposition: 'WRITE',       door: 'IssueWriter.advance ×N' },
   { surface: 'POST /api/issues/:issueId/close',                     kind: 'http', disposition: 'WRITE',       door: 'IssueWriter.advance("closed")' },
-  { surface: 'POST /api/issues/:id/beads/:beadId/inspect',          kind: 'http', disposition: 'RELOCATE',    door: 'Agents (work.inspect)' },
+  { surface: 'POST /api/issues/:id/beads/:itemId/inspect',          kind: 'http', disposition: 'RELOCATE',    door: 'Agents (work.inspect)' },
   { surface: 'POST /api/issues/:id/generate-tasks',                 kind: 'http', disposition: 'WRITE',       door: 'IssueWriter.advance("working") fallback path' },
+
+  // ── knowledge-viewer.ts ───────────────────────────────────────────────────
+  { surface: 'GET /api/knowledge-viewer/status',                    kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Optional OpenKnowledge subprocess status; outside 8 remodel domains' },
+  { surface: 'POST /api/knowledge-viewer/install',                  kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Progressive third-party viewer installation; outside 8 remodel domains' },
+  { surface: 'POST /api/knowledge-viewer/start',                    kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Optional OpenKnowledge subprocess lifecycle; outside 8 remodel domains' },
+  { surface: 'GET /knowledge-viewer/*',                              kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Authenticated compatibility redirect to the origin-isolated viewer host' },
 
   // ── metrics.ts ────────────────────────────────────────────────────────────
   { surface: 'GET /api/metrics/summary',                  kind: 'http', disposition: 'AGGREGATE',   door: 'Issues + Agents + Merge' },
@@ -302,11 +340,13 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'POST /api/project-mappings',                kind: 'http', disposition: 'RELOCATE',    door: 'Config' },
   { surface: 'GET /api/system/health',                    kind: 'http', disposition: 'AGGREGATE',   door: 'Issues + Agents + Merge' },
   { surface: 'GET /api/godview/system-health',            kind: 'http', disposition: 'AGGREGATE',   door: 'Issues + Agents + Merge' },
+  { surface: 'GET /api/deploy/staleness',                 kind: 'http', disposition: 'READ',        door: 'Deployment staleness resolver with a shared runtime-decoded contract' },
   { surface: 'GET /api/health/agents',                    kind: 'http', disposition: 'READ',        door: 'AgentsResolver.list (health view)' },
   { surface: 'POST /api/health/agents/:id/ping',          kind: 'http', disposition: 'WRITE',       door: 'AgentWriter.recordHealth (ping)' },
   { surface: 'GET /api/tracker-status',                   kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Tracker connection status; outside 8 remodel domains' },
   { surface: 'POST /api/rally/validate',                  kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Rally validator; outside 8 remodel domains' },
   { surface: 'GET /api/no-resume-mode',                   kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Boot flag probe; outside 8 remodel domains' },
+  { surface: 'POST /api/resume-all',                      kind: 'http', disposition: 'WRITE',       door: 'SettingsWriter.disableNoResumeMode + AgentWriter.resume ×N' },
   { surface: 'GET /api/deacon/status',                    kind: 'http', disposition: 'READ',        door: 'SettingsResolver.isDeaconPaused + live status' },
   { surface: 'GET /api/deacon/logs',                      kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Deacon log stream; outside 8 remodel domains' },
   { surface: 'POST /api/deacon/patrol',                   kind: 'http', disposition: 'RELOCATE',    door: 'CloisterRuntime.patrol (residue)' },
@@ -346,9 +386,11 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
 
   // ── projects.ts ───────────────────────────────────────────────────────────
   { surface: 'GET /api/projects/:projectKey/session-tree',          kind: 'http', disposition: 'RELOCATE',    door: 'Conversations (session tree)' },
+  { surface: 'GET /api/projects/:projectKey/release-status',        kind: 'http', disposition: 'READ',        door: 'ProjectPipelinesResolver.fetchProjectReleaseStatus (PAN-2555)' },
   { surface: 'GET /api/session-trees',                              kind: 'http', disposition: 'RELOCATE',    door: 'Conversations' },
   { surface: 'GET /api/projects/:projectKey/auto-merge-default',    kind: 'http', disposition: 'READ',        door: 'ConfigResolver.getProject (autoMergeDefault field)' },
   { surface: 'POST /api/projects/:projectKey/auto-merge-default',   kind: 'http', disposition: 'RELOCATE',    door: 'Config (ConfigWriter.setAutoMergeDefault, to be designed)' },
+  { surface: 'POST /api/projects/:projectKey/rename',               kind: 'http', disposition: 'WRITE',       door: 'Project registry rename write door (renameProject)' },
 
   // ── remote.ts ─────────────────────────────────────────────────────────────
   { surface: 'GET /api/remote/status',                                      kind: 'http', disposition: 'RELOCATE',    door: 'Infra/Settings (remote substrate health)' },
@@ -395,6 +437,8 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'POST /api/settings/openrouter/test-key',               kind: 'http', disposition: 'RELOCATE',    door: 'provider-auth' },
   { surface: 'GET /api/settings/harness-policy',                     kind: 'http', disposition: 'RELOCATE',    door: 'provider-auth/harness-policy' },
   { surface: 'GET /api/settings/provider-env-conflicts',             kind: 'http', disposition: 'RELOCATE',    door: 'provider-auth' },
+  { surface: 'GET /api/settings/legacy-import/conversations',        kind: 'http', disposition: 'READ',        door: 'previewLegacyConversations (src/lib/overdeck/legacy-import.ts)' },
+  { surface: 'POST /api/settings/legacy-import/conversations',       kind: 'http', disposition: 'WRITE',       door: 'importLegacyConversations → importLegacyConversation write door' },
 
   // ── show.ts ───────────────────────────────────────────────────────────────
   { surface: 'GET /api/show/:issueId',                    kind: 'http', disposition: 'AGGREGATE',   door: 'Issues + Agents + Cost' },
@@ -434,6 +478,9 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'POST /api/specialists/:project/:issueId/review/restart',           kind: 'http', disposition: 'RELOCATE',    door: 'Orchestration + AgentWriter.spawn' },
   { surface: 'POST /api/specialists/:project/:issueId/reviewer/:role/restart',   kind: 'http', disposition: 'RELOCATE',    door: 'Orchestration + AgentWriter.spawn' },
   { surface: 'GET /api/models/resolve',                                          kind: 'http', disposition: 'RELOCATE',    door: 'Settings' },
+
+  // ── tiered-callouts.ts ────────────────────────────────────────────────────
+  { surface: 'POST /api/tiered/callouts',                 kind: 'http', disposition: 'RELOCATE',    door: 'Tiered execution supervisor/callout orchestration' },
 
   // ── terminals.ts ──────────────────────────────────────────────────────────
   { surface: 'POST /api/terminals',                       kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Terminal management; outside 8 remodel domains' },
@@ -512,6 +559,8 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   // Conversations / discovered sessions
   { surface: 'pan.scanConversations',           kind: 'rpc', disposition: 'WRITE',       door: 'TranscriptsWriter.scan' },
   { surface: 'pan.searchConversations',         kind: 'rpc', disposition: 'READ',        door: 'TranscriptsResolver.search' },
+  { surface: 'pan.listSessionsFeed',            kind: 'rpc', disposition: 'READ',        door: 'TranscriptsResolver.sessionsFeed' },
+  { surface: 'pan.getSessionsFeedFacets',       kind: 'rpc', disposition: 'READ',        door: 'TranscriptsResolver.sessionsFeedFacets' },
   { surface: 'pan.listDiscoveredSessions',      kind: 'rpc', disposition: 'READ',        door: 'TranscriptsResolver.list' },
   { surface: 'pan.getDiscoveredSession',        kind: 'rpc', disposition: 'READ',        door: 'TranscriptsResolver.get' },
   { surface: 'pan.enrichSessions',             kind: 'rpc', disposition: 'WRITE',       door: 'TranscriptsWriter.enrich' },
@@ -602,6 +651,7 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'pan flywheel start',             kind: 'cli', disposition: 'WRITE',       door: 'SettingsWriter.startFlywheel + AgentWriter.spawn' },
   { surface: 'pan flywheel pause',             kind: 'cli', disposition: 'WRITE',       door: 'SettingsWriter.pauseFlywheel + AgentWriter.stop' },
   { surface: 'pan flywheel resume',            kind: 'cli', disposition: 'WRITE',       door: 'SettingsWriter.resumeFlywheel + AgentWriter.spawn' },
+  { surface: 'pan flywheel stop',              kind: 'cli', disposition: 'WRITE',       door: 'clearFlywheelGate + AgentWriter.stop + Orchestration report' },
   { surface: 'pan flywheel abort',             kind: 'cli', disposition: 'WRITE',       door: 'SettingsWriter.abortFlywheel + AgentWriter.stop' },
   { surface: 'pan deacon pause',               kind: 'cli', disposition: 'WRITE',       door: 'SettingsWriter.setDeaconPaused(true)' },
   { surface: 'pan deacon unpause',             kind: 'cli', disposition: 'WRITE',       door: 'SettingsWriter.setDeaconPaused(false)' },
@@ -632,6 +682,7 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
 
   // PAN-1866: backlog sequence routes
   { surface: 'GET /api/backlog/sequence',                  kind: 'http', disposition: 'READ',       door: 'backlog route reads backlog_sequence cache + parseSequenceMd fallback; server-side inPipeline join via getReviewStatusSync (PAN-1866)' },
+  { surface: 'GET /api/backlog/issue-state',               kind: 'http', disposition: 'READ',       door: 'backlog route reads single-issue pickup state from backlog classifier (same source as /sequence) + getReviewStatusSync join (PAN-2059)' },
   { surface: 'POST /api/backlog/sequence/regenerate',      kind: 'http', disposition: 'WRITE',      door: 'backlog route spawns sequencer agent via spawnSequencerAgent (PAN-1866)' },
   { surface: 'POST /api/backlog/sequence/gate',            kind: 'http', disposition: 'WRITE',      door: 'backlog route writes operator gate field to sequence.md via writeSequenceMd; applies parked label when gate=blocked (PAN-1866)' },
   { surface: 'POST /api/backlog/sequence/planning',        kind: 'http', disposition: 'WRITE',      door: 'backlog route writes operator planning field to sequence.md via writeSequenceMd (PAN-1866)' },
@@ -644,4 +695,85 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   // Pre-existing routes discovered during PAN-1866 audit (were missing from matrix)
   { surface: 'POST /api/agents/:id/restart-fresh',         kind: 'http', disposition: 'WRITE',      door: 'agents route wipes work-agent state and re-spawns on new harness/model; deliberate operator override for harness switch' },
   { surface: 'POST /api/review/:issueId/purge',            kind: 'http', disposition: 'WRITE',      door: 'workspaces route purges all review agents for an issue and resets review status' },
+  { surface: 'GET /api/projects/:projectKey/swarm-policy', kind: 'http', disposition: 'READ',       door: 'Project config resolver reads the configured project-level swarm policy' },
+  { surface: 'POST /api/projects/:projectKey/swarm-policy', kind: 'http', disposition: 'WRITE',     door: 'Project config writer sets the project-level swarm policy' },
+  { surface: 'GET /api/issues/:issueId/swarm-policy',      kind: 'http', disposition: 'READ',       door: 'Issue record resolver reads and resolves the issue-level swarm policy' },
+  { surface: 'POST /api/issues/:issueId/swarm-policy',     kind: 'http', disposition: 'WRITE',      door: 'Issue record writer sets the issue-level swarm policy' },
+];
+
+/** PAN-2648 Beads-removal surface lock. */
+export type BeadsRemovalDisposition = 'RETAIN_AS_TASK' | 'DELETE';
+
+export interface BeadsRemovalMatrixEntry {
+  surface: string;
+  disposition: BeadsRemovalDisposition;
+  /** Concrete replacement for retained behavior, or the reason for deletion. */
+  target: string;
+}
+
+export const BEADS_REMOVAL_NO_LOSS_MATRIX: BeadsRemovalMatrixEntry[] = [
+  { surface: 'bd ready / Beads ready query', disposition: 'RETAIN_AS_TASK', target: 'pan task next; getDispatchableItems()' },
+  { surface: 'pan beads claim', disposition: 'RETAIN_AS_TASK', target: 'pan task claim with ownership and transition guards' },
+  { surface: 'pan beads close', disposition: 'RETAIN_AS_TASK', target: 'pan task done, restricted to the claim owner' },
+  { surface: 'pan beads update --status blocked/in_progress/open', disposition: 'RETAIN_AS_TASK', target: 'pan task block/claim/unblock' },
+  { surface: 'bd update --claim atomic claim semantics', disposition: 'RETAIN_AS_TASK', target: 'Record fs-lock, task transition matrix, and owned claims' },
+  { surface: 'pan beads create/delete/dep', disposition: 'DELETE', target: 'Planning owns immutable checklist structure' },
+  { surface: 'pan beads sweep/compact/stats/upgrade/doctor/reconcile', disposition: 'DELETE', target: 'The Beads runtime store is removed' },
+  { surface: 'Per-bead commit/push invariant', disposition: 'RETAIN_AS_TASK', target: 'One pushed commit per xBRIEF item' },
+  { surface: 'Conditional per-bead inspection', disposition: 'RETAIN_AS_TASK', target: 'Item metadata and pan inspect --item' },
+  { surface: 'Work prompt task list', disposition: 'RETAIN_AS_TASK', target: 'Merged xBRIEF items and active slice' },
+  { surface: 'Crash recovery position', disposition: 'RETAIN_AS_TASK', target: 'Merged statuses, owned claims, record resume hazards, and stale-claim patrol' },
+  { surface: 'Start has-beads gate', disposition: 'RETAIN_AS_TASK', target: 'Readable implementation-ready xBRIEF gate' },
+  { surface: 'pan done open-beads gate', disposition: 'RETAIN_AS_TASK', target: 'Non-terminal xBRIEF item and acceptance-criteria gate' },
+  { surface: 'Idle open-beads nudge', disposition: 'RETAIN_AS_TASK', target: 'getDispatchableItems() result' },
+  { surface: 'Stuck-remediation ready-beads gate', disposition: 'RETAIN_AS_TASK', target: 'Merged-xBRIEF readiness' },
+  { surface: 'Orphaned completion all-beads-closed gate', disposition: 'RETAIN_AS_TASK', target: 'All xBRIEF checklist items terminal' },
+  { surface: 'Backlog/flywheel issuesWithBeads readiness', disposition: 'RETAIN_AS_TASK', target: 'Planned or implementation-ready spec presence' },
+  { surface: 'Dashboard /beads list', disposition: 'RETAIN_AS_TASK', target: '/tasks backed by the merged xBRIEF' },
+  { surface: 'Beads rail/tab/dialog/kanban', disposition: 'RETAIN_AS_TASK', target: 'Tasks UX backed by xBRIEF data' },
+  { surface: 'Beads rollup/freshness/sync services and events', disposition: 'DELETE', target: 'The local merged xBRIEF view needs no freshness layer' },
+  { surface: 'Resource hasBeads, beadTotals, beadsPath', disposition: 'RETAIN_AS_TASK', target: 'hasTasks and taskTotals; the path/source signal is deleted' },
+  { surface: 'Install/prerequisite bd checks', disposition: 'DELETE', target: 'The bd executable is no longer a prerequisite' },
+  { surface: 'Workspace .beads/redirect creation/copy', disposition: 'DELETE', target: 'The Beads canonical-home redirect is no longer used' },
+  { surface: 'State migration Beads cutover marker/layout checks', disposition: 'DELETE', target: 'The Beads state layout is no longer used' },
+  { surface: 'Teardown export, restore, auto-commit, remote sync', disposition: 'DELETE', target: 'There is no derived Beads state to synchronize' },
+  { surface: 'Beads skills, rules, and AGENTS template section', disposition: 'DELETE', target: 'The task loop moves to work-agent instructions' },
+  { surface: 'docs/BEADS.md and configuration/beads.mdx', disposition: 'DELETE', target: 'xBRIEF and task documentation replaces live Beads documentation' },
+  { surface: 'record.beadsMapping field', disposition: 'DELETE', target: 'New records omit it; readers tolerate the legacy field' },
+];
+
+/** PAN-2647 system-health surface lock. */
+export type HealthNoLossDisposition = 'V2_HOME' | 'SUPERSEDED';
+
+export interface HealthNoLossMatrixEntry {
+  surface: string;
+  disposition: HealthNoLossDisposition;
+  /** Concrete V2 home, or the explicit reason for supersession. */
+  target: string;
+}
+
+export const HEALTH_NO_LOSS_MATRIX: HealthNoLossMatrixEntry[] = [
+  { surface: 'Header health pill metric', disposition: 'V2_HOME', target: 'SystemHealthPill state-specific trigger copy from SystemHealthSnapshot.state and admission evidence' },
+  { surface: 'CPU and load', disposition: 'V2_HOME', target: 'SystemHealthSnapshot.host.metrics.cpuPercent and loadPerCore1m in SystemHealthPill' },
+  { surface: 'Memory totals', disposition: 'V2_HOME', target: 'SystemHealthSnapshot.host.metrics usedMemoryBytes, totalMemoryBytes, and availableMemoryBytes in SystemHealthPill' },
+  { surface: 'Swap fields', disposition: 'V2_HOME', target: 'SystemHealthSnapshot.host.metrics swap occupancy shown as diagnostic context in SystemHealthPill' },
+  { surface: 'Committed-memory diagnostic', disposition: 'V2_HOME', target: 'SystemHealthSnapshot.host.metrics virtualCommitmentPercent shown as Overcommit diagnostic in SystemHealthPill' },
+  { surface: 'Memory attributions', disposition: 'V2_HOME', target: 'SystemHealthSnapshot.summary overdeckMemoryBytes and overdeckMemoryPercent in SystemHealthPill' },
+  { surface: 'Role counts', disposition: 'V2_HOME', target: 'SystemHealthSnapshot.summary role counts, admission admittedWorkAgentCount, and HealthDashboard status summary cards' },
+  { surface: 'Webhook state', disposition: 'V2_HOME', target: 'SystemHealthSnapshot.services webhook-relay entry with legacy summary fallback in SystemHealthPill' },
+  { surface: 'Kill action', disposition: 'V2_HOME', target: 'SystemHealthConsumer.killTarget agent and specialist actions through useKillAgent or the specialist kill endpoint' },
+  { surface: 'Remove action', disposition: 'V2_HOME', target: 'SystemHealthConsumer.killTarget container action through DELETE /api/resources/docker/container/:id' },
+  { surface: 'Leaked-focus supersession', disposition: 'SUPERSEDED', target: 'Critical transitions focus leaked consumers first; Show all restores the complete top-consumer list' },
+  { surface: 'Transition event', disposition: 'V2_HOME', target: 'SystemHealthPill emits one operator-facing toast when accepted health transitions to critical' },
+  { surface: 'Stale-build chip', disposition: 'V2_HOME', target: 'StaleBuildChip reads DeployStalenessSnapshot through useDeployStaleness and GET /api/deploy/staleness, outside the health contract' },
+  { surface: 'GET /api/system/health', disposition: 'V2_HOME', target: 'Accepted SystemHealthSnapshot V2 compatibility route from getAcceptedSystemHealthSnapshot()' },
+  { surface: 'GET /api/godview/system-health', disposition: 'V2_HOME', target: 'Accepted SystemHealthSnapshot V2 plus retained Godview scalar projections for one compatibility cycle' },
+  { surface: 'GET /api/health/agents', disposition: 'V2_HOME', target: 'AgentHealthSnapshot[] projection from the canonical read model and live tmux liveness' },
+  { surface: 'Resources host vitals', disposition: 'V2_HOME', target: 'GET /api/resources hostVitals projected from accepted SystemHealthSnapshot.host metrics' },
+  { surface: 'Spawn gate', disposition: 'V2_HOME', target: 'GET /api/resources spawnGate projected from accepted admission evidence and enforcement decision' },
+  { surface: 'Capacity guardrail', disposition: 'V2_HOME', target: 'mapSpawnGateDecision preserves blocking enforcement decisions while attaching accepted health evidence' },
+  { surface: 'Summary cards', disposition: 'V2_HOME', target: 'HealthDashboard renders all accepted AgentHealthStatus counts with accessible names' },
+  { surface: 'Deacon section', disposition: 'V2_HOME', target: 'HealthDashboard DeaconStatus remains visible while loading, unavailable, or agent-empty' },
+  { surface: 'TLDR section', disposition: 'V2_HOME', target: 'HealthDashboard TldrServiceStatus distinguishes optional unconfigured from request unavailable' },
+  { surface: 'pan doctor', disposition: 'V2_HOME', target: 'Independent dependency, installation, state-worktree, and system diagnostic command; it is not a live V2 snapshot view' },
 ];

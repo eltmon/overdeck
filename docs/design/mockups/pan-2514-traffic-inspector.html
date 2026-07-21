@@ -1,0 +1,531 @@
+<!doctype html>
+<!--
+  PAN-2514 mockup — Claude Code Traffic Inspector (Observability page).
+
+  Interactive: light/dark toggle (top-right), master Capture toggle, filter
+  chips, and every block expand/collapses. Sample data only.
+
+  Tokens lifted verbatim from src/dashboard/frontend/src/index.css
+  (light :root + .dark). DM Sans for prose, Space Grotesk for the wordmark
+  only, SF Mono (system fallback) for identifiers. Signal discipline:
+  blue = machine working (live capture), amber = human-action, token counts
+  neutral (cyan is money-only), one colored signal per row, badges are
+  rounded-sm 8%/32% tint — no pills.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>PAN-2514 · Traffic Inspector</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* ─── Light mode (default) — from index.css :root ─── */
+  :root {
+    color-scheme: light;
+    --radius: 0.625rem;
+    --radius-sm: calc(var(--radius) - 4px);
+    --background:#ffffff; --foreground:#1f2937;
+    --card:#ffffff; --card-foreground:#1f2937;
+    --card-2:#f7f7f8;
+    --popover:#ffffff;
+    --primary: oklch(0.488 0.217 264); --primary-foreground:#ffffff;
+    --secondary: color-mix(in srgb, black 4%, transparent);
+    --accent: color-mix(in srgb, black 4%, transparent);
+    --muted: color-mix(in srgb, black 4%, transparent);
+    --muted-foreground:#6b7280;
+    --border: color-mix(in srgb, black 8%, transparent);
+    --input: color-mix(in srgb, black 10%, transparent);
+    --destructive:#ef4444; --destructive-foreground:#b91c1c;
+    --info:#3b82f6; --info-foreground:#1d4ed8;
+    --success:#10b981; --success-foreground:#047857;
+    --warning:#f59e0b; --warning-foreground:#b45309;
+    --signal-review:#a855f7; --signal-review-foreground:#7e22ce;
+    --signal-cost:#06b6d4; --signal-cost-foreground:#0e7490;
+    --shadow: 0 1px 2px rgba(0,0,0,.04), 0 8px 24px rgba(0,0,0,.06);
+  }
+  /* ─── Dark mode — from index.css .dark ─── */
+  .dark {
+    color-scheme: dark;
+    --background:#080b10; --foreground:#e5e7eb;
+    --card:#0c1018; --card-foreground:#e5e7eb;
+    --card-2:#11161f;
+    --popover:#0c1018;
+    --primary: oklch(0.588 0.217 264); --primary-foreground:#ffffff;
+    --secondary: color-mix(in srgb, white 6%, transparent);
+    --accent: color-mix(in srgb, white 8%, transparent);
+    --muted: color-mix(in srgb, white 4%, transparent);
+    --muted-foreground:#9ca3af;
+    --border: color-mix(in srgb, white 6%, transparent);
+    --input: color-mix(in srgb, white 8%, transparent);
+    --destructive:#f87171; --destructive-foreground:#fca5a5;
+    --info:#3b82f6; --info-foreground:#60a5fa;
+    --success:#10b981; --success-foreground:#34d399;
+    --warning:#f59e0b; --warning-foreground:#fbbf24;
+    --signal-review:#a855f7; --signal-review-foreground:#c084fc;
+    --signal-cost:#06b6d4; --signal-cost-foreground:#22d3ee;
+    --shadow: none;
+  }
+
+  * { box-sizing:border-box; margin:0; padding:0; }
+  html,body { height:100%; }
+  body {
+    background:var(--background); color:var(--foreground);
+    font-family:"DM Sans", system-ui, sans-serif; font-size:14px; line-height:1.45;
+    -webkit-font-smoothing:antialiased;
+  }
+  body::after {
+    content:""; position:fixed; inset:0; pointer-events:none; opacity:.035; z-index:0;
+    background-size:256px 256px;
+    background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+  .mono { font-family:"SF Mono", ui-monospace, SFMono-Regular, Consolas, monospace; font-size:.86em; }
+  ::-webkit-scrollbar { width:8px; height:8px; }
+  ::-webkit-scrollbar-thumb { background:color-mix(in srgb, var(--foreground) 18%, transparent); border-radius:4px; }
+
+  .shell { max-width:1180px; margin:0 auto; padding:20px 24px 60px; position:relative; z-index:1; }
+
+  /* ── Page header ── */
+  .pagehead { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; margin-bottom:6px; }
+  .titlewrap h1 { font-family:"Space Grotesk"; font-weight:600; font-size:19px; letter-spacing:-.01em; }
+  .titlewrap .crumb { color:var(--muted-foreground); font-size:12px; margin-bottom:3px; }
+  .titlewrap .crumb .path { font-family:"SF Mono", ui-monospace, monospace; font-size:11px; }
+  .titlewrap p.lede { color:var(--muted-foreground); font-size:12.5px; margin-top:5px; max-width:720px; }
+
+  .themebtn {
+    display:inline-flex; align-items:center; gap:7px; height:32px; padding:0 12px;
+    border:1px solid var(--border); border-radius:var(--radius-sm); background:var(--card);
+    color:var(--muted-foreground); font-family:inherit; font-size:12px; font-weight:500; cursor:pointer;
+    box-shadow:var(--shadow);
+  }
+  .themebtn:hover { background:var(--accent); color:var(--foreground); }
+
+  /* ── Control bar (capture toggle + stats) ── */
+  .controls {
+    margin-top:14px; border:1px solid var(--border); border-radius:var(--radius);
+    background:var(--card); box-shadow:var(--shadow);
+    display:flex; align-items:center; gap:20px; padding:13px 16px; flex-wrap:wrap;
+  }
+  .dark .controls { box-shadow:none; }
+  .capture { display:flex; align-items:center; gap:11px; }
+  .switch { width:40px; height:22px; border-radius:999px; background:var(--input); position:relative; cursor:pointer; flex:none; transition:background .18s; }
+  .switch::after { content:""; position:absolute; top:2px; left:2px; width:18px; height:18px; border-radius:999px; background:#fff; transition:left .18s; box-shadow:0 1px 2px rgba(0,0,0,.25); }
+  .switch.on { background:var(--info); }
+  .switch.on::after { left:20px; }
+  .capture .lab { font-weight:500; }
+  .capture .state { font-size:11.5px; }
+  .capture .state.live { color:var(--info-foreground); }
+  .capture .state.off { color:var(--muted-foreground); }
+  .livedot { width:7px; height:7px; border-radius:999px; background:var(--info); display:inline-block; margin-right:5px; vertical-align:middle; animation:pulse 1.6s ease-in-out infinite; }
+  @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:.35;} }
+  .cap-note { font-size:11px; color:var(--muted-foreground); border-left:1px solid var(--border); padding-left:16px; max-width:300px; }
+  .stats { margin-left:auto; display:flex; gap:22px; }
+  .stat { text-align:right; }
+  .stat .v { font-family:"SF Mono", ui-monospace, monospace; font-size:15px; font-weight:500; font-variant-numeric:tabular-nums; }
+  .stat .k { font-size:10px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted-foreground); }
+
+  /* ── Filters ── */
+  .filters { display:flex; align-items:center; gap:8px; margin-top:14px; flex-wrap:wrap; }
+  .filters .grp { display:flex; align-items:center; gap:6px; }
+  .filters .glabel { font-size:10px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted-foreground); margin-right:2px; }
+  .chip {
+    font-size:12px; padding:4px 10px; border-radius:999px; border:1px solid var(--border);
+    background:var(--card); color:var(--muted-foreground); cursor:pointer; font-family:inherit;
+  }
+  .chip.mono { font-size:11px; }
+  .chip.on { background:var(--accent); color:var(--foreground); border-color:color-mix(in srgb, var(--foreground) 22%, transparent); }
+  .search { margin-left:auto; display:flex; align-items:center; gap:7px; border:1px solid var(--input); border-radius:var(--radius-sm); background:var(--card); padding:6px 10px; min-width:220px; }
+  .search input { border:0; background:transparent; color:var(--foreground); font-family:inherit; font-size:12.5px; outline:none; width:100%; }
+  .search input::placeholder { color:var(--muted-foreground); }
+
+  /* ── Request cards ── */
+  .stream { margin-top:16px; display:flex; flex-direction:column; gap:10px; }
+  .req { border:1px solid var(--border); border-radius:var(--radius); background:var(--card); box-shadow:var(--shadow); overflow:hidden; }
+  .dark .req { box-shadow:none; }
+  .req.hidden { display:none; }
+  .reqhead { display:flex; align-items:center; gap:12px; padding:11px 14px; cursor:pointer; }
+  .reqhead:hover { background:var(--accent); }
+  .caret { flex:none; color:var(--muted-foreground); transition:transform .16s; font-size:11px; width:12px; }
+  .req.open .caret { transform:rotate(90deg); }
+  .agent { font-family:"SF Mono", ui-monospace, monospace; font-size:12px; font-weight:500; }
+  .modelchip { font-family:"SF Mono", ui-monospace, monospace; font-size:10.5px; padding:2px 7px; border-radius:var(--radius-sm); border:1px solid var(--border); color:var(--muted-foreground); background:var(--card-2); }
+  .role { font-size:11px; color:var(--muted-foreground); }
+  .ts { font-family:"SF Mono", ui-monospace, monospace; font-size:11px; color:var(--muted-foreground); }
+  .reqmeta { margin-left:auto; display:flex; align-items:center; gap:16px; }
+  .toks { font-family:"SF Mono", ui-monospace, monospace; font-size:11.5px; color:var(--muted-foreground); font-variant-numeric:tabular-nums; }
+  .toks b { color:var(--foreground); font-weight:500; }
+  /* one-signal-per-row: the live badge is the only color on a captured row */
+  .badge { display:inline-flex; align-items:center; gap:5px; height:20px; padding:0 8px; border-radius:var(--radius-sm); font-size:10.5px; font-weight:500; }
+  .badge.live { background:color-mix(in srgb, var(--info) 8%, transparent); border:1px solid color-mix(in srgb, var(--info) 32%, transparent); color:var(--info-foreground); }
+  .badge.done { background:color-mix(in srgb, var(--muted) 60%, transparent); border:1px solid var(--border); color:var(--muted-foreground); }
+
+  .reqbody { display:none; border-top:1px solid var(--border); }
+  .req.open .reqbody { display:block; }
+
+  /* context-mix bar under an open request */
+  .mixbar { display:flex; height:6px; margin:0; }
+  .mixbar span { height:100%; }
+  .mixbar .m-sys { background:color-mix(in srgb, var(--foreground) 24%, transparent); }
+  .mixbar .m-tools { background:var(--info); opacity:.75; }
+  .mixbar .m-msgs { background:color-mix(in srgb, var(--foreground) 12%, transparent); }
+  .mixlegend { display:flex; gap:16px; padding:8px 14px; font-size:11px; color:var(--muted-foreground); border-bottom:1px solid var(--border); }
+  .mixlegend i { display:inline-block; width:9px; height:9px; border-radius:2px; margin-right:5px; vertical-align:middle; }
+  .mixlegend .i-sys { background:color-mix(in srgb, var(--foreground) 24%, transparent); }
+  .mixlegend .i-tools { background:var(--info); opacity:.75; }
+  .mixlegend .i-msgs { background:color-mix(in srgb, var(--foreground) 12%, transparent); }
+
+  /* collapsible section */
+  .sec { border-bottom:1px solid var(--border); }
+  .sec:last-child { border-bottom:0; }
+  .sechead { display:flex; align-items:center; gap:10px; padding:10px 14px; cursor:pointer; }
+  .sechead:hover { background:var(--accent); }
+  .sechead .caret { font-size:10px; }
+  .sec.open > .sechead .caret { transform:rotate(90deg); }
+  .sectitle { font-weight:500; font-size:13px; }
+  .seccount { font-family:"SF Mono", ui-monospace, monospace; font-size:11px; color:var(--muted-foreground); font-variant-numeric:tabular-nums; }
+  .secmeta { margin-left:auto; font-family:"SF Mono", ui-monospace, monospace; font-size:11px; color:var(--muted-foreground); font-variant-numeric:tabular-nums; }
+  .seccontent { display:none; padding:4px 14px 14px; }
+  .sec.open > .seccontent { display:block; }
+
+  pre.code { background:var(--card-2); border:1px solid var(--border); border-radius:var(--radius-sm); padding:11px 13px; font-family:"SF Mono", ui-monospace, monospace; font-size:11.5px; line-height:1.55; overflow-x:auto; white-space:pre-wrap; color:var(--foreground); }
+
+  /* tool rows — ranked by byte size */
+  .tool { border-bottom:1px solid var(--border); }
+  .tool:last-child { border-bottom:0; }
+  .toolhead { display:grid; grid-template-columns:12px 1fr 150px 74px; align-items:center; gap:10px; padding:7px 2px; cursor:pointer; }
+  .toolhead:hover { color:var(--foreground); }
+  .toolname { font-family:"SF Mono", ui-monospace, monospace; font-size:12px; }
+  .toolname .srv { color:var(--muted-foreground); }
+  .sizebar { height:8px; border-radius:3px; background:var(--muted); overflow:hidden; }
+  .sizebar i { display:block; height:100%; background:color-mix(in srgb, var(--foreground) 22%, transparent); }
+  .tool.top .sizebar i { background:var(--info); opacity:.8; }
+  .toolbytes { text-align:right; font-family:"SF Mono", ui-monospace, monospace; font-size:11px; color:var(--muted-foreground); font-variant-numeric:tabular-nums; }
+  .toolschema { display:none; padding:4px 0 10px 22px; }
+  .tool.open .toolschema { display:block; }
+  .tool .caret { font-size:9px; }
+  .tool.open > .toolhead .caret { transform:rotate(90deg); }
+
+  /* message blocks */
+  .msg { border:1px solid var(--border); border-radius:var(--radius-sm); margin-bottom:7px; overflow:hidden; }
+  .msghead { display:flex; align-items:center; gap:9px; padding:7px 11px; cursor:pointer; font-size:12px; }
+  .msghead:hover { background:var(--accent); }
+  .msghead .caret { font-size:9px; }
+  .msg.open > .msghead .caret { transform:rotate(90deg); }
+  .rolepill { font-size:9.5px; letter-spacing:.05em; text-transform:uppercase; color:var(--muted-foreground); font-weight:500; }
+  .tu { font-family:"SF Mono", ui-monospace, monospace; font-size:11.5px; }
+  .tu.tool_use { color:var(--info-foreground); }
+  .tu.tool_result { color:var(--muted-foreground); }
+  .msgmeta { margin-left:auto; font-family:"SF Mono", ui-monospace, monospace; font-size:10.5px; color:var(--muted-foreground); }
+  .msgbody { display:none; padding:2px 11px 11px; }
+  .msg.open .msgbody { display:block; }
+
+  .empty { text-align:center; padding:60px 20px; color:var(--muted-foreground); }
+  .empty .big { font-size:15px; color:var(--foreground); margin-bottom:6px; font-weight:500; }
+
+  .footnote { margin-top:24px; font-size:11px; color:var(--muted-foreground); border-top:1px dashed var(--border); padding-top:12px; }
+  .footnote b { color:var(--foreground); font-weight:500; }
+</style>
+</head>
+<body class="dark">
+<div class="shell">
+
+  <!-- header -->
+  <div class="pagehead">
+    <div class="titlewrap">
+      <div class="crumb">Observability · <span class="path">/traffic</span></div>
+      <h1>Traffic Inspector</h1>
+      <p class="lede">Passively intercepts the model API traffic our Claude Code agents send, and renders each request as inspectable blocks — which tools eat the context window, the full message history, and real token usage. <span class="mono">PAN-2514</span> mockup.</p>
+    </div>
+    <button class="themebtn" id="themebtn" onclick="toggleTheme()"><span id="themeicon">☾</span> <span id="themelabel">Dark</span></button>
+  </div>
+
+  <!-- control bar -->
+  <div class="controls">
+    <div class="capture">
+      <div class="switch on" id="capswitch" onclick="toggleCapture()"></div>
+      <div>
+        <div class="lab">Capture</div>
+        <div class="state live" id="capstate"><span class="livedot"></span>Live — proxy on :8318</div>
+      </div>
+    </div>
+    <div class="cap-note" id="capnote">Routes newly-spawned Claude Code agents through the logging proxy. Running agents keep their launch-time endpoint until restarted.</div>
+    <div class="stats">
+      <div class="stat"><div class="v">128</div><div class="k">Requests</div></div>
+      <div class="stat"><div class="v">154,946</div><div class="k">Tool bytes</div></div>
+      <div class="stat"><div class="v">65,538</div><div class="k">Input tokens</div></div>
+    </div>
+  </div>
+
+  <!-- filters -->
+  <div class="filters">
+    <div class="grp"><span class="glabel">Model</span>
+      <button class="chip mono on" onclick="tog(this)">all</button>
+      <button class="chip mono" onclick="tog(this)">gpt-5.5</button>
+      <button class="chip mono" onclick="tog(this)">claude-opus-4-8</button>
+      <button class="chip mono" onclick="tog(this)">kimi-k2</button>
+    </div>
+    <div class="grp"><span class="glabel">Tool</span>
+      <button class="chip on" onclick="tog(this)">All</button>
+      <button class="chip mono" onclick="tog(this)">Bash</button>
+      <button class="chip mono" onclick="tog(this)">Read</button>
+      <button class="chip mono" onclick="tog(this)">Edit</button>
+      <button class="chip mono" onclick="tog(this)">mcp__playwright__*</button>
+    </div>
+    <div class="grp"><span class="glabel">Dir</span>
+      <button class="chip on" onclick="tog(this)">Both</button>
+      <button class="chip" onclick="tog(this)">Request</button>
+      <button class="chip" onclick="tog(this)">Response</button>
+    </div>
+    <div class="search">🔎<input placeholder="Search prompts, tool names, content…" /></div>
+  </div>
+
+  <!-- request stream -->
+  <div class="stream" id="stream">
+
+    <!-- REQUEST 1 — open by default, full detail -->
+    <div class="req open">
+      <div class="reqhead" onclick="toggleReq(this)">
+        <span class="caret">▶</span>
+        <span class="agent">agent-pan-2514</span>
+        <span class="modelchip">gpt-5.5</span>
+        <span class="role">work · turn 14</span>
+        <span class="ts">14:22:07</span>
+        <div class="reqmeta">
+          <span class="toks"><b>65,538</b> in · 1,204 out · <b>58k</b> cached</span>
+          <span class="badge live"><span class="livedot"></span>Streaming</span>
+        </div>
+      </div>
+      <div class="reqbody">
+        <div class="mixbar">
+          <span class="m-sys"  style="width:9%"></span>
+          <span class="m-tools" style="width:44%"></span>
+          <span class="m-msgs" style="width:47%"></span>
+        </div>
+        <div class="mixlegend">
+          <span><i class="i-sys"></i>System 5,912 B</span>
+          <span><i class="i-tools"></i>Tools 154,946 B · 69 tools</span>
+          <span><i class="i-msgs"></i>Messages 41 · ~28k tok</span>
+        </div>
+
+        <!-- System prompt -->
+        <div class="sec">
+          <div class="sechead" onclick="toggleSec(this)">
+            <span class="caret">▶</span><span class="sectitle">System prompt</span>
+            <span class="secmeta">5,912 B · ~1,480 tok</span>
+          </div>
+          <div class="seccontent">
+            <pre class="code">You are Claude Code, Anthropic's official CLI for Claude.
+You are an interactive agent that helps users with software
+engineering tasks.
+
+# Harness
+ - Text you output outside of tool use is displayed to the user
+   as Github-flavored markdown in a terminal.
+ - Tools run behind a user-selected permission mode…
+   [+ 132 more lines — click to expand full]</pre>
+          </div>
+        </div>
+
+        <!-- Tools — ranked by byte size (open) -->
+        <div class="sec open">
+          <div class="sechead" onclick="toggleSec(this)">
+            <span class="caret">▶</span><span class="sectitle">Tools</span>
+            <span class="seccount">69 tools</span>
+            <span class="secmeta">154,946 B · the context hog</span>
+          </div>
+          <div class="seccontent">
+            <div class="tool top">
+              <div class="toolhead" onclick="toggleTool(this)">
+                <span class="caret">▶</span>
+                <span class="toolname"><span class="srv">mcp__playwright__</span>browser_snapshot</span>
+                <span class="sizebar"><i style="width:100%"></i></span>
+                <span class="toolbytes">31,204 B</span>
+              </div>
+              <div class="toolschema"><pre class="code">{
+  "name": "browser_snapshot",
+  "description": "Capture accessibility snapshot of the current page…",
+  "input_schema": { "type": "object", "properties": { … } }
+}</pre></div>
+            </div>
+            <div class="tool">
+              <div class="toolhead" onclick="toggleTool(this)">
+                <span class="caret">▶</span>
+                <span class="toolname">Bash</span>
+                <span class="sizebar"><i style="width:71%"></i></span>
+                <span class="toolbytes">22,110 B</span>
+              </div>
+              <div class="toolschema"><pre class="code">{ "name":"Bash", "description":"Executes a bash command…",
+  "input_schema": { "command":{…}, "timeout":{…}, "run_in_background":{…} } }</pre></div>
+            </div>
+            <div class="tool">
+              <div class="toolhead" onclick="toggleTool(this)">
+                <span class="caret">▶</span>
+                <span class="toolname">Edit</span>
+                <span class="sizebar"><i style="width:38%"></i></span>
+                <span class="toolbytes">11,860 B</span>
+              </div>
+              <div class="toolschema"><pre class="code">{ "name":"Edit", … }</pre></div>
+            </div>
+            <div class="tool">
+              <div class="toolhead" onclick="toggleTool(this)">
+                <span class="caret">▶</span>
+                <span class="toolname">Read</span>
+                <span class="sizebar"><i style="width:31%"></i></span>
+                <span class="toolbytes">9,540 B</span>
+              </div>
+              <div class="toolschema"><pre class="code">{ "name":"Read", … }</pre></div>
+            </div>
+            <div class="tool">
+              <div class="toolhead" onclick="toggleTool(this)">
+                <span class="caret">▶</span>
+                <span class="toolname"><span class="srv">mcp__linear__</span>save_issue</span>
+                <span class="sizebar"><i style="width:24%"></i></span>
+                <span class="toolbytes">7,420 B</span>
+              </div>
+              <div class="toolschema"><pre class="code">{ "name":"save_issue", … }</pre></div>
+            </div>
+            <div class="tool">
+              <div class="toolhead" onclick="toggleTool(this)">
+                <span class="caret">▶</span>
+                <span class="toolname" style="color:var(--muted-foreground)">+ 64 more tools</span>
+                <span class="sizebar"><i style="width:14%"></i></span>
+                <span class="toolbytes">72,812 B</span>
+              </div>
+              <div class="toolschema"><pre class="code">Grep · Glob · Write · WebFetch · TaskCreate · TaskUpdate ·
+Agent · Monitor · ScheduleWakeup · Skill · ToolSearch ·
+mcp__playwright__browser_* · mcp__linear__* · …</pre></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Messages -->
+        <div class="sec">
+          <div class="sechead" onclick="toggleSec(this)">
+            <span class="caret">▶</span><span class="sectitle">Messages</span>
+            <span class="seccount">41 blocks</span>
+            <span class="secmeta">~28,140 tok</span>
+          </div>
+          <div class="seccontent">
+            <div class="msg">
+              <div class="msghead" onclick="toggleMsg(this)"><span class="caret">▶</span><span class="rolepill">user</span><span>Build the traffic inspector page…</span><span class="msgmeta">312 tok</span></div>
+              <div class="msgbody"><pre class="code">Build the traffic inspector page following the style guide…</pre></div>
+            </div>
+            <div class="msg open">
+              <div class="msghead" onclick="toggleMsg(this)"><span class="caret">▶</span><span class="rolepill">assistant</span><span class="tu tool_use">tool_use · Bash</span><span class="msgmeta">88 tok</span></div>
+              <div class="msgbody"><pre class="code">{
+  "name": "Bash",
+  "input": { "command": "npm run build", "description": "Build the project" }
+}</pre></div>
+            </div>
+            <div class="msg">
+              <div class="msghead" onclick="toggleMsg(this)"><span class="caret">▶</span><span class="rolepill">user</span><span class="tu tool_result">tool_result · Bash</span><span class="msgmeta">1,940 tok</span></div>
+              <div class="msgbody"><pre class="code">&gt; build finished in 4.2s
+dist/dashboard/server.js  1.4 MB …</pre></div>
+            </div>
+            <div class="msg">
+              <div class="msghead" onclick="toggleMsg(this)"><span class="caret">▶</span><span class="rolepill">assistant</span><span class="tu tool_use">tool_use · Edit</span><span class="msgmeta">210 tok</span></div>
+              <div class="msgbody"><pre class="code">{ "name":"Edit", "input":{ "file_path":"…/index.css", "old_string":"…", "new_string":"…" } }</pre></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Response + usage -->
+        <div class="sec">
+          <div class="sechead" onclick="toggleSec(this)">
+            <span class="caret">▶</span><span class="sectitle">Response &amp; usage</span>
+            <span class="secmeta">1,204 out · stop: tool_use</span>
+          </div>
+          <div class="seccontent">
+            <pre class="code">assistant ▸ tool_use · Write(pan-2514-traffic-inspector.html)
+
+usage: { input_tokens: 65538, output_tokens: 1204,
+         cache_read_input_tokens: 58021, cache_creation_input_tokens: 4096 }</pre>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- REQUEST 2 — collapsed, native Claude -->
+    <div class="req">
+      <div class="reqhead" onclick="toggleReq(this)">
+        <span class="caret">▶</span>
+        <span class="agent">agent-min-846</span>
+        <span class="modelchip">claude-opus-4-8</span>
+        <span class="role">review · turn 3</span>
+        <span class="ts">14:21:44</span>
+        <div class="reqmeta">
+          <span class="toks"><b>38,902</b> in · 642 out · <b>31k</b> cached</span>
+          <span class="badge done">Complete</span>
+        </div>
+      </div>
+      <div class="reqbody">
+        <div class="mixbar"><span class="m-sys" style="width:7%"></span><span class="m-tools" style="width:52%"></span><span class="m-msgs" style="width:41%"></span></div>
+        <div class="mixlegend"><span><i class="i-sys"></i>System 4,980 B</span><span><i class="i-tools"></i>Tools 121,300 B · 61 tools</span><span><i class="i-msgs"></i>Messages 18</span></div>
+        <div class="sec"><div class="sechead" onclick="toggleSec(this)"><span class="caret">▶</span><span class="sectitle">System prompt</span><span class="secmeta">4,980 B</span></div><div class="seccontent"><pre class="code">You are Claude Code… (review role context injected)</pre></div></div>
+        <div class="sec"><div class="sechead" onclick="toggleSec(this)"><span class="caret">▶</span><span class="sectitle">Tools</span><span class="seccount">61 tools</span><span class="secmeta">121,300 B</span></div><div class="seccontent"><div class="tool top"><div class="toolhead" onclick="toggleTool(this)"><span class="caret">▶</span><span class="toolname">Read</span><span class="sizebar"><i style="width:100%"></i></span><span class="toolbytes">9,540 B</span></div><div class="toolschema"><pre class="code">{ "name":"Read", … }</pre></div></div></div></div>
+      </div>
+    </div>
+
+    <!-- REQUEST 3 — collapsed, kimi -->
+    <div class="req">
+      <div class="reqhead" onclick="toggleReq(this)">
+        <span class="caret">▶</span>
+        <span class="agent">agent-krux-31</span>
+        <span class="modelchip">kimi-k2</span>
+        <span class="role">work · turn 7</span>
+        <span class="ts">14:20:58</span>
+        <div class="reqmeta">
+          <span class="toks"><b>52,110</b> in · 980 out · <b>0</b> cached</span>
+          <span class="badge done">Complete</span>
+        </div>
+      </div>
+      <div class="reqbody">
+        <div class="mixlegend" style="border-top:1px solid var(--border)"><span><i class="i-tools"></i>Tools 138,020 B · 66 tools</span><span><i class="i-msgs"></i>Messages 24</span></div>
+        <div class="sec"><div class="sechead" onclick="toggleSec(this)"><span class="caret">▶</span><span class="sectitle">Tools</span><span class="seccount">66 tools</span><span class="secmeta">138,020 B</span></div><div class="seccontent"><pre class="code">(expand to inspect schemas)</pre></div></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- empty state, shown when capture is OFF -->
+  <div class="empty" id="emptyState" style="display:none;">
+    <div class="big">Capture is off</div>
+    <div>New Claude Code agents route directly to their model endpoint — no traffic is recorded.<br>Toggle Capture on to start intercepting newly-spawned agents.</div>
+  </div>
+
+  <div class="footnote">
+    <b>Mechanism:</b> a logging reverse-proxy spliced into the per-model <span class="mono">ANTHROPIC_BASE_URL</span> chain (<span class="mono">getCliproxyClientEnv()</span> · <span class="mono">getProviderEnvSync()</span>). Forwards each <span class="mono">/v1/messages</span> request untouched to the real upstream (CLIProxy :8317 for GPT/Gemini, provider URL, or <span class="mono">api.anthropic.com</span> for native Claude), auth redacted, and streams captures to the dashboard. &nbsp;·&nbsp; <b>V1:</b> Claude Code harness only — Pi &amp; Codex use other transports.
+  </div>
+
+</div>
+
+<script>
+  function toggleTheme(){
+    document.body.classList.toggle('dark');
+    var dark = document.body.classList.contains('dark');
+    document.getElementById('themeicon').textContent = dark ? '☾' : '☀';
+    document.getElementById('themelabel').textContent = dark ? 'Dark' : 'Light';
+  }
+  function toggleCapture(){
+    var sw = document.getElementById('capswitch');
+    sw.classList.toggle('on');
+    var on = sw.classList.contains('on');
+    document.getElementById('capstate').innerHTML = on
+      ? '<span class="livedot"></span>Live — proxy on :8318'
+      : 'Off — agents route direct';
+    document.getElementById('capstate').className = 'state ' + (on ? 'live' : 'off');
+    document.getElementById('stream').style.display = on ? 'flex' : 'none';
+    document.getElementById('emptyState').style.display = on ? 'none' : 'block';
+  }
+  function tog(el){
+    // radio-style within a group
+    [...el.parentElement.querySelectorAll('.chip')].forEach(c=>c.classList.remove('on'));
+    el.classList.add('on');
+  }
+  function toggleReq(h){ h.parentElement.classList.toggle('open'); }
+  function toggleSec(h){ h.parentElement.classList.toggle('open'); }
+  function toggleTool(h){ h.parentElement.classList.toggle('open'); }
+  function toggleMsg(h){ h.parentElement.classList.toggle('open'); }
+</script>
+</body>
+</html>

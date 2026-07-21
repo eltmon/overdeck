@@ -12,9 +12,16 @@ export function jsonResponse(
   data: unknown,
   options?: number | { status?: number; headers?: Record<string, string> },
 ): HttpServerResponse.HttpServerResponse {
+  return jsonStringResponse(JSON.stringify(data), options);
+}
+
+export function jsonStringResponse(
+  json: string,
+  options?: number | { status?: number; headers?: Record<string, string> },
+): HttpServerResponse.HttpServerResponse {
   const opts = typeof options === 'number' ? { status: options } : options;
   return HttpServerResponse.text(
-    JSON.stringify(data),
+    json,
     {
       status: opts?.status ?? 200,
       contentType: 'application/json',

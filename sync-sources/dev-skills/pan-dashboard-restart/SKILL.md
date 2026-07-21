@@ -56,9 +56,9 @@ for i in $(seq 1 15); do { [ -n "$OLD" ] && kill -0 "$OLD" 2>/dev/null; } && sle
 #    PORT is inherited from the environment; set it explicitly if you need a specific port.
 setsid bash -c 'exec node dist/dashboard/server.js' > /tmp/pan-dash.log 2>&1 < /dev/null &
 
-# 4. Verify health (Traefik routes pan.localhost -> the API port)
+# 4. Verify health (Traefik routes overdeck.localhost -> the API port)
 for i in $(seq 1 40); do
-  code=$(curl -sk -o /dev/null -w '%{http_code}' --max-time 3 https://pan.localhost/api/health 2>/dev/null)
+  code=$(curl -sk -o /dev/null -w '%{http_code}' --max-time 3 https://overdeck.localhost/api/health 2>/dev/null)
   [ "$code" = 200 ] && { echo "healthy after ${i}s"; break; }
   sleep 1
 done
@@ -74,10 +74,11 @@ readlink -f /proc/$NEW/cwd      # must be the primary repo path
 - **Keep the deacon OFF during stabilization** (e.g. while diagnosing churn): prefix the start with `OVERDECK_DISABLE_DEACON=1`, or use `pan restart --no-deacon`. No deacon = no auto-resume and no janitor while you settle things.
 - **Suppress auto-resume** (thundering-herd safety before the resume throttle is trusted, or right after a reboot): prefix `OVERDECK_NO_RESUME=1`.
 - **Re-freeze / trim** if a restart wakes too many agents: `pan admin cloister freeze` (global pause) or `pan admin cloister brake` (trim work agents to the cap).
+- **Operator-only override:** `OVERDECK_WORKSPACE_DASHBOARD_ALLOW_PRIMARY=1` lets a *non-workspace* peer boot bind the host dashboard port when the canonical dashboard is deliberately stopped. Boots from a `workspaces/feature-*` checkout are refused unconditionally — the env var does nothing there (PAN-2322). Never export it in an agent environment. The runtime refusal error intentionally no longer names this variable.
 
 ## Verify success
 
-- `pan.localhost/api/health` returns `{"status":"ok"}` and `curl http://localhost:<port>/api/health` returns 200.
+- `overdeck.localhost/api/health` returns `{"status":"ok"}` and `curl http://localhost:<port>/api/health` returns 200.
 - Exactly one **host-level** `node dist/dashboard/server.js` process; its `/proc/<pid>/cwd` is the primary repo.
   **Do not count workspace-container servers.** Each running workspace devcontainer has its own `server` service whose `dist/dashboard/server.js` process is visible in host `ps` — those are legitimate read/UI peers (cwd `/workspaces/overdeck`, parent `containerd-shim`, `OVERDECK_DISABLE_DEACON=1`), NOT duplicate dashboards and NOT a single-deacon hazard. Seeing N+1 server processes with N containers up is the healthy state. Container-aware census:
   ```bash

@@ -53,7 +53,7 @@ so simply restales the live batches and a fresh one reassembles automatically.
 ## Live UAT stacks
 
 Each generation can serve a live dashboard at
-`uat-<codename>.pan.localhost`, spun on demand from the batch's worktree.
+`uat-<codename>.overdeck.localhost`, spun on demand from the batch's worktree.
 Overdeck runs **at most two UAT stacks at once** (Docker's network pool is
 limited) and tears down the oldest when you start a third; promoting or
 invalidating a batch always tears its stack down.

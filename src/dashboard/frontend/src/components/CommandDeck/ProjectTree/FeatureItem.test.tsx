@@ -1,11 +1,15 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, within, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactElement } from 'react';
 import type { SessionNode as SessionNodeType } from '@overdeck/contracts';
 import { DialogProvider } from '../../DialogProvider';
-import { FeatureItem, pickBestSession } from './FeatureItem';
+import { FeatureItem, isWorkOrSpecialistSession, pickBestSession } from './FeatureItem';
 import type { ProjectFeature, ProjectFeatureResourceIdentifiers } from './ProjectNode';
+import { resolveUatActions } from '../uat-actions';
+import { refreshDashboardState } from '../../../lib/refresh-dashboard-state';
+import { useDashboardStore } from '../../../lib/store';
+import { installStrictFetchMock } from '../../../test-utils/strictFetchMock';
 
 vi.mock('lucide-react', async (importOriginal) => {
   const actual = await importOriginal<typeof import('lucide-react')>();
@@ -26,6 +30,7 @@ vi.mock('lucide-react', async (importOriginal) => {
     Container: () => <svg data-testid="container" />,
     Radio: () => <svg data-testid="radio" />,
     Workflow: () => <svg data-testid="workflow" />,
+    MessageSquare: () => <svg data-testid="message-square" />,
   };
 });
 
@@ -42,8 +47,23 @@ vi.mock('../../shared/ModelPicker/ModelPicker', () => ({
   useAvailableModels: () => ({ groups: [] }),
 }));
 
+vi.mock('sonner', () => ({
+  toast: {
+    error: vi.fn(),
+    info: vi.fn(),
+    success: vi.fn(),
+  },
+}));
+
 vi.mock('../../../lib/refresh-dashboard-state', () => ({
   refreshDashboardState: vi.fn(),
+}));
+
+vi.mock('../../../lib/wsTransport', () => ({
+  dashboardMutationJsonHeaders: vi.fn(async () => ({
+    'Content-Type': 'application/json',
+    'x-overdeck-csrf-token': 'test-csrf-token',
+  })),
 }));
 
 vi.mock('./SessionNode', () => ({
@@ -84,6 +104,7 @@ vi.mock('../styles/command-deck.module.css', () => ({
     featureBadge_running: 'featureBadge_running',
     featureBadge_stopped: 'featureBadge_stopped',
     featureBadge_error: 'featureBadge_error',
+    featureBadge_troubled: 'featureBadge_troubled',
     featureActivityError: 'featureActivityError',
     featureState: 'featureState',
     featureState_done: 'featureState_done',
@@ -102,6 +123,10 @@ vi.mock('../styles/command-deck.module.css', () => ({
     sessionList: 'sessionList',
     sessionNode: 'sessionNode',
     sessionNodeSelected: 'sessionNodeSelected',
+    sessionIconSlot: 'sessionIconSlot',
+    sessionLabel: 'sessionLabel',
+    sessionModel: 'sessionModel',
+    sessionStatus: 'sessionStatus',
   },
 }));
 
@@ -130,10 +155,11 @@ function makeFeature(overrides?: Partial<ProjectFeature>): ProjectFeature {
       tmuxSessionCount: 0,
       tmuxSessionNames: [],
       prs: [],
-      hasVbrief: false,
-      hasBeads: false,
+      hasXbrief: false,
+      hasTasks: false,
       dockerContainerCount: 0,
       dockerContainerNames: [],
+      conversations: [],
     },
     ...overrides,
   };
@@ -161,7 +187,73 @@ function renderFeature(ui: ReactElement) {
   );
 }
 
+function openFeatureContextMenu() {
+  const featureRow = screen.getByText('Test Feature').closest('button');
+  expect(featureRow).not.toBeNull();
+  fireEvent.contextMenu(featureRow!);
+  return screen.getByRole('menu');
+}
+
+function stubWorkspace(workspace: Record<string, unknown>) {
+  vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+    if (url === '/api/workspaces/PAN-821') {
+      return {
+        ok: true,
+        json: async () => workspace,
+      };
+    }
+    return {
+      ok: true,
+      json: async () => ({
+        workspacePaths: [],
+        localBranchNames: [],
+        remoteBranchNames: [],
+        tmuxSessionNames: [],
+        prs: [],
+        dockerContainerNames: [],
+      } satisfies ProjectFeatureResourceIdentifiers),
+    };
+  }));
+}
+
+function renderReadyForMergeFeature() {
+  return renderFeature(
+    <FeatureItem
+      feature={makeFeature({
+        stateLabel: 'In Review',
+        readyForMerge: true,
+        resourceSources: ['workspace'],
+        resourceDetails: {
+          hasWorkspace: true,
+          localBranchCount: 0,
+          remoteBranchCount: 0,
+          tmuxSessionCount: 0,
+          prs: [],
+          hasXbrief: false,
+          hasTasks: false,
+          dockerContainerCount: 2,
+        },
+      })}
+      isSelected={false}
+      onSelect={() => {}}
+    />,
+  );
+}
+
 // ─── pickBestSession ──────────────────────────────────────────────────────────
+
+describe('isWorkOrSpecialistSession', () => {
+  it.each(['work', 'knowledge', 'strike', 'planning', 'review', 'reviewer', 'test', 'ship', 'merge'])(
+    'returns true for %s sessions',
+    (type) => {
+      expect(isWorkOrSpecialistSession({ type } as SessionNodeType)).toBe(true);
+    },
+  );
+
+  it('returns false for non-work and non-specialist sessions', () => {
+    expect(isWorkOrSpecialistSession({ type: 'legacy' } as SessionNodeType)).toBe(false);
+  });
+});
 
 describe('pickBestSession', () => {
   it('returns null for empty sessions', () => {
@@ -207,7 +299,9 @@ describe('pickBestSession', () => {
 describe('FeatureItem', () => {
   beforeEach(() => {
     localStorage.clear();
+    useDashboardStore.setState({ drawer: { issueId: null, tab: 'overview' } });
     vi.restoreAllMocks();
+    vi.mocked(refreshDashboardState).mockClear();
     vi.stubGlobal('fetch', vi.fn(async () => ({
       ok: true,
       json: async () => ({
@@ -228,7 +322,7 @@ describe('FeatureItem', () => {
 
   it('shows paused badge with age + reason and fires unpause (PAN-1779)', () => {
     const onUnpauseSession = vi.fn();
-    renderFeature(
+    const view = renderFeature(
       <FeatureItem
         feature={makeFeature({
           sessions: [makeSession({
@@ -252,7 +346,7 @@ describe('FeatureItem', () => {
   });
 
   it('does not show paused badge for unpaused sessions', () => {
-    renderFeature(
+    const view = renderFeature(
       <FeatureItem
         feature={makeFeature({ sessions: [makeSession()] })}
         isSelected={false}
@@ -264,7 +358,7 @@ describe('FeatureItem', () => {
   });
 
   it('renders feature info without caret when no sessions', () => {
-    renderFeature(
+    const view = renderFeature(
       <FeatureItem
         feature={makeFeature()}
         isSelected={false}
@@ -274,6 +368,103 @@ describe('FeatureItem', () => {
     expect(screen.getAllByText('PAN-821')[0]).toBeInTheDocument();
     expect(screen.queryByTestId('chevron-right')).not.toBeInTheDocument();
     expect(screen.queryByTestId('chevron-down')).not.toBeInTheDocument();
+  });
+
+  it('renders the grouped issue menu and routes the single Wipe action through typed confirmation', async () => {
+    const onDeepWipe = vi.fn();
+    const windowConfirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    renderFeature(
+      <FeatureItem
+        feature={makeFeature()}
+        title="Test Feature"
+        isSelected={false}
+        onSelect={() => {}}
+        onDeepWipe={onDeepWipe}
+      />,
+    );
+
+    const menu = openFeatureContextMenu();
+    expect(menu).toHaveAttribute('data-section', 'FeatureContextMenu (issue-row right-click)');
+    expect(screen.getByText('Issue actions')).toBeInTheDocument();
+    expect(screen.getByText('Queued for plan')).toBeInTheDocument();
+    expect(screen.getByText('For this phase')).toBeInTheDocument();
+    for (const section of ['Communicate', 'Lifecycle', 'Recover', 'Inspect', 'Navigate']) {
+      expect(within(menu).getByText(section)).toBeInTheDocument();
+    }
+
+    const danger = screen.getByRole('menuitem', { name: /^Danger \(\d+ available\)$/ });
+    expect(danger).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByTestId('issue-action-wipe')).not.toBeInTheDocument();
+
+    fireEvent.click(danger);
+    expect(danger).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getAllByRole('menuitem', { name: 'Wipe' })).toHaveLength(1);
+
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Wipe' }));
+    expect(await screen.findByRole('alertdialog')).toBeInTheDocument();
+    expect(screen.getByLabelText('Confirmation text')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Wipe' })).toBeDisabled();
+    expect(windowConfirm).not.toHaveBeenCalled();
+    expect(onDeepWipe).not.toHaveBeenCalled();
+  });
+
+  it('renders session utilities under This session with their existing conditions', () => {
+    const onOpenStateDir = vi.fn();
+    const onViewJsonl = vi.fn();
+    const view = renderFeature(
+      <FeatureItem
+        feature={makeFeature({ sessions: [makeSession({ hasJsonl: true })] })}
+        title="Test Feature"
+        isSelected={false}
+        onSelect={() => {}}
+        onOpenStateDir={onOpenStateDir}
+        onViewJsonl={onViewJsonl}
+      />,
+    );
+
+    openFeatureContextMenu();
+    expect(screen.getByText('This session')).toBeInTheDocument();
+    expect(screen.getByTestId('non-issue-action-openStateDir')).toBeInTheDocument();
+    expect(screen.getByTestId('non-issue-action-viewJsonl')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Open State Dir' }));
+    expect(onOpenStateDir).toHaveBeenCalledWith('agent-pan-821');
+
+    openFeatureContextMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'View JSONL' }));
+    expect(onViewJsonl).toHaveBeenCalledWith('agent-pan-821');
+
+    view.unmount();
+    const noJsonlView = renderFeature(
+      <FeatureItem
+        feature={makeFeature({ sessions: [makeSession({ hasJsonl: false })] })}
+        title="Test Feature"
+        isSelected={false}
+        onSelect={() => {}}
+        onOpenStateDir={onOpenStateDir}
+        onViewJsonl={onViewJsonl}
+      />,
+    );
+    openFeatureContextMenu();
+    expect(screen.getByTestId('non-issue-action-openStateDir')).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Open State Dir' })).toBeInTheDocument();
+    expect(screen.queryByTestId('non-issue-action-viewJsonl')).not.toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'View JSONL' })).not.toBeInTheDocument();
+
+    noJsonlView.unmount();
+    renderFeature(
+      <FeatureItem
+        feature={makeFeature({ sessions: [] })}
+        title="Test Feature"
+        isSelected={false}
+        onSelect={() => {}}
+        onOpenStateDir={onOpenStateDir}
+        onViewJsonl={onViewJsonl}
+      />,
+    );
+    openFeatureContextMenu();
+    expect(screen.queryByText('This session')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('non-issue-action-openStateDir')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('non-issue-action-viewJsonl')).not.toBeInTheDocument();
   });
 
   it('renders a muted untitled placeholder when title is empty', () => {
@@ -352,6 +543,169 @@ describe('FeatureItem', () => {
     );
     expect(screen.getByText('▸ work')).toHaveAttribute('title', 'Work agent sessions for this issue: 1 total. 1 running.');
     expect(screen.getByText('●●● 2')).toHaveAttribute('title', 'Review pipeline sessions for this issue: 2 total. 1 active, 0 queued or starting, 1 stopped. Roles present: correctness and security.');
+  });
+
+  it('shows a warning troubled badge on the parent row', () => {
+    renderFeature(
+      <FeatureItem
+        feature={makeFeature({
+          sessions: [
+            makeSession({
+              troubled: true,
+              troubledReason: 'PTY echo-confirm timed out',
+              troubledAt: '2026-07-02T18:30:00Z',
+              consecutiveFailures: 2,
+              queuedMailCount: 0,
+            }),
+          ],
+        })}
+        isSelected={false}
+        onSelect={() => {}}
+      />,
+    );
+    const badge = screen.getByTestId('feature-troubled');
+    expect(badge).toHaveTextContent('Troubled');
+    expect(badge).toHaveClass('featureBadge_troubled');
+  });
+
+  it('includes troubled details in the badge title', () => {
+    renderFeature(
+      <FeatureItem
+        feature={makeFeature({
+          sessions: [
+            makeSession({
+              sessionId: 'agent-pan-821-slot-1',
+              troubled: true,
+              troubledReason: 'PTY echo-confirm timed out',
+              troubledAt: '2026-07-02T18:30:00Z',
+              consecutiveFailures: 3,
+              queuedMailCount: 4,
+            }),
+          ],
+        })}
+        isSelected={false}
+        onSelect={() => {}}
+      />,
+    );
+    expect(screen.getByTestId('feature-troubled')).toHaveAttribute(
+      'title',
+      'Session: agent-pan-821-slot-1. Reason: PTY echo-confirm timed out. Failures: 3. Troubled at: 2026-07-02T18:30:00Z. Queued deliveries: 4.',
+    );
+  });
+
+  it('flags zero-failure troubled badges as likely spurious', () => {
+    renderFeature(
+      <FeatureItem
+        feature={makeFeature({
+          sessions: [
+            makeSession({
+              troubled: true,
+              troubledReason: 'gate was set manually',
+              troubledAt: '2026-07-02T18:30:00Z',
+              consecutiveFailures: 0,
+            }),
+          ],
+        })}
+        isSelected={false}
+        onSelect={() => {}}
+      />,
+    );
+    expect(screen.getByTestId('feature-troubled')).toHaveAttribute(
+      'title',
+      expect.stringContaining('Likely spurious: troubled with 0 failures.'),
+    );
+  });
+
+  it('shows queued delivery count on troubled badges', () => {
+    renderFeature(
+      <FeatureItem
+        feature={makeFeature({
+          sessions: [
+            makeSession({
+              troubled: true,
+              troubledReason: 'feedback queued',
+              consecutiveFailures: 1,
+              queuedMailCount: 3,
+            }),
+          ],
+        })}
+        isSelected={false}
+        onSelect={() => {}}
+      />,
+    );
+    expect(screen.getByTestId('feature-troubled')).toHaveTextContent('Troubled · 3 queued');
+  });
+
+  it('clears the specific troubled session from the badge', async () => {
+    const onSelect = vi.fn();
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ success: true }),
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+    renderFeature(
+      <FeatureItem
+        feature={makeFeature({
+          sessions: [
+            makeSession({
+              sessionId: 'agent-pan-821-slot-1',
+              troubled: true,
+              troubledReason: 'feedback queued',
+              consecutiveFailures: 1,
+              queuedMailCount: 3,
+            }),
+          ],
+        })}
+        isSelected={false}
+        onSelect={onSelect}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId('feature-troubled'));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith('/api/agents/agent-pan-821-slot-1/untroubled', expect.objectContaining({
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-overdeck-csrf-token': 'test-csrf-token',
+        },
+        body: '{}',
+      }));
+    });
+    expect(refreshDashboardState).toHaveBeenCalled();
+    expect(onSelect).not.toHaveBeenCalled();
+    expect(await screen.findByText('Cleared troubled state for agent-pan-821-slot-1')).toBeInTheDocument();
+  });
+
+  it('shows an error alert when clearing troubled from the badge fails', async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: false,
+      text: async () => JSON.stringify({ error: 'No such agent' }),
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+    renderFeature(
+      <FeatureItem
+        feature={makeFeature({
+          sessions: [
+            makeSession({
+              sessionId: 'agent-pan-821-slot-1',
+              troubled: true,
+              troubledReason: 'feedback queued',
+              consecutiveFailures: 1,
+            }),
+          ],
+        })}
+        isSelected={false}
+        onSelect={() => {}}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId('feature-troubled'));
+
+    expect(await screen.findByText('No such agent')).toBeInTheDocument();
+    expect(refreshDashboardState).not.toHaveBeenCalled();
   });
 
   it('shows a review error badge when a review session failed', () => {
@@ -514,6 +868,31 @@ describe('FeatureItem', () => {
     expect(localStorage.getItem('mc-feature-expanded:PAN-821')).toBeNull();
   });
 
+  it('grows the rail to cockpit and opens the console drawer without selecting a tab', () => {
+    const onSelect = vi.fn();
+    const { container } = renderFeature(
+      <FeatureItem
+        feature={makeFeature({ sessions: [makeSession()], stateLabel: 'Done' })}
+        isSelected={false}
+        onSelect={onSelect}
+      />,
+    );
+    const issueView = () => container.querySelector('[data-component="feature-item"]');
+    expect(issueView()).toHaveAttribute('data-density', 'rail');
+
+    fireEvent.click(screen.getByTestId('chevron-right'));
+    expect(issueView()).toHaveAttribute('data-density', 'cockpit');
+    expect(onSelect).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Expand issue full screen' }));
+    expect(issueView()).toHaveAttribute('data-density', 'cockpit');
+    expect(useDashboardStore.getState().drawer).toEqual({ issueId: 'PAN-821', tab: 'conversation' });
+    expect(onSelect).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByTestId('chevron-down'));
+    expect(issueView()).toHaveAttribute('data-density', 'rail');
+  });
+
   it('restores expansion state from localStorage on mount', () => {
     localStorage.setItem('mc-feature-expanded:PAN-821', 'true');
     renderFeature(
@@ -578,10 +957,10 @@ describe('FeatureItem', () => {
     }));
     vi.stubGlobal('fetch', fetchMock);
 
-    renderFeature(
+    const view = renderFeature(
       <FeatureItem
         feature={makeFeature({
-          resourceSources: ['workspace', 'branch', 'tmux', 'pr', 'docker', 'vbrief', 'beads'],
+          resourceSources: ['workspace', 'branch', 'tmux', 'pr', 'docker', 'vbrief', 'tasks'],
           resourceDetails: {
             hasWorkspace: true,
             localBranchCount: 1,
@@ -595,8 +974,8 @@ describe('FeatureItem', () => {
                 isDraft: false,
               },
             ],
-            hasVbrief: true,
-            hasBeads: true,
+            hasXbrief: true,
+            hasTasks: true,
             dockerContainerCount: 2,
           },
         })}
@@ -615,15 +994,15 @@ describe('FeatureItem', () => {
     expect(screen.getByText('branch (local): feature/pan-821')).toBeInTheDocument();
     expect(screen.getByText('branch (remote): origin/feature/pan-821')).toBeInTheDocument();
     expect(screen.getByText('tmux: agent-pan-821')).toBeInTheDocument();
-    expect(screen.getByText('vBRIEF present')).toBeInTheDocument();
-    expect(screen.getByText('beads present')).toBeInTheDocument();
+    expect(screen.getByText('xBRIEF present')).toBeInTheDocument();
+    expect(screen.getByText('tasks present')).toBeInTheDocument();
     expect(screen.getByText('PR: #123 Test PR (open)')).toBeInTheDocument();
     expect(screen.getByText('docker: pan-821-db')).toBeInTheDocument();
     expect(screen.getByText('docker: pan-821-cache')).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith('/api/issues/PAN-821/resource-details');
   });
 
-  it('shows expanded UAT environment state for ready-for-merge issues', async () => {
+  it('collapses UAT environment panel by default and expands on header click for ready-for-merge issues', async () => {
     const fetchMock = vi.fn(async (url: string) => {
       if (url === '/api/workspaces/PAN-821') {
         return {
@@ -631,7 +1010,7 @@ describe('FeatureItem', () => {
           json: async () => ({
             exists: true,
             issueId: 'PAN-821',
-            frontendUrl: 'https://feature-pan-821.pan.localhost',
+            frontendUrl: 'https://feature-pan-821.overdeck.localhost',
             stackHealth: {
               healthy: false,
               reasons: ['api unhealthy: connection refused'],
@@ -663,6 +1042,59 @@ describe('FeatureItem', () => {
     });
     vi.stubGlobal('fetch', fetchMock);
 
+    const view = renderFeature(
+      <FeatureItem
+        feature={makeFeature({
+          stateLabel: 'In Review',
+          readyForMerge: true,
+          resourceSources: ['workspace'],
+          resourceDetails: {
+            hasWorkspace: true,
+            localBranchCount: 0,
+            remoteBranchCount: 0,
+            tmuxSessionCount: 0,
+            prs: [],
+            hasXbrief: false,
+            hasTasks: false,
+            dockerContainerCount: 2,
+            conversations: [],
+          },
+          sessions: [
+            makeSession({ sessionId: 'agent-pan-821', type: 'work', status: 'stopped', presence: 'inactive' }),
+          ],
+        })}
+        isSelected={false}
+        onSelect={() => {}}
+      />,
+    );
+
+    // Collapsed by default: header, summary count and badge are visible; the
+    // per-service body (full label + service rows) is not rendered.
+    expect(await screen.findByText('UAT environment')).toBeTruthy();
+    expect(screen.getByTestId('feature-uat-stack')).toBeTruthy();
+    expect(screen.queryByText('UAT stack 1/2 healthy')).toBeNull();
+    expect(screen.queryByText('postgres')).toBeNull();
+    expect(screen.queryByText('api')).toBeNull();
+    let toggle = screen.getByRole('button', { name: 'Toggle UAT environment details' });
+    expect(within(toggle).getByTestId('chevron-right')).toBeTruthy();
+    expect(localStorage.getItem('mc-feature-expanded:PAN-821')).toBeNull();
+    expect(localStorage.getItem('mc-feature-expanded:PAN-821:uat')).toBeNull();
+
+    // Clicking the header expands and renders the per-service tree rows.
+    fireEvent.click(toggle);
+    expect(await screen.findByText('postgres')).toBeTruthy();
+    expect(screen.getByText('api')).toBeTruthy();
+    expect(screen.getByText('Up 2m')).toBeTruthy();
+    expect(screen.getByText('Up 42s')).toBeTruthy();
+    const logsAction = screen.getByTestId('uat-inline-action-logs');
+    expect(logsAction).toBeTruthy();
+    expect(logsAction.className).not.toMatch(/opacity|hover/);
+    toggle = screen.getByRole('button', { name: 'Toggle UAT environment details' });
+    expect(within(toggle).getByTestId('chevron-down')).toBeTruthy();
+    expect(localStorage.getItem('mc-feature-expanded:PAN-821')).toBeNull();
+    expect(localStorage.getItem('mc-feature-expanded:PAN-821:uat')).toBe('true');
+
+    view.unmount();
     renderFeature(
       <FeatureItem
         feature={makeFeature({
@@ -675,9 +1107,10 @@ describe('FeatureItem', () => {
             remoteBranchCount: 0,
             tmuxSessionCount: 0,
             prs: [],
-            hasVbrief: false,
-            hasBeads: false,
+            hasXbrief: false,
+            hasTasks: false,
             dockerContainerCount: 2,
+            conversations: [],
           },
           sessions: [
             makeSession({ sessionId: 'agent-pan-821', type: 'work', status: 'stopped', presence: 'inactive' }),
@@ -687,18 +1120,133 @@ describe('FeatureItem', () => {
         onSelect={() => {}}
       />,
     );
+    expect(await screen.findByText('postgres')).toBeTruthy();
 
-    expect(await screen.findByText('UAT environment')).toBeTruthy();
-    expect(await screen.findByText('UAT stack 1/2 healthy')).toBeTruthy();
-    expect(screen.getByText('api unhealthy: connection refused')).toBeTruthy();
-    expect(screen.getByText('postgres')).toBeTruthy();
-    expect(screen.getByText('api')).toBeTruthy();
-    expect(screen.getByTestId('feature-uat-stack')).toBeTruthy();
+    // Clicking again collapses and removes the service rows.
+    fireEvent.click(screen.getByRole('button', { name: 'Toggle UAT environment details' }));
+    expect(screen.queryByText('postgres')).toBeNull();
+    expect(screen.queryByText('api')).toBeNull();
+    expect(localStorage.getItem('mc-feature-expanded:PAN-821:uat')).toBeNull();
+  });
+
+  it('opens the UAT context menu with resolver actions for an unhealthy stack', async () => {
+    stubWorkspace({
+      exists: true,
+      issueId: 'PAN-821',
+      frontendUrl: 'https://feature-pan-821.overdeck.localhost',
+      stackHealth: {
+        healthy: false,
+        reasons: ['api unhealthy: connection refused'],
+        lastObserved: '2026-06-14T19:02:00.000Z',
+      },
+      containers: {
+        postgres: { running: true, uptime: '2m', status: 'running', health: 'healthy', ports: [5432] },
+        api: { running: true, uptime: '42s', status: 'running', health: 'unhealthy', ports: [8080] },
+      },
+    });
+
+    renderReadyForMergeFeature();
+
+    fireEvent.contextMenu(await screen.findByTestId('uat-stack-tree-header'));
+    const items = await screen.findAllByRole('menuitem');
+    const labels = items.map(item => item.textContent);
+    const expected = resolveUatActions('unhealthy').menu.map(action => action.label);
+
+    expect(labels).toEqual(expected);
+    expect(labels.at(-1)).toBe('Reap');
+    expect(items.at(-1)?.className).toContain('text-destructive');
+  });
+
+  it('opens the UAT context menu with resolver actions for a stopped stack', async () => {
+    stubWorkspace({
+      exists: true,
+      issueId: 'PAN-821',
+      stackHealth: {
+        healthy: false,
+        reasons: ['api exited', 'postgres exited'],
+        lastObserved: '2026-06-14T19:02:00.000Z',
+      },
+      containers: {
+        postgres: { running: false, uptime: '', status: 'exited', health: 'none', ports: [5432] },
+        api: { running: false, uptime: '', status: 'exited', health: 'none', ports: [8080] },
+      },
+    });
+
+    renderReadyForMergeFeature();
+
+    fireEvent.contextMenu(await screen.findByTestId('uat-stack-tree-header'));
+    const items = await screen.findAllByRole('menuitem');
+    const labels = items.map(item => item.textContent);
+    const expected = resolveUatActions('stopped').menu.map(action => action.label);
+
+    expect(labels).toEqual(expected);
+    expect(labels.at(-1)).toBe('Reap');
+    expect(items.at(-1)?.className).toContain('text-destructive');
+  });
+
+  it('confirms UAT reap through the workspace reap route and never calls deep-wipe', async () => {
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      if (url === '/api/workspaces/PAN-821') {
+        return {
+          ok: true,
+          json: async () => ({
+            exists: true,
+            issueId: 'PAN-821',
+            stackHealth: {
+              healthy: false,
+              reasons: ['api exited', 'postgres exited'],
+              lastObserved: '2026-06-14T19:02:00.000Z',
+            },
+            containers: {
+              postgres: { running: false, uptime: '', status: 'exited', health: 'none', ports: [5432] },
+              api: { running: false, uptime: '', status: 'exited', health: 'none', ports: [8080] },
+            },
+          }),
+        };
+      }
+      if (url === '/api/workspaces/PAN-821/reap' && init?.method === 'POST') {
+        return {
+          ok: true,
+          json: async () => ({ success: true, activityId: 'activity-1' }),
+        };
+      }
+      return {
+        ok: true,
+        json: async () => ({
+          workspacePaths: [],
+          localBranchNames: [],
+          remoteBranchNames: [],
+          tmuxSessionNames: [],
+          prs: [],
+          dockerContainerNames: [],
+        } satisfies ProjectFeatureResourceIdentifiers),
+      };
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const confirmSpy = vi.fn(() => true);
+    vi.stubGlobal('confirm', confirmSpy);
+
+    renderReadyForMergeFeature();
+
+    fireEvent.click(await screen.findByTestId('uat-inline-action-reap'));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith('/api/workspaces/PAN-821/reap', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-overdeck-csrf-token': 'test-csrf-token',
+        },
+      });
+    });
+    expect(confirmSpy).toHaveBeenCalledTimes(1);
+    const calledUrls = fetchMock.mock.calls.map(call => String(call[0]));
+    expect(calledUrls.some(url => url.includes('deep-wipe'))).toBe(false);
   });
 
   it('shows cleanup affordances for orphaned resources', () => {
     const onCleanupOrphanedResources = vi.fn();
-    renderFeature(
+    const { container } = renderFeature(
       <FeatureItem
         feature={makeFeature({
           issueId: 'PAN-777',
@@ -711,9 +1259,10 @@ describe('FeatureItem', () => {
             remoteBranchCount: 0,
             tmuxSessionCount: 0,
             prs: [],
-            hasVbrief: false,
-            hasBeads: false,
+            hasXbrief: false,
+            hasTasks: false,
             dockerContainerCount: 0,
+            conversations: [],
           },
         })}
         isSelected={false}
@@ -722,8 +1271,132 @@ describe('FeatureItem', () => {
       />,
     );
 
-    fireEvent.mouseEnter(screen.getByTitle('workspace: allocated').parentElement!);
-    fireEvent.click(screen.getByRole('button', { name: 'Cleanup' }));
+    const strip = container.querySelector('.featureResourceStrip');
+    expect(strip).toBeTruthy();
+    if (strip) fireEvent.mouseEnter(strip);
+
+    const cleanupButton = screen.getByTitle('Clean up orphaned workspace resources');
+    fireEvent.click(cleanupButton);
+
+    expect(onCleanupOrphanedResources).toHaveBeenCalledTimes(1);
     expect(onCleanupOrphanedResources).toHaveBeenCalledWith('PAN-777');
+  });
+
+  it('renders issue-linked conversations as child rows with links to /conv/<id>', () => {
+    renderFeature(
+      <FeatureItem
+        feature={makeFeature({
+          sessions: [],
+          resourceSources: ['conversation'],
+          resourceDetails: {
+            hasWorkspace: false,
+            localBranchCount: 0,
+            remoteBranchCount: 0,
+            tmuxSessionCount: 0,
+            prs: [],
+            hasXbrief: false,
+            hasTasks: false,
+            dockerContainerCount: 0,
+            conversations: [
+              { id: 42, name: 'conv-pan-821', title: 'My conv', status: 'active' },
+              { id: 43, name: 'conv-pan-821-2', title: null, status: 'ended' },
+            ],
+          },
+        })}
+        isSelected={false}
+        onSelect={() => {}}
+      />,
+    );
+
+    const activeLink = screen.getByTestId('conversation-42');
+    expect(activeLink).toHaveAttribute('href', '/conv/42');
+    expect(activeLink).toHaveTextContent('My conv');
+    expect(activeLink.children).toHaveLength(4);
+    expect(activeLink.children[0]).toHaveClass('sessionIconSlot');
+    expect(activeLink.children[1]).toHaveClass('sessionLabel');
+    expect(activeLink.children[2]).toHaveClass('sessionStatus');
+    expect(activeLink.children[3]).toHaveClass('sessionModel');
+
+    const endedLink = screen.getByTestId('conversation-43');
+    expect(endedLink).toHaveAttribute('href', '/conv/43');
+    expect(endedLink).toHaveTextContent('Conversation');
+  });
+
+  it('shows the expand caret for an issue with conversations but no sessions', () => {
+    renderFeature(
+      <FeatureItem
+        feature={makeFeature({
+          stateLabel: 'Done',
+          sessions: [],
+          resourceSources: ['conversation'],
+          resourceDetails: {
+            hasWorkspace: false,
+            localBranchCount: 0,
+            remoteBranchCount: 0,
+            tmuxSessionCount: 0,
+            prs: [],
+            hasXbrief: false,
+            hasTasks: false,
+            dockerContainerCount: 0,
+            conversations: [{ id: 7, name: 'conv-pan-821', title: 'Only conv', status: 'active' }],
+          },
+        })}
+        isSelected={false}
+        onSelect={() => {}}
+      />,
+    );
+
+    expect(screen.queryByTestId('conversation-7')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Expand sessions' }));
+    const link = screen.getByTestId('conversation-7');
+    expect(link).toHaveAttribute('href', '/conv/7');
+    expect(link).toHaveTextContent('Only conv');
+  });
+});
+
+/**
+ * PAN-2765 — a wait can be buried a level down in the tree. The issue row must
+ * say so without the operator expanding it, which is how the live PAN-2760
+ * planning question went unseen.
+ */
+describe('FeatureItem needs-attention shading', () => {
+  let fetchControl: ReturnType<typeof installStrictFetchMock>;
+
+  beforeEach(() => {
+    fetchControl = installStrictFetchMock(({ method, url }) => {
+      if (method !== 'GET') return undefined;
+      if (url === '/api/settings/available-models') return Response.json({ models: [] });
+      if (url === '/api/flywheel/uat-generations') return Response.json([]);
+      if (url === '/api/workspaces/PAN-821') return Response.json({});
+      if (url.startsWith('/api/review/PAN-821/') || url.startsWith('/api/issues/PAN-821/')) {
+        return Response.json({});
+      }
+      return undefined;
+    });
+  });
+
+  afterEach(async () => {
+    await fetchControl.assertNoUnexpectedRequests();
+    vi.unstubAllGlobals();
+  });
+
+  it('shades the issue row when a descendant session awaits input', () => {
+    const { container } = renderFeature(
+      <FeatureItem
+        feature={makeFeature({
+          sessions: [makeSession({ type: 'planning', sessionId: 'planning-pan-821', awaitingInput: true })],
+        })}
+      />,
+    );
+
+    expect(container.querySelector('[data-needs-attention="true"]')).not.toBeNull();
+  });
+
+  it('does not shade the issue row when no descendant awaits input', () => {
+    const { container } = renderFeature(
+      <FeatureItem feature={makeFeature({ sessions: [makeSession()] })} />,
+    );
+
+    expect(container.querySelector('[data-needs-attention="true"]')).toBeNull();
   });
 });

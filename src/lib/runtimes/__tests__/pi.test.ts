@@ -4,6 +4,15 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
+const harnessMocks = vi.hoisted(() => ({
+  prepareHarnessLaunch: vi.fn(async () => ({
+    binaryPath: '/home/test/.local/bin/omp',
+    pathExport: `export PATH='/home/test/.local/bin':"$PATH"`,
+  })),
+}))
+
+vi.mock('../../harness-binary.js', () => harnessMocks)
+
 import { PiRuntimeSync, createPiRuntimeSync, PiSpawnTimeout } from '../pi.js'
 import { getGlobalRegistry, getRuntime, setGlobalRegistry, RuntimeRegistry } from '../index.js'
 import { createClaudeCodeRuntimeSync } from '../claude-code.js'
@@ -75,7 +84,7 @@ describe('PiRuntime.spawnAgent precondition checks', () => {
     ).rejects.toThrow(/piExtensionPath/)
   })
 
-  // Full spawn flow with a 30s timeout is exercised by the e2e bead
+  // Full spawn flow with a 30s timeout is exercised by the e2e task
   // workspace-w1o0 (smoke test that drives a real Pi process through one
   // prompt). PiSpawnTimeout is a typed error class — verify it is exported
   // and constructible so consumers can `instanceof` against it.
@@ -198,10 +207,10 @@ vi.mock('child_process', async () => {
 })
 
 // ── PiRuntime resume behavior (PAN-636 workspace-3119) ──────────────────────
-// The pi-extension persists ~/.overdeck/agents/<id>/session.id on every
+// The pi/ohmypi-extension persists ~/.overdeck/agents/<id>/session.id on every
 // session_start with a non-null sessionId; PiRuntime.spawnAgent reads that
-// file and forwards it as `pi --session <id>` so the next spawn lands in the
-// same Pi session. We mock tmux out so we can drive spawnAgent end-to-end
+// file and forwards it as `omp --resume <id>` so the next spawn lands in the
+// same session. We mock tmux out so we can drive spawnAgent end-to-end
 // without a real shell process.
 vi.mock('../../tmux.js', async () => {
   const actual = await vi.importActual<typeof import('../../tmux.js')>('../../tmux.js')
@@ -233,7 +242,7 @@ describe('PiRuntime.spawnAgent resume via session.id (PAN-636 workspace-3119)', 
     writeFileSync(join(dir, 'ready.json'), JSON.stringify({ sessionId: 'irrelevant' }))
   }
 
-  it('AC2: re-spawning after a kill emits `pi --session <id>` when session.id is present', async () => {
+  it('AC2: re-spawning after a kill emits `omp --resume <id>` when session.id is present', async () => {
     const agentId = 'agent-resume-1'
     const dir = join(h.home, '.overdeck', 'agents', agentId)
     const sessionsDir = join(dir, 'sessions')
@@ -252,7 +261,7 @@ describe('PiRuntime.spawnAgent resume via session.id (PAN-636 workspace-3119)', 
     } as any)
 
     const launcher = require('node:fs').readFileSync(join(dir, 'pi-launcher.sh'), 'utf-8')
-    expect(launcher).toMatch(/--session\s+'?sess-stored-7777'?/)
+    expect(launcher).toMatch(/--resume\s+'?sess-stored-7777'?/)
   })
 
   it('AC3: goes fresh and warns only when NEITHER session.id NOR a parseable session id exists', async () => {
@@ -274,7 +283,7 @@ describe('PiRuntime.spawnAgent resume via session.id (PAN-636 workspace-3119)', 
     } as any)
 
     const launcher = require('node:fs').readFileSync(join(dir, 'pi-launcher.sh'), 'utf-8')
-    expect(launcher).not.toMatch(/--session\s+\S/)
+    expect(launcher).not.toMatch(/--resume\s+\S/)
 
     const warned = warnSpy.mock.calls.map((c) => String(c[0])).join('\n')
     expect(warned).toMatch(/no resumable session id/)
@@ -299,7 +308,7 @@ describe('PiRuntime.spawnAgent resume via session.id (PAN-636 workspace-3119)', 
     } as any)
 
     const launcher = require('node:fs').readFileSync(join(dir, 'pi-launcher.sh'), 'utf-8')
-    expect(launcher).toMatch(/--session\s+'?real-pi-sess-9999'?/)
+    expect(launcher).toMatch(/--resume\s+'?real-pi-sess-9999'?/)
 
     const warned = warnSpy.mock.calls.map((c) => String(c[0])).join('\n')
     expect(warned).not.toMatch(/no resumable session id/)
@@ -322,7 +331,7 @@ describe('PiRuntime.spawnAgent resume via session.id (PAN-636 workspace-3119)', 
   })
 })
 
-describe('PiRuntime.killAgent escalation ladder + cleanup (PAN-636 bead 8qco)', () => {
+describe('PiRuntime.killAgent escalation ladder + cleanup (PAN-636 task 8qco)', () => {
   let h: ReturnType<typeof withFakeHome>
   beforeEach(() => { h = withFakeHome() })
   afterEach(() => h.cleanup())

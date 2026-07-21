@@ -17,12 +17,16 @@
 
 import { Effect } from 'effect';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { mkdirSync, rmSync, writeFileSync } from 'fs';
+import { dirname } from 'path';
 
 import {
   buildConvoyPrompt,
   isReviewSessionForIssue,
   killAllReviewerSessions,
   killAllReviewSessions,
+  resolveReviewMode,
+  isExtendedReviewEnabled,
   spawnReviewRoleForIssue,
   spawnReviewSubRoleForIssue,
 } from '../../../src/lib/cloister/review-agent.js';
@@ -40,6 +44,13 @@ const {
   mockSetReviewStatus,
   mockGetReviewStatus,
   mockArchiveFeedbackFiles,
+  mockLoadConfigSync,
+  mockReadIssueRecordSync,
+  mockResolveProjectForIssue,
+  mockGetLatestSessionIdSync,
+  mockResumeAgent,
+  mockStopAgent,
+  mockWipeAgentStateDirs,
 } = vi.hoisted(() => ({
   mockKillSessionAsync: vi.fn().mockResolvedValue(undefined),
   mockSaveAgentStateAsync: vi.fn().mockResolvedValue(undefined),
@@ -53,6 +64,13 @@ const {
   mockSetReviewStatus: vi.fn(),
   mockGetReviewStatus: vi.fn(() => null),
   mockArchiveFeedbackFiles: vi.fn(() => Effect.void),
+  mockLoadConfigSync: vi.fn(() => ({ config: {} })),
+  mockReadIssueRecordSync: vi.fn(() => null),
+  mockResolveProjectForIssue: vi.fn(() => ({ name: 'test', path: '/tmp/project' })),
+  mockGetLatestSessionIdSync: vi.fn(() => null),
+  mockResumeAgent: vi.fn().mockResolvedValue({ success: false, error: 'no session' }),
+  mockStopAgent: vi.fn().mockResolvedValue(undefined),
+  mockWipeAgentStateDirs: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('../../../src/lib/tmux.js', async () => {
@@ -72,21 +90,38 @@ vi.mock('../../../src/lib/tmux.js', async () => {
 
 vi.mock('../../../src/lib/agents.js', () => ({
   getAgentState: (...args: Parameters<typeof mockGetAgentState>) => Effect.sync(() => mockGetAgentState(...args)),
-  getAgentStateSync: (...args: Parameters<typeof mockGetAgentState>) => Effect.sync(() => mockGetAgentState(...args)),
+  getAgentStateSync: (...args: Parameters<typeof mockGetAgentState>) => mockGetAgentState(...args),
   messageAgent: mockMessageAgent,
   saveAgentState: (...args: Parameters<typeof mockSaveAgentStateAsync>) => Effect.promise(() => mockSaveAgentStateAsync(...args)),
   saveAgentStateSync: (...args: Parameters<typeof mockSaveAgentStateAsync>) => Effect.promise(() => mockSaveAgentStateAsync(...args)),
   saveAgentStateProgram: (...args: Parameters<typeof mockSaveAgentStateAsync>) => Effect.promise(() => mockSaveAgentStateAsync(...args)),
   spawnRun: mockSpawnRun,
-  getLatestSessionIdSync: vi.fn().mockReturnValue(null),
-  resumeAgent: vi.fn().mockResolvedValue({ success: false, error: 'no session' }),
+  getLatestSessionIdSync: mockGetLatestSessionIdSync,
+  resumeAgent: mockResumeAgent,
+  stopAgent: (...args: Parameters<typeof mockStopAgent>) => Effect.promise(() => mockStopAgent(...args)),
+  wipeAgentStateDirs: mockWipeAgentStateDirs,
+  getProviderAuthMode: vi.fn(async () => 'apikey'),
 }));
 
 vi.mock('../../../src/lib/config-yaml.js', () => ({
   loadConfig: vi.fn(() => ({ config: {} })),
-  loadConfigSync: vi.fn(() => ({ config: {} })),
+  loadConfigSync: mockLoadConfigSync,
   resolveModel: vi.fn(() => 'configured-reviewer-model'),
 }));
+
+vi.mock('../../../src/lib/pan-dir/record.js', () => ({
+  readIssueRecordSync: mockReadIssueRecordSync,
+  resolveProjectForIssue: mockResolveProjectForIssue,
+  writeAgentHarnessModelSync: vi.fn(),
+}));
+
+vi.mock('../../../src/lib/paths.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../src/lib/paths.js')>();
+  return {
+    ...actual,
+    AGENTS_DIR: '/tmp/pan-review-agent-test-agents',
+  };
+});
 
 vi.mock('../../../src/lib/pipeline-notifier.js', () => ({
   notifyPipeline: mockNotifyPipeline,
@@ -116,10 +151,113 @@ beforeEach(() => {
   mockMessageAgent.mockResolvedValue(undefined);
   mockGetAgentState.mockReturnValue(null);
   mockGetReviewStatus.mockReturnValue(null);
+  mockLoadConfigSync.mockReturnValue({ config: {} });
+  mockReadIssueRecordSync.mockReturnValue(null);
+  mockResolveProjectForIssue.mockReturnValue({ name: 'test', path: '/tmp/project' });
+  mockGetLatestSessionIdSync.mockReturnValue(null);
+  mockResumeAgent.mockResolvedValue({ success: false, error: 'no session' });
+  mockWipeAgentStateDirs.mockResolvedValue(undefined);
   mockBuildRealConflictGateDeps.mockReturnValue({ real: true });
   mockResolveConflictGate.mockResolvedValue({ gated: false });
   mockGetCachedConflictGateMergeability.mockReturnValue(undefined);
   mockArchiveFeedbackFiles.mockReturnValue(Effect.void);
+});
+
+const REVIEW_MODE_WORKSPACE = '/tmp/pan-review-mode';
+const REVIEW_AGENT_DEFAULT_WORKSPACE = '/tmp/pan-review-agent-default';
+const REVIEW_AGENT_SUBROLE_WORKSPACE = '/tmp/pan-review-agent-subrole';
+const REVIEW_AGENT_RUN_ID = 'agent-pan-1059-review-abcdef12';
+
+function minimalReviewContextManifest(manifestPath: string) {
+  return {
+    runId: REVIEW_AGENT_RUN_ID,
+    issueId: 'PAN-1059',
+    generatedAt: '2026-01-01T00:00:00.000Z',
+    branch: 'feature/pan-1059',
+    headSha: 'abcdef12',
+    diff: { stat: 'src/example.ts | 1 +', truncated: true },
+    changedFiles: [
+      {
+        path: 'src/example.ts',
+        status: 'M',
+        additions: 1,
+        deletions: 0,
+        riskScore: 3,
+      },
+    ],
+    largeChangeset: { fileCount: 1, changedLines: 1, isLarge: false },
+    acceptanceCriteria: ['Preserve review prompt wiring'],
+    nonGoals: [],
+    traces: [],
+    policyNotes: [],
+    stubUiFindings: [],
+    manifestPath,
+  };
+}
+
+function prepareWorkspace(path: string): void {
+  rmSync(path, { recursive: true, force: true });
+  mkdirSync(path, { recursive: true });
+}
+
+function writeReviewManifest(workspace: string): string {
+  const manifestPath = `${workspace}/.pan/review/${REVIEW_AGENT_RUN_ID}/context.json`;
+  mkdirSync(dirname(manifestPath), { recursive: true });
+  writeFileSync(
+    manifestPath,
+    JSON.stringify(minimalReviewContextManifest(manifestPath), null, 2),
+    'utf-8',
+  );
+  return manifestPath;
+}
+
+describe('review mode resolution', () => {
+  it('defaults to quick when neither the issue record nor config sets review mode', () => {
+    expect(resolveReviewMode('PAN-1982')).toBe('quick');
+    expect(isExtendedReviewEnabled('PAN-1982')).toBe(false);
+
+    expect(mockResolveProjectForIssue).toHaveBeenCalledWith('PAN-1982');
+    expect(mockReadIssueRecordSync).toHaveBeenCalledWith({ name: 'test', path: '/tmp/project' }, 'PAN-1982');
+    expect(mockLoadConfigSync).toHaveBeenCalled();
+  });
+
+  it('uses full mode from merged config when no per-issue override exists', () => {
+    mockLoadConfigSync.mockReturnValue({
+      config: { roles: { review: { model: 'workhorse:expensive', mode: 'full' } } },
+    });
+
+    expect(resolveReviewMode('PAN-1982')).toBe('full');
+    expect(isExtendedReviewEnabled('PAN-1982')).toBe(true);
+  });
+
+  it('uses per-issue reviewMode over merged project and global config', () => {
+    mockLoadConfigSync.mockReturnValue({
+      config: { roles: { review: { model: 'workhorse:expensive', mode: 'quick' } } },
+    });
+    mockReadIssueRecordSync.mockReturnValue({ reviewMode: 'full' });
+
+    expect(resolveReviewMode('PAN-1982')).toBe('full');
+    expect(isExtendedReviewEnabled('PAN-1982')).toBe(true);
+    expect(mockLoadConfigSync).not.toHaveBeenCalled();
+  });
+
+  it("resolves mode 'none' from merged config (PAN-1862 FR-13)", () => {
+    mockLoadConfigSync.mockReturnValue({
+      config: { roles: { review: { model: 'workhorse:expensive', mode: 'none' } } },
+    });
+
+    expect(resolveReviewMode('PAN-1982')).toBe('none');
+    expect(isExtendedReviewEnabled('PAN-1982')).toBe(false);
+  });
+
+  it("resolves per-issue reviewMode 'none' over config", () => {
+    mockLoadConfigSync.mockReturnValue({
+      config: { roles: { review: { model: 'workhorse:expensive', mode: 'full' } } },
+    });
+    mockReadIssueRecordSync.mockReturnValue({ reviewMode: 'none' });
+
+    expect(resolveReviewMode('PAN-1982')).toBe('none');
+  });
 });
 
 // ── killAllReviewSessions ─────────────────────────────────────────────────────
@@ -339,6 +477,90 @@ describe('spawnReviewRoleForIssue conflict gate', () => {
   });
 });
 
+// ── review mode fan-out dispatch ─────────────────────────────────────────────
+
+describe('spawnReviewRoleForIssue review mode fan-out', () => {
+  const reviewOpts = {
+    issueId: 'PAN-1982',
+    workspace: REVIEW_MODE_WORKSPACE,
+    branch: 'feature/pan-1982',
+    force: true,
+  };
+
+  beforeEach(() => {
+    prepareWorkspace(REVIEW_MODE_WORKSPACE);
+    mockSpawnRun.mockImplementation(async (issueId: string, _role: string, options: { subRole?: string }) => ({
+      id: options.subRole
+        ? `agent-${issueId.toLowerCase()}-review-${options.subRole}`
+        : `agent-${issueId.toLowerCase()}-review`,
+    }));
+  });
+
+  it('quick mode spawns only the parent self-review session', async () => {
+    mockReadIssueRecordSync.mockReturnValue({ reviewMode: 'quick' });
+
+    const result = await Effect.runPromise(spawnReviewRoleForIssue(reviewOpts));
+
+    expect(result).toEqual({
+      success: true,
+      message: 'Self-review spawned: agent-pan-1982-review',
+    });
+    expect(mockSpawnRun).toHaveBeenCalledTimes(1);
+    const [_issueId, _role, parentOptions] = mockSpawnRun.mock.calls[0];
+    expect(parentOptions).not.toHaveProperty('subRole');
+    expect(parentOptions.prompt).toContain('you are the sole reviewer');
+    expect(parentOptions.prompt).not.toContain('STANDBY');
+  });
+
+  it('full mode branches to synthesis prompt and fans out every sub-reviewer lane', async () => {
+    const { readFileSync } = await import('fs');
+    const { resolve } = await import('path');
+    const agentSrc = readFileSync(
+      resolve(import.meta.dirname, '../../../src/lib/cloister/review-agent.ts'),
+      'utf-8',
+    );
+
+    const dispatchBlock = agentSrc.match(
+      /const fullReview = isExtendedReviewEnabled\(opts\.issueId\);[\s\S]*?Review role \(self-review\) spawned/,
+    );
+    expect(dispatchBlock).not.toBeNull();
+    const block = dispatchBlock![0];
+
+    expect(block).toContain('buildReviewRolePrompt');
+    expect(block).toContain('buildSelfReviewPrompt');
+    // PAN-1862: the fan-out itself lives in review-convoy.ts — the dispatch block
+    // delegates to launchConvoyReviewersPromise over the selective in-scope set
+    // (all four on a first cycle; a subset when carried verdicts prove skips safe).
+    expect(block).toContain('launchConvoyReviewersPromise');
+    expect(block).toContain('...(opts.model ? { model: opts.model } : {})');
+    expect(block).toContain('...(opts.harness ? { harness: opts.harness } : {})');
+    expect(block).toContain('message: `Convoy review spawned: ${run.id}`');
+    // The fan-out itself (params.inScope.map -> spawnReviewSubRoleForIssue) lives in
+    // review-convoy.ts and is exercised behaviorally by the review-rerun-scope and
+    // convoy tests — no extra source introspection here (lint:source-introspection).
+  });
+
+  it('full mode re-review resumes the parent before reusing the convoy fan-out path', async () => {
+    const { readFileSync } = await import('fs');
+    const { resolve } = await import('path');
+    const agentSrc = readFileSync(
+      resolve(import.meta.dirname, '../../../src/lib/cloister/review-agent.ts'),
+      'utf-8',
+    );
+
+    const resumeBlock = agentSrc.match(
+      /if \(canResumeReview\) \{[\s\S]*?falling back to a fresh session/,
+    );
+    expect(resumeBlock).not.toBeNull();
+    const block = resumeBlock![0];
+
+    expect(block).toContain('resumeAgent(reviewAgentId, prompt)');
+    expect(block).toContain('if (fullReview)');
+    expect(block).toContain('await spawnConvoyReviewers(reviewAgentId)');
+    expect(block).toContain('Convoy review resumed (session preserved)');
+  });
+});
+
 // ── pan down integration (PAN-931) ────────────────────────────────────────────
 // Regression: verifies that `pan down` imports and calls killAllReviewSessions
 // so review sessions are cleaned up during dashboard shutdown.
@@ -401,16 +623,15 @@ describe('pan down integration (PAN-931)', () => {
 // The route must use 'failed' for reviewStatus so the type contract is maintained.
 
 describe('reviewStatus type-safety regression', () => {
-  it('workspaces.ts request-review route does not write reviewStatus=dispatch_failed', async () => {
+  it('review-pipeline.ts request-review route does not write reviewStatus=dispatch_failed', async () => {
     const { readFileSync } = await import('fs');
     const { resolve } = await import('path');
     const routeSrc = readFileSync(
-      resolve(import.meta.dirname, '../../../src/dashboard/server/routes/workspaces.ts'),
+      resolve(import.meta.dirname, '../../../src/dashboard/server/routes/workspaces/review-pipeline.ts'),
       'utf-8',
     );
-
     const requestReviewMatch = routeSrc.match(
-      /postWorkspaceRequestReviewRoute[\s\S]*?postWorkspaceResetReviewRoute/,
+      /const postWorkspaceRequestReviewRoute[\s\S]*?export const reviewPipelineRouteLayer/,
     );
     expect(requestReviewMatch).not.toBeNull();
     const requestReviewBlock = requestReviewMatch![0];
@@ -436,12 +657,11 @@ describe('request-review fresh convoy regression', () => {
     const { readFileSync } = await import('fs');
     const { resolve } = await import('path');
     const routeSrc = readFileSync(
-      resolve(import.meta.dirname, '../../../src/dashboard/server/routes/workspaces.ts'),
+      resolve(import.meta.dirname, '../../../src/dashboard/server/routes/workspaces/review-pipeline.ts'),
       'utf-8',
     );
-
     const requestReviewMatch = routeSrc.match(
-      /postWorkspaceRequestReviewRoute[\s\S]*?postWorkspaceResetReviewRoute/,
+      /const postWorkspaceRequestReviewRoute[\s\S]*?export const reviewPipelineRouteLayer/,
     );
     expect(requestReviewMatch).not.toBeNull();
     const requestReviewBlock = requestReviewMatch![0];
@@ -504,11 +724,11 @@ describe('stale synthesis session detection (PAN-1131)', () => {
 });
 
 describe('passed-state rerun regression', () => {
-  it('workspaces.ts request-review route rejects dirty workspaces before rerun dispatch', async () => {
+  it('review-pipeline.ts request-review route rejects dirty workspaces before rerun dispatch', async () => {
     const { readFileSync } = await import('fs');
     const { resolve } = await import('path');
     const routeSrc = readFileSync(
-      resolve(import.meta.dirname, '../../../src/dashboard/server/routes/workspaces.ts'),
+      resolve(import.meta.dirname, '../../../src/dashboard/server/routes/workspaces/review-pipeline.ts'),
       'utf-8',
     );
 
@@ -522,11 +742,11 @@ describe('passed-state rerun regression', () => {
     expect(rerunBlock).toContain('dirty workspace on rerun path');
   });
 
-  it('workspaces.ts request-review route uses spawnReviewRoleForIssue in the rerun path', async () => {
+  it('review-pipeline.ts request-review route uses spawnReviewRoleForIssue in the rerun path', async () => {
     const { readFileSync } = await import('fs');
     const { resolve } = await import('path');
     const routeSrc = readFileSync(
-      resolve(import.meta.dirname, '../../../src/dashboard/server/routes/workspaces.ts'),
+      resolve(import.meta.dirname, '../../../src/dashboard/server/routes/workspaces/review-pipeline.ts'),
       'utf-8',
     );
 
@@ -616,8 +836,15 @@ describe('convoy orchestration', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGetAgentState.mockReturnValue(null);
+    mockGetLatestSessionIdSync.mockReturnValue(null);
+    mockResumeAgent.mockResolvedValue({ success: false, error: 'no session' });
+    mockStopAgent.mockResolvedValue(undefined);
     mockSpawnRun.mockResolvedValue({ id: 'agent-pan-1059-review-security' });
     mockGetAgentState.mockReturnValue(null);
+    prepareWorkspace(REVIEW_AGENT_DEFAULT_WORKSPACE);
+    prepareWorkspace(REVIEW_AGENT_SUBROLE_WORKSPACE);
+    writeReviewManifest(REVIEW_AGENT_DEFAULT_WORKSPACE);
+    writeReviewManifest(REVIEW_AGENT_SUBROLE_WORKSPACE);
   });
 
   it('builds a manifest-scoped convoy prompt for one sub-role', async () => {
@@ -642,16 +869,18 @@ describe('convoy orchestration', () => {
   });
 
   it('uses run-scoped output paths by default', async () => {
+    const manifestPath = writeReviewManifest(REVIEW_AGENT_DEFAULT_WORKSPACE);
+
     const result = await Effect.runPromise(spawnReviewSubRoleForIssue({
       issueId: 'PAN-1059',
-      workspace: '/tmp/pan-review-agent-default',
+      workspace: REVIEW_AGENT_DEFAULT_WORKSPACE,
       subRole: 'security',
-      runId: 'agent-pan-1059-review-abcdef12',
-      contextManifestPath: '/tmp/pan-review-agent-default/.pan/review/agent-pan-1059-review-abcdef12/context.json',
+      runId: REVIEW_AGENT_RUN_ID,
+      contextManifestPath: manifestPath,
     }));
 
     expect(result.success).toBe(true);
-    const expectedOutput = '/tmp/pan-review-agent-default/.pan/review/agent-pan-1059-review-abcdef12/security.md';
+    const expectedOutput = `${REVIEW_AGENT_DEFAULT_WORKSPACE}/.pan/review/${REVIEW_AGENT_RUN_ID}/security.md`;
     expect(mockSpawnRun).toHaveBeenCalledWith('PAN-1059', 'review', expect.objectContaining({
       allowHost: false,
       reviewOutputPath: expectedOutput,
@@ -662,13 +891,15 @@ describe('convoy orchestration', () => {
   });
 
   it('spawns a reviewer as a review sub-role session with the resolved model', async () => {
+    const manifestPath = writeReviewManifest(REVIEW_AGENT_SUBROLE_WORKSPACE);
+
     const result = await Effect.runPromise(spawnReviewSubRoleForIssue({
       issueId: 'PAN-1059',
-      workspace: '/workspace',
+      workspace: REVIEW_AGENT_SUBROLE_WORKSPACE,
       subRole: 'security',
-      runId: 'agent-pan-1059-review-abcdef12',
+      runId: REVIEW_AGENT_RUN_ID,
       outputPath: '/tmp/pan-review-agent-test-security.md',
-      contextManifestPath: '/workspace/.pan/review/agent-pan-1059-review-abcdef12/context.json',
+      contextManifestPath: manifestPath,
     }));
 
     expect(result).toMatchObject({
@@ -676,7 +907,7 @@ describe('convoy orchestration', () => {
       sessionId: 'agent-pan-1059-review-security',
     });
     expect(mockSpawnRun).toHaveBeenCalledWith('PAN-1059', 'review', expect.objectContaining({
-      workspace: '/workspace',
+      workspace: REVIEW_AGENT_SUBROLE_WORKSPACE,
       subRole: 'security',
       model: 'configured-reviewer-model',
       allowHost: false,
@@ -685,7 +916,7 @@ describe('convoy orchestration', () => {
     expect(mockSaveAgentStateAsync).toHaveBeenCalledWith(expect.objectContaining({
       id: 'agent-pan-1059-review-security',
       reviewSubRole: 'security',
-      reviewRunId: 'agent-pan-1059-review-abcdef12',
+      reviewRunId: REVIEW_AGENT_RUN_ID,
       reviewOutputPath: '/tmp/pan-review-agent-test-security.md',
       reviewSynthesisAgentId: 'agent-pan-1059-review',
       reviewDeadlineAt: expect.any(String),
@@ -696,6 +927,35 @@ describe('convoy orchestration', () => {
       role: 'security',
       sessionName: 'agent-pan-1059-review-security',
     });
+  });
+
+  it('stops an idle-alive reviewer before fresh-spawning the new prompt', async () => {
+    const reviewerId = 'agent-pan-1059-review-security';
+    mockGetAgentState.mockReturnValue({
+      id: reviewerId,
+      model: 'configured-reviewer-model',
+      harness: 'codex',
+    });
+    mockGetLatestSessionIdSync.mockReturnValue('saved-session');
+    mockResumeAgent.mockResolvedValue({
+      success: false,
+      error: `Cannot resume ${reviewerId}: it appears healthy (tmux session up, harness process alive) — there is nothing to resume. Stop it first if you intend to restart it.`,
+    });
+
+    const result = await Effect.runPromise(spawnReviewSubRoleForIssue({
+      issueId: 'PAN-1059',
+      workspace: REVIEW_AGENT_SUBROLE_WORKSPACE,
+      subRole: 'security',
+      runId: REVIEW_AGENT_RUN_ID,
+      contextManifestPath: writeReviewManifest(REVIEW_AGENT_SUBROLE_WORKSPACE),
+    }));
+
+    expect(result.success).toBe(true);
+    expect(mockStopAgent).toHaveBeenCalledWith(reviewerId);
+    expect(mockStopAgent.mock.invocationCallOrder[0]).toBeLessThan(mockSpawnRun.mock.invocationCallOrder[0]);
+    expect(mockSpawnRun).toHaveBeenCalledWith('PAN-1059', 'review', expect.objectContaining({
+      prompt: expect.stringContaining('REVIEW TASK for PAN-1059 — SECURITY REVIEW'),
+    }));
   });
 });
 
@@ -746,16 +1006,15 @@ describe('deacon gated review deferral', () => {
 // dispatch error (e.g., tmux not ready, file-system issue).
 
 describe('dispatch failure reviewStatus regression', () => {
-  it('workspaces.ts request-review route blocks dirty worktrees before verification', async () => {
+  it('review-pipeline.ts request-review route blocks dirty worktrees before verification', async () => {
     const { readFileSync } = await import('fs');
     const { resolve } = await import('path');
     const routeSrc = readFileSync(
-      resolve(import.meta.dirname, '../../../src/dashboard/server/routes/workspaces.ts'),
+      resolve(import.meta.dirname, '../../../src/dashboard/server/routes/workspaces/review-pipeline.ts'),
       'utf-8',
     );
-
     const requestReviewMatch = routeSrc.match(
-      /postWorkspaceRequestReviewRoute[\s\S]*?postWorkspaceResetReviewRoute/,
+      /const postWorkspaceRequestReviewRoute[\s\S]*?export const reviewPipelineRouteLayer/,
     );
     expect(requestReviewMatch).not.toBeNull();
     const requestReviewBlock = requestReviewMatch![0];
@@ -770,30 +1029,30 @@ describe('dispatch failure reviewStatus regression', () => {
     expect(requestReviewBlock).not.toContain('Effect.promise(() => getWorkspaceGitInfo(');
   });
 
-  it('workspaces.ts request-review route yields the verification Effect directly', async () => {
+  it('review-pipeline.ts request-review route starts guarded background verification', async () => {
     const { readFileSync } = await import('fs');
     const { resolve } = await import('path');
     const routeSrc = readFileSync(
-      resolve(import.meta.dirname, '../../../src/dashboard/server/routes/workspaces.ts'),
+      resolve(import.meta.dirname, '../../../src/dashboard/server/routes/workspaces/review-pipeline.ts'),
       'utf-8',
     );
-
     const requestReviewMatch = routeSrc.match(
-      /postWorkspaceRequestReviewRoute[\s\S]*?postWorkspaceResetReviewRoute/,
+      /const postWorkspaceRequestReviewRoute[\s\S]*?export const reviewPipelineRouteLayer/,
     );
     expect(requestReviewMatch).not.toBeNull();
     const requestReviewBlock = requestReviewMatch![0];
 
-    expect(requestReviewBlock).toContain('yield* runVerificationForIssue(');
-    expect(requestReviewBlock).not.toContain('Effect.promise(() => runVerificationForIssue(');
-    expect(requestReviewBlock).not.toContain('Effect.promise(() => getWorkspaceGitInfo(');
+    expect(requestReviewBlock).toContain('requestReviewPipeline.isInFlight(canonicalIssueId)');
+    expect(requestReviewBlock).toContain('requestReviewPipeline.start(canonicalIssueId');
+    expect(requestReviewBlock).toContain('verify: () => Effect.runPromise(runVerificationForIssue(');
+    expect(requestReviewBlock).not.toContain('yield* runVerificationForIssue(');
   });
 
   it('specialists review restart route returns 409 for gated dispatches', async () => {
     const { readFileSync } = await import('fs');
     const { resolve } = await import('path');
     const routeSrc = readFileSync(
-      resolve(import.meta.dirname, '../../../src/dashboard/server/routes/specialists.ts'),
+      resolve(import.meta.dirname, '../../../src/dashboard/server/routes/specialists/project-routes.ts'),
       'utf-8',
     );
 
@@ -809,32 +1068,31 @@ describe('dispatch failure reviewStatus regression', () => {
     expect(restartBlock).toContain('{ status: 409 }');
   });
 
-  it('workspaces.ts review request routes treat gated dispatches as deferrals', async () => {
+  it('review-pipeline.ts review request route records gated background dispatches as deferrals', async () => {
     const { readFileSync } = await import('fs');
     const { resolve } = await import('path');
     const routeSrc = readFileSync(
-      resolve(import.meta.dirname, '../../../src/dashboard/server/routes/workspaces.ts'),
+      resolve(import.meta.dirname, '../../../src/dashboard/server/routes/workspaces/review-pipeline.ts'),
       'utf-8',
     );
-
     const requestReviewMatch = routeSrc.match(
-      /postWorkspaceRequestReviewRoute[\s\S]*?postWorkspaceResetReviewRoute/,
+      /const postWorkspaceRequestReviewRoute[\s\S]*?export const reviewPipelineRouteLayer/,
     );
     expect(requestReviewMatch).not.toBeNull();
     const requestReviewBlock = requestReviewMatch![0];
 
     expect(routeSrc).toContain('reviewResult.gated');
+    expect(requestReviewBlock).toContain('if (result.gated)');
     expect(requestReviewBlock).toContain('Review deferred for');
-    expect(requestReviewBlock).toContain('gated: true');
-    expect(requestReviewBlock).toContain('{ status: 409 }');
+    expect(requestReviewBlock).toContain("reviewStatus: 'pending'");
     expect(requestReviewBlock).toContain('reviewNotes: result.message');
   });
 
-  it('workspaces.ts approve route treats gated dispatches as deferrals', async () => {
+  it('merge-ops.ts approve route treats gated dispatches as deferrals', async () => {
     const { readFileSync } = await import('fs');
     const { resolve } = await import('path');
     const routeSrc = readFileSync(
-      resolve(import.meta.dirname, '../../../src/dashboard/server/routes/workspaces.ts'),
+      resolve(import.meta.dirname, '../../../src/dashboard/server/routes/workspaces/merge-ops.ts'),
       'utf-8',
     );
 
@@ -854,17 +1112,15 @@ describe('dispatch failure reviewStatus regression', () => {
     expect(approveBlock).toContain('setReviewStatusBase(issueId, {');
   });
 
-  it('workspaces.ts dispatch failure paths set reviewStatus=pending not failed', async () => {
+  it('review-pipeline.ts dispatch failure paths set reviewStatus=pending not failed', async () => {
     const { readFileSync } = await import('fs');
     const { resolve } = await import('path');
     const routeSrc = readFileSync(
-      resolve(import.meta.dirname, '../../../src/dashboard/server/routes/workspaces.ts'),
+      resolve(import.meta.dirname, '../../../src/dashboard/server/routes/workspaces/review-pipeline.ts'),
       'utf-8',
     );
-
-    // Extract the request-review route block
     const requestReviewMatch = routeSrc.match(
-      /postWorkspaceRequestReviewRoute[\s\S]*?postWorkspaceResetReviewRoute/,
+      /const postWorkspaceRequestReviewRoute[\s\S]*?export const reviewPipelineRouteLayer/,
     );
     expect(requestReviewMatch).not.toBeNull();
     const requestReviewBlock = requestReviewMatch![0];
