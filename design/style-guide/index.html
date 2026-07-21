@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Overdeck style guide — canonical references & samples</title>
+<style>
+  :root {
+    --bg: #080b10; --card: #0e1420; --card2: #111a2a; --border: #1e2a3d;
+    --fg: #dbe4f0; --muted: #7d8ca3; --primary: #5b8def; --info: #56b8e0;
+    --success: #34c98e; --warning: #e5b545;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--fg); font: 14px/1.55 "DM Sans", system-ui, sans-serif; padding: 32px 20px 80px; }
+  .wrap { max-width: 860px; margin: 0 auto; }
+  h1 { font-size: 24px; font-weight: 500; letter-spacing: -0.01em; }
+  h2 { font-size: 14px; font-weight: 500; margin-top: 26px; color: var(--fg); }
+  .sub { color: var(--muted); margin-top: 6px; max-width: 72ch; }
+  a { color: var(--primary); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; margin-top: 12px; }
+  .card h3 { font-size: 14px; font-weight: 500; }
+  .card p { color: var(--muted); font-size: 12.5px; margin-top: 4px; }
+  .path { font-family: ui-monospace, monospace; font-size: 12px; color: var(--info); }
+  .law { border-color: #5b8def55; }
+  .law h3 { color: var(--primary); }
+  .samples { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }
+  @media (max-width: 700px) { .samples { grid-template-columns: 1fr; } }
+  .sample { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; }
+  .sample b { font-weight: 500; }
+  .sample span { display: block; color: var(--muted); font-size: 12px; margin-top: 3px; }
+  .note { margin-top: 20px; padding: 12px 14px; border: 1px solid var(--border); border-left: 3px solid var(--warning); border-radius: 8px; color: var(--muted); font-size: 12.5px; }
+  .note b { color: var(--fg); font-weight: 500; }
+  code { font-family: ui-monospace, monospace; font-size: 12px; color: var(--info); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Style guide — canonical references & samples</h1>
+  <p class="sub">Everything that governs how the dashboard should look and behave, in one index. The law is a single file; the skill just points at it. Samples below render the guide's own mockups (open them to inspect every rule in situ).</p>
+
+  <h2>The law (one file)</h2>
+  <div class="card law">
+    <h3><a href="./STYLE-GUIDE.md">design/style-guide/STYLE-GUIDE.md</a></h3>
+    <p>Canonical typography canon, color system, color-restraint rules, component specs, forbidden patterns. Everything else defers to this file. Versioned in-repo (currently v1.2).</p>
+    <p class="path">design/style-guide/STYLE-GUIDE.md</p>
+  </div>
+
+  <h2>The skill (a pointer, not a second source)</h2>
+  <div class="card">
+    <h3>pan-style-guide</h3>
+    <p>The agent skill that routes every UI task to the law. Its order of reading: <b>1. The law</b> (the file above), then its own distilled reminders. It holds no rules of its own — if it ever disagrees with the file, the file wins.</p>
+    <p class="path">~/.agents/skills/pan-style-guide/SKILL.md</p>
+  </div>
+
+  <h2>Style samples (the guide's own mockups)</h2>
+  <div class="samples">
+    <div class="sample"><a href="./mockups/board.html"><b>board.html</b></a><span>Kanban board — columns, card anatomy, color restraint in a dense view</span></div>
+    <div class="sample"><a href="./mockups/command-deck.html"><b>command-deck.html</b></a><span>Command Deck — project rail, issue tree, badges</span></div>
+    <div class="sample"><a href="./mockups/issue-detail.html"><b>issue-detail.html</b></a><span>Issue detail — drawer/page anatomy, gates, rails</span></div>
+    <div class="sample"><a href="./mockups/pipeline.html"><b>pipeline.html</b></a><span>Pipeline view — phase buckets, exception states</span></div>
+    <div class="sample"><a href="./mockups/agents.html"><b>agents.html</b></a><span>Agents surface — roster, status chips, cost lines</span></div>
+    <div class="sample"><a href="./mockups/system-map.html"><b>system-map.html</b></a><span>System map — surface inventory and navigation</span></div>
+  </div>
+
+  <div class="note">
+    <b>How to use this page:</b> rule on <code>STYLE-GUIDE.md</code> first; check a sample to see the rule applied. The <code>pan-style-guide</code> skill is what agents load — it just re-states the same canon. Nothing else in the repo is a style authority; anything in <code>workspaces/*</code> or <code>.claude/worktrees/*</code> is a checkout of the same file.
+  </div>
+</div>
+</body>
+</html>
