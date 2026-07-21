@@ -3,7 +3,7 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-07-19T02:22:16.359Z",
-  "updated": "2026-07-21T21:05:55.305Z",
+  "updated": "2026-07-21T21:06:04.137Z",
   "pipeline": {
     "issueId": "PAN-2895",
     "reviewStatus": "pending",
@@ -12,16 +12,9 @@
     "mergeStatus": "failed",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-21T21:05:55.301Z",
+    "updatedAt": "2026-07-21T21:06:04.093Z",
     "verificationNotes": "The supervised verification worker stopped before recording a result; verification re-runs on the next cycle.",
     "mergeNotes": "GitHub PR #2903 is CONFLICTING with main. Resolve conflicts before merging — see https://github.com/eltmon/overdeck/pull/2903.",
-    "blockerReasons": [
-      {
-        "type": "merge_conflict",
-        "summary": "Conflicts with main",
-        "detectedAt": "2026-07-21T21:05:55.279Z"
-      }
-    ],
     "strikeReadyHead": "9b5eadcccb765994d6794fdad6c44c9910489832",
     "strikeReadyAt": "2026-07-19T03:59:41.559Z",
     "strikeLandingState": "recovering",
@@ -55,10 +48,10 @@
       "byStage": {
         "implementation": {
           "anthropic/claude-fable-5": {
-            "input": 10,
-            "output": 2550,
-            "cacheRead": 1210028,
-            "cacheWrite": 4597
+            "input": 12,
+            "output": 2801,
+            "cacheRead": 1454620,
+            "cacheWrite": 5656
           }
         },
         "strike": {
@@ -72,10 +65,10 @@
       },
       "totals": {
         "anthropic/claude-fable-5": {
-          "input": 10,
-          "output": 2550,
-          "cacheRead": 1210028,
-          "cacheWrite": 4597
+          "input": 12,
+          "output": 2801,
+          "cacheRead": 1454620,
+          "cacheWrite": 5656
         },
         "openai/gpt-5.6-sol": {
           "input": 1539297,
@@ -85,8 +78,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 39.921668,
-        "pricingAsOf": "2026-07-21T21:05:55.302Z"
+        "usd": 40.192068,
+        "pricingAsOf": "2026-07-21T21:06:04.112Z"
       }
     },
     "merges": [],
