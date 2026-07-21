@@ -96,6 +96,12 @@ export interface EmbeddingsDbHandle {
   /** Remove all chunks and embeddings for a session (used when a session is deleted). */
   deleteSession(sessionId: string): void;
 
+  /** List every file path with an incremental-indexing cursor. */
+  listFileCursors(): string[];
+
+  /** Remove the incremental-indexing cursor for a file (used when the file is deleted). */
+  deleteCursor(filePath: string): void;
+
   /** Close the DB connection. */
   close(): void;
 }
@@ -196,6 +202,8 @@ interface Stmts {
   setCursor: SqliteStatement;
   deleteChunksBySession: SqliteStatement;
   deleteEmbeddingsBySession: SqliteStatement;
+  listFileCursors: SqliteStatement;
+  deleteCursor: SqliteStatement;
 }
 
 function prepareStmts(db: SqliteDatabase): Stmts {
@@ -234,6 +242,12 @@ function prepareStmts(db: SqliteDatabase): Stmts {
       DELETE FROM chunks_vec WHERE rowid IN (
         SELECT rowid FROM chunks WHERE session_id = ?
       )
+    `),
+    listFileCursors: db.prepare(`
+      SELECT file_path FROM file_cursors
+    `),
+    deleteCursor: db.prepare(`
+      DELETE FROM file_cursors WHERE file_path = ?
     `),
   };
 }
@@ -293,6 +307,8 @@ export function openEmbeddingsDb(
     searchVector: () => { throw new Error(`EmbeddingsDb unavailable: ${reason}`); },
     getStats: () => ({ chunkCount: 0, indexedFileCount: 0, lastIndexedAt: null }),
     deleteSession: () => {},
+    listFileCursors: () => [],
+    deleteCursor: () => {},
     close: () => {},
   });
 
@@ -404,6 +420,15 @@ export function openEmbeddingsDb(
     deleteSession(sessionId: string): void {
       stmts.deleteEmbeddingsBySession.run(sessionId);
       stmts.deleteChunksBySession.run(sessionId);
+    },
+
+    listFileCursors(): string[] {
+      const rows = stmts.listFileCursors.all() as Array<{ file_path: string }>;
+      return rows.map((row) => row.file_path);
+    },
+
+    deleteCursor(filePath: string): void {
+      stmts.deleteCursor.run(filePath);
     },
 
     close(): void {

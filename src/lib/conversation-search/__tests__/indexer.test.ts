@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { estimateFullReindexConversationSearchCost, fullReindexConversationSearch, indexConversationFile } from '../indexer.js';
+import { estimateFullReindexConversationSearchCost, fullReindexConversationSearch, indexConversationFile, indexConversationSearch } from '../indexer.js';
 import type { ChunkInsert, EmbeddingsDbHandle } from '../../database/conversation-embeddings-db.js';
 import type { ConversationEmbeddingProvider } from '../embedding-provider.js';
 import type { NormalizedConversationSearchConfig } from '../../config-yaml.js';
@@ -47,7 +47,13 @@ function fakeDb(): EmbeddingsDbHandle & { chunks: ChunkInsert[]; cursors: Map<st
     searchBm25: vi.fn(),
     searchVector: vi.fn(),
     getStats: vi.fn(() => ({ chunkCount: chunks.length, indexedFileCount: cursors.size, lastIndexedAt: null })),
-    deleteSession: vi.fn(),
+    deleteSession: vi.fn((sessionId: string) => {
+      for (let i = chunks.length - 1; i >= 0; i -= 1) {
+        if (chunks[i]!.sessionId === sessionId) chunks.splice(i, 1);
+      }
+    }),
+    listFileCursors: vi.fn(() => [...cursors.keys()]),
+    deleteCursor: vi.fn((filePath: string) => { cursors.delete(filePath); }),
     close: vi.fn(),
   };
 }
@@ -100,6 +106,28 @@ describe('conversation search indexer', () => {
 
     expect(result.chunksIndexed).toBe(1);
     expect(db.chunks.map((chunk) => chunk.text)).toEqual(['first', 'second']);
+  });
+
+  it('prunes chunks and cursors for sessions whose JSONL was deleted', async () => {
+    const dir = makeTmpDir();
+    const gonePath = join(dir, 'session-gone.jsonl');
+    const keptPath = join(dir, 'session-kept.jsonl');
+    writeFileSync(gonePath, line(message('user', 'soon deleted')));
+    writeFileSync(keptPath, line(message('user', 'still here')));
+    const db = fakeDb();
+    const provider = fakeProvider();
+
+    await indexConversationSearch({ config: config(), roots: [dir], db, provider });
+    expect(db.chunks.map((chunk) => chunk.sessionId).sort()).toEqual(['session-gone', 'session-kept']);
+
+    rmSync(gonePath);
+    const result = await indexConversationSearch({ config: config(), roots: [dir], db, provider });
+
+    expect(result.sessionsPruned).toBe(1);
+    expect(db.deleteSession).toHaveBeenCalledWith('session-gone');
+    expect(db.chunks.map((chunk) => chunk.sessionId)).toEqual(['session-kept']);
+    expect(db.cursors.has(gonePath)).toBe(false);
+    expect(db.cursors.has(keptPath)).toBe(true);
   });
 
   it('no-ops when conversation search is disabled', async () => {
