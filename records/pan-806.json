@@ -85,7 +85,7 @@
   ],
   "feedback": [],
   "created": "2026-07-21T16:29:59.439Z",
-  "updated": "2026-07-21T16:50:59.960Z",
+  "updated": "2026-07-21T16:56:50.336Z",
   "pipeline": {
     "issueId": "PAN-806",
     "reviewStatus": "pending",
@@ -173,16 +173,8 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "git-path-wrapper": {
-        "writerId": "agent-pan-806",
-        "agentId": "agent-pan-806",
-        "pid": 3470617,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-21T16:50:59.960Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-806",
@@ -216,6 +208,17 @@
         "outcome": "completed",
         "reason": "Installed executable agent-gated pre-rebase hook at git-resolved hooks path, preserved existing hooks, reapplied after Husky installs, and tested sentinel/human bypass plus agent blocking",
         "releasedAt": "2026-07-21T16:50:47.929Z"
+      },
+      {
+        "writerId": "agent-pan-806",
+        "agentId": "agent-pan-806",
+        "pid": 3470617,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-21T16:50:59.960Z",
+        "itemId": "git-path-wrapper",
+        "outcome": "completed",
+        "reason": "Generated per-agent git wrappers for all non-conversation launchers, blocking rebase/reset --hard/stash while preserving sentinel and permitted-command passthrough; updated deterministic snapshots and execution tests",
+        "releasedAt": "2026-07-21T16:56:50.336Z"
       }
     ],
     "statusReasons": {
@@ -230,6 +233,10 @@
       "prerebase-hook-install": {
         "reason": "Installed executable agent-gated pre-rebase hook at git-resolved hooks path, preserved existing hooks, reapplied after Husky installs, and tested sentinel/human bypass plus agent blocking",
         "updatedAt": "2026-07-21T16:50:47.929Z"
+      },
+      "git-path-wrapper": {
+        "reason": "Generated per-agent git wrappers for all non-conversation launchers, blocking rebase/reset --hard/stash while preserving sentinel and permitted-command passthrough; updated deterministic snapshots and execution tests",
+        "updatedAt": "2026-07-21T16:56:50.336Z"
       }
     }
   },
@@ -244,6 +251,10 @@
     "prerebase-hook-install.prerebase-hook-install.ac1": "completed",
     "prerebase-hook-install.prerebase-hook-install.ac2": "completed",
     "prerebase-hook-install.prerebase-hook-install.ac3": "completed",
-    "git-path-wrapper": "running"
+    "git-path-wrapper": "completed",
+    "git-path-wrapper.git-path-wrapper.ac1": "completed",
+    "git-path-wrapper.git-path-wrapper.ac2": "completed",
+    "git-path-wrapper.git-path-wrapper.ac3": "completed",
+    "git-path-wrapper.git-path-wrapper.ac4": "completed"
   }
 }
