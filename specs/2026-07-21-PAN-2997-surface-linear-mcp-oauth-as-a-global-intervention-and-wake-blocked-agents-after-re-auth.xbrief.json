@@ -4,17 +4,17 @@
     "created": "2026-07-21T23:30:06Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2997: Surface Linear MCP OAuth as a global intervention and wake blocked agents after re-auth",
-    "updated": "2026-07-21T23:37:41.616Z"
+    "updated": "2026-07-21T23:37:43.771Z"
   },
   "plan": {
     "id": "pan-2997",
     "title": "Surface Linear MCP OAuth as a global intervention and wake blocked agents after re-auth",
-    "status": "approved",
+    "status": "running",
     "uid": "7cd104b1-1562-4321-a4ce-7e2a2f53c72d",
     "author": "agent:k3[1m]",
-    "sequence": 5,
+    "sequence": 6,
     "created": "2026-07-21T23:30:06Z",
-    "updated": "2026-07-21T23:37:41.616Z",
+    "updated": "2026-07-21T23:37:43.771Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2997",
