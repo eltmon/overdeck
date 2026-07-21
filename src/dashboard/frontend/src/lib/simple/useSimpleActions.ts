@@ -9,6 +9,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { refreshDashboardState } from '../refresh-dashboard-state';
 import { useAlert } from '../../components/DialogProvider';
+import { resumableRecoveryFromBody, useResumeRecovery } from '../resumeRecovery';
 
 async function postJson(url: string, body?: unknown): Promise<unknown> {
   const res = await fetch(url, {
@@ -18,6 +19,16 @@ async function postJson(url: string, body?: unknown): Promise<unknown> {
   });
   if (!res.ok) {
     const text = await res.text();
+    let parsed: unknown = null;
+    try { parsed = JSON.parse(text); } catch { /* not JSON */ }
+    // Same recovery path as the registry actions: a 409 with a resumable
+    // lifecycle opens the Resume / Start fresh dialog, not an alert.
+    const recovery = res.status === 409 ? resumableRecoveryFromBody(parsed) : null;
+    if (recovery) {
+      const issueId = typeof body === 'object' && body !== null && 'issueId' in body ? String((body as { issueId: unknown }).issueId) : undefined;
+      useResumeRecovery.getState().openRecovery({ ...recovery, issueId });
+      return { recovery: true };
+    }
     let message = `Request failed (${res.status})`;
     try {
       const data = JSON.parse(text);
