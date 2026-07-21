@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-21T23:09:49.270Z",
-  "updated": "2026-07-21T23:49:03.591Z",
+  "updated": "2026-07-21T23:54:26.258Z",
   "pipeline": {
     "issueId": "PAN-2997",
     "reviewStatus": "pending",
@@ -61,16 +61,8 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "linear-mcp-heartbeat-ingestion": {
-        "writerId": "agent-pan-2997",
-        "agentId": "agent-pan-2997",
-        "pid": 2788103,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-21T23:49:03.591Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2997",
@@ -104,6 +96,17 @@
         "outcome": "completed",
         "reason": "Added the same one-shot authenticate, wait, re-check, and resume contract to work and plan role prompts",
         "releasedAt": "2026-07-21T23:48:02.571Z"
+      },
+      {
+        "writerId": "agent-pan-2997",
+        "agentId": "agent-pan-2997",
+        "pid": 2788103,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-21T23:49:03.591Z",
+        "itemId": "linear-mcp-heartbeat-ingestion",
+        "outcome": "completed",
+        "reason": "Added required/healthy heartbeat mappings, runtime issue attribution from AgentStateService, route-level malformed rejection coverage, and Schema-valid emit tests",
+        "releasedAt": "2026-07-21T23:54:26.258Z"
       }
     ],
     "statusReasons": {
@@ -118,6 +121,10 @@
       "role-linear-mcp-guidance": {
         "reason": "Added the same one-shot authenticate, wait, re-check, and resume contract to work and plan role prompts",
         "updatedAt": "2026-07-21T23:48:02.571Z"
+      },
+      "linear-mcp-heartbeat-ingestion": {
+        "reason": "Added required/healthy heartbeat mappings, runtime issue attribution from AgentStateService, route-level malformed rejection coverage, and Schema-valid emit tests",
+        "updatedAt": "2026-07-21T23:54:26.258Z"
       }
     }
   },
@@ -134,6 +141,9 @@
     "role-linear-mcp-guidance": "completed",
     "role-linear-mcp-guidance.role-linear-mcp-guidance.ac1": "completed",
     "role-linear-mcp-guidance.role-linear-mcp-guidance.ac2": "completed",
-    "linear-mcp-heartbeat-ingestion": "running"
+    "linear-mcp-heartbeat-ingestion": "completed",
+    "linear-mcp-heartbeat-ingestion.linear-mcp-heartbeat-ingestion.ac1": "completed",
+    "linear-mcp-heartbeat-ingestion.linear-mcp-heartbeat-ingestion.ac2": "completed",
+    "linear-mcp-heartbeat-ingestion.linear-mcp-heartbeat-ingestion.ac3": "completed"
   }
 }
