@@ -66,6 +66,7 @@ describe('KnowledgePage', () => {
       'command-deck': '/command-deck',
       agents: '/agents',
       flywheel: '/flywheel',
+      orders: '/orders',
       backlog: '/backlog',
       resources: '/resources',
       autopreso: '/autopreso',
