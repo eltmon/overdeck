@@ -53,6 +53,8 @@ describe('AgentState role persistence', () => {
     vi.doUnmock('../cloister/specialists.js');
     vi.doUnmock('../transcript-landing.js');
     vi.doUnmock('../agent-runtime-mirror.js');
+    vi.doUnmock('../agent-runtime.js');
+    vi.doUnmock('../agents/delivery.js');
     vi.doUnmock('../runtimes/pi-fifo.js');
     vi.doUnmock('../runtimes/ohmypi-fifo.js');
     vi.doUnmock('../harness-resolve.js');
@@ -748,6 +750,106 @@ describe('AgentState role persistence', () => {
     const { assertWorkspaceStackHealthyForSpawn } = await import('../agents.js');
 
     await expect(assertWorkspaceStackHealthyForSpawn(undefined as any, 'work')).resolves.toBeUndefined();
+  });
+
+  it('PAN-2895: fresh-launches when the saved Claude session JSONL is missing', async () => {
+    ensurePtySupervisorArtifact();
+    const workspace = mkdtempSync(join(tmpdir(), 'pan-missing-jsonl-resume-'));
+    const agentId = 'agent-pan-2895-review';
+    const createSessionAsync = vi.fn(async () => undefined);
+    const emitAgentEvent = vi.fn(() => Effect.succeed(true));
+    const deliverInitialPromptWithRetry = vi.fn(async () => ({ ok: true, path: 'tmux' as const }));
+    const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    const originalHome = process.env.HOME;
+    process.env.HOME = tempHome;
+
+    vi.doMock('../workspace/stack-health.js', () => ({
+      getWorkspaceStackHealth: vi.fn(() => Effect.succeed({ healthy: true, reasons: [], lastObserved: '2026-07-19T00:00:00.000Z' })),
+    }));
+    vi.doMock('../workspace/rebuild-stack.js', () => ({
+      rebuildWorkspaceStack: vi.fn(() => Effect.succeed({ success: true })),
+    }));
+    vi.doMock('../projects.js', async (importOriginal) => ({
+      ...((await importOriginal()) as typeof import('../projects.js')),
+      resolveProjectFromIssueSync: vi.fn(() => null),
+    }));
+    vi.doMock('../tmux.js', async (importOriginal) => ({
+      ...((await importOriginal()) as typeof import('../tmux.js')),
+      sessionExists: vi.fn(() => Effect.succeed(false)),
+      sessionExistsSync: vi.fn(() => false),
+      isPaneDead: vi.fn(() => Effect.succeed(true)),
+      createSession: vi.fn((...args: unknown[]) => Effect.promise(() => Promise.resolve(createSessionAsync(...args)))),
+      listPaneValues: vi.fn(() => Effect.succeed([])),
+      capturePane: vi.fn(() => Effect.succeed('')),
+      setOption: vi.fn(() => Effect.void),
+    }));
+    vi.doMock('../agent-runtime-mirror.js', () => ({
+      getRuntimeSnapshot: vi.fn(() => Effect.succeed({
+        activity: 'stopped',
+        lastActivity: '2026-07-19T00:00:00.000Z',
+        claudeSessionId: 'missing-session',
+        sessionModel: 'claude-sonnet-4-6',
+        sessionHarness: 'claude-code',
+      })),
+      isAgentStateServiceInProcess: vi.fn(() => Effect.succeed(true)),
+    }));
+    vi.doMock('../agent-runtime.js', async (importOriginal) => ({
+      ...((await importOriginal()) as typeof import('../agent-runtime.js')),
+      emitAgentEvent,
+    }));
+    vi.doMock('../harness-resolve.js', async (importOriginal) => ({
+      ...((await importOriginal()) as typeof import('../harness-resolve.js')),
+      resolveHarness: vi.fn(async () => 'claude-code'),
+    }));
+    vi.doMock('../agents/delivery.js', async (importOriginal) => ({
+      ...((await importOriginal()) as typeof import('../agents/delivery.js')),
+      deliverInitialPromptWithRetry,
+    }));
+
+    try {
+      const { getAgentStateSync, resumeAgent, saveAgentStateSync } = await import('../agents.js');
+      saveAgentStateSync({
+        id: agentId,
+        issueId: 'PAN-2895',
+        workspace,
+        harness: 'claude-code',
+        role: 'review',
+        model: 'claude-sonnet-4-6',
+        status: 'stopped',
+        startedAt: '2026-07-19T00:00:00.000Z',
+        sessionId: 'missing-session',
+      } as any);
+      const agentDir = join(tempHome, 'agents', agentId);
+      writeFileSync(join(agentDir, 'session.id'), 'missing-session');
+      writeFileSync(join(agentDir, 'sessions.json'), JSON.stringify(['missing-session']));
+      writeFileSync(join(agentDir, 'runtime.json'), JSON.stringify({ claudeSessionId: 'missing-session' }));
+      writeFileSync(join(agentDir, 'launcher.sh'), "claude --resume 'missing-session'\n");
+
+      const result = await resumeAgent(agentId, 'continue review');
+
+      expect(result).toMatchObject({ success: true, messageDelivered: true });
+      expect(createSessionAsync).toHaveBeenCalled();
+      expect(deliverInitialPromptWithRetry).toHaveBeenCalled();
+      const freshSessionId = readFileSync(join(agentDir, 'session.id'), 'utf-8').trim();
+      expect(freshSessionId).not.toBe('missing-session');
+      const launcher = readFileSync(join(agentDir, 'launcher.sh'), 'utf-8');
+      expect(launcher).not.toContain("--resume 'missing-session'");
+      expect(launcher).toContain(`--session-id '${freshSessionId}'`);
+      expect(getAgentStateSync(agentId)?.sessionId).toBe(freshSessionId);
+      expect(emitAgentEvent).toHaveBeenCalledWith(
+        agentId,
+        expect.objectContaining({ kind: 'model_set', claudeSessionId: null }),
+      );
+      expect(emitAgentEvent).toHaveBeenCalledWith(
+        agentId,
+        expect.objectContaining({ kind: 'model_set', claudeSessionId: freshSessionId }),
+      );
+      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('saved Claude transcript was missing'));
+    } finally {
+      process.env.HOME = originalHome;
+      consoleSpy.mockRestore();
+      rmSync(workspace, { recursive: true, force: true });
+    }
   });
 
   it('PAN-2009: fresh-launches a stopped ohmypi agent when the prior ohmypi process is dead', async () => {

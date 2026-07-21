@@ -1148,21 +1148,26 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
       const { agentId, model, claudeSessionId, sessionModel, sessionHarness } = event.payload
       const prev = state.agentRuntimeById[agentId]
         ?? defaultRuntimeSnapshot(agentId, event.timestamp, event.sequence)
+      const nextSessionId = claudeSessionId === null
+        ? undefined
+        : claudeSessionId ?? prev.claudeSessionId
       const next: AgentRuntimeSnapshot = {
         ...prev,
         model,
-        claudeSessionId: claudeSessionId ?? prev.claudeSessionId,
+        claudeSessionId: nextSessionId,
         sessionModel: sessionModel ?? prev.sessionModel,
         sessionHarness: sessionHarness ?? prev.sessionHarness,
         lastActivity: event.timestamp,
         updatedAtSequence: event.sequence,
       }
       let nextAgentIdBySessionId = state.agentIdBySessionId
-      if (claudeSessionId && claudeSessionId !== prev.claudeSessionId) {
-        nextAgentIdBySessionId = { ...state.agentIdBySessionId, [claudeSessionId]: agentId }
+      if (claudeSessionId !== undefined && nextSessionId !== prev.claudeSessionId) {
         if (prev.claudeSessionId && state.agentIdBySessionId[prev.claudeSessionId] === agentId) {
-          const { [prev.claudeSessionId]: _removed, ...rest } = state.agentIdBySessionId
-          nextAgentIdBySessionId = { ...rest, [claudeSessionId]: agentId }
+          const { [prev.claudeSessionId]: _removed, ...rest } = nextAgentIdBySessionId
+          nextAgentIdBySessionId = rest
+        }
+        if (nextSessionId) {
+          nextAgentIdBySessionId = { ...nextAgentIdBySessionId, [nextSessionId]: agentId }
         }
       }
       return {

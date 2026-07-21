@@ -10,7 +10,7 @@
 
 import chalk from 'chalk';
 import { getDashboardApiUrlSync } from '../../lib/config.js';
-import { resetSessionCommand } from './reset-session.js';
+import { resetReviewSessionsCommand } from './reset-session.js';
 
 const DASHBOARD_URL = getDashboardApiUrlSync();
 
@@ -43,18 +43,10 @@ export async function resetReviewCommand(id: string, options: ResetReviewOptions
     }
 
     if (options.session) {
-      // Non-destructive: clears only the resume pointers (session.id / sessions.json)
-      // under ~/.overdeck/agents/<id>/ so the next start opens a fresh Claude
-      // session. The JSONL transcript history is NEVER touched — that is the truly
-      // sacred artifact, and resetSessionCommand does not delete it. Also refuses
-      // while the agent is running. Re-enabled after bf77f0194 hard-blocked this and
-      // left `pan start` pointing at a dead command (its refusal recommends exactly
-      // this). Needed e.g. to switch a stopped agent's model, where the saved session
-      // can't be resumed under different provider routing.
-      // PAN-2948: in the review namespace the saved session to clear is the
-      // REVIEWER's — passing the bare issue id targeted the work agent, so the
-      // reviewer's stale session survived and the next dispatch resumed it.
-      await resetSessionCommand(`agent-${issueId.toLowerCase()}-review`);
+      // Non-destructive: clears the parent review role and any convoy reviewers'
+      // mutable resume pointers (PAN-2948: the review namespace's sessions, not
+      // the work agent's). Claude JSONL transcripts are never touched.
+      await resetReviewSessionsCommand(id);
     }
 
   } catch (error: any) {

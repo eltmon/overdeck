@@ -337,7 +337,7 @@ export const AgentModelSetEvent = Schema.Struct({
   payload: Schema.Struct({
     agentId: AgentId,
     model: Schema.String,
-    claudeSessionId: Schema.optional(Schema.String),
+    claudeSessionId: Schema.optional(Schema.NullOr(Schema.String)),
     sessionModel: Schema.optional(Schema.String),
     sessionHarness: Schema.optional(Schema.String),
   }),

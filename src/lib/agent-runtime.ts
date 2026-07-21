@@ -65,7 +65,7 @@ type HeartbeatBody =
   | { kind: 'waiting_clear'; clearedBy: 'user_response' | 'timeout' | 'stopped' | 'tool_resumed' }
   | { kind: 'message_received'; direction: 'to_agent' | 'from_agent'; source: 'user' | 'cloister' | 'specialist' | 'automated' }
   | { kind: 'channel_reply'; reply: { kind: ChannelReplyKind; summary: string; artifactRefs?: ChannelReplyArtifactRef[] } }
-  | { kind: 'model_set'; model: string; claudeSessionId?: string; sessionModel?: string; sessionHarness?: string }
+  | { kind: 'model_set'; model: string; claudeSessionId?: string | null; sessionModel?: string; sessionHarness?: string }
   | { kind: 'resolution_set'; resolution: AgentResolution; resolutionCount: number }
   | { kind: 'current_issue_set'; currentIssue?: string }
   | { kind: 'context_saturation_changed'; contextSaturatedAt?: string }
