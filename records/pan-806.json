@@ -120,19 +120,19 @@
   ],
   "feedback": [],
   "created": "2026-07-21T16:29:59.439Z",
-  "updated": "2026-07-21T18:03:24.486Z",
+  "updated": "2026-07-21T18:16:31.871Z",
   "pipeline": {
     "issueId": "PAN-806",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-21T17:44:12.340Z",
-    "updatedAt": "2026-07-21T18:03:24.456Z",
-    "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
+    "updatedAt": "2026-07-21T18:16:31.837Z",
+    "reviewNotes": "Agent re-review request (2/25): Fixed review issues",
     "inspectNotes": "rebase-helper.ts:101,200 add OVERDECK_PAN_GIT_OP:'1' alongside GIT_EDITOR:'true' on git rebase and git rebase --continue; abort/merge-fallback also sentineled. New tests/unit/lib/rebase-helper.test.ts (3 tests) assert coexistence via objectContaining; ran locally, all pass.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2986",
     "lastVerifiedCommit": "4d3f253ca4395edd917c79fa95e24c4fc533dc16",
@@ -177,9 +177,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 2333327,
-            "output": 275431,
-            "cacheRead": 143050752,
+            "input": 2466140,
+            "output": 313646,
+            "cacheRead": 150942720,
             "cacheWrite": 0
           }
         }
@@ -198,9 +198,9 @@
           "cacheWrite": 235496
         },
         "openai/gpt-5.6-sol": {
-          "input": 4424877,
-          "output": 456887,
-          "cacheRead": 167043584,
+          "input": 4557690,
+          "output": 495102,
+          "cacheRead": 174935552,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -211,8 +211,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 126.305858,
-        "pricingAsOf": "2026-07-21T18:03:24.466Z"
+        "usd": 132.062357,
+        "pricingAsOf": "2026-07-21T18:16:31.865Z"
       }
     },
     "merges": [
