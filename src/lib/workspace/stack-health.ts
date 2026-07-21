@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 
@@ -20,6 +20,55 @@ const execFileAsync = promisify(execFile);
 export const DEFAULT_STUCK_CREATED_THRESHOLD_MS = 120_000;
 
 export type { DockerContainerLifecycle } from '../docker-stats.js';
+
+function declaredComposeProjectName(content: string, featureFolder: string): string | null {
+  const templatedMatch = content.match(/COMPOSE_PROJECT_NAME="([^$"]*)\$\{FEATURE_FOLDER\}"/);
+  if (templatedMatch) return `${templatedMatch[1]}${featureFolder}`;
+  const literalMatch = content.match(/COMPOSE_PROJECT_NAME="([^"]+)"/);
+  return literalMatch?.[1] ?? null;
+}
+
+/**
+ * Derive the canonical `COMPOSE_PROJECT_NAME` for a workspace. Throws when the
+ * workspace declares a name that does not end in the feature folder — a
+ * mismatch means `docker compose down` would target the wrong stack.
+ * (Lives here rather than in rebuild-stack so health checks can scope
+ * container matching without an import cycle.)
+ */
+export function composeProjectNameForWorkspace(workspacePath: string, issueId: string): string {
+  const featureFolder = `feature-${issueId.toLowerCase()}`;
+  const fallback = `overdeck-${featureFolder}`;
+  for (const devPath of [join(workspacePath, '.devcontainer', 'dev'), join(workspacePath, 'dev')]) {
+    if (!existsSync(devPath)) continue;
+    try {
+      const declared = declaredComposeProjectName(readFileSync(devPath, 'utf-8'), featureFolder);
+      if (!declared) continue;
+      if (!declared.endsWith(featureFolder)) {
+        throw new Error(
+          `Refusing workspace rebuild: ${devPath} declares COMPOSE_PROJECT_NAME=${declared}, expected a name ending in ${featureFolder}`,
+        );
+      }
+      return declared;
+    } catch (err: any) {
+      if (err?.message?.startsWith('Refusing workspace rebuild:')) throw err;
+    }
+  }
+  return fallback;
+}
+
+/**
+ * Best-effort canonical compose project for a workspace — null when the
+ * workspace (or its dev file) is missing or declares a conflicting name, in
+ * which case callers fall back to name-token matching.
+ */
+export function tryComposeProjectNameForWorkspace(workspacePath: string | null | undefined, issueId: string): string | null {
+  if (!workspacePath || !existsSync(workspacePath)) return null;
+  try {
+    return composeProjectNameForWorkspace(workspacePath, issueId);
+  } catch {
+    return null;
+  }
+}
 
 export interface WorkspaceStackHealth {
   healthy: boolean;
@@ -49,6 +98,13 @@ interface DockerPsJson {
   Status?: string;
   State?: string;
   CreatedAt?: string;
+  Labels?: string;
+}
+
+/** Extract `com.docker.compose.project` from docker ps's comma-joined Labels. */
+function parseComposeProjectLabel(labels: string | undefined): string | undefined {
+  if (!labels) return undefined;
+  return /(?:^|,)com\.docker\.compose\.project=([^,]+)/.exec(labels)?.[1];
 }
 
 const lastHealthByIssue = new Map<string, boolean>();
@@ -106,9 +162,21 @@ export function inferIssueIdFromStackContainerName(name: string): string | null 
   return rally?.[1]?.toUpperCase() ?? null;
 }
 
-function isStackContainer(container: DockerContainerLifecycle, issueId: string): boolean {
+function isStackContainer(container: DockerContainerLifecycle, issueId: string, composeProjectName?: string | null): boolean {
+  // When the workspace's canonical compose project is known AND the container
+  // carries a compose-project label, the label decides. This keeps stale
+  // containers from a previous project naming (e.g. overdeck-feature-min-865-*
+  // corpses next to a live myn-feature-min-865 stack) from poisoning health.
+  if (composeProjectName && container.composeProject) {
+    return container.composeProject === composeProjectName;
+  }
+  return hasIssueToken(container.name, issueId);
+}
+
+/** Name-token match: does this container name belong to the issue's stack? */
+export function hasIssueToken(containerName: string, issueId: string): boolean {
   const normalized = normalizeIssue(issueId);
-  const name = container.name.toLowerCase();
+  const name = containerName.toLowerCase();
   return hasNameToken(name, `feature-${normalized}`) || hasNameToken(name, normalized);
 }
 
@@ -141,7 +209,7 @@ export function evaluateWorkspaceStackHealth(
   issueId: string,
   projectConfig: WorkspaceStackProject | null | undefined,
   containers: DockerContainerLifecycle[],
-  options: { now?: Date; stuckCreatedThresholdMs?: number; stackExpected?: boolean } = {},
+  options: { now?: Date; stuckCreatedThresholdMs?: number; stackExpected?: boolean; composeProjectName?: string | null } = {},
 ): WorkspaceStackHealth {
   const now = options.now ?? new Date();
   const lastObserved = now.toISOString();
@@ -150,7 +218,7 @@ export function evaluateWorkspaceStackHealth(
   }
 
   const thresholdMs = options.stuckCreatedThresholdMs ?? DEFAULT_STUCK_CREATED_THRESHOLD_MS;
-  const stackContainers = containers.filter((container) => isStackContainer(container, issueId));
+  const stackContainers = containers.filter((container) => isStackContainer(container, issueId, options.composeProjectName));
   const reasons: string[] = [];
 
   if (stackContainers.length === 0 && options.stackExpected !== false) {
@@ -206,6 +274,7 @@ export const collectDockerContainerLifecycleSnapshot = (): Effect.Effect<DockerC
             status: raw.Status ?? '',
             state: raw.State,
             createdAt: raw.CreatedAt,
+            composeProject: parseComposeProjectLabel(raw.Labels),
           });
         } catch {
           // Ignore malformed docker rows.
@@ -241,10 +310,12 @@ export const getWorkspaceStackHealth = (
       recordDockerContainerLifecycleSnapshot(containers, observedAt);
     }
 
+    const workspacePath = options.workspacePath ?? defaultWorkspacePath(issueId, projectConfig);
     const health = evaluateWorkspaceStackHealth(issueId, projectConfig, containers, {
       now: options.now,
       stuckCreatedThresholdMs: options.stuckCreatedThresholdMs,
       stackExpected: options.stackExpected ?? isWorkspaceStackExpected(issueId, projectConfig, options.workspacePath),
+      composeProjectName: tryComposeProjectNameForWorkspace(workspacePath, issueId),
     });
     const observedHealth = observedAt && !options.now
       ? { ...health, lastObserved: observedAt }

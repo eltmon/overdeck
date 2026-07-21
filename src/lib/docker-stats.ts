@@ -25,6 +25,8 @@ export interface DockerContainerLifecycle {
   status: string;
   state?: string;
   createdAt?: string;
+  /** `com.docker.compose.project` label when the container is compose-managed. */
+  composeProject?: string;
 }
 
 export interface ContainerHistory {

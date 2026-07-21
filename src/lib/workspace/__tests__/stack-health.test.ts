@@ -135,6 +135,39 @@ describe('evaluateWorkspaceStackHealth', () => {
     expect(health.reasons).toEqual(['overdeck-feature-pan-1140-server-1 service exited (0)']);
   });
 
+  it('ignores same-issue corpses from a previous compose project when the canonical project is known', () => {
+    // MIN-865 2026-07-21: a live myn-feature-min-865 stack sat next to 3-day-old
+    // overdeck-feature-min-865-* corpses (exit 255); token-only matching called
+    // the stack unhealthy and blocked every agent start.
+    const health = evaluateWorkspaceStackHealth('MIN-865', dockerProject, [
+      container({ name: 'myn-feature-min-865-api-1', status: 'Up 2 minutes', state: 'running', composeProject: 'myn-feature-min-865' }),
+      container({ name: 'myn-feature-min-865-postgres-1', status: 'Up 2 minutes (healthy)', state: 'running', composeProject: 'myn-feature-min-865' }),
+      container({ name: 'overdeck-feature-min-865-api-1', status: 'Exited (255) 3 days ago', state: 'exited', composeProject: 'overdeck-feature-min-865' }),
+      container({ name: 'overdeck-feature-min-865-postgres-1', status: 'Exited (255) 3 days ago', state: 'exited', composeProject: 'overdeck-feature-min-865' }),
+    ], { now, composeProjectName: 'myn-feature-min-865' });
+
+    expect(health.healthy).toBe(true);
+    expect(health.reasons).toEqual([]);
+  });
+
+  it('still counts foreign-project containers when the canonical project is unknown (legacy fallback)', () => {
+    const health = evaluateWorkspaceStackHealth('MIN-865', dockerProject, [
+      container({ name: 'overdeck-feature-min-865-api-1', status: 'Exited (255) 3 days ago', state: 'exited', composeProject: 'overdeck-feature-min-865' }),
+    ], { now });
+
+    expect(health.healthy).toBe(false);
+    expect(health.reasons[0]).toContain('overdeck-feature-min-865-api-1 service exited (255)');
+  });
+
+  it('counts same-issue containers without a compose-project label by name token', () => {
+    const health = evaluateWorkspaceStackHealth('MIN-865', dockerProject, [
+      container({ name: 'myn-feature-min-865-api-1', status: 'Exited (1) 2 minutes ago', state: 'exited' }),
+    ], { now, composeProjectName: 'myn-feature-min-865' });
+
+    expect(health.healthy).toBe(false);
+    expect(health.reasons[0]).toContain('myn-feature-min-865-api-1 service exited (1)');
+  });
+
   it('keeps Up containers healthy', () => {
     const health = evaluateWorkspaceStackHealth('PAN-1140', dockerProject, [
       container({ status: 'Up 2 minutes', state: 'running' }),

@@ -17,7 +17,7 @@
  */
 
 import { execFile } from 'node:child_process';
-import { existsSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, rmSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { promisify } from 'node:util';
 
@@ -27,8 +27,16 @@ import { recordDockerContainerLifecycleSnapshot } from '../docker-stats.js';
 import { getProjectSync, resolveProjectFromIssueSync } from '../projects.js';
 import { isIssueClosed } from '../cloister/issue-closed.js';
 import { ensureDevcontainerSync } from './ensure-devcontainer.js';
-import { collectDockerContainerLifecycleSnapshot } from './stack-health.js';
+import {
+  collectDockerContainerLifecycleSnapshot,
+  composeProjectNameForWorkspace,
+  hasIssueToken,
+} from './stack-health.js';
 import { reconcileTraefikNetworks } from './traefik-connect.js';
+
+// Canonical home is stack-health.ts (health checks need it too); re-export so
+// existing consumers of this module keep working.
+export { composeProjectNameForWorkspace } from './stack-health.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -39,39 +47,6 @@ const COMPOSE_FILES = [
   'compose.yml',
   'compose.yaml',
 ];
-
-function declaredComposeProjectName(content: string, featureFolder: string): string | null {
-  const templatedMatch = content.match(/COMPOSE_PROJECT_NAME="([^$"]*)\$\{FEATURE_FOLDER\}"/);
-  if (templatedMatch) return `${templatedMatch[1]}${featureFolder}`;
-  const literalMatch = content.match(/COMPOSE_PROJECT_NAME="([^"]+)"/);
-  return literalMatch?.[1] ?? null;
-}
-
-/**
- * Derive the canonical `COMPOSE_PROJECT_NAME` for a workspace, refusing the
- * rebuild if the workspace declares a name that does not match — a mismatch
- * means `docker compose down` would target the wrong stack.
- */
-export function composeProjectNameForWorkspace(workspacePath: string, issueId: string): string {
-  const featureFolder = `feature-${issueId.toLowerCase()}`;
-  const fallback = `overdeck-${featureFolder}`;
-  for (const devPath of [join(workspacePath, '.devcontainer', 'dev'), join(workspacePath, 'dev')]) {
-    if (!existsSync(devPath)) continue;
-    try {
-      const declared = declaredComposeProjectName(readFileSync(devPath, 'utf-8'), featureFolder);
-      if (!declared) continue;
-      if (!declared.endsWith(featureFolder)) {
-        throw new Error(
-          `Refusing workspace rebuild: ${devPath} declares COMPOSE_PROJECT_NAME=${declared}, expected a name ending in ${featureFolder}`,
-        );
-      }
-      return declared;
-    } catch (err: any) {
-      if (err?.message?.startsWith('Refusing workspace rebuild:')) throw err;
-    }
-  }
-  return fallback;
-}
 
 function findDevcontainerComposeFile(workspacePath: string): string | null {
   const devcontainerDir = join(workspacePath, '.devcontainer');
@@ -117,6 +92,33 @@ export interface RebuildWorkspaceStackOptions {
   /** Progress callback for each rebuild phase. Optional. */
   onProgress?: (message: string) => void;
 }
+
+/**
+ * Remove same-issue containers that do NOT belong to the canonical compose
+ * project — corpses left behind by a previous project naming (e.g.
+ * overdeck-feature-min-865-* next to a live myn-feature-min-865 stack). They
+ * poison token-based health matching and can hold port bindings. Never touches
+ * a running container: a live foreign stack is left for a human.
+ */
+export const removeStaleIssueContainers = (
+  issueId: string,
+  composeProjectName: string,
+): Effect.Effect<number> =>
+  Effect.promise(async () => {
+    const containers = await Effect.runPromise(collectDockerContainerLifecycleSnapshot());
+    let removed = 0;
+    for (const container of containers) {
+      if (container.composeProject === composeProjectName) continue;
+      if (!hasIssueToken(container.name, issueId)) continue;
+      const running = container.state?.toLowerCase() === 'running' || /^up\b/i.test(container.status);
+      if (running) continue;
+      const removedOk = await execFileAsync('docker', ['rm', '-f', container.id], { timeout: 30_000 })
+        .then(() => true)
+        .catch(() => false);
+      if (removedOk) removed += 1;
+    }
+    return removed;
+  });
 
 export interface RebuildWorkspaceStackResult {
   success: boolean;
@@ -213,6 +215,11 @@ export const rebuildWorkspaceStack = (
     );
     const containers = yield* collectDockerContainerLifecycleSnapshot();
     recordDockerContainerLifecycleSnapshot(containers);
+
+    // Sweep corpses from any previous project naming for this issue so
+    // token-based health checks and future rebuilds see only the fresh stack.
+    progress('Removing stale containers from previous stack projects...');
+    yield* removeStaleIssueContainers(normalizedIssueId, composeProjectName);
 
     // PAN-2428: without this, routes to the fresh stack 504 until traefik is
     // manually connected to the stack's network.
