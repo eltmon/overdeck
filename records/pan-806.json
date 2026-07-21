@@ -103,34 +103,26 @@
       "timestamp": "2026-07-21T17:50:38.320Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-21T17:50:37Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-806\n\nExisting project pre-rebase hooks are skipped by the pan sentinel before their policy runs\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-806 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "created": "2026-07-21T16:29:59.439Z",
-  "updated": "2026-07-21T17:57:51.072Z",
+  "updated": "2026-07-21T17:58:11.947Z",
   "pipeline": {
     "issueId": "PAN-806",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-21T17:44:12.340Z",
-    "updatedAt": "2026-07-21T17:57:51.045Z",
+    "updatedAt": "2026-07-21T17:58:11.921Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "inspectNotes": "rebase-helper.ts:101,200 add OVERDECK_PAN_GIT_OP:'1' alongside GIT_EDITOR:'true' on git rebase and git rebase --continue; abort/merge-fallback also sentineled. New tests/unit/lib/rebase-helper.test.ts (3 tests) assert coexistence via objectContaining; ran locally, all pass.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2986",
     "lastVerifiedCommit": "1e8633b850b2f01817acf6cabd59e738fce11e5e",
     "reviewRequestedAt": "2026-07-21T17:44:12.340Z",
-    "reviewSpawnedAt": "2026-07-21T17:50:37.320Z",
+    "reviewSpawnedAt": "2026-07-21T17:58:11.920Z",
     "strikeRecoveryCount": 0
   },
   "closeOut": {
@@ -170,9 +162,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 2254194,
-            "output": 224601,
-            "cacheRead": 139682816,
+            "input": 2255250,
+            "output": 224723,
+            "cacheRead": 139872256,
             "cacheWrite": 0
           }
         }
@@ -191,9 +183,9 @@
           "cacheWrite": 235496
         },
         "openai/gpt-5.6-sol": {
-          "input": 3059070,
-          "output": 364097,
-          "cacheRead": 159807488,
+          "input": 3060126,
+          "output": 364219,
+          "cacheRead": 159996928,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -204,8 +196,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 113.075075,
-        "pricingAsOf": "2026-07-21T17:57:51.065Z"
+        "usd": 113.178735,
+        "pricingAsOf": "2026-07-21T17:58:11.943Z"
       }
     },
     "merges": [
