@@ -4,6 +4,7 @@ import { AlertTriangle, Loader2, ExternalLink } from 'lucide-react';
 import { SensitiveText } from './SensitiveText';
 import { useCodexAuthStatus } from '../hooks/useCodexAuthStatus';
 import { setReauthSession } from '../lib/pending-codex-spawn';
+import { popoutTerminal } from './TerminalPanel';
 
 export function CodexAuthBanner() {
   const { data: authStatus } = useCodexAuthStatus();
@@ -25,7 +26,10 @@ export function CodexAuthBanner() {
       const { sessionName, statusToken } = await res.json() as { sessionName: string; statusToken: string };
       setReauthSession(sessionName, statusToken);
       toast.success('Re-authentication session started — opening terminal…');
-      window.location.href = `/terminal/${sessionName}`;
+      // PAN-2973: open the re-auth terminal in a popup instead of navigating
+      // this tab away — a full-document navigation tears down the dashboard
+      // SPA and unmounts useCodexAutoRetry, which polls re-auth completion.
+      popoutTerminal(sessionName, 'Codex re-authentication');
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to start re-authentication');
     } finally {
