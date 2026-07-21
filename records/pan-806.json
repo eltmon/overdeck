@@ -125,7 +125,7 @@
   ],
   "feedback": [],
   "created": "2026-07-21T16:29:59.439Z",
-  "updated": "2026-07-21T18:21:46.391Z",
+  "updated": "2026-07-21T18:22:10.641Z",
   "pipeline": {
     "issueId": "PAN-806",
     "reviewStatus": "passed",
@@ -136,13 +136,12 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-21T17:44:12.340Z",
-    "updatedAt": "2026-07-21T18:21:46.383Z",
+    "updatedAt": "2026-07-21T18:22:10.630Z",
     "reviewNotes": "Prior hook-interpreter and git global-option blockers are fixed; no blocking findings remain",
-    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "rebase-helper.ts:101,200 add OVERDECK_PAN_GIT_OP:'1' alongside GIT_EDITOR:'true' on git rebase and git rebase --continue; abort/merge-fallback also sentineled. New tests/unit/lib/rebase-helper.test.ts (3 tests) assert coexistence via objectContaining; ran locally, all pass.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2986",
     "reviewedAtCommit": "812ae913c39efb733bfdc2903ba7cdf46a7b754c",
-    "lastVerifiedCommit": "4d3f253ca4395edd917c79fa95e24c4fc533dc16",
+    "lastVerifiedCommit": "812ae913c39efb733bfdc2903ba7cdf46a7b754c",
     "reviewRequestedAt": "2026-07-21T17:44:12.340Z",
     "reviewSpawnedAt": "2026-07-21T18:19:11.977Z",
     "strikeRecoveryCount": 0
@@ -182,6 +181,14 @@
             "cacheWrite": 126457
           }
         },
+        "test": {
+          "anthropic/claude-sonnet-5": {
+            "input": 12,
+            "output": 1342,
+            "cacheRead": 604850,
+            "cacheWrite": 124048
+          }
+        },
         "work": {
           "openai/gpt-5.6-sol": {
             "input": 2467636,
@@ -211,15 +218,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 8,
-          "output": 3199,
-          "cacheRead": 357614,
-          "cacheWrite": 126457
+          "input": 20,
+          "output": 4541,
+          "cacheRead": 962464,
+          "cacheWrite": 250505
         }
       },
       "costAtCloseOut": {
-        "usd": 147.67482,
-        "pricingAsOf": "2026-07-21T18:21:46.387Z"
+        "usd": 148.119355,
+        "pricingAsOf": "2026-07-21T18:22:10.635Z"
       }
     },
     "merges": [
