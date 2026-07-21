@@ -67,8 +67,7 @@ const PRE_REBASE_HOOK_MARKER = '# OVERDECK MANAGED PRE-REBASE GUARD';
 const PRE_REBASE_HOOK_PREFIX = [
   '#!/bin/sh',
   PRE_REBASE_HOOK_MARKER,
-  '[ "$OVERDECK_PAN_GIT_OP" = "1" ] && exit 0',
-  'if [ -n "$OVERDECK_AGENT_ID" ]; then',
+  'if [ "$OVERDECK_PAN_GIT_OP" != "1" ] && [ -n "$OVERDECK_AGENT_ID" ]; then',
   '  echo "Overdeck agents must not run git rebase directly." >&2',
   '  echo "Use pan sync-main <ISSUE-ID> to sync main or pan done <ISSUE-ID> to submit." >&2',
   '  exit 1',

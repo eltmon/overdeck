@@ -78,6 +78,24 @@ describe('installPreRebaseHook', () => {
     expect(readFileSync(markerPath, 'utf-8')).toBe('preserved');
   });
 
+  it('runs an existing project pre-rebase hook for pan-owned rebases', async () => {
+    const hooksDir = join(worktreePath, '.test-hooks');
+    const hookPath = join(hooksDir, 'pre-rebase');
+    const markerPath = join(worktreePath, 'existing-hook-ran');
+    mkdirSync(hooksDir, { recursive: true });
+    writeFileSync(hookPath, `#!/bin/sh\nprintf preserved > "${markerPath}"\n`);
+    chmodSync(hookPath, 0o755);
+
+    await installPreRebaseHook(worktreePath);
+    const result = runRebase({
+      OVERDECK_AGENT_ID: 'agent-pan-806',
+      OVERDECK_PAN_GIT_OP: '1',
+    });
+
+    expect(result.status).toBe(0);
+    expect(readFileSync(markerPath, 'utf-8')).toBe('preserved');
+  });
+
   it('exits 1 from the hook and blocks agent rebases with pan guidance', async () => {
     const hookPath = await installPreRebaseHook(worktreePath);
     const env = { ...process.env, OVERDECK_AGENT_ID: 'agent-pan-806' };
