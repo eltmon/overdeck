@@ -115,6 +115,8 @@ function durableSubset(p: PanIssuePipelineRecord): DurableStatusFields {
     strikeReadyAt: p.strikeReadyAt,
     strikeLandingState: p.strikeLandingState,
     strikeRecoveryCount: p.strikeRecoveryCount,
+    strikeTransportRetryCount: p.strikeTransportRetryCount,
+    strikeNextAttemptAt: p.strikeNextAttemptAt,
     strikeLandingAttempts: p.strikeLandingAttempts,
     closedOut: p.closedOut,
     closedOutAt: p.closedOutAt,

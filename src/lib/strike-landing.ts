@@ -13,5 +13,7 @@ export interface StrikeLandingStatus {
   strikeReadyAt?: string;
   strikeLandingState?: StrikeLandingState;
   strikeRecoveryCount?: number;
+  strikeTransportRetryCount?: number;
+  strikeNextAttemptAt?: string;
   strikeLandingAttempts?: StrikeLandingAttempt[];
 }

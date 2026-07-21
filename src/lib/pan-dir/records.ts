@@ -137,6 +137,8 @@ function projectPipeline(
     strikeReadyAt: status.strikeReadyAt,
     strikeLandingState: status.strikeLandingState,
     strikeRecoveryCount: status.strikeRecoveryCount,
+    strikeTransportRetryCount: status.strikeTransportRetryCount,
+    strikeNextAttemptAt: status.strikeNextAttemptAt,
     strikeLandingAttempts: status.strikeLandingAttempts,
   };
 }

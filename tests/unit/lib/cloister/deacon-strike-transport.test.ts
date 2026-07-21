@@ -63,6 +63,7 @@ describe('Deacon strike merge transport', () => {
       fetchImpl,
     })).resolves.toEqual({
       success: false,
+      transport: true,
       error: 'Strike merge request failed: connection refused',
     });
   });

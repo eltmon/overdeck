@@ -15,7 +15,7 @@ export interface StrikeMergeRequest {
   kind: 'strike'; markerHead: string; workspacePath: string; branchName: string; recoveryTarget: string;
 }
 
-export interface StrikeMergeResult { success: boolean; mergeStatus?: string; error?: string }
+export interface StrikeMergeResult { success: boolean; mergeStatus?: string; error?: string; transport?: boolean }
 type StrikeMergeTrigger = (issueId: string, request: StrikeMergeRequest) => Promise<StrikeMergeResult>;
 
 function internalDashboardUrl(): string {
@@ -46,7 +46,11 @@ export async function requestStrikeMerge(
       ? body
       : { success: false, error: `Strike merge endpoint returned HTTP ${response.status} without a structured result` };
   } catch (error) {
-    return { success: false, error: `Strike merge request failed: ${error instanceof Error ? error.message : String(error)}` };
+    return {
+      success: false,
+      transport: true,
+      error: `Strike merge request failed: ${error instanceof Error ? error.message : String(error)}`,
+    };
   }
 }
 
