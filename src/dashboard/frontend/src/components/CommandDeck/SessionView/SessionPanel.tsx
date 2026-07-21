@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback, useEffect, useLayoutEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { GitFork, TriangleAlert, AlertCircle, TerminalSquare, MessagesSquare, Wrench } from 'lucide-react';
+import { GitFork, TriangleAlert, AlertCircle, TerminalSquare, MessagesSquare, Wrench, Loader2 } from 'lucide-react';
 import type { SessionNode as SessionNodeType } from '@overdeck/contracts';
 import type { Conversation } from '../ConversationList';
 import { ConversationPanel } from '../../chat/ConversationPanel';
@@ -412,6 +412,17 @@ export function SessionPanel({ session, issueId, roundMarkers, reviewers }: Sess
           ) : hasTranscript ? (
             <div ref={transcriptRef} onScroll={onTranscriptScroll} className={styles.sessionPanelTranscript}>
               <ChatMarkdown text={session.transcript!} isStreaming={false} cwd={undefined} />
+            </div>
+          ) : session.presence !== 'ended' || session.status === 'starting' ? (
+            // The agent is starting but hasn't written any JSONL or transcript
+            // yet — say so instead of reading as broken. status==='starting'
+            // covers the placeholder window before tmux exists (presence
+            // derives from tmux liveness and reads 'ended' until then). The
+            // store updates via SSE, so the panel swaps to the conversation as
+            // soon as the first output lands.
+            <div className={styles.sessionPanelEmpty}>
+              <Loader2 size={15} className="animate-spin" style={{ display: 'inline-block', verticalAlign: '-2px', marginRight: 7 }} />
+              Starting agent — conversation output will appear here shortly.
             </div>
           ) : (
             <div className={styles.sessionPanelEmpty}>
