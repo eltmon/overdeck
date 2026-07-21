@@ -1,23 +1,6 @@
 {
   "issueId": "PAN-2984",
   "schemaVersion": 2,
-  "created": "2026-07-21T15:14:12.381Z",
-  "updated": "2026-07-21T15:14:12.800Z",
-  "pipeline": {
-    "issueId": "PAN-2984",
-    "reviewStatus": "pending",
-    "testStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-07-21T15:14:12.381Z"
-  },
-  "closeOut": {
-    "usage": {
-      "byStage": {},
-      "totals": {}
-    },
-    "merges": [],
-    "ranOn": "eltmon-z790"
-  },
   "sessionHistory": [
     {
       "reason": "planning",
@@ -26,6 +9,61 @@
       "timestamp": "2026-07-21T15:14:12.381Z"
     }
   ],
+  "feedback": [],
+  "created": "2026-07-21T15:14:12.381Z",
+  "updated": "2026-07-21T15:24:14.433Z",
+  "pipeline": {
+    "issueId": "PAN-2984",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
+    "mergeStatus": "pending",
+    "releaseStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-21T15:24:14.390Z"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "memory-extraction": {
+          "anthropic/claude-haiku-4-5": {
+            "input": 8337,
+            "output": 200,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
+        "plan": {
+          "anthropic/claude-fable-5": {
+            "input": 221,
+            "output": 45017,
+            "cacheRead": 3571820,
+            "cacheWrite": 305673
+          }
+        }
+      },
+      "totals": {
+        "anthropic/claude-haiku-4-5": {
+          "input": 8337,
+          "output": 200,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        },
+        "anthropic/claude-fable-5": {
+          "input": 221,
+          "output": 45017,
+          "cacheRead": 3571820,
+          "cacheWrite": 305673
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 9.655135,
+        "pricingAsOf": "2026-07-21T15:24:14.430Z"
+      }
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790"
+  },
   "harness": "claude-code",
-  "model": "claude-fable-5"
+  "model": "gpt-5.6-sol"
 }
