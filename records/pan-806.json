@@ -125,7 +125,7 @@
   ],
   "feedback": [],
   "created": "2026-07-21T16:29:59.439Z",
-  "updated": "2026-07-21T18:21:39.394Z",
+  "updated": "2026-07-21T18:21:40.272Z",
   "pipeline": {
     "issueId": "PAN-806",
     "reviewStatus": "passed",
@@ -229,7 +229,7 @@
   },
   "workModel": "gpt-5.6-sol",
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-sonnet-5",
   "tasks": {
     "sequence": 10,
     "claims": {},
