@@ -108,7 +108,10 @@ function defaultDeps(): StrikeLandingDeps {
   };
 }
 
-const NON_ACTIONABLE = /permission|merge guard|configured project|integration|infrastructure|unavailable|not registered|workspace does not exist/i;
+const TRANSPORT_BACKOFF_BASE_MS = 60_000;
+const TRANSPORT_BACKOFF_CAP_MS = 1_800_000;
+const MAX_TRANSPORT_RETRIES = 10;
+const NON_ACTIONABLE = /permission|merge guard|configured project|integration|infrastructure|unavailable|not registered|workspace does not exist|fetch failed|ECONNREFUSED|ECONNRESET|socket hang up|ETIMEDOUT|EAI_AGAIN/i;
 function attemptHistory(attempts: StrikeLandingAttempt[]): string {
   return attempts.map((attempt, index) => `${index + 1}. strike ${attempt.strikeHead}; main ${attempt.mainHead}; ${attempt.outcome}: ${attempt.detail}`).join('\n');
 }
@@ -133,6 +136,47 @@ async function handleFailure(issueId: string, head: string, detail: string, proj
   return `[strike-landing] ${issueId} at ${head} needs-you`;
 }
 
+async function handleTransportFailure(issueId: string, head: string, detail: string, status: ReviewStatus, deps: StrikeLandingDeps): Promise<string> {
+  const timestamp = deps.now();
+  const project = deps.resolveProject(issueId);
+  const projectPath = project?.projectPath ?? '';
+  const workspacePath = project ? join(projectPath, 'workspaces', `feature-${issueId.toLowerCase()}-strike`) : '';
+  let mainHead = 'unknown';
+  try { if (projectPath) mainHead = await deps.getMainHead(projectPath); }
+  catch (error) { detail += `; main HEAD unavailable: ${error instanceof Error ? error.message : String(error)}`; }
+  const attempts: StrikeLandingAttempt[] = [
+    ...(status.strikeLandingAttempts ?? []),
+    { timestamp, strikeHead: head, mainHead, outcome: 'transport-failed', detail },
+  ];
+  const retryCount = (status.strikeTransportRetryCount ?? 0) + 1;
+
+  if (retryCount < MAX_TRANSPORT_RETRIES) {
+    const delayMs = Math.min(TRANSPORT_BACKOFF_CAP_MS, TRANSPORT_BACKOFF_BASE_MS * (2 ** (retryCount - 1)));
+    const nextAttemptAt = new Date(Date.parse(timestamp) + delayMs).toISOString();
+    deps.setStatus(issueId, {
+      strikeLandingState: 'ready',
+      strikeReadyHead: head,
+      strikeTransportRetryCount: retryCount,
+      strikeNextAttemptAt: nextAttemptAt,
+      strikeLandingAttempts: attempts,
+      mergeNotes: detail,
+    });
+    return `[strike-landing] ${issueId} at ${head} transport retry ${retryCount}/${MAX_TRANSPORT_RETRIES} after ${nextAttemptAt}`;
+  }
+
+  const reason = `Strike landing for ${issueId} needs operator attention after ${retryCount} transport attempt(s).\n${attemptHistory(attempts)}`;
+  deps.setStatus(issueId, {
+    strikeLandingState: 'needs_you',
+    strikeTransportRetryCount: retryCount,
+    strikeNextAttemptAt: undefined,
+    strikeLandingAttempts: attempts,
+    mergeNotes: detail,
+  });
+  await deps.writeFeedback(issueId, workspacePath, `## Strike landing needs operator attention\n\n${reason}`);
+  await deps.needsYou(issueId, reason, { attempts });
+  return `[strike-landing] ${issueId} at ${head} needs-you`;
+}
+
 export async function patrolStrikeLandings(overrides: Partial<StrikeLandingDeps> = {}): Promise<string[]> {
   const deps = { ...defaultDeps(), ...overrides };
   const actions: string[] = [];
@@ -140,6 +184,7 @@ export async function patrolStrikeLandings(overrides: Partial<StrikeLandingDeps>
     const issueId = (candidate.issueId || key).toUpperCase();
     const head = candidate.strikeReadyHead;
     if (!head || (candidate.strikeLandingState !== 'ready' && candidate.strikeLandingState !== 'landing')) continue;
+    if (candidate.strikeNextAttemptAt && candidate.strikeNextAttemptAt > deps.now()) continue;
     if (candidate.deaconIgnored || candidate.stuck || candidate.mergeStatus === 'merged') continue;
 
     const current = deps.getStatus(issueId);
@@ -181,9 +226,17 @@ async function executeStrikeLanding(issueId: string, head: string, claimed: Revi
     };
     const result = await deps.mergeIssue(issueId, request);
     if (result.mergeStatus === 'merged') {
-      deps.setStatus(issueId, { strikeLandingState: 'landed', strikeReadyHead: undefined, strikeReadyAt: undefined });
+      deps.setStatus(issueId, {
+        strikeLandingState: 'landed',
+        strikeReadyHead: undefined,
+        strikeReadyAt: undefined,
+        strikeTransportRetryCount: undefined,
+        strikeNextAttemptAt: undefined,
+      });
     } else if (result.success || result.mergeStatus === 'queued' || result.mergeStatus === 'merging' || result.mergeStatus === 'merged') {
       return;
+    } else if (result.transport) {
+      await handleTransportFailure(issueId, head, result.error ?? 'Strike landing transport failed', claimed, deps);
     } else {
       await handleFailure(issueId, head, result.error ?? 'Strike landing failed', project.projectPath, request.workspacePath, claimed, deps);
     }

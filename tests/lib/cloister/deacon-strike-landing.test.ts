@@ -8,7 +8,7 @@ function ready(overrides: Partial<ReviewStatus> = {}): ReviewStatus {
   return { issueId: 'PAN-2702', reviewStatus: 'pending', testStatus: 'pending', readyForMerge: false, updatedAt: 't', strikeReadyHead: head, strikeLandingState: 'ready', ...overrides };
 }
 
-function deps(result: { success: boolean; mergeStatus?: string; error?: string } = { success: true, mergeStatus: 'merged' }): StrikeLandingDeps & { readonly state: ReviewStatus; setState: (state: ReviewStatus) => void; flush: () => Promise<void> } {
+function deps(result: { success: boolean; mergeStatus?: string; error?: string; transport?: boolean } = { success: true, mergeStatus: 'merged' }): StrikeLandingDeps & { readonly state: ReviewStatus; setState: (state: ReviewStatus) => void; flush: () => Promise<void> } {
   const container = { state: ready() };
   const scheduled: Promise<void>[] = [];
   const scheduledKeys = new Set<string>();
@@ -93,12 +93,103 @@ describe('patrolStrikeLandings', () => {
     expect(d.state.mergeNotes).toContain('Unexpected supervised strike landing failure: worker crashed');
   });
 
+  it('surfaces transport-flavored supervised rejection without demanding a fresh head', async () => {
+    const d = deps();
+    vi.mocked(d.mergeIssue).mockRejectedValue(new Error('fetch failed: ECONNREFUSED'));
+    await patrolStrikeLandings(d);
+    await d.flush();
+    expect(d.state).toMatchObject({ strikeLandingState: 'needs_you', strikeRecoveryCount: 1 });
+    expect(d.deliverRecovery).not.toHaveBeenCalled();
+    expect(d.writeFeedback).toHaveBeenCalledTimes(1);
+    expect(d.needsYou).toHaveBeenCalledTimes(1);
+  });
+
   it('marks a terminal merge landed and clears readiness', async () => {
     const d = deps();
+    d.setState(ready({
+      strikeTransportRetryCount: 2,
+      strikeNextAttemptAt: '2026-07-16T00:00:00.000Z',
+    }));
     const actions = await patrolStrikeLandings(d);
     await d.flush();
-    expect(d.state).toMatchObject({ strikeLandingState: 'landed', strikeReadyHead: undefined, strikeReadyAt: undefined });
+    expect(d.state).toMatchObject({
+      strikeLandingState: 'landed',
+      strikeReadyHead: undefined,
+      strikeReadyAt: undefined,
+      strikeTransportRetryCount: undefined,
+      strikeNextAttemptAt: undefined,
+    });
     expect(actions).toEqual([`[strike-landing] claimed PAN-2702 at ${head}`]);
+  });
+
+  it('retries a transport failure at the same head after exponential backoff', async () => {
+    const d = deps({ success: false, transport: true, error: 'Strike merge request failed: fetch failed' });
+    await expect(patrolStrikeLandings(d)).resolves.toEqual([`[strike-landing] claimed PAN-2702 at ${head}`]);
+    await d.flush();
+    expect(d.state).toMatchObject({
+      strikeLandingState: 'ready',
+      strikeReadyHead: head,
+      strikeTransportRetryCount: 1,
+      strikeNextAttemptAt: '2026-07-16T00:01:00.000Z',
+    });
+    expect(d.state.strikeLandingAttempts).toEqual([{
+      timestamp: '2026-07-16T00:00:00.000Z',
+      strikeHead: head,
+      mainHead: 'main-head',
+      outcome: 'transport-failed',
+      detail: 'Strike merge request failed: fetch failed',
+    }]);
+    expect(d.deliverRecovery).not.toHaveBeenCalled();
+  });
+
+  it('skips transport retries until their due time, then reclaims the same head', async () => {
+    const d = deps({ success: true, mergeStatus: 'queued' });
+    d.setState(ready({
+      strikeTransportRetryCount: 1,
+      strikeNextAttemptAt: '2026-07-16T00:01:00.000Z',
+    }));
+
+    await expect(patrolStrikeLandings(d)).resolves.toEqual([]);
+    expect(d.mergeIssue).not.toHaveBeenCalled();
+
+    d.now = () => '2026-07-16T00:01:00.000Z';
+    await expect(patrolStrikeLandings(d)).resolves.toEqual([`[strike-landing] claimed PAN-2702 at ${head}`]);
+    await d.flush();
+    expect(d.mergeIssue).toHaveBeenCalledWith('PAN-2702', expect.objectContaining({ markerHead: head }));
+  });
+
+  it('escalates the tenth transport failure with complete attempt history', async () => {
+    const d = deps({ success: false, transport: true, error: 'connection refused' });
+    d.setState(ready({
+      strikeTransportRetryCount: 9,
+      strikeLandingAttempts: [{
+        timestamp: 'old',
+        strikeHead: 'old-head',
+        mainHead: 'old-main',
+        outcome: 'transport-failed',
+        detail: 'old transport failure',
+      }],
+    }));
+
+    await patrolStrikeLandings(d);
+    await d.flush();
+
+    expect(d.state).toMatchObject({
+      strikeLandingState: 'needs_you',
+      strikeTransportRetryCount: 10,
+      strikeNextAttemptAt: undefined,
+    });
+    expect(d.writeFeedback).toHaveBeenCalledWith(
+      'PAN-2702',
+      '/repo/workspaces/feature-pan-2702-strike',
+      expect.stringContaining('old-head'),
+    );
+    expect(d.needsYou).toHaveBeenCalledWith(
+      'PAN-2702',
+      expect.stringContaining('old-head'),
+      expect.objectContaining({ attempts: expect.any(Array) }),
+    );
+    expect(d.deliverRecovery).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -132,12 +223,15 @@ describe('patrolStrikeLandings', () => {
   it.each([
     ['third actionable cycle', 'gate failed', 2],
     ['non-actionable failure', 'Integration permission denied', 0],
+    ['fetch failure safety net', 'fetch failed', 0],
+    ['connection refusal safety net', 'ECONNREFUSED', 0],
   ])('surfaces needs-you once for %s with ordered history', async (_label, error, priorCount) => {
     const d = deps({ success: false, error });
     d.setState(ready({ strikeRecoveryCount: priorCount, strikeLandingAttempts: [{ timestamp: 'old', strikeHead: 'old-head', mainHead: 'old-main', outcome: 'failed', detail: 'old failure' }] }));
     await expect(patrolStrikeLandings(d)).resolves.toEqual([`[strike-landing] claimed PAN-2702 at ${head}`]);
     await d.flush();
     expect(d.state.strikeLandingState).toBe('needs_you');
+    expect(d.deliverRecovery).not.toHaveBeenCalled();
     expect(d.writeFeedback).toHaveBeenCalledTimes(1);
     expect(d.needsYou).toHaveBeenCalledWith('PAN-2702', expect.stringContaining('old-head'), expect.objectContaining({ attempts: expect.any(Array) }));
     await expect(patrolStrikeLandings(d)).resolves.toEqual([]);
