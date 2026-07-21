@@ -49,8 +49,8 @@ export function composeProjectNameForWorkspace(workspacePath: string, issueId: s
         );
       }
       return declared;
-    } catch (err: any) {
-      if (err?.message?.startsWith('Refusing workspace rebuild:')) throw err;
+    } catch (err: unknown) {
+      if (err instanceof Error && err.message.startsWith('Refusing workspace rebuild:')) throw err;
     }
   }
   return fallback;
