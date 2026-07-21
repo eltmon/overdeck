@@ -85,7 +85,7 @@
   ],
   "feedback": [],
   "created": "2026-07-21T16:29:59.439Z",
-  "updated": "2026-07-21T16:44:03.778Z",
+  "updated": "2026-07-21T16:50:47.929Z",
   "pipeline": {
     "issueId": "PAN-806",
     "reviewStatus": "pending",
@@ -173,16 +173,8 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "prerebase-hook-install": {
-        "writerId": "agent-pan-806",
-        "agentId": "agent-pan-806",
-        "pid": 3216548,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-21T16:44:03.778Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-806",
@@ -205,6 +197,17 @@
         "outcome": "completed",
         "reason": "Replaced raw restart rebase instructions with pan sync-main and added tested permitted/forbidden git operations table",
         "releasedAt": "2026-07-21T16:43:55.369Z"
+      },
+      {
+        "writerId": "agent-pan-806",
+        "agentId": "agent-pan-806",
+        "pid": 3216548,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-21T16:44:03.778Z",
+        "itemId": "prerebase-hook-install",
+        "outcome": "completed",
+        "reason": "Installed executable agent-gated pre-rebase hook at git-resolved hooks path, preserved existing hooks, reapplied after Husky installs, and tested sentinel/human bypass plus agent blocking",
+        "releasedAt": "2026-07-21T16:50:47.929Z"
       }
     ],
     "statusReasons": {
@@ -215,6 +218,10 @@
       "workmd-prompt-fix": {
         "reason": "Replaced raw restart rebase instructions with pan sync-main and added tested permitted/forbidden git operations table",
         "updatedAt": "2026-07-21T16:43:55.369Z"
+      },
+      "prerebase-hook-install": {
+        "reason": "Installed executable agent-gated pre-rebase hook at git-resolved hooks path, preserved existing hooks, reapplied after Husky installs, and tested sentinel/human bypass plus agent blocking",
+        "updatedAt": "2026-07-21T16:50:47.929Z"
       }
     }
   },
@@ -225,6 +232,9 @@
     "workmd-prompt-fix": "completed",
     "workmd-prompt-fix.workmd-prompt-fix.ac1": "completed",
     "workmd-prompt-fix.workmd-prompt-fix.ac2": "completed",
-    "prerebase-hook-install": "running"
+    "prerebase-hook-install": "completed",
+    "prerebase-hook-install.prerebase-hook-install.ac1": "completed",
+    "prerebase-hook-install.prerebase-hook-install.ac2": "completed",
+    "prerebase-hook-install.prerebase-hook-install.ac3": "completed"
   }
 }
