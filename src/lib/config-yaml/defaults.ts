@@ -1,6 +1,7 @@
 import { join } from 'path';
 import { homedir, totalmem } from 'os';
 import { defaultBackgroundAiFeatures } from '../background-ai/registry.js';
+import { OVERDECK_HOME } from '../paths.js';
 import { DEFAULT_TIERED_EXECUTION_CONFIG } from '../agents/tier-table.js';
 import { cloneRoles, DEFAULT_ROLES, DEFAULT_WORKHORSES } from './roles.js';
 import type { NormalizedConfig } from './schema.js';
@@ -238,4 +239,4 @@ export const DEFAULT_CONFIG: NormalizedConfig = {
 /**
  * Path to global config file
  */
-export const GLOBAL_CONFIG_PATH = join(homedir(), '.overdeck', 'config.yaml');
+export const GLOBAL_CONFIG_PATH = join(OVERDECK_HOME, 'config.yaml');

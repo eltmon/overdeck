@@ -1,5 +1,5 @@
-import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, copyFileSync, symlinkSync, statSync, renameSync, rmSync } from 'fs';
-import { join, dirname, extname, relative } from 'path';
+import { chmodSync, existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, copyFileSync, symlinkSync, statSync, renameSync, rmSync } from 'fs';
+import { join, dirname, extname, relative, resolve } from 'path';
 import { homedir } from 'os';
 import { exec } from 'child_process';
 import { promisify } from 'util';
@@ -63,6 +63,50 @@ export function relocateVenvScripts(sourceVenv: string, destVenv: string): void 
   }
 }
 
+const PRE_REBASE_HOOK_MARKER = '# OVERDECK MANAGED PRE-REBASE GUARD';
+const PRE_REBASE_ORIGINAL_SUFFIX = '.overdeck-original';
+const PRE_REBASE_HOOK_PREFIX = [
+  '#!/bin/sh',
+  PRE_REBASE_HOOK_MARKER,
+  'if [ "$OVERDECK_PAN_GIT_OP" != "1" ] && [ -n "$OVERDECK_AGENT_ID" ]; then',
+  '  echo "Overdeck agents must not run git rebase directly." >&2',
+  '  echo "Use pan sync-main <ISSUE-ID> to sync main or pan done <ISSUE-ID> to submit." >&2',
+  '  exit 1',
+  'fi',
+  '',
+].join('\n');
+
+/** Install the agent-only rebase guard in Git's configured hooks directory. */
+export async function installPreRebaseHook(targetPath: string): Promise<string> {
+  const { stdout } = await execAsync('git rev-parse --git-path hooks', {
+    cwd: targetPath,
+    encoding: 'utf-8',
+  });
+  const hooksDir = resolve(targetPath, stdout.trim());
+  const hookPath = join(hooksDir, 'pre-rebase');
+
+  mkdirSync(hooksDir, { recursive: true });
+  const originalHookPath = `${hookPath}${PRE_REBASE_ORIGINAL_SUFFIX}`;
+  const existingHook = existsSync(hookPath) ? readFileSync(hookPath, 'utf-8') : '';
+  if (!existingHook.includes(PRE_REBASE_HOOK_MARKER)) {
+    if (existingHook) {
+      rmSync(originalHookPath, { force: true });
+      renameSync(hookPath, originalHookPath);
+    }
+    const hook = [
+      PRE_REBASE_HOOK_PREFIX,
+      `if [ -x "\${0}${PRE_REBASE_ORIGINAL_SUFFIX}" ]; then`,
+      `  exec "\${0}${PRE_REBASE_ORIGINAL_SUFFIX}" "$@"`,
+      'fi',
+      'exit 0',
+      '',
+    ].join('\n');
+    writeFileSync(hookPath, hook, { encoding: 'utf-8', mode: 0o755 });
+  }
+  chmodSync(hookPath, 0o755);
+  return hookPath;
+}
+
 /**
  * Create a git worktree
  * @param repoPath Path to the source git repository
@@ -99,6 +143,8 @@ export async function createWorktree(
       // Create new branch from the configured default branch
       await execAsync(`git worktree add "${targetPath}" -b "${branchName}" "${defaultBranch}"`, { cwd: repoPath });
     }
+
+    await installPreRebaseHook(targetPath);
 
     // Clear unstaged deletions from the new worktree (e.g. .planning/ files that exist on the
     // feature branch but not on main appear as deleted in a fresh worktree). Without this,

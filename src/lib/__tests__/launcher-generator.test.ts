@@ -1,5 +1,6 @@
+import { spawnSync } from 'node:child_process';
+import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
 import { describe, expect, it, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { generateLauncherScriptSync, generateLauncherWrapperSync, type LauncherConfig } from '../launcher-generator.js';
@@ -26,6 +27,36 @@ const DEFAULT_CONFIG: LauncherConfig = {
   role: 'work',
   workingDir: '/workspace/project',
 };
+
+function materializeGitGuard(): { script: string; wrapperPath: string } {
+  const realGitDir = join(tempHome, 'real-git');
+  const realGitPath = join(realGitDir, 'git');
+  const launcherPath = join(tempHome, 'launcher.sh');
+  mkdirSync(realGitDir, { recursive: true });
+  writeFileSync(realGitPath, '#!/bin/sh\nexit 23\n');
+  chmodSync(realGitPath, 0o755);
+
+  const script = generateLauncherScriptSync({
+    ...DEFAULT_CONFIG,
+    changeDir: false,
+    overdeckEnv: { agentId: 'agent-pan-806', issueId: 'PAN-806', sessionType: 'work' },
+    baseCommand: 'true',
+  });
+  writeFileSync(launcherPath, script);
+
+  const launcherResult = spawnSync('bash', [launcherPath], {
+    encoding: 'utf-8',
+    env: { ...process.env, PATH: `${realGitDir}:${process.env.PATH ?? ''}` },
+  });
+  if (launcherResult.status !== 0) {
+    throw new Error(`Launcher failed: ${launcherResult.stderr}`);
+  }
+
+  return {
+    script,
+    wrapperPath: join(tempHome, 'agents', 'agent-pan-806', 'git-guard', 'git'),
+  };
+}
 
 describe('generateLauncherScript', () => {
   it('work agent spawn (basic)', () => {
@@ -89,6 +120,62 @@ describe('generateLauncherScript', () => {
     `);
   });
 
+  it('adds the git guard only to issue-bound agent launchers', () => {
+    const { script } = materializeGitGuard();
+    expect(script).toContain('_OVERDECK_REAL_GIT="$(command -v git)"');
+    expect(script).toContain("agents/agent-pan-806/git-guard/git");
+    expect(script).toContain('export PATH="');
+    expect(script).toContain('git-guard:$PATH"');
+
+    const conversationScript = generateLauncherScriptSync({
+      ...DEFAULT_CONFIG,
+      spawnMode: 'conversation',
+      overdeckEnv: { agentId: 'conv-123', issueId: 'PAN-806' },
+      baseCommand: 'claude',
+    });
+    expect(conversationScript).not.toContain('_OVERDECK_REAL_GIT');
+    expect(conversationScript).not.toContain('git-guard');
+  });
+
+  it('blocks history operations and passes permitted git commands to real git', () => {
+    const { wrapperPath } = materializeGitGuard();
+    const run = (args: string[]) => spawnSync(wrapperPath, args, {
+      encoding: 'utf-8',
+      env: { ...process.env, OVERDECK_PAN_GIT_OP: '' },
+    });
+
+    for (const args of [
+      ['rebase', 'main'],
+      ['reset', '--hard', 'HEAD'],
+      ['stash', 'push'],
+      ['-C', '/workspace', 'rebase', 'main'],
+      ['-C/workspace', 'reset', '--hard', 'HEAD'],
+      ['-c', 'core.hooksPath=/tmp/hooks', 'stash', 'push'],
+      ['-ccore.hooksPath=/tmp/hooks', 'rebase', 'main'],
+    ]) {
+      const result = run(args);
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('Overdeck agents must not run git');
+    }
+    for (const args of [['status'], ['add', '.'], ['fetch', 'origin']]) {
+      expect(run(args).status).toBe(23);
+    }
+  });
+
+  it('passes every git command through when the pan git-op sentinel is set', () => {
+    const { wrapperPath } = materializeGitGuard();
+    const run = (args: string[]) => spawnSync(wrapperPath, args, {
+      encoding: 'utf-8',
+      env: { ...process.env, OVERDECK_PAN_GIT_OP: '1' },
+    });
+
+    for (const args of [['rebase', 'main'], ['reset', '--hard', 'HEAD'], ['stash', 'push']]) {
+      const result = run(args);
+      expect(result.status).toBe(23);
+      expect(result.stderr).not.toContain('Overdeck agents must not run git');
+    }
+  });
+
   it('planning agent spawn', () => {
     const script = generateLauncherScriptSync({
       ...DEFAULT_CONFIG,
@@ -103,7 +190,7 @@ describe('generateLauncherScript', () => {
       debugLog: '/tmp/pan-launcher-debug.log',
       keepAlive: true,
     });
-    expect(script).toMatchInlineSnapshot(`
+    expect(script.replaceAll(tempHome, '<OVERDECK_HOME>')).toMatchInlineSnapshot(`
       "#!/bin/bash
       unset TMUX TMUX_PANE STY
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
@@ -116,6 +203,58 @@ describe('generateLauncherScript', () => {
       export OVERDECK_AGENT_ID='plan-abc'
       export OVERDECK_ISSUE_ID='PAN-824'
       export OVERDECK_SESSION_TYPE='planning'
+      _OVERDECK_REAL_GIT="$(command -v git)"
+      mkdir -p '<OVERDECK_HOME>/agents/plan-abc/git-guard'
+      cat > '<OVERDECK_HOME>/agents/plan-abc/git-guard/git' <<EOF
+      #!/bin/sh
+      _OVERDECK_REAL_GIT="$_OVERDECK_REAL_GIT"
+      if [ "\\$OVERDECK_PAN_GIT_OP" = "1" ]; then
+        exec "\\$_OVERDECK_REAL_GIT" "\\$@"
+      fi
+      _overdeck_git_find_command() {
+        while [ "\\$#" -gt 0 ]; do
+          case "\\$1" in
+            -C|-c|--git-dir|--work-tree|--namespace|--config-env|--super-prefix|--attr-source)
+              shift
+              [ "\\$#" -gt 0 ] && shift
+              ;;
+            -C?*|-c?*|--git-dir=*|--work-tree=*|--namespace=*|--config-env=*|--super-prefix=*|--attr-source=*)
+              shift
+              ;;
+            --)
+              shift
+              break
+              ;;
+            -*)
+              shift
+              ;;
+            *)
+              printf "%s\\n" "\\$1"
+              return
+              ;;
+          esac
+        done
+        [ "\\$#" -gt 0 ] && printf "%s\\n" "\\$1"
+      }
+      _overdeck_git_command="\\$(_overdeck_git_find_command "\\$@")"
+      case "\\$_overdeck_git_command" in
+        rebase|stash)
+          echo "Overdeck agents must not run git \\$_overdeck_git_command directly. Use pan sync-main to sync main or pan done to submit." >&2
+          exit 1
+          ;;
+        reset)
+          for _overdeck_git_arg in "\\$@"; do
+            if [ "\\$_overdeck_git_arg" = "--hard" ]; then
+              echo "Overdeck agents must not run git reset --hard. Commit, explicitly discard, or surface the state instead." >&2
+              exit 1
+            fi
+          done
+          ;;
+      esac
+      exec "\\$_OVERDECK_REAL_GIT" "\\$@"
+      EOF
+      chmod 0755 '<OVERDECK_HOME>/agents/plan-abc/git-guard/git'
+      export PATH="<OVERDECK_HOME>/agents/plan-abc/git-guard:$PATH"
       cd -- '/workspace/project'
       export ANTHROPIC_BASE_URL="http://proxy"
       trap '' HUP
@@ -149,7 +288,7 @@ describe('generateLauncherScript', () => {
       sessionId: 'sess-abc',
       model: 'claude-sonnet-4-6',
     });
-    expect(script).toMatchInlineSnapshot(`
+    expect(script.replaceAll(tempHome, '<OVERDECK_HOME>')).toMatchInlineSnapshot(`
       "#!/bin/bash
       unset TMUX TMUX_PANE STY
       set -o pipefail
@@ -158,6 +297,58 @@ describe('generateLauncherScript', () => {
       export OVERDECK_AGENT_ID='spec-123'
       export OVERDECK_ISSUE_ID='PAN-824'
       export OVERDECK_SESSION_TYPE='correctness-review'
+      _OVERDECK_REAL_GIT="$(command -v git)"
+      mkdir -p '<OVERDECK_HOME>/agents/spec-123/git-guard'
+      cat > '<OVERDECK_HOME>/agents/spec-123/git-guard/git' <<EOF
+      #!/bin/sh
+      _OVERDECK_REAL_GIT="$_OVERDECK_REAL_GIT"
+      if [ "\\$OVERDECK_PAN_GIT_OP" = "1" ]; then
+        exec "\\$_OVERDECK_REAL_GIT" "\\$@"
+      fi
+      _overdeck_git_find_command() {
+        while [ "\\$#" -gt 0 ]; do
+          case "\\$1" in
+            -C|-c|--git-dir|--work-tree|--namespace|--config-env|--super-prefix|--attr-source)
+              shift
+              [ "\\$#" -gt 0 ] && shift
+              ;;
+            -C?*|-c?*|--git-dir=*|--work-tree=*|--namespace=*|--config-env=*|--super-prefix=*|--attr-source=*)
+              shift
+              ;;
+            --)
+              shift
+              break
+              ;;
+            -*)
+              shift
+              ;;
+            *)
+              printf "%s\\n" "\\$1"
+              return
+              ;;
+          esac
+        done
+        [ "\\$#" -gt 0 ] && printf "%s\\n" "\\$1"
+      }
+      _overdeck_git_command="\\$(_overdeck_git_find_command "\\$@")"
+      case "\\$_overdeck_git_command" in
+        rebase|stash)
+          echo "Overdeck agents must not run git \\$_overdeck_git_command directly. Use pan sync-main to sync main or pan done to submit." >&2
+          exit 1
+          ;;
+        reset)
+          for _overdeck_git_arg in "\\$@"; do
+            if [ "\\$_overdeck_git_arg" = "--hard" ]; then
+              echo "Overdeck agents must not run git reset --hard. Commit, explicitly discard, or surface the state instead." >&2
+              exit 1
+            fi
+          done
+          ;;
+      esac
+      exec "\\$_OVERDECK_REAL_GIT" "\\$@"
+      EOF
+      chmod 0755 '<OVERDECK_HOME>/agents/spec-123/git-guard/git'
+      export PATH="<OVERDECK_HOME>/agents/spec-123/git-guard:$PATH"
       cd -- '/workspace/project'
       unset ANTHROPIC_API_KEY
       unset ANTHROPIC_BASE_URL

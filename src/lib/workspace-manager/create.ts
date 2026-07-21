@@ -25,6 +25,7 @@ import {
   assignPort,
   copyProjectTemplateDirs,
   createWorktree,
+  installPreRebaseHook,
   preTrustDirectorySync,
   relocateVenvScripts,
   restorePreWorktreeMetadataSync,
@@ -375,6 +376,23 @@ export async function createWorkspacePromise(options: WorkspaceCreateOptions): P
     const msg = `Dependency install failed (${pkgManager}): ${installErr.message?.slice(0, 200)}`;
     result.errors.push(msg);
     progress('Installing dependencies', 'Failed — workspace creation aborted', 'complete');
+    return result;
+  }
+
+  // Package installers such as Husky regenerate the resolved hooks directory.
+  // Reinstall the guard after dependencies so workspace creation cannot erase it.
+  const hookTargets = workspaceConfig.type === 'polyrepo' && workspaceConfig.repos
+    ? workspaceConfig.repos
+      .filter(repo => repo.link_type !== 'symlink')
+      .map(repo => join(workspacePath, repo.name))
+      .filter(path => existsSync(join(path, '.git')))
+    : [workspacePath];
+  try {
+    for (const hookTarget of hookTargets) {
+      await installPreRebaseHook(hookTarget);
+    }
+  } catch (hookErr: any) {
+    result.errors.push(`Pre-rebase guard install failed: ${hookErr.message?.slice(0, 200)}`);
     return result;
   }
 

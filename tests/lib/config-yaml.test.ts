@@ -315,11 +315,8 @@ api_keys:
   });
 
   describe('getGlobalConfigPath', () => {
-    it('should return path to global config', () => {
-      // This test is safe as it only checks the path structure, not file existence
-      const path = getGlobalConfigPath();
-      expect(path).toContain('.overdeck');
-      expect(path).toContain('config.yaml');
+    it('should return the config path under OVERDECK_HOME', () => {
+      expect(getGlobalConfigPath()).toBe(join(process.env.OVERDECK_HOME!, 'config.yaml'));
     });
   });
 

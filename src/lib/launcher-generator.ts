@@ -7,6 +7,7 @@ import { qualifyPiModel } from './providers.js';
 import { shellQuoteModelIdSync } from './model-validation.js';
 import { colorFgBgForTheme, getUiThemeSync } from './ui-theme.js';
 import { packageRoot } from './paths.js';
+import { buildGitGuardLines } from './launcher-git-guard.js';
 
 export type LauncherSpawnMode = 'conversation' | 'remote' | 'resume';
 
@@ -294,6 +295,10 @@ export function generateLauncherScriptSync(config: LauncherConfig): string {
       lines.push(`export OVERDECK_SESSION_TYPE=${shellQuote(config.overdeckEnv.sessionType)}`);
       explicitlySetOverdeckKeys.add('OVERDECK_SESSION_TYPE');
     }
+  }
+
+  if (config.overdeckEnv?.agentId && config.spawnMode !== 'conversation') {
+    lines.push(...buildGitGuardLines(config.overdeckEnv.agentId));
   }
 
   // Extra env exports

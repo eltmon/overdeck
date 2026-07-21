@@ -1,5 +1,5 @@
-import { readFileSync, mkdirSync, writeFileSync } from 'fs';
-import { mkdir as mkdirAsync, writeFile as writeFileAsync } from 'fs/promises';
+import { readFileSync, mkdirSync, writeFileSync, rmSync } from 'fs';
+import { mkdir as mkdirAsync, rm, writeFile as writeFileAsync } from 'fs/promises';
 import { exec, execSync } from 'child_process';
 import { promisify } from 'util';
 import { join } from 'path';
@@ -165,6 +165,12 @@ export function stopAgentSync(agentId: string): void {
   // kill-session). Runs even when no tmux session existed in the first place.
   killLauncherProcessSync(normalizedId);
 
+  try {
+    rmSync(join(AGENTS_DIR, normalizedId, 'git-guard'), { recursive: true, force: true });
+  } catch {
+    // Non-fatal — stopping the agent must succeed even if guard cleanup fails.
+  }
+
   const state = getAgentStateSync(normalizedId);
   if (state) {
     // Ensure id is set — runtime state files may lack it (PAN-150)
@@ -215,6 +221,14 @@ export const stopAgent = (agentId: string): Effect.Effect<void, FsError | TmuxEr
       try: () => killLauncherProcessAsync(normalizedId),
       catch: (cause): never => { throw cause; },
     }).pipe(Effect.catch(() => Effect.void));
+
+    yield* Effect.promise(async () => {
+      try {
+        await rm(join(AGENTS_DIR, normalizedId, 'git-guard'), { recursive: true, force: true });
+      } catch {
+        // Non-fatal — stopping the agent must succeed even if guard cleanup fails.
+      }
+    });
 
     const state = yield* getAgentState(normalizedId);
     if (state) {
