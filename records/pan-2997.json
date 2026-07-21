@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-21T23:09:49.270Z",
-  "updated": "2026-07-21T23:47:07.833Z",
+  "updated": "2026-07-21T23:48:02.571Z",
   "pipeline": {
     "issueId": "PAN-2997",
     "reviewStatus": "pending",
@@ -61,16 +61,8 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "role-linear-mcp-guidance": {
-        "writerId": "agent-pan-2997",
-        "agentId": "agent-pan-2997",
-        "pid": 2743088,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-21T23:47:07.832Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2997",
@@ -93,6 +85,17 @@
         "outcome": "completed",
         "reason": "Added the event-store-backed lifecycle fold, read/write helpers, projection, TTL expiry, wake-set computation, and fake-timer unit coverage",
         "releasedAt": "2026-07-21T23:46:33.687Z"
+      },
+      {
+        "writerId": "agent-pan-2997",
+        "agentId": "agent-pan-2997",
+        "pid": 2743088,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-21T23:47:07.832Z",
+        "itemId": "role-linear-mcp-guidance",
+        "outcome": "completed",
+        "reason": "Added the same one-shot authenticate, wait, re-check, and resume contract to work and plan role prompts",
+        "releasedAt": "2026-07-21T23:48:02.571Z"
       }
     ],
     "statusReasons": {
@@ -103,6 +106,10 @@
       "linear-mcp-auth-fold": {
         "reason": "Added the event-store-backed lifecycle fold, read/write helpers, projection, TTL expiry, wake-set computation, and fake-timer unit coverage",
         "updatedAt": "2026-07-21T23:46:33.687Z"
+      },
+      "role-linear-mcp-guidance": {
+        "reason": "Added the same one-shot authenticate, wait, re-check, and resume contract to work and plan role prompts",
+        "updatedAt": "2026-07-21T23:48:02.571Z"
       }
     }
   },
@@ -116,6 +123,8 @@
     "linear-mcp-auth-fold.linear-mcp-auth-fold.ac2": "completed",
     "linear-mcp-auth-fold.linear-mcp-auth-fold.ac3": "completed",
     "linear-mcp-auth-fold.linear-mcp-auth-fold.ac4": "completed",
-    "role-linear-mcp-guidance": "running"
+    "role-linear-mcp-guidance": "completed",
+    "role-linear-mcp-guidance.role-linear-mcp-guidance.ac1": "completed",
+    "role-linear-mcp-guidance.role-linear-mcp-guidance.ac2": "completed"
   }
 }
