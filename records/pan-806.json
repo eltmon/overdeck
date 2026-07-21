@@ -85,7 +85,7 @@
   ],
   "feedback": [],
   "created": "2026-07-21T16:29:59.439Z",
-  "updated": "2026-07-21T17:42:36.039Z",
+  "updated": "2026-07-21T17:42:42.284Z",
   "pipeline": {
     "issueId": "PAN-806",
     "reviewStatus": "pending",
@@ -95,9 +95,11 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-21T16:37:09.348Z",
+    "updatedAt": "2026-07-21T17:42:42.283Z",
     "inspectNotes": "rebase-helper.ts:101,200 add OVERDECK_PAN_GIT_OP:'1' alongside GIT_EDITOR:'true' on git rebase and git rebase --continue; abort/merge-fallback also sentineled. New tests/unit/lib/rebase-helper.test.ts (3 tests) assert coexistence via objectContaining; ran locally, all pass.",
-    "strikeRecoveryCount": 0
+    "strikeRecoveryCount": 0,
+    "reviewRequestedAt": "2026-07-21T17:42:42.283Z",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2986"
   },
   "closeOut": {
     "usage": {
