@@ -9,6 +9,7 @@ import { HttpServerResponse } from 'effect/unstable/http';
 
 import { jsonResponse } from '../../dashboard/server/http-helpers.js';
 import { parseIssueIdSync } from '../issue-id.js';
+import { MODEL_ID_PATTERN } from '../model-validation.js';
 import { issueIdFromBranch } from '../webhook-handlers.js';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
@@ -68,7 +69,8 @@ import {
 } from '../../dashboard/server/routes/jsonl-resolver.js';
 import * as self from './conversation-forks.js';
 
-const SAFE_MODEL_PATTERN = /^[a-zA-Z0-9_.:\/-]+$/;
+// Canonical model-id shape (allows the `[1m]` suffix) — see model-validation.ts (PAN-2979).
+const SAFE_MODEL_PATTERN = MODEL_ID_PATTERN;
 const SESSION_FILE_MISS_TTL_MS = 2000;
 const sessionFileByIdCache = new Map<string, { path: string | null; ts: number }>();
 

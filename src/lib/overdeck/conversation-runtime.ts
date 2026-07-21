@@ -8,6 +8,7 @@ import { createInterface } from 'node:readline';
 import { promisify } from 'node:util';
 import { Effect } from 'effect';
 import { BLANKED_PROVIDER_ENV } from '../child-env.js';
+import { MODEL_ID_PATTERN } from '../model-validation.js';
 import { getClaudePermissionFlagsStringSync, resolvePermissionModeSync, BYPASS_PERMISSION_MODE } from '../claude-permissions.js';
 import { getProjectSync, listProjectsSync } from '../projects.js';
 import { getDefaultCwd } from '../default-cwd.js';
@@ -176,7 +177,11 @@ export async function stopConversationRuntime(conv: Conversation, name: string):
 function shellQuote(str: string): string {
   return "'" + str.replace(/'/g, "'\"'\"'") + "'";
 }
-const SAFE_MODEL_PATTERN = /^[a-zA-Z0-9_.:\/-]+$/;
+// Canonical model-id shape lives in model-validation.ts — it permits the
+// square-bracket context suffix (e.g. `k3[1m]`) that a local copy of this
+// pattern once rejected (PAN-2979). Shell safety comes from single-quote
+// wrapping at the launcher, not from this character set.
+const SAFE_MODEL_PATTERN = MODEL_ID_PATTERN;
 const SAFE_EFFORT_PATTERN = /^(low|medium|high)$/;
 const SAFE_ISSUE_ID_PATTERN = /^[A-Z0-9]+-[0-9]+$/;
 const PI_CONVERSATION_SOURCE_CONTRACT = [
