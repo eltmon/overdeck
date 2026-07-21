@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-21T15:14:12.381Z",
-  "updated": "2026-07-21T15:52:58.797Z",
+  "updated": "2026-07-21T15:57:29.250Z",
   "pipeline": {
     "issueId": "PAN-2984",
     "reviewStatus": "pending",
@@ -97,16 +97,8 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 13,
-    "claims": {
-      "dashboard-setup-endpoints": {
-        "writerId": "agent-pan-2984",
-        "agentId": "agent-pan-2984",
-        "pid": 2381391,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-21T15:52:58.797Z"
-      }
-    },
+    "sequence": 14,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2984",
@@ -173,6 +165,17 @@
         "outcome": "completed",
         "reason": "Added TTY plan display and y/N consent, non-TTY actionable failure, manual decline behavior, and injected prompt/executor seams; 13 CLI tests and a real pseudo-TTY decline flow pass.",
         "releasedAt": "2026-07-21T15:52:51.561Z"
+      },
+      {
+        "writerId": "agent-pan-2984",
+        "agentId": "agent-pan-2984",
+        "pid": 2381391,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-21T15:52:58.797Z",
+        "itemId": "dashboard-setup-endpoints",
+        "outcome": "completed",
+        "reason": "Added setupPlan projection to viewer status and full consented-plan execution/retry to the install handler; 1,226 dashboard server tests and full typecheck pass.",
+        "releasedAt": "2026-07-21T15:57:29.250Z"
       }
     ],
     "statusReasons": {
@@ -199,6 +202,10 @@
       "cli-assisted-flow": {
         "reason": "Added TTY plan display and y/N consent, non-TTY actionable failure, manual decline behavior, and injected prompt/executor seams; 13 CLI tests and a real pseudo-TTY decline flow pass.",
         "updatedAt": "2026-07-21T15:52:51.561Z"
+      },
+      "dashboard-setup-endpoints": {
+        "reason": "Added setupPlan projection to viewer status and full consented-plan execution/retry to the install handler; 1,226 dashboard server tests and full typecheck pass.",
+        "updatedAt": "2026-07-21T15:57:29.250Z"
       }
     }
   },
@@ -235,6 +242,10 @@
     "cli-assisted-flow.cli-assisted-flow.ac2": "completed",
     "cli-assisted-flow.cli-assisted-flow.ac3": "completed",
     "cli-assisted-flow.cli-assisted-flow.ac4": "completed",
-    "dashboard-setup-endpoints": "running"
+    "dashboard-setup-endpoints": "completed",
+    "dashboard-setup-endpoints.dashboard-setup-endpoints.ac1": "completed",
+    "dashboard-setup-endpoints.dashboard-setup-endpoints.ac2": "completed",
+    "dashboard-setup-endpoints.dashboard-setup-endpoints.ac3": "completed",
+    "dashboard-setup-endpoints.dashboard-setup-endpoints.ac4": "completed"
   }
 }
