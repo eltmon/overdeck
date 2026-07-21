@@ -120,24 +120,24 @@
   ],
   "feedback": [],
   "created": "2026-07-21T16:29:59.439Z",
-  "updated": "2026-07-21T18:16:31.871Z",
+  "updated": "2026-07-21T18:19:12.012Z",
   "pipeline": {
     "issueId": "PAN-806",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-21T17:44:12.340Z",
-    "updatedAt": "2026-07-21T18:16:31.837Z",
+    "updatedAt": "2026-07-21T18:19:11.977Z",
     "reviewNotes": "Agent re-review request (2/25): Fixed review issues",
     "inspectNotes": "rebase-helper.ts:101,200 add OVERDECK_PAN_GIT_OP:'1' alongside GIT_EDITOR:'true' on git rebase and git rebase --continue; abort/merge-fallback also sentineled. New tests/unit/lib/rebase-helper.test.ts (3 tests) assert coexistence via objectContaining; ran locally, all pass.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2986",
     "lastVerifiedCommit": "4d3f253ca4395edd917c79fa95e24c4fc533dc16",
     "reviewRequestedAt": "2026-07-21T17:44:12.340Z",
-    "reviewSpawnedAt": "2026-07-21T18:03:19.385Z",
+    "reviewSpawnedAt": "2026-07-21T18:19:11.977Z",
     "strikeRecoveryCount": 0
   },
   "closeOut": {
@@ -177,9 +177,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 2466140,
-            "output": 313646,
-            "cacheRead": 150942720,
+            "input": 2467636,
+            "output": 313754,
+            "cacheRead": 151222272,
             "cacheWrite": 0
           }
         }
@@ -198,9 +198,9 @@
           "cacheWrite": 235496
         },
         "openai/gpt-5.6-sol": {
-          "input": 4557690,
-          "output": 495102,
-          "cacheRead": 174935552,
+          "input": 4559186,
+          "output": 495210,
+          "cacheRead": 175215104,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -211,8 +211,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 132.062357,
-        "pricingAsOf": "2026-07-21T18:16:31.865Z"
+        "usd": 132.212853,
+        "pricingAsOf": "2026-07-21T18:19:12.004Z"
       }
     },
     "merges": [
