@@ -2,7 +2,7 @@
   "issueId": "PAN-2997",
   "schemaVersion": 2,
   "created": "2026-07-21T23:09:49.270Z",
-  "updated": "2026-07-21T23:10:14.148Z",
+  "updated": "2026-07-21T23:10:14.730Z",
   "pipeline": {
     "issueId": "PAN-2997",
     "reviewStatus": "pending",
@@ -26,5 +26,7 @@
       "note": "Planning session started for PAN-2997: Surface Linear MCP OAuth as a global intervention and wake blocked agents after re-auth",
       "timestamp": "2026-07-21T23:10:14.148Z"
     }
-  ]
+  ],
+  "harness": "claude-code",
+  "model": "k3[1m]"
 }
