@@ -15,8 +15,42 @@
     }
   ],
   "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      "src/cli/commands/__tests__/strike-ready.test.ts"
+    ],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "docs/SPECIALIST_WORKFLOW.md",
+      "src/cli/commands/strike-ready.ts",
+      "src/lib/agents/messaging.ts",
+      "src/lib/cloister/deacon-strike-landing.ts",
+      "src/lib/overdeck/review-status-record-sync.ts",
+      "src/lib/pan-dir/records.ts",
+      "src/lib/strike-landing.ts",
+      "tests/lib/cloister/deacon-strike-landing.test.ts",
+      "tests/unit/cli/commands/strike-ready.test.ts",
+      "tests/unit/lib/agents/message-agent.test.ts",
+      "tests/unit/lib/cloister/deacon-strike-transport.test.ts"
+    ],
+    "actualChangedFiles": [
+      "docs/SPECIALIST_WORKFLOW.md",
+      "src/cli/commands/__tests__/strike-ready.test.ts",
+      "src/cli/commands/strike-ready.ts",
+      "src/lib/agents/messaging.ts",
+      "src/lib/cloister/deacon-strike-landing.ts",
+      "src/lib/overdeck/review-status-record-sync.ts",
+      "src/lib/pan-dir/records.ts",
+      "src/lib/strike-landing.ts",
+      "tests/lib/cloister/deacon-strike-landing.test.ts",
+      "tests/unit/cli/commands/strike-ready.test.ts",
+      "tests/unit/lib/agents/message-agent.test.ts",
+      "tests/unit/lib/cloister/deacon-strike-transport.test.ts"
+    ],
+    "recordedAt": "2026-07-21T23:31:08.000Z"
+  },
   "created": "2026-07-21T22:47:36.935Z",
-  "updated": "2026-07-21T23:31:11.287Z",
+  "updated": "2026-07-21T23:31:15.868Z",
   "pipeline": {
     "issueId": "PAN-2993",
     "reviewStatus": "pending",
@@ -26,8 +60,9 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-21T23:31:11.285Z",
+    "updatedAt": "2026-07-21T23:31:15.542Z",
     "inspectNotes": "All 4 ACs verified against src/lib/agents/messaging.ts@79bb7b47: stopped-agent resume failure returns {delivered:false,queuedToMail:true,reason} naming both resumeResult.error and PAN-1980 session-rotation disable; paused/gated path returns gate reason; live-session/successful-resume paths return delivered:true; only deacon-strike-landing.ts touched among callers and npm run typecheck passes clean (0 new errors).",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2998",
     "reviewRequestedAt": "2026-07-21T23:31:11.285Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -62,8 +97,7 @@
         "tests/unit/lib/cloister/deacon-strike-transport.test.ts"
       ],
       "recordedAt": "2026-07-21T23:31:08.000Z"
-    },
-    "prUrl": "https://github.com/eltmon/overdeck/pull/2998"
+    }
   },
   "closeOut": {
     "usage": {
@@ -78,17 +112,17 @@
         },
         "review.supervisor": {
           "anthropic/claude-sonnet-5": {
-            "input": 14,
-            "output": 4464,
-            "cacheRead": 828269,
-            "cacheWrite": 143725
+            "input": 16,
+            "output": 4730,
+            "cacheRead": 971994,
+            "cacheWrite": 144980
           }
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 555778,
-            "output": 76726,
-            "cacheRead": 31439872,
+            "input": 658697,
+            "output": 93969,
+            "cacheRead": 46596096,
             "cacheWrite": 0
           }
         }
@@ -101,24 +135,26 @@
           "cacheWrite": 311785
         },
         "anthropic/claude-sonnet-5": {
-          "input": 14,
-          "output": 4464,
-          "cacheRead": 828269,
-          "cacheWrite": 143725
+          "input": 16,
+          "output": 4730,
+          "cacheRead": 971994,
+          "cacheWrite": 144980
         },
         "openai/gpt-5.6-sol": {
-          "input": 555778,
-          "output": 76726,
-          "cacheRead": 31439872,
+          "input": 658697,
+          "output": 93969,
+          "cacheRead": 46596096,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 31.879838,
-        "pricingAsOf": "2026-07-21T23:16:55.046Z"
+        "usd": 40.524382,
+        "pricingAsOf": "2026-07-21T23:31:15.577Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/2998"
+    ],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
@@ -249,39 +285,5 @@
     "docs-strike-lifecycle": "completed",
     "docs-strike-lifecycle.docs-strike-lifecycle.ac1": "completed",
     "docs-strike-lifecycle.docs-strike-lifecycle.ac2": "completed"
-  },
-  "scopeDrift": {
-    "outsideDeclaredScope": [
-      "src/cli/commands/__tests__/strike-ready.test.ts"
-    ],
-    "declaredScopeUntouched": [],
-    "declaredScope": [
-      "docs/SPECIALIST_WORKFLOW.md",
-      "src/cli/commands/strike-ready.ts",
-      "src/lib/agents/messaging.ts",
-      "src/lib/cloister/deacon-strike-landing.ts",
-      "src/lib/overdeck/review-status-record-sync.ts",
-      "src/lib/pan-dir/records.ts",
-      "src/lib/strike-landing.ts",
-      "tests/lib/cloister/deacon-strike-landing.test.ts",
-      "tests/unit/cli/commands/strike-ready.test.ts",
-      "tests/unit/lib/agents/message-agent.test.ts",
-      "tests/unit/lib/cloister/deacon-strike-transport.test.ts"
-    ],
-    "actualChangedFiles": [
-      "docs/SPECIALIST_WORKFLOW.md",
-      "src/cli/commands/__tests__/strike-ready.test.ts",
-      "src/cli/commands/strike-ready.ts",
-      "src/lib/agents/messaging.ts",
-      "src/lib/cloister/deacon-strike-landing.ts",
-      "src/lib/overdeck/review-status-record-sync.ts",
-      "src/lib/pan-dir/records.ts",
-      "src/lib/strike-landing.ts",
-      "tests/lib/cloister/deacon-strike-landing.test.ts",
-      "tests/unit/cli/commands/strike-ready.test.ts",
-      "tests/unit/lib/agents/message-agent.test.ts",
-      "tests/unit/lib/cloister/deacon-strike-transport.test.ts"
-    ],
-    "recordedAt": "2026-07-21T23:31:08.000Z"
   }
 }
