@@ -52,9 +52,27 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-21T23:57:57.684Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-21T23:58Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-21T23:58:12.160Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-21T23:58:12.360Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-21T23:58:12Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2993\n\nSandbox fallback serialization drops explicit clears for strike transport retry fields, so stale backoff survives re-arm and landed transitions.\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2993 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "drizzle/overdeck/0000_overdeck_init.sql",
@@ -106,7 +124,7 @@
     "recordedAt": "2026-07-21T23:54:05.124Z"
   },
   "created": "2026-07-21T22:47:36.935Z",
-  "updated": "2026-07-21T23:58:11.595Z",
+  "updated": "2026-07-21T23:58:12.361Z",
   "pipeline": {
     "issueId": "PAN-2993",
     "reviewStatus": "blocked",
