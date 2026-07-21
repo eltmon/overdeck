@@ -1,8 +1,10 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import {
   ensureOpenKnowledge,
+  resolveOpenKnowledgeSetupPlan,
   startReadOnlyOpenKnowledgeServer,
   type EnsureOpenKnowledgeResult,
+  type OpenKnowledgeSetupPlan,
   type StartOpenKnowledgeServerResult,
 } from '../../../lib/installers/open-knowledge.js';
 import { resolveKnowledgeBundleRoot } from '../../../lib/memory/injection.js';
@@ -21,6 +23,7 @@ export interface KnowledgeViewerStatus {
   proxyUrl?: string;
   embeddable?: boolean;
   message?: string;
+  setupPlan?: { kind: string; steps: string[] };
 }
 
 export interface KnowledgeViewerService {
@@ -33,6 +36,7 @@ export interface KnowledgeViewerService {
 export interface KnowledgeViewerDependencies {
   resolveBundle?: (projectKey: string) => Promise<string | null>;
   ensure?: (options: { autoInstall: false }) => Promise<EnsureOpenKnowledgeResult>;
+  resolveSetupPlan?: () => Promise<OpenKnowledgeSetupPlan>;
   start?: (bundlePath: string, options: { openBrowser: false; okCommand?: string }) => Promise<StartOpenKnowledgeServerResult>;
   stop?: (bundlePath: string, okCommand?: string) => Promise<void>;
   fetchImpl?: typeof fetch;
@@ -60,6 +64,7 @@ export function createKnowledgeViewerService(
 ): KnowledgeViewerService {
   const resolveBundle = dependencies.resolveBundle ?? resolveBundleForProject;
   const ensure = dependencies.ensure ?? ((options) => ensureOpenKnowledge(options));
+  const resolveSetupPlan = dependencies.resolveSetupPlan ?? resolveOpenKnowledgeSetupPlan;
   const start = dependencies.start ?? ((bundlePath, options) => startReadOnlyOpenKnowledgeServer(bundlePath, options));
   const stop = dependencies.stop ?? stopOpenKnowledgeWithSpawn;
   const fetchImpl = dependencies.fetchImpl ?? fetch;
@@ -75,11 +80,18 @@ export function createKnowledgeViewerService(
 
     let installed = true;
     let installMessage: string | undefined;
+    let setupPlan: KnowledgeViewerStatus['setupPlan'];
     try {
       installedCache ??= await ensure({ autoInstall: false });
     } catch (error) {
       installed = false;
       installMessage = errorMessage(error);
+      try {
+        const plan = await resolveSetupPlan();
+        if (plan.kind !== 'ready') setupPlan = { kind: plan.kind, steps: plan.steps };
+      } catch (planError) {
+        installMessage = errorMessage(planError);
+      }
     }
 
     const entry = entries.get(projectKey);
@@ -98,6 +110,7 @@ export function createKnowledgeViewerService(
           url: entry.url,
           embeddable: probe.embeddable,
           ...(installMessage ? { message: installMessage } : {}),
+          ...(setupPlan ? { setupPlan } : {}),
         };
       }
     }
@@ -111,6 +124,7 @@ export function createKnowledgeViewerService(
       running: false,
       bundlePath,
       ...(installMessage ? { message: installMessage } : {}),
+      ...(setupPlan ? { setupPlan } : {}),
     };
   }
 

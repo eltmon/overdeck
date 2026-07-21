@@ -5,7 +5,13 @@ import type { Socket } from 'node:net';
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
 import { WebSocket, WebSocketServer } from 'ws';
-import { ensureOpenKnowledge } from '../../../lib/installers/open-knowledge.js';
+import {
+  ensureOpenKnowledge,
+  executeOpenKnowledgeSetupPlan,
+  OpenKnowledgeSetupRequiredError,
+  type EnsureOpenKnowledgeResult,
+  type OpenKnowledgeSetupPlan,
+} from '../../../lib/installers/open-knowledge.js';
 import {
   getKnowledgeViewerStatus,
   getOrStartViewer,
@@ -22,7 +28,8 @@ import { validateOriginHeaders } from './origin-validation.js';
 
 export interface KnowledgeViewerRouteDependencies {
   getStatus?: (projectKey: string) => Promise<KnowledgeViewerStatus>;
-  ensure?: (options: { autoInstall: true }) => Promise<unknown>;
+  ensure?: (options: { autoInstall: true }) => Promise<EnsureOpenKnowledgeResult>;
+  executeSetupPlan?: (plan: OpenKnowledgeSetupPlan) => Promise<string>;
   start?: (projectKey: string) => Promise<KnowledgeViewerStatus>;
   invalidateInstallationCache?: () => void;
 }
@@ -76,6 +83,7 @@ export function createKnowledgeViewerRouteHandlers(
 ): KnowledgeViewerRouteHandlers {
   const getStatus = dependencies.getStatus ?? getKnowledgeViewerStatus;
   const ensure = dependencies.ensure ?? ((options) => ensureOpenKnowledge(options));
+  const executeSetupPlan = dependencies.executeSetupPlan ?? executeOpenKnowledgeSetupPlan;
   const startViewer = dependencies.start ?? getOrStartViewer;
   const invalidateInstallationCache = dependencies.invalidateInstallationCache ?? invalidateKnowledgeViewerInstallationCache;
 
@@ -84,7 +92,13 @@ export function createKnowledgeViewerRouteHandlers(
   }
 
   async function install(projectKey: string): Promise<KnowledgeViewerStatus> {
-    await ensure({ autoInstall: true });
+    try {
+      await ensure({ autoInstall: true });
+    } catch (error) {
+      if (!(error instanceof OpenKnowledgeSetupRequiredError)) throw error;
+      await executeSetupPlan(error.plan);
+      await ensure({ autoInstall: true });
+    }
     invalidateInstallationCache();
     return status(projectKey);
   }
