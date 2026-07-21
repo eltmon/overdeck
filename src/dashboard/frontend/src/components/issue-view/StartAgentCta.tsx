@@ -77,6 +77,16 @@ export function StartAgentCta({ issueId, density, surface = 'issue-view' }: { is
       </button>
     )}
     {!compact && mode === 'start' && <><button type="button" className="inline-flex items-center gap-1 rounded border border-border px-2 py-1 text-[11px]" aria-expanded={overrideOpen} onClick={() => setOverrideOpen((open) => !open)}><Settings2 className="h-3 w-3" />Overrides<ChevronDown className="h-3 w-3" /></button>{overrideOpen && <div className="rounded border border-border p-2"><label className="flex items-center gap-2 text-[12px]"><input type="checkbox" checked={overrideEnabled} onChange={(event) => setOverrideEnabled(event.target.checked)} />Override default harness and model</label>{overrideEnabled && <ModelHarnessPicker model={model} harness={harness} onModelChange={setModel} onHarnessChange={setHarness} groups={groups} harnessPolicy={harnessPolicy} modelLabel="Agent model" />}</div>}</>}
-    {mutation.error && <p role="alert" className="text-[12px] text-destructive">{mutation.error.message}</p>}
+    {mutation.error && (
+      // Red error text must be copyable even inside a button row — selectable
+      // + stopPropagation so selecting it doesn't fire the row.
+      <p
+        role="alert"
+        className="text-[12px] text-destructive select-text cursor-text"
+        onClick={(event) => event.stopPropagation()}
+      >
+        {mutation.error.message}
+      </p>
+    )}
   </div>;
 }
