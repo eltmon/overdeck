@@ -125,18 +125,18 @@
   ],
   "feedback": [],
   "created": "2026-07-21T16:29:59.439Z",
-  "updated": "2026-07-21T18:21:40.272Z",
+  "updated": "2026-07-21T18:21:46.391Z",
   "pipeline": {
     "issueId": "PAN-806",
     "reviewStatus": "passed",
-    "testStatus": "pending",
+    "testStatus": "testing",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-21T17:44:12.340Z",
-    "updatedAt": "2026-07-21T18:21:39.369Z",
+    "updatedAt": "2026-07-21T18:21:46.383Z",
     "reviewNotes": "Prior hook-interpreter and git global-option blockers are fixed; no blocking findings remain",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "rebase-helper.ts:101,200 add OVERDECK_PAN_GIT_OP:'1' alongside GIT_EDITOR:'true' on git rebase and git rebase --continue; abort/merge-fallback also sentineled. New tests/unit/lib/rebase-helper.test.ts (3 tests) assert coexistence via objectContaining; ran locally, all pass.",
@@ -219,7 +219,7 @@
       },
       "costAtCloseOut": {
         "usd": 147.67482,
-        "pricingAsOf": "2026-07-21T18:21:39.390Z"
+        "pricingAsOf": "2026-07-21T18:21:46.387Z"
       }
     },
     "merges": [
@@ -229,7 +229,7 @@
   },
   "workModel": "gpt-5.6-sol",
   "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "model": "gpt-5.6-sol",
   "tasks": {
     "sequence": 10,
     "claims": {},
