@@ -85,7 +85,7 @@
   ],
   "feedback": [],
   "created": "2026-07-21T16:29:59.439Z",
-  "updated": "2026-07-21T16:57:24.117Z",
+  "updated": "2026-07-21T17:02:56.966Z",
   "pipeline": {
     "issueId": "PAN-806",
     "reviewStatus": "pending",
@@ -173,16 +173,8 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 9,
-    "claims": {
-      "guard-dir-cleanup": {
-        "writerId": "agent-pan-806",
-        "agentId": "agent-pan-806",
-        "pid": 3863119,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-21T16:57:24.117Z"
-      }
-    },
+    "sequence": 10,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-806",
@@ -227,6 +219,17 @@
         "outcome": "completed",
         "reason": "Generated per-agent git wrappers for all non-conversation launchers, blocking rebase/reset --hard/stash while preserving sentinel and permitted-command passthrough; updated deterministic snapshots and execution tests",
         "releasedAt": "2026-07-21T16:56:50.336Z"
+      },
+      {
+        "writerId": "agent-pan-806",
+        "agentId": "agent-pan-806",
+        "pid": 3863119,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-21T16:57:24.117Z",
+        "itemId": "guard-dir-cleanup",
+        "outcome": "completed",
+        "reason": "Removed per-agent git-guard directories on both sync and async stop paths with force/recursive cleanup and absence coverage",
+        "releasedAt": "2026-07-21T17:02:56.966Z"
       }
     ],
     "statusReasons": {
@@ -245,6 +248,10 @@
       "git-path-wrapper": {
         "reason": "Generated per-agent git wrappers for all non-conversation launchers, blocking rebase/reset --hard/stash while preserving sentinel and permitted-command passthrough; updated deterministic snapshots and execution tests",
         "updatedAt": "2026-07-21T16:56:50.336Z"
+      },
+      "guard-dir-cleanup": {
+        "reason": "Removed per-agent git-guard directories on both sync and async stop paths with force/recursive cleanup and absence coverage",
+        "updatedAt": "2026-07-21T17:02:56.966Z"
       }
     }
   },
@@ -264,6 +271,8 @@
     "git-path-wrapper.git-path-wrapper.ac2": "completed",
     "git-path-wrapper.git-path-wrapper.ac3": "completed",
     "git-path-wrapper.git-path-wrapper.ac4": "completed",
-    "guard-dir-cleanup": "running"
+    "guard-dir-cleanup": "completed",
+    "guard-dir-cleanup.guard-dir-cleanup.ac1": "completed",
+    "guard-dir-cleanup.guard-dir-cleanup.ac2": "completed"
   }
 }
