@@ -85,7 +85,7 @@
   ],
   "feedback": [],
   "created": "2026-07-21T16:29:59.439Z",
-  "updated": "2026-07-21T16:50:47.929Z",
+  "updated": "2026-07-21T16:50:59.960Z",
   "pipeline": {
     "issueId": "PAN-806",
     "reviewStatus": "pending",
@@ -173,8 +173,16 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 6,
-    "claims": {},
+    "sequence": 7,
+    "claims": {
+      "git-path-wrapper": {
+        "writerId": "agent-pan-806",
+        "agentId": "agent-pan-806",
+        "pid": 3470617,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-21T16:50:59.960Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-806",
@@ -235,6 +243,7 @@
     "prerebase-hook-install": "completed",
     "prerebase-hook-install.prerebase-hook-install.ac1": "completed",
     "prerebase-hook-install.prerebase-hook-install.ac2": "completed",
-    "prerebase-hook-install.prerebase-hook-install.ac3": "completed"
+    "prerebase-hook-install.prerebase-hook-install.ac3": "completed",
+    "git-path-wrapper": "running"
   }
 }
