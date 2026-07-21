@@ -370,7 +370,7 @@
     "recordedAt": "2026-07-21T14:09:48.216Z"
   },
   "created": "2026-07-17T12:54:30.819Z",
-  "updated": "2026-07-21T14:12:50.520Z",
+  "updated": "2026-07-21T14:15:09.099Z",
   "pipeline": {
     "issueId": "PAN-2377",
     "reviewStatus": "passed",
@@ -381,11 +381,11 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-21T14:10:45.917Z",
-    "updatedAt": "2026-07-21T14:12:50.501Z",
+    "updatedAt": "2026-07-21T14:15:09.078Z",
     "reviewNotes": "Order-book route is now covered by the Knowledge route no-loss audit; focused route tests pass",
-    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2894",
     "reviewedAtCommit": "3a245d15e583e32feaf6a4a571acc3bd1b038e10",
+    "lastVerifiedCommit": "3a245d15e583e32feaf6a4a571acc3bd1b038e10",
     "reviewRequestedAt": "2026-07-21T14:10:45.917Z",
     "reviewSpawnedAt": "2026-07-21T14:12:25.864Z",
     "scopeDrift": {
@@ -645,10 +645,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 525,
-            "output": 101834,
-            "cacheRead": 49175843,
-            "cacheWrite": 823970
+            "input": 569,
+            "output": 109893,
+            "cacheRead": 51794255,
+            "cacheWrite": 965916
           }
         },
         "work": {
@@ -680,15 +680,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 537,
-          "output": 108017,
-          "cacheRead": 49770029,
-          "cacheWrite": 956545
+          "input": 581,
+          "output": 116076,
+          "cacheRead": 52388441,
+          "cacheWrite": 1098491
         }
       },
       "costAtCloseOut": {
-        "usd": 665.8104324,
-        "pricingAsOf": "2026-07-21T14:12:50.507Z"
+        "usd": 666.7696584,
+        "pricingAsOf": "2026-07-21T14:15:09.092Z"
       }
     },
     "merges": [
