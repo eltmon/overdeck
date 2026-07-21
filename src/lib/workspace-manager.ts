@@ -308,6 +308,40 @@ function validateFeatureName(name: string): boolean {
   return /^[a-zA-Z0-9-]+$/.test(name);
 }
 
+const PRE_REBASE_HOOK_MARKER = '# OVERDECK MANAGED PRE-REBASE GUARD';
+const PRE_REBASE_HOOK_PREFIX = [
+  '#!/bin/sh',
+  PRE_REBASE_HOOK_MARKER,
+  '[ "$OVERDECK_PAN_GIT_OP" = "1" ] && exit 0',
+  'if [ -n "$OVERDECK_AGENT_ID" ]; then',
+  '  echo "Overdeck agents must not run git rebase directly." >&2',
+  '  echo "Use pan sync-main <ISSUE-ID> to sync main or pan done <ISSUE-ID> to submit." >&2',
+  '  exit 1',
+  'fi',
+  '',
+].join('\n');
+
+/** Install the agent-only rebase guard in Git's configured hooks directory. */
+export async function installPreRebaseHook(targetPath: string): Promise<string> {
+  const { stdout } = await execAsync('git rev-parse --git-path hooks', {
+    cwd: targetPath,
+    encoding: 'utf-8',
+  });
+  const hooksDir = resolve(targetPath, stdout.trim());
+  const hookPath = join(hooksDir, 'pre-rebase');
+
+  mkdirSync(hooksDir, { recursive: true });
+  const existingHook = existsSync(hookPath) ? readFileSync(hookPath, 'utf-8') : '';
+  if (!existingHook.includes(PRE_REBASE_HOOK_MARKER)) {
+    const hook = existingHook
+      ? `${PRE_REBASE_HOOK_PREFIX}# Existing project hook follows\n${existingHook}`
+      : `${PRE_REBASE_HOOK_PREFIX}exit 0\n`;
+    writeFileSync(hookPath, hook, { encoding: 'utf-8', mode: 0o755 });
+  }
+  chmodSync(hookPath, 0o755);
+  return hookPath;
+}
+
 /**
  * Create a git worktree
  * @param repoPath Path to the source git repository
@@ -344,6 +378,8 @@ async function createWorktree(
       // Create new branch from the configured default branch
       await execAsync(`git worktree add "${targetPath}" -b "${branchName}" "${defaultBranch}"`, { cwd: repoPath });
     }
+
+    await installPreRebaseHook(targetPath);
 
     // Clear unstaged deletions from the new worktree (e.g. .planning/ files that exist on the
     // feature branch but not on main appear as deleted in a fresh worktree). Without this,
@@ -751,6 +787,23 @@ function copyProjectTemplateDirs(
     const msg = `Dependency install failed (${pkgManager}): ${installErr.message?.slice(0, 200)}`;
     result.errors.push(msg);
     progress('Installing dependencies', 'Failed — workspace creation aborted', 'complete');
+    return result;
+  }
+
+  // Package installers such as Husky regenerate the resolved hooks directory.
+  // Reinstall the guard after dependencies so workspace creation cannot erase it.
+  const hookTargets = workspaceConfig.type === 'polyrepo' && workspaceConfig.repos
+    ? workspaceConfig.repos
+      .filter(repo => repo.link_type !== 'symlink')
+      .map(repo => join(workspacePath, repo.name))
+      .filter(path => existsSync(join(path, '.git')))
+    : [workspacePath];
+  try {
+    for (const hookTarget of hookTargets) {
+      await installPreRebaseHook(hookTarget);
+    }
+  } catch (hookErr: any) {
+    result.errors.push(`Pre-rebase guard install failed: ${hookErr.message?.slice(0, 200)}`);
     return result;
   }
 
