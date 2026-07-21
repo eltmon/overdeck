@@ -5,6 +5,7 @@
  * so the network request is deduped and both surfaces agree on the list.
  */
 import { compareIssueIds } from '@overdeck/contracts';
+import { dashboardMutationJsonHeaders } from '../../lib/wsTransport';
 import type { ProjectFeature } from './ProjectTree/ProjectNode';
 
 /** Sentinel deck key for the "No project" bucket — conversations/terminals not
@@ -84,7 +85,7 @@ export async function fetchProjectPipelineMembership(projectKey: string): Promis
 export async function refreshProjectPipelineMembership(projectKey: string): Promise<true> {
   const response = await fetch(
     `/api/pipeline/membership/refresh?project=${encodeURIComponent(projectKey)}`,
-    { method: 'POST' },
+    { method: 'POST', headers: await dashboardMutationJsonHeaders() },
   );
   if (response.ok) return true;
   throw new Error(await readMembershipError(response));
