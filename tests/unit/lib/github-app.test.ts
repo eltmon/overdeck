@@ -40,6 +40,7 @@ import {
   getIssueState,
   getIssueStatePromise,
   getMergeBackendStatus,
+  getPullRequestState,
   isIntegrationPermissionError,
   listOpenIssuesWithLabels,
   listOpenIssuesWithLabelsPromise,
@@ -158,6 +159,18 @@ describe('getCiCheckRunsState', () => {
     ])).resolves.toMatchObject({ verdict: 'red', green: false, pending: false, failed: true, failedCount: 1 });
   });
 
+  it('excludes advisory check runs without suppressing real failures', async () => {
+    await expect(loadState([
+      { name: 'test', status: 'completed', conclusion: 'success' },
+      { name: 'coderabbitai[bot]', status: 'completed', conclusion: 'failure' },
+    ])).resolves.toMatchObject({ verdict: 'green', green: true, failed: false, total: 1, failedCount: 0 });
+
+    await expect(loadState([
+      { name: 'test', status: 'completed', conclusion: 'failure' },
+      { name: 'coderabbitai[bot]', status: 'completed', conclusion: 'failure' },
+    ])).resolves.toMatchObject({ verdict: 'red', green: false, failed: true, total: 1, failedCount: 1 });
+  });
+
   it('fetches paginated check-runs before deciding the commit is green', async () => {
     fetchMock
       .mockResolvedValueOnce(new Response(JSON.stringify({ token: 'token', expires_at: '2026-06-10T00:00:00Z' }), { status: 201 }))
@@ -191,6 +204,71 @@ describe('getCiCheckRunsState', () => {
       'https://api.github.com/repos/eltmon/overdeck/commits/abc123/check-runs?per_page=100',
       'https://api.github.com/repos/eltmon/overdeck/commits/abc123/check-runs?per_page=100&page=2',
     ]);
+  });
+});
+
+describe('getPullRequestState', () => {
+  const fetchMock = vi.fn();
+
+  beforeEach(() => {
+    vi.stubGlobal('fetch', fetchMock);
+    fetchMock.mockReset();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  function mockPullRequestState(
+    statuses: Array<{ context: string; state: string }>,
+    checkRuns: Array<{ name: string; status: string; conclusion: string | null }> = [
+      { name: 'test', status: 'completed', conclusion: 'success' },
+    ],
+  ): void {
+    fetchMock.mockImplementation(async (input: string | URL | Request) => {
+      const url = String(input);
+      if (url.endsWith('/app/installations/67890/access_tokens')) {
+        return new Response(JSON.stringify({ token: 'token', expires_at: '2026-06-10T00:00:00Z' }), { status: 201 });
+      }
+      if (url.endsWith('/repos/eltmon/overdeck/pulls/42')) {
+        return new Response(JSON.stringify({
+          html_url: 'https://github.com/eltmon/overdeck/pull/42',
+          state: 'open',
+          mergeable: true,
+          mergeable_state: 'unstable',
+          draft: false,
+          head: { sha: 'abc123' },
+          base: { ref: 'main' },
+        }), { status: 200 });
+      }
+      if (url.endsWith('/repos/eltmon/overdeck/commits/abc123/status')) {
+        return new Response(JSON.stringify({ state: 'failure', statuses }), { status: 200 });
+      }
+      if (url.endsWith('/repos/eltmon/overdeck/commits/abc123/check-runs')) {
+        return new Response(JSON.stringify({ check_runs: checkRuns }), { status: 200 });
+      }
+      throw new Error(`Unexpected GitHub API request: ${url}`);
+    });
+  }
+
+  it('ignores an advisory commit status when every real check is green', async () => {
+    mockPullRequestState([
+      { context: 'test', state: 'success' },
+      { context: 'CodeRabbit', state: 'failure' },
+    ]);
+
+    await expect(Effect.runPromise(getPullRequestState('eltmon', 'overdeck', 42)))
+      .resolves.toMatchObject({ checksPending: false, checksFailed: false });
+  });
+
+  it('still fails when a real commit status fails', async () => {
+    mockPullRequestState([
+      { context: 'test', state: 'failure' },
+      { context: 'CodeRabbit', state: 'failure' },
+    ]);
+
+    await expect(Effect.runPromise(getPullRequestState('eltmon', 'overdeck', 42)))
+      .resolves.toMatchObject({ checksFailed: true });
   });
 });
 
