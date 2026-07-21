@@ -16,24 +16,42 @@
   ],
   "feedback": [],
   "created": "2026-07-21T23:09:49.270Z",
-  "updated": "2026-07-21T23:46:43.219Z",
+  "updated": "2026-07-21T23:46:50.351Z",
   "pipeline": {
     "issueId": "PAN-2997",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
+    "inspectStatus": "inspecting",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-21T23:37:33.994Z"
+    "updatedAt": "2026-07-21T23:46:50.340Z",
+    "inspectNotes": "Inspecting item linear-mcp-auth-fold"
   },
   "closeOut": {
     "usage": {
-      "byStage": {},
-      "totals": {},
+      "byStage": {
+        "work": {
+          "openai/gpt-5.6-sol": {
+            "input": 476971,
+            "output": 42416,
+            "cacheRead": 12460544,
+            "cacheWrite": 0
+          }
+        }
+      },
+      "totals": {
+        "openai/gpt-5.6-sol": {
+          "input": 476971,
+          "output": 42416,
+          "cacheRead": 12460544,
+          "cacheWrite": 0
+        }
+      },
       "costAtCloseOut": {
-        "usd": 0,
-        "pricingAsOf": "2026-07-21T23:37:34.010Z"
+        "usd": 9.887607000000001,
+        "pricingAsOf": "2026-07-21T23:46:50.344Z"
       }
     },
     "merges": [],
@@ -41,7 +59,7 @@
   },
   "workModel": "gpt-5.6-sol",
   "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "model": "gpt-5.6-sol",
   "tasks": {
     "sequence": 4,
     "claims": {},
