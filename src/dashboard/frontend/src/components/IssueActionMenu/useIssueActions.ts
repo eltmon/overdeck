@@ -14,7 +14,7 @@ import {
 } from '../../lib/issueActions';
 import { refreshDashboardState } from '../../lib/refresh-dashboard-state';
 import { dashboardMutationJsonHeaders } from '../../lib/wsTransport';
-import { resumableRecoveryFromBody, useResumeRecovery } from '../../lib/resumeRecovery';
+import { recoveryFromBody, useResumeRecovery } from '../../lib/resumeRecovery';
 import { selectAgents, selectIssues, selectReviewStatus, useDashboardStore } from '../../lib/store';
 import type { WorkspaceInfo } from '../../lib/workspace-types';
 import { STATUS_LABELS, type Agent, type Issue, type WorkAgentLifecycle } from '../../types';
@@ -321,7 +321,7 @@ export function useIssueActions(issueId: string): UseIssueActionsResult {
         try { parsed = JSON.parse(text); } catch { /* not JSON */ }
         // A 409 carrying a resumable lifecycle is a CHOICE, not an error —
         // surface the Resume / Start fresh dialog instead of a raw alert.
-        const recovery = response.status === 409 ? resumableRecoveryFromBody(parsed) : null;
+        const recovery = response.status === 409 ? recoveryFromBody(parsed) : null;
         if (recovery) {
           openRecovery({ ...recovery, issueId });
           return { success: false, recovery: true };
