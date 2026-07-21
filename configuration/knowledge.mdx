@@ -1,0 +1,76 @@
+---
+title: Project Knowledge
+description: Configure OKF bundles and the progressive OpenKnowledge viewer
+---
+
+# Project Knowledge
+
+Overdeck resolves each project's Open Knowledge Format (OKF) bundle, injects cited concepts into agent context, and provides a local visual viewer. Knowledge changes stay in the bundle's normal Git and pull-request workflow.
+
+## Configure the bundle
+
+Set `knowledge_repo` on the project in `~/.overdeck/projects.yaml`, or add `.okf.yml` at the code-repository root:
+
+```yaml
+bundle: ../my-project-knowledge
+remote: git@github.com:example/my-project-knowledge.git
+```
+
+Resolution checks the registered project's `knowledge_repo` first, then `.okf.yml`. If neither points to a readable bundle, run `/okf init` to create or connect one.
+
+## Open the viewer
+
+Use either command from the project repository:
+
+```bash
+pan knowledge open
+# Equivalent skill command:
+/okf open
+```
+
+The first explicit open may install `@inkeep/open-knowledge` globally. Overdeck does not install it during `pan install`, dashboard startup, or any other unattended path. Repeated opens inspect OpenKnowledge's project lock and reuse the verified live URL instead of printing an unproven port.
+
+| Option | Effect |
+| --- | --- |
+| `--no-install` | Do not install the viewer; report how to install it when the `ok` executable is missing. |
+| `--no-browser` | Start the local viewer and print its URL without opening a browser. |
+
+OpenKnowledge v0.34 requires Node.js 24 or newer. The Overdeck dashboard continues to run under Node.js 22; only the separate `ok` subprocess uses Node.js 24+.
+
+## Dashboard Knowledge page
+
+Select **Knowledge** under **System** in the dashboard sidebar. The page shows the selected project's bundle state and starts one reusable viewer process for that project. Each project is routed through its own `knowledge-<hex>.<dashboard-domain>` origin, so OpenKnowledge's root `/api/*` and `/collab` traffic stays pinned to that project. The proxy accepts a viewer-specific credential minted by an authenticated dashboard request; dashboard cookies, authorization, CSRF tokens, internal headers, and upstream cookies never cross the subprocess boundary.
+
+If the viewer permits framing, its workspace appears directly on the page. If a future viewer version refuses framing through `X-Frame-Options` or Content Security Policy, the page shows an **Open viewer** link to the direct local URL instead.
+
+<Warning>
+  Overdeck starts both dashboard and CLI viewers against a disposable snapshot
+  outside the canonical bundle. OpenKnowledge can accept edits inside that
+  projection, but those writes are discarded and cannot bypass the PR-gated
+  `/okf author` path. A v0.34 round-trip test made this boundary necessary by
+  changing unrelated YAML formatting during an edit.
+</Warning>
+
+To change knowledge, use the portable OKF workflow:
+
+```bash
+/okf author "focused topic"
+/okf sync --topic "focused topic"
+/okf validate --strict
+```
+
+## Optional MCP registration
+
+Opening the viewer never changes MCP or skill configuration. Overdeck initializes the viewer runtime with `ok init --no-mcp --no-skills`.
+
+To opt in, run the upstream command from the resolved bundle root:
+
+```bash
+ok init --mcp --no-skills --scope user
+```
+
+Choose `--scope project` for repository-local registration or `--scope both` for both locations. OpenKnowledge supports Claude Code (`~/.claude.json` or `.mcp.json`), Codex (`~/.codex/config.toml` or `.codex/config.toml`), and Cursor (`~/.cursor/mcp.json` or `.cursor/mcp.json`). Review the paths reported by `ok init`, then restart the client when required.
+
+## License boundary
+
+`@inkeep/open-knowledge` is licensed GPL-3.0-or-later. Overdeck is MIT-licensed and keeps the viewer at arm's length: it is installed separately, launched as an executable, and accessed over HTTP and WebSocket. No OpenKnowledge code is imported, linked, or bundled into `@overdeck/*`.

@@ -14,6 +14,7 @@ import { ResourcesPanel } from '../components/ResourcesPanel';
 import { GodViewPage } from '../components/GodView';
 import { DeaconActivityView } from '../components/DeaconActivityView';
 import { ContextPage } from '../components/context/ContextPage';
+import { KnowledgePage } from '../components/knowledge/KnowledgePage';
 import { ConversationsPage } from '../components/conversations/ConversationsPage';
 import { AutoPresoView } from '../components/autopreso/AutoPresoView';
 import { BootstrapGate } from '../components/BootstrapGate';
@@ -168,6 +169,11 @@ export function AppRoutes({
               onTabChange('agents');
             }}
           />
+        </div>
+      )}
+      {activeTab === 'knowledge' && (
+        <div className="w-full h-full overflow-hidden">
+          <KnowledgePage projectKey={selectedProjectKey} />
         </div>
       )}
       {activeTab === 'skills' && (

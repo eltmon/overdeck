@@ -16,6 +16,21 @@ Create a knowledge bundle.
 - `--dir <path>`: use any external directory.
 - `--local <subdir>`: create an in-repo bundle.
 
+## `/okf open [--no-install] [--no-browser]`
+
+Open the configured bundle in the local visual viewer.
+
+```bash
+/okf open
+/okf open --no-install
+/okf open --no-browser
+```
+
+- Resolves the bundle from `.okf.yml` (or Overdeck's `knowledge_repo` setting).
+- Delegates to `pan knowledge open` when Overdeck is available.
+- Progressively installs the separate GPL-3.0 `ok` program only after the explicit open request; `--no-install` opts out.
+- `--no-browser` starts or reuses the viewer and prints its URL without launching a browser.
+
 ## `/okf author "<topic>"`
 
 Write or update one concept.

@@ -20,6 +20,10 @@ services:
       - "traefik.http.routers.overdeck.rule=Host(`overdeck.localhost`)"
       - "traefik.http.routers.overdeck.entrypoints=websecure"
       - "traefik.http.routers.overdeck.tls=true"
+      - "traefik.http.routers.overdeck-knowledge.rule=HostRegexp(`^knowledge-[a-f0-9]+\\.overdeck\\.localhost$`)"
+      - "traefik.http.routers.overdeck-knowledge.entrypoints=websecure"
+      - "traefik.http.routers.overdeck-knowledge.tls=true"
+      - "traefik.http.routers.overdeck-knowledge.service=overdeck"
       - "traefik.http.services.overdeck.loadbalancer.server.port=3000"
 
 networks:

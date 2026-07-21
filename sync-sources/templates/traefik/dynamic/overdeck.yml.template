@@ -30,6 +30,16 @@ http:
       service: overdeck-api
       tls: {}
 
+    # Origin-isolated OpenKnowledge viewers. The dashboard server derives the
+    # project from the hex-encoded host label and proxies every root-relative
+    # HTTP/WebSocket path to that project's viewer process.
+    overdeck-knowledge-viewer:
+      rule: "HostRegexp(`^knowledge-[a-f0-9]+\\.{{TRAEFIK_DOMAIN}}$`)"
+      entryPoints:
+        - websecure
+      service: overdeck-api
+      tls: {}
+
     # Published HTML artifacts
     overdeck-artifacts:
       rule: "Host(`artifacts.{{TRAEFIK_DOMAIN}}`) && PathPrefix(`/a/`)"

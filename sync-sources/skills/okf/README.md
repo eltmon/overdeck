@@ -61,6 +61,7 @@ The copied skill remains portable. Its core scripts do not import Overdeck and r
 | Command | Summary |
 | --- | --- |
 | `/okf init` | Create or connect the knowledge bundle and pointer file. |
+| `/okf open [--no-install] [--no-browser]` | Open the configured bundle in the local visual knowledge viewer. |
 | `/okf author "<topic>"` | Write or update one concept for one idea. |
 | `/okf convert <path>` | Convert existing docs into OKF without destructive edits. |
 | `/okf sync [--topic "<focus>"]` | Update concepts from code or documentation diffs. |

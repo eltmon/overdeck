@@ -34,6 +34,7 @@ import { WorkspaceServiceLive } from './services/workspace-service.js';
 import { OpenRouterServiceLive } from './services/openrouter-service.js';
 import { PanOpenLive } from './services/open.js';
 import { setupTerminalWebSocket } from './ws-terminal.js';
+import { knowledgeViewerRouteLayer, setupKnowledgeViewerProxy } from './routes/knowledge-viewer.js';
 import { setupVoiceWebSocket } from './ws-voice.js';
 import { setupAutoPresoWebSocket } from './ws-autopreso.js';
 import { websocketRpcRouteLayer } from './ws-rpc.js'
@@ -97,6 +98,7 @@ const HttpServerLive = Layer.unwrap(
     const bind = retryDashboardBind(NodeHttpServer.make(() => {
       const nodeServer = NodeHttp.createServer();
       setupTerminalWebSocket(nodeServer);
+      setupKnowledgeViewerProxy(nodeServer);
       setupVoiceWebSocket(nodeServer);
       setupAutoPresoWebSocket(nodeServer);
       return nodeServer;
@@ -353,6 +355,7 @@ export const makeRoutesLayer = Layer.mergeAll(
   tieredCalloutsRouteLayer,
   backlogRouteLayer,
   internalEventsRouteLayer,
+  knowledgeViewerRouteLayer,
   staticRouteLayer,
 );
 

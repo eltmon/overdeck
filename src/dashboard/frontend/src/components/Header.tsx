@@ -10,6 +10,7 @@ export type Tab =
   | 'flywheel'
   | 'backlog'
   | 'resources'
+  | 'knowledge'
   | 'skills'
   | 'context'
   | 'health'
