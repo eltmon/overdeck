@@ -2,7 +2,7 @@
   "issueId": "PAN-806",
   "schemaVersion": 2,
   "created": "2026-07-21T16:29:59.439Z",
-  "updated": "2026-07-21T16:29:59.439Z",
+  "updated": "2026-07-21T16:30:02.920Z",
   "pipeline": {
     "issueId": "PAN-806",
     "reviewStatus": "pending",
@@ -24,5 +24,6 @@
       "reason": "start",
       "agentModel": "gpt-5.6-sol"
     }
-  ]
+  ],
+  "workModel": "gpt-5.6-sol"
 }
