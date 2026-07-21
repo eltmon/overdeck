@@ -16,17 +16,23 @@ interface IssueViewProps extends Omit<HTMLAttributes<HTMLDivElement>, 'children'
  * Shared semantic boundary for the three progressive issue-view densities.
  * Shells retain routing and interaction glue; this component owns density
  * membership and the cross-density policy controls.
+ *
+ * PAN-2975: the StartAgentCta block renders only at cockpit/console densities.
+ * At rail density it must not float above the row — FeatureItem mounts it
+ * inline (chip surface) inside the row's meta line instead.
  */
 export function IssueView({ issueId, density, children, ...rootProps }: IssueViewProps) {
   const dataComponent = (rootProps as Record<string, unknown>)['data-component'];
   return (
     <div {...rootProps} data-component={typeof dataComponent === 'string' ? dataComponent : 'issue-view'} data-density={density}>
       {(density === 'cockpit' || density === 'console') && (
-        <div data-section={density === 'console' ? 'IssuePolicyStrip / PoliciesControl' : 'ReviewPolicyControl'}>
-          <ReviewPolicyControl issueId={issueId} />
-        </div>
+        <>
+          <div data-section={density === 'console' ? 'IssuePolicyStrip / PoliciesControl' : 'ReviewPolicyControl'}>
+            <ReviewPolicyControl issueId={issueId} />
+          </div>
+          <div data-section="StartAgentCta"><StartAgentCta issueId={issueId} density={density} /></div>
+        </>
       )}
-      <div data-section="StartAgentCta"><StartAgentCta issueId={issueId} density={density} /></div>
       {children}
     </div>
   );

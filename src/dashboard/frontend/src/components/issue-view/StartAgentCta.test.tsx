@@ -88,9 +88,18 @@ describe('StartAgentCta', () => {
     setState({ resume: true });
     renderCta('rail');
     const button = screen.getByRole('button', { name: 'Resume session · PAN-2499' });
-    expect(button).toHaveClass('bg-info/10', 'border-info/40', 'text-info-foreground');
+    // Compact (rail/chip/inline): badge-like chip, never a loud primary block.
+    expect(button).toHaveClass('bg-info/10', 'border-info/30', 'text-info-foreground', 'text-[10px]');
     expect(button).not.toHaveClass('bg-primary');
     expect(button).toHaveAttribute('title', 'Reopens the saved session for PAN-2499 with its memory intact');
+  });
+
+  it('keeps the fuller quiet button at issue-view surfaces', () => {
+    setState({ resume: true });
+    renderCta('console');
+    const button = screen.getByRole('button', { name: 'Resume session · PAN-2499' });
+    expect(button).toHaveClass('bg-info/10', 'border-info/40', 'text-info-foreground', 'text-[12px]');
+    expect(button).not.toHaveClass('bg-primary');
   });
 
   it('prefers resume when fresh start and resume are both enabled', async () => {

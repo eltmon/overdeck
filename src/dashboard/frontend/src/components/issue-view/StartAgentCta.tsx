@@ -61,7 +61,9 @@ export function StartAgentCta({ issueId, density, surface = 'issue-view' }: { is
         disabled={mutation.isPending}
         title={mode === 'resume' ? `Reopens the saved session for ${issueId} with its memory intact` : undefined}
         className={mode === 'resume'
-          ? 'inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] border border-info/40 bg-info/10 px-2.5 py-1.5 text-[12px] font-semibold text-info-foreground transition-colors hover:bg-info/20 disabled:opacity-50'
+          ? compact
+            ? 'inline-flex items-center gap-1 rounded-[4px] border border-info/30 bg-info/10 px-1.5 py-0.5 text-[10px] font-medium text-info-foreground transition-colors hover:bg-info/20 disabled:opacity-50'
+            : 'inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] border border-info/40 bg-info/10 px-2.5 py-1.5 text-[12px] font-semibold text-info-foreground transition-colors hover:bg-info/20 disabled:opacity-50'
           : 'rounded-[var(--radius-sm)] bg-primary px-2.5 py-1.5 text-[12px] font-medium text-primary-foreground disabled:opacity-50'}
         onClick={() => clearAndStart ? setConfirming(true) : mutation.mutate(mode)}
       >

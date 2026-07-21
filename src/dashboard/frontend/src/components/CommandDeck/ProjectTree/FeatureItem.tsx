@@ -27,6 +27,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { MergeButton } from '../../MergeButton';
 import { TroubledBadges } from './TroubledBadges';
 import { IssueView, IssueViewFullscreenButton, RailShipProgress } from '../../issue-view/IssueView';
+import { StartAgentCta } from '../../issue-view/StartAgentCta';
 import { ExpandableSessionNode } from './ExpandableSessionNode';
 import { SessionNode } from './SessionNode';
 import { useDashboardStore } from '../../../lib/store';
@@ -1049,6 +1050,9 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
             )}
           </span>
           <span className={styles.featureMetaLine}>
+          {/* PAN-2975: the resume affordance lives INSIDE the row's meta line
+              as a badge-like chip — never a detached block above the card. */}
+          <StartAgentCta issueId={feature.issueId} density="rail" surface="chip" />
           {!feature.isRally && aggregateBadges.length > 0 && (
             <span data-section="Badges" className={styles.featureBadgeGroup}>
               {aggregateBadges.map((badge) => (
