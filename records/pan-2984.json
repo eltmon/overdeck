@@ -11,18 +11,18 @@
   ],
   "feedback": [],
   "created": "2026-07-21T15:14:12.381Z",
-  "updated": "2026-07-21T15:29:36.483Z",
+  "updated": "2026-07-21T15:29:50.326Z",
   "pipeline": {
     "issueId": "PAN-2984",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "inspecting",
+    "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-21T15:29:12.726Z",
-    "inspectNotes": "Inspecting item node-runtime-resolver"
+    "updatedAt": "2026-07-21T15:29:50.277Z",
+    "inspectNotes": "All 5 ACs verified against node-runtime.ts/node-runtime.test.ts: nvm/fnm/volta/mise/asdf detection, highest->24 selection via path-segment parsing with single validating runCommand call, override short-circuits manager scan, invalid override rejects with OVERDECK_OPEN_KNOWLEDGE_NODE in message. 10/10 tests pass locally."
   },
   "closeOut": {
     "usage": {
@@ -43,11 +43,19 @@
             "cacheWrite": 305673
           }
         },
+        "review.supervisor": {
+          "anthropic/claude-sonnet-5": {
+            "input": 4,
+            "output": 2202,
+            "cacheRead": 120385,
+            "cacheWrite": 128690
+          }
+        },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 600607,
-            "output": 54798,
-            "cacheRead": 5944320,
+            "input": 609685,
+            "output": 57926,
+            "cacheRead": 7186944,
             "cacheWrite": 0
           }
         }
@@ -65,16 +73,22 @@
           "cacheRead": 3571820,
           "cacheWrite": 305673
         },
+        "anthropic/claude-sonnet-5": {
+          "input": 4,
+          "output": 2202,
+          "cacheRead": 120385,
+          "cacheWrite": 128690
+        },
         "openai/gpt-5.6-sol": {
-          "input": 600607,
-          "output": 54798,
-          "cacheRead": 5944320,
+          "input": 609685,
+          "output": 57926,
+          "cacheRead": 7186944,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 17.289863,
-        "pricingAsOf": "2026-07-21T15:29:12.729Z"
+        "usd": 18.418236,
+        "pricingAsOf": "2026-07-21T15:29:50.323Z"
       }
     },
     "merges": [],
