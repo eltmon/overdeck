@@ -85,7 +85,7 @@
   ],
   "feedback": [],
   "created": "2026-07-21T16:29:59.439Z",
-  "updated": "2026-07-21T16:37:09.394Z",
+  "updated": "2026-07-21T16:42:21.735Z",
   "pipeline": {
     "issueId": "PAN-806",
     "reviewStatus": "pending",
@@ -173,8 +173,16 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 2,
-    "claims": {},
+    "sequence": 3,
+    "claims": {
+      "workmd-prompt-fix": {
+        "writerId": "agent-pan-806",
+        "agentId": "agent-pan-806",
+        "pid": 3197948,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-21T16:42:21.735Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-806",
@@ -198,6 +206,7 @@
   "statusOverrides": {
     "rebase-helper-sentinel": "completed",
     "rebase-helper-sentinel.rebase-helper-sentinel.ac1": "completed",
-    "rebase-helper-sentinel.rebase-helper-sentinel.ac2": "completed"
+    "rebase-helper-sentinel.rebase-helper-sentinel.ac2": "completed",
+    "workmd-prompt-fix": "running"
   }
 }
