@@ -9,7 +9,17 @@
     "postureSetBy": "dashboard",
     "postureReason": "Operator paused new pickup."
   },
-  "items": [],
+  "items": [
+    {
+      "issue": "PAN-2858",
+      "lane": "A",
+      "order": 1,
+      "prereqs": [],
+      "reVerify": false,
+      "addedAt": "2026-07-21T14:21:37.909Z",
+      "addedBy": "dashboard"
+    }
+  ],
   "createdAt": "2026-07-19T07:18:44.092Z",
-  "updatedAt": "2026-07-19T07:21:48.160Z"
+  "updatedAt": "2026-07-21T14:21:37.909Z"
 }
