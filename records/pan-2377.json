@@ -375,19 +375,19 @@
     "recordedAt": "2026-07-21T14:09:48.216Z"
   },
   "created": "2026-07-17T12:54:30.819Z",
-  "updated": "2026-07-21T14:22:21.902Z",
+  "updated": "2026-07-21T14:30:50.404Z",
   "pipeline": {
     "issueId": "PAN-2377",
-    "reviewStatus": "reviewing",
-    "testStatus": "pending",
+    "reviewStatus": "passed",
+    "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "failed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": false,
+    "readyForMerge": true,
     "panDoneRecoveredAt": "2026-07-21T14:10:45.917Z",
-    "updatedAt": "2026-07-21T14:22:21.834Z",
-    "reviewNotes": "Agent re-review request (1/25): Fixed test",
+    "updatedAt": "2026-07-21T14:30:50.391Z",
+    "reviewNotes": "Order-book route is now covered by the Knowledge route no-loss audit; focused route tests pass",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2894",
     "reviewedAtCommit": "3a245d15e583e32feaf6a4a571acc3bd1b038e10",
     "lastVerifiedCommit": "3a245d15e583e32feaf6a4a571acc3bd1b038e10",
@@ -650,10 +650,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 2296,
-            "output": 129595,
-            "cacheRead": 57824842,
-            "cacheWrite": 1009223
+            "input": 2298,
+            "output": 130698,
+            "cacheRead": 58010095,
+            "cacheWrite": 1009387
           }
         },
         "work": {
@@ -685,15 +685,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 2308,
-          "output": 135778,
-          "cacheRead": 58419028,
-          "cacheWrite": 1141798
+          "input": 2310,
+          "output": 136881,
+          "cacheRead": 58604281,
+          "cacheWrite": 1141962
         }
       },
       "costAtCloseOut": {
-        "usd": 668.2845204,
-        "pricingAsOf": "2026-07-21T14:22:21.848Z"
+        "usd": 668.3330154,
+        "pricingAsOf": "2026-07-21T14:30:50.401Z"
       }
     },
     "merges": [
