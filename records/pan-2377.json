@@ -370,18 +370,18 @@
     "recordedAt": "2026-07-21T14:09:48.216Z"
   },
   "created": "2026-07-17T12:54:30.819Z",
-  "updated": "2026-07-21T14:12:40.189Z",
+  "updated": "2026-07-21T14:12:50.520Z",
   "pipeline": {
     "issueId": "PAN-2377",
     "reviewStatus": "passed",
-    "testStatus": "pending",
+    "testStatus": "testing",
     "verificationStatus": "passed",
     "inspectStatus": "failed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-21T14:10:45.917Z",
-    "updatedAt": "2026-07-21T14:12:38.572Z",
+    "updatedAt": "2026-07-21T14:12:50.501Z",
     "reviewNotes": "Order-book route is now covered by the Knowledge route no-loss audit; focused route tests pass",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2894",
@@ -614,8 +614,8 @@
         "memory-extraction": {
           "anthropic/claude-haiku-4-5": {
             "input": 744,
-            "output": 200,
-            "cacheRead": 0,
+            "output": 400,
+            "cacheRead": 744,
             "cacheWrite": 0
           }
         },
@@ -629,9 +629,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 12286813,
-            "output": 553690,
-            "cacheRead": 116091904,
+            "input": 12641891,
+            "output": 554052,
+            "cacheRead": 116517888,
             "cacheWrite": 0
           }
         },
@@ -663,8 +663,8 @@
       "totals": {
         "anthropic/claude-haiku-4-5": {
           "input": 744,
-          "output": 200,
-          "cacheRead": 0,
+          "output": 400,
+          "cacheRead": 744,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -674,9 +674,9 @@
           "cacheWrite": 169467
         },
         "openai/gpt-5.6-sol": {
-          "input": 33777863,
-          "output": 2055003,
-          "cacheRead": 822940160,
+          "input": 34132941,
+          "output": 2055365,
+          "cacheRead": 823366144,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -687,8 +687,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 663.810116,
-        "pricingAsOf": "2026-07-21T14:12:38.597Z"
+        "usd": 665.8104324,
+        "pricingAsOf": "2026-07-21T14:12:50.507Z"
       }
     },
     "merges": [
@@ -697,7 +697,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
     "sequence": 38,
