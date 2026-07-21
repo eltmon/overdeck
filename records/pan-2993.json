@@ -22,7 +22,8 @@
   "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
-      "src/cli/commands/__tests__/strike-ready.test.ts"
+      "src/cli/commands/__tests__/strike-ready.test.ts",
+      "src/lib/workspace/stack-health.ts"
     ],
     "declaredScopeUntouched": [],
     "declaredScope": [
@@ -47,15 +48,16 @@
       "src/lib/overdeck/review-status-record-sync.ts",
       "src/lib/pan-dir/records.ts",
       "src/lib/strike-landing.ts",
+      "src/lib/workspace/stack-health.ts",
       "tests/lib/cloister/deacon-strike-landing.test.ts",
       "tests/unit/cli/commands/strike-ready.test.ts",
       "tests/unit/lib/agents/message-agent.test.ts",
       "tests/unit/lib/cloister/deacon-strike-transport.test.ts"
     ],
-    "recordedAt": "2026-07-21T23:31:08.000Z"
+    "recordedAt": "2026-07-21T23:35:33.248Z"
   },
   "created": "2026-07-21T22:47:36.935Z",
-  "updated": "2026-07-21T23:35:27.467Z",
+  "updated": "2026-07-21T23:35:33.249Z",
   "pipeline": {
     "issueId": "PAN-2993",
     "reviewStatus": "failed",
