@@ -3,7 +3,7 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-07-21T23:35:54.133Z",
-  "updated": "2026-07-21T23:57:42.862Z",
+  "updated": "2026-07-21T23:57:51.994Z",
   "pipeline": {
     "issueId": "PAN-2999",
     "reviewStatus": "pending",
@@ -11,13 +11,21 @@
     "mergeStatus": "failed",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-21T23:57:42.717Z",
+    "updatedAt": "2026-07-21T23:57:51.986Z",
     "mergeNotes": "Failed to create PR: Command failed: gh pr create --head strike/pan-2999 --base main --title PAN-2999 --body-file /tmp/pan-pr-body-PAN-2999-1784678261833.md\npull request create failed: GraphQL: A pull request already exists for eltmon:strike/pan-2999. (createPullRequest)\n",
     "strikeReadyHead": "9f6ef88b3e82c5c8e7c3b37a18f932335acb80fb",
     "strikeReadyAt": "2026-07-21T23:57:10.504Z",
-    "strikeLandingState": "landing",
-    "strikeRecoveryCount": 0,
-    "strikeLandingAttempts": []
+    "strikeLandingState": "recovering",
+    "strikeRecoveryCount": 1,
+    "strikeLandingAttempts": [
+      {
+        "timestamp": "2026-07-21T23:57:42.726Z",
+        "strikeHead": "9f6ef88b3e82c5c8e7c3b37a18f932335acb80fb",
+        "mainHead": "a5b6c526db007c618de92ae0fff261d3e86ed76e",
+        "outcome": "failed",
+        "detail": "Failed to create PR: Command failed: gh pr create --head strike/pan-2999 --base main --title PAN-2999 --body-file /tmp/pan-pr-body-PAN-2999-1784678261833.md\npull request create failed: GraphQL: A pull request already exists for eltmon:strike/pan-2999. (createPullRequest)\n"
+      }
+    ]
   },
   "closeOut": {
     "usage": {
@@ -41,7 +49,7 @@
       },
       "costAtCloseOut": {
         "usd": 4.743294,
-        "pricingAsOf": "2026-07-21T23:57:42.790Z"
+        "pricingAsOf": "2026-07-21T23:57:51.989Z"
       }
     },
     "merges": [],
