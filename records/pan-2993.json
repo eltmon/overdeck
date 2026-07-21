@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-21T22:47:36.935Z",
-  "updated": "2026-07-21T23:02:59.357Z",
+  "updated": "2026-07-21T23:07:47.317Z",
   "pipeline": {
     "issueId": "PAN-2993",
     "reviewStatus": "pending",
@@ -59,16 +59,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "transport-retry-backoff": {
-        "writerId": "agent-pan-2993",
-        "agentId": "agent-pan-2993",
-        "pid": 1907668,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-21T23:02:59.357Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2993",
@@ -80,12 +72,27 @@
         "outcome": "completed",
         "reason": "Classified rejected internal merge fetches as transport failures, added retry/backoff status fields, mirrored them through durable records, and covered the transport flag with regression tests.",
         "releasedAt": "2026-07-21T23:02:37.193Z"
+      },
+      {
+        "writerId": "agent-pan-2993",
+        "agentId": "agent-pan-2993",
+        "pid": 1907668,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-21T23:02:59.357Z",
+        "itemId": "transport-retry-backoff",
+        "outcome": "completed",
+        "reason": "Added patrol-driven same-head transport retries with exponential backoff, a ten-attempt needs-you cap, landed-state cleanup, transport safety-net classification, and focused regression coverage.",
+        "releasedAt": "2026-07-21T23:07:47.316Z"
       }
     ],
     "statusReasons": {
       "transport-flag-and-fields": {
         "reason": "Classified rejected internal merge fetches as transport failures, added retry/backoff status fields, mirrored them through durable records, and covered the transport flag with regression tests.",
         "updatedAt": "2026-07-21T23:02:37.193Z"
+      },
+      "transport-retry-backoff": {
+        "reason": "Added patrol-driven same-head transport retries with exponential backoff, a ten-attempt needs-you cap, landed-state cleanup, transport safety-net classification, and focused regression coverage.",
+        "updatedAt": "2026-07-21T23:07:47.316Z"
       }
     }
   },
@@ -94,6 +101,11 @@
     "transport-flag-and-fields.transport-flag-and-fields.ac1": "completed",
     "transport-flag-and-fields.transport-flag-and-fields.ac2": "completed",
     "transport-flag-and-fields.transport-flag-and-fields.ac3": "completed",
-    "transport-retry-backoff": "running"
+    "transport-retry-backoff": "completed",
+    "transport-retry-backoff.transport-retry-backoff.ac1": "completed",
+    "transport-retry-backoff.transport-retry-backoff.ac2": "completed",
+    "transport-retry-backoff.transport-retry-backoff.ac3": "completed",
+    "transport-retry-backoff.transport-retry-backoff.ac4": "completed",
+    "transport-retry-backoff.transport-retry-backoff.ac5": "completed"
   }
 }
