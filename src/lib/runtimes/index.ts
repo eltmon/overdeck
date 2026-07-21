@@ -33,6 +33,11 @@ export {
   createCodexRuntimeSync,
   createCodexRuntime,
 } from './codex.js';
+export {
+  AcpRuntimeSync,
+  createAcpRuntimeSync,
+  AcpSpawnTimeout,
+} from './acp.js';
 
 import type {
   AgentRuntimeSync,
@@ -44,6 +49,7 @@ import { createClaudeCodeRuntimeSync } from './claude-code.js';
 import { createPiRuntimeSync } from './pi.js';
 import { createOhmypiRuntimeSync } from './ohmypi.js';
 import { createCodexRuntimeSync } from './codex.js';
+import { createAcpRuntimeSync } from './acp.js';
 
 /**
  * Runtime registry implementation
@@ -96,6 +102,9 @@ export class RuntimeRegistry implements RuntimeRegistryInterface {
     if (harness === 'codex') {
       return this.get('codex') ?? null;
     }
+    if (harness === 'acp') {
+      return this.get('acp') ?? null;
+    }
     return this.get('claude-code') ?? null;
   }
 }
@@ -115,12 +124,13 @@ export function getGlobalRegistry(): RuntimeRegistry {
   if (!globalRegistry) {
     globalRegistry = new RuntimeRegistry();
 
-    // Register Claude Code (default), ohmypi (PAN-1989), and Codex (PAN-1574) runtimes.
+    // Register Claude Code (default), ohmypi (PAN-1989), Codex (PAN-1574), and ACP runtimes.
     // Pi (PAN-636) is legacy and no longer registered — 'pi' harness is normalized
     // to 'ohmypi' by getRuntimeForAgent (see above) and normalizeHarness() in conversations.ts.
     globalRegistry.register(createClaudeCodeRuntimeSync());
     globalRegistry.register(createOhmypiRuntimeSync());
     globalRegistry.register(createCodexRuntimeSync());
+    globalRegistry.register(createAcpRuntimeSync());
   }
   return globalRegistry;
 }

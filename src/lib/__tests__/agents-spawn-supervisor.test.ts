@@ -16,6 +16,9 @@ let resolveHarnessMock: ReturnType<typeof vi.fn>;
 let prepareHarnessLaunchMock: ReturnType<typeof vi.fn>;
 let emitAgentEventMock: ReturnType<typeof vi.fn>;
 let ensureLifecycleHooksMock: ReturnType<typeof vi.fn>;
+let deliverAgentMessageMock: ReturnType<typeof vi.fn>;
+let waitForPromptReadyMock: ReturnType<typeof vi.fn>;
+let stopAgentMock: ReturnType<typeof vi.fn>;
 let capturePaneText: string;
 let channelsMcpEnabled: boolean;
 let activeFlywheelRunId: string | null;
@@ -47,6 +50,9 @@ function mockSpawnDependencies(): void {
   sendRawKeystrokeMock = vi.fn(() => Effect.void);
   emitAgentEventMock = vi.fn(() => Effect.succeed(true));
   ensureLifecycleHooksMock = vi.fn(async () => undefined);
+  deliverAgentMessageMock = vi.fn(async () => ({ ok: true, path: 'acp' }));
+  waitForPromptReadyMock = vi.fn(async () => true);
+  stopAgentMock = vi.fn(() => Effect.void);
   resolveHarnessMock = vi.fn(async ({ explicit, model }: { explicit?: string; model: string }) => {
     if (explicit) return explicit;
     if (model === 'gpt-5.5') return 'codex';
@@ -69,6 +75,18 @@ function mockSpawnDependencies(): void {
   }));
   vi.doMock('../agents/hook-readiness.js', () => ({
     ensureLifecycleHooksBeforeLaunch: ensureLifecycleHooksMock,
+  }));
+  vi.doMock('../agents/delivery.js', async (importOriginal) => ({
+    ...((await importOriginal()) as typeof import('../agents/delivery.js')),
+    deliverAgentMessage: deliverAgentMessageMock,
+  }));
+  vi.doMock('../agents/runtime-command.js', async (importOriginal) => ({
+    ...((await importOriginal()) as typeof import('../agents/runtime-command.js')),
+    waitForPromptReady: waitForPromptReadyMock,
+  }));
+  vi.doMock('../agents/termination.js', async (importOriginal) => ({
+    ...((await importOriginal()) as typeof import('../agents/termination.js')),
+    stopAgent: stopAgentMock,
   }));
   vi.doMock('../agent-runtime-mirror.js', () => ({
     getRuntimeSnapshot: vi.fn(() => Effect.succeed(null)),
@@ -207,6 +225,9 @@ afterEach(() => {
   vi.doUnmock('../harness-binary.js');
   vi.doUnmock('../agent-runtime.js');
   vi.doUnmock('../agents/hook-readiness.js');
+  vi.doUnmock('../agents/delivery.js');
+  vi.doUnmock('../agents/runtime-command.js');
+  vi.doUnmock('../agents/termination.js');
   vi.doUnmock('../agent-runtime-mirror.js');
   vi.doUnmock('../runtimes/codex.js');
   vi.doUnmock('../codex-auth.js');
@@ -476,6 +497,25 @@ describe('spawnAgent PTY supervisor wiring', () => {
         sessionHarness: 'codex',
       }),
     );
+  });
+
+  it('stops and rejects a non-flywheel ACP role when its initial prompt fails', async () => {
+    deliverAgentMessageMock.mockRejectedValueOnce(new Error('provider rejected prompt'));
+    const { spawnRun } = await import('../agents.js');
+
+    await expect(spawnRun('PAN-1405', 'review', {
+      workspace,
+      model: 'kimi-k2.6',
+      harness: 'acp',
+      prompt: 'review the change',
+    })).rejects.toThrow('Agent agent-pan-1405-review kickoff delivery failed: provider rejected prompt');
+
+    expect(waitForPromptReadyMock).toHaveBeenCalledWith('agent-pan-1405-review', 'acp', 30);
+    expect(stopAgentMock).toHaveBeenCalledWith('agent-pan-1405-review');
+    const persisted = JSON.parse(
+      readFileSync(join(tmpHome, 'agents', 'agent-pan-1405-review', 'state.json'), 'utf8'),
+    ) as AgentState;
+    expect(persisted.status).toBe('starting');
   });
 
   it('preserves role-run session origin on resume by not rewriting origin fields', async () => {

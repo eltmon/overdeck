@@ -10,12 +10,13 @@ extensibility mechanism each one exposes, and what that means for future
 features.
 
 <Note>
-**This is a planning survey, not a support matrix.** Overdeck supports exactly
-two harnesses today — `claude-code` and `ohmypi` (see [Harnesses](/configuration/harnesses)
-for the operational guide). Every other harness on this page is surveyed for
-*evaluation*; it is **not integrated**. Facts are current as of May 2026 and
-should be re-verified before any decision. Items flagged **⚠ verify** could not
-be cleanly confirmed.
+**This is a planning survey, not a support matrix.** Overdeck supports four
+harnesses today — `claude-code`, `ohmypi`, `codex`, and native `acp` (see
+[Harnesses](/configuration/harnesses) for the operational guide). Kimi Code CLI
+is the first agent wired through ACP; other tools on this page remain surveyed
+for evaluation until their provider adapters land. Facts are current as of May
+2026 unless a profile says otherwise and should be re-verified before any
+decision. Items flagged **⚠ verify** could not be cleanly confirmed.
 </Note>
 
 ## Why this document exists
@@ -79,12 +80,34 @@ them.
 | --- | --- | --- |
 | `claude-code` | **Supported** (default) | none needed — drop-in `claude` |
 | `ohmypi` | **Supported** (alternative) | `src/lib/runtimes/ohmypi.ts` + vendored `packages/ohmypi-extension/` |
+| `codex` | **Supported** (alternative) | `src/lib/runtimes/codex.ts` |
+| `acp` | **Supported** (Kimi first) | `src/lib/runtimes/acp.ts` + vendored `packages/effect-acp/` |
 
-Everything else in this document is **not supported** — surveyed for planning.
-One nuance: Overdeck already authenticates **ChatGPT-subscription OAuth
-tokens** via CLIProxy to drive GPT *models*. That is model routing, not a Codex
-*harness* integration — but it lowers the auth cost of adding the Codex CLI
-harness later.
+The native `acp` harness is a reusable protocol integration, but version one
+registers only Kimi Code CLI as a selectable ACP provider. The remaining
+profiles are surveyed for planning unless their status explicitly says
+supported.
+
+## ACP-capable agents
+
+Overdeck now speaks [Agent Client Protocol](https://agentclientprotocol.com/)
+natively, so adding another ACP-speaking CLI no longer requires inventing a
+new transport, event stream, permission channel, or session lifecycle. It does
+still require a provider adapter that names the executable, arguments, and
+authentication method; Overdeck fails loudly rather than treating protocol
+compatibility as automatic support.
+
+| ACP agent | Overdeck status | Next integration work |
+| --- | --- | --- |
+| **Kimi Code CLI** | **Wired now** through `kimi acp` | None for version one; run interactive `/login` once before use. |
+| **Cursor CLI** | ACP-reachable next | Register its executable, launch arguments, and authentication mapping. |
+| **Grok CLI** | ACP-reachable next | Register its executable, launch arguments, and authentication mapping. |
+| **Google Gemini CLI** | ACP-reachable next | Register its executable, launch arguments, and authentication mapping. |
+
+Kimi is therefore a supported agent through the `acp` harness. Cursor, Grok,
+and Gemini remain candidates: their ACP support reduces the adapter to
+provider-specific startup and auth, but they are not selectable until those
+adapters and probes land.
 
 ## Harness profiles
 

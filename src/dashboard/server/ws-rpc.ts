@@ -20,7 +20,8 @@ import { contextUsageFromParseResult, gateSnapshotEmission, parseConversationMes
 import { isPiSessionFile, parsePiConversationMessages } from './services/pi-conversation-parser.js';
 import { isOhmypiSessionFile, parseOhmypiConversationMessages } from './services/ohmypi-conversation-parser.js';
 import { parseCodexConversationMessages } from './services/codex-conversation-parser.js';
-import { resolveAgentHarness, resolvePiSessionPath, resolveCodexRolloutPath, readLauncherPinnedSessionId } from './routes/jsonl-resolver.js';
+import { parseAcpConversationMessages } from './services/acp-conversation-parser.js';
+import { resolveAgentHarness, resolvePiSessionPath, resolveCodexRolloutPath, resolveAcpTranscriptPath, readLauncherPinnedSessionId } from './routes/jsonl-resolver.js';
 import { watch as fsWatch } from 'node:fs';
 import { sessionFilePath } from '../../lib/paths.js';
 import { getRuntimeCensus } from '../../lib/runtime-census.js';
@@ -339,32 +340,27 @@ function ohmypiSnapshotParser(harness: unknown): (file: string) => Promise<Parse
   }
 }
 
-function streamHarnessFullParseSnapshots(
+export function streamHarnessFullParseSnapshots(
   sessionName: string,
   harness: unknown,
   model: string | null,
   unresolvedMeansEmpty = false,
 ): FullParseSnapshotStream | null {
   const behavior = getHarnessBehavior(harness as Parameters<typeof getHarnessBehavior>[0]);
+  const streamResolved = (
+    resolve: () => Promise<string | null>,
+    parse: (file: string) => Promise<ParseResult>,
+  ) => streamResolvedFullParseSnapshots(resolve, parse, model, unresolvedMeansEmpty);
 
   if (behavior.transcriptKind === 'ohmypi-jsonl') {
-    return streamResolvedFullParseSnapshots(
-      () => resolvePiSessionPath(sessionName),
-      ohmypiSnapshotParser(harness),
-      model,
-      unresolvedMeansEmpty,
-    );
+    return streamResolved(() => resolvePiSessionPath(sessionName), ohmypiSnapshotParser(harness));
   }
-
   if (behavior.transcriptKind === 'codex-rollout-jsonl') {
-    return streamResolvedFullParseSnapshots(
-      () => resolveCodexRolloutPath(sessionName),
-      parseCodexConversationMessages,
-      model,
-      unresolvedMeansEmpty,
-    );
+    return streamResolved(() => resolveCodexRolloutPath(sessionName), parseCodexConversationMessages);
   }
-
+  if (behavior.transcriptKind === 'acp-jsonl') {
+    return streamResolved(() => resolveAcpTranscriptPath(sessionName), parseAcpConversationMessages);
+  }
   return null;
 }
 

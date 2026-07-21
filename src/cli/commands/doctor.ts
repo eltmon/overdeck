@@ -23,6 +23,11 @@ import { getDashboardApiUrlSync } from '../../lib/config.js';
 import { CacheService } from '../../dashboard/server/services/cache-service.js';
 import { classifyDashboardAgent } from '../../dashboard/frontend/src/lib/agent-classifier.js';
 import { getMainDivergence, type MainDivergence } from '../../lib/state-plane.js';
+import {
+  checkSystemPrerequisite,
+  type PrerequisiteProbe,
+  type PrerequisiteResolver,
+} from '../../lib/system-prerequisites.js';
 import { checkStateWorktrees } from './doctor-state-worktree.js';
 import { isXBriefFilename } from '../../lib/xbrief/lifecycle.js';
 // Minimum supported omp harness version (PAN-1989); its lineage differs from pi and was baselined at 16.1.16.
@@ -39,6 +44,27 @@ function compareSemver(a: string, b: string): number {
     if (da !== db) return da - db;
   }
   return 0;
+}
+
+export async function checkKimi(
+  probe?: PrerequisiteProbe,
+  resolver?: PrerequisiteResolver,
+): Promise<CheckResult[]> {
+  const kimi = await checkSystemPrerequisite('kimi', probe, resolver);
+  if (!kimi.found) {
+    return [{
+      name: kimi.name,
+      status: 'warn',
+      message: 'Not installed (optional ACP harness)',
+      fix: `Install: ${kimi.install.linux}`,
+    }];
+  }
+
+  return [{
+    name: kimi.name,
+    status: 'ok',
+    message: kimi.version ?? 'Installed (version unknown)',
+  }];
 }
 
 export function checkCodex(): CheckResult[] {
@@ -707,6 +733,9 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<void> 
 
   // Codex CLI (alternative harness — PAN-1574). Optional: missing → warn.
   for (const c of checkCodex()) checks.push(c);
+
+  // Kimi Code CLI (ACP harness). Resolve the same configured executable used at launch.
+  for (const c of await checkKimi()) checks.push(c);
 
   // Check Overdeck directories
   const directories = [

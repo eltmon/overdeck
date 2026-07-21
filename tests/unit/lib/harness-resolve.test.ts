@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   loadConfigSync: vi.fn(),
   canUseHarnessSync: vi.fn(),
   getProviderAuthMode: vi.fn(),
+  configuredHarnessBinaryPath: vi.fn(),
   resolveHarnessBinary: vi.fn(),
 }));
 
@@ -25,7 +26,8 @@ vi.mock('../../../src/lib/agents.js', () => ({
 }));
 
 vi.mock('../../../src/lib/harness-binary.js', () => ({
-  harnessBinaryName: (harness: RuntimeName) => harness === 'ohmypi' ? 'omp' : harness === 'codex' ? 'codex' : 'claude',
+  configuredHarnessBinaryPath: mocks.configuredHarnessBinaryPath,
+  harnessBinaryName: (harness: RuntimeName) => harness === 'ohmypi' ? 'omp' : harness === 'codex' ? 'codex' : harness === 'acp' ? 'kimi' : 'claude',
   resolveHarnessBinary: mocks.resolveHarnessBinary,
 }));
 
@@ -55,6 +57,7 @@ describe('resolveHarness', () => {
     vi.clearAllMocks();
     setConfig({});
     setBinaryAvailable(true);
+    mocks.configuredHarnessBinaryPath.mockReturnValue(undefined);
     mocks.getProviderAuthMode.mockResolvedValue(undefined);
     mocks.canUseHarnessSync.mockReturnValue({ allowed: true });
     infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
@@ -153,7 +156,7 @@ describe('resolveHarness', () => {
     // binary must fail loudly rather than degrade onto claude-code/CLIProxy.
     await expect(resolveHarness({ model: 'gpt-5.5' })).rejects.toThrow('has no installed codex binary at spawn');
 
-    expect(mocks.resolveHarnessBinary).toHaveBeenCalledWith('codex');
+    expect(mocks.resolveHarnessBinary).toHaveBeenCalledWith('codex', undefined);
   });
 
   it('logs the built-in provider-default notice once per provider', async () => {

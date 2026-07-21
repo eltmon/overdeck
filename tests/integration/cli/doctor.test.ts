@@ -184,6 +184,22 @@ describe('doctor command', () => {
       const result = await execa('docker', ['--version']);
       expect(result.exitCode).toBe(0);
     });
+
+    it('probes the configured Kimi ACP executable', async () => {
+      const { checkKimi } = await import('../../../src/cli/commands/doctor.js');
+      const probe = vi.fn(async (command: string) => `${command} 0.27.0`);
+      const resolver = vi.fn(async () => '/opt/kimi configured/bin/kimi');
+
+      const checks = await checkKimi(probe, resolver);
+
+      expect(resolver).toHaveBeenCalledWith('kimi', { acpHarness: true });
+      expect(probe).toHaveBeenCalledWith('/opt/kimi configured/bin/kimi', ['--version']);
+      expect(checks).toEqual([{
+        name: 'Kimi Code CLI',
+        status: 'ok',
+        message: '/opt/kimi configured/bin/kimi 0.27.0',
+      }]);
+    });
   });
 
   describe('environment checks', () => {

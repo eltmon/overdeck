@@ -16,7 +16,8 @@ const MODEL_BY_PROVIDER = {
   openrouter: 'qwen/qwen3.6-plus:free',
 } as const
 
-const HARNESSES: RuntimeName[] = ['claude-code', 'pi', 'ohmypi', 'codex']
+const HARNESSES: Array<RuntimeName | 'pi'> = ['claude-code', 'pi', 'ohmypi', 'codex', 'acp']
+const HARNESSES_WITHOUT_ACP = HARNESSES.filter((harness) => harness !== 'acp')
 const PROVIDERS = Object.keys(MODEL_BY_PROVIDER) as Array<keyof typeof MODEL_BY_PROVIDER>
 const AUTH_MODES: Array<AuthMode | undefined> = ['api-key', 'subscription', undefined]
 
@@ -88,6 +89,17 @@ describe('canUseHarness', () => {
     expect(canUseHarnessSync('codex', MODEL_BY_PROVIDER.anthropic, undefined)).toEqual({ allowed: true })
   })
 
+  it('allows ACP + Kimi under API-key and subscription-backed OAuth auth', () => {
+    expect(canUseHarnessSync('acp', 'kimi-k2.7-code', 'api-key')).toEqual({ allowed: true })
+    expect(canUseHarnessSync('acp', 'kimi-k2.7-code', 'subscription')).toEqual({ allowed: true })
+  })
+
+  it.each(PROVIDERS)('blocks ACP + unsupported %s provider', (provider) => {
+    const decision = canUseHarnessSync('acp', MODEL_BY_PROVIDER[provider], 'subscription')
+    expect(decision.allowed).toBe(false)
+    expect(decision.reason).toContain('Kimi')
+  })
+
   it('blocks gpt-5.5 + api-key on every harness (subscription-only model)', () => {
     for (const harness of HARNESSES) {
       const decision = canUseHarnessSync(harness, 'gpt-5.5', 'api-key')
@@ -97,14 +109,14 @@ describe('canUseHarness', () => {
     }
   })
 
-  it('allows gpt-5.5 + subscription on every harness', () => {
-    for (const harness of HARNESSES) {
+  it('allows gpt-5.5 + subscription on every supported non-ACP harness', () => {
+    for (const harness of HARNESSES_WITHOUT_ACP) {
       expect(canUseHarnessSync(harness, 'gpt-5.5', 'subscription')).toEqual({ allowed: true })
     }
   })
 
-  it('allows gpt-5.5 + undefined authMode (no auth context engaged)', () => {
-    for (const harness of HARNESSES) {
+  it('allows gpt-5.5 + undefined authMode on every supported non-ACP harness', () => {
+    for (const harness of HARNESSES_WITHOUT_ACP) {
       expect(canUseHarnessSync(harness, 'gpt-5.5', undefined)).toEqual({ allowed: true })
     }
   })
@@ -122,35 +134,36 @@ describe('canUseHarness', () => {
   )
 
   it.each(['gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna'] as const)(
-    'allows %s + subscription on every harness',
+    'allows %s + subscription on every supported non-ACP harness',
     (model) => {
-      for (const harness of HARNESSES) {
+      for (const harness of HARNESSES_WITHOUT_ACP) {
         expect(canUseHarnessSync(harness, model, 'subscription')).toEqual({ allowed: true })
       }
     },
   )
 
   it.each(['gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna'] as const)(
-    'allows %s + undefined authMode (no auth context engaged)',
+    'allows %s + undefined authMode on every supported non-ACP harness',
     (model) => {
-      for (const harness of HARNESSES) {
+      for (const harness of HARNESSES_WITHOUT_ACP) {
         expect(canUseHarnessSync(harness, model, undefined)).toEqual({ allowed: true })
       }
     },
   )
 
-  it('AC(PAN-1989): covers the full 4 x 5 x 3 matrix — only ohmypi+anthropic+subscription is blocked', () => {
-    const cells: Array<{ harness: RuntimeName; provider: string; authMode: AuthMode | undefined; allowed: boolean }> = []
+  it('covers the full 5 x 5 x 3 matrix including Kimi-only ACP policy', () => {
+    const cells: Array<{ harness: RuntimeName | 'pi'; provider: string; authMode: AuthMode | undefined; allowed: boolean }> = []
     for (const harness of HARNESSES) {
       for (const provider of PROVIDERS) {
         for (const authMode of AUTH_MODES) {
           const isBlockedCell =
-            harness === 'ohmypi' && provider === 'anthropic' && authMode === 'subscription'
+            (harness === 'ohmypi' && provider === 'anthropic' && authMode === 'subscription')
+            || harness === 'acp'
           cells.push({ harness, provider, authMode, allowed: !isBlockedCell })
         }
       }
     }
-    expect(cells).toHaveLength(4 * 5 * 3)
+    expect(cells).toHaveLength(5 * 5 * 3)
     for (const cell of cells) {
       const model = MODEL_BY_PROVIDER[cell.provider as keyof typeof MODEL_BY_PROVIDER]
       const decision = canUseHarnessSync(cell.harness, model, cell.authMode)

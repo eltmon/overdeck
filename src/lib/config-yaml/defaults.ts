@@ -230,6 +230,9 @@ export const DEFAULT_CONFIG: NormalizedConfig = {
     permissionMode: 'auto-review',
     transport: 'app-server',
   },
+  acp: {
+    permissionMode: 'auto',
+  },
 };
 
 /**

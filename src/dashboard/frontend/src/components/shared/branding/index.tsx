@@ -88,6 +88,15 @@ const PiHarnessIcon = (props: IconProps) => (
   </svg>
 );
 
+const AcpHarnessIcon = (props: IconProps) => (
+  <svg viewBox="0 0 24 24" role="img" aria-label="ACP harness mark" {...props}>
+    <rect width="24" height="24" rx="5" fill="currentColor" />
+    <text x="12" y="15" textAnchor="middle" fontSize="7" fontWeight="700" fill="white">
+      ACP
+    </text>
+  </svg>
+);
+
 export const PROVIDER_BRANDS: Record<Provider, BrandDef> = {
   anthropic: { id: 'anthropic', label: 'Anthropic', color: '#d97757', Icon: AnthropicIcon },
   openai: { id: 'openai', label: 'OpenAI', color: '#10a37f', Icon: OpenAIIcon },
@@ -105,6 +114,7 @@ export const HARNESS_BRANDS: Record<Harness, BrandDef> = {
   'claude-code': { id: 'claude-code', label: 'Claude Code', color: PROVIDER_BRANDS.anthropic.color, Icon: AnthropicIcon },
   codex: { id: 'codex', label: 'Codex', color: PROVIDER_BRANDS.openai.color, Icon: OpenAIIcon },
   ohmypi: { id: 'ohmypi', label: 'oh-my-pi', color: '#7c3aed', Icon: PiHarnessIcon },
+  acp: { id: 'acp', label: 'ACP', color: '#475569', Icon: AcpHarnessIcon },
 };
 
 export const PROVIDER_COLORS: Record<Provider, string> = Object.fromEntries(

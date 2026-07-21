@@ -577,9 +577,8 @@ async function createSummaryForkPromise(
   conv: Conversation,
   options: SummaryForkOptions = {},
 ): Promise<SummaryForkResult> {
-  const sourceSessionFile = conv.claudeSessionId
-    ? sessionFilePath(conv.cwd, conv.claudeSessionId)
-    : null;
+  const sourceAdapter = getTranscriptAdapter(conv.harness ?? undefined);
+  const sourceSessionFile = await sourceAdapter.resolveSessionFile(conv);
   if (!sourceSessionFile) {
     throw new Error(`No session file found for conversation ${conv.name}`);
   }

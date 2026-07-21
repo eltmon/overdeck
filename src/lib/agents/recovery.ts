@@ -13,6 +13,7 @@ import { logAgentLifecycleSync } from '../persistent-logger.js';
 import { getProviderForModelSync, setupCredentialFileAuthSync, clearCredentialFileAuthSync } from '../providers.js';
 import type { ModelId } from '../settings.js';
 import { normalizeHarness } from '../overdeck/conversations.js';
+import { getHarnessBehavior } from '../runtimes/behavior.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import {
   createSession,
@@ -59,7 +60,7 @@ export interface RestartAgentOptions {
 }
 
 export function resolveRecoveryResumeSessionId(agentId: string, harness: RuntimeName): string | undefined {
-  if (harness !== 'codex') return undefined;
+  if (harness !== 'codex' && harness !== 'acp') return undefined;
   return getLatestSessionIdSync(agentId) ?? undefined;
 }
 
@@ -133,6 +134,7 @@ export async function restartAgent(
       role: agentState.role,
       isPlanning: agentState.role === 'plan',
       harness: effectiveHarness,
+      harnessBinaryPath: harnessLaunch.binaryPath,
       useSupervisor: supervisorLaunch.useSupervisor,
       supervisorScriptPath: supervisorLaunch.supervisorScriptPath,
       extraEnvExports: [harnessLaunch.pathExport],
@@ -168,15 +170,22 @@ export async function restartAgent(
       }
     } else {
       const ready = await waitForPromptReady(normalizedId, effectiveHarness, 30);
-      if (ready) {
-        await new Promise(r => setTimeout(r, 500));
-        if (effectiveHarness === 'codex') {
-          await deliverAgentMessage(normalizedId, prompt, 'restartAgent:continue-prompt', resilientDeliveryMethod(agentState.deliveryMethod));
-        } else {
-          await Effect.runPromise(sendKeys(normalizedId, prompt));
+      if (!ready) {
+        throw new Error(`${getHarnessBehavior(effectiveHarness).displayName} did not become ready within 30s for ${normalizedId}`);
+      }
+      await new Promise(r => setTimeout(r, 500));
+      if (effectiveHarness === 'codex' || effectiveHarness === 'acp') {
+        const delivery = await deliverAgentMessage(
+          normalizedId,
+          prompt,
+          'restartAgent:continue-prompt',
+          effectiveHarness === 'codex' ? resilientDeliveryMethod(agentState.deliveryMethod) : undefined,
+        );
+        if (!delivery.ok) {
+          throw new Error(`${getHarnessBehavior(effectiveHarness).displayName} continue prompt delivery failed`);
         }
       } else {
-        console.error(`[restartAgent] ${effectiveHarness === 'codex' ? 'Codex' : 'Claude'} did not become ready within 30s for ${normalizedId}`);
+        await Effect.runPromise(sendKeys(normalizedId, prompt));
       }
     }
 
@@ -192,6 +201,7 @@ export async function restartAgent(
     return { success: true };
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : String(error);
+    await Effect.runPromise(stopAgent(normalizedId)).catch(() => undefined);
     logAgentLifecycleSync(normalizedId, `restartAgent FAILED: ${msg}`);
     return { success: false, error: `Failed to restart agent: ${msg}` };
   }
@@ -332,6 +342,7 @@ export async function recoverAgent(
       role: recoveryRole,
       isPlanning: recoveryRole === 'plan',
       harness: 'ohmypi',
+      harnessBinaryPath: harnessLaunch.binaryPath,
       extraEnvExports: [harnessLaunch.pathExport],
     });
     const launcherScript = join(getAgentDir(normalizedId), 'launcher.sh');
@@ -355,6 +366,48 @@ export async function recoverAgent(
     markAgentRunning(state);
     saveAgentStateSync(state);
     logAgentLifecycleSync(normalizedId, `recoverAgent SUCCESS: recoveryCount=${health.recoveryCount} (ohmypi)`);
+    return state;
+  }
+
+  if (recoveryHarness === 'acp') {
+    const resumeSessionId = resolveRecoveryResumeSessionId(normalizedId, recoveryHarness);
+    const { launcherContent, providerEnv: acpProviderEnv } = await buildAgentLaunchConfig({
+      agentId: normalizedId,
+      model: state.model,
+      workspace: state.workspace,
+      role: recoveryRole,
+      isPlanning: recoveryRole === 'plan',
+      ...(resumeSessionId ? { spawnMode: 'resume' as const, resumeSessionId } : {}),
+      harness: 'acp',
+      harnessBinaryPath: harnessLaunch.binaryPath,
+      extraEnvExports: [harnessLaunch.pathExport],
+    });
+    const launcherScript = join(getAgentDir(normalizedId), 'launcher.sh');
+    await writeLauncherScriptAtomic(launcherScript, launcherContent);
+    await Effect.runPromise(createSession(normalizedId, state.workspace, `bash ${launcherScript}`, {
+      env: {
+        ...BLANKED_PROVIDER_ENV,
+        OVERDECK_AGENT_ID: normalizedId,
+        OVERDECK_ISSUE_ID: state.issueId || '',
+        OVERDECK_SESSION_TYPE: recoveryRole,
+        CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION: 'false',
+        ...acpProviderEnv,
+      },
+    }));
+    const delivery = await deliverInitialPromptWithRetry(
+      normalizedId,
+      recoveryPrompt,
+      'recoverAgent:acp-recovery-prompt',
+    );
+    if (!delivery.ok) {
+      await Effect.runPromise(stopAgent(normalizedId));
+      throw new Error(
+        `ACP recovery prompt delivery failed for ${normalizedId}: ${delivery.failure ?? 'unknown failure'}`,
+      );
+    }
+    markAgentRunning(state);
+    saveAgentStateSync(state);
+    logAgentLifecycleSync(normalizedId, `recoverAgent SUCCESS: recoveryCount=${health.recoveryCount} (acp)`);
     return state;
   }
 

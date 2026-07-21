@@ -28,10 +28,16 @@ vi.mock('../../paths.js', async (importOriginal) => ({
   encodeClaudeProjectDir: (p: string) => p,
 }))
 
-import { RuntimeRegistry, setGlobalRegistry, getGlobalRegistry, getHarnessBehavior } from '../index.js'
+import {
+  AcpRuntimeSync,
+  RuntimeRegistry,
+  setGlobalRegistry,
+  getGlobalRegistry,
+  getHarnessBehavior,
+} from '../index.js'
 import type { AgentRuntimeSync, HarnessBehavior } from '../types.js'
 
-function stubRuntime(name: 'claude-code' | 'ohmypi' | 'codex'): AgentRuntimeSync {
+function stubRuntime(name: 'claude-code' | 'ohmypi' | 'codex' | 'acp'): AgentRuntimeSync {
   const behavior = getHarnessBehavior(name)
   return {
     name,
@@ -67,6 +73,12 @@ function writeAgentState(agentId: string, fields: Record<string, unknown>): void
   )
 }
 
+describe('global runtime registry', () => {
+  it('registers the real ACP runtime by default', () => {
+    expect(getGlobalRegistry().get('acp')).toBeInstanceOf(AcpRuntimeSync)
+  })
+})
+
 describe('RuntimeRegistry.getRuntimeForAgent dispatches by state.harness (PAN-636)', () => {
   let savedRegistry: ReturnType<typeof getGlobalRegistry> | null = null
 
@@ -76,6 +88,7 @@ describe('RuntimeRegistry.getRuntimeForAgent dispatches by state.harness (PAN-63
     fresh.register(stubRuntime('claude-code'))
     fresh.register(stubRuntime('ohmypi'))
     fresh.register(stubRuntime('codex'))
+    fresh.register(stubRuntime('acp'))
     setGlobalRegistry(fresh)
   })
   afterEach(() => {
@@ -95,6 +108,11 @@ describe('RuntimeRegistry.getRuntimeForAgent dispatches by state.harness (PAN-63
   it('returns the codex runtime when state.harness === "codex" (PAN-1574)', () => {
     writeAgentState('agent-codex-1', { harness: 'codex' })
     expect(getGlobalRegistry().getRuntimeForAgent('agent-codex-1')?.name).toBe('codex')
+  })
+
+  it('returns the acp runtime when state.harness === "acp"', () => {
+    writeAgentState('agent-acp-1', { harness: 'acp' })
+    expect(getGlobalRegistry().getRuntimeForAgent('agent-acp-1')?.name).toBe('acp')
   })
 
   it('returns the claude-code runtime when state.harness === "claude-code" (AC1)', () => {
@@ -200,6 +218,29 @@ describe('getHarnessBehavior', () => {
       supportsPatchProjection: true,
       usesCodexHome: true,
       workAgentMode: 'codex-work-tui',
+      readyTimeoutSeconds: 30,
+    })
+  })
+
+  it('defines dedicated ACP behavior switches', () => {
+    expect(pickBehaviorFields(getHarnessBehavior('acp'))).toEqual({
+      executableName: 'acp-host',
+      processNames: ['acp-host', 'kimi'],
+      launchCommandKind: 'acp-host',
+      deliveryKind: 'acp-host-rpc',
+      readinessKind: 'acp-host-ready',
+      transcriptKind: 'acp-jsonl',
+      sessionIdSource: 'acp-session-id',
+      contextLayerKind: 'acp',
+      feedKind: 'acp',
+      supportsPtySupervisor: false,
+      supportsChannelsBridge: false,
+      supportsConversationStreaming: true,
+      supportsPatchProjection: false,
+      usesRpcFifo: false,
+      usesCodexHome: false,
+      injectsPromptTimeMemory: false,
+      workAgentMode: 'acp-host',
       readyTimeoutSeconds: 30,
     })
   })

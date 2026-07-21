@@ -28,6 +28,7 @@
         "drizzle-kit": "^0.31.10",
         "drizzle-orm": "^0.45.2",
         "effect": "4.0.0-beta.73",
+        "effect-acp": "workspace:*",
         "execa": "^8.0.1",
         "inquirer": "^9.3.8",
         "js-yaml": "^4.1.1",
@@ -96,6 +97,18 @@
       "devDependencies": {
         "@effect/language-service": "catalog:",
         "tsdown": "^0.21.7",
+        "typescript": "catalog:",
+      },
+    },
+    "packages/effect-acp": {
+      "name": "effect-acp",
+      "dependencies": {
+        "effect": "catalog:",
+      },
+      "devDependencies": {
+        "@effect/platform-node": "catalog:",
+        "@effect/vitest": "catalog:",
+        "@types/node": "^20.10.0",
         "typescript": "catalog:",
       },
     },
@@ -1699,6 +1712,8 @@
     "ee-first": ["ee-first@1.1.1", "", {}, "sha512-WMwm9LhRUo+WUaRN+vRuETqG89IgZphVSNkdFgeb6sS/E4OrDIN7t48CAewSHXc6C8lefD8KKfr5vY61brQlow=="],
 
     "effect": ["effect@4.0.0-beta.73", "", { "dependencies": { "@standard-schema/spec": "^1.1.0", "fast-check": "^4.8.0", "find-my-way-ts": "^0.1.6", "ini": "^7.0.0", "kubernetes-types": "^1.30.0", "msgpackr": "^2.0.1", "multipasta": "^0.2.7", "toml": "^4.1.1", "uuid": "^14.0.0", "yaml": "^2.9.0" } }, "sha512-rL7jjpT31JhxNiZ0X4sgu+WSJi7uwKTX2jz2OW7PrPLfz5DPjT9iXxxVrekxwpfGdgo92bvxbCc5kBlXgusQJw=="],
+
+    "effect-acp": ["effect-acp@workspace:packages/effect-acp"],
 
     "ejs": ["ejs@3.1.10", "", { "dependencies": { "jake": "^10.8.5" }, "bin": { "ejs": "bin/cli.js" } }, "sha512-UeJmFfOrAQS8OJWPZ4qtgHyWExa088/MtK5UEyoJGFH67cDEXkZSviOiKRCZ4Xij0zxI3JECgYs3oKx+AizQBA=="],
 

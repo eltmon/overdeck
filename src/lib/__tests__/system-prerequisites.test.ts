@@ -31,6 +31,25 @@ describe('checkSystemPrerequisites', () => {
     });
   });
 
+  it('routes the Kimi probe through the configured ACP executable resolver', async () => {
+    const calls: Array<{ command: string; acpHarness: boolean }> = [];
+    const report = await checkSystemPrerequisites(
+      async (cmd) => `${cmd} 0.27.0`,
+      async (command, options) => {
+        calls.push({ command, acpHarness: options?.acpHarness === true });
+        return command === 'kimi'
+          ? '/opt/kimi configured/bin/kimi'
+          : `/usr/bin/${command}`;
+      },
+    );
+
+    expect(calls).toContainEqual({ command: 'kimi', acpHarness: true });
+    expect(report.checks.find((check) => check.id === 'kimi')).toMatchObject({
+      found: true,
+      version: '/opt/kimi configured/bin/kimi 0.27.0',
+    });
+  });
+
   it('flags missing required tools and keeps optional misses non-blocking', async () => {
     const missingTmuxAndDocker = async (command: string) =>
       command === 'tmux' || command === 'docker' ? null : `/resolved/bin/${command}`;
@@ -61,6 +80,20 @@ describe('checkSystemPrerequisites', () => {
 });
 
 describe('collectSetupDiagnostics', () => {
+  it('reports Kimi from the same configured ACP executable used for launch', async () => {
+    const report = await collectSetupDiagnostics(
+      '9.8.7',
+      async (cmd) => `${cmd} 0.27.0`,
+      async (command, options) => command === 'kimi' && options?.acpHarness
+        ? '/opt/kimi configured/bin/kimi'
+        : `/usr/bin/${command}`,
+    );
+
+    expect(report.markdown).toContain(
+      '✓ kimi: /opt/kimi configured/bin/kimi 0.27.0 — /opt/kimi configured/bin/kimi',
+    );
+  });
+
   it('produces a bounded support report without dumping environment secrets', async () => {
     const previousSecret = process.env['OVERDECK_DIAGNOSTIC_TEST_SECRET'];
     process.env['OVERDECK_DIAGNOSTIC_TEST_SECRET'] = 'must-not-appear';

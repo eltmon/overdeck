@@ -23,6 +23,7 @@ import {
 import { Effect, Layer, Schema } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
+import { workspaceContextWithoutProjectLayer } from '../../../lib/context-layers/assemble.js';
 import { renderForHarness, validateTemplate } from '../../../lib/context-layers/harness.js';
 import {
   globalContextFile as defaultGlobalContextFile,
@@ -70,7 +71,7 @@ type DashboardContextSyncResponse = ContextSyncResponse & {
 
 type RuleScope = 'universal' | 'dev';
 
-const PREVIEW_HARNESSES: readonly Harness[] = ['claude-code', 'ohmypi', 'codex'];
+const PREVIEW_HARNESSES: readonly Harness[] = ['claude-code', 'ohmypi', 'codex', 'acp'];
 const FRONTMATTER_RE = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/;
 const execFileAsync = promisify(execFile);
 const decodePreviewRequest = Schema.decodeUnknownSync(ContextPreviewRequest);
@@ -274,7 +275,7 @@ async function buildSyncTargets(projects: ProjectEntry[]): Promise<ContextSyncTa
       await describeSyncTarget('claude-code', 'project', key, `${config.name} · CLAUDE.md`, join(config.path, 'CLAUDE.md')),
     );
     targets.push(
-      await describeSyncTarget('pi', 'project', key, `${config.name} · AGENTS.md`, join(config.path, 'AGENTS.md')),
+      await describeSyncTarget('ohmypi', 'project', key, `${config.name} · AGENTS.md`, join(config.path, 'AGENTS.md')),
     );
   }
 
@@ -381,7 +382,11 @@ async function renderBundledRulesAsync(harness: Harness): Promise<string> {
 function renderLayerSections(layers: readonly ResolvedLayer[], drafts: ReadonlyMap<string, string>, harness: Harness): string {
   return layers
     .map((layer) => {
-      const rendered = renderForHarness(contentForLayer(layer, drafts), harness).trim();
+      const raw = contentForLayer(layer, drafts);
+      const effective = harness === 'acp' && layer.kind === 'workspace'
+        ? workspaceContextWithoutProjectLayer(raw)
+        : raw;
+      const rendered = renderForHarness(effective, harness).trim();
       const label = layer.kind === 'global'
         ? 'Global layer'
         : layer.kind === 'project'
@@ -418,6 +423,10 @@ function fullPromptPreview(previews: Record<Harness, string>): string {
     '## Overdeck-controlled Codex bundle',
     '',
     previews.codex || '(no rendered context)',
+    '',
+    '## Overdeck-controlled ACP bundle',
+    '',
+    previews.acp || '(no rendered context)',
     '',
     '## Runtime-only sections',
     '',
@@ -483,6 +492,7 @@ export async function previewContextLayers(
       'claude-code': previews['claude-code'],
       ohmypi: previews.ohmypi,
       codex: previews.codex,
+      acp: previews.acp,
       fullPrompt: fullPromptPreview(previews),
     },
     diagnostics: diagnosticsForLayers(layers, drafts),

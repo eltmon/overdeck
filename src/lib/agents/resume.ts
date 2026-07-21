@@ -412,6 +412,7 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
       ...(shouldResumeSavedSession ? { spawnMode: 'resume' as const, resumeSessionId: sessionId } : {}),
       sessionId: freshSessionId,
       harness: effectiveHarness,
+      harnessBinaryPath: harnessLaunch.binaryPath,
       useSupervisor: supervisorLaunch.useSupervisor,
       supervisorScriptPath: supervisorLaunch.supervisorScriptPath,
       extraEnvExports: [harnessLaunch.pathExport],
@@ -449,6 +450,21 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         console.error(`[resumeAgent] ohmypi prompt delivery failed: ${msg}`);
+      }
+    } else if (effectiveHarness === 'acp') {
+      const delivery = await deliverInitialPromptWithRetry(
+        normalizedId,
+        effectiveMessage,
+        'resumeAgent:acp-continue',
+      );
+      messageDelivered = delivery.ok;
+      if (delivery.ok && resumeMessage.redeliveringKickoff) markKickoffRedelivered(agentState);
+      if (!delivery.ok) {
+        await Effect.runPromise(killSession(normalizedId));
+        return {
+          success: false,
+          error: `ACP continue prompt did not land: ${delivery.failure ?? 'unknown failure'}`,
+        };
       }
     } else if (effectiveHarness === 'codex') {
       const delivery = await deliverInitialPromptWithRetry(normalizedId, effectiveMessage, 'resumeAgent:codex-continue', resilientDeliveryMethod(agentState.deliveryMethod));

@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { exec, execFile } from 'node:child_process';
 import { existsSync, createReadStream } from 'node:fs';
-import { mkdir, writeFile, readFile, stat, realpath, rename } from 'node:fs/promises';
+import { mkdir, writeFile, readFile, stat, realpath, rename, rm } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { createInterface } from 'node:readline';
@@ -42,7 +42,6 @@ import { deliverAgentMessage, writeChannelsBridgeMcpConfig, dismissDevChannelsDi
 import {
   getAgentRuntimeBaseCommand,
   getProviderExportsForModel,
-  getProviderEnvForModel,
   getProviderAuthMode,
 } from '../agents.js';
 import { writeBridgeTokenSync } from '../bridge-token.js';
@@ -57,6 +56,7 @@ import type { RuntimeName } from '../runtimes/types.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import { piFifoPaths } from '../runtimes/pi-fifo.js';
 import { generateLauncherScriptSync } from '../launcher-generator.js';
+import { getAcpLauncherFields, waitForAcpHostReady } from '../agents/runtime-command.js';
 import { workspaceContextFile, piGlobalContextFile } from '../context-layers/layers.js';
 import { ensureSessionContextBriefingFile } from '../briefing-freshness.js';
 import { sessionFilePath, getOverdeckHome, resolveOhmypiExtensionPath } from '../paths.js';
@@ -187,7 +187,7 @@ const PI_CONVERSATION_SOURCE_CONTRACT = [
 export async function resolveAllowedHarness(requested: unknown, model?: string | null): Promise<RuntimeName> {
   if (!model) return 'claude-code';
   const explicit: RuntimeName | undefined =
-    requested === 'ohmypi' || requested === 'claude-code' || requested === 'codex' ? requested : undefined;
+    requested === 'ohmypi' || requested === 'claude-code' || requested === 'codex' || requested === 'acp' ? requested : undefined;
   return resolveHarness({ model, explicit });
 }
 export async function isInsideGitWorkTree(dir: string): Promise<boolean> {
@@ -298,6 +298,10 @@ export function shouldUseSupervisorForConversation(
   return getHarnessBehavior(harness).supportsPtySupervisor && process.env.OVERDECK_DOCKER_WORKSPACE !== '1' && process.env.PAN_DOCKER !== '1';
 }
 export async function waitForConversationRuntimeReady(tmuxSession: string, harness: RuntimeName, mode: 'spawn' | 'respawn'): Promise<void> {
+  if (harness === 'acp') {
+    await waitForAcpHostReady(tmuxSession);
+    return;
+  }
   const transcriptKind = getHarnessBehavior(harness).transcriptKind;
   if (transcriptKind === 'ohmypi-jsonl') {
     const ready = await waitForPiTuiReady(tmuxSession);
@@ -326,7 +330,7 @@ export async function handleConversationSwitchModel(
   const currentHarness: RuntimeName = conv.harness ?? 'claude-code';
   const requestedHarness = body['harness'];
   let harness: RuntimeName = currentHarness;
-  if (requestedHarness === 'ohmypi' || requestedHarness === 'pi' || requestedHarness === 'claude-code' || requestedHarness === 'codex') {
+  if (requestedHarness === 'ohmypi' || requestedHarness === 'pi' || requestedHarness === 'claude-code' || requestedHarness === 'codex' || requestedHarness === 'acp') {
     const requestedRuntime: RuntimeName = requestedHarness === 'pi' ? 'ohmypi' : requestedHarness;
     if (requestedRuntime !== currentHarness) {
       const policyModel = model ?? conv.model ?? '';
@@ -518,7 +522,6 @@ export async function spawnConversationSession(
   const permissionFlags = getClaudePermissionFlagsStringSync();
   let runtimeCommand = `claude ${permissionFlags}`;
   let providerExportsStr = '';
-  let providerEnv: Record<string, string> = {};
   let piFields: {
     harness: 'ohmypi';
     piMode: 'tui';
@@ -533,8 +536,22 @@ export async function spawnConversationSession(
     codexSessionDir: string;
     resumeSessionId?: string;
   } | undefined;
+  let acpFields: (ReturnType<typeof getAcpLauncherFields> & { resumeSessionId?: string }) | undefined;
   let codexTransport: 'app-server' | 'tui' | undefined;
-  if (model) {
+  if (behavior.launchCommandKind === 'acp-host') {
+    if (!model) throw new Error('ACP conversation requires a model');
+    if (!SAFE_MODEL_PATTERN.test(model)) throw new Error('Invalid model name');
+    const sessionIdPath = join(getOverdeckHome(), 'agents', tmuxSession, 'acp-session-id');
+    const resumeSessionId = resume
+      ? await readFile(sessionIdPath, 'utf-8').then((value) => value.trim() || undefined).catch(() => undefined)
+      : undefined;
+    await rm(sessionIdPath, { force: true });
+    acpFields = {
+      ...getAcpLauncherFields(tmuxSession, model, cwd, harnessLaunch.binaryPath, 'work'),
+      resumeSessionId,
+    };
+    runtimeCommand = 'acp-host';
+  } else if (model) {
     if (!SAFE_MODEL_PATTERN.test(model)) {
       throw new Error('Invalid model name');
     }
@@ -544,7 +561,6 @@ export async function spawnConversationSession(
       runtimeCommand = `${runtimeCommand} --permission-mode ${mode === 'auto' ? 'auto' : BYPASS_PERMISSION_MODE}`;
     }
     providerExportsStr = (await getProviderExportsForModel(model)).trim();
-    providerEnv = await getProviderEnvForModel(model);
     if (behavior.transcriptKind === 'ohmypi-jsonl') {
       if (getProviderForModelSync(model).name === 'openai') {
         const auth = await getOhmypiCodexAuthStatus({ refreshIfExpired: true });
@@ -618,6 +634,7 @@ export async function spawnConversationSession(
   if (
     !piFields &&
     !codexFields &&
+    !acpFields &&
     !plainFork &&
     isClaudeCodeChannelsEnabled() &&
     (!model || getProviderForModelSync(model).name === 'anthropic') &&
@@ -640,7 +657,7 @@ export async function spawnConversationSession(
       workingDir: cwd,
       setTerminalEnv: true,
       unsetProviderEnv: true,
-      overdeckEnv: { ...(issueId ? { issueId } : {}), ...((piFields || codexFields || useSupervisor) ? { agentId: tmuxSession } : {}) },
+      overdeckEnv: { ...(issueId ? { issueId } : {}), ...((piFields || codexFields || acpFields || useSupervisor) ? { agentId: tmuxSession } : {}) },
       extraEnvExports: [
         harnessLaunch.pathExport,
         `export OVERDECK_DASHBOARD_URL="http://127.0.0.1:${process.env['API_PORT'] ?? process.env['PORT'] ?? '3011'}"`,
@@ -650,15 +667,15 @@ export async function spawnConversationSession(
       baseCommand: runtimeCommand,
       appendSystemPromptFiles: piFields
         ? await piConversationSystemPromptFiles(cwd)
-        : codexFields
+        : codexFields || acpFields
           ? []
           : await claudeConversationSystemPromptFiles(cwd),
       model: launcherModel,
-      ...(piFields ?? codexFields ?? {
+      ...(piFields ?? codexFields ?? acpFields ?? {
         resumeSessionId: resume ? claudeSessionId : undefined,
         sessionId: resume ? undefined : claudeSessionId,
       }),
-      extraArgs: !piFields && effort ? `--effort "${effort}"` : undefined,
+      extraArgs: !piFields && !acpFields && effort ? `--effort "${effort}"` : undefined,
       keepAlive: true,
       fileMode: 0o700,
       channelsBridgeMcpConfig,
@@ -774,10 +791,16 @@ export async function handleConversationCreate(
         await spawnConversationSession(tmuxSession, cwd, claudeSessionId, model, effort, issueId, false, harness);
         console.log(`[conversations] tmux session ${tmuxSession} spawned, sessionId: ${claudeSessionId}`);
         await waitForConversationRuntimeReady(tmuxSession, harness, 'spawn');
-        if (message) await deliverAgentMessage(tmuxSession, message, 'conversation-message', resolveConversationDeliveryMethod(conv));
+        if (message) {
+          const delivery = await deliverAgentMessage(tmuxSession, message, 'conversation-message', resolveConversationDeliveryMethod(conv));
+          if (harness === 'acp' && !delivery.ok) {
+            throw new Error(`ACP initial prompt did not land: ${delivery.failure ?? 'unknown failure'}`);
+          }
+        }
       } catch (spawnErr: unknown) {
         const msg = spawnErr instanceof Error ? spawnErr.message : String(spawnErr);
         console.error(`[conversations] background spawn failed for ${tmuxSession}: ${msg}`);
+        if (harness === 'acp') await stopConversationRuntime(conv, name);
         updateSpawnError(name, msg);
         getEventStore().emitOnly({ type: 'conversation.created', timestamp: new Date().toISOString(), payload: { conversationName: name } });
       }
@@ -849,6 +872,9 @@ export async function handleConversationResume(
       await waitForConversationRuntimeReady(conv.tmuxSession, harness, 'respawn');
       markConversationActive(name);
       return jsonResponse({ ...conv, status: 'active', model: model ?? conv.model, harness, reattached: false, sessionAlive: true });
+    } catch (error) {
+      if (harness === 'acp') await stopConversationRuntime(conv, name);
+      throw error;
     } finally {
       respawn.done();
     }
@@ -888,19 +914,25 @@ export async function handleConversationRestartAll(
     const results: { name: string; model: string | null; status: string }[] = [];
     for (const conv of convs) {
       const respawn = markRespawnPending(conv.tmuxSession);
+      let attemptedHarness: RuntimeName = conv.harness ?? 'claude-code';
       try {
         await Effect.runPromise(killSession(conv.tmuxSession).pipe(Effect.catch(() => Effect.succeed(undefined))));
         const oldSessionId = conv.claudeSessionId;
         const sessionFileForResume = await deps.resolveSessionFile(conv);
         const canResume = !!oldSessionId && !!sessionFileForResume && existsSync(sessionFileForResume);
         const harness = await resolveAllowedHarness(conv.harness, conv.model);
+        attemptedHarness = harness;
         await spawnConversationSession(conv.tmuxSession, conv.cwd, oldSessionId ?? randomUUID(), conv.model ?? undefined, conv.effort ?? undefined, conv.issueId ?? undefined, canResume, harness);
+        if (harness === 'acp') {
+          await waitForConversationRuntimeReady(conv.tmuxSession, harness, 'respawn');
+        }
         setConversationHarness(conv.name, harness);
         markConversationActive(conv.name);
         results.push({ name: conv.name, model: conv.model, status: 'restarted' });
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
         console.error(`[conversations] Failed to restart ${conv.name}:`, msg);
+        if (attemptedHarness === 'acp') await stopConversationRuntime(conv, conv.name);
         results.push({ name: conv.name, model: conv.model, status: 'failed' });
       } finally {
         respawn.done();

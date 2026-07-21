@@ -51,6 +51,7 @@ const HARNESS_LABELS: Record<Harness, string> = {
   'claude-code': 'Claude Code',
   ohmypi: 'oh-my-pi',
   codex: 'Codex',
+  acp: 'ACP',
 };
 
 const PROVIDERS: { id: Provider; name: string; placeholder: string }[] = [

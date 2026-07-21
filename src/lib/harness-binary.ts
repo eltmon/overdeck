@@ -5,6 +5,7 @@ import { homedir } from 'node:os';
 import { delimiter, dirname, isAbsolute, join, resolve } from 'node:path';
 import { promisify } from 'node:util';
 
+import { loadConfigSync } from './config-yaml.js';
 import type { RuntimeName } from './runtimes/types.js';
 
 const execFileAsync = promisify(execFile);
@@ -14,11 +15,14 @@ export const HARNESS_BINARY_BY_RUNTIME: Record<RuntimeName, string> = {
   'claude-code': 'claude',
   ohmypi: 'omp',
   codex: 'codex',
+  acp: 'kimi',
 };
 
 export type ExecutableCommandRunner = (command: string, args: string[]) => Promise<string>;
 
 export interface ExecutableResolutionOptions {
+  /** Explicit executable selected by configuration. Must be an absolute path. */
+  executablePath?: string;
   pathValue?: string;
   home?: string;
   cwd?: string;
@@ -71,6 +75,18 @@ export async function resolveExecutable(
   const pathValue = options.pathValue ?? process.env['PATH'] ?? '';
   const accessExecutable = options.accessExecutable ?? ((path: string) => access(path, constants.X_OK));
   const runCommand = options.runCommand ?? defaultRunCommand;
+
+  if (options.executablePath !== undefined) {
+    if (!isAbsolute(options.executablePath)) {
+      throw new Error(`Configured executable path must be absolute: ${options.executablePath}`);
+    }
+    try {
+      await accessExecutable(options.executablePath);
+      return options.executablePath;
+    } catch {
+      return null;
+    }
+  }
 
   const pathDirectories = pathValue
     .split(delimiter)
@@ -125,11 +141,25 @@ export function harnessBinaryName(harness: RuntimeName): string {
   return HARNESS_BINARY_BY_RUNTIME[harness];
 }
 
+export function configuredHarnessBinaryPath(harness: RuntimeName): string | undefined {
+  if (harness !== 'acp') return undefined;
+  return loadConfigSync().config.acp?.kimi?.binaryPath;
+}
+
+function withConfiguredExecutable(
+  harness: RuntimeName,
+  options: ExecutableResolutionOptions = {},
+): ExecutableResolutionOptions {
+  if (options.executablePath !== undefined) return options;
+  const executablePath = configuredHarnessBinaryPath(harness);
+  return executablePath === undefined ? options : { ...options, executablePath };
+}
+
 export async function resolveHarnessBinary(
   harness: RuntimeName,
   options?: ExecutableResolutionOptions,
 ): Promise<string | null> {
-  return resolveExecutable(harnessBinaryName(harness), options);
+  return resolveExecutable(harnessBinaryName(harness), withConfiguredExecutable(harness, options));
 }
 
 export async function requireHarnessBinary(
@@ -137,10 +167,22 @@ export async function requireHarnessBinary(
   options?: ExecutableResolutionOptions,
 ): Promise<string> {
   const binary = harnessBinaryName(harness);
-  const resolved = await resolveExecutable(binary, options);
+  const effectiveOptions = withConfiguredExecutable(harness, options);
+  const resolved = await resolveExecutable(binary, effectiveOptions);
   if (resolved) return resolved;
 
-  const harnessName = harness === 'claude-code' ? 'Claude Code' : harness === 'ohmypi' ? 'OhMyPi' : 'Codex CLI';
+  const harnessName = harness === 'claude-code'
+    ? 'Claude Code'
+    : harness === 'ohmypi'
+      ? 'OhMyPi'
+      : harness === 'codex'
+        ? 'Codex CLI'
+        : 'Kimi Code CLI';
+  if (effectiveOptions.executablePath) {
+    throw new Error(
+      `${harnessName} configured executable "${effectiveOptions.executablePath}" was not found or is not executable. Fix its configured path, then restart Overdeck. No terminal session was created.`,
+    );
+  }
   throw new Error(
     `${harnessName} executable "${binary}" was not found. Install ${harnessName} or add its installation directory to PATH, then restart Overdeck. No terminal session was created.`,
   );

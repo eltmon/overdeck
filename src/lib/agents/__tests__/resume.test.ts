@@ -40,6 +40,24 @@ describe('resolveRecoveryResumeSessionId', () => {
     expect(resolveRecoveryResumeSessionId(agentId, 'codex')).toBe('thread-123');
   });
 
+  it('returns the persisted ACP session id for recovery launchers', () => {
+    const agentId = 'agent-acp-resume';
+    mkdirSync(agentDir(agentId), { recursive: true });
+    writeFileSync(join(agentDir(agentId), 'state.json'), JSON.stringify({
+      id: agentId,
+      issueId: 'PAN-2858',
+      workspace: '/tmp/workspace',
+      harness: 'acp',
+      role: 'work',
+      model: 'kimi-for-coding',
+      status: 'stopped',
+      startedAt: new Date().toISOString(),
+    }));
+    writeFileSync(join(agentDir(agentId), 'acp-session-id'), 'acp-session-123\n');
+
+    expect(resolveRecoveryResumeSessionId(agentId, 'acp')).toBe('acp-session-123');
+  });
+
   it('does not apply Codex thread ids to other harnesses', () => {
     const agentId = 'agent-claude-resume';
     mkdirSync(agentDir(agentId), { recursive: true });

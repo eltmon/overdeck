@@ -21,6 +21,7 @@ const STATUS_DOT_COLORS: Record<AgentState, string> = {
 const AGENT_LABELS: Record<string, string> = {
   claude_code: 'Claude Code',
   pi: 'Pi',
+  acp: 'Kimi',
   unknown: 'Unknown',
 };
 
@@ -72,6 +73,7 @@ export function ConversationFeedCard({ entry, onSelect, now = new Date() }: Conv
 function harnessForFeedAgent(agent: string): Harness {
   if (agent === 'ohmypi' || agent === 'pi') return 'ohmypi';
   if (agent === 'codex') return 'codex';
+  if (agent === 'acp') return 'acp';
   return 'claude-code';
 }
 

@@ -367,7 +367,7 @@ export interface RoleConfig {
   model: RoleModelRef;
   /** Explicit scalar staffing model for autonomous planning dispatch. */
   autonomousModel?: RoleModelRef;
-  harness?: 'claude-code' | 'ohmypi' | 'codex';
+  harness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp';
   effort?: RoleEffort;
   mode?: ReviewMode;
   /** PAN-1862 (FR-7): re-review scope for the review role (default 'changed'). */
@@ -589,6 +589,19 @@ export interface YamlConfig {
   codex?: {
     permissionMode?: 'read-only' | 'workspace' | 'auto-review' | 'full-access';
     transport?: 'app-server' | 'tui';
+  };
+
+  /**
+   * Agent Client Protocol spawn behavior.
+   *
+   * 'auto' automatically selects advertised allow or reject outcomes. 'prompt'
+   * is reserved for the AskUserQuestion permission follow-up.
+   */
+  acp?: {
+    permissionMode?: 'auto';
+    kimi?: {
+      binaryPath?: string;
+    };
   };
 
   /** Remote work-agent provisioning settings (dashboard-editable subset). */
@@ -887,6 +900,14 @@ export interface NormalizedConfig {
   codex: {
     permissionMode: 'read-only' | 'workspace' | 'auto-review' | 'full-access';
     transport: 'app-server' | 'tui';
+  };
+
+  /** ACP permission mode and provider-specific process settings. */
+  acp: {
+    permissionMode: 'auto';
+    kimi?: {
+      binaryPath?: string;
+    };
   };
 
   /** Remote work-agent provisioning settings surfaced by the dashboard. */

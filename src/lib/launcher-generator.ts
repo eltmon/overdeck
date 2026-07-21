@@ -10,7 +10,7 @@ import { packageRoot } from './paths.js';
 
 export type LauncherSpawnMode = 'conversation' | 'remote' | 'resume';
 
-export type LauncherHarness = 'claude-code' | 'ohmypi' | 'codex';
+export type LauncherHarness = 'claude-code' | 'ohmypi' | 'codex' | 'acp';
 
 export interface LauncherConfig {
   role: Role;
@@ -70,6 +70,17 @@ export interface LauncherConfig {
    * reading and writing files in the working directory).
    */
   codexSandboxMode?: string;
+
+  /** Agent identity passed to the persistent ACP host. Required for harness='acp'. */
+  acpAgentId?: string;
+  /** ACP provider name (for example, 'kimi'). Required for harness='acp'. */
+  acpProvider?: string;
+  /** Workspace exposed to the ACP agent. Required for harness='acp'. */
+  acpWorkspace?: string;
+  /** Exact ACP provider executable validated by launch preflight. Required for harness='acp'. */
+  acpBinaryPath?: string;
+  /** Materialized Overdeck context bundle injected into the first fresh ACP prompt. */
+  acpContextFile?: string;
 
   // Command construction
   /**
@@ -427,7 +438,9 @@ function buildCommand(config: LauncherConfig): string[] {
     if (behavior.launchCommandKind === 'codex-work-tui') {
       return buildCodexCommand(config, false);
     }
-
+    if (behavior.launchCommandKind === 'acp-host') {
+      return buildAcpCommand(config, false);
+    }
 
     // Conversation panel doesn't use exec — it runs the command then loops
     if (config.baseCommand) {
@@ -515,6 +528,9 @@ function buildNonConversationCommand(config: LauncherConfig, useExec: boolean): 
   }
   if (behavior.launchCommandKind === 'codex-work-tui') {
     return buildCodexCommand(config, useExec);
+  }
+  if (behavior.launchCommandKind === 'acp-host') {
+    return buildAcpCommand(config, useExec);
   }
 
   const parts: string[] = [];
@@ -693,6 +709,47 @@ function systemPromptFiles(config: LauncherConfig): string[] {
     ...(config.appendSystemPromptFile ? [config.appendSystemPromptFile] : []),
     ...(config.appendSystemPromptFiles ?? []),
   ];
+}
+
+function buildAcpCommand(config: LauncherConfig, useExec: boolean): string[] {
+  if (!config.acpAgentId) {
+    throw new Error('acp launcher requires acpAgentId');
+  }
+  if (!config.acpProvider) {
+    throw new Error('acp launcher requires acpProvider');
+  }
+  if (!config.acpWorkspace) {
+    throw new Error('acp launcher requires acpWorkspace');
+  }
+  if (!config.acpBinaryPath) {
+    throw new Error('acp launcher requires acpBinaryPath');
+  }
+
+  const hostPath = join(packageRoot, 'dist', 'acp-host.js');
+  const tokens = [
+    'node',
+    shellQuote(hostPath),
+    '--agent',
+    shellQuote(config.acpAgentId),
+    '--provider',
+    shellQuote(config.acpProvider),
+    '--workspace',
+    shellQuote(config.acpWorkspace),
+    '--binary-path',
+    shellQuote(config.acpBinaryPath),
+  ];
+  if (config.resumeSessionId) {
+    tokens.push('--resume', shellQuote(config.resumeSessionId));
+  }
+  if (config.model) {
+    tokens.push('--model', shellQuoteModelIdSync(config.model));
+  }
+  if (config.acpContextFile) {
+    tokens.push('--context-file', shellQuote(config.acpContextFile));
+  }
+
+  const cmd = tokens.join(' ');
+  return [useExec ? `exec ${cmd}` : cmd];
 }
 
 function buildCodexCommand(config: LauncherConfig, useExec: boolean): string[] {
