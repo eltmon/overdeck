@@ -7,7 +7,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DialogProvider } from '../DialogProvider';
 import { ResumableSessionDialog } from '../ResumableSessionDialog';
-import { recoveryFromBody, useResumeRecovery } from '../../lib/resumeRecovery';
+import { recoveryFromBody, openRecoveryForStartBlock, useResumeRecovery } from '../../lib/resumeRecovery';
 
 function renderDialog() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
@@ -48,6 +48,24 @@ describe('recoveryFromBody', () => {
     expect(recoveryFromBody({ error: 'boom' })).toBeNull();
     expect(recoveryFromBody({ lifecycle: { agentId: 'agent-x', canResumeSession: false } })).toBeNull();
     expect(recoveryFromBody(null)).toBeNull();
+  });
+});
+
+describe('openRecoveryForStartBlock', () => {
+  beforeEach(() => {
+    useResumeRecovery.setState({ request: null });
+  });
+
+  it('opens the recovery dialog for a start-block 409', () => {
+    const handled = openRecoveryForStartBlock(409, { lifecycle: { agentId: 'agent-x', canResumeSession: true } }, 'PAN-2876');
+    expect(handled).toBe(true);
+    expect(useResumeRecovery.getState().request).toEqual({ kind: 'resumable', agentId: 'agent-x', issueId: 'PAN-2876' });
+  });
+
+  it('ignores non-409 statuses and non-recovery 409s', () => {
+    expect(openRecoveryForStartBlock(500, { lifecycle: { agentId: 'agent-x', canResumeSession: true } })).toBe(false);
+    expect(openRecoveryForStartBlock(409, { requiresAcknowledgement: true })).toBe(false);
+    expect(useResumeRecovery.getState().request).toBeNull();
   });
 });
 
@@ -123,6 +141,32 @@ describe('ResumableSessionDialog', () => {
       expect(calls.some((c) => c.url === '/api/agents/agent-pan-2876/unpause' && c.method === 'POST')).toBe(true);
       expect(calls.some((c) => c.url === '/api/agents' && c.method === 'POST' && c.body === JSON.stringify({ issueId: 'PAN-2876' }))).toBe(true);
     });
+  });
+
+  it('swaps to the resumable recovery when the start-after-clear hits a new 409', async () => {
+    useResumeRecovery.getState().openRecovery({ kind: 'paused', agentId: 'agent-pan-2876', issueId: 'PAN-2876' });
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('/api/dashboard/session')) return Response.json({ csrfToken: 'test-csrf' });
+      if (url === '/api/agents') {
+        return Response.json(
+          { error: "Agent agent-pan-2876 has a resumable Claude session. Use 'pan resume …' …", lifecycle: { agentId: 'agent-pan-2876', canResumeSession: true } },
+          { status: 409 },
+        );
+      }
+      return Response.json({ success: true });
+    }));
+    renderDialog();
+
+    fireEvent.click(screen.getByTestId('recovery-primary'));
+
+    // The dialog stays open but becomes the resumable-session recovery —
+    // the operator gets Resume / Start fresh buttons, not a CLI-text alert.
+    await waitFor(() => {
+      expect(screen.getByTestId('resumable-session-dialog')).toHaveAttribute('data-kind', 'resumable');
+    });
+    expect(screen.getByTestId('recovery-start-fresh')).toBeInTheDocument();
+    expect(useResumeRecovery.getState().request).toEqual({ kind: 'resumable', agentId: 'agent-pan-2876', issueId: 'PAN-2876' });
   });
 
   it('Cancel closes without any lifecycle calls', () => {

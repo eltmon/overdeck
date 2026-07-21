@@ -27,6 +27,7 @@ import { useCommandDeckSelection } from '../../lib/commandDeckSelection';
 import { getTransport, type PanRpcProtocolClient } from '../../lib/wsTransport';
 import { refreshDashboardState } from '../../lib/refresh-dashboard-state';
 import { isCodexBlockedResponse, setPendingCodexSpawn } from '../../lib/pending-codex-spawn';
+import { openRecoveryForStartBlock } from '../../lib/resumeRecovery';
 import { getDirectRestartRequest } from '../../lib/restartRouting';
 import { useConfirm } from '../DialogProvider';
 import { WS_METHODS } from '@overdeck/contracts';
@@ -921,6 +922,7 @@ export function CommandDeck({
         });
         if (!resumeRetryRes.ok) {
           const retryData = await resumeRetryRes.json().catch(() => ({})) as { error?: string };
+          if (openRecoveryForStartBlock(resumeRetryRes.status, retryData, issueId)) return;
           throw new Error(retryData.error || 'Failed to restart agent');
         }
         toast.success('Agent restarted');
@@ -930,6 +932,8 @@ export function CommandDeck({
       // Only fall through to start-fresh when there is genuinely no session to resume.
       const noSession = resumeData.lifecycle?.canResumeSession === false && !resumeData.lifecycle?.hasLiveTmuxSession;
       if (!noSession) {
+        // A gate/resumable 409 opens the recovery dialog instead of toasting CLI text.
+        if (openRecoveryForStartBlock(resumeRes.status, resumeData, issueId)) return;
         throw new Error(resumeData.error || 'Failed to resume agent');
       }
 
@@ -961,6 +965,8 @@ export function CommandDeck({
           setPendingCodexSpawn(lastRequestBody);
           throw new Error(data.hint || data.error || 'Codex authentication expired — re-authenticate to continue');
         }
+        // Start-block 409s open the recovery dialog instead of toasting CLI text.
+        if (openRecoveryForStartBlock(res.status, data, issueId)) return;
         throw new Error(data.error || data.hint || 'Failed to start agent');
       }
       if (data.guardrails?.warnings?.length) {

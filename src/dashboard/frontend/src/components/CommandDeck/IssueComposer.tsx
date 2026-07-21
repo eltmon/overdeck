@@ -18,6 +18,7 @@ import type { SessionNode as SessionNodeType } from '@overdeck/contracts';
 import type { StartAgentResponse } from '../../types';
 import { useCommandDeckSelection } from '../../lib/commandDeckSelection';
 import { isCodexBlockedResponse, setPendingCodexSpawn } from '../../lib/pending-codex-spawn';
+import { openRecoveryForStartBlock, StartBlockHandoff } from '../../lib/resumeRecovery';
 
 interface IssueComposerProps {
   issueId: string;
@@ -90,6 +91,8 @@ export function IssueComposer({ issueId, sessions }: IssueComposerProps) {
           setPendingCodexSpawn(lastRequestBody);
           throw new Error(data.hint || data.error || 'Codex authentication expired — re-authenticate to continue');
         }
+        // Start-block 409s open the recovery dialog — the CLI text never toasts.
+        if (openRecoveryForStartBlock(res.status, data, issueId)) throw new StartBlockHandoff();
         throw new Error(data.error || data.hint || 'Failed to start agent');
       }
       return data;
@@ -105,6 +108,7 @@ export function IssueComposer({ issueId, sessions }: IssueComposerProps) {
       setTimeout(() => queryClient.invalidateQueries({ queryKey: ['agents'] }), 2000);
     },
     onError: (err: Error) => {
+      if (err instanceof StartBlockHandoff) return;
       posthog.captureException(err, { issue_id: issueId });
       toast.error(err.message, { duration: 8000 });
     },

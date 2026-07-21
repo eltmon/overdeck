@@ -29,6 +29,28 @@ export const useResumeRecovery = create<ResumeRecoveryState>((set) => ({
 }));
 
 /**
+ * Thrown by action surfaces after a start-block 409 was handed to the
+ * recovery dialog — their onError/catch handlers suppress the error toast
+ * for it, because the dialog IS the error surface.
+ */
+export class StartBlockHandoff extends Error {}
+
+/**
+ * If a failed POST /api/agents (or agent resume) response is a start-block
+ * 409 (resumable session, troubled gate, paused gate), open the recovery
+ * dialog and return true. Returns false for everything else so callers keep
+ * their plain error path. Use this in every surface that starts an agent so
+ * the CLI-instruction text never reaches a toast or inline alert.
+ */
+export function openRecoveryForStartBlock(status: number, body: unknown, issueId?: string): boolean {
+  if (status !== 409) return false;
+  const recovery = recoveryFromBody(body);
+  if (!recovery) return false;
+  useResumeRecovery.getState().openRecovery({ ...recovery, issueId });
+  return true;
+}
+
+/**
  * Inspect a failed action response's parsed body for a recoverable 409:
  * - resumable session (lifecycle.canResumeSession) → Resume / Start fresh
  * - troubled gate (troubled: true) → Clear gate & start

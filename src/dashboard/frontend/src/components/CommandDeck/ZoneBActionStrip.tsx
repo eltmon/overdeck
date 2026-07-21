@@ -20,6 +20,7 @@ import type { SessionNode as SessionNodeType } from '@overdeck/contracts';
 import { useConfirm } from '../DialogProvider';
 import { refreshDashboardState } from '../../lib/refresh-dashboard-state';
 import { isCodexBlockedResponse, setPendingCodexSpawn } from '../../lib/pending-codex-spawn';
+import { openRecoveryForStartBlock, StartBlockHandoff } from '../../lib/resumeRecovery';
 import {
   ZONE_B_SESSION_ACTIONS,
   type NonIssueActionContext,
@@ -128,6 +129,8 @@ export function ZoneBActionStrip({ session, issueId, onViewTerminal }: ZoneBActi
           setPendingCodexSpawn(lastRequestBody);
           throw new Error(data.hint || data.error || 'Codex authentication expired — re-authenticate to continue');
         }
+        // Start-block 409s open the recovery dialog — the CLI text never surfaces raw.
+        if (openRecoveryForStartBlock(res.status, data, targetIssueId)) throw new StartBlockHandoff();
         throw new Error(data.error || data.hint || 'Failed to restart agent');
       }
       return data;

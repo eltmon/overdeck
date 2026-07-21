@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { useResumeRecovery } from '../../lib/resumeRecovery';
 import { StartAgentCta } from './StartAgentCta';
 
 const useIssueActions = vi.fn();
@@ -31,6 +32,7 @@ function renderCta(density: 'rail' | 'cockpit' | 'console' = 'cockpit') {
 
 beforeEach(() => {
   vi.restoreAllMocks();
+  useResumeRecovery.setState({ request: null });
   refreshDashboardState.mockResolvedValue(undefined);
   setState();
 });
@@ -62,18 +64,33 @@ describe('StartAgentCta', () => {
   });
 
   it.each([
-    ['troubled', 'troubled flag'],
-    ['paused', 'paused gate'],
-  ] as const)('names the %s gate and confirms before clearing it', async (kind, copy) => {
+    ['troubled'],
+    ['paused'],
+  ] as const)('opens the shared recovery dialog for the %s gate instead of an inline confirm', async (kind) => {
     setState({ start: true, [kind]: true });
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}'));
     renderCta();
     fireEvent.click(screen.getByRole('button', { name: 'Start work agent' }));
-    expect(screen.getByRole('dialog')).toHaveTextContent(copy);
+    // No inline confirm, no fetch — the click hands the gate to the same
+    // ResumableSessionDialog every other start surface uses.
+    expect(useResumeRecovery.getState().request).toEqual({ kind, agentId: 'agent-pan-2499', issueId: 'PAN-2499' });
     expect(fetchMock).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole('button', { name: 'Clear gate and start' }));
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledOnce());
-    expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))).toEqual({ issueId: 'PAN-2499', projectId: 'overdeck', clearGates: true });
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('hands a 409 resumable-session block to the recovery dialog instead of showing CLI text', async () => {
+    setState({ start: true });
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(
+      JSON.stringify({
+        error: "Agent agent-pan-2499 has a resumable Claude session. Use 'pan resume agent-pan-2499' to continue it, or 'pan start agent-pan-2499 --fresh' to start a new session.",
+        lifecycle: { agentId: 'agent-pan-2499', canResumeSession: true },
+      }),
+      { status: 409 },
+    ));
+    renderCta();
+    fireEvent.click(screen.getByRole('button', { name: 'Start work agent' }));
+    await waitFor(() => expect(useResumeRecovery.getState().request).toEqual({ kind: 'resumable', agentId: 'agent-pan-2499', issueId: 'PAN-2499' }));
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
   it('resumes a resumable stopped session through the agent endpoint', async () => {

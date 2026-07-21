@@ -8,7 +8,7 @@ import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Loader2, Play, RotateCcw, ShieldCheck, X } from 'lucide-react';
 import { toast } from 'sonner';
-import { useResumeRecovery, type RecoveryRequest } from '../lib/resumeRecovery';
+import { useResumeRecovery, recoveryFromBody, type RecoveryRequest } from '../lib/resumeRecovery';
 import { dashboardMutationJsonHeaders } from '../lib/wsTransport';
 import { refreshDashboardState } from '../lib/refresh-dashboard-state';
 import { toastResumeOutcome } from '../lib/resumeOutcome';
@@ -53,6 +53,7 @@ const CONTENT: Record<RecoveryRequest['kind'], { title: (r: RecoveryRequest) => 
 export function ResumableSessionDialog() {
   const request = useResumeRecovery((s) => s.request);
   const closeRecovery = useResumeRecovery((s) => s.closeRecovery);
+  const openRecovery = useResumeRecovery((s) => s.openRecovery);
   const queryClient = useQueryClient();
   const showAlert = useAlert();
   const [pending, setPending] = useState<'primary' | 'fresh' | null>(null);
@@ -66,8 +67,29 @@ export function ResumableSessionDialog() {
     showAlert({ message: err instanceof Error ? err.message : 'Recovery failed', variant: 'error' });
   };
 
-  const startIssue = async () => {
-    if (issueId) await postJson('/api/agents', { issueId });
+  /**
+   * Start the issue after a gate clear / session reset. If the start itself
+   * hits a NEW start-block (e.g. unpausing reveals a resumable session), swap
+   * the dialog to that recovery instead of failing with a raw CLI-text alert.
+   * Returns true when the dialog was handed off to a new request.
+   */
+  const startIssue = async (): Promise<boolean> => {
+    if (!issueId) return false;
+    const res = await fetch('/api/agents', {
+      method: 'POST',
+      credentials: 'include',
+      headers: await dashboardMutationJsonHeaders(),
+      body: JSON.stringify({ issueId }),
+    });
+    if (res.ok) return false;
+    const parsed = await res.json().catch(() => null);
+    const recovery = res.status === 409 ? recoveryFromBody(parsed) : null;
+    if (recovery) {
+      setPending(null);
+      openRecovery({ ...recovery, issueId });
+      return true;
+    }
+    throw new Error((parsed as { error?: string } | null)?.error || `Request failed (${res.status})`);
   };
 
   const primary = async () => {
@@ -78,11 +100,11 @@ export function ResumableSessionDialog() {
         toastResumeOutcome(agentId);
       } else if (kind === 'troubled') {
         await postJson(`/api/agents/${encodeURIComponent(agentId)}/untroubled`);
-        await startIssue();
+        if (await startIssue()) return;
         toast.success(issueId ? `${agentId} gate cleared — starting` : `${agentId} gate cleared`);
       } else {
         await postJson(`/api/agents/${encodeURIComponent(agentId)}/unpause`);
-        await startIssue();
+        if (await startIssue()) return;
         toast.success(issueId ? `${agentId} unpaused — starting` : `${agentId} unpaused`);
       }
       closeRecovery();
@@ -94,7 +116,7 @@ export function ResumableSessionDialog() {
     setPending('fresh');
     try {
       await postJson(`/api/agents/${encodeURIComponent(agentId)}/reset-session`);
-      await startIssue();
+      if (await startIssue()) return;
       toast.success(issueId ? `${agentId} reset — fresh session starting` : `${agentId} session memory discarded`);
       closeRecovery();
       await refreshDashboardState(queryClient);
