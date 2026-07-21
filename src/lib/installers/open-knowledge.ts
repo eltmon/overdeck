@@ -19,7 +19,7 @@ const OPEN_KNOWLEDGE_PACKAGE = '@inkeep/open-knowledge';
 const MANUAL_INSTALL_COMMAND = `npm install -g ${OPEN_KNOWLEDGE_PACKAGE}`;
 const DEFAULT_START_RETRY_DELAY_MS = 250;
 const DEFAULT_START_MAX_ATTEMPTS = 40;
-const NVM_INSTALL_COMMAND = 'curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash';
+const NVM_INSTALL_COMMAND = "PROFILE=/dev/null bash -c 'curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash'";
 
 export interface CommandResult {
   stdout: string;
@@ -425,6 +425,7 @@ async function resolveOpenKnowledgeInstallPlan(
     env: options.env,
     homedir: options.homedir,
     listDir: options.listDir,
+    realpath: options.realpath,
     runCommand: options.runCommand,
   });
 
@@ -453,8 +454,8 @@ async function resolveOpenKnowledgeInstallPlan(
   return {
     kind: 'install-nvm',
     steps: [
-      `Install nvm with the official installer: \`${NVM_INSTALL_COMMAND}\`. The installer may update your shell rc files, and this step runs only after your explicit consent.`,
-      'Install Node 24 through nvm without changing its default alias, then pin only the OpenKnowledge viewer to that runtime.',
+      `Install nvm with the official installer while suppressing shell-profile edits: \`${NVM_INSTALL_COMMAND}\`.`,
+      'Install Node 24 inside the setup subprocess, then restore the existing nvm default alias exactly—or remove the alias if none existed—before pinning only the OpenKnowledge viewer to that runtime.',
       `For manual setup instead, install Node 24+ yourself, run \`${MANUAL_INSTALL_COMMAND}\`, and retry.`,
     ],
     manualCommand: MANUAL_INSTALL_COMMAND,
@@ -486,7 +487,7 @@ function resolveShimPath(options: Pick<OpenKnowledgeSetupOptions, 'homedir' | 's
 function managerInstallCommand(manager: NodeVersionManager): string {
   switch (manager) {
     case 'nvm':
-      return 'bash -c \'NVM_ROOT="${NVM_DIR:-$HOME/.nvm}"; [ -f "$NVM_ROOT/nvm.sh" ] || NVM_ROOT="$HOME/.config/nvm"; . "$NVM_ROOT/nvm.sh" && nvm install --no-progress 24\'';
+      return 'bash -c \'NVM_ROOT="${NVM_DIR:-$HOME/.nvm}"; [ -f "$NVM_ROOT/nvm.sh" ] || NVM_ROOT="$HOME/.config/nvm"; . "$NVM_ROOT/nvm.sh"; DEFAULT_ALIAS_PATH="$NVM_ROOT/alias/default"; DEFAULT_ALIAS_BACKUP="$(mktemp)"; HAD_DEFAULT=0; if [ -f "$DEFAULT_ALIAS_PATH" ]; then HAD_DEFAULT=1; cp "$DEFAULT_ALIAS_PATH" "$DEFAULT_ALIAS_BACKUP"; fi; restore_default() { if [ "$HAD_DEFAULT" -eq 1 ]; then mkdir -p "$(dirname "$DEFAULT_ALIAS_PATH")"; cp "$DEFAULT_ALIAS_BACKUP" "$DEFAULT_ALIAS_PATH"; else rm -f "$DEFAULT_ALIAS_PATH"; fi; rm -f "$DEFAULT_ALIAS_BACKUP"; }; trap restore_default EXIT; nvm install --no-progress 24\'';
     case 'fnm':
       return 'fnm install 24';
     case 'volta':
@@ -501,7 +502,7 @@ function managerInstallCommand(manager: NodeVersionManager): string {
 function managerInstallStep(manager: NodeVersionManager, installCommand: string): string {
   const label = manager === 'nvm' ? 'nvm' : manager === 'fnm' ? 'fnm' : manager[0].toUpperCase() + manager.slice(1);
   const defaultDetail = manager === 'nvm'
-    ? 'This shell-local install does not change the nvm default alias or your shell configuration.'
+    ? 'This shell-local install restores the existing default alias exactly, removes any newly created alias when none existed, and does not change your shell configuration.'
     : `This installs a runtime for OpenKnowledge without changing your default Node or shell configuration.`;
   return `Install Node 24 with ${label} by running \`${installCommand}\`. ${defaultDetail}`;
 }

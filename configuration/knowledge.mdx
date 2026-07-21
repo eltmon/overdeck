@@ -47,7 +47,7 @@ When the ambient `node` command is older than version 24, Overdeck resolves a ru
 4. If your version manager has no suitable runtime, show the exact Node.js 24 install command and ask before downloading it.
 5. If no version manager exists, offer an nvm installation or show the manual setup command.
 
-The setup assistant leaves your default Node.js version and shell rc files untouched. The only exception is an nvm installation, whose official installer can update shell rc files; Overdeck shows that step and requires explicit consent before running it.
+The setup assistant leaves your default Node.js version and shell rc files untouched. A fresh nvm bootstrap disables the installer's profile edits, and the Node.js 24 install restores the prior nvm `default` alias exactly—or removes the alias when none existed before setup.
 
 For a managed runtime, Overdeck writes `~/.local/bin/ok` with an `overdeck-managed shim` marker. The shim pins the exact Node.js binary, survives later default-version changes, and is safe to delete; `pan knowledge open` regenerates it when needed. Overdeck never overwrites an unmarked file at that path.
 

@@ -71,6 +71,10 @@ export function createKnowledgeViewerService(
   const entries = new Map<string, ViewerEntry>();
   const starts = new Map<string, Promise<KnowledgeViewerStatus>>();
   let installedCache: EnsureOpenKnowledgeResult | null = null;
+  let missingInstallationCache: {
+    message: string;
+    setupPlan?: KnowledgeViewerStatus['setupPlan'];
+  } | null = null;
 
   async function getStatus(projectKey: string): Promise<KnowledgeViewerStatus> {
     const bundlePath = await resolveBundle(projectKey);
@@ -78,21 +82,25 @@ export function createKnowledgeViewerService(
       return unavailableStatus(projectKey, starts.has(projectKey), 'No OKF bundle is configured. Run `/okf init` first.');
     }
 
-    let installed = true;
-    let installMessage: string | undefined;
-    let setupPlan: KnowledgeViewerStatus['setupPlan'];
-    try {
-      installedCache ??= await ensure({ autoInstall: false });
-    } catch (error) {
-      installed = false;
-      installMessage = errorMessage(error);
+    if (!installedCache && !missingInstallationCache) {
       try {
-        const plan = await resolveSetupPlan();
-        if (plan.kind !== 'ready') setupPlan = { kind: plan.kind, steps: plan.steps };
-      } catch (planError) {
-        installMessage = errorMessage(planError);
+        installedCache = await ensure({ autoInstall: false });
+      } catch (error) {
+        let message = errorMessage(error);
+        let setupPlan: KnowledgeViewerStatus['setupPlan'];
+        try {
+          const plan = await resolveSetupPlan();
+          if (plan.kind !== 'ready') setupPlan = { kind: plan.kind, steps: plan.steps };
+        } catch (planError) {
+          message = errorMessage(planError);
+        }
+        missingInstallationCache = { message, ...(setupPlan ? { setupPlan } : {}) };
       }
     }
+
+    const installed = installedCache !== null;
+    const installMessage = missingInstallationCache?.message;
+    const setupPlan = missingInstallationCache?.setupPlan;
 
     const entry = entries.get(projectKey);
     if (entry && isProcessLive(entry)) {
@@ -149,6 +157,7 @@ export function createKnowledgeViewerService(
       started = await start(status.bundlePath!, { openBrowser: false, okCommand });
     } catch (error) {
       installedCache = null;
+      missingInstallationCache = null;
       throw error;
     }
     const entry: ViewerEntry = {
@@ -201,6 +210,7 @@ export function createKnowledgeViewerService(
 
   function invalidateInstallationCache(): void {
     installedCache = null;
+    missingInstallationCache = null;
   }
 
   async function stopAll(): Promise<void> {

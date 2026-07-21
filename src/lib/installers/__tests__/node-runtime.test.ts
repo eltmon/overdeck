@@ -141,23 +141,27 @@ describe('resolveNode24Runtime', () => {
     expect(runCommand).not.toHaveBeenCalled();
   });
 
-  it('uses a valid explicit override without scanning version managers', async () => {
+  it('resolves a valid absolute override to a stable path without scanning version managers', async () => {
     const override = '/opt/node-v24/bin/node';
+    const canonicalPath = '/runtimes/node-v24.17.0/bin/node';
     const listDir = vi.fn(async () => {
       throw new Error('manager scan should not run');
     });
+    const realpath = vi.fn(async () => canonicalPath);
     const runCommand = vi.fn(async () => success('v24.17.0\n'));
 
     const result = await resolveNode24Runtime({
       env: { OVERDECK_OPEN_KNOWLEDGE_NODE: override },
       homedir: () => home,
       listDir,
+      realpath,
       runCommand,
     });
 
-    expect(result).toEqual({ kind: 'runtime', nodePath: override, source: 'override' });
+    expect(result).toEqual({ kind: 'runtime', nodePath: canonicalPath, source: 'override' });
+    expect(realpath).toHaveBeenCalledWith(override);
     expect(runCommand).toHaveBeenCalledOnce();
-    expect(runCommand).toHaveBeenCalledWith(override, ['--version']);
+    expect(runCommand).toHaveBeenCalledWith(canonicalPath, ['--version']);
     expect(listDir).not.toHaveBeenCalled();
   });
 
@@ -169,8 +173,24 @@ describe('resolveNode24Runtime', () => {
       env: { OVERDECK_OPEN_KNOWLEDGE_NODE: override },
       homedir: () => home,
       listDir: fakeListDir({}),
+      realpath: async (path) => path,
       runCommand,
     })).rejects.toThrow('OVERDECK_OPEN_KNOWLEDGE_NODE');
+  });
+
+  it('rejects a relative override before executing it', async () => {
+    const runCommand = vi.fn(async () => success('v24.17.0\n'));
+    const realpath = vi.fn(async (path: string) => path);
+
+    await expect(resolveNode24Runtime({
+      env: { OVERDECK_OPEN_KNOWLEDGE_NODE: 'node' },
+      homedir: () => home,
+      listDir: fakeListDir({}),
+      realpath,
+      runCommand,
+    })).rejects.toThrow(/OVERDECK_OPEN_KNOWLEDGE_NODE.*absolute/);
+    expect(realpath).not.toHaveBeenCalled();
+    expect(runCommand).not.toHaveBeenCalled();
   });
 
   it('selects the highest version from path segments and validates only that binary', async () => {
@@ -187,6 +207,27 @@ describe('resolveNode24Runtime', () => {
     expect(result).toEqual({ kind: 'runtime', nodePath: selectedPath, source: 'nvm' });
     expect(runCommand).toHaveBeenCalledOnce();
     expect(runCommand).toHaveBeenCalledWith(selectedPath, ['--version']);
+  });
+
+  it('falls back to the next-highest working runtime when a newer installation is stale', async () => {
+    const root = join(home, '.nvm');
+    const stalePath = join(root, 'versions', 'node', 'v25.1.0', 'bin', 'node');
+    const workingPath = join(root, 'versions', 'node', 'v24.17.0', 'bin', 'node');
+    const runCommand = vi.fn(async (command: string) => {
+      if (command === stalePath) throw new Error('broken executable');
+      return success('v24.17.0\n');
+    });
+
+    const result = await resolveNode24Runtime({
+      env: {},
+      homedir: () => home,
+      listDir: fakeListDir(nvmTree(root, ['v24.17.0', 'v25.1.0'])),
+      runCommand,
+    });
+
+    expect(result).toEqual({ kind: 'runtime', nodePath: workingPath, source: 'nvm' });
+    expect(runCommand).toHaveBeenNthCalledWith(1, stalePath, ['--version']);
+    expect(runCommand).toHaveBeenNthCalledWith(2, workingPath, ['--version']);
   });
 });
 

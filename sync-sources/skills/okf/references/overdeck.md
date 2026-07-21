@@ -13,9 +13,9 @@ Detection is by command execution, never by Python or TypeScript imports.
 
 ## OpenKnowledge Viewer Runtime
 
-`pan knowledge open` and the dashboard Knowledge page use an assisted Node.js 24 resolution flow for the OpenKnowledge viewer. Overdeck first reuses a working `ok`, then checks `OVERDECK_OPEN_KNOWLEDGE_NODE`, then searches installed runtimes under nvm, fnm, Volta, mise, and asdf. If a download is required, the operator sees the exact setup steps and must consent before they run; the ambient/default Node.js version remains unchanged.
+`pan knowledge open` and the dashboard Knowledge page use an assisted Node.js 24 resolution flow for the OpenKnowledge viewer. Overdeck first reuses a working `ok`, then checks `OVERDECK_OPEN_KNOWLEDGE_NODE`, then searches installed runtimes under nvm, fnm, Volta, mise, and asdf. If a download is required, the operator sees the exact setup steps and must consent before they run; shell profiles and the ambient/default Node.js version remain unchanged. A fresh nvm bootstrap suppresses profile edits and restores or removes the `default` alias to match its pre-setup state.
 
-Set `OVERDECK_OPEN_KNOWLEDGE_NODE=/absolute/path/to/node` to pin the viewer to a specific Node.js 24+ binary. The override affects only the separate `ok` subprocess.
+Set `OVERDECK_OPEN_KNOWLEDGE_NODE=/absolute/path/to/node` to pin the viewer to a specific Node.js 24+ binary. Overdeck rejects relative overrides and resolves the absolute path before writing the shim, so the override affects only the separate `ok` subprocess and cannot drift with `PATH`.
 
 ## Optional OpenKnowledge MCP Registration
 

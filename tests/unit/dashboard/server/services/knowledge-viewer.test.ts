@@ -92,6 +92,11 @@ describe('knowledge viewer service', () => {
       ensure: async () => {
         throw new Error('install with npm install -g @inkeep/open-knowledge');
       },
+      resolveSetupPlan: async () => ({
+        kind: 'install-nvm',
+        steps: ['Install nvm without changing shell configuration.'],
+        manualCommand: 'npm install -g @inkeep/open-knowledge',
+      }),
     });
 
     await expect(noBundle.getOrStartViewer('overdeck')).resolves.toMatchObject({
@@ -191,6 +196,33 @@ describe('knowledge viewer service', () => {
     service.invalidateInstallationCache();
     await service.getStatus('overdeck');
     expect(ensure).toHaveBeenCalledTimes(2);
+  });
+
+  it('caches a missing binary and its setup plan until explicitly invalidated', async () => {
+    const ensure = vi.fn(async () => {
+      throw new Error('open-knowledge is not installed');
+    });
+    const resolveSetupPlan = vi.fn(async () => ({
+      kind: 'install-node-via-manager' as const,
+      manager: 'volta' as const,
+      installCommand: 'volta fetch node@24',
+      steps: ['Install Node 24 with Volta without changing your default Node.'],
+    }));
+    const service = createKnowledgeViewerService({
+      resolveBundle: async () => '/repo/knowledge',
+      ensure,
+      resolveSetupPlan,
+    });
+
+    await service.getStatus('overdeck');
+    await service.getStatus('overdeck');
+    expect(ensure).toHaveBeenCalledOnce();
+    expect(resolveSetupPlan).toHaveBeenCalledOnce();
+
+    service.invalidateInstallationCache();
+    await service.getStatus('overdeck');
+    expect(ensure).toHaveBeenCalledTimes(2);
+    expect(resolveSetupPlan).toHaveBeenCalledTimes(2);
   });
 
   it('reports framing headers as an embed-blocked status', async () => {

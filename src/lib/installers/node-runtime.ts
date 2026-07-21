@@ -1,6 +1,6 @@
-import { chmod, mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, readFile, readdir, realpath as fsRealpath, writeFile } from 'node:fs/promises';
 import { homedir as osHomedir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { dirname, isAbsolute, join } from 'node:path';
 
 const MINIMUM_NODE_MAJOR = 24;
 const OPEN_KNOWLEDGE_NODE_ENV = 'OVERDECK_OPEN_KNOWLEDGE_NODE';
@@ -29,6 +29,7 @@ export interface ResolveNode24RuntimeOptions {
   env?: NodeJS.ProcessEnv;
   homedir?: () => string;
   listDir?: NodeRuntimeListDir;
+  realpath?: (path: string) => Promise<string>;
   runCommand: NodeRuntimeCommandRunner;
 }
 
@@ -114,8 +115,10 @@ export async function resolveNode24Runtime(
 
   if (override) {
     try {
-      await validateNode24(override, options.runCommand);
-      return { kind: 'runtime', nodePath: override, source: 'override' };
+      if (!isAbsolute(override)) throw new Error('the path must be absolute');
+      const nodePath = await (options.realpath ?? fsRealpath)(override);
+      await validateNode24(nodePath, options.runCommand);
+      return { kind: 'runtime', nodePath, source: 'override' };
     } catch (error) {
       throw new Error(`${OPEN_KNOWLEDGE_NODE_ENV} points to an invalid Node 24+ binary at ${override}: ${errorMessage(error)}`);
     }
@@ -127,18 +130,20 @@ export async function resolveNode24Runtime(
   const candidates = (
     await Promise.all(detectedManagers.map((manager) => listRuntimeCandidates(manager, listDir)))
   ).flat();
-  const selected = candidates.reduce<RuntimeCandidate | null>((highest, candidate) => {
-    if (candidate.version.major < MINIMUM_NODE_MAJOR) return highest;
-    if (!highest || compareVersions(candidate.version, highest.version) > 0) return candidate;
-    return highest;
-  }, null);
+  const eligibleCandidates = candidates
+    .filter((candidate) => candidate.version.major >= MINIMUM_NODE_MAJOR)
+    .sort((left, right) => compareVersions(right.version, left.version));
 
-  if (!selected) {
-    return { kind: 'manager-without-24', manager: detectedManagers[0].definition.name };
+  for (const candidate of eligibleCandidates) {
+    try {
+      await validateNode24(candidate.nodePath, options.runCommand);
+      return { kind: 'runtime', nodePath: candidate.nodePath, source: candidate.manager };
+    } catch {
+      // A partially removed runtime must not hide the next-highest working installation.
+    }
   }
 
-  await validateNode24(selected.nodePath, options.runCommand);
-  return { kind: 'runtime', nodePath: selected.nodePath, source: selected.manager };
+  return { kind: 'manager-without-24', manager: detectedManagers[0].definition.name };
 }
 
 export async function readShimOwnership(shimPath: string): Promise<OkShimOwnership> {

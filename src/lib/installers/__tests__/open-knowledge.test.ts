@@ -1,5 +1,5 @@
+import { execFile, type ChildProcess } from 'node:child_process';
 import { EventEmitter } from 'node:events';
-import type { ChildProcess } from 'node:child_process';
 import { access, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -11,6 +11,7 @@ import {
   OpenKnowledgeError,
   OpenKnowledgeSetupRequiredError,
   prepareOpenKnowledgeSnapshot,
+  resolveOpenKnowledgeSetupPlan,
   startOpenKnowledgeServer,
   type CommandResult,
   type OpenKnowledgeSetupPlan,
@@ -211,6 +212,103 @@ describe('executeOpenKnowledgeSetupPlan', () => {
     expect(runCommand).toHaveBeenCalledWith('bash', ['-c', 'volta fetch node@24']);
     expect(resolveRuntime).toHaveBeenCalledOnce();
     expect(writeShim).toHaveBeenCalledOnce();
+  });
+
+  it('installs nvm without profile edits and restores the pre-existing default alias after Node installation', async () => {
+    const plan = await resolveOpenKnowledgeSetupPlan({
+      homedir: () => '/home/tester',
+      runCommand: vi.fn(async () => { throw new Error('missing'); }),
+      resolveRuntime: vi.fn(async () => ({ kind: 'none' as const })),
+    });
+    expect(plan).toMatchObject({ kind: 'install-nvm' });
+    if (plan.kind !== 'install-nvm') throw new Error('expected install-nvm plan');
+    expect(plan.steps.join(' ')).toContain('PROFILE=/dev/null');
+
+    const nodePath = '/home/tester/.nvm/versions/node/v24.17.0/bin/node';
+    const runCommand = vi.fn(async () => success());
+    const resolveRuntime = vi.fn()
+      .mockResolvedValueOnce({ kind: 'manager-without-24', manager: 'nvm' })
+      .mockResolvedValueOnce({ kind: 'runtime', nodePath, source: 'nvm' });
+
+    await executeOpenKnowledgeSetupPlan(plan, {
+      env: { PATH: '/usr/bin' },
+      homedir: () => '/home/tester',
+      runCommand,
+      resolveRuntime,
+      realpath: async () => '/home/tester/.nvm/versions/node/v24.17.0/bin/ok-target',
+      writeShim: async () => '/home/tester/.local/bin/ok',
+    });
+
+    const setupCommands = runCommand.mock.calls
+      .filter(([command]) => command === 'bash')
+      .map(([, args]) => args[1]);
+    expect(setupCommands[0]).toContain('PROFILE=/dev/null');
+    expect(setupCommands[1]).toContain('DEFAULT_ALIAS_PATH="$NVM_ROOT/alias/default"');
+    expect(setupCommands[1]).toContain('cp "$DEFAULT_ALIAS_PATH" "$DEFAULT_ALIAS_BACKUP"');
+    expect(setupCommands[1]).toContain('trap restore_default EXIT');
+    expect(setupCommands[1]).toContain('rm -f "$DEFAULT_ALIAS_PATH"');
+  });
+
+  it.each([
+    { name: 'restores an existing default alias byte-for-byte', initialAlias: 'lts/hydrogen\n' },
+    { name: 'removes the default alias when none existed', initialAlias: null },
+  ])('$name', async ({ initialAlias }) => {
+    vi.useRealTimers();
+    const root = await mkdtemp(join(tmpdir(), 'overdeck-fake-nvm-'));
+    const aliasPath = join(root, 'alias', 'default');
+    try {
+      await writeFile(join(root, 'nvm.sh'), [
+        'nvm() {',
+        '  if [ "$1" = "install" ]; then',
+        '    mkdir -p "$NVM_ROOT/alias"',
+        '    printf "24\\n" > "$NVM_ROOT/alias/default"',
+        '  fi',
+        '}',
+        '',
+      ].join('\n'));
+      if (initialAlias !== null) {
+        await mkdir(join(root, 'alias'), { recursive: true });
+        await writeFile(aliasPath, initialAlias);
+      }
+
+      const plan = await resolveOpenKnowledgeSetupPlan({
+        env: { NVM_DIR: root },
+        homedir: () => '/home/tester',
+        runCommand: vi.fn(async () => { throw new Error('missing'); }),
+        resolveRuntime: vi.fn(async () => ({ kind: 'manager-without-24' as const, manager: 'nvm' as const })),
+      });
+      if (plan.kind !== 'install-node-via-manager') throw new Error('expected nvm manager plan');
+
+      const nodePath = join(root, 'versions', 'node', 'v24.17.0', 'bin', 'node');
+      const runCommand = vi.fn(async (command: string, args: string[]) => {
+        if (command === 'bash') {
+          await new Promise<void>((resolve, reject) => {
+            execFile('bash', args, { env: { ...process.env, HOME: '/home/tester', NVM_DIR: root } }, (error) => {
+              if (error) reject(error);
+              else resolve();
+            });
+          });
+        }
+        return success();
+      });
+
+      await executeOpenKnowledgeSetupPlan(plan, {
+        env: { PATH: '/usr/bin', NVM_DIR: root },
+        homedir: () => '/home/tester',
+        runCommand,
+        resolveRuntime: vi.fn(async () => ({ kind: 'runtime' as const, nodePath, source: 'nvm' as const })),
+        realpath: async () => join(root, 'bin', 'ok-target'),
+        writeShim: async () => '/home/tester/.local/bin/ok',
+      });
+
+      if (initialAlias === null) {
+        await expect(access(aliasPath)).rejects.toThrow();
+      } else {
+        expect(await readFile(aliasPath, 'utf8')).toBe(initialAlias);
+      }
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
   });
 });
 
