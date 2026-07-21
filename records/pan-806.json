@@ -85,7 +85,7 @@
   ],
   "feedback": [],
   "created": "2026-07-21T16:29:59.439Z",
-  "updated": "2026-07-21T16:42:21.735Z",
+  "updated": "2026-07-21T16:43:55.369Z",
   "pipeline": {
     "issueId": "PAN-806",
     "reviewStatus": "pending",
@@ -173,16 +173,8 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "workmd-prompt-fix": {
-        "writerId": "agent-pan-806",
-        "agentId": "agent-pan-806",
-        "pid": 3197948,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-21T16:42:21.735Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-806",
@@ -194,12 +186,27 @@
         "outcome": "completed",
         "reason": "Added OVERDECK_PAN_GIT_OP=1 to pan-owned rebase, abort, merge fallback, and continue calls with mocked execAsync coverage",
         "releasedAt": "2026-07-21T16:36:02.287Z"
+      },
+      {
+        "writerId": "agent-pan-806",
+        "agentId": "agent-pan-806",
+        "pid": 3197948,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-21T16:42:21.735Z",
+        "itemId": "workmd-prompt-fix",
+        "outcome": "completed",
+        "reason": "Replaced raw restart rebase instructions with pan sync-main and added tested permitted/forbidden git operations table",
+        "releasedAt": "2026-07-21T16:43:55.369Z"
       }
     ],
     "statusReasons": {
       "rebase-helper-sentinel": {
         "reason": "Added OVERDECK_PAN_GIT_OP=1 to pan-owned rebase, abort, merge fallback, and continue calls with mocked execAsync coverage",
         "updatedAt": "2026-07-21T16:36:02.287Z"
+      },
+      "workmd-prompt-fix": {
+        "reason": "Replaced raw restart rebase instructions with pan sync-main and added tested permitted/forbidden git operations table",
+        "updatedAt": "2026-07-21T16:43:55.369Z"
       }
     }
   },
@@ -207,6 +214,8 @@
     "rebase-helper-sentinel": "completed",
     "rebase-helper-sentinel.rebase-helper-sentinel.ac1": "completed",
     "rebase-helper-sentinel.rebase-helper-sentinel.ac2": "completed",
-    "workmd-prompt-fix": "running"
+    "workmd-prompt-fix": "completed",
+    "workmd-prompt-fix.workmd-prompt-fix.ac1": "completed",
+    "workmd-prompt-fix.workmd-prompt-fix.ac2": "completed"
   }
 }
