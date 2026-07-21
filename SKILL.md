@@ -1,6 +1,6 @@
 ---
 name: okf
-description: Maintain a project knowledge wiki in Open Knowledge Format with /okf init, author, convert, sync, study, retro, extract, validate, lint, and embed.
+description: Maintain a project knowledge wiki in Open Knowledge Format with /okf init, open, author, convert, sync, study, retro, extract, validate, lint, and embed.
 triggers:
   - /okf
   - okf
@@ -26,6 +26,7 @@ The bundle is the source of truth. Keep changes small, cited, and PR-gated. Dete
 | Command | Purpose | Primary references |
 | --- | --- | --- |
 | `/okf init` | Create or connect a project knowledge bundle. | `references/workflow.md`, `references/spec.md` |
+| `/okf open [--no-install] [--no-browser]` | Open the configured bundle in the local visual knowledge viewer. | `references/overdeck.md` |
 | `/okf author "<topic>"` | Write or refresh one focused concept. | `templates/concept.md`, `references/taxonomy.md`, `references/model-bridges.md` |
 | `/okf convert <path>` | Convert existing docs into OKF concepts without deleting originals. | `references/conversion.md` |
 | `/okf sync [--topic "<focus>"]` | Update concepts from code or documentation changes. | `references/workflow.md`, `references/model-bridges.md` |
@@ -79,6 +80,16 @@ Create a knowledge bundle and pointer file.
 - Write `.okf.yml` at the code repo root with `bundle: ../<project>-knowledge` and `remote: <created remote>`; for `--local`, point `bundle:` at the local subdirectory and omit companion repo creation.
 - Add exactly one discovery line to `CLAUDE.md` or `AGENTS.md`, preserving it without duplication on repeated init.
 - Future resolution order is host project config `knowledge_repo`, then `.okf.yml`, then a clear error telling the user to run `/okf init`.
+
+## `/okf open [--no-install] [--no-browser]`
+
+Open the configured bundle in the local visual knowledge viewer.
+
+- Resolve the bundle from `.okf.yml`; under Overdeck, the canonical resolver also honors the project's `knowledge_repo` setting.
+- When `pan` is available, delegate to `pan knowledge open` and pass through `--no-install` and `--no-browser`.
+- By default, an explicit open request progressively installs the separately licensed GPL-3.0 `@inkeep/open-knowledge` program. `--no-install` requires an existing `ok` binary instead.
+- The viewer is an arm's-length subprocess served over HTTP. Overdeck launches it against a disposable snapshot, reuses healthy lock-reported processes, and never lets viewer edits touch the canonical PR-gated bundle.
+- Never import, require, or bundle `@inkeep/open-knowledge` into the portable OKF scripts or Overdeck packages.
 
 ## `/okf author "<topic>"`
 
