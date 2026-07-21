@@ -101,7 +101,7 @@
     "recordedAt": "2026-07-21T23:54:05.124Z"
   },
   "created": "2026-07-21T22:47:36.935Z",
-  "updated": "2026-07-21T23:54:05.970Z",
+  "updated": "2026-07-21T23:54:10.222Z",
   "pipeline": {
     "issueId": "PAN-2993",
     "reviewStatus": "pending",
@@ -111,7 +111,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-21T23:54:05.969Z",
+    "updatedAt": "2026-07-21T23:54:10.163Z",
     "reviewNotes": "Review dispatch skipped — already running: agent-pan-2993-review",
     "inspectNotes": "All 4 ACs verified against src/lib/agents/messaging.ts@79bb7b47: stopped-agent resume failure returns {delivered:false,queuedToMail:true,reason} naming both resumeResult.error and PAN-1980 session-rotation disable; paused/gated path returns gate reason; live-session/successful-resume paths return delivered:true; only deacon-strike-landing.ts touched among callers and npm run typecheck passes clean (0 new errors).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2998",
@@ -182,9 +182,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 1350769,
-            "output": 115145,
-            "cacheRead": 22509568,
+            "input": 1719902,
+            "output": 117400,
+            "cacheRead": 23945216,
             "cacheWrite": 0
           }
         },
@@ -198,9 +198,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 2504504,
-            "output": 133464,
-            "cacheRead": 78671872,
+            "input": 2506042,
+            "output": 133946,
+            "cacheRead": 79217664,
             "cacheWrite": 0
           }
         }
@@ -213,9 +213,9 @@
           "cacheWrite": 311785
         },
         "openai/gpt-5.6-sol": {
-          "input": 3855273,
-          "output": 248609,
-          "cacheRead": 101181440,
+          "input": 4225944,
+          "output": 251346,
+          "cacheRead": 103162880,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -226,8 +226,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 88.439134,
-        "pricingAsOf": "2026-07-21T23:53:41.692Z"
+        "usd": 91.365319,
+        "pricingAsOf": "2026-07-21T23:54:10.217Z"
       }
     },
     "merges": [
