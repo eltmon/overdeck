@@ -71,18 +71,19 @@ describe('conformance gate: single shell (C-DETAIL §3.9)', () => {
     ]);
   });
 
-  it('IssueDetailShell is only composed by IssueDetail and the cockpit', () => {
+  it('IssueDetailShell is only composed by IssueDetail itself', () => {
+    // Every surface reaches the shell through the ONE component (#2962).
     expect(importersOf(/IssueDetailShell/)).toEqual([
-      'components/Stage/cockpit/IssueMissionControl.tsx',
       'components/issue-detail/IssueDetail.tsx',
     ]);
   });
 
   it('only the sanctioned shells host IssueDetail', () => {
-    // The frame (drawer), the deck tree (rail density, #2962 decision A).
-    // The cockpit route joins this list at page density (#2962 decision 2).
+    // The frame (drawer), the deck tree (rail density, #2962 decision A),
+    // and the cockpit route (page density, #2962 decision 2).
     expect(importersOf(/issue-detail\/IssueDetail/)).toEqual([
       'components/CommandDeck/ProjectTree/FeatureItem.tsx',
+      'components/Stage/cockpit/IssueMissionControl.tsx',
       'components/drawer/IssueDrawer.tsx',
     ]);
   });

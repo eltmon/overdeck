@@ -1,29 +1,24 @@
 import { useCallback, useMemo, useState, type ReactNode } from 'react'
 import { ActivityTab } from '../../CommandDeck/ZoneCOverviewTabs/ActivityTab'
 import { ShipTab } from './ShipTab'
-import { TasksTab } from '../../CommandDeck/ZoneCOverviewTabs/TasksTab'
 import { CostsTab } from '../../CommandDeck/ZoneCOverviewTabs/CostsTab'
 import { DiscussionsTab } from '../../CommandDeck/ZoneCOverviewTabs/DiscussionsTab'
-import { MarkdownTab } from '../../CommandDeck/ZoneCOverviewTabs/MarkdownTab'
 import { statusColor } from '../../CommandDeck/ZoneCOverviewTabs/PrDiffTab'
-import { XBriefTab } from '../../CommandDeck/ZoneCOverviewTabs/XBriefTab'
 import {
   useActivityQuery,
   useIssueCheckRunsQuery,
   useIssueCostsQuery,
-  usePlanningQuery,
   usePrQuery,
   useReviewStatusQuery,
   type IssueCheckRun,
   type ReviewStatusData,
 } from '../../CommandDeck/ZoneCOverviewTabs/queries'
-import DrawerArtifactsPanel from '../../drawer/DrawerArtifactsPanel'
 import { IssueActionMenu } from '../../IssueActionMenu/IssueActionMenu'
 import { useIssueActions } from '../../IssueActionMenu/useIssueActions'
 import { selectAgents, selectReviewStatus, useDashboardStore } from '../../../lib/store'
 import { derivePipelineState, type PipelineState } from '../../../lib/issuePipelineState'
 import { currentPhase, phaseLabel } from '../../../lib/simple/phases'
-import { IssueDetailShell } from '../../issue-detail/IssueDetailShell'
+import { IssueDetail } from '../../issue-detail/IssueDetail'
 import { IssueView } from '../../issue-view/IssueView'
 import { SessionPanel } from '../../CommandDeck/SessionView/SessionPanel'
 import { MissionConversationTab } from './MissionConversationTab'
@@ -61,37 +56,37 @@ export interface IssueMissionControlProps {
 }
 
 type MissionTab =
-  | 'overview'
-  | 'code'        // PAN-1991 #6: PR + CI checks + diff/changed-files
-  | 'plan'
-  | 'timeline'    // PAN-1991 #6: Activity + History merged
-  | 'discussion'
-  | 'costs'
-  | 'artifacts'
-  | 'ship'         // PAN-2487: Ship & Merge view — live merge-door progress + log
-  | 'files'        // tool — #10
-  | 'terminal'     // tool — #10
-  | 'beads'        // not a visible tab; reachable from the rail's "open full"
+  // PRD binding tab set — rendered by the ONE IssueDetail at page density.
+  | 'conversation' | 'plan' | 'tasks' | 'terminal' | 'activity' | 'files' | 'artifacts'
+  // Cockpit's own overview (richer than the drawer's) and the appended
+  // cockpit-only tabs (operator decision, #2962).
+  | 'overview' | 'code' | 'timeline' | 'discussion' | 'costs' | 'ship';
 
-type PipelinePhaseKey = 'plan' | 'work' | 'review' | 'test' | 'ci' | 'ship' | 'merge'
+/** Tabs whose bodies come from the ONE IssueDetail component. */
+const ISSUE_DETAIL_TAB_IDS = new Set<MissionTab>(['conversation', 'plan', 'tasks', 'terminal', 'activity', 'files', 'artifacts']);
+
+// PAN-2908 C-DETAIL (operator decision, #2962): the cockpit route renders the
+// one IssueDetail at page density for the binding set; the cockpit's own
+// overview plus its unique tabs append after. Conversation is the default.
+const TABS: Array<{ id: MissionTab; label: string }> = [
+  { id: 'conversation', label: 'Conversation' },
+  { id: 'overview', label: 'Overview' },
+  { id: 'plan', label: 'Plan map' },
+  { id: 'tasks', label: 'Tasks' },
+  { id: 'terminal', label: 'Terminal' },
+  { id: 'activity', label: 'Activity' },
+  { id: 'files', label: 'Files' },
+  { id: 'artifacts', label: 'Artifacts' },
+  { id: 'code', label: 'Code' },
+  { id: 'timeline', label: 'Timeline' },
+  { id: 'discussion', label: 'Discussion' },
+  { id: 'costs', label: 'Costs' },
+  { id: 'ship', label: 'Ship' },
+]
 
 type IssueTreeContext = 'issue'
 
 const SPINE_COLLAPSED_KEY = 'overdeck.cockpit.spineCollapsed'
-
-// PAN-2398: status lives in StatusNarrative; beads = rail; tools = panes.
-const TABS: Array<{ id: MissionTab; label: string }> = [
-  { id: 'overview', label: 'Overview' },
-  { id: 'code', label: 'Code' },
-  { id: 'plan', label: 'PRD / Plan' },
-  { id: 'timeline', label: 'Timeline' },
-  { id: 'discussion', label: 'Discussion' },
-  { id: 'costs', label: 'Costs' },
-  { id: 'artifacts', label: 'Artifacts' },
-  { id: 'ship', label: 'Ship' },
-  { id: 'files', label: 'Files' },
-  { id: 'terminal', label: 'Terminal' },
-]
 
 // Explicit, literal Tailwind classes — interpolated utilities get purged.
 // PAN-1991 #4: active = blue (a machine is working), not purple (purple is
@@ -303,32 +298,6 @@ function GitHubCiPanel({ issueId }: { issueId: string }) {
   )
 }
 
-function MarkdownMissionTab({ issueId, field }: { issueId: string; field: 'prd' | 'state' }) {
-  const planning = usePlanningQuery(issueId, { enabled: true })
-  return <MarkdownTab body={planning.data?.[field]} isLoading={planning.isLoading} emptyLabel={`No ${field.toUpperCase()} document.`} />
-}
-
-function PlanMissionTab({ issueId }: { issueId: string }) {
-  return (
-    <div className="grid gap-3 xl:grid-cols-2">
-      <CockpitCard tone="info" title="xBRIEF"><XBriefTab issueId={issueId} /></CockpitCard>
-      <CockpitCard tone="muted" title="PRD draft"><MarkdownMissionTab issueId={issueId} field="prd" /></CockpitCard>
-      <CockpitCard tone="muted" title="STATE"><MarkdownMissionTab issueId={issueId} field="state" /></CockpitCard>
-    </div>
-  )
-}
-
-function OpenPaneCard({ title, description, action, onOpen }: { title: string; description: string; action: string; onOpen: () => void }) {
-  return (
-    <CockpitCard tone="muted" title={title}>
-      <p className="text-[12px] text-muted-foreground">{description}</p>
-      <button type="button" className="mt-3 rounded-[var(--radius-sm)] border border-border px-3 py-2 text-[12px] font-semibold hover:bg-accent" onClick={onOpen}>
-        {action}
-      </button>
-    </CockpitCard>
-  )
-}
-
 const NOW_LABEL: Record<string, string> = {
   work: 'Work', strike: 'Strike', review: 'Review', reviewer: 'Reviewer',
   test: 'Test', ship: 'Ship', merge: 'Ship', planning: 'Plan', legacy: 'Plan',
@@ -440,14 +409,18 @@ function tabBadge(tab: MissionTab, checks: ReturnType<typeof useIssueCheckRunsQu
   return null
 }
 
-export function IssueMissionControl({ issueId, title, branch, projectName, launcher, agentDock, actionDock, timeline, onOpenPane }: IssueMissionControlProps) {
-  const [activeTab, setActiveTab] = useState<MissionTab | null>('overview')
+export function IssueMissionControl({ issueId, title, branch, projectName, launcher, agentDock, actionDock, timeline }: IssueMissionControlProps) {
+  // PAN-2908 C-DETAIL (operator decision, #2962): Conversation is the default
+  // tab — same conversation-first law as the drawer.
+  const [activeTab, setActiveTab] = useState<MissionTab | null>('conversation')
   const [treeContext, setTreeContext] = useState<IssueTreeContext | null>(null)
   const [selectedTreeSession, setSelectedTreeSession] = useState<SessionNode | null>(null)
   const [treeSessions, setTreeSessions] = useState<readonly SessionNode[]>([])
   const [tasksDrawerOpen, setTasksDrawerOpen] = useState(false)
+  // Operator decision (#2962): the session-tree lane starts collapsed behind a
+  // toggle (persisted preference honored).
   const [spineCollapsed, setSpineCollapsed] = useState(
-    () => typeof window !== 'undefined' && window.localStorage.getItem(SPINE_COLLAPSED_KEY) === 'true',
+    () => typeof window !== 'undefined' && window.localStorage.getItem(SPINE_COLLAPSED_KEY) !== 'false',
   )
   const tasksQuery = useTasksQuery(issueId)
   const tasksRollup = taskStatusRollup(tasksQuery.data?.tasks ?? [])
@@ -467,12 +440,6 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
     () => allAgents.filter((a) => a.issueId?.toLowerCase() === issueId.toLowerCase()),
     [allAgents, issueId],
   )
-  const openAgentConversationById = (agentId: string) => {
-    const session = treeSessions.find((s) => s.sessionId === agentId)
-    if (session) { selectSessionFromTree(session); return }
-    const agent = issueAgents.find((a) => a.id === agentId)
-    if (agent?.role) handlePhaseClick(agent.role as PipelinePhaseKey)
-  }
   // PAN-2908 C-VOCAB/one-data-model: the header pill runs on the shared
   // pipeline machine (WS snapshot first, HTTP detail as warmup fallback) —
   // no bespoke phase re-derivation on this surface.
@@ -528,14 +495,6 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
     if (session) { selectSessionFromTree(session); return true }
     return false
   }
-  const handlePhaseClick = (phase: PipelinePhaseKey) => {
-    if (phase === 'work') { if (!openAgentByType('work')) selectTab('overview'); return }
-    if (phase === 'review') { if (!openAgentByType('review')) selectTab('overview'); return }
-    if (phase === 'test') { if (!openAgentByType('test')) selectTab('overview'); return }
-    if (phase === 'plan') { selectTab('plan'); return }
-    if (phase === 'ci') { selectTab('code'); return }
-    selectTab('ship') // PAN-2487: ship / merge phases open the Ship & Merge view
-  }
   const recordTreeSessions = useCallback((sessions: readonly SessionNode[]) => {
     setTreeSessions(sessions)
     setSelectedTreeSession((current) => {
@@ -587,20 +546,8 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
             cost={cost > 0 ? `$${cost.toFixed(2)}` : undefined}
           />
         </div>
-        {/* PAN-2908 C-DETAIL: the ONE issue-detail anatomy — same rail +
-            specialist strip as the drawer, one component to fix (journey
-            strip and bespoke strip mounts deleted). */}
-        <div data-section="Pipeline Band" className="mt-3">
-          <IssueDetailShell
-            issueId={issueId}
-            agents={issueAgents}
-            reviewStatus={reviewSnapshot}
-            reviewerSessions={treeSessions.filter((s) => s.type === 'reviewer')}
-            activeAgentId={selectedTreeSession?.sessionId ?? null}
-            onOpenAgentConversation={openAgentConversationById}
-            onSelectPhase={(railPhase) => handlePhaseClick(railPhase === 'done' ? 'ship' : railPhase)}
-          />
-        </div>
+        {/* PAN-2908 C-DETAIL: the pipeline band lives inside IssueDetail now —
+            the cockpit route renders the ONE component, no duplicate shell. */}
       </header>
 
       <nav data-section="Detail Tabs" className="flex flex-nowrap gap-1 overflow-x-auto border-b border-border bg-card px-3 pt-2" aria-label="Issue cockpit tabs">
@@ -671,6 +618,22 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
                 onOpenAgent={openAgentByType}
               /></div>
             )}
+            {/* PAN-2908 C-DETAIL (operator decision, #2962): the binding tabs
+                are the ONE IssueDetail at page density — the cockpit nav drives
+                its tab, the shell inside it drives its conversations. */}
+            {ISSUE_DETAIL_TAB_IDS.has(activeTab as MissionTab) && (
+              <div data-section="IssueDetail page body" className="h-[calc(100vh-340px)] min-h-[520px]">
+                <IssueDetail
+                  issueId={issueId}
+                  density="page"
+                  showTabs={false}
+                  tab={activeTab as MissionTab}
+                  onSelectTab={(tab) => selectTab(tab as MissionTab)}
+                  agents={issueAgents}
+                  reviewStatus={reviewSnapshot}
+                />
+              </div>
+            )}
             {activeTab === 'overview' && <div data-section="Awareness rail"><OverviewTab issueId={issueId} onTab={selectTab} onOpenAgent={openAgentByType} sessions={treeSessions} onSelectSession={selectSessionFromTree} /></div>}
             {activeTab === 'code' && (
               <div data-section="Code tab" className="space-y-3.5">
@@ -678,7 +641,6 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
                 <ChangedFilesView issueId={issueId} />
               </div>
             )}
-            {activeTab === 'plan' && <div data-section="PRD / Timeline / Discussion tabs"><PlanMissionTab issueId={issueId} /></div>}
             {activeTab === 'timeline' && (
               <div data-section="PRD / Timeline / Discussion tabs" className="space-y-4">
                 <div>
@@ -693,11 +655,7 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
             )}
             {activeTab === 'discussion' && <div data-section="PRD / Timeline / Discussion tabs"><DiscussionsTab issueId={issueId} /></div>}
             {activeTab === 'costs' && <div data-section="Costs / Artifacts / Ship tabs"><CostsTab issueId={issueId} /></div>}
-            {activeTab === 'artifacts' && <div data-section="Costs / Artifacts / Ship tabs"><DrawerArtifactsPanel issueId={issueId} /></div>}
             {activeTab === 'ship' && <div data-section="Costs / Artifacts / Ship tabs"><ShipTab issueId={issueId} /></div>}
-            {activeTab === 'files' && <div data-section="Conversation / Files / Terminal tabs"><OpenPaneCard title="Files" description="Open the issue-scoped workspace file browser in a deck pane." action="Open files pane" onOpen={() => onOpenPane('files')} /></div>}
-            {activeTab === 'terminal' && <div data-section="Conversation / Files / Terminal tabs"><OpenPaneCard title="Terminal" description="Open the issue terminal drawer for the current workspace." action="Open terminal" onOpen={() => onOpenPane('terminal')} /></div>}
-            {activeTab === 'beads' && <div data-section="TasksRail / TasksTab"><TasksTab issueId={issueId} /></div>}
           </div>
         </main>
       </div>
@@ -707,7 +665,7 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
         query={tasksQuery}
         rollup={tasksRollup}
         onClose={() => setTasksDrawerOpen(false)}
-        onOpenFull={() => selectTab('beads')}
+        onOpenFull={() => selectTab('tasks')}
       />
     </IssueView>
   )

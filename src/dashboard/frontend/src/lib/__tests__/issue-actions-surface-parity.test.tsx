@@ -88,6 +88,11 @@ vi.mock('../../components/Stage/cockpit/AgentsLane', () => ({ AgentsLane: () => 
 vi.mock('../../components/Stage/cockpit/ChangedFilesView', () => ({ ChangedFilesView: () => <div>Changed files</div> }));
 vi.mock('../../components/Stage/cockpit/IssueBlockerSpotlight', () => ({ IssueBlockerSpotlight: () => <div>Blocker</div> }));
 vi.mock('../../components/Stage/cockpit/PickupGateCard', () => ({ PickupGateCard: () => <div>Pickup gate</div> }));
+// This file proves action parity across surfaces; the ONE IssueDetail's
+// anatomy (and its data chain) is covered by its own tests.
+vi.mock('../../components/issue-detail/IssueDetail', () => ({
+  IssueDetail: () => <div data-testid="issue-detail-stub" />,
+}));
 vi.mock('../../components/Stage/cockpit/StatusHistoryTab', () => ({ StatusHistoryTab: () => <div>History</div> }));
 vi.mock('../../components/Stage/cockpit/TasksRail', () => ({
   TasksRail: () => <div>Task rail</div>,

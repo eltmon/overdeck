@@ -71,6 +71,9 @@ export interface IssueDetailProps {
   tasksBadge?: string | undefined;
   /** Conversation pane height in px (rail density). Default 420. */
   conversationHeight?: number | undefined;
+  /** Render the tab strip? Default true. The cockpit's own nav drives the
+   *  binding tabs, so it mounts the body without a second strip. */
+  showTabs?: boolean | undefined;
   className?: string;
 }
 
@@ -269,7 +272,7 @@ function IssueDetailTabs({ tab, onSelectTab, tasksBadge }: {
   );
 }
 
-export function IssueDetail({ issueId, density, agents, reviewStatus, tab, onSelectTab, tasksBadge, conversationHeight = 420, className }: IssueDetailProps) {
+export function IssueDetail({ issueId, density, agents, reviewStatus, tab, onSelectTab, tasksBadge, conversationHeight = 420, showTabs = true, className }: IssueDetailProps) {
   // Selected agent for the Conversation/Terminal panes. Owned here so the
   // choice survives a Conversation ⇄ Terminal switch; falls back to the
   // default pick whenever the selection is cleared or no longer matches.
@@ -324,7 +327,9 @@ export function IssueDetail({ issueId, density, agents, reviewStatus, tab, onSel
   return (
     <div data-component="issue-detail" data-density={density} className={cn('flex min-h-0 flex-1 flex-col', className)}>
       <div data-section="DrawerPausedBanner"><PausedBanner agents={agents} /></div>
-      <div data-section="DrawerTabs"><IssueDetailTabs tab={tab} onSelectTab={onSelectTab} tasksBadge={tasksBadge} /></div>
+      {showTabs && (
+        <div data-section="DrawerTabs"><IssueDetailTabs tab={tab} onSelectTab={onSelectTab} tasksBadge={tasksBadge} /></div>
+      )}
       {/* PAN-2908 C-DETAIL: the ONE issue-detail anatomy (rail + strip as the
           per-agent conversation switcher), shared with the cockpit. */}
       <div data-section="PhaseTimeline" className="px-[22px] pt-[10px]">
