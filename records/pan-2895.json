@@ -3,16 +3,17 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-07-19T02:22:16.359Z",
-  "updated": "2026-07-21T21:31:13.536Z",
+  "updated": "2026-07-21T21:31:18.989Z",
   "pipeline": {
     "issueId": "PAN-2895",
-    "reviewStatus": "pending",
-    "testStatus": "pending",
+    "reviewStatus": "passed",
+    "testStatus": "passed",
     "verificationStatus": "passed",
     "mergeStatus": "merged",
     "releaseStatus": "skipped",
     "readyForMerge": false,
-    "updatedAt": "2026-07-21T21:31:13.351Z",
+    "updatedAt": "2026-07-21T21:31:18.830Z",
+    "testNotes": "Skipped: issue is already merged",
     "lastVerifiedCommit": "3f4779212b5b4b386034827207bcb4e239dcc63f",
     "strikeLandingState": "landed",
     "strikeRecoveryCount": 1,
@@ -52,10 +53,10 @@
       "byStage": {
         "implementation": {
           "anthropic/claude-fable-5": {
-            "input": 110,
-            "output": 26622,
-            "cacheRead": 15670089,
-            "cacheWrite": 74983
+            "input": 112,
+            "output": 26781,
+            "cacheRead": 15985067,
+            "cacheWrite": 76261
           }
         },
         "strike": {
@@ -69,10 +70,10 @@
       },
       "totals": {
         "anthropic/claude-fable-5": {
-          "input": 110,
-          "output": 26622,
-          "cacheRead": 15670089,
-          "cacheWrite": 74983
+          "input": 112,
+          "output": 26781,
+          "cacheRead": 15985067,
+          "cacheWrite": 76261
         },
         "openai/gpt-5.6-sol": {
           "input": 1539297,
@@ -82,8 +83,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 56.466166,
-        "pricingAsOf": "2026-07-21T21:31:13.527Z"
+        "usd": 56.805089,
+        "pricingAsOf": "2026-07-21T21:31:18.937Z"
       }
     },
     "merges": [],
