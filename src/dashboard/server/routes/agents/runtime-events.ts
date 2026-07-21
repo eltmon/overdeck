@@ -52,12 +52,24 @@ export const getAgentHealthHistoryRoute = HttpRouter.add(
 //   {kind: "resolution_set",    resolution, resolutionCount}
 //   {kind: "current_issue_set", currentIssue?}
 //   {kind: "context_saturation_changed", contextSaturatedAt?}
+//   {kind: "linear_mcp_auth_required", authUrl?, expiresAt?}
+//   {kind: "linear_mcp_auth_healthy"}
 
-function emitAgentRuntimeEvent(id: string, body: Record<string, unknown>, timestamp: string) {
+export function emitAgentRuntimeEvent(id: string, body: Record<string, unknown>, timestamp: string) {
   return Effect.gen(function* () {
+    let eventBody = body;
+    if (body['kind'] === 'linear_mcp_auth_required' || body['kind'] === 'linear_mcp_auth_healthy') {
+      const { AgentStateService } = yield* Effect.promise(
+        () => import('../../services/agent-state-service.js'),
+      );
+      const agentState = yield* AgentStateService;
+      const snapshot = yield* agentState.get(id);
+      eventBody = { ...body, issueId: snapshot?.currentIssue ?? null };
+    }
+
     let raw: Record<string, unknown> | null;
     try {
-      raw = bodyToEvent(id, body, timestamp);
+      raw = bodyToEvent(id, eventBody, timestamp);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'invalid heartbeat payload';
       return { ok: false as const, response: jsonResponse({ success: false, error: message }, { status: 400 }) };
