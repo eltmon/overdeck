@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-21T22:47:36.935Z",
-  "updated": "2026-07-21T23:24:49.943Z",
+  "updated": "2026-07-21T23:24:59.363Z",
   "pipeline": {
     "issueId": "PAN-2993",
     "reviewStatus": "pending",
@@ -89,8 +89,16 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 10,
-    "claims": {},
+    "sequence": 11,
+    "claims": {
+      "docs-strike-lifecycle": {
+        "writerId": "agent-pan-2993",
+        "agentId": "agent-pan-2993",
+        "pid": 2321555,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-21T23:24:59.363Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-2993",
@@ -194,6 +202,7 @@
     "strike-ready-rearm-recovering": "completed",
     "strike-ready-rearm-recovering.strike-ready-rearm-recovering.ac1": "completed",
     "strike-ready-rearm-recovering.strike-ready-rearm-recovering.ac2": "completed",
-    "strike-ready-rearm-recovering.strike-ready-rearm-recovering.ac3": "completed"
+    "strike-ready-rearm-recovering.strike-ready-rearm-recovering.ac3": "completed",
+    "docs-strike-lifecycle": "running"
   }
 }
