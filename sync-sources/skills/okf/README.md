@@ -15,14 +15,21 @@ Embedding commands also need Ollama or an API key for the selected provider.
 
 Overdeck users receive this skill through `pan sync`.
 
-Standalone Claude Code users can copy-install it:
+Standalone Claude Code users install it from the mirror repo, [eltmon/okf](https://github.com/eltmon/okf) — symlink so `git pull` updates it in place:
 
 ```bash
+git clone https://github.com/eltmon/okf.git ~/Projects/okf
 mkdir -p ~/.claude/skills
-cp -R sync-sources/skills/okf ~/.claude/skills/okf
+ln -s ~/Projects/okf ~/.claude/skills/okf
 ```
 
-The copied skill remains portable. Its core scripts do not import Overdeck and require only git, gh, Python 3, and PyYAML for non-embedding workflows.
+Or copy-install instead of symlinking:
+
+```bash
+cp -R ~/Projects/okf ~/.claude/skills/okf
+```
+
+The skill remains portable. Its core scripts do not import Overdeck and require only git, gh, Python 3, and PyYAML for non-embedding workflows.
 
 ## 5-Minute Quickstart
 
@@ -61,6 +68,7 @@ The copied skill remains portable. Its core scripts do not import Overdeck and r
 | Command | Summary |
 | --- | --- |
 | `/okf init` | Create or connect the knowledge bundle and pointer file. |
+| `/okf open [--no-install] [--no-browser]` | Open the configured bundle in the local visual knowledge viewer. |
 | `/okf author "<topic>"` | Write or update one concept for one idea. |
 | `/okf convert <path>` | Convert existing docs into OKF without destructive edits. |
 | `/okf sync [--topic "<focus>"]` | Update concepts from code or documentation diffs. |

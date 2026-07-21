@@ -26,6 +26,7 @@ describe('StaleBuildChip', () => {
       behindTotal: 5,
       behindBuildInputs: 2,
       originMainLastCommitAt: 1_710_000_000_000,
+      originMainLastBuildInputCommitAt: 1_710_000_000_000,
       computedAt: 1_752_580_800_000,
     };
 
@@ -46,6 +47,7 @@ describe('StaleBuildChip', () => {
       behindTotal: 0,
       behindBuildInputs: 0,
       originMainLastCommitAt: 1_710_000_000_000,
+      originMainLastBuildInputCommitAt: 1_710_000_000_000,
       computedAt: 1_752_580_800_000,
     };
 

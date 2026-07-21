@@ -43,7 +43,7 @@ export async function getDeployBlockReason(
 ): Promise<string | null> {
   const deps = { ...defaultDependencies, ...dependencies };
   const verifyingIssues = Object.entries(deps.loadReviewStatuses())
-    .filter(([, status]) => status.verificationStatus === 'running')
+    .filter(([, status]) => status.verificationStatus === 'running' && status.mergeStatus !== 'merged')
     .map(([issueId]) => issueId)
     .sort();
 

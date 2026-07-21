@@ -47,6 +47,7 @@ export async function buildHarnessPolicyDecisions(
       'claude-code': canUseHarnessSync('claude-code', model, authMode),
       ohmypi: canUseHarnessSync('ohmypi', model, authMode),
       codex: canUseHarnessSync('codex', model, authMode),
+      acp: canUseHarnessSync('acp', model, authMode),
     };
   }
   return decisions;

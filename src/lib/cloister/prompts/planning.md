@@ -41,6 +41,7 @@ optional:
 - Ask clarifying questions (use AskUserQuestion tool)
 - Explore the codebase to understand context (read files, grep)
 - Generate planning artifacts:
+  - **PRD draft** at `.pan/drafts/{{ISSUE_ID}}.md` in your workspace — the human-readable implementation brief the xBRIEF is lowered from. Written FIRST, before the xBRIEF, whenever no canonical PRD already exists. `pan plan finalize` refuses to run without it (PRD-first gate) and promotes it to `drafts/` on `overdeck-state` through the draft write door.
   - **continue.json** at `.overdeck/continue.json` — structured decisions, hazards, and approach context (see format below). Replaces the old STATE.md.
   - **xBRIEF plan** at `.overdeck/spec.vbrief.json` (deliberate legacy-compatible workspace filename; `plan finalize` promotes it to `specs/*.xbrief.json` on `overdeck-state` through the state write door)
 - Present options and tradeoffs for the user to decide
@@ -155,9 +156,9 @@ If any of these is unmet, ask the next question instead of starting Phase 3.
 
 **Record every exchange.** After each AskUserQuestion response, append the question, the
 options offered, and the chosen answer to the PRD draft at
-`<projectRoot>/.pan/drafts/{{ISSUE_ID}}.md` under a `## Planning Q&A` heading (create the
-heading on first use). These records are how future agents understand WHY the plan chose
-what it chose.
+`.pan/drafts/{{ISSUE_ID}}.md` in your workspace under a `## Planning Q&A` heading (create
+the heading on first use). These records are how future agents understand WHY the plan
+chose what it chose.
 
 ### Playwright Isolation
 
@@ -280,10 +281,11 @@ When `requiresInspection` is `true`, set `metadata.inspectionDepth` to `"fast"` 
 6. Do edges encode only real dependencies (output→input, shared mutation, ordering)?
 
 When discovery is complete:
-1. Create **continue.json** at `.overdeck/continue.json` with decisions, hazards, and approach context (see format below).
-2. Create an **xBRIEF plan** at `.overdeck/spec.vbrief.json` — **MUST follow the exact format below**.
-3. Run `pan plan finalize` from the workspace root. This finalizes the tasks in your xBRIEF and sets `plan.status` to `proposed`.
-4. Summarize the plan and STOP
+1. Write the **PRD draft** at `.pan/drafts/{{ISSUE_ID}}.md` in your workspace (unless a canonical PRD already exists on `overdeck-state` and is still accurate). Follow the standard in `.claude/rules/prd-authoring.md`: glossary first, verified file/line references, before/after snippets, numbered work items, numbered FR-/NFR- requirements, decisions made in the doc, a documentation work item naming exact doc files, mechanically checkable acceptance criteria. The xBRIEF is *lowered from* this PRD — do not write the xBRIEF first. `pan plan finalize` fails without a PRD of at least 20 lines (PRD-first gate) and promotes it to `drafts/` on `overdeck-state`.
+2. Create **continue.json** at `.overdeck/continue.json` with decisions, hazards, and approach context (see format below).
+3. Create an **xBRIEF plan** at `.overdeck/spec.vbrief.json` — **MUST follow the exact format below**.
+4. Run `pan plan finalize` from the workspace root. This finalizes the tasks in your xBRIEF and sets `plan.status` to `proposed`.
+5. Summarize the plan and STOP
 
 **Do not create a parallel task store.** `pan plan finalize` promotes the workspace xBRIEF plan, and the task door records claims and status overlays against its items.
 

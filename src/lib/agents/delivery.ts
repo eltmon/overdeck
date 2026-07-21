@@ -30,7 +30,7 @@ import {
 
 export type DeliveryResult = {
   ok: boolean;
-  path: 'app-server' | 'supervisor' | 'channels' | 'tmux' | 'pi' | 'codex';
+  path: 'app-server' | 'acp' | 'supervisor' | 'channels' | 'tmux' | 'pi' | 'codex';
   failure?: string;
 };
 
@@ -66,10 +66,11 @@ function overdeckHomeForChannels(): string {
 async function appendChannelDeliveryLog(
   agentId: string,
   entry: {
-    path: 'app-server' | 'supervisor' | 'channel' | 'tmux';
+    path: 'app-server' | 'acp' | 'supervisor' | 'channel' | 'tmux';
     reason?: string;
     caller?: string;
     appServer?: string;
+    acp?: string;
     'pty-supervisor'?: string;
     channels?: string;
   },
@@ -93,9 +94,9 @@ async function appendChannelDeliveryLog(
   }
 }
 
-function readAppServerTokenSync(agentId: string): string | null {
+function readSocketTokenSync(agentId: string, filename: string): string | null {
   try {
-    const tokenPath = join(overdeckHomeForSockets(), 'agents', agentId, 'appserver-token');
+    const tokenPath = join(overdeckHomeForSockets(), 'agents', agentId, filename);
     if (!existsSync(tokenPath)) return null;
     const token = readFileSync(tokenPath, 'utf-8').trim();
     return token || null;
@@ -104,18 +105,25 @@ function readAppServerTokenSync(agentId: string): string | null {
   }
 }
 
+function readAppServerTokenSync(agentId: string): string | null {
+  return readSocketTokenSync(agentId, 'appserver-token');
+}
+
+function readAcpTokenSync(agentId: string): string | null {
+  return readSocketTokenSync(agentId, 'acp-token');
+}
+
 /**
  * POST a JSON body to a Unix-domain socket using node:net + a hand-rolled
  * minimal HTTP/1.1 request. Resolves on a 200-class response, rejects on any
- * error including socket-not-found, connection refused, write timeout, or
- * non-2xx status. Kept tiny on purpose: this is a hot path, only one caller,
- * and the whole point of a fallback to tmux is that we do not need a robust
- * HTTP client here.
+ * error including socket-not-found, connection refused, an optional client
+ * timeout, or non-2xx status. Kept tiny on purpose because this is a hot path
+ * and these local protocol hosts need only a narrow HTTP client.
  */
 async function postUnixSocketJson(
   socketPath: string,
   body: unknown,
-  timeoutMs: number,
+  timeoutMs: number | undefined,
   token: string,
   tokenHeader: string = BRIDGE_TOKEN_HEADER,
 ): Promise<{ status: number; body: string }> {
@@ -173,10 +181,12 @@ async function postUnixSocketJson(
       },
     );
 
-    timeout = setTimeout(() => {
-      req.destroy(new Error('socket POST timeout'));
-    }, timeoutMs);
-    timeout.unref?.();
+    if (timeoutMs !== undefined) {
+      timeout = setTimeout(() => {
+        req.destroy(new Error('socket POST timeout'));
+      }, timeoutMs);
+      timeout.unref?.();
+    }
     req.on('error', (err: Error) => {
       finishErr(err);
     });
@@ -187,8 +197,9 @@ async function postUnixSocketJson(
 
 /**
  * Single delivery primitive for orchestrator-to-work-agent messages. Auto mode
- * tries the PTY supervisor socket, then legacy Channels MCP, then tmux. Explicit
- * socket methods are strict and throw instead of falling back.
+ * tries persistent protocol hosts, the PTY supervisor socket, legacy Channels
+ * MCP, then tmux. Explicit socket methods and ACP targets are strict: ACP prompts
+ * cannot fall back to terminal injection because only session/prompt reaches the agent.
  */
 export async function deliverAgentMessage(
   agentId: string,
@@ -209,6 +220,13 @@ export async function deliverAgentMessage(
     resolvedMethod ??= 'auto';
   }
 
+  const isAcpTarget = state?.harness === 'acp';
+  if (isAcpTarget && resolvedMethod !== 'auto') {
+    throw new Error(
+      `MessageDeliveryFailed: ACP delivery failed for ${normalizedId} (${caller}): ACP requires authenticated host RPC delivery`,
+    );
+  }
+
   if (resolvedMethod === 'tmux') {
     await assertTmuxTargetCanReceive(normalizedId, caller);
     await Effect.runPromise(sendKeys(normalizedId, message));
@@ -216,7 +234,7 @@ export async function deliverAgentMessage(
   }
 
   let appServerFailure: string | undefined;
-  if (resolvedMethod === 'auto') {
+  if (resolvedMethod === 'auto' && !isAcpTarget) {
     const appServerSocketPath = join(overdeckHomeForSockets(), 'sockets', `appserver-${normalizedId}.sock`);
     if (existsSync(appServerSocketPath)) {
       const appServerToken = readAppServerTokenSync(normalizedId);
@@ -239,6 +257,49 @@ export async function deliverAgentMessage(
           appServerFailure = `socket-post-failed: ${reason}`;
         }
       }
+    }
+  }
+
+  let acpFailure: string | undefined;
+  if (resolvedMethod === 'auto') {
+    const acpSocketPath = join(overdeckHomeForSockets(), 'sockets', `acp-${normalizedId}.sock`);
+    const acpSocketExists = existsSync(acpSocketPath);
+    if (isAcpTarget || acpSocketExists) {
+      const acpToken = readAcpTokenSync(normalizedId);
+      if (!acpSocketExists) {
+        acpFailure = 'socket-missing';
+      } else if (!acpToken) {
+        acpFailure = 'acp-token-missing';
+      } else {
+        try {
+          // The ACP host acknowledges queue acceptance rather than model-turn
+          // completion, so this bounds a wedged local host without constraining
+          // how long the provider may take to finish the queued turn.
+          await postUnixSocketJson(
+            acpSocketPath,
+            { op: 'message', content: message, meta: { caller } },
+            8_000,
+            acpToken,
+          );
+          await appendChannelDeliveryLog(normalizedId, { path: 'acp', caller });
+          return { ok: true, path: 'acp' };
+        } catch (err) {
+          const reason = err instanceof Error ? err.message : String(err);
+          acpFailure = `socket-post-failed: ${reason}`;
+        }
+      }
+
+      // ACP prompts only enter the agent through session/prompt on the host RPC
+      // socket. Terminal fallbacks can accept pasted text while bypassing the ACP
+      // session entirely, so an ACP transport failure must remain a loud failure.
+      await appendChannelDeliveryLog(normalizedId, {
+        path: 'acp',
+        reason: acpFailure,
+        caller,
+      });
+      throw new Error(
+        `MessageDeliveryFailed: ACP delivery failed for ${normalizedId} (${caller}): ${acpFailure}`,
+      );
     }
   }
 
@@ -317,6 +378,7 @@ export async function deliverAgentMessage(
       reason: channelFailure,
       caller,
       ...(appServerFailure ? { appServer: appServerFailure } : {}),
+      ...(acpFailure ? { acp: acpFailure } : {}),
       ...(supervisorFailure ? { 'pty-supervisor': supervisorFailure } : {}),
       ...(channelFailure ? { channels: channelFailure } : {}),
     });

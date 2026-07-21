@@ -72,29 +72,43 @@ Key design decisions from the June 25–26 and July 7–9 sessions:
   theesfeld "prime directive" hook failure mode and Overdeck's
   no-ambient-subagent policy).
 
-### The viewer: filed, not built — coinstall inkeep/open-knowledge
+### The viewer: progressive, read-only OpenKnowledge integration
 
-**Yes, we opened a feature for an OKF viewer.** It lives as the
-"Preferred approach for #1/#2/#4" section of
-[PAN-2066](https://github.com/eltmon/overdeck/issues/2066) (open) — no
-standalone issue was filed. Decided 2026-07-14/15: adopt
-[`inkeep/open-knowledge`](https://github.com/inkeep/open-knowledge) (WYSIWYG
-markdown editor + graph wiki-link viewer + out-of-the-box MCP/agentic search)
-at arm's length rather than building our own `viz.html` / MCP server:
+[PAN-2066](https://github.com/eltmon/overdeck/issues/2066) adopted
+[`inkeep/open-knowledge`](https://github.com/inkeep/open-knowledge) for visual
+browsing, graph navigation, search, and optional MCP access. The GPL-3.0-or-later
+package remains an arm's-length global program: Overdeck never imports, links,
+or bundles it into the MIT-licensed `@overdeck/*` packages. Overdeck invokes the
+`ok` executable as a subprocess and communicates over HTTP and WebSocket.
 
-1. `pan install` optionally coinstalls `@inkeep/open-knowledge` (GPL-3.0 vs our
-   MIT is fine as **mere aggregation** — separate global binary, shelled out to,
-   never linked/imported into `@overdeck/*`; requires Node 24+).
-2. New `/okf open` (or `pan knowledge open`) verb resolving the bundle from
-   `.okf.yml` and shelling out to `ok start --open <bundle>`.
-3. Let `ok init` wire its MCP into harnesses to satisfy the read-server goal.
+The integration is progressive:
 
-It covers PAN-2066 items #2 (graph visualizer) and #4 (MCP read server) and
-dents #1 (hybrid search); Overdeck keeps the deterministic conformance gate,
-PR-gated writes, #3 lease mode, and #5 semantic auditor. **Blocking gate:**
-verify open-knowledge preserves frontmatter losslessly on save and leaves
-`index.md`/`log.md` untouched — if it churns frontmatter, the integration is
-blocked until it doesn't.
+1. `pan install` does not install OpenKnowledge. The first explicit
+   `pan knowledge open`, `/okf open`, or dashboard **Install viewer** action may
+   install it globally; `--no-install` requires an existing installation.
+2. The server owns one viewer process per project, reuses healthy lock-reported
+   processes, and proxies every HTTP and WebSocket path through a project-keyed,
+   origin-isolated `knowledge-<hex>.<dashboard-domain>` host. Short-lived viewer
+   credentials never expose dashboard cookies or internal headers upstream.
+3. Every viewer runs against a disposable snapshot outside the canonical bundle.
+   OpenKnowledge may accept edits inside that projection, but those writes cannot
+   reach the PR-gated source and are discarded when the snapshot is refreshed.
+4. The dashboard **Knowledge** page represents missing-bundle, not-installed,
+   installing, starting, embedded, and framing-blocked states. When framing is
+   refused, it offers the viewer's direct local URL in a new tab.
+5. `ok init` MCP registration is always a separate opt-in action. Unattended
+   viewer initialization uses `--no-mcp --no-skills`, so opening the viewer
+   never changes Claude Code, Codex, or Cursor configuration.
+
+The mandatory round-trip spike on OpenKnowledge v0.34.0 found source-format
+loss: editing only `description` also rewrote an unrelated inline YAML `tags`
+array. The integrated dashboard is therefore mechanically read-only with respect
+to the canonical bundle: both the dashboard and CLI launch a disposable snapshot,
+so viewer edits are discarded rather than reaching source files. Operators browse
+and search there, then use `/okf author` for PR-gated edits that preserve unknown
+frontmatter and pass deterministic conformance checks. Lease-based
+writes and the advisory semantic auditor remain deferred capabilities rather
+than viewer responsibilities.
 
 ### Our own bundle so far
 
@@ -261,3 +275,8 @@ From the spec repo's issues/discussions (all open unless noted):
 - **2026-07-14/15** — inkeep/open-knowledge licensing + integration analysis;
   viewer plan written into PAN-2066 as the preferred approach for items
   #1/#2/#4.
+- **2026-07-19** — progressive installation, `pan knowledge open`, `/okf open`,
+  server-owned lifecycle, origin-isolated proxying, and the dashboard Knowledge
+  page implemented. The round-trip spike found YAML source-format churn, so the
+  viewer runs against a disposable read-only projection and MCP registration
+  stays explicitly opt-in.

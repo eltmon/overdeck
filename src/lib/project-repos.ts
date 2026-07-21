@@ -1,4 +1,5 @@
 import { Effect } from 'effect';
+import { existsSync } from 'fs';
 import { join } from 'path';
 import { getProjectSync, resolveProjectFromIssueSync, type ProjectConfig, type ResolvedProject } from './projects.js';
 import type { ForgeType } from './forge.js';
@@ -113,6 +114,66 @@ export function resolveProjectReposFromResolvedIssueSync(
     resolvedProject.projectPath,
     projectConfig,
     issueId
+  );
+}
+
+// ─── Workspace repo roots (PAN-2948) ─────────────────────────────────────────
+// A polyrepo workspace is a wrapper directory whose code lives in nested
+// sub-repo worktrees named by repo key (<workspace>/fe, <workspace>/api, …).
+// The wrapper itself is a one-commit artifacts repo (planning scaffold +
+// .gitignore excluding the sub-repos), so any git operation that matters —
+// diffing, pushing, head resolution — must run inside the sub-repos, never
+// the workspace root. Monorepo workspaces resolve to a single root at the
+// workspace path, so callers can loop unconditionally.
+
+export interface WorkspaceRepoRoot {
+  repoKey: string;
+  /** Absolute path of the repo checkout inside the workspace. */
+  dir: string;
+  sourceBranch: string;
+  targetBranch: string;
+  isPolyrepo: boolean;
+}
+
+/** Pure mapping from resolved repos + workspace path to on-disk repo roots. */
+export function computeWorkspaceRepoRootsSync(
+  repos: ResolvedProjectRepo[] | null,
+  issueId: string,
+  workspacePath: string
+): WorkspaceRepoRoot[] {
+  if (repos && repos.length > 1) {
+    const roots = repos
+      .filter(repo => repo.required)
+      .map(repo => ({
+        repoKey: repo.repoKey,
+        dir: join(workspacePath, repo.repoKey),
+        sourceBranch: repo.sourceBranch,
+        targetBranch: repo.targetBranch,
+        isPolyrepo: true,
+      }))
+      .filter(root => existsSync(join(root.dir, '.git')));
+    if (roots.length > 0) return roots;
+  }
+
+  const single = repos?.[0];
+  return [{
+    repoKey: single?.repoKey ?? issueId.toLowerCase(),
+    dir: workspacePath,
+    sourceBranch: single?.sourceBranch ?? `feature/${issueId.toLowerCase()}`,
+    targetBranch: single?.targetBranch ?? 'main',
+    isPolyrepo: false,
+  }];
+}
+
+/** Resolve the git roots inside a workspace for an issue (polyrepo-aware). */
+export function resolveWorkspaceRepoRootsSync(
+  issueId: string,
+  workspacePath: string
+): WorkspaceRepoRoot[] {
+  return computeWorkspaceRepoRootsSync(
+    resolveProjectReposForIssueSync(issueId),
+    issueId,
+    workspacePath
   );
 }
 

@@ -12,7 +12,7 @@ import {
   getAvailableModelsSync,
 } from '../../src/lib/model-fallback.js';
 import { ModelId } from '../../src/lib/settings.js';
-import { hasModelCapabilitySync, getModelEffortLevelsSync, modelSupportsEffortSync, MODEL_CAPABILITIES, modelSupportsImagesSync } from '../../src/lib/model-capabilities.js';
+import { hasModelCapabilitySync, getModelCapabilitySync, getModelEffortLevelsSync, modelSupportsEffortSync, MODEL_CAPABILITIES, modelSupportsImagesSync } from '../../src/lib/model-capabilities.js';
 
 describe('model-fallback', () => {
   // Spy on console.warn to test warning logs
@@ -388,7 +388,7 @@ describe('model-fallback', () => {
       const enabled = new Set<ModelProvider>(['anthropic', 'openai', 'google', 'kimi']);
       const models = getAvailableModelsSync(enabled);
 
-      expect(models.length).toBe(35); // 8 Anthropic + 16 OpenAI + 6 Google + 5 Kimi
+      expect(models.length).toBe(37); // 8 Anthropic + 16 OpenAI + 6 Google + 7 Kimi
     });
 
     it('should include OpenAI models when OpenAI enabled', () => {
@@ -502,8 +502,22 @@ describe('model-fallback', () => {
       expect(applyFallbackSync('kimi-k2.7-code' as ModelId, anthropicOnly)).toBe('claude-sonnet-5');
     });
 
-    it('kimi-k2.7-code is a known model capability', () => {
-      expect(hasModelCapabilitySync('kimi-k2.7-code')).toBe(true);
+    it('K3 model ids are recognized as kimi provider models', () => {
+      expect(getModelProviderSync('k3' as ModelId)).toBe('kimi');
+      expect(getModelProviderSync('k3[1m]' as ModelId)).toBe('kimi');
+    });
+
+    it('K3 model ids fall back to Sonnet when kimi is disabled', () => {
+      const anthropicOnly = new Set<ModelProvider>(['anthropic']);
+      expect(applyFallbackSync('k3' as ModelId, anthropicOnly)).toBe('claude-sonnet-5');
+      expect(applyFallbackSync('k3[1m]' as ModelId, anthropicOnly)).toBe('claude-sonnet-5');
+    });
+
+    it('K3 capabilities pin the standard and 1M context windows', () => {
+      expect(hasModelCapabilitySync('k3')).toBe(true);
+      expect(hasModelCapabilitySync('k3[1m]')).toBe(true);
+      expect(getModelCapabilitySync('k3').contextWindow).toBe(262144);
+      expect(getModelCapabilitySync('k3[1m]').contextWindow).toBe(1048576);
     });
 
     it('glm-5.2 is recognized as zai provider', () => {

@@ -47,6 +47,23 @@ const SESSION_JSONL = [
   }),
 ].join('\n') + '\n';
 
+const ACP_SESSION_JSONL = [
+  JSON.stringify({
+    timestamp: '2026-07-18T10:00:00.000Z',
+    role: 'user',
+    content: 'Inspect the repository.',
+    sessionId: 'acp-session-1',
+    source: 'orchestrator',
+  }),
+  JSON.stringify({
+    timestamp: '2026-07-18T10:00:01.000Z',
+    role: 'assistant',
+    content: 'The repository is ready.',
+    sessionId: 'acp-session-1',
+    source: 'agent',
+  }),
+].join('\n') + '\n';
+
 beforeEach(() => {
   odb = setupOverdeckTestDb();
   fakeClaudeDir = join(odb.home, '.claude', 'projects');
@@ -177,6 +194,36 @@ describe('scanner', () => {
     expect(sess).toBeDefined();
     expect(sess!.messageCount).toBe(2);
     expect(sess!.toolsUsed).toContain('Read');
+  });
+
+  it('dispatches ACP transcripts to the ACP parser without disturbing Claude parsing', async () => {
+    const claudePath = join(fakeClaudeDir, '-home-user-Projects-myapp', 'claude-alongside-acp.jsonl');
+    const agentDir = join(odb.home, '.overdeck', 'agents', 'agent-acp-scanner');
+    const acpPath = join(agentDir, 'acp-session.jsonl');
+    mkdirSync(agentDir, { recursive: true });
+    writeFileSync(claudePath, SESSION_JSONL, 'utf8');
+    writeFileSync(join(agentDir, 'state.json'), JSON.stringify({ harness: 'acp' }), 'utf8');
+    writeFileSync(acpPath, ACP_SESSION_JSONL, 'utf8');
+    seedAgent(odb, 'agent-acp-scanner', '/home/user/Projects/acp-owned', 'acp', 'kimi');
+
+    const result = await scan({ mode: 'system', watchDirs: [] });
+    const sessions = findDiscoveredSessions();
+
+    expect(result.errors).toBe(0);
+    expect(sessions.find((session) => session.jsonlPath === acpPath)).toMatchObject({
+      harness: 'acp',
+      sessionId: 'acp-session-1',
+      workspacePath: '/home/user/Projects/acp-owned',
+      messageCount: 2,
+      firstTs: '2026-07-18T10:00:00.000Z',
+      lastTs: '2026-07-18T10:00:01.000Z',
+    });
+    expect(sessions.find((session) => session.jsonlPath === claudePath)).toMatchObject({
+      harness: 'claude-code',
+      sessionId: 'sess-1',
+      messageCount: 2,
+      toolsUsed: ['Read'],
+    });
   });
 
   it('change detection: re-scan of unchanged file does not re-parse', async () => {
@@ -540,7 +587,13 @@ function seedConversationFile(
   ).run(input.id, input.harness, input.locator, Date.parse('2026-07-02T00:00:00.000Z'));
 }
 
-function seedAgent(dbHandle: OverdeckTestDb, id: string, workspace: string): void {
+function seedAgent(
+  dbHandle: OverdeckTestDb,
+  id: string,
+  workspace: string,
+  harness = 'codex',
+  model = 'gpt-5.5',
+): void {
   const now = new Date('2026-07-02T00:00:00.000Z').toISOString();
   const db = dbHandle.raw();
   db.exec('PRAGMA foreign_keys = OFF');
@@ -548,7 +601,7 @@ function seedAgent(dbHandle: OverdeckTestDb, id: string, workspace: string): voi
     db.prepare(
       `INSERT INTO agents (id, issue_id, role, status, workspace, harness, model, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    ).run(id, 'PAN-2224', 'work', 'stopped', workspace, 'codex', 'gpt-5.5', now);
+    ).run(id, 'PAN-2224', 'work', 'stopped', workspace, harness, model, now);
   } finally {
     db.exec('PRAGMA foreign_keys = ON');
   }

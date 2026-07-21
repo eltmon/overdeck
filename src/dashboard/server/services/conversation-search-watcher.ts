@@ -5,10 +5,11 @@ import { watch as chokidarWatch, type FSWatcher } from 'chokidar';
 
 import { getConversationSearchConfigSync, type NormalizedConversationSearchConfig } from '../../../lib/config-yaml.js';
 import { createConversationEmbeddingProvider } from '../../../lib/conversation-search/embedding-provider.js';
-import { indexConversationFile, indexConversationSearch, type ConversationIndexResult } from '../../../lib/conversation-search/indexer.js';
+import { indexConversationFile, indexConversationSearch, sessionIdFromPath, type ConversationIndexResult } from '../../../lib/conversation-search/indexer.js';
+import { dimensionsForModel, openEmbeddingsDb } from '../../../lib/overdeck/conversations-search.js';
 
 interface WatcherLike {
-  on(event: 'add' | 'change', callback: (filePath: string) => void): WatcherLike;
+  on(event: 'add' | 'change' | 'unlink', callback: (filePath: string) => void): WatcherLike;
   on(event: 'error', callback: (error: unknown) => void): WatcherLike;
   close(): Promise<unknown> | unknown;
 }
@@ -16,6 +17,7 @@ interface WatcherLike {
 type WatchFactory = (paths: string[], options: { ignoreInitial: boolean; awaitWriteFinish: { stabilityThreshold: number; pollInterval: number } }) => WatcherLike;
 type IndexAllFn = (options: { config: NormalizedConversationSearchConfig; roots: string[]; signal?: AbortSignal }) => Promise<ConversationIndexResult>;
 type IndexFileFn = (options: { filePath: string; config: NormalizedConversationSearchConfig; signal?: AbortSignal }) => Promise<ConversationIndexResult>;
+type RemoveFileFn = (options: { filePath: string; config: NormalizedConversationSearchConfig }) => Promise<void>;
 
 export interface ConversationSearchWatcherOptions {
   config?: NormalizedConversationSearchConfig;
@@ -24,6 +26,7 @@ export interface ConversationSearchWatcherOptions {
   watchFactory?: WatchFactory;
   indexAll?: IndexAllFn;
   indexFile?: IndexFileFn;
+  removeFile?: RemoveFileFn;
   maxConcurrentIndexers?: number;
   log?: Pick<Console, 'log' | 'warn'>;
 }
@@ -33,6 +36,19 @@ const DEFAULT_WRITE_STABILITY_MS = 250;
 const DEFAULT_WRITE_POLL_MS = 50;
 
 let activeWatcher: ConversationSearchWatcher | null = null;
+
+/** Drop a deleted transcript's chunks and indexing cursor so search stops surfacing it. */
+async function defaultRemoveFile(options: { filePath: string; config: NormalizedConversationSearchConfig }): Promise<void> {
+  const { filePath, config } = options;
+  const db = openEmbeddingsDb(config.dbPath, dimensionsForModel(config.model));
+  try {
+    if (!db.available) return;
+    db.deleteCursor(filePath);
+    db.deleteSession(sessionIdFromPath(filePath));
+  } finally {
+    db.close();
+  }
+}
 
 function watcherSignature(config: NormalizedConversationSearchConfig, roots: string[]): string {
   return JSON.stringify({
@@ -52,6 +68,7 @@ export class ConversationSearchWatcher {
   private readonly watchFactory: WatchFactory;
   private readonly indexAll: IndexAllFn;
   private readonly indexFile: IndexFileFn;
+  private readonly removeFile: RemoveFileFn;
   private readonly maxConcurrentIndexers: number;
   private readonly log: Pick<Console, 'log' | 'warn'>;
   readonly signature: string;
@@ -74,6 +91,7 @@ export class ConversationSearchWatcher {
     this.watchFactory = options.watchFactory ?? ((paths, watchOptions) => chokidarWatch(paths, watchOptions) as FSWatcher);
     this.indexAll = options.indexAll ?? indexConversationSearch;
     this.indexFile = options.indexFile ?? indexConversationFile;
+    this.removeFile = options.removeFile ?? defaultRemoveFile;
     this.maxConcurrentIndexers = Math.max(1, options.maxConcurrentIndexers ?? 1);
     this.log = options.log ?? console;
   }
@@ -89,7 +107,8 @@ export class ConversationSearchWatcher {
         if (result.disabled) {
           this.log.warn(`[conversation-search] startup index skipped: ${result.unavailableReason ?? 'disabled'}`);
         } else {
-          this.log.log(`[conversation-search] startup indexed ${result.chunksIndexed} chunk${result.chunksIndexed === 1 ? '' : 's'} across ${result.filesScanned} file${result.filesScanned === 1 ? '' : 's'}`);
+          const prunedNote = result.sessionsPruned > 0 ? `, pruned ${result.sessionsPruned} stale session${result.sessionsPruned === 1 ? '' : 's'}` : '';
+          this.log.log(`[conversation-search] startup indexed ${result.chunksIndexed} chunk${result.chunksIndexed === 1 ? '' : 's'} across ${result.filesScanned} file${result.filesScanned === 1 ? '' : 's'}${prunedNote}`);
         }
         this.log.log(`[boot-timing] conversation-search startup index completed at +${Math.round(performance.now() - startupT0)}ms`);
       })
@@ -112,6 +131,7 @@ export class ConversationSearchWatcher {
     this.watcher
       .on('add', (filePath) => this.schedule(filePath))
       .on('change', (filePath) => this.schedule(filePath))
+      .on('unlink', (filePath) => this.remove(filePath))
       .on('error', (error) => this.log.warn('[conversation-search] watcher error:', error));
   }
 
@@ -152,6 +172,25 @@ export class ConversationSearchWatcher {
     }
     this.queued.add(filePath);
     this.drainQueue();
+  }
+
+  private remove(filePath: string): void {
+    if (this.stopped || !filePath.endsWith('.jsonl')) return;
+    // A pending or queued index for a now-deleted file would only fail on ENOENT.
+    const timer = this.pending.get(filePath);
+    if (timer) clearTimeout(timer);
+    this.pending.delete(filePath);
+    this.queued.delete(filePath);
+    this.rerun.delete(filePath);
+    const task = Promise.resolve()
+      .then(() => this.removeFile({ filePath, config: this.config }))
+      .catch((error: unknown) => {
+        this.log.warn(`[conversation-search] failed to prune deleted session ${filePath}:`, error);
+      })
+      .finally(() => {
+        this.activeTasks.delete(task);
+      });
+    this.activeTasks.add(task);
   }
 
   private drainQueue(): void {

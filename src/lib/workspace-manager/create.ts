@@ -25,6 +25,7 @@ import {
   assignPort,
   copyProjectTemplateDirs,
   createWorktree,
+  installPreRebaseHook,
   preTrustDirectorySync,
   relocateVenvScripts,
   restorePreWorktreeMetadataSync,
@@ -82,17 +83,30 @@ export function ensurePolyrepoWorkspaceGitignoreSync(
     }
   }
 
-  if (added.length === 0 && removed.length === 0) {
+  // PAN-2541: the workspace .overdeck/ dir is disposable issue runtime
+  // (continue.json, transcripts, feedback); durable state lives on the
+  // overdeck-state branch. Without this entry the scaffold repo shows
+  // `?? .overdeck/` and agents invent local .git/info/exclude edits.
+  const addRuntimeEntry =
+    !normalizedLines.includes('.overdeck/') && !normalizedLines.includes('.overdeck');
+
+  if (added.length === 0 && !addRuntimeEntry && removed.length === 0) {
     return { added, removed };
   }
 
   if (content && !content.endsWith('\n')) {
     content += '\n';
   }
-  if (!normalizedLines.some(l => l.includes('Polyrepo') || l.includes('polyrepo'))) {
-    content += '\n# Polyrepo sub-repositories\n';
+  if (added.length > 0) {
+    if (!normalizedLines.some(l => l.includes('Polyrepo') || l.includes('polyrepo'))) {
+      content += '\n# Polyrepo sub-repositories\n';
+    }
+    content += added.join('\n') + '\n';
   }
-  content += added.join('\n') + '\n';
+  if (addRuntimeEntry) {
+    content += '\n# Overdeck workspace runtime (PAN-2541: durable state lives on overdeck-state)\n.overdeck/\n';
+    added.push('.overdeck/');
+  }
   writeFileSync(gitignorePath, content, 'utf-8');
   return { added, removed };
 }
@@ -362,6 +376,23 @@ export async function createWorkspacePromise(options: WorkspaceCreateOptions): P
     const msg = `Dependency install failed (${pkgManager}): ${installErr.message?.slice(0, 200)}`;
     result.errors.push(msg);
     progress('Installing dependencies', 'Failed — workspace creation aborted', 'complete');
+    return result;
+  }
+
+  // Package installers such as Husky regenerate the resolved hooks directory.
+  // Reinstall the guard after dependencies so workspace creation cannot erase it.
+  const hookTargets = workspaceConfig.type === 'polyrepo' && workspaceConfig.repos
+    ? workspaceConfig.repos
+      .filter(repo => repo.link_type !== 'symlink')
+      .map(repo => join(workspacePath, repo.name))
+      .filter(path => existsSync(join(path, '.git')))
+    : [workspacePath];
+  try {
+    for (const hookTarget of hookTargets) {
+      await installPreRebaseHook(hookTarget);
+    }
+  } catch (hookErr: any) {
+    result.errors.push(`Pre-rebase guard install failed: ${hookErr.message?.slice(0, 200)}`);
     return result;
   }
 

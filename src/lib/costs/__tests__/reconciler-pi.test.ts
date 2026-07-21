@@ -24,6 +24,16 @@ describe('PAN-1935: pi-harness cost capture', () => {
       expect(pricing!.outputPer1k).toBe(0.004); // $4.00/M
     });
 
+    it('returns pricing for K3 model ids', () => {
+      for (const model of ['k3', 'k3[1m]']) {
+        const pricing = getPricingSync('custom', model);
+        expect(pricing).not.toBeNull();
+        expect(pricing!.inputPer1k).toBe(0.003); // $3.00/M cache-miss
+        expect(pricing!.outputPer1k).toBe(0.015); // $15.00/M
+        expect(pricing!.cacheReadPer1k).toBe(0.0003); // $0.30/M cache-hit
+      }
+    });
+
     it('returns pricing for glm-5.1 and glm-4.7', () => {
       expect(getPricingSync('custom', 'glm-5.1')).not.toBeNull();
       expect(getPricingSync('custom', 'glm-4.7')).not.toBeNull();
@@ -93,6 +103,14 @@ describe('PAN-1935: pi-harness cost capture', () => {
       const content = piMessage('kimi-k2.7-code', 'kimi', { input: 50000, output: 1000, cacheRead: 0, cacheWrite: 0, totalTokens: 51000 }, 'kresp-1', 'k1');
       const [ev] = extractPiCostEvents(content, 'agent-pan-1922', 'PAN-1922', 'work', sessionId);
       expect(ev!.model).toBe('kimi-k2.7-code');
+      expect(ev!.provider).toBe('custom');
+      expect(ev!.cost).toBeGreaterThan(0);
+    });
+
+    it('extracts a K3 event', () => {
+      const content = piMessage('k3', 'kimi', { input: 50000, output: 1000, cacheRead: 0, cacheWrite: 0, totalTokens: 51000 }, 'kresp-3', 'k3');
+      const [ev] = extractPiCostEvents(content, 'agent-pan-2859', 'PAN-2859', 'work', sessionId);
+      expect(ev!.model).toBe('k3');
       expect(ev!.provider).toBe('custom');
       expect(ev!.cost).toBeGreaterThan(0);
     });

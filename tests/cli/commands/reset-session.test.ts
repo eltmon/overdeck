@@ -33,7 +33,33 @@ vi.mock('../../../src/lib/issue-id.js', () => ({
   resolveIssueIdSync: (id: string) => id.toUpperCase(),
 }));
 
-import { resetReviewSessionsCommand } from '../../../src/cli/commands/reset-session.js';
+import { resetReviewSessionsCommand, resetSessionCommand } from '../../../src/cli/commands/reset-session.js';
+
+describe('resetSessionCommand', () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('targets a full agent-… id directly instead of rebuilding from the issue id (PAN-2948)', async () => {
+    const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+
+    await resetSessionCommand('agent-min-880-review');
+
+    expect(mocks.clearAgentSessionPointers).toHaveBeenCalledWith('agent-min-880-review');
+
+    consoleSpy.mockRestore();
+  });
+
+  it('targets the work agent for a bare issue id', async () => {
+    const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+
+    await resetSessionCommand('pan-2895');
+
+    expect(mocks.clearAgentSessionPointers).toHaveBeenCalledWith('agent-pan-2895');
+
+    consoleSpy.mockRestore();
+  });
+});
 
 describe('resetReviewSessionsCommand', () => {
   afterEach(() => {

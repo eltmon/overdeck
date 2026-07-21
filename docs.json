@@ -98,6 +98,7 @@
             "group": "Configuration",
             "pages": [
               "configuration/projects",
+              "configuration/knowledge",
               "configuration/harnesses",
               "configuration/context-layers",
               "configuration/state-branch",

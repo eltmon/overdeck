@@ -17,6 +17,7 @@ import { getDashboardIdentity } from './identity.js';
 import { Effect, FileSystem, Layer, Option, Path } from 'effect';
 import { FetchHttpClient, HttpRouter, HttpServer, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
 import { ServerConfig } from './config.js';
+import { markDashboardListening } from './dashboard-listening.js';
 import { EventStoreServiceLive } from './services/domain-services.js';
 import { ReadModelServiceLive } from './read-model.js';
 import { AgentsResolverLive } from '../../lib/overdeck/agents.js';
@@ -33,10 +34,12 @@ import { WorkspaceServiceLive } from './services/workspace-service.js';
 import { OpenRouterServiceLive } from './services/openrouter-service.js';
 import { PanOpenLive } from './services/open.js';
 import { setupTerminalWebSocket } from './ws-terminal.js';
+import { knowledgeViewerRouteLayer, setupKnowledgeViewerProxy } from './routes/knowledge-viewer.js';
 import { setupVoiceWebSocket } from './ws-voice.js';
 import { setupAutoPresoWebSocket } from './ws-autopreso.js';
 import { websocketRpcRouteLayer } from './ws-rpc.js'
 import { issuesRouteLayer } from './routes/issues.js'
+import { pipelineMembershipRouteLayer } from './routes/pipeline-membership.js'
 import { agentsRouteLayer } from './routes/agents.js'
 import { workspacesRouteLayer } from './routes/workspaces.js'
 import { specialistsRouteLayer } from './routes/specialists.js'
@@ -76,6 +79,7 @@ import { internalEventsRouteLayer } from './routes/internal-events.js';
 import { dashboardCsrfToken, dashboardSessionCookieHeader, rejectUnauthorizedDashboardRequest, rejectUnauthorizedDashboardSessionMintRequest } from './routes/dashboard-auth.js';
 import { validateOrigin } from './routes/origin-validation.js';
 import { emitActivityEntrySync, emitActivityTtsSync } from '../../lib/activity-logger.js';
+import { retryDashboardBind } from './server-bind.js';
 
 // ─── Dual-runtime layers ──────────────────────────────────────────────────────
 
@@ -91,14 +95,23 @@ const HttpServerLive = Layer.unwrap(
       Effect.promise(() => import('@effect/platform-node/NodeHttpServer')),
       Effect.promise(() => import('node:http')),
     ]);
-    const nodeServer = NodeHttp.createServer();
-    setupTerminalWebSocket(nodeServer);
-    setupVoiceWebSocket(nodeServer);
-    setupAutoPresoWebSocket(nodeServer);
-    return NodeHttpServer.layer(() => nodeServer, {
+    const bind = retryDashboardBind(NodeHttpServer.make(() => {
+      const nodeServer = NodeHttp.createServer();
+      setupTerminalWebSocket(nodeServer);
+      setupKnowledgeViewerProxy(nodeServer);
+      setupVoiceWebSocket(nodeServer);
+      setupAutoPresoWebSocket(nodeServer);
+      return nodeServer;
+    }, {
       host: config.host,
       port: config.port,
+    }), (attempt, delayMs) => {
+      console.warn(`[overdeck] HTTP bind failed with EADDRINUSE; retry ${attempt}/3 in ${delayMs}ms`);
     });
+    return Layer.mergeAll(
+      Layer.effect(HttpServer.HttpServer)(bind),
+      NodeHttpServer.layerHttpServices,
+    );
   }),
 );
 
@@ -305,6 +318,7 @@ export const makeRoutesLayer = Layer.mergeAll(
   dashboardSessionRouteLayer,
   websocketRpcRouteLayer,
   issuesRouteLayer,
+  pipelineMembershipRouteLayer,
   agentsRouteLayer,
   workspacesRouteLayer,
   specialistsRouteLayer,
@@ -341,6 +355,7 @@ export const makeRoutesLayer = Layer.mergeAll(
   tieredCalloutsRouteLayer,
   backlogRouteLayer,
   internalEventsRouteLayer,
+  knowledgeViewerRouteLayer,
   staticRouteLayer,
 );
 
@@ -406,6 +421,7 @@ export const makeServerLayer = Layer.unwrap(
       Effect.gen(function* () {
         yield* HttpServer.HttpServer;
         yield* Effect.sync(() => {
+          markDashboardListening();
           console.log(`[boot-timing] HTTP server listening at +${Math.round(performance.now())}ms (since process start)`);
           console.log(`[overdeck] Dashboard listening on http://${config.host}:${config.port}`);
           const mode = process.env['OVERDECK_MODE'] === 'production' ? 'production mode' : 'development mode';

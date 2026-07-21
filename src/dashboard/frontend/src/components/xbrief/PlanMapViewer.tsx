@@ -14,6 +14,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useDashboardStore } from '../../lib/store';
 import DagRenderer, { type DagEdge, type DagNode } from './DagRenderer';
 import type { XBriefDocument, XBriefItem } from './types';
+import { LoadingBoundary } from '../primitives/LoadingBoundary';
 
 export interface PlanMapViewerProps {
   issueId: string;
@@ -84,7 +85,13 @@ export function PlanMapViewer({ issueId, onNodeClick, className, compact }: Plan
   }, [storeSequence, issueId, queryClient]);
 
   if (isLoading) {
-    return <div className={className}><div className="px-3 py-6 text-xs text-muted-foreground">Loading the plan map…</div></div>;
+    return (
+      <div className={className}>
+        <LoadingBoundary label="The plan map" timeoutMs={8000}>
+          <div className="px-3 py-6 text-xs text-muted-foreground">Loading the plan map…</div>
+        </LoadingBoundary>
+      </div>
+    );
   }
   if (isError || !doc?.plan) {
     return <div className={className}><div className="px-3 py-6 text-xs text-muted-foreground">No plan to map yet.</div></div>;

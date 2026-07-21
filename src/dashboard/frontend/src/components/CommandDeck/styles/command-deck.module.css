@@ -183,6 +183,13 @@
   padding: 2px 0;
 }
 
+.membershipStatus {
+  margin: 4px 8px;
+  color: var(--muted-foreground);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
 .membershipError {
   display: flex;
   align-items: flex-start;

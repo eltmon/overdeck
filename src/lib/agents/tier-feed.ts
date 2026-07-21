@@ -15,6 +15,7 @@
 
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
+import { renderWorkspaceGitShowPromise } from '../git-utils.js';
 import { deliverAgentMessage, type DeliveryResult } from './delivery.js';
 import type { StandingTierAgent } from './standing-tiers.js';
 import { estimateFeedDeliveryTokens, recordTierFeedDelivery } from './tier-metrics.js';
@@ -63,6 +64,7 @@ export interface BroadcastDelivery {
 }
 
 export interface RenderCommitFeedDiffDeps {
+  issueId?: string;
   gitShow?: (workspace: string, sha: string, args: string[]) => Promise<string>;
 }
 
@@ -100,11 +102,11 @@ export async function renderCommitFeedDiff(
   const pathspecArgs = feedConfig.exclude.length > 0
     ? ['--', '.', ...feedConfig.exclude.map(glob => `:(exclude)${glob}`)]
     : [];
-  const diff = await gitShow(workspace, sha, pathspecArgs);
+  const diff = await renderWorkspaceGitShowPromise(deps.issueId, workspace, sha, pathspecArgs, gitShow);
   const maxBytes = feedConfig.max_diff_bytes;
   if (maxBytes === null || Buffer.byteLength(diff, 'utf-8') <= maxBytes) return diff;
 
-  const stat = await gitShow(workspace, sha, ['--stat', ...pathspecArgs]);
+  const stat = await renderWorkspaceGitShowPromise(deps.issueId, workspace, sha, ['--stat', ...pathspecArgs], gitShow);
   return [
     stat.trimEnd(),
     '',
@@ -184,9 +186,13 @@ export async function broadcastCommit(options: BroadcastCommitOptions): Promise<
   if (shouldSkipFeedSubject(subject, feedConfig)) return [];
 
   const renderDiff = options.renderDiff
-    ?? (options.gitShow
-      ? (workspace: string, sha: string) => options.gitShow!(workspace, sha)
-      : renderCommitFeedDiff);
+    ?? ((workspace: string, sha: string, config: ValidatedTieredExecutionFeedConfig) =>
+      renderCommitFeedDiff(workspace, sha, config, {
+        issueId: options.issueId,
+        gitShow: options.gitShow
+          ? (repoPath, repoSha) => options.gitShow!(repoPath, repoSha)
+          : undefined,
+      }));
   const deliver = options.deliver ?? deliverAgentMessage;
   const recordDelivery = options.recordDelivery ?? recordTierFeedDelivery;
   const now = options.now ?? (() => new Date());

@@ -19,9 +19,9 @@ import { useQuery } from '@tanstack/react-query';
 import { GitFork, TriangleAlert, AlertCircle, Wrench } from 'lucide-react';
 
 import { ConversationPanel } from '../chat/ConversationPanel';
+import { StartAgentCta } from '../issue-view/StartAgentCta';
 import type { Conversation } from '../CommandDeck/ConversationList';
 import { XTerminal } from '../XTerminal';
-import type { Agent } from '../../types';
 import { useConversationUiState } from '../../hooks/useConversationUiState';
 import styles from '../CommandDeck/styles/command-deck.module.css';
 
@@ -39,9 +39,27 @@ async function fetchAgentGitInfo(agentId: string): Promise<AgentGitInfo | null> 
   return res.json();
 }
 
-const ENDED_AGENT_STATUSES = new Set<Agent['status']>(['stopped', 'dead', 'failed']);
+const ENDED_AGENT_STATUSES = new Set<string>(['stopped', 'dead', 'failed']);
 
-function isEndedAgent(agent: Agent): boolean {
+/**
+ * The minimal agent shape a session pane needs. Both the read-model
+ * AgentSnapshot (simple mode, peeks) and the REST Agent (drawer) satisfy it —
+ * one conversation renderer over whichever projection the caller has.
+ */
+export interface SessionAgent {
+  id: string;
+  issueId?: string | null;
+  status: string;
+  role?: string | null;
+  startedAt?: string | null;
+  lastActivity?: string | null;
+  workspace?: string | null;
+  model?: string | null;
+  harness?: string | null;
+  runtime?: string | null;
+}
+
+function isEndedAgent(agent: SessionAgent): boolean {
   return ENDED_AGENT_STATUSES.has(agent.status);
 }
 
@@ -49,7 +67,7 @@ function isEndedAgent(agent: Agent): boolean {
  * Pick the agent the drawer should show by default: the active work agent,
  * then any work agent, then any active agent, then whatever exists.
  */
-export function pickDefaultDrawerAgent(agents: readonly Agent[]): Agent | null {
+export function pickDefaultDrawerAgent(agents: readonly SessionAgent[]): SessionAgent | null {
   const live = agents.filter((agent) => !isEndedAgent(agent));
   return (
     live.find((agent) => agent.role === 'work')
@@ -60,8 +78,8 @@ export function pickDefaultDrawerAgent(agents: readonly Agent[]): Agent | null {
   );
 }
 
-/** Synthesize a Conversation from an Agent so ConversationPanel can render it. */
-function agentToConversation(agent: Agent): Conversation {
+/** Synthesize a Conversation from an agent so ConversationPanel can render it. */
+function agentToConversation(agent: SessionAgent): Conversation {
   const ended = isEndedAgent(agent);
   return {
     id: -1,
@@ -70,24 +88,23 @@ function agentToConversation(agent: Agent): Conversation {
     status: ended ? 'ended' : 'active',
     cwd: agent.workspace ?? '',
     issueId: agent.issueId ?? null,
-    createdAt: agent.startedAt,
+    createdAt: agent.startedAt ?? agent.lastActivity ?? '',
     // ConversationPanel reads `!sessionAlive && !endedAt` as "still spawning"
     // and shows a "Starting…" placeholder over the transcript — an ended agent
     // must report a non-null endedAt, so fall back to lastActivity/startedAt.
-    endedAt: ended ? (agent.lastActivity ?? agent.startedAt) : null,
+    endedAt: ended ? (agent.lastActivity ?? agent.startedAt ?? null) : null,
     lastAttachedAt: null,
     sessionAlive: !ended,
     sessionFile: agent.id,
     model: agent.model,
     // The agent snapshot carries the harness in `runtime` (claude-code|pi|codex);
-    // `harness` itself is not on AgentSnapshot. Fall back to runtime so the
-    // synthetic conversation is correctly tagged — this drives the RPC terminal
-    // notice and pi/codex live streaming (PAN-1908).
+    // fall back to runtime so the synthetic conversation is correctly tagged —
+    // this drives the RPC terminal notice and pi/codex live streaming (PAN-1908).
     harness: ((agent.harness ?? agent.runtime) as Conversation['harness']) ?? null,
   };
 }
 
-function agentOptionLabel(agent: Agent): string {
+function agentOptionLabel(agent: SessionAgent): string {
   const slotMatch = /^agent-[a-z]+-\d+-slot-(\d+)$/i.exec(agent.id);
   if (slotMatch) return `Slot ${slotMatch[1]} · ${agent.id}`;
 
@@ -97,13 +114,17 @@ function agentOptionLabel(agent: Agent): string {
 
 interface DrawerAgentSessionProps {
   view: 'conversation' | 'terminal';
-  agents: readonly Agent[];
+  agents: readonly SessionAgent[];
   /** The agent to display — resolved by IssueDrawer, shared across both tabs. */
   agentId: string | null;
   onSelectAgent: (agentId: string) => void;
+  /** Needed for the no-agent start surface (StartAgentCta). */
+  issueId?: string | null;
+  /** Hide ConversationPanel's composer — the parent provides its own (simple mode). */
+  hideComposer?: boolean;
 }
 
-export function DrawerAgentSession({ view, agents, agentId, onSelectAgent }: DrawerAgentSessionProps) {
+export function DrawerAgentSession({ view, agents, agentId, onSelectAgent, issueId, hideComposer = false }: DrawerAgentSessionProps) {
   const testId = `drawer-tab-panel-${view}`;
 
   const agent = useMemo(
@@ -137,9 +158,17 @@ export function DrawerAgentSession({ view, agents, agentId, onSelectAgent }: Dra
         <div className="mb-[8px] text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
           {view === 'conversation' ? 'Conversation' : 'Terminal'}
         </div>
-        <p className="text-[12px] leading-5 text-muted-foreground">
-          No agent session for this issue yet. The {view === 'conversation' ? 'transcript' : 'live terminal'} appears here once an agent starts.
+        <p className="text-[12px] font-medium text-foreground">
+          Nothing here yet — no agent has started on this issue.
         </p>
+        <p className="mt-[4px] text-[12px] leading-5 text-muted-foreground">
+          Start work and the live {view === 'conversation' ? 'conversation' : 'terminal'} appears here. Everything else about the issue is one tab away (Overview).
+        </p>
+        {issueId && (
+          <div className="mt-[12px]">
+            <StartAgentCta issueId={issueId} density="console" />
+          </div>
+        )}
       </div>
     );
   }
@@ -226,6 +255,7 @@ export function DrawerAgentSession({ view, agents, agentId, onSelectAgent }: Dra
             agentId={agent.id}
             hideToolCalls={hideToolCalls}
             onToggleHideToolCalls={toggleHideToolCalls}
+            hideComposer={hideComposer}
           />
         ) : isEndedAgent(agent) ? (
           <div className="flex h-full items-center justify-center p-[18px] text-[13px] text-muted-foreground">

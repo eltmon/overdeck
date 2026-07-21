@@ -68,21 +68,25 @@ export function AppChrome({
 }: AppChromeProps) {
   return (
     <>
-      <BootReconciliationModal />
+      {/* PAN-2908 C-FRESH: system notices render in ONE slim row instead of
+          stacked full-width banners. */}
+      <div data-component="system-notices-row" className="flex flex-wrap items-stretch border-b border-border">
+        <BootReconciliationModal />
 
-      {/* Deacon-frozen state and stopped-agents are now compact pills in the
-          app bar (PAN-1591), not persistent full-width banners. */}
-      <OrphanTestAgentsSurface />
+        {/* Deacon-frozen state and stopped-agents are now compact pills in the
+            app bar (PAN-1591), not persistent full-width banners. */}
+        <OrphanTestAgentsSurface />
 
-      {/* Setup checklist — shown while a required host tool (tmux, git, node,
-          claude) is missing from the server's PATH (PAN-774) */}
-      <SetupChecklistBanner />
+        {/* Setup checklist — shown while a required host tool (tmux, git, node,
+            claude) is missing from the server's PATH (PAN-774) */}
+        <SetupChecklistBanner />
 
-      {/* Package/context inputs changed since the last pan sync. */}
-      <SyncRequiredBanner />
+        {/* Package/context inputs changed since the last pan sync. */}
+        <SyncRequiredBanner />
 
-      {/* Codex Auth Banner — shown when Codex OAuth tokens are expired/burned */}
-      <CodexAuthBanner />
+        {/* Codex Auth Banner — shown when Codex OAuth tokens are expired/burned */}
+        <CodexAuthBanner />
+      </div>
 
       {/* Dashboard Restart Banner — shown during a planned restart (post-merge deploy, pan restart) */}
       {showRestartBanner && (

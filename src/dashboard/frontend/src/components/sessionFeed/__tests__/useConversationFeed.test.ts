@@ -86,14 +86,22 @@ describe('mapConversationsToFeedEntries', () => {
     expect(entries[0]?.lastMessageSnippet).toBe('No messages yet');
   });
 
-  it('maps harness values to feed agents', () => {
+  it('maps harness values to feed agents through their registered behavior', () => {
     const entries = mapConversationsToFeedEntries([
       conversation({ name: 'claude', harness: 'claude-code' }),
       conversation({ name: 'pi', harness: 'ohmypi' }),
+      conversation({ name: 'codex', harness: 'codex' }),
+      conversation({ name: 'acp', harness: 'acp' }),
       conversation({ name: 'unknown', harness: null }),
     ]);
 
-    expect(entries.map((entry) => entry.agent)).toEqual(['claude_code', 'pi', 'unknown']);
+    expect(entries.map((entry) => entry.agent)).toEqual([
+      'claude_code',
+      'pi',
+      'codex',
+      'acp',
+      'unknown',
+    ]);
   });
 });
 

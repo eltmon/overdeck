@@ -68,6 +68,26 @@ describe('resolvePrimaryDashboardIdentity', () => {
     );
     expect(child.unref).toHaveBeenCalled();
   });
+
+  it('returns a handle that stops the spawned systemd unit', () => {
+    processMocks.execFileSync.mockReturnValue(undefined);
+    vi.spyOn(Date, 'now').mockReturnValue(123456);
+
+    const handle = spawnDashboardDetached({
+      dashboardPort: 3010,
+      dashboardApiPort: 3011,
+      traefikEnabled: false,
+      traefikDomain: 'overdeck.localhost',
+    } as Parameters<typeof spawnDashboardDetached>[0]);
+    handle.stop();
+
+    expect(processMocks.execFileSync).toHaveBeenLastCalledWith(
+      'systemctl',
+      ['--user', 'stop', 'overdeck-dashboard-123456.service'],
+      { stdio: 'ignore' },
+    );
+    expect(processMocks.spawn).not.toHaveBeenCalled();
+  });
 });
 
 describe('refuseNonPrimaryDashboardCwd', () => {

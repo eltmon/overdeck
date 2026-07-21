@@ -28121,7 +28121,8 @@ function validateRoleFields(role, roleConfig) {
 			if (!Number.isInteger(entry.weight) || entry.weight <= 0) throw new Error(`config.yaml: roles.${role}.model[${i}].weight must be a positive integer`);
 		}
 	}
-	if (roleConfig.harness !== void 0 && roleConfig.harness !== "claude-code" && roleConfig.harness !== "ohmypi" && roleConfig.harness !== "codex") throw new Error(`config.yaml: roles.${role}.harness must be claude-code, ohmypi, or codex`);
+	if (roleConfig.autonomousModel !== void 0 && typeof roleConfig.autonomousModel !== "string") throw new Error(`config.yaml: roles.${role}.autonomousModel must be a scalar model reference`);
+	if (roleConfig.harness !== void 0 && roleConfig.harness !== "claude-code" && roleConfig.harness !== "ohmypi" && roleConfig.harness !== "codex" && roleConfig.harness !== "acp") throw new Error(`config.yaml: roles.${role}.harness must be claude-code, ohmypi, codex, or acp`);
 	if (roleConfig.effort !== void 0 && !ROLE_EFFORTS.includes(roleConfig.effort)) throw new Error(`config.yaml: roles.${role}.effort must be one of ${ROLE_EFFORTS.join(", ")}`);
 	if (roleConfig.mode !== void 0 && roleConfig.mode !== "quick" && roleConfig.mode !== "full" && roleConfig.mode !== "none") throw new Error(`config.yaml: roles.${role}.mode must be quick, full, or none`);
 	if (roleConfig.reReviewScope !== void 0 && roleConfig.reReviewScope !== "all" && roleConfig.reReviewScope !== "changed" && roleConfig.reReviewScope !== "blockers") throw new Error(`config.yaml: roles.${role}.reReviewScope must be all, changed, or blockers`);
@@ -28138,6 +28139,7 @@ function validateRoleModelRefs(config) {
 	}
 	for (const [role, roleConfig] of Object.entries(config.roles ?? {})) {
 		validateRoleFields(role, roleConfig);
+		if (typeof roleConfig.autonomousModel === "string") derefWorkhorse(roleConfig.autonomousModel, config, `roles.${role}.autonomousModel`);
 		if (Array.isArray(roleConfig.model)) for (let i = 0; i < roleConfig.model.length; i++) derefWorkhorse(roleConfig.model[i].model, config, `roles.${role}.model[${i}].model`);
 		else if (roleConfig.model) {
 			const resolvedModel = derefWorkhorse(roleConfig.model, config, `roles.${role}.model`);
@@ -28734,7 +28736,7 @@ const DEFAULT_TIERED_EXECUTION_CONFIG = {
 	difficultyToTier: {}
 };
 function isRuntimeName(value) {
-	return value === "claude-code" || value === "ohmypi" || value === "codex";
+	return value === "claude-code" || value === "ohmypi" || value === "codex" || value === "acp";
 }
 function isDifficulty(value) {
 	return TIERED_EXECUTION_DIFFICULTIES.includes(value);
@@ -28757,7 +28759,7 @@ function knownModelIds() {
 	return ids;
 }
 function validateHarness(harness, path) {
-	if (!isRuntimeName(harness)) throw new TieredExecutionConfigError(`${path}.harness '${harness}' is unknown; expected claude-code, ohmypi, or codex`);
+	if (!isRuntimeName(harness)) throw new TieredExecutionConfigError(`${path}.harness '${harness}' is unknown; expected claude-code, ohmypi, codex, or acp`);
 }
 function validateModel(model, path) {
 	const resolved = resolveModelIdSync(model);
@@ -29288,7 +29290,7 @@ function normalizeProviderConfig(providerConfig, fallbackKey) {
 	};
 }
 function validateProviderHarness(provider, harness) {
-	if (harness !== void 0 && harness !== "claude-code" && harness !== "ohmypi" && harness !== "codex") throw new Error(`config.yaml: models.providers.${provider}.harness must be claude-code, ohmypi, or codex`);
+	if (harness !== void 0 && harness !== "claude-code" && harness !== "ohmypi" && harness !== "codex" && harness !== "acp") throw new Error(`config.yaml: models.providers.${provider}.harness must be claude-code, ohmypi, codex, or acp`);
 }
 function applyProviderHarness(result, provider, harness) {
 	validateProviderHarness(provider, harness);

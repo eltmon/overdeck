@@ -64,12 +64,12 @@ export type VerificationStatusValue = typeof VerificationStatusValue.Type
 // consumer that branches on harness MUST go through getHarness() so unknown or
 // legacy values normalize to 'claude-code'.
 //
-// PAN-1989: narrowed to 3-value set — 'pi' retired; legacy DB rows read as
-// 'ohmypi' via getHarness(). All new write sites use 'ohmypi'.
+// PAN-1989 retired 'pi'; legacy DB rows read as 'ohmypi' via getHarness().
+// All new write sites use canonical harness literals.
 
-export type Harness = 'claude-code' | 'ohmypi' | 'codex'
+export type Harness = 'claude-code' | 'ohmypi' | 'codex' | 'acp'
 
-const KNOWN_HARNESSES: ReadonlySet<string> = new Set<Harness>(['claude-code', 'ohmypi', 'codex'])
+const KNOWN_HARNESSES: ReadonlySet<string> = new Set<Harness>(['claude-code', 'ohmypi', 'codex', 'acp'])
 
 /**
  * Normalize a snapshot's runtime field to a known Harness value.

@@ -146,7 +146,7 @@ function ConfirmDialogContent({
 
       {/* Body */}
       <div className="px-6 py-5 space-y-3">
-        <p id="dialog-message" className="text-sm text-foreground whitespace-pre-line">{options.message}</p>
+        <p id="dialog-message" className="text-sm text-foreground whitespace-pre-line select-text cursor-text">{options.message}</p>
         {requiresText ? (
           <label className="block text-xs text-muted-foreground">
             Type <span className="font-mono text-foreground">{options.requiredText}</span> to confirm
@@ -225,7 +225,7 @@ function AlertDialogContent({
 
       {/* Body */}
       <div className="px-6 py-5">
-        <p id="alert-message" className="text-sm text-foreground whitespace-pre-line">{options.message}</p>
+        <p id="alert-message" className="text-sm text-foreground whitespace-pre-line select-text cursor-text">{options.message}</p>
       </div>
 
       {/* Footer */}

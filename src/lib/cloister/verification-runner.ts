@@ -11,15 +11,17 @@
 import { basename, dirname, join } from 'path';
 import { homedir } from 'os';
 import { exec } from 'child_process';
-import { existsSync } from 'fs';
-import { readdir } from 'fs/promises';
 import { promisify } from 'util';
 import { Effect } from 'effect';
 import { getReviewStatusSync, markWorkspaceStuck, setReviewStatusSync } from '../review-status.js';
 import { runQualityGates, DEFAULT_GATES } from './validation.js';
 import { readVerificationArtifact, writeVerificationArtifact } from './verification-artifact.js';
 import { buildFinalFailureInstructions } from './verification-feedback.js';
-import { isVerificationWorkerActive, runSupervisedVerification } from './verification-worker-supervisor.js';
+import {
+  isVerificationWorkerActive,
+  markVerificationWorkerAdmissionPhase,
+  runSupervisedVerification,
+} from './verification-worker-supervisor.js';
 import type {
   VerificationRunnerOptions,
   VerificationRunnerOutcome,
@@ -30,6 +32,7 @@ import { writeFeedbackFile } from './feedback-writer.js';
 import { resolveIssueFeedbackTarget, surfaceIssueFeedbackNeedsYou } from './feedback-target.js';
 import { messageAgent, setAgentPaused, stopAgent } from '../agents.js';
 import { findProjectByPathSync, resolveProjectFromIssueSync } from '../projects.js';
+import { resolveWorkspaceRepoRootsSync } from '../project-repos.js';
 import { getXBriefACStatusSync } from '../xbrief/acceptance-criteria.js';
 import { XBriefMergeConflictError } from '../xbrief/io.js';
 import { isXBriefFilename } from '../xbrief/lifecycle.js';
@@ -40,8 +43,24 @@ const execAsync = promisify(exec);
 
 export const VERIFICATION_MAX_CYCLES = 3;
 const NO_PROGRESS_REPEAT_THRESHOLD = 2;
+const MERGED_VERIFICATION_REASON = 'Merge already landed; verify-on-main owns post-merge validation.';
 
 export type { VerificationRunnerOptions, VerificationRunnerOutcome, WorkspaceInfo } from './verification-types.js';
+
+function skipMergedVerification(
+  issueId: string,
+  logPrefix: string,
+  status = getReviewStatusSync(issueId),
+): VerificationRunnerOutcome | null {
+  if (status?.mergeStatus !== 'merged') return null;
+
+  setReviewStatusSync(issueId, {
+    verificationStatus: 'skipped',
+    verificationNotes: MERGED_VERIFICATION_REASON,
+  });
+  console.log(`[${logPrefix}] Skipping pre-merge verification for ${issueId}: ${MERGED_VERIFICATION_REASON}`);
+  return { outcome: 'skipped', reason: MERGED_VERIFICATION_REASON };
+}
 
 interface SyncResult {
   repoDir: string;
@@ -108,6 +127,8 @@ async function escalateVerificationStuck(
   summary: string,
   logPrefix: string,
 ): Promise<void> {
+  if (skipMergedVerification(issueId, logPrefix)) return;
+
   const agentId = `agent-${issueId.toLowerCase()}`;
   const reason = `needs-you: verification stuck after ${cycleCount}/${VERIFICATION_MAX_CYCLES} attempts (${failedCheck})`;
 
@@ -189,7 +210,11 @@ async function deliverVerificationFeedback(
   details: Record<string, unknown>,
   logPrefix: string,
 ): Promise<void> {
+  if (skipMergedVerification(issueId, logPrefix)) return;
+
   const target = await resolveIssueFeedbackTarget(issueId);
+  if (skipMergedVerification(issueId, logPrefix)) return;
+
   if ('agentId' in target) {
     // PAN-2668: verification feedback owes rework — a stopped-by-user agent
     // with a completed handoff is re-driven, not silently queued mail.
@@ -202,37 +227,6 @@ async function deliverVerificationFeedback(
     specialist: 'verification-gate',
     ...details,
   });
-}
-
-async function resolveGitDirs(
-  workspacePath: string,
-  projectConfig: ReturnType<typeof findProjectByPathSync>,
-): Promise<{ gitDirs: string[]; isPolyrepo: boolean }> {
-  const isPolyrepoConfig = projectConfig?.workspace?.type === 'polyrepo';
-
-  if (!isPolyrepoConfig && existsSync(join(workspacePath, '.git'))) {
-    return { gitDirs: [workspacePath], isPolyrepo: false };
-  }
-
-  const gitDirs: string[] = [];
-  try {
-    const entries = await readdir(workspacePath, { withFileTypes: true });
-    for (const entry of entries) {
-      if (entry.isDirectory() && !entry.name.startsWith('.') && existsSync(join(workspacePath, entry.name, '.git'))) {
-        gitDirs.push(join(workspacePath, entry.name));
-      }
-    }
-  } catch {}
-
-  if (gitDirs.length > 0) {
-    return { gitDirs, isPolyrepo: true };
-  }
-
-  if (existsSync(join(workspacePath, '.git'))) {
-    return { gitDirs: [workspacePath], isPolyrepo: false };
-  }
-
-  return { gitDirs: [], isPolyrepo: false };
 }
 
 async function syncSingleRepo(gitDir: string, targetBranch: string): Promise<SyncResult> {
@@ -352,6 +346,33 @@ export function changesetHasNoContent(changedFiles: readonly string[]): boolean 
   return content.length === 0;
 }
 
+/**
+ * Return whether any actual workspace repository contains implementation
+ * changes. `undefined` means at least one repo diff failed and no positive
+ * evidence was found, so callers must conservatively skip the empty guard.
+ */
+export async function workspaceChangesetHasContent(
+  issueId: string,
+  workspacePath: string,
+): Promise<boolean | undefined> {
+  const roots = resolveWorkspaceRepoRootsSync(issueId, workspacePath);
+  let diffFailed = false;
+
+  for (const root of roots) {
+    try {
+      const { stdout } = await execAsync(
+        `git diff --name-only origin/${root.targetBranch}...HEAD`,
+        { cwd: root.dir, encoding: 'utf-8', timeout: 15_000 },
+      );
+      if (!changesetHasNoContent(stdout.split('\n'))) return true;
+    } catch {
+      diffFailed = true;
+    }
+  }
+
+  return diffFailed ? undefined : false;
+}
+
 async function runVerificationForIssuePromise(
   issueId: string,
   workspacePath: string,
@@ -360,6 +381,9 @@ async function runVerificationForIssuePromise(
   options: VerificationRunnerOptions = {},
 ): Promise<VerificationRunnerOutcome> {
   const currentStatus = getReviewStatusSync(issueId);
+  const mergedOutcome = skipMergedVerification(issueId, logPrefix, currentStatus);
+  if (mergedOutcome) return mergedOutcome;
+
   const currentCycles = currentStatus?.verificationCycleCount ?? 0;
 
   if (currentCycles >= VERIFICATION_MAX_CYCLES) {
@@ -374,21 +398,24 @@ async function runVerificationForIssuePromise(
 
   try {
     const projectConfig = findProjectByPathSync(workspacePath);
-    const { gitDirs, isPolyrepo } = await resolveGitDirs(workspacePath, projectConfig);
+    const repoRoots = resolveWorkspaceRepoRootsSync(issueId, workspacePath);
+    const isPolyrepo = repoRoots.some(root => root.isPolyrepo);
 
     // === Sync target branch ===
     if (options.syncTargetBranch !== false) {
-      if (gitDirs.length === 0) {
+      if (repoRoots.length === 0) {
         console.log(`[${logPrefix}] No git directories found in workspace ${workspacePath} — skipping sync`);
       } else {
         const syncResults: SyncResult[] = [];
-        for (const gitDir of gitDirs) {
-          const repoName = isPolyrepo ? basename(gitDir) : undefined;
-          const targetBranch = getSyncTargetBranch(workspacePath, projectConfig, repoName);
+        for (const root of repoRoots) {
+          const repoName = isPolyrepo ? root.repoKey : undefined;
           const displayName = repoName || basename(workspacePath);
-          console.log(`[${logPrefix}] Syncing ${targetBranch} into ${displayName} for ${issueId}...`);
-          syncResults.push(await syncSingleRepo(gitDir, targetBranch));
+          console.log(`[${logPrefix}] Syncing ${root.targetBranch} into ${displayName} for ${issueId}...`);
+          syncResults.push(await syncSingleRepo(root.dir, root.targetBranch));
         }
+
+        const postSyncMergedOutcome = skipMergedVerification(issueId, logPrefix);
+        if (postSyncMergedOutcome) return postSyncMergedOutcome;
 
         const failures = syncResults.filter(r => !r.success);
 
@@ -449,6 +476,9 @@ async function runVerificationForIssuePromise(
       console.log(`[${logPrefix}] Skipping target-branch sync for ${issueId}; verifying current workspace state`);
     }
 
+    const postSyncMergedOutcome = skipMergedVerification(issueId, logPrefix);
+    if (postSyncMergedOutcome) return postSyncMergedOutcome;
+
     // Load project-specific gates or fall back to defaults
     const gates =
       projectConfig?.quality_gates && Object.keys(projectConfig.quality_gates).length > 0
@@ -465,7 +495,7 @@ async function runVerificationForIssuePromise(
     // merged this branch into the workspace above, so `origin/<target>` is the
     // pre-PR baseline; `vitest run --changed {{CHANGED_BASE}}` then runs only the
     // tests affected by the PR and ignores pre-existing failures elsewhere.
-    const changedBase = `origin/${getSyncTargetBranch(workspacePath, projectConfig, undefined)}`;
+    const changedBase = `origin/${repoRoots[0]?.targetBranch ?? getSyncTargetBranch(workspacePath, projectConfig, undefined)}`;
     const placeholders: TemplatePlaceholders = {
       FEATURE_NAME: featureName,
       FEATURE_FOLDER: featureFolder,
@@ -537,10 +567,12 @@ async function runVerificationForIssuePromise(
     writeLiveArtifact();
 
     const gateResults = await Effect.runPromise(runQualityGates(gates, workspacePath, 'pre_push', {
+      issueId,
       isRemote: workspaceInfo.isRemote,
       vmName: workspaceInfo.vmName,
       placeholders,
       ...(options.onGateLog ? { onLog: options.onGateLog } : {}),
+      onAdmissionPhase: (state) => markVerificationWorkerAdmissionPhase(issueId, state),
       onGateStart: (name) => {
         liveGateName = name;
         liveGateTail = '';
@@ -565,6 +597,9 @@ async function runVerificationForIssuePromise(
       },
     }));
 
+    const postGateMergedOutcome = skipMergedVerification(issueId, logPrefix);
+    if (postGateMergedOutcome) return postGateMergedOutcome;
+
     const failedGate = gateResults.find(r => !r.passed && r.required !== false);
 
     // PAN-2461: an infra-unavailable gate (container/docker missing) is NOT a code
@@ -583,13 +618,14 @@ async function runVerificationForIssuePromise(
       });
       try {
         const { rebuildWorkspaceStack } = await import('../workspace/rebuild-stack.js');
-        void Effect.runPromise(rebuildWorkspaceStack(issueId, {
+        const rebuildResult = await Effect.runPromise(rebuildWorkspaceStack(issueId, {
           onProgress: (m) => console.log(`[${logPrefix}] ${issueId} stack rebuild: ${m}`),
-        })).then((r) => {
-          if (!r.success) console.warn(`[${logPrefix}] Stack rebuild for ${issueId} failed: ${r.error}`);
-        });
+        }));
+        if (!rebuildResult.success) {
+          console.warn(`[${logPrefix}] Stack rebuild for ${issueId} failed: ${rebuildResult.error}`);
+        }
       } catch (err) {
-        console.warn(`[${logPrefix}] Could not trigger stack rebuild for ${issueId}: ${err instanceof Error ? err.message : String(err)}`);
+        console.warn(`[${logPrefix}] Could not settle stack rebuild for ${issueId}: ${err instanceof Error ? err.message : String(err)}`);
       }
       return { outcome: 'failed', failedCheck: failedGate.name, cycleCount: currentCycles, maxCycles: VERIFICATION_MAX_CYCLES };
     }
@@ -748,6 +784,9 @@ async function runVerificationForIssuePromise(
     const taskBlockers = options.skipPlanChecklist
       ? []
       : await checkIncompletePlanItemsPromise(workspacePath, issueId);
+    const postChecklistMergedOutcome = skipMergedVerification(issueId, logPrefix);
+    if (postChecklistMergedOutcome) return postChecklistMergedOutcome;
+
     if (taskBlockers.length > 0) {
       const newCycleCount = currentCycles + 1;
       const failedCheck = 'incomplete-plan-items';
@@ -795,51 +834,55 @@ async function runVerificationForIssuePromise(
     // leaves a branch whose only changes are pipeline artifacts (.pan/xBRIEF task state);
     // lint/test/build and the AC gate all pass trivially on no code, so without
     // this guard the empty "completion" silently advances. Bounce it back.
-    try {
-      const { stdout: changedOut } = await execAsync(
-        `git diff --name-only ${changedBase}...HEAD`,
-        { cwd: workspacePath, encoding: 'utf-8', timeout: 15000 },
-      );
-      if (changesetHasNoContent(changedOut.split('\n'))) {
-        const newCycleCount = currentCycles + 1;
-        const failedCheck = 'empty-changeset';
-        const summary = `Branch has no implementation — only pipeline artifacts (.pan/xBRIEF task state) changed vs ${changedBase}. The work agent produced no code (likely a kickoff-delivery zombie — PAN-2179).`;
-        setReviewStatusSync(issueId, {
-          reviewStatus: 'pending',
-          verificationStatus: 'failed',
-          verificationNotes: summary,
-          verificationCycleCount: newCycleCount,
-          verificationMaxCycles: VERIFICATION_MAX_CYCLES,
-        });
-        if (shouldEscalateVerificationFailure(currentStatus, failedCheck, newCycleCount)) {
-          await escalateVerificationStuck(issueId, failedCheck, newCycleCount, summary, logPrefix);
-        }
-        try {
-          const msg = shouldEscalateVerificationFailure(currentStatus, failedCheck, newCycleCount)
-            ? `VERIFICATION STUCK for ${issueId}.\nFailed check: ${failedCheck} after ${newCycleCount}/${VERIFICATION_MAX_CYCLES} attempts — branch still has no implementation.\n\n${buildFinalFailureInstructions(issueId)}`
-            : `VERIFICATION FAILED for ${issueId}.\nFailed check: ${failedCheck} — your branch contains NO code (only .pan/xBRIEF task state changed vs ${changedBase}).\n\nYou must actually implement the issue: read the plan (.pan/spec.vbrief.json + the issue body), write and commit the code, push, then run pan review request. Do NOT stop at the prompt — keep working until pan review request completes.`;
-          await deliverVerificationFeedback(issueId, msg, {
-            failedCheck,
-            changedBase,
-          }, logPrefix);
-          console.error(`[${logPrefix}] VERIFICATION FAILED for ${issueId}: empty-changeset (no content files vs ${changedBase})`);
-        } catch (feedbackErr: any) {
-          console.error(`[${logPrefix}] Failed to send empty-changeset feedback for ${issueId}:`, feedbackErr);
-        }
-        return { outcome: 'failed', failedCheck, cycleCount: newCycleCount, maxCycles: VERIFICATION_MAX_CYCLES };
+    const changesetHasContent = await workspaceChangesetHasContent(issueId, workspacePath);
+    const postDiffMergedOutcome = skipMergedVerification(issueId, logPrefix);
+    if (postDiffMergedOutcome) return postDiffMergedOutcome;
+
+    if (changesetHasContent === false) {
+      const newCycleCount = currentCycles + 1;
+      const failedCheck = 'empty-changeset';
+      const comparedTargets = repoRoots.map(root => `${root.repoKey}:origin/${root.targetBranch}`).join(', ');
+      const summary = `Branch has no implementation — only pipeline artifacts (.pan/xBRIEF task state) changed across workspace repos vs ${comparedTargets}. The work agent produced no code (likely a kickoff-delivery zombie — PAN-2179).`;
+      setReviewStatusSync(issueId, {
+        reviewStatus: 'pending',
+        verificationStatus: 'failed',
+        verificationNotes: summary,
+        verificationCycleCount: newCycleCount,
+        verificationMaxCycles: VERIFICATION_MAX_CYCLES,
+      });
+      if (shouldEscalateVerificationFailure(currentStatus, failedCheck, newCycleCount)) {
+        await escalateVerificationStuck(issueId, failedCheck, newCycleCount, summary, logPrefix);
       }
-    } catch (diffErr: any) {
-      // Non-fatal: if the diff can't be computed, don't block — log and proceed.
-      console.warn(`[${logPrefix}] empty-changeset guard skipped (diff failed): ${diffErr.message}`);
+      try {
+        const msg = shouldEscalateVerificationFailure(currentStatus, failedCheck, newCycleCount)
+          ? `VERIFICATION STUCK for ${issueId}.\nFailed check: ${failedCheck} after ${newCycleCount}/${VERIFICATION_MAX_CYCLES} attempts — branch still has no implementation.\n\n${buildFinalFailureInstructions(issueId)}`
+          : `VERIFICATION FAILED for ${issueId}.\nFailed check: ${failedCheck} — your branch contains NO code (only .pan/xBRIEF task state changed across ${comparedTargets}).\n\nYou must actually implement the issue: read the plan (.pan/spec.vbrief.json + the issue body), write and commit the code, push, then run pan review request. Do NOT stop at the prompt — keep working until pan review request completes.`;
+        await deliverVerificationFeedback(issueId, msg, {
+          failedCheck,
+          changedBase: comparedTargets,
+        }, logPrefix);
+        console.error(`[${logPrefix}] VERIFICATION FAILED for ${issueId}: empty-changeset (no content files across ${comparedTargets})`);
+      } catch (feedbackErr: any) {
+        console.error(`[${logPrefix}] Failed to send empty-changeset feedback for ${issueId}:`, feedbackErr);
+      }
+      return { outcome: 'failed', failedCheck, cycleCount: newCycleCount, maxCycles: VERIFICATION_MAX_CYCLES };
+    }
+    if (changesetHasContent === undefined) {
+      console.warn(`[${logPrefix}] empty-changeset guard skipped (one or more repo diffs failed)`);
     }
 
     // Snapshot HEAD at verification pass time — compared with reviewedAtCommit
     // after review to skip redundant test-agent when no code changed.
+    // PAN-2948: polyrepo-aware — the wrapper repo's HEAD never changes, so
+    // snapshotting it would make this comparison report "no drift" forever.
     let lastVerifiedCommit: string | undefined;
     try {
-      const { stdout } = await execAsync('git rev-parse HEAD', { cwd: workspacePath, encoding: 'utf-8', timeout: 5000 });
-      lastVerifiedCommit = stdout.trim();
+      const { snapshotWorkspaceHeadsPromise } = await import('../git-utils.js');
+      lastVerifiedCommit = await snapshotWorkspaceHeadsPromise(issueId, workspacePath);
     } catch { /* non-fatal — skip optimization if we can't get HEAD */ }
+
+    const prePassMergedOutcome = skipMergedVerification(issueId, logPrefix);
+    if (prePassMergedOutcome) return prePassMergedOutcome;
 
     setReviewStatusSync(issueId, {
       verificationStatus: 'passed',
@@ -865,6 +908,9 @@ async function runVerificationForIssuePromise(
     return { outcome: 'passed' };
 
   } catch (verifyErr: any) {
+    const errorMergedOutcome = skipMergedVerification(issueId, logPrefix);
+    if (errorMergedOutcome) return errorMergedOutcome;
+
     setReviewStatusSync(issueId, {
       reviewStatus: 'pending',
       verificationStatus: 'failed',

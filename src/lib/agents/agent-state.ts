@@ -814,7 +814,9 @@ export function markAgentRunning(state: AgentState, options?: { preserveFailureT
   assertAgentCanTransitionToRunning(state);
   const oldStatus = state.status;
   state.status = 'running';
-  state.lastActivity = new Date().toISOString();
+  // Codex activity comes from app-server notifications or rollout JSONL. A
+  // synthetic spawn timestamp becomes permanently stale in the TUI fallback.
+  if (state.harness !== 'codex') state.lastActivity = new Date().toISOString();
   if (options?.preserveFailureTracking !== true) {
     clearFailureTrackingFields(state);
   }

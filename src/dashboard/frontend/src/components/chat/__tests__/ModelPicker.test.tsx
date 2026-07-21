@@ -111,10 +111,12 @@ describe('chat ModelPicker live harness labels', () => {
     expect(within(screen.getByRole('button', { name: /^Claude Code/i })).queryByText('Experimental')).not.toBeInTheDocument();
     expect(within(screen.getByRole('button', { name: /^oh-my-pi/i })).getByText('Experimental')).toBeInTheDocument();
     expect(within(screen.getByRole('button', { name: /^Codex/i })).getByText('Experimental')).toBeInTheDocument();
+    expect(within(screen.getByRole('button', { name: /^ACP/i })).getByText('Experimental')).toBeInTheDocument();
     expect(screen.getByLabelText('Claude Code logo')).toBeInTheDocument();
     expect(screen.getByLabelText('oh-my-pi logo')).toBeInTheDocument();
     expect(screen.getByLabelText('Codex logo')).toBeInTheDocument();
-    expect(screen.getAllByText(/May lose fidelity/)).toHaveLength(2);
+    expect(screen.getByLabelText('ACP logo')).toBeInTheDocument();
+    expect(screen.getAllByText(/May lose fidelity/)).toHaveLength(3);
     expect(screen.getByRole('button', { name: /^oh-my-pi/i })).toHaveAttribute('title', expect.stringContaining('May lose fidelity'));
   });
 

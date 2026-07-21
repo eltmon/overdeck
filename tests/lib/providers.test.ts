@@ -48,8 +48,10 @@ describe('providers', () => {
     });
   });
 
-  it('resolves the kimi provider for the kimi-k2.7-code coding model', () => {
-    expect(getProviderForModelSync('kimi-k2.7-code').name).toBe('kimi');
+  it('resolves the kimi provider for K2.7 and K3 Claude Code model ids', () => {
+    expect(getProviderForModelSync('kimi-k2.7-code')).toBe(PROVIDERS.kimi);
+    expect(getProviderForModelSync('k3')).toBe(PROVIDERS.kimi);
+    expect(getProviderForModelSync('k3[1m]')).toBe(PROVIDERS.kimi);
   });
 
   it('resolves the zai provider for glm-5.2', () => {

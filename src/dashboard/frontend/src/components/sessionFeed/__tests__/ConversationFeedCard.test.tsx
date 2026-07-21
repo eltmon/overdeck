@@ -49,6 +49,26 @@ describe('ConversationFeedCard', () => {
     expect(screen.getByText('π')).toBeInTheDocument();
   });
 
+  it('renders ACP conversations with Kimi labeling and transcript summary text', () => {
+    render(
+      <ConversationFeedCard
+        entry={entry({
+          agent: 'acp',
+          lastMessageSnippet: 'Read package.json\nThe repository is ready.',
+          messageCount: 2,
+        })}
+        onSelect={vi.fn()}
+        now={new Date('2026-05-23T01:05:00.000Z')}
+      />,
+    );
+
+    expect(screen.getByLabelText('ACP logo')).toBeInTheDocument();
+    expect(screen.getByText('Kimi')).toBeInTheDocument();
+    expect(screen.getByText(/Read package\.json/)).toBeInTheDocument();
+    expect(screen.getByText(/The repository is ready\./)).toBeInTheDocument();
+    expect(screen.getByText('2')).toBeInTheDocument();
+  });
+
   it('shows relative timestamp in a time element with dateTime set to the ISO timestamp', () => {
     render(
       <ConversationFeedCard

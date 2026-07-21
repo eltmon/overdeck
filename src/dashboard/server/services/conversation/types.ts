@@ -7,6 +7,8 @@ export interface ParseResult {
   byteOffset: number;
   /** True when the last assistant message has no completedAt and file was modified recently. */
   streaming: boolean;
+  /** Durable completion boundary for the current turn, when the transcript provides one. */
+  lastTurnCompletedAt?: string;
   /** Total estimated cost in USD computed from assistant message usage data (cache-discount aware). */
   totalCost: number;
   /** Total token throughput (input + output + cache read + cache write) across assistant messages. */

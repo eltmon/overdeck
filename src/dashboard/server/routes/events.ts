@@ -21,6 +21,7 @@ import { Effect, Layer, Option, Stream } from 'effect';
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
 
 import { getEventStore, type StoredEvent } from '../event-store.js';
+import { retainAllAgentOutputInterest } from '../services/agent-output-service.js';
 import { jsonResponse } from '../http-helpers.js';
 import { httpHandler } from './http-handler.js';
 
@@ -159,6 +160,7 @@ const getEventStreamRoute = HttpRouter.add(
       const nodeStream = new ReadableStream<Uint8Array>({
         start(controller) {
           let closed = false;
+          let cleanedUp = false;
           const safeEnqueue = (chunk: Uint8Array) => {
             if (closed) return;
             try {
@@ -210,16 +212,21 @@ const getEventStreamRoute = HttpRouter.add(
             if (!matchesFilter(event, filters)) return;
             safeEnqueue(encoder.encode(formatFrame(event)));
           });
+          const releaseOutputInterest = !filters.types || filters.types.has('agent.output_received')
+            ? retainAllAgentOutputInterest()
+            : () => undefined;
 
           const keepalive = setInterval(() => {
             safeEnqueue(encoder.encode(`: keepalive\n\n`));
           }, KEEPALIVE_INTERVAL_MS);
 
           cleanup = () => {
-            if (closed) return;
+            if (cleanedUp) return;
+            cleanedUp = true;
             closed = true;
             clearInterval(keepalive);
             unsubscribe();
+            releaseOutputInterest();
             try {
               controller.close();
             } catch {

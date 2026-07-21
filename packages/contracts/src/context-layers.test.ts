@@ -95,7 +95,7 @@ describe("context dashboard contracts", () => {
 
   it("names harness previews with shared harness values and fullPrompt", () => {
     const harnesses: readonly Harness[] = CONTEXT_PREVIEW_HARNESSES
-    expect(harnesses).toEqual(["claude-code", "ohmypi", "codex"])
+    expect(harnesses).toEqual(["claude-code", "ohmypi", "codex", "acp"])
 
     const parsed = decodePreviewResponse({
       operation: "preview",
@@ -103,6 +103,7 @@ describe("context dashboard contracts", () => {
         "claude-code": "Claude Code rendered context",
         ohmypi: "oh-my-pi rendered context",
         codex: "Codex rendered context",
+        acp: "ACP rendered context",
         fullPrompt: "Overdeck injected prompt audit",
       },
       diagnostics: [],
@@ -110,6 +111,7 @@ describe("context dashboard contracts", () => {
 
     expect(parsed.previews["claude-code"]).toBe("Claude Code rendered context")
     expect(parsed.previews.ohmypi).toBe("oh-my-pi rendered context")
+    expect(parsed.previews.acp).toBe("ACP rendered context")
     expect(parsed.previews.fullPrompt).toBe("Overdeck injected prompt audit")
   })
 

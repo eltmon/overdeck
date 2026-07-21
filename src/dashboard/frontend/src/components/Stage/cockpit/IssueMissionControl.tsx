@@ -1,31 +1,24 @@
-import { useCallback, useEffect, useState, type ReactNode } from 'react'
+import { useCallback, useMemo, useState, type ReactNode } from 'react'
 import { ActivityTab } from '../../CommandDeck/ZoneCOverviewTabs/ActivityTab'
 import { ShipTab } from './ShipTab'
-import { TasksTab } from '../../CommandDeck/ZoneCOverviewTabs/TasksTab'
 import { CostsTab } from '../../CommandDeck/ZoneCOverviewTabs/CostsTab'
 import { DiscussionsTab } from '../../CommandDeck/ZoneCOverviewTabs/DiscussionsTab'
-import { MarkdownTab } from '../../CommandDeck/ZoneCOverviewTabs/MarkdownTab'
 import { statusColor } from '../../CommandDeck/ZoneCOverviewTabs/PrDiffTab'
-import { XBriefTab } from '../../CommandDeck/ZoneCOverviewTabs/XBriefTab'
 import {
   useActivityQuery,
   useIssueCheckRunsQuery,
   useIssueCostsQuery,
-  usePlanningQuery,
   usePrQuery,
   useReviewStatusQuery,
   type IssueCheckRun,
   type ReviewStatusData,
 } from '../../CommandDeck/ZoneCOverviewTabs/queries'
-import DrawerArtifactsPanel from '../../drawer/DrawerArtifactsPanel'
-import { MergeButton } from '../../MergeButton'
-import { IssueActionDialogHost } from '../../IssueActionMenu/IssueActionMenu'
-import {
-  IssueActionGroupedBody,
-  type IssueActionMenuItemPrimitiveProps,
-  type IssueActionMenuPrimitives,
-} from '../../IssueActionMenu/IssueActionGroupedBody'
+import { IssueActionMenu } from '../../IssueActionMenu/IssueActionMenu'
 import { useIssueActions } from '../../IssueActionMenu/useIssueActions'
+import { selectAgents, selectReviewStatus, useDashboardStore } from '../../../lib/store'
+import { derivePipelineState, type PipelineState } from '../../../lib/issuePipelineState'
+import { currentPhase, phaseLabel } from '../../../lib/simple/phases'
+import { IssueDetail } from '../../issue-detail/IssueDetail'
 import { IssueView } from '../../issue-view/IssueView'
 import { SessionPanel } from '../../CommandDeck/SessionView/SessionPanel'
 import { MissionConversationTab } from './MissionConversationTab'
@@ -43,9 +36,10 @@ import { StatusHistoryTab } from './StatusHistoryTab'
 import { CrewStage } from './CrewStage'
 import { HappenedFeed } from './HappenedFeed'
 import { PlanMapCard } from './PlanMapCard'
-import { StatusNarrative, type JourneyStageKey } from './StatusNarrative'
+import { StatusNarrative } from './StatusNarrative'
 import { CockpitCard, CockpitPill, type CockpitTone } from './CockpitCard'
 import type { SessionNode } from '@overdeck/contracts'
+import type { Agent } from '../../../types'
 import styles from './cockpitBody.module.css'
 
 export interface IssueMissionControlProps {
@@ -62,37 +56,37 @@ export interface IssueMissionControlProps {
 }
 
 type MissionTab =
-  | 'overview'
-  | 'code'        // PAN-1991 #6: PR + CI checks + diff/changed-files
-  | 'plan'
-  | 'timeline'    // PAN-1991 #6: Activity + History merged
-  | 'discussion'
-  | 'costs'
-  | 'artifacts'
-  | 'ship'         // PAN-2487: Ship & Merge view — live merge-door progress + log
-  | 'files'        // tool — #10
-  | 'terminal'     // tool — #10
-  | 'beads'        // not a visible tab; reachable from the rail's "open full"
+  // PRD binding tab set — rendered by the ONE IssueDetail at page density.
+  | 'conversation' | 'plan' | 'tasks' | 'terminal' | 'activity' | 'files' | 'artifacts'
+  // Cockpit's own overview (richer than the drawer's) and the appended
+  // cockpit-only tabs (operator decision, #2962).
+  | 'overview' | 'code' | 'timeline' | 'discussion' | 'costs' | 'ship';
 
-type PipelinePhaseKey = 'plan' | 'work' | 'review' | 'test' | 'ci' | 'ship' | 'merge'
+/** Tabs whose bodies come from the ONE IssueDetail component. */
+const ISSUE_DETAIL_TAB_IDS = new Set<MissionTab>(['conversation', 'plan', 'tasks', 'terminal', 'activity', 'files', 'artifacts']);
+
+// PAN-2908 C-DETAIL (operator decision, #2962): the cockpit route renders the
+// one IssueDetail at page density for the binding set; the cockpit's own
+// overview plus its unique tabs append after. Conversation is the default.
+const TABS: Array<{ id: MissionTab; label: string }> = [
+  { id: 'conversation', label: 'Conversation' },
+  { id: 'overview', label: 'Overview' },
+  { id: 'plan', label: 'Plan map' },
+  { id: 'tasks', label: 'Tasks' },
+  { id: 'terminal', label: 'Terminal' },
+  { id: 'activity', label: 'Activity' },
+  { id: 'files', label: 'Files' },
+  { id: 'artifacts', label: 'Artifacts' },
+  { id: 'code', label: 'Code' },
+  { id: 'timeline', label: 'Timeline' },
+  { id: 'discussion', label: 'Discussion' },
+  { id: 'costs', label: 'Costs' },
+  { id: 'ship', label: 'Ship' },
+]
 
 type IssueTreeContext = 'issue'
 
 const SPINE_COLLAPSED_KEY = 'overdeck.cockpit.spineCollapsed'
-
-// PAN-2398: status lives in StatusNarrative; beads = rail; tools = panes.
-const TABS: Array<{ id: MissionTab; label: string }> = [
-  { id: 'overview', label: 'Overview' },
-  { id: 'code', label: 'Code' },
-  { id: 'plan', label: 'PRD / Plan' },
-  { id: 'timeline', label: 'Timeline' },
-  { id: 'discussion', label: 'Discussion' },
-  { id: 'costs', label: 'Costs' },
-  { id: 'artifacts', label: 'Artifacts' },
-  { id: 'ship', label: 'Ship' },
-  { id: 'files', label: 'Files' },
-  { id: 'terminal', label: 'Terminal' },
-]
 
 // Explicit, literal Tailwind classes — interpolated utilities get purged.
 // PAN-1991 #4: active = blue (a machine is working), not purple (purple is
@@ -114,16 +108,14 @@ function checkRunLabel(run: Pick<IssueCheckRun, 'status' | 'conclusion'>): strin
   return (run.conclusion ?? 'unknown').replace(/_/g, ' ')
 }
 
-function phaseStatus(rs: ReviewStatusData | undefined) {
-  if (!rs) return 'pending'
-  if (rs.mergeStatus === 'merged') return 'merged'
-  if (rs.mergeStatus === 'merging' || rs.mergeStatus === 'queued' || rs.mergeStatus === 'verifying') return rs.mergeStatus
-  if (rs.testStatus === 'testing') return 'testing'
-  if (rs.reviewStatus === 'reviewing') return 'reviewing'
-  if (rs.reviewStatus === 'blocked' || rs.reviewStatus === 'failed') return rs.reviewStatus
-  if (rs.testStatus === 'failed' || rs.testStatus === 'dispatch_failed') return rs.testStatus
-  if (rs.readyForMerge) return 'ready'
-  return rs.reviewStatus ?? 'pending'
+// PAN-2908: the cockpit's bespoke phaseStatus() derivation is deleted — the
+// header pill speaks the ONE shared machine (derivePipelineState) and the
+// six-word vocabulary (phaseLabel), same as the board, drawer, and rail.
+function pillTone(state: PipelineState): CockpitTone {
+  if (state === 'merged' || state === 'done') return 'success'
+  if (state === 'in_review_changes_requested' || state === 'testing_failures' || state === 'verification_failing' || state === 'canceled') return 'destructive'
+  if (state === 'generic') return 'muted'
+  return 'info'
 }
 
 function nextAction(rs: ReviewStatusData | undefined): string {
@@ -138,141 +130,13 @@ function nextAction(rs: ReviewStatusData | undefined): string {
   return 'awaiting pipeline'
 }
 
-function mergeBlockReason(rs: ReviewStatusData | undefined): string {
-  if (!rs) return 'status unknown'
-  if (rs.mergeStatus === 'merged') return 'merged'
-  if (rs.reviewStatus === 'blocked' || rs.reviewStatus === 'failed') return 'blocked by review'
-  if (rs.testStatus === 'failed' || rs.testStatus === 'dispatch_failed') return 'test failed'
-  if (rs.reviewStatus !== 'passed') return 'review pending'
-  if (rs.testStatus === 'pending' || rs.testStatus === 'testing') return 'test pending'
-  return 'not ready'
-}
+
 
 function HeaderStat({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div className="flex flex-col gap-px text-right">
       <div className="text-[9px] uppercase tracking-[0.06em] text-muted-foreground">{label}</div>
       <div className="text-[11.5px] text-foreground">{value}</div>
-    </div>
-  )
-}
-
-function MergeCta({ issueId, rs }: { issueId: string; rs: ReviewStatusData | undefined }) {
-  if (rs?.mergeStatus === 'merged') {
-    return (
-      <span className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] border badge-border-success badge-bg-success px-3 py-2 text-[12px] font-medium text-success-foreground">
-        ✓ Merged
-      </span>
-    )
-  }
-  if (rs?.readyForMerge) {
-    return <MergeButton issueId={issueId} reviewStatus={rs} variant="inspector" tone="primary" />
-  }
-  const reason = mergeBlockReason(rs)
-  return (
-    <button
-      type="button"
-      disabled
-      title={`Merge gated: ${reason}`}
-      className="inline-flex cursor-not-allowed items-center gap-1.5 rounded-[var(--radius-sm)] border border-border bg-muted/40 px-3 py-2 text-[12px] font-medium text-muted-foreground opacity-80"
-    >
-      ⛔ Merge — {reason}
-    </button>
-  )
-}
-
-function createMegaMenuItem(onClose: () => void, destructive: boolean) {
-  return function MegaMenuItem({
-    children,
-    className = '',
-    disabled,
-    role = 'menuitem',
-    onActivate,
-    preventClose,
-    ...props
-  }: IssueActionMenuItemPrimitiveProps) {
-    const colorClass = destructive
-      ? 'text-destructive-foreground hover:bg-destructive/10'
-      : 'text-foreground hover:bg-accent'
-
-    return (
-      <button
-        {...props}
-        type="button"
-        role={role}
-        disabled={disabled}
-        className={`flex w-full items-center rounded-[8px] px-2 py-1.5 text-left text-[12px] transition-colors disabled:cursor-not-allowed disabled:opacity-45 ${colorClass} ${className}`}
-        onClick={() => {
-          onActivate?.()
-          if (!preventClose) onClose()
-        }}
-      >
-        {children}
-      </button>
-    )
-  }
-}
-
-function MegaMenuLabel({ children }: { children: ReactNode }) {
-  return (
-    <h4 className="mb-1.5 px-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-      {children}
-    </h4>
-  )
-}
-
-function MegaMenuSeparator() {
-  return <div className="col-span-full my-1 h-px bg-border" />
-}
-
-function megaMenuPrimitives(onClose: () => void): IssueActionMenuPrimitives {
-  return {
-    Item: createMegaMenuItem(onClose, false),
-    DestructiveItem: createMegaMenuItem(onClose, true),
-    Label: MegaMenuLabel,
-    Separator: MegaMenuSeparator,
-  }
-}
-
-function IssueActionMegaMenu({ issueId }: { issueId: string }) {
-  const [open, setOpen] = useState(false)
-  const actions = useIssueActions(issueId)
-
-  useEffect(() => {
-    if (!open) return
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setOpen(false)
-    }
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
-  }, [open])
-
-  return (
-    <div className="relative">
-      <button
-        type="button"
-        aria-expanded={open}
-        aria-label="Issue actions"
-        className="inline-flex items-center rounded-[var(--radius-sm)] border border-border bg-card px-3 py-2 text-[12px] font-semibold text-foreground transition-colors hover:bg-accent"
-        onClick={() => setOpen((value) => !value)}
-      >
-        ⌘ Actions ▾
-      </button>
-      {open && (
-        <>
-          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div
-            role="menu"
-            className="absolute right-0 top-full z-50 mt-2 grid w-[min(560px,calc(100vw-48px))] grid-cols-1 gap-x-5 gap-y-2 rounded-[18px] border border-border bg-popover p-3 shadow-xl md:grid-cols-2"
-          >
-            <IssueActionGroupedBody
-              actions={actions}
-              primitives={megaMenuPrimitives(() => setOpen(false))}
-            />
-          </div>
-        </>
-      )}
-      <IssueActionDialogHost issueId={issueId} actions={actions} />
     </div>
   )
 }
@@ -434,32 +298,6 @@ function GitHubCiPanel({ issueId }: { issueId: string }) {
   )
 }
 
-function MarkdownMissionTab({ issueId, field }: { issueId: string; field: 'prd' | 'state' }) {
-  const planning = usePlanningQuery(issueId, { enabled: true })
-  return <MarkdownTab body={planning.data?.[field]} isLoading={planning.isLoading} emptyLabel={`No ${field.toUpperCase()} document.`} />
-}
-
-function PlanMissionTab({ issueId }: { issueId: string }) {
-  return (
-    <div className="grid gap-3 xl:grid-cols-2">
-      <CockpitCard tone="info" title="xBRIEF"><XBriefTab issueId={issueId} /></CockpitCard>
-      <CockpitCard tone="muted" title="PRD draft"><MarkdownMissionTab issueId={issueId} field="prd" /></CockpitCard>
-      <CockpitCard tone="muted" title="STATE"><MarkdownMissionTab issueId={issueId} field="state" /></CockpitCard>
-    </div>
-  )
-}
-
-function OpenPaneCard({ title, description, action, onOpen }: { title: string; description: string; action: string; onOpen: () => void }) {
-  return (
-    <CockpitCard tone="muted" title={title}>
-      <p className="text-[12px] text-muted-foreground">{description}</p>
-      <button type="button" className="mt-3 rounded-[var(--radius-sm)] border border-border px-3 py-2 text-[12px] font-semibold hover:bg-accent" onClick={onOpen}>
-        {action}
-      </button>
-    </CockpitCard>
-  )
-}
-
 const NOW_LABEL: Record<string, string> = {
   work: 'Work', strike: 'Strike', review: 'Review', reviewer: 'Reviewer',
   test: 'Test', ship: 'Ship', merge: 'Ship', planning: 'Plan', legacy: 'Plan',
@@ -571,14 +409,18 @@ function tabBadge(tab: MissionTab, checks: ReturnType<typeof useIssueCheckRunsQu
   return null
 }
 
-export function IssueMissionControl({ issueId, title, branch, projectName, launcher, agentDock, actionDock, timeline, onOpenPane }: IssueMissionControlProps) {
-  const [activeTab, setActiveTab] = useState<MissionTab | null>('overview')
+export function IssueMissionControl({ issueId, title, branch, projectName, launcher, agentDock, actionDock, timeline }: IssueMissionControlProps) {
+  // PAN-2908 C-DETAIL (operator decision, #2962): Conversation is the default
+  // tab — same conversation-first law as the drawer.
+  const [activeTab, setActiveTab] = useState<MissionTab | null>('conversation')
   const [treeContext, setTreeContext] = useState<IssueTreeContext | null>(null)
   const [selectedTreeSession, setSelectedTreeSession] = useState<SessionNode | null>(null)
   const [treeSessions, setTreeSessions] = useState<readonly SessionNode[]>([])
   const [tasksDrawerOpen, setTasksDrawerOpen] = useState(false)
+  // Operator decision (#2962): the session-tree lane starts collapsed behind a
+  // toggle (persisted preference honored).
   const [spineCollapsed, setSpineCollapsed] = useState(
-    () => typeof window !== 'undefined' && window.localStorage.getItem(SPINE_COLLAPSED_KEY) === 'true',
+    () => typeof window !== 'undefined' && window.localStorage.getItem(SPINE_COLLAPSED_KEY) !== 'false',
   )
   const tasksQuery = useTasksQuery(issueId)
   const tasksRollup = taskStatusRollup(tasksQuery.data?.tasks ?? [])
@@ -587,7 +429,42 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
   const checks = useIssueCheckRunsQuery(issueId)
   const costs = useIssueCostsQuery(issueId)
   const headerActions = useIssueActions(issueId)
-  const phase = phaseStatus(review.data)
+  const allAgents = useDashboardStore(selectAgents) as Agent[]
+  const reviewSnapshot = useDashboardStore(selectReviewStatus(issueId))
+  const issueRecord = useDashboardStore((s) =>
+    (s.issuesRaw as Array<{ identifier: string; state?: string; status?: string }> | undefined)?.find(
+      (candidate) => candidate.identifier === issueId,
+    ),
+  )
+  const issueAgents = useMemo(
+    () => allAgents.filter((a) => a.issueId?.toLowerCase() === issueId.toLowerCase()),
+    [allAgents, issueId],
+  )
+  // PAN-2908 C-VOCAB/one-data-model: the header pill runs on the shared
+  // pipeline machine (WS snapshot first, HTTP detail as warmup fallback) —
+  // no bespoke phase re-derivation on this surface.
+  const primaryAgent = useMemo(() => {
+    const live = issueAgents.filter((a) => a.status === 'running' || a.status === 'starting')
+    return live.find((a) => a.role === 'work') ?? live[0] ?? issueAgents[0] ?? null
+  }, [issueAgents])
+  const workAgentRunning = useMemo(
+    () => issueAgents.some((a) => a.role === 'work' && (a.status === 'running' || a.status === 'starting')),
+    [issueAgents],
+  )
+  const pipelineState = derivePipelineState({
+    reviewStatus: (reviewSnapshot ?? review.data ?? null),
+    agent: primaryAgent,
+    hasPlan: headerActions.state.hasPlan,
+    hasTasks: tasksRollup.total > 0,
+    issueCanonicalState: issueRecord?.state ?? issueRecord?.status ?? null,
+    isMerged: (reviewSnapshot ?? review.data)?.mergeStatus === 'merged',
+  })
+  const currentPhaseKey = currentPhase(pipelineState)
+  const phase = currentPhaseKey
+    ? phaseLabel(currentPhaseKey)
+    : pipelineState === 'merged' || pipelineState === 'done'
+      ? phaseLabel('done')
+      : '—'
   const cost = costs.data?.resolvedTotalCost ?? costs.data?.totalCost ?? 0
   const toggleSpine = () => {
     setSpineCollapsed((collapsed) => {
@@ -618,23 +495,6 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
     if (session) { selectSessionFromTree(session); return true }
     return false
   }
-  // PAN-1991 #4/#6: clicking a pipeline phase opens that phase's info. Work/
-  // Review/Test open the agent's own conversation/findings (per #6, review
-  // findings live on the Review agent, not a status tab); CI/CD opens Code.
-  const handleStageClick = (stage: JourneyStageKey) => {
-    const map: Record<JourneyStageKey, PipelinePhaseKey> = {
-      planned: 'plan', building: 'work', reviewing: 'review', testing: 'test', shipping: 'merge',
-    }
-    handlePhaseClick(map[stage])
-  }
-  const handlePhaseClick = (phase: PipelinePhaseKey) => {
-    if (phase === 'work') { if (!openAgentByType('work')) selectTab('overview'); return }
-    if (phase === 'review') { if (!openAgentByType('review')) selectTab('overview'); return }
-    if (phase === 'test') { if (!openAgentByType('test')) selectTab('overview'); return }
-    if (phase === 'plan') { selectTab('plan'); return }
-    if (phase === 'ci') { selectTab('code'); return }
-    selectTab('ship') // PAN-2487: ship / merge phases open the Ship & Merge view
-  }
   const recordTreeSessions = useCallback((sessions: readonly SessionNode[]) => {
     setTreeSessions(sessions)
     setSelectedTreeSession((current) => {
@@ -654,7 +514,7 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
             <div className="mt-1 flex flex-wrap items-center gap-2">
               <span className="font-mono text-[13px] font-medium text-foreground">{issueId}</span>
               <h1 className="min-w-0 max-w-full break-words text-[16px] font-medium leading-snug text-foreground">{title}</h1>
-              <CockpitPill tone={statusToTone(phase)}>{phase}</CockpitPill>
+              <CockpitPill tone={pillTone(pipelineState)}>{phase}</CockpitPill>
             </div>
           </div>
           <div className={styles.headerMeta}>
@@ -672,11 +532,9 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
               />
             </div>
             <div className="flex items-center gap-2">
-              {/* PAN-1874: per-issue review mode / re-review scope override (same
-                  control as the session-view IssueHeader; PAN-2499's unified view
-                  inventories it once). */}
-              <MergeCta issueId={issueId} rs={review.data} />
-              <IssueActionMegaMenu issueId={issueId} />
+              {/* PAN-2908 C-ACTIONS: merge flows through the shared registry menu
+                  (primary at READY_TO_MERGE); the bespoke MergeCta is gone. */}
+              <IssueActionMenu issueId={issueId} mode="primary-strip" className="flex items-center gap-1" />
             </div>
           </div>
         </div>
@@ -684,11 +542,12 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
           <StatusNarrative
             issueId={issueId}
             hasPlan={headerActions.state.hasPlan}
-            workRunning={phase === 'pending'}
+            workRunning={workAgentRunning}
             cost={cost > 0 ? `$${cost.toFixed(2)}` : undefined}
-            onStageClick={handleStageClick}
           />
         </div>
+        {/* PAN-2908 C-DETAIL: the pipeline band lives inside IssueDetail now —
+            the cockpit route renders the ONE component, no duplicate shell. */}
       </header>
 
       <nav data-section="Detail Tabs" className="flex flex-nowrap gap-1 overflow-x-auto border-b border-border bg-card px-3 pt-2" aria-label="Issue cockpit tabs">
@@ -759,6 +618,22 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
                 onOpenAgent={openAgentByType}
               /></div>
             )}
+            {/* PAN-2908 C-DETAIL (operator decision, #2962): the binding tabs
+                are the ONE IssueDetail at page density — the cockpit nav drives
+                its tab, the shell inside it drives its conversations. */}
+            {ISSUE_DETAIL_TAB_IDS.has(activeTab as MissionTab) && (
+              <div data-section="IssueDetail page body" className="h-[calc(100vh-340px)] min-h-[520px]">
+                <IssueDetail
+                  issueId={issueId}
+                  density="page"
+                  showTabs={false}
+                  tab={activeTab as MissionTab}
+                  onSelectTab={(tab) => selectTab(tab as MissionTab)}
+                  agents={issueAgents}
+                  reviewStatus={reviewSnapshot}
+                />
+              </div>
+            )}
             {activeTab === 'overview' && <div data-section="Awareness rail"><OverviewTab issueId={issueId} onTab={selectTab} onOpenAgent={openAgentByType} sessions={treeSessions} onSelectSession={selectSessionFromTree} /></div>}
             {activeTab === 'code' && (
               <div data-section="Code tab" className="space-y-3.5">
@@ -766,7 +641,6 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
                 <ChangedFilesView issueId={issueId} />
               </div>
             )}
-            {activeTab === 'plan' && <div data-section="PRD / Timeline / Discussion tabs"><PlanMissionTab issueId={issueId} /></div>}
             {activeTab === 'timeline' && (
               <div data-section="PRD / Timeline / Discussion tabs" className="space-y-4">
                 <div>
@@ -781,11 +655,7 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
             )}
             {activeTab === 'discussion' && <div data-section="PRD / Timeline / Discussion tabs"><DiscussionsTab issueId={issueId} /></div>}
             {activeTab === 'costs' && <div data-section="Costs / Artifacts / Ship tabs"><CostsTab issueId={issueId} /></div>}
-            {activeTab === 'artifacts' && <div data-section="Costs / Artifacts / Ship tabs"><DrawerArtifactsPanel issueId={issueId} /></div>}
             {activeTab === 'ship' && <div data-section="Costs / Artifacts / Ship tabs"><ShipTab issueId={issueId} /></div>}
-            {activeTab === 'files' && <div data-section="Conversation / Files / Terminal tabs"><OpenPaneCard title="Files" description="Open the issue-scoped workspace file browser in a deck pane." action="Open files pane" onOpen={() => onOpenPane('files')} /></div>}
-            {activeTab === 'terminal' && <div data-section="Conversation / Files / Terminal tabs"><OpenPaneCard title="Terminal" description="Open the issue terminal drawer for the current workspace." action="Open terminal" onOpen={() => onOpenPane('terminal')} /></div>}
-            {activeTab === 'beads' && <div data-section="TasksRail / TasksTab"><TasksTab issueId={issueId} /></div>}
           </div>
         </main>
       </div>
@@ -795,7 +665,7 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
         query={tasksQuery}
         rollup={tasksRollup}
         onClose={() => setTasksDrawerOpen(false)}
-        onOpenFull={() => selectTab('beads')}
+        onOpenFull={() => selectTab('tasks')}
       />
     </IssueView>
   )

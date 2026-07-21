@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ZoneBActionStrip } from '../../components/CommandDeck/ZoneBActionStrip';
 import { DialogProvider } from '../../components/DialogProvider';
 import DrawerActionBar from '../../components/drawer/DrawerActionBar';
-import { GroupedIssueActionMenu } from '../../components/IssueActionMenu/GroupedIssueActionMenu';
+import { IssueActionContextMenu as GroupedIssueActionMenu } from '../../components/IssueActionMenu';
 import type { IssueActionView, UseIssueActionsResult } from '../../components/IssueActionMenu/useIssueActions';
 import { IssueCard } from '../../components/KanbanBoard/cards/KanbanCards';
 import { PipelineView } from '../../components/Pipeline/PipelineView';
@@ -51,6 +51,7 @@ vi.mock('../../components/IssueActionMenu/useIssueActions', async (importOrigina
 
 vi.mock('../../components/drawer/useDrawerData', () => ({
   useDrawerData: () => drawerDataState.current,
+  useIssueData: () => drawerDataState.current,
 }));
 
 vi.mock('../../components/CommandDeck/ZoneCOverviewTabs/queries', () => ({
@@ -87,6 +88,11 @@ vi.mock('../../components/Stage/cockpit/AgentsLane', () => ({ AgentsLane: () => 
 vi.mock('../../components/Stage/cockpit/ChangedFilesView', () => ({ ChangedFilesView: () => <div>Changed files</div> }));
 vi.mock('../../components/Stage/cockpit/IssueBlockerSpotlight', () => ({ IssueBlockerSpotlight: () => <div>Blocker</div> }));
 vi.mock('../../components/Stage/cockpit/PickupGateCard', () => ({ PickupGateCard: () => <div>Pickup gate</div> }));
+// This file proves action parity across surfaces; the ONE IssueDetail's
+// anatomy (and its data chain) is covered by its own tests.
+vi.mock('../../components/issue-detail/IssueDetail', () => ({
+  IssueDetail: () => <div data-testid="issue-detail-stub" />,
+}));
 vi.mock('../../components/Stage/cockpit/StatusHistoryTab', () => ({ StatusHistoryTab: () => <div>History</div> }));
 vi.mock('../../components/Stage/cockpit/TasksRail', () => ({
   TasksRail: () => <div>Task rail</div>,
@@ -315,9 +321,7 @@ export function expectedActions(
   const enabledPinKeys = surface === 'drawer'
     ? new Set(layout.all.filter((view) => view.action.key === 'viewPr' && view.enabled).map((view) => view.action.key))
     : new Set<string>();
-  const grouped = surface === 'cockpit' || surface === 'rail' || surface === 'pipeline'
-    ? layout.all
-    : [...layout.secondary, ...layout.overflow].filter((view) => !enabledPinKeys.has(view.action.key));
+  const grouped = [...layout.all].filter((view) => !enabledPinKeys.has(view.action.key));
   const rendered = layout.all;
   const railExtras = surface === 'rail'
     ? registry.rail
@@ -327,7 +331,7 @@ export function expectedActions(
   const normalGroups = GROUP_ORDER
     .filter((group) => group !== 'danger')
     .filter((group) => grouped.some((view) => view.action.group === group));
-  const phaseSection = (surface === 'cockpit' || surface === 'rail')
+  const phaseSection = (surface !== 'zone-b')
     && layout.primary.some((view) => view.enabled)
     ? ['phase']
     : [];
@@ -342,7 +346,7 @@ export function expectedActions(
     actions,
     groupOrder,
     sessionExtras: railExtras.map((action) => nonIssueId(action.scope, action.key)),
-    pinnedComponents: surface === 'drawer' ? ['merge'] : [],
+    pinnedComponents: [],
     dangerLast: groupOrder.at(-1) === 'danger',
   };
 }
@@ -487,7 +491,7 @@ function renderSurface(surface: Surface, fixture: StateFixture, context: Surface
         onOpenPane={noop}
       />,
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Issue actions' }));
+    fireEvent.click(screen.getByTestId('issue-action-overflow-button'));
   } else if (surface === 'board') {
     renderWithProviders(
       <IssueCard
@@ -658,7 +662,7 @@ describe('issue action cross-surface parity', () => {
     expect(() => compareSurface(expected, actual)).not.toThrow();
   });
 
-  it('keeps the drawer merge component pin outside registry menu parity', () => {
+  it('renders merge through the registry on the drawer (no bespoke pin)', () => {
     const fixture = STATE_FIXTURES.find((entry) => entry.name === 'ready_to_merge')!;
     const context = surfaceContexts(fixture.sessionPresence);
     const expected = expectedActions(REGISTRY, fixture.state, 'drawer', context);
@@ -667,8 +671,8 @@ describe('issue action cross-surface parity', () => {
     const actual = observeSurface('drawer');
 
     expect(actual.actions[issueId('viewPr')]).toBe(true);
-    expect(actual.pinnedComponents).toEqual(['merge']);
-    expect(Object.keys(actual.actions)).not.toContain('issue:merge');
+    expect(actual.actions[issueId('merge')]).toBe(true);
+    expect(actual.pinnedComponents).toEqual([]);
     expect(() => compareSurface(expected, actual)).not.toThrow();
   });
 

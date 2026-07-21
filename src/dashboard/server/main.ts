@@ -15,8 +15,14 @@ import { startSharedIssueService, getSharedIssueService } from './services/issue
 import { startAgentEnrichmentService, stopAgentEnrichmentService } from './services/agent-enrichment-service.js';
 import { startMergeBlockerReconcileService } from './services/merge-blocker-reconcile-service.js';
 import { startResourceRefreshTriggers } from './services/resource-refresh-triggers.js';
-import { refreshMembershipSnapshotsForProjects } from './services/pipeline-membership.js';
-import { triggerResourceDiscoveryRefresh } from './services/resource-discovery.js';
+import {
+  enqueueProjectsResourceRefresh,
+  getProjectResourceRefreshQueueState,
+  startProjectResourceConvergence,
+  stopProjectResourceRefreshQueue,
+  whenProjectResourceRefreshIdle,
+} from './services/project-resource-refresh-queue.js';
+import { whenDashboardListening } from './dashboard-listening.js';
 import {
   shouldStartStaleCheckRetriggerService,
   startStaleCheckRetriggerService,
@@ -50,6 +56,7 @@ import { mkdir } from 'node:fs/promises';
 import { getOverdeckHome } from '../../lib/paths.js';
 import { ensureManagedTmuxContextOnce } from '../../lib/tmux.js';
 import { startCliproxyWatchdog } from './routes/cliproxy.js';
+import { startResourcesSnapshotService } from './routes/resources/snapshot.js';
 import { cleanupOrphanedConversationAttachments } from './services/conversation-attachments.js';
 import { closeMemoryFtsDatabases } from '../../lib/memory/fts-db.js';
 import { startTranscriptPoller, stopTranscriptPoller, syncTranscriptPollerRegistry } from '../../lib/memory/poller.js';
@@ -66,6 +73,7 @@ import { startEventLoopMonitor, stopEventLoopMonitor } from './services/event-lo
 import { formatBootGateState, resolveBootGates } from '../../lib/boot-gates.js';
 import { startBootReconciliation } from '../../lib/cloister/boot-reconciliation.js';
 import { startDeaconChild, stopDeaconChild } from './services/deacon-supervisor.js';
+import { stopAllKnowledgeViewers } from './services/knowledge-viewer.js';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { Layer } from 'effect';
@@ -94,8 +102,6 @@ initDashboardLogFile();
 // spawn→listen window attributable. See server.ts for the matching listen mark.
 console.log(`[boot-timing] module graph loaded at +${Math.round(performance.now())}ms (since process start)`);
 console.log(`[overdeck] Boot gates: ${formatBootGateState(resolveBootGates())}`);
-startEventLoopMonitor();
-console.log('[overdeck] Event loop delay monitor started');
 
 // Ensure OVERDECK_HOME exists before any service that needs it (e.g. CacheService opening cache.db)
 await mkdir(getOverdeckHome(), { recursive: true });
@@ -104,9 +110,6 @@ await mkdir(getOverdeckHome(), { recursive: true });
 // Generates and persists a random token at <OVERDECK_HOME>/internal-token (mode 0600)
 // on first start; reused on subsequent starts. Used by /api/internal/pipeline/notify.
 ensureInternalTokenSync();
-
-void warnIfAutonomousMergeBackendUnavailable();
-void warnIfAppCannotMerge();
 
 // Prepare the managed tmux context exactly once, before any code path can spawn
 // tmux. After this call `buildTmuxArgs`, `buildTmuxCommandString`, and
@@ -118,6 +121,37 @@ await ensureManagedTmuxContextOnce();
 await initTrackerConfigCache().catch(err => {
   console.log('[tracker-config] Warning: failed to cache .overdeck.env:', err.message);
 });
+
+// A normal boot creates an EMPTY overdeck.db (fresh-install semantics). There is
+// NO legacy seed / db↔db migration — overdeck state is JSON/git-backed (PAN-1983).
+try {
+  const overdeckDbPath = getOverdeckDatabasePath();
+  if (!existsSync(overdeckDbPath)) {
+    createOverdeckDatabase({ dbPath: overdeckDbPath });
+    console.log(`[overdeck] Created overdeck.db at ${overdeckDbPath}`);
+  }
+} catch (err) {
+  // Non-fatal: dashboard continues with whatever data is in overdeck.db.
+  console.warn('[overdeck] Overdeck db init failed (non-fatal):', err);
+}
+
+// Bind the HTTP socket before starting any background service or the Deacon.
+// A bind failure is retried by server.ts and then terminates this process through
+// Effect's Node runtime; no headless orchestrator is allowed to survive it.
+const main = runServer.pipe(Effect.provide(ServerConfigLayer)) as Effect.Effect<never, unknown>;
+if (typeof Bun !== 'undefined') {
+  const { runMain } = await import('@effect/platform-bun/BunRuntime');
+  runMain(main as never);
+} else {
+  const { runMain } = await import('@effect/platform-node/NodeRuntime');
+  runMain(main as never);
+}
+await whenDashboardListening();
+
+startEventLoopMonitor();
+console.log('[overdeck] Event loop delay monitor started');
+void warnIfAutonomousMergeBackendUnavailable();
+void warnIfAppCannotMerge();
 
 // Start the shared IssueDataService — fire and forget.
 // It loads SQLite-cached data instantly and pushes an initial snapshot,
@@ -168,8 +202,8 @@ if (isPeerDashboard) {
 startAgentEnrichmentService();
 console.log('[overdeck] AgentEnrichmentService started');
 
-// Start background agent output poller — emits agent.output_received domain events
-// so DrawerActiveAgent and other consumers receive live stream excerpts.
+// Enable demand-driven agent output capture. The poller starts only while an
+// RPC or public SSE subscriber has expressed output interest.
 startAgentOutputService();
 console.log('[overdeck] AgentOutputService started');
 
@@ -464,7 +498,11 @@ console.log('[overdeck] Merge-ready notifier → domain events wired');
 startConversationLifecycleService();
 console.log('[overdeck] ConversationLifecycleService started');
 
-startSubstrateBugPoller();
+if (isPeerDashboard) {
+  console.log('[overdeck] SubstrateBugPoller skipped — peer dashboard does not poll trackers');
+} else {
+  startSubstrateBugPoller();
+}
 
 // PAN-1737 UAT batch trains: keep one assembled, testable batch ready at all
 // times (gated per-tick on flywheel.merge_train_enabled; no-op without an
@@ -501,27 +539,41 @@ console.log(conversationSearchWatcher
   ? '[overdeck] Conversation search watcher started'
   : '[overdeck] Conversation search watcher skipped (conversationSearch.enabled=false)');
 
+let stopResourceRefreshServices = () => undefined;
+
 void (async () => {
   const store = await initEventStore();
-  // PAN-2893: agent lifecycle events refresh the membership + resource-discovery
-  // caches immediately, so `pan start` reaches the issues pane in seconds instead
-  // of waiting out the 30s/5m TTLs. Must start AFTER initEventStore() resolves —
-  // getEventStore() throws before that.
-  startResourceRefreshTriggers();
-  console.log('[overdeck] ResourceRefreshTriggers started (event-driven cache refresh)');
-  // PAN-2896: warm the membership + resource-discovery caches in the background
-  // so the first issues-pane click after a restart serves warm instead of
-  // blocking on a cold multi-second compute. Fire-and-forget — boot is not
-  // delayed and a warm failure only logs.
-  const warmStart = Date.now();
-  void refreshMembershipSnapshotsForProjects(listProjectsSync().map((entry) => entry.config))
-    .then(() => triggerResourceDiscoveryRefresh())
-    .then((issues) => {
-      console.log(`[overdeck] Boot cache warm complete: ${issues.length} resource-allocated issue(s) in ${Math.round((Date.now() - warmStart) / 1000)}s (PAN-2896)`);
-    })
-    .catch((err) => {
-      console.warn('[overdeck] Boot cache warm failed (pane falls back to on-demand compute):', err instanceof Error ? err.message : String(err));
-    });
+  // Request serving comes first. Resource convergence starts only after the
+  // Node 22 server has bound its socket, then all boot/event/periodic work flows
+  // through the same non-overlapping project queue.
+  void whenDashboardListening().then(async () => {
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    const stopTriggers = startResourceRefreshTriggers();
+    const stopConvergence = startProjectResourceConvergence();
+    const stopResourcesSnapshot = startResourcesSnapshotService();
+    stopResourceRefreshServices = () => {
+      stopTriggers();
+      stopConvergence();
+      stopResourcesSnapshot();
+      stopProjectResourceRefreshQueue();
+    };
+    console.log('[overdeck] Project resource refresh queue and resources snapshot service started');
+
+    const warmStart = Date.now();
+    enqueueProjectsResourceRefresh(
+      listProjectsSync().map((entry) => entry.config),
+      'boot-warm',
+    );
+    await whenProjectResourceRefreshIdle();
+    const queueState = getProjectResourceRefreshQueueState();
+    if (queueState.lastError) {
+      console.warn('[overdeck] Boot cache warm completed with errors:', queueState.lastError);
+    } else {
+      console.log(`[overdeck] Boot cache warm complete in ${Math.round((Date.now() - warmStart) / 1000)}s`);
+    }
+  }).catch((err) => {
+    console.warn('[overdeck] Resource refresh startup failed:', err instanceof Error ? err.message : String(err));
+  });
   store.subscribe((event) => {
     if (event.type === 'agent.stopped' || event.type === 'agent.heartbeat_dead') {
       const agentId = typeof (event.payload as { agentId?: unknown }).agentId === 'string'
@@ -596,6 +648,7 @@ const handleShutdownSignal = async (signal: NodeJS.Signals) => {
     }
   }
   clearInterval(attachmentCleanupTimer);
+  stopResourceRefreshServices();
   stopAgentEnrichmentService();
   stopAgentOutputService();
   stopConversationLifecycleService();
@@ -609,6 +662,7 @@ const handleShutdownSignal = async (signal: NodeJS.Signals) => {
   stopCostReconcileService();
   stopStaleCheckRetriggerService();
   stopRestartAnnouncer();
+  await stopAllKnowledgeViewers().catch((err) => console.warn('[knowledge-viewer] shutdown failed:', err?.message ?? err));
   await stopDeaconChild().catch((err) => console.warn('[deacon-supervisor] child shutdown failed:', err?.message ?? err));
   try {
     // Reap only quality-gate trees owned by this dashboard process. Normal
@@ -746,7 +800,7 @@ if (process.env.OVERDECK_DISABLE_DEACON === '1') {
       console.error(`[overdeck] ${summary}`);
       emitActivityEntrySync({ source: 'dashboard', level: 'error', message: summary });
     }
-    const reconciliation = startBootReconciliation({ onGraceExpired: applyBootReconciliationDecision });
+    const reconciliation = startBootReconciliation({ onGraceExpired: async () => { await applyBootReconciliationDecision(); } });
     if (reconciliation.decision !== 'pending') {
       void applyBootReconciliationDecision();
     }
@@ -800,30 +854,4 @@ async function pruneClosedIssueReviewStatuses(): Promise<void> {
   if (removed > 0) {
     console.log(`[overdeck] Pruned ${removed} stale review-status entr${removed === 1 ? 'y' : 'ies'} for closed issues`);
   }
-}
-
-// ── Overdeck boot: create overdeck.db if needed ──────────────────────────────
-// A normal boot creates an EMPTY overdeck.db (fresh-install semantics). There is
-// NO legacy seed / db↔db migration — overdeck state is JSON/git-backed (PAN-1983).
-await (async () => {
-  try {
-    const overdeckDbPath = getOverdeckDatabasePath();
-    if (!existsSync(overdeckDbPath)) {
-      createOverdeckDatabase({ dbPath: overdeckDbPath });
-      console.log(`[overdeck] Created overdeck.db at ${overdeckDbPath}`);
-    }
-  } catch (err) {
-    // Non-fatal: dashboard continues with whatever data is in overdeck.db.
-    console.warn('[overdeck] Overdeck db init failed (non-fatal):', err);
-  }
-})();
-
-const main = runServer.pipe(Effect.provide(ServerConfigLayer)) as Effect.Effect<never, unknown>;
-
-if (typeof Bun !== 'undefined') {
-  const { runMain } = await import('@effect/platform-bun/BunRuntime');
-  runMain(main as never);
-} else {
-  const { runMain } = await import('@effect/platform-node/NodeRuntime');
-  runMain(main as never);
 }

@@ -68,7 +68,11 @@ import { CacheService } from '../services/cache-service.js';
 import { EventStoreService } from '../services/domain-services.js';
 import { resolveIssueHeadlineCost } from '../services/issue-cost-resolver.js';
 import { getCachedRunningAgents } from '../services/running-agents-cache.js';
-import { getLastGoodMembershipSnapshot, getPipelineMembershipResultsForProjects, getPipelineMembershipSnapshotsForProjects, getProjectPipelineMembership, summarizePipelineMembership, unavailablePipelineMembership } from '../services/pipeline-membership.js';
+import {
+  readPipelineMembershipSnapshotsForProjects,
+  summarizePipelineMembership,
+  unavailablePipelineMembership,
+} from '../services/pipeline-membership.js';
 import { invalidateAgentsCache } from './agents.js';
 import { IssueLifecycle, type IssueState } from '../services/issue-lifecycle.js';
 import { LinearClient } from '../services/linear-client.js';
@@ -236,7 +240,7 @@ const getIssuesRoute = HttpRouter.add(
       }
     }
     const membershipByIssue = new Map<string, IssuePipelineMembership>();
-    const results = getPipelineMembershipSnapshotsForProjects([...projects.values()]);
+    const results = readPipelineMembershipSnapshotsForProjects([...projects.values()]);
     const successfulPaths = new Set<string>();
     const failedPaths = new Set<string>();
     for (const result of results) {
@@ -900,40 +904,7 @@ const getResourceAllocatedIssuesRoute = HttpRouter.add(
   })),
 );
 
-const getPipelineMembershipRoute = HttpRouter.add(
-  'GET',
-  '/api/pipeline/membership',
-  httpHandler(Effect.gen(function* () {
-    const request = yield* HttpServerRequest.HttpServerRequest;
-    const projectKey = new URL(request.url, 'http://localhost').searchParams.get('project');
-    if (!projectKey) return jsonResponse({ error: 'project query parameter is required' }, { status: 400 });
-    const project = getProjectSync(projectKey);
-    if (!project) return jsonResponse({ error: `Project not found: ${projectKey}` }, { status: 404 });
-    // ProjectMembershipBoundary gates the issues-pane render on this response,
-    // so it must be instant. Serve the membership SNAPSHOT (5-minute TTL,
-    // background-refreshed by getPipelineMembershipSnapshotsForProjects, agent
-    // lifecycle events, and the boot warm) instead of blocking on a live
-    // gather — the pre-snapshot behavior blocked every click 30s+ after the
-    // last gather on a multi-second GitHub/Linear/git crawl (the PAN-2879
-    // skeleton regression). Only a truly cold snapshot (nothing gathered since
-    // boot) blocks once, with the last-good fallback for transient tracker
-    // failures (e.g. a Linear 503) so the pane never blanks (PAN-2893).
-    return jsonResponse(yield* Effect.promise(async () => {
-      const snapshot = getPipelineMembershipSnapshotsForProjects([project])[0];
-      if (snapshot?.memberships) return snapshot.memberships;
-      try {
-        return await getProjectPipelineMembership(project);
-      } catch (error) {
-        const lastGood = getLastGoodMembershipSnapshot(project.path);
-        if (lastGood) {
-          console.warn(`[pipeline-membership] live gather failed for ${projectKey}; serving last-good snapshot:`, error instanceof Error ? error.message : String(error));
-          return lastGood;
-        }
-        throw error;
-      }
-    }));
-  })),
-);
+// Pipeline-membership routes live in routes/pipeline-membership.ts (PAN-2972).
 
 const getIssueResourceDetailsRoute = HttpRouter.add(
   'GET',
@@ -974,7 +945,6 @@ export const issuesRouteLayer = Layer.mergeAll(
   postIssueGenerateTasksRoute,
   getIssueCostsRoute,
   getResourceAllocatedIssuesRoute,
-  getPipelineMembershipRoute,
   getIssueResourceDetailsRoute,
   getIssuePrRoute,
   getIssuePrDiffRoute,

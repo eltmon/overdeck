@@ -239,7 +239,9 @@ describe('FleetAgentsView', () => {
     fireEvent.click(screen.getAllByTestId('issue-action-overflow-button')[0]);
 
     const menu = screen.getByTestId('issue-action-overflow-menu');
-    expect(within(menu).getByTestId('issue-action-tell')).toHaveTextContent('Tell agent');
+    expect(within(menu).getAllByTestId('issue-action-tell').length).toBeGreaterThan(0);
+    // Stop lives behind the collapsed Danger disclosure (C-ACTIONS)
+    fireEvent.click(within(menu).getByRole('menuitem', { name: /^Danger \(\d+ available\)$/ }));
     expect(within(menu).getByTestId('issue-action-stopAgent')).toHaveTextContent('Stop agent');
     expect(within(menu).getByTestId('issue-action-pause')).toHaveTextContent('Pause agent');
     expect(within(menu).getByTestId('issue-action-unpause')).toHaveTextContent('Unpause agent');

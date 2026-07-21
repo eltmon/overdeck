@@ -8,6 +8,7 @@ import {
   resolveAgentHarness,
   resolveClaudeSessionId,
   resolveCodexRolloutPath,
+  resolveAcpTranscriptPath,
   resolveJsonlPath,
   resolvePiSessionPath,
 } from '../jsonl-resolver.js';
@@ -381,6 +382,71 @@ describe('resolveJsonlPath — codex agents (PAN-1805)', () => {
     });
 
     expect(path).toBe(join(projectDir, `${CLAUDE_SESSION_ID}.jsonl`));
+  });
+});
+
+describe('resolveJsonlPath — ACP agents', () => {
+  const ACP_AGENT_ID = 'agent-pan-2858';
+
+  async function setupAcpAgent(harness: string = 'acp'): Promise<string> {
+    const agentDir = join(agentsDir, ACP_AGENT_ID);
+    await mkdir(agentDir, { recursive: true });
+    await writeFile(join(agentDir, 'state.json'), JSON.stringify({
+      id: ACP_AGENT_ID,
+      harness,
+      workspace: WORKSPACE_PATH,
+    }));
+    const transcriptPath = join(agentDir, 'acp-session.jsonl');
+    await writeFile(transcriptPath, '{"role":"assistant","content":"ready"}\n');
+    return transcriptPath;
+  }
+
+  it('resolves the normalized ACP host transcript', async () => {
+    const transcriptPath = await setupAcpAgent();
+
+    expect(await resolveAcpTranscriptPath(ACP_AGENT_ID, {
+      agentsDirOverride: agentsDir,
+    })).toBe(transcriptPath);
+    expect(await resolveJsonlPath(ACP_AGENT_ID, WORKSPACE_PATH, {
+      agentsDirOverride: agentsDir,
+      claudeProjectsDirOverride: claudeProjectsDir,
+    })).toBe(transcriptPath);
+  });
+
+  it('ACP harness wins over stale Claude session artifacts', async () => {
+    const transcriptPath = await setupAcpAgent();
+    const projectDir = join(claudeProjectsDir, encodeClaudeProjectDir(WORKSPACE_PATH));
+    await mkdir(projectDir, { recursive: true });
+    await writeFile(join(agentsDir, ACP_AGENT_ID, 'session.id'), CLAUDE_SESSION_ID);
+    await writeFile(join(projectDir, `${CLAUDE_SESSION_ID}.jsonl`), '{"stale":"claude"}\n');
+
+    const path = await resolveJsonlPath(ACP_AGENT_ID, WORKSPACE_PATH, {
+      agentsDirOverride: agentsDir,
+      claudeProjectsDirOverride: claudeProjectsDir,
+    });
+
+    expect(path).toBe(transcriptPath);
+  });
+
+  it('corrects a stale claude-code recording when only an ACP transcript exists', async () => {
+    const transcriptPath = await setupAcpAgent('claude-code');
+
+    expect(await resolveAgentHarness(ACP_AGENT_ID, {
+      agentsDirOverride: agentsDir,
+      claudeProjectsDirOverride: claudeProjectsDir,
+    })).toBe('acp');
+    expect(await resolveJsonlPath(ACP_AGENT_ID, WORKSPACE_PATH, {
+      agentsDirOverride: agentsDir,
+      claudeProjectsDirOverride: claudeProjectsDir,
+    })).toBe(transcriptPath);
+  });
+
+  it('does not misclassify acp-session.jsonl as a Pi transcript', async () => {
+    await setupAcpAgent();
+
+    expect(await resolvePiSessionPath(ACP_AGENT_ID, {
+      agentsDirOverride: agentsDir,
+    })).toBeNull();
   });
 });
 

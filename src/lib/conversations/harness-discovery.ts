@@ -9,7 +9,7 @@ import { promises as fs } from 'fs';
 import { homedir } from 'os';
 import { basename, join } from 'path';
 
-export type DiscoveredHarness = 'claude-code' | 'pi' | 'ohmypi' | 'codex';
+export type DiscoveredHarness = 'claude-code' | 'pi' | 'ohmypi' | 'codex' | 'acp';
 
 export interface DiscoveredFile {
   jsonlPath: string;
@@ -145,16 +145,16 @@ async function collectAgentDirFiles(root: string, warnings: string[] = []): Prom
     const piHarness = agentHarness === 'pi' || agentHarness === 'ohmypi' ? agentHarness : 'ohmypi';
 
     result.push(...await collectPiFamilyRoot(join(agentDir, 'sessions'), piHarness, warnings));
-    await collectAgentRootPiFiles(agentDir, piHarness, warnings, result);
+    await collectAgentRootFiles(agentDir, piHarness, warnings, result);
     await collectJsonlFiles(join(agentDir, 'codex-home', 'sessions'), join(agentDir, 'codex-home', 'sessions'), 'codex', warnings, result);
   }
 
   return result;
 }
 
-async function collectAgentRootPiFiles(
+async function collectAgentRootFiles(
   agentDir: string,
-  harness: 'pi' | 'ohmypi',
+  piHarness: 'pi' | 'ohmypi',
   warnings: string[],
   result: DiscoveredFile[],
 ): Promise<void> {
@@ -170,8 +170,11 @@ async function collectAgentRootPiFiles(
 
   for (const entry of entries) {
     const name = String(entry.name);
-    if (entry.isFile() && isPiWorkAgentJsonl(name)) {
-      result.push({ projectDir: agentDir, jsonlPath: join(agentDir, name), harness });
+    if (!entry.isFile()) continue;
+    if (name === 'acp-session.jsonl') {
+      result.push({ projectDir: agentDir, jsonlPath: join(agentDir, name), harness: 'acp' });
+    } else if (isPiWorkAgentJsonl(name)) {
+      result.push({ projectDir: agentDir, jsonlPath: join(agentDir, name), harness: piHarness });
     }
   }
 }

@@ -257,8 +257,8 @@ async function collectSessionTreeNodes(
   }
 
   for (const checkId of [...candidateSessionIds].sort((a, b) => compareSessionTreeSessionIds(a, b, issueLower))) {
-    const agentDir = join(agentsDir, checkId);
-    if (!await pathExists(agentDir)) continue;
+    // PAN-1908: the agents registry decides whether a session exists — never
+    // the ~/.overdeck/agents/<id>/ dir, which janitors remove after sessions end.
     const state = getAgentStateSync(checkId);
     if (!state) continue;
 
@@ -626,17 +626,19 @@ export async function fetchProjectSessionTree(
         const agentDir = join(getOverdeckHome(), 'agents', `agent-${c.issueLower}`);
         const planningAgentDir = join(getOverdeckHome(), 'agents', `planning-${c.issueLower}`);
         const planRunAgentDir = join(getOverdeckHome(), 'agents', `agent-${c.issueLower}-plan`);
+        const strikeAgentDir = join(getOverdeckHome(), 'agents', `strike-${c.issueLower}`);
         const panDir = join(workspacesDir, c.name, PAN_DIRNAME);
         const overdeckDir = join(workspacesDir, c.name, WORKSPACE_RUNTIME_DIRNAME);
         const hasIssueTmux = liveTmuxIssueIds.has(c.issueLower);
-        const [hasAgent, hasPlanning, hasPlanningAgent, hasPlanRunAgent, hasOverdeck] = await Promise.all([
+        const [hasAgent, hasPlanning, hasPlanningAgent, hasPlanRunAgent, hasStrikeAgent, hasOverdeck] = await Promise.all([
           pathExists(agentDir),
           pathExists(panDir),
           pathExists(planningAgentDir),
           pathExists(planRunAgentDir),
+          pathExists(strikeAgentDir),
           pathExists(overdeckDir),
         ]);
-        const hasAnySignal = hasAgent || hasPlanning || hasPlanningAgent || hasPlanRunAgent || hasOverdeck || hasIssueTmux;
+        const hasAnySignal = hasAgent || hasPlanning || hasPlanningAgent || hasPlanRunAgent || hasStrikeAgent || hasOverdeck || hasIssueTmux;
         if (!hasAnySignal) return null;
         try {
           const workspacePath = join(workspacesDir, c.name);

@@ -142,10 +142,17 @@ export function ForkModal({ conversation, initialMode, initialFocus, onConfirm, 
   const { groups, compactionModel, harnessPolicy } = useAvailableModels();
   const defaultModel = getDefaultConversationModel() || FALLBACK_DEFAULT_CONVERSATION_MODEL;
 
-  // Intent is the user-facing choice (3 options). The 4th legacy mode
+  // Intent is the user-facing choice (up to 3 options). The 4th legacy mode
   // ("fast-summary") is an advanced toggle under the summary intent.
+  // ACP transcripts are portable only through summary/handoff adapters; the
+  // server rejects an exact-copy fork from an ACP source.
+  const sourceSupportsPlainFork = conversation.harness !== 'acp';
   const initialIntent: ForkIntent =
-    initialMode === 'plain' ? 'plain' : initialMode === 'handoff' ? 'handoff' : 'summary';
+    initialMode === 'plain' && sourceSupportsPlainFork
+      ? 'plain'
+      : initialMode === 'handoff'
+        ? 'handoff'
+        : 'summary';
   const [intent, setIntent] = useState<ForkIntent>(initialIntent);
   const [fastSummary, setFastSummary] = useState(initialMode === 'fast-summary');
 
@@ -232,7 +239,9 @@ export function ForkModal({ conversation, initialMode, initialFocus, onConfirm, 
   const intentOptions: { value: ForkIntent; label: string; hint: string }[] = [
     { value: 'summary', label: 'Fresh summary', hint: 'An LLM distills the prior context into a seed message. Best for most cases.' },
     { value: 'handoff', label: 'Agent handoff', hint: 'An agent writes a handoff document — richer, captures dead ends and next steps.' },
-    { value: 'plain', label: 'Exact copy', hint: 'Carry over the raw history verbatim. Same model only.' },
+    ...(sourceSupportsPlainFork
+      ? [{ value: 'plain' as const, label: 'Exact copy', hint: 'Carry over the raw history verbatim. Same model only.' }]
+      : []),
   ];
 
   return (

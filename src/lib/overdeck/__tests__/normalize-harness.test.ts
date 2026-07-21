@@ -18,6 +18,10 @@ describe('normalizeHarness', () => {
     expect(normalizeHarness('codex')).toBe('codex');
   });
 
+  it("accepts 'acp' and returns it unchanged", () => {
+    expect(normalizeHarness('acp')).toBe('acp');
+  });
+
   it('returns null for unknown harness values', () => {
     expect(normalizeHarness('unknown')).toBeNull();
     expect(normalizeHarness('')).toBeNull();

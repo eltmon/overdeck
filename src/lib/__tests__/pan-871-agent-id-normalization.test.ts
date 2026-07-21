@@ -1,5 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
+const runtimeCensusMocks = vi.hoisted(() => ({
+  getRuntimeCensus: vi.fn(),
+  getRuntimeCensusSnapshot: vi.fn(),
+}));
+
+vi.mock('../runtime-census.js', () => runtimeCensusMocks);
+
 vi.mock('fs', () => ({
   existsSync: vi.fn((path: string) => String(path).includes('agent-pan-871/state.json') || String(path) === '/tmp/test/agents'),
   readFileSync: vi.fn(() => JSON.stringify({
@@ -97,6 +104,7 @@ import { listOverdeckAgentStatesSync } from '../overdeck/agent-state-sync.js';
 describe('agent ID normalization (PAN-871)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    runtimeCensusMocks.getRuntimeCensusSnapshot.mockReturnValue(null);
   });
 
   it('normalizes bare issue IDs when reading state', () => {
@@ -126,6 +134,27 @@ describe('agent ID normalization (PAN-871)', () => {
     expect(agents).toHaveLength(1);
     expect(agents[0].id).toBe('agent-pan-871');
     expect(agents[0].tmuxActive).toBe(true);
+  });
+
+  it('fails open when the shared tmux census is unavailable', () => {
+    runtimeCensusMocks.getRuntimeCensusSnapshot.mockReturnValue({
+      tmuxAvailable: false,
+      sessionNames: new Set<string>(),
+    });
+    vi.mocked(listOverdeckAgentStatesSync).mockReturnValue([
+      {
+        id: 'agent-pan-871',
+        issueId: 'PAN-871',
+        role: 'work',
+        status: 'running',
+        workspace: '/tmp/workspace',
+        harness: 'claude-code',
+        model: 'claude-sonnet-4-6',
+        startedAt: '2026-04-27T00:00:00.000Z',
+      } as import('../agents.js').AgentState,
+    ]);
+
+    expect(listRunningAgentsSync()[0].tmuxActive).toBe(true);
   });
 
   it('resolves issue IDs to the single registered strike agent when no work agent exists', async () => {

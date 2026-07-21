@@ -259,6 +259,77 @@ export interface WorkspaceCommitInfo {
   branch: string;
 }
 
+export interface WorkspaceHeadAnchorEntry {
+  repoKey: string;
+  sha: string;
+}
+
+export type WorkspaceGitShow = (
+  repoPath: string,
+  sha: string,
+  args: string[],
+) => Promise<string>;
+
+/**
+ * Parse a polyrepo head anchor such as `fe@<sha> api@<sha>`.
+ * Plain single-repo refs return null. Malformed composite anchors fail before
+ * any caller can accidentally pass the whitespace-containing value to git.
+ */
+export function parseWorkspaceHeadAnchor(anchor: string): WorkspaceHeadAnchorEntry[] | null {
+  const normalized = anchor.trim();
+  if (!normalized.includes('@')) {
+    if (/\s/.test(normalized)) {
+      throw new Error(`Invalid workspace head anchor: ${anchor}`);
+    }
+    return null;
+  }
+
+  const entries = normalized.split(/\s+/).map((token) => {
+    const match = /^([^@\s]+)@([0-9a-fA-F]{40,64})$/.exec(token);
+    if (!match) {
+      throw new Error(`Invalid workspace head anchor token '${token}' in '${anchor}'`);
+    }
+    return { repoKey: match[1], sha: match[2] };
+  });
+
+  return entries;
+}
+
+/**
+ * Render `git show` for a single-repo ref or every entry in a polyrepo anchor.
+ * Composite entries are resolved to their nested worktree and labeled using
+ * the same repo-section convention as review and inspect diff summaries.
+ */
+export async function renderWorkspaceGitShowPromise(
+  issueId: string | undefined,
+  workspacePath: string,
+  anchor: string,
+  args: string[],
+  gitShow: WorkspaceGitShow,
+): Promise<string> {
+  const entries = parseWorkspaceHeadAnchor(anchor);
+  if (!entries) return gitShow(workspacePath, anchor.trim(), args);
+  if (!issueId) {
+    throw new Error(`Cannot resolve composite workspace head anchor '${anchor}' without an issue id`);
+  }
+
+  const { resolveWorkspaceRepoRootsSync } = await import('./project-repos.js');
+  const rootsByKey = new Map(
+    resolveWorkspaceRepoRootsSync(issueId, workspacePath).map(root => [root.repoKey, root]),
+  );
+
+  const sections = await Promise.all(entries.map(async ({ repoKey, sha }) => {
+    const root = rootsByKey.get(repoKey);
+    if (!root) {
+      throw new Error(`Composite workspace head anchor repo '${repoKey}' was not found in ${workspacePath}`);
+    }
+    const diff = await gitShow(root.dir, sha, args);
+    return `── ${repoKey} ──\n${diff.trimEnd()}`;
+  }));
+
+  return sections.join('\n');
+}
+
 async function getWorkspaceGitInfoPromise(workspacePath: string): Promise<WorkspaceCommitInfo> {
   try {
     const [headResult, branchResult] = await Promise.all([
@@ -273,6 +344,35 @@ async function getWorkspaceGitInfoPromise(workspacePath: string): Promise<Worksp
     const msg = err instanceof Error ? err.message : String(err);
     throw new Error(`getWorkspaceGitInfo failed for ${workspacePath}: ${msg}`);
   }
+}
+
+/**
+ * Snapshot the code HEAD(s) of a workspace for drift comparison (PAN-2948).
+ *
+ * Monorepo: returns the workspace HEAD SHA (unchanged behavior). Polyrepo:
+ * returns a composite `fe@<sha> api@<sha>` over the sub-repo worktrees —
+ * the wrapper repo at the workspace root is a one-commit artifacts repo whose
+ * SHA never changes, so snapshotting it makes every drift comparison
+ * (reviewedAtCommit vs lastVerifiedCommit, reviewer verdict anchors) report
+ * "no drift" forever. Composite snapshots compare equal iff every sub-repo
+ * head is unchanged; consumers that try to use the anchor as a git ref fail
+ * the ref lookup and fall back to their conservative full-rerun path.
+ */
+export async function snapshotWorkspaceHeadsPromise(issueId: string, workspacePath: string): Promise<string | undefined> {
+  // Dynamic import: project-repos → projects sits above this low-level module
+  // in the layering; a static edge here would risk a require cycle.
+  const { resolveWorkspaceRepoRootsSync } = await import('./project-repos.js');
+  const roots = resolveWorkspaceRepoRootsSync(issueId, workspacePath);
+  const isPolyrepo = roots.some(root => root.isPolyrepo);
+  const heads: string[] = [];
+  for (const root of roots) {
+    try {
+      const { stdout } = await execAsync('git rev-parse HEAD', { cwd: root.dir, encoding: 'utf-8', timeout: 10_000 });
+      const sha = stdout.trim();
+      if (sha) heads.push(isPolyrepo ? `${root.repoKey}@${sha}` : sha);
+    } catch { /* unreadable root — omit from the snapshot */ }
+  }
+  return heads.length > 0 ? heads.join(' ') : undefined;
 }
 
 async function hasStaleLocksPromise(repoPath: string): Promise<boolean> {

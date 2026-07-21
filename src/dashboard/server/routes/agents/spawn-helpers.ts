@@ -181,7 +181,7 @@ export function handleContainerOrchestration(input: {
   devScript: string;
   agentSessionName: string;
   role: Role;
-  effectiveHarness: 'claude-code' | 'ohmypi' | 'codex' | null;
+  effectiveHarness: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | null;
   allowHost: boolean;
   spawnModel: string;
   spawnGuardrails: SpawnGuardrailDecision;

@@ -45,7 +45,7 @@ import type { AgentSnapshot, SessionNodePresence } from '@overdeck/contracts';
 import { deriveSessionPresence } from '../services/session-presence.js';
 import { resolveIssueHeadlineCost } from '../services/issue-cost-resolver.js';
 import { getCachedRunningAgents } from '../services/running-agents-cache.js';
-import { findPrdAtStatusSync, type PrdLocation } from '../../../lib/prd-locations.js';
+import { findPrdAnywhereSync, type PrdLocation } from '../../../lib/prd-locations.js';
 import { resolveProjectFromIssueSync, listProjectsSync } from '../../../lib/projects.js';
 import { extractPrefixSync, parseIssueIdSync } from '../../../lib/issue-id.js';
 import { loadSettingsApi } from '../../../lib/settings-api.js';
@@ -284,20 +284,23 @@ export async function fetchActivityDataWithContext(
   const planningAgentId = `planning-${issueLower}`;
   const planRunAgentId = `agent-${issueLower}-plan`;
   const knowledgeAgentId = `agent-${issueLower}-knowledge`;
+  const strikeAgentId = `strike-${issueLower}`;
   const agentsDir = join(homedir(), '.overdeck', 'agents');
 
   let hasPlanningSection = false;
 
-  for (const checkId of [planningAgentId, agentId, planRunAgentId, knowledgeAgentId]) {
+  for (const checkId of [planningAgentId, agentId, planRunAgentId, knowledgeAgentId, strikeAgentId]) {
     const agentDir = join(agentsDir, checkId);
-    if (!await pathExists(agentDir)) continue;
-
+    // PAN-1908: the agents registry decides whether a session exists — never
+    // the ~/.overdeck/agents/<id>/ dir, which janitors remove after sessions end.
     const state = getAgentStateSync(checkId);
     if (!state) continue;
 
     try {
       const isPlanning = checkId.startsWith('planning-') || state.role === 'plan';
-      const sectionType = isPlanning ? 'planning' : checkId.endsWith('-knowledge') ? 'knowledge' : 'work';
+      const sectionType = isPlanning ? 'planning'
+        : checkId.startsWith('strike-') ? 'strike'
+        : checkId.endsWith('-knowledge') ? 'knowledge' : 'work';
       if (isPlanning) hasPlanningSection = true;
 
       let transcript = '';
@@ -337,8 +340,8 @@ export async function fetchActivityDataWithContext(
       // Resolve JSONL path for conversation rendering (PAN-821)
       const jsonlPath = await resolveJsonlPath(checkId, workspacePath);
 
-      // Only expose interactive terminal for work/planning sessions (PAN-821 review)
-      const exposeInteractiveTerminal = sectionType === 'work' || sectionType === 'planning';
+      // Only expose interactive terminal for work/planning/strike sessions (PAN-821 review)
+      const exposeInteractiveTerminal = sectionType === 'work' || sectionType === 'planning' || sectionType === 'strike';
 
       // Terminal-end signal: endedAt is populated only when the session has
       // actually ended. duration is preserved as elapsed seconds for existing UI.
@@ -785,7 +788,7 @@ async function fetchPlanningData(
   } catch { /* no xBRIEF plan */ }
 
   if (!hasPlanningDir && !hasPanContinue) {
-    const prd = await readPrdContent(findPrdAtStatusSync(projectPath, issueId, 'active'));
+    const prd = await readPrdContent(findPrdAnywhereSync(projectPath, issueId));
     if (prd) {
       result.prd = prd;
       result.hasPrd = true;
@@ -820,13 +823,13 @@ async function fetchPlanningData(
   }
 
   if (!result.prd) {
-    for (const status of ['active', 'planned', 'completed'] as const) {
-      const content = await readPrdContent(findPrdAtStatusSync(projectPath, issueId, status));
-      if (content) {
-        result.prd = content;
-        result.hasPrd = true;
-        break;
-      }
+    // findPrdAnywhereSync covers legacy docs/prds roots and canonical
+    // drafts/<issue>.md on overdeck-state, which the status-only loop missed,
+    // so promoted PRDs were invisible here.
+    const content = await readPrdContent(findPrdAnywhereSync(projectPath, issueId));
+    if (content) {
+      result.prd = content;
+      result.hasPrd = true;
     }
   }
 

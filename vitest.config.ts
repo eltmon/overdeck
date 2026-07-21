@@ -14,8 +14,8 @@ const excludeQuarantined = (isCI || isVerification) && !isFlakeLane;
 
 const quarantined = readQuarantineList(__dirname);
 const defaultInclude = includeBenchmarks
-  ? ['tests/**/*.test.ts', 'tests/**/*.spec.ts', 'tests/**/*.bench.ts', 'src/**/__tests__/**/*.test.ts', 'packages/**/src/__tests__/**/*.test.ts', 'src/**/*.bench.ts']
-  : ['tests/**/*.test.ts', 'tests/**/*.spec.ts', 'src/**/__tests__/**/*.test.ts', 'packages/**/src/__tests__/**/*.test.ts'];
+  ? ['tests/**/*.test.ts', 'tests/**/*.spec.ts', 'tests/**/*.bench.ts', 'src/**/__tests__/**/*.test.ts', 'packages/**/src/__tests__/**/*.test.ts', 'packages/effect-acp/src/**/*.test.ts', 'src/**/*.bench.ts']
+  : ['tests/**/*.test.ts', 'tests/**/*.spec.ts', 'src/**/__tests__/**/*.test.ts', 'packages/**/src/__tests__/**/*.test.ts', 'packages/effect-acp/src/**/*.test.ts'];
 
 export default defineConfig({
   cacheDir: '.cache/vitest',

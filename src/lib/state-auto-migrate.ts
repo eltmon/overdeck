@@ -117,7 +117,7 @@ async function reconcile(
       return blocked(projectKey, worktreeBlockReason(worktree));
     }
     if (worktree.status === 'legacy') {
-      return blocked(projectKey, 'The remote migration marker is valid but the local state worktree still resolves to the legacy project checkout.');
+      return blocked(projectKey, worktree.detail);
     }
     return { status: 'ready', projectKey, worktree: worktree.status };
   } catch (error) {

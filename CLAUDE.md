@@ -2,7 +2,7 @@
 
 > **Note:** Universal and dev-scope engineering rules — async tmux, no execSync in server, fake timers for retry tests, worktree discipline, work-agents-via-pan, stash discipline, dashboard-Node22-only, single-deacon invariant, no-destructive-requests, file-path references, Karpathy rules — live in [`sync-sources/rules/`](sync-sources/rules/) and are folded into `~/.claude/CLAUDE.md` automatically via `pan sync`. This file holds **project-specific** guidance that doesn't apply outside this repo.
 
-> **Knowledge bundle (OKF):** Project knowledge lives in the OKF bundle at [`../overdeck-knowledge`](../overdeck-knowledge) (remote `eltmon/overdeck-knowledge`), pointed to by [`.okf.yml`](.okf.yml). Use `/okf extract "<query>"` to pull cited context, `/okf author`/`/okf sync`/`/okf study` to maintain it.
+> **Knowledge bundle (OKF):** Project knowledge lives in the OKF bundle at [`../overdeck-knowledge`](../overdeck-knowledge) (remote `eltmon/overdeck-knowledge`), pointed to by [`.okf.yml`](.okf.yml). Use `/okf extract "<query>"` to pull cited context and `/okf author`/`/okf sync`/`/okf study` to maintain it. `/okf open` and the dashboard **Knowledge** page run OpenKnowledge against a disposable read-only snapshot; edit through `/okf author` because the upstream v0.34 editor does not preserve YAML source formatting losslessly.
 
 ## Engineering Philosophy: No Bandaids
 
@@ -103,7 +103,7 @@ git push origin v0.9.4
 
 ## Harnesses
 
-Overdeck supports three coding-agent harnesses: `claude-code` (default), `pi`/`ohmypi` (alternative, multi-provider), and `codex` (OpenAI Codex CLI — first-party agent loop for the GPT model family; Codex work agents use the persistent `codex app-server` transport by default, with `codex.transport: tui` as a temporary escape hatch to the legacy `codexMode: work-tui` path). The Codex runtime adapter remains `src/lib/runtimes/codex.ts`. The harness is picked per spawn at plan kickoff, role runs, work agent start, and the conversation panel; roles read harness/model defaults from Settings. Pi + Anthropic + subscription auth is the only blocked combination (ToS gate in `src/lib/harness-policy.ts`).
+Overdeck supports four coding-agent harnesses: `claude-code` (default), `pi`/`ohmypi` (alternative, multi-provider), `codex` (OpenAI Codex CLI — first-party agent loop for the GPT model family), and `acp` (native Agent Client Protocol, with Kimi Code CLI as the first wired agent). Codex work agents use the persistent `codex app-server` transport by default, with `codex.transport: tui` as a temporary escape hatch to the legacy `codexMode: work-tui` path; the runtime adapter remains `src/lib/runtimes/codex.ts`. The ACP integration vendors the Effect-based protocol client in `packages/effect-acp/` and runs through `src/lib/runtimes/acp.ts`. The harness is picked per spawn at plan kickoff, role runs, work agent start, and the conversation panel; roles read harness/model defaults from Settings. Pi + Anthropic + subscription auth is the only blocked combination (ToS gate in `src/lib/harness-policy.ts`).
 
 See [configuration/harnesses.mdx](configuration/harnesses.mdx) for installation, picker locations, ToS rules, and troubleshooting. The wider field of coding-agent harnesses Overdeck could adopt is surveyed in [reference/harness-landscape.mdx](reference/harness-landscape.mdx). (`docs/HARNESSES.md` is now a redirect stub — the harness docs are published in the Mintlify site.)
 
@@ -580,7 +580,7 @@ There are four artifacts. They are distinct — do not conflate them.
 
 | Artifact | Location | Writer | Mutability |
 | --- | --- | --- | --- |
-| **PRD draft** (`.md`) | `drafts/<issue>.md` on `overdeck-state` (disk: `${OVERDECK_HOME}/state/<project>/drafts/<issue>.md`) | Human or planning agent | Free-form narrative, human-mutable |
+| **PRD draft** (`.md`) | `drafts/<issue>.md` on `overdeck-state` (disk: `${OVERDECK_HOME}/state/<project>/drafts/<issue>.md`); planning agents author it workspace-side at `.pan/drafts/<ISSUE>.md` and complete-planning promotes it to `overdeck-state` | Human or planning agent | Free-form narrative, human-mutable |
 | **xBRIEF spec** (`.json`) | `specs/<YYYY-MM-DD>-<ISSUE>-<slug>.xbrief.json` on `overdeck-state` (disk: `${OVERDECK_HOME}/state/<project>/specs/<file>`) | Pipeline only (single writer) | Immutable after planning — only `plan.status` changes via `updateSpecStatus()` |
 | **Project-side continue state** (`.json`) | `${OVERDECK_HOME}/state/<project>/continues/<issue-lowercase>.xbrief.json` | Pipeline | Session resume point, decisions, hazards, sessionHistory, feedback — one canonical file per issue, never moves |
 | **Workspace-side continue state** (`.json`) | `<workspace>/.overdeck/continue.json` | Pipeline + work agent | Session state + `statusOverrides` map tracking item/subItem completion |

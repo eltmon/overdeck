@@ -38,8 +38,7 @@ const lifecycleMocks = vi.hoisted(() => ({
 
 const inspectMocks = vi.hoisted(() => ({
   spawnInspectAgent: vi.fn(),
-  getDiffBase: vi.fn(),
-  getDiffStats: vi.fn(),
+  getInspectDiffContext: vi.fn(),
 }));
 
 const trackerMocks = vi.hoisted(() => ({
@@ -119,8 +118,7 @@ vi.mock('../../../lib/cloister/inspect-agent.js', () => ({
 }));
 
 vi.mock('../../../lib/cloister/inspect-checkpoints.js', () => ({
-  getDiffBase: inspectMocks.getDiffBase,
-  getDiffStats: inspectMocks.getDiffStats,
+  getInspectDiffContext: inspectMocks.getInspectDiffContext,
 }));
 
 vi.mock('../../../lib/xbrief/io.js', () => ({
@@ -222,10 +220,14 @@ describe('resolveBareNumericIdSync rollout (PAN-1173)', () => {
     lifecycleMocks.closeOut.mockReturnValue(Effect.succeed({ success: true, steps: [] }));
     inspectMocks.spawnInspectAgent.mockReset();
     inspectMocks.spawnInspectAgent.mockReturnValue(Effect.succeed({ success: true, tmuxSession: 'inspect-1', runId: 'run-1' }));
-    inspectMocks.getDiffBase.mockReset();
-    inspectMocks.getDiffBase.mockReturnValue(Effect.succeed('abcdef123456'));
-    inspectMocks.getDiffStats.mockReset();
-    inspectMocks.getDiffStats.mockReturnValue(Effect.succeed('1 file changed'));
+    inspectMocks.getInspectDiffContext.mockReset();
+    inspectMocks.getInspectDiffContext.mockReturnValue(Effect.succeed({
+      currentHead: 'fedcba987654',
+      checkpoint: 'abcdef12',
+      diffStats: '1 file changed',
+      diffCommand: 'git diff abcdef123456...HEAD',
+      repos: [],
+    }));
     trackerMocks.resolveTrackerTypeSync.mockReset();
     trackerMocks.resolveTrackerTypeSync.mockReturnValue('rally');
     trackerMocks.isGitHubIssueSync.mockReset();

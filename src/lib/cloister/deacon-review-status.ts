@@ -507,9 +507,11 @@ async function reconcileReviewStatusOrphan(
 
     if (workspace) {
       try {
+        // PAN-2948: polyrepo-aware — lastVerifiedCommit is a composite
+        // sub-repo snapshot, so compare against the same snapshot form.
         const currentHead = options.readWorkspaceHead
           ? await options.readWorkspaceHead(workspace)
-          : (await execAsync('git rev-parse HEAD', { cwd: workspace })).stdout.trim();
+          : await (await import('../git-utils.js')).snapshotWorkspaceHeadsPromise(issueId, workspace);
         if (currentHead === status.lastVerifiedCommit) {
           setReviewStatusSync(issueId, {
             reviewStatus: 'pending',
@@ -537,8 +539,9 @@ async function reconcileReviewStatusOrphan(
         if (project) {
           const workspacePath = join(project.projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`);
           if (existsSync(workspacePath)) {
-            const { stdout } = await execAsync('git rev-parse HEAD', { cwd: workspacePath });
-            reviewUpdate['reviewedAtCommit'] = stdout.trim();
+            // PAN-2948: polyrepo-aware — snapshots sub-repo heads, not the wrapper.
+            const { snapshotWorkspaceHeadsPromise } = await import('../git-utils.js');
+            reviewUpdate['reviewedAtCommit'] = await snapshotWorkspaceHeadsPromise(issueId, workspacePath);
           }
         }
       } catch { /* non-fatal */ }

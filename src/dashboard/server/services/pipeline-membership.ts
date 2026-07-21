@@ -64,6 +64,8 @@ interface MembershipSnapshot {
   value: PipelineMembership[];
   refreshedAt: number;
   refresh?: Promise<void>;
+  lastError?: string;
+  lastErrorAt?: number;
 }
 
 const membershipSnapshots = new Map<string, MembershipSnapshot>();
@@ -79,12 +81,40 @@ function refreshMembershipSnapshot(
   snapshot.refresh = scheduleMembershipRefresh(() => getMembership(project)).then((value) => {
     snapshot.value = value;
     snapshot.refreshedAt = now();
-  }).catch(() => {
+    snapshot.lastError = undefined;
+    snapshot.lastErrorAt = undefined;
+  }).catch((error: unknown) => {
     // Keep the last successful snapshot; a cold caller remains unavailable.
+    // Record and log the failure — a swallowed boot-warm failure previously
+    // left a cold project with zero diagnostic trace (PAN-2972).
+    snapshot.lastError = error instanceof Error ? error.message : String(error);
+    snapshot.lastErrorAt = now();
+    console.warn(
+      `[pipeline-membership] refresh failed for ${project.name ?? project.path}; keeping last-good snapshot:`,
+      snapshot.lastError,
+    );
   }).finally(() => {
     snapshot.refresh = undefined;
   });
   return snapshot.refresh;
+}
+
+/** Read the latest successful snapshots without scheduling tracker or git work. */
+export function readPipelineMembershipSnapshotsForProjects(
+  projects: ProjectConfig[],
+): ProjectPipelineMembershipResult[] {
+  return projects.map((project) => {
+    const snapshot = membershipSnapshots.get(project.path);
+    if (snapshot?.refreshedAt) return { project, memberships: snapshot.value };
+    // Cold cache: surface the recorded failure when one exists so the operator
+    // sees the real cause instead of a permanent "loading" (PAN-2972).
+    return {
+      project,
+      error: new Error(snapshot?.lastError
+        ? `Pipeline membership refresh failed: ${snapshot.lastError}`
+        : 'Pipeline membership snapshot is loading'),
+    };
+  });
 }
 
 /** Return the latest successful snapshot immediately and refresh stale/missing projects in the background. */
@@ -93,17 +123,16 @@ export function getPipelineMembershipSnapshotsForProjects(
   getMembership: MembershipLookup = getProjectPipelineMembership,
   now = Date.now,
 ): ProjectPipelineMembershipResult[] {
-  return projects.map((project) => {
+  const results = readPipelineMembershipSnapshotsForProjects(projects);
+  for (const project of projects) {
     const snapshot = membershipSnapshots.get(project.path);
     if (!snapshot?.refresh && (!snapshot || now() - snapshot.refreshedAt >= PIPELINE_MEMBERSHIP_SNAPSHOT_TTL_MS)) {
       const current = snapshot ?? { value: [], refreshedAt: 0 };
       membershipSnapshots.set(project.path, current);
       void refreshMembershipSnapshot(project, current, getMembership, now);
     }
-    return snapshot?.refreshedAt
-      ? { project, memberships: snapshot.value }
-      : { project, error: new Error('Pipeline membership snapshot is loading') };
-  });
+  }
+  return results;
 }
 
 /** Await only the first snapshot; later resource refreshes consume stale data while revalidating. */

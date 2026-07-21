@@ -16,8 +16,7 @@ import { promisify } from 'util';
 import { Effect } from 'effect';
 import { ProcessSpawnError } from '../errors.js';
 import {
-  getDiffBase,
-  getDiffStats,
+  getInspectDiffContext,
   getCurrentHead,
   saveCheckpoint,
 } from './inspect-checkpoints.js';
@@ -90,9 +89,10 @@ async function buildInspectPromptPromise(context: InspectContext): Promise<strin
   if (!item) throw new Error(`Item ${context.itemId} requires a readable xBRIEF entry in ${context.workspace}.`);
   const itemDescription = `**Title:** ${item.title}\n\n**Action:** ${item.narrative?.Action ?? 'No narrative provided.'}`;
 
-  // Get diff scope
-  const diffBase = await Effect.runPromise(getDiffBase(context.projectKey, context.issueId, context.workspace));
-  const diffStats = await Effect.runPromise(getDiffStats(context.workspace, diffBase));
+  // Resolve the item diff from the code repo(s), never the polyrepo wrapper.
+  const diffContext = await Effect.runPromise(
+    getInspectDiffContext(context.projectKey, context.issueId, context.workspace),
+  );
 
   const apiUrl = process.env.OVERDECK_DASHBOARD_URL || process.env.DASHBOARD_URL || `http://localhost:${process.env.API_PORT || process.env.PORT || '3011'}`;
 
@@ -102,9 +102,9 @@ async function buildInspectPromptPromise(context: InspectContext): Promise<strin
     .replace(/\{\{issueId\}\}/g, context.issueId)
     .replace(/\{\{itemId\}\}/g, context.itemId)
     .replace(/\{\{workspacePath\}\}/g, context.workspace)
-    .replace(/\{\{checkpoint\}\}/g, diffBase.substring(0, 8))
-    .replace(/\{\{diffBase\}\}/g, diffBase)
-    .replace(/\{\{diffStats\}\}/g, diffStats)
+    .replace(/\{\{checkpoint\}\}/g, diffContext.checkpoint)
+    .replace(/\{\{diffCommand\}\}/g, diffContext.diffCommand)
+    .replace(/\{\{diffStats\}\}/g, diffContext.diffStats)
     .replace(/\{\{itemDescription\}\}/g, itemDescription)
     .replace(/\{\{resultStatus\}\}/g, '${RESULT_STATUS}')
     .replace(/\{\{resultNotes\}\}/g, '${RESULT_NOTES}');
@@ -148,7 +148,7 @@ async function routeInspectToStandingSupervisorIfEnabled(
     inspectOwnerSession: agentId,
   });
 
-  const sha = await Effect.runPromise(getCurrentHead(context.workspace));
+  const sha = await Effect.runPromise(getCurrentHead(context.issueId, context.workspace));
   const prdMarkdown = await loadPrdDraft(context.projectPath, context.issueId);
   await deliverCommitForReview({
     supervisorAgentId: agentId,
@@ -326,7 +326,7 @@ async function spawnInspectAgentPromise(
   workspacePath: string
 ): Promise<void> {
   if (status === 'passed') {
-    const commitSha = await Effect.runPromise(getCurrentHead(workspacePath));
+    const commitSha = await Effect.runPromise(getCurrentHead(issueId, workspacePath));
     saveCheckpoint(projectKey, issueId, itemId, commitSha);
     console.log(`[inspect] Checkpoint saved for ${issueId} item ${itemId} at ${commitSha.substring(0, 8)}`);
 

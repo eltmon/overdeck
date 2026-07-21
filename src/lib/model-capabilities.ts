@@ -750,9 +750,9 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
   'gemini-2.5-pro': { model: 'gemini-2.5-pro', provider: 'google', displayName: 'Gemini 2.5 Pro (deprecated)', costPer1MTokens: 7.0, contextWindow: 1000000, skills: { 'code-generation': 90, 'code-review': 88, debugging: 86, planning: 86, documentation: 88, testing: 86, security: 80, performance: 86, synthesis: 90, speed: 70, 'context-length': 100 } },
   'gemini-2.5-flash': { model: 'gemini-2.5-flash', provider: 'google', displayName: 'Gemini 2.5 Flash (deprecated)', costPer1MTokens: 0.4, contextWindow: 1000000, skills: { 'code-generation': 78, 'code-review': 74, debugging: 70, planning: 66, documentation: 74, testing: 70, security: 58, performance: 68, synthesis: 74, speed: 94, 'context-length': 100 } },
 
-  // ═══════════════════════════════════════════════════════════════════════════
   // KIMI MODELS
-  // ═══════════════════════════════════════════════════════════════════════════
+  'k3': { model: 'k3', provider: 'kimi', displayName: 'Kimi K3', costPer1MTokens: 9, contextWindow: 262144, skills: { 'code-generation': 95, 'code-review': 93, debugging: 93, planning: 90, documentation: 90, testing: 90, security: 85, performance: 88, synthesis: 94, speed: 70, 'context-length': 98 }, notes: 'Kimi K3 coding endpoint alias. 2.8T MoE, always-thinking, 256K context. Source: https://www.kimi.com/code/docs/en/third-party-tools/other-coding-agents.html' },
+  'k3[1m]': { model: 'k3[1m]', provider: 'kimi', displayName: 'Kimi K3 (1M)', costPer1MTokens: 9, contextWindow: 1048576, skills: { 'code-generation': 95, 'code-review': 93, debugging: 93, planning: 90, documentation: 90, testing: 90, security: 85, performance: 88, synthesis: 94, speed: 70, 'context-length': 100 }, notes: 'Kimi K3 coding endpoint 1M alias. 2.8T MoE, always-thinking, 1,048,576-token context. Source: https://www.kimi.com/code/docs/en/third-party-tools/other-coding-agents.html' },
 
   'kimi-k2.7-code': {
     model: 'kimi-k2.7-code',

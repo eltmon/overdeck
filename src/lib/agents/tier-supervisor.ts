@@ -30,6 +30,7 @@ import { execFile } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
+import { renderWorkspaceGitShowPromise } from '../git-utils.js';
 import type { XBriefDocument, XBriefEdge, XBriefItem, XBriefSubItem } from '../xbrief/types.js';
 import type { AgentState } from './agent-state.js';
 import { deliverAgentMessage } from './delivery.js';
@@ -403,13 +404,15 @@ Rules:
 - Only review this commit against this bead's acceptance criteria — compile, lint, and tests are the verification gate's job, and code style is the review convoy's job.`;
 }
 
-async function getCommitDiff(workspacePath: string, sha: string): Promise<string> {
-  const { stdout } = await execFileAsync('git', ['show', sha], {
-    cwd: workspacePath,
-    encoding: 'utf-8',
-    maxBuffer: 10 * 1024 * 1024,
+async function getCommitDiff(issueId: string, workspacePath: string, sha: string): Promise<string> {
+  return renderWorkspaceGitShowPromise(issueId, workspacePath, sha, [], async (repoPath, repoSha, args) => {
+    const { stdout } = await execFileAsync('git', ['show', repoSha, ...args], {
+      cwd: repoPath,
+      encoding: 'utf-8',
+      maxBuffer: 10 * 1024 * 1024,
+    });
+    return stdout;
   });
-  return stdout;
 }
 
 /**
@@ -420,7 +423,8 @@ async function getCommitDiff(workspacePath: string, sha: string): Promise<string
  */
 export async function deliverCommitForReview(options: DeliverCommitForReviewOptions): Promise<DeliveryResult> {
   const deliver = options.deps?.deliver ?? deliverAgentMessage;
-  const getDiff = options.deps?.getDiff ?? getCommitDiff;
+  const getDiff = options.deps?.getDiff
+    ?? ((workspacePath, sha) => getCommitDiff(options.issueId, workspacePath, sha));
 
   const diff = await getDiff(options.workspacePath, options.sha);
   const traces = Array.isArray(options.item.metadata?.traces)

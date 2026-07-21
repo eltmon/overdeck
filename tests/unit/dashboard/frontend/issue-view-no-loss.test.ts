@@ -79,7 +79,14 @@ function findHiddenCockpitSectionRules(
   });
 }
 
-const COCKPIT_SOURCE_TAGS = collectFiles(COCKPIT_COMPONENTS_ROOT, '.tsx')
+const COCKPIT_SOURCE_FILES = [...new Set([
+  ...collectFiles(COCKPIT_COMPONENTS_ROOT, '.tsx'),
+  ...ISSUE_VIEW_INVENTORY
+    .filter((entry) => entry.view === 'cockpit' && entry.home.endsWith('.tsx'))
+    .map((entry) => path.resolve(REPO_ROOT, entry.home)),
+])];
+
+const COCKPIT_SOURCE_TAGS = COCKPIT_SOURCE_FILES
   .filter((file) => !file.endsWith('.test.tsx'))
   .flatMap((file) => parseCockpitSectionTags(
     readFileSync(file, 'utf8'),

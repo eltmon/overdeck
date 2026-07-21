@@ -413,28 +413,44 @@ export async function gatherProjectLensSignals(
   for (const id of specIssues) candidates.add(id);
 
   if (owner && repo) {
-    const candidateHeads = [...new Set([...candidates].flatMap((id) => [
+    const unknownIssueIds = [...candidates].filter((id) => !knownStateByIssue.has(id));
+    const issueStateCandidates = unknownIssueIds.filter((id) =>
+      openPrIssues.has(id) || branchIssues.has(id));
+    const issueStateCandidateSet = new Set(issueStateCandidates);
+    for (const id of unknownIssueIds) {
+      // listOpenIssues is a complete paginated snapshot. A spec-only candidate
+      // absent from it is closed (or no longer an issue), and either case resolves
+      // terminal without another per-number GraphQL lookup.
+      if (!issueStateCandidateSet.has(id)) candidates.delete(id);
+    }
+    const issueStates = issueStateCandidates.length > 0
+      ? await deps.listIssueStates(owner, repo, issueStateCandidates.map(issueNumber))
+      : [];
+    const stateByNumber = new Map(issueStates.map((entry) => [entry.number, entry.state]));
+    for (const id of issueStateCandidates) {
+      const state = stateByNumber.get(issueNumber(id));
+      if (state) knownStateByIssue.set(id, state);
+      else candidates.delete(id);
+    }
+
+    // Closed issues resolve terminal regardless of merged-PR history (unless a PR
+    // is still open, already captured above), so only open candidates need the
+    // expensive merged-head oracle. This keeps historical refs/specs out of the
+    // GraphQL fan-out without changing membership semantics.
+    const openCandidates = [...candidates].filter((id) => knownStateByIssue.get(id) === 'open');
+    const candidateHeads = [...new Set(openCandidates.flatMap((id) => [
       ...(headRefsByIssue.get(id) ?? []),
       `feature/${id.toLowerCase()}`,
       `strike/${id.toLowerCase()}`,
     ]))];
     const mergedHeads = new Set(await deps.listMergedPullRequestHeads(owner, repo, candidateHeads));
-    for (const id of candidates) {
+    for (const id of openCandidates) {
       const possibleHeads = [
         ...(headRefsByIssue.get(id) ?? []),
         `feature/${id.toLowerCase()}`,
         `strike/${id.toLowerCase()}`,
       ];
       if (possibleHeads.some((head) => mergedHeads.has(head))) mergedPrIssues.add(id);
-    }
-
-    const unknownIssueIds = [...candidates].filter((id) => !knownStateByIssue.has(id));
-    const issueStates = await deps.listIssueStates(owner, repo, unknownIssueIds.map(issueNumber));
-    const stateByNumber = new Map(issueStates.map((entry) => [entry.number, entry.state]));
-    for (const id of unknownIssueIds) {
-      const state = stateByNumber.get(issueNumber(id));
-      if (state) knownStateByIssue.set(id, state);
-      else candidates.delete(id);
     }
   }
 

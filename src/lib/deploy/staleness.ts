@@ -15,6 +15,7 @@ export interface BuildStaleness {
   readonly behindTotal: number | null;
   readonly behindBuildInputs: number | null;
   readonly originMainLastCommitAt: number | null;
+  readonly originMainLastBuildInputCommitAt: number | null;
   readonly computedAt: number;
   readonly reason?: string;
 }
@@ -79,6 +80,7 @@ function unknown(
     behindTotal: null,
     behindBuildInputs: null,
     originMainLastCommitAt: null,
+    originMainLastBuildInputCommitAt: null,
     computedAt,
     reason,
   };
@@ -124,16 +126,23 @@ export async function computeBuildStaleness(input: {
   try {
     originMainSha = (await run('git', ['rev-parse', 'origin/main'], { cwd: repoRoot })).stdout.trim();
     const range = `${buildCommit}..origin/main`;
-    const [total, buildInputs, lastCommit] = await Promise.all([
+    const [total, buildInputs, lastCommit, lastBuildInputCommit] = await Promise.all([
       run('git', ['rev-list', '--count', range], { cwd: repoRoot }),
       run('git', ['rev-list', '--count', range, '--', ...BUILD_INPUT_PATHS], { cwd: repoRoot }),
       run('git', ['log', '-1', '--format=%ct', 'origin/main'], { cwd: repoRoot }),
+      run('git', ['log', '-1', '--format=%ct', 'origin/main', '--', ...BUILD_INPUT_PATHS], { cwd: repoRoot }),
     ]);
     const behindTotal = Number.parseInt(total.stdout.trim(), 10);
     const behindBuildInputs = Number.parseInt(buildInputs.stdout.trim(), 10);
     const originMainLastCommitAt = Number.parseInt(lastCommit.stdout.trim(), 10) * 1000;
+    const originMainLastBuildInputCommitAt = Number.parseInt(lastBuildInputCommit.stdout.trim(), 10) * 1000;
 
-    if (![behindTotal, behindBuildInputs, originMainLastCommitAt].every(Number.isFinite)) {
+    if (![
+      behindTotal,
+      behindBuildInputs,
+      originMainLastCommitAt,
+      originMainLastBuildInputCommitAt,
+    ].every(Number.isFinite)) {
       return unknown(buildCommit, computedAt, 'Git returned invalid staleness metadata.', originMainSha);
     }
 
@@ -144,6 +153,7 @@ export async function computeBuildStaleness(input: {
       behindTotal,
       behindBuildInputs,
       originMainLastCommitAt,
+      originMainLastBuildInputCommitAt,
       computedAt,
     };
   } catch (error) {

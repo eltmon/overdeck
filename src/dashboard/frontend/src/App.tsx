@@ -12,6 +12,8 @@ import { SearchModal } from './components/search/SearchModal';
 import { CommandPalette, type ConversationPaletteOpenRequest } from './components/CommandPalette';
 import { NO_PROJECT_KEY } from './components/CommandDeck/projectsData';
 import { IssueDrawer } from './components/drawer/IssueDrawer';
+import { ConversationDock } from './components/dock/ConversationDock';
+import { ResumableSessionDialog } from './components/ResumableSessionDialog';
 import { SessionFeedSidebar } from './components/sessionFeed/SessionFeedSidebar';
 import { NewProjectModal, type CreatedProject } from './components/CommandDeck/NewProjectModal';
 import { Tab } from './components/Header';
@@ -55,6 +57,7 @@ import {
 } from './App/StandaloneRoutes';
 import { AppRoutes, type PendingConversationTarget } from './App/AppRoutes';
 import { AppChrome } from './App/AppChrome';
+import { useUiMode } from './lib/simple/uiMode';
 import { isRunningAgentStatus } from './components/AgentPillPopoverRow';
 import { usePendingInputDialogs } from './App/hooks/usePendingInputDialogs';
 import { useDesktopActivityNotifications } from './App/hooks/useDesktopActivityNotifications';
@@ -221,6 +224,7 @@ export default function App() {
   // the app-bar search to that project (PAN-1593).
   const [searchProjectPrefix, setSearchProjectPrefix] = useState<string | null>(null);
   const [isPaletteOpen, setIsPaletteOpen] = useState(false);
+  const [paletteInitialScope, setPaletteInitialScope] = useState<'all' | 'conversations'>('all');
   const [pendingConversationTarget, setPendingConversationTarget] = useState<PendingConversationTarget | null>(null);
   const [isSessionFeedSidebarOpen, setIsSessionFeedSidebarOpen] = useState(readSessionFeedSidebarOpen);
   const [trackerBannerDismissed, setTrackerBannerDismissed] = useState(false);
@@ -397,9 +401,17 @@ export default function App() {
   }, [activeTab]);
 
   // PAN-1234: /issues/:id opens the drawer without rewriting the URL.
+  // PAN-2908: in simple mode the same URL opens the simple issue page instead.
   const applyIssueRoute = useCallback(() => {
     const issueId = getIssueIdFromPath();
     if (!issueId) return;
+    if (useUiMode.getState().mode === 'simple') {
+      if (activeTab !== 'home') {
+        setActiveTabState('home');
+      }
+      useUiMode.getState().openSimpleIssue(issueId);
+      return;
+    }
     // Ensure the parent surface is active (initial load may resolve it from
     // getTabFromPath, but popstate can arrive with any tab).
     const targetTab = getLastTab() ?? 'pipeline';
@@ -611,7 +623,13 @@ export default function App() {
         setIsSearchOpen(true);
       } else if (e.key === 'k' && isCmdOrCtrl && !e.shiftKey) {
         e.preventDefault();
+        setPaletteInitialScope('all');
         setIsPaletteOpen((prev) => !prev);
+      } else if (e.key === 'j' && isCmdOrCtrl && !e.shiftKey) {
+        // PAN-2908 C-CONVO: ⌘J jumps straight to conversations.
+        e.preventDefault();
+        setPaletteInitialScope('conversations');
+        setIsPaletteOpen(true);
       }
     };
 
@@ -826,6 +844,11 @@ export default function App() {
       </div>
 
       <IssueDrawer />
+      {/* PAN-2908 C-CONVO: persistent conversation dock (level 2 · talk). */}
+      <ConversationDock />
+      {/* Resume-session recovery: the 409 "has a resumable session" becomes a
+          real dialog (Resume / Start fresh) instead of a CLI-text alert. */}
+      <ResumableSessionDialog />
 
       <UpdateDialog
         isOpen={isUpdateDialogOpen}
@@ -885,6 +908,7 @@ export default function App() {
       {/* Command Palette — Cmd+K / Ctrl+K */}
       <CommandPalette
         isOpen={isPaletteOpen}
+        initialScope={paletteInitialScope}
         onClose={() => setIsPaletteOpen(false)}
         onNavigate={(tab, issueId) => {
           setActiveTab(tab as Tab);

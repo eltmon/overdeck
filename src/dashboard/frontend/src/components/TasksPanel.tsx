@@ -4,6 +4,7 @@ import { Circle, CheckCircle2, Clock, List, GitFork, ListTodo, RefreshCw, Loader
 import { PlanMapViewer } from './xbrief/PlanMapViewer.js';
 import type { XBriefItem, XBriefDocument } from './xbrief/types.js';
 import { taskStatusBucket } from '../lib/taskStatus';
+import { LoadingBoundary } from './primitives/LoadingBoundary';
 
 interface TaskTask {
   id: string;
@@ -75,8 +76,12 @@ export function TasksPanel({ issueId }: TasksPanelProps) {
   if (isLoading) {
     return (
       <div data-section="beads-panel" className="py-3 text-center text-muted-foreground text-xs">
-        <Loader2 className="w-4 h-4 animate-spin mx-auto mb-1" />
-        Loading tasks...
+        <LoadingBoundary label="Tasks" timeoutMs={8000}>
+          <div>
+            <Loader2 className="w-4 h-4 animate-spin mx-auto mb-1" />
+            Loading tasks...
+          </div>
+        </LoadingBoundary>
       </div>
     );
   }

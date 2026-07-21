@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   decideResumeGate,
   getAgentResumeGateBlockReason,
+  markAgentRunning,
+  type AgentState,
   type ResumeGateBlock,
 } from '../../../../src/lib/agents/agent-state.js';
 
@@ -35,6 +37,30 @@ describe('getAgentResumeGateBlockReason', () => {
       reason: 'agent is in failure backoff (2 failures)',
       consecutiveFailures: 2,
     });
+  });
+});
+
+describe('markAgentRunning', () => {
+  function state(harness: AgentState['harness']): AgentState {
+    return {
+      id: `agent-${harness}`,
+      issueId: 'PAN-2731',
+      workspace: '/tmp/workspace',
+      harness,
+      status: 'starting',
+      startedAt: '2026-07-15T15:22:04.971Z',
+    };
+  }
+
+  it('does not invent a Codex lastActivity timestamp before observed activity', () => {
+    const codex = state('codex');
+    const claude = state('claude-code');
+
+    markAgentRunning(codex);
+    markAgentRunning(claude);
+
+    expect(codex.lastActivity).toBeUndefined();
+    expect(claude.lastActivity).toEqual(expect.any(String));
   });
 });
 

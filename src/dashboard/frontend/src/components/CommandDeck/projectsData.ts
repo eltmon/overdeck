@@ -5,6 +5,7 @@
  * so the network request is deduped and both surfaces agree on the list.
  */
 import { compareIssueIds } from '@overdeck/contracts';
+import { dashboardMutationJsonHeaders } from '../../lib/wsTransport';
 import type { ProjectFeature } from './ProjectTree/ProjectNode';
 
 /** Sentinel deck key for the "No project" bucket — conversations/terminals not
@@ -73,7 +74,24 @@ export function groupProjects(issues: ProjectFeature[]): ProjectData[] {
 export async function fetchProjectPipelineMembership(projectKey: string): Promise<true> {
   const response = await fetch(`/api/pipeline/membership?project=${encodeURIComponent(projectKey)}`);
   if (response.ok) return true;
+  throw new Error(await readMembershipError(response));
+}
 
+/**
+ * PAN-2972 — operator-initiated retry. A cold snapshot can only be healed by a
+ * re-gather, so the retry button POSTs to the refresh route instead of
+ * re-reading the same cold snapshot.
+ */
+export async function refreshProjectPipelineMembership(projectKey: string): Promise<true> {
+  const response = await fetch(
+    `/api/pipeline/membership/refresh?project=${encodeURIComponent(projectKey)}`,
+    { method: 'POST', headers: await dashboardMutationJsonHeaders() },
+  );
+  if (response.ok) return true;
+  throw new Error(await readMembershipError(response));
+}
+
+async function readMembershipError(response: Response): Promise<string> {
   let message = 'Pipeline membership could not be loaded';
   try {
     const body = await response.json() as { error?: unknown };
@@ -81,7 +99,7 @@ export async function fetchProjectPipelineMembership(projectKey: string): Promis
   } catch {
     // Keep the operator-facing fallback when the server returns a non-JSON error.
   }
-  throw new Error(message);
+  return message;
 }
 
 export async function fetchProjects(): Promise<ProjectData[]> {

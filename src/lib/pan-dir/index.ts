@@ -57,8 +57,10 @@ export {
   hasIssueDraft,
   listIssueDrafts,
   MIN_PRD_LINES,
+  promoteWorkspacePrdDraft,
   readIssueDraft,
   writeIssueDraft,
   type PrdGateResult,
+  type PromoteWorkspacePrdDraftResult,
 } from './drafts.js'
 export { readWorkspaceContext, writeWorkspaceContext } from './context.js'

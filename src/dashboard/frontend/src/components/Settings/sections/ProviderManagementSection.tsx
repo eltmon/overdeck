@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import type { CodexAuthStatus } from '../../../hooks/useCodexAuthStatus';
 import { setReauthSession } from '../../../lib/pending-codex-spawn';
+import { popoutTerminal } from '../../TerminalPanel';
 import { HarnessLogo, ProviderLogo } from '../../shared/branding';
 import { SensitiveText } from '../../SensitiveText';
 import { OpenRouterPage } from '../OpenRouterPage';
@@ -50,6 +51,7 @@ const HARNESS_LABELS: Record<Harness, string> = {
   'claude-code': 'Claude Code',
   ohmypi: 'oh-my-pi',
   codex: 'Codex',
+  acp: 'ACP',
 };
 
 const PROVIDERS: { id: Provider; name: string; placeholder: string }[] = [
@@ -338,7 +340,9 @@ export function ProviderManagementSection({
                                   }
                                   const { sessionName, statusToken } = await res.json() as { sessionName: string; statusToken: string };
                                   setReauthSession(sessionName, statusToken);
-                                  window.location.href = `/terminal/${sessionName}`;
+                                  // PAN-2973: popup, not navigation — keep the
+                                  // dashboard SPA (and its re-auth polling) alive.
+                                  popoutTerminal(sessionName, 'Codex re-authentication');
                                 } catch (err) {
                                   toast.error(err instanceof Error ? err.message : 'Failed to start re-authentication');
                                 }

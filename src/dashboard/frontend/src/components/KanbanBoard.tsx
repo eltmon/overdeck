@@ -8,7 +8,7 @@ import {
   useDroppable,
 } from '@dnd-kit/core';
 import { Issue, Agent, LinearProject, STATUS_ORDER, STATUS_LABELS, CanonicalState } from '../types';
-import { Tag, X } from 'lucide-react';
+import { Tag } from 'lucide-react';
 import { PlanDialog } from './PlanDialog';
 // PAN-1048 — SpecialistAgent type retired; specialist-style indicators now
 // derive directly from role-tagged AgentSnapshots (review / test / ship).
@@ -29,11 +29,13 @@ import {
 } from './KanbanBoard/dialogs';
 import { DragOverlayCard, ListIssueRow } from './KanbanBoard/cards';
 import { ColumnContent } from './KanbanBoard/columns';
+import { CanceledListView } from './KanbanBoard/CanceledListView';
+import { buildBoardColumns } from './KanbanBoard/planColumns';
+import { NeedsYouStrip } from './KanbanBoard/NeedsYouStrip';
 import { useDragDrop } from './KanbanBoard/hooks/useDragDrop';
 import { KanbanFilterBar } from './KanbanBoard/views';
 import {
   COLUMN_COLORS,
-  COLUMN_TITLES,
   applyReviewStateToIssue,
 
   generateMockRallyData,
@@ -126,6 +128,9 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
   const [xbriefDialogIssue, setXbriefDialogIssue] = useState<Issue | null>(null); // xBRIEF viewer
   const [cycleFilter, setCycleFilter] = useState<CycleFilter>('current'); // Default to current cycle
   const [includeCompleted, setIncludeCompleted] = useState(false);
+  // PAN-2908 C-BOARD: the Done column collapses to the cycle's recent N
+  // (planColumns cap); this expands it on demand.
+  const [showAllDone, setShowAllDone] = useState(false);
 
   // Rally feature expand/collapse state (lifted from ColumnContent for expand/collapse all)
   const [collapsedFeatures, setCollapsedFeatures] = useState<Set<string>>(new Set());
@@ -778,44 +783,22 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
           )}
         </div>
       ) : cycleFilter === 'canceled' ? (
-        /* Canceled - List View (grouped by cancellation type) */
-        <div className="space-y-6 overflow-y-auto pb-4">
-          {groupedByCanceledType.map((group) => (
-            <div key={group.name} className="bg-card rounded-lg">
-              <div className="px-4 py-3 border-b border-border">
-                <div className="flex items-center gap-2">
-                  <X className="w-4 h-4 text-destructive-foreground" />
-                  <h3 className="font-semibold text-foreground">{group.name}</h3>
-                  <span className="text-sm text-muted-foreground">({group.issues.length})</span>
-                </div>
-              </div>
-              <div className="divide-y divide-divider">
-                {group.issues.map((issue) => (
-                  <ListIssueRow
-                    key={issue.id}
-                    issue={issue}
-                    issueWorkAgentsById={issueWorkAgentsById}
-                    agents={agents}
-                    specialists={specialists}
-                    issueCosts={issueCosts}
-                    costsLoading={costsLoading}
-                    selectedIssue={selectedIssue}
-                    onSelectIssue={onSelectIssue}
-                    onPlan={openPlanDialog}
-                    isBulkSelected={bulkSelection.isSelected(issue.identifier)}
-                    onBulkToggle={() => bulkSelection.toggle(issue.identifier)}
-                  />
-                ))}
-              </div>
-            </div>
-          ))}
-          {groupedByCanceledType.length === 0 && (
-            <div className="text-center py-12 text-muted-foreground">
-              No canceled issues
-            </div>
-          )}
-        </div>
+        <CanceledListView
+          groups={groupedByCanceledType}
+          issueWorkAgentsById={issueWorkAgentsById}
+          agents={agents}
+          specialists={specialists}
+          issueCosts={issueCosts}
+          costsLoading={costsLoading}
+          selectedIssue={selectedIssue}
+          onSelectIssue={onSelectIssue}
+          onPlan={openPlanDialog}
+          isBulkSelected={bulkSelection.isSelected}
+          onBulkToggle={bulkSelection.toggle}
+        />
       ) : (
+        <>
+        <NeedsYouStrip onOpenIssue={openIssue} />
         <DndContext
           sensors={sensors}
           collisionDetection={closestCorners}
@@ -824,14 +807,20 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
           onDragEnd={handleDragEnd}
         >
           <div className="flex gap-4 overflow-hidden pb-4">
-            {STATUS_ORDER.filter(s => s !== 'backlog').map((status) => {
-            const columnIssueIds = sortedGrouped[status].map(i => i.identifier);
-            const selectedInColumn = columnIssueIds.filter(id => bulkSelection.isSelected(id));
-            const allSelected = columnIssueIds.length > 0 && selectedInColumn.length === columnIssueIds.length;
-            const someSelected = selectedInColumn.length > 0 && selectedInColumn.length < columnIssueIds.length;
+            {(() => {
+              // PAN-2908 C-BOARD v2: Plan column split lives in planColumns.ts.
+              const columns = buildBoardColumns(sortedGrouped, agents, planningStateById);
+              return columns.map((column) => {
+                const status = column.key;
+                const rawColumnIssues = column.issues ?? [];
+                const columnIssues = status === 'done' && showAllDone && column.fullIssues ? column.fullIssues : rawColumnIssues;
+                const columnIssueIds = columnIssues.map((i) => i.identifier);
+                const selectedInColumn = columnIssueIds.filter((id) => bulkSelection.isSelected(id));
+                const allSelected = columnIssueIds.length > 0 && selectedInColumn.length === columnIssueIds.length;
+                const someSelected = selectedInColumn.length > 0 && selectedInColumn.length < columnIssueIds.length;
 
             return (
-              <DroppableColumn key={status} status={status} activeDragStatus={activeDragStatus} overId={activeOverId} issueIds={sortedGrouped[status].map(i => i.id)}>
+              <DroppableColumn key={status} status={status as CanonicalState} activeDragStatus={activeDragStatus} overId={activeOverId} issueIds={columnIssues.map(i => i.id)}>
                 <div
                   className="flex-1 min-w-0"
                   data-testid={`kanban-column-${status.replace(/_/g, '-')}`}
@@ -854,15 +843,15 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
                             }
                           }}
                           className="w-4 h-4 rounded border-border text-primary focus:ring-primary cursor-pointer shrink-0"
-                          aria-label={`Select all ${COLUMN_TITLES[status]}`}
+                          aria-label={`Select all ${column.title}`}
                         />
-                        <h3 className="font-semibold text-foreground">{COLUMN_TITLES[status]}</h3>
+                        <h3 className="font-semibold text-foreground">{column.title}</h3>
                       </div>
-                      <span className="text-sm text-muted-foreground">{sortedGrouped[status].length}</span>
+                      <span className="text-sm text-muted-foreground">{columnIssues.length}</span>
                     </div>
                   </div>
                   <ColumnContent
-                    issues={sortedGrouped[status]}
+                    issues={columnIssues}
                     issueWorkAgentsById={issueWorkAgentsById}
                     agents={agents}
                     specialists={specialists}
@@ -881,18 +870,31 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
                     onBulkToggle={bulkSelection.toggle}
                     planningStateById={planningStateById}
                     workspaceByIssueId={stackHealthByIssue}
+                    rollup={column.rollup === true}
                   />
+                  {status === 'done' && (column.overflowCount ?? 0) > 0 && (
+                    <button
+                      type="button"
+                      data-testid="done-column-overflow-toggle"
+                      className="w-full border-t border-border bg-card px-4 py-2 text-left text-[11px] text-muted-foreground transition-colors hover:text-foreground"
+                      onClick={() => setShowAllDone((value) => !value)}
+                    >
+                      {showAllDone ? 'Collapse to recent' : `…and ${column.overflowCount} more this cycle — show all`}
+                    </button>
+                  )}
                   {/* TODO(PAN-1242): + New issue column footer button — see PRD §4.7.6 */}
                   </div>
                 </div>
               </DroppableColumn>
             );
-          })}
+              });
+            })()}
           </div>
           <DragOverlay dropAnimation={dropAnimation}>
             {activeDragIssue ? <DragOverlayCard issue={activeDragIssue} /> : null}
           </DragOverlay>
         </DndContext>
+        </>
       )}
 
       {/* Undo Toast */}

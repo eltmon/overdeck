@@ -7,8 +7,9 @@ const mocks = vi.hoisted(() => ({
   execFile: vi.fn(),
   findSpecByIssue: vi.fn(),
   getPipelineMembershipForProjects: vi.fn(),
-  getPipelineMembershipSnapshotsForResourceDiscovery: vi.fn(),
+  membershipSnapshotResults: [] as Array<{ project: { name: string; path: string }; memberships: unknown[] }>,
   getAgentRuntimeState: vi.fn(),
+  getRuntimeCensus: vi.fn(),
   getGitHubConfig: vi.fn(),
   issueService: {
     getIssues: vi.fn(),
@@ -34,7 +35,21 @@ vi.mock('../../../../../src/dashboard/server/services/pipeline-membership.js', (
     project: configs[0],
     memberships: await mocks.getPipelineMembershipForProjects(configs),
   }],
-  getPipelineMembershipSnapshotsForResourceDiscovery: mocks.getPipelineMembershipSnapshotsForResourceDiscovery,
+  refreshMembershipSnapshotsForProjects: async (configs: Array<{ name: string; path: string }>) => {
+    try {
+      const memberships = await mocks.getPipelineMembershipForProjects(configs);
+      for (const project of configs) {
+        mocks.membershipSnapshotResults = mocks.membershipSnapshotResults
+          .filter((result) => result.project.path !== project.path);
+        mocks.membershipSnapshotResults.push({ project, memberships });
+      }
+    } catch {
+      // Preserve the prior snapshot, or remain cold when no gather succeeded.
+    }
+  },
+  readPipelineMembershipSnapshotsForProjects: (configs: Array<{ name: string; path: string }>) =>
+    configs.map((project) => mocks.membershipSnapshotResults.find((result) => result.project.path === project.path)
+      ?? { project, error: new Error('Pipeline membership snapshot is loading') }),
 }));
 
 vi.mock('../../../../../src/lib/pipeline-membership-gather.js', () => ({
@@ -57,6 +72,10 @@ vi.mock('../../../../../src/lib/projects.js', () => ({
 
 vi.mock('../../../../../src/lib/tmux.js', () => ({
   listSessionNames: mocks.listSessionNames,
+}));
+
+vi.mock('../../../../../src/lib/runtime-census.js', () => ({
+  getRuntimeCensus: mocks.getRuntimeCensus,
 }));
 
 vi.mock('../../../../../src/dashboard/server/review-status.js', () => ({
@@ -86,8 +105,11 @@ vi.mock('../../../../../src/dashboard/server/services/issue-service-singleton.js
 import type { ResourceAllocatedIssue } from '../../../../../src/dashboard/server/services/resource-discovery.js';
 import {
   discoverResourceAllocatedIssues,
+  getCachedResourceAllocatedIssues,
+  getResourceDetailIdentifiers,
   groupResourceAllocatedIssuesByProject,
   isDiscoverableAgentSession,
+  refreshResourceAllocatedProjects,
   resetResourceAllocatedIssuesCacheForTests,
   sanitizeResourceAllocatedIssues,
 } from '../../../../../src/dashboard/server/services/resource-discovery.js';
@@ -117,18 +139,16 @@ beforeEach(() => {
     { key: 'overdeck', config: { name: 'overdeck', path: '/tmp/overdeck', issue_prefix: 'PAN', github_repo: 'eltmon/overdeck' } },
   ]);
   mocks.listSessionNames.mockReturnValue(Effect.succeed([]));
+  mocks.getRuntimeCensus.mockImplementation(async () => ({
+    sessionNames: new Set(await Effect.runPromise(mocks.listSessionNames())),
+  }));
   mocks.listConversations.mockReturnValue([]);
   mocks.openPullRequests = [];
   mocks.readdir.mockResolvedValue([]);
   mocks.stat.mockRejectedValue(new Error('no such file'));
   mocks.findSpecByIssue.mockReturnValue(Effect.fail('no spec'));
   mocks.getPipelineMembershipForProjects.mockResolvedValue([]);
-  mocks.getPipelineMembershipSnapshotsForResourceDiscovery.mockImplementation(
-    async (configs: Array<{ name: string; path: string }>) => [{
-      project: configs[0],
-      memberships: await mocks.getPipelineMembershipForProjects(configs),
-    }],
-  );
+  mocks.membershipSnapshotResults = [];
   mocks.resolveAgentGitInfo.mockResolvedValue({
     actualBranch: null,
     branchDrifted: false,
@@ -146,6 +166,51 @@ beforeEach(() => {
       return;
     }
     callback(null, { stdout: '' });
+  });
+});
+
+describe('resource-discovery snapshot ownership', () => {
+  it('keeps request-side list and detail reads free of discovery work', async () => {
+    await expect(getCachedResourceAllocatedIssues()).resolves.toEqual([]);
+    await expect(getResourceDetailIdentifiers('PAN-1')).resolves.toBeNull();
+
+    expect(mocks.issueService.getIssues).not.toHaveBeenCalled();
+    expect(mocks.listSessionNames).not.toHaveBeenCalled();
+    expect(mocks.execFile).not.toHaveBeenCalled();
+  });
+
+  it('reuses the membership snapshot for lifecycle-only resource refreshes', async () => {
+    const overdeckProject = { name: 'overdeck', path: '/tmp/overdeck', issue_prefix: 'PAN', github_repo: 'eltmon/overdeck' };
+
+    await refreshResourceAllocatedProjects([overdeckProject], { refreshMembership: false });
+
+    expect(mocks.getPipelineMembershipForProjects).not.toHaveBeenCalled();
+  });
+
+  it('publishes refreshed projects independently into one combined snapshot', async () => {
+    const overdeckProject = { name: 'overdeck', path: '/tmp/overdeck', issue_prefix: 'PAN', github_repo: 'eltmon/overdeck' };
+    const mynProject = { name: 'mind-your-now', path: '/tmp/myn', issue_prefix: 'MIN', gitlab_repo: 'eltmon/mind-your-now' };
+    mocks.listProjectsSync.mockReturnValue([
+      { key: 'overdeck', config: overdeckProject },
+      { key: 'mind-your-now', config: mynProject },
+    ]);
+    mocks.resolveProjectFromIssueSync.mockImplementation((issueId: string) => issueId.startsWith('MIN-')
+      ? { projectKey: 'mind-your-now', projectName: 'mind-your-now', projectPath: '/tmp/myn' }
+      : { projectKey: 'overdeck', projectName: 'overdeck', projectPath: '/tmp/overdeck' });
+    mocks.issueService.getIssues.mockReturnValue([
+      { identifier: 'PAN-1', title: 'Overdeck work', state: 'open' },
+      { identifier: 'MIN-1', title: 'MYN work', state: 'open' },
+    ]);
+    mocks.listSessionNames.mockReturnValue(Effect.succeed(['agent-pan-1', 'agent-min-1']));
+    mocks.getPipelineMembershipForProjects.mockImplementation(async (configs: Array<{ path: string }>) => [
+      membership(configs[0]?.path === mynProject.path ? 'MIN-1' : 'PAN-1'),
+    ]);
+
+    await refreshResourceAllocatedProjects([overdeckProject]);
+    expect((await getCachedResourceAllocatedIssues()).map((issue) => issue.issueId)).toEqual(['PAN-1']);
+
+    await refreshResourceAllocatedProjects([mynProject]);
+    expect((await getCachedResourceAllocatedIssues()).map((issue) => issue.issueId)).toEqual(['MIN-1', 'PAN-1']);
   });
 });
 
@@ -438,16 +503,13 @@ describe('resource-discovery mixed tracker projects', () => {
       { identifier: 'MIN-1', title: 'Linear work', state: 'open', rawTrackerState: 'Started' },
     ]);
     mocks.listSessionNames.mockReturnValue(Effect.succeed(['agent-pan-1966', 'agent-min-1']));
-    mocks.getPipelineMembershipSnapshotsForResourceDiscovery.mockResolvedValue([
-      {
-        project: overdeckProject,
-        memberships: [{
-          issueId: 'PAN-1966', inPipeline: true, bucket: 'in_flight', reasons: ['open issue'], labelDrift: null,
-          lenses: { L1_openPr: false, L2_unmergedBranch: false, L3_issueOpen: true, L4_phaseLabel: null },
-        }],
-      },
-      { project: mynProject, error: new Error('membership unavailable') },
-    ]);
+    mocks.getPipelineMembershipForProjects.mockImplementation(async (configs: Array<{ path: string }>) => {
+      if (configs[0]?.path === mynProject.path) throw new Error('membership unavailable');
+      return [{
+        issueId: 'PAN-1966', inPipeline: true, bucket: 'in_flight', reasons: ['open issue'], labelDrift: null,
+        lenses: { L1_openPr: false, L2_unmergedBranch: false, L3_issueOpen: true, L4_phaseLabel: null },
+      }];
+    });
 
     const discovered = await discoverResourceAllocatedIssues();
 
@@ -471,9 +533,7 @@ describe('resource-discovery mixed tracker projects', () => {
       { identifier: 'MIN-1', title: 'Linear work', state: 'open', rawTrackerState: 'Started' },
     ]);
     mocks.listSessionNames.mockReturnValue(Effect.succeed(['agent-min-1']));
-    mocks.getPipelineMembershipSnapshotsForResourceDiscovery.mockResolvedValue([
-      { project, memberships: [] },
-    ]);
+    mocks.getPipelineMembershipForProjects.mockResolvedValue([]);
 
     await expect(discoverResourceAllocatedIssues()).resolves.toEqual([]);
   });
@@ -559,24 +619,17 @@ describe('resource-discovery branch-ahead signal', () => {
     resetResourceAllocatedIssuesCacheForTests();
     mocks.execFile.mockImplementation((command: string, args: string[], _options: unknown, callback: (error: Error | null, result?: { stdout: string }) => void) => {
       if (command === 'git' && args[0] === 'for-each-ref') {
-        const patterns = args.filter((a) => a.includes('feature/*') || a.includes('bypass/*'));
         const isNoMerged = args.includes('--no-merged=main');
-        const hasFeature = patterns.some((p) => p.includes('feature/*'));
-        const hasBypass = patterns.some((p) => p.includes('bypass/*'));
-        const isRemote = patterns.some((p) => p.includes('refs/remotes/'));
-        const prefix = isRemote ? 'origin/' : '';
-        const branches: string[] = [];
-        if (hasFeature) {
-          if (isNoMerged) {
-            branches.push(`${prefix}feature/pan-9002`, `${prefix}feature/pan-9003`);
-          } else {
-            branches.push(`${prefix}feature/pan-9001`, `${prefix}feature/pan-9002`, `${prefix}feature/pan-9003`);
-          }
-        }
-        if (hasBypass) {
-          branches.push(`${prefix}bypass/pan-9002`);
-        }
-        callback(null, { stdout: branches.join('\n') + (branches.length ? '\n' : '') });
+        const branches = isNoMerged
+          ? [
+              'feature/pan-9002', 'feature/pan-9003', 'bypass/pan-9002',
+              'origin/feature/pan-9002', 'origin/feature/pan-9003', 'origin/bypass/pan-9002',
+            ]
+          : [
+              'feature/pan-9001', 'feature/pan-9002', 'feature/pan-9003', 'bypass/pan-9002',
+              'origin/feature/pan-9001', 'origin/feature/pan-9002', 'origin/feature/pan-9003', 'origin/bypass/pan-9002',
+            ];
+        callback(null, { stdout: `${branches.join('\n')}\n` });
         return;
       }
       if (command === 'gh' && args[0] === 'pr') {
@@ -600,6 +653,8 @@ describe('resource-discovery branch-ahead signal', () => {
     expect(issue!.resourceSources).toContain('branch');
     expect(issue!.resourceDetails.branchAheadOfMain).toBe(true);
     expect(issue!.resourceDetails.localBranchCount).toBe(2);
+    expect(mocks.execFile.mock.calls.filter(([command, args]) =>
+      command === 'git' && args[0] === 'for-each-ref')).toHaveLength(2);
   });
 
   it('records branchAheadOfMain false for a feature branch fully merged into main', async () => {

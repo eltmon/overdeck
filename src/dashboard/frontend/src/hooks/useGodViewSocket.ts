@@ -5,7 +5,7 @@
  * receives all domain events via WebSocket RPC (EventRouter).
  *
  * Data sources:
- *   - agent output → DashboardStore.agentOutputById (from agent.output_received events)
+ *   - agent output → DashboardStore.agentOutputById (dedicated subscribeAgentOutput streams)
  *   - agent status → DashboardStore.agentsById (from agent.status_changed events)
  *   - activity → DashboardStore.recentActivity (from activity.entry / activity.updated events)
  *   - system health → REST polling /api/godview/system-health (unchanged)

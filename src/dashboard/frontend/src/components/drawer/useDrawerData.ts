@@ -48,10 +48,8 @@ export type DrawerPhaseTimelineState = 'done' | 'current' | 'upcoming';
 
 export type DrawerPhaseTimelineStep = {
   id: 'triaged' | 'planned' | 'implemented' | 'reviewed' | 'shipping' | 'merged';
-  label: string;
   state: DrawerPhaseTimelineState;
   when: string;
-  sub: string;
 };
 
 type ActivityEntry = {
@@ -318,13 +316,15 @@ function phaseTimeline(issue: Issue | null, reviewStatus: ReviewStatusSnapshot |
   const currentIndex = merged ? -1 : shippingCurrent ? 4 : reviewedCurrent ? 3 : implementedCurrent ? 2 : plannedCurrent ? 1 : 0;
   const done = [Boolean(issue), plannedDone, implementedDone, reviewedDone, merged, merged];
 
+  // PAN-2908 C-VOCAB: ids carry the legacy when-stamps only — the six-phase
+  // rail maps them (LEGACY_WHEN_TO_PHASE); the legacy labels are gone.
   const steps = [
-    { id: 'triaged' as const, label: 'Triaged', when: formatWhen(issue?.createdAt), sub: 'issue' },
-    { id: 'planned' as const, label: 'Planned', when: formatWhen(issue?.updatedAt), sub: 'plan' },
-    { id: 'implemented' as const, label: 'Implemented', when: formatWhen(reviewStatus?.updatedAt), sub: 'work' },
-    { id: 'reviewed' as const, label: 'Reviewed', when: formatWhen(reviewStatus?.reviewSpawnedAt ?? reviewStatus?.updatedAt), sub: 'review' },
-    { id: 'shipping' as const, label: 'Shipping', when: formatWhen(reviewStatus?.updatedAt), sub: 'ship' },
-    { id: 'merged' as const, label: 'Merged', when: formatWhen(issue?.completedAt ?? (merged ? reviewStatus?.updatedAt : undefined)), sub: 'done' },
+    { id: 'triaged' as const, when: formatWhen(issue?.createdAt) },
+    { id: 'planned' as const, when: formatWhen(issue?.updatedAt) },
+    { id: 'implemented' as const, when: formatWhen(reviewStatus?.updatedAt) },
+    { id: 'reviewed' as const, when: formatWhen(reviewStatus?.reviewSpawnedAt ?? reviewStatus?.updatedAt) },
+    { id: 'shipping' as const, when: formatWhen(reviewStatus?.updatedAt) },
+    { id: 'merged' as const, when: formatWhen(issue?.completedAt ?? (merged ? reviewStatus?.updatedAt : undefined)) },
   ];
   return steps.map((step, index) => ({
     ...step,

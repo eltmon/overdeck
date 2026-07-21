@@ -38,9 +38,13 @@ vi.mock('../smart-compaction.js', async (importOriginal) => {
       void prompt;
       throw new Error('runModelSummary mock not configured for this test');
     }),
+    summarizeSerializedText: vi.fn(async (serialized: string) => `ACP-SUMMARY:\n${serialized}`),
   };
 });
-import { runModelSummary as mockedRunModelSummary } from '../smart-compaction.js';
+import {
+  runModelSummary as mockedRunModelSummary,
+  summarizeSerializedText as mockedSummarizeSerializedText,
+} from '../smart-compaction.js';
 import { Effect as EffectMod } from 'effect';
 
 const originalOverdeckHome = process.env.OVERDECK_HOME;
@@ -150,6 +154,7 @@ afterEach(() => {
   vi.useRealTimers();
   vi.mocked(deliverAgentMessage).mockReset();
   vi.mocked(deliverAgentMessage).mockResolvedValue(undefined);
+  vi.mocked(mockedSummarizeSerializedText).mockClear();
   closeOverdeckDatabaseSync();
   resetDiscoveredSessionsSchemaBootstrap();
   _testDbPaths.length = 0;
@@ -163,6 +168,45 @@ afterEach(() => {
   } else {
     process.env.HOME = originalHome;
   }
+});
+
+describe('summary fork transcript resolution', () => {
+  it('summarizes an ACP conversation without a Claude session ID', async () => {
+    const home = join(tmpdir(), `pan-summary-fork-acp-${Date.now()}`);
+    const source = await createSourceConversation(home, {
+      tmuxSession: 'conv-acp-source',
+      claudeSessionId: null,
+      harness: 'acp',
+    });
+    const agentDir = join(home, 'agents', source.tmuxSession);
+    const sourceFile = join(agentDir, 'acp-session.jsonl');
+    await mkdir(agentDir, { recursive: true });
+    await writeFile(sourceFile, [
+      JSON.stringify({
+        timestamp: '2026-07-18T00:00:00.000Z',
+        role: 'user',
+        content: 'Continue the native ACP implementation',
+      }),
+      JSON.stringify({
+        timestamp: '2026-07-18T00:00:01.000Z',
+        role: 'assistant',
+        content: 'The ACP host is ready for verification',
+      }),
+    ].join('\n') + '\n', 'utf-8');
+
+    const result = await Effect.runPromise(createSummaryFork(source, {
+      model: 'claude-haiku-4-5',
+    }));
+
+    expect(result.summary).toContain('ACP-SUMMARY:');
+    expect(result.summary).toContain('Continue the native ACP implementation');
+    expect(result.summaryModel).toBe('claude-haiku-4-5');
+    expect(mockedSummarizeSerializedText).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(mockedSummarizeSerializedText).mock.calls[0]?.[0]).toContain(
+      '[assistant]\nThe ACP host is ready for verification',
+    );
+    rmSync(home, { recursive: true, force: true });
+  });
 });
 
 describe('validateHandoffDoc', () => {

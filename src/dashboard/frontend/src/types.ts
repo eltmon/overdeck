@@ -92,7 +92,7 @@ export interface Agent {
   id: string;
   issueId?: string;
   runtime: string;
-  harness?: 'claude-code' | 'pi' | 'ohmypi' | 'codex' | null;
+  harness?: 'claude-code' | 'pi' | 'ohmypi' | 'codex' | 'acp' | null;
   model: string;
   status: 'healthy' | 'warning' | 'stuck' | 'stalled' | 'dead' | 'stopped' | 'starting' | 'running' | 'failed' | 'error' | 'unknown';
   error?: string;

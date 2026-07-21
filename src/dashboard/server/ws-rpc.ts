@@ -14,15 +14,17 @@ import { PanOpen } from './services/open.js';
 import { EventStoreService } from './services/domain-services.js';
 import { ReadModelService, type ReadModelServiceShape } from './read-model.js';
 import { TerminalService } from './services/terminal-service.js';
+import { shouldBroadcastDashboardEvent, streamAgentOutput } from './services/agent-output-stream.js';
 import { getConversationByName } from '../../lib/overdeck/conversations.js';
 import { contextUsageFromParseResult, gateSnapshotEmission, parseConversationMessages, parseEntireConversation, watchConversation, type ParseState, type ParseResult } from './services/conversation-service.js';
 import { isPiSessionFile, parsePiConversationMessages } from './services/pi-conversation-parser.js';
 import { isOhmypiSessionFile, parseOhmypiConversationMessages } from './services/ohmypi-conversation-parser.js';
 import { parseCodexConversationMessages } from './services/codex-conversation-parser.js';
-import { resolveAgentHarness, resolvePiSessionPath, resolveCodexRolloutPath, readLauncherPinnedSessionId } from './routes/jsonl-resolver.js';
+import { parseAcpConversationMessages } from './services/acp-conversation-parser.js';
+import { resolveAgentHarness, resolvePiSessionPath, resolveCodexRolloutPath, resolveAcpTranscriptPath, readLauncherPinnedSessionId } from './routes/jsonl-resolver.js';
 import { watch as fsWatch } from 'node:fs';
 import { sessionFilePath } from '../../lib/paths.js';
-import { listSessionNames } from '../../lib/tmux.js';
+import { getRuntimeCensus } from '../../lib/runtime-census.js';
 import { listProjectsSync } from '../../lib/projects.js';
 import type { AgentStatus, ConversationEvent, DomainEvent, EmbedProgressEvent, EnrichCompleteEvent, EnrichProgressEvent, ScanCompleteEvent, ScanProgressEvent, ScanStartedEvent, SessionNodePresence, SessionTreeDelta, SystemHeartbeatEvent } from '@overdeck/contracts';
 import type { StoredEvent } from './event-store.js';
@@ -59,10 +61,11 @@ function storedToDomainEvent(stored: StoredEvent): DomainEvent {
 // wedging the dashboard in a permanent "Reconnecting…" loop (same failure
 // class as PAN-2225). Validate at the boundary: drop loudly instead.
 const isKnownDomainEvent = Schema.is(DomainEventSchema);
-function passesDomainEventSchema(event: DomainEvent): boolean {
+function passesDomainEventSchema(event: unknown): event is DomainEvent {
   if (isKnownDomainEvent(event)) return true;
+  const candidate = event as { type?: unknown; sequence?: unknown };
   console.error(
-    `[ws-rpc] dropping domain event that fails DomainEvent schema validation — add it to the contracts union: type=${event.type} seq=${event.sequence}`,
+    `[ws-rpc] dropping domain event that fails DomainEvent schema validation — add it to the contracts union: type=${String(candidate.type)} seq=${String(candidate.sequence)}`,
   );
   return false;
 }
@@ -337,32 +340,27 @@ function ohmypiSnapshotParser(harness: unknown): (file: string) => Promise<Parse
   }
 }
 
-function streamHarnessFullParseSnapshots(
+export function streamHarnessFullParseSnapshots(
   sessionName: string,
   harness: unknown,
   model: string | null,
   unresolvedMeansEmpty = false,
 ): FullParseSnapshotStream | null {
   const behavior = getHarnessBehavior(harness as Parameters<typeof getHarnessBehavior>[0]);
+  const streamResolved = (
+    resolve: () => Promise<string | null>,
+    parse: (file: string) => Promise<ParseResult>,
+  ) => streamResolvedFullParseSnapshots(resolve, parse, model, unresolvedMeansEmpty);
 
   if (behavior.transcriptKind === 'ohmypi-jsonl') {
-    return streamResolvedFullParseSnapshots(
-      () => resolvePiSessionPath(sessionName),
-      ohmypiSnapshotParser(harness),
-      model,
-      unresolvedMeansEmpty,
-    );
+    return streamResolved(() => resolvePiSessionPath(sessionName), ohmypiSnapshotParser(harness));
   }
-
   if (behavior.transcriptKind === 'codex-rollout-jsonl') {
-    return streamResolvedFullParseSnapshots(
-      () => resolveCodexRolloutPath(sessionName),
-      parseCodexConversationMessages,
-      model,
-      unresolvedMeansEmpty,
-    );
+    return streamResolved(() => resolveCodexRolloutPath(sessionName), parseCodexConversationMessages);
   }
-
+  if (behavior.transcriptKind === 'acp-jsonl') {
+    return streamResolved(() => resolveAcpTranscriptPath(sessionName), parseAcpConversationMessages);
+  }
   return null;
 }
 
@@ -673,9 +671,9 @@ function startSharedPresencePoller(): void {
 
   const tick = async () => {
     try {
-      const sessions = await Effect.runPromise(listSessionNames());
-      const current = new Set(sessions.filter(s => s.trim()));
-
+      const census = await getRuntimeCensus();
+      if (!census.available) return;
+      const current = new Set(census.sessionNames);
       for (const s of sharedPresencePoller.knownSessions) {
         if (!current.has(s)) {
           const issueId = extractIssueIdFromSession(s);
@@ -757,9 +755,6 @@ const PanRpcLayer = PanRpcGroup.toLayer(
     const terminalService = yield* TerminalService;
     const panOpen = yield* PanOpen;
 
-    // PAN-1249: handler set is incomplete — missing routes are stubbed by other code paths.
-    // Suppress the exhaustiveness check until the missing handlers are reintegrated.
-    // @ts-expect-error — missing handlers (getWorkspaceDetail, startPlanning, startAgent, deepWipe, etc.)
     return PanRpcGroup.of({
       // ── subscribeDomainEvents ────────────────────────────────────────────────
       [WS_METHODS.subscribeDomainEvents]: (_input) => {
@@ -768,6 +763,7 @@ const PanRpcLayer = PanRpcGroup.toLayer(
           Stream.map(createSystemHeartbeatEvent),
         );
         return eventStore.streamEvents.pipe(
+          Stream.filter(shouldBroadcastDashboardEvent),
           Stream.map(storedToDomainEvent),
           Stream.filter(passesDomainEventSchema),
           Stream.merge(heartbeats),
@@ -793,6 +789,7 @@ const PanRpcLayer = PanRpcGroup.toLayer(
       [WS_METHODS.subscribeIssueEvents]: (input) => {
         console.log(`[ws-rpc] subscribeIssueEvents invoked issueId=${input.issueId}`);
         return eventStore.streamEvents.pipe(
+          Stream.filter(shouldBroadcastDashboardEvent),
           Stream.map(storedToDomainEvent),
           Stream.filter(passesDomainEventSchema),
           Stream.mapEffect((event) =>
@@ -810,19 +807,7 @@ const PanRpcLayer = PanRpcGroup.toLayer(
 
       // ── subscribeAgentOutput — live agent stdout lines ───────────────────────
       // Filtered view of the domain event stream for a specific agent
-      [WS_METHODS.subscribeAgentOutput]: (input) =>
-        eventStore.streamEvents.pipe(
-          Stream.filter(
-            (e) => e.type === 'agent.output_received' &&
-              (e.payload as Record<string, unknown>)['agentId'] === input.agentId,
-          ),
-          Stream.flatMap((e) => {
-            const payload = e.payload as { agentId: string; lines: string[] };
-            return Stream.fromIterable(
-              payload.lines.map((line) => ({ agentId: payload.agentId, line })),
-            );
-          }),
-        ),
+      [WS_METHODS.subscribeAgentOutput]: (input) => streamAgentOutput(eventStore, input.agentId),
 
       // ── getSnapshot — returns clean read model data (PAN-433) ─────────────────
       [WS_METHODS.getSnapshot]: (_input) =>

@@ -5,6 +5,7 @@
 import { createReadStream } from 'fs';
 import { createInterface } from 'readline';
 
+import type { AcpTranscriptEntry } from '../acp/transcript.js';
 import type { SessionMetadata } from './jsonl-async.js';
 
 interface PiSessionLine {
@@ -186,6 +187,37 @@ export async function parsePiSessionMetadata(filePath: string): Promise<SessionM
   return result;
 }
 
+export async function parseAcpSessionMetadata(filePath: string): Promise<SessionMetadata> {
+  const result = emptySessionMetadata();
+  const toolsSet = new Set<string>();
+
+  await readJsonl(filePath, (entry) => {
+    const acpEntry = entry as unknown as Partial<AcpTranscriptEntry>;
+    if (
+      typeof acpEntry.timestamp !== 'string' ||
+      typeof acpEntry.content !== 'string' ||
+      !isAcpTranscriptRole(acpEntry.role)
+    ) {
+      return;
+    }
+
+    result.messageCount++;
+    recordTimestamp(result, acpEntry.timestamp);
+    if (!result.sessionId && typeof acpEntry.sessionId === 'string' && acpEntry.sessionId.length > 0) {
+      result.sessionId = acpEntry.sessionId;
+    }
+    if (Array.isArray(acpEntry.toolCalls)) {
+      for (const toolCall of acpEntry.toolCalls) {
+        const name = toolCall.title?.trim() || toolCall.kind?.trim();
+        if (name) toolsSet.add(name);
+      }
+    }
+  });
+
+  result.toolsUsed = [...toolsSet];
+  return result;
+}
+
 export async function parseCodexSessionMetadata(filePath: string): Promise<SessionMetadata> {
   const result = emptySessionMetadata();
   const modelCounts: Record<string, number> = {};
@@ -309,6 +341,10 @@ function recordTimestamp(result: SessionMetadata, ts: unknown): void {
   if (typeof ts !== 'string' || ts.length === 0) return;
   if (result.firstTs === null) result.firstTs = ts;
   result.lastTs = ts;
+}
+
+function isAcpTranscriptRole(role: unknown): role is AcpTranscriptEntry['role'] {
+  return role === 'user' || role === 'assistant' || role === 'tool' || role === 'system';
 }
 
 function normalizeModel(provider: unknown, model: unknown): string | null {

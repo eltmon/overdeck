@@ -20,7 +20,7 @@ import { listRunningAgents, getAgentRuntimeState, type AgentState } from '../../
 import { classifyAgentHealth } from '../../../lib/agents/health.js';
 import { resolveProjectFromIssueSync } from '../../../lib/projects.js';
 import { isSmeeConfiguredSync, isSmeeProcessRunningSync } from '../../../lib/smee.js';
-import { listPaneValues } from '../../../lib/tmux.js';
+import { descendantPidsForSession, getRuntimeCensus } from '../../../lib/runtime-census.js';
 import { DockerStatsCollector, type ContainerStats } from '../../../lib/docker-stats.js';
 import {
   readReviewStatusMap,
@@ -76,13 +76,6 @@ export interface ProcMemorySnapshot {
 interface CpuSample {
   idle: number;
   total: number;
-}
-
-interface ProcessRow {
-  pid: number;
-  ppid: number;
-  rssKb: number;
-  command: string;
 }
 
 export interface HealthAgentProcess {
@@ -443,55 +436,6 @@ async function readCpuPercent(): Promise<number> {
   return Math.round(((totalDelta - idleDelta) / totalDelta) * 1000) / 10;
 }
 
-async function readProcessTable(): Promise<Map<number, ProcessRow>> {
-  const { stdout } = await execAsync('ps -eo pid=,ppid=,rss=,args=', {
-    encoding: 'utf-8',
-    timeout: 10_000,
-  });
-
-  const rows = new Map<number, ProcessRow>();
-  for (const line of stdout.split('\n')) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
-    const match = trimmed.match(/^(\d+)\s+(\d+)\s+(\d+)\s+(.+)$/);
-    if (!match) continue;
-    const pid = Number(match[1]);
-    const ppid = Number(match[2]);
-    const rssKb = Number(match[3]);
-    const command = match[4] ?? '';
-    if (!Number.isFinite(pid) || !Number.isFinite(ppid) || !Number.isFinite(rssKb)) continue;
-    rows.set(pid, { pid, ppid, rssKb, command });
-  }
-  return rows;
-}
-
-function getDescendantPids(rootPid: number, processes: Map<number, ProcessRow>): Set<number> {
-  const descendants = new Set<number>();
-  const queue = [rootPid];
-
-  while (queue.length > 0) {
-    const pid = queue.shift();
-    if (!pid || descendants.has(pid)) continue;
-    descendants.add(pid);
-
-    for (const process of processes.values()) {
-      if (process.ppid === pid && !descendants.has(process.pid)) {
-        queue.push(process.pid);
-      }
-    }
-  }
-
-  return descendants;
-}
-
-function sumProcessMemory(descendants: Set<number>, processes: Map<number, ProcessRow>): number {
-  let totalRssKb = 0;
-  for (const pid of descendants) {
-    totalRssKb += processes.get(pid)?.rssKb ?? 0;
-  }
-  return totalRssKb * KB;
-}
-
 function buildLeakedSpecialists(
   agents: readonly HealthAgentProcess[],
 ): HealthLeakedSpecialist[] {
@@ -610,7 +554,7 @@ async function collectAgentProcesses(): Promise<{
   const liveSessions = new Set(
     registeredAgents.filter((agent) => agent.tmuxActive).map((agent) => agent.id),
   );
-  const processTable = await readProcessTable().catch(() => new Map<number, ProcessRow>());
+  const runtimeCensus = await getRuntimeCensus();
   const reviewStatuses = reviewStatusMap();
 
   const collected = await Promise.all(
@@ -619,14 +563,11 @@ async function collectAgentProcesses(): Promise<{
         Effect.runPromise(getAgentRuntimeState(agent.id)).catch(() => null),
         Effect.runPromise(getRuntimeSnapshot(agent.id)).catch(() => null),
       ]);
-      // PAN-977 round-12 high-2: panePid cache field was removed from
-      // AgentRuntimeState; always query tmux for the current pane PID.
-      const panePidValue = (await Effect.runPromise(listPaneValues(agent.id, '#{pane_pid}')))[0];
-      const panePid = Number(panePidValue ?? '0');
-      const descendants = Number.isFinite(panePid) && panePid > 0
-        ? getDescendantPids(panePid, processTable)
-        : new Set<number>();
-      const memoryBytes = descendants.size > 0 ? sumProcessMemory(descendants, processTable) : 0;
+      const descendants = descendantPidsForSession(runtimeCensus, agent.id);
+      const memoryBytes = [...descendants].reduce(
+        (sum, pid) => sum + (runtimeCensus.processesByPid.get(pid)?.rssBytes ?? 0),
+        0,
+      );
       const lifecycle = agentLifecycle(
         agent.role,
         agent.issueId,

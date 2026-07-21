@@ -46,6 +46,8 @@ afterEach(() => {
 
 // Imports after mocks are registered.
 import {
+  claimAgentStartPlaceholderWithDeps,
+  rollbackAgentStartPlaceholderWithDeps,
   saveAgentStateAndEmitEventWithDeps,
 } from '../../../../../src/dashboard/server/services/agent-projection.js';
 
@@ -286,5 +288,148 @@ describe('saveAgentStateAndEmitEventWithDeps', () => {
     expect(emitted[0].sequence).toBe(result.sequence);
     expect(emitted[0].type).toBe('agent.started');
     expect(emitted[0].timestamp).toBe('2026-06-15T10:00:00.000Z');
+  });
+});
+
+describe('work-spawn placeholder ownership', () => {
+  it('refuses to overwrite a live or already-running agent', () => {
+    const eventStore = { emitStored: vi.fn() };
+    const running = makeAgentState({ model: 'gpt-5.6-sol', status: 'running' });
+    saveAgentStateAndEmitEventWithDeps(odb.raw(), eventStore, running, makeStartedEvent());
+
+    const placeholder = makeAgentState({
+      model: 'pending-work-spawn',
+      status: 'starting',
+      startedAt: '2026-06-15T10:02:00.000Z',
+    });
+    expect(claimAgentStartPlaceholderWithDeps(
+      odb.raw(),
+      eventStore,
+      placeholder,
+      makeStartedEvent(),
+      true,
+    )).toEqual({ claimed: false, reason: 'live-session' });
+    expect(claimAgentStartPlaceholderWithDeps(
+      odb.raw(),
+      eventStore,
+      placeholder,
+      makeStartedEvent(),
+      false,
+    )).toEqual({ claimed: false, reason: 'active-state' });
+
+    expect(getOverdeckAgentStateSync(running.id)).toMatchObject({
+      model: 'gpt-5.6-sol',
+      status: 'running',
+    });
+  });
+
+  it('allows only one concurrent starting placeholder', () => {
+    const eventStore = { emitStored: vi.fn() };
+    const startedAt = new Date().toISOString();
+    const first = makeAgentState({
+      model: 'pending-work-spawn',
+      status: 'starting',
+      startedAt,
+    });
+    const second = makeAgentState({
+      model: 'pending-work-spawn',
+      status: 'starting',
+      startedAt: new Date(Date.parse(startedAt) + 1).toISOString(),
+    });
+
+    expect(claimAgentStartPlaceholderWithDeps(
+      odb.raw(),
+      eventStore,
+      first,
+      makeStartedEvent(),
+      false,
+    )).toEqual({ claimed: true });
+    expect(claimAgentStartPlaceholderWithDeps(
+      odb.raw(),
+      eventStore,
+      second,
+      makeStartedEvent(),
+      false,
+    )).toEqual({ claimed: false, reason: 'active-state' });
+    expect(getOverdeckAgentStateSync(first.id)?.startedAt).toBe(first.startedAt);
+  });
+
+  it('allows a stale starting placeholder to be replaced', () => {
+    const eventStore = { emitStored: vi.fn() };
+    saveAgentStateAndEmitEventWithDeps(
+      odb.raw(),
+      eventStore,
+      makeAgentState({
+        model: 'pending-work-spawn',
+        status: 'starting',
+        startedAt: '2026-06-15T10:02:00.000Z',
+      }),
+      makeStartedEvent(),
+    );
+    const replacement = makeAgentState({
+      model: 'pending-work-spawn',
+      status: 'starting',
+      startedAt: new Date().toISOString(),
+    });
+
+    expect(claimAgentStartPlaceholderWithDeps(
+      odb.raw(),
+      eventStore,
+      replacement,
+      makeStartedEvent(),
+      false,
+    )).toEqual({ claimed: true });
+    expect(getOverdeckAgentStateSync(replacement.id)?.startedAt).toBe(replacement.startedAt);
+  });
+
+  it('rolls back only the placeholder owned by the failed spawn', () => {
+    const eventStore = { emitStored: vi.fn() };
+    const placeholder = makeAgentState({
+      model: 'pending-work-spawn',
+      status: 'starting',
+      startedAt: '2026-06-15T10:02:00.000Z',
+    });
+    claimAgentStartPlaceholderWithDeps(
+      odb.raw(),
+      eventStore,
+      placeholder,
+      makeStartedEvent(),
+      false,
+    );
+
+    const stopped = makeAgentState({
+      model: 'gpt-5.6-sol',
+      status: 'stopped',
+      startedAt: placeholder.startedAt,
+    });
+    expect(rollbackAgentStartPlaceholderWithDeps(
+      odb.raw(),
+      eventStore,
+      placeholder,
+      stopped,
+      makeStatusChangedEvent({ agentId: placeholder.id, status: 'stopped' }),
+    )).toBe(true);
+    expect(getOverdeckAgentStateSync(placeholder.id)).toMatchObject({
+      model: 'gpt-5.6-sol',
+      status: 'stopped',
+    });
+
+    saveAgentStateAndEmitEventWithDeps(
+      odb.raw(),
+      eventStore,
+      makeAgentState({ model: 'gpt-5.6-sol', status: 'running' }),
+      makeStartedEvent(),
+    );
+    expect(rollbackAgentStartPlaceholderWithDeps(
+      odb.raw(),
+      eventStore,
+      placeholder,
+      stopped,
+      makeStatusChangedEvent({ agentId: placeholder.id, status: 'stopped' }),
+    )).toBe(false);
+    expect(getOverdeckAgentStateSync(placeholder.id)).toMatchObject({
+      model: 'gpt-5.6-sol',
+      status: 'running',
+    });
   });
 });

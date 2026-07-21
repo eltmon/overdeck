@@ -1,5 +1,6 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
+import { renderWorkspaceGitShowPromise } from '../git-utils.js';
 import type { ModelId } from '../settings.js';
 import type { XBriefDocument, XBriefItem } from '../xbrief/types.js';
 import type { TierOverridesMap } from '../xbrief/io.js';
@@ -139,7 +140,7 @@ export async function replayStandingAgent(
   target: ReplayTarget,
   options: TierReplayOptions = {},
 ): Promise<ReplayResult> {
-  const deps = replayDeps(options.deps);
+  const deps = replayDeps(options.deps, target.issueId);
   const replayTarget: ReplayTarget = target.kind === 'tier'
     ? { ...target, ...resolveReplaySlot(target, deps) }
     : target;
@@ -187,7 +188,7 @@ export async function compactAtTierRunBoundary(
   options: TierRunCompactionOptions,
 ): Promise<ReplayResult | null> {
   if (!shouldReplayCompactAtTierRunBoundary(options.compaction)) return null;
-  const deps = replayDeps(options.deps);
+  const deps = replayDeps(options.deps, options.target.issueId);
   const rerouted = resolveReroutedReplayTarget(options.target);
   if (!rerouted) {
     if (options.target.agentId) await deps.stop(options.target.agentId);
@@ -396,26 +397,29 @@ async function runGitLog(workspace: string, base: string): Promise<Array<{ sha: 
     .filter((entry) => entry.sha.trim().length > 0);
 }
 
-async function runGitShow(workspace: string, sha: string): Promise<string> {
-  const { stdout } = await execFileAsync('git', ['show', sha], {
-    cwd: workspace,
-    encoding: 'utf-8',
-    maxBuffer: 16 * 1024 * 1024,
+async function runGitShow(issueId: string, workspace: string, sha: string): Promise<string> {
+  return renderWorkspaceGitShowPromise(issueId, workspace, sha, [], async (repoPath, repoSha, args) => {
+    const { stdout } = await execFileAsync('git', ['show', repoSha, ...args], {
+      cwd: repoPath,
+      encoding: 'utf-8',
+      maxBuffer: 16 * 1024 * 1024,
+    });
+    return stdout;
   });
-  return stdout;
 }
 
-function replayDeps(deps: TierReplayDeps = {}): Required<TierReplayDeps> {
+function replayDeps(deps: TierReplayDeps = {}, issueId: string): Required<TierReplayDeps> {
   return {
     spawn: deps.spawn ?? spawnRun,
     deliver: deps.deliver ?? deliverAgentMessage,
     stop: deps.stop ?? stopAgent,
     gitLog: deps.gitLog ?? runGitLog,
-    gitShow: deps.gitShow ?? runGitShow,
+    gitShow: deps.gitShow ?? ((workspace, sha) => runGitShow(issueId, workspace, sha)),
     renderDiff: deps.renderDiff
       ?? (deps.gitShow
         ? (workspace, sha) => deps.gitShow!(workspace, sha)
-        : renderCommitFeedDiff),
+        : (workspace, sha, feedConfig) =>
+          renderCommitFeedDiff(workspace, sha, feedConfig, { issueId })),
     listSlotOwnership: deps.listSlotOwnership ?? listSlotOwnership,
   };
 }

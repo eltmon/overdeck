@@ -145,11 +145,11 @@ function renderMenuLabels(entries: typeof legacyCommandDeckIssueActions) {
 }
 
 describe('issueActions no-actions-lost audit', () => {
-  it('keeps human-only and session-only identities outside IssueActionKey', () => {
-    expectTypeOf<Extract<IssueActionKey, 'merge' | 'viewXbrief'>>()
-      .toEqualTypeOf<never>();
-    expect([...registryKeys]).not.toContain('merge');
+  it('keeps merge as a first-class registry entry (PAN-2908 reverses decision D6)', () => {
+    expect(registryKeys).toContain('merge');
     expect([...registryKeys]).not.toContain('viewXbrief');
+    expectTypeOf<Extract<IssueActionKey, 'viewXbrief'>>()
+      .toEqualTypeOf<never>();
   });
 
   it('maps every pre-reconciliation issue-scoped Command Deck action to the registry or a documented human-only exclusion', () => {

@@ -1,12 +1,16 @@
 /**
  * PAN-2398 — the ONE status narrative. Replaces the cockpit's duplicate
- * pipeline chip row + gates pill row with a single plain-language headline,
- * a "what happens next" line, and a five-stage journey strip with glosses.
+ * pipeline chip row + gates pill row with a single plain-language headline
+ * and a "what happens next" line.
  * Design contract: docs/design/mockups/issue-cockpit-redesign.html.
  *
  * Copy rules (binding, from the PRD): no pipeline jargon — never render
  * "verification gate", "merge-ready", "pickup", "released". A failing gate is
  * folded into the headline in plain words; deep detail stays in the Code tab.
+ *
+ * PAN-2908 C-VOCAB: the five-stage journey strip (Planned→…→Shipping) is gone
+ * from the tree, not just the render — the shared IssuePhaseRail beside this
+ * narrative is the one phase vocabulary everywhere.
  */
 
 import { useQuery } from '@tanstack/react-query'
@@ -18,23 +22,12 @@ import {
   type ReviewStatusData,
 } from '../../CommandDeck/ZoneCOverviewTabs/queries'
 
-export type JourneyStageKey = 'planned' | 'building' | 'reviewing' | 'testing' | 'shipping'
-type StageState = 'done' | 'now' | 'fail' | 'todo'
-
 interface PlanCounts { done: number; total: number }
-
-interface JourneyStage {
-  key: JourneyStageKey
-  label: string
-  gloss: string
-  state: StageState
-}
 
 export interface NarrativeModel {
   headline: string
   next: string
   needsYou: boolean
-  stages: JourneyStage[]
 }
 
 /** Pure narrative derivation — exported for tests. */
@@ -49,8 +42,6 @@ export function deriveNarrative(args: {
   const summary = ci?.summary
   const ciFailing = Boolean(summary && (summary.failed || summary.cancelled))
   const progress = plan && plan.total > 0 ? `${plan.done} of ${plan.total} tasks done` : undefined
-  const buildingDone = Boolean(plan && plan.total > 0 && plan.done >= plan.total)
-    || rs?.reviewStatus === 'passed' || rs?.reviewStatus === 'reviewing'
 
   let headline: string
   let next: string
@@ -89,31 +80,7 @@ export function deriveNarrative(args: {
     next = 'The plan is ready; work begins when it’s picked up.'
   }
   if (!needsYou) next = `${next} Nothing needs you yet.`
-
-  const reviewState: StageState = rs?.reviewStatus === 'blocked' || rs?.reviewStatus === 'failed' ? 'fail'
-    : rs?.reviewStatus === 'reviewing' ? 'now'
-    : rs?.reviewStatus === 'passed' ? 'done' : 'todo'
-  const testState: StageState = rs?.testStatus === 'failed' || rs?.testStatus === 'dispatch_failed' || ciFailing ? 'fail'
-    : rs?.testStatus === 'testing' ? 'now'
-    : rs?.testStatus === 'passed' || rs?.testStatus === 'skipped' ? 'done' : 'todo'
-  const shippingState: StageState = rs?.mergeStatus === 'merged' ? 'done'
-    : rs?.readyForMerge ? 'now' : 'todo'
-  const buildingState: StageState = buildingDone ? 'done' : (workRunning || (plan && plan.total > 0)) ? 'now' : 'todo'
-
-  const stages: JourneyStage[] = [
-    { key: 'planned', label: 'Planned', gloss: 'what to build', state: hasPlan ? 'done' : 'now' },
-    { key: 'building', label: 'Building', gloss: progress ?? 'writing code', state: hasPlan ? buildingState : 'todo' },
-    { key: 'reviewing', label: 'Reviewing', gloss: 'quality check', state: reviewState },
-    { key: 'testing', label: 'Testing', gloss: 'does it work', state: testState },
-    { key: 'shipping', label: 'Shipping', gloss: 'merge to main', state: shippingState },
-  ]
-  // Exactly one "now": the first non-done stage after the last done one, if
-  // none is already active/failing — keeps the strip honest and calm.
-  if (!stages.some((stage) => stage.state === 'now' || stage.state === 'fail')) {
-    const first = stages.find((stage) => stage.state === 'todo')
-    if (first) first.state = 'now'
-  }
-  return { headline, next, needsYou, stages }
+  return { headline, next, needsYou }
 }
 
 
@@ -156,25 +123,11 @@ export function detailFragments(args: {
   return fragments
 }
 
-const BAR_CLASS: Record<StageState, string> = {
-  done: 'bg-teal-500',
-  now: 'bg-blue-500',
-  fail: 'bg-red-500',
-  todo: 'bg-muted',
-}
-const LABEL_CLASS: Record<StageState, string> = {
-  done: 'text-muted-foreground',
-  now: 'text-foreground font-semibold',
-  fail: 'text-red-500 font-semibold',
-  todo: 'text-muted-foreground/60',
-}
-
-export function StatusNarrative({ issueId, workRunning, hasPlan, cost, onStageClick }: {
+export function StatusNarrative({ issueId, workRunning, hasPlan, cost }: {
   issueId: string
   workRunning: boolean
   hasPlan: boolean
   cost?: string
-  onStageClick?: (stage: JourneyStageKey) => void
 }) {
   const review = useReviewStatusQuery(issueId)
   const ci = useIssueCheckRunsQuery(issueId)
@@ -214,20 +167,9 @@ export function StatusNarrative({ issueId, workRunning, hasPlan, cost, onStageCl
           </div>
         )}
       </div>
-      <div className="mt-3.5 flex" data-testid="journey-strip" data-section="Pipeline Band">
-        {model.stages.map((stage) => (
-          <button
-            key={stage.key}
-            type="button"
-            onClick={onStageClick ? () => onStageClick(stage.key) : undefined}
-            className="relative flex-1 pt-3.5 text-center text-[11.5px]"
-          >
-            <span className={`absolute left-0 right-0 top-0.5 h-[3px] rounded-sm ${BAR_CLASS[stage.state]} ${stage.state === 'now' ? 'animate-pulse' : ''}`} />
-            <span className={LABEL_CLASS[stage.state]}>{stage.label}</span>
-            <span className="block text-[10px] font-normal text-muted-foreground/70">{stage.gloss}</span>
-          </button>
-        ))}
-      </div>
+      {/* PAN-2908 C-VOCAB: the legacy journey strip (Planned→…→Shipping) is
+          replaced by the shared IssuePhaseRail mounted beside this narrative
+          in the cockpit header — one vocabulary everywhere. */}
       <div className="mt-2 text-[11px] text-muted-foreground/80" data-testid="status-details">
         {detailFragments({ rs: review.data, ci: ci.data, prMergeable: pr.data?.pr?.mergeable, hasPr: Boolean(pr.data?.pr) }).join(' · ')}
       </div>

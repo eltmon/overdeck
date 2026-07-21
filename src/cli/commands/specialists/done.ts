@@ -140,9 +140,10 @@ export async function doneCommand(
               `feature-${normalizedIssueId.toLowerCase()}`,
             );
             if (existsSync(workspacePath)) {
-              const { getWorkspaceGitInfo } = await import('../../../lib/git-utils.js');
-              const { HEAD } = await Effect.runPromise(getWorkspaceGitInfo(workspacePath));
-              if (HEAD) workspaceHead = HEAD;
+              // PAN-2948: polyrepo-aware — snapshots sub-repo heads, not the wrapper.
+              const { snapshotWorkspaceHeadsPromise } = await import('../../../lib/git-utils.js');
+              const snapshot = await snapshotWorkspaceHeadsPromise(normalizedIssueId, workspacePath);
+              if (snapshot) workspaceHead = snapshot;
             }
           }
         } catch (err) {

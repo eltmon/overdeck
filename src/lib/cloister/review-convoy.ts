@@ -292,8 +292,15 @@ export async function computeConvoyScope(issueId: string, workspace: string): Pr
     );
     if (anchors.size === 1) {
       try {
+        // PAN-2948: diff in the primary code repo, not the workspace root — a
+        // polyrepo wrapper's HEAD never moves, so a wrapper-anchored diff would
+        // report zero drift and wrongly carry every verdict forward. Composite
+        // or wrapper-era anchors fail the ref lookup here and fall through to
+        // the conservative full-convoy path.
+        const { resolveWorkspaceRepoRootsSync } = await import('../project-repos.js');
+        const primaryRepoDir = resolveWorkspaceRepoRootsSync(issueId, workspace)[0]?.dir ?? workspace;
         const { stdout } = await execAsync(`git diff --name-only ${[...anchors][0]}..HEAD`, {
-          cwd: workspace, encoding: 'utf-8', timeout: 15_000,
+          cwd: primaryRepoDir, encoding: 'utf-8', timeout: 15_000,
         });
         changedFiles = stdout.split('\n').map(l => l.trim()).filter(Boolean);
       } catch { /* anchor unreachable (rebase) -> unknown drift -> all run */ }

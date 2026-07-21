@@ -69,17 +69,29 @@ describe('restartDashboard — scope contract', () => {
     expect(cliproxySpies.isCliproxyRunning).not.toHaveBeenCalled();
   });
 
-  it('throws StageError if health check never passes', async () => {
+  it('reaps the spawned dashboard if health check never passes', async () => {
+    vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] });
     vi.unstubAllGlobals();
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockRejectedValue(new Error('ECONNREFUSED')),
-    );
-    const startHook = vi.fn().mockResolvedValue(undefined);
+    const fetchMock = vi.fn().mockRejectedValue(new Error('ECONNREFUSED'));
+    vi.stubGlobal('fetch', fetchMock);
+    const stop = vi.fn().mockResolvedValue(undefined);
+    const startHook = vi.fn().mockResolvedValue({ stop });
 
-    await expect(Effect.runPromise(
-      restartDashboard(baseConfig, startHook, { healthTimeoutMs: 300 }),
-    )).rejects.toBeInstanceOf(StageError);
+    try {
+      const restart = Effect.runPromise(
+        restartDashboard(baseConfig, startHook, { healthTimeoutMs: 300 }),
+      );
+      while (fetchMock.mock.calls.length === 0) {
+        await new Promise<void>((resolve) => setImmediate(resolve));
+      }
+      const rejection = expect(restart).rejects.toBeInstanceOf(StageError);
+      await vi.advanceTimersByTimeAsync(500);
+
+      await rejection;
+      expect(stop).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

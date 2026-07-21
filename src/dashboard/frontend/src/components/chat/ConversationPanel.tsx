@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import { toastResumeOutcome } from '../../lib/resumeOutcome';
 import { useDashboardStore } from '../../lib/store';
 import { useTheme } from '../../hooks/useTheme';
 import { useConversationUiState } from '../../hooks/useConversationUiState';
@@ -105,6 +106,9 @@ interface ConversationPanelProps {
   onEmbeddedResume?: () => void;
   /** Label for the embedded resume button. Defaults to "Resume Session". */
   embeddedResumeLabel?: string;
+  /** Hide the composer entirely — the parent renders its own way to talk to
+   *  the agent (e.g. simple mode's jargon-free steering composer). */
+  hideComposer?: boolean;
   /** Called when a message POST fails — use to trigger a conversation refetch. */
   onSendFailed?: () => void;
 }
@@ -155,6 +159,7 @@ export function ConversationPanel({
   onToggleHideToolCalls,
   onEmbeddedResume,
   embeddedResumeLabel,
+  hideComposer = false,
   onSendFailed,
 }: ConversationPanelProps) {
   const [resumed, setResumed] = useState(false);
@@ -224,7 +229,7 @@ export function ConversationPanel({
   const { data: messagesData, isLoading: messagesLoading } = useQuery({
     queryKey: messagesQueryKey,
     queryFn: async ({ signal }) => {
-      const fetched = await fetchMessages(conversation.name, signal);
+      const fetched = await fetchMessages(conversation.name, signal, agentId);
       // If the WS subscription became active while this HTTP request was in
       // flight, prefer the streamed cache ONLY when it is at least as complete
       // as this HTTP backfill. When the WS snapshot has not arrived yet (or was
@@ -375,6 +380,8 @@ export function ConversationPanel({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['conversations'] });
       queryClient.invalidateQueries({ queryKey: conversationMessagesQueryKey(conversation.name) });
+      // PAN-2975: the resume bar reports the actual outcome too.
+      toastResumeOutcome(conversation.name);
       setResumed(true);
     },
   });
@@ -1005,6 +1012,7 @@ export function ConversationPanel({
               onArchive={!embedded ? handleArchive : undefined}
               resumePending={resumeMutation.isPending}
               resumeLabel={embeddedResumeLabel}
+              hideComposer={hideComposer}
               onSendFailed={onSendFailed}
               roundMarkers={roundMarkers}
               roundMetadata={roundMetadata}
@@ -1161,12 +1169,19 @@ interface MessagesResponse {
   error?: string;
 }
 
-async function fetchMessages(name: string, signal?: AbortSignal): Promise<MessagesResponse> {
+export async function fetchMessages(name: string, signal?: AbortSignal, agentId?: string): Promise<MessagesResponse> {
   // PAN-1705: timeout + React Query's abort signal so a request in flight
   // during a server restart rejects (and retries) instead of pinning the
   // panel on "Loading…" forever, and switching conversations cancels the
   // previous conversation's fetch.
   const res = await fetchWithTimeout(`/api/conversations/${encodeURIComponent(name)}/messages`, { signal });
+  // An agent the store knows (queued specialist, wiped workspace, cleaned
+  // session file) 404s here — that means "no saved history", not an incident.
+  // Render the honest empty state instead of the warning card. Real user
+  // conversations (no agentId) keep the failure card + Retry.
+  if (res.status === 404 && agentId) {
+    return { messages: [], workLog: [], streaming: false };
+  }
   if (!res.ok) throw new Error('Failed to fetch messages');
   return res.json();
 }
@@ -1178,6 +1193,8 @@ interface ConversationViewProps {
   resumePending?: boolean;
   /** Override label for the resume button. Defaults to "Resume Session". */
   resumeLabel?: string;
+  /** Hide the composer — the parent renders its own way to talk to the agent. */
+  hideComposer?: boolean;
   /** Called when a message POST fails. */
   onSendFailed?: () => void;
   /** ModelPicker component to render next to the Resume button */
@@ -1209,7 +1226,7 @@ interface ConversationViewProps {
 
 export type { FailedMessage } from './chat-types';
 
-function ConversationView({ conversation, onResume, onArchive, resumePending, resumeLabel, onSendFailed: onSendFailedProp, modelPicker, roundMarkers, roundMetadata, turnDiffSummaryByAssistantMessageId, onOpenTurnDiff, resolvedTheme, agentId, hideToolCalls, workingPhase, agentBusy = false, streamMessagesEnabled, messagesData, messagesLoading, targetMessageId, targetMessageIndex, targetMessageNonce, onTargetMessageHandled }: ConversationViewProps) {
+function ConversationView({ conversation, onResume, onArchive, resumePending, resumeLabel, hideComposer = false, onSendFailed: onSendFailedProp, modelPicker, roundMarkers, roundMetadata, turnDiffSummaryByAssistantMessageId, onOpenTurnDiff, resolvedTheme, agentId, hideToolCalls, workingPhase, agentBusy = false, streamMessagesEnabled, messagesData, messagesLoading, targetMessageId, targetMessageIndex, targetMessageNonce, onTargetMessageHandled }: ConversationViewProps) {
   const isCompacting = useDashboardStore((s) => s.conversationsCompactingByName?.[conversation.name] ?? false);
   // Optimistic sent messages and the failed-send retry outbox live in the
   // module-level composerStore, keyed by conversation name. ConversationView is
@@ -1514,7 +1531,7 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, re
             {resumePending ? 'Resuming…' : (resumeLabel ?? 'Resume Session')}
           </button>
         </div>
-      ) : (
+      ) : hideComposer ? null : (
         <ComposerFooter
           conversation={conversation}
           onSend={handleMessageSent}

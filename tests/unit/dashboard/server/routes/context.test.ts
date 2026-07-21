@@ -10,6 +10,7 @@ import {
   saveContextLayer,
   syncContextLayers,
 } from '../../../../../src/dashboard/server/routes/context.js';
+import { assembleWorkspaceContext } from '../../../../../src/lib/context-layers/assemble.js';
 import type { ProjectConfig } from '../../../../../src/lib/projects.js';
 
 async function exists(path: string): Promise<boolean> {
@@ -124,6 +125,40 @@ describe('dashboard context routes helpers', () => {
     expect(response.previews.fullPrompt).toContain('Private harness base prompt: Unavailable');
     expect(syncRunner).not.toHaveBeenCalled();
     await expect(exists(globalFile)).resolves.toBe(false);
+  });
+
+  it('makes the ACP preview match live workspace project-layer removal', async () => {
+    const projects = await fixtureProject();
+    const projectPath = projects[0]!.config.path;
+    const workspacePath = join(projectPath, 'workspaces', 'feature-pan-1201');
+    const projectContent = [
+      'Shared project guidance.',
+      '{{#harness:claude}}Claude-only project guidance.{{/harness:claude}}',
+      '{{#harness:acp}}ACP-only project guidance.{{/harness:acp}}',
+    ].join('\n');
+    await saveContextLayer(projects, { kind: 'project', projectKey: 'pan' }, projectContent);
+    await saveContextLayer(projects, {
+      kind: 'workspace',
+      projectKey: 'pan',
+      workspacePath,
+    }, assembleWorkspaceContext({
+      projectRoot: projectPath,
+      harness: 'claude-code',
+      issueId: 'PAN-1201',
+      workspacePath,
+      branch: 'feature/pan-1201',
+    }));
+
+    const response = await previewContextLayers(projects, {
+      kind: 'workspace',
+      projectKey: 'pan',
+      workspacePath,
+    }, []);
+
+    expect(response.previews.acp).toContain('ACP-only project guidance.');
+    expect(response.previews.acp).not.toContain('Claude-only project guidance.');
+    expect(response.previews.acp.match(/Shared project guidance\./g)).toHaveLength(1);
+    expect(response.previews.acp).toContain('# Workspace: PAN-1201');
   });
 
   it('saves layer content without syncing', async () => {

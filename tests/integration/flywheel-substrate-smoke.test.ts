@@ -318,7 +318,7 @@ describe('flywheel substrate bug smoke', () => {
       const query = url.searchParams.get('q') ?? '';
       if (url.pathname === '/search/issues' && query.includes('is:issue')) {
         return response({
-          items: query.includes('author:panopticon-agent[bot]')
+          items: query.includes('Flywheel-Filed-By:')
             ? [{
               number: 2001,
               title: 'Substrate bug',
@@ -326,7 +326,7 @@ describe('flywheel substrate bug smoke', () => {
               created_at: '2026-05-25T12:10:00.000Z',
               updated_at: '2026-05-25T12:10:00.000Z',
               labels: [{ name: 'substrate' }, { name: 'P1' }],
-              user: { login: 'panopticon-agent[bot]' },
+              user: { login: 'eltmon' },
             }]
             : [],
         });

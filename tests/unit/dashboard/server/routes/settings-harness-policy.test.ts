@@ -65,6 +65,7 @@ describe('buildHarnessPolicyDecisions', () => {
       // Runtime-name members are all present.
       expect(perModel).toHaveProperty('claude-code');
       expect(perModel).toHaveProperty('codex');
+      expect(perModel).toHaveProperty('acp');
     }
   });
 

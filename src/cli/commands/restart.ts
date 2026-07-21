@@ -45,6 +45,7 @@ import {
   StageError,
   waitForDashboardHealth,
   stopDashboard,
+  type DashboardSpawnHandle,
   type PlatformConfig,
 } from '../../lib/platform-lifecycle.js';
 
@@ -169,7 +170,7 @@ function searchedBundlePaths(): string[] {
   return uniqueBundleCandidates().map(candidate => candidate.path);
 }
 
-export function spawnDashboardDetached(config: PlatformConfig, opts?: BootGateOptions): void {
+export function spawnDashboardDetached(config: PlatformConfig, opts?: BootGateOptions): DashboardSpawnHandle {
   const serverPath = resolveBundledServerPath();
   if (!existsSync(serverPath)) {
     throw new StageError({
@@ -201,7 +202,8 @@ export function spawnDashboardDetached(config: PlatformConfig, opts?: BootGateOp
   // and a conversation/flywheel-spawned one dies with that tmux pane's scope.
   // Run the server in its own transient systemd unit (same isolation the
   // shared tmux server gets, PAN-1798) so its lifecycle belongs to nobody.
-  if (spawnDashboardSystemdUnit(serverPath, fullEnv, identity.repoRoot)) return;
+  const systemdHandle = spawnDashboardSystemdUnit(serverPath, fullEnv, identity.repoRoot);
+  if (systemdHandle) return systemdHandle;
 
   const child = spawn(resolveNode22(), [serverPath], {
     cwd: identity.repoRoot,
@@ -214,6 +216,16 @@ export function spawnDashboardDetached(config: PlatformConfig, opts?: BootGateOp
     '[dashboard] WARNING (PAN-2804): could not start the dashboard via systemd-run. ' +
       'It shares the invoking process tree\'s cgroup; restarting that unit/scope will kill it.',
   );
+  return {
+    stop: () => {
+      if (!child.pid) return;
+      try {
+        process.kill(child.pid, 'SIGTERM');
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'ESRCH') throw error;
+      }
+    },
+  };
 }
 
 /** Valid systemd --setenv names; skips exported bash functions etc. */
@@ -223,17 +235,18 @@ function spawnDashboardSystemdUnit(
   serverPath: string,
   fullEnv: Record<string, string | undefined>,
   repoRoot: string,
-): boolean {
-  if (process.platform !== 'linux') return false;
+): DashboardSpawnHandle | null {
+  if (process.platform !== 'linux') return null;
   try {
     mkdirSync(dirname(DASHBOARD_LOG_FILE), { recursive: true });
+    const unitName = `overdeck-dashboard-${Date.now()}`;
     const setenvArgs = Object.entries(fullEnv)
       .filter(([k, v]) => v !== undefined && ENV_NAME_RE.test(k))
       .flatMap(([k, v]) => ['--setenv', `${k}=${v}`]);
     execFileSync(
       'systemd-run',
       [
-        '--user', '--unit', `overdeck-dashboard-${Date.now()}`,
+        '--user', '--unit', unitName,
         '--collect', '--quiet',
         // The dashboard is the orchestrator — shed agents before it (PAN-2500).
         '--property=ManagedOOMPreference=avoid',
@@ -246,9 +259,23 @@ function spawnDashboardSystemdUnit(
       ],
       { stdio: 'ignore' },
     );
-    return true;
+    return {
+      stop: () => {
+        const unit = `${unitName}.service`;
+        try {
+          execFileSync('systemctl', ['--user', 'stop', unit], { stdio: 'ignore' });
+        } catch (stopError) {
+          try {
+            execFileSync('systemctl', ['--user', 'is-active', '--quiet', unit], { stdio: 'ignore' });
+          } catch {
+            return; // The unit already exited and was collected.
+          }
+          throw stopError;
+        }
+      },
+    };
   } catch {
-    return false;
+    return null;
   }
 }
 
@@ -469,11 +496,16 @@ async function runFullRestart(
     installCliproxy: cliproxy.installCliproxySync,
   }));
 
-  spawnDashboardDetached(config, opts.bootGateOptions);
-  await Effect.runPromise(waitForDashboardHealth(config.dashboardApiPort, {
-    timeoutMs: opts.healthTimeoutMs,
-    expectedIdentity: resolvePrimaryDashboardIdentity(),
-  }));
+  const spawnedDashboard = spawnDashboardDetached(config, opts.bootGateOptions);
+  try {
+    await Effect.runPromise(waitForDashboardHealth(config.dashboardApiPort, {
+      timeoutMs: opts.healthTimeoutMs,
+      expectedIdentity: resolvePrimaryDashboardIdentity(),
+    }));
+  } catch (error) {
+    await spawnedDashboard.stop();
+    throw error;
+  }
 
   try {
     const { startSupervisorProcessSync } = await import('../../lib/supervisor.js');

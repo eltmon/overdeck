@@ -146,7 +146,7 @@ export function startPlanningForIssue(options: {
     } = body as any;
     void skipWorkspace;
     void startDocker;
-    const requestedHarness = harness === 'ohmypi' || harness === 'claude-code' || harness === 'codex' ? harness : 'claude-code';
+    const requestedHarness = harness === 'ohmypi' || harness === 'claude-code' || harness === 'codex' || harness === 'acp' ? harness : 'claude-code';
 
     console.log(`[start-planning] START for ${id}, workspaceLocation=${workspaceLocation}, shadow=${shadowMode}`);
 

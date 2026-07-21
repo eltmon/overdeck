@@ -18,6 +18,10 @@ describe('getHarness', () => {
     expect(getHarness({ runtime: 'codex' })).toBe('codex')
   })
 
+  it('returns acp when runtime is the canonical literal', () => {
+    expect(getHarness({ runtime: 'acp' })).toBe('acp')
+  })
+
   it('falls back to claude-code for the legacy "claude" wire value', () => {
     expect(getHarness({ runtime: 'claude' })).toBe('claude-code')
   })

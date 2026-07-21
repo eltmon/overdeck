@@ -11,7 +11,7 @@ import chalk from 'chalk';
 import { resolveProjectFromIssueSync } from '../../lib/projects.js';
 import { resolveBareNumericIdSync } from '../../lib/issue-id.js';
 import { spawnInspectAgent, type InspectContext } from '../../lib/cloister/inspect-agent.js';
-import { getDiffBase, getDiffStats } from '../../lib/cloister/inspect-checkpoints.js';
+import { getInspectDiffContext } from '../../lib/cloister/inspect-checkpoints.js';
 import { readWorkspacePlanSync } from '../../lib/xbrief/io.js';
 
 interface InspectOptions {
@@ -87,9 +87,10 @@ export async function inspectCommand(id: string, options: InspectOptions): Promi
 
   const resolvedItem = await resolveInspectItem(options.item, workspacePath);
 
-  // Show what we're inspecting
-  const diffBase = await Effect.runPromise(getDiffBase(project.projectKey, normalizedIssueId, workspacePath));
-  const diffStats = await Effect.runPromise(getDiffStats(workspacePath, diffBase));
+  // Show what we're inspecting from the actual code repo(s), not a polyrepo wrapper.
+  const diffContext = await Effect.runPromise(
+    getInspectDiffContext(project.projectKey, normalizedIssueId, workspacePath),
+  );
 
   console.log('');
   console.log(chalk.bold('Requesting inspection'));
@@ -97,10 +98,10 @@ export async function inspectCommand(id: string, options: InspectOptions): Promi
   console.log(chalk.dim(`  Item:      ${options.item}`));
   console.log(chalk.dim(`  Depth:     ${options.deep ? 'deep' : 'fast'}`));
   console.log(chalk.dim(`  Workspace: ${workspacePath}`));
-  console.log(chalk.dim(`  Diff from: ${diffBase.substring(0, 8)}`));
+  console.log(chalk.dim(`  Diff from: ${diffContext.checkpoint}`));
   console.log('');
   console.log(chalk.dim('Diff scope:'));
-  console.log(chalk.dim(diffStats.split('\n').map(l => `  ${l}`).join('\n')));
+  console.log(chalk.dim(diffContext.diffStats.split('\n').map(l => `  ${l}`).join('\n')));
   console.log('');
 
   // Spawn the inspect specialist

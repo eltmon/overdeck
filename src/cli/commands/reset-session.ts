@@ -39,8 +39,13 @@ async function resetAgentSessions(agentIds: string[]): Promise<void> {
 }
 
 export async function resetSessionCommand(id: string): Promise<void> {
-  const issueId = resolveIssueIdSync(id);
-  const agentId = `agent-${issueId.toLowerCase()}`;
+  // A full "agent-…" id (e.g. agent-min-880-review) targets that agent
+  // directly — rebuilding from the issue id would silently drop role
+  // suffixes and clear the wrong agent's session (PAN-2948). A bare issue
+  // id keeps targeting the work agent.
+  const agentId = id.startsWith('agent-')
+    ? id
+    : `agent-${resolveIssueIdSync(id).toLowerCase()}`;
 
   if (!getAgentStateSync(agentId) && !existsSync(getAgentDir(agentId))) {
     console.log(chalk.red(`Agent ${agentId} not found.`));

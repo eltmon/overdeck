@@ -47,15 +47,16 @@ describe('useAgentSetInvalidation', () => {
     expect(invalidateQueries).not.toHaveBeenCalled();
   });
 
-  it('invalidates the projects query once after a debounced agent-set change', async () => {
+  it('invalidates projects and active membership after a debounced agent-set change', async () => {
     renderHook(() => useAgentSetInvalidation(queryClient));
 
     setAgents({ 'agent-pan-1': agent('agent-pan-1') });
     expect(invalidateQueries).not.toHaveBeenCalled();
 
     await act(() => vi.advanceTimersByTimeAsync(AGENT_SET_INVALIDATION_DEBOUNCE_MS));
-    expect(invalidateQueries).toHaveBeenCalledTimes(1);
+    expect(invalidateQueries).toHaveBeenCalledTimes(2);
     expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['command-deck-projects'] });
+    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['project-pipeline-membership'] });
   });
 
   it('collapses a spawn burst into one invalidation', async () => {
@@ -66,7 +67,7 @@ describe('useAgentSetInvalidation', () => {
     setAgents({ a: agent('a'), b: agent('b'), c: agent('c') });
 
     await act(() => vi.advanceTimersByTimeAsync(AGENT_SET_INVALIDATION_DEBOUNCE_MS));
-    expect(invalidateQueries).toHaveBeenCalledTimes(1);
+    expect(invalidateQueries).toHaveBeenCalledTimes(2);
   });
 
   it('ignores status-only churn on a stable agent set', async () => {

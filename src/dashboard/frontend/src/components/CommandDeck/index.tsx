@@ -27,6 +27,7 @@ import { useCommandDeckSelection } from '../../lib/commandDeckSelection';
 import { getTransport, type PanRpcProtocolClient } from '../../lib/wsTransport';
 import { refreshDashboardState } from '../../lib/refresh-dashboard-state';
 import { isCodexBlockedResponse, setPendingCodexSpawn } from '../../lib/pending-codex-spawn';
+import { openRecoveryForStartBlock } from '../../lib/resumeRecovery';
 import { getDirectRestartRequest } from '../../lib/restartRouting';
 import { useConfirm } from '../DialogProvider';
 import { WS_METHODS } from '@overdeck/contracts';
@@ -36,6 +37,7 @@ import { fetchWithTimeout } from '../../lib/apiFetch';
 import { fetchRegisteredProjects, findRegisteredProject, isKnownProject, ProjectRegistryErrorState, UnknownProjectState } from './UnknownProjectState';
 import { IssuesPaneFilterRow } from './IssuesPaneFilterRow';
 import { usePlannedBacklogVisibility } from '../../hooks/usePlannedBacklogVisibility';
+import { LoadingBoundary } from '../primitives/LoadingBoundary';
 
 async function fetchConversations(): Promise<Conversation[]> {
   const res = await fetchWithTimeout('/api/conversations');
@@ -158,6 +160,14 @@ interface CommandDeckProps {
 const CONVS_COLLAPSED_KEY = 'mc-convs-collapsed';
 const PROJECTS_COLLAPSED_KEY = 'mc-projects-collapsed';
 const SECTION_SPLIT_KEY = 'mc-section-split';
+
+function ProjectPendingState({ onRetry }: { onRetry: () => void }) {
+  return (
+    <div role="status" className="flex items-center justify-center p-8">
+      <LoadingBoundary label="The project" timeoutMs={8000} onRetry={onRetry}><span>Loading project…</span></LoadingBoundary>
+    </div>
+  )
+}
 
 export function CommandDeck({
   issues = [],
@@ -539,29 +549,41 @@ export function CommandDeck({
 
   // On mount or when convId changes (popstate), apply the deep-link: switch to
   // the conversation's project and open it as an agent tab in that deck.
+  const convDeepLinkRetry = useRef({ id: null as string | null, count: 0 });
   useEffect(() => {
     if (!convId || conversations.length === 0) return;
     if (convId === appliedConvId.current) return;
     const conv = conversations.find((c) => String(c.id) === convId || c.name === convId);
-    if (conv) {
-      setSelectedConversation(conv.name);
-      setSelectedFeature(null);
-      const projectName = resolveConversationProjectName(conv) ?? NO_PROJECT_KEY;
-      const target = pendingConversationTarget?.conversationName === conv.name
-        ? {
-            messageId: pendingConversationTarget.messageId,
-            messageIndex: pendingConversationTarget.messageIndex,
-            nonce: pendingConversationTarget.nonce,
-          }
-        : undefined;
-      // Opening a conversation: the /conv/<id> route owns the URL, so switch the
-      // deck's project without writing /command-deck/<project> over it.
-      onSelectProject?.(projectName, { updateUrl: false });
-      openConversationTabIn(projectName, conv.name, pendingConversationTarget?.label ?? conv.title ?? 'Agent', target);
-      if (target) onPendingConversationTargetConsumed?.();
-      appliedConvId.current = convId;
+    if (!conv) {
+      // The deep-link targets a conversation the 10s poll hasn't surfaced yet
+      // (just created). Refresh promptly instead of waiting out the poll —
+      // with a small retry budget so a genuinely-unknown id doesn't loop.
+      if (convDeepLinkRetry.current.id !== convId) convDeepLinkRetry.current = { id: convId, count: 0 };
+      if (convDeepLinkRetry.current.count < 5) {
+        convDeepLinkRetry.current.count += 1;
+        const timer = setTimeout(() => void queryClient.invalidateQueries({ queryKey: ['conversations'] }), 700);
+        return () => clearTimeout(timer);
+      }
+      return;
     }
-  }, [convId, conversations, resolveConversationProjectName, onSelectProject, openConversationTabIn, pendingConversationTarget, onPendingConversationTargetConsumed]);
+    convDeepLinkRetry.current = { id: null, count: 0 };
+    setSelectedConversation(conv.name);
+    setSelectedFeature(null);
+    const projectName = resolveConversationProjectName(conv) ?? NO_PROJECT_KEY;
+    const target = pendingConversationTarget?.conversationName === conv.name
+      ? {
+          messageId: pendingConversationTarget.messageId,
+          messageIndex: pendingConversationTarget.messageIndex,
+          nonce: pendingConversationTarget.nonce,
+        }
+      : undefined;
+    // Opening a conversation: the /conv/<id> route owns the URL, so switch the
+    // deck's project without writing /command-deck/<project> over it.
+    onSelectProject?.(projectName, { updateUrl: false });
+    openConversationTabIn(projectName, conv.name, pendingConversationTarget?.label ?? conv.title ?? 'Agent', target);
+    if (target) onPendingConversationTargetConsumed?.();
+    appliedConvId.current = convId;
+  }, [convId, conversations, queryClient, resolveConversationProjectName, onSelectProject, openConversationTabIn, pendingConversationTarget, onPendingConversationTargetConsumed]);
 
   // Auto-select first conversation on initial load if no deep-link and no feature selected.
   // An `?issue=` deep-link (issue cockpit/drawer, e.g. ?issue=PAN-1908&tab=conversation)
@@ -900,6 +922,7 @@ export function CommandDeck({
         });
         if (!resumeRetryRes.ok) {
           const retryData = await resumeRetryRes.json().catch(() => ({})) as { error?: string };
+          if (openRecoveryForStartBlock(resumeRetryRes.status, retryData, issueId)) return;
           throw new Error(retryData.error || 'Failed to restart agent');
         }
         toast.success('Agent restarted');
@@ -909,6 +932,8 @@ export function CommandDeck({
       // Only fall through to start-fresh when there is genuinely no session to resume.
       const noSession = resumeData.lifecycle?.canResumeSession === false && !resumeData.lifecycle?.hasLiveTmuxSession;
       if (!noSession) {
+        // A gate/resumable 409 opens the recovery dialog instead of toasting CLI text.
+        if (openRecoveryForStartBlock(resumeRes.status, resumeData, issueId)) return;
         throw new Error(resumeData.error || 'Failed to resume agent');
       }
 
@@ -940,6 +965,8 @@ export function CommandDeck({
           setPendingCodexSpawn(lastRequestBody);
           throw new Error(data.hint || data.error || 'Codex authentication expired — re-authenticate to continue');
         }
+        // Start-block 409s open the recovery dialog instead of toasting CLI text.
+        if (openRecoveryForStartBlock(res.status, data, issueId)) return;
         throw new Error(data.error || data.hint || 'Failed to start agent');
       }
       if (data.guardrails?.warnings?.length) {
@@ -1433,7 +1460,7 @@ export function CommandDeck({
 
         {/* Content Area — the project-scoped deck (PAN-1561) */}
         <div className={styles.content}>
-          {isProjectValidationPending ? <div className={styles.contentEmpty} role="status">Loading project…</div>
+          {isProjectValidationPending ? <ProjectPendingState onRetry={() => void refetchRegisteredProjects()} />
           : registeredProjectsError ? <ProjectRegistryErrorState onRetry={() => void refetchRegisteredProjects()} />
           : showUnknownProject ? (
             <UnknownProjectState project={selectedProject!} registeredProjects={registeredProjects} onSelectProject={onSelectProject} />

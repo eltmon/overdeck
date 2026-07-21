@@ -31,6 +31,7 @@ import {
 } from './provider-env.js';
 import {
   claudeSystemPromptFiles,
+  getAcpLauncherFields,
   getAgentRuntimeBaseCommand,
   getCodexLauncherFields,
   getOhmypiLauncherFields,
@@ -433,6 +434,8 @@ export async function buildAgentLaunchConfig(opts: {
    * no agent-definition system.
    */
   harness?: RuntimeName;
+  /** Exact harness executable validated by the shared launch preflight. */
+  harnessBinaryPath?: string;
   extraEnvExports?: string[];
   /** Claude Code `--effort` level threaded into the launcher command. */
   effort?: RoleEffort;
@@ -453,16 +456,20 @@ export async function buildAgentLaunchConfig(opts: {
     console.warn(`[agents] injectOverdeckInfraDeny failed for ${opts.agentId} (non-fatal): ${err instanceof Error ? err.message : err}`);
   }
 
-  const providerEnv = await getProviderEnvForModel(model);
+  const behavior = getHarnessBehavior(opts.harness);
+  const isAcp = behavior.launchCommandKind === 'acp-host';
+  const providerEnv = isAcp ? {} : await getProviderEnvForModel(model);
 
-  const provider = getProviderForModelSync(model as ModelId);
-  if (provider.authType === 'credential-file') {
-    setupCredentialFileAuthSync(provider, opts.workspace);
-  } else {
-    clearCredentialFileAuthSync(opts.workspace);
+  if (!isAcp) {
+    const provider = getProviderForModelSync(model as ModelId);
+    if (provider.authType === 'credential-file') {
+      setupCredentialFileAuthSync(provider, opts.workspace);
+    } else {
+      clearCredentialFileAuthSync(opts.workspace);
+    }
   }
 
-  const providerExports = await getProviderExportsForModel(model);
+  const providerExports = isAcp ? undefined : await getProviderExportsForModel(model);
 
   // PAN-1048: resume/restart launchers must respect the agent's role.
   // A resumed review/test/ship run loads the wrong frontmatter (and wrong
@@ -473,12 +480,23 @@ export async function buildAgentLaunchConfig(opts: {
   // the launcher; getOhmypiLauncherFields() resolves them from the agent state
   // and they're spread into generateLauncherScript() below.
   // PAN-1574: codex harness needs its per-agent CODEX_HOME path.
-  const behavior = getHarnessBehavior(opts.harness);
   const piLauncherFields = behavior.usesRpcFifo
     ? await getOhmypiLauncherFields(opts.agentId, model)
     : {};
   const codexLauncherFields = behavior.usesCodexHome
     ? getCodexLauncherFields(opts.agentId, model, opts.workspace, launchRole)
+    : {};
+  if (isAcp && !opts.harnessBinaryPath) {
+    throw new Error('ACP launch requires the executable path resolved by preflight');
+  }
+  const acpLauncherFields = isAcp
+    ? getAcpLauncherFields(
+        opts.agentId,
+        model,
+        opts.workspace,
+        opts.harnessBinaryPath!,
+        launchRole,
+      )
     : {};
 
   if (opts.spawnMode === 'resume' && opts.resumeSessionId) {
@@ -516,7 +534,7 @@ export async function buildAgentLaunchConfig(opts: {
         ? await getAgentRuntimeBaseCommand(model, opts.agentId, launchRole, opts.harness)
         : `claude ${getClaudePermissionFlagsStringSync()}${roleSystemPromptInjectionSync(roleAgentDefinitionPath(launchRole))}`,
       resumeSessionId: opts.resumeSessionId,
-      model: behavior.launchCommandKind !== 'claude-code' || providerExports.includes('ANTHROPIC_BASE_URL') ? model : undefined,
+      model: behavior.launchCommandKind !== 'claude-code' || providerExports?.includes('ANTHROPIC_BASE_URL') ? model : undefined,
       extraArgs: behavior.launchCommandKind !== 'claude-code' ? undefined : `--name ${opts.agentId}`,
       appendSystemPromptFiles: await claudeSystemPromptFiles(opts.workspace, opts.harness),
       extraEnvExports: opts.extraEnvExports,
@@ -525,6 +543,7 @@ export async function buildAgentLaunchConfig(opts: {
       promptInline: opts.promptInline,
       ...piLauncherFields,
       ...codexLauncherFields,
+      ...acpLauncherFields,
     });
     return { launcherContent, providerEnv };
   }
@@ -560,6 +579,7 @@ export async function buildAgentLaunchConfig(opts: {
     promptInline: opts.promptInline,
     ...piLauncherFields,
     ...codexLauncherFields,
+    ...acpLauncherFields,
     ...(opts.channelsBridgeMcpConfig
       ? {
           channelsBridgeMcpConfig: opts.channelsBridgeMcpConfig,

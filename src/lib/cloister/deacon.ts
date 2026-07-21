@@ -869,11 +869,11 @@ export async function cleanupStaleAgentState(): Promise<string[]> {
           // No session — candidate for cleanup
         }
 
-        // PAN-1908: for canonical agent-* directories, prefer the SQLite agents
-        // table as the source of truth. If an entry exists, keep the directory
-        // even if state.json is old — the registry (not the filesystem) owns
-        // retention. Reviewer directories remain filesystem-ephemeral.
-        if (dir.name.startsWith('agent-')) {
+        // PAN-1908: for canonical agent-*/strike-* directories, prefer the
+        // SQLite agents table as the source of truth. If an entry exists, keep
+        // the directory even if state.json is old — the registry (not the
+        // filesystem) owns retention. Reviewers remain filesystem-ephemeral.
+        if (dir.name.startsWith('agent-') || dir.name.startsWith('strike-')) {
           const agent = await Effect.runPromise(
             getAgentState(dir.name).pipe(Effect.catch(() => Effect.succeed(null))),
           );

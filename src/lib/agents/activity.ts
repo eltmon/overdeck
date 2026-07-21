@@ -157,7 +157,16 @@ export function getLatestSessionIdSync(agentId: string): string | null {
   const codexThreadId = resolveCodexThreadIdSync(agentId);
   if (codexThreadId) return codexThreadId;
 
-  // 1. session.id (pinned before fresh launch and updated by suspend/resume) —
+  // 1. ACP session id — the host writes the provider's durable session/load id.
+  const agentState = getAgentStateSync(agentId);
+  if (agentState?.harness && getHarnessBehavior(agentState.harness).sessionIdSource === 'acp-session-id') {
+    try {
+      const acpSessionId = readFileSync(join(getAgentDir(agentId), 'acp-session-id'), 'utf-8').trim();
+      if (acpSessionId) return acpSessionId;
+    } catch { /* non-fatal */ }
+  }
+
+  // 2. session.id (pinned before fresh launch and updated by suspend/resume) —
   //    the real id for claude-code.
   const fromSessionFile = getSessionId(agentId);
   if (fromSessionFile) return fromSessionFile;
@@ -200,7 +209,6 @@ export function getLatestSessionIdSync(agentId: string): string | null {
   //    the freshest session JSONL. Mirror the ohmypi runtime adapter's own resume
   //    resolution so the deacon recovery path can resume a crashed ohmypi agent
   //    instead of only respawning it fresh and losing context.
-  const agentState = getAgentStateSync(agentId);
   if (agentState?.harness && getHarnessBehavior(agentState.harness).sessionIdSource === 'transcript-jsonl') {
     const ohmypiSessionId = resolveLatestOhmypiSessionId(agentId);
     if (ohmypiSessionId) return ohmypiSessionId;

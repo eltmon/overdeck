@@ -51,8 +51,8 @@ function normalizeProviderConfig(
 }
 
 function validateProviderHarness(provider: ModelProvider, harness: RuntimeName | undefined): void {
-  if (harness !== undefined && harness !== 'claude-code' && harness !== 'ohmypi' && harness !== 'codex') {
-    throw new Error(`config.yaml: models.providers.${provider}.harness must be claude-code, ohmypi, or codex`);
+  if (harness !== undefined && harness !== 'claude-code' && harness !== 'ohmypi' && harness !== 'codex' && harness !== 'acp') {
+    throw new Error(`config.yaml: models.providers.${provider}.harness must be claude-code, ohmypi, codex, or acp`);
   }
 }
 
@@ -205,6 +205,9 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
     codex: {
       permissionMode: DEFAULT_CONFIG.codex.permissionMode,
       transport: DEFAULT_CONFIG.codex.transport,
+    },
+    acp: {
+      permissionMode: DEFAULT_CONFIG.acp.permissionMode,
     },
   };
 
@@ -701,6 +704,16 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
     }
     if (config.codex && (config.codex.transport === 'app-server' || config.codex.transport === 'tui')) {
       result.codex.transport = config.codex.transport;
+    }
+
+    if (config.acp?.permissionMode === 'auto') {
+      result.acp.permissionMode = config.acp.permissionMode;
+    }
+    if (config.acp?.kimi?.binaryPath !== undefined) {
+      result.acp.kimi = {
+        ...result.acp.kimi,
+        binaryPath: config.acp.kimi.binaryPath,
+      };
     }
 
     // Merge remote work-agent provisioning settings

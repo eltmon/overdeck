@@ -9,33 +9,20 @@ import { isAwaitingInput } from '../../lib/pendingInput';
 import {
   useDashboardStore,
   selectAgentById,
-  selectAgentOutput,
   selectPendingPermissionAgentIds,
 } from '../../lib/store';
 import { cn } from '../../lib/utils';
 import { ACTIVE_AGENT_PANEL_SECTIONS } from './inventory';
-
-export type StreamLineKind = 'verb-line' | 'ok' | 'warn' | 'err' | 'neutral';
-
-const STREAM_LINE_COLOR_CLASS: Record<StreamLineKind, string> = {
-  'verb-line': 'text-signal-review-foreground',
-  ok: 'text-success-foreground',
-  warn: 'text-warning-foreground',
-  err: 'text-destructive-foreground',
-  neutral: 'text-foreground',
-};
+import { useIssueActions } from '../IssueActionMenu/useIssueActions';
+import { IssueActionDialogHost } from '../IssueActionMenu';
+import { RESUME_WHAT_IT_DOES } from '../../lib/resumeOutcome';
 
 /**
- * Classify a stream line for color routing per PRD §4.7 stream excerpt rules.
- * Priority: err > warn > ok > verb-line > neutral.
+ * PAN-2908 C-DETAIL: the gray "stream excerpt" box and its "No recent stream
+ * output" state are deleted, not re-skinned — the conversation pane (rich
+ * transcript) is the live view now. This panel keeps the agent header/meta,
+ * the resume affordance, and the tell form.
  */
-export function classifyStreamLine(line: string): StreamLineKind {
-  if (/^[✗❌]\s*|\bERR\b|\bERROR\b|\bFAIL\b/i.test(line)) return 'err';
-  if (/^!\s*|\bWARN\b|\bWARNING\b/i.test(line)) return 'warn';
-  if (/^✓\s*|\bOK\b|\bPASS\b|\bdone\b/i.test(line)) return 'ok';
-  if (/^[→▸✱]/.test(line)) return 'verb-line';
-  return 'neutral';
-}
 
 function stuckHours(agent: AgentSnapshot, now: Date): number {
   const since = agent.firstFailureInRunAt ?? agent.lastFailureAt ?? agent.lastActivity ?? agent.startedAt;
@@ -89,8 +76,11 @@ export function ActiveAgentPanel({
 }: ActiveAgentPanelProps) {
   const agent = useDashboardStore(selectAgentById(agentId));
   const pendingPermissionAgentIds = useDashboardStore(selectPendingPermissionAgentIds);
-  const agentOutput = useDashboardStore(selectAgentOutput(agentId));
   const [sending, setSending] = useState(false);
+  // PAN-2975: one resume path — the registry's resumeSession action (same
+  // endpoint, same outcome toast, shared copy) instead of a bespoke canned call.
+  const issueActions = useIssueActions(agent?.issueId ?? '');
+  const resumeView = agent?.issueId ? issueActions.all.find((view) => view.action.key === 'resumeSession') : undefined;
 
   const sectionId = density === 'console' ? 'active-agent' : undefined;
 
@@ -117,10 +107,8 @@ export function ActiveAgentPanel({
     return fallback;
   }
 
-  const streamLines = agentOutput.slice(-8);
   const meta = `${getFriendlyModelName(agent.model)} · ${getHarness(agent)} · spend ${formatSpend(agent.costSoFar)}`;
   const isEffectivelyLive = agent.status === 'running' || agent.status === 'starting';
-  const maxHeightClass = density === 'rail' ? 'max-h-[120px]' : 'max-h-[180px]';
 
   const sendTell = async (text: string) => {
     if (sending) return false;
@@ -148,29 +136,6 @@ export function ActiveAgentPanel({
       return true;
     } catch (error) {
       console.error('[active-agent-panel] send error:', error);
-      return false;
-    } finally {
-      setSending(false);
-    }
-  };
-
-  const sendResume = async () => {
-    if (sending) return false;
-    setSending(true);
-    try {
-      const response = await fetch(`/api/agents/${agentId}/resume`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: 'Resumed from active agent panel' }),
-      });
-      if (!response.ok) {
-        const body = await response.text();
-        console.warn(`[active-agent-panel] resume ${response.status}: ${body.slice(0, 300)}`);
-        return false;
-      }
-      return true;
-    } catch (error) {
-      console.error('[active-agent-panel] resume error:', error);
       return false;
     } finally {
       setSending(false);
@@ -210,45 +175,24 @@ export function ActiveAgentPanel({
         </div>
       </div>
 
-      <div
-        data-testid="active-agent-panel-stream"
-        data-section={ACTIVE_AGENT_PANEL_SECTIONS[2]}
-        className={cn(
-          'mt-[12px] overflow-auto rounded-[10px] border border-border bg-[rgb(0_0_0_/_32%)] px-[12px] py-[10px] font-mono text-[11px] leading-[16px]',
-          maxHeightClass,
-        )}
-      >
-        {streamLines.length > 0 ? (
-          streamLines.map((line, index) => (
-            <div
-              key={`${line}-${index}`}
-              data-section={ACTIVE_AGENT_PANEL_SECTIONS[3]}
-              className={cn('truncate', STREAM_LINE_COLOR_CLASS[classifyStreamLine(line)])}
-            >
-              {line}
-            </div>
-          ))
-        ) : (
-          <div className="italic text-muted-foreground">No recent stream output</div>
-        )}
-      </div>
-
-      {!isEffectivelyLive && (
+      {!isEffectivelyLive && resumeView?.enabled && (
         <button
           type="button"
           data-testid="active-agent-panel-resume"
-          data-section={ACTIVE_AGENT_PANEL_SECTIONS[4]}
+          data-section={ACTIVE_AGENT_PANEL_SECTIONS[2]}
+          title={RESUME_WHAT_IT_DOES}
           className="mt-[10px] w-full rounded-[var(--radius-sm)] border border-primary/30 bg-primary/10 px-[12px] py-[8px] text-[12px] font-medium text-primary transition-colors hover:bg-primary/20 disabled:cursor-not-allowed disabled:opacity-50"
-          onClick={() => void sendResume()}
-          disabled={sending}
+          onClick={() => resumeView.invoke()}
+          disabled={resumeView.isPending}
         >
-          {sending ? 'Resuming…' : '▶ Resume agent'}
+          {resumeView.isPending ? 'Resuming…' : `▶ Resume session · ${agent.issueId}`}
         </button>
       )}
+      {agent?.issueId && <IssueActionDialogHost issueId={agent.issueId} actions={issueActions} />}
 
       <div
         data-testid="active-agent-panel-tell"
-        data-section={ACTIVE_AGENT_PANEL_SECTIONS[5]}
+        data-section={ACTIVE_AGENT_PANEL_SECTIONS[3]}
       >
         <AgentTellForm
           className="mt-[10px] flex gap-[8px]"

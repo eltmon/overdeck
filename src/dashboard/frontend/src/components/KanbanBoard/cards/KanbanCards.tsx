@@ -5,6 +5,11 @@ import { useDashboardStore, selectReviewStatus } from '../../../lib/store';
 import { Issue, Agent, STATUS_LABELS } from '../../../types';
 import { getFriendlyModelName } from '../../../lib/dashboard-utils';
 import { deriveIssueActionPhase, type PipelinePhase } from '../../../lib/issueActions';
+import { derivePipelineState } from '../../../lib/issuePipelineState';
+import { phaseRailState } from '../../../lib/simple/phases';
+import { PhaseDots } from '../../issue-detail/PhaseDots';
+import { IssuePeek } from '../../issue-detail/IssuePeek';
+import { useConvoDock } from '../../../lib/convoDock';
 import { hasActualPendingQuestion } from '../../../lib/pipeline-state';
 import { cn } from '../../../lib/utils';
 import { getIssueWorkAgentMap, isAgentSessionAttachable } from '../../../lib/workAgents';
@@ -558,6 +563,7 @@ interface IssueCardProps {
 export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, specialists = [], cost, isSelected, isFocused = false, onSelect, isBulkSelected, onBulkToggle, planningState, workspace: workspaceProp }: IssueCardProps) {
   const [showCostModal, setShowCostModal] = useState(false);
   const [actionOpenSignal, setActionOpenSignal] = useState(0);
+  const addToDock = useConvoDock((s) => s.add);
   const cardRef = useRef<HTMLDivElement>(null);
   const stackHealth = workspaceProp?.stackHealth;
   const isStackUnhealthy = stackHealth?.healthy === false;
@@ -591,6 +597,15 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
     isMerged,
     hasPendingInput,
   });
+  // PAN-2908 C-VOCAB: the card's mini phase rail, from the same classifier.
+  const phaseRail = phaseRailState(derivePipelineState({
+    reviewStatus,
+    agent: activeAgent,
+    hasPlan: planningState?.hasPlan ?? issue.hasPlan ?? false,
+    hasTasks: planningState?.hasTasks ?? issue.hasTasks ?? false,
+    issueCanonicalState: canonical,
+    isMerged,
+  }));
   const isPipelineStuck = issueActionPhase === 'STUCK';
   const pinActionRow = isRunning || issueActionPhase === 'STUCK' || issueActionPhase === 'INPUT' || issueActionPhase === 'READY_TO_MERGE';
   const cardVerb = CARD_VERB_BY_PHASE[issueActionPhase];
@@ -636,6 +651,9 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
       : issue.identifier;
 
   return (
+    // PAN-2908 C-CONVO: every card carries the hover peek (level 1 · glance) —
+    // 350ms intent delay, phase dots + state + last-said, "pop into dock".
+    <IssuePeek issueId={issue.identifier} onDock={addToDock}>
     <IssueCardPrimitive
       ref={cardRef}
       testId={`issue-card-${issue.identifier}`}
@@ -781,6 +799,7 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
 
         {/* Foot */}
         <div className="flex items-center gap-2 pt-2 mt-2" style={{ borderTop: '1px solid var(--border)' }}>
+          <PhaseDots rail={phaseRail} className="mr-0.5" />
           <div className="flex flex-col min-w-0 gap-0.5 flex-1">
             {activeAgent ? (
               <>
@@ -828,5 +847,6 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
         />
       </div>
     </IssueCardPrimitive>
+    </IssuePeek>
   );
 }

@@ -297,6 +297,7 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'GET /api/issues/:id/costs',                           kind: 'http', disposition: 'RELOCATE',    door: 'CostResolver.issueDetail' },
   { surface: 'GET /api/issues/resource-allocated',                  kind: 'http', disposition: 'READ',        door: 'IssuesResolver.list({resourceAllocated:true})' },
   { surface: 'GET /api/pipeline/membership',                        kind: 'http', disposition: 'READ',        door: 'PipelineMembershipService.getCached()' },
+  { surface: 'POST /api/pipeline/membership/refresh',               kind: 'http', disposition: 'READ',        door: 'refreshMembershipSnapshotsForProjects() — operator retry re-gathers the snapshot cache (PAN-2972); no canonical state written' },
   { surface: 'GET /api/issues/:id/resource-details',                kind: 'http', disposition: 'AGGREGATE',   door: 'IssuesResolver.get + AgentsResolver' },
   { surface: 'POST /api/issues/:id/start-planning',                 kind: 'http', disposition: 'WRITE',       door: 'IssueWriter.advance("planning")' },
   { surface: 'POST /api/issues/:id/abort-planning',                 kind: 'http', disposition: 'WRITE',       door: 'IssueWriter.advance("todo","abort-planning") + AgentWriter.stop' },
@@ -315,6 +316,12 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'POST /api/issues/:issueId/close',                     kind: 'http', disposition: 'WRITE',       door: 'IssueWriter.advance("closed")' },
   { surface: 'POST /api/issues/:id/beads/:itemId/inspect',          kind: 'http', disposition: 'RELOCATE',    door: 'Agents (work.inspect)' },
   { surface: 'POST /api/issues/:id/generate-tasks',                 kind: 'http', disposition: 'WRITE',       door: 'IssueWriter.advance("working") fallback path' },
+
+  // ── knowledge-viewer.ts ───────────────────────────────────────────────────
+  { surface: 'GET /api/knowledge-viewer/status',                    kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Optional OpenKnowledge subprocess status; outside 8 remodel domains' },
+  { surface: 'POST /api/knowledge-viewer/install',                  kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Progressive third-party viewer installation; outside 8 remodel domains' },
+  { surface: 'POST /api/knowledge-viewer/start',                    kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Optional OpenKnowledge subprocess lifecycle; outside 8 remodel domains' },
+  { surface: 'GET /knowledge-viewer/*',                              kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Authenticated compatibility redirect to the origin-isolated viewer host' },
 
   // ── metrics.ts ────────────────────────────────────────────────────────────
   { surface: 'GET /api/metrics/summary',                  kind: 'http', disposition: 'AGGREGATE',   door: 'Issues + Agents + Merge' },

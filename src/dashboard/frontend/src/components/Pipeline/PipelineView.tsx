@@ -242,6 +242,7 @@ function PipelineIssueRow({ issue, phase, agent, costEvents, now, onOpen, focuse
       focused={focused}
       onOpen={onOpen}
       onContextMenu={() => setOpenSignal((value) => value + 1)}
+      peek
       actionMenu={<IssueActionMenu issueId={issue.identifier} mode="overflow-only" className="inline-flex" openSignal={openSignal} />}
       trailingBadge={<AutoMergeToggle issueId={issue.identifier} autoMerge={autoMerge} variant="badge" compact />}
     />

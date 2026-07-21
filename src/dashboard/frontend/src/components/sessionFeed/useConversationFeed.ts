@@ -1,6 +1,10 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { getHarnessBehavior, type IssueId } from '@overdeck/contracts';
+import {
+  getHarnessBehavior,
+  type HarnessFeedKind,
+  type IssueId,
+} from '@overdeck/contracts';
 import type { ConversationSessionFeedEntry } from './types';
 import { fetchWithTimeout } from '../../lib/apiFetch';
 
@@ -14,7 +18,7 @@ export interface ConversationFeedRow {
   issueId: string | null;
   cwd?: string | null;
   title?: string | null;
-  harness?: 'claude-code' | 'pi' | 'ohmypi' | 'codex' | null;
+  harness?: 'claude-code' | 'pi' | 'ohmypi' | 'codex' | 'acp' | null;
   archivedAt?: string | null;
   messageCount?: number;
 }
@@ -75,7 +79,9 @@ export function useConversationFeed(): UseConversationFeedResult {
   };
 }
 
-function mapHarnessToAgent(harness: ConversationFeedRow['harness']): 'claude_code' | 'pi' | 'codex' | 'unknown' {
+function mapHarnessToAgent(
+  harness: ConversationFeedRow['harness'],
+): HarnessFeedKind | 'unknown' {
   if (harness) return getHarnessBehavior(harness).feedKind;
   return 'unknown';
 }

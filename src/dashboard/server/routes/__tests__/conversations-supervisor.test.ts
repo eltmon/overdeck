@@ -12,14 +12,19 @@ import { dirname, join } from 'node:path';
 let overdeckHome: string;
 let channelsEnabled = false;
 let createSupervisorSocket = false;
+let createAcpHostArtifacts = false;
 let resolvedHarnessBinary: string | null = '/usr/bin/claude';
+let resolvedConversationHarness = 'claude-code';
+let resolvedProviderName = 'anthropic';
+let deliveryResult: { ok: boolean; path?: string; failure?: string } = { ok: true, path: 'supervisor' };
+let listedSessionNames: string[] = [];
 let dismissDevChannelsDialogMock: ReturnType<typeof vi.fn>;
 let createSessionCalls: Array<{ session: string; command: string }> = [];
 
 vi.mock('../../../../lib/agents.js', () => {
   dismissDevChannelsDialogMock = vi.fn().mockResolvedValue(undefined);
   return {
-    deliverAgentMessage: vi.fn().mockResolvedValue(undefined),
+    deliverAgentMessage: vi.fn(async () => deliveryResult),
     writeChannelsBridgeMcpConfig: vi.fn().mockResolvedValue(undefined),
     dismissDevChannelsDialog: dismissDevChannelsDialogMock,
     clearReadySignal: vi.fn(),
@@ -63,13 +68,22 @@ vi.mock('../../../../lib/config-yaml.js', () => ({
 }));
 
 vi.mock('../../../../lib/providers.js', () => ({
-  getProviderForModelSync: vi.fn(() => ({ name: 'anthropic' })),
+  UnknownModelError: class UnknownModelError extends Error {},
+  getProviderForModelSync: vi.fn(() => ({ name: resolvedProviderName })),
   piProviderForModel: vi.fn(() => 'anthropic'),
   qualifyPiModel: vi.fn((m: string) => m),
 }));
 
+vi.mock('../../../../lib/harness-resolve.js', () => ({
+  resolveHarness: vi.fn(async () => resolvedConversationHarness),
+}));
+
 vi.mock('../../../../lib/workspace-manager.js', () => ({
   preTrustDirectory: vi.fn(),
+}));
+
+vi.mock('../../event-store.js', () => ({
+  getEventStore: vi.fn(() => ({ emitOnly: vi.fn() })),
 }));
 
 vi.mock('../../../../lib/tmux.js', () => ({
@@ -87,11 +101,20 @@ vi.mock('../../../../lib/tmux.js', () => ({
       writeFileSync(socketPath, '');
       chmodSync(socketPath, 0o600);
     }
+    if (createAcpHostArtifacts) {
+      const agentDir = join(overdeckHome, 'agents', session);
+      const socketDir = join(overdeckHome, 'sockets');
+      mkdirSync(agentDir, { recursive: true, mode: 0o700 });
+      mkdirSync(socketDir, { recursive: true, mode: 0o700 });
+      writeFileSync(join(agentDir, 'acp-session-id'), 'fresh-acp-session\n', { mode: 0o600 });
+      writeFileSync(join(agentDir, 'acp-token'), 'test-token\n', { mode: 0o600 });
+      writeFileSync(join(socketDir, `acp-${session}.sock`), '', { mode: 0o600 });
+    }
   })),
   setOption: vi.fn(() => Effect.succeed(undefined)),
   exactPaneTarget: vi.fn((name: string) => `=${name}:`),
   waitForClaudePrompt: vi.fn(() => Effect.succeed(Promise.resolve(true))),
-  listSessionNames: vi.fn(() => Effect.succeed([])),
+  listSessionNames: vi.fn(() => Effect.succeed(listedSessionNames)),
 }));
 
 function conversationDir(session: string): string {
@@ -106,6 +129,7 @@ function cleanupSession(session: string): void {
   rmSync(conversationDir(session), { recursive: true, force: true });
   rmSync(join(overdeckHome, 'agents', session), { recursive: true, force: true });
   rmSync(join(overdeckHome, 'sockets', `pty-${session}.sock`), { force: true });
+  rmSync(join(overdeckHome, 'sockets', `acp-${session}.sock`), { force: true });
 }
 
 function ensurePtySupervisorBuildArtifact(): void {
@@ -113,6 +137,17 @@ function ensurePtySupervisorBuildArtifact(): void {
   if (existsSync(supervisorDistPath)) return;
   mkdirSync(dirname(supervisorDistPath), { recursive: true });
   writeFileSync(supervisorDistPath, '#!/usr/bin/env node\n');
+}
+
+function decodeJsonResponse(response: { body: unknown }): Record<string, unknown> {
+  const payload = response.body as { body?: Uint8Array } | null;
+  const text = payload?.body ? new TextDecoder().decode(payload.body) : '{}';
+  return JSON.parse(text) as Record<string, unknown>;
+}
+
+async function resetConversationDb(): Promise<void> {
+  const { closeOverdeckDatabaseSync } = await import('../../../../lib/overdeck/infra.js');
+  closeOverdeckDatabaseSync();
 }
 
 describe('spawnConversationSession PTY supervisor wiring', () => {
@@ -125,11 +160,17 @@ describe('spawnConversationSession PTY supervisor wiring', () => {
     delete process.env.PAN_DOCKER;
     delete process.env.OVERDECK_DOCKER_WORKSPACE;
     createSupervisorSocket = false;
+    createAcpHostArtifacts = false;
     resolvedHarnessBinary = '/usr/bin/claude';
+    resolvedConversationHarness = 'claude-code';
+    resolvedProviderName = 'anthropic';
+    deliveryResult = { ok: true, path: 'supervisor' };
+    listedSessionNames = [];
     createSessionCalls = [];
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    await resetConversationDb();
     for (const call of createSessionCalls) cleanupSession(call.session);
     rmSync(overdeckHome, { recursive: true, force: true });
     delete process.env.OVERDECK_HOME;
@@ -324,5 +365,115 @@ describe('spawnConversationSession PTY supervisor wiring', () => {
     const launcher = launcherFor('conv-docker-test');
     expect(launcher).not.toContain('pty-supervisor.js');
     expect(existsSync(join(overdeckHome, 'agents', 'conv-docker-test', 'pty-token'))).toBe(false);
+  });
+
+  it('launches ACP conversations through the package host with the exact Kimi executable', async () => {
+    channelsEnabled = true;
+    createAcpHostArtifacts = true;
+    resolvedHarnessBinary = '/opt/kimi code/bin/kimi';
+    resolvedProviderName = 'kimi';
+    const session = 'conv-acp-test';
+    const agentDir = join(overdeckHome, 'agents', session);
+    mkdirSync(agentDir, { recursive: true });
+    writeFileSync(join(agentDir, 'acp-session-id'), 'persisted-acp-session\n');
+    const agents = await import('../../../../lib/agents.js');
+    vi.mocked(agents.writeChannelsBridgeMcpConfig).mockClear();
+    const { spawnConversationSession } = await import('../../../../lib/overdeck/conversation-runtime.js');
+
+    await spawnConversationSession(
+      session,
+      tmpdir(),
+      'claude-shaped-session-id',
+      'kimi-k2.7-code',
+      'high',
+      'PAN-2858',
+      true,
+      'acp',
+    );
+
+    const launcher = launcherFor(session);
+    expect(launcher).toContain(`${process.cwd()}/dist/acp-host.js`);
+    expect(launcher).toContain("--binary-path '/opt/kimi code/bin/kimi'");
+    expect(launcher).toContain("--resume 'persisted-acp-session'");
+    expect(launcher).toContain(`export OVERDECK_AGENT_ID='${session}'`);
+    expect(launcher).not.toContain('pty-supervisor.js');
+    expect(launcher).not.toContain('--mcp-config');
+    expect(launcher).not.toContain('--session-id');
+    expect(launcher).not.toContain('--effort');
+    expect(launcher).not.toContain('claude-shaped-session-id');
+    expect(readFileSync(join(agentDir, 'acp-session-id'), 'utf8').trim()).toBe('fresh-acp-session');
+    expect(existsSync(join(agentDir, 'pty-token'))).toBe(false);
+    expect(agents.writeChannelsBridgeMcpConfig).not.toHaveBeenCalled();
+  });
+
+  it('tears down ACP creation when the initial protocol prompt fails', async () => {
+    createAcpHostArtifacts = true;
+    resolvedHarnessBinary = '/opt/kimi/bin/kimi';
+    resolvedConversationHarness = 'acp';
+    resolvedProviderName = 'kimi';
+    deliveryResult = { ok: false, path: 'acp', failure: 'provider rejected prompt' };
+    const tmux = await import('../../../../lib/tmux.js');
+    vi.mocked(tmux.killSession).mockClear();
+    const { handleConversationCreate } = await import('../../../../lib/overdeck/conversation-runtime.js');
+    const conversations = await import('../../../../lib/overdeck/conversations.js');
+
+    const response = await handleConversationCreate(
+      {
+        message: 'start the ACP conversation',
+        model: 'kimi-k2.7-code',
+        harness: 'acp',
+      },
+      { generateAiTitle: vi.fn().mockResolvedValue(undefined) },
+    );
+    const created = decodeJsonResponse(response);
+    const name = created['name'] as string;
+    const session = created['tmuxSession'] as string;
+
+    await vi.waitFor(() => {
+      expect(conversations.getConversationByName(name)?.spawnError).toContain(
+        'ACP initial prompt did not land: provider rejected prompt',
+      );
+    });
+    expect(tmux.killSession).toHaveBeenCalledWith(session);
+  });
+
+  it('tears down a newly resolved ACP runtime when restart readiness fails', async () => {
+    vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] });
+    try {
+      resolvedHarnessBinary = '/opt/kimi/bin/kimi';
+      resolvedConversationHarness = 'acp';
+      resolvedProviderName = 'kimi';
+      const name = 'restart-to-acp';
+      const session = 'conv-restart-to-acp';
+      listedSessionNames = [session];
+      const conversations = await import('../../../../lib/overdeck/conversations.js');
+      conversations.createConversation({
+        name,
+        tmuxSession: session,
+        cwd: tmpdir(),
+        claudeSessionId: 'old-claude-session',
+        model: 'kimi-k2.7-code',
+        harness: 'claude-code',
+      });
+      const tmux = await import('../../../../lib/tmux.js');
+      vi.mocked(tmux.killSession).mockClear();
+      const { handleConversationRestartAll } = await import('../../../../lib/overdeck/conversation-runtime.js');
+
+      const restart = handleConversationRestartAll({
+        resolveSessionFile: vi.fn().mockResolvedValue(null),
+      });
+      await vi.waitFor(() => {
+        expect(createSessionCalls.some((call) => call.session === session)).toBe(true);
+      });
+      await vi.advanceTimersByTimeAsync(30_500);
+      const result = decodeJsonResponse(await restart);
+
+      expect(result['results']).toEqual([
+        { name, model: 'kimi-k2.7-code', status: 'failed' },
+      ]);
+      expect(vi.mocked(tmux.killSession).mock.calls.filter(([target]) => target === session)).toHaveLength(3);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

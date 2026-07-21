@@ -7,6 +7,7 @@ export const DeployStalenessSnapshot = Schema.Struct({
   behindTotal: Schema.NullOr(Schema.Number),
   behindBuildInputs: Schema.NullOr(Schema.Number),
   originMainLastCommitAt: Schema.NullOr(Schema.Number),
+  originMainLastBuildInputCommitAt: Schema.NullOr(Schema.Number),
   computedAt: Schema.Number,
   reason: Schema.optional(Schema.String),
 })

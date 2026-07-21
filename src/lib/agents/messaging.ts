@@ -23,6 +23,7 @@ import {
   getAgentStateSync,
   markAgentRunning,
   saveAgentStateSync,
+  type AgentState,
   type MessageAgentRedriveOptions,
   type Role,
 } from './agent-state.js';
@@ -63,6 +64,13 @@ function queueAgentMail(agentId: string, message: string, pendingTurnEndDelivery
 }
 
 const USER_MESSAGE_INTERVENTION_SOURCES = new Set(['pan-tell', 'dashboard:user-message']);
+
+export function resolveAgentDeliveryMethod(
+  state: Pick<AgentState, 'harness' | 'deliveryMethod'> | null | undefined,
+): 'auto' | 'supervisor' | 'channels' | 'tmux' | undefined {
+  if (state?.harness === 'acp') return 'auto';
+  return resilientDeliveryMethod(state?.deliveryMethod);
+}
 
 function claimCodexIdleTurn(agentId: string): boolean {
   try {
@@ -312,7 +320,7 @@ export async function messageAgent(
             sessionId: fallbackSessionId,
             message: resumeMessage.message,
             caller: 'resumeAgent:resume-prompt',
-            deliveryMethod: resilientDeliveryMethod(agentState.deliveryMethod),
+            deliveryMethod: resolveAgentDeliveryMethod(agentState),
           });
           delivered = delivery.delivered;
           if (!delivery.delivered) {
@@ -322,7 +330,7 @@ export async function messageAgent(
           console.error(`[agents] Fallback-restarted ${normalizedId} but no session id was recorded — feedback in mail queue`);
         }
       } else {
-        const delivery = await deliverAgentMessage(normalizedId, resumeMessage.message, 'resumeAgent:resume-prompt', resilientDeliveryMethod(agentState.deliveryMethod));
+        const delivery = await deliverAgentMessage(normalizedId, resumeMessage.message, 'resumeAgent:resume-prompt', resolveAgentDeliveryMethod(agentState));
         delivered = delivery.ok;
       }
       if (delivered) {
@@ -368,7 +376,7 @@ export async function messageAgent(
       return;
     }
 
-    const deliveryMethod = resilientDeliveryMethod(agentState?.deliveryMethod);
+    const deliveryMethod = resolveAgentDeliveryMethod(agentState);
     await deliverAgentMessage(normalizedId, message, `messageAgent:${caller}`, deliveryMethod);
     queueAgentMail(normalizedId, message);
     await appendTellInterventionForUserSource(normalizedId, caller);
@@ -409,7 +417,7 @@ export async function messageAgent(
     console.warn(`[agents] ${normalizedId} not at idle prompt after 5s — sending message anyway`);
   }
 
-  const deliveryMethod = resilientDeliveryMethod(agentState?.deliveryMethod);
+  const deliveryMethod = resolveAgentDeliveryMethod(agentState);
   await deliverAgentMessage(normalizedId, message, `messageAgent:${caller}`, deliveryMethod);
 
   // Save a durable backup. Unlike `.pending.md` busy-turn mail, the Codex hook

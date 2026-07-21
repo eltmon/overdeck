@@ -115,9 +115,25 @@ describe('SessionPanel', () => {
     expect(screen.getByTestId('chat-markdown')).toHaveTextContent('Hello world');
   });
 
-  it('shows empty state when no hasJsonl and no transcript', () => {
-    render(<SessionPanel session={makeSession()} />);
+  it('shows empty state when no hasJsonl and no transcript for an ENDED session', () => {
+    render(<SessionPanel session={makeSession({ presence: 'ended', endedAt: new Date().toISOString() })} />);
     expect(screen.getByText('No conversation data available for this session.')).toBeInTheDocument();
+    expect(screen.queryByText(/Starting agent/)).not.toBeInTheDocument();
+  });
+
+  it('shows a Starting placeholder for a live session that has not produced output yet', () => {
+    render(<SessionPanel session={makeSession({ presence: 'active' })} />);
+    expect(screen.getByText(/Starting agent/)).toBeInTheDocument();
+    expect(screen.queryByText('No conversation data available for this session.')).not.toBeInTheDocument();
+  });
+
+  it('shows the Starting placeholder during the pre-tmux placeholder window (presence still ended)', () => {
+    // Spawn window: state.json says 'starting' but tmux doesn't exist yet, so
+    // deriveSessionPresence reports 'ended'. This is exactly the state that
+    // used to read "No conversation data available" while an agent spawned.
+    render(<SessionPanel session={makeSession({ status: 'starting', presence: 'ended' })} />);
+    expect(screen.getByText(/Starting agent/)).toBeInTheDocument();
+    expect(screen.queryByText('No conversation data available for this session.')).not.toBeInTheDocument();
   });
 
   it('switches to terminal view on toggle click', () => {

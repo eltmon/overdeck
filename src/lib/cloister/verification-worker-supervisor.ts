@@ -5,13 +5,17 @@ import { spawn } from 'node:child_process';
 import { getOverdeckHome, packageRoot } from '../paths.js';
 import type { VerificationRunnerOptions, VerificationRunnerOutcome, WorkspaceInfo } from './verification-types.js';
 
-type WorkerState = {
+export type WorkerState = {
   runId: string;
   issueId: string;
   workspacePath: string;
   pid: number;
   startedAt: string;
   resultPath: string;
+  phase: 'queued' | 'running';
+  admittedAt: string | null;
+  currentGate?: string;
+  currentAttempt?: number;
 };
 
 const POLL_MS = 250;
@@ -40,8 +44,26 @@ function isProcessAlive(pid: number): boolean {
 
 export function readVerificationWorkerState(issueId: string): WorkerState | null {
   try {
-    const parsed = JSON.parse(readFileSync(statePath(issueId), 'utf8')) as WorkerState;
-    return parsed.issueId === issueId && Number.isInteger(parsed.pid) ? parsed : null;
+    const parsed = JSON.parse(readFileSync(statePath(issueId), 'utf8')) as Partial<WorkerState>;
+    if (
+      parsed.issueId !== issueId
+      || !Number.isInteger(parsed.pid)
+      || typeof parsed.runId !== 'string'
+      || typeof parsed.workspacePath !== 'string'
+      || typeof parsed.startedAt !== 'string'
+      || typeof parsed.resultPath !== 'string'
+    ) return null;
+    return {
+      ...parsed,
+      runId: parsed.runId,
+      issueId,
+      workspacePath: parsed.workspacePath,
+      pid: parsed.pid!,
+      startedAt: parsed.startedAt,
+      resultPath: parsed.resultPath,
+      phase: parsed.phase === 'queued' ? 'queued' : 'running',
+      admittedAt: parsed.admittedAt === undefined ? parsed.startedAt : parsed.admittedAt,
+    };
   } catch {
     return null;
   }
@@ -58,18 +80,47 @@ function writeJsonAtomic(path: string, value: unknown): void {
   renameSync(temp, path);
 }
 
+export function verificationWorkerDeadline(state: WorkerState): number | null {
+  if (!state.admittedAt) return null;
+  const admittedAt = Date.parse(state.admittedAt);
+  return Number.isFinite(admittedAt) ? admittedAt + MAX_RUN_MS : null;
+}
+
+export function markVerificationWorkerAdmissionPhase(
+  issueId: string,
+  update: {
+    phase: 'queued' | 'running';
+    gateName: string;
+    attempt: number;
+    admittedAt?: string;
+  },
+): void {
+  const state = readVerificationWorkerState(issueId);
+  if (!state || state.pid !== process.pid) return;
+  writeJsonAtomic(statePath(issueId), {
+    ...state,
+    phase: update.phase,
+    admittedAt: state.admittedAt ?? update.admittedAt ?? null,
+    currentGate: update.gateName,
+    currentAttempt: update.attempt,
+  });
+}
+
 async function waitForResult(state: WorkerState): Promise<VerificationRunnerOutcome> {
-  const deadline = Date.now() + MAX_RUN_MS;
-  while (Date.now() < deadline) {
+  for (;;) {
     if (existsSync(state.resultPath)) {
       return JSON.parse(readFileSync(state.resultPath, 'utf8')) as VerificationRunnerOutcome;
     }
     if (!isProcessAlive(state.pid)) {
       return { outcome: 'error', message: `Verification worker ${state.pid} exited before writing a result` };
     }
+    const current = readVerificationWorkerState(state.issueId) ?? state;
+    const deadline = verificationWorkerDeadline(current);
+    if (deadline !== null && Date.now() >= deadline) {
+      return { outcome: 'error', message: `Verification worker ${state.pid} exceeded ${MAX_RUN_MS}ms after CPU admission` };
+    }
     await new Promise<void>((resolve) => setTimeout(resolve, POLL_MS));
   }
-  return { outcome: 'error', message: `Verification worker ${state.pid} exceeded ${MAX_RUN_MS}ms` };
 }
 
 export async function runSupervisedVerification(
@@ -115,6 +166,8 @@ export async function runSupervisedVerification(
     pid: child.pid,
     startedAt: new Date().toISOString(),
     resultPath,
+    phase: 'queued',
+    admittedAt: null,
   };
   writeJsonAtomic(statePath(issueId), state);
   child.unref();

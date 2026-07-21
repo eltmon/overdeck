@@ -12,13 +12,14 @@ import styles from './ModelPicker.module.css';
 export const FALLBACK_COMPACTION_MODEL = 'claude-haiku-4-5-20251001';
 
 
-export type Harness = 'claude-code' | 'ohmypi' | 'codex';
+export type Harness = 'claude-code' | 'ohmypi' | 'codex' | 'acp';
 export type AuthMode = 'api-key' | 'subscription';
 
 export const HARNESS_OPTIONS: Array<{ id: Harness; label: string; description: string }> = [
   { id: 'claude-code', label: 'Claude Code', description: 'Default Claude Code CLI harness' },
   { id: 'ohmypi', label: 'oh-my-pi', description: 'Alternative harness for non-Anthropic models (omp binary)' },
   { id: 'codex', label: 'Codex', description: 'OpenAI Codex CLI harness' },
+  { id: 'acp', label: 'ACP', description: 'Agent Client Protocol harness' },
 ];
 
 export const PI_TOS_BLOCK_REASON = 'ohmypi cannot run Anthropic models when authenticated via Claude Code subscription (Terms of Service). Switch Anthropic to API-key auth, or pick a non-Anthropic model.';

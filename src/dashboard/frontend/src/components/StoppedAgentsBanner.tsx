@@ -6,6 +6,7 @@ import { useDashboardStore, selectAgents, selectIssues } from '../lib/store';
 import { classifyDashboardAgent } from '../lib/agent-classifier';
 import { Agent, type StartAgentResponse } from '../types';
 import { isCodexBlockedResponse, setPendingCodexSpawn } from '../lib/pending-codex-spawn';
+import { recoveryFromBody, useResumeRecovery } from '../lib/resumeRecovery';
 import { AgentPillPopoverRow, describeAgentStop, relativeTime } from './AgentPillPopoverRow';
 
 interface RestartResult {
@@ -137,6 +138,7 @@ export function StoppedAgentsBanner({ variant = 'banner' }: { variant?: 'banner'
     setResults(null);
 
     const restartResults: RestartResult[] = [];
+    let handoffOpened = false;
 
     for (const agent of stoppedAgents) {
       if (!agent.issueId) continue;
@@ -172,6 +174,18 @@ export function StoppedAgentsBanner({ variant = 'banner' }: { variant?: 'banner'
           if (isCodexBlockedResponse(res, data)) {
             setPendingCodexSpawn(lastRequestBody);
             restartResults.push({ issueId: agent.issueId, success: false, error: data.hint || data.error || 'Codex authentication expired — re-authenticate to continue' });
+            continue;
+          }
+          const recovery = res.status === 409 ? recoveryFromBody(data) : null;
+          if (recovery) {
+            // A start-block is a choice, not a failure — open the recovery
+            // dialog for the first blocked issue and mark blocked rows plainly;
+            // the server's CLI-instruction text never reaches the list.
+            if (!handoffOpened) {
+              useResumeRecovery.getState().openRecovery({ ...recovery, issueId: agent.issueId });
+              handoffOpened = true;
+            }
+            restartResults.push({ issueId: agent.issueId, success: false, error: 'Needs your choice — Resume or Start fresh' });
             continue;
           }
           restartResults.push({ issueId: agent.issueId, success: false, error: data.error || data.hint || res.statusText });

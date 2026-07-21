@@ -133,6 +133,42 @@ describe('palette conversation search', () => {
     expect(result.conversations[0]?.excerptSegments).toContainEqual({ text: 'needle', match: true });
   });
 
+  it('drops conversation hits whose transcript file was deleted after indexing', async () => {
+    const root = tmpDir!;
+    const projectDir = join(root, 'projects', 'overdeck');
+    mkdirSync(projectDir, { recursive: true });
+    const sessionFile = join(projectDir, 'session-deleted.jsonl');
+    writeFileSync(sessionFile, jsonlMessage('assistant', 'The needle appears in this fixture transcript.'));
+
+    const config: NormalizedConversationSearchConfig = {
+      enabled: true,
+      provider: 'openai',
+      model: 'text-embedding-3-small',
+      apiKeyRef: undefined,
+      dbPath: join(root, 'embeddings.db'),
+    };
+    const dimensions = dimensionsForModel(config.model);
+    const provider = fakeProvider(dimensions);
+    vi.mocked(getConversationSearchConfigSync).mockReturnValue(config);
+    vi.mocked(createConversationEmbeddingProvider).mockReturnValue(provider);
+
+    const db = openEmbeddingsDb(config.dbPath, dimensions);
+    expect(db.available).toBe(true);
+    await indexConversationFile({
+      filePath: sessionFile,
+      config,
+      db,
+      provider,
+      now: () => '2026-06-02T01:01:00.000Z',
+    });
+    db.close();
+
+    rmSync(sessionFile);
+
+    const result = await runPaletteSearch('needle', 5);
+    expect(result.conversations).toEqual([]);
+  });
+
   it('keeps Phase-1 memory results when conversation search is disabled', async () => {
     const config: NormalizedConversationSearchConfig = {
       enabled: false,

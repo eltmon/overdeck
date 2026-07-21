@@ -12,10 +12,10 @@ export const COLUMN_COLORS: Record<string, string> = {
 
 export const COLUMN_TITLES: Record<string, string> = {
   backlog: 'Backlog',
-  todo: 'To Do',
-  in_progress: 'In Progress',
-  in_review: 'In Review',
-  verifying_on_main: 'Verifying',
+  todo: 'Backlog',
+  in_progress: 'Work',
+  in_review: 'Review',
+  verifying_on_main: 'Ship',
   done: 'Done',
 };
 

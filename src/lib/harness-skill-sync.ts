@@ -12,7 +12,7 @@ import {
 import type { SyncItem, SyncOptions, SyncResult } from './sync.js';
 
 /** Every harness whose native skill discovery is supplied by `pan sync`. */
-export const SKILL_SYNC_HARNESSES = ['claude-code', 'codex', 'pi', 'ohmypi'] as const;
+export const SKILL_SYNC_HARNESSES = ['claude-code', 'codex', 'acp', 'pi', 'ohmypi'] as const;
 
 /** Plan the shared Agent Skills half of the harness fan-out. */
 export function planAgentSkillsSync(

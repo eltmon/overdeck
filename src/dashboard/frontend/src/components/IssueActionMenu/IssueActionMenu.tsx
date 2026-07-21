@@ -1,13 +1,23 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode, type RefObject } from 'react';
 import { MoreHorizontal, X } from 'lucide-react';
+import { useMenuOpen } from '../../lib/menuOpenState';
 
 import { AgentTellForm } from '../AgentTellForm';
 import { PlanDialog } from '../PlanDialog';
 import type { IssueActionKey } from '../../lib/issueActions';
 import {
+  ContextMenuContent,
+  ContextMenuDestructiveItem,
+  ContextMenuItem,
+  ContextMenuLabel,
+  ContextMenuSeparator,
+} from '../shared/ContextMenu';
+import {
   IssueActionGroupedBody,
+  type IssueActionGroupedBodyProps,
   type IssueActionMenuItemPrimitiveProps,
   type IssueActionMenuPrimitives,
+  type NonIssueActionInvocation,
 } from './IssueActionGroupedBody';
 import { IssueOpenInDialog } from './IssueOpenInDialog';
 import type { IssueActionView, UseIssueActionsResult } from './useIssueActions';
@@ -141,19 +151,96 @@ function OverflowMenu({
   );
 }
 
+/* ── context presentation (right-click) — the third IssueActionMenu
+ *  presentation (strip · overflow · context), folded in from the deleted
+ *  GroupedIssueActionMenu skin (PAN-2908 C-ACTIONS §8.3). */
+
+function ContextMenuItemPrimitive({
+  onActivate,
+  preventClose,
+  ...props
+}: IssueActionMenuItemPrimitiveProps) {
+  return (
+    <ContextMenuItem
+      {...props}
+      onSelect={(event) => {
+        if (preventClose) event.preventDefault();
+        onActivate?.();
+      }}
+    />
+  );
+}
+
+function ContextMenuDestructiveItemPrimitive({
+  onActivate,
+  preventClose,
+  ...props
+}: IssueActionMenuItemPrimitiveProps) {
+  return (
+    <ContextMenuDestructiveItem
+      {...props}
+      onSelect={(event) => {
+        if (preventClose) event.preventDefault();
+        onActivate?.();
+      }}
+    />
+  );
+}
+
+const contextMenuPrimitives: IssueActionMenuPrimitives = {
+  Item: ContextMenuItemPrimitive,
+  DestructiveItem: ContextMenuDestructiveItemPrimitive,
+  Label: ContextMenuLabel,
+  Separator: ContextMenuSeparator,
+};
+
+export type { NonIssueActionInvocation };
+
+export type IssueActionContextMenuProps = Omit<IssueActionGroupedBodyProps, 'primitives'> & {
+  'data-section'?: string;
+};
+
+/** Right-click presentation of the one grouped body, for ContextMenuRoot hosts. */
+export function IssueActionContextMenu({
+  actions,
+  nonIssueActions,
+  defaultExplain,
+  'data-section': dataSection,
+}: IssueActionContextMenuProps) {
+  return (
+    <ContextMenuContent className="w-[320px] font-sans" data-section={dataSection}>
+      <IssueActionGroupedBody
+        actions={actions}
+        primitives={contextMenuPrimitives}
+        nonIssueActions={nonIssueActions}
+        defaultExplain={defaultExplain}
+      />
+    </ContextMenuContent>
+  );
+}
+
 function OverflowButton({
   actions,
   triggerRef,
   openSignal,
+  count,
+  menuKey,
 }: {
   actions: Pick<UseIssueActionsResult, 'all' | 'primary' | 'phase'>;
   triggerRef?: RefObject<HTMLButtonElement>;
   openSignal?: number;
+  count?: number;
+  menuKey?: string;
 }) {
-  const [open, setOpen] = useState(false);
+  // PAN-2937: open state lives in the store so live re-renders can't close it.
+  const openMenuKey = useMenuOpen((s) => s.openMenuKey);
+  const setOpenMenu = useMenuOpen((s) => s.setOpenMenu);
+  const key = menuKey ?? `issue-action:${actions.phase}`;
+  const open = openMenuKey === key;
+  const more = count ?? actions.all.length;
 
   useEffect(() => {
-    if (openSignal) setOpen(true);
+    if (openSignal) setOpenMenu(key);
   }, [openSignal]);
 
   return (
@@ -162,14 +249,14 @@ function OverflowButton({
         ref={triggerRef}
         type="button"
         data-testid="issue-action-overflow-button"
-        aria-label={`${actions.all.length} more issue actions`}
+        aria-label={`${more} more issue actions`}
         className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-        onClick={() => setOpen((value) => !value)}
+        onClick={() => setOpenMenu(open ? null : key)}
       >
         <MoreHorizontal className="h-4 w-4" />
-        <span>{actions.all.length} more</span>
+        <span>{more} more</span>
       </button>
-      {open ? <OverflowMenu actions={actions} onClose={() => setOpen(false)} /> : null}
+      {open ? <OverflowMenu actions={actions} onClose={() => setOpenMenu(null)} /> : null}
     </div>
   );
 }
@@ -373,9 +460,15 @@ export function IssueActionMenu({
   const primaryStripOverflow = [...scopedSecondary, ...scopedOverflow]
     .filter((view) => !excludedFromOverflow(view));
   const overflowOnly = scopedAll.filter((view) => !excludedFromOverflow(view));
+  // The overflow body is the FULL menu (phase section + every group) minus
+  // pinned entries — one complete menu everywhere (C-ACTIONS). The button
+  // count stays cosmetic: items beyond the inline strip.
+  const menuAll = mode === 'overflow-only' ? overflowOnly : [...primary, ...primaryStripOverflow];
+  const overflowPrimary = scopedPrimary.filter((view) => !excludedFromOverflow(view));
+  const overflowCount = (mode === 'overflow-only' ? overflowOnly : primaryStripOverflow).length;
   const overflowActions = {
-    all: mode === 'overflow-only' ? overflowOnly : primaryStripOverflow,
-    primary: [],
+    all: menuAll,
+    primary: overflowPrimary,
     phase: actions.phase,
   };
   const hasPins = registryPins.length > 0 || pinned.length > 0;
@@ -385,8 +478,8 @@ export function IssueActionMenu({
       {mode !== 'overflow-only' ? primary.map((view) => (
         <ActionButton key={view.action.key} view={view} inline />
       )) : null}
-      {mode === 'overflow-only' || (mode === 'primary-strip' && primaryStripOverflow.length > 0) ? (
-        <OverflowButton actions={overflowActions} triggerRef={overflowTriggerRef} openSignal={openSignal} />
+      {mode === 'overflow-only' || (mode === 'primary-strip' && menuAll.length > 0) ? (
+        <OverflowButton actions={overflowActions} count={overflowCount} triggerRef={overflowTriggerRef} openSignal={openSignal} menuKey={`issue-action:${issueId}`} />
       ) : null}
       {hasPins ? <div data-testid="issue-action-pin-spacer" className="flex-1" /> : null}
       {registryPins.map((view) => (

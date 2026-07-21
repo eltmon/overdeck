@@ -24,6 +24,14 @@ vi.mock('../../../../lib/tmux.js', () => ({
   listPaneValues: (...args: unknown[]) => Effect.succeed(mockListPaneValues(...args)),
 }));
 
+vi.mock('../../../../lib/runtime-census.js', () => ({
+  getRuntimeCensus: async () => ({
+    sessionNames: new Set(mockListSessions().map((session: { name: string }) => session.name)),
+    processesByPid: new Map(),
+  }),
+  panePidsForSession: (_census: unknown, sessionName: string) => mockListPaneValues(sessionName),
+}));
+
 vi.mock('../../../../lib/docker-stats.js', () => ({
   DockerStatsCollector: class {
     start() {
@@ -39,6 +47,15 @@ vi.mock('../../../../lib/docker-stats.js', () => ({
 // ─── Import after mocks ───────────────────────────────────────────────────────
 
 import { getResourcesEffect, getDockerStatsCollector } from '../resources.js';
+import { parseProcessTable } from '../resources/agents-stats.js';
+
+describe('parseProcessTable compatibility', () => {
+  it('preserves the exported four-column ps parser', () => {
+    expect(parseProcessTable('100 1 2.5 2048')).toEqual([
+      { pid: 100, ppid: 1, cpuPercent: 2.5, rssBytes: 2048 * 1024 },
+    ]);
+  });
+});
 
 async function runResourcesEffect(): Promise<{
   status: number;

@@ -8,6 +8,7 @@ import { WorkspaceStatusCard, type WorkspaceStatusStats } from '../components/Co
 import { fetchProjects, filterSpecOnlyPlanned, type ProjectData } from '../components/CommandDeck/projectsData';
 import { usePlannedBacklogVisibility } from '../hooks/usePlannedBacklogVisibility';
 import { useDashboardStore, selectLatestMemoryFailure } from '../lib/store';
+import { ModeToggle } from '../components/simple/parts';
 import { formatRelativeTime } from '../lib/formatRelativeTime';
 import { bucketByTime, type TimeBucketKey } from '../lib/timeBuckets';
 import type { Issue } from '../types';
@@ -141,11 +142,16 @@ export function HomePage({ onOpenWorkspaceHome, onNewProject, onSelectProject, o
     <div className="h-full w-full overflow-y-auto bg-background">
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 p-6">
         <header className="rounded-xl border border-border bg-card p-6 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">Overdeck Home</p>
-          <h1 className="mt-2 text-3xl font-semibold text-foreground">System briefing</h1>
-          <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
-            A live landing page for current workspace context, cross-workspace ownership, and memory-first guidance.
-          </p>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">Overdeck Home</p>
+              <h1 className="mt-2 text-3xl font-semibold text-foreground">System briefing</h1>
+              <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
+                A live landing page for current workspace context, cross-workspace ownership, and memory-first guidance.
+              </p>
+            </div>
+            <ModeToggle />
+          </div>
         </header>
 
         <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5" aria-label="Home summary">

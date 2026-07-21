@@ -37,7 +37,10 @@ async function collectRelativeImportGraph(entry: string, visited = new Set<strin
 
 function deps(): PipelineMembershipGatherDeps {
   return {
-    listOpenIssues: vi.fn().mockResolvedValue([{ number: 1, labels: ['in-review'] }]),
+    listOpenIssues: vi.fn().mockResolvedValue([
+      { number: 1, labels: ['in-review'] },
+      { number: 4, labels: [] },
+    ]),
     listPhaseLabeledIssues: vi.fn().mockResolvedValue([]),
     listOpenPullRequests: vi.fn().mockResolvedValue([{
       headRefName: 'feature/pan-2', headRepoFullName: 'eltmon/overdeck',
@@ -158,7 +161,7 @@ describe('gatherProjectLensSignals', () => {
     expect(mocked.listMergedPullRequestHeads).toHaveBeenCalledWith(
       'eltmon',
       'overdeck',
-      ['strike/pan-20', 'feature/pan-20', 'strike/pan-21', 'feature/pan-21'],
+      ['strike/pan-20', 'feature/pan-20'],
     );
     expect(result).toEqual([
       { issueId: 'PAN-20', issueOpen: true, hasOpenPr: false, hasMergedPr: false, hasConventionBranch: true, branchUnmerged: true, hasMergedBranchWork: false, phaseLabel: null, hasXbriefSpec: false, explicitlyReady: false },
@@ -289,7 +292,7 @@ describe('gatherProjectLensSignals', () => {
     });
   });
 
-  it('lists all PRs through one paginated dependency regardless of candidate count', async () => {
+  it('lists open PRs once and checks merged history only for open candidates', async () => {
     const mocked = deps();
     await gatherProjectLensSignals(project, mocked);
     expect(mocked.listOpenPullRequests).toHaveBeenCalledOnce();
@@ -297,7 +300,7 @@ describe('gatherProjectLensSignals', () => {
     expect(mocked.listMergedPullRequestHeads).toHaveBeenCalledWith(
       'eltmon',
       'overdeck',
-      expect.arrayContaining(['feature/pan-1', 'feature/pan-2', 'feature/pan-3', 'feature/pan-4']),
+      ['feature/pan-1', 'strike/pan-1', 'feature/pan-4', 'strike/pan-4'],
     );
     expect(mocked.run).not.toHaveBeenCalledWith('gh', expect.anything(), expect.anything());
   });
@@ -363,7 +366,7 @@ describe('gatherProjectLensSignals', () => {
     await expect(gatherProjectLensSignals(project, mocked)).resolves.toEqual([]);
   });
 
-  it('resolves issue states with one bulk dependency call', async () => {
+  it('does not query issue states or merged history for closed spec-only candidates', async () => {
     const mocked = deps();
     mocked.listOpenIssues = vi.fn().mockResolvedValue([]);
     mocked.listOpenPullRequests = vi.fn().mockResolvedValue([]);
@@ -371,24 +374,20 @@ describe('gatherProjectLensSignals', () => {
     mocked.listSpecIssueIds = vi.fn().mockResolvedValue(
       Array.from({ length: 40 }, (_, index) => `PAN-${index + 1}`),
     );
-    mocked.listIssueStates = vi.fn().mockImplementation(async (_owner, _repo, numbers: number[]) =>
-      numbers.map((number) => ({ number, state: 'closed' as const })));
+    mocked.run = vi.fn().mockResolvedValue('');
 
-    await gatherProjectLensSignals(project, mocked);
+    await expect(gatherProjectLensSignals(project, mocked)).resolves.toEqual([]);
 
-    expect(mocked.listIssueStates).toHaveBeenCalledOnce();
-    expect(mocked.listIssueStates).toHaveBeenCalledWith('eltmon', 'overdeck', expect.arrayContaining([1, 40]));
-    expect(mocked.listMergedPullRequestHeads).toHaveBeenCalledOnce();
-    expect(mocked.listMergedPullRequestHeads).toHaveBeenCalledWith(
-      'eltmon',
-      'overdeck',
-      expect.arrayContaining(['feature/pan-1', 'feature/pan-40']),
-    );
+    expect(mocked.listIssueStates).not.toHaveBeenCalled();
+    expect(mocked.listMergedPullRequestHeads).toHaveBeenCalledWith('eltmon', 'overdeck', []);
   });
 
   it('checks merged PR history only for active candidate heads', async () => {
     const mocked = deps();
-    mocked.listOpenIssues = vi.fn().mockResolvedValue([]);
+    mocked.listOpenIssues = vi.fn().mockResolvedValue([
+      { number: 10, labels: [] },
+      { number: 11, labels: [] },
+    ]);
     mocked.listOpenPullRequests = vi.fn().mockResolvedValue([]);
     mocked.listSpecIssueIds = vi.fn().mockResolvedValue(['PAN-10', 'PAN-11']);
     mocked.run = vi.fn().mockResolvedValue('');
@@ -396,6 +395,7 @@ describe('gatherProjectLensSignals', () => {
 
     await gatherProjectLensSignals(project, mocked);
 
+    expect(mocked.listIssueStates).not.toHaveBeenCalled();
     expect(mocked.listMergedPullRequestHeads).toHaveBeenCalledOnce();
     expect(mocked.listMergedPullRequestHeads).toHaveBeenCalledWith(
       'eltmon',

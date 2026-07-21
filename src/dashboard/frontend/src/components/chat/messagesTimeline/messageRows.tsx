@@ -146,7 +146,7 @@ export function AssistantMessageRow({
     <div className={styles.assistantMessageRow}>
       <Bot size={14} className={styles.assistantMessageAvatar} aria-hidden="true" />
       <div className={styles.assistantMessageContent}>
-        <ChatMarkdown text={message.text} isStreaming={isStreaming && !message.completedAt} cwd={cwd} issueId={issueId} />
+        <TurnBody text={message.text} streaming={isStreaming && !message.completedAt} cwd={cwd} issueId={issueId} />
         {turnDiffSummary && turnDiffSummary.files.length > 0 && (
           <div className="mt-2 rounded-md border border-border/50 bg-muted/30 p-2">
             <div className="flex items-center justify-between mb-1.5">
@@ -197,6 +197,64 @@ export function AssistantMessageRow({
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+/* ── PAN-2908 C-VERB (#2967): structured verdict cards for completion/verdict
+ *  messages. The per-turn line-budget collapse shipped and was REJECTED by
+ *  the operator (2026-07-20: "let's not do this after all") — turns render in
+ *  full; only the verdict card remains from the contract's item 1. */
+
+function firstNonEmptyLine(text: string): string {
+  return text.split('\n').find((line) => line.trim().length > 0) ?? '';
+}
+
+type VerdictTone = 'pass' | 'fail' | 'info';
+
+function detectVerdict(line: string): { tone: VerdictTone } | null {
+  if (/\b(all checks passed|review passed|tests? (all )?passed|work (is )?complete|fully green|ready to merge|merged successfully)\b/i.test(line)) return { tone: 'pass' };
+  if (/\b(checks? (are )?failing|review failed|tests? (are )?failing|tests? failed|changes requested)\b/i.test(line)) return { tone: 'fail' };
+  if (/^(✓|✔|✅)/.test(line.trim())) return { tone: 'pass' };
+  if (/^(✗|❌)/.test(line.trim())) return { tone: 'fail' };
+  return null;
+}
+
+const VERDICT_CARD_CLASS: Record<VerdictTone, string> = {
+  pass: 'border-success/40 bg-success/10',
+  fail: 'border-destructive/40 bg-destructive/10',
+  info: 'border-info/40 bg-info/10',
+};
+const VERDICT_GLYPH: Record<VerdictTone, string> = { pass: '✓', fail: '✗', info: 'ℹ' };
+
+/**
+ * The assistant turn body: the full turn (no collapsing), with a structured
+ * verdict card in place of the plain first line when the turn is a
+ * completion/verdict message.
+ */
+export function TurnBody({ text, streaming, cwd, issueId }: { text: string; streaming: boolean; cwd?: string; issueId?: string | null }) {
+  if (streaming) {
+    return <ChatMarkdown text={text} isStreaming cwd={cwd} issueId={issueId} />;
+  }
+
+  const digest = firstNonEmptyLine(text);
+  const verdict = detectVerdict(digest);
+  if (!verdict) {
+    return <ChatMarkdown text={text} cwd={cwd} issueId={issueId} />;
+  }
+
+  const rest = text.slice(text.indexOf(digest) + digest.length).replace(/^\n+/, '');
+  return (
+    <div>
+      <div
+        data-testid="turn-verdict-card"
+        data-tone={verdict.tone}
+        className={`mb-1.5 flex items-center gap-2 rounded-md border px-3 py-2 ${VERDICT_CARD_CLASS[verdict.tone]}`}
+      >
+        <span className="font-semibold">{VERDICT_GLYPH[verdict.tone]}</span>
+        <span className="font-medium"><ChatMarkdown text={digest} cwd={cwd} issueId={issueId} /></span>
+      </div>
+      {rest && <ChatMarkdown text={rest} cwd={cwd} issueId={issueId} />}
     </div>
   );
 }

@@ -7,6 +7,7 @@ import { FileActivityTree } from './FileActivityTree';
 import { AgentTimeline } from './AgentTimeline';
 import { ActionBar } from './ActionBar';
 import { useDashboardStore, selectAgentOutput, selectAgentById } from '../../lib/store';
+import { useAgentOutputSubscription } from '../../hooks/useAgentOutputSubscription';
 import type { Agent } from '../../types';
 
 interface FocusViewProps {
@@ -28,6 +29,7 @@ function InfoRow({ label, value }: { label: string; value: string }) {
 }
 
 export function AgentFocusView({ agent, onClose }: FocusViewProps) {
+  useAgentOutputSubscription(agent.id);
   const terminalLines = useDashboardStore(selectAgentOutput(agent.id));
   const liveAgent = useDashboardStore(selectAgentById(agent.id));
   const liveStatus = liveAgent?.status ?? agent.status;

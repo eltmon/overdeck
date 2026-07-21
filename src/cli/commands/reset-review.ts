@@ -44,7 +44,8 @@ export async function resetReviewCommand(id: string, options: ResetReviewOptions
 
     if (options.session) {
       // Non-destructive: clears the parent review role and any convoy reviewers'
-      // mutable resume pointers. Claude JSONL transcripts are never touched.
+      // mutable resume pointers (PAN-2948: the review namespace's sessions, not
+      // the work agent's). Claude JSONL transcripts are never touched.
       await resetReviewSessionsCommand(id);
     }
 

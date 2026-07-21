@@ -14,6 +14,8 @@ import {
 } from '../../lib/issueActions';
 import { refreshDashboardState } from '../../lib/refresh-dashboard-state';
 import { dashboardMutationJsonHeaders } from '../../lib/wsTransport';
+import { recoveryFromBody, useResumeRecovery } from '../../lib/resumeRecovery';
+import { toastResumeOutcome } from '../../lib/resumeOutcome';
 import { selectAgents, selectIssues, selectReviewStatus, useDashboardStore } from '../../lib/store';
 import type { WorkspaceInfo } from '../../lib/workspace-types';
 import { STATUS_LABELS, type Agent, type Issue, type WorkAgentLifecycle } from '../../types';
@@ -71,15 +73,12 @@ function activeAgentForIssue(agents: Agent[], issueId: string) {
   return issueAgents.find((agent) => agent.id?.toLowerCase() === workAgentId) ?? issueAgents[0];
 }
 
-async function responseError(response: Response, fallback: string) {
-  const text = await response.text();
+async function responseError(response: Response, fallback: string, preRead?: { text: string; parsed: unknown }) {
+  const text = preRead?.text ?? (await response.text());
   if (!text) return fallback;
-  try {
-    const parsed = JSON.parse(text) as { error?: string; message?: string; hint?: string };
-    return parsed.error ?? parsed.message ?? parsed.hint ?? fallback;
-  } catch {
-    return text.length < 200 ? text : fallback;
-  }
+  const parsed = preRead ? (preRead.parsed as { error?: string; message?: string; hint?: string }) : (() => { try { return JSON.parse(text) as { error?: string; message?: string; hint?: string }; } catch { return null; } })();
+  if (parsed) return parsed.error ?? parsed.message ?? parsed.hint ?? fallback;
+  return text.length < 200 ? text : fallback;
 }
 
 function interpolateEndpoint(endpoint: string, issueId: string, agent: Agent | undefined, state: IssueActionState, selectedTaskId?: string | null) {
@@ -186,6 +185,10 @@ function disabledReasonForAction(action: IssueActionEntry) {
       return 'No transcript artifact is available for this issue.';
     case 'closeOut':
       return 'Close out is available only after merge verification.';
+    case 'merge':
+      return 'Merge is available once review has approved and the PR is mergeable.';
+    case 'upload':
+      return 'Transcript upload is temporarily unavailable while its endpoint is rebuilt.';
     case 'reopen':
       return 'Reopen is available only for done or canceled issues.';
     case 'unpause':
@@ -253,6 +256,7 @@ export function useIssueActions(issueId: string): UseIssueActionsResult {
   const openIssue = useDashboardStore((state) => state.openIssue);
   const [activeDialog, setActiveDialog] = useState<IssueActionDialogState>(null);
   const [pendingKey, setPendingKey] = useState<IssueActionKey | null>(null);
+  const openRecovery = useResumeRecovery((s) => s.openRecovery);
 
   const issue = useMemo(() => issues.find((candidate) => candidate.identifier.toLowerCase() === issueId.toLowerCase()), [issueId, issues]);
   const agent = useMemo(() => activeAgentForIssue(agents, issueId), [agents, issueId]);
@@ -312,13 +316,29 @@ export function useIssueActions(issueId: string): UseIssueActionsResult {
         headers: await dashboardMutationJsonHeaders(),
         body: payload ? JSON.stringify(payload) : '{}',
       });
-      if (!response.ok) throw new Error(await responseError(response, `Failed to run ${action.label}`));
+      if (!response.ok) {
+        const text = await response.text();
+        let parsed: unknown = null;
+        try { parsed = JSON.parse(text); } catch { /* not JSON */ }
+        // A 409 carrying a resumable lifecycle is a CHOICE, not an error —
+        // surface the Resume / Start fresh dialog instead of a raw alert.
+        const recovery = response.status === 409 ? recoveryFromBody(parsed) : null;
+        if (recovery) {
+          openRecovery({ ...recovery, issueId });
+          return { success: false, recovery: true };
+        }
+        throw new Error(await responseError(response, `Failed to run ${action.label}`, { text, parsed }));
+      }
       return response.json().catch(() => ({ success: true }));
     },
     onSuccess: async (_data, { action }) => {
       await refreshDashboardState(queryClient);
       if (action.key === 'unpause') {
         toast.success(`${issueId} unpaused — deacon resumes it on the next patrol`);
+      }
+      if (action.key === 'resumeSession' && agent?.id) {
+        // PAN-2975: every resume affordance reports the actual outcome.
+        toastResumeOutcome(agent.id);
       }
     },
     onError: (error: Error) => {
@@ -356,6 +376,18 @@ export function useIssueActions(issueId: string): UseIssueActionsResult {
         confirmLabel: action.label,
         variant: 'destructive',
         requiredText: action.label,
+      });
+      if (!confirmed) return;
+    }
+
+    // Merge is safe-kind but irreversible-ish: keep the old MergeButton's
+    // confirm step (C-ACTIONS — same guard, one registry path).
+    if (action.key === 'merge') {
+      const confirmed = await confirm({
+        title: 'Merge to main',
+        message: `Merge ${issueId} into main?\n\nThe branch is approved and checks are green. This cannot be un-merged automatically.`,
+        confirmLabel: 'Merge to main',
+        variant: 'default',
       });
       if (!confirmed) return;
     }

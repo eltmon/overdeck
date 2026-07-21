@@ -7,7 +7,7 @@ import { ensureParentDir, resolveRagRunsFile, resolveStatusFile } from './paths.
 import { expandMemoryQuery, type QueryExpansionCall, type QueryExpansionResult } from './query-expansion.js';
 import { searchMemory, type MemorySearchHit } from './search.js';
 import { isMemoryKnowledgeIndexEnabled, isMemoryPromptTimeInjectionEnabled } from './settings.js';
-import { loadProjectsConfigSync, resolveProjectFromIssueSync } from '../projects.js';
+import { findProjectByPathSync, loadProjectsConfigSync, resolveProjectFromIssueSync } from '../projects.js';
 
 export const PROMPT_TIME_MEMORY_BUDGETS = {
   status: 2000,
@@ -462,14 +462,25 @@ async function readKnowledgeIndex(identity: MemoryIdentity): Promise<string | nu
   return lines.join('\n');
 }
 
-async function resolveKnowledgeBundleRoot(identity: MemoryIdentity): Promise<string | null> {
-  const resolved = resolveProjectFromIssueSync(identity.issueId);
-  if (!resolved) return null;
+export async function resolveKnowledgeBundleRoot(
+  identity: MemoryIdentity | { projectPath: string },
+): Promise<string | null> {
+  let projectPath: string;
+  let knowledgeRepo: string | undefined;
 
-  const config = loadProjectsConfigSync().projects[resolved.projectKey];
-  const projectPath = resolved.projectPath;
-  if (typeof config?.knowledge_repo === 'string' && config.knowledge_repo.trim()) {
-    return resolvePath(projectPath, config.knowledge_repo);
+  if ('issueId' in identity) {
+    const resolved = resolveProjectFromIssueSync(identity.issueId);
+    if (!resolved) return null;
+    projectPath = resolved.projectPath;
+    knowledgeRepo = loadProjectsConfigSync().projects[resolved.projectKey]?.knowledge_repo;
+  } else {
+    const project = findProjectByPathSync(identity.projectPath);
+    projectPath = project?.path ?? identity.projectPath;
+    knowledgeRepo = project?.knowledge_repo;
+  }
+
+  if (typeof knowledgeRepo === 'string' && knowledgeRepo.trim()) {
+    return resolvePath(projectPath, knowledgeRepo);
   }
 
   try {

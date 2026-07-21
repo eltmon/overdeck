@@ -19,6 +19,8 @@
  *                       order no longer reflects time-recency. We disambiguate
  *                       across all listed IDs by JSONL mtime.
  *   3. runtime state  — in-process mirror, populated by hooks
+ *   4. agents registry — the DB row's session_id recorded at spawn; survives
+ *                        janitor removal of the agent directory
  *
  * Async-only (fs/promises) because this code path runs inside the dashboard
  * server's event loop.
@@ -175,6 +177,15 @@ export async function resolveClaudeSessionId(
     if (runtimeState?.claudeSessionId) return runtimeState.claudeSessionId;
   } catch { /* non-fatal */ }
 
+  // 4. agents registry — the DB row records session_id at spawn (PAN-1908) and
+  //    survives janitors removing the agent directory, so an ended session's
+  //    transcript stays resolvable. Skipped under agentsDirOverride (test hook)
+  //    to keep resolver tests hermetic, mirroring readRecordedState.
+  if (!opts.agentsDirOverride) {
+    const registrySessionId = getAgentStateSync(agentId)?.sessionId?.trim();
+    if (registrySessionId) return registrySessionId;
+  }
+
   return null;
 }
 
@@ -245,7 +256,7 @@ async function readRecordedState(
  * Resolve the harness for transcript routing. Reads state.json, then
  * self-corrects when the recorded value is stale.
  *
- * Trust an explicit non-default harness (codex / pi / ohmypi) — it was chosen
+ * Trust an explicit non-default harness (codex / pi / ohmypi / acp) — it was chosen
  * by resolveHarness at spawn time and is not the generic fallback. The
  * 'claude-code' default, however, goes stale in one observed case: a
  * wipe-and-respawn that changed the provider-default harness left state.json
@@ -266,7 +277,7 @@ export async function resolveAgentHarness(
   opts: ResolveJsonlPathOptions = {},
 ): Promise<string | null> {
   const recorded = (await readRecordedState(agentId, opts)).harness;
-  if (recorded === 'codex' || recorded === 'pi' || recorded === 'ohmypi') {
+  if (recorded === 'codex' || recorded === 'pi' || recorded === 'ohmypi' || recorded === 'acp') {
     return recorded;
   }
   // 'claude-code' (or null) is the default that can go stale. Correct it from
@@ -274,6 +285,7 @@ export async function resolveAgentHarness(
   if (await agentHasClaudeTranscript(agentId, opts)) {
     return recorded ?? 'claude-code';
   }
+  if (await resolveAcpTranscriptPath(agentId, opts)) return 'acp';
   if (await resolveCodexRolloutPath(agentId, opts)) return 'codex';
   if (await resolvePiSessionPath(agentId, opts)) return 'ohmypi';
   return recorded;
@@ -324,6 +336,16 @@ export async function resolveCodexRolloutPath(
   return findLatestRollout(codexHome);
 }
 
+/** Resolve the normalized transcript written by the persistent ACP host. */
+export async function resolveAcpTranscriptPath(
+  agentId: string,
+  opts: ResolveJsonlPathOptions = {},
+): Promise<string | null> {
+  const agentsRoot = opts.agentsDirOverride ?? join(getOverdeckHome(), 'agents');
+  const transcriptPath = join(agentsRoot, agentId, 'acp-session.jsonl');
+  return await pathExists(transcriptPath) ? transcriptPath : null;
+}
+
 /**
  * Resolve the pi/kimi session JSONL (PAN-1908). Pi writes its session transcript
  * as `<iso-ts>_<session-id>.jsonl` either in the agent dir's `sessions/` subdir
@@ -337,7 +359,12 @@ export async function resolvePiSessionPath(
 ): Promise<string | null> {
   const agentsRoot = opts.agentsDirOverride ?? join(getOverdeckHome(), 'agents');
   const agentDir = join(agentsRoot, agentId);
-  const NON_TRANSCRIPT = new Set(['cost-events.jsonl', 'activity.jsonl', 'pending-events.jsonl']);
+  const NON_TRANSCRIPT = new Set([
+    'acp-session.jsonl',
+    'cost-events.jsonl',
+    'activity.jsonl',
+    'pending-events.jsonl',
+  ]);
   let best: { path: string; mtime: number } | null = null;
   for (const dir of [join(agentDir, 'sessions'), agentDir]) {
     let entries: string[];
@@ -379,6 +406,9 @@ export async function resolveJsonlPath(
   }
   if (behavior.transcriptKind === 'ohmypi-jsonl') {
     return resolvePiSessionPath(agentId, opts);
+  }
+  if (behavior.transcriptKind === 'acp-jsonl') {
+    return resolveAcpTranscriptPath(agentId, opts);
   }
 
   const claudeSessionId = await resolveClaudeSessionId(agentId, opts);

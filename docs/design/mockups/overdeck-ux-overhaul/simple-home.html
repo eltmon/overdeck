@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>My Work — Simple Mode — Overdeck UX Overhaul</title>
+<link rel="stylesheet" href="shared.css">
+<script src="shared.js" defer></script>
+<style>
+  .topbar { display: flex; align-items: center; gap: 14px; padding: 12px 26px; border-bottom: 1px solid var(--border); }
+  .topbar .search { flex: 0 1 340px; height: 34px; background: var(--muted); border: 1px solid var(--input); border-radius: var(--radius-lg); color: var(--muted-foreground); padding: 0 14px; font-size: 12.5px; display: flex; align-items: center; }
+  .mode-toggle { display: inline-flex; border: 1px solid var(--input); border-radius: var(--radius-lg); overflow: hidden; margin-left: auto; }
+  .mode-toggle button { padding: 6px 14px; font-size: 12px; font-weight: 500; background: none; border: none; color: var(--muted-foreground); }
+  .mode-toggle button.active { background: var(--accent); color: var(--foreground); }
+  .mode-toggle button:hover { color: var(--foreground); }
+
+  .page { max-width: 860px; margin: 0 auto; padding: 30px 26px 90px; }
+  .greet h1 { font-size: 24px; font-weight: 500; }
+  .greet p { color: var(--muted-foreground); margin-top: 4px; font-size: 14px; }
+  .greet .statline { display: flex; gap: 18px; margin-top: 14px; font-size: 13px; color: var(--muted-foreground); }
+  .greet .statline b { color: var(--foreground); font-weight: 500; }
+
+  .new-task { display: flex; gap: 10px; margin-top: 18px; }
+  .new-task input { flex: 1; height: 44px; background: var(--card); border: 1px solid var(--input); border-radius: var(--radius-xl); color: var(--foreground); padding: 0 16px; font-family: inherit; font-size: 14px; outline: none; }
+  .new-task input:focus { border-color: var(--ring); }
+  .new-task .btn { height: 44px; padding: 0 20px; font-size: 14px; border-radius: var(--radius-xl); }
+
+  .section { margin-top: 34px; }
+  .section > h2 { font-size: 15px; font-weight: 500; display: flex; align-items: baseline; gap: 8px; }
+  .section > h2 .count { font-size: 12px; color: var(--muted-foreground); }
+  .section > .sub { font-size: 12.5px; color: var(--muted-foreground); margin-top: 2px; }
+
+  .ncard { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-2xl); padding: 16px 18px; margin-top: 12px; }
+  .ncard.attention { border-color: color-mix(in srgb, var(--warning) 32%, transparent); }
+  .ncard.ready { border-color: color-mix(in srgb, var(--success) 32%, transparent); }
+  .ncard .kicker { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted-foreground); }
+  .ncard h3 { font-size: 15px; font-weight: 500; margin-top: 4px; }
+  .ncard .say { margin-top: 8px; font-size: 13.5px; line-height: 1.5; }
+  .ncard .say em { color: var(--foreground); font-style: normal; background: var(--muted); border-radius: var(--radius-sm); padding: 1px 6px; }
+  .ncard .actions { display: flex; gap: 8px; margin-top: 12px; align-items: center; }
+  .ncard .quiet-link { font-size: 12px; color: var(--muted-foreground); margin-left: auto; }
+  .ncard .quiet-link:hover { color: var(--foreground); }
+  .answer-row { display: flex; gap: 8px; margin-top: 10px; }
+  .answer-row input { flex: 1; height: 36px; background: var(--muted); border: 1px solid var(--input); border-radius: var(--radius-lg); color: var(--foreground); padding: 0 12px; font-family: inherit; font-size: 13px; outline: none; }
+  .answer-row input:focus { border-color: var(--ring); }
+
+  .progress { height: 4px; background: var(--accent); border-radius: 2px; margin-top: 12px; overflow: hidden; }
+  .progress i { display: block; height: 100%; background: var(--info); border-radius: 2px; }
+  .wcard { display: flex; gap: 14px; align-items: center; background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-xl); padding: 14px 16px; margin-top: 10px; }
+  .wcard .pulse-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--info); flex: none; animation: badge-pulse 1.6s ease-out infinite; }
+  .wcard .w-main { flex: 1; min-width: 0; }
+  .wcard h3 { font-size: 14px; font-weight: 500; }
+  .wcard .w-status { font-size: 12px; color: var(--muted-foreground); margin-top: 2px; }
+  .wcard .w-status b { color: var(--info-foreground); font-weight: 500; }
+
+  .done-row { display: flex; align-items: center; gap: 10px; padding: 10px 4px; border-bottom: 1px solid var(--border); font-size: 13px; }
+  .done-row:last-child { border-bottom: none; }
+  .done-row .check { width: 16px; height: 16px; border-radius: 50%; background: color-mix(in srgb, var(--success) 12%, transparent); color: var(--success-foreground); display: inline-flex; align-items: center; justify-content: center; font-size: 10px; flex: none; }
+  .done-row .when { margin-left: auto; font-size: 11.5px; color: var(--muted-foreground); }
+</style>
+</head>
+<body>
+
+<div class="mock-banner">
+  <span class="tag">Mockup 2 of 7 · Simple mode</span>
+  <span class="crumbs"><a href="index.html">UX Overhaul</a> → <b>My work</b> — the default home a junior dev sees</span>
+  <span style="margin-left:auto" class="density-toggle"><a href="simple-issue.html"><button>Next: simple issue →</button></a></span>
+</div>
+
+<div class="topbar">
+  <span class="wordmark" style="font-size:15px">◎ Overdeck</span>
+  <div class="search">Search your tasks…</div>
+  <div class="mode-toggle">
+    <button class="active">Simple</button>
+    <button onclick="location.href='board.html'">Advanced</button>
+  </div>
+</div>
+
+<div class="page">
+  <div class="greet">
+    <h1>Good evening.</h1>
+    <p>Two things need you. Everything else is moving on its own.</p>
+    <div class="statline">
+      <span><b>3</b> being worked on</span>
+      <span><b>1</b> ready to merge</span>
+      <span><b>12</b> finished this week</span>
+    </div>
+  </div>
+
+  <div class="new-task">
+    <input placeholder="Describe what you want built or fixed, in plain words…">
+    <button class="btn">Hand it off</button>
+  </div>
+
+  <!-- ═══ NEEDS YOU ═══ -->
+  <div class="section">
+    <h2>Needs you <span class="count">2</span></h2>
+    <div class="sub">Work pauses until you answer. Everything else keeps going.</div>
+
+    <div class="ncard attention">
+      <div class="kicker">Question · Mobile UI Refresh</div>
+      <h3>Which theme tokens should stay?</h3>
+      <div class="say">The agent is redesigning the mobile theme and needs one decision: <em>keep the 4 legacy theme tokens, or replace them with the 2 new ones?</em></div>
+      <div class="answer-row">
+        <input placeholder="Type your answer… e.g. 'replace them, legacy is dead code'">
+        <button class="btn">Answer</button>
+      </div>
+      <div class="actions" style="margin-top:8px">
+        <span class="quiet-link">Waiting 12 min · the agent picks up right where it left off</span>
+      </div>
+    </div>
+
+    <div class="ncard attention">
+      <div class="kicker">Review found problems · Desktop home calendar</div>
+      <h3>Two things need fixing before this can merge</h3>
+      <div class="say">The automatic review checked the finished work and found <em>2 issues</em> (a date-timezone bug and a missing empty state). The agent can fix both itself.</div>
+      <div class="actions">
+        <button class="btn">Tell the agent to fix them</button>
+        <button class="btn ghost">See the findings</button>
+        <span class="quiet-link">Found 26 min ago</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ WORKING NOW ═══ -->
+  <div class="section">
+    <h2>Working now <span class="count">3</span></h2>
+    <div class="sub">Nothing for you to do on these — you'll be told when they're ready.</div>
+
+    <div class="wcard">
+      <span class="pulse-dot"></span>
+      <div class="w-main">
+        <h3>Set up PostHog product analytics</h3>
+        <div class="w-status"><b>Writing code</b> · started 34 min ago · usually about 2 hours · task 4 of 13</div>
+        <div class="progress"><i style="width:31%"></i></div>
+      </div>
+      <button class="btn ghost sm">Watch</button>
+    </div>
+
+    <div class="wcard">
+      <span class="pulse-dot"></span>
+      <div class="w-main">
+        <h3>Conversation subagent rail</h3>
+        <div class="w-status"><b>Writing code</b> · started 2h ago · task 11 of 18</div>
+        <div class="progress"><i style="width:61%"></i></div>
+      </div>
+      <button class="btn ghost sm">Watch</button>
+    </div>
+
+    <div class="wcard">
+      <span class="pulse-dot" style="background:var(--warning)"></span>
+      <div class="w-main">
+        <h3>feat(flywheel): special orders runs</h3>
+        <div class="w-status"><b>Being checked</b> · the work is done, automatic review is reading it now · ~5 min</div>
+        <div class="progress"><i style="width:88%;background:var(--warning)"></i></div>
+      </div>
+      <button class="btn ghost sm">Watch</button>
+    </div>
+  </div>
+
+  <!-- ═══ READY ═══ -->
+  <div class="section">
+    <h2>Ready to merge <span class="count">1</span></h2>
+
+    <div class="ncard ready">
+      <div class="kicker">All checks passed · Resume path fix</div>
+      <h3>Resume path retries a session whose JSONL was deleted</h3>
+      <div class="say">Written, reviewed, and tested. <em>3 files changed, all checks green.</em> Merging puts it on main.</div>
+      <div class="actions">
+        <button class="btn" style="background:var(--success);color:#04120c">Merge to main</button>
+        <button class="btn ghost">See the changes</button>
+        <span class="quiet-link">Not sure? Ask a teammate first — nothing is automatic here</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ DONE ═══ -->
+  <div class="section">
+    <h2>Finished this week <span class="count">12</span></h2>
+    <div class="done-row"><span class="check">✓</span>Issues pipeline pane is poll-driven<span class="when">merged 2h ago</span></div>
+    <div class="done-row"><span class="check">✓</span>Pipeline membership infers 'landed via non-PR path'<span class="when">merged 5h ago</span></div>
+    <div class="done-row"><span class="check">✓</span>False post_merge_limbo during planning<span class="when">yesterday</span></div>
+    <div class="done-row"><span class="check">✓</span>Conversation launch dies with raw 'execvp(3) failed'<span class="when">yesterday</span></div>
+  </div>
+</div>
+
+</body>
+</html>

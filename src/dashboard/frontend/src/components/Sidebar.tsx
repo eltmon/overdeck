@@ -4,7 +4,7 @@ import {
   Home, LayoutGrid, Bot, Server,
   Terminal, BarChart3, DollarSign, HeartPulse, Cpu, Settings,
   Zap, Compass, GitBranch, GitMerge, ChevronsLeft, ChevronsRight, Sun, Moon, Menu,
-  Hammer, Loader2, History, Mic, FileText, ChevronDown, ChevronRight, MoreHorizontal, Shield, ListOrdered,
+  Hammer, Loader2, History, Mic, FileText, BookOpen, ChevronDown, ChevronRight, MoreHorizontal, Shield, ListOrdered,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { fetchProjects, filterSpecOnlyPlanned, isUnscopedConversation, NO_PROJECT_KEY, NO_PROJECT_LABEL, type RegisteredProjectLite } from './CommandDeck/projectsData';
@@ -117,6 +117,7 @@ const MORE_GROUPS: NavGroup[] = [
   {
     label: 'System',
     items: [
+      { id: 'knowledge' as Tab, label: 'Knowledge', icon: BookOpen },
       { id: 'skills' as Tab, label: 'Skills', icon: Cpu },
       { id: 'context' as Tab, label: 'Context', icon: FileText },
       { id: 'settings' as Tab, label: 'Settings', icon: Settings },

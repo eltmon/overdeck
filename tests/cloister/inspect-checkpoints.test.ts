@@ -1,4 +1,3 @@
-import { Effect } from 'effect';
 /**
  * PAN-382: Tests for inspect checkpoint system
  */
@@ -15,34 +14,15 @@ const TEST_HOME = vi.hoisted(() => {
   return join(tmpdir(), `pan-test-inspect-${Date.now()}`);
 });
 
-const execSyncMock = vi.hoisted(() => vi.fn());
-
 vi.mock('os', async () => {
   const actual = await vi.importActual<typeof import('os')>('os');
   return { ...actual, homedir: () => TEST_HOME };
 });
 
-vi.mock('child_process', () => ({
-  execSync: (...args: any[]) => execSyncMock(...args),
-  exec: vi.fn((cmd: string, opts: any, cb?: Function) => {
-    // Simulate async exec by calling execSync mock
-    const callback = cb || opts;
-    try {
-      const result = execSyncMock(cmd, typeof opts === 'object' ? opts : {});
-      if (typeof callback === 'function') callback(null, { stdout: result || '', stderr: '' });
-    } catch (err) {
-      if (typeof callback === 'function') callback(err, { stdout: '', stderr: '' });
-    }
-  }),
-}));
-
 import {
   loadCheckpoints,
   getLastCheckpoint,
   saveCheckpoint,
-  getDiffBase,
-  getDiffStats,
-  getCurrentHead,
 } from '../../src/lib/cloister/inspect-checkpoints.js';
 
 describe('inspect-checkpoints', () => {
@@ -51,7 +31,6 @@ describe('inspect-checkpoints', () => {
 
   beforeEach(() => {
     mkdirSync(join(TEST_HOME, '.overdeck'), { recursive: true });
-    execSyncMock.mockReset();
   });
 
   afterEach(() => {
@@ -122,68 +101,6 @@ describe('inspect-checkpoints', () => {
       const data = loadCheckpoints(projectKey, issueId);
       expect(data!.checkpoints).toHaveLength(3);
       expect(data!.checkpoints[2].itemId).toBe('myn-82');
-    });
-  });
-
-  describe('getDiffBase', () => {
-    it('uses the parent commit when no checkpoint exists', async () => {
-      execSyncMock.mockReturnValue('abc123def456\n');
-
-      const base = await Effect.runPromise(getDiffBase(projectKey, issueId, '/tmp/workspace'));
-      expect(base).toBe('abc123def456');
-    });
-
-    it('uses the parent commit even when checkpoints exist', async () => {
-      saveCheckpoint(projectKey, issueId, 'myn-80', 'checkpoint-sha');
-      execSyncMock.mockReturnValue('parent-sha\n');
-
-      const base = await Effect.runPromise(getDiffBase(projectKey, issueId, '/tmp/workspace'));
-      expect(base).toBe('parent-sha');
-    });
-
-    it('falls back to main when merge-base fails', async () => {
-      execSyncMock.mockImplementation(() => {
-        throw new Error('not a git repo');
-      });
-
-      const base = await Effect.runPromise(getDiffBase(projectKey, issueId, '/tmp/workspace'));
-      expect(base).toBe('main');
-    });
-  });
-
-  describe('getDiffStats', () => {
-    it('returns diff stats from git', async () => {
-      execSyncMock.mockReturnValue(' 3 files changed, 120 insertions(+), 5 deletions(-)\n');
-
-      const stats = await Effect.runPromise(getDiffStats('/tmp/workspace', 'abc123'));
-      expect(stats).toContain('3 files changed');
-    });
-
-    it('returns fallback message on error', async () => {
-      execSyncMock.mockImplementation(() => {
-        throw new Error('git error');
-      });
-
-      const stats = await Effect.runPromise(getDiffStats('/tmp/workspace', 'abc123'));
-      expect(stats).toBe('Unable to compute diff stats');
-    });
-  });
-
-  describe('getCurrentHead', () => {
-    it('returns HEAD sha', async () => {
-      execSyncMock.mockReturnValue('abc123def456\n');
-
-      const head = await Effect.runPromise(getCurrentHead('/tmp/workspace'));
-      expect(head).toBe('abc123def456');
-    });
-
-    it('returns unknown on error', async () => {
-      execSyncMock.mockImplementation(() => {
-        throw new Error('not a git repo');
-      });
-
-      const head = await Effect.runPromise(getCurrentHead('/tmp/workspace'));
-      expect(head).toBe('unknown');
     });
   });
 });

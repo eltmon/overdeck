@@ -17,7 +17,7 @@ import { getAgentStateSync, saveAgentStateSync } from '../agents.js';
 import { emitActivityEntrySync, emitActivityTtsSync } from '../activity-logger.js';
 import { createInFlightGuard } from '../cloister/in-flight-guard.js';
 import { getInternalTokenSync, INTERNAL_TOKEN_HEADER } from '../internal-token.js';
-import { checkPrdGateSync, asPanSpecDocument, findSpecByIssue, writeSpecDocument, writeSpecForIssue } from '../pan-dir/index.js';
+import { checkPrdGateSync, promoteWorkspacePrdDraft, asPanSpecDocument, findSpecByIssue, writeSpecDocument, writeSpecForIssue } from '../pan-dir/index.js';
 import { resolveAutoSpawnOnFinalize } from '../planning/spawn-planning-session.js';
 import { extractTeamPrefix, findProjectByPathSync, findProjectByTeamSync, resolveProjectFromIssueSync } from '../projects.js';
 import { markWorkspaceStuck } from '../review-status.js';
@@ -96,7 +96,7 @@ export interface CompletePlanningAutoSpawnResult {
   workAgentSkipReason?: 'stack-unhealthy' | 'guardrails' | 'paused' | 'troubled' | 'unauthorized' | 'spawn-failed';
 }
 
-type CompletePlanningPhase = 'prdGate' | 'beadsMaterialize' | 'specWrite' | 'autoSpawn' | 'terminal';
+type CompletePlanningPhase = 'prdGate' | 'prdPromote' | 'beadsMaterialize' | 'specWrite' | 'autoSpawn' | 'terminal';
 type CompletePlanningPhaseStatus = 'start' | 'success' | 'failure' | 'skipped';
 
 const completePlanningGuard = createInFlightGuard();
@@ -563,6 +563,28 @@ export async function completePlanningForIssue(options: {
           return jsonResponse({ error: `PRD-first gate: no PRD draft for ${id.toUpperCase()}`, prdGate }, { status: 422 });
         }
         emitCompletePlanningPhase(id, 'prdGate', 'success', `found ${prdGate.path} (${prdGate.lineCount} lines)`);
+      }
+
+      // PRD promotion: the gate accepts a workspace-authored draft, but the
+      // workspace is disposable — promote it to drafts/ on the state plane so
+      // the PRD survives workspace teardown (the PAN-2858 defect: spec promoted,
+      // PRD stranded). Never overwrites an existing canonical draft. Runs even
+      // under the noPrd bypass — if a draft exists anyway, promoting it is
+      // strictly better than stranding it. A promotion failure is a state-door
+      // write failure and fails promotion loudly, same as a spec-write failure.
+      try {
+        const draftPromotion = await Effect.runPromise(
+          promoteWorkspacePrdDraft({ projectRoot: projectPath, workspacePath, issueId: id }),
+        );
+        if (draftPromotion.promoted) {
+          emitCompletePlanningPhase(id, 'prdPromote', 'success', `promoted ${draftPromotion.source} -> ${draftPromotion.path}`);
+        } else {
+          emitCompletePlanningPhase(id, 'prdPromote', 'skipped', draftPromotion.reason);
+        }
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : String(error);
+        emitCompletePlanningPhase(id, 'prdPromote', 'failure', reason);
+        return jsonResponse({ error: `PRD draft promotion failed for ${id.toUpperCase()}: ${reason}` }, { status: 500 });
       }
 
       const workspacePlanPath = await (async () =>

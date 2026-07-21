@@ -17,10 +17,12 @@ import { parseEntireConversation } from '../../services/conversation-service.js'
 import { parsePiConversationMessages } from '../../services/pi-conversation-parser.js';
 import { parseOhmypiConversationMessages } from '../../services/ohmypi-conversation-parser.js';
 import { parseCodexConversationMessages } from '../../services/codex-conversation-parser.js';
+import { parseAcpConversationMessages } from '../../services/acp-conversation-parser.js';
 import {
   readLauncherPinnedSessionId,
   resolvePiSessionPath,
   resolveCodexRolloutPath,
+  resolveAcpTranscriptPath,
   resolveAgentHarness,
 } from '../jsonl-resolver.js';
 import { jsonResponse } from '../../http-helpers.js';
@@ -133,6 +135,23 @@ export async function buildConversationResponse(id: string): Promise<Conversatio
       if (!sessionFile || !existsSync(sessionFile)) return EMPTY_CONVERSATION;
       const result = await parseCodexConversationMessages(sessionFile);
       return { ...result, streaming: false };
+    }
+
+    if (harness === 'acp') {
+      const sessionFile = await resolveAcpTranscriptPath(id);
+      if (!sessionFile || !existsSync(sessionFile)) return EMPTY_CONVERSATION;
+      const result = await parseAcpConversationMessages(sessionFile);
+      return {
+        ...result,
+        messages: result.messages.map((message) => message.role === 'assistant'
+          ? {
+              ...message,
+              completedAt: message.completedAt ?? message.createdAt,
+              streaming: false,
+            }
+          : message),
+        streaming: false,
+      };
     }
 
     // claude-code (default): try launcher-pinned session ID first (ground truth),

@@ -388,7 +388,7 @@ describe('FeatureItem', () => {
     expect(screen.getByText('Issue actions')).toBeInTheDocument();
     expect(screen.getByText('Queued for plan')).toBeInTheDocument();
     expect(screen.getByText('For this phase')).toBeInTheDocument();
-    for (const section of ['Planning', 'Work', 'Review & Test', 'Agent', 'Workspace', 'Artifacts', 'Navigation']) {
+    for (const section of ['Communicate', 'Lifecycle', 'Recover', 'Inspect', 'Navigate']) {
       expect(within(menu).getByText(section)).toBeInTheDocument();
     }
 
@@ -886,7 +886,7 @@ describe('FeatureItem', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Expand issue full screen' }));
     expect(issueView()).toHaveAttribute('data-density', 'cockpit');
-    expect(useDashboardStore.getState().drawer).toEqual({ issueId: 'PAN-821', tab: 'overview' });
+    expect(useDashboardStore.getState().drawer).toEqual({ issueId: 'PAN-821', tab: 'conversation' });
     expect(onSelect).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByTestId('chevron-down'));

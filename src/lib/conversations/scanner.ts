@@ -31,7 +31,7 @@ import { buildCorrelationMapSync, buildLocatorCorrelationMapSync, mergeCorrelati
 import { getModelCapabilitySync } from '../model-capabilities.js';
 import { resolveModelIdSync } from '../model-capabilities.js';
 import { discoverJsonlFiles, type DiscoveredFile } from './harness-discovery.js';
-import { parseCodexSessionMetadata, parsePiSessionMetadata } from './harness-metadata.js';
+import { parseAcpSessionMetadata, parseCodexSessionMetadata, parsePiSessionMetadata } from './harness-metadata.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -85,6 +85,9 @@ export async function scan(opts: ScanOptions): Promise<ScanResult> {
     if (file.harness === 'codex') {
       return parseCodexSessionMetadata(file.jsonlPath);
     }
+    if (file.harness === 'acp') {
+      return parseAcpSessionMetadata(file.jsonlPath);
+    }
     return parseJsonl(file.jsonlPath);
   };
   const resolveWorkspace = async (file: DiscoveredFile, cwdFromFirstMessage: string | null) => {
@@ -94,8 +97,8 @@ export async function scan(opts: ScanOptions): Promise<ScanResult> {
     if (cwdFromFirstMessage) {
       return { workspacePath: cwdFromFirstMessage, workspaceHash: null as string | null, warning: null as string | null };
     }
-    if (file.harness === 'codex') {
-      return { workspacePath: resolveCodexAgentWorkspace(file.jsonlPath), workspaceHash: null as string | null, warning: null as string | null };
+    if (file.harness === 'codex' || file.harness === 'acp') {
+      return { workspacePath: resolveAgentWorkspace(file.jsonlPath), workspaceHash: null as string | null, warning: null as string | null };
     }
     return { workspacePath: null as string | null, workspaceHash: null as string | null, warning: null as string | null };
   };
@@ -327,7 +330,7 @@ function combineCorrelation(
   return byLocator ? mergeCorrelation(fallback, byLocator) : fallback;
 }
 
-function resolveCodexAgentWorkspace(jsonlPath: string): string | null {
+function resolveAgentWorkspace(jsonlPath: string): string | null {
   const normalized = jsonlPath.replace(/\\/g, '/');
   const match = normalized.match(/\/\.overdeck\/agents\/([^/]+)\//);
   const agentId = match?.[1];

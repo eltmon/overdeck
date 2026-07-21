@@ -11,7 +11,8 @@ import { homedir } from 'os';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { Effect } from 'effect';
-import { GitError } from '../errors.js';
+import { resolveWorkspaceRepoRootsSync, type WorkspaceRepoRoot } from '../project-repos.js';
+import { snapshotWorkspaceHeadsPromise } from '../git-utils.js';
 
 const execAsync = promisify(exec);
 
@@ -94,86 +95,161 @@ export function saveCheckpoint(
   writeFileSync(getCheckpointPath(projectKey, issueId), JSON.stringify(data, null, 2));
 
   return checkpoint;
-}async function getDiffBasePromise(_projectKey: string, _issueId: string, workspacePath: string): Promise<string> {
-  try {
-    const { stdout } = await execAsync('git rev-parse HEAD^', {
-      cwd: workspacePath,
-      encoding: 'utf-8',
-    });
-    return stdout.trim();
-  } catch {
-    // Fallback to 'main' if the branch has no parent commit.
-    return 'main';
+}
+
+export interface InspectDiffRepo {
+  repoKey: string;
+  dir: string;
+  headSha: string;
+  diffBase: string;
+}
+
+export interface InspectDiffContext {
+  currentHead: string;
+  checkpoint: string;
+  diffStats: string;
+  diffCommand: string;
+  repos: InspectDiffRepo[];
+}
+
+function shellQuote(value: string): string {
+  return `'${value.replace(/'/g, `'"'"'`)}'`;
+}
+
+function parseCompositeSnapshot(snapshot: string | undefined): Map<string, string> {
+  const heads = new Map<string, string>();
+  if (!snapshot) return heads;
+  for (const token of snapshot.split(/\s+/)) {
+    const separator = token.lastIndexOf('@');
+    if (separator <= 0 || separator === token.length - 1) continue;
+    heads.set(token.slice(0, separator), token.slice(separator + 1));
   }
-}async function getDiffStatsPromise(workspacePath: string, diffBase: string): Promise<string> {
-  try {
-    const { stdout } = await execAsync(`git diff --stat ${diffBase}...HEAD`, {
-      cwd: workspacePath,
-      encoding: 'utf-8',
-    });
-    return stdout.trim() || 'No changes detected';
-  } catch {
-    return 'Unable to compute diff stats';
-  }
-}async function getCurrentHeadPromise(workspacePath: string): Promise<string> {
+  return heads;
+}
+
+async function readHead(root: WorkspaceRepoRoot): Promise<string | null> {
   try {
     const { stdout } = await execAsync('git rev-parse HEAD', {
-      cwd: workspacePath,
+      cwd: root.dir,
       encoding: 'utf-8',
+      timeout: 10_000,
     });
-    return stdout.trim();
+    return stdout.trim() || null;
   } catch {
-    return 'unknown';
+    return null;
   }
 }
 
-// ─── PAN-1249: additive Effect variants ───────────────────────────────────────
-
-/**
- * Effect-typed variant of {@link getDiffBase}. Always succeeds — falls back to
- * `'main'` if `git merge-base` fails, matching the Promise version's behavior.
- */
-export function getDiffBase(
-  _projectKey: string,
-  _issueId: string,
-  workspacePath: string,
-): Effect.Effect<string> {
-  return Effect.tryPromise({
-    try: () => execAsync('git rev-parse HEAD^', { cwd: workspacePath, encoding: 'utf-8' }),
-    catch: (cause) => new GitError({ command: ['git', 'rev-parse', 'HEAD^'], stderr: String(cause), exitCode: -1, cause }),
-  }).pipe(
-    Effect.map(({ stdout }) => stdout.trim()),
-    Effect.orElseSucceed(() => 'main'),
-  );
+async function resolveTargetBase(root: WorkspaceRepoRoot): Promise<string> {
+  for (const target of [`origin/${root.targetBranch}`, root.targetBranch]) {
+    try {
+      const { stdout } = await execAsync(`git merge-base ${shellQuote(target)} HEAD`, {
+        cwd: root.dir,
+        encoding: 'utf-8',
+        timeout: 10_000,
+      });
+      const base = stdout.trim();
+      if (base) return base;
+    } catch { /* try the next target */ }
+  }
+  try {
+    const { stdout } = await execAsync('git rev-parse HEAD^', {
+      cwd: root.dir,
+      encoding: 'utf-8',
+      timeout: 10_000,
+    });
+    return stdout.trim();
+  } catch {
+    return root.targetBranch;
+  }
 }
 
 /**
- * Effect-typed variant of {@link getDiffStats}. Always succeeds — returns a
- * human-readable fallback string when the diff command fails.
+ * Resolve the per-item inspection diff across the actual workspace repositories.
+ * Polyrepo checkpoints store composite `repo@sha` snapshots so unchanged repos
+ * are omitted instead of reviewing their previous, unrelated commit.
  */
-export function getDiffStats(
+async function getInspectDiffContextPromise(
+  projectKey: string,
+  issueId: string,
   workspacePath: string,
-  diffBase: string,
-): Effect.Effect<string> {
-  return Effect.tryPromise({
-    try: () => execAsync(`git diff --stat ${diffBase}...HEAD`, { cwd: workspacePath, encoding: 'utf-8' }),
-    catch: (cause) => new GitError({ command: ['git', 'diff', '--stat', `${diffBase}...HEAD`], stderr: String(cause), exitCode: -1, cause }),
-  }).pipe(
-    Effect.map(({ stdout }) => stdout.trim() || 'No changes detected'),
-    Effect.orElseSucceed(() => 'Unable to compute diff stats'),
-  );
+): Promise<InspectDiffContext> {
+  const roots = resolveWorkspaceRepoRootsSync(issueId, workspacePath);
+  const isPolyrepo = roots.some(root => root.isPolyrepo);
+  const previousHeads = isPolyrepo
+    ? parseCompositeSnapshot(getLastCheckpoint(projectKey, issueId)?.commitSha)
+    : new Map<string, string>();
+  const repos: InspectDiffRepo[] = [];
+
+  for (const root of roots) {
+    const headSha = await readHead(root);
+    if (!headSha) continue;
+
+    let diffBase: string;
+    if (isPolyrepo) {
+      const previousHead = previousHeads.get(root.repoKey);
+      if (previousHead === headSha) continue;
+      diffBase = previousHead ?? await resolveTargetBase(root);
+      if (diffBase === headSha) continue;
+    } else {
+      try {
+        const { stdout } = await execAsync('git rev-parse HEAD^', {
+          cwd: root.dir,
+          encoding: 'utf-8',
+          timeout: 10_000,
+        });
+        diffBase = stdout.trim();
+      } catch {
+        diffBase = root.targetBranch;
+      }
+    }
+
+    repos.push({ repoKey: root.repoKey, dir: root.dir, headSha, diffBase });
+  }
+
+  const statSections: string[] = [];
+  const commands: string[] = [];
+  for (const repo of repos) {
+    let stat = 'Unable to compute diff stats';
+    try {
+      const { stdout } = await execAsync(`git diff --stat ${shellQuote(repo.diffBase)}...HEAD`, {
+        cwd: repo.dir,
+        encoding: 'utf-8',
+        timeout: 15_000,
+      });
+      stat = stdout.trim() || 'No changes detected';
+    } catch { /* retain the human-readable fallback */ }
+
+    statSections.push(isPolyrepo ? `── ${repo.repoKey} ──\n${stat}` : stat);
+    commands.push(
+      `${isPolyrepo ? `printf '\\n── ${repo.repoKey} ──\\n'\n` : ''}` +
+      `git -C ${shellQuote(repo.dir)} diff ${shellQuote(repo.diffBase)}...HEAD`,
+    );
+  }
+
+  const currentHead = await snapshotWorkspaceHeadsPromise(issueId, workspacePath) ?? 'unknown';
+  return {
+    currentHead,
+    checkpoint: repos.length > 0
+      ? repos.map(repo => isPolyrepo ? `${repo.repoKey}@${repo.diffBase.slice(0, 8)}` : repo.diffBase).join(' ')
+      : currentHead,
+    diffStats: statSections.join('\n') || 'No changes detected across workspace repositories',
+    diffCommand: commands.join('\n') || `printf '%s\\n' 'No changes detected across workspace repositories'`,
+    repos,
+  };
 }
 
-/**
- * Effect-typed variant of {@link getCurrentHead}. Always succeeds — returns
- * `'unknown'` on failure to preserve the Promise version's contract.
- */
-export function getCurrentHead(workspacePath: string): Effect.Effect<string> {
-  return Effect.tryPromise({
-    try: () => execAsync('git rev-parse HEAD', { cwd: workspacePath, encoding: 'utf-8' }),
-    catch: (cause) => new GitError({ command: ['git', 'rev-parse', 'HEAD'], stderr: String(cause), exitCode: -1, cause }),
-  }).pipe(
-    Effect.map(({ stdout }) => stdout.trim()),
-    Effect.orElseSucceed(() => 'unknown'),
+export function getInspectDiffContext(
+  projectKey: string,
+  issueId: string,
+  workspacePath: string,
+): Effect.Effect<InspectDiffContext> {
+  return Effect.promise(() => getInspectDiffContextPromise(projectKey, issueId, workspacePath));
+}
+
+/** Resolve the code HEAD(s), never the polyrepo wrapper commit. */
+export function getCurrentHead(issueId: string, workspacePath: string): Effect.Effect<string> {
+  return Effect.promise(async () =>
+    await snapshotWorkspaceHeadsPromise(issueId, workspacePath) ?? 'unknown'
   );
 }

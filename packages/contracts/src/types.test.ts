@@ -1,10 +1,16 @@
 import { describe, expect, it } from "vitest"
 import { Schema } from "effect"
-import { ReleaseStatusValue, ReviewStatusSnapshot } from "./types"
+import { getHarness, ReleaseStatusValue, ReviewStatusSnapshot } from "./types"
 
 const decodeReleaseStatus = Schema.decodeUnknownSync(ReleaseStatusValue)
 const decodeReviewStatus = Schema.decodeUnknownSync(ReviewStatusSnapshot)
 const encodeReviewStatus = Schema.encodeSync(ReviewStatusSnapshot)
+
+describe("getHarness", () => {
+  it("preserves the canonical ACP runtime literal", () => {
+    expect(getHarness({ runtime: "acp" })).toBe("acp")
+  })
+})
 
 describe("ReleaseStatusValue", () => {
   it("accepts the allowed release status literals", () => {

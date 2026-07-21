@@ -151,6 +151,22 @@ describe('automatic state migration coordinator', () => {
     expect(deps.ensureWorktree).not.toHaveBeenCalled();
   });
 
+  it('surfaces the migration inspection failure instead of claiming the local worktree resolved legacy', async () => {
+    const deps = dependencies({
+      ensureWorktree: vi.fn(async () => ({
+        status: 'legacy',
+        path: '/tmp/state',
+        detail: 'The remote overdeck-state marker check failed transiently and no valid cached or local marker was available.',
+      })),
+    });
+
+    await expect(ensureAutomaticStateMigration('fixture-transient', project, deps)).resolves.toEqual({
+      status: 'blocked',
+      projectKey: 'fixture-transient',
+      reason: 'The remote overdeck-state marker check failed transiently and no valid cached or local marker was available.',
+    });
+  });
+
   it('blocks a polyrepo container root that is not a git repository with a clear reason (PAN-2676)', async () => {
     const polyrepoProject = { name: 'Auricle', path: '/tmp/auricle', workspace: { type: 'polyrepo' as const } };
     const deps = dependencies({

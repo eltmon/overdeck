@@ -5919,3 +5919,166 @@ Remaining in flight: PAN-2710 strike (nudged at 83m idle), 7 work agents + 1491,
 - **PAN-2377: review PASSED (cycle 2), tests running** — next UAT candidate when green.
 - **PAN-2858 still wedged 45+ min** — poke backstop provably absent (evidence appended to PAN-2899).
 - Headline: prsMerged=2, closedOut=2 this run.
+
+## Ticks 6-8 — 2026-07-19 ~03:30-04:10 — ★ PAN-2859 Kimi K3 LANDED (353247e0, PR #2904); PAN-2377 ready → UAT batch assembled; PAN-2907 filed
+- **PAN-2859 landed**: reviewed 18-file diff (on-spec: providers/capabilities/cost/bracket-safe model-validation/provider-env dual export/docs/tests), ran independent gates (typecheck+lint green; 9914/9915 tests — one ENOTEMPTY tmpdir flake in deacon-swarm-doneness verified passing in isolation), PR #2904 all checks green, squash-merged. K3 (`k3`, `k3[1m]`) now selectable on claude-code kimi provider.
+- **`pan done --strike` squash-refusal now FILED as PAN-2907** (was an unfiled tick-32 note): ancestry check can never pass the prescribed gh-API squash-merge; fix = forge-PR-merged evidence or git cherry.
+- **PAN-2377 review+test PASSED → UAT batch re-assembled** (uat/pan-vale-0719, base 353247e0, single member PR #2894) — operator promotes.
+- **Deploy gate friction observed**: with 7 strikes cycling, "verification in flight" defers agent-issued reloads repeatedly (2829 earlier, 2902 now) — K3+b6ea(PAN-2896) deploy pending behind it; retry loop armed. If this recurs across runs, consider a deploy-gate refinement (queue deploy for gate-clear instead of refuse) — fold into PAN-2901's item 3 or file separately.
+- **Strike states**: 2895 PR #2903 (operator's, landing recovery), 2902 PR #2906 (pushed, verifying), 2897 pushed (1 ahead, rebase-loop), 2898 pushed (2 ahead), 2899/2900 implementing. PAN-2858 still wedged (2899 pending); MIN-880 still clobber-hidden (2898 pending).
+
+## Ticks 9-10 — 2026-07-19 ~04:15-04:30 — ★ PAN-2859 + PAN-2902 CLOSED OUT (both live); run tally: 4 merged, 4 closed
+- **PAN-2859 (Kimi K3) closed out** after CI green — merged (353247e0), deployed, live, closed with structural strike accepts (review/tests/verification/post-merge rows don't exist for pipeline-bypass strikes; recorded explicitly).
+- **PAN-2902 (migration-race) merged via PR #2906 auto-squash, deployed (dd2b8678 live), CI green, closed out.** Fix verified on review: bounded tip re-resolution validating the NEWER fetched tip, cache/local-marker fallback on remote errors, distinguishable 'legacy' detail. MYN false-legacy spawn blocks should stop; watch MIN-880/MYN spawns to confirm.
+- **Landing pattern that worked**: review diff → `gh pr merge --squash` (or --auto) → deploy via `pan reload` retry-loop (verification-gate defers are routine with a busy strike fleet) → `gh run watch` CI → `pan close --force` with structural strike accepts. `pan done --strike` remains broken for squash landings (PAN-2907).
+- Remaining strikes: 2895 (operator's, PR #2903 landing recovery), 2897 (pushed, no PR yet), 2898 (pushed, no PR), 2899/2900 (implementing). UAT: PAN-2377 batch assembled, awaiting operator promote.
+
+## Tick 11-12 — 2026-07-19 ~04:30-04:40 — ★ PAN-2897 landed+deployed+closed: PATROL AUTO-DEPLOY RESTORED
+- **PAN-2897 (reload bun ENOENT) merged (#2909), deployed (5eca930361 live), CI green, closed out.** Fix reviewed: PATH scan with X_OK checks + ~/.bun/bin/bun fallback + loud error; tests included. From here the deploy patrol self-ships merges — I stop manual reloads unless the patrol demonstrably fails (watch restart-status.json initiator/trigger for the first patrol-initiated success as positive evidence).
+- **Run tally: 5 merged (2890, 2829, 2859, 2902, 2897), 5 closed out.** Remaining: 2899 (4 commits pushed), 2898 (2 pushed), 2900 (implementing), 2895 (operator's #2903), PAN-2377 UAT promote pending, PAN-2900/PAN-2901/PAN-2907 fixes queued behind current fleet.
+
+## Ticks 13-16 — 2026-07-19 ~04:50-05:30 — ★ PAN-2898 + PAN-2900 landed+closed; MIN-880 SELF-HEALED (operator complaint resolved)
+- **PAN-2900 (DoD deploy row → buildCommit ancestry) merged #2910, deployed, closed.** Close-out gates now prove "shipped" by commit identity, not timestamps — the operator's twice-raised complaint is mechanically fixed.
+- **PAN-2898 (placeholder clobber) merged #2911, deployed (303a0a4108), closed.** Guard + rollback + self-heal reconciler. **VERIFIED LIVE: agent-min-880 state.json self-healed from pending-work-spawn/starting → gpt-5.6-sol/running with the session intact** — the dashboard Start-button-on-live-agent bug is closed end-to-end.
+- **Patrol auto-deploy still lags** its 4-5-min observation windows (2 misses since the 2897 fix went live; manual fallback used). Before declaring it still-broken: check deploy-patrol cadence/interval — a 10-min patrol would explain both misses. Next tick: read its interval + look for its first successful self-deploy in restart-status.json.
+- **Run tally: 7 merged (2890 2829 2859 2902 2897 2900 2898), 7 closed out, all deployed+live.** Remaining: 2899 (pushed 4 commits, NO PR yet — check for submit stall), 2895 (operator's #2903), PAN-2377 UAT promote pending, PAN-2901 fix unstarted, PAN-2907 unstarted.
+
+## Ticks 17-18 — 2026-07-19 ~05:45-06:00 — PAN-2899 closed (8/8); patrol-debounce root-caused → PAN-2913; strikes 2901/2907 spawned
+- **PAN-2899 merged (#2912 — PR created by ME: agent turn ended pre-submit, branch was pushed; brief sanctions orchestrator gh pr create), deployed (11c1b3761d), closed.** Compact-continuation invariant now live: orchestrator /compact registers a continuation the deacon patrol delivers. Forward-looking only — agent-pan-2858 (pre-fix wedge) still needs one operator nudge; surfaced in suggestions.
+- **Patrol auto-deploy "misses" ROOT-CAUSED → PAN-2913 (not the 2897 bug):** debounce keys on ANY main commit (staleness.ts:130 `git log -1 %ct`); my own FLYWHEEL-STATE pushes every 10-20 min perpetually reset it during active runs. Fix = debounce on last BUILD-INPUT commit. Until it lands, manual deploy after each merge remains MY job during runs (patrol works fine when the flywheel is quiet).
+- **Strikes spawned: PAN-2901** (verification false-fail on merged issues) + **PAN-2907** (pan done --strike squash refusal). Fleet: 2901, 2907, 2895 (operator's #2903 still open).
+- **Run tally: 8 merged, 8 closed out** (2890 2829 2859 2902 2897 2900 2898 2899), all deployed+live, MIN-880 self-heal verified.
+
+## Ticks 20-21 — 2026-07-19 ~06:30-06:45 — ★ PAN-2901 + PAN-2907 landed; 2913 strike spawned; 9 merged / 9 closed (+1 pending)
+- **PAN-2901 merged (#2914), deployed (373703bc), closed.** Verification runner now skips merged issues (`skipped` + reason at every entry point, post-sync re-checks) and the deploy-window releases when the issue merges mid-run — the two biggest sources of this run's close-out/deploy friction are gone.
+- **PAN-2907 merged (#2915), deploy done; close chained on the newer CI run.** `pan done --strike` now accepts squash-merged strikes via forge merge evidence. NOTE: the 2907 agent stranded a local rebase (non-fast-forward push refused, correctly). Resolution: unnecessary — the PR from the pushed tip was MERGEABLE; squash-merge landed it. Lesson: a stale strike branch does NOT need a re-push if its PR is mergeable — squash rebases content implicitly.
+- **PAN-2913 strike spawned** (patrol debounce → build-input commits).
+- **Cohort approaching drain**: after 2913 + 2907-close, remaining = PAN-2377 (UAT promote, operator), PAN-2858 (needs one nudge, operator), 2895 (operator's strike #2903). All three are operator-gated — quiescence per role doctrine once 2913 lands.
+
+# RUN-66 RETROSPECTIVE — 2026-07-19 02:21Z → ~07:15Z (~5h, 23 ticks)
+
+## Shipped (11 issues merged + deployed + closed; main GREEN throughout except 0 red incidents)
+- **PAN-2890** agent-pills drill-down + **PAN-2829** (features, via 2 operator UAT promotes of uat/pan-vale-0719)
+- **PAN-2859** Kimi K3 (`k3`/`k3[1m]`) on claude-code kimi provider — operator-requested mid-run, landed same run
+- **PAN-2897** pan reload bun ENOENT (auto-deploy path un-broken)
+- **PAN-2898** placeholder clobbers live agent state (MIN-880 Start-button bug; self-heal VERIFIED live)
+- **PAN-2899** orchestrated /compact continuation (silent stall class)
+- **PAN-2900** DoD deploy row → buildCommit ancestry (operator-demanded "closed before shipped" fix)
+- **PAN-2901** verification runner skips merged issues + deploy-window release
+- **PAN-2902** state-migration tip-move race (MYN spawn blocks)
+- **PAN-2907** pan done --strike squash acceptance
+- **PAN-2913** patrol debounce → build-input commits
+Substrate bugs filed: 2897 2898 2899 2900 2901 2902 2907 2913 (8; ALL fixed and landed same run). Plus 3 occurrences appended to operator's PAN-2895.
+
+## Mechanisms that carried the run
+1. Land loop: review diff → squash-merge → gh run watch → deploy (manual, PAN-2913 debounce) → pan close --force + structural strike accepts.
+2. Orchestrator opens the PR when a strike agent's turn ends pre-submit (2899, 2907, sanctioned by brief) — and a stale strike branch needs NO re-push if its PR is MERGEABLE (squash rebases content implicitly; 2907 rebase-strand resolved this way).
+3. Positive-evidence discipline before overriding gates (live vitest pid before believing "verification in flight"; 3x ls-remote before calling the migration marker valid).
+
+## Standing lessons
+- `pan reload` needs PATH="$HOME/.bun/bin:$PATH" in ALL non-interactive shells (until server env carries it).
+- Watch cwd drift in long-lived shells: two mistakes this run (state commit from strike ws; reload refused from non-primary) — both caught by guards.
+- Close-out DoD gate + deployment gate blocked incorrect orderings 5+ times this run and were RIGHT each time — trust them, satisfy rows honestly, use accepts only for structural strike rows or artifacts citing a filed issue.
+- UAT/merge-queue reads the emitted verbs (PAN-1736): emit shipping verbs BEFORE assemble-uat.
+
+## Handover state (operator-gated remainder)
+- PAN-2377: review+test passed, UAT batch uat/pan-vale-0719 assembled → operator promotes.
+- PAN-2858: wedged pre-2899-fix; ONE operator message (or stop/start) re-drives it.
+- PAN-2895: operator's strike, PR #2903 open.
+- MIN-852: needs interactive `claude mcp login linear`.
+- Backlog: ~20 planned_backlog PAN items awaiting release (auto_pickup OFF); TIN-1; lens-gather config gaps (lexerra GitHub App 404, krux missing issue_prefix) — unfiled, low priority.
+
+## Ticks 27-29 — 2026-07-19 ~08:25-09:10 — PAN-2731 landed+closed (12/12); patrol FIRED but crashed mid-deploy (~20-min outage) → PAN-2918 filed+struck
+- **PAN-2731 (codex liveness fields) merged (#2917), live, closed.** Fix: codex agents get NO synthetic lastActivity stamp and NO costSoFar:0 init — absence reads as unknown, not ghost. POSITIVE-EVIDENCE VERIFICATION STILL PENDING: needs a live codex agent showing advancing fields; check on the next codex spawn.
+- **PAN-2913 debounce fix CONFIRMED — the patrol fired autonomously** (marker `trigger: deacon, reason: auto-deploy` at 08:43)… **and then its detached reload (pid 3549157) died after killing the old server, before starting the new one → :3011 DOWN ~20 min.** Nothing supervised the child; the watchdog didn't recover; and `pan reload` recovery was REFUSED by a stale restart lock still citing the dead pid. Recovered via `pan reload --force` (fe28cdc99f live). Filed **PAN-2918** (2 legs: patrol must health-verify after its reload child exits; restart lock must liveness-check its holder pid) + spawned strike. Lesson: the deploy gate's refusal is only as good as its premise — when the cited pid is dead and nothing serves :3011, --force is the correct move, not gate-worship.
+- Tally: **12 merged / 12 closed**. Active: strike-pan-2918. Operator-gated: PAN-2377 promote, PAN-2858 nudge, 2895 #2903.
+
+## Ticks 30-32 — 2026-07-19 ~09:40-10:00 — ★ PAN-2918 landed+deployed (post-verified): DEPLOY LOOP FULLY SELF-HEALING
+- **PAN-2918 merged (#2920), deployed (2365ac7058, post-deploy health verified ok), close chained on CI.** Both legs live: patrol auto-deploy now runs under `systemd-run --user` with Restart=on-failure + captured logs (a dead reload can't silently strand a killed server), and the restart lock liveness-checks its holder (dead pid → race-safe stale-break).
+- **The deploy loop is now end-to-end self-healing**: patrol fires on real staleness (PAN-2913), its reload survives crashes (PAN-2918), refusals can't wedge on dead locks (PAN-2918), and close-out proves shipped-ness by buildCommit ancestry (PAN-2900). Manual-deployer duty ENDS — next merge should ship itself; observe one full autonomous cycle before fully trusting.
+- Tally: **13 merged / 13 closed** (12 + 2918 pending its CI-green close). Operator-gated remainder unchanged: PAN-2377 promote, PAN-2858 nudge, 2895 #2903, MIN-852 OAuth.
+
+## Ticks 44-45 — 2026-07-19 ~13:05-13:25 — ★★ CAPSTONE: FIRST FULLY-AUTONOMOUS PATROL DEPLOY VERIFIED
+- **be7b881677 (issue-rail responsiveness fix, pushed by a conversation) was deployed by the patrol with ZERO orchestrator involvement** — merged ~13:05, patrol deployed 13:10 (5-min build-input debounce working as designed post-PAN-2913), supervised reload survived (PAN-2918), server healthy on the new build. The deploy loop is verified self-healing end-to-end in production.
+- Two refinements filed as **PAN-2924**: (1) initiator misattributed as flywheel-orchestrator (patrol child inherits server env — stamp deploy-patrol explicitly); (2) patrol deploys before the tip's CI concludes (deployed while CI in_progress — decide gate-on-CI vs documented fast-deploy trade-off).
+- Manual-deployer duty formally ENDS this run. Remaining watch unchanged: PAN-2377 promote, PAN-2858 nudge, 2895 #2903, MIN-852 OAuth.
+
+## Ticks 48-53 — 2026-07-19 ~14:15-15:35 — RED-MAIN INCIDENT (~75 min): layered breaks, convergence with a live conversation
+- **Timeline:** 1522726084 (census refactor) broke the build (missing parseProcessTable export) → ALL CI jobs red; conversation kept pushing unrelated commits over red main; first strike fix un-MASKED two more legs (stale type-ratchet baseline 67→66; state-plane-docs allowlist vs the xBRIEF docs rename); patrol (no CI gate) DEPLOYED a red build at 15:15 (latent runtime error — appended as concrete evidence to PAN-2924); finally the conversation landed its own fixes (bba806daa5 export + 67542218 doc cleanup) and main went green. My strike PRs #2926/#2928 closed as superseded; PAN-2925/2927 closed.
+- **LESSONS:**
+  1. **Layered red-main:** the first fix un-masks the next failure — expect the arbiter loop (fix → PR CI → new failure → extend fix) rather than one-shot repair. Recipe issues (PAN-2927 style: exact commands, all legs, 'PR CI is the arbiter, skip full local suite') are the right form.
+  2. **Racing a live conversation on red main is wasteful:** they own the breaking series and land fixes with less friction (direct push, no PR gates). Better protocol next time: file the diagnosis issue IMMEDIATELY (they see it), spawn the strike as INSURANCE, but expect to stand down. First-landing-wins was the right frame; my strike lost the race and that's fine — total red window still bounded.
+  3. **Strike agents deadlock on 'need green main to verify red-main fix'** (2925) and over-run full local suites against explicit recipe advice (2927, 25+ min). Orchestrator publishing the agent's committed work + PR CI as arbiter breaks both — used twice successfully.
+  4. **Patrol ships red tips** (PAN-2924 leg 2 now has live evidence — deployed 67542218 while red). CI gate on the patrol is now priority.
+- Standing watch unchanged: PAN-2377 promote, PAN-2858 nudge, 2895 #2903, MIN-852.
+
+## Ticks 55-59 — 2026-07-19 ~15:45-16:30 — 2nd red-main (30-min turnaround); operator perf series deployed 3x on request
+- **2nd red-main today:** 82a6da7a13 (poller rework: retired-bot search → Flywheel-Filed-By trailer) broke the substrate-smoke integration fixture (still mocked the old author: query → poller projected null). Protocol from incident 1 executed cleanly: diagnose→file (PAN-2929)→insurance strike→publish agent's 2-line fixture fix (PR #2930)→merged, ~30 min red window. Green-verify + 2929 close chained on run 24bf3426 (which combines the operator's bc1027ba6a perf series + the fixture fix).
+- **Operator perf-stabilization series deployed on direct request 3x:** 3031bf2bec → 82a6da7a13 → bc1027ba6a (live). Series highlights: SubstrateBugPoller 422-storm killed (also cleans pan flywheel weights), /api/resources pre-serialized 3s snapshot (was 90ms rebuild+tmux per request per client), lifecycle refreshes reuse membership snapshot (durable lenses only at boot + 5-min convergence).
+- **strike-pan-2924** (patrol CI gate + initiator attribution): implemented +210/-24, long verify phase — land next tick.
+
+## Ticks 60-63 — 2026-07-19 ~16:35-17:05 — ★ PAN-2924 landed (deploy loop COMPLETE); headless-boot outage → PAN-2931; 2nd red-main closed out
+- **PAN-2924 merged (#2933), deployed (d3d26c6ca9, post-verified), close chained on CI.** The patrol now: fires on real build-input staleness (2913), runs its reload supervised (2918), deploys ONLY green tips via gh CI-state resolution (2924), and stamps OVERDECK_AGENT_ID=deploy-patrol for honest attribution (2924). With the DoD ancestry gate (2900), the deploy loop is functionally complete.
+- **Remaining known gap → PAN-2931 (filed after a live 15-min headless outage):** a reload-spawned server whose :3011 bind fails keeps running deacon/services with no HTTP; health-gate expiry doesn't reap it. Recovery was `pan restart --force` (stale dead-pid lock also bit again pre-2918-deploy... no — the 2918 lock fix applies to the lock; this was the failed-boot process left alive). STRIKE NEXT SLOT.
+- **PAN-2929 closed out** (2nd red-main; the PAN-2900 ancestry gate correctly held its close until the test-only merge was actually serving — sealed exactly the operator's 'closed before shipped' complaint).
+- Run substrate tally: **13 issues fully landed+closed by the flywheel** (2859 2890 2829 2897 2898 2899 2900 2901 2902 2907 2913 2929 + 2924 pending CI-close), 2 red-mains resolved (one by insurance-standdown, one by 30-min strike), 3 operator-directed deploys, 12 substrate bugs filed of which 10 fixed same-run.
+
+## Ticks 64-69 — 2026-07-19 ~17:10-18:00 — ★ PAN-2931 landed: DEPLOY LOOP FULLY HARDENED; operator perf campaign deployed to convergence
+- **PAN-2931 merged (#2934), deployed (b6d0d4f6e1, post-verified), close chained on CI.** Bind is now load-bearing (EADDRINUSE retry ×3 then fatal — no more headless servers) and the restart flow holds a spawn handle to reap unhealthy children on health-timeout.
+- **DEPLOY LOOP FULLY HARDENED — five fixes, all landed this run:** ancestry-proof close gate (2900), build-input debounce (2913), supervised patrol reload (2918), CI-gated + honestly-attributed patrol deploys (2924), fatal-bind + health-gate reap (2931). Every leg has live-incident provenance from today.
+- **Operator perf campaign deployed on request through 6 builds** (3031bf2bec → 82a6da7a13 → bc1027ba6a → 58167db37d → 43fd5348ec → 6bde0f299f → 4c6fa36aa8): SubstrateBugPoller 422 storm, /api/resources snapshotting, membership-lens reuse, convergence git-metadata caching, merged-PR oracle scoping, health-route census dedup. Each verified live post-deploy.
+- **Run tally: 14 substrate/feature issues landed+closed by the flywheel** + 2 red-mains resolved + stale PR hygiene (#2926 closed). Operator-gated remainder unchanged: PAN-2377 promote, PAN-2858 nudge, 2895 #2903, MIN-852 OAuth.
+
+## Ticks 80-82 — 2026-07-19 ~21:00-21:30 — RED-MAIN #3 (25-min turnaround); direct-push pattern filed
+- **Red-main #3:** caf515da3d (#2908 one-action-model) failed lint:source-introspection (stale baseline). Protocol run: diagnose→file (PAN-2938)→insurance strike→publish its 1-line baseline fix (PR #2939)→merged; green-verify + close chained on the fix's own run (LESSON: grab the run id AFTER the merge lands — the chain watched the pre-merge red run once and false-reported STILL RED).
+- **Pattern filed as PAN-2940-ish (see actual id in issues):** 3 red-mains today, all direct-push series bypassing PR CI, all mechanically preventable — options for operator: pre-push lint/typecheck doctrine, PR+auto-merge for series, or ratchet-guard pre-push leg.
+
+## Ticks 94-99 — 2026-07-20 ~00:30-01:50 — RED-MAIN #4 (1-line fix, no-loss gate vindicated); PAN-2888 residue confirmed again
+- **Red-main #4:** 0dfc7eae24 (#2908 drawer refactor) renamed a data-section (SpecialistStrip→DrawerReviewSpecialists) without updating the issue-view no-loss inventory — the audit gate failed main EXACTLY as designed (the no-actions-lost discipline working). 1-line alignment (PR #2944) landed during a GitHub Actions API outage (503s ~1h) using the commits/check-runs API instead of the runs API. PAN-2940 pattern: 4 same-day occurrences, all #2908-adjacent direct pushes.
+- **CI-polling lesson:** a check-runs green-poll must require a NON-EMPTY completed set (total > threshold) — zero-registered-checks reads as green and false-passed once; the close gate caught it.
+- **PAN-2833/2869 'failed verification' flags = PAN-2888 residue again** (CLOSED issues, stale rows) — appended occurrence; the metric read 5 with 0 actionable.
+- 2943 close chained (test-green → deploy → close). Tally heading to 16 landed+closed.
+
+## Ticks 115-117 — 2026-07-20 ~06:05-06:35 — RED-MAIN #5 (25-min turnaround, 1-line)
+- **Red-main #5:** overnight #2908 slices changed resetSession to take the review agent id; review-reset.test.ts still expected the bare issue id. Strike reproduced+fixed in ~10 min; published (PR #2953), merged (ea8c3a0541). PAN-2940 pattern: 5 occurrences — every red-main this run traces to direct-push series skipping PR CI. Close of PAN-2951 chained on merge-commit CI + deploy.
+
+## Tick 125 — 2026-07-20 ~09:55 — ★ PAN-2956 (polyrepo inspect git-show) LANDED + EMPIRICALLY VERIFIED; MIN-882 infra failure resolved
+- **PAN-2956 merged (c5d4a4e8f9 / #2958), deployed (live 09:52:59), closed.** PAN-2948 made the anchor producer polyrepo-aware (git-utils composite `fe@sha api@sha`) but left three `git show <sha>` consumers (tier-supervisor getCommitDiff:407, tier-feed:78, tier-replay:400) passing the composite as one ref → ENAMETOOLONG → inspect specialist gets no diff → 12m timeout, no verdict. Fix: `renderWorkspaceGitShowPromise` splits the composite, runs `git show` per sub-repo, concatenates under `── repoKey ──` headers; falls back rather than crashing on an unparseable ref.
+- **EMPIRICAL PROOF (not string-grep): re-ran `pan inspect MIN-882 --item metering-cost-door` on the fixed live code — supervisor received the full polyrepo diff (read the real sub-commits: AdminVoiceConfig.tsx, voice-eligibility endpoint), NO ENAMETOOLONG, and produced a verdict (inspect_status=failed).** Operator's prior 15m-timeout runs predated the 09:52:59 deploy (old code).
+- **NUANCE for operator:** verdict is FAILED — a genuine content finding (committed diff = voice-settings/admin-voice-config, doesn't match the metering-cost-door bead's ACs), NOT an infra failure. MIN-882 metering-cost-door is now verdict-able; the blocking verdict is real work to resolve.
+- LESSON: verify a "spawn/infra failure produced no verdict" fix by re-running the real spawn on real data and observing a verdict land — a deployed-chunk string grep is necessary but not sufficient (I chased the timestamp/chunk ambiguity; the end-to-end re-run was the decisive proof).
+
+## Tick 126 — 2026-07-20 ~10:45 — MIN-882 metering-cost-door UNBLOCKED via operator-approved disposition; 2 more inspect bugs filed
+- **Stale supervisor recovered:** agent-min-882-review-supervisor lingered 38m past its 12m limit after posting a verdict ("standing by for next commit delivery") — killed session + set state stopped (operator-authorized). Filed **PAN-2960** (supervisor doesn't self-terminate after verdict / doesn't enforce 12m).
+- **Spurious FAILED root-caused → PAN-2959:** `pan inspect --item metering-cost-door` reviewed workspace HEAD (03b29a8d, 4 voice commits later) instead of the item's actual commit e39404ef. Separate from the PAN-2956 git-show infra bug. Filed PAN-2959 (inspect must resolve the item's commit, not HEAD, esp. on retry-after-HEAD-moved).
+- **Operator-approved PASSED disposition applied (grounded, not bypass):** verified all 4 metering-cost-door ACs present in e39404ef (api): AC1 migration V252 (usage_detail_json JSONB, reported_cost_usd NUMERIC(10,6), generated total_cost_usd); AC2 COALESCE cost computation; AC3 @Column usage_detail_json jsonb; AC4 NUMERIC(10,6)/scale=6/ROUND_HALF_UP + 293-line repo test. inspect_status → passed. Work agent can proceed to gemini-adapter.
+- LESSON: an inspect "no verdict / spurious verdict" can stack THREE distinct bugs (git-show composite ENAMETOOLONG=2956, wrong-commit scoping=2959, supervisor-no-self-terminate=2960). Fixing one un-masks the next; verify each by re-running on real data and reading the actual diff the inspector received.
+
+## Ticks 127-130 — 2026-07-20 ~11:00-14:40 — MIN-882 COMPLETED (In Review); polyrepo completion path hardened (6 substrate bugs)
+- **MIN-882 `pan done` completed cleanly** — no rebase, no force-push, branches unchanged (api 12c23b48 / fe ed3456fa1), moved to In Review. Did NOT merge (require_uat_before_merge ON; iOS-device sample-rate UAT + running-app Playwright AC remain explicit outstanding operator checkpoints — not asserted passed).
+- **The MIN-882 saga surfaced 6 real polyrepo/inspect substrate bugs, all filed, 2 fixed+deployed this session:**
+  - PAN-2956 (git-show composite ENAMETOOLONG in inspect) — FIXED+deployed+verified.
+  - PAN-2959 (inspect reviews workspace HEAD not the item's commit → spurious verdict) — filed.
+  - PAN-2960 (inspect supervisor lingers past 12m, no self-terminate) — filed.
+  - PAN-2961 (pan done force-pushes even when up-to-date → breaks GitLab/no-history-rewrite completion; fix in rebase-helper.ts, NOT merge-rebase.ts) — FIXED+deployed+verified via live pan done.
+  - PAN-2966 (polyrepo wrapper .gitignore misses .pan/ .devcontainer/ dev → cleanliness gate false-fails) — filed; worked around via operator-approved `pan done --force` (scaffolding-only untracked, work clean+pushed).
+  - metering-cost-door PASSED via operator-approved disposition (all 4 ACs verified in e39404ef); gemini-adapter unblocked (stale scheduling block).
+- **Red-main #6 (5eb82f2d53, #2908 source-introspection unbaselined conformance-gates.test.ts) cleared** via PAN-2963 (baseline) before the completion chain could verify. #2908 external UX agent = 6 red-mains today, all mechanical gate catches (PAN-2940 pattern).
+- LESSON: the polyrepo (MYN) completion+inspect path was genuinely under-hardened vs single-repo GitHub. Each fix un-masked the next (git-show → wrong-commit → force-push → wrapper-gitignore). Verify each by running the real command (pan inspect / pan done) on the real workspace and reading what it actually did.
+
+## Tick 165 — 2026-07-21 ~01:10 — RED-MAIN #7 (honest no-loss re-home)
+- **Red-main #7:** e1c6734a70 (#2962 cockpit-on-ONE-IssueDetail) broke issue-view-no-loss.test.ts — the Pipeline Band cockpit section lost its data-section marker when the refactor consolidated it into IssueDetailShell. Strike-pan-2969 did the HONEST fix (verified via live dev server): re-homed the `data-section="Pipeline Band"` marker into IssueDetailShell + pointed the inventory at the new home — affordance PRESERVED, not deleted. Merged #2970 (251c846956). PAN-2940 pattern now 7 red-mains, all #2908/#2962 direct-push mechanical gate catches.
+- LESSON reinforced: the no-loss audit's value is exactly this — it forces refactors to re-home affordances (marker follows the section) rather than silently drop them. The correct strike fix restores/moves the marker, never just deletes the inventory row.
+
+## Tick 166 — 2026-07-21 ~01:20 — quiescent standing-watch; PAN-2969 close CI-gated
+- **PAN-2969 close is genuinely gated, not stalled:** merge 251c846956 has only `test` pending (0 failing); live buildCommit (4ef3c1670e, #2967) is 4 commits behind main and does NOT contain the fix. Since PAN-2969 is a frontend change, its DoD deploy row (PAN-2900 buildCommit-ancestry) requires a live build containing the merge. Plan: deploy on CI-green, then close normally — will NOT `--accept-deploy` a real user-facing change. Re-armed.
+- **Pipeline (require_uat_before_merge ON — flywheel never merges):** PAN-2377 (PR#2894 CLEAN, review-complete) + PAN-2858 (PR#2875 CLEAN, test-complete) are review-clean → UAT candidates awaiting operator, NOT stalls. PAN-2066 (PR#2942 UNSTABLE, PR CI unsettled). PAN-2895 strike (PR#2903 DIRTY — conflicts vs the fast-moving main #2908/#2962 series). All four agents idle-at-prompt in manual mode — correct quiescent posture, no nudge injected.
+- **MIN-882 In Review, operator-owned:** iOS-device sample-rate UAT + running-app Playwright ACs remain outstanding operator checkpoints. DO NOT MERGE; not asserted passed.
+- **Memory pressure noted:** swap fully consumed (8190/8191 MB), RAM 83% (53.5/64 GB), 10 active agents. No action unless the memory-governor wedges dispatch.
+- **#2908/#2962 UX agent still actively merging** (main advanced through 251c→a231→26e7 this tick). Red-main protocol armed; CI green so far.
+
+## Tick 167 — 2026-07-21 ~01:49 — PAN-2969 CLOSED; pipeline fully quiescent; sustained memory pressure
+- **PAN-2969 CLOSED (completes tick 166's gated close):** 251c846956 went fully green (8 checks), deployed via `pan reload` (live build 116fb87da9 contains the merge → DoD deploy row PASS on real ancestry, no --accept-deploy), 6/7 rows passed naturally; only verification was `missing` (strike pattern) → accepted grounded in row-6 (9 green check-runs on the merged commit). Issue #2969 closed, closed-out label applied. Also reaped 2 orphaned server.js (29h+10.7h, no port) — removed second-Deacon duel risk.
+- **PAN pipeline quiescent:** blocks-main EMPTY, 0 PAN in planning, main green at 116fb87da9 (== live build). PAN-2377 (PR#2894 CLEAN) + PAN-2858 (PR#2875 CLEAN) = UAT candidates awaiting operator (require_uat_before_merge ON — flywheel never merges). PAN-2066 (PR#2942 UNSTABLE). PAN-2895 strike (PR#2903 DIRTY, operator-owned — not nudged). MIN-882 In Review, operator-owned, DO NOT MERGE.
+- **Non-PAN note:** planning-lexerra-1 (LEXERRA-1) in error status ("Unknown error") — different project, not a PAN pipeline blocker; left for its own owner.
+- **Memory pressure sustained:** swap fully saturated (8191/8191 MB), RAM 84%, 10 active agents. Deliberately NOT spawning toward max20 (would deepen pressure); 10 >> min2. Memory-governor owns sheds; no dispatch wedge observed. Briefing's "20 troubled / 5 failed states" = gated-stopped + non-PAN agents, advisory not flow-blocking.

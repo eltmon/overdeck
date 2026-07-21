@@ -10,6 +10,7 @@ import { usePendingInputSubjects } from '../../lib/useDecisions';
 import { DecisionsPanel } from '../DecisionsPanel';
 import { describePendingInput } from '../../lib/pendingInput';
 import { useAskUserQuestionUiStore } from '../../lib/askUserQuestionUiStore';
+import { LoadingBoundary } from '../primitives/LoadingBoundary';
 
 // ActivityPanel.tsx is the raw activity log; CommandDeck/ActivityFeedSidebar.tsx is per-issue observations; this SessionFeedSidebar is the cross-session feed.
 export const SESSION_FEED_TAB_STORAGE_KEY = 'overdeck.ui.sessionFeedSidebarTab';
@@ -332,7 +333,7 @@ function FeedTabContent({ tab, onSelect, now, issueIds, unscoped }: { tab: Wired
   const isEmpty = tab === 'all' ? scopedAll.length === 0 : scopedEntries.length === 0;
 
   if (feed.error) return <p className="text-xs text-destructive">{feed.error.message}</p>;
-  if (feed.isLoading) return <p className="text-xs text-muted-foreground">Loading activity…</p>;
+  if (feed.isLoading) return <LoadingBoundary label="The activity feed" timeoutMs={8000}><p className="text-xs text-muted-foreground">Loading activity…</p></LoadingBoundary>;
   if (isEmpty) {
     return (
       <div data-testid={`session-feed-empty-${tab}`} className="rounded-lg border border-dashed border-border p-4 text-center text-xs text-muted-foreground">

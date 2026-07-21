@@ -13,6 +13,7 @@ const EXPECTED_EXPORTS = Object.freeze([
   'buildCavemanExports',
   'buildCompactRecoverySeed',
   'buildDefaultResumeContinueMessage',
+  'buildResumeContinueMessage',
   'buildSpawnEnvForModel',
   'clearAgentPaused',
   'clearAgentPausedSync',

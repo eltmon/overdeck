@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const readProcMemoryMock = vi.fn();
 const loadConfigSyncMock = vi.fn();
@@ -68,9 +68,23 @@ import {
   shed,
   type GovernorReserves,
 } from '../../../../src/lib/cloister/memory-governor.js';
-import { getResourceStacks, type ResourceStack, type StackContainerResource } from '../../../../src/dashboard/server/routes/resources/stacks.js';
+import {
+  getResourceStacks,
+  resetResourceStackReviewStatusReaderForTests,
+  setResourceStackReviewStatusReaderForTests,
+  type ResourceStack,
+  type StackContainerResource,
+} from '../../../../src/dashboard/server/routes/resources/stacks.js';
 
 const GIB = 1024 ** 3;
+
+beforeEach(() => {
+  setResourceStackReviewStatusReaderForTests(() => null);
+});
+
+afterEach(() => {
+  resetResourceStackReviewStatusReaderForTests();
+});
 
 describe('classifyMemoryPressure', () => {
   const thresholds = { warningBytes: 4 * GIB, criticalBytes: 2 * GIB };

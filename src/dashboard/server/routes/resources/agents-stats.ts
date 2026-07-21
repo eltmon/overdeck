@@ -1,14 +1,9 @@
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
-
 import { Effect } from 'effect';
 
 import { listAgentStates, type AgentState } from '../../../../lib/agents.js';
 import type { CostEvent } from '../../../../lib/costs/events.js';
 import { queryCostEventsSync } from '../../../../lib/overdeck/cost-sync.js';
-import { listPaneValues, listSessions } from '../../../../lib/tmux.js';
-
-const execFileAsync = promisify(execFile);
+import { getRuntimeCensus, panePidsForSession } from '../../../../lib/runtime-census.js';
 const BURN_WINDOW_MS = 30 * 60 * 1000;
 
 export interface AgentProcessRecord {
@@ -182,6 +177,7 @@ export function getAgentStatsSnapshotEffect(
   });
 }
 
+/** Compatibility parser retained for route consumers and focused tests. */
 export function parseProcessTable(psTable: string): AgentProcessRecord[] {
   return psTable
     .split('\n')
@@ -200,24 +196,21 @@ export function parseProcessTable(psTable: string): AgentProcessRecord[] {
 }
 
 async function readBatchedProcessTable(): Promise<AgentProcessRecord[]> {
-  const { stdout } = await execFileAsync('ps', ['-eo', 'pid=,ppid=,pcpu=,rss='], {
-    encoding: 'utf8',
-  });
-  return parseProcessTable(stdout);
+  const census = await getRuntimeCensus();
+  return [...census.processesByPid.values()].map((process) => ({
+    pid: process.pid,
+    ppid: process.ppid,
+    cpuPercent: process.cpuPercent,
+    rssBytes: process.rssBytes,
+  }));
 }
 
 function defaultListSessionNames(): Effect.Effect<readonly string[], unknown, never> {
-  return listSessions().pipe(
-    Effect.map((sessions) => sessions.map((session) => session.name)),
-  );
+  return Effect.promise(async () => [...(await getRuntimeCensus()).sessionNames]);
 }
 
 function defaultListPanePids(sessionName: string): Effect.Effect<readonly number[], unknown, never> {
-  return listPaneValues(sessionName, '#{pane_pid}').pipe(
-    Effect.map((values) => values
-      .map((value) => Number(value.trim()))
-      .filter((value) => Number.isFinite(value) && value > 0)),
-  );
+  return Effect.promise(async () => panePidsForSession(await getRuntimeCensus(), sessionName));
 }
 
 function buildProcessTotalsByRoot(

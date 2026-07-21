@@ -19,7 +19,6 @@ import { createReadStream, existsSync } from 'fs';
 import { createInterface } from 'readline';
 import { homedir } from 'os';
 import { join } from 'path';
-import { Effect } from 'effect';
 import {
   createConversation,
   getConversationByClaudeSessionId,
@@ -30,7 +29,12 @@ import {
   setClearedToConvId,
   type LegacyConversation as Conversation,
 } from '../../../lib/overdeck/conversations.js';
-import { listSessionNames, isHarnessProcessAlive, listPaneValues } from '../../../lib/tmux.js';
+import {
+  getRuntimeCensus,
+  refreshRuntimeCensus,
+  runtimeCensusHasHarnessProcess,
+  type RuntimeCensus,
+} from '../../../lib/runtime-census.js';
 import { isRespawnPending } from './pending-respawn.js';
 import { encodeClaudeProjectDir, sessionFilePath, getOverdeckHome } from '../../../lib/paths.js';
 import { getHarnessBehavior } from '../../../lib/runtimes/behavior.js';
@@ -89,13 +93,12 @@ async function tailFile(path: string, maxBytes: number): Promise<string> {
  * a "; "-prefixed suffix for the log line, or "" when nothing is available.
  * Every probe is independently guarded so a diagnostics failure never throws.
  */
-async function captureCorpseDiagnostics(tmuxSession: string): Promise<string> {
+async function captureCorpseDiagnostics(tmuxSession: string, census: RuntimeCensus): Promise<string> {
   const parts: string[] = [];
-  try {
-    const values = await Effect.runPromise(listPaneValues(tmuxSession, '#{pane_dead_status}'));
-    const status = values.find((v) => v.trim() !== '')?.trim();
-    if (status) parts.push(`exitStatus=${status}`);
-  } catch { /* tmux best-effort */ }
+  const status = (census.panesBySession.get(tmuxSession) ?? [])
+    .map((pane) => pane.paneDeadStatus)
+    .find((value) => value !== null);
+  if (status !== undefined) parts.push(`exitStatus=${status}`);
   try {
     const logPath = join(getOverdeckHome(), 'agents', tmuxSession, 'output.log');
     if (existsSync(logPath)) {
@@ -133,7 +136,10 @@ export async function pollConversations(): Promise<void> {
     const conversations = listConversations();
     if (conversations.length === 0) return;
 
-    const aliveSessions = new Set(await Effect.runPromise(listSessionNames()));
+    const census = await getRuntimeCensus();
+    if (!census.available) return;
+    const aliveSessions = new Set(census.sessionNames);
+    let revalidationCensus: RuntimeCensus | null = null;
 
     const endedConversations: typeof conversations = [];
     let sessionGoneCount = 0;
@@ -145,13 +151,14 @@ export async function pollConversations(): Promise<void> {
       // Grace protects a just-spawned conversation: its pane may still be the
       // launcher shell before the harness process takes the foreground.
       if (ageMs < SPAWN_GRACE_PERIOD_MS) continue;
-      const sessionGone = !aliveSessions.has(conv.tmuxSession);
+      let sessionGone = !aliveSessions.has(conv.tmuxSession);
       // Session exists but the harness process has exited — only the launcher
       // keep-alive loop (`while true; do sleep 60; done`) is left. tmux still
       // reports the session, so the gone-check misses it. Mark ended so the
       // dashboard stops showing a dead conversation as active and resume
       // respawns it. PAN-1638.
-      const harnessGone = !sessionGone && !(await isHarnessProcessAlive(conv.tmuxSession));
+      let harnessGone = !sessionGone
+        && !(await runtimeCensusHasHarnessProcess(census, conv.tmuxSession));
       if (!sessionGone && !harnessGone) {
         // PAN-1972: the poller used to be one-directional — it only ever marked
         // conversations 'ended'. A transient blip (a dashboard restart that
@@ -184,6 +191,14 @@ export async function pollConversations(): Promise<void> {
         fresh.lastAttachedAt ? new Date(fresh.lastAttachedAt).getTime() || 0 : 0,
       );
       if (Date.now() - lastAliveSignalMs < SPAWN_GRACE_PERIOD_MS) continue;
+
+      revalidationCensus ??= await refreshRuntimeCensus();
+      if (!revalidationCensus.available) continue;
+      sessionGone = !revalidationCensus.sessionNames.has(conv.tmuxSession);
+      harnessGone = !sessionGone
+        && !(await runtimeCensusHasHarnessProcess(revalidationCensus, conv.tmuxSession));
+      if (!sessionGone && !harnessGone) continue;
+
       if (process.env.DEBUG?.includes('conversation-lifecycle')) {
         console.log(
           sessionGone
@@ -196,7 +211,7 @@ export async function pollConversations(): Promise<void> {
         // while tmux kept the (now dead) pane. Capture the death evidence — pane
         // exit status + output.log tail — instead of the old reasonless line, so
         // an ENOSPC/uncaught-exception death is diagnosable from this log alone.
-        const diag = await captureCorpseDiagnostics(conv.tmuxSession);
+        const diag = await captureCorpseDiagnostics(conv.tmuxSession, revalidationCensus);
         if (diag) keepAliveCorpseDiagnostics.push(`${conv.tmuxSession}${diag}`);
       }
       markConversationEnded(conv.name);
