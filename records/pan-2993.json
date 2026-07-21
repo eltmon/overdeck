@@ -101,27 +101,34 @@
     "recordedAt": "2026-07-21T23:54:05.124Z"
   },
   "created": "2026-07-21T22:47:36.935Z",
-  "updated": "2026-07-21T23:54:05.125Z",
+  "updated": "2026-07-21T23:54:05.970Z",
   "pipeline": {
     "issueId": "PAN-2993",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-21T23:53:41.681Z",
+    "updatedAt": "2026-07-21T23:54:05.969Z",
     "reviewNotes": "Review dispatch skipped — already running: agent-pan-2993-review",
     "inspectNotes": "All 4 ACs verified against src/lib/agents/messaging.ts@79bb7b47: stopped-agent resume failure returns {delivered:false,queuedToMail:true,reason} naming both resumeResult.error and PAN-1980 session-rotation disable; paused/gated path returns gate reason; live-session/successful-resume paths return delivered:true; only deacon-strike-landing.ts touched among callers and npm run typecheck passes clean (0 new errors).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2998",
     "lastVerifiedCommit": "cd0f24e6995175255d7bce8327e8e000801f3589",
-    "reviewRequestedAt": "2026-07-21T23:35:38.985Z",
+    "reviewRequestedAt": "2026-07-21T23:54:05.969Z",
     "reviewSpawnedAt": "2026-07-21T23:53:41.680Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
+        "drizzle/overdeck/0000_overdeck_init.sql",
         "src/cli/commands/__tests__/strike-ready.test.ts",
-        "src/lib/workspace/stack-health.ts"
+        "src/dashboard/server/routes/workspaces/merge-strike.ts",
+        "src/lib/overdeck/__tests__/schema-topups.test.ts",
+        "src/lib/overdeck/infra.ts",
+        "src/lib/overdeck/review-status-sync.ts",
+        "src/lib/workspace/stack-health.ts",
+        "tests/unit/dashboard/server/routes/strike-merge.test.ts",
+        "tests/unit/lib/overdeck/review-status-sync.test.ts"
       ],
       "declaredScopeUntouched": [],
       "declaredScope": [
@@ -139,20 +146,27 @@
       ],
       "actualChangedFiles": [
         "docs/SPECIALIST_WORKFLOW.md",
+        "drizzle/overdeck/0000_overdeck_init.sql",
         "src/cli/commands/__tests__/strike-ready.test.ts",
         "src/cli/commands/strike-ready.ts",
+        "src/dashboard/server/routes/workspaces/merge-strike.ts",
         "src/lib/agents/messaging.ts",
         "src/lib/cloister/deacon-strike-landing.ts",
+        "src/lib/overdeck/__tests__/schema-topups.test.ts",
+        "src/lib/overdeck/infra.ts",
         "src/lib/overdeck/review-status-record-sync.ts",
+        "src/lib/overdeck/review-status-sync.ts",
         "src/lib/pan-dir/records.ts",
         "src/lib/strike-landing.ts",
         "src/lib/workspace/stack-health.ts",
         "tests/lib/cloister/deacon-strike-landing.test.ts",
         "tests/unit/cli/commands/strike-ready.test.ts",
+        "tests/unit/dashboard/server/routes/strike-merge.test.ts",
         "tests/unit/lib/agents/message-agent.test.ts",
-        "tests/unit/lib/cloister/deacon-strike-transport.test.ts"
+        "tests/unit/lib/cloister/deacon-strike-transport.test.ts",
+        "tests/unit/lib/overdeck/review-status-sync.test.ts"
       ],
-      "recordedAt": "2026-07-21T23:35:33.248Z"
+      "recordedAt": "2026-07-21T23:54:05.124Z"
     }
   },
   "closeOut": {
