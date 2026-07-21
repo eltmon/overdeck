@@ -67,23 +67,24 @@
     "recordedAt": "2026-07-21T23:35:33.248Z"
   },
   "created": "2026-07-21T22:47:36.935Z",
-  "updated": "2026-07-21T23:35:39.316Z",
+  "updated": "2026-07-21T23:35:41.161Z",
   "pipeline": {
     "issueId": "PAN-2993",
     "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-21T23:35:34.718Z",
+    "panDoneRecoveredAt": "2026-07-21T23:35:38.985Z",
+    "updatedAt": "2026-07-21T23:35:40.682Z",
     "reviewNotes": "Verification failed at lint",
     "verificationNotes": "Verification FAILED at lint (14286ms):\n\n\n> @overdeck/core@0.45.23 lint\n> eslint src/ --ext .js,.ts,.tsx --no-inline-config && npm run lint:effect && npm run lint:permissions && npm run lint:state-writes && npm run lint:overdeck-boundaries && npm run lint:pipeline-membership && npm run lint:skills && npm run lint:prompts && npm run lint:prompt-trailer && npm run lint:file-size && npm run lint:source-introspection && npm run lint:no-coderabbit-merge-gate && npm run lint:circular && npm run lint:ratchet-audit && npm run lint:quarantine-audit\n\n\n/home/eltmon/Projects/overdeck/workspaces/feature-pan-2993/src/lib/workspace/stack-health.ts\n  52:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any\n\n✖ 1 problem (1 error, 0 warnings)\n\n",
     "inspectNotes": "All 4 ACs verified against src/lib/agents/messaging.ts@79bb7b47: stopped-agent resume failure returns {delivered:false,queuedToMail:true,reason} naming both resumeResult.error and PAN-1980 session-rotation disable; paused/gated path returns gate reason; live-session/successful-resume paths return delivered:true; only deacon-strike-landing.ts touched among callers and npm run typecheck passes clean (0 new errors).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2998",
     "reviewRequestedAt": "2026-07-21T23:35:38.985Z",
-    "reviewSpawnedAt": "2026-07-21T23:35:34.717Z",
+    "reviewSpawnedAt": "2026-07-21T23:35:40.681Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "src/cli/commands/__tests__/strike-ready.test.ts",
@@ -119,8 +120,7 @@
         "tests/unit/lib/cloister/deacon-strike-transport.test.ts"
       ],
       "recordedAt": "2026-07-21T23:35:33.248Z"
-    },
-    "panDoneRecoveredAt": "2026-07-21T23:35:38.985Z"
+    }
   },
   "closeOut": {
     "usage": {
@@ -151,9 +151,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 1721662,
-            "output": 100662,
-            "cacheRead": 51590656,
+            "input": 1728769,
+            "output": 101603,
+            "cacheRead": 52709376,
             "cacheWrite": 0
           }
         }
@@ -166,9 +166,9 @@
           "cacheWrite": 311785
         },
         "openai/gpt-5.6-sol": {
-          "input": 2435280,
-          "output": 148036,
-          "cacheRead": 61997568,
+          "input": 2442387,
+          "output": 148977,
+          "cacheRead": 63116288,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -179,8 +179,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 58.730043,
-        "pricingAsOf": "2026-07-21T23:35:34.731Z"
+        "usd": 59.353168,
+        "pricingAsOf": "2026-07-21T23:35:40.798Z"
       }
     },
     "merges": [
