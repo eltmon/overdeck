@@ -90,7 +90,7 @@
   ],
   "feedback": [],
   "created": "2026-07-21T16:29:59.439Z",
-  "updated": "2026-07-21T17:48:14.459Z",
+  "updated": "2026-07-21T17:48:16.218Z",
   "pipeline": {
     "issueId": "PAN-806",
     "reviewStatus": "pending",
@@ -101,7 +101,8 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-21T17:44:12.340Z",
-    "updatedAt": "2026-07-21T17:48:14.444Z",
+    "updatedAt": "2026-07-21T17:48:15.154Z",
+    "reviewNotes": "Review dispatch skipped — already running: agent-pan-806-review",
     "inspectNotes": "rebase-helper.ts:101,200 add OVERDECK_PAN_GIT_OP:'1' alongside GIT_EDITOR:'true' on git rebase and git rebase --continue; abort/merge-fallback also sentineled. New tests/unit/lib/rebase-helper.test.ts (3 tests) assert coexistence via objectContaining; ran locally, all pass.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2986",
     "lastVerifiedCommit": "1e8633b850b2f01817acf6cabd59e738fce11e5e",
@@ -181,7 +182,7 @@
       },
       "costAtCloseOut": {
         "usd": 105.000903,
-        "pricingAsOf": "2026-07-21T17:48:14.450Z"
+        "pricingAsOf": "2026-07-21T17:48:15.166Z"
       }
     },
     "merges": [
