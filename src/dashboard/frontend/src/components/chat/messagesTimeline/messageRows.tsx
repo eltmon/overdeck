@@ -146,7 +146,7 @@ export function AssistantMessageRow({
     <div className={styles.assistantMessageRow}>
       <Bot size={14} className={styles.assistantMessageAvatar} aria-hidden="true" />
       <div className={styles.assistantMessageContent}>
-        <ChatMarkdown text={message.text} isStreaming={isStreaming && !message.completedAt} cwd={cwd} issueId={issueId} />
+        <TurnBody text={message.text} streaming={isStreaming && !message.completedAt} cwd={cwd} issueId={issueId} />
         {turnDiffSummary && turnDiffSummary.files.length > 0 && (
           <div className="mt-2 rounded-md border border-border/50 bg-muted/30 p-2">
             <div className="flex items-center justify-between mb-1.5">
@@ -197,6 +197,83 @@ export function AssistantMessageRow({
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+/* ── PAN-2908 C-VERB (#2967): digest-first turns with a per-turn line budget,
+ *  and structured verdict cards for completion/verdict messages. Wordy by
+ *  default, digest by design — every turn leads with its verdict sentence;
+ *  bodies longer than the budget collapse behind "▸ N more lines". */
+
+/** Rendered-line budget beyond the digest line. */
+export const TURN_LINE_BUDGET = 6;
+
+function nonEmptyLines(text: string): string[] {
+  return text.split('\n').filter((line) => line.trim().length > 0);
+}
+
+type VerdictTone = 'pass' | 'fail' | 'info';
+
+function detectVerdict(line: string): { tone: VerdictTone } | null {
+  if (/\b(all checks passed|review passed|tests? (all )?passed|work (is )?complete|fully green|ready to merge|merged successfully)\b/i.test(line)) return { tone: 'pass' };
+  if (/\b(checks? (are )?failing|review failed|tests? (are )?failing|tests? failed|changes requested|blocked)\b/i.test(line)) return { tone: 'fail' };
+  if (/^(✓|✔|✅)/.test(line.trim())) return { tone: 'pass' };
+  if (/^(✗|❌)/.test(line.trim())) return { tone: 'fail' };
+  return null;
+}
+
+const VERDICT_CARD_CLASS: Record<VerdictTone, string> = {
+  pass: 'border-success/40 bg-success/10',
+  fail: 'border-destructive/40 bg-destructive/10',
+  info: 'border-info/40 bg-info/10',
+};
+const VERDICT_GLYPH: Record<VerdictTone, string> = { pass: '✓', fail: '✗', info: 'ℹ' };
+
+/**
+ * The assistant turn body: digest line (or verdict card) + the rest under a
+ * per-turn line budget. Expansion is per-turn (local state) and never resets
+ * scroll — the timeline's virtualizer re-measures the row in place.
+ */
+export function TurnBody({ text, streaming, cwd, issueId }: { text: string; streaming: boolean; cwd?: string; issueId?: string | null }) {
+  const [expanded, setExpanded] = useState(false);
+
+  if (streaming) {
+    // Streaming turns never collapse — the digest is still forming.
+    return <ChatMarkdown text={text} isStreaming cwd={cwd} issueId={issueId} />;
+  }
+
+  const lines = nonEmptyLines(text);
+  const digest = lines[0] ?? '';
+  const rest = lines.slice(1).join('\n');
+  const overBudget = lines.length - 1 > TURN_LINE_BUDGET;
+  const verdict = detectVerdict(digest);
+
+  return (
+    <div>
+      {verdict ? (
+        <div
+          data-testid="turn-verdict-card"
+          data-tone={verdict.tone}
+          className={`mb-1.5 flex items-center gap-2 rounded-md border px-3 py-2 ${VERDICT_CARD_CLASS[verdict.tone]}`}
+        >
+          <span className="font-semibold">{VERDICT_GLYPH[verdict.tone]}</span>
+          <span className="font-medium"><ChatMarkdown text={digest} cwd={cwd} issueId={issueId} /></span>
+        </div>
+      ) : (
+        digest && <ChatMarkdown text={digest} cwd={cwd} issueId={issueId} />
+      )}
+      {rest && (expanded || !overBudget) && <ChatMarkdown text={rest} cwd={cwd} issueId={issueId} />}
+      {overBudget && (
+        <button
+          type="button"
+          data-testid="turn-budget-toggle"
+          className="mt-1 text-[11px] text-muted-foreground hover:text-foreground"
+          onClick={() => setExpanded((v) => !v)}
+        >
+          {expanded ? '▾ show less' : `▸ ${lines.length - 1} more lines`}
+        </button>
+      )}
     </div>
   );
 }
