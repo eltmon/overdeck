@@ -1,14 +1,12 @@
 /**
- * PAN-2908 · C-VERB §3.9 gate — the wordy-transcript contract.
- *
- * A synthetic wordy transcript (10-paragraph turns, >6 tool rows) proves:
- * no turn renders beyond its line budget, command groups collapse, verdict
- * messages become structured cards, and per-turn expansion never remounts
- * the row (scroll anchor holds — the virtualizer re-measures in place).
+ * PAN-2908 · C-VERB §3.9 gate — the wordy-transcript contract AS AMENDED by
+ * the operator (2026-07-20): turns render in FULL (the per-turn line-budget
+ * collapse was shipped then rejected), completion messages become structured
+ * verdict cards, and the pre-existing work-log group collapse stays.
  */
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { TurnBody, TURN_LINE_BUDGET } from './messageRows';
+import { TurnBody } from './messageRows';
 import { WorkLogGroup } from './workLogRows';
 import type { WorkLogEntry } from '../chat-types';
 
@@ -22,37 +20,18 @@ function paragraphs(n: number, prefix = 'Paragraph'): string {
   return Array.from({ length: n }, (_, i) => `${prefix} ${i + 1} — the agent explains at length.`).join('\n\n');
 }
 
-describe('C-VERB gate: per-turn line budget', () => {
-  it('collapses a 10-paragraph turn to digest + toggle, expands per-turn', () => {
+describe('C-VERB gate: turns render in full (collapse rejected by operator)', () => {
+  it('renders a 10-paragraph turn completely, with no budget toggle', () => {
     render(<TurnBody text={paragraphs(10)} streaming={false} />);
-
-    // Digest leads; the rest is collapsed behind the budget toggle.
     expect(screen.getByText(/Paragraph 1 —/)).toBeInTheDocument();
-    expect(screen.queryByText(/Paragraph 5 —/)).not.toBeInTheDocument();
-    const toggle = screen.getByTestId('turn-budget-toggle');
-    expect(toggle).toHaveTextContent(`▸ ${TURN_LINE_BUDGET + 3} more lines`);
-
-    // Per-turn expansion reveals the body (never remounts the row).
-    const row = toggle.parentElement;
-    fireEvent.click(toggle);
-    expect(screen.getByText(/Paragraph 5 —/)).toBeInTheDocument();
-    expect(screen.getByTestId('turn-budget-toggle')).toHaveTextContent('▾ show less');
-    expect(screen.getByTestId('turn-budget-toggle').parentElement).toBe(row);
-
-    // …and collapses again.
-    fireEvent.click(screen.getByTestId('turn-budget-toggle'));
-    expect(screen.queryByText(/Paragraph 5 —/)).not.toBeInTheDocument();
-  });
-
-  it('renders short turns in full with no toggle', () => {
-    render(<TurnBody text={paragraphs(3)} streaming={false} />);
-    expect(screen.getByText(/Paragraph 3 —/)).toBeInTheDocument();
+    expect(screen.getByText(/Paragraph 10 —/)).toBeInTheDocument();
     expect(screen.queryByTestId('turn-budget-toggle')).not.toBeInTheDocument();
   });
 
-  it('never collapses a streaming turn, however long', () => {
-    render(<TurnBody text={paragraphs(12)} streaming />);
-    expect(screen.getByText(/Paragraph 12 —/)).toBeInTheDocument();
+  it('renders the full body after a verdict card too', () => {
+    render(<TurnBody text={'ALL CHECKS PASSED for PAN-2377.\n\n' + paragraphs(8, 'Detail')} streaming={false} />);
+    expect(screen.getByTestId('turn-verdict-card')).toBeInTheDocument();
+    expect(screen.getByText(/Detail 8 —/)).toBeInTheDocument();
     expect(screen.queryByTestId('turn-budget-toggle')).not.toBeInTheDocument();
   });
 });
@@ -89,7 +68,7 @@ describe('C-VERB gate: verdict extraction', () => {
   });
 });
 
-describe('C-VERB gate: command groups collapse', () => {
+describe('C-VERB gate: command groups collapse (pre-existing)', () => {
   function entries(n: number): WorkLogEntry[] {
     return Array.from({ length: n }, (_, i) => ({
       id: `e-${i}`,

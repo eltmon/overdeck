@@ -201,16 +201,13 @@ export function AssistantMessageRow({
   );
 }
 
-/* ── PAN-2908 C-VERB (#2967): digest-first turns with a per-turn line budget,
- *  and structured verdict cards for completion/verdict messages. Wordy by
- *  default, digest by design — every turn leads with its verdict sentence;
- *  bodies longer than the budget collapse behind "▸ N more lines". */
+/* ── PAN-2908 C-VERB (#2967): structured verdict cards for completion/verdict
+ *  messages. The per-turn line-budget collapse shipped and was REJECTED by
+ *  the operator (2026-07-20: "let's not do this after all") — turns render in
+ *  full; only the verdict card remains from the contract's item 1. */
 
-/** Rendered-line budget beyond the digest line. */
-export const TURN_LINE_BUDGET = 6;
-
-function nonEmptyLines(text: string): string[] {
-  return text.split('\n').filter((line) => line.trim().length > 0);
+function firstNonEmptyLine(text: string): string {
+  return text.split('\n').find((line) => line.trim().length > 0) ?? '';
 }
 
 type VerdictTone = 'pass' | 'fail' | 'info';
@@ -231,49 +228,33 @@ const VERDICT_CARD_CLASS: Record<VerdictTone, string> = {
 const VERDICT_GLYPH: Record<VerdictTone, string> = { pass: '✓', fail: '✗', info: 'ℹ' };
 
 /**
- * The assistant turn body: digest line (or verdict card) + the rest under a
- * per-turn line budget. Expansion is per-turn (local state) and never resets
- * scroll — the timeline's virtualizer re-measures the row in place.
+ * The assistant turn body: the full turn (no collapsing), with a structured
+ * verdict card in place of the plain first line when the turn is a
+ * completion/verdict message.
  */
 export function TurnBody({ text, streaming, cwd, issueId }: { text: string; streaming: boolean; cwd?: string; issueId?: string | null }) {
-  const [expanded, setExpanded] = useState(false);
-
   if (streaming) {
-    // Streaming turns never collapse — the digest is still forming.
     return <ChatMarkdown text={text} isStreaming cwd={cwd} issueId={issueId} />;
   }
 
-  const lines = nonEmptyLines(text);
-  const digest = lines[0] ?? '';
-  const rest = lines.slice(1).join('\n');
-  const overBudget = lines.length - 1 > TURN_LINE_BUDGET;
+  const digest = firstNonEmptyLine(text);
   const verdict = detectVerdict(digest);
+  if (!verdict) {
+    return <ChatMarkdown text={text} cwd={cwd} issueId={issueId} />;
+  }
 
+  const rest = text.slice(text.indexOf(digest) + digest.length).replace(/^\n+/, '');
   return (
     <div>
-      {verdict ? (
-        <div
-          data-testid="turn-verdict-card"
-          data-tone={verdict.tone}
-          className={`mb-1.5 flex items-center gap-2 rounded-md border px-3 py-2 ${VERDICT_CARD_CLASS[verdict.tone]}`}
-        >
-          <span className="font-semibold">{VERDICT_GLYPH[verdict.tone]}</span>
-          <span className="font-medium"><ChatMarkdown text={digest} cwd={cwd} issueId={issueId} /></span>
-        </div>
-      ) : (
-        digest && <ChatMarkdown text={digest} cwd={cwd} issueId={issueId} />
-      )}
-      {rest && (expanded || !overBudget) && <ChatMarkdown text={rest} cwd={cwd} issueId={issueId} />}
-      {overBudget && (
-        <button
-          type="button"
-          data-testid="turn-budget-toggle"
-          className="mt-1 text-[11px] text-muted-foreground hover:text-foreground"
-          onClick={() => setExpanded((v) => !v)}
-        >
-          {expanded ? '▾ show less' : `▸ ${lines.length - 1} more lines`}
-        </button>
-      )}
+      <div
+        data-testid="turn-verdict-card"
+        data-tone={verdict.tone}
+        className={`mb-1.5 flex items-center gap-2 rounded-md border px-3 py-2 ${VERDICT_CARD_CLASS[verdict.tone]}`}
+      >
+        <span className="font-semibold">{VERDICT_GLYPH[verdict.tone]}</span>
+        <span className="font-medium"><ChatMarkdown text={digest} cwd={cwd} issueId={issueId} /></span>
+      </div>
+      {rest && <ChatMarkdown text={rest} cwd={cwd} issueId={issueId} />}
     </div>
   );
 }
