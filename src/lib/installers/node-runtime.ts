@@ -1,9 +1,10 @@
-import { readdir } from 'node:fs/promises';
+import { chmod, mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import { homedir as osHomedir } from 'node:os';
 import { dirname, join } from 'node:path';
 
 const MINIMUM_NODE_MAJOR = 24;
 const OPEN_KNOWLEDGE_NODE_ENV = 'OVERDECK_OPEN_KNOWLEDGE_NODE';
+const OVERDECK_SHIM_MARKER = 'overdeck-managed shim';
 
 export type NodeVersionManager = 'nvm' | 'fnm' | 'volta' | 'mise' | 'asdf';
 export type NodeRuntimeSource = 'override' | NodeVersionManager;
@@ -30,6 +31,14 @@ export interface ResolveNode24RuntimeOptions {
   listDir?: NodeRuntimeListDir;
   runCommand: NodeRuntimeCommandRunner;
 }
+
+export interface WriteOkShimOptions {
+  nodePath: string;
+  entryScript: string;
+  shimPath?: string;
+}
+
+export type OkShimOwnership = 'overdeck' | 'foreign' | 'absent';
 
 interface ParsedVersion {
   major: number;
@@ -132,6 +141,39 @@ export async function resolveNode24Runtime(
   return { kind: 'runtime', nodePath: selected.nodePath, source: selected.manager };
 }
 
+export async function readShimOwnership(shimPath: string): Promise<OkShimOwnership> {
+  try {
+    const content = await readFile(shimPath, 'utf8');
+    return content.includes(OVERDECK_SHIM_MARKER) ? 'overdeck' : 'foreign';
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return 'absent';
+    throw error;
+  }
+}
+
+export async function writeOkShim(options: WriteOkShimOptions): Promise<string> {
+  const shimPath = options.shimPath ?? join(osHomedir(), '.local', 'bin', 'ok');
+  const ownership = await readShimOwnership(shimPath);
+  if (ownership === 'foreign') {
+    throw new Error(
+      `Refusing to overwrite ${shimPath} because it is not an Overdeck-managed shim. Delete or fix that file, then retry.`,
+    );
+  }
+
+  const content = [
+    '#!/bin/sh',
+    '# overdeck-managed shim (PAN-2984): pins open-knowledge to a Node 24 runtime.',
+    '# Regenerate with `pan knowledge open`; safe to delete.',
+    `exec "${escapeDoubleQuotedShell(options.nodePath)}" "${escapeDoubleQuotedShell(options.entryScript)}" "$@"`,
+    '',
+  ].join('\n');
+
+  await mkdir(dirname(shimPath), { recursive: true });
+  await writeFile(shimPath, content, { mode: 0o755 });
+  await chmod(shimPath, 0o755);
+  return shimPath;
+}
+
 async function detectManagers(
   env: NodeJS.ProcessEnv,
   home: string,
@@ -221,6 +263,10 @@ function compareVersions(left: ParsedVersion, right: ParsedVersion): number {
 
 function unique(values: string[]): string[] {
   return [...new Set(values)];
+}
+
+function escapeDoubleQuotedShell(value: string): string {
+  return value.replace(/[\\"$`]/g, '\\$&');
 }
 
 function errorMessage(error: unknown): string {

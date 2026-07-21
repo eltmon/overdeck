@@ -1,7 +1,11 @@
+import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+  readShimOwnership,
   resolveNode24Runtime,
+  writeOkShim,
   type NodeRuntimeCommandResult,
   type NodeRuntimeListDir,
   type NodeVersionManager,
@@ -9,6 +13,17 @@ import {
 
 const home = '/home/tester';
 const success = (stdout: string): NodeRuntimeCommandResult => ({ stdout, stderr: '' });
+const tempDirectories: string[] = [];
+
+afterEach(async () => {
+  await Promise.all(tempDirectories.splice(0).map((directory) => rm(directory, { recursive: true, force: true })));
+});
+
+async function createTempDirectory(): Promise<string> {
+  const directory = await mkdtemp(join(tmpdir(), 'overdeck-node-runtime-'));
+  tempDirectories.push(directory);
+  return directory;
+}
 
 function fakeListDir(tree: Record<string, readonly string[]>): NodeRuntimeListDir {
   return vi.fn(async (directory: string) => {
@@ -172,5 +187,70 @@ describe('resolveNode24Runtime', () => {
     expect(result).toEqual({ kind: 'runtime', nodePath: selectedPath, source: 'nvm' });
     expect(runCommand).toHaveBeenCalledOnce();
     expect(runCommand).toHaveBeenCalledWith(selectedPath, ['--version']);
+  });
+});
+
+describe('OpenKnowledge shim', () => {
+  it('writes an executable managed shim with the pinned node and entry script', async () => {
+    const directory = await createTempDirectory();
+    const shimPath = join(directory, '.local', 'bin', 'ok');
+
+    const result = await writeOkShim({
+      nodePath: '/opt/node-v24/bin/node',
+      entryScript: '/opt/node-v24/lib/node_modules/@inkeep/open-knowledge/dist/cli.mjs',
+      shimPath,
+    });
+
+    const [content, fileStat] = await Promise.all([readFile(shimPath, 'utf8'), stat(shimPath)]);
+    expect(result).toBe(shimPath);
+    expect(content).toContain('# overdeck-managed shim (PAN-2984)');
+    expect(content).toContain(
+      'exec "/opt/node-v24/bin/node" "/opt/node-v24/lib/node_modules/@inkeep/open-knowledge/dist/cli.mjs" "$@"',
+    );
+    expect(fileStat.mode & 0o777).toBe(0o755);
+  });
+
+  it('refuses to overwrite a foreign file and preserves its bytes', async () => {
+    const directory = await createTempDirectory();
+    const shimPath = join(directory, 'ok');
+    const foreignContent = Buffer.from('#!/bin/sh\necho user-owned\n');
+    await writeFile(shimPath, foreignContent);
+
+    await expect(writeOkShim({
+      nodePath: '/opt/node-v24/bin/node',
+      entryScript: '/opt/open-knowledge/cli.mjs',
+      shimPath,
+    })).rejects.toThrow(shimPath);
+
+    expect(await readFile(shimPath)).toEqual(foreignContent);
+  });
+
+  it('rewrites an existing Overdeck-managed shim with new pinned paths', async () => {
+    const directory = await createTempDirectory();
+    const shimPath = join(directory, 'ok');
+    await writeFile(shimPath, '#!/bin/sh\n# overdeck-managed shim (PAN-2984)\nexec old old "$@"\n');
+
+    await writeOkShim({
+      nodePath: '/new/node-v24/bin/node',
+      entryScript: '/new/open-knowledge/cli.mjs',
+      shimPath,
+    });
+
+    const content = await readFile(shimPath, 'utf8');
+    expect(content).toContain('exec "/new/node-v24/bin/node" "/new/open-knowledge/cli.mjs" "$@"');
+    expect(content).not.toContain('exec old old');
+  });
+
+  it('classifies absent, managed, and foreign shim files', async () => {
+    const directory = await createTempDirectory();
+    const absentPath = join(directory, 'absent');
+    const managedPath = join(directory, 'managed');
+    const foreignPath = join(directory, 'foreign');
+    await writeFile(managedPath, '# overdeck-managed shim (PAN-2984)\n');
+    await writeFile(foreignPath, '#!/bin/sh\necho foreign\n');
+
+    await expect(readShimOwnership(absentPath)).resolves.toBe('absent');
+    await expect(readShimOwnership(managedPath)).resolves.toBe('overdeck');
+    await expect(readShimOwnership(foreignPath)).resolves.toBe('foreign');
   });
 });
