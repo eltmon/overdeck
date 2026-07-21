@@ -324,7 +324,7 @@
     "recordedAt": "2026-07-19T00:54:19.291Z"
   },
   "created": "2026-07-17T12:54:30.819Z",
-  "updated": "2026-07-21T13:49:00.452Z",
+  "updated": "2026-07-21T13:56:54.504Z",
   "pipeline": {
     "issueId": "PAN-2377",
     "reviewStatus": "reviewing",
@@ -334,7 +334,6 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "panDoneRecoveredAt": "2026-07-19T00:54:56.018Z",
     "updatedAt": "2026-07-21T13:48:58.904Z",
     "reviewNotes": "Review dispatch deferred: merge conflict with main must be resolved before review dispatch",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2894",
