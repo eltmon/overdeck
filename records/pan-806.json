@@ -86,11 +86,34 @@
       "timestamp": "2026-07-21T17:42:46.292Z",
       "reason": "end",
       "note": "No skipped work. Deviation: final-suite failures exposed and fixed a pre-existing config loader bug that ignored OVERDECK_HOME, causing 63 tests to read the operator's weighted model config. Hazard: the pre-rebase hook exits 1 as specified, while Git maps hook rejection to git-rebase exit 128; the command is still blocked with pan guidance. Delivered prompt controls, pan-owned rebase sentinel, executable pre-rebase guard, per-agent PATH wrapper, and stop cleanup. npm test, npm run lint, and npm run typecheck pass."
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-21T17:50Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-21T17:50:37.336Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-21T17:50:37.439Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-21T17:50:38.320Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-21T17:50:37Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-806\n\nExisting project pre-rebase hooks are skipped by the pan sentinel before their policy runs\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-806 -m \"Fixed review issues\"`"
+    }
+  ],
   "created": "2026-07-21T16:29:59.439Z",
-  "updated": "2026-07-21T17:50:36.719Z",
+  "updated": "2026-07-21T17:50:38.321Z",
   "pipeline": {
     "issueId": "PAN-806",
     "reviewStatus": "blocked",
