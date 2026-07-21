@@ -90,22 +90,22 @@
     "recordedAt": "2026-07-21T23:35:33.248Z"
   },
   "created": "2026-07-21T22:47:36.935Z",
-  "updated": "2026-07-21T23:40:31.862Z",
+  "updated": "2026-07-21T23:41:11.097Z",
   "pipeline": {
     "issueId": "PAN-2993",
     "reviewStatus": "blocked",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-21T23:35:38.985Z",
-    "updatedAt": "2026-07-21T23:40:30.919Z",
+    "updatedAt": "2026-07-21T23:41:11.085Z",
     "reviewNotes": "Transport backoff state is not persisted for patrol reloads, and an ambiguous lost response can overwrite a successful landed state with ready.",
-    "verificationNotes": "Verification FAILED at lint (14286ms):\n\n\n> @overdeck/core@0.45.23 lint\n> eslint src/ --ext .js,.ts,.tsx --no-inline-config && npm run lint:effect && npm run lint:permissions && npm run lint:state-writes && npm run lint:overdeck-boundaries && npm run lint:pipeline-membership && npm run lint:skills && npm run lint:prompts && npm run lint:prompt-trailer && npm run lint:file-size && npm run lint:source-introspection && npm run lint:no-coderabbit-merge-gate && npm run lint:circular && npm run lint:ratchet-audit && npm run lint:quarantine-audit\n\n\n/home/eltmon/Projects/overdeck/workspaces/feature-pan-2993/src/lib/workspace/stack-health.ts\n  52:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any\n\n✖ 1 problem (1 error, 0 warnings)\n\n",
     "inspectNotes": "All 4 ACs verified against src/lib/agents/messaging.ts@79bb7b47: stopped-agent resume failure returns {delivered:false,queuedToMail:true,reason} naming both resumeResult.error and PAN-1980 session-rotation disable; paused/gated path returns gate reason; live-session/successful-resume paths return delivered:true; only deacon-strike-landing.ts touched among callers and npm run typecheck passes clean (0 new errors).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2998",
+    "lastVerifiedCommit": "cd0f24e6995175255d7bce8327e8e000801f3589",
     "reviewRequestedAt": "2026-07-21T23:35:38.985Z",
     "reviewSpawnedAt": "2026-07-21T23:35:41.294Z",
     "scopeDrift": {
@@ -158,9 +158,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 1319043,
-            "output": 74629,
-            "cacheRead": 19919360,
+            "input": 1350769,
+            "output": 115145,
+            "cacheRead": 22509568,
             "cacheWrite": 0
           }
         },
@@ -174,9 +174,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 1735313,
-            "output": 102161,
-            "cacheRead": 54062080,
+            "input": 2344035,
+            "output": 105317,
+            "cacheRead": 55972352,
             "cacheWrite": 0
           }
         }
@@ -189,9 +189,9 @@
           "cacheWrite": 311785
         },
         "openai/gpt-5.6-sol": {
-          "input": 3054356,
-          "output": 176790,
-          "cacheRead": 73981440,
+          "input": 3694804,
+          "output": 220462,
+          "cacheRead": 78481920,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -202,8 +202,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 68.679979,
-        "pricingAsOf": "2026-07-21T23:40:30.945Z"
+        "usd": 75.442619,
+        "pricingAsOf": "2026-07-21T23:41:11.090Z"
       }
     },
     "merges": [
