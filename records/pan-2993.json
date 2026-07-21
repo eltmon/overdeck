@@ -50,20 +50,22 @@
     "recordedAt": "2026-07-21T23:31:08.000Z"
   },
   "created": "2026-07-21T22:47:36.935Z",
-  "updated": "2026-07-21T23:31:15.977Z",
+  "updated": "2026-07-21T23:31:18.753Z",
   "pipeline": {
     "issueId": "PAN-2993",
-    "reviewStatus": "pending",
+    "reviewStatus": "failed",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-21T23:31:15.542Z",
+    "updatedAt": "2026-07-21T23:31:18.748Z",
+    "reviewNotes": "Review role spawn failed: Command failed: tmux -L overdeck -f /home/eltmon/.overdeck/tmux/overdeck.tmux.conf new-session -d -s agent-pan-2993-review -c /home/eltmon/Projects/overdeck/workspaces/feature-pan-2993 -x 200 -y 50 -e ANTHROPIC_API_KEY= -e ANTHROPIC_BASE_URL=http://127.0.0.1:8317 -e ANTHROPIC_AUTH_TOKEN=overdeck-local-cliproxy-key -e ANTHROPIC_DEFAULT_HAIKU_MODEL= -e OPENAI_API_KEY= -e GEMINI_API_KEY= -e API_TIMEOUT_MS= -e CLAUDE_CODE_API_KEY_HELPER_TTL_MS= -e KIMI_API_KEY= -e MINIMAX_API_KEY= -e ZAI_API_KEY= -e MIMO_API_KEY= -e OPENROUTER_API_KEY= -e NOUS_API_KEY= -e DASHSCOPE_API_KEY= -e TERM=xterm-256color -e OVERDECK_AGENT_ID=agent-pan-2993-review -e OVERDECK_ISSUE_ID=PAN-2993 -e OVERDECK_SESSION_TYPE=review -e CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false -e GIT_SEQUENCE_EDITOR=false -e OVERDECK_FLYWHEEL_RUN_ID=RUN-68 -e OVERDECK_FLYWHEEL_AGENT_ROLE=review bash /home/eltmon/.overdeck/agents/agent-pan-2993-review/launcher.sh\nduplicate session: agent-pan-2993-review\n",
     "inspectNotes": "All 4 ACs verified against src/lib/agents/messaging.ts@79bb7b47: stopped-agent resume failure returns {delivered:false,queuedToMail:true,reason} naming both resumeResult.error and PAN-1980 session-rotation disable; paused/gated path returns gate reason; live-session/successful-resume paths return delivered:true; only deacon-strike-landing.ts touched among callers and npm run typecheck passes clean (0 new errors).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2998",
     "reviewRequestedAt": "2026-07-21T23:31:11.285Z",
+    "reviewSpawnedAt": "2026-07-21T23:31:15.992Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "src/cli/commands/__tests__/strike-ready.test.ts"
@@ -149,7 +151,7 @@
       },
       "costAtCloseOut": {
         "usd": 40.524382,
-        "pricingAsOf": "2026-07-21T23:31:15.577Z"
+        "pricingAsOf": "2026-07-21T23:31:18.750Z"
       }
     },
     "merges": [
