@@ -27,7 +27,7 @@ import {
   defaultBackgroundAiFeatures,
   type BackgroundAiFeature,
 } from './background-ai/registry.js';
-import { getOverdeckHome } from './paths.js';
+import { OVERDECK_HOME } from './paths.js';
 export type { SubscriptionPlan, AuthMode };
 
 /**
@@ -1213,7 +1213,7 @@ const DEFAULT_CONFIG: NormalizedConfig = {
 /**
  * Path to global config file
  */
-const GLOBAL_CONFIG_PATH = join(getOverdeckHome(), 'config.yaml');
+const GLOBAL_CONFIG_PATH = join(OVERDECK_HOME, 'config.yaml');
 
 /**
  * Normalize a provider config (handle both boolean and object forms)

@@ -29,20 +29,14 @@ vi.mock('../../../../lib/agents.js', () => ({
 }));
 
 let TEST_HOME: string;
-let CONFIG_HOME: string;
-const ORIGINAL_HOME = process.env.HOME;
 
 beforeEach(() => {
   mockGenerateSmartSummary.mockClear();
   TEST_HOME = join(tmpdir(), `pan-compaction-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
-  CONFIG_HOME = join(tmpdir(), `pan-compaction-config-${Date.now()}-${Math.random().toString(36).slice(2)}`);
   mkdirSync(TEST_HOME, { recursive: true });
-  mkdirSync(CONFIG_HOME, { recursive: true });
   process.env.OVERDECK_HOME = TEST_HOME;
-  process.env.HOME = CONFIG_HOME;
-  mkdirSync(join(CONFIG_HOME, '.overdeck'), { recursive: true });
   writeFileSync(
-    join(CONFIG_HOME, '.overdeck', 'config.yaml'),
+    join(TEST_HOME, 'config.yaml'),
     [
       'conversations:',
       '  compaction_model: claude-haiku-4-5',
@@ -54,13 +48,7 @@ beforeEach(() => {
 
 afterEach(() => {
   delete process.env.OVERDECK_HOME;
-  if (ORIGINAL_HOME) {
-    process.env.HOME = ORIGINAL_HOME;
-  } else {
-    delete process.env.HOME;
-  }
   rmSync(TEST_HOME, { recursive: true, force: true });
-  rmSync(CONFIG_HOME, { recursive: true, force: true });
 });
 
 describe('conversation compaction service', () => {
