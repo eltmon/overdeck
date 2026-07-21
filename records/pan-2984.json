@@ -77,7 +77,7 @@
     "recordedAt": "2026-07-21T16:48:34.581Z"
   },
   "created": "2026-07-21T15:14:12.381Z",
-  "updated": "2026-07-21T16:48:39.715Z",
+  "updated": "2026-07-21T16:48:44.319Z",
   "pipeline": {
     "issueId": "PAN-2984",
     "reviewStatus": "pending",
@@ -87,7 +87,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-21T16:48:39.673Z",
+    "updatedAt": "2026-07-21T16:48:44.263Z",
     "reviewNotes": "nvm setup modifies shell rc files and can make Node 24 the default, violating FR-1",
     "inspectNotes": "All 6 ACs verified: install-under-runtime plan prefixes PATH with runtime bin dir and writes shim via writeShim (AC1); manager-without-24 rejects OpenKnowledgeSetupRequiredError with plan.kind install-node-via-manager, volta installCommand 'volta fetch node@24' (AC2); no-manager case rejects install-nvm plan whose steps include the npm install one-liner (AC3); bare 'ok' probe failing falls through to shimPath probe and returns absolute shim path (AC4); autoInstall:false throws manual-install message without invoking resolveSetupPlan (AC5); health-poll test uses vi.advanceTimersByTimeAsync under file-level vi.useFakeTimers() (AC6). 12/12 tests pass locally.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2985",
@@ -157,9 +157,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 1792220,
-            "output": 105161,
-            "cacheRead": 13163008,
+            "input": 1842155,
+            "output": 106826,
+            "cacheRead": 13933568,
             "cacheWrite": 0
           }
         },
@@ -173,9 +173,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 3044663,
-            "output": 316324,
-            "cacheRead": 114867712,
+            "input": 3051695,
+            "output": 316840,
+            "cacheRead": 116022784,
             "cacheWrite": 0
           }
         }
@@ -194,9 +194,9 @@
           "cacheWrite": 305673
         },
         "openai/gpt-5.6-sol": {
-          "input": 4836883,
-          "output": 421485,
-          "cacheRead": 128030720,
+          "input": 4893850,
+          "output": 423666,
+          "cacheRead": 129956352,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -207,8 +207,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 111.200442,
-        "pricingAsOf": "2026-07-21T16:48:39.710Z"
+        "usd": 112.513523,
+        "pricingAsOf": "2026-07-21T16:48:44.314Z"
       }
     },
     "merges": [
