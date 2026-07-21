@@ -122,6 +122,11 @@
       "timestamp": "2026-07-21T13:57:06.776Z",
       "reason": "end",
       "note": "Agent signaled work complete"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-21T13:57:07.667Z"
     }
   ],
   "feedback": [],
@@ -343,7 +348,7 @@
     "recordedAt": "2026-07-21T13:57:01.547Z"
   },
   "created": "2026-07-17T12:54:30.819Z",
-  "updated": "2026-07-21T13:57:06.777Z",
+  "updated": "2026-07-21T13:57:07.668Z",
   "pipeline": {
     "issueId": "PAN-2377",
     "reviewStatus": "reviewing",
