@@ -365,7 +365,7 @@
     "recordedAt": "2026-07-21T14:09:48.216Z"
   },
   "created": "2026-07-17T12:54:30.819Z",
-  "updated": "2026-07-21T14:10:02.051Z",
+  "updated": "2026-07-21T14:10:46.336Z",
   "pipeline": {
     "issueId": "PAN-2377",
     "reviewStatus": "pending",
@@ -379,7 +379,7 @@
     "reviewNotes": "Agent re-review request (1/25): Fixed test",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2894",
-    "reviewRequestedAt": "2026-07-21T14:09:49.160Z",
+    "reviewRequestedAt": "2026-07-21T14:10:45.917Z",
     "reviewSpawnedAt": "2026-07-21T14:06:01.709Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -599,7 +599,8 @@
         "tests/unit/lib/overdeck/no-loss-matrix.ts"
       ],
       "recordedAt": "2026-07-21T14:09:48.216Z"
-    }
+    },
+    "panDoneRecoveredAt": "2026-07-21T14:10:45.917Z"
   },
   "closeOut": {
     "usage": {
