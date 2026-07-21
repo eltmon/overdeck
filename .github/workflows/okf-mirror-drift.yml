@@ -1,0 +1,36 @@
+name: okf-mirror-drift
+
+# Fails when sync-sources/skills/okf/ on main has drifted ahead of the
+# standalone mirror at eltmon/okf. The mirror repo is public, so this check
+# needs no credentials; the fix is to run scripts/mirror-okf-skill.sh.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'sync-sources/skills/okf/**'
+
+permissions: {}
+
+jobs:
+  drift:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Compare skill tree against mirror
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin main
+          current_tree="$(git rev-parse "origin/main:sync-sources/skills/okf")"
+          mirror_tip="$(git ls-remote https://github.com/eltmon/okf.git refs/heads/main | cut -f1)"
+          if [[ -z "$mirror_tip" ]]; then
+            echo "eltmon/okf has no main branch — push the initial mirror with scripts/mirror-okf-skill.sh"
+            exit 1
+          fi
+          git fetch --no-tags --filter=blob:none https://github.com/eltmon/okf.git "$mirror_tip"
+          mirrored_tree="$(git rev-parse "${mirror_tip}^{tree}")"
+          if [[ "$mirrored_tree" != "$current_tree" ]]; then
+            echo "::error::sync-sources/skills/okf ($current_tree) is ahead of eltmon/okf ($mirrored_tree)."
+            echo "::error::Run scripts/mirror-okf-skill.sh from an overdeck checkout to sync the standalone repo."
+            exit 1
+          fi
+          echo "Mirror is in sync (tree ${current_tree:0:12})"
