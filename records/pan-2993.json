@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-21T22:47:36.935Z",
-  "updated": "2026-07-21T23:24:59.363Z",
+  "updated": "2026-07-21T23:25:46.739Z",
   "pipeline": {
     "issueId": "PAN-2993",
     "reviewStatus": "pending",
@@ -89,16 +89,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 11,
-    "claims": {
-      "docs-strike-lifecycle": {
-        "writerId": "agent-pan-2993",
-        "agentId": "agent-pan-2993",
-        "pid": 2321555,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-21T23:24:59.363Z"
-      }
-    },
+    "sequence": 12,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2993",
@@ -154,6 +146,17 @@
         "outcome": "completed",
         "reason": "Allowed same-head strike-ready to re-arm recovering and needs_you states, cleared transport backoff fields on every re-arm/new-head cycle, preserved ready/landing idempotence, and added injected-git regression coverage.",
         "releasedAt": "2026-07-21T23:24:49.943Z"
+      },
+      {
+        "writerId": "agent-pan-2993",
+        "agentId": "agent-pan-2993",
+        "pid": 2321555,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-21T23:24:59.363Z",
+        "itemId": "docs-strike-lifecycle",
+        "outcome": "completed",
+        "reason": "Documented same-head transport retries with exponential backoff, immediate needs-you escalation for mail-only recovery, and strike-ready re-arm from recovering at the unchanged head.",
+        "releasedAt": "2026-07-21T23:25:46.739Z"
       }
     ],
     "statusReasons": {
@@ -176,6 +179,10 @@
       "strike-ready-rearm-recovering": {
         "reason": "Allowed same-head strike-ready to re-arm recovering and needs_you states, cleared transport backoff fields on every re-arm/new-head cycle, preserved ready/landing idempotence, and added injected-git regression coverage.",
         "updatedAt": "2026-07-21T23:24:49.943Z"
+      },
+      "docs-strike-lifecycle": {
+        "reason": "Documented same-head transport retries with exponential backoff, immediate needs-you escalation for mail-only recovery, and strike-ready re-arm from recovering at the unchanged head.",
+        "updatedAt": "2026-07-21T23:25:46.739Z"
       }
     }
   },
@@ -203,6 +210,8 @@
     "strike-ready-rearm-recovering.strike-ready-rearm-recovering.ac1": "completed",
     "strike-ready-rearm-recovering.strike-ready-rearm-recovering.ac2": "completed",
     "strike-ready-rearm-recovering.strike-ready-rearm-recovering.ac3": "completed",
-    "docs-strike-lifecycle": "running"
+    "docs-strike-lifecycle": "completed",
+    "docs-strike-lifecycle.docs-strike-lifecycle.ac1": "completed",
+    "docs-strike-lifecycle.docs-strike-lifecycle.ac2": "completed"
   }
 }
