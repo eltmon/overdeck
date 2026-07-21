@@ -85,7 +85,7 @@
   ],
   "feedback": [],
   "created": "2026-07-21T16:29:59.439Z",
-  "updated": "2026-07-21T16:56:50.336Z",
+  "updated": "2026-07-21T16:57:24.117Z",
   "pipeline": {
     "issueId": "PAN-806",
     "reviewStatus": "pending",
@@ -173,8 +173,16 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 8,
-    "claims": {},
+    "sequence": 9,
+    "claims": {
+      "guard-dir-cleanup": {
+        "writerId": "agent-pan-806",
+        "agentId": "agent-pan-806",
+        "pid": 3863119,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-21T16:57:24.117Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-806",
@@ -255,6 +263,7 @@
     "git-path-wrapper.git-path-wrapper.ac1": "completed",
     "git-path-wrapper.git-path-wrapper.ac2": "completed",
     "git-path-wrapper.git-path-wrapper.ac3": "completed",
-    "git-path-wrapper.git-path-wrapper.ac4": "completed"
+    "git-path-wrapper.git-path-wrapper.ac4": "completed",
+    "guard-dir-cleanup": "running"
   }
 }
