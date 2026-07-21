@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-21T23:09:49.270Z",
-  "updated": "2026-07-21T23:48:06.473Z",
+  "updated": "2026-07-21T23:49:03.591Z",
   "pipeline": {
     "issueId": "PAN-2997",
     "reviewStatus": "pending",
@@ -61,8 +61,16 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 6,
-    "claims": {},
+    "sequence": 7,
+    "claims": {
+      "linear-mcp-heartbeat-ingestion": {
+        "writerId": "agent-pan-2997",
+        "agentId": "agent-pan-2997",
+        "pid": 2788103,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-21T23:49:03.591Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-2997",
@@ -125,6 +133,7 @@
     "linear-mcp-auth-fold.linear-mcp-auth-fold.ac4": "completed",
     "role-linear-mcp-guidance": "completed",
     "role-linear-mcp-guidance.role-linear-mcp-guidance.ac1": "completed",
-    "role-linear-mcp-guidance.role-linear-mcp-guidance.ac2": "completed"
+    "role-linear-mcp-guidance.role-linear-mcp-guidance.ac2": "completed",
+    "linear-mcp-heartbeat-ingestion": "running"
   }
 }
