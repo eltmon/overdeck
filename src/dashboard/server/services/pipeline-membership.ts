@@ -64,6 +64,8 @@ interface MembershipSnapshot {
   value: PipelineMembership[];
   refreshedAt: number;
   refresh?: Promise<void>;
+  lastError?: string;
+  lastErrorAt?: number;
 }
 
 const membershipSnapshots = new Map<string, MembershipSnapshot>();
@@ -79,8 +81,18 @@ function refreshMembershipSnapshot(
   snapshot.refresh = scheduleMembershipRefresh(() => getMembership(project)).then((value) => {
     snapshot.value = value;
     snapshot.refreshedAt = now();
-  }).catch(() => {
+    snapshot.lastError = undefined;
+    snapshot.lastErrorAt = undefined;
+  }).catch((error: unknown) => {
     // Keep the last successful snapshot; a cold caller remains unavailable.
+    // Record and log the failure — a swallowed boot-warm failure previously
+    // left a cold project with zero diagnostic trace (PAN-2972).
+    snapshot.lastError = error instanceof Error ? error.message : String(error);
+    snapshot.lastErrorAt = now();
+    console.warn(
+      `[pipeline-membership] refresh failed for ${project.name ?? project.path}; keeping last-good snapshot:`,
+      snapshot.lastError,
+    );
   }).finally(() => {
     snapshot.refresh = undefined;
   });
@@ -93,9 +105,15 @@ export function readPipelineMembershipSnapshotsForProjects(
 ): ProjectPipelineMembershipResult[] {
   return projects.map((project) => {
     const snapshot = membershipSnapshots.get(project.path);
-    return snapshot?.refreshedAt
-      ? { project, memberships: snapshot.value }
-      : { project, error: new Error('Pipeline membership snapshot is loading') };
+    if (snapshot?.refreshedAt) return { project, memberships: snapshot.value };
+    // Cold cache: surface the recorded failure when one exists so the operator
+    // sees the real cause instead of a permanent "loading" (PAN-2972).
+    return {
+      project,
+      error: new Error(snapshot?.lastError
+        ? `Pipeline membership refresh failed: ${snapshot.lastError}`
+        : 'Pipeline membership snapshot is loading'),
+    };
   });
 }
 

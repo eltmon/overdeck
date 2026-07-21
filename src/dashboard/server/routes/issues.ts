@@ -904,26 +904,7 @@ const getResourceAllocatedIssuesRoute = HttpRouter.add(
   })),
 );
 
-const getPipelineMembershipRoute = HttpRouter.add(
-  'GET',
-  '/api/pipeline/membership',
-  httpHandler(Effect.gen(function* () {
-    const request = yield* HttpServerRequest.HttpServerRequest;
-    const projectKey = new URL(request.url, 'http://localhost').searchParams.get('project');
-    if (!projectKey) return jsonResponse({ error: 'project query parameter is required' }, { status: 400 });
-    const project = getProjectSync(projectKey);
-    if (!project) return jsonResponse({ error: `Project not found: ${projectKey}` }, { status: 404 });
-    // Request handlers are snapshot readers only. A cold server returns a fast
-    // unavailable response while boot/event refreshes populate the cache; it
-    // never launches tracker or git discovery from the operator's click.
-    const snapshot = readPipelineMembershipSnapshotsForProjects([project])[0];
-    if (snapshot?.memberships) return jsonResponse(snapshot.memberships);
-    return jsonResponse(
-      { error: 'Pipeline membership snapshot is loading' },
-      { status: 503 },
-    );
-  })),
-);
+// Pipeline-membership routes live in routes/pipeline-membership.ts (PAN-2972).
 
 const getIssueResourceDetailsRoute = HttpRouter.add(
   'GET',
@@ -964,7 +945,6 @@ export const issuesRouteLayer = Layer.mergeAll(
   postIssueGenerateTasksRoute,
   getIssueCostsRoute,
   getResourceAllocatedIssuesRoute,
-  getPipelineMembershipRoute,
   getIssueResourceDetailsRoute,
   getIssuePrRoute,
   getIssuePrDiffRoute,

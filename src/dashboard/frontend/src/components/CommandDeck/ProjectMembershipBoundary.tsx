@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { CircleAlert } from 'lucide-react';
-import { fetchProjectPipelineMembership, NO_PROJECT_KEY } from './projectsData';
+import { fetchProjectPipelineMembership, refreshProjectPipelineMembership, NO_PROJECT_KEY } from './projectsData';
 import styles from './styles/command-deck.module.css';
 
 interface ProjectMembershipBoundaryProps {
@@ -26,6 +26,14 @@ export function ProjectMembershipBoundary({
     queryFn: () => fetchProjectPipelineMembership(projectKey!),
     enabled: Boolean(projectKey && selectedProject !== NO_PROJECT_KEY && !disabled),
     retry: false,
+  });
+
+  // PAN-2972 — the GET above only reads the server's snapshot, so on a cold
+  // cache a plain refetch can never succeed. Retry forces a server-side
+  // re-gather, then refetches the snapshot it just populated.
+  const retryMembership = useMutation({
+    mutationFn: () => refreshProjectPipelineMembership(projectKey!),
+    onSettled: () => void membership.refetch(),
   });
 
   if (!selectedProject) {
@@ -58,16 +66,19 @@ export function ProjectMembershipBoundary({
               <strong>{projectName ?? selectedProject}</strong>, so this issue list may be incomplete.
             </p>
             <p className={styles.membershipErrorDetail}>
-              {membership.error instanceof Error
-                ? membership.error.message
-                : 'Pipeline membership could not be loaded'}
+              {retryMembership.error instanceof Error
+                ? retryMembership.error.message
+                : membership.error instanceof Error
+                  ? membership.error.message
+                  : 'Pipeline membership could not be loaded'}
             </p>
             <button
               type="button"
               className={styles.membershipErrorRetry}
-              onClick={() => void membership.refetch()}
+              onClick={() => retryMembership.mutate()}
+              disabled={retryMembership.isPending}
             >
-              Retry membership
+              {retryMembership.isPending ? 'Retrying…' : 'Retry membership'}
             </button>
           </div>
         </div>

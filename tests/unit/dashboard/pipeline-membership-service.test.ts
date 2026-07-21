@@ -128,6 +128,37 @@ describe('pipeline membership service', () => {
     expect(getMembership).toHaveBeenCalledOnce();
   });
 
+  it('PAN-2972: logs a cold-cache refresh failure and surfaces the cause on subsequent reads', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const project = { name: 'cold-failure', path: '/cold-failure', github_repo: 'owner/cold-failure' };
+      const getMembership = Object.assign(
+        vi.fn().mockRejectedValue(new Error('Linear 503 connection termination')),
+        { invalidate: vi.fn() },
+      );
+
+      await refreshMembershipSnapshotsForProjects([project], getMembership);
+
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining('refresh failed for cold-failure'),
+        'Linear 503 connection termination',
+      );
+      const read = readPipelineMembershipSnapshotsForProjects([project])[0];
+      expect(read?.error).toBeInstanceOf(Error);
+      expect((read?.error as Error).message).toBe(
+        'Pipeline membership refresh failed: Linear 503 connection termination',
+      );
+
+      // A later successful refresh clears the recorded failure.
+      getMembership.mockResolvedValue([{ issueId: 'PAN-1' }]);
+      await refreshMembershipSnapshotsForProjects([project], getMembership);
+      expect(readPipelineMembershipSnapshotsForProjects([project])[0]?.memberships)
+        .toEqual([{ issueId: 'PAN-1' }]);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
   it('returns unavailable on a cold read, then serves the successful snapshot while refreshing', async () => {
     const project = { name: 'snapshot-test', path: '/snapshot-test', github_repo: 'owner/repo' };
     const getMembership = vi.fn().mockResolvedValue([{ issueId: 'PAN-1' }]);
