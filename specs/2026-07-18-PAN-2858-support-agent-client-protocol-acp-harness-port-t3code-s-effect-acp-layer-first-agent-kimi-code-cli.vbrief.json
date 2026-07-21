@@ -4,17 +4,17 @@
     "created": "2026-07-18T01:17:43.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2858: Support Agent Client Protocol (ACP) harness — port t3code's effect-acp layer; first agent: Kimi Code CLI",
-    "updated": "2026-07-18T01:33:26.167Z"
+    "updated": "2026-07-21T10:06:44.215Z"
   },
   "plan": {
     "id": "pan-2858",
     "title": "Support Agent Client Protocol (ACP) harness — port t3code's effect-acp layer; first agent: Kimi Code CLI",
-    "status": "running",
+    "status": "completed",
     "uid": "8258cc1a-38a5-40c8-bc35-4f4e1873939a",
     "author": "agent:claude-fable-5",
-    "sequence": 4,
+    "sequence": 5,
     "created": "2026-07-18T01:17:43.000Z",
-    "updated": "2026-07-18T01:33:26.167Z",
+    "updated": "2026-07-21T10:06:44.215Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2858",
@@ -1356,5 +1356,5 @@
       "canonicalFilename": "2026-07-18-PAN-2858-support-agent-client-protocol-acp-harness-port-t3code-s-effect-acp-layer-first-agent-kimi-code-cli.vbrief.json"
     }
   },
-  "status": "active"
+  "status": "completed"
 }
