@@ -124,7 +124,7 @@ export function ResumableSessionDialog() {
   };
 
   return (
-    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/40" onClick={() => !pending && closeRecovery()}>
+    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/40" onClick={closeRecovery}>
       <div
         role="dialog"
         aria-label={content.title(request)}
@@ -135,7 +135,7 @@ export function ResumableSessionDialog() {
       >
         <div className="mb-3 flex items-center justify-between gap-3">
           <h3 className="font-medium"><span className="font-mono">{agentId}</span>{content.title(request).slice(agentId.length)}</h3>
-          <button type="button" aria-label="Close" className="text-muted-foreground hover:text-foreground" onClick={closeRecovery} disabled={!!pending}>
+          <button type="button" aria-label="Close" className="text-muted-foreground hover:text-foreground" onClick={closeRecovery}>
             <X size={16} />
           </button>
         </div>
@@ -166,12 +166,20 @@ export function ResumableSessionDialog() {
           <button
             type="button"
             onClick={closeRecovery}
-            disabled={!!pending}
-            className="ml-auto rounded-md px-2 py-1.5 text-xs text-muted-foreground hover:text-foreground disabled:opacity-50"
+            className="ml-auto rounded-md px-2 py-1.5 text-xs text-muted-foreground hover:text-foreground"
           >
             Cancel
           </button>
         </div>
+        {pending && (
+          // A start can take minutes when the workspace docker stack has to
+          // come up first. Never trap the operator: closing only dismisses the
+          // dialog — the start keeps running server-side and the tree updates
+          // via SSE when the agent lands.
+          <p data-testid="recovery-pending-hint" className="mt-3 text-[11px] leading-4 text-muted-foreground">
+            Starting can take a few minutes when the workspace docker stack needs to come up. Closing this won&apos;t stop it.
+          </p>
+        )}
       </div>
     </div>
   );

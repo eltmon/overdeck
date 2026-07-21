@@ -176,4 +176,24 @@ describe('ResumableSessionDialog', () => {
     expect(screen.queryByTestId('resumable-session-dialog')).not.toBeInTheDocument();
     expect(fetchCalls().some((c) => c.url.includes('/resume') || c.url.includes('/reset-session') || c.url.includes('/untroubled'))).toBe(false);
   });
+
+  it('never traps the operator: Cancel works while a start is in flight', async () => {
+    useResumeRecovery.getState().openRecovery({ kind: 'paused', agentId: 'agent-min-852', issueId: 'MIN-852' });
+    // A start that never resolves — simulates a multi-minute docker stack rebuild.
+    vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('/api/dashboard/session')) return Promise.resolve(Response.json({ csrfToken: 'test-csrf' }));
+      return new Promise<Response>(() => {});
+    }));
+    renderDialog();
+
+    fireEvent.click(screen.getByTestId('recovery-primary'));
+
+    // Pending: the action button locks and the hint explains the wait…
+    await waitFor(() => expect(screen.getByTestId('recovery-pending-hint')).toBeInTheDocument());
+    expect(screen.getByTestId('recovery-primary')).toBeDisabled();
+    // …but Cancel and the X are never taken away.
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(screen.queryByTestId('resumable-session-dialog')).not.toBeInTheDocument();
+  });
 });

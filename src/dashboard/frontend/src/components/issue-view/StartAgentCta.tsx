@@ -65,6 +65,12 @@ export function StartAgentCta({ issueId, density, surface = 'issue-view' }: { is
   // filled bg-primary block on a dense row.
   const startLabel = surface === 'chip' ? `▶ Start · ${issueId}` : surface === 'inline' ? `Start · ${issueId}` : 'Start work agent';
   const label = mode === 'resume' ? resumeLabel : startLabel;
+  // Pending keeps the issue id on compact surfaces (PAN-2975) so a tree full
+  // of spinning buttons stays unambiguous; starting can take minutes when the
+  // workspace docker stack has to come up, so the wait must be visible.
+  const pendingLabel = compact
+    ? `${mode === 'resume' ? 'Resuming' : 'Starting'}… · ${issueId}`
+    : mode === 'resume' ? 'Resuming…' : 'Starting…';
   const compactButtonClass = mode === 'resume'
     ? 'inline-flex items-center gap-1 rounded-[4px] border border-info/30 bg-info/10 px-1.5 py-0.5 text-[10px] font-medium text-info-foreground transition-colors hover:bg-info/20 disabled:opacity-50'
     : 'inline-flex items-center gap-1 rounded-[4px] px-1.5 py-0.5 text-[10px] font-medium text-primary transition-colors hover:text-primary/80 disabled:opacity-50';
@@ -90,7 +96,7 @@ export function StartAgentCta({ issueId, density, surface = 'issue-view' }: { is
       className={compact ? compactButtonClass : fullButtonClass}
       onClick={handleClick}
     >
-      {mutation.isPending && mode === 'resume' ? 'Resuming…' : label}
+      {mutation.isPending ? pendingLabel : label}
     </button>
     {!compact && mode === 'start' && <><button type="button" className="inline-flex items-center gap-1 rounded border border-border px-2 py-1 text-[11px]" aria-expanded={overrideOpen} onClick={() => setOverrideOpen((open) => !open)}><Settings2 className="h-3 w-3" />Overrides<ChevronDown className="h-3 w-3" /></button>{overrideOpen && <div className="rounded border border-border p-2"><label className="flex items-center gap-2 text-[12px]"><input type="checkbox" checked={overrideEnabled} onChange={(event) => setOverrideEnabled(event.target.checked)} />Override default harness and model</label>{overrideEnabled && <ModelHarnessPicker model={model} harness={harness} onModelChange={setModel} onHarnessChange={setHarness} groups={groups} harnessPolicy={harnessPolicy} modelLabel="Agent model" />}</div>}</>}
     {mutation.error && !(mutation.error instanceof StartBlockHandoff) && (
