@@ -853,18 +853,18 @@
     "recordedAt": "2026-07-19T15:21:39.631Z"
   },
   "created": "2026-07-18T01:08:14.744Z",
-  "updated": "2026-07-21T05:58:59.471Z",
+  "updated": "2026-07-21T06:04:31.254Z",
   "pipeline": {
     "issueId": "PAN-2858",
     "reviewStatus": "passed",
     "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
-    "mergeStatus": "verifying",
+    "mergeStatus": "merged",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-19T15:22:19.616Z",
-    "updatedAt": "2026-07-21T05:58:59.453Z",
+    "updatedAt": "2026-07-21T06:04:31.233Z",
     "reviewNotes": "Review bypassed: verification passed but review infrastructure repeatedly failed.",
     "testNotes": "Gates run from workspace feature-pan-2858 (all 17 xBRIEF items completed). bun install clean; packages/contracts rebuilt clean. npm run typecheck: PASS (tsc root+hooks+evals clean; dashboard-types ratchet at known 65-error baseline, no new). npm run lint: PASS (eslint + all 13 custom lint sub-checks: circular-deps 77 baselined/no new, file-size no new god files, ratchet-audit, quarantine-audit 12 entries, pipeline-membership, overdeck-boundaries, state-writes, skills, prompts, source-introspection, no-coderabbit-merge-gate). npm run test (root vitest + issueActions frontend subset): 10139 passed, 50 skipped, 1 flaky timeout in tests/unit/lib/platform-lifecycle.test.ts (restartDashboard scope contract) under full-suite parallel load; re-ran that file in isolation -> 9/9 passed in 1.94s (well under the 5s timeout), and `git diff main...HEAD -- tests/unit/lib/platform-lifecycle.test.ts src/lib/platform-lifecycle.ts` is empty, confirming the branch never touches it. Treated as pre-existing resource-contention flake, not a regression. Ran the item-specified verify_commands the root gate doesn't cover: `npm --prefix ./src/dashboard/frontend run test -- sessionFeed` (10 files/66 tests incl. the acp harness->feedKind mapping case) and full frontend suite `npm --prefix ./src/dashboard/frontend run test` (231 files/2209 tests) both pass clean. Explicitly re-ran all 14 ACP-specific backend test files (src/lib/acp/__tests__/*, packages/effect-acp/src/*.test.ts, runtimes/__tests__/acp.test.ts, acp-conversation-parser.test.ts, activity-summary-acp.test.ts) standalone: 99/99 pass. UAT decision: browser/Playwright UAT NOT required. This issue is a backend harness/transport port (vendored effect-acp, ACP host process, runtime adapter, delivery tier, config, permissions); its only frontend surface is session-feed rendering for the new 'acp' harness (acp-frontend-feed item), whose acceptance criteria explicitly call for hook-test proof ('no blank card, no crash' and feedKind mapping), not browser verification -- both are satisfied by the passing sessionFeed suite. The issue's 'a work agent runs end-to-end through the pipeline on ACP' criterion is covered by the opt-in kimi-acp-probe-e2e test (gated behind KIMI_ACP_PROBE=1, deliberately excluded from default CI, requires an authenticated real kimi binary) -- exercising it or spawning a live pan-start work agent against a real Kimi CLI session is outside this test role's boundaries (no spawning work/UAT agents) and outside the declared gate scope. No issue notes, PR notes, or vBRIEF wording demand dashboard/browser verification. reviewStatus was already 'passed' prior to this run (scope-drift files noted in the record are pre-existing dashboard-infra fixes bundled on the branch, already accepted by review).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2875",
@@ -1286,7 +1286,7 @@
       },
       "costAtCloseOut": {
         "usd": 993.992817,
-        "pricingAsOf": "2026-07-21T05:58:59.465Z"
+        "pricingAsOf": "2026-07-21T06:04:31.249Z"
       }
     },
     "merges": [
