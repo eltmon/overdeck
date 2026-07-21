@@ -35,7 +35,7 @@ describe('knowledge viewer service', () => {
     const start = vi.fn(async () => startResult(child));
     const service = createKnowledgeViewerService({
       resolveBundle: async () => '/repo/knowledge',
-      ensure: async () => ({ status: 'already-installed', command: 'ok' }),
+      ensure: async () => ({ status: 'already-installed', command: '/home/tester/.local/bin/ok' }),
       start,
       stop: async () => {},
       fetchImpl: vi.fn(async () => response(true)),
@@ -55,7 +55,10 @@ describe('knowledge viewer service', () => {
       url: 'http://127.0.0.1:39847',
       embeddable: true,
     });
-    expect(start).toHaveBeenCalledWith('/repo/knowledge', { openBrowser: false });
+    expect(start).toHaveBeenCalledWith('/repo/knowledge', {
+      openBrowser: false,
+      okCommand: '/home/tester/.local/bin/ok',
+    });
   });
 
   it('reuses one healthy process for concurrent and subsequent starts', async () => {
@@ -105,12 +108,34 @@ describe('knowledge viewer service', () => {
     });
   });
 
+  it('includes setup steps when the viewer is not installed', async () => {
+    const steps = ['Install Node 24 with Volta without changing your default Node.'];
+    const service = createKnowledgeViewerService({
+      resolveBundle: async () => '/repo/knowledge',
+      ensure: vi.fn(async () => {
+        throw new Error('open-knowledge is not installed');
+      }),
+      resolveSetupPlan: vi.fn(async () => ({
+        kind: 'install-node-via-manager',
+        manager: 'volta',
+        installCommand: 'volta fetch node@24',
+        steps,
+      })),
+    });
+
+    await expect(service.getStatus('overdeck')).resolves.toMatchObject({
+      installed: false,
+      running: false,
+      setupPlan: { kind: 'install-node-via-manager', steps },
+    });
+  });
+
   it('stops an owned process when its post-start health probe fails', async () => {
     const child = fakeChild();
     const stop = vi.fn(async () => {});
     const service = createKnowledgeViewerService({
       resolveBundle: async () => '/repo/knowledge',
-      ensure: async () => ({ status: 'already-installed', command: 'ok' }),
+      ensure: async () => ({ status: 'already-installed', command: '/home/tester/.local/bin/ok' }),
       start: async () => startResult(child),
       stop,
       fetchImpl: vi.fn(async () => response(false)),
@@ -120,7 +145,7 @@ describe('knowledge viewer service', () => {
       'open-knowledge viewer did not remain healthy at http://127.0.0.1:39847',
     );
 
-    expect(stop).toHaveBeenCalledWith('/runtime/read-only-snapshot');
+    expect(stop).toHaveBeenCalledWith('/runtime/read-only-snapshot', '/home/tester/.local/bin/ok');
     expect(child.kill).toHaveBeenCalledWith('SIGTERM');
   });
 
@@ -136,7 +161,7 @@ describe('knowledge viewer service', () => {
     });
     await owned.getOrStartViewer('overdeck');
     await owned.stopAll();
-    expect(stopOwned).toHaveBeenCalledWith('/runtime/read-only-snapshot');
+    expect(stopOwned).toHaveBeenCalledWith('/runtime/read-only-snapshot', 'ok');
 
     const stopReused = vi.fn(async () => {});
     const reused = createKnowledgeViewerService({
