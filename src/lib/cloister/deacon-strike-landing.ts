@@ -5,7 +5,7 @@ import { Effect } from 'effect';
 
 import { loadReviewStatuses, getReviewStatusSync, setReviewStatusSync, type ReviewStatus } from '../review-status.js';
 import { resolveProjectFromIssueSync } from '../projects.js';
-import { messageAgent } from '../agents/messaging.js';
+import { messageAgent, type MessageDeliveryOutcome } from '../agents/messaging.js';
 import { writeFeedbackFile } from './feedback-writer.js';
 import { surfaceIssueFeedbackNeedsYou } from './feedback-target.js';
 import type { StrikeLandingAttempt } from '../strike-landing.js';
@@ -61,7 +61,7 @@ export interface StrikeLandingDeps {
   resolveProject: typeof resolveProjectFromIssueSync;
   mergeIssue: StrikeMergeTrigger;
   getMainHead: (projectPath: string) => Promise<string>;
-  deliverRecovery: (agentId: string, message: string) => Promise<void>;
+  deliverRecovery: (agentId: string, message: string) => Promise<MessageDeliveryOutcome>;
   writeFeedback: (issueId: string, workspacePath: string, markdownBody: string) => Promise<boolean>;
   needsYou: (issueId: string, reason: string, details: Record<string, unknown>) => Promise<void>;
   now: () => string;
