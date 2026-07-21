@@ -125,19 +125,19 @@
   ],
   "feedback": [],
   "created": "2026-07-21T16:29:59.439Z",
-  "updated": "2026-07-21T18:22:10.641Z",
+  "updated": "2026-07-21T18:22:13.253Z",
   "pipeline": {
     "issueId": "PAN-806",
-    "reviewStatus": "passed",
-    "testStatus": "testing",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-21T17:44:12.340Z",
-    "updatedAt": "2026-07-21T18:22:10.630Z",
-    "reviewNotes": "Prior hook-interpreter and git global-option blockers are fixed; no blocking findings remain",
+    "updatedAt": "2026-07-21T18:22:13.236Z",
+    "reviewNotes": "Agent re-review request (2/25): Fixed review issues",
     "inspectNotes": "rebase-helper.ts:101,200 add OVERDECK_PAN_GIT_OP:'1' alongside GIT_EDITOR:'true' on git rebase and git rebase --continue; abort/merge-fallback also sentineled. New tests/unit/lib/rebase-helper.test.ts (3 tests) assert coexistence via objectContaining; ran locally, all pass.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2986",
     "reviewedAtCommit": "812ae913c39efb733bfdc2903ba7cdf46a7b754c",
@@ -183,10 +183,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 12,
-            "output": 1342,
-            "cacheRead": 604850,
-            "cacheWrite": 124048
+            "input": 14,
+            "output": 1541,
+            "cacheRead": 728898,
+            "cacheWrite": 131489
           }
         },
         "work": {
@@ -218,15 +218,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 20,
-          "output": 4541,
-          "cacheRead": 962464,
-          "cacheWrite": 250505
+          "input": 22,
+          "output": 4740,
+          "cacheRead": 1086512,
+          "cacheWrite": 257946
         }
       },
       "costAtCloseOut": {
-        "usd": 148.119355,
-        "pricingAsOf": "2026-07-21T18:22:10.635Z"
+        "usd": 148.164761,
+        "pricingAsOf": "2026-07-21T18:22:13.249Z"
       }
     },
     "merges": [
