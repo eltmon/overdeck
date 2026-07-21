@@ -3,7 +3,7 @@
  *
  * Dispatches verified webhook events to per-type handlers that update
  * review_status blockerReasons based on GitHub-native merge blockers.
- * Advisory checks such as CodeRabbit are excluded because they must never gate merges.
+ * Shared advisory-check classification excludes signals such as CodeRabbit from merge gates.
  */
 
 import { Effect } from 'effect';
@@ -13,6 +13,9 @@ import { GitHubApiError } from './errors.js';
 import { relayCiFailureFeedback } from './cloister/ci-failure-feedback.js';
 import { isInGraphQLCooldown, noteGraphQLRateLimit } from './github-graphql-cooldown.js';
 import { bumpIssuePrTabCacheGeneration } from '../dashboard/server/services/pr-tab-cache.js';
+import { ADVISORY_CHECK_NAMES, isAdvisoryCheckName } from './advisory-checks.js';
+
+export { ADVISORY_CHECK_NAMES, isAdvisoryCheckName };
 
 export interface WebhookPayload {
   action?: string;
@@ -191,14 +194,6 @@ const KNOWN_NOT_MERGEABLE_STATES = new Set(['blocked', 'behind']);
 
 /** `gh` statusCheckRollup conclusions/states that count as a failing required check. */
 export const FAILING_CHECK_CONCLUSIONS = new Set(['FAILURE', 'ERROR', 'TIMED_OUT', 'CANCELLED', 'ACTION_REQUIRED', 'STARTUP_FAILURE', 'STALE']);
-
-/** Lowercase check-name prefixes that provide advisory context but never gate merges. */
-export const ADVISORY_CHECK_NAMES = new Set(['coderabbit']);
-
-function isAdvisoryCheckName(name: string | null | undefined): boolean {
-  const normalized = name?.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
-  return normalized != null && [...ADVISORY_CHECK_NAMES].some((advisory) => normalized.startsWith(advisory));
-}
 
 const pendingReconciliation = new Set<string>();
 const reconciliationTimeouts = new Map<string, NodeJS.Timeout>();

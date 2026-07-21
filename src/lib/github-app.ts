@@ -18,6 +18,7 @@ import { promisify } from 'util';
 import { Effect } from 'effect';
 import { GitHubApiError, ConfigError, FsError } from './errors.js';
 import { withConcurrencyLimitPromise } from './concurrency.js';
+import { isAdvisoryCheckName } from './advisory-checks.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -434,13 +435,13 @@ export function parsePullRequestRef(input: {
 function summarizeCiCheckRuns(
   runs: NonNullable<GitHubCheckRunApiResponse['check_runs']>,
 ): GitHubCiCheckRunsState {
-  const checkRuns = runs.map((run) => ({
-    id: run.id,
-    name: run.name || 'GitHub check run',
-    status: run.status || 'unknown',
-    conclusion: run.conclusion ?? null,
-    htmlUrl: run.html_url,
-  }));
+  const checkRuns = runs.filter((run) => !isAdvisoryCheckName(run.name)).map((run) => ({
+      id: run.id,
+      name: run.name || 'GitHub check run',
+      status: run.status || 'unknown',
+      conclusion: run.conclusion ?? null,
+      htmlUrl: run.html_url,
+    }));
 
   const pendingRuns = checkRuns.filter((run) => run.status !== 'completed');
   const successfulRuns = checkRuns.filter(
@@ -489,15 +490,16 @@ async function getCommitCheckState(
   sha: string,
 ): Promise<{ pending: boolean; failed: boolean }> {
   const [combinedStatus, checkRuns] = await Promise.all([
-    githubApi<{ state?: string }>(`/repos/${owner}/${repo}/commits/${sha}/status`),
+    githubApi<{ state?: string; statuses?: Array<{ context?: string; state?: string }> }>(`/repos/${owner}/${repo}/commits/${sha}/status`),
     githubApi<GitHubCheckRunApiResponse>(
       `/repos/${owner}/${repo}/commits/${sha}/check-runs`
     ),
   ]);
 
-  const statusState = combinedStatus.state || '';
-  const pendingStatus = statusState === 'pending';
-  const failedStatus = statusState === 'failure' || statusState === 'error';
+  // Aggregate state includes advisory contexts, so derive merge-gating status per context.
+  const statuses = (combinedStatus.statuses ?? []).filter((status) => !isAdvisoryCheckName(status.context));
+  const pendingStatus = statuses.some((status) => status.state === 'pending');
+  const failedStatus = statuses.some((status) => status.state === 'failure' || status.state === 'error');
   const ciState = summarizeCiCheckRuns(checkRuns.check_runs || []);
 
   return {
