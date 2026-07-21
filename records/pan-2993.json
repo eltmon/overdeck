@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-21T22:47:36.935Z",
-  "updated": "2026-07-21T23:00:09.339Z",
+  "updated": "2026-07-21T23:02:37.193Z",
   "pipeline": {
     "issueId": "PAN-2993",
     "reviewStatus": "pending",
@@ -59,18 +59,32 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "transport-flag-and-fields": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-2993",
         "agentId": "agent-pan-2993",
         "pid": 1856070,
         "host": "eltmon-z790",
-        "claimedAt": "2026-07-21T23:00:09.339Z"
+        "claimedAt": "2026-07-21T23:00:09.339Z",
+        "itemId": "transport-flag-and-fields",
+        "outcome": "completed",
+        "reason": "Classified rejected internal merge fetches as transport failures, added retry/backoff status fields, mirrored them through durable records, and covered the transport flag with regression tests.",
+        "releasedAt": "2026-07-21T23:02:37.193Z"
+      }
+    ],
+    "statusReasons": {
+      "transport-flag-and-fields": {
+        "reason": "Classified rejected internal merge fetches as transport failures, added retry/backoff status fields, mirrored them through durable records, and covered the transport flag with regression tests.",
+        "updatedAt": "2026-07-21T23:02:37.193Z"
       }
     }
   },
   "statusOverrides": {
-    "transport-flag-and-fields": "running"
+    "transport-flag-and-fields": "completed",
+    "transport-flag-and-fields.transport-flag-and-fields.ac1": "completed",
+    "transport-flag-and-fields.transport-flag-and-fields.ac2": "completed",
+    "transport-flag-and-fields.transport-flag-and-fields.ac3": "completed"
   }
 }
