@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-21T22:47:36.935Z",
-  "updated": "2026-07-21T23:20:36.409Z",
+  "updated": "2026-07-21T23:24:49.943Z",
   "pipeline": {
     "issueId": "PAN-2993",
     "reviewStatus": "pending",
@@ -89,16 +89,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 9,
-    "claims": {
-      "strike-ready-rearm-recovering": {
-        "writerId": "agent-pan-2993",
-        "agentId": "agent-pan-2993",
-        "pid": 2226976,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-21T23:20:36.409Z"
-      }
-    },
+    "sequence": 10,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2993",
@@ -143,6 +135,17 @@
         "outcome": "completed",
         "reason": "Consumed MessageDeliveryOutcome in strike recovery so mail-only delivery escalates immediately to needs_you with durable feedback, while delivered and thrown paths preserve their intended behavior.",
         "releasedAt": "2026-07-21T23:20:09.687Z"
+      },
+      {
+        "writerId": "agent-pan-2993",
+        "agentId": "agent-pan-2993",
+        "pid": 2226976,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-21T23:20:36.409Z",
+        "itemId": "strike-ready-rearm-recovering",
+        "outcome": "completed",
+        "reason": "Allowed same-head strike-ready to re-arm recovering and needs_you states, cleared transport backoff fields on every re-arm/new-head cycle, preserved ready/landing idempotence, and added injected-git regression coverage.",
+        "releasedAt": "2026-07-21T23:24:49.943Z"
       }
     ],
     "statusReasons": {
@@ -161,6 +164,10 @@
       "strike-recovery-undelivered": {
         "reason": "Consumed MessageDeliveryOutcome in strike recovery so mail-only delivery escalates immediately to needs_you with durable feedback, while delivered and thrown paths preserve their intended behavior.",
         "updatedAt": "2026-07-21T23:20:09.687Z"
+      },
+      "strike-ready-rearm-recovering": {
+        "reason": "Allowed same-head strike-ready to re-arm recovering and needs_you states, cleared transport backoff fields on every re-arm/new-head cycle, preserved ready/landing idempotence, and added injected-git regression coverage.",
+        "updatedAt": "2026-07-21T23:24:49.943Z"
       }
     }
   },
@@ -184,6 +191,9 @@
     "strike-recovery-undelivered.strike-recovery-undelivered.ac1": "completed",
     "strike-recovery-undelivered.strike-recovery-undelivered.ac2": "completed",
     "strike-recovery-undelivered.strike-recovery-undelivered.ac3": "completed",
-    "strike-ready-rearm-recovering": "running"
+    "strike-ready-rearm-recovering": "completed",
+    "strike-ready-rearm-recovering.strike-ready-rearm-recovering.ac1": "completed",
+    "strike-ready-rearm-recovering.strike-ready-rearm-recovering.ac2": "completed",
+    "strike-ready-rearm-recovering.strike-ready-rearm-recovering.ac3": "completed"
   }
 }
