@@ -3,7 +3,7 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-07-19T02:22:16.359Z",
-  "updated": "2026-07-21T21:20:09.542Z",
+  "updated": "2026-07-21T21:25:07.087Z",
   "pipeline": {
     "issueId": "PAN-2895",
     "reviewStatus": "pending",
@@ -12,12 +12,12 @@
     "mergeStatus": "verifying",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-21T21:20:08.876Z",
+    "updatedAt": "2026-07-21T21:25:07.077Z",
     "verificationNotes": "The supervised verification worker stopped before recording a result; verification re-runs on the next cycle.",
     "strikeReadyHead": "3f4779212b5b4b386034827207bcb4e239dcc63f",
     "strikeReadyAt": "2026-07-21T21:19:16.581Z",
-    "strikeLandingState": "landing",
-    "strikeRecoveryCount": 0,
+    "strikeLandingState": "recovering",
+    "strikeRecoveryCount": 1,
     "strikeLandingAttempts": [
       {
         "timestamp": "2026-07-19T03:20:56.265Z",
@@ -39,6 +39,13 @@
         "mainHead": "9fe54364c62782b0109b559c98c75b84d943ce65",
         "outcome": "failed",
         "detail": "GitHub PR #2903 is CONFLICTING with main. Resolve conflicts before merging — see https://github.com/eltmon/overdeck/pull/2903."
+      },
+      {
+        "timestamp": "2026-07-21T21:25:07.068Z",
+        "strikeHead": "3f4779212b5b4b386034827207bcb4e239dcc63f",
+        "mainHead": "9fe54364c62782b0109b559c98c75b84d943ce65",
+        "outcome": "failed",
+        "detail": "Strike merge request failed: fetch failed"
       }
     ]
   },
@@ -78,7 +85,7 @@
       },
       "costAtCloseOut": {
         "usd": 52.822968,
-        "pricingAsOf": "2026-07-21T21:20:08.895Z"
+        "pricingAsOf": "2026-07-21T21:25:07.081Z"
       }
     },
     "merges": [],
