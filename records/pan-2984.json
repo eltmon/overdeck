@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-21T15:14:12.381Z",
-  "updated": "2026-07-21T15:35:03.022Z",
+  "updated": "2026-07-21T15:42:19.554Z",
   "pipeline": {
     "issueId": "PAN-2984",
     "reviewStatus": "pending",
@@ -97,16 +97,8 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "ensure-ladder": {
-        "writerId": "agent-pan-2984",
-        "agentId": "agent-pan-2984",
-        "pid": 2143490,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-21T15:35:03.022Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2984",
@@ -140,6 +132,17 @@
         "outcome": "completed",
         "reason": "Added managed-shim ownership detection, foreign-file protection, executable shim writing, and rewrite coverage; 14 scoped tests and typecheck pass.",
         "releasedAt": "2026-07-21T15:34:44.704Z"
+      },
+      {
+        "writerId": "agent-pan-2984",
+        "agentId": "agent-pan-2984",
+        "pid": 2143490,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-21T15:35:03.022Z",
+        "itemId": "ensure-ladder",
+        "outcome": "completed",
+        "reason": "Implemented shared setup-plan resolution/execution, typed consent-required errors, PATH+absolute-shim probing, pinned-runtime npm install/shim creation, and fake-timer health polling; 26 scoped tests and full typecheck pass.",
+        "releasedAt": "2026-07-21T15:42:19.553Z"
       }
     ],
     "statusReasons": {
@@ -154,6 +157,10 @@
       "ok-shim-writer": {
         "reason": "Added managed-shim ownership detection, foreign-file protection, executable shim writing, and rewrite coverage; 14 scoped tests and typecheck pass.",
         "updatedAt": "2026-07-21T15:34:44.704Z"
+      },
+      "ensure-ladder": {
+        "reason": "Implemented shared setup-plan resolution/execution, typed consent-required errors, PATH+absolute-shim probing, pinned-runtime npm install/shim creation, and fake-timer health polling; 26 scoped tests and full typecheck pass.",
+        "updatedAt": "2026-07-21T15:42:19.553Z"
       }
     }
   },
@@ -173,6 +180,12 @@
     "ok-shim-writer.ok-shim-writer.ac2": "completed",
     "ok-shim-writer.ok-shim-writer.ac3": "completed",
     "ok-shim-writer.ok-shim-writer.ac4": "completed",
-    "ensure-ladder": "running"
+    "ensure-ladder": "completed",
+    "ensure-ladder.ensure-ladder.ac1": "completed",
+    "ensure-ladder.ensure-ladder.ac2": "completed",
+    "ensure-ladder.ensure-ladder.ac3": "completed",
+    "ensure-ladder.ensure-ladder.ac4": "completed",
+    "ensure-ladder.ensure-ladder.ac5": "completed",
+    "ensure-ladder.ensure-ladder.ac6": "completed"
   }
 }
