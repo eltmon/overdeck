@@ -319,29 +319,19 @@
     "recordedAt": "2026-07-19T00:54:19.291Z"
   },
   "created": "2026-07-17T12:54:30.819Z",
-  "updated": "2026-07-21T13:44:35.038Z",
+  "updated": "2026-07-21T13:45:05.363Z",
   "pipeline": {
     "issueId": "PAN-2377",
-    "reviewStatus": "passed",
-    "testStatus": "passed",
-    "verificationStatus": "passed",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
     "inspectStatus": "failed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-19T00:54:56.018Z",
-    "updatedAt": "2026-07-21T13:44:35.022Z",
-    "blockerReasons": [
-      {
-        "type": "merge_conflict",
-        "summary": "Merge conflict with target branch",
-        "detectedAt": "2026-07-21T13:44:35.021Z"
-      }
-    ],
-    "prUrl": "https://github.com/eltmon/overdeck/pull/2894",
-    "reviewedAtCommit": "07088273a11c5c86e1ef8bb0513c4545b6b6cf02",
-    "lastVerifiedCommit": "1efab25bdb7b55b494dffc64f858401acec57b05",
-    "reviewSpawnedAt": "2026-07-19T06:51:39.050Z"
+    "updatedAt": "2026-07-21T13:45:05.351Z",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2894"
   },
   "closeOut": {
     "usage": {
@@ -409,7 +399,7 @@
       },
       "costAtCloseOut": {
         "usd": 627.487888,
-        "pricingAsOf": "2026-07-21T13:44:35.033Z"
+        "pricingAsOf": "2026-07-21T13:45:05.360Z"
       }
     },
     "merges": [
