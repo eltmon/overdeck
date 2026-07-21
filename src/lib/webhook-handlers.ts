@@ -3,6 +3,7 @@
  *
  * Dispatches verified webhook events to per-type handlers that update
  * review_status blockerReasons based on GitHub-native merge blockers.
+ * Advisory checks such as CodeRabbit are excluded because they must never gate merges.
  */
 
 import { Effect } from 'effect';
@@ -191,6 +192,14 @@ const KNOWN_NOT_MERGEABLE_STATES = new Set(['blocked', 'behind']);
 /** `gh` statusCheckRollup conclusions/states that count as a failing required check. */
 export const FAILING_CHECK_CONCLUSIONS = new Set(['FAILURE', 'ERROR', 'TIMED_OUT', 'CANCELLED', 'ACTION_REQUIRED', 'STARTUP_FAILURE', 'STALE']);
 
+/** Lowercase check-name prefixes that provide advisory context but never gate merges. */
+export const ADVISORY_CHECK_NAMES = new Set(['coderabbit']);
+
+function isAdvisoryCheckName(name: string | null | undefined): boolean {
+  const normalized = name?.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+  return normalized != null && [...ADVISORY_CHECK_NAMES].some((advisory) => normalized.startsWith(advisory));
+}
+
 const pendingReconciliation = new Set<string>();
 const reconciliationTimeouts = new Map<string, NodeJS.Timeout>();
 
@@ -264,13 +273,19 @@ export async function refreshMergeStateFromGitHub(issueId: string, repo: string,
         mergeable?: string | null;
         mergeStateStatus?: string | null;
         isDraft?: boolean;
-        statusCheckRollup?: Array<{ conclusion?: string | null; state?: string | null }>;
+        statusCheckRollup?: Array<{
+          name?: string | null;
+          context?: string | null;
+          conclusion?: string | null;
+          state?: string | null;
+        }>;
       };
       mergeable = (pr.mergeable ?? '').toUpperCase();
       mergeState = (pr.mergeStateStatus ?? '').toUpperCase();
       isDraft = pr.isDraft === true;
-      checksFailed = (pr.statusCheckRollup ?? []).some((c) =>
-        FAILING_CHECK_CONCLUSIONS.has((c.conclusion || c.state || '').toUpperCase()),
+      checksFailed = (pr.statusCheckRollup ?? []).some((check) =>
+        !isAdvisoryCheckName(check.name ?? check.context)
+        && FAILING_CHECK_CONCLUSIONS.has((check.conclusion || check.state || '').toUpperCase()),
       );
     }
 
@@ -355,12 +370,14 @@ export async function refreshMergeStateFromGitHub(issueId: string, repo: string,
 
   const repo = payload.repository!.full_name;
   const sourceKey = `check_run:${run.name ?? String(run.id ?? 'unknown')}`;
+  const isAdvisory = isAdvisoryCheckName(run.name);
 
   for (const pr of run.pull_requests) {
     const issueId = issueIdFromBranch(pr.head.ref);
     if (!issueId) continue;
 
     bumpIssuePrTabCacheGeneration(issueId);
+    if (isAdvisory) continue;
 
     const status = await loadAndValidateStatus(issueId, repo, pr.number, pr.head.sha);
     if (!status) continue;
@@ -626,11 +643,13 @@ async function handlePullRequestReviewThreadPromise(payload: WebhookPayload): Pr
   const repo = payload.repository!.full_name;
   const context = payload.context ?? 'default';
   const sourceKey = `status:${context}`;
+  const isAdvisory = isAdvisoryCheckName(context);
 
   for (const branch of branches) {
     const issueId = issueIdFromBranch(branch.name);
     if (issueId) {
       bumpIssuePrTabCacheGeneration(issueId);
+      if (isAdvisory) continue;
 
       const status = await loadAndValidateStatus(issueId, repo, undefined, payload.sha);
       if (!status) continue;

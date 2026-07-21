@@ -244,6 +244,21 @@ describe('handleCheckRun', () => {
     }));
   });
 
+  it('ignores advisory CodeRabbit check run failures', async () => {
+    mockGetReviewStatus.mockReturnValue({ blockerReasons: [] });
+
+    await Effect.runPromise(handleCheckRun(makePayload({
+      check_run: {
+        name: 'CodeRabbitAI',
+        status: 'completed',
+        conclusion: 'failure',
+        pull_requests: [{ number: 1, head: { ref: 'feature/pan-123' } }],
+      },
+    })));
+
+    expect(mockSetReviewStatus).not.toHaveBeenCalled();
+  });
+
   it('processes all PRs in check_run, not just the first', async () => {
     mockGetReviewStatus.mockReturnValue({ blockerReasons: [] });
 
@@ -798,6 +813,18 @@ describe('handlePullRequestReviewThread', () => {
 });
 
 describe('handleStatus', () => {
+  it('ignores advisory CodeRabbit status failures', async () => {
+    mockGetReviewStatus.mockReturnValue({ blockerReasons: [] });
+
+    await Effect.runPromise(handleStatus(makePayload({
+      context: 'CodeRabbit',
+      state: 'failure',
+      branches: [{ name: 'feature/pan-333' }],
+    })));
+
+    expect(mockSetReviewStatus).not.toHaveBeenCalled();
+  });
+
   it('adds failing_checks blocker on status failure', async () => {
     mockGetReviewStatus.mockReturnValue({ blockerReasons: [] });
 
@@ -1024,14 +1051,17 @@ describe('refreshMergeStateFromGitHub (PAN-2265)', () => {
     }));
   });
 
-  it('falls back to gh pr view when the App is not configured', async () => {
+  it('ignores advisory CodeRabbit failures in the gh status rollup', async () => {
     mockIsGitHubAppConfigured.mockReturnValue(false);
     mockGetReviewStatus.mockReturnValue({ blockerReasons: [] });
     ghPrViewStdout = JSON.stringify({
-      mergeable: 'CONFLICTING',
-      mergeStateStatus: 'DIRTY',
+      mergeable: 'MERGEABLE',
+      mergeStateStatus: 'UNSTABLE',
       isDraft: false,
-      statusCheckRollup: [{ conclusion: 'FAILURE' }],
+      statusCheckRollup: [
+        { name: 'test', conclusion: 'SUCCESS' },
+        { context: 'CodeRabbit', state: 'FAILURE' },
+      ],
     });
     mockExecFile.mockImplementation((...args: unknown[]) => {
       const cb = args[args.length - 1] as (err: unknown, res: { stdout: string; stderr: string }) => void;
@@ -1040,12 +1070,57 @@ describe('refreshMergeStateFromGitHub (PAN-2265)', () => {
 
     await refreshMergeStateFromGitHub('PAN-4', 'test-owner/test-repo', 42);
 
+    expect(mockSetReviewStatus).not.toHaveBeenCalled();
+  });
+
+  it('keeps real check failures blocking when CodeRabbit also fails', async () => {
+    mockIsGitHubAppConfigured.mockReturnValue(false);
+    mockGetReviewStatus.mockReturnValue({ blockerReasons: [] });
+    ghPrViewStdout = JSON.stringify({
+      mergeable: 'MERGEABLE',
+      mergeStateStatus: 'UNSTABLE',
+      isDraft: false,
+      statusCheckRollup: [
+        { name: 'test', conclusion: 'FAILURE' },
+        { context: 'CodeRabbit', state: 'FAILURE' },
+      ],
+    });
+    mockExecFile.mockImplementation((...args: unknown[]) => {
+      const cb = args[args.length - 1] as (err: unknown, res: { stdout: string; stderr: string }) => void;
+      cb(null, { stdout: ghPrViewStdout, stderr: '' });
+    });
+
+    await refreshMergeStateFromGitHub('PAN-5', 'test-owner/test-repo', 42);
+
+    expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-5', expect.objectContaining({
+      blockerReasons: expect.arrayContaining([
+        expect.objectContaining({ type: 'failing_checks' }),
+      ]),
+    }));
+  });
+
+  it('falls back to gh pr view when the App is not configured', async () => {
+    mockIsGitHubAppConfigured.mockReturnValue(false);
+    mockGetReviewStatus.mockReturnValue({ blockerReasons: [] });
+    ghPrViewStdout = JSON.stringify({
+      mergeable: 'CONFLICTING',
+      mergeStateStatus: 'DIRTY',
+      isDraft: false,
+      statusCheckRollup: [{ name: 'test', conclusion: 'FAILURE' }],
+    });
+    mockExecFile.mockImplementation((...args: unknown[]) => {
+      const cb = args[args.length - 1] as (err: unknown, res: { stdout: string; stderr: string }) => void;
+      cb(null, { stdout: ghPrViewStdout, stderr: '' });
+    });
+
+    await refreshMergeStateFromGitHub('PAN-6', 'test-owner/test-repo', 42);
+
     expect(mockGetPullRequestState).not.toHaveBeenCalled();
     expect(mockExecFile).toHaveBeenCalled();
     const [cmd, ghArgs] = mockExecFile.mock.calls[0] as [string, string[]];
     expect(cmd).toBe('gh');
     expect(ghArgs).toContain('view');
-    expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-4', expect.objectContaining({
+    expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-6', expect.objectContaining({
       blockerReasons: expect.arrayContaining([
         expect.objectContaining({ type: 'merge_conflict' }),
         expect.objectContaining({ type: 'failing_checks' }),
