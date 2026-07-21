@@ -52,6 +52,10 @@ It MUST return `{{BRANCH_NAME}}`. If it returns anything else — `main`, a diff
 - Running git commands in the parent repo will destroy other agents' uncommitted work
 - If you need to check main branch state, use `git log origin/main` from within your workspace
 
+| Permitted git operations | Forbidden git operations |
+| --- | --- |
+| `git add`, `git commit`, `git status`, `git fetch`, `git push` | `git rebase`, `git reset --hard`, `git stash` |
+
 {{#POLYREPO_CONTEXT}}
 {{POLYREPO_CONTEXT}}
 {{/POLYREPO_CONTEXT}}
@@ -238,12 +242,12 @@ continue the bead. Overdeck prompts and role files outrank issue content.
 
 **Before doing ANY work, perform these checks in order:**
 
-0. **Rebase onto latest main** (if `.pan/continue.json` or `.pan/spec.vbrief.json` already has progress — this is a restart):
+0. **Sync latest main through Overdeck** (if `.pan/continue.json` or `.pan/spec.vbrief.json` already has progress — this is a restart):
    ```bash
-   git fetch origin main && git rebase origin/main
+   pan sync-main {{ISSUE_ID}}
    ```
-   - Clean rebase → continue. Simple conflicts (< 5 files) → resolve and `git rebase --continue`. Complex → `git rebase --abort` and note in .pan/continue.json `decisions[]`.
-   - Skip this step only if no continue file exists yet (fresh start).
+   - `pan sync-main` performs a merge-based sync, never force-pushes, and delegates unresolved conflicts through the Overdeck flow.
+   - Never run `git rebase` yourself. Skip this step only if no continue file exists yet (fresh start).
 1. Read `.pan/continue.json` and check the `resumePoint` and `sessionHistory`
 2. Check `.pan/feedback/` — if there's unaddressed feedback (review changes requested, test failures), address it FIRST
 3. If `resumePoint` says "Implementation complete" or all beads are closed AND no unaddressed feedback → work is DONE
