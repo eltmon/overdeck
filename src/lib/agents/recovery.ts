@@ -49,7 +49,7 @@ import {
   writeOhmypiAgentPrompt,
 } from './runtime-command.js';
 import { assertWorkspaceStackHealthyForSpawn, buildAgentLaunchConfig } from './spawn-prep.js';
-import { prepareSupervisorForRelaunch } from './supervisor-channels.js';
+import { prepareSupervisorForRelaunch, buildResumeContinueMessage } from './supervisor-channels.js';
 import { stopAgent } from './termination.js';
 
 export interface RestartAgentOptions {
@@ -157,7 +157,10 @@ export async function restartAgent(
       },
     }));
 
-    const prompt = message || `You are resuming work on ${agentState.issueId}. Read .pan/continue.json for context and pick up where you left off.`;
+    // PAN-2974 (root cause B): the fallback continue-prompt is phase-aware —
+    // a handed-off agent (completed marker) gets a passive restore, not a
+    // "pick up where you left off" that re-drives the pipeline.
+    const prompt = message || buildResumeContinueMessage(agentState);
     if (effectiveHarness === 'ohmypi') {
       // ohmypi does not fire the Claude SessionStart hook and does not read tmux
       // input — wait for ready.json and write the continue prompt through the

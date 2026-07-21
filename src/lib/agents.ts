@@ -8,6 +8,7 @@ export {
 } from './agents/identity.js';
 export {
   buildDefaultResumeContinueMessage,
+  buildResumeContinueMessage,
   decideChannelsForWorkAgent,
   decideSupervisorForWorkAgent,
   dismissDevChannelsDialog,

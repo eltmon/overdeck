@@ -128,6 +128,19 @@ vi.mock('../no-resume-mode.js', () => ({
   getNoResumeMode: () => ({ active: false, since: null }),
 }));
 
+// PAN-2974: the boot-reconciliation decision is controllable per test.
+// Default null preserves the pre-existing behavior for every other case here.
+const mocks = {
+  bootState: { decision: null as string | null },
+};
+vi.mock('../../../lib/overdeck/control-settings.js', async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  return {
+    ...actual,
+    getBootReconciliationState: vi.fn(() => ({ ...mocks.bootState })),
+  };
+});
+
 import {
   handleAgentStoppedEvent,
   handleAgentHeartbeatDeadEvent,
@@ -153,6 +166,7 @@ describe('PAN-1908 reactive liveness handlers', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     tempDir = mkdtempSync(join(tmpdir(), 'pan-1908-liveness-'));
+    mocks.bootState.decision = null;
     mockGetAgentStateSync.mockReturnValue(null);
     mockSaveAgentState.mockReturnValue(Effect.void);
     mockResumeAgent.mockResolvedValue({ success: true });
@@ -198,6 +212,75 @@ describe('PAN-1908 reactive liveness handlers', () => {
       });
 
       const result = await handleAgentStoppedEvent('agent-pan-1908');
+
+      expect(result).toBe('agent-pan-1908');
+      expect(mockResumeAgent).toHaveBeenCalledWith('agent-pan-1908');
+    });
+
+    // PAN-2974 root cause A: while the boot-reconciliation decision is pending
+    // (or hold_all), the EVENT path holds every stopped work agent — not just
+    // the ones in the pending-hold set (2026-07-21 MIN-882 resumed ungated).
+    it('holds a stopped work agent while the boot decision is pending, even outside the pending-hold set', async () => {
+      mocks.bootState.decision = 'pending';
+      mockGetAgentStateSync.mockReturnValue(makeState());
+      mockGetReviewStatusSync.mockReturnValue({
+        issueId: 'PAN-1908',
+        reviewStatus: 'blocked',
+        testStatus: 'pending',
+        verificationStatus: 'pending',
+        readyForMerge: false,
+      });
+
+      const result = await handleAgentStoppedEvent('agent-pan-1908');
+
+      expect(result).toBeNull();
+      expect(mockResumeAgent).not.toHaveBeenCalled();
+    });
+
+    it('holds a stopped work agent while the boot decision is hold_all', async () => {
+      mocks.bootState.decision = 'hold_all';
+      mockGetAgentStateSync.mockReturnValue(makeState());
+      mockGetReviewStatusSync.mockReturnValue({
+        issueId: 'PAN-1908',
+        reviewStatus: 'blocked',
+        testStatus: 'pending',
+      });
+
+      const result = await handleAgentStoppedEvent('agent-pan-1908');
+
+      expect(result).toBeNull();
+      expect(mockResumeAgent).not.toHaveBeenCalled();
+    });
+
+    it('resumes normally once a decision is made (no pending window)', async () => {
+      mocks.bootState.decision = 'resume_all';
+      mockGetAgentStateSync.mockReturnValue(makeState());
+      mockGetReviewStatusSync.mockReturnValue({
+        issueId: 'PAN-1908',
+        reviewStatus: 'blocked',
+        testStatus: 'pending',
+        verificationStatus: 'pending',
+        readyForMerge: false,
+      });
+
+      const result = await handleAgentStoppedEvent('agent-pan-1908');
+
+      expect(result).toBe('agent-pan-1908');
+      expect(mockResumeAgent).toHaveBeenCalledWith('agent-pan-1908');
+    });
+
+    it('does not gate the batch path (skipGlobalGates) on the pending window — the batch owns its own gate', async () => {
+      mocks.bootState.decision = 'pending';
+      mockGetAgentStateSync.mockReturnValue(makeState());
+      mockGetReviewStatusSync.mockReturnValue({
+        issueId: 'PAN-1908',
+        reviewStatus: 'blocked',
+        testStatus: 'pending',
+        verificationStatus: 'pending',
+        readyForMerge: false,
+      });
+
+      const result = await handleAgentStoppedEvent('agent-pan-1908', { skipGlobalGates: true });
 
       expect(result).toBe('agent-pan-1908');
       expect(mockResumeAgent).toHaveBeenCalledWith('agent-pan-1908');

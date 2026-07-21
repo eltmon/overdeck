@@ -22,7 +22,7 @@ import { getReviewStatusSync } from '../review-status.js';
 import { getBootReconciliationState } from '../overdeck/control-settings.js';
 import { captureTranscriptUserRecordSnapshot } from '../transcript-landing.js';
 import {
-  buildDefaultResumeContinueMessage,
+  buildResumeContinueMessage,
   getAgentDir,
   getAgentRuntimeStateSync,
   getAgentState,
@@ -405,7 +405,7 @@ function buildStalledResumePrompt(state: AgentState): string | null {
       return null;
     }
   }
-  return buildDefaultResumeContinueMessage(state.issueId);
+  return buildResumeContinueMessage(state);
 }
 
 function readyTaskLine(item: XBriefItem): string {
@@ -648,6 +648,20 @@ export async function handleAgentStoppedEvent(
 
   if (getBootReconciliationHeldResumeSet().has(agentId)) {
     logDeaconEventSync(`handleAgentStoppedEvent: ${agentId} skipped — held by boot reconciliation decision`);
+    return null;
+  }
+
+  // PAN-2974 (root cause A): the event path used to resume ungated during the
+  // grace window whenever the agent fell OUTSIDE the pending-hold set (e.g.
+  // recency-excluded completions — 2026-07-21 MIN-882). While the decision is
+  // pending (or hold_all), hold every stopped work agent on this path and log
+  // it as a late-arriving candidate for the operator dialog — the batch path
+  // (autoResumeStoppedWorkAgents) owns the evaluation, mirroring its
+  // getBootReconciliationPendingHoldSet() gate. skipGlobalGates stays
+  // authoritative for the batch's own calls.
+  const bootDecision = getBootReconciliationState().decision;
+  if (!skipGlobalGates && (bootDecision === 'pending' || bootDecision === 'hold_all')) {
+    logDeaconEventSync(`handleAgentStoppedEvent: ${agentId} held — boot reconciliation ${bootDecision} (late-arriving candidate, evaluated with the batch)`);
     return null;
   }
 

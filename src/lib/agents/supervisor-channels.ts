@@ -1,4 +1,5 @@
 import { readFile } from 'fs/promises';
+import { existsSync } from 'fs';
 import { homedir } from 'os';
 import { dirname, join } from 'path';
 import { Effect } from 'effect';
@@ -32,6 +33,37 @@ interface SupervisorChannelsSpawnOptions {
 
 export function buildDefaultResumeContinueMessage(issueId: string): string {
   return `You are resuming work on ${issueId}. Read .pan/continue.json for context and pick up where you left off — do not wait for further instructions.`;
+}
+
+/** Completed marker check: the agent dir's own markers, or the workspace's. */
+function hasCompletionMarkerForAgent(state: AgentState): boolean {
+  const agentDir = getAgentDir(state.id);
+  if (existsSync(join(agentDir, 'completed')) || existsSync(join(agentDir, 'completed.processed'))) return true;
+  const workspace = state.workspace;
+  if (workspace && (existsSync(join(workspace, '.pan', 'completed')) || existsSync(join(workspace, '.pan', 'completed.processed')))) return true;
+  return false;
+}
+
+/**
+ * PAN-2974 (root cause B): the resume kickoff is phase-aware. Telling an agent
+ * whose work was already handed off (completed marker) to "pick up where you
+ * left off — do not wait for further instructions" makes it re-drive pipeline
+ * stages on its own authority — 2026-07-21 MIN-882: a post-reboot resume
+ * re-ran verification, restored config, and fired `pan review request` /
+ * `pan review restart` while the operator was mid-UAT on finished work.
+ * A handed-off agent gets a PASSIVE restore instead; only agents that crashed
+ * mid-implementation get the aggressive kickoff.
+ */
+export function buildResumeContinueMessage(state: AgentState): string {
+  const issueId = state.issueId;
+  if (hasCompletionMarkerForAgent(state)) {
+    return [
+      `Your session for ${issueId} was restored after a restart.`,
+      `The work was already handed off — a completed marker exists. Do NOT re-drive pipeline stages (review, test, verify, merge) on your own authority.`,
+      `Stay available for the operator and act only on new instructions.`,
+    ].join(' ');
+  }
+  return buildDefaultResumeContinueMessage(issueId);
 }
 
 export async function buildResumeMessageForAgent(

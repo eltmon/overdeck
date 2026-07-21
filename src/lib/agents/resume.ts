@@ -43,7 +43,7 @@ import {
   writeOhmypiAgentPrompt,
 } from './runtime-command.js';
 import {
-  buildDefaultResumeContinueMessage,
+  buildResumeContinueMessage,
   buildResumeMessageForAgent,
   markKickoffRedelivered,
   prepareSupervisorForRelaunch,
@@ -383,7 +383,7 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
     // seed (summary + reseed instructions) IS the opening prompt of the fresh
     // session; a caller-supplied message rides along after it.
     const issueId = agentState.issueId || normalizedId.replace(/^agent-/, '').toUpperCase();
-    const defaultResumeMessage = buildDefaultResumeContinueMessage(issueId);
+    const defaultResumeMessage = buildResumeContinueMessage(agentState);
     const resumeMessage: { message?: string; redeliveringKickoff: boolean; error?: string } = compactSeed
       ? { message: message ? `${compactSeed}\n\n${message}` : compactSeed, redeliveringKickoff: false }
       : resumeDriftReasons.length > 0
