@@ -156,9 +156,12 @@ describe('knowledgeCommand', () => {
     }));
   });
 
-  it('opens the configured bundle, auto-installs on explicit use, and launches the browser', async () => {
+  it('opens the configured bundle through the resolved command and launches the browser', async () => {
     const unref = vi.fn();
-    const ensure = vi.fn(async () => ({ status: 'already-installed' as const, command: 'ok' as const }));
+    const ensure = vi.fn(async () => ({
+      status: 'already-installed' as const,
+      command: '/home/tester/.local/bin/ok',
+    }));
     const start = vi.fn(async () => ({
       process: { unref } as never,
       owned: true,
@@ -180,7 +183,10 @@ describe('knowledgeCommand', () => {
 
     expect(memoryMocks.resolveKnowledgeBundleRoot).toHaveBeenCalledWith({ projectPath: '/repo/overdeck' });
     expect(ensure).toHaveBeenCalledWith({ autoInstall: true });
-    expect(start).toHaveBeenCalledWith('/repo/overdeck/knowledge', { openBrowser: false });
+    expect(start).toHaveBeenCalledWith('/repo/overdeck/knowledge', {
+      openBrowser: false,
+      okCommand: '/home/tester/.local/bin/ok',
+    });
     expect(unref).toHaveBeenCalledOnce();
     expect(openBrowser).toHaveBeenCalledWith('http://127.0.0.1:39847');
     expect(log).toHaveBeenCalledWith('Knowledge viewer: http://127.0.0.1:39847');

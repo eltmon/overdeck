@@ -33,14 +33,15 @@ export interface KnowledgeViewerService {
 export interface KnowledgeViewerDependencies {
   resolveBundle?: (projectKey: string) => Promise<string | null>;
   ensure?: (options: { autoInstall: false }) => Promise<EnsureOpenKnowledgeResult>;
-  start?: (bundlePath: string, options: { openBrowser: false }) => Promise<StartOpenKnowledgeServerResult>;
-  stop?: (bundlePath: string) => Promise<void>;
+  start?: (bundlePath: string, options: { openBrowser: false; okCommand?: string }) => Promise<StartOpenKnowledgeServerResult>;
+  stop?: (bundlePath: string, okCommand?: string) => Promise<void>;
   fetchImpl?: typeof fetch;
 }
 
 interface ViewerEntry {
   bundlePath: string;
   runtimeBundlePath: string;
+  okCommand: string;
   process: ChildProcess | null;
   owned: boolean;
   port: number;
@@ -128,9 +129,10 @@ export function createKnowledgeViewerService(
     const status = await getStatus(projectKey);
     if (!status.bundleConfigured || !status.installed || status.running) return status;
 
+    const okCommand = installedCache?.command ?? 'ok';
     let started: StartOpenKnowledgeServerResult;
     try {
-      started = await start(status.bundlePath!, { openBrowser: false });
+      started = await start(status.bundlePath!, { openBrowser: false, okCommand });
     } catch (error) {
       installedCache = null;
       throw error;
@@ -138,6 +140,7 @@ export function createKnowledgeViewerService(
     const entry: ViewerEntry = {
       bundlePath: status.bundlePath!,
       runtimeBundlePath: started.runtimeBundlePath,
+      okCommand,
       process: started.process,
       owned: started.owned,
       port: started.port,
@@ -175,7 +178,7 @@ export function createKnowledgeViewerService(
     if (entries.get(projectKey) === entry) entries.delete(projectKey);
     if (!entry.owned) return;
     try {
-      await stop(entry.runtimeBundlePath);
+      await stop(entry.runtimeBundlePath, entry.okCommand);
     } catch {
       // The tracked child is still ours to terminate when the `ok stop` helper fails.
     }
@@ -239,9 +242,9 @@ function responseAllowsEmbedding(headers: Headers): boolean {
   return frameAncestors !== "'none'" && frameAncestors !== "'self'";
 }
 
-async function stopOpenKnowledgeWithSpawn(bundlePath: string): Promise<void> {
+async function stopOpenKnowledgeWithSpawn(bundlePath: string, okCommand = 'ok'): Promise<void> {
   await new Promise<void>((resolve, reject) => {
-    const child = spawn('ok', ['--cwd', bundlePath, 'stop'], { stdio: 'ignore' });
+    const child = spawn(okCommand, ['--cwd', bundlePath, 'stop'], { stdio: 'ignore' });
     child.once('error', reject);
     child.once('exit', (code) => {
       if (code === 0) resolve();

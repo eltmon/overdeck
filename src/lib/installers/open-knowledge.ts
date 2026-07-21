@@ -82,6 +82,7 @@ export interface StartOpenKnowledgeServerOptions {
   initializeIfNeeded?: boolean;
   retryDelayMs?: number;
   maxHealthAttempts?: number;
+  okCommand?: string;
   runCommand?: CommandRunner;
   spawnProcess?: SpawnProcess;
   isInitialized?: (bundlePath: string) => Promise<boolean>;
@@ -204,7 +205,7 @@ export async function startReadOnlyOpenKnowledgeServer(
 ): Promise<StartOpenKnowledgeServerResult> {
   const prepareSnapshot = options.prepareSnapshot ?? prepareOpenKnowledgeSnapshot;
   const runtimeBundlePath = await readOnlyOpenKnowledgeSnapshotPath(bundlePath, options.snapshotRoot);
-  const getStatus = options.getStatus ?? ((path) => getOpenKnowledgeStatus(path, options.runCommand));
+  const getStatus = options.getStatus ?? ((path) => getOpenKnowledgeStatus(path, options.runCommand, options.okCommand));
   const existing = await getStatus(runtimeBundlePath);
   if (!liveStatus(existing)) {
     await prepareSnapshot(bundlePath, options.snapshotRoot);
@@ -261,9 +262,10 @@ export async function readOnlyOpenKnowledgeSnapshotPath(
 export async function getOpenKnowledgeStatus(
   bundlePath: string,
   runCommand: CommandRunner = runCommandWithSpawn,
+  okCommand = 'ok',
 ): Promise<OpenKnowledgeStatus> {
   try {
-    const result = await runCommand('ok', ['--cwd', bundlePath, 'status', '--json']);
+    const result = await runCommand(okCommand, ['--cwd', bundlePath, 'status', '--json']);
     const parsed = JSON.parse(result.stdout) as Partial<OpenKnowledgeStatus>;
     return {
       server: normalizeProcessStatus(parsed.server, 'server'),
@@ -279,7 +281,8 @@ export async function startOpenKnowledgeServer(
   options: StartOpenKnowledgeServerOptions = {},
 ): Promise<StartOpenKnowledgeServerResult> {
   const runCommand = options.runCommand ?? runCommandWithSpawn;
-  const getStatus = options.getStatus ?? ((path) => getOpenKnowledgeStatus(path, runCommand));
+  const okCommand = options.okCommand ?? 'ok';
+  const getStatus = options.getStatus ?? ((path) => getOpenKnowledgeStatus(path, runCommand, okCommand));
   const fetchImpl = options.fetchImpl ?? fetch;
   const sleep = options.sleep ?? ((ms) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
   const retryDelayMs = options.retryDelayMs ?? DEFAULT_START_RETRY_DELAY_MS;
@@ -293,7 +296,7 @@ export async function startOpenKnowledgeServer(
     if (options.initializeIfNeeded === false) {
       throw new OpenKnowledgeError(`open-knowledge is not initialized for ${bundlePath}. Run \`ok init\` first.`);
     }
-    await runCommand('ok', [
+    await runCommand(okCommand, [
       '--cwd',
       bundlePath,
       'init',
@@ -334,7 +337,7 @@ export async function startOpenKnowledgeServer(
   if (options.openBrowser) args.push('--open');
 
   const spawnProcess = options.spawnProcess ?? ((command, commandArgs, spawnOptions) => spawn(command, commandArgs, spawnOptions));
-  const child = spawnProcess('ok', args, { stdio: 'ignore' });
+  const child = spawnProcess(okCommand, args, { stdio: 'ignore' });
   await waitForSpawn(child);
 
   for (let attempt = 1; attempt <= maxHealthAttempts; attempt += 1) {

@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   ensureOpenKnowledge,
   executeOpenKnowledgeSetupPlan,
+  getOpenKnowledgeStatus,
   OpenKnowledgeError,
   OpenKnowledgeSetupRequiredError,
   prepareOpenKnowledgeSnapshot,
@@ -213,6 +214,25 @@ describe('executeOpenKnowledgeSetupPlan', () => {
   });
 });
 
+describe('getOpenKnowledgeStatus', () => {
+  it('runs status through the provided ok command', async () => {
+    const runCommand = vi.fn(async () => success(JSON.stringify({
+      server: { name: 'server', state: 'alive', alive: true, port: 8789 },
+      ui: { name: 'ui', state: 'alive', alive: true, port: 39847 },
+    })));
+
+    const result = await getOpenKnowledgeStatus('/tmp/knowledge', runCommand, '/home/tester/.local/bin/ok');
+
+    expect(result.server.alive).toBe(true);
+    expect(runCommand).toHaveBeenCalledWith('/home/tester/.local/bin/ok', [
+      '--cwd',
+      '/tmp/knowledge',
+      'status',
+      '--json',
+    ]);
+  });
+});
+
 describe('startOpenKnowledgeServer', () => {
   const missingStatus = {
     server: { name: 'server', state: 'missing', alive: false },
@@ -278,6 +298,34 @@ describe('startOpenKnowledgeServer', () => {
       url: 'http://127.0.0.1:39847',
       runtimeBundlePath: '/tmp/knowledge',
     });
+  });
+
+  it('initializes and starts through the provided ok command', async () => {
+    const okCommand = '/home/tester/.local/bin/ok';
+    const runCommand = vi.fn(async () => success());
+    const child = new EventEmitter() as ChildProcess;
+    Object.defineProperty(child, 'exitCode', { value: null, writable: true });
+    child.kill = vi.fn(() => true);
+    const spawnProcess = vi.fn((_command, _args, _options) => {
+      queueMicrotask(() => child.emit('spawn'));
+      return child;
+    });
+    const getStatus = vi.fn()
+      .mockResolvedValueOnce(missingStatus)
+      .mockResolvedValueOnce(liveStatus);
+
+    await startOpenKnowledgeServer('/tmp/knowledge', {
+      okCommand,
+      runCommand,
+      spawnProcess,
+      getStatus,
+      fetchImpl: vi.fn(async () => new Response('ok')),
+      isInitialized: async () => false,
+      getAvailablePorts: async () => [8789, 39847],
+    });
+
+    expect(runCommand).toHaveBeenCalledWith(okCommand, expect.arrayContaining(['init']));
+    expect(spawnProcess).toHaveBeenCalledWith(okCommand, expect.arrayContaining(['start']), { stdio: 'ignore' });
   });
 
   it('reuses a healthy lock-reported viewer and returns its verified URL', async () => {

@@ -29,7 +29,7 @@ export interface KnowledgeOpenOptions {
 export interface KnowledgeOpenDependencies {
   cwd?: () => string;
   ensure?: (options: { autoInstall: boolean }) => Promise<EnsureOpenKnowledgeResult>;
-  start?: (bundlePath: string, options: { openBrowser: false }) => Promise<StartOpenKnowledgeServerResult>;
+  start?: (bundlePath: string, options: { openBrowser: false; okCommand?: string }) => Promise<StartOpenKnowledgeServerResult>;
   openBrowser?: (url: string) => Promise<void>;
 }
 
@@ -145,8 +145,8 @@ export async function knowledgeOpenCommand(
 
   const ensure = dependencies.ensure ?? ensureOpenKnowledge;
   const start = dependencies.start ?? startReadOnlyOpenKnowledgeServer;
-  await ensure({ autoInstall: options.install !== false });
-  const viewer = await start(bundlePath, { openBrowser: false });
+  const installation = await ensure({ autoInstall: options.install !== false });
+  const viewer = await start(bundlePath, { openBrowser: false, okCommand: installation.command });
   viewer.process?.unref();
 
   console.log(`Knowledge viewer: ${viewer.url}${viewer.reused ? ' (reused)' : ''}`);
