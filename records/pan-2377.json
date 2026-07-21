@@ -348,7 +348,7 @@
     "recordedAt": "2026-07-21T13:57:01.547Z"
   },
   "created": "2026-07-17T12:54:30.819Z",
-  "updated": "2026-07-21T13:57:07.668Z",
+  "updated": "2026-07-21T13:57:53.915Z",
   "pipeline": {
     "issueId": "PAN-2377",
     "reviewStatus": "reviewing",
@@ -361,7 +361,7 @@
     "updatedAt": "2026-07-21T13:57:05.285Z",
     "reviewNotes": "Review dispatch deferred: merge conflict with main must be resolved before review dispatch",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2894",
-    "reviewRequestedAt": "2026-07-21T13:57:03.595Z",
+    "reviewRequestedAt": "2026-07-21T13:57:53.545Z",
     "reviewSpawnedAt": "2026-07-21T13:57:05.284Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -579,7 +579,8 @@
         "tests/unit/lib/overdeck/no-loss-matrix.ts"
       ],
       "recordedAt": "2026-07-21T13:57:01.547Z"
-    }
+    },
+    "panDoneRecoveredAt": "2026-07-21T13:57:53.545Z"
   },
   "closeOut": {
     "usage": {
