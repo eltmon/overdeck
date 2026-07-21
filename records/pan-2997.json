@@ -16,42 +16,42 @@
   ],
   "feedback": [],
   "created": "2026-07-21T23:09:49.270Z",
-  "updated": "2026-07-21T23:48:02.571Z",
+  "updated": "2026-07-21T23:48:06.473Z",
   "pipeline": {
     "issueId": "PAN-2997",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "inspecting",
+    "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-21T23:46:50.340Z",
-    "inspectNotes": "Inspecting item linear-mcp-auth-fold"
+    "updatedAt": "2026-07-21T23:48:06.404Z",
+    "inspectNotes": "Fold dedupes required events per-agent via Map; latest non-null authUrl/authUrlAgentId wins; expiry computed from authUrlExpiresAt and reactivates on fresh required; healthy event closes to lastCompleted, notified targets open??lastCompleted, duplicate healthy is a no-op leaving wake set empty post-notification. All 4 ACs verified by hand against fake-timer tests."
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 476971,
-            "output": 42416,
-            "cacheRead": 12460544,
+            "input": 507855,
+            "output": 45182,
+            "cacheRead": 15476224,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 476971,
-          "output": 42416,
-          "cacheRead": 12460544,
+          "input": 507855,
+          "output": 45182,
+          "cacheRead": 15476224,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 9.887607000000001,
-        "pricingAsOf": "2026-07-21T23:46:50.344Z"
+        "usd": 11.632847,
+        "pricingAsOf": "2026-07-21T23:48:06.455Z"
       }
     },
     "merges": [],
