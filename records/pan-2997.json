@@ -1,24 +1,6 @@
 {
   "issueId": "PAN-2997",
   "schemaVersion": 2,
-  "created": "2026-07-21T23:09:49.270Z",
-  "updated": "2026-07-21T23:37:29.331Z",
-  "pipeline": {
-    "issueId": "PAN-2997",
-    "reviewStatus": "pending",
-    "testStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-07-21T23:09:49.270Z"
-  },
-  "closeOut": {
-    "usage": {
-      "byStage": {},
-      "totals": {}
-    },
-    "merges": [],
-    "ranOn": "eltmon-z790"
-  },
-  "workModel": "gpt-5.6-sol",
   "sessionHistory": [
     {
       "reason": "planning",
@@ -27,6 +9,32 @@
       "timestamp": "2026-07-21T23:10:14.148Z"
     }
   ],
+  "feedback": [],
+  "created": "2026-07-21T23:09:49.270Z",
+  "updated": "2026-07-21T23:37:34.016Z",
+  "pipeline": {
+    "issueId": "PAN-2997",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
+    "mergeStatus": "pending",
+    "releaseStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-21T23:37:33.994Z"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {},
+      "totals": {},
+      "costAtCloseOut": {
+        "usd": 0,
+        "pricingAsOf": "2026-07-21T23:37:34.010Z"
+      }
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790"
+  },
+  "workModel": "gpt-5.6-sol",
   "harness": "claude-code",
-  "model": "k3[1m]"
+  "model": "gpt-5.6-sol"
 }
