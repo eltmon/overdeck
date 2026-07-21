@@ -98,13 +98,16 @@ async function rebaseOneRepo(
         cwd: repoPath,
         encoding: 'utf-8',
         timeout: 120000,
-        env: { ...process.env, GIT_EDITOR: 'true' },
+        env: { ...process.env, GIT_EDITOR: 'true', OVERDECK_PAN_GIT_OP: '1' },
       });
     } catch (rebaseErr: any) {
       const resolution = await tryResolvePlanningConflicts(repoPath);
 
       if (!resolution.resolved) {
-        await execAsync('git rebase --abort', { cwd: repoPath }).catch(() => {});
+        await execAsync('git rebase --abort', {
+          cwd: repoPath,
+          env: { ...process.env, OVERDECK_PAN_GIT_OP: '1' },
+        }).catch(() => {});
 
         // Fallback: try merge instead of rebase for non-planning conflicts.
         // Rebasing large branches (many commits) across file conflicts is painful;
@@ -115,6 +118,7 @@ async function rebaseOneRepo(
               cwd: repoPath,
               encoding: 'utf-8',
               timeout: 120000,
+              env: { ...process.env, OVERDECK_PAN_GIT_OP: '1' },
             });
             // Merge succeeded — continue to push below.
             alreadyRebased = false; // mark as needing push
@@ -193,7 +197,7 @@ async function tryResolvePlanningConflicts(
       cwd: repoPath,
       encoding: 'utf-8',
       timeout: 60000,
-      env: { ...process.env, GIT_EDITOR: 'true' },
+      env: { ...process.env, GIT_EDITOR: 'true', OVERDECK_PAN_GIT_OP: '1' },
     });
 
     return { resolved: true, remainingConflicts: [] };
