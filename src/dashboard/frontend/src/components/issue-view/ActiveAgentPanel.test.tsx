@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { DialogProvider } from '../DialogProvider';
 import { useDashboardStore } from '../../lib/store';
 import { ActiveAgentPanel } from './ActiveAgentPanel';
 import type { AgentSnapshot } from '@overdeck/contracts';
@@ -7,6 +9,11 @@ import type { AgentSnapshot } from '@overdeck/contracts';
 function mockFetch() {
   return vi.fn(async (input: RequestInfo | URL) => {
     const url = String(input);
+    if (url.includes('/api/dashboard/session')) return Response.json({ csrfToken: 'test-csrf' });
+    if (url.includes('/api/agents/') && url.endsWith('/has-session')) {
+      // The registry resumeSession path checks lifecycle resumability here.
+      return Response.json({ lifecycle: { agentId: 'agent-pan-2499-slot-2', canResumeSession: true, hasSavedSession: true, hasWorkspace: true, recommendedAction: 'resume' } });
+    }
     if (url.includes('/api/agents/') && (url.endsWith('/tell') || url.endsWith('/resume'))) {
       return Response.json({ messageDelivered: true });
     }
@@ -27,7 +34,14 @@ function makeAgent(overrides: Partial<AgentSnapshot> & { id: string }): AgentSna
 }
 
 function renderPanel(agentId = 'agent-pan-2499-slot-2', props: { density?: 'console' | 'cockpit' | 'rail' } = {}) {
-  return render(<ActiveAgentPanel agentId={agentId} density={props.density} />);
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+  return render(
+    <QueryClientProvider client={qc}>
+      <DialogProvider>
+        <ActiveAgentPanel agentId={agentId} density={props.density} />
+      </DialogProvider>
+    </QueryClientProvider>,
+  );
 }
 
 describe('ActiveAgentPanel', () => {
@@ -71,7 +85,7 @@ describe('ActiveAgentPanel', () => {
     expect(screen.queryByText('→ starting task')).not.toBeInTheDocument();
   });
 
-  it('keeps errored agents visible with diagnostics and recovery controls', () => {
+  it('keeps errored agents visible with diagnostics and recovery controls', async () => {
     useDashboardStore.setState({
       agentsById: {
         'agent-pan-2499-slot-2': makeAgent({ id: 'agent-pan-2499-slot-2', status: 'error' }),
@@ -85,7 +99,7 @@ describe('ActiveAgentPanel', () => {
 
     expect(screen.queryByText('No active agent.')).not.toBeInTheDocument();
     expect(screen.getByText(/STUCK/)).toBeInTheDocument();
-    expect(screen.getByTestId('active-agent-panel-resume')).toBeInTheDocument();
+    expect(await screen.findByTestId('active-agent-panel-resume')).toBeInTheDocument();
   });
 
   it('posts Tell input to /api/agents/:agentId/tell for a live agent', async () => {
@@ -141,7 +155,7 @@ describe('ActiveAgentPanel', () => {
     });
   });
 
-  it('renders a Resume button that posts to /api/agents/:agentId/resume', async () => {
+  it('renders a Resume button that posts to /api/agents/:agentId/resume (registry path, PAN-2975)', async () => {
     useDashboardStore.setState({
       agentsById: {
         'agent-pan-2499-slot-2': makeAgent({ id: 'agent-pan-2499-slot-2', status: 'stopped' }),
@@ -151,17 +165,15 @@ describe('ActiveAgentPanel', () => {
 
     renderPanel();
 
-    const resumeButton = screen.getByTestId('active-agent-panel-resume');
-    expect(resumeButton).toBeInTheDocument();
+    const resumeButton = await screen.findByTestId('active-agent-panel-resume');
+    expect(resumeButton).toHaveTextContent('Resume session · PAN-2499');
+    expect(resumeButton).toHaveAttribute('title', 'Reopens the saved session with its memory intact.');
     fireEvent.click(resumeButton);
 
     await waitFor(() => {
       expect(window.fetch).toHaveBeenCalledWith(
         '/api/agents/agent-pan-2499-slot-2/resume',
-        expect.objectContaining({
-          method: 'POST',
-          body: JSON.stringify({ message: 'Resumed from active agent panel' }),
-        }),
+        expect.objectContaining({ method: 'POST' }),
       );
     });
   });

@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import { useResumeRecovery, type RecoveryRequest } from '../lib/resumeRecovery';
 import { dashboardMutationJsonHeaders } from '../lib/wsTransport';
 import { refreshDashboardState } from '../lib/refresh-dashboard-state';
+import { toastResumeOutcome } from '../lib/resumeOutcome';
 import { useAlert } from './DialogProvider';
 
 async function postJson(url: string, body?: unknown): Promise<void> {
@@ -74,7 +75,7 @@ export function ResumableSessionDialog() {
     try {
       if (kind === 'resumable') {
         await postJson(`/api/agents/${encodeURIComponent(agentId)}/resume`);
-        toast.success(`${agentId} resumed`);
+        toastResumeOutcome(agentId);
       } else if (kind === 'troubled') {
         await postJson(`/api/agents/${encodeURIComponent(agentId)}/untroubled`);
         await startIssue();

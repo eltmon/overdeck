@@ -15,6 +15,7 @@ import {
 import { refreshDashboardState } from '../../lib/refresh-dashboard-state';
 import { dashboardMutationJsonHeaders } from '../../lib/wsTransport';
 import { recoveryFromBody, useResumeRecovery } from '../../lib/resumeRecovery';
+import { toastResumeOutcome } from '../../lib/resumeOutcome';
 import { selectAgents, selectIssues, selectReviewStatus, useDashboardStore } from '../../lib/store';
 import type { WorkspaceInfo } from '../../lib/workspace-types';
 import { STATUS_LABELS, type Agent, type Issue, type WorkAgentLifecycle } from '../../types';
@@ -334,6 +335,10 @@ export function useIssueActions(issueId: string): UseIssueActionsResult {
       await refreshDashboardState(queryClient);
       if (action.key === 'unpause') {
         toast.success(`${issueId} unpaused — deacon resumes it on the next patrol`);
+      }
+      if (action.key === 'resumeSession' && agent?.id) {
+        // PAN-2975: every resume affordance reports the actual outcome.
+        toastResumeOutcome(agent.id);
       }
     },
     onError: (error: Error) => {

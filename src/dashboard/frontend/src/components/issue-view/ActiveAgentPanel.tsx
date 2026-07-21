@@ -13,6 +13,9 @@ import {
 } from '../../lib/store';
 import { cn } from '../../lib/utils';
 import { ACTIVE_AGENT_PANEL_SECTIONS } from './inventory';
+import { useIssueActions } from '../IssueActionMenu/useIssueActions';
+import { IssueActionDialogHost } from '../IssueActionMenu';
+import { RESUME_WHAT_IT_DOES } from '../../lib/resumeOutcome';
 
 /**
  * PAN-2908 C-DETAIL: the gray "stream excerpt" box and its "No recent stream
@@ -74,6 +77,10 @@ export function ActiveAgentPanel({
   const agent = useDashboardStore(selectAgentById(agentId));
   const pendingPermissionAgentIds = useDashboardStore(selectPendingPermissionAgentIds);
   const [sending, setSending] = useState(false);
+  // PAN-2975: one resume path — the registry's resumeSession action (same
+  // endpoint, same outcome toast, shared copy) instead of a bespoke canned call.
+  const issueActions = useIssueActions(agent?.issueId ?? '');
+  const resumeView = agent?.issueId ? issueActions.all.find((view) => view.action.key === 'resumeSession') : undefined;
 
   const sectionId = density === 'console' ? 'active-agent' : undefined;
 
@@ -135,29 +142,6 @@ export function ActiveAgentPanel({
     }
   };
 
-  const sendResume = async () => {
-    if (sending) return false;
-    setSending(true);
-    try {
-      const response = await fetch(`/api/agents/${agentId}/resume`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: 'Resumed from active agent panel' }),
-      });
-      if (!response.ok) {
-        const body = await response.text();
-        console.warn(`[active-agent-panel] resume ${response.status}: ${body.slice(0, 300)}`);
-        return false;
-      }
-      return true;
-    } catch (error) {
-      console.error('[active-agent-panel] resume error:', error);
-      return false;
-    } finally {
-      setSending(false);
-    }
-  };
-
   return (
     <section
       id={sectionId}
@@ -191,18 +175,20 @@ export function ActiveAgentPanel({
         </div>
       </div>
 
-      {!isEffectivelyLive && (
+      {!isEffectivelyLive && resumeView?.enabled && (
         <button
           type="button"
           data-testid="active-agent-panel-resume"
           data-section={ACTIVE_AGENT_PANEL_SECTIONS[2]}
+          title={RESUME_WHAT_IT_DOES}
           className="mt-[10px] w-full rounded-[var(--radius-sm)] border border-primary/30 bg-primary/10 px-[12px] py-[8px] text-[12px] font-medium text-primary transition-colors hover:bg-primary/20 disabled:cursor-not-allowed disabled:opacity-50"
-          onClick={() => void sendResume()}
-          disabled={sending}
+          onClick={() => resumeView.invoke()}
+          disabled={resumeView.isPending}
         >
-          {sending ? 'Resuming…' : '▶ Resume agent'}
+          {resumeView.isPending ? 'Resuming…' : `▶ Resume session · ${agent.issueId}`}
         </button>
       )}
+      {agent?.issueId && <IssueActionDialogHost issueId={agent.issueId} actions={issueActions} />}
 
       <div
         data-testid="active-agent-panel-tell"

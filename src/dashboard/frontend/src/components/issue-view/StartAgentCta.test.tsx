@@ -80,15 +80,24 @@ describe('StartAgentCta', () => {
     setState({ resume: true });
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}'));
     renderCta();
-    fireEvent.click(screen.getByRole('button', { name: 'Resume session' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Resume session · PAN-2499' }));
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/agents/agent-pan-2499/resume', expect.objectContaining({ method: 'POST' })));
+  });
+
+  it('identifies its issue and uses the quiet resume treatment (PAN-2975)', () => {
+    setState({ resume: true });
+    renderCta('rail');
+    const button = screen.getByRole('button', { name: 'Resume session · PAN-2499' });
+    expect(button).toHaveClass('bg-info/10', 'border-info/40', 'text-info-foreground');
+    expect(button).not.toHaveClass('bg-primary');
+    expect(button).toHaveAttribute('title', 'Reopens the saved session for PAN-2499 with its memory intact');
   });
 
   it('prefers resume when fresh start and resume are both enabled', async () => {
     setState({ start: true, resume: true });
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}'));
     renderCta();
-    fireEvent.click(screen.getByRole('button', { name: 'Resume session' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Resume session · PAN-2499' }));
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/agents/agent-pan-2499/resume', expect.objectContaining({ method: 'POST' })));
   });
 

@@ -10,6 +10,7 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { DialogProvider } from '../DialogProvider';
 import type { Agent } from '../../types';
 import { IssueDetail } from './IssueDetail';
 
@@ -58,7 +59,7 @@ const AGENTS: Agent[] = [
 
 function renderDetail(ui: React.ReactElement) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(<QueryClientProvider client={qc}>{ui}</QueryClientProvider>);
+  return render(<QueryClientProvider client={qc}><DialogProvider>{ui}</DialogProvider></QueryClientProvider>);
 }
 
 describe('IssueDetail (C-DETAIL one component)', () => {
