@@ -37,6 +37,22 @@ The first explicit open may install `@inkeep/open-knowledge` globally. Overdeck 
 
 OpenKnowledge v0.34 requires Node.js 24 or newer. The Overdeck dashboard continues to run under Node.js 22; only the separate `ok` subprocess uses Node.js 24+.
 
+### Assisted Node.js 24 setup
+
+When the ambient `node` command is older than version 24, Overdeck resolves a runtime for the viewer without changing the Node.js version used by Overdeck or your shell:
+
+1. Use an existing working `ok` command.
+2. Use the Node.js binary named by `OVERDECK_OPEN_KNOWLEDGE_NODE`, when set and valid.
+3. Look for an installed Node.js 24+ runtime under nvm, fnm, Volta, mise, or asdf, install OpenKnowledge inside that runtime, and pin the viewer to it.
+4. If your version manager has no suitable runtime, show the exact Node.js 24 install command and ask before downloading it.
+5. If no version manager exists, offer an nvm installation or show the manual setup command.
+
+The setup assistant leaves your default Node.js version and shell rc files untouched. The only exception is an nvm installation, whose official installer can update shell rc files; Overdeck shows that step and requires explicit consent before running it.
+
+For a managed runtime, Overdeck writes `~/.local/bin/ok` with an `overdeck-managed shim` marker. The shim pins the exact Node.js binary, survives later default-version changes, and is safe to delete; `pan knowledge open` regenerates it when needed. Overdeck never overwrites an unmarked file at that path.
+
+Advanced users can set `OVERDECK_OPEN_KNOWLEDGE_NODE=/absolute/path/to/node` to select a specific Node.js 24+ binary. An invalid override fails with a direct configuration error instead of falling through to another runtime. For fully manual setup, install Node.js 24+ and `@inkeep/open-knowledge` yourself, then rerun `pan knowledge open`; `--no-install` keeps this manual-only behavior.
+
 ## Dashboard Knowledge page
 
 Select **Knowledge** under **System** in the dashboard sidebar. The page shows the selected project's bundle state and starts one reusable viewer process for that project. Each project is routed through its own `knowledge-<hex>.<dashboard-domain>` origin, so OpenKnowledge's root `/api/*` and `/collab` traffic stays pinned to that project. The proxy accepts a viewer-specific credential minted by an authenticated dashboard request; dashboard cookies, authorization, CSRF tokens, internal headers, and upstream cookies never cross the subprocess boundary.

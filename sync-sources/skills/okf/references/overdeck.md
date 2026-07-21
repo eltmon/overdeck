@@ -11,6 +11,12 @@ Overdeck is available only when:
 
 Detection is by command execution, never by Python or TypeScript imports.
 
+## OpenKnowledge Viewer Runtime
+
+`pan knowledge open` and the dashboard Knowledge page use an assisted Node.js 24 resolution flow for the OpenKnowledge viewer. Overdeck first reuses a working `ok`, then checks `OVERDECK_OPEN_KNOWLEDGE_NODE`, then searches installed runtimes under nvm, fnm, Volta, mise, and asdf. If a download is required, the operator sees the exact setup steps and must consent before they run; the ambient/default Node.js version remains unchanged.
+
+Set `OVERDECK_OPEN_KNOWLEDGE_NODE=/absolute/path/to/node` to pin the viewer to a specific Node.js 24+ binary. The override affects only the separate `ok` subprocess.
+
 ## Optional OpenKnowledge MCP Registration
 
 The dashboard viewer and `pan knowledge open` never register an MCP server. Their unattended initialization always uses `ok init --no-mcp --no-skills`, so opening the viewer cannot change an editor or agent configuration.
