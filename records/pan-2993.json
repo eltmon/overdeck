@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-21T22:47:36.935Z",
-  "updated": "2026-07-21T23:31:02.020Z",
+  "updated": "2026-07-21T23:31:08.001Z",
   "pipeline": {
     "issueId": "PAN-2993",
     "reviewStatus": "pending",
@@ -213,5 +213,39 @@
     "docs-strike-lifecycle": "completed",
     "docs-strike-lifecycle.docs-strike-lifecycle.ac1": "completed",
     "docs-strike-lifecycle.docs-strike-lifecycle.ac2": "completed"
+  },
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      "src/cli/commands/__tests__/strike-ready.test.ts"
+    ],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "docs/SPECIALIST_WORKFLOW.md",
+      "src/cli/commands/strike-ready.ts",
+      "src/lib/agents/messaging.ts",
+      "src/lib/cloister/deacon-strike-landing.ts",
+      "src/lib/overdeck/review-status-record-sync.ts",
+      "src/lib/pan-dir/records.ts",
+      "src/lib/strike-landing.ts",
+      "tests/lib/cloister/deacon-strike-landing.test.ts",
+      "tests/unit/cli/commands/strike-ready.test.ts",
+      "tests/unit/lib/agents/message-agent.test.ts",
+      "tests/unit/lib/cloister/deacon-strike-transport.test.ts"
+    ],
+    "actualChangedFiles": [
+      "docs/SPECIALIST_WORKFLOW.md",
+      "src/cli/commands/__tests__/strike-ready.test.ts",
+      "src/cli/commands/strike-ready.ts",
+      "src/lib/agents/messaging.ts",
+      "src/lib/cloister/deacon-strike-landing.ts",
+      "src/lib/overdeck/review-status-record-sync.ts",
+      "src/lib/pan-dir/records.ts",
+      "src/lib/strike-landing.ts",
+      "tests/lib/cloister/deacon-strike-landing.test.ts",
+      "tests/unit/cli/commands/strike-ready.test.ts",
+      "tests/unit/lib/agents/message-agent.test.ts",
+      "tests/unit/lib/cloister/deacon-strike-transport.test.ts"
+    ],
+    "recordedAt": "2026-07-21T23:31:08.000Z"
   }
 }
