@@ -57,7 +57,7 @@
     "recordedAt": "2026-07-21T16:22:43.458Z"
   },
   "created": "2026-07-21T15:14:12.381Z",
-  "updated": "2026-07-21T16:22:54.462Z",
+  "updated": "2026-07-21T16:23:00.187Z",
   "pipeline": {
     "issueId": "PAN-2984",
     "reviewStatus": "pending",
@@ -70,7 +70,7 @@
     "updatedAt": "2026-07-21T16:22:54.446Z",
     "inspectNotes": "All 6 ACs verified: install-under-runtime plan prefixes PATH with runtime bin dir and writes shim via writeShim (AC1); manager-without-24 rejects OpenKnowledgeSetupRequiredError with plan.kind install-node-via-manager, volta installCommand 'volta fetch node@24' (AC2); no-manager case rejects install-nvm plan whose steps include the npm install one-liner (AC3); bare 'ok' probe failing falls through to shimPath probe and returns absolute shim path (AC4); autoInstall:false throws manual-install message without invoking resolveSetupPlan (AC5); health-poll test uses vi.advanceTimersByTimeAsync under file-level vi.useFakeTimers() (AC6). 12/12 tests pass locally.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2985",
-    "reviewRequestedAt": "2026-07-21T16:22:46.629Z",
+    "reviewRequestedAt": "2026-07-21T16:22:59.831Z",
     "reviewSpawnedAt": "2026-07-21T16:22:47.810Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -112,7 +112,8 @@
         "tests/unit/dashboard/server/services/knowledge-viewer.test.ts"
       ],
       "recordedAt": "2026-07-21T16:22:43.458Z"
-    }
+    },
+    "panDoneRecoveredAt": "2026-07-21T16:22:59.831Z"
   },
   "closeOut": {
     "usage": {
