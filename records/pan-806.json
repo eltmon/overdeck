@@ -106,11 +106,24 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-21T17:58:13.147Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-21T18:01Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-21T18:01:18.985Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-21T18:01:18Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-806\n\nExisting non-POSIX pre-rebase hooks are reinterpreted, and git -C/-c bypasses the PATH guard\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-806 -m \"Fixed review issues\"`"
+    }
+  ],
   "created": "2026-07-21T16:29:59.439Z",
-  "updated": "2026-07-21T18:01:18.330Z",
+  "updated": "2026-07-21T18:01:18.985Z",
   "pipeline": {
     "issueId": "PAN-806",
     "reviewStatus": "blocked",
