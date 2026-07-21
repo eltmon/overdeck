@@ -76,7 +76,7 @@ export function IssueDetailShell({
   });
 
   return (
-    <div data-component="issue-detail-shell" className={className}>
+    <div data-component="issue-detail-shell" data-section="Pipeline Band" className={className}>
       <IssuePhaseRail
         issueId={issueId ?? undefined}
         activePhase={activePhase}
