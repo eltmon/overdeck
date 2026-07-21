@@ -57,20 +57,21 @@
     "recordedAt": "2026-07-21T16:22:43.458Z"
   },
   "created": "2026-07-21T15:14:12.381Z",
-  "updated": "2026-07-21T16:23:59.593Z",
+  "updated": "2026-07-21T16:26:09.046Z",
   "pipeline": {
     "issueId": "PAN-2984",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-21T16:22:59.831Z",
-    "updatedAt": "2026-07-21T16:23:59.570Z",
+    "updatedAt": "2026-07-21T16:26:09.029Z",
     "inspectNotes": "All 6 ACs verified: install-under-runtime plan prefixes PATH with runtime bin dir and writes shim via writeShim (AC1); manager-without-24 rejects OpenKnowledgeSetupRequiredError with plan.kind install-node-via-manager, volta installCommand 'volta fetch node@24' (AC2); no-manager case rejects install-nvm plan whose steps include the npm install one-liner (AC3); bare 'ok' probe failing falls through to shimPath probe and returns absolute shim path (AC4); autoInstall:false throws manual-install message without invoking resolveSetupPlan (AC5); health-poll test uses vi.advanceTimersByTimeAsync under file-level vi.useFakeTimers() (AC6). 12/12 tests pass locally.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2985",
+    "lastVerifiedCommit": "f9972ecef33f10fc46079eecd565efc1bdd0a183",
     "reviewRequestedAt": "2026-07-21T16:22:59.831Z",
     "reviewSpawnedAt": "2026-07-21T16:22:47.810Z",
     "scopeDrift": {
@@ -136,9 +137,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 512962,
-            "output": 9793,
-            "cacheRead": 1750016,
+            "input": 810406,
+            "output": 44401,
+            "cacheRead": 4170752,
             "cacheWrite": 0
           }
         },
@@ -173,9 +174,9 @@
           "cacheWrite": 305673
         },
         "openai/gpt-5.6-sol": {
-          "input": 2511471,
-          "output": 261700,
-          "cacheRead": 87644160,
+          "input": 2808915,
+          "output": 296308,
+          "cacheRead": 90064896,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -186,8 +187,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 74.586552,
-        "pricingAsOf": "2026-07-21T16:23:59.581Z"
+        "usd": 78.32238,
+        "pricingAsOf": "2026-07-21T16:26:09.035Z"
       }
     },
     "merges": [
