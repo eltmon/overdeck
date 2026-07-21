@@ -81,25 +81,31 @@
       "timestamp": "2026-07-21T16:29:59.438Z",
       "reason": "start",
       "agentModel": "gpt-5.6-sol"
+    },
+    {
+      "timestamp": "2026-07-21T17:42:46.292Z",
+      "reason": "end",
+      "note": "No skipped work. Deviation: final-suite failures exposed and fixed a pre-existing config loader bug that ignored OVERDECK_HOME, causing 63 tests to read the operator's weighted model config. Hazard: the pre-rebase hook exits 1 as specified, while Git maps hook rejection to git-rebase exit 128; the command is still blocked with pan guidance. Delivered prompt controls, pan-owned rebase sentinel, executable pre-rebase guard, per-agent PATH wrapper, and stop cleanup. npm test, npm run lint, and npm run typecheck pass."
     }
   ],
   "feedback": [],
   "created": "2026-07-21T16:29:59.439Z",
-  "updated": "2026-07-21T17:42:42.284Z",
+  "updated": "2026-07-21T17:42:46.292Z",
   "pipeline": {
     "issueId": "PAN-806",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-21T17:42:42.283Z",
+    "updatedAt": "2026-07-21T17:42:45.978Z",
     "inspectNotes": "rebase-helper.ts:101,200 add OVERDECK_PAN_GIT_OP:'1' alongside GIT_EDITOR:'true' on git rebase and git rebase --continue; abort/merge-fallback also sentineled. New tests/unit/lib/rebase-helper.test.ts (3 tests) assert coexistence via objectContaining; ran locally, all pass.",
-    "strikeRecoveryCount": 0,
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2986",
     "reviewRequestedAt": "2026-07-21T17:42:42.283Z",
-    "prUrl": "https://github.com/eltmon/overdeck/pull/2986"
+    "reviewSpawnedAt": "2026-07-21T17:42:45.977Z",
+    "strikeRecoveryCount": 0
   },
   "closeOut": {
     "usage": {
@@ -122,17 +128,17 @@
         },
         "review.supervisor": {
           "anthropic/claude-sonnet-5": {
-            "input": 6,
-            "output": 3012,
-            "cacheRead": 234227,
-            "cacheWrite": 123387
+            "input": 8,
+            "output": 3199,
+            "cacheRead": 357614,
+            "cacheWrite": 126457
           }
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 440914,
-            "output": 23910,
-            "cacheRead": 7535616,
+            "input": 2062456,
+            "output": 214657,
+            "cacheRead": 135950848,
             "cacheWrite": 0
           }
         }
@@ -151,29 +157,31 @@
           "cacheWrite": 235496
         },
         "anthropic/claude-sonnet-5": {
-          "input": 6,
-          "output": 3012,
-          "cacheRead": 234227,
-          "cacheWrite": 123387
+          "input": 8,
+          "output": 3199,
+          "cacheRead": 357614,
+          "cacheWrite": 126457
         },
         "openai/gpt-5.6-sol": {
-          "input": 440914,
-          "output": 23910,
-          "cacheRead": 7535616,
+          "input": 2062456,
+          "output": 214657,
+          "cacheRead": 135950848,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 13.608523,
-        "pricingAsOf": "2026-07-21T16:37:09.378Z"
+        "usd": 91.680485,
+        "pricingAsOf": "2026-07-21T17:42:46.046Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/2986"
+    ],
     "ranOn": "eltmon-z790"
   },
   "workModel": "gpt-5.6-sol",
   "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "model": "gpt-5.6-sol",
   "tasks": {
     "sequence": 10,
     "claims": {},
