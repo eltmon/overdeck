@@ -297,6 +297,7 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'GET /api/issues/:id/costs',                           kind: 'http', disposition: 'RELOCATE',    door: 'CostResolver.issueDetail' },
   { surface: 'GET /api/issues/resource-allocated',                  kind: 'http', disposition: 'READ',        door: 'IssuesResolver.list({resourceAllocated:true})' },
   { surface: 'GET /api/pipeline/membership',                        kind: 'http', disposition: 'READ',        door: 'PipelineMembershipService.getCached()' },
+  { surface: 'POST /api/pipeline/membership/refresh',               kind: 'http', disposition: 'READ',        door: 'refreshMembershipSnapshotsForProjects() — operator retry re-gathers the snapshot cache (PAN-2972); no canonical state written' },
   { surface: 'GET /api/issues/:id/resource-details',                kind: 'http', disposition: 'AGGREGATE',   door: 'IssuesResolver.get + AgentsResolver' },
   { surface: 'POST /api/issues/:id/start-planning',                 kind: 'http', disposition: 'WRITE',       door: 'IssueWriter.advance("planning")' },
   { surface: 'POST /api/issues/:id/abort-planning',                 kind: 'http', disposition: 'WRITE',       door: 'IssueWriter.advance("todo","abort-planning") + AgentWriter.stop' },

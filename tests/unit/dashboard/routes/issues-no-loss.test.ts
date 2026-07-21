@@ -7,6 +7,8 @@ import { describe, expect, it } from 'vitest';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const WORKSPACE_ROOT = join(__dirname, '..', '..', '..', '..');
 const ISSUES_ROUTE_FILE = join(WORKSPACE_ROOT, 'src', 'dashboard', 'server', 'routes', 'issues.ts');
+// PAN-2972 relocated the pipeline-membership routes out of issues.ts.
+const MEMBERSHIP_ROUTE_FILE = join(WORKSPACE_ROOT, 'src', 'dashboard', 'server', 'routes', 'pipeline-membership.ts');
 
 const EXPECTED_ISSUES_ROUTES = [
   'GET /api/issues',
@@ -42,11 +44,17 @@ const EXPECTED_ISSUES_ROUTES = [
   'GET /api/issues/:id/ship-log',
   'GET /api/issues/resource-allocated',
   'GET /api/issues/:id/resource-details',
-  'GET /api/pipeline/membership',
 ] as const;
 
-function enumerateIssuesRoutes(): Set<string> {
-  const content = readFileSync(ISSUES_ROUTE_FILE, 'utf8');
+// PAN-2972: GET moved from issues.ts (no-loss relocation); POST is the new
+// operator retry door.
+const EXPECTED_MEMBERSHIP_ROUTES = [
+  'GET /api/pipeline/membership',
+  'POST /api/pipeline/membership/refresh',
+] as const;
+
+function enumerateRoutes(file: string): Set<string> {
+  const content = readFileSync(file, 'utf8');
   const routes = new Set<string>();
   const routePattern = /HttpRouter\.add\(\s*\n?\s*['"`]([A-Z]+)['"`]\s*,\s*\n?\s*['"`]([^'"`\n]+)['"`]/gm;
 
@@ -57,12 +65,17 @@ function enumerateIssuesRoutes(): Set<string> {
   return routes;
 }
 
-describe('PAN-2148 issues route no-loss audit', () => {
-  it('keeps all 33 issuesRouteLayer method/path registrations', () => {
-    const liveRoutes = enumerateIssuesRoutes();
-    const expectedRoutes = new Set(EXPECTED_ISSUES_ROUTES);
+function enumerateIssuesRoutes(): Set<string> {
+  return new Set([...enumerateRoutes(ISSUES_ROUTE_FILE), ...enumerateRoutes(MEMBERSHIP_ROUTE_FILE)]);
+}
 
-    const missing = EXPECTED_ISSUES_ROUTES.filter((route) => !liveRoutes.has(route));
+describe('PAN-2148 issues route no-loss audit', () => {
+  it('keeps all 34 issues + pipeline-membership method/path registrations', () => {
+    const liveRoutes = enumerateIssuesRoutes();
+    const allExpected = [...EXPECTED_ISSUES_ROUTES, ...EXPECTED_MEMBERSHIP_ROUTES];
+    const expectedRoutes = new Set<string>(allExpected);
+
+    const missing = allExpected.filter((route) => !liveRoutes.has(route));
     const unexpected = [...liveRoutes].filter((route) => !expectedRoutes.has(route));
 
     expect(missing, [
@@ -77,6 +90,6 @@ describe('PAN-2148 issues route no-loss audit', () => {
       ...unexpected.map((route) => `  unexpected: ${route}`),
     ].join('\n')).toEqual([]);
 
-    expect(liveRoutes.size).toBe(33);
+    expect(liveRoutes.size).toBe(34);
   });
 });
