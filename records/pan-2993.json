@@ -106,10 +106,10 @@
     "recordedAt": "2026-07-21T23:54:05.124Z"
   },
   "created": "2026-07-21T22:47:36.935Z",
-  "updated": "2026-07-21T23:57:57.685Z",
+  "updated": "2026-07-21T23:58:11.595Z",
   "pipeline": {
     "issueId": "PAN-2993",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
@@ -117,8 +117,8 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-21T23:54:40.299Z",
-    "updatedAt": "2026-07-21T23:57:56.589Z",
-    "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
+    "updatedAt": "2026-07-21T23:58:11.544Z",
+    "reviewNotes": "Sandbox fallback serialization drops explicit clears for strike transport retry fields, so stale backoff survives re-arm and landed transitions.",
     "inspectNotes": "All 4 ACs verified against src/lib/agents/messaging.ts@79bb7b47: stopped-agent resume failure returns {delivered:false,queuedToMail:true,reason} naming both resumeResult.error and PAN-1980 session-rotation disable; paused/gated path returns gate reason; live-session/successful-resume paths return delivered:true; only deacon-strike-landing.ts touched among callers and npm run typecheck passes clean (0 new errors).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2998",
     "lastVerifiedCommit": "cd0f24e6995175255d7bce8327e8e000801f3589",
@@ -233,7 +233,7 @@
       },
       "costAtCloseOut": {
         "usd": 101.587976,
-        "pricingAsOf": "2026-07-21T23:57:56.597Z"
+        "pricingAsOf": "2026-07-21T23:58:11.577Z"
       }
     },
     "merges": [
