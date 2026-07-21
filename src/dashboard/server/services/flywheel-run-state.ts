@@ -4,7 +4,7 @@ import { mkdir, readdir, readFile, rename, stat, writeFile } from 'node:fs/promi
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { Schema } from 'effect';
-import { FlywheelRunId, FlywheelStatus } from '@overdeck/contracts';
+import { FlywheelRunId, FlywheelStatus, type OrderBook } from '@overdeck/contracts';
 import {
   getFlywheelActiveRunId,
   isFlywheelGloballyPaused,
@@ -12,11 +12,20 @@ import {
   setFlywheelGloballyPaused,
 } from '../../../lib/overdeck/control-settings.js';
 import { countAgentsByStatusRole } from '../../../lib/overdeck/agents.js';
+import { computeBookProgress, getBook } from '../../../lib/orders/resolver.js';
+import type { OrderBookProgress } from '../../../lib/orders/types.js';
+import { setStatus as setOrderBookStatus } from '../../../lib/orders/writer.js';
+import { findProjectByPathSync } from '../../../lib/projects.js';
+import { resolveStateReadHomeSync } from '../../../lib/state-read-home.js';
 
 export type FlywheelRunStatus = 'running' | 'paused' | 'complete' | 'aborted';
 
 export interface FlywheelRunStateOptions {
   overdeckHome?: string;
+  orderStateRoot?: (workspace: string) => string;
+  getOrderBook?: typeof getBook;
+  computeOrderProgress?: typeof computeBookProgress;
+  setOrderStatus?: typeof setOrderBookStatus;
 }
 
 export interface FlywheelRunListOptions extends FlywheelRunStateOptions {
@@ -35,6 +44,7 @@ export interface FlywheelRunSummary {
 
 export interface FlywheelRunDetail extends FlywheelRunSummary {
   latest: FlywheelStatus | null;
+  orders?: FlywheelStatus['orders'];
   paths: {
     latest: string;
     report?: string;
@@ -48,6 +58,8 @@ export interface FlywheelLaunchMetadata {
   workspace: string;
   briefPath: string;
   briefDisplayPath: string;
+  briefOverlayPath?: string;
+  orders?: { bookId: string };
 }
 
 const decodeFlywheelStatus = Schema.decodeUnknownSync(FlywheelStatus);
@@ -177,10 +189,64 @@ async function writeJsonAtomic(path: string, payload: unknown): Promise<string> 
   return path;
 }
 
+export function enrichFlywheelStatusWithOrders(
+  status: FlywheelStatus,
+  book: OrderBook,
+  progress: OrderBookProgress,
+): FlywheelStatus {
+  const terminalPipelineStatuses = new Set(['failed', 'merged', 'parked']);
+  const inFlight = new Set(status.activePipeline
+    .filter((item) => !terminalPipelineStatuses.has(item.status))
+    .map((item) => item.issueId.toUpperCase()));
+  const laneAInFlight = book.items
+    .filter((item) => item.lane === 'A' && inFlight.has(item.issue.toUpperCase()))
+    .sort((left, right) => left.order - right.order)
+    .map((item) => item.issue);
+  const laneBInFlight = book.items
+    .filter((item) => item.lane === 'B' && inFlight.has(item.issue.toUpperCase()))
+    .sort((left, right) => left.order - right.order)[0]?.issue;
+  return {
+    ...status,
+    orders: {
+      bookId: book.id,
+      bookName: book.name,
+      landed: progress.landed,
+      total: progress.total,
+      laneAInFlight,
+      ...(laneBInFlight ? { laneBInFlight } : {}),
+      drained: progress.drained,
+    },
+  };
+}
+
+async function mechanicallyEnrichOrdersStatus(
+  status: FlywheelStatus,
+  options: FlywheelRunStateOptions,
+): Promise<FlywheelStatus> {
+  const launch = await readFlywheelLaunchMetadata(status.runId, options);
+  if (!launch?.orders) {
+    const { orders: _untrustedOrders, ...booklessStatus } = status;
+    return booklessStatus;
+  }
+  const stateRoot = options.orderStateRoot?.(launch.workspace) ?? (() => {
+    const project = findProjectByPathSync(launch.workspace);
+    if (!project) throw new Error(`No configured project contains orders-bound Flywheel workspace ${launch.workspace}`);
+    return resolveStateReadHomeSync(project).root;
+  })();
+  const book = (options.getOrderBook ?? getBook)(stateRoot, launch.orders.bookId);
+  if (!book) throw new Error(`Flywheel run ${status.runId} references missing order book ${launch.orders.bookId}`);
+  const progress = (options.computeOrderProgress ?? computeBookProgress)(book);
+  if (progress.drained && book.status === 'running') {
+    await (options.setOrderStatus ?? setOrderBookStatus)(stateRoot, book.id, 'drained', { runId: book.runId });
+  }
+  return enrichFlywheelStatusWithOrders(status, book, progress);
+}
+
 export async function writeLatestFlywheelStatus(status: FlywheelStatus, options: FlywheelRunStateOptions = {}): Promise<string> {
+  const enriched = await mechanicallyEnrichOrdersStatus(status, options);
   const latestPath = join(getFlywheelRunDir(status.runId, options), 'latest.json');
-  await writeJsonAtomic(latestPath, status);
-  publishLatestFlywheelStatus(status);
+  await writeJsonAtomic(latestPath, enriched);
+  publishLatestFlywheelStatus(enriched);
   return latestPath;
 }
 
@@ -190,6 +256,15 @@ function decodeLaunchMetadata(payload: unknown): FlywheelLaunchMetadata {
   if (record.version !== 1) throw new Error('Invalid Flywheel launch metadata version');
   for (const key of ['runId', 'workspace', 'briefPath', 'briefDisplayPath']) {
     if (typeof record[key] !== 'string' || !record[key]) throw new Error(`Invalid Flywheel launch metadata: ${key}`);
+  }
+  if (record.briefOverlayPath !== undefined && (typeof record.briefOverlayPath !== 'string' || !record.briefOverlayPath)) {
+    throw new Error('Invalid Flywheel launch metadata: briefOverlayPath');
+  }
+  if (record.orders !== undefined) {
+    const orders = record.orders as Record<string, unknown>;
+    if (!orders || typeof orders !== 'object' || typeof orders.bookId !== 'string' || !orders.bookId) {
+      throw new Error('Invalid Flywheel launch metadata: orders.bookId');
+    }
   }
   return record as unknown as FlywheelLaunchMetadata;
 }
@@ -330,6 +405,7 @@ export async function getFlywheelRunDetail(runId: string, options: FlywheelCurre
     startedAt: latest.startedAt,
     status,
     latest: withLiveAgentsActive(latest, liveCount),
+    ...(latest.orders ? { orders: latest.orders } : {}),
     paths: {
       latest: join(runDir, 'latest.json'),
       ...((await fileExists(reportPath)) ? { report: reportPath } : {}),

@@ -55,6 +55,7 @@ pan-memory
 pan-merge
 pan-network
 pan-new-project
+pan-orders
 pan-oversee
 pan-pause
 pan-plan

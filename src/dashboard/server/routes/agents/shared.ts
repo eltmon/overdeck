@@ -50,6 +50,7 @@ export function buildPanStartArgs(input: {
   model: string;
   harness?: RuntimeName | null;
   allowHost?: boolean;
+  offBook?: boolean;
 }): string[] {
   return [
     'start',
@@ -59,6 +60,7 @@ export function buildPanStartArgs(input: {
     input.model,
     ...(input.harness ? ['--harness', input.harness] : []),
     ...(input.allowHost ? ['--host', '--yes'] : []),
+    ...(input.offBook ? ['--off-book'] : []),
   ];
 }
 

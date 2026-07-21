@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
+import type { OrderBook } from '@overdeck/contracts';
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
@@ -25,12 +26,19 @@ export type IssueActionDialogState = {
   action: IssueActionEntry;
 } | null;
 
+export type IssueActionSubmenuOption = {
+  key: string;
+  label: string;
+  invoke: () => void;
+};
+
 export type IssueActionView = {
   action: IssueActionEntry;
   enabled: boolean;
   disabledReason?: string;
   isPending: boolean;
   invoke: () => void;
+  submenu?: IssueActionSubmenuOption[];
 };
 
 export type IssueActionLayout = {
@@ -50,6 +58,7 @@ export type UseIssueActionsResult = IssueActionLayout & {
   activeDialog: IssueActionDialogState;
   closeDialog: () => void;
   submitDialogAction: (action: IssueActionEntry, body?: Record<string, unknown>, selectedTaskId?: string | null) => void;
+  createOrderBookForIssue: (name: string) => Promise<void>;
   isActionPending: (key: IssueActionKey) => boolean;
 };
 
@@ -169,6 +178,8 @@ function disabledReasonForAction(action: IssueActionEntry) {
       return 'Select a task before requesting inspection.';
     case 'viewPr':
       return 'No pull request URL is available yet.';
+    case 'addToOrderBook':
+      return 'Available only for open issues that are not already in a non-complete order book.';
     case 'open':
       return 'Workspace does not exist';
     case 'syncMain':
@@ -279,6 +290,25 @@ export function useIssueActions(issueId: string): UseIssueActionsResult {
   });
   const lifecycle = agent?.lifecycle ?? lifecycleFallback.data ?? undefined;
 
+  const orderBooksQuery = useQuery({
+    queryKey: ['order-books'],
+    queryFn: async () => {
+      const response = await fetch('/api/orders');
+      if (!response.ok) throw new Error(`orders failed: ${response.status}`);
+      const payload = await response.json() as { books?: OrderBook[] };
+      return payload.books ?? [];
+    },
+    staleTime: 15_000,
+  });
+  const activeOrderBooks = useMemo(
+    () => (orderBooksQuery.data ?? []).filter((book) => book.status !== 'complete'),
+    [orderBooksQuery.data],
+  );
+  const isInActiveOrderBook = useMemo(
+    () => activeOrderBooks.some((book) => book.items.some((item) => item.issue.toLowerCase() === issueId.toLowerCase())),
+    [activeOrderBooks, issueId],
+  );
+
   const workspace = useMemo<WorkspaceInfo | undefined>(() => {
     if (!issue?.workspacePath) return undefined;
     return { exists: true, issueId, path: issue.workspacePath };
@@ -301,8 +331,10 @@ export function useIssueActions(issueId: string): UseIssueActionsResult {
       hasPr: Boolean(reviewStatus?.readyForMerge || reviewStatus?.prUrl),
       prUrl: reviewStatus?.prUrl ?? null,
       hasPendingInput: agent?.hasPendingQuestion === true,
+      orderBooksLoaded: orderBooksQuery.isSuccess,
+      isInActiveOrderBook,
     };
-  }, [agent, issue, issueId, lifecycle, reviewStatus, workspace]);
+  }, [agent, isInActiveOrderBook, issue, issueId, lifecycle, orderBooksQuery.isSuccess, reviewStatus, workspace]);
 
   const phase = useMemo(() => deriveIssueActionPhase(state), [state]);
 
@@ -352,7 +384,59 @@ export function useIssueActions(issueId: string): UseIssueActionsResult {
     postActionMutation.mutate({ action, body, selectedTaskId });
   }, [postActionMutation]);
 
-  const isActionPending = useCallback((key: IssueActionKey) => pendingKey === key && postActionMutation.isPending, [pendingKey, postActionMutation.isPending]);
+  const addToOrderBookMutation = useMutation({
+    mutationFn: async (bookId: string) => {
+      const response = await fetch(`/api/orders/${encodeURIComponent(bookId)}/items`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: await dashboardMutationJsonHeaders(),
+        body: JSON.stringify({ item: { issue: issueId, lane: 'A' } }),
+      });
+      if (!response.ok) throw new Error(await responseError(response, 'Failed to add issue to order book'));
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['order-books'] });
+      toast.success(`${issueId} added to the order book`);
+    },
+    onError: (error: Error) => alert({ message: error.message, variant: 'error' }),
+    onSettled: () => setPendingKey(null),
+  });
+
+  const addIssueToOrderBook = useCallback((bookId: string) => {
+    setPendingKey('addToOrderBook');
+    addToOrderBookMutation.mutate(bookId);
+  }, [addToOrderBookMutation]);
+
+  const createOrderBookForIssue = useCallback(async (name: string) => {
+    setPendingKey('addToOrderBook');
+    try {
+      const createResponse = await fetch('/api/orders', {
+        method: 'POST',
+        credentials: 'include',
+        headers: await dashboardMutationJsonHeaders(),
+        body: JSON.stringify({ name }),
+      });
+      if (!createResponse.ok) throw new Error(await responseError(createResponse, 'Failed to create order book'));
+      const created = await createResponse.json() as OrderBook;
+      const addResponse = await fetch(`/api/orders/${encodeURIComponent(created.id)}/items`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: await dashboardMutationJsonHeaders(),
+        body: JSON.stringify({ item: { issue: issueId, lane: 'A' } }),
+      });
+      if (!addResponse.ok) throw new Error(await responseError(addResponse, 'Failed to add issue to the new order book'));
+      await queryClient.invalidateQueries({ queryKey: ['order-books'] });
+      toast.success(`${issueId} added to ${created.name}`);
+    } catch (cause) {
+      const error = cause instanceof Error ? cause : new Error(String(cause));
+      await alert({ message: error.message, variant: 'error' });
+      throw error;
+    } finally {
+      setPendingKey(null);
+    }
+  }, [alert, issueId, queryClient]);
+
+  const isActionPending = useCallback((key: IssueActionKey) => pendingKey === key && (postActionMutation.isPending || addToOrderBookMutation.isPending), [addToOrderBookMutation.isPending, pendingKey, postActionMutation.isPending]);
 
   const runAction = useCallback(async (action: IssueActionEntry) => {
     if (!action.enabledWhen(state)) return;
@@ -403,14 +487,25 @@ export function useIssueActions(issueId: string): UseIssueActionsResult {
 
   const all = useMemo<IssueActionView[]>(() => ISSUE_ACTIONS.map((action) => {
     const enabled = action.enabledWhen(state);
+    const invoke = () => { void runAction(action); };
     return {
       action,
       enabled,
       disabledReason: enabled ? undefined : disabledReasonForAction(action),
       isPending: isActionPending(action.key),
-      invoke: () => { void runAction(action); },
+      invoke,
+      submenu: action.key === 'addToOrderBook' && enabled
+        ? [
+            ...activeOrderBooks.map((book) => ({
+              key: book.id,
+              label: book.name,
+              invoke: () => addIssueToOrderBook(book.id),
+            })),
+            { key: 'new', label: '+ New book…', invoke },
+          ]
+        : undefined,
     };
-  }), [isActionPending, runAction, state]);
+  }), [activeOrderBooks, addIssueToOrderBook, isActionPending, runAction, state]);
 
   const layout = useMemo<IssueActionLayout>(() => {
     const byKey = new Map(all.map((view) => [view.action.key, view]));
@@ -436,6 +531,7 @@ export function useIssueActions(issueId: string): UseIssueActionsResult {
     activeDialog,
     closeDialog: () => setActiveDialog(null),
     submitDialogAction,
+    createOrderBookForIssue,
     isActionPending,
   };
 }

@@ -5,7 +5,9 @@ const execMock = vi.hoisted(() => vi.fn());
 const execFileMock = vi.hoisted(() => vi.fn());
 const githubAppMocks = vi.hoisted(() => ({
   isGitHubAppConfigured: vi.fn(() => false),
+  listIssuesWithAnyLabelPromise: vi.fn(async () => []),
   listOpenIssuesWithLabels: vi.fn(() => Effect.succeed([])),
+  listOpenIssuesWithLabelsPromise: vi.fn(async () => []),
 }));
 
 vi.mock('node:child_process', async (importOriginal) => {
@@ -30,7 +32,9 @@ vi.mock('node:child_process', async (importOriginal) => {
 
 vi.mock('../../../../src/lib/github-app.js', () => ({
   isGitHubAppConfigured: githubAppMocks.isGitHubAppConfigured,
+  listIssuesWithAnyLabelPromise: githubAppMocks.listIssuesWithAnyLabelPromise,
   listOpenIssuesWithLabels: githubAppMocks.listOpenIssuesWithLabels,
+  listOpenIssuesWithLabelsPromise: githubAppMocks.listOpenIssuesWithLabelsPromise,
 }));
 
 import { fetchOpenIssueLabels } from '../../../../src/cli/commands/flywheel-surfaces.js';

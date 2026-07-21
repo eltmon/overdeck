@@ -8,6 +8,7 @@ Read this with:
 
 - [`flywheel-brief.md`](./flywheel-brief.md) — the operating contract the orchestrator reads at the start of every run.
 - [`ROLES.md`](./ROLES.md) — the role taxonomy the Flywheel coordinates.
+- [`ORDER-BOOKS.md`](./ORDER-BOOKS.md) — first-class operator campaigns, lane enforcement, drain detection, and continuation.
 - [`../packages/contracts/src/flywheel.ts`](../packages/contracts/src/flywheel.ts) — the shared `FlywheelStatus` contract.
 
 ## Awaiting Merge UAT context
@@ -41,6 +42,7 @@ The top-level fields are:
 | `parked` | Issues the Flywheel cannot move without a concrete reason. |
 | `system` | Main HEAD, RAM, swap, active-agent count, and agent cap. |
 | `openQuestions` | Actionable human decisions only. |
+| `orders` | Optional bound order-book identity, progress, lane occupancy, and mechanical drained state. |
 | `ticks`, `lastTickAt` | Loop cadence metadata. |
 
 To extend the contract:
@@ -122,11 +124,12 @@ The Flywheel lifecycle is exposed as `pan flywheel` commands and mirrored by das
 
 | Command | Purpose |
 | --- | --- |
-| `pan flywheel start` | Starts the singleton orchestrator for a configured scope and brief. |
+| `pan flywheel start` | Starts the singleton orchestrator for a configured scope and brief. Add `--orders <book-id>` to bind a ready order book. |
 | `pan flywheel pause` | Stops the loop from launching more work while preserving run state. |
 | `pan flywheel resume` | Continues a paused run from its saved state. |
 | `pan flywheel status` | Reads the latest `FlywheelStatus` snapshot. |
 | `pan flywheel emit-status --file <json>` | Validates and writes a status snapshot from the orchestrator. |
+| `pan flywheel complete` | Finalizes a drained orders-bound run, writes its report and retrospective result, then starts the next ready book or backlog mode when configured. |
 | `pan flywheel report` | Writes the per-run report under the run directory and commits any pending changes to `docs/FLYWHEEL-STATE.md`. |
 
 Cloister owns the singleton gate. Only one Flywheel run may be active for a Overdeck home at a time. If a second start request arrives, it should fail with a clear active-run response instead of spawning a competing orchestrator. Pause and resume operate on that same saved run record, not on a new run.
@@ -143,10 +146,12 @@ Run artifacts live under the Flywheel home:
 
 ```text
 ${OVERDECK_HOME:-~/.overdeck}/flywheel/runs/<RUN-ID>/
-  latest.json      # latest validated FlywheelStatus
-  report.md        # end-of-run report, when complete
-  opened-pr.json   # optional merge/report metadata
-  aborted.json     # present when the run ended early
+  latest.json             # latest validated FlywheelStatus
+  report.md               # end-of-run report, when complete
+  retro.md                # optional recognized improvements for an orders-bound run
+  orders-overrides.jsonl  # audited --off-book dispatches, when used
+  opened-pr.json          # optional merge/report metadata
+  aborted.json            # present when the run ended early
 ```
 
 Status writes must be atomic. Write a temporary file in the run directory, then rename it over `latest.json`.

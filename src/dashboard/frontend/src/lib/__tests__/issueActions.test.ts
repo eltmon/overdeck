@@ -59,6 +59,7 @@ const preservedActionKeys: readonly IssueActionKey[] = [
   'completeWorkReset',
   'restartFromPlan',
   'restartAgent',
+  'addToOrderBook',
 ];
 
 const baseState: IssueActionState = {
@@ -258,6 +259,14 @@ describe('ISSUE_ACTIONS', () => {
     expect(action('resetIssue').kind).toBe('destructive');
     expect(action('resetToPlanned').kind).toBe('destructive');
     expect(action('cancel').kind).toBe('destructive');
+  });
+
+  it('enables order-book promotion only for open issues outside non-complete books', () => {
+    const available = { ...baseState, orderBooksLoaded: true, isInActiveOrderBook: false };
+    expect(action('addToOrderBook').enabledWhen(available)).toBe(true);
+    expect(action('addToOrderBook').enabledWhen({ ...available, issueCanonicalState: 'done' })).toBe(false);
+    expect(action('addToOrderBook').enabledWhen({ ...available, isInActiveOrderBook: true })).toBe(false);
+    expect(action('addToOrderBook').enabledWhen({ ...available, orderBooksLoaded: false })).toBe(false);
   });
 
   it('does not enable running-agent actions for stopped agents', () => {

@@ -70,6 +70,7 @@ import { codexAuthRouteLayer } from './routes/codex-auth.js';
 import { terminalsRouteLayer } from './routes/terminals.js';
 import { discoveredSessionsRouteLayer } from './routes/discovered-sessions.js';
 import { flywheelRouteLayer } from './routes/flywheel.js';
+import { ordersRouteLayer } from './routes/orders.js';
 import { artifactsRouteLayer } from './routes/artifacts.js';
 import { backlogRouteLayer } from './routes/backlog.js';
 import { featureRegistryRouteLayer } from './routes/feature-registry.js';
@@ -349,6 +350,7 @@ export const makeRoutesLayer = Layer.mergeAll(
   terminalsRouteLayer,
   discoveredSessionsRouteLayer,
   flywheelRouteLayer,
+  ordersRouteLayer,
   artifactsRouteLayer,
   featureRegistryRouteLayer,
   fsRouteLayer,
