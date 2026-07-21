@@ -51,8 +51,18 @@ export function StartAgentCta({ issueId, density, surface = 'issue-view' }: { is
   // id rides on the button so a tree full of them is never ambiguous, and the
   // copy says what resume actually does (reopens with memory intact).
   const resumeLabel = surface === 'chip' ? `▶ Resume · ${issueId}` : surface === 'inline' ? `Resume · ${issueId}` : `Resume session · ${issueId}`;
-  const label = mode === 'resume' ? resumeLabel : surface === 'chip' ? '▶ Start' : surface === 'inline' ? 'Start' : 'Start work agent';
+  // Style-guide card-footer rule: action links stay monochromatic; the ONE
+  // allowed color exception is the primary CTA in text-primary — never a
+  // filled bg-primary block on a dense row.
+  const startLabel = surface === 'chip' ? `▶ Start · ${issueId}` : surface === 'inline' ? `Start · ${issueId}` : 'Start work agent';
+  const label = mode === 'resume' ? resumeLabel : startLabel;
   const confirmCopy = gate === 'troubled' ? 'This agent was marked troubled after repeated failed resumes. Clear the troubled flag and start a fresh work agent?' : 'This agent is paused and needs your attention. Clear the paused gate and start a fresh work agent?';
+  const compactButtonClass = mode === 'resume'
+    ? 'inline-flex items-center gap-1 rounded-[4px] border border-info/30 bg-info/10 px-1.5 py-0.5 text-[10px] font-medium text-info-foreground transition-colors hover:bg-info/20 disabled:opacity-50'
+    : 'inline-flex items-center gap-1 rounded-[4px] px-1.5 py-0.5 text-[10px] font-medium text-primary transition-colors hover:text-primary/80 disabled:opacity-50';
+  const fullButtonClass = mode === 'resume'
+    ? 'inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] border border-info/40 bg-info/10 px-2.5 py-1.5 text-[12px] font-semibold text-info-foreground transition-colors hover:bg-info/20 disabled:opacity-50'
+    : 'rounded-[var(--radius-sm)] bg-primary px-2.5 py-1.5 text-[12px] font-medium text-primary-foreground disabled:opacity-50';
   return <div data-section="StartAgentCta" className={compact ? 'inline-flex items-center gap-2' : 'w-full space-y-2'} onClick={(event) => event.stopPropagation()}>
     {confirming && <div role="dialog" className="rounded-[var(--radius-sm)] border border-warning/50 bg-warning/10 p-3 text-[12px]"><p>{confirmCopy}</p><div className="mt-2 flex gap-2"><button type="button" className="rounded bg-primary px-2 py-1 text-primary-foreground" onClick={() => mutation.mutate('start')}>Clear gate and start</button><button type="button" className="rounded border border-border px-2 py-1" onClick={() => setConfirming(false)}>Cancel</button></div></div>}
     {!confirming && (
@@ -60,11 +70,7 @@ export function StartAgentCta({ issueId, density, surface = 'issue-view' }: { is
         type="button"
         disabled={mutation.isPending}
         title={mode === 'resume' ? `Reopens the saved session for ${issueId} with its memory intact` : undefined}
-        className={mode === 'resume'
-          ? compact
-            ? 'inline-flex items-center gap-1 rounded-[4px] border border-info/30 bg-info/10 px-1.5 py-0.5 text-[10px] font-medium text-info-foreground transition-colors hover:bg-info/20 disabled:opacity-50'
-            : 'inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] border border-info/40 bg-info/10 px-2.5 py-1.5 text-[12px] font-semibold text-info-foreground transition-colors hover:bg-info/20 disabled:opacity-50'
-          : 'rounded-[var(--radius-sm)] bg-primary px-2.5 py-1.5 text-[12px] font-medium text-primary-foreground disabled:opacity-50'}
+        className={compact ? compactButtonClass : fullButtonClass}
         onClick={() => clearAndStart ? setConfirming(true) : mutation.mutate(mode)}
       >
         {mutation.isPending && mode === 'resume' ? 'Resuming…' : label}

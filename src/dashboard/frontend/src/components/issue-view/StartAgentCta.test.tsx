@@ -127,13 +127,22 @@ describe('StartAgentCta', () => {
   });
 
   it.each([
-    ['chip', '▶ Start'],
-    ['inline', 'Start'],
+    ['chip', '▶ Start · PAN-2499'],
+    ['inline', 'Start · PAN-2499'],
   ] as const)('renders the %s adoption without the override panel', (surface, label) => {
     setState({ start: true });
     const queryClient = new QueryClient();
     render(<QueryClientProvider client={queryClient}><StartAgentCta issueId="PAN-2499" density="rail" surface={surface} /></QueryClientProvider>);
     expect(screen.getByRole('button', { name: label })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Overrides' })).not.toBeInTheDocument();
+  });
+
+  it('renders start as a text-primary quiet link on compact surfaces (style-guide card-footer rule)', () => {
+    setState({ start: true });
+    const queryClient = new QueryClient();
+    render(<QueryClientProvider client={queryClient}><StartAgentCta issueId="PAN-2499" density="rail" surface="chip" /></QueryClientProvider>);
+    const button = screen.getByRole('button', { name: '▶ Start · PAN-2499' });
+    expect(button).toHaveClass('text-primary');
+    expect(button).not.toHaveClass('bg-primary');
   });
 });
