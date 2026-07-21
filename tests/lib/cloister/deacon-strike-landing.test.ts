@@ -21,7 +21,7 @@ function deps(result: { success: boolean; mergeStatus?: string; error?: string; 
     resolveProject: vi.fn().mockReturnValue({ projectPath: '/repo', projectKey: 'overdeck' }),
     mergeIssue: vi.fn().mockResolvedValue(result),
     getMainHead: vi.fn().mockResolvedValue('main-head'),
-    deliverRecovery: vi.fn().mockResolvedValue(undefined),
+    deliverRecovery: vi.fn().mockResolvedValue({ delivered: true, queuedToMail: true }),
     writeFeedback: vi.fn().mockResolvedValue(true),
     needsYou: vi.fn().mockResolvedValue(undefined),
     now: () => '2026-07-16T00:00:00.000Z',
@@ -235,6 +235,21 @@ describe('patrolStrikeLandings', () => {
     expect(d.writeFeedback).toHaveBeenCalledTimes(1);
     expect(d.needsYou).toHaveBeenCalledWith('PAN-2702', expect.stringContaining('old-head'), expect.objectContaining({ attempts: expect.any(Array) }));
     await expect(patrolStrikeLandings(d)).resolves.toEqual([]);
+    expect(d.needsYou).toHaveBeenCalledTimes(1);
+  });
+
+  it('escalates recovery queued to mail without a live recipient', async () => {
+    const d = deps({ success: false, error: 'gate failed' });
+    vi.mocked(d.deliverRecovery).mockResolvedValue({
+      delivered: false,
+      queuedToMail: true,
+      reason: 'resume failed: session not found',
+    });
+    await patrolStrikeLandings(d);
+    await d.flush();
+    expect(d.state).toMatchObject({ strikeLandingState: 'needs_you', strikeRecoveryCount: 1 });
+    expect(d.state.strikeLandingAttempts?.[0].detail).toContain('recovery not delivered: resume failed: session not found');
+    expect(d.writeFeedback).toHaveBeenCalledTimes(1);
     expect(d.needsYou).toHaveBeenCalledTimes(1);
   });
 

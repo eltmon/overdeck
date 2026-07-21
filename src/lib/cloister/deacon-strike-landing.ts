@@ -124,9 +124,13 @@ async function handleFailure(issueId: string, head: string, detail: string, proj
   const recoveryMessage = `Strike landing failed for ${issueId} at ${head}.\n\nCurrent main: ${mainHead}\nFailure: ${detail}\n\nFetch origin, rebase strike/${issueId.toLowerCase()} onto current origin/main, resolve every conflict, rerun the configured gates, push only strike/${issueId.toLowerCase()}, then run pan strike-ready ${issueId}. A fresh pushed HEAD is required before another landing attempt.`;
   if (!NON_ACTIONABLE.test(detail) && recoveryCount < 3) {
     try {
-      await deps.deliverRecovery(`strike-${issueId.toLowerCase()}`, recoveryMessage);
-      deps.setStatus(issueId, { strikeLandingState: 'recovering', strikeRecoveryCount: recoveryCount, strikeLandingAttempts: attempts, mergeNotes: detail });
-      return `[strike-landing] ${issueId} at ${head} recovering (${recoveryCount}/3)`;
+      const outcome = await deps.deliverRecovery(`strike-${issueId.toLowerCase()}`, recoveryMessage);
+      if (outcome.delivered) {
+        deps.setStatus(issueId, { strikeLandingState: 'recovering', strikeRecoveryCount: recoveryCount, strikeLandingAttempts: attempts, mergeNotes: detail });
+        return `[strike-landing] ${issueId} at ${head} recovering (${recoveryCount}/3)`;
+      }
+      detail += `; recovery not delivered: ${outcome.reason ?? 'queued to mail only'}`;
+      attempts[attempts.length - 1] = { ...attempts[attempts.length - 1], detail };
     } catch (error) { detail += `; recovery delivery failed: ${error instanceof Error ? error.message : String(error)}`; attempts[attempts.length - 1] = { ...attempts[attempts.length - 1], detail }; }
   }
   const reason = `Strike landing for ${issueId} needs operator attention after ${recoveryCount} cycle(s).\n${attemptHistory(attempts)}`;
