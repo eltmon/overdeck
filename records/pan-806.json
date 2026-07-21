@@ -85,7 +85,7 @@
   ],
   "feedback": [],
   "created": "2026-07-21T16:29:59.439Z",
-  "updated": "2026-07-21T16:31:06.668Z",
+  "updated": "2026-07-21T16:36:02.287Z",
   "pipeline": {
     "issueId": "PAN-806",
     "reviewStatus": "pending",
@@ -143,18 +143,31 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "rebase-helper-sentinel": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-806",
         "agentId": "agent-pan-806",
         "pid": 2852980,
         "host": "eltmon-z790",
-        "claimedAt": "2026-07-21T16:31:06.668Z"
+        "claimedAt": "2026-07-21T16:31:06.668Z",
+        "itemId": "rebase-helper-sentinel",
+        "outcome": "completed",
+        "reason": "Added OVERDECK_PAN_GIT_OP=1 to pan-owned rebase, abort, merge fallback, and continue calls with mocked execAsync coverage",
+        "releasedAt": "2026-07-21T16:36:02.287Z"
+      }
+    ],
+    "statusReasons": {
+      "rebase-helper-sentinel": {
+        "reason": "Added OVERDECK_PAN_GIT_OP=1 to pan-owned rebase, abort, merge fallback, and continue calls with mocked execAsync coverage",
+        "updatedAt": "2026-07-21T16:36:02.287Z"
       }
     }
   },
   "statusOverrides": {
-    "rebase-helper-sentinel": "running"
+    "rebase-helper-sentinel": "completed",
+    "rebase-helper-sentinel.rebase-helper-sentinel.ac1": "completed",
+    "rebase-helper-sentinel.rebase-helper-sentinel.ac2": "completed"
   }
 }
