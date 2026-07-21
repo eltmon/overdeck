@@ -74,10 +74,10 @@
       "sync-sources/skills/okf/references/overdeck.md",
       "tests/unit/dashboard/server/services/knowledge-viewer.test.ts"
     ],
-    "recordedAt": "2026-07-21T16:22:43.458Z"
+    "recordedAt": "2026-07-21T16:48:34.581Z"
   },
   "created": "2026-07-21T15:14:12.381Z",
-  "updated": "2026-07-21T16:48:27.734Z",
+  "updated": "2026-07-21T16:48:34.583Z",
   "pipeline": {
     "issueId": "PAN-2984",
     "reviewStatus": "reviewing",
