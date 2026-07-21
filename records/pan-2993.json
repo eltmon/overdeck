@@ -101,7 +101,7 @@
     "recordedAt": "2026-07-21T23:54:05.124Z"
   },
   "created": "2026-07-21T22:47:36.935Z",
-  "updated": "2026-07-21T23:54:21.982Z",
+  "updated": "2026-07-21T23:54:40.635Z",
   "pipeline": {
     "issueId": "PAN-2993",
     "reviewStatus": "pending",
@@ -116,7 +116,7 @@
     "inspectNotes": "All 4 ACs verified against src/lib/agents/messaging.ts@79bb7b47: stopped-agent resume failure returns {delivered:false,queuedToMail:true,reason} naming both resumeResult.error and PAN-1980 session-rotation disable; paused/gated path returns gate reason; live-session/successful-resume paths return delivered:true; only deacon-strike-landing.ts touched among callers and npm run typecheck passes clean (0 new errors).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2998",
     "lastVerifiedCommit": "cd0f24e6995175255d7bce8327e8e000801f3589",
-    "reviewRequestedAt": "2026-07-21T23:54:05.969Z",
+    "reviewRequestedAt": "2026-07-21T23:54:40.299Z",
     "reviewSpawnedAt": "2026-07-21T23:53:41.680Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -167,7 +167,8 @@
         "tests/unit/lib/overdeck/review-status-sync.test.ts"
       ],
       "recordedAt": "2026-07-21T23:54:05.124Z"
-    }
+    },
+    "panDoneRecoveredAt": "2026-07-21T23:54:40.299Z"
   },
   "closeOut": {
     "usage": {
