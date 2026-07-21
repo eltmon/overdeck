@@ -27,10 +27,14 @@ vi.mock('../../../lib/installers/mnemos.js', () => ({
   ensureMnemos: installerMocks.ensureMnemos,
 }));
 
-vi.mock('../../../lib/installers/open-knowledge.js', () => ({
-  ensureOpenKnowledge: installerMocks.ensureOpenKnowledge,
-  startReadOnlyOpenKnowledgeServer: installerMocks.startReadOnlyOpenKnowledgeServer,
-}));
+vi.mock('../../../lib/installers/open-knowledge.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../lib/installers/open-knowledge.js')>();
+  return {
+    ...actual,
+    ensureOpenKnowledge: installerMocks.ensureOpenKnowledge,
+    startReadOnlyOpenKnowledgeServer: installerMocks.startReadOnlyOpenKnowledgeServer,
+  };
+});
 
 vi.mock('../../../lib/memory/injection.js', () => ({
   resolveKnowledgeBundleRoot: memoryMocks.resolveKnowledgeBundleRoot,
@@ -40,6 +44,7 @@ vi.mock('../../../lib/projects.js', () => ({
   resolveProjectFromIssueSync: projectMocks.resolveProjectFromIssueSync,
 }));
 
+import { OpenKnowledgeError, OpenKnowledgeSetupRequiredError } from '../../../lib/installers/open-knowledge.js';
 import {
   buildKnowledgePrompt,
   configureKnowledgeCommand,
@@ -156,9 +161,12 @@ describe('knowledgeCommand', () => {
     }));
   });
 
-  it('opens the configured bundle, auto-installs on explicit use, and launches the browser', async () => {
+  it('opens the configured bundle through the resolved command and launches the browser', async () => {
     const unref = vi.fn();
-    const ensure = vi.fn(async () => ({ status: 'already-installed' as const, command: 'ok' as const }));
+    const ensure = vi.fn(async () => ({
+      status: 'already-installed' as const,
+      command: '/home/tester/.local/bin/ok',
+    }));
     const start = vi.fn(async () => ({
       process: { unref } as never,
       owned: true,
@@ -180,11 +188,123 @@ describe('knowledgeCommand', () => {
 
     expect(memoryMocks.resolveKnowledgeBundleRoot).toHaveBeenCalledWith({ projectPath: '/repo/overdeck' });
     expect(ensure).toHaveBeenCalledWith({ autoInstall: true });
-    expect(start).toHaveBeenCalledWith('/repo/overdeck/knowledge', { openBrowser: false });
+    expect(start).toHaveBeenCalledWith('/repo/overdeck/knowledge', {
+      openBrowser: false,
+      okCommand: '/home/tester/.local/bin/ok',
+    });
     expect(unref).toHaveBeenCalledOnce();
     expect(openBrowser).toHaveBeenCalledWith('http://127.0.0.1:39847');
     expect(log).toHaveBeenCalledWith('Knowledge viewer: http://127.0.0.1:39847');
     log.mockRestore();
+  });
+
+  it('prints a manager plan, prompts on TTY, executes consented setup, and retries ensure', async () => {
+    const plan = {
+      kind: 'install-node-via-manager' as const,
+      manager: 'volta' as const,
+      installCommand: 'volta fetch node@24',
+      steps: ['Install Node 24 with Volta without changing your default Node.'],
+    };
+    const ensure = vi.fn()
+      .mockRejectedValueOnce(new OpenKnowledgeSetupRequiredError(plan))
+      .mockResolvedValueOnce({ status: 'installed', command: '/home/tester/.local/bin/ok' });
+    const executeSetupPlan = vi.fn(async () => '/home/tester/.local/bin/ok');
+    const start = vi.fn(async () => ({
+      process: null,
+      owned: false,
+      reused: true,
+      port: 39847,
+      apiPort: 8789,
+      url: 'http://127.0.0.1:39847',
+      runtimeBundlePath: '/runtime/read-only-snapshot',
+    }));
+    const prompt = vi.fn(async () => 'y');
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    await knowledgeOpenCommand({ browser: false }, {
+      cwd: () => '/repo/overdeck',
+      ensure,
+      executeSetupPlan,
+      start,
+      prompt,
+      isTTY: () => true,
+    });
+
+    expect(log).toHaveBeenCalledWith(plan.steps[0]);
+    expect(prompt).toHaveBeenCalledWith('Proceed? [y/N] ');
+    expect(executeSetupPlan).toHaveBeenCalledWith(plan);
+    expect(ensure).toHaveBeenCalledTimes(2);
+    expect(start).toHaveBeenCalledWith('/repo/overdeck/knowledge', {
+      openBrowser: false,
+      okCommand: '/home/tester/.local/bin/ok',
+    });
+    log.mockRestore();
+  });
+
+  it('prints the manual command and exits when setup consent is declined', async () => {
+    const plan = {
+      kind: 'install-node-via-manager' as const,
+      manager: 'fnm' as const,
+      installCommand: 'fnm install 24',
+      steps: ['Install Node 24 with fnm without changing your default Node.'],
+    };
+    const ensure = vi.fn().mockRejectedValue(new OpenKnowledgeSetupRequiredError(plan));
+    const executeSetupPlan = vi.fn();
+    const start = vi.fn();
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    await knowledgeOpenCommand({ browser: false }, {
+      cwd: () => '/repo/overdeck',
+      ensure,
+      executeSetupPlan,
+      start,
+      prompt: async () => 'n',
+      isTTY: () => true,
+    });
+
+    expect(log).toHaveBeenCalledWith('Manual setup: fnm install 24');
+    expect(executeSetupPlan).not.toHaveBeenCalled();
+    expect(start).not.toHaveBeenCalled();
+    log.mockRestore();
+  });
+
+  it('rejects with setup steps without prompting on non-TTY stdin', async () => {
+    const plan = {
+      kind: 'install-nvm' as const,
+      steps: ['Install nvm only after reviewing its shell changes.'],
+      manualCommand: 'npm install -g @inkeep/open-knowledge',
+    };
+    const ensure = vi.fn().mockRejectedValue(new OpenKnowledgeSetupRequiredError(plan));
+    const prompt = vi.fn();
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    await expect(knowledgeOpenCommand({ browser: false }, {
+      cwd: () => '/repo/overdeck',
+      ensure,
+      prompt,
+      isTTY: () => false,
+    })).rejects.toThrow(/Install nvm only after reviewing its shell changes\.[\s\S]*npm install -g @inkeep\/open-knowledge/);
+    expect(prompt).not.toHaveBeenCalled();
+    log.mockRestore();
+  });
+
+  it('keeps --no-install strict without prompting or executing setup', async () => {
+    const ensure = vi.fn().mockRejectedValue(
+      new OpenKnowledgeError('open-knowledge is not installed. Install it manually with `npm install -g @inkeep/open-knowledge`.'),
+    );
+    const prompt = vi.fn();
+    const executeSetupPlan = vi.fn();
+
+    await expect(knowledgeOpenCommand({ install: false, browser: false }, {
+      cwd: () => '/repo/overdeck',
+      ensure,
+      prompt,
+      executeSetupPlan,
+      isTTY: () => true,
+    })).rejects.toThrow('npm install -g @inkeep/open-knowledge');
+    expect(ensure).toHaveBeenCalledWith({ autoInstall: false });
+    expect(prompt).not.toHaveBeenCalled();
+    expect(executeSetupPlan).not.toHaveBeenCalled();
   });
 
   it('reports and opens the verified URL when the upstream lock is reused', async () => {

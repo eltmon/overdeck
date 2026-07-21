@@ -15,6 +15,7 @@ export interface KnowledgeViewerStatus {
   proxyUrl?: string;
   embeddable?: boolean;
   message?: string;
+  setupPlan?: { kind: string; steps: string[] };
 }
 
 interface KnowledgePageProps {
@@ -193,6 +194,14 @@ export function KnowledgePage({ projectKey }: KnowledgePageProps) {
             {status.message && (
               <p className="mt-2 max-w-2xl font-mono text-xs text-muted-foreground">{status.message}</p>
             )}
+            {status.setupPlan?.steps.length ? (
+              <ol
+                className="mt-4 max-w-2xl list-decimal space-y-2 pl-5 text-sm text-muted-foreground"
+                data-testid="knowledge-setup-plan"
+              >
+                {status.setupPlan.steps.map((step) => <li key={step}>{step}</li>)}
+              </ol>
+            ) : null}
             <button
               type="button"
               onClick={() => installMutation.mutate()}
@@ -202,7 +211,7 @@ export function KnowledgePage({ projectKey }: KnowledgePageProps) {
               {installMutation.isPending
                 ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
                 : <Download className="h-4 w-4" aria-hidden="true" />}
-              {installMutation.isPending ? 'Installing viewer' : 'Install viewer'}
+              {installMutation.isPending ? 'Setting up the viewer' : 'Set up the viewer'}
             </button>
           </section>
         )}
