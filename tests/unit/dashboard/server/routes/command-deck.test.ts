@@ -186,6 +186,30 @@ describe('fetchActivityDataWithContext', () => {
     expect(Number.isFinite(section?.duration)).toBe(true);
   });
 
+  it('emits a strike section from the agents registry even after its state dir is gone', async () => {
+    const issueId = 'PAN-2895';
+    const strikeId = 'strike-pan-2895';
+    mockAgentStates.set(strikeId, {
+      id: strikeId,
+      issueId,
+      role: 'strike',
+      model: 'gpt-5.6-sol',
+      status: 'stopped',
+      startedAt: '2026-07-19T02:22:16Z',
+      stoppedAt: '2026-07-21T02:33:22Z',
+      workspace: '/tmp/overdeck/workspaces/feature-pan-2895-strike',
+    });
+
+    const result = await fetchActivityDataWithContext(issueId, { tmuxSessionNames: new Set() });
+    const section = (result as { sections: Array<{ sessionId: string; type: string; endedAt?: string; tmuxSession?: string }> }).sections
+      .find((s) => s.sessionId === strikeId);
+
+    expect(section).toBeDefined();
+    expect(section?.type).toBe('strike');
+    expect(section?.endedAt).toBe('2026-07-21T02:33:22Z');
+    expect(section?.tmuxSession).toBe(strikeId);
+  });
+
   it('sets planningComplete on planning sections only when planning is finished', async () => {
     const issueId = 'PAN-539';
     const planningId = 'planning-pan-539';

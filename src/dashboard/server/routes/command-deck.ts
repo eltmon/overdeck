@@ -284,20 +284,23 @@ export async function fetchActivityDataWithContext(
   const planningAgentId = `planning-${issueLower}`;
   const planRunAgentId = `agent-${issueLower}-plan`;
   const knowledgeAgentId = `agent-${issueLower}-knowledge`;
+  const strikeAgentId = `strike-${issueLower}`;
   const agentsDir = join(homedir(), '.overdeck', 'agents');
 
   let hasPlanningSection = false;
 
-  for (const checkId of [planningAgentId, agentId, planRunAgentId, knowledgeAgentId]) {
+  for (const checkId of [planningAgentId, agentId, planRunAgentId, knowledgeAgentId, strikeAgentId]) {
     const agentDir = join(agentsDir, checkId);
-    if (!await pathExists(agentDir)) continue;
-
+    // PAN-1908: the agents registry decides whether a session exists — never
+    // the ~/.overdeck/agents/<id>/ dir, which janitors remove after sessions end.
     const state = getAgentStateSync(checkId);
     if (!state) continue;
 
     try {
       const isPlanning = checkId.startsWith('planning-') || state.role === 'plan';
-      const sectionType = isPlanning ? 'planning' : checkId.endsWith('-knowledge') ? 'knowledge' : 'work';
+      const sectionType = isPlanning ? 'planning'
+        : checkId.startsWith('strike-') ? 'strike'
+        : checkId.endsWith('-knowledge') ? 'knowledge' : 'work';
       if (isPlanning) hasPlanningSection = true;
 
       let transcript = '';
@@ -337,8 +340,8 @@ export async function fetchActivityDataWithContext(
       // Resolve JSONL path for conversation rendering (PAN-821)
       const jsonlPath = await resolveJsonlPath(checkId, workspacePath);
 
-      // Only expose interactive terminal for work/planning sessions (PAN-821 review)
-      const exposeInteractiveTerminal = sectionType === 'work' || sectionType === 'planning';
+      // Only expose interactive terminal for work/planning/strike sessions (PAN-821 review)
+      const exposeInteractiveTerminal = sectionType === 'work' || sectionType === 'planning' || sectionType === 'strike';
 
       // Terminal-end signal: endedAt is populated only when the session has
       // actually ended. duration is preserved as elapsed seconds for existing UI.

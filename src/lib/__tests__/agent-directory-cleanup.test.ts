@@ -85,6 +85,17 @@ describe('isValidAgentDirectoryName', () => {
     expect(isValidAgentDirectoryName('merge-pan-646')).toBe(false);
   });
 
+  it('accepts strike directories (registered agents, never orphans)', () => {
+    expect(isValidAgentDirectoryName('strike-pan-2895')).toBe(true);
+    expect(isValidAgentDirectoryName('strike-min-215')).toBe(true);
+  });
+
+  it('rejects malformed strike directories', () => {
+    expect(isValidAgentDirectoryName('strike-PAN-2895')).toBe(false);
+    expect(isValidAgentDirectoryName('strike-2895')).toBe(false);
+    expect(isValidAgentDirectoryName('strike-')).toBe(false);
+  });
+
   it('accepts specialist role directories (review/test/ship convoy)', () => {
     expect(isValidAgentDirectoryName('agent-pan-457-review')).toBe(true);
     expect(isValidAgentDirectoryName('agent-pan-457-review-correctness')).toBe(true);

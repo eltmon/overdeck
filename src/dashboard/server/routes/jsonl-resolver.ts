@@ -19,6 +19,8 @@
  *                       order no longer reflects time-recency. We disambiguate
  *                       across all listed IDs by JSONL mtime.
  *   3. runtime state  — in-process mirror, populated by hooks
+ *   4. agents registry — the DB row's session_id recorded at spawn; survives
+ *                        janitor removal of the agent directory
  *
  * Async-only (fs/promises) because this code path runs inside the dashboard
  * server's event loop.
@@ -174,6 +176,15 @@ export async function resolveClaudeSessionId(
     const runtimeState = await lookup(agentId);
     if (runtimeState?.claudeSessionId) return runtimeState.claudeSessionId;
   } catch { /* non-fatal */ }
+
+  // 4. agents registry — the DB row records session_id at spawn (PAN-1908) and
+  //    survives janitors removing the agent directory, so an ended session's
+  //    transcript stays resolvable. Skipped under agentsDirOverride (test hook)
+  //    to keep resolver tests hermetic, mirroring readRecordedState.
+  if (!opts.agentsDirOverride) {
+    const registrySessionId = getAgentStateSync(agentId)?.sessionId?.trim();
+    if (registrySessionId) return registrySessionId;
+  }
 
   return null;
 }

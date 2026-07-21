@@ -51,12 +51,16 @@ export const CLOSED_ISSUE_AGENT_DIR_GRACE_MS = 7 * 24 * 60 * 60 * 1000;
 /**
  * Check whether a directory name matches a valid work-agent directory pattern.
  *
- * Work-agent directories (agent-<issueId>) are always preserved.
+ * Work-agent directories (agent-<issueId>) are always preserved, and so are
+ * strike directories (strike-<issueId>) — strike sessions are registered in
+ * the agents table and their state dir holds session.id/mail like any other
+ * agent. Reaping them orphans the DB row and drops the strike node from the
+ * issue tree.
  * Planning-agent directories are handled separately — they are only valid
  * while their tmux session is running.
  */
 export function isValidAgentDirectoryName(name: string): boolean {
-  const match = name.match(/^agent-(.+)$/);
+  const match = name.match(/^(?:agent|strike)-(.+)$/);
   if (!match) return false;
 
   const suffix = match[1]!;

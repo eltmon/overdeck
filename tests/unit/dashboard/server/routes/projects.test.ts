@@ -625,6 +625,43 @@ describe('fetchProjectSessionTree', () => {
     expect(tree.features[0]?.sessions).toHaveLength(0);
   });
 
+  it('emits a strike node from the agents registry even after its state dir is gone', async () => {
+    (listProjectsSync as any).mockReturnValue([
+      {
+        key: 'overdeck',
+        config: { name: 'overdeck', path: '/tmp/overdeck', workspace: { workspaces_dir: 'workspaces' } },
+      },
+    ]);
+    (listSessionNames as any).mockReturnValue(Effect.succeed([]));
+    (getAgentRuntimeState as any).mockReturnValue(Effect.succeed(null));
+    mockAgentStates.set('strike-pan-888', agentState({
+      id: 'strike-pan-888',
+      issueId: 'PAN-888',
+      role: 'strike',
+      model: 'gpt-5.6-sol',
+      status: 'stopped',
+      stoppedAt: '2026-07-21T02:33:22Z',
+      workspace: '/tmp/overdeck/workspaces/feature-pan-888-strike',
+    }));
+    // No strike-pan-888 dir under ~/.overdeck/agents — only the workspace
+    // .overdeck dir signals the feature. The registry row alone must produce
+    // the strike node.
+    mockAccess(new Set([
+      '/tmp/overdeck/workspaces',
+      '/tmp/overdeck/workspaces/feature-pan-888/.overdeck',
+    ]));
+    mockWorkspaceReaddir([{ name: 'feature-pan-888', isDirectory: () => true, isFile: () => false }]);
+
+    const result = await fetchProjectSessionTree('overdeck');
+
+    const tree = result as { features: Array<{ issueId: string; sessions: Array<{ sessionId: string; type: string; endedAt?: string }> }> };
+    expect(tree.features).toHaveLength(1);
+    const strikeNode = tree.features[0]?.sessions.find((s) => s.sessionId === 'strike-pan-888');
+    expect(strikeNode).toBeDefined();
+    expect(strikeNode?.type).toBe('strike');
+    expect(strikeNode?.endedAt).toBe('2026-07-21T02:33:22Z');
+  });
+
   it('classifies agent-<issue>-plan as a planning session', async () => {
     (listProjectsSync as any).mockReturnValue([
       {
