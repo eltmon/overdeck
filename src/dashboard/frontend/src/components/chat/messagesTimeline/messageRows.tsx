@@ -217,7 +217,7 @@ type VerdictTone = 'pass' | 'fail' | 'info';
 
 function detectVerdict(line: string): { tone: VerdictTone } | null {
   if (/\b(all checks passed|review passed|tests? (all )?passed|work (is )?complete|fully green|ready to merge|merged successfully)\b/i.test(line)) return { tone: 'pass' };
-  if (/\b(checks? (are )?failing|review failed|tests? (are )?failing|tests? failed|changes requested|blocked)\b/i.test(line)) return { tone: 'fail' };
+  if (/\b(checks? (are )?failing|review failed|tests? (are )?failing|tests? failed|changes requested)\b/i.test(line)) return { tone: 'fail' };
   if (/^(✓|✔|✅)/.test(line.trim())) return { tone: 'pass' };
   if (/^(✗|❌)/.test(line.trim())) return { tone: 'fail' };
   return null;

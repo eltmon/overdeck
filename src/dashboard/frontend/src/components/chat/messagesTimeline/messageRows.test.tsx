@@ -82,6 +82,11 @@ describe('C-VERB gate: verdict extraction', () => {
     render(<TurnBody text={paragraphs(2)} streaming={false} />);
     expect(screen.queryByTestId('turn-verdict-card')).not.toBeInTheDocument();
   });
+
+  it('does not card neutral mentions of "blocked" (over-fire guard)', () => {
+    render(<TurnBody text={'Work is blocked by the upstream task finishing first.'} streaming={false} />);
+    expect(screen.queryByTestId('turn-verdict-card')).not.toBeInTheDocument();
+  });
 });
 
 describe('C-VERB gate: command groups collapse', () => {
