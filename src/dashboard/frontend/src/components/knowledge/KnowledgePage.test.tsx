@@ -98,7 +98,7 @@ describe('KnowledgePage', () => {
     expect(screen.getByText('/okf init')).toBeInTheDocument();
   });
 
-  it('renders the binary diagnosis and sends an authenticated install mutation', async () => {
+  it('renders the setup plan and sends an authenticated install mutation', async () => {
     let resolveInstall!: (value: Response) => void;
     const installResponse = new Promise<Response>((resolve) => { resolveInstall = resolve; });
     const fetchMock = vi.fn((input: RequestInfo | URL) => {
@@ -110,15 +110,24 @@ describe('KnowledgePage', () => {
         starting: false,
         running: false,
         message: 'open-knowledge requires Node 24+',
+        setupPlan: {
+          kind: 'install-node-via-manager',
+          steps: [
+            'Install Node 24 with Volta without changing your default Node.',
+            'Pin only the OpenKnowledge viewer to that runtime.',
+          ],
+        },
       }));
     });
     vi.stubGlobal('fetch', fetchMock);
 
     renderPage();
     expect(await screen.findByText('open-knowledge requires Node 24+')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Install viewer' }));
+    expect(screen.getByText('Install Node 24 with Volta without changing your default Node.')).toBeInTheDocument();
+    expect(screen.getByText('Pin only the OpenKnowledge viewer to that runtime.')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Set up the viewer' }));
 
-    expect(await screen.findByRole('button', { name: 'Installing viewer' })).toBeDisabled();
+    expect(await screen.findByRole('button', { name: 'Setting up the viewer' })).toBeDisabled();
     expect(fetchMock).toHaveBeenCalledWith('/api/knowledge-viewer/install', expect.objectContaining({
       method: 'POST',
       credentials: 'include',
@@ -129,6 +138,43 @@ describe('KnowledgePage', () => {
       body: JSON.stringify({ project: 'overdeck' }),
     }));
     resolveInstall(jsonResponse({ installed: true }));
+  });
+
+  it('renders an install failure in the existing error region', async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      if (String(input).includes('/install')) {
+        return Promise.resolve(jsonResponse({ error: 'volta fetch failed with code 7' }, false));
+      }
+      return Promise.resolve(jsonResponse({
+        projectKey: 'overdeck',
+        bundleConfigured: true,
+        installed: false,
+        starting: false,
+        running: false,
+      }));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderPage();
+    fireEvent.click(await screen.findByRole('button', { name: 'Set up the viewer' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('volta fetch failed with code 7');
+  });
+
+  it('keeps the current not-installed copy without an empty setup-plan list', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => jsonResponse({
+      projectKey: 'overdeck',
+      bundleConfigured: true,
+      installed: false,
+      starting: false,
+      running: false,
+    })));
+
+    renderPage();
+
+    expect(await screen.findByText('Install the local knowledge viewer')).toBeInTheDocument();
+    expect(screen.getByText(/OpenKnowledge is installed only after this explicit request/)).toBeInTheDocument();
+    expect(screen.queryByTestId('knowledge-setup-plan')).not.toBeInTheDocument();
   });
 
   it('renders the machine-active starting state', async () => {
