@@ -67,7 +67,7 @@
     "recordedAt": "2026-07-21T23:35:33.248Z"
   },
   "created": "2026-07-21T22:47:36.935Z",
-  "updated": "2026-07-21T23:35:36.820Z",
+  "updated": "2026-07-21T23:35:39.316Z",
   "pipeline": {
     "issueId": "PAN-2993",
     "reviewStatus": "reviewing",
@@ -82,7 +82,7 @@
     "verificationNotes": "Verification FAILED at lint (14286ms):\n\n\n> @overdeck/core@0.45.23 lint\n> eslint src/ --ext .js,.ts,.tsx --no-inline-config && npm run lint:effect && npm run lint:permissions && npm run lint:state-writes && npm run lint:overdeck-boundaries && npm run lint:pipeline-membership && npm run lint:skills && npm run lint:prompts && npm run lint:prompt-trailer && npm run lint:file-size && npm run lint:source-introspection && npm run lint:no-coderabbit-merge-gate && npm run lint:circular && npm run lint:ratchet-audit && npm run lint:quarantine-audit\n\n\n/home/eltmon/Projects/overdeck/workspaces/feature-pan-2993/src/lib/workspace/stack-health.ts\n  52:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any\n\n✖ 1 problem (1 error, 0 warnings)\n\n",
     "inspectNotes": "All 4 ACs verified against src/lib/agents/messaging.ts@79bb7b47: stopped-agent resume failure returns {delivered:false,queuedToMail:true,reason} naming both resumeResult.error and PAN-1980 session-rotation disable; paused/gated path returns gate reason; live-session/successful-resume paths return delivered:true; only deacon-strike-landing.ts touched among callers and npm run typecheck passes clean (0 new errors).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2998",
-    "reviewRequestedAt": "2026-07-21T23:35:34.013Z",
+    "reviewRequestedAt": "2026-07-21T23:35:38.985Z",
     "reviewSpawnedAt": "2026-07-21T23:35:34.717Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -119,7 +119,8 @@
         "tests/unit/lib/cloister/deacon-strike-transport.test.ts"
       ],
       "recordedAt": "2026-07-21T23:35:33.248Z"
-    }
+    },
+    "panDoneRecoveredAt": "2026-07-21T23:35:38.985Z"
   },
   "closeOut": {
     "usage": {
