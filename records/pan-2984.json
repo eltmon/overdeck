@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-21T15:14:12.381Z",
-  "updated": "2026-07-21T16:22:37.463Z",
+  "updated": "2026-07-21T16:22:43.459Z",
   "pipeline": {
     "issueId": "PAN-2984",
     "reviewStatus": "pending",
@@ -267,5 +267,46 @@
     "knowledge-page-assisted-flow.knowledge-page-assisted-flow.ac2": "completed",
     "knowledge-page-assisted-flow.knowledge-page-assisted-flow.ac3": "completed",
     "knowledge-page-assisted-flow.knowledge-page-assisted-flow.ac4": "completed"
+  },
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      "tests/unit/dashboard/server/services/knowledge-viewer.test.ts"
+    ],
+    "declaredScopeUntouched": [
+      "src/dashboard/server/services/__tests__/knowledge-viewer.test.ts"
+    ],
+    "declaredScope": [
+      "configuration/knowledge.mdx",
+      "src/cli/commands/__tests__/knowledge.test.ts",
+      "src/cli/commands/knowledge.ts",
+      "src/dashboard/frontend/src/components/knowledge/KnowledgePage.test.tsx",
+      "src/dashboard/frontend/src/components/knowledge/KnowledgePage.tsx",
+      "src/dashboard/server/routes/__tests__/knowledge-viewer.test.ts",
+      "src/dashboard/server/routes/knowledge-viewer.ts",
+      "src/dashboard/server/services/__tests__/knowledge-viewer.test.ts",
+      "src/dashboard/server/services/knowledge-viewer.ts",
+      "src/lib/installers/__tests__/node-runtime.test.ts",
+      "src/lib/installers/__tests__/open-knowledge.test.ts",
+      "src/lib/installers/node-runtime.ts",
+      "src/lib/installers/open-knowledge.ts",
+      "sync-sources/skills/okf/references/overdeck.md"
+    ],
+    "actualChangedFiles": [
+      "configuration/knowledge.mdx",
+      "src/cli/commands/__tests__/knowledge.test.ts",
+      "src/cli/commands/knowledge.ts",
+      "src/dashboard/frontend/src/components/knowledge/KnowledgePage.test.tsx",
+      "src/dashboard/frontend/src/components/knowledge/KnowledgePage.tsx",
+      "src/dashboard/server/routes/__tests__/knowledge-viewer.test.ts",
+      "src/dashboard/server/routes/knowledge-viewer.ts",
+      "src/dashboard/server/services/knowledge-viewer.ts",
+      "src/lib/installers/__tests__/node-runtime.test.ts",
+      "src/lib/installers/__tests__/open-knowledge.test.ts",
+      "src/lib/installers/node-runtime.ts",
+      "src/lib/installers/open-knowledge.ts",
+      "sync-sources/skills/okf/references/overdeck.md",
+      "tests/unit/dashboard/server/services/knowledge-viewer.test.ts"
+    ],
+    "recordedAt": "2026-07-21T16:22:43.458Z"
   }
 }
