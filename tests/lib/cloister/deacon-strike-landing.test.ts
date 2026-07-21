@@ -142,6 +142,33 @@ describe('patrolStrikeLandings', () => {
     expect(d.deliverRecovery).not.toHaveBeenCalled();
   });
 
+  it('preserves a landed state when a successful merge response is lost', async () => {
+    const d = deps();
+    vi.mocked(d.mergeIssue).mockImplementation(async () => {
+      d.setState({
+        ...d.state,
+        mergeStatus: 'merged',
+        strikeLandingState: 'landed',
+        strikeReadyHead: undefined,
+        strikeReadyAt: undefined,
+      });
+      return { success: false, transport: true, error: 'Strike merge request failed: socket hang up' };
+    });
+
+    await patrolStrikeLandings(d);
+    await d.flush();
+
+    expect(d.state).toMatchObject({
+      mergeStatus: 'merged',
+      strikeLandingState: 'landed',
+      strikeReadyHead: undefined,
+      strikeTransportRetryCount: undefined,
+      strikeNextAttemptAt: undefined,
+    });
+    expect(d.deliverRecovery).not.toHaveBeenCalled();
+    expect(d.writeFeedback).not.toHaveBeenCalled();
+  });
+
   it('skips transport retries until their due time, then reclaims the same head', async () => {
     const d = deps({ success: true, mergeStatus: 'queued' });
     d.setState(ready({

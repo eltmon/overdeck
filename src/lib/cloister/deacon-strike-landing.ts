@@ -240,7 +240,18 @@ async function executeStrikeLanding(issueId: string, head: string, claimed: Revi
     } else if (result.success || result.mergeStatus === 'queued' || result.mergeStatus === 'merging' || result.mergeStatus === 'merged') {
       return;
     } else if (result.transport) {
-      await handleTransportFailure(issueId, head, result.error ?? 'Strike landing transport failed', claimed, deps);
+      const current = deps.getStatus(issueId) ?? claimed;
+      if (current.mergeStatus === 'merged' || current.strikeLandingState === 'landed') {
+        deps.setStatus(issueId, {
+          strikeLandingState: 'landed',
+          strikeReadyHead: undefined,
+          strikeReadyAt: undefined,
+          strikeTransportRetryCount: undefined,
+          strikeNextAttemptAt: undefined,
+        });
+        return;
+      }
+      await handleTransportFailure(issueId, head, result.error ?? 'Strike landing transport failed', current, deps);
     } else {
       await handleFailure(issueId, head, result.error ?? 'Strike landing failed', project.projectPath, request.workspacePath, claimed, deps);
     }

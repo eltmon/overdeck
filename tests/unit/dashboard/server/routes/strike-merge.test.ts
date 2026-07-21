@@ -38,7 +38,13 @@ describe('strike merge-door eligibility', () => {
   });
 
   it('clears a queued strike marker at canonical merge completion', () => {
-    expect(mergeCompletionStatus(request)).toEqual({ strikeLandingState: 'landed', strikeReadyHead: undefined, strikeReadyAt: undefined });
+    expect(mergeCompletionStatus(request)).toEqual({
+      strikeLandingState: 'landed',
+      strikeReadyHead: undefined,
+      strikeReadyAt: undefined,
+      strikeTransportRetryCount: undefined,
+      strikeNextAttemptAt: undefined,
+    });
     expect(mergeCompletionStatus({ kind: 'normal' })).toEqual({});
   });
 
