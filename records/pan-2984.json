@@ -11,26 +11,26 @@
   ],
   "feedback": [],
   "created": "2026-07-21T15:14:12.381Z",
-  "updated": "2026-07-21T15:42:19.554Z",
+  "updated": "2026-07-21T15:42:23.003Z",
   "pipeline": {
     "issueId": "PAN-2984",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "passed",
+    "inspectStatus": "inspecting",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-21T15:29:50.277Z",
-    "inspectNotes": "All 5 ACs verified against node-runtime.ts/node-runtime.test.ts: nvm/fnm/volta/mise/asdf detection, highest->24 selection via path-segment parsing with single validating runCommand call, override short-circuits manager scan, invalid override rejects with OVERDECK_OPEN_KNOWLEDGE_NODE in message. 10/10 tests pass locally."
+    "updatedAt": "2026-07-21T15:42:22.986Z",
+    "inspectNotes": "Inspecting item ensure-ladder"
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "memory-extraction": {
           "anthropic/claude-haiku-4-5": {
-            "input": 22930,
-            "output": 400,
+            "input": 23400,
+            "output": 982,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -45,25 +45,25 @@
         },
         "review.supervisor": {
           "anthropic/claude-sonnet-5": {
-            "input": 4,
-            "output": 2202,
-            "cacheRead": 120385,
-            "cacheWrite": 128690
+            "input": 6,
+            "output": 2418,
+            "cacheRead": 249075,
+            "cacheWrite": 130529
           }
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 609685,
-            "output": 57926,
-            "cacheRead": 7186944,
+            "input": 889850,
+            "output": 176608,
+            "cacheRead": 25920000,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "anthropic/claude-haiku-4-5": {
-          "input": 22930,
-          "output": 400,
+          "input": 23400,
+          "output": 982,
           "cacheRead": 0,
           "cacheWrite": 0
         },
@@ -74,21 +74,21 @@
           "cacheWrite": 305673
         },
         "anthropic/claude-sonnet-5": {
-          "input": 4,
-          "output": 2202,
-          "cacheRead": 120385,
-          "cacheWrite": 128690
+          "input": 6,
+          "output": 2418,
+          "cacheRead": 249075,
+          "cacheWrite": 130529
         },
         "openai/gpt-5.6-sol": {
-          "input": 609685,
-          "output": 57926,
-          "cacheRead": 7186944,
+          "input": 889850,
+          "output": 176608,
+          "cacheRead": 25920000,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 18.418236,
-        "pricingAsOf": "2026-07-21T15:29:50.323Z"
+        "usd": 32.781929,
+        "pricingAsOf": "2026-07-21T15:42:22.994Z"
       }
     },
     "merges": [],
