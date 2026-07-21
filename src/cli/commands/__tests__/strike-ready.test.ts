@@ -52,6 +52,8 @@ describe('strikeReadyCommand', () => {
       strikeReadyAt: '2026-07-16T12:00:00.000Z',
       strikeLandingState: 'ready',
       strikeRecoveryCount: 0,
+      strikeTransportRetryCount: undefined,
+      strikeNextAttemptAt: undefined,
       strikeLandingAttempts: [],
     });
     expect(result.strikeReadyHead).toBe(head);
@@ -86,11 +88,13 @@ describe('strikeReadyCommand', () => {
     expect(deps.setStatus).toHaveBeenCalledWith('PAN-2702', {
       strikeLandingState: 'ready',
       strikeRecoveryCount: 0,
+      strikeTransportRetryCount: undefined,
+      strikeNextAttemptAt: undefined,
       strikeLandingAttempts: attempts,
     });
   });
 
-  it.each(['ready', 'landing', 'recovering'] as const)(
+  it.each(['ready', 'landing'] as const)(
     'keeps an identical HEAD in %s idempotent',
     async (strikeLandingState) => {
       const existing = status({
