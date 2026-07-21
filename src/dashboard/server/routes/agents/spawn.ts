@@ -26,6 +26,7 @@ import { clearWorkspaceStuck, getReviewStatusSync } from '../../../../lib/review
 import { isStateMigrated } from '../../../../lib/state-home.js';
 import { shouldCommitLegacyWorkspaceArtifacts } from '../../../../lib/state-read-home.js';
 import { parsePorcelainStatusPaths } from '../../../../lib/state-plane.js';
+import { assertWorkspaceStackHealthyForSpawn } from '../../../../lib/agents/spawn-prep.js';
 import { getWorkspaceStackHealth } from '../../../../lib/workspace/stack-health.js';
 import { writeAutoStartXBrief } from '../../../../lib/xbrief/auto-synthesize.js';
 import { findPlan, readPlan } from '../../../../lib/xbrief/io.js';
@@ -486,7 +487,17 @@ export const postAgentsRoute = HttpRouter.add(
 
     if (!isRemote) {
       emitStartAgentPhase(issueId, 'stackHealthGate', 'start', 'checking workspace docker stack health', { workspacePath });
-      const stackHealth = yield* getWorkspaceStackHealth(issueId, { projectConfig, workspacePath });
+      let stackHealth = yield* getWorkspaceStackHealth(issueId, { projectConfig, workspacePath });
+      if (!stackHealth.healthy && !allowHost) {
+        // A stopped/missing stack must not block the click: run the same
+        // bounded rebuild the CLI spawn gate performs (throttled, escalates
+        // after repeated failure), then re-check. Only 422 if still unhealthy.
+        emitStartAgentPhase(issueId, 'stackHealthGate', 'start', 'stack unhealthy — attempting workspace stack rebuild', { workspacePath });
+        yield* Effect.promise(() =>
+          assertWorkspaceStackHealthyForSpawn(issueId, 'work', false, workspacePath).catch(() => undefined),
+        );
+        stackHealth = yield* getWorkspaceStackHealth(issueId, { projectConfig, workspacePath });
+      }
       if (!stackHealth.healthy) {
         yield* Effect.promise(() => appendAgentLifecycleLog(agentSessionName, 'agent.start_blocked_stack_unhealthy', {
           issueId,
