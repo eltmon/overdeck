@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-21T15:14:12.381Z",
-  "updated": "2026-07-21T15:57:53.696Z",
+  "updated": "2026-07-21T16:05:15.884Z",
   "pipeline": {
     "issueId": "PAN-2984",
     "reviewStatus": "pending",
@@ -97,16 +97,8 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 15,
-    "claims": {
-      "knowledge-page-assisted-flow": {
-        "writerId": "agent-pan-2984",
-        "agentId": "agent-pan-2984",
-        "pid": 2443743,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-21T15:57:53.696Z"
-      }
-    },
+    "sequence": 16,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2984",
@@ -184,6 +176,17 @@
         "outcome": "completed",
         "reason": "Added setupPlan projection to viewer status and full consented-plan execution/retry to the install handler; 1,226 dashboard server tests and full typecheck pass.",
         "releasedAt": "2026-07-21T15:57:29.250Z"
+      },
+      {
+        "writerId": "agent-pan-2984",
+        "agentId": "agent-pan-2984",
+        "pid": 2443743,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-21T15:57:53.696Z",
+        "itemId": "knowledge-page-assisted-flow",
+        "outcome": "completed",
+        "reason": "Rendered setup-plan steps in the not-installed panel, relabeled the consent action and pending state, preserved error handling and no-plan copy, and verified the dark-mode layout via an isolated Playwright screenshot; 11 component tests pass.",
+        "releasedAt": "2026-07-21T16:05:15.884Z"
       }
     ],
     "statusReasons": {
@@ -214,6 +217,10 @@
       "dashboard-setup-endpoints": {
         "reason": "Added setupPlan projection to viewer status and full consented-plan execution/retry to the install handler; 1,226 dashboard server tests and full typecheck pass.",
         "updatedAt": "2026-07-21T15:57:29.250Z"
+      },
+      "knowledge-page-assisted-flow": {
+        "reason": "Rendered setup-plan steps in the not-installed panel, relabeled the consent action and pending state, preserved error handling and no-plan copy, and verified the dark-mode layout via an isolated Playwright screenshot; 11 component tests pass.",
+        "updatedAt": "2026-07-21T16:05:15.884Z"
       }
     }
   },
@@ -255,6 +262,10 @@
     "dashboard-setup-endpoints.dashboard-setup-endpoints.ac2": "completed",
     "dashboard-setup-endpoints.dashboard-setup-endpoints.ac3": "completed",
     "dashboard-setup-endpoints.dashboard-setup-endpoints.ac4": "completed",
-    "knowledge-page-assisted-flow": "running"
+    "knowledge-page-assisted-flow": "completed",
+    "knowledge-page-assisted-flow.knowledge-page-assisted-flow.ac1": "completed",
+    "knowledge-page-assisted-flow.knowledge-page-assisted-flow.ac2": "completed",
+    "knowledge-page-assisted-flow.knowledge-page-assisted-flow.ac3": "completed",
+    "knowledge-page-assisted-flow.knowledge-page-assisted-flow.ac4": "completed"
   }
 }
