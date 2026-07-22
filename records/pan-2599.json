@@ -162,7 +162,7 @@
     "recordedAt": "2026-07-22T23:16:44.964Z"
   },
   "created": "2026-07-16T05:02:53.170Z",
-  "updated": "2026-07-22T23:24:36.596Z",
+  "updated": "2026-07-22T23:25:31.642Z",
   "pipeline": {
     "issueId": "PAN-2599",
     "reviewStatus": "failed",
@@ -177,7 +177,7 @@
     "inspectNotes": "Both ACs verified in diff: getClient() gates on telemetryBlockedForProcess()+resolveTelemetryEnabled() before constructing PostHog, so disabled capture()+shutdown() never invoke the constructor (AC1); shutdown() races client.shutdown() against a 2s setTimeout with finally-clearTimeout, and service.test.ts's hung-flush test advances fake timers to exactly 2000ms to confirm the bound (AC2).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3009",
     "lastVerifiedCommit": "4e5ec24551d4f49486a82fbd5089d843817775ca",
-    "reviewRequestedAt": "2026-07-22T23:16:45.922Z",
+    "reviewRequestedAt": "2026-07-22T23:25:31.079Z",
     "reviewSpawnedAt": "2026-07-22T23:16:52.276Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -315,7 +315,8 @@
         "tests/unit/telemetry-docs.test.ts"
       ],
       "recordedAt": "2026-07-22T23:16:44.964Z"
-    }
+    },
+    "panDoneRecoveredAt": "2026-07-22T23:25:31.079Z"
   },
   "closeOut": {
     "usage": {
