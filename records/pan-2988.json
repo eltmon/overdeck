@@ -62,17 +62,14 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-22T23:48:27.736Z"
-    }
-  ],
-  "feedback": [
+    },
     {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-22T23:48:27Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2988\n\nReconcile sweep compares only updatedAt, so a lost newer event sharing the prior transition's millisecond timestamp remains stale forever\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2988 -m \"Fixed review issues\"`"
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-22T23:49:24.066Z"
     }
   ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "src/dashboard/frontend/src/components/KanbanBoard.test.tsx",
@@ -138,10 +135,10 @@
     "recordedAt": "2026-07-22T23:43:55.929Z"
   },
   "created": "2026-07-22T21:25:31.822Z",
-  "updated": "2026-07-22T23:49:21.375Z",
+  "updated": "2026-07-22T23:49:24.066Z",
   "pipeline": {
     "issueId": "PAN-2988",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -149,13 +146,13 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-22T23:45:50.199Z",
-    "updatedAt": "2026-07-22T23:49:20.354Z",
+    "updatedAt": "2026-07-22T23:49:22.568Z",
     "reviewNotes": "Review dispatch skipped — already running: agent-pan-2988-review",
     "inspectNotes": "All 3 call sites (main.ts status_changed + merge-ready, deacon-main.ts merge-ready) now call emitReviewStatusChanged synchronously before any async enrichment; helper appends unenriched status first, then races enrichment against a 5s Effect.timeout via Effect.catch (verified Effect.catch is the effect@4.0.0-beta.73 name for catchAll, and TimeoutException is a typed/recoverable failure so it's caught correctly), logs a warning naming the issue on timeout/failure with exactly one event appended, and gates the second enriched append on both hasSugar and an unchanged canonical updatedAt. grep confirms enrichReviewStatus is no longer imported/referenced in main.ts or deacon-main.ts.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3010",
     "lastVerifiedCommit": "56700887fb26b984f069d4e256669dec729f33ac",
     "reviewRequestedAt": "2026-07-22T23:45:50.199Z",
-    "reviewSpawnedAt": "2026-07-22T23:48:15.351Z",
+    "reviewSpawnedAt": "2026-07-22T23:49:22.567Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "src/dashboard/frontend/src/components/KanbanBoard.test.tsx",
@@ -242,8 +239,8 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 5412477,
-            "output": 308253,
+            "input": 5836531,
+            "output": 308377,
             "cacheRead": 151389184,
             "cacheWrite": 0
           }
@@ -251,8 +248,8 @@
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 7314583,
-          "output": 420375,
+          "input": 7738637,
+          "output": 420499,
           "cacheRead": 177803776,
           "cacheWrite": 0
         },
@@ -264,8 +261,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 138.879324,
-        "pricingAsOf": "2026-07-22T23:49:20.372Z"
+        "usd": 141.003314,
+        "pricingAsOf": "2026-07-22T23:49:22.597Z"
       }
     },
     "merges": [
