@@ -146,7 +146,7 @@
   ],
   "feedback": [],
   "created": "2026-07-17T12:34:27.875Z",
-  "updated": "2026-07-22T21:35:11.614Z",
+  "updated": "2026-07-22T21:35:20.478Z",
   "pipeline": {
     "issueId": "PAN-2838",
     "reviewStatus": "pending",
@@ -360,5 +360,28 @@
     "docs-update": "completed",
     "docs-update.docs-update.ac1": "completed",
     "docs-update.docs-update.ac2": "completed"
+  },
+  "scopeDrift": {
+    "outsideDeclaredScope": [],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "configuration/auto-merge.mdx",
+      "docs/SWARM-POLICY.md",
+      "src/dashboard/frontend/src/components/CommandDeck/ProjectOverview.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/ProjectSettingsDisclosure.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/__tests__/ProjectSettingsDisclosure.test.tsx",
+      "src/dashboard/frontend/src/components/Stage/ProjectHome.test.tsx",
+      "src/dashboard/frontend/src/components/Stage/ProjectHome.tsx"
+    ],
+    "actualChangedFiles": [
+      "configuration/auto-merge.mdx",
+      "docs/SWARM-POLICY.md",
+      "src/dashboard/frontend/src/components/CommandDeck/ProjectOverview.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/ProjectSettingsDisclosure.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/__tests__/ProjectSettingsDisclosure.test.tsx",
+      "src/dashboard/frontend/src/components/Stage/ProjectHome.test.tsx",
+      "src/dashboard/frontend/src/components/Stage/ProjectHome.tsx"
+    ],
+    "recordedAt": "2026-07-22T21:35:20.476Z"
   }
 }
