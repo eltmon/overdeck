@@ -142,6 +142,11 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-22T20:54:05.205Z"
+    },
+    {
+      "timestamp": "2026-07-22T21:35:27.997Z",
+      "reason": "end",
+      "note": "Initial npm test failed because the dashboard bundle was absent; npm run build produced the required dist/dashboard/server.js and the full rerun passed (10,367 tests, 50 skipped). No plan deviations. Runtime verification also showed an unrelated pre-existing auricle pipeline-membership error in the issue rail; the sparse Project settings panel rendered collapsed and expanded correctly. Delivered rotating disclosure state, collapsed setting summaries, sparse-project availability, component coverage, and documentation."
     }
   ],
   "feedback": [],
@@ -169,7 +174,7 @@
     "recordedAt": "2026-07-22T21:35:20.476Z"
   },
   "created": "2026-07-17T12:34:27.875Z",
-  "updated": "2026-07-22T21:35:26.207Z",
+  "updated": "2026-07-22T21:35:27.998Z",
   "pipeline": {
     "issueId": "PAN-2838",
     "reviewStatus": "reviewing",
