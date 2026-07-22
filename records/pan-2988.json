@@ -17,9 +17,32 @@
       "timestamp": "2026-07-22T23:18:19.396Z",
       "reason": "end",
       "note": "Anomalies addressed first: lint exposed new circular paths from the reconciliation extraction, so host side effects now flow through injected hooks. The full suite exposed stale mocks from the immediate-unpause change; upstream PAN-3007 then landed the complete repair, so the completion conflict was resolved by merging current main and taking that fix. Isolated runtime verification briefly spawned a temporary review agent, which was safely stopped, and one earlier state-writer push hit a concurrent lease rejection. Implemented durable pre-enrichment events, five-second stale-safe enrichment, journal and 60-second sweep healing, resync API/CLI/Recover action, and docs. Post-merge gates pass: typecheck, lint, full root and frontend tests; API, CLI, boot wiring, and enabled UI action were runtime-verified."
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-22T23:28Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-22T23:28:07.745Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-22T23:28:07.843Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-22T23:28:08.020Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-22T23:28:07Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2988\n\nEqual updatedAt values let stale enrichment patches overwrite newer review status, and the sweep cannot detect the regression.\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2988 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [],
     "declaredScopeUntouched": [],
@@ -78,7 +101,7 @@
     "recordedAt": "2026-07-22T23:18:12.981Z"
   },
   "created": "2026-07-22T21:25:31.822Z",
-  "updated": "2026-07-22T23:28:06.026Z",
+  "updated": "2026-07-22T23:28:08.021Z",
   "pipeline": {
     "issueId": "PAN-2988",
     "reviewStatus": "blocked",
