@@ -121,22 +121,22 @@
     "recordedAt": "2026-07-22T01:20:05.090Z"
   },
   "created": "2026-07-21T23:09:49.270Z",
-  "updated": "2026-07-22T02:27:09.734Z",
+  "updated": "2026-07-22T02:31:58.958Z",
   "pipeline": {
     "issueId": "PAN-2997",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-22T01:21:05.035Z",
-    "updatedAt": "2026-07-22T02:27:09.656Z",
+    "updatedAt": "2026-07-22T02:31:58.946Z",
     "reviewNotes": "Agent re-review request (2/25): Fixed both cycle-2 blockers: (1) Wake delivery is now crash-idempotent — a durable 'delivering' claim ((lifecycleId, agentId) key) is appended BEFORE messageAgentWithOutcome runs, so a crash after the claim (including after a successful send whose completion record never commits) never replays the delivery at boot recovery; delivery is skipped when the claim can't be recorded. At-most-once by design; the lost-wake window self-heals via the agent's next failed Linear call. Regression test simulates delivery succeeding while the completion append throws, then re-runs boot recovery and proves the door isn't called again. (2) The fold no longer calls readFrom(0) — EventStore gained queryByTypesSince (type predicate + sequence bound both in indexed SQL), and the projection is maintained incrementally: polls typically read zero rows and unrelated retained history is never materialized. Regression tests cover a 5000-event unrelated population and incremental advancement. Also scheduled a follow-up run when the 10-pass cap is hit (the P2). Lint, typecheck, root (10388) and frontend (2382) suites green.",
     "inspectNotes": "Fold dedupes required events per-agent via Map; latest non-null authUrl/authUrlAgentId wins; expiry computed from authUrlExpiresAt and reactivates on fresh required; healthy event closes to lastCompleted, notified targets open??lastCompleted, duplicate healthy is a no-op leaving wake set empty post-notification. All 4 ACs verified by hand against fake-timer tests.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3004",
-    "lastVerifiedCommit": "6c913d7c1bcb6582223a79b0841a881e37e6d209",
+    "lastVerifiedCommit": "09ce9e0baac085ec1d7b119b755f49f28d9b5e83",
     "reviewRequestedAt": "2026-07-22T01:21:05.035Z",
     "reviewSpawnedAt": "2026-07-22T02:27:04.801Z",
     "scopeDrift": {
@@ -213,9 +213,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 4377560,
-            "output": 232589,
-            "cacheRead": 51007488,
+            "input": 7587195,
+            "output": 265953,
+            "cacheRead": 57369600,
             "cacheWrite": 0
           }
         },
@@ -244,9 +244,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 5295815,
-          "output": 370095,
-          "cacheRead": 120206848,
+          "input": 8505450,
+          "output": 403459,
+          "cacheRead": 126568960,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -257,8 +257,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 98.003005,
-        "pricingAsOf": "2026-07-22T02:27:09.674Z"
+        "usd": 118.233156,
+        "pricingAsOf": "2026-07-22T02:31:58.951Z"
       }
     },
     "merges": [
@@ -268,7 +268,7 @@
   },
   "workModel": "k3[1m]",
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "k3[1m]",
   "tasks": {
     "sequence": 20,
     "claims": {},
