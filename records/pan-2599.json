@@ -10,7 +10,7 @@
   ],
   "feedback": [],
   "created": "2026-07-16T05:02:53.170Z",
-  "updated": "2026-07-22T21:21:46.151Z",
+  "updated": "2026-07-22T21:37:36.376Z",
   "pipeline": {
     "issueId": "PAN-2599",
     "reviewStatus": "pending",
@@ -103,16 +103,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 9,
-    "claims": {
-      "frontend-wrapper": {
-        "writerId": "agent-pan-2599",
-        "agentId": "agent-pan-2599",
-        "pid": 1724211,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-22T21:21:46.151Z"
-      }
-    },
+    "sequence": 10,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2599",
@@ -157,6 +149,17 @@
         "outcome": "completed",
         "reason": "Settings GET now reports effective telemetry enablement plus install ID, and generic PUT persistence validates and writes telemetry.enabled while ignoring installId writes.",
         "releasedAt": "2026-07-22T21:21:25.876Z"
+      },
+      {
+        "writerId": "agent-pan-2599",
+        "agentId": "agent-pan-2599",
+        "pid": 1724211,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-22T21:21:46.151Z",
+        "itemId": "frontend-wrapper",
+        "outcome": "completed",
+        "reason": "Added settings-gated PostHog initialization, typed capture wrappers, anonymous install ID registration, and migrated all event, exception, and recovery telemetry call sites.",
+        "releasedAt": "2026-07-22T21:37:36.376Z"
       }
     ],
     "statusReasons": {
@@ -175,6 +178,10 @@
       "settings-api": {
         "reason": "Settings GET now reports effective telemetry enablement plus install ID, and generic PUT persistence validates and writes telemetry.enabled while ignoring installId writes.",
         "updatedAt": "2026-07-22T21:21:25.876Z"
+      },
+      "frontend-wrapper": {
+        "reason": "Added settings-gated PostHog initialization, typed capture wrappers, anonymous install ID registration, and migrated all event, exception, and recovery telemetry call sites.",
+        "updatedAt": "2026-07-22T21:37:36.376Z"
       }
     }
   },
@@ -191,6 +198,8 @@
     "settings-api": "completed",
     "settings-api.settings-api.ac1": "completed",
     "settings-api.settings-api.ac2": "completed",
-    "frontend-wrapper": "running"
+    "frontend-wrapper": "completed",
+    "frontend-wrapper.frontend-wrapper.ac1": "completed",
+    "frontend-wrapper.frontend-wrapper.ac2": "completed"
   }
 }
