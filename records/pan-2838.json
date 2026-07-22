@@ -146,7 +146,7 @@
   ],
   "feedback": [],
   "created": "2026-07-17T12:34:27.875Z",
-  "updated": "2026-07-22T21:00:46.236Z",
+  "updated": "2026-07-22T21:02:13.405Z",
   "pipeline": {
     "issueId": "PAN-2838",
     "reviewStatus": "pending",
@@ -219,16 +219,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "summary-values": {
-        "writerId": "agent-pan-2838",
-        "agentId": "agent-pan-2838",
-        "pid": 1047728,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-22T21:00:46.235Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2838",
@@ -251,6 +243,17 @@
         "outcome": "completed",
         "reason": "Removed the stale badge and added a group-open rotating ChevronRight with no React state",
         "releasedAt": "2026-07-22T21:00:31.907Z"
+      },
+      {
+        "writerId": "agent-pan-2838",
+        "agentId": "agent-pan-2838",
+        "pid": 1047728,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-22T21:00:46.235Z",
+        "itemId": "summary-values",
+        "outcome": "completed",
+        "reason": "Added cache-sharing summary queries and plain muted labels for current auto-merge and swarm settings",
+        "releasedAt": "2026-07-22T21:02:13.405Z"
       }
     ],
     "statusReasons": {
@@ -261,6 +264,10 @@
       "disclosure-chevron": {
         "reason": "Removed the stale badge and added a group-open rotating ChevronRight with no React state",
         "updatedAt": "2026-07-22T21:00:31.907Z"
+      },
+      "summary-values": {
+        "reason": "Added cache-sharing summary queries and plain muted labels for current auto-merge and swarm settings",
+        "updatedAt": "2026-07-22T21:02:13.405Z"
       }
     }
   },
@@ -273,6 +280,9 @@
     "disclosure-chevron.disclosure-chevron.ac1": "completed",
     "disclosure-chevron.disclosure-chevron.ac2": "completed",
     "disclosure-chevron.disclosure-chevron.ac3": "completed",
-    "summary-values": "running"
+    "summary-values": "completed",
+    "summary-values.summary-values.ac1": "completed",
+    "summary-values.summary-values.ac2": "completed",
+    "summary-values.summary-values.ac3": "completed"
   }
 }
