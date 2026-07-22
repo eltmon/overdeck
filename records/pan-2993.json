@@ -141,19 +141,19 @@
     "recordedAt": "2026-07-21T23:54:05.124Z"
   },
   "created": "2026-07-21T22:47:36.935Z",
-  "updated": "2026-07-22T01:03:12.342Z",
+  "updated": "2026-07-22T01:03:16.104Z",
   "pipeline": {
     "issueId": "PAN-2993",
-    "reviewStatus": "passed",
-    "testStatus": "testing",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-22T00:56:26.857Z",
-    "updatedAt": "2026-07-22T01:03:12.329Z",
-    "reviewNotes": "Approved: fallback clearing, persisted backoff, ambiguous-merge recovery, remote PR head, and file-size ratchet are all correct and verified.",
+    "updatedAt": "2026-07-22T01:03:15.767Z",
+    "reviewNotes": "Agent re-review request (2/25): Fixed review issues",
     "inspectNotes": "All 4 ACs verified against src/lib/agents/messaging.ts@79bb7b47: stopped-agent resume failure returns {delivered:false,queuedToMail:true,reason} naming both resumeResult.error and PAN-1980 session-rotation disable; paused/gated path returns gate reason; live-session/successful-resume paths return delivered:true; only deacon-strike-landing.ts touched among callers and npm run typecheck passes clean (0 new errors).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2998",
     "reviewedAtCommit": "824379a55260cfc72abdef9ed0e2c2a13f236a04",
@@ -269,7 +269,7 @@
       },
       "costAtCloseOut": {
         "usd": 159.376511,
-        "pricingAsOf": "2026-07-22T01:03:12.335Z"
+        "pricingAsOf": "2026-07-22T01:03:15.780Z"
       }
     },
     "merges": [
