@@ -196,7 +196,7 @@
     "recordedAt": "2026-07-22T20:02:42.067Z"
   },
   "created": "2026-07-21T22:47:36.935Z",
-  "updated": "2026-07-22T20:02:51.094Z",
+  "updated": "2026-07-22T20:02:51.619Z",
   "pipeline": {
     "issueId": "PAN-2993",
     "reviewStatus": "reviewing",
@@ -331,7 +331,7 @@
       },
       "costAtCloseOut": {
         "usd": 198.28642,
-        "pricingAsOf": "2026-07-22T20:02:51.087Z"
+        "pricingAsOf": "2026-07-22T20:02:50.592Z"
       }
     },
     "merges": [
