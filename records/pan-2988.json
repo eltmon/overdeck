@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-22T21:25:31.822Z",
-  "updated": "2026-07-22T22:00:18.337Z",
+  "updated": "2026-07-22T22:07:01.180Z",
   "pipeline": {
     "issueId": "PAN-2988",
     "reviewStatus": "pending",
@@ -75,16 +75,8 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "read-door-reconcile-emit": {
-        "writerId": "agent-pan-2988",
-        "agentId": "agent-pan-2988",
-        "pid": 2932627,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-22T22:00:18.337Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2988",
@@ -107,6 +99,17 @@
         "outcome": "completed",
         "reason": "Added a five-second Effect timeout around tmux session discovery and fake-timer coverage for the unenriched fallback.",
         "releasedAt": "2026-07-22T22:00:08.218Z"
+      },
+      {
+        "writerId": "agent-pan-2988",
+        "agentId": "agent-pan-2988",
+        "pid": 2932627,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-22T22:00:18.337Z",
+        "itemId": "read-door-reconcile-emit",
+        "outcome": "completed",
+        "reason": "Extracted journal reconciliation and host recovery helpers, emitted status_changed after successful DB reconciliation, preserved public predicate exports, added reconciliation tests, and removed the file-size baseline entry after the file fell below threshold.",
+        "releasedAt": "2026-07-22T22:07:01.180Z"
       }
     ],
     "statusReasons": {
@@ -117,6 +120,10 @@
       "timeout-enrichment": {
         "reason": "Added a five-second Effect timeout around tmux session discovery and fake-timer coverage for the unenriched fallback.",
         "updatedAt": "2026-07-22T22:00:08.218Z"
+      },
+      "read-door-reconcile-emit": {
+        "reason": "Extracted journal reconciliation and host recovery helpers, emitted status_changed after successful DB reconciliation, preserved public predicate exports, added reconciliation tests, and removed the file-size baseline entry after the file fell below threshold.",
+        "updatedAt": "2026-07-22T22:07:01.180Z"
       }
     }
   },
@@ -130,6 +137,10 @@
     "timeout-enrichment": "completed",
     "timeout-enrichment.timeout-enrichment.ac1": "completed",
     "timeout-enrichment.timeout-enrichment.ac2": "completed",
-    "read-door-reconcile-emit": "running"
+    "read-door-reconcile-emit": "completed",
+    "read-door-reconcile-emit.read-door-reconcile-emit.ac1": "completed",
+    "read-door-reconcile-emit.read-door-reconcile-emit.ac2": "completed",
+    "read-door-reconcile-emit.read-door-reconcile-emit.ac3": "completed",
+    "read-door-reconcile-emit.read-door-reconcile-emit.ac4": "completed"
   }
 }
