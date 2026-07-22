@@ -27,9 +27,27 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-22T01:26:06.524Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-22T01:33Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-22T01:33:40.793Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "k3[1m]",
+      "timestamp": "2026-07-22T01:33:40.919Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-22T01:33:40Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2997\n\nLinear MCP failures bypass the registered hook, and lifecycle wake bookkeeping can strand blocked agents.\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2997 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "src/lib/agents/messaging.ts",
@@ -91,7 +109,7 @@
     "recordedAt": "2026-07-22T01:20:05.090Z"
   },
   "created": "2026-07-21T23:09:49.270Z",
-  "updated": "2026-07-22T01:33:40.005Z",
+  "updated": "2026-07-22T01:33:40.920Z",
   "pipeline": {
     "issueId": "PAN-2997",
     "reviewStatus": "blocked",
