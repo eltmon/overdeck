@@ -146,19 +146,19 @@
     "recordedAt": "2026-07-22T01:20:05.090Z"
   },
   "created": "2026-07-21T23:09:49.270Z",
-  "updated": "2026-07-22T03:17:05.561Z",
+  "updated": "2026-07-22T03:25:48.830Z",
   "pipeline": {
     "issueId": "PAN-2997",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-22T01:21:05.035Z",
-    "updatedAt": "2026-07-22T03:17:05.472Z",
-    "reviewNotes": "Agent re-review request (3/25): Fixed the cycle-3 blocker: the pre-delivery claim is no longer terminal. Claims are now resumable — the agent stays in the wake set until a completion lands — and recovery reconciles an uncompleted claim against the agent's durable mail outbox via the new agentHasMailContentSince helper (messaging.ts). Every non-throwing messageAgentWithOutcome path backs the message up to mail, so mail containing the wake copy at/after the claim timestamp proves the acknowledged send durably landed: the ledger completes WITHOUT re-sending. Mail absent means the send never durably happened, so recovery drives it. Both interruption tests the review demanded exist: crash-after-claim/before-send produces exactly one delivery; crash-after-acknowledged-send/before-completion-persistence produces no second delivery. The fold tracks claimedAt (claim) separately from notifiedAt (completion); a claim alone never removes an agent from the wake set. Also fixed the P2: follow-up runs after an unstabilized pass back off exponentially (1s doubling to 60s, reset on stabilization) with a fake-timer regression test. Typecheck, lint, root suite (10391) all green.",
+    "updatedAt": "2026-07-22T03:25:48.725Z",
+    "reviewNotes": "Agent re-review request (4/25): Fixed the cycle-4 blocker by replacing mail-content reconciliation with a real keyed outbox, per the review's fix direction. Each (lifecycleId, agentId) wake now has a durable JSON entry at ~/.overdeck/agents/<id>/linear-mcp-wake/<lifecycleId>.json carrying the message, pending/acknowledged state, and recorded outcome; writes are atomic (temp+rename) and async-only (the sync directory-scan helper is gone from messaging.ts entirely — it is byte-identical to its pre-PR state except nothing). The delivery wrapper records the acknowledgment as part of its own protocol on every path, so acknowledged sends always have receipts — including the two resume paths that never wrote the mail backup. Recovery reads one exact path: acknowledged suppresses replay and replays the recorded outcome faithfully (queued stays queued); pending/missing is (re)driven. All four interruption tests the review demanded run against the REAL outbox primitive on a temp OVERDECK_HOME: pre-send claim recovery (one delivery), post-send/pre-receipt crash (defined single replay of an unacknowledged send), acknowledged-send suppression (no second call, completion retried), queued-outcome recovery (not falsified to delivered), plus two identical wakes in adjacent lifecycles (B is never suppressed by A's receipt). The 'delivering' event literal stays decodable but is no longer emitted or treated as a claim. Typecheck, lint, root (10394) and frontend (2382) suites all green.",
     "inspectNotes": "Fold dedupes required events per-agent via Map; latest non-null authUrl/authUrlAgentId wins; expiry computed from authUrlExpiresAt and reactivates on fresh required; healthy event closes to lastCompleted, notified targets open??lastCompleted, duplicate healthy is a no-op leaving wake set empty post-notification. All 4 ACs verified by hand against fake-timer tests.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3004",
     "lastVerifiedCommit": "fee45ba9ea9d128af392be2261daf0a9dfdbf329",
@@ -283,7 +283,7 @@
       },
       "costAtCloseOut": {
         "usd": 131.374399,
-        "pricingAsOf": "2026-07-22T03:17:05.557Z"
+        "pricingAsOf": "2026-07-22T03:25:48.789Z"
       }
     },
     "merges": [
