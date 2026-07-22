@@ -166,19 +166,19 @@
     "recordedAt": "2026-07-22T01:20:05.090Z"
   },
   "created": "2026-07-21T23:09:49.270Z",
-  "updated": "2026-07-22T04:33:22.996Z",
+  "updated": "2026-07-22T04:36:04.799Z",
   "pipeline": {
     "issueId": "PAN-2997",
-    "reviewStatus": "passed",
+    "reviewStatus": "blocked",
     "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": true,
+    "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-22T01:21:05.035Z",
-    "updatedAt": "2026-07-22T04:33:22.957Z",
-    "reviewNotes": "Agent re-review request (5/25): Fixed the cycle-5 blocker by threading the (lifecycleId, agentId) key into the actual delivery door and making the crash-independent components deduplicate the side effect, per the review's fix direction. Dashboard-side state fundamentally cannot provide exactly-once — the dedup record must live where the side effect lives, and a duplicate is only possible when the agent survived the crash, which is exactly when those components are alive to answer. (1) PTY supervisor keeps a per-server delivered-keys set and answers repeat keyed POSTs with {deduplicated:true} instead of a second PTY write; its exit kills the agent with it (H1), so the in-memory set is exactly as durable as the side effect it guards. A record-delivered op registers keys for paths the supervisor didn't mediate (resume kickoff prompts). (2) The tmux fallback (new src/lib/tmux-dedup.ts — tmux.ts stayed under its size ratchet) does check+paste+mark as ONE if-shell command list executed by the tmux server, atomic w.r.t. dashboard crash; deduplicated replays send no stray Enter (composer may hold operator text). (3) deliverAgentMessage/messageAgentWithOutcome thread opts.dedupKey; keyed mail backups use deterministic filenames; unkeyed callers keep their exact pre-key call shape. (4) The wake keys on linear-mcp-auth-wake:<lifecycleId>, so the demanded regression holds: first call succeeds, ack persistence fails, recovery runs — the replayed delivery is deduplicated at the door and the cumulative visible delivery count stays one. Tests: real-supervisor dedup + record-delivered (dist rebuilt), real throwaway-tmux-server atomic paste/mark/replay, delivery-level threading, wake-level key assertions. Typecheck, lint, root (10402), frontend (2382) all green.",
+    "updatedAt": "2026-07-22T04:36:04.766Z",
+    "reviewNotes": "Keyed delivery still loses tmux wakes before Enter and can duplicate concurrent supervisor, resume, remote, or Channels deliveries.",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
     "verificationNotes": "Pre-review verification already covered the reviewed commit",
     "inspectNotes": "Fold dedupes required events per-agent via Map; latest non-null authUrl/authUrlAgentId wins; expiry computed from authUrlExpiresAt and reactivates on fresh required; healthy event closes to lastCompleted, notified targets open??lastCompleted, duplicate healthy is a no-op leaving wake set empty post-notification. All 4 ACs verified by hand against fake-timer tests.",
@@ -261,9 +261,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 12651113,
-            "output": 342417,
-            "cacheRead": 70237696,
+            "input": 12987559,
+            "output": 379911,
+            "cacheRead": 82902016,
             "cacheWrite": 0
           }
         },
@@ -292,9 +292,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 13569368,
-          "output": 479923,
-          "cacheRead": 139437056,
+          "input": 13905814,
+          "output": 517417,
+          "cacheRead": 152101376,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -305,8 +305,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 152.280714,
-        "pricingAsOf": "2026-07-22T04:33:22.991Z"
+        "usd": 161.419924,
+        "pricingAsOf": "2026-07-22T04:36:04.784Z"
       }
     },
     "merges": [
