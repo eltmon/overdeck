@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-21T23:09:49.270Z",
-  "updated": "2026-07-22T00:14:43.108Z",
+  "updated": "2026-07-22T00:17:23.613Z",
   "pipeline": {
     "issueId": "PAN-2997",
     "reviewStatus": "pending",
@@ -61,16 +61,8 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 13,
-    "claims": {
-      "linear-mcp-hook": {
-        "writerId": "agent-pan-2997",
-        "agentId": "agent-pan-2997",
-        "pid": 3396314,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-22T00:14:43.108Z"
-      }
-    },
+    "sequence": 14,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2997",
@@ -137,6 +129,17 @@
         "outcome": "completed",
         "reason": "Added origin-validated projection, callback relay, and operator-complete routes with URL validation, canonical event writes, server registration, and route tests",
         "releasedAt": "2026-07-22T00:14:24.257Z"
+      },
+      {
+        "writerId": "agent-pan-2997",
+        "agentId": "agent-pan-2997",
+        "pid": 3396314,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-22T00:14:43.108Z",
+        "itemId": "linear-mcp-hook",
+        "outcome": "released",
+        "reason": "stale claim released (agent-pan-2997 dead)",
+        "releasedAt": "2026-07-22T00:17:23.570Z"
       }
     ],
     "statusReasons": {
@@ -163,6 +166,10 @@
       "linear-mcp-routes": {
         "reason": "Added origin-validated projection, callback relay, and operator-complete routes with URL validation, canonical event writes, server registration, and route tests",
         "updatedAt": "2026-07-22T00:14:24.257Z"
+      },
+      "linear-mcp-hook": {
+        "reason": "stale claim released (agent-pan-2997 dead)",
+        "updatedAt": "2026-07-22T00:17:23.570Z"
       }
     }
   },
@@ -194,6 +201,6 @@
     "linear-mcp-routes.linear-mcp-routes.ac2": "completed",
     "linear-mcp-routes.linear-mcp-routes.ac3": "completed",
     "linear-mcp-routes.linear-mcp-routes.ac4": "completed",
-    "linear-mcp-hook": "running"
+    "linear-mcp-hook": "pending"
   }
 }
