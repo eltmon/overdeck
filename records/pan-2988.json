@@ -2,7 +2,7 @@
   "issueId": "PAN-2988",
   "schemaVersion": 2,
   "created": "2026-07-22T21:25:31.822Z",
-  "updated": "2026-07-22T21:26:16.257Z",
+  "updated": "2026-07-22T21:26:17.703Z",
   "pipeline": {
     "issueId": "PAN-2988",
     "reviewStatus": "pending",
@@ -26,5 +26,7 @@
       "note": "Planning session started for PAN-2988: Lost review.status_changed event strands a merge-ready issue: invisible on Awaiting Merge, all actions gated, no re-sync path",
       "timestamp": "2026-07-22T21:26:16.257Z"
     }
-  ]
+  ],
+  "harness": "claude-code",
+  "model": "k3"
 }
