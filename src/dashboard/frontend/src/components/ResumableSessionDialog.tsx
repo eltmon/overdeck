@@ -6,7 +6,7 @@
  */
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Loader2, Play, RotateCcw, ShieldCheck, X } from 'lucide-react';
+import { Loader2, Play, RotateCcw, ShieldCheck, Square, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { useResumeRecovery, recoveryFromBody, type RecoveryRequest } from '../lib/resumeRecovery';
 import { dashboardMutationJsonHeaders } from '../lib/wsTransport';
@@ -47,6 +47,11 @@ const CONTENT: Record<RecoveryRequest['kind'], { title: (r: RecoveryRequest) => 
     title: (r) => `${r.agentId} is paused${r.detail ? ` (${r.detail})` : ''}`,
     body: 'This agent was deliberately paused — starting it is blocked until it is unpaused. Unpause and start it?',
     primary: 'Unpause & start',
+  },
+  'live-session': {
+    title: (r) => `${r.agentId} is still running`,
+    body: 'Restarting it (for example with a different model) requires stopping it first. The workspace, plan, and branch are kept.',
+    primary: 'Stop & restart',
   },
 };
 
@@ -95,7 +100,26 @@ export function ResumableSessionDialog() {
   const primary = async () => {
     setPending('primary');
     try {
-      if (kind === 'resumable') {
+      if (kind === 'live-session') {
+        // Stop the live agent (this is the 'pan kill' the 409 demanded), then
+        // re-run the original request when the caller supplied one. Without a
+        // retry payload we only stop — never do more than was asked.
+        const stopRes = await fetch(`/api/agents/${encodeURIComponent(agentId)}`, {
+          method: 'DELETE',
+          credentials: 'include',
+          headers: await dashboardMutationJsonHeaders(),
+        });
+        if (!stopRes.ok) {
+          const parsed = await stopRes.json().catch(() => null);
+          throw new Error((parsed as { error?: string } | null)?.error || `Failed to stop ${agentId}`);
+        }
+        if (request.retry) {
+          await postJson(request.retry.url, request.retry.body ?? {});
+          toast.success(`${agentId} stopped — restarting`);
+        } else {
+          toast.success(`${agentId} stopped`);
+        }
+      } else if (kind === 'resumable') {
         await postJson(`/api/agents/${encodeURIComponent(agentId)}/resume`);
         toastResumeOutcome(agentId);
       } else if (kind === 'troubled') {
@@ -148,8 +172,8 @@ export function ResumableSessionDialog() {
             disabled={!!pending}
             className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-opacity disabled:opacity-50"
           >
-            {pending === 'primary' ? <Loader2 size={13} className="animate-spin" /> : kind === 'resumable' ? <Play size={13} /> : <ShieldCheck size={13} />}
-            {content.primary}
+            {pending === 'primary' ? <Loader2 size={13} className="animate-spin" /> : kind === 'resumable' ? <Play size={13} /> : kind === 'live-session' ? <Square size={13} /> : <ShieldCheck size={13} />}
+            {kind === 'live-session' && !request.retry ? 'Stop agent' : content.primary}
           </button>
           {kind === 'resumable' && (
             <button

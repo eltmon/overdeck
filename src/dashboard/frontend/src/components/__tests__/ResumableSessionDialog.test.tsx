@@ -49,6 +49,15 @@ describe('recoveryFromBody', () => {
     expect(recoveryFromBody({ lifecycle: { agentId: 'agent-x', canResumeSession: false } })).toBeNull();
     expect(recoveryFromBody(null)).toBeNull();
   });
+
+  it('extracts a live-session recovery from a live-tmux 409, ahead of resumable', () => {
+    expect(recoveryFromBody({ error: '…has a live tmux session…', lifecycle: { agentId: 'agent-x', hasLiveTmuxSession: true } }))
+      .toEqual({ kind: 'live-session', agentId: 'agent-x' });
+    // A stopped-on-paper agent with a live session can look resumable — the
+    // live session wins, because resume would just 409 again.
+    expect(recoveryFromBody({ lifecycle: { agentId: 'agent-x', hasLiveTmuxSession: true, canResumeSession: true } }))
+      .toEqual({ kind: 'live-session', agentId: 'agent-x' });
+  });
 });
 
 describe('openRecoveryForStartBlock', () => {
@@ -167,6 +176,41 @@ describe('ResumableSessionDialog', () => {
     });
     expect(screen.getByTestId('recovery-start-fresh')).toBeInTheDocument();
     expect(useResumeRecovery.getState().request).toEqual({ kind: 'resumable', agentId: 'agent-pan-2876', issueId: 'PAN-2876' });
+  });
+
+  it('Stop & restart stops the live agent then re-runs the original request (PAN-2997)', async () => {
+    useResumeRecovery.getState().openRecovery({
+      kind: 'live-session',
+      agentId: 'agent-pan-2997',
+      issueId: 'PAN-2997',
+      retry: { url: '/api/agents/agent-pan-2997/restart-fresh', body: { spawn: true, model: 'kimi-k3-1m' } },
+    });
+    renderDialog();
+    expect(screen.getByTestId('resumable-session-dialog')).toHaveAttribute('data-kind', 'live-session');
+    expect(screen.getByRole('button', { name: /Stop & restart/ })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('recovery-primary'));
+
+    await waitFor(() => {
+      const calls = fetchCalls();
+      expect(calls.some((c) => c.url === '/api/agents/agent-pan-2997' && c.method === 'DELETE')).toBe(true);
+      expect(calls.some((c) => c.url === '/api/agents/agent-pan-2997/restart-fresh' && c.method === 'POST' && c.body === JSON.stringify({ spawn: true, model: 'kimi-k3-1m' }))).toBe(true);
+    });
+    await waitFor(() => expect(screen.queryByTestId('resumable-session-dialog')).not.toBeInTheDocument());
+  });
+
+  it('live-session without a retry payload only stops the agent — never does more than asked', async () => {
+    useResumeRecovery.getState().openRecovery({ kind: 'live-session', agentId: 'agent-pan-2997', issueId: 'PAN-2997' });
+    renderDialog();
+    expect(screen.getByRole('button', { name: /Stop agent/ })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('recovery-primary'));
+
+    await waitFor(() => {
+      const calls = fetchCalls();
+      expect(calls.some((c) => c.url === '/api/agents/agent-pan-2997' && c.method === 'DELETE')).toBe(true);
+    });
+    expect(fetchCalls().some((c) => c.url.includes('restart-fresh'))).toBe(false);
   });
 
   it('Cancel closes without any lifecycle calls', () => {

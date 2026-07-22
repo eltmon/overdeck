@@ -353,10 +353,16 @@ export function useIssueActions(issueId: string): UseIssueActionsResult {
         let parsed: unknown = null;
         try { parsed = JSON.parse(text); } catch { /* not JSON */ }
         // A 409 carrying a resumable lifecycle is a CHOICE, not an error —
-        // surface the Resume / Start fresh dialog instead of a raw alert.
+        // surface the Resume / Start fresh dialog instead of a raw alert. The
+        // retry payload lets a live-session recovery re-run THIS action after
+        // the stop.
         const recovery = response.status === 409 ? recoveryFromBody(parsed) : null;
         if (recovery) {
-          openRecovery({ ...recovery, issueId });
+          openRecovery({
+            ...recovery,
+            issueId,
+            retry: { url: interpolateEndpoint(action.endpoint, issueId, agent, state, selectedTaskId), body: payload ?? {} },
+          });
           return { success: false, recovery: true };
         }
         throw new Error(await responseError(response, `Failed to run ${action.label}`, { text, parsed }));

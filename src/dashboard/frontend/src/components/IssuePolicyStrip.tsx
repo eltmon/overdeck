@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 import { HelpTooltip, TooltipBody, TooltipProvider } from './shared/Tooltip';
+import { openRecoveryForStartBlock } from '../lib/resumeRecovery';
 
 /** Wide enough for a 108px label column plus a four-option segmented control and its reset link. */
 const PANEL_WIDTH = 440;
@@ -303,6 +304,12 @@ export function IssuePolicyStrip({ issueId }: { issueId: string }) {
         body: JSON.stringify({ spawn: true, model: staffing.override.workModel }),
       });
       const result = await response.json() as { error?: string; details?: string };
+      // A live-session 409 offers Stop & restart with the same payload instead
+      // of printing the 'pan kill' instruction in the strip.
+      if (openRecoveryForStartBlock(response.status, result, issueId, {
+        url: `/api/agents/agent-${issueId.toLowerCase()}/restart-fresh`,
+        body: { spawn: true, model: staffing.override.workModel },
+      })) return;
       setRestartMessage(response.ok ? 'Fresh restart requested.' : (result.error ?? 'Restart failed.'));
       if (response.ok) await refresh();
     } catch {

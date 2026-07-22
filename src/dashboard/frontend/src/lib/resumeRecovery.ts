@@ -6,7 +6,7 @@
  */
 import { create } from 'zustand';
 
-export type RecoveryKind = 'resumable' | 'troubled' | 'paused';
+export type RecoveryKind = 'resumable' | 'troubled' | 'paused' | 'live-session';
 
 export interface RecoveryRequest {
   kind: RecoveryKind;
@@ -14,6 +14,12 @@ export interface RecoveryRequest {
   issueId?: string;
   /** Server-provided context (e.g. "3 failures" / the pause reason). */
   detail?: string;
+  /**
+   * For 'live-session': the original request to re-run after the agent is
+   * stopped (e.g. the restart-fresh call that 409'd). Without it the dialog
+   * only stops the agent — it never does more than the operator asked.
+   */
+  retry?: { url: string; body?: unknown };
 }
 
 interface ResumeRecoveryState {
@@ -42,11 +48,11 @@ export class StartBlockHandoff extends Error {}
  * their plain error path. Use this in every surface that starts an agent so
  * the CLI-instruction text never reaches a toast or inline alert.
  */
-export function openRecoveryForStartBlock(status: number, body: unknown, issueId?: string): boolean {
+export function openRecoveryForStartBlock(status: number, body: unknown, issueId?: string, retry?: RecoveryRequest['retry']): boolean {
   if (status !== 409) return false;
   const recovery = recoveryFromBody(body);
   if (!recovery) return false;
-  useResumeRecovery.getState().openRecovery({ ...recovery, issueId });
+  useResumeRecovery.getState().openRecovery({ ...recovery, issueId, ...(retry ? { retry } : {}) });
   return true;
 }
 
@@ -60,7 +66,13 @@ export function openRecoveryForStartBlock(status: number, body: unknown, issueId
 export function recoveryFromBody(body: unknown): RecoveryRequest | null {
   if (!body || typeof body !== 'object') return null;
 
-  const lifecycle = (body as { lifecycle?: { agentId?: string; canResumeSession?: boolean } }).lifecycle;
+  const lifecycle = (body as { lifecycle?: { agentId?: string; canResumeSession?: boolean; hasLiveTmuxSession?: boolean } }).lifecycle;
+  // A live tmux session blocks everything (restart-fresh, resume, start) —
+  // offer Stop & retry. Checked first: a stopped-on-paper agent with a live
+  // session can also look resumable, but resume would just 409 again.
+  if (lifecycle?.hasLiveTmuxSession === true && typeof lifecycle.agentId === 'string') {
+    return { kind: 'live-session', agentId: lifecycle.agentId };
+  }
   if (lifecycle?.canResumeSession === true && typeof lifecycle.agentId === 'string') {
     return { kind: 'resumable', agentId: lifecycle.agentId };
   }

@@ -883,6 +883,12 @@ export function CommandDeck({
           spawnedHarness?: string;
         };
         if (!restartFreshRes.ok) {
+          // A live-session 409 offers Stop & restart with the SAME payload —
+          // never the raw 'pan kill' instruction text.
+          if (openRecoveryForStartBlock(restartFreshRes.status, restartFreshData, issueId, {
+            url: `/api/agents/${sessionId}/restart-fresh`,
+            body: { spawn: true, ...(model ? { model } : {}), ...(harness ? { harness } : {}) },
+          })) return;
           throw new Error(restartFreshData.error || 'Failed to restart agent with new harness/model');
         }
         toast.success(
