@@ -146,7 +146,7 @@
   ],
   "feedback": [],
   "created": "2026-07-17T12:34:27.875Z",
-  "updated": "2026-07-22T21:03:56.335Z",
+  "updated": "2026-07-22T21:05:05.751Z",
   "pipeline": {
     "issueId": "PAN-2838",
     "reviewStatus": "pending",
@@ -219,16 +219,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 9,
-    "claims": {
-      "disclosure-tests": {
-        "writerId": "agent-pan-2838",
-        "agentId": "agent-pan-2838",
-        "pid": 1170546,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-22T21:03:56.335Z"
-      }
-    },
+    "sequence": 10,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2838",
@@ -273,6 +265,17 @@
         "outcome": "completed",
         "reason": "Rendered ProjectSettingsDisclosure in the sparse HomePane detail slot only when a registered projectKey exists",
         "releasedAt": "2026-07-22T21:03:47.723Z"
+      },
+      {
+        "writerId": "agent-pan-2838",
+        "agentId": "agent-pan-2838",
+        "pid": 1170546,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-22T21:03:56.335Z",
+        "itemId": "disclosure-tests",
+        "outcome": "completed",
+        "reason": "Added six strict-fetch component tests for chevron structure, collapsed values, no-loss controls, helper copy, and auto-merge saves",
+        "releasedAt": "2026-07-22T21:05:05.751Z"
       }
     ],
     "statusReasons": {
@@ -291,6 +294,10 @@
       "sparse-settings-render": {
         "reason": "Rendered ProjectSettingsDisclosure in the sparse HomePane detail slot only when a registered projectKey exists",
         "updatedAt": "2026-07-22T21:03:47.723Z"
+      },
+      "disclosure-tests": {
+        "reason": "Added six strict-fetch component tests for chevron structure, collapsed values, no-loss controls, helper copy, and auto-merge saves",
+        "updatedAt": "2026-07-22T21:05:05.751Z"
       }
     }
   },
@@ -311,6 +318,10 @@
     "sparse-settings-render.sparse-settings-render.ac1": "completed",
     "sparse-settings-render.sparse-settings-render.ac2": "completed",
     "sparse-settings-render.sparse-settings-render.ac3": "completed",
-    "disclosure-tests": "running"
+    "disclosure-tests": "completed",
+    "disclosure-tests.disclosure-tests.ac1": "completed",
+    "disclosure-tests.disclosure-tests.ac2": "completed",
+    "disclosure-tests.disclosure-tests.ac3": "completed",
+    "disclosure-tests.disclosure-tests.ac4": "completed"
   }
 }
