@@ -40,6 +40,25 @@ gh run rerun <run-id> --failed
 After GitHub reports the new result, the existing merge-blocker reconciliation
 poll clears the stale blocker within about 10 minutes.
 
+## Issue passed review but is missing from Awaiting Merge
+
+The canonical review status may report `readyForMerge: true` while the issue is
+missing from **Awaiting Merge** and merge actions remain disabled. This means a
+`review.status_changed` event was lost, so the dashboard's event-driven read
+model is stale even though the canonical record is correct.
+
+The dashboard checks for this drift every 60 seconds and re-emits canonical
+status automatically, so the issue normally repairs itself within one minute.
+To recover immediately, open the issue action menu and choose **Recover →
+Re-sync pipeline state**, or run:
+
+```bash
+pan review resync <id>
+```
+
+Both recovery paths only re-emit the canonical status. They do not change the
+review, test, verification, or merge verdict.
+
 ## WSL2 Stability Issues (Windows Users)
 
 WSL2 can experience crashes and networking issues, especially under heavy AI agent workloads. Here are recommended `.wslconfig` settings to improve stability.
