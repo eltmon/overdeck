@@ -166,7 +166,7 @@
     "recordedAt": "2026-07-22T19:46:31.826Z"
   },
   "created": "2026-07-21T22:47:36.935Z",
-  "updated": "2026-07-22T19:52:14.348Z",
+  "updated": "2026-07-22T19:52:27.309Z",
   "pipeline": {
     "issueId": "PAN-2993",
     "reviewStatus": "failed",
@@ -180,7 +180,7 @@
     "reviewNotes": "Review dispatch deferred: merge conflict with main must be resolved before review dispatch",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2998",
     "lastVerifiedCommit": "63edafa5a50d2c1eceed953c90f9d6b55ef88252",
-    "reviewRequestedAt": "2026-07-22T19:46:32.754Z",
+    "reviewRequestedAt": "2026-07-22T19:52:26.955Z",
     "reviewSpawnedAt": "2026-07-22T19:46:37.573Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -241,7 +241,8 @@
         "tests/unit/lib/rebase-helper.test.ts"
       ],
       "recordedAt": "2026-07-22T19:46:31.826Z"
-    }
+    },
+    "panDoneRecoveredAt": "2026-07-22T19:52:26.955Z"
   },
   "closeOut": {
     "usage": {
