@@ -26,7 +26,7 @@
   ],
   "feedback": [],
   "created": "2026-07-21T23:09:49.270Z",
-  "updated": "2026-07-22T00:52:01.709Z",
+  "updated": "2026-07-22T00:55:20.872Z",
   "pipeline": {
     "issueId": "PAN-2997",
     "reviewStatus": "pending",
@@ -71,16 +71,8 @@
   "harness": "claude-code",
   "model": "k3[1m]",
   "tasks": {
-    "sequence": 15,
-    "claims": {
-      "linear-mcp-hook": {
-        "writerId": "agent-pan-2997",
-        "agentId": "agent-pan-2997",
-        "pid": 4076595,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-22T00:52:01.709Z"
-      }
-    },
+    "sequence": 16,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2997",
@@ -158,6 +150,17 @@
         "outcome": "released",
         "reason": "stale claim released (agent-pan-2997 dead)",
         "releasedAt": "2026-07-22T00:17:23.570Z"
+      },
+      {
+        "writerId": "agent-pan-2997",
+        "agentId": "agent-pan-2997",
+        "pid": 4076595,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-22T00:52:01.709Z",
+        "itemId": "linear-mcp-hook",
+        "outcome": "completed",
+        "reason": "Hook script, registration, and 6-test contract suite were already committed in dbd6e10863; verified all 6 tests pass, registration present in claude-hooks-registration.ts (HOOK_SCRIPT_NAMES + PostToolUse mcp__linear__.* matcher), synced main for file-size baseline, pushed.",
+        "releasedAt": "2026-07-22T00:55:20.871Z"
       }
     ],
     "statusReasons": {
@@ -186,8 +189,8 @@
         "updatedAt": "2026-07-22T00:14:24.257Z"
       },
       "linear-mcp-hook": {
-        "reason": "stale claim released (agent-pan-2997 dead)",
-        "updatedAt": "2026-07-22T00:17:23.570Z"
+        "reason": "Hook script, registration, and 6-test contract suite were already committed in dbd6e10863; verified all 6 tests pass, registration present in claude-hooks-registration.ts (HOOK_SCRIPT_NAMES + PostToolUse mcp__linear__.* matcher), synced main for file-size baseline, pushed.",
+        "updatedAt": "2026-07-22T00:55:20.871Z"
       }
     }
   },
@@ -219,6 +222,11 @@
     "linear-mcp-routes.linear-mcp-routes.ac2": "completed",
     "linear-mcp-routes.linear-mcp-routes.ac3": "completed",
     "linear-mcp-routes.linear-mcp-routes.ac4": "completed",
-    "linear-mcp-hook": "running"
+    "linear-mcp-hook": "completed",
+    "linear-mcp-hook.linear-mcp-hook.ac1": "completed",
+    "linear-mcp-hook.linear-mcp-hook.ac2": "completed",
+    "linear-mcp-hook.linear-mcp-hook.ac3": "completed",
+    "linear-mcp-hook.linear-mcp-hook.ac4": "completed",
+    "linear-mcp-hook.linear-mcp-hook.ac5": "completed"
   }
 }
