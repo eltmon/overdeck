@@ -196,19 +196,21 @@
     "recordedAt": "2026-07-22T20:02:42.067Z"
   },
   "created": "2026-07-21T22:47:36.935Z",
-  "updated": "2026-07-22T20:02:51.619Z",
+  "updated": "2026-07-22T20:06:19.633Z",
   "pipeline": {
     "issueId": "PAN-2993",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "passed",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-22T20:02:51.066Z",
-    "reviewNotes": "Implicit force-with-lease is not pinned to the observed remote head, so a concurrent fetch can let the push overwrite a newer remote commit.",
+    "updatedAt": "2026-07-22T20:06:19.614Z",
+    "reviewNotes": "Explicit expected-SHA lease fixes the remote overwrite race; all review dimensions and focused verification passed.",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2998",
+    "reviewedAtCommit": "e91bb31361447751398bcf5c852c48ebbc35384f",
     "lastVerifiedCommit": "63edafa5a50d2c1eceed953c90f9d6b55ef88252",
     "reviewRequestedAt": "2026-07-22T20:02:42.997Z",
     "reviewSpawnedAt": "2026-07-22T20:02:47.585Z",
@@ -286,9 +288,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 6171662,
-            "output": 265360,
-            "cacheRead": 58204672,
+            "input": 6452443,
+            "output": 283211,
+            "cacheRead": 61008384,
             "cacheWrite": 0
           }
         },
@@ -302,9 +304,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 5683355,
-            "output": 260966,
-            "cacheRead": 166010880,
+            "input": 5700330,
+            "output": 266422,
+            "cacheRead": 169822720,
             "cacheWrite": 0
           }
         }
@@ -317,9 +319,9 @@
           "cacheWrite": 311785
         },
         "openai/gpt-5.6-sol": {
-          "input": 11855017,
-          "output": 526326,
-          "cacheRead": 224215552,
+          "input": 12152773,
+          "output": 549633,
+          "cacheRead": 230831104,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -330,8 +332,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 198.28642,
-        "pricingAsOf": "2026-07-22T20:02:50.592Z"
+        "usd": 203.782186,
+        "pricingAsOf": "2026-07-22T20:06:19.629Z"
       }
     },
     "merges": [
