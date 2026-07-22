@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { ChevronRight } from 'lucide-react';
 
 /** PAN-1693/1695: per-project settings in the cockpit — currently the auto-merge default. */
 function ProjectSettingsSection({ projectKey }: { projectKey: string }) {
@@ -76,19 +77,18 @@ function ProjectSettingsSection({ projectKey }: { projectKey: string }) {
 function ProjectDisclosure({
   title,
   summary,
-  badges,
   defaultOpen = false,
   children,
 }: {
   title: string;
   summary: string;
-  badges?: string[];
   defaultOpen?: boolean;
   children: ReactNode;
 }) {
   return (
     <details
       open={defaultOpen}
+      className="group"
       style={{
         border: '1px solid var(--border)',
         borderRadius: 10,
@@ -108,30 +108,10 @@ function ProjectDisclosure({
         }}
       >
         <span style={{ minWidth: 0, display: 'flex', alignItems: 'baseline', gap: 8 }}>
+          <ChevronRight size={14} className="shrink-0 text-muted-foreground transition-transform group-open:rotate-90" aria-hidden="true" />
           <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--foreground)' }}>{title}</span>
           <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 12, color: 'var(--muted-foreground)' }}>{summary}</span>
         </span>
-        {badges && badges.length > 0 && (
-          <span style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-            {badges.map((badge) => (
-              <span
-                key={badge}
-                style={{
-                  border: '1px solid var(--border)',
-                  borderRadius: 999,
-                  padding: '2px 7px',
-                  background: 'var(--secondary)',
-                  color: 'var(--foreground)',
-                  fontSize: 11,
-                  fontWeight: 650,
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                {badge}
-              </span>
-            ))}
-          </span>
-        )}
       </summary>
       <div style={{ borderTop: '1px solid var(--border)', padding: 12, background: 'var(--background)' }}>
         {children}
@@ -145,7 +125,6 @@ export function ProjectSettingsDisclosure({ projectKey }: { projectKey: string }
     <ProjectDisclosure
       title="Project settings"
       summary="Auto-merge default and project-level merge policy"
-      badges={['collapsed']}
     >
       <ProjectSettingsSection projectKey={projectKey} />
     </ProjectDisclosure>
