@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-22T21:25:31.822Z",
-  "updated": "2026-07-22T21:58:15.004Z",
+  "updated": "2026-07-22T22:00:08.218Z",
   "pipeline": {
     "issueId": "PAN-2988",
     "reviewStatus": "pending",
@@ -75,16 +75,8 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "timeout-enrichment": {
-        "writerId": "agent-pan-2988",
-        "agentId": "agent-pan-2988",
-        "pid": 2894328,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-22T21:58:15.004Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2988",
@@ -96,12 +88,27 @@
         "outcome": "completed",
         "reason": "Added synchronous unenriched review.status_changed emission, bounded best-effort enrichment with stale/no-sugar guards, rewired all three emit sites, and added fake-timer coverage.",
         "releasedAt": "2026-07-22T21:52:01.120Z"
+      },
+      {
+        "writerId": "agent-pan-2988",
+        "agentId": "agent-pan-2988",
+        "pid": 2894328,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-22T21:58:15.004Z",
+        "itemId": "timeout-enrichment",
+        "outcome": "completed",
+        "reason": "Added a five-second Effect timeout around tmux session discovery and fake-timer coverage for the unenriched fallback.",
+        "releasedAt": "2026-07-22T22:00:08.218Z"
       }
     ],
     "statusReasons": {
       "durable-sync-emit": {
         "reason": "Added synchronous unenriched review.status_changed emission, bounded best-effort enrichment with stale/no-sugar guards, rewired all three emit sites, and added fake-timer coverage.",
         "updatedAt": "2026-07-22T21:52:01.120Z"
+      },
+      "timeout-enrichment": {
+        "reason": "Added a five-second Effect timeout around tmux session discovery and fake-timer coverage for the unenriched fallback.",
+        "updatedAt": "2026-07-22T22:00:08.218Z"
       }
     }
   },
@@ -112,6 +119,8 @@
     "durable-sync-emit.durable-sync-emit.ac3": "completed",
     "durable-sync-emit.durable-sync-emit.ac4": "completed",
     "durable-sync-emit.durable-sync-emit.ac5": "completed",
-    "timeout-enrichment": "running"
+    "timeout-enrichment": "completed",
+    "timeout-enrichment.timeout-enrichment.ac1": "completed",
+    "timeout-enrichment.timeout-enrichment.ac2": "completed"
   }
 }
