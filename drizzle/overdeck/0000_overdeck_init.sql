@@ -349,6 +349,8 @@ CREATE TABLE `review_status` (
 	`strike_ready_at` integer,
 	`strike_landing_state` text,
 	`strike_recovery_count` integer DEFAULT 0,
+	`strike_transport_retry_count` integer,
+	`strike_next_attempt_at` integer,
 	`strike_landing_attempts` text
 );
 --> statement-breakpoint

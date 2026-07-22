@@ -12,15 +12,19 @@ const mocks = vi.hoisted(() => ({
   getCodexAppServerStatus: vi.fn(),
   appendOperatorInterventionEvent: vi.fn(),
   logAgentLifecycleSync: vi.fn(),
+  resumeAgent: vi.fn(),
 }));
 
 vi.mock('../../../../src/lib/agents/agent-state.js', () => ({
   getAgentDir: (agentId: string) => `/tmp/${agentId}`,
   getAgentResumeGateBlockReason: (state: { paused?: boolean; troubled?: boolean; consecutiveFailures?: number }) => {
-    if (state.paused) return 'agent is paused';
-    if (state.troubled) return `agent is troubled (${state.consecutiveFailures ?? 0} failures)`;
+    if (state.paused) return { reason: 'agent is paused' };
+    if (state.troubled) return { reason: `agent is troubled (${state.consecutiveFailures ?? 0} failures)` };
     return undefined;
   },
+  decideResumeGate: (block: { reason?: string } | undefined) => block
+    ? { decision: 'block', reason: block.reason }
+    : { decision: 'proceed', clearStoppedByUser: false },
   getAgentStateSync: mocks.getAgentStateSync,
   markAgentRunning: vi.fn(),
   saveAgentStateSync: vi.fn(),
@@ -99,6 +103,11 @@ vi.mock('../../../../src/lib/session-rotation.js', () => ({
   ALLOW_SESSION_ROTATION_ON_RESUME: false,
 }));
 
+vi.mock('../../../../src/lib/agents.js', () => ({
+  assertWorkspaceStackHealthyForSpawn: vi.fn(),
+  resumeAgent: mocks.resumeAgent,
+}));
+
 vi.mock('../../../../src/lib/agents/provider-env.js', () => ({
   getProviderEnvForModel: vi.fn(),
   getProviderExportsForModel: vi.fn(),
@@ -114,6 +123,7 @@ describe('messageAgent', () => {
     mocks.listPaneValues.mockReturnValue(Effect.succeed([]));
     mocks.waitForAgentIdle.mockResolvedValue(true);
     mocks.deliverAgentMessage.mockResolvedValue({ ok: true });
+    mocks.resumeAgent.mockResolvedValue({ success: true, messageDelivered: true });
     mocks.getCodexAppServerStatus.mockRejectedValue(new Error('no app-server'));
   });
 
@@ -133,7 +143,10 @@ describe('messageAgent', () => {
       consecutiveFailures: 3,
     });
 
-    await messageAgent('agent-pan-2262', 'review feedback', 'pan-tell');
+    await expect(messageAgent('agent-pan-2262', 'review feedback', 'pan-tell')).resolves.toEqual({
+      delivered: true,
+      queuedToMail: true,
+    });
 
     expect(mocks.deliverAgentMessage).toHaveBeenCalledWith(
       'agent-pan-2262',
@@ -145,6 +158,40 @@ describe('messageAgent', () => {
       'agent-pan-2262',
       expect.stringContaining('queued mail without resume'),
     );
+  });
+
+  it('reports paused-agent mail as undelivered with the gate reason', async () => {
+    mocks.getAgentStateSync.mockReturnValue({
+      id: 'agent-pan-2262',
+      issueId: 'PAN-2262',
+      status: 'stopped',
+      workspace: '/repo',
+      paused: true,
+    });
+
+    await expect(messageAgent('agent-pan-2262', 'review feedback')).resolves.toEqual({
+      delivered: false,
+      queuedToMail: true,
+      reason: 'agent is paused',
+    });
+    expect(mocks.resumeAgent).not.toHaveBeenCalled();
+  });
+
+  it('reports a failed stopped-agent resume without rotating the session', async () => {
+    mocks.getAgentStateSync.mockReturnValue({
+      id: 'agent-pan-2262',
+      issueId: 'PAN-2262',
+      status: 'stopped',
+      workspace: '/repo',
+    });
+    mocks.resumeAgent.mockResolvedValue({ success: false, error: 'session not found' });
+
+    await expect(messageAgent('agent-pan-2262', 'review feedback')).resolves.toEqual({
+      delivered: false,
+      queuedToMail: true,
+      reason: expect.stringContaining('resume failed (session not found)'),
+    });
+    expect(mocks.deliverAgentMessage).not.toHaveBeenCalled();
   });
 
   it('queues a message instead of pasting into a mid-turn codex agent', async () => {

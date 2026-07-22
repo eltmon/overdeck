@@ -75,6 +75,8 @@ interface DbRow {
   strike_ready_at: number | null;
   strike_landing_state: string | null;
   strike_recovery_count: number | null;
+  strike_transport_retry_count: number | null;
+  strike_next_attempt_at: number | null;
   strike_landing_attempts: string | null;
 }
 
@@ -132,6 +134,8 @@ function rowToReviewStatus(row: DbRow, history: StatusHistoryEntry[]): ReviewSta
     strikeReadyAt: msToIso(row.strike_ready_at),
     strikeLandingState: (row.strike_landing_state as ReviewStatus['strikeLandingState']) ?? undefined,
     strikeRecoveryCount: row.strike_recovery_count ?? undefined,
+    strikeTransportRetryCount: row.strike_transport_retry_count ?? undefined,
+    strikeNextAttemptAt: msToIso(row.strike_next_attempt_at),
     strikeLandingAttempts: row.strike_landing_attempts
       ? JSON.parse(row.strike_landing_attempts) as ReviewStatus['strikeLandingAttempts']
       : undefined,
@@ -187,9 +191,10 @@ export function upsertReviewStatusSync(status: ReviewStatus): void {
         deacon_ignored, deacon_ignored_at, deacon_ignored_reason,
         blocker_reasons, last_verified_commit, merge_step, auto_merge,
         strike_ready_head, strike_ready_at, strike_landing_state,
-        strike_recovery_count, strike_landing_attempts
+        strike_recovery_count, strike_transport_retry_count,
+        strike_next_attempt_at, strike_landing_attempts
       ) VALUES (
-        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
       )
       ON CONFLICT(issue_id) DO UPDATE SET
         review_status = excluded.review_status,
@@ -237,6 +242,8 @@ export function upsertReviewStatusSync(status: ReviewStatus): void {
         strike_ready_at = excluded.strike_ready_at,
         strike_landing_state = excluded.strike_landing_state,
         strike_recovery_count = excluded.strike_recovery_count,
+        strike_transport_retry_count = excluded.strike_transport_retry_count,
+        strike_next_attempt_at = excluded.strike_next_attempt_at,
         strike_landing_attempts = excluded.strike_landing_attempts
     `).run(
       s.issueId,
@@ -285,6 +292,8 @@ export function upsertReviewStatusSync(status: ReviewStatus): void {
       isoToMs(s.strikeReadyAt),
       s.strikeLandingState ?? null,
       s.strikeRecoveryCount ?? null,
+      s.strikeTransportRetryCount ?? null,
+      isoToMs(s.strikeNextAttemptAt),
       s.strikeLandingAttempts ? JSON.stringify(s.strikeLandingAttempts) : null,
     );
 

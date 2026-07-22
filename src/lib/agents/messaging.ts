@@ -53,6 +53,12 @@ import {
   getProviderExportsForModel,
 } from './provider-env.js';
 
+export interface MessageDeliveryOutcome {
+  delivered: boolean;
+  queuedToMail: boolean;
+  reason?: string;
+}
+
 function queueAgentMail(agentId: string, message: string, pendingTurnEndDelivery = false): void {
   const mailDir = join(getAgentDir(agentId), 'mail');
   mkdirSync(mailDir, { recursive: true });
@@ -102,7 +108,7 @@ export async function messageAgent(
   message: string,
   caller = 'internal',
   opts: MessageAgentRedriveOptions = {},
-): Promise<void> {
+): Promise<MessageDeliveryOutcome> {
   const normalizedId = normalizeAgentId(agentId);
   const agentState = getAgentStateSync(normalizedId);
 
@@ -132,7 +138,7 @@ export async function messageAgent(
     queueAgentMail(normalizedId, message);
     logAgentLifecycleSync(normalizedId, `messageAgent queued mail without resume: ${gateBlockReason}`);
     console.log(`[agents] Queued message for ${normalizedId}; ${gateBlockReason}`);
-    return;
+    return { delivered: false, queuedToMail: true, reason: gateBlockReason };
   }
 
   // Check if agent is suspended - auto-resume if so (PAN-80)
@@ -144,7 +150,7 @@ export async function messageAgent(
       queueAgentMail(normalizedId, message);
       logAgentLifecycleSync(normalizedId, `messageAgent queued mail without resume: ${gateBlockReason}`);
       console.log(`[agents] Queued message for ${normalizedId}; ${gateBlockReason}`);
-      return;
+      return { delivered: false, queuedToMail: true, reason: gateBlockReason };
     }
     console.log(`[agents] Auto-resuming suspended agent ${normalizedId} to deliver message`);
     const { resumeAgent } = await import('../agents.js');
@@ -157,7 +163,7 @@ export async function messageAgent(
     }
     // Message already sent during resume
     await appendTellInterventionForUserSource(normalizedId, caller);
-    return;
+    return { delivered: true, queuedToMail: false };
   }
 
   // Check if agent is stopped — auto-resume to deliver feedback (PAN-367 / PAN-705)
@@ -180,7 +186,7 @@ export async function messageAgent(
       queueAgentMail(normalizedId, message);
       logAgentLifecycleSync(normalizedId, `messageAgent queued mail without resume: ${gateBlockReason}`);
       console.log(`[agents] Queued message for ${normalizedId}; ${gateBlockReason}`);
-      return;
+      return { delivered: false, queuedToMail: true, reason: gateBlockReason };
     }
     console.log(`[agents] Auto-resuming stopped agent ${normalizedId} to deliver feedback (session exists: ${await Effect.runPromise(sessionExists(normalizedId))})`);
 
@@ -193,7 +199,7 @@ export async function messageAgent(
     if (resumeResult.success && resumeResult.messageDelivered !== false) {
       await appendTellInterventionForUserSource(normalizedId, caller);
       console.log(`[agents] Resumed ${normalizedId} and delivered feedback`);
-      return;
+      return { delivered: true, queuedToMail: true };
     }
 
     // Resume failed OR message was not delivered (ready signal timed out). Fall back to
@@ -217,7 +223,7 @@ export async function messageAgent(
       const stopMsg = `Not restarting ${normalizedId} with a fresh session — ${why}; session rotation is disabled (PAN-1980). Agent left stopped; feedback queued in mail.`;
       console.warn(`[agents] ${stopMsg}`);
       emitActivityEntrySync({ source: 'work-agent', level: 'error', message: `${normalizedId}: ${stopMsg}`, issueId: agentState.issueId });
-      return;
+      return { delivered: false, queuedToMail: true, reason: stopMsg };
     }
 
     const providerEnv = agentState.model ? await getProviderEnvForModel(agentState.model) : {};
@@ -301,7 +307,10 @@ export async function messageAgent(
     const ready = await waitForPromptReady(normalizedId, fallbackHarness, 30);
     const fallbackResumePrompt = `You are resuming work on ${agentState.issueId}. Check .pan/feedback/ for specialist feedback that arrived while you were stopped, then continue working.\n\n${message}`;
     const resumeMessage = await buildResumeMessageForAgent(agentState, fallbackResumePrompt, message);
+    let delivered = false;
+    let reason: string | undefined;
     if (resumeMessage.error) {
+      reason = resumeMessage.error;
       console.error(`[agents] Fallback-restarted ${normalizedId} but ${resumeMessage.error}`);
       emitActivityEntrySync({
         source: 'work-agent',
@@ -310,7 +319,6 @@ export async function messageAgent(
         issueId: agentState.issueId,
       });
     } else if (ready && resumeMessage.message) {
-      let delivered = false;
       if (fallbackHarness === 'claude-code') {
         const fallbackSessionId = getLatestSessionIdSync(normalizedId);
         if (fallbackSessionId) {
@@ -324,14 +332,17 @@ export async function messageAgent(
           });
           delivered = delivery.delivered;
           if (!delivery.delivered) {
+            reason = `resume prompt did not land after ${delivery.attempts} delivery attempts`;
             console.error(`[agents] Fallback resume prompt did not land after ${delivery.attempts} delivery attempts`);
           }
         } else {
+          reason = 'no session id was recorded';
           console.error(`[agents] Fallback-restarted ${normalizedId} but no session id was recorded — feedback in mail queue`);
         }
       } else {
         const delivery = await deliverAgentMessage(normalizedId, resumeMessage.message, 'resumeAgent:resume-prompt', resolveAgentDeliveryMethod(agentState));
         delivered = delivery.ok;
+        if (!delivery.ok) reason = 'resume prompt delivery failed';
       }
       if (delivered) {
         if (resumeMessage.redeliveringKickoff) markKickoffRedelivered(agentState);
@@ -339,10 +350,11 @@ export async function messageAgent(
         console.log(`[agents] Fallback-restarted ${normalizedId} and delivered feedback`);
       }
     } else {
+      reason = 'ready signal not detected';
       console.warn(`[agents] Fallback-restarted ${normalizedId} but ready signal not detected — feedback in mail queue`);
     }
 
-    return;
+    return { delivered, queuedToMail: true, ...(reason ? { reason } : {}) };
   }
 
   // Check if this is a remote agent
@@ -355,7 +367,7 @@ export async function messageAgent(
     // Also save to mail queue for persistence
     queueAgentMail(normalizedId, message);
     await appendTellInterventionForUserSource(normalizedId, caller);
-    return;
+    return { delivered: true, queuedToMail: true };
   }
 
   const expectedHarness = agentState?.harness ?? 'claude-code';
@@ -373,14 +385,14 @@ export async function messageAgent(
       logAgentLifecycleSync(normalizedId, 'messageAgent queued mail for codex turn-end delivery: agent busy');
       console.log(`[agents] Queued message for ${normalizedId}; codex agent is mid-turn`);
       await appendTellInterventionForUserSource(normalizedId, caller);
-      return;
+      return { delivered: true, queuedToMail: true, reason: 'queued for turn-end delivery' };
     }
 
     const deliveryMethod = resolveAgentDeliveryMethod(agentState);
-    await deliverAgentMessage(normalizedId, message, `messageAgent:${caller}`, deliveryMethod);
+    const delivery = await deliverAgentMessage(normalizedId, message, `messageAgent:${caller}`, deliveryMethod);
     queueAgentMail(normalizedId, message);
     await appendTellInterventionForUserSource(normalizedId, caller);
-    return;
+    return { delivered: delivery.ok, queuedToMail: true };
   }
 
   if (!(await Effect.runPromise(sessionExists(normalizedId)))) {
@@ -400,10 +412,11 @@ export async function messageAgent(
     const { resumeAgent } = await import('../agents.js');
     const resumeResult = await resumeAgent(normalizedId, message);
     if (resumeResult.success) {
-      if (resumeResult.messageDelivered !== false) {
+      const delivered = resumeResult.messageDelivered !== false;
+      if (delivered) {
         await appendTellInterventionForUserSource(normalizedId, caller);
       }
-      return;
+      return { delivered, queuedToMail: false };
     }
     throw new Error(`Agent ${normalizedId} session is dead and resume failed: ${resumeResult.error}`);
   }
@@ -418,10 +431,11 @@ export async function messageAgent(
   }
 
   const deliveryMethod = resolveAgentDeliveryMethod(agentState);
-  await deliverAgentMessage(normalizedId, message, `messageAgent:${caller}`, deliveryMethod);
+  const delivery = await deliverAgentMessage(normalizedId, message, `messageAgent:${caller}`, deliveryMethod);
 
   // Save a durable backup. Unlike `.pending.md` busy-turn mail, the Codex hook
   // does not replay ordinary `.md` backups because they have already landed.
   queueAgentMail(normalizedId, message);
   await appendTellInterventionForUserSource(normalizedId, caller);
+  return { delivered: delivery.ok, queuedToMail: true };
 }

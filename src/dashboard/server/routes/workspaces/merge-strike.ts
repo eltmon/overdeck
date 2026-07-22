@@ -47,8 +47,16 @@ export function parseStrikeMergeRequest(raw: unknown): StrikeMergeRequest | null
     : null;
 }
 
-export function mergeCompletionStatus(request: TriggerMergeRequest): Pick<ReviewStatus, 'strikeLandingState' | 'strikeReadyHead' | 'strikeReadyAt'> | Record<string, never> {
-  return request.kind === 'strike' ? { strikeLandingState: 'landed', strikeReadyHead: undefined, strikeReadyAt: undefined } : {};
+export function mergeCompletionStatus(request: TriggerMergeRequest): Pick<ReviewStatus, 'strikeLandingState' | 'strikeReadyHead' | 'strikeReadyAt' | 'strikeTransportRetryCount' | 'strikeNextAttemptAt'> | Record<string, never> {
+  return request.kind === 'strike'
+    ? {
+        strikeLandingState: 'landed',
+        strikeReadyHead: undefined,
+        strikeReadyAt: undefined,
+        strikeTransportRetryCount: undefined,
+        strikeNextAttemptAt: undefined,
+      }
+    : {};
 }
 export function activeStrikeMerge(currentMerge: string | null, pendingOperation?: { type: string; status: string } | null): boolean {
   return currentMerge !== null || (pendingOperation?.type === 'merge' && pendingOperation.status === 'running');

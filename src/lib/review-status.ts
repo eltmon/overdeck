@@ -235,9 +235,8 @@ export function loadReadyForMergeFlags(issueIds: string[]): Map<string, boolean>
             readyForMerge: false,
           }),
         };
-        for (const [key, value] of Object.entries(journal.durable)) {
-          if (value !== undefined) (merged as unknown as Record<string, unknown>)[key] = value;
-        }
+        for (const [key, value] of Object.entries(journal.durable)) if (value !== undefined) (merged as unknown as Record<string, unknown>)[key] = value;
+        for (const key of journal.clearedFields ?? []) delete (merged as unknown as Record<string, unknown>)[key];
         merged.issueId = issueId;
         merged.updatedAt = journal.updatedAt;
         const hasBlockers = (merged.blockerReasons?.length ?? 0) > 0;
@@ -842,9 +841,8 @@ export function getReviewStatusSync(issueId: string): ReviewStatus | null {
     // Apply ONLY the journal fields that are actually present. The journal carries the durable
     // verdict; DB-only/ephemeral fields it does not store (stuck/stuckReason, transient counters)
     // must NOT be clobbered with `undefined`. This keeps every reconcile a strict overlay.
-    for (const [key, value] of Object.entries(journal.durable)) {
-      if (value !== undefined) (merged as unknown as Record<string, unknown>)[key] = value;
-    }
+    for (const [key, value] of Object.entries(journal.durable)) if (value !== undefined) (merged as unknown as Record<string, unknown>)[key] = value;
+    for (const key of journal.clearedFields ?? []) delete (merged as unknown as Record<string, unknown>)[key];
     merged.issueId = issueId;
     merged.updatedAt = journal.updatedAt;
     const hasBlockers = (merged.blockerReasons?.length ?? 0) > 0;

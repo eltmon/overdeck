@@ -73,6 +73,22 @@ describe('overdeck schema top-ups', () => {
     expect(costIndexRows(reopened)).toHaveLength(2);
   });
 
+  it('restores strike transport backoff columns in an existing database', () => {
+    const dbPath = makeDbPath();
+    const initial = getOverdeckDatabaseSync(dbPath);
+    initial.exec('ALTER TABLE `review_status` DROP COLUMN `strike_transport_retry_count`');
+    initial.exec('ALTER TABLE `review_status` DROP COLUMN `strike_next_attempt_at`');
+    closeOverdeckDatabaseSync();
+
+    const toppedUp = getOverdeckDatabaseSync(dbPath);
+    const columns = toppedUp
+      .prepare('PRAGMA table_info(`review_status`)')
+      .all<{ name: string }>()
+      .map((column) => column.name);
+    expect(columns).toContain('strike_transport_retry_count');
+    expect(columns).toContain('strike_next_attempt_at');
+  });
+
   it('uses idx_cost_agent_id for the agent daily-cost query', () => {
     const db = getOverdeckDatabaseSync(makeDbPath());
     const plan = db

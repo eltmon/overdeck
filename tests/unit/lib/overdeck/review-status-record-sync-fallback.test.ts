@@ -15,6 +15,11 @@ const state = vi.hoisted(() => ({
   recordLanded: true,
 }));
 
+const dbMocks = vi.hoisted(() => ({
+  getReviewStatusFromDbSync: vi.fn(),
+  upsertReviewStatusSync: vi.fn(),
+}));
+
 vi.mock('../../../../src/lib/projects.js', () => ({
   resolveProjectFromIssueSync: (issueId: string) =>
     issueId.startsWith('PAN-')
@@ -31,12 +36,22 @@ vi.mock('../../../../src/lib/pan-dir/records.js', () => ({
   updateIssueRecordForIssue: vi.fn(async () => state.recordLanded),
 }));
 
+vi.mock('../../../../src/lib/overdeck/review-status-sync.js', () => ({
+  clearWorkspaceStuck: vi.fn(),
+  deleteReviewStatus: vi.fn(),
+  getAllReviewStatusesFromDb: vi.fn(() => ({})),
+  getReviewStatusFromDbSync: dbMocks.getReviewStatusFromDbSync,
+  getReviewStatusesFromDb: vi.fn(() => ({})),
+  markWorkspaceStuck: vi.fn(),
+  upsertReviewStatusSync: dbMocks.upsertReviewStatusSync,
+}));
+
 import {
   readJournalStatusSync,
   updateIssueRecordForReviewStatusSync,
   workspaceVerdictFallbackPath,
 } from '../../../../src/lib/overdeck/review-status-record-sync.js';
-import type { ReviewStatus } from '../../../../src/lib/review-status.js';
+import { getReviewStatusSync, type ReviewStatus } from '../../../../src/lib/review-status.js';
 
 const ISSUE = 'PAN-9999';
 
@@ -46,14 +61,19 @@ function fallbackPathOrThrow(): string {
   return p;
 }
 
-function writeFallback(updatedAt: string, pipeline: Record<string, unknown>): void {
+function writeFallback(
+  updatedAt: string,
+  pipeline: Record<string, unknown>,
+  clearedFields?: string[],
+): void {
   const p = fallbackPathOrThrow();
   mkdirSync(join(state.projectPath, 'workspaces', 'feature-pan-9999', '.overdeck'), { recursive: true });
-  writeFileSync(p, JSON.stringify({ issueId: ISSUE, updatedAt, pipeline }));
+  writeFileSync(p, JSON.stringify({ issueId: ISSUE, updatedAt, pipeline, clearedFields }));
 }
 
 describe('workspace verdict fallback (PAN-2583)', () => {
   beforeEach(() => {
+    vi.clearAllMocks();
     state.projectPath = mkdtempSync(join(tmpdir(), 'pan-2583-'));
     state.pipeline = null;
     state.recordLanded = true;
@@ -90,6 +110,80 @@ describe('workspace verdict fallback (PAN-2583)', () => {
     expect(result?.durable.prUrl).toBe('https://example.com/pr/1');
   });
 
+  it('applies explicit strike transport clears from a newer fallback', () => {
+    state.pipeline = {
+      reviewStatus: 'reviewing',
+      testStatus: 'pending',
+      strikeTransportRetryCount: 4,
+      strikeNextAttemptAt: '2026-07-11T12:30:00.000Z',
+      updatedAt: '2026-07-11T10:00:00.000Z',
+    };
+    writeFallback(
+      '2026-07-11T12:00:00.000Z',
+      { reviewStatus: 'reviewing', testStatus: 'pending' },
+      ['strikeTransportRetryCount', 'strikeNextAttemptAt'],
+    );
+
+    const result = readJournalStatusSync(ISSUE);
+    expect(result?.durable.strikeTransportRetryCount).toBeUndefined();
+    expect(result?.durable.strikeNextAttemptAt).toBeUndefined();
+    expect(result?.clearedFields).toEqual([
+      'strikeTransportRetryCount',
+      'strikeNextAttemptAt',
+    ]);
+  });
+
+  it('ignores clear markers outside the allowlisted transport fields', () => {
+    state.pipeline = {
+      reviewStatus: 'reviewing',
+      testStatus: 'pending',
+      updatedAt: '2026-07-11T10:00:00.000Z',
+    };
+    writeFallback(
+      '2026-07-11T12:00:00.000Z',
+      { reviewStatus: 'blocked', testStatus: 'pending' },
+      ['reviewStatus', 'strikeNextAttemptAt'],
+    );
+
+    const result = readJournalStatusSync(ISSUE);
+    expect(result?.durable.reviewStatus).toBe('blocked');
+    expect(result?.clearedFields).toEqual(['strikeNextAttemptAt']);
+  });
+
+  it('clears stale backoff fields when reconciling the fallback into the DB cache', () => {
+    state.pipeline = {
+      reviewStatus: 'reviewing',
+      testStatus: 'pending',
+      strikeTransportRetryCount: 4,
+      strikeNextAttemptAt: '2026-07-11T12:30:00.000Z',
+      updatedAt: '2026-07-11T10:00:00.000Z',
+    };
+    writeFallback(
+      '2026-07-11T12:00:00.000Z',
+      { reviewStatus: 'reviewing', testStatus: 'pending' },
+      ['strikeTransportRetryCount', 'strikeNextAttemptAt'],
+    );
+    dbMocks.getReviewStatusFromDbSync.mockReturnValue({
+      issueId: ISSUE,
+      reviewStatus: 'reviewing',
+      testStatus: 'pending',
+      readyForMerge: false,
+      updatedAt: '2026-07-11T11:00:00.000Z',
+      strikeTransportRetryCount: 4,
+      strikeNextAttemptAt: '2026-07-11T12:30:00.000Z',
+    } satisfies ReviewStatus);
+
+    const result = getReviewStatusSync(ISSUE);
+
+    expect(result?.strikeTransportRetryCount).toBeUndefined();
+    expect(result?.strikeNextAttemptAt).toBeUndefined();
+    expect(dbMocks.upsertReviewStatusSync).toHaveBeenCalledOnce();
+    const reconciled = dbMocks.upsertReviewStatusSync.mock.calls[0]?.[0] as ReviewStatus;
+    expect(reconciled.issueId).toBe(ISSUE);
+    expect(reconciled).not.toHaveProperty('strikeTransportRetryCount');
+    expect(reconciled).not.toHaveProperty('strikeNextAttemptAt');
+  });
+
   it('ignores a fallback older than the record', () => {
     state.pipeline = { reviewStatus: 'passed', testStatus: 'pending', updatedAt: '2026-07-11T12:00:00.000Z' };
     writeFallback('2026-07-11T10:00:00.000Z', { reviewStatus: 'blocked' });
@@ -120,6 +214,10 @@ describe('workspace verdict fallback (PAN-2583)', () => {
     });
     const written = JSON.parse(readFileSync(fallbackPathOrThrow(), 'utf-8'));
     expect(written.pipeline.reviewStatus).toBe('blocked');
+    expect(written.clearedFields).toEqual([
+      'strikeTransportRetryCount',
+      'strikeNextAttemptAt',
+    ]);
     expect(written.updatedAt).toBe('2026-07-11T13:00:00.000Z');
   });
 

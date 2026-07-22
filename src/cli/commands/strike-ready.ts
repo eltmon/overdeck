@@ -71,11 +71,13 @@ export async function strikeReadyCommand(
 
   const previous = deps.getStatus(issueId);
   if (previous?.strikeReadyHead === remoteHead) {
-    if (previous.strikeLandingState !== 'needs_you') return previous;
+    if (previous.strikeLandingState !== 'needs_you' && previous.strikeLandingState !== 'recovering') return previous;
     deps.clearStuck(issueId);
     return deps.setStatus(issueId, {
       strikeLandingState: 'ready',
       strikeRecoveryCount: 0,
+      strikeTransportRetryCount: undefined,
+      strikeNextAttemptAt: undefined,
       strikeLandingAttempts: previous.strikeLandingAttempts ?? [],
     });
   }
@@ -86,6 +88,8 @@ export async function strikeReadyCommand(
     strikeReadyAt: readyAt,
     strikeLandingState: 'ready',
     strikeRecoveryCount: 0,
+    strikeTransportRetryCount: undefined,
+    strikeNextAttemptAt: undefined,
     strikeLandingAttempts: previous?.strikeLandingAttempts ?? [],
   });
 }

@@ -46,6 +46,8 @@ export const OVERDECK_SCHEMA_TOP_UP_EXPECTATIONS: SchemaTopUpExpectations = {
     { table: 'review_status', column: 'strike_ready_at' },
     { table: 'review_status', column: 'strike_landing_state' },
     { table: 'review_status', column: 'strike_recovery_count' },
+    { table: 'review_status', column: 'strike_transport_retry_count' },
+    { table: 'review_status', column: 'strike_next_attempt_at' },
     { table: 'review_status', column: 'strike_landing_attempts' },
     { table: 'agents', column: 'yielded_by_scheduler' },
     { table: 'agents', column: 'review_discovery_pending' },
@@ -133,6 +135,8 @@ function ensureRuntimeIndexesSync(db: SqliteDatabase): void {
   runSchemaTopUp(db, 'ALTER TABLE `review_status` ADD COLUMN `strike_ready_at` integer');
   runSchemaTopUp(db, 'ALTER TABLE `review_status` ADD COLUMN `strike_landing_state` text');
   runSchemaTopUp(db, 'ALTER TABLE `review_status` ADD COLUMN `strike_recovery_count` integer DEFAULT 0');
+  runSchemaTopUp(db, 'ALTER TABLE `review_status` ADD COLUMN `strike_transport_retry_count` integer');
+  runSchemaTopUp(db, 'ALTER TABLE `review_status` ADD COLUMN `strike_next_attempt_at` integer');
   runSchemaTopUp(db, 'ALTER TABLE `review_status` ADD COLUMN `strike_landing_attempts` text');
   ensureReleaseSetTablesSync(db);
   // PAN-1491: existing overdeck.db files created before substrate-bug weights need
