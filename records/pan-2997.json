@@ -164,10 +164,10 @@
     "recordedAt": "2026-07-22T01:20:05.090Z"
   },
   "created": "2026-07-21T23:09:49.270Z",
-  "updated": "2026-07-22T03:30:39.426Z",
+  "updated": "2026-07-22T03:30:41.954Z",
   "pipeline": {
     "issueId": "PAN-2997",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -175,8 +175,8 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-22T01:21:05.035Z",
-    "updatedAt": "2026-07-22T03:30:39.414Z",
-    "reviewNotes": "The keyed outbox still acknowledges after the unkeyed external send, so a post-send/pre-ack crash replays the same lifecycle wake and violates exactly-one delivery.",
+    "updatedAt": "2026-07-22T03:30:41.934Z",
+    "reviewNotes": "Agent re-review request (4/25): Fixed the cycle-4 blocker by replacing mail-content reconciliation with a real keyed outbox, per the review's fix direction. Each (lifecycleId, agentId) wake now has a durable JSON entry at ~/.overdeck/agents/<id>/linear-mcp-wake/<lifecycleId>.json carrying the message, pending/acknowledged state, and recorded outcome; writes are atomic (temp+rename) and async-only (the sync directory-scan helper is gone from messaging.ts entirely — it is byte-identical to its pre-PR state except nothing). The delivery wrapper records the acknowledgment as part of its own protocol on every path, so acknowledged sends always have receipts — including the two resume paths that never wrote the mail backup. Recovery reads one exact path: acknowledged suppresses replay and replays the recorded outcome faithfully (queued stays queued); pending/missing is (re)driven. All four interruption tests the review demanded run against the REAL outbox primitive on a temp OVERDECK_HOME: pre-send claim recovery (one delivery), post-send/pre-receipt crash (defined single replay of an unacknowledged send), acknowledged-send suppression (no second call, completion retried), queued-outcome recovery (not falsified to delivered), plus two identical wakes in adjacent lifecycles (B is never suppressed by A's receipt). The 'delivering' event literal stays decodable but is no longer emitted or treated as a claim. Typecheck, lint, root (10394) and frontend (2382) suites all green.",
     "inspectNotes": "Fold dedupes required events per-agent via Map; latest non-null authUrl/authUrlAgentId wins; expiry computed from authUrlExpiresAt and reactivates on fresh required; healthy event closes to lastCompleted, notified targets open??lastCompleted, duplicate healthy is a no-op leaving wake set empty post-notification. All 4 ACs verified by hand against fake-timer tests.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3004",
     "lastVerifiedCommit": "6e4eb4b4d5d5ad77c0b33e3262b99ae768c0477c",
@@ -301,7 +301,7 @@
       },
       "costAtCloseOut": {
         "usd": 144.043263,
-        "pricingAsOf": "2026-07-22T03:30:39.419Z"
+        "pricingAsOf": "2026-07-22T03:30:41.951Z"
       }
     },
     "merges": [
