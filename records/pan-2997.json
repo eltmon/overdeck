@@ -12,11 +12,16 @@
       "timestamp": "2026-07-21T23:37:43.771Z",
       "reason": "start",
       "agentModel": "gpt-5.6-sol"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "k3[1m]",
+      "timestamp": "2026-07-22T00:31:13.906Z"
     }
   ],
   "feedback": [],
   "created": "2026-07-21T23:09:49.270Z",
-  "updated": "2026-07-22T00:26:54.215Z",
+  "updated": "2026-07-22T00:31:13.906Z",
   "pipeline": {
     "issueId": "PAN-2997",
     "reviewStatus": "pending",
