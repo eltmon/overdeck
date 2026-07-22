@@ -5,7 +5,7 @@ Automatic swarming is off by default. An explicit `pan swarm <issue>` remains an
 The policy resolves each field independently in this order: one-run CLI override, issue record override, project override, global configuration, then the built-in default. The fields are `mode` (`off`, `auto`, or `always`), `maxSlots`, and `autoAdvance`.
 
 - Global values are edited under **Settings → Swarming** and stored in `~/.overdeck/config.yaml`.
-- Project values are edited in the project's overview settings and stored in `~/.overdeck/projects.yaml`.
+- Project values are edited in the **Project settings** panel on the project's HOME tab, which is available for every registered project, including projects with no in-flight pipeline issues, and stored in `~/.overdeck/projects.yaml`.
 - Issue values are edited in Issue Detail and stored in the issue's canonical record on `overdeck-state`.
 
 `off` selects a single work agent for future automatic dispatch. `auto` permits a swarm only when xBRIEF readiness proves the work can be partitioned safely. `always` requires swarm readiness rather than silently falling back. Policy changes never stop or resize an already-running swarm; use the existing freeze, stop, resume, recover, and reset controls for runtime operations.

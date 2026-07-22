@@ -42,6 +42,17 @@ The default is `true` (auto-merge OFF — operator UAT required before merge).
 When the toggle is `false`, the Flywheel orchestrator may schedule auto-merge
 for any issue that satisfies the eligibility predicate.
 
+## Per-project default
+
+Every registered project's HOME tab includes a **Project settings** panel, even
+when the project has no in-flight pipeline issues. Its auto-merge control offers
+**⚡ Auto**, **🔒 Hold for UAT**, and **Global default**, and the collapsed row
+shows the current auto-merge and swarming values at a glance. The project default
+applies only to issues without an explicit per-issue auto-merge setting.
+
+Changes are saved through `POST /api/projects/:key/auto-merge-default` and stored
+in `~/.overdeck/projects.yaml`.
+
 <Note>
 **Auto-merge vs. UAT batch trains.** This toggle controls *per-issue* scheduled
 auto-merge — Overdeck merging one eligible PR at a time without a human click.
