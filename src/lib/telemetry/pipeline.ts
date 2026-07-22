@@ -3,7 +3,8 @@ import type {
   PipelineStageChangedProperties,
   TelemetryModelFamily,
 } from '@overdeck/contracts';
-import { getAgentStateSync, normalizeAgentId, type AgentState } from '../agents.js';
+import { getAgentStateSync, type AgentState } from '../agents/agent-state.js';
+import { normalizeAgentId } from '../agents/identity.js';
 import { AnalyticsService } from './service.js';
 
 const serverAnalytics = new AnalyticsService('server');

@@ -1,0 +1,119 @@
+---
+title: PostHog for coding agents
+description: Give an MCP-capable agent scoped access to PostHog analytics and error data
+---
+
+# PostHog for coding agents
+
+PostHog exposes a hosted Model Context Protocol (MCP) server at:
+
+```text
+https://mcp.posthog.com/mcp
+```
+
+Use it when an agent needs to inspect analytics, error groups, feature flags, or
+dashboards while investigating a product question. The MCP connection is
+separate from Overdeck's anonymous product telemetry; it accesses your PostHog
+account with the permissions you grant.
+
+## Connect with OAuth
+
+OAuth is the recommended authentication path because it avoids copying a
+long-lived personal key into agent configuration. For Claude Code:
+
+```bash
+claude mcp add --transport http posthog https://mcp.posthog.com/mcp -s user
+```
+
+The first connection opens a browser login. The hosted endpoint routes the
+session to the correct PostHog region.
+
+PostHog also provides an interactive installer for supported clients:
+
+```bash
+npx @posthog/wizard mcp add
+```
+
+For investigation-only sessions, restrict the exposed tools and writes:
+
+```text
+https://mcp.posthog.com/mcp?readonly=true&features=flags,insights
+```
+
+You can also pin `organization_id`, `project_id`, `features`, or individual
+`tools` in the MCP URL. These filters reduce the agent's available surface;
+they do not replace account permissions.
+
+## Clients without OAuth
+
+Create a PostHog personal API key with the **MCP Server** preset, scope it to the
+smallest project and permissions the task needs, and send it as a Bearer token:
+
+```json
+{
+  "mcpServers": {
+    "posthog": {
+      "url": "https://mcp.posthog.com/mcp?readonly=true",
+      "headers": {
+        "Authorization": "Bearer phx_your_scoped_personal_key"
+      }
+    }
+  }
+}
+```
+
+Do not use the public project ingestion key for MCP access. Do not commit a
+personal key to a repository, agent prompt, or shared context file.
+
+## PostHog CLI
+
+Overdeck pins `@posthog/cli` for release source-map uploads. The CLI requires a
+personal API key, rather than the public ingestion key:
+
+```bash
+export POSTHOG_CLI_API_KEY="phx_your_personal_api_key"
+export POSTHOG_CLI_PROJECT_ID="12345"
+export POSTHOG_CLI_HOST="https://us.posthog.com"
+```
+
+Create the key with the **Source map upload** preset or grant only
+`error_tracking:write`. `POSTHOG_CLI_PROJECT_ID` is the numeric project or
+environment ID accessible to that key. Use `https://eu.posthog.com` or your
+self-hosted URL when applicable.
+
+The release pipeline runs the equivalent of:
+
+```bash
+npx posthog-cli sourcemap inject \
+  --directory dist/dashboard/public \
+  --release-name overdeck-dashboard \
+  --release-version 1.2.3
+
+npx posthog-cli sourcemap upload \
+  --directory dist/dashboard/public \
+  --release-name overdeck-dashboard \
+  --release-version 1.2.3 \
+  --delete-after
+```
+
+Injection and upload run against the exact dashboard bundle built by the npm
+release job. `--delete-after` prevents source maps from entering the published
+package. If `POSTHOG_CLI_API_KEY` is absent, Overdeck prints a warning and lets
+the release continue without a network call.
+
+## Safe agent-use pattern
+
+1. Start with OAuth and `readonly=true` for analytics or error investigation.
+2. Pin the PostHog project and expose only the feature families or tools the
+   task needs.
+3. Grant a write scope only for an explicit write task, such as managing a
+   feature flag, and remove it afterward.
+4. Keep CLI and MCP credentials in environment variables or the client's secure
+   credential store, never in repository files.
+5. Review any agent-proposed dashboard, flag, or experiment mutation before it
+   reaches PostHog.
+
+See the [PostHog MCP documentation](https://posthog.com/docs/model-context-protocol),
+[MCP authentication and restrictions](https://posthog.com/docs/model-context-protocol/faq),
+and [`@posthog/cli` documentation](https://www.npmjs.com/package/%40posthog%2Fcli)
+for the current tool and scope reference.

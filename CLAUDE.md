@@ -107,6 +107,10 @@ Overdeck supports four coding-agent harnesses: `claude-code` (default), `pi`/`oh
 
 See [configuration/harnesses.mdx](configuration/harnesses.mdx) for installation, picker locations, ToS rules, and troubleshooting. The wider field of coding-agent harnesses Overdeck could adopt is surveyed in [reference/harness-landscape.mdx](reference/harness-landscape.mdx). (`docs/HARNESSES.md` is now a redirect stub — the harness docs are published in the Mintlify site.)
 
+## Telemetry
+
+The anonymous event schema, privacy contract, and opt-out controls are documented in [docs/TELEMETRY.md](docs/TELEMETRY.md). Browser events must use `src/dashboard/frontend/src/lib/telemetry.ts`, and Node events, exceptions, and feature flags must use `src/lib/telemetry/service.ts`; never import a PostHog SDK or send to PostHog outside those write doors.
+
 ## Overdeck Agent Taxonomy
 
 Overdeck's issue pipeline is expressed as four spawned **roles** plus a server-side merge handoff:

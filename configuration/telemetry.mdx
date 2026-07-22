@@ -1,0 +1,79 @@
+---
+title: Anonymous telemetry
+description: What Overdeck sends to PostHog and how to disable it
+---
+
+# Anonymous telemetry
+
+Overdeck sends anonymous product-usage and error telemetry to PostHog. It helps
+the maintainers understand which dashboard and CLI surfaces are used, where
+issues stop in the delivery pipeline, and which exceptions occur on real
+installations.
+
+Telemetry is enabled by default. Session replay is disabled, and Overdeck does
+not send code, prompts, terminal content, issue or repository identifiers, file
+paths, branch names, email addresses, or credentials.
+
+## Disable telemetry
+
+The fastest control is **Settings → Telemetry → Share anonymous usage data**.
+The setting autosaves and applies on the next dashboard load.
+
+You can make the same change in `~/.overdeck/config.yaml`:
+
+```yaml
+telemetry:
+  enabled: false
+```
+
+For process-level control, set:
+
+```bash
+OVERDECK_TELEMETRY=0
+```
+
+`OVERDECK_TELEMETRY=false` is equivalent. The environment variable takes
+precedence over the YAML setting, so it can enforce opt-out for services,
+containers, or CI without changing a user's configuration file.
+
+When telemetry is disabled, Overdeck does not initialize PostHog in the
+browser, server, or CLI. Event capture, exception capture, and feature-flag
+reads make no PostHog network requests.
+
+## Anonymous install ID
+
+Overdeck creates a random UUIDv4 at `~/.overdeck/telemetry-id`. If you set
+`OVERDECK_HOME`, the file lives at `${OVERDECK_HOME}/telemetry-id`. Its file
+mode is `0600`, and it remains local except when used as the anonymous PostHog
+`distinct_id`.
+
+The ID is generated independently. Overdeck does not read Claude Code, Codex,
+GitHub, Git, or other credential files to identify an installation.
+
+## What is sent
+
+- Dashboard tab and action categories
+- Allowlisted CLI verbs, success state, and coarse duration buckets
+- Coarse project and active-agent count buckets
+- Pipeline stage, harness, and model-family enums
+- Platform, architecture, Overdeck version, and client type
+- Browser and server exceptions for error grouping
+
+Raw counts and durations are replaced by coarse buckets. The complete,
+mechanically checked event and property list is in
+[Anonymous telemetry schema](https://github.com/eltmon/overdeck/blob/main/docs/TELEMETRY.md).
+
+## What is never sent
+
+- Source code or file contents
+- Prompts, completions, or terminal output
+- Issue IDs, titles, or descriptions
+- Repository, branch, workspace, or file-path names
+- Email addresses, account IDs, or credentials
+- Session replay recordings
+
+<Info>
+Feature-flag support currently exposes a read door for future rollouts, but no
+production Overdeck feature is controlled remotely. Disabled or offline flag
+reads always use the local fallback.
+</Info>
