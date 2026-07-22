@@ -174,19 +174,21 @@
     "recordedAt": "2026-07-22T21:35:20.476Z"
   },
   "created": "2026-07-17T12:34:27.875Z",
-  "updated": "2026-07-22T21:36:07.072Z",
+  "updated": "2026-07-22T21:40:11.828Z",
   "pipeline": {
     "issueId": "PAN-2838",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-22T21:36:01.975Z",
+    "panDoneRecoveredAt": "2026-07-22T21:36:06.484Z",
+    "updatedAt": "2026-07-22T21:40:11.808Z",
     "inspectNotes": "Verbatim extraction: ProjectSettingsSection + ProjectDisclosure moved byte-for-byte into ProjectSettingsDisclosure.tsx, new wrapper reproduces identical JSX (title/summary/badges/children) at the call site, fetch endpoints unchanged, old definitions fully removed from ProjectOverview.tsx.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3006",
+    "lastVerifiedCommit": "a662b8f6663631da31de25a94dcd75584489f1ae",
     "reviewRequestedAt": "2026-07-22T21:36:06.484Z",
     "reviewSpawnedAt": "2026-07-22T21:35:25.167Z",
     "scopeDrift": {
@@ -211,8 +213,7 @@
         "src/dashboard/frontend/src/components/Stage/ProjectHome.tsx"
       ],
       "recordedAt": "2026-07-22T21:35:20.476Z"
-    },
-    "panDoneRecoveredAt": "2026-07-22T21:36:06.484Z"
+    }
   },
   "closeOut": {
     "usage": {
@@ -227,9 +228,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 368412,
-            "output": 6697,
-            "cacheRead": 817152,
+            "input": 548025,
+            "output": 14381,
+            "cacheRead": 1834496,
             "cacheWrite": 0
           }
         },
@@ -258,9 +259,9 @@
           "cacheWrite": 158395
         },
         "openai/gpt-5.6-sol": {
-          "input": 2298459,
-          "output": 78298,
-          "cacheRead": 44143616,
+          "input": 2478072,
+          "output": 85982,
+          "cacheRead": 45160960,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -271,8 +272,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 44.139232,
-        "pricingAsOf": "2026-07-22T21:36:02.003Z"
+        "usd": 45.776489,
+        "pricingAsOf": "2026-07-22T21:40:11.815Z"
       }
     },
     "merges": [
