@@ -14,7 +14,7 @@ import { refreshDashboardState } from '../lib/refresh-dashboard-state';
 import { toastResumeOutcome } from '../lib/resumeOutcome';
 import { useAlert } from './DialogProvider';
 
-async function postJson(url: string, body?: unknown): Promise<void> {
+async function postJson(url: string, body?: unknown): Promise<Record<string, unknown> | null> {
   const res = await fetch(url, {
     method: 'POST',
     credentials: 'include',
@@ -30,6 +30,7 @@ async function postJson(url: string, body?: unknown): Promise<void> {
     } catch { /* keep default */ }
     throw new Error(message);
   }
+  return res.json().catch(() => null);
 }
 
 const CONTENT: Record<RecoveryRequest['kind'], { title: (r: RecoveryRequest) => string; body: string; primary: string }> = {
@@ -127,9 +128,14 @@ export function ResumableSessionDialog() {
         if (await startIssue()) return;
         toast.success(issueId ? `${agentId} gate cleared — starting` : `${agentId} gate cleared`);
       } else {
-        await postJson(`/api/agents/${encodeURIComponent(agentId)}/unpause`);
-        if (await startIssue()) return;
-        toast.success(issueId ? `${agentId} unpaused — starting` : `${agentId} unpaused`);
+        const unpauseResult = await postJson(`/api/agents/${encodeURIComponent(agentId)}/unpause`);
+        if (unpauseResult?.resumeTriggered === true) {
+          // The route resumed the agent itself — a follow-up start would race it.
+          toast.success(`${agentId} unpaused — resuming now`);
+        } else {
+          if (await startIssue()) return;
+          toast.success(issueId ? `${agentId} unpaused — starting` : `${agentId} unpaused`);
+        }
       }
       closeRecovery();
       await refreshDashboardState(queryClient);

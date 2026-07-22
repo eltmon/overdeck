@@ -1,6 +1,8 @@
 import chalk from 'chalk';
 import { clearAgentPausedSync, getAgentStateSync, resolveAgentTargetSync } from '../../lib/agents.js';
 import { appendOperatorInterventionEvent } from '../../lib/operator-interventions.js';
+import { getWorkAgentLifecycleStateSync } from '../../lib/work-agent-lifecycle.js';
+import { resumeAgent } from '../../lib/agents/resume.js';
 
 export async function unpauseCommand(id: string): Promise<void> {
   // PAN-1760: resolve through normalizeAgentId so full agent IDs
@@ -31,7 +33,23 @@ export async function unpauseCommand(id: string): Promise<void> {
     } else {
       console.log(chalk.dim(`Agent ${agentId} is already unpaused.`));
     }
-    console.log(chalk.dim(`Run pan start ${issueId} to spawn now, or wait for the Deacon's next patrol.`));
+
+    // Resume immediately — unpause means "go now", not "wait for the Deacon's
+    // next patrol". Only when there is actually a session to resume; a plain
+    // stopped agent with no session is pointed at pan start instead.
+    if (getWorkAgentLifecycleStateSync(agentId).canResumeSession) {
+      console.log(chalk.dim('Resuming now…'));
+      const result = await resumeAgent(agentId);
+      if (result.success) {
+        console.log(chalk.green(`Agent ${agentId} resumed.`));
+      } else {
+        console.error(chalk.red(`Resume failed: ${result.error ?? 'unknown error'}`));
+        console.error(chalk.dim(`Run pan start ${issueId} to spawn a fresh agent.`));
+        process.exitCode = 1;
+      }
+    } else {
+      console.log(chalk.dim(`No saved session to resume — run pan start ${issueId} to spawn now.`));
+    }
   } catch (error: any) {
     console.error(chalk.red('Error: ' + error.message));
     process.exit(1);

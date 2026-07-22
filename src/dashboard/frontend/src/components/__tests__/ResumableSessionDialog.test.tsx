@@ -152,6 +152,26 @@ describe('ResumableSessionDialog', () => {
     });
   });
 
+  it('Paused recovery skips the follow-up start when the unpause route already resumed', async () => {
+    useResumeRecovery.getState().openRecovery({ kind: 'paused', agentId: 'agent-pan-2997', issueId: 'PAN-2997' });
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('/api/dashboard/session')) return Response.json({ csrfToken: 'test-csrf' });
+      if (url.endsWith('/unpause')) return Response.json({ success: true, resumeTriggered: true });
+      return Response.json({ success: true });
+    }));
+    renderDialog();
+
+    fireEvent.click(screen.getByTestId('recovery-primary'));
+
+    // Unpause fired the resume server-side — a start POST would race it.
+    await waitFor(() => {
+      expect(fetchCalls().some((c) => c.url === '/api/agents/agent-pan-2997/unpause' && c.method === 'POST')).toBe(true);
+    });
+    await waitFor(() => expect(screen.queryByTestId('resumable-session-dialog')).not.toBeInTheDocument());
+    expect(fetchCalls().some((c) => c.url === '/api/agents' && c.method === 'POST')).toBe(false);
+  });
+
   it('swaps to the resumable recovery when the start-after-clear hits a new 409', async () => {
     useResumeRecovery.getState().openRecovery({ kind: 'paused', agentId: 'agent-pan-2876', issueId: 'PAN-2876' });
     vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {

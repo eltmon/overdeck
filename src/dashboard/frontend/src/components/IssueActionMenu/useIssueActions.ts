@@ -372,7 +372,10 @@ export function useIssueActions(issueId: string): UseIssueActionsResult {
     onSuccess: async (_data, { action }) => {
       await refreshDashboardState(queryClient);
       if (action.key === 'unpause') {
-        toast.success(`${issueId} unpaused — deacon resumes it on the next patrol`);
+        // The route resumes immediately when a session exists — no more
+        // "deacon resumes it on the next patrol" wait.
+        const resuming = (_data as { resumeTriggered?: boolean } | undefined)?.resumeTriggered === true;
+        toast.success(resuming ? `${issueId} unpaused — resuming now` : `${issueId} unpaused`);
       }
       if (action.key === 'resumeSession' && agent?.id) {
         // PAN-2975: every resume affordance reports the actual outcome.

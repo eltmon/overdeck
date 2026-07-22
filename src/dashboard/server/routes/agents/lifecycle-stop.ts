@@ -16,6 +16,7 @@ import { emitActivityEntrySync } from '../../../../lib/activity-logger.js';
 import { operatorInterventionEvent } from '../../../../lib/operator-interventions.js';
 import { stopWorkspaceDocker } from '../../../../lib/workspace-manager.js';
 import { killSession, sessionExists } from '../../../../lib/tmux.js';
+import { getWorkAgentLifecycleState } from '../../../../lib/work-agent-lifecycle.js';
 import { saveAgentStateAndEmitEventProgram } from '../../services/agent-projection.js';
 import { EventStoreService } from '../../services/domain-services.js';
 import { jsonResponse } from '../../http-helpers.js';
@@ -289,7 +290,30 @@ export const postAgentUnpauseRoute = HttpRouter.add(
     });
 
     invalidateAgentsCache();
-    return jsonResponse({ success: true, agent: updatedState });
+
+    // Resume immediately instead of leaving the agent for the deacon's next
+    // patrol — clicking unpause means "go now". Fire-and-forget: resume has
+    // its own readiness gate; the response returns at once and the tree
+    // updates via the projection as the agent comes up. Only fires when the
+    // lifecycle says there is actually a session to resume — a plain stopped
+    // agent with no session is left for the Start button, same as before.
+    let resumeTriggered = false;
+    const lifecycle = yield* getWorkAgentLifecycleState(id);
+    // Troubled agents are quarantined from auto-resume (the deacon skips them
+    // too) — firing resumeAgent would just hit its gate and make
+    // resumeTriggered a lie. untroubled + start is the path for those.
+    if (lifecycle.canResumeSession && updatedState.troubled !== true) {
+      resumeTriggered = true;
+      yield* Effect.promise(() => appendAgentLifecycleLog(id, 'agent.unpause_immediate_resume_triggered'));
+      void import('../../../../lib/agents/resume.js')
+        .then(({ resumeAgent }) => resumeAgent(id))
+        .then((result) => {
+          if (!result.success) console.warn(`[agents] immediate resume after unpause failed for ${id}: ${result.error}`);
+        })
+        .catch((err) => console.warn(`[agents] immediate resume after unpause errored for ${id}:`, err));
+    }
+
+    return jsonResponse({ success: true, agent: updatedState, resumeTriggered });
   })),
 );
 
