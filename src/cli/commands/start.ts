@@ -708,6 +708,8 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
   try {
     const model = normalizeModelOverrideSync(options.model);
     if (model) options.model = model;
+    const planModel = normalizeModelOverrideSync(options.planModel);
+    if (planModel) options.planModel = planModel;
   } catch (err) {
     process.stderr.write(`${err instanceof Error ? err.message : String(err)}\n`);
     process.exit(1);
@@ -871,9 +873,12 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
         if (options.model) {
           // --model is the WORK model (already persisted to the issue record by
           // applyStartPolicyOptions above) — the planning agent keeps the
-          // configured planning default. Say so, because the pre-fix behavior
-          // silently handed the model to planning instead.
-          spinner.info(`Work agent model for ${id}: ${options.model} (planning uses the configured default)`);
+          // configured planning default unless --plan-model names one. Say so,
+          // because the pre-fix behavior silently handed the model to planning
+          // instead.
+          spinner.info(
+            `Work agent model for ${id}: ${options.model} (planning uses ${options.planModel ?? 'the configured default'})`,
+          );
         }
         let sessionName = '';
         try {
@@ -886,6 +891,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
                 auto: resolvedPlanningMode === 'auto',
                 autoStart: true,
                 probe: false,
+                model: options.planModel,
                 workModel: options.model,
                 harness: options.harness,
                 effort: options.effort,

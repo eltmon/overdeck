@@ -31,6 +31,7 @@ pan start PAN-123 --fresh  # Drop the saved session and start a new one (e.g. sw
 pan start PAN-123 --harness codex  # Explicitly use the Codex harness
 pan start PAN-123 --model gpt-5.6-sol --swarm off --review-mode full
 pan start PAN-123 --review-model gpt-5.6-sol  # Pin the convoy review model
+pan start PAN-123 --plan-model k3 --model k3  # Auto-plan AND work on Kimi k3
 pan start PAN-123 --remote --tier durable  # Remote Fly.io workspace with persistent volume
 pan start PAN-123 --remote --tier ephemeral  # Remote Fly.io workspace that winds down on stale heartbeat
 ```
@@ -63,6 +64,9 @@ Start-time policy flags are persisted on the issue before planning or work begin
 sets the durable work-model override used by later respawns, `--swarm` accepts `off`, `auto`,
 or `always`, `--review-mode` accepts `quick`, `full`, or `none`, and `--review-model` pins the
 model used by the review convoy. Omitted flags leave existing and inherited policy untouched.
+When this start also kicks off planning (no plan exists yet), `--plan-model <model>` overrides
+the planning agent's model for that session only — it is a one-shot override, not persisted
+policy, and it never changes the work agent's model (`--model`).
 
 If an agent is paused, `pan start <id>` refuses to spawn until you run `pan unpause <id>`.
 Use `--force` only when you intentionally want to clear that pause gate and start anyway.

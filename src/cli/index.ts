@@ -573,6 +573,7 @@ program
   .option('--remote', 'Use remote workspace (Fly.io)')
   .option('--local', 'Use local workspace (explicit override)')
   .option('--plan <mode>', "Planning depth when no plan exists yet: interactive | auto | skip (default: config planning.default_mode, shipped default auto)")
+  .option('--plan-model <model>', 'Planning model override when this start auto-plans (defaults to roles.plan.model); the work model stays --model')
   .option('--auto', '[deprecated: use --plan skip] Skip planning agent by synthesizing a minimal xBRIEF from the issue title/body')
   .option('--force', 'Clear a paused agent gate and start anyway')
   .option('--fresh', 'Drop the saved Claude session (non-destructive) and start a new one — e.g. to switch a stopped agent\'s model')

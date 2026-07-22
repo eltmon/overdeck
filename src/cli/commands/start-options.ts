@@ -16,6 +16,9 @@ export interface IssueOptions {
   tier?: string;
   /** Explicit planning-depth flag: interactive | auto | skip. */
   plan?: string;
+  /** Planning-role model override used when this start auto-plans (interactive
+   *  or auto). Omit to use roles.plan.model. The work model stays --model. */
+  planModel?: string;
   /** Legacy auto-skip-planning flag; deprecated — use --plan skip instead. */
   auto?: boolean;
   host?: boolean;
