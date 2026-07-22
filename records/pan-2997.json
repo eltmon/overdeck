@@ -146,10 +146,10 @@
     "recordedAt": "2026-07-22T01:20:05.090Z"
   },
   "created": "2026-07-21T23:09:49.270Z",
-  "updated": "2026-07-22T03:01:01.752Z",
+  "updated": "2026-07-22T03:01:05.726Z",
   "pipeline": {
     "issueId": "PAN-2997",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -157,13 +157,13 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-22T01:21:05.035Z",
-    "updatedAt": "2026-07-22T03:01:00.170Z",
+    "updatedAt": "2026-07-22T03:01:05.710Z",
     "reviewNotes": "Agent re-review request (3/25): Fixed the cycle-3 blocker: the pre-delivery claim is no longer terminal. Claims are now resumable — the agent stays in the wake set until a completion lands — and recovery reconciles an uncompleted claim against the agent's durable mail outbox via the new agentHasMailContentSince helper (messaging.ts). Every non-throwing messageAgentWithOutcome path backs the message up to mail, so mail containing the wake copy at/after the claim timestamp proves the acknowledged send durably landed: the ledger completes WITHOUT re-sending. Mail absent means the send never durably happened, so recovery drives it. Both interruption tests the review demanded exist: crash-after-claim/before-send produces exactly one delivery; crash-after-acknowledged-send/before-completion-persistence produces no second delivery. The fold tracks claimedAt (claim) separately from notifiedAt (completion); a claim alone never removes an agent from the wake set. Also fixed the P2: follow-up runs after an unstabilized pass back off exponentially (1s doubling to 60s, reset on stabilization) with a fake-timer regression test. Typecheck, lint, root suite (10391) all green.",
     "inspectNotes": "Fold dedupes required events per-agent via Map; latest non-null authUrl/authUrlAgentId wins; expiry computed from authUrlExpiresAt and reactivates on fresh required; healthy event closes to lastCompleted, notified targets open??lastCompleted, duplicate healthy is a no-op leaving wake set empty post-notification. All 4 ACs verified by hand against fake-timer tests.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3004",
     "lastVerifiedCommit": "fee45ba9ea9d128af392be2261daf0a9dfdbf329",
     "reviewRequestedAt": "2026-07-22T01:21:05.035Z",
-    "reviewSpawnedAt": "2026-07-22T02:56:04.675Z",
+    "reviewSpawnedAt": "2026-07-22T03:01:00.539Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "src/lib/agents/messaging.ts",
@@ -283,7 +283,7 @@
       },
       "costAtCloseOut": {
         "usd": 131.374399,
-        "pricingAsOf": "2026-07-22T03:01:00.185Z"
+        "pricingAsOf": "2026-07-22T03:01:05.722Z"
       }
     },
     "merges": [
@@ -293,7 +293,7 @@
   },
   "workModel": "k3[1m]",
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "k3[1m]",
   "tasks": {
     "sequence": 20,
     "claims": {},
