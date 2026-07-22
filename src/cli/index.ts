@@ -985,12 +985,11 @@ program
     // Additionally, the TypeScript source has circular ESM dependencies that Node.js
     // strict ESM rejects but Bun tolerates — so we must run the built dist/server.js,
     // not the raw source via tsx.
-    const node22 = (() => {
-      // Prefer the nvm-managed Node 22 binary if available
-      const nvmNode = '/home/eltmon/.config/nvm/versions/node/v22.22.0/bin/node';
-      if (existsSync(nvmNode)) return nvmNode;
-      return 'node'; // fall back to PATH
-    })();
+    // ensureCompatibleNode() (node-preflight.ts) already relaunched the CLI under
+    // a Node >= 22.16 if the shell default was too old, so process.execPath is a
+    // guaranteed-compatible, cross-platform Node. Re-resolving via PATH would hand
+    // the dashboard the old `node` (no node:sqlite) — the dashboard-boot failure.
+    const node22 = process.execPath;
 
     const dashboardOriginEnv = traefikEnabled
       ? {

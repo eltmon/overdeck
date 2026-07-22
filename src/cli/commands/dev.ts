@@ -37,9 +37,10 @@ function ensureDashboardBundle(): boolean {
 }
 
 function resolveNode22(): string {
-  const nvmNode = '/home/eltmon/.config/nvm/versions/node/v22.22.0/bin/node';
-  if (existsSync(nvmNode)) return nvmNode;
-  return 'node';
+  // ensureCompatibleNode() relaunches the CLI under a Node >= 22.16 before any
+  // command runs, so process.execPath is a guaranteed-compatible, portable Node
+  // binary — reuse it rather than re-resolving the old default `node` via PATH.
+  return process.execPath;
 }
 
 function readConfig() {
