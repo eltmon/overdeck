@@ -102,9 +102,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-22T04:32:52.466Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-22T04:36Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-22T04:36:05.487Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-22T04:36:05Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2997\n\nKeyed delivery still loses tmux wakes before Enter and can duplicate concurrent supervisor, resume, remote, or Channels deliveries.\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2997 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "src/lib/agents/messaging.ts",
@@ -166,7 +179,7 @@
     "recordedAt": "2026-07-22T01:20:05.090Z"
   },
   "created": "2026-07-21T23:09:49.270Z",
-  "updated": "2026-07-22T04:36:04.799Z",
+  "updated": "2026-07-22T04:36:05.487Z",
   "pipeline": {
     "issueId": "PAN-2997",
     "reviewStatus": "blocked",
