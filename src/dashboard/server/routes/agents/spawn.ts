@@ -62,10 +62,7 @@ import {
   updateRegistryForAgentStart,
   type AgentStartGateDecision,
 } from './shared.js';
-import {
-  handleContainerOrchestration,
-  handleRemoteAgentSpawn,
-} from './spawn-helpers.js';
+import { handleContainerOrchestration, handleRemoteAgentSpawn } from './spawn-helpers.js';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -511,13 +508,9 @@ export const postAgentsRoute = HttpRouter.add(
       emitStartAgentPhase(issueId, 'stackHealthGate', 'start', 'checking workspace docker stack health', { workspacePath });
       let stackHealth = yield* getWorkspaceStackHealth(issueId, { projectConfig, workspacePath });
       if (!stackHealth.healthy && !allowHost) {
-        // A stopped/missing stack must not block the click: run the same
-        // bounded rebuild the CLI spawn gate performs (throttled, escalates
-        // after repeated failure), then re-check. Only 422 if still unhealthy.
         emitStartAgentPhase(issueId, 'stackHealthGate', 'start', 'stack unhealthy — attempting workspace stack rebuild', { workspacePath });
         yield* Effect.promise(() =>
-          assertWorkspaceStackHealthyForSpawn(issueId, 'work', false, workspacePath).catch(() => undefined),
-        );
+          assertWorkspaceStackHealthyForSpawn(issueId, 'work', false, workspacePath).catch(() => undefined));
         stackHealth = yield* getWorkspaceStackHealth(issueId, { projectConfig, workspacePath });
       }
       if (!stackHealth.healthy) {
