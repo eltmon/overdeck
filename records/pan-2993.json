@@ -201,18 +201,17 @@
     "recordedAt": "2026-07-22T20:02:42.067Z"
   },
   "created": "2026-07-21T22:47:36.935Z",
-  "updated": "2026-07-22T20:59:17.021Z",
+  "updated": "2026-07-22T20:59:19.987Z",
   "pipeline": {
     "issueId": "PAN-2993",
     "reviewStatus": "passed",
     "testStatus": "passed",
-    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "merged",
     "releaseStatus": "skipped",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-22T20:09:10.175Z",
-    "updatedAt": "2026-07-22T20:43:38.788Z",
+    "updatedAt": "2026-07-22T20:59:19.969Z",
     "reviewNotes": "Explicit expected-SHA lease fixes the remote overwrite race; all review dimensions and focused verification passed.",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2998",
@@ -279,7 +278,9 @@
         "tests/unit/lib/rebase-helper.test.ts"
       ],
       "recordedAt": "2026-07-22T20:02:42.067Z"
-    }
+    },
+    "closedOut": true,
+    "closedOutAt": "2026-07-22T20:59:19.969Z"
   },
   "closeOut": {
     "usage": {
@@ -345,7 +346,80 @@
     "merges": [
       "https://github.com/eltmon/overdeck/pull/2998"
     ],
-    "ranOn": "eltmon-z790"
+    "ranOn": "eltmon-z790",
+    "dodGate": {
+      "evaluatedAt": "2026-07-22T20:59:19.984Z",
+      "rows": [
+        {
+          "id": "review",
+          "num": 1,
+          "title": "Review passed",
+          "expected": "reviewStatus: passed",
+          "observed": "reviewStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "tests",
+          "num": 2,
+          "title": "Tests passed",
+          "expected": "testStatus: passed",
+          "observed": "testStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "verification",
+          "num": 3,
+          "title": "Verification green on the branch",
+          "expected": "verificationStatus: passed at lastVerifiedCommit",
+          "observed": "verificationStatus: passed at e91bb31361447751398bcf5c852c48ebbc35384f",
+          "status": "pass"
+        },
+        {
+          "id": "merged",
+          "num": 4,
+          "title": "Merged to main",
+          "expected": "PR merged on the forge",
+          "observed": "Merge specialist confirmed merge completed; PR #2998 MERGED at 2026-07-22T20:43:23Z",
+          "status": "pass",
+          "mergedAt": "2026-07-22T20:43:23Z",
+          "mergeCommit": "0696eab815f10335a09d68631dfd85ba907f9b60"
+        },
+        {
+          "id": "post-merge",
+          "num": 5,
+          "title": "Post-merge lifecycle ran",
+          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
+          "observed": "canonical state: verifying_on_main; no running work/planning agents",
+          "status": "pass"
+        },
+        {
+          "id": "main-verify",
+          "num": 6,
+          "title": "Verified on main",
+          "expected": "merged commit verified on main",
+          "observed": "9 check-runs concluded successfully on 0696eab815f10335a09d68631dfd85ba907f9b60",
+          "status": "pass"
+        },
+        {
+          "id": "deploy",
+          "num": 7,
+          "title": "Deployed",
+          "expected": "live server build includes the merged commit",
+          "observed": "build commit 0696eab8 contains merge 0696eab8",
+          "status": "pass"
+        },
+        {
+          "id": "teardown",
+          "num": 8,
+          "title": "Close-out teardown verified",
+          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
+          "overridable": false,
+          "status": "pass",
+          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; Stopped TLDR daemon; Stopped Docker containers; Killed 2 orphaned process(es); Removed git worktree; Removed 5 agent state directories; No strike branch strike/pan-2993 found; Pruned 282 checkpoint ref(s) for agent-pan-2993, planning-pan-2993, strike-pan-2993; No specialist registry entries for PAN-2993"
+        }
+      ],
+      "accepted": []
+    }
   },
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
