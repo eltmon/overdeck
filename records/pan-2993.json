@@ -131,18 +131,18 @@
     "recordedAt": "2026-07-21T23:54:05.124Z"
   },
   "created": "2026-07-21T22:47:36.935Z",
-  "updated": "2026-07-22T00:45:31.211Z",
+  "updated": "2026-07-22T00:51:12.965Z",
   "pipeline": {
     "issueId": "PAN-2993",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-22T00:45:30.120Z",
-    "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
+    "updatedAt": "2026-07-22T00:51:12.884Z",
+    "reviewNotes": "Reviewed fixes are not pushed to PR #2998, and committed HEAD retains a stale file-size baseline whose only correction is uncommitted.",
     "inspectNotes": "All 4 ACs verified against src/lib/agents/messaging.ts@79bb7b47: stopped-agent resume failure returns {delivered:false,queuedToMail:true,reason} naming both resumeResult.error and PAN-1980 session-rotation disable; paused/gated path returns gate reason; live-session/successful-resume paths return delivered:true; only deacon-strike-landing.ts touched among callers and npm run typecheck passes clean (0 new errors).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2998",
     "lastVerifiedCommit": "ecfa0ef67b8fdee6d437eebbe562de99af717820",
@@ -212,9 +212,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 2432068,
-            "output": 160400,
-            "cacheRead": 35954176,
+            "input": 3649628,
+            "output": 185159,
+            "cacheRead": 46312448,
             "cacheWrite": 0
           }
         },
@@ -228,9 +228,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 3856939,
-            "output": 195802,
-            "cacheRead": 135067136,
+            "input": 3885213,
+            "output": 197286,
+            "cacheRead": 135754240,
             "cacheWrite": 0
           }
         }
@@ -243,9 +243,9 @@
           "cacheWrite": 311785
         },
         "openai/gpt-5.6-sol": {
-          "input": 6289007,
-          "output": 356202,
-          "cacheRead": 171021312,
+          "input": 7534841,
+          "output": 382445,
+          "cacheRead": 182066688,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -256,8 +256,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 138.75553,
-        "pricingAsOf": "2026-07-22T00:45:30.137Z"
+        "usd": 151.294678,
+        "pricingAsOf": "2026-07-22T00:51:12.954Z"
       }
     },
     "merges": [
