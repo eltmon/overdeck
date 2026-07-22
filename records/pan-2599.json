@@ -10,7 +10,7 @@
   ],
   "feedback": [],
   "created": "2026-07-16T05:02:53.170Z",
-  "updated": "2026-07-22T20:54:49.950Z",
+  "updated": "2026-07-22T20:55:24.082Z",
   "pipeline": {
     "issueId": "PAN-2599",
     "reviewStatus": "pending",
@@ -77,5 +77,20 @@
   },
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
-  "workModel": "gpt-5.6-sol"
+  "workModel": "gpt-5.6-sol",
+  "tasks": {
+    "sequence": 1,
+    "claims": {
+      "telemetry-config": {
+        "writerId": "agent-pan-2599",
+        "agentId": "agent-pan-2599",
+        "pid": 878531,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-22T20:55:24.082Z"
+      }
+    }
+  },
+  "statusOverrides": {
+    "telemetry-config": "running"
+  }
 }
