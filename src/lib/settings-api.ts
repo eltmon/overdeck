@@ -36,6 +36,8 @@ import type { RuntimeName } from './runtimes/types.js';
 import { getBuiltInDefaultHarness } from './providers.js';
 import { defaultBackgroundAiFeatures, type BackgroundAiFeature } from './background-ai/registry.js';
 import { MODEL_CAPABILITIES, hasModelCapabilitySync, MODEL_DEPRECATIONS, resolveModelIdSync, getModelEffortLevelsSync } from './model-capabilities.js';
+import { resolveTelemetryEnabled } from './telemetry/config.js';
+import { getOrCreateInstallId } from './telemetry/install-id.js';
 
 /**
  * Deprecation warning in API format
@@ -195,6 +197,10 @@ export interface ApiSettingsConfig {
     tldr?: {
       enabled?: boolean;
     };
+  };
+  telemetry?: {
+    enabled: boolean;
+    installId?: string;
   };
   tts?: ApiTtsConfig;
   /** TTS activity-summarizer model/enabled, surfaced for the Background AI section (PAN-1589). */
@@ -702,6 +708,10 @@ export function loadSettingsApi(): ApiSettingsConfig {
         enabled: config.tldr?.enabled ?? true,
       },
     },
+    telemetry: {
+      enabled: resolveTelemetryEnabled(),
+      installId: getOrCreateInstallId(),
+    },
     tts: toApiTtsConfig(config.tts),
     tts_summarizer: {
       model: config.ttsSummarizer?.model,
@@ -803,6 +813,7 @@ async function writeYamlConfigPreservingComments(yamlConfig: YamlConfig): Promis
     ['memory', config.memory],
     ['background_ai', config.background_ai],
     ['tracker_keys', config.tracker_keys],
+    ['telemetry', config.telemetry],
     ['experimental', config.experimental],
     ['claude', config.claude],
     ['codex', config.codex],
@@ -931,6 +942,7 @@ async function saveSettingsApiPromise(settings: ApiSettingsConfig): Promise<void
         }
       : undefined,
     tracker_keys: settings.tracker_keys,
+    telemetry: settings.telemetry ? { enabled: settings.telemetry.enabled } : undefined,
     experimental: settings.experimental
       ? {
           experimentalFeatures: settings.experimental.experimentalFeatures,
@@ -1034,6 +1046,10 @@ async function updateSettingsApiPromise(updates: Partial<ApiSettingsConfig>): Pr
     tracker_keys: {
       ...current.tracker_keys,
       ...updates.tracker_keys,
+    },
+    telemetry: {
+      enabled: updates.telemetry?.enabled ?? current.telemetry?.enabled ?? true,
+      installId: current.telemetry?.installId,
     },
     experimental: {
       ...current.experimental,
@@ -1184,6 +1200,17 @@ export function validateSettingsApi(settings: ApiSettingsConfig): ValidationResu
     }
     if (settings.memory.worker_concurrency !== undefined && (!Number.isInteger(settings.memory.worker_concurrency) || settings.memory.worker_concurrency < 1)) {
       errors.push('memory.worker_concurrency must be a positive integer');
+    }
+  }
+
+  if (settings.telemetry !== undefined) {
+    if (!isRecord(settings.telemetry)) {
+      errors.push('telemetry must be an object');
+    } else {
+      if (typeof settings.telemetry.enabled !== 'boolean') errors.push('telemetry.enabled must be a boolean');
+      if (settings.telemetry.installId !== undefined && typeof settings.telemetry.installId !== 'string') {
+        errors.push('telemetry.installId must be a string');
+      }
     }
   }
 
