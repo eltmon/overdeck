@@ -12,7 +12,7 @@ import { Effect } from 'effect';
 import { capturePane, killSession, listSessionNames, sendKeys, sessionExists } from '../tmux.js';
 import { emitActivityEntrySync, emitActivityTtsSync } from '../activity-logger.js';
 import { loadConfigSync } from '../config-yaml.js';
-import { shouldRestartForPostMerge } from './merge-agent-step0.js';
+import { shouldRestartForPostMerge } from './merge-agent-step0.js'; import { capturePipelineStageForIssue } from '../telemetry/pipeline.js';
 import {
   ensureSyncGitQuiescent,
   probeGitOperationHeads,
@@ -551,7 +551,7 @@ export async function postMergeLifecycle(
     await maybeSpawnPostMergeKnowledgeRetro(issueId, projectPath);
 
     // Mark completed BEFORE logging — prevents re-entry even if the log line triggers something
-    _completedPostMerge.add(issueId);
+    _completedPostMerge.add(issueId); capturePipelineStageForIssue(issueId, 'merged');
 
     console.log(`[merge-agent] Post-merge handoff completed for ${issueId}. Awaiting close-out (verify on main).`);
     announceMerge('completed', issueId);

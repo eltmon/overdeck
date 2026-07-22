@@ -37,6 +37,7 @@ import { getXBriefACStatusSync } from '../xbrief/acceptance-criteria.js';
 import { XBriefMergeConflictError } from '../xbrief/io.js';
 import { isXBriefFilename } from '../xbrief/lifecycle.js';
 import { checkIncompletePlanItemsPromise } from '../work/done-preflight.js';
+import { capturePipelineStageForIssue } from '../telemetry/pipeline.js';
 import type { TemplatePlaceholders } from '../workspace-config.js';
 
 const execAsync = promisify(exec);
@@ -889,6 +890,7 @@ async function runVerificationForIssuePromise(
       verificationNotes: undefined,
       ...(lastVerifiedCommit ? { lastVerifiedCommit } : {}),
     });
+    capturePipelineStageForIssue(issueId, 'verification_passed');
     console.log(`[${logPrefix}] Verification passed for ${issueId}${lastVerifiedCommit ? ` (HEAD=${lastVerifiedCommit.slice(0, 8)})` : ''} — proceeding to review-agent`);
 
     // Post overdeck/tests=success so the GitHub CI test job can self-skip
