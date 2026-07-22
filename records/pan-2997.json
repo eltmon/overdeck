@@ -121,18 +121,18 @@
     "recordedAt": "2026-07-22T01:20:05.090Z"
   },
   "created": "2026-07-21T23:09:49.270Z",
-  "updated": "2026-07-22T02:27:09.257Z",
+  "updated": "2026-07-22T02:27:09.734Z",
   "pipeline": {
     "issueId": "PAN-2997",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-22T01:21:05.035Z",
-    "updatedAt": "2026-07-22T02:27:09.223Z",
+    "updatedAt": "2026-07-22T02:27:09.656Z",
     "reviewNotes": "Agent re-review request (2/25): Fixed both cycle-2 blockers: (1) Wake delivery is now crash-idempotent — a durable 'delivering' claim ((lifecycleId, agentId) key) is appended BEFORE messageAgentWithOutcome runs, so a crash after the claim (including after a successful send whose completion record never commits) never replays the delivery at boot recovery; delivery is skipped when the claim can't be recorded. At-most-once by design; the lost-wake window self-heals via the agent's next failed Linear call. Regression test simulates delivery succeeding while the completion append throws, then re-runs boot recovery and proves the door isn't called again. (2) The fold no longer calls readFrom(0) — EventStore gained queryByTypesSince (type predicate + sequence bound both in indexed SQL), and the projection is maintained incrementally: polls typically read zero rows and unrelated retained history is never materialized. Regression tests cover a 5000-event unrelated population and incremental advancement. Also scheduled a follow-up run when the 10-pass cap is hit (the P2). Lint, typecheck, root (10388) and frontend (2382) suites green.",
     "inspectNotes": "Fold dedupes required events per-agent via Map; latest non-null authUrl/authUrlAgentId wins; expiry computed from authUrlExpiresAt and reactivates on fresh required; healthy event closes to lastCompleted, notified targets open??lastCompleted, duplicate healthy is a no-op leaving wake set empty post-notification. All 4 ACs verified by hand against fake-timer tests.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3004",
@@ -258,7 +258,7 @@
       },
       "costAtCloseOut": {
         "usd": 98.003005,
-        "pricingAsOf": "2026-07-22T02:27:09.253Z"
+        "pricingAsOf": "2026-07-22T02:27:09.674Z"
       }
     },
     "merges": [
@@ -268,7 +268,7 @@
   },
   "workModel": "k3[1m]",
   "harness": "claude-code",
-  "model": "k3[1m]",
+  "model": "gpt-5.6-sol",
   "tasks": {
     "sequence": 20,
     "claims": {},
