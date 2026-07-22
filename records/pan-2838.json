@@ -146,7 +146,7 @@
   ],
   "feedback": [],
   "created": "2026-07-17T12:34:27.875Z",
-  "updated": "2026-07-22T21:02:21.325Z",
+  "updated": "2026-07-22T21:03:47.723Z",
   "pipeline": {
     "issueId": "PAN-2838",
     "reviewStatus": "pending",
@@ -219,16 +219,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "sparse-settings-render": {
-        "writerId": "agent-pan-2838",
-        "agentId": "agent-pan-2838",
-        "pid": 1111331,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-22T21:02:21.325Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2838",
@@ -262,6 +254,17 @@
         "outcome": "completed",
         "reason": "Added cache-sharing summary queries and plain muted labels for current auto-merge and swarm settings",
         "releasedAt": "2026-07-22T21:02:13.405Z"
+      },
+      {
+        "writerId": "agent-pan-2838",
+        "agentId": "agent-pan-2838",
+        "pid": 1111331,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-22T21:02:21.325Z",
+        "itemId": "sparse-settings-render",
+        "outcome": "completed",
+        "reason": "Rendered ProjectSettingsDisclosure in the sparse HomePane detail slot only when a registered projectKey exists",
+        "releasedAt": "2026-07-22T21:03:47.723Z"
       }
     ],
     "statusReasons": {
@@ -276,6 +279,10 @@
       "summary-values": {
         "reason": "Added cache-sharing summary queries and plain muted labels for current auto-merge and swarm settings",
         "updatedAt": "2026-07-22T21:02:13.405Z"
+      },
+      "sparse-settings-render": {
+        "reason": "Rendered ProjectSettingsDisclosure in the sparse HomePane detail slot only when a registered projectKey exists",
+        "updatedAt": "2026-07-22T21:03:47.723Z"
       }
     }
   },
@@ -292,6 +299,9 @@
     "summary-values.summary-values.ac1": "completed",
     "summary-values.summary-values.ac2": "completed",
     "summary-values.summary-values.ac3": "completed",
-    "sparse-settings-render": "running"
+    "sparse-settings-render": "completed",
+    "sparse-settings-render.sparse-settings-render.ac1": "completed",
+    "sparse-settings-render.sparse-settings-render.ac2": "completed",
+    "sparse-settings-render.sparse-settings-render.ac3": "completed"
   }
 }
