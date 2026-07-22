@@ -1,3 +1,4 @@
+import { isDeepStrictEqual } from 'node:util';
 import { Effect } from 'effect';
 import { enrichReviewStatus } from '../../lib/review-status-enrichment.js';
 import { getReviewStatusSync, type ReviewStatus } from '../../lib/review-status.js';
@@ -8,6 +9,14 @@ export type ReviewStatusEventAppend = (event: {
   timestamp: string;
   payload: { issueId: string; status: unknown };
 }) => void;
+
+function canonicalStatus(status: ReviewStatus): Record<string, unknown> {
+  const canonical = { ...status } as Record<string, unknown>;
+  delete canonical.reviewCoordinatorSessionName;
+  delete canonical.reviewSessionNames;
+  delete canonical.reviewSubStatuses;
+  return canonical;
+}
 
 export function emitReviewStatusChanged(
   append: ReviewStatusEventAppend,
@@ -45,7 +54,7 @@ export function emitReviewStatusChanged(
     if (!hasSugar) return;
 
     const current = getReviewStatusSync(issueId);
-    if ((current?.updatedAt ?? '') !== status.updatedAt) return;
+    if (!current || !isDeepStrictEqual(canonicalStatus(current), canonicalStatus(status))) return;
 
     append({
       type: 'review.status_changed',

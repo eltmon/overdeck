@@ -109,6 +109,46 @@ describe('emitReviewStatusChanged', () => {
     expect(append).toHaveBeenCalledTimes(1);
   });
 
+  it('rejects an older enrichment patch when two transitions share updatedAt', async () => {
+    const older = { ...status, testStatus: 'testing' as const, readyForMerge: false };
+    const newer = { ...status, testStatus: 'passed' as const, readyForMerge: true };
+    let resolveOlder!: (value: ReviewStatus) => void;
+    let resolveNewer!: (value: ReviewStatus) => void;
+    mockEnrichReviewStatus
+      .mockReturnValueOnce(Effect.promise(() => new Promise<ReviewStatus>((resolve) => {
+        resolveOlder = resolve;
+      })))
+      .mockReturnValueOnce(Effect.promise(() => new Promise<ReviewStatus>((resolve) => {
+        resolveNewer = resolve;
+      })));
+    mockGetReviewStatusSync.mockReturnValue(newer);
+    const append = vi.fn();
+
+    emitReviewStatusChanged(append, status.issueId, older);
+    emitReviewStatusChanged(append, status.issueId, newer);
+    expect(append).toHaveBeenCalledTimes(2);
+
+    resolveNewer({
+      ...newer,
+      reviewCoordinatorSessionName: 'agent-pan-2988-review',
+    } as ReviewStatus);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(append).toHaveBeenCalledTimes(3);
+
+    resolveOlder({
+      ...older,
+      reviewCoordinatorSessionName: 'agent-pan-2988-review',
+    } as ReviewStatus);
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(append).toHaveBeenCalledTimes(3);
+    expect(append).toHaveBeenLastCalledWith(expect.objectContaining({
+      payload: expect.objectContaining({
+        status: expect.objectContaining({ testStatus: 'passed', readyForMerge: true }),
+      }),
+    }));
+  });
+
   it('skips an enrichment patch when enrichment produces no sugar', async () => {
     mockEnrichReviewStatus.mockReturnValue(Effect.succeed({ ...status }));
     const append = vi.fn();

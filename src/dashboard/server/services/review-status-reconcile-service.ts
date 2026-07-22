@@ -31,7 +31,7 @@ async function reconcileOnce(): Promise<void> {
   // not duplicate an event that the read door just healed.
   for (const issueId of Object.keys(cached)) {
     const canonical = getReviewStatusSync(issueId);
-    if (!canonical || canonical.mergeStatus === 'merged') continue;
+    if (!canonical) continue;
     canonicalByIssue.set(issueId.toUpperCase(), canonical);
   }
 

@@ -913,9 +913,7 @@ describe('IssueCard', () => {
       );
     });
     await waitFor(() => {
-      expect(toast.success).toHaveBeenCalledWith(
-        'TEST-123 unpaused — deacon resumes it on the next patrol',
-      );
+      expect(toast.success).toHaveBeenCalledWith('TEST-123 unpaused');
       expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['issues'] });
       expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['agents'] });
       expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['review-status'] });

@@ -119,6 +119,29 @@ describe('review status reconcile service', () => {
     expect(log).not.toHaveBeenCalled();
   });
 
+  it('re-emits a newer merged status', async () => {
+    const merged = {
+      ...canonical,
+      mergeStatus: 'merged' as const,
+      readyForMerge: false,
+      updatedAt: '2026-07-22T20:02:00.000Z',
+    };
+    mockLoadReviewStatuses.mockReturnValue({ [merged.issueId]: merged });
+    mockGetReviewStatusSync.mockReturnValue(merged);
+    mockQueryLatestPerIssue.mockReturnValue([statusEvent(canonical.updatedAt)]);
+
+    startReviewStatusReconcileService();
+    await vi.advanceTimersByTimeAsync(60_000);
+
+    expect(mockEmitReviewStatusChanged).toHaveBeenCalledOnce();
+    expect(mockEmitReviewStatusChanged).toHaveBeenCalledWith(
+      expect.any(Function),
+      merged.issueId,
+      merged,
+    );
+    expect(mockAppend).toHaveBeenCalledOnce();
+  });
+
   it('continues running after a reconcile tick throws', async () => {
     mockLoadReviewStatuses
       .mockImplementationOnce(() => { throw new Error('transient read failure'); })
