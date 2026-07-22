@@ -86,17 +86,17 @@
     "recordedAt": "2026-07-22T01:19:32.988Z"
   },
   "created": "2026-07-21T23:09:49.270Z",
-  "updated": "2026-07-22T01:19:43.416Z",
+  "updated": "2026-07-22T01:19:44.050Z",
   "pipeline": {
     "issueId": "PAN-2997",
     "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-22T01:19:43.399Z",
+    "updatedAt": "2026-07-22T01:19:43.865Z",
     "inspectNotes": "Fold dedupes required events per-agent via Map; latest non-null authUrl/authUrlAgentId wins; expiry computed from authUrlExpiresAt and reactivates on fresh required; healthy event closes to lastCompleted, notified targets open??lastCompleted, duplicate healthy is a no-op leaving wake set empty post-notification. All 4 ACs verified by hand against fake-timer tests.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3004",
     "reviewRequestedAt": "2026-07-22T01:19:35.605Z",
@@ -198,7 +198,7 @@
       },
       "costAtCloseOut": {
         "usd": 43.630794,
-        "pricingAsOf": "2026-07-22T01:19:43.413Z"
+        "pricingAsOf": "2026-07-22T01:19:43.887Z"
       }
     },
     "merges": [
