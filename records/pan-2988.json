@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-22T21:25:31.822Z",
-  "updated": "2026-07-22T22:22:07.784Z",
+  "updated": "2026-07-22T22:36:55.046Z",
   "pipeline": {
     "issueId": "PAN-2988",
     "reviewStatus": "pending",
@@ -75,16 +75,8 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 13,
-    "claims": {
-      "recover-action-menu-entry": {
-        "writerId": "agent-pan-2988",
-        "agentId": "agent-pan-2988",
-        "pid": 3301735,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-22T22:22:07.784Z"
-      }
-    },
+    "sequence": 14,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2988",
@@ -151,6 +143,17 @@
         "outcome": "completed",
         "reason": "Added pan review resync, extracted review command registration without losing existing commands, updated the pan-review skill, lowered the CLI file-size baseline, and exercised the built CLI against an isolated dashboard.",
         "releasedAt": "2026-07-22T22:21:59.426Z"
+      },
+      {
+        "writerId": "agent-pan-2988",
+        "agentId": "agent-pan-2988",
+        "pid": 3301735,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-22T22:22:07.784Z",
+        "itemId": "recover-action-menu-entry",
+        "outcome": "completed",
+        "reason": "Added a never-gated Re-sync pipeline state Recover action, updated CLI/action parity coverage, and verified via isolated Playwright rendering that the action appears enabled in PAN-2988's live issue menu.",
+        "releasedAt": "2026-07-22T22:36:55.046Z"
       }
     ],
     "statusReasons": {
@@ -177,6 +180,10 @@
       "cli-review-resync": {
         "reason": "Added pan review resync, extracted review command registration without losing existing commands, updated the pan-review skill, lowered the CLI file-size baseline, and exercised the built CLI against an isolated dashboard.",
         "updatedAt": "2026-07-22T22:21:59.426Z"
+      },
+      "recover-action-menu-entry": {
+        "reason": "Added a never-gated Re-sync pipeline state Recover action, updated CLI/action parity coverage, and verified via isolated Playwright rendering that the action appears enabled in PAN-2988's live issue menu.",
+        "updatedAt": "2026-07-22T22:36:55.046Z"
       }
     }
   },
@@ -208,6 +215,8 @@
     "cli-review-resync.cli-review-resync.ac1": "completed",
     "cli-review-resync.cli-review-resync.ac2": "completed",
     "cli-review-resync.cli-review-resync.ac3": "completed",
-    "recover-action-menu-entry": "running"
+    "recover-action-menu-entry": "completed",
+    "recover-action-menu-entry.recover-action-menu-entry.ac1": "completed",
+    "recover-action-menu-entry.recover-action-menu-entry.ac2": "completed"
   }
 }
