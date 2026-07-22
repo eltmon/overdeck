@@ -82,17 +82,14 @@
       "reason": "feedback",
       "note": "[2026-07-22T00:51Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-07-22T00:51:13.598Z"
-    }
-  ],
-  "feedback": [
+    },
     {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-22T00:51:13Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2993\n\nReviewed fixes are not pushed to PR #2998, and committed HEAD retains a stale file-size baseline whose only correction is uncommitted.\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2993 -m \"Fixed review issues\"`"
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-22T00:56:33.259Z"
     }
   ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "drizzle/overdeck/0000_overdeck_init.sql",
@@ -144,23 +141,24 @@
     "recordedAt": "2026-07-21T23:54:05.124Z"
   },
   "created": "2026-07-21T22:47:36.935Z",
-  "updated": "2026-07-22T00:56:27.377Z",
+  "updated": "2026-07-22T00:56:33.260Z",
   "pipeline": {
     "issueId": "PAN-2993",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-22T00:56:25.125Z",
+    "panDoneRecoveredAt": "2026-07-22T00:56:26.857Z",
+    "updatedAt": "2026-07-22T00:56:31.959Z",
     "reviewNotes": "Agent re-review request (2/25): Fixed review issues",
     "inspectNotes": "All 4 ACs verified against src/lib/agents/messaging.ts@79bb7b47: stopped-agent resume failure returns {delivered:false,queuedToMail:true,reason} naming both resumeResult.error and PAN-1980 session-rotation disable; paused/gated path returns gate reason; live-session/successful-resume paths return delivered:true; only deacon-strike-landing.ts touched among callers and npm run typecheck passes clean (0 new errors).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2998",
     "lastVerifiedCommit": "ecfa0ef67b8fdee6d437eebbe562de99af717820",
     "reviewRequestedAt": "2026-07-22T00:56:26.857Z",
-    "reviewSpawnedAt": "2026-07-22T00:45:30.118Z",
+    "reviewSpawnedAt": "2026-07-22T00:56:31.958Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "drizzle/overdeck/0000_overdeck_init.sql",
@@ -210,8 +208,7 @@
         "tests/unit/lib/overdeck/review-status-sync.test.ts"
       ],
       "recordedAt": "2026-07-21T23:54:05.124Z"
-    },
-    "panDoneRecoveredAt": "2026-07-22T00:56:26.857Z"
+    }
   },
   "closeOut": {
     "usage": {
@@ -271,7 +268,7 @@
       },
       "costAtCloseOut": {
         "usd": 154.355613,
-        "pricingAsOf": "2026-07-22T00:56:25.168Z"
+        "pricingAsOf": "2026-07-22T00:56:32.012Z"
       }
     },
     "merges": [
