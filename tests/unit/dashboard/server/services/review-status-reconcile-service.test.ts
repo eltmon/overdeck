@@ -33,7 +33,8 @@ vi.mock('../../../../../src/dashboard/server/identity.js', () => ({
   getDashboardIdentity: mockGetDashboardIdentity,
 }));
 
-vi.mock('../../../../../src/dashboard/server/review-status-emit.js', () => ({
+vi.mock('../../../../../src/dashboard/server/review-status-emit.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../../src/dashboard/server/review-status-emit.js')>()),
   emitReviewStatusChanged: mockEmitReviewStatusChanged,
 }));
 
@@ -52,14 +53,14 @@ const canonical: ReviewStatus = {
   updatedAt: '2026-07-22T20:01:00.000Z',
 };
 
-function statusEvent(updatedAt: string) {
+function statusEvent(updatedAt: string, status: ReviewStatus = canonical) {
   return {
     sequence: 10,
     type: 'review.status_changed',
     timestamp: '2026-07-22T20:00:00.000Z',
     payload: {
       issueId: canonical.issueId,
-      status: { ...canonical, updatedAt },
+      status: { ...status, updatedAt },
     },
   };
 }
@@ -103,12 +104,15 @@ describe('review status reconcile service', () => {
     expect(mockAppend).toHaveBeenCalledOnce();
     expect(log).toHaveBeenCalledWith(
       `[review-status-reconcile] re-emitting status for ${canonical.issueId} ` +
-      '(canonical newer than last event — healing lost status_changed)',
+      '(canonical differs from last event — healing lost status_changed)',
     );
   });
 
   it('does not emit across several ticks when the latest event matches canonical status', async () => {
-    mockQueryLatestPerIssue.mockReturnValue([statusEvent(canonical.updatedAt)]);
+    mockQueryLatestPerIssue.mockReturnValue([statusEvent(canonical.updatedAt, {
+      ...canonical,
+      reviewSessionNames: ['agent-pan-2988-review-correctness'],
+    } as ReviewStatus)]);
     const log = vi.spyOn(console, 'log').mockImplementation(() => {});
 
     startReviewStatusReconcileService();
@@ -117,6 +121,26 @@ describe('review status reconcile service', () => {
     expect(mockEmitReviewStatusChanged).not.toHaveBeenCalled();
     expect(mockAppend).not.toHaveBeenCalled();
     expect(log).not.toHaveBeenCalled();
+  });
+
+  it('re-emits when equal timestamps carry different canonical status', async () => {
+    const older = {
+      ...canonical,
+      testStatus: 'testing' as const,
+      readyForMerge: false,
+    };
+    mockQueryLatestPerIssue.mockReturnValue([statusEvent(canonical.updatedAt, older)]);
+
+    startReviewStatusReconcileService();
+    await vi.advanceTimersByTimeAsync(60_000);
+
+    expect(mockEmitReviewStatusChanged).toHaveBeenCalledOnce();
+    expect(mockEmitReviewStatusChanged).toHaveBeenCalledWith(
+      expect.any(Function),
+      canonical.issueId,
+      canonical,
+    );
+    expect(mockAppend).toHaveBeenCalledOnce();
   });
 
   it('re-emits a newer merged status', async () => {

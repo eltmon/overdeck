@@ -10,12 +10,16 @@ export type ReviewStatusEventAppend = (event: {
   payload: { issueId: string; status: unknown };
 }) => void;
 
-function canonicalStatus(status: ReviewStatus): Record<string, unknown> {
+function canonicalStatus(status: object): Record<string, unknown> {
   const canonical = { ...status } as Record<string, unknown>;
   delete canonical.reviewCoordinatorSessionName;
   delete canonical.reviewSessionNames;
   delete canonical.reviewSubStatuses;
   return canonical;
+}
+
+export function sameCanonicalReviewStatus(left: object, right: object): boolean {
+  return isDeepStrictEqual(canonicalStatus(left), canonicalStatus(right));
 }
 
 export function emitReviewStatusChanged(
@@ -54,7 +58,7 @@ export function emitReviewStatusChanged(
     if (!hasSugar) return;
 
     const current = getReviewStatusSync(issueId);
-    if (!current || !isDeepStrictEqual(canonicalStatus(current), canonicalStatus(status))) return;
+    if (!current || !sameCanonicalReviewStatus(current, status)) return;
 
     append({
       type: 'review.status_changed',

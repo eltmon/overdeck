@@ -2,7 +2,10 @@ import type { DomainEvent } from '@overdeck/contracts';
 import { getReviewStatusSync, loadReviewStatuses, type ReviewStatus } from '../../../lib/review-status.js';
 import { getEventStore, type StoredEvent } from '../event-store.js';
 import { getDashboardIdentity } from '../identity.js';
-import { emitReviewStatusChanged } from '../review-status-emit.js';
+import {
+  emitReviewStatusChanged,
+  sameCanonicalReviewStatus,
+} from '../review-status-emit.js';
 
 const POLL_INTERVAL_MS = 60_000;
 
@@ -46,11 +49,16 @@ async function reconcileOnce(): Promise<void> {
     const latest = latestByIssue.get(issueId);
     const latestPayload = latest ? reviewStatusPayload(latest) : null;
     const lastUpdatedAt = latestPayload?.status.updatedAt ?? '';
-    if (lastUpdatedAt >= canonical.updatedAt) continue;
+    if (lastUpdatedAt > canonical.updatedAt) continue;
+    if (
+      lastUpdatedAt === canonical.updatedAt &&
+      latestPayload &&
+      sameCanonicalReviewStatus(latestPayload.status, canonical)
+    ) continue;
 
     console.log(
       `[review-status-reconcile] re-emitting status for ${issueId} ` +
-      '(canonical newer than last event — healing lost status_changed)',
+      '(canonical differs from last event — healing lost status_changed)',
     );
     emitReviewStatusChanged(
       (event) => store.append(event as Omit<DomainEvent, 'sequence'>),
