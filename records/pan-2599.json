@@ -10,7 +10,7 @@
   ],
   "feedback": [],
   "created": "2026-07-16T05:02:53.170Z",
-  "updated": "2026-07-22T22:37:08.987Z",
+  "updated": "2026-07-22T22:43:02.485Z",
   "pipeline": {
     "issueId": "PAN-2599",
     "reviewStatus": "pending",
@@ -103,16 +103,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 21,
-    "claims": {
-      "sourcemaps-release": {
-        "writerId": "agent-pan-2599",
-        "agentId": "agent-pan-2599",
-        "pid": 3526848,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-22T22:37:08.987Z"
-      }
-    },
+    "sequence": 22,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2599",
@@ -223,6 +215,17 @@
         "outcome": "completed",
         "reason": "Emitted enum-only pipeline_stage_changed events from the idempotent post-merge lifecycle, verification pass owner, and shared close-out workflow; resolved harness/model family without identifiers, passed focused and workflow tests, and pushed 4f51c60621.",
         "releasedAt": "2026-07-22T22:36:54.942Z"
+      },
+      {
+        "writerId": "agent-pan-2599",
+        "agentId": "agent-pan-2599",
+        "pid": 3526848,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-22T22:37:08.987Z",
+        "itemId": "sourcemaps-release",
+        "outcome": "completed",
+        "reason": "Enabled hidden Vite sourcemaps, pinned PostHog CLI, added tested skip-with-warning upload command, moved inject/upload into the release workflow after its shipping build, verified 459 maps with zero sourceMappingURL references, and pushed 81dd49a3f2.",
+        "releasedAt": "2026-07-22T22:43:02.485Z"
       }
     ],
     "statusReasons": {
@@ -265,6 +268,10 @@
       "pipeline-events": {
         "reason": "Emitted enum-only pipeline_stage_changed events from the idempotent post-merge lifecycle, verification pass owner, and shared close-out workflow; resolved harness/model family without identifiers, passed focused and workflow tests, and pushed 4f51c60621.",
         "updatedAt": "2026-07-22T22:36:54.942Z"
+      },
+      "sourcemaps-release": {
+        "reason": "Enabled hidden Vite sourcemaps, pinned PostHog CLI, added tested skip-with-warning upload command, moved inject/upload into the release workflow after its shipping build, verified 459 maps with zero sourceMappingURL references, and pushed 81dd49a3f2.",
+        "updatedAt": "2026-07-22T22:43:02.485Z"
       }
     }
   },
@@ -299,6 +306,8 @@
     "pipeline-events": "completed",
     "pipeline-events.pipeline-events.ac1": "completed",
     "pipeline-events.pipeline-events.ac2": "completed",
-    "sourcemaps-release": "running"
+    "sourcemaps-release": "completed",
+    "sourcemaps-release.sourcemaps-release.ac1": "completed",
+    "sourcemaps-release.sourcemaps-release.ac2": "completed"
   }
 }
