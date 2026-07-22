@@ -10,18 +10,18 @@
   ],
   "feedback": [],
   "created": "2026-07-16T05:02:53.170Z",
-  "updated": "2026-07-22T21:08:03.642Z",
+  "updated": "2026-07-22T21:09:09.853Z",
   "pipeline": {
     "issueId": "PAN-2599",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "inspecting",
+    "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-22T21:08:03.612Z",
-    "inspectNotes": "Inspecting item contracts-schema"
+    "updatedAt": "2026-07-22T21:09:09.794Z",
+    "inspectNotes": "vitest telemetry-schema.test.ts passes (2/2), TELEMETRY_EVENT_NAMES has all 15 expected names, barrel export wired in index.ts, contracts build+typecheck both exit 0"
   },
   "closeOut": {
     "usage": {
@@ -48,11 +48,19 @@
             "cacheWrite": 214045
           }
         },
+        "review.supervisor": {
+          "anthropic/claude-sonnet-5": {
+            "input": 12,
+            "output": 3849,
+            "cacheRead": 660267,
+            "cacheWrite": 135970
+          }
+        },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 960143,
-            "output": 82866,
-            "cacheRead": 29584896,
+            "input": 960795,
+            "output": 82994,
+            "cacheRead": 29946368,
             "cacheWrite": 0
           }
         }
@@ -65,9 +73,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 10308992,
-          "output": 93358,
-          "cacheRead": 38610944,
+          "input": 10309644,
+          "output": 93486,
+          "cacheRead": 38972416,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -75,11 +83,17 @@
           "output": 10456,
           "cacheRead": 649747,
           "cacheWrite": 214045
+        },
+        "anthropic/claude-sonnet-5": {
+          "input": 12,
+          "output": 3849,
+          "cacheRead": 660267,
+          "cacheWrite": 135970
         }
       },
       "costAtCloseOut": {
-        "usd": 32.369103,
-        "pricingAsOf": "2026-07-22T21:08:03.619Z"
+        "usd": 33.067432000000004,
+        "pricingAsOf": "2026-07-22T21:09:09.834Z"
       }
     },
     "merges": [],
