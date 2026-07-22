@@ -86,20 +86,21 @@
     "recordedAt": "2026-07-22T01:19:32.988Z"
   },
   "created": "2026-07-21T23:09:49.270Z",
-  "updated": "2026-07-22T01:19:41.314Z",
+  "updated": "2026-07-22T01:19:43.416Z",
   "pipeline": {
     "issueId": "PAN-2997",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-22T01:19:39.558Z",
+    "updatedAt": "2026-07-22T01:19:43.399Z",
     "inspectNotes": "Fold dedupes required events per-agent via Map; latest non-null authUrl/authUrlAgentId wins; expiry computed from authUrlExpiresAt and reactivates on fresh required; healthy event closes to lastCompleted, notified targets open??lastCompleted, duplicate healthy is a no-op leaving wake set empty post-notification. All 4 ACs verified by hand against fake-timer tests.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3004",
     "reviewRequestedAt": "2026-07-22T01:19:35.605Z",
+    "reviewSpawnedAt": "2026-07-22T01:19:40.276Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "src/lib/agents/messaging.ts",
@@ -197,7 +198,7 @@
       },
       "costAtCloseOut": {
         "usd": 43.630794,
-        "pricingAsOf": "2026-07-22T01:19:39.600Z"
+        "pricingAsOf": "2026-07-22T01:19:43.413Z"
       }
     },
     "merges": [
@@ -207,7 +208,7 @@
   },
   "workModel": "k3[1m]",
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "k3[1m]",
   "tasks": {
     "sequence": 20,
     "claims": {},
