@@ -87,22 +87,23 @@
     "recordedAt": "2026-07-21T16:48:34.581Z"
   },
   "created": "2026-07-21T15:14:12.381Z",
-  "updated": "2026-07-22T20:56:33.743Z",
+  "updated": "2026-07-22T20:56:36.332Z",
   "pipeline": {
     "issueId": "PAN-2984",
     "reviewStatus": "passed",
     "testStatus": "passed",
-    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "merged",
     "releaseStatus": "skipped",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-21T16:49:00.719Z",
-    "updatedAt": "2026-07-22T20:30:42.399Z",
+    "updatedAt": "2026-07-22T20:56:36.305Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2985",
     "reviewedAtCommit": "d44e4a9fefeaab0cf09708ce2193ae2d46feeb25",
     "lastVerifiedCommit": "d44e4a9fefeaab0cf09708ce2193ae2d46feeb25",
-    "reviewSpawnedAt": "2026-07-21T17:37:14.297Z"
+    "reviewSpawnedAt": "2026-07-21T17:37:14.297Z",
+    "closedOut": true,
+    "closedOutAt": "2026-07-22T20:56:36.305Z"
   },
   "closeOut": {
     "usage": {
@@ -190,7 +191,80 @@
     "merges": [
       "https://github.com/eltmon/overdeck/pull/2985"
     ],
-    "ranOn": "eltmon-z790"
+    "ranOn": "eltmon-z790",
+    "dodGate": {
+      "evaluatedAt": "2026-07-22T20:56:36.329Z",
+      "rows": [
+        {
+          "id": "review",
+          "num": 1,
+          "title": "Review passed",
+          "expected": "reviewStatus: passed",
+          "observed": "reviewStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "tests",
+          "num": 2,
+          "title": "Tests passed",
+          "expected": "testStatus: passed",
+          "observed": "testStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "verification",
+          "num": 3,
+          "title": "Verification green on the branch",
+          "expected": "verificationStatus: passed at lastVerifiedCommit",
+          "observed": "verificationStatus: passed at d44e4a9fefeaab0cf09708ce2193ae2d46feeb25",
+          "status": "pass"
+        },
+        {
+          "id": "merged",
+          "num": 4,
+          "title": "Merged to main",
+          "expected": "PR merged on the forge",
+          "observed": "Merge specialist confirmed merge completed; PR #2985 MERGED at 2026-07-22T00:13:36Z",
+          "status": "pass",
+          "mergedAt": "2026-07-22T00:13:36Z",
+          "mergeCommit": "810eb218c4ac5e60ad92f168f8299073de48dd16"
+        },
+        {
+          "id": "post-merge",
+          "num": 5,
+          "title": "Post-merge lifecycle ran",
+          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
+          "observed": "canonical state: verifying_on_main; no running work/planning agents",
+          "status": "pass"
+        },
+        {
+          "id": "main-verify",
+          "num": 6,
+          "title": "Verified on main",
+          "expected": "merged commit verified on main",
+          "observed": "1 check-runs concluded successfully on 810eb218c4ac5e60ad92f168f8299073de48dd16",
+          "status": "pass"
+        },
+        {
+          "id": "deploy",
+          "num": 7,
+          "title": "Deployed",
+          "expected": "live server build includes the merged commit",
+          "observed": "build commit 992b7990 contains merge 810eb218",
+          "status": "pass"
+        },
+        {
+          "id": "teardown",
+          "num": 8,
+          "title": "Close-out teardown verified",
+          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
+          "overridable": false,
+          "status": "pass",
+          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; Stopped TLDR daemon; Stopped Docker containers; No orphaned processes found; Removed git worktree; Removed 6 agent state directories; No strike branch strike/pan-2984 found; Pruned 193 checkpoint ref(s) for agent-pan-2984, planning-pan-2984, strike-pan-2984; No specialist registry entries for PAN-2984"
+        }
+      ],
+      "accepted": []
+    }
   },
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
