@@ -146,7 +146,7 @@
   ],
   "feedback": [],
   "created": "2026-07-17T12:34:27.875Z",
-  "updated": "2026-07-22T21:06:43.355Z",
+  "updated": "2026-07-22T21:06:52.126Z",
   "pipeline": {
     "issueId": "PAN-2838",
     "reviewStatus": "pending",
@@ -219,8 +219,16 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 12,
-    "claims": {},
+    "sequence": 13,
+    "claims": {
+      "docs-update": {
+        "writerId": "agent-pan-2838",
+        "agentId": "agent-pan-2838",
+        "pid": 1298576,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-22T21:06:52.126Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-2838",
@@ -341,6 +349,7 @@
     "sparse-fallback-tests": "completed",
     "sparse-fallback-tests.sparse-fallback-tests.ac1": "completed",
     "sparse-fallback-tests.sparse-fallback-tests.ac2": "completed",
-    "sparse-fallback-tests.sparse-fallback-tests.ac3": "completed"
+    "sparse-fallback-tests.sparse-fallback-tests.ac3": "completed",
+    "docs-update": "running"
   }
 }
