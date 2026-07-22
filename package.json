@@ -163,6 +163,7 @@
     "js-yaml": "^4.1.1",
     "mustache": "^4.2.0",
     "ora": "^8.2.0",
+    "posthog-node": "^5.46.0",
     "smee-client": "^5.0.0",
     "sqlite-vec": "^0.1.9",
     "ws": "^8.20.0",
