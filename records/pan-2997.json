@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-21T23:09:49.270Z",
-  "updated": "2026-07-22T00:09:43.716Z",
+  "updated": "2026-07-22T00:14:24.257Z",
   "pipeline": {
     "issueId": "PAN-2997",
     "reviewStatus": "pending",
@@ -61,16 +61,8 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 11,
-    "claims": {
-      "linear-mcp-routes": {
-        "writerId": "agent-pan-2997",
-        "agentId": "agent-pan-2997",
-        "pid": 3316974,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-22T00:09:43.716Z"
-      }
-    },
+    "sequence": 12,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2997",
@@ -126,6 +118,17 @@
         "outcome": "completed",
         "reason": "Added coalesced wake processing, delivered/queued/failed ledgers, reactive healthy handling, boot recovery, delivery outcome reporting, and boot/runtime tests",
         "releasedAt": "2026-07-22T00:09:24.887Z"
+      },
+      {
+        "writerId": "agent-pan-2997",
+        "agentId": "agent-pan-2997",
+        "pid": 3316974,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-22T00:09:43.716Z",
+        "itemId": "linear-mcp-routes",
+        "outcome": "completed",
+        "reason": "Added origin-validated projection, callback relay, and operator-complete routes with URL validation, canonical event writes, server registration, and route tests",
+        "releasedAt": "2026-07-22T00:14:24.257Z"
       }
     ],
     "statusReasons": {
@@ -148,6 +151,10 @@
       "linear-mcp-wake": {
         "reason": "Added coalesced wake processing, delivered/queued/failed ledgers, reactive healthy handling, boot recovery, delivery outcome reporting, and boot/runtime tests",
         "updatedAt": "2026-07-22T00:09:24.887Z"
+      },
+      "linear-mcp-routes": {
+        "reason": "Added origin-validated projection, callback relay, and operator-complete routes with URL validation, canonical event writes, server registration, and route tests",
+        "updatedAt": "2026-07-22T00:14:24.257Z"
       }
     }
   },
@@ -174,6 +181,10 @@
     "linear-mcp-wake.linear-mcp-wake.ac3": "completed",
     "linear-mcp-wake.linear-mcp-wake.ac4": "completed",
     "linear-mcp-wake.linear-mcp-wake.ac5": "completed",
-    "linear-mcp-routes": "running"
+    "linear-mcp-routes": "completed",
+    "linear-mcp-routes.linear-mcp-routes.ac1": "completed",
+    "linear-mcp-routes.linear-mcp-routes.ac2": "completed",
+    "linear-mcp-routes.linear-mcp-routes.ac3": "completed",
+    "linear-mcp-routes.linear-mcp-routes.ac4": "completed"
   }
 }
