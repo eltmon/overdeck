@@ -32,13 +32,14 @@ export async function resyncReviewCommand(id: string): Promise<void> {
       `✓ Re-synced ${issueId}: review=${result.status.reviewStatus} ` +
       `test=${result.status.testStatus} readyForMerge=${result.status.readyForMerge}`,
     ));
-  } catch (error: any) {
-    if (error.code === 'ECONNREFUSED') {
+  } catch (error: unknown) {
+    const failure = error as { code?: string; message?: string };
+    if (failure.code === 'ECONNREFUSED') {
       console.error(chalk.red('Error: Dashboard not running'));
       console.error(chalk.dim('Start the dashboard with: pan up'));
       process.exit(1);
     }
-    console.error(chalk.red(`Error: ${error.message}`));
+    console.error(chalk.red(`Error: ${failure.message ?? String(error)}`));
     process.exit(1);
   }
 }
