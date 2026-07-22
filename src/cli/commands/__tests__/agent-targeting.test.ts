@@ -16,6 +16,11 @@ const interventionMocks = vi.hoisted(() => ({
   appendOperatorInterventionEvent: vi.fn(async () => {}),
 }));
 
+const unpauseMocks = vi.hoisted(() => ({
+  getWorkAgentLifecycleStateSync: vi.fn(() => ({ canResumeSession: false })),
+  resumeAgent: vi.fn(),
+}));
+
 const FAKE_AGENTS_DIR_LISTING = vi.hoisted(() => ({
   entries: [] as string[],
 }));
@@ -53,6 +58,14 @@ vi.mock('../../../lib/tmux.js', async (importOriginal) => {
 
 vi.mock('../../../lib/operator-interventions.js', () => ({
   appendOperatorInterventionEvent: interventionMocks.appendOperatorInterventionEvent,
+}));
+
+vi.mock('../../../lib/work-agent-lifecycle.js', () => ({
+  getWorkAgentLifecycleStateSync: unpauseMocks.getWorkAgentLifecycleStateSync,
+}));
+
+vi.mock('../../../lib/agents/resume.js', () => ({
+  resumeAgent: unpauseMocks.resumeAgent,
 }));
 
 vi.mock('../../../lib/remote/index.js', () => ({
@@ -147,6 +160,17 @@ describe('unpauseCommand agent targeting (PAN-1760)', () => {
     const { unpauseCommand } = await import('../unpause.js');
     await unpauseCommand('strike-pan-1723');
     expect(agentMocks.clearAgentPausedSync).toHaveBeenCalledWith('strike-pan-1723');
+  });
+
+  it('resumes a saved session immediately after unpausing', async () => {
+    agentMocks.getAgentStateSync.mockReturnValue({ ...STOPPED_STATE, paused: true });
+    unpauseMocks.getWorkAgentLifecycleStateSync.mockReturnValueOnce({ canResumeSession: true });
+    unpauseMocks.resumeAgent.mockResolvedValueOnce({ success: true });
+    const { unpauseCommand } = await import('../unpause.js');
+
+    await unpauseCommand('strike-pan-1723');
+
+    expect(unpauseMocks.resumeAgent).toHaveBeenCalledWith('strike-pan-1723');
   });
 });
 

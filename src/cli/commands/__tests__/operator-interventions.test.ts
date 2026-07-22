@@ -51,6 +51,11 @@ const interventionMocks = vi.hoisted(() => ({
   appendOperatorInterventionEvent: vi.fn(),
 }));
 
+const unpauseMocks = vi.hoisted(() => ({
+  getWorkAgentLifecycleStateSync: vi.fn(() => ({ canResumeSession: false })),
+  resumeAgent: vi.fn(),
+}));
+
 vi.mock('../../../lib/agents.js', () => {
   // Mirror the real prefix/singleton routing (PAN-1760) so command targeting
   // stays under test while the heavy agents module remains mocked.
@@ -77,6 +82,14 @@ vi.mock('../../../lib/agents.js', () => {
 
 vi.mock('../../../lib/tmux.js', () => ({
   sessionExistsSync: tmuxMocks.sessionExistsSync,
+}));
+
+vi.mock('../../../lib/work-agent-lifecycle.js', () => ({
+  getWorkAgentLifecycleStateSync: unpauseMocks.getWorkAgentLifecycleStateSync,
+}));
+
+vi.mock('../../../lib/agents/resume.js', () => ({
+  resumeAgent: unpauseMocks.resumeAgent,
 }));
 
 vi.mock('../../../lib/remote/index.js', () => ({

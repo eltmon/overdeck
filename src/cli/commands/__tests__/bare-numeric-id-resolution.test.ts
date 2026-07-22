@@ -32,6 +32,11 @@ const interventionMocks = vi.hoisted(() => ({
   appendOperatorInterventionEvent: vi.fn(),
 }));
 
+const unpauseMocks = vi.hoisted(() => ({
+  getWorkAgentLifecycleStateSync: vi.fn(() => ({ canResumeSession: false })),
+  resumeAgent: vi.fn(),
+}));
+
 const lifecycleMocks = vi.hoisted(() => ({
   closeOut: vi.fn(),
 }));
@@ -89,6 +94,14 @@ vi.mock('../../../lib/agents.js', () => {
 
 vi.mock('../../../lib/tmux.js', () => ({
   sessionExistsSync: tmuxMocks.sessionExistsSync,
+}));
+
+vi.mock('../../../lib/work-agent-lifecycle.js', () => ({
+  getWorkAgentLifecycleStateSync: unpauseMocks.getWorkAgentLifecycleStateSync,
+}));
+
+vi.mock('../../../lib/agents/resume.js', () => ({
+  resumeAgent: unpauseMocks.resumeAgent,
 }));
 
 vi.mock('../../../lib/projects.js', () => ({
