@@ -14,6 +14,7 @@ import { runServer } from './server.js';
 import { startSharedIssueService, getSharedIssueService } from './services/issue-service-singleton.js';
 import { startAgentEnrichmentService, stopAgentEnrichmentService } from './services/agent-enrichment-service.js';
 import { startMergeBlockerReconcileService } from './services/merge-blocker-reconcile-service.js';
+import { startReviewStatusReconcileService } from './services/review-status-reconcile-service.js';
 import { startResourceRefreshTriggers } from './services/resource-refresh-triggers.js';
 import {
   enqueueProjectsResourceRefresh,
@@ -212,6 +213,12 @@ console.log('[overdeck] AgentOutputService started');
 // Awaiting-Merge queue (and its live MERGE button) before any click.
 startMergeBlockerReconcileService();
 console.log('[overdeck] MergeBlockerReconcileService started');
+
+if (startReviewStatusReconcileService()) {
+  console.log('[overdeck] ReviewStatusReconcileService started');
+} else {
+  console.log('[overdeck] ReviewStatusReconcileService skipped — non-primary dashboard process');
+}
 
 if (shouldStartStaleCheckRetriggerService()) {
   startStaleCheckRetriggerService();
