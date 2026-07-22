@@ -196,7 +196,7 @@
     "recordedAt": "2026-07-22T20:02:42.067Z"
   },
   "created": "2026-07-21T22:47:36.935Z",
-  "updated": "2026-07-22T20:08:24.211Z",
+  "updated": "2026-07-22T20:09:10.514Z",
   "pipeline": {
     "issueId": "PAN-2993",
     "reviewStatus": "passed",
@@ -211,7 +211,7 @@
     "prUrl": "https://github.com/eltmon/overdeck/pull/2998",
     "reviewedAtCommit": "e91bb31361447751398bcf5c852c48ebbc35384f",
     "lastVerifiedCommit": "e91bb31361447751398bcf5c852c48ebbc35384f",
-    "reviewRequestedAt": "2026-07-22T20:02:42.997Z",
+    "reviewRequestedAt": "2026-07-22T20:09:10.175Z",
     "reviewSpawnedAt": "2026-07-22T20:02:47.585Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -272,7 +272,8 @@
         "tests/unit/lib/rebase-helper.test.ts"
       ],
       "recordedAt": "2026-07-22T20:02:42.067Z"
-    }
+    },
+    "panDoneRecoveredAt": "2026-07-22T20:09:10.175Z"
   },
   "closeOut": {
     "usage": {
