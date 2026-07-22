@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-22T21:25:31.822Z",
-  "updated": "2026-07-22T22:13:28.393Z",
+  "updated": "2026-07-22T22:16:42.485Z",
   "pipeline": {
     "issueId": "PAN-2988",
     "reviewStatus": "pending",
@@ -75,16 +75,8 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 9,
-    "claims": {
-      "resync-endpoint": {
-        "writerId": "agent-pan-2988",
-        "agentId": "agent-pan-2988",
-        "pid": 3139998,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-22T22:13:28.393Z"
-      }
-    },
+    "sequence": 10,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2988",
@@ -129,6 +121,17 @@
         "outcome": "completed",
         "reason": "Added latest-event-per-issue querying and a primary-dashboard 60-second drift sweep with self-healing re-emission, error isolation, fake-timer tests, and isolated primary/peer boot verification.",
         "releasedAt": "2026-07-22T22:13:14.264Z"
+      },
+      {
+        "writerId": "agent-pan-2988",
+        "agentId": "agent-pan-2988",
+        "pid": 3139998,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-22T22:13:28.393Z",
+        "itemId": "resync-endpoint",
+        "outcome": "completed",
+        "reason": "Added a read-only canonical review status re-emit endpoint, 404 handling, no-write-door assertions, and isolated HTTP verification for POST plus wrong-method behavior.",
+        "releasedAt": "2026-07-22T22:16:42.485Z"
       }
     ],
     "statusReasons": {
@@ -147,6 +150,10 @@
       "reconcile-sweep-service": {
         "reason": "Added latest-event-per-issue querying and a primary-dashboard 60-second drift sweep with self-healing re-emission, error isolation, fake-timer tests, and isolated primary/peer boot verification.",
         "updatedAt": "2026-07-22T22:13:14.264Z"
+      },
+      "resync-endpoint": {
+        "reason": "Added a read-only canonical review status re-emit endpoint, 404 handling, no-write-door assertions, and isolated HTTP verification for POST plus wrong-method behavior.",
+        "updatedAt": "2026-07-22T22:16:42.485Z"
       }
     }
   },
@@ -170,6 +177,9 @@
     "reconcile-sweep-service.reconcile-sweep-service.ac2": "completed",
     "reconcile-sweep-service.reconcile-sweep-service.ac3": "completed",
     "reconcile-sweep-service.reconcile-sweep-service.ac4": "completed",
-    "resync-endpoint": "running"
+    "resync-endpoint": "completed",
+    "resync-endpoint.resync-endpoint.ac1": "completed",
+    "resync-endpoint.resync-endpoint.ac2": "completed",
+    "resync-endpoint.resync-endpoint.ac3": "completed"
   }
 }
