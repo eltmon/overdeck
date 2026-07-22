@@ -2,7 +2,7 @@
   "issueId": "PAN-2599",
   "schemaVersion": 2,
   "created": "2026-07-16T05:02:53.170Z",
-  "updated": "2026-07-22T20:54:17.461Z",
+  "updated": "2026-07-22T20:54:21.559Z",
   "pipeline": {
     "issueId": "PAN-2599",
     "reviewStatus": "pending",
@@ -26,5 +26,6 @@
       "reason": "start",
       "agentModel": "gpt-5.6-sol"
     }
-  ]
+  ],
+  "workModel": "gpt-5.6-sol"
 }
