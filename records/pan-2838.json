@@ -229,7 +229,7 @@
     "recordedAt": "2026-07-22T21:35:20.476Z"
   },
   "created": "2026-07-17T12:34:27.875Z",
-  "updated": "2026-07-22T21:48:53.956Z",
+  "updated": "2026-07-22T22:23:52.559Z",
   "pipeline": {
     "issueId": "PAN-2838",
     "reviewStatus": "passed",
@@ -240,7 +240,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-22T21:36:06.484Z",
-    "updatedAt": "2026-07-22T21:48:53.930Z",
+    "updatedAt": "2026-07-22T22:23:51.568Z",
     "reviewNotes": "Approved: all acceptance criteria are met with no correctness, security, requirements, or performance blockers.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "blockerReasons": [
@@ -313,7 +313,7 @@
       },
       "costAtCloseOut": {
         "usd": 66.192671,
-        "pricingAsOf": "2026-07-22T21:48:53.950Z"
+        "pricingAsOf": "2026-07-22T22:23:52.422Z"
       }
     },
     "merges": [
