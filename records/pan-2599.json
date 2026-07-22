@@ -24,6 +24,7 @@
       ".github/workflows/release.yml",
       "scripts/file-size-baseline.txt",
       "src/cli/telemetry.ts",
+      "src/dashboard/frontend/src/components/KanbanBoard.test.tsx",
       "src/dashboard/frontend/src/components/Settings/sections/__tests__/TelemetrySection.test.tsx",
       "src/dashboard/frontend/src/components/Settings/settingsPageConstants.ts",
       "src/dashboard/frontend/src/components/Settings/types.ts",
@@ -115,6 +116,7 @@
       "src/dashboard/frontend/src/components/CommandDeck/ForkModal.tsx",
       "src/dashboard/frontend/src/components/CommandDeck/IssueComposer.tsx",
       "src/dashboard/frontend/src/components/CommandDeck/NewProjectModal.tsx",
+      "src/dashboard/frontend/src/components/KanbanBoard.test.tsx",
       "src/dashboard/frontend/src/components/PlanApprovalDialog.tsx",
       "src/dashboard/frontend/src/components/Settings/SettingsPage.tsx",
       "src/dashboard/frontend/src/components/Settings/sections/TelemetrySection.tsx",
@@ -152,10 +154,10 @@
       "tests/unit/lib/telemetry/service.test.ts",
       "tests/unit/telemetry-docs.test.ts"
     ],
-    "recordedAt": "2026-07-22T23:04:09.259Z"
+    "recordedAt": "2026-07-22T23:16:44.964Z"
   },
   "created": "2026-07-16T05:02:53.170Z",
-  "updated": "2026-07-22T23:16:36.917Z",
+  "updated": "2026-07-22T23:16:44.967Z",
   "pipeline": {
     "issueId": "PAN-2599",
     "reviewStatus": "reviewing",
