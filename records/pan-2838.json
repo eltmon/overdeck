@@ -145,20 +145,45 @@
     }
   ],
   "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "configuration/auto-merge.mdx",
+      "docs/SWARM-POLICY.md",
+      "src/dashboard/frontend/src/components/CommandDeck/ProjectOverview.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/ProjectSettingsDisclosure.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/__tests__/ProjectSettingsDisclosure.test.tsx",
+      "src/dashboard/frontend/src/components/Stage/ProjectHome.test.tsx",
+      "src/dashboard/frontend/src/components/Stage/ProjectHome.tsx"
+    ],
+    "actualChangedFiles": [
+      "configuration/auto-merge.mdx",
+      "docs/SWARM-POLICY.md",
+      "src/dashboard/frontend/src/components/CommandDeck/ProjectOverview.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/ProjectSettingsDisclosure.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/__tests__/ProjectSettingsDisclosure.test.tsx",
+      "src/dashboard/frontend/src/components/Stage/ProjectHome.test.tsx",
+      "src/dashboard/frontend/src/components/Stage/ProjectHome.tsx"
+    ],
+    "recordedAt": "2026-07-22T21:35:20.476Z"
+  },
   "created": "2026-07-17T12:34:27.875Z",
-  "updated": "2026-07-22T21:35:25.132Z",
+  "updated": "2026-07-22T21:35:26.207Z",
   "pipeline": {
     "issueId": "PAN-2838",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-22T21:35:23.853Z",
+    "updatedAt": "2026-07-22T21:35:25.169Z",
     "inspectNotes": "Verbatim extraction: ProjectSettingsSection + ProjectDisclosure moved byte-for-byte into ProjectSettingsDisclosure.tsx, new wrapper reproduces identical JSX (title/summary/badges/children) at the call site, fetch endpoints unchanged, old definitions fully removed from ProjectOverview.tsx.",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3006",
     "reviewRequestedAt": "2026-07-22T21:35:23.853Z",
+    "reviewSpawnedAt": "2026-07-22T21:35:25.167Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
       "declaredScopeUntouched": [],
@@ -181,8 +206,7 @@
         "src/dashboard/frontend/src/components/Stage/ProjectHome.tsx"
       ],
       "recordedAt": "2026-07-22T21:35:20.476Z"
-    },
-    "prUrl": "https://github.com/eltmon/overdeck/pull/3006"
+    }
   },
   "closeOut": {
     "usage": {
@@ -197,17 +221,17 @@
         },
         "review.supervisor": {
           "anthropic/claude-sonnet-5": {
-            "input": 4,
-            "output": 1149,
-            "cacheRead": 111837,
-            "cacheWrite": 121690
+            "input": 6,
+            "output": 1306,
+            "cacheRead": 233527,
+            "cacheWrite": 122742
           }
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 902052,
-            "output": 18509,
-            "cacheRead": 6321152,
+            "input": 1911393,
+            "output": 68943,
+            "cacheRead": 41176576,
             "cacheWrite": 0
           }
         }
@@ -220,24 +244,26 @@
           "cacheWrite": 158395
         },
         "anthropic/claude-sonnet-5": {
-          "input": 4,
-          "output": 1149,
-          "cacheRead": 111837,
-          "cacheWrite": 121690
+          "input": 6,
+          "output": 1306,
+          "cacheRead": 233527,
+          "cacheWrite": 122742
         },
         "openai/gpt-5.6-sol": {
-          "input": 902052,
-          "output": 18509,
-          "cacheRead": 6321152,
+          "input": 1911393,
+          "output": 68943,
+          "cacheRead": 41176576,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 16.423753,
-        "pricingAsOf": "2026-07-22T20:58:23.749Z"
+        "usd": 40.439732,
+        "pricingAsOf": "2026-07-22T21:35:25.321Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/3006"
+    ],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
@@ -385,28 +411,5 @@
     "docs-update": "completed",
     "docs-update.docs-update.ac1": "completed",
     "docs-update.docs-update.ac2": "completed"
-  },
-  "scopeDrift": {
-    "outsideDeclaredScope": [],
-    "declaredScopeUntouched": [],
-    "declaredScope": [
-      "configuration/auto-merge.mdx",
-      "docs/SWARM-POLICY.md",
-      "src/dashboard/frontend/src/components/CommandDeck/ProjectOverview.tsx",
-      "src/dashboard/frontend/src/components/CommandDeck/ProjectSettingsDisclosure.tsx",
-      "src/dashboard/frontend/src/components/CommandDeck/__tests__/ProjectSettingsDisclosure.test.tsx",
-      "src/dashboard/frontend/src/components/Stage/ProjectHome.test.tsx",
-      "src/dashboard/frontend/src/components/Stage/ProjectHome.tsx"
-    ],
-    "actualChangedFiles": [
-      "configuration/auto-merge.mdx",
-      "docs/SWARM-POLICY.md",
-      "src/dashboard/frontend/src/components/CommandDeck/ProjectOverview.tsx",
-      "src/dashboard/frontend/src/components/CommandDeck/ProjectSettingsDisclosure.tsx",
-      "src/dashboard/frontend/src/components/CommandDeck/__tests__/ProjectSettingsDisclosure.test.tsx",
-      "src/dashboard/frontend/src/components/Stage/ProjectHome.test.tsx",
-      "src/dashboard/frontend/src/components/Stage/ProjectHome.tsx"
-    ],
-    "recordedAt": "2026-07-22T21:35:20.476Z"
   }
 }
