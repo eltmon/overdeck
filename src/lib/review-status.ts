@@ -15,17 +15,18 @@ import {
 import { registerReviewStatusMapReader } from './cloister/review-status-source.js';
 import { normalizeReviewStatusSync } from './review-status-normalize.js';
 import { updateIssueRecordForReviewStatusSync, enrichReviewNotesFromRecordSync, readJournalStatusSync } from './overdeck/review-status-record-sync.js';
-import { needsReviewDispatch } from './review-dispatch-decision.js';
+import {
+  emitReactiveLifecycleEvent,
+  maybeAutoDispatchReviewHostSide,
+  maybeRecoverTestVerdictHostSide,
+  reconcileJournalIntoCacheSync,
+  reviewGatesPassedSync,
+  verificationSatisfied,
+} from './review-status-reconcile.js';
 import type { ScopeDriftRecord } from './xbrief/continue-state.js'; import type { StrikeLandingStatus } from './strike-landing.js';
 import type { InspectionStatusFields } from './inspection-status.js';
 
-function emitReactiveLifecycleEvent(type: 'review.approved' | 'test.passed', issueId: string): void {
-  try {
-    notifyPipelineSync({ type, issueId });
-  } catch (error) {
-    console.warn(`[review-status] Failed to emit ${type} for ${issueId}:`, error);
-  }
-}
+export { reviewGatesPassedSync, verificationSatisfied } from './review-status-reconcile.js';
 
 export interface StatusHistoryEntry {
   type: 'review' | 'test' | 'merge' | 'inspect' | 'uat' | 'release';
@@ -127,35 +128,6 @@ export interface ReviewStatus extends StrikeLandingStatus, InspectionStatusField
   // removed. The review pipeline no longer stashes uncommitted work — the
   // dirty-worktree gate refuses pan done / pan review request before review
   // is dispatched.
-}
-
-export function verificationSatisfied(status: Pick<ReviewStatus, 'verificationStatus'>): boolean {
-  // Only block readyForMerge if verification explicitly FAILED.
-  // 'pending' means "scheduled but not yet run this cycle" — not a failure signal.
-  // request-review resets verificationStatus to 'pending' as part of its cycle reset,
-  // but subsequent review+test passing should still yield readyForMerge=true.
-  // The post-rebase gate in triggerMerge() is the authoritative quality gate (PAN-XXX).
-  return status.verificationStatus !== 'failed';
-}
-
-/**
- * PAN-1988: the merge-gate predicate (review passed, test passed/skipped, verification not
- * failed, UAT ok, merge not started). Extracted so both setReviewStatusSync and the
- * journal→DB reconcile in getReviewStatusSync derive readyForMerge identically.
- */
-export function reviewGatesPassedSync(
-  s: Pick<ReviewStatus, 'reviewStatus' | 'testStatus' | 'verificationStatus' | 'uatStatus' | 'mergeStatus'>,
-): boolean {
-  return (
-    (s.reviewStatus === 'passed' || s.reviewStatus === 'skipped') &&
-    (s.testStatus === 'passed' || s.testStatus === 'skipped') &&
-    verificationSatisfied(s) &&
-    (s.uatStatus === undefined || s.uatStatus === 'passed') &&
-    (s.mergeStatus === 'pending' ||
-      s.mergeStatus === 'queued' ||
-      s.mergeStatus === undefined ||
-      s.mergeStatus === null)
-  );
 }
 
 export interface MergeGateEligibility {
@@ -646,134 +618,6 @@ export function resetPipelineVerdictsForWorkStartSync(issueId: string, options: 
   });
 }
 
-/**
- * PAN-1988 — deliver review feedback to the work agent from the HOST when a blocked/failed
- * verdict is reconciled from the journal. Dynamic import to avoid a static import cycle
- * (review-verdict-feedback → review-status). Fully best-effort: in a sandboxed agent process the
- * delivery fails (host paths blocked) and is swallowed; the host process performs the real
- * notification. Never throws into the read path.
- */
-async function deliverReviewVerdictFeedbackHostSide(issueId: string, status: ReviewStatus): Promise<void> {
-  try {
-    const { deliverReviewVerdictFeedback } = await import('./cloister/review-verdict-feedback.js');
-    const result = await Effect.runPromise(deliverReviewVerdictFeedback({
-      issueId,
-      verdict: status.reviewStatus === 'failed' ? 'failed' : 'blocked',
-      notes: status.reviewNotes,
-      prUrl: status.prUrl,
-    }));
-    if (result.agentMessageSent) {
-      console.log(`[review-status] delivered review feedback to the work agent for ${issueId} (host-side)`);
-    }
-  } catch (err) {
-    console.warn(`[review-status] host-side review feedback delivery for ${issueId} did not complete (non-fatal): ${err instanceof Error ? err.message : String(err)}`);
-  }
-}
-
-// PAN-1988 auto-heal — throttle so the reconcile-on-read does not spam dispatch attempts for a
-// genuinely-gated issue (one whose dispatch keeps deferring on a merge conflict). Date.now() is
-// available in normal lib code (only workflow scripts forbid it).
-const reviewDispatchAttemptAt = new Map<string, number>();
-const REVIEW_AUTO_DISPATCH_THROTTLE_MS = 30_000;
-
-/**
- * PAN-1988 auto-heal — the host re-dispatches review from the durable journal intent. When the
- * work agent's `pan done` recorded a `reviewRequestedAt` but the reactive dashboard trigger never
- * landed (dashboard reloading, dropped event, frozen deacon), the next status read notices the
- * un-serviced request and dispatches review here. {@link needsReviewDispatch} gates it,
- * spawnReviewRoleForIssue is idempotent (it skips a live review), and a 30s throttle bounds retries
- * for a gated issue. Fire-and-forget; in a sandboxed reader the dispatch is a best-effort no-op.
- */
-function maybeAutoDispatchReviewHostSide(issueId: string, status: ReviewStatus): void {
-  if (!needsReviewDispatch({
-    reviewRequestedAt: status.reviewRequestedAt,
-    reviewSpawnedAt: status.reviewSpawnedAt,
-    reviewStatus: status.reviewStatus,
-    mergeStatus: status.mergeStatus,
-  })) return;
-  const last = reviewDispatchAttemptAt.get(issueId) ?? 0;
-  if (Date.now() - last < REVIEW_AUTO_DISPATCH_THROTTLE_MS) return;
-  reviewDispatchAttemptAt.set(issueId, Date.now());
-  void dispatchReviewHostSide(issueId, status.prUrl);
-}
-
-async function dispatchReviewHostSide(issueId: string, prUrl?: string): Promise<void> {
-  try {
-    const { resolveProjectFromIssueSync } = await import('./projects.js');
-    const resolved = resolveProjectFromIssueSync(issueId);
-    if (!resolved) return;
-    const { existsSync } = await import('fs');
-    const workspace = join(resolved.projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`);
-    if (!existsSync(workspace)) return;
-    let branch = `feature/${issueId.toLowerCase()}`;
-    try {
-      const { promisify } = await import('util');
-      const { exec } = await import('child_process');
-      const execAsync = promisify(exec);
-      const { stdout } = await execAsync('git branch --show-current', { cwd: workspace, encoding: 'utf-8' });
-      branch = stdout.trim() || branch;
-    } catch { /* non-fatal — fall back to the conventional branch name */ }
-    const { spawnReviewRoleForIssue } = await import('./cloister/review-agent.js');
-    const result = await Effect.runPromise(spawnReviewRoleForIssue({ issueId, workspace, branch, ...(prUrl ? { prUrl } : {}) }));
-    if (result.success) {
-      // PAN-2584: a guard-skip resolves success WITHOUT spawning — logging it as
-      // "auto-dispatched" made an idempotency no-op loop read as forward progress.
-      if (result.message?.startsWith('Review already in progress')) {
-        console.log(`[review-status] review dispatch for ${issueId}: already in progress — no-op (host-side)`);
-      } else {
-        console.log(`[review-status] auto-dispatched review for ${issueId} from durable journal intent (host-side)`);
-      }
-    }
-  } catch (err) {
-    console.warn(`[review-status] host-side review auto-dispatch for ${issueId} did not complete (non-fatal): ${err instanceof Error ? err.message : String(err)}`);
-  }
-}
-
-// ── PAN-1988 host-owned TEST-stage recovery ───────────────────────────────────
-// The test stage had NO reactive path. Recovering an unsignaled verdict (the agent — often Haiku —
-// writes .pan/test/result.json then idles without POSTing) AND the test=failed → work-agent requeue
-// both lived ONLY in deacon patrols (checkCompletedButUnsignaledTests + the dead-end requeue). With
-// the deacon frozen, a finished test agent stranded the issue at test=testing forever. The host now
-// (a) recovers the written verdict on read and (b) hands a failure back to the work agent — symmetric
-// with the review stage. Recovery only acts on a WRITTEN artifact; it never guesses pass/fail.
-const testVerdictRecoveryAt = new Map<string, number>();
-const TEST_VERDICT_RECOVERY_THROTTLE_MS = 60_000;
-
-function maybeRecoverTestVerdictHostSide(issueId: string, status: ReviewStatus): void {
-  if (status.reviewStatus !== 'passed') return; // tests only run after review approves
-  if (status.mergeStatus === 'merged' || status.readyForMerge) return;
-  // Only act while the verdict is UNSIGNALED — once test resolves (passed/failed) the write path
-  // owns the transition (test.passed → ship; test failed → deliverTestFailureToWorkAgentHostSide).
-  if (status.testStatus !== 'testing' && status.testStatus !== 'pending' && status.testStatus !== 'dispatch_failed') return;
-  const last = testVerdictRecoveryAt.get(issueId) ?? 0;
-  if (Date.now() - last < TEST_VERDICT_RECOVERY_THROTTLE_MS) return;
-  testVerdictRecoveryAt.set(issueId, Date.now());
-  void recoverTestVerdictHostSide(issueId);
-}
-
-async function recoverTestVerdictHostSide(issueId: string): Promise<void> {
-  try {
-    const { resolveProjectFromIssueSync } = await import('./projects.js');
-    const resolved = resolveProjectFromIssueSync(issueId);
-    if (!resolved) return;
-    const { existsSync } = await import('fs');
-    const workspace = join(resolved.projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`);
-    if (!existsSync(workspace)) return;
-    const { readTestVerdictArtifact } = await import('./cloister/test-verdict.js');
-    const artifact = readTestVerdictArtifact(workspace);
-    if (!artifact) return; // no WRITTEN verdict — never guess; the agent/deacon owns the write-nudge
-    // Record the recovered verdict. setReviewStatusSync emits test.passed (→ ship) for a pass and
-    // fires the work-agent handoff (below) on a fail, via its test-transition logic.
-    setReviewStatusSync(issueId, {
-      testStatus: artifact.status,
-      testNotes: artifact.notes ?? `Recovered from .pan/test/result.json (${artifact.status}) — the test agent wrote the verdict but never signaled`,
-    });
-    console.log(`[review-status] recovered unsignaled test verdict for ${issueId}: ${artifact.status} (host-side, from .pan/test/result.json)`);
-  } catch (err) {
-    console.warn(`[review-status] host-side test verdict recovery for ${issueId} did not complete (non-fatal): ${err instanceof Error ? err.message : String(err)}`);
-  }
-}
-
 async function deliverTestFailureToWorkAgentHostSide(issueId: string, status: ReviewStatus): Promise<void> {
   try {
     const { resolveProjectFromIssueSync } = await import('./projects.js');
@@ -829,74 +673,14 @@ export function getReviewStatusSync(issueId: string): ReviewStatus | null {
   // write succeeds, a sandboxed reader's reconcile is a best-effort no-op.
   const journalNewer = !dbStatus || (dbStatus.updatedAt ?? '') < journal.updatedAt;
   if (journalNewer) {
-    const merged: ReviewStatus = {
-      ...(dbStatus ?? {
-        issueId,
-        reviewStatus: 'pending' as const,
-        testStatus: 'pending' as const,
-        updatedAt: journal.updatedAt,
-        readyForMerge: false,
-      }),
-    };
-    // Apply ONLY the journal fields that are actually present. The journal carries the durable
-    // verdict; DB-only/ephemeral fields it does not store (stuck/stuckReason, transient counters)
-    // must NOT be clobbered with `undefined`. This keeps every reconcile a strict overlay.
-    for (const [key, value] of Object.entries(journal.durable)) if (value !== undefined) (merged as unknown as Record<string, unknown>)[key] = value;
-    for (const key of journal.clearedFields ?? []) delete (merged as unknown as Record<string, unknown>)[key];
-    merged.issueId = issueId;
-    merged.updatedAt = journal.updatedAt;
-    const hasBlockers = (merged.blockerReasons?.length ?? 0) > 0;
-    merged.readyForMerge = hasBlockers ? false : reviewGatesPassedSync(merged);
-    const reconciled = normalizeReviewStatusSync(merged);
-    try {
-      dbUpsert(reconciled);
-    } catch {
-      // Read-only DB (a sandboxed reader) — the host reconciles when it reads. Non-fatal.
-    }
-
-    // PAN-1988 — host-owned review FEEDBACK delivery. A sandboxed review agent records its
-    // verdict to the journal but cannot notify the work agent (the work agent's tmux/mail and
-    // the network are outside its jail — "side effects failed due restricted network / readonly
-    // host paths"). When the HOST reconciles a NEW blocked/failed review verdict, it delivers the
-    // feedback here. Fires exactly once per verdict: the reconcile only runs while the journal is
-    // newer than the DB, and the dbUpsert above makes the DB catch up, so the next read does not
-    // re-fire. In a sandboxed agent process the delivery is a best-effort no-op (host paths
-    // blocked); the host's read performs the real delivery. Fire-and-forget.
-    const wasBlocked = dbStatus?.reviewStatus === 'blocked' || dbStatus?.reviewStatus === 'failed';
-    const nowBlocked = reconciled.reviewStatus === 'blocked' || reconciled.reviewStatus === 'failed';
-    if (nowBlocked && !wasBlocked) {
-      void deliverReviewVerdictFeedbackHostSide(issueId, reconciled);
-    }
-
-    // PAN-1988 — host-owned review→test and test→ship HANDOFF. setReviewStatusSync emits these
-    // lifecycle events on the write path, but a sandboxed agent (codex/pi) records its verdict to
-    // the JOURNAL only and the host picks it up HERE via reconcile — which bypasses
-    // setReviewStatusSync. Without re-emitting, a passed verdict strands at review=passed/test=pending
-    // (and a passed test strands before ship) until the deacon patrol nudges it — and the deacon may
-    // be frozen. Re-emit the same transitions the write path would, so reactive Cloister advances.
-    const wasReviewPassed = dbStatus?.reviewStatus === 'passed';
-    const nowReviewPassed = reconciled.reviewStatus === 'passed';
-    if (nowReviewPassed && !wasReviewPassed && reconciled.testStatus === 'pending') {
-      console.log(`[review-status] reconcile: review.approved for ${issueId} (host-owned handoff — sandboxed agent verdict from journal)`);
-      void emitReactiveLifecycleEvent('review.approved', issueId);
-    }
-    const wasTestPassed = dbStatus?.testStatus === 'passed';
-    const nowTestPassed = reconciled.testStatus === 'passed';
-    if (nowTestPassed && !wasTestPassed) {
-      console.log(`[review-status] reconcile: test.passed for ${issueId} (host-owned handoff — sandboxed agent verdict from journal)`);
-      void emitReactiveLifecycleEvent('test.passed', issueId);
-    }
-
-    maybeAutoDispatchReviewHostSide(issueId, reconciled);
-    maybeRecoverTestVerdictHostSide(issueId, reconciled);
-    return reconciled;
+    return reconcileJournalIntoCacheSync(issueId, dbStatus, journal, setReviewStatusSync);
   }
 
   // DB is current → overlay the feedback TEXT from the journal (it is no longer stored in the
   // DB; the row holds only the queryable status flags).
   const enriched = enrichReviewNotesFromRecordSync(issueId, dbStatus!);
   maybeAutoDispatchReviewHostSide(issueId, enriched);
-  maybeRecoverTestVerdictHostSide(issueId, enriched);
+  maybeRecoverTestVerdictHostSide(issueId, enriched, setReviewStatusSync);
   return enriched;
 }
 
