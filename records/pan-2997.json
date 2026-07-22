@@ -91,10 +91,10 @@
     "recordedAt": "2026-07-22T01:20:05.090Z"
   },
   "created": "2026-07-21T23:09:49.270Z",
-  "updated": "2026-07-22T01:26:06.536Z",
+  "updated": "2026-07-22T01:33:40.005Z",
   "pipeline": {
     "issueId": "PAN-2997",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -102,8 +102,8 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-22T01:21:05.035Z",
-    "updatedAt": "2026-07-22T01:26:05.343Z",
-    "reviewNotes": "Review dispatch skipped — already running: agent-pan-2997-review",
+    "updatedAt": "2026-07-22T01:33:39.974Z",
+    "reviewNotes": "Linear MCP failures bypass the registered hook, and lifecycle wake bookkeeping can strand blocked agents.",
     "inspectNotes": "Fold dedupes required events per-agent via Map; latest non-null authUrl/authUrlAgentId wins; expiry computed from authUrlExpiresAt and reactivates on fresh required; healthy event closes to lastCompleted, notified targets open??lastCompleted, duplicate healthy is a no-op leaving wake set empty post-notification. All 4 ACs verified by hand against fake-timer tests.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3004",
     "lastVerifiedCommit": "d94938ce1358b9e318284ed4db4d248b45c39726",
@@ -183,9 +183,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 689287,
-            "output": 74637,
-            "cacheRead": 14324736,
+            "input": 1744161,
+            "output": 103596,
+            "cacheRead": 25029632,
             "cacheWrite": 0
           }
         },
@@ -214,9 +214,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 1607542,
-          "output": 212143,
-          "cacheRead": 83524096,
+          "input": 2662416,
+          "output": 241102,
+          "cacheRead": 94228992,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -227,8 +227,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 56.481704,
-        "pricingAsOf": "2026-07-22T01:26:05.356Z"
+        "usd": 67.977292,
+        "pricingAsOf": "2026-07-22T01:33:39.992Z"
       }
     },
     "merges": [
@@ -238,7 +238,7 @@
   },
   "workModel": "k3[1m]",
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "k3[1m]",
   "tasks": {
     "sequence": 20,
     "claims": {},
