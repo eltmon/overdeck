@@ -1,3 +1,4 @@
+import type { DomainEvent } from '@overdeck/contracts';
 import { getReviewStatusSync, loadReviewStatuses, type ReviewStatus } from '../../../lib/review-status.js';
 import { getEventStore, type StoredEvent } from '../event-store.js';
 import { getDashboardIdentity } from '../identity.js';
@@ -52,7 +53,7 @@ async function reconcileOnce(): Promise<void> {
       '(canonical newer than last event — healing lost status_changed)',
     );
     emitReviewStatusChanged(
-      (event) => store.append(event as any),
+      (event) => store.append(event as Omit<DomainEvent, 'sequence'>),
       issueId,
       canonical,
     );
