@@ -141,18 +141,18 @@
     "recordedAt": "2026-07-21T23:54:05.124Z"
   },
   "created": "2026-07-21T22:47:36.935Z",
-  "updated": "2026-07-22T00:57:41.383Z",
+  "updated": "2026-07-22T00:57:47.510Z",
   "pipeline": {
     "issueId": "PAN-2993",
     "reviewStatus": "passed",
-    "testStatus": "pending",
+    "testStatus": "testing",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-22T00:56:26.857Z",
-    "updatedAt": "2026-07-22T00:57:40.404Z",
+    "updatedAt": "2026-07-22T00:57:47.498Z",
     "reviewNotes": "Approved: fallback clearing, persisted backoff, ambiguous-merge recovery, remote PR head, and file-size ratchet are all correct and verified.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "All 4 ACs verified against src/lib/agents/messaging.ts@79bb7b47: stopped-agent resume failure returns {delivered:false,queuedToMail:true,reason} naming both resumeResult.error and PAN-1980 session-rotation disable; paused/gated path returns gate reason; live-session/successful-resume paths return delivered:true; only deacon-strike-landing.ts touched among callers and npm run typecheck passes clean (0 new errors).",
@@ -225,9 +225,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 4226894,
-            "output": 204994,
-            "cacheRead": 51903488,
+            "input": 4233374,
+            "output": 207931,
+            "cacheRead": 52774400,
             "cacheWrite": 0
           }
         },
@@ -256,9 +256,9 @@
           "cacheWrite": 311785
         },
         "openai/gpt-5.6-sol": {
-          "input": 8126166,
-          "output": 404944,
-          "cacheRead": 189855232,
+          "input": 8132646,
+          "output": 407881,
+          "cacheRead": 190726144,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -269,8 +269,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 158.820545,
-        "pricingAsOf": "2026-07-22T00:57:40.424Z"
+        "usd": 159.376511,
+        "pricingAsOf": "2026-07-22T00:57:47.503Z"
       }
     },
     "merges": [
@@ -279,7 +279,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
     "sequence": 12,
