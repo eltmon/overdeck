@@ -132,6 +132,11 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-22T20:02:49.436Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-22T20:09:12.811Z"
     }
   ],
   "feedback": [],
@@ -196,23 +201,24 @@
     "recordedAt": "2026-07-22T20:02:42.067Z"
   },
   "created": "2026-07-21T22:47:36.935Z",
-  "updated": "2026-07-22T20:09:11.335Z",
+  "updated": "2026-07-22T20:09:12.811Z",
   "pipeline": {
     "issueId": "PAN-2993",
-    "reviewStatus": "passed",
+    "reviewStatus": "reviewing",
     "testStatus": "testing",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-22T20:08:24.194Z",
+    "panDoneRecoveredAt": "2026-07-22T20:09:10.175Z",
+    "updatedAt": "2026-07-22T20:09:11.356Z",
     "reviewNotes": "Explicit expected-SHA lease fixes the remote overwrite race; all review dimensions and focused verification passed.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2998",
     "reviewedAtCommit": "e91bb31361447751398bcf5c852c48ebbc35384f",
     "lastVerifiedCommit": "e91bb31361447751398bcf5c852c48ebbc35384f",
     "reviewRequestedAt": "2026-07-22T20:09:10.175Z",
-    "reviewSpawnedAt": "2026-07-22T20:02:47.585Z",
+    "reviewSpawnedAt": "2026-07-22T20:09:11.355Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "drizzle/overdeck/0000_overdeck_init.sql",
@@ -272,8 +278,7 @@
         "tests/unit/lib/rebase-helper.test.ts"
       ],
       "recordedAt": "2026-07-22T20:02:42.067Z"
-    },
-    "panDoneRecoveredAt": "2026-07-22T20:09:10.175Z"
+    }
   },
   "closeOut": {
     "usage": {
@@ -333,7 +338,7 @@
       },
       "costAtCloseOut": {
         "usd": 205.117052,
-        "pricingAsOf": "2026-07-22T20:08:24.203Z"
+        "pricingAsOf": "2026-07-22T20:09:11.456Z"
       }
     },
     "merges": [
