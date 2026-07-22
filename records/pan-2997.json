@@ -17,11 +17,16 @@
       "reason": "resume",
       "agentModel": "k3[1m]",
       "timestamp": "2026-07-22T00:31:13.906Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "k3[1m]",
+      "timestamp": "2026-07-22T00:51:33.135Z"
     }
   ],
   "feedback": [],
   "created": "2026-07-21T23:09:49.270Z",
-  "updated": "2026-07-22T00:32:44.063Z",
+  "updated": "2026-07-22T00:51:33.177Z",
   "pipeline": {
     "issueId": "PAN-2997",
     "reviewStatus": "pending",
@@ -64,7 +69,7 @@
   },
   "workModel": "k3[1m]",
   "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "model": "k3[1m]",
   "tasks": {
     "sequence": 14,
     "claims": {},
