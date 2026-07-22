@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-22T21:25:31.822Z",
-  "updated": "2026-07-22T22:07:14.921Z",
+  "updated": "2026-07-22T22:13:14.264Z",
   "pipeline": {
     "issueId": "PAN-2988",
     "reviewStatus": "pending",
@@ -75,16 +75,8 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "reconcile-sweep-service": {
-        "writerId": "agent-pan-2988",
-        "agentId": "agent-pan-2988",
-        "pid": 3053608,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-22T22:07:14.920Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2988",
@@ -118,6 +110,17 @@
         "outcome": "completed",
         "reason": "Extracted journal reconciliation and host recovery helpers, emitted status_changed after successful DB reconciliation, preserved public predicate exports, added reconciliation tests, and removed the file-size baseline entry after the file fell below threshold.",
         "releasedAt": "2026-07-22T22:07:01.180Z"
+      },
+      {
+        "writerId": "agent-pan-2988",
+        "agentId": "agent-pan-2988",
+        "pid": 3053608,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-22T22:07:14.920Z",
+        "itemId": "reconcile-sweep-service",
+        "outcome": "completed",
+        "reason": "Added latest-event-per-issue querying and a primary-dashboard 60-second drift sweep with self-healing re-emission, error isolation, fake-timer tests, and isolated primary/peer boot verification.",
+        "releasedAt": "2026-07-22T22:13:14.264Z"
       }
     ],
     "statusReasons": {
@@ -132,6 +135,10 @@
       "read-door-reconcile-emit": {
         "reason": "Extracted journal reconciliation and host recovery helpers, emitted status_changed after successful DB reconciliation, preserved public predicate exports, added reconciliation tests, and removed the file-size baseline entry after the file fell below threshold.",
         "updatedAt": "2026-07-22T22:07:01.180Z"
+      },
+      "reconcile-sweep-service": {
+        "reason": "Added latest-event-per-issue querying and a primary-dashboard 60-second drift sweep with self-healing re-emission, error isolation, fake-timer tests, and isolated primary/peer boot verification.",
+        "updatedAt": "2026-07-22T22:13:14.264Z"
       }
     }
   },
@@ -150,6 +157,10 @@
     "read-door-reconcile-emit.read-door-reconcile-emit.ac2": "completed",
     "read-door-reconcile-emit.read-door-reconcile-emit.ac3": "completed",
     "read-door-reconcile-emit.read-door-reconcile-emit.ac4": "completed",
-    "reconcile-sweep-service": "running"
+    "reconcile-sweep-service": "completed",
+    "reconcile-sweep-service.reconcile-sweep-service.ac1": "completed",
+    "reconcile-sweep-service.reconcile-sweep-service.ac2": "completed",
+    "reconcile-sweep-service.reconcile-sweep-service.ac3": "completed",
+    "reconcile-sweep-service.reconcile-sweep-service.ac4": "completed"
   }
 }
