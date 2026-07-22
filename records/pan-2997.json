@@ -106,19 +106,19 @@
     "recordedAt": "2026-07-22T01:20:05.090Z"
   },
   "created": "2026-07-21T23:09:49.270Z",
-  "updated": "2026-07-22T02:04:04.085Z",
+  "updated": "2026-07-22T02:06:43.727Z",
   "pipeline": {
     "issueId": "PAN-2997",
-    "reviewStatus": "pending",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-22T01:21:05.035Z",
-    "updatedAt": "2026-07-22T02:04:03.926Z",
-    "reviewNotes": "Agent re-review request (1/25): Fixed all 5 blocking findings: (1) hook now registered for PostToolUseFailure parsing the documented top-level error field — PostToolUse only fires on success; (2) auth classifier tightened — 401 needs a non-identifier boundary and successful payloads are only classified when error-shaped, so MIN-401/prose can't false-trigger; (3) lifecycles carry durable seq-N correlation ids on notified events, fold applies notifications only to their own lifecycle, wake pass drains until stable (deferred-delivery repro test added); (4) fold reads via healthy-anchored sequence predicate with boundary expansion, no per-type 100-event cap (>100 events regression test added); (5) blocked agents enriched with canonical tracker URLs via the issues read door — MIN issues render as links; stale auth action hidden when expired. Lint, typecheck, root (10383) and frontend (2382) suites all green.",
+    "updatedAt": "2026-07-22T02:06:43.696Z",
+    "reviewNotes": "Wake delivery can replay across a crash, and the banner poll materializes the full retained event log.",
     "inspectNotes": "Fold dedupes required events per-agent via Map; latest non-null authUrl/authUrlAgentId wins; expiry computed from authUrlExpiresAt and reactivates on fresh required; healthy event closes to lastCompleted, notified targets open??lastCompleted, duplicate healthy is a no-op leaving wake set empty post-notification. All 4 ACs verified by hand against fake-timer tests.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3004",
     "lastVerifiedCommit": "d94938ce1358b9e318284ed4db4d248b45c39726",
@@ -198,9 +198,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 4090608,
-            "output": 189257,
-            "cacheRead": 37767680,
+            "input": 4370246,
+            "output": 232279,
+            "cacheRead": 49801216,
             "cacheWrite": 0
           }
         },
@@ -229,9 +229,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 5008863,
-          "output": 326763,
-          "cacheRead": 106967040,
+          "input": 5288501,
+          "output": 369785,
+          "cacheRead": 119000576,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -242,8 +242,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 88.648381,
-        "pricingAsOf": "2026-07-22T02:04:04.014Z"
+        "usd": 97.353999,
+        "pricingAsOf": "2026-07-22T02:06:43.715Z"
       }
     },
     "merges": [
