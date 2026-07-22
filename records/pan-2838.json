@@ -229,49 +229,29 @@
     "recordedAt": "2026-07-22T21:35:20.476Z"
   },
   "created": "2026-07-17T12:34:27.875Z",
-  "updated": "2026-07-22T21:48:21.434Z",
+  "updated": "2026-07-22T21:48:35.360Z",
   "pipeline": {
     "issueId": "PAN-2838",
     "reviewStatus": "passed",
-    "testStatus": "pending",
+    "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-22T21:36:06.484Z",
-    "updatedAt": "2026-07-22T21:44:40.905Z",
-    "reviewNotes": "Approved: settings disclosure meets all acceptance criteria with no correctness, security, requirements, or performance blockers.",
-    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
-    "inspectNotes": "Verbatim extraction: ProjectSettingsSection + ProjectDisclosure moved byte-for-byte into ProjectSettingsDisclosure.tsx, new wrapper reproduces identical JSX (title/summary/badges/children) at the call site, fetch endpoints unchanged, old definitions fully removed from ProjectOverview.tsx.",
+    "updatedAt": "2026-07-22T21:48:35.314Z",
+    "blockerReasons": [
+      {
+        "type": "failing_checks",
+        "summary": "Required checks are failing",
+        "detectedAt": "2026-07-22T21:48:35.314Z"
+      }
+    ],
     "prUrl": "https://github.com/eltmon/overdeck/pull/3006",
     "reviewedAtCommit": "a662b8f6663631da31de25a94dcd75584489f1ae",
     "lastVerifiedCommit": "a662b8f6663631da31de25a94dcd75584489f1ae",
-    "reviewRequestedAt": "2026-07-22T21:36:06.484Z",
-    "reviewSpawnedAt": "2026-07-22T21:35:25.167Z",
-    "scopeDrift": {
-      "outsideDeclaredScope": [],
-      "declaredScopeUntouched": [],
-      "declaredScope": [
-        "configuration/auto-merge.mdx",
-        "docs/SWARM-POLICY.md",
-        "src/dashboard/frontend/src/components/CommandDeck/ProjectOverview.tsx",
-        "src/dashboard/frontend/src/components/CommandDeck/ProjectSettingsDisclosure.tsx",
-        "src/dashboard/frontend/src/components/CommandDeck/__tests__/ProjectSettingsDisclosure.test.tsx",
-        "src/dashboard/frontend/src/components/Stage/ProjectHome.test.tsx",
-        "src/dashboard/frontend/src/components/Stage/ProjectHome.tsx"
-      ],
-      "actualChangedFiles": [
-        "configuration/auto-merge.mdx",
-        "docs/SWARM-POLICY.md",
-        "src/dashboard/frontend/src/components/CommandDeck/ProjectOverview.tsx",
-        "src/dashboard/frontend/src/components/CommandDeck/ProjectSettingsDisclosure.tsx",
-        "src/dashboard/frontend/src/components/CommandDeck/__tests__/ProjectSettingsDisclosure.test.tsx",
-        "src/dashboard/frontend/src/components/Stage/ProjectHome.test.tsx",
-        "src/dashboard/frontend/src/components/Stage/ProjectHome.tsx"
-      ],
-      "recordedAt": "2026-07-22T21:35:20.476Z"
-    }
+    "reviewSpawnedAt": "2026-07-22T21:35:25.167Z"
   },
   "closeOut": {
     "usage": {
@@ -286,9 +266,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 667615,
-            "output": 37665,
-            "cacheRead": 5154816,
+            "input": 3044978,
+            "output": 54242,
+            "cacheRead": 7093248,
             "cacheWrite": 0
           }
         },
@@ -317,9 +297,9 @@
           "cacheWrite": 158395
         },
         "openai/gpt-5.6-sol": {
-          "input": 2597662,
-          "output": 109266,
-          "cacheRead": 48481280,
+          "input": 4975025,
+          "output": 125843,
+          "cacheRead": 50419712,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -330,8 +310,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 48.733119,
-        "pricingAsOf": "2026-07-22T21:44:40.961Z"
+        "usd": 62.08646,
+        "pricingAsOf": "2026-07-22T21:48:35.355Z"
       }
     },
     "merges": [
