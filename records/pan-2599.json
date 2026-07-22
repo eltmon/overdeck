@@ -145,17 +145,17 @@
     "recordedAt": "2026-07-22T23:04:09.259Z"
   },
   "created": "2026-07-16T05:02:53.170Z",
-  "updated": "2026-07-22T23:04:21.815Z",
+  "updated": "2026-07-22T23:07:26.115Z",
   "pipeline": {
     "issueId": "PAN-2599",
-    "reviewStatus": "failed",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-22T23:04:20.790Z",
+    "updatedAt": "2026-07-22T23:07:26.086Z",
     "reviewNotes": "Review role spawn failed: Command failed: tmux -L overdeck -f /home/eltmon/.overdeck/tmux/overdeck.tmux.conf new-session -d -s agent-pan-2599-review -c /home/eltmon/Projects/overdeck/workspaces/feature-pan-2599 -x 200 -y 50 -e ANTHROPIC_API_KEY= -e ANTHROPIC_BASE_URL=http://127.0.0.1:8317 -e ANTHROPIC_AUTH_TOKEN=overdeck-local-cliproxy-key -e ANTHROPIC_DEFAULT_HAIKU_MODEL= -e OPENAI_API_KEY= -e GEMINI_API_KEY= -e API_TIMEOUT_MS= -e CLAUDE_CODE_API_KEY_HELPER_TTL_MS= -e KIMI_API_KEY= -e MINIMAX_API_KEY= -e ZAI_API_KEY= -e MIMO_API_KEY= -e OPENROUTER_API_KEY= -e NOUS_API_KEY= -e DASHSCOPE_API_KEY= -e TERM=xterm-256color -e OVERDECK_AGENT_ID=agent-pan-2599-review -e OVERDECK_ISSUE_ID=PAN-2599 -e OVERDECK_SESSION_TYPE=review -e CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false -e GIT_SEQUENCE_EDITOR=false -e OVERDECK_FLYWHEEL_RUN_ID=RUN-68 -e OVERDECK_FLYWHEEL_AGENT_ROLE=review bash /home/eltmon/.overdeck/agents/agent-pan-2599-review/launcher.sh\nduplicate session: agent-pan-2599-review\n",
     "inspectNotes": "Both ACs verified in diff: getClient() gates on telemetryBlockedForProcess()+resolveTelemetryEnabled() before constructing PostHog, so disabled capture()+shutdown() never invoke the constructor (AC1); shutdown() races client.shutdown() against a 2s setTimeout with finally-clearTimeout, and service.test.ts's hung-flush test advances fake timers to exactly 2000ms to confirm the bound (AC2).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3009",
@@ -322,6 +322,14 @@
             "cacheWrite": 214045
           }
         },
+        "review": {
+          "openai/gpt-5.6-sol": {
+            "input": 741135,
+            "output": 54472,
+            "cacheRead": 6680576,
+            "cacheWrite": 0
+          }
+        },
         "review.supervisor": {
           "anthropic/claude-sonnet-5": {
             "input": 16,
@@ -332,9 +340,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 6294042,
-            "output": 426295,
-            "cacheRead": 245394944,
+            "input": 6296100,
+            "output": 426659,
+            "cacheRead": 245953024,
             "cacheWrite": 0
           }
         }
@@ -347,9 +355,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 15642891,
-          "output": 436787,
-          "cacheRead": 254420992,
+          "input": 16386084,
+          "output": 491623,
+          "cacheRead": 261659648,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -366,8 +374,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 178.096734,
-        "pricingAsOf": "2026-07-22T23:04:20.808Z"
+        "usd": 187.077107,
+        "pricingAsOf": "2026-07-22T23:07:26.104Z"
       }
     },
     "merges": [
