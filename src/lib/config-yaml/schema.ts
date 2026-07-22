@@ -418,10 +418,7 @@ export interface IssuesConfig {
   closed_window_days?: number;
 }
 
-export interface TelemetryConfig {
-  /** Whether anonymous product telemetry is enabled. */
-  enabled?: boolean;
-}
+export interface TelemetryConfig { enabled?: boolean }
 
 /**
  * Complete configuration structure (YAML schema)
