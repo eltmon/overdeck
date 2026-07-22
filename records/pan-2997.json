@@ -119,10 +119,10 @@
     "recordedAt": "2026-07-22T01:20:05.090Z"
   },
   "created": "2026-07-21T23:09:49.270Z",
-  "updated": "2026-07-22T02:08:43.419Z",
+  "updated": "2026-07-22T02:08:46.159Z",
   "pipeline": {
     "issueId": "PAN-2997",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -130,8 +130,8 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-22T01:21:05.035Z",
-    "updatedAt": "2026-07-22T02:08:43.406Z",
-    "reviewNotes": "Wake delivery can replay across a crash, and the banner poll materializes the full retained event log.",
+    "updatedAt": "2026-07-22T02:08:46.125Z",
+    "reviewNotes": "Agent re-review request (1/25): Fixed all 5 blocking findings: (1) hook now registered for PostToolUseFailure parsing the documented top-level error field — PostToolUse only fires on success; (2) auth classifier tightened — 401 needs a non-identifier boundary and successful payloads are only classified when error-shaped, so MIN-401/prose can't false-trigger; (3) lifecycles carry durable seq-N correlation ids on notified events, fold applies notifications only to their own lifecycle, wake pass drains until stable (deferred-delivery repro test added); (4) fold reads via healthy-anchored sequence predicate with boundary expansion, no per-type 100-event cap (>100 events regression test added); (5) blocked agents enriched with canonical tracker URLs via the issues read door — MIN issues render as links; stale auth action hidden when expired. Lint, typecheck, root (10383) and frontend (2382) suites all green.",
     "inspectNotes": "Fold dedupes required events per-agent via Map; latest non-null authUrl/authUrlAgentId wins; expiry computed from authUrlExpiresAt and reactivates on fresh required; healthy event closes to lastCompleted, notified targets open??lastCompleted, duplicate healthy is a no-op leaving wake set empty post-notification. All 4 ACs verified by hand against fake-timer tests.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3004",
     "lastVerifiedCommit": "6c913d7c1bcb6582223a79b0841a881e37e6d209",
@@ -256,7 +256,7 @@
       },
       "costAtCloseOut": {
         "usd": 98.003005,
-        "pricingAsOf": "2026-07-22T02:08:43.412Z"
+        "pricingAsOf": "2026-07-22T02:08:46.156Z"
       }
     },
     "merges": [
