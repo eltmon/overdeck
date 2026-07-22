@@ -76,19 +76,8 @@ import { registerCloseCommand } from './commands/close.js';
 import { showCommand } from './commands/show.js';
 import { listCommand as issuesCommand } from './commands/issues.js';
 import { triageCommand } from './commands/triage.js';
-import { pendingCommand } from './commands/pending.js';
-import { requestReviewCommand } from './commands/request-review.js';
-import { resetReviewCommand } from './commands/reset-review.js';
-import { abortReviewCommand } from './commands/abort-review.js';
-import { reviewModeCommand, reviewScopeCommand } from './commands/review-mode.js';
+import { registerReviewCommands } from './commands/review-subcommands.js';
 import { staffingCommand } from './commands/staffing.js';
-// PAN-1048 R5: `pan review run` removed. Review now runs as the role primitive
-// via spawnRun(issueId, 'review', …) → roles/review.md, with convoy reviewers
-// spawned by the review role through `pan review spawn-reviewer`.
-// The blocking-orchestrator CLI was the only caller of runParallelReview /
-// parseReviewSynthesis (now also retired).
-import { reviewRestartCommand } from './commands/review-restart.js';
-import { reviewSpawnReviewerCommand } from './commands/review-spawn-reviewer.js';
 import { destroyCommand as destroyWorkspaceCommand, registerWorkspaceCommands } from './commands/workspace.js';
 import { registerTestCommands } from './commands/test.js';
 import { registerTtsCommands } from './commands/tts.js';
@@ -330,63 +319,9 @@ program
   .option('-e, --editor <editor>', 'Editor to use (cursor, windsurf, vscode, zed, etc.)')
   .action(openCommand);
 
-// pan review — pending, request, reset
-const review = program
-  .command('review')
-  .description('Review-loop management: pending items, request re-review, reset cycles');
-
-review
-  .command('pending')
-  .description('List completed work awaiting review')
-  .option('--ready', 'List issues ready for merge (review+test green, not merged) regardless of origin')
-  .option('--blocked', 'List issues blocked in review/test/merge from the SQLite review-status store')
-  .action(pendingCommand);
-
-review
-  .command('request <id>')
-  .description('Request re-review after fixing feedback')
-  .option('-m, --message <text>', 'Message describing the fixes applied')
-  .action(requestReviewCommand);
-
-review
-  .command('reset <id>')
-  .description('Reset review/test/merge cycles (human override)')
-  .option('--session', 'Also clear all saved Claude review-session pointers')
-  .action(resetReviewCommand);
-
-review
-  .command('abort <id>')
-  .description('Kill all running reviewer sessions and leave the worker idle')
-  .action(abortReviewCommand);
-review
-  .command('mode <id> <mode>')
-  .description('Set per-issue review mode (quick, full, or none)')
-  .action(reviewModeCommand);
-review
-  .command('scope <id> <scope>')
-  .description('Set per-issue re-review scope (all, changed, or blockers) — which convoy reviewers re-run (PAN-1874)')
-  .action(reviewScopeCommand);
+registerReviewCommands(program);
 
 program.command('staffing <id>').description('Show or set per-issue work-model and swarm overrides').option('--model <model>', 'Set the work model, or default to clear the override').option('--swarm <mode>', 'Set swarm mode (off, auto, always), or default to clear the override').action(staffingCommand);
-review
-  .command('restart <id>')
-  .description('Kill running reviewers and dispatch fresh review pipeline')
-  .option('--model <model>', 'Override model for all reviewers (e.g. gpt-5.4, claude-sonnet-5)')
-  .option('--role <role>', 'Restart only a specific reviewer role (correctness/security/performance/requirements)')
-  .action(reviewRestartCommand);
-
-review
-  .command('spawn-reviewer <id>', { hidden: true })
-  .description('Internal: spawn one review convoy sub-role')
-  .requiredOption('--sub-role <role>', 'Reviewer sub-role (security/correctness/performance/requirements)')
-  .requiredOption('--run-id <id>', 'Review run ID')
-  .option('--workspace <path>', 'Workspace path')
-  .option('--output <path>', 'Reviewer output path')
-  .option('--context <path>', 'Context manifest path')
-  .option('--model <model>', 'Override reviewer model')
-  .action(reviewSpawnReviewerCommand);
-
-// PAN-1048 R5: `pan review run` removed (see import note above).
 
 // pan backlog — sequence writer surface
 const backlog = program

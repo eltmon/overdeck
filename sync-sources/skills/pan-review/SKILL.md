@@ -1,12 +1,13 @@
 ---
 name: pan-review
-description: "pan review <subcommand> — manage the code review lifecycle: list pending work, set quick/full mode, re-request review, reset/abort/restart review cycles"
+description: "pan review <subcommand> — manage the code review lifecycle: list pending work, re-request review, heal status drift, reset/abort/restart review cycles"
 triggers:
   - pan review
   - review pending
   - request review
   - review mode
   - reset review
+  - resync review
   - restart review
   - abort review
   - code review lifecycle
@@ -30,6 +31,7 @@ pan review pending --blocked                       # List blocked review/test/me
 pan review request <id>                            # Re-request review after fixing feedback
 pan review mode <id> <quick|full>                  # Set this issue's review mode override
 pan review reset <id> [--session]                  # Reset review/test/merge cycles (human override)
+pan review resync <id>                             # Re-emit canonical status to heal dashboard drift
 pan review abort <id>                              # Kill all running reviewers, leave worker idle
 pan review restart <id> [--model <m>] [--role <r>] # Kill reviewers and dispatch a fresh review pipeline
 ```
@@ -54,6 +56,9 @@ pan review restart <id> [--model <m>] [--role <r>] # Kill reviewers and dispatch
   pipeline can be re-dispatched from scratch. Use when the saved state is
   inconsistent or corrupt. `--session` additionally clears the saved Claude
   session for each reviewer so they restart with a clean conversation.
+- **`resync <id>`** — Reads the canonical review status and re-emits it without
+  changing any verdict. Use when an issue passed review but is missing from
+  Awaiting Merge or its actions are wrongly gated by stale dashboard state.
 - **`abort <id>`** — Kills any currently running reviewer sessions but
   leaves the work agent alone. Use when reviewers are stuck or running
   against the wrong commit and you want to halt without resetting state.
@@ -77,6 +82,7 @@ pan review restart <id> [--model <m>] [--role <r>] # Kill reviewers and dispatch
 | This issue needs the full review convoy | `pan review mode <id> full` |
 | Return an issue to default quick review | `pan review mode <id> quick` |
 | Pipeline state is inconsistent, need a clean slate | `pan review reset <id>` |
+| Issue passed but is missing from Awaiting Merge or actions are wrongly gated | `pan review resync <id>` |
 | Same as above plus reviewer Claude sessions are bad | `pan review reset <id> --session` |
 | Reviewer is hung, just kill it | `pan review abort <id>` |
 | Reviewer crashed, want a fresh convoy with a different model | `pan review restart <id> --model gpt-5.4` |
