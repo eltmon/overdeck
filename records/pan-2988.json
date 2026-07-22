@@ -15,20 +15,79 @@
     }
   ],
   "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "docs/ISSUE-VIEW.md",
+      "reference/troubleshooting.mdx",
+      "scripts/file-size-baseline.txt",
+      "src/cli/commands/resync-review.ts",
+      "src/cli/commands/review-subcommands.ts",
+      "src/cli/index.ts",
+      "src/dashboard/frontend/src/lib/__tests__/issueActions.parity.test.tsx",
+      "src/dashboard/frontend/src/lib/issueActions.ts",
+      "src/dashboard/server/deacon-main.ts",
+      "src/dashboard/server/event-store.ts",
+      "src/dashboard/server/main.ts",
+      "src/dashboard/server/review-status-emit.ts",
+      "src/dashboard/server/routes/workspaces/review-control.ts",
+      "src/dashboard/server/services/review-status-reconcile-service.ts",
+      "src/lib/review-status-enrichment.ts",
+      "src/lib/review-status-reconcile.ts",
+      "src/lib/review-status.ts",
+      "sync-sources/skills/pan-review/SKILL.md",
+      "tests/dashboard/event-store.test.ts",
+      "tests/unit/dashboard/server/review-status-emit.test.ts",
+      "tests/unit/dashboard/server/routes/resync-review-route.test.ts",
+      "tests/unit/dashboard/server/services/review-status-reconcile-service.test.ts",
+      "tests/unit/lib/review-status-enrichment.test.ts",
+      "tests/unit/lib/review-status-reconcile.test.ts"
+    ],
+    "actualChangedFiles": [
+      "docs/ISSUE-VIEW.md",
+      "reference/troubleshooting.mdx",
+      "scripts/file-size-baseline.txt",
+      "src/cli/commands/resync-review.ts",
+      "src/cli/commands/review-subcommands.ts",
+      "src/cli/index.ts",
+      "src/dashboard/frontend/src/lib/__tests__/issueActions.parity.test.tsx",
+      "src/dashboard/frontend/src/lib/issueActions.ts",
+      "src/dashboard/server/deacon-main.ts",
+      "src/dashboard/server/event-store.ts",
+      "src/dashboard/server/main.ts",
+      "src/dashboard/server/review-status-emit.ts",
+      "src/dashboard/server/routes/workspaces/review-control.ts",
+      "src/dashboard/server/services/review-status-reconcile-service.ts",
+      "src/lib/review-status-enrichment.ts",
+      "src/lib/review-status-reconcile.ts",
+      "src/lib/review-status.ts",
+      "sync-sources/skills/pan-review/SKILL.md",
+      "tests/dashboard/event-store.test.ts",
+      "tests/unit/dashboard/server/review-status-emit.test.ts",
+      "tests/unit/dashboard/server/routes/resync-review-route.test.ts",
+      "tests/unit/dashboard/server/services/review-status-reconcile-service.test.ts",
+      "tests/unit/lib/review-status-enrichment.test.ts",
+      "tests/unit/lib/review-status-reconcile.test.ts"
+    ],
+    "recordedAt": "2026-07-22T23:18:12.981Z"
+  },
   "created": "2026-07-22T21:25:31.822Z",
-  "updated": "2026-07-22T23:18:16.950Z",
+  "updated": "2026-07-22T23:18:17.991Z",
   "pipeline": {
     "issueId": "PAN-2988",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-22T23:18:15.947Z",
+    "updatedAt": "2026-07-22T23:18:16.965Z",
     "inspectNotes": "All 3 call sites (main.ts status_changed + merge-ready, deacon-main.ts merge-ready) now call emitReviewStatusChanged synchronously before any async enrichment; helper appends unenriched status first, then races enrichment against a 5s Effect.timeout via Effect.catch (verified Effect.catch is the effect@4.0.0-beta.73 name for catchAll, and TimeoutException is a typed/recoverable failure so it's caught correctly), logs a warning naming the issue on timeout/failure with exactly one event appended, and gates the second enriched append on both hasSugar and an unchanged canonical updatedAt. grep confirms enrichReviewStatus is no longer imported/referenced in main.ts or deacon-main.ts.",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3010",
     "reviewRequestedAt": "2026-07-22T23:18:15.947Z",
+    "reviewSpawnedAt": "2026-07-22T23:18:16.965Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
       "declaredScopeUntouched": [],
@@ -85,54 +144,55 @@
         "tests/unit/lib/review-status-reconcile.test.ts"
       ],
       "recordedAt": "2026-07-22T23:18:12.981Z"
-    },
-    "prUrl": "https://github.com/eltmon/overdeck/pull/3010"
+    }
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "review.supervisor": {
           "anthropic/claude-sonnet-5": {
-            "input": 28,
-            "output": 5027,
-            "cacheRead": 1763207,
-            "cacheWrite": 140641
+            "input": 30,
+            "output": 5662,
+            "cacheRead": 1904959,
+            "cacheWrite": 142239
           }
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 526266,
-            "output": 26363,
-            "cacheRead": 9131008,
+            "input": 4177420,
+            "output": 251098,
+            "cacheRead": 121912832,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "anthropic/claude-sonnet-5": {
-          "input": 28,
-          "output": 5027,
-          "cacheRead": 1763207,
-          "cacheWrite": 140641
+          "input": 30,
+          "output": 5662,
+          "cacheRead": 1904959,
+          "cacheWrite": 142239
         },
         "openai/gpt-5.6-sol": {
-          "input": 526266,
-          "output": 26363,
-          "cacheRead": 9131008,
+          "input": 4177420,
+          "output": 251098,
+          "cacheRead": 121912832,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 8.742296,
-        "pricingAsOf": "2026-07-22T21:54:09.011Z"
+        "usd": 90.169727,
+        "pricingAsOf": "2026-07-22T23:18:16.980Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/3010"
+    ],
     "ranOn": "eltmon-z790"
   },
   "workModel": "gpt-5.6-sol",
   "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "model": "gpt-5.6-sol",
   "tasks": {
     "sequence": 16,
     "claims": {},
@@ -295,62 +355,5 @@
     "docs": "completed",
     "docs.docs.ac1": "completed",
     "docs.docs.ac2": "completed"
-  },
-  "scopeDrift": {
-    "outsideDeclaredScope": [],
-    "declaredScopeUntouched": [],
-    "declaredScope": [
-      "docs/ISSUE-VIEW.md",
-      "reference/troubleshooting.mdx",
-      "scripts/file-size-baseline.txt",
-      "src/cli/commands/resync-review.ts",
-      "src/cli/commands/review-subcommands.ts",
-      "src/cli/index.ts",
-      "src/dashboard/frontend/src/lib/__tests__/issueActions.parity.test.tsx",
-      "src/dashboard/frontend/src/lib/issueActions.ts",
-      "src/dashboard/server/deacon-main.ts",
-      "src/dashboard/server/event-store.ts",
-      "src/dashboard/server/main.ts",
-      "src/dashboard/server/review-status-emit.ts",
-      "src/dashboard/server/routes/workspaces/review-control.ts",
-      "src/dashboard/server/services/review-status-reconcile-service.ts",
-      "src/lib/review-status-enrichment.ts",
-      "src/lib/review-status-reconcile.ts",
-      "src/lib/review-status.ts",
-      "sync-sources/skills/pan-review/SKILL.md",
-      "tests/dashboard/event-store.test.ts",
-      "tests/unit/dashboard/server/review-status-emit.test.ts",
-      "tests/unit/dashboard/server/routes/resync-review-route.test.ts",
-      "tests/unit/dashboard/server/services/review-status-reconcile-service.test.ts",
-      "tests/unit/lib/review-status-enrichment.test.ts",
-      "tests/unit/lib/review-status-reconcile.test.ts"
-    ],
-    "actualChangedFiles": [
-      "docs/ISSUE-VIEW.md",
-      "reference/troubleshooting.mdx",
-      "scripts/file-size-baseline.txt",
-      "src/cli/commands/resync-review.ts",
-      "src/cli/commands/review-subcommands.ts",
-      "src/cli/index.ts",
-      "src/dashboard/frontend/src/lib/__tests__/issueActions.parity.test.tsx",
-      "src/dashboard/frontend/src/lib/issueActions.ts",
-      "src/dashboard/server/deacon-main.ts",
-      "src/dashboard/server/event-store.ts",
-      "src/dashboard/server/main.ts",
-      "src/dashboard/server/review-status-emit.ts",
-      "src/dashboard/server/routes/workspaces/review-control.ts",
-      "src/dashboard/server/services/review-status-reconcile-service.ts",
-      "src/lib/review-status-enrichment.ts",
-      "src/lib/review-status-reconcile.ts",
-      "src/lib/review-status.ts",
-      "sync-sources/skills/pan-review/SKILL.md",
-      "tests/dashboard/event-store.test.ts",
-      "tests/unit/dashboard/server/review-status-emit.test.ts",
-      "tests/unit/dashboard/server/routes/resync-review-route.test.ts",
-      "tests/unit/dashboard/server/services/review-status-reconcile-service.test.ts",
-      "tests/unit/lib/review-status-enrichment.test.ts",
-      "tests/unit/lib/review-status-reconcile.test.ts"
-    ],
-    "recordedAt": "2026-07-22T23:18:12.981Z"
   }
 }
