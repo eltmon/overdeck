@@ -4,17 +4,17 @@
     "created": "2026-07-21T15:17:07Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2984: Assisted Node-24 install for the open-knowledge viewer (version-manager aware, never touches default node)",
-    "updated": "2026-07-21T15:24:27.320Z"
+    "updated": "2026-07-22T20:56:22.104Z"
   },
   "plan": {
     "id": "pan-2984",
     "title": "Assisted Node-24 install for the open-knowledge viewer (version-manager aware, never touches default node)",
-    "status": "running",
+    "status": "completed",
     "uid": "a2e189a8-83cb-477b-93bd-c49f677998b2",
     "author": "agent:claude-fable-5",
-    "sequence": 4,
+    "sequence": 5,
     "created": "2026-07-21T15:17:07Z",
-    "updated": "2026-07-21T15:24:27.320Z",
+    "updated": "2026-07-22T20:56:22.104Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2984",
@@ -729,5 +729,5 @@
       "canonicalFilename": "2026-07-21-PAN-2984-assisted-node-24-install-for-the-open-knowledge-viewer-version-manager-aware-never-touches-default-node.xbrief.json"
     }
   },
-  "status": "active"
+  "status": "completed"
 }
