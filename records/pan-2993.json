@@ -103,14 +103,19 @@
   "scopeDrift": {
     "outsideDeclaredScope": [
       "drizzle/overdeck/0000_overdeck_init.sql",
+      "scripts/file-size-baseline.txt",
       "src/cli/commands/__tests__/strike-ready.test.ts",
+      "src/dashboard/server/routes/agents/spawn.ts",
       "src/dashboard/server/routes/workspaces/merge-strike.ts",
       "src/lib/overdeck/__tests__/schema-topups.test.ts",
       "src/lib/overdeck/infra.ts",
       "src/lib/overdeck/review-status-sync.ts",
-      "src/lib/workspace/stack-health.ts",
+      "src/lib/rebase-helper.ts",
+      "src/lib/review-status.ts",
       "tests/unit/dashboard/server/routes/strike-merge.test.ts",
-      "tests/unit/lib/overdeck/review-status-sync.test.ts"
+      "tests/unit/lib/overdeck/review-status-record-sync-fallback.test.ts",
+      "tests/unit/lib/overdeck/review-status-sync.test.ts",
+      "tests/unit/lib/rebase-helper.test.ts"
     ],
     "declaredScopeUntouched": [],
     "declaredScope": [
@@ -129,8 +134,10 @@
     "actualChangedFiles": [
       "docs/SPECIALIST_WORKFLOW.md",
       "drizzle/overdeck/0000_overdeck_init.sql",
+      "scripts/file-size-baseline.txt",
       "src/cli/commands/__tests__/strike-ready.test.ts",
       "src/cli/commands/strike-ready.ts",
+      "src/dashboard/server/routes/agents/spawn.ts",
       "src/dashboard/server/routes/workspaces/merge-strike.ts",
       "src/lib/agents/messaging.ts",
       "src/lib/cloister/deacon-strike-landing.ts",
@@ -139,19 +146,22 @@
       "src/lib/overdeck/review-status-record-sync.ts",
       "src/lib/overdeck/review-status-sync.ts",
       "src/lib/pan-dir/records.ts",
+      "src/lib/rebase-helper.ts",
+      "src/lib/review-status.ts",
       "src/lib/strike-landing.ts",
-      "src/lib/workspace/stack-health.ts",
       "tests/lib/cloister/deacon-strike-landing.test.ts",
       "tests/unit/cli/commands/strike-ready.test.ts",
       "tests/unit/dashboard/server/routes/strike-merge.test.ts",
       "tests/unit/lib/agents/message-agent.test.ts",
       "tests/unit/lib/cloister/deacon-strike-transport.test.ts",
-      "tests/unit/lib/overdeck/review-status-sync.test.ts"
+      "tests/unit/lib/overdeck/review-status-record-sync-fallback.test.ts",
+      "tests/unit/lib/overdeck/review-status-sync.test.ts",
+      "tests/unit/lib/rebase-helper.test.ts"
     ],
-    "recordedAt": "2026-07-21T23:54:05.124Z"
+    "recordedAt": "2026-07-22T19:46:31.826Z"
   },
   "created": "2026-07-21T22:47:36.935Z",
-  "updated": "2026-07-22T19:46:23.528Z",
+  "updated": "2026-07-22T19:46:31.827Z",
   "pipeline": {
     "issueId": "PAN-2993",
     "reviewStatus": "reviewing",
