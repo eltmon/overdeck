@@ -37,7 +37,7 @@ export async function unpauseCommand(id: string): Promise<void> {
     // Resume immediately — unpause means "go now", not "wait for the Deacon's
     // next patrol". Only when there is actually a session to resume; a plain
     // stopped agent with no session is pointed at pan start instead.
-    if (getWorkAgentLifecycleStateSync(agentId).canResumeSession) {
+    if (wasPaused && getWorkAgentLifecycleStateSync(agentId).canResumeSession) {
       console.log(chalk.dim('Resuming now…'));
       const result = await resumeAgent(agentId);
       if (result.success) {
@@ -47,7 +47,7 @@ export async function unpauseCommand(id: string): Promise<void> {
         console.error(chalk.dim(`Run pan start ${issueId} to spawn a fresh agent.`));
         process.exitCode = 1;
       }
-    } else {
+    } else if (wasPaused) {
       console.log(chalk.dim(`No saved session to resume — run pan start ${issueId} to spawn now.`));
     }
   } catch (error: any) {

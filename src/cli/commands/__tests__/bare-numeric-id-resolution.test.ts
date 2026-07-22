@@ -32,6 +32,11 @@ const interventionMocks = vi.hoisted(() => ({
   appendOperatorInterventionEvent: vi.fn(),
 }));
 
+const unpauseMocks = vi.hoisted(() => ({
+  getWorkAgentLifecycleStateSync: vi.fn(),
+  resumeAgent: vi.fn(),
+}));
+
 const lifecycleMocks = vi.hoisted(() => ({
   closeOut: vi.fn(),
 }));
@@ -107,6 +112,14 @@ vi.mock('../../../lib/lifecycle/archive-planning.js', () => ({
 
 vi.mock('../../../lib/operator-interventions.js', () => ({
   appendOperatorInterventionEvent: interventionMocks.appendOperatorInterventionEvent,
+}));
+
+vi.mock('../../../lib/work-agent-lifecycle.js', () => ({
+  getWorkAgentLifecycleStateSync: unpauseMocks.getWorkAgentLifecycleStateSync,
+}));
+
+vi.mock('../../../lib/agents/resume.js', () => ({
+  resumeAgent: unpauseMocks.resumeAgent,
 }));
 
 vi.mock('../../../lib/lifecycle/index.js', () => ({
@@ -216,6 +229,10 @@ describe('resolveBareNumericIdSync rollout (PAN-1173)', () => {
     workspaceMocks.findWorkspacePath.mockReturnValue(null);
     interventionMocks.appendOperatorInterventionEvent.mockReset();
     interventionMocks.appendOperatorInterventionEvent.mockResolvedValue(undefined);
+    unpauseMocks.getWorkAgentLifecycleStateSync.mockReset();
+    unpauseMocks.getWorkAgentLifecycleStateSync.mockReturnValue({ canResumeSession: false });
+    unpauseMocks.resumeAgent.mockReset();
+    unpauseMocks.resumeAgent.mockResolvedValue({ success: true });
     lifecycleMocks.closeOut.mockReset();
     lifecycleMocks.closeOut.mockReturnValue(Effect.succeed({ success: true, steps: [] }));
     inspectMocks.spawnInspectAgent.mockReset();
