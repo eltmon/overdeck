@@ -10,7 +10,7 @@
   ],
   "feedback": [],
   "created": "2026-07-16T05:02:53.170Z",
-  "updated": "2026-07-22T21:14:13.308Z",
+  "updated": "2026-07-22T21:21:25.876Z",
   "pipeline": {
     "issueId": "PAN-2599",
     "reviewStatus": "pending",
@@ -103,16 +103,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "settings-api": {
-        "writerId": "agent-pan-2599",
-        "agentId": "agent-pan-2599",
-        "pid": 1538950,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-22T21:14:13.307Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2599",
@@ -146,6 +138,17 @@
         "outcome": "completed",
         "reason": "Added the 15-event telemetry contract, privacy-restricted per-event property types, contract barrel export, and schema drift tests.",
         "releasedAt": "2026-07-22T21:07:42.869Z"
+      },
+      {
+        "writerId": "agent-pan-2599",
+        "agentId": "agent-pan-2599",
+        "pid": 1538950,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-22T21:14:13.307Z",
+        "itemId": "settings-api",
+        "outcome": "completed",
+        "reason": "Settings GET now reports effective telemetry enablement plus install ID, and generic PUT persistence validates and writes telemetry.enabled while ignoring installId writes.",
+        "releasedAt": "2026-07-22T21:21:25.876Z"
       }
     ],
     "statusReasons": {
@@ -160,6 +163,10 @@
       "contracts-schema": {
         "reason": "Added the 15-event telemetry contract, privacy-restricted per-event property types, contract barrel export, and schema drift tests.",
         "updatedAt": "2026-07-22T21:07:42.869Z"
+      },
+      "settings-api": {
+        "reason": "Settings GET now reports effective telemetry enablement plus install ID, and generic PUT persistence validates and writes telemetry.enabled while ignoring installId writes.",
+        "updatedAt": "2026-07-22T21:21:25.876Z"
       }
     }
   },
@@ -173,6 +180,8 @@
     "contracts-schema": "completed",
     "contracts-schema.contracts-schema.ac1": "completed",
     "contracts-schema.contracts-schema.ac2": "completed",
-    "settings-api": "running"
+    "settings-api": "completed",
+    "settings-api.settings-api.ac1": "completed",
+    "settings-api.settings-api.ac2": "completed"
   }
 }
