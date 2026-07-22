@@ -1,6 +1,5 @@
 import React from 'react';
-import posthog from 'posthog-js';
-import packageJson from '../../../../package.json';
+import { bucketCount, captureException } from './lib/telemetry';
 
 /**
  * Front-end self-recovery for dashboard restarts.
@@ -19,10 +18,9 @@ import packageJson from '../../../../package.json';
  * Strategy: on a same-origin module/asset load failure, show a reconnecting
  * overlay, poll the origin until it serves again, then reload. Three reloads
  * within 15 seconds are allowed; the fourth trips a manual-recovery circuit
- * breaker. Each decision sends `frontend_recovery_reload` to PostHog immediately
- * with trigger, resource, message, stackHead, reloadCount, and appVersion.
- * A tripped circuit breaker also sends `frontend_recovery_reload_loop` with the
- * same properties.
+ * breaker. Each decision is reported through PostHog exception capture with a
+ * categorical recovery action, trigger, reload-count bucket, and reload decision.
+ * A tripped circuit breaker reports a second `frontend_recovery_reload_loop` action.
  */
 
 const OVERLAY_ID = 'pan-recovery-overlay';
@@ -109,14 +107,17 @@ export function captureRecoveryReload(
   details: RecoveryDetails,
   decision: { count: number; shouldReload: boolean },
 ): void {
-  const properties = {
-    ...details,
-    reloadCount: decision.count,
-    appVersion: packageJson.version,
+  const error = new Error(details.message ?? 'Frontend recovery reload');
+  if (details.stackHead) error.stack = details.stackHead;
+  const context = {
+    action: 'frontend_recovery_reload' as const,
+    trigger: details.trigger,
+    reload_count: bucketCount(decision.count),
+    should_reload: decision.shouldReload,
   };
-  posthog.capture('frontend_recovery_reload', properties, { send_instantly: true });
+  captureException(error, context);
   if (!decision.shouldReload) {
-    posthog.capture('frontend_recovery_reload_loop', properties, { send_instantly: true });
+    captureException(error, { ...context, action: 'frontend_recovery_reload_loop' });
   }
 }
 

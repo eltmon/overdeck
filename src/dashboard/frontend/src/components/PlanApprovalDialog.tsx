@@ -15,7 +15,7 @@
  */
 import { useState } from 'react'
 import { ClipboardCheck, Loader2, Minus, Check, MessageSquare } from 'lucide-react'
-import posthog from 'posthog-js'
+import { capture } from '../lib/telemetry'
 import { ChatMarkdown } from './chat/ChatMarkdown'
 
 export interface PlanApprovalSubject {
@@ -58,10 +58,8 @@ export function PlanApprovalDialog({
 
   const handleRequestChanges = (): void => {
     if (!feedback.trim()) return
-    posthog.capture('plan_changes_requested', {
-      subject_id: subject?.id,
-      issue_id: subject?.issueId,
-      kind_label: subject?.kindLabel,
+    capture('plan_changes_requested', {
+      subject_kind: subject.kindLabel === 'Conversation' ? 'conversation' : 'agent',
     })
     onRequestChanges(feedback.trim())
     setShowFeedback(false)
@@ -171,10 +169,8 @@ export function PlanApprovalDialog({
           <button
             type="button"
             onClick={() => {
-              posthog.capture('plan_approved', {
-                subject_id: subject?.id,
-                issue_id: subject?.issueId,
-                kind_label: subject?.kindLabel,
+              capture('plan_approved', {
+                subject_kind: subject.kindLabel === 'Conversation' ? 'conversation' : 'agent',
               })
               onApprove()
             }}

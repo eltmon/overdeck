@@ -1,17 +1,13 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import posthog from 'posthog-js';
+import { initTelemetry } from './lib/telemetry';
 import { DialogProvider } from './components/DialogProvider';
 import App from './App';
 import { installRecovery, RootErrorBoundary } from './recovery';
 import './index.css';
 
-posthog.init(import.meta.env.VITE_PUBLIC_POSTHOG_KEY as string, {
-  api_host: import.meta.env.VITE_PUBLIC_POSTHOG_HOST as string,
-  person_profiles: 'identified_only',
-  capture_exceptions: true,
-});
+void initTelemetry();
 
 // Recover from asset/module load failures during a server restart (the blank
 // page + 404 symptom). Install before render so a failure mid-boot is caught.

@@ -13,7 +13,7 @@ import { useCallback, useMemo } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { SendHorizontal, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import posthog from 'posthog-js';
+import { capture, captureException } from '../../lib/telemetry';
 import type { SessionNode as SessionNodeType } from '@overdeck/contracts';
 import type { StartAgentResponse } from '../../types';
 import { useCommandDeckSelection } from '../../lib/commandDeckSelection';
@@ -98,9 +98,8 @@ export function IssueComposer({ issueId, sessions }: IssueComposerProps) {
       return data;
     },
     onSuccess: (_data, message) => {
-      posthog.capture('agent_spawned', {
-        issue_id: issueId,
-        spawn_mode: mode.kind,
+      capture('agent_spawned', {
+        spawn_mode: mode.kind === 'spawn-work-and-send' ? 'spawn-work-and-send' : 'spawn-and-send',
         has_message: Boolean(message),
       });
       clearDraft(issueId);
@@ -109,7 +108,7 @@ export function IssueComposer({ issueId, sessions }: IssueComposerProps) {
     },
     onError: (err: Error) => {
       if (err instanceof StartBlockHandoff) return;
-      posthog.captureException(err, { issue_id: issueId });
+      captureException(err, { action: 'agent_spawn' });
       toast.error(err.message, { duration: 8000 });
     },
   });

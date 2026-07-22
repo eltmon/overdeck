@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import posthog from 'posthog-js';
+import { captureException } from './lib/telemetry';
 import {
   captureRecoveryReload,
   hideOverlay,
@@ -12,9 +12,10 @@ import {
   showOverlay,
 } from './recovery';
 
-vi.mock('posthog-js', () => ({
-  default: { capture: vi.fn() },
-}));
+vi.mock('./lib/telemetry', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./lib/telemetry')>();
+  return { ...actual, captureException: vi.fn() };
+});
 
 const INDEX_HTML = readFileSync(resolve(process.cwd(), 'index.html'), 'utf8');
 
@@ -121,18 +122,16 @@ describe('recovery reload telemetry', () => {
       message: 'Module asset failed to load',
     }, decision);
 
-    expect(posthog.capture).toHaveBeenCalledWith(
-      'frontend_recovery_reload',
-      expect.objectContaining({
+    expect(captureException).toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'Module asset failed to load' }),
+      {
+        action: 'frontend_recovery_reload',
         trigger: 'asset_load_error',
-        resource: `${window.location.origin}/assets/App.js`,
-        message: 'Module asset failed to load',
-        reloadCount: 1,
-        appVersion: expect.any(String),
-      }),
-      { send_instantly: true },
+        reload_count: '1-2',
+        should_reload: true,
+      },
     );
-    expect(posthog.capture).toHaveBeenCalledTimes(1);
+    expect(captureException).toHaveBeenCalledTimes(1);
   });
 
   it('sends loop telemetry immediately when the circuit breaker trips', () => {
@@ -148,21 +147,20 @@ describe('recovery reload telemetry', () => {
       stackHead: 'Error: chunk failed',
     }, decision);
 
-    expect(posthog.capture).toHaveBeenNthCalledWith(
+    expect(captureException).toHaveBeenNthCalledWith(
       1,
-      'frontend_recovery_reload',
+      expect.objectContaining({ stack: 'Error: chunk failed' }),
       expect.objectContaining({
+        action: 'frontend_recovery_reload',
         trigger: 'root_error_boundary',
-        reloadCount: 4,
-        stackHead: 'Error: chunk failed',
+        reload_count: '3-5',
+        should_reload: false,
       }),
-      { send_instantly: true },
     );
-    expect(posthog.capture).toHaveBeenNthCalledWith(
+    expect(captureException).toHaveBeenNthCalledWith(
       2,
-      'frontend_recovery_reload_loop',
-      expect.objectContaining({ reloadCount: 4 }),
-      { send_instantly: true },
+      expect.objectContaining({ stack: 'Error: chunk failed' }),
+      expect.objectContaining({ action: 'frontend_recovery_reload_loop', reload_count: '3-5' }),
     );
   });
 });
