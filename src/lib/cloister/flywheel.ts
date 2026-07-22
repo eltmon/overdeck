@@ -10,7 +10,10 @@ import { getInternalTokenSync, INTERNAL_TOKEN_HEADER } from '../internal-token.j
 import { getAgentDir, spawnRun, stopAgent } from '../agents.js';
 import { parseSequenceMd } from '../backlog/sequence-io.js';
 import { computePredictedConflictSignals, declaredIssueFootprint, pickFromSequence, type IssueFileFootprint } from '../flywheel-merge-order.js';
+import { requireFlywheelBrief } from '../flywheel-start.js';
 import { findProjectByPathSync, getProjectSwarmHotspots } from '../projects.js';
+import { getBook as getOrderBook } from '../orders/resolver.js';
+import { resolveStateReadHomeSync } from '../state-read-home.js';
 import type { XBriefDocument } from '../xbrief/types.js';
 import {
   getFlywheelActiveRunId,
@@ -19,7 +22,7 @@ import {
   setFlywheelActiveRunId,
   setFlywheelGloballyPaused,
 } from '../overdeck/control-settings.js';
-import { resolveLiveFlywheelRunId, saveRunCohort } from '../../dashboard/server/services/flywheel-run-state.js';
+import { abortFlywheelRun, readFlywheelLaunchMetadata, resolveLiveFlywheelRunId, saveRunCohort } from '../../dashboard/server/services/flywheel-run-state.js';
 import { buildClassifyLookups } from '../backlog/lookups.js';
 import { computeCohort } from '../backlog/pickup.js';
 import { gatherProjectLensSignals } from '../pipeline-membership-gather.js';
@@ -33,6 +36,32 @@ export function isIssueInResolvedPipeline(issueId: string, memberships: Pipeline
   );
 }
 
+interface ActiveOrderBookIssuesDeps {
+  activeRunId?: () => string | null;
+  readLaunch?: typeof readFlywheelLaunchMetadata;
+  stateRoot?: (projectRoot: string) => string | null;
+  getBook?: typeof getOrderBook;
+}
+
+export async function activeOrderBookIssues(
+  projectRoot: string,
+  runId?: string,
+  deps: ActiveOrderBookIssuesDeps = {},
+): Promise<ReadonlySet<string>> {
+  const activeRunId = runId ?? (deps.activeRunId ?? getFlywheelActiveRunId)();
+  if (!activeRunId) return new Set();
+  const launch = await (deps.readLaunch ?? readFlywheelLaunchMetadata)(activeRunId);
+  const bookId = launch?.orders?.bookId;
+  if (!bookId) return new Set();
+  const stateRoot = deps.stateRoot?.(projectRoot) ?? (() => {
+    const project = findProjectByPathSync(projectRoot);
+    return project ? resolveStateReadHomeSync(project).root : null;
+  })();
+  if (!stateRoot) return new Set();
+  const book = (deps.getBook ?? getOrderBook)(stateRoot, bookId);
+  return new Set(book?.items.map((item) => item.issue.toUpperCase()) ?? []);
+}
+
 const FlywheelRunIdSchema = Schema.String.check(Schema.isPattern(/^RUN-\d+$/));
 const decodeFlywheelRunId = Schema.decodeUnknownSync(FlywheelRunIdSchema);
 
@@ -40,6 +69,8 @@ export interface FlywheelLifecycleOptions {
   runId?: FlywheelRunId;
   workspace?: string;
   briefPath?: string;
+  briefOverlayPath?: string;
+  briefOverlayContent?: string;
   prompt?: string;
   model?: string;
   harness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp';
@@ -105,7 +136,7 @@ async function fetchIssueRowsFromDashboard(): Promise<Array<{ ref?: string; iden
   }
 }
 
-async function flywheelRunConfigurationSection(options: FlywheelLifecycleOptions): Promise<string> {
+async function flywheelRunConfigurationSection(options: FlywheelLifecycleOptions, runId?: string): Promise<string> {
   const configLines = [
     options.harness ? `Harness: ${options.harness}` : undefined,
     options.effort ? `Effort: ${options.effort}` : undefined,
@@ -121,8 +152,10 @@ async function flywheelRunConfigurationSection(options: FlywheelLifecycleOptions
   ].filter(Boolean).join('\n');
 
   let sequenceSection = '';
-  if (options.autoPickupBacklog) {
-    const seqPath = join(process.cwd(), '.pan', 'backlog', 'sequence.md');
+  const projectRoot = process.cwd();
+  const orderBookIssues = await activeOrderBookIssues(projectRoot, runId);
+  if (options.autoPickupBacklog || orderBookIssues.size > 0) {
+    const seqPath = join(projectRoot, '.pan', 'backlog', 'sequence.md');
     if (existsSync(seqPath)) {
       try {
         const md = readFileSync(seqPath, 'utf-8');
@@ -148,7 +181,6 @@ async function flywheelRunConfigurationSection(options: FlywheelLifecycleOptions
             return assigneeName === 'eltmon';
           };
 
-          const projectRoot = process.cwd();
           const specsDir = join(projectRoot, '.pan', 'specs');
           const issuesWithSpecs = new Set<string>();
           const declaredFootprints: IssueFileFootprint[] = [];
@@ -186,7 +218,16 @@ async function flywheelRunConfigurationSection(options: FlywheelLifecycleOptions
           const top10 = parsed.doc.nodes.slice(0, 10).map((n) =>
             `  #${n.rank} ${n.issue}: ${n.why.slice(0, 100)} [gate:${n.gate}]`,
           );
-          const nextPick = pickFromSequence(parsed.doc.nodes, { issueLabels: issueLabelsLookup, isAuthorizedIssue, isReadyOrHasPrd, isInPipeline, requireReady: true, autoPickupBacklog: options.autoPickupBacklog, predictedConflictSignals });
+          const nextPick = pickFromSequence(parsed.doc.nodes, {
+            issueLabels: issueLabelsLookup,
+            isAuthorizedIssue,
+            isReadyOrHasPrd,
+            isInPipeline,
+            requireReady: true,
+            autoPickupBacklog: options.autoPickupBacklog,
+            activeBookMembership: orderBookIssues,
+            predictedConflictSignals,
+          });
           let nextLine: string;
           let pickInstruction: string;
           if (!membershipAvailable) {
@@ -218,7 +259,7 @@ async function flywheelRunConfigurationSection(options: FlywheelLifecycleOptions
 }
 
 async function defaultFlywheelPrompt(runId: string, options: FlywheelLifecycleOptions, briefContent?: string): Promise<string> {
-  const configSection = await flywheelRunConfigurationSection(options);
+  const configSection = await flywheelRunConfigurationSection(options, runId);
   const briefSection = options.briefPath
     ? `\n\nBrief path: ${options.briefPath}\n\n${briefContent ?? ''}`
     : '';
@@ -276,15 +317,37 @@ export function buildFlywheelResumePrompt(configSection: string, briefContent?: 
   return `${base}${configSection}${brief}`;
 }
 
+function withOrderBookBriefOverlay(
+  briefContent: string | undefined,
+  overlayPath: string | undefined,
+  overlayContent: string | undefined,
+): string | undefined {
+  if (!overlayContent) return briefContent;
+  const standard = briefContent?.trimEnd() ?? '';
+  const overlay = `--- Order-book brief overlay${overlayPath ? `: ${overlayPath}` : ''} ---\n\n${overlayContent.trim()}`;
+  return standard ? `${standard}\n\n${overlay}` : overlay;
+}
+
 export async function spawnFlywheelAgent(runId: string, options: FlywheelLifecycleOptions = {}): Promise<AgentState> {
   const workspace = options.workspace ?? process.cwd();
   // Re-read the brief on every spawn (fresh AND resume) so its directives survive
   // resume/compaction. Default to the standard brief path when none is supplied.
   const briefPath = options.briefPath ?? join(workspace, 'docs', 'flywheel-brief.md');
-  const briefContent = await readFile(briefPath, 'utf8').catch(() => undefined);
+  let briefOverlayPath = options.briefOverlayPath;
+  let briefOverlayContent = options.briefOverlayContent;
+  if (briefOverlayPath && briefOverlayContent === undefined) {
+    const resolvedOverlay = await requireFlywheelBrief(workspace, briefOverlayPath);
+    briefOverlayPath = resolvedOverlay.displayPath;
+    briefOverlayContent = await readFile(resolvedOverlay.absolutePath, 'utf8');
+  }
+  const briefContent = withOrderBookBriefOverlay(
+    await readFile(briefPath, 'utf8').catch(() => undefined),
+    briefOverlayPath,
+    briefOverlayContent,
+  );
   const prompt = options.resumeSessionId
-    ? buildFlywheelResumePrompt(await flywheelRunConfigurationSection(options), briefContent)
-    : (options.prompt ?? (await defaultFlywheelPrompt(runId, options, briefContent)));
+    ? buildFlywheelResumePrompt(await flywheelRunConfigurationSection(options, runId), briefContent)
+    : (options.prompt ?? (await defaultFlywheelPrompt(runId, { ...options, briefPath }, briefContent)));
   return spawnRun(runId, 'flywheel', {
     agentId: FLYWHEEL_ORCHESTRATOR_AGENT_ID,
     workspace,
@@ -335,12 +398,26 @@ export async function spawnFlywheel(options: FlywheelLifecycleOptions = {}): Pro
     if (existsSync(seqPath)) {
       const parsed = parseSequenceMd(readFileSync(seqPath, 'utf-8'));
       if (parsed.ok) {
-        saveRunCohort(runId, computeCohort(parsed.doc.nodes, buildClassifyLookups(workspace), options.maxAgents ?? 5, options.autoPickupBacklog ?? isFlywheelAutoPickupBacklog()));
+        saveRunCohort(runId, computeCohort(
+          parsed.doc.nodes,
+          buildClassifyLookups(workspace),
+          options.maxAgents ?? 5,
+          options.autoPickupBacklog ?? isFlywheelAutoPickupBacklog(),
+          await activeOrderBookIssues(workspace, runId),
+        ));
       }
     }
   } catch { /* cohort snapshot is best-effort */ }
 
   return agent;
+}
+
+export async function abortSpawnedFlywheel(runId: string): Promise<void> {
+  try {
+    await Effect.runPromise(stopAgent(FLYWHEEL_ORCHESTRATOR_AGENT_ID));
+  } finally {
+    await abortFlywheelRun(runId);
+  }
 }
 
 export async function pauseFlywheel(): Promise<FlywheelPauseResult> {
@@ -368,7 +445,14 @@ export async function resumeFlywheel(options: FlywheelLifecycleOptions = {}): Pr
   const runId = parseRunId(activeRunId);
 
   const resumeSessionId = options.resumeSessionId ?? await loadResumeSessionId(runId) ?? undefined;
-  const agent = await spawnFlywheelAgent(runId, withFlywheelAutonomyOptions({ ...options, resumeSessionId }));
+  const launch = await readFlywheelLaunchMetadata(runId);
+  const agent = await spawnFlywheelAgent(runId, withFlywheelAutonomyOptions({
+    ...options,
+    workspace: options.workspace ?? launch?.workspace,
+    briefPath: options.briefPath ?? launch?.briefPath,
+    briefOverlayPath: options.briefOverlayPath ?? launch?.briefOverlayPath,
+    resumeSessionId,
+  }));
   setFlywheelGloballyPaused(false);
   return { activeRunId, agent };
 }

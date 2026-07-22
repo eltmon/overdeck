@@ -24,6 +24,7 @@ import { AgentsSkeleton } from '../components/skeletons/AgentsSkeleton';
 import { PipelineSkeleton } from '../components/skeletons/PipelineSkeleton';
 import { GodViewSkeleton } from '../components/skeletons/GodViewSkeleton';
 import { FlywheelPage } from '../pages/FlywheelPage';
+import { OrderBookPage } from '../pages/OrderBookPage';
 import { BacklogSequencerPage } from '../pages/BacklogSequencerPage';
 import { HomePage } from '../pages/HomePage';
 import type { Tab } from '../components/Header';
@@ -221,6 +222,11 @@ export function AppRoutes({
             }}
             onNavigateIssue={(issueId) => onOpenIssue(issueId)}
           />
+        </div>
+      )}
+      {activeTab === 'orders' && (
+        <div className="w-full h-full overflow-hidden">
+          <OrderBookPage />
         </div>
       )}
       {activeTab === 'backlog' && (

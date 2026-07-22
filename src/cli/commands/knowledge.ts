@@ -1,3 +1,4 @@
+import { createInterface } from 'node:readline/promises';
 import chalk from 'chalk';
 import ora from 'ora';
 import type { Command } from 'commander';
@@ -6,8 +7,11 @@ import { spawnRun } from '../../lib/agents.js';
 import { ensureMnemos } from '../../lib/installers/mnemos.js';
 import {
   ensureOpenKnowledge,
+  executeOpenKnowledgeSetupPlan,
+  OpenKnowledgeSetupRequiredError,
   startReadOnlyOpenKnowledgeServer,
   type EnsureOpenKnowledgeResult,
+  type OpenKnowledgeSetupPlan,
   type StartOpenKnowledgeServerResult,
 } from '../../lib/installers/open-knowledge.js';
 import { resolveKnowledgeBundleRoot } from '../../lib/memory/injection.js';
@@ -29,7 +33,10 @@ export interface KnowledgeOpenOptions {
 export interface KnowledgeOpenDependencies {
   cwd?: () => string;
   ensure?: (options: { autoInstall: boolean }) => Promise<EnsureOpenKnowledgeResult>;
-  start?: (bundlePath: string, options: { openBrowser: false }) => Promise<StartOpenKnowledgeServerResult>;
+  executeSetupPlan?: (plan: OpenKnowledgeSetupPlan) => Promise<string>;
+  start?: (bundlePath: string, options: { openBrowser: false; okCommand?: string }) => Promise<StartOpenKnowledgeServerResult>;
+  prompt?: (question: string) => Promise<string>;
+  isTTY?: () => boolean;
   openBrowser?: (url: string) => Promise<void>;
 }
 
@@ -145,8 +152,29 @@ export async function knowledgeOpenCommand(
 
   const ensure = dependencies.ensure ?? ensureOpenKnowledge;
   const start = dependencies.start ?? startReadOnlyOpenKnowledgeServer;
-  await ensure({ autoInstall: options.install !== false });
-  const viewer = await start(bundlePath, { openBrowser: false });
+  const autoInstall = options.install !== false;
+  let installation: EnsureOpenKnowledgeResult;
+  try {
+    installation = await ensure({ autoInstall });
+  } catch (error) {
+    if (!autoInstall || !(error instanceof OpenKnowledgeSetupRequiredError)) throw error;
+    const plan = error.plan;
+    for (const step of plan.steps) console.log(step);
+    const manualCommand = plan.kind === 'install-nvm' ? plan.manualCommand : plan.installCommand;
+    if (!(dependencies.isTTY?.() ?? process.stdin.isTTY === true)) {
+      throw new Error(`${plan.steps.join('\n')}\nRun manually: ${manualCommand}`);
+    }
+
+    const answer = await (dependencies.prompt ?? promptForKnowledgeSetup)('Proceed? [y/N] ');
+    if (!/^y(?:es)?$/i.test(answer.trim())) {
+      console.log(`Manual setup: ${manualCommand}`);
+      return;
+    }
+
+    await (dependencies.executeSetupPlan ?? executeOpenKnowledgeSetupPlan)(plan);
+    installation = await ensure({ autoInstall });
+  }
+  const viewer = await start(bundlePath, { openBrowser: false, okCommand: installation.command });
   viewer.process?.unref();
 
   console.log(`Knowledge viewer: ${viewer.url}${viewer.reused ? ' (reused)' : ''}`);
@@ -156,6 +184,15 @@ export async function knowledgeOpenCommand(
     await (dependencies.openBrowser ?? openViewerInBrowser)(viewer.url);
   } catch (error: unknown) {
     console.warn(`Could not open the browser automatically: ${errorMessage(error)}`);
+  }
+}
+
+async function promptForKnowledgeSetup(question: string): Promise<string> {
+  const readline = createInterface({ input: process.stdin, output: process.stdout });
+  try {
+    return await readline.question(question);
+  } finally {
+    readline.close();
   }
 }
 

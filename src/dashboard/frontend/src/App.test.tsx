@@ -274,13 +274,12 @@ describe('conversation route helpers', () => {
     });
   });
 
-  it('maps the Flywheel URL to the flywheel tab', () => {
+  it('maps the Flywheel and Order Book URLs to their tabs', () => {
     window.history.replaceState(null, '', '/flywheel');
+    expect(getConversationRouteState()).toMatchObject({ tab: 'flywheel', convId: null });
 
-    expect(getConversationRouteState()).toMatchObject({
-      tab: 'flywheel',
-      convId: null,
-    });
+    window.history.replaceState(null, '', '/orders');
+    expect(getConversationRouteState()).toMatchObject({ tab: 'orders', convId: null });
   });
 
   it('resolves Home as the default route, Pipeline as /pipeline, Board as /board, and Context as /context', () => {

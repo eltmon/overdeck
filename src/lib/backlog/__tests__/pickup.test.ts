@@ -104,6 +104,12 @@ describe('isAutoPickable', () => {
     expect(isAutoPickable({ ...base, released: false, objection: true }, true)).toBe(false);
     expect(isAutoPickable({ ...base, released: false, planned: false }, true)).toBe(false);
   });
+
+  it('active order-book membership releases only the member when auto-pickup is off', () => {
+    const unreleased = { ...base, released: false };
+    expect(isAutoPickable(unreleased, false, true)).toBe(true);
+    expect(isAutoPickable(unreleased, false, false)).toBe(false);
+  });
 });
 
 describe('isUnblockEligible (override)', () => {
@@ -125,6 +131,15 @@ describe('pickableQueue ordering', () => {
     ];
     const lk = lookups({ A: { labels: ['ready', 'released'], planned: true }, B: { labels: ['ready', 'released'], planned: true }, C: { labels: ['ready', 'released'], planned: true } });
     expect(pickableQueue(nodes, lk).map((n) => n.issue)).toEqual(['B', 'A', 'C']);
+  });
+
+  it('includes an unreleased active-book member but excludes an unreleased off-book issue', () => {
+    const nodes = [node({ issue: 'PAN-1', rank: 1 }), node({ issue: 'PAN-2', rank: 2 })];
+    const lk = lookups({
+      'PAN-1': { labels: ['ready'], planned: true },
+      'PAN-2': { labels: ['ready'], planned: true },
+    });
+    expect(pickableQueue(nodes, lk, false, new Set(['PAN-2'])).map((item) => item.issue)).toEqual(['PAN-2']);
   });
 });
 

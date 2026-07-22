@@ -1,8 +1,10 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import {
   ensureOpenKnowledge,
+  resolveOpenKnowledgeSetupPlan,
   startReadOnlyOpenKnowledgeServer,
   type EnsureOpenKnowledgeResult,
+  type OpenKnowledgeSetupPlan,
   type StartOpenKnowledgeServerResult,
 } from '../../../lib/installers/open-knowledge.js';
 import { resolveKnowledgeBundleRoot } from '../../../lib/memory/injection.js';
@@ -21,6 +23,7 @@ export interface KnowledgeViewerStatus {
   proxyUrl?: string;
   embeddable?: boolean;
   message?: string;
+  setupPlan?: { kind: string; steps: string[] };
 }
 
 export interface KnowledgeViewerService {
@@ -33,14 +36,16 @@ export interface KnowledgeViewerService {
 export interface KnowledgeViewerDependencies {
   resolveBundle?: (projectKey: string) => Promise<string | null>;
   ensure?: (options: { autoInstall: false }) => Promise<EnsureOpenKnowledgeResult>;
-  start?: (bundlePath: string, options: { openBrowser: false }) => Promise<StartOpenKnowledgeServerResult>;
-  stop?: (bundlePath: string) => Promise<void>;
+  resolveSetupPlan?: () => Promise<OpenKnowledgeSetupPlan>;
+  start?: (bundlePath: string, options: { openBrowser: false; okCommand?: string }) => Promise<StartOpenKnowledgeServerResult>;
+  stop?: (bundlePath: string, okCommand?: string) => Promise<void>;
   fetchImpl?: typeof fetch;
 }
 
 interface ViewerEntry {
   bundlePath: string;
   runtimeBundlePath: string;
+  okCommand: string;
   process: ChildProcess | null;
   owned: boolean;
   port: number;
@@ -59,12 +64,17 @@ export function createKnowledgeViewerService(
 ): KnowledgeViewerService {
   const resolveBundle = dependencies.resolveBundle ?? resolveBundleForProject;
   const ensure = dependencies.ensure ?? ((options) => ensureOpenKnowledge(options));
+  const resolveSetupPlan = dependencies.resolveSetupPlan ?? resolveOpenKnowledgeSetupPlan;
   const start = dependencies.start ?? ((bundlePath, options) => startReadOnlyOpenKnowledgeServer(bundlePath, options));
   const stop = dependencies.stop ?? stopOpenKnowledgeWithSpawn;
   const fetchImpl = dependencies.fetchImpl ?? fetch;
   const entries = new Map<string, ViewerEntry>();
   const starts = new Map<string, Promise<KnowledgeViewerStatus>>();
   let installedCache: EnsureOpenKnowledgeResult | null = null;
+  let missingInstallationCache: {
+    message: string;
+    setupPlan?: KnowledgeViewerStatus['setupPlan'];
+  } | null = null;
 
   async function getStatus(projectKey: string): Promise<KnowledgeViewerStatus> {
     const bundlePath = await resolveBundle(projectKey);
@@ -72,14 +82,25 @@ export function createKnowledgeViewerService(
       return unavailableStatus(projectKey, starts.has(projectKey), 'No OKF bundle is configured. Run `/okf init` first.');
     }
 
-    let installed = true;
-    let installMessage: string | undefined;
-    try {
-      installedCache ??= await ensure({ autoInstall: false });
-    } catch (error) {
-      installed = false;
-      installMessage = errorMessage(error);
+    if (!installedCache && !missingInstallationCache) {
+      try {
+        installedCache = await ensure({ autoInstall: false });
+      } catch (error) {
+        let message = errorMessage(error);
+        let setupPlan: KnowledgeViewerStatus['setupPlan'];
+        try {
+          const plan = await resolveSetupPlan();
+          if (plan.kind !== 'ready') setupPlan = { kind: plan.kind, steps: plan.steps };
+        } catch (planError) {
+          message = errorMessage(planError);
+        }
+        missingInstallationCache = { message, ...(setupPlan ? { setupPlan } : {}) };
+      }
     }
+
+    const installed = installedCache !== null;
+    const installMessage = missingInstallationCache?.message;
+    const setupPlan = missingInstallationCache?.setupPlan;
 
     const entry = entries.get(projectKey);
     if (entry && isProcessLive(entry)) {
@@ -97,6 +118,7 @@ export function createKnowledgeViewerService(
           url: entry.url,
           embeddable: probe.embeddable,
           ...(installMessage ? { message: installMessage } : {}),
+          ...(setupPlan ? { setupPlan } : {}),
         };
       }
     }
@@ -110,6 +132,7 @@ export function createKnowledgeViewerService(
       running: false,
       bundlePath,
       ...(installMessage ? { message: installMessage } : {}),
+      ...(setupPlan ? { setupPlan } : {}),
     };
   }
 
@@ -128,16 +151,19 @@ export function createKnowledgeViewerService(
     const status = await getStatus(projectKey);
     if (!status.bundleConfigured || !status.installed || status.running) return status;
 
+    const okCommand = installedCache?.command ?? 'ok';
     let started: StartOpenKnowledgeServerResult;
     try {
-      started = await start(status.bundlePath!, { openBrowser: false });
+      started = await start(status.bundlePath!, { openBrowser: false, okCommand });
     } catch (error) {
       installedCache = null;
+      missingInstallationCache = null;
       throw error;
     }
     const entry: ViewerEntry = {
       bundlePath: status.bundlePath!,
       runtimeBundlePath: started.runtimeBundlePath,
+      okCommand,
       process: started.process,
       owned: started.owned,
       port: started.port,
@@ -175,7 +201,7 @@ export function createKnowledgeViewerService(
     if (entries.get(projectKey) === entry) entries.delete(projectKey);
     if (!entry.owned) return;
     try {
-      await stop(entry.runtimeBundlePath);
+      await stop(entry.runtimeBundlePath, entry.okCommand);
     } catch {
       // The tracked child is still ours to terminate when the `ok stop` helper fails.
     }
@@ -184,6 +210,7 @@ export function createKnowledgeViewerService(
 
   function invalidateInstallationCache(): void {
     installedCache = null;
+    missingInstallationCache = null;
   }
 
   async function stopAll(): Promise<void> {
@@ -239,9 +266,9 @@ function responseAllowsEmbedding(headers: Headers): boolean {
   return frameAncestors !== "'none'" && frameAncestors !== "'self'";
 }
 
-async function stopOpenKnowledgeWithSpawn(bundlePath: string): Promise<void> {
+async function stopOpenKnowledgeWithSpawn(bundlePath: string, okCommand = 'ok'): Promise<void> {
   await new Promise<void>((resolve, reject) => {
-    const child = spawn('ok', ['--cwd', bundlePath, 'stop'], { stdio: 'ignore' });
+    const child = spawn(okCommand, ['--cwd', bundlePath, 'stop'], { stdio: 'ignore' });
     child.once('error', reject);
     child.once('exit', (code) => {
       if (code === 0) resolve();

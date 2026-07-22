@@ -107,7 +107,7 @@ import { createCostCommand } from './commands/cost.js';
 import { createMemoryCommand } from './commands/memory.js';
 import { createBriefingCommand } from './commands/briefing.js';
 import { createComplianceCommand } from './commands/compliance.js';
-import { createRegistryCommand } from './commands/registry.js';
+import { createRegistryCommand } from './commands/registry.js'; import { createOrdersCommand } from './commands/orders.js';
 import { createDocsCommand } from './commands/docs.js';
 import { planCommand } from './commands/plan.js';
 import { strikeCommand } from './commands/strike.js'; import { registerStrikeReadyCommand } from './commands/strike-ready.js';
@@ -577,7 +577,7 @@ program
   .option('--force', 'Clear a paused agent gate and start anyway')
   .option('--fresh', 'Drop the saved Claude session (non-destructive) and start a new one — e.g. to switch a stopped agent\'s model')
   .option('--host', 'Bypass workspace docker stack-health gate and spawn on the host')
-  .option('--yes', 'Confirm --host in non-interactive contexts')
+  .option('--yes', 'Confirm --host in non-interactive contexts').option('--off-book', 'Allow one work-agent dispatch outside the active order book and log the override')
   .action(startCommand);
 
 program
@@ -601,7 +601,7 @@ registerRolloutCommands(program);
 program.addCommand(createMemoryCommand());
 program.addCommand(createBriefingCommand());
 program.addCommand(createComplianceCommand());
-program.addCommand(createRegistryCommand());
+program.addCommand(createRegistryCommand()); program.addCommand(createOrdersCommand());
 program.addCommand(createDocsCommand());
 
 // Register admin commands (pan admin cloister, pan admin specialists, etc.)

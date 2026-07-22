@@ -39,6 +39,13 @@ interface FlywheelSuggestionShape {
   priority: string;
 }
 
+interface OrderDrainFixture {
+  name: string;
+  runDir: string;
+  realImprovements: string[];
+  expectRetro: boolean;
+}
+
 const cases: Array<{ input: BoardFixture; expected: BoardFixture }> = [
   {
     input: {
@@ -208,6 +215,56 @@ function launchedIssues(suggestions: FlywheelSuggestionShape[]): Set<string> {
   return set;
 }
 
+const orderDrainCases: Array<{ input: OrderDrainFixture; expected: OrderDrainFixture }> = [
+  {
+    input: {
+      name: 'drained order book with real improvements',
+      runDir: '/tmp/flywheel/runs/RUN-42',
+      realImprovements: ['Clarify the order-book launch template when a prerequisite is parked.'],
+      expectRetro: true,
+    },
+    expected: {
+      name: 'drained order book with real improvements',
+      runDir: '/tmp/flywheel/runs/RUN-42',
+      realImprovements: [],
+      expectRetro: true,
+    },
+  },
+  {
+    input: {
+      name: 'drained order book without real improvements',
+      runDir: '/tmp/flywheel/runs/RUN-43',
+      realImprovements: [],
+      expectRetro: false,
+    },
+    expected: {
+      name: 'drained order book without real improvements',
+      runDir: '/tmp/flywheel/runs/RUN-43',
+      realImprovements: [],
+      expectRetro: false,
+    },
+  },
+];
+
+async function runOrderDrainFixture(fixture: OrderDrainFixture): Promise<{ actions: string[]; raw: string }> {
+  const system = [flywheelRole, '', '---', '', flywheelBrief].join('\n');
+  const user = [
+    'The current mechanically-derived Flywheel status contains `orders.drained: true`.',
+    `The run directory is ${fixture.runDir}.`,
+    fixture.realImprovements.length > 0
+      ? `You recognized these real improvements: ${fixture.realImprovements.join(' ')}`
+      : 'You recognized no real doctrine, substrate, or template improvements.',
+    'Emit ONLY a JSON array of concise actions you take next, in order. Include literal paths and commands.',
+  ].join('\n');
+  const raw = await runPromptScenario({ system, user });
+  const parsed = extractJsonArray(raw);
+  return { actions: parsed.filter((value): value is string => typeof value === 'string'), raw };
+}
+
+function normalizedActions(actions: string[]): string {
+  return actions.join('\n').toLowerCase();
+}
+
 evalite<BoardFixture, { suggestions: FlywheelSuggestionShape[]; raw: string }, BoardFixture>(
   'flywheel launch-vs-report decision',
   {
@@ -243,6 +300,53 @@ evalite<BoardFixture, { suggestions: FlywheelSuggestionShape[]; raw: string }, B
         name: 'parses as json array',
         description: 'The model response must be parseable as a JSON array of suggestions.',
         scorer: ({ output }) => (Array.isArray(output.suggestions) ? 1 : 0),
+      }),
+    ],
+  },
+);
+
+evalite<OrderDrainFixture, { actions: string[]; raw: string }, OrderDrainFixture>(
+  'flywheel order-book drain completion',
+  {
+    data: orderDrainCases,
+    task: async (input) => runOrderDrainFixture(input),
+    scorers: [
+      createScorer({
+        name: 'completes the drained run',
+        description: 'A drained order-book run invokes the canonical completion command.',
+        scorer: ({ output }) => normalizedActions(output.actions).includes('pan flywheel complete') ? 1 : 0,
+      }),
+      createScorer({
+        name: 'records only real improvements',
+        description: 'retro.md is written exactly when the fixture identifies a real improvement.',
+        scorer: ({ output, expected }) => {
+          if (!expected) return 0;
+          const mentionsRetro = normalizedActions(output.actions).includes(`${expected.runDir.toLowerCase()}/retro.md`);
+          return mentionsRetro === expected.expectRetro ? 1 : 0;
+        },
+      }),
+      createScorer({
+        name: 'files recognized improvements',
+        description: 'A real improvement produces an issue-filing action; an empty retrospective does not.',
+        scorer: ({ output, expected }) => {
+          if (!expected) return 0;
+          const filesIssue = normalizedActions(output.actions).includes('issue');
+          return filesIssue === expected.expectRetro ? 1 : 0;
+        },
+      }),
+      createScorer({
+        name: 'ends without self-continuation',
+        description: 'After completion the orchestrator ends its turn instead of launching another run.',
+        scorer: ({ output }) => {
+          const actions = normalizedActions(output.actions);
+          const endsTurn = actions.includes('end') && actions.includes('turn');
+          return endsTurn && !actions.includes('pan flywheel start') ? 1 : 0;
+        },
+      }),
+      createScorer({
+        name: 'parses as an action array',
+        description: 'The model response must be a non-empty JSON array of action strings.',
+        scorer: ({ output }) => output.actions.length > 0 ? 1 : 0,
       }),
     ],
   },

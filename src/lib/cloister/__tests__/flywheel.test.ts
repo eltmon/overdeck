@@ -1,3 +1,6 @@
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
@@ -5,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   paused: false,
   autoPickupBacklog: false,
   requireUatBeforeMerge: true,
+  launchMetadata: null as null | { workspace?: string; briefPath?: string; briefOverlayPath?: string },
   spawnRun: vi.fn(async (issueId: string, role: string, options: { agentId: string; workspace: string; harness?: 'claude-code' | 'pi'; flywheelRunId?: string }) => ({
     id: options.agentId,
     issueId,
@@ -49,7 +53,9 @@ vi.mock('../../overdeck/control-settings.js', () => ({
 // short-circuit it to mirror the prior gate-only semantics; the resolver's
 // self-heal logic is covered by flywheel-run-state's own tests.
 vi.mock('../../../dashboard/server/services/flywheel-run-state.js', () => ({
+  readFlywheelLaunchMetadata: async () => mocks.launchMetadata,
   resolveLiveFlywheelRunId: async () => mocks.activeRunId,
+  saveRunCohort: vi.fn(),
 }));
 
 import { FLYWHEEL_ORCHESTRATOR_AGENT_ID, buildFlywheelResumePrompt, pauseFlywheel, resumeFlywheel, spawnFlywheel } from '../flywheel.js';
@@ -62,6 +68,7 @@ describe('flywheel lifecycle', () => {
     mocks.paused = false;
     mocks.autoPickupBacklog = false;
     mocks.requireUatBeforeMerge = true;
+    mocks.launchMetadata = null;
     mocks.spawnRun.mockClear();
     mocks.stopAgentProgram.mockClear();
   });
@@ -104,6 +111,20 @@ describe('flywheel lifecycle', () => {
     expect(prompt).toContain('Scope: all-tracked-projects');
     expect(prompt).toContain('Auto-pickup backlog: false');
     expect(prompt).toContain('Require UAT before merge: true');
+  });
+
+  it('appends an order-book overlay to the effective orchestrator brief', async () => {
+    await spawnFlywheel({
+      runId: 'RUN-1',
+      workspace: '/repo',
+      env: cleanEnv,
+      briefOverlayPath: 'docs/campaign-overlay.md',
+      briefOverlayContent: 'Run this campaign in the operator-specified order.',
+    });
+
+    const prompt = mocks.spawnRun.mock.calls[0][2].prompt;
+    expect(prompt).toContain('Order-book brief overlay: docs/campaign-overlay.md');
+    expect(prompt).toContain('Run this campaign in the operator-specified order.');
   });
 
   it('renders the flywheel autonomy options truth table in the brief', async () => {
@@ -183,6 +204,37 @@ describe('flywheel lifecycle', () => {
     expect(resumePrompt).toContain('Run configuration:');
     expect(resumePrompt).toContain('Auto-pickup backlog: false');
     expect(resumePrompt).toContain('Require UAT before merge: true');
+  });
+
+  it('re-attaches the persisted order-book overlay during cwd-independent automatic recovery', async () => {
+    const workspace = mkdtempSync(join(tmpdir(), 'flywheel-overlay-resume-'));
+    const dashboardCwd = mkdtempSync(join(tmpdir(), 'flywheel-dashboard-cwd-'));
+    const originalCwd = process.cwd();
+    mkdirSync(join(workspace, 'docs'), { recursive: true });
+    writeFileSync(join(workspace, 'docs', 'flywheel-brief.md'), 'Standing instructions.');
+    writeFileSync(join(workspace, 'docs', 'campaign-overlay.md'), 'Resume this campaign in strict order.');
+    try {
+      await spawnFlywheel({ runId: 'RUN-9', workspace, env: cleanEnv });
+      await pauseFlywheel();
+      mocks.launchMetadata = {
+        workspace,
+        briefPath: join(workspace, 'docs', 'flywheel-brief.md'),
+        briefOverlayPath: 'docs/campaign-overlay.md',
+      };
+      process.chdir(dashboardCwd);
+
+      await resumeFlywheel();
+
+      expect(mocks.spawnRun.mock.calls[1][2].workspace).toBe(workspace);
+      const resumePrompt = mocks.spawnRun.mock.calls[1][2].prompt;
+      expect(resumePrompt).toContain('Standing instructions.');
+      expect(resumePrompt).toContain('Order-book brief overlay: docs/campaign-overlay.md');
+      expect(resumePrompt).toContain('Resume this campaign in strict order.');
+    } finally {
+      process.chdir(originalCwd);
+      rmSync(workspace, { recursive: true, force: true });
+      rmSync(dashboardCwd, { recursive: true, force: true });
+    }
   });
 
   it('keeps the pause gate set when resume spawn fails', async () => {

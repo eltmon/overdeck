@@ -295,6 +295,42 @@ function ActionDialogFrame({ label, onClose, children }: ActionDialogFrameProps)
 }
 
 
+function NewOrderBookDialog({ actions, onClose }: { actions: UseIssueActionsResult; onClose: () => void }) {
+  const [name, setName] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const trimmed = name.trim();
+    if (!trimmed || submitting) return;
+    setSubmitting(true);
+    try {
+      await actions.createOrderBookForIssue(trimmed);
+      onClose();
+    } catch {
+      // The shared action hook presents the server error.
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <ActionDialogFrame label="New order book" onClose={onClose}>
+      <form className="space-y-3" onSubmit={(event) => { void onSubmit(event); }}>
+        <label className="block space-y-1 text-xs text-muted-foreground">
+          <span>Book name</span>
+          <input autoFocus value={name} onChange={(event) => setName(event.target.value)} className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary" />
+        </label>
+        <p className="text-[11px] text-muted-foreground">The issue will be added to Lane A. Arrange the book on the Order Book page.</p>
+        <div className="flex justify-end gap-2">
+          <button type="button" className="rounded-md px-3 py-1.5 text-xs text-muted-foreground hover:bg-accent" onClick={onClose}>Cancel</button>
+          <button type="submit" disabled={!name.trim() || submitting} className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-50">{submitting ? 'Creating…' : 'Create & add'}</button>
+        </div>
+      </form>
+    </ActionDialogFrame>
+  );
+}
+
 function InspectTaskDialog({ issueId, actions, onClose }: { issueId: string; actions: UseIssueActionsResult; onClose: () => void }) {
   const action = actions.activeDialog?.action;
   const [tasks, setTasks] = useState<TaskTask[]>([]);
@@ -416,6 +452,10 @@ export function IssueActionDialogHost({ issueId, actions, onAfterClose }: { issu
 
   if (activeDialog.key === 'inspectTask') {
     return <InspectTaskDialog issueId={issueId} actions={actions} onClose={handleClose} />;
+  }
+
+  if (activeDialog.key === 'addToOrderBook') {
+    return <NewOrderBookDialog actions={actions} onClose={handleClose} />;
   }
 
   return (
