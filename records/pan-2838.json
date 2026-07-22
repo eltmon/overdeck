@@ -174,7 +174,7 @@
     "recordedAt": "2026-07-22T21:35:20.476Z"
   },
   "created": "2026-07-17T12:34:27.875Z",
-  "updated": "2026-07-22T21:35:56.119Z",
+  "updated": "2026-07-22T21:36:02.013Z",
   "pipeline": {
     "issueId": "PAN-2838",
     "reviewStatus": "pending",
@@ -184,7 +184,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-22T21:35:55.937Z",
+    "updatedAt": "2026-07-22T21:36:01.975Z",
     "inspectNotes": "Verbatim extraction: ProjectSettingsSection + ProjectDisclosure moved byte-for-byte into ProjectSettingsDisclosure.tsx, new wrapper reproduces identical JSX (title/summary/badges/children) at the call site, fetch endpoints unchanged, old definitions fully removed from ProjectOverview.tsx.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3006",
     "reviewRequestedAt": "2026-07-22T21:35:23.853Z",
@@ -226,9 +226,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 352964,
-            "output": 3185,
-            "cacheRead": 256000,
+            "input": 368412,
+            "output": 6697,
+            "cacheRead": 817152,
             "cacheWrite": 0
           }
         },
@@ -257,9 +257,9 @@
           "cacheWrite": 158395
         },
         "openai/gpt-5.6-sol": {
-          "input": 2283011,
-          "output": 74786,
-          "cacheRead": 43582464,
+          "input": 2298459,
+          "output": 78298,
+          "cacheRead": 44143616,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -270,8 +270,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 43.676056,
-        "pricingAsOf": "2026-07-22T21:35:56.055Z"
+        "usd": 44.139232,
+        "pricingAsOf": "2026-07-22T21:36:02.003Z"
       }
     },
     "merges": [
