@@ -192,6 +192,9 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
     issues: {
       closedWindowDays: DEFAULT_CONFIG.issues.closedWindowDays,
     },
+    telemetry: {
+      enabled: DEFAULT_CONFIG.telemetry.enabled,
+    },
     experimental: {
       experimentalFeatures: DEFAULT_CONFIG.experimental.experimentalFeatures,
       claudeCodeChannels: DEFAULT_CONFIG.experimental.claudeCodeChannels,
@@ -663,6 +666,10 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
       if (result.resources.governorRecoveryReserveGb <= result.resources.governorSoftReserveGb) {
         result.resources.governorRecoveryReserveGb = result.resources.governorSoftReserveGb + 1;
       }
+    }
+
+    if (typeof config.telemetry?.enabled === 'boolean') {
+      result.telemetry.enabled = config.telemetry.enabled;
     }
 
     if (config.issues) {

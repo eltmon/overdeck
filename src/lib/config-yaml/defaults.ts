@@ -214,6 +214,9 @@ export const DEFAULT_CONFIG: NormalizedConfig = {
   issues: {
     closedWindowDays: 14,
   },
+  telemetry: {
+    enabled: true,
+  },
   experimental: {
     experimentalFeatures: false,
     claudeCodeChannels: false,
