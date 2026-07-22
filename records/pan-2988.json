@@ -135,7 +135,7 @@
     "recordedAt": "2026-07-22T23:43:55.929Z"
   },
   "created": "2026-07-22T21:25:31.822Z",
-  "updated": "2026-07-22T23:49:24.066Z",
+  "updated": "2026-07-22T23:49:27.880Z",
   "pipeline": {
     "issueId": "PAN-2988",
     "reviewStatus": "reviewing",
@@ -146,7 +146,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-22T23:45:50.199Z",
-    "updatedAt": "2026-07-22T23:49:22.568Z",
+    "updatedAt": "2026-07-22T23:49:27.852Z",
     "reviewNotes": "Review dispatch skipped — already running: agent-pan-2988-review",
     "inspectNotes": "All 3 call sites (main.ts status_changed + merge-ready, deacon-main.ts merge-ready) now call emitReviewStatusChanged synchronously before any async enrichment; helper appends unenriched status first, then races enrichment against a 5s Effect.timeout via Effect.catch (verified Effect.catch is the effect@4.0.0-beta.73 name for catchAll, and TimeoutException is a typed/recoverable failure so it's caught correctly), logs a warning naming the issue on timeout/failure with exactly one event appended, and gates the second enriched append on both hasSugar and an unchanged canonical updatedAt. grep confirms enrichReviewStatus is no longer imported/referenced in main.ts or deacon-main.ts.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3010",
@@ -262,7 +262,7 @@
       },
       "costAtCloseOut": {
         "usd": 141.003314,
-        "pricingAsOf": "2026-07-22T23:49:22.597Z"
+        "pricingAsOf": "2026-07-22T23:49:27.861Z"
       }
     },
     "merges": [
