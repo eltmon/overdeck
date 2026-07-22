@@ -626,9 +626,12 @@ export const LinearMcpAuthNotifiedEvent = Schema.Struct({
   payload: Schema.Struct({
     agentId: Schema.String,
     issueId: Schema.NullOr(Schema.String),
-    outcome: Schema.Literals(["delivered", "queued", "failed"]),
-    // Correlates this record to the lifecycle whose wake pass produced it;
-    // absent only in events written before PAN-2997 review cycle 2.
+    // 'delivering' is the durable pre-delivery claim (PAN-2997 review cycle
+    // 3): it makes the wake crash-idempotent — a crash after the claim never
+    // replays the delivery at boot recovery. lifecycleId correlates this
+    // record to the lifecycle whose wake pass produced it; absent only in
+    // events written before PAN-2997 review cycle 2.
+    outcome: Schema.Literals(["delivering", "delivered", "queued", "failed"]),
     lifecycleId: Schema.optional(Schema.String),
   }),
 })

@@ -1,10 +1,13 @@
 import type { StoredEvent } from '../../dashboard/server/event-store.js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+// Deliberately NO readFrom/queryByType on the mock store: the fold must read
+// only the auth-typed lifecycle slice through queryByTypesSince. Any call to
+// the generic full-history readers throws a TypeError and fails the test.
 const eventStoreMocks = vi.hoisted(() => ({
   appendAsync: vi.fn(),
-  queryByType: vi.fn(),
-  readFrom: vi.fn(),
+  queryByTypesSince: vi.fn(),
+  getLatestSequence: vi.fn(),
 }));
 
 vi.mock('../../dashboard/server/event-store.js', () => ({
@@ -13,6 +16,7 @@ vi.mock('../../dashboard/server/event-store.js', () => ({
 
 import {
   LINEAR_MCP_AUTH_URL_TTL_MS,
+  _resetLinearMcpAuthProjectionCacheForTests,
   computeLinearMcpAuthWakeSet,
   resolveLinearMcpAuthIntervention,
 } from '../linear-mcp-auth.js';
@@ -45,19 +49,15 @@ function healthyEvent(sequence: number, timestamp = '2026-07-21T12:05:00.000Z'):
   });
 }
 
-/** Mirrors the real store: queryByType returns the most recent `limit`
- * events in ascending order; readFrom returns everything after a sequence. */
+/** Mirrors the real query: type predicate and sequence bound both applied. */
 function useEvents(events: StoredEvent[]): void {
-  eventStoreMocks.queryByType.mockImplementation((type: string, limit = 100) => (
+  eventStoreMocks.queryByTypesSince.mockImplementation((types: string[], afterSequence: number) => (
     events
-      .filter(candidate => candidate.type === type)
+      .filter(candidate => candidate.sequence > afterSequence && types.includes(candidate.type))
       .sort((a, b) => a.sequence - b.sequence)
-      .slice(-limit)
   ));
-  eventStoreMocks.readFrom.mockImplementation((fromSequence: number) => (
-    events
-      .filter(candidate => candidate.sequence > fromSequence && candidate.type !== 'issues.snapshot')
-      .sort((a, b) => a.sequence - b.sequence)
+  eventStoreMocks.getLatestSequence.mockImplementation(() => (
+    events.reduce((max, candidate) => Math.max(max, candidate.sequence), 0)
   ));
 }
 
@@ -66,8 +66,9 @@ describe('Linear MCP auth intervention fold', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-07-21T12:00:00.000Z'));
     eventStoreMocks.appendAsync.mockReset();
-    eventStoreMocks.queryByType.mockReset();
-    eventStoreMocks.readFrom.mockReset();
+    eventStoreMocks.queryByTypesSince.mockReset();
+    eventStoreMocks.getLatestSequence.mockReset();
+    _resetLinearMcpAuthProjectionCacheForTests();
     useEvents([]);
   });
 
@@ -188,6 +189,69 @@ describe('Linear MCP auth intervention fold', () => {
 
     expect(intervention.blockedAgents.map(agent => agent.agentId)).toContain('agent-min-852');
     expect(intervention.blockedAgents).toHaveLength(2);
+  });
+
+  it('reads only the auth-typed slice even alongside a large unrelated event population', async () => {
+    // Regression: the polling path must never materialize unrelated retained
+    // history. The mock store has no readFrom at all, and queryByTypesSince
+    // applies both predicates, so any full-table read fails this test.
+    const events: StoredEvent[] = [requiredEvent(1, 'agent-min-852', 'MIN-852')];
+    for (let sequence = 2; sequence <= 5000; sequence++) {
+      events.push(event(sequence, 'agent.activity_changed', '2026-07-21T12:00:00.000Z', { agentId: 'agent-other' }));
+    }
+    events.push(healthyEvent(5001));
+    useEvents(events);
+
+    const intervention = await resolveLinearMcpAuthIntervention();
+
+    expect(intervention.status).toBe('none');
+    // Every delta query carries the auth type predicate — unrelated events
+    // are filtered in SQL, never in JS.
+    for (const call of eventStoreMocks.queryByTypesSince.mock.calls) {
+      expect(call[0]).toEqual(expect.arrayContaining([
+        'linear_mcp_auth.required',
+        'linear_mcp_auth.healthy',
+        'linear_mcp_auth.notified',
+        'linear_mcp_auth.callback_relayed',
+      ]));
+    }
+  });
+
+  it('advances the projection incrementally instead of refolding history per poll', async () => {
+    const events = [
+      requiredEvent(1, 'agent-min-852', 'MIN-852'),
+    ];
+    useEvents(events);
+
+    await resolveLinearMcpAuthIntervention();
+    await resolveLinearMcpAuthIntervention();
+
+    const calls = eventStoreMocks.queryByTypesSince.mock.calls;
+    expect(calls).toHaveLength(2);
+    // The second poll asks only for events after the first covered sequence.
+    expect(calls[0]?.[1]).toBe(0);
+    expect(calls[1]?.[1]).toBe(1);
+
+    events.push(healthyEvent(2));
+    useEvents(events);
+    await expect(resolveLinearMcpAuthIntervention()).resolves.toMatchObject({ status: 'none' });
+    expect(eventStoreMocks.queryByTypesSince.mock.calls[2]?.[1]).toBe(1);
+  });
+
+  it('rebuilds the projection when retention compaction empties the events table', async () => {
+    const events = [requiredEvent(1, 'agent-min-852', 'MIN-852')];
+    useEvents(events);
+    await resolveLinearMcpAuthIntervention();
+
+    // Retention compaction (or a purge) removed everything: the store's
+    // latest sequence is now behind the covered sequence, so the cached
+    // prefix is stale and the projection must restart from scratch.
+    useEvents([]);
+
+    await expect(resolveLinearMcpAuthIntervention()).resolves.toMatchObject({
+      status: 'none',
+      blockedAgents: [],
+    });
   });
 
   it('applies a delayed notification only to its own lifecycle, never to a newer one', async () => {

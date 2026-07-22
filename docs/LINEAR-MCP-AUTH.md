@@ -58,7 +58,7 @@ Canonical definitions live in `src/lib/linear-mcp-auth.ts`
 | --- | --- | --- |
 | `linear_mcp_auth.required` | `{ agentId, issueId, authUrl, expiresAt }` | Hook heartbeat ingestion |
 | `linear_mcp_auth.healthy` | `{ agentId, issueId, source: 'hook' \| 'operator' }` | Hook heartbeat ingestion, or the operator via `POST /api/linear-mcp-auth/complete` |
-| `linear_mcp_auth.notified` | `{ agentId, issueId, outcome: 'delivered' \| 'queued' \| 'failed', lifecycleId }` | The wake pass, after messaging a blocked agent |
+| `linear_mcp_auth.notified` | `{ agentId, issueId, outcome: 'delivering' \| 'delivered' \| 'queued' \| 'failed', lifecycleId }` | The wake pass: a durable `delivering` claim before delivery, then the completion record after |
 | `linear_mcp_auth.callback_relayed` | `{ agentId, issueId }` | `POST /api/linear-mcp-auth/callback`, after relaying a callback URL |
 
 ## Lifecycle fold semantics
@@ -92,9 +92,14 @@ into one **open lifecycle** plus the last completed one:
   'none'`). `callback_relayed` is record-keeping only.
 - **Bounded complete reads.** The fold never queries event types with the
   store's per-type cap — repeated failures would push earlier blocked agents
-  out of a 100-event window. It anchors on healthy-event boundaries and reads
-  forward with a sequence predicate, expanding the anchor until the last
-  completed lifecycle is fully reconstructed.
+  out of a 100-event window — and it never runs a generic full-history read
+  either: the projection is maintained incrementally. Each read fetches only
+  auth-typed events newer than the covered sequence through
+  `EventStore.queryByTypesSince`, an indexed SQL query that applies the type
+  predicate and sequence bound in the database, so the banner's 5–30s polling
+  path typically reads zero rows and never materializes unrelated retained
+  history. If retention compaction or a purge leaves the store behind the
+  covered sequence, the projection restarts from scratch.
 - **Projection.** `resolveLinearMcpAuthIntervention()` serves `GET
   /api/linear-mcp-auth` with `{ status, authUrl, authUrlAgentId,
   authUrlExpiresAt, declaredAt, blockedAgents[] }`; the route enriches each
@@ -149,14 +154,25 @@ has not yet been notified:
 - The message (`LINEAR_MCP_AUTH_WAKE_COPY`) tells the agent to re-check Linear
   access with one lightweight read and resume its canonical task, and not to
   retry in a loop if it still fails.
-- Each attempt is recorded as a `linear_mcp_auth.notified` event with outcome
-  `delivered`, `queued`, or `failed` and the owning `lifecycleId`, so an agent
-  is woken at most once per lifecycle.
+- Each delivery is claimed **before** it is sent: a `linear_mcp_auth.notified`
+  event with outcome `delivering` and the owning `lifecycleId` is appended
+  first, then the message goes out, then a completion record (`delivered`,
+  `queued`, or `failed`) is appended. The `(lifecycleId, agentId)` claim is
+  the deterministic delivery key that makes the wake **crash-idempotent**: a
+  crash after the claim — including after a successful send whose completion
+  record never commits — is visible to boot recovery, so the delivery is
+  never replayed. This is at-most-once by design; the residual lost-wake
+  window (crash between claim and send) self-heals when the still-blocked
+  agent's next failed Linear call opens a fresh lifecycle. If the claim
+  itself cannot be recorded, the delivery is skipped for that pass rather
+  than risk a replay.
 - **Drain-until-stable.** The wake pass loops: after waking one completed
   lifecycle it re-reads the fold, so a lifecycle that completed while
   deliveries were in flight gets its own wake round inside the same coalesced
   run instead of being swallowed by it. A pass that cannot stabilize after 10
-  rounds logs and defers to the next trigger.
+  rounds schedules its own follow-up run (healthy triggers that arrived
+  mid-run received the same coalesced promise, so no external retry is
+  guaranteed).
 - **Boot recovery:** the Cloister service runs the wake pass on startup
   (`src/lib/cloister/service.ts`) and on every `linear_mcp_auth.healthy`
   domain event (`src/lib/cloister/service-reactive.ts`), so an agent that was

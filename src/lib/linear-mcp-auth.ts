@@ -12,7 +12,7 @@ export const LINEAR_MCP_AUTH_WAKE_COPY = 'Linear MCP authentication has been res
 const linearMcpAuthWakeCoalescer = createPromiseCoalescer<void>();
 
 export type LinearMcpAuthStatus = 'none' | 'active' | 'expired';
-export type LinearMcpAuthNotificationOutcome = 'delivered' | 'queued' | 'failed';
+export type LinearMcpAuthNotificationOutcome = 'delivering' | 'delivered' | 'queued' | 'failed';
 
 export interface LinearMcpAuthBlockedAgent {
   agentId: string;
@@ -95,9 +95,12 @@ function defaultExpiresAt(declaredAt: string): string {
   return new Date(Date.parse(declaredAt) + LINEAR_MCP_AUTH_URL_TTL_MS).toISOString();
 }
 
-function foldLinearMcpAuthEvents(events: StoredEvent[]): LinearMcpAuthFold {
-  let open: LinearMcpAuthLifecycle | null = null;
-  let lastCompleted: LinearMcpAuthLifecycle | null = null;
+function foldLinearMcpAuthEvents(
+  events: StoredEvent[],
+  initial: LinearMcpAuthFold = { open: null, lastCompleted: null },
+): LinearMcpAuthFold {
+  let open = initial.open;
+  let lastCompleted = initial.lastCompleted;
 
   for (const event of events) {
     switch (event.type) {
@@ -160,39 +163,45 @@ function foldLinearMcpAuthEvents(events: StoredEvent[]): LinearMcpAuthFold {
   return { open, lastCompleted };
 }
 
-const HEALTHY_BOUNDARY_CANDIDATES = 50;
+interface LinearMcpAuthProjectionCache {
+  fold: LinearMcpAuthFold;
+  coveredSequence: number;
+}
 
+let projectionCache: LinearMcpAuthProjectionCache | null = null;
+
+export function _resetLinearMcpAuthProjectionCacheForTests(): void {
+  projectionCache = null;
+}
+
+/**
+ * Read the lifecycle fold from a maintained projection rather than rebuilding
+ * it per poll. The projection advances incrementally: each read fetches only
+ * auth-typed events newer than the covered sequence via an indexed SQL query
+ * (`queryByTypesSince`), so unrelated retained history is never materialized
+ * — a full `readFrom(0)` on the seven-day event table has blown the heap in
+ * smoke testing, and the banner calls this path every 5–30 seconds per
+ * connected client.
+ */
 async function readLinearMcpAuthFold(): Promise<LinearMcpAuthFold> {
   const store = await initEventStore();
-  // The fold needs the currently-open lifecycle plus the last completed one
-  // (for wake bookkeeping). queryByType's per-type cap (default 100) silently
-  // drops blocked agents once one type overflows, so read with a sequence
-  // predicate instead, anchored just before the last completed lifecycle.
-  //
-  // The anchor is a healthy event, but healthy events are only lifecycle
-  // boundaries when a lifecycle was open — a duplicate healthy is a no-op.
-  // So walk candidate boundaries from the second-most-recent healthy
-  // backwards: if the window contains a healthy event yet reconstructs no
-  // completed lifecycle, that healthy closed a lifecycle whose opening
-  // required events were cut off — expand to the next older candidate.
-  const healthyEvents = store.queryByType('linear_mcp_auth.healthy', HEALTHY_BOUNDARY_CANDIDATES);
-  const candidates = [
-    ...healthyEvents.slice(0, -1).map(candidate => candidate.sequence).reverse(),
-    0,
-  ];
-
-  let fold: LinearMcpAuthFold = { open: null, lastCompleted: null };
-  for (const boundary of candidates) {
-    const events = store.readFrom(boundary)
-      .filter(candidate =>
-        (LINEAR_MCP_AUTH_EVENT_TYPES as readonly string[]).includes(candidate.type))
-      .sort((a, b) => a.sequence - b.sequence);
-    fold = foldLinearMcpAuthEvents(events);
-    const windowHasHealthy = events.some(candidate => candidate.type === 'linear_mcp_auth.healthy');
-    if (fold.lastCompleted !== null || !windowHasHealthy || boundary === 0) {
-      break;
-    }
+  // The events table is a disposable cache — rebuilt, compacted, or purged
+  // underneath us. If it now ends before the covered sequence, the cached
+  // prefix is stale and the projection must restart from scratch.
+  if (projectionCache !== null && store.getLatestSequence() < projectionCache.coveredSequence) {
+    projectionCache = null;
   }
+  const afterSequence = projectionCache?.coveredSequence ?? 0;
+  const delta = store.queryByTypesSince([...LINEAR_MCP_AUTH_EVENT_TYPES], afterSequence);
+  if (delta.length === 0 && projectionCache !== null) {
+    return projectionCache.fold;
+  }
+  const fold = foldLinearMcpAuthEvents(delta, projectionCache?.fold);
+  const lastEvent = delta[delta.length - 1];
+  projectionCache = {
+    fold,
+    coveredSequence: lastEvent !== undefined ? lastEvent.sequence : afterSequence,
+  };
   return fold;
 }
 
@@ -295,10 +304,36 @@ export function processLinearMcpAuthWake(): Promise<void> {
     // trigger gets this in-flight promise back). Re-reading the fold after
     // each pass surfaces the newly completed lifecycle, so it gets its own
     // wake round inside the same coalesced run.
+    let stabilized = false;
     for (let pass = 0; pass < MAX_WAKE_PASSES; pass++) {
       const wakeSet = await computeLinearMcpAuthWakeSet();
-      if (wakeSet === null || wakeSet.agents.length === 0) return;
+      if (wakeSet === null || wakeSet.agents.length === 0) {
+        stabilized = true;
+        break;
+      }
       for (const blockedAgent of wakeSet.agents) {
+        // Durable claim BEFORE delivery: the (lifecycleId, agentId) claim row
+        // is the deterministic delivery key that makes the wake
+        // crash-idempotent. A crash after the claim is visible to boot
+        // recovery (notifiedAt is set), so the delivery is never replayed; a
+        // crash before it delivers exactly once on the next pass. This is
+        // at-most-once by design — the residual lost-wake window self-heals
+        // when the still-blocked agent's next failed Linear call opens a
+        // fresh lifecycle.
+        try {
+          await appendLinearMcpAuthNotifiedEvent({
+            agentId: blockedAgent.agentId,
+            issueId: blockedAgent.issueId,
+            outcome: 'delivering',
+            lifecycleId: wakeSet.lifecycleId,
+          });
+        } catch (claimError) {
+          // Without the durable claim a crash could replay the delivery —
+          // skip this agent rather than risk a duplicate wake.
+          console.error(`[linear-mcp-auth] failed to record wake claim for ${blockedAgent.agentId}; skipping delivery this pass:`, claimError);
+          continue;
+        }
+
         let outcome: LinearMcpAuthNotificationOutcome;
         try {
           outcome = await messageAgentWithOutcome(
@@ -309,14 +344,27 @@ export function processLinearMcpAuthWake(): Promise<void> {
         } catch {
           outcome = 'failed';
         }
-        await appendLinearMcpAuthNotifiedEvent({
-          agentId: blockedAgent.agentId,
-          issueId: blockedAgent.issueId,
-          outcome,
-          lifecycleId: wakeSet.lifecycleId,
-        });
+        try {
+          await appendLinearMcpAuthNotifiedEvent({
+            agentId: blockedAgent.agentId,
+            issueId: blockedAgent.issueId,
+            outcome,
+            lifecycleId: wakeSet.lifecycleId,
+          });
+        } catch (completionError) {
+          // The claim already guarantees at-most-once; a lost completion
+          // record leaves the log showing 'delivering' for this agent.
+          console.error(`[linear-mcp-auth] failed to record wake outcome for ${blockedAgent.agentId}:`, completionError);
+        }
       }
     }
-    console.error(`[linear-mcp-auth] wake pass did not stabilize after ${MAX_WAKE_PASSES} passes — remaining wakes deferred to the next trigger or boot recovery`);
+    if (!stabilized) {
+      console.error(`[linear-mcp-auth] wake pass did not stabilize after ${MAX_WAKE_PASSES} passes — scheduling a follow-up run`);
+      // Every healthy trigger that arrived during this run received the same
+      // coalesced promise, so no external retry is guaranteed. Schedule one
+      // ourselves, after the coalescer entry for this run clears.
+      const timer = setTimeout(() => { void processLinearMcpAuthWake(); }, 1000);
+      timer.unref();
+    }
   });
 }
