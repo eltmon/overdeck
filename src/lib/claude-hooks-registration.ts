@@ -57,6 +57,7 @@ export const HOOK_SCRIPT_NAMES: readonly string[] = [
   'pan-hook-lib.sh',        // PAN-800: shared library sourced by all hooks
   'pre-tool-hook',
   'ask-user-question-hook',
+  'linear-mcp-auth-hook',
   'auto-approve-hook',
   'heartbeat-hook',
   'stop-hook',
@@ -97,6 +98,7 @@ export const OVERDECK_HOOK_REGISTRATIONS: readonly HookRegistration[] = [
   { hookType: 'PreToolUse', scriptName: 'tmux-send-keys-guard', matcher: 'Bash' },
   { hookType: 'PreToolUse', scriptName: 'ask-user-question-hook', matcher: 'AskUserQuestion' },
   { hookType: 'PostToolUse', scriptName: 'heartbeat-hook' },
+  { hookType: 'PostToolUse', scriptName: 'linear-mcp-auth-hook', matcher: 'mcp__linear__.*' },
   { hookType: 'PostToolUse', scriptName: 'permission-event-hook' },
   { hookType: 'Stop', scriptName: 'stop-hook' },
   { hookType: 'Stop', scriptName: 'permission-event-hook' },

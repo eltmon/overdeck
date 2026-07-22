@@ -1,0 +1,63 @@
+#!/bin/bash
+# PostToolUse hook for structured Linear MCP OAuth intervention events (PAN-2997).
+# Never breaks Claude Code: every failure exits 0 silently.
+
+set +e
+
+INPUT=$(cat 2>/dev/null || echo '{}')
+command -v jq >/dev/null 2>&1 || exit 0
+
+TOOL_NAME=$(printf '%s' "$INPUT" | jq -r '.tool_name // ""' 2>/dev/null)
+[[ "$TOOL_NAME" == mcp__linear__* ]] || exit 0
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=pan-hook-lib.sh
+. "$SCRIPT_DIR/pan-hook-lib.sh" 2>/dev/null || exit 0
+declare -f pan_resolve_agent_id >/dev/null 2>&1 || exit 0
+pan_resolve_agent_id || exit 0
+declare -f pan_emit_event >/dev/null 2>&1 || exit 0
+
+RESPONSE=$(printf '%s' "$INPUT" | jq -r '
+  (.tool_response // .tool_result // "")
+  | if type == "string" then . else tojson end
+' 2>/dev/null)
+[ -n "$RESPONSE" ] || RESPONSE=''
+
+MARKER_DIR="${OVERDECK_HOME:-$HOME/.overdeck}/agents/$AGENT_ID"
+MARKER="$MARKER_DIR/linear-mcp-auth-pending"
+
+emit_required() {
+  local auth_url="$1"
+  local body
+  body=$(jq -n --arg authUrl "$auth_url" '{
+    kind: "linear_mcp_auth_required",
+    authUrl: (if $authUrl == "" then null else $authUrl end)
+  }' 2>/dev/null) || return 0
+  pan_emit_event "$AGENT_ID" "$body" >/dev/null 2>&1 || true
+  mkdir -p "$MARKER_DIR" 2>/dev/null || true
+  : > "$MARKER" 2>/dev/null || true
+}
+
+emit_healthy_if_pending() {
+  [ -f "$MARKER" ] || return 0
+  local body
+  body=$(jq -n '{kind: "linear_mcp_auth_healthy"}' 2>/dev/null) || return 0
+  pan_emit_event "$AGENT_ID" "$body" >/dev/null 2>&1 || true
+  rm -f "$MARKER" 2>/dev/null || true
+}
+
+if [ "$TOOL_NAME" = 'mcp__linear__authenticate' ]; then
+  AUTH_URL=$(printf '%s\n' "$RESPONSE" \
+    | grep -Eo 'https://linear\.app/oauth/authorize[^"[:space:]<>]*' 2>/dev/null \
+    | sed -n '1p')
+  emit_required "$AUTH_URL"
+  exit 0
+fi
+
+if printf '%s' "$RESPONSE" | grep -Eiq 'requires authentication|not authenticated|unauthorized|401'; then
+  emit_required ''
+  exit 0
+fi
+
+emit_healthy_if_pending
+exit 0
