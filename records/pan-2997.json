@@ -26,7 +26,7 @@
   ],
   "feedback": [],
   "created": "2026-07-21T23:09:49.270Z",
-  "updated": "2026-07-22T00:55:20.872Z",
+  "updated": "2026-07-22T00:55:38.739Z",
   "pipeline": {
     "issueId": "PAN-2997",
     "reviewStatus": "pending",
@@ -71,8 +71,16 @@
   "harness": "claude-code",
   "model": "k3[1m]",
   "tasks": {
-    "sequence": 16,
-    "claims": {},
+    "sequence": 17,
+    "claims": {
+      "linear-mcp-banner": {
+        "writerId": "agent-pan-2997",
+        "agentId": "agent-pan-2997",
+        "pid": 4162292,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-22T00:55:38.739Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-2997",
@@ -227,6 +235,7 @@
     "linear-mcp-hook.linear-mcp-hook.ac2": "completed",
     "linear-mcp-hook.linear-mcp-hook.ac3": "completed",
     "linear-mcp-hook.linear-mcp-hook.ac4": "completed",
-    "linear-mcp-hook.linear-mcp-hook.ac5": "completed"
+    "linear-mcp-hook.linear-mcp-hook.ac5": "completed",
+    "linear-mcp-banner": "running"
   }
 }
