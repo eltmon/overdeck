@@ -191,10 +191,10 @@
       "tests/unit/lib/overdeck/review-status-sync.test.ts",
       "tests/unit/lib/rebase-helper.test.ts"
     ],
-    "recordedAt": "2026-07-22T19:46:31.826Z"
+    "recordedAt": "2026-07-22T20:02:42.067Z"
   },
   "created": "2026-07-21T22:47:36.935Z",
-  "updated": "2026-07-22T20:02:33.580Z",
+  "updated": "2026-07-22T20:02:42.069Z",
   "pipeline": {
     "issueId": "PAN-2993",
     "reviewStatus": "blocked",
