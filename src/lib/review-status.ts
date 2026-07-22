@@ -16,119 +16,17 @@ import { registerReviewStatusMapReader } from './cloister/review-status-source.j
 import { normalizeReviewStatusSync } from './review-status-normalize.js';
 import { updateIssueRecordForReviewStatusSync, enrichReviewNotesFromRecordSync, readJournalStatusSync } from './overdeck/review-status-record-sync.js';
 import {
-  emitReactiveLifecycleEvent,
-  maybeAutoDispatchReviewHostSide,
-  maybeRecoverTestVerdictHostSide,
   reconcileJournalIntoCacheSync,
   reviewGatesPassedSync,
   verificationSatisfied,
+  type BlockerReason,
+  type ReviewStatus,
+  type StatusHistoryEntry,
 } from './review-status-reconcile.js';
-import type { ScopeDriftRecord } from './xbrief/continue-state.js'; import type { StrikeLandingStatus } from './strike-landing.js';
-import type { InspectionStatusFields } from './inspection-status.js';
+import { needsReviewDispatch } from './review-dispatch-decision.js';
 
 export { reviewGatesPassedSync, verificationSatisfied } from './review-status-reconcile.js';
-
-export interface StatusHistoryEntry {
-  type: 'review' | 'test' | 'merge' | 'inspect' | 'uat' | 'release';
-  status: string;
-  timestamp: string;
-  notes?: string;
-}
-
-export interface BlockerReason {
-  type: 'failing_checks' | 'merge_conflict' | 'unresolved_conversations' | 'changes_requested' | 'draft_pr' | 'not_mergeable';
-  summary: string;
-  details?: string;
-  detectedAt: string;
-}
-
-export interface ReviewStatus extends StrikeLandingStatus, InspectionStatusFields {
-  issueId: string;
-  reviewStatus: 'pending' | 'reviewing' | 'passed' | 'failed' | 'blocked' | 'skipped';
-  testStatus: 'pending' | 'testing' | 'passed' | 'failed' | 'skipped' | 'dispatch_failed';
-  mergeStatus?: 'pending' | 'queued' | 'merging' | 'verifying' | 'merged' | 'failed';
-  releaseStatus?: 'pending' | 'releasing' | 'passed' | 'failed' | 'partial' | 'rolled_back' | 'skipped';
-  uatStatus?: 'pending' | 'testing' | 'passed' | 'failed';
-  uatNotes?: string;
-  verificationStatus?: 'pending' | 'running' | 'passed' | 'failed' | 'skipped';
-  verificationNotes?: string;
-  verificationCycleCount?: number;
-  verificationMaxCycles?: number;
-  reviewNotes?: string;
-  testNotes?: string;
-  mergeNotes?: string;
-  releaseNotes?: string;
-  updatedAt: string;
-  readyForMerge: boolean;
-  /**
-   * PAN-1691: per-issue merge-train routing key.
-   * `undefined` = follow the project default; `true` = auto-merge (fast lane,
-   * rides the train and ships when green); `false` = hold for UAT (manual lane,
-   * waits for human batch review). The merge-train engine reads this to decide
-   * whether a ready issue auto-advances or is held for the UAT candidate.
-   */
-  autoMerge?: boolean;
-  autoRequeueCount?: number;
-  mergeRetryCount?: number;
-  prUrl?: string;
-  /** PAN-905: HEAD commit SHA of the tracked PR for webhook identity validation */
-  prHeadSha?: string;
-  /** PAN-905: GitHub PR number of the tracked PR for webhook identity validation */
-  prNumber?: number;
-  history?: StatusHistoryEntry[];
-  /** PAN-905: GitHub-native merge blocker reasons */
-  blockerReasons?: BlockerReason[];
-  /** HEAD commit SHA at the time review passed — used to detect new commits after review */
-  reviewedAtCommit?: string;
-  /** HEAD commit SHA at the time the pre-review verification gate passed — used to skip redundant test-agent */
-  lastVerifiedCommit?: string;
-  /** Current merge pipeline step for granular merge progress tracking */
-  mergeStep?: string;
-  /** PAN-653: workspace is stuck (e.g. main diverged mid-approve) — Deacon skips it */
-  stuck?: boolean;
-  /** PAN-653: reason workspace is stuck (e.g. 'main_diverged') */
-  stuckReason?: string;
-  /** PAN-653: ISO timestamp when workspace was marked stuck */
-  stuckAt?: string;
-  /** PAN-653: JSON details about the stuck event (e.g. {localSha, remoteSha}) */
-  stuckDetails?: string;
-  /** PAN-699: timestamp when review agents were dispatched (ISO in records, epoch millis in SQLite) */
-  reviewSpawnedAt?: string | number;
-  /**
-   * PAN-1988 auto-heal: durable JOURNAL intent set by `pan done` BEFORE it reaches the dashboard.
-   * "The work agent finished and wants review." When this is newer than {@link reviewSpawnedAt}
-   * and nothing is reviewing, the host reconciles on read and dispatches review — surviving a
-   * dashboard reload, a dropped event, or a frozen deacon. Journal-only (not a DB column).
-   */
-  reviewRequestedAt?: string;
-  /** PAN-1765: timestamp when a conflict-resolution work agent was dispatched. */
-  conflictResolutionDispatchedAt?: string;
-  /** PAN-699: number of test-agent dispatch retries (circuit breaker) */
-  testRetryCount?: number;
-  /** PAN-794: number of consecutive parallel-review re-dispatch attempts within the current cycle */
-  reviewRetryCount?: number;
-  /** PAN-794: ISO timestamp when deacon began the current recovery cycle — acts as the history cutoff for the breaker */
-  recoveryStartedAt?: string;
-  /** Human-requested ignore flag: when true, Deacon patrol skips this issue entirely (distinct from `stuck`, which is a system-set failure marker). */
-  deaconIgnored?: boolean;
-  /** ISO timestamp when the ignore flag was set. */
-  deaconIgnoredAt?: string;
-  /** Optional free-form reason shown alongside the ignore toggle. */
-  deaconIgnoredReason?: string;
-  /** PAN-1762: advisory files_scope drift recorded at pan done and surfaced to review. */
-  scopeDrift?: ScopeDriftRecord;
-  /**
-   * PAN-1862 (FR-6): per-convoy-reviewer verdicts from the latest full-review cycle,
-   * keyed by sub-role (security/correctness/performance/requirements). Journal-durable
-   * (not a DB column — overlaid on read like reviewRequestedAt). `atCommit` anchors
-   * drift invalidation for selective re-review (reviewersToRerun).
-   */
-  reviewerVerdicts?: Partial<Record<string, { status: 'passed' | 'blocked'; atCommit?: string; findingsPath?: string }>>;
-  // PAN-1531: reviewTempStashRef / reviewTempStashMessage / reviewTempStashSequence
-  // removed. The review pipeline no longer stashes uncommitted work — the
-  // dirty-worktree gate refuses pan done / pan review request before review
-  // is dispatched.
-}
+export type { BlockerReason, ReviewStatus, StatusHistoryEntry } from './review-status-reconcile.js';
 
 export interface MergeGateEligibility {
   eligible: boolean;
@@ -571,6 +469,126 @@ export function setReviewStatusSync(
 
   return updated;
 }
+
+function emitReactiveLifecycleEvent(
+  type: 'review.approved' | 'test.passed',
+  issueId: string,
+): void {
+  try {
+    notifyPipelineSync({ type, issueId });
+  } catch (error) {
+    console.warn(`[review-status] Failed to emit ${type} for ${issueId}:`, error);
+  }
+}
+
+async function deliverReviewVerdictFeedbackHostSide(
+  issueId: string,
+  status: ReviewStatus,
+): Promise<void> {
+  try {
+    const { deliverReviewVerdictFeedback } = await import('./cloister/review-verdict-feedback.js');
+    const result = await Effect.runPromise(deliverReviewVerdictFeedback({
+      issueId,
+      verdict: status.reviewStatus === 'failed' ? 'failed' : 'blocked',
+      notes: status.reviewNotes,
+      prUrl: status.prUrl,
+    }));
+    if (result.agentMessageSent) {
+      console.log(`[review-status] delivered review feedback to the work agent for ${issueId} (host-side)`);
+    }
+  } catch (err) {
+    console.warn(`[review-status] host-side review feedback delivery for ${issueId} did not complete (non-fatal): ${err instanceof Error ? err.message : String(err)}`);
+  }
+}
+
+const reviewDispatchAttemptAt = new Map<string, number>();
+const REVIEW_AUTO_DISPATCH_THROTTLE_MS = 30_000;
+
+function maybeAutoDispatchReviewHostSide(issueId: string, status: ReviewStatus): void {
+  if (!needsReviewDispatch({
+    reviewRequestedAt: status.reviewRequestedAt,
+    reviewSpawnedAt: status.reviewSpawnedAt,
+    reviewStatus: status.reviewStatus,
+    mergeStatus: status.mergeStatus,
+  })) return;
+  const last = reviewDispatchAttemptAt.get(issueId) ?? 0;
+  if (Date.now() - last < REVIEW_AUTO_DISPATCH_THROTTLE_MS) return;
+  reviewDispatchAttemptAt.set(issueId, Date.now());
+  void dispatchReviewHostSide(issueId, status.prUrl);
+}
+
+async function dispatchReviewHostSide(issueId: string, prUrl?: string): Promise<void> {
+  try {
+    const { resolveProjectFromIssueSync } = await import('./projects.js');
+    const resolved = resolveProjectFromIssueSync(issueId);
+    if (!resolved) return;
+    const { existsSync } = await import('fs');
+    const workspace = join(resolved.projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`);
+    if (!existsSync(workspace)) return;
+    let branch = `feature/${issueId.toLowerCase()}`;
+    try {
+      const { promisify } = await import('util');
+      const { exec } = await import('child_process');
+      const execAsync = promisify(exec);
+      const { stdout } = await execAsync('git branch --show-current', {
+        cwd: workspace,
+        encoding: 'utf-8',
+      });
+      branch = stdout.trim() || branch;
+    } catch { /* non-fatal — fall back to the conventional branch name */ }
+    const { spawnReviewRoleForIssue } = await import('./cloister/review-agent.js');
+    const result = await Effect.runPromise(spawnReviewRoleForIssue({
+      issueId,
+      workspace,
+      branch,
+      ...(prUrl ? { prUrl } : {}),
+    }));
+    if (result.success) {
+      const message = result.message?.startsWith('Review already in progress')
+        ? 'already in progress — no-op'
+        : 'auto-dispatched from durable journal intent';
+      console.log(`[review-status] review dispatch for ${issueId}: ${message} (host-side)`);
+    }
+  } catch (err) {
+    console.warn(`[review-status] host-side review auto-dispatch for ${issueId} did not complete (non-fatal): ${err instanceof Error ? err.message : String(err)}`);
+  }
+}
+
+const testVerdictRecoveryAt = new Map<string, number>();
+const TEST_VERDICT_RECOVERY_THROTTLE_MS = 60_000;
+
+function maybeRecoverTestVerdictHostSide(issueId: string, status: ReviewStatus): void {
+  if (status.reviewStatus !== 'passed') return;
+  if (status.mergeStatus === 'merged' || status.readyForMerge) return;
+  if (status.testStatus !== 'testing' && status.testStatus !== 'pending' && status.testStatus !== 'dispatch_failed') return;
+  const last = testVerdictRecoveryAt.get(issueId) ?? 0;
+  if (Date.now() - last < TEST_VERDICT_RECOVERY_THROTTLE_MS) return;
+  testVerdictRecoveryAt.set(issueId, Date.now());
+  void recoverTestVerdictHostSide(issueId);
+}
+
+async function recoverTestVerdictHostSide(issueId: string): Promise<void> {
+  try {
+    const { resolveProjectFromIssueSync } = await import('./projects.js');
+    const resolved = resolveProjectFromIssueSync(issueId);
+    if (!resolved) return;
+    const { existsSync } = await import('fs');
+    const workspace = join(resolved.projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`);
+    if (!existsSync(workspace)) return;
+    const { readTestVerdictArtifact } = await import('./cloister/test-verdict.js');
+    const artifact = readTestVerdictArtifact(workspace);
+    if (!artifact) return;
+    setReviewStatusSync(issueId, {
+      testStatus: artifact.status,
+      testNotes: artifact.notes ??
+        `Recovered from .pan/test/result.json (${artifact.status}) — the test agent wrote the verdict but never signaled`,
+    });
+    console.log(`[review-status] recovered unsignaled test verdict for ${issueId}: ${artifact.status} (host-side, from .pan/test/result.json)`);
+  } catch (err) {
+    console.warn(`[review-status] host-side test verdict recovery for ${issueId} did not complete (non-fatal): ${err instanceof Error ? err.message : String(err)}`);
+  }
+}
+
 export function resetPipelineVerdictsForWorkStartSync(issueId: string, options: { force?: boolean } = {}): ReviewStatus | null {
   const status = getReviewStatusSync(issueId);
   if (!status) return null;
@@ -673,14 +691,26 @@ export function getReviewStatusSync(issueId: string): ReviewStatus | null {
   // write succeeds, a sandboxed reader's reconcile is a best-effort no-op.
   const journalNewer = !dbStatus || (dbStatus.updatedAt ?? '') < journal.updatedAt;
   if (journalNewer) {
-    return reconcileJournalIntoCacheSync(issueId, dbStatus, journal, setReviewStatusSync);
+    return reconcileJournalIntoCacheSync(issueId, dbStatus, journal, {
+      notifyStatusChanged: (reconciledIssueId, status) => {
+        notifyPipelineSync({
+          type: 'status_changed',
+          issueId: reconciledIssueId,
+          status,
+        });
+      },
+      deliverReviewVerdictFeedbackHostSide,
+      emitReactiveLifecycleEvent,
+      maybeAutoDispatchReviewHostSide,
+      maybeRecoverTestVerdictHostSide,
+    });
   }
 
   // DB is current → overlay the feedback TEXT from the journal (it is no longer stored in the
   // DB; the row holds only the queryable status flags).
   const enriched = enrichReviewNotesFromRecordSync(issueId, dbStatus!);
   maybeAutoDispatchReviewHostSide(issueId, enriched);
-  maybeRecoverTestVerdictHostSide(issueId, enriched, setReviewStatusSync);
+  maybeRecoverTestVerdictHostSide(issueId, enriched);
   return enriched;
 }
 
