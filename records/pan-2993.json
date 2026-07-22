@@ -201,7 +201,7 @@
     "recordedAt": "2026-07-22T20:02:42.067Z"
   },
   "created": "2026-07-21T22:47:36.935Z",
-  "updated": "2026-07-22T20:43:23.643Z",
+  "updated": "2026-07-22T20:43:38.997Z",
   "pipeline": {
     "issueId": "PAN-2993",
     "reviewStatus": "passed",
@@ -209,10 +209,10 @@
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "merged",
-    "releaseStatus": "pending",
+    "releaseStatus": "skipped",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-22T20:09:10.175Z",
-    "updatedAt": "2026-07-22T20:43:23.547Z",
+    "updatedAt": "2026-07-22T20:43:38.788Z",
     "reviewNotes": "Explicit expected-SHA lease fixes the remote overwrite race; all review dimensions and focused verification passed.",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2998",
@@ -339,7 +339,7 @@
       },
       "costAtCloseOut": {
         "usd": 205.117052,
-        "pricingAsOf": "2026-07-22T20:43:23.614Z"
+        "pricingAsOf": "2026-07-22T20:43:38.924Z"
       }
     },
     "merges": [
@@ -348,7 +348,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-fable-5",
   "workModel": "gpt-5.6-sol",
   "tasks": {
     "sequence": 12,
