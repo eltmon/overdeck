@@ -4,7 +4,7 @@
     "created": "2026-07-22T21:42:47.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2988: Lost review.status_changed event strands a merge-ready issue: invisible on Awaiting Merge, all actions gated, no re-sync path",
-    "updated": "2026-07-22T21:47:01.894Z"
+    "updated": "2026-07-22T21:47:04.448Z"
   },
   "plan": {
     "id": "pan-2988",
@@ -12,9 +12,9 @@
     "status": "approved",
     "uid": "6466b5ce-2677-431b-825a-3731deadd704",
     "author": "agent:k3",
-    "sequence": 3,
+    "sequence": 5,
     "created": "2026-07-22T21:42:47.000Z",
-    "updated": "2026-07-22T21:47:01.894Z",
+    "updated": "2026-07-22T21:47:04.448Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2988",
