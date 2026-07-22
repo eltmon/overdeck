@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-22T21:25:31.822Z",
-  "updated": "2026-07-22T22:21:59.426Z",
+  "updated": "2026-07-22T22:22:07.784Z",
   "pipeline": {
     "issueId": "PAN-2988",
     "reviewStatus": "pending",
@@ -75,8 +75,16 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 12,
-    "claims": {},
+    "sequence": 13,
+    "claims": {
+      "recover-action-menu-entry": {
+        "writerId": "agent-pan-2988",
+        "agentId": "agent-pan-2988",
+        "pid": 3301735,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-22T22:22:07.784Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-2988",
@@ -199,6 +207,7 @@
     "cli-review-resync": "completed",
     "cli-review-resync.cli-review-resync.ac1": "completed",
     "cli-review-resync.cli-review-resync.ac2": "completed",
-    "cli-review-resync.cli-review-resync.ac3": "completed"
+    "cli-review-resync.cli-review-resync.ac3": "completed",
+    "recover-action-menu-entry": "running"
   }
 }
