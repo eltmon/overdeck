@@ -58,7 +58,7 @@ Canonical definitions live in `src/lib/linear-mcp-auth.ts`
 | --- | --- | --- |
 | `linear_mcp_auth.required` | `{ agentId, issueId, authUrl, expiresAt }` | Hook heartbeat ingestion |
 | `linear_mcp_auth.healthy` | `{ agentId, issueId, source: 'hook' \| 'operator' }` | Hook heartbeat ingestion, or the operator via `POST /api/linear-mcp-auth/complete` |
-| `linear_mcp_auth.notified` | `{ agentId, issueId, outcome: 'delivering' \| 'delivered' \| 'queued' \| 'failed', lifecycleId }` | The wake pass: a durable `delivering` claim before delivery, then the completion record after |
+| `linear_mcp_auth.notified` | `{ agentId, issueId, outcome: 'delivered' \| 'queued' \| 'failed', lifecycleId }` | The wake pass, after the outbox records the delivery outcome. (The decodable `delivering` literal is a legacy value from the pre-outbox iteration and is ignored by the fold.) |
 | `linear_mcp_auth.callback_relayed` | `{ agentId, issueId }` | `POST /api/linear-mcp-auth/callback`, after relaying a callback URL |
 
 ## Lifecycle fold semantics
@@ -154,24 +154,27 @@ has not yet been notified:
 - The message (`LINEAR_MCP_AUTH_WAKE_COPY`) tells the agent to re-check Linear
   access with one lightweight read and resume its canonical task, and not to
   retry in a loop if it still fails.
-- Each delivery is claimed **before** it is sent: a `linear_mcp_auth.notified`
-  event with outcome `delivering` and the owning `lifecycleId` is appended
-  first, then the message goes out, then a completion record (`delivered`,
-  `queued`, or `failed`) is appended. The `(lifecycleId, agentId)` claim is
-  the deterministic delivery key an interrupted attempt resumes from. A claim
-  is **not terminal** — the agent stays in the wake set until a completion
-  lands — so a crash after the claim but before the send still produces
-  exactly one eventual delivery.
-- **Outbox reconciliation.** Every non-throwing path through
-  `messageAgentWithOutcome` backs the message up to the agent's durable mail
-  queue. When recovery (boot or a later pass) finds a claim without a
-  completion, it checks that outbox via `agentHasMailContentSince()`: a mail
-  file containing the wake copy at or after the claim timestamp proves the
-  acknowledged send durably landed, so the ledger is completed **without
-  re-sending** — a crash after an acknowledged send never produces a second
-  delivery. Mail absent means the send never durably happened, so the wake is
-  driven then. If the claim itself cannot be recorded, the delivery is
-  skipped for that pass rather than risk an unreconciled replay.
+- Each delivery goes through the **keyed wake outbox**: one JSON entry per
+  `(lifecycleId, agentId)` at
+  `~/.overdeck/agents/<agentId>/linear-mcp-wake/<lifecycleId>.json`, carrying
+  the intended message, a `pending`/`acknowledged` state, and the recorded
+  outcome. Writes are temp-file + rename (atomic on POSIX) and all I/O is
+  async. The delivery wrapper (`deliverWakeWithOutbox`) creates the entry
+  before sending and records the acknowledgment — with the real outcome
+  (`delivered`, `queued`, or `failed`) — as part of its own protocol on every
+  path, so every acknowledged send has a receipt.
+- **Recovery semantics.** An agent stays in the wake set until a completion
+  DomainEvent lands. When a pass finds no completion, it reads the keyed
+  entry (one exact-path async read — no directory scans, no content or
+  timestamp matching): `acknowledged` suppresses the replay and the pass only
+  retries the completion record, replaying the recorded outcome faithfully
+  (`queued` is never upgraded to `delivered`); `pending` or missing means the
+  send was never acknowledged, so it is (re)driven. The result is exactly one
+  acknowledged delivery per agent per lifecycle across every crash window:
+  crash before the entry → driven once; crash after a send whose ack never
+  landed → replayed once (correct — unacknowledged); crash after the ack →
+  never replayed. Lifecycle B's entry is independent of lifecycle A's, so an
+  identical wake message in an adjacent lifecycle is never suppressed.
 - **Drain-until-stable.** The wake pass loops: after waking one completed
   lifecycle it re-reads the fold, so a lifecycle that completed while
   deliveries were in flight gets its own wake round inside the same coalesced
@@ -179,7 +182,7 @@ has not yet been notified:
   rounds schedules its own follow-up run with bounded exponential backoff
   (1s doubling to 60s; healthy triggers that arrived mid-run received the
   same coalesced promise, so no external retry is guaranteed, and a
-  persistent EventStore failure cannot become a hot retry loop).
+  persistent failure cannot become a hot retry loop).
 - **Boot recovery:** the Cloister service runs the wake pass on startup
   (`src/lib/cloister/service.ts`) and on every `linear_mcp_auth.healthy`
   domain event (`src/lib/cloister/service-reactive.ts`), so an agent that was

@@ -1,11 +1,13 @@
 import type { DomainEvent } from '@overdeck/contracts';
 import { Effect } from 'effect';
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   appendAsync: vi.fn(),
   getLatestSequence: vi.fn(),
-  hasMail: vi.fn(),
   messageAgent: vi.fn(),
   queryByTypesSince: vi.fn(),
 }));
@@ -20,7 +22,6 @@ vi.mock('../../dashboard/server/event-store.js', () => ({
 
 vi.mock('../agents/messaging.js', () => ({
   messageAgentWithOutcome: mocks.messageAgent,
-  agentHasMailContentSince: mocks.hasMail,
 }));
 
 import { handleCloisterDomainEvent } from '../cloister/service-reactive.js';
@@ -37,7 +38,19 @@ interface TestEvent {
   payload: Record<string, unknown>;
 }
 
+interface OutboxEntryFixture {
+  lifecycleId: string;
+  agentId: string;
+  message: string;
+  state: 'pending' | 'acknowledged';
+  outcome?: string;
+  createdAt: string;
+  acknowledgedAt?: string;
+}
+
 let events: TestEvent[] = [];
+let overdeckHome: string;
+let previousHome: string | undefined;
 
 function required(sequence: number, agentId: string, issueId: string): TestEvent {
   return {
@@ -57,31 +70,53 @@ function healthy(sequence: number): TestEvent {
   };
 }
 
-function claim(sequence: number, agentId: string, issueId: string, lifecycleId: string): TestEvent {
-  return {
-    sequence,
-    type: 'linear_mcp_auth.notified',
-    timestamp: `2026-07-21T12:00:0${sequence}.000Z`,
-    payload: { agentId, issueId, outcome: 'delivering', lifecycleId },
-  };
-}
-
 function notifiedEvents(): TestEvent[] {
   return events.filter(event => event.type === 'linear_mcp_auth.notified');
 }
 
-function completionEvents(): TestEvent[] {
-  return notifiedEvents().filter(event => event.payload['outcome'] !== 'delivering');
+function outboxPath(agentId: string, lifecycleId: string): string {
+  return join(overdeckHome, 'agents', agentId, 'linear-mcp-wake', `${lifecycleId}.json`);
+}
+
+function seedOutbox(agentId: string, entry: OutboxEntryFixture): void {
+  const path = outboxPath(agentId, entry.lifecycleId);
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, JSON.stringify(entry), 'utf-8');
+}
+
+function readOutbox(agentId: string, lifecycleId: string): OutboxEntryFixture {
+  return JSON.parse(readFileSync(outboxPath(agentId, lifecycleId), 'utf-8')) as OutboxEntryFixture;
+}
+
+function pendingEntry(lifecycleId: string, agentId: string): OutboxEntryFixture {
+  return {
+    lifecycleId,
+    agentId,
+    message: LINEAR_MCP_AUTH_WAKE_COPY,
+    state: 'pending',
+    createdAt: '2026-07-21T12:00:10.000Z',
+  };
+}
+
+function acknowledgedEntry(lifecycleId: string, agentId: string, outcome: string): OutboxEntryFixture {
+  return {
+    ...pendingEntry(lifecycleId, agentId),
+    state: 'acknowledged',
+    outcome,
+    acknowledgedAt: '2026-07-21T12:00:11.000Z',
+  };
 }
 
 describe('Linear MCP auth wake processor', () => {
   beforeEach(() => {
     events = [];
     _resetLinearMcpAuthProjectionCacheForTests();
+    previousHome = process.env.OVERDECK_HOME;
+    overdeckHome = mkdtempSync(join(tmpdir(), 'overdeck-linear-wake-'));
+    process.env.OVERDECK_HOME = overdeckHome;
+
     mocks.messageAgent.mockReset();
     mocks.messageAgent.mockResolvedValue('delivered');
-    mocks.hasMail.mockReset();
-    mocks.hasMail.mockReturnValue(false);
     mocks.queryByTypesSince.mockReset();
     mocks.queryByTypesSince.mockImplementation((types: string[], afterSequence: number) => (
       events
@@ -104,10 +139,16 @@ describe('Linear MCP auth wake processor', () => {
   });
 
   afterEach(() => {
+    if (previousHome === undefined) {
+      delete process.env.OVERDECK_HOME;
+    } else {
+      process.env.OVERDECK_HOME = previousHome;
+    }
+    rmSync(overdeckHome, { recursive: true, force: true });
     vi.useRealTimers();
   });
 
-  it('reacts to healthy by claiming, delivering one wake, and recording its outcome', async () => {
+  it('reacts to healthy by delivering one wake and recording its outcome and receipt', async () => {
     events.push(required(1, 'agent-min-852', 'MIN-852'), healthy(2));
 
     await Effect.runPromise(handleCloisterDomainEvent({ type: 'linear_mcp_auth.healthy' }));
@@ -118,20 +159,17 @@ describe('Linear MCP auth wake processor', () => {
       LINEAR_MCP_AUTH_WAKE_COPY,
       'linear-mcp-auth-wake',
     );
-    const notified = notifiedEvents();
-    expect(notified).toHaveLength(2);
-    // Durable claim first, completion record second — both for lifecycle seq-1.
-    expect(notified[0]?.payload).toEqual({
-      agentId: 'agent-min-852',
-      issueId: 'MIN-852',
-      outcome: 'delivering',
-      lifecycleId: 'seq-1',
-    });
-    expect(notified[1]?.payload).toEqual({
+    expect(notifiedEvents()).toHaveLength(1);
+    expect(notifiedEvents()[0]?.payload).toEqual({
       agentId: 'agent-min-852',
       issueId: 'MIN-852',
       outcome: 'delivered',
       lifecycleId: 'seq-1',
+    });
+    // The keyed outbox receipt is acknowledged with the same outcome.
+    expect(readOutbox('agent-min-852', 'seq-1')).toMatchObject({
+      state: 'acknowledged',
+      outcome: 'delivered',
     });
   });
 
@@ -149,7 +187,7 @@ describe('Linear MCP auth wake processor', () => {
       'agent-min-852',
       'agent-pan-2997',
     ]);
-    expect(completionEvents().map(event => event.payload['outcome'])).toEqual([
+    expect(notifiedEvents().map(event => event.payload['outcome'])).toEqual([
       'delivered',
       'delivered',
     ]);
@@ -162,7 +200,11 @@ describe('Linear MCP auth wake processor', () => {
 
     await processLinearMcpAuthWake();
 
-    expect(completionEvents()[0]?.payload['outcome']).toBe('queued');
+    expect(notifiedEvents()[0]?.payload['outcome']).toBe('queued');
+    expect(readOutbox('agent-min-852', 'seq-1')).toMatchObject({
+      state: 'acknowledged',
+      outcome: 'queued',
+    });
   });
 
   it('records failed when the agent no longer exists', async () => {
@@ -170,7 +212,11 @@ describe('Linear MCP auth wake processor', () => {
     mocks.messageAgent.mockRejectedValue(new Error('Agent agent-min-852 not running'));
 
     await expect(processLinearMcpAuthWake()).resolves.toBeUndefined();
-    expect(completionEvents()[0]?.payload['outcome']).toBe('failed');
+    expect(notifiedEvents()[0]?.payload['outcome']).toBe('failed');
+    expect(readOutbox('agent-min-852', 'seq-1')).toMatchObject({
+      state: 'acknowledged',
+      outcome: 'failed',
+    });
   });
 
   it('does not send another wake after notified events have been recorded', async () => {
@@ -180,7 +226,7 @@ describe('Linear MCP auth wake processor', () => {
     await processLinearMcpAuthWake();
 
     expect(mocks.messageAgent).toHaveBeenCalledOnce();
-    expect(notifiedEvents()).toHaveLength(2);
+    expect(notifiedEvents()).toHaveLength(1);
   });
 
   it('recovers pending wake work recorded before server boot', async () => {
@@ -193,78 +239,114 @@ describe('Linear MCP auth wake processor', () => {
       LINEAR_MCP_AUTH_WAKE_COPY,
       'linear-mcp-auth-wake',
     );
-    expect(notifiedEvents()).toHaveLength(2);
+    expect(notifiedEvents()).toHaveLength(1);
   });
 
   it('delivers exactly once when the process died after the claim but before the send', async () => {
-    // The interrupted state: claim committed, no mail backup, no completion.
-    // Boot recovery must drive the send — zero deliveries would strand the
-    // blocked agent.
+    // Crash state: a pending outbox entry exists (the claim) but the send
+    // never ran. Recovery must drive it — zero deliveries strands the agent.
+    events.push(required(1, 'agent-min-852', 'MIN-852'), healthy(2));
+    seedOutbox('agent-min-852', pendingEntry('seq-1', 'agent-min-852'));
+
+    await processLinearMcpAuthWake();
+
+    expect(mocks.messageAgent).toHaveBeenCalledOnce();
+    expect(readOutbox('agent-min-852', 'seq-1')).toMatchObject({
+      state: 'acknowledged',
+      outcome: 'delivered',
+    });
+    expect(notifiedEvents()).toHaveLength(1);
+    expect(notifiedEvents()[0]?.payload['outcome']).toBe('delivered');
+  });
+
+  it('resumes an unacknowledged entry after a post-send/pre-receipt crash', async () => {
+    // Crash state: the send happened but the ack write never landed, so the
+    // entry is still pending. That send was never acknowledged — replaying
+    // it once is the defined recovery semantic.
+    events.push(required(1, 'agent-min-852', 'MIN-852'), healthy(2));
+    seedOutbox('agent-min-852', pendingEntry('seq-1', 'agent-min-852'));
+
+    await processLinearMcpAuthWake();
+
+    expect(mocks.messageAgent).toHaveBeenCalledOnce();
+    expect(readOutbox('agent-min-852', 'seq-1')).toMatchObject({
+      state: 'acknowledged',
+      outcome: 'delivered',
+    });
+    expect(notifiedEvents()).toHaveLength(1);
+  });
+
+  it('does not replay an acknowledged wake when the process died before the completion event landed', async () => {
+    // Crash state: acknowledged receipt exists, but the completion DomainEvent
+    // was never appended. Recovery completes the ledger WITHOUT re-sending.
+    events.push(required(1, 'agent-min-852', 'MIN-852'), healthy(2));
+    seedOutbox('agent-min-852', acknowledgedEntry('seq-1', 'agent-min-852', 'delivered'));
+
+    await processLinearMcpAuthWake();
+
+    expect(mocks.messageAgent).not.toHaveBeenCalled();
+    expect(notifiedEvents()).toHaveLength(1);
+    expect(notifiedEvents()[0]?.payload).toEqual({
+      agentId: 'agent-min-852',
+      issueId: 'MIN-852',
+      outcome: 'delivered',
+      lifecycleId: 'seq-1',
+    });
+  });
+
+  it('replays the recorded queued outcome on recovery instead of upgrading it to delivered', async () => {
+    // Crash state: the send was queued for a stopped agent and acknowledged,
+    // but the completion event never landed. Recovery must record 'queued',
+    // not a falsified 'delivered'.
+    events.push(required(1, 'agent-min-852', 'MIN-852'), healthy(2));
+    seedOutbox('agent-min-852', acknowledgedEntry('seq-1', 'agent-min-852', 'queued'));
+
+    await processLinearMcpAuthWake();
+
+    expect(mocks.messageAgent).not.toHaveBeenCalled();
+    expect(notifiedEvents()[0]?.payload['outcome']).toBe('queued');
+  });
+
+  it('never suppresses a new lifecycle behind an identical acknowledged wake from the previous one', async () => {
+    // Lifecycle A is fully done (acknowledged receipt + completion event).
+    // Lifecycle B needs the same wake copy. The receipts are keyed per
+    // lifecycle, so A's acknowledgment must not mark B handled.
     events.push(
       required(1, 'agent-min-852', 'MIN-852'),
       healthy(2),
-      claim(3, 'agent-min-852', 'MIN-852', 'seq-1'),
+      required(3, 'agent-min-852', 'MIN-852'),
+      healthy(4),
     );
-    mocks.hasMail.mockReturnValue(false);
-
-    await processLinearMcpAuthWake();
-
-    expect(mocks.messageAgent).toHaveBeenCalledOnce();
-    expect(mocks.messageAgent).toHaveBeenCalledWith(
-      'agent-min-852',
-      LINEAR_MCP_AUTH_WAKE_COPY,
-      'linear-mcp-auth-wake',
-    );
-    expect(completionEvents()).toHaveLength(1);
-    expect(completionEvents()[0]?.payload['outcome']).toBe('delivered');
-  });
-
-  it('does not replay a delivered wake when the process dies before the completion record lands', async () => {
-    // Crash window: claim committed, acknowledged send happened (the durable
-    // mail backup exists), but the completion append never committed. Boot
-    // recovery reconciles the claim against the outbox and completes the
-    // ledger WITHOUT a second delivery.
-    events.push(required(1, 'agent-min-852', 'MIN-852'), healthy(2));
-
-    // Every non-throwing messageAgent path backs the message up to the mail
-    // queue — simulate that side effect on the mock.
-    mocks.messageAgent.mockImplementation(async () => {
-      mocks.hasMail.mockReturnValue(true);
-      return 'delivered';
-    });
-
-    const realAppend = mocks.appendAsync.getMockImplementation();
-    let completionAppendFailed = false;
-    mocks.appendAsync.mockImplementation(async (event: Omit<DomainEvent, 'sequence'>) => {
-      const payload = (event as { payload?: { outcome?: string } }).payload;
-      if (!completionAppendFailed && payload?.outcome === 'delivered') {
-        completionAppendFailed = true;
-        throw new Error('process exited before commit');
-      }
-      return realAppend?.(event) ?? 0;
+    seedOutbox('agent-min-852', acknowledgedEntry('seq-1', 'agent-min-852', 'delivered'));
+    events.push({
+      sequence: 5,
+      type: 'linear_mcp_auth.notified',
+      timestamp: '2026-07-21T12:00:12.000Z',
+      payload: { agentId: 'agent-min-852', issueId: 'MIN-852', outcome: 'delivered', lifecycleId: 'seq-1' },
     });
 
     await processLinearMcpAuthWake();
-    expect(mocks.messageAgent).toHaveBeenCalledOnce();
 
-    // Boot recovery runs the same entry point; the mail backup proves the
-    // acknowledged send, so no replay.
-    await processLinearMcpAuthWake();
+    // Exactly one send — for lifecycle seq-3. A's receipt suppressed nothing.
     expect(mocks.messageAgent).toHaveBeenCalledOnce();
-    // The interrupted claim got its completion record this time.
-    expect(completionEvents()).toHaveLength(1);
-    expect(completionEvents()[0]?.payload['outcome']).toBe('delivered');
+    expect(readOutbox('agent-min-852', 'seq-3')).toMatchObject({
+      state: 'acknowledged',
+      outcome: 'delivered',
+    });
+    expect(notifiedEvents().map(event => event.payload['lifecycleId'])).toEqual(['seq-1', 'seq-3']);
   });
 
-  it('skips delivery when the durable claim cannot be recorded', async () => {
+  it('skips delivery when the outbox receipt cannot be written', async () => {
     vi.useFakeTimers();
-    events.push(required(1, 'agent-min-852', 'MIN-852'), healthy(2));
-    mocks.appendAsync.mockRejectedValue(new Error('database is locked'));
     vi.spyOn(console, 'error').mockImplementation(() => {});
+    events.push(required(1, 'agent-min-852', 'MIN-852'), healthy(2));
+    // The agent dir is a FILE, so mkdir of the outbox dir fails every pass.
+    mkdirSync(join(overdeckHome, 'agents'), { recursive: true });
+    writeFileSync(join(overdeckHome, 'agents', 'agent-min-852'), 'not a directory');
 
     await expect(processLinearMcpAuthWake()).resolves.toBeUndefined();
 
-    // No claim, no delivery — an unreconciled send could replay after a crash.
+    // No receipt, no delivery — an unreceipted send could replay after a crash.
     expect(mocks.messageAgent).not.toHaveBeenCalled();
   });
 
@@ -273,27 +355,32 @@ describe('Linear MCP auth wake processor', () => {
     const timeoutSpy = vi.spyOn(global, 'setTimeout');
     vi.spyOn(console, 'error').mockImplementation(() => {});
     events.push(required(1, 'agent-min-852', 'MIN-852'), healthy(2));
-    // Claims always fail, so every pass retries and no pass stabilizes.
+    // Completion appends always fail, so the agent never leaves the wake set.
+    // The acknowledged receipt means the door is still only called once.
     mocks.appendAsync.mockRejectedValue(new Error('database is locked'));
 
     await processLinearMcpAuthWake();
+    expect(mocks.messageAgent).toHaveBeenCalledOnce();
     const callsAfterFirstRun = mocks.appendAsync.mock.calls.length;
     expect(callsAfterFirstRun).toBeGreaterThan(0);
 
-    // The follow-up is scheduled with exponential backoff, not a hot 1s loop.
     await vi.advanceTimersByTimeAsync(1000);
-    const callsAfterFirstFollowUp = mocks.appendAsync.mock.calls.length;
-    expect(callsAfterFirstFollowUp).toBeGreaterThan(callsAfterFirstRun);
+    // The scheduled follow-up is in flight behind real fs I/O; join it
+    // through the coalescer (same promise if running, a fresh identical run
+    // if it already settled) so the assertions see a completed pass.
+    await processLinearMcpAuthWake();
+    expect(mocks.appendAsync.mock.calls.length).toBeGreaterThan(callsAfterFirstRun);
+    expect(mocks.messageAgent).toHaveBeenCalledOnce();
 
     const delays = timeoutSpy.mock.calls.map(call => call[1]);
-    expect(delays).toEqual([1000, 2000]);
+    expect(delays.slice(0, 2)).toEqual([1000, 2000]);
   });
 
   it('drains a lifecycle that completes while an earlier wake pass is still delivering', async () => {
     // Review repro: lifecycle A closes and its wake pass starts; lifecycle B
     // for the same agent opens and closes while A's delivery is in flight.
     // The pass must not swallow B's healthy — it drains until stable and
-    // wakes B too, and A's notification records may not mark B handled.
+    // wakes B too, and A's completion records may not mark B handled.
     events.push(required(1, 'agent-min-852', 'MIN-852'), healthy(2));
 
     mocks.messageAgent.mockImplementation(async () => {
@@ -309,10 +396,7 @@ describe('Linear MCP auth wake processor', () => {
 
     // Two wake rounds: one for lifecycle seq-1, one for lifecycle seq-3.
     expect(mocks.messageAgent).toHaveBeenCalledTimes(2);
-    const completionLifecycleIds = completionEvents().map(event => event.payload['lifecycleId']);
+    const completionLifecycleIds = notifiedEvents().map(event => event.payload['lifecycleId']);
     expect(completionLifecycleIds).toEqual(['seq-1', 'seq-3']);
-    // Each lifecycle got its own claim + completion pair.
-    expect(notifiedEvents().filter(event => event.payload['lifecycleId'] === 'seq-1')).toHaveLength(2);
-    expect(notifiedEvents().filter(event => event.payload['lifecycleId'] === 'seq-3')).toHaveLength(2);
   });
 });

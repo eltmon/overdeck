@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, unlinkSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, unlinkSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { Effect } from 'effect';
 import { emitActivityEntrySync } from '../activity-logger.js';
@@ -75,37 +75,6 @@ function queueAgentMail(agentId: string, message: string, pendingTurnEndDelivery
     join(mailDir, `${timestamp}${pendingTurnEndDelivery ? '.pending' : ''}.md`),
     content
   );
-}
-
-/**
- * Durable-delivery check for outbox reconciliation (PAN-2997): every
- * non-throwing path through `messageAgentWithOutcome` backs the message up to
- * the agent's mail queue, so a mail file containing `content` with an mtime
- * at or after `sinceIso` proves an acknowledged send reached the agent's
- * durable outbox. Recovery uses this to complete an interrupted claim without
- * re-sending. Small negative tolerance for filesystem clock granularity.
- */
-export function agentHasMailContentSince(agentId: string, content: string, sinceIso: string): boolean {
-  const mailDir = join(getAgentDir(normalizeAgentId(agentId)), 'mail');
-  let entries: string[];
-  try {
-    entries = readdirSync(mailDir);
-  } catch {
-    return false;
-  }
-  const sinceMs = Date.parse(sinceIso);
-  if (Number.isNaN(sinceMs)) return false;
-  for (const entry of entries) {
-    if (!entry.endsWith('.md')) continue;
-    try {
-      const path = join(mailDir, entry);
-      if (statSync(path).mtimeMs + 1000 < sinceMs) continue;
-      if (readFileSync(path, 'utf-8').includes(content)) return true;
-    } catch {
-      // Unreadable entry — keep scanning.
-    }
-  }
-  return false;
 }
 
 const USER_MESSAGE_INTERVENTION_SOURCES = new Set(['pan-tell', 'dashboard:user-message']);

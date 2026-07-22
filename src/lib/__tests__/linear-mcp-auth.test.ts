@@ -297,9 +297,9 @@ describe('Linear MCP auth intervention fold', () => {
     });
   });
 
-  it('keeps a claimed-but-uncompleted agent in the wake set', async () => {
-    // A 'delivering' claim is not terminal: recovery must resume it (against
-    // the mail outbox), not treat the agent as handled.
+  it('does not treat a legacy delivering claim as a completion', async () => {
+    // 'delivering' rows from earlier iterations are not completions: the
+    // agent stays in the wake set (resumption is keyed by the outbox).
     useEvents([
       requiredEvent(1, 'agent-min-852', 'MIN-852'),
       healthyEvent(2),
@@ -315,7 +315,6 @@ describe('Linear MCP auth intervention fold', () => {
       lifecycleId: 'seq-1',
       agents: [expect.objectContaining({
         agentId: 'agent-min-852',
-        claimedAt: '2026-07-21T12:05:01.000Z',
         notifiedAt: null,
       })],
     });

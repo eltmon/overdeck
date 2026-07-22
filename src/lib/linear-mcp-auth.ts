@@ -1,9 +1,12 @@
 import type { DomainEvent } from '@overdeck/contracts';
+import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import {
   initEventStore,
   type StoredEvent,
 } from '../dashboard/server/event-store.js';
-import { messageAgentWithOutcome, agentHasMailContentSince } from './agents/messaging.js';
+import { getAgentDir } from './agents/agent-state.js';
+import { messageAgentWithOutcome } from './agents/messaging.js';
 import { createPromiseCoalescer } from './cloister/in-flight-guard.js';
 
 export const LINEAR_MCP_AUTH_URL_TTL_MS = 30 * 60 * 1000;
@@ -22,11 +25,6 @@ export interface LinearMcpAuthBlockedAgent {
   /** Set by a completion record (delivered/queued/failed). Terminal: the
    * agent never re-enters the wake set for this lifecycle. */
   notifiedAt: string | null;
-  /** Set by a pre-delivery 'delivering' claim. NOT terminal: an agent with a
-   * claim but no completion stays in the wake set, and recovery reconciles
-   * the claim against the durable mail outbox before deciding whether the
-   * send must be replayed. */
-  claimedAt?: string | null;
   /** Projection-only enrichment attached by the GET route from the issues
    * resolver; never persisted in lifecycle events. */
   issueUrl?: string | null;
@@ -154,20 +152,14 @@ function foldLinearMcpAuthEvents(
             : null)
           : (open ?? lastCompleted);
         const agent = lifecycle?.agents.get(payload.agentId);
-        if (agent !== undefined) {
-          if (payload.outcome === 'delivering') {
-            // A claim is not a completion: it marks where an interrupted
-            // delivery resumes from, never that the wake happened.
-            lifecycle?.agents.set(payload.agentId, {
-              ...agent,
-              claimedAt: event.timestamp,
-            });
-          } else {
-            lifecycle?.agents.set(payload.agentId, {
-              ...agent,
-              notifiedAt: event.timestamp,
-            });
-          }
+        // 'delivering' rows from earlier iterations are not completions and
+        // are ignored: interrupted deliveries are resumed through the keyed
+        // outbox (see deliverWakeWithOutbox), not the event log.
+        if (agent !== undefined && payload.outcome !== 'delivering') {
+          lifecycle?.agents.set(payload.agentId, {
+            ...agent,
+            notifiedAt: event.timestamp,
+          });
         }
         break;
       }
@@ -318,9 +310,101 @@ const WAKE_FOLLOW_UP_MAX_DELAY_MS = 60_000;
 
 let wakeFollowUpDelayMs = WAKE_FOLLOW_UP_MIN_DELAY_MS;
 
+// ── Keyed wake outbox ────────────────────────────────────────────────────────
+//
+// The durable delivery receipt for one (lifecycleId, agentId) wake. Unlike a
+// claim flag in the event log, the entry is lifecycle-keyed, carries the
+// intended message and the delivery state/outcome, and is updated by the
+// delivery wrapper itself on every path — so every acknowledged send has a
+// receipt, recovery resumes only unacknowledged entries, and no cross-
+// lifecycle content or timestamp matching is involved. Writes are temp-file +
+// rename (atomic on POSIX) and all I/O is async (NFR-1).
+
+export interface LinearMcpWakeOutboxEntry {
+  lifecycleId: string;
+  agentId: string;
+  message: string;
+  state: 'pending' | 'acknowledged';
+  outcome?: LinearMcpAuthNotificationOutcome;
+  createdAt: string;
+  acknowledgedAt?: string;
+}
+
+function wakeOutboxPath(agentId: string, lifecycleId: string): string {
+  return join(getAgentDir(agentId), 'linear-mcp-wake', `${lifecycleId}.json`);
+}
+
+async function readWakeOutbox(agentId: string, lifecycleId: string): Promise<LinearMcpWakeOutboxEntry | null> {
+  try {
+    const raw = await readFile(wakeOutboxPath(agentId, lifecycleId), 'utf-8');
+    return JSON.parse(raw) as LinearMcpWakeOutboxEntry;
+  } catch {
+    return null;
+  }
+}
+
+async function writeWakeOutbox(entry: LinearMcpWakeOutboxEntry): Promise<void> {
+  const path = wakeOutboxPath(entry.agentId, entry.lifecycleId);
+  await mkdir(join(getAgentDir(entry.agentId), 'linear-mcp-wake'), { recursive: true });
+  const tmpPath = `${path}.${process.pid}.tmp`;
+  await writeFile(tmpPath, JSON.stringify(entry, null, 2), 'utf-8');
+  await rename(tmpPath, path);
+}
+
+interface WakeDelivery {
+  /** True when this call actually invoked the delivery door. */
+  sent: boolean;
+  outcome: LinearMcpAuthNotificationOutcome;
+}
+
 /**
- * Record the completion of a delivery attempt. Kept tiny so both the normal
- * send path and the mail-reconciled recovery path share it.
+ * Deliver one lifecycle's wake through the keyed outbox. An acknowledged
+ * entry suppresses the replay and replays only its recorded outcome — a
+ * crash after the ack write never produces a second send, and the recorded
+ * outcome stays faithful ('queued' is never upgraded to 'delivered'). A
+ * pending or missing entry is (re)driven: a crash before the ack write
+ * replays the send, which is correct because that send was never
+ * acknowledged.
+ */
+async function deliverWakeWithOutbox(agentId: string, lifecycleId: string): Promise<WakeDelivery> {
+  const existing = await readWakeOutbox(agentId, lifecycleId);
+  if (existing?.state === 'acknowledged' && existing.outcome !== undefined) {
+    return { sent: false, outcome: existing.outcome };
+  }
+  if (existing === null) {
+    await writeWakeOutbox({
+      lifecycleId,
+      agentId,
+      message: LINEAR_MCP_AUTH_WAKE_COPY,
+      state: 'pending',
+      createdAt: new Date().toISOString(),
+    });
+  }
+
+  let outcome: LinearMcpAuthNotificationOutcome;
+  try {
+    outcome = await messageAgentWithOutcome(agentId, LINEAR_MCP_AUTH_WAKE_COPY, 'linear-mcp-auth-wake');
+  } catch {
+    outcome = 'failed';
+  }
+  await writeWakeOutbox({
+    lifecycleId,
+    agentId,
+    message: LINEAR_MCP_AUTH_WAKE_COPY,
+    state: 'acknowledged',
+    outcome,
+    createdAt: existing?.createdAt ?? new Date().toISOString(),
+    acknowledgedAt: new Date().toISOString(),
+  });
+  return { sent: true, outcome };
+}
+
+/**
+ * Record the completion of a delivery attempt in the lifecycle event log —
+ * this, not the outbox receipt, is what removes the agent from the wake set.
+ * If the append fails, the agent stays in the wake set but the acknowledged
+ * outbox entry suppresses any replay: the next pass only retries this
+ * completion record.
  */
 async function recordWakeCompletion(
   blockedAgent: LinearMcpAuthBlockedAgent,
@@ -335,9 +419,6 @@ async function recordWakeCompletion(
       lifecycleId,
     });
   } catch (completionError) {
-    // The claim already bounds replay; a lost completion record leaves the
-    // agent in the wake set with a claim, and the next pass reconciles
-    // against the mail outbox instead of re-sending.
     console.error(`[linear-mcp-auth] failed to record wake outcome for ${blockedAgent.agentId}:`, completionError);
   }
 }
@@ -358,61 +439,22 @@ export function processLinearMcpAuthWake(): Promise<void> {
         break;
       }
       for (const blockedAgent of wakeSet.agents) {
-        if (blockedAgent.claimedAt !== null && blockedAgent.claimedAt !== undefined) {
-          // Resume an interrupted claim. Every non-throwing path through
-          // messageAgentWithOutcome backs the message up to the agent's
-          // durable mail queue, so mail containing the wake copy at or after
-          // the claim timestamp proves the acknowledged send reached the
-          // outbox — complete the ledger WITHOUT re-sending. Mail absent
-          // means the send never durably happened, so fall through and send.
-          const alreadyDelivered = agentHasMailContentSince(
-            blockedAgent.agentId,
-            LINEAR_MCP_AUTH_WAKE_COPY,
-            blockedAgent.claimedAt,
-          );
-          if (alreadyDelivered) {
-            await recordWakeCompletion(blockedAgent, wakeSet.lifecycleId, 'delivered');
-            continue;
-          }
-        } else {
-          // Durable claim BEFORE delivery: the (lifecycleId, agentId) claim
-          // marks the deterministic delivery key an interrupted attempt
-          // resumes from. It is NOT terminal — the agent stays in the wake
-          // set until a completion lands — so a crash after the claim still
-          // produces exactly one eventual delivery, never zero and never two.
-          try {
-            await appendLinearMcpAuthNotifiedEvent({
-              agentId: blockedAgent.agentId,
-              issueId: blockedAgent.issueId,
-              outcome: 'delivering',
-              lifecycleId: wakeSet.lifecycleId,
-            });
-          } catch (claimError) {
-            // Without the durable claim, an interrupted attempt cannot be
-            // reconciled — skip this agent rather than risk a duplicate wake.
-            console.error(`[linear-mcp-auth] failed to record wake claim for ${blockedAgent.agentId}; skipping delivery this pass:`, claimError);
-            continue;
-          }
-        }
-
-        let outcome: LinearMcpAuthNotificationOutcome;
         try {
-          outcome = await messageAgentWithOutcome(
-            blockedAgent.agentId,
-            LINEAR_MCP_AUTH_WAKE_COPY,
-            'linear-mcp-auth-wake',
-          );
-        } catch {
-          outcome = 'failed';
+          const delivery = await deliverWakeWithOutbox(blockedAgent.agentId, wakeSet.lifecycleId);
+          await recordWakeCompletion(blockedAgent, wakeSet.lifecycleId, delivery.outcome);
+        } catch (deliveryError) {
+          // The outbox itself is unreadable/unwritable — without a durable
+          // receipt an interrupted attempt cannot be reconciled, so skip this
+          // agent rather than risk an unreconciled replay.
+          console.error(`[linear-mcp-auth] wake outbox failure for ${blockedAgent.agentId}; skipping this pass:`, deliveryError);
         }
-        await recordWakeCompletion(blockedAgent, wakeSet.lifecycleId, outcome);
       }
     }
     if (!stabilized) {
       // Every healthy trigger that arrived during this run received the same
       // coalesced promise, so no external retry is guaranteed. Schedule one
-      // ourselves with bounded exponential backoff — a persistent EventStore
-      // failure must not turn into a hot retry/log loop.
+      // ourselves with bounded exponential backoff — a persistent outbox or
+      // EventStore failure must not turn into a hot retry/log loop.
       console.error(`[linear-mcp-auth] wake pass did not stabilize after ${MAX_WAKE_PASSES} passes — scheduling a follow-up run in ${wakeFollowUpDelayMs}ms`);
       const timer = setTimeout(() => { void processLinearMcpAuthWake(); }, wakeFollowUpDelayMs);
       timer.unref();
