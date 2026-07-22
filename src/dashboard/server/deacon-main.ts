@@ -98,7 +98,11 @@ setMergeReadyNotifier((issueId) => {
   const status = getReviewStatusSync(issueId);
   if (!status) return;
   try {
-    emitReviewStatusChanged((event) => append(event as any), issueId, status);
+    emitReviewStatusChanged(
+      (event) => append(event as Omit<DomainEvent, 'sequence'>),
+      issueId,
+      status,
+    );
   } catch (err) {
     console.error('[deacon-child] Failed to append merge-ready event:', err);
   }
