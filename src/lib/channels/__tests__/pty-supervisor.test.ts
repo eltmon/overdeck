@@ -492,4 +492,42 @@ describe.skipIf(isBun)('pty-supervisor subprocess', () => {
 
     expect(statSync(socketPath).mode & 0o777).toBe(0o600);
   });
+
+  it('deduplicates a repeated dedupKey without a second PTY write (PAN-2997)', async () => {
+    const agentId = 'agent-dedup-key';
+    const content = 'dedup-wake-content';
+    const { token, socketPath } = await readySupervisor(agentId, 'cat');
+
+    const first = await postToUnixSocket(socketPath, token, { content, echo: false, dedupKey: 'wake-seq-1' });
+    expect(first.status).toBe(200);
+    await waitForProcessOutput(() => stdout.includes(content), 'supervisor did not echo posted content');
+    // Plain cat echoes both the tty input and its output, so let the first
+    // delivery's output fully settle, then require the replay adds nothing.
+    await new Promise(r => setTimeout(r, 500));
+    const occurrencesAfterFirst = stdout.match(new RegExp(content, 'g'))?.length ?? 0;
+    expect(occurrencesAfterFirst).toBeGreaterThan(0);
+
+    // The dashboard-crash replay: same key, same content. The supervisor
+    // survived the "crash", so it answers with a dedup, not a second write.
+    const second = await postToUnixSocket(socketPath, token, { content, echo: false, dedupKey: 'wake-seq-1' });
+    expect(second.status).toBe(200);
+    expect(second.body).toContain('deduplicated');
+    await new Promise(r => setTimeout(r, 300));
+    expect(stdout.match(new RegExp(content, 'g'))).toHaveLength(occurrencesAfterFirst);
+  });
+
+  it('record-delivered suppresses a later keyed injection without writing (PAN-2997)', async () => {
+    const agentId = 'agent-dedup-record';
+    const content = 'dedup-recorded-content';
+    const { token, socketPath } = await readySupervisor(agentId, 'cat');
+
+    const record = await postToUnixSocket(socketPath, token, { op: 'record-delivered', dedupKey: 'wake-seq-2' });
+    expect(record.status).toBe(200);
+
+    const replay = await postToUnixSocket(socketPath, token, { content, echo: false, dedupKey: 'wake-seq-2' });
+    expect(replay.status).toBe(200);
+    expect(replay.body).toContain('deduplicated');
+    await new Promise(r => setTimeout(r, 300));
+    expect(stdout).not.toContain(content);
+  });
 });

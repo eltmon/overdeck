@@ -726,6 +726,13 @@ export type ResumeIntent = 'autonomous' | 'operator-start' | 'message-delivery';
  *  a stopped-by-user agent that has a completed handoff. */
 export interface MessageAgentRedriveOptions {
   owesRework?: boolean;
+  /**
+   * Idempotency key threaded to the delivery door (PAN-2997). Keyed live
+   * deliveries are deduplicated by the crash-independent delivery component
+   * (supervisor key set / tmux session option), so a dashboard crash and
+   * recovery can never inject the same keyed message twice.
+   */
+  dedupKey?: string;
 }
 
 export interface ResumeGateContext {

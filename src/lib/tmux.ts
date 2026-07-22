@@ -21,7 +21,7 @@ const VALID_SESSION_NAME_RE = /^[a-zA-Z0-9._-]+$/;
 const DEFAULT_TMUX_WINDOW_COLS = 200;
 const DEFAULT_TMUX_WINDOW_ROWS = 50;
 
-function validateSessionName(name: string): void {
+export function validateSessionName(name: string): void {
   if (!VALID_SESSION_NAME_RE.test(name)) {
     throw new Error(`Invalid tmux session name: ${name}`);
   }
@@ -466,7 +466,7 @@ export function buildTmuxCommandString(args: string[]): string {
   return [command, ...commandArgs.map(shellQuote)].join(' ');
 }
 
-async function tmuxExecAsync(args: string[], options?: Parameters<typeof execFileAsync>[2]) {
+export async function tmuxExecAsync(args: string[], options?: Parameters<typeof execFileAsync>[2]) {
   const mode = getTmuxConfigMode();
   await ensureTmuxContextPreparedAsync(mode);
   return execFileAsync('tmux', [...getTmuxContextArgsForMode(mode), ...args], options);

@@ -163,18 +163,44 @@ has not yet been notified:
   before sending and records the acknowledgment — with the real outcome
   (`delivered`, `queued`, or `failed`) — as part of its own protocol on every
   path, so every acknowledged send has a receipt.
+- **The side effect itself is deduplicated by key at the delivery door.** The
+  outbox makes an *incomplete* first delivery replayable, but it cannot help
+  a *completed* delivery whose ack was lost to a dashboard crash — that is
+  why the wake key (`linear-mcp-auth-wake:<lifecycleId>`) is also threaded
+  through `messageAgentWithOutcome` into `deliverAgentMessage`, where the
+  crash-independent components deduplicate the injection itself:
+  - **PTY supervisor** keeps a per-server set of delivered keys. Its own exit
+    kills the agent with it (H1 lifecycle), so an in-memory set is exactly as
+    durable as the side effect it guards: a replay after a dashboard crash
+    hits the surviving supervisor and gets `{ deduplicated: true }` instead
+    of a second PTY write; a replay after the agent itself died is a
+    legitimate first delivery to the resumed session. A
+    `record-delivered` operation lets paths that bypass the supervisor
+    (resume kickoff prompts) still register the key.
+  - **tmux fallback** marks a per-session user option in the same
+    server-side `if-shell` command that pastes (`sendKeysDedup`), so the
+    check, paste, and mark are one atomic step the tmux server executes —
+    a dashboard exit cannot interrupt it. A deduplicated replay sends no
+    stray Enter, because the composer may hold unrelated operator text.
+  - **Keyed mail backups** use a deterministic filename, so a replayed send
+    overwrites the same durable backup instead of stacking a second copy.
+  - Channels, codex app-server, and ACP tiers receive the key as advisory
+    metadata only; they are unreachable for this feature because the
+    detection hook is Claude-Code-only.
 - **Recovery semantics.** An agent stays in the wake set until a completion
   DomainEvent lands. When a pass finds no completion, it reads the keyed
   entry (one exact-path async read — no directory scans, no content or
   timestamp matching): `acknowledged` suppresses the replay and the pass only
   retries the completion record, replaying the recorded outcome faithfully
   (`queued` is never upgraded to `delivered`); `pending` or missing means the
-  send was never acknowledged, so it is (re)driven. The result is exactly one
-  acknowledged delivery per agent per lifecycle across every crash window:
-  crash before the entry → driven once; crash after a send whose ack never
-  landed → replayed once (correct — unacknowledged); crash after the ack →
-  never replayed. Lifecycle B's entry is independent of lifecycle A's, so an
-  identical wake message in an adjacent lifecycle is never suppressed.
+  send was never acknowledged, so it is (re)driven — and when the original
+  send had in fact completed before the crash, the door-level dedup makes
+  that replay a no-op for the agent. The result is exactly one visible
+  delivery per agent per lifecycle across every crash window: crash before
+  the entry → driven once; crash after a send whose ack never landed →
+  replayed, but deduplicated at the door; crash after the ack → never
+  replayed. Lifecycle B's entry and key are independent of lifecycle A's, so
+  an identical wake message in an adjacent lifecycle is never suppressed.
 - **Drain-until-stable.** The wake pass loops: after waking one completed
   lifecycle it re-reads the fold, so a lifecycle that completed while
   deliveries were in flight gets its own wake round inside the same coalesced

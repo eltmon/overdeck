@@ -383,7 +383,18 @@ async function deliverWakeWithOutbox(agentId: string, lifecycleId: string): Prom
 
   let outcome: LinearMcpAuthNotificationOutcome;
   try {
-    outcome = await messageAgentWithOutcome(agentId, LINEAR_MCP_AUTH_WAKE_COPY, 'linear-mcp-auth-wake');
+    // The key is threaded to the delivery door, where the crash-independent
+    // component (supervisor key set / tmux session option) deduplicates the
+    // side effect itself. A dashboard crash after a completed delivery can
+    // still replay THIS call (the outbox ack may not have landed), but the
+    // replayed delivery deduplicates at the door — the agent never sees the
+    // same keyed wake twice.
+    outcome = await messageAgentWithOutcome(
+      agentId,
+      LINEAR_MCP_AUTH_WAKE_COPY,
+      'linear-mcp-auth-wake',
+      { dedupKey: `linear-mcp-auth-wake:${lifecycleId}` },
+    );
   } catch {
     outcome = 'failed';
   }

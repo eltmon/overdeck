@@ -158,6 +158,7 @@ describe('Linear MCP auth wake processor', () => {
       'agent-min-852',
       LINEAR_MCP_AUTH_WAKE_COPY,
       'linear-mcp-auth-wake',
+      { dedupKey: 'linear-mcp-auth-wake:seq-1' },
     );
     expect(notifiedEvents()).toHaveLength(1);
     expect(notifiedEvents()[0]?.payload).toEqual({
@@ -238,6 +239,7 @@ describe('Linear MCP auth wake processor', () => {
       'agent-min-852',
       LINEAR_MCP_AUTH_WAKE_COPY,
       'linear-mcp-auth-wake',
+      { dedupKey: 'linear-mcp-auth-wake:seq-1' },
     );
     expect(notifiedEvents()).toHaveLength(1);
   });

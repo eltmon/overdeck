@@ -16,6 +16,7 @@ import {
 } from '../agents.js';
 import { getAgentRuntimeState } from './runtime-state.js';
 import { isPaneDead, sendKeys, sessionExists } from '../tmux.js';
+import { sendEnterKey, sendKeysDedup } from '../tmux-dedup.js';
 import { BRIDGE_TOKEN_HEADER, readBridgeTokenSync } from '../bridge-token.js';
 import { PTY_TOKEN_HEADER, readPtyToken } from '../pty-token.js';
 import {
@@ -32,7 +33,50 @@ export type DeliveryResult = {
   ok: boolean;
   path: 'app-server' | 'acp' | 'supervisor' | 'channels' | 'tmux' | 'pi' | 'codex';
   failure?: string;
+  /** True when the delivery was suppressed by the keyed dedup record — the
+   * side effect already happened on an earlier call with the same key. */
+  deduplicated?: boolean;
 };
+
+export interface DeliverAgentMessageOptions {
+  /**
+   * Idempotency key (PAN-2997). Keyed deliveries are deduplicated by the
+   * crash-independent delivery component, not by dashboard-side state: the
+   * PTY supervisor keeps the key set (its exit kills the agent with it, so a
+   * replay after that is a legitimate first delivery), and the tmux fallback
+   * marks a per-session user option in the same server-side command that
+   * pastes. A dashboard crash between the side effect and the caller's own
+   * bookkeeping can therefore never deliver the same keyed message twice.
+   * Channels/app-server/ACP tiers receive the key as advisory metadata only.
+   */
+  dedupKey?: string;
+}
+
+/**
+ * Record a dedup key in the agent's supervisor without injecting anything
+ * (PAN-2997). Used when a keyed message reached the agent through a channel
+ * the supervisor did not mediate — e.g. a resume kickoff prompt — so a later
+ * keyed replay still deduplicates. Best-effort: any failure only reopens the
+ * at-least-once window for this key; it never blocks the caller.
+ */
+export async function recordDeliveredKeyWithSupervisor(agentId: string, dedupKey: string): Promise<void> {
+  const normalizedId = normalizeAgentId(agentId);
+  const supervisorSocketPath = join(overdeckHomeForSockets(), 'sockets', `pty-${normalizedId}.sock`);
+  if (!existsSync(supervisorSocketPath)) return;
+  const ptyToken = await readPtyToken(normalizedId);
+  if (!ptyToken) return;
+  try {
+    await postUnixSocketJson(
+      supervisorSocketPath,
+      { op: 'record-delivered', dedupKey },
+      3_000,
+      ptyToken,
+      PTY_TOKEN_HEADER,
+    );
+  } catch {
+    // Best-effort per the doc comment.
+  }
+}
 
 /**
  * PAN-1988: resume / feedback / continue delivery must be RESILIENT. When an agent is pinned to
@@ -206,8 +250,10 @@ export async function deliverAgentMessage(
   message: string,
   caller: string = 'unknown',
   deliveryMethod?: 'auto' | 'supervisor' | 'channels' | 'tmux',
+  opts: DeliverAgentMessageOptions = {},
 ): Promise<DeliveryResult> {
   const normalizedId = normalizeAgentId(agentId);
+  const dedupKey = opts.dedupKey;
 
   let channelsEnabled = false;
   let resolvedMethod = deliveryMethod;
@@ -229,6 +275,18 @@ export async function deliverAgentMessage(
 
   if (resolvedMethod === 'tmux') {
     await assertTmuxTargetCanReceive(normalizedId, caller);
+    if (dedupKey !== undefined) {
+      const outcome = await sendKeysDedup(normalizedId, message, dedupKey, caller);
+      if (outcome === 'delivered') {
+        // Paste landed — submit with a standalone Enter after the settle
+        // window, mirroring the supervisor's proven timing. A deduplicated
+        // replay deliberately sends no stray Enter: the composer may hold
+        // unrelated operator text.
+        await new Promise(r => setTimeout(r, 300));
+        await sendEnterKey(normalizedId);
+      }
+      return { ok: true, path: 'tmux', deduplicated: outcome === 'deduplicated' };
+    }
     await Effect.runPromise(sendKeys(normalizedId, message));
     return { ok: true, path: 'tmux' };
   }
@@ -242,7 +300,7 @@ export async function deliverAgentMessage(
         appServerFailure = 'appserver-token-missing';
       } else {
         try {
-          const appServerBody: Record<string, unknown> = { op: 'message', content: message, meta: { caller } };
+          const appServerBody: Record<string, unknown> = { op: 'message', content: message, meta: { caller, ...(dedupKey !== undefined ? { dedupKey } : {}) } };
           if (state?.model) appServerBody.model = state.model;
           await postUnixSocketJson(
             appServerSocketPath,
@@ -277,7 +335,7 @@ export async function deliverAgentMessage(
           // how long the provider may take to finish the queued turn.
           await postUnixSocketJson(
             acpSocketPath,
-            { op: 'message', content: message, meta: { caller } },
+            { op: 'message', content: message, meta: { caller, ...(dedupKey !== undefined ? { dedupKey } : {}) } },
             8_000,
             acpToken,
           );
@@ -317,15 +375,26 @@ export async function deliverAgentMessage(
         // worst-case injection budget. Abandoning the POST mid-injection would
         // fire the tmux fallback while the supervisor is still writing and
         // re-create the duplicate-writer race PAN-1769 fixed.
-        await postUnixSocketJson(
+        const supervisorResponse = await postUnixSocketJson(
           supervisorSocketPath,
-          { content: message, meta: { caller } },
+          { content: message, meta: { caller }, ...(dedupKey !== undefined ? { dedupKey } : {}) },
           supervisorInjectionBudgetMs(message.length) + SUPERVISOR_CLIENT_MARGIN_MS,
           ptyToken,
           PTY_TOKEN_HEADER,
         );
         await appendChannelDeliveryLog(normalizedId, { path: 'supervisor', caller });
-        return { ok: true, path: 'supervisor' };
+        let supervisorDeduplicated = false;
+        try {
+          const parsed = JSON.parse(supervisorResponse.body) as { deduplicated?: boolean };
+          supervisorDeduplicated = parsed.deduplicated === true;
+        } catch {
+          // Legacy supervisor build without dedup support — treat as delivered.
+        }
+        return {
+          ok: true,
+          path: 'supervisor',
+          ...(dedupKey !== undefined ? { deduplicated: supervisorDeduplicated } : {}),
+        };
       } catch (err) {
         const reason = err instanceof Error ? err.message : String(err);
         supervisorFailure = `socket-post-failed: ${reason}`;
@@ -352,7 +421,7 @@ export async function deliverAgentMessage(
         try {
           await postUnixSocketJson(
             socketPath,
-            { content: message, meta: { caller } },
+            { content: message, meta: { caller, ...(dedupKey !== undefined ? { dedupKey } : {}) } },
             2000,
             bridgeToken,
           );
@@ -383,11 +452,27 @@ export async function deliverAgentMessage(
       ...(channelFailure ? { channels: channelFailure } : {}),
     });
     await assertTmuxTargetCanReceive(normalizedId, caller);
+    if (dedupKey !== undefined) {
+      const outcome = await sendKeysDedup(normalizedId, message, dedupKey, caller);
+      if (outcome === 'delivered') {
+        await new Promise(r => setTimeout(r, 300));
+        await sendEnterKey(normalizedId);
+      }
+      return { ok: true, path: 'tmux', failure: channelFailure ?? supervisorFailure, deduplicated: outcome === 'deduplicated' };
+    }
     await Effect.runPromise(sendKeys(normalizedId, message));
     return { ok: true, path: 'tmux', failure: channelFailure ?? supervisorFailure };
   }
 
   await assertTmuxTargetCanReceive(normalizedId, caller);
+  if (dedupKey !== undefined) {
+    const outcome = await sendKeysDedup(normalizedId, message, dedupKey, caller);
+    if (outcome === 'delivered') {
+      await new Promise(r => setTimeout(r, 300));
+      await sendEnterKey(normalizedId);
+    }
+    return { ok: true, path: 'tmux', deduplicated: outcome === 'deduplicated' };
+  }
   await Effect.runPromise(sendKeys(normalizedId, message));
   return { ok: true, path: 'tmux' };
 }

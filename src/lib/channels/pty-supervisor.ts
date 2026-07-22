@@ -49,7 +49,29 @@ export interface PtySupervisorPayload {
   echo?: boolean;
   caller?: string;
   meta?: Record<string, string>;
+  /**
+   * Optional idempotency key (PAN-2997). When present, the supervisor
+   * remembers injected keys and silently deduplicates repeat deliveries of
+   * the same key. The set is in-memory by design: the supervisor owns the
+   * agent's PTY, so a supervisor exit means the agent died too (H1) — a
+   * replayed delivery to a resumed session is a legitimate first delivery,
+   * not a duplicate. What this closes is the dashboard-crash window: the
+   * dashboard may die between the supervisor's injection and its own
+   * bookkeeping, but the supervisor survives and answers the replay with a
+   * dedup instead of a second PTY write.
+   */
+  dedupKey?: string;
+  /**
+   * When 'record-delivered', no content is injected — the key is simply added
+   * to the dedup set. Used when the message reached the agent through a
+   * channel the supervisor did not mediate (e.g. a resume kickoff prompt),
+   * so a later keyed replay still deduplicates.
+   */
+  op?: 'record-delivered';
 }
+
+/** Max accepted dedup key length; keys are free-form caller namespaces. */
+const DEDUP_KEY_MAX_CHARS = 200;
 
 export function getPtySupervisorSocketPath(agentId: string): string {
   return join(getOverdeckHome(), 'sockets', `pty-${agentId}.sock`);
@@ -112,10 +134,19 @@ async function readJsonBody(req: IncomingMessage): Promise<unknown> {
 function parsePayload(value: unknown): PtySupervisorPayload | null {
   if (value === null || typeof value !== 'object') return null;
   const payload = value as Partial<PtySupervisorPayload>;
+  if (payload.op === 'record-delivered') {
+    // Key-only operation: no content required.
+    return typeof payload.dedupKey === 'string' && payload.dedupKey.length > 0
+      && payload.dedupKey.length <= DEDUP_KEY_MAX_CHARS
+      ? payload as PtySupervisorPayload
+      : null;
+  }
   if (typeof payload.content !== 'string' || payload.content.length === 0) return null;
   if (payload.content.length > INPUT_PURGE_MAX_CHARS) return null;
   if (payload.echo !== undefined && typeof payload.echo !== 'boolean') return null;
   if (payload.caller !== undefined && typeof payload.caller !== 'string') return null;
+  if (payload.dedupKey !== undefined
+    && (typeof payload.dedupKey !== 'string' || payload.dedupKey.length === 0 || payload.dedupKey.length > DEDUP_KEY_MAX_CHARS)) return null;
   if (payload.meta !== undefined) {
     if (payload.meta === null || typeof payload.meta !== 'object' || Array.isArray(payload.meta)) return null;
     for (const [key, metaValue] of Object.entries(payload.meta)) {
@@ -373,6 +404,12 @@ export async function injectPtyMessage(
 }
 
 export function createPtySupervisorServer(agentId: string, child: pty.IPty): Server {
+  // Per-server dedup memory. A supervisor exit kills the agent with it (H1),
+  // so this never needs to survive the supervisor itself — only the
+  // dashboard, whose crash between the supervisor's injection and the
+  // dashboard's own ack bookkeeping is exactly the replay this suppresses.
+  const deliveredDedupKeys = new Set<string>();
+
   return createServer(async (req, res) => {
     if (req.method !== 'POST') {
       writeJson(res, 405, { error: 'method not allowed' });
@@ -397,8 +434,32 @@ export function createPtySupervisorServer(agentId: string, child: pty.IPty): Ser
       return;
     }
 
+    if (payload.dedupKey !== undefined && deliveredDedupKeys.has(payload.dedupKey)) {
+      // Already injected (or recorded) — suppress the replay. This is what
+      // keeps a dashboard crash-and-recovery from delivering the same keyed
+      // message twice.
+      writeJson(res, 200, { ok: true, deduplicated: true });
+      return;
+    }
+
+    if (payload.op === 'record-delivered') {
+      const key = payload.dedupKey;
+      if (key === undefined) {
+        writeJson(res, 400, { error: 'dedupKey is required for record-delivered' });
+        return;
+      }
+      deliveredDedupKeys.add(key);
+      writeJson(res, 200, { ok: true, recorded: true });
+      return;
+    }
+
     try {
       await injectPtyMessage(child, agentId, payload);
+      if (payload.dedupKey !== undefined) {
+        // Recorded only after a confirmed injection, inside the supervisor's
+        // own crash boundary — the dashboard cannot interrupt this ordering.
+        deliveredDedupKeys.add(payload.dedupKey);
+      }
       writeJson(res, 200, 'ok');
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);

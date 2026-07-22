@@ -34,6 +34,11 @@ vi.mock('../tmux.js', () => ({
   waitForClaudePrompt: vi.fn(async () => true),
 }));
 
+vi.mock('../tmux-dedup.js', () => ({
+  sendKeysDedup: vi.fn(async () => 'delivered'),
+  sendEnterKey: vi.fn(async () => undefined),
+}));
+
 vi.mock('../paths.js', async (importOriginal) => {
   const actual = (await importOriginal()) as Record<string, unknown>;
   return {
@@ -525,6 +530,57 @@ describe('channel bridge delivery', () => {
     } finally {
       await new Promise<void>((r) => server.close(() => r()));
     }
+  });
+
+  it('threads dedupKey to the supervisor and surfaces deduplication (PAN-2997)', async () => {
+    const agentId = 'agent-dedup';
+    writeAgentState(agentId, { channelsEnabled: false });
+    await writePtyToken(agentId);
+    const socketPath = join(socketDir, `pty-${agentId}.sock`);
+    const capture: { lastBody?: string } = {};
+    const server = await startFakeBridge(socketPath, {
+      status: 200,
+      body: JSON.stringify({ ok: true, deduplicated: true }),
+      capture,
+    });
+    try {
+      const result = await deliverAgentMessage(agentId, 'wake', 'caller-wake', undefined, { dedupKey: 'wake:seq-1' });
+      expect(result).toEqual({ ok: true, path: 'supervisor', deduplicated: true });
+      expect(JSON.parse(capture.lastBody!)).toMatchObject({
+        content: 'wake',
+        dedupKey: 'wake:seq-1',
+      });
+    } finally {
+      await new Promise<void>((r) => server.close(() => r()));
+    }
+  });
+
+  it('uses the atomic tmux dedup path for keyed tmux deliveries (PAN-2997)', async () => {
+    const agentId = 'agent-dedup-tmux';
+    writeAgentState(agentId, { channelsEnabled: false, deliveryMethod: 'tmux' });
+    const { sendKeysDedup, sendEnterKey } = await import('../tmux-dedup.js');
+    vi.mocked(sendKeysDedup).mockClear();
+    vi.mocked(sendEnterKey).mockClear();
+
+    const result = await deliverAgentMessage(agentId, 'wake', 'caller-wake', 'tmux', { dedupKey: 'wake:seq-1' });
+
+    expect(result).toEqual({ ok: true, path: 'tmux', deduplicated: false });
+    expect(vi.mocked(sendKeysDedup)).toHaveBeenCalledWith(agentId, 'wake', 'wake:seq-1', 'caller-wake');
+    expect(vi.mocked(sendEnterKey)).toHaveBeenCalledWith(agentId);
+  });
+
+  it('sends no Enter when the tmux dedup path reports a prior delivery (PAN-2997)', async () => {
+    const agentId = 'agent-dedup-tmux-replay';
+    writeAgentState(agentId, { channelsEnabled: false, deliveryMethod: 'tmux' });
+    const { sendKeysDedup, sendEnterKey } = await import('../tmux-dedup.js');
+    vi.mocked(sendKeysDedup).mockClear();
+    vi.mocked(sendEnterKey).mockClear();
+    vi.mocked(sendKeysDedup).mockResolvedValueOnce('deduplicated');
+
+    const result = await deliverAgentMessage(agentId, 'wake', 'caller-wake', 'tmux', { dedupKey: 'wake:seq-1' });
+
+    expect(result).toEqual({ ok: true, path: 'tmux', deduplicated: true });
+    expect(vi.mocked(sendEnterKey)).not.toHaveBeenCalled();
   });
 
   it('codex work agents use live-session delivery instead of exec resume', async () => {
