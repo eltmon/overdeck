@@ -21,7 +21,7 @@
   ],
   "feedback": [],
   "created": "2026-07-21T23:09:49.270Z",
-  "updated": "2026-07-22T00:31:13.906Z",
+  "updated": "2026-07-22T00:32:44.063Z",
   "pipeline": {
     "issueId": "PAN-2997",
     "reviewStatus": "pending",
@@ -64,7 +64,7 @@
   },
   "workModel": "k3[1m]",
   "harness": "claude-code",
-  "model": "k3[1m]",
+  "model": "claude-sonnet-5",
   "tasks": {
     "sequence": 14,
     "claims": {},
