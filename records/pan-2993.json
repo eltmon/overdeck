@@ -121,10 +121,10 @@
     "recordedAt": "2026-07-21T23:54:05.124Z"
   },
   "created": "2026-07-21T22:47:36.935Z",
-  "updated": "2026-07-22T00:01:40.098Z",
+  "updated": "2026-07-22T00:17:31.747Z",
   "pipeline": {
     "issueId": "PAN-2993",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -132,7 +132,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-21T23:54:40.299Z",
-    "updatedAt": "2026-07-22T00:01:40.013Z",
+    "updatedAt": "2026-07-22T00:17:31.543Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "inspectNotes": "All 4 ACs verified against src/lib/agents/messaging.ts@79bb7b47: stopped-agent resume failure returns {delivered:false,queuedToMail:true,reason} naming both resumeResult.error and PAN-1980 session-rotation disable; paused/gated path returns gate reason; live-session/successful-resume paths return delivered:true; only deacon-strike-landing.ts touched among callers and npm run typecheck passes clean (0 new errors).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2998",
@@ -219,9 +219,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 3332176,
-            "output": 153344,
-            "cacheRead": 94909440,
+            "input": 3431010,
+            "output": 166019,
+            "cacheRead": 107466752,
             "cacheWrite": 0
           }
         }
@@ -234,9 +234,9 @@
           "cacheWrite": 311785
         },
         "openai/gpt-5.6-sol": {
-          "input": 5764244,
-          "output": 313744,
-          "cacheRead": 130863616,
+          "input": 5863078,
+          "output": 326419,
+          "cacheRead": 143420928,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -247,8 +247,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 114.779127,
-        "pricingAsOf": "2026-07-22T00:01:40.043Z"
+        "usd": 121.932203,
+        "pricingAsOf": "2026-07-22T00:17:31.743Z"
       }
     },
     "merges": [
