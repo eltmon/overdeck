@@ -115,17 +115,17 @@
     "recordedAt": "2026-07-22T23:43:55.929Z"
   },
   "created": "2026-07-22T21:25:31.822Z",
-  "updated": "2026-07-22T23:44:04.359Z",
+  "updated": "2026-07-22T23:44:05.286Z",
   "pipeline": {
     "issueId": "PAN-2988",
     "reviewStatus": "failed",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-22T23:44:04.168Z",
+    "updatedAt": "2026-07-22T23:44:04.621Z",
     "reviewNotes": "Verification failed at test",
     "verificationNotes": "Verification FAILED at test (270877ms):\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-2988/src/dashboard/frontend\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-2988\n\n ❯ src/lib/__tests__/issueActions.c-actions.test.ts (15 tests | 1 failed) 147ms\n     × snapshots the enabled action set for every representative phase 21ms\n ❯ src/components/drawer/IssueDrawer.test.tsx (29 tests | 1 failed) 1267ms\n     × snapshots enabled drawer footer actions for work-running and ready-to-merge phases 131ms\n ❯ src/components/KanbanBoard.test.tsx (91 tests | 1 failed) 1817ms\n     × routes paused-agent Unpause through the primary-strip registry overflow 1142ms\n\n  Snapshots  2 failed\n Test Files  3 failed | 28 passed (31)\n      Tests  3 failed | 580 passed (583)\n   Start at  19:28:43\n   Duration  6.10s (transform 25.04s, setup 7.92s, import 50.66s, tests 18.41s, environment 15.01s)\n\n[prep] state-reconcile\n[prep] completed: state-reconcile (0s elapsed)\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Workspace already up to date with main\n[prep] completed: sync-main (0s elapsed)\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-aXeHaC/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] completed: tracker-context (0s elapsed)\n[prep] Spawning agent...\n[prep] spawn\n[prep] completed: spawn (0s elapsed)\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Workspace already up to date with main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[\n…(632 chars elided)…\nFound workspace: /tmp/pan-auto-resume-gating-064E1t/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Found workspace: /tmp/pan-auto-resume-gating-064E1t/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace: /tmp/pan-auto-resume-gating-064E1t/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace: /tmp/pan-auto-resume-gating-064E1t/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace: /tmp/pan-auto-resume-gating-064E1t/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building a\n...(truncated)",
     "inspectNotes": "All 3 call sites (main.ts status_changed + merge-ready, deacon-main.ts merge-ready) now call emitReviewStatusChanged synchronously before any async enrichment; helper appends unenriched status first, then races enrichment against a 5s Effect.timeout via Effect.catch (verified Effect.catch is the effect@4.0.0-beta.73 name for catchAll, and TimeoutException is a typed/recoverable failure so it's caught correctly), logs a warning naming the issue on timeout/failure with exactly one event appended, and gates the second enriched append on both hasSugar and an unchanged canonical updatedAt. grep confirms enrichReviewStatus is no longer imported/referenced in main.ts or deacon-main.ts.",
@@ -241,7 +241,7 @@
       },
       "costAtCloseOut": {
         "usd": 121.748509,
-        "pricingAsOf": "2026-07-22T23:44:04.186Z"
+        "pricingAsOf": "2026-07-22T23:44:04.642Z"
       }
     },
     "merges": [
