@@ -4,17 +4,17 @@
     "created": "2026-07-21T23:05:00.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2993: Strike landing wedges permanently when the strike agent is dead: transport failures demand a fresh head, recovery mail goes to a queue nobody reads, and strike-ready no-ops in 'recovering'",
-    "updated": "2026-07-21T22:59:38.517Z"
+    "updated": "2026-07-22T20:59:04.343Z"
   },
   "plan": {
     "id": "pan-2993",
     "title": "Strike landing wedges permanently when the strike agent is dead: transport failures demand a fresh head, recovery mail goes to a queue nobody reads, and strike-ready no-ops in 'recovering'",
-    "status": "running",
+    "status": "completed",
     "uid": "e4130c60-ad6f-4d3c-9bb1-119d6fa973c0",
     "author": "agent:claude-fable-5",
-    "sequence": 6,
+    "sequence": 7,
     "created": "2026-07-21T23:05:00.000Z",
-    "updated": "2026-07-21T22:59:38.517Z",
+    "updated": "2026-07-22T20:59:04.343Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2993",
@@ -498,5 +498,5 @@
       "canonicalFilename": "2026-07-21-PAN-2993-strike-landing-wedges-permanently-when-the-strike-agent-is-dead-transport-failures-demand-a-fresh-head-recovery-mail-goes-to-a-queue-nobody-reads-and-strike-ready-no-ops-in-recovering.xbrief.json"
     }
   },
-  "status": "active"
+  "status": "completed"
 }
