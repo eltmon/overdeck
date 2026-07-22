@@ -22,6 +22,11 @@
       "reason": "resume",
       "agentModel": "k3[1m]",
       "timestamp": "2026-07-22T00:51:33.135Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-22T01:26:06.524Z"
     }
   ],
   "feedback": [],
@@ -86,7 +91,7 @@
     "recordedAt": "2026-07-22T01:20:05.090Z"
   },
   "created": "2026-07-21T23:09:49.270Z",
-  "updated": "2026-07-22T01:26:05.365Z",
+  "updated": "2026-07-22T01:26:06.536Z",
   "pipeline": {
     "issueId": "PAN-2997",
     "reviewStatus": "reviewing",
@@ -233,7 +238,7 @@
   },
   "workModel": "k3[1m]",
   "harness": "claude-code",
-  "model": "k3[1m]",
+  "model": "gpt-5.6-sol",
   "tasks": {
     "sequence": 20,
     "claims": {},
