@@ -12,8 +12,8 @@ import {
 } from '../../lib/cloister/deacon.js';
 import { createDeaconEventClient } from '../../lib/cloister/deacon-event-client.js';
 import { getReviewStatusSync } from '../../lib/review-status.js';
-import { enrichReviewStatus } from '../../lib/review-status-enrichment.js';
 import { ensureInternalTokenSync } from '../../lib/internal-token.js';
+import { emitReviewStatusChanged } from './review-status-emit.js';
 import { flushAllPendingAutoCommits } from '../../lib/pan-dir/auto-commit.js';
 import type { DomainEvent } from '@overdeck/contracts';
 
@@ -97,14 +97,11 @@ setAgentStatusChangedNotifier((state, previousStatus, hasLiveTmuxSession) => {
 setMergeReadyNotifier((issueId) => {
   const status = getReviewStatusSync(issueId);
   if (!status) return;
-  void (async () => {
-    try {
-      const enriched = await Effect.runPromise(enrichReviewStatus(issueId, status));
-      append(domainEvent('review.status_changed', { issueId, status: enriched }));
-    } catch (err) {
-      console.error('[deacon-child] Failed to append merge-ready event:', err);
-    }
-  })();
+  try {
+    emitReviewStatusChanged((event) => append(event as any), issueId, status);
+  } catch (err) {
+    console.error('[deacon-child] Failed to append merge-ready event:', err);
+  }
 });
 
 process.on('message', (message) => {

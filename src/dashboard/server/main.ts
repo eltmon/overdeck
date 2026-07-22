@@ -43,9 +43,9 @@ import { setPipelineHandlerSync } from '../../lib/pipeline-notifier.js';
 import { ensureInternalTokenSync } from '../../lib/internal-token.js';
 import { clearStuckMergeStatuses, fixStuckReadyForMerge, fixStuckCommentedReviews, getReviewStatusSync, loadReviewStatuses, clearReviewStatus } from '../../lib/review-status.js';
 import { reconcileStaleGitHubBlockers } from '../../lib/webhook-handlers.js';
-import { enrichReviewStatus } from '../../lib/review-status-enrichment.js';
 import { recoverStuckForks, waitForInFlightForkPipelines } from '../../lib/overdeck/conversation-forks.js';
 import { getEventStore, initEventStore } from './event-store.js';
+import { emitReviewStatusChanged } from './review-status-emit.js';
 import { emitActivityEntrySync, emitActivityTtsSync } from '../../lib/activity-logger.js';
 import { shouldAutoStart } from '../../lib/cloister/config.js';
 import { applyBootReconciliationDecision, setAgentStoppedNotifier, setAgentStatusChangedNotifier, setMergeReadyNotifier } from '../../lib/cloister/deacon.js';
@@ -246,23 +246,15 @@ if (process.env.OVERDECK_MODE === 'desktop') {
 setPipelineHandlerSync((event) => {
   switch (event.type) {
     case 'status_changed': {
-      // Enrich async — fire-and-forget so the notifier stays sync.
-      // Session-name discovery needs tmux, which is async; appending the event
-      // is delayed by <1 tick which is fine because reviewSessionNames are only
-      // needed for the TerminalTabs UI, not for DB state transitions.
-      void (async () => {
-        try {
-          const enriched = await Effect.runPromise(enrichReviewStatus(event.issueId, event.status));
-          const es = getEventStore();
-          es.append({
-            type: 'review.status_changed',
-            timestamp: new Date().toISOString(),
-            payload: { issueId: event.issueId, status: enriched },
-          } as any);
-        } catch (err) {
-          console.error('[pipeline] Failed to append status_changed event:', err);
-        }
-      })();
+      try {
+        emitReviewStatusChanged(
+          (domainEvent) => getEventStore().append(domainEvent as any),
+          event.issueId,
+          event.status,
+        );
+      } catch (err) {
+        console.error('[pipeline] Failed to append status_changed event:', err);
+      }
       return;
     }
 
@@ -478,19 +470,15 @@ console.log('[overdeck] Agent stopped/status notifiers → domain events wired')
 setMergeReadyNotifier((issueId) => {
   const status = getReviewStatusSync(issueId);
   if (!status) return;
-  void (async () => {
-    try {
-      const enriched = await Effect.runPromise(enrichReviewStatus(issueId, status));
-      const es = getEventStore();
-      es.append({
-        type: 'review.status_changed',
-        timestamp: new Date().toISOString(),
-        payload: { issueId, status: enriched },
-      } as any);
-    } catch (err) {
-      console.error('[pipeline] Failed to append merge-ready event:', err);
-    }
-  })();
+  try {
+    emitReviewStatusChanged(
+      (domainEvent) => getEventStore().append(domainEvent as any),
+      issueId,
+      status,
+    );
+  } catch (err) {
+    console.error('[pipeline] Failed to append merge-ready event:', err);
+  }
 });
 console.log('[overdeck] Merge-ready notifier → domain events wired');
 
