@@ -81,6 +81,12 @@ export function enrichReviewNotesFromRecordSync(issueId: string, status: ReviewS
 
 type DurableStatusFields = Partial<ReviewStatus> & { closedOut?: boolean; closedOutAt?: string };
 
+const FALLBACK_CLEARABLE_FIELDS = [
+  'strikeTransportRetryCount',
+  'strikeNextAttemptAt',
+] as const;
+type FallbackClearableField = typeof FALLBACK_CLEARABLE_FIELDS[number];
+
 /**
  * The durable field subset shared by the journal record's pipeline block and the
  * workspace verdict fallback (PAN-2583). Derived/live columns (readyForMerge,
@@ -132,6 +138,7 @@ interface WorkspaceVerdictFallback {
   issueId: string;
   updatedAt: string;
   pipeline: DurableStatusFields;
+  clearedFields?: FallbackClearableField[];
 }
 
 export function workspaceVerdictFallbackPath(issueId: string): string | null {
@@ -160,10 +167,14 @@ function writeWorkspaceVerdictFallbackSync(issueId: string, status: ReviewStatus
       return;
     }
     mkdirSync(dirname(path), { recursive: true });
+    const clearedFields = FALLBACK_CLEARABLE_FIELDS.filter(
+      (field) => status[field] === undefined,
+    );
     const payload: WorkspaceVerdictFallback = {
       issueId: issueId.toUpperCase(),
       updatedAt: status.updatedAt ?? new Date().toISOString(),
       pipeline: durableSubset(status as unknown as PanIssuePipelineRecord),
+      ...(clearedFields.length > 0 ? { clearedFields } : {}),
     };
     writeFileSync(path, JSON.stringify(payload, null, 2));
     console.warn(
@@ -182,7 +193,11 @@ function readWorkspaceVerdictFallbackSync(issueId: string): WorkspaceVerdictFall
     if (!path || !existsSync(path)) return null;
     const parsed = JSON.parse(readFileSync(path, 'utf-8')) as WorkspaceVerdictFallback;
     if (!parsed?.updatedAt || !parsed.pipeline) return null;
-    return parsed;
+    const clearedFields = Array.isArray(parsed.clearedFields)
+      ? parsed.clearedFields.filter((field): field is FallbackClearableField =>
+          typeof field === 'string' && (FALLBACK_CLEARABLE_FIELDS as readonly string[]).includes(field))
+      : [];
+    return { ...parsed, clearedFields };
   } catch {
     return null;
   }
@@ -206,7 +221,7 @@ function readWorkspaceVerdictFallbackSync(issueId: string): WorkspaceVerdictFall
  */
 export function readJournalStatusSync(
   issueId: string,
-): { updatedAt: string; durable: DurableStatusFields } | null {
+): { updatedAt: string; durable: DurableStatusFields; clearedFields?: FallbackClearableField[] } | null {
   const p = readPipelineSync(issueId);
   const fallback = readWorkspaceVerdictFallbackSync(issueId);
   const fallbackNewer = !!fallback && (!p || (p.updatedAt ?? '') < fallback.updatedAt);
@@ -215,7 +230,13 @@ export function readJournalStatusSync(
     const overlay = Object.fromEntries(
       Object.entries(fallback.pipeline).filter(([, value]) => value !== undefined),
     ) as DurableStatusFields;
-    return { updatedAt: fallback.updatedAt, durable: { ...base, ...overlay } };
+    const durable = { ...base, ...overlay };
+    for (const field of fallback.clearedFields ?? []) delete durable[field];
+    return {
+      updatedAt: fallback.updatedAt,
+      durable,
+      ...(fallback.clearedFields?.length ? { clearedFields: fallback.clearedFields } : {}),
+    };
   }
   if (!p) return null;
   return { updatedAt: p.updatedAt, durable: durableSubset(p) };
