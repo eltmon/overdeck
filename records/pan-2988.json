@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-22T21:25:31.822Z",
-  "updated": "2026-07-22T22:37:32.614Z",
+  "updated": "2026-07-22T22:38:47.438Z",
   "pipeline": {
     "issueId": "PAN-2988",
     "reviewStatus": "pending",
@@ -75,16 +75,8 @@
   "harness": "claude-code",
   "model": "claude-sonnet-5",
   "tasks": {
-    "sequence": 15,
-    "claims": {
-      "docs": {
-        "writerId": "agent-pan-2988",
-        "agentId": "agent-pan-2988",
-        "pid": 3530701,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-22T22:37:29.517Z"
-      }
-    },
+    "sequence": 16,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2988",
@@ -162,6 +154,17 @@
         "outcome": "completed",
         "reason": "Added a never-gated Re-sync pipeline state Recover action, updated CLI/action parity coverage, and verified via isolated Playwright rendering that the action appears enabled in PAN-2988's live issue menu.",
         "releasedAt": "2026-07-22T22:36:55.046Z"
+      },
+      {
+        "writerId": "agent-pan-2988",
+        "agentId": "agent-pan-2988",
+        "pid": 3530701,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-22T22:37:29.517Z",
+        "itemId": "docs",
+        "outcome": "completed",
+        "reason": "Documented the automatic 60-second status reconciliation, immediate Recover action and CLI escape hatch, and the resyncPipelineState registry contract.",
+        "releasedAt": "2026-07-22T22:38:47.438Z"
       }
     ],
     "statusReasons": {
@@ -192,6 +195,10 @@
       "recover-action-menu-entry": {
         "reason": "Added a never-gated Re-sync pipeline state Recover action, updated CLI/action parity coverage, and verified via isolated Playwright rendering that the action appears enabled in PAN-2988's live issue menu.",
         "updatedAt": "2026-07-22T22:36:55.046Z"
+      },
+      "docs": {
+        "reason": "Documented the automatic 60-second status reconciliation, immediate Recover action and CLI escape hatch, and the resyncPipelineState registry contract.",
+        "updatedAt": "2026-07-22T22:38:47.438Z"
       }
     }
   },
@@ -226,6 +233,8 @@
     "recover-action-menu-entry": "completed",
     "recover-action-menu-entry.recover-action-menu-entry.ac1": "completed",
     "recover-action-menu-entry.recover-action-menu-entry.ac2": "completed",
-    "docs": "running"
+    "docs": "completed",
+    "docs.docs.ac1": "completed",
+    "docs.docs.ac2": "completed"
   }
 }
