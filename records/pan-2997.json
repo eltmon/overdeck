@@ -119,22 +119,22 @@
     "recordedAt": "2026-07-22T01:20:05.090Z"
   },
   "created": "2026-07-21T23:09:49.270Z",
-  "updated": "2026-07-22T02:06:44.524Z",
+  "updated": "2026-07-22T02:08:43.419Z",
   "pipeline": {
     "issueId": "PAN-2997",
     "reviewStatus": "blocked",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-22T01:21:05.035Z",
-    "updatedAt": "2026-07-22T02:06:43.696Z",
+    "updatedAt": "2026-07-22T02:08:43.406Z",
     "reviewNotes": "Wake delivery can replay across a crash, and the banner poll materializes the full retained event log.",
     "inspectNotes": "Fold dedupes required events per-agent via Map; latest non-null authUrl/authUrlAgentId wins; expiry computed from authUrlExpiresAt and reactivates on fresh required; healthy event closes to lastCompleted, notified targets open??lastCompleted, duplicate healthy is a no-op leaving wake set empty post-notification. All 4 ACs verified by hand against fake-timer tests.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3004",
-    "lastVerifiedCommit": "d94938ce1358b9e318284ed4db4d248b45c39726",
+    "lastVerifiedCommit": "6c913d7c1bcb6582223a79b0841a881e37e6d209",
     "reviewRequestedAt": "2026-07-22T01:21:05.035Z",
     "reviewSpawnedAt": "2026-07-22T01:59:08.245Z",
     "scopeDrift": {
@@ -211,9 +211,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 4370246,
-            "output": 232279,
-            "cacheRead": 49801216,
+            "input": 4377560,
+            "output": 232589,
+            "cacheRead": 51007488,
             "cacheWrite": 0
           }
         },
@@ -242,9 +242,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 5288501,
-          "output": 369785,
-          "cacheRead": 119000576,
+          "input": 5295815,
+          "output": 370095,
+          "cacheRead": 120206848,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -255,8 +255,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 97.353999,
-        "pricingAsOf": "2026-07-22T02:06:43.715Z"
+        "usd": 98.003005,
+        "pricingAsOf": "2026-07-22T02:08:43.412Z"
       }
     },
     "merges": [
