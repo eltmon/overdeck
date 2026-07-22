@@ -166,18 +166,19 @@
     "recordedAt": "2026-07-22T19:46:31.826Z"
   },
   "created": "2026-07-21T22:47:36.935Z",
-  "updated": "2026-07-22T19:52:27.309Z",
+  "updated": "2026-07-22T19:53:21.435Z",
   "pipeline": {
     "issueId": "PAN-2993",
-    "reviewStatus": "failed",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-22T19:52:14.335Z",
-    "reviewNotes": "Review dispatch deferred: merge conflict with main must be resolved before review dispatch",
+    "panDoneRecoveredAt": "2026-07-22T19:52:26.955Z",
+    "updatedAt": "2026-07-22T19:53:21.391Z",
+    "reviewNotes": "Implicit force-with-lease is not pinned to the observed remote head and can overwrite a concurrent remote commit after a tracking-ref refresh.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2998",
     "lastVerifiedCommit": "63edafa5a50d2c1eceed953c90f9d6b55ef88252",
     "reviewRequestedAt": "2026-07-22T19:52:26.955Z",
@@ -241,8 +242,7 @@
         "tests/unit/lib/rebase-helper.test.ts"
       ],
       "recordedAt": "2026-07-22T19:46:31.826Z"
-    },
-    "panDoneRecoveredAt": "2026-07-22T19:52:26.955Z"
+    }
   },
   "closeOut": {
     "usage": {
@@ -257,9 +257,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 5916586,
-            "output": 251508,
-            "cacheRead": 56339968,
+            "input": 5978380,
+            "output": 262513,
+            "cacheRead": 57884672,
             "cacheWrite": 0
           }
         },
@@ -288,9 +288,9 @@
           "cacheWrite": 311785
         },
         "openai/gpt-5.6-sol": {
-          "input": 11139573,
-          "output": 494504,
-          "cacheRead": 212160512,
+          "input": 11201367,
+          "output": 505509,
+          "cacheRead": 213705216,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -301,8 +301,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 187.72702,
-        "pricingAsOf": "2026-07-22T19:52:14.342Z"
+        "usd": 189.138492,
+        "pricingAsOf": "2026-07-22T19:53:21.425Z"
       }
     },
     "merges": [
