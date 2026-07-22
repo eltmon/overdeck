@@ -46,6 +46,7 @@
         "@effect/vitest": "catalog:",
         "@napi-rs/canvas": "^1.0.0",
         "@overdeck/contracts": "workspace:*",
+        "@posthog/cli": "0.8.4",
         "@total-typescript/ts-reset": "^0.6.1",
         "@types/inquirer": "^9.0.9",
         "@types/js-yaml": "^4.0.9",
@@ -789,6 +790,8 @@
     "@pkgjs/parseargs": ["@pkgjs/parseargs@0.11.0", "", {}, "sha512-+1VkjdD0QBLPodGrJUeqarH8VAIvQODIbwh9XpP5Syisf7YoQgsJKPNFoqqLQlu+VQ/tVSshMR6loPMn8U+dPg=="],
 
     "@playwright/test": ["@playwright/test@1.60.0", "", { "dependencies": { "playwright": "1.60.0" }, "bin": { "playwright": "cli.js" } }, "sha512-O71yZIbAh/PxDMNGns37GHBIfrVkEVyn+AXyIa5dOTfb4/xNvRWV+Vv/NMbNCtODB/pO7vLlF2OTmMVLhmr7Ag=="],
+
+    "@posthog/cli": ["@posthog/cli@0.8.4", "", { "dependencies": { "detect-libc": "^2.1.2" }, "bin": { "posthog-cli": "run-posthog-cli.js" } }, "sha512-NLoLF6j+dcnBrbTUOYPUaOR4hj+bniXEyPJ3loDu3/HAOZo0nLasVd6Y+YiM4BTynrygvHT+KZUNZpRVLHzxoQ=="],
 
     "@posthog/core": ["@posthog/core@1.45.0", "", { "dependencies": { "@posthog/types": "^1.398.0" } }, "sha512-nP5FGwkIk8Ngy45BHzwN/kBGV6jqNZINn+iSge5CbdjMevZsEYK8OG3QOSyysml3yWn4tsRJroGi76+HrBIJuQ=="],
 

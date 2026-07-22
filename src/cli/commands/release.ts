@@ -59,6 +59,14 @@ export function registerReleaseCommands(program: Command): void {
     );
 
   release
+    .command('sourcemaps')
+    .description('Upload the built dashboard sourcemaps to PostHog')
+    .requiredOption('--version <version>', 'Release version associated with the built dashboard')
+    .action((options: { version: string }) =>
+      uploadReleaseSourcemaps(getRepoRoot(), options.version)
+    );
+
+  release
     .command('notes [from] [to]')
     .description('Draft release notes from git history')
     .option('--write <path>', 'Write the generated notes to a file')
@@ -108,6 +116,55 @@ function runStreaming(command: string, cwd: string): void {
     cwd,
     stdio: 'inherit',
   });
+}
+
+type SourcemapCommandRunner = (
+  command: string,
+  args: string[],
+  options: { cwd: string; env: NodeJS.ProcessEnv },
+) => void;
+
+export function uploadReleaseSourcemaps(
+  repoRoot: string,
+  version: string,
+  options: {
+    env?: NodeJS.ProcessEnv;
+    run?: SourcemapCommandRunner;
+    warn?: (message: string) => void;
+  } = {},
+): void {
+  const env = options.env ?? process.env;
+  const warn = options.warn ?? console.warn;
+  if (!env.POSTHOG_CLI_API_KEY) {
+    warn('Warning: POSTHOG_CLI_API_KEY is not set; skipping PostHog sourcemap upload.');
+    return;
+  }
+
+  const runCommand = options.run ?? ((command, args, commandOptions) => {
+    execFileSync(command, args, {
+      cwd: commandOptions.cwd,
+      env: commandOptions.env,
+      stdio: 'inherit',
+    });
+  });
+  const directory = join(repoRoot, 'dist', 'dashboard', 'public');
+  const releaseArgs = [
+    '--directory', directory,
+    '--release-name', 'overdeck-dashboard',
+    '--release-version', version,
+  ];
+
+  runCommand('npx', ['posthog-cli', 'sourcemap', 'inject', ...releaseArgs], {
+    cwd: repoRoot,
+    env,
+  });
+  runCommand('npx', [
+    'posthog-cli',
+    'sourcemap',
+    'upload',
+    ...releaseArgs,
+    '--delete-after',
+  ], { cwd: repoRoot, env });
 }
 
 function getRepoRoot(): string {
