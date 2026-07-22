@@ -164,22 +164,22 @@
     "recordedAt": "2026-07-22T01:20:05.090Z"
   },
   "created": "2026-07-21T23:09:49.270Z",
-  "updated": "2026-07-22T03:27:54.497Z",
+  "updated": "2026-07-22T03:30:39.426Z",
   "pipeline": {
     "issueId": "PAN-2997",
     "reviewStatus": "blocked",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-22T01:21:05.035Z",
-    "updatedAt": "2026-07-22T03:27:53.835Z",
+    "updatedAt": "2026-07-22T03:30:39.414Z",
     "reviewNotes": "The keyed outbox still acknowledges after the unkeyed external send, so a post-send/pre-ack crash replays the same lifecycle wake and violates exactly-one delivery.",
     "inspectNotes": "Fold dedupes required events per-agent via Map; latest non-null authUrl/authUrlAgentId wins; expiry computed from authUrlExpiresAt and reactivates on fresh required; healthy event closes to lastCompleted, notified targets open??lastCompleted, duplicate healthy is a no-op leaving wake set empty post-notification. All 4 ACs verified by hand against fake-timer tests.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3004",
-    "lastVerifiedCommit": "fee45ba9ea9d128af392be2261daf0a9dfdbf329",
+    "lastVerifiedCommit": "6e4eb4b4d5d5ad77c0b33e3262b99ae768c0477c",
     "reviewRequestedAt": "2026-07-22T01:21:05.035Z",
     "reviewSpawnedAt": "2026-07-22T03:26:04.969Z",
     "scopeDrift": {
@@ -256,9 +256,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 10621120,
-            "output": 332781,
-            "cacheRead": 68897280,
+            "input": 11078862,
+            "output": 340211,
+            "cacheRead": 69617664,
             "cacheWrite": 0
           }
         },
@@ -287,9 +287,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 11539375,
-          "output": 470287,
-          "cacheRead": 138096640,
+          "input": 11997117,
+          "output": 477717,
+          "cacheRead": 138817024,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -300,8 +300,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 141.171461,
-        "pricingAsOf": "2026-07-22T03:27:53.853Z"
+        "usd": 144.043263,
+        "pricingAsOf": "2026-07-22T03:30:39.419Z"
       }
     },
     "merges": [
