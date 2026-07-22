@@ -89,6 +89,7 @@ describe('rebaseAndPushRepos', () => {
       if (command === 'git rev-parse origin/main') return { stdout: 'base-sha\n', stderr: '' };
       if (command === 'git rev-parse origin/feature/min-882') return { stdout: 'remote-sha\n', stderr: '' };
       if (command === 'git rev-parse HEAD') return { stdout: 'local-sha\n', stderr: '' };
+      if (command === 'git merge-base --is-ancestor remote-sha local-sha') return { stdout: '', stderr: '' };
       if (command === 'git push origin HEAD:refs/heads/feature/min-882') return { stdout: '', stderr: '' };
       throw new Error(`unexpected command: ${command}`);
     });
@@ -101,6 +102,29 @@ describe('rebaseAndPushRepos', () => {
       expect.objectContaining({ cwd: '/workspace/api' }),
     );
     expect(execMock.mock.calls.map(([command]) => command).join('\n')).not.toContain('--force');
+  });
+
+  it('uses force-with-lease when an up-to-date branch rewrote published history', async () => {
+    execMock.mockImplementation(async (command: string) => {
+      if (command.startsWith('git fetch origin')) return { stdout: '', stderr: '' };
+      if (command === 'git merge-base HEAD origin/main') return { stdout: 'base-sha\n', stderr: '' };
+      if (command === 'git rev-parse origin/main') return { stdout: 'base-sha\n', stderr: '' };
+      if (command === 'git rev-parse origin/feature/min-882') return { stdout: 'remote-sha\n', stderr: '' };
+      if (command === 'git rev-parse HEAD') return { stdout: 'rebased-sha\n', stderr: '' };
+      if (command === 'git merge-base --is-ancestor remote-sha rebased-sha') throw new Error('not an ancestor');
+      if (command === 'git push --force-with-lease origin HEAD:refs/heads/feature/min-882') {
+        return { stdout: '', stderr: '' };
+      }
+      throw new Error(`unexpected command: ${command}`);
+    });
+
+    const result = await Effect.runPromise(rebaseAndPushRepos('/workspace', mergeSet));
+
+    expect(result.success).toBe(true);
+    expect(execMock).toHaveBeenCalledWith(
+      'git push --force-with-lease origin HEAD:refs/heads/feature/min-882',
+      expect.objectContaining({ cwd: '/workspace/api' }),
+    );
   });
 
   it('sets the pan git-op sentinel alongside GIT_EDITOR for rebase', async () => {

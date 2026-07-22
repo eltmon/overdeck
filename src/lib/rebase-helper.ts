@@ -117,9 +117,21 @@ async function rebaseOneRepo(
       return { repoKey, outcome: 'already-current' };
     }
 
+    let pushMode = '';
+    if (remoteHead.trim()) {
+      try {
+        await execAsync(
+          `git merge-base --is-ancestor ${remoteHead.trim()} ${localHead.trim()}`,
+          { cwd: repoPath, encoding: 'utf-8', timeout: 10000 },
+        );
+      } catch {
+        pushMode = ' --force-with-lease';
+      }
+    }
+
     try {
       await execAsync(
-        `git push origin HEAD:refs/heads/${sourceBranch}`,
+        `git push${pushMode} origin HEAD:refs/heads/${sourceBranch}`,
         { cwd: repoPath, encoding: 'utf-8', timeout: 60000 },
       );
       return { repoKey, outcome: 'already-current' };
