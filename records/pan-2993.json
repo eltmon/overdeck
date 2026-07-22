@@ -196,22 +196,22 @@
     "recordedAt": "2026-07-22T20:02:42.067Z"
   },
   "created": "2026-07-21T22:47:36.935Z",
-  "updated": "2026-07-22T20:02:49.436Z",
+  "updated": "2026-07-22T20:02:51.094Z",
   "pipeline": {
     "issueId": "PAN-2993",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-22T20:02:46.851Z",
+    "updatedAt": "2026-07-22T20:02:51.066Z",
     "reviewNotes": "Implicit force-with-lease is not pinned to the observed remote head, so a concurrent fetch can let the push overwrite a newer remote commit.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2998",
     "lastVerifiedCommit": "63edafa5a50d2c1eceed953c90f9d6b55ef88252",
     "reviewRequestedAt": "2026-07-22T20:02:42.997Z",
-    "reviewSpawnedAt": "2026-07-22T19:53:22.191Z",
+    "reviewSpawnedAt": "2026-07-22T20:02:47.585Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "drizzle/overdeck/0000_overdeck_init.sql",
@@ -331,7 +331,7 @@
       },
       "costAtCloseOut": {
         "usd": 198.28642,
-        "pricingAsOf": "2026-07-22T20:02:46.879Z"
+        "pricingAsOf": "2026-07-22T20:02:51.087Z"
       }
     },
     "merges": [
