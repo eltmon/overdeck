@@ -4,17 +4,17 @@
     "created": "2026-07-17T12:57:55Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2377: feat(flywheel): first-class 'special orders' runs — operator-supplied order book executed with lane semantics",
-    "updated": "2026-07-18T19:03:40.680Z"
+    "updated": "2026-07-22T20:55:48.616Z"
   },
   "plan": {
     "id": "pan-2377",
     "title": "feat(flywheel): first-class 'special orders' runs — operator-supplied order book executed with lane semantics",
-    "status": "running",
+    "status": "completed",
     "uid": "0a78e5ba-9f52-4c80-b360-e19f7077e0ec",
     "author": "agent:claude-fable-5",
-    "sequence": 9,
+    "sequence": 10,
     "created": "2026-07-17T12:57:55Z",
-    "updated": "2026-07-18T19:03:40.680Z",
+    "updated": "2026-07-22T20:55:48.616Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2377",
@@ -1395,5 +1395,5 @@
       "canonicalFilename": "2026-07-17-PAN-2377-feat-flywheel-first-class-special-orders-runs-operator-supplied-order-book-executed-with-lane-semantics.vbrief.json"
     }
   },
-  "status": "active"
+  "status": "completed"
 }
