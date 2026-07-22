@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-22T21:25:31.822Z",
-  "updated": "2026-07-22T22:16:50.789Z",
+  "updated": "2026-07-22T22:21:59.426Z",
   "pipeline": {
     "issueId": "PAN-2988",
     "reviewStatus": "pending",
@@ -75,16 +75,8 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 11,
-    "claims": {
-      "cli-review-resync": {
-        "writerId": "agent-pan-2988",
-        "agentId": "agent-pan-2988",
-        "pid": 3167528,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-22T22:16:50.788Z"
-      }
-    },
+    "sequence": 12,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2988",
@@ -140,6 +132,17 @@
         "outcome": "completed",
         "reason": "Added a read-only canonical review status re-emit endpoint, 404 handling, no-write-door assertions, and isolated HTTP verification for POST plus wrong-method behavior.",
         "releasedAt": "2026-07-22T22:16:42.485Z"
+      },
+      {
+        "writerId": "agent-pan-2988",
+        "agentId": "agent-pan-2988",
+        "pid": 3167528,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-22T22:16:50.788Z",
+        "itemId": "cli-review-resync",
+        "outcome": "completed",
+        "reason": "Added pan review resync, extracted review command registration without losing existing commands, updated the pan-review skill, lowered the CLI file-size baseline, and exercised the built CLI against an isolated dashboard.",
+        "releasedAt": "2026-07-22T22:21:59.426Z"
       }
     ],
     "statusReasons": {
@@ -162,6 +165,10 @@
       "resync-endpoint": {
         "reason": "Added a read-only canonical review status re-emit endpoint, 404 handling, no-write-door assertions, and isolated HTTP verification for POST plus wrong-method behavior.",
         "updatedAt": "2026-07-22T22:16:42.485Z"
+      },
+      "cli-review-resync": {
+        "reason": "Added pan review resync, extracted review command registration without losing existing commands, updated the pan-review skill, lowered the CLI file-size baseline, and exercised the built CLI against an isolated dashboard.",
+        "updatedAt": "2026-07-22T22:21:59.426Z"
       }
     }
   },
@@ -189,6 +196,9 @@
     "resync-endpoint.resync-endpoint.ac1": "completed",
     "resync-endpoint.resync-endpoint.ac2": "completed",
     "resync-endpoint.resync-endpoint.ac3": "completed",
-    "cli-review-resync": "running"
+    "cli-review-resync": "completed",
+    "cli-review-resync.cli-review-resync.ac1": "completed",
+    "cli-review-resync.cli-review-resync.ac2": "completed",
+    "cli-review-resync.cli-review-resync.ac3": "completed"
   }
 }
