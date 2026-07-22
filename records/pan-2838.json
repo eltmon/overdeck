@@ -146,7 +146,7 @@
   ],
   "feedback": [],
   "created": "2026-07-17T12:34:27.875Z",
-  "updated": "2026-07-22T20:54:35.352Z",
+  "updated": "2026-07-22T20:57:37.354Z",
   "pipeline": {
     "issueId": "PAN-2838",
     "reviewStatus": "pending",
@@ -189,18 +189,32 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "extract-settings-disclosure": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-2838",
         "agentId": "agent-pan-2838",
         "pid": 867074,
         "host": "eltmon-z790",
-        "claimedAt": "2026-07-22T20:54:35.352Z"
+        "claimedAt": "2026-07-22T20:54:35.352Z",
+        "itemId": "extract-settings-disclosure",
+        "outcome": "completed",
+        "reason": "Moved the settings section and disclosure into ProjectSettingsDisclosure without changing DOM or queries; ProjectOverview tests and typecheck pass",
+        "releasedAt": "2026-07-22T20:57:37.354Z"
+      }
+    ],
+    "statusReasons": {
+      "extract-settings-disclosure": {
+        "reason": "Moved the settings section and disclosure into ProjectSettingsDisclosure without changing DOM or queries; ProjectOverview tests and typecheck pass",
+        "updatedAt": "2026-07-22T20:57:37.354Z"
       }
     }
   },
   "statusOverrides": {
-    "extract-settings-disclosure": "running"
+    "extract-settings-disclosure": "completed",
+    "extract-settings-disclosure.extract-settings-disclosure.ac1": "completed",
+    "extract-settings-disclosure.extract-settings-disclosure.ac2": "completed",
+    "extract-settings-disclosure.extract-settings-disclosure.ac3": "completed"
   }
 }
