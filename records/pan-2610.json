@@ -3166,7 +3166,7 @@
     }
   ],
   "created": "2026-07-12T22:50:33.242Z",
-  "updated": "2026-07-22T05:18:18.033Z",
+  "updated": "2026-07-22T05:29:17.865Z",
   "pipeline": {
     "issueId": "PAN-2610",
     "reviewStatus": "failed",
@@ -3278,6 +3278,14 @@
       "tripCount": 1,
       "open": true,
       "needsYouEmittedAt": "2026-07-20T21:54:13.264Z"
+    },
+    {
+      "issue": "PAN-2610",
+      "recoveryPath": "dead-end-rebuild",
+      "obligationGeneration": "2026-07-22T05:18:17.999Z",
+      "tripCount": 1,
+      "open": true,
+      "needsYouEmittedAt": "2026-07-22T05:29:17.863Z"
     }
   ]
 }
