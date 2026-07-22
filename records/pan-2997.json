@@ -42,9 +42,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-22T01:59:09.409Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-22T02:06Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-22T02:06:44.523Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-22T02:06:44Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2997\n\nWake delivery can replay across a crash, and the banner poll materializes the full retained event log.\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2997 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "src/lib/agents/messaging.ts",
@@ -106,7 +119,7 @@
     "recordedAt": "2026-07-22T01:20:05.090Z"
   },
   "created": "2026-07-21T23:09:49.270Z",
-  "updated": "2026-07-22T02:06:43.727Z",
+  "updated": "2026-07-22T02:06:44.524Z",
   "pipeline": {
     "issueId": "PAN-2997",
     "reviewStatus": "blocked",
