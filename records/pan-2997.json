@@ -26,7 +26,7 @@
   ],
   "feedback": [],
   "created": "2026-07-21T23:09:49.270Z",
-  "updated": "2026-07-22T00:55:38.739Z",
+  "updated": "2026-07-22T01:02:27.445Z",
   "pipeline": {
     "issueId": "PAN-2997",
     "reviewStatus": "pending",
@@ -71,16 +71,8 @@
   "harness": "claude-code",
   "model": "k3[1m]",
   "tasks": {
-    "sequence": 17,
-    "claims": {
-      "linear-mcp-banner": {
-        "writerId": "agent-pan-2997",
-        "agentId": "agent-pan-2997",
-        "pid": 4162292,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-22T00:55:38.739Z"
-      }
-    },
+    "sequence": 18,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2997",
@@ -169,6 +161,17 @@
         "outcome": "completed",
         "reason": "Hook script, registration, and 6-test contract suite were already committed in dbd6e10863; verified all 6 tests pass, registration present in claude-hooks-registration.ts (HOOK_SCRIPT_NAMES + PostToolUse mcp__linear__.* matcher), synced main for file-size baseline, pushed.",
         "releasedAt": "2026-07-22T00:55:20.871Z"
+      },
+      {
+        "writerId": "agent-pan-2997",
+        "agentId": "agent-pan-2997",
+        "pid": 4162292,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-22T00:55:38.739Z",
+        "itemId": "linear-mcp-banner",
+        "outcome": "completed",
+        "reason": "Added useLinearMcpAuthStatus (React Query, 5s active/30s idle polling), LinearMcpAuthBanner (hidden when none; blocked agents + issue links; open-authorization anchor; callback-URL relay with remote-localhost fallback copy; mark-completed with wake consequence copy; expired and waiting-for-URL states), mounted under CodexAuthBanner in AppChrome. 7/7 banner tests pass; typecheck clean.",
+        "releasedAt": "2026-07-22T01:02:27.445Z"
       }
     ],
     "statusReasons": {
@@ -199,6 +202,10 @@
       "linear-mcp-hook": {
         "reason": "Hook script, registration, and 6-test contract suite were already committed in dbd6e10863; verified all 6 tests pass, registration present in claude-hooks-registration.ts (HOOK_SCRIPT_NAMES + PostToolUse mcp__linear__.* matcher), synced main for file-size baseline, pushed.",
         "updatedAt": "2026-07-22T00:55:20.871Z"
+      },
+      "linear-mcp-banner": {
+        "reason": "Added useLinearMcpAuthStatus (React Query, 5s active/30s idle polling), LinearMcpAuthBanner (hidden when none; blocked agents + issue links; open-authorization anchor; callback-URL relay with remote-localhost fallback copy; mark-completed with wake consequence copy; expired and waiting-for-URL states), mounted under CodexAuthBanner in AppChrome. 7/7 banner tests pass; typecheck clean.",
+        "updatedAt": "2026-07-22T01:02:27.445Z"
       }
     }
   },
@@ -236,6 +243,11 @@
     "linear-mcp-hook.linear-mcp-hook.ac3": "completed",
     "linear-mcp-hook.linear-mcp-hook.ac4": "completed",
     "linear-mcp-hook.linear-mcp-hook.ac5": "completed",
-    "linear-mcp-banner": "running"
+    "linear-mcp-banner": "completed",
+    "linear-mcp-banner.linear-mcp-banner.ac1": "completed",
+    "linear-mcp-banner.linear-mcp-banner.ac2": "completed",
+    "linear-mcp-banner.linear-mcp-banner.ac3": "completed",
+    "linear-mcp-banner.linear-mcp-banner.ac4": "completed",
+    "linear-mcp-banner.linear-mcp-banner.ac5": "completed"
   }
 }
