@@ -9,8 +9,13 @@ import { getOrCreateInstallId } from './install-id.js';
 const DEFAULT_POSTHOG_API_KEY = 'phc_pwvHeDutnCmAm8tZh5hRaQ7mMoho3T9gb4t4qRjK2Zjt';
 const DEFAULT_POSTHOG_HOST = 'https://us.i.posthog.com';
 const SHUTDOWN_TIMEOUT_MS = 2_000;
+const FLAG_TIMEOUT_MS = 500;
 
 export type AnalyticsClientType = 'cli' | 'server';
+
+export interface AnalyticsServiceOptions {
+  featureFlagOverrides?: Readonly<Record<string, boolean>>;
+}
 
 let cachedOverdeckVersion: string | undefined;
 
@@ -32,7 +37,10 @@ function telemetryBlockedForProcess(): boolean {
 export class AnalyticsService {
   private client: PostHog | undefined;
 
-  constructor(private readonly clientType: AnalyticsClientType) {}
+  constructor(
+    private readonly clientType: AnalyticsClientType,
+    private readonly options: AnalyticsServiceOptions = {},
+  ) {}
 
   capture<Event extends TelemetryEventName>(
     event: Event,
@@ -56,6 +64,31 @@ export class AnalyticsService {
       });
     } catch {
       // Analytics must never fail the caller.
+    }
+  }
+
+  async isFeatureEnabled(flag: string, fallback: boolean): Promise<boolean> {
+    const override = this.options.featureFlagOverrides?.[flag];
+    if (typeof override === 'boolean') return override;
+
+    const client = this.getClient();
+    if (!client) return fallback;
+
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    try {
+      const result = await Promise.race([
+        client.isFeatureEnabled(flag, getOrCreateInstallId(), {
+          sendFeatureFlagEvents: false,
+        }),
+        new Promise<boolean>((resolve) => {
+          timeout = setTimeout(() => resolve(fallback), FLAG_TIMEOUT_MS);
+        }),
+      ]);
+      return typeof result === 'boolean' ? result : fallback;
+    } catch {
+      return fallback;
+    } finally {
+      if (timeout) clearTimeout(timeout);
     }
   }
 
