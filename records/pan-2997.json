@@ -126,10 +126,10 @@
     "recordedAt": "2026-07-22T01:20:05.090Z"
   },
   "created": "2026-07-21T23:09:49.270Z",
-  "updated": "2026-07-22T02:32:08.984Z",
+  "updated": "2026-07-22T02:33:02.602Z",
   "pipeline": {
     "issueId": "PAN-2997",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -137,8 +137,8 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-22T01:21:05.035Z",
-    "updatedAt": "2026-07-22T02:32:08.958Z",
-    "reviewNotes": "Agent re-review request (2/25): Fixed both cycle-2 blockers: (1) Wake delivery is now crash-idempotent — a durable 'delivering' claim ((lifecycleId, agentId) key) is appended BEFORE messageAgentWithOutcome runs, so a crash after the claim (including after a successful send whose completion record never commits) never replays the delivery at boot recovery; delivery is skipped when the claim can't be recorded. At-most-once by design; the lost-wake window self-heals via the agent's next failed Linear call. Regression test simulates delivery succeeding while the completion append throws, then re-runs boot recovery and proves the door isn't called again. (2) The fold no longer calls readFrom(0) — EventStore gained queryByTypesSince (type predicate + sequence bound both in indexed SQL), and the projection is maintained incrementally: polls typically read zero rows and unrelated retained history is never materialized. Regression tests cover a 5000-event unrelated population and incremental advancement. Also scheduled a follow-up run when the 10-pass cap is hit (the P2). Lint, typecheck, root (10388) and frontend (2382) suites green.",
+    "updatedAt": "2026-07-22T02:33:02.571Z",
+    "reviewNotes": "The pre-delivery wake claim prevents duplicate replay by creating a crash window that permanently loses the required agent wake.",
     "inspectNotes": "Fold dedupes required events per-agent via Map; latest non-null authUrl/authUrlAgentId wins; expiry computed from authUrlExpiresAt and reactivates on fresh required; healthy event closes to lastCompleted, notified targets open??lastCompleted, duplicate healthy is a no-op leaving wake set empty post-notification. All 4 ACs verified by hand against fake-timer tests.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3004",
     "lastVerifiedCommit": "09ce9e0baac085ec1d7b119b755f49f28d9b5e83",
@@ -218,9 +218,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 7587195,
-            "output": 265953,
-            "cacheRead": 57369600,
+            "input": 8170083,
+            "output": 281641,
+            "cacheRead": 58273792,
             "cacheWrite": 0
           }
         },
@@ -249,9 +249,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 8505450,
-          "output": 403459,
-          "cacheRead": 126568960,
+          "input": 9088338,
+          "output": 419147,
+          "cacheRead": 127473152,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -262,8 +262,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 118.233156,
-        "pricingAsOf": "2026-07-22T02:32:08.982Z"
+        "usd": 122.070332,
+        "pricingAsOf": "2026-07-22T02:33:02.589Z"
       }
     },
     "merges": [
