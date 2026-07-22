@@ -6,6 +6,13 @@ import {
 import { AnalyticsService } from '../lib/telemetry/service.js';
 
 const TELEMETRY_CLI_VERB_SET = new Set<string>(TELEMETRY_CLI_VERBS);
+type ProcessExitCode = Parameters<NodeJS.Process['exit']>[0];
+
+class CliExitRequest extends Error {
+  constructor(readonly code: ProcessExitCode) {
+    super('CLI exit requested');
+  }
+}
 
 export function bucketCliDuration(durationMs: number): TelemetryDurationBucket {
   if (durationMs < 100) return 'under_100ms';
@@ -61,14 +68,33 @@ export async function exitCli(code: number): Promise<never> {
 export async function runCliWithTelemetry(
   run: () => Promise<unknown>,
   drain: () => Promise<void>,
+  exit: (code: ProcessExitCode) => never = (code) => process.exit(code),
+  telemetry: CliTelemetryLifecycle = cliTelemetry,
 ): Promise<void> {
+  const originalExit = process.exit;
+  let exitRequest: CliExitRequest | undefined;
+  process.exit = ((code?: ProcessExitCode): never => {
+    throw new CliExitRequest(code);
+  }) as NodeJS.Process['exit'];
+
   try {
-    await run();
-    await cliTelemetry.finish((process.exitCode ?? 0) === 0);
-  } catch (error) {
-    await cliTelemetry.finish(false);
-    throw error;
+    try {
+      await run();
+      await telemetry.finish(Number(process.exitCode ?? 0) === 0);
+    } catch (error) {
+      if (error instanceof CliExitRequest) {
+        exitRequest = error;
+        await telemetry.finish(Number(error.code ?? process.exitCode ?? 0) === 0);
+      } else {
+        await telemetry.finish(false);
+        throw error;
+      }
+    } finally {
+      await drain();
+    }
   } finally {
-    await drain();
+    process.exit = originalExit;
   }
+
+  if (exitRequest) return exit(exitRequest.code ?? process.exitCode ?? 0);
 }

@@ -5,7 +5,9 @@ import {
   CliTelemetryLifecycle,
   exitAfterTelemetry,
   resolveTelemetryCliVerb,
+  runCliWithTelemetry,
 } from '../../../src/cli/telemetry.js';
+import { approveCommand } from '../../../src/cli/commands/approve.js';
 
 const captureMock = vi.hoisted(() => vi.fn());
 const shutdownMock = vi.hoisted(() => vi.fn());
@@ -67,6 +69,47 @@ describe('CLI telemetry lifecycle', () => {
     await vi.advanceTimersByTimeAsync(1);
     expect(await exitResult).toBe(exitError);
     expect(exit).toHaveBeenCalledWith(1);
+  });
+
+  it('intercepts an existing direct process.exit command and flushes before termination', async () => {
+    const analytics = {
+      capture: vi.fn(),
+      shutdown: vi.fn(() => new Promise<void>((resolve) => {
+        setTimeout(resolve, 2_000);
+      })),
+    } as unknown as Pick<AnalyticsService, 'capture' | 'shutdown'>;
+    const telemetry = new CliTelemetryLifecycle(analytics, 0);
+    const drain = vi.fn(async () => undefined);
+    const exitError = new Error('process exited');
+    const exit = vi.fn((): never => { throw exitError; });
+    const originalExit = process.exit;
+    const consoleLog = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+
+    const result = runCliWithTelemetry(
+      () => approveCommand('PAN-2599'),
+      drain,
+      exit,
+      telemetry,
+    ).catch((error) => error);
+    await Promise.resolve();
+
+    expect(analytics.capture).toHaveBeenCalledWith('cli_command_run', {
+      verb: 'other',
+      ok: false,
+      duration_ms: 'under_100ms',
+    });
+    expect(drain).not.toHaveBeenCalled();
+    expect(exit).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(1_999);
+    expect(exit).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(1);
+    expect(await result).toBe(exitError);
+    expect(drain).toHaveBeenCalledTimes(1);
+    expect(exit).toHaveBeenCalledWith(1);
+    expect(process.exit).toBe(originalExit);
+    consoleLog.mockRestore();
   });
 
   it('exits immediately without SDK capture when telemetry is test-disabled', async () => {
