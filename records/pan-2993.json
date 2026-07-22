@@ -124,15 +124,7 @@
       "timestamp": "2026-07-22T20:02:29.039Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-22T20:02:29Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2993\n\nImplicit force-with-lease is not pinned to the observed remote head, so a concurrent fetch can let the push overwrite a newer remote commit.\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2993 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "drizzle/overdeck/0000_overdeck_init.sql",
@@ -194,7 +186,7 @@
     "recordedAt": "2026-07-22T20:02:42.067Z"
   },
   "created": "2026-07-21T22:47:36.935Z",
-  "updated": "2026-07-22T20:02:46.882Z",
+  "updated": "2026-07-22T20:02:47.533Z",
   "pipeline": {
     "issueId": "PAN-2993",
     "reviewStatus": "pending",
