@@ -111,8 +111,10 @@ describe('rebaseAndPushRepos', () => {
       if (command === 'git rev-parse origin/main') return { stdout: 'base-sha\n', stderr: '' };
       if (command === 'git rev-parse origin/feature/min-882') return { stdout: 'remote-sha\n', stderr: '' };
       if (command === 'git rev-parse HEAD') return { stdout: 'rebased-sha\n', stderr: '' };
-      if (command === 'git merge-base --is-ancestor remote-sha rebased-sha') throw new Error('not an ancestor');
-      if (command === 'git push --force-with-lease origin HEAD:refs/heads/feature/min-882') {
+      if (command === 'git merge-base --is-ancestor remote-sha rebased-sha') {
+        throw Object.assign(new Error('not an ancestor'), { code: 1 });
+      }
+      if (command === 'git push --force-with-lease=refs/heads/feature/min-882:remote-sha origin HEAD:refs/heads/feature/min-882') {
         return { stdout: '', stderr: '' };
       }
       throw new Error(`unexpected command: ${command}`);
@@ -122,9 +124,40 @@ describe('rebaseAndPushRepos', () => {
 
     expect(result.success).toBe(true);
     expect(execMock).toHaveBeenCalledWith(
-      'git push --force-with-lease origin HEAD:refs/heads/feature/min-882',
+      'git push --force-with-lease=refs/heads/feature/min-882:remote-sha origin HEAD:refs/heads/feature/min-882',
       expect.objectContaining({ cwd: '/workspace/api' }),
     );
+  });
+
+  it('does not force-push when the ancestry check itself fails', async () => {
+    execMock.mockImplementation(async (command: string) => {
+      if (command.startsWith('git fetch origin')) return { stdout: '', stderr: '' };
+      if (command === 'git merge-base HEAD origin/main') return { stdout: 'base-sha\n', stderr: '' };
+      if (command === 'git rev-parse origin/main') return { stdout: 'base-sha\n', stderr: '' };
+      if (command === 'git rev-parse origin/feature/min-882') return { stdout: 'remote-sha\n', stderr: '' };
+      if (command === 'git rev-parse HEAD') return { stdout: 'rebased-sha\n', stderr: '' };
+      if (command === 'git merge-base --is-ancestor remote-sha rebased-sha') {
+        throw Object.assign(new Error('repository unavailable'), { code: 128 });
+      }
+      throw new Error(`unexpected command: ${command}`);
+    });
+
+    const result = await Effect.runPromise(rebaseAndPushRepos('/workspace', mergeSet));
+
+    expect(result).toEqual({
+      success: false,
+      firstFailure: {
+        repoKey: 'api',
+        outcome: 'error',
+        message: 'Failed to compare feature history: repository unavailable',
+      },
+      results: [{
+        repoKey: 'api',
+        outcome: 'error',
+        message: 'Failed to compare feature history: repository unavailable',
+      }],
+    });
+    expect(execMock.mock.calls.map(([command]) => command).join('\n')).not.toContain('git push');
   });
 
   it('sets the pan git-op sentinel alongside GIT_EDITOR for rebase', async () => {
