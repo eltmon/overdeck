@@ -39,22 +39,7 @@
       "timestamp": "2026-07-22T23:28:17.464Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-22T23:28:07Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2988\n\nEqual updatedAt values let stale enrichment patches overwrite newer review status, and the sweep cannot detect the regression.\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2988 -m \"Fixed review issues\"`"
-    },
-    {
-      "seq": 2,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-22T23:28:17Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2988\n\nEnrichment stale guard uses non-unique updatedAt, allowing an older async patch to overwrite a newer status and evade reconciliation\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2988 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "src/dashboard/frontend/src/components/KanbanBoard.test.tsx",
@@ -120,7 +105,7 @@
     "recordedAt": "2026-07-22T23:43:55.929Z"
   },
   "created": "2026-07-22T21:25:31.822Z",
-  "updated": "2026-07-22T23:44:00.290Z",
+  "updated": "2026-07-22T23:44:00.982Z",
   "pipeline": {
     "issueId": "PAN-2988",
     "reviewStatus": "pending",
