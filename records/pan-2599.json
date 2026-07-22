@@ -10,7 +10,7 @@
   ],
   "feedback": [],
   "created": "2026-07-16T05:02:53.170Z",
-  "updated": "2026-07-22T22:29:26.350Z",
+  "updated": "2026-07-22T22:36:54.942Z",
   "pipeline": {
     "issueId": "PAN-2599",
     "reviewStatus": "pending",
@@ -103,16 +103,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 19,
-    "claims": {
-      "pipeline-events": {
-        "writerId": "agent-pan-2599",
-        "agentId": "agent-pan-2599",
-        "pid": 3411974,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-22T22:29:26.350Z"
-      }
-    },
+    "sequence": 20,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2599",
@@ -212,6 +204,17 @@
         "outcome": "completed",
         "reason": "Added non-blocking server_boot capture with bucketed project and live-agent counts, isolated failures from boot, passed tests/typecheck/build, runtime-boot-tested a throwaway Node 22 server on port 4321, and pushed b327c3fb32.",
         "releasedAt": "2026-07-22T22:29:13.112Z"
+      },
+      {
+        "writerId": "agent-pan-2599",
+        "agentId": "agent-pan-2599",
+        "pid": 3411974,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-22T22:29:26.350Z",
+        "itemId": "pipeline-events",
+        "outcome": "completed",
+        "reason": "Emitted enum-only pipeline_stage_changed events from the idempotent post-merge lifecycle, verification pass owner, and shared close-out workflow; resolved harness/model family without identifiers, passed focused and workflow tests, and pushed 4f51c60621.",
+        "releasedAt": "2026-07-22T22:36:54.942Z"
       }
     ],
     "statusReasons": {
@@ -250,6 +253,10 @@
       "server-boot-event": {
         "reason": "Added non-blocking server_boot capture with bucketed project and live-agent counts, isolated failures from boot, passed tests/typecheck/build, runtime-boot-tested a throwaway Node 22 server on port 4321, and pushed b327c3fb32.",
         "updatedAt": "2026-07-22T22:29:13.112Z"
+      },
+      "pipeline-events": {
+        "reason": "Emitted enum-only pipeline_stage_changed events from the idempotent post-merge lifecycle, verification pass owner, and shared close-out workflow; resolved harness/model family without identifiers, passed focused and workflow tests, and pushed 4f51c60621.",
+        "updatedAt": "2026-07-22T22:36:54.942Z"
       }
     }
   },
@@ -281,6 +288,8 @@
     "server-boot-event": "completed",
     "server-boot-event.server-boot-event.ac1": "completed",
     "server-boot-event.server-boot-event.ac2": "completed",
-    "pipeline-events": "running"
+    "pipeline-events": "completed",
+    "pipeline-events.pipeline-events.ac1": "completed",
+    "pipeline-events.pipeline-events.ac2": "completed"
   }
 }
