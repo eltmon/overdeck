@@ -69,15 +69,7 @@
       "timestamp": "2026-07-22T02:33:03.207Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-22T02:33:03Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2997\n\nThe pre-delivery wake claim prevents duplicate replay by creating a crash window that permanently loses the required agent wake.\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2997 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "src/lib/agents/messaging.ts",
@@ -139,10 +131,10 @@
     "recordedAt": "2026-07-22T01:20:05.090Z"
   },
   "created": "2026-07-21T23:09:49.270Z",
-  "updated": "2026-07-22T02:48:04.096Z",
+  "updated": "2026-07-22T02:56:04.700Z",
   "pipeline": {
     "issueId": "PAN-2997",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -150,12 +142,12 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-22T01:21:05.035Z",
-    "updatedAt": "2026-07-22T02:48:04.076Z",
+    "updatedAt": "2026-07-22T02:56:04.675Z",
     "inspectNotes": "Fold dedupes required events per-agent via Map; latest non-null authUrl/authUrlAgentId wins; expiry computed from authUrlExpiresAt and reactivates on fresh required; healthy event closes to lastCompleted, notified targets open??lastCompleted, duplicate healthy is a no-op leaving wake set empty post-notification. All 4 ACs verified by hand against fake-timer tests.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3004",
     "lastVerifiedCommit": "09ce9e0baac085ec1d7b119b755f49f28d9b5e83",
     "reviewRequestedAt": "2026-07-22T01:21:05.035Z",
-    "reviewSpawnedAt": "2026-07-22T02:32:02.276Z",
+    "reviewSpawnedAt": "2026-07-22T02:56:04.675Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "src/lib/agents/messaging.ts",
@@ -275,7 +267,7 @@
       },
       "costAtCloseOut": {
         "usd": 122.259884,
-        "pricingAsOf": "2026-07-22T02:48:04.093Z"
+        "pricingAsOf": "2026-07-22T02:56:04.689Z"
       }
     },
     "merges": [
