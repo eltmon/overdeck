@@ -74,6 +74,40 @@ function ProjectSettingsSection({ projectKey }: { projectKey: string }) {
   );
 }
 
+function ProjectSettingsSummary({ projectKey }: { projectKey: string }) {
+  const { data } = useQuery({
+    queryKey: ['project-auto-merge-default', projectKey],
+    queryFn: async (): Promise<{ value: 'auto' | 'hold' | null }> => {
+      const res = await fetch(`/api/projects/${encodeURIComponent(projectKey)}/auto-merge-default`);
+      if (!res.ok) return { value: null };
+      return res.json();
+    },
+    enabled: !!projectKey,
+  });
+  const { data: swarmData } = useQuery({ queryKey: ['project-swarm-policy', projectKey], queryFn: async () => (await fetch(`/api/projects/${encodeURIComponent(projectKey)}/swarm-policy`)).json() as Promise<{ configured: { mode?: 'off' | 'auto' | 'always' } | null }> });
+
+  if (!data || !swarmData) return null;
+
+  const autoMergeLabel = data.value === 'auto'
+    ? '⚡ Auto'
+    : data.value === 'hold'
+      ? '🔒 Hold for UAT'
+      : 'Global default';
+  const swarmLabel = swarmData.configured?.mode === 'off'
+    ? 'Swarm off'
+    : swarmData.configured?.mode === 'auto'
+      ? 'Swarm auto'
+      : swarmData.configured?.mode === 'always'
+        ? 'Swarm always'
+        : 'Swarm inherit';
+
+  return (
+    <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--muted-foreground)' }}>
+      {autoMergeLabel} · {swarmLabel}
+    </span>
+  );
+}
+
 function ProjectDisclosure({
   title,
   summary,
@@ -81,7 +115,7 @@ function ProjectDisclosure({
   children,
 }: {
   title: string;
-  summary: string;
+  summary: ReactNode;
   defaultOpen?: boolean;
   children: ReactNode;
 }) {
@@ -124,7 +158,7 @@ export function ProjectSettingsDisclosure({ projectKey }: { projectKey: string }
   return (
     <ProjectDisclosure
       title="Project settings"
-      summary="Auto-merge default and project-level merge policy"
+      summary={<ProjectSettingsSummary projectKey={projectKey} />}
     >
       <ProjectSettingsSection projectKey={projectKey} />
     </ProjectDisclosure>
