@@ -185,10 +185,10 @@
     "recordedAt": "2026-07-22T23:16:44.964Z"
   },
   "created": "2026-07-16T05:02:53.170Z",
-  "updated": "2026-07-22T23:28:52.953Z",
+  "updated": "2026-07-22T23:32:31.331Z",
   "pipeline": {
     "issueId": "PAN-2599",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -196,13 +196,13 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-22T23:25:31.079Z",
-    "updatedAt": "2026-07-22T23:28:50.896Z",
+    "updatedAt": "2026-07-22T23:32:31.163Z",
     "reviewNotes": "PostHog defaults permit forbidden DOM/replay capture and unsanitized exception data.",
     "inspectNotes": "Both ACs verified in diff: getClient() gates on telemetryBlockedForProcess()+resolveTelemetryEnabled() before constructing PostHog, so disabled capture()+shutdown() never invoke the constructor (AC1); shutdown() races client.shutdown() against a 2s setTimeout with finally-clearTimeout, and service.test.ts's hung-flush test advances fake timers to exactly 2000ms to confirm the bound (AC2).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3009",
     "lastVerifiedCommit": "4e5ec24551d4f49486a82fbd5089d843817775ca",
     "reviewRequestedAt": "2026-07-22T23:25:31.079Z",
-    "reviewSpawnedAt": "2026-07-22T23:16:52.276Z",
+    "reviewSpawnedAt": "2026-07-22T23:28:51.639Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         ".github/workflows/release.yml",
@@ -384,9 +384,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 6967584,
-            "output": 442016,
-            "cacheRead": 265273856,
+            "input": 7684103,
+            "output": 486790,
+            "cacheRead": 282529792,
             "cacheWrite": 0
           }
         }
@@ -399,9 +399,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 18993083,
-          "output": 753514,
-          "cacheRead": 330415104,
+          "input": 19709602,
+          "output": 798288,
+          "cacheRead": 347671040,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -418,8 +418,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 242.34656,
-        "pricingAsOf": "2026-07-22T23:28:50.948Z"
+        "usd": 255.900343,
+        "pricingAsOf": "2026-07-22T23:32:31.271Z"
       }
     },
     "merges": [
