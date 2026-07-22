@@ -58,7 +58,7 @@ drift test fails when this table and the typed contract disagree.
 | `agent_question_answered` | `subject_kind` (`agent` or `conversation`), `answer_type` (`custom` or `selection`), `question_count` (count bucket) | An operator answered an agent question. |
 | `server_boot` | `project_count`, `active_agent_count` (count buckets) | A dashboard server reached the listening state. |
 | `cli_command_run` | `verb` (allowlisted CLI verb), `ok` (boolean), `duration_ms` (duration bucket) | A CLI command completed. |
-| `pipeline_stage_changed` | `stage` (`merged`, `verification_passed`, or `closed_out`), `harness` (harness enum), `model` (model-family enum) | An issue crossed a pipeline funnel stage. |
+| `pipeline_stage_changed` | `stage` (`work_done`, `review_passed`, `verification_passed`, `merged`, or `closed_out`), `harness` (harness enum), `model` (model-family enum) | An issue crossed a pipeline funnel stage. |
 
 Count buckets are `0`, `1-2`, `3-5`, `6-10`, and `11+`. Duration buckets are
 `under_100ms`, `100ms-999ms`, `1s-9s`, and `10s+`; raw counts and timings are

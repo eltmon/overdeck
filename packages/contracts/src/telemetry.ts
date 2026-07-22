@@ -180,7 +180,7 @@ export interface CliCommandRunProperties {
 }
 
 export interface PipelineStageChangedProperties {
-  readonly stage: "merged" | "verification_passed" | "closed_out"
+  readonly stage: "work_done" | "review_passed" | "verification_passed" | "merged" | "closed_out"
   readonly harness: Harness
   readonly model: TelemetryModelFamily
 }

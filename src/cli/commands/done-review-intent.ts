@@ -1,6 +1,7 @@
 import { getProjectConfigFromWorkspacePath, resolveProjectForIssue } from '../../lib/pan-dir/record.js';
 import { updateIssueRecord } from '../../lib/pan-dir/record-update.js';
 import type { ScopeDriftRecord } from '../../lib/xbrief/continue-state.js';
+import { capturePipelineStageForIssue } from '../../lib/telemetry/pipeline.js';
 
 export interface DoneReviewIntent {
   reviewRequestedAt: string;
@@ -28,4 +29,5 @@ export async function persistDoneReviewIntent(
       updatedAt: intent.reviewRequestedAt,
     };
   });
+  capturePipelineStageForIssue(issueId, 'work_done');
 }

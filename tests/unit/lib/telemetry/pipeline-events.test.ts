@@ -24,13 +24,17 @@ describe('pipeline telemetry events', () => {
   it('captures each funnel transition with enum-only properties', () => {
     const capture = vi.fn();
 
-    capturePipelineStage('merged', context, { capture });
+    capturePipelineStage('work_done', context, { capture });
+    capturePipelineStage('review_passed', context, { capture });
     capturePipelineStage('verification_passed', context, { capture });
+    capturePipelineStage('merged', context, { capture });
     capturePipelineStage('closed_out', context, { capture });
 
     expect(capture.mock.calls).toEqual([
-      ['pipeline_stage_changed', { stage: 'merged', ...context }],
+      ['pipeline_stage_changed', { stage: 'work_done', ...context }],
+      ['pipeline_stage_changed', { stage: 'review_passed', ...context }],
       ['pipeline_stage_changed', { stage: 'verification_passed', ...context }],
+      ['pipeline_stage_changed', { stage: 'merged', ...context }],
       ['pipeline_stage_changed', { stage: 'closed_out', ...context }],
     ]);
     for (const [, properties] of capture.mock.calls) {
