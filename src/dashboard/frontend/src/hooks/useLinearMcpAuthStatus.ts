@@ -6,6 +6,9 @@ export interface LinearMcpAuthBlockedAgent {
   declaredAt: string;
   expiresAt: string;
   notifiedAt: string | null;
+  /** Canonical tracker URL projected by the server (Linear web URL, GitHub
+   * html_url); null when the issue cannot be resolved. */
+  issueUrl?: string | null;
 }
 
 export interface LinearMcpAuthStatus {

@@ -6,12 +6,14 @@ const mocks = vi.hoisted(() => ({
   appendAsync: vi.fn(),
   messageAgent: vi.fn(),
   queryByType: vi.fn(),
+  readFrom: vi.fn(),
 }));
 
 vi.mock('../../dashboard/server/event-store.js', () => ({
   initEventStore: vi.fn(async () => ({
     appendAsync: mocks.appendAsync,
     queryByType: mocks.queryByType,
+    readFrom: mocks.readFrom,
   })),
 }));
 
@@ -62,10 +64,16 @@ describe('Linear MCP auth wake processor', () => {
     mocks.messageAgent.mockReset();
     mocks.messageAgent.mockResolvedValue('delivered');
     mocks.queryByType.mockReset();
-    mocks.queryByType.mockImplementation((type: string) => (
+    mocks.queryByType.mockImplementation((type: string, limit = 100) => (
       events
         .filter(event => event.type === type)
-        .sort((a, b) => b.sequence - a.sequence)
+        .sort((a, b) => a.sequence - b.sequence)
+        .slice(-limit)
+    ));
+    mocks.readFrom.mockImplementation((fromSequence: number) => (
+      events
+        .filter(event => event.sequence > fromSequence && event.type !== 'issues.snapshot')
+        .sort((a, b) => a.sequence - b.sequence)
     ));
     mocks.appendAsync.mockReset();
     mocks.appendAsync.mockImplementation(async (event: Omit<DomainEvent, 'sequence'>) => {
@@ -94,6 +102,7 @@ describe('Linear MCP auth wake processor', () => {
       agentId: 'agent-min-852',
       issueId: 'MIN-852',
       outcome: 'delivered',
+      lifecycleId: 'seq-1',
     });
   });
 
@@ -115,6 +124,7 @@ describe('Linear MCP auth wake processor', () => {
       'delivered',
       'delivered',
     ]);
+    expect(notifiedEvents().every(event => event.payload['lifecycleId'] === 'seq-1')).toBe(true);
   });
 
   it('records queued when messageAgent routes a stopped or gated agent to mail', async () => {
@@ -155,5 +165,29 @@ describe('Linear MCP auth wake processor', () => {
       'linear-mcp-auth-wake',
     );
     expect(notifiedEvents()).toHaveLength(1);
+  });
+
+  it('drains a lifecycle that completes while an earlier wake pass is still delivering', async () => {
+    // Review repro: lifecycle A closes and its wake pass starts; lifecycle B
+    // for the same agent opens and closes while A's delivery is in flight.
+    // The pass must not swallow B's healthy — it drains until stable and
+    // wakes B too, and A's delayed notification record may not mark B handled.
+    events.push(required(1, 'agent-min-852', 'MIN-852'), healthy(2));
+
+    mocks.messageAgent.mockImplementation(async () => {
+      // Mid-delivery, the agent fails again and the operator re-auths:
+      // lifecycle B opens and closes behind the in-flight pass.
+      if (events.some(event => event.type === 'linear_mcp_auth.required' && event.sequence >= 3) === false) {
+        events.push(required(3, 'agent-min-852', 'MIN-852'), healthy(4));
+      }
+      return 'delivered';
+    });
+
+    await processLinearMcpAuthWake();
+
+    // Two wake rounds: one for lifecycle seq-1, one for lifecycle seq-3.
+    expect(mocks.messageAgent).toHaveBeenCalledTimes(2);
+    const lifecycleIds = notifiedEvents().map(event => event.payload['lifecycleId']);
+    expect(lifecycleIds).toEqual(['seq-1', 'seq-3']);
   });
 });

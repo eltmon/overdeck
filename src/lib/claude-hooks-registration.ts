@@ -33,6 +33,7 @@ export interface ClaudeSettings {
   hooks?: {
     PreToolUse?: HookConfig[];
     PostToolUse?: HookConfig[];
+    PostToolUseFailure?: HookConfig[];
     Stop?: HookConfig[];
     SessionStart?: HookConfig[];
     Notification?: HookConfig[];
@@ -99,6 +100,10 @@ export const OVERDECK_HOOK_REGISTRATIONS: readonly HookRegistration[] = [
   { hookType: 'PreToolUse', scriptName: 'ask-user-question-hook', matcher: 'AskUserQuestion' },
   { hookType: 'PostToolUse', scriptName: 'heartbeat-hook' },
   { hookType: 'PostToolUse', scriptName: 'linear-mcp-auth-hook', matcher: 'mcp__linear__.*' },
+  // PostToolUse only fires on successful tool calls; a failed MCP call (the
+  // motivating Linear OAuth-expired case) fires PostToolUseFailure with a
+  // top-level `error` field instead (PAN-2997 review cycle 2).
+  { hookType: 'PostToolUseFailure', scriptName: 'linear-mcp-auth-hook', matcher: 'mcp__linear__.*' },
   { hookType: 'PostToolUse', scriptName: 'permission-event-hook' },
   { hookType: 'Stop', scriptName: 'stop-hook' },
   { hookType: 'Stop', scriptName: 'permission-event-hook' },

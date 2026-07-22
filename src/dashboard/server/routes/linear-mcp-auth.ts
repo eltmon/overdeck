@@ -5,7 +5,9 @@ import {
   appendLinearMcpAuthCallbackRelayedEvent,
   appendLinearMcpAuthHealthyEvent,
   resolveLinearMcpAuthIntervention,
+  type LinearMcpAuthIntervention,
 } from '../../../lib/linear-mcp-auth.js';
+import { getSharedIssueService } from '../services/issue-service-singleton.js';
 import { jsonResponse } from '../http-helpers.js';
 import { httpHandler } from './http-handler.js';
 import { validateOrigin } from './origin-validation.js';
@@ -43,12 +45,41 @@ function callbackCopy(callbackUrl: string): string {
   return `${LINEAR_MCP_AUTH_CALLBACK_COPY_PREFIX} ${callbackUrl} — then re-check Linear access and resume your canonical task.`;
 }
 
+/**
+ * Attach each blocked agent's canonical tracker URL (Linear web URL, GitHub
+ * html_url) from the issues read door so the banner can link every blocked
+ * agent's issue — including Linear-tracked ones the frontend cannot derive a
+ * URL for. Best-effort: an unresolvable issue falls back to null and the
+ * banner renders its own fallback.
+ */
+function withIssueUrls(intervention: LinearMcpAuthIntervention): LinearMcpAuthIntervention {
+  let urlByIdentifier: Map<string, string>;
+  try {
+    urlByIdentifier = new Map();
+    const issues = getSharedIssueService().getIssues({ includeCompleted: true }) as Array<{ identifier?: unknown; url?: unknown }>;
+    for (const issue of issues) {
+      if (typeof issue.identifier === 'string' && typeof issue.url === 'string' && issue.url !== '') {
+        urlByIdentifier.set(issue.identifier.toLowerCase(), issue.url);
+      }
+    }
+  } catch {
+    return intervention;
+  }
+  return {
+    ...intervention,
+    blockedAgents: intervention.blockedAgents.map(agent => ({
+      ...agent,
+      issueUrl: agent.issueId ? urlByIdentifier.get(agent.issueId.toLowerCase()) ?? null : null,
+    })),
+  };
+}
+
 const getLinearMcpAuthRoute = HttpRouter.add(
   'GET',
   '/api/linear-mcp-auth',
   httpHandler(Effect.gen(function* () {
     const intervention = yield* Effect.promise(() => resolveLinearMcpAuthIntervention());
-    return jsonResponse(intervention);
+    return jsonResponse(withIssueUrls(intervention));
   })),
 );
 

@@ -627,6 +627,9 @@ export const LinearMcpAuthNotifiedEvent = Schema.Struct({
     agentId: Schema.String,
     issueId: Schema.NullOr(Schema.String),
     outcome: Schema.Literals(["delivered", "queued", "failed"]),
+    // Correlates this record to the lifecycle whose wake pass produced it;
+    // absent only in events written before PAN-2997 review cycle 2.
+    lifecycleId: Schema.optional(Schema.String),
   }),
 })
 export type LinearMcpAuthNotifiedEvent = typeof LinearMcpAuthNotifiedEvent.Type

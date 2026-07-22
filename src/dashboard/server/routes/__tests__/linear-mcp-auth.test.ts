@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   appendHealthy: vi.fn(),
   messageAgent: vi.fn(),
   resolve: vi.fn(),
+  getIssues: vi.fn(),
 }));
 
 vi.mock('../../../../lib/agents/messaging.js', () => ({
@@ -17,6 +18,10 @@ vi.mock('../../../../lib/linear-mcp-auth.js', () => ({
   appendLinearMcpAuthCallbackRelayedEvent: mocks.appendCallbackRelayed,
   appendLinearMcpAuthHealthyEvent: mocks.appendHealthy,
   resolveLinearMcpAuthIntervention: mocks.resolve,
+}));
+
+vi.mock('../../services/issue-service-singleton.js', () => ({
+  getSharedIssueService: vi.fn(() => ({ getIssues: mocks.getIssues })),
 }));
 
 import {
@@ -85,6 +90,7 @@ describe('Linear MCP auth routes', () => {
     mocks.appendHealthy.mockReset().mockResolvedValue(1);
     mocks.messageAgent.mockReset().mockResolvedValue(undefined);
     mocks.resolve.mockReset().mockResolvedValue(NONE);
+    mocks.getIssues.mockReset().mockReturnValue([]);
   });
 
   it('GET returns the projection without side effects', async () => {
@@ -92,10 +98,31 @@ describe('Linear MCP auth routes', () => {
 
     const result = await request('GET', '/api/linear-mcp-auth');
 
-    expect(result).toEqual({ status: 200, body: ACTIVE });
+    expect(result).toEqual({
+      status: 200,
+      body: {
+        ...ACTIVE,
+        blockedAgents: [{ ...ACTIVE.blockedAgents[0], issueUrl: null }],
+      },
+    });
     expect(mocks.messageAgent).not.toHaveBeenCalled();
     expect(mocks.appendCallbackRelayed).not.toHaveBeenCalled();
     expect(mocks.appendHealthy).not.toHaveBeenCalled();
+  });
+
+  it('GET enriches each blocked agent with its canonical tracker URL', async () => {
+    mocks.resolve.mockResolvedValue(ACTIVE);
+    mocks.getIssues.mockReturnValue([
+      { identifier: 'MIN-852', url: 'https://linear.app/mind-your-now/issue/MIN-852/habits-full-bug-audit' },
+    ]);
+
+    const result = await request('GET', '/api/linear-mcp-auth');
+
+    expect(result.status).toBe(200);
+    expect((result.body['blockedAgents'] as Array<Record<string, unknown>>)[0]).toMatchObject({
+      agentId: 'agent-min-852',
+      issueUrl: 'https://linear.app/mind-your-now/issue/MIN-852/habits-full-bug-audit',
+    });
   });
 
   it.each([

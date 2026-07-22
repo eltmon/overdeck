@@ -65,7 +65,7 @@ export function LinearMcpAuthBanner() {
         <p className="text-warning-foreground text-sm font-semibold flex-1">
           Linear authentication required — {blockedAgents.length} agent{blockedAgents.length === 1 ? '' : 's'} blocked on Linear MCP OAuth.
         </p>
-        {intervention.authUrl && (
+        {intervention.authUrl && intervention.status === 'active' && (
           <a
             href={intervention.authUrl}
             target="_blank"
@@ -98,7 +98,7 @@ export function LinearMcpAuthBanner() {
       {blockedAgents.length > 0 && (
         <ul className="text-warning-foreground text-sm pl-8 flex flex-col gap-0.5">
           {blockedAgents.map((agent) => {
-            const issueUrl = agent.issueId ? trackerIssueUrl(agent.issueId) : null;
+            const issueUrl = agent.issueUrl ?? (agent.issueId ? trackerIssueUrl(agent.issueId) : null);
             return (
               <li key={agent.agentId}>
                 <span className="font-semibold">{agent.agentId}</span>

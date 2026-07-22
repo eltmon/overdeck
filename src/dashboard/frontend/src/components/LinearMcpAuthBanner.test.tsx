@@ -28,6 +28,7 @@ function intervention(overrides: Partial<LinearMcpAuthStatus> = {}): LinearMcpAu
         declaredAt: '2026-07-21T23:00:00Z',
         expiresAt: '2026-07-22T01:00:00Z',
         notifiedAt: null,
+        issueUrl: 'https://linear.app/mind-your-now/issue/MIN-852/habits-full-bug-audit',
       },
       {
         agentId: 'agent-pan-2997',
@@ -35,6 +36,7 @@ function intervention(overrides: Partial<LinearMcpAuthStatus> = {}): LinearMcpAu
         declaredAt: '2026-07-21T23:05:00Z',
         expiresAt: '2026-07-22T01:00:00Z',
         notifiedAt: null,
+        issueUrl: null,
       },
     ],
     ...overrides,
@@ -78,10 +80,12 @@ describe('LinearMcpAuthBanner', () => {
     expect(screen.getByText('agent-min-852')).toBeInTheDocument();
     expect(screen.getByText('agent-pan-2997')).toBeInTheDocument();
 
-    // PAN-prefixed issues resolve to a GitHub link; Linear issues fall back to plain text.
+    // Every blocked agent's issue renders as a link: the server-projected
+    // canonical URL for Linear issues, the derived GitHub URL for PAN ones.
+    const minLink = screen.getByRole('link', { name: 'MIN-852' });
+    expect(minLink).toHaveAttribute('href', 'https://linear.app/mind-your-now/issue/MIN-852/habits-full-bug-audit');
     const panLink = screen.getByRole('link', { name: 'PAN-2997' });
     expect(panLink).toHaveAttribute('href', 'https://github.com/eltmon/overdeck/issues/2997');
-    expect(screen.getByText('agent-min-852').closest('li')?.textContent).toContain('MIN-852');
 
     const openAuth = screen.getByRole('link', { name: /Open Linear authorization/ });
     expect(openAuth).toHaveAttribute('href', 'https://linear.app/oauth/authorize?client_id=test&state=abc');
@@ -89,10 +93,11 @@ describe('LinearMcpAuthBanner', () => {
     expect(openAuth.textContent).toContain('agent-min-852');
   });
 
-  it('shows the expired state copy when the authorization link expired', () => {
+  it('shows the expired state copy and no actionable stale link when the authorization link expired', () => {
     setIntervention(intervention({ status: 'expired' }));
     render(<LinearMcpAuthBanner />);
     expect(screen.getByText(/This authorization link expired/)).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Open Linear authorization/ })).not.toBeInTheDocument();
   });
 
   it('shows the waiting-for-URL state when no agent has produced an authorization URL', () => {

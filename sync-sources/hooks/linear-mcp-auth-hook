@@ -1,5 +1,10 @@
 #!/bin/bash
-# PostToolUse hook for structured Linear MCP OAuth intervention events (PAN-2997).
+# PostToolUse + PostToolUseFailure hook for structured Linear MCP OAuth
+# intervention events (PAN-2997). Registered with matcher mcp__linear__.* for
+# both hook events: PostToolUse fires after a tool call SUCCEEDS, while a
+# failed MCP call — the motivating OAuth-expired case — fires
+# PostToolUseFailure with a top-level `error` field and no tool_response.
+#
 # Never breaks Claude Code: every failure exits 0 silently.
 
 set +e
@@ -10,6 +15,8 @@ command -v jq >/dev/null 2>&1 || exit 0
 TOOL_NAME=$(printf '%s' "$INPUT" | jq -r '.tool_name // ""' 2>/dev/null)
 [[ "$TOOL_NAME" == mcp__linear__* ]] || exit 0
 
+EVENT_NAME=$(printf '%s' "$INPUT" | jq -r '.hook_event_name // "PostToolUse"' 2>/dev/null)
+
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=pan-hook-lib.sh
 . "$SCRIPT_DIR/pan-hook-lib.sh" 2>/dev/null || exit 0
@@ -17,14 +24,15 @@ declare -f pan_resolve_agent_id >/dev/null 2>&1 || exit 0
 pan_resolve_agent_id || exit 0
 declare -f pan_emit_event >/dev/null 2>&1 || exit 0
 
-RESPONSE=$(printf '%s' "$INPUT" | jq -r '
-  (.tool_response // .tool_result // "")
-  | if type == "string" then . else tojson end
-' 2>/dev/null)
-[ -n "$RESPONSE" ] || RESPONSE=''
-
 MARKER_DIR="${OVERDECK_HOME:-$HOME/.overdeck}/agents/$AGENT_ID"
 MARKER="$MARKER_DIR/linear-mcp-auth-pending"
+
+# Auth-failure classifier. The 401 alternative requires a non-identifier
+# boundary on both sides so ordinary Linear data (MIN-401, "AUR-4015") can
+# never match; prose phrases are matched as words.
+is_auth_error_text() {
+  printf '%s' "$1" | grep -Eiq 'requires authentication|not authenticated|unauthorized|(^|[^0-9A-Za-z-])401([^0-9]|$)'
+}
 
 emit_required() {
   local auth_url="$1"
@@ -46,6 +54,22 @@ emit_healthy_if_pending() {
   rm -f "$MARKER" 2>/dev/null || true
 }
 
+if [ "$EVENT_NAME" = "PostToolUseFailure" ]; then
+  # Documented failure-event shape: top-level `error`, no tool_response.
+  ERROR_TEXT=$(printf '%s' "$INPUT" | jq -r '.error // ""' 2>/dev/null)
+  if is_auth_error_text "$ERROR_TEXT"; then
+    emit_required ''
+  fi
+  exit 0
+fi
+
+# PostToolUse — successful tool call.
+RESPONSE=$(printf '%s' "$INPUT" | jq -r '
+  (.tool_response // .tool_result // "")
+  | if type == "string" then . else tojson end
+' 2>/dev/null)
+[ -n "$RESPONSE" ] || RESPONSE=''
+
 if [ "$TOOL_NAME" = 'mcp__linear__authenticate' ]; then
   AUTH_URL=$(printf '%s\n' "$RESPONSE" \
     | grep -Eo 'https://linear\.app/oauth/authorize[^"[:space:]<>]*' 2>/dev/null \
@@ -54,7 +78,17 @@ if [ "$TOOL_NAME" = 'mcp__linear__authenticate' ]; then
   exit 0
 fi
 
-if printf '%s' "$RESPONSE" | grep -Eiq 'requires authentication|not authenticated|unauthorized|401'; then
+# An MCP server can report a failure inside a successful hook event as an
+# error-shaped payload (isError: true, or an `error` member). Only those
+# payloads are auth-classified — ordinary successful result data (issue
+# identifiers like MIN-401, titles mentioning 401s or "unauthorized") never
+# reaches this check and simply clears any pending intervention below.
+ERROR_SHAPED=$(printf '%s' "$INPUT" | jq -r '
+  (.tool_response // .tool_result // {})
+  | if type == "object" and ((.isError == true) or (.error != null)) then "yes" else "" end
+' 2>/dev/null)
+
+if [ -n "$ERROR_SHAPED" ] && is_auth_error_text "$RESPONSE"; then
   emit_required ''
   exit 0
 fi

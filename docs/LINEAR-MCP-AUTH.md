@@ -12,10 +12,15 @@ GPT/Codex OAuth failures.
 
 ## Detection: the hook contract
 
-`sync-sources/hooks/linear-mcp-auth-hook` is a Claude Code **PostToolUse** hook
-registered with matcher `mcp__linear__.*` (see `HOOK_SCRIPT_NAMES` and
-`OVERDECK_HOOK_REGISTRATIONS` in `src/lib/claude-hooks-registration.ts`). It
-never breaks Claude Code — every failure mode exits 0 silently.
+`sync-sources/hooks/linear-mcp-auth-hook` is a Claude Code hook registered with
+matcher `mcp__linear__.*` for **both** `PostToolUse` and `PostToolUseFailure`
+(see `HOOK_SCRIPT_NAMES` and `OVERDECK_HOOK_REGISTRATIONS` in
+`src/lib/claude-hooks-registration.ts`). This dual registration is load-bearing:
+`PostToolUse` fires only after a tool call *succeeds*, so a failed MCP call —
+the motivating OAuth-expired case — never reaches a `PostToolUse`-only hook.
+Failures arrive as `PostToolUseFailure` with a top-level `error` field and no
+`tool_response`. The hook never breaks Claude Code — every failure mode exits
+0 silently.
 
 The hook emits heartbeat events via `pan_emit_event` (see
 `sync-sources/hooks/pan-hook-lib.sh`). Its emitted `kind` strings are a
@@ -25,10 +30,15 @@ silently breaks detection:
 - `linear_mcp_auth_required` — emitted when:
   - `mcp__linear__authenticate` returns; the first
     `https://linear.app/oauth/authorize…` URL in the tool response is extracted
-    into `authUrl` (`null` when extraction fails); or
-  - any `mcp__linear__*` tool response matches an auth-error pattern
-    (`requires authentication|not authenticated|unauthorized|401`), with
-    `authUrl: null`.
+    into `authUrl` (`null` when extraction fails);
+  - a `PostToolUseFailure` event's `error` text matches the auth classifier
+    (`requires authentication|not authenticated|unauthorized`, or `401` with a
+    non-identifier boundary so `MIN-401`-style data can never match); or
+  - a successful `PostToolUse` payload is error-shaped (`isError: true` or an
+    `error` member) AND matches the same classifier. Ordinary successful
+    result data — issue identifiers, titles mentioning 401s or "unauthorized"
+    — is never auth-classified: it clears a pending intervention instead of
+    raising a false one.
   - Each required emission touches the marker file
     `${OVERDECK_HOME}/agents/<agentId>/linear-mcp-auth-pending`.
 - `linear_mcp_auth_healthy` — emitted only when a `mcp__linear__*` response is
@@ -48,7 +58,7 @@ Canonical definitions live in `src/lib/linear-mcp-auth.ts`
 | --- | --- | --- |
 | `linear_mcp_auth.required` | `{ agentId, issueId, authUrl, expiresAt }` | Hook heartbeat ingestion |
 | `linear_mcp_auth.healthy` | `{ agentId, issueId, source: 'hook' \| 'operator' }` | Hook heartbeat ingestion, or the operator via `POST /api/linear-mcp-auth/complete` |
-| `linear_mcp_auth.notified` | `{ agentId, issueId, outcome: 'delivered' \| 'queued' \| 'failed' }` | The wake pass, after messaging a blocked agent |
+| `linear_mcp_auth.notified` | `{ agentId, issueId, outcome: 'delivered' \| 'queued' \| 'failed', lifecycleId }` | The wake pass, after messaging a blocked agent |
 | `linear_mcp_auth.callback_relayed` | `{ agentId, issueId }` | `POST /api/linear-mcp-auth/callback`, after relaying a callback URL |
 
 ## Lifecycle fold semantics
@@ -59,7 +69,16 @@ into one **open lifecycle** plus the last completed one:
 - **One open lifecycle.** The first `required` event opens it; every later
   `required` dedups into it — agents are keyed by `agentId`, so repeated auth
   failures from the same agent update its row instead of minting a new OAuth
-  request, and additional agents join the same intervention.
+  request, and additional agents join the same intervention. Each lifecycle
+  gets a durable correlation id (`seq-<n>`, the sequence of the `required`
+  event that opened it).
+- **Correlated notifications.** `notified` events carry the `lifecycleId` of
+  the lifecycle whose wake pass produced them, and the fold applies a
+  notification only to that lifecycle. Without this, a delayed delivery record
+  from lifecycle A could be stamped onto a newer lifecycle B for the same
+  agent, permanently suppressing B's wake. (Records written before this
+  correlation existed carry no `lifecycleId` and apply to the current
+  lifecycle as before.)
 - **authUrl ownership.** The most recent `required` event carrying a non-null
   `authUrl` owns the intervention's authorization URL (`authUrlAgentId`). The
   URL is the agent-generated OAuth link the operator opens.
@@ -70,12 +89,19 @@ into one **open lifecycle** plus the last completed one:
   `required` with a new URL.
 - **Close.** Any `linear_mcp_auth.healthy` event closes the open lifecycle
   (it becomes `lastCompleted`, and the projection returns to `status:
-  'none'`). `notified` events stamp `notifiedAt` on the agent row in whichever
-  lifecycle is current; `callback_relayed` is record-keeping only.
+  'none'`). `callback_relayed` is record-keeping only.
+- **Bounded complete reads.** The fold never queries event types with the
+  store's per-type cap — repeated failures would push earlier blocked agents
+  out of a 100-event window. It anchors on healthy-event boundaries and reads
+  forward with a sequence predicate, expanding the anchor until the last
+  completed lifecycle is fully reconstructed.
 - **Projection.** `resolveLinearMcpAuthIntervention()` serves `GET
   /api/linear-mcp-auth` with `{ status, authUrl, authUrlAgentId,
-  authUrlExpiresAt, declaredAt, blockedAgents[] }`. Because the fold reads the
-  durable event store, banner state survives dashboard restarts.
+  authUrlExpiresAt, declaredAt, blockedAgents[] }`; the route enriches each
+  blocked agent with `issueUrl`, its canonical tracker URL from the issues
+  read door (Linear web URL, GitHub html_url), so the banner can link every
+  issue. Because the fold reads the durable event store, banner state
+  survives dashboard restarts.
 
 ## Banner states
 
@@ -86,12 +112,13 @@ intervention is active, 30s when idle):
 
 - **none** — banner hidden.
 - **active with authUrl** — "Linear authentication required" header, the
-  blocked-agent list with issue links, and an "Open Linear authorization"
-  anchor naming the owning agent.
+  blocked-agent list with links to their canonical issue URLs, and an "Open
+  Linear authorization" anchor naming the owning agent.
 - **active without authUrl** — waiting-for-URL copy: no blocked agent has
   produced an authorization URL yet.
 - **expired** — copy stating the link expired and refreshes automatically when
-  a blocked agent generates a fresh one.
+  a blocked agent generates a fresh one; the stale authorization action is not
+  rendered, so the operator cannot start a flow the UI knows cannot complete.
 
 ## Operator completion flows
 
@@ -123,8 +150,13 @@ has not yet been notified:
   access with one lightweight read and resume its canonical task, and not to
   retry in a loop if it still fails.
 - Each attempt is recorded as a `linear_mcp_auth.notified` event with outcome
-  `delivered`, `queued`, or `failed`, so an agent is woken at most once per
-  lifecycle.
+  `delivered`, `queued`, or `failed` and the owning `lifecycleId`, so an agent
+  is woken at most once per lifecycle.
+- **Drain-until-stable.** The wake pass loops: after waking one completed
+  lifecycle it re-reads the fold, so a lifecycle that completed while
+  deliveries were in flight gets its own wake round inside the same coalesced
+  run instead of being swallowed by it. A pass that cannot stabilize after 10
+  rounds logs and defers to the next trigger.
 - **Boot recovery:** the Cloister service runs the wake pass on startup
   (`src/lib/cloister/service.ts`) and on every `linear_mcp_auth.healthy`
   domain event (`src/lib/cloister/service-reactive.ts`), so an agent that was

@@ -113,10 +113,30 @@ describe('linear-mcp-auth-hook', () => {
     expect(existsSync(markerPath())).toBe(true)
   })
 
-  it('emits required with a null URL for an auth error from any Linear tool', async () => {
+  it('emits required with a null URL for a real PostToolUseFailure auth error', async () => {
+    // The documented failure-event shape: top-level `error` + `is_interrupt`,
+    // no tool_response. PostToolUse does not fire for failed MCP calls at all.
+    const failureInput = JSON.stringify({
+      hook_event_name: 'PostToolUseFailure',
+      tool_name: 'mcp__linear__list_issues',
+      tool_input: {},
+      error: 'MCP error 401: Unauthorized — Linear session requires authentication',
+      is_interrupt: false,
+    })
+
+    await runHook(tempDir, failureInput, environment())
+
+    expect(eventBodies(eventLog)).toEqual([{
+      kind: 'linear_mcp_auth_required',
+      authUrl: null,
+    }])
+    expect(existsSync(markerPath())).toBe(true)
+  })
+
+  it('emits required for an error-shaped success payload carrying an auth error', async () => {
     await runHook(
       tempDir,
-      input('mcp__linear__list_issues', { error: '401 Unauthorized: not authenticated' }),
+      input('mcp__linear__list_issues', { isError: true, error: '401 Unauthorized: not authenticated' }),
       environment(),
     )
 
@@ -125,6 +145,45 @@ describe('linear-mcp-auth-hook', () => {
       authUrl: null,
     }])
     expect(existsSync(markerPath())).toBe(true)
+  })
+
+  it('stays silent for a PostToolUseFailure that is not an auth error', async () => {
+    const failureInput = JSON.stringify({
+      hook_event_name: 'PostToolUseFailure',
+      tool_name: 'mcp__linear__get_issue',
+      tool_input: {},
+      error: 'MCP error -40: issue MIN-401 not found',
+      is_interrupt: false,
+    })
+
+    const result = await runHook(tempDir, failureInput, environment())
+
+    expect(result.code).toBe(0)
+    expect(eventBodies(eventLog)).toEqual([])
+    expect(existsSync(markerPath())).toBe(false)
+  })
+
+  it('never auth-classifies successful issue data containing 401s or "unauthorized"', async () => {
+    // Regression: ordinary Linear payloads legitimately contain identifiers
+    // like MIN-401 and prose about 401/unauthorized behavior — none of that is
+    // MCP authentication state, and a successful call must clear a pending
+    // intervention instead of raising a false one.
+    mkdirSync(join(overdeckHome, 'agents', agentId), { recursive: true })
+    writeFileSync(markerPath(), '')
+
+    await runHook(
+      tempDir,
+      input('mcp__linear__list_issues', {
+        issues: [
+          { identifier: 'MIN-401', title: 'Retry after a 401 response' },
+          { identifier: 'MIN-402', title: 'Mark legacy tokens unauthorized in docs' },
+        ],
+      }),
+      environment(),
+    )
+
+    expect(eventBodies(eventLog)).toEqual([{ kind: 'linear_mcp_auth_healthy' }])
+    expect(existsSync(markerPath())).toBe(false)
   })
 
   it('emits healthy and deletes the marker after complete_authentication succeeds', async () => {

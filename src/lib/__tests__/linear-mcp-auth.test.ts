@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const eventStoreMocks = vi.hoisted(() => ({
   appendAsync: vi.fn(),
   queryByType: vi.fn(),
+  readFrom: vi.fn(),
 }));
 
 vi.mock('../../dashboard/server/event-store.js', () => ({
@@ -25,11 +26,38 @@ function event(
   return { sequence, type, timestamp, payload };
 }
 
+function requiredEvent(
+  sequence: number,
+  agentId: string,
+  issueId: string,
+  authUrl: string | null = null,
+  expiresAt: string | null = null,
+  timestamp = '2026-07-21T12:00:00.000Z',
+): StoredEvent {
+  return event(sequence, 'linear_mcp_auth.required', timestamp, { agentId, issueId, authUrl, expiresAt });
+}
+
+function healthyEvent(sequence: number, timestamp = '2026-07-21T12:05:00.000Z'): StoredEvent {
+  return event(sequence, 'linear_mcp_auth.healthy', timestamp, {
+    agentId: 'operator',
+    issueId: null,
+    source: 'operator',
+  });
+}
+
+/** Mirrors the real store: queryByType returns the most recent `limit`
+ * events in ascending order; readFrom returns everything after a sequence. */
 function useEvents(events: StoredEvent[]): void {
-  eventStoreMocks.queryByType.mockImplementation((type: string) => (
+  eventStoreMocks.queryByType.mockImplementation((type: string, limit = 100) => (
     events
       .filter(candidate => candidate.type === type)
-      .sort((a, b) => b.sequence - a.sequence)
+      .sort((a, b) => a.sequence - b.sequence)
+      .slice(-limit)
+  ));
+  eventStoreMocks.readFrom.mockImplementation((fromSequence: number) => (
+    events
+      .filter(candidate => candidate.sequence > fromSequence && candidate.type !== 'issues.snapshot')
+      .sort((a, b) => a.sequence - b.sequence)
   ));
 }
 
@@ -39,6 +67,7 @@ describe('Linear MCP auth intervention fold', () => {
     vi.setSystemTime(new Date('2026-07-21T12:00:00.000Z'));
     eventStoreMocks.appendAsync.mockReset();
     eventStoreMocks.queryByType.mockReset();
+    eventStoreMocks.readFrom.mockReset();
     useEvents([]);
   });
 
@@ -48,12 +77,7 @@ describe('Linear MCP auth intervention fold', () => {
 
   it('projects one blocked agent with the default expiry', async () => {
     useEvents([
-      event(1, 'linear_mcp_auth.required', '2026-07-21T12:00:00.000Z', {
-        agentId: 'agent-min-852',
-        issueId: 'MIN-852',
-        authUrl: null,
-        expiresAt: null,
-      }),
+      requiredEvent(1, 'agent-min-852', 'MIN-852'),
     ]);
 
     await expect(resolveLinearMcpAuthIntervention()).resolves.toEqual({
@@ -74,18 +98,8 @@ describe('Linear MCP auth intervention fold', () => {
 
   it('deduplicates multiple agents and tracks the latest authorization URL owner', async () => {
     useEvents([
-      event(1, 'linear_mcp_auth.required', '2026-07-21T12:00:00.000Z', {
-        agentId: 'agent-min-852',
-        issueId: 'MIN-852',
-        authUrl: 'https://linear.app/oauth/authorize?state=first',
-        expiresAt: '2026-07-21T12:20:00.000Z',
-      }),
-      event(2, 'linear_mcp_auth.required', '2026-07-21T12:05:00.000Z', {
-        agentId: 'agent-pan-2997',
-        issueId: 'PAN-2997',
-        authUrl: 'https://linear.app/oauth/authorize?state=second',
-        expiresAt: '2026-07-21T12:35:00.000Z',
-      }),
+      requiredEvent(1, 'agent-min-852', 'MIN-852', 'https://linear.app/oauth/authorize?state=first', '2026-07-21T12:20:00.000Z'),
+      requiredEvent(2, 'agent-pan-2997', 'PAN-2997', 'https://linear.app/oauth/authorize?state=second', '2026-07-21T12:35:00.000Z', '2026-07-21T12:05:00.000Z'),
     ]);
 
     const intervention = await resolveLinearMcpAuthIntervention();
@@ -105,24 +119,14 @@ describe('Linear MCP auth intervention fold', () => {
 
   it('changes to expired at the default TTL and returns to active after a fresh required event', async () => {
     const events = [
-      event(1, 'linear_mcp_auth.required', '2026-07-21T12:00:00.000Z', {
-        agentId: 'agent-min-852',
-        issueId: 'MIN-852',
-        authUrl: 'https://linear.app/oauth/authorize?state=first',
-        expiresAt: null,
-      }),
+      requiredEvent(1, 'agent-min-852', 'MIN-852', 'https://linear.app/oauth/authorize?state=first'),
     ];
     useEvents(events);
 
     await vi.advanceTimersByTimeAsync(LINEAR_MCP_AUTH_URL_TTL_MS + 1);
     await expect(resolveLinearMcpAuthIntervention()).resolves.toMatchObject({ status: 'expired' });
 
-    events.push(event(2, 'linear_mcp_auth.required', '2026-07-21T12:30:00.001Z', {
-      agentId: 'agent-min-852',
-      issueId: 'MIN-852',
-      authUrl: 'https://linear.app/oauth/authorize?state=refreshed',
-      expiresAt: null,
-    }));
+    events.push(requiredEvent(2, 'agent-min-852', 'MIN-852', 'https://linear.app/oauth/authorize?state=refreshed', null, '2026-07-21T12:30:00.001Z'));
     useEvents(events);
 
     await expect(resolveLinearMcpAuthIntervention()).resolves.toMatchObject({
@@ -134,53 +138,115 @@ describe('Linear MCP auth intervention fold', () => {
 
   it('applies notifications after close to the last completed lifecycle', async () => {
     useEvents([
-      event(1, 'linear_mcp_auth.required', '2026-07-21T12:00:00.000Z', {
-        agentId: 'agent-min-852',
-        issueId: 'MIN-852',
-        authUrl: null,
-        expiresAt: null,
-      }),
-      event(2, 'linear_mcp_auth.healthy', '2026-07-21T12:05:00.000Z', {
-        agentId: 'agent-min-852',
-        issueId: 'MIN-852',
-        source: 'hook',
-      }),
+      requiredEvent(1, 'agent-min-852', 'MIN-852'),
+      healthyEvent(2),
       event(3, 'linear_mcp_auth.notified', '2026-07-21T12:05:01.000Z', {
         agentId: 'agent-min-852',
         issueId: 'MIN-852',
         outcome: 'delivered',
+        lifecycleId: 'seq-1',
       }),
     ]);
 
     await expect(resolveLinearMcpAuthIntervention()).resolves.toMatchObject({ status: 'none' });
-    await expect(computeLinearMcpAuthWakeSet()).resolves.toEqual([]);
+    await expect(computeLinearMcpAuthWakeSet()).resolves.toEqual({
+      lifecycleId: 'seq-1',
+      agents: [],
+    });
   });
 
   it('keeps the wake set empty when a duplicate healthy event arrives after notification', async () => {
     useEvents([
-      event(1, 'linear_mcp_auth.required', '2026-07-21T12:00:00.000Z', {
+      requiredEvent(1, 'agent-min-852', 'MIN-852'),
+      healthyEvent(2),
+      event(3, 'linear_mcp_auth.notified', '2026-07-21T12:05:01.000Z', {
         agentId: 'agent-min-852',
         issueId: 'MIN-852',
-        authUrl: null,
-        expiresAt: null,
+        outcome: 'delivered',
+        lifecycleId: 'seq-1',
       }),
-      event(2, 'linear_mcp_auth.healthy', '2026-07-21T12:05:00.000Z', {
+      healthyEvent(4, '2026-07-21T12:05:02.000Z'),
+    ]);
+
+    await expect(computeLinearMcpAuthWakeSet()).resolves.toEqual({
+      lifecycleId: 'seq-1',
+      agents: [],
+    });
+  });
+
+  it('keeps every blocked agent visible and wakeable past 100 required events', async () => {
+    // Regression: the old fold queried each event type with the store's
+    // default 100-event cap, so enough repeated failures from one agent
+    // pushed another agent's declaration out of the reconstruction window.
+    const events: StoredEvent[] = [requiredEvent(1, 'agent-min-852', 'MIN-852')];
+    for (let sequence = 2; sequence <= 150; sequence++) {
+      events.push(requiredEvent(sequence, 'agent-pan-2997', 'PAN-2997'));
+    }
+    useEvents(events);
+
+    const intervention = await resolveLinearMcpAuthIntervention();
+
+    expect(intervention.blockedAgents.map(agent => agent.agentId)).toContain('agent-min-852');
+    expect(intervention.blockedAgents).toHaveLength(2);
+  });
+
+  it('applies a delayed notification only to its own lifecycle, never to a newer one', async () => {
+    // The review's stranding sequence: required(A) → healthy(A) → required(B,
+    // same agent) → healthy(B) → notified(A). Lifecycle B must remain
+    // unwoken — A's delayed record may not mark B handled.
+    useEvents([
+      requiredEvent(1, 'agent-min-852', 'MIN-852'),
+      healthyEvent(2, '2026-07-21T12:01:00.000Z'),
+      requiredEvent(3, 'agent-min-852', 'MIN-852', null, null, '2026-07-21T12:02:00.000Z'),
+      healthyEvent(4, '2026-07-21T12:03:00.000Z'),
+      event(5, 'linear_mcp_auth.notified', '2026-07-21T12:03:30.000Z', {
         agentId: 'agent-min-852',
         issueId: 'MIN-852',
-        source: 'hook',
+        outcome: 'delivered',
+        lifecycleId: 'seq-1',
       }),
+    ]);
+
+    // B (seq-3) is the last completed lifecycle and its agent was never
+    // notified — the wake set must still contain it.
+    await expect(computeLinearMcpAuthWakeSet()).resolves.toEqual({
+      lifecycleId: 'seq-3',
+      agents: [expect.objectContaining({ agentId: 'agent-min-852', notifiedAt: null })],
+    });
+  });
+
+  it('ignores a notification whose lifecycle id matches no known lifecycle', async () => {
+    useEvents([
+      requiredEvent(1, 'agent-min-852', 'MIN-852'),
+      healthyEvent(2),
+      event(3, 'linear_mcp_auth.notified', '2026-07-21T12:05:01.000Z', {
+        agentId: 'agent-min-852',
+        issueId: 'MIN-852',
+        outcome: 'delivered',
+        lifecycleId: 'seq-999',
+      }),
+    ]);
+
+    await expect(computeLinearMcpAuthWakeSet()).resolves.toEqual({
+      lifecycleId: 'seq-1',
+      agents: [expect.objectContaining({ agentId: 'agent-min-852', notifiedAt: null })],
+    });
+  });
+
+  it('applies legacy notifications without a lifecycle id to the current lifecycle', async () => {
+    useEvents([
+      requiredEvent(1, 'agent-min-852', 'MIN-852'),
+      healthyEvent(2),
       event(3, 'linear_mcp_auth.notified', '2026-07-21T12:05:01.000Z', {
         agentId: 'agent-min-852',
         issueId: 'MIN-852',
         outcome: 'delivered',
       }),
-      event(4, 'linear_mcp_auth.healthy', '2026-07-21T12:05:02.000Z', {
-        agentId: 'agent-min-852',
-        issueId: 'MIN-852',
-        source: 'hook',
-      }),
     ]);
 
-    await expect(computeLinearMcpAuthWakeSet()).resolves.toEqual([]);
+    await expect(computeLinearMcpAuthWakeSet()).resolves.toEqual({
+      lifecycleId: 'seq-1',
+      agents: [],
+    });
   });
 });

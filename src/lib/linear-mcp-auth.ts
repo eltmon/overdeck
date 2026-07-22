@@ -20,6 +20,9 @@ export interface LinearMcpAuthBlockedAgent {
   declaredAt: string;
   expiresAt: string;
   notifiedAt: string | null;
+  /** Projection-only enrichment attached by the GET route from the issues
+   * resolver; never persisted in lifecycle events. */
+  issueUrl?: string | null;
 }
 
 export interface LinearMcpAuthIntervention {
@@ -32,6 +35,10 @@ export interface LinearMcpAuthIntervention {
 }
 
 interface LinearMcpAuthLifecycle {
+  /** Durable correlation id: the sequence of the required event that opened
+   * this lifecycle. `notified` events carry it so a delayed delivery record
+   * can only be applied to the lifecycle whose wake attempt produced it. */
+  id: string;
   declaredAt: string;
   authUrl: string | null;
   authUrlAgentId: string | null;
@@ -61,6 +68,9 @@ export interface NotifiedPayload {
   agentId: string;
   issueId: string | null;
   outcome: LinearMcpAuthNotificationOutcome;
+  /** Correlates this record to the lifecycle whose wake attempt produced it.
+   * Absent only in events written before PAN-2997 review cycle 2. */
+  lifecycleId?: string;
 }
 
 export interface CallbackRelayedPayload {
@@ -94,6 +104,7 @@ function foldLinearMcpAuthEvents(events: StoredEvent[]): LinearMcpAuthFold {
       case 'linear_mcp_auth.required': {
         const payload = event.payload as RequiredPayload;
         open ??= {
+          id: `seq-${event.sequence}`,
           declaredAt: event.timestamp,
           authUrl: null,
           authUrlAgentId: null,
@@ -123,7 +134,15 @@ function foldLinearMcpAuthEvents(events: StoredEvent[]): LinearMcpAuthFold {
         break;
       case 'linear_mcp_auth.notified': {
         const payload = event.payload as NotifiedPayload;
-        const lifecycle = open ?? lastCompleted;
+        // A notification record belongs to exactly one lifecycle: the one
+        // whose wake pass produced it. Without this correlation a delayed
+        // delivery from lifecycle A could be stamped onto lifecycle B,
+        // permanently suppressing B's wake.
+        const lifecycle = payload.lifecycleId !== undefined
+          ? (open?.id === payload.lifecycleId ? open
+            : lastCompleted?.id === payload.lifecycleId ? lastCompleted
+            : null)
+          : (open ?? lastCompleted);
         const agent = lifecycle?.agents.get(payload.agentId);
         if (agent !== undefined) {
           lifecycle?.agents.set(payload.agentId, {
@@ -141,12 +160,40 @@ function foldLinearMcpAuthEvents(events: StoredEvent[]): LinearMcpAuthFold {
   return { open, lastCompleted };
 }
 
+const HEALTHY_BOUNDARY_CANDIDATES = 50;
+
 async function readLinearMcpAuthFold(): Promise<LinearMcpAuthFold> {
   const store = await initEventStore();
-  const events = LINEAR_MCP_AUTH_EVENT_TYPES
-    .flatMap(type => store.queryByType(type))
-    .sort((a, b) => a.sequence - b.sequence);
-  return foldLinearMcpAuthEvents(events);
+  // The fold needs the currently-open lifecycle plus the last completed one
+  // (for wake bookkeeping). queryByType's per-type cap (default 100) silently
+  // drops blocked agents once one type overflows, so read with a sequence
+  // predicate instead, anchored just before the last completed lifecycle.
+  //
+  // The anchor is a healthy event, but healthy events are only lifecycle
+  // boundaries when a lifecycle was open — a duplicate healthy is a no-op.
+  // So walk candidate boundaries from the second-most-recent healthy
+  // backwards: if the window contains a healthy event yet reconstructs no
+  // completed lifecycle, that healthy closed a lifecycle whose opening
+  // required events were cut off — expand to the next older candidate.
+  const healthyEvents = store.queryByType('linear_mcp_auth.healthy', HEALTHY_BOUNDARY_CANDIDATES);
+  const candidates = [
+    ...healthyEvents.slice(0, -1).map(candidate => candidate.sequence).reverse(),
+    0,
+  ];
+
+  let fold: LinearMcpAuthFold = { open: null, lastCompleted: null };
+  for (const boundary of candidates) {
+    const events = store.readFrom(boundary)
+      .filter(candidate =>
+        (LINEAR_MCP_AUTH_EVENT_TYPES as readonly string[]).includes(candidate.type))
+      .sort((a, b) => a.sequence - b.sequence);
+    fold = foldLinearMcpAuthEvents(events);
+    const windowHasHealthy = events.some(candidate => candidate.type === 'linear_mcp_auth.healthy');
+    if (fold.lastCompleted !== null || !windowHasHealthy || boundary === 0) {
+      break;
+    }
+  }
+  return fold;
 }
 
 function projectLifecycle(
@@ -227,31 +274,49 @@ export async function resolveLinearMcpAuthIntervention(
   return projectLifecycle(open, nowIso);
 }
 
-export async function computeLinearMcpAuthWakeSet(): Promise<LinearMcpAuthBlockedAgent[]> {
-  const { lastCompleted } = await readLinearMcpAuthFold();
-  if (lastCompleted === null) return [];
-  return [...lastCompleted.agents.values()].filter(agent => agent.notifiedAt === null);
+export interface LinearMcpAuthWakeSet {
+  lifecycleId: string;
+  agents: LinearMcpAuthBlockedAgent[];
 }
+
+export async function computeLinearMcpAuthWakeSet(): Promise<LinearMcpAuthWakeSet | null> {
+  const { lastCompleted } = await readLinearMcpAuthFold();
+  if (lastCompleted === null) return null;
+  const agents = [...lastCompleted.agents.values()].filter(agent => agent.notifiedAt === null);
+  return { lifecycleId: lastCompleted.id, agents };
+}
+
+const MAX_WAKE_PASSES = 10;
 
 export function processLinearMcpAuthWake(): Promise<void> {
   return linearMcpAuthWakeCoalescer.run('global', async () => {
-    const blockedAgents = await computeLinearMcpAuthWakeSet();
-    for (const blockedAgent of blockedAgents) {
-      let outcome: LinearMcpAuthNotificationOutcome;
-      try {
-        outcome = await messageAgentWithOutcome(
-          blockedAgent.agentId,
-          LINEAR_MCP_AUTH_WAKE_COPY,
-          'linear-mcp-auth-wake',
-        );
-      } catch {
-        outcome = 'failed';
+    // Drain-until-stable: a healthy event that lands while this pass is
+    // delivering wakes would otherwise be swallowed by the coalescer (its
+    // trigger gets this in-flight promise back). Re-reading the fold after
+    // each pass surfaces the newly completed lifecycle, so it gets its own
+    // wake round inside the same coalesced run.
+    for (let pass = 0; pass < MAX_WAKE_PASSES; pass++) {
+      const wakeSet = await computeLinearMcpAuthWakeSet();
+      if (wakeSet === null || wakeSet.agents.length === 0) return;
+      for (const blockedAgent of wakeSet.agents) {
+        let outcome: LinearMcpAuthNotificationOutcome;
+        try {
+          outcome = await messageAgentWithOutcome(
+            blockedAgent.agentId,
+            LINEAR_MCP_AUTH_WAKE_COPY,
+            'linear-mcp-auth-wake',
+          );
+        } catch {
+          outcome = 'failed';
+        }
+        await appendLinearMcpAuthNotifiedEvent({
+          agentId: blockedAgent.agentId,
+          issueId: blockedAgent.issueId,
+          outcome,
+          lifecycleId: wakeSet.lifecycleId,
+        });
       }
-      await appendLinearMcpAuthNotifiedEvent({
-        agentId: blockedAgent.agentId,
-        issueId: blockedAgent.issueId,
-        outcome,
-      });
     }
+    console.error(`[linear-mcp-auth] wake pass did not stabilize after ${MAX_WAKE_PASSES} passes — remaining wakes deferred to the next trigger or boot recovery`);
   });
 }
