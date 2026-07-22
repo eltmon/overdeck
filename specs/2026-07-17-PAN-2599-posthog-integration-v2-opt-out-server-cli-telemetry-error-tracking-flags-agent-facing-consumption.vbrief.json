@@ -4,17 +4,17 @@
     "created": "2026-07-17T07:13:19-04:00",
     "author": "overdeck/dev",
     "description": "Plan for PAN-2599: PostHog v2 — opt-out, server/CLI telemetry, error tracking, flags, agent-facing docs",
-    "updated": "2026-07-22T20:54:55.281Z"
+    "updated": "2026-07-22T20:54:57.063Z"
   },
   "plan": {
     "id": "pan-2599",
     "title": "PostHog integration v2: opt-out, server/CLI telemetry, error tracking, flags, agent-facing consumption",
-    "status": "approved",
+    "status": "running",
     "uid": "c58a207a-54ca-4bac-8fc6-fe4887c5a5b8",
     "author": "agent:claude-fable-5",
-    "sequence": 6,
+    "sequence": 7,
     "created": "2026-07-17T07:13:19-04:00",
-    "updated": "2026-07-22T20:54:55.281Z",
+    "updated": "2026-07-22T20:54:57.063Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2599",
