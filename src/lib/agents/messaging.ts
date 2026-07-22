@@ -60,6 +60,8 @@ export interface MessageDeliveryOutcome {
   reason?: string;
 }
 
+export type MessageAgentOutcome = 'delivered' | 'queued';
+
 function queueAgentMail(agentId: string, message: string, pendingTurnEndDelivery = false, source?: string): void {
   const mailDir = join(getAgentDir(agentId), 'mail');
   mkdirSync(mailDir, { recursive: true });
@@ -461,4 +463,14 @@ export async function messageAgent(
   queueAgentMail(normalizedId, message);
   await appendTellInterventionForUserSource(normalizedId, caller);
   return { delivered: delivery.ok, queuedToMail: true };
+}
+
+export async function messageAgentWithOutcome(
+  agentId: string,
+  message: string,
+  caller = 'internal',
+  opts: MessageAgentRedriveOptions = {},
+): Promise<MessageAgentOutcome> {
+  const outcome = await messageAgent(agentId, message, caller, opts);
+  return outcome.delivered ? 'delivered' : 'queued';
 }

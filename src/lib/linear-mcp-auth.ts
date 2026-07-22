@@ -3,8 +3,13 @@ import {
   initEventStore,
   type StoredEvent,
 } from '../dashboard/server/event-store.js';
+import { messageAgentWithOutcome } from './agents/messaging.js';
+import { createPromiseCoalescer } from './cloister/in-flight-guard.js';
 
 export const LINEAR_MCP_AUTH_URL_TTL_MS = 30 * 60 * 1000;
+export const LINEAR_MCP_AUTH_WAKE_COPY = 'Linear MCP authentication has been restored — the operator completed OAuth. Re-check access now with one lightweight read (e.g. mcp__linear__list_issues). If it succeeds, resume your canonical task. If it still returns an authentication error, call mcp__linear__authenticate once and wait; do not retry in a loop.';
+
+const linearMcpAuthWakeCoalescer = createPromiseCoalescer<void>();
 
 export type LinearMcpAuthStatus = 'none' | 'active' | 'expired';
 export type LinearMcpAuthNotificationOutcome = 'delivered' | 'queued' | 'failed';
@@ -226,4 +231,27 @@ export async function computeLinearMcpAuthWakeSet(): Promise<LinearMcpAuthBlocke
   const { lastCompleted } = await readLinearMcpAuthFold();
   if (lastCompleted === null) return [];
   return [...lastCompleted.agents.values()].filter(agent => agent.notifiedAt === null);
+}
+
+export function processLinearMcpAuthWake(): Promise<void> {
+  return linearMcpAuthWakeCoalescer.run('global', async () => {
+    const blockedAgents = await computeLinearMcpAuthWakeSet();
+    for (const blockedAgent of blockedAgents) {
+      let outcome: LinearMcpAuthNotificationOutcome;
+      try {
+        outcome = await messageAgentWithOutcome(
+          blockedAgent.agentId,
+          LINEAR_MCP_AUTH_WAKE_COPY,
+          'linear-mcp-auth-wake',
+        );
+      } catch {
+        outcome = 'failed';
+      }
+      await appendLinearMcpAuthNotifiedEvent({
+        agentId: blockedAgent.agentId,
+        issueId: blockedAgent.issueId,
+        outcome,
+      });
+    }
+  });
 }

@@ -386,6 +386,12 @@ export function issueStateChangeFromDomainEvent(event: CloisterDomainEventLike):
 }
 
 async function handleCloisterDomainEventPromise(event: CloisterDomainEventLike): Promise<void> {
+  if (event.type === 'linear_mcp_auth.healthy') {
+    const { processLinearMcpAuthWake } = await import('../linear-mcp-auth.js');
+    await processLinearMcpAuthWake();
+    return;
+  }
+
   // PAN-1908: reactive agent liveness — deacon handles agent.stopped and
   // agent.heartbeat_dead events instead of scanning agent directories.
   if (event.type === 'agent.stopped') {
