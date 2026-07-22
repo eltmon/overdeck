@@ -146,7 +146,7 @@
   ],
   "feedback": [],
   "created": "2026-07-17T12:34:27.875Z",
-  "updated": "2026-07-22T21:05:14.978Z",
+  "updated": "2026-07-22T21:06:43.355Z",
   "pipeline": {
     "issueId": "PAN-2838",
     "reviewStatus": "pending",
@@ -219,16 +219,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 11,
-    "claims": {
-      "sparse-fallback-tests": {
-        "writerId": "agent-pan-2838",
-        "agentId": "agent-pan-2838",
-        "pid": 1222139,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-22T21:05:14.977Z"
-      }
-    },
+    "sequence": 12,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2838",
@@ -284,6 +276,17 @@
         "outcome": "completed",
         "reason": "Added six strict-fetch component tests for chevron structure, collapsed values, no-loss controls, helper copy, and auto-merge saves",
         "releasedAt": "2026-07-22T21:05:05.751Z"
+      },
+      {
+        "writerId": "agent-pan-2838",
+        "agentId": "agent-pan-2838",
+        "pid": 1222139,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-22T21:05:14.977Z",
+        "itemId": "sparse-fallback-tests",
+        "outcome": "completed",
+        "reason": "Added sparse ProjectHome coverage for registered project settings and no-key suppression without changing existing test cases",
+        "releasedAt": "2026-07-22T21:06:43.355Z"
       }
     ],
     "statusReasons": {
@@ -306,6 +309,10 @@
       "disclosure-tests": {
         "reason": "Added six strict-fetch component tests for chevron structure, collapsed values, no-loss controls, helper copy, and auto-merge saves",
         "updatedAt": "2026-07-22T21:05:05.751Z"
+      },
+      "sparse-fallback-tests": {
+        "reason": "Added sparse ProjectHome coverage for registered project settings and no-key suppression without changing existing test cases",
+        "updatedAt": "2026-07-22T21:06:43.355Z"
       }
     }
   },
@@ -331,6 +338,9 @@
     "disclosure-tests.disclosure-tests.ac2": "completed",
     "disclosure-tests.disclosure-tests.ac3": "completed",
     "disclosure-tests.disclosure-tests.ac4": "completed",
-    "sparse-fallback-tests": "running"
+    "sparse-fallback-tests": "completed",
+    "sparse-fallback-tests.sparse-fallback-tests.ac1": "completed",
+    "sparse-fallback-tests.sparse-fallback-tests.ac2": "completed",
+    "sparse-fallback-tests.sparse-fallback-tests.ac3": "completed"
   }
 }
