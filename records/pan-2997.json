@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-21T23:09:49.270Z",
-  "updated": "2026-07-21T23:54:43.114Z",
+  "updated": "2026-07-22T00:09:24.887Z",
   "pipeline": {
     "issueId": "PAN-2997",
     "reviewStatus": "pending",
@@ -61,16 +61,8 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 9,
-    "claims": {
-      "linear-mcp-wake": {
-        "writerId": "agent-pan-2997",
-        "agentId": "agent-pan-2997",
-        "pid": 2907353,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-21T23:54:43.114Z"
-      }
-    },
+    "sequence": 10,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2997",
@@ -115,6 +107,17 @@
         "outcome": "completed",
         "reason": "Added required/healthy heartbeat mappings, runtime issue attribution from AgentStateService, route-level malformed rejection coverage, and Schema-valid emit tests",
         "releasedAt": "2026-07-21T23:54:26.258Z"
+      },
+      {
+        "writerId": "agent-pan-2997",
+        "agentId": "agent-pan-2997",
+        "pid": 2907353,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-21T23:54:43.114Z",
+        "itemId": "linear-mcp-wake",
+        "outcome": "completed",
+        "reason": "Added coalesced wake processing, delivered/queued/failed ledgers, reactive healthy handling, boot recovery, delivery outcome reporting, and boot/runtime tests",
+        "releasedAt": "2026-07-22T00:09:24.887Z"
       }
     ],
     "statusReasons": {
@@ -133,6 +136,10 @@
       "linear-mcp-heartbeat-ingestion": {
         "reason": "Added required/healthy heartbeat mappings, runtime issue attribution from AgentStateService, route-level malformed rejection coverage, and Schema-valid emit tests",
         "updatedAt": "2026-07-21T23:54:26.258Z"
+      },
+      "linear-mcp-wake": {
+        "reason": "Added coalesced wake processing, delivered/queued/failed ledgers, reactive healthy handling, boot recovery, delivery outcome reporting, and boot/runtime tests",
+        "updatedAt": "2026-07-22T00:09:24.887Z"
       }
     }
   },
@@ -153,6 +160,11 @@
     "linear-mcp-heartbeat-ingestion.linear-mcp-heartbeat-ingestion.ac1": "completed",
     "linear-mcp-heartbeat-ingestion.linear-mcp-heartbeat-ingestion.ac2": "completed",
     "linear-mcp-heartbeat-ingestion.linear-mcp-heartbeat-ingestion.ac3": "completed",
-    "linear-mcp-wake": "running"
+    "linear-mcp-wake": "completed",
+    "linear-mcp-wake.linear-mcp-wake.ac1": "completed",
+    "linear-mcp-wake.linear-mcp-wake.ac2": "completed",
+    "linear-mcp-wake.linear-mcp-wake.ac3": "completed",
+    "linear-mcp-wake.linear-mcp-wake.ac4": "completed",
+    "linear-mcp-wake.linear-mcp-wake.ac5": "completed"
   }
 }
