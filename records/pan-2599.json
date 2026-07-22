@@ -10,7 +10,7 @@
   ],
   "feedback": [],
   "created": "2026-07-16T05:02:53.170Z",
-  "updated": "2026-07-22T22:56:45.391Z",
+  "updated": "2026-07-22T22:57:13.170Z",
   "pipeline": {
     "issueId": "PAN-2599",
     "reviewStatus": "pending",
@@ -103,16 +103,8 @@
   "model": "claude-sonnet-5",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 25,
-    "claims": {
-      "telemetry-docs": {
-        "writerId": "agent-pan-2599",
-        "agentId": "agent-pan-2599",
-        "pid": 3705505,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-22T22:47:09.949Z"
-      }
-    },
+    "sequence": 26,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2599",
@@ -245,6 +237,17 @@
         "outcome": "completed",
         "reason": "Added AnalyticsService.isFeatureEnabled with explicit local overrides, disabled/offline fallback, anonymous /flags evaluation, and a fake-timer-verified 500ms bound; pushed f64b8b8fdb.",
         "releasedAt": "2026-07-22T22:46:58.011Z"
+      },
+      {
+        "writerId": "agent-pan-2599",
+        "agentId": "agent-pan-2599",
+        "pid": 3705505,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-22T22:47:09.949Z",
+        "itemId": "telemetry-docs",
+        "outcome": "completed",
+        "reason": "Documented the complete typed event schema, privacy and opt-out controls, install identity, error tracking, flags, hosted MCP and scoped CLI credentials; registered Mintlify pages, added a bidirectional drift test, passed full lint, and pushed 0d19de301f.",
+        "releasedAt": "2026-07-22T22:57:13.170Z"
       }
     ],
     "statusReasons": {
@@ -295,6 +298,10 @@
       "flag-door": {
         "reason": "Added AnalyticsService.isFeatureEnabled with explicit local overrides, disabled/offline fallback, anonymous /flags evaluation, and a fake-timer-verified 500ms bound; pushed f64b8b8fdb.",
         "updatedAt": "2026-07-22T22:46:58.011Z"
+      },
+      "telemetry-docs": {
+        "reason": "Documented the complete typed event schema, privacy and opt-out controls, install identity, error tracking, flags, hosted MCP and scoped CLI credentials; registered Mintlify pages, added a bidirectional drift test, passed full lint, and pushed 0d19de301f.",
+        "updatedAt": "2026-07-22T22:57:13.170Z"
       }
     }
   },
@@ -335,6 +342,8 @@
     "flag-door": "completed",
     "flag-door.flag-door.ac1": "completed",
     "flag-door.flag-door.ac2": "completed",
-    "telemetry-docs": "running"
+    "telemetry-docs": "completed",
+    "telemetry-docs.telemetry-docs.ac1": "completed",
+    "telemetry-docs.telemetry-docs.ac2": "completed"
   }
 }
