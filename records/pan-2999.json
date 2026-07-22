@@ -3,7 +3,7 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-07-21T23:35:54.133Z",
-  "updated": "2026-07-22T00:06:45.701Z",
+  "updated": "2026-07-22T00:11:51.081Z",
   "pipeline": {
     "issueId": "PAN-2999",
     "reviewStatus": "pending",
@@ -12,11 +12,11 @@
     "mergeStatus": "verifying",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-22T00:06:44.670Z",
+    "updatedAt": "2026-07-22T00:11:51.068Z",
     "strikeReadyHead": "58e7a00bd9703c05f837146978298555c802db73",
     "strikeReadyAt": "2026-07-22T00:06:02.993Z",
-    "strikeLandingState": "landing",
-    "strikeRecoveryCount": 0,
+    "strikeLandingState": "recovering",
+    "strikeRecoveryCount": 1,
     "strikeLandingAttempts": [
       {
         "timestamp": "2026-07-21T23:57:42.726Z",
@@ -24,6 +24,13 @@
         "mainHead": "a5b6c526db007c618de92ae0fff261d3e86ed76e",
         "outcome": "failed",
         "detail": "Failed to create PR: Command failed: gh pr create --head strike/pan-2999 --base main --title PAN-2999 --body-file /tmp/pan-pr-body-PAN-2999-1784678261833.md\npull request create failed: GraphQL: A pull request already exists for eltmon:strike/pan-2999. (createPullRequest)\n"
+      },
+      {
+        "timestamp": "2026-07-22T00:11:43.253Z",
+        "strikeHead": "58e7a00bd9703c05f837146978298555c802db73",
+        "mainHead": "a5b6c526db007c618de92ae0fff261d3e86ed76e",
+        "outcome": "failed",
+        "detail": "Strike merge request failed: fetch failed"
       }
     ]
   },
@@ -49,7 +56,7 @@
       },
       "costAtCloseOut": {
         "usd": 6.35335,
-        "pricingAsOf": "2026-07-22T00:06:44.692Z"
+        "pricingAsOf": "2026-07-22T00:11:51.073Z"
       }
     },
     "merges": [],
