@@ -2,7 +2,7 @@
   "issueId": "PAN-2989",
   "schemaVersion": 2,
   "created": "2026-07-22T21:26:29.366Z",
-  "updated": "2026-07-22T21:27:04.883Z",
+  "updated": "2026-07-22T21:27:06.089Z",
   "pipeline": {
     "issueId": "PAN-2989",
     "reviewStatus": "pending",
@@ -26,5 +26,7 @@
       "note": "Planning session started for PAN-2989: State-branch push runs under the per-issue record lock — a stalled push starves verdict journal writes (8+ min observed)",
       "timestamp": "2026-07-22T21:27:04.882Z"
     }
-  ]
+  ],
+  "harness": "claude-code",
+  "model": "k3"
 }
