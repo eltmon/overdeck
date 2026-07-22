@@ -20,11 +20,6 @@ export const TELEMETRY_EVENT_NAMES = [
 
 export type TelemetryEventName = typeof TELEMETRY_EVENT_NAMES[number]
 
-export type TelemetryCountBucket = "0" | "1-2" | "3-5" | "6-10" | "11+"
-export type TelemetryDurationBucket = "under_100ms" | "100ms-999ms" | "1s-9s" | "10s+"
-export type TelemetryDecisionSubjectKind = "agent" | "conversation"
-export type TelemetryModelFamily = "claude" | "gpt" | "gemini" | "kimi" | "minimax" | "glm" | "mimo" | "other"
-
 export const TELEMETRY_CLI_VERBS = [
   "abort",
   "approve",
@@ -87,120 +82,113 @@ export const TELEMETRY_CLI_VERBS = [
   "other",
 ] as const
 
-export type TelemetryCliVerb = typeof TELEMETRY_CLI_VERBS[number]
+const TELEMETRY_HARNESSES = ["claude-code", "ohmypi", "codex", "acp"] as const satisfies readonly Harness[]
 
-export type TelemetryDashboardTab =
-  | "home"
-  | "pipeline"
-  | "kanban"
-  | "command-deck"
-  | "agents"
-  | "flywheel"
-  | "orders"
-  | "backlog"
-  | "resources"
-  | "knowledge"
-  | "skills"
-  | "context"
-  | "health"
-  | "activity"
-  | "metrics"
-  | "costs"
-  | "autopreso"
-  | "settings"
-  | "god-view"
-  | "deacon"
-  | "sessions"
-  | "awaiting-merge"
+export const TELEMETRY_PROPERTY_DOMAINS = {
+  agent_spawn_mode: ["spawn-and-send", "spawn-work-and-send"],
+  answer_type: ["custom", "selection"],
+  auto_merge_variant: ["segmented", "badge"],
+  boolean: [false, true],
+  cli_verb: TELEMETRY_CLI_VERBS,
+  close_out_variant: ["card", "inspector"],
+  count_bucket: ["0", "1-2", "3-5", "6-10", "11+"],
+  dashboard_tab: [
+    "home",
+    "pipeline",
+    "kanban",
+    "command-deck",
+    "agents",
+    "flywheel",
+    "orders",
+    "backlog",
+    "resources",
+    "knowledge",
+    "skills",
+    "context",
+    "health",
+    "activity",
+    "metrics",
+    "costs",
+    "autopreso",
+    "settings",
+    "god-view",
+    "deacon",
+    "sessions",
+    "awaiting-merge",
+  ],
+  decision_subject: ["agent", "conversation"],
+  duration_bucket: ["under_100ms", "100ms-999ms", "1s-9s", "10s+"],
+  forge: ["github", "gitlab"],
+  fork_kind: ["summary", "handoff", "plain"],
+  harness: TELEMETRY_HARNESSES,
+  merge_kind: ["pipeline"],
+  model_family: ["claude", "gpt", "gemini", "kimi", "minimax", "glm", "mimo", "other"],
+  pipeline_stage: ["work_done", "review_passed", "verification_passed", "merged", "closed_out"],
+  project_mode: ["existing", "new"],
+} as const
 
-export interface DashboardTabViewedProperties {
-  readonly tab: TelemetryDashboardTab
+export type TelemetryPropertyDomainName = keyof typeof TELEMETRY_PROPERTY_DOMAINS
+
+export const TELEMETRY_EVENT_CATALOG = {
+  dashboard_tab_viewed: { tab: "dashboard_tab" },
+  agent_spawned: { spawn_mode: "agent_spawn_mode", has_message: "boolean" },
+  project_created: { mode: "project_mode" },
+  issue_merged: { merge_kind: "merge_kind" },
+  force_merge_triggered: { forge: "forge" },
+  issue_closed_out: { variant: "close_out_variant" },
+  bulk_close_out_initiated: { issue_count: "count_bucket" },
+  auto_merge_toggled: { auto_merge: "boolean", variant: "auto_merge_variant" },
+  conversation_forked: {
+    fork_intent: "fork_kind",
+    fork_mode: "fork_kind",
+    fast_summary: "boolean",
+    launch_harness: "harness",
+  },
+  plan_approved: { subject_kind: "decision_subject" },
+  plan_changes_requested: { subject_kind: "decision_subject" },
+  agent_question_answered: {
+    subject_kind: "decision_subject",
+    answer_type: "answer_type",
+    question_count: "count_bucket",
+  },
+  server_boot: { project_count: "count_bucket", active_agent_count: "count_bucket" },
+  cli_command_run: { verb: "cli_verb", ok: "boolean", duration_ms: "duration_bucket" },
+  pipeline_stage_changed: { stage: "pipeline_stage", harness: "harness", model: "model_family" },
+} as const satisfies Record<TelemetryEventName, Record<string, TelemetryPropertyDomainName>>
+
+type TelemetryPropertyValue<Domain extends TelemetryPropertyDomainName> =
+  (typeof TELEMETRY_PROPERTY_DOMAINS)[Domain][number]
+
+type EventProperties<Event extends TelemetryEventName> = {
+  readonly [Property in keyof (typeof TELEMETRY_EVENT_CATALOG)[Event]]:
+    TelemetryPropertyValue<(typeof TELEMETRY_EVENT_CATALOG)[Event][Property] & TelemetryPropertyDomainName>
 }
 
-export interface AgentSpawnedProperties {
-  readonly spawn_mode: "spawn-and-send" | "spawn-work-and-send"
-  readonly has_message: boolean
-}
+export type TelemetryCountBucket = TelemetryPropertyValue<"count_bucket">
+export type TelemetryDurationBucket = TelemetryPropertyValue<"duration_bucket">
+export type TelemetryDecisionSubjectKind = TelemetryPropertyValue<"decision_subject">
+export type TelemetryModelFamily = TelemetryPropertyValue<"model_family">
+export type TelemetryCliVerb = TelemetryPropertyValue<"cli_verb">
+export type TelemetryDashboardTab = TelemetryPropertyValue<"dashboard_tab">
 
-export interface ProjectCreatedProperties {
-  readonly mode: "existing" | "new"
-}
+export type DashboardTabViewedProperties = EventProperties<"dashboard_tab_viewed">
+export type AgentSpawnedProperties = EventProperties<"agent_spawned">
+export type ProjectCreatedProperties = EventProperties<"project_created">
+export type IssueMergedProperties = EventProperties<"issue_merged">
+export type ForceMergeTriggeredProperties = EventProperties<"force_merge_triggered">
+export type IssueClosedOutProperties = EventProperties<"issue_closed_out">
+export type BulkCloseOutInitiatedProperties = EventProperties<"bulk_close_out_initiated">
+export type AutoMergeToggledProperties = EventProperties<"auto_merge_toggled">
+export type ConversationForkedProperties = EventProperties<"conversation_forked">
+export type PlanApprovedProperties = EventProperties<"plan_approved">
+export type PlanChangesRequestedProperties = EventProperties<"plan_changes_requested">
+export type AgentQuestionAnsweredProperties = EventProperties<"agent_question_answered">
+export type ServerBootProperties = EventProperties<"server_boot">
+export type CliCommandRunProperties = EventProperties<"cli_command_run">
+export type PipelineStageChangedProperties = EventProperties<"pipeline_stage_changed">
 
-export interface IssueMergedProperties {
-  readonly merge_kind: "pipeline"
-}
-
-export interface ForceMergeTriggeredProperties {
-  readonly forge: "github" | "gitlab"
-}
-
-export interface IssueClosedOutProperties {
-  readonly variant: "card" | "inspector"
-}
-
-export interface BulkCloseOutInitiatedProperties {
-  readonly issue_count: TelemetryCountBucket
-}
-
-export interface AutoMergeToggledProperties {
-  readonly auto_merge: boolean
-  readonly variant: "segmented" | "badge"
-}
-
-export interface ConversationForkedProperties {
-  readonly fork_intent: "summary" | "handoff" | "plain"
-  readonly fork_mode: "summary" | "handoff" | "plain"
-  readonly fast_summary: boolean
-  readonly launch_harness: Harness
-}
-
-export interface PlanApprovedProperties {
-  readonly subject_kind: TelemetryDecisionSubjectKind
-}
-
-export interface PlanChangesRequestedProperties {
-  readonly subject_kind: TelemetryDecisionSubjectKind
-}
-
-export interface AgentQuestionAnsweredProperties {
-  readonly subject_kind: TelemetryDecisionSubjectKind
-  readonly answer_type: "custom" | "selection"
-  readonly question_count: TelemetryCountBucket
-}
-
-export interface ServerBootProperties {
-  readonly project_count: TelemetryCountBucket
-  readonly active_agent_count: TelemetryCountBucket
-}
-
-export interface CliCommandRunProperties {
-  readonly verb: TelemetryCliVerb
-  readonly ok: boolean
-  readonly duration_ms: TelemetryDurationBucket
-}
-
-export interface PipelineStageChangedProperties {
-  readonly stage: "work_done" | "review_passed" | "verification_passed" | "merged" | "closed_out"
-  readonly harness: Harness
-  readonly model: TelemetryModelFamily
-}
-
-export interface TelemetryEventProperties {
-  readonly dashboard_tab_viewed: DashboardTabViewedProperties
-  readonly agent_spawned: AgentSpawnedProperties
-  readonly project_created: ProjectCreatedProperties
-  readonly issue_merged: IssueMergedProperties
-  readonly force_merge_triggered: ForceMergeTriggeredProperties
-  readonly issue_closed_out: IssueClosedOutProperties
-  readonly bulk_close_out_initiated: BulkCloseOutInitiatedProperties
-  readonly auto_merge_toggled: AutoMergeToggledProperties
-  readonly conversation_forked: ConversationForkedProperties
-  readonly plan_approved: PlanApprovedProperties
-  readonly plan_changes_requested: PlanChangesRequestedProperties
-  readonly agent_question_answered: AgentQuestionAnsweredProperties
-  readonly server_boot: ServerBootProperties
-  readonly cli_command_run: CliCommandRunProperties
-  readonly pipeline_stage_changed: PipelineStageChangedProperties
+export type TelemetryEventProperties = {
+  readonly [Event in TelemetryEventName]: EventProperties<Event>
 }
 
 export type TelemetryPropertiesFor<Event extends TelemetryEventName> = TelemetryEventProperties[Event]

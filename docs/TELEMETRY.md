@@ -42,27 +42,48 @@ Every event is defined in `packages/contracts/src/telemetry.ts`. Product event
 properties are closed unions of enums, booleans, and coarse buckets. The schema
 drift test fails when this table and the typed contract disagree.
 
+The Properties column uses `property=domain`. The domain table below is part of
+the public contract and lists every allowed value.
+
 | Event | Properties | Meaning |
 | --- | --- | --- |
-| `dashboard_tab_viewed` | `tab` (dashboard-tab enum) | A top-level dashboard tab became active. |
-| `agent_spawned` | `spawn_mode` (`spawn-and-send` or `spawn-work-and-send`), `has_message` (boolean) | An operator started an agent from the dashboard. |
-| `project_created` | `mode` (`existing` or `new`) | The project wizard registered or created a project. |
-| `issue_merged` | `merge_kind` (`pipeline`) | The dashboard merge action completed. |
-| `force_merge_triggered` | `forge` (`github` or `gitlab`) | An operator invoked force merge. |
-| `issue_closed_out` | `variant` (`card` or `inspector`) | A dashboard close-out action completed. |
-| `bulk_close_out_initiated` | `issue_count` (count bucket) | The operator started bulk close-out. |
-| `auto_merge_toggled` | `auto_merge` (boolean), `variant` (`segmented` or `badge`) | The operator changed an issue's auto-merge mode. |
-| `conversation_forked` | `fork_intent`, `fork_mode` (`summary`, `handoff`, or `plain`), `fast_summary` (boolean), `launch_harness` (harness enum) | A conversation fork was launched. |
-| `plan_approved` | `subject_kind` (`agent` or `conversation`) | An operator approved a plan decision. |
-| `plan_changes_requested` | `subject_kind` (`agent` or `conversation`) | An operator requested plan changes. |
-| `agent_question_answered` | `subject_kind` (`agent` or `conversation`), `answer_type` (`custom` or `selection`), `question_count` (count bucket) | An operator answered an agent question. |
-| `server_boot` | `project_count`, `active_agent_count` (count buckets) | A dashboard server reached the listening state. |
-| `cli_command_run` | `verb` (allowlisted CLI verb), `ok` (boolean), `duration_ms` (duration bucket) | A CLI command completed. |
-| `pipeline_stage_changed` | `stage` (`work_done`, `review_passed`, `verification_passed`, `merged`, or `closed_out`), `harness` (harness enum), `model` (model-family enum) | An issue crossed a pipeline funnel stage. |
+| `dashboard_tab_viewed` | `tab=dashboard_tab` | A top-level dashboard tab became active. |
+| `agent_spawned` | `spawn_mode=agent_spawn_mode; has_message=boolean` | An operator started an agent from the dashboard. |
+| `project_created` | `mode=project_mode` | The project wizard registered or created a project. |
+| `issue_merged` | `merge_kind=merge_kind` | The dashboard merge action completed. |
+| `force_merge_triggered` | `forge=forge` | An operator invoked force merge. |
+| `issue_closed_out` | `variant=close_out_variant` | A dashboard close-out action completed. |
+| `bulk_close_out_initiated` | `issue_count=count_bucket` | The operator started bulk close-out. |
+| `auto_merge_toggled` | `auto_merge=boolean; variant=auto_merge_variant` | The operator changed an issue's auto-merge mode. |
+| `conversation_forked` | `fork_intent=fork_kind; fork_mode=fork_kind; fast_summary=boolean; launch_harness=harness` | A conversation fork was launched. |
+| `plan_approved` | `subject_kind=decision_subject` | An operator approved a plan decision. |
+| `plan_changes_requested` | `subject_kind=decision_subject` | An operator requested plan changes. |
+| `agent_question_answered` | `subject_kind=decision_subject; answer_type=answer_type; question_count=count_bucket` | An operator answered an agent question. |
+| `server_boot` | `project_count=count_bucket; active_agent_count=count_bucket` | A dashboard server reached the listening state. |
+| `cli_command_run` | `verb=cli_verb; ok=boolean; duration_ms=duration_bucket` | A CLI command completed. |
+| `pipeline_stage_changed` | `stage=pipeline_stage; harness=harness; model=model_family` | An issue crossed a pipeline funnel stage. |
 
-Count buckets are `0`, `1-2`, `3-5`, `6-10`, and `11+`. Duration buckets are
-`under_100ms`, `100ms-999ms`, `1s-9s`, and `10s+`; raw counts and timings are
-not sent.
+| Domain | Allowed values |
+| --- | --- |
+| `agent_spawn_mode` | `spawn-and-send`, `spawn-work-and-send` |
+| `answer_type` | `custom`, `selection` |
+| `auto_merge_variant` | `segmented`, `badge` |
+| `boolean` | `false`, `true` |
+| `cli_verb` | `abort`, `approve`, `backlog`, `backup`, `clean`, `context`, `destroy`, `dev`, `diff`, `doctor`, `done`, `down`, `edit`, `finalize`, `fork`, `handoff`, `health`, `init`, `issues`, `kill`, `list`, `migrate`, `mode`, `open`, `pause`, `pending`, `plan`, `project`, `projects`, `recover`, `reload`, `reopen`, `request`, `reset`, `restart`, `restore`, `resume`, `review`, `scope`, `serve`, `show`, `skills`, `spawn-reviewer`, `staffing`, `start`, `status`, `strike`, `sync`, `sync-main`, `tell`, `unarchive-conversation`, `unpause`, `untroubled`, `up`, `update`, `validate`, `wipe`, `write-sequence`, `other` |
+| `close_out_variant` | `card`, `inspector` |
+| `count_bucket` | `0`, `1-2`, `3-5`, `6-10`, `11+` |
+| `dashboard_tab` | `home`, `pipeline`, `kanban`, `command-deck`, `agents`, `flywheel`, `orders`, `backlog`, `resources`, `knowledge`, `skills`, `context`, `health`, `activity`, `metrics`, `costs`, `autopreso`, `settings`, `god-view`, `deacon`, `sessions`, `awaiting-merge` |
+| `decision_subject` | `agent`, `conversation` |
+| `duration_bucket` | `under_100ms`, `100ms-999ms`, `1s-9s`, `10s+` |
+| `forge` | `github`, `gitlab` |
+| `fork_kind` | `summary`, `handoff`, `plain` |
+| `harness` | `claude-code`, `ohmypi`, `codex`, `acp` |
+| `merge_kind` | `pipeline` |
+| `model_family` | `claude`, `gpt`, `gemini`, `kimi`, `minimax`, `glm`, `mimo`, `other` |
+| `pipeline_stage` | `work_done`, `review_passed`, `verification_passed`, `merged`, `closed_out` |
+| `project_mode` | `existing`, `new` |
+
+Raw counts and timings are never sent.
 
 Node events also receive the anonymous install ID and the centrally stamped
 `$process_person_profile: false`, platform, architecture, Overdeck version, and
@@ -72,10 +93,11 @@ person profiles.
 
 ## Error tracking and source maps
 
-The frontend SDK captures browser exceptions, and the server SDK enables Node
-exception autocapture. Frontend production builds generate hidden source maps:
-the JavaScript bundles contain no `sourceMappingURL` comments. The release
-workflow injects and uploads the exact CI-built bundle when
+Browser and Node exceptions pass through Overdeck's telemetry doors, which replace
+raw messages and stack frames with a fixed categorical error before capture. SDK
+automatic exception capture is disabled. Frontend production builds generate hidden
+source maps: the JavaScript bundles contain no `sourceMappingURL` comments. The
+release workflow injects and uploads the exact CI-built bundle when
 `POSTHOG_CLI_API_KEY` is available, then removes the map files before npm
 publishing. A missing key prints a warning and does not block the release.
 

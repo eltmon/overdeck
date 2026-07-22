@@ -1,41 +1,101 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { TELEMETRY_EVENT_NAMES } from '@overdeck/contracts';
+import {
+  TELEMETRY_EVENT_CATALOG,
+  TELEMETRY_EVENT_NAMES,
+  TELEMETRY_PROPERTY_DOMAINS,
+} from '@overdeck/contracts';
 
 const repoRoot = join(import.meta.dirname, '..', '..');
 const telemetryDocPath = join(repoRoot, 'docs', 'TELEMETRY.md');
 
-function documentedEvents(markdown: string): string[] {
-  return [...markdown.matchAll(/^\| `([a-z_]+)` \|/gm)]
-    .map((match) => match[1]!)
-    .sort();
+type Catalog = Record<string, Record<string, string>>;
+type Domains = Record<string, string[]>;
+
+function documentedCatalog(markdown: string): Catalog {
+  const catalog: Catalog = {};
+  for (const match of markdown.matchAll(/^\| `([a-z_]+)` \| `([^`]*=[^`]*)` \|/gm)) {
+    const properties = Object.fromEntries(
+      match[2]!.split('; ').map((entry) => entry.split('=', 2) as [string, string]),
+    );
+    catalog[match[1]!] = properties;
+  }
+  return catalog;
 }
 
-function eventDrift(markdown: string): { missing: string[]; extra: string[] } {
-  const contract = new Set<string>(TELEMETRY_EVENT_NAMES);
-  const documented = new Set(documentedEvents(markdown));
+function documentedDomains(markdown: string): Domains {
+  const domains: Domains = {};
+  for (const match of markdown.matchAll(/^\| `([a-z_]+)` \| ((?:`[^`]+`(?:, )?)+) \|$/gm)) {
+    domains[match[1]!] = [...match[2]!.matchAll(/`([^`]+)`/g)].map((value) => value[1]!);
+  }
+  return domains;
+}
+
+function runtimeCatalog(): Catalog {
+  return Object.fromEntries(
+    Object.entries(TELEMETRY_EVENT_CATALOG).map(([event, properties]) => [
+      event,
+      { ...properties },
+    ]),
+  );
+}
+
+function runtimeDomains(): Domains {
+  return Object.fromEntries(
+    Object.entries(TELEMETRY_PROPERTY_DOMAINS).map(([domain, values]) => [
+      domain,
+      values.map(String),
+    ]),
+  );
+}
+
+function catalogDrift(markdown: string): {
+  events: Catalog;
+  domains: Domains;
+} {
   return {
-    missing: [...contract].filter((event) => !documented.has(event)).sort(),
-    extra: [...documented].filter((event) => !contract.has(event)).sort(),
+    events: documentedCatalog(markdown),
+    domains: documentedDomains(markdown),
   };
 }
 
 describe('telemetry documentation', () => {
   const markdown = readFileSync(telemetryDocPath, 'utf8');
 
-  it('keeps the documented event table in exact sync with contracts', () => {
-    expect(eventDrift(markdown)).toEqual({ missing: [], extra: [] });
-    expect(documentedEvents(markdown)).toHaveLength(TELEMETRY_EVENT_NAMES.length);
+  it('keeps every event, property, and allowed value domain in exact contract sync', () => {
+    expect(catalogDrift(markdown)).toEqual({
+      events: runtimeCatalog(),
+      domains: runtimeDomains(),
+    });
+    expect(Object.keys(documentedCatalog(markdown))).toHaveLength(TELEMETRY_EVENT_NAMES.length);
   });
 
   it('detects a contract event removed from the documentation', () => {
     const withoutServerBoot = markdown.replace(/^\| `server_boot` \|.*\n/m, '');
 
-    expect(eventDrift(withoutServerBoot)).toEqual({
-      missing: ['server_boot'],
-      extra: [],
-    });
+    expect(documentedCatalog(withoutServerBoot)).not.toEqual(runtimeCatalog());
+    expect(documentedCatalog(withoutServerBoot)).not.toHaveProperty('server_boot');
+  });
+
+  it('detects property drift while the event name remains unchanged', () => {
+    const changedProperty = markdown.replace(
+      '`mode=project_mode` | The project wizard',
+      '`source=project_mode` | The project wizard',
+    );
+
+    expect(documentedCatalog(changedProperty)).toHaveProperty('project_created');
+    expect(documentedCatalog(changedProperty)).not.toEqual(runtimeCatalog());
+  });
+
+  it('detects allowed-value drift while properties and events remain unchanged', () => {
+    const changedDomain = markdown.replace(
+      '| `project_mode` | `existing`, `new` |',
+      '| `project_mode` | `existing`, `new`, `imported` |',
+    );
+
+    expect(documentedCatalog(changedDomain)).toEqual(runtimeCatalog());
+    expect(documentedDomains(changedDomain)).not.toEqual(runtimeDomains());
   });
 
   it('registers the telemetry and agent-reference pages in Mintlify navigation', () => {
