@@ -174,7 +174,7 @@
     "recordedAt": "2026-07-22T21:35:20.476Z"
   },
   "created": "2026-07-17T12:34:27.875Z",
-  "updated": "2026-07-22T21:36:02.013Z",
+  "updated": "2026-07-22T21:36:07.072Z",
   "pipeline": {
     "issueId": "PAN-2838",
     "reviewStatus": "pending",
@@ -187,7 +187,7 @@
     "updatedAt": "2026-07-22T21:36:01.975Z",
     "inspectNotes": "Verbatim extraction: ProjectSettingsSection + ProjectDisclosure moved byte-for-byte into ProjectSettingsDisclosure.tsx, new wrapper reproduces identical JSX (title/summary/badges/children) at the call site, fetch endpoints unchanged, old definitions fully removed from ProjectOverview.tsx.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3006",
-    "reviewRequestedAt": "2026-07-22T21:35:23.853Z",
+    "reviewRequestedAt": "2026-07-22T21:36:06.484Z",
     "reviewSpawnedAt": "2026-07-22T21:35:25.167Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
@@ -211,7 +211,8 @@
         "src/dashboard/frontend/src/components/Stage/ProjectHome.tsx"
       ],
       "recordedAt": "2026-07-22T21:35:20.476Z"
-    }
+    },
+    "panDoneRecoveredAt": "2026-07-22T21:36:06.484Z"
   },
   "closeOut": {
     "usage": {
