@@ -158,21 +158,28 @@ has not yet been notified:
   event with outcome `delivering` and the owning `lifecycleId` is appended
   first, then the message goes out, then a completion record (`delivered`,
   `queued`, or `failed`) is appended. The `(lifecycleId, agentId)` claim is
-  the deterministic delivery key that makes the wake **crash-idempotent**: a
-  crash after the claim — including after a successful send whose completion
-  record never commits — is visible to boot recovery, so the delivery is
-  never replayed. This is at-most-once by design; the residual lost-wake
-  window (crash between claim and send) self-heals when the still-blocked
-  agent's next failed Linear call opens a fresh lifecycle. If the claim
-  itself cannot be recorded, the delivery is skipped for that pass rather
-  than risk a replay.
+  the deterministic delivery key an interrupted attempt resumes from. A claim
+  is **not terminal** — the agent stays in the wake set until a completion
+  lands — so a crash after the claim but before the send still produces
+  exactly one eventual delivery.
+- **Outbox reconciliation.** Every non-throwing path through
+  `messageAgentWithOutcome` backs the message up to the agent's durable mail
+  queue. When recovery (boot or a later pass) finds a claim without a
+  completion, it checks that outbox via `agentHasMailContentSince()`: a mail
+  file containing the wake copy at or after the claim timestamp proves the
+  acknowledged send durably landed, so the ledger is completed **without
+  re-sending** — a crash after an acknowledged send never produces a second
+  delivery. Mail absent means the send never durably happened, so the wake is
+  driven then. If the claim itself cannot be recorded, the delivery is
+  skipped for that pass rather than risk an unreconciled replay.
 - **Drain-until-stable.** The wake pass loops: after waking one completed
   lifecycle it re-reads the fold, so a lifecycle that completed while
   deliveries were in flight gets its own wake round inside the same coalesced
   run instead of being swallowed by it. A pass that cannot stabilize after 10
-  rounds schedules its own follow-up run (healthy triggers that arrived
-  mid-run received the same coalesced promise, so no external retry is
-  guaranteed).
+  rounds schedules its own follow-up run with bounded exponential backoff
+  (1s doubling to 60s; healthy triggers that arrived mid-run received the
+  same coalesced promise, so no external retry is guaranteed, and a
+  persistent EventStore failure cannot become a hot retry loop).
 - **Boot recovery:** the Cloister service runs the wake pass on startup
   (`src/lib/cloister/service.ts`) and on every `linear_mcp_auth.healthy`
   domain event (`src/lib/cloister/service-reactive.ts`), so an agent that was

@@ -297,6 +297,30 @@ describe('Linear MCP auth intervention fold', () => {
     });
   });
 
+  it('keeps a claimed-but-uncompleted agent in the wake set', async () => {
+    // A 'delivering' claim is not terminal: recovery must resume it (against
+    // the mail outbox), not treat the agent as handled.
+    useEvents([
+      requiredEvent(1, 'agent-min-852', 'MIN-852'),
+      healthyEvent(2),
+      event(3, 'linear_mcp_auth.notified', '2026-07-21T12:05:01.000Z', {
+        agentId: 'agent-min-852',
+        issueId: 'MIN-852',
+        outcome: 'delivering',
+        lifecycleId: 'seq-1',
+      }),
+    ]);
+
+    await expect(computeLinearMcpAuthWakeSet()).resolves.toEqual({
+      lifecycleId: 'seq-1',
+      agents: [expect.objectContaining({
+        agentId: 'agent-min-852',
+        claimedAt: '2026-07-21T12:05:01.000Z',
+        notifiedAt: null,
+      })],
+    });
+  });
+
   it('applies legacy notifications without a lifecycle id to the current lifecycle', async () => {
     useEvents([
       requiredEvent(1, 'agent-min-852', 'MIN-852'),
