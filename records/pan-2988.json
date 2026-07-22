@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-22T21:25:31.822Z",
-  "updated": "2026-07-22T21:47:30.798Z",
+  "updated": "2026-07-22T21:52:01.120Z",
   "pipeline": {
     "issueId": "PAN-2988",
     "reviewStatus": "pending",
@@ -43,18 +43,34 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "durable-sync-emit": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-2988",
         "agentId": "agent-pan-2988",
         "pid": 2642452,
         "host": "eltmon-z790",
-        "claimedAt": "2026-07-22T21:47:30.798Z"
+        "claimedAt": "2026-07-22T21:47:30.798Z",
+        "itemId": "durable-sync-emit",
+        "outcome": "completed",
+        "reason": "Added synchronous unenriched review.status_changed emission, bounded best-effort enrichment with stale/no-sugar guards, rewired all three emit sites, and added fake-timer coverage.",
+        "releasedAt": "2026-07-22T21:52:01.120Z"
+      }
+    ],
+    "statusReasons": {
+      "durable-sync-emit": {
+        "reason": "Added synchronous unenriched review.status_changed emission, bounded best-effort enrichment with stale/no-sugar guards, rewired all three emit sites, and added fake-timer coverage.",
+        "updatedAt": "2026-07-22T21:52:01.120Z"
       }
     }
   },
   "statusOverrides": {
-    "durable-sync-emit": "running"
+    "durable-sync-emit": "completed",
+    "durable-sync-emit.durable-sync-emit.ac1": "completed",
+    "durable-sync-emit.durable-sync-emit.ac2": "completed",
+    "durable-sync-emit.durable-sync-emit.ac3": "completed",
+    "durable-sync-emit.durable-sync-emit.ac4": "completed",
+    "durable-sync-emit.durable-sync-emit.ac5": "completed"
   }
 }
