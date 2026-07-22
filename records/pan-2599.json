@@ -162,23 +162,23 @@
     "recordedAt": "2026-07-22T23:16:44.964Z"
   },
   "created": "2026-07-16T05:02:53.170Z",
-  "updated": "2026-07-22T23:16:52.924Z",
+  "updated": "2026-07-22T23:16:57.157Z",
   "pipeline": {
     "issueId": "PAN-2599",
-    "reviewStatus": "pending",
+    "reviewStatus": "failed",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-22T23:16:51.255Z",
+    "updatedAt": "2026-07-22T23:16:56.101Z",
     "reviewNotes": "Verification failed at test",
     "verificationNotes": "Verification FAILED at test (453105ms):\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-2599\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-2599/src/dashboard/frontend\n\n ❯ src/components/KanbanBoard.test.tsx (91 tests | 1 failed) 2000ms\n     × routes paused-agent Unpause through the primary-strip registry overflow 1132ms\n\n Test Files  1 failed | 261 passed (262)\n      Tests  1 failed | 2380 passed (2381)\n   Start at  19:11:19\n   Duration  19.56s (transform 33.73s, setup 54.90s, import 128.27s, tests 56.16s, environment 120.22s)\n\n[prep] state-reconcile\n[prep] completed: state-reconcile (0s elapsed)\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Workspace already up to date with main\n[prep] completed: sync-main (0s elapsed)\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-A1WWE5/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] completed: tracker-context (0s elapsed)\n[prep] Spawning agent...\n[prep] spawn\n[prep] completed: spawn (0s elapsed)\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Workspace already up to date with main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Workspace already up to date with main\n[prep] Workspace already up to date with main\n[prep] Workspace already up to date with main\n[prep] Workspace a\n…(296 chars elided)…\n workspace: /tmp/pan-auto-resume-gating-FLaiVt/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Found workspace: /tmp/pan-auto-resume-gating-FLaiVt/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace: /tmp/pan-auto-resume-gating-FLaiVt/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace: /tmp/pan-auto-resume-gating-FLaiVt/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace: /tmp/pan-auto-resume-gating-FLaiVt/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent \n...(truncated)",
     "inspectNotes": "Both ACs verified in diff: getClient() gates on telemetryBlockedForProcess()+resolveTelemetryEnabled() before constructing PostHog, so disabled capture()+shutdown() never invoke the constructor (AC1); shutdown() races client.shutdown() against a 2s setTimeout with finally-clearTimeout, and service.test.ts's hung-flush test advances fake timers to exactly 2000ms to confirm the bound (AC2).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3009",
     "reviewRequestedAt": "2026-07-22T23:16:45.922Z",
-    "reviewSpawnedAt": "2026-07-22T23:15:26.713Z",
+    "reviewSpawnedAt": "2026-07-22T23:16:52.276Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         ".github/workflows/release.yml",
@@ -395,7 +395,7 @@
       },
       "costAtCloseOut": {
         "usd": 208.037896,
-        "pricingAsOf": "2026-07-22T23:16:51.301Z"
+        "pricingAsOf": "2026-07-22T23:16:56.141Z"
       }
     },
     "merges": [
