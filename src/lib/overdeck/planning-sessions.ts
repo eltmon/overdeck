@@ -20,7 +20,9 @@ import { appendContinueSessionEntryForIssue } from '../xbrief/lifecycle-io.js';
 import { isPlanningComplete, findPlan } from '../xbrief/io.js';
 import { extractPrefixSync } from '../issue-id.js';
 import { spawnPlanningSession, type PlanningIssue } from '../planning/spawn-planning-session.js';
-import { findProjectByTeamSync, resolveProjectFromIssueSync } from '../projects.js';
+import { findProjectByTeamSync, getProjectSync, resolveProjectFromIssueSync } from '../projects.js';
+import { updateIssueRecord } from '../pan-dir/record-update.js';
+import { requireModelOverrideSync } from '../model-validation.js';
 import { resolveGitHubIssueSync, resolveTrackerTypeSync } from '../tracker-utils.js';
 import { killSession, listSessionNames, sessionExists } from '../tmux.js';
 import { canUseHarnessSync } from '../harness-policy.js';
@@ -147,6 +149,33 @@ export function startPlanningForIssue(options: {
     void skipWorkspace;
     void startDocker;
     const requestedHarness = harness === 'ohmypi' || harness === 'claude-code' || harness === 'codex' || harness === 'acp' ? harness : 'claude-code';
+
+    // Role-scoped model selection (PAN-2997 flow): `workModel` targets the WORK
+    // agent only. It persists to the issue record — the staffing resolver
+    // ('issue-override' tier) picks it up for the post-planning auto-spawn and
+    // every later work spawn — while `model` keeps targeting the planning
+    // agent. A start that names a model for the work agent therefore leaves
+    // the planning default (the operator's Fable) untouched.
+    const workModelRaw = (body as any).workModel;
+    if (typeof workModelRaw === 'string' && workModelRaw.trim()) {
+      const staffingProject = (() => {
+        const resolved = resolveProjectFromIssueSync(id);
+        return resolved ? getProjectSync(resolved.projectKey) : null;
+      })();
+      if (!staffingProject) {
+        return jsonResponse({ error: `Issue project not found for ${id}` }, { status: 404 });
+      }
+      let normalizedWorkModel: string;
+      try {
+        normalizedWorkModel = requireModelOverrideSync(workModelRaw.trim());
+      } catch (err) {
+        return jsonResponse({ error: err instanceof Error ? err.message : String(err) }, { status: 400 });
+      }
+      yield* Effect.promise(() =>
+        updateIssueRecord(staffingProject, id.toUpperCase(), (record) => { record.workModel = normalizedWorkModel; }),
+      );
+      console.log(`[start-planning] ${id} work agent model recorded: ${normalizedWorkModel} (planning agent uses the configured default)`);
+    }
 
     console.log(`[start-planning] START for ${id}, workspaceLocation=${workspaceLocation}, shadow=${shadowMode}`);
 

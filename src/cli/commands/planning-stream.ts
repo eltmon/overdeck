@@ -69,6 +69,7 @@ export function buildStartPlanningBody(input: {
   autoStart: boolean;
   probe?: boolean;
   model?: string;
+  workModel?: string;
   harness?: string;
   effort?: string;
   workspaceLocation?: 'remote' | 'local';
@@ -78,6 +79,7 @@ export function buildStartPlanningBody(input: {
     autoStart: input.autoStart,
     probe: input.probe === true,
     model: input.model || undefined,
+    workModel: input.workModel || undefined,
     harness: input.harness || undefined,
     effort: input.effort || undefined,
     workspaceLocation: input.workspaceLocation ?? 'local',

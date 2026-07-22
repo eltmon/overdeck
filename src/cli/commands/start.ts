@@ -868,6 +868,13 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
         }
 
         spinner.text = `Starting ${resolvedPlanningMode} planning session for ${id}...`;
+        if (options.model) {
+          // --model is the WORK model (already persisted to the issue record by
+          // applyStartPolicyOptions above) — the planning agent keeps the
+          // configured planning default. Say so, because the pre-fix behavior
+          // silently handed the model to planning instead.
+          spinner.info(`Work agent model for ${id}: ${options.model} (planning uses the configured default)`);
+        }
         let sessionName = '';
         try {
           const response = await fetch(
@@ -879,7 +886,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
                 auto: resolvedPlanningMode === 'auto',
                 autoStart: true,
                 probe: false,
-                model: options.model,
+                workModel: options.model,
                 harness: options.harness,
                 effort: options.effort,
                 workspaceLocation: effectiveRemote ? 'remote' : 'local',
