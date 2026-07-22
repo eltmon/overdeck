@@ -62,5 +62,6 @@ export const SETTINGS_NAV_ITEMS: NavItem[] = [
   { id: 'diff', label: 'Diff', icon: SplitSquareVertical },
   { id: 'desktop', label: 'Desktop App', icon: Monitor },
   { id: 'maintenance', label: 'Maintenance', icon: Wrench },
+  { id: 'telemetry', label: 'Telemetry', icon: BarChart3 },
   { id: 'experimental', label: 'Experimental', icon: Beaker },
 ];
