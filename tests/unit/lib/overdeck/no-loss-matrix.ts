@@ -137,6 +137,11 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   // ── commands.ts ───────────────────────────────────────────────────────────
   { surface: 'GET /api/commands',                                      kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Composer command catalog from generated module state; no canonical state store' },
 
+  // ── linear-mcp-auth.ts (PAN-2997) ─────────────────────────────────────────
+  { surface: 'GET /api/linear-mcp-auth',                  kind: 'http', disposition: 'READ',        door: 'linear-mcp-auth event fold (resolveLinearMcpAuthIntervention)' },
+  { surface: 'POST /api/linear-mcp-auth/callback',        kind: 'http', disposition: 'WRITE',       door: 'linear-mcp-auth events + messageAgent delivery door' },
+  { surface: 'POST /api/linear-mcp-auth/complete',        kind: 'http', disposition: 'WRITE',       door: 'linear-mcp-auth events (appendLinearMcpAuthHealthyEvent)' },
+
   // ── command-deck.ts ───────────────────────────────────────────────────────
   { surface: 'GET /api/command-deck/activity/:issueId',                  kind: 'http', disposition: 'AGGREGATE',   door: 'Issues + Agents + events' },
   { surface: 'GET /api/command-deck/planning/:issueId',                  kind: 'http', disposition: 'AGGREGATE',   door: 'Issues + Agents planning detail' },
