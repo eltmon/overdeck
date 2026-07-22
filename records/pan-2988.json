@@ -138,21 +138,22 @@
     "recordedAt": "2026-07-22T23:43:55.929Z"
   },
   "created": "2026-07-22T21:25:31.822Z",
-  "updated": "2026-07-22T23:48:27.736Z",
+  "updated": "2026-07-22T23:49:19.296Z",
   "pipeline": {
     "issueId": "PAN-2988",
     "reviewStatus": "blocked",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-22T23:45:50.199Z",
-    "updatedAt": "2026-07-22T23:48:26.861Z",
+    "updatedAt": "2026-07-22T23:49:19.283Z",
     "reviewNotes": "Reconcile sweep compares only updatedAt, so a lost newer event sharing the prior transition's millisecond timestamp remains stale forever",
     "inspectNotes": "All 3 call sites (main.ts status_changed + merge-ready, deacon-main.ts merge-ready) now call emitReviewStatusChanged synchronously before any async enrichment; helper appends unenriched status first, then races enrichment against a 5s Effect.timeout via Effect.catch (verified Effect.catch is the effect@4.0.0-beta.73 name for catchAll, and TimeoutException is a typed/recoverable failure so it's caught correctly), logs a warning naming the issue on timeout/failure with exactly one event appended, and gates the second enriched append on both hasSugar and an unchanged canonical updatedAt. grep confirms enrichReviewStatus is no longer imported/referenced in main.ts or deacon-main.ts.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3010",
+    "lastVerifiedCommit": "56700887fb26b984f069d4e256669dec729f33ac",
     "reviewRequestedAt": "2026-07-22T23:45:50.199Z",
     "reviewSpawnedAt": "2026-07-22T23:48:15.351Z",
     "scopeDrift": {
@@ -225,9 +226,9 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 1509377,
-            "output": 108131,
-            "cacheRead": 25750528,
+            "input": 1902106,
+            "output": 112122,
+            "cacheRead": 26414592,
             "cacheWrite": 0
           }
         },
@@ -241,18 +242,18 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 5014906,
-            "output": 295899,
-            "cacheRead": 148019200,
+            "input": 5412477,
+            "output": 308253,
+            "cacheRead": 151389184,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 6524283,
-          "output": 404030,
-          "cacheRead": 173769728,
+          "input": 7314583,
+          "output": 420375,
+          "cacheRead": 177803776,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -263,8 +264,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 132.42045,
-        "pricingAsOf": "2026-07-22T23:48:26.884Z"
+        "usd": 138.879324,
+        "pricingAsOf": "2026-07-22T23:49:19.289Z"
       }
     },
     "merges": [
