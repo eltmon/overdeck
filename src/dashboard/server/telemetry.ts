@@ -2,7 +2,7 @@ import { Effect } from 'effect';
 import type { ServerBootProperties, TelemetryCountBucket } from '@overdeck/contracts';
 import { listRunningAgents } from '../../lib/agents.js';
 import { listProjectsSync } from '../../lib/projects.js';
-import { AnalyticsService } from '../../lib/telemetry/service.js';
+import { getAnalyticsService } from '../../lib/telemetry/service.js';
 
 interface ServerBootTelemetryDeps {
   analytics: {
@@ -12,7 +12,7 @@ interface ServerBootTelemetryDeps {
   listAgents: () => Promise<ReadonlyArray<{ tmuxActive: boolean }>>;
 }
 
-const serverAnalytics = new AnalyticsService('server');
+const serverAnalytics = getAnalyticsService('server');
 
 const defaultDeps: ServerBootTelemetryDeps = {
   analytics: serverAnalytics,

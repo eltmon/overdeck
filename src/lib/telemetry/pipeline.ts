@@ -5,9 +5,9 @@ import type {
 } from '@overdeck/contracts';
 import { getAgentStateSync, type AgentState } from '../agents/agent-state.js';
 import { normalizeAgentId } from '../agents/identity.js';
-import { AnalyticsService } from './service.js';
+import { getAnalyticsService } from './service.js';
 
-const serverAnalytics = new AnalyticsService('server');
+const serverAnalytics = getAnalyticsService('server');
 const HARNESSES = new Set<Harness>(['claude-code', 'ohmypi', 'codex', 'acp']);
 
 export interface PipelineTelemetryContext {

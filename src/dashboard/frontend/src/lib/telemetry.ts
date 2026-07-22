@@ -44,7 +44,12 @@ export async function initTelemetry(): Promise<void> {
     posthog.init(import.meta.env.VITE_PUBLIC_POSTHOG_KEY as string, {
       api_host: import.meta.env.VITE_PUBLIC_POSTHOG_HOST as string,
       person_profiles: 'identified_only',
-      capture_exceptions: true,
+      autocapture: false,
+      capture_pageview: false,
+      capture_pageleave: false,
+      capture_exceptions: false,
+      disable_session_recording: true,
+      disable_surveys: true,
     });
     if (settings.telemetry?.installId) {
       posthog.register({ install_id: settings.telemetry.installId });
@@ -63,9 +68,19 @@ export function capture<Event extends TelemetryEventName>(
   posthog.capture(event, properties);
 }
 
+export function sanitizeTelemetryException(
+  _error: unknown,
+  context: TelemetryExceptionContext,
+): Error {
+  const sanitized = new Error(`Overdeck ${context.action} operation failed`);
+  sanitized.name = 'OverdeckTelemetryException';
+  sanitized.stack = undefined;
+  return sanitized;
+}
+
 export function captureException(error: unknown, context: TelemetryExceptionContext): void {
   if (!initialized || import.meta.env.MODE === 'test') return;
-  posthog.captureException(error, context);
+  posthog.captureException(sanitizeTelemetryException(error, context), context);
 }
 
 export function bucketCount(value: number): TelemetryCountBucket {

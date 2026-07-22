@@ -4,7 +4,6 @@
  * Provides API-compatible interface for settings management.
  * Converts between YAML config format and frontend API format.
  */
-
 import { readFile, writeFile } from 'fs/promises';
 import { parseDocument } from 'yaml';
 import { Data, Effect } from 'effect';
@@ -38,6 +37,7 @@ import { defaultBackgroundAiFeatures, type BackgroundAiFeature } from './backgro
 import { MODEL_CAPABILITIES, hasModelCapabilitySync, MODEL_DEPRECATIONS, resolveModelIdSync, getModelEffortLevelsSync } from './model-capabilities.js';
 import { resolveTelemetryEnabled } from './telemetry/config.js';
 import { getOrCreateInstallId } from './telemetry/install-id.js';
+import { synchronizeAnalyticsServices } from './telemetry/service.js';
 
 /**
  * Deprecation warning in API format
@@ -964,9 +964,9 @@ async function saveSettingsApiPromise(settings: ApiSettingsConfig): Promise<void
 
   await writeYamlConfigPreservingComments(yamlConfig);
 
-  // Clear the config-yaml cache because mtime-based invalidation can miss rapid
-  // writes (same-millisecond) or coarse filesystem mtime resolution.
+  // Clear the cache because rapid writes or coarse filesystem mtime resolution can miss invalidation.
   clearConfigCache();
+  await synchronizeAnalyticsServices();
 }
 
 async function updateSettingsApiPromise(updates: Partial<ApiSettingsConfig>): Promise<ApiSettingsConfig> {

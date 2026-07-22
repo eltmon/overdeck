@@ -17,7 +17,17 @@ export interface AnalyticsServiceOptions {
   featureFlagOverrides?: Readonly<Record<string, boolean>>;
 }
 
+export type TelemetryExceptionAction =
+  | 'cli_command'
+  | 'pipeline_transition'
+  | 'server_boot';
+
+export interface TelemetryExceptionContext {
+  action: TelemetryExceptionAction;
+}
+
 let cachedOverdeckVersion: string | undefined;
+const sharedAnalyticsServices = new Map<AnalyticsClientType, AnalyticsService>();
 
 function getOverdeckVersion(): string {
   if (cachedOverdeckVersion) return cachedOverdeckVersion;
@@ -67,6 +77,32 @@ export class AnalyticsService {
     }
   }
 
+  captureException(_error: unknown, context: TelemetryExceptionContext): void {
+    const client = this.getClient();
+    if (!client) return;
+
+    const sanitized = new Error(`Overdeck ${context.action} operation failed`);
+    sanitized.name = 'OverdeckTelemetryException';
+    sanitized.stack = undefined;
+
+    try {
+      client.captureException(
+        sanitized,
+        getOrCreateInstallId(),
+        {
+          action: context.action,
+          $process_person_profile: false,
+          platform: process.platform,
+          arch: process.arch,
+          overdeckVersion: getOverdeckVersion(),
+          clientType: this.clientType,
+        },
+      );
+    } catch {
+      // Analytics must never fail the caller.
+    }
+  }
+
   async isFeatureEnabled(flag: string, fallback: boolean): Promise<boolean> {
     const override = this.options.featureFlagOverrides?.[flag];
     if (typeof override === 'boolean') return override;
@@ -111,16 +147,25 @@ export class AnalyticsService {
   }
 
   private getClient(): PostHog | undefined {
+    let enabled = false;
+    try {
+      enabled = !telemetryBlockedForProcess() && resolveTelemetryEnabled();
+    } catch {
+      // A configuration read failure must fail closed.
+    }
+
+    if (!enabled) {
+      void this.shutdown();
+      return undefined;
+    }
     if (this.client) return this.client;
-    if (telemetryBlockedForProcess()) return undefined;
 
     try {
-      if (!resolveTelemetryEnabled()) return undefined;
       this.client = new PostHog(
         process.env.POSTHOG_API_KEY ?? DEFAULT_POSTHOG_API_KEY,
         {
           host: process.env.POSTHOG_HOST ?? DEFAULT_POSTHOG_HOST,
-          enableExceptionAutocapture: this.clientType === 'server',
+          enableExceptionAutocapture: false,
         },
       );
       return this.client;
@@ -128,4 +173,27 @@ export class AnalyticsService {
       return undefined;
     }
   }
+}
+
+export function getAnalyticsService(clientType: AnalyticsClientType): AnalyticsService {
+  const existing = sharedAnalyticsServices.get(clientType);
+  if (existing) return existing;
+
+  const analytics = new AnalyticsService(clientType);
+  sharedAnalyticsServices.set(clientType, analytics);
+  return analytics;
+}
+
+export async function synchronizeAnalyticsServices(): Promise<void> {
+  let enabled = false;
+  try {
+    enabled = resolveTelemetryEnabled();
+  } catch {
+    // A configuration read failure must fail closed.
+  }
+  if (enabled) return;
+
+  await Promise.all(
+    [...sharedAnalyticsServices.values()].map((analytics) => analytics.shutdown()),
+  );
 }
