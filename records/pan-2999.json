@@ -3,15 +3,15 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-07-21T23:35:54.133Z",
-  "updated": "2026-07-22T00:06:40.640Z",
+  "updated": "2026-07-22T00:06:43.134Z",
   "pipeline": {
     "issueId": "PAN-2999",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "mergeStatus": "failed",
+    "mergeStatus": "merging",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-22T00:06:40.624Z",
+    "updatedAt": "2026-07-22T00:06:43.018Z",
     "mergeNotes": "Failed to create PR: Command failed: gh pr create --head strike/pan-2999 --base main --title PAN-2999 --body-file /tmp/pan-pr-body-PAN-2999-1784678261833.md\npull request create failed: GraphQL: A pull request already exists for eltmon:strike/pan-2999. (createPullRequest)\n",
     "strikeReadyHead": "58e7a00bd9703c05f837146978298555c802db73",
     "strikeReadyAt": "2026-07-22T00:06:02.993Z",
@@ -49,7 +49,7 @@
       },
       "costAtCloseOut": {
         "usd": 6.35335,
-        "pricingAsOf": "2026-07-22T00:06:40.632Z"
+        "pricingAsOf": "2026-07-22T00:06:43.064Z"
       }
     },
     "merges": [],
