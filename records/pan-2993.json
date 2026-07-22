@@ -194,7 +194,7 @@
     "recordedAt": "2026-07-22T19:46:31.826Z"
   },
   "created": "2026-07-21T22:47:36.935Z",
-  "updated": "2026-07-22T20:02:29.039Z",
+  "updated": "2026-07-22T20:02:33.580Z",
   "pipeline": {
     "issueId": "PAN-2993",
     "reviewStatus": "blocked",
@@ -204,7 +204,6 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "panDoneRecoveredAt": "2026-07-22T19:52:26.955Z",
     "updatedAt": "2026-07-22T20:02:28.038Z",
     "reviewNotes": "Implicit force-with-lease is not pinned to the observed remote head, so a concurrent fetch can let the push overwrite a newer remote commit.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2998",
