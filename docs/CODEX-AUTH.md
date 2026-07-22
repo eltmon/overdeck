@@ -234,3 +234,4 @@ This means the refresh token was consumed elsewhere. The detection system will r
 - [CONFIGURATION.md](./CONFIGURATION.md) — General provider and API key configuration
 - [TESTING-PROVIDERS.md](./TESTING-PROVIDERS.md) — Provider connectivity testing
 - [MODEL_ROUTING.md](./MODEL_ROUTING.md) — How work types map to providers
+- [LINEAR-MCP-AUTH.md](./LINEAR-MCP-AUTH.md) — The same top-banner intervention for Linear MCP OAuth, plus automatic wake of blocked agents after re-auth
