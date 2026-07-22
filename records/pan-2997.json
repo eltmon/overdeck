@@ -25,8 +25,68 @@
     }
   ],
   "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      "src/lib/agents/messaging.ts",
+      "src/lib/cloister/service.ts",
+      "tests/unit/lib/overdeck/no-loss-matrix.ts"
+    ],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "docs/CODEX-AUTH.md",
+      "docs/LINEAR-MCP-AUTH.md",
+      "packages/contracts/src/events.ts",
+      "roles/plan.md",
+      "roles/work.md",
+      "src/dashboard/frontend/src/App/AppChrome.tsx",
+      "src/dashboard/frontend/src/components/LinearMcpAuthBanner.test.tsx",
+      "src/dashboard/frontend/src/components/LinearMcpAuthBanner.tsx",
+      "src/dashboard/frontend/src/hooks/useLinearMcpAuthStatus.ts",
+      "src/dashboard/server/routes/__tests__/linear-mcp-auth.test.ts",
+      "src/dashboard/server/routes/agents/runtime-events.ts",
+      "src/dashboard/server/routes/linear-mcp-auth.ts",
+      "src/dashboard/server/server.ts",
+      "src/dashboard/server/services/agent-event-utils.ts",
+      "src/lib/__tests__/linear-mcp-auth-wake.test.ts",
+      "src/lib/__tests__/linear-mcp-auth.test.ts",
+      "src/lib/claude-hooks-registration.ts",
+      "src/lib/cloister/service-reactive.ts",
+      "src/lib/linear-mcp-auth.ts",
+      "sync-sources/hooks/linear-mcp-auth-hook*",
+      "tests/contracts/heartbeat-ingestion.test.ts",
+      "tests/scripts/linear-mcp-auth-hook.test.ts"
+    ],
+    "actualChangedFiles": [
+      "docs/CODEX-AUTH.md",
+      "docs/LINEAR-MCP-AUTH.md",
+      "packages/contracts/src/events.ts",
+      "roles/plan.md",
+      "roles/work.md",
+      "src/dashboard/frontend/src/App/AppChrome.tsx",
+      "src/dashboard/frontend/src/components/LinearMcpAuthBanner.test.tsx",
+      "src/dashboard/frontend/src/components/LinearMcpAuthBanner.tsx",
+      "src/dashboard/frontend/src/hooks/useLinearMcpAuthStatus.ts",
+      "src/dashboard/server/routes/__tests__/linear-mcp-auth.test.ts",
+      "src/dashboard/server/routes/agents/runtime-events.ts",
+      "src/dashboard/server/routes/linear-mcp-auth.ts",
+      "src/dashboard/server/server.ts",
+      "src/dashboard/server/services/agent-event-utils.ts",
+      "src/lib/__tests__/linear-mcp-auth-wake.test.ts",
+      "src/lib/__tests__/linear-mcp-auth.test.ts",
+      "src/lib/agents/messaging.ts",
+      "src/lib/claude-hooks-registration.ts",
+      "src/lib/cloister/service-reactive.ts",
+      "src/lib/cloister/service.ts",
+      "src/lib/linear-mcp-auth.ts",
+      "sync-sources/hooks/linear-mcp-auth-hook",
+      "tests/contracts/heartbeat-ingestion.test.ts",
+      "tests/scripts/linear-mcp-auth-hook.test.ts",
+      "tests/unit/lib/overdeck/no-loss-matrix.ts"
+    ],
+    "recordedAt": "2026-07-22T01:19:32.988Z"
+  },
   "created": "2026-07-21T23:09:49.270Z",
-  "updated": "2026-07-22T01:19:35.605Z",
+  "updated": "2026-07-22T01:19:39.989Z",
   "pipeline": {
     "issueId": "PAN-2997",
     "reviewStatus": "pending",
@@ -36,8 +96,9 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-22T01:19:35.605Z",
+    "updatedAt": "2026-07-22T01:19:39.558Z",
     "inspectNotes": "Fold dedupes required events per-agent via Map; latest non-null authUrl/authUrlAgentId wins; expiry computed from authUrlExpiresAt and reactivates on fresh required; healthy event closes to lastCompleted, notified targets open??lastCompleted, duplicate healthy is a no-op leaving wake set empty post-notification. All 4 ACs verified by hand against fake-timer tests.",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3004",
     "reviewRequestedAt": "2026-07-22T01:19:35.605Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -98,35 +159,50 @@
         "tests/unit/lib/overdeck/no-loss-matrix.ts"
       ],
       "recordedAt": "2026-07-22T01:19:32.988Z"
-    },
-    "prUrl": "https://github.com/eltmon/overdeck/pull/3004"
+    }
   },
   "closeOut": {
     "usage": {
       "byStage": {
+        "review.supervisor": {
+          "anthropic/claude-sonnet-5": {
+            "input": 2,
+            "output": 347,
+            "cacheRead": 0,
+            "cacheWrite": 124474
+          }
+        },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 507855,
-            "output": 45182,
-            "cacheRead": 15476224,
+            "input": 918255,
+            "output": 137506,
+            "cacheRead": 69199360,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
+        "anthropic/claude-sonnet-5": {
+          "input": 2,
+          "output": 347,
+          "cacheRead": 0,
+          "cacheWrite": 124474
+        },
         "openai/gpt-5.6-sol": {
-          "input": 507855,
-          "output": 45182,
-          "cacheRead": 15476224,
+          "input": 918255,
+          "output": 137506,
+          "cacheRead": 69199360,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 11.632847,
-        "pricingAsOf": "2026-07-21T23:48:06.455Z"
+        "usd": 43.630794,
+        "pricingAsOf": "2026-07-22T01:19:39.600Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/3004"
+    ],
     "ranOn": "eltmon-z790"
   },
   "workModel": "k3[1m]",
@@ -329,65 +405,5 @@
     "docs-linear-mcp-auth": "completed",
     "docs-linear-mcp-auth.docs-linear-mcp-auth.ac1": "completed",
     "docs-linear-mcp-auth.docs-linear-mcp-auth.ac2": "completed"
-  },
-  "scopeDrift": {
-    "outsideDeclaredScope": [
-      "src/lib/agents/messaging.ts",
-      "src/lib/cloister/service.ts",
-      "tests/unit/lib/overdeck/no-loss-matrix.ts"
-    ],
-    "declaredScopeUntouched": [],
-    "declaredScope": [
-      "docs/CODEX-AUTH.md",
-      "docs/LINEAR-MCP-AUTH.md",
-      "packages/contracts/src/events.ts",
-      "roles/plan.md",
-      "roles/work.md",
-      "src/dashboard/frontend/src/App/AppChrome.tsx",
-      "src/dashboard/frontend/src/components/LinearMcpAuthBanner.test.tsx",
-      "src/dashboard/frontend/src/components/LinearMcpAuthBanner.tsx",
-      "src/dashboard/frontend/src/hooks/useLinearMcpAuthStatus.ts",
-      "src/dashboard/server/routes/__tests__/linear-mcp-auth.test.ts",
-      "src/dashboard/server/routes/agents/runtime-events.ts",
-      "src/dashboard/server/routes/linear-mcp-auth.ts",
-      "src/dashboard/server/server.ts",
-      "src/dashboard/server/services/agent-event-utils.ts",
-      "src/lib/__tests__/linear-mcp-auth-wake.test.ts",
-      "src/lib/__tests__/linear-mcp-auth.test.ts",
-      "src/lib/claude-hooks-registration.ts",
-      "src/lib/cloister/service-reactive.ts",
-      "src/lib/linear-mcp-auth.ts",
-      "sync-sources/hooks/linear-mcp-auth-hook*",
-      "tests/contracts/heartbeat-ingestion.test.ts",
-      "tests/scripts/linear-mcp-auth-hook.test.ts"
-    ],
-    "actualChangedFiles": [
-      "docs/CODEX-AUTH.md",
-      "docs/LINEAR-MCP-AUTH.md",
-      "packages/contracts/src/events.ts",
-      "roles/plan.md",
-      "roles/work.md",
-      "src/dashboard/frontend/src/App/AppChrome.tsx",
-      "src/dashboard/frontend/src/components/LinearMcpAuthBanner.test.tsx",
-      "src/dashboard/frontend/src/components/LinearMcpAuthBanner.tsx",
-      "src/dashboard/frontend/src/hooks/useLinearMcpAuthStatus.ts",
-      "src/dashboard/server/routes/__tests__/linear-mcp-auth.test.ts",
-      "src/dashboard/server/routes/agents/runtime-events.ts",
-      "src/dashboard/server/routes/linear-mcp-auth.ts",
-      "src/dashboard/server/server.ts",
-      "src/dashboard/server/services/agent-event-utils.ts",
-      "src/lib/__tests__/linear-mcp-auth-wake.test.ts",
-      "src/lib/__tests__/linear-mcp-auth.test.ts",
-      "src/lib/agents/messaging.ts",
-      "src/lib/claude-hooks-registration.ts",
-      "src/lib/cloister/service-reactive.ts",
-      "src/lib/cloister/service.ts",
-      "src/lib/linear-mcp-auth.ts",
-      "sync-sources/hooks/linear-mcp-auth-hook",
-      "tests/contracts/heartbeat-ingestion.test.ts",
-      "tests/scripts/linear-mcp-auth-hook.test.ts",
-      "tests/unit/lib/overdeck/no-loss-matrix.ts"
-    ],
-    "recordedAt": "2026-07-22T01:19:32.988Z"
   }
 }
