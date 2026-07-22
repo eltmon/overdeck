@@ -113,19 +113,20 @@
     "recordedAt": "2026-07-22T23:18:12.981Z"
   },
   "created": "2026-07-22T21:25:31.822Z",
-  "updated": "2026-07-22T23:28:17.465Z",
+  "updated": "2026-07-22T23:30:55.906Z",
   "pipeline": {
     "issueId": "PAN-2988",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "failed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-22T23:19:32.542Z",
-    "updatedAt": "2026-07-22T23:28:16.648Z",
+    "updatedAt": "2026-07-22T23:30:55.835Z",
     "reviewNotes": "Enrichment stale guard uses non-unique updatedAt, allowing an older async patch to overwrite a newer status and evade reconciliation",
+    "verificationNotes": "Verification FAILED at test (270877ms):\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-2988/src/dashboard/frontend\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-2988\n\n ❯ src/lib/__tests__/issueActions.c-actions.test.ts (15 tests | 1 failed) 147ms\n     × snapshots the enabled action set for every representative phase 21ms\n ❯ src/components/drawer/IssueDrawer.test.tsx (29 tests | 1 failed) 1267ms\n     × snapshots enabled drawer footer actions for work-running and ready-to-merge phases 131ms\n ❯ src/components/KanbanBoard.test.tsx (91 tests | 1 failed) 1817ms\n     × routes paused-agent Unpause through the primary-strip registry overflow 1142ms\n\n  Snapshots  2 failed\n Test Files  3 failed | 28 passed (31)\n      Tests  3 failed | 580 passed (583)\n   Start at  19:28:43\n   Duration  6.10s (transform 25.04s, setup 7.92s, import 50.66s, tests 18.41s, environment 15.01s)\n\n[prep] state-reconcile\n[prep] completed: state-reconcile (0s elapsed)\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Workspace already up to date with main\n[prep] completed: sync-main (0s elapsed)\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-aXeHaC/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] completed: tracker-context (0s elapsed)\n[prep] Spawning agent...\n[prep] spawn\n[prep] completed: spawn (0s elapsed)\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Workspace already up to date with main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[\n…(632 chars elided)…\nFound workspace: /tmp/pan-auto-resume-gating-064E1t/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Found workspace: /tmp/pan-auto-resume-gating-064E1t/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace: /tmp/pan-auto-resume-gating-064E1t/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace: /tmp/pan-auto-resume-gating-064E1t/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace: /tmp/pan-auto-resume-gating-064E1t/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building a\n...(truncated)",
     "inspectNotes": "All 3 call sites (main.ts status_changed + merge-ready, deacon-main.ts merge-ready) now call emitReviewStatusChanged synchronously before any async enrichment; helper appends unenriched status first, then races enrichment against a 5s Effect.timeout via Effect.catch (verified Effect.catch is the effect@4.0.0-beta.73 name for catchAll, and TimeoutException is a typed/recoverable failure so it's caught correctly), logs a warning naming the issue on timeout/failure with exactly one event appended, and gates the second enriched append on both hasSugar and an unchanged canonical updatedAt. grep confirms enrichReviewStatus is no longer imported/referenced in main.ts or deacon-main.ts.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3010",
     "reviewRequestedAt": "2026-07-22T23:19:32.542Z",
@@ -193,9 +194,9 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 664529,
-            "output": 56730,
-            "cacheRead": 17392128,
+            "input": 992533,
+            "output": 70344,
+            "cacheRead": 18500096,
             "cacheWrite": 0
           }
         },
@@ -209,18 +210,18 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 4481783,
-            "output": 260618,
-            "cacheRead": 125283840,
+            "input": 4715263,
+            "output": 271142,
+            "cacheRead": 129632768,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 5146312,
-          "output": 317348,
-          "cacheRead": 142675968,
+          "input": 5707796,
+          "output": 341486,
+          "cacheRead": 148132864,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -231,8 +232,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 107.383255,
-        "pricingAsOf": "2026-07-22T23:28:16.670Z"
+        "usd": 113.643263,
+        "pricingAsOf": "2026-07-22T23:30:55.866Z"
       }
     },
     "merges": [
