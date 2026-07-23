@@ -97,9 +97,9 @@ npx posthog-cli sourcemap upload \
 ```
 
 Injection and upload run against the exact dashboard bundle built by the npm
-release job. `--delete-after` prevents source maps from entering the published
-package. If `POSTHOG_CLI_API_KEY` is absent, Overdeck prints a warning and lets
-the release continue without a network call.
+release job. Overdeck removes source maps locally after the command, including
+when `POSTHOG_CLI_API_KEY` is absent, so maps cannot enter the published package.
+A missing key prints a warning and lets the release continue without a network call.
 
 ## Safe agent-use pattern
 

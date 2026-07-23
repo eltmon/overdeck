@@ -1,7 +1,8 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
-import { execFileSync, execSync } from 'child_process';
-import { mkdirSync, readFileSync, writeFileSync } from 'fs';
+import { execFileSync, execSync, spawn } from 'child_process';
+import { mkdirSync, readFileSync, writeFileSync, type Dirent } from 'fs';
+import { readdir, unlink } from 'fs/promises';
 import { dirname, join } from 'path';
 
 type ReleaseChannel = 'stable' | 'canary';
@@ -62,9 +63,9 @@ export function registerReleaseCommands(program: Command): void {
     .command('sourcemaps')
     .description('Upload the built dashboard sourcemaps to PostHog')
     .requiredOption('--version <version>', 'Release version associated with the built dashboard')
-    .action((options: { version: string }) =>
-      uploadReleaseSourcemaps(getRepoRoot(), options.version)
-    );
+    .action(async (options: { version: string }) => {
+      await uploadReleaseSourcemaps(getRepoRoot(), options.version);
+    });
 
   release
     .command('notes [from] [to]')
@@ -122,9 +123,44 @@ type SourcemapCommandRunner = (
   command: string,
   args: string[],
   options: { cwd: string; env: NodeJS.ProcessEnv },
-) => void;
+) => Promise<void>;
 
-export function uploadReleaseSourcemaps(
+function runSourcemapCommand(
+  command: string,
+  args: string[],
+  options: { cwd: string; env: NodeJS.ProcessEnv },
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, args, {
+      cwd: options.cwd,
+      env: options.env,
+      stdio: 'inherit',
+    });
+    child.once('error', reject);
+    child.once('close', (code, signal) => {
+      if (code === 0) resolve();
+      else reject(new Error(`${command} exited with ${signal ? `signal ${signal}` : `code ${code ?? 'unknown'}`}`));
+    });
+  });
+}
+
+async function removeSourcemaps(directory: string): Promise<void> {
+  let entries: Dirent[];
+  try {
+    entries = await readdir(directory, { withFileTypes: true });
+  } catch (error) {
+    if (error instanceof Error && 'code' in error && error.code === 'ENOENT') return;
+    throw error;
+  }
+
+  await Promise.all(entries.map(async (entry) => {
+    const path = join(directory, entry.name);
+    if (entry.isDirectory()) await removeSourcemaps(path);
+    else if (entry.isFile() && entry.name.endsWith('.map')) await unlink(path);
+  }));
+}
+
+export async function uploadReleaseSourcemaps(
   repoRoot: string,
   version: string,
   options: {
@@ -132,39 +168,38 @@ export function uploadReleaseSourcemaps(
     run?: SourcemapCommandRunner;
     warn?: (message: string) => void;
   } = {},
-): void {
+): Promise<void> {
   const env = options.env ?? process.env;
   const warn = options.warn ?? console.warn;
+  const directory = join(repoRoot, 'dist', 'dashboard', 'public');
   if (!env.POSTHOG_CLI_API_KEY) {
     warn('Warning: POSTHOG_CLI_API_KEY is not set; skipping PostHog sourcemap upload.');
+    await removeSourcemaps(directory);
     return;
   }
 
-  const runCommand = options.run ?? ((command, args, commandOptions) => {
-    execFileSync(command, args, {
-      cwd: commandOptions.cwd,
-      env: commandOptions.env,
-      stdio: 'inherit',
-    });
-  });
-  const directory = join(repoRoot, 'dist', 'dashboard', 'public');
+  const runCommand = options.run ?? runSourcemapCommand;
   const releaseArgs = [
     '--directory', directory,
     '--release-name', 'overdeck-dashboard',
     '--release-version', version,
   ];
 
-  runCommand('npx', ['posthog-cli', 'sourcemap', 'inject', ...releaseArgs], {
-    cwd: repoRoot,
-    env,
-  });
-  runCommand('npx', [
-    'posthog-cli',
-    'sourcemap',
-    'upload',
-    ...releaseArgs,
-    '--delete-after',
-  ], { cwd: repoRoot, env });
+  try {
+    await runCommand('npx', ['posthog-cli', 'sourcemap', 'inject', ...releaseArgs], {
+      cwd: repoRoot,
+      env,
+    });
+    await runCommand('npx', [
+      'posthog-cli',
+      'sourcemap',
+      'upload',
+      ...releaseArgs,
+      '--delete-after',
+    ], { cwd: repoRoot, env });
+  } finally {
+    await removeSourcemaps(directory);
+  }
 }
 
 function getRepoRoot(): string {
