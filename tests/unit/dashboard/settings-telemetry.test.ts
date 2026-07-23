@@ -92,6 +92,7 @@ describe('settings telemetry', () => {
   it('returns default enabled state and the read-only install ID', () => {
     expect(loadSettingsApi().telemetry).toEqual({
       enabled: true,
+      effectiveEnabled: true,
       installId: '123e4567-e89b-42d3-a456-426614174000',
     });
   });
@@ -140,10 +141,26 @@ describe('settings telemetry', () => {
     expect(isFeatureEnabledMock).not.toHaveBeenCalled();
   });
 
-  it('reports telemetry disabled when the environment forces opt-out', () => {
+  it('preserves configured telemetry during an unrelated save under env opt-out', async () => {
+    useTelemetryConfig(true);
+    process.env.OVERDECK_TELEMETRY = '0';
+    const settings = loadSettingsApi();
+    settings.tmux = { config_mode: 'inherit-user' };
+
+    await Effect.runPromise(saveSettingsApi(settings));
+
+    const writtenYaml = writeFileMock.mock.calls.at(-1)?.[1];
+    expect(parse(String(writtenYaml)).telemetry).toEqual({ enabled: true });
+  });
+
+  it('reports configured and effective state separately under env opt-out', () => {
     useTelemetryConfig(true);
     process.env.OVERDECK_TELEMETRY = '0';
 
-    expect(loadSettingsApi().telemetry?.enabled).toBe(false);
+    expect(loadSettingsApi().telemetry).toEqual({
+      enabled: true,
+      effectiveEnabled: false,
+      installId: '123e4567-e89b-42d3-a456-426614174000',
+    });
   });
 });

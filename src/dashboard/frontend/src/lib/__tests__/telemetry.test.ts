@@ -30,7 +30,9 @@ describe('frontend telemetry wrapper', () => {
   it('never initializes PostHog when settings disable telemetry', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => ({
       ok: true,
-      json: async () => ({ telemetry: { enabled: false, installId: 'install-id' } }),
+      json: async () => ({
+        telemetry: { enabled: true, effectiveEnabled: false, installId: 'install-id' },
+      }),
     })));
     const { initTelemetry } = await import('../telemetry');
 

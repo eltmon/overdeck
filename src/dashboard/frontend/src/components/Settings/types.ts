@@ -210,6 +210,7 @@ export interface SettingsConfig {
   };
   telemetry?: {
     enabled: boolean;
+    effectiveEnabled?: boolean;
     installId?: string;
   };
   memory?: MemorySettingsConfig;

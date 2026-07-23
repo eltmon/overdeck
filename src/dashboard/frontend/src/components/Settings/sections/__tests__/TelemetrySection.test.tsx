@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { TelemetrySection } from '../TelemetrySection';
 import type { SettingsConfig } from '../../types';
 
-function settings(enabled: boolean): SettingsConfig {
+function settings(enabled: boolean, effectiveEnabled = enabled): SettingsConfig {
   return {
     models: {
       providers: {
@@ -22,6 +22,7 @@ function settings(enabled: boolean): SettingsConfig {
     api_keys: {},
     telemetry: {
       enabled,
+      effectiveEnabled,
       installId: '123e4567-e89b-42d3-a456-426614174000',
     },
   };
@@ -43,8 +44,24 @@ describe('TelemetrySection', () => {
     expect(onSettingsChange).toHaveBeenCalledTimes(1);
     expect(onSettingsChange.mock.calls[0][0].telemetry).toEqual({
       enabled: false,
+      effectiveEnabled: false,
       installId: '123e4567-e89b-42d3-a456-426614174000',
     });
+  });
+
+  it('shows an environment-forced opt-out without changing the configured switch', () => {
+    render(
+      <TelemetrySection
+        formData={settings(true, false)}
+        saveStatus="idle"
+        onSettingsChange={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole('switch', { name: 'Share anonymous usage data' }).getAttribute('aria-checked')).toBe('true');
+    expect(screen.getByTestId('telemetry-status').textContent).toContain('Disabled by OVERDECK_TELEMETRY');
+    expect(screen.getByTestId('telemetry-sent-list').className).toContain('opacity-45');
+    expect(screen.getByText(/enabled: true/)).toBeTruthy();
   });
 
   it('renders disabled state, privacy details, and configuration equivalents', () => {

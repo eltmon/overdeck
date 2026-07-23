@@ -8,6 +8,7 @@ import type {
 interface TelemetrySettingsResponse {
   telemetry?: {
     enabled?: boolean;
+    effectiveEnabled?: boolean;
     installId?: string;
   };
 }
@@ -100,7 +101,7 @@ export async function initTelemetry(): Promise<void> {
     if (!response.ok) return;
 
     const settings = await response.json() as TelemetrySettingsResponse;
-    if (settings.telemetry?.enabled === false) return;
+    if ((settings.telemetry?.effectiveEnabled ?? settings.telemetry?.enabled) === false) return;
 
     posthog.init(import.meta.env.VITE_PUBLIC_POSTHOG_KEY as string, {
       api_host: import.meta.env.VITE_PUBLIC_POSTHOG_HOST as string,

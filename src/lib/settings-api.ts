@@ -31,11 +31,12 @@ import {
 import { ModelId } from './settings.js';
 import type { Role } from './agents.js';
 import { tieredExecutionConfigForSave, validateTieredExecutionSettings, type ApiTieredExecutionConfig } from './settings-api-tiered-execution.js';
+import { validateApiTelemetryConfig, type ApiTelemetryConfig } from './settings-api-telemetry.js';
 import type { RuntimeName } from './runtimes/types.js';
 import { getBuiltInDefaultHarness } from './providers.js';
 import { defaultBackgroundAiFeatures, type BackgroundAiFeature } from './background-ai/registry.js';
 import { MODEL_CAPABILITIES, hasModelCapabilitySync, MODEL_DEPRECATIONS, resolveModelIdSync, getModelEffortLevelsSync } from './model-capabilities.js';
-import { resolveTelemetryEnabled } from './telemetry/config.js';
+import { resolveTelemetryEnabled, telemetryEnvironmentForcesOff } from './telemetry/config.js';
 import { getOrCreateInstallId } from './telemetry/install-id.js';
 import { synchronizeAnalyticsServices } from './telemetry/service.js';
 
@@ -198,10 +199,7 @@ export interface ApiSettingsConfig {
       enabled?: boolean;
     };
   };
-  telemetry?: {
-    enabled: boolean;
-    installId?: string;
-  };
+  telemetry?: ApiTelemetryConfig;
   tts?: ApiTtsConfig;
   /** TTS activity-summarizer model/enabled, surfaced for the Background AI section (PAN-1589). */
   tts_summarizer?: {
@@ -709,7 +707,8 @@ export function loadSettingsApi(): ApiSettingsConfig {
       },
     },
     telemetry: {
-      enabled: resolveTelemetryEnabled(),
+      enabled: config.telemetry?.enabled ?? true,
+      effectiveEnabled: resolveTelemetryEnabled(),
       installId: getOrCreateInstallId(),
     },
     tts: toApiTtsConfig(config.tts),
@@ -1049,6 +1048,7 @@ async function updateSettingsApiPromise(updates: Partial<ApiSettingsConfig>): Pr
     },
     telemetry: {
       enabled: updates.telemetry?.enabled ?? current.telemetry?.enabled ?? true,
+      effectiveEnabled: !telemetryEnvironmentForcesOff() && (updates.telemetry?.enabled ?? current.telemetry?.enabled ?? true),
       installId: current.telemetry?.installId,
     },
     experimental: {
@@ -1203,16 +1203,7 @@ export function validateSettingsApi(settings: ApiSettingsConfig): ValidationResu
     }
   }
 
-  if (settings.telemetry !== undefined) {
-    if (!isRecord(settings.telemetry)) {
-      errors.push('telemetry must be an object');
-    } else {
-      if (typeof settings.telemetry.enabled !== 'boolean') errors.push('telemetry.enabled must be a boolean');
-      if (settings.telemetry.installId !== undefined && typeof settings.telemetry.installId !== 'string') {
-        errors.push('telemetry.installId must be a string');
-      }
-    }
-  }
+  if (settings.telemetry !== undefined) errors.push(...validateApiTelemetryConfig(settings.telemetry));
 
   // Validate experimental flags — every flag must be a boolean if present.
   if (settings.experimental !== undefined) {
