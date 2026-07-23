@@ -79,15 +79,7 @@
       "timestamp": "2026-07-23T00:03:10.967Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-23T00:03:10Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2988\n\nEqual-timestamp comparison mismatches persisted JSON against DB objects with undefined fields, causing a perpetual 60-second event re-emission loop\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2988 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "src/dashboard/frontend/src/components/KanbanBoard.test.tsx",
@@ -153,10 +145,10 @@
     "recordedAt": "2026-07-22T23:43:55.929Z"
   },
   "created": "2026-07-22T21:25:31.822Z",
-  "updated": "2026-07-23T00:12:32.989Z",
+  "updated": "2026-07-23T00:12:34.999Z",
   "pipeline": {
     "issueId": "PAN-2988",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -164,13 +156,13 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-22T23:45:50.199Z",
-    "updatedAt": "2026-07-23T00:12:32.975Z",
+    "updatedAt": "2026-07-23T00:12:34.272Z",
     "reviewNotes": "Agent re-review request (3/25): Fixed review issues",
     "inspectNotes": "All 3 call sites (main.ts status_changed + merge-ready, deacon-main.ts merge-ready) now call emitReviewStatusChanged synchronously before any async enrichment; helper appends unenriched status first, then races enrichment against a 5s Effect.timeout via Effect.catch (verified Effect.catch is the effect@4.0.0-beta.73 name for catchAll, and TimeoutException is a typed/recoverable failure so it's caught correctly), logs a warning naming the issue on timeout/failure with exactly one event appended, and gates the second enriched append on both hasSugar and an unchanged canonical updatedAt. grep confirms enrichReviewStatus is no longer imported/referenced in main.ts or deacon-main.ts.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3010",
     "lastVerifiedCommit": "d1c367f682fc33cdf4c28a14054733e75d6f925c",
     "reviewRequestedAt": "2026-07-22T23:45:50.199Z",
-    "reviewSpawnedAt": "2026-07-22T23:59:10.600Z",
+    "reviewSpawnedAt": "2026-07-23T00:12:34.272Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "src/dashboard/frontend/src/components/KanbanBoard.test.tsx",
@@ -280,7 +272,7 @@
       },
       "costAtCloseOut": {
         "usd": 164.180103,
-        "pricingAsOf": "2026-07-23T00:12:32.985Z"
+        "pricingAsOf": "2026-07-23T00:12:34.287Z"
       }
     },
     "merges": [
