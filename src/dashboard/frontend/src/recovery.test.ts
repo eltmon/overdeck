@@ -173,6 +173,10 @@ describe('RootErrorBoundary recovery policy', () => {
 
     expect(document.getElementById('pan-recovery-overlay')).toBeNull();
     expect(sessionStorage.getItem('pan.recovery.lastCrashReload')).toBeNull();
+    expect(captureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      { action: 'frontend_unhandled_error', trigger: 'root_error_boundary' },
+    );
   });
 
   it('still starts self-recovery for module load errors', () => {

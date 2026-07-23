@@ -1,4 +1,4 @@
-import posthog from 'posthog-js';
+import posthog, { type CaptureResult, type Properties } from 'posthog-js';
 import type {
   TelemetryCountBucket,
   TelemetryEventName,
@@ -17,7 +17,8 @@ export type TelemetryExceptionAction =
   | 'merge'
   | 'force_merge'
   | 'frontend_recovery_reload'
-  | 'frontend_recovery_reload_loop';
+  | 'frontend_recovery_reload_loop'
+  | 'frontend_unhandled_error';
 
 export interface TelemetryExceptionContext {
   action: TelemetryExceptionAction;
@@ -33,6 +34,66 @@ export interface TelemetryExceptionContext {
 
 let initialized = false;
 
+const PRIVATE_BROWSER_PROPERTY_FRAGMENTS = [
+  'campaign',
+  'pathname',
+  'referrer',
+  'referring_domain',
+  'session_entry',
+  'url',
+];
+const CLICK_ID_PROPERTIES = new Set([
+  'dclid',
+  'epik',
+  'fbclid',
+  'gclid',
+  'gclsrc',
+  'igshid',
+  'irclid',
+  'li_fat_id',
+  'mc_cid',
+  'msclkid',
+  'rdt_cid',
+  'ttclid',
+  'twclid',
+]);
+
+function sanitizeBrowserProperties(properties: Properties | undefined): Properties | undefined {
+  if (!properties) return properties;
+  const sanitized = { ...properties };
+  for (const key of Object.keys(sanitized)) {
+    const normalized = key.toLowerCase().replace(/^\$/, '');
+    if (
+      normalized.startsWith('utm_') ||
+      CLICK_ID_PROPERTIES.has(normalized) ||
+      PRIVATE_BROWSER_PROPERTY_FRAGMENTS.some((fragment) => normalized.includes(fragment))
+    ) {
+      delete sanitized[key];
+    }
+  }
+  return sanitized;
+}
+
+export function sanitizePostHogEvent(event: CaptureResult | null): CaptureResult | null {
+  if (!event) return null;
+  const properties = sanitizeBrowserProperties(event.properties) ?? {};
+  if (event.event === '$exception') {
+    for (const key of Object.keys(properties)) {
+      if (key.startsWith('$exception_') && key !== '$exception_level') delete properties[key];
+    }
+    properties.$exception_list = [{
+      type: 'OverdeckTelemetryException',
+      value: 'Overdeck browser operation failed',
+    }];
+  }
+  return {
+    ...event,
+    properties,
+    $set: sanitizeBrowserProperties(event.$set),
+    $set_once: sanitizeBrowserProperties(event.$set_once),
+  };
+}
+
 export async function initTelemetry(): Promise<void> {
   try {
     const response = await fetch('/api/settings');
@@ -47,7 +108,15 @@ export async function initTelemetry(): Promise<void> {
       autocapture: false,
       capture_pageview: false,
       capture_pageleave: false,
-      capture_exceptions: false,
+      capture_exceptions: {
+        capture_unhandled_errors: true,
+        capture_unhandled_rejections: true,
+        capture_console_errors: false,
+      },
+      before_send: sanitizePostHogEvent,
+      get_current_url: () => 'https://overdeck.invalid/',
+      save_campaign_params: false,
+      save_referrer: false,
       disable_session_recording: true,
       disable_surveys: true,
     });

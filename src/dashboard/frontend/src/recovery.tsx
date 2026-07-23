@@ -281,6 +281,10 @@ export class RootErrorBoundary extends React.Component<
   }
 
   componentDidCatch(error: unknown): void {
+    captureException(error, {
+      action: 'frontend_unhandled_error',
+      trigger: 'root_error_boundary',
+    });
     if (isModuleLoadError(error)) {
       const message = errorMessage(error);
       void waitForServerThenReload({
