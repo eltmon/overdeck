@@ -1,3 +1,4 @@
+import { spawn } from 'node:child_process';
 import {
   mkdtempSync,
   readFileSync,
@@ -7,6 +8,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { getOrCreateInstallId } from '../../../../src/lib/telemetry/install-id.js';
 
@@ -14,6 +16,36 @@ const UUID_V4_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}
 const originalOverdeckHome = process.env.OVERDECK_HOME;
 
 let testHome: string;
+
+function readInstallIdFromChild(overdeckHome: string): Promise<string> {
+  const moduleUrl = pathToFileURL(join(
+    import.meta.dirname,
+    '../../../../src/lib/telemetry/install-id.ts',
+  )).href;
+  const script = `
+    import { getOrCreateInstallId } from ${JSON.stringify(moduleUrl)};
+    process.stdout.write(getOrCreateInstallId());
+  `;
+  return new Promise((resolve, reject) => {
+    const child = spawn(process.execPath, [
+      '--import', 'tsx', '--input-type=module', '--eval', script,
+    ], {
+      env: { ...process.env, OVERDECK_HOME: overdeckHome },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let stdout = '';
+    let stderr = '';
+    child.stdout.setEncoding('utf8');
+    child.stderr.setEncoding('utf8');
+    child.stdout.on('data', (chunk: string) => { stdout += chunk; });
+    child.stderr.on('data', (chunk: string) => { stderr += chunk; });
+    child.once('error', reject);
+    child.once('close', (code) => {
+      if (code === 0) resolve(stdout.trim());
+      else reject(new Error(`install-ID child exited ${code}: ${stderr}`));
+    });
+  });
+}
 
 describe('getOrCreateInstallId', () => {
   beforeEach(() => {
@@ -44,6 +76,22 @@ describe('getOrCreateInstallId', () => {
       expect(getOrCreateInstallId()).toBe(repaired);
     },
   );
+
+  it('returns one durable winner during concurrent invalid-file repair', async () => {
+    const installIdPath = join(testHome, 'telemetry-id');
+    writeFileSync(installIdPath, 'partial-id', { mode: 0o644 });
+
+    const [first, second] = await Promise.all([
+      readInstallIdFromChild(testHome),
+      readInstallIdFromChild(testHome),
+    ]);
+    const durable = readFileSync(installIdPath, 'utf8').trim();
+
+    expect(first).toMatch(UUID_V4_PATTERN);
+    expect(second).toBe(first);
+    expect(durable).toBe(first);
+    expect(statSync(installIdPath).mode & 0o777).toBe(0o600);
+  });
 
   it('creates one stable UUIDv4 under OVERDECK_HOME with mode 0600', () => {
     const first = getOrCreateInstallId();

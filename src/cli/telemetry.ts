@@ -61,6 +61,28 @@ export class CliTelemetryLifecycle {
   }
 }
 
+export class CliProcessLifecycle {
+  private finishPromise: Promise<void> | undefined;
+
+  constructor(
+    private readonly telemetry: Pick<CliTelemetryLifecycle, 'finish'>,
+    private readonly drain: () => Promise<void>,
+  ) {}
+
+  finish(ok: boolean): Promise<void> {
+    this.finishPromise ??= this.finishOnce(ok);
+    return this.finishPromise;
+  }
+
+  private async finishOnce(ok: boolean): Promise<void> {
+    try {
+      await this.drain();
+    } finally {
+      await this.telemetry.finish(ok);
+    }
+  }
+}
+
 const cliTelemetry = new CliTelemetryLifecycle();
 registerCliExitFinalizer((code) => cliTelemetry.finish(code === 0));
 
@@ -77,13 +99,13 @@ export async function runCliWithTelemetry(
   run: () => Promise<unknown>,
   drain: () => Promise<void>,
 ): Promise<void> {
+  const lifecycle = new CliProcessLifecycle(cliTelemetry, drain);
+  registerCliExitFinalizer((code) => lifecycle.finish(code === 0));
   try {
     await run();
-    await cliTelemetry.finish(Number(process.exitCode ?? 0) === 0);
+    await lifecycle.finish(Number(process.exitCode ?? 0) === 0);
   } catch (error) {
-    await cliTelemetry.finish(false);
+    await lifecycle.finish(false);
     throw error;
-  } finally {
-    await drain();
   }
 }

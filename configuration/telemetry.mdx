@@ -45,8 +45,9 @@ reads make no PostHog network requests.
 Overdeck creates a random UUIDv4 at `~/.overdeck/telemetry-id`. If you set
 `OVERDECK_HOME`, the file lives at `${OVERDECK_HOME}/telemetry-id`. Its file
 mode is `0600`, and it remains local except when used as the anonymous PostHog
-`distinct_id`. If the file is empty, partial, or not a UUIDv4, Overdeck replaces
-it atomically with a valid ID and restores mode `0600`.
+`distinct_id`. If the file is empty, partial, or not a UUIDv4, Overdeck repairs
+it under an exclusive process lock, re-reads the durable winner, and restores
+mode `0600`.
 
 The ID is generated independently. Overdeck does not read Claude Code, Codex,
 GitHub, Git, or other credential files to identify an installation.

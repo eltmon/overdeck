@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   AnalyticsService,
+  getAnalyticsService,
+  shutdownAnalyticsServices,
   trackAnalyticsTask,
 } from '../../../../src/lib/telemetry/service.js';
 import { CliTelemetryLifecycle } from '../../../../src/cli/telemetry.js';
@@ -30,6 +32,7 @@ vi.mock('../../../../src/lib/telemetry/install-id.js', () => ({
 
 const originalVitest = process.env.VITEST;
 const originalNodeEnv = process.env.NODE_ENV;
+const originalExitCode = process.exitCode;
 
 function allowTelemetryInTestProcess(): void {
   delete process.env.VITEST;
@@ -51,6 +54,7 @@ describe('AnalyticsService', () => {
     else process.env.VITEST = originalVitest;
     if (originalNodeEnv === undefined) delete process.env.NODE_ENV;
     else process.env.NODE_ENV = originalNodeEnv;
+    process.exitCode = originalExitCode;
   });
 
   it('never constructs the client when telemetry is disabled', async () => {
@@ -158,44 +162,65 @@ describe('AnalyticsService', () => {
     expect(JSON.stringify([sanitized, properties])).not.toContain('ghp_secret');
   });
 
-  it('captures and detaches sanitized process exception handlers', async () => {
+  it.each([
+    ['uncaughtException', 'uncaught_exception'],
+    ['unhandledRejection', 'unhandled_rejection'],
+  ] as const)('captures %s, flushes, and exits nonzero', async (event, action) => {
     const onSpy = vi.spyOn(process, 'on');
     const offSpy = vi.spyOn(process, 'off');
-    const analytics = new AnalyticsService('server', { captureProcessExceptions: true });
+    const fatalExit = vi.fn() as unknown as (code: number) => never;
+    const analytics = new AnalyticsService('server', {
+      captureProcessExceptions: true,
+      fatalProcessExit: fatalExit,
+    });
 
     analytics.capture('server_boot', { project_count: '0', active_agent_count: '0' });
-    const uncaught = onSpy.mock.calls.find(([event]) => event === 'uncaughtExceptionMonitor')?.[1] as
+    const handler = onSpy.mock.calls.find(([registered]) => registered === event)?.[1] as
       | ((error: Error) => void)
       | undefined;
-    const rejection = onSpy.mock.calls.find(([event]) => event === 'unhandledRejection')?.[1] as
-      | ((reason: unknown) => void)
-      | undefined;
-    expect(uncaught).toBeTypeOf('function');
-    expect(rejection).toBeTypeOf('function');
+    expect(handler).toBeTypeOf('function');
     captureExceptionMock.mockClear();
+    shutdownMock.mockClear();
 
-    uncaught?.(new Error('PAN-2599 /home/alice/private-repo ghp_secret'));
-    rejection?.(new Error('private branch feature/secret'));
+    handler?.(new Error('PAN-2599 /home/alice/private-repo ghp_secret'));
+    await vi.runAllTimersAsync();
 
-    expect(captureExceptionMock).toHaveBeenCalledTimes(2);
+    expect(captureExceptionMock).toHaveBeenCalledOnce();
     expect(captureExceptionMock.mock.calls[0]?.[0]).toMatchObject({
-      message: 'Overdeck uncaught_exception operation failed',
-      stack: undefined,
-    });
-    expect(captureExceptionMock.mock.calls[1]?.[0]).toMatchObject({
-      message: 'Overdeck unhandled_rejection operation failed',
+      message: `Overdeck ${action} operation failed`,
       stack: undefined,
     });
     expect(JSON.stringify(captureExceptionMock.mock.calls)).not.toContain('PAN-2599');
     expect(JSON.stringify(captureExceptionMock.mock.calls)).not.toContain('/home/alice');
     expect(JSON.stringify(captureExceptionMock.mock.calls)).not.toContain('ghp_secret');
-
-    await analytics.shutdown();
-
-    expect(offSpy).toHaveBeenCalledWith('uncaughtExceptionMonitor', uncaught);
-    expect(offSpy).toHaveBeenCalledWith('unhandledRejection', rejection);
+    expect(shutdownMock).toHaveBeenCalledOnce();
+    expect(fatalExit).toHaveBeenCalledWith(1);
+    expect(process.exitCode).toBe(1);
+    expect(offSpy).toHaveBeenCalledWith('uncaughtException', expect.any(Function));
+    expect(offSpy).toHaveBeenCalledWith('unhandledRejection', expect.any(Function));
     onSpy.mockRestore();
     offSpy.mockRestore();
+  });
+
+  it('bounds fatal exception flushing before nonzero exit', async () => {
+    const onSpy = vi.spyOn(process, 'on');
+    const fatalExit = vi.fn() as unknown as (code: number) => never;
+    shutdownMock.mockReturnValue(new Promise<void>(() => undefined));
+    const analytics = new AnalyticsService('server', {
+      captureProcessExceptions: true,
+      fatalProcessExit: fatalExit,
+    });
+    analytics.capture('server_boot', { project_count: '0', active_agent_count: '0' });
+    const handler = onSpy.mock.calls.find(([event]) => event === 'uncaughtException')?.[1] as
+      | ((error: Error) => void)
+      | undefined;
+
+    handler?.(new Error('private fatal error'));
+    await vi.advanceTimersByTimeAsync(1_999);
+    expect(fatalExit).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(fatalExit).toHaveBeenCalledWith(1);
+    onSpy.mockRestore();
   });
 
   it('stops using an existing client when telemetry becomes disabled', async () => {
@@ -230,6 +255,28 @@ describe('AnalyticsService', () => {
     await analytics.shutdown();
 
     expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('caps pending work plus client shutdown at two seconds total', async () => {
+    shutdownMock.mockReturnValue(new Promise<void>(() => undefined));
+    const analytics = getAnalyticsService('cli');
+    analytics.capture('project_created', { mode: 'existing' });
+    let finishPending: (() => void) | undefined;
+    trackAnalyticsTask(new Promise<void>((resolve) => {
+      finishPending = resolve;
+    }));
+
+    const shutdownPromise = shutdownAnalyticsServices();
+    let settled = false;
+    void shutdownPromise.then(() => { settled = true; });
+
+    await vi.advanceTimersByTimeAsync(1_999);
+    expect(settled).toBe(false);
+    await vi.advanceTimersByTimeAsync(1);
+    await shutdownPromise;
+    expect(settled).toBe(true);
+    finishPending?.();
+    await Promise.resolve();
   });
 
   it('bounds a hung shutdown flush at two seconds', async () => {

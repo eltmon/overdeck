@@ -7,6 +7,7 @@ import {
 } from '../../../src/cli/exit.js';
 import {
   bucketCliDuration,
+  CliProcessLifecycle,
   CliTelemetryLifecycle,
   exitAfterTelemetry,
   resolveTelemetryCliVerb,
@@ -90,6 +91,44 @@ describe('CLI telemetry lifecycle', () => {
     await vi.advanceTimersByTimeAsync(2_000);
     expect(await result).toBe(exitError);
     expect(exit).toHaveBeenCalledWith(7);
+  });
+
+  it('drains journal and state writes before telemetry and native exit', async () => {
+    let finishJournal: (() => void) | undefined;
+    let finishState: (() => void) | undefined;
+    let finishTelemetry: (() => void) | undefined;
+    const journal = new Promise<void>((resolve) => { finishJournal = resolve; });
+    const state = new Promise<void>((resolve) => { finishState = resolve; });
+    const telemetry = new Promise<void>((resolve) => { finishTelemetry = resolve; });
+    const drain = vi.fn(async () => {
+      await journal;
+      await state;
+    });
+    const finish = vi.fn(() => telemetry);
+    const lifecycle = new CliProcessLifecycle({ finish }, drain);
+    registerCliExitFinalizer((code) => lifecycle.finish(code === 0));
+    const exitError = new Error('process exited');
+    const exit = vi.fn((): never => { throw exitError; });
+
+    const result = exitThroughDoor(0, exit).catch((error) => error);
+    expect(drain).toHaveBeenCalledOnce();
+    expect(finish).not.toHaveBeenCalled();
+    expect(exit).not.toHaveBeenCalled();
+
+    finishJournal?.();
+    await Promise.resolve();
+    expect(finish).not.toHaveBeenCalled();
+    expect(exit).not.toHaveBeenCalled();
+
+    finishState?.();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(finish).toHaveBeenCalledWith(true);
+    expect(exit).not.toHaveBeenCalled();
+
+    finishTelemetry?.();
+    expect(await result).toBe(exitError);
+    expect(exit).toHaveBeenCalledWith(0);
   });
 
   it('flushes a child-process callback exit through the explicit async door', async () => {

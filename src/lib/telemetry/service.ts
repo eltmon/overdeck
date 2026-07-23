@@ -15,6 +15,7 @@ export type AnalyticsClientType = 'cli' | 'server';
 
 export interface AnalyticsServiceOptions {
   captureProcessExceptions?: boolean;
+  fatalProcessExit?: (code: number) => never;
   featureFlagOverrides?: Readonly<Record<string, boolean>>;
 }
 
@@ -52,9 +53,10 @@ function telemetryBlockedForProcess(): boolean {
 export class AnalyticsService {
   private client: PostHog | undefined;
   private processExceptionHandlers: {
-    uncaughtException: (error: Error, origin: NodeJS.UncaughtExceptionOrigin) => void;
-    unhandledRejection: (reason: unknown, promise: Promise<unknown>) => void;
+    uncaughtException: (error: Error) => void;
+    unhandledRejection: (reason: unknown) => void;
   } | undefined;
+  private fatalExceptionInFlight = false;
 
   constructor(
     private readonly clientType: AnalyticsClientType,
@@ -137,7 +139,7 @@ export class AnalyticsService {
     }
   }
 
-  async shutdown(): Promise<void> {
+  async shutdown(timeoutMs = SHUTDOWN_TIMEOUT_MS): Promise<void> {
     this.detachProcessExceptionHandlers();
     const client = this.client;
     if (!client) return;
@@ -145,9 +147,11 @@ export class AnalyticsService {
 
     let timeout: ReturnType<typeof setTimeout> | undefined;
     try {
+      const shutdown = Promise.resolve(client.shutdown(Math.max(0, timeoutMs)));
+      if (timeoutMs <= 0) return;
       await Promise.race([
-        Promise.resolve(client.shutdown(SHUTDOWN_TIMEOUT_MS)),
-        new Promise<void>((resolve) => { timeout = setTimeout(resolve, SHUTDOWN_TIMEOUT_MS); }),
+        shutdown,
+        new Promise<void>((resolve) => { timeout = setTimeout(resolve, timeoutMs); }),
       ]);
     } catch {
       // Analytics must never fail shutdown.
@@ -159,20 +163,34 @@ export class AnalyticsService {
   private attachProcessExceptionHandlers(): void {
     if (!this.options.captureProcessExceptions || this.processExceptionHandlers) return;
     const uncaughtException = (error: Error): void => {
-      this.captureException(error, { action: 'uncaught_exception' });
+      this.captureFatalProcessException(error, 'uncaught_exception');
     };
     const unhandledRejection = (reason: unknown): void => {
-      this.captureException(reason, { action: 'unhandled_rejection' });
+      this.captureFatalProcessException(reason, 'unhandled_rejection');
     };
     this.processExceptionHandlers = { uncaughtException, unhandledRejection };
-    process.on('uncaughtExceptionMonitor', uncaughtException);
+    process.on('uncaughtException', uncaughtException);
     process.on('unhandledRejection', unhandledRejection);
+  }
+
+  private captureFatalProcessException(
+    error: unknown,
+    action: Extract<TelemetryExceptionAction, 'uncaught_exception' | 'unhandled_rejection'>,
+  ): void {
+    if (this.fatalExceptionInFlight) return;
+    this.fatalExceptionInFlight = true;
+    process.exitCode = 1;
+    this.captureException(error, { action });
+    void this.shutdown().finally(() => {
+      const exit = this.options.fatalProcessExit ?? process.exit;
+      exit(1);
+    });
   }
 
   private detachProcessExceptionHandlers(): void {
     const handlers = this.processExceptionHandlers;
     if (!handlers) return;
-    process.off('uncaughtExceptionMonitor', handlers.uncaughtException);
+    process.off('uncaughtException', handlers.uncaughtException);
     process.off('unhandledRejection', handlers.unhandledRejection);
     this.processExceptionHandlers = undefined;
   }
@@ -233,20 +251,28 @@ export function trackAnalyticsTask<Task extends Promise<unknown>>(task: Task): T
   return task;
 }
 
-export async function shutdownAnalyticsServices(): Promise<void> {
+async function waitForPendingAnalyticsTasks(timeoutMs: number): Promise<void> {
+  if (pendingAnalyticsTasks.size === 0 || timeoutMs <= 0) return;
   let timeout: ReturnType<typeof setTimeout> | undefined;
   try {
     await Promise.race([
       Promise.allSettled([...pendingAnalyticsTasks]),
       new Promise<void>((resolve) => {
-        timeout = setTimeout(resolve, SHUTDOWN_TIMEOUT_MS);
+        timeout = setTimeout(resolve, timeoutMs);
       }),
     ]);
   } finally {
     if (timeout) clearTimeout(timeout);
   }
+}
+
+export async function shutdownAnalyticsServices(): Promise<void> {
+  const deadline = Date.now() + SHUTDOWN_TIMEOUT_MS;
+  await waitForPendingAnalyticsTasks(SHUTDOWN_TIMEOUT_MS);
+  const remainingMs = Math.max(0, deadline - Date.now());
   await Promise.all(
-    [...sharedAnalyticsServices.values()].map((analytics) => analytics.shutdown()),
+    [...sharedAnalyticsServices.values()].map((analytics) =>
+      analytics.shutdown(remainingMs)),
   );
 }
 

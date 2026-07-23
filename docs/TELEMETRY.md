@@ -33,8 +33,9 @@ and feature-flag operations local no-ops.
 The first telemetry-capable run creates a random UUIDv4 at
 `~/.overdeck/telemetry-id`, or `${OVERDECK_HOME}/telemetry-id` when
 `OVERDECK_HOME` is set. The file is created with mode `0600` and reused on that
-installation. Invalid or partial file content is replaced atomically with a new
-UUIDv4 and mode `0600`. Overdeck does not derive identity from Claude Code,
+installation. Invalid or partial file content is repaired under an exclusive
+process lock, then re-read so concurrent processes use the same durable UUIDv4
+with mode `0600`. Overdeck does not derive identity from Claude Code,
 Codex, Git, GitHub, or any other credential or account file.
 
 ## Event schema
@@ -100,7 +101,9 @@ Browser and Node exceptions pass through Overdeck's telemetry doors, which repla
 raw messages and stack frames with a fixed categorical error before capture. The
 browser SDK observes unhandled errors and rejections through a sanitized `before_send`
 hook. Overdeck owns removable Node process listeners instead of enabling the SDK's raw
-Node autocapture. Frontend production builds generate hidden source maps: the
+Node autocapture. Fatal Node exceptions are sanitized, flushed within the shared
+two-second telemetry deadline, and terminate the process with a nonzero exit.
+Frontend production builds generate hidden source maps: the
 JavaScript bundles contain no `sourceMappingURL` comments. The
 release workflow injects and uploads the exact CI-built bundle when
 `POSTHOG_CLI_API_KEY` is available, then removes the map files before npm
