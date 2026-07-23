@@ -240,19 +240,19 @@
     "recordedAt": "2026-07-22T23:16:44.964Z"
   },
   "created": "2026-07-16T05:02:53.170Z",
-  "updated": "2026-07-23T02:31:02.980Z",
+  "updated": "2026-07-23T02:41:41.910Z",
   "pipeline": {
     "issueId": "PAN-2599",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-22T23:25:31.079Z",
-    "updatedAt": "2026-07-23T02:31:02.319Z",
-    "reviewNotes": "Fatal exception telemetry suppresses the local error message and stack, leaving dashboard crashes undiagnosable",
+    "updatedAt": "2026-07-23T02:41:41.887Z",
+    "reviewNotes": "Agent re-review request (4/25): Fixed review issues",
     "inspectNotes": "Both ACs verified in diff: getClient() gates on telemetryBlockedForProcess()+resolveTelemetryEnabled() before constructing PostHog, so disabled capture()+shutdown() never invoke the constructor (AC1); shutdown() races client.shutdown() against a 2s setTimeout with finally-clearTimeout, and service.test.ts's hung-flush test advances fake timers to exactly 2000ms to confirm the bound (AC2).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3009",
     "lastVerifiedCommit": "29cb4b7425e91aaa5a919b2f67ff5c05e5ad41bb",
@@ -423,9 +423,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 8396549,
-            "output": 575210,
-            "cacheRead": 153885696,
+            "input": 8401593,
+            "output": 575448,
+            "cacheRead": 154962944,
             "cacheWrite": 0
           }
         },
@@ -439,9 +439,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 11261395,
-            "output": 906985,
-            "cacheRead": 531811840,
+            "input": 11337409,
+            "output": 921626,
+            "cacheRead": 548974080,
             "cacheWrite": 0
           }
         }
@@ -454,9 +454,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 29006793,
-          "output": 1492687,
-          "cacheRead": 694723584,
+          "input": 29087851,
+          "output": 1507566,
+          "cacheRead": 712963072,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -473,8 +473,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 496.74454000000003,
-        "pricingAsOf": "2026-07-23T02:31:02.338Z"
+        "usd": 506.715944,
+        "pricingAsOf": "2026-07-23T02:41:41.906Z"
       }
     },
     "merges": [
