@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { inspect } from 'node:util';
 import { PostHog } from 'posthog-node';
 import type { TelemetryEventName, TelemetryPropertiesFor } from '@overdeck/contracts';
 import { packageRoot } from '../paths.js';
@@ -180,6 +181,14 @@ export class AnalyticsService {
     if (this.fatalExceptionInFlight) return;
     this.fatalExceptionInFlight = true;
     process.exitCode = 1;
+    try {
+      const detail = error instanceof Error
+        ? error.stack ?? `${error.name}: ${error.message}`
+        : inspect(error);
+      process.stderr.write(`${detail}\n`);
+    } catch {
+      // Local logging failure must not prevent the bounded fatal flush and exit.
+    }
     this.captureException(error, { action });
     void this.shutdown().finally(() => {
       const exit = this.options.fatalProcessExit ?? process.exit;

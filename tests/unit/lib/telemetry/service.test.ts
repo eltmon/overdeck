@@ -168,6 +168,7 @@ describe('AnalyticsService', () => {
   ] as const)('captures %s, flushes, and exits nonzero', async (event, action) => {
     const onSpy = vi.spyOn(process, 'on');
     const offSpy = vi.spyOn(process, 'off');
+    const stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
     const fatalExit = vi.fn() as unknown as (code: number) => never;
     const analytics = new AnalyticsService('server', {
       captureProcessExceptions: true,
@@ -193,6 +194,9 @@ describe('AnalyticsService', () => {
     expect(JSON.stringify(captureExceptionMock.mock.calls)).not.toContain('PAN-2599');
     expect(JSON.stringify(captureExceptionMock.mock.calls)).not.toContain('/home/alice');
     expect(JSON.stringify(captureExceptionMock.mock.calls)).not.toContain('ghp_secret');
+    expect(stderrSpy).toHaveBeenCalledWith(expect.stringContaining('PAN-2599'));
+    expect(stderrSpy).toHaveBeenCalledWith(expect.stringContaining('/home/alice'));
+    expect(stderrSpy).toHaveBeenCalledWith(expect.stringContaining('ghp_secret'));
     expect(shutdownMock).toHaveBeenCalledOnce();
     expect(fatalExit).toHaveBeenCalledWith(1);
     expect(process.exitCode).toBe(1);
@@ -200,10 +204,12 @@ describe('AnalyticsService', () => {
     expect(offSpy).toHaveBeenCalledWith('unhandledRejection', expect.any(Function));
     onSpy.mockRestore();
     offSpy.mockRestore();
+    stderrSpy.mockRestore();
   });
 
   it('bounds fatal exception flushing before nonzero exit', async () => {
     const onSpy = vi.spyOn(process, 'on');
+    const stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
     const fatalExit = vi.fn() as unknown as (code: number) => never;
     shutdownMock.mockReturnValue(new Promise<void>(() => undefined));
     const analytics = new AnalyticsService('server', {
@@ -221,6 +227,7 @@ describe('AnalyticsService', () => {
     await vi.advanceTimersByTimeAsync(1);
     expect(fatalExit).toHaveBeenCalledWith(1);
     onSpy.mockRestore();
+    stderrSpy.mockRestore();
   });
 
   it('stops using an existing client when telemetry becomes disabled', async () => {

@@ -55,6 +55,7 @@ async function runFatalChild(
           ...process.env,
           NODE_ENV: 'production',
           OVERDECK_HOME: overdeckHome,
+          OVERDECK_TELEMETRY: '1',
           POSTHOG_API_KEY: 'phc_test',
           POSTHOG_HOST: `http://127.0.0.1:${address.port}`,
           VITEST: '',
@@ -94,11 +95,15 @@ describe('fatal Node telemetry', () => {
       const result = await runFatalChild(mode);
 
       expect(result.code).toBe(1);
+      expect(result.output).toContain('PAN-2599');
+      expect(result.output).toContain('/home/alice/private-repo');
+      expect(result.output).toContain('ghp_secret');
+      expect(result.output).toContain('telemetry-fatal-child.ts');
       expect(result.payload).toContain(`Overdeck ${action} operation failed`);
       expect(result.payload).toContain(`"action":"${action}"`);
-      expect(`${result.output}\n${result.payload}`).not.toContain('PAN-2599');
-      expect(`${result.output}\n${result.payload}`).not.toContain('/home/alice');
-      expect(`${result.output}\n${result.payload}`).not.toContain('ghp_secret');
+      expect(result.payload).not.toContain('PAN-2599');
+      expect(result.payload).not.toContain('/home/alice');
+      expect(result.payload).not.toContain('ghp_secret');
     },
     15_000,
   );

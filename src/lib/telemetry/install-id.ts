@@ -5,6 +5,7 @@ import {
   readFileSync,
   renameSync,
   rmSync,
+  statSync,
   writeFileSync,
 } from 'node:fs';
 import { join } from 'node:path';
@@ -13,6 +14,7 @@ import { getOverdeckHome } from '../paths.js';
 const INSTALL_ID_FILE = 'telemetry-id';
 const INSTALL_ID_REPAIR_LOCK = 'telemetry-id.repair.lock';
 const REPAIR_WAIT_MS = 10;
+const REPAIR_LOCK_LEASE_MS = 1_000;
 const REPAIR_MAX_ATTEMPTS = 200;
 const REPAIR_WAIT_ARRAY = new Int32Array(new SharedArrayBuffer(4));
 const UUID_V4_PATTERN =
@@ -31,8 +33,23 @@ function errorCode(error: unknown): string | undefined {
 
 function repairOwnerIsAlive(lockPath: string): boolean {
   try {
-    const ownerPid = Number(readFileSync(lockPath, 'utf8').trim());
-    if (!Number.isInteger(ownerPid) || ownerPid <= 0) return false;
+    const rawOwner = readFileSync(lockPath, 'utf8').trim();
+    let ownerPid: number;
+    let createdAt: number;
+    try {
+      const owner = JSON.parse(rawOwner) as { pid?: unknown; createdAt?: unknown };
+      ownerPid = Number(owner.pid);
+      createdAt = Number(owner.createdAt);
+    } catch {
+      ownerPid = Number(rawOwner);
+      createdAt = statSync(lockPath).mtimeMs;
+    }
+    if (
+      !Number.isInteger(ownerPid) ||
+      ownerPid <= 0 ||
+      !Number.isFinite(createdAt) ||
+      Date.now() - createdAt >= REPAIR_LOCK_LEASE_MS
+    ) return false;
     process.kill(ownerPid, 0);
     return true;
   } catch (error) {
@@ -60,7 +77,10 @@ function repairInvalidInstallId(path: string, overdeckHome: string): string {
   const lockPath = join(overdeckHome, INSTALL_ID_REPAIR_LOCK);
   for (let attempt = 0; attempt < REPAIR_MAX_ATTEMPTS; attempt += 1) {
     try {
-      writeFileSync(lockPath, `${process.pid}\n`, {
+      writeFileSync(lockPath, `${JSON.stringify({
+        pid: process.pid,
+        createdAt: Date.now(),
+      })}\n`, {
         encoding: 'utf8',
         mode: 0o600,
         flag: 'wx',

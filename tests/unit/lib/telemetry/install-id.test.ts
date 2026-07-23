@@ -1,5 +1,6 @@
 import { spawn } from 'node:child_process';
 import {
+  existsSync,
   mkdtempSync,
   readFileSync,
   rmSync,
@@ -76,6 +77,22 @@ describe('getOrCreateInstallId', () => {
       expect(getOrCreateInstallId()).toBe(repaired);
     },
   );
+
+  it('expires a stale repair lock even when its PID has been reused', () => {
+    const installIdPath = join(testHome, 'telemetry-id');
+    const lockPath = join(testHome, 'telemetry-id.repair.lock');
+    writeFileSync(installIdPath, 'partial-id', { mode: 0o644 });
+    writeFileSync(lockPath, JSON.stringify({
+      pid: process.pid,
+      createdAt: Date.now() - 2_000,
+    }));
+
+    const repaired = getOrCreateInstallId();
+
+    expect(repaired).toMatch(UUID_V4_PATTERN);
+    expect(readFileSync(installIdPath, 'utf8').trim()).toBe(repaired);
+    expect(existsSync(lockPath)).toBe(false);
+  });
 
   it('returns one durable winner during concurrent invalid-file repair', async () => {
     const installIdPath = join(testHome, 'telemetry-id');
