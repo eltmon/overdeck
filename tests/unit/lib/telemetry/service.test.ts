@@ -118,6 +118,46 @@ describe('AnalyticsService', () => {
     expect(JSON.stringify([sanitized, properties])).not.toContain('ghp_secret');
   });
 
+  it('captures and detaches sanitized process exception handlers', async () => {
+    const onSpy = vi.spyOn(process, 'on');
+    const offSpy = vi.spyOn(process, 'off');
+    const analytics = new AnalyticsService('server', { captureProcessExceptions: true });
+
+    analytics.capture('server_boot', { project_count: '0', active_agent_count: '0' });
+    const uncaught = onSpy.mock.calls.find(([event]) => event === 'uncaughtExceptionMonitor')?.[1] as
+      | ((error: Error) => void)
+      | undefined;
+    const rejection = onSpy.mock.calls.find(([event]) => event === 'unhandledRejection')?.[1] as
+      | ((reason: unknown) => void)
+      | undefined;
+    expect(uncaught).toBeTypeOf('function');
+    expect(rejection).toBeTypeOf('function');
+    captureExceptionMock.mockClear();
+
+    uncaught?.(new Error('PAN-2599 /home/alice/private-repo ghp_secret'));
+    rejection?.(new Error('private branch feature/secret'));
+
+    expect(captureExceptionMock).toHaveBeenCalledTimes(2);
+    expect(captureExceptionMock.mock.calls[0]?.[0]).toMatchObject({
+      message: 'Overdeck uncaught_exception operation failed',
+      stack: undefined,
+    });
+    expect(captureExceptionMock.mock.calls[1]?.[0]).toMatchObject({
+      message: 'Overdeck unhandled_rejection operation failed',
+      stack: undefined,
+    });
+    expect(JSON.stringify(captureExceptionMock.mock.calls)).not.toContain('PAN-2599');
+    expect(JSON.stringify(captureExceptionMock.mock.calls)).not.toContain('/home/alice');
+    expect(JSON.stringify(captureExceptionMock.mock.calls)).not.toContain('ghp_secret');
+
+    await analytics.shutdown();
+
+    expect(offSpy).toHaveBeenCalledWith('uncaughtExceptionMonitor', uncaught);
+    expect(offSpy).toHaveBeenCalledWith('unhandledRejection', rejection);
+    onSpy.mockRestore();
+    offSpy.mockRestore();
+  });
+
   it('stops using an existing client when telemetry becomes disabled', async () => {
     const analytics = new AnalyticsService('server');
     analytics.capture('server_boot', { project_count: '0', active_agent_count: '0' });

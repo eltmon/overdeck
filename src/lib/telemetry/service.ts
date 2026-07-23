@@ -14,13 +14,16 @@ const FLAG_TIMEOUT_MS = 500;
 export type AnalyticsClientType = 'cli' | 'server';
 
 export interface AnalyticsServiceOptions {
+  captureProcessExceptions?: boolean;
   featureFlagOverrides?: Readonly<Record<string, boolean>>;
 }
 
 export type TelemetryExceptionAction =
   | 'cli_command'
   | 'pipeline_transition'
-  | 'server_boot';
+  | 'server_boot'
+  | 'uncaught_exception'
+  | 'unhandled_rejection';
 
 export interface TelemetryExceptionContext {
   action: TelemetryExceptionAction;
@@ -46,6 +49,10 @@ function telemetryBlockedForProcess(): boolean {
 
 export class AnalyticsService {
   private client: PostHog | undefined;
+  private processExceptionHandlers: {
+    uncaughtException: (error: Error, origin: NodeJS.UncaughtExceptionOrigin) => void;
+    unhandledRejection: (reason: unknown, promise: Promise<unknown>) => void;
+  } | undefined;
 
   constructor(
     private readonly clientType: AnalyticsClientType,
@@ -129,6 +136,7 @@ export class AnalyticsService {
   }
 
   async shutdown(): Promise<void> {
+    this.detachProcessExceptionHandlers();
     const client = this.client;
     if (!client) return;
     this.client = undefined;
@@ -144,6 +152,27 @@ export class AnalyticsService {
     } finally {
       if (timeout) clearTimeout(timeout);
     }
+  }
+
+  private attachProcessExceptionHandlers(): void {
+    if (!this.options.captureProcessExceptions || this.processExceptionHandlers) return;
+    const uncaughtException = (error: Error): void => {
+      this.captureException(error, { action: 'uncaught_exception' });
+    };
+    const unhandledRejection = (reason: unknown): void => {
+      this.captureException(reason, { action: 'unhandled_rejection' });
+    };
+    this.processExceptionHandlers = { uncaughtException, unhandledRejection };
+    process.on('uncaughtExceptionMonitor', uncaughtException);
+    process.on('unhandledRejection', unhandledRejection);
+  }
+
+  private detachProcessExceptionHandlers(): void {
+    const handlers = this.processExceptionHandlers;
+    if (!handlers) return;
+    process.off('uncaughtExceptionMonitor', handlers.uncaughtException);
+    process.off('unhandledRejection', handlers.unhandledRejection);
+    this.processExceptionHandlers = undefined;
   }
 
   private getClient(): PostHog | undefined {
@@ -168,6 +197,7 @@ export class AnalyticsService {
           enableExceptionAutocapture: false,
         },
       );
+      this.attachProcessExceptionHandlers();
       return this.client;
     } catch {
       return undefined;
@@ -179,7 +209,9 @@ export function getAnalyticsService(clientType: AnalyticsClientType): AnalyticsS
   const existing = sharedAnalyticsServices.get(clientType);
   if (existing) return existing;
 
-  const analytics = new AnalyticsService(clientType);
+  const analytics = new AnalyticsService(clientType, {
+    captureProcessExceptions: clientType === 'server',
+  });
   sharedAnalyticsServices.set(clientType, analytics);
   return analytics;
 }

@@ -94,9 +94,11 @@ person profiles.
 ## Error tracking and source maps
 
 Browser and Node exceptions pass through Overdeck's telemetry doors, which replace
-raw messages and stack frames with a fixed categorical error before capture. SDK
-automatic exception capture is disabled. Frontend production builds generate hidden
-source maps: the JavaScript bundles contain no `sourceMappingURL` comments. The
+raw messages and stack frames with a fixed categorical error before capture. The
+browser SDK observes unhandled errors and rejections through a sanitized `before_send`
+hook. Overdeck owns removable Node process listeners instead of enabling the SDK's raw
+Node autocapture. Frontend production builds generate hidden source maps: the
+JavaScript bundles contain no `sourceMappingURL` comments. The
 release workflow injects and uploads the exact CI-built bundle when
 `POSTHOG_CLI_API_KEY` is available, then removes the map files before npm
 publishing. A missing key prints a warning and does not block the release.
