@@ -86,9 +86,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-23T02:27:09.206Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-23T02:31Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-23T02:31:02.980Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-23T02:31:02Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2599\n\nFatal exception telemetry suppresses the local error message and stack, leaving dashboard crashes undiagnosable\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2599 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       ".github/workflows/release.yml",
@@ -227,7 +240,7 @@
     "recordedAt": "2026-07-22T23:16:44.964Z"
   },
   "created": "2026-07-16T05:02:53.170Z",
-  "updated": "2026-07-23T02:31:02.351Z",
+  "updated": "2026-07-23T02:31:02.980Z",
   "pipeline": {
     "issueId": "PAN-2599",
     "reviewStatus": "blocked",
