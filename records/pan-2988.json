@@ -72,9 +72,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-22T23:59:11.788Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-23T00:03Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-23T00:03:10.967Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-23T00:03:10Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2988\n\nEqual-timestamp comparison mismatches persisted JSON against DB objects with undefined fields, causing a perpetual 60-second event re-emission loop\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2988 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "src/dashboard/frontend/src/components/KanbanBoard.test.tsx",
@@ -140,7 +153,7 @@
     "recordedAt": "2026-07-22T23:43:55.929Z"
   },
   "created": "2026-07-22T21:25:31.822Z",
-  "updated": "2026-07-23T00:03:10.405Z",
+  "updated": "2026-07-23T00:03:10.967Z",
   "pipeline": {
     "issueId": "PAN-2988",
     "reviewStatus": "blocked",
