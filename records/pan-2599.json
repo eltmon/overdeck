@@ -93,15 +93,7 @@
       "timestamp": "2026-07-23T02:31:02.980Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-23T02:31:02Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2599\n\nFatal exception telemetry suppresses the local error message and stack, leaving dashboard crashes undiagnosable\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2599 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       ".github/workflows/release.yml",
@@ -240,24 +232,24 @@
     "recordedAt": "2026-07-22T23:16:44.964Z"
   },
   "created": "2026-07-16T05:02:53.170Z",
-  "updated": "2026-07-23T02:41:41.910Z",
+  "updated": "2026-07-23T02:42:30.661Z",
   "pipeline": {
     "issueId": "PAN-2599",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-22T23:25:31.079Z",
-    "updatedAt": "2026-07-23T02:41:41.887Z",
+    "updatedAt": "2026-07-23T02:42:30.615Z",
     "reviewNotes": "Agent re-review request (4/25): Fixed review issues",
     "inspectNotes": "Both ACs verified in diff: getClient() gates on telemetryBlockedForProcess()+resolveTelemetryEnabled() before constructing PostHog, so disabled capture()+shutdown() never invoke the constructor (AC1); shutdown() races client.shutdown() against a 2s setTimeout with finally-clearTimeout, and service.test.ts's hung-flush test advances fake timers to exactly 2000ms to confirm the bound (AC2).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3009",
     "lastVerifiedCommit": "29cb4b7425e91aaa5a919b2f67ff5c05e5ad41bb",
     "reviewRequestedAt": "2026-07-22T23:25:31.079Z",
-    "reviewSpawnedAt": "2026-07-23T02:27:07.754Z",
+    "reviewSpawnedAt": "2026-07-23T02:42:30.615Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         ".github/workflows/release.yml",
@@ -474,7 +466,7 @@
       },
       "costAtCloseOut": {
         "usd": 506.715944,
-        "pricingAsOf": "2026-07-23T02:41:41.906Z"
+        "pricingAsOf": "2026-07-23T02:42:30.637Z"
       }
     },
     "merges": [
