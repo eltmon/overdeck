@@ -71,9 +71,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-23T01:55:13.620Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-23T02:03Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-23T02:03:38.486Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-23T02:03:38Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2599\n\nThe explicit CLI exit door bypasses durable-write draining, so close-out can terminate before state commits are pushed\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2599 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       ".github/workflows/release.yml",
@@ -212,7 +225,7 @@
     "recordedAt": "2026-07-22T23:16:44.964Z"
   },
   "created": "2026-07-16T05:02:53.170Z",
-  "updated": "2026-07-23T02:03:37.443Z",
+  "updated": "2026-07-23T02:03:38.486Z",
   "pipeline": {
     "issueId": "PAN-2599",
     "reviewStatus": "blocked",
