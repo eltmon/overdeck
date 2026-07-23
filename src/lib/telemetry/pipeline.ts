@@ -3,8 +3,10 @@ import type {
   PipelineStageChangedProperties,
   TelemetryModelFamily,
 } from '@overdeck/contracts';
-import { getAgentStateSync, type AgentState } from '../agents/agent-state.js';
-import { normalizeAgentId } from '../agents/identity.js';
+import {
+  readPipelineTelemetryAgentState,
+  type PipelineTelemetryAgentState,
+} from './pipeline-agent-reader.js';
 import { getAnalyticsService } from './service.js';
 
 const serverAnalytics = getAnalyticsService('server');
@@ -29,9 +31,9 @@ export function toTelemetryModelFamily(model: string): TelemetryModelFamily {
 
 export function resolvePipelineTelemetryContext(
   issueId: string,
-  readAgent: (agentId: string) => AgentState | null = getAgentStateSync,
+  readAgent: (agentId: string) => PipelineTelemetryAgentState | null = readPipelineTelemetryAgentState,
 ): PipelineTelemetryContext | null {
-  const state = readAgent(normalizeAgentId(issueId));
+  const state = readAgent(`agent-${issueId.toLowerCase()}`);
   if (!state?.harness || !HARNESSES.has(state.harness)) return null;
   return {
     harness: state.harness,
