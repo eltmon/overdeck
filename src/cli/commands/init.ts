@@ -1,4 +1,4 @@
-import { exitCli } from '../telemetry.js';
+import { exitCli } from '../exit.js';
 import { existsSync, mkdirSync, readdirSync, cpSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -149,6 +149,6 @@ export async function initCommand(): Promise<void> {
   } catch (error: any) {
     spinner.fail('Failed to initialize');
     console.error(chalk.red(error.message));
-    return void exitCli(1);
+    return exitCli(1);
   }
 }

@@ -1,4 +1,4 @@
-import { exitCli } from '../../telemetry.js';
+import { exitCli } from '../../exit.js';
 import chalk from 'chalk';
 import { INTERNAL_TOKEN_HEADER, ensureInternalTokenSync } from '../../../lib/internal-token.js';
 
@@ -41,14 +41,14 @@ export async function backfillTitlesCommand(options: BackfillOptions = {}): Prom
     if (!res.ok) {
       const body = await res.text().catch(() => '');
       console.error(chalk.red(`Dashboard returned ${res.status}${body ? `: ${body}` : ''}`));
-      return void exitCli(1);
+      return exitCli(1);
     }
 
     report = (await res.json()) as BackfillReport;
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error(chalk.red(`Dashboard not running — start it with \`pan up\` (${msg})`));
-    return void exitCli(1);
+    return exitCli(1);
   }
 
   console.log(chalk.bold(`Backfill titles report${dryRun ? chalk.yellow(' [dry run]') : ''}\n`));

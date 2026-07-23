@@ -1,4 +1,4 @@
-import { exitCli } from '../../telemetry.js';
+import { exitCli } from '../../exit.js';
 import { Effect } from 'effect';
 import chalk from 'chalk';
 import {
@@ -299,7 +299,7 @@ export async function setupHooksCommand(opts: SetupHooksOptions = {}): Promise<v
       console.log(chalk.dim('  macOS:  brew install jq'));
       console.log(chalk.dim('  Ubuntu: sudo apt-get install jq'));
       console.log(chalk.dim('  CentOS: sudo yum install jq\n'));
-      return void exitCli(1);
+      return exitCli(1);
     }
   } else {
     console.log(chalk.green('✓ jq is installed'));
@@ -331,7 +331,7 @@ export async function setupHooksCommand(opts: SetupHooksOptions = {}): Promise<v
     if (!existsSync(sourcePath)) {
       console.log(chalk.red(`✗ Could not find ${scriptName} script`));
       console.log(chalk.dim(`  Checked: ${sourcePath}`));
-      return void exitCli(1);
+      return exitCli(1);
     }
 
     copyFileSync(sourcePath, scriptDest);

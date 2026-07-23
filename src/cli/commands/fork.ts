@@ -1,4 +1,4 @@
-import { exitCli } from '../telemetry.js';
+import { exitCli } from '../exit.js';
 import chalk from 'chalk';
 import { existsSync } from 'fs';
 import { getConversationById, getConversationByName } from '../../lib/overdeck/conversations.js';
@@ -38,13 +38,13 @@ export async function forkCommand(
     } else {
       console.log(chalk.yellow(`Conversation not found: ${convRef}`));
     }
-    return void exitCli(1);
+    return exitCli(1);
   }
 
   const sessionFile = conv.claudeSessionId ? sessionFilePath(conv.cwd, conv.claudeSessionId) : null;
   if (!sessionFile || !existsSync(sessionFile)) {
     console.log(chalk.yellow(`No session file found for conversation ${conv.name}`));
-    return void exitCli(1);
+    return exitCli(1);
   }
 
   const forkMode: 'plain' | 'summary' = options.plain ? 'plain' : 'summary';
@@ -65,20 +65,20 @@ export async function forkCommand(
   } catch (err) {
     if (err instanceof ForkServerError) {
       console.log(chalk.red(err.message));
-      return void exitCli(1);
+      return exitCli(1);
     }
     throw err;
   }
 
   if (newConv.forkStatus === 'failed') {
     console.log(chalk.red(`${modeLabel} failed: ${newConv.forkError ?? 'unknown error'}`));
-    return void exitCli(1);
+    return exitCli(1);
   }
   if (isForkResultInProgress(newConv)) {
     console.log(chalk.yellow(`${modeLabel.charAt(0).toUpperCase() + modeLabel.slice(1)} is still in progress — watch https://overdeck.localhost/conv/${newConv.id}`));
     console.log(chalk.gray(`  Conv ID: ${newConv.id}`));
     console.log(chalk.gray(`  Session: ${newConv.tmuxSession}${newConv.sessionAlive ? ' (live)' : ''}`));
-    return void exitCli(1);
+    return exitCli(1);
   }
 
   console.log(chalk.green(`${modeLabel.charAt(0).toUpperCase() + modeLabel.slice(1)}ed conversation ${conv.name} → ${newConv.name}`));

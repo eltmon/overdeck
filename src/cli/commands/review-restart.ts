@@ -9,7 +9,7 @@
  * reviewers (with model)" context menu.
  */
 
-import { exitCli } from '../telemetry.js';
+import { exitCli } from '../exit.js';
 import chalk from 'chalk';
 import { getDashboardApiUrlSync } from '../../lib/config.js';
 import { resolveProjectFromIssueSync } from '../../lib/projects.js';
@@ -71,13 +71,13 @@ export async function reviewRestartCommand(
     console.error(chalk.dim(
       'Pass a fully-qualified ID like "PAN-1148", or ensure the agent state dir exists at ~/.overdeck/agents/agent-<prefix>-<num>/',
     ));
-    return void exitCli(1);
+    return exitCli(1);
   }
 
   const resolved = resolveProjectFromIssueSync(issueId);
   if (!resolved) {
     console.error(chalk.red(`\nError: cannot resolve project for ${issueId}`));
-    return void exitCli(1);
+    return exitCli(1);
   }
 
   const modelLabel = opts.model ? ` with model ${chalk.cyan(opts.model)}` : '';
@@ -99,7 +99,7 @@ export async function reviewRestartCommand(
 
     if (!response.ok) {
       console.error(chalk.red(`\nError: ${result.error || 'Failed to restart review'}`));
-      return void exitCli(1);
+      return exitCli(1);
     }
 
     console.log(chalk.green(`\n✓ Review restarted for ${issueId}`));
@@ -109,9 +109,9 @@ export async function reviewRestartCommand(
     if (error.code === 'ECONNREFUSED') {
       console.error(chalk.red('\nError: Dashboard not running'));
       console.error(chalk.dim('Start the dashboard with: pan up'));
-      return void exitCli(1);
+      return exitCli(1);
     }
     console.error(chalk.red(`\nError: ${error.message}`));
-    return void exitCli(1);
+    return exitCli(1);
   }
 }

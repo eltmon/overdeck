@@ -8,7 +8,7 @@
 // This module is imported first in src/cli/index.ts and its only dependencies
 // are Node built-ins, so it loads and runs under old Node without issue.
 
-import { exitCli } from './telemetry.js';
+import { exitCli } from './exit.js';
 import { spawnSync } from 'child_process';
 import { existsSync, readdirSync } from 'fs';
 import { homedir } from 'os';

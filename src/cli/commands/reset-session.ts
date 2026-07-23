@@ -1,4 +1,4 @@
-import { exitCli } from '../telemetry.js';
+import { exitCli } from '../exit.js';
 import chalk from 'chalk';
 import { existsSync } from 'fs';
 import { getAgentStateSync, getAgentDir, getLatestSessionIdSync } from '../../lib/agents.js';
@@ -12,7 +12,7 @@ async function resetAgentSessions(agentIds: string[]): Promise<void> {
   const running = targets.find((agentId) => getWorkAgentLifecycleStateSync(agentId).hasLiveTmuxSession);
   if (running) {
     console.log(chalk.red(`Agent ${running} is running. Stop it first before resetting its session.`));
-    return void exitCli(1);
+    return exitCli(1);
     return;
   }
 
@@ -50,7 +50,7 @@ export async function resetSessionCommand(id: string): Promise<void> {
 
   if (!getAgentStateSync(agentId) && !existsSync(getAgentDir(agentId))) {
     console.log(chalk.red(`Agent ${agentId} not found.`));
-    return void exitCli(1);
+    return exitCli(1);
     return;
   }
 

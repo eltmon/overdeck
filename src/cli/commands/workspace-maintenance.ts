@@ -1,4 +1,4 @@
-import { exitCli } from '../telemetry.js';
+import { exitCli } from '../exit.js';
 import chalk from 'chalk';
 import ora from 'ora';
 import { existsSync, readFileSync } from 'fs';
@@ -48,7 +48,7 @@ export async function useConfigCommand(issueId: string, options: UseConfigOption
 
     if (!existsSync(workspacePath)) {
       spinner.fail(`Workspace not found: ${workspacePath}`);
-      return void exitCli(1);
+      return exitCli(1);
     }
 
     spinner.text = 'Copying config...';
@@ -72,7 +72,7 @@ export async function useConfigCommand(issueId: string, options: UseConfigOption
 
   } catch (error: any) {
     spinner.fail(`Failed to copy config: ${error.message}`);
-    return void exitCli(1);
+    return exitCli(1);
   }
 }
 
@@ -93,7 +93,7 @@ export async function updateCommand(issueId: string, options: UpdateOptions): Pr
 
     if (!projectConfig) {
       spinner.fail(`No project found for issue ${issueId}`);
-      return void exitCli(1);
+      return exitCli(1);
     }
 
     const workspaceConfig = projectConfig.workspace;
@@ -102,7 +102,7 @@ export async function updateCommand(issueId: string, options: UpdateOptions): Pr
 
     if (!existsSync(workspacePath)) {
       spinner.fail(`Workspace not found: ${workspacePath}`);
-      return void exitCli(1);
+      return exitCli(1);
     }
 
     // Check if an agent is running in this workspace
@@ -114,7 +114,7 @@ export async function updateCommand(issueId: string, options: UpdateOptions): Pr
     if (agentInWorkspace && !options.force) {
       spinner.fail(`Agent ${agentInWorkspace.id} is running in this workspace`);
       console.log(chalk.dim('  Use --force to update anyway, or stop the agent first.'));
-      return void exitCli(1);
+      return exitCli(1);
     }
 
     if (agentInWorkspace) {
@@ -152,7 +152,7 @@ export async function updateCommand(issueId: string, options: UpdateOptions): Pr
 
   } catch (error: any) {
     spinner.fail(`Failed to update workspace: ${error.message}`);
-    return void exitCli(1);
+    return exitCli(1);
   }
 }
 
@@ -208,13 +208,13 @@ export async function addRepoCommand(workspaceId: string, repoNames: string[], o
 
     if (!projectConfig) {
       spinner.fail(`No project found for workspace ${workspaceId}`);
-      return void exitCli(1);
+      return exitCli(1);
     }
 
     const workspaceConfig = projectConfig.workspace;
     if (!workspaceConfig || workspaceConfig.type !== 'polyrepo') {
       spinner.fail(`Project ${projectConfig.name} does not use polyrepo workspace`);
-      return void exitCli(1);
+      return exitCli(1);
     }
 
     if (!workspaceConfig.progressive) {
@@ -227,13 +227,13 @@ export async function addRepoCommand(workspaceId: string, repoNames: string[], o
     if (options.group) {
       if (!workspaceConfig.groups_file) {
         spinner.fail('--group requires groups_file to be set in workspace config');
-        return void exitCli(1);
+        return exitCli(1);
       }
 
       const groupsFilePath = join(projectConfig.path, workspaceConfig.groups_file);
       if (!existsSync(groupsFilePath)) {
         spinner.fail(`Groups file not found: ${groupsFilePath}`);
-        return void exitCli(1);
+        return exitCli(1);
       }
 
       const groups = loadRepoGroups(groupsFilePath);
@@ -244,13 +244,13 @@ export async function addRepoCommand(workspaceId: string, repoNames: string[], o
         targetRepoNames = groups.groups[options.group] as string[];
       } else {
         spinner.fail(`Unknown group: ${options.group}`);
-        return void exitCli(1);
+        return exitCli(1);
       }
     }
 
     if (targetRepoNames.length === 0) {
       spinner.fail('No repos to add');
-      return void exitCli(1);
+      return exitCli(1);
     }
 
     // Add repos to workspace
@@ -266,7 +266,7 @@ export async function addRepoCommand(workspaceId: string, repoNames: string[], o
       for (const step of result.steps) {
         console.log(chalk.dim(`  ${step}`));
       }
-      return void exitCli(1);
+      return exitCli(1);
     }
 
     spinner.succeed(`Added ${targetRepoNames.length} repository(s) to workspace`);
@@ -280,7 +280,7 @@ export async function addRepoCommand(workspaceId: string, repoNames: string[], o
 
   } catch (error: any) {
     spinner.fail(`Failed to add repos: ${error.message}`);
-    return void exitCli(1);
+    return exitCli(1);
   }
 }
 

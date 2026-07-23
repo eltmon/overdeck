@@ -1,4 +1,4 @@
-import { exitCli } from '../telemetry.js';
+import { exitCli } from '../exit.js';
 import { Effect } from 'effect';
 import chalk from 'chalk';
 import {
@@ -173,7 +173,7 @@ export async function healthCommand(
       process.on('SIGINT', () => {
         console.log('\n' + chalk.dim('Stopping health daemon...'));
         stop();
-        return void exitCli(0);
+        return exitCli(0);
       });
 
       // Keep process running

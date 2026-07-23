@@ -1,4 +1,4 @@
-import { exitCli } from '../telemetry.js';
+import { exitCli } from '../exit.js';
 import chalk from 'chalk';
 import type { Command } from 'commander';
 import { existsSync, readFileSync } from 'fs';
@@ -313,7 +313,7 @@ export async function projectShowCommand(keyOrName: string): Promise<void> {
   if (!found) {
     console.error(chalk.red(`Project not found: ${keyOrName}`));
     console.log(chalk.dim(`Use 'pan projects list' to see registered projects.`));
-    return void exitCli(1);
+    return exitCli(1);
   }
 
   const pathExists = existsSync(found.path);

@@ -2,6 +2,10 @@ import { EventEmitter } from 'node:events';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AnalyticsService } from '../../../src/lib/telemetry/service.js';
 import {
+  exitCli as exitThroughDoor,
+  registerCliExitFinalizer,
+} from '../../../src/cli/exit.js';
+import {
   bucketCliDuration,
   CliTelemetryLifecycle,
   exitAfterTelemetry,
@@ -27,6 +31,7 @@ describe('CLI telemetry lifecycle', () => {
   });
 
   afterEach(() => {
+    registerCliExitFinalizer(async () => undefined);
     vi.useRealTimers();
   });
 
@@ -68,6 +73,23 @@ describe('CLI telemetry lifecycle', () => {
     await vi.advanceTimersByTimeAsync(1);
     expect(await exitResult).toBe(exitError);
     expect(exit).toHaveBeenCalledWith(1);
+  });
+
+  it('runs the registered finalizer before the lightweight exit door', async () => {
+    const finalize = vi.fn(() => new Promise<void>((resolve) => {
+      setTimeout(resolve, 2_000);
+    }));
+    registerCliExitFinalizer(finalize);
+    const exitError = new Error('process exited');
+    const exit = vi.fn((): never => { throw exitError; });
+
+    const result = exitThroughDoor(7, exit).catch((error) => error);
+
+    expect(finalize).toHaveBeenCalledWith(7);
+    expect(exit).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(2_000);
+    expect(await result).toBe(exitError);
+    expect(exit).toHaveBeenCalledWith(7);
   });
 
   it('flushes a child-process callback exit through the explicit async door', async () => {

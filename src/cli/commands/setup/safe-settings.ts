@@ -14,7 +14,7 @@
  *      where /tmp is tmpfs and $HOME is on a separate filesystem).
  */
 
-import { exitCli } from '../../telemetry.js';
+import { exitCli } from '../../exit.js';
 import chalk from 'chalk';
 import { copyFileSync, mkdirSync, readFileSync, readdirSync, renameSync, unlinkSync, writeFileSync, existsSync } from 'fs';
 import { dirname, basename, join } from 'path';

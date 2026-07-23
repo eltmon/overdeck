@@ -1,4 +1,4 @@
-import { exitCli } from '../telemetry.js';
+import { exitCli } from '../exit.js';
 import { Effect } from 'effect';
 import { Command } from 'commander';
 import chalk from 'chalk';
@@ -44,7 +44,7 @@ async function runCommand(target: string | undefined, options: RunOptions): Prom
       const found = projects.find(p => p.key === options.project || p.config.name === options.project);
       if (!found) {
         spinner.fail(`Project not found: ${options.project}`);
-        return void exitCli(1);
+        return exitCli(1);
       }
       projectConfig = found.config;
     } else if (target) {
@@ -67,7 +67,7 @@ async function runCommand(target: string | undefined, options: RunOptions): Prom
         projectConfig = found.config;
       } else {
         spinner.fail('Could not determine project. Use --project flag or run from a project directory.');
-        return void exitCli(1);
+        return exitCli(1);
       }
     }
 
@@ -83,7 +83,7 @@ async function runCommand(target: string | undefined, options: RunOptions): Prom
       console.log(chalk.dim('          type: maven'));
       console.log(chalk.dim('          path: api'));
       console.log(chalk.dim('          command: ./mvnw test'));
-      return void exitCli(1);
+      return exitCli(1);
     }
 
     // Determine feature name from target
@@ -109,10 +109,10 @@ async function runCommand(target: string | undefined, options: RunOptions): Prom
     }));
 
     // Exit with appropriate code
-    return void exitCli(result.overallStatus === 'passed' ? 0 : 1);
+    return exitCli(result.overallStatus === 'passed' ? 0 : 1);
   } catch (error: any) {
     spinner.fail(error.message);
-    return void exitCli(1);
+    return exitCli(1);
   }
 }
 

@@ -4,7 +4,7 @@
  * Show RAM/disk usage across Fly.io machines.
  */
 
-import { exitCli } from '../../telemetry.js';
+import { exitCli } from '../../exit.js';
 import chalk from 'chalk';
 import { Effect } from 'effect';
 import ora from 'ora';
@@ -186,6 +186,6 @@ export async function resourcesCommand(options: ResourcesOptions): Promise<void>
 
   } catch (error: any) {
     spinner.fail(`Failed to get resources: ${error.message}`);
-    return void exitCli(1);
+    return exitCli(1);
   }
 }

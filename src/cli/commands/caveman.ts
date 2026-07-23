@@ -5,7 +5,7 @@
  * caveman-compress Python script. Manual use only, never automated.
  */
 
-import { exitCli } from '../telemetry.js';
+import { exitCli } from '../exit.js';
 import { Command } from 'commander';
 import chalk from 'chalk';
 import { existsSync } from 'fs';
@@ -26,7 +26,7 @@ async function cavemanCompressCommand(file: string): Promise<void> {
 
   if (!existsSync(resolvedFile)) {
     console.error(chalk.red(`✗ File not found: ${resolvedFile}`));
-    return void exitCli(1);
+    return exitCli(1);
   }
 
   // Check python3
@@ -35,7 +35,7 @@ async function cavemanCompressCommand(file: string): Promise<void> {
   } catch {
     console.error(chalk.red('✗ python3 not found'));
     console.error(chalk.dim('  Install python3 to use caveman-compress.'));
-    return void exitCli(1);
+    return exitCli(1);
   }
 
   const compressDir = getCavemanCompressDir();
@@ -46,7 +46,7 @@ async function cavemanCompressCommand(file: string): Promise<void> {
     console.error(chalk.dim('\nOr download manually from:'));
     console.error(chalk.dim('  https://github.com/JuliusBrussee/caveman/tree/main/caveman-compress'));
     console.error(chalk.dim(`  → place at ${compressDir}/`));
-    return void exitCli(1);
+    return exitCli(1);
   }
 
   console.log(chalk.bold(`Compressing: ${resolvedFile}\n`));
@@ -71,7 +71,7 @@ async function cavemanCompressCommand(file: string): Promise<void> {
     const e = err as { stdout?: string; stderr?: string };
     if (e.stdout) process.stdout.write(e.stdout);
     if (e.stderr) process.stderr.write(e.stderr);
-    return void exitCli(1);
+    return exitCli(1);
   }
 }
 

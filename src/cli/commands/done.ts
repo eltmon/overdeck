@@ -1,4 +1,4 @@
-import { exitCli } from '../telemetry.js';
+import { exitCli } from '../exit.js';
 import chalk from 'chalk';
 import ora from 'ora';
 import { saveAgentRuntimeState } from '../../lib/agents.js';
@@ -430,7 +430,7 @@ export async function completeSlotWork(issueId: string, slot: SlotCompletionCont
       `refusing to mark the slot done. Re-run \`pan done ${slot.agentId}\` so the ` +
       `swarm coordinator can observe this slot as completed.`,
     ));
-    return void exitCli(1);
+    return exitCli(1);
   }
 
   if (slot.agentState) {
@@ -479,7 +479,7 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
     const resolved = resolveProjectFromIssueSync(issueId);
     if (!resolved?.projectPath) {
       console.error(chalk.red(`Could not resolve project for ${issueId}; cannot run strike post-merge handoff.`));
-      return void exitCli(1);
+      return exitCli(1);
     }
 
     const branchName = `strike/${issueId.toLowerCase()}`;
@@ -496,7 +496,7 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       console.error(chalk.red(`Strike post-merge handoff refused for ${issueId}: ${message}`));
-      return void exitCli(1);
+      return exitCli(1);
     }
 
     emitActivityEntrySync({
@@ -530,16 +530,16 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
         const labels = (labelsStr || '').split(',').filter(Boolean);
         if (stateLower === 'closed') {
           console.error(chalk.red(`\n✖ ${issueId} is already closed. Cannot mark work as done on a closed issue.\n`));
-          return void exitCli(1);
+          return exitCli(1);
         }
         // Defense-in-depth: refuse to re-submit an issue that has already been closed out
         if (labels.some(l => l.toLowerCase() === 'closed-out')) {
           console.error(chalk.red(`\n✖ ${issueId} has already been closed out. Cannot mark work as done on a closed-out issue.\n`));
-          return void exitCli(1);
+          return exitCli(1);
         }
       } catch (guardErr) {
         console.error(chalk.yellow(`\n⚠ Could not verify issue state for ${issueId} (${(guardErr as Error).message}). Aborting for safety — use --force to override.\n`));
-        return void exitCli(1);
+        return exitCli(1);
       }
     } else {
       const linearApiKey = await Effect.runPromise(getLinearApiKey());
@@ -559,13 +559,13 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
               const state = await results.nodes[0].state;
               if (state?.type === 'completed' || state?.type === 'canceled') {
                 console.error(chalk.red(`\n✖ ${issueId} is already closed. Cannot mark work as done on a closed issue.\n`));
-                return void exitCli(1);
+                return exitCli(1);
               }
             }
           }
         } catch (guardErr) {
           console.error(chalk.yellow(`\n⚠ Could not verify Linear issue state for ${issueId} (${(guardErr as Error).message}). Aborting for safety — use --force to override.\n`));
-          return void exitCli(1);
+          return exitCli(1);
         }
       }
     }
@@ -619,7 +619,7 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
         console.error(chalk.dim(`  After resolving, run 'pan done ${issueId}' again.`));
         console.error(chalk.dim('  Use --force to skip checks (NOT recommended — leaves uncommitted work behind).'));
         console.error('');
-        return void exitCli(1);
+        return exitCli(1);
         return;
       }
 
@@ -686,7 +686,7 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
               console.error(chalk.red(failure.message || 'Unknown rebase error'));
             }
             console.error('');
-            return void exitCli(1);
+            return exitCli(1);
           }
 
           const rebased = rebaseResult.results.filter(r => r.outcome === 'rebased');
@@ -1023,6 +1023,6 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
 
   } catch (error: any) {
     spinner.fail(error.message);
-    return void exitCli(1);
+    return exitCli(1);
   }
 }

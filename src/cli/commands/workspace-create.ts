@@ -1,4 +1,4 @@
-import { exitCli } from '../telemetry.js';
+import { exitCli } from '../exit.js';
 import chalk from 'chalk';
 import ora from 'ora';
 import { exec, execSync } from 'child_process';
@@ -56,7 +56,7 @@ export async function createCommand(issueId: string, options: CreateOptions): Pr
 
     if (options.remote && options.local) {
       spinner.fail('Cannot specify both --remote and --local');
-      return void exitCli(1);
+      return exitCli(1);
     }
 
     if (options.remote) {
@@ -154,7 +154,7 @@ export async function createCommand(issueId: string, options: CreateOptions): Pr
         for (const error of result.errors) {
           console.error(chalk.red(`  ${error}`));
         }
-        return void exitCli(1);
+        return exitCli(1);
       }
       return;
     }
@@ -183,7 +183,7 @@ export async function createCommand(issueId: string, options: CreateOptions): Pr
         if (error.stderr) {
           console.error(error.stderr);
         }
-        return void exitCli(1);
+        return exitCli(1);
       }
     }
 
@@ -227,12 +227,12 @@ export async function createCommand(issueId: string, options: CreateOptions): Pr
 
     if (existsSync(workspacePath)) {
       spinner.fail(`Workspace already exists: ${workspacePath}`);
-      return void exitCli(1);
+      return exitCli(1);
     }
 
     if (!existsSync(join(projectRoot, '.git'))) {
       spinner.fail('Not a git repository. Run this from the project root.');
-      return void exitCli(1);
+      return exitCli(1);
     }
 
     // Create worktree
@@ -430,6 +430,6 @@ export async function createCommand(issueId: string, options: CreateOptions): Pr
 
   } catch (error: any) {
     spinner.fail(error.message);
-    return void exitCli(1);
+    return exitCli(1);
   }
 }

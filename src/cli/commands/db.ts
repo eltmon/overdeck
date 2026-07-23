@@ -1,4 +1,4 @@
-import { exitCli } from '../telemetry.js';
+import { exitCli } from '../exit.js';
 import { Command } from 'commander';
 import chalk from 'chalk';
 import ora from 'ora';

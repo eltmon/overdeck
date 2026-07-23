@@ -1,4 +1,4 @@
-import { exitCli } from '../telemetry.js';
+import { exitCli } from '../exit.js';
 import chalk from 'chalk';
 import ora from 'ora';
 import { exec } from 'child_process';
@@ -118,7 +118,7 @@ export async function listCommand(options: ListOptions): Promise<void> {
     if (projects.length > 0) {
       console.log(chalk.dim('Tip: Use --all to list workspaces across all registered projects.'));
     }
-    return void exitCli(1);
+    return exitCli(1);
   }
 
   const worktrees = await Effect.runPromise(
@@ -199,7 +199,7 @@ export async function destroyCommand(issueId: string, options: DestroyOptions): 
         for (const error of result.errors) {
           console.error(chalk.red(`  ${error}`));
         }
-        return void exitCli(1);
+        return exitCli(1);
       }
       return;
     }
@@ -224,7 +224,7 @@ export async function destroyCommand(issueId: string, options: DestroyOptions): 
         return;
       } catch (error: any) {
         spinner.fail(`Custom remove command failed: ${error.message}`);
-        return void exitCli(1);
+        return exitCli(1);
       }
     }
 
@@ -250,7 +250,7 @@ export async function destroyCommand(issueId: string, options: DestroyOptions): 
         projectRoot = process.cwd();
       } else {
         spinner.fail(`Workspace not found: ${workspacePath}`);
-        return void exitCli(1);
+        return exitCli(1);
       }
     }
 
@@ -267,6 +267,6 @@ export async function destroyCommand(issueId: string, options: DestroyOptions): 
     if (!options.force) {
       console.log(chalk.dim('Tip: Use --force to remove even with uncommitted changes'));
     }
-    return void exitCli(1);
+    return exitCli(1);
   }
 }

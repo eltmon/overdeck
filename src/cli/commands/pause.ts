@@ -1,4 +1,4 @@
-import { exitCli } from '../telemetry.js';
+import { exitCli } from '../exit.js';
 import chalk from 'chalk';
 import { getAgentStateSync, resolveAgentTargetSync, setAgentPausedSync, stopAgentSync } from '../../lib/agents.js';
 import { listSlotAgents } from '../../lib/agents/slot-reconcile.js';
@@ -14,19 +14,19 @@ export async function pauseCommand(id: string, options: PauseOptions): Promise<v
   // (strike-pan-1723, inspect-…, agent-…-ship) are addressable, not just issue IDs.
   const agentId = resolveAgentTargetSync(id);
   if (!agentId) {
-    if (printSwarmPauseGuidance(id)) { void exitCli(1); return; }
+    if (printSwarmPauseGuidance(id)) return exitCli(1);
     console.error(chalk.red(`Could not resolve agent target "${id}"`));
     console.error(chalk.dim(
       'Pass an issue ID like "PAN-1148" or a full agent ID like "strike-pan-1723"; the state dir must exist under ~/.overdeck/agents/',
     ));
-    return void exitCli(1);
+    return exitCli(1);
   }
   const state = getAgentStateSync(agentId);
 
   if (!state) {
-    if (printSwarmPauseGuidance(id)) { void exitCli(1); return; }
+    if (printSwarmPauseGuidance(id)) return exitCli(1);
     console.error(chalk.red(`Agent ${agentId} not found.`));
-    return void exitCli(1);
+    return exitCli(1);
   }
   const issueId = state.issueId;
 
@@ -44,7 +44,7 @@ export async function pauseCommand(id: string, options: PauseOptions): Promise<v
     console.log(chalk.green(`Paused${stopped} agent: ${agentId}${reason}`));
   } catch (error: any) {
     console.error(chalk.red('Error: ' + error.message));
-    return void exitCli(1);
+    return exitCli(1);
   }
 }
 

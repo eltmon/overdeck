@@ -13,7 +13,7 @@
  *   --no-docker  Don't start Docker containers after migration
  */
 
-import { exitCli } from '../telemetry.js';
+import { exitCli } from '../exit.js';
 import chalk from 'chalk';
 import { Effect } from 'effect';
 import ora from 'ora';
@@ -579,7 +579,7 @@ export async function migrateWorkspace(
   // Validate options
   if (options.toRemote && options.toLocal) {
     console.error(chalk.red('Error: Cannot specify both --to-remote and --to-local'));
-    return void exitCli(1);
+    return exitCli(1);
   }
 
   // Detect current location
@@ -588,7 +588,7 @@ export async function migrateWorkspace(
   if (currentLocation === 'none') {
     console.error(chalk.red(`Error: No workspace found for ${issueId}`));
     console.error(chalk.dim('Create a workspace first with: pan workspace <issue-id>'));
-    return void exitCli(1);
+    return exitCli(1);
   }
 
   // Determine migration direction
@@ -607,11 +607,11 @@ export async function migrateWorkspace(
   // Validate direction makes sense
   if (direction === 'to-remote' && currentLocation === 'remote') {
     console.error(chalk.red('Error: Workspace is already remote'));
-    return void exitCli(1);
+    return exitCli(1);
   }
   if (direction === 'to-local' && currentLocation === 'local') {
     console.error(chalk.red('Error: Workspace is already local'));
-    return void exitCli(1);
+    return exitCli(1);
   }
 
   // Execute migration
@@ -646,6 +646,6 @@ export async function migrateWorkspace(
     console.log(chalk.green(`✓ ${result.message}`));
   } else {
     console.error(chalk.red('Migration failed'));
-    return void exitCli(1);
+    return exitCli(1);
   }
 }

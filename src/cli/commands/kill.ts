@@ -1,4 +1,4 @@
-import { exitCli } from '../telemetry.js';
+import { exitCli } from '../exit.js';
 import { existsSync, readdirSync } from 'fs';
 import { Effect } from 'effect';
 import chalk from 'chalk';
@@ -70,7 +70,7 @@ export async function killCommand(id: string, options: KillOptions): Promise<voi
       console.error(chalk.dim(
         'Pass an issue ID like "PAN-1148" or a full agent ID like "strike-pan-1723"; the state dir must exist under ~/.overdeck/agents/',
       ));
-      return void exitCli(1);
+      return exitCli(1);
     }
     issueId = resolved;
     const issueLower = issueId.toLowerCase();

@@ -9,6 +9,9 @@ import {
   setAnalyticsClientTypeForProcess,
   shutdownAnalyticsServices,
 } from '../lib/telemetry/service.js';
+import { registerCliExitFinalizer } from './exit.js';
+
+export { exitCli } from './exit.js';
 
 setAnalyticsClientTypeForProcess('cli');
 
@@ -59,6 +62,7 @@ export class CliTelemetryLifecycle {
 }
 
 const cliTelemetry = new CliTelemetryLifecycle();
+registerCliExitFinalizer((code) => cliTelemetry.finish(code === 0));
 
 export async function exitAfterTelemetry(
   code: number,
@@ -67,10 +71,6 @@ export async function exitAfterTelemetry(
 ): Promise<never> {
   await telemetry.finish(code === 0);
   return exit(code);
-}
-
-export async function exitCli(code: number): Promise<never> {
-  return exitAfterTelemetry(code, cliTelemetry);
 }
 
 export async function runCliWithTelemetry(

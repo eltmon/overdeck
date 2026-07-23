@@ -7,7 +7,7 @@
  * stops the fly machine.
  */
 
-import { exitCli } from '../../telemetry.js';
+import { exitCli } from '../../exit.js';
 import chalk from 'chalk';
 import { reapCompletedRemoteAgents } from '../../../lib/remote/remote-completion.js';
 
@@ -37,5 +37,5 @@ export async function reapCommand(options: ReapOptions): Promise<void> {
     if (result.status === 'error') failures++;
   }
 
-  if (failures > 0) { void exitCli(1); return; }
+  if (failures > 0) return exitCli(1);
 }

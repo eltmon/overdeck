@@ -1,4 +1,4 @@
-import { exitCli } from '../telemetry.js';
+import { exitCli } from '../exit.js';
 import { execFile } from 'child_process';
 import { existsSync, readdirSync } from 'fs';
 import { createInterface } from 'readline/promises';
@@ -271,7 +271,7 @@ export async function workspaceReapCommand(options: WorkspaceReapOptions = {}): 
     days = parseReapDays(options.days);
   } catch (error: any) {
     console.error(chalk.red(`✗ ${error.message}`));
-    return void exitCli(1);
+    return exitCli(1);
   }
 
   const cutoffMs = Date.now() - days * 86_400_000;
@@ -281,7 +281,7 @@ export async function workspaceReapCommand(options: WorkspaceReapOptions = {}): 
     containers = await inspectContainers(ids);
   } catch (error: any) {
     console.error(chalk.red(`✗ Failed to query Docker containers: ${error.message ?? error}`));
-    return void exitCli(1);
+    return exitCli(1);
   }
 
   const activeAgentIssueIds = collectActiveAgentIssueIds();

@@ -1,4 +1,4 @@
-import { exitCli } from '../telemetry.js';
+import { exitCli } from '../exit.js';
 import chalk from 'chalk';
 import { existsSync } from 'fs';
 import { getConversationById, getConversationByName } from '../../lib/overdeck/conversations.js';
@@ -58,13 +58,13 @@ export async function handoffCommand(
         console.log(chalk.gray(`  pan handoff self "${focusPreview}"`));
       }
     }
-    return void exitCli(1);
+    return exitCli(1);
   }
 
   const sessionFile = conv.claudeSessionId ? sessionFilePath(conv.cwd, conv.claudeSessionId) : null;
   if (!sessionFile || !existsSync(sessionFile)) {
     console.log(chalk.yellow(`No session file found for conversation ${conv.name}`));
-    return void exitCli(1);
+    return exitCli(1);
   }
 
   const focus = focusArgs.join(' ').trim() || undefined;
@@ -73,21 +73,21 @@ export async function handoffCommand(
     console.log(chalk.yellow(`Focus is ${focus.length} characters — the limit is ${FOCUS_MAX_CHARS}. No conversation was created.`));
     console.log(chalk.gray('  Put the full brief in a file in the target cwd and point a short focus at it,'));
     console.log(chalk.gray('  e.g. "Read .pan/handoff-brief.md FIRST and follow it exactly. <one-line goal>".'));
-    return void exitCli(1);
+    return exitCli(1);
   }
   printIgnoredHarnessNotice('--harness', options.harness);
   printIgnoredHarnessNotice('--author-harness', options.authorHarness);
   const author = options.author === 'source' ? 'source' : 'external';
   if (options.author !== undefined && options.author !== 'source' && options.author !== 'external') {
     console.log(chalk.yellow(`Invalid --author: ${options.author}. Expected source or external.`));
-    return void exitCli(1);
+    return exitCli(1);
   }
   let issueId: string | undefined;
   if (options.issue !== undefined) {
     const parsed = parseIssueIdSync(options.issue.trim());
     if (!parsed) {
       console.log(chalk.yellow(`Invalid --issue: ${options.issue}. Expected an issue ID like PAN-123.`));
-      return void exitCli(1);
+      return exitCli(1);
     }
     issueId = parsed.raw;
   }
@@ -115,7 +115,7 @@ export async function handoffCommand(
   } catch (err) {
     if (err instanceof ForkServerError) {
       console.log(chalk.red(err.message));
-      return void exitCli(1);
+      return exitCli(1);
     }
     throw err;
   }
@@ -123,13 +123,13 @@ export async function handoffCommand(
   if (newConv.forkStatus === 'failed') {
     console.log(chalk.red(`Handoff failed: ${newConv.forkError ?? 'unknown error'}`));
     console.log(chalk.gray(`  Conv ID: ${newConv.id} (Dashboard: https://overdeck.localhost/conv/${newConv.id})`));
-    return void exitCli(1);
+    return exitCli(1);
   }
   if (isForkResultInProgress(newConv)) {
     console.log(chalk.yellow(`Handoff is still in progress — watch https://overdeck.localhost/conv/${newConv.id}`));
     console.log(chalk.gray(`  Conv ID: ${newConv.id}`));
     console.log(chalk.gray(`  Session: ${newConv.tmuxSession}${newConv.sessionAlive ? ' (live)' : ''}`));
-    return void exitCli(1);
+    return exitCli(1);
   }
   if (newConv.forkFallbackReason) {
     console.log(chalk.yellow(`Handoff fell back to summary fork: ${newConv.forkFallbackReason}`));

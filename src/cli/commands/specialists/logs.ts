@@ -6,7 +6,7 @@
  * pan specialists logs --tail <project> <type> - follow active run
  */
 
-import { exitCli } from '../../telemetry.js';
+import { exitCli } from '../../exit.js';
 import { readFileSync, existsSync, statSync } from 'fs';
 import { exec } from 'child_process';
 import { promisify } from 'util';
@@ -75,7 +75,7 @@ export async function listLogsCommand(
     console.log(`\nView a specific run: pan specialists logs ${project} ${type} <runId>\n`);
   } catch (error: any) {
     console.error('❌ Error listing logs:', error.message);
-    return void exitCli(1);
+    return exitCli(1);
   }
 }
 
@@ -95,7 +95,7 @@ export async function viewLogCommand(
 
     if (!content) {
       console.error(`❌ Run log not found: ${runId}`);
-      return void exitCli(1);
+      return exitCli(1);
     }
 
     if (options.json) {
@@ -116,7 +116,7 @@ export async function viewLogCommand(
     }
   } catch (error: any) {
     console.error('❌ Error viewing log:', error.message);
-    return void exitCli(1);
+    return exitCli(1);
   }
 }
 
@@ -133,14 +133,14 @@ export async function tailLogCommand(project: string, type: string): Promise<voi
 
     if (!metadata.currentRun) {
       console.error(`❌ No active run for ${project}/${type}`);
-      return void exitCli(1);
+      return exitCli(1);
     }
 
     const logPath = getRunLogPath(project, type, metadata.currentRun);
 
     if (!existsSync(logPath)) {
       console.error(`❌ Log file not found: ${logPath}`);
-      return void exitCli(1);
+      return exitCli(1);
     }
 
     console.log(`📡 Following ${project}/${type} (${metadata.currentRun})...`);
@@ -156,7 +156,7 @@ export async function tailLogCommand(project: string, type: string): Promise<voi
     process.on('SIGINT', () => {
       console.log('\n\n📊 Stopped following log');
       tail.kill();
-      return void exitCli(0);
+      return exitCli(0);
     });
 
     // Wait for tail to exit
@@ -172,7 +172,7 @@ export async function tailLogCommand(project: string, type: string): Promise<voi
     });
   } catch (error: any) {
     console.error('❌ Error tailing log:', error.message);
-    return void exitCli(1);
+    return exitCli(1);
   }
 }
 
@@ -189,7 +189,7 @@ export async function logsCommand(
   if (typeof projectOrOptions === 'object' && projectOrOptions.tail) {
     if (!type || !runIdOrOptions || typeof runIdOrOptions === 'object') {
       console.error('❌ Usage: pan specialists logs --tail <project> <type>');
-      return void exitCli(1);
+      return exitCli(1);
     }
     await tailLogCommand(type, runIdOrOptions as string);
     return;
@@ -202,7 +202,7 @@ export async function logsCommand(
     const options = (runIdOrOptions as LogsOptions) || {};
     if (!type) {
       console.error('❌ Usage: pan specialists logs <project> <type>');
-      return void exitCli(1);
+      return exitCli(1);
     }
     await listLogsCommand(project, type, options);
     return;
@@ -228,7 +228,7 @@ export async function cleanupLogsCommand(
       if (!(options as any)?.force) {
         console.log('⚠️  This will clean up old logs for all projects and specialists.');
         console.log('   Use --force to confirm.');
-        return void exitCli(1);
+        return exitCli(1);
       }
 
       const { cleanupAllLogsSync } = await import('../../../lib/cloister/specialist-logs.js');
@@ -255,13 +255,13 @@ export async function cleanupLogsCommand(
     if (!projectOrAll || !type) {
       console.error('❌ Usage: pan specialists cleanup-logs <project> <type>');
       console.error('   or:    pan specialists cleanup-logs --all --force');
-      return void exitCli(1);
+      return exitCli(1);
     }
 
     if (!options?.force) {
       console.log(`⚠️  This will clean up old logs for ${projectOrAll}/${type}.`);
       console.log('   Use --force to confirm.');
-      return void exitCli(1);
+      return exitCli(1);
     }
 
     const { cleanupOldLogsSync } = await import('../../../lib/cloister/specialist-logs.js');
@@ -276,6 +276,6 @@ export async function cleanupLogsCommand(
     console.log(`✅ Deleted ${deleted} old logs\n`);
   } catch (error: any) {
     console.error('❌ Error cleaning up logs:', error.message);
-    return void exitCli(1);
+    return exitCli(1);
   }
 }

@@ -2,7 +2,7 @@
  * pan update - Update Overdeck to latest version
  */
 
-import { exitCli } from '../telemetry.js';
+import { exitCli } from '../exit.js';
 import { execFile } from 'child_process';
 import chalk from 'chalk';
 import { readFileSync } from 'fs';
@@ -50,7 +50,7 @@ export async function updateCommand(options: {
   } catch (error) {
     console.error(chalk.red('Failed to check for updates'));
     console.error(chalk.dim('Make sure you have internet connectivity'));
-    return void exitCli(1);
+    return exitCli(1);
   }
 
   const needsUpdate = manager!.getSnapshot().phase === 'available';
@@ -96,6 +96,6 @@ export async function updateCommand(options: {
     console.error(
       chalk.dim('If you were on overdeck or @eltmon/panctl, rerun the install command above to migrate to @overdeck/core.')
     );
-    return void exitCli(1);
+    return exitCli(1);
   }
 }

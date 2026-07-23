@@ -1,4 +1,4 @@
-import { exitCli } from '../../telemetry.js';
+import { exitCli } from '../../exit.js';
 import { Effect } from 'effect';
 /**
  * Specialist Done Command
@@ -39,12 +39,12 @@ export async function doneCommand(
   if (!validSpecialists.includes(specialist)) {
     console.error(chalk.red(`Invalid specialist: ${specialist}`));
     console.error(chalk.dim(`Valid options: ${validSpecialists.join(', ')}`));
-    return void exitCli(1);
+    return exitCli(1);
   }
 
   if (!options.status) {
     console.error(chalk.red('--status is required'));
-    return void exitCli(1);
+    return exitCli(1);
   }
 
   const normalizedIssueId = issueId.toUpperCase();
@@ -55,7 +55,7 @@ export async function doneCommand(
   if (!validStatuses.includes(options.status)) {
     console.error(chalk.red(`Invalid status: ${options.status}`));
     console.error(chalk.dim(`Valid options for ${specialist}: ${validStatuses.join(', ')}`));
-    return void exitCli(1);
+    return exitCli(1);
   }
 
   if (specialist === 'inspect') {

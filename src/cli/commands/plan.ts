@@ -1,4 +1,4 @@
-import { exitCli } from '../telemetry.js';
+import { exitCli } from '../exit.js';
 import chalk from 'chalk';
 import ora from 'ora';
 import { getDashboardApiUrlSync } from '../../lib/config.js';
@@ -18,7 +18,7 @@ interface PlanOptions {
 export async function planCommand(id: string | undefined, options: PlanOptions): Promise<void> {
   if (!id) {
     console.error(chalk.red('Issue ID required. Usage: pan plan <id> [--auto]'));
-    return void exitCli(1);
+    return exitCli(1);
   }
 
   const issueId = id.toUpperCase();
@@ -56,7 +56,7 @@ export async function planCommand(id: string | undefined, options: PlanOptions):
         if (text) message = text;
       }
       spinner.fail(message);
-      return void exitCli(1);
+      return exitCli(1);
     }
 
     let sessionName = '';
@@ -70,6 +70,6 @@ export async function planCommand(id: string | undefined, options: PlanOptions):
   } catch (error) {
     spinner.fail(error instanceof Error ? error.message : String(error));
     printPlanningConnectionError(issueId);
-    return void exitCli(1);
+    return exitCli(1);
   }
 }

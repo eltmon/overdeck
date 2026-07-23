@@ -4,7 +4,7 @@
  * Fetches current status from tracker and updates the shadow state cache.
  */
 
-import { exitCli } from '../telemetry.js';
+import { exitCli } from '../exit.js';
 import chalk from 'chalk';
 import ora from 'ora';
 import {
@@ -74,7 +74,7 @@ export async function refreshCommand(id: string, options: RefreshOptions = {}): 
   if (!state) {
     spinner.fail(`Issue ${issueId} is not in shadow mode`);
     console.log(chalk.dim('Use --shadow flag when running pan start/plan/done to enable shadow mode'));
-    return void exitCli(1);
+    return exitCli(1);
   }
 
   let result: { success: boolean; error?: string; state?: IssueState } = {
@@ -88,16 +88,16 @@ export async function refreshCommand(id: string, options: RefreshOptions = {}): 
       result = await refreshFromLinear(apiKey, issueId);
     } else {
       spinner.fail('LINEAR_API_KEY not set');
-      return void exitCli(1);
+      return exitCli(1);
     }
   } else {
     spinner.fail('Only Linear issues are supported for refresh');
-    return void exitCli(1);
+    return exitCli(1);
   }
 
   if (!result.success) {
     spinner.fail(`Refresh failed: ${result.error}`);
-    return void exitCli(1);
+    return exitCli(1);
   }
 
   // Update the cache

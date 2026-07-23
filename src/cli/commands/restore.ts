@@ -1,4 +1,4 @@
-import { exitCli } from '../telemetry.js';
+import { exitCli } from '../exit.js';
 import chalk from 'chalk';
 import ora from 'ora';
 import inquirer from 'inquirer';
@@ -75,6 +75,6 @@ export async function restoreCommand(timestamp?: string): Promise<void> {
   } catch (error: any) {
     spinner.fail('Failed to restore');
     console.error(chalk.red(error.message));
-    return void exitCli(1);
+    return exitCli(1);
   }
 }

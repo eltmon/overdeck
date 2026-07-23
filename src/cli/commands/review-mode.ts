@@ -1,4 +1,4 @@
-import { exitCli } from '../telemetry.js';
+import { exitCli } from '../exit.js';
 import chalk from 'chalk';
 
 import type { ReviewMode } from '../../lib/config-yaml.js';
@@ -17,7 +17,7 @@ export async function reviewModeCommand(id: string, mode: string): Promise<void>
   if (!isReviewMode(mode)) {
     console.error(chalk.red(`Error: review mode must be quick, full, or none, got '${mode}'`));
     console.error(chalk.dim(`Usage: pan review mode ${issueId} <quick|full|none>`));
-    return void exitCli(1);
+    return exitCli(1);
   }
 
   const project = resolveProjectForIssue(issueId) ?? getProjectConfigFromWorkspacePath(process.cwd());
@@ -39,7 +39,7 @@ export async function reviewScopeCommand(id: string, scope: string): Promise<voi
   if (!isReReviewScope(scope)) {
     console.error(chalk.red(`Error: re-review scope must be all, changed, or blockers, got '${scope}'`));
     console.error(chalk.dim(`Usage: pan review scope ${issueId} <all|changed|blockers>`));
-    return void exitCli(1);
+    return exitCli(1);
   }
 
   const project = resolveProjectForIssue(issueId) ?? getProjectConfigFromWorkspacePath(process.cwd());

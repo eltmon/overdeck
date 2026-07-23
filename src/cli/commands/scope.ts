@@ -6,7 +6,7 @@
  * branch-awareness, and background-push behavior.
  */
 
-import { exitCli } from '../telemetry.js';
+import { exitCli } from '../exit.js';
 import { Command } from 'commander';
 import chalk from 'chalk';
 import { Effect } from 'effect';
@@ -270,7 +270,7 @@ async function showCommand(issueId: string, options: { project?: string }): Prom
   const found = findXBriefByIssueSync(projectPath, upperId);
   if (!found) {
     console.log(chalk.red(`No xBRIEF found for ${upperId} in ${projectPath}`));
-    return void exitCli(1);
+    return exitCli(1);
   }
 
   const plan = found.document.plan;
@@ -447,11 +447,11 @@ async function restoreCommand(issueId: string, options: { project?: string }): P
   const found = findXBriefByIssueSync(projectPath, issueId);
   if (!found) {
     console.log(chalk.red(`No xBRIEF found for ${issueId}`));
-    return void exitCli(1);
+    return exitCli(1);
   }
   if (found.lifecycleDir !== 'completed' && found.lifecycleDir !== 'cancelled') {
     console.log(chalk.yellow(`xBRIEF is in ${found.lifecycleDir} — restore only works from completed/ or cancelled/`));
-    return void exitCli(1);
+    return exitCli(1);
   }
   const result = await Effect.runPromise(transitionXBriefOnMain(
     projectPath,

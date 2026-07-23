@@ -1,4 +1,4 @@
-import { exitCli } from '../telemetry.js';
+import { exitCli } from '../exit.js';
 import chalk from 'chalk';
 import ora from 'ora';
 import {
@@ -22,7 +22,7 @@ export async function recoverCommand(id?: string, options: RecoverOptions = {}):
   try {
     if (options.compact && !id) {
       spinner.fail('Specify an agent ID when using --compact');
-      return void exitCli(1);
+      return exitCli(1);
     }
 
     // Auto-recover all crashed agents
@@ -100,7 +100,7 @@ export async function recoverCommand(id?: string, options: RecoverOptions = {}):
       });
       if (!result.success) {
         spinner.fail(result.error || `Failed to compact-recover ${agentId}`);
-        return void exitCli(1);
+        return exitCli(1);
       }
 
       spinner.succeed(`Compact-recovered: ${agentId}`);
@@ -114,7 +114,7 @@ export async function recoverCommand(id?: string, options: RecoverOptions = {}):
 
     if (!state) {
       spinner.fail(`Agent not found: ${agentId}`);
-      return void exitCli(1);
+      return exitCli(1);
     }
 
     spinner.succeed(`Recovered: ${agentId}`);
@@ -130,6 +130,6 @@ export async function recoverCommand(id?: string, options: RecoverOptions = {}):
 
   } catch (error: any) {
     spinner.fail(error.message);
-    return void exitCli(1);
+    return exitCli(1);
   }
 }

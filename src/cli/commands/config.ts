@@ -1,4 +1,4 @@
-import { exitCli } from '../telemetry.js';
+import { exitCli } from '../exit.js';
 import { Effect } from 'effect';
 import { Command } from 'commander';
 import chalk from 'chalk';
@@ -45,7 +45,7 @@ async function configShadowCommand(options: ShadowOptions): Promise<void> {
     if (!validTrackers.includes(trackerType)) {
       console.log(chalk.red(`Error: Invalid tracker type '${trackerType}'`));
       console.log(chalk.dim(`Valid trackers: ${validTrackers.join(', ')}`));
-      return void exitCli(1);
+      return exitCli(1);
     }
 
     if (options.enable) {

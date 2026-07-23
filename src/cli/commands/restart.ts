@@ -1,4 +1,4 @@
-import { exitCli } from '../telemetry.js';
+import { exitCli } from '../exit.js';
 import { Effect } from 'effect';
 /**
  * `pan restart` — scoped restart with explicit dependency isolation.

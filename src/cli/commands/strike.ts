@@ -1,4 +1,4 @@
-import { exitCli } from '../telemetry.js';
+import { exitCli } from '../exit.js';
 import chalk from 'chalk';
 import ora from 'ora';
 import { existsSync, mkdirSync } from 'fs';
@@ -237,7 +237,7 @@ async function runOne(issueId: string, options: StrikeOptions): Promise<void> {
 export async function strikeCommand(ids: string[], options: StrikeOptions = {}): Promise<void> {
   if (!ids || ids.length === 0) {
     console.error(chalk.red('Issue ID required. Usage: pan strike <id> [<id>...]'));
-    return void exitCli(1);
+    return exitCli(1);
   }
 
   let failures = 0;
@@ -251,7 +251,7 @@ export async function strikeCommand(ids: string[], options: StrikeOptions = {}):
 
   if (failures > 0) {
     console.error(chalk.red(`\n${failures} of ${ids.length} strike(s) failed`));
-    return void exitCli(1);
+    return exitCli(1);
   }
 }
 

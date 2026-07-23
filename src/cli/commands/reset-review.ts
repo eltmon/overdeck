@@ -8,7 +8,7 @@
  * review reset completes.
  */
 
-import { exitCli } from '../telemetry.js';
+import { exitCli } from '../exit.js';
 import chalk from 'chalk';
 import { getDashboardApiUrlSync } from '../../lib/config.js';
 import { resetReviewSessionsCommand } from './reset-session.js';
@@ -34,7 +34,7 @@ export async function resetReviewCommand(id: string, options: ResetReviewOptions
 
     if (!response.ok) {
       console.error(chalk.red(`\nError: ${result.error || 'Failed to reset review cycles'}`));
-      return void exitCli(1);
+      return exitCli(1);
     }
 
     console.log(chalk.green(`\n✓ ${result.message}`));
@@ -54,9 +54,9 @@ export async function resetReviewCommand(id: string, options: ResetReviewOptions
     if (error.code === 'ECONNREFUSED') {
       console.error(chalk.red('\nError: Dashboard not running'));
       console.error(chalk.dim('Start the dashboard with: pan up'));
-      return void exitCli(1);
+      return exitCli(1);
     }
     console.error(chalk.red(`\nError: ${error.message}`));
-    return void exitCli(1);
+    return exitCli(1);
   }
 }

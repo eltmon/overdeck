@@ -1,4 +1,4 @@
-import { exitCli } from '../telemetry.js';
+import { exitCli } from '../exit.js';
 import { Command } from 'commander';
 import chalk from 'chalk';
 import ora from 'ora';
@@ -207,7 +207,7 @@ async function installCommand(options: InstallOptions): Promise<void> {
 
   if (options.check) {
     printPrereqStatus(prereqs);
-    return void exitCli(prereqs.allPassed ? 0 : 1);
+    return exitCli(prereqs.allPassed ? 0 : 1);
   }
 
   printPrereqStatus(prereqs);
@@ -215,7 +215,7 @@ async function installCommand(options: InstallOptions): Promise<void> {
   if (!prereqs.allPassed) {
     console.log(chalk.red('Fix prerequisites above before continuing.'));
     console.log(chalk.dim('Tip: Run with --minimal to skip optional components'));
-    return void exitCli(1);
+    return exitCli(1);
   }
 
   // Step 2: Initialize directories

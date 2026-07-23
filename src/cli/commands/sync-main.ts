@@ -5,7 +5,7 @@
  * Uses git merge (not rebase) and delegates conflict resolution to the merge-agent.
  */
 
-import { exitCli } from '../telemetry.js';
+import { exitCli } from '../exit.js';
 import chalk from 'chalk';
 import ora from 'ora';
 import { getDashboardApiUrlSync } from '../../lib/config.js';
@@ -40,7 +40,7 @@ export async function syncMainCommand(id: string): Promise<void> {
         console.error(chalk.yellow('\nConflict files:'));
         result.conflictFiles.forEach(f => console.error(chalk.yellow(`  - ${f}`)));
       }
-      return void exitCli(1);
+      return exitCli(1);
     }
 
     if (result.alreadyUpToDate) {
@@ -65,6 +65,6 @@ export async function syncMainCommand(id: string): Promise<void> {
   } catch (error: any) {
     spinner.fail(chalk.red(`Failed to reach dashboard: ${error.message}`));
     console.error(chalk.dim(`Make sure the dashboard is running: pan up`));
-    return void exitCli(1);
+    return exitCli(1);
   }
 }

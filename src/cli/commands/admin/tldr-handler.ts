@@ -1,4 +1,4 @@
-import { exitCli } from '../../telemetry.js';
+import { exitCli } from '../../exit.js';
 import chalk from 'chalk';
 import { getTldrDaemonServiceSync, listTldrDaemonServicesSync } from '../../../lib/tldr-daemon.js';
 import { existsSync, readdirSync, readFileSync, statSync } from 'fs';
@@ -211,13 +211,13 @@ async function startCommand(workspace: string | undefined, options: TldrOptions)
 
     if (!existsSync(wsPath)) {
       console.error(chalk.red(`Error: Workspace not found: ${workspace}`));
-      return void exitCli(1);
+      return exitCli(1);
     }
 
     if (!existsSync(venvPath)) {
       console.error(chalk.red(`Error: No .venv found in workspace: ${workspace}`));
       console.error(chalk.dim('Workspace needs to be recreated with TLDR support'));
-      return void exitCli(1);
+      return exitCli(1);
     }
 
     const service = getTldrDaemonServiceSync(wsPath, venvPath);
@@ -233,7 +233,7 @@ async function startCommand(workspace: string | undefined, options: TldrOptions)
     if (!existsSync(venvPath)) {
       console.error(chalk.red('Error: No .venv found in project root'));
       console.error(chalk.dim('Create a project .venv, then run `pan admin tldr start`'));
-      return void exitCli(1);
+      return exitCli(1);
     }
 
     const service = getTldrDaemonServiceSync(projectRoot, venvPath);
@@ -255,12 +255,12 @@ async function stopCommand(workspace: string | undefined, options: TldrOptions):
 
     if (!existsSync(wsPath)) {
       console.error(chalk.red(`Error: Workspace not found: ${workspace}`));
-      return void exitCli(1);
+      return exitCli(1);
     }
 
     if (!existsSync(venvPath)) {
       console.error(chalk.red(`Error: No .venv found in workspace: ${workspace}`));
-      return void exitCli(1);
+      return exitCli(1);
     }
 
     const service = getTldrDaemonServiceSync(wsPath, venvPath);
@@ -275,7 +275,7 @@ async function stopCommand(workspace: string | undefined, options: TldrOptions):
 
     if (!existsSync(venvPath)) {
       console.error(chalk.red('Error: No .venv found in project root'));
-      return void exitCli(1);
+      return exitCli(1);
     }
 
     const service = getTldrDaemonServiceSync(projectRoot, venvPath);
@@ -297,12 +297,12 @@ async function warmCommand(workspace: string | undefined, options: TldrOptions):
 
     if (!existsSync(wsPath)) {
       console.error(chalk.red(`Error: Workspace not found: ${workspace}`));
-      return void exitCli(1);
+      return exitCli(1);
     }
 
     if (!existsSync(venvPath)) {
       console.error(chalk.red(`Error: No .venv found in workspace: ${workspace}`));
-      return void exitCli(1);
+      return exitCli(1);
     }
 
     const service = getTldrDaemonServiceSync(wsPath, venvPath);
@@ -324,7 +324,7 @@ async function warmCommand(workspace: string | undefined, options: TldrOptions):
     if (!existsSync(venvPath)) {
       console.error(chalk.red('Error: No .venv found in project root'));
       console.error(chalk.dim('Create a project .venv, then run `pan admin tldr start`'));
-      return void exitCli(1);
+      return exitCli(1);
     }
 
     const service = getTldrDaemonServiceSync(projectRoot, venvPath);

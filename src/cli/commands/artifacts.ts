@@ -1,4 +1,4 @@
-import { exitCli } from '../telemetry.js';
+import { exitCli } from '../exit.js';
 import { spawn } from 'node:child_process';
 import { resolve } from 'node:path';
 import chalk from 'chalk';
@@ -176,7 +176,7 @@ export async function artifactShareCommand(file: string, options: ArtifactShareO
     console.error(chalk.red('tunneling not yet supported'));
   }
 
-  return void exitCli(1);
+  return exitCli(1);
 }
 
 export async function artifactValidateCommand(file: string, options: ValidateOptions = {}, deps: ArtifactCommandDeps = {}): Promise<void> {
@@ -355,7 +355,7 @@ async function runArtifactCommand(action: () => Promise<void>, options: { json?:
     } else {
       printError(error);
     }
-    return void exitCli(1);
+    return exitCli(1);
   }
 }
 

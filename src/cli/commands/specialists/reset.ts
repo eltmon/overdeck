@@ -6,7 +6,7 @@
  * are managed through the normal agent lifecycle.
  */
 
-import { exitCli } from '../../telemetry.js';
+import { exitCli } from '../../exit.js';
 import chalk from 'chalk';
 
 interface ResetOptions {
@@ -18,5 +18,5 @@ export async function resetCommand(name: string | undefined, options: ResetOptio
   const target = options.all ? 'all legacy specialists' : (name ?? 'the requested specialist');
   console.log(chalk.red(`\nLegacy specialist reset is no longer supported for ${target}.`));
   console.log(chalk.dim('Use role-agent controls or stop the relevant tmux session/agent from the dashboard.\n'));
-  return void exitCli(1);
+  return exitCli(1);
 }
