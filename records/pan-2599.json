@@ -51,6 +51,11 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-23T00:23:33.348Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-23T00:29:23.475Z"
     }
   ],
   "feedback": [],
@@ -192,10 +197,10 @@
     "recordedAt": "2026-07-22T23:16:44.964Z"
   },
   "created": "2026-07-16T05:02:53.170Z",
-  "updated": "2026-07-23T00:29:21.138Z",
+  "updated": "2026-07-23T00:29:23.475Z",
   "pipeline": {
     "issueId": "PAN-2599",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -203,13 +208,13 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-22T23:25:31.079Z",
-    "updatedAt": "2026-07-23T00:29:21.123Z",
+    "updatedAt": "2026-07-23T00:29:21.966Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "inspectNotes": "Both ACs verified in diff: getClient() gates on telemetryBlockedForProcess()+resolveTelemetryEnabled() before constructing PostHog, so disabled capture()+shutdown() never invoke the constructor (AC1); shutdown() races client.shutdown() against a 2s setTimeout with finally-clearTimeout, and service.test.ts's hung-flush test advances fake timers to exactly 2000ms to confirm the bound (AC2).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3009",
     "lastVerifiedCommit": "88ffb3732083499a580c334fa219cb59655c2279",
     "reviewRequestedAt": "2026-07-22T23:25:31.079Z",
-    "reviewSpawnedAt": "2026-07-23T00:23:32.072Z",
+    "reviewSpawnedAt": "2026-07-23T00:29:21.965Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         ".github/workflows/release.yml",
@@ -426,7 +431,7 @@
       },
       "costAtCloseOut": {
         "usd": 340.892783,
-        "pricingAsOf": "2026-07-23T00:29:21.134Z"
+        "pricingAsOf": "2026-07-23T00:29:22.007Z"
       }
     },
     "merges": [
