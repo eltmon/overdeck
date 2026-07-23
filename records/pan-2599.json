@@ -197,7 +197,7 @@
     "recordedAt": "2026-07-22T23:16:44.964Z"
   },
   "created": "2026-07-16T05:02:53.170Z",
-  "updated": "2026-07-23T00:29:23.475Z",
+  "updated": "2026-07-23T00:29:27.949Z",
   "pipeline": {
     "issueId": "PAN-2599",
     "reviewStatus": "reviewing",
@@ -208,7 +208,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-22T23:25:31.079Z",
-    "updatedAt": "2026-07-23T00:29:21.966Z",
+    "updatedAt": "2026-07-23T00:29:27.918Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "inspectNotes": "Both ACs verified in diff: getClient() gates on telemetryBlockedForProcess()+resolveTelemetryEnabled() before constructing PostHog, so disabled capture()+shutdown() never invoke the constructor (AC1); shutdown() races client.shutdown() against a 2s setTimeout with finally-clearTimeout, and service.test.ts's hung-flush test advances fake timers to exactly 2000ms to confirm the bound (AC2).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3009",
@@ -431,7 +431,7 @@
       },
       "costAtCloseOut": {
         "usd": 340.892783,
-        "pricingAsOf": "2026-07-23T00:29:22.007Z"
+        "pricingAsOf": "2026-07-23T00:29:27.927Z"
       }
     },
     "merges": [
