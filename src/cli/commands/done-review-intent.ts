@@ -29,5 +29,5 @@ export async function persistDoneReviewIntent(
       updatedAt: intent.reviewRequestedAt,
     };
   });
-  capturePipelineStageForIssue(issueId, 'work_done');
+  void capturePipelineStageForIssue(issueId, 'work_done');
 }

@@ -551,7 +551,7 @@ export async function postMergeLifecycle(
     await maybeSpawnPostMergeKnowledgeRetro(issueId, projectPath);
 
     // Mark completed BEFORE logging — prevents re-entry even if the log line triggers something
-    _completedPostMerge.add(issueId); capturePipelineStageForIssue(issueId, 'merged');
+    _completedPostMerge.add(issueId); void capturePipelineStageForIssue(issueId, 'merged');
 
     console.log(`[merge-agent] Post-merge handoff completed for ${issueId}. Awaiting close-out (verify on main).`);
     announceMerge('completed', issueId);

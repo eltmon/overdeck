@@ -32,6 +32,7 @@ export interface TelemetryExceptionContext {
 let cachedOverdeckVersion: string | undefined;
 let processAnalyticsClientType: AnalyticsClientType = 'server';
 const sharedAnalyticsServices = new Map<AnalyticsClientType, AnalyticsService>();
+const pendingAnalyticsTasks = new Set<Promise<unknown>>();
 
 function getOverdeckVersion(): string {
   if (cachedOverdeckVersion) return cachedOverdeckVersion;
@@ -225,7 +226,25 @@ export function getAnalyticsService(clientType: AnalyticsClientType): AnalyticsS
   return analytics;
 }
 
+export function trackAnalyticsTask<Task extends Promise<unknown>>(task: Task): Task {
+  pendingAnalyticsTasks.add(task);
+  const remove = (): void => { pendingAnalyticsTasks.delete(task); };
+  void task.then(remove, remove);
+  return task;
+}
+
 export async function shutdownAnalyticsServices(): Promise<void> {
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  try {
+    await Promise.race([
+      Promise.allSettled([...pendingAnalyticsTasks]),
+      new Promise<void>((resolve) => {
+        timeout = setTimeout(resolve, SHUTDOWN_TIMEOUT_MS);
+      }),
+    ]);
+  } finally {
+    if (timeout) clearTimeout(timeout);
+  }
   await Promise.all(
     [...sharedAnalyticsServices.values()].map((analytics) => analytics.shutdown()),
   );

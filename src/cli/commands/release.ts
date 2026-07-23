@@ -187,11 +187,12 @@ export async function uploadReleaseSourcemaps(
   ];
 
   try {
-    await runCommand('npx', ['posthog-cli', 'sourcemap', 'inject', ...releaseArgs], {
+    await runCommand('npx', ['--no-install', 'posthog-cli', 'sourcemap', 'inject', ...releaseArgs], {
       cwd: repoRoot,
       env,
     });
     await runCommand('npx', [
+      '--no-install',
       'posthog-cli',
       'sourcemap',
       'upload',

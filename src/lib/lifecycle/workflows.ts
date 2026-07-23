@@ -223,12 +223,14 @@ export function closeOut(
     }
 
     // 5+6. Teardown workspace + agent state
-    let telemetryContext: PipelineTelemetryContext | null = null;
-    try {
-      telemetryContext = resolvePipelineTelemetryContext(ctx.issueId);
-    } catch {
-      // Agent attribution is best-effort and must not abort close-out.
-    }
+    const telemetryContext: PipelineTelemetryContext | null = yield* Effect.promise(async () => {
+      try {
+        return await resolvePipelineTelemetryContext(ctx.issueId);
+      } catch {
+        // Membership and agent attribution are best-effort and must not abort close-out.
+        return null;
+      }
+    });
     const closeOutConfig = (yield* Effect.promise(() => Effect.runPromise(loadCloisterConfig()))).close_out;
     const teardownSteps = yield* teardownWorkspace(ctx, {
       deleteWorkspace: closeOutConfig?.remove_workspace ?? false,

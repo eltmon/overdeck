@@ -44,27 +44,45 @@ describe('pipeline telemetry events', () => {
     }
   });
 
-  it('resolves harness and model family from the work agent only', () => {
+  it('resolves harness and model family from the work agent only', async () => {
     const readAgent = vi.fn(() => ({
       harness: 'codex',
       model: 'gpt-5.6-sol',
     }) as never);
 
-    expect(resolvePipelineTelemetryContext('PAN-2599', readAgent)).toEqual({
+    await expect(resolvePipelineTelemetryContext(
+      'PAN-2599',
+      readAgent,
+      async () => true,
+    )).resolves.toEqual({
       harness: 'codex',
       model: 'gpt',
     });
     expect(readAgent).toHaveBeenCalledWith('agent-pan-2599');
   });
 
-  it('skips legacy agent rows without a usable model', () => {
-    expect(resolvePipelineTelemetryContext('PAN-2599', () => ({
+  it('checks canonical membership before reading agent attribution', async () => {
+    const readAgent = vi.fn(() => ({
       harness: 'claude-code',
-    }))).toBeNull();
-    expect(resolvePipelineTelemetryContext('PAN-2599', () => ({
+      model: 'claude-sonnet-5',
+    }) as const);
+
+    await expect(resolvePipelineTelemetryContext(
+      'PAN-2599',
+      readAgent,
+      async () => false,
+    )).resolves.toBeNull();
+    expect(readAgent).not.toHaveBeenCalled();
+  });
+
+  it('skips legacy agent rows without a usable model', async () => {
+    await expect(resolvePipelineTelemetryContext('PAN-2599', () => ({
+      harness: 'claude-code',
+    }), async () => true)).resolves.toBeNull();
+    await expect(resolvePipelineTelemetryContext('PAN-2599', () => ({
       harness: 'claude-code',
       model: '   ',
-    }))).toBeNull();
+    }), async () => true)).resolves.toBeNull();
   });
 
   it('maps model names into the declared privacy-safe families', () => {

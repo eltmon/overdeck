@@ -30,7 +30,7 @@ const {
   mockSweepOrphanedTasks: vi.fn().mockResolvedValue({ ok: true, closedIds: [], skipped: 0 }),
   mockEvaluateDodGate: vi.fn(),
   mockCapturePipelineStage: vi.fn(),
-  mockResolvePipelineTelemetryContext: vi.fn(() => null),
+  mockResolvePipelineTelemetryContext: vi.fn(async () => null),
 }));
 
 vi.mock('../../../../src/lib/lifecycle/dod-gate.js', () => ({

@@ -1,4 +1,10 @@
-import { mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs';
+import {
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -23,6 +29,21 @@ describe('getOrCreateInstallId', () => {
       process.env.OVERDECK_HOME = originalOverdeckHome;
     }
   });
+
+  it.each(['', 'partial-id', '123e4567-e89b-12d3-a456-426614174000'])(
+    'atomically repairs invalid persisted content %j',
+    (invalidContent) => {
+      const installIdPath = join(testHome, 'telemetry-id');
+      writeFileSync(installIdPath, invalidContent, { mode: 0o644 });
+
+      const repaired = getOrCreateInstallId();
+
+      expect(repaired).toMatch(UUID_V4_PATTERN);
+      expect(readFileSync(installIdPath, 'utf8').trim()).toBe(repaired);
+      expect(statSync(installIdPath).mode & 0o777).toBe(0o600);
+      expect(getOrCreateInstallId()).toBe(repaired);
+    },
+  );
 
   it('creates one stable UUIDv4 under OVERDECK_HOME with mode 0600', () => {
     const first = getOrCreateInstallId();

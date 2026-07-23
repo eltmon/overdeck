@@ -70,13 +70,13 @@ describe('release sourcemap upload', () => {
     expect(run).toHaveBeenNthCalledWith(
       1,
       'npx',
-      ['posthog-cli', 'sourcemap', 'inject', ...releaseArgs],
+      ['--no-install', 'posthog-cli', 'sourcemap', 'inject', ...releaseArgs],
       { cwd: repoRoot, env },
     );
     expect(run).toHaveBeenNthCalledWith(
       2,
       'npx',
-      ['posthog-cli', 'sourcemap', 'upload', ...releaseArgs, '--delete-after'],
+      ['--no-install', 'posthog-cli', 'sourcemap', 'upload', ...releaseArgs, '--delete-after'],
       { cwd: repoRoot, env },
     );
     await expect(access(mapPath)).rejects.toMatchObject({ code: 'ENOENT' });

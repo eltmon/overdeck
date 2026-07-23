@@ -12,6 +12,13 @@ const telemetryDocPath = join(repoRoot, 'docs', 'TELEMETRY.md');
 
 type Catalog = Record<string, Record<string, string>>;
 type Domains = Record<string, string[]>;
+interface DocsNavigation {
+  navigation?: {
+    tabs?: Array<{
+      groups?: Array<{ pages?: unknown[] }>;
+    }>;
+  };
+}
 
 function documentedCatalog(markdown: string): Catalog {
   const catalog: Catalog = {};
@@ -99,11 +106,15 @@ describe('telemetry documentation', () => {
   });
 
   it('registers the telemetry and agent-reference pages in Mintlify navigation', () => {
-    const docsConfig = JSON.parse(readFileSync(join(repoRoot, 'docs.json'), 'utf8')) as unknown;
-    const serialized = JSON.stringify(docsConfig);
+    const docsConfig = JSON.parse(
+      readFileSync(join(repoRoot, 'docs.json'), 'utf8'),
+    ) as DocsNavigation;
+    const pages = docsConfig.navigation?.tabs?.flatMap((tab) =>
+      tab.groups?.flatMap((group) => group.pages ?? []) ?? []
+    ) ?? [];
 
-    expect(serialized).toContain('configuration/telemetry');
-    expect(serialized).toContain('reference/posthog-agents');
+    expect(pages).toContain('configuration/telemetry');
+    expect(pages).toContain('reference/posthog-agents');
     expect(() => readFileSync(join(repoRoot, 'configuration', 'telemetry.mdx'), 'utf8')).not.toThrow();
     expect(() => readFileSync(join(repoRoot, 'reference', 'posthog-agents.mdx'), 'utf8')).not.toThrow();
   });

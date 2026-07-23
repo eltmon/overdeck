@@ -84,12 +84,12 @@ self-hosted URL when applicable.
 The release pipeline runs the equivalent of:
 
 ```bash
-npx posthog-cli sourcemap inject \
+npx --no-install posthog-cli sourcemap inject \
   --directory dist/dashboard/public \
   --release-name overdeck-dashboard \
   --release-version 1.2.3
 
-npx posthog-cli sourcemap upload \
+npx --no-install posthog-cli sourcemap upload \
   --directory dist/dashboard/public \
   --release-name overdeck-dashboard \
   --release-version 1.2.3 \

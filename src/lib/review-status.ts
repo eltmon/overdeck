@@ -482,7 +482,7 @@ export function setReviewStatusSync(
     });
   }
   if (update.reviewStatus && update.reviewStatus !== status.reviewStatus) {
-    if (update.reviewStatus === 'passed') capturePipelineStageForIssue(issueId, 'review_passed');
+    if (update.reviewStatus === 'passed') void capturePipelineStageForIssue(issueId, 'review_passed');
     let reviewMsg = `${issueId} — review started`;
     if (update.reviewStatus === 'reviewing') {
       const retryCount = updated.reviewRetryCount ?? 0;

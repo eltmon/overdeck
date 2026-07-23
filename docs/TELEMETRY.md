@@ -33,8 +33,9 @@ and feature-flag operations local no-ops.
 The first telemetry-capable run creates a random UUIDv4 at
 `~/.overdeck/telemetry-id`, or `${OVERDECK_HOME}/telemetry-id` when
 `OVERDECK_HOME` is set. The file is created with mode `0600` and reused on that
-installation. Overdeck does not derive identity from Claude Code, Codex, Git,
-GitHub, or any other credential or account file.
+installation. Invalid or partial file content is replaced atomically with a new
+UUIDv4 and mode `0600`. Overdeck does not derive identity from Claude Code,
+Codex, Git, GitHub, or any other credential or account file.
 
 ## Event schema
 
@@ -83,7 +84,9 @@ the public contract and lists every allowed value.
 | `pipeline_stage` | `work_done`, `review_passed`, `verification_passed`, `merged`, `closed_out` |
 | `project_mode` | `existing`, `new` |
 
-Raw counts and timings are never sent.
+Raw counts and timings are never sent. Pipeline attribution is emitted only
+after the canonical pipeline-membership resolver confirms that the issue is in
+the pipeline, so stale agent rows cannot supply harness or model metadata.
 
 Node events also receive the anonymous install ID and the centrally stamped
 `$process_person_profile: false`, platform, architecture, Overdeck version, and

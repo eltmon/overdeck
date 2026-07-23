@@ -890,7 +890,7 @@ async function runVerificationForIssuePromise(
       verificationNotes: undefined,
       ...(lastVerifiedCommit ? { lastVerifiedCommit } : {}),
     });
-    capturePipelineStageForIssue(issueId, 'verification_passed');
+    void capturePipelineStageForIssue(issueId, 'verification_passed');
     console.log(`[${logPrefix}] Verification passed for ${issueId}${lastVerifiedCommit ? ` (HEAD=${lastVerifiedCommit.slice(0, 8)})` : ''} — proceeding to review-agent`);
 
     // Post overdeck/tests=success so the GitHub CI test job can self-skip

@@ -1,5 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { AnalyticsService } from '../../../../src/lib/telemetry/service.js';
+import {
+  AnalyticsService,
+  trackAnalyticsTask,
+} from '../../../../src/lib/telemetry/service.js';
 import { CliTelemetryLifecycle } from '../../../../src/cli/telemetry.js';
 import { capturePipelineStage } from '../../../../src/lib/telemetry/pipeline.js';
 import { resolveTelemetryEnabled } from '../../../../src/lib/telemetry/config.js';
@@ -110,6 +113,22 @@ describe('AnalyticsService', () => {
         clientType: 'cli',
       }),
     }));
+    expect(shutdownMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('waits for pending analytics work before flushing shared clients', async () => {
+    let finishPending: (() => void) | undefined;
+    trackAnalyticsTask(new Promise<void>((resolve) => {
+      finishPending = resolve;
+    }));
+    const telemetry = new CliTelemetryLifecycle(undefined, 0);
+
+    const finish = telemetry.finish(true, ['node', 'pan', 'done'], 50);
+    await Promise.resolve();
+
+    expect(shutdownMock).not.toHaveBeenCalled();
+    finishPending?.();
+    await finish;
     expect(shutdownMock).toHaveBeenCalledTimes(1);
   });
 
