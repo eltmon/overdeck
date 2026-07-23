@@ -4,6 +4,7 @@
  * pan specialists <command>
  */
 
+import { exitCli } from '../../telemetry.js';
 import { Command } from 'commander';
 import { listCommand } from './list.js';
 import { wakeCommand } from './wake.js';
@@ -45,12 +46,12 @@ export function registerSpecialistsCommands(program: Command): void {
     .action(async (type: string, issueId: string) => {
       if (type !== 'review') {
         console.error(`discovery-ready only applies to the review specialist (got '${type}')`);
-        process.exit(1);
+        return void exitCli(1);
       }
       const { handleReviewDiscoveryReady } = await import('../../../lib/cloister/review-agent.js');
       const result = await handleReviewDiscoveryReady(issueId, { source: 'cli-signal' });
       console.log(result.message);
-      process.exit(result.success ? 0 : 1);
+      return void exitCli(result.success ? 0 : 1);
     });
 
   // pan specialists done <type> <issueId> --status <passed|failed|blocked> [--notes "..."]

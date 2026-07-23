@@ -8,6 +8,7 @@
  *   enable    Re-enable docs RAG injection
  */
 
+import { exitCli } from '../telemetry.js';
 import { Command } from 'commander';
 import { existsSync } from 'fs';
 import {
@@ -76,7 +77,7 @@ export function createDocsCommand(commandOptions: CreateDocsCommandOptions = {})
       const top = Number.parseInt(options.top ?? '5', 10);
       if (!Number.isFinite(top) || top <= 0) {
         console.error(`Invalid --top value: ${options.top}`);
-        process.exit(1);
+        return void exitCli(1);
       }
       const indexPath = options.indexPath ?? getDocsIndexPath();
       if (!existsSync(indexPath)) {
@@ -107,7 +108,7 @@ export function createDocsCommand(commandOptions: CreateDocsCommandOptions = {})
       const scope = (options.scope ?? 'session') as DocsDisableScope;
       if (!['session', 'project', 'global'].includes(scope)) {
         console.error(`Invalid scope: ${scope}`);
-        process.exit(1);
+        return void exitCli(1);
       }
       await setDocsDisabled({ scope, disabled: true, reason: options.reason });
       console.log(`Docs RAG disabled (scope: ${scope})`);
@@ -121,7 +122,7 @@ export function createDocsCommand(commandOptions: CreateDocsCommandOptions = {})
       const scope = (options.scope ?? 'session') as DocsDisableScope;
       if (!['session', 'project', 'global'].includes(scope)) {
         console.error(`Invalid scope: ${scope}`);
-        process.exit(1);
+        return void exitCli(1);
       }
       await setDocsDisabled({ scope, disabled: false });
       console.log(`Docs RAG enabled (scope: ${scope})`);

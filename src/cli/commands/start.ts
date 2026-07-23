@@ -1,3 +1,4 @@
+import { exitCli } from '../telemetry.js';
 import chalk from 'chalk';
 import ora, { type Ora } from 'ora';
 import { existsSync, readFileSync } from 'fs';
@@ -6,7 +7,6 @@ import { homedir } from 'os';
 import { createInterface } from 'readline/promises';
 import { promisify } from 'util';
 import { exec, execFile } from 'child_process';
-
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
 import { clearAgentPausedSync, getAgentStateSync, spawnAgent } from '../../lib/agents.js';
@@ -154,7 +154,7 @@ async function resolveExplicitHarnessFlag(
 
   if (harness !== 'claude-code' && harness !== 'ohmypi' && harness !== 'codex' && harness !== 'acp') {
     process.stderr.write(`Invalid --harness value: ${harness}. Expected 'claude-code', 'ohmypi', 'codex', or 'acp'.\n`);
-    process.exit(1);
+    return void exitCli(1);
   }
 
   if (model) {
@@ -163,7 +163,7 @@ async function resolveExplicitHarnessFlag(
     const decision = canUseHarnessSync(harness, model, await getProviderAuthMode(model));
     if (!decision.allowed) {
       process.stderr.write(`${decision.reason}\n`);
-      process.exit(1);
+      return void exitCli(1);
     }
   }
 
@@ -314,7 +314,7 @@ async function handleRemoteWorkspace(
     console.log('');
     console.log(chalk.dim('Run: pan admin remote setup'));
     console.log(chalk.dim('This writes the required remote settings to ~/.overdeck/config.toml'));
-    process.exit(1);
+    return void exitCli(1);
   }
 
   // Check remote availability
@@ -327,7 +327,7 @@ async function handleRemoteWorkspace(
 
     // If user explicitly requested remote, fail
     if (options.remote) {
-      process.exit(1);
+      return void exitCli(1);
     }
 
     // Otherwise, suggest creating local workspace
@@ -335,7 +335,7 @@ async function handleRemoteWorkspace(
     console.log(chalk.bold('To create a local workspace instead:'));
     console.log(`  ${chalk.cyan(`pan workspace ${issueId} --local`)}`);
     console.log(`  ${chalk.cyan(`pan start ${issueId} --local`)}`);
-    process.exit(1);
+    return void exitCli(1);
   }
 
   // Check for existing remote workspace
@@ -349,7 +349,7 @@ async function handleRemoteWorkspace(
       remoteMetadata = await Effect.runPromise(createRemoteWorkspace(issueId, { spinner, tier: options.tier as 'ephemeral' | 'durable' | undefined }));
     } catch (error: any) {
       spinner.fail(`Failed to create remote workspace: ${error.message}`);
-      process.exit(1);
+      return void exitCli(1);
     }
   }
 
@@ -362,7 +362,7 @@ async function handleRemoteWorkspace(
     spinner.fail(`Agent ${agentId} already running on remote VM`);
     console.log('');
     console.log(chalk.dim(`Use 'pan tell ${issueId} "message"' to send commands`));
-    process.exit(1);
+    return void exitCli(1);
   }
 
   // Resolve the effective tier up front so dry-run output and the provider
@@ -407,7 +407,7 @@ async function handleRemoteWorkspace(
   const spendCap = checkRemoteSpendCap(config);
   if (!spendCap.allowed) {
     spinner.fail(spendCap.message!);
-    process.exit(1);
+    return void exitCli(1);
   }
 
   // Spawn remote agent
@@ -493,7 +493,7 @@ async function handleRemoteWorkspace(
 
   } catch (error: any) {
     spinner.fail(`Failed to spawn remote agent: ${error.message}`);
-    process.exit(1);
+    return void exitCli(1);
   }
 }
 
@@ -658,7 +658,7 @@ async function failPostCreateValidation(options: PostCreateValidationFailureOpti
     }
   }
 
-  process.exit(1);
+  return exitCli(1);
 }
 
 async function repairMainBranchWorkspace(workspace: string, normalizedId: string): Promise<string | null> {
@@ -712,11 +712,11 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     if (planModel) options.planModel = planModel;
   } catch (err) {
     process.stderr.write(`${err instanceof Error ? err.message : String(err)}\n`);
-    process.exit(1);
+    return void exitCli(1);
   }
 
   if (!(await confirmHostOverride(options))) {
-    process.exit(1);
+    return void exitCli(1);
   }
 
   // Normalize issue ID (MIN-648 -> min-648 for tmux session name)
@@ -735,7 +735,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
   const VALID_TIERS = ['ephemeral', 'durable'] as const;
   if (options.tier && !VALID_TIERS.includes(options.tier as (typeof VALID_TIERS)[number])) {
     process.stderr.write(`Invalid --tier value: ${options.tier}. Expected 'ephemeral' or 'durable'.\n`);
-    process.exit(1);
+    return void exitCli(1);
   }
 
   // Resolve the Claude Code --effort level for this spawn: explicit --effort
@@ -747,13 +747,13 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
   if (resolvedEffort !== undefined) {
     if (!ROLE_EFFORTS.includes(resolvedEffort)) {
       process.stderr.write(`Invalid --effort value: ${resolvedEffort}. Expected one of ${ROLE_EFFORTS.join(', ')}.\n`);
-      process.exit(1);
+      return void exitCli(1);
     }
     const workModel = resolveRoleModel('work', spawnModel || undefined, yamlConfig);
     const supportedEfforts = getModelEffortLevelsSync(workModel);
     if (supportedEfforts !== undefined && !supportedEfforts.includes(resolvedEffort)) {
       process.stderr.write(`Effort '${resolvedEffort}' is not supported by ${workModel} (supported: ${supportedEfforts.join(', ')}).\n`);
-      process.exit(1);
+      return void exitCli(1);
     }
   }
 
@@ -772,7 +772,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     }
   } catch (error) {
     process.stderr.write(chalk.red(`${error instanceof Error ? error.message : String(error)}\n`));
-    process.exit(1);
+    return void exitCli(1);
   }
   options.planningMode = resolvedPlanningMode;
   // Preserve legacy behavior until route-unplanned-to-planning bead fully wires
@@ -786,7 +786,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
       process.stderr.write(chalk.red(`Pause reason: ${existingAgentState.pausedReason}\n`));
     }
     process.stderr.write(chalk.red(`Run pan unpause ${id} to clear the pause, or pan start ${id} --force to override.\n`));
-    process.exit(1);
+    return void exitCli(1);
   }
   if (existingAgentState?.troubled === true) {
     const failures = existingAgentState.consecutiveFailures ?? 0;
@@ -795,7 +795,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
       process.stderr.write(chalk.red(`Last failure: ${existingAgentState.lastFailureReason}\n`));
     }
     process.stderr.write(chalk.red(`Investigate the crash cause, then run pan untroubled ${id} before starting.\n`));
-    process.exit(1);
+    return void exitCli(1);
   }
 
   // No-op with exit 0 when the work agent is already live and running.
@@ -814,7 +814,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
   const conflict = describeConflictingWorkAgents(id, agentId);
   if (conflict) {
     process.stderr.write(chalk.red(conflict));
-    process.exit(1);
+    return void exitCli(1);
   }
   const spinner = ora(`Preparing workspace for ${id}...`).start();
   const prep = createPrepProgress(spinner);
@@ -924,7 +924,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
         } catch (error) {
           spinner.fail(error instanceof Error ? error.message : String(error));
           printPlanningConnectionError(id);
-          process.exit(1);
+          return void exitCli(1);
         }
       }
       // mode === 'skip': fall through to the existing auto-synthesize path.
@@ -955,7 +955,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
         const { sessionExistsSync } = await import('../../lib/tmux.js');
         if (sessionExistsSync(agentIdForFresh)) {
           console.error(chalk.red(`Agent ${agentIdForFresh} has a live tmux session. Run 'pan kill ${id}' first, then retry --fresh.`));
-          process.exit(1);
+          return void exitCli(1);
         }
         const { wipeAgentStateDirs } = await import('../../lib/agents.js');
         const wipeResult = await wipeAgentStateDirs(id);
@@ -1003,7 +1003,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
         workspaceCreatedThisRun = true;
       } catch (wsErr) {
         spinner.fail(`Failed to create workspace for ${id}: ${(wsErr as Error).message}`);
-        process.exit(1);
+        return void exitCli(1);
       }
     }
 
@@ -1299,7 +1299,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
 
   } catch (error: any) {
     spinner.fail(error.message);
-    process.exit(1);
+    return void exitCli(1);
   }
 }
 

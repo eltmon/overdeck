@@ -2,6 +2,7 @@
  * pan conversations enrich — generate AI summaries and tags for sessions (PAN-457)
  */
 
+import { exitCli } from '../../telemetry.js';
 import chalk from 'chalk';
 import { createInterface } from 'node:readline/promises';
 import { stdin as input, stdout as output } from 'node:process';
@@ -66,7 +67,7 @@ export async function enrichAction(
 
   if (![1, 2, 3].includes(tier)) {
     console.error(chalk.red('--tier must be 1, 2, or 3'));
-    process.exit(1);
+    return void exitCli(1);
   }
 
   console.log(chalk.bold(`Enriching sessions at tier L${tier}...`));
@@ -117,7 +118,7 @@ export async function enrichAction(
       console.log(chalk.yellow(`Threshold:      $${err.threshold.toFixed(2)}`));
 
       if (!yes && !(await confirmCost())) {
-        process.exit(1);
+        return void exitCli(1);
       }
 
       console.log(chalk.yellow(`Proceeding with accepted cost...`));

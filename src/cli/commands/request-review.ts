@@ -5,6 +5,7 @@
  * Used by agents to automatically queue for re-review (circuit breaker: max 7)
  */
 
+import { exitCli } from '../telemetry.js';
 import chalk from 'chalk';
 import { getDashboardApiUrlSync } from '../../lib/config.js';
 
@@ -48,14 +49,14 @@ export async function requestReviewCommand(
         console.error(chalk.red('\nCircuit breaker triggered!'));
         console.error(chalk.yellow(`Maximum automatic re-review requests (${MAX_AUTO_REQUEUES}) exceeded.`));
         console.error(chalk.dim('A human must click the Review button in the dashboard to continue.'));
-        process.exit(1);
+        return void exitCli(1);
       }
 
       console.error(chalk.red(`\nError: ${result.error || 'Failed to request review'}`));
       if (result.hint) {
         console.error(chalk.dim(result.hint));
       }
-      process.exit(1);
+      return void exitCli(1);
     }
 
     console.log(chalk.green(`\n✓ ${result.message}`));
@@ -74,9 +75,9 @@ export async function requestReviewCommand(
     if (error.code === 'ECONNREFUSED') {
       console.error(chalk.red('\nError: Dashboard not running'));
       console.error(chalk.dim('Start the dashboard with: cd src/dashboard && npm run dev'));
-      process.exit(1);
+      return void exitCli(1);
     }
     console.error(chalk.red(`\nError: ${error.message}`));
-    process.exit(1);
+    return void exitCli(1);
   }
 }

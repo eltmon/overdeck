@@ -1,3 +1,4 @@
+import { exitCli } from '../telemetry.js';
 import { Effect } from 'effect';
 /**
  * PAN-382: pan inspect <issueId> --bead <itemId>
@@ -36,7 +37,7 @@ export function registerInspectCommand(program: Command): void {
         await inspectCommand(issueId, options);
       } catch (error: any) {
         console.error(chalk.red(`Error: ${error.message}`));
-        process.exit(1);
+        return void exitCli(1);
       }
     });
 }
@@ -55,7 +56,7 @@ export async function inspectCommand(id: string, options: InspectOptions): Promi
     console.error(chalk.dim(
       'Pass a fully-qualified ID like "PAN-1148", or ensure the agent state dir exists at ~/.overdeck/agents/agent-<prefix>-<num>/',
     ));
-    process.exit(1);
+    return void exitCli(1);
   }
   const normalizedIssueId = issueId.toUpperCase();
 
@@ -64,7 +65,7 @@ export async function inspectCommand(id: string, options: InspectOptions): Promi
   if (!project) {
     console.error(chalk.red(`Could not resolve project for issue ${normalizedIssueId}`));
     console.error(chalk.dim('Make sure the issue prefix matches a registered project'));
-    process.exit(1);
+    return void exitCli(1);
   }
 
   // Find workspace path
@@ -82,7 +83,7 @@ export async function inspectCommand(id: string, options: InspectOptions): Promi
   if (!workspacePath) {
     console.error(chalk.red(`Could not find workspace for ${normalizedIssueId}`));
     console.error(chalk.dim('Provide --workspace <path> or ensure a workspace exists for this issue'));
-    process.exit(1);
+    return void exitCli(1);
   }
 
   const resolvedItem = await resolveInspectItem(options.item, workspacePath);
@@ -133,6 +134,6 @@ export async function inspectCommand(id: string, options: InspectOptions): Promi
     if (result.error) {
       console.error(chalk.dim(result.error));
     }
-    process.exit(1);
+    return void exitCli(1);
   }
 }

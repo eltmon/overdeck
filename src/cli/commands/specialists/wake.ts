@@ -5,6 +5,7 @@
  * plan/work/review/test/ship agents directly.
  */
 
+import { exitCli } from '../../telemetry.js';
 import chalk from 'chalk';
 
 interface WakeOptions {
@@ -14,5 +15,5 @@ interface WakeOptions {
 export async function wakeCommand(name: string, _options: WakeOptions): Promise<void> {
   console.log(chalk.red(`\nLegacy specialist wake is no longer supported for '${name}'.`));
   console.log(chalk.dim('Use the issue lifecycle / role runner instead: plan, work, review, test, or ship.\n'));
-  process.exit(1);
+  return void exitCli(1);
 }

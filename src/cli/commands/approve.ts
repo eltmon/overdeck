@@ -1,3 +1,4 @@
+import { exitCli } from '../telemetry.js';
 import chalk from 'chalk';
 
 export async function approveCommand(_id: string): Promise<void> {
@@ -11,5 +12,5 @@ export async function approveCommand(_id: string): Promise<void> {
   console.log(chalk.dim('The dashboard merge path handles merge queue serialization, post-merge'));
   console.log(chalk.dim('lifecycle (Docker cleanup, label cleanup, issue close), and idempotency'));
   console.log(chalk.dim('guards that pan approve bypassed.'));
-  process.exit(1);
+  return void exitCli(1);
 }

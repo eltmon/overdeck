@@ -1,3 +1,4 @@
+import { exitCli } from '../../telemetry.js';
 import chalk from 'chalk';
 import { Effect } from 'effect';
 import { getLinearApiKey } from '../../../lib/shadow-utils.js';
@@ -131,7 +132,7 @@ export async function listStatesCommand(options: ListOptions): Promise<void> {
   const apiKey = await Effect.runPromise(getLinearApiKey());
   if (!apiKey) {
     console.error(chalk.red('LINEAR_API_KEY not found in ~/.overdeck.env or environment'));
-    process.exit(1);
+    return void exitCli(1);
   }
 
   const teamKey = options.team || 'MIN'; // Default to MIN team
@@ -169,7 +170,7 @@ export async function listStatesCommand(options: ListOptions): Promise<void> {
     }
   } catch (error: any) {
     console.error(chalk.red(`Error: ${error.message}`));
-    process.exit(1);
+    return void exitCli(1);
   }
 }
 
@@ -177,7 +178,7 @@ export async function cleanupStatesCommand(options: CleanupOptions): Promise<voi
   const apiKey = await Effect.runPromise(getLinearApiKey());
   if (!apiKey) {
     console.error(chalk.red('LINEAR_API_KEY not found in ~/.overdeck.env or environment'));
-    process.exit(1);
+    return void exitCli(1);
   }
 
   const teamKey = options.team || 'MIN';
@@ -198,10 +199,10 @@ export async function cleanupStatesCommand(options: CleanupOptions): Promise<voi
       console.log(chalk.green('\nCleanup complete!'));
     } else {
       console.log(chalk.yellow('\nCleanup incomplete - manual action may be required'));
-      process.exit(1);
+      return void exitCli(1);
     }
   } catch (error: any) {
     console.error(chalk.red(`Error: ${error.message}`));
-    process.exit(1);
+    return void exitCli(1);
   }
 }

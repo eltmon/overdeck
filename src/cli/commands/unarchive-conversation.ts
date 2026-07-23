@@ -1,3 +1,4 @@
+import { exitCli } from '../telemetry.js';
 import chalk from 'chalk';
 import {
   getConversationByName,
@@ -13,7 +14,7 @@ export async function unarchiveConversationCommand(query: string): Promise<void>
   const normalizedQuery = normalize(query);
   if (!normalizedQuery) {
     console.log(chalk.yellow('Provide a conversation name or title to unarchive.'));
-    process.exit(1);
+    return void exitCli(1);
   }
 
   const byName = getConversationByName(query);
@@ -35,7 +36,7 @@ export async function unarchiveConversationCommand(query: string): Promise<void>
 
   if (matches.length === 0) {
     console.log(chalk.yellow(`No archived conversation matched: ${query}`));
-    process.exit(1);
+    return void exitCli(1);
   }
 
   if (matches.length > 1) {
@@ -44,7 +45,7 @@ export async function unarchiveConversationCommand(query: string): Promise<void>
       console.log(chalk.gray(`  ${conv.name} — ${conv.title || 'untitled'}`));
     }
     console.log(chalk.dim('Use the exact conversation name to disambiguate.'));
-    process.exit(1);
+    return void exitCli(1);
   }
 
   const match = matches[0];

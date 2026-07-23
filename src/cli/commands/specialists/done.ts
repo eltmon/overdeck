@@ -1,3 +1,4 @@
+import { exitCli } from '../../telemetry.js';
 import { Effect } from 'effect';
 /**
  * Specialist Done Command
@@ -38,12 +39,12 @@ export async function doneCommand(
   if (!validSpecialists.includes(specialist)) {
     console.error(chalk.red(`Invalid specialist: ${specialist}`));
     console.error(chalk.dim(`Valid options: ${validSpecialists.join(', ')}`));
-    process.exit(1);
+    return void exitCli(1);
   }
 
   if (!options.status) {
     console.error(chalk.red('--status is required'));
-    process.exit(1);
+    return void exitCli(1);
   }
 
   const normalizedIssueId = issueId.toUpperCase();
@@ -54,7 +55,7 @@ export async function doneCommand(
   if (!validStatuses.includes(options.status)) {
     console.error(chalk.red(`Invalid status: ${options.status}`));
     console.error(chalk.dim(`Valid options for ${specialist}: ${validStatuses.join(', ')}`));
-    process.exit(1);
+    return void exitCli(1);
   }
 
   if (specialist === 'inspect') {
@@ -306,7 +307,7 @@ export async function doneAndExitCommand(
   // DB) that write is the ONLY durable copy of the verdict. Drain it first.
   const { flushReviewStatusJournalWrites } = await import('../../../lib/overdeck/review-status-record-sync.js');
   await flushReviewStatusJournalWrites();
-  process.exit(0);
+  return exitCli(0);
 }
 
 function formatStatus(status: string): string {

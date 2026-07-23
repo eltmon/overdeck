@@ -2,6 +2,7 @@
  * pan conversations jsonl <conv-id> — resolve a conversation's Claude JSONL path.
  */
 
+import { exitCli } from '../../telemetry.js';
 import chalk from 'chalk';
 
 import { getConversationById } from '../../../lib/overdeck/conversations.js';
@@ -14,14 +15,14 @@ export interface JsonlActionOptions {
 export async function jsonlAction(convId: string, opts: JsonlActionOptions): Promise<void> {
   if (!/^\d+$/.test(convId)) {
     console.error(chalk.red(`Invalid conversation ID: ${convId}`));
-    process.exit(1);
+    return void exitCli(1);
   }
 
   const conversationId = Number(convId);
   const conversation = getConversationById(conversationId);
   if (!conversation) {
     console.error(chalk.red(`Conversation ${conversationId} not found`));
-    process.exit(1);
+    return void exitCli(1);
   }
 
   const result = resolveConversationTranscript(conversation.cwd, conversation.claudeSessionId);
@@ -46,9 +47,9 @@ export async function jsonlAction(convId: string, opts: JsonlActionOptions): Pro
     console.error(chalk.red(`Transcript JSONL for conversation ${conversation.id} is not present on disk.`));
     console.error(chalk.gray(`  Expected path: ${result.path}`));
     console.error(chalk.gray('  Claude Code may have expired or pruned the session file; restore the JSONL to access the raw transcript.'));
-    process.exit(1);
+    return void exitCli(1);
   }
 
   console.error(chalk.red(`Conversation ${conversation.id} has no claude_session_id recorded; transcript path is unknown.`));
-  process.exit(1);
+  return void exitCli(1);
 }

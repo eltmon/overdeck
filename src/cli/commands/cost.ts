@@ -1,3 +1,4 @@
+import { exitCli } from '../telemetry.js';
 import { Effect } from 'effect';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
@@ -63,7 +64,7 @@ export async function runCostSync(): Promise<void> {
     }
   } catch (error: unknown) {
     console.error(chalk.red('Error:'), error instanceof Error ? error.message : String(error));
-    process.exit(1);
+    return void exitCli(1);
   }
 }
 
@@ -255,7 +256,7 @@ export function createCostCommand(): Command {
         }
       } catch (error: unknown) {
         console.error(chalk.red('Error:'), error instanceof Error ? error.message : String(error));
-        process.exit(1);
+        return void exitCli(1);
       }
     });
 
@@ -294,7 +295,7 @@ export function createCostCommand(): Command {
         }
       } catch (error: unknown) {
         console.error(chalk.red('Error:'), error instanceof Error ? error.message : String(error));
-        process.exit(1);
+        return void exitCli(1);
       }
     });
 
@@ -341,7 +342,7 @@ export function createCostCommand(): Command {
         }
       } catch (error: unknown) {
         console.error(chalk.red('Error:'), error instanceof Error ? error.message : String(error));
-        process.exit(1);
+        return void exitCli(1);
       }
     });
 
@@ -364,7 +365,7 @@ export function createCostCommand(): Command {
         console.log(report);
       } catch (error: unknown) {
         console.error(chalk.red('Error:'), error instanceof Error ? error.message : String(error));
-        process.exit(1);
+        return void exitCli(1);
       }
     });
 
@@ -407,7 +408,7 @@ export function createCostCommand(): Command {
         }
       } catch (error: unknown) {
         console.error(chalk.red('Error:'), error instanceof Error ? error.message : String(error));
-        process.exit(1);
+        return void exitCli(1);
       }
     });
 
@@ -442,7 +443,7 @@ export function createCostCommand(): Command {
         console.log(`  Alert at: ${(newBudget.alertThreshold * 100).toFixed(0)}%`);
       } catch (error: unknown) {
         console.error(chalk.red('Error:'), error instanceof Error ? error.message : String(error));
-        process.exit(1);
+        return void exitCli(1);
       }
     });
 
@@ -483,7 +484,7 @@ export function createCostCommand(): Command {
         }
       } catch (error: unknown) {
         console.error(chalk.red('Error:'), error instanceof Error ? error.message : String(error));
-        process.exit(1);
+        return void exitCli(1);
       }
     });
 
@@ -497,7 +498,7 @@ export function createCostCommand(): Command {
 
         if (!status.budget) {
           console.log(chalk.red('Budget not found:'), id);
-          process.exit(1);
+          return void exitCli(1);
         }
 
         const b = status.budget;
@@ -522,7 +523,7 @@ export function createCostCommand(): Command {
         console.log(`Alert Threshold: ${(b.alertThreshold * 100).toFixed(0)}%`);
       } catch (error: unknown) {
         console.error(chalk.red('Error:'), error instanceof Error ? error.message : String(error));
-        process.exit(1);
+        return void exitCli(1);
       }
     });
 
@@ -538,11 +539,11 @@ export function createCostCommand(): Command {
           console.log(chalk.green('✓ Budget deleted'));
         } else {
           console.log(chalk.red('Budget not found:'), id);
-          process.exit(1);
+          return void exitCli(1);
         }
       } catch (error: unknown) {
         console.error(chalk.red('Error:'), error instanceof Error ? error.message : String(error));
-        process.exit(1);
+        return void exitCli(1);
       }
     });
 
@@ -561,7 +562,7 @@ export function createCostCommand(): Command {
         await runCostBackfill({ write: Boolean(options.write) });
       } catch (error: unknown) {
         console.error(chalk.red('Error:'), error instanceof Error ? error.message : String(error));
-        process.exit(1);
+        return void exitCli(1);
       }
     });
 

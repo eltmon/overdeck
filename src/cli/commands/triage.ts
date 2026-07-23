@@ -4,6 +4,7 @@
  * Uses the tracker abstraction to move issues between trackers.
  */
 
+import { exitCli } from '../telemetry.js';
 import chalk from 'chalk';
 import { Effect } from 'effect';
 import ora from 'ora';
@@ -235,6 +236,6 @@ repo = "your-repo"
 
   } catch (error: any) {
     spinner.fail(error.message);
-    process.exit(1);
+    return void exitCli(1);
   }
 }

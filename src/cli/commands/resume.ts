@@ -1,3 +1,4 @@
+import { exitCli } from '../telemetry.js';
 import chalk from 'chalk';
 import { createInterface } from 'node:readline/promises';
 import { resumeAgent } from '../../lib/agents.js';
@@ -46,13 +47,13 @@ export async function resumeCommand(id: string, options: ResumeOptions = {}): Pr
       lifecycle = getWorkAgentLifecycleStateSync(id);
     } else {
       console.error(chalk.red(msg));
-      process.exit(1);
+      return void exitCli(1);
     }
   }
 
   const allowHost = await confirmHostOverride(options);
   if (!allowHost) {
-    process.exit(1);
+    return void exitCli(1);
   }
 
   const result = await resumeAgent(id, undefined, { allowHost: options.host === true, compact: options.compact === true });
@@ -65,7 +66,7 @@ export async function resumeCommand(id: string, options: ResumeOptions = {}): Pr
     if ((result.error || '').includes('stack')) {
       console.log(chalk.dim(`Or retry with --host to bypass the docker stack-health gate.`));
     }
-    process.exit(1);
+    return void exitCli(1);
   }
 
   console.log(chalk.green(`Resumed session for ${lifecycle.agentId}`));

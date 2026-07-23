@@ -1,3 +1,4 @@
+import { exitCli } from '../telemetry.js';
 import chalk from 'chalk';
 import { messageAgent, resolveAgentTargetSync } from '../../lib/agents.js';
 import { loadRemoteAgentState, sendToRemoteAgent } from '../../lib/remote/index.js';
@@ -11,7 +12,7 @@ export async function tellCommand(id: string, message: string): Promise<void> {
     console.error(chalk.dim(
       'Pass an issue ID like "PAN-1148" or a full agent ID like "strike-pan-1723"; the state dir must exist under ~/.overdeck/agents/',
     ));
-    process.exit(1);
+    return void exitCli(1);
   }
 
   try {
@@ -30,6 +31,6 @@ export async function tellCommand(id: string, message: string): Promise<void> {
     console.log(chalk.dim(`  "${message}"`));
   } catch (error: any) {
     console.error(chalk.red('Error: ' + error.message));
-    process.exit(1);
+    return void exitCli(1);
   }
 }

@@ -1,3 +1,4 @@
+import { exitCli } from '../telemetry.js';
 import { Command } from 'commander';
 import chalk from 'chalk';
 import { execFileSync, execSync, spawn } from 'child_process';
@@ -532,7 +533,7 @@ async function releaseCheckCommand(): Promise<void> {
 
   const failed = results.filter((result) => !result.ok);
   if (failed.length > 0) {
-    process.exit(1);
+    return void exitCli(1);
   }
 }
 
@@ -570,7 +571,7 @@ async function releaseCreateCommand(
   const failed = results.filter((result) => !result.ok);
   if (failed.length > 0) {
     console.log(chalk.red('\nRelease preflight failed.'));
-    process.exit(1);
+    return void exitCli(1);
   }
 
   pkg.version = resolvedVersion;

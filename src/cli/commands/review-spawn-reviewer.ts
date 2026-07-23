@@ -1,3 +1,4 @@
+import { exitCli } from '../telemetry.js';
 import { Effect } from 'effect';
 import chalk from 'chalk';
 import { join } from 'path';
@@ -28,17 +29,17 @@ export async function reviewSpawnReviewerCommand(
   const subRole = parseSubRole(opts.subRole);
   if (!subRole) {
     console.error(chalk.red(`Error: --sub-role must be one of ${REVIEW_SUB_ROLES.join(', ')}`));
-    process.exit(1);
+    return void exitCli(1);
   }
   if (!opts.runId) {
     console.error(chalk.red('Error: --run-id is required'));
-    process.exit(1);
+    return void exitCli(1);
   }
 
   const resolved = resolveProjectFromIssueSync(issueId);
   if (!resolved && !opts.workspace) {
     console.error(chalk.red(`Error: cannot resolve project workspace for ${issueId}`));
-    process.exit(1);
+    return void exitCli(1);
   }
 
   const workspace = opts.workspace ?? join(resolved!.projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`);
@@ -57,7 +58,7 @@ export async function reviewSpawnReviewerCommand(
 
   if (!result.success) {
     console.error(chalk.red(`Error: ${result.error ?? result.message}`));
-    process.exit(1);
+    return void exitCli(1);
   }
 
   console.log(chalk.green(`✓ ${result.message}`));

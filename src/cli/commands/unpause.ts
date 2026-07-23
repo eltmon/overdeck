@@ -1,3 +1,4 @@
+import { exitCli } from '../telemetry.js';
 import chalk from 'chalk';
 import { clearAgentPausedSync, getAgentStateSync, resolveAgentTargetSync } from '../../lib/agents.js';
 import { appendOperatorInterventionEvent } from '../../lib/operator-interventions.js';
@@ -13,13 +14,13 @@ export async function unpauseCommand(id: string): Promise<void> {
     console.error(chalk.dim(
       'Pass an issue ID like "PAN-1148" or a full agent ID like "strike-pan-1723"; the state dir must exist under ~/.overdeck/agents/',
     ));
-    process.exit(1);
+    return void exitCli(1);
   }
   const state = getAgentStateSync(agentId);
 
   if (!state) {
     console.error(chalk.red(`Agent ${agentId} not found.`));
-    process.exit(1);
+    return void exitCli(1);
   }
   const issueId = state.issueId;
 
@@ -52,6 +53,6 @@ export async function unpauseCommand(id: string): Promise<void> {
     }
   } catch (error: any) {
     console.error(chalk.red('Error: ' + error.message));
-    process.exit(1);
+    return void exitCli(1);
   }
 }

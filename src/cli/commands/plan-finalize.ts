@@ -1,3 +1,4 @@
+import { exitCli } from '../telemetry.js';
 import chalk from 'chalk';
 import { existsSync, readFileSync, renameSync, writeFileSync } from 'fs';
 import { homedir } from 'os';
@@ -166,7 +167,7 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
     const msg = 'No workspace spec found in current directory or any parent. Run this from a workspace where the planning agent wrote .pan/spec.vbrief.json.';
     if (options.json) console.log(JSON.stringify({ success: false, error: msg }));
     else console.error(chalk.red('✗ ' + msg));
-    process.exit(1);
+    return void exitCli(1);
   }
 
   const planPath = findWorkspaceDraftPlanSync(workspacePath) ?? findPlanSync(workspacePath);
@@ -174,7 +175,7 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
     const msg = `xBRIEF plan not readable at ${workspacePath}/.pan/spec.vbrief.json`;
     if (options.json) console.log(JSON.stringify({ success: false, error: msg }));
     else console.error(chalk.red('✗ ' + msg));
-    process.exit(1);
+    return void exitCli(1);
   }
 
   // Derive issue ID from workspace directory name (feature-<id> or <id>) so we
@@ -198,7 +199,7 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
       } else {
         console.error(chalk.red(message));
       }
-      process.exit(4);
+      return void exitCli(4);
     }
   }
 
@@ -229,7 +230,7 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
         for (const line of readinessReport) console.error(chalk.dim(line));
         console.error(chalk.dim('Use --no-quality-lint only for an emergency one-run bypass.'));
       }
-      process.exit(3);
+      return void exitCli(3);
     }
     const warnings = qualityGate.issues.filter(issue => issue.severity === 'warn');
     if (warnings.length > 0) {
@@ -347,7 +348,7 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
   }
 
   if (!noPromote && !promoted) {
-    process.exit(1);
+    return void exitCli(1);
   }
 }
 

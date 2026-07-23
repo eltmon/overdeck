@@ -1,3 +1,4 @@
+import { exitCli } from '../telemetry.js';
 import chalk from 'chalk';
 import { Effect } from 'effect';
 import type { AgentStatus } from '@overdeck/contracts';
@@ -979,9 +980,9 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<void> 
   console.log('');
 
   if (hasErrors) {
-    process.exit(1);
+    return void exitCli(1);
   }
   if (options.strict && hasWarnings) {
-    process.exit(1);
+    return void exitCli(1);
   }
 }

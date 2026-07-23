@@ -1,3 +1,4 @@
+import { exitCli } from '../../telemetry.js';
 import chalk from 'chalk';
 import {
   checkHookSync,
@@ -64,7 +65,7 @@ export async function hookCommand(
     case 'push': {
       if (!idOrMessage) {
         console.log(chalk.red('Usage: pan admin fpp push <agent-id> <message>'));
-        process.exit(1);
+        return void exitCli(1);
       }
 
       const [targetAgent, ...messageParts] = idOrMessage.split(' ');
@@ -72,7 +73,7 @@ export async function hookCommand(
 
       if (!message) {
         console.log(chalk.red('Message required'));
-        process.exit(1);
+        return void exitCli(1);
       }
 
       const item = pushToHookSync(normalizeAgentId(targetAgent), {
@@ -89,7 +90,7 @@ export async function hookCommand(
     case 'pop': {
       if (!idOrMessage) {
         console.log(chalk.red('Usage: pan admin fpp pop <item-id>'));
-        process.exit(1);
+        return void exitCli(1);
       }
 
       const success = popFromHookSync(agentId, idOrMessage);
@@ -110,7 +111,7 @@ export async function hookCommand(
     case 'mail': {
       if (!idOrMessage) {
         console.log(chalk.red('Usage: pan admin fpp mail <agent-id> <message>'));
-        process.exit(1);
+        return void exitCli(1);
       }
 
       const [targetAgent, ...messageParts] = idOrMessage.split(' ');
@@ -118,7 +119,7 @@ export async function hookCommand(
 
       if (!message) {
         console.log(chalk.red('Message required'));
-        process.exit(1);
+        return void exitCli(1);
       }
 
       sendMailSync(

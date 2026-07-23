@@ -14,6 +14,7 @@
  *   3. The current working directory (matched against project.path entries).
  */
 
+import { exitCli } from '../telemetry.js';
 import { existsSync } from 'fs';
 import { join } from 'path';
 import chalk from 'chalk';
@@ -48,7 +49,7 @@ export async function workspaceRenderDevcontainerCommand(
           `(e.g. --project mind-your-now) or run from inside a configured project tree.`,
       ),
     );
-    process.exit(1);
+    return void exitCli(1);
   }
 
   const featureFolder = featureName.startsWith('feature-')
@@ -64,7 +65,7 @@ export async function workspaceRenderDevcontainerCommand(
       chalk.red(`✗ Workspace path does not exist: ${workspacePath}`) +
         chalk.dim(`\n  Create the workspace folder and worktrees first, then re-run.`),
     );
-    process.exit(1);
+    return void exitCli(1);
   }
 
   if (!project.workspace?.docker?.compose_template) {
@@ -74,7 +75,7 @@ export async function workspaceRenderDevcontainerCommand(
           `Nothing to render.`,
       ),
     );
-    process.exit(1);
+    return void exitCli(1);
   }
 
   try {
@@ -109,7 +110,7 @@ export async function workspaceRenderDevcontainerCommand(
     }
   } catch (err: any) {
     console.error(chalk.red(`✗ Render failed: ${err.message ?? err}`));
-    process.exit(1);
+    return void exitCli(1);
   }
 }
 

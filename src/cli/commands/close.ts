@@ -5,6 +5,7 @@
  * closes the issue on the tracker, and applies the `closed-out` label.
  */
 
+import { exitCli } from '../telemetry.js';
 import chalk from 'chalk';
 import type { Command } from 'commander';
 import { Effect } from 'effect';
@@ -138,7 +139,7 @@ export async function closeOutCommand(id: string, options: CloseOutOptions): Pro
     console.error(chalk.dim(
       'Pass a fully-qualified ID like "PAN-1148", or ensure the agent state dir exists at ~/.overdeck/agents/agent-<prefix>-<num>/',
     ));
-    process.exit(1);
+    return void exitCli(1);
   }
 
   // Close-out caller guard. Close-out is destructive (closes the tracker issue +
@@ -156,7 +157,7 @@ export async function closeOutCommand(id: string, options: CloseOutOptions): Pro
   const isFlywheelOrchestrator = agentId?.startsWith('flywheel-') ?? false;
   if (agentId && !isOperatorConversation && !isFlywheelOrchestrator) {
     console.error(chalk.red('Close-out is not permitted for this agent. Only operator conversations (conv-*) and the flywheel orchestrator may close out issues.'));
-    process.exit(1);
+    return void exitCli(1);
   }
 
   const issueLower = issueId.toLowerCase();
@@ -178,7 +179,7 @@ export async function closeOutCommand(id: string, options: CloseOutOptions): Pro
 
   if (!projectPath) {
     console.error(chalk.red(`Could not resolve project for ${issueId}`));
-    process.exit(1);
+    return void exitCli(1);
   }
 
   // Determine tracker type
@@ -288,10 +289,10 @@ export async function closeOutCommand(id: string, options: CloseOutOptions): Pro
     // whose open handles otherwise keep the event loop alive, so the command
     // hangs after printing "complete". The failure path below already exits;
     // this makes success symmetric. (PAN-1621)
-    process.exit(0);
+    return void exitCli(0);
   } else {
     const failedStep = result.steps.find(s => !s.success && !s.skipped);
     console.log(chalk.red(`Close-out failed: ${failedStep?.error || 'Unknown error'}`));
-    process.exit(1);
+    return void exitCli(1);
   }
 }

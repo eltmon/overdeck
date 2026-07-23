@@ -1,3 +1,4 @@
+import { exitCli } from '../../telemetry.js';
 import { Effect } from 'effect';
 import chalk from 'chalk';
 import {
@@ -15,7 +16,7 @@ import { join, dirname } from 'path';
 import { execFileSync, execSync } from 'child_process';
 import { arch as osArch, homedir, platform as osPlatform, tmpdir } from 'os';
 import { createHash } from 'crypto';
-import { readSettingsOrAbortSync, backupSettingsSync, pruneBackupsSync, atomicWriteJsonSync, diffJson } from './safe-settings.js';
+import { readSettingsOrAbort, backupSettingsSync, pruneBackupsSync, atomicWriteJsonSync, diffJson } from './safe-settings.js';
 import { SYNC_SOURCES } from '../../../lib/paths.js';
 
 const RTK_VERSION = '0.41.0';
@@ -298,7 +299,7 @@ export async function setupHooksCommand(opts: SetupHooksOptions = {}): Promise<v
       console.log(chalk.dim('  macOS:  brew install jq'));
       console.log(chalk.dim('  Ubuntu: sudo apt-get install jq'));
       console.log(chalk.dim('  CentOS: sudo yum install jq\n'));
-      process.exit(1);
+      return void exitCli(1);
     }
   } else {
     console.log(chalk.green('✓ jq is installed'));
@@ -330,7 +331,7 @@ export async function setupHooksCommand(opts: SetupHooksOptions = {}): Promise<v
     if (!existsSync(sourcePath)) {
       console.log(chalk.red(`✗ Could not find ${scriptName} script`));
       console.log(chalk.dim(`  Checked: ${sourcePath}`));
-      process.exit(1);
+      return void exitCli(1);
     }
 
     copyFileSync(sourcePath, scriptDest);
@@ -346,7 +347,7 @@ export async function setupHooksCommand(opts: SetupHooksOptions = {}): Promise<v
   // PAN-1137: refuse to proceed on parse failure. Previous behavior reset
   // settings to `{}` on JSON.parse error and wrote it back, erasing every
   // user customization (statusLine, theme, mcpServers, etc.).
-  const settingsBefore: ClaudeSettings = readSettingsOrAbortSync(settingsPath);
+  const settingsBefore: ClaudeSettings = await readSettingsOrAbort(settingsPath);
   // Deep clone the pre-mutation snapshot for the dry-run diff. Cheap —
   // settings.json is small.
   const beforeSnapshot: ClaudeSettings = JSON.parse(JSON.stringify(settingsBefore));

@@ -4,6 +4,7 @@
  * Shows Fly.io connection status and list of machines.
  */
 
+import { exitCli } from '../../telemetry.js';
 import chalk from 'chalk';
 import { Effect } from 'effect';
 import ora from 'ora';
@@ -103,6 +104,6 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
     console.log('');
   } catch (error: any) {
     spinner.fail(`Failed to get status: ${error.message}`);
-    process.exit(1);
+    return void exitCli(1);
   }
 }

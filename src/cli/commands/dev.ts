@@ -1,3 +1,4 @@
+import { exitCli } from '../telemetry.js';
 import { execSync, spawn, ChildProcess } from 'child_process';
 import { existsSync, readFileSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
@@ -318,7 +319,7 @@ export async function devCommand(options: { skipTraefik?: boolean; deacon?: bool
   // ── Ensure bundle ──────────────────────────────────────────────────────────
   if (!ensureDashboardBundle()) {
     console.error(chalk.red('Error: Could not build dashboard server bundle'));
-    process.exit(1);
+    return void exitCli(1);
   }
 
   // ── Kill existing processes ────────────────────────────────────────────────
@@ -350,7 +351,7 @@ export async function devCommand(options: { skipTraefik?: boolean; deacon?: bool
         `Port ${config.dashboardApiPort} is still in use after SIGKILL. A stuck process ` +
         `is holding it — run \`pan down\`, or kill it manually, then retry \`pan dev\`.`,
       ));
-      process.exit(1);
+      return void exitCli(1);
     }
   }
 
@@ -406,7 +407,7 @@ export async function devCommand(options: { skipTraefik?: boolean; deacon?: bool
     child.stderr?.on('data', (data) => process.stderr.write(chalk.dim(`[server] ${data}`)));
     child.on('error', (err) => {
       console.error(chalk.red('Failed to start API server:'), err.message);
-      if (!supervising) process.exit(1);
+      if (!supervising) { void exitCli(1); return; }
       else scheduleApiRespawn();
     });
     child.on('close', (code, signal) => {
@@ -414,7 +415,7 @@ export async function devCommand(options: { skipTraefik?: boolean; deacon?: bool
       if (!supervising) {
         if (code !== 0 && code !== null) {
           console.error(chalk.red(`API server exited with code ${code}`));
-          process.exit(1);
+          return void exitCli(1);
         }
         return;
       }
@@ -546,7 +547,7 @@ export async function devCommand(options: { skipTraefik?: boolean; deacon?: bool
       console.error(chalk.red('Failed to start Vite:'), err.message);
       if (!supervising) {
         if (apiChild) apiChild.kill('SIGTERM');
-        process.exit(1);
+        return void exitCli(1);
       } else {
         scheduleViteRespawn();
       }
@@ -591,7 +592,7 @@ export async function devCommand(options: { skipTraefik?: boolean; deacon?: bool
   } catch (err: any) {
     console.error(chalk.red('API server health check failed:'), err.message);
     apiChild.kill('SIGTERM');
-    process.exit(1);
+    return void exitCli(1);
   }
 
   console.log(chalk.dim('Starting Vite dev server...'));
@@ -603,7 +604,7 @@ export async function devCommand(options: { skipTraefik?: boolean; deacon?: bool
     console.error(chalk.red('Vite frontend did not start:'), err.message);
     apiChild.kill('SIGTERM');
     viteChild.kill('SIGTERM');
-    process.exit(1);
+    return void exitCli(1);
   }
 
   // Both children are healthy: enable self-healing and publish the marker so the
@@ -676,7 +677,7 @@ export async function devCommand(options: { skipTraefik?: boolean; deacon?: bool
       // ignore
     }
 
-    process.exit(0);
+    return void exitCli(0);
   };
 
   process.on('SIGINT', () => shutdown('SIGINT'));

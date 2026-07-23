@@ -4,6 +4,7 @@
  * Uses the tracker abstraction to support Linear, GitHub, and GitLab.
  */
 
+import { exitCli } from '../telemetry.js';
 import chalk from 'chalk';
 import { Effect } from 'effect';
 import ora from 'ora';
@@ -167,7 +168,7 @@ export async function listCommand(options: ListOptions): Promise<void> {
       if (!['linear', 'github', 'gitlab', 'rally'].includes(trackerType)) {
         spinner.fail(`Unknown tracker: ${options.tracker}`);
         console.log(chalk.dim('Valid trackers: linear, github, gitlab, rally'));
-        process.exit(1);
+        return void exitCli(1);
       }
       trackersToQuery.push(trackerType);
     } else if (options.allTrackers) {
@@ -181,7 +182,7 @@ export async function listCommand(options: ListOptions): Promise<void> {
     if (trackersToQuery.length === 0) {
       spinner.fail('No trackers configured');
       console.log(chalk.dim('Configure trackers in ~/.overdeck/config.toml'));
-      process.exit(1);
+      return void exitCli(1);
     }
 
     // Fetch issues from all requested trackers
@@ -272,6 +273,6 @@ export async function listCommand(options: ListOptions): Promise<void> {
 
   } catch (error: any) {
     spinner.fail(error.message);
-    process.exit(1);
+    return void exitCli(1);
   }
 }

@@ -1,3 +1,4 @@
+import { exitCli } from '../telemetry.js';
 import { join } from 'node:path';
 import { existsSync } from 'node:fs';
 import { spawn } from 'node:child_process';
@@ -50,20 +51,20 @@ export async function openCommand(id: string, options: { editor?: string }) {
     console.error(chalk.dim(
       'Pass a fully-qualified ID like "PAN-1148", or ensure the agent state dir exists at ~/.overdeck/agents/agent-<prefix>-<num>/',
     ));
-    process.exit(1);
+    return void exitCli(1);
   }
   const editors = await loadEditors();
   const issueLower = issueId.toLowerCase();
   const resolved = resolveProjectFromIssueSync(issueId);
   if (!resolved) {
     console.error(`No project found for issue ${issueId}`);
-    process.exit(1);
+    return void exitCli(1);
   }
 
   const workspacePath = join(resolved.projectPath, 'workspaces', `feature-${issueLower}`);
   if (!existsSync(workspacePath)) {
     console.error(`Workspace not found: ${workspacePath}`);
-    process.exit(1);
+    return void exitCli(1);
   }
 
   let editorCommand: string;
@@ -74,13 +75,13 @@ export async function openCommand(id: string, options: { editor?: string }) {
     if (!entry) {
       console.error(`Unknown editor: ${options.editor}`);
       console.error(`Available: ${editors.map((e) => e.id).join(', ')}`);
-      process.exit(1);
+      return void exitCli(1);
     }
     if (entry.id === 'file-manager') {
       const cmd = getFileManagerCommand();
       if (!cmd) {
         console.error('File manager not available on this platform');
-        process.exit(1);
+        return void exitCli(1);
       }
       editorCommand = cmd;
       editorLabel = 'File Manager';
@@ -93,7 +94,7 @@ export async function openCommand(id: string, options: { editor?: string }) {
     if (!detected) {
       console.error('No supported editor found in PATH');
       console.error(`Supported: ${editors.filter((e) => e.command).map((e) => `${e.label} (${e.command})`).join(', ')}`);
-      process.exit(1);
+      return void exitCli(1);
     }
     editorCommand = detected.command;
     editorLabel = editors.find((e) => e.id === detected.id)!.label;

@@ -1,3 +1,4 @@
+import { exitCli } from '../telemetry.js';
 import { Effect } from 'effect';
 /**
  * `pan workspace deep-clean <issueId>` — interactive, user-only entry point
@@ -52,7 +53,7 @@ export async function workspaceDeepCleanCommand(
             "  scripted flow. If you're sure you want this, run it manually.\n",
         ),
     );
-    process.exit(2);
+    return void exitCli(2);
   }
 
   const issueLower = issueId.toLowerCase();
@@ -60,13 +61,13 @@ export async function workspaceDeepCleanCommand(
   const projectConfig = teamPrefix ? findProjectByTeamSync(teamPrefix) : null;
   if (!projectConfig) {
     console.error(chalk.red(`✗ No project found for issue ${issueId}`));
-    process.exit(1);
+    return void exitCli(1);
   }
 
   const workspacePath = join(projectConfig.path, 'workspaces', `feature-${issueLower}`);
   if (!existsSync(workspacePath)) {
     console.error(chalk.red(`✗ Workspace not found: ${workspacePath}`));
-    process.exit(1);
+    return void exitCli(1);
   }
 
   console.log();
@@ -88,7 +89,7 @@ export async function workspaceDeepCleanCommand(
     toDelete = await Effect.runPromise(dryRunGitClean({ workspacePath }));
   } catch (err: any) {
     console.error(chalk.red(`✗ git clean dry-run failed: ${err.message ?? err}`));
-    process.exit(1);
+    return void exitCli(1);
   }
 
   if (toDelete.length === 0) {
@@ -138,7 +139,7 @@ export async function workspaceDeepCleanCommand(
     } else {
       console.error(chalk.red(`✗ git clean failed: ${err.message ?? err}`));
     }
-    process.exit(1);
+    return void exitCli(1);
   }
 
   console.log(chalk.green(`\n  ✓ Deleted ${toDelete.length} item(s) from ${workspacePath}\n`));

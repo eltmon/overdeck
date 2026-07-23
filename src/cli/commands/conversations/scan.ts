@@ -2,6 +2,7 @@
  * pan conversations scan — scan ~/.claude/projects/ for JSONL sessions (PAN-457)
  */
 
+import { exitCli } from '../../telemetry.js';
 import chalk from 'chalk';
 import { scan } from '../../../lib/conversations/scanner.js';
 import type { ScanProgress } from '../../../lib/conversations/scanner.js';
@@ -17,7 +18,7 @@ export async function scanAction(opts: {
 
   if (mode === 'targeted' && (!opts.dirs || opts.dirs.length === 0)) {
     console.error(chalk.red('--mode targeted requires --dir <path> to be specified'));
-    process.exit(1);
+    return void exitCli(1);
   }
 
   if (opts.dryRun) {

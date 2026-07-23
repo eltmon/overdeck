@@ -1,3 +1,4 @@
+import { exitCli } from '../telemetry.js';
 import { Command } from 'commander';
 import chalk, { type ChalkInstance } from 'chalk';
 import { parseIssueIdSync, resolveIssueIdSync } from '../../lib/issue-id.js';
@@ -56,14 +57,14 @@ function formatReleaseSet(releaseSet: ReleaseSet): string {
 export async function rolloutStatusCommand(issueId: string): Promise<void> {
   if (!parseIssueIdSync(issueId)) {
     console.error(chalk.red(`Invalid issue ID: ${issueId}`));
-    process.exit(1);
+    return void exitCli(1);
   }
   const canonicalIssueId = resolveIssueIdSync(issueId);
 
   const resolved = resolveProjectFromIssueSync(canonicalIssueId);
   if (!resolved) {
     console.error(chalk.red(`No project configured for ${canonicalIssueId}`));
-    process.exit(1);
+    return void exitCli(1);
   }
 
   const releaseSet = getReleaseSetSync(canonicalIssueId);
@@ -78,14 +79,14 @@ export async function rolloutStatusCommand(issueId: string): Promise<void> {
 export async function rolloutRetryCommand(issueId: string): Promise<void> {
   if (!parseIssueIdSync(issueId)) {
     console.error(chalk.red(`Invalid issue ID: ${issueId}`));
-    process.exit(1);
+    return void exitCli(1);
   }
   const canonicalIssueId = resolveIssueIdSync(issueId);
 
   const resolved = resolveProjectFromIssueSync(canonicalIssueId);
   if (!resolved) {
     console.error(chalk.red(`No project configured for ${canonicalIssueId}`));
-    process.exit(1);
+    return void exitCli(1);
   }
 
   const releaseSet = await runRelease(canonicalIssueId, resolved.projectPath);

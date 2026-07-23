@@ -5,6 +5,7 @@
  * into the current workspace and optionally into global user settings.
  */
 
+import { exitCli } from '../telemetry.js';
 import chalk from 'chalk';
 import ora from 'ora';
 import { readFileSync, writeFileSync, existsSync, mkdirSync, copyFileSync } from 'fs';
@@ -35,7 +36,7 @@ export async function copyConfigCommand(options: CopyConfigOptions = {}): Promis
     console.log(chalk.red('✗ Not in a git repository/workspace'));
     console.log(chalk.dim('  Run this command from within a workspace directory'));
     console.log('');
-    process.exit(1);
+    return void exitCli(1);
   }
 
   // Verify source config exists
@@ -46,7 +47,7 @@ export async function copyConfigCommand(options: CopyConfigOptions = {}): Promis
     console.log(chalk.yellow('⚠ No config.yaml found in ~/.overdeck/'));
     console.log(chalk.dim('  Initialize Overdeck first with: pan init'));
     console.log('');
-    process.exit(1);
+    return void exitCli(1);
   }
 
   // Create workspace config directory if it doesn't exist
@@ -157,7 +158,7 @@ export async function copyConfigCommand(options: CopyConfigOptions = {}): Promis
   } catch (error) {
     spinner.fail('Configuration copy failed');
     console.error(chalk.red(`Error: ${(error as Error).message}`));
-    process.exit(1);
+    return void exitCli(1);
   }
 
   console.log(chalk.bold('Next steps:'));

@@ -8,6 +8,7 @@
  * so nothing that previously resolved through that index is lost.
  */
 
+import { exitCli } from '../../telemetry.js';
 import chalk from 'chalk';
 
 import { resolveConversationTranscript } from '../../../lib/conversations/transcript-path.js';
@@ -58,7 +59,7 @@ export async function showAction(id: string, opts: ShowActionOptions): Promise<v
   const numericId = parseInt(id, 10);
   if (isNaN(numericId)) {
     console.error(chalk.red(`Invalid ID: ${id}`));
-    process.exit(1);
+    return void exitCli(1);
   }
 
   const resolved = resolveShowTarget(numericId);
@@ -69,7 +70,7 @@ export async function showAction(id: string, opts: ShowActionOptions): Promise<v
     console.error(
       chalk.gray(`  Tried conversation #${numericId} and discovered-session #${numericId}.`),
     );
-    process.exit(1);
+    return void exitCli(1);
   }
 
   if (opts.json) {

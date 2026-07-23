@@ -1,3 +1,4 @@
+import { exitCli } from '../telemetry.js';
 import { Effect } from 'effect';
 /**
  * pan show - Display shadow state details for an issue
@@ -22,7 +23,7 @@ export async function shadowCommand(id: string): Promise<void> {
   if (!state) {
     spinner.fail(`Issue ${issueId} is not in shadow mode`);
     console.log(chalk.dim('Use --shadow flag when running pan start/plan/done to enable shadow mode'));
-    process.exit(1);
+    return void exitCli(1);
   }
 
   spinner.stop();

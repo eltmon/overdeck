@@ -1,3 +1,4 @@
+import { exitCli } from '../telemetry.js';
 import chalk from 'chalk';
 import { Effect } from 'effect';
 import ora from 'ora';
@@ -23,7 +24,7 @@ export async function workspaceRebuildCommand(issueId: string): Promise<void> {
 
   if (!result.success) {
     spinner.fail(`Workspace rebuild failed: ${result.error}`);
-    process.exit(1);
+    return void exitCli(1);
   }
 
   spinner.succeed(`Workspace stack rebuilt for ${issueId.toUpperCase()}`);

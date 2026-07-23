@@ -1,3 +1,4 @@
+import { exitCli } from '../telemetry.js';
 import chalk from 'chalk';
 import ora from 'ora';
 import inquirer from 'inquirer';
@@ -290,7 +291,7 @@ export async function reopenCommand(id: string, options: ReopenOptions = {}): Pr
     console.error(chalk.dim(
       'Pass a fully-qualified ID like "PAN-1148", or ensure the agent state dir exists at ~/.overdeck/agents/agent-<prefix>-<num>/',
     ));
-    process.exit(1);
+    return void exitCli(1);
   }
 
   // Resolve tracker type using the same logic as `pan start` so GitHub issues
@@ -307,7 +308,7 @@ export async function reopenCommand(id: string, options: ReopenOptions = {}): Pr
     console.log(chalk.red(`\nError: \`pan reopen\` does not support ${trackerType} tracker.`));
     console.log(`  Issue ${issueId} is tracked as ${trackerType} in your projects.yaml.`);
     console.log(`  Currently supported trackers: github, linear.`);
-    process.exit(1);
+    return void exitCli(1);
   }
 }
 
@@ -411,7 +412,7 @@ async function reopenGitHubIssueCommand(id: string, options: ReopenOptions): Pro
     if (spinner.isSpinning) spinner.fail();
     const message = error instanceof Error ? error.message : String(error);
     console.error(chalk.red(`Error: ${message}`));
-    process.exit(1);
+    return void exitCli(1);
   }
 }
 
@@ -425,7 +426,7 @@ async function reopenLinearIssueCommand(id: string, options: ReopenOptions): Pro
       console.log('');
       console.log(chalk.dim('Set it in ~/.overdeck.env:'));
       console.log('  LINEAR_API_KEY=lin_api_xxxxx');
-      process.exit(1);
+      return void exitCli(1);
     }
 
     const client = new LinearClient({ apiKey });
@@ -551,7 +552,7 @@ async function reopenLinearIssueCommand(id: string, options: ReopenOptions): Pro
     if (spinner.isSpinning) spinner.fail();
     const message = error instanceof Error ? error.message : String(error);
     console.error(chalk.red(`Error: ${message}`));
-    process.exit(1);
+    return void exitCli(1);
   }
 }
 

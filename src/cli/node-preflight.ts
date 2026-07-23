@@ -8,6 +8,7 @@
 // This module is imported first in src/cli/index.ts and its only dependencies
 // are Node built-ins, so it loads and runs under old Node without issue.
 
+import { exitCli } from './telemetry.js';
 import { spawnSync } from 'child_process';
 import { existsSync, readdirSync } from 'fs';
 import { homedir } from 'os';
@@ -130,25 +131,25 @@ function describeSource(path: string): string {
   return path;
 }
 
-function failNoCompatibleNode(): never {
+async function failNoCompatibleNode(): Promise<never> {
   process.stderr.write(
     `\nOverdeck requires Node.js ${MIN_LABEL} or later. You are running Node.js ${process.versions.node}.\n`,
   );
   process.stderr.write(`No compatible Node was found on this system. Install Node ${MIN_LABEL}+ with:\n\n`);
   process.stderr.write(`  ${detectVersionManagerHint()}\n\n`);
   process.stderr.write('then re-run your command.\n');
-  process.exit(1);
+  return exitCli(1);
 }
 
 // Called first at CLI startup. If the current Node is too old, relaunch the CLI
 // under a compatible one; if none exists, fail fast with a specific fix command.
 // A no-op when already on Node 22+.
-export function ensureCompatibleNode(argv: string[] = process.argv, env = process.env): void {
+export async function ensureCompatibleNode(argv: string[] = process.argv, env = process.env): Promise<void> {
   const current = parseNodeVersion(process.versions.node);
   if (current && meetsMinimum(current)) return;
 
   // Already relaunched once — do not loop; the relaunch target was still too old.
-  if (env[RELAUNCH_ENV] === '1') failNoCompatibleNode();
+  if (env[RELAUNCH_ENV] === '1') return failNoCompatibleNode();
 
   const compatible = findCompatibleNode();
   if (compatible) {
@@ -161,8 +162,8 @@ export function ensureCompatibleNode(argv: string[] = process.argv, env = proces
       stdio: 'inherit',
       env: { ...env, [RELAUNCH_ENV]: '1' },
     });
-    process.exit(result.status ?? 1);
+    return exitCli(result.status ?? 1);
   }
 
-  failNoCompatibleNode();
+  return failNoCompatibleNode();
 }

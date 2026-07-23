@@ -11,6 +11,7 @@
  * when the planning agent was launched with --auto-start (PAN-1972).
  */
 
+import { exitCli } from '../telemetry.js';
 import chalk from 'chalk';
 import ora from 'ora';
 import { promotePlanning, readAutoSpawnOnFinalize } from './plan-finalize.js';
@@ -27,7 +28,7 @@ export async function planDoneCommand(id: string, options: { prd?: boolean } = {
 
   if (!result.success) {
     spinner.fail(chalk.red(`Failed: ${result.error || 'Unknown error'}`));
-    process.exit(1);
+    return void exitCli(1);
   }
 
   spinner.succeed(chalk.green(`✓ Planning complete for ${issueId}`));

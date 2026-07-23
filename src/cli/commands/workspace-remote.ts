@@ -1,3 +1,4 @@
+import { exitCli } from '../telemetry.js';
 import chalk from 'chalk';
 import type { Ora } from 'ora';
 import ora from 'ora';
@@ -73,7 +74,7 @@ export async function createRemoteWorkspace(
     spinner.fail('Remote workspaces not enabled');
     console.log('');
     console.log(chalk.dim('Run: pan remote setup'));
-    process.exit(1);
+    return void exitCli(1);
   }
 
   // Check availability
@@ -82,7 +83,7 @@ export async function createRemoteWorkspace(
     spinner.fail('Remote not available');
     console.log('');
     console.log(chalk.yellow(availability.reason || 'Unknown error'));
-    process.exit(1);
+    return void exitCli(1);
   }
 
   const fly = createFlyProviderFromConfig(remoteConfig);
@@ -145,7 +146,7 @@ export async function createRemoteWorkspace(
       console.log(chalk.dim('Make sure you are in a git repository with a remote origin.'));
       // Clean up VM
       await Effect.runPromise(fly.deleteVm(vmName));
-      process.exit(1);
+      return void exitCli(1);
     }
 
     // Step 3: Add SSH host keys and clone repository on VM
@@ -345,7 +346,7 @@ with open(path, "w") as f:
     } catch {
       // Ignore cleanup errors
     }
-    process.exit(1);
+    return void exitCli(1);
   }
 }
 
@@ -361,7 +362,7 @@ interface MigrateOptions {
 export async function migrateCommand(issueId: string, options: MigrateOptions): Promise<void> {
   if (options.to && options.to !== 'remote' && options.to !== 'local') {
     console.error(chalk.red('Invalid --to value. Use "remote" or "local".'));
-    process.exit(1);
+    return void exitCli(1);
   }
   const { migrateWorkspace } = await import('./workspace-migrate.js');
   await migrateWorkspace(issueId, {
@@ -384,7 +385,7 @@ export async function syncAuthCommand(issueId: string): Promise<void> {
   if (!metadata || metadata.location !== 'remote') {
     spinner.fail(`No remote workspace found for ${issueId}`);
     console.log(chalk.dim('Create one with: pan workspace create --remote ' + issueId));
-    process.exit(1);
+    return void exitCli(1);
   }
 
   try {
@@ -419,7 +420,7 @@ export async function syncAuthCommand(issueId: string): Promise<void> {
     }
   } catch (error: any) {
     spinner.fail(`Failed to sync credentials: ${error.message}`);
-    process.exit(1);
+    return void exitCli(1);
   }
 }
 
@@ -433,7 +434,7 @@ export async function sshCommand(issueId: string): Promise<void> {
   if (!metadata || metadata.location !== 'remote') {
     console.error(chalk.red(`No remote workspace found for ${issueId}`));
     console.log(chalk.dim('Create one with: pan workspace create --remote ' + issueId));
-    process.exit(1);
+    return void exitCli(1);
   }
 
   const { spawn } = await import('child_process');
@@ -445,7 +446,7 @@ export async function sshCommand(issueId: string): Promise<void> {
   });
 
   child.on('exit', (code) => {
-    process.exit(code || 0);
+    return void exitCli(code || 0);
   });
 }
 
@@ -460,7 +461,7 @@ export async function startCommand(issueId: string): Promise<void> {
 
   if (!metadata || metadata.location !== 'remote') {
     spinner.fail(`No remote workspace found for ${issueId}`);
-    process.exit(1);
+    return void exitCli(1);
   }
 
   try {
@@ -478,7 +479,7 @@ export async function startCommand(issueId: string): Promise<void> {
 
   } catch (error: any) {
     spinner.fail(`Failed to start: ${error.message}`);
-    process.exit(1);
+    return void exitCli(1);
   }
 }
 
@@ -493,7 +494,7 @@ export async function stopCommand(issueId: string): Promise<void> {
 
   if (!metadata || metadata.location !== 'remote') {
     spinner.fail(`No remote workspace found for ${issueId}`);
-    process.exit(1);
+    return void exitCli(1);
   }
 
   try {
@@ -508,7 +509,7 @@ export async function stopCommand(issueId: string): Promise<void> {
 
   } catch (error: any) {
     spinner.fail(`Failed to stop: ${error.message}`);
-    process.exit(1);
+    return void exitCli(1);
   }
 }
 
@@ -550,6 +551,6 @@ export async function destroyRemoteWorkspace(
     if (!options.force) {
       console.log(chalk.dim('  Tip: Use --force to forcefully clean up'));
     }
-    process.exit(1);
+    return void exitCli(1);
   }
 }

@@ -1,3 +1,4 @@
+import { EventEmitter } from 'node:events';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AnalyticsService } from '../../../src/lib/telemetry/service.js';
 import {
@@ -5,9 +6,7 @@ import {
   CliTelemetryLifecycle,
   exitAfterTelemetry,
   resolveTelemetryCliVerb,
-  runCliWithTelemetry,
 } from '../../../src/cli/telemetry.js';
-import { approveCommand } from '../../../src/cli/commands/approve.js';
 
 const captureMock = vi.hoisted(() => vi.fn());
 const shutdownMock = vi.hoisted(() => vi.fn());
@@ -71,45 +70,55 @@ describe('CLI telemetry lifecycle', () => {
     expect(exit).toHaveBeenCalledWith(1);
   });
 
-  it('intercepts an existing direct process.exit command and flushes before termination', async () => {
+  it('flushes a child-process callback exit through the explicit async door', async () => {
     const analytics = {
       capture: vi.fn(),
-      shutdown: vi.fn(() => new Promise<void>((resolve) => {
-        setTimeout(resolve, 2_000);
-      })),
+      shutdown: vi.fn(() => new Promise<void>((resolve) => setTimeout(resolve, 2_000))),
     } as unknown as Pick<AnalyticsService, 'capture' | 'shutdown'>;
     const telemetry = new CliTelemetryLifecycle(analytics, 0);
-    const drain = vi.fn(async () => undefined);
     const exitError = new Error('process exited');
     const exit = vi.fn((): never => { throw exitError; });
-    const originalExit = process.exit;
-    const consoleLog = vi.spyOn(console, 'log').mockImplementation(() => undefined);
-
-    const result = runCliWithTelemetry(
-      () => approveCommand('PAN-2599'),
-      drain,
-      exit,
-      telemetry,
-    ).catch((error) => error);
-    await Promise.resolve();
-
-    expect(analytics.capture).toHaveBeenCalledWith('cli_command_run', {
-      verb: 'other',
-      ok: false,
-      duration_ms: 'under_100ms',
+    const child = new EventEmitter();
+    let pendingExit: Promise<unknown> | undefined;
+    child.once('exit', (code: number) => {
+      pendingExit = exitAfterTelemetry(code, telemetry, exit).catch((error) => error);
     });
-    expect(drain).not.toHaveBeenCalled();
-    expect(exit).not.toHaveBeenCalled();
 
-    await vi.advanceTimersByTimeAsync(1_999);
-    expect(exit).not.toHaveBeenCalled();
+    child.emit('exit', 7);
 
-    await vi.advanceTimersByTimeAsync(1);
-    expect(await result).toBe(exitError);
-    expect(drain).toHaveBeenCalledTimes(1);
-    expect(exit).toHaveBeenCalledWith(1);
-    expect(process.exit).toBe(originalExit);
-    consoleLog.mockRestore();
+    expect(exit).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(2_000);
+    expect(await pendingExit).toBe(exitError);
+    expect(exit).toHaveBeenCalledWith(7);
+    expect(analytics.capture).toHaveBeenCalledWith(
+      'cli_command_run',
+      expect.objectContaining({ ok: false }),
+    );
+  });
+
+  it('flushes a SIGINT exit and shares an in-flight finalization', async () => {
+    const analytics = {
+      capture: vi.fn(),
+      shutdown: vi.fn(() => new Promise<void>((resolve) => setTimeout(resolve, 2_000))),
+    } as unknown as Pick<AnalyticsService, 'capture' | 'shutdown'>;
+    const telemetry = new CliTelemetryLifecycle(analytics, 0);
+    const exitError = new Error('process exited');
+    const exit = vi.fn((): never => { throw exitError; });
+    const signals = new EventEmitter();
+    let pendingExit: Promise<unknown> | undefined;
+    signals.once('SIGINT', () => {
+      pendingExit = exitAfterTelemetry(130, telemetry, exit).catch((error) => error);
+    });
+
+    signals.emit('SIGINT');
+    const duplicateFinish = telemetry.finish(false);
+
+    await vi.advanceTimersByTimeAsync(2_000);
+    await duplicateFinish;
+    expect(await pendingExit).toBe(exitError);
+    expect(exit).toHaveBeenCalledWith(130);
+    expect(analytics.capture).toHaveBeenCalledTimes(1);
+    expect(analytics.shutdown).toHaveBeenCalledTimes(1);
   });
 
   it('exits immediately without SDK capture when telemetry is test-disabled', async () => {

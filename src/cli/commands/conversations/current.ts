@@ -7,6 +7,7 @@
  * and guessing.
  */
 
+import { exitCli } from '../../telemetry.js';
 import chalk from 'chalk';
 import { resolveCurrentConversation, currentTmuxSession } from '../../../lib/conversations/current.js';
 
@@ -20,7 +21,7 @@ export async function currentAction(opts: { json?: boolean }): Promise<void> {
     }
     console.error(chalk.yellow('Could not determine the current conversation.'));
     console.error(chalk.gray('  This command only resolves when run from inside a Overdeck conversation session.'));
-    process.exit(1);
+    return void exitCli(1);
   }
 
   if (opts.json) {

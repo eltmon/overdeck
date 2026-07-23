@@ -1,3 +1,4 @@
+import { exitCli } from '../telemetry.js';
 import { Command } from 'commander';
 import chalk from 'chalk';
 import ora from 'ora';
@@ -585,7 +586,7 @@ export async function restoreVerdictsAndExitCommand(options: {
   verbose?: boolean;
 }): Promise<never> {
   await restoreVerdictsCommand(options);
-  process.exit(process.exitCode && process.exitCode !== 0 ? process.exitCode : 0);
+  return exitCli(Number(process.exitCode && process.exitCode !== 0 ? process.exitCode : 0));
 }
 
 async function reconcileMergesCommand(options: {

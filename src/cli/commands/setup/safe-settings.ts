@@ -14,6 +14,7 @@
  *      where /tmp is tmpfs and $HOME is on a separate filesystem).
  */
 
+import { exitCli } from '../../telemetry.js';
 import chalk from 'chalk';
 import { copyFileSync, mkdirSync, readFileSync, readdirSync, renameSync, unlinkSync, writeFileSync, existsSync } from 'fs';
 import { dirname, basename, join } from 'path';
@@ -40,7 +41,7 @@ export {
  * If the file does not exist, returns an empty object — that case is
  * legitimate (fresh install, no settings yet).
  */
-export function readSettingsOrAbortSync(path: string): Record<string, any> {
+export async function readSettingsOrAbort(path: string): Promise<Record<string, any>> {
   if (!existsSync(path)) return {};
 
   let raw: string;
@@ -49,7 +50,7 @@ export function readSettingsOrAbortSync(path: string): Record<string, any> {
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error(chalk.red(`\n✗ Could not read ${path}: ${message}`));
-    process.exit(1);
+    return exitCli(1);
   }
 
   try {
@@ -65,7 +66,7 @@ export function readSettingsOrAbortSync(path: string): Record<string, any> {
     } else {
       console.error(chalk.dim('  No backup found. Inspect or hand-edit the file before re-running.'));
     }
-    process.exit(1);
+    return exitCli(1);
   }
 }
 

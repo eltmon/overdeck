@@ -5,6 +5,7 @@
  * to 'pending'. Does NOT message the work agent — leaves the worker idle.
  */
 
+import { exitCli } from '../telemetry.js';
 import chalk from 'chalk';
 import { getDashboardApiUrlSync } from '../../lib/config.js';
 
@@ -31,7 +32,7 @@ export async function abortReviewCommand(id: string): Promise<void> {
 
     if (!response.ok) {
       console.error(chalk.red(`\nError: ${result.error || 'Failed to abort reviewers'}`));
-      process.exit(1);
+      return void exitCli(1);
     }
 
     console.log(chalk.green(`\n✓ ${result.message}`));
@@ -49,9 +50,9 @@ export async function abortReviewCommand(id: string): Promise<void> {
     if (error.code === 'ECONNREFUSED') {
       console.error(chalk.red('\nError: Dashboard not running'));
       console.error(chalk.dim('Start the dashboard with: pan up'));
-      process.exit(1);
+      return void exitCli(1);
     }
     console.error(chalk.red(`\nError: ${error.message}`));
-    process.exit(1);
+    return void exitCli(1);
   }
 }

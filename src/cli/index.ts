@@ -8,7 +8,7 @@ import { ensureCompatibleNode } from './node-preflight.js'; import { drainPendin
 // Relaunch under a compatible Node (>=22) before anything else runs. If the
 // current runtime is already Node 22+ this is a no-op; otherwise it re-execs the
 // CLI under an installed Node 22+, or exits with a specific fix command.
-ensureCompatibleNode();
+await ensureCompatibleNode();
 
 // Load ~/.overdeck.env before any other imports
 // This makes API keys and other env vars available to all commands

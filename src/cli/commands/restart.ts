@@ -1,3 +1,4 @@
+import { exitCli } from '../telemetry.js';
 import { Effect } from 'effect';
 /**
  * `pan restart` — scoped restart with explicit dependency isolation.
@@ -61,7 +62,7 @@ export interface RestartOptions {
   noResume?: boolean;
 }
 
-function resolveScope(options: RestartOptions): 'dashboard' | 'cliproxy' | 'traefik' | 'full' {
+async function resolveScope(options: RestartOptions): Promise<'dashboard' | 'cliproxy' | 'traefik' | 'full'> {
   const flags = [
     options.dashboard && 'dashboard',
     options.cliproxy && 'cliproxy',
@@ -70,7 +71,7 @@ function resolveScope(options: RestartOptions): 'dashboard' | 'cliproxy' | 'trae
   ].filter(Boolean) as string[];
   if (flags.length > 1) {
     console.error(chalk.red(`Error: --${flags.join(' and --')} are mutually exclusive`));
-    process.exit(2);
+    return exitCli(2);
   }
   return (flags[0] as any) || 'dashboard';
 }
@@ -316,7 +317,7 @@ export async function shouldRunManualSupervisorCycle(env: NodeJS.ProcessEnv = pr
 
 export async function restartCommand(options: RestartOptions): Promise<void> {
   const startedAt = Date.now();
-  const scope = resolveScope(options);
+  const scope = await resolveScope(options);
   if ((scope === 'dashboard' || scope === 'full') && refuseNonPrimaryDashboardCwd(process.cwd(), 'restart')) {
     return;
   }
