@@ -30,6 +30,7 @@ export interface TelemetryExceptionContext {
 }
 
 let cachedOverdeckVersion: string | undefined;
+let processAnalyticsClientType: AnalyticsClientType = 'server';
 const sharedAnalyticsServices = new Map<AnalyticsClientType, AnalyticsService>();
 
 function getOverdeckVersion(): string {
@@ -205,6 +206,14 @@ export class AnalyticsService {
   }
 }
 
+export function setAnalyticsClientTypeForProcess(clientType: AnalyticsClientType): void {
+  processAnalyticsClientType = clientType;
+}
+
+export function getAnalyticsClientTypeForProcess(): AnalyticsClientType {
+  return processAnalyticsClientType;
+}
+
 export function getAnalyticsService(clientType: AnalyticsClientType): AnalyticsService {
   const existing = sharedAnalyticsServices.get(clientType);
   if (existing) return existing;
@@ -216,6 +225,12 @@ export function getAnalyticsService(clientType: AnalyticsClientType): AnalyticsS
   return analytics;
 }
 
+export async function shutdownAnalyticsServices(): Promise<void> {
+  await Promise.all(
+    [...sharedAnalyticsServices.values()].map((analytics) => analytics.shutdown()),
+  );
+}
+
 export async function synchronizeAnalyticsServices(): Promise<void> {
   let enabled = false;
   try {
@@ -224,8 +239,5 @@ export async function synchronizeAnalyticsServices(): Promise<void> {
     // A configuration read failure must fail closed.
   }
   if (enabled) return;
-
-  await Promise.all(
-    [...sharedAnalyticsServices.values()].map((analytics) => analytics.shutdown()),
-  );
+  await shutdownAnalyticsServices();
 }

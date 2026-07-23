@@ -7,9 +7,10 @@ import {
   readPipelineTelemetryAgentState,
   type PipelineTelemetryAgentState,
 } from './pipeline-agent-reader.js';
-import { getAnalyticsService } from './service.js';
-
-const serverAnalytics = getAnalyticsService('server');
+import {
+  getAnalyticsClientTypeForProcess,
+  getAnalyticsService,
+} from './service.js';
 const HARNESSES = new Set<Harness>(['claude-code', 'ohmypi', 'codex', 'acp']);
 
 export interface PipelineTelemetryContext {
@@ -34,7 +35,12 @@ export function resolvePipelineTelemetryContext(
   readAgent: (agentId: string) => PipelineTelemetryAgentState | null = readPipelineTelemetryAgentState,
 ): PipelineTelemetryContext | null {
   const state = readAgent(`agent-${issueId.toLowerCase()}`);
-  if (!state?.harness || !HARNESSES.has(state.harness)) return null;
+  if (
+    !state?.harness ||
+    !HARNESSES.has(state.harness) ||
+    typeof state.model !== 'string' ||
+    state.model.trim().length === 0
+  ) return null;
   return {
     harness: state.harness,
     model: toTelemetryModelFamily(state.model),
@@ -49,7 +55,7 @@ export function capturePipelineStage(
       event: 'pipeline_stage_changed',
       properties: PipelineStageChangedProperties,
     ) => void;
-  } = serverAnalytics,
+  } = getAnalyticsService(getAnalyticsClientTypeForProcess()),
 ): void {
   if (!context) return;
   try {

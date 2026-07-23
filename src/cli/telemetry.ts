@@ -3,7 +3,14 @@ import {
   type TelemetryCliVerb,
   type TelemetryDurationBucket,
 } from '@overdeck/contracts';
-import { AnalyticsService } from '../lib/telemetry/service.js';
+import {
+  AnalyticsService,
+  getAnalyticsService,
+  setAnalyticsClientTypeForProcess,
+  shutdownAnalyticsServices,
+} from '../lib/telemetry/service.js';
+
+setAnalyticsClientTypeForProcess('cli');
 
 const TELEMETRY_CLI_VERB_SET = new Set<string>(TELEMETRY_CLI_VERBS);
 
@@ -23,12 +30,18 @@ export function resolveTelemetryCliVerb(argv: readonly string[]): TelemetryCliVe
 
 export class CliTelemetryLifecycle {
   private finishPromise: Promise<void> | undefined;
+  private readonly analytics: Pick<AnalyticsService, 'capture' | 'shutdown'>;
+  private readonly shutdown: () => Promise<void>;
 
   constructor(
-    private readonly analytics: Pick<AnalyticsService, 'capture' | 'shutdown'> =
-      new AnalyticsService('cli'),
+    analytics?: Pick<AnalyticsService, 'capture' | 'shutdown'>,
     private readonly startedAt = Date.now(),
-  ) {}
+  ) {
+    this.analytics = analytics ?? getAnalyticsService('cli');
+    this.shutdown = analytics
+      ? () => analytics.shutdown()
+      : shutdownAnalyticsServices;
+  }
 
   finish(ok: boolean, argv = process.argv, finishedAt = Date.now()): Promise<void> {
     this.finishPromise ??= this.finishOnce(ok, argv, finishedAt);
@@ -41,7 +54,7 @@ export class CliTelemetryLifecycle {
       ok,
       duration_ms: bucketCliDuration(Math.max(0, finishedAt - this.startedAt)),
     });
-    await this.analytics.shutdown();
+    await this.shutdown();
   }
 }
 

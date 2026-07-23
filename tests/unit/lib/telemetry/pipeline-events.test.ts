@@ -57,6 +57,16 @@ describe('pipeline telemetry events', () => {
     expect(readAgent).toHaveBeenCalledWith('agent-pan-2599');
   });
 
+  it('skips legacy agent rows without a usable model', () => {
+    expect(resolvePipelineTelemetryContext('PAN-2599', () => ({
+      harness: 'claude-code',
+    }))).toBeNull();
+    expect(resolvePipelineTelemetryContext('PAN-2599', () => ({
+      harness: 'claude-code',
+      model: '   ',
+    }))).toBeNull();
+  });
+
   it('maps model names into the declared privacy-safe families', () => {
     expect(toTelemetryModelFamily('claude-sonnet-5')).toBe('claude');
     expect(toTelemetryModelFamily('gemini-3-pro')).toBe('gemini');

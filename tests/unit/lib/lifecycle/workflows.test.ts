@@ -19,6 +19,8 @@ const {
   mockWriteCloseOutDodGateSync,
   mockSweepOrphanedTasks,
   mockEvaluateDodGate,
+  mockCapturePipelineStage,
+  mockResolvePipelineTelemetryContext,
 } = vi.hoisted(() => ({
   mockExecAsync: vi.fn().mockResolvedValue({ stdout: '', stderr: '' }),
   mockClearReviewStatus: vi.fn(),
@@ -27,10 +29,17 @@ const {
   mockWriteCloseOutDodGateSync: vi.fn(),
   mockSweepOrphanedTasks: vi.fn().mockResolvedValue({ ok: true, closedIds: [], skipped: 0 }),
   mockEvaluateDodGate: vi.fn(),
+  mockCapturePipelineStage: vi.fn(),
+  mockResolvePipelineTelemetryContext: vi.fn(() => null),
 }));
 
 vi.mock('../../../../src/lib/lifecycle/dod-gate.js', () => ({
   evaluateDodGate: mockEvaluateDodGate,
+}));
+
+vi.mock('../../../../src/lib/telemetry/pipeline.js', () => ({
+  capturePipelineStage: mockCapturePipelineStage,
+  resolvePipelineTelemetryContext: mockResolvePipelineTelemetryContext,
 }));
 
 vi.mock('child_process', () => ({
@@ -330,6 +339,20 @@ describe('workflows', () => {
         }),
       );
       expect(result.steps.find(step => step.step === 'close-out:record-dod-gate')).toMatchObject({ success: true });
+    });
+
+    it('does not abort when telemetry attribution fails', async () => {
+      mockResolvePipelineTelemetryContext.mockImplementationOnce(() => {
+        throw new Error('legacy agent row is malformed');
+      });
+
+      const result = await closeOut(
+        { issueId: 'PAN-100', projectPath: testDir },
+        { tracker: successfulTracker() },
+      );
+
+      expect(result.success).toBe(true);
+      expect(mockCapturePipelineStage).toHaveBeenCalledWith('closed_out', null);
     });
 
     it('should verify branch merged before proceeding', async () => {

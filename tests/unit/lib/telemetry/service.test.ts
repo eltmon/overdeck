@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AnalyticsService } from '../../../../src/lib/telemetry/service.js';
+import { CliTelemetryLifecycle } from '../../../../src/cli/telemetry.js';
+import { capturePipelineStage } from '../../../../src/lib/telemetry/pipeline.js';
 import { resolveTelemetryEnabled } from '../../../../src/lib/telemetry/config.js';
 
 const captureMock = vi.hoisted(() => vi.fn());
@@ -90,6 +92,25 @@ describe('AnalyticsService', () => {
         clientType: 'server',
       }),
     });
+  });
+
+  it('flushes CLI-owned pipeline events through the shared CLI client', async () => {
+    capturePipelineStage('work_done', {
+      harness: 'claude-code',
+      model: 'claude',
+    });
+    const telemetry = new CliTelemetryLifecycle(undefined, 0);
+
+    await telemetry.finish(true, ['node', 'pan', 'done'], 50);
+
+    expect(captureMock).toHaveBeenCalledWith(expect.objectContaining({
+      event: 'pipeline_stage_changed',
+      properties: expect.objectContaining({
+        stage: 'work_done',
+        clientType: 'cli',
+      }),
+    }));
+    expect(shutdownMock).toHaveBeenCalledTimes(1);
   });
 
   it('removes private messages and stack frames from captured exceptions', () => {

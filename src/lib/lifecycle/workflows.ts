@@ -37,7 +37,11 @@ import {
 } from '../pan-dir/record.js';
 import { pruneStoppedAgentsForIssue } from '../cloister/agent-gc.js';
 import { evaluateDodGate } from './dod-gate.js';
-import { capturePipelineStage, resolvePipelineTelemetryContext } from '../telemetry/pipeline.js';
+import {
+  capturePipelineStage,
+  resolvePipelineTelemetryContext,
+  type PipelineTelemetryContext,
+} from '../telemetry/pipeline.js';
 import { acceptFlagFor, DOD_ROWS, type DodGateResult } from './dod.js';
 
 const execAsync = promisify(exec);
@@ -219,7 +223,12 @@ export function closeOut(
     }
 
     // 5+6. Teardown workspace + agent state
-    const telemetryContext = resolvePipelineTelemetryContext(ctx.issueId);
+    let telemetryContext: PipelineTelemetryContext | null = null;
+    try {
+      telemetryContext = resolvePipelineTelemetryContext(ctx.issueId);
+    } catch {
+      // Agent attribution is best-effort and must not abort close-out.
+    }
     const closeOutConfig = (yield* Effect.promise(() => Effect.runPromise(loadCloisterConfig()))).close_out;
     const teardownSteps = yield* teardownWorkspace(ctx, {
       deleteWorkspace: closeOutConfig?.remove_workspace ?? false,

@@ -2,7 +2,7 @@ import type { Harness } from '@overdeck/contracts';
 
 export interface PipelineTelemetryAgentState {
   harness?: Harness;
-  model: string;
+  model?: string;
 }
 
 type PipelineTelemetryAgentReader = (
