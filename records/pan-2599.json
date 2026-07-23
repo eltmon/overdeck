@@ -48,15 +48,7 @@
       "timestamp": "2026-07-22T23:51:10.226Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-22T23:51:10Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2599\n\nBrowser telemetry still leaks private route identifiers via PostHog default URL properties\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2599 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       ".github/workflows/release.yml",
@@ -195,24 +187,24 @@
     "recordedAt": "2026-07-22T23:16:44.964Z"
   },
   "created": "2026-07-16T05:02:53.170Z",
-  "updated": "2026-07-23T00:23:02.159Z",
+  "updated": "2026-07-23T00:23:32.107Z",
   "pipeline": {
     "issueId": "PAN-2599",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-22T23:25:31.079Z",
-    "updatedAt": "2026-07-23T00:23:02.138Z",
+    "updatedAt": "2026-07-23T00:23:32.072Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "inspectNotes": "Both ACs verified in diff: getClient() gates on telemetryBlockedForProcess()+resolveTelemetryEnabled() before constructing PostHog, so disabled capture()+shutdown() never invoke the constructor (AC1); shutdown() races client.shutdown() against a 2s setTimeout with finally-clearTimeout, and service.test.ts's hung-flush test advances fake timers to exactly 2000ms to confirm the bound (AC2).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3009",
     "lastVerifiedCommit": "4e5ec24551d4f49486a82fbd5089d843817775ca",
     "reviewRequestedAt": "2026-07-22T23:25:31.079Z",
-    "reviewSpawnedAt": "2026-07-22T23:43:31.434Z",
+    "reviewSpawnedAt": "2026-07-23T00:23:32.072Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         ".github/workflows/release.yml",
@@ -394,9 +386,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 9099717,
-            "output": 632791,
-            "cacheRead": 347958784,
+            "input": 9107679,
+            "output": 633585,
+            "cacheRead": 350251520,
             "cacheWrite": 0
           }
         }
@@ -409,9 +401,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 22062015,
-          "output": 1025100,
-          "cacheRead": 444366848,
+          "input": 22069977,
+          "output": 1025894,
+          "cacheRead": 446659584,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -428,8 +420,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 322.814672,
-        "pricingAsOf": "2026-07-23T00:23:02.154Z"
+        "usd": 324.02467,
+        "pricingAsOf": "2026-07-23T00:23:32.089Z"
       }
     },
     "merges": [
