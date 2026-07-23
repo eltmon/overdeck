@@ -108,12 +108,19 @@ describe('review status reconcile service', () => {
     );
   });
 
-  it('does not emit across several ticks when the latest event matches canonical status', async () => {
-    mockQueryLatestPerIssue.mockReturnValue([statusEvent(canonical.updatedAt, {
-      ...canonical,
+  it('does not emit across several ticks when persisted JSON matches canonical status', async () => {
+    const canonicalWithUndefined = { ...canonical, mergeNotes: undefined };
+    const persisted = JSON.parse(JSON.stringify({
+      ...canonicalWithUndefined,
       reviewSessionNames: ['agent-pan-2988-review-correctness'],
-    } as ReviewStatus)]);
+    })) as ReviewStatus;
+    mockLoadReviewStatuses.mockReturnValue({ [canonical.issueId]: canonicalWithUndefined });
+    mockGetReviewStatusSync.mockReturnValue(canonicalWithUndefined);
+    mockQueryLatestPerIssue.mockReturnValue([statusEvent(canonical.updatedAt, persisted)]);
     const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    expect(Object.hasOwn(canonicalWithUndefined, 'mergeNotes')).toBe(true);
+    expect(Object.hasOwn(persisted, 'mergeNotes')).toBe(false);
 
     startReviewStatusReconcileService();
     await vi.advanceTimersByTimeAsync(3 * 60_000);

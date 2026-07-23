@@ -15,7 +15,9 @@ function canonicalStatus(status: object): Record<string, unknown> {
   delete canonical.reviewCoordinatorSessionName;
   delete canonical.reviewSessionNames;
   delete canonical.reviewSubStatuses;
-  return canonical;
+  // EventStore persists payloads through JSON, which removes undefined keys.
+  // Normalize both sides to that same shape before comparing DB and event data.
+  return JSON.parse(JSON.stringify(canonical)) as Record<string, unknown>;
 }
 
 export function sameCanonicalReviewStatus(left: object, right: object): boolean {
