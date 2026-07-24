@@ -207,22 +207,22 @@
     "recordedAt": "2026-07-24T23:08:31.650Z"
   },
   "created": "2026-07-12T09:32:29.900Z",
-  "updated": "2026-07-24T23:45:01.133Z",
+  "updated": "2026-07-24T23:45:16.613Z",
   "pipeline": {
     "issueId": "PAN-1525",
     "reviewStatus": "blocked",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-24T23:12:31.996Z",
-    "updatedAt": "2026-07-24T23:45:00.499Z",
+    "updatedAt": "2026-07-24T23:45:16.573Z",
     "reviewNotes": "Codex homes still copy skills from legacy ~/.codex/skills instead of the canonical pan-sync ~/.agents/skills source, so FR-12 remains unmet.",
     "inspectNotes": "Composer-command parse+route inserted before compact/transform/delivery in conversation-message.ts with early return; unknown-command maps to 404 naming token + 'Type /pan to list available commands'; terminal-only policy maps to 422 naming exact command display; unprefixed text/pan-start negative control preserves original compact/transform/deliverAgentMessage path. All 4 ACs covered by router.test.ts assertions matching the exact banned-call list.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3033",
-    "lastVerifiedCommit": "0b4828d4e0a9559885b4ecd9b143711f04aba82d",
+    "lastVerifiedCommit": "1805f713e5fed262bc08b49eb66bea8421f885b0",
     "reviewRequestedAt": "2026-07-24T23:12:31.996Z",
     "reviewSpawnedAt": "2026-07-24T23:39:31.527Z",
     "scopeDrift": {
@@ -385,9 +385,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 2786187,
-            "output": 208598,
-            "cacheRead": 64580608,
+            "input": 2793245,
+            "output": 213254,
+            "cacheRead": 65815552,
             "cacheWrite": 0
           }
         },
@@ -416,9 +416,9 @@
           "cacheWrite": 921870
         },
         "openai/gpt-5.6-sol": {
-          "input": 12799301,
-          "output": 1019987,
-          "cacheRead": 495526912,
+          "input": 12806359,
+          "output": 1024643,
+          "cacheRead": 496761856,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -429,8 +429,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 378.25574,
-        "pricingAsOf": "2026-07-24T23:45:00.534Z"
+        "usd": 379.048182,
+        "pricingAsOf": "2026-07-24T23:45:16.605Z"
       }
     },
     "merges": [
