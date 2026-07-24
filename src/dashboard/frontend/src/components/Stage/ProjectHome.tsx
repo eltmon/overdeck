@@ -14,6 +14,7 @@ import type { TimelineConversation } from './HomePane/timeline-utils'
 import type { StageApi } from './types'
 import { ProjectReleasePanel } from './HomePane/ProjectReleasePanel'
 import { ProjectOverview, projectTotalCost, type IssueCostBreakdown } from '../CommandDeck/ProjectOverview'
+import { ProjectSettingsDisclosure } from '../CommandDeck/ProjectSettingsDisclosure'
 import type { ProjectFeature } from '../CommandDeck/ProjectTree/ProjectNode'
 import styles from './stage.module.css'
 
@@ -225,6 +226,7 @@ export function ProjectHome({
           }
         />
       }
+      detail={projectKey ? <ProjectSettingsDisclosure projectKey={projectKey} /> : undefined}
       timeline={
         <Timeline
           conversations={timelineConversations}
