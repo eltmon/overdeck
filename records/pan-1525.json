@@ -60,15 +60,7 @@
       "timestamp": "2026-07-24T23:45:01.132Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-24T23:45:01Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-1525\n\nCodex homes still copy skills from legacy ~/.codex/skills instead of the canonical pan-sync ~/.agents/skills source, so FR-12 remains unmet.\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1525 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "packages/contracts/src/composer-commands.test.ts",
@@ -207,10 +199,10 @@
     "recordedAt": "2026-07-24T23:08:31.650Z"
   },
   "created": "2026-07-12T09:32:29.900Z",
-  "updated": "2026-07-24T23:45:16.613Z",
+  "updated": "2026-07-24T23:45:20.015Z",
   "pipeline": {
     "issueId": "PAN-1525",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -218,8 +210,8 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-24T23:12:31.996Z",
-    "updatedAt": "2026-07-24T23:45:16.573Z",
-    "reviewNotes": "Codex homes still copy skills from legacy ~/.codex/skills instead of the canonical pan-sync ~/.agents/skills source, so FR-12 remains unmet.",
+    "updatedAt": "2026-07-24T23:45:19.607Z",
+    "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "inspectNotes": "Composer-command parse+route inserted before compact/transform/delivery in conversation-message.ts with early return; unknown-command maps to 404 naming token + 'Type /pan to list available commands'; terminal-only policy maps to 422 naming exact command display; unprefixed text/pan-start negative control preserves original compact/transform/deliverAgentMessage path. All 4 ACs covered by router.test.ts assertions matching the exact banned-call list.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3033",
     "lastVerifiedCommit": "1805f713e5fed262bc08b49eb66bea8421f885b0",
@@ -401,9 +393,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 10013114,
-            "output": 811389,
-            "cacheRead": 430946304,
+            "input": 10018501,
+            "output": 813277,
+            "cacheRead": 431737344,
             "cacheWrite": 0
           }
         }
@@ -416,9 +408,9 @@
           "cacheWrite": 921870
         },
         "openai/gpt-5.6-sol": {
-          "input": 12806359,
-          "output": 1024643,
-          "cacheRead": 496761856,
+          "input": 12811746,
+          "output": 1026531,
+          "cacheRead": 497552896,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -429,8 +421,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 379.048182,
-        "pricingAsOf": "2026-07-24T23:45:16.605Z"
+        "usd": 379.527277,
+        "pricingAsOf": "2026-07-24T23:45:19.627Z"
       }
     },
     "merges": [
