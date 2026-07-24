@@ -65,6 +65,9 @@ export interface StageProps {
   renderIssue: (issueId: string, api: StageApi) => ReactNode
   /** Fired when the active tab is a conversation, so the rail can highlight it. */
   onActiveConversationChange?: (conversationId: string) => void
+  /** Fired when the active tab is an issue, so upstream selection (and the
+   * /command-deck/<project>/<issue> URL) follows the visible view. */
+  onActiveIssueChange?: (issueId: string) => void
 }
 
 const PANE_LABELS: Record<PaneType, string> = {
@@ -122,7 +125,7 @@ function renderPane(pane: WorkspacePane, ctx: StageContext) {
  * are composed by the caller via `renderHome` / `renderIssue` (they need the
  * project's / issue's data); every other pane dispatches through `renderPane`.
  */
-export function Stage({ deckKey, conversations = [], resolveSession, terminalCwd, onCreateConversation, renderHome, renderIssue, onActiveConversationChange }: StageProps) {
+export function Stage({ deckKey, conversations = [], resolveSession, terminalCwd, onCreateConversation, renderHome, renderIssue, onActiveConversationChange, onActiveIssueChange }: StageProps) {
   const ensureHome = usePanesStore((s) => s.ensureHome)
   const addPane = usePanesStore((s) => s.addPane)
   const closePane = usePanesStore((s) => s.closePane)
@@ -518,6 +521,15 @@ export function Stage({ deckKey, conversations = [], resolveSession, terminalCwd
       onActiveConversationChange?.(activePane.conversationId)
     }
   }, [activePane?.paneId, activePane?.paneType, activePane?.conversationId, onActiveConversationChange])
+
+  // Same reverse sync for issue tabs: clicking an issue pane tab bypasses the
+  // rail's selection handler, so notify upstream selection here — that keeps
+  // the /command-deck/<project>/<issue> URL following the visible view.
+  useEffect(() => {
+    if (activePane?.paneType === 'issue' && activePane.issueId) {
+      onActiveIssueChange?.(activePane.issueId)
+    }
+  }, [activePane?.paneId, activePane?.paneType, activePane?.issueId, onActiveIssueChange])
 
   // Re-resolve the right-clicked tab's conversation from the live list so the
   // menu reflects current state and self-dismisses if the conversation is gone.
