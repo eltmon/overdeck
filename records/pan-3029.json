@@ -3,19 +3,29 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-07-24T19:21:51.138Z",
-  "updated": "2026-07-24T19:50:29.413Z",
+  "updated": "2026-07-24T19:50:31.318Z",
   "pipeline": {
     "issueId": "PAN-3029",
     "reviewStatus": "pending",
     "testStatus": "pending",
+    "mergeStatus": "failed",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-24T19:50:29.402Z",
+    "updatedAt": "2026-07-24T19:50:31.312Z",
+    "mergeNotes": "Failed to create PR: Command failed: gh pr create --head strike/pan-3029 --base main --title PAN-3029 --body-file /tmp/pan-pr-body-PAN-3029-1784922630246.md\npull request create failed: GraphQL: Something went wrong while executing your query on 2026-07-24T19:50:31Z. Please include `9C6C:1C98CB:183B264:55AC404:6A63C206` when reporting this issue.\n",
     "strikeReadyHead": "98cdf41f18e34567a2a26cfbcd4101020635d516",
     "strikeReadyAt": "2026-07-24T19:50:22.963Z",
-    "strikeLandingState": "landing",
-    "strikeRecoveryCount": 0,
-    "strikeLandingAttempts": []
+    "strikeLandingState": "recovering",
+    "strikeRecoveryCount": 1,
+    "strikeLandingAttempts": [
+      {
+        "timestamp": "2026-07-24T19:50:31.302Z",
+        "strikeHead": "98cdf41f18e34567a2a26cfbcd4101020635d516",
+        "mainHead": "6c79528428bab38cd2bdac687e8c73342b3f084d",
+        "outcome": "failed",
+        "detail": "Failed to create PR: Command failed: gh pr create --head strike/pan-3029 --base main --title PAN-3029 --body-file /tmp/pan-pr-body-PAN-3029-1784922630246.md\npull request create failed: GraphQL: Something went wrong while executing your query on 2026-07-24T19:50:31Z. Please include `9C6C:1C98CB:183B264:55AC404:6A63C206` when reporting this issue.\n"
+      }
+    ]
   },
   "closeOut": {
     "usage": {
@@ -39,7 +49,7 @@
       },
       "costAtCloseOut": {
         "usd": 14.734916,
-        "pricingAsOf": "2026-07-24T19:50:29.406Z"
+        "pricingAsOf": "2026-07-24T19:50:31.313Z"
       }
     },
     "merges": [],
