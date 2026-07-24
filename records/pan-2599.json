@@ -247,7 +247,7 @@
     "recordedAt": "2026-07-22T23:16:44.964Z"
   },
   "created": "2026-07-16T05:02:53.170Z",
-  "updated": "2026-07-24T19:08:21.365Z",
+  "updated": "2026-07-24T20:07:06.879Z",
   "pipeline": {
     "issueId": "PAN-2599",
     "reviewStatus": "passed",
@@ -258,7 +258,7 @@
     "releaseStatus": "skipped",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-22T23:25:31.079Z",
-    "updatedAt": "2026-07-24T19:06:15.031Z",
+    "updatedAt": "2026-07-24T20:07:06.853Z",
     "reviewNotes": "Latest main merge preserves the approved telemetry implementation; full tests, typecheck, and lint pass",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3009",
@@ -352,7 +352,7 @@
       },
       "costAtCloseOut": {
         "usd": 556.689855,
-        "pricingAsOf": "2026-07-24T19:06:15.232Z"
+        "pricingAsOf": "2026-07-24T20:07:06.876Z"
       }
     },
     "merges": [
