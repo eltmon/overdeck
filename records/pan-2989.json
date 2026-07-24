@@ -82,18 +82,18 @@
     "recordedAt": "2026-07-24T17:59:05.966Z"
   },
   "created": "2026-07-22T21:26:29.366Z",
-  "updated": "2026-07-24T18:46:11.967Z",
+  "updated": "2026-07-24T18:52:25.730Z",
   "pipeline": {
     "issueId": "PAN-2989",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-24T18:02:06.151Z",
-    "updatedAt": "2026-07-24T18:46:11.148Z",
-    "reviewNotes": "Fallback drain claims hide active verdicts from reads and dead-claim recovery can overwrite a newer live verdict",
+    "updatedAt": "2026-07-24T18:52:25.669Z",
+    "reviewNotes": "Agent re-review request (2/25): Fixed review issues",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3027",
     "lastVerifiedCommit": "5dfb7d6ce94c0f28627f20e7d7200e30c735cb64",
     "reviewRequestedAt": "2026-07-24T18:02:06.151Z",
@@ -145,9 +145,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 2679303,
-            "output": 190107,
-            "cacheRead": 27684352,
+            "input": 2724680,
+            "output": 218330,
+            "cacheRead": 29498368,
             "cacheWrite": 0
           }
         }
@@ -160,15 +160,15 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 2679303,
-          "output": 190107,
-          "cacheRead": 27684352,
+          "input": 2724680,
+          "output": 218330,
+          "cacheRead": 29498368,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 32.9602863,
-        "pricingAsOf": "2026-07-24T18:46:11.181Z"
+        "usd": 34.9408693,
+        "pricingAsOf": "2026-07-24T18:52:25.710Z"
       }
     },
     "merges": [
