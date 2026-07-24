@@ -1,5 +1,9 @@
+import {
+  COMPOSER_COMMAND_INSERT_OVERRIDES,
+  COMPOSER_COMMAND_MANIFEST,
+  COMPOSER_COMMAND_VARIANTS,
+} from '@overdeck/contracts';
 import type { SlashCommand } from './slashCommandTypes';
-import { GENERATED_SLASH_COMMANDS } from './slashCommands.generated';
 
 /** Entries that are not pan CLI commands and cannot be generated. */
 const STATIC_SLASH_COMMANDS: SlashCommand[] = [
@@ -40,9 +44,30 @@ const STATIC_SLASH_COMMANDS: SlashCommand[] = [
   },
 ];
 
+const OVERDECK_SLASH_COMMANDS: SlashCommand[] = COMPOSER_COMMAND_MANIFEST.map(entry => {
+  const commandPath = entry.path.join(' ');
+  return {
+    id: entry.id,
+    label: entry.display,
+    description: entry.description,
+    insert: COMPOSER_COMMAND_INSERT_OVERRIDES[commandPath]
+      ?? `${entry.display}${entry.args.length > 0 ? ' ' : ''}`,
+    category: entry.category,
+  };
+});
+
+const CURATED_OVERDECK_VARIANTS: SlashCommand[] = COMPOSER_COMMAND_VARIANTS.map(variant => ({
+  id: variant.id,
+  label: variant.display,
+  description: variant.description,
+  insert: variant.insert,
+  category: variant.category,
+}));
+
 export const SLASH_COMMANDS: SlashCommand[] = [
   ...STATIC_SLASH_COMMANDS,
-  ...GENERATED_SLASH_COMMANDS,
+  ...OVERDECK_SLASH_COMMANDS,
+  ...CURATED_OVERDECK_VARIANTS,
 ];
 
 export type { SlashCommand };
