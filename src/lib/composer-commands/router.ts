@@ -3,6 +3,7 @@ import type {
   ComposerCommandResult,
 } from '@overdeck/contracts';
 import type { RuntimeName } from '../runtimes/types.js';
+import { runDetachedCommand } from './detached.js';
 import { runCapturedCommand } from './executors.js';
 import type { ParsedOverdeckComposerCommand } from './parser.js';
 import { resolvePolicy } from './policy.js';
@@ -29,6 +30,9 @@ export async function handleComposerCommand({
 
   if (policy.mode === 'captured') {
     return runCapturedCommand(parsed.argv);
+  }
+  if (policy.mode === 'detached') {
+    return runDetachedCommand(parsed.argv);
   }
   if (policy.mode === 'terminal-only') {
     return {

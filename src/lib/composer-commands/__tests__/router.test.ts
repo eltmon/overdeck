@@ -16,8 +16,18 @@ const mocks = vi.hoisted(() => ({
     output: 'captured output',
     truncated: false,
   })),
+  runDetachedCommand: vi.fn(async (argv: readonly string[]) => ({
+    kind: 'activity' as const,
+    status: 'accepted' as const,
+    command: `/pan ${argv.join(' ')}`,
+    activityId: 'activity-42',
+    message: 'Started command. Watch activity activity-42 for progress.',
+  })),
 }));
 
+vi.mock('../detached.js', () => ({
+  runDetachedCommand: mocks.runDetachedCommand,
+}));
 vi.mock('../executors.js', () => ({
   runCapturedCommand: mocks.runCapturedCommand,
 }));
@@ -199,5 +209,24 @@ describe('conversation composer command routing', () => {
       command: '/pan status',
     });
     expect(mocks.runCapturedCommand).toHaveBeenCalledWith(['status']);
+  });
+
+  it('dispatches detached policies with only the canonical operator argv', async () => {
+    const parsed = parseOverdeckComposerCommand('/pan start PAN-42');
+    expect(parsed).not.toBeNull();
+
+    await expect(handleComposerCommand({
+      parsed: parsed!,
+      target: {
+        kind: 'conversation',
+        id: conversation.name,
+        harness: conversation.harness,
+      },
+    })).resolves.toMatchObject({
+      kind: 'activity',
+      status: 'accepted',
+      command: '/pan start PAN-42',
+    });
+    expect(mocks.runDetachedCommand).toHaveBeenCalledWith(['start', 'PAN-42']);
   });
 });
