@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-24T17:28:09.122Z",
-  "updated": "2026-07-24T17:59:12.107Z",
+  "updated": "2026-07-24T18:03:09.124Z",
   "pipeline": {
     "issueId": "PAN-3021",
     "reviewStatus": "pending",
@@ -83,16 +83,8 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "composer-swap": {
-        "writerId": "agent-pan-3021",
-        "agentId": "agent-pan-3021",
-        "pid": 4009926,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-24T17:59:12.107Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3021",
@@ -115,6 +107,17 @@
         "outcome": "completed",
         "reason": "Added deterministic CLI-registry codegen, explicit curation overlay and extras, shared SlashCommand type, committed generated registry, package script, and audited generated-file size baseline.",
         "releasedAt": "2026-07-24T17:58:56.434Z"
+      },
+      {
+        "writerId": "agent-pan-3021",
+        "agentId": "agent-pan-3021",
+        "pid": 4009926,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-24T17:59:12.107Z",
+        "itemId": "composer-swap",
+        "outcome": "completed",
+        "reason": "Replaced the ComposerPromptEditor hardcoded registry with merged static and generated command data, preserved exports, and added grouping coverage for /model plus pan strike.",
+        "releasedAt": "2026-07-24T18:03:09.123Z"
       }
     ],
     "statusReasons": {
@@ -125,6 +128,10 @@
       "generator-and-overlay": {
         "reason": "Added deterministic CLI-registry codegen, explicit curation overlay and extras, shared SlashCommand type, committed generated registry, package script, and audited generated-file size baseline.",
         "updatedAt": "2026-07-24T17:58:56.434Z"
+      },
+      "composer-swap": {
+        "reason": "Replaced the ComposerPromptEditor hardcoded registry with merged static and generated command data, preserved exports, and added grouping coverage for /model plus pan strike.",
+        "updatedAt": "2026-07-24T18:03:09.123Z"
       }
     }
   },
@@ -140,6 +147,10 @@
     "generator-and-overlay.generator-and-overlay.ac3": "completed",
     "generator-and-overlay.generator-and-overlay.ac4": "completed",
     "generator-and-overlay.generator-and-overlay.ac5": "completed",
-    "composer-swap": "running"
+    "composer-swap": "completed",
+    "composer-swap.composer-swap.ac1": "completed",
+    "composer-swap.composer-swap.ac2": "completed",
+    "composer-swap.composer-swap.ac3": "completed",
+    "composer-swap.composer-swap.ac4": "completed"
   }
 }
