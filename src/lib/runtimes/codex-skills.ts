@@ -2,7 +2,7 @@ import { cpSync, existsSync, mkdirSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 
 /**
- * Copy globally-synced Codex skills into an isolated managed CODEX_HOME.
+ * Copy globally-synced Agent Skills into an isolated managed CODEX_HOME.
  * Top-level destination-only skills are preserved so agent-specific additions
  * survive resume; source-owned skill directories are recursively refreshed.
  */

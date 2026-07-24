@@ -9,10 +9,11 @@ import { createClaudeCodeRuntimeSync } from '../claude-code.js'
 import { createPiRuntimeSync } from '../pi.js'
 import { createCodexRuntimeSync } from '../codex.js'
 
-function withFakeCodexHome(): { codexHome: string; agentsHome: string; cleanup: () => void } {
+function withFakeCodexHome(): { codexHome: string; agentsHome: string; sharedSkills: string; cleanup: () => void } {
   const base = mkdtempSync(join(tmpdir(), 'pan-codex-runtime-'))
   const codexHome = join(base, '.codex')
   const agentsHome = join(base, '.overdeck', 'agents')
+  const sharedSkills = join(base, '.agents', 'skills')
   mkdirSync(codexHome, { recursive: true })
   mkdirSync(agentsHome, { recursive: true })
   const originalCodexHome = process.env['CODEX_HOME']
@@ -22,6 +23,7 @@ function withFakeCodexHome(): { codexHome: string; agentsHome: string; cleanup: 
   return {
     codexHome,
     agentsHome,
+    sharedSkills,
     cleanup: () => {
       if (originalCodexHome === undefined) {
         delete process.env['CODEX_HOME']
@@ -285,13 +287,15 @@ describe('initCodexHome', () => {
     expect(existsNode(join(codexDir, 'rules'))).toBe(false)
   })
 
-  it('copies every global Codex skill into an isolated home without linking the skill root', () => {
-    const globalSkills = join(ctx.codexHome, 'skills')
-    mkdirSync(join(globalSkills, 'alpha', 'scripts'), { recursive: true })
-    mkdirSync(join(globalSkills, 'beta'), { recursive: true })
-    writeFileSync(join(globalSkills, 'alpha', 'SKILL.md'), '# Alpha\n')
-    writeFileSync(join(globalSkills, 'alpha', 'scripts', 'run.sh'), 'exit 0\n')
-    writeFileSync(join(globalSkills, 'beta', 'SKILL.md'), '# Beta\n')
+  it('copies every pan-sync Agent Skill into an isolated home without using legacy Codex skills', () => {
+    mkdirSync(join(ctx.sharedSkills, 'alpha', 'scripts'), { recursive: true })
+    mkdirSync(join(ctx.sharedSkills, 'beta'), { recursive: true })
+    writeFileSync(join(ctx.sharedSkills, 'alpha', 'SKILL.md'), '# Alpha\n')
+    writeFileSync(join(ctx.sharedSkills, 'alpha', 'scripts', 'run.sh'), 'exit 0\n')
+    writeFileSync(join(ctx.sharedSkills, 'beta', 'SKILL.md'), '# Beta\n')
+    const legacySkills = join(ctx.codexHome, 'skills', 'legacy-only')
+    mkdirSync(legacySkills, { recursive: true })
+    writeFileSync(join(legacySkills, 'SKILL.md'), '# Legacy\n')
     const codexDir = join(ctx.agentsHome, 'agent-init-skills')
 
     initCodexHome(codexDir)
@@ -301,13 +305,14 @@ describe('initCodexHome', () => {
     expect(readFileSync(join(homeSkills, 'alpha', 'SKILL.md'), 'utf8')).toBe('# Alpha\n')
     expect(readFileSync(join(homeSkills, 'alpha', 'scripts', 'run.sh'), 'utf8')).toBe('exit 0\n')
     expect(readFileSync(join(homeSkills, 'beta', 'SKILL.md'), 'utf8')).toBe('# Beta\n')
+    expect(existsSync(join(homeSkills, 'legacy-only'))).toBe(false)
     expect(existsSync(join(codexDir, 'sessions'))).toBe(true)
     expect(lstatSync(join(codexDir, 'sessions')).isSymbolicLink()).toBe(false)
     expect(lstatSync(join(codexDir, 'config.toml')).isSymbolicLink()).toBe(false)
   })
 
   it('refreshes managed skills while preserving per-agent-only skill directories', () => {
-    const globalSkill = join(ctx.codexHome, 'skills', 'managed')
+    const globalSkill = join(ctx.sharedSkills, 'managed')
     mkdirSync(globalSkill, { recursive: true })
     writeFileSync(join(globalSkill, 'SKILL.md'), '# Version one\n')
     const codexDir = join(ctx.agentsHome, 'agent-init-skills-repeat')
@@ -324,7 +329,7 @@ describe('initCodexHome', () => {
     expect(readFileSync(join(localOnly, 'SKILL.md'), 'utf8')).toBe('# Local only\n')
   })
 
-  it('silently skips skill seeding when the global skills directory is missing', () => {
+  it('silently skips skill seeding when the shared Agent Skills directory is missing', () => {
     const codexDir = join(ctx.agentsHome, 'agent-init-skills-none')
 
     expect(() => initCodexHome(codexDir)).not.toThrow()

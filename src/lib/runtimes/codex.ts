@@ -407,9 +407,10 @@ export function initCodexHome(codexHomeDir: string, opts: InitCodexHomeOpts = {}
   seedCodexRulesSymlink(join(codexHomeDir, 'rules'), join(globalCodexHome, 'rules'))
 
   // Skills are copied rather than linked: every managed CODEX_HOME remains
-  // isolated, while `pan sync` updates are refreshed on each init/resume.
+  // isolated, while `pan sync` updates in the Agent Skills standard home are
+  // refreshed on each init/resume.
   syncCodexSkillsIntoHome(
-    join(globalCodexHome, 'skills'),
+    join(homedir(), '.agents', 'skills'),
     join(codexHomeDir, 'skills'),
   )
 
