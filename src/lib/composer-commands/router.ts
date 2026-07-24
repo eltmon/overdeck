@@ -1,3 +1,11 @@
+/**
+ * Harness-independent composer control-plane router.
+ *
+ * Message endpoints call this after target/body validation and before every
+ * harness-specific stage: native compact handling, attachment transformation,
+ * prompt-memory injection, and delivery. Returning early here guarantees that
+ * `/pan` operator commands cannot become harness prompts or transcript rows.
+ */
 import type {
   ComposerCommandPolicy,
   ComposerCommandResult,

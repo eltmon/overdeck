@@ -24,6 +24,14 @@ skills, MCP, and AGENTS.md — see the [Harness Landscape](/reference/harness-la
 | `codex` | [OpenAI Codex CLI](https://github.com/openai/codex) (`codex`) | OpenAI-model work | Uses persistent `codex app-server` sessions by default; requires Codex CLI `0.144.0` or newer. |
 | `acp` | [Kimi Code CLI](https://www.kimi.com/code/docs/en/kimi-code-cli/guides/getting-started.html) (`kimi`) | Opt-in Kimi work | Uses the open Agent Client Protocol over a persistent authenticated host; Kimi is the first wired ACP agent. |
 
+## Composer commands across harnesses
+
+The dashboard reserves `/pan <verb> [args]` for Overdeck operator commands. The dashboard parses and executes this namespace before a message reaches the coding harness, so `/pan` has the same syntax, validation, canonical arguments, confirmations, and result shape under `claude-code`, `codex`, `ohmypi`, and `acp`. Unprefixed `pan ...` text is still delivered as an ordinary prompt.
+
+Harness-native slash commands are a separate lane and are not uniform. The composer menu reads the active harness's verified capability list: for example, Claude Code exposes native commands such as `/model`, while a harness with no verified inventory shows no native entries. Overdeck commands appear in their own **Overdeck** group, so choosing a harness never changes the `/pan` control-plane surface.
+
+Managed Codex sessions use an isolated `CODEX_HOME`. On initialization and resume, Overdeck copies the globally synced `~/.codex/skills` directories into that home's `skills/` directory. Managed skills are refreshed additively, per-agent-only skill directories are preserved, and Codex still keeps its sessions and configuration inside the isolated home.
+
 ## Supported harnesses
 
 ### Claude Code (default)
@@ -73,8 +81,9 @@ skills, MCP, and AGENTS.md — see the [Harness Landscape](/reference/harness-la
 - Runtime adapter at `src/lib/runtimes/codex.ts`; per-agent thread-id pinning
   enables session introspection and cost parsing
   (`src/lib/cost-parsers/codex-parser.ts`).
-- Native AGENTS.md and Claude-Code-compatible skills; `pan sync` distributes
-  context layers and skills to it like any other harness.
+- Native AGENTS.md and Claude-Code-compatible skills; `pan sync` prepares the
+  global context and skill sources, then each isolated Codex home receives an
+  additive copy of the synced skill directories during initialization.
 - Role-declared MCP servers, such as Playwright for the `test` role, are
   provisioned as `[mcp_servers.<name>]` entries in the per-agent Codex config
   so browser UAT can run on Codex.
