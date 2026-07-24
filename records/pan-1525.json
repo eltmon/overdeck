@@ -27,7 +27,7 @@
   ],
   "feedback": [],
   "created": "2026-07-12T09:32:29.900Z",
-  "updated": "2026-07-24T20:50:19.154Z",
+  "updated": "2026-07-24T21:06:31.302Z",
   "pipeline": {
     "issueId": "PAN-1525",
     "reviewStatus": "pending",
@@ -109,16 +109,8 @@
   "model": "claude-sonnet-5",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 17,
-    "claims": {
-      "executors-detached": {
-        "writerId": "agent-pan-1525",
-        "agentId": "agent-pan-1525",
-        "pid": 2520226,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-24T20:50:19.154Z"
-      }
-    },
+    "sequence": 18,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-1525",
@@ -207,6 +199,17 @@
         "outcome": "completed",
         "reason": "Implemented captured show/status/tell execution via spawnPanCli argv arrays with 64 KiB bounded output, exit-derived completed/failed status, stderr capture, and a 30-second SIGTERM timeout using fake-timer tests. Executor/router tests, typecheck, ESLint, and throwaway API verification pass: status completed with real CLI output, tell failure returned structured failed output, and doctor stayed terminal-only.",
         "releasedAt": "2026-07-24T20:49:57.034Z"
+      },
+      {
+        "writerId": "agent-pan-1525",
+        "agentId": "agent-pan-1525",
+        "pid": 2520226,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-24T20:50:19.154Z",
+        "itemId": "executors-detached",
+        "outcome": "completed",
+        "reason": "Detached start and plan now launch through the shared spawnPanCli activity helper, return accepted activity results, preserve route completion semantics, and forward exact operator argv without provider flags. Focused tests, typecheck, full lint, and throwaway Node 22 API verification passed.",
+        "releasedAt": "2026-07-24T21:06:31.302Z"
       }
     ],
     "statusReasons": {
@@ -241,6 +244,10 @@
       "executors-captured": {
         "reason": "Implemented captured show/status/tell execution via spawnPanCli argv arrays with 64 KiB bounded output, exit-derived completed/failed status, stderr capture, and a 30-second SIGTERM timeout using fake-timer tests. Executor/router tests, typecheck, ESLint, and throwaway API verification pass: status completed with real CLI output, tell failure returned structured failed output, and doctor stayed terminal-only.",
         "updatedAt": "2026-07-24T20:49:57.034Z"
+      },
+      "executors-detached": {
+        "reason": "Detached start and plan now launch through the shared spawnPanCli activity helper, return accepted activity results, preserve route completion semantics, and forward exact operator argv without provider flags. Focused tests, typecheck, full lint, and throwaway Node 22 API verification passed.",
+        "updatedAt": "2026-07-24T21:06:31.302Z"
       }
     }
   },
@@ -278,6 +285,9 @@
     "executors-captured.executors-captured.ac1": "completed",
     "executors-captured.executors-captured.ac2": "completed",
     "executors-captured.executors-captured.ac3": "completed",
-    "executors-detached": "running"
+    "executors-detached": "completed",
+    "executors-detached.executors-detached.ac1": "completed",
+    "executors-detached.executors-detached.ac2": "completed",
+    "executors-detached.executors-detached.ac3": "completed"
   }
 }
