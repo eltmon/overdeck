@@ -27,7 +27,7 @@
   ],
   "feedback": [],
   "created": "2026-07-12T09:32:29.900Z",
-  "updated": "2026-07-24T22:41:27.361Z",
+  "updated": "2026-07-24T22:48:10.509Z",
   "pipeline": {
     "issueId": "PAN-1525",
     "reviewStatus": "pending",
@@ -109,16 +109,8 @@
   "model": "claude-sonnet-5",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 33,
-    "claims": {
-      "composer-playwright": {
-        "writerId": "agent-pan-1525",
-        "agentId": "agent-pan-1525",
-        "pid": 3702484,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-24T22:41:27.361Z"
-      }
-    },
+    "sequence": 34,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-1525",
@@ -292,6 +284,16 @@
         "itemId": "no-loss-and-matrix",
         "outcome": "completed",
         "releasedAt": "2026-07-24T22:41:19.310Z"
+      },
+      {
+        "writerId": "agent-pan-1525",
+        "agentId": "agent-pan-1525",
+        "pid": 3702484,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-24T22:41:27.361Z",
+        "itemId": "composer-playwright",
+        "outcome": "completed",
+        "releasedAt": "2026-07-24T22:48:10.509Z"
       }
     ],
     "statusReasons": {
@@ -416,6 +418,9 @@
     "no-loss-and-matrix.no-loss-and-matrix.ac1": "completed",
     "no-loss-and-matrix.no-loss-and-matrix.ac2": "completed",
     "no-loss-and-matrix.no-loss-and-matrix.ac3": "completed",
-    "composer-playwright": "running"
+    "composer-playwright": "completed",
+    "composer-playwright.composer-playwright.ac1": "completed",
+    "composer-playwright.composer-playwright.ac2": "completed",
+    "composer-playwright.composer-playwright.ac3": "completed"
   }
 }
