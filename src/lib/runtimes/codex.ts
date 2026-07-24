@@ -11,6 +11,11 @@
  * getSessionCost are stubs in this bead — they throw NotImplementedError
  * and will be filled in by downstream beads (spawn-agent, send-message,
  * kill-agent, cost-parser, notify-heartbeat).
+ *
+ * Skill discovery checkpoint (Codex CLI 0.144.4, 2026-07-24): running
+ * `codex debug prompt-input` with an isolated CODEX_HOME listed a probe skill
+ * from `$CODEX_HOME/skills/<name>/SKILL.md`, confirming this is the supported
+ * per-home discovery location.
  */
 
 import { existsSync, readFileSync, statSync, writeFileSync, readdirSync, mkdirSync, copyFileSync, chmodSync, openSync, readSync, closeSync, lstatSync, readlinkSync, symlinkSync, unlinkSync } from 'node:fs'
@@ -34,6 +39,7 @@ import type {
   Agent,
 } from './types.js'
 import { CODEX_BEHAVIOR } from './behavior.js'
+import { syncCodexSkillsIntoHome } from './codex-skills.js'
 import { tmuxCreateSession, tmuxKillSession, tmuxSessionExists } from './tmux-cli.js'
 import { TmuxError, ProcessSpawnError, ProcessTimeoutError } from '../errors.js'
 import { prepareHarnessLaunch } from '../harness-binary.js'
@@ -399,6 +405,13 @@ export function initCodexHome(codexHomeDir: string, opts: InitCodexHomeOpts = {}
   // agent home. Link the directory rather than copying it so rule amendments
   // accepted in one persistent session remain available to later sessions.
   seedCodexRulesSymlink(join(codexHomeDir, 'rules'), join(globalCodexHome, 'rules'))
+
+  // Skills are copied rather than linked: every managed CODEX_HOME remains
+  // isolated, while `pan sync` updates are refreshed on each init/resume.
+  syncCodexSkillsIntoHome(
+    join(globalCodexHome, 'skills'),
+    join(codexHomeDir, 'skills'),
+  )
 
   const agentsMdPath = join(codexHomeDir, 'AGENTS.md')
   if (!existsSync(agentsMdPath)) {

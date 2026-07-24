@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
+import { existsSync, lstatSync, mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -283,6 +283,52 @@ describe('initCodexHome', () => {
     initCodexHome(codexDir)
 
     expect(existsNode(join(codexDir, 'rules'))).toBe(false)
+  })
+
+  it('copies every global Codex skill into an isolated home without linking the skill root', () => {
+    const globalSkills = join(ctx.codexHome, 'skills')
+    mkdirSync(join(globalSkills, 'alpha', 'scripts'), { recursive: true })
+    mkdirSync(join(globalSkills, 'beta'), { recursive: true })
+    writeFileSync(join(globalSkills, 'alpha', 'SKILL.md'), '# Alpha\n')
+    writeFileSync(join(globalSkills, 'alpha', 'scripts', 'run.sh'), 'exit 0\n')
+    writeFileSync(join(globalSkills, 'beta', 'SKILL.md'), '# Beta\n')
+    const codexDir = join(ctx.agentsHome, 'agent-init-skills')
+
+    initCodexHome(codexDir)
+
+    const homeSkills = join(codexDir, 'skills')
+    expect(lstatSync(homeSkills).isSymbolicLink()).toBe(false)
+    expect(readFileSync(join(homeSkills, 'alpha', 'SKILL.md'), 'utf8')).toBe('# Alpha\n')
+    expect(readFileSync(join(homeSkills, 'alpha', 'scripts', 'run.sh'), 'utf8')).toBe('exit 0\n')
+    expect(readFileSync(join(homeSkills, 'beta', 'SKILL.md'), 'utf8')).toBe('# Beta\n')
+    expect(existsSync(join(codexDir, 'sessions'))).toBe(true)
+    expect(lstatSync(join(codexDir, 'sessions')).isSymbolicLink()).toBe(false)
+    expect(lstatSync(join(codexDir, 'config.toml')).isSymbolicLink()).toBe(false)
+  })
+
+  it('refreshes managed skills while preserving per-agent-only skill directories', () => {
+    const globalSkill = join(ctx.codexHome, 'skills', 'managed')
+    mkdirSync(globalSkill, { recursive: true })
+    writeFileSync(join(globalSkill, 'SKILL.md'), '# Version one\n')
+    const codexDir = join(ctx.agentsHome, 'agent-init-skills-repeat')
+    initCodexHome(codexDir)
+
+    const localOnly = join(codexDir, 'skills', 'local-only')
+    mkdirSync(localOnly, { recursive: true })
+    writeFileSync(join(localOnly, 'SKILL.md'), '# Local only\n')
+    writeFileSync(join(globalSkill, 'SKILL.md'), '# Version two\n')
+
+    initCodexHome(codexDir)
+
+    expect(readFileSync(join(codexDir, 'skills', 'managed', 'SKILL.md'), 'utf8')).toBe('# Version two\n')
+    expect(readFileSync(join(localOnly, 'SKILL.md'), 'utf8')).toBe('# Local only\n')
+  })
+
+  it('silently skips skill seeding when the global skills directory is missing', () => {
+    const codexDir = join(ctx.agentsHome, 'agent-init-skills-none')
+
+    expect(() => initCodexHome(codexDir)).not.toThrow()
+    expect(existsSync(join(codexDir, 'skills'))).toBe(false)
   })
 
   it('is idempotent — a second init leaves the existing symlink in place (PAN-2285)', () => {
