@@ -35,6 +35,7 @@ import {
 import { getAgentRuntimeStateSync } from '../../../../lib/agents.js';
 import { normalizeModelOverrideSync } from '../../../../lib/model-validation.js';
 import { resolveModel } from '../../../../lib/config-yaml.js';
+import { notifyPipelineSync } from '../../../../lib/pipeline-notifier.js';
 import { jsonResponse } from '../../http-helpers.js';
 import { httpHandler } from '../http-handler.js';
 import {
@@ -65,6 +66,27 @@ export type ResetReviewResult =
         preservedResolution?: { agentId: string; resolution?: string; resolutionCount?: number };
       };
     };
+
+export type ResyncReviewResult =
+  | { httpStatus: 404; body: { ok: false; error: string } }
+  | { httpStatus: 200; body: { ok: true; status: NonNullable<ReturnType<typeof getReviewStatusSync>> } };
+
+/**
+ * Read and re-emit canonical review status without mutating it. This is the
+ * operator escape hatch for PAN-2988-style lost review.status_changed events.
+ */
+export function processResyncReviewStatus(issueId: string): ResyncReviewResult {
+  const status = getReviewStatusSync(issueId);
+  if (!status) {
+    return {
+      httpStatus: 404,
+      body: { ok: false, error: `no review status found for ${issueId}` },
+    };
+  }
+
+  notifyPipelineSync({ type: 'status_changed', issueId, status });
+  return { httpStatus: 200, body: { ok: true, status } };
+}
 
 /**
  * Core logic for POST /api/review/:issueId/reset (synchronous, testable).
@@ -396,6 +418,22 @@ const postWorkspaceResetReviewRoute = HttpRouter.add(
     });
   }))
 );
+
+const postReviewResyncRoute = HttpRouter.add(
+  'POST',
+  '/api/review/:issueId/resync',
+  httpHandler(Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const issueId = params['issueId'] ?? '';
+    if (!parseIssueIdSync(issueId)) {
+      return jsonResponse({ error: 'Invalid issue ID' }, { status: 400 });
+    }
+
+    const result = processResyncReviewStatus(issueId.toUpperCase());
+    return jsonResponse(result.body, { status: result.httpStatus });
+  })),
+);
+
 // ─── Route: POST /api/review/:issueId/purge ────────────────────────────────
 //
 // COMPLETE review reset. Tears down the issue's entire review fleet — the
@@ -700,6 +738,7 @@ const postReviewConfigRoute = HttpRouter.add(
 
 export const reviewControlRouteLayer = Layer.mergeAll(
   postWorkspaceResetReviewRoute,
+  postReviewResyncRoute,
   postWorkspaceReviewPurgeRoute,
   postWorkspaceAbortReviewRoute,
   postWorkspaceUnstickRoute,

@@ -128,6 +128,44 @@ describe('EventStore.readFrom', () => {
   })
 })
 
+// ─── queryLatestPerIssue ─────────────────────────────────────────────────────
+
+describe('EventStore.queryLatestPerIssue', () => {
+  it('returns the latest event for each payload issue ID', () => {
+    const store = createEventStore(makeDb())
+    store.append({
+      type: 'review.status_changed',
+      timestamp: ts(),
+      payload: { issueId: 'PAN-1', status: { updatedAt: '2026-07-22T20:00:00.000Z' } },
+    } as any)
+    store.append({
+      type: 'review.status_changed',
+      timestamp: ts(1),
+      payload: { issueId: 'PAN-2', status: { updatedAt: '2026-07-22T20:01:00.000Z' } },
+    } as any)
+    store.append({
+      type: 'review.status_changed',
+      timestamp: ts(2),
+      payload: { issueId: 'PAN-1', status: { updatedAt: '2026-07-22T20:02:00.000Z' } },
+    } as any)
+    store.append({
+      type: 'agent.started',
+      timestamp: ts(3),
+      payload: { issueId: 'PAN-1' },
+    } as any)
+
+    const latest = store.queryLatestPerIssue('review.status_changed')
+    const byIssue = new Map(latest.map((event) => [
+      (event.payload as { issueId: string }).issueId,
+      event,
+    ]))
+
+    expect(latest).toHaveLength(2)
+    expect(byIssue.get('PAN-1')?.sequence).toBe(3)
+    expect(byIssue.get('PAN-2')?.sequence).toBe(2)
+  })
+})
+
 // ─── subscribe / unsubscribe ─────────────────────────────────────────────────
 
 describe('EventStore.subscribe', () => {

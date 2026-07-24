@@ -55,6 +55,8 @@ export interface EventStore {
   readFrom(fromSequence: number): StoredEvent[];
   /** Return events of a given type, most recent first, capped at limit. */
   queryByType(type: string, limit?: number): StoredEvent[];
+  /** Return the latest event per payload.issueId for a given event type. */
+  queryLatestPerIssue(type: string): StoredEvent[];
   /** Subscribe to live events. Returns an unsubscribe function. */
   subscribe(fn: EventSubscriber): Unsubscribe;
   /** Run 7-day retention compaction. Called at startup. */
@@ -170,6 +172,17 @@ export function createEventStore(db: DbAdapter): EventStore {
   );
   const queryByTypeStmt = db.prepare<EventRow>(
     `SELECT sequence, type, timestamp, payload FROM events WHERE type = ? ORDER BY sequence DESC LIMIT ?`,
+  );
+  const queryLatestPerIssueStmt = db.prepare<EventRow>(
+    `SELECT e.sequence, e.type, e.timestamp, e.payload
+     FROM events e
+     JOIN (
+       SELECT json_extract(payload, '$.issueId') AS issue_id, MAX(sequence) AS max_seq
+       FROM events
+       WHERE type = ?
+       GROUP BY issue_id
+     ) latest ON e.sequence = latest.max_seq
+     ORDER BY e.sequence ASC`,
   );
   const purgeTypeStmt = db.prepare<void>(
     `DELETE FROM events WHERE type = ?`,
@@ -328,11 +341,27 @@ export function createEventStore(db: DbAdapter): EventStore {
     return rows.map(rowToStored).reverse();
   }
 
+  function queryLatestPerIssue(type: string): StoredEvent[] {
+    return queryLatestPerIssueStmt.all([type]).map(rowToStored);
+  }
+
   function emitStored(event: StoredEvent): void {
     emitter.emit('event', event);
   }
 
-  return { append, appendAsync, emitOnly, readFrom, queryByType, subscribe, compact, purgeType, getLatestSequence, emitStored };
+  return {
+    append,
+    appendAsync,
+    emitOnly,
+    readFrom,
+    queryByType,
+    queryLatestPerIssue,
+    subscribe,
+    compact,
+    purgeType,
+    getLatestSequence,
+    emitStored,
+  };
 }
 
 // ─── Module-level singleton ───────────────────────────────────────────────────

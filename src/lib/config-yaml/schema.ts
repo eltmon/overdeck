@@ -418,6 +418,8 @@ export interface IssuesConfig {
   closed_window_days?: number;
 }
 
+export interface TelemetryConfig { enabled?: boolean }
+
 /**
  * Complete configuration structure (YAML schema)
  */
@@ -557,6 +559,9 @@ export interface YamlConfig {
 
   /** Dashboard issue-fetch behavior */
   issues?: IssuesConfig;
+
+  /** Anonymous product telemetry configuration. */
+  telemetry?: TelemetryConfig;
 
   /** Experimental, opt-in features. Each flag is research-preview and may be removed. */
   experimental?: ExperimentalConfig;
@@ -887,6 +892,9 @@ export interface NormalizedConfig {
   issues: {
     closedWindowDays: number;
   };
+
+  /** Anonymous product telemetry configuration, normalised (always defined). */
+  telemetry: Required<TelemetryConfig>;
 
   /** Experimental flag values, normalised (always defined, never undefined). */
   experimental: NormalizedExperimentalConfig;

@@ -34,6 +34,7 @@ export const ISSUE_SCOPED_PAN_VERBS = [
   'review request',
   'review restart',
   'review reset',
+  'review resync',
   'kill',
   'pause',
   'unpause',
@@ -61,6 +62,7 @@ const AUDITED_REGISTRY_KEYS = [
   'requestReview',
   'restartReview',
   'recoverReview',
+  'resyncPipelineState',
   'purgeReview',
   'stopAgent',
   'pause',
@@ -151,6 +153,8 @@ function commandFileForPanVerb(panVerb: string) {
       return 'review-restart.ts';
     case 'review reset':
       return 'reset-review.ts';
+    case 'review resync':
+      return 'resync-review.ts';
     case 'destroy':
       return 'workspace.ts';
     default:

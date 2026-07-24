@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { X, GitBranchPlus, HelpCircle } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import posthog from 'posthog-js';
+import { capture } from '../../lib/telemetry';
 import {
   getDefaultConversationModel,
   FALLBACK_DEFAULT_CONVERSATION_MODEL,
@@ -514,7 +514,7 @@ export function ForkModal({ conversation, initialMode, initialFocus, onConfirm, 
             disabled={confirmDisabled}
             title={handoffUnavailable ? 'Source-authored handoff requires a running source conversation' : undefined}
             onClick={() => {
-              posthog.capture('conversation_forked', {
+              capture('conversation_forked', {
                 fork_intent: intent,
                 fork_mode: apiForkMode,
                 fast_summary: localSummaryOnly,

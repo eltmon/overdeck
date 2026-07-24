@@ -98,6 +98,7 @@
             "group": "Configuration",
             "pages": [
               "configuration/projects",
+              "configuration/telemetry",
               "configuration/knowledge",
               "configuration/harnesses",
               "configuration/context-layers",
@@ -132,6 +133,7 @@
               "reference/architecture",
               "reference/state-model",
               "reference/harness-landscape",
+              "reference/posthog-agents",
               "reference/template-conversations",
               "reference/prompts",
               "reference/troubleshooting",
