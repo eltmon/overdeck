@@ -69,6 +69,20 @@ function isPiConversation(conversation: Conversation): boolean {
   return conversation.harness === 'ohmypi' || conversation.harness === 'pi';
 }
 
+function openComposerUi(
+  conversation: Conversation,
+  action: 'handoff' | 'fork',
+  focus?: string,
+): void {
+  window.dispatchEvent(new CustomEvent('overdeck:open-fork-modal', {
+    detail: {
+      conversation,
+      mode: action === 'handoff' ? 'handoff' : 'summary',
+      focus,
+    },
+  }));
+}
+
 function formatFileSize(bytes: number): string {
   if (bytes === 0) return '0 B';
   const units = ['B', 'KB', 'MB', 'GB'];
@@ -396,9 +410,7 @@ export function ComposerFooter({
     const handoffMatch = messageText.match(/^\/(?:pan[\s-])?handoff(?:\s+(.+))?$/i);
     if (handoffMatch) {
       const focus = handoffMatch[1]?.trim() || undefined;
-      window.dispatchEvent(new CustomEvent('overdeck:open-fork-modal', {
-        detail: { conversation, mode: 'handoff', focus },
-      }));
+      openComposerUi(conversation, 'handoff', focus);
       editor.update(() => {
         $getRoot().clear();
       });
@@ -449,16 +461,26 @@ export function ComposerFooter({
         return;
       }
 
-      // Optimistic: notify parent immediately so message appears before server round-trip
-      onSend?.(composedMessage);
+      // `/pan fork` is server-routed to the same local dialog as the handoff
+      // aliases above. Do not create an optimistic chat bubble for a UI action.
+      const awaitsUiResult = /^\/pan\s+fork(?:\s|$)/i.test(composedMessage);
+      if (!awaitsUiResult) onSend?.(composedMessage);
 
-      await sendConversationMessage(
+      const commandResult = await sendConversationMessage(
         submitConversationName,
         composedMessage,
         agentId,
         piConversation && deliverAs !== 'auto' ? deliverAs : undefined,
       );
-      onSendAcknowledged?.(composedMessage);
+      if (commandResult?.kind === 'ui') {
+        openComposerUi(
+          conversation,
+          commandResult.action,
+          commandResult.args.focus || undefined,
+        );
+      } else {
+        onSendAcknowledged?.(composedMessage);
+      }
 
       // The send consumed this conversation's attachments — revoke their previews and
       // drop them from the store. Target submitConversationName explicitly so the
@@ -487,7 +509,7 @@ export function ComposerFooter({
       // Refocus editor
       editor.focus();
     }
-  }, [agentId, conversation.model, conversation.name, conversation.sessionAlive, consumeAttachmentsForConversation, deliverAs, harness, isDisabled, model, onSend, onSendAcknowledged, onSendFailed, piConversation, sending, setSendingFor]);
+  }, [agentId, conversation, consumeAttachmentsForConversation, deliverAs, harness, isDisabled, model, onSend, onSendAcknowledged, onSendFailed, piConversation, sending, setSendingFor]);
 
   useEffect(() => {
     const previousConversationName = previousConversationNameRef.current;

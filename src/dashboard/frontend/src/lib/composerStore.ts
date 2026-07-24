@@ -23,6 +23,7 @@
  * Empty slices are pruned so the map only ever holds conversations that have
  * live ephemeral state.
  */
+import type { ComposerCommandResult } from '@overdeck/contracts';
 import { create } from 'zustand';
 import type { ChatMessage, FailedMessage } from '../components/chat/chat-types';
 import {
@@ -88,19 +89,34 @@ function isEmptySlice(s: ComposerSlice): boolean {
 
 // ─── Message send (shared by the composer and the retry outbox) ─────────────────
 
+type ComposerUiCommandResult = Extract<ComposerCommandResult, { kind: 'ui' }>;
+
+function isComposerUiCommandResult(value: unknown): value is ComposerUiCommandResult {
+  if (!value || typeof value !== 'object') return false;
+  const candidate = value as Record<string, unknown>;
+  return (
+    candidate.kind === 'ui' &&
+    candidate.status === 'requires_ui' &&
+    (candidate.action === 'handoff' || candidate.action === 'fork') &&
+    candidate.args !== null &&
+    typeof candidate.args === 'object'
+  );
+}
+
 /**
  * POST a message to a conversation (or agent) session. The single source of
  * truth for the send endpoint + payload, used by both the composer's first send
  * (ComposerFooter.handleSubmit) and the failed-message retry (retryFailed
  * below). Throws on a non-2xx response so callers can move the message to the
- * retry outbox.
+ * retry outbox. UI command results are returned so the composer can open the
+ * requested dialog instead of rendering the command as a chat message.
  */
 export async function sendConversationMessage(
   conversationName: string,
   message: string,
   agentId?: string,
   deliverAs?: 'steer' | 'follow_up',
-): Promise<void> {
+): Promise<ComposerUiCommandResult | null> {
   const endpoint = agentId
     ? `/api/agents/${encodeURIComponent(agentId)}/message`
     : `/api/conversations/${encodeURIComponent(conversationName)}/message`;
@@ -116,6 +132,8 @@ export async function sendConversationMessage(
     const body = await res.text().catch(() => '');
     throw new Error(`Failed to send message (${res.status})${body ? `: ${body}` : ''}`);
   }
+  const responseBody = await res.json().catch(() => null);
+  return isComposerUiCommandResult(responseBody) ? responseBody : null;
 }
 
 // ─── Attachment API + upload pump (module-level, survives component unmount) ────

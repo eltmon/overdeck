@@ -133,6 +133,79 @@ describe('ComposerFooter attachments', () => {
     vi.unstubAllGlobals();
   });
 
+  it.each([
+    '/handoff make it fast',
+    '/pan-handoff make it fast',
+    '/pan handoff make it fast',
+  ])('opens the handoff dialog locally for %s', message => {
+    const openModal = vi.fn();
+    window.addEventListener('overdeck:open-fork-modal', openModal);
+    const onSend = vi.fn();
+
+    render(<ComposerFooter conversation={conversation} onSend={onSend} />);
+    fireEvent.change(screen.getByTestId('composer-editor'), { target: { value: message } });
+    fireEvent.click(screen.getByTitle('Send message (Enter)'));
+
+    expect(openModal).toHaveBeenCalledOnce();
+    expect((openModal.mock.calls[0][0] as CustomEvent).detail).toEqual({
+      conversation,
+      mode: 'handoff',
+      focus: 'make it fast',
+    });
+    expect(fetch).not.toHaveBeenCalled();
+    expect(onSend).not.toHaveBeenCalled();
+    window.removeEventListener('overdeck:open-fork-modal', openModal);
+  });
+
+  it('opens the server-requested fork dialog without rendering a chat message', async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes('/message')) {
+        return new Response(JSON.stringify({
+          kind: 'ui',
+          status: 'requires_ui',
+          action: 'fork',
+          args: { focus: 'make it fast' },
+        }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      if (url.includes('/api/settings/claude-auth')) {
+        return new Response(JSON.stringify({ loggedIn: true, hasAnthropicApiKey: false }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    const openModal = vi.fn();
+    window.addEventListener('overdeck:open-fork-modal', openModal);
+    const onSend = vi.fn();
+    const onSendAcknowledged = vi.fn();
+
+    render(
+      <ComposerFooter
+        conversation={conversation}
+        onSend={onSend}
+        onSendAcknowledged={onSendAcknowledged}
+      />,
+    );
+    fireEvent.change(screen.getByTestId('composer-editor'), { target: { value: '/pan fork make it fast' } });
+    fireEvent.click(screen.getByTitle('Send message (Enter)'));
+
+    await waitFor(() => expect(openModal).toHaveBeenCalledOnce());
+    expect((openModal.mock.calls[0][0] as CustomEvent).detail).toEqual({
+      conversation,
+      mode: 'summary',
+      focus: 'make it fast',
+    });
+    expect(onSend).not.toHaveBeenCalled();
+    expect(onSendAcknowledged).not.toHaveBeenCalled();
+    window.removeEventListener('overdeck:open-fork-modal', openModal);
+  });
+
   it('uploads pasted images and sends their server paths with the message', async () => {
     const fetchMock = vi.mocked(fetch);
     fetchMock.mockImplementation(async (input) => {

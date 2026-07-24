@@ -133,6 +133,48 @@ describe('conversation composer command routing', () => {
     expect(mocks.deliverAgentMessage).not.toHaveBeenCalled();
   });
 
+  it.each([
+    '/handoff make it fast',
+    '/pan-handoff make it fast',
+    '/pan handoff make it fast',
+  ])('routes the handoff alias %s to the UI without harness delivery', async message => {
+    const deps = dependencies();
+    const response = await handleConversationMessage(
+      conversation.name,
+      { message },
+      deps,
+    );
+
+    expect(response.status).toBe(200);
+    expect(decodeJsonResponse(response)).toEqual({
+      kind: 'ui',
+      status: 'requires_ui',
+      action: 'handoff',
+      args: { focus: 'make it fast' },
+    });
+    expect(deps.shouldInterceptManualCompact).not.toHaveBeenCalled();
+    expect(deps.transformMessageForHarness).not.toHaveBeenCalled();
+    expect(mocks.deliverControl).not.toHaveBeenCalled();
+    expect(mocks.deliverAgentMessage).not.toHaveBeenCalled();
+  });
+
+  it('routes /pan fork to the UI with its focus preserved', async () => {
+    const response = await handleConversationMessage(
+      conversation.name,
+      { message: '/pan fork summarize the current work' },
+      dependencies(),
+    );
+
+    expect(response.status).toBe(200);
+    expect(decodeJsonResponse(response)).toEqual({
+      kind: 'ui',
+      status: 'requires_ui',
+      action: 'fork',
+      args: { focus: 'summarize the current work' },
+    });
+    expect(mocks.deliverAgentMessage).not.toHaveBeenCalled();
+  });
+
   it('returns actionable parser errors without harness delivery', async () => {
     const deps = dependencies();
     const response = await handleConversationMessage(
