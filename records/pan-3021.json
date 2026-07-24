@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-24T17:28:09.122Z",
-  "updated": "2026-07-24T18:03:28.178Z",
+  "updated": "2026-07-24T18:05:07.721Z",
   "pipeline": {
     "issueId": "PAN-3021",
     "reviewStatus": "pending",
@@ -83,16 +83,8 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "drift-lint-gate": {
-        "writerId": "agent-pan-3021",
-        "agentId": "agent-pan-3021",
-        "pid": 76920,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-24T18:03:28.178Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3021",
@@ -126,6 +118,17 @@
         "outcome": "completed",
         "reason": "Replaced the ComposerPromptEditor hardcoded registry with merged static and generated command data, preserved exports, and added grouping coverage for /model plus pan strike.",
         "releasedAt": "2026-07-24T18:03:09.123Z"
+      },
+      {
+        "writerId": "agent-pan-3021",
+        "agentId": "agent-pan-3021",
+        "pid": 76920,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-24T18:03:28.178Z",
+        "itemId": "drift-lint-gate",
+        "outcome": "completed",
+        "reason": "Added an executable drift checker that regenerates to a temporary file, reports the regeneration command on mismatch, and wired it directly after lint:skills in npm run lint.",
+        "releasedAt": "2026-07-24T18:05:07.720Z"
       }
     ],
     "statusReasons": {
@@ -140,6 +143,10 @@
       "composer-swap": {
         "reason": "Replaced the ComposerPromptEditor hardcoded registry with merged static and generated command data, preserved exports, and added grouping coverage for /model plus pan strike.",
         "updatedAt": "2026-07-24T18:03:09.123Z"
+      },
+      "drift-lint-gate": {
+        "reason": "Added an executable drift checker that regenerates to a temporary file, reports the regeneration command on mismatch, and wired it directly after lint:skills in npm run lint.",
+        "updatedAt": "2026-07-24T18:05:07.720Z"
       }
     }
   },
@@ -160,6 +167,9 @@
     "composer-swap.composer-swap.ac2": "completed",
     "composer-swap.composer-swap.ac3": "completed",
     "composer-swap.composer-swap.ac4": "completed",
-    "drift-lint-gate": "running"
+    "drift-lint-gate": "completed",
+    "drift-lint-gate.drift-lint-gate.ac1": "completed",
+    "drift-lint-gate.drift-lint-gate.ac2": "completed",
+    "drift-lint-gate.drift-lint-gate.ac3": "completed"
   }
 }
