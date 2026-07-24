@@ -163,6 +163,19 @@ export default function App() {
   const [cockpitRoute, setCockpitRouteState] = useState<{ project: string; issue: string } | null>(
     () => initialCockpitRoute,
   );
+  // Last-written command-deck path. The conversation-route sync rewrites the
+  // URL whenever the active conversation clears — which every issue click does
+  // via setSelectedConversation(null) — and collapsing that write to bare
+  // /command-deck clobbered the cockpit deep-link the issue selection just
+  // wrote. Deriving the cleared-conversation URL from this ref makes the two
+  // writers order-insensitive.
+  const commandDeckPathRef = useRef<string>(
+    initialCockpitRoute
+      ? `/command-deck/${encodeURIComponent(initialCockpitRoute.project)}/${encodeURIComponent(initialCockpitRoute.issue)}`
+      : initialProjectRoute
+        ? `/command-deck/${encodeURIComponent(initialProjectRoute)}`
+        : '/command-deck',
+  );
   const setConversationRoute = useCallback((id: string | null, viewMode: ConversationViewMode = 'conversation') => {
     setSelectedConvIdState(id);
     setConversationViewModeState(id ? viewMode : 'conversation');
@@ -173,7 +186,7 @@ export default function App() {
       } else if (id) {
         delete next[id];
       }
-      window.history.replaceState(null, '', buildConversationUrl(id, viewMode, current));
+      window.history.replaceState(null, '', id ? buildConversationUrl(id, viewMode, current) : commandDeckPathRef.current);
       return next;
     });
   }, []);
@@ -198,6 +211,7 @@ export default function App() {
     setSelectedProjectKey(project.key);
     setActiveTabState('command-deck');
     const path = `/command-deck/${encodeURIComponent(project.key)}`;
+    commandDeckPathRef.current = path;
     if (window.location.pathname !== path) {
       window.history.pushState({ tab: 'command-deck', project: project.key }, '', path);
     }
@@ -433,12 +447,17 @@ export default function App() {
   const onCockpitChange = useCallback((projectKey: string | null, issueId: string | null) => {
     if (projectKey && issueId) {
       const path = `/command-deck/${encodeURIComponent(projectKey)}/${encodeURIComponent(issueId)}`;
+      commandDeckPathRef.current = path;
       if (window.location.pathname !== path) window.history.replaceState({ tab: 'command-deck' }, '', path);
     } else if (projectKey) {
       const path = `/command-deck/${encodeURIComponent(projectKey)}`;
+      commandDeckPathRef.current = path;
       if (window.location.pathname !== path) window.history.replaceState({ tab: 'command-deck', project: projectKey }, '', path);
-    } else if (window.location.pathname.startsWith('/command-deck/')) {
-      window.history.replaceState({ tab: 'command-deck' }, '', '/command-deck');
+    } else {
+      commandDeckPathRef.current = '/command-deck';
+      if (window.location.pathname.startsWith('/command-deck/')) {
+        window.history.replaceState({ tab: 'command-deck' }, '', '/command-deck');
+      }
     }
   }, []);
 
@@ -528,6 +547,11 @@ export default function App() {
       const cockpitRoute = getCockpitRouteFromPath();
       setCockpitRouteState(cockpitRoute);
       const routeProject = cockpitRoute?.project ?? getCommandDeckProjectRouteFromPath();
+      commandDeckPathRef.current = cockpitRoute
+        ? `/command-deck/${encodeURIComponent(cockpitRoute.project)}/${encodeURIComponent(cockpitRoute.issue)}`
+        : routeProject
+          ? `/command-deck/${encodeURIComponent(routeProject)}`
+          : '/command-deck';
       if (routeProject) {
         setSelectedProjectKey(routeProject);
       } else if (window.location.pathname === '/command-deck') {
