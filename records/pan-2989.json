@@ -42,6 +42,11 @@
       "reason": "feedback",
       "note": "[2026-07-24T19:01Z] review-agent → CHANGES-REQUESTED — seq 2",
       "timestamp": "2026-07-24T19:01:27.914Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-24T19:14:22.269Z"
     }
   ],
   "feedback": [],
@@ -79,7 +84,7 @@
     "recordedAt": "2026-07-24T17:59:05.966Z"
   },
   "created": "2026-07-22T21:26:29.366Z",
-  "updated": "2026-07-24T19:14:21.097Z",
+  "updated": "2026-07-24T19:14:22.282Z",
   "pipeline": {
     "issueId": "PAN-2989",
     "reviewStatus": "reviewing",
@@ -176,7 +181,7 @@
   },
   "workModel": "k3",
   "harness": "claude-code",
-  "model": "k3",
+  "model": "gpt-5.6-sol",
   "tasks": {
     "sequence": 8,
     "claims": {},
