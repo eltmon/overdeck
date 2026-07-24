@@ -40,7 +40,8 @@ export const MODELS_BY_PROVIDER: Record<string, ProviderDef> = {
     name: 'Anthropic',
     models: [
       { id: 'claude-fable-5' as ModelId, name: 'Claude Fable 5', icon: Gem, tier: 'premium', costPer1MTokens: 90, capabilities: ['reasoning', 'code', 'vision', 'agentic'], description: 'Mythos-class flagship — long-horizon autonomous work, low→max effort. ~2× Opus pricing ($10 in / $50 out).' },
-      { id: 'claude-opus-4-8' as ModelId, name: 'Claude Opus 4.8', icon: Gem, tier: 'premium', costPer1MTokens: 45, capabilities: ['reasoning', 'code', 'vision', 'agentic'], description: 'Most capable — current flagship, xhigh/max effort, deepest reasoning' },
+      { id: 'claude-opus-5' as ModelId, name: 'Claude Opus 5', icon: Gem, tier: 'premium', costPer1MTokens: 45, capabilities: ['reasoning', 'code', 'vision', 'agentic', 'large-context'], description: 'Current Opus (July 2026) — near-Fable-5 capability at half the cost, 1M context, low→max effort' },
+      { id: 'claude-opus-4-8' as ModelId, name: 'Claude Opus 4.8', icon: Gem, tier: 'premium', costPer1MTokens: 45, capabilities: ['reasoning', 'code', 'vision', 'agentic'], description: 'Previous flagship — xhigh/max effort, deepest reasoning' },
       { id: 'claude-opus-4-7' as ModelId, name: 'Claude Opus 4.7', icon: Gem, tier: 'premium', costPer1MTokens: 45, capabilities: ['reasoning', 'code', 'vision', 'agentic'], description: 'Previous flagship — xhigh/max effort, deepest reasoning' },
       { id: 'claude-opus-4-6' as ModelId, name: 'Claude Opus 4.6', icon: Gem, tier: 'premium', costPer1MTokens: 45, capabilities: ['reasoning', 'code', 'vision', 'agentic'], description: 'Previous Opus, strong reasoning and planning' },
       { id: 'claude-sonnet-5' as ModelId, name: 'Claude Sonnet 5', icon: Sparkles, tier: 'balanced', costPer1MTokens: 6, capabilities: ['reasoning', 'code', 'vision', 'agentic', 'large-context'], description: 'Current Sonnet — 1M context, intro pricing through Aug 31, 2026' },

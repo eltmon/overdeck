@@ -104,6 +104,7 @@ export function getFriendlyModelName(fullModel: string | undefined | null): stri
   const backingModel = fullModel.replace(/^(?:oai|cx|go)@/, '');
 
   // Anthropic models
+  if (backingModel.includes('opus-5') || backingModel.includes('opus.5')) return 'Opus 5';
   if (backingModel.includes('opus-4-8') || backingModel.includes('opus-4.8')) return 'Opus 4.8';
   if (backingModel.includes('opus-4-7') || backingModel.includes('opus-4.7')) return 'Opus 4.7';
   if (backingModel.includes('opus-4-6') || backingModel.includes('opus-4.6')) return 'Opus 4.6';

@@ -202,6 +202,33 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
     notes: 'Mythos-class flagship (June 2026). Tuned for long-horizon autonomous work spanning millions of tokens. Beats Opus 4.8 across effort levels; same effort set (high is the default, xhigh between high and max). Adaptive thinking always on. Premium pricing (~2× Opus 4.8) — opt-in for the most demanding planning/coding.',
   },
 
+  'claude-opus-5': {
+    model: 'claude-opus-5',
+    provider: 'anthropic',
+    displayName: 'Claude Opus 5',
+    // Real API pricing is $5/M input, $25/M output (same as Opus 4.8; half of
+    // Fable 5). Blended figure mirrors the Opus-4.8 baseline (45) so
+    // cost-awareness ordering stays consistent. Exact per-token rates live in
+    // cost.ts DEFAULT_PRICING.
+    costPer1MTokens: 45.0,
+    contextWindow: 1000000, // 1M context window by default (launch docs, 2026-07-24)
+    skills: {
+      'code-generation': 99,
+      'code-review': 99,
+      debugging: 99,
+      planning: 99,
+      documentation: 97,
+      testing: 96,
+      security: 99,
+      performance: 94,
+      synthesis: 99,
+      speed: 45,
+      'context-length': 100,
+    },
+    effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'],
+    notes: 'Opus generation released 2026-07-24. Near-Fable-5 capability at half the cost ($5/$25 per MTok, same as Opus 4.8). Adaptive thinking on by default; full effort range with stronger low/medium than 4.8; disabling thinking is capped at effort high. 1M context, 128K max output, May 2026 knowledge cutoff. Scores provisional — verify against benchmarks.',
+  },
+
   'claude-opus-4-8': {
     model: 'claude-opus-4-8',
     provider: 'anthropic',

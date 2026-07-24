@@ -874,6 +874,7 @@ const CHUNK_BUDGET_CHARS_BY_MODEL: Record<string, number> = {
   'claude-sonnet-5': 1_200_000,           // ~300k tokens content, 1M window
   'claude-sonnet-4-6': 1_200_000,         // ~300k tokens content, 1M window
   'claude-fable-5': 1_200_000,            // ~300k tokens content, large window
+  'claude-opus-5': 1_200_000,             // ~300k tokens content, 1M window
   'claude-opus-4-8': 1_200_000,           // ~300k tokens content, 1M window
   'claude-opus-4-7': 1_200_000,           // ~300k tokens content, 1M window
   'claude-opus-4-6': 1_200_000,           // ~300k tokens content, 1M window
