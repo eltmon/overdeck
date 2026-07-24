@@ -87,7 +87,10 @@ export const DEFAULT_PRICING: ModelPricing[] = [
   // Anthropic - Fable 5 (Mythos-class flagship): $10/M input, $50/M output. Cache
   // rates mirror Anthropic's standard ratios (read 0.1×, write-5m 1.25×, write-1h 2× of input).
   { provider: 'anthropic', model: 'claude-fable-5', inputPer1k: 0.010, outputPer1k: 0.050, cacheReadPer1k: 0.001, cacheWrite5mPer1k: 0.0125, cacheWrite1hPer1k: 0.020, currency: 'USD' },
-  // Anthropic - 4.8 series (current flagship; same pricing tier as 4.7/4.6 — verify at launch)
+  // Anthropic - Opus 5 (July 2026): $5/M input, $25/M output — same rates as Opus 4.8,
+  // half of Fable 5. Standard cache ratios (read 0.1×, write-5m 1.25×, write-1h 2× of input).
+  { provider: 'anthropic', model: 'claude-opus-5', inputPer1k: 0.005, outputPer1k: 0.025, cacheReadPer1k: 0.0005, cacheWrite5mPer1k: 0.00625, cacheWrite1hPer1k: 0.01, currency: 'USD' },
+  // Anthropic - 4.8 series (same pricing tier as 4.7/4.6 — verify at launch)
   { provider: 'anthropic', model: 'claude-opus-4-8', inputPer1k: 0.005, outputPer1k: 0.025, cacheReadPer1k: 0.0005, cacheWrite5mPer1k: 0.00625, cacheWrite1hPer1k: 0.01, currency: 'USD' },
   // Anthropic - 4.7 series
   { provider: 'anthropic', model: 'claude-opus-4-7', inputPer1k: 0.005, outputPer1k: 0.025, cacheReadPer1k: 0.0005, cacheWrite5mPer1k: 0.00625, cacheWrite1hPer1k: 0.01, currency: 'USD' },

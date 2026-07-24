@@ -153,7 +153,9 @@ export function normalizeModelName(model: string): { provider: AIProvider; model
     }
 
     // Opus models
-    if (model.includes('opus-4-8') || model.includes('opus-4.8')) {
+    if (model.includes('opus-5') || model.includes('opus.5')) {
+      normalizedModel = 'claude-opus-5';
+    } else if (model.includes('opus-4-8') || model.includes('opus-4.8')) {
       normalizedModel = 'claude-opus-4-8';
     } else if (model.includes('opus-4-7') || model.includes('opus-4.7')) {
       normalizedModel = 'claude-opus-4-7';
