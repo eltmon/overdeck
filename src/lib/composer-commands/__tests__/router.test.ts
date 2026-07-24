@@ -137,14 +137,27 @@ describe('conversation composer command routing', () => {
     '/handoff make it fast',
     '/pan-handoff make it fast',
     '/pan handoff make it fast',
-  ])('routes the handoff alias %s to the UI without harness delivery', async message => {
+  ])('routes the confirmed handoff alias %s to the UI without harness delivery', async message => {
     const deps = dependencies();
-    const response = await handleConversationMessage(
+    const confirmationResponse = await handleConversationMessage(
       conversation.name,
       { message },
       deps,
     );
+    const confirmation = decodeJsonResponse(confirmationResponse);
 
+    expect(confirmationResponse.status).toBe(200);
+    expect(confirmation).toMatchObject({
+      kind: 'confirmation',
+      status: 'confirmation_required',
+    });
+    expect(confirmation.consequence).toContain('Review the destination and focus');
+
+    const response = await handleConversationMessage(
+      conversation.name,
+      { message, confirmationNonce: confirmation.nonce },
+      deps,
+    );
     expect(response.status).toBe(200);
     expect(decodeJsonResponse(response)).toEqual({
       kind: 'ui',
@@ -158,10 +171,17 @@ describe('conversation composer command routing', () => {
     expect(mocks.deliverAgentMessage).not.toHaveBeenCalled();
   });
 
-  it('routes /pan fork to the UI with its focus preserved', async () => {
+  it('routes a confirmed /pan fork to the UI with its focus preserved', async () => {
+    const message = '/pan fork summarize the current work';
+    const confirmationResponse = await handleConversationMessage(
+      conversation.name,
+      { message },
+      dependencies(),
+    );
+    const confirmation = decodeJsonResponse(confirmationResponse);
     const response = await handleConversationMessage(
       conversation.name,
-      { message: '/pan fork summarize the current work' },
+      { message, confirmationNonce: confirmation.nonce },
       dependencies(),
     );
 

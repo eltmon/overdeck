@@ -7,6 +7,11 @@ import { Effect } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
 import { getAgentState, messageAgent } from '../../../../lib/agents.js';
+import {
+  ComposerCommandConfirmationError,
+  composerCommandConfirmationFromBody,
+  type ComposerCommandConfirmationInput,
+} from '../../../../lib/composer-commands/confirmations.js';
 import { ComposerCommandParseError } from '../../../../lib/composer-commands/parser.js';
 import {
   composerCommandResultHttpStatus,
@@ -34,7 +39,11 @@ async function sendAgentMessage(id: string, message: string) {
   return isRemote ? { success: true, remote: true } : { success: true };
 }
 
-export async function handleAgentMessage(id: string, message: string) {
+export async function handleAgentMessage(
+  id: string,
+  message: string,
+  confirmation?: ComposerCommandConfirmationInput,
+) {
   try {
     if (isComposerCommandMessage(message)) {
       const agentState = await Effect.runPromise(
@@ -42,6 +51,7 @@ export async function handleAgentMessage(id: string, message: string) {
       );
       const result = await handleComposerCommandMessage({
         message,
+        confirmation,
         target: {
           kind: 'agent',
           id,
@@ -55,6 +65,12 @@ export async function handleAgentMessage(id: string, message: string) {
       }
     }
   } catch (error) {
+    if (error instanceof ComposerCommandConfirmationError) {
+      return jsonResponse({
+        error: error.message,
+        code: error.code,
+      }, { status: 422 });
+    }
     if (!(error instanceof ComposerCommandParseError)) throw error;
     const status = error.code === 'unknown-command' ? 404 : error.code === 'unknown-flag' ? 422 : 400;
     return jsonResponse({
@@ -97,7 +113,11 @@ function postAgentMessageLikeRoute(path: `/${string}`) {
         return jsonResponse({ error: 'Message required' }, { status: 400 });
       }
 
-      return yield* Effect.promise(() => handleAgentMessage(id, message));
+      return yield* Effect.promise(() => handleAgentMessage(
+        id,
+        message,
+        composerCommandConfirmationFromBody(body as Record<string, unknown>),
+      ));
     })),
   );
 }
