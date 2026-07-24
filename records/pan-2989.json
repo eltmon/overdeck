@@ -64,18 +64,18 @@
     "recordedAt": "2026-07-24T17:59:05.966Z"
   },
   "created": "2026-07-22T21:26:29.366Z",
-  "updated": "2026-07-24T18:37:22.850Z",
+  "updated": "2026-07-24T18:37:37.489Z",
   "pipeline": {
     "issueId": "PAN-2989",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-24T18:02:06.151Z",
-    "updatedAt": "2026-07-24T18:37:21.568Z",
-    "reviewNotes": "Timed-out reconcile/restore can mutate state after lock release, and fallback drain can delete a newer concurrent verdict.",
+    "updatedAt": "2026-07-24T18:37:37.450Z",
+    "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3027",
     "lastVerifiedCommit": "71788807c9744164393bcc7d182a72cea7d762e6",
     "reviewRequestedAt": "2026-07-24T18:02:06.151Z",
@@ -150,7 +150,7 @@
       },
       "costAtCloseOut": {
         "usd": 16.3604123,
-        "pricingAsOf": "2026-07-24T18:37:21.580Z"
+        "pricingAsOf": "2026-07-24T18:37:37.470Z"
       }
     },
     "merges": [
@@ -160,7 +160,7 @@
   },
   "workModel": "k3",
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "k3",
   "tasks": {
     "sequence": 8,
     "claims": {},
