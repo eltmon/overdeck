@@ -27,7 +27,7 @@
   ],
   "feedback": [],
   "created": "2026-07-12T09:32:29.900Z",
-  "updated": "2026-07-24T21:26:43.022Z",
+  "updated": "2026-07-24T21:40:22.779Z",
   "pipeline": {
     "issueId": "PAN-1525",
     "reviewStatus": "pending",
@@ -109,16 +109,8 @@
   "model": "claude-sonnet-5",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 21,
-    "claims": {
-      "confirmations": {
-        "writerId": "agent-pan-1525",
-        "agentId": "agent-pan-1525",
-        "pid": 2923755,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-24T21:26:43.022Z"
-      }
-    },
+    "sequence": 22,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-1525",
@@ -229,6 +221,17 @@
         "outcome": "completed",
         "reason": "The shared router now handles all three handoff aliases and /pan fork as structured UI results before harness delivery. ComposerFooter preserves the local handoff fast path, opens server-requested dialogs, and suppresses chat bubbles for UI commands. Router, agent-route, and ComposerFooter tests, typecheck, lint, throwaway Node 22 API checks, and Playwright dialog screenshots passed.",
         "releasedAt": "2026-07-24T21:26:25.894Z"
+      },
+      {
+        "writerId": "agent-pan-1525",
+        "agentId": "agent-pan-1525",
+        "pid": 2923755,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-24T21:26:43.022Z",
+        "itemId": "confirmations",
+        "outcome": "completed",
+        "reason": "Composer dialog and destructive policies now issue five-minute, target-and-argv-bound single-use nonces. Invalid, expired, replayed, mismatched, and mistyped confirmations return 422 without execution; destructive policies fail closed without typed text. Fake-timer tests, route tests, typecheck, lint/circular guards, and throwaway Node 22 API verification passed.",
+        "releasedAt": "2026-07-24T21:40:22.779Z"
       }
     ],
     "statusReasons": {
@@ -271,6 +274,10 @@
       "ui-handoff-result": {
         "reason": "The shared router now handles all three handoff aliases and /pan fork as structured UI results before harness delivery. ComposerFooter preserves the local handoff fast path, opens server-requested dialogs, and suppresses chat bubbles for UI commands. Router, agent-route, and ComposerFooter tests, typecheck, lint, throwaway Node 22 API checks, and Playwright dialog screenshots passed.",
         "updatedAt": "2026-07-24T21:26:25.894Z"
+      },
+      "confirmations": {
+        "reason": "Composer dialog and destructive policies now issue five-minute, target-and-argv-bound single-use nonces. Invalid, expired, replayed, mismatched, and mistyped confirmations return 422 without execution; destructive policies fail closed without typed text. Fake-timer tests, route tests, typecheck, lint/circular guards, and throwaway Node 22 API verification passed.",
+        "updatedAt": "2026-07-24T21:40:22.779Z"
       }
     }
   },
@@ -316,6 +323,9 @@
     "ui-handoff-result.ui-handoff-result.ac1": "completed",
     "ui-handoff-result.ui-handoff-result.ac2": "completed",
     "ui-handoff-result.ui-handoff-result.ac3": "completed",
-    "confirmations": "running"
+    "confirmations": "completed",
+    "confirmations.confirmations.ac1": "completed",
+    "confirmations.confirmations.ac2": "completed",
+    "confirmations.confirmations.ac3": "completed"
   }
 }
