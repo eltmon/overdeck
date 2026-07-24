@@ -143,6 +143,27 @@ describe('ComposerPromptEditor', () => {
     }));
   });
 
+  it('groups static and generated commands in the slash menu', () => {
+    const commands = SLASH_COMMANDS.filter(command =>
+      command.id === 'model' || command.id === 'pan-strike');
+
+    render(
+      <SlashMenu
+        commands={commands}
+        filter=""
+        selectedIndex={0}
+        onSelect={noop}
+        onClose={noop}
+        anchorRect={null}
+      />,
+    );
+
+    expect(screen.getByText('AI CLI')).toBeInTheDocument();
+    expect(screen.getByText('/model')).toBeInTheDocument();
+    expect(screen.getByText('Lifecycle')).toBeInTheDocument();
+    expect(screen.getByText('pan strike')).toBeInTheDocument();
+  });
+
   afterEach(() => {
     vi.restoreAllMocks();
   });
