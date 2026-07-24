@@ -170,18 +170,18 @@
     "recordedAt": "2026-07-24T11:10:15.151Z"
   },
   "created": "2026-07-22T21:25:31.822Z",
-  "updated": "2026-07-24T11:19:32.062Z",
+  "updated": "2026-07-24T11:19:38.047Z",
   "pipeline": {
     "issueId": "PAN-2988",
     "reviewStatus": "passed",
-    "testStatus": "pending",
+    "testStatus": "testing",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-24T11:10:34.462Z",
-    "updatedAt": "2026-07-24T11:19:31.095Z",
+    "updatedAt": "2026-07-24T11:19:38.037Z",
     "reviewNotes": "Approved: current-main merge preserves the reviewed PAN-2988 behavior; cycle diff is clean across correctness, security, requirements, and performance",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3010",
@@ -298,7 +298,7 @@
       },
       "costAtCloseOut": {
         "usd": 208.268066,
-        "pricingAsOf": "2026-07-24T11:19:31.115Z"
+        "pricingAsOf": "2026-07-24T11:19:38.041Z"
       }
     },
     "merges": [
@@ -308,7 +308,7 @@
   },
   "workModel": "gpt-5.6-sol",
   "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "model": "gpt-5.6-sol",
   "tasks": {
     "sequence": 16,
     "claims": {},
