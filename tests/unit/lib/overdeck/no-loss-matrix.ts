@@ -133,6 +133,9 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'POST /api/settings/codex-reauth',           kind: 'http', disposition: 'RELOCATE',    door: 'provider-auth' },
   { surface: 'POST /api/settings/codex-reauth/status',    kind: 'http', disposition: 'RELOCATE',    door: 'provider-auth' },
 
+  // ── commands.ts ───────────────────────────────────────────────────────────
+  { surface: 'GET /api/commands',                                      kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Composer command catalog from generated module state; no canonical state store' },
+
   // ── command-deck.ts ───────────────────────────────────────────────────────
   { surface: 'GET /api/command-deck/activity/:issueId',                  kind: 'http', disposition: 'AGGREGATE',   door: 'Issues + Agents + events' },
   { surface: 'GET /api/command-deck/planning/:issueId',                  kind: 'http', disposition: 'AGGREGATE',   door: 'Issues + Agents planning detail' },
