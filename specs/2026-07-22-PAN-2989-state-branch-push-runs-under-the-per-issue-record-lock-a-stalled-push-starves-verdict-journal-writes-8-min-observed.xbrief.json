@@ -4,17 +4,17 @@
     "created": "2026-07-22T21:44:26.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2989: State-branch push runs under the per-issue record lock — a stalled push starves verdict journal writes (8+ min observed)",
-    "updated": "2026-07-22T21:47:48.104Z"
+    "updated": "2026-07-24T17:13:25.746Z"
   },
   "plan": {
     "id": "pan-2989",
     "title": "State-branch push runs under the per-issue record lock — a stalled push starves verdict journal writes (8+ min observed)",
-    "status": "proposed",
+    "status": "approved",
     "uid": "a93f77d0-b156-4ead-9aea-dbff7242029c",
     "author": "agent:k3",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-07-22T21:44:26.000Z",
-    "updated": "2026-07-22T21:47:48.104Z",
+    "updated": "2026-07-24T17:13:25.746Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2989",
@@ -349,5 +349,5 @@
       "canonicalFilename": "2026-07-22-PAN-2989-state-branch-push-runs-under-the-per-issue-record-lock-a-stalled-push-starves-verdict-journal-writes-8-min-observed.xbrief.json"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
