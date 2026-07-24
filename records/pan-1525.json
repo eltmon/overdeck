@@ -27,7 +27,7 @@
   ],
   "feedback": [],
   "created": "2026-07-12T09:32:29.900Z",
-  "updated": "2026-07-24T20:35:49.089Z",
+  "updated": "2026-07-24T20:41:43.281Z",
   "pipeline": {
     "issueId": "PAN-1525",
     "reviewStatus": "pending",
@@ -109,16 +109,8 @@
   "model": "claude-sonnet-5",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 13,
-    "claims": {
-      "router-agent": {
-        "writerId": "agent-pan-1525",
-        "agentId": "agent-pan-1525",
-        "pid": 2104512,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-24T20:35:49.089Z"
-      }
-    },
+    "sequence": 14,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-1525",
@@ -185,6 +177,17 @@
         "outcome": "completed",
         "reason": "Added the shared composer router and intercepted /pan immediately after conversation message validation, before compaction, attachments, transformation, memory, or harness delivery. Typed parser errors map to 400/404/422 and terminal-only results return 422. Router tests, typecheck, full lint, and a throwaway API instance pass: /pan status and doctor returned structured 422s, bogus returned actionable 404, shell syntax returned 400, and only ordinary text attempted fake tmux delivery.",
         "releasedAt": "2026-07-24T20:28:45.234Z"
+      },
+      {
+        "writerId": "agent-pan-1525",
+        "agentId": "agent-pan-1525",
+        "pid": 2104512,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-24T20:35:49.089Z",
+        "itemId": "router-agent",
+        "outcome": "completed",
+        "reason": "Routed agent message/tell endpoints through the shared /pan parser and router before messageAgent, while preserving ordinary text delivery. Agent messaging tests and typecheck pass. Throwaway API verification returned the same /pan status 422 and bogus 404 as conversations; only ordinary text reached the fake-agent delivery path.",
+        "releasedAt": "2026-07-24T20:41:43.281Z"
       }
     ],
     "statusReasons": {
@@ -211,6 +214,10 @@
       "router-conversation": {
         "reason": "Added the shared composer router and intercepted /pan immediately after conversation message validation, before compaction, attachments, transformation, memory, or harness delivery. Typed parser errors map to 400/404/422 and terminal-only results return 422. Router tests, typecheck, full lint, and a throwaway API instance pass: /pan status and doctor returned structured 422s, bogus returned actionable 404, shell syntax returned 400, and only ordinary text attempted fake tmux delivery.",
         "updatedAt": "2026-07-24T20:28:45.234Z"
+      },
+      "router-agent": {
+        "reason": "Routed agent message/tell endpoints through the shared /pan parser and router before messageAgent, while preserving ordinary text delivery. Agent messaging tests and typecheck pass. Throwaway API verification returned the same /pan status 422 and bogus 404 as conversations; only ordinary text reached the fake-agent delivery path.",
+        "updatedAt": "2026-07-24T20:41:43.281Z"
       }
     }
   },
@@ -241,6 +248,8 @@
     "router-conversation.router-conversation.ac2": "completed",
     "router-conversation.router-conversation.ac3": "completed",
     "router-conversation.router-conversation.ac4": "completed",
-    "router-agent": "running"
+    "router-agent": "completed",
+    "router-agent.router-agent.ac1": "completed",
+    "router-agent.router-agent.ac2": "completed"
   }
 }
