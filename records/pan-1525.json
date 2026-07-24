@@ -27,7 +27,7 @@
   ],
   "feedback": [],
   "created": "2026-07-12T09:32:29.900Z",
-  "updated": "2026-07-24T21:59:20.199Z",
+  "updated": "2026-07-24T22:26:42.102Z",
   "pipeline": {
     "issueId": "PAN-1525",
     "reviewStatus": "pending",
@@ -109,16 +109,8 @@
   "model": "claude-sonnet-5",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 27,
-    "claims": {
-      "frontend-command-results": {
-        "writerId": "agent-pan-1525",
-        "agentId": "agent-pan-1525",
-        "pid": 3284403,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-24T21:59:20.199Z"
-      }
-    },
+    "sequence": 28,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-1525",
@@ -262,6 +254,16 @@
         "outcome": "completed",
         "reason": "GET /api/commands now serves the module-state manifest projected with mode and safety plus the requested harness-native commands. Invalid harnesses return a complete 400 response. Completeness/stability/no-spawn tests, typecheck, lint, and an isolated Node 22 boot test with sequential live requests passed.",
         "releasedAt": "2026-07-24T21:59:00.784Z"
+      },
+      {
+        "writerId": "agent-pan-1525",
+        "agentId": "agent-pan-1525",
+        "pid": 3284403,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-24T21:59:20.199Z",
+        "itemId": "frontend-command-results",
+        "outcome": "completed",
+        "releasedAt": "2026-07-24T22:26:42.102Z"
       }
     ],
     "statusReasons": {
@@ -373,6 +375,10 @@
     "api-commands-endpoint.api-commands-endpoint.ac1": "completed",
     "api-commands-endpoint.api-commands-endpoint.ac2": "completed",
     "api-commands-endpoint.api-commands-endpoint.ac3": "completed",
-    "frontend-command-results": "running"
+    "frontend-command-results": "completed",
+    "frontend-command-results.frontend-command-results.ac1": "completed",
+    "frontend-command-results.frontend-command-results.ac2": "completed",
+    "frontend-command-results.frontend-command-results.ac3": "completed",
+    "frontend-command-results.frontend-command-results.ac4": "completed"
   }
 }
