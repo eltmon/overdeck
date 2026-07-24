@@ -27,7 +27,7 @@
   ],
   "feedback": [],
   "created": "2026-07-12T09:32:29.900Z",
-  "updated": "2026-07-24T22:35:34.221Z",
+  "updated": "2026-07-24T22:41:19.310Z",
   "pipeline": {
     "issueId": "PAN-1525",
     "reviewStatus": "pending",
@@ -109,16 +109,8 @@
   "model": "claude-sonnet-5",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 31,
-    "claims": {
-      "no-loss-and-matrix": {
-        "writerId": "agent-pan-1525",
-        "agentId": "agent-pan-1525",
-        "pid": 3663710,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-24T22:35:34.221Z"
-      }
-    },
+    "sequence": 32,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-1525",
@@ -282,6 +274,16 @@
         "itemId": "codex-skills-seed",
         "outcome": "completed",
         "releasedAt": "2026-07-24T22:35:25.962Z"
+      },
+      {
+        "writerId": "agent-pan-1525",
+        "agentId": "agent-pan-1525",
+        "pid": 3663710,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-24T22:35:34.221Z",
+        "itemId": "no-loss-and-matrix",
+        "outcome": "completed",
+        "releasedAt": "2026-07-24T22:41:19.310Z"
       }
     ],
     "statusReasons": {
@@ -402,6 +404,9 @@
     "codex-skills-seed.codex-skills-seed.ac1": "completed",
     "codex-skills-seed.codex-skills-seed.ac2": "completed",
     "codex-skills-seed.codex-skills-seed.ac3": "completed",
-    "no-loss-and-matrix": "running"
+    "no-loss-and-matrix": "completed",
+    "no-loss-and-matrix.no-loss-and-matrix.ac1": "completed",
+    "no-loss-and-matrix.no-loss-and-matrix.ac2": "completed",
+    "no-loss-and-matrix.no-loss-and-matrix.ac3": "completed"
   }
 }
