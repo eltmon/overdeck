@@ -60,22 +60,23 @@
     "recordedAt": "2026-07-24T18:23:54.613Z"
   },
   "created": "2026-07-24T17:28:09.122Z",
-  "updated": "2026-07-24T18:36:54.502Z",
+  "updated": "2026-07-24T18:43:10.463Z",
   "pipeline": {
     "issueId": "PAN-3021",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "passed",
     "testStatus": "pending",
-    "verificationStatus": "failed",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-24T18:25:23.151Z",
-    "updatedAt": "2026-07-24T18:36:53.449Z",
-    "reviewNotes": "Verification failed at test",
-    "verificationNotes": "Verification FAILED at test (515672ms):\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-3021\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-3021/src/dashboard/frontend\n\n ❯ src/components/KanbanBoard.test.tsx (91 tests | 1 failed) 2504ms\n     × routes paused-agent Unpause through the primary-strip registry overflow 1208ms\n\n Test Files  1 failed | 260 passed (261)\n      Tests  1 failed | 2384 passed (2385)\n   Start at  14:32:17\n   Duration  29.82s (transform 58.59s, setup 73.05s, import 212.99s, tests 87.13s, environment 172.96s)\n\n[prep] state-reconcile\n[prep] completed: state-reconcile (0s elapsed)\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Workspace already up to date with main\n[prep] completed: sync-main (0s elapsed)\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-v4iqS6/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] completed: tracker-context (0s elapsed)\n[prep] Spawning agent...\n[prep] spawn\n[prep] completed: spawn (0s elapsed)\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Workspace already up to date with main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Workspace already up to date with main\n[prep] Workspace already up to date with main\n[prep] Workspace already up to date with main\n[prep] Workspace a\n…(296 chars elided)…\n workspace: /tmp/pan-auto-resume-gating-jNccyP/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Found workspace: /tmp/pan-auto-resume-gating-jNccyP/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace: /tmp/pan-auto-resume-gating-jNccyP/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace: /tmp/pan-auto-resume-gating-jNccyP/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace: /tmp/pan-auto-resume-gating-jNccyP/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent \n...(truncated)",
+    "updatedAt": "2026-07-24T18:43:10.417Z",
+    "reviewNotes": "Approved d110b0b2: command registry generation, composer integration, no-loss gate, security, and performance checks pass",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "Verified all 4 ACs: strike/swarm registered on root program, admin/cloister/status nested correctly, spawn-reviewer confirmed {hidden:true} at src/cli/index.ts:380 and filtered by commander's visibleCommands (verified in node_modules/commander/lib/help.js), unit tests correctly assert args metadata and hidden-exclusion/ordering.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3028",
+    "reviewedAtCommit": "3ea9809f171e2c7516ca4f3d3824a86062232abf",
     "reviewRequestedAt": "2026-07-24T18:25:23.151Z",
     "reviewSpawnedAt": "2026-07-24T18:36:53.448Z",
     "scopeDrift": {
@@ -129,6 +130,14 @@
             "cacheWrite": 195578
           }
         },
+        "review": {
+          "openai/gpt-5.6-sol": {
+            "input": 1180400,
+            "output": 83012,
+            "cacheRead": 11453440,
+            "cacheWrite": 0
+          }
+        },
         "review.supervisor": {
           "anthropic/claude-sonnet-5": {
             "input": 20,
@@ -139,9 +148,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 1702919,
-            "output": 159481,
-            "cacheRead": 59558400,
+            "input": 1823928,
+            "output": 165955,
+            "cacheRead": 66924544,
             "cacheWrite": 0
           }
         }
@@ -153,22 +162,22 @@
           "cacheRead": 2844783,
           "cacheWrite": 195578
         },
+        "openai/gpt-5.6-sol": {
+          "input": 3004328,
+          "output": 248967,
+          "cacheRead": 78377984,
+          "cacheWrite": 0
+        },
         "anthropic/claude-sonnet-5": {
           "input": 20,
           "output": 3980,
           "cacheRead": 1150102,
           "cacheWrite": 132451
-        },
-        "openai/gpt-5.6-sol": {
-          "input": 1702919,
-          "output": 159481,
-          "cacheRead": 59558400,
-          "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 51.003054,
-        "pricingAsOf": "2026-07-24T18:36:53.475Z"
+        "usd": 69.604471,
+        "pricingAsOf": "2026-07-24T18:43:10.454Z"
       }
     },
     "merges": [
