@@ -18,7 +18,7 @@ import { closeOut, type WorkflowResult } from '../../lib/lifecycle/index.js';
 import { resolveProjectFromIssueSync, extractTeamPrefix, findProjectByTeamSync } from '../../lib/projects.js';
 import { resolveBareNumericIdSync } from '../../lib/issue-id.js';
 import { mapGitHubStateToCanonical, type CanonicalState } from '../../core/state-mapping.js';
-import { acceptFlagFor, DOD_ROWS, type DodRowId } from '../../lib/lifecycle/dod.js';
+import { acceptFlagFor, canAcceptDodMisses, DOD_ROWS, type DodRowId } from '../../lib/lifecycle/dod.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -159,6 +159,14 @@ export async function closeOutCommand(id: string, options: CloseOutOptions): Pro
     process.exit(1);
   }
 
+  const dodAcceptedRows = DOD_ROWS
+    .filter(row => row.overridable && options[optionNameForRow(row.id)])
+    .map(row => row.id);
+  if (dodAcceptedRows.length > 0 && !canAcceptDodMisses(agentId ?? '')) {
+    console.error(chalk.red('The flywheel orchestrator cannot accept missed Definition-of-Done rows. An operator must run pan close with the required --accept-<row> flags.'));
+    process.exit(1);
+  }
+
   const issueLower = issueId.toLowerCase();
   const issueUpper = issueId.toUpperCase();
 
@@ -253,9 +261,6 @@ export async function closeOutCommand(id: string, options: CloseOutOptions): Pro
       : {}),
   };
 
-  const dodAcceptedRows = DOD_ROWS
-    .filter(row => row.overridable && options[optionNameForRow(row.id)])
-    .map(row => row.id);
   const result = await Effect.runPromise(closeOut(ctx, {
     dodAcceptedRows,
     dodAcceptedBy: process.env.OVERDECK_AGENT_ID || userInfo().username,
