@@ -1,7 +1,7 @@
 import { ExternalLink } from 'lucide-react'
 import { useWorkspaceQuery } from '../../CommandDeck/ZoneCOverviewTabs/queries'
 import { useIssueActions, type IssueActionView } from '../../IssueActionMenu/useIssueActions'
-import { UatStackStatus } from '../../CommandDeck/UatStackStatus'
+import { UatStackStatus, getUatStackSummary } from '../../CommandDeck/UatStackStatus'
 import { CockpitCard } from './CockpitCard'
 
 function KV({ k, children }: { k: string; children: React.ReactNode }) {
@@ -33,8 +33,11 @@ export function WorkspaceCard({ issueId }: { issueId: string }) {
     )
   }
 
-  const services = ws.services?.filter((s) => s.url) ?? []
-  if (services.length === 0) {
+  // Never-built stack: nothing is routed behind the service URLs, so don't
+  // render links that 404.
+  const stackAbsent = getUatStackSummary({ containers: ws.containers, stackHealth: ws.stackHealth })?.state === 'absent'
+  const services = stackAbsent ? [] : ws.services?.filter((s) => s.url) ?? []
+  if (services.length === 0 && !stackAbsent) {
     if (ws.frontendUrl) services.push({ name: 'Frontend', url: ws.frontendUrl })
     if (ws.apiUrl) services.push({ name: 'API', url: ws.apiUrl })
   }

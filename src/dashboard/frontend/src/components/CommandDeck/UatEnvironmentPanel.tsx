@@ -35,6 +35,9 @@ export function UatEnvironmentPanel({ issueId, className = '' }: { issueId: stri
   if (!ws.frontendUrl && !ws.apiUrl && !summary) return null;
 
   const displayUrl = ws.frontendUrl?.replace(/^https?:\/\//, '');
+  // A never-built stack has no route behind the URLs — render them inert so we
+  // don't advertise links that 404.
+  const linksLive = summary?.state !== 'absent';
   // The URL links render permanently below; the inline slots are for stack ops.
   const stackActions = summary
     ? resolveUatActions(summary.state).inline.filter((a) => a.id !== 'open-uat' && a.id !== 'open-api')
@@ -72,7 +75,7 @@ export function UatEnvironmentPanel({ issueId, className = '' }: { issueId: stri
               {action.label}
             </button>
           ))}
-          {ws.apiUrl && (
+          {ws.apiUrl && linksLive && (
             <a
               href={ws.apiUrl}
               target="_blank"
@@ -84,7 +87,7 @@ export function UatEnvironmentPanel({ issueId, className = '' }: { issueId: stri
           )}
         </div>
       </div>
-      {ws.frontendUrl && (
+      {ws.frontendUrl && linksLive && (
         <a
           href={ws.frontendUrl}
           target="_blank"
@@ -95,6 +98,14 @@ export function UatEnvironmentPanel({ issueId, className = '' }: { issueId: stri
           <span className="min-w-0 truncate font-mono">{displayUrl}</span>
           <ExternalLink className="ml-auto h-3.5 w-3.5 shrink-0" />
         </a>
+      )}
+      {ws.frontendUrl && !linksLive && (
+        <div
+          title="This will be the UAT URL once the stack is built"
+          className="mb-[10px] flex items-center gap-2 rounded-[var(--radius-sm)] border border-border bg-muted/20 px-3 py-2 text-[13px] text-muted-foreground"
+        >
+          <span className="min-w-0 truncate font-mono">{displayUrl}</span>
+        </div>
       )}
       <UatStackStatus
         containers={ws.containers}

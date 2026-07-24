@@ -672,6 +672,14 @@ export function CommandDeck({
     selectSession(issueId, activeWorkSession?.sessionId ?? null);
   }, [selectSession, projectsWithSessions, selectedProject, openIssueTabIn]);
 
+  // Reverse sync from the Stage: clicking an issue pane tab bypasses
+  // handleSelectFeature, so mirror the selection here to keep the cockpit URL
+  // (/command-deck/<project>/<issue>) following the visible view.
+  const handleActiveIssuePane = useCallback((issueId: string) => {
+    setSelectedFeature(issueId);
+    setSelectedConversation(null);
+  }, []);
+
   const handleSelectSession = useCallback((issueId: string, sessionId: string) => {
     setSelectedFeature(issueId);
     selectSession(issueId, sessionId);
@@ -1478,6 +1486,7 @@ export function CommandDeck({
               resolveSession={resolveSession}
               onCreateConversation={createDeckConversation}
               onActiveConversationChange={setSelectedConversation}
+              onActiveIssueChange={handleActiveIssuePane}
               terminalCwd={selectedRegisteredProject?.path}
               renderHome={(api) => (
                 <ProjectHome

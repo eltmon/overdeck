@@ -505,6 +505,8 @@ export interface WorkspaceStackHealth {
   healthy: boolean;
   reasons: string[];
   lastObserved: string;
+  /** False when the workspace stack was never provisioned (no .devcontainer). */
+  stackExpected?: boolean;
 }
 
 export interface WorkspacePendingOperation {
