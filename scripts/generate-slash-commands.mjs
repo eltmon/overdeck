@@ -108,12 +108,13 @@ const generatedEntries = commandTree
     return !curation.deny.some(prefix => commandPath === prefix || commandPath.startsWith(`${prefix} `));
   })
   .map(command => {
-    const label = `pan ${command.path.join(' ')}`;
+    const commandPath = command.path.join(' ');
+    const label = `pan ${commandPath}`;
     return {
       id: `pan-${command.path.join('-')}`,
       label,
       description: firstSentence(command.description),
-      insert: `${label}${command.args.length > 0 ? ' ' : ''}`,
+      insert: curation.insertOverrides[commandPath] ?? `${label}${command.args.length > 0 ? ' ' : ''}`,
       category: curation.categories[command.path[0]] ?? 'CLI',
     };
   });

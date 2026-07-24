@@ -190,7 +190,7 @@ export const GENERATED_SLASH_COMMANDS: SlashCommand[] = [
     id: 'pan-plan-finalize',
     label: 'pan plan finalize',
     description: 'Mark the workspace plan as proposed and promote it to canonical state',
-    insert: 'pan plan finalize',
+    insert: 'pan plan finalize ',
     category: 'Lifecycle',
   },
   {
@@ -981,21 +981,21 @@ export const GENERATED_SLASH_COMMANDS: SlashCommand[] = [
     id: 'pan-admin-specialists-done',
     label: 'pan admin specialists done',
     description: 'Signal specialist completion (deterministic status update)',
-    insert: 'pan admin specialists done ',
+    insert: 'pan admin specialists done',
     category: 'Admin',
   },
   {
     id: 'pan-admin-specialists-logs',
     label: 'pan admin specialists logs',
     description: 'View specialist run logs',
-    insert: 'pan admin specialists logs ',
+    insert: 'pan admin specialists logs',
     category: 'Admin',
   },
   {
     id: 'pan-admin-specialists-cleanup-logs',
     label: 'pan admin specialists cleanup-logs',
     description: 'Clean up old specialist logs',
-    insert: 'pan admin specialists cleanup-logs ',
+    insert: 'pan admin specialists cleanup-logs',
     category: 'Admin',
   },
   {
