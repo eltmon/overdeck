@@ -247,18 +247,18 @@
     "recordedAt": "2026-07-22T23:16:44.964Z"
   },
   "created": "2026-07-16T05:02:53.170Z",
-  "updated": "2026-07-24T17:43:51.655Z",
+  "updated": "2026-07-24T18:00:34.997Z",
   "pipeline": {
     "issueId": "PAN-2599",
     "reviewStatus": "passed",
-    "testStatus": "testing",
+    "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": false,
+    "readyForMerge": true,
     "panDoneRecoveredAt": "2026-07-22T23:25:31.079Z",
-    "updatedAt": "2026-07-24T17:43:51.644Z",
+    "updatedAt": "2026-07-24T18:00:34.865Z",
     "reviewNotes": "Latest main merge preserves the approved telemetry implementation; full tests, typecheck, and lint pass",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3009",
@@ -307,6 +307,14 @@
             "cacheWrite": 259421
           }
         },
+        "test": {
+          "anthropic/claude-sonnet-5": {
+            "input": 1820,
+            "output": 20137,
+            "cacheRead": 8583292,
+            "cacheWrite": 201039
+          }
+        },
         "work": {
           "openai/gpt-5.6-sol": {
             "input": 12739363,
@@ -336,15 +344,15 @@
           "cacheWrite": 214045
         },
         "anthropic/claude-sonnet-5": {
-          "input": 16,
-          "output": 4241,
-          "cacheRead": 796237,
-          "cacheWrite": 259421
+          "input": 1836,
+          "output": 24378,
+          "cacheRead": 9379529,
+          "cacheWrite": 460460
         }
       },
       "costAtCloseOut": {
-        "usd": 554.221277,
-        "pricingAsOf": "2026-07-24T17:43:51.650Z"
+        "usd": 556.645546,
+        "pricingAsOf": "2026-07-24T18:00:34.968Z"
       }
     },
     "merges": [
