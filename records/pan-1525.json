@@ -169,10 +169,10 @@
     "recordedAt": "2026-07-24T23:08:31.650Z"
   },
   "created": "2026-07-12T09:32:29.900Z",
-  "updated": "2026-07-24T23:14:14.694Z",
+  "updated": "2026-07-24T23:22:37.546Z",
   "pipeline": {
     "issueId": "PAN-1525",
-    "reviewStatus": "pending",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -180,7 +180,8 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-24T23:12:31.996Z",
-    "updatedAt": "2026-07-24T23:14:14.658Z",
+    "updatedAt": "2026-07-24T23:22:37.500Z",
+    "reviewNotes": "Detached /pan inputs allow path traversal outside the agent directory before CLI validation",
     "inspectNotes": "Composer-command parse+route inserted before compact/transform/delivery in conversation-message.ts with early return; unknown-command maps to 404 naming token + 'Type /pan to list available commands'; terminal-only policy maps to 422 naming exact command display; unprefixed text/pan-start negative control preserves original compact/transform/deliverAgentMessage path. All 4 ACs covered by router.test.ts assertions matching the exact banned-call list.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3033",
     "lastVerifiedCommit": "0b4828d4e0a9559885b4ecd9b143711f04aba82d",
@@ -346,9 +347,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 882956,
-            "output": 71872,
-            "cacheRead": 17952256,
+            "input": 1131439,
+            "output": 163274,
+            "cacheRead": 47458304,
             "cacheWrite": 0
           }
         },
@@ -377,9 +378,9 @@
           "cacheWrite": 722940
         },
         "openai/gpt-5.6-sol": {
-          "input": 7868564,
-          "output": 844141,
-          "cacheRead": 430355968,
+          "input": 8117047,
+          "output": 935543,
+          "cacheRead": 459862016,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -390,8 +391,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 312.620953,
-        "pricingAsOf": "2026-07-24T23:14:14.687Z"
+        "usd": 331.358452,
+        "pricingAsOf": "2026-07-24T23:22:37.542Z"
       }
     },
     "merges": [
