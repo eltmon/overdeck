@@ -27,7 +27,7 @@
   ],
   "feedback": [],
   "created": "2026-07-12T09:32:29.900Z",
-  "updated": "2026-07-24T21:52:30.646Z",
+  "updated": "2026-07-24T21:59:00.785Z",
   "pipeline": {
     "issueId": "PAN-1525",
     "reviewStatus": "pending",
@@ -109,16 +109,8 @@
   "model": "claude-sonnet-5",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 25,
-    "claims": {
-      "api-commands-endpoint": {
-        "writerId": "agent-pan-1525",
-        "agentId": "agent-pan-1525",
-        "pid": 3209302,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-24T21:52:30.646Z"
-      }
-    },
+    "sequence": 26,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-1525",
@@ -251,6 +243,17 @@
         "outcome": "completed",
         "reason": "Harness behavior now carries source-annotated native command capabilities: Claude Code 2.1.209 exposes verified /model, /context, /effort, and /cancel entries, while unverified Codex, Pi, and ACP inventories fail closed as empty. The composer builds the active harness group dynamically. Runtime/frontend tests, typecheck, lint, and Playwright screenshots across Claude Code and Codex passed.",
         "releasedAt": "2026-07-24T21:52:12.634Z"
+      },
+      {
+        "writerId": "agent-pan-1525",
+        "agentId": "agent-pan-1525",
+        "pid": 3209302,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-24T21:52:30.646Z",
+        "itemId": "api-commands-endpoint",
+        "outcome": "completed",
+        "reason": "GET /api/commands now serves the module-state manifest projected with mode and safety plus the requested harness-native commands. Invalid harnesses return a complete 400 response. Completeness/stability/no-spawn tests, typecheck, lint, and an isolated Node 22 boot test with sequential live requests passed.",
+        "releasedAt": "2026-07-24T21:59:00.784Z"
       }
     ],
     "statusReasons": {
@@ -301,6 +304,10 @@
       "native-capabilities": {
         "reason": "Harness behavior now carries source-annotated native command capabilities: Claude Code 2.1.209 exposes verified /model, /context, /effort, and /cancel entries, while unverified Codex, Pi, and ACP inventories fail closed as empty. The composer builds the active harness group dynamically. Runtime/frontend tests, typecheck, lint, and Playwright screenshots across Claude Code and Codex passed.",
         "updatedAt": "2026-07-24T21:52:12.634Z"
+      },
+      "api-commands-endpoint": {
+        "reason": "GET /api/commands now serves the module-state manifest projected with mode and safety plus the requested harness-native commands. Invalid harnesses return a complete 400 response. Completeness/stability/no-spawn tests, typecheck, lint, and an isolated Node 22 boot test with sequential live requests passed.",
+        "updatedAt": "2026-07-24T21:59:00.784Z"
       }
     }
   },
@@ -354,6 +361,9 @@
     "native-capabilities.native-capabilities.ac1": "completed",
     "native-capabilities.native-capabilities.ac2": "completed",
     "native-capabilities.native-capabilities.ac3": "completed",
-    "api-commands-endpoint": "running"
+    "api-commands-endpoint": "completed",
+    "api-commands-endpoint.api-commands-endpoint.ac1": "completed",
+    "api-commands-endpoint.api-commands-endpoint.ac2": "completed",
+    "api-commands-endpoint.api-commands-endpoint.ac3": "completed"
   }
 }
