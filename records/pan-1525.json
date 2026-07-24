@@ -27,7 +27,7 @@
   ],
   "feedback": [],
   "created": "2026-07-12T09:32:29.900Z",
-  "updated": "2026-07-24T20:13:45.947Z",
+  "updated": "2026-07-24T20:17:47.434Z",
   "pipeline": {
     "issueId": "PAN-1525",
     "reviewStatus": "pending",
@@ -95,16 +95,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 9,
-    "claims": {
-      "command-parser": {
-        "writerId": "agent-pan-1525",
-        "agentId": "agent-pan-1525",
-        "pid": 1936692,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-24T20:13:45.947Z"
-      }
-    },
+    "sequence": 10,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-1525",
@@ -149,6 +141,17 @@
         "outcome": "completed",
         "reason": "Added fail-closed composer execution/safety policies for start, plan, show, status, tell, handoff, and fork, with manifest-integrity enforcement. Policy tests and typecheck pass.",
         "releasedAt": "2026-07-24T20:13:25.199Z"
+      },
+      {
+        "writerId": "agent-pan-1525",
+        "agentId": "agent-pan-1525",
+        "pid": 1936692,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-24T20:13:45.947Z",
+        "itemId": "command-parser",
+        "outcome": "completed",
+        "reason": "Added manifest-driven /pan parsing with quoted values, canonical path/flag aliases, typed validation errors, positional/flag checks, and shell-metacharacter rejection. Parser tests (14 cases) and typecheck pass; the module has no process-spawn dependency.",
+        "releasedAt": "2026-07-24T20:17:47.434Z"
       }
     ],
     "statusReasons": {
@@ -167,6 +170,10 @@
       "policy-overlay": {
         "reason": "Added fail-closed composer execution/safety policies for start, plan, show, status, tell, handoff, and fork, with manifest-integrity enforcement. Policy tests and typecheck pass.",
         "updatedAt": "2026-07-24T20:13:25.199Z"
+      },
+      "command-parser": {
+        "reason": "Added manifest-driven /pan parsing with quoted values, canonical path/flag aliases, typed validation errors, positional/flag checks, and shell-metacharacter rejection. Parser tests (14 cases) and typecheck pass; the module has no process-spawn dependency.",
+        "updatedAt": "2026-07-24T20:17:47.434Z"
       }
     }
   },
@@ -187,6 +194,10 @@
     "policy-overlay": "completed",
     "policy-overlay.policy-overlay.ac1": "completed",
     "policy-overlay.policy-overlay.ac2": "completed",
-    "command-parser": "running"
+    "command-parser": "completed",
+    "command-parser.command-parser.ac1": "completed",
+    "command-parser.command-parser.ac2": "completed",
+    "command-parser.command-parser.ac3": "completed",
+    "command-parser.command-parser.ac4": "completed"
   }
 }
