@@ -3,11 +3,19 @@ import type { Command } from 'commander';
 export interface CommandInfo {
   /** Command path below the program root, e.g. ["admin", "cloister", "status"]. */
   path: string[];
+  aliases: string[];
   description: string;
   /** Declared positional arguments. */
   args: { name: string; required: boolean; variadic: boolean }[];
+  /** Declared visible options. */
+  options: { flags: string; description: string; required: boolean; valueHint: string | null }[];
   /** True when the command has visible subcommands. */
   hasSubcommands: boolean;
+}
+
+function optionValueHint(flags: string): string | null {
+  const match = flags.match(/<([^>]+)>|\[([^\]]+)\]/);
+  return match?.[1] ?? match?.[2] ?? null;
 }
 
 export function collectCommandTree(root: Command): CommandInfo[] {
@@ -25,12 +33,21 @@ export function collectCommandTree(root: Command): CommandInfo[] {
 
       commands.push({
         path,
+        aliases: command.aliases(),
         description: command.description(),
         args: command.registeredArguments.map(argument => ({
           name: argument.name(),
           required: argument.required,
           variadic: argument.variadic,
         })),
+        options: command.options
+          .filter(option => !option.hidden)
+          .map(option => ({
+            flags: option.flags,
+            description: option.description,
+            required: option.required,
+            valueHint: optionValueHint(option.flags),
+          })),
         hasSubcommands: visibleSubcommands.length > 0,
       });
 

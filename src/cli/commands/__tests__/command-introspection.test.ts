@@ -1,14 +1,20 @@
 import { describe, expect, it } from 'vitest';
-import { Command } from 'commander';
+import { Command, Option } from 'commander';
 import { collectCommandTree } from '../../command-introspection.js';
 
 function buildProgram(): Command {
   const program = new Command();
   program.name('pan');
 
-  program.command('alpha').description('First visible command');
+  program.command('alpha').alias('a').description('First visible command');
 
   const admin = program.command('admin').description('Administrative commands');
+  admin
+    .command('commands')
+    .description('List visible commands')
+    .option('--json', 'Emit machine-readable JSON')
+    .option('--format <format>', 'Select output format')
+    .addOption(new Option('--secret-option', 'Hidden option').hideHelp());
   const cloister = admin.command('cloister').description('Manage the lifecycle watchdog');
   cloister.command('status').description('Show watchdog status');
   cloister.command('secret', { hidden: true }).description('Hidden implementation detail');
@@ -24,6 +30,7 @@ describe('collectCommandTree', () => {
     expect(tree.map(command => command.path)).toEqual([
       ['alpha'],
       ['admin'],
+      ['admin', 'commands'],
       ['admin', 'cloister'],
       ['admin', 'cloister', 'status'],
       ['kill'],
@@ -40,6 +47,30 @@ describe('collectCommandTree', () => {
 
     expect(kill?.args).toEqual([
       { name: 'id', required: true, variadic: false },
+    ]);
+  });
+
+  it('returns aliases and visible option metadata', () => {
+    const tree = collectCommandTree(buildProgram());
+    const alpha = tree.find(command => command.path.join(' ') === 'alpha');
+    const commands = tree.find(command => command.path.join(' ') === 'admin commands');
+    const kill = tree.find(command => command.path.join(' ') === 'kill');
+
+    expect(alpha?.aliases).toEqual(['a']);
+    expect(kill?.aliases).toEqual([]);
+    expect(commands?.options).toEqual([
+      {
+        flags: '--json',
+        description: 'Emit machine-readable JSON',
+        required: false,
+        valueHint: null,
+      },
+      {
+        flags: '--format <format>',
+        description: 'Select output format',
+        required: true,
+        valueHint: 'format',
+      },
     ]);
   });
 });
