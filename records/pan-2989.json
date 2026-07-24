@@ -93,7 +93,7 @@
     "recordedAt": "2026-07-24T19:20:31.861Z"
   },
   "created": "2026-07-22T21:26:29.366Z",
-  "updated": "2026-07-24T19:20:40.851Z",
+  "updated": "2026-07-24T19:20:43.049Z",
   "pipeline": {
     "issueId": "PAN-2989",
     "reviewStatus": "failed",
@@ -193,7 +193,7 @@
   },
   "workModel": "k3",
   "harness": "claude-code",
-  "model": "k3",
+  "model": "gpt-5.6-sol",
   "tasks": {
     "sequence": 8,
     "claims": {},
