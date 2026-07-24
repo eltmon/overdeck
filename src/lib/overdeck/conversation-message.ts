@@ -13,13 +13,10 @@ import { getHarnessBehavior } from '../runtimes/behavior.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import { captureTranscriptUserRecordSnapshot } from '../transcript-landing.js';
 import { deliverAgentMessage, injectPiConversationMemory } from '../agents.js';
-import {
-  ComposerCommandParseError,
-  parseOverdeckComposerCommand,
-} from '../composer-commands/parser.js';
+import { ComposerCommandParseError } from '../composer-commands/parser.js';
 import {
   composerCommandResultHttpStatus,
-  handleComposerCommand,
+  handleComposerCommandMessage,
 } from '../composer-commands/router.js';
 import {
   extractConversationAttachmentPaths,
@@ -414,18 +411,17 @@ export async function handleConversationMessage(
   }
 
   try {
-    const parsed = parseOverdeckComposerCommand(message);
-    if (parsed !== null) {
-      const result = await handleComposerCommand({
-        parsed,
-        target: {
-          kind: 'conversation',
-          id: conv.name,
-          harness: conv.harness ?? 'claude-code',
-          cwd: conv.cwd,
-          issueId: conv.issueId ?? undefined,
-        },
-      });
+    const result = await handleComposerCommandMessage({
+      message,
+      target: {
+        kind: 'conversation',
+        id: conv.name,
+        harness: conv.harness ?? 'claude-code',
+        cwd: conv.cwd,
+        issueId: conv.issueId ?? undefined,
+      },
+    });
+    if (result !== null) {
       return jsonResponse(result, { status: composerCommandResultHttpStatus(result) });
     }
   } catch (error) {

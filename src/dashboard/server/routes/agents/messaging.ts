@@ -7,13 +7,11 @@ import { Effect } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
 import { getAgentState, messageAgent } from '../../../../lib/agents.js';
-import {
-  ComposerCommandParseError,
-  parseOverdeckComposerCommand,
-} from '../../../../lib/composer-commands/parser.js';
+import { ComposerCommandParseError } from '../../../../lib/composer-commands/parser.js';
 import {
   composerCommandResultHttpStatus,
-  handleComposerCommand,
+  handleComposerCommandMessage,
+  isComposerCommandMessage,
 } from '../../../../lib/composer-commands/router.js';
 import { jsonResponse } from '../../http-helpers.js';
 import { httpHandler } from '../http-handler.js';
@@ -38,13 +36,12 @@ async function sendAgentMessage(id: string, message: string) {
 
 export async function handleAgentMessage(id: string, message: string) {
   try {
-    const parsed = parseOverdeckComposerCommand(message);
-    if (parsed !== null) {
+    if (isComposerCommandMessage(message)) {
       const agentState = await Effect.runPromise(
         getAgentState(id).pipe(Effect.catch(() => Effect.succeed(null))),
       );
-      const result = await handleComposerCommand({
-        parsed,
+      const result = await handleComposerCommandMessage({
+        message,
         target: {
           kind: 'agent',
           id,
@@ -53,7 +50,9 @@ export async function handleAgentMessage(id: string, message: string) {
           issueId: agentState?.issueId,
         },
       });
-      return jsonResponse(result, { status: composerCommandResultHttpStatus(result) });
+      if (result !== null) {
+        return jsonResponse(result, { status: composerCommandResultHttpStatus(result) });
+      }
     }
   } catch (error) {
     if (!(error instanceof ComposerCommandParseError)) throw error;
