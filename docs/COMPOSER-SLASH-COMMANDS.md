@@ -9,13 +9,14 @@ Commander registrations in src/cli/index.ts and src/cli/commands/**
   → pan admin commands --json
   → scripts/generate-slash-commands.mjs
        + scripts/slash-commands-curation.json
-  → src/dashboard/frontend/src/components/chat/slashCommands.generated.ts
-  → scripts/lint-slash-commands.sh (run by npm run lint)
+  ├─→ src/dashboard/frontend/src/components/chat/slashCommands.generated.ts
+  └─→ packages/contracts/src/composer-commands.generated.ts
+  → scripts/lint-slash-commands.sh (drift-gates both outputs; run by npm run lint)
 ```
 
-`pan admin commands --json` recursively reports visible command paths, descriptions, positional arguments, and whether each command has visible children. Hidden commands and Commander's implicit `help` entries are excluded by `src/cli/command-introspection.ts`.
+`pan admin commands --json` recursively reports visible command paths, aliases, descriptions, positional arguments, options, and whether each command has visible children. Hidden commands, hidden options, and Commander's implicit `help` entries are excluded by `src/cli/command-introspection.ts`.
 
-The generator keeps runnable leaves and command nodes that accept positional arguments, applies the curation overlay, and writes the committed TypeScript module. The generated file has no timestamp, so two runs against the same CLI registry produce identical bytes.
+The generator writes two deterministic committed modules. The frontend autocomplete output keeps runnable leaves and command nodes that accept positional arguments, then applies the curation overlay. The contracts manifest contains every visible command with its complete syntax metadata and category so the dashboard server and frontend can share one command description without importing the CLI entrypoint. Neither generated file has a timestamp, so two runs against the same CLI registry produce identical bytes.
 
 Regenerate after changing CLI commands or the overlay:
 
@@ -24,7 +25,7 @@ npm run build:cli
 npm run generate:slash-commands
 ```
 
-Never edit `slashCommands.generated.ts` by hand. `scripts/lint-slash-commands.sh` regenerates to a temporary file and fails when the committed module differs, with the command needed to repair the drift. This follows the sibling CLI drift-gate pattern in `scripts/lint-skills.sh`.
+Never edit `slashCommands.generated.ts` or `composer-commands.generated.ts` by hand. `scripts/lint-slash-commands.sh` regenerates both to temporary files and fails when either committed module differs, with the command needed to repair the drift. This follows the sibling CLI drift-gate pattern in `scripts/lint-skills.sh`.
 
 ## Choosing the right curation mechanism
 
