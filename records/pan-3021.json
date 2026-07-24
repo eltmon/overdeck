@@ -21,7 +21,9 @@
   ],
   "feedback": [],
   "scopeDrift": {
-    "outsideDeclaredScope": [],
+    "outsideDeclaredScope": [
+      "src/dashboard/frontend/src/components/KanbanBoard.test.tsx"
+    ],
     "declaredScopeUntouched": [],
     "declaredScope": [
       "docs/COMPOSER-SLASH-COMMANDS.md",
@@ -50,6 +52,7 @@
       "src/cli/command-introspection.ts",
       "src/cli/commands/__tests__/command-introspection.test.ts",
       "src/cli/commands/admin/index.ts",
+      "src/dashboard/frontend/src/components/KanbanBoard.test.tsx",
       "src/dashboard/frontend/src/components/chat/ComposerPromptEditor.tsx",
       "src/dashboard/frontend/src/components/chat/__tests__/ComposerPromptEditor.test.tsx",
       "src/dashboard/frontend/src/components/chat/__tests__/slashCommands.no-loss.test.ts",
@@ -57,10 +60,10 @@
       "src/dashboard/frontend/src/components/chat/slashCommands.generated.ts",
       "src/dashboard/frontend/src/components/chat/slashCommands.ts"
     ],
-    "recordedAt": "2026-07-24T18:23:54.613Z"
+    "recordedAt": "2026-07-24T18:43:30.234Z"
   },
   "created": "2026-07-24T17:28:09.122Z",
-  "updated": "2026-07-24T18:43:22.168Z",
+  "updated": "2026-07-24T18:43:30.235Z",
   "pipeline": {
     "issueId": "PAN-3021",
     "reviewStatus": "passed",
