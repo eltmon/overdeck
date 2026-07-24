@@ -29,7 +29,8 @@ export class RecordDurabilityTimeoutError extends Error {
     super(
       `Durability wait for ${issueId} state exceeded ${budgetMs}ms; releasing the record ` +
       `lock. The mutation remains in the local record and the flush continues in the ` +
-      `background; the verdict fallback and drain reconcile cross-machine durability.`,
+      `background; callers with a fallback (e.g. the review-verdict fallback and drain) ` +
+      `reconcile through it, other writers must retry the write.`,
     );
     this.name = 'RecordDurabilityTimeoutError';
   }
@@ -40,9 +41,14 @@ function recordDurabilityBudgetMs(): number {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_RECORD_DURABILITY_BUDGET_MS;
 }
 
-// Race `promise` against the shared deadline WITHOUT aborting it: a timing-out writer
-// must not cancel peers' shared-gitRoot flushes. `onTimeout` runs best-effort cleanup
-// (e.g. abortRebase) before the rejection propagates.
+// Race `promise` against the shared deadline WITHOUT aborting it by default: a
+// timing-out writer must not cancel peers' shared-gitRoot flushes (NFR-1). When
+// the operation owns cancellable resources (reconcile/restore git subprocesses),
+// `onTimeout` aborts them and awaits their settlement, so nothing the operation
+// started can mutate the state worktree after the record lock is released.
+// Cleanup is bounded by the abort path — it must never wait out another full
+// git timeout under the lock. Once the deadline fires, the
+// RecordDurabilityTimeoutError always wins the race.
 async function withRecordDurabilityDeadline<T>(
   issueId: string,
   promise: Promise<T>,
@@ -55,22 +61,34 @@ async function withRecordDurabilityDeadline<T>(
     await onTimeout?.().catch(() => undefined);
     throw new RecordDurabilityTimeoutError(issueId, budgetMs);
   }
-  let timer: NodeJS.Timeout | undefined;
-  try {
-    return await Promise.race([
-      promise,
-      new Promise<never>((_resolve, reject) => {
-        timer = setTimeout(() => {
-          void (onTimeout?.() ?? Promise.resolve())
-            .catch(() => undefined)
-            .finally(() => reject(new RecordDurabilityTimeoutError(issueId, budgetMs)));
-        }, remaining);
-        timer.unref?.();
-      }),
-    ]);
-  } finally {
-    if (timer) clearTimeout(timer);
-  }
+  return await new Promise<T>((resolve, reject) => {
+    let settled = false;
+    let timingOut = false;
+    const timer = setTimeout(() => {
+      timingOut = true;
+      void (onTimeout?.() ?? Promise.resolve())
+        .catch(() => undefined)
+        .finally(() => {
+          settled = true;
+          reject(new RecordDurabilityTimeoutError(issueId, budgetMs));
+        });
+    }, remaining);
+    timer.unref?.();
+    promise.then(
+      (value) => {
+        if (settled || timingOut) return;
+        settled = true;
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error) => {
+        if (settled || timingOut) return;
+        settled = true;
+        clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
 }
 
 export interface UpdateIssueRecordOptions {
@@ -95,15 +113,30 @@ interface GitFailure extends Error {
   stdout?: string;
 }
 
-async function git(gitRoot: string, args: string[]): Promise<string> {
+interface GitOptions {
+  signal?: AbortSignal;
+  timeoutMs?: number;
+}
+
+async function git(gitRoot: string, args: string[], options: GitOptions = {}): Promise<string> {
   const result = await execFileAsync('git', args, {
     cwd: gitRoot,
     encoding: 'utf8',
-    timeout: 30_000,
+    timeout: options.timeoutMs ?? 30_000,
     maxBuffer: 16 * 1024 * 1024,
     env: { ...process.env, HUSKY: '0' },
+    ...(options.signal ? { signal: options.signal } : {}),
   });
   return result.stdout.trim();
+}
+
+// Mutation steps between git subprocesses are synchronous and not cancellable —
+// check the deadline abort explicitly so an aborted reconcile/restore never
+// writes the record file or commits after the lock has been released.
+function throwIfDurabilityAborted(signal: AbortSignal | undefined): void {
+  if (signal?.aborted) {
+    throw new Error('Record durability operation aborted at the deadline');
+  }
 }
 
 function gitFailureMessage(error: unknown): string {
@@ -118,9 +151,11 @@ function isRemoteRefRaceError(message: string): boolean {
   return /non-fast-forward|fetch first|stale info|cannot lock ref.*expected|failed to update ref/i.test(message);
 }
 
-async function abortRebase(gitRoot: string): Promise<void> {
+async function abortRebase(gitRoot: string, options: GitOptions = {}): Promise<void> {
   try {
-    await git(gitRoot, ['rebase', '--abort']);
+    // Bounded local cleanup: a deadline abort must not extend the lock hold by
+    // another full git timeout.
+    await git(gitRoot, ['rebase', '--abort'], { timeoutMs: 5_000, ...options });
   } catch {
     // The rebase may already have stopped or completed.
   }
@@ -132,9 +167,10 @@ async function replayConflictedRecord(
   mutator: IssueRecordMutator,
   gitRoot: string,
   recordPath: string,
+  signal?: AbortSignal,
 ): Promise<void> {
   const relativeRecordPath = relative(gitRoot, recordPath).replace(/\\/g, '/');
-  const conflicts = (await git(gitRoot, ['diff', '--name-only', '--diff-filter=U']))
+  const conflicts = (await git(gitRoot, ['diff', '--name-only', '--diff-filter=U'], { signal }))
     .split('\n')
     .map((path) => path.trim())
     .filter(Boolean);
@@ -151,13 +187,15 @@ async function replayConflictedRecord(
     '--worktree',
     '--',
     relativeRecordPath,
-  ]);
+  ], { signal });
   const remoteRecord = readIssueRecordSync(project, issueId);
   if (!remoteRecord) throw new Error(`Remote ${issueId} state record is unreadable`);
   const result = await mutator(remoteRecord);
+  throwIfDurabilityAborted(signal);
   writeIssueRecordSync(project, issueId, result ?? remoteRecord);
-  await git(gitRoot, ['add', '--', relativeRecordPath]);
-  await git(gitRoot, ['-c', 'core.editor=true', 'rebase', '--continue']);
+  await git(gitRoot, ['add', '--', relativeRecordPath], { signal });
+  throwIfDurabilityAborted(signal);
+  await git(gitRoot, ['-c', 'core.editor=true', 'rebase', '--continue'], { signal });
 }
 
 async function restoreRetryableRecord(
@@ -165,34 +203,42 @@ async function restoreRetryableRecord(
   issueId: string,
   original: PanIssueRecord,
   recordPath: string,
+  signal?: AbortSignal,
 ): Promise<void> {
   const stateHome = resolveStateReadHomeSync(project);
   const gitRoot = stateHome.root;
   const relativeRecordPath = relative(gitRoot, recordPath).replace(/\\/g, '/');
-  await abortRebase(gitRoot);
+  await abortRebase(gitRoot, { signal });
 
   let restored = structuredClone(original);
   const branch = stateHome.migrated
     ? STATE_BRANCH
-    : await git(gitRoot, ['branch', '--show-current']);
+    : await git(gitRoot, ['branch', '--show-current'], { signal });
 
   try {
-    await git(gitRoot, ['fetch', 'origin', branch]);
+    await git(gitRoot, ['fetch', 'origin', branch], { signal });
     restored = JSON.parse(
-      await git(gitRoot, ['show', `origin/${branch}:${relativeRecordPath}`]),
+      await git(gitRoot, ['show', `origin/${branch}:${relativeRecordPath}`], { signal }),
     ) as PanIssueRecord;
-  } catch {
+  } catch (fetchError) {
+    // An abort at the durability deadline must NOT be swallowed here — the
+    // pre-mutation snapshot write below would then run after lock release.
+    throwIfDurabilityAborted(signal);
     // Network and remote-read failures must not prevent local retryability. The
     // pre-mutation snapshot is still safer than leaving terminal local state.
+    void fetchError;
   }
 
+  throwIfDurabilityAborted(signal);
   writeIssueRecordSync(project, issueId, restored);
-  await git(gitRoot, ['add', '--', relativeRecordPath]);
+  await git(gitRoot, ['add', '--', relativeRecordPath], { signal });
 
   try {
-    await git(gitRoot, ['diff', '--cached', '--quiet', '--', relativeRecordPath]);
+    await git(gitRoot, ['diff', '--cached', '--quiet', '--', relativeRecordPath], { signal });
     return;
-  } catch {
+  } catch (diffError) {
+    throwIfDurabilityAborted(signal);
+    void diffError;
     // A staged diff needs a compensating commit so HEAD, not only the worktree,
     // is retryable. The failed mutation remains auditable in local history.
   }
@@ -203,7 +249,7 @@ async function restoreRetryableRecord(
     `chore(records): restore ${issueId} after failed state push`,
     '--',
     relativeRecordPath,
-  ]);
+  ], { signal });
 }
 
 async function reconcileStatePush(
@@ -211,18 +257,21 @@ async function reconcileStatePush(
   issueId: string,
   mutator: IssueRecordMutator,
   recordPath: string,
+  signal?: AbortSignal,
 ): Promise<PanIssueRecord> {
   const gitRoot = resolveStateReadHomeSync(project).root;
 
   for (let attempt = 0; attempt < MAX_STATE_PUSH_RECONCILIATIONS; attempt += 1) {
-    await git(gitRoot, ['fetch', 'origin', STATE_BRANCH]);
+    throwIfDurabilityAborted(signal);
+    await git(gitRoot, ['fetch', 'origin', STATE_BRANCH], { signal });
     try {
-      await git(gitRoot, ['rebase', `origin/${STATE_BRANCH}`]);
+      await git(gitRoot, ['rebase', `origin/${STATE_BRANCH}`], { signal });
     } catch (error) {
+      throwIfDurabilityAborted(signal);
       try {
-        await replayConflictedRecord(project, issueId, mutator, gitRoot, recordPath);
+        await replayConflictedRecord(project, issueId, mutator, gitRoot, recordPath, signal);
       } catch (replayError) {
-        await abortRebase(gitRoot);
+        await abortRebase(gitRoot, { signal });
         throw new Error(
           `Failed to reconcile ${issueId} state after push race: ${gitFailureMessage(replayError)}`,
           { cause: error },
@@ -231,11 +280,12 @@ async function reconcileStatePush(
     }
 
     try {
-      await git(gitRoot, ['push', 'origin', STATE_BRANCH]);
+      await git(gitRoot, ['push', 'origin', STATE_BRANCH], { signal });
       const record = readIssueRecordSync(project, issueId);
       if (!record) throw new Error(`Reconciled ${issueId} state record is unreadable`);
       return record;
     } catch (error) {
+      throwIfDurabilityAborted(signal);
       const message = gitFailureMessage(error);
       if (!isRemoteRefRaceError(message)) {
         throw new Error(`Failed to push reconciled ${issueId} state: ${message}`, { cause: error });
@@ -284,12 +334,22 @@ export async function updateIssueRecord(
       if (flushed.pushed === false) {
         const stateHome = resolveStateReadHomeSync(project);
         if (stateHome.migrated && isRemoteRefRaceError(flushed.reason ?? '')) {
+          const reconcileAbort = new AbortController();
+          const reconcilePromise = reconcileStatePush(project, normalizedIssueId, mutator, path, reconcileAbort.signal);
           return await withRecordDurabilityDeadline(
             normalizedIssueId,
-            reconcileStatePush(project, normalizedIssueId, mutator, path),
+            reconcilePromise,
             deadlineMs,
             budgetMs,
-            () => abortRebase(resolveStateReadHomeSync(project).root),
+            async () => {
+              // Stop the reconcile's git subprocesses and wait for them to die —
+              // nothing it started may rebase/push/write after the lock releases.
+              reconcileAbort.abort();
+              await reconcilePromise.catch(() => undefined);
+              // Leave the worktree out of a mid-rebase state; bounded local
+              // cleanup, not another full git timeout under the lock.
+              await abortRebase(resolveStateReadHomeSync(project).root);
+            },
           );
         }
         throw new Error(`Failed to push ${normalizedIssueId} state: ${flushed.reason ?? 'unknown push failure'}`);
@@ -304,11 +364,20 @@ export async function updateIssueRecord(
       // still land the commit, so rewinding to the pre-mutation snapshot would race it.
       if (error instanceof RecordDurabilityTimeoutError) throw error;
       try {
+        const restoreAbort = new AbortController();
+        const restorePromise = restoreRetryableRecord(project, normalizedIssueId, original, path, restoreAbort.signal);
         await withRecordDurabilityDeadline(
           normalizedIssueId,
-          restoreRetryableRecord(project, normalizedIssueId, original, path),
+          restorePromise,
           deadlineMs,
           budgetMs,
+          async () => {
+            // Same post-release guarantee as the reconcile path: kill the
+            // restore's git subprocesses and await their settlement so the
+            // pre-mutation snapshot can never overwrite a newer writer.
+            restoreAbort.abort();
+            await restorePromise.catch(() => undefined);
+          },
         );
       } catch (restoreError) {
         if (restoreError instanceof RecordDurabilityTimeoutError) throw restoreError;

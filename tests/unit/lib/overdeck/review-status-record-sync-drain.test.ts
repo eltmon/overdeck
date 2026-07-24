@@ -8,8 +8,8 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync, existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 
 const state = vi.hoisted(() => ({
@@ -143,6 +143,69 @@ describe('workspace verdict fallback drain (PAN-2989)', () => {
 
     await expect(drainWorkspaceVerdictFallback(ISSUE)).resolves.toBe(false);
     expect(existsSync(fallbackPathOrThrow())).toBe(true);
+  });
+
+  it('never deletes a newer fallback written while the drain awaits the record write', async () => {
+    state.pipeline = { reviewStatus: 'reviewing', testStatus: 'pending', updatedAt: '2026-07-22T09:00:00.000Z' };
+    writeFallback('2026-07-22T10:00:00.000Z', { reviewStatus: 'blocked', reviewNotes: 'generation A' });
+
+    // Drain A claims generation A and suspends inside the record write.
+    let resolveFold!: (landed: boolean) => void;
+    mockUpdateIssueRecordForIssue.mockImplementation(
+      () => new Promise<boolean>((resolve) => { resolveFold = resolve; }),
+    );
+    const drainA = drainWorkspaceVerdictFallback(ISSUE);
+
+    // A concurrent failed verdict write replaces the live path with generation B.
+    writeFallback('2026-07-22T11:00:00.000Z', { reviewStatus: 'passed', reviewNotes: 'generation B' });
+
+    resolveFold(true);
+    await expect(drainA).resolves.toBe(true);
+
+    // Generation B survives at the live path — drain A deleted only its claim.
+    const live = JSON.parse(readFileSync(fallbackPathOrThrow(), 'utf8')) as { updatedAt: string };
+    expect(live.updatedAt).toBe('2026-07-22T11:00:00.000Z');
+
+    // And generation B is folded into the record on the next drain.
+    mockUpdateIssueRecordForIssue.mockResolvedValue(true);
+    await expect(drainWorkspaceVerdictFallback(ISSUE)).resolves.toBe(true);
+    const [, status] = mockUpdateIssueRecordForIssue.mock.calls[1] as [string, ReviewStatus];
+    expect(status.reviewNotes).toBe('generation B');
+    expect(existsSync(fallbackPathOrThrow())).toBe(false);
+  });
+
+  it('drops the older claim when the fold fails and a newer generation arrived meanwhile', async () => {
+    writeFallback('2026-07-22T10:00:00.000Z', { reviewStatus: 'blocked', reviewNotes: 'generation A' });
+
+    let resolveFold!: (landed: boolean) => void;
+    mockUpdateIssueRecordForIssue.mockImplementation(
+      () => new Promise<boolean>((resolve) => { resolveFold = resolve; }),
+    );
+    const drainA = drainWorkspaceVerdictFallback(ISSUE);
+
+    writeFallback('2026-07-22T11:00:00.000Z', { reviewStatus: 'passed', reviewNotes: 'generation B' });
+    resolveFold(false);
+    await expect(drainA).resolves.toBe(false);
+
+    // The failed drain does not restore its older generation over the newer one.
+    const live = JSON.parse(readFileSync(fallbackPathOrThrow(), 'utf8')) as { updatedAt: string };
+    expect(live.updatedAt).toBe('2026-07-22T11:00:00.000Z');
+  });
+
+  it('recovers a stranded drain claim left behind by a dead process', async () => {
+    const live = fallbackPathOrThrow();
+    mkdirSync(dirname(live), { recursive: true });
+    writeFileSync(`${live}.drain-2147483647-1`, JSON.stringify({
+      issueId: ISSUE,
+      updatedAt: '2026-07-22T10:00:00.000Z',
+      pipeline: { reviewStatus: 'blocked' },
+    }));
+    mockUpdateIssueRecordForIssue.mockResolvedValue(true);
+
+    await expect(drainWorkspaceVerdictFallback(ISSUE)).resolves.toBe(true);
+
+    expect(mockUpdateIssueRecordForIssue).toHaveBeenCalledTimes(1);
+    expect(existsSync(`${live}.drain-2147483647-1`)).toBe(false);
   });
 
   it('drains a pending fallback after the next landed journal write', async () => {

@@ -7,7 +7,7 @@
  */
 
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { setImmediate } from 'node:timers';
@@ -202,5 +202,108 @@ describe('updateIssueRecord durability budget (PAN-2989)', () => {
 
     expect(result.statusOverrides).toEqual({ 'wi-1': 'completed' });
     expect(mockFlushAutoCommits).toHaveBeenCalledTimes(1);
+  });
+
+  it('aborts a hung restore at the deadline so it never rewinds the record after lock release', async () => {
+    // A non-race push failure routes the error path into restoreRetryableRecord.
+    mockFlushAutoCommits.mockImplementation(() =>
+      Effect.succeed({ committed: true, pushed: false, reason: 'simulated non-race push failure' } satisfies FlushResult),
+    );
+    // Hang the restore's fetch: the remote's upload-pack sleeps before serving.
+    const hook = join(remote, 'hooks', 'pre-upload-pack');
+    writeFileSync(hook, '#!/bin/sh\nsleep 60\n');
+    chmodSync(hook, 0o755);
+
+    const first = updateIssueRecord(project, ISSUE_ID, (record) => {
+      record.statusOverrides = { 'wi-1': 'completed' };
+    });
+    const rejection = expect(first).rejects.toBeInstanceOf(RecordDurabilityTimeoutError);
+    await settleUntilDeadlineArmed();
+    await vi.advanceTimersByTimeAsync(30_000);
+    await rejection;
+
+    // The restore's git subprocess was killed at the deadline, before its
+    // pre-mutation snapshot write: the mutation survives on disk.
+    expect(readLocalRecord(root).statusOverrides).toEqual({ 'wi-1': 'completed' });
+    expect(git(root, 'log', '--format=%s', '-3')).not.toContain('restore');
+
+    // The lock is free — a second writer completes immediately...
+    mockFlushAutoCommits.mockImplementation(() => healthyFlush());
+    await updateIssueRecord(project, ISSUE_ID, (record) => {
+      record.statusOverrides = { ...(record.statusOverrides ?? {}), 'wi-2': 'completed' };
+    });
+    // ...and still nothing from the timed-out restore lands afterwards.
+    expect(readLocalRecord(root).statusOverrides).toEqual({ 'wi-1': 'completed', 'wi-2': 'completed' });
+    expect(git(root, 'log', '--format=%s', '-3')).not.toContain('restore');
+  });
+
+  it('aborts a hung reconcile fetch at the deadline — no rebase or push after lock release', async () => {
+    // Migrated layout: a state worktree on overdeck-state with the marker.
+    const stateRoot = join(process.env.OVERDECK_HOME!, 'state', 'migrated');
+    mkdirSync(join(stateRoot, 'records'), { recursive: true });
+    git(stateRoot, 'init', '-q');
+    git(stateRoot, 'config', 'user.email', 'test@overdeck.local');
+    git(stateRoot, 'config', 'user.name', 'Overdeck Test');
+    git(stateRoot, 'config', 'commit.gpgsign', 'false');
+    writeFileSync(join(stateRoot, 'migration-complete.json'), JSON.stringify({
+      sourceMainSha: '0'.repeat(40),
+      stateBranchSha: '0'.repeat(40),
+      completedAt: '2026-07-17T00:00:00.000Z',
+      version: 1,
+    }));
+    writeFileSync(join(stateRoot, 'records', 'durable-1.json'), JSON.stringify({
+      issueId: ISSUE_ID,
+      schemaVersion: 2,
+      statusOverrides: {},
+      pipeline: { issueId: ISSUE_ID, reviewStatus: 'pending', testStatus: 'pending', readyForMerge: false, updatedAt: '2026-07-17T00:00:00.000Z' },
+      closeOut: { usage: { byStage: {}, totals: {} }, merges: [], ranOn: 'main' },
+    } satisfies PanIssueRecord, null, 2));
+    git(stateRoot, 'add', '.');
+    git(stateRoot, 'commit', '-q', '-m', 'seed state branch');
+    git(stateRoot, 'branch', '-M', 'overdeck-state');
+    git(stateRoot, 'remote', 'add', 'origin', remote);
+    git(stateRoot, 'push', '-q', '-u', 'origin', 'overdeck-state');
+    const seedSha = git(stateRoot, 'rev-parse', 'HEAD');
+
+    // Hang every fetch: the reconcile's first step never completes.
+    const hook = join(remote, 'hooks', 'pre-upload-pack');
+    writeFileSync(hook, '#!/bin/sh\nsleep 60\n');
+    chmodSync(hook, 0o755);
+
+    // A remote-ref race flush failure routes into reconcileStatePush.
+    mockFlushAutoCommits.mockImplementation(() =>
+      Effect.succeed({
+        committed: true,
+        pushed: false,
+        reason: `error: cannot lock ref 'refs/heads/overdeck-state': is at ${'a'.repeat(40)} but expected ${'b'.repeat(40)}`,
+      } satisfies FlushResult),
+    );
+
+    const migratedProject = { ...project, path: stateRoot };
+    const first = updateIssueRecord(migratedProject, ISSUE_ID, (record) => {
+      record.statusOverrides = { 'wi-1': 'completed' };
+    });
+    const rejection = expect(first).rejects.toBeInstanceOf(RecordDurabilityTimeoutError);
+    await settleUntilDeadlineArmed();
+    await vi.advanceTimersByTimeAsync(30_000);
+    await rejection;
+
+    // The fetch was killed mid-flight: no rebase ran and no push landed.
+    expect(git(stateRoot, 'rev-parse', 'HEAD')).toBe(seedSha);
+    expect(git(remote, 'rev-parse', 'overdeck-state')).toBe(seedSha);
+    expect(existsSync(join(stateRoot, '.git', 'rebase-merge'))).toBe(false);
+    expect(existsSync(join(stateRoot, '.git', 'REBASE_HEAD'))).toBe(false);
+
+    // A second writer acquires the lock immediately...
+    mockFlushAutoCommits.mockImplementation(() => healthyFlush());
+    const second = await updateIssueRecord(migratedProject, ISSUE_ID, (record) => {
+      record.statusOverrides = { ...(record.statusOverrides ?? {}), 'wi-2': 'completed' };
+    });
+    expect(second.statusOverrides).toEqual({ 'wi-1': 'completed', 'wi-2': 'completed' });
+
+    // ...and still nothing from the timed-out reconcile lands afterwards.
+    expect(git(stateRoot, 'rev-parse', 'HEAD')).toBe(seedSha);
+    expect(git(remote, 'rev-parse', 'overdeck-state')).toBe(seedSha);
+    expect(existsSync(join(stateRoot, '.git', 'rebase-merge'))).toBe(false);
   });
 });

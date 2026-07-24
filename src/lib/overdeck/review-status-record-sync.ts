@@ -1,5 +1,5 @@
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { basename, dirname, join } from 'node:path';
 import type { ReviewStatus } from '../review-status.js';
 import { updateIssueRecordForIssue, type PanIssuePipelineRecord } from '../pan-dir/records.js';
 import { readIssueRecordSync } from '../pan-dir/record.js';
@@ -186,7 +186,12 @@ function writeWorkspaceVerdictFallbackSync(issueId: string, status: ReviewStatus
       pipeline: durableSubset(status as unknown as PanIssuePipelineRecord),
       ...(clearedFields.length > 0 ? { clearedFields } : {}),
     };
-    writeFileSync(path, JSON.stringify(payload, null, 2));
+    // Atomic replace: a drain may claim the live path by rename at any moment,
+    // and a plain writeFileSync could be renamed aside mid-write and fold a
+    // torn payload into the canonical record.
+    const tmpPath = `${path}.tmp-${process.pid}`;
+    writeFileSync(tmpPath, JSON.stringify(payload, null, 2));
+    renameSync(tmpPath, path);
     console.warn(
       `[review-status] journal write failed for ${issueId} — durable verdict written to workspace fallback ${path}; the host sweeps it on the next status read (PAN-2583)`,
     );
@@ -197,10 +202,8 @@ function writeWorkspaceVerdictFallbackSync(issueId: string, status: ReviewStatus
   }
 }
 
-function readWorkspaceVerdictFallbackSync(issueId: string): WorkspaceVerdictFallback | null {
+function parseWorkspaceVerdictFallback(path: string): WorkspaceVerdictFallback | null {
   try {
-    const path = workspaceVerdictFallbackPath(issueId);
-    if (!path || !existsSync(path)) return null;
     const parsed = JSON.parse(readFileSync(path, 'utf-8')) as WorkspaceVerdictFallback;
     if (!parsed?.updatedAt || !parsed.pipeline) return null;
     const clearedFields = Array.isArray(parsed.clearedFields)
@@ -208,6 +211,82 @@ function readWorkspaceVerdictFallbackSync(issueId: string): WorkspaceVerdictFall
           typeof field === 'string' && (FALLBACK_CLEARABLE_FIELDS as readonly string[]).includes(field))
       : [];
     return { ...parsed, clearedFields };
+  } catch {
+    return null;
+  }
+}
+
+function isPidAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * A process that crashed mid-drain leaves its claimed generation beside the
+ * live path (`<fallback>.drain-<pid>-<n>`). A claim owned by a dead pid belongs
+ * to nobody — hand it back to the live path so the verdict is not stranded.
+ */
+function recoverStrandedDrainClaimsSync(livePath: string): void {
+  try {
+    const prefix = `${basename(livePath)}.drain-`;
+    for (const entry of readdirSync(dirname(livePath))) {
+      if (!entry.startsWith(prefix)) continue;
+      const pid = Number(entry.slice(prefix.length).split('-')[0]);
+      if (Number.isInteger(pid) && pid > 0 && isPidAlive(pid)) continue;
+      try {
+        renameSync(join(dirname(livePath), entry), livePath);
+      } catch {
+        // Raced another recovery or a fresh write; the generation still exists.
+      }
+      return; // one generation back at the live path is enough
+    }
+  } catch {
+    // Best effort — a stranded claim is recovered on a later pass.
+  }
+}
+
+let drainClaimCounter = 0;
+
+/**
+ * Claim the live fallback generation by renaming it aside (atomic same-dir
+ * rename), so a concurrent verdict write creates a NEW generation at the live
+ * path instead of being check-then-deleted mid-fold. Review finding: a drain
+ * that deletes the shared path after awaiting the record write can remove a
+ * newer fallback written while it was suspended.
+ */
+function claimWorkspaceVerdictFallbackSync(
+  issueId: string,
+): { claimPath: string; fallback: WorkspaceVerdictFallback } | null {
+  const path = workspaceVerdictFallbackPath(issueId);
+  if (!path) return null;
+  recoverStrandedDrainClaimsSync(path);
+  if (!existsSync(path)) return null;
+  drainClaimCounter += 1;
+  const claimPath = `${path}.drain-${process.pid}-${drainClaimCounter}`;
+  try {
+    renameSync(path, claimPath);
+  } catch {
+    return null; // another drain claimed it first; that drain owns the generation
+  }
+  const fallback = parseWorkspaceVerdictFallback(claimPath);
+  if (!fallback) {
+    rmSync(claimPath, { force: true });
+    return null;
+  }
+  return { claimPath, fallback };
+}
+
+function readWorkspaceVerdictFallbackSync(issueId: string): WorkspaceVerdictFallback | null {
+  try {
+    const path = workspaceVerdictFallbackPath(issueId);
+    if (!path) return null;
+    recoverStrandedDrainClaimsSync(path);
+    if (!existsSync(path)) return null;
+    return parseWorkspaceVerdictFallback(path);
   } catch {
     return null;
   }
@@ -227,15 +306,18 @@ const drainTimers = new Map<string, NodeJS.Timeout>();
  * the same rule readJournalStatusSync uses — so a journal that already moved past
  * the fallback just cleans up the file. Returns true when no fallback remains
  * pending (drained, superseded, or never written).
+ *
+ * Generation-aware: the drain claims exactly the generation it read via an
+ * atomic rename and deletes only that claim. A newer fallback written while the
+ * record write was in flight stays at the live path for its own drain schedule.
  */
 export async function drainWorkspaceVerdictFallback(issueId: string): Promise<boolean> {
-  const fallback = readWorkspaceVerdictFallbackSync(issueId);
-  if (!fallback) return true;
-  const path = workspaceVerdictFallbackPath(issueId);
-  if (!path) return false;
+  const claimed = claimWorkspaceVerdictFallbackSync(issueId);
+  if (!claimed) return true;
+  const { claimPath, fallback } = claimed;
   const journal = readPipelineSync(issueId);
   if (journal?.updatedAt && !(journal.updatedAt < fallback.updatedAt)) {
-    rmSync(path, { force: true });
+    rmSync(claimPath, { force: true });
     return true;
   }
   // projectPipeline projects only from the ReviewStatus, so fields the fallback
@@ -247,8 +329,24 @@ export async function drainWorkspaceVerdictFallback(issueId: string): Promise<bo
     readyForMerge: false, // derived on read; the stored value is never consulted
   } as ReviewStatus;
   const landed = await updateIssueRecordForIssue(issueId, status);
-  if (landed) rmSync(path, { force: true });
-  return landed;
+  if (landed) {
+    rmSync(claimPath, { force: true });
+    return true;
+  }
+  // The fold failed: hand the claimed generation back to the live path unless a
+  // newer generation replaced it there while we awaited — the newer one carries
+  // the newer verdict and its own drain schedule is already armed.
+  const livePath = workspaceVerdictFallbackPath(issueId);
+  if (livePath && !existsSync(livePath)) {
+    try {
+      renameSync(claimPath, livePath);
+      return false;
+    } catch {
+      // Raced a concurrent write; fall through to dropping the older claim.
+    }
+  }
+  rmSync(claimPath, { force: true });
+  return false;
 }
 
 /** Track a fire-and-forget drain so short-lived CLIs await it before exit. */
