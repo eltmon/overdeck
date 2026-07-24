@@ -6,7 +6,15 @@ import { join } from 'node:path';
 import { Effect } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
-import { messageAgent } from '../../../../lib/agents.js';
+import { getAgentState, messageAgent } from '../../../../lib/agents.js';
+import {
+  ComposerCommandParseError,
+  parseOverdeckComposerCommand,
+} from '../../../../lib/composer-commands/parser.js';
+import {
+  composerCommandResultHttpStatus,
+  handleComposerCommand,
+} from '../../../../lib/composer-commands/router.js';
 import { jsonResponse } from '../../http-helpers.js';
 import { httpHandler } from '../http-handler.js';
 import { validateOrigin } from '../origin-validation.js';
@@ -26,6 +34,39 @@ async function sendAgentMessage(id: string, message: string) {
 
   await messageAgent(id, message, 'dashboard:user-message');
   return isRemote ? { success: true, remote: true } : { success: true };
+}
+
+export async function handleAgentMessage(id: string, message: string) {
+  try {
+    const parsed = parseOverdeckComposerCommand(message);
+    if (parsed !== null) {
+      const agentState = await Effect.runPromise(
+        getAgentState(id).pipe(Effect.catch(() => Effect.succeed(null))),
+      );
+      const result = await handleComposerCommand({
+        parsed,
+        target: {
+          kind: 'agent',
+          id,
+          harness: agentState?.harness ?? 'claude-code',
+          cwd: agentState?.workspace,
+          issueId: agentState?.issueId,
+        },
+      });
+      return jsonResponse(result, { status: composerCommandResultHttpStatus(result) });
+    }
+  } catch (error) {
+    if (!(error instanceof ComposerCommandParseError)) throw error;
+    const status = error.code === 'unknown-command' ? 404 : error.code === 'unknown-flag' ? 422 : 400;
+    return jsonResponse({
+      error: error.message,
+      code: error.code,
+      token: error.token,
+      expected: error.expected,
+    }, { status });
+  }
+
+  return jsonResponse(await sendAgentMessage(id, message));
 }
 
 export function validateAgentMessageOrigin(request: HttpServerRequest.HttpServerRequest) {
@@ -57,9 +98,7 @@ function postAgentMessageLikeRoute(path: `/${string}`) {
         return jsonResponse({ error: 'Message required' }, { status: 400 });
       }
 
-      return yield* Effect.promise(() => sendAgentMessage(id, message)).pipe(
-        Effect.map((result) => jsonResponse(result)),
-      );
+      return yield* Effect.promise(() => handleAgentMessage(id, message));
     })),
   );
 }
