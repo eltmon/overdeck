@@ -22,6 +22,56 @@ import {
 
 const execFileAsync = promisify(execFile);
 const MAX_STATE_PUSH_RECONCILIATIONS = 3;
+const DEFAULT_RECORD_DURABILITY_BUDGET_MS = 30_000;
+
+export class RecordDurabilityTimeoutError extends Error {
+  constructor(issueId: string, budgetMs: number) {
+    super(
+      `Durability wait for ${issueId} state exceeded ${budgetMs}ms; releasing the record ` +
+      `lock. The mutation remains in the local record and the flush continues in the ` +
+      `background; the verdict fallback and drain reconcile cross-machine durability.`,
+    );
+    this.name = 'RecordDurabilityTimeoutError';
+  }
+}
+
+function recordDurabilityBudgetMs(): number {
+  const parsed = Number(process.env.OVERDECK_RECORD_DURABILITY_BUDGET_MS);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_RECORD_DURABILITY_BUDGET_MS;
+}
+
+// Race `promise` against the shared deadline WITHOUT aborting it: a timing-out writer
+// must not cancel peers' shared-gitRoot flushes. `onTimeout` runs best-effort cleanup
+// (e.g. abortRebase) before the rejection propagates.
+async function withRecordDurabilityDeadline<T>(
+  issueId: string,
+  promise: Promise<T>,
+  deadlineMs: number,
+  budgetMs: number,
+  onTimeout?: () => Promise<void>,
+): Promise<T> {
+  const remaining = deadlineMs - Date.now();
+  if (remaining <= 0) {
+    await onTimeout?.().catch(() => undefined);
+    throw new RecordDurabilityTimeoutError(issueId, budgetMs);
+  }
+  let timer: NodeJS.Timeout | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<never>((_resolve, reject) => {
+        timer = setTimeout(() => {
+          void (onTimeout?.() ?? Promise.resolve())
+            .catch(() => undefined)
+            .finally(() => reject(new RecordDurabilityTimeoutError(issueId, budgetMs)));
+        }, remaining);
+        timer.unref?.();
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
 
 export interface UpdateIssueRecordOptions {
   writerId?: string;
@@ -215,16 +265,32 @@ export async function updateIssueRecord(
       return readIssueRecordSync(project, normalizedIssueId) ?? next;
     }
 
+    const budgetMs = recordDurabilityBudgetMs();
+    const deadlineMs = Date.now() + budgetMs;
     try {
       const commitRoot = queueIssueRecordCommit(project, normalizedIssueId, path);
       // Start and await the explicit flush while the issue lock is held. No second
       // writer may observe the local terminal state before its durability outcome
       // is known, and the queue's zero-delay timer cannot consume this batch first.
-      const flushed = await Effect.runPromise(flushAutoCommits(commitRoot));
+      // The wait is bounded (PAN-2989): a stalled push must not starve peer writers
+      // for minutes — on timeout the lock releases and the flush continues in the
+      // background.
+      const flushed = await withRecordDurabilityDeadline(
+        normalizedIssueId,
+        Effect.runPromise(flushAutoCommits(commitRoot)),
+        deadlineMs,
+        budgetMs,
+      );
       if (flushed.pushed === false) {
         const stateHome = resolveStateReadHomeSync(project);
         if (stateHome.migrated && isRemoteRefRaceError(flushed.reason ?? '')) {
-          return await reconcileStatePush(project, normalizedIssueId, mutator, path);
+          return await withRecordDurabilityDeadline(
+            normalizedIssueId,
+            reconcileStatePush(project, normalizedIssueId, mutator, path),
+            deadlineMs,
+            budgetMs,
+            () => abortRebase(resolveStateReadHomeSync(project).root),
+          );
         }
         throw new Error(`Failed to push ${normalizedIssueId} state: ${flushed.reason ?? 'unknown push failure'}`);
       }
@@ -234,9 +300,18 @@ export async function updateIssueRecord(
 
       return readIssueRecordSync(project, normalizedIssueId) ?? next;
     } catch (error) {
+      // Never restore on a durability timeout (PAN-2989): the background flush may
+      // still land the commit, so rewinding to the pre-mutation snapshot would race it.
+      if (error instanceof RecordDurabilityTimeoutError) throw error;
       try {
-        await restoreRetryableRecord(project, normalizedIssueId, original, path);
+        await withRecordDurabilityDeadline(
+          normalizedIssueId,
+          restoreRetryableRecord(project, normalizedIssueId, original, path),
+          deadlineMs,
+          budgetMs,
+        );
       } catch (restoreError) {
+        if (restoreError instanceof RecordDurabilityTimeoutError) throw restoreError;
         throw new Error(
           `Failed to persist ${normalizedIssueId} state and restore retryability: ${gitFailureMessage(restoreError)}`,
           { cause: error },
