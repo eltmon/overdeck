@@ -60,7 +60,7 @@
     "recordedAt": "2026-07-24T18:23:54.613Z"
   },
   "created": "2026-07-24T17:28:09.122Z",
-  "updated": "2026-07-24T18:43:19.982Z",
+  "updated": "2026-07-24T18:43:22.168Z",
   "pipeline": {
     "issueId": "PAN-3021",
     "reviewStatus": "passed",
@@ -70,7 +70,6 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "panDoneRecoveredAt": "2026-07-24T18:25:23.151Z",
     "updatedAt": "2026-07-24T18:43:19.968Z",
     "reviewNotes": "Approved d110b0b2: command registry generation, composer integration, no-loss gate, security, and performance checks pass",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
