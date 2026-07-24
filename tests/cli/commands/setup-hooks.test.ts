@@ -17,7 +17,7 @@ import { mkdtempSync, readFileSync, rmSync, existsSync, writeFileSync, readdirSy
 import { tmpdir } from 'os';
 import { join, basename } from 'path';
 import {
-  readSettingsOrAbortSync,
+  readSettingsOrAbort,
   backupSettingsSync,
   pruneBackupsSync,
   atomicWriteJsonSync,
@@ -30,31 +30,31 @@ function makeTempDir(): { dir: string; cleanup: () => void } {
   return { dir, cleanup: () => rmSync(dir, { recursive: true, force: true }) };
 }
 
-describe('readSettingsOrAbortSync', () => {
+describe('readSettingsOrAbort', () => {
   let h: ReturnType<typeof makeTempDir>;
   beforeEach(() => { h = makeTempDir(); });
   afterEach(() => h.cleanup());
 
-  it('returns parsed object for a valid settings.json', () => {
+  it('returns parsed object for a valid settings.json', async () => {
     const path = join(h.dir, 'settings.json');
     writeFileSync(path, JSON.stringify({ theme: 'dark', statusLine: { type: 'command' } }), 'utf-8');
-    const result = readSettingsOrAbortSync(path);
+    const result = await readSettingsOrAbort(path);
     expect(result).toEqual({ theme: 'dark', statusLine: { type: 'command' } });
   });
 
-  it('returns empty object when the file does not exist (fresh install)', () => {
+  it('returns empty object when the file does not exist (fresh install)', async () => {
     const path = join(h.dir, 'settings.json');
-    expect(readSettingsOrAbortSync(path)).toEqual({});
+    await expect(readSettingsOrAbort(path)).resolves.toEqual({});
   });
 
-  it('PAN-1137: aborts with non-zero exit on parse failure rather than resetting to {}', () => {
+  it('PAN-1137: aborts with non-zero exit on parse failure rather than resetting to {}', async () => {
     const path = join(h.dir, 'settings.json');
     writeFileSync(path, '{ "hooks": {', 'utf-8'); // truncated, unparseable
     const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {
       throw new Error('__process_exit_called__');
     });
     const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    expect(() => readSettingsOrAbortSync(path)).toThrow('__process_exit_called__');
+    await expect(readSettingsOrAbort(path)).rejects.toThrow('__process_exit_called__');
     expect(exitSpy).toHaveBeenCalledWith(1);
 
     // Critical: the corrupt file was NOT overwritten or truncated by the
@@ -65,7 +65,7 @@ describe('readSettingsOrAbortSync', () => {
     errSpy.mockRestore();
   });
 
-  it('PAN-1137: error message points at the file and any existing backup', () => {
+  it('PAN-1137: error message points at the file and any existing backup', async () => {
     const path = join(h.dir, 'settings.json');
     writeFileSync(path, '{ "hooks": {', 'utf-8');
     const backupPath = `${path}.pan-backup-2026-05-15T12-00-00-000Z`;
@@ -76,7 +76,7 @@ describe('readSettingsOrAbortSync', () => {
     });
     const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-    expect(() => readSettingsOrAbortSync(path)).toThrow('__exit__');
+    await expect(readSettingsOrAbort(path)).rejects.toThrow('__exit__');
     const calls = errSpy.mock.calls.map((c) => c.join(' ')).join('\n');
     expect(calls).toContain('not valid JSON');
     expect(calls).toContain(backupPath);
@@ -167,7 +167,7 @@ describe('PAN-1137 round-trip: unknown top-level keys survive', () => {
   beforeEach(() => { h = makeTempDir(); });
   afterEach(() => h.cleanup());
 
-  it('preserves statusLine, theme, mcpServers, and other custom keys', () => {
+  it('preserves statusLine, theme, mcpServers, and other custom keys', async () => {
     const path = join(h.dir, 'settings.json');
     const original = {
       statusLine: { type: 'command', command: '/home/eltmon/.claude/statusline.sh', padding: 0 },
@@ -182,7 +182,7 @@ describe('PAN-1137 round-trip: unknown top-level keys survive', () => {
     writeFileSync(path, JSON.stringify(original, null, 2), 'utf-8');
 
     // Simulate the installer mutation: read, touch a hook, atomic-write.
-    const settings = readSettingsOrAbortSync(path);
+    const settings = await readSettingsOrAbort(path);
     if (!settings['hooks']) settings['hooks'] = {};
     settings['hooks'].SessionStart = [
       { matcher: '.*', hooks: [{ type: 'command', command: '/home/eltmon/.overdeck/bin/session-start-hook' }] },

@@ -8,7 +8,7 @@ import { ensureCompatibleNode } from './node-preflight.js'; import { drainPendin
 // Relaunch under a compatible Node (>=22) before anything else runs. If the
 // current runtime is already Node 22+ this is a no-op; otherwise it re-execs the
 // CLI under an installed Node 22+, or exits with a specific fix command.
-ensureCompatibleNode();
+await ensureCompatibleNode();
 
 // Load ~/.overdeck.env before any other imports
 // This makes API keys and other env vars available to all commands
@@ -127,7 +127,7 @@ import { openCommand } from './commands/open.js';
 import { registerFlywheelCommands } from './commands/flywheel.js';
 import { registerMergeCommands } from './commands/merge.js';
 import { registerArtifactCommands } from './commands/artifacts.js';
-import { registerSwarmCommands } from './commands/swarm.js'; import { registerTaskCommands } from './commands/task.js';
+import { registerSwarmCommands } from './commands/swarm.js'; import { registerTaskCommands } from './commands/task.js'; import { exitCli, runCliWithTelemetry } from './telemetry.js';
 
 // Pre-parse --yolo from argv so it works regardless of position relative to the
 // subcommand. Commander's enablePositionalOptions() routes post-subcommand options
@@ -408,12 +408,12 @@ backlog
       raw = JSON.parse(readFileSync(file, 'utf-8'));
     } catch (e: any) {
       console.error(chalk.red(`Error: could not read ${file}: ${e.message}`));
-      process.exit(1);
+      return exitCli(1);
     }
     const result = parseSequenceJson(raw);
     if (!result.ok) {
       console.error(chalk.red(`Validation error: ${result.error}`));
-      process.exit(1);
+      return exitCli(1);
     }
     writeSequenceMd(projectRoot, result.doc);
     console.log(chalk.green(`✓ Wrote .pan/backlog/sequence.md (${result.doc.nodes.length} nodes, pass=${result.doc.pass})`));
@@ -857,7 +857,7 @@ program
     if (!isProduction && !isDevelopment) {
       console.error(chalk.red('Error: Dashboard not found'));
       console.error(chalk.dim('This may be a corrupted installation. Try reinstalling @overdeck/core.'));
-      process.exit(1);
+      return exitCli(1);
     }
 
     // Check npm is available (only needed for development mode)
@@ -867,7 +867,7 @@ program
       } catch {
         console.error(chalk.red('Error: npm not found in PATH'));
         console.error(chalk.dim('Make sure Node.js and npm are installed and in your PATH'));
-        process.exit(1);
+        return exitCli(1);
       }
     }
 
@@ -1026,10 +1026,10 @@ program
 
       // Handle spawn errors before unref
       let hasError = false;
-      child.on('error', (err) => {
+      child.on('error', async (err) => {
         hasError = true;
         console.error(chalk.red('Failed to start dashboard in background:'), err.message);
-        process.exit(1);
+        return exitCli(1);
       });
 
       // Small delay to catch immediate spawn errors
@@ -1094,9 +1094,9 @@ program
             },
           });
 
-      child.on('error', (err) => {
+      child.on('error', async (err) => {
         console.error(chalk.red('Failed to start dashboard:'), err.message);
-        process.exit(1);
+        return exitCli(1);
       });
 
       let readyUrl: string;
@@ -1371,7 +1371,7 @@ program
     if (!existsSync(bundledServer) || !existsSync(bundledFrontendIndex)) {
       console.error(chalk.red('Error: Dashboard bundle not found.'));
       console.error(chalk.dim('This package may not be fully built. Try: npm run build'));
-      process.exit(1);
+      return exitCli(1);
     }
 
     console.log(chalk.bold('Overdeck Dashboard'));
@@ -1382,9 +1382,9 @@ program
       env: { ...process.env, PORT: String(port), OVERDECK_INTERNAL_TOKEN: internalToken },
     });
 
-    server.on('error', (err) => {
+    server.on('error', async (err) => {
       console.error(chalk.red('Failed to start dashboard:'), err.message);
-      process.exit(1);
+      return exitCli(1);
     });
 
     // Open browser after server has had a moment to start
@@ -1411,4 +1411,4 @@ if (process.argv.length === 2) {
 }
 
 // Short-lived commands must drain durable state writes before exit (PAN-2692).
-await program.parseAsync(process.argv, { from: 'node' }).finally(drainPendingDurableWrites);
+await runCliWithTelemetry(() => program.parseAsync(process.argv, { from: 'node' }), drainPendingDurableWrites);

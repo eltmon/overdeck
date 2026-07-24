@@ -1,5 +1,5 @@
 import { X, Trash2 } from 'lucide-react';
-import posthog from 'posthog-js';
+import { bucketCount, capture } from '../lib/telemetry';
 
 interface BulkActionBarProps {
   count: number;
@@ -30,7 +30,7 @@ export function BulkActionBar({ count, onCloseOut, onCancel }: BulkActionBarProp
         <div className="w-px h-5 bg-border" />
         <button
           onClick={() => {
-            posthog.capture('bulk_close_out_initiated', { issue_count: count });
+            capture('bulk_close_out_initiated', { issue_count: bucketCount(count) });
             onCloseOut();
           }}
           className="inline-flex items-center gap-1.5 h-9 rounded-lg bg-destructive px-3 text-sm font-medium text-destructive-foreground transition-shadow duration-200 hover:shadow-xs/5 focus-visible:ring-[3px] focus-visible:ring-ring/24 focus-visible:ring-offset-1"

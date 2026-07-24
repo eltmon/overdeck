@@ -81,7 +81,7 @@ import { createOverdeckDatabase } from '../../../scripts/create-overdeck-db.js';
 import { getOverdeckDatabasePath } from '../../lib/overdeck/paths.js';
 import { ProjectsLive } from '../../lib/overdeck/config.js';
 import { RecordsLive, TmuxLive } from '../../lib/overdeck/infra.js';
-import { getAgentSessionsSync } from '../../lib/tmux.js';
+import { startServerBootTelemetry } from './telemetry.js';
 import { isSmeeConfiguredSync, startSmeeProcessSync } from '../../lib/smee.js';
 import { flushAllPendingAutoCommits } from '../../lib/pan-dir/auto-commit.js';
 import { listProjectsSync } from '../../lib/projects.js';
@@ -147,6 +147,7 @@ if (typeof Bun !== 'undefined') {
   runMain(main as never);
 }
 await whenDashboardListening();
+startServerBootTelemetry();
 
 startEventLoopMonitor();
 console.log('[overdeck] Event loop delay monitor started');

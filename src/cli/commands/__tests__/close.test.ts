@@ -66,8 +66,8 @@ describe('closeOutCommand', () => {
     vi.stubEnv('OVERDECK_AGENT_ID', '');
     vi.spyOn(console, 'log').mockImplementation(() => {});
     vi.spyOn(console, 'error').mockImplementation(() => {});
-    // closeOutCommand calls process.exit(0) on success (PAN-1621). Stub it with
-    // an explicit throw so the promise rejection remains observable in Vitest.
+    // closeOutCommand reaches the async exit door on success (PAN-1621). Stub
+    // the final native exit so the promise rejection remains observable in Vitest.
     vi.spyOn(process, 'exit').mockImplementation(((code?: number) => {
       throw new Error(`process.exit unexpectedly called with "${code}"`);
     }) as never);
