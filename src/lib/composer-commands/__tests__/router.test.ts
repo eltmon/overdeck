@@ -9,8 +9,18 @@ const mocks = vi.hoisted(() => ({
     injectsPromptTimeMemory: false,
     transcriptKind: 'claude-jsonl',
   })),
+  runCapturedCommand: vi.fn(async (argv: readonly string[]) => ({
+    kind: 'captured' as const,
+    status: 'completed' as const,
+    command: `/pan ${argv.join(' ')}`,
+    output: 'captured output',
+    truncated: false,
+  })),
 }));
 
+vi.mock('../executors.js', () => ({
+  runCapturedCommand: mocks.runCapturedCommand,
+}));
 vi.mock('../../overdeck/conversations.js', () => ({
   getConversationByName: mocks.getConversationByName,
   setConversationClaudeSessionId: vi.fn(),
@@ -101,10 +111,11 @@ describe('conversation composer command routing', () => {
     );
     const body = decodeJsonResponse(response);
 
-    expect(response.status).toBe(422);
+    expect(response.status).toBe(200);
     expect(body).toMatchObject({
-      kind: 'terminal-only',
-      status: 'rejected',
+      kind: 'captured',
+      status: 'completed',
+      command: '/pan status',
     });
     expect(deps.shouldInterceptManualCompact).not.toHaveBeenCalled();
     expect(deps.transformMessageForHarness).not.toHaveBeenCalled();
@@ -171,7 +182,7 @@ describe('conversation composer command routing', () => {
     );
   });
 
-  it('returns the router fail-closed result until registered executors land', async () => {
+  it('dispatches captured policies with the canonical argv', async () => {
     const parsed = parseOverdeckComposerCommand('/pan status');
     expect(parsed).not.toBeNull();
 
@@ -182,10 +193,11 @@ describe('conversation composer command routing', () => {
         id: conversation.name,
         harness: conversation.harness,
       },
-    })).resolves.toEqual({
-      kind: 'terminal-only',
-      status: 'rejected',
-      message: '/pan status is recognized as a captured command, but its composer executor is not registered yet. Run it in a terminal for now.',
+    })).resolves.toMatchObject({
+      kind: 'captured',
+      status: 'completed',
+      command: '/pan status',
     });
+    expect(mocks.runCapturedCommand).toHaveBeenCalledWith(['status']);
   });
 });
