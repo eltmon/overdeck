@@ -1,6 +1,6 @@
 import type { ChildProcess } from 'node:child_process';
 import { EventEmitter } from 'node:events';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { access, mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -77,6 +77,49 @@ describe('detached composer command execution', () => {
     await resultPromise;
     expect(spawnPanCli.mock.calls[0][0]).toEqual(['plan', 'PAN-42', '--auto']);
     child.emit('close', 0, null);
+  });
+
+  it.each([
+    ['start', '../../../escaped'],
+    ['start', '/tmp/escaped'],
+    ['start', 'PAN-42/../../escaped'],
+    ['start', '..\\..\\escaped'],
+    ['plan', '../../../escaped'],
+    ['plan', '/tmp/escaped'],
+    ['plan', 'PAN-42/../../escaped'],
+    ['plan', '..\\..\\escaped'],
+  ])('rejects /pan %s issue path traversal before filesystem access or spawn', async (command, issueId) => {
+    const spawnPanCli = vi.fn();
+
+    await expect(runDetachedCommand([command, issueId], {
+      overdeckHome,
+      spawnPanCli,
+    })).resolves.toEqual({
+      kind: 'terminal-only',
+      status: 'rejected',
+      message: `/pan ${command} requires a canonical issue ID such as PAN-1525.`,
+    });
+
+    expect(spawnPanCli).not.toHaveBeenCalled();
+    await expect(access(join(overdeckHome, 'agents'))).rejects.toMatchObject({ code: 'ENOENT' });
+  });
+
+  it('rejects an unsafe agent session name at the detached launcher boundary', async () => {
+    const spawnPanCli = vi.fn();
+
+    await expect(launchPanCommandDetached({
+      agentSessionName: '../escaped',
+      issueId: 'PAN-42',
+      role: 'work',
+      workspacePath: '/tmp/pan-42',
+      args: ['start', 'PAN-42'],
+    }, {
+      overdeckHome,
+      spawnPanCli,
+    })).rejects.toThrow('Agent ID must be a single filesystem-safe path segment.');
+
+    expect(spawnPanCli).not.toHaveBeenCalled();
+    await expect(access(join(overdeckHome, 'agents'))).rejects.toMatchObject({ code: 'ENOENT' });
   });
 
   it('preserves the route helper contract by awaiting successful completion', async () => {

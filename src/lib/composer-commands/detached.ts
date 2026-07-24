@@ -1,8 +1,9 @@
 import type { ChildProcess } from 'node:child_process';
 import { appendFile, mkdir, open, readFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { isAbsolute, join, resolve } from 'node:path';
 
 import type { ComposerCommandResult } from '@overdeck/contracts';
+import { parseIssueIdSync } from '../issue-id.js';
 import { spawnPanCli } from '../pan-cli-invocation.js';
 import { getOverdeckHome } from '../paths.js';
 
@@ -26,13 +27,27 @@ export interface DetachedPanCommandDependencies {
   spawnPanCli?: typeof spawnPanCli;
 }
 
+function resolveAgentDirectory(overdeckHome: string, agentId: string): string {
+  if (
+    agentId.length === 0 ||
+    agentId === '.' ||
+    agentId === '..' ||
+    agentId.includes('/') ||
+    agentId.includes('\\') ||
+    isAbsolute(agentId)
+  ) {
+    throw new Error('Agent ID must be a single filesystem-safe path segment.');
+  }
+  return join(resolve(overdeckHome, 'agents'), agentId);
+}
+
 export async function appendAgentLifecycleLog(
   agentId: string,
   event: string,
   details: Record<string, unknown> = {},
   overdeckHome = getOverdeckHome(),
 ): Promise<void> {
-  const agentDir = join(overdeckHome, 'agents', agentId);
+  const agentDir = resolveAgentDirectory(overdeckHome, agentId);
   await mkdir(agentDir, { recursive: true });
   const logLine = JSON.stringify({
     ts: new Date().toISOString(),
@@ -50,7 +65,7 @@ export async function launchPanCommandDetached(
   const cwd = input.cwd ?? workspacePath;
   const overdeckHome = dependencies.overdeckHome ?? getOverdeckHome();
   const activityId = `activity-${(dependencies.now ?? Date.now)()}`;
-  const agentDir = join(overdeckHome, 'agents', agentSessionName);
+  const agentDir = resolveAgentDirectory(overdeckHome, agentSessionName);
   await mkdir(agentDir, { recursive: true });
   const spawnLogPath = join(agentDir, 'spawn.log');
   const spawnLogHandle = await open(spawnLogPath, 'a');
@@ -188,9 +203,17 @@ export async function runDetachedCommand(
   argv: string[],
   dependencies: DetachedPanCommandDependencies = {},
 ): Promise<ComposerCommandResult> {
-  const issueId = argv[1] ?? 'unknown issue';
+  const issueId = argv[1] ?? '';
+  const parsedIssueId = parseIssueIdSync(issueId);
+  if (!parsedIssueId) {
+    return {
+      kind: 'terminal-only',
+      status: 'rejected',
+      message: `/pan ${argv[0] ?? 'command'} requires a canonical issue ID such as PAN-1525.`,
+    };
+  }
   const role = argv[0] === 'plan' ? 'plan' : 'work';
-  const agentSessionName = `${role === 'plan' ? 'planning' : 'agent'}-${issueId.toLowerCase()}`;
+  const agentSessionName = `${role === 'plan' ? 'planning' : 'agent'}-${parsedIssueId.normalized}`;
   const launch = await launchPanCommandDetached({
     agentSessionName,
     issueId,
