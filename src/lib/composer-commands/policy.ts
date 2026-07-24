@@ -10,8 +10,18 @@ export const COMPOSER_COMMAND_POLICIES: Readonly<Record<string, ComposerCommandP
   show: { mode: 'captured', safety: 'safe' },
   status: { mode: 'captured', safety: 'safe' },
   tell: { mode: 'captured', safety: 'safe' },
-  handoff: { mode: 'ui', safety: 'dialog', uiAction: 'handoff' },
-  fork: { mode: 'ui', safety: 'dialog', uiAction: 'fork' },
+  handoff: {
+    mode: 'ui',
+    safety: 'dialog',
+    uiAction: 'handoff',
+    confirmationText: 'This opens the handoff dialog for the selected conversation. Review the destination and focus before continuing.',
+  },
+  fork: {
+    mode: 'ui',
+    safety: 'dialog',
+    uiAction: 'fork',
+    confirmationText: 'This opens the fork dialog for the selected conversation. Review the fork mode and destination before continuing.',
+  },
 };
 
 const DEFAULT_POLICY: ComposerCommandPolicy = {

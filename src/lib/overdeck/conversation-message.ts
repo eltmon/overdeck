@@ -13,6 +13,10 @@ import { getHarnessBehavior } from '../runtimes/behavior.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import { captureTranscriptUserRecordSnapshot } from '../transcript-landing.js';
 import { deliverAgentMessage, injectPiConversationMemory } from '../agents.js';
+import {
+  ComposerCommandConfirmationError,
+  composerCommandConfirmationFromBody,
+} from '../composer-commands/confirmations.js';
 import { ComposerCommandParseError } from '../composer-commands/parser.js';
 import {
   composerCommandResultHttpStatus,
@@ -413,6 +417,7 @@ export async function handleConversationMessage(
   try {
     const result = await handleComposerCommandMessage({
       message,
+      confirmation: composerCommandConfirmationFromBody(body),
       target: {
         kind: 'conversation',
         id: conv.name,
@@ -425,6 +430,12 @@ export async function handleConversationMessage(
       return jsonResponse(result, { status: composerCommandResultHttpStatus(result) });
     }
   } catch (error) {
+    if (error instanceof ComposerCommandConfirmationError) {
+      return jsonResponse({
+        error: error.message,
+        code: error.code,
+      }, { status: 422 });
+    }
     if (!(error instanceof ComposerCommandParseError)) throw error;
     const status = error.code === 'unknown-command' ? 404 : error.code === 'unknown-flag' ? 422 : 400;
     return jsonResponse({

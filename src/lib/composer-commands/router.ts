@@ -3,6 +3,11 @@ import type {
   ComposerCommandResult,
 } from '@overdeck/contracts';
 import type { RuntimeName } from '../runtimes/types.js';
+import {
+  composerConfirmationStore,
+  type ComposerCommandConfirmationInput,
+  type ComposerConfirmationStore,
+} from './confirmations.js';
 import { runDetachedCommand } from './detached.js';
 import { runCapturedCommand } from './executors.js';
 import {
@@ -22,11 +27,18 @@ export interface ComposerCommandTarget {
 export interface HandleComposerCommandInput {
   parsed: ParsedOverdeckComposerCommand;
   target: ComposerCommandTarget;
+  confirmation?: ComposerCommandConfirmationInput;
 }
 
 export interface HandleComposerCommandMessageInput {
   message: string;
   target: ComposerCommandTarget;
+  confirmation?: ComposerCommandConfirmationInput;
+}
+
+export interface ComposerCommandRouterDependencies {
+  confirmationStore?: ComposerConfirmationStore;
+  resolvePolicy?: (path: readonly string[]) => ComposerCommandPolicy;
 }
 
 const UI_COMMAND_PATTERNS = [
@@ -50,23 +62,52 @@ export function isComposerCommandMessage(message: string): boolean {
 export async function handleComposerCommandMessage({
   message,
   target,
-}: HandleComposerCommandMessageInput): Promise<ComposerCommandResult | null> {
+  confirmation,
+}: HandleComposerCommandMessageInput, dependencies: ComposerCommandRouterDependencies = {}): Promise<ComposerCommandResult | null> {
   for (const { action, pattern } of UI_COMMAND_PATTERNS) {
     const match = message.match(pattern);
-    if (match) return uiCommandResult(action, match[1]?.trim());
+    if (match) {
+      const parsed = parseOverdeckComposerCommand(`/pan ${action}`)!;
+      const focus = match[1]?.trim();
+      if (focus) parsed.argv.push(focus);
+      return handleComposerCommand(
+        { parsed, target, confirmation },
+        dependencies,
+      );
+    }
   }
 
   const parsed = parseOverdeckComposerCommand(message);
   if (parsed === null) return null;
-  return handleComposerCommand({ parsed, target });
+  return handleComposerCommand(
+    { parsed, target, confirmation },
+    dependencies,
+  );
 }
 
 export async function handleComposerCommand({
   parsed,
   target,
-}: HandleComposerCommandInput): Promise<ComposerCommandResult> {
-  const policy = resolvePolicy(parsed.entry.path);
-  void target;
+  confirmation,
+}: HandleComposerCommandInput, dependencies: ComposerCommandRouterDependencies = {}): Promise<ComposerCommandResult> {
+  const policy = (dependencies.resolvePolicy ?? resolvePolicy)(parsed.entry.path);
+  if (policy.safety !== 'safe') {
+    const confirmationStore = dependencies.confirmationStore ?? composerConfirmationStore;
+    if (confirmation === undefined) {
+      return confirmationStore.issue({
+        target,
+        argv: parsed.argv,
+        policy,
+        display: parsed.entry.display,
+      });
+    }
+    confirmationStore.consume({
+      target,
+      argv: parsed.argv,
+      policy,
+      confirmation,
+    });
+  }
 
   if (policy.mode === 'captured') {
     return runCapturedCommand(parsed.argv);
