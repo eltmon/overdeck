@@ -169,7 +169,7 @@
     "recordedAt": "2026-07-24T23:08:31.650Z"
   },
   "created": "2026-07-12T09:32:29.900Z",
-  "updated": "2026-07-24T23:12:30.804Z",
+  "updated": "2026-07-24T23:12:32.663Z",
   "pipeline": {
     "issueId": "PAN-1525",
     "reviewStatus": "pending",
@@ -182,7 +182,7 @@
     "updatedAt": "2026-07-24T23:12:30.782Z",
     "inspectNotes": "Composer-command parse+route inserted before compact/transform/delivery in conversation-message.ts with early return; unknown-command maps to 404 naming token + 'Type /pan to list available commands'; terminal-only policy maps to 422 naming exact command display; unprefixed text/pan-start negative control preserves original compact/transform/deliverAgentMessage path. All 4 ACs covered by router.test.ts assertions matching the exact banned-call list.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3033",
-    "reviewRequestedAt": "2026-07-24T23:08:34.316Z",
+    "reviewRequestedAt": "2026-07-24T23:12:31.996Z",
     "reviewSpawnedAt": "2026-07-24T23:08:38.120Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -321,7 +321,8 @@
       ],
       "recordedAt": "2026-07-24T23:08:31.650Z"
     },
-    "strikeRecoveryCount": 0
+    "strikeRecoveryCount": 0,
+    "panDoneRecoveredAt": "2026-07-24T23:12:31.996Z"
   },
   "closeOut": {
     "usage": {
