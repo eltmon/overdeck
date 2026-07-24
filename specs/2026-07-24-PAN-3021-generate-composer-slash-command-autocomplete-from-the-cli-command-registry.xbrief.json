@@ -4,17 +4,17 @@
     "created": "2026-07-24T17:40:00.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3021: Composer slash-command autocomplete is a hand-maintained list drifted 38 commands behind the CLI (strike, swarm, task, approve, merge, flywheel…)",
-    "updated": "2026-07-24T17:36:53.955Z"
+    "updated": "2026-07-24T17:43:59.121Z"
   },
   "plan": {
     "id": "pan-3021",
     "title": "Generate composer slash-command autocomplete from the CLI command registry",
-    "status": "proposed",
+    "status": "approved",
     "uid": "7f3a1c2e-9b4d-4e6a-8c5f-2d1b0a9e8f47",
     "author": "agent:claude-fable-5",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-07-24T17:40:00.000Z",
-    "updated": "2026-07-24T17:36:53.955Z",
+    "updated": "2026-07-24T17:43:59.121Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3021",
@@ -483,5 +483,5 @@
       "canonicalFilename": "2026-07-24-PAN-3021-generate-composer-slash-command-autocomplete-from-the-cli-command-registry.xbrief.json"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
