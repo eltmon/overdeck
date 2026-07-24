@@ -27,7 +27,7 @@
   ],
   "feedback": [],
   "created": "2026-07-12T09:32:29.900Z",
-  "updated": "2026-07-24T19:51:43.923Z",
+  "updated": "2026-07-24T20:10:37.077Z",
   "pipeline": {
     "issueId": "PAN-1525",
     "reviewStatus": "pending",
@@ -95,16 +95,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "frontend-manifest-adapter": {
-        "writerId": "agent-pan-1525",
-        "agentId": "agent-pan-1525",
-        "pid": 1745121,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-24T19:51:43.923Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-1525",
@@ -127,6 +119,17 @@
         "outcome": "completed",
         "reason": "Added shared composer command contracts, generated canonical manifest, deterministic two-output drift gate, manifest tests, documentation, and dashboard CLI-entrypoint bundle guard. Full lint, typecheck, contracts test, dashboard server build, and drift checks pass.",
         "releasedAt": "2026-07-24T19:43:57.193Z"
+      },
+      {
+        "writerId": "agent-pan-1525",
+        "agentId": "agent-pan-1525",
+        "pid": 1745121,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-24T19:51:43.923Z",
+        "itemId": "frontend-manifest-adapter",
+        "outcome": "completed",
+        "reason": "Replaced the retired frontend-generated command list with contracts-manifest-derived /pan suggestions and generated curation variants; added a frozen 262-entry no-loss inventory. Frontend tests, full lint, typecheck, and isolated browser verification pass; selecting /pan start inserts '/pan start ', /model remains visible, and unknown filters hide results.",
+        "releasedAt": "2026-07-24T20:10:37.077Z"
       }
     ],
     "statusReasons": {
@@ -137,6 +140,10 @@
       "contracts-manifest": {
         "reason": "Added shared composer command contracts, generated canonical manifest, deterministic two-output drift gate, manifest tests, documentation, and dashboard CLI-entrypoint bundle guard. Full lint, typecheck, contracts test, dashboard server build, and drift checks pass.",
         "updatedAt": "2026-07-24T19:43:57.193Z"
+      },
+      "frontend-manifest-adapter": {
+        "reason": "Replaced the retired frontend-generated command list with contracts-manifest-derived /pan suggestions and generated curation variants; added a frozen 262-entry no-loss inventory. Frontend tests, full lint, typecheck, and isolated browser verification pass; selecting /pan start inserts '/pan start ', /model remains visible, and unknown filters hide results.",
+        "updatedAt": "2026-07-24T20:10:37.077Z"
       }
     }
   },
@@ -150,6 +157,9 @@
     "contracts-manifest.contracts-manifest.ac2": "completed",
     "contracts-manifest.contracts-manifest.ac3": "completed",
     "contracts-manifest.contracts-manifest.ac4": "completed",
-    "frontend-manifest-adapter": "running"
+    "frontend-manifest-adapter": "completed",
+    "frontend-manifest-adapter.frontend-manifest-adapter.ac1": "completed",
+    "frontend-manifest-adapter.frontend-manifest-adapter.ac2": "completed",
+    "frontend-manifest-adapter.frontend-manifest-adapter.ac3": "completed"
   }
 }
