@@ -12,6 +12,7 @@ import { readAgentHarnessModelRecordSync, writeAgentHarnessModelRecordSync } fro
 import { logAgentLifecycleSync } from '../persistent-logger.js';
 import { recordFeatureRegistryLifecycle } from '../registry/feature-registry-population.js';
 import { normalizeAgentId } from './identity.js';
+import { registerPipelineTelemetryAgentReader } from '../telemetry/pipeline-agent-reader.js';
 
 export type Role = 'plan' | 'work' | 'review' | 'test' | 'ship' | 'flywheel' | 'strike' | 'sequencer' | 'knowledge';
 
@@ -300,6 +301,8 @@ export function getAgentStateSync(agentId: string): AgentState | null {
 
   return state;
 }
+
+registerPipelineTelemetryAgentReader(getAgentStateSync);
 
 export const getAgentState = (agentId: string): Effect.Effect<AgentState | null, FsError> => {
   return Effect.try({

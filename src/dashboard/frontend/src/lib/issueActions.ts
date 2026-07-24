@@ -29,6 +29,7 @@ export type IssueActionKey =
   | 'requestReview'
   | 'restartReview'
   | 'recoverReview'
+  | 'resyncPipelineState'
   | 'purgeReview'
   | 'stopAgent'
   | 'pause'
@@ -609,6 +610,7 @@ const ISSUE_ACTION_DEFINITIONS: Omit<IssueActionEntry, 'scope'>[] = [
   { key: 'requestReview', label: 'Request review', description: 'Send the current code out for AI review.', panVerb: 'review request', endpoint: '/api/review/:id/trigger', enabledWhen: canRequestReview, phasePrimary: phasePrimary('requestReview'), kind: 'safe', group: 'lifecycle' },
   { key: 'restartReview', label: 'Re-run review on latest commit', description: 'Review again from the newest commit (e.g. after pushing fixes).', panVerb: 'review restart', endpoint: '/api/review/:id/trigger?force=true', enabledWhen: canRestartReview, phasePrimary: [], kind: 'safe', group: 'lifecycle' },
   { key: 'recoverReview', label: 'Reset stalled review state', description: 'Un-wedge a review that stopped moving; nothing is deleted.', panVerb: 'review reset', endpoint: '/api/review/:id/reset', enabledWhen: hasReviewFailure, phasePrimary: [], kind: 'safe', group: 'recover' },
+  { key: 'resyncPipelineState', label: 'Re-sync pipeline state', description: 'Reload the canonical review status when the dashboard is stale; no verdict is changed.', panVerb: 'review resync', endpoint: '/api/review/:id/resync', enabledWhen: always, phasePrimary: [], kind: 'safe', group: 'recover' },
   { key: 'purgeReview', label: 'Remove review sessions & reset', description: 'Kill every reviewer session and clear review state — the "review is haunted" fix.', panVerb: null, endpoint: '/api/review/:id/purge', enabledWhen: canPurgeReview, phasePrimary: [], kind: 'destructive', group: 'recover' },
   { key: 'stopAgent', label: 'Stop agent', description: 'Stop the running agent. Its work, branch, and session are kept.', panVerb: 'kill', endpoint: '/api/agents/:agentId/stop', enabledWhen: hasLiveAgent, phasePrimary: [], kind: 'safe', group: 'danger' },
   { key: 'pause', label: 'Pause agent', description: 'Pause the agent (optionally with a reason). Resume anytime.', panVerb: 'pause', endpoint: '/api/agents/:agentId/pause', enabledWhen: (state) => hasLiveAgent(state) && !isPaused(state), phasePrimary: [], kind: 'dialog', group: 'danger' },

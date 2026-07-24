@@ -16,7 +16,7 @@
  */
 import { useState } from 'react'
 import { Loader2, MessageCircleQuestion, Minus } from 'lucide-react'
-import posthog from 'posthog-js'
+import { bucketCount, capture } from '../lib/telemetry'
 
 /**
  * PAN-1520 — minimal shape the dialog consumes. Works for either an
@@ -79,12 +79,10 @@ export function AskUserQuestionDialog({
 
   const handleSubmit = (): void => {
     const isCustom = customText.trim().length > 0
-    posthog.capture('agent_question_answered', {
-      subject_id: agent?.id,
-      issue_id: agent?.issueId,
-      kind_label: agent?.kindLabel,
+    capture('agent_question_answered', {
+      subject_kind: agent.kindLabel === 'Conversation' ? 'conversation' : 'agent',
       answer_type: isCustom ? 'custom' : 'selection',
-      question_count: questions.length,
+      question_count: bucketCount(questions.length),
     })
     if (isCustom) {
       onSubmit([customText.trim()])

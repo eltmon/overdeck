@@ -1,5 +1,6 @@
-import { describe, it, expect, vi } from 'vitest'
+import { afterEach, describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ProjectHome } from './ProjectHome'
 import type { StageApi } from './types'
 
@@ -24,6 +25,10 @@ function deferred<T>() {
 }
 
 describe('ProjectHome', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
   it('passes the launcher query into the created agent conversation', async () => {
     const openOrFocusAgentPane = vi.fn()
     const onCreateConversation = vi.fn().mockResolvedValue({ name: 'conv-123' })
@@ -123,5 +128,48 @@ describe('ProjectHome', () => {
       await retry.promise
     })
     expect(openOrFocusAgentPane).toHaveBeenCalledWith('conv-456', 'Agent')
+  })
+
+  it('renders project settings in the sparse layout for a registered project', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input)
+      if (url === '/api/projects/myn/auto-merge-default') {
+        return Response.json({ value: null })
+      }
+      if (url === '/api/projects/myn/swarm-policy') {
+        return Response.json({ configured: null })
+      }
+      throw new Error(`Unexpected request: ${url}`)
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+
+    render(
+      <QueryClientProvider client={client}>
+        <ProjectHome
+          projectName="Mind Your Now"
+          projectKey="myn"
+          api={api()}
+        />
+      </QueryClientProvider>,
+    )
+
+    expect(await screen.findAllByText('Project settings')).not.toHaveLength(0)
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2))
+  })
+
+  it('omits project settings and settings requests without a project key', () => {
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+
+    render(
+      <ProjectHome
+        projectName="No project"
+        api={api()}
+      />,
+    )
+
+    expect(screen.queryByText('Project settings')).toBeNull()
+    expect(fetchMock.mock.calls.some(([input]) => String(input).startsWith('/api/projects/'))).toBe(false)
   })
 })

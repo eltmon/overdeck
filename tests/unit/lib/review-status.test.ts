@@ -10,6 +10,7 @@ vi.mock('../../../src/lib/database/index.js', () => ({
 }));
 
 const mockUpdateIssueRecordForIssue = vi.hoisted(() => vi.fn());
+const capturePipelineStageForIssueMock = vi.hoisted(() => vi.fn());
 
 vi.mock('../../../src/lib/pan-dir/records.js', () => ({
   updateIssueRecordForIssue: mockUpdateIssueRecordForIssue,
@@ -27,6 +28,10 @@ vi.mock('../../../src/lib/activity-logger.js', () => ({
   emitActivityTtsSync: vi.fn(),
 }));
 
+vi.mock('../../../src/lib/telemetry/pipeline.js', () => ({
+  capturePipelineStageForIssue: capturePipelineStageForIssueMock,
+}));
+
 import { getReviewStatusSync, setReviewStatusSync } from '../../../src/lib/review-status.js';
 
 describe('review status scope drift', () => {
@@ -35,6 +40,7 @@ describe('review status scope drift', () => {
     testDb.pragma('foreign_keys = ON');
     initSchema(testDb);
     mockUpdateIssueRecordForIssue.mockClear();
+    capturePipelineStageForIssueMock.mockClear();
   });
 
   afterEach(() => {
@@ -81,5 +87,7 @@ describe('review status scope drift', () => {
       verificationStatus: 'passed',
       readyForMerge: true,
     });
+    expect(capturePipelineStageForIssueMock).toHaveBeenCalledTimes(1);
+    expect(capturePipelineStageForIssueMock).toHaveBeenCalledWith('PAN-2200', 'review_passed');
   });
 });

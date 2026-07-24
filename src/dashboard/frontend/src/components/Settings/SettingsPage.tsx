@@ -30,6 +30,7 @@ import { TrackerKeysSection } from './sections/TrackerKeysSection';
 import { AppearanceSection } from './sections/AppearanceSection';
 import { DiffSection } from './sections/DiffSection';
 import { MaintenanceSection } from './sections/MaintenanceSection';
+import { TelemetrySection } from './sections/TelemetrySection';
 import { ExperimentalSection } from './sections/ExperimentalSection';
 import { MODELS_BY_PROVIDER, type OpenRouterFavoriteModel } from './modelCatalog';
 import { LegacyImportDialog } from './LegacyImportDialog';
@@ -659,6 +660,12 @@ export function SettingsPage() {
       <div id="desktop" className="py-6 scroll-mt-4">
         <DesktopSettingsSection />
       </div>
+
+      <TelemetrySection
+        formData={formData}
+        saveStatus={saveStatus}
+        onSettingsChange={applySettings}
+      />
 
       <ExperimentalSection
         formData={formData}

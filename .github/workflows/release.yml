@@ -122,6 +122,14 @@ jobs:
       - name: Build
         run: bun run build
 
+      - name: Upload dashboard sourcemaps to PostHog
+        env:
+          POSTHOG_CLI_API_KEY: ${{ secrets.POSTHOG_CLI_API_KEY }}
+          POSTHOG_CLI_PROJECT_ID: ${{ secrets.POSTHOG_CLI_PROJECT_ID }}
+          POSTHOG_CLI_HOST: https://us.posthog.com
+          OVERDECK_TELEMETRY: '0'
+        run: node dist/cli/index.js release sourcemaps --version "${GITHUB_REF_NAME#v}"
+
       # PAN-1609: gate the release on the full test suite. release.yml is a
       # separate workflow from ci.yml (it fires on tag push, not PR), so without
       # this a `v*` tag could publish a red vitest suite to npm. This runs in the

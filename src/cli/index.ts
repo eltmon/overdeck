@@ -8,7 +8,7 @@ import { ensureCompatibleNode } from './node-preflight.js'; import { drainPendin
 // Relaunch under a compatible Node (>=22) before anything else runs. If the
 // current runtime is already Node 22+ this is a no-op; otherwise it re-execs the
 // CLI under an installed Node 22+, or exits with a specific fix command.
-ensureCompatibleNode();
+await ensureCompatibleNode();
 
 // Load ~/.overdeck.env before any other imports
 // This makes API keys and other env vars available to all commands
@@ -77,19 +77,8 @@ import { registerCloseCommand } from './commands/close.js';
 import { showCommand } from './commands/show.js';
 import { listCommand as issuesCommand } from './commands/issues.js';
 import { triageCommand } from './commands/triage.js';
-import { pendingCommand } from './commands/pending.js';
-import { requestReviewCommand } from './commands/request-review.js';
-import { resetReviewCommand } from './commands/reset-review.js';
-import { abortReviewCommand } from './commands/abort-review.js';
-import { reviewModeCommand, reviewScopeCommand } from './commands/review-mode.js';
+import { registerReviewCommands } from './commands/review-subcommands.js';
 import { staffingCommand } from './commands/staffing.js';
-// PAN-1048 R5: `pan review run` removed. Review now runs as the role primitive
-// via spawnRun(issueId, 'review', …) → roles/review.md, with convoy reviewers
-// spawned by the review role through `pan review spawn-reviewer`.
-// The blocking-orchestrator CLI was the only caller of runParallelReview /
-// parseReviewSynthesis (now also retired).
-import { reviewRestartCommand } from './commands/review-restart.js';
-import { reviewSpawnReviewerCommand } from './commands/review-spawn-reviewer.js';
 import { destroyCommand as destroyWorkspaceCommand, registerWorkspaceCommands } from './commands/workspace.js';
 import { registerTestCommands } from './commands/test.js';
 import { registerTtsCommands } from './commands/tts.js';
@@ -127,7 +116,7 @@ import { openCommand } from './commands/open.js';
 import { registerFlywheelCommands } from './commands/flywheel.js';
 import { registerMergeCommands } from './commands/merge.js';
 import { registerArtifactCommands } from './commands/artifacts.js';
-import { registerSwarmCommands } from './commands/swarm.js'; import { registerTaskCommands } from './commands/task.js';
+import { registerSwarmCommands } from './commands/swarm.js'; import { registerTaskCommands } from './commands/task.js'; import { exitCli, runCliWithTelemetry } from './telemetry.js';
 
 // Pre-parse --yolo from argv so it works regardless of position relative to the
 // subcommand. Commander's enablePositionalOptions() routes post-subcommand options
@@ -331,63 +320,9 @@ program
   .option('-e, --editor <editor>', 'Editor to use (cursor, windsurf, vscode, zed, etc.)')
   .action(openCommand);
 
-// pan review — pending, request, reset
-const review = program
-  .command('review')
-  .description('Review-loop management: pending items, request re-review, reset cycles');
-
-review
-  .command('pending')
-  .description('List completed work awaiting review')
-  .option('--ready', 'List issues ready for merge (review+test green, not merged) regardless of origin')
-  .option('--blocked', 'List issues blocked in review/test/merge from the SQLite review-status store')
-  .action(pendingCommand);
-
-review
-  .command('request <id>')
-  .description('Request re-review after fixing feedback')
-  .option('-m, --message <text>', 'Message describing the fixes applied')
-  .action(requestReviewCommand);
-
-review
-  .command('reset <id>')
-  .description('Reset review/test/merge cycles (human override)')
-  .option('--session', 'Also clear all saved Claude review-session pointers')
-  .action(resetReviewCommand);
-
-review
-  .command('abort <id>')
-  .description('Kill all running reviewer sessions and leave the worker idle')
-  .action(abortReviewCommand);
-review
-  .command('mode <id> <mode>')
-  .description('Set per-issue review mode (quick, full, or none)')
-  .action(reviewModeCommand);
-review
-  .command('scope <id> <scope>')
-  .description('Set per-issue re-review scope (all, changed, or blockers) — which convoy reviewers re-run (PAN-1874)')
-  .action(reviewScopeCommand);
+registerReviewCommands(program);
 
 program.command('staffing <id>').description('Show or set per-issue work-model and swarm overrides').option('--model <model>', 'Set the work model, or default to clear the override').option('--swarm <mode>', 'Set swarm mode (off, auto, always), or default to clear the override').action(staffingCommand);
-review
-  .command('restart <id>')
-  .description('Kill running reviewers and dispatch fresh review pipeline')
-  .option('--model <model>', 'Override model for all reviewers (e.g. gpt-5.4, claude-sonnet-5)')
-  .option('--role <role>', 'Restart only a specific reviewer role (correctness/security/performance/requirements)')
-  .action(reviewRestartCommand);
-
-review
-  .command('spawn-reviewer <id>', { hidden: true })
-  .description('Internal: spawn one review convoy sub-role')
-  .requiredOption('--sub-role <role>', 'Reviewer sub-role (security/correctness/performance/requirements)')
-  .requiredOption('--run-id <id>', 'Review run ID')
-  .option('--workspace <path>', 'Workspace path')
-  .option('--output <path>', 'Reviewer output path')
-  .option('--context <path>', 'Context manifest path')
-  .option('--model <model>', 'Override reviewer model')
-  .action(reviewSpawnReviewerCommand);
-
-// PAN-1048 R5: `pan review run` removed (see import note above).
 
 // pan backlog — sequence writer surface
 const backlog = program
@@ -408,12 +343,12 @@ backlog
       raw = JSON.parse(readFileSync(file, 'utf-8'));
     } catch (e: any) {
       console.error(chalk.red(`Error: could not read ${file}: ${e.message}`));
-      process.exit(1);
+      return exitCli(1);
     }
     const result = parseSequenceJson(raw);
     if (!result.ok) {
       console.error(chalk.red(`Validation error: ${result.error}`));
-      process.exit(1);
+      return exitCli(1);
     }
     writeSequenceMd(projectRoot, result.doc);
     console.log(chalk.green(`✓ Wrote .pan/backlog/sequence.md (${result.doc.nodes.length} nodes, pass=${result.doc.pass})`));
@@ -857,7 +792,7 @@ program
     if (!isProduction && !isDevelopment) {
       console.error(chalk.red('Error: Dashboard not found'));
       console.error(chalk.dim('This may be a corrupted installation. Try reinstalling @overdeck/core.'));
-      process.exit(1);
+      return exitCli(1);
     }
 
     // Check npm is available (only needed for development mode)
@@ -867,7 +802,7 @@ program
       } catch {
         console.error(chalk.red('Error: npm not found in PATH'));
         console.error(chalk.dim('Make sure Node.js and npm are installed and in your PATH'));
-        process.exit(1);
+        return exitCli(1);
       }
     }
 
@@ -1026,10 +961,10 @@ program
 
       // Handle spawn errors before unref
       let hasError = false;
-      child.on('error', (err) => {
+      child.on('error', async (err) => {
         hasError = true;
         console.error(chalk.red('Failed to start dashboard in background:'), err.message);
-        process.exit(1);
+        return exitCli(1);
       });
 
       // Small delay to catch immediate spawn errors
@@ -1094,9 +1029,9 @@ program
             },
           });
 
-      child.on('error', (err) => {
+      child.on('error', async (err) => {
         console.error(chalk.red('Failed to start dashboard:'), err.message);
-        process.exit(1);
+        return exitCli(1);
       });
 
       let readyUrl: string;
@@ -1371,7 +1306,7 @@ program
     if (!existsSync(bundledServer) || !existsSync(bundledFrontendIndex)) {
       console.error(chalk.red('Error: Dashboard bundle not found.'));
       console.error(chalk.dim('This package may not be fully built. Try: npm run build'));
-      process.exit(1);
+      return exitCli(1);
     }
 
     console.log(chalk.bold('Overdeck Dashboard'));
@@ -1382,9 +1317,9 @@ program
       env: { ...process.env, PORT: String(port), OVERDECK_INTERNAL_TOKEN: internalToken },
     });
 
-    server.on('error', (err) => {
+    server.on('error', async (err) => {
       console.error(chalk.red('Failed to start dashboard:'), err.message);
-      process.exit(1);
+      return exitCli(1);
     });
 
     // Open browser after server has had a moment to start
@@ -1411,4 +1346,4 @@ if (process.argv.length === 2) {
 }
 
 // Short-lived commands must drain durable state writes before exit (PAN-2692).
-await program.parseAsync(process.argv, { from: 'node' }).finally(drainPendingDurableWrites);
+await runCliWithTelemetry(() => program.parseAsync(process.argv, { from: 'node' }), drainPendingDurableWrites);
