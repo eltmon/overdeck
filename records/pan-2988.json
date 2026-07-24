@@ -160,7 +160,7 @@
     "recordedAt": "2026-07-24T11:10:15.151Z"
   },
   "created": "2026-07-22T21:25:31.822Z",
-  "updated": "2026-07-24T11:10:15.898Z",
+  "updated": "2026-07-24T11:10:19.636Z",
   "pipeline": {
     "issueId": "PAN-2988",
     "reviewStatus": "pending",
@@ -170,12 +170,12 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-24T11:10:15.897Z",
+    "updatedAt": "2026-07-24T11:10:19.597Z",
     "verificationNotes": "The supervised verification worker stopped before recording a result; verification re-runs on the next cycle.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3010",
     "lastVerifiedCommit": "d1c367f682fc33cdf4c28a14054733e75d6f925c",
-    "reviewSpawnedAt": "2026-07-24T11:10:10.152Z",
     "reviewRequestedAt": "2026-07-24T11:10:15.897Z",
+    "reviewSpawnedAt": "2026-07-24T11:10:10.152Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "src/dashboard/frontend/src/components/KanbanBoard.test.tsx",
@@ -285,7 +285,7 @@
       },
       "costAtCloseOut": {
         "usd": 190.821205,
-        "pricingAsOf": "2026-07-24T11:10:10.174Z"
+        "pricingAsOf": "2026-07-24T11:10:19.633Z"
       }
     },
     "merges": [
