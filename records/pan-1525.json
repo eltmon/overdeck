@@ -27,7 +27,7 @@
   ],
   "feedback": [],
   "created": "2026-07-12T09:32:29.900Z",
-  "updated": "2026-07-24T21:26:25.894Z",
+  "updated": "2026-07-24T21:26:43.022Z",
   "pipeline": {
     "issueId": "PAN-1525",
     "reviewStatus": "pending",
@@ -109,8 +109,16 @@
   "model": "claude-sonnet-5",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 20,
-    "claims": {},
+    "sequence": 21,
+    "claims": {
+      "confirmations": {
+        "writerId": "agent-pan-1525",
+        "agentId": "agent-pan-1525",
+        "pid": 2923755,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-24T21:26:43.022Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-1525",
@@ -307,6 +315,7 @@
     "ui-handoff-result": "completed",
     "ui-handoff-result.ui-handoff-result.ac1": "completed",
     "ui-handoff-result.ui-handoff-result.ac2": "completed",
-    "ui-handoff-result.ui-handoff-result.ac3": "completed"
+    "ui-handoff-result.ui-handoff-result.ac3": "completed",
+    "confirmations": "running"
   }
 }
