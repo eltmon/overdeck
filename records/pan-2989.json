@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-22T21:26:29.366Z",
-  "updated": "2026-07-24T17:14:13.893Z",
+  "updated": "2026-07-24T17:35:17.634Z",
   "pipeline": {
     "issueId": "PAN-2989",
     "reviewStatus": "pending",
@@ -38,18 +38,33 @@
   "harness": "claude-code",
   "model": "k3",
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "bound-record-durability-hold": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-2989",
         "agentId": "agent-pan-2989",
         "pid": 2872894,
         "host": "eltmon-z790",
-        "claimedAt": "2026-07-24T17:14:13.893Z"
+        "claimedAt": "2026-07-24T17:14:13.893Z",
+        "itemId": "bound-record-durability-hold",
+        "outcome": "completed",
+        "reason": "Added RecordDurabilityTimeoutError + withRecordDurabilityDeadline (env OVERDECK_RECORD_DURABILITY_BUDGET_MS, default 30s) wrapping the flush await, reconcileStatePush (best-effort abortRebase on timeout), and restoreRetryableRecord in updateIssueRecord. Timeout rethrows without restoring; flush is raced, never aborted. New test file record-update-durability-budget.test.ts (4 tests, fake timers, 5/5 stable runs); adjacent record-update/lock suites green; typecheck+lint clean.",
+        "releasedAt": "2026-07-24T17:35:17.633Z"
+      }
+    ],
+    "statusReasons": {
+      "bound-record-durability-hold": {
+        "reason": "Added RecordDurabilityTimeoutError + withRecordDurabilityDeadline (env OVERDECK_RECORD_DURABILITY_BUDGET_MS, default 30s) wrapping the flush await, reconcileStatePush (best-effort abortRebase on timeout), and restoreRetryableRecord in updateIssueRecord. Timeout rethrows without restoring; flush is raced, never aborted. New test file record-update-durability-budget.test.ts (4 tests, fake timers, 5/5 stable runs); adjacent record-update/lock suites green; typecheck+lint clean.",
+        "updatedAt": "2026-07-24T17:35:17.633Z"
       }
     }
   },
   "statusOverrides": {
-    "bound-record-durability-hold": "running"
+    "bound-record-durability-hold": "completed",
+    "bound-record-durability-hold.bound-record-durability-hold.ac1": "completed",
+    "bound-record-durability-hold.bound-record-durability-hold.ac2": "completed",
+    "bound-record-durability-hold.bound-record-durability-hold.ac3": "completed",
+    "bound-record-durability-hold.bound-record-durability-hold.ac4": "completed"
   }
 }
