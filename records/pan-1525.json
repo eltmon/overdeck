@@ -27,7 +27,7 @@
   ],
   "feedback": [],
   "created": "2026-07-12T09:32:29.900Z",
-  "updated": "2026-07-24T22:48:10.509Z",
+  "updated": "2026-07-24T22:48:25.707Z",
   "pipeline": {
     "issueId": "PAN-1525",
     "reviewStatus": "pending",
@@ -109,8 +109,16 @@
   "model": "claude-sonnet-5",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 34,
-    "claims": {},
+    "sequence": 35,
+    "claims": {
+      "docs-three-lanes": {
+        "writerId": "agent-pan-1525",
+        "agentId": "agent-pan-1525",
+        "pid": 3778792,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-24T22:48:25.707Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-1525",
@@ -421,6 +429,7 @@
     "composer-playwright": "completed",
     "composer-playwright.composer-playwright.ac1": "completed",
     "composer-playwright.composer-playwright.ac2": "completed",
-    "composer-playwright.composer-playwright.ac3": "completed"
+    "composer-playwright.composer-playwright.ac3": "completed",
+    "docs-three-lanes": "running"
   }
 }
