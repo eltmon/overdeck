@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-24T17:28:09.122Z",
-  "updated": "2026-07-24T18:09:14.445Z",
+  "updated": "2026-07-24T18:10:09.936Z",
   "pipeline": {
     "issueId": "PAN-3021",
     "reviewStatus": "pending",
@@ -83,16 +83,8 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 11,
-    "claims": {
-      "docs-pipeline": {
-        "writerId": "agent-pan-3021",
-        "agentId": "agent-pan-3021",
-        "pid": 249586,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-24T18:09:14.445Z"
-      }
-    },
+    "sequence": 12,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3021",
@@ -148,6 +140,17 @@
         "outcome": "completed",
         "reason": "Pinned all 95 pre-change entries, verified four removed CLI paths, asserted static/headline coverage, and added explicit insert overrides for four live commands whose legacy whitespace differed from generated defaults.",
         "releasedAt": "2026-07-24T18:09:00.393Z"
+      },
+      {
+        "writerId": "agent-pan-3021",
+        "agentId": "agent-pan-3021",
+        "pid": 249586,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-24T18:09:14.445Z",
+        "itemId": "docs-pipeline",
+        "outcome": "completed",
+        "reason": "Documented the CLI-to-composer generation flow, all artifacts, regeneration and drift checks, static/extra/deny/insert-override curation rules, and the no-loss audit.",
+        "releasedAt": "2026-07-24T18:10:09.935Z"
       }
     ],
     "statusReasons": {
@@ -170,6 +173,10 @@
       "no-loss-audit-test": {
         "reason": "Pinned all 95 pre-change entries, verified four removed CLI paths, asserted static/headline coverage, and added explicit insert overrides for four live commands whose legacy whitespace differed from generated defaults.",
         "updatedAt": "2026-07-24T18:09:00.393Z"
+      },
+      "docs-pipeline": {
+        "reason": "Documented the CLI-to-composer generation flow, all artifacts, regeneration and drift checks, static/extra/deny/insert-override curation rules, and the no-loss audit.",
+        "updatedAt": "2026-07-24T18:10:09.935Z"
       }
     }
   },
@@ -198,6 +205,8 @@
     "no-loss-audit-test.no-loss-audit-test.ac1": "completed",
     "no-loss-audit-test.no-loss-audit-test.ac2": "completed",
     "no-loss-audit-test.no-loss-audit-test.ac3": "completed",
-    "docs-pipeline": "running"
+    "docs-pipeline": "completed",
+    "docs-pipeline.docs-pipeline.ac1": "completed",
+    "docs-pipeline.docs-pipeline.ac2": "completed"
   }
 }
