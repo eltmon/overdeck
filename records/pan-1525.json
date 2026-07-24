@@ -27,7 +27,7 @@
   ],
   "feedback": [],
   "created": "2026-07-12T09:32:29.900Z",
-  "updated": "2026-07-24T22:48:25.707Z",
+  "updated": "2026-07-24T22:52:20.850Z",
   "pipeline": {
     "issueId": "PAN-1525",
     "reviewStatus": "pending",
@@ -109,16 +109,8 @@
   "model": "claude-sonnet-5",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 35,
-    "claims": {
-      "docs-three-lanes": {
-        "writerId": "agent-pan-1525",
-        "agentId": "agent-pan-1525",
-        "pid": 3778792,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-24T22:48:25.707Z"
-      }
-    },
+    "sequence": 36,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-1525",
@@ -302,6 +294,16 @@
         "itemId": "composer-playwright",
         "outcome": "completed",
         "releasedAt": "2026-07-24T22:48:10.509Z"
+      },
+      {
+        "writerId": "agent-pan-1525",
+        "agentId": "agent-pan-1525",
+        "pid": 3778792,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-24T22:48:25.707Z",
+        "itemId": "docs-three-lanes",
+        "outcome": "completed",
+        "releasedAt": "2026-07-24T22:52:20.850Z"
       }
     ],
     "statusReasons": {
@@ -430,6 +432,9 @@
     "composer-playwright.composer-playwright.ac1": "completed",
     "composer-playwright.composer-playwright.ac2": "completed",
     "composer-playwright.composer-playwright.ac3": "completed",
-    "docs-three-lanes": "running"
+    "docs-three-lanes": "completed",
+    "docs-three-lanes.docs-three-lanes.ac1": "completed",
+    "docs-three-lanes.docs-three-lanes.ac2": "completed",
+    "docs-three-lanes.docs-three-lanes.ac3": "completed"
   }
 }
