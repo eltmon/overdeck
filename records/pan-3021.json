@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-24T17:28:09.122Z",
-  "updated": "2026-07-24T17:54:42.389Z",
+  "updated": "2026-07-24T17:58:56.435Z",
   "pipeline": {
     "issueId": "PAN-3021",
     "reviewStatus": "pending",
@@ -83,16 +83,8 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "generator-and-overlay": {
-        "writerId": "agent-pan-3021",
-        "agentId": "agent-pan-3021",
-        "pid": 3743150,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-24T17:54:42.388Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3021",
@@ -104,12 +96,27 @@
         "outcome": "completed",
         "reason": "Added a public Commander command-tree walker, exposed pan admin commands --json/human output, and covered visibility/order/argument metadata with unit tests.",
         "releasedAt": "2026-07-24T17:47:41.154Z"
+      },
+      {
+        "writerId": "agent-pan-3021",
+        "agentId": "agent-pan-3021",
+        "pid": 3743150,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-24T17:54:42.388Z",
+        "itemId": "generator-and-overlay",
+        "outcome": "completed",
+        "reason": "Added deterministic CLI-registry codegen, explicit curation overlay and extras, shared SlashCommand type, committed generated registry, package script, and audited generated-file size baseline.",
+        "releasedAt": "2026-07-24T17:58:56.434Z"
       }
     ],
     "statusReasons": {
       "cli-introspection": {
         "reason": "Added a public Commander command-tree walker, exposed pan admin commands --json/human output, and covered visibility/order/argument metadata with unit tests.",
         "updatedAt": "2026-07-24T17:47:41.154Z"
+      },
+      "generator-and-overlay": {
+        "reason": "Added deterministic CLI-registry codegen, explicit curation overlay and extras, shared SlashCommand type, committed generated registry, package script, and audited generated-file size baseline.",
+        "updatedAt": "2026-07-24T17:58:56.434Z"
       }
     }
   },
@@ -119,6 +126,11 @@
     "cli-introspection.cli-introspection.ac2": "completed",
     "cli-introspection.cli-introspection.ac3": "completed",
     "cli-introspection.cli-introspection.ac4": "completed",
-    "generator-and-overlay": "running"
+    "generator-and-overlay": "completed",
+    "generator-and-overlay.generator-and-overlay.ac1": "completed",
+    "generator-and-overlay.generator-and-overlay.ac2": "completed",
+    "generator-and-overlay.generator-and-overlay.ac3": "completed",
+    "generator-and-overlay.generator-and-overlay.ac4": "completed",
+    "generator-and-overlay.generator-and-overlay.ac5": "completed"
   }
 }
