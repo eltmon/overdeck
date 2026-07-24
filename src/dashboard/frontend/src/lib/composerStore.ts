@@ -65,6 +65,8 @@ interface ComposerSlice {
   optimisticBaseCount: number;
   /** Messages whose send POST failed — retryable from the timeline. */
   failed: FailedMessage[];
+  /** Structured results from dashboard-intercepted `/pan` commands. */
+  commandResults: ChatMessage[];
 }
 
 // Stable empty fallbacks so selectors return a referentially-stable value when a
@@ -73,9 +75,17 @@ interface ComposerSlice {
 const EMPTY_ATTACHMENTS: PendingAttachment[] = [];
 const EMPTY_OPTIMISTIC: ChatMessage[] = [];
 const EMPTY_FAILED: FailedMessage[] = [];
+const EMPTY_COMMAND_RESULTS: ChatMessage[] = [];
 
 function emptySlice(): ComposerSlice {
-  return { sending: false, attachments: [], optimistic: [], optimisticBaseCount: 0, failed: [] };
+  return {
+    sending: false,
+    attachments: [],
+    optimistic: [],
+    optimisticBaseCount: 0,
+    failed: [],
+    commandResults: [],
+  };
 }
 
 function isEmptySlice(s: ComposerSlice): boolean {
@@ -83,57 +93,109 @@ function isEmptySlice(s: ComposerSlice): boolean {
     !s.sending &&
     s.attachments.length === 0 &&
     s.optimistic.length === 0 &&
-    s.failed.length === 0
+    s.failed.length === 0 &&
+    s.commandResults.length === 0
   );
 }
 
 // ─── Message send (shared by the composer and the retry outbox) ─────────────────
 
-type ComposerUiCommandResult = Extract<ComposerCommandResult, { kind: 'ui' }>;
-
-function isComposerUiCommandResult(value: unknown): value is ComposerUiCommandResult {
+export function isComposerCommandResult(value: unknown): value is ComposerCommandResult {
   if (!value || typeof value !== 'object') return false;
   const candidate = value as Record<string, unknown>;
-  return (
-    candidate.kind === 'ui' &&
-    candidate.status === 'requires_ui' &&
-    (candidate.action === 'handoff' || candidate.action === 'fork') &&
-    candidate.args !== null &&
-    typeof candidate.args === 'object'
-  );
+  switch (candidate.kind) {
+    case 'captured':
+      return (
+        (candidate.status === 'completed' || candidate.status === 'failed') &&
+        typeof candidate.command === 'string' &&
+        typeof candidate.output === 'string' &&
+        typeof candidate.truncated === 'boolean'
+      );
+    case 'activity':
+      return (
+        candidate.status === 'accepted' &&
+        typeof candidate.command === 'string' &&
+        typeof candidate.activityId === 'string' &&
+        typeof candidate.message === 'string'
+      );
+    case 'ui':
+      return (
+        candidate.status === 'requires_ui' &&
+        (candidate.action === 'handoff' || candidate.action === 'fork') &&
+        candidate.args !== null &&
+        typeof candidate.args === 'object'
+      );
+    case 'confirmation':
+      return (
+        candidate.status === 'confirmation_required' &&
+        typeof candidate.nonce === 'string' &&
+        typeof candidate.consequence === 'string' &&
+        (candidate.typedText === undefined || typeof candidate.typedText === 'string')
+      );
+    case 'terminal-only':
+      return candidate.status === 'rejected' && typeof candidate.message === 'string';
+    default:
+      return false;
+  }
+}
+
+export interface ComposerCommandConfirmation {
+  nonce: string;
+  typedText?: string;
 }
 
 /**
  * POST a message to a conversation (or agent) session. The single source of
  * truth for the send endpoint + payload, used by both the composer's first send
- * (ComposerFooter.handleSubmit) and the failed-message retry (retryFailed
- * below). Throws on a non-2xx response so callers can move the message to the
- * retry outbox. UI command results are returned so the composer can open the
- * requested dialog instead of rendering the command as a chat message.
+ * (ComposerFooter.handleSubmit), confirmation resubmissions, and the failed-
+ * message retry below. Structured command results are returned even when their
+ * HTTP status is non-2xx (for example terminal-only rejection), while ordinary
+ * transport failures still throw so callers can preserve the text in the retry
+ * outbox.
  */
 export async function sendConversationMessage(
   conversationName: string,
   message: string,
   agentId?: string,
   deliverAs?: 'steer' | 'follow_up',
-): Promise<ComposerUiCommandResult | null> {
+  confirmation?: ComposerCommandConfirmation,
+): Promise<ComposerCommandResult | null> {
   const endpoint = agentId
     ? `/api/agents/${encodeURIComponent(agentId)}/message`
     : `/api/conversations/${encodeURIComponent(conversationName)}/message`;
-  const payload = deliverAs && !agentId
-    ? { message, deliverAs }
-    : { message };
+  const payload = {
+    message,
+    ...(deliverAs && !agentId ? { deliverAs } : {}),
+    ...(confirmation ? {
+      confirmationNonce: confirmation.nonce,
+      ...(confirmation.typedText !== undefined
+        ? { confirmationText: confirmation.typedText }
+        : {}),
+    } : {}),
+  };
   const res = await fetch(endpoint, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   });
-  if (!res.ok) {
-    const body = await res.text().catch(() => '');
-    throw new Error(`Failed to send message (${res.status})${body ? `: ${body}` : ''}`);
+  const body = await res.text().catch(() => '');
+  let responseBody: unknown = null;
+  if (body) {
+    try {
+      responseBody = JSON.parse(body);
+    } catch {
+      responseBody = null;
+    }
   }
-  const responseBody = await res.json().catch(() => null);
-  return isComposerUiCommandResult(responseBody) ? responseBody : null;
+  if (isComposerCommandResult(responseBody)) return responseBody;
+  if (!res.ok) {
+    const error = responseBody && typeof responseBody === 'object' &&
+      'error' in responseBody && typeof responseBody.error === 'string'
+      ? responseBody.error
+      : body;
+    throw new Error(`Failed to send message (${res.status})${error ? `: ${error}` : ''}`);
+  }
+  return null;
 }
 
 // ─── Attachment API + upload pump (module-level, survives component unmount) ────
@@ -266,18 +328,27 @@ interface ComposerStore {
   acknowledgeOptimistic(conversationName: string, text: string): void;
   clearOptimistic(conversationName: string): void;
 
-  /** A send POST failed: drop the optimistic copy and add to the retry outbox. */
-  failSend(conversationName: string, text: string): void;
+  /** A send POST failed: preserve it in the retry outbox with its original lane. */
+  failSend(conversationName: string, text: string, kind?: FailedMessage['kind']): void;
   removeFailed(conversationName: string, id: string): void;
 
+  addCommandResult(
+    conversationName: string,
+    commandText: string,
+    result: ComposerCommandResult,
+  ): void;
+  replaceCommandResult(
+    conversationName: string,
+    messageId: string,
+    result: ComposerCommandResult,
+  ): void;
+  removeCommandResult(conversationName: string, messageId: string): void;
+
   /**
-   * Re-send a message from the retry outbox. Mirrors the composer's first-send
-   * path so a retry is exactly as robust as a first send: the text is moved from
-   * the outbox to an optimistic "Sending…" bubble BEFORE the POST (so it is
-   * always on a recoverable surface and the stall/compaction safety net in
-   * ConversationView re-arms for it), then POSTed. On POST failure the message
-   * returns to the outbox via failSend; a retry whose POST succeeds but is then
-   * eaten by a compaction is caught by that same net instead of vanishing.
+   * Re-send a message from the retry outbox through its original lane. Prompts
+   * retain the existing optimistic-bubble and compaction recovery behavior.
+   * Commands never become prompt bubbles; their structured result is appended
+   * to the command timeline instead.
    */
   retryFailed(
     conversationName: string,
@@ -285,7 +356,7 @@ interface ComposerStore {
     text: string,
     serverBaseCount: number,
     agentId?: string,
-  ): Promise<void>;
+  ): Promise<ComposerCommandResult | null>;
 }
 
 /** Immutably update one conversation's slice, pruning it when it becomes empty. */
@@ -435,15 +506,15 @@ export const useComposerStore = create<ComposerStore>((set, get) => ({
       ),
     })),
 
-  failSend: (conversationName, text) =>
+  failSend: (conversationName, text, kind = 'prompt') =>
     set((state) => ({
       byConversation: mutateSlice(state.byConversation, conversationName, (s) => ({
         ...s,
-        optimistic: [],
-        optimisticBaseCount: 0,
+        optimistic: kind === 'prompt' ? [] : s.optimistic,
+        optimisticBaseCount: kind === 'prompt' ? 0 : s.optimisticBaseCount,
         failed: [
           ...s.failed,
-          { id: `failed-${Date.now()}`, text, createdAt: new Date().toISOString() },
+          { id: `failed-${Date.now()}`, text, kind, createdAt: new Date().toISOString() },
         ],
       })),
     })),
@@ -456,21 +527,63 @@ export const useComposerStore = create<ComposerStore>((set, get) => ({
       })),
     })),
 
+  addCommandResult: (conversationName, commandText, result) =>
+    set((state) => ({
+      byConversation: mutateSlice(state.byConversation, conversationName, (s) => ({
+        ...s,
+        commandResults: [
+          ...s.commandResults,
+          {
+            id: `command-result-${Date.now()}-${s.commandResults.length}`,
+            role: 'system',
+            text: commandText,
+            commandText,
+            commandResult: result,
+            createdAt: new Date().toISOString(),
+          },
+        ],
+      })),
+    })),
+
+  replaceCommandResult: (conversationName, messageId, result) =>
+    set((state) => ({
+      byConversation: mutateSlice(state.byConversation, conversationName, (s) => ({
+        ...s,
+        commandResults: s.commandResults.map((message) =>
+          message.id === messageId ? { ...message, commandResult: result } : message,
+        ),
+      })),
+    })),
+
+  removeCommandResult: (conversationName, messageId) =>
+    set((state) => ({
+      byConversation: mutateSlice(state.byConversation, conversationName, (s) => ({
+        ...s,
+        commandResults: s.commandResults.filter((message) => message.id !== messageId),
+      })),
+    })),
+
   retryFailed: async (conversationName, failedId, text, serverBaseCount, agentId) => {
-    const { addOptimistic, removeFailed, failSend } = get();
-    // Move the text onto a recoverable surface (an optimistic "Sending…" bubble)
-    // BEFORE clearing the outbox entry and BEFORE the POST — the message is never
-    // outbox → void. The optimistic bubble also re-arms the stall/compaction
-    // safety net in ConversationView, so a retry the agent eats during a
-    // compaction re-fails back to the outbox instead of being lost silently.
-    addOptimistic(conversationName, text, serverBaseCount);
+    const { addOptimistic, addCommandResult, removeFailed, failSend } = get();
+    const failed = get().byConversation[conversationName]?.failed.find(
+      candidate => candidate.id === failedId,
+    );
+    const kind = failed?.kind ?? 'prompt';
+    if (kind === 'prompt') {
+      // Preserve the ordinary prompt path byte-for-byte: move the text onto a
+      // recoverable optimistic surface before clearing the outbox and POSTing.
+      addOptimistic(conversationName, text, serverBaseCount);
+    }
     removeFailed(conversationName, failedId);
     try {
-      await sendConversationMessage(conversationName, text, agentId);
+      const result = await sendConversationMessage(conversationName, text, agentId);
+      if (kind === 'command' && result && result.kind !== 'ui') {
+        addCommandResult(conversationName, text, result);
+      }
+      return result;
     } catch {
-      // failSend clears the optimistic copy and re-adds the text to the outbox —
-      // identical to the first-send failure path (ComposerFooter onSendFailed).
-      failSend(conversationName, text);
+      failSend(conversationName, text, kind);
+      return null;
     }
   },
 }));
@@ -495,6 +608,12 @@ export function useConversationOptimisticBaseCount(conversationName: string): nu
 
 export function useConversationFailed(conversationName: string): FailedMessage[] {
   return useComposerStore((s) => s.byConversation[conversationName]?.failed ?? EMPTY_FAILED);
+}
+
+export function useConversationCommandResults(conversationName: string): ChatMessage[] {
+  return useComposerStore(
+    (s) => s.byConversation[conversationName]?.commandResults ?? EMPTY_COMMAND_RESULTS,
+  );
 }
 
 /** Non-hook synchronous read of a conversation's pending attachments (for event handlers). */

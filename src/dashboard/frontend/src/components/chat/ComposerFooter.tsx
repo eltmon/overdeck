@@ -49,8 +49,8 @@ interface ComposerFooterProps {
   onSend?: (text: string) => void;
   /** Called after the send POST resolves successfully. */
   onSendAcknowledged?: (text: string) => void;
-  /** Called when the POST fails — parent should move the optimistic message to the failed outbox */
-  onSendFailed?: (text: string) => void;
+  /** Called when the POST fails — parent preserves the original prompt/command lane. */
+  onSendFailed?: (text: string, kind: 'command' | 'prompt') => void;
   /** Agent ID for agent sessions (uses /api/agents/* endpoints instead of /api/conversations/*) */
   agentId?: string;
   /**
@@ -126,6 +126,7 @@ export function ComposerFooter({
   const enqueueAttachmentsForConversation = useComposerStore((s) => s.enqueueAttachments);
   const removeAttachmentForConversation = useComposerStore((s) => s.removeAttachment);
   const consumeAttachmentsForConversation = useComposerStore((s) => s.consumeAttachments);
+  const addCommandResult = useComposerStore((s) => s.addCommandResult);
 
   const [text, setText] = useState('');
   const [isVoiceWidgetOpen, setIsVoiceWidgetOpen] = useState(false);
@@ -444,6 +445,7 @@ export function ComposerFooter({
       .map((attachment) => `@${attachment.serverPath}`)
       .join('\n');
     const composedMessage = [attachmentPrefix, messageText].filter(Boolean).join('\n');
+    const isPortableCommand = /^\/pan(?:\s|$)/i.test(composedMessage);
     try {
       // DISABLED 2026-06-16: a plain message-send must NEVER switch the model.
       // This auto-switch silently killed a running agent's live session (the Opus
@@ -461,10 +463,10 @@ export function ComposerFooter({
         return;
       }
 
-      // `/pan fork` is server-routed to the same local dialog as the handoff
-      // aliases above. Do not create an optimistic chat bubble for a UI action.
-      const awaitsUiResult = /^\/pan\s+fork(?:\s|$)/i.test(composedMessage);
-      if (!awaitsUiResult) onSend?.(composedMessage);
+      // The `/pan` namespace is intercepted by the dashboard control plane and
+      // returns a structured result. It must never appear as an optimistic user
+      // prompt or reach the harness transcript.
+      if (!isPortableCommand) onSend?.(composedMessage);
 
       const commandResult = await sendConversationMessage(
         submitConversationName,
@@ -478,6 +480,8 @@ export function ComposerFooter({
           commandResult.action,
           commandResult.args.focus || undefined,
         );
+      } else if (commandResult) {
+        addCommandResult(submitConversationName, composedMessage, commandResult);
       } else {
         onSendAcknowledged?.(composedMessage);
       }
@@ -501,7 +505,7 @@ export function ComposerFooter({
     } catch (err) {
       console.error('[ComposerFooter] Failed to send:', err);
       toast.error(err instanceof Error ? err.message : 'Failed to send message');
-      onSendFailed?.(composedMessage);
+      onSendFailed?.(composedMessage, isPortableCommand ? 'command' : 'prompt');
     } finally {
       // Clear the originating conversation's sending state regardless of which
       // conversation is now mounted — the send belonged to submitConversationName.
@@ -509,7 +513,7 @@ export function ComposerFooter({
       // Refocus editor
       editor.focus();
     }
-  }, [agentId, conversation, consumeAttachmentsForConversation, deliverAs, harness, isDisabled, model, onSend, onSendAcknowledged, onSendFailed, piConversation, sending, setSendingFor]);
+  }, [addCommandResult, agentId, conversation, consumeAttachmentsForConversation, deliverAs, harness, isDisabled, model, onSend, onSendAcknowledged, onSendFailed, piConversation, sending, setSendingFor]);
 
   useEffect(() => {
     const previousConversationName = previousConversationNameRef.current;

@@ -21,7 +21,6 @@ import {
   useComposerStore,
   useConversationOptimistic,
   useConversationOptimisticBaseCount,
-  useConversationFailed,
 } from '../../lib/composerStore';
 import { getWorkingPhase, getPhaseLabel, getPendingToolEntry, isSpinnerPhase, type WorkingPhase } from '../../lib/workingPhase';
 import { deriveRoundMarkers } from '../../lib/deriveRoundMarkers';
@@ -35,6 +34,7 @@ import { useConversationMutations } from '../CommandDeck/useConversationMutation
 import { ForkModal } from '../CommandDeck/ForkModal';
 import { closeConversationPanes } from '../../lib/panesStore';
 import { conversationMessagesQueryKey, useConversationMessagesStream } from './useConversationMessagesStream';
+import { useComposerDeliveryState } from './useComposerDeliveryState';
 import styles from '../CommandDeck/styles/command-deck.module.css';
 
 // PAN-1635: a turn that has shown no transcript progress for this long is
@@ -1236,13 +1236,10 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, re
   // retry. The store keeps both with the conversation they belong to.
   const optimisticMessages = useConversationOptimistic(conversation.name);
   const optimisticBaseCount = useConversationOptimisticBaseCount(conversation.name);
-  const failedMessages = useConversationFailed(conversation.name);
   const addOptimistic = useComposerStore((s) => s.addOptimistic);
   const acknowledgeOptimistic = useComposerStore((s) => s.acknowledgeOptimistic);
   const clearOptimistic = useComposerStore((s) => s.clearOptimistic);
   const failSend = useComposerStore((s) => s.failSend);
-  const removeFailed = useComposerStore((s) => s.removeFailed);
-  const retryFailed = useComposerStore((s) => s.retryFailed);
   const queryClient = useQueryClient();
 
   // When forkStatus transitions from non-null to null (fork completed),
@@ -1261,6 +1258,19 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, re
 
   const serverMessages = data?.messages ?? [];
   const workLog = data?.workLog ?? [];
+  const {
+    commandResults,
+    failedMessages,
+    handleConfirmCommand,
+    handleDiscardFailed,
+    handleRetryFailed,
+    handleSendFailed,
+  } = useComposerDeliveryState({
+    conversation,
+    agentId,
+    serverBaseCount: serverMessages.length,
+    onSendFailed: onSendFailedProp,
+  });
   // PAN-1523: ContextWindowMeter lives in the composer toolbar (matches
   // t3code's placement). The snapshot adapter normalizes the server's
   // `ContextUsage` shape into t3code's `ContextWindowSnapshot` so future
@@ -1281,7 +1291,7 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, re
   const absorbedCount = Math.min(optimisticMessages.length, echoedUserCount);
   const visibleOptimistic = optimisticMessages.slice(absorbedCount);
   const serverCaughtUp = optimisticMessages.length > 0 && visibleOptimistic.length === 0;
-  const messages = [...serverMessages, ...visibleOptimistic];
+  const messages = [...serverMessages, ...visibleOptimistic, ...commandResults];
 
   const handleMessageSent = useCallback((text: string) => {
     addOptimistic(conversation.name, text, serverMessages.length);
@@ -1291,23 +1301,6 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, re
     if (conversation.harness !== 'ohmypi' && conversation.harness !== 'pi') return;
     acknowledgeOptimistic(conversation.name, text);
   }, [acknowledgeOptimistic, conversation.harness, conversation.name]);
-
-  // Called by ComposerFooter when POST fails — move optimistic to failed outbox.
-  const handleSendFailed = useCallback((text: string) => {
-    failSend(conversation.name, text);
-    onSendFailedProp?.();
-  }, [failSend, conversation.name, onSendFailedProp]);
-
-  // Retry funnels through the same store action a first send uses, so the text
-  // becomes an optimistic "Sending…" bubble (covered by the stall/compaction
-  // safety net) instead of being removed from the outbox into the void.
-  const handleRetryFailed = useCallback((failedId: string, text: string) => {
-    void retryFailed(conversation.name, failedId, text, serverMessages.length, agentId);
-  }, [retryFailed, conversation.name, serverMessages.length, agentId]);
-
-  const handleDiscardFailed = useCallback((failedId: string) => {
-    removeFailed(conversation.name, failedId);
-  }, [removeFailed, conversation.name]);
 
   // Failed messages are NOT cleared on conversation switch — they persist in the
   // store keyed per-conversation so the retry outbox survives navigating away
@@ -1485,6 +1478,7 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, re
           failedMessages={failedMessages}
           onRetryFailed={handleRetryFailed}
           onDiscardFailed={handleDiscardFailed}
+          onConfirmCommand={handleConfirmCommand}
           proposedPlan={data?.proposedPlan}
           compactBoundaries={data?.compactBoundaries}
           compacting={isCompacting}

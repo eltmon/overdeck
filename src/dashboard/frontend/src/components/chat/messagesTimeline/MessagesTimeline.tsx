@@ -53,6 +53,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
   failedMessages,
   onRetryFailed,
   onDiscardFailed,
+  onConfirmCommand,
   proposedPlan,
   compactBoundaries,
   compacting,
@@ -455,6 +456,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
                     resolvedTheme={resolvedTheme}
                     hideToolCalls={hideToolCalls}
                     workingPhase={workingPhase}
+                    onConfirmCommand={onConfirmCommand}
                   />
                   {markersForRow?.map((marker) => (
                     <RoundDivider
@@ -492,6 +494,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
                 resolvedTheme={resolvedTheme}
                 hideToolCalls={hideToolCalls}
                 workingPhase={workingPhase}
+                onConfirmCommand={onConfirmCommand}
               />
               {markersForRow?.map((marker) => (
                 <RoundDivider
@@ -597,7 +600,9 @@ export const MessagesTimeline = memo(function MessagesTimeline({
               <ChatMarkdown text={fm.text} cwd={cwd} issueId={issueId} />
             </div>
             <div className={styles.failedMessageActions}>
-              <span className={styles.failedMessageLabel}>Failed to send</span>
+              <span className={styles.failedMessageLabel}>
+                {fm.kind === 'command' ? 'Command request failed' : 'Failed to send'}
+              </span>
               <button
                 className={styles.failedMessageBtn}
                 onClick={() => onRetryFailed?.(fm.id, fm.text)}
