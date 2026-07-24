@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-22T21:26:29.366Z",
-  "updated": "2026-07-24T17:48:43.727Z",
+  "updated": "2026-07-24T17:48:59.493Z",
   "pipeline": {
     "issueId": "PAN-2989",
     "reviewStatus": "pending",
@@ -38,8 +38,16 @@
   "harness": "claude-code",
   "model": "k3",
   "tasks": {
-    "sequence": 6,
-    "claims": {},
+    "sequence": 7,
+    "claims": {
+      "docs-record-lock-bounds-and-drain": {
+        "writerId": "agent-pan-2989",
+        "agentId": "agent-pan-2989",
+        "pid": 3588253,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-24T17:48:59.493Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-2989",
@@ -104,6 +112,7 @@
     "proactive-verdict-fallback-drain.proactive-verdict-fallback-drain.ac1": "completed",
     "proactive-verdict-fallback-drain.proactive-verdict-fallback-drain.ac2": "completed",
     "proactive-verdict-fallback-drain.proactive-verdict-fallback-drain.ac3": "completed",
-    "proactive-verdict-fallback-drain.proactive-verdict-fallback-drain.ac4": "completed"
+    "proactive-verdict-fallback-drain.proactive-verdict-fallback-drain.ac4": "completed",
+    "docs-record-lock-bounds-and-drain": "running"
   }
 }
