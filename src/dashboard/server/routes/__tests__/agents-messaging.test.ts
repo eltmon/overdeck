@@ -4,8 +4,18 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const agentMocks = vi.hoisted(() => ({
   getAgentState: vi.fn(),
   messageAgent: vi.fn().mockResolvedValue(undefined),
+  runCapturedCommand: vi.fn(async (argv: readonly string[]) => ({
+    kind: 'captured' as const,
+    status: 'completed' as const,
+    command: `/pan ${argv.join(' ')}`,
+    output: 'captured output',
+    truncated: false,
+  })),
 }));
 
+vi.mock('../../../../lib/composer-commands/executors.js', () => ({
+  runCapturedCommand: agentMocks.runCapturedCommand,
+}));
 vi.mock('../../../../lib/agents.js', () => ({
   getAgentState: agentMocks.getAgentState,
   messageAgent: agentMocks.messageAgent,
@@ -33,11 +43,13 @@ describe('agent message composer routing', () => {
   it('intercepts /pan with the shared structured result and skips messageAgent', async () => {
     const response = await handleAgentMessage('agent-pan-42', '/pan status');
 
-    expect(response.status).toBe(422);
+    expect(response.status).toBe(200);
     expect(decodeJsonResponse(response)).toEqual({
-      kind: 'terminal-only',
-      status: 'rejected',
-      message: '/pan status is recognized as a captured command, but its composer executor is not registered yet. Run it in a terminal for now.',
+      kind: 'captured',
+      status: 'completed',
+      command: '/pan status',
+      output: 'captured output',
+      truncated: false,
     });
     expect(agentMocks.getAgentState).toHaveBeenCalledWith('agent-pan-42');
     expect(agentMocks.messageAgent).not.toHaveBeenCalled();
