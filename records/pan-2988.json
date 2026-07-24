@@ -170,7 +170,7 @@
     "recordedAt": "2026-07-24T11:25:43.566Z"
   },
   "created": "2026-07-22T21:25:31.822Z",
-  "updated": "2026-07-24T11:47:40.076Z",
+  "updated": "2026-07-24T17:15:18.464Z",
   "pipeline": {
     "issueId": "PAN-2988",
     "reviewStatus": "passed",
@@ -179,79 +179,19 @@
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": true,
-    "updatedAt": "2026-07-24T11:47:40.008Z",
-    "reviewNotes": "Approved: current-main merge preserves the reviewed PAN-2988 behavior; cycle diff is clean across correctness, security, requirements, and performance",
-    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-24T17:15:18.445Z",
+    "blockerReasons": [
+      {
+        "type": "merge_conflict",
+        "summary": "Merge conflict with target branch",
+        "detectedAt": "2026-07-24T17:15:18.445Z"
+      }
+    ],
     "prUrl": "https://github.com/eltmon/overdeck/pull/3010",
     "reviewedAtCommit": "76eef8ab1041f33a1ff8c43cb1bffdc0efcc7291",
     "lastVerifiedCommit": "d1c367f682fc33cdf4c28a14054733e75d6f925c",
-    "reviewRequestedAt": "2026-07-24T11:10:34.462Z",
-    "reviewSpawnedAt": "2026-07-24T11:18:29.260Z",
-    "scopeDrift": {
-      "outsideDeclaredScope": [
-        "src/dashboard/frontend/src/components/KanbanBoard.test.tsx",
-        "src/dashboard/frontend/src/components/drawer/IssueDrawer.test.tsx",
-        "src/dashboard/frontend/src/lib/__tests__/issueActions.c-actions.test.ts"
-      ],
-      "declaredScopeUntouched": [],
-      "declaredScope": [
-        "docs/ISSUE-VIEW.md",
-        "reference/troubleshooting.mdx",
-        "scripts/file-size-baseline.txt",
-        "src/cli/commands/resync-review.ts",
-        "src/cli/commands/review-subcommands.ts",
-        "src/cli/index.ts",
-        "src/dashboard/frontend/src/lib/__tests__/issueActions.parity.test.tsx",
-        "src/dashboard/frontend/src/lib/issueActions.ts",
-        "src/dashboard/server/deacon-main.ts",
-        "src/dashboard/server/event-store.ts",
-        "src/dashboard/server/main.ts",
-        "src/dashboard/server/review-status-emit.ts",
-        "src/dashboard/server/routes/workspaces/review-control.ts",
-        "src/dashboard/server/services/review-status-reconcile-service.ts",
-        "src/lib/review-status-enrichment.ts",
-        "src/lib/review-status-reconcile.ts",
-        "src/lib/review-status.ts",
-        "sync-sources/skills/pan-review/SKILL.md",
-        "tests/dashboard/event-store.test.ts",
-        "tests/unit/dashboard/server/review-status-emit.test.ts",
-        "tests/unit/dashboard/server/routes/resync-review-route.test.ts",
-        "tests/unit/dashboard/server/services/review-status-reconcile-service.test.ts",
-        "tests/unit/lib/review-status-enrichment.test.ts",
-        "tests/unit/lib/review-status-reconcile.test.ts"
-      ],
-      "actualChangedFiles": [
-        "docs/ISSUE-VIEW.md",
-        "reference/troubleshooting.mdx",
-        "scripts/file-size-baseline.txt",
-        "src/cli/commands/resync-review.ts",
-        "src/cli/commands/review-subcommands.ts",
-        "src/cli/index.ts",
-        "src/dashboard/frontend/src/components/KanbanBoard.test.tsx",
-        "src/dashboard/frontend/src/components/drawer/IssueDrawer.test.tsx",
-        "src/dashboard/frontend/src/lib/__tests__/issueActions.c-actions.test.ts",
-        "src/dashboard/frontend/src/lib/__tests__/issueActions.parity.test.tsx",
-        "src/dashboard/frontend/src/lib/issueActions.ts",
-        "src/dashboard/server/deacon-main.ts",
-        "src/dashboard/server/event-store.ts",
-        "src/dashboard/server/main.ts",
-        "src/dashboard/server/review-status-emit.ts",
-        "src/dashboard/server/routes/workspaces/review-control.ts",
-        "src/dashboard/server/services/review-status-reconcile-service.ts",
-        "src/lib/review-status-enrichment.ts",
-        "src/lib/review-status-reconcile.ts",
-        "src/lib/review-status.ts",
-        "sync-sources/skills/pan-review/SKILL.md",
-        "tests/dashboard/event-store.test.ts",
-        "tests/unit/dashboard/server/review-status-emit.test.ts",
-        "tests/unit/dashboard/server/routes/resync-review-route.test.ts",
-        "tests/unit/dashboard/server/services/review-status-reconcile-service.test.ts",
-        "tests/unit/lib/review-status-enrichment.test.ts",
-        "tests/unit/lib/review-status-reconcile.test.ts"
-      ],
-      "recordedAt": "2026-07-24T11:10:15.151Z"
-    }
+    "reviewSpawnedAt": "2026-07-24T11:18:29.260Z"
   },
   "closeOut": {
     "usage": {
@@ -274,10 +214,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 196,
-            "output": 58449,
-            "cacheRead": 22263457,
-            "cacheWrite": 295400
+            "input": 200,
+            "output": 60006,
+            "cacheRead": 22854460,
+            "cacheWrite": 297038
           }
         },
         "work": {
@@ -297,15 +237,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 226,
-          "output": 64111,
-          "cacheRead": 24168416,
-          "cacheWrite": 437639
+          "input": 230,
+          "output": 65668,
+          "cacheRead": 24759419,
+          "cacheWrite": 439277
         }
       },
       "costAtCloseOut": {
-        "usd": 222.575551,
-        "pricingAsOf": "2026-07-24T11:47:40.069Z"
+        "usd": 222.713425,
+        "pricingAsOf": "2026-07-24T17:15:18.460Z"
       }
     },
     "merges": [
