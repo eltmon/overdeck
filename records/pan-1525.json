@@ -27,7 +27,7 @@
   ],
   "feedback": [],
   "created": "2026-07-12T09:32:29.900Z",
-  "updated": "2026-07-24T21:40:39.430Z",
+  "updated": "2026-07-24T21:52:12.634Z",
   "pipeline": {
     "issueId": "PAN-1525",
     "reviewStatus": "pending",
@@ -109,16 +109,8 @@
   "model": "claude-sonnet-5",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 23,
-    "claims": {
-      "native-capabilities": {
-        "writerId": "agent-pan-1525",
-        "agentId": "agent-pan-1525",
-        "pid": 3078879,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-24T21:40:39.430Z"
-      }
-    },
+    "sequence": 24,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-1525",
@@ -240,6 +232,17 @@
         "outcome": "completed",
         "reason": "Composer dialog and destructive policies now issue five-minute, target-and-argv-bound single-use nonces. Invalid, expired, replayed, mismatched, and mistyped confirmations return 422 without execution; destructive policies fail closed without typed text. Fake-timer tests, route tests, typecheck, lint/circular guards, and throwaway Node 22 API verification passed.",
         "releasedAt": "2026-07-24T21:40:22.779Z"
+      },
+      {
+        "writerId": "agent-pan-1525",
+        "agentId": "agent-pan-1525",
+        "pid": 3078879,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-24T21:40:39.430Z",
+        "itemId": "native-capabilities",
+        "outcome": "completed",
+        "reason": "Harness behavior now carries source-annotated native command capabilities: Claude Code 2.1.209 exposes verified /model, /context, /effort, and /cancel entries, while unverified Codex, Pi, and ACP inventories fail closed as empty. The composer builds the active harness group dynamically. Runtime/frontend tests, typecheck, lint, and Playwright screenshots across Claude Code and Codex passed.",
+        "releasedAt": "2026-07-24T21:52:12.634Z"
       }
     ],
     "statusReasons": {
@@ -286,6 +289,10 @@
       "confirmations": {
         "reason": "Composer dialog and destructive policies now issue five-minute, target-and-argv-bound single-use nonces. Invalid, expired, replayed, mismatched, and mistyped confirmations return 422 without execution; destructive policies fail closed without typed text. Fake-timer tests, route tests, typecheck, lint/circular guards, and throwaway Node 22 API verification passed.",
         "updatedAt": "2026-07-24T21:40:22.779Z"
+      },
+      "native-capabilities": {
+        "reason": "Harness behavior now carries source-annotated native command capabilities: Claude Code 2.1.209 exposes verified /model, /context, /effort, and /cancel entries, while unverified Codex, Pi, and ACP inventories fail closed as empty. The composer builds the active harness group dynamically. Runtime/frontend tests, typecheck, lint, and Playwright screenshots across Claude Code and Codex passed.",
+        "updatedAt": "2026-07-24T21:52:12.634Z"
       }
     }
   },
@@ -335,6 +342,9 @@
     "confirmations.confirmations.ac1": "completed",
     "confirmations.confirmations.ac2": "completed",
     "confirmations.confirmations.ac3": "completed",
-    "native-capabilities": "running"
+    "native-capabilities": "completed",
+    "native-capabilities.native-capabilities.ac1": "completed",
+    "native-capabilities.native-capabilities.ac2": "completed",
+    "native-capabilities.native-capabilities.ac3": "completed"
   }
 }
