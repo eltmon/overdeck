@@ -37,6 +37,11 @@ import {
 } from '../pan-dir/record.js';
 import { pruneStoppedAgentsForIssue } from '../cloister/agent-gc.js';
 import { evaluateDodGate } from './dod-gate.js';
+import {
+  capturePipelineStage,
+  resolvePipelineTelemetryContext,
+  type PipelineTelemetryContext,
+} from '../telemetry/pipeline.js';
 import { acceptFlagFor, BRANCH_ABSENT_MERGE_ERROR, DOD_ROWS, type DodGateResult } from './dod.js';
 
 const execAsync = promisify(exec);
@@ -218,6 +223,14 @@ export function closeOut(
     }
 
     // 5+6. Teardown workspace + agent state
+    const telemetryContext: PipelineTelemetryContext | null = yield* Effect.promise(async () => {
+      try {
+        return await resolvePipelineTelemetryContext(ctx.issueId);
+      } catch {
+        // Membership and agent attribution are best-effort and must not abort close-out.
+        return null;
+      }
+    });
     const closeOutConfig = (yield* Effect.promise(() => Effect.runPromise(loadCloisterConfig()))).close_out;
     const teardownSteps = yield* teardownWorkspace(ctx, {
       deleteWorkspace: closeOutConfig?.remove_workspace ?? false,
@@ -271,7 +284,9 @@ export function closeOut(
     yield* Effect.promise(() => resetPostMergeStateForIssue(ctx.issueId));
     yield* Effect.promise(() => recordFeatureRegistryLifecycle({ issueId: ctx.issueId, status: 'archived' }));
 
-    return buildResult('close-out', ctx.issueId, allSteps, start, dodGate);
+    const result = buildResult('close-out', ctx.issueId, allSteps, start, dodGate);
+    if (result.success && !markTerminal.skipped) capturePipelineStage('closed_out', telemetryContext);
+    return result;
   });
 }
 

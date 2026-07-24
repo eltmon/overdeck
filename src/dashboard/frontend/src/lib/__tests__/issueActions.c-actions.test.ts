@@ -237,6 +237,7 @@ describe('C-ACTIONS · enabled-set snapshot per phase (§3.9 gate)', () => {
           "plan",
           "autoPlan",
           "startSkipPlanning",
+          "resyncPipelineState",
           "wipe",
           "resetIssue",
           "cancel",
@@ -248,6 +249,7 @@ describe('C-ACTIONS · enabled-set snapshot per phase (§3.9 gate)', () => {
           "startAgent",
           "restartReview",
           "recoverReview",
+          "resyncPipelineState",
           "purgeReview",
           "syncMain",
           "rebuildAndStart",
@@ -265,6 +267,7 @@ describe('C-ACTIONS · enabled-set snapshot per phase (§3.9 gate)', () => {
           "restartFromPlan",
         ],
         "MERGED": [
+          "resyncPipelineState",
           "syncMain",
           "reopen",
           "closeOut",
@@ -280,6 +283,7 @@ describe('C-ACTIONS · enabled-set snapshot per phase (§3.9 gate)', () => {
         "PLANNED": [
           "startAgent",
           "requestReview",
+          "resyncPipelineState",
           "syncMain",
           "rebuildAndStart",
           "inspectTask",
@@ -296,6 +300,7 @@ describe('C-ACTIONS · enabled-set snapshot per phase (§3.9 gate)', () => {
           "restartFromPlan",
         ],
         "READY_TO_MERGE": [
+          "resyncPipelineState",
           "syncMain",
           "inspectTask",
           "merge",
@@ -314,6 +319,7 @@ describe('C-ACTIONS · enabled-set snapshot per phase (§3.9 gate)', () => {
         ],
         "REVIEW_RUNNING": [
           "restartReview",
+          "resyncPipelineState",
           "purgeReview",
           "syncMain",
           "inspectTask",
@@ -331,6 +337,7 @@ describe('C-ACTIONS · enabled-set snapshot per phase (§3.9 gate)', () => {
         ],
         "TESTING": [
           "restartReview",
+          "resyncPipelineState",
           "purgeReview",
           "syncMain",
           "inspectTask",
@@ -349,6 +356,7 @@ describe('C-ACTIONS · enabled-set snapshot per phase (§3.9 gate)', () => {
         "WORK_IDLE": [
           "startAgent",
           "requestReview",
+          "resyncPipelineState",
           "recoverAgent",
           "syncMain",
           "rebuildAndStart",
@@ -370,6 +378,7 @@ describe('C-ACTIONS · enabled-set snapshot per phase (§3.9 gate)', () => {
         "WORK_PAUSED": [
           "tell",
           "doneWork",
+          "resyncPipelineState",
           "stopAgent",
           "unpause",
           "syncMain",
@@ -391,6 +400,7 @@ describe('C-ACTIONS · enabled-set snapshot per phase (§3.9 gate)', () => {
         "WORK_RUNNING": [
           "tell",
           "doneWork",
+          "resyncPipelineState",
           "stopAgent",
           "pause",
           "syncMain",

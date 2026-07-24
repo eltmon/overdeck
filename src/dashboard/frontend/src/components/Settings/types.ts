@@ -208,6 +208,11 @@ export interface SettingsConfig {
       enabled?: boolean;
     };
   };
+  telemetry?: {
+    enabled: boolean;
+    effectiveEnabled?: boolean;
+    installId?: string;
+  };
   memory?: MemorySettingsConfig;
   background_ai?: BackgroundAiConfig;
   tts_summarizer?: {

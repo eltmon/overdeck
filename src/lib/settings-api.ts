@@ -4,7 +4,6 @@
  * Provides API-compatible interface for settings management.
  * Converts between YAML config format and frontend API format.
  */
-
 import { readFile, writeFile } from 'fs/promises';
 import { parseDocument } from 'yaml';
 import { Data, Effect } from 'effect';
@@ -32,10 +31,14 @@ import {
 import { ModelId } from './settings.js';
 import type { Role } from './agents.js';
 import { tieredExecutionConfigForSave, validateTieredExecutionSettings, type ApiTieredExecutionConfig } from './settings-api-tiered-execution.js';
+import { validateApiTelemetryConfig, type ApiTelemetryConfig } from './settings-api-telemetry.js';
 import type { RuntimeName } from './runtimes/types.js';
 import { getBuiltInDefaultHarness } from './providers.js';
 import { defaultBackgroundAiFeatures, type BackgroundAiFeature } from './background-ai/registry.js';
 import { MODEL_CAPABILITIES, hasModelCapabilitySync, MODEL_DEPRECATIONS, resolveModelIdSync, getModelEffortLevelsSync } from './model-capabilities.js';
+import { resolveTelemetryEnabled, telemetryEnvironmentForcesOff } from './telemetry/config.js';
+import { getOrCreateInstallId } from './telemetry/install-id.js';
+import { synchronizeAnalyticsServices } from './telemetry/service.js';
 
 /**
  * Deprecation warning in API format
@@ -196,6 +199,7 @@ export interface ApiSettingsConfig {
       enabled?: boolean;
     };
   };
+  telemetry?: ApiTelemetryConfig;
   tts?: ApiTtsConfig;
   /** TTS activity-summarizer model/enabled, surfaced for the Background AI section (PAN-1589). */
   tts_summarizer?: {
@@ -702,6 +706,11 @@ export function loadSettingsApi(): ApiSettingsConfig {
         enabled: config.tldr?.enabled ?? true,
       },
     },
+    telemetry: {
+      enabled: config.telemetry?.enabled ?? true,
+      effectiveEnabled: resolveTelemetryEnabled(),
+      installId: getOrCreateInstallId(),
+    },
     tts: toApiTtsConfig(config.tts),
     tts_summarizer: {
       model: config.ttsSummarizer?.model,
@@ -803,6 +812,7 @@ async function writeYamlConfigPreservingComments(yamlConfig: YamlConfig): Promis
     ['memory', config.memory],
     ['background_ai', config.background_ai],
     ['tracker_keys', config.tracker_keys],
+    ['telemetry', config.telemetry],
     ['experimental', config.experimental],
     ['claude', config.claude],
     ['codex', config.codex],
@@ -931,6 +941,7 @@ async function saveSettingsApiPromise(settings: ApiSettingsConfig): Promise<void
         }
       : undefined,
     tracker_keys: settings.tracker_keys,
+    telemetry: settings.telemetry ? { enabled: settings.telemetry.enabled } : undefined,
     experimental: settings.experimental
       ? {
           experimentalFeatures: settings.experimental.experimentalFeatures,
@@ -952,9 +963,9 @@ async function saveSettingsApiPromise(settings: ApiSettingsConfig): Promise<void
 
   await writeYamlConfigPreservingComments(yamlConfig);
 
-  // Clear the config-yaml cache because mtime-based invalidation can miss rapid
-  // writes (same-millisecond) or coarse filesystem mtime resolution.
+  // Clear the cache because rapid writes or coarse filesystem mtime resolution can miss invalidation.
   clearConfigCache();
+  await synchronizeAnalyticsServices();
 }
 
 async function updateSettingsApiPromise(updates: Partial<ApiSettingsConfig>): Promise<ApiSettingsConfig> {
@@ -1034,6 +1045,11 @@ async function updateSettingsApiPromise(updates: Partial<ApiSettingsConfig>): Pr
     tracker_keys: {
       ...current.tracker_keys,
       ...updates.tracker_keys,
+    },
+    telemetry: {
+      enabled: updates.telemetry?.enabled ?? current.telemetry?.enabled ?? true,
+      effectiveEnabled: !telemetryEnvironmentForcesOff() && (updates.telemetry?.enabled ?? current.telemetry?.enabled ?? true),
+      installId: current.telemetry?.installId,
     },
     experimental: {
       ...current.experimental,
@@ -1186,6 +1202,8 @@ export function validateSettingsApi(settings: ApiSettingsConfig): ValidationResu
       errors.push('memory.worker_concurrency must be a positive integer');
     }
   }
+
+  if (settings.telemetry !== undefined) errors.push(...validateApiTelemetryConfig(settings.telemetry));
 
   // Validate experimental flags — every flag must be a boolean if present.
   if (settings.experimental !== undefined) {
