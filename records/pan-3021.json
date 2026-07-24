@@ -2,7 +2,7 @@
   "issueId": "PAN-3021",
   "schemaVersion": 2,
   "created": "2026-07-24T17:28:09.122Z",
-  "updated": "2026-07-24T17:28:09.122Z",
+  "updated": "2026-07-24T17:28:10.541Z",
   "pipeline": {
     "issueId": "PAN-3021",
     "reviewStatus": "pending",
@@ -25,5 +25,7 @@
       "note": "Planning session started for PAN-3021: Composer slash-command autocomplete is a hand-maintained list drifted 38 commands behind the CLI (strike, swarm, task, approve, merge, flywheel…)",
       "timestamp": "2026-07-24T17:28:09.122Z"
     }
-  ]
+  ],
+  "harness": "claude-code",
+  "model": "claude-fable-5"
 }
