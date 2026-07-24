@@ -289,3 +289,22 @@ export const COMPOSER_COMMAND_MANIFEST: ComposerCommandManifestEntry[] = [
   {"id":"pan-cost-backfill","path":["cost","backfill"],"display":"/pan cost backfill","description":"Reconstruct cost events from stored harness session transcripts","args":[],"options":[{"flags":"--write","description":"Persist non-duplicate reconstructed cost events","required":false,"valueHint":null}],"aliases":[],"category":"Data"},
   {"id":"pan-serve","path":["serve"],"display":"/pan serve","description":"Start the dashboard server and open it in the default browser (npx launcher)","args":[],"options":[{"flags":"--port <port>","description":"Port to listen on","required":true,"valueHint":"port"}],"aliases":[],"category":"CLI"},
 ]
+
+export const COMPOSER_COMMAND_INSERT_OVERRIDES: Readonly<Record<string, string>> = {
+  "plan finalize": "/pan plan finalize ",
+  "admin specialists done": "/pan admin specialists done",
+  "admin specialists logs": "/pan admin specialists logs",
+  "admin specialists cleanup-logs": "/pan admin specialists cleanup-logs"
+}
+
+export const COMPOSER_COMMAND_VARIANTS = [
+  {"id":"pan-show-cv","path":["show"],"display":"/pan show --cv","description":"Show agent work history (CV)","insert":"/pan show --cv","category":"Observation"},
+  {"id":"pan-show-context","path":["show"],"display":"/pan show --context","description":"Show context engineering state","insert":"/pan show --context","category":"Observation"},
+  {"id":"pan-show-health","path":["show"],"display":"/pan show --health","description":"Show health + heartbeat status","insert":"/pan show --health","category":"Observation"},
+  {"id":"pan-plan-auto-start","path":["plan"],"display":"/pan plan --auto --auto-start","description":"Auto-plan the issue, then auto-start the work agent","insert":"/pan plan --auto --auto-start ","category":"Lifecycle"},
+  {"id":"pan-review-reset-session","path":["review","reset"],"display":"/pan review reset --session","description":"Reset review and clear saved Claude session","insert":"/pan review reset --session","category":"Review"},
+  {"id":"pan-fork-plain","path":["fork"],"display":"/pan fork --plain","description":"Plain fork — copy raw history, skip summary","insert":"/pan fork --plain","category":"Conversation"},
+  {"id":"pan-handoff-model","path":["handoff"],"display":"/pan handoff --model","description":"Model for the new conversation","insert":"/pan handoff --model ","category":"Conversation"},
+  {"id":"pan-handoff-harness","path":["handoff"],"display":"/pan handoff --harness","description":"Harness for the new conversation (claude-code|pi)","insert":"/pan handoff --harness ","category":"Conversation"},
+  {"id":"pan-handoff-cwd","path":["handoff"],"display":"/pan handoff --cwd","description":"Working directory for the new conversation","insert":"/pan handoff --cwd ","category":"Conversation"},
+] as const

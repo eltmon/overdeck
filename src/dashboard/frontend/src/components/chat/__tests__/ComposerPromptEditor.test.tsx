@@ -135,15 +135,37 @@ describe('ComposerPromptEditor', () => {
     onChangePluginCallback = null;
   });
 
-  it('offers reset-to-planned in composer autocomplete', () => {
+  it('offers portable reset-to-planned autocomplete', () => {
     expect(SLASH_COMMANDS).toContainEqual(expect.objectContaining({
       id: 'pan-reset-to-planned',
-      label: 'pan reset-to-planned',
-      insert: 'pan reset-to-planned ',
+      label: '/pan reset-to-planned',
+      insert: '/pan reset-to-planned ',
     }));
   });
 
-  it('groups static and generated commands in the slash menu', () => {
+  it('selects the portable start command with argument-ready insertion text', () => {
+    const start = SLASH_COMMANDS.find(command => command.id === 'pan-start');
+    const onSelect = vi.fn();
+
+    expect(start).toBeDefined();
+    render(
+      <SlashMenu
+        commands={[start!]}
+        filter=""
+        selectedIndex={0}
+        onSelect={onSelect}
+        onClose={noop}
+        anchorRect={null}
+      />,
+    );
+
+    fireEvent.click(screen.getByText('/pan start'));
+    expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({
+      insert: '/pan start ',
+    }));
+  });
+
+  it('groups static and Overdeck commands in the slash menu', () => {
     const commands = SLASH_COMMANDS.filter(command =>
       command.id === 'model' || command.id === 'pan-strike');
 
@@ -161,7 +183,7 @@ describe('ComposerPromptEditor', () => {
     expect(screen.getByText('AI CLI')).toBeInTheDocument();
     expect(screen.getByText('/model')).toBeInTheDocument();
     expect(screen.getByText('Lifecycle')).toBeInTheDocument();
-    expect(screen.getByText('pan strike')).toBeInTheDocument();
+    expect(screen.getByText('/pan strike')).toBeInTheDocument();
   });
 
   afterEach(() => {

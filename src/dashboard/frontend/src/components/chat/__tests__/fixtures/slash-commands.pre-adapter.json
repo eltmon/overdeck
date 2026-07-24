@@ -1,0 +1,1050 @@
+[
+  {
+    "label": "/model",
+    "insert": "/model "
+  },
+  {
+    "label": "/context",
+    "insert": "/context "
+  },
+  {
+    "label": "/effort",
+    "insert": "/effort "
+  },
+  {
+    "label": "/cancel",
+    "insert": "/cancel"
+  },
+  {
+    "label": "/handoff",
+    "insert": "/handoff "
+  },
+  {
+    "label": "pan init",
+    "insert": "pan init"
+  },
+  {
+    "label": "pan sync",
+    "insert": "pan sync"
+  },
+  {
+    "label": "pan context list",
+    "insert": "pan context list"
+  },
+  {
+    "label": "pan context edit",
+    "insert": "pan context edit"
+  },
+  {
+    "label": "pan context sync",
+    "insert": "pan context sync"
+  },
+  {
+    "label": "pan context diff",
+    "insert": "pan context diff"
+  },
+  {
+    "label": "pan context validate",
+    "insert": "pan context validate"
+  },
+  {
+    "label": "pan context migrate",
+    "insert": "pan context migrate"
+  },
+  {
+    "label": "pan restore",
+    "insert": "pan restore "
+  },
+  {
+    "label": "pan backup list",
+    "insert": "pan backup list"
+  },
+  {
+    "label": "pan backup clean",
+    "insert": "pan backup clean"
+  },
+  {
+    "label": "pan skills",
+    "insert": "pan skills"
+  },
+  {
+    "label": "pan issues",
+    "insert": "pan issues"
+  },
+  {
+    "label": "pan show",
+    "insert": "pan show "
+  },
+  {
+    "label": "pan open",
+    "insert": "pan open "
+  },
+  {
+    "label": "pan review pending",
+    "insert": "pan review pending"
+  },
+  {
+    "label": "pan review request",
+    "insert": "pan review request "
+  },
+  {
+    "label": "pan review reset",
+    "insert": "pan review reset "
+  },
+  {
+    "label": "pan review resync",
+    "insert": "pan review resync "
+  },
+  {
+    "label": "pan review abort",
+    "insert": "pan review abort "
+  },
+  {
+    "label": "pan review mode",
+    "insert": "pan review mode "
+  },
+  {
+    "label": "pan review scope",
+    "insert": "pan review scope "
+  },
+  {
+    "label": "pan review restart",
+    "insert": "pan review restart "
+  },
+  {
+    "label": "pan staffing",
+    "insert": "pan staffing "
+  },
+  {
+    "label": "pan backlog write-sequence",
+    "insert": "pan backlog write-sequence "
+  },
+  {
+    "label": "pan backlog forecast",
+    "insert": "pan backlog forecast"
+  },
+  {
+    "label": "pan plan",
+    "insert": "pan plan "
+  },
+  {
+    "label": "pan plan finalize",
+    "insert": "pan plan finalize "
+  },
+  {
+    "label": "pan plan done",
+    "insert": "pan plan done "
+  },
+  {
+    "label": "pan tell",
+    "insert": "pan tell "
+  },
+  {
+    "label": "pan monitor",
+    "insert": "pan monitor "
+  },
+  {
+    "label": "pan inbox",
+    "insert": "pan inbox "
+  },
+  {
+    "label": "pan kill",
+    "insert": "pan kill "
+  },
+  {
+    "label": "pan reset-to-planned",
+    "insert": "pan reset-to-planned "
+  },
+  {
+    "label": "pan pause",
+    "insert": "pan pause "
+  },
+  {
+    "label": "pan unpause",
+    "insert": "pan unpause "
+  },
+  {
+    "label": "pan untroubled",
+    "insert": "pan untroubled "
+  },
+  {
+    "label": "pan fork",
+    "insert": "pan fork "
+  },
+  {
+    "label": "pan handoff",
+    "insert": "pan handoff "
+  },
+  {
+    "label": "pan unarchive-conversation",
+    "insert": "pan unarchive-conversation "
+  },
+  {
+    "label": "pan resume",
+    "insert": "pan resume "
+  },
+  {
+    "label": "pan recover",
+    "insert": "pan recover "
+  },
+  {
+    "label": "pan sync-main",
+    "insert": "pan sync-main "
+  },
+  {
+    "label": "pan done",
+    "insert": "pan done "
+  },
+  {
+    "label": "pan approve",
+    "insert": "pan approve "
+  },
+  {
+    "label": "pan reopen",
+    "insert": "pan reopen "
+  },
+  {
+    "label": "pan wipe",
+    "insert": "pan wipe "
+  },
+  {
+    "label": "pan destroy",
+    "insert": "pan destroy "
+  },
+  {
+    "label": "pan close",
+    "insert": "pan close "
+  },
+  {
+    "label": "pan start",
+    "insert": "pan start "
+  },
+  {
+    "label": "pan strike",
+    "insert": "pan strike "
+  },
+  {
+    "label": "pan strike-ready",
+    "insert": "pan strike-ready "
+  },
+  {
+    "label": "pan knowledge",
+    "insert": "pan knowledge "
+  },
+  {
+    "label": "pan knowledge open",
+    "insert": "pan knowledge open"
+  },
+  {
+    "label": "pan swarm",
+    "insert": "pan swarm "
+  },
+  {
+    "label": "pan swarm recover",
+    "insert": "pan swarm recover "
+  },
+  {
+    "label": "pan swarm freeze",
+    "insert": "pan swarm freeze "
+  },
+  {
+    "label": "pan swarm resume",
+    "insert": "pan swarm resume "
+  },
+  {
+    "label": "pan swarm status",
+    "insert": "pan swarm status "
+  },
+  {
+    "label": "pan swarm stop",
+    "insert": "pan swarm stop "
+  },
+  {
+    "label": "pan swarm reset",
+    "insert": "pan swarm reset "
+  },
+  {
+    "label": "pan task next",
+    "insert": "pan task next "
+  },
+  {
+    "label": "pan task show",
+    "insert": "pan task show "
+  },
+  {
+    "label": "pan task claim",
+    "insert": "pan task claim "
+  },
+  {
+    "label": "pan task done",
+    "insert": "pan task done "
+  },
+  {
+    "label": "pan task block",
+    "insert": "pan task block "
+  },
+  {
+    "label": "pan task unblock",
+    "insert": "pan task unblock "
+  },
+  {
+    "label": "pan task cancel",
+    "insert": "pan task cancel "
+  },
+  {
+    "label": "pan workspace create",
+    "insert": "pan workspace create "
+  },
+  {
+    "label": "pan workspace migrate",
+    "insert": "pan workspace migrate "
+  },
+  {
+    "label": "pan workspace ssh",
+    "insert": "pan workspace ssh "
+  },
+  {
+    "label": "pan workspace sync-auth",
+    "insert": "pan workspace sync-auth "
+  },
+  {
+    "label": "pan workspace start",
+    "insert": "pan workspace start "
+  },
+  {
+    "label": "pan workspace stop",
+    "insert": "pan workspace stop "
+  },
+  {
+    "label": "pan workspace list",
+    "insert": "pan workspace list"
+  },
+  {
+    "label": "pan workspace destroy",
+    "insert": "pan workspace destroy "
+  },
+  {
+    "label": "pan workspace render-devcontainer",
+    "insert": "pan workspace render-devcontainer "
+  },
+  {
+    "label": "pan workspace deep-clean",
+    "insert": "pan workspace deep-clean "
+  },
+  {
+    "label": "pan workspace rebuild",
+    "insert": "pan workspace rebuild "
+  },
+  {
+    "label": "pan workspace reap",
+    "insert": "pan workspace reap"
+  },
+  {
+    "label": "pan workspace update",
+    "insert": "pan workspace update "
+  },
+  {
+    "label": "pan workspace use-config",
+    "insert": "pan workspace use-config "
+  },
+  {
+    "label": "pan workspace add-repo",
+    "insert": "pan workspace add-repo "
+  },
+  {
+    "label": "pan test run",
+    "insert": "pan test run "
+  },
+  {
+    "label": "pan test list",
+    "insert": "pan test list "
+  },
+  {
+    "label": "pan tts voices list",
+    "insert": "pan tts voices list"
+  },
+  {
+    "label": "pan tts voices show",
+    "insert": "pan tts voices show "
+  },
+  {
+    "label": "pan tts voices play",
+    "insert": "pan tts voices play "
+  },
+  {
+    "label": "pan tts voices delete",
+    "insert": "pan tts voices delete "
+  },
+  {
+    "label": "pan tts voices set-default",
+    "insert": "pan tts voices set-default "
+  },
+  {
+    "label": "pan tts voices map",
+    "insert": "pan tts voices map "
+  },
+  {
+    "label": "pan tts start",
+    "insert": "pan tts start"
+  },
+  {
+    "label": "pan tts stop",
+    "insert": "pan tts stop"
+  },
+  {
+    "label": "pan tts status",
+    "insert": "pan tts status"
+  },
+  {
+    "label": "pan tts restart",
+    "insert": "pan tts restart"
+  },
+  {
+    "label": "pan tts install-systemd",
+    "insert": "pan tts install-systemd"
+  },
+  {
+    "label": "pan tts test",
+    "insert": "pan tts test "
+  },
+  {
+    "label": "pan release check",
+    "insert": "pan release check"
+  },
+  {
+    "label": "pan release stable",
+    "insert": "pan release stable"
+  },
+  {
+    "label": "pan release canary",
+    "insert": "pan release canary"
+  },
+  {
+    "label": "pan release sourcemaps",
+    "insert": "pan release sourcemaps"
+  },
+  {
+    "label": "pan release notes",
+    "insert": "pan release notes "
+  },
+  {
+    "label": "pan rollout status",
+    "insert": "pan rollout status "
+  },
+  {
+    "label": "pan rollout retry",
+    "insert": "pan rollout retry "
+  },
+  {
+    "label": "pan memory search",
+    "insert": "pan memory search "
+  },
+  {
+    "label": "pan memory status",
+    "insert": "pan memory status "
+  },
+  {
+    "label": "pan memory reset",
+    "insert": "pan memory reset "
+  },
+  {
+    "label": "pan memory summary",
+    "insert": "pan memory summary "
+  },
+  {
+    "label": "pan memory doctor",
+    "insert": "pan memory doctor"
+  },
+  {
+    "label": "pan memory config",
+    "insert": "pan memory config"
+  },
+  {
+    "label": "pan briefing",
+    "insert": "pan briefing"
+  },
+  {
+    "label": "pan compliance status",
+    "insert": "pan compliance status"
+  },
+  {
+    "label": "pan registry tag",
+    "insert": "pan registry tag "
+  },
+  {
+    "label": "pan registry list",
+    "insert": "pan registry list"
+  },
+  {
+    "label": "pan registry show",
+    "insert": "pan registry show "
+  },
+  {
+    "label": "pan orders create",
+    "insert": "pan orders create "
+  },
+  {
+    "label": "pan orders list",
+    "insert": "pan orders list"
+  },
+  {
+    "label": "pan orders show",
+    "insert": "pan orders show "
+  },
+  {
+    "label": "pan orders add",
+    "insert": "pan orders add "
+  },
+  {
+    "label": "pan orders remove",
+    "insert": "pan orders remove "
+  },
+  {
+    "label": "pan orders move",
+    "insert": "pan orders move "
+  },
+  {
+    "label": "pan orders start",
+    "insert": "pan orders start "
+  },
+  {
+    "label": "pan docs query",
+    "insert": "pan docs query "
+  },
+  {
+    "label": "pan docs reindex",
+    "insert": "pan docs reindex"
+  },
+  {
+    "label": "pan docs disable",
+    "insert": "pan docs disable"
+  },
+  {
+    "label": "pan docs enable",
+    "insert": "pan docs enable"
+  },
+  {
+    "label": "pan admin commands",
+    "insert": "pan admin commands"
+  },
+  {
+    "label": "pan admin state migrate",
+    "insert": "pan admin state migrate "
+  },
+  {
+    "label": "pan admin state migrate-xbrief",
+    "insert": "pan admin state migrate-xbrief "
+  },
+  {
+    "label": "pan admin reconcile-labels",
+    "insert": "pan admin reconcile-labels"
+  },
+  {
+    "label": "pan admin cloister status",
+    "insert": "pan admin cloister status"
+  },
+  {
+    "label": "pan admin cloister start",
+    "insert": "pan admin cloister start"
+  },
+  {
+    "label": "pan admin cloister stop",
+    "insert": "pan admin cloister stop"
+  },
+  {
+    "label": "pan admin cloister emergency-stop",
+    "insert": "pan admin cloister emergency-stop"
+  },
+  {
+    "label": "pan admin cloister brake",
+    "insert": "pan admin cloister brake"
+  },
+  {
+    "label": "pan admin cloister freeze",
+    "insert": "pan admin cloister freeze"
+  },
+  {
+    "label": "pan admin cloister unfreeze",
+    "insert": "pan admin cloister unfreeze"
+  },
+  {
+    "label": "pan admin specialists list",
+    "insert": "pan admin specialists list"
+  },
+  {
+    "label": "pan admin specialists wake",
+    "insert": "pan admin specialists wake "
+  },
+  {
+    "label": "pan admin specialists reset",
+    "insert": "pan admin specialists reset "
+  },
+  {
+    "label": "pan admin specialists discovery-ready",
+    "insert": "pan admin specialists discovery-ready "
+  },
+  {
+    "label": "pan admin specialists done",
+    "insert": "pan admin specialists done"
+  },
+  {
+    "label": "pan admin specialists logs",
+    "insert": "pan admin specialists logs"
+  },
+  {
+    "label": "pan admin specialists cleanup-logs",
+    "insert": "pan admin specialists cleanup-logs"
+  },
+  {
+    "label": "pan admin remote status",
+    "insert": "pan admin remote status"
+  },
+  {
+    "label": "pan admin remote init",
+    "insert": "pan admin remote init"
+  },
+  {
+    "label": "pan admin remote resources",
+    "insert": "pan admin remote resources"
+  },
+  {
+    "label": "pan admin remote setup",
+    "insert": "pan admin remote setup"
+  },
+  {
+    "label": "pan admin remote reap",
+    "insert": "pan admin remote reap"
+  },
+  {
+    "label": "pan admin db snapshot",
+    "insert": "pan admin db snapshot"
+  },
+  {
+    "label": "pan admin db seed",
+    "insert": "pan admin db seed "
+  },
+  {
+    "label": "pan admin db status",
+    "insert": "pan admin db status "
+  },
+  {
+    "label": "pan admin db clean",
+    "insert": "pan admin db clean "
+  },
+  {
+    "label": "pan admin db config",
+    "insert": "pan admin db config "
+  },
+  {
+    "label": "pan admin db rebuild-agents",
+    "insert": "pan admin db rebuild-agents"
+  },
+  {
+    "label": "pan admin db gc-agents",
+    "insert": "pan admin db gc-agents"
+  },
+  {
+    "label": "pan admin db rebuild",
+    "insert": "pan admin db rebuild"
+  },
+  {
+    "label": "pan admin db backfill-records",
+    "insert": "pan admin db backfill-records"
+  },
+  {
+    "label": "pan admin db restore-verdicts",
+    "insert": "pan admin db restore-verdicts"
+  },
+  {
+    "label": "pan admin db reconcile-merges",
+    "insert": "pan admin db reconcile-merges"
+  },
+  {
+    "label": "pan admin config shadow",
+    "insert": "pan admin config shadow"
+  },
+  {
+    "label": "pan admin hooks install",
+    "insert": "pan admin hooks install"
+  },
+  {
+    "label": "pan admin hooks status",
+    "insert": "pan admin hooks status"
+  },
+  {
+    "label": "pan admin tldr",
+    "insert": "pan admin tldr "
+  },
+  {
+    "label": "pan admin fpp",
+    "insert": "pan admin fpp "
+  },
+  {
+    "label": "pan admin conversations backfill-titles",
+    "insert": "pan admin conversations backfill-titles"
+  },
+  {
+    "label": "pan admin tracker linear-states",
+    "insert": "pan admin tracker linear-states"
+  },
+  {
+    "label": "pan admin tracker linear-cleanup",
+    "insert": "pan admin tracker linear-cleanup"
+  },
+  {
+    "label": "pan admin migrate-config",
+    "insert": "pan admin migrate-config"
+  },
+  {
+    "label": "pan conversations scan",
+    "insert": "pan conversations scan "
+  },
+  {
+    "label": "pan conversations search",
+    "insert": "pan conversations search "
+  },
+  {
+    "label": "pan conversations list",
+    "insert": "pan conversations list"
+  },
+  {
+    "label": "pan conversations show",
+    "insert": "pan conversations show "
+  },
+  {
+    "label": "pan conversations jsonl",
+    "insert": "pan conversations jsonl "
+  },
+  {
+    "label": "pan conversations current",
+    "insert": "pan conversations current"
+  },
+  {
+    "label": "pan conversations cost",
+    "insert": "pan conversations cost"
+  },
+  {
+    "label": "pan conversations embed",
+    "insert": "pan conversations embed "
+  },
+  {
+    "label": "pan conversations enrich",
+    "insert": "pan conversations enrich "
+  },
+  {
+    "label": "pan ohmypi-auth status",
+    "insert": "pan ohmypi-auth status"
+  },
+  {
+    "label": "pan ohmypi-auth login",
+    "insert": "pan ohmypi-auth login"
+  },
+  {
+    "label": "pan install",
+    "insert": "pan install"
+  },
+  {
+    "label": "pan inspect",
+    "insert": "pan inspect "
+  },
+  {
+    "label": "pan caveman-compress",
+    "insert": "pan caveman-compress "
+  },
+  {
+    "label": "pan scope list",
+    "insert": "pan scope list"
+  },
+  {
+    "label": "pan scope show",
+    "insert": "pan scope show "
+  },
+  {
+    "label": "pan scope propose",
+    "insert": "pan scope propose "
+  },
+  {
+    "label": "pan scope approve",
+    "insert": "pan scope approve "
+  },
+  {
+    "label": "pan scope complete",
+    "insert": "pan scope complete "
+  },
+  {
+    "label": "pan scope cancel",
+    "insert": "pan scope cancel "
+  },
+  {
+    "label": "pan scope restore",
+    "insert": "pan scope restore "
+  },
+  {
+    "label": "pan flywheel merge-blockers",
+    "insert": "pan flywheel merge-blockers"
+  },
+  {
+    "label": "pan flywheel weights",
+    "insert": "pan flywheel weights"
+  },
+  {
+    "label": "pan flywheel start",
+    "insert": "pan flywheel start"
+  },
+  {
+    "label": "pan flywheel emit-status",
+    "insert": "pan flywheel emit-status"
+  },
+  {
+    "label": "pan flywheel config",
+    "insert": "pan flywheel config"
+  },
+  {
+    "label": "pan flywheel status",
+    "insert": "pan flywheel status"
+  },
+  {
+    "label": "pan flywheel stats",
+    "insert": "pan flywheel stats"
+  },
+  {
+    "label": "pan flywheel pause",
+    "insert": "pan flywheel pause"
+  },
+  {
+    "label": "pan flywheel resume",
+    "insert": "pan flywheel resume"
+  },
+  {
+    "label": "pan flywheel report",
+    "insert": "pan flywheel report"
+  },
+  {
+    "label": "pan flywheel complete",
+    "insert": "pan flywheel complete"
+  },
+  {
+    "label": "pan flywheel stop",
+    "insert": "pan flywheel stop"
+  },
+  {
+    "label": "pan flywheel abort",
+    "insert": "pan flywheel abort"
+  },
+  {
+    "label": "pan merge cancel",
+    "insert": "pan merge cancel "
+  },
+  {
+    "label": "pan artifacts create",
+    "insert": "pan artifacts create "
+  },
+  {
+    "label": "pan artifacts publish",
+    "insert": "pan artifacts publish "
+  },
+  {
+    "label": "pan artifacts unshare",
+    "insert": "pan artifacts unshare "
+  },
+  {
+    "label": "pan artifacts share",
+    "insert": "pan artifacts share "
+  },
+  {
+    "label": "pan artifacts validate",
+    "insert": "pan artifacts validate "
+  },
+  {
+    "label": "pan artifacts status",
+    "insert": "pan artifacts status "
+  },
+  {
+    "label": "pan artifacts list",
+    "insert": "pan artifacts list"
+  },
+  {
+    "label": "pan artifacts url",
+    "insert": "pan artifacts url "
+  },
+  {
+    "label": "pan artifacts open",
+    "insert": "pan artifacts open "
+  },
+  {
+    "label": "pan status",
+    "insert": "pan status"
+  },
+  {
+    "label": "pan dev",
+    "insert": "pan dev"
+  },
+  {
+    "label": "pan up",
+    "insert": "pan up"
+  },
+  {
+    "label": "pan down",
+    "insert": "pan down"
+  },
+  {
+    "label": "pan reload",
+    "insert": "pan reload"
+  },
+  {
+    "label": "pan restart",
+    "insert": "pan restart"
+  },
+  {
+    "label": "pan project add",
+    "insert": "pan project add "
+  },
+  {
+    "label": "pan project list",
+    "insert": "pan project list"
+  },
+  {
+    "label": "pan project show",
+    "insert": "pan project show "
+  },
+  {
+    "label": "pan project rename",
+    "insert": "pan project rename "
+  },
+  {
+    "label": "pan project remove",
+    "insert": "pan project remove "
+  },
+  {
+    "label": "pan project init",
+    "insert": "pan project init"
+  },
+  {
+    "label": "pan projects add",
+    "insert": "pan projects add "
+  },
+  {
+    "label": "pan projects list",
+    "insert": "pan projects list"
+  },
+  {
+    "label": "pan projects show",
+    "insert": "pan projects show "
+  },
+  {
+    "label": "pan projects rename",
+    "insert": "pan projects rename "
+  },
+  {
+    "label": "pan projects remove",
+    "insert": "pan projects remove "
+  },
+  {
+    "label": "pan projects init",
+    "insert": "pan projects init"
+  },
+  {
+    "label": "pan health",
+    "insert": "pan health"
+  },
+  {
+    "label": "pan doctor",
+    "insert": "pan doctor"
+  },
+  {
+    "label": "pan resources",
+    "insert": "pan resources"
+  },
+  {
+    "label": "pan hygiene",
+    "insert": "pan hygiene"
+  },
+  {
+    "label": "pan update",
+    "insert": "pan update"
+  },
+  {
+    "label": "pan cost today",
+    "insert": "pan cost today"
+  },
+  {
+    "label": "pan cost week",
+    "insert": "pan cost week"
+  },
+  {
+    "label": "pan cost month",
+    "insert": "pan cost month"
+  },
+  {
+    "label": "pan cost report",
+    "insert": "pan cost report"
+  },
+  {
+    "label": "pan cost issue",
+    "insert": "pan cost issue "
+  },
+  {
+    "label": "pan cost budget create",
+    "insert": "pan cost budget create "
+  },
+  {
+    "label": "pan cost budget list",
+    "insert": "pan cost budget list"
+  },
+  {
+    "label": "pan cost budget check",
+    "insert": "pan cost budget check "
+  },
+  {
+    "label": "pan cost budget delete",
+    "insert": "pan cost budget delete "
+  },
+  {
+    "label": "pan cost sync",
+    "insert": "pan cost sync"
+  },
+  {
+    "label": "pan cost backfill",
+    "insert": "pan cost backfill"
+  },
+  {
+    "label": "pan serve",
+    "insert": "pan serve"
+  },
+  {
+    "label": "pan show --cv",
+    "insert": "pan show  --cv"
+  },
+  {
+    "label": "pan show --context",
+    "insert": "pan show  --context"
+  },
+  {
+    "label": "pan show --health",
+    "insert": "pan show  --health"
+  },
+  {
+    "label": "pan plan --auto --auto-start",
+    "insert": "pan plan --auto --auto-start "
+  },
+  {
+    "label": "pan review reset --session",
+    "insert": "pan review reset  --session"
+  },
+  {
+    "label": "pan fork --plain",
+    "insert": "pan fork  --plain"
+  },
+  {
+    "label": "pan handoff --model",
+    "insert": "pan handoff  --model "
+  },
+  {
+    "label": "pan handoff --harness",
+    "insert": "pan handoff  --harness "
+  },
+  {
+    "label": "pan handoff --cwd",
+    "insert": "pan handoff  --cwd "
+  }
+]

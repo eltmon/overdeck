@@ -67,4 +67,8 @@ export type ComposerCommandResult =
     readonly message: string
   }
 
-export { COMPOSER_COMMAND_MANIFEST } from "./composer-commands.generated"
+export {
+  COMPOSER_COMMAND_INSERT_OVERRIDES,
+  COMPOSER_COMMAND_MANIFEST,
+  COMPOSER_COMMAND_VARIANTS,
+} from "./composer-commands.generated"
