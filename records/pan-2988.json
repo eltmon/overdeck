@@ -185,7 +185,7 @@
     "recordedAt": "2026-07-24T11:25:43.566Z"
   },
   "created": "2026-07-22T21:25:31.822Z",
-  "updated": "2026-07-24T19:07:16.626Z",
+  "updated": "2026-07-24T19:08:24.296Z",
   "pipeline": {
     "issueId": "PAN-2988",
     "reviewStatus": "passed",
@@ -267,7 +267,7 @@
   },
   "workModel": "gpt-5.6-sol",
   "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "model": "gpt-5.6-sol",
   "tasks": {
     "sequence": 16,
     "claims": {},
