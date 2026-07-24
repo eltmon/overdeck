@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-22T21:26:29.366Z",
-  "updated": "2026-07-24T17:59:02.810Z",
+  "updated": "2026-07-24T17:59:05.967Z",
   "pipeline": {
     "issueId": "PAN-2989",
     "reviewStatus": "pending",
@@ -124,5 +124,38 @@
     "docs-record-lock-bounds-and-drain.docs-record-lock-bounds-and-drain.ac1": "completed",
     "docs-record-lock-bounds-and-drain.docs-record-lock-bounds-and-drain.ac2": "completed",
     "docs-record-lock-bounds-and-drain.docs-record-lock-bounds-and-drain.ac3": "completed"
+  },
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      "src/cli/commands/__tests__/restart-spawn-env.test.ts",
+      "tests/unit/dashboard/config.test.ts"
+    ],
+    "declaredScopeUntouched": [
+      "src/cli/commands/__tests__/restart.test.ts"
+    ],
+    "declaredScope": [
+      "configuration/state-branch.mdx",
+      "docs/AGENT-STATE-PLANES.md",
+      "src/cli/commands/__tests__/restart.test.ts",
+      "src/cli/commands/restart.ts",
+      "src/dashboard/server/config.ts",
+      "src/lib/overdeck/review-status-record-sync.ts",
+      "src/lib/pan-dir/record-update.ts",
+      "tests/unit/lib/overdeck/review-status-record-sync-drain.test.ts",
+      "tests/unit/lib/pan-dir/record-update-durability-budget.test.ts"
+    ],
+    "actualChangedFiles": [
+      "configuration/state-branch.mdx",
+      "docs/AGENT-STATE-PLANES.md",
+      "src/cli/commands/__tests__/restart-spawn-env.test.ts",
+      "src/cli/commands/restart.ts",
+      "src/dashboard/server/config.ts",
+      "src/lib/overdeck/review-status-record-sync.ts",
+      "src/lib/pan-dir/record-update.ts",
+      "tests/unit/dashboard/config.test.ts",
+      "tests/unit/lib/overdeck/review-status-record-sync-drain.test.ts",
+      "tests/unit/lib/pan-dir/record-update-durability-budget.test.ts"
+    ],
+    "recordedAt": "2026-07-24T17:59:05.966Z"
   }
 }
