@@ -185,25 +185,26 @@
     "recordedAt": "2026-07-24T11:25:43.566Z"
   },
   "created": "2026-07-22T21:25:31.822Z",
-  "updated": "2026-07-24T20:07:06.611Z",
+  "updated": "2026-07-24T20:58:37.793Z",
   "pipeline": {
     "issueId": "PAN-2988",
     "reviewStatus": "passed",
     "testStatus": "passed",
-    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "merged",
     "releaseStatus": "skipped",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-24T17:28:10.885Z",
-    "updatedAt": "2026-07-24T20:07:06.601Z",
+    "updatedAt": "2026-07-24T20:58:37.780Z",
     "reviewNotes": "Approved: latest main merge preserves PAN-2988; cycle diff is clean across correctness, security, requirements, and performance",
     "testNotes": "Gates: npm run typecheck (clean), npm run lint (clean, all sub-checks incl. file-size/circular/ratchet/skills/prompts), npm test (10411 tests passed, 50 skipped, 0 failed) all green at HEAD 1c95ab189c. Initial npm test run showed 10 failures in 3 pre-existing files unrelated to PAN-2988's diff (record-update.test.ts, dangerous-git-ops.test.ts, cloister/validation.test.ts) all erroring with 'Overdeck agents must not run git reset --hard/rebase'; root-caused to this test-role session's own git-guard shim being first in $PATH and intercepting internal git subprocess calls the tests make to exercise real git behavior. Re-ran those 3 files and then the full suite with the git-guard entry stripped from PATH (diagnostic only, no code/test edits): 23/23 then 10411/10411 passed, confirming the failures were environmental, not a regression. UAT: rebuilt dist/dashboard/server.js at HEAD and restarted this issue's own isolated workspace container (overdeck-feature-pan-2988-server-1, Node 22, buildCommit confirmed == HEAD) rather than touching the shared host dashboard on :3011. Live-verified the core fix end-to-end via curl against https://api-feature-pan-2988.overdeck.localhost: GET .../api/review/PAN-2988/status returns canonical status; POST .../api/review/PAN-2988/resync returns 200 {ok:true,status:...} for the real issue and 404 for a nonexistent one; GET on the same path falls through to the SPA (route is POST-only), matching AC resync-endpoint.ac1/ac2. Could not complete live-browser verification of the 'Re-sync pipeline state' RECOVER-group menu entry (recover-action-menu-entry.ac1/ac2): this workspace's isolated dev container runs with OVERDECK_DISABLE_DEACON=1 and IssueDataService in cache-only mode by deliberate design (PAN-1817, rate-limit protection), so it never populates a tracker-issue cache and the issue drawer/kanban card for PAN-2988 render with no issue object (confirmed via Playwright: drawer opens and shows real pipeline activity/review-status via the git-record read door, but DrawerActionBar's IssueActionMenu only renders when issue.identifier is set, which stays undefined here; same on /board, no kanban card). This is an architectural property of the isolated per-workspace container, not a PAN-2988 defect, and not something in scope to alter. That AC is instead covered by real React rendering of IssueActionMenu/ISSUE_ACTION_DEFINITIONS in src/dashboard/frontend/src/lib/__tests__/issueActions.parity.test.tsx, issueActions.test.ts, and issueActions.no-actions-lost.test.ts, all 51/51 passing, asserting 'review resync' is in ISSUE_SCOPED_PAN_VERBS and 'resyncPipelineState' is in AUDITED_REGISTRY_KEYS with enabledWhen:always in the recover group.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3010",
     "reviewedAtCommit": "1c95ab189c910202eeff4aacbaff6131a3f400c9",
     "lastVerifiedCommit": "a14dd3a5d4fee87627713a5ebeb9dde4f43cd7db",
-    "reviewSpawnedAt": "2026-07-24T18:13:02.923Z"
+    "reviewSpawnedAt": "2026-07-24T18:13:02.923Z",
+    "closedOut": true,
+    "closedOutAt": "2026-07-24T20:58:37.780Z"
   },
   "closeOut": {
     "usage": {
@@ -263,7 +264,80 @@
     "merges": [
       "https://github.com/eltmon/overdeck/pull/3010"
     ],
-    "ranOn": "eltmon-z790"
+    "ranOn": "eltmon-z790",
+    "dodGate": {
+      "evaluatedAt": "2026-07-24T20:58:37.791Z",
+      "rows": [
+        {
+          "id": "review",
+          "num": 1,
+          "title": "Review passed",
+          "expected": "reviewStatus: passed",
+          "observed": "reviewStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "tests",
+          "num": 2,
+          "title": "Tests passed",
+          "expected": "testStatus: passed",
+          "observed": "testStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "verification",
+          "num": 3,
+          "title": "Verification green on the branch",
+          "expected": "verificationStatus: passed at lastVerifiedCommit",
+          "observed": "verificationStatus: passed at a14dd3a5d4fee87627713a5ebeb9dde4f43cd7db",
+          "status": "pass"
+        },
+        {
+          "id": "merged",
+          "num": 4,
+          "title": "Merged to main",
+          "expected": "PR merged on the forge",
+          "observed": "Merge specialist confirmed merge completed; PR #3010 MERGED at 2026-07-24T19:05:58Z",
+          "status": "pass",
+          "mergedAt": "2026-07-24T19:05:58Z",
+          "mergeCommit": "88ee5ccf978298306b217a385b2c6092d1b9369f"
+        },
+        {
+          "id": "post-merge",
+          "num": 5,
+          "title": "Post-merge lifecycle ran",
+          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
+          "observed": "canonical state: verifying_on_main; no running work/planning agents",
+          "status": "pass"
+        },
+        {
+          "id": "main-verify",
+          "num": 6,
+          "title": "Verified on main",
+          "expected": "merged commit verified on main",
+          "observed": "1 check-runs concluded successfully on 88ee5ccf978298306b217a385b2c6092d1b9369f",
+          "status": "pass"
+        },
+        {
+          "id": "deploy",
+          "num": 7,
+          "title": "Deployed",
+          "expected": "live server build includes the merged commit",
+          "observed": "build commit 72061353 contains merge 88ee5ccf",
+          "status": "pass"
+        },
+        {
+          "id": "teardown",
+          "num": 8,
+          "title": "Close-out teardown verified",
+          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
+          "overridable": false,
+          "status": "pass",
+          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; Stopped TLDR daemon; Stopped Docker containers; Killed 2 orphaned process(es); Removed git worktree; Removed 5 agent state directories; No strike branch strike/pan-2988 found; Pruned 389 checkpoint ref(s) for agent-pan-2988, planning-pan-2988, strike-pan-2988; No specialist registry entries for PAN-2988"
+        }
+      ],
+      "accepted": []
+    }
   },
   "workModel": "gpt-5.6-sol",
   "harness": "claude-code",
