@@ -25,6 +25,10 @@ import {
   COMMAND_PRIORITY_HIGH,
 } from 'lexical';
 import styles from '../CommandDeck/styles/command-deck.module.css';
+import { SLASH_COMMANDS, type SlashCommand } from './slashCommands';
+
+export { SLASH_COMMANDS };
+export type { SlashCommand };
 
 // ─── Draft persistence ────────────────────────────────────────────────────────
 
@@ -51,164 +55,6 @@ function saveDraft(conversationName: string, text: string): void {
     // Storage full or unavailable
   }
 }
-
-// ─── Slash commands ───────────────────────────────────────────────────────────
-
-export interface SlashCommand {
-  id: string;
-  label: string;
-  description: string;
-  insert: string;
-  category?: string;
-}
-
-export const SLASH_COMMANDS: SlashCommand[] = [
-  // ─── AI CLI Commands ─────────────────────────────────────────────────────────
-  {
-    id: 'model',
-    label: '/model',
-    description: 'Switch the AI model for this conversation',
-    insert: '/model ',
-    category: 'AI CLI',
-  },
-  {
-    id: 'context',
-    label: '/context',
-    description: 'Add context from a file or URL',
-    insert: '/context ',
-    category: 'AI CLI',
-  },
-  {
-    id: 'effort',
-    label: '/effort',
-    description: 'Set effort level (low, medium, high)',
-    insert: '/effort ',
-    category: 'AI CLI',
-  },
-  {
-    id: 'cancel',
-    label: '/cancel',
-    description: 'Cancel the current operation',
-    insert: '/cancel',
-    category: 'AI CLI',
-  },
-
-  // ─── Core System ─────────────────────────────────────────────────────────────
-  { id: 'pan-up', label: 'pan up', description: 'Start dashboard and Traefik', insert: 'pan up', category: 'Core' },
-  { id: 'pan-down', label: 'pan down', description: 'Stop dashboard and Traefik', insert: 'pan down', category: 'Core' },
-  { id: 'pan-reload', label: 'pan reload', description: 'Rebuild then restart the dashboard if build succeeds', insert: 'pan reload', category: 'Core' },
-  { id: 'pan-restart', label: 'pan restart', description: 'Restart dashboard (use --full for entire stack)', insert: 'pan restart', category: 'Core' },
-  { id: 'pan-status', label: 'pan status', description: 'Show running agents', insert: 'pan status', category: 'Core' },
-  { id: 'pan-init', label: 'pan init', description: 'Initialize Overdeck', insert: 'pan init', category: 'Core' },
-  { id: 'pan-sync', label: 'pan sync', description: 'Sync skills/agents/rules to devroot', insert: 'pan sync', category: 'Core' },
-  { id: 'pan-doctor', label: 'pan doctor', description: 'Check system health', insert: 'pan doctor', category: 'Core' },
-  { id: 'pan-update', label: 'pan update', description: 'Update Overdeck', insert: 'pan update', category: 'Core' },
-  { id: 'pan-install', label: 'pan install', description: 'Install prerequisites', insert: 'pan install', category: 'Core' },
-  { id: 'pan-serve', label: 'pan serve', description: 'Start dashboard and open in browser', insert: 'pan serve', category: 'Core' },
-  { id: 'pan-skills', label: 'pan skills', description: 'List and manage skills', insert: 'pan skills', category: 'Core' },
-  { id: 'pan-test-run', label: 'pan test run', description: 'Run tests', insert: 'pan test run ', category: 'Core' },
-
-  // ─── Lifecycle ───────────────────────────────────────────────────────────────
-  { id: 'pan-start', label: 'pan start', description: 'Spawn agent for an issue', insert: 'pan start ', category: 'Lifecycle' },
-  { id: 'pan-tell', label: 'pan tell', description: 'Send message to running agent', insert: 'pan tell ', category: 'Lifecycle' },
-  { id: 'pan-kill', label: 'pan kill', description: 'Kill a running agent', insert: 'pan kill ', category: 'Lifecycle' },
-  { id: 'pan-resume', label: 'pan resume', description: 'Resume a paused agent', insert: 'pan resume ', category: 'Lifecycle' },
-  { id: 'pan-recover', label: 'pan recover', description: 'Recover a crashed agent', insert: 'pan recover ', category: 'Lifecycle' },
-  { id: 'pan-sync-main', label: 'pan sync-main', description: 'Sync latest main into feature branch', insert: 'pan sync-main ', category: 'Lifecycle' },
-  { id: 'pan-done', label: 'pan done', description: 'Mark agent work complete', insert: 'pan done ', category: 'Lifecycle' },
-  { id: 'pan-reopen', label: 'pan reopen', description: 'Reopen a completed issue', insert: 'pan reopen ', category: 'Lifecycle' },
-  { id: 'pan-reset-to-planned', label: 'pan reset-to-planned', description: 'Return an issue to post-planning while preserving its workspace and branch', insert: 'pan reset-to-planned ', category: 'Lifecycle' },
-  { id: 'pan-wipe', label: 'pan wipe', description: 'Deep wipe: completely reset all state', insert: 'pan wipe ', category: 'Lifecycle' },
-  { id: 'pan-close', label: 'pan close', description: 'Close out a completed issue', insert: 'pan close ', category: 'Lifecycle' },
-  { id: 'pan-plan', label: 'pan plan', description: 'Create execution plan before spawning', insert: 'pan plan ', category: 'Lifecycle' },
-  { id: 'pan-plan-auto-start', label: 'pan plan --auto --auto-start', description: 'Auto-plan the issue, then auto-start the work agent', insert: 'pan plan --auto --auto-start ', category: 'Lifecycle' },
-  { id: 'pan-plan-finalize', label: 'pan plan finalize', description: 'Materialize plan to tasks', insert: 'pan plan finalize ', category: 'Lifecycle' },
-  { id: 'pan-issues', label: 'pan issues', description: 'List and triage issues from configured trackers', insert: 'pan issues', category: 'Lifecycle' },
-
-  // ─── Observation ─────────────────────────────────────────────────────────────
-  { id: 'pan-show', label: 'pan show', description: 'Show shadow state, CV, context, health', insert: 'pan show ', category: 'Observation' },
-  { id: 'pan-show-cv', label: 'pan show --cv', description: 'Show agent work history (CV)', insert: 'pan show  --cv', category: 'Observation' },
-  { id: 'pan-show-context', label: 'pan show --context', description: 'Show context engineering state', insert: 'pan show  --context', category: 'Observation' },
-  { id: 'pan-show-health', label: 'pan show --health', description: 'Show health + heartbeat status', insert: 'pan show  --health', category: 'Observation' },
-
-  // ─── Review ──────────────────────────────────────────────────────────────────
-  { id: 'pan-review-pending', label: 'pan review pending', description: 'Show completed work awaiting review', insert: 'pan review pending', category: 'Review' },
-  { id: 'pan-review-request', label: 'pan review request', description: 'Request re-review after fixing feedback', insert: 'pan review request ', category: 'Review' },
-  { id: 'pan-review-reset', label: 'pan review reset', description: 'Reset review/test/merge cycles', insert: 'pan review reset ', category: 'Review' },
-  { id: 'pan-review-reset-session', label: 'pan review reset --session', description: 'Reset review and clear saved Claude session', insert: 'pan review reset  --session', category: 'Review' },
-
-  // ─── Workspace ───────────────────────────────────────────────────────────────
-  { id: 'pan-workspace-create', label: 'pan workspace create', description: 'Create workspace for issue', insert: 'pan workspace create ', category: 'Workspace' },
-  { id: 'pan-workspace-list', label: 'pan workspace list', description: 'List all workspaces', insert: 'pan workspace list', category: 'Workspace' },
-  { id: 'pan-workspace-destroy', label: 'pan workspace destroy', description: 'Destroy workspace', insert: 'pan workspace destroy ', category: 'Workspace' },
-  { id: 'pan-workspace-update', label: 'pan workspace update', description: 'Update skills/agents/rules in workspace', insert: 'pan workspace update ', category: 'Workspace' },
-  { id: 'pan-workspace-migrate', label: 'pan workspace migrate', description: 'Migrate workspace local ↔ remote', insert: 'pan workspace migrate ', category: 'Workspace' },
-  { id: 'pan-workspace-ssh', label: 'pan workspace ssh', description: 'SSH into remote workspace VM', insert: 'pan workspace ssh ', category: 'Workspace' },
-  { id: 'pan-workspace-sync-auth', label: 'pan workspace sync-auth', description: 'Sync Claude credentials to remote', insert: 'pan workspace sync-auth ', category: 'Workspace' },
-  { id: 'pan-workspace-start', label: 'pan workspace start', description: 'Start a stopped remote workspace', insert: 'pan workspace start ', category: 'Workspace' },
-  { id: 'pan-workspace-stop', label: 'pan workspace stop', description: 'Stop (hibernate) a remote workspace', insert: 'pan workspace stop ', category: 'Workspace' },
-  { id: 'pan-workspace-add-repo', label: 'pan workspace add-repo', description: 'Add repos to polyrepo workspace', insert: 'pan workspace add-repo ', category: 'Workspace' },
-
-  // ─── Admin: Cloister ─────────────────────────────────────────────────────────
-  { id: 'pan-admin-cloister-status', label: 'pan admin cloister status', description: 'Show Cloister service status', insert: 'pan admin cloister status', category: 'Admin' },
-  { id: 'pan-admin-cloister-start', label: 'pan admin cloister start', description: 'Start Cloister monitoring', insert: 'pan admin cloister start', category: 'Admin' },
-  { id: 'pan-admin-cloister-stop', label: 'pan admin cloister stop', description: 'Stop Cloister monitoring', insert: 'pan admin cloister stop', category: 'Admin' },
-  { id: 'pan-admin-cloister-emergency-stop', label: 'pan admin cloister emergency-stop', description: 'Emergency stop — kill ALL agents', insert: 'pan admin cloister emergency-stop', category: 'Admin' },
-
-  // ─── Admin: Specialists ──────────────────────────────────────────────────────
-  { id: 'pan-admin-specialists-list', label: 'pan admin specialists list', description: 'Show all specialists with status', insert: 'pan admin specialists list', category: 'Admin' },
-  { id: 'pan-admin-specialists-wake', label: 'pan admin specialists wake', description: 'Wake up a specialist agent', insert: 'pan admin specialists wake ', category: 'Admin' },
-  { id: 'pan-admin-specialists-queue', label: 'pan admin specialists queue', description: 'Show pending specialist work', insert: 'pan admin specialists queue ', category: 'Admin' },
-  { id: 'pan-admin-specialists-reset', label: 'pan admin specialists reset', description: 'Reset a specialist', insert: 'pan admin specialists reset ', category: 'Admin' },
-  { id: 'pan-admin-specialists-clear-queue', label: 'pan admin specialists clear-queue', description: 'Clear specialist queue', insert: 'pan admin specialists clear-queue ', category: 'Admin' },
-  { id: 'pan-admin-specialists-done', label: 'pan admin specialists done', description: 'Signal specialist completion', insert: 'pan admin specialists done', category: 'Admin' },
-  { id: 'pan-admin-specialists-logs', label: 'pan admin specialists logs', description: 'View specialist run logs', insert: 'pan admin specialists logs', category: 'Admin' },
-  { id: 'pan-admin-specialists-cleanup-logs', label: 'pan admin specialists cleanup-logs', description: 'Clean up old specialist logs', insert: 'pan admin specialists cleanup-logs', category: 'Admin' },
-
-  // ─── Project ─────────────────────────────────────────────────────────────────
-  { id: 'pan-project-add', label: 'pan project add', description: 'Register a project', insert: 'pan project add ', category: 'Project' },
-  { id: 'pan-project-list', label: 'pan project list', description: 'List all registered projects', insert: 'pan project list', category: 'Project' },
-  { id: 'pan-project-show', label: 'pan project show', description: 'Show project details', insert: 'pan project show ', category: 'Project' },
-  { id: 'pan-project-remove', label: 'pan project remove', description: 'Remove a project', insert: 'pan project remove ', category: 'Project' },
-  { id: 'pan-project-init', label: 'pan project init', description: 'Initialize projects.yaml', insert: 'pan project init', category: 'Project' },
-
-  // ─── Admin: Remote ───────────────────────────────────────────────────────────
-  { id: 'pan-admin-remote-status', label: 'pan admin remote status', description: 'Show Fly.io connection status', insert: 'pan admin remote status', category: 'Admin' },
-  { id: 'pan-admin-remote-init', label: 'pan admin remote init', description: 'Initialize Fly.io app', insert: 'pan admin remote init', category: 'Admin' },
-  { id: 'pan-admin-remote-resources', label: 'pan admin remote resources', description: 'Show RAM/disk usage across VMs', insert: 'pan admin remote resources', category: 'Admin' },
-  { id: 'pan-admin-remote-setup', label: 'pan admin remote setup', description: 'Setup Fly.io integration', insert: 'pan admin remote setup', category: 'Admin' },
-
-  // ─── Admin: DB & Tasks ───────────────────────────────────────────────────────
-  { id: 'pan-admin-db-snapshot', label: 'pan admin db snapshot', description: 'Create database snapshot', insert: 'pan admin db snapshot', category: 'Admin' },
-  { id: 'pan-admin-db-seed', label: 'pan admin db seed', description: 'Seed database', insert: 'pan admin db seed ', category: 'Admin' },
-  { id: 'pan-admin-tasks-compact', label: 'pan admin tasks compact', description: 'Compact tasks database', insert: 'pan admin tasks compact', category: 'Admin' },
-  { id: 'pan-admin-tasks-stats', label: 'pan admin tasks stats', description: 'Show tasks statistics', insert: 'pan admin tasks stats', category: 'Admin' },
-  { id: 'pan-admin-config-shadow', label: 'pan admin config shadow', description: 'Configure shadow mode', insert: 'pan admin config shadow', category: 'Admin' },
-  { id: 'pan-admin-hooks-install', label: 'pan admin hooks install', description: 'Install/update Claude Code heartbeat hooks', insert: 'pan admin hooks install', category: 'Admin' },
-  { id: 'pan-admin-tldr', label: 'pan admin tldr', description: 'TLDR daemon management', insert: 'pan admin tldr ', category: 'Admin' },
-  { id: 'pan-admin-fpp', label: 'pan admin fpp', description: 'FPP hooks: check, push, pop, clear', insert: 'pan admin fpp ', category: 'Admin' },
-  { id: 'pan-admin-tracker-linear-states', label: 'pan admin tracker linear-states', description: 'Manage Linear workflow states', insert: 'pan admin tracker linear-states', category: 'Admin' },
-  { id: 'pan-admin-tracker-linear-cleanup', label: 'pan admin tracker linear-cleanup', description: 'Clean up Linear custom states', insert: 'pan admin tracker linear-cleanup', category: 'Admin' },
-  { id: 'pan-admin-migrate-config', label: 'pan admin migrate-config', description: 'Migrate settings.json to config.yaml', insert: 'pan admin migrate-config', category: 'Admin' },
-
-  // ─── Conversation (dashboard UI actions — intercepted, do NOT pass to agent) ─
-  { id: 'handoff', label: '/handoff', description: 'Open the handoff dialog for this conversation (trailing text becomes focus)', insert: '/handoff ', category: 'Conversation' },
-  // ─── Conversation (agent-bound — pass to agent which runs the CLI) ──────────
-  { id: 'pan-fork', label: 'pan fork', description: 'Summary fork a conversation', insert: 'pan fork ', category: 'Conversation' },
-  { id: 'pan-fork-plain', label: 'pan fork --plain', description: 'Plain fork — copy raw history, skip summary', insert: 'pan fork  --plain', category: 'Conversation' },
-  { id: 'pan-handoff', label: 'pan handoff', description: 'Agent-authored handoff (trailing text becomes focus). Tip: /handoff opens a dialog instead.', insert: 'pan handoff ', category: 'Conversation' },
-  { id: 'pan-handoff-model', label: 'pan handoff --model', description: 'Model for the new conversation', insert: 'pan handoff  --model ', category: 'Conversation' },
-  { id: 'pan-handoff-harness', label: 'pan handoff --harness', description: 'Harness for the new conversation (claude-code|pi)', insert: 'pan handoff  --harness ', category: 'Conversation' },
-  { id: 'pan-handoff-cwd', label: 'pan handoff --cwd', description: 'Working directory for the new conversation', insert: 'pan handoff  --cwd ', category: 'Conversation' },
-
-  // ─── Data ────────────────────────────────────────────────────────────────────
-  { id: 'pan-backup-list', label: 'pan backup list', description: 'List all backups', insert: 'pan backup list', category: 'Data' },
-  { id: 'pan-backup-clean', label: 'pan backup clean', description: 'Remove old backups', insert: 'pan backup clean', category: 'Data' },
-  { id: 'pan-restore', label: 'pan restore', description: 'Restore from backup', insert: 'pan restore ', category: 'Data' },
-  { id: 'pan-inspect', label: 'pan inspect', description: 'Inspect workspace state', insert: 'pan inspect ', category: 'Data' },
-  { id: 'pan-cost-today', label: 'pan cost today', description: 'Show cost tracking for today', insert: 'pan cost today', category: 'Data' },
-  { id: 'pan-cost-sync', label: 'pan cost sync', description: 'Import cost events from WAL files', insert: 'pan cost sync', category: 'Data' },
-];
 
 // ─── Inner plugin: handles Enter/Shift+Enter and draft save ──────────────────
 

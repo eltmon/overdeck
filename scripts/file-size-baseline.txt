@@ -29,5 +29,6 @@
 1582 src/dashboard/frontend/src/components/CommandDeck/index.tsx
 1726 src/lib/database/schema.ts
 1727 src/dashboard/server/routes/workspaces.ts
+1792 src/dashboard/frontend/src/components/chat/slashCommands.generated.ts
 1923 src/dashboard/server/routes/workspaces/merge-ops.ts
 3631 src/lib/cloister/deacon.ts

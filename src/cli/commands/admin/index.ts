@@ -8,6 +8,7 @@
  */
 
 import { Command } from 'commander';
+import { collectCommandTree } from '../../command-introspection.js';
 import { registerCloisterCommands } from '../cloister/index.js';
 import { registerSpecialistsCommands } from '../specialists/index.js';
 import { registerRemoteCommands } from '../remote/index.js';
@@ -26,6 +27,21 @@ export function registerAdminCommands(program: Command): void {
   const admin = program
     .command('admin')
     .description('Plumbing commands: watchdog, specialists, infra, db, config, and more');
+
+  admin
+    .command('commands')
+    .description('List every visible pan command (plumbing; feeds composer autocomplete codegen)')
+    .option('--json', 'Emit machine-readable JSON')
+    .action((options: { json?: boolean }) => {
+      const tree = collectCommandTree(program);
+      if (options.json) {
+        console.log(JSON.stringify(tree, null, 2));
+        return;
+      }
+      for (const command of tree) {
+        console.log(`pan ${command.path.join(' ')}  —  ${command.description}`);
+      }
+    });
 
   registerStateMigrationCommand(admin);
   registerReconcileLabelsCommand(admin);
