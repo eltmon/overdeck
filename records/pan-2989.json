@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-22T21:26:29.366Z",
-  "updated": "2026-07-24T17:48:59.493Z",
+  "updated": "2026-07-24T17:51:10.323Z",
   "pipeline": {
     "issueId": "PAN-2989",
     "reviewStatus": "pending",
@@ -38,16 +38,8 @@
   "harness": "claude-code",
   "model": "k3",
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "docs-record-lock-bounds-and-drain": {
-        "writerId": "agent-pan-2989",
-        "agentId": "agent-pan-2989",
-        "pid": 3588253,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-24T17:48:59.493Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2989",
@@ -81,6 +73,17 @@
         "outcome": "completed",
         "reason": "Added drainWorkspaceVerdictFallback (newer-wins fold + delete) triggered after landed journal writes (tracked in pendingJournalWrites) and via unref'd 5s/30s/120s retry timers per issue after fallback writes. New review-status-record-sync-drain.test.ts (7 tests, fake timers); full tests/unit/lib/overdeck (289) green; typecheck+lint clean.",
         "releasedAt": "2026-07-24T17:48:43.726Z"
+      },
+      {
+        "writerId": "agent-pan-2989",
+        "agentId": "agent-pan-2989",
+        "pid": 3588253,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-24T17:48:59.493Z",
+        "itemId": "docs-record-lock-bounds-and-drain",
+        "outcome": "completed",
+        "reason": "Documented the bounded record-lock hold (OVERDECK_RECORD_DURABILITY_BUDGET_MS, timeout semantics), the proactive pipeline-verdict.json drain, and the server-identity scrub in configuration/state-branch.mdx (new section) and docs/AGENT-STATE-PLANES.md (permanent-plane paragraph).",
+        "releasedAt": "2026-07-24T17:51:10.323Z"
       }
     ],
     "statusReasons": {
@@ -95,6 +98,10 @@
       "proactive-verdict-fallback-drain": {
         "reason": "Added drainWorkspaceVerdictFallback (newer-wins fold + delete) triggered after landed journal writes (tracked in pendingJournalWrites) and via unref'd 5s/30s/120s retry timers per issue after fallback writes. New review-status-record-sync-drain.test.ts (7 tests, fake timers); full tests/unit/lib/overdeck (289) green; typecheck+lint clean.",
         "updatedAt": "2026-07-24T17:48:43.726Z"
+      },
+      "docs-record-lock-bounds-and-drain": {
+        "reason": "Documented the bounded record-lock hold (OVERDECK_RECORD_DURABILITY_BUDGET_MS, timeout semantics), the proactive pipeline-verdict.json drain, and the server-identity scrub in configuration/state-branch.mdx (new section) and docs/AGENT-STATE-PLANES.md (permanent-plane paragraph).",
+        "updatedAt": "2026-07-24T17:51:10.323Z"
       }
     }
   },
@@ -113,6 +120,9 @@
     "proactive-verdict-fallback-drain.proactive-verdict-fallback-drain.ac2": "completed",
     "proactive-verdict-fallback-drain.proactive-verdict-fallback-drain.ac3": "completed",
     "proactive-verdict-fallback-drain.proactive-verdict-fallback-drain.ac4": "completed",
-    "docs-record-lock-bounds-and-drain": "running"
+    "docs-record-lock-bounds-and-drain": "completed",
+    "docs-record-lock-bounds-and-drain.docs-record-lock-bounds-and-drain.ac1": "completed",
+    "docs-record-lock-bounds-and-drain.docs-record-lock-bounds-and-drain.ac2": "completed",
+    "docs-record-lock-bounds-and-drain.docs-record-lock-bounds-and-drain.ac3": "completed"
   }
 }
