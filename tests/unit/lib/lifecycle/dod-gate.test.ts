@@ -12,7 +12,7 @@ import {
   evaluateDodGate,
   type DodStatusRowDeps,
 } from '../../../../src/lib/lifecycle/dod-gate.js';
-import { DOD_ROWS, type DodRowId, type DodRowResult } from '../../../../src/lib/lifecycle/dod.js';
+import { BRANCH_ABSENT_MERGE_ERROR, DOD_ROWS, type DodRowId, type DodRowResult } from '../../../../src/lib/lifecycle/dod.js';
 import { stepFailed, stepOk, stepSkipped } from '../../../../src/lib/lifecycle/types.js';
 
 const issueId = 'PAN-2715';
@@ -122,6 +122,35 @@ describe('Definition-of-Done merged row', () => {
     });
     expect(pass).toMatchObject({ status: 'pass', observed: expect.stringContaining('All commits merged to main') });
     expect(miss).toMatchObject({ status: 'miss', observed: expect.stringContaining('2 unmerged commit') });
+  });
+
+  it('rejects branch absence when neither the forge nor the durable record proves a merge', async () => {
+    const row = await checkMergedRow(ctx, {
+      verifyMerged: async () => stepFailed('close-out:verify-merged', BRANCH_ABSENT_MERGE_ERROR),
+      readPullRequest: async () => ({}),
+      readDurableMerges: async () => [],
+    });
+
+    expect(row).toMatchObject({
+      status: 'miss',
+      observed: expect.stringContaining('no merged forge artifact or durable close-out merge record found'),
+    });
+  });
+
+  it('accepts a deleted branch only with positive durable or forge merge evidence', async () => {
+    const durable = await checkMergedRow({ issueId, projectPath: '/tmp/overdeck' }, {
+      verifyMerged: async () => stepFailed('close-out:verify-merged', BRANCH_ABSENT_MERGE_ERROR),
+      readPullRequest: async () => ({}),
+      readDurableMerges: async () => ['https://github.com/eltmon/overdeck/pull/2720'],
+    });
+    const forge = await checkMergedRow(ctx, {
+      verifyMerged: async () => stepFailed('close-out:verify-merged', BRANCH_ABSENT_MERGE_ERROR),
+      readPullRequest: async () => ({ number: 2720, state: 'MERGED', mergedAt: '2026-07-15T12:00:00Z' }),
+      readDurableMerges: async () => [],
+    });
+
+    expect(durable).toMatchObject({ status: 'pass', observed: expect.stringContaining('1 merge artifact') });
+    expect(forge).toMatchObject({ status: 'pass', mergedAt: '2026-07-15T12:00:00Z' });
   });
 
   it('treats the existing idempotent skip as a pass', async () => {
@@ -361,6 +390,13 @@ describe('assembled Definition-of-Done gate', () => {
       by: 'operator',
       at: '2026-07-15T13:00:00Z',
     });
+  });
+
+  it('rejects Definition-of-Done overrides issued by the autonomous flywheel', async () => {
+    await expect(evaluateDodGate(ctx, {
+      acceptedRows: ['review', 'tests', 'verification'],
+      acceptedBy: 'flywheel-orchestrator',
+    }, deps('miss'))).rejects.toThrow('flywheel orchestrator cannot accept');
   });
 
   it('rejects unknown and non-overridable acceptance rows', async () => {
