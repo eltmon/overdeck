@@ -414,6 +414,10 @@ export async function handleConversationMessage(
     return jsonResponse({ error: `Message exceeds maximum length of ${MAX_MESSAGE_LENGTH} characters` }, { status: 400 });
   }
 
+  // Routing order is deliberate: validate → /pan route → native compact →
+  // attachments → harness delivery. Intercepting the portable namespace here
+  // keeps operator commands out of prompt transforms, control channels, PTY/tmux
+  // delivery, and harness transcripts while ordinary text follows the old path.
   try {
     const result = await handleComposerCommandMessage({
       message,
