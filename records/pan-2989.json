@@ -37,6 +37,11 @@
       "reason": "feedback",
       "note": "[2026-07-24T18:46Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-07-24T18:46:11.967Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-24T19:01Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-07-24T19:01:27.914Z"
     }
   ],
   "feedback": [
@@ -46,6 +51,13 @@
       "outcome": "changes-requested",
       "timestamp": "2026-07-24T18:46:11Z",
       "markdownBody": "# Review CHANGES REQUESTED for PAN-2989\n\nFallback drain claims hide active verdicts from reads and dead-claim recovery can overwrite a newer live verdict\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2989 -m \"Fixed review issues\"`"
+    },
+    {
+      "seq": 2,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-24T19:01:27Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2989\n\nStranded-claim recovery still has a cross-process check-then-rename race that can overwrite the newest fallback verdict\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2989 -m \"Fixed review issues\"`"
     }
   ],
   "scopeDrift": {
@@ -82,7 +94,7 @@
     "recordedAt": "2026-07-24T17:59:05.966Z"
   },
   "created": "2026-07-22T21:26:29.366Z",
-  "updated": "2026-07-24T19:01:27.345Z",
+  "updated": "2026-07-24T19:01:27.914Z",
   "pipeline": {
     "issueId": "PAN-2989",
     "reviewStatus": "blocked",
