@@ -63,17 +63,17 @@
     "recordedAt": "2026-07-24T18:43:30.234Z"
   },
   "created": "2026-07-24T17:28:09.122Z",
-  "updated": "2026-07-24T18:57:42.618Z",
+  "updated": "2026-07-24T19:05:58.395Z",
   "pipeline": {
     "issueId": "PAN-3021",
     "reviewStatus": "passed",
     "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
-    "mergeStatus": "pending",
+    "mergeStatus": "merged",
     "releaseStatus": "pending",
-    "readyForMerge": true,
-    "updatedAt": "2026-07-24T18:57:42.514Z",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-24T19:05:58.161Z",
     "reviewNotes": "Approved d110b0b2: command registry generation, composer integration, no-loss gate, security, and performance checks pass",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "Verified all 4 ACs: strike/swarm registered on root program, admin/cloister/status nested correctly, spawn-reviewer confirmed {hidden:true} at src/cli/index.ts:380 and filtered by commander's visibleCommands (verified in node_modules/commander/lib/help.js), unit tests correctly assert args metadata and hidden-exclusion/ordering.",
@@ -150,10 +150,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 162,
-            "output": 32151,
-            "cacheRead": 15217026,
-            "cacheWrite": 251806
+            "input": 166,
+            "output": 33810,
+            "cacheRead": 15720788,
+            "cacheWrite": 253421
           }
         },
         "work": {
@@ -179,15 +179,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 182,
-          "output": 36131,
-          "cacheRead": 16367128,
-          "cacheWrite": 384257
+          "input": 186,
+          "output": 37790,
+          "cacheRead": 16870890,
+          "cacheWrite": 385872
         }
       },
       "costAtCloseOut": {
-        "usd": 75.373835,
-        "pricingAsOf": "2026-07-24T18:57:42.602Z"
+        "usd": 75.495223,
+        "pricingAsOf": "2026-07-24T19:05:58.232Z"
       }
     },
     "merges": [
