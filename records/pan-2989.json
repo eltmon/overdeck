@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-22T21:26:29.366Z",
-  "updated": "2026-07-24T17:35:56.698Z",
+  "updated": "2026-07-24T17:41:23.667Z",
   "pipeline": {
     "issueId": "PAN-2989",
     "reviewStatus": "pending",
@@ -38,16 +38,8 @@
   "harness": "claude-code",
   "model": "k3",
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "scrub-dashboard-server-agent-identity": {
-        "writerId": "agent-pan-2989",
-        "agentId": "agent-pan-2989",
-        "pid": 3313019,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-24T17:35:56.698Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2989",
@@ -59,12 +51,27 @@
         "outcome": "completed",
         "reason": "Added RecordDurabilityTimeoutError + withRecordDurabilityDeadline (env OVERDECK_RECORD_DURABILITY_BUDGET_MS, default 30s) wrapping the flush await, reconcileStatePush (best-effort abortRebase on timeout), and restoreRetryableRecord in updateIssueRecord. Timeout rethrows without restoring; flush is raced, never aborted. New test file record-update-durability-budget.test.ts (4 tests, fake timers, 5/5 stable runs); adjacent record-update/lock suites green; typecheck+lint clean.",
         "releasedAt": "2026-07-24T17:35:17.633Z"
+      },
+      {
+        "writerId": "agent-pan-2989",
+        "agentId": "agent-pan-2989",
+        "pid": 3313019,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-24T17:35:56.698Z",
+        "itemId": "scrub-dashboard-server-agent-identity",
+        "outcome": "completed",
+        "reason": "spawnDashboardDetached now calls exported scrubAgentIdentityFromDashboardEnv (relocates OVERDECK_AGENT_ID to OVERDECK_DASHBOARD_SPAWNED_BY, deletes the three identity vars); PAN-2322 guard in config.ts reads the new var with unchanged decisions. New restart-spawn-env.test.ts (3 tests); config.test.ts identity-gate cases ported to the new var; 325 cli tests + 32 config tests green; typecheck+lint clean.",
+        "releasedAt": "2026-07-24T17:41:23.667Z"
       }
     ],
     "statusReasons": {
       "bound-record-durability-hold": {
         "reason": "Added RecordDurabilityTimeoutError + withRecordDurabilityDeadline (env OVERDECK_RECORD_DURABILITY_BUDGET_MS, default 30s) wrapping the flush await, reconcileStatePush (best-effort abortRebase on timeout), and restoreRetryableRecord in updateIssueRecord. Timeout rethrows without restoring; flush is raced, never aborted. New test file record-update-durability-budget.test.ts (4 tests, fake timers, 5/5 stable runs); adjacent record-update/lock suites green; typecheck+lint clean.",
         "updatedAt": "2026-07-24T17:35:17.633Z"
+      },
+      "scrub-dashboard-server-agent-identity": {
+        "reason": "spawnDashboardDetached now calls exported scrubAgentIdentityFromDashboardEnv (relocates OVERDECK_AGENT_ID to OVERDECK_DASHBOARD_SPAWNED_BY, deletes the three identity vars); PAN-2322 guard in config.ts reads the new var with unchanged decisions. New restart-spawn-env.test.ts (3 tests); config.test.ts identity-gate cases ported to the new var; 325 cli tests + 32 config tests green; typecheck+lint clean.",
+        "updatedAt": "2026-07-24T17:41:23.667Z"
       }
     }
   },
@@ -74,6 +81,9 @@
     "bound-record-durability-hold.bound-record-durability-hold.ac2": "completed",
     "bound-record-durability-hold.bound-record-durability-hold.ac3": "completed",
     "bound-record-durability-hold.bound-record-durability-hold.ac4": "completed",
-    "scrub-dashboard-server-agent-identity": "running"
+    "scrub-dashboard-server-agent-identity": "completed",
+    "scrub-dashboard-server-agent-identity.scrub-dashboard-server-agent-identity.ac1": "completed",
+    "scrub-dashboard-server-agent-identity.scrub-dashboard-server-agent-identity.ac2": "completed",
+    "scrub-dashboard-server-agent-identity.scrub-dashboard-server-agent-identity.ac3": "completed"
   }
 }
