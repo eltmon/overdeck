@@ -12,16 +12,15 @@
 1113 src/lib/overdeck/agents.ts
 1143 src/dashboard/server/routes/settings.ts
 1148 src/lib/cloister/deacon-swarm.ts
-1159 src/lib/review-status.ts
 1195 src/lib/conversations/smart-compaction.ts
 1205 src/lib/sync.ts
 1303 src/lib/tmux.ts
 1305 src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx
 1306 src/cli/commands/start.ts
 1306 src/dashboard/server/ws-rpc.ts
+1349 src/cli/index.ts
 1391 src/lib/model-capabilities.ts
 1407 src/lib/cloister/merge-agent.ts
-1414 src/cli/index.ts
 1443 src/dashboard/server/routes/command-deck.ts
 1504 src/lib/settings-api.ts
 1520 src/dashboard/server/services/issue-data-service.ts

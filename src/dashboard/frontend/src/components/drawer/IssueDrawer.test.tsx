@@ -776,6 +776,7 @@ describe('IssueDrawer', () => {
       {
         "READY_TO_MERGE": [
           "issue-action-merge",
+          "issue-action-resyncPipelineState",
           "issue-action-syncMain",
           "issue-action-copySettings",
           "issue-action-tasks",
@@ -793,6 +794,7 @@ describe('IssueDrawer', () => {
         "WORK_RUNNING": [
           "issue-action-tell",
           "issue-action-doneWork",
+          "issue-action-resyncPipelineState",
           "issue-action-syncMain",
           "issue-action-copySettings",
           "issue-action-tasks",

@@ -45,7 +45,11 @@ function mostRecentByTimestamp(
 ): Promise<EnrichedReviewStatus> {
   let allSessions: string[] = [];
   try {
-    allSessions = [...await Effect.runPromise(listSessionNames())];
+    // PAN-2988 — match the emit helper's patch budget so a wedged tmux call
+    // cannot leave any enrichment caller holding a pending promise forever.
+    allSessions = [
+      ...await Effect.runPromise(listSessionNames().pipe(Effect.timeout('5 seconds'))),
+    ];
   } catch {
     return status;
   }
