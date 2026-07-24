@@ -28,6 +28,7 @@ export interface MessagesTimelineProps {
   failedMessages?: FailedMessage[];
   onRetryFailed?: (failedId: string, text: string) => void;
   onDiscardFailed?: (failedId: string) => void;
+  onConfirmCommand?: (messageId: string, typedText?: string) => Promise<void>;
   proposedPlan?: ProposedPlan;
   compactBoundaries?: CompactBoundary[];
   compacting?: boolean;
