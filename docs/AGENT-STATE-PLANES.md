@@ -26,6 +26,22 @@ canonical, migration-aware paths — one record, read through the per-domain
 resolver and written through the single record writer — so a slot's durable
 completion is never silently lost to a stale workspace-local copy.
 
+Record writes hold the per-issue fs lock across the state-worktree commit and
+push, bounded by `OVERDECK_RECORD_DURABILITY_BUDGET_MS` (default 30s,
+PAN-2989): on expiry the writer rejects with `RecordDurabilityTimeoutError`
+and releases the lock, keeps the mutation in the local record (no
+restore-on-timeout — the raced flush may still land), and never aborts the
+shared-gitRoot flush of peer writers. A verdict write that cannot take the
+lock in time falls back to `<workspace>/.overdeck/pipeline-verdict.json`;
+`drainWorkspaceVerdictFallback()` folds that fallback into the canonical
+record (newer-wins on ISO `updatedAt`) and deletes it, triggered after every
+landed journal write for the issue and on unref'd 5s/30s/120s retries after a
+fallback write. Lock-owner attribution is truthful: the spawned dashboard
+server never inherits `OVERDECK_AGENT_ID`/`OVERDECK_ISSUE_ID`/
+`OVERDECK_SESSION_TYPE` (the spawner's identity is preserved as
+`OVERDECK_DASHBOARD_SPAWNED_BY` for the PAN-2322 port guard), so server-side
+record writes are attributed `process-<pid>@<hostname>`.
+
 `migration-complete.json` at the remote branch tip proves cutover. `pan sync`,
 dashboard coordinator startup, and work startup reconcile every registered
 project automatically before pipeline writes are allowed. The migrator carries
