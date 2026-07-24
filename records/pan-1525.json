@@ -197,10 +197,10 @@
     "recordedAt": "2026-07-24T23:08:31.650Z"
   },
   "created": "2026-07-12T09:32:29.900Z",
-  "updated": "2026-07-24T23:22:49.872Z",
+  "updated": "2026-07-24T23:24:30.536Z",
   "pipeline": {
     "issueId": "PAN-1525",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -208,8 +208,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-24T23:12:31.996Z",
-    "updatedAt": "2026-07-24T23:22:49.169Z",
-    "reviewNotes": "Detached /pan start and plan derive log paths from unvalidated issue text, enabling path traversal outside the agent directory.",
+    "updatedAt": "2026-07-24T23:24:30.515Z",
     "inspectNotes": "Composer-command parse+route inserted before compact/transform/delivery in conversation-message.ts with early return; unknown-command maps to 404 naming token + 'Type /pan to list available commands'; terminal-only policy maps to 422 naming exact command display; unprefixed text/pan-start negative control preserves original compact/transform/deliverAgentMessage path. All 4 ACs covered by router.test.ts assertions matching the exact banned-call list.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3033",
     "lastVerifiedCommit": "0b4828d4e0a9559885b4ecd9b143711f04aba82d",
@@ -359,10 +358,10 @@
       "byStage": {
         "implementation": {
           "anthropic/claude-fable-5": {
-            "input": 118,
-            "output": 31006,
-            "cacheRead": 10436084,
-            "cacheWrite": 57291
+            "input": 125,
+            "output": 32010,
+            "cacheRead": 11019438,
+            "cacheWrite": 256221
           }
         },
         "plan": {
@@ -375,9 +374,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 1131439,
-            "output": 163274,
-            "cacheRead": 47458304,
+            "input": 1577339,
+            "output": 163526,
+            "cacheRead": 47512576,
             "cacheWrite": 0
           }
         },
@@ -391,24 +390,24 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 6985608,
-            "output": 772269,
-            "cacheRead": 412403712,
+            "input": 9253666,
+            "output": 776105,
+            "cacheRead": 414711296,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "anthropic/claude-fable-5": {
-          "input": 20106,
-          "output": 105315,
-          "cacheRead": 17514352,
-          "cacheWrite": 722940
+          "input": 20113,
+          "output": 106319,
+          "cacheRead": 18097706,
+          "cacheWrite": 921870
         },
         "openai/gpt-5.6-sol": {
-          "input": 8117047,
-          "output": 935543,
-          "cacheRead": 459862016,
+          "input": 10831005,
+          "output": 939631,
+          "cacheRead": 462223872,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -419,8 +418,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 331.358452,
-        "pricingAsOf": "2026-07-24T23:22:49.192Z"
+        "usd": 349.35206,
+        "pricingAsOf": "2026-07-24T23:24:30.533Z"
       }
     },
     "merges": [
