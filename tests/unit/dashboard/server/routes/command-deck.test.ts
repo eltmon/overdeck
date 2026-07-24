@@ -76,6 +76,8 @@ vi.mock('node:fs/promises', async () => {
 });
 
 import { extractReviewerRole, fetchActivityDataWithContext } from '../../../../../src/dashboard/server/routes/command-deck.ts';
+import { getReviewStatusSync } from '../../../../../src/dashboard/server/review-status.js';
+import { resolveJsonlPath } from '../../../../../src/dashboard/server/routes/jsonl-resolver.js';
 
 const mockAgentStates = vi.hoisted(() => new Map<string, any>());
 const mockRuntimeStates = vi.hoisted(() => new Map<string, any>());
@@ -138,6 +140,8 @@ describe('fetchActivityDataWithContext', () => {
     mockAgentStates.clear();
     mockRuntimeStates.clear();
     mockIsPlanningComplete.mockReturnValue(Effect.succeed(false));
+    vi.mocked(getReviewStatusSync).mockReturnValue(null);
+    vi.mocked(resolveJsonlPath).mockResolvedValue(null);
   });
 
   it('leaves endedAt undefined for a live work session', async () => {
@@ -267,5 +271,46 @@ describe('fetchActivityDataWithContext', () => {
     expect(planning).toBeDefined();
     expect(planning?.type).toBe('planning');
     expect(planning?.planningComplete).toBe(false);
+  });
+
+  it('uses merge-door history without probing a synthetic ship conversation', async () => {
+    const issueId = 'PAN-3020';
+    const shipId = 'agent-pan-3020-ship';
+    vi.mocked(getReviewStatusSync).mockReturnValue({
+      history: [{ type: 'merge', status: 'merging', timestamp: '2026-07-24T12:00:00Z' }],
+    } as ReturnType<typeof getReviewStatusSync>);
+
+    const result = await fetchActivityDataWithContext(issueId, { tmuxSessionNames: new Set() });
+    const sections = (result as { sections: Array<{ sessionId: string; type: string }> }).sections;
+
+    expect(sections.some((section) => section.sessionId === shipId)).toBe(false);
+    expect(resolveJsonlPath).not.toHaveBeenCalledWith(shipId, expect.any(String));
+  });
+
+  it('retains a historical ship conversation when its transcript resolves', async () => {
+    const issueId = 'PAN-3020';
+    const shipId = 'agent-pan-3020-ship';
+    mockAgentStates.set(shipId, {
+      id: shipId,
+      issueId,
+      role: 'ship',
+      model: 'claude-sonnet-5',
+      status: 'stopped',
+      startedAt: '2026-07-24T12:00:00Z',
+    });
+    vi.mocked(getReviewStatusSync).mockReturnValue({
+      history: [{ type: 'merge', status: 'passed', timestamp: '2026-07-24T12:00:00Z' }],
+    } as ReturnType<typeof getReviewStatusSync>);
+    vi.mocked(resolveJsonlPath).mockImplementation(async (agentId) => (
+      agentId === shipId ? '/tmp/ship.jsonl' : null
+    ));
+
+    const result = await fetchActivityDataWithContext(issueId, { tmuxSessionNames: new Set() });
+    const sections = (result as { sections: Array<{ sessionId: string; type: string; hasJsonl?: boolean }> }).sections;
+
+    expect(sections.find((section) => section.sessionId === shipId)).toMatchObject({
+      type: 'ship',
+      hasJsonl: true,
+    });
   });
 });

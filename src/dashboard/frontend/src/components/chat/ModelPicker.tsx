@@ -45,11 +45,12 @@ type ProviderHarnesses = Partial<Record<string, Harness>>;
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 /** @deprecated Use string — exported for backward compatibility only. */
-export type ClaudeModelId = 'claude-fable-5' | 'claude-opus-4-8' | 'claude-opus-4-7' | 'claude-opus-4-6' | 'claude-sonnet-5' | 'claude-sonnet-4-6' | 'claude-haiku-4-5-20251001';
+export type ClaudeModelId = 'claude-fable-5' | 'claude-opus-5' | 'claude-opus-4-8' | 'claude-opus-4-7' | 'claude-opus-4-6' | 'claude-sonnet-5' | 'claude-sonnet-4-6' | 'claude-haiku-4-5-20251001';
 
 /** Effort levels for known Anthropic models. Kept for backward compatibility. */
 export const MODEL_EFFORT_SUPPORT: Record<ClaudeModelId, readonly string[]> = {
   'claude-fable-5': ['low', 'medium', 'high', 'xhigh', 'max'],
+  'claude-opus-5': ['low', 'medium', 'high', 'xhigh', 'max'],
   'claude-opus-4-8': ['low', 'medium', 'high', 'xhigh', 'max'],
   'claude-opus-4-7': ['low', 'medium', 'high', 'xhigh', 'max'],
   'claude-opus-4-6': ['low', 'medium', 'high', 'max'],
@@ -81,6 +82,7 @@ const FALLBACK_GROUPS: ModelGroup[] = [
     label: 'Anthropic',
     models: [
       { id: 'claude-fable-5', label: 'Claude Fable 5', provider: 'anthropic', costDisplay: '$90/1M', costPer1MTokens: 90, effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'] },
+      { id: 'claude-opus-5', label: 'Claude Opus 5', provider: 'anthropic', costDisplay: '$45/1M', costPer1MTokens: 45, effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'] },
       { id: 'claude-opus-4-8', label: 'Claude Opus 4.8', provider: 'anthropic', costDisplay: '$45/1M', costPer1MTokens: 45, effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'] },
       { id: 'claude-opus-4-7', label: 'Claude Opus 4.7', provider: 'anthropic', costDisplay: '$45/1M', costPer1MTokens: 45, effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'] },
       { id: 'claude-sonnet-5', label: 'Claude Sonnet 5', provider: 'anthropic', costDisplay: '$6/1M', costPer1MTokens: 6, effortLevels: ['low', 'medium', 'high'] },

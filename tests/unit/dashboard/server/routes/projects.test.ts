@@ -92,6 +92,7 @@ import { listProjectsSync } from '../../../../../src/lib/projects.js';
 import { listSessionNames } from '../../../../../src/lib/tmux.js';
 import { getAgentRuntimeState } from '../../../../../src/lib/agents.js';
 import { getReviewStatusSync } from '../../../../../src/dashboard/server/review-status.js';
+import { resolveJsonlPath } from '../../../../../src/dashboard/server/routes/jsonl-resolver.js';
 import { access, readdir, readFile, stat } from 'node:fs/promises';
 
 const RECENT_PLANNING_MTIME = new Date(Date.now() - 60_000);
@@ -139,6 +140,7 @@ describe('fetchProjectSessionTree', () => {
     (stat as any).mockResolvedValue({ mtime: RECENT_PLANNING_MTIME });
     mockFindSpecByIssue.mockReturnValue(Effect.succeed(null));
     (getReviewStatusSync as any).mockReturnValue(null);
+    (resolveJsonlPath as any).mockResolvedValue(null);
     (getAgentRuntimeState as any).mockReturnValue(Effect.succeed(null));
   });
 
@@ -462,6 +464,67 @@ describe('fetchProjectSessionTree', () => {
       troubledAt: '2026-02-03T04:05:06Z',
       consecutiveFailures: 1,
       queuedMailCount: 1,
+    });
+  });
+
+  it('uses merge-door history without probing a synthetic ship conversation', async () => {
+    (listProjectsSync as any).mockReturnValue([
+      {
+        key: 'overdeck',
+        config: { name: 'overdeck', path: '/tmp/overdeck', workspace: { workspaces_dir: 'workspaces' } },
+      },
+    ]);
+    (listSessionNames as any).mockReturnValue(Effect.succeed([]));
+    (getReviewStatusSync as any).mockReturnValue({
+      history: [{ type: 'merge', status: 'merging', timestamp: '2026-07-24T12:00:00Z' }],
+    });
+    mockAccess(new Set([
+      '/tmp/overdeck/workspaces',
+      '/tmp/overdeck/workspaces/feature-pan-3020/.overdeck',
+    ]));
+    mockWorkspaceReaddir([{ name: 'feature-pan-3020', isDirectory: () => true, isFile: () => false }]);
+
+    const result = await fetchProjectSessionTree('overdeck');
+
+    const tree = result as { features: Array<{ sessions: Array<{ sessionId: string }> }> };
+    expect(tree.features[0]?.sessions.some((session) => session.sessionId === 'agent-pan-3020-ship')).toBe(false);
+    expect(resolveJsonlPath).not.toHaveBeenCalledWith('agent-pan-3020-ship', expect.any(String));
+  });
+
+  it('retains a historical ship conversation when its transcript resolves', async () => {
+    (listProjectsSync as any).mockReturnValue([
+      {
+        key: 'overdeck',
+        config: { name: 'overdeck', path: '/tmp/overdeck', workspace: { workspaces_dir: 'workspaces' } },
+      },
+    ]);
+    (listSessionNames as any).mockReturnValue(Effect.succeed([]));
+    (getReviewStatusSync as any).mockReturnValue({
+      history: [{ type: 'merge', status: 'passed', timestamp: '2026-07-24T12:00:00Z' }],
+    });
+    mockAgentStates.set('agent-pan-3020-ship', agentState({
+      id: 'agent-pan-3020-ship',
+      issueId: 'PAN-3020',
+      role: 'ship',
+      model: 'claude-sonnet-5',
+      status: 'stopped',
+      workspace: '/tmp/overdeck/workspaces/feature-pan-3020',
+    }));
+    (resolveJsonlPath as any).mockImplementation(async (agentId: string) => (
+      agentId === 'agent-pan-3020-ship' ? '/tmp/ship.jsonl' : null
+    ));
+    mockAccess(new Set([
+      '/tmp/overdeck/workspaces',
+      '/tmp/overdeck/workspaces/feature-pan-3020/.overdeck',
+    ]));
+    mockWorkspaceReaddir([{ name: 'feature-pan-3020', isDirectory: () => true, isFile: () => false }]);
+
+    const result = await fetchProjectSessionTree('overdeck');
+
+    const tree = result as { features: Array<{ sessions: Array<{ sessionId: string; type: string; hasJsonl?: boolean }> }> };
+    expect(tree.features[0]?.sessions.find((session) => session.sessionId === 'agent-pan-3020-ship')).toMatchObject({
+      type: 'ship',
+      hasJsonl: true,
     });
   });
 
