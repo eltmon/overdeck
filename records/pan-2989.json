@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-22T21:26:29.366Z",
-  "updated": "2026-07-24T17:41:36.549Z",
+  "updated": "2026-07-24T17:48:43.727Z",
   "pipeline": {
     "issueId": "PAN-2989",
     "reviewStatus": "pending",
@@ -38,16 +38,8 @@
   "harness": "claude-code",
   "model": "k3",
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "proactive-verdict-fallback-drain": {
-        "writerId": "agent-pan-2989",
-        "agentId": "agent-pan-2989",
-        "pid": 3410794,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-24T17:41:36.549Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2989",
@@ -70,6 +62,17 @@
         "outcome": "completed",
         "reason": "spawnDashboardDetached now calls exported scrubAgentIdentityFromDashboardEnv (relocates OVERDECK_AGENT_ID to OVERDECK_DASHBOARD_SPAWNED_BY, deletes the three identity vars); PAN-2322 guard in config.ts reads the new var with unchanged decisions. New restart-spawn-env.test.ts (3 tests); config.test.ts identity-gate cases ported to the new var; 325 cli tests + 32 config tests green; typecheck+lint clean.",
         "releasedAt": "2026-07-24T17:41:23.667Z"
+      },
+      {
+        "writerId": "agent-pan-2989",
+        "agentId": "agent-pan-2989",
+        "pid": 3410794,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-24T17:41:36.549Z",
+        "itemId": "proactive-verdict-fallback-drain",
+        "outcome": "completed",
+        "reason": "Added drainWorkspaceVerdictFallback (newer-wins fold + delete) triggered after landed journal writes (tracked in pendingJournalWrites) and via unref'd 5s/30s/120s retry timers per issue after fallback writes. New review-status-record-sync-drain.test.ts (7 tests, fake timers); full tests/unit/lib/overdeck (289) green; typecheck+lint clean.",
+        "releasedAt": "2026-07-24T17:48:43.726Z"
       }
     ],
     "statusReasons": {
@@ -80,6 +83,10 @@
       "scrub-dashboard-server-agent-identity": {
         "reason": "spawnDashboardDetached now calls exported scrubAgentIdentityFromDashboardEnv (relocates OVERDECK_AGENT_ID to OVERDECK_DASHBOARD_SPAWNED_BY, deletes the three identity vars); PAN-2322 guard in config.ts reads the new var with unchanged decisions. New restart-spawn-env.test.ts (3 tests); config.test.ts identity-gate cases ported to the new var; 325 cli tests + 32 config tests green; typecheck+lint clean.",
         "updatedAt": "2026-07-24T17:41:23.667Z"
+      },
+      "proactive-verdict-fallback-drain": {
+        "reason": "Added drainWorkspaceVerdictFallback (newer-wins fold + delete) triggered after landed journal writes (tracked in pendingJournalWrites) and via unref'd 5s/30s/120s retry timers per issue after fallback writes. New review-status-record-sync-drain.test.ts (7 tests, fake timers); full tests/unit/lib/overdeck (289) green; typecheck+lint clean.",
+        "updatedAt": "2026-07-24T17:48:43.726Z"
       }
     }
   },
@@ -93,6 +100,10 @@
     "scrub-dashboard-server-agent-identity.scrub-dashboard-server-agent-identity.ac1": "completed",
     "scrub-dashboard-server-agent-identity.scrub-dashboard-server-agent-identity.ac2": "completed",
     "scrub-dashboard-server-agent-identity.scrub-dashboard-server-agent-identity.ac3": "completed",
-    "proactive-verdict-fallback-drain": "running"
+    "proactive-verdict-fallback-drain": "completed",
+    "proactive-verdict-fallback-drain.proactive-verdict-fallback-drain.ac1": "completed",
+    "proactive-verdict-fallback-drain.proactive-verdict-fallback-drain.ac2": "completed",
+    "proactive-verdict-fallback-drain.proactive-verdict-fallback-drain.ac3": "completed",
+    "proactive-verdict-fallback-drain.proactive-verdict-fallback-drain.ac4": "completed"
   }
 }
