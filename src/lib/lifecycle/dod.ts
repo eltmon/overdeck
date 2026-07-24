@@ -63,6 +63,12 @@ export function acceptFlagFor(row: DodRowDef): string {
   return `--accept-${row.id}`;
 }
 
+export function canAcceptDodMisses(actor: string): boolean {
+  return !actor.startsWith('flywheel-');
+}
+
+export const BRANCH_ABSENT_MERGE_ERROR = 'Feature branch is absent; positive merge evidence is required';
+
 export type DodRowStatus = 'pass' | 'miss' | 'skip';
 
 export interface DodRowResult {

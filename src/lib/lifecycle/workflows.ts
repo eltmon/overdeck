@@ -42,7 +42,7 @@ import {
   resolvePipelineTelemetryContext,
   type PipelineTelemetryContext,
 } from '../telemetry/pipeline.js';
-import { acceptFlagFor, DOD_ROWS, type DodGateResult } from './dod.js';
+import { acceptFlagFor, BRANCH_ABSENT_MERGE_ERROR, DOD_ROWS, type DodGateResult } from './dod.js';
 
 const execAsync = promisify(exec);
 
@@ -592,8 +592,8 @@ export async function verifyBranchMergedImpl(ctx: LifecycleContext): Promise<Ste
       if (remoteCheck) return remoteCheck;
     }
 
-    // No branch at all — assume squash-merged and branch deleted
-    return stepOk(step, ['Branch already cleaned up (squash-merged)']);
+    // Branch absence is not merge evidence: teardown can delete an unmerged branch.
+    return stepFailed(step, BRANCH_ABSENT_MERGE_ERROR);
   } catch (err) {
     return stepFailed(step, `Could not verify merge: ${(err as Error).message}`);
   }

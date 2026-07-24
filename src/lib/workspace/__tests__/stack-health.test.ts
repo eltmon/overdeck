@@ -189,6 +189,14 @@ describe('evaluateWorkspaceStackHealth', () => {
 
     expect(health.healthy).toBe(true);
     expect(health.reasons).toEqual([]);
+    // Surfaced so UIs can render "not built" instead of a vacuous "healthy".
+    expect(health.stackExpected).toBe(false);
+  });
+
+  it('reports stackExpected=true for a provisioned Docker workspace', () => {
+    const health = evaluateWorkspaceStackHealth('PAN-1140', dockerProject, [], { now, stackExpected: true });
+
+    expect(health.stackExpected).toBe(true);
   });
 
   it('does not match overlapping issue IDs by substring', () => {
@@ -224,6 +232,9 @@ describe('evaluateWorkspaceStackHealth', () => {
       healthy: false,
       reasons: ['overdeck-feature-pan-1140-init-1 init exited non-zero (1)'],
       lastObserved: '2026-05-16T23:01:00.000Z',
+      // No workspace dir on disk in this test → stack not expected; the failed
+      // init container is still reported.
+      stackExpected: false,
     });
   });
 
@@ -243,6 +254,7 @@ describe('evaluateWorkspaceStackHealth', () => {
         healthy: true,
         reasons: [],
         lastObserved: now.toISOString(),
+        stackExpected: false,
       });
     } finally {
       rmSync(projectRoot, { recursive: true, force: true });
@@ -264,6 +276,7 @@ describe('evaluateWorkspaceStackHealth', () => {
         healthy: false,
         reasons: ['No Docker containers found for workspace stack pan-1140'],
         lastObserved: now.toISOString(),
+        stackExpected: true,
       });
     } finally {
       rmSync(projectRoot, { recursive: true, force: true });

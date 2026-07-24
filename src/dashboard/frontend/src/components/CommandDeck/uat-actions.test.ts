@@ -13,6 +13,7 @@ describe('resolveUatActions', () => {
     ['unhealthy', 'active', ['logs', 'rebuild'], ['open-uat', 'open-api', 'logs', 'rebuild', 'restart', 'stop', 'open-state-dir', 'copy-stack-name', 'reap']],
     ['stopped', 'idle', ['start', 'reap'], ['logs', 'rebuild', 'open-state-dir', 'copy-stack-name', 'reap']],
     ['stale', 'merged', ['reap'], ['logs', 'start', 'open-state-dir', 'copy-stack-name', 'reap']],
+    ['absent', 'active', ['rebuild'], ['rebuild', 'open-state-dir', 'copy-stack-name', 'reap']],
   ] as Array<[UatStackState, UatIssueLifecycle, string[], string[]]>)(
     'returns documented actions for %s/%s',
     (stackState, issueLifecycle, inlineIds, menuIds) => {

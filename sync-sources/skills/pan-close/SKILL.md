@@ -42,8 +42,10 @@ Each overridable row has one explicit acceptance flag:
 --accept-deploy       Row 7: live dashboard build includes the merge
 ```
 
-An acceptance records the flag, operator/agent identity, and timestamp in the
-issue close-out record. Use it only when the missing evidence is understood:
+An acceptance records the flag, operator identity, and timestamp in the issue
+close-out record. The autonomous flywheel may run a clean close-out, but it cannot
+use `--accept-*`; an operator must apply every override after reviewing the miss.
+Use an override only when the missing evidence is understood:
 
 ```bash
 pan close PAN-1234 --force

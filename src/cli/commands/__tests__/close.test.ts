@@ -165,6 +165,20 @@ describe('closeOutCommand', () => {
     expect(mocks.closeOut).toHaveBeenCalledOnce();
   });
 
+  it('bars the flywheel orchestrator from self-issuing Definition-of-Done overrides', async () => {
+    vi.stubEnv('OVERDECK_AGENT_ID', 'flywheel-orchestrator');
+    await expect(closeOutCommand('PAN-1190', {
+      force: true,
+      acceptReview: true,
+      acceptTests: true,
+      acceptVerification: true,
+    })).rejects.toThrow('process.exit unexpectedly called with "1"');
+
+    expect(mocks.closeOut).not.toHaveBeenCalled();
+    const errors = vi.mocked(console.error).mock.calls.map((c) => String(c[0])).join('\n');
+    expect(errors).toContain('flywheel orchestrator cannot accept');
+  });
+
   it('allows an operator conversation (conv-*) to close out', async () => {
     vi.stubEnv('OVERDECK_AGENT_ID', 'conv-20260608-1234');
     await expect(closeOutCommand('PAN-1190', { force: true })).rejects.toThrow('process.exit unexpectedly called with "0"');

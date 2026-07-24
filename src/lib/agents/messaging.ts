@@ -33,6 +33,7 @@ import {
   deliverResumeMessageWithTranscriptConfirmation,
   resilientDeliveryMethod,
 } from './delivery.js';
+import { formatMailFileContent, isMonitorLive } from './monitor-transport.js';
 import { getAgentRuntimeStateSync } from './runtime-state.js';
 import {
   claudeSystemPromptFiles,
@@ -59,13 +60,18 @@ export interface MessageDeliveryOutcome {
   reason?: string;
 }
 
-function queueAgentMail(agentId: string, message: string, pendingTurnEndDelivery = false): void {
+function queueAgentMail(agentId: string, message: string, pendingTurnEndDelivery = false, source?: string): void {
   const mailDir = join(getAgentDir(agentId), 'mail');
   mkdirSync(mailDir, { recursive: true });
-  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const now = new Date();
+  const timestamp = now.toISOString().replace(/[:.]/g, '-');
+  // The provenance header is only written when a source is known (the monitor
+  // tier, PAN-3015). Callers that replay mail verbatim (codex notify hook
+  // pastes `.pending.md` content) keep the legacy `# Message\n\n<body>` shape.
+  const content = source ? formatMailFileContent(message, source, now) : `# Message\n\n${message}\n`;
   writeFileSync(
     join(mailDir, `${timestamp}${pendingTurnEndDelivery ? '.pending' : ''}.md`),
-    `# Message\n\n${message}\n`
+    content
   );
 }
 
@@ -371,6 +377,23 @@ export async function messageAgent(
   }
 
   const expectedHarness = agentState?.harness ?? 'claude-code';
+
+  // PAN-3015 monitor tier: when the agent's Claude Code session runs a live
+  // `pan monitor` background task, the durable mail file IS the delivery — the
+  // monitor prints it to stdout and the harness surfaces it to the model,
+  // waking an idle session. No keystroke transport runs, which sidesteps the
+  // whole echo-confirm/paste/Enter failure class (PAN-1769, PAN-2228,
+  // PAN-1988). Mid-session tells only: kickoff/resume never reach this path
+  // (no monitor exists before the session's first turn), and a stale
+  // heartbeat or dead pid falls through to the normal cascade.
+  if (expectedHarness === 'claude-code' && isMonitorLive(normalizedId)) {
+    queueAgentMail(normalizedId, message, false, caller);
+    logAgentLifecycleSync(normalizedId, `messageAgent delivered via monitor mail (caller: ${caller})`);
+    console.log(`[agents] Delivered message to ${normalizedId} via monitor inbox`);
+    await appendTellInterventionForUserSource(normalizedId, caller);
+    return { delivered: true, queuedToMail: true, reason: 'monitor' };
+  }
+
   let appServerState: string | undefined;
   try {
     appServerState = (await getCodexAppServerStatus(normalizedId)).state;

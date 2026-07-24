@@ -4,7 +4,7 @@ import styles from './styles/command-deck.module.css';
 
 type Density = 'compact' | 'full' | 'tree';
 export type UatContainerState = 'healthy' | 'starting' | 'unhealthy' | 'stopped' | 'unknown';
-export type UatStackState = 'healthy' | 'starting' | 'unhealthy' | 'stopped' | 'stale';
+export type UatStackState = 'healthy' | 'starting' | 'unhealthy' | 'stopped' | 'stale' | 'absent';
 export type UatStackLifecycle = 'active' | 'merged' | 'idle';
 
 interface UatStackStatusProps {
@@ -141,6 +141,10 @@ export function resolveUatStackState({
   const entries = Object.entries(containers ?? {});
   if (entries.length === 0 && stackHealth?.healthy === undefined && !pending) return null;
   if (pending) return 'starting';
+  // Never-provisioned stack (no .devcontainer, zero containers): the backend
+  // reports vacuous healthy=true for pipeline gating, but there is nothing
+  // running and nothing routed — showing "healthy" here is a lie.
+  if (entries.length === 0 && stackHealth?.stackExpected === false) return 'absent';
 
   const states = entries.map(([, status]) => normalizeStatus(status));
   if (entries.length > 0 && states.every(state => state === 'stopped')) return 'stopped';
@@ -166,6 +170,9 @@ export function getUatStackSummary({
   const active = state === 'starting' || state === 'unhealthy';
   if (state === 'stale') {
     return { label: 'UAT stack merged · idle', healthyCount, totalCount, active: false, state };
+  }
+  if (state === 'absent') {
+    return { label: 'UAT stack not built', healthyCount, totalCount, active: false, state };
   }
   if (state === 'healthy') {
     return { label: totalCount > 0 ? `UAT stack ${healthyCount}/${totalCount} healthy` : 'UAT stack healthy', healthyCount, totalCount, active, state };
@@ -247,7 +254,7 @@ export function UatStackStatus({
         <SummaryIcon summary={summary} />
         <span className={`font-semibold ${summaryTone(summary)}`}>{summary.label}</span>
         {lastProbe && <span className="text-[11px] text-muted-foreground">last probe {lastProbe}</span>}
-        {frontendUrl && stackHealth?.healthy === true && (
+        {frontendUrl && summary.state === 'healthy' && (
           <a href={frontendUrl} target="_blank" rel="noreferrer" className="ml-auto inline-flex items-center gap-1 text-[11px] text-info-foreground hover:underline">
             UAT <ExternalLink className="h-3 w-3" />
           </a>
@@ -270,7 +277,7 @@ export function UatStackStatus({
           ))}
         </div>
       )}
-      {density === 'full' && (frontendUrl || apiUrl) && (
+      {density === 'full' && summary.state !== 'absent' && (frontendUrl || apiUrl) && (
         <div className="mt-2 flex flex-wrap gap-2 text-[11px]">
           {frontendUrl && (
             <a href={frontendUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-info-foreground hover:underline">

@@ -72,6 +72,38 @@ describe('UAT stack status semantics', () => {
     })).toBe('stale');
   });
 
+  it('classifies a never-provisioned stack as absent, not healthy', () => {
+    // Backend reports vacuous healthy=true (stackExpected=false, no
+    // .devcontainer, zero containers) — the UI must not claim a live stack.
+    const stackHealth = { healthy: true, reasons: [], lastObserved: '2026-06-29T12:00:00.000Z', stackExpected: false };
+    expect(resolveUatStackState({ containers: {}, stackHealth })).toBe('absent');
+    const summary = getUatStackSummary({ containers: {}, stackHealth });
+    expect(summary?.label).toBe('UAT stack not built');
+    expect(summary?.active).toBe(false);
+
+    // Containers present → the flag is irrelevant; normal classification wins.
+    expect(resolveUatStackState({
+      containers: { api: container() },
+      stackHealth,
+    })).toBe('healthy');
+  });
+
+  it('hides UAT links for an absent stack', () => {
+    render(
+      <UatStackStatus
+        containers={{}}
+        stackHealth={{ healthy: true, reasons: [], lastObserved: '2026-06-29T12:00:00.000Z', stackExpected: false }}
+        frontendUrl="https://feature-min-892.myn.localhost"
+        apiUrl="https://api-feature-min-892.myn.localhost"
+        density="full"
+      />,
+    );
+    expect(screen.getByText('UAT stack not built')).toBeTruthy();
+    expect(screen.queryByText('UAT')).toBeNull();
+    expect(screen.queryByText('Frontend')).toBeNull();
+    expect(screen.queryByText('API')).toBeNull();
+  });
+
   it('summarizes a cleanly stopped stack as stopped, inactive, and non-red', () => {
     const summary = getUatStackSummary({
       containers: {
