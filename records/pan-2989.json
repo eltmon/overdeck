@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-22T21:26:29.366Z",
-  "updated": "2026-07-24T17:59:05.967Z",
+  "updated": "2026-07-24T17:59:08.919Z",
   "pipeline": {
     "issueId": "PAN-2989",
     "reviewStatus": "pending",
@@ -20,7 +20,42 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-24T17:13:13.637Z"
+    "updatedAt": "2026-07-24T17:59:08.918Z",
+    "reviewRequestedAt": "2026-07-24T17:59:08.918Z",
+    "scopeDrift": {
+      "outsideDeclaredScope": [
+        "src/cli/commands/__tests__/restart-spawn-env.test.ts",
+        "tests/unit/dashboard/config.test.ts"
+      ],
+      "declaredScopeUntouched": [
+        "src/cli/commands/__tests__/restart.test.ts"
+      ],
+      "declaredScope": [
+        "configuration/state-branch.mdx",
+        "docs/AGENT-STATE-PLANES.md",
+        "src/cli/commands/__tests__/restart.test.ts",
+        "src/cli/commands/restart.ts",
+        "src/dashboard/server/config.ts",
+        "src/lib/overdeck/review-status-record-sync.ts",
+        "src/lib/pan-dir/record-update.ts",
+        "tests/unit/lib/overdeck/review-status-record-sync-drain.test.ts",
+        "tests/unit/lib/pan-dir/record-update-durability-budget.test.ts"
+      ],
+      "actualChangedFiles": [
+        "configuration/state-branch.mdx",
+        "docs/AGENT-STATE-PLANES.md",
+        "src/cli/commands/__tests__/restart-spawn-env.test.ts",
+        "src/cli/commands/restart.ts",
+        "src/dashboard/server/config.ts",
+        "src/lib/overdeck/review-status-record-sync.ts",
+        "src/lib/pan-dir/record-update.ts",
+        "tests/unit/dashboard/config.test.ts",
+        "tests/unit/lib/overdeck/review-status-record-sync-drain.test.ts",
+        "tests/unit/lib/pan-dir/record-update-durability-budget.test.ts"
+      ],
+      "recordedAt": "2026-07-24T17:59:05.966Z"
+    },
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3027"
   },
   "closeOut": {
     "usage": {
