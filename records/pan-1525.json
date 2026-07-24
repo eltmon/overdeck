@@ -27,7 +27,7 @@
   ],
   "feedback": [],
   "created": "2026-07-12T09:32:29.900Z",
-  "updated": "2026-07-24T21:06:46.150Z",
+  "updated": "2026-07-24T21:26:25.894Z",
   "pipeline": {
     "issueId": "PAN-1525",
     "reviewStatus": "pending",
@@ -109,16 +109,8 @@
   "model": "claude-sonnet-5",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 19,
-    "claims": {
-      "ui-handoff-result": {
-        "writerId": "agent-pan-1525",
-        "agentId": "agent-pan-1525",
-        "pid": 2697607,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-24T21:06:46.150Z"
-      }
-    },
+    "sequence": 20,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-1525",
@@ -218,6 +210,17 @@
         "outcome": "completed",
         "reason": "Detached start and plan now launch through the shared spawnPanCli activity helper, return accepted activity results, preserve route completion semantics, and forward exact operator argv without provider flags. Focused tests, typecheck, full lint, and throwaway Node 22 API verification passed.",
         "releasedAt": "2026-07-24T21:06:31.302Z"
+      },
+      {
+        "writerId": "agent-pan-1525",
+        "agentId": "agent-pan-1525",
+        "pid": 2697607,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-24T21:06:46.150Z",
+        "itemId": "ui-handoff-result",
+        "outcome": "completed",
+        "reason": "The shared router now handles all three handoff aliases and /pan fork as structured UI results before harness delivery. ComposerFooter preserves the local handoff fast path, opens server-requested dialogs, and suppresses chat bubbles for UI commands. Router, agent-route, and ComposerFooter tests, typecheck, lint, throwaway Node 22 API checks, and Playwright dialog screenshots passed.",
+        "releasedAt": "2026-07-24T21:26:25.894Z"
       }
     ],
     "statusReasons": {
@@ -256,6 +259,10 @@
       "executors-detached": {
         "reason": "Detached start and plan now launch through the shared spawnPanCli activity helper, return accepted activity results, preserve route completion semantics, and forward exact operator argv without provider flags. Focused tests, typecheck, full lint, and throwaway Node 22 API verification passed.",
         "updatedAt": "2026-07-24T21:06:31.302Z"
+      },
+      "ui-handoff-result": {
+        "reason": "The shared router now handles all three handoff aliases and /pan fork as structured UI results before harness delivery. ComposerFooter preserves the local handoff fast path, opens server-requested dialogs, and suppresses chat bubbles for UI commands. Router, agent-route, and ComposerFooter tests, typecheck, lint, throwaway Node 22 API checks, and Playwright dialog screenshots passed.",
+        "updatedAt": "2026-07-24T21:26:25.894Z"
       }
     }
   },
@@ -297,6 +304,9 @@
     "executors-detached.executors-detached.ac1": "completed",
     "executors-detached.executors-detached.ac2": "completed",
     "executors-detached.executors-detached.ac3": "completed",
-    "ui-handoff-result": "running"
+    "ui-handoff-result": "completed",
+    "ui-handoff-result.ui-handoff-result.ac1": "completed",
+    "ui-handoff-result.ui-handoff-result.ac2": "completed",
+    "ui-handoff-result.ui-handoff-result.ac3": "completed"
   }
 }
