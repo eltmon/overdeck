@@ -27,7 +27,7 @@
   ],
   "feedback": [],
   "created": "2026-07-12T09:32:29.900Z",
-  "updated": "2026-07-24T20:18:05.554Z",
+  "updated": "2026-07-24T20:28:45.234Z",
   "pipeline": {
     "issueId": "PAN-1525",
     "reviewStatus": "pending",
@@ -95,16 +95,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 11,
-    "claims": {
-      "router-conversation": {
-        "writerId": "agent-pan-1525",
-        "agentId": "agent-pan-1525",
-        "pid": 1990437,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-24T20:18:05.553Z"
-      }
-    },
+    "sequence": 12,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-1525",
@@ -160,6 +152,17 @@
         "outcome": "completed",
         "reason": "Added manifest-driven /pan parsing with quoted values, canonical path/flag aliases, typed validation errors, positional/flag checks, and shell-metacharacter rejection. Parser tests (14 cases) and typecheck pass; the module has no process-spawn dependency.",
         "releasedAt": "2026-07-24T20:17:47.434Z"
+      },
+      {
+        "writerId": "agent-pan-1525",
+        "agentId": "agent-pan-1525",
+        "pid": 1990437,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-24T20:18:05.553Z",
+        "itemId": "router-conversation",
+        "outcome": "completed",
+        "reason": "Added the shared composer router and intercepted /pan immediately after conversation message validation, before compaction, attachments, transformation, memory, or harness delivery. Typed parser errors map to 400/404/422 and terminal-only results return 422. Router tests, typecheck, full lint, and a throwaway API instance pass: /pan status and doctor returned structured 422s, bogus returned actionable 404, shell syntax returned 400, and only ordinary text attempted fake tmux delivery.",
+        "releasedAt": "2026-07-24T20:28:45.234Z"
       }
     ],
     "statusReasons": {
@@ -182,6 +185,10 @@
       "command-parser": {
         "reason": "Added manifest-driven /pan parsing with quoted values, canonical path/flag aliases, typed validation errors, positional/flag checks, and shell-metacharacter rejection. Parser tests (14 cases) and typecheck pass; the module has no process-spawn dependency.",
         "updatedAt": "2026-07-24T20:17:47.434Z"
+      },
+      "router-conversation": {
+        "reason": "Added the shared composer router and intercepted /pan immediately after conversation message validation, before compaction, attachments, transformation, memory, or harness delivery. Typed parser errors map to 400/404/422 and terminal-only results return 422. Router tests, typecheck, full lint, and a throwaway API instance pass: /pan status and doctor returned structured 422s, bogus returned actionable 404, shell syntax returned 400, and only ordinary text attempted fake tmux delivery.",
+        "updatedAt": "2026-07-24T20:28:45.234Z"
       }
     }
   },
@@ -207,6 +214,10 @@
     "command-parser.command-parser.ac2": "completed",
     "command-parser.command-parser.ac3": "completed",
     "command-parser.command-parser.ac4": "completed",
-    "router-conversation": "running"
+    "router-conversation": "completed",
+    "router-conversation.router-conversation.ac1": "completed",
+    "router-conversation.router-conversation.ac2": "completed",
+    "router-conversation.router-conversation.ac3": "completed",
+    "router-conversation.router-conversation.ac4": "completed"
   }
 }
