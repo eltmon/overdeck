@@ -118,5 +118,17 @@ export function resolveUatActions(
           action('reap', { label: 'Reap workspace' }),
         ]),
       };
+    case 'absent':
+      // Stack never provisioned: Rebuild is the only action that creates the
+      // stack from scratch (start/restart docker-compose no-op with no containers).
+      return {
+        inline: [action('rebuild', { label: 'Build stack', tone: 'primary' })],
+        menu: withReapLast([
+          action('rebuild', { label: 'Build stack' }),
+          action('open-state-dir'),
+          action('copy-stack-name'),
+          action('reap'),
+        ]),
+      };
   }
 }

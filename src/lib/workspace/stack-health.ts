@@ -74,6 +74,14 @@ export interface WorkspaceStackHealth {
   healthy: boolean;
   reasons: string[];
   lastObserved: string;
+  /**
+   * False when the workspace has no rendered .devcontainer, i.e. the stack was
+   * never provisioned. Zero containers is then vacuously "healthy" for
+   * pipeline gating, but UIs must not present it as a live healthy stack
+   * (MIN-892 showed "UAT stack healthy" + UAT links that 404'd).
+   * Only set on the docker-workspace path; undefined for non-docker projects.
+   */
+  stackExpected?: boolean;
 }
 
 export interface WorkspaceStackProject {
@@ -219,9 +227,10 @@ export function evaluateWorkspaceStackHealth(
 
   const thresholdMs = options.stuckCreatedThresholdMs ?? DEFAULT_STUCK_CREATED_THRESHOLD_MS;
   const stackContainers = containers.filter((container) => isStackContainer(container, issueId, options.composeProjectName));
+  const stackExpected = options.stackExpected !== false;
   const reasons: string[] = [];
 
-  if (stackContainers.length === 0 && options.stackExpected !== false) {
+  if (stackContainers.length === 0 && stackExpected) {
     reasons.push(`No Docker containers found for workspace stack ${normalizeIssue(issueId)}`);
   }
 
@@ -248,7 +257,7 @@ export function evaluateWorkspaceStackHealth(
     }
   }
 
-  return { healthy: reasons.length === 0, reasons, lastObserved };
+  return { healthy: reasons.length === 0, reasons, lastObserved, stackExpected };
 }
 
 export const collectDockerContainerLifecycleSnapshot = (): Effect.Effect<DockerContainerLifecycle[]> =>
