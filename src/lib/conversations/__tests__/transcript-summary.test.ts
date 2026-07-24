@@ -133,15 +133,21 @@ describe('titleTranscriptWindow', () => {
 // ─── PAN-2657 hardening ────────────────────────────────────────────────────────
 // A summarizer spawned with default tool access once continued the transcript's
 // implementation work and wrote production code into the live checkout. These
-// tests lock the three gates: no tools, --bare (no settings/hooks from cwd or
-// ~/.claude), auto-deny permission mode, a non-repository scratch cwd, and
+// tests lock the three gates: no tools, --safe-mode + --setting-sources ''
+// (no settings/hooks from cwd or ~/.claude, but auth still works — --bare
+// broke OAuth credential reads as of CLI 2.1.209), auto-deny permission
+// mode, a non-repository scratch cwd, and
 // untrusted-data fencing around every transcript prompt.
 describe('PAN-2657 background-AI spawn hardening', () => {
   it('builds claude args with all tool access stripped and auto-deny permissions', async () => {
     const { buildStructuredClaudeArgs } = await import('../transcript-summary.js');
     const args = buildStructuredClaudeArgs({ type: 'object' }, 'claude-haiku-4-5-20251001');
     expect(args[0]).toBe('-p');
-    expect(args).toContain('--bare');
+    expect(args).toContain('--safe-mode');
+    expect(args).not.toContain('--bare');
+    const settingSourcesIdx = args.indexOf('--setting-sources');
+    expect(settingSourcesIdx).toBeGreaterThan(-1);
+    expect(args[settingSourcesIdx + 1]).toBe('');
     const toolsIdx = args.indexOf('--tools');
     expect(toolsIdx).toBeGreaterThan(-1);
     expect(args[toolsIdx + 1]).toBe('');
