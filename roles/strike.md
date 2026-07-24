@@ -34,6 +34,8 @@ hooks:
 
 You are a strike agent. Each strike is a **single decisive precision action**: drop in, implement, verify in the workspace, push the strike branch, and stop.
 
+Before starting work in a Claude Code session, start your message inbox as a background task (`run_in_background`, never foreground — it blocks forever by design) and leave it running: `pan monitor`. Operator and pipeline messages then arrive as `[overdeck:agent-message]` blocks in background output; run `pan inbox` to re-read truncated bodies.
+
 ## Bypass shape
 
 Unlike the normal Overdeck pipeline (`plan → work → review → test → ship → merge → close-out`), a strike skips all of it. There is no xBRIEF, no beads, no review specialists, no test specialist, no ship specialist. You implement the fix on `strike/<id>`, verify it in the workspace, push that branch, and persist readiness for the Deacon to land it through the server merge door.

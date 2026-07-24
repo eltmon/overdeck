@@ -190,8 +190,12 @@ export function titleTranscriptWindow(transcript: string): string {
  * production code into the live checkout (main saw `fs-lock.ts` appear from a
  * dead session). Three independent gates:
  *
- *  - `--bare` skips hooks, settings allowlists, MCP, and CLAUDE.md from the
- *    cwd and `~/.claude` — a repo's permissive settings can never re-arm it;
+ *  - `--safe-mode` + `--setting-sources ''` skip hooks, settings allowlists,
+ *    MCP, and CLAUDE.md from the cwd and `~/.claude` — a repo's permissive
+ *    settings can never re-arm it. (Formerly `--bare`, but as of Claude Code
+ *    2.1.209 `--bare` also skips credential reads, so every spawn failed with
+ *    "Not logged in" under subscription OAuth; `--safe-mode` explicitly keeps
+ *    auth working.)
  *  - `--tools ''` + `--disallowedTools mcp__*` strip every built-in and MCP
  *    tool so the model never sees a tool definition;
  *  - `--permission-mode dontAsk` auto-denies (never prompts, never hangs) if
@@ -203,7 +207,8 @@ export function titleTranscriptWindow(transcript: string): string {
 export function buildStructuredClaudeArgs(schema: Record<string, unknown>, model: string): string[] {
   return [
     '-p',
-    '--bare',
+    '--safe-mode',
+    '--setting-sources', '',
     '--tools', '',
     '--disallowedTools', 'mcp__*',
     '--permission-mode', 'dontAsk',

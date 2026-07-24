@@ -57,6 +57,7 @@ import { issueCommand as startCommand } from './commands/start.js';
 import type { RoleEffort } from '../lib/config-yaml.js';
 import type { RuntimeName } from '../lib/runtimes/types.js';
 import { tellCommand } from './commands/tell.js';
+import { registerMonitorCommands } from './commands/monitor.js';
 import { killCommand } from './commands/kill.js';
 import { registerResetToPlannedCommand } from './commands/reset-to-planned.js';
 import { pauseCommand } from './commands/pause.js';
@@ -388,6 +389,7 @@ program
   .command('tell <id> <message>')
   .description('Send message to running agent')
   .action(tellCommand);
+registerMonitorCommands(program);
 program
   .command('kill <id>')
   .alias('stop')
