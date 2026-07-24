@@ -604,6 +604,9 @@ export async function fetchActivityDataWithContext(
       const specialistSessionId = isShipStage
         ? `agent-${issueLower}-ship`
         : `agent-${issueLower}-test`;
+      const specialistIsLive = tmuxSessionNames.has(specialistSessionId);
+      const specialistState = getAgentStateSync(specialistSessionId);
+      if (isShipStage && !specialistIsLive && !specialistState) continue;
 
       if (includeTranscripts && ss.status === 'running') {
         try {
@@ -616,15 +619,12 @@ export async function fetchActivityDataWithContext(
         } catch { /* specialist may not be running */ }
       }
 
-      const specialistIsLive = tmuxSessionNames.has(specialistSessionId);
       const specialistIsZombie = specialistIsLive && (ss.status === 'completed' || ss.status === 'failed');
       const specialistPresence: SessionNodePresence = specialistIsLive && !specialistIsZombie
         ? (ss.status === 'running' ? 'active' : 'idle')
         : specialistIsZombie ? 'idle' : 'ended';
       const specialistJsonlPath = await resolveJsonlPath(specialistSessionId, workspacePath);
-      // PAN-1832: surface the actual test/ship agent model + harness rather than
-      // a hardcoded 'specialist' label the frontend back-fills with role defaults.
-      const specialistState = getAgentStateSync(specialistSessionId);
+      if (isShipStage && !specialistIsLive && !specialistJsonlPath) continue;
 
       sections.push({
         type: nodeType,

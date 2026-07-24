@@ -467,30 +467,30 @@ async function collectSessionTreeNodes(
       });
     }
 
-    // Merge/ship history — server-side shipping now prepares the branch, while
-    // historical `merge` entries still surface under the `ship` node identity.
     const mergeEntries = centralStatus.history.filter((entry) => entry.type === 'merge');
     const latestMerge = mergeEntries[mergeEntries.length - 1];
     if (latestMerge) {
       const shipSessionName = `agent-${issueLower}-ship`;
       const shipIsLive = context.tmuxSessionNames.has(shipSessionName);
-      const shipJsonlPath = await resolveJsonlPath(shipSessionName, workspacePath);
-      sections.push({
-        type: 'ship',
-        sessionId: shipSessionName,
-        model: 'specialist',
-        startedAt: latestMerge.timestamp,
-        endedAt: undefined,
-        duration: 0,
-        status: normalizeAgentStatus(latestMerge.status === 'merging' ? 'running' : latestMerge.status),
-        presence: shipIsLive ? (latestMerge.status === 'merging' ? 'active' : 'idle') : 'ended',
-        hasJsonl: !!shipJsonlPath,
-        tmuxSession: shipIsLive ? shipSessionName : undefined,
-        ...await readSessionGateFields(shipSessionName),
-      });
+      const shipState = getAgentStateSync(shipSessionName);
+      const shipJsonlPath = shipIsLive || shipState ? await resolveJsonlPath(shipSessionName, workspacePath) : null;
+      if (shipIsLive || shipJsonlPath) {
+        sections.push({
+          type: 'ship',
+          sessionId: shipSessionName,
+          model: 'specialist',
+          startedAt: latestMerge.timestamp,
+          endedAt: undefined,
+          duration: 0,
+          status: normalizeAgentStatus(latestMerge.status === 'merging' ? 'running' : latestMerge.status),
+          presence: shipIsLive ? (latestMerge.status === 'merging' ? 'active' : 'idle') : 'ended',
+          hasJsonl: !!shipJsonlPath,
+          tmuxSession: shipIsLive ? shipSessionName : undefined,
+          ...await readSessionGateFields(shipSessionName),
+        });
+      }
     }
   }
-
   // PAN-2053: attach read-only model-origin so the right-click MODEL inspector works
   // in the project tree, not just the activity cockpit. Shared helper with command-deck.
   enrichSessionsWithModelOrigin(sections, issueId);
