@@ -18,11 +18,16 @@
       "reason": "resume",
       "agentModel": "claude-fable-5",
       "timestamp": "2026-07-24T19:19:57.068Z"
+    },
+    {
+      "timestamp": "2026-07-24T19:22:18.613Z",
+      "reason": "start",
+      "agentModel": "gpt-5.6-sol"
     }
   ],
   "feedback": [],
   "created": "2026-07-12T09:32:29.900Z",
-  "updated": "2026-07-24T19:22:06.785Z",
+  "updated": "2026-07-24T19:22:18.614Z",
   "pipeline": {
     "issueId": "PAN-1525",
     "reviewStatus": "pending",
