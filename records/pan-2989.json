@@ -37,17 +37,14 @@
       "reason": "feedback",
       "note": "[2026-07-24T18:46Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-07-24T18:46:11.967Z"
-    }
-  ],
-  "feedback": [
+    },
     {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-24T18:46:11Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2989\n\nFallback drain claims hide active verdicts from reads and dead-claim recovery can overwrite a newer live verdict\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2989 -m \"Fixed review issues\"`"
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-24T18:58:41.142Z"
     }
   ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "src/cli/commands/__tests__/restart-spawn-env.test.ts",
@@ -82,7 +79,7 @@
     "recordedAt": "2026-07-24T17:59:05.966Z"
   },
   "created": "2026-07-22T21:26:29.366Z",
-  "updated": "2026-07-24T18:58:39.666Z",
+  "updated": "2026-07-24T18:58:41.156Z",
   "pipeline": {
     "issueId": "PAN-2989",
     "reviewStatus": "pending",
@@ -178,7 +175,7 @@
   },
   "workModel": "k3",
   "harness": "claude-code",
-  "model": "k3",
+  "model": "gpt-5.6-sol",
   "tasks": {
     "sequence": 8,
     "claims": {},
