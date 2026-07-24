@@ -626,6 +626,7 @@ export function ComposerFooter({
         {/* Editor (no border of its own) */}
         <ComposerPromptEditor
           conversationName={conversation.name}
+          harness={harness}
           disabled={isDisabled}
           onCommandKeyDown={handleCommandKey}
           editorRef={editorRef}

@@ -24,10 +24,11 @@ import {
   KEY_ENTER_COMMAND,
   COMMAND_PRIORITY_HIGH,
 } from 'lexical';
+import type { Harness } from '../shared/ModelPicker';
 import styles from '../CommandDeck/styles/command-deck.module.css';
-import { SLASH_COMMANDS, type SlashCommand } from './slashCommands';
+import { getSlashCommands, SLASH_COMMANDS, type SlashCommand } from './slashCommands';
 
-export { SLASH_COMMANDS };
+export { getSlashCommands, SLASH_COMMANDS };
 export type { SlashCommand };
 
 // ─── Draft persistence ────────────────────────────────────────────────────────
@@ -184,6 +185,7 @@ function EditorRefPlugin({ editorRef }: EditorRefPluginProps) {
 
 export interface ComposerPromptEditorProps {
   conversationName: string;
+  harness?: Harness;
   disabled?: boolean;
   placeholder?: string;
   onCommandKeyDown: (key: 'Enter') => void;
@@ -334,6 +336,7 @@ export function SlashMenu({ commands, filter, selectedIndex, onSelect, onClose, 
 
 export function ComposerPromptEditor({
   conversationName,
+  harness = 'claude-code',
   disabled = false,
   placeholder = 'Message the agent…',
   onCommandKeyDown,
@@ -388,9 +391,10 @@ export function ComposerPromptEditor({
     };
   }, [text]);
 
+  const slashCommands = useMemo(() => getSlashCommands(harness), [harness]);
   const filteredCommands = useMemo(
-    () => filterCommands(SLASH_COMMANDS, slashContext?.filterText ?? ''),
-    [slashContext],
+    () => filterCommands(slashCommands, slashContext?.filterText ?? ''),
+    [slashCommands, slashContext],
   );
 
   const handleSlashKey = useCallback((root: HTMLElement) => {
@@ -520,7 +524,7 @@ export function ComposerPromptEditor({
       </LexicalComposer>
       {isSlashMenuOpen && filteredCommands.length > 0 && (
         <SlashMenu
-          commands={SLASH_COMMANDS}
+          commands={slashCommands}
           filter={slashContext?.filterText ?? ''}
           selectedIndex={selectedIndex}
           onSelect={handleSlashSelect}

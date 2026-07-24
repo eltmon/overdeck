@@ -4,7 +4,13 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
-import { ComposerPromptEditor, SlashMenu, SLASH_COMMANDS, type SlashCommand } from '../ComposerPromptEditor';
+import {
+  ComposerPromptEditor,
+  getSlashCommands,
+  SlashMenu,
+  SLASH_COMMANDS,
+  type SlashCommand,
+} from '../ComposerPromptEditor';
 
 // Mock the CSS module — must match class names used in ComposerPromptEditor
 vi.mock('../../CommandDeck/styles/command-deck.module.css', () => ({
@@ -165,9 +171,9 @@ describe('ComposerPromptEditor', () => {
     }));
   });
 
-  it('groups static and Overdeck commands in the slash menu', () => {
-    const commands = SLASH_COMMANDS.filter(command =>
-      command.id === 'model' || command.id === 'pan-strike');
+  it('groups active-harness native and Overdeck commands in the slash menu', () => {
+    const commands = getSlashCommands('claude-code').filter(command =>
+      command.label === '/model' || command.id === 'pan-strike');
 
     render(
       <SlashMenu
@@ -180,11 +186,18 @@ describe('ComposerPromptEditor', () => {
       />,
     );
 
-    expect(screen.getByText('AI CLI')).toBeInTheDocument();
+    expect(screen.getByText('Claude Code native')).toBeInTheDocument();
     expect(screen.getByText('/model')).toBeInTheDocument();
     expect(screen.getByText('Lifecycle')).toBeInTheDocument();
     expect(screen.getByText('/pan strike')).toBeInTheDocument();
   });
+
+  it.each(['codex', 'ohmypi', 'acp'] as const)(
+    'hides Claude-only native commands for %s',
+    harness => {
+      expect(getSlashCommands(harness).some(command => command.label === '/model')).toBe(false);
+    },
+  );
 
   afterEach(() => {
     vi.restoreAllMocks();
