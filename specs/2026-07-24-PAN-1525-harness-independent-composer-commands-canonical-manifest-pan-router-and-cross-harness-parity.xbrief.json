@@ -4,17 +4,17 @@
     "created": "2026-07-24T19:13:12Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-1525: Harness-independent composer commands: canonical manifest, /pan router, and cross-harness parity",
-    "updated": "2026-07-24T19:22:16.356Z"
+    "updated": "2026-07-24T19:22:18.613Z"
   },
   "plan": {
     "id": "pan-1525",
     "title": "Harness-independent composer commands: canonical manifest, /pan router, and cross-harness parity",
-    "status": "approved",
+    "status": "running",
     "uid": "7f38acea-f618-4812-9909-a085916d2f11",
     "author": "agent:claude-fable-5",
-    "sequence": 5,
+    "sequence": 6,
     "created": "2026-07-24T19:13:12Z",
-    "updated": "2026-07-24T19:22:16.356Z",
+    "updated": "2026-07-24T19:22:18.613Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/1525",
