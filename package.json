@@ -79,6 +79,7 @@
   "scripts": {
     "dev": "tsx watch src/cli/index.ts",
     "eval": "cd evals && evalite .",
+    "generate:slash-commands": "node scripts/generate-slash-commands.mjs",
     "build": "npm run build:contracts && npm run build:pi-extension && npm run build:ohmypi-extension && npm run build:cli && node scripts/build-post-cli.mjs",
     "build:pi-extension": "npm --prefix ./packages/pi-extension run build",
     "build:ohmypi-extension": "npm --prefix ./packages/ohmypi-extension run build",
