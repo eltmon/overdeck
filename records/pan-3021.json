@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-24T17:28:09.122Z",
-  "updated": "2026-07-24T18:23:54.614Z",
+  "updated": "2026-07-24T18:23:57.333Z",
   "pipeline": {
     "issueId": "PAN-3021",
     "reviewStatus": "pending",
@@ -21,8 +21,49 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-24T17:49:35.410Z",
-    "inspectNotes": "Verified all 4 ACs: strike/swarm registered on root program, admin/cloister/status nested correctly, spawn-reviewer confirmed {hidden:true} at src/cli/index.ts:380 and filtered by commander's visibleCommands (verified in node_modules/commander/lib/help.js), unit tests correctly assert args metadata and hidden-exclusion/ordering."
+    "updatedAt": "2026-07-24T18:23:57.332Z",
+    "inspectNotes": "Verified all 4 ACs: strike/swarm registered on root program, admin/cloister/status nested correctly, spawn-reviewer confirmed {hidden:true} at src/cli/index.ts:380 and filtered by commander's visibleCommands (verified in node_modules/commander/lib/help.js), unit tests correctly assert args metadata and hidden-exclusion/ordering.",
+    "reviewRequestedAt": "2026-07-24T18:23:57.332Z",
+    "scopeDrift": {
+      "outsideDeclaredScope": [],
+      "declaredScopeUntouched": [],
+      "declaredScope": [
+        "docs/COMPOSER-SLASH-COMMANDS.md",
+        "package.json",
+        "scripts/file-size-baseline.txt",
+        "scripts/generate-slash-commands.mjs",
+        "scripts/lint-slash-commands.sh",
+        "scripts/slash-commands-curation.json",
+        "src/cli/command-introspection.ts",
+        "src/cli/commands/__tests__/command-introspection.test.ts",
+        "src/cli/commands/admin/index.ts",
+        "src/dashboard/frontend/src/components/chat/ComposerPromptEditor.tsx",
+        "src/dashboard/frontend/src/components/chat/__tests__/ComposerPromptEditor.test.tsx",
+        "src/dashboard/frontend/src/components/chat/__tests__/slashCommands.no-loss.test.ts",
+        "src/dashboard/frontend/src/components/chat/slashCommandTypes.ts",
+        "src/dashboard/frontend/src/components/chat/slashCommands.generated.ts",
+        "src/dashboard/frontend/src/components/chat/slashCommands.ts"
+      ],
+      "actualChangedFiles": [
+        "docs/COMPOSER-SLASH-COMMANDS.md",
+        "package.json",
+        "scripts/file-size-baseline.txt",
+        "scripts/generate-slash-commands.mjs",
+        "scripts/lint-slash-commands.sh",
+        "scripts/slash-commands-curation.json",
+        "src/cli/command-introspection.ts",
+        "src/cli/commands/__tests__/command-introspection.test.ts",
+        "src/cli/commands/admin/index.ts",
+        "src/dashboard/frontend/src/components/chat/ComposerPromptEditor.tsx",
+        "src/dashboard/frontend/src/components/chat/__tests__/ComposerPromptEditor.test.tsx",
+        "src/dashboard/frontend/src/components/chat/__tests__/slashCommands.no-loss.test.ts",
+        "src/dashboard/frontend/src/components/chat/slashCommandTypes.ts",
+        "src/dashboard/frontend/src/components/chat/slashCommands.generated.ts",
+        "src/dashboard/frontend/src/components/chat/slashCommands.ts"
+      ],
+      "recordedAt": "2026-07-24T18:23:54.613Z"
+    },
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3028"
   },
   "closeOut": {
     "usage": {
