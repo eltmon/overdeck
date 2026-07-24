@@ -225,24 +225,53 @@ function isPidAlive(pid: number): boolean {
   }
 }
 
+function drainClaimPid(entry: string, prefix: string): number | null {
+  const pid = Number(entry.slice(prefix.length).split('-')[0]);
+  return Number.isInteger(pid) && pid > 0 ? pid : null;
+}
+
 /**
  * A process that crashed mid-drain leaves its claimed generation beside the
  * live path (`<fallback>.drain-<pid>-<n>`). A claim owned by a dead pid belongs
- * to nobody — hand it back to the live path so the verdict is not stranded.
+ * to nobody — recover it. When the live path is free the claim is handed back
+ * wholesale; when a live generation already exists the two are compared on
+ * ISO `updatedAt` and only the newer payload survives. Recovery must never
+ * rename over an existing live path blindly: POSIX rename replaces the
+ * destination, so an older stranded claim would silently delete a newer
+ * verdict written after the crash.
  */
 function recoverStrandedDrainClaimsSync(livePath: string): void {
   try {
     const prefix = `${basename(livePath)}.drain-`;
     for (const entry of readdirSync(dirname(livePath))) {
       if (!entry.startsWith(prefix)) continue;
-      const pid = Number(entry.slice(prefix.length).split('-')[0]);
-      if (Number.isInteger(pid) && pid > 0 && isPidAlive(pid)) continue;
-      try {
-        renameSync(join(dirname(livePath), entry), livePath);
-      } catch {
-        // Raced another recovery or a fresh write; the generation still exists.
+      const pid = drainClaimPid(entry, prefix);
+      if (pid !== null && isPidAlive(pid)) continue; // an in-flight drain owns it
+      const claimPath = join(dirname(livePath), entry);
+      if (!existsSync(livePath)) {
+        try {
+          renameSync(claimPath, livePath);
+        } catch {
+          // Raced another recovery or a fresh write; the generation still exists.
+        }
+        continue;
       }
-      return; // one generation back at the live path is enough
+      const claim = parseWorkspaceVerdictFallback(claimPath);
+      const live = parseWorkspaceVerdictFallback(livePath);
+      if (claim && (!live || live.updatedAt < claim.updatedAt)) {
+        // The stranded claim is strictly newer: swap it in. The claim is a
+        // complete file (claims are created by renaming a complete write), so
+        // replacing the older live payload loses nothing.
+        try {
+          renameSync(claimPath, livePath);
+        } catch {
+          // Raced a concurrent writer; keep the claim for a later pass.
+        }
+      } else {
+        // The live generation is newer (or the claim is unreadable): the claim
+        // carries nothing the live path does not supersede.
+        rmSync(claimPath, { force: true });
+      }
     }
   } catch {
     // Best effort — a stranded claim is recovered on a later pass.
@@ -285,8 +314,22 @@ function readWorkspaceVerdictFallbackSync(issueId: string): WorkspaceVerdictFall
     const path = workspaceVerdictFallbackPath(issueId);
     if (!path) return null;
     recoverStrandedDrainClaimsSync(path);
-    if (!existsSync(path)) return null;
-    return parseWorkspaceVerdictFallback(path);
+    // Read-only newest-wins overlay across the live path AND any in-flight
+    // drain claims: a drain holds its generation at a claim path for the full
+    // duration of the record write, and the verdict must stay visible to
+    // readers throughout — otherwise status reads fall back to the older
+    // journal for up to the entire durability budget. Reads never mutate.
+    let newest: WorkspaceVerdictFallback | null = null;
+    const consider = (candidate: WorkspaceVerdictFallback | null): void => {
+      if (candidate && (!newest || newest.updatedAt < candidate.updatedAt)) newest = candidate;
+    };
+    if (existsSync(path)) consider(parseWorkspaceVerdictFallback(path));
+    const prefix = `${basename(path)}.drain-`;
+    for (const entry of readdirSync(dirname(path))) {
+      if (!entry.startsWith(prefix)) continue;
+      consider(parseWorkspaceVerdictFallback(join(dirname(path), entry)));
+    }
+    return newest;
   } catch {
     return null;
   }
