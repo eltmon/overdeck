@@ -165,10 +165,10 @@
     "recordedAt": "2026-07-24T11:10:15.151Z"
   },
   "created": "2026-07-22T21:25:31.822Z",
-  "updated": "2026-07-24T11:18:05.849Z",
+  "updated": "2026-07-24T11:18:08.408Z",
   "pipeline": {
     "issueId": "PAN-2988",
-    "reviewStatus": "pending",
+    "reviewStatus": "failed",
     "testStatus": "pending",
     "verificationStatus": "failed",
     "inspectStatus": "passed",
@@ -176,7 +176,8 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-24T11:10:34.462Z",
-    "updatedAt": "2026-07-24T11:18:05.703Z",
+    "updatedAt": "2026-07-24T11:18:08.287Z",
+    "reviewNotes": "Verification failed at test",
     "verificationNotes": "Verification FAILED at test (307097ms):\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-2988/src/dashboard/frontend\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-2988\n\n\n Test Files  31 passed (31)\n      Tests  583 passed (583)\n   Start at  07:15:32\n   Duration  5.62s (transform 23.08s, setup 7.97s, import 47.15s, tests 15.64s, environment 11.85s)\n\n[prep] state-reconcile\n[prep] completed: state-reconcile (0s elapsed)\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Workspace already up to date with main\n[prep] completed: sync-main (0s elapsed)\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-17E9s9/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] completed: tracker-context (0s elapsed)\n[prep] Spawning agent...\n[prep] spawn\n[prep] completed: spawn (0s elapsed)\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Workspace already up to date with main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Workspace already up to date with main\n[prep] Workspace already up to date with main\n[prep] Workspace already up to date with main\n[prep] Workspace already up to date with main\n[prep] completed: sync-main (0s elapsed)\n[prep] completed: sync-main (0s elapsed)\n[prep] completed: sync-main (0s elapsed)\n[prep] completed: sync-main (0s e\n…(4059 chars elided)…\nuck/4 — preserved, not reset)\n\nstdout | tests/unit/dashboard/server/routes/reset-review-route.test.ts > processResetReviewPipeline — POST /api/review/:issueId/reset route contract > PAN-805 regression: preserves stuck resolution across reset\n[reset-review] Human-initiated pipeline reset for PAN-STUCK (work-agent agent-pan-stuck resolution=stuck/4 — preserved, not reset)\n\n ❯ |root| tests/unit/dashboard/server/routes/reset-review-route.test.ts (15 tests | 5 failed) 64ms\n     × 200: resets review/test/merge/verification status to pending 12ms (retry x1)\n     × 200: clears the stuck marker and circuit-breaker retry counters 5ms (retry x1)\n     × PAN-805 regression: does NOT call saveAgentRuntimeState (resolution stays untouched) 5ms (retry x1)\n     × PAN-805 regression: does not call saveAgentRuntimeState even when runtime state is absent 5ms (retry x1)\n     × PAN-805 regression: preserves stuck resolution across reset 5ms (retry x1)\n ❯ |root| tests/unit/lib/flywheel\n...(truncated)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3010",
     "lastVerifiedCommit": "d1c367f682fc33cdf4c28a14054733e75d6f925c",
@@ -291,7 +292,7 @@
       },
       "costAtCloseOut": {
         "usd": 196.256759,
-        "pricingAsOf": "2026-07-24T11:18:05.745Z"
+        "pricingAsOf": "2026-07-24T11:18:08.357Z"
       }
     },
     "merges": [
