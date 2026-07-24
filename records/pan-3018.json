@@ -3,7 +3,7 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-07-24T15:52:21.187Z",
-  "updated": "2026-07-24T16:32:39.249Z",
+  "updated": "2026-07-24T16:34:00.733Z",
   "pipeline": {
     "issueId": "PAN-3018",
     "reviewStatus": "pending",
@@ -12,13 +12,23 @@
     "mergeStatus": "verifying",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-24T16:32:39.235Z",
+    "updatedAt": "2026-07-24T16:34:00.728Z",
     "lastVerifiedCommit": "59692f688badbe2dc10929f61bc60e01f33146ca",
     "strikeReadyHead": "59692f688badbe2dc10929f61bc60e01f33146ca",
     "strikeReadyAt": "2026-07-24T16:28:17.634Z",
-    "strikeLandingState": "landing",
+    "strikeLandingState": "ready",
     "strikeRecoveryCount": 0,
-    "strikeLandingAttempts": []
+    "strikeTransportRetryCount": 1,
+    "strikeNextAttemptAt": "2026-07-24T16:35:00.722Z",
+    "strikeLandingAttempts": [
+      {
+        "timestamp": "2026-07-24T16:34:00.722Z",
+        "strikeHead": "59692f688badbe2dc10929f61bc60e01f33146ca",
+        "mainHead": "5fcb369ed126ba3ac463da0a971b8882e5ea28f4",
+        "outcome": "transport-failed",
+        "detail": "Strike merge request failed: fetch failed"
+      }
+    ]
   },
   "closeOut": {
     "usage": {
@@ -42,7 +52,7 @@
       },
       "costAtCloseOut": {
         "usd": 17.221472,
-        "pricingAsOf": "2026-07-24T16:32:39.245Z"
+        "pricingAsOf": "2026-07-24T16:34:00.730Z"
       }
     },
     "merges": [],
