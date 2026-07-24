@@ -15,8 +15,24 @@ const EXPECTED_POLICIES: ReadonlyArray<{
   { path: ['show'], policy: { mode: 'captured', safety: 'safe' } },
   { path: ['status'], policy: { mode: 'captured', safety: 'safe' } },
   { path: ['tell'], policy: { mode: 'captured', safety: 'safe' } },
-  { path: ['handoff'], policy: { mode: 'ui', safety: 'dialog', uiAction: 'handoff' } },
-  { path: ['fork'], policy: { mode: 'ui', safety: 'dialog', uiAction: 'fork' } },
+  {
+    path: ['handoff'],
+    policy: {
+      mode: 'ui',
+      safety: 'dialog',
+      uiAction: 'handoff',
+      confirmationText: 'This opens the handoff dialog for the selected conversation. Review the destination and focus before continuing.',
+    },
+  },
+  {
+    path: ['fork'],
+    policy: {
+      mode: 'ui',
+      safety: 'dialog',
+      uiAction: 'fork',
+      confirmationText: 'This opens the fork dialog for the selected conversation. Review the fork mode and destination before continuing.',
+    },
+  },
 ];
 
 describe('composer command policy', () => {
