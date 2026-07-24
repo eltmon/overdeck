@@ -93,16 +93,16 @@
     "recordedAt": "2026-07-24T19:20:31.861Z"
   },
   "created": "2026-07-22T21:26:29.366Z",
-  "updated": "2026-07-24T19:25:24.455Z",
+  "updated": "2026-07-24T19:25:30.315Z",
   "pipeline": {
     "issueId": "PAN-2989",
     "reviewStatus": "passed",
-    "testStatus": "pending",
+    "testStatus": "testing",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-24T19:25:23.735Z",
+    "updatedAt": "2026-07-24T19:25:30.306Z",
     "reviewNotes": "Approved: claim-everything fallback drain eliminates the cross-process overwrite race; focused tests, typecheck, lint, and diff checks pass",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3027",
@@ -161,9 +161,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 4729442,
-            "output": 348093,
-            "cacheRead": 47605248,
+            "input": 4746122,
+            "output": 360231,
+            "cacheRead": 49187328,
             "cacheWrite": 0
           }
         }
@@ -176,15 +176,15 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 4729442,
-          "output": 348093,
-          "cacheRead": 47605248,
+          "input": 4746122,
+          "output": 360231,
+          "cacheRead": 49187328,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 57.9110093,
-        "pricingAsOf": "2026-07-24T19:25:23.762Z"
+        "usd": 59.1495893,
+        "pricingAsOf": "2026-07-24T19:25:30.311Z"
       }
     },
     "merges": [
@@ -194,7 +194,7 @@
   },
   "workModel": "k3",
   "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "model": "k3",
   "tasks": {
     "sequence": 8,
     "claims": {},
