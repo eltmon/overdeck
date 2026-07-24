@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-22T21:26:29.366Z",
-  "updated": "2026-07-24T17:13:13.656Z",
+  "updated": "2026-07-24T17:14:13.893Z",
   "pipeline": {
     "issueId": "PAN-2989",
     "reviewStatus": "pending",
@@ -36,5 +36,20 @@
   },
   "workModel": "k3",
   "harness": "claude-code",
-  "model": "k3"
+  "model": "k3",
+  "tasks": {
+    "sequence": 1,
+    "claims": {
+      "bound-record-durability-hold": {
+        "writerId": "agent-pan-2989",
+        "agentId": "agent-pan-2989",
+        "pid": 2872894,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-24T17:14:13.893Z"
+      }
+    }
+  },
+  "statusOverrides": {
+    "bound-record-durability-hold": "running"
+  }
 }
