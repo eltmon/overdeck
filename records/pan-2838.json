@@ -229,7 +229,7 @@
     "recordedAt": "2026-07-22T21:35:20.476Z"
   },
   "created": "2026-07-17T12:34:27.875Z",
-  "updated": "2026-07-24T19:05:06.249Z",
+  "updated": "2026-07-24T19:05:08.058Z",
   "pipeline": {
     "issueId": "PAN-2838",
     "reviewStatus": "passed",
@@ -240,7 +240,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-22T21:36:06.484Z",
-    "updatedAt": "2026-07-24T19:05:06.225Z",
+    "updatedAt": "2026-07-24T19:05:07.706Z",
     "reviewNotes": "Approved: settings disclosure meets all acceptance criteria with no correctness, security, requirements, or performance blockers.",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3006",
@@ -306,7 +306,7 @@
       },
       "costAtCloseOut": {
         "usd": 66.192671,
-        "pricingAsOf": "2026-07-24T19:05:06.246Z"
+        "pricingAsOf": "2026-07-24T19:05:07.723Z"
       }
     },
     "merges": [
