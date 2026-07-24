@@ -27,7 +27,7 @@
   ],
   "feedback": [],
   "created": "2026-07-12T09:32:29.900Z",
-  "updated": "2026-07-24T21:40:22.779Z",
+  "updated": "2026-07-24T21:40:39.430Z",
   "pipeline": {
     "issueId": "PAN-1525",
     "reviewStatus": "pending",
@@ -109,8 +109,16 @@
   "model": "claude-sonnet-5",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 22,
-    "claims": {},
+    "sequence": 23,
+    "claims": {
+      "native-capabilities": {
+        "writerId": "agent-pan-1525",
+        "agentId": "agent-pan-1525",
+        "pid": 3078879,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-24T21:40:39.430Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-1525",
@@ -326,6 +334,7 @@
     "confirmations": "completed",
     "confirmations.confirmations.ac1": "completed",
     "confirmations.confirmations.ac2": "completed",
-    "confirmations.confirmations.ac3": "completed"
+    "confirmations.confirmations.ac3": "completed",
+    "native-capabilities": "running"
   }
 }
