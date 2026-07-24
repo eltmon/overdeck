@@ -27,7 +27,7 @@
   ],
   "feedback": [],
   "created": "2026-07-12T09:32:29.900Z",
-  "updated": "2026-07-24T20:42:06.619Z",
+  "updated": "2026-07-24T20:49:57.035Z",
   "pipeline": {
     "issueId": "PAN-1525",
     "reviewStatus": "pending",
@@ -109,16 +109,8 @@
   "model": "claude-sonnet-5",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 15,
-    "claims": {
-      "executors-captured": {
-        "writerId": "agent-pan-1525",
-        "agentId": "agent-pan-1525",
-        "pid": 2349474,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-24T20:42:06.618Z"
-      }
-    },
+    "sequence": 16,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-1525",
@@ -196,6 +188,17 @@
         "outcome": "completed",
         "reason": "Routed agent message/tell endpoints through the shared /pan parser and router before messageAgent, while preserving ordinary text delivery. Agent messaging tests and typecheck pass. Throwaway API verification returned the same /pan status 422 and bogus 404 as conversations; only ordinary text reached the fake-agent delivery path.",
         "releasedAt": "2026-07-24T20:41:43.281Z"
+      },
+      {
+        "writerId": "agent-pan-1525",
+        "agentId": "agent-pan-1525",
+        "pid": 2349474,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-24T20:42:06.618Z",
+        "itemId": "executors-captured",
+        "outcome": "completed",
+        "reason": "Implemented captured show/status/tell execution via spawnPanCli argv arrays with 64 KiB bounded output, exit-derived completed/failed status, stderr capture, and a 30-second SIGTERM timeout using fake-timer tests. Executor/router tests, typecheck, ESLint, and throwaway API verification pass: status completed with real CLI output, tell failure returned structured failed output, and doctor stayed terminal-only.",
+        "releasedAt": "2026-07-24T20:49:57.034Z"
       }
     ],
     "statusReasons": {
@@ -226,6 +229,10 @@
       "router-agent": {
         "reason": "Routed agent message/tell endpoints through the shared /pan parser and router before messageAgent, while preserving ordinary text delivery. Agent messaging tests and typecheck pass. Throwaway API verification returned the same /pan status 422 and bogus 404 as conversations; only ordinary text reached the fake-agent delivery path.",
         "updatedAt": "2026-07-24T20:41:43.281Z"
+      },
+      "executors-captured": {
+        "reason": "Implemented captured show/status/tell execution via spawnPanCli argv arrays with 64 KiB bounded output, exit-derived completed/failed status, stderr capture, and a 30-second SIGTERM timeout using fake-timer tests. Executor/router tests, typecheck, ESLint, and throwaway API verification pass: status completed with real CLI output, tell failure returned structured failed output, and doctor stayed terminal-only.",
+        "updatedAt": "2026-07-24T20:49:57.034Z"
       }
     }
   },
@@ -259,6 +266,9 @@
     "router-agent": "completed",
     "router-agent.router-agent.ac1": "completed",
     "router-agent.router-agent.ac2": "completed",
-    "executors-captured": "running"
+    "executors-captured": "completed",
+    "executors-captured.executors-captured.ac1": "completed",
+    "executors-captured.executors-captured.ac2": "completed",
+    "executors-captured.executors-captured.ac3": "completed"
   }
 }
