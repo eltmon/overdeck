@@ -26,7 +26,7 @@ const OVERDECK_SLASH_COMMANDS: SlashCommand[] = COMPOSER_COMMAND_MANIFEST.map(en
     description: entry.description,
     insert: COMPOSER_COMMAND_INSERT_OVERRIDES[commandPath]
       ?? `${entry.display}${entry.args.length > 0 ? ' ' : ''}`,
-    category: entry.category,
+    category: 'Overdeck',
   };
 });
 
@@ -35,7 +35,7 @@ const CURATED_OVERDECK_VARIANTS: SlashCommand[] = COMPOSER_COMMAND_VARIANTS.map(
   label: variant.display,
   description: variant.description,
   insert: variant.insert,
-  category: variant.category,
+  category: 'Overdeck',
 }));
 
 export function getSlashCommands(harness: HarnessName): SlashCommand[] {

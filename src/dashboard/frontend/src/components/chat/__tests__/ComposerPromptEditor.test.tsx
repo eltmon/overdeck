@@ -188,7 +188,7 @@ describe('ComposerPromptEditor', () => {
 
     expect(screen.getByText('Claude Code native')).toBeInTheDocument();
     expect(screen.getByText('/model')).toBeInTheDocument();
-    expect(screen.getByText('Lifecycle')).toBeInTheDocument();
+    expect(screen.getByText('Overdeck')).toBeInTheDocument();
     expect(screen.getByText('/pan strike')).toBeInTheDocument();
   });
 
