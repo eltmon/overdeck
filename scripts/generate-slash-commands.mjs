@@ -18,14 +18,33 @@ const defaultOutputPath = join(
   'chat',
   'slashCommands.generated.ts',
 );
+const defaultManifestOutputPath = join(
+  projectRoot,
+  'packages',
+  'contracts',
+  'src',
+  'composer-commands.generated.ts',
+);
 
-function parseOutputPath(args) {
-  if (args.length === 0) return defaultOutputPath;
-  if (args.length === 2 && args[0] === '--out' && args[1]) {
-    return resolve(projectRoot, args[1]);
+function parseOutputPaths(args) {
+  const paths = {
+    outputPath: defaultOutputPath,
+    manifestOutputPath: defaultManifestOutputPath,
+  };
+
+  for (let index = 0; index < args.length; index += 2) {
+    const flag = args[index];
+    const value = args[index + 1];
+    if (!value || (flag !== '--out' && flag !== '--manifest-out')) {
+      console.error(
+        'usage: node scripts/generate-slash-commands.mjs [--out <path>] [--manifest-out <path>]',
+      );
+      process.exit(2);
+    }
+    paths[flag === '--out' ? 'outputPath' : 'manifestOutputPath'] = resolve(projectRoot, value);
   }
-  console.error('usage: node scripts/generate-slash-commands.mjs [--out <path>]');
-  process.exit(2);
+
+  return paths;
 }
 
 function firstSentence(description) {
@@ -68,7 +87,21 @@ function renderModule(entries) {
   ].join('\n');
 }
 
-const outputPath = parseOutputPath(process.argv.slice(2));
+function renderManifestModule(entries) {
+  return [
+    '// GENERATED FILE — do not edit by hand.',
+    '// Source: the pan CLI command registry via `pan admin commands --json`.',
+    '// Regenerate: npm run generate:slash-commands   (drift-gated by scripts/lint-slash-commands.sh)',
+    'import type { ComposerCommandManifestEntry } from "./composer-commands"',
+    '',
+    'export const COMPOSER_COMMAND_MANIFEST: ComposerCommandManifestEntry[] = [',
+    ...entries.map(entry => `  ${JSON.stringify(entry)},`),
+    ']',
+    '',
+  ].join('\n');
+}
+
+const { outputPath, manifestOutputPath } = parseOutputPaths(process.argv.slice(2));
 
 if (!existsSync(cliEntry)) {
   console.error("dist/cli/index.js not found — run 'npm run build:cli' first");
@@ -120,6 +153,27 @@ const generatedEntries = commandTree
   });
 
 const entries = [...generatedEntries, ...curation.extras];
-await mkdir(dirname(outputPath), { recursive: true });
-await writeFile(outputPath, renderModule(entries), 'utf8');
+const manifestEntries = commandTree.map(command => {
+  const commandPath = command.path.join(' ');
+  return {
+    id: `pan-${command.path.join('-')}`,
+    path: command.path,
+    display: `/pan ${commandPath}`,
+    description: command.description,
+    args: command.args,
+    options: command.options,
+    aliases: command.aliases,
+    category: curation.categories[command.path[0]] ?? 'CLI',
+  };
+});
+
+await Promise.all([
+  mkdir(dirname(outputPath), { recursive: true }),
+  mkdir(dirname(manifestOutputPath), { recursive: true }),
+]);
+await Promise.all([
+  writeFile(outputPath, renderModule(entries), 'utf8'),
+  writeFile(manifestOutputPath, renderManifestModule(manifestEntries), 'utf8'),
+]);
 console.log(`Generated ${entries.length} slash commands at ${outputPath}`);
+console.log(`Generated ${manifestEntries.length} composer commands at ${manifestOutputPath}`);
