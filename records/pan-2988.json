@@ -170,17 +170,18 @@
     "recordedAt": "2026-07-24T11:25:43.566Z"
   },
   "created": "2026-07-22T21:25:31.822Z",
-  "updated": "2026-07-24T17:26:51.703Z",
+  "updated": "2026-07-24T17:27:02.644Z",
   "pipeline": {
     "issueId": "PAN-2988",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-24T17:26:51.644Z",
+    "updatedAt": "2026-07-24T17:27:02.599Z",
+    "reviewNotes": "Agent re-review request (1/25): Resolved the origin/main conflict by preserving the sorted file-size baseline and agents/spawn override while retaining PAN-2988's 1349-line CLI extraction and removal of review-status.ts from the baseline. Build, typecheck, lint, 84 close-out/reconciliation tests, 22 spawn-route tests, 56 review-status tests, and 186 frontend action tests pass.",
     "blockerReasons": [
       {
         "type": "merge_conflict",
@@ -221,18 +222,18 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 11185130,
-            "output": 387568,
-            "cacheRead": 231009792,
+            "input": 11187866,
+            "output": 387924,
+            "cacheRead": 231407104,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 15395680,
-          "output": 558602,
-          "cacheRead": 277989888,
+          "input": 15398416,
+          "output": 558958,
+          "cacheRead": 278387200,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -243,8 +244,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 239.438623,
-        "pricingAsOf": "2026-07-24T17:26:51.694Z"
+        "usd": 239.661639,
+        "pricingAsOf": "2026-07-24T17:27:02.636Z"
       }
     },
     "merges": [
