@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-22T21:26:29.366Z",
-  "updated": "2026-07-24T17:41:23.667Z",
+  "updated": "2026-07-24T17:41:36.549Z",
   "pipeline": {
     "issueId": "PAN-2989",
     "reviewStatus": "pending",
@@ -38,8 +38,16 @@
   "harness": "claude-code",
   "model": "k3",
   "tasks": {
-    "sequence": 4,
-    "claims": {},
+    "sequence": 5,
+    "claims": {
+      "proactive-verdict-fallback-drain": {
+        "writerId": "agent-pan-2989",
+        "agentId": "agent-pan-2989",
+        "pid": 3410794,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-24T17:41:36.549Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-2989",
@@ -84,6 +92,7 @@
     "scrub-dashboard-server-agent-identity": "completed",
     "scrub-dashboard-server-agent-identity.scrub-dashboard-server-agent-identity.ac1": "completed",
     "scrub-dashboard-server-agent-identity.scrub-dashboard-server-agent-identity.ac2": "completed",
-    "scrub-dashboard-server-agent-identity.scrub-dashboard-server-agent-identity.ac3": "completed"
+    "scrub-dashboard-server-agent-identity.scrub-dashboard-server-agent-identity.ac3": "completed",
+    "proactive-verdict-fallback-drain": "running"
   }
 }
