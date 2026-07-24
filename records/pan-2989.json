@@ -94,18 +94,18 @@
     "recordedAt": "2026-07-24T17:59:05.966Z"
   },
   "created": "2026-07-22T21:26:29.366Z",
-  "updated": "2026-07-24T19:01:27.914Z",
+  "updated": "2026-07-24T19:11:49.489Z",
   "pipeline": {
     "issueId": "PAN-2989",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-24T18:02:06.151Z",
-    "updatedAt": "2026-07-24T19:01:27.313Z",
-    "reviewNotes": "Stranded-claim recovery still has a cross-process check-then-rename race that can overwrite the newest fallback verdict",
+    "updatedAt": "2026-07-24T19:11:49.397Z",
+    "reviewNotes": "Agent re-review request (3/25): Fixed review issues",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3027",
     "lastVerifiedCommit": "99161e24a36d66cd03016939e2d43582f5f9d916",
     "reviewRequestedAt": "2026-07-24T18:02:06.151Z",
@@ -157,9 +157,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 3361940,
-            "output": 265056,
-            "cacheRead": 35113984,
+            "input": 3367554,
+            "output": 265226,
+            "cacheRead": 35497984,
             "cacheWrite": 0
           }
         }
@@ -172,15 +172,15 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 3361940,
-          "output": 265056,
-          "cacheRead": 35113984,
+          "input": 3367554,
+          "output": 265226,
+          "cacheRead": 35497984,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 42.3367573,
-        "pricingAsOf": "2026-07-24T19:01:27.331Z"
+        "usd": 42.5619273,
+        "pricingAsOf": "2026-07-24T19:11:49.460Z"
       }
     },
     "merges": [
