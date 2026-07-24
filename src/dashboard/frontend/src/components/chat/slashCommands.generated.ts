@@ -131,6 +131,13 @@ export const GENERATED_SLASH_COMMANDS: SlashCommand[] = [
     category: 'Review',
   },
   {
+    id: 'pan-review-resync',
+    label: 'pan review resync',
+    description: 'Re-emit canonical review status (heal a lost pipeline event)',
+    insert: 'pan review resync ',
+    category: 'Review',
+  },
+  {
     id: 'pan-review-abort',
     label: 'pan review abort',
     description: 'Kill all running reviewer sessions and leave the worker idle',
@@ -695,6 +702,13 @@ export const GENERATED_SLASH_COMMANDS: SlashCommand[] = [
     label: 'pan release canary',
     description: 'Create a canary release commit and tag',
     insert: 'pan release canary',
+    category: 'Flywheel',
+  },
+  {
+    id: 'pan-release-sourcemaps',
+    label: 'pan release sourcemaps',
+    description: 'Upload the built dashboard sourcemaps to PostHog',
+    insert: 'pan release sourcemaps',
     category: 'Flywheel',
   },
   {
