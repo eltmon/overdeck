@@ -98,17 +98,17 @@
     "recordedAt": "2026-07-24T19:20:31.861Z"
   },
   "created": "2026-07-22T21:26:29.366Z",
-  "updated": "2026-07-24T19:31:56.833Z",
+  "updated": "2026-07-24T19:44:27.230Z",
   "pipeline": {
     "issueId": "PAN-2989",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "passed",
     "testStatus": "passed",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": false,
+    "readyForMerge": true,
     "panDoneRecoveredAt": "2026-07-24T19:28:22.610Z",
-    "updatedAt": "2026-07-24T19:31:56.715Z",
+    "updatedAt": "2026-07-24T19:44:27.133Z",
     "reviewNotes": "Approved: claim-everything fallback drain eliminates the cross-process overwrite race; focused tests, typecheck, lint, and diff checks pass",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3027",
     "reviewedAtCommit": "e6447d968e8aea9c05dc4bcfd45cba753e470cbc",
@@ -174,10 +174,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 40,
-            "output": 5806,
-            "cacheRead": 2986382,
-            "cacheWrite": 183849
+            "input": 42,
+            "output": 6580,
+            "cacheRead": 3170231,
+            "cacheWrite": 184069
           }
         }
       },
@@ -195,15 +195,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 40,
-          "output": 5806,
-          "cacheRead": 2986382,
-          "cacheWrite": 183849
+          "input": 42,
+          "output": 6580,
+          "cacheRead": 3170231,
+          "cacheWrite": 184069
         }
       },
       "costAtCloseOut": {
-        "usd": 60.2646273,
-        "pricingAsOf": "2026-07-24T19:31:56.809Z"
+        "usd": 60.3096913,
+        "pricingAsOf": "2026-07-24T19:44:27.222Z"
       }
     },
     "merges": [
