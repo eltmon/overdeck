@@ -119,8 +119,8 @@ function resolveEntry(tokens: readonly string[]): { entry: ComposerCommandManife
   throw new ComposerCommandParseError(
     'unknown-command',
     token
-      ? `Unknown Overdeck command "${token}". Choose a command shown under the /pan menu.`
-      : 'Missing an Overdeck command after /pan. Choose a command shown under the /pan menu.',
+      ? `Unknown Overdeck command "${token}". Type /pan to list available commands.`
+      : 'Missing an Overdeck command after /pan. Type /pan to list available commands.',
     token,
     '/pan <command>',
   );
