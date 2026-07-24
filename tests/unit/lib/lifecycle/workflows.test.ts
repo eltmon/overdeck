@@ -332,16 +332,15 @@ describe('workflows', () => {
       expect(result.steps.find(step => step.step === 'close-out:record-dod-gate')).toMatchObject({ success: true });
     });
 
-    it('should verify branch merged before proceeding', async () => {
-      // Mock git branch check — branch doesn't exist (squash-merged)
+    it('rejects branch absence instead of assuming a squash merge', async () => {
       mockExecAsync.mockResolvedValue({ stdout: '', stderr: '' });
 
       const ctx = { issueId: 'PAN-100', projectPath: testDir };
       const verifyStep = await Effect.runPromise(__testInternals.verifyBranchMerged(ctx));
 
       expect(verifyStep.step).toBe('close-out:verify-merged');
-      expect(verifyStep.success).toBe(true);
-      expect(verifyStep.details).toEqual(['Branch already cleaned up (squash-merged)']);
+      expect(verifyStep.success).toBe(false);
+      expect(verifyStep.error).toBe('Feature branch is absent; positive merge evidence is required');
     });
 
     it('accepts a squash-merged GitHub PR when the branch tip matches the merged PR head', async () => {

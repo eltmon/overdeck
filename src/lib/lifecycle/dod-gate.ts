@@ -17,7 +17,15 @@ import {
 } from '../pan-dir/record.js';
 import { getAutoCloseOutCanonicalState } from '../cloister/deacon-canonical-state.js';
 import { fetchCommitCheckRuns, fetchIssuePullRequest } from '../overdeck/pull-requests.js';
-import { acceptFlagFor, DOD_ROWS, type DodGateResult, type DodRowId, type DodRowResult } from './dod.js';
+import {
+  acceptFlagFor,
+  BRANCH_ABSENT_MERGE_ERROR,
+  canAcceptDodMisses,
+  DOD_ROWS,
+  type DodGateResult,
+  type DodRowId,
+  type DodRowResult,
+} from './dod.js';
 import type { LifecycleContext, StepResult } from './types.js';
 
 const execFileAsync = promisify(execFile);
@@ -46,6 +54,7 @@ interface MergedRowDeps {
     mergedAt?: string;
     mergeCommit?: { oid?: string } | string | null;
   }>;
+  readDurableMerges?: (ctx: LifecycleContext) => Promise<string[]>;
 }
 
 const defaultMergedRowDeps: MergedRowDeps = {
@@ -61,6 +70,10 @@ const defaultMergedRowDeps: MergedRowDeps = {
     const response = await fetchIssuePullRequest(ctx.issueId);
     if (response.error) throw new Error(response.error);
     return response.pr ?? {};
+  },
+  readDurableMerges: async ctx => {
+    const project = resolveProjectForIssue(ctx.issueId) ?? getProjectConfigFromWorkspacePath(ctx.projectPath);
+    return (await readIssueRecord(project, ctx.issueId))?.closeOut.merges ?? [];
   },
 };
 
@@ -224,23 +237,48 @@ export async function checkMergedRow(
   const detail = verified.details?.join('; ');
   const observed = detail || verified.error || (verified.skipped ? 'issue already closed on forge' : 'merge not verified');
   const merged = result('merged', verified.success || verified.skipped ? 'pass' : 'miss', observed) as MergedDodRowResult;
+  const branchAbsent = verified.error === BRANCH_ABSENT_MERGE_ERROR;
+  let durableMerges: string[] = [];
 
-  if (!ctx.github) return merged;
+  if (branchAbsent) {
+    try {
+      durableMerges = await (deps.readDurableMerges ?? defaultMergedRowDeps.readDurableMerges!)(ctx);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      merged.observed = `${merged.observed}; durable merge evidence unavailable: ${message}`;
+    }
+  }
 
-  try {
-    const branchName = `feature/${ctx.issueId.toLowerCase()}`;
-    const pullRequest = await deps.readPullRequest(ctx, branchName);
-    merged.mergedAt = pullRequest.mergedAt;
-    merged.mergeCommit = typeof pullRequest.mergeCommit === 'string'
-      ? pullRequest.mergeCommit
-      : pullRequest.mergeCommit?.oid;
-    const number = pullRequest.number ? `PR #${pullRequest.number}` : 'PR';
-    const state = pullRequest.state ?? 'state unknown';
-    const at = pullRequest.mergedAt ? ` at ${pullRequest.mergedAt}` : '';
-    merged.observed = `${merged.observed}; ${number} ${state}${at}`;
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    merged.observed = `${merged.observed}; forge metadata unavailable: ${message}`;
+  let pullRequestState: string | undefined;
+  if (ctx.github) {
+    try {
+      const branchName = `feature/${ctx.issueId.toLowerCase()}`;
+      const pullRequest = await deps.readPullRequest(ctx, branchName);
+      pullRequestState = pullRequest.state;
+      merged.mergedAt = pullRequest.mergedAt;
+      merged.mergeCommit = typeof pullRequest.mergeCommit === 'string'
+        ? pullRequest.mergeCommit
+        : pullRequest.mergeCommit?.oid;
+      const number = pullRequest.number ? `PR #${pullRequest.number}` : 'PR';
+      const state = pullRequest.state ?? 'state unknown';
+      const at = pullRequest.mergedAt ? ` at ${pullRequest.mergedAt}` : '';
+      merged.observed = `${merged.observed}; ${number} ${state}${at}`;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      merged.observed = `${merged.observed}; forge metadata unavailable: ${message}`;
+    }
+  }
+
+  if (branchAbsent) {
+    const forgeMerged = pullRequestState?.toUpperCase() === 'MERGED';
+    if (durableMerges.length > 0 || forgeMerged) {
+      merged.status = 'pass';
+      if (durableMerges.length > 0) {
+        merged.observed = `${merged.observed}; durable close-out record contains ${durableMerges.length} merge artifact(s)`;
+      }
+    } else {
+      merged.observed = `${merged.observed}; no merged forge artifact or durable close-out merge record found`;
+    }
   }
 
   return merged;
@@ -363,6 +401,10 @@ export async function evaluateDodGate(
   for (const id of acceptedRows) {
     if (!overridable.has(id)) throw new TypeError(`DoD row "${id}" cannot be accepted; valid rows: ${[...overridable].join(', ')}`);
   }
+  const by = opts.acceptedBy ?? process.env.OVERDECK_AGENT_ID ?? userInfo().username;
+  if (acceptedRows.size > 0 && !canAcceptDodMisses(by)) {
+    throw new TypeError('The flywheel orchestrator cannot accept missed Definition-of-Done rows; an operator must apply --accept-<row> overrides.');
+  }
 
   const merged = opts.verifyMerged
     ? await checkMergedRow(ctx, { ...defaultMergedRowDeps, verifyMerged: opts.verifyMerged })
@@ -376,7 +418,6 @@ export async function evaluateDodGate(
     deps.mainVerify(ctx, merged.mergeCommit),
     deps.deploy(ctx, { mergedAt: merged.mergedAt, mergeCommit: merged.mergeCommit }),
   ]);
-  const by = opts.acceptedBy ?? process.env.OVERDECK_AGENT_ID ?? userInfo().username;
   for (const row of rows) {
     if (row.status === 'miss' && acceptedRows.has(row.id)) {
       row.acceptedBy = { flag: acceptFlagFor(rowDefinition(row.id)), by, at: deps.now() };

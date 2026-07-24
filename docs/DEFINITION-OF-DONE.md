@@ -34,7 +34,9 @@ this table and that module from drifting silently.
   this table in the same commit; the doc-drift test blocks a partial edit.
 - **Auto-close-out uses the same gate.** A missed row blocks Deacon's automatic close-out and
   surfaces through its recorded auto-close-out failure. Automation never accepts a miss on
-  the operator's behalf.
+  the operator's behalf; `flywheel-*` callers are mechanically barred from `--accept-*`.
+- **Branch absence is not merge evidence.** The `merged` row requires positive evidence from
+  the forge or the durable close-out merge record; deleting an unmerged branch remains a miss.
 
 ## Related
 
