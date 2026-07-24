@@ -1,6 +1,8 @@
 import { watch, type FSWatcher } from 'fs';
 import { mkdirSync } from 'fs';
+import type { Command } from 'commander';
 import { resolveAgentTargetSync } from '../../lib/agents.js';
+import { inboxCommand } from './inbox.js';
 import {
   agentMailDir,
   clearMonitorPresence,
@@ -10,6 +12,19 @@ import {
 } from '../../lib/agents/monitor-transport.js';
 
 const POLL_INTERVAL_MS = 2_000;
+
+/** Registers `pan monitor` + `pan inbox` (kept out of the cli index god file). */
+export function registerMonitorCommands(program: Command): void {
+  program
+    .command('monitor [id]')
+    .description('Long-running background inbox: drain agent mail to stdout (run inside the agent session; PAN-3015)')
+    .action(monitorCommand);
+  program
+    .command('inbox [id]')
+    .description('Print full bodies of recent agent mail (unread + read archive); moves nothing')
+    .option('--limit <n>', 'Max messages to print (default 10)')
+    .action(inboxCommand);
+}
 
 /**
  * `pan monitor [id]` — long-running background inbox for a Claude Code session

@@ -57,8 +57,7 @@ import { issueCommand as startCommand } from './commands/start.js';
 import type { RoleEffort } from '../lib/config-yaml.js';
 import type { RuntimeName } from '../lib/runtimes/types.js';
 import { tellCommand } from './commands/tell.js';
-import { monitorCommand } from './commands/monitor.js';
-import { inboxCommand } from './commands/inbox.js';
+import { registerMonitorCommands } from './commands/monitor.js';
 import { killCommand } from './commands/kill.js';
 import { registerResetToPlannedCommand } from './commands/reset-to-planned.js';
 import { pauseCommand } from './commands/pause.js';
@@ -455,15 +454,7 @@ program
   .command('tell <id> <message>')
   .description('Send message to running agent')
   .action(tellCommand);
-program
-  .command('monitor [id]')
-  .description('Long-running background inbox: drain agent mail to stdout (run inside the agent session; PAN-3015)')
-  .action(monitorCommand);
-program
-  .command('inbox [id]')
-  .description('Print full bodies of recent agent mail (unread + read archive); moves nothing')
-  .option('--limit <n>', 'Max messages to print (default 10)')
-  .action(inboxCommand);
+registerMonitorCommands(program);
 program
   .command('kill <id>')
   .alias('stop')
