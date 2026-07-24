@@ -50,15 +50,7 @@
       "timestamp": "2026-07-24T23:22:49.872Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-24T23:22:49Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-1525\n\nDetached /pan start and plan derive log paths from unvalidated issue text, enabling path traversal outside the agent directory.\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1525 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "packages/contracts/src/composer-commands.test.ts",
@@ -197,10 +189,10 @@
     "recordedAt": "2026-07-24T23:08:31.650Z"
   },
   "created": "2026-07-12T09:32:29.900Z",
-  "updated": "2026-07-24T23:24:30.536Z",
+  "updated": "2026-07-24T23:39:31.581Z",
   "pipeline": {
     "issueId": "PAN-1525",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -208,12 +200,12 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-24T23:12:31.996Z",
-    "updatedAt": "2026-07-24T23:24:30.515Z",
+    "updatedAt": "2026-07-24T23:39:31.529Z",
     "inspectNotes": "Composer-command parse+route inserted before compact/transform/delivery in conversation-message.ts with early return; unknown-command maps to 404 naming token + 'Type /pan to list available commands'; terminal-only policy maps to 422 naming exact command display; unprefixed text/pan-start negative control preserves original compact/transform/deliverAgentMessage path. All 4 ACs covered by router.test.ts assertions matching the exact banned-call list.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3033",
     "lastVerifiedCommit": "0b4828d4e0a9559885b4ecd9b143711f04aba82d",
     "reviewRequestedAt": "2026-07-24T23:12:31.996Z",
-    "reviewSpawnedAt": "2026-07-24T23:22:38.231Z",
+    "reviewSpawnedAt": "2026-07-24T23:39:31.527Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "packages/contracts/src/composer-commands.test.ts",
@@ -390,9 +382,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 9253666,
-            "output": 776105,
-            "cacheRead": 414711296,
+            "input": 10000608,
+            "output": 809534,
+            "cacheRead": 428761088,
             "cacheWrite": 0
           }
         }
@@ -405,9 +397,9 @@
           "cacheWrite": 921870
         },
         "openai/gpt-5.6-sol": {
-          "input": 10831005,
-          "output": 939631,
-          "cacheRead": 462223872,
+          "input": 11577947,
+          "output": 973060,
+          "cacheRead": 476273664,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -418,8 +410,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 349.35206,
-        "pricingAsOf": "2026-07-24T23:24:30.533Z"
+        "usd": 361.114536,
+        "pricingAsOf": "2026-07-24T23:39:31.559Z"
       }
     },
     "merges": [
