@@ -69,7 +69,7 @@ const ENV_KEYS = [
   'DASHBOARD_URL',
   'OVERDECK_HOME',
   'OVERDECK_WORKSPACE_DASHBOARD_ALLOW_PRIMARY',
-  'OVERDECK_AGENT_ID',
+  'OVERDECK_DASHBOARD_SPAWNED_BY',
 ];
 
 let envSnapshot: EnvSnapshot;
@@ -193,7 +193,7 @@ describe('ServerConfig', () => {
     it.each(['agent-pan-2545', 'planning-pan-2545', 'flywheel-orchestrator', 'strike-pan-2485', 'future-role-pan-1'])(
       'refuses the primary-port escape hatch for pipeline identity %s',
       async (agentId) => {
-        process.env['OVERDECK_AGENT_ID'] = agentId;
+        process.env['OVERDECK_DASHBOARD_SPAWNED_BY'] = agentId;
 
         await expect(getConfig()).rejects.toThrow(
           `Refusing host dashboard port override for pipeline-role identity`,
@@ -204,8 +204,8 @@ describe('ServerConfig', () => {
     it.each([undefined, 'conv-20260709-6371'])(
       'allows the primary-port escape hatch for operator identity %s',
       async (agentId) => {
-        if (agentId === undefined) delete process.env['OVERDECK_AGENT_ID'];
-        else process.env['OVERDECK_AGENT_ID'] = agentId;
+        if (agentId === undefined) delete process.env['OVERDECK_DASHBOARD_SPAWNED_BY'];
+        else process.env['OVERDECK_DASHBOARD_SPAWNED_BY'] = agentId;
 
         await expect(getConfig()).resolves.toMatchObject({ port: 3011 });
       },
@@ -216,7 +216,7 @@ describe('ServerConfig', () => {
       try {
         writeFileSync(join(repoRoot, '.git'), 'gitdir: /primary/.git/worktrees/handoff\n');
         identityMock.current = { repoRoot, mode: 'primary' };
-        process.env['OVERDECK_AGENT_ID'] = 'conv-20260709-6371';
+        process.env['OVERDECK_DASHBOARD_SPAWNED_BY'] = 'conv-20260709-6371';
 
         await expect(getConfig()).rejects.toThrow(
           `Refusing to bind host dashboard port 3011 from repoRoot=${repoRoot}`,
@@ -331,7 +331,7 @@ describe('ServerConfig', () => {
       }
 
       process.env['OVERDECK_WORKSPACE_DASHBOARD_ALLOW_PRIMARY'] = '1';
-      process.env['OVERDECK_AGENT_ID'] = 'agent-pan-2545';
+      process.env['OVERDECK_DASHBOARD_SPAWNED_BY'] = 'agent-pan-2545';
       await expect(getConfig()).rejects.toThrow();
       try {
         await getConfig();

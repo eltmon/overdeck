@@ -171,6 +171,21 @@ function searchedBundlePaths(): string[] {
   return uniqueBundleCandidates().map(candidate => candidate.path);
 }
 
+// PAN-2989: the dashboard server is not an agent — never let it inherit the
+// spawner's identity. Deploy-patrol exports OVERDECK_AGENT_ID=deploy-patrol on
+// its `pan reload` child (deploy-patrol.ts:76); the restarted server inherited
+// it and every record-lock owner string lied. Preserve the inherited identity
+// under a dedicated var for the PAN-2322 port-override guard, which
+// legitimately needs to know WHO spawned us.
+export function scrubAgentIdentityFromDashboardEnv(env: NodeJS.ProcessEnv): void {
+  if (env.OVERDECK_AGENT_ID !== undefined) {
+    env.OVERDECK_DASHBOARD_SPAWNED_BY = env.OVERDECK_AGENT_ID;
+  }
+  delete env.OVERDECK_AGENT_ID;
+  delete env.OVERDECK_ISSUE_ID;
+  delete env.OVERDECK_SESSION_TYPE;
+}
+
 export function spawnDashboardDetached(config: PlatformConfig, opts?: BootGateOptions): DashboardSpawnHandle {
   const serverPath = resolveBundledServerPath();
   if (!existsSync(serverPath)) {
@@ -180,6 +195,7 @@ export function spawnDashboardDetached(config: PlatformConfig, opts?: BootGateOp
     });
   }
   const env = applyBootGateEnv({ ...process.env }, opts);
+  scrubAgentIdentityFromDashboardEnv(env);
   const traefikEnv = config.traefikEnabled
     ? {
         DASHBOARD_URL: `https://${config.traefikDomain}`,
