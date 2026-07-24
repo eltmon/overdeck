@@ -93,7 +93,7 @@
     "recordedAt": "2026-07-24T19:20:31.861Z"
   },
   "created": "2026-07-22T21:26:29.366Z",
-  "updated": "2026-07-24T19:28:02.801Z",
+  "updated": "2026-07-24T19:28:23.005Z",
   "pipeline": {
     "issueId": "PAN-2989",
     "reviewStatus": "passed",
@@ -107,7 +107,7 @@
     "prUrl": "https://github.com/eltmon/overdeck/pull/3027",
     "reviewedAtCommit": "e6447d968e8aea9c05dc4bcfd45cba753e470cbc",
     "lastVerifiedCommit": "e6447d968e8aea9c05dc4bcfd45cba753e470cbc",
-    "reviewRequestedAt": "2026-07-24T19:20:32.575Z",
+    "reviewRequestedAt": "2026-07-24T19:28:22.610Z",
     "reviewSpawnedAt": "2026-07-24T19:20:36.734Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -145,7 +145,8 @@
         "tests/unit/lib/pan-dir/record-update-durability-budget.test.ts"
       ],
       "recordedAt": "2026-07-24T19:20:31.861Z"
-    }
+    },
+    "panDoneRecoveredAt": "2026-07-24T19:28:22.610Z"
   },
   "closeOut": {
     "usage": {
