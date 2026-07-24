@@ -14,6 +14,14 @@ import type { RuntimeName } from '../runtimes/types.js';
 import { captureTranscriptUserRecordSnapshot } from '../transcript-landing.js';
 import { deliverAgentMessage, injectPiConversationMemory } from '../agents.js';
 import {
+  ComposerCommandParseError,
+  parseOverdeckComposerCommand,
+} from '../composer-commands/parser.js';
+import {
+  composerCommandResultHttpStatus,
+  handleComposerCommand,
+} from '../composer-commands/router.js';
+import {
   extractConversationAttachmentPaths,
   ensureConversationAttachmentDir,
   getConversationAttachmentsRoot,
@@ -194,6 +202,8 @@ function sanitizeUploadBasename(name: string): string {
 export interface ConversationMessageDependencies {
   resolveSessionFile(conv: Conversation): Promise<string | null>;
   generateAiTitle(name: string, message: string): Promise<void>;
+  shouldInterceptManualCompact?(message: string): boolean;
+  transformMessageForHarness?(message: string, harness: RuntimeName, attachmentPaths: string[]): string;
 }
 
 export function safeUploadExtension(filename: string, mimeType: string): string {
@@ -403,7 +413,34 @@ export async function handleConversationMessage(
     return jsonResponse({ error: `Message exceeds maximum length of ${MAX_MESSAGE_LENGTH} characters` }, { status: 400 });
   }
 
-  if (getHarnessBehavior(conv.harness).transcriptKind === 'claude-jsonl' && shouldInterceptManualCompact(message)) {
+  try {
+    const parsed = parseOverdeckComposerCommand(message);
+    if (parsed !== null) {
+      const result = await handleComposerCommand({
+        parsed,
+        target: {
+          kind: 'conversation',
+          id: conv.name,
+          harness: conv.harness ?? 'claude-code',
+          cwd: conv.cwd,
+          issueId: conv.issueId ?? undefined,
+        },
+      });
+      return jsonResponse(result, { status: composerCommandResultHttpStatus(result) });
+    }
+  } catch (error) {
+    if (!(error instanceof ComposerCommandParseError)) throw error;
+    const status = error.code === 'unknown-command' ? 404 : error.code === 'unknown-flag' ? 422 : 400;
+    return jsonResponse({
+      error: error.message,
+      code: error.code,
+      token: error.token,
+      expected: error.expected,
+    }, { status });
+  }
+
+  const interceptManualCompact = deps.shouldInterceptManualCompact ?? shouldInterceptManualCompact;
+  if (getHarnessBehavior(conv.harness).transcriptKind === 'claude-jsonl' && interceptManualCompact(message)) {
     const compactSessionFile = await deps.resolveSessionFile(conv);
     if (!compactSessionFile || !existsSync(compactSessionFile)) {
       return jsonResponse({ error: `No session file found for conversation ${conv.name}` }, { status: 400 });
@@ -461,7 +498,8 @@ export async function handleConversationMessage(
     );
   }
 
-  let deliveredMessage = transformMessageForHarness(outboundMessage, harness, effectiveAttachmentPaths);
+  const transformForHarness = deps.transformMessageForHarness ?? transformMessageForHarness;
+  let deliveredMessage = transformForHarness(outboundMessage, harness, effectiveAttachmentPaths);
   if (behavior.injectsPromptTimeMemory) {
     deliveredMessage = await injectPiConversationMemory(
       { cwd: conv.cwd, issueId: conv.issueId, conversationName: conv.name },
