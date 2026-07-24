@@ -107,6 +107,11 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-24T17:28:15.200Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-24T17:35:55.864Z"
     }
   ],
   "feedback": [],
@@ -175,10 +180,10 @@
     "recordedAt": "2026-07-24T11:25:43.566Z"
   },
   "created": "2026-07-22T21:25:31.822Z",
-  "updated": "2026-07-24T17:35:53.105Z",
+  "updated": "2026-07-24T17:35:55.865Z",
   "pipeline": {
     "issueId": "PAN-2988",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -186,12 +191,12 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-24T17:28:10.885Z",
-    "updatedAt": "2026-07-24T17:35:53.023Z",
+    "updatedAt": "2026-07-24T17:35:54.162Z",
     "reviewNotes": "Agent re-review request (1/25): Resolved the origin/main conflict by preserving the sorted file-size baseline and agents/spawn override while retaining PAN-2988's 1349-line CLI extraction and removal of review-status.ts from the baseline. Build, typecheck, lint, 84 close-out/reconciliation tests, 22 spawn-route tests, 56 review-status tests, and 186 frontend action tests pass.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3010",
     "lastVerifiedCommit": "a14dd3a5d4fee87627713a5ebeb9dde4f43cd7db",
     "reviewRequestedAt": "2026-07-24T17:28:10.885Z",
-    "reviewSpawnedAt": "2026-07-24T17:28:13.602Z"
+    "reviewSpawnedAt": "2026-07-24T17:35:54.161Z"
   },
   "closeOut": {
     "usage": {
@@ -245,7 +250,7 @@
       },
       "costAtCloseOut": {
         "usd": 240.764598,
-        "pricingAsOf": "2026-07-24T17:35:53.099Z"
+        "pricingAsOf": "2026-07-24T17:35:54.219Z"
       }
     },
     "merges": [
