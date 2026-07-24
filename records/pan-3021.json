@@ -60,18 +60,18 @@
     "recordedAt": "2026-07-24T18:23:54.613Z"
   },
   "created": "2026-07-24T17:28:09.122Z",
-  "updated": "2026-07-24T18:43:11.687Z",
+  "updated": "2026-07-24T18:43:19.982Z",
   "pipeline": {
     "issueId": "PAN-3021",
     "reviewStatus": "passed",
-    "testStatus": "pending",
+    "testStatus": "testing",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-24T18:25:23.151Z",
-    "updatedAt": "2026-07-24T18:43:10.417Z",
+    "updatedAt": "2026-07-24T18:43:19.968Z",
     "reviewNotes": "Approved d110b0b2: command registry generation, composer integration, no-loss gate, security, and performance checks pass",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "Verified all 4 ACs: strike/swarm registered on root program, admin/cloister/status nested correctly, spawn-reviewer confirmed {hidden:true} at src/cli/index.ts:380 and filtered by commander's visibleCommands (verified in node_modules/commander/lib/help.js), unit tests correctly assert args metadata and hidden-exclusion/ordering.",
@@ -132,9 +132,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 1180400,
-            "output": 83012,
-            "cacheRead": 11453440,
+            "input": 1185356,
+            "output": 83996,
+            "cacheRead": 11872768,
             "cacheWrite": 0
           }
         },
@@ -148,9 +148,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 1823928,
-            "output": 165955,
-            "cacheRead": 66924544,
+            "input": 1831910,
+            "output": 166255,
+            "cacheRead": 67926016,
             "cacheWrite": 0
           }
         }
@@ -163,9 +163,9 @@
           "cacheWrite": 195578
         },
         "openai/gpt-5.6-sol": {
-          "input": 3004328,
-          "output": 248967,
-          "cacheRead": 78377984,
+          "input": 3017266,
+          "output": 250251,
+          "cacheRead": 79798784,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -176,8 +176,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 69.604471,
-        "pricingAsOf": "2026-07-24T18:43:10.454Z"
+        "usd": 70.418081,
+        "pricingAsOf": "2026-07-24T18:43:19.973Z"
       }
     },
     "merges": [
@@ -186,7 +186,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "model": "gpt-5.6-sol",
   "tasks": {
     "sequence": 12,
     "claims": {},
