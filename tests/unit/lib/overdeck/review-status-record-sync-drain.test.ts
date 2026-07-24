@@ -1,0 +1,210 @@
+/**
+ * PAN-2989: proactive drain of the workspace verdict fallback. Before this,
+ * nothing ever folded `pipeline-verdict.json` back into the canonical record —
+ * the journal could lag the truth for ~an hour. The drain folds a pending
+ * fallback into the record (newer-wins on ISO updatedAt) and deletes the file,
+ * triggered after every landed journal write and on scheduled retries after a
+ * fallback write.
+ */
+
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync, existsSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
+
+const state = vi.hoisted(() => ({
+  projectPath: '',
+  pipeline: null as Record<string, unknown> | null,
+}));
+
+const mockUpdateIssueRecordForIssue = vi.hoisted(() => vi.fn());
+
+vi.mock('../../../../src/lib/projects.js', () => ({
+  resolveProjectFromIssueSync: (issueId: string) =>
+    issueId.startsWith('PAN-')
+      ? { projectKey: 'overdeck', projectName: 'overdeck', projectPath: state.projectPath }
+      : null,
+  getProjectSync: () => ({ key: 'overdeck', path: state.projectPath }),
+}));
+
+vi.mock('../../../../src/lib/pan-dir/record.js', () => ({
+  readIssueRecordSync: () => (state.pipeline ? { pipeline: state.pipeline } : null),
+}));
+
+vi.mock('../../../../src/lib/pan-dir/records.js', () => ({
+  updateIssueRecordForIssue: mockUpdateIssueRecordForIssue,
+}));
+
+import {
+  drainWorkspaceVerdictFallback,
+  flushReviewStatusJournalWrites,
+  readJournalStatusSync,
+  updateIssueRecordForReviewStatusSync,
+  workspaceVerdictFallbackPath,
+} from '../../../../src/lib/overdeck/review-status-record-sync.js';
+import type { ReviewStatus } from '../../../../src/lib/review-status.js';
+
+const ISSUE = 'PAN-9999';
+
+function fallbackPathOrThrow(): string {
+  const p = workspaceVerdictFallbackPath(ISSUE);
+  if (!p) throw new Error('expected a fallback path');
+  return p;
+}
+
+function writeFallback(
+  updatedAt: string,
+  pipeline: Record<string, unknown>,
+  clearedFields?: string[],
+): void {
+  const p = fallbackPathOrThrow();
+  mkdirSync(join(state.projectPath, 'workspaces', 'feature-pan-9999', '.overdeck'), { recursive: true });
+  writeFileSync(p, JSON.stringify({ issueId: ISSUE, updatedAt, pipeline, clearedFields }));
+}
+
+function verdict(updatedAt: string): ReviewStatus {
+  return {
+    issueId: ISSUE,
+    reviewStatus: 'passed',
+    testStatus: 'passed',
+    readyForMerge: false,
+    updatedAt,
+  } as ReviewStatus;
+}
+
+describe('workspace verdict fallback drain (PAN-2989)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    state.projectPath = mkdtempSync(join(tmpdir(), 'pan-2989-drain-'));
+    state.pipeline = null;
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    rmSync(state.projectPath, { recursive: true, force: true });
+  });
+
+  it('deletes the fallback without a record write when the journal is already newer', async () => {
+    state.pipeline = { reviewStatus: 'passed', testStatus: 'passed', updatedAt: '2026-07-22T10:00:00.000Z' };
+    writeFallback('2026-07-22T09:00:00.000Z', { reviewStatus: 'blocked' });
+
+    await expect(drainWorkspaceVerdictFallback(ISSUE)).resolves.toBe(true);
+
+    expect(mockUpdateIssueRecordForIssue).not.toHaveBeenCalled();
+    expect(existsSync(fallbackPathOrThrow())).toBe(false);
+  });
+
+  it('folds a newer fallback into the record and deletes the file', async () => {
+    state.pipeline = { reviewStatus: 'reviewing', testStatus: 'pending', updatedAt: '2026-07-22T09:00:00.000Z' };
+    writeFallback('2026-07-22T10:00:00.000Z', { reviewStatus: 'blocked', reviewNotes: 'changes requested' });
+    mockUpdateIssueRecordForIssue.mockResolvedValue(true);
+
+    await expect(drainWorkspaceVerdictFallback(ISSUE)).resolves.toBe(true);
+
+    expect(mockUpdateIssueRecordForIssue).toHaveBeenCalledTimes(1);
+    const [issueId, status] = mockUpdateIssueRecordForIssue.mock.calls[0] as [string, ReviewStatus];
+    expect(issueId).toBe(ISSUE);
+    expect(status.reviewStatus).toBe('blocked');
+    expect(status.reviewNotes).toBe('changes requested');
+    expect(status.updatedAt).toBe('2026-07-22T10:00:00.000Z');
+    expect(existsSync(fallbackPathOrThrow())).toBe(false);
+
+    // With the fallback gone, reads return the record's data — no overlay.
+    const result = readJournalStatusSync(ISSUE);
+    expect(result?.durable.reviewStatus).toBe('reviewing');
+  });
+
+  it('does not resurrect cleared strike fields in the drained status', async () => {
+    state.pipeline = {
+      reviewStatus: 'reviewing',
+      testStatus: 'pending',
+      strikeTransportRetryCount: 4,
+      strikeNextAttemptAt: '2026-07-22T12:30:00.000Z',
+      updatedAt: '2026-07-22T09:00:00.000Z',
+    };
+    writeFallback(
+      '2026-07-22T10:00:00.000Z',
+      { reviewStatus: 'passed' },
+      ['strikeTransportRetryCount', 'strikeNextAttemptAt'],
+    );
+    mockUpdateIssueRecordForIssue.mockResolvedValue(true);
+
+    await expect(drainWorkspaceVerdictFallback(ISSUE)).resolves.toBe(true);
+
+    const [, status] = mockUpdateIssueRecordForIssue.mock.calls[0] as [string, ReviewStatus];
+    expect(status.strikeTransportRetryCount).toBeUndefined();
+    expect(status.strikeNextAttemptAt).toBeUndefined();
+  });
+
+  it('keeps the fallback when the record write does not land', async () => {
+    writeFallback('2026-07-22T10:00:00.000Z', { reviewStatus: 'blocked' });
+    mockUpdateIssueRecordForIssue.mockResolvedValue(false);
+
+    await expect(drainWorkspaceVerdictFallback(ISSUE)).resolves.toBe(false);
+    expect(existsSync(fallbackPathOrThrow())).toBe(true);
+  });
+
+  it('drains a pending fallback after the next landed journal write', async () => {
+    state.pipeline = { reviewStatus: 'reviewing', testStatus: 'pending', updatedAt: '2026-07-22T09:00:00.000Z' };
+    writeFallback('2026-07-22T10:00:00.000Z', { reviewStatus: 'blocked' });
+    mockUpdateIssueRecordForIssue.mockResolvedValue(true);
+
+    updateIssueRecordForReviewStatusSync(ISSUE, verdict('2026-07-22T11:00:00.000Z'));
+    await flushReviewStatusJournalWrites();
+
+    // One call for the verdict itself, one for the drain.
+    expect(mockUpdateIssueRecordForIssue).toHaveBeenCalledTimes(2);
+    expect(existsSync(fallbackPathOrThrow())).toBe(false);
+  });
+
+  it('retries a failed journal write on the 5s/30s/120s schedule and stops after success', async () => {
+    // Initial verdict write fails (fallback written); the first two drain
+    // attempts fail too, the third lands.
+    mockUpdateIssueRecordForIssue
+      .mockResolvedValueOnce(false)
+      .mockResolvedValueOnce(false)
+      .mockResolvedValueOnce(false)
+      .mockResolvedValue(true);
+
+    updateIssueRecordForReviewStatusSync(ISSUE, verdict('2026-07-22T10:00:00.000Z'));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(existsSync(fallbackPathOrThrow())).toBe(true);
+    expect(mockUpdateIssueRecordForIssue).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(mockUpdateIssueRecordForIssue).toHaveBeenCalledTimes(2);
+    expect(existsSync(fallbackPathOrThrow())).toBe(true);
+
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(mockUpdateIssueRecordForIssue).toHaveBeenCalledTimes(3);
+    expect(existsSync(fallbackPathOrThrow())).toBe(true);
+
+    await vi.advanceTimersByTimeAsync(120_000);
+    expect(mockUpdateIssueRecordForIssue).toHaveBeenCalledTimes(4);
+    expect(existsSync(fallbackPathOrThrow())).toBe(false);
+
+    // Schedule exhausted after success — nothing further fires.
+    await vi.advanceTimersByTimeAsync(600_000);
+    expect(mockUpdateIssueRecordForIssue).toHaveBeenCalledTimes(4);
+  });
+
+  it('stops retrying once the schedule is exhausted', async () => {
+    mockUpdateIssueRecordForIssue.mockResolvedValue(false);
+
+    updateIssueRecordForReviewStatusSync(ISSUE, verdict('2026-07-22T10:00:00.000Z'));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(mockUpdateIssueRecordForIssue).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(5_000);
+    await vi.advanceTimersByTimeAsync(30_000);
+    await vi.advanceTimersByTimeAsync(120_000);
+    expect(mockUpdateIssueRecordForIssue).toHaveBeenCalledTimes(4);
+
+    // A fourth advance fires nothing — the schedule is exhausted and the
+    // fallback remains for the next successful journal write to drain.
+    await vi.advanceTimersByTimeAsync(600_000);
+    expect(mockUpdateIssueRecordForIssue).toHaveBeenCalledTimes(4);
+    expect(existsSync(fallbackPathOrThrow())).toBe(true);
+  });
+});

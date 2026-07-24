@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import type { ReviewStatus } from '../review-status.js';
 import { updateIssueRecordForIssue, type PanIssuePipelineRecord } from '../pan-dir/records.js';
@@ -22,9 +22,19 @@ export function updateIssueRecordForReviewStatusSync(issueId: string, status: Re
     .then((landed) => {
       // Only an explicit `false` means the durable write failed — undefined
       // (e.g. a test double) is "unknown", not "failed".
-      if (landed === false) writeWorkspaceVerdictFallbackSync(issueId, status);
+      if (landed === false) {
+        writeWorkspaceVerdictFallbackSync(issueId, status);
+        scheduleVerdictFallbackDrain(issueId);
+      } else if (landed === true) {
+        // PAN-2989: a landed journal write is the earliest safe moment to fold any
+        // pending workspace fallback back into the canonical record.
+        trackVerdictFallbackDrain(issueId);
+      }
     })
-    .catch(() => writeWorkspaceVerdictFallbackSync(issueId, status));
+    .catch(() => {
+      writeWorkspaceVerdictFallbackSync(issueId, status);
+      scheduleVerdictFallbackDrain(issueId);
+    });
   pendingJournalWrites.add(write);
   void write.finally(() => pendingJournalWrites.delete(write));
 }
@@ -201,6 +211,83 @@ function readWorkspaceVerdictFallbackSync(issueId: string): WorkspaceVerdictFall
   } catch {
     return null;
   }
+}
+
+// PAN-2989: proactive drain of the workspace verdict fallback. Before this, nothing
+// ever folded a fallback back into the canonical record — observed 2026-07-21 on
+// PAN-806: the canonical journal lagged the truth for ~an hour after a stalled lock
+// forced verdict writes to the fallback. The drain runs after every landed journal
+// write for the issue, and on unref'd scheduled retries after a fallback write.
+const DRAIN_RETRY_DELAYS_MS = [5_000, 30_000, 120_000] as const;
+const drainTimers = new Map<string, NodeJS.Timeout>();
+
+/**
+ * Fold a pending workspace verdict fallback into the canonical record and delete
+ * it, without waiting for the next status read. Newer-wins on ISO `updatedAt` —
+ * the same rule readJournalStatusSync uses — so a journal that already moved past
+ * the fallback just cleans up the file. Returns true when no fallback remains
+ * pending (drained, superseded, or never written).
+ */
+export async function drainWorkspaceVerdictFallback(issueId: string): Promise<boolean> {
+  const fallback = readWorkspaceVerdictFallbackSync(issueId);
+  if (!fallback) return true;
+  const path = workspaceVerdictFallbackPath(issueId);
+  if (!path) return false;
+  const journal = readPipelineSync(issueId);
+  if (journal?.updatedAt && !(journal.updatedAt < fallback.updatedAt)) {
+    rmSync(path, { force: true });
+    return true;
+  }
+  // projectPipeline projects only from the ReviewStatus, so fields the fallback
+  // cleared (clearedFields) stay absent and do not resurrect from the record.
+  const status = {
+    issueId: fallback.issueId,
+    ...fallback.pipeline,
+    updatedAt: fallback.updatedAt,
+    readyForMerge: false, // derived on read; the stored value is never consulted
+  } as ReviewStatus;
+  const landed = await updateIssueRecordForIssue(issueId, status);
+  if (landed) rmSync(path, { force: true });
+  return landed;
+}
+
+/** Track a fire-and-forget drain so short-lived CLIs await it before exit. */
+function trackVerdictFallbackDrain(issueId: string): void {
+  const drain = drainWorkspaceVerdictFallback(issueId)
+    .then(() => undefined)
+    .catch(() => undefined);
+  pendingJournalWrites.add(drain);
+  void drain.finally(() => pendingJournalWrites.delete(drain));
+}
+
+/**
+ * Schedule unref'd drain retries after a fallback write. One timer per issue —
+ * a new fallback write resets the schedule. Retries stop on success, on
+ * exhaustion, or when the fallback file is gone.
+ */
+function scheduleVerdictFallbackDrain(issueId: string): void {
+  const key = issueId.toUpperCase();
+  const existing = drainTimers.get(key);
+  if (existing) clearTimeout(existing);
+
+  const attempt = (index: number): void => {
+    const delay = DRAIN_RETRY_DELAYS_MS[index];
+    if (delay === undefined) {
+      drainTimers.delete(key);
+      return;
+    }
+    const timer = setTimeout(() => {
+      drainTimers.delete(key);
+      void drainWorkspaceVerdictFallback(key)
+        .catch(() => false)
+        .then((drained) => {
+          if (!drained) attempt(index + 1);
+        });
+    }, delay);
+    timer.unref?.();
+    drainTimers.set(key, timer);
+  };
+  attempt(0);
 }
 
 /**
