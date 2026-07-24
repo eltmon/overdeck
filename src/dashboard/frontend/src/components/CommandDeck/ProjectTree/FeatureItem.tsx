@@ -10,6 +10,7 @@ import type { ProjectFeature, ProjectFeatureResourceIdentifiers, ResourceSource 
 import type { Harness } from '../../shared/ModelPicker';
 import { ResourcesGroup } from './ResourcesGroup';
 import { getUatStackSummary } from '../UatStackStatus';
+import { FeatureAppLink, FeatureUatChip } from './FeatureAppLink';
 import { UatStackTreeGroup } from './UatStackTreeGroup';
 import { useWorkspaceQuery } from '../ZoneCOverviewTabs/queries';
 import { createUatActionHandler } from './uat-action-handlers';
@@ -959,8 +960,10 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
   );
   const trainInfo = useUatTrainMembership().get(feature.issueId.toUpperCase());
   const shouldShowUatStack = expanded && feature.readyForMerge && Boolean(feature.resourceDetails?.hasWorkspace);
+  // Any expanded row with a workspace queries (not just merge-ready), so
+  // FeatureAppLink can render during work phase; collapsed rows never poll.
   const workspaceQuery = useWorkspaceQuery(feature.issueId, {
-    enabled: shouldShowUatStack,
+    enabled: expanded && Boolean(feature.resourceDetails?.hasWorkspace),
   });
   const workspace = workspaceQuery.data;
   const stackPending = workspace?.pendingOperation?.status === 'running' && (
@@ -1148,16 +1151,9 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
               🚆 {trainInfo.name} · {trainInfo.order}/{trainInfo.total}
             </span>
           )}
+          <FeatureAppLink frontendUrl={workspace?.frontendUrl} summary={uatStackSummary} />
           {/* Merge-ready only — earlier phases have no stack, and a cached workspace query rendered a bogus chip for planning-phase issues (PAN-2996). */}
-          {feature.readyForMerge && uatStackSummary && (
-            <span
-              className={`${styles.featureBadge} ${uatStackSummary.active ? styles.featureBadge_paused : styles.featureBadge_running}`}
-              data-testid="feature-uat-stack"
-              title="UAT workspace Docker stack status"
-            >
-              {`UAT ${uatStackSummary.state === 'stale' ? 'idle' : uatStackSummary.state}`}
-            </span>
-          )}
+          {feature.readyForMerge && <FeatureUatChip summary={uatStackSummary} />}
           <span data-section="Pipeline pips" className={styles.featurePipe} data-testid="feature-pipe" title="plan · work · review · test · ship">
             {pipeline.map((seg, i) => (
               <i key={PIPE_ORDER[i]} className={PIPE_CLASS[seg] ? styles[PIPE_CLASS[seg] as keyof typeof styles] as string : undefined} />
