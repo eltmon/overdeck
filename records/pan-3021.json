@@ -10,8 +10,47 @@
     }
   ],
   "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "docs/COMPOSER-SLASH-COMMANDS.md",
+      "package.json",
+      "scripts/file-size-baseline.txt",
+      "scripts/generate-slash-commands.mjs",
+      "scripts/lint-slash-commands.sh",
+      "scripts/slash-commands-curation.json",
+      "src/cli/command-introspection.ts",
+      "src/cli/commands/__tests__/command-introspection.test.ts",
+      "src/cli/commands/admin/index.ts",
+      "src/dashboard/frontend/src/components/chat/ComposerPromptEditor.tsx",
+      "src/dashboard/frontend/src/components/chat/__tests__/ComposerPromptEditor.test.tsx",
+      "src/dashboard/frontend/src/components/chat/__tests__/slashCommands.no-loss.test.ts",
+      "src/dashboard/frontend/src/components/chat/slashCommandTypes.ts",
+      "src/dashboard/frontend/src/components/chat/slashCommands.generated.ts",
+      "src/dashboard/frontend/src/components/chat/slashCommands.ts"
+    ],
+    "actualChangedFiles": [
+      "docs/COMPOSER-SLASH-COMMANDS.md",
+      "package.json",
+      "scripts/file-size-baseline.txt",
+      "scripts/generate-slash-commands.mjs",
+      "scripts/lint-slash-commands.sh",
+      "scripts/slash-commands-curation.json",
+      "src/cli/command-introspection.ts",
+      "src/cli/commands/__tests__/command-introspection.test.ts",
+      "src/cli/commands/admin/index.ts",
+      "src/dashboard/frontend/src/components/chat/ComposerPromptEditor.tsx",
+      "src/dashboard/frontend/src/components/chat/__tests__/ComposerPromptEditor.test.tsx",
+      "src/dashboard/frontend/src/components/chat/__tests__/slashCommands.no-loss.test.ts",
+      "src/dashboard/frontend/src/components/chat/slashCommandTypes.ts",
+      "src/dashboard/frontend/src/components/chat/slashCommands.generated.ts",
+      "src/dashboard/frontend/src/components/chat/slashCommands.ts"
+    ],
+    "recordedAt": "2026-07-24T18:23:54.613Z"
+  },
   "created": "2026-07-24T17:28:09.122Z",
-  "updated": "2026-07-24T18:23:57.333Z",
+  "updated": "2026-07-24T18:24:01.275Z",
   "pipeline": {
     "issueId": "PAN-3021",
     "reviewStatus": "pending",
@@ -21,8 +60,9 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-24T18:23:57.332Z",
+    "updatedAt": "2026-07-24T18:24:00.821Z",
     "inspectNotes": "Verified all 4 ACs: strike/swarm registered on root program, admin/cloister/status nested correctly, spawn-reviewer confirmed {hidden:true} at src/cli/index.ts:380 and filtered by commander's visibleCommands (verified in node_modules/commander/lib/help.js), unit tests correctly assert args metadata and hidden-exclusion/ordering.",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3028",
     "reviewRequestedAt": "2026-07-24T18:23:57.332Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
@@ -62,8 +102,7 @@
         "src/dashboard/frontend/src/components/chat/slashCommands.ts"
       ],
       "recordedAt": "2026-07-24T18:23:54.613Z"
-    },
-    "prUrl": "https://github.com/eltmon/overdeck/pull/3028"
+    }
   },
   "closeOut": {
     "usage": {
@@ -78,17 +117,17 @@
         },
         "review.supervisor": {
           "anthropic/claude-sonnet-5": {
-            "input": 18,
-            "output": 3620,
-            "cacheRead": 1018419,
-            "cacheWrite": 131683
+            "input": 20,
+            "output": 3980,
+            "cacheRead": 1150102,
+            "cacheWrite": 132451
           }
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 607551,
-            "output": 18900,
-            "cacheRead": 8221696,
+            "input": 1049622,
+            "output": 144314,
+            "cacheRead": 55326208,
             "cacheWrite": 0
           }
         }
@@ -101,24 +140,26 @@
           "cacheWrite": 195578
         },
         "anthropic/claude-sonnet-5": {
-          "input": 18,
-          "output": 3620,
-          "cacheRead": 1018419,
-          "cacheWrite": 131683
+          "input": 20,
+          "output": 3980,
+          "cacheRead": 1150102,
+          "cacheWrite": 132451
         },
         "openai/gpt-5.6-sol": {
-          "input": 607551,
-          "output": 18900,
-          "cacheRead": 8221696,
+          "input": 1049622,
+          "output": 144314,
+          "cacheRead": 55326208,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 15.608571,
-        "pricingAsOf": "2026-07-24T17:49:35.450Z"
+        "usd": 45.165463,
+        "pricingAsOf": "2026-07-24T18:24:00.863Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/3028"
+    ],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
@@ -249,44 +290,5 @@
     "docs-pipeline": "completed",
     "docs-pipeline.docs-pipeline.ac1": "completed",
     "docs-pipeline.docs-pipeline.ac2": "completed"
-  },
-  "scopeDrift": {
-    "outsideDeclaredScope": [],
-    "declaredScopeUntouched": [],
-    "declaredScope": [
-      "docs/COMPOSER-SLASH-COMMANDS.md",
-      "package.json",
-      "scripts/file-size-baseline.txt",
-      "scripts/generate-slash-commands.mjs",
-      "scripts/lint-slash-commands.sh",
-      "scripts/slash-commands-curation.json",
-      "src/cli/command-introspection.ts",
-      "src/cli/commands/__tests__/command-introspection.test.ts",
-      "src/cli/commands/admin/index.ts",
-      "src/dashboard/frontend/src/components/chat/ComposerPromptEditor.tsx",
-      "src/dashboard/frontend/src/components/chat/__tests__/ComposerPromptEditor.test.tsx",
-      "src/dashboard/frontend/src/components/chat/__tests__/slashCommands.no-loss.test.ts",
-      "src/dashboard/frontend/src/components/chat/slashCommandTypes.ts",
-      "src/dashboard/frontend/src/components/chat/slashCommands.generated.ts",
-      "src/dashboard/frontend/src/components/chat/slashCommands.ts"
-    ],
-    "actualChangedFiles": [
-      "docs/COMPOSER-SLASH-COMMANDS.md",
-      "package.json",
-      "scripts/file-size-baseline.txt",
-      "scripts/generate-slash-commands.mjs",
-      "scripts/lint-slash-commands.sh",
-      "scripts/slash-commands-curation.json",
-      "src/cli/command-introspection.ts",
-      "src/cli/commands/__tests__/command-introspection.test.ts",
-      "src/cli/commands/admin/index.ts",
-      "src/dashboard/frontend/src/components/chat/ComposerPromptEditor.tsx",
-      "src/dashboard/frontend/src/components/chat/__tests__/ComposerPromptEditor.test.tsx",
-      "src/dashboard/frontend/src/components/chat/__tests__/slashCommands.no-loss.test.ts",
-      "src/dashboard/frontend/src/components/chat/slashCommandTypes.ts",
-      "src/dashboard/frontend/src/components/chat/slashCommands.generated.ts",
-      "src/dashboard/frontend/src/components/chat/slashCommands.ts"
-    ],
-    "recordedAt": "2026-07-24T18:23:54.613Z"
   }
 }
