@@ -27,18 +27,18 @@
   ],
   "feedback": [],
   "created": "2026-07-12T09:32:29.900Z",
-  "updated": "2026-07-24T20:28:45.234Z",
+  "updated": "2026-07-24T20:29:08.106Z",
   "pipeline": {
     "issueId": "PAN-1525",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "passed",
+    "inspectStatus": "inspecting",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-24T19:45:54.103Z",
-    "inspectNotes": "Manifest covers full commandTree with args/options/aliases/category; spot-check test verifies pan start/show/kill/admin-commands; generator is deterministic (no timestamp, fixed key order) and lint-slash-commands.sh drift-gates both outputs with repair command in message; tsdown cliEntrypointExclusionAssertion guards the dashboard bundle against importing src/cli/index.ts; docs/COMPOSER-SLASH-COMMANDS.md updated with two-output pipeline.",
+    "updatedAt": "2026-07-24T20:29:08.086Z",
+    "inspectNotes": "Inspecting item router-conversation",
     "strikeRecoveryCount": 0
   },
   "closeOut": {
@@ -60,11 +60,19 @@
             "cacheWrite": 665649
           }
         },
+        "review.supervisor": {
+          "anthropic/claude-sonnet-5": {
+            "input": 2,
+            "output": 210,
+            "cacheRead": 0,
+            "cacheWrite": 121481
+          }
+        },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 621325,
-            "output": 54454,
-            "cacheRead": 31090688,
+            "input": 2308246,
+            "output": 265891,
+            "cacheRead": 109274112,
             "cacheWrite": 0
           }
         }
@@ -76,16 +84,22 @@
           "cacheRead": 17514352,
           "cacheWrite": 722940
         },
+        "anthropic/claude-sonnet-5": {
+          "input": 2,
+          "output": 210,
+          "cacheRead": 0,
+          "cacheWrite": 121481
+        },
         "openai/gpt-5.6-sol": {
-          "input": 621325,
-          "output": 54454,
-          "cacheRead": 31090688,
+          "input": 2308246,
+          "output": 265891,
+          "cacheRead": 109274112,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 52.303519,
-        "pricingAsOf": "2026-07-24T19:45:54.227Z"
+        "usd": 106.478753,
+        "pricingAsOf": "2026-07-24T20:29:08.096Z"
       }
     },
     "merges": [],
