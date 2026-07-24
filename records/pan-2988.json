@@ -170,7 +170,7 @@
     "recordedAt": "2026-07-24T11:10:15.151Z"
   },
   "created": "2026-07-22T21:25:31.822Z",
-  "updated": "2026-07-24T11:19:38.047Z",
+  "updated": "2026-07-24T11:25:40.902Z",
   "pipeline": {
     "issueId": "PAN-2988",
     "reviewStatus": "passed",
@@ -180,7 +180,6 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "panDoneRecoveredAt": "2026-07-24T11:10:34.462Z",
     "updatedAt": "2026-07-24T11:19:38.037Z",
     "reviewNotes": "Approved: current-main merge preserves the reviewed PAN-2988 behavior; cycle diff is clean across correctness, security, requirements, and performance",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
