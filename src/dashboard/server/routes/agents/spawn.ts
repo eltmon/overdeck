@@ -9,6 +9,7 @@ import {
   saveAgentState, determineModel, getProviderAuthMode, getAgentState,
   clearAgentPaused, clearAgentTroubled,
 } from '../../../../lib/agents.js';
+import { resolveIssueWorkModel } from '../../../../lib/agents/staffing.js';
 import type { AgentState } from '../../../../lib/agents/agent-state.js';
 import { operatorInterventionEvent } from '../../../../lib/operator-interventions.js';
 import { buildChildEnvWithoutTmuxSync } from '../../../../lib/child-env.js';
@@ -450,8 +451,13 @@ export const postAgentsRoute = HttpRouter.add(
 
     let spawnModel: string;
     try {
+      // PAN-3022: no explicit body model → honor the per-issue work-model
+      // override (record.workModel, PAN-2997 issue-override tier) before the
+      // role default — same resolution order as `pan start`. Without this the
+      // route resolves the role default and the `pan start --model` child then
+      // persists it, clobbering the stored override.
       spawnModel = determineModel({
-        model: (body as any).model,
+        model: (body as any).model ?? resolveIssueWorkModel(issueId),
         role,
         spawnKey: `${role}:${issueId}`,
       });
