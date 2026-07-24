@@ -52,7 +52,9 @@
   "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
+      "scripts/file-size-baseline.txt",
       "src/cli/commands/__tests__/restart-spawn-env.test.ts",
+      "src/dashboard/frontend/src/components/chat/slashCommands.generated.ts",
       "tests/unit/dashboard/config.test.ts"
     ],
     "declaredScopeUntouched": [
@@ -72,8 +74,10 @@
     "actualChangedFiles": [
       "configuration/state-branch.mdx",
       "docs/AGENT-STATE-PLANES.md",
+      "scripts/file-size-baseline.txt",
       "src/cli/commands/__tests__/restart-spawn-env.test.ts",
       "src/cli/commands/restart.ts",
+      "src/dashboard/frontend/src/components/chat/slashCommands.generated.ts",
       "src/dashboard/server/config.ts",
       "src/lib/overdeck/review-status-record-sync.ts",
       "src/lib/pan-dir/record-update.ts",
@@ -81,10 +85,10 @@
       "tests/unit/lib/overdeck/review-status-record-sync-drain.test.ts",
       "tests/unit/lib/pan-dir/record-update-durability-budget.test.ts"
     ],
-    "recordedAt": "2026-07-24T17:59:05.966Z"
+    "recordedAt": "2026-07-24T19:20:31.861Z"
   },
   "created": "2026-07-22T21:26:29.366Z",
-  "updated": "2026-07-24T19:20:24.738Z",
+  "updated": "2026-07-24T19:20:31.862Z",
   "pipeline": {
     "issueId": "PAN-2989",
     "reviewStatus": "reviewing",
