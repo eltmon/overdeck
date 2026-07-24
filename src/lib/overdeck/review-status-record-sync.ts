@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, linkSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 import type { ReviewStatus } from '../review-status.js';
 import { updateIssueRecordForIssue, type PanIssuePipelineRecord } from '../pan-dir/records.js';
@@ -230,95 +230,74 @@ function drainClaimPid(entry: string, prefix: string): number | null {
   return Number.isInteger(pid) && pid > 0 ? pid : null;
 }
 
-/**
- * A process that crashed mid-drain leaves its claimed generation beside the
- * live path (`<fallback>.drain-<pid>-<n>`). A claim owned by a dead pid belongs
- * to nobody — recover it. When the live path is free the claim is handed back
- * wholesale; when a live generation already exists the two are compared on
- * ISO `updatedAt` and only the newer payload survives. Recovery must never
- * rename over an existing live path blindly: POSIX rename replaces the
- * destination, so an older stranded claim would silently delete a newer
- * verdict written after the crash.
- */
-function recoverStrandedDrainClaimsSync(livePath: string): void {
-  try {
-    const prefix = `${basename(livePath)}.drain-`;
-    for (const entry of readdirSync(dirname(livePath))) {
-      if (!entry.startsWith(prefix)) continue;
-      const pid = drainClaimPid(entry, prefix);
-      if (pid !== null && isPidAlive(pid)) continue; // an in-flight drain owns it
-      const claimPath = join(dirname(livePath), entry);
-      if (!existsSync(livePath)) {
-        try {
-          renameSync(claimPath, livePath);
-        } catch {
-          // Raced another recovery or a fresh write; the generation still exists.
-        }
-        continue;
-      }
-      const claim = parseWorkspaceVerdictFallback(claimPath);
-      const live = parseWorkspaceVerdictFallback(livePath);
-      if (claim && (!live || live.updatedAt < claim.updatedAt)) {
-        // The stranded claim is strictly newer: swap it in. The claim is a
-        // complete file (claims are created by renaming a complete write), so
-        // replacing the older live payload loses nothing.
-        try {
-          renameSync(claimPath, livePath);
-        } catch {
-          // Raced a concurrent writer; keep the claim for a later pass.
-        }
-      } else {
-        // The live generation is newer (or the claim is unreadable): the claim
-        // carries nothing the live path does not supersede.
-        rmSync(claimPath, { force: true });
-      }
-    }
-  } catch {
-    // Best effort — a stranded claim is recovered on a later pass.
-  }
-}
-
 let drainClaimCounter = 0;
 
+interface ClaimedFallbackGeneration {
+  claimPath: string;
+  fallback: WorkspaceVerdictFallback;
+}
+
 /**
- * Claim the live fallback generation by renaming it aside (atomic same-dir
- * rename), so a concurrent verdict write creates a NEW generation at the live
- * path instead of being check-then-deleted mid-fold. Review finding: a drain
- * that deletes the shared path after awaiting the record write can remove a
- * newer fallback written while it was suspended.
+ * Claim every drainable fallback generation — the live path plus any claims
+ * whose owning process is dead — by renaming each onto a unique path owned by
+ * this drain. Live-pid claims belong to in-flight drains and are left alone.
+ *
+ * Race safety: every rename target is a fresh, unique path, so no concurrent
+ * verdict writer's file is ever replaced (POSIX rename onto an existing path
+ * overwrites it — that is exactly the loss this protocol avoids). The payload
+ * is parsed only AFTER the claim, so the generation compared and folded is
+ * precisely the one this drain owns, never a stale pre-check snapshot.
  */
 function claimWorkspaceVerdictFallbackSync(
   issueId: string,
-): { claimPath: string; fallback: WorkspaceVerdictFallback } | null {
+): ClaimedFallbackGeneration[] | null {
   const path = workspaceVerdictFallbackPath(issueId);
   if (!path) return null;
-  recoverStrandedDrainClaimsSync(path);
-  if (!existsSync(path)) return null;
-  drainClaimCounter += 1;
-  const claimPath = `${path}.drain-${process.pid}-${drainClaimCounter}`;
+  const dir = dirname(path);
+  const prefix = `${basename(path)}.drain-`;
+  let entries: string[];
   try {
-    renameSync(path, claimPath);
+    entries = readdirSync(dir);
   } catch {
-    return null; // another drain claimed it first; that drain owns the generation
-  }
-  const fallback = parseWorkspaceVerdictFallback(claimPath);
-  if (!fallback) {
-    rmSync(claimPath, { force: true });
     return null;
   }
-  return { claimPath, fallback };
+  const candidates: string[] = [];
+  if (entries.includes(basename(path))) candidates.push(path);
+  for (const entry of entries) {
+    if (!entry.startsWith(prefix)) continue;
+    const pid = drainClaimPid(entry, prefix);
+    if (pid !== null && isPidAlive(pid)) continue; // an in-flight drain owns it
+    candidates.push(join(dir, entry));
+  }
+  const claims: ClaimedFallbackGeneration[] = [];
+  for (const candidate of candidates) {
+    drainClaimCounter += 1;
+    const claimPath = `${path}.drain-${process.pid}-${drainClaimCounter}`;
+    try {
+      renameSync(candidate, claimPath);
+    } catch {
+      continue; // raced another drain; that drain owns the generation
+    }
+    const fallback = parseWorkspaceVerdictFallback(claimPath);
+    if (!fallback) {
+      rmSync(claimPath, { force: true });
+      continue;
+    }
+    claims.push({ claimPath, fallback });
+  }
+  return claims.length > 0 ? claims : null;
 }
 
 function readWorkspaceVerdictFallbackSync(issueId: string): WorkspaceVerdictFallback | null {
   try {
     const path = workspaceVerdictFallbackPath(issueId);
     if (!path) return null;
-    recoverStrandedDrainClaimsSync(path);
-    // Read-only newest-wins overlay across the live path AND any in-flight
-    // drain claims: a drain holds its generation at a claim path for the full
-    // duration of the record write, and the verdict must stay visible to
+    // Read-only newest-wins overlay across the live path AND all drain
+    // claims: a drain holds its generations at claim paths for the full
+    // duration of the record write, and every verdict must stay visible to
     // readers throughout — otherwise status reads fall back to the older
-    // journal for up to the entire durability budget. Reads never mutate.
+    // journal for up to the entire durability budget. Reads never mutate;
+    // folding and cleanup are the drain's job alone.
     let newest: WorkspaceVerdictFallback | null = null;
     const consider = (candidate: WorkspaceVerdictFallback | null): void => {
       if (candidate && (!newest || newest.updatedAt < candidate.updatedAt)) newest = candidate;
@@ -350,17 +329,27 @@ const drainTimers = new Map<string, NodeJS.Timeout>();
  * the fallback just cleans up the file. Returns true when no fallback remains
  * pending (drained, superseded, or never written).
  *
- * Generation-aware: the drain claims exactly the generation it read via an
- * atomic rename and deletes only that claim. A newer fallback written while the
- * record write was in flight stays at the live path for its own drain schedule.
+ * Generation-aware: the drain claims every drainable generation (the live
+ * path plus stranded claims) onto unique paths it owns, folds the newest, and
+ * deletes only its own claims. A newer fallback written while the record
+ * write was in flight stays at the live path for its own drain schedule, and
+ * no step ever renames onto a path another process may have just created.
  */
 export async function drainWorkspaceVerdictFallback(issueId: string): Promise<boolean> {
-  const claimed = claimWorkspaceVerdictFallbackSync(issueId);
-  if (!claimed) return true;
-  const { claimPath, fallback } = claimed;
+  const claims = claimWorkspaceVerdictFallbackSync(issueId);
+  if (!claims) return true;
+  // Newest-wins across every claimed generation — the same rule the read
+  // overlay uses. Older claims are superseded by the winner and are removed
+  // once the winner's outcome is known.
+  let winner = claims[0]!;
+  for (const claim of claims) {
+    if (winner.fallback.updatedAt < claim.fallback.updatedAt) winner = claim;
+  }
+  const losers = claims.filter((claim) => claim !== winner);
+  const { fallback } = winner;
   const journal = readPipelineSync(issueId);
   if (journal?.updatedAt && !(journal.updatedAt < fallback.updatedAt)) {
-    rmSync(claimPath, { force: true });
+    for (const claim of claims) rmSync(claim.claimPath, { force: true });
     return true;
   }
   // projectPipeline projects only from the ReviewStatus, so fields the fallback
@@ -373,22 +362,45 @@ export async function drainWorkspaceVerdictFallback(issueId: string): Promise<bo
   } as ReviewStatus;
   const landed = await updateIssueRecordForIssue(issueId, status);
   if (landed) {
-    rmSync(claimPath, { force: true });
+    for (const claim of claims) rmSync(claim.claimPath, { force: true });
     return true;
   }
-  // The fold failed: hand the claimed generation back to the live path unless a
-  // newer generation replaced it there while we awaited — the newer one carries
-  // the newer verdict and its own drain schedule is already armed.
+  // The fold failed: superseded generations are dropped, and the winner is
+  // published back to the live path with ATOMIC no-replace semantics —
+  // linkSync fails with EEXIST when a concurrent writer already created a
+  // live file, so a newer verdict that arrived during the await can never be
+  // overwritten. If the live generation is somehow the older one, the winner
+  // stays as a stranded (non-pid) claim: the read overlay still surfaces it
+  // and the next drain folds it.
+  for (const claim of losers) rmSync(claim.claimPath, { force: true });
   const livePath = workspaceVerdictFallbackPath(issueId);
-  if (livePath && !existsSync(livePath)) {
+  if (livePath) {
+    let published = false;
     try {
-      renameSync(claimPath, livePath);
-      return false;
+      linkSync(winner.claimPath, livePath);
+      published = true;
     } catch {
-      // Raced a concurrent write; fall through to dropping the older claim.
+      // A live generation already exists (or the fs rejected the link).
+    }
+    if (published) {
+      rmSync(winner.claimPath, { force: true });
+      return false;
+    }
+    const live = existsSync(livePath) ? parseWorkspaceVerdictFallback(livePath) : null;
+    if (live && !(live.updatedAt < fallback.updatedAt)) {
+      // The live generation is newer-or-equal: it carries the winning verdict.
+      rmSync(winner.claimPath, { force: true });
+      return false;
     }
   }
-  rmSync(claimPath, { force: true });
+  // Keep the winner claim, but mark it stranded so a later drain reclaims it
+  // (a live-pid claim would look owned by this process forever).
+  drainClaimCounter += 1;
+  try {
+    renameSync(winner.claimPath, `${winner.claimPath.split('.drain-')[0]}.drain-republish-${drainClaimCounter}`);
+  } catch {
+    // Leave the claim as-is; it remains readable and recoverable.
+  }
   return false;
 }
 

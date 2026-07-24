@@ -8,7 +8,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readdirSync, rmSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 
@@ -190,6 +190,38 @@ describe('workspace verdict fallback drain (PAN-2989)', () => {
     // The failed drain does not restore its older generation over the newer one.
     const live = JSON.parse(readFileSync(fallbackPathOrThrow(), 'utf8')) as { updatedAt: string };
     expect(live.updatedAt).toBe('2026-07-22T11:00:00.000Z');
+  });
+
+  it('keeps a failed fold winner that is newer than a live generation written during the await', async () => {
+    writeFallback('2026-07-22T10:00:00.000Z', { reviewStatus: 'blocked', reviewNotes: 'generation A' });
+
+    let resolveFold!: (landed: boolean) => void;
+    mockUpdateIssueRecordForIssue.mockImplementation(
+      () => new Promise<boolean>((resolve) => { resolveFold = resolve; }),
+    );
+    const drainA = drainWorkspaceVerdictFallback(ISSUE);
+
+    // A concurrent writer replaces the live path with an OLDER verdict while
+    // the drain is suspended. The failed fold must not discard its newer
+    // winner just because the no-replace publish found a live file.
+    writeFallback('2026-07-22T09:00:00.000Z', { reviewStatus: 'passed', reviewNotes: 'older generation B' });
+    resolveFold(false);
+    await expect(drainA).resolves.toBe(false);
+
+    // The newer claimed generation survives and still wins the read overlay.
+    const read = readJournalStatusSync(ISSUE);
+    expect(read?.updatedAt).toBe('2026-07-22T10:00:00.000Z');
+    expect(read?.durable.reviewNotes).toBe('generation A');
+
+    // And the next drain folds the newer generation, cleaning up both files.
+    mockUpdateIssueRecordForIssue.mockResolvedValue(true);
+    await expect(drainWorkspaceVerdictFallback(ISSUE)).resolves.toBe(true);
+    const [, status] = mockUpdateIssueRecordForIssue.mock.calls[1] as [string, ReviewStatus];
+    expect(status.reviewNotes).toBe('generation A');
+    expect(existsSync(fallbackPathOrThrow())).toBe(false);
+    const remaining = readdirSync(join(state.projectPath, 'workspaces', 'feature-pan-9999', '.overdeck'))
+      .filter((entry) => entry.startsWith('pipeline-verdict.json'));
+    expect(remaining).toEqual([]);
   });
 
   it('keeps the claimed verdict visible to status reads while the drain awaits the record write', async () => {
