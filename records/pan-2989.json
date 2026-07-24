@@ -52,6 +52,11 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-24T19:20:37.775Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-24T19:28:25.558Z"
     }
   ],
   "feedback": [],
@@ -93,22 +98,23 @@
     "recordedAt": "2026-07-24T19:20:31.861Z"
   },
   "created": "2026-07-22T21:26:29.366Z",
-  "updated": "2026-07-24T19:28:23.749Z",
+  "updated": "2026-07-24T19:28:25.572Z",
   "pipeline": {
     "issueId": "PAN-2989",
-    "reviewStatus": "passed",
+    "reviewStatus": "reviewing",
     "testStatus": "testing",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-24T19:28:02.771Z",
+    "panDoneRecoveredAt": "2026-07-24T19:28:22.610Z",
+    "updatedAt": "2026-07-24T19:28:23.796Z",
     "reviewNotes": "Approved: claim-everything fallback drain eliminates the cross-process overwrite race; focused tests, typecheck, lint, and diff checks pass",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3027",
     "reviewedAtCommit": "e6447d968e8aea9c05dc4bcfd45cba753e470cbc",
     "lastVerifiedCommit": "e6447d968e8aea9c05dc4bcfd45cba753e470cbc",
     "reviewRequestedAt": "2026-07-24T19:28:22.610Z",
-    "reviewSpawnedAt": "2026-07-24T19:20:36.734Z",
+    "reviewSpawnedAt": "2026-07-24T19:28:23.795Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "scripts/file-size-baseline.txt",
@@ -145,8 +151,7 @@
         "tests/unit/lib/pan-dir/record-update-durability-budget.test.ts"
       ],
       "recordedAt": "2026-07-24T19:20:31.861Z"
-    },
-    "panDoneRecoveredAt": "2026-07-24T19:28:22.610Z"
+    }
   },
   "closeOut": {
     "usage": {
@@ -169,10 +174,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 28,
-            "output": 4109,
-            "cacheRead": 1918669,
-            "cacheWrite": 172151
+            "input": 30,
+            "output": 4352,
+            "cacheRead": 2090820,
+            "cacheWrite": 172819
           }
         }
       },
@@ -190,15 +195,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 28,
-          "output": 4109,
-          "cacheRead": 1918669,
-          "cacheWrite": 172151
+          "input": 30,
+          "output": 4352,
+          "cacheRead": 2090820,
+          "cacheWrite": 172819
         }
       },
       "costAtCloseOut": {
-        "usd": 60.0048463,
-        "pricingAsOf": "2026-07-24T19:28:02.783Z"
+        "usd": 60.0433803,
+        "pricingAsOf": "2026-07-24T19:28:24.078Z"
       }
     },
     "merges": [
@@ -208,7 +213,7 @@
   },
   "workModel": "k3",
   "harness": "claude-code",
-  "model": "k3",
+  "model": "gpt-5.6-sol",
   "tasks": {
     "sequence": 8,
     "claims": {},
