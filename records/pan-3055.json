@@ -43,7 +43,7 @@
     "recordedAt": "2026-07-25T12:48:24.279Z"
   },
   "created": "2026-07-25T11:59:26.466Z",
-  "updated": "2026-07-25T13:18:51.126Z",
+  "updated": "2026-07-25T13:31:48.321Z",
   "pipeline": {
     "issueId": "PAN-3055",
     "reviewStatus": "passed",
@@ -51,13 +51,13 @@
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": false,
+    "readyForMerge": true,
     "panDoneRecoveredAt": "2026-07-25T12:49:09.494Z",
-    "updatedAt": "2026-07-25T13:18:48.073Z",
+    "updatedAt": "2026-07-25T13:31:48.286Z",
     "reviewNotes": "Approved: census-gated falling-edge reap is correct, scoped, documented, and passes focused tests, lint, and dashboard typecheck.",
-    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3064",
     "reviewedAtCommit": "5c1fbda45ed271e7b94580e6a042ce7af18b80d5",
+    "lastVerifiedCommit": "5c1fbda45ed271e7b94580e6a042ce7af18b80d5",
     "reviewRequestedAt": "2026-07-25T12:49:09.494Z",
     "reviewSpawnedAt": "2026-07-25T12:52:47.824Z",
     "scopeDrift": {
@@ -99,10 +99,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 274,
-            "output": 6649,
-            "cacheRead": 2439189,
-            "cacheWrite": 174460
+            "input": 276,
+            "output": 6799,
+            "cacheRead": 2613649,
+            "cacheWrite": 175365
           }
         },
         "work": {
@@ -128,15 +128,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 274,
-          "output": 6649,
-          "cacheRead": 2439189,
-          "cacheWrite": 174460
+          "input": 276,
+          "output": 6799,
+          "cacheRead": 2613649,
+          "cacheWrite": 175365
         }
       },
       "costAtCloseOut": {
-        "usd": 51.45601,
-        "pricingAsOf": "2026-07-25T13:18:51.119Z"
+        "usd": 51.494669,
+        "pricingAsOf": "2026-07-25T13:31:48.312Z"
       }
     },
     "merges": [
