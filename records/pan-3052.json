@@ -45,7 +45,7 @@
     "recordedAt": "2026-07-25T12:51:35.667Z"
   },
   "created": "2026-07-25T11:59:01.400Z",
-  "updated": "2026-07-25T12:55:25.762Z",
+  "updated": "2026-07-25T12:55:31.840Z",
   "pipeline": {
     "issueId": "PAN-3052",
     "reviewStatus": "pending",
@@ -54,7 +54,8 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-25T12:55:19.423Z",
+    "panDoneRecoveredAt": "2026-07-25T12:55:25.351Z",
+    "updatedAt": "2026-07-25T12:55:25.738Z",
     "reviewNotes": "Review role spawn failed: Command failed: tmux -L overdeck -f /home/eltmon/.overdeck/tmux/overdeck.tmux.conf new-session -d -s agent-pan-3052-review -c /home/eltmon/Projects/overdeck/workspaces/feature-pan-3052 -x 200 -y 50 -e ANTHROPIC_API_KEY= -e ANTHROPIC_BASE_URL=http://127.0.0.1:8317 -e ANTHROPIC_AUTH_TOKEN=overdeck-local-cliproxy-key -e ANTHROPIC_DEFAULT_HAIKU_MODEL= -e OPENAI_API_KEY= -e GEMINI_API_KEY= -e API_TIMEOUT_MS= -e CLAUDE_CODE_API_KEY_HELPER_TTL_MS= -e KIMI_API_KEY= -e MINIMAX_API_KEY= -e ZAI_API_KEY= -e MIMO_API_KEY= -e OPENROUTER_API_KEY= -e NOUS_API_KEY= -e DASHSCOPE_API_KEY= -e TERM=xterm-256color -e OVERDECK_AGENT_ID=agent-pan-3052-review -e OVERDECK_ISSUE_ID=PAN-3052 -e OVERDECK_SESSION_TYPE=review -e CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false -e GIT_SEQUENCE_EDITOR=false -e OVERDECK_FLYWHEEL_RUN_ID=RUN-70 -e OVERDECK_FLYWHEEL_AGENT_ROLE=review bash /home/eltmon/.overdeck/agents/agent-pan-3052-review/launcher.sh\nduplicate session: agent-pan-3052-review\n",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3065",
     "reviewRequestedAt": "2026-07-25T12:55:25.351Z",
@@ -80,8 +81,7 @@
         "src/lib/cloister/deacon.ts"
       ],
       "recordedAt": "2026-07-25T12:51:35.667Z"
-    },
-    "panDoneRecoveredAt": "2026-07-25T12:55:25.351Z"
+    }
   },
   "closeOut": {
     "usage": {
@@ -96,9 +96,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 529333,
-            "output": 35797,
-            "cacheRead": 3571200,
+            "input": 546588,
+            "output": 39647,
+            "cacheRead": 4162560,
             "cacheWrite": 0
           }
         },
@@ -119,15 +119,15 @@
           "cacheWrite": 267892
         },
         "openai/gpt-5.6-sol": {
-          "input": 1153118,
-          "output": 108750,
-          "cacheRead": 31229440,
+          "input": 1170373,
+          "output": 112600,
+          "cacheRead": 31820800,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 32.451149,
-        "pricingAsOf": "2026-07-25T12:55:19.496Z"
+        "usd": 32.948604,
+        "pricingAsOf": "2026-07-25T12:55:31.829Z"
       }
     },
     "merges": [
