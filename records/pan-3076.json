@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-25T21:12:36.630Z",
-  "updated": "2026-07-25T21:39:34.034Z",
+  "updated": "2026-07-25T21:40:52.440Z",
   "pipeline": {
     "issueId": "PAN-3076",
     "reviewStatus": "pending",
@@ -75,16 +75,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "stamp-review-status-route": {
-        "writerId": "agent-pan-3076",
-        "agentId": "agent-pan-3076",
-        "pid": 2228381,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-25T21:39:34.034Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3076",
@@ -107,6 +99,17 @@
         "outcome": "completed",
         "reason": "Added composite-aware workspace anchor drift evaluator with per-repo tree, state-plane, and contribution checks plus real-git coverage.",
         "releasedAt": "2026-07-25T21:39:17.188Z"
+      },
+      {
+        "writerId": "agent-pan-3076",
+        "agentId": "agent-pan-3076",
+        "pid": 2228381,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-25T21:39:34.034Z",
+        "itemId": "stamp-review-status-route",
+        "outcome": "completed",
+        "reason": "Changed the review status route to stamp reviewedAtCommit from snapshotWorkspaceHeadsPromise inside Effect.",
+        "releasedAt": "2026-07-25T21:40:52.440Z"
       }
     ],
     "statusReasons": {
@@ -117,6 +120,10 @@
       "anchor-drift-evaluator": {
         "reason": "Added composite-aware workspace anchor drift evaluator with per-repo tree, state-plane, and contribution checks plus real-git coverage.",
         "updatedAt": "2026-07-25T21:39:17.188Z"
+      },
+      "stamp-review-status-route": {
+        "reason": "Changed the review status route to stamp reviewedAtCommit from snapshotWorkspaceHeadsPromise inside Effect.",
+        "updatedAt": "2026-07-25T21:40:52.440Z"
       }
     }
   },
@@ -130,6 +137,8 @@
     "anchor-drift-evaluator.anchor-drift-evaluator.ac2": "completed",
     "anchor-drift-evaluator.anchor-drift-evaluator.ac3": "completed",
     "anchor-drift-evaluator.anchor-drift-evaluator.ac4": "completed",
-    "stamp-review-status-route": "running"
+    "stamp-review-status-route": "completed",
+    "stamp-review-status-route.stamp-review-status-route.ac1": "completed",
+    "stamp-review-status-route.stamp-review-status-route.ac2": "completed"
   }
 }
