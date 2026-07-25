@@ -98,7 +98,7 @@
     "recordedAt": "2026-07-24T19:20:31.861Z"
   },
   "created": "2026-07-22T21:26:29.366Z",
-  "updated": "2026-07-25T06:51:21.458Z",
+  "updated": "2026-07-25T06:52:37.370Z",
   "pipeline": {
     "issueId": "PAN-2989",
     "reviewStatus": "passed",
@@ -213,7 +213,7 @@
   },
   "workModel": "k3",
   "harness": "claude-code",
-  "model": "k3",
+  "model": "claude-sonnet-5",
   "tasks": {
     "sequence": 8,
     "claims": {},
