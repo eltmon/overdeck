@@ -1,6 +1,13 @@
 {
   "issueId": "PAN-3052",
   "schemaVersion": 2,
+  "decisions": [
+    {
+      "id": "D-test-waived",
+      "summary": "Test gate waived: Pure behavior-preserving extraction; commit cb39b20958 added the existing boot-reconciliation tests that cover this path, and this branch preserves them unmodified with 18/18 passing.",
+      "recordedAt": "2026-07-25T12:51:34.702Z"
+    }
+  ],
   "sessionHistory": [
     {
       "reason": "planning",
@@ -15,8 +22,30 @@
     }
   ],
   "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [],
+    "declaredScopeUntouched": [
+      "dist/dashboard/server.js"
+    ],
+    "declaredScope": [
+      "dist/dashboard/server.js",
+      "docs/codebase-health/B-deacon-decomp.md",
+      "scripts/file-size-baseline.txt",
+      "src/lib/cloister/boot-reconciliation-apply.ts",
+      "src/lib/cloister/deacon-auto-resume.ts",
+      "src/lib/cloister/deacon.ts"
+    ],
+    "actualChangedFiles": [
+      "docs/codebase-health/B-deacon-decomp.md",
+      "scripts/file-size-baseline.txt",
+      "src/lib/cloister/boot-reconciliation-apply.ts",
+      "src/lib/cloister/deacon-auto-resume.ts",
+      "src/lib/cloister/deacon.ts"
+    ],
+    "recordedAt": "2026-07-25T12:51:35.667Z"
+  },
   "created": "2026-07-25T11:59:01.400Z",
-  "updated": "2026-07-25T12:51:38.956Z",
+  "updated": "2026-07-25T12:51:43.348Z",
   "pipeline": {
     "issueId": "PAN-3052",
     "reviewStatus": "pending",
@@ -25,7 +54,8 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-25T12:51:38.955Z",
+    "updatedAt": "2026-07-25T12:51:43.300Z",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3065",
     "reviewRequestedAt": "2026-07-25T12:51:38.955Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
@@ -48,8 +78,7 @@
         "src/lib/cloister/deacon.ts"
       ],
       "recordedAt": "2026-07-25T12:51:35.667Z"
-    },
-    "prUrl": "https://github.com/eltmon/overdeck/pull/3065"
+    }
   },
   "closeOut": {
     "usage": {
@@ -61,6 +90,14 @@
             "cacheRead": 2801216,
             "cacheWrite": 267892
           }
+        },
+        "work": {
+          "openai/gpt-5.6-sol": {
+            "input": 599414,
+            "output": 68415,
+            "cacheRead": 25542144,
+            "cacheWrite": 0
+          }
         }
       },
       "totals": {
@@ -69,14 +106,22 @@
           "output": 33162,
           "cacheRead": 2801216,
           "cacheWrite": 267892
+        },
+        "openai/gpt-5.6-sol": {
+          "input": 599414,
+          "output": 68415,
+          "cacheRead": 25542144,
+          "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 7.808339,
-        "pricingAsOf": "2026-07-25T12:07:06.678Z"
+        "usd": 25.628931,
+        "pricingAsOf": "2026-07-25T12:51:43.341Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/3065"
+    ],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
@@ -149,34 +194,5 @@
     "docs-decomp-note": "completed",
     "docs-decomp-note.docs-decomp-note.ac1": "completed",
     "docs-decomp-note.docs-decomp-note.ac2": "completed"
-  },
-  "decisions": [
-    {
-      "id": "D-test-waived",
-      "summary": "Test gate waived: Pure behavior-preserving extraction; commit cb39b20958 added the existing boot-reconciliation tests that cover this path, and this branch preserves them unmodified with 18/18 passing.",
-      "recordedAt": "2026-07-25T12:51:34.702Z"
-    }
-  ],
-  "scopeDrift": {
-    "outsideDeclaredScope": [],
-    "declaredScopeUntouched": [
-      "dist/dashboard/server.js"
-    ],
-    "declaredScope": [
-      "dist/dashboard/server.js",
-      "docs/codebase-health/B-deacon-decomp.md",
-      "scripts/file-size-baseline.txt",
-      "src/lib/cloister/boot-reconciliation-apply.ts",
-      "src/lib/cloister/deacon-auto-resume.ts",
-      "src/lib/cloister/deacon.ts"
-    ],
-    "actualChangedFiles": [
-      "docs/codebase-health/B-deacon-decomp.md",
-      "scripts/file-size-baseline.txt",
-      "src/lib/cloister/boot-reconciliation-apply.ts",
-      "src/lib/cloister/deacon-auto-resume.ts",
-      "src/lib/cloister/deacon.ts"
-    ],
-    "recordedAt": "2026-07-25T12:51:35.667Z"
   }
 }
