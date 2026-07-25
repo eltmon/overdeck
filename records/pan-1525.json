@@ -229,19 +229,19 @@
     "recordedAt": "2026-07-24T23:08:31.650Z"
   },
   "created": "2026-07-12T09:32:29.900Z",
-  "updated": "2026-07-25T01:20:51.062Z",
+  "updated": "2026-07-25T01:20:57.864Z",
   "pipeline": {
     "issueId": "PAN-1525",
-    "reviewStatus": "passed",
-    "testStatus": "testing",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-24T23:12:31.996Z",
-    "updatedAt": "2026-07-25T01:20:51.021Z",
-    "reviewNotes": "All prior composer-command blockers are fixed; focused tests and typecheck pass with only non-blocking concurrency and refresh-latency advisories.",
+    "updatedAt": "2026-07-25T01:20:57.302Z",
+    "reviewNotes": "Agent re-review request (3/25): Fixed review issues",
     "inspectNotes": "Composer-command parse+route inserted before compact/transform/delivery in conversation-message.ts with early return; unknown-command maps to 404 naming token + 'Type /pan to list available commands'; terminal-only policy maps to 422 naming exact command display; unprefixed text/pan-start negative control preserves original compact/transform/deliverAgentMessage path. All 4 ACs covered by router.test.ts assertions matching the exact banned-call list.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3033",
     "reviewedAtCommit": "1c64f86d2f98357e43e341f8b5e2bbe6304237df",
@@ -424,10 +424,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 14,
-            "output": 2015,
-            "cacheRead": 751357,
-            "cacheWrite": 129977
+            "input": 16,
+            "output": 2341,
+            "cacheRead": 881334,
+            "cacheWrite": 131159
           }
         },
         "work": {
@@ -453,15 +453,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 20,
-          "output": 10046,
-          "cacheRead": 1107613,
-          "cacheWrite": 372543
+          "input": 22,
+          "output": 10372,
+          "cacheRead": 1237590,
+          "cacheWrite": 373725
         }
       },
       "costAtCloseOut": {
-        "usd": 493.10496,
-        "pricingAsOf": "2026-07-25T01:20:51.052Z"
+        "usd": 493.137174,
+        "pricingAsOf": "2026-07-25T01:20:57.324Z"
       }
     },
     "merges": [
