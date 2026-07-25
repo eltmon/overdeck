@@ -75,8 +75,7 @@ import {
   markWorkspaceStuck,
   setDeaconIgnored,
   setAutoMerge,
-  type ReviewStatus,
-  type ReviewStatusUpdate,
+  type ReviewStatus, type ReviewStatusUpdate,
 } from '../../../lib/review-status.js';
 import {
   getCachedConflictGateMergeability,
