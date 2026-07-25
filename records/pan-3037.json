@@ -355,18 +355,19 @@
     "recordedAt": "2026-07-25T22:13:33.131Z"
   },
   "created": "2026-07-25T20:44:21.373Z",
-  "updated": "2026-07-25T22:55:19.401Z",
+  "updated": "2026-07-25T23:03:50.008Z",
   "pipeline": {
     "issueId": "PAN-3037",
     "reviewStatus": "pending",
-    "testStatus": "passed",
-    "verificationStatus": "passed",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-25T22:20:18.803Z",
-    "updatedAt": "2026-07-25T22:55:19.350Z",
+    "updatedAt": "2026-07-25T23:03:49.514Z",
+    "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
     "verificationNotes": "Pre-review verification already covered the reviewed commit",
     "inspectNotes": "All 5 ACs met: per-repo iteration with repoKey-prefixed paths, conflict abort leaves repo quiescent and skips remaining repos, aggregate alreadyUpToDate requires all repos current, monorepo keeps unprefixed single-element shape, abort returns cancellation + skipped entries. Extraction into sync-main-workspace.ts is logic-identical; baseline 1404 matches actual wc -l.",
@@ -448,9 +449,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 2219041,
-            "output": 153399,
-            "cacheRead": 93245952,
+            "input": 2999942,
+            "output": 154436,
+            "cacheRead": 94408704,
             "cacheWrite": 0
           }
         }
@@ -463,15 +464,15 @@
           "cacheWrite": 311392
         },
         "openai/gpt-5.6-sol": {
-          "input": 18230350,
-          "output": 399065,
-          "cacheRead": 130207232,
+          "input": 19011251,
+          "output": 400102,
+          "cacheRead": 131369984,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 181.377674,
-        "pricingAsOf": "2026-07-25T22:55:19.395Z"
+        "usd": 185.894665,
+        "pricingAsOf": "2026-07-25T23:03:49.690Z"
       }
     },
     "merges": [
