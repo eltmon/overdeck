@@ -633,7 +633,19 @@ export function buildPolyrepoContext(issueId: string, workspacePath: string): st
     lines.push(`**PR target branch:** \`${[...prTargets].join('` or `')}\` (NOT main/master)`);
   }
 
-  // Progressive workspace: add instructions for adding repos
+  lines.push('');
+  lines.push('## Creating a New Deliverable Repository');
+  lines.push('');
+  lines.push('If this issue requires a repository that is not listed above, register it before writing or committing code:');
+  lines.push('');
+  lines.push('```bash');
+  lines.push(`pan workspace add-repo ${issueId.toLowerCase()} --new <git-url>`);
+  lines.push('```');
+  lines.push('');
+  lines.push('This creates the issue feature branch and adds the repo to review, inspection, and merge.');
+  lines.push('Do not clone an unregistered repo into the workspace or push deliverable code to its main branch.');
+
+  // Progressive workspace: add instructions for adding configured repos
   if (isProgressive) {
     lines.push('');
     lines.push('## Adding Repositories');

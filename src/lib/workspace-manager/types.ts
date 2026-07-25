@@ -47,6 +47,15 @@ export interface AddReposToWorkspaceResult {
   steps: string[];
 }
 
+export interface AddNewRepoToWorkspaceOptions {
+  projectKey: string;
+  projectConfig: ProjectConfig;
+  featureName: string;
+  gitUrl: string;
+  repoName?: string;
+  dryRun?: boolean;
+}
+
 export interface WorkspaceRemoveOptions {
   projectConfig: ProjectConfig;
   featureName: string;
