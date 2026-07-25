@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-25T22:42:08.234Z",
-  "updated": "2026-07-25T22:52:17.214Z",
+  "updated": "2026-07-25T22:55:59.890Z",
   "pipeline": {
     "issueId": "PAN-3083",
     "reviewStatus": "pending",
@@ -59,18 +59,33 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "guard-dispatch-predicate": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-3083",
         "agentId": "agent-pan-3083",
         "pid": 399592,
         "host": "eltmon-z790",
-        "claimedAt": "2026-07-25T22:52:17.214Z"
+        "claimedAt": "2026-07-25T22:52:17.214Z",
+        "itemId": "guard-dispatch-predicate",
+        "outcome": "completed",
+        "reason": "Added terminal/ready guards to needsReviewDispatch, forwarded readyForMerge from host-side reconciliation, and added focused regression coverage.",
+        "releasedAt": "2026-07-25T22:55:59.890Z"
+      }
+    ],
+    "statusReasons": {
+      "guard-dispatch-predicate": {
+        "reason": "Added terminal/ready guards to needsReviewDispatch, forwarded readyForMerge from host-side reconciliation, and added focused regression coverage.",
+        "updatedAt": "2026-07-25T22:55:59.890Z"
       }
     }
   },
   "statusOverrides": {
-    "guard-dispatch-predicate": "running"
+    "guard-dispatch-predicate": "completed",
+    "guard-dispatch-predicate.guard-dispatch-predicate.ac1": "completed",
+    "guard-dispatch-predicate.guard-dispatch-predicate.ac2": "completed",
+    "guard-dispatch-predicate.guard-dispatch-predicate.ac3": "completed",
+    "guard-dispatch-predicate.guard-dispatch-predicate.ac4": "completed"
   }
 }
