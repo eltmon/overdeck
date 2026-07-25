@@ -107,12 +107,16 @@ describe('POST /api/specialists/done inspect item attribution', () => {
     });
 
     expect(result.status).toBe(200);
+    // The itemId argument is the structured `itemId` field verbatim. The notes
+    // ride along as their own argument (PAN-3078 forwards them into the verdict
+    // message delivered to the work agent) and must never leak into attribution.
     expect(mocks.onInspectComplete).toHaveBeenCalledWith(
       'overdeck',
       'PAN-2724',
       'issue-view-model',
       'passed',
       join(projectPath, 'workspaces', 'feature-pan-2724'),
+      'This predates this bead and is correct',
     );
   });
 });
