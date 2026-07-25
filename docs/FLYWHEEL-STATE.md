@@ -6504,3 +6504,21 @@ Substrate bugs filed: 2897 2898 2899 2900 2901 2902 2907 2913 (8; ALL fixed and 
 - **Deferred PAN-3070** (health classifier reporting a frozen agent as `working`) rather than striking both — it is a correctness-of-reporting issue, not a pipeline blocker, and spending the second free slot would have left zero headroom for a red-main emergency.
 - State: main **green** on `f8892e1dc0`, live `c8aaefafe9`, bridge networks **16 for the fifth consecutive tick** (PAN-3053's read-only pressure patrol now live), 18 agents vs cap 20.
 - **LESSON: the pickup gate has an emergency override, and forgetting it is the most expensive mistake available.** Twice this run a `bug`-labelled pipeline blocker would have been deferred forever under `auto_pickup_backlog=OFF` — PAN-3051 (inherited from RUN-69) and now PAN-3067. The question to ask of any blocker is not "is it released?" but "does it block a pipeline stage doctrine names?" — spawning, review, test, merge, or close-out.
+
+## RUN-70 tick 13 (2026-07-25 17:15-17:25Z) — PAN-3067 reviewed, gates green, PR #3071 open — HANDOFF POINT
+- **The strike answered the judgement call properly — the thing I was most worried it would get wrong.** My scope said: decide whether `lastVerifiedCommit` stays required, **state which you chose and why**, and do not silently drop it. It chose to drop the requirement and **justified it with code evidence**: the anchor is best-effort — `verification-runner` snapshots HEAD inside a try/catch marked *"non-fatal — skip optimization if we can't get HEAD"*, spreads the field conditionally, and a policy `skipped` verdict never carries one. Its absence proves nothing about whether verification ran, while requiring it left six merged, CI-green, deployed issues un-closable. Verdict alone now decides the row (matching rows 1 and 2), and the observed string **always** reports the anchor's presence or absence, so no miss can hide its own cause again.
+- Gates verified by me: `dod-gate.test.ts` **30 pass** (incl. the absent-anchor regression case), typecheck clean. PR #3071 open; guard + trailer gate pass, build/lint/test running.
+
+### HANDOFF — pick up here
+1. **Merge PR #3071 on green**, then `pan done PAN-3067 --strike`.
+2. **Deploy behind the ancestry preflight** — this has caught a wrong build TWICE (ticks 5 and 9). `git status --porcelain` must be clean AND `git merge-base --is-ancestor <sha> HEAD` must pass for **every** fix sha including the new merge. Local main is usually `behind` after a merge: **merge `origin/main` in first — never rebase** (the git guard refuses it, correctly).
+3. **Then retry close-out** for PAN-3021, PAN-3029, PAN-3051, PAN-3053, PAN-3056, PAN-3068. **Never `--accept-*`.** Row 3 should now pass on the verdict alone; row 7 already passes since the deploy.
+4. **PAN-3070** (health classifier reports a frozen agent as `working`) is filed and unstruck — strike it if a slot is free, keeping 1 slot headroom for red-main.
+5. **Then assess quiescence** and write the RUN-70 retrospective + `pan flywheel report --force`.
+
+### Run state at handoff
+- main **green** `f8892e1dc0`; live `c8aaefafe9` carrying all 5 deployed fixes; bridge networks **16** (5+ ticks steady).
+- **Landed, deployed and VERIFIED this run:** PAN-3056 (red main), PAN-3053 (pool detection), PAN-3051 (decisions surface), PAN-3068 (prompt detection) — plus PAN-3052 deployed.
+- **Filed with traced diagnoses:** PAN-3062 (shared worktree builds nobody asserted), PAN-3067 (self-corrected, now in PR), PAN-3070 (health classifier), plus fresh evidence on PAN-3049/PAN-3046.
+- **Zero `--force`, zero `--accept-*`, zero `pan tell` nudges, zero agents harmed by cleanup** (safety rule held 6/6).
+- **My docs commits (ticks 3-13) are committed LOCALLY and unpushed** — pushing would ship another session's commits (PAN-3062). They are durable in git; do not lose them by resetting.
