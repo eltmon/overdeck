@@ -34,6 +34,7 @@ vi.mock('../../../../src/lib/pan-dir/record-update.js', () => ({
 
 vi.mock('../../../../src/lib/review-status.js', () => ({
   markWorkspaceStuck: mockMarkWorkspaceStuck,
+  FEEDBACK_DELIVERY_STUCK_REASON: 'feedback_delivery_needs_you',
 }));
 
 vi.mock('../../../../src/lib/tmux.js', () => ({

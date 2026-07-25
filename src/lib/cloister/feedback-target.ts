@@ -193,8 +193,8 @@ export async function surfaceIssueFeedbackNeedsYou(
   details: Record<string, unknown> = {},
 ): Promise<void> {
   try {
-    const { markWorkspaceStuck } = await import('../review-status.js');
-    markWorkspaceStuck(issueId, 'feedback_delivery_needs_you', {
+    const { markWorkspaceStuck, FEEDBACK_DELIVERY_STUCK_REASON } = await import('../review-status.js');
+    markWorkspaceStuck(issueId, FEEDBACK_DELIVERY_STUCK_REASON, {
       reason,
       ...details,
     });

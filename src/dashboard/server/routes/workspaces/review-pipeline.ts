@@ -25,7 +25,7 @@ import { parseIssueIdSync, extractPrefixSync, resolveIssueIdSync } from '../../.
 import { resolveProjectFromIssueSync } from '../../../../lib/projects.js';
 import { isStatePlaneOnlyStatus } from '../../../../lib/state-plane.js';
 import { EventStoreService } from '../../services/domain-services.js';
-import { getReviewStatusSync, type ReviewStatus } from '../../../../lib/review-status.js';
+import { clearFeedbackDeliveryStuck, getReviewStatusSync, type ReviewStatus } from '../../../../lib/review-status.js';
 import { getReleaseSetSync } from '../../../../lib/release-set.js';
 import { getCachedConflictGateMergeability } from '../../../../lib/cloister/conflict-gate.js';
 import { transitionIssueToInReview, spawnRun } from '../../../../lib/agents.js';
@@ -708,6 +708,10 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
       verificationStatus: 'pending',
       reviewNotes,
     });
+
+    // PAN-3074: a re-review request is mechanical proof the agent received and
+    // acted on the feedback — retire a stale feedback_delivery_needs_you flag.
+    clearFeedbackDeliveryStuck(canonicalIssueId);
 
     const started = requestReviewPipeline.start(canonicalIssueId, {
       verify: () => Effect.runPromise(runVerificationForIssue(

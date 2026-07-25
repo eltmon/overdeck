@@ -8,7 +8,7 @@ import { Effect } from 'effect';
 
 import { messageAgent } from '../agents.js';
 import { resolveProjectFromIssueSync } from '../projects.js';
-import { getReviewStatusSync } from '../review-status.js';
+import { clearFeedbackDeliveryStuck, getReviewStatusSync } from '../review-status.js';
 import { PAN_DIRNAME } from '../pan-dir/types.js';
 import { writeFeedbackFile } from './feedback-writer.js';
 import { resolveIssueFeedbackTarget, surfaceIssueFeedbackNeedsYou } from './feedback-target.js';
@@ -145,6 +145,9 @@ async function deliverReviewVerdictFeedbackPromise(
           // stopped-by-user agent with a completed handoff instead of queueing.
           await messageAgent(target.agentId, message, 'internal', { owesRework: true });
           agentMessageSent = true;
+          // PAN-3074: delivery succeeded — a prior feedback_delivery_needs_you
+          // flag no longer describes reality.
+          clearFeedbackDeliveryStuck(issueId);
         } catch (err) {
           // PAN-2228: a resolved-but-unreachable target is a real delivery failure,
           // not a shrug. Surface it as needs-you so the stall is visible instead of

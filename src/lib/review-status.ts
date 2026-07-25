@@ -884,6 +884,21 @@ export function clearWorkspaceStuck(issueId: string): void {
   }
 }
 
+/** Stuck reason recorded when specialist feedback could not reach a live agent (feedback-target.ts). */
+export const FEEDBACK_DELIVERY_STUCK_REASON = 'feedback_delivery_needs_you';
+
+/**
+ * PAN-3074: clear a feedback-delivery stuck flag once the condition it recorded
+ * no longer holds — the feedback reached a live agent, or the agent completed
+ * the fix-and-resubmit loop (`pan review request`). Any other stuck reason is
+ * operator territory and stays put.
+ */
+export function clearFeedbackDeliveryStuck(issueId: string): void {
+  const status = getReviewStatusSync(issueId);
+  if (status?.stuck !== true || status.stuckReason !== FEEDBACK_DELIVERY_STUCK_REASON) return;
+  clearWorkspaceStuck(issueId);
+}
+
 /**
  * Set or clear the operator-requested deacon-ignore flag. When set, Deacon
  * patrol skips the issue entirely on every cycle. Distinct from `stuck`, which

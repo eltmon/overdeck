@@ -43,7 +43,7 @@ afterEach(() => {
 
 // ============== Imports (after mocks are set up) ==============
 
-import { markWorkspaceStuck, clearWorkspaceStuck, loadReviewStatuses, setReviewStatusSync } from '../../../src/lib/review-status.js';
+import { markWorkspaceStuck, clearWorkspaceStuck, clearFeedbackDeliveryStuck, FEEDBACK_DELIVERY_STUCK_REASON, loadReviewStatuses, setReviewStatusSync } from '../../../src/lib/review-status.js';
 
 // ============== Tests ==============
 
@@ -89,6 +89,41 @@ describe('markWorkspaceStuck (notifyPipeline symmetry)', () => {
     expect(call.type).toBe('status_changed');
     expect(call.issueId).toBe('PAN-NEW');
     expect(call.status.stuck).toBe(true);
+  });
+});
+
+// ============== clearFeedbackDeliveryStuck (PAN-3074) ==============
+
+describe('clearFeedbackDeliveryStuck', () => {
+  it('clears the flag when stuckReason is feedback_delivery_needs_you', () => {
+    odb.raw().prepare(`INSERT INTO review_status (issue_id, review_status, test_status, stuck, stuck_reason, updated_at, ready_for_merge) VALUES ('PAN-50', 'blocked', 'pending', 1, '${FEEDBACK_DELIVERY_STUCK_REASON}', datetime('now'), 0)`).run();
+
+    clearFeedbackDeliveryStuck('PAN-50');
+
+    const after = loadReviewStatuses();
+    expect(after['PAN-50'].stuck).toBeFalsy();
+    expect(after['PAN-50'].stuckReason).toBeFalsy();
+    expect(mockNotifyPipeline).toHaveBeenCalledOnce();
+  });
+
+  it('leaves any other stuck reason untouched', () => {
+    odb.raw().prepare(`INSERT INTO review_status (issue_id, review_status, test_status, stuck, stuck_reason, updated_at, ready_for_merge) VALUES ('PAN-51', 'passed', 'passed', 1, 'main_diverged', datetime('now'), 0)`).run();
+
+    clearFeedbackDeliveryStuck('PAN-51');
+
+    const after = loadReviewStatuses();
+    expect(after['PAN-51'].stuck).toBe(true);
+    expect(after['PAN-51'].stuckReason).toBe('main_diverged');
+    expect(mockNotifyPipeline).not.toHaveBeenCalled();
+  });
+
+  it('is a no-op for an unstuck or unknown issue', () => {
+    odb.raw().prepare(`INSERT INTO review_status (issue_id, review_status, test_status, updated_at, ready_for_merge) VALUES ('PAN-52', 'pending', 'pending', datetime('now'), 0)`).run();
+
+    clearFeedbackDeliveryStuck('PAN-52');
+    clearFeedbackDeliveryStuck('PAN-MISSING');
+
+    expect(mockNotifyPipeline).not.toHaveBeenCalled();
   });
 });
 
