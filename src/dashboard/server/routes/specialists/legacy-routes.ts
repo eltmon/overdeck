@@ -229,7 +229,32 @@ const postSpecialistsDoneRoute = HttpRouter.add(
 
     // Apply the update (triggers side effects like idle state, queue processing)
     const updatedStatus = setReviewStatusBase(normalizedIssueId, update);
-    if (specialist === 'inspect' && status === 'failed') yield* Effect.promise(() => reportTieredInspectFailureEscalation(normalizedIssueId, notes));
+    if (specialist === 'inspect' && status === 'failed') {
+      yield* Effect.promise(() => reportTieredInspectFailureEscalation(normalizedIssueId, notes));
+      // PAN-3078: a blocked verdict must reach the work agent, or it keeps
+      // building on rejected work. itemId comes from the supervisor's
+      // `pan admin specialists done --item`; legacy ephemeral inspectors omit
+      // it, so fall back to the inspectBeadId stamped when inspection started.
+      yield* Effect.promise(async () => {
+        try {
+          const failedItemId = itemId ?? getReviewStatusSync(normalizedIssueId)?.inspectBeadId ?? undefined;
+          const project = resolveProjectFromIssueSync(normalizedIssueId);
+          if (project && failedItemId) {
+            const workspacePath = join(
+              project.projectPath,
+              'workspaces',
+              `feature-${normalizedIssueId.toLowerCase()}`,
+            );
+            if (existsSync(workspacePath)) {
+              const { onInspectComplete } = await import('../../../../lib/cloister/inspect-agent.js');
+              await Effect.runPromise(onInspectComplete(project.projectKey, normalizedIssueId, failedItemId, 'failed', workspacePath, notes));
+            }
+          }
+        } catch (err) {
+          console.error(`[specialists/done] Error delivering failed inspect verdict for ${normalizedIssueId}:`, err);
+        }
+      });
+    }
 
     // Set specialist state to idle and clear registry write-scope.
     // CRITICAL: No `await` between the mergeStatus write above and the guard check below.
@@ -324,7 +349,7 @@ const postSpecialistsDoneRoute = HttpRouter.add(
               `feature-${normalizedIssueId.toLowerCase()}`,
             );
             if (existsSync(workspacePath)) {
-              await Effect.runPromise(onInspectComplete(project.projectKey, normalizedIssueId, itemId!, 'passed', workspacePath));
+              await Effect.runPromise(onInspectComplete(project.projectKey, normalizedIssueId, itemId!, 'passed', workspacePath, notes));
 
             }
           }
