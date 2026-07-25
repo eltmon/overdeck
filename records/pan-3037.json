@@ -2,7 +2,7 @@
   "issueId": "PAN-3037",
   "schemaVersion": 2,
   "created": "2026-07-25T20:44:21.373Z",
-  "updated": "2026-07-25T20:44:21.373Z",
+  "updated": "2026-07-25T20:44:22.326Z",
   "pipeline": {
     "issueId": "PAN-3037",
     "reviewStatus": "pending",
@@ -25,5 +25,7 @@
       "note": "Planning session started for PAN-3037: pan sync-main fails on polyrepo workspaces — probes workspace root for .git instead of iterating member repos",
       "timestamp": "2026-07-25T20:44:21.373Z"
     }
-  ]
+  ],
+  "harness": "claude-code",
+  "model": "claude-fable-5"
 }
