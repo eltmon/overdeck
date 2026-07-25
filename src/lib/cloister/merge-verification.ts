@@ -25,17 +25,22 @@ async function requireCompletePolyrepoMerge(
   issueId: string,
   mergedResult: { merged: true; reason: string },
 ): Promise<{ merged: boolean; reason: string }> {
-  const mergeSet = getMergeSetSync(issueId);
-  if (!mergeSet || mergeSet.repos.length <= 1) return mergedResult;
+  try {
+    const mergeSet = getMergeSetSync(issueId);
+    if (!mergeSet || mergeSet.repos.length <= 1) return mergedResult;
 
-  const completeness = await assessMergeCompleteness(issueId);
-  if (!completeness.complete) {
-    return {
-      merged: false,
-      reason: `sibling repo(s) unmerged: ${completeness.summary}`,
-    };
+    const completeness = await assessMergeCompleteness(issueId);
+    if (!completeness.complete) {
+      return {
+        merged: false,
+        reason: `sibling repo(s) unmerged: ${completeness.summary}`,
+      };
+    }
+    return mergedResult;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return { merged: false, reason: `sibling repo merge state is unverifiable: ${message}` };
   }
-  return mergedResult;
 }
 
 export async function verifyMergedBeforeLifecycle(

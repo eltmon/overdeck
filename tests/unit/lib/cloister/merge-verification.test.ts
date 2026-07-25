@@ -126,6 +126,17 @@ describe('verifyMergedBeforeLifecycle', () => {
     expect(result).toEqual({ merged: true, reason: 'GitHub PR #2467 is merged' });
     expect(assessMergeCompletenessMock).not.toHaveBeenCalled();
   });
+
+  it('fails closed when sibling merge state cannot be read', async () => {
+    getMergeSetMock.mockImplementation(() => { throw new Error('database unavailable'); });
+
+    const result = await verifyMergedBeforeLifecycle('PAN-2467', '/projects/overdeck');
+
+    expect(result).toEqual({
+      merged: false,
+      reason: 'sibling repo merge state is unverifiable: database unavailable',
+    });
+  });
 });
 
 describe('shouldSkipDispatchAsMerged', () => {
