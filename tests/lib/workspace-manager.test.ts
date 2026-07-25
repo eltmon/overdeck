@@ -257,7 +257,7 @@ describe('createWorkspace', () => {
     expect(result.success).toBe(true);
     expect(result.steps).toContain('Staged pre-worktree .pan metadata');
     expect(mockExecAsync).toHaveBeenCalledWith(
-      expect.stringContaining(`git worktree add "${workspacePath}" -b "feature/pan-2050"`),
+      expect.stringContaining(`git worktree add -b "feature/pan-2050" "${workspacePath}"`),
       expect.objectContaining({ cwd: tempDir }),
     );
     expect(readFileSync(recordPath, 'utf8')).toBe('{"issueId":"PAN-2050"}\n');
