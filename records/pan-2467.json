@@ -22,7 +22,7 @@
   ],
   "feedback": [],
   "created": "2026-07-25T20:42:32.108Z",
-  "updated": "2026-07-25T21:10:51.417Z",
+  "updated": "2026-07-25T21:16:37.302Z",
   "pipeline": {
     "issueId": "PAN-2467",
     "reviewStatus": "pending",
@@ -81,8 +81,16 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 4,
-    "claims": {},
+    "sequence": 5,
+    "claims": {
+      "chokepoint-gate": {
+        "writerId": "agent-pan-2467",
+        "agentId": "agent-pan-2467",
+        "pid": 1548918,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-25T21:16:37.302Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-2467",
@@ -128,6 +136,7 @@
     "completeness-assessor.completeness-assessor.ac2": "completed",
     "completeness-assessor.completeness-assessor.ac3": "completed",
     "completeness-assessor.completeness-assessor.ac4": "completed",
-    "completeness-assessor.completeness-assessor.ac5": "completed"
+    "completeness-assessor.completeness-assessor.ac5": "completed",
+    "chokepoint-gate": "running"
   }
 }
