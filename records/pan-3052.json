@@ -65,17 +65,17 @@
     "recordedAt": "2026-07-25T12:51:35.667Z"
   },
   "created": "2026-07-25T11:59:01.400Z",
-  "updated": "2026-07-25T20:28:27.106Z",
+  "updated": "2026-07-25T20:28:39.295Z",
   "pipeline": {
     "issueId": "PAN-3052",
     "reviewStatus": "passed",
     "testStatus": "passed",
     "verificationStatus": "passed",
     "mergeStatus": "merged",
-    "releaseStatus": "pending",
+    "releaseStatus": "skipped",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-25T12:55:25.351Z",
-    "updatedAt": "2026-07-25T20:28:27.069Z",
+    "updatedAt": "2026-07-25T20:28:39.108Z",
     "reviewNotes": "Approved: behavior-preserving extraction is byte-identical, acyclic, under the file-size ceiling, and passes typecheck, lint, 648 cloister tests, build, and final-HEAD Node 22 boot.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3065",
     "reviewedAtCommit": "3f4c47f8227b09533ef4885220f6ed4215bda0df",
@@ -163,7 +163,7 @@
       },
       "costAtCloseOut": {
         "usd": 47.279996,
-        "pricingAsOf": "2026-07-25T20:28:27.087Z"
+        "pricingAsOf": "2026-07-25T20:28:39.258Z"
       }
     },
     "merges": [
