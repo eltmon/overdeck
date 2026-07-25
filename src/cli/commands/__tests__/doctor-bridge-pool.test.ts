@@ -33,9 +33,12 @@ vi.mock('fs', async () => {
   };
 });
 
-import { checkDevnetNetworkPool } from '../doctor.js';
+import { checkDockerBridgeNetworkPool } from '../doctor.js';
 
-describe('doctor checkDevnetNetworkPool (PAN-2510)', () => {
+/** 10.200.0.0/16 carved at size 24 → 2^(24-16) = 256 slots. */
+const WIDE_POOLS = JSON.stringify({ 'default-address-pools': [{ base: '10.200.0.0/16', size: 24 }] });
+
+describe('doctor checkDockerBridgeNetworkPool (PAN-2510, PAN-3053)', () => {
   beforeEach(() => {
     execSyncMock.mockReset();
     execMock.mockReset();
@@ -58,35 +61,86 @@ describe('doctor checkDevnetNetworkPool (PAN-2510)', () => {
       throw new Error(`unexpected execSync: ${cmd}`);
     });
 
-    const results = await checkDevnetNetworkPool();
+    const results = await checkDockerBridgeNetworkPool();
 
     expect(results).toEqual([]);
     expect(execMock).not.toHaveBeenCalled();
   });
 
-  it('warns when the devnet count is within 5 of the ~31 default pool limit', async () => {
-    const networks = Array.from({ length: 28 }, (_, i) => `overdeck-feature-pan-${1000 + i}_devnet`);
+  it('asks docker for every bridge network rather than filtering by name', async () => {
+    execMock.mockResolvedValue({ stdout: 'bridge\n', stderr: '' });
+    readFileMock.mockResolvedValue(WIDE_POOLS);
+
+    await checkDockerBridgeNetworkPool();
+
+    expect(execMock).toHaveBeenCalledWith(
+      expect.stringContaining('--filter driver=bridge'),
+      undefined,
+    );
+  });
+
+  it('warns on the host-wide bridge count, not the overdeck-named subset', async () => {
+    // PAN-3053 regression: only 12 of these carry the `overdeck-feature-*_devnet`
+    // name the old check filtered on, so it reported 12 against a threshold of
+    // 26 — healthy — while the host sat 5 slots from total exhaustion.
+    const networks = [
+      'bridge',
+      'overdeck',
+      'panopticon',
+      'myn-main_devnet',
+      ...Array.from({ length: 10 }, (_, i) => `myn-feature-min-${800 + i}_devnet`),
+      ...Array.from({ length: 12 }, (_, i) => `overdeck-feature-pan-${1000 + i}_devnet`),
+    ];
+    expect(networks).toHaveLength(26);
+
     execMock.mockResolvedValue({ stdout: networks.join('\n'), stderr: '' });
-    readFileMock.mockResolvedValue(JSON.stringify({ 'default-address-pools': [{ base: '10.200.0.0/16', size: 24 }] }));
+    readFileMock.mockRejectedValue(new Error('ENOENT')); // no daemon.json → default ~31 limit
 
-    const results = await checkDevnetNetworkPool();
+    const results = await checkDockerBridgeNetworkPool();
 
-    const warning = results.find((r) => r.name === 'Docker devnet pool');
-    expect(warning).toBeDefined();
+    const warning = results.find((r) => r.name === 'Docker bridge network pool');
     expect(warning?.status).toBe('warn');
-    expect(warning?.message).toContain('28');
-    expect(warning?.message).toContain('~31');
-    expect(warning?.fix).toContain('default-address-pools');
+    expect(warning?.message).toContain('26 of ~31');
+    expect(warning?.message).toContain('5 left');
+    // The per-prefix breakdown survives as diagnostic detail.
+    expect(warning?.message).toContain('overdeck-feature-* 12');
+    expect(warning?.message).toContain('myn-feature-* 10');
+    expect(warning?.message).toContain('other 4');
+  });
+
+  it('reports an error once the pool is fully consumed', async () => {
+    const networks = Array.from({ length: 31 }, (_, i) => `myn-feature-min-${800 + i}_devnet`);
+    execMock.mockResolvedValue({ stdout: networks.join('\n'), stderr: '' });
+    readFileMock.mockRejectedValue(new Error('ENOENT'));
+
+    const results = await checkDockerBridgeNetworkPool();
+
+    const check = results.find((r) => r.name === 'Docker bridge network pool');
+    expect(check?.status).toBe('error');
+    expect(check?.message).toContain('31 bridge networks');
+    expect(check?.message).toContain('cannot be created');
+    expect(check?.fix).toContain('default-address-pools');
+  });
+
+  it('derives the limit from default-address-pools instead of false-alarming at 26', async () => {
+    const networks = Array.from({ length: 40 }, (_, i) => `overdeck-feature-pan-${1000 + i}_devnet`);
+    execMock.mockResolvedValue({ stdout: networks.join('\n'), stderr: '' });
+    readFileMock.mockResolvedValue(WIDE_POOLS);
+
+    const results = await checkDockerBridgeNetworkPool();
+
+    expect(results).toHaveLength(1);
+    expect(results[0].status).toBe('ok');
+    expect(results[0].message).toContain('40 of ~256');
   });
 
   it('warns when daemon.json lacks default-address-pools', async () => {
     execMock.mockResolvedValue({ stdout: 'overdeck-feature-pan-1234_devnet\n', stderr: '' });
     readFileMock.mockResolvedValue(JSON.stringify({}));
 
-    const results = await checkDevnetNetworkPool();
+    const results = await checkDockerBridgeNetworkPool();
 
     const warning = results.find((r) => r.name === 'Docker default-address-pools');
-    expect(warning).toBeDefined();
     expect(warning?.status).toBe('warn');
     expect(warning?.message).toContain('/etc/docker/daemon.json');
     expect(warning?.fix).toContain('default-address-pools');
@@ -94,44 +148,31 @@ describe('doctor checkDevnetNetworkPool (PAN-2510)', () => {
 
   it('returns ok when few networks exist and default-address-pools is configured', async () => {
     execMock.mockResolvedValue({ stdout: 'overdeck-feature-pan-1234_devnet\n', stderr: '' });
-    readFileMock.mockResolvedValue(JSON.stringify({ 'default-address-pools': [{ base: '10.200.0.0/16', size: 24 }] }));
+    readFileMock.mockResolvedValue(WIDE_POOLS);
 
-    const results = await checkDevnetNetworkPool();
+    const results = await checkDockerBridgeNetworkPool();
 
     expect(results).toHaveLength(1);
-    expect(results[0].name).toBe('Docker devnet pool');
+    expect(results[0].name).toBe('Docker bridge network pool');
     expect(results[0].status).toBe('ok');
-    expect(results[0].message).toContain('1 devnet networks');
+    expect(results[0].message).toContain('1 of ~256');
   });
 
   it('treats a missing daemon.json as absent default-address-pools', async () => {
     execMock.mockResolvedValue({ stdout: '', stderr: '' });
     readFileMock.mockRejectedValue(new Error('ENOENT'));
 
-    const results = await checkDevnetNetworkPool();
+    const results = await checkDockerBridgeNetworkPool();
 
     const warning = results.find((r) => r.name === 'Docker default-address-pools');
     expect(warning?.status).toBe('warn');
-  });
-
-  it('ignores non-overdeck networks when counting devnets', async () => {
-    execMock.mockResolvedValue({
-      stdout: ['bridge', 'host', 'overdeck-feature-pan-1234_devnet', 'some-custom_devnet'].join('\n'),
-      stderr: '',
-    });
-    readFileMock.mockResolvedValue(JSON.stringify({ 'default-address-pools': [{ base: '10.200.0.0/16', size: 24 }] }));
-
-    const results = await checkDevnetNetworkPool();
-
-    const ok = results.find((r) => r.status === 'ok');
-    expect(ok?.message).toContain('1 devnet networks');
   });
 
   it('does not use execSync for docker network or daemon.json reads', async () => {
     execMock.mockResolvedValue({ stdout: '', stderr: '' });
     readFileMock.mockResolvedValue(JSON.stringify({ 'default-address-pools': [] }));
 
-    await checkDevnetNetworkPool();
+    await checkDockerBridgeNetworkPool();
 
     const syncDockerCalls = execSyncMock.mock.calls.filter((call) =>
       String(call[0]).includes('docker network') || String(call[0]).includes('daemon.json'),
