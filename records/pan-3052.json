@@ -2,7 +2,7 @@
   "issueId": "PAN-3052",
   "schemaVersion": 2,
   "created": "2026-07-25T11:59:01.400Z",
-  "updated": "2026-07-25T11:59:01.400Z",
+  "updated": "2026-07-25T11:59:02.288Z",
   "pipeline": {
     "issueId": "PAN-3052",
     "reviewStatus": "pending",
@@ -25,5 +25,7 @@
       "note": "Planning session started for PAN-3052: Extract applyBootReconciliationDecision out of the deacon-auto-resume god file (boot-dialog honesty fixes already landed in cb39b20958)",
       "timestamp": "2026-07-25T11:59:01.399Z"
     }
-  ]
+  ],
+  "harness": "claude-code",
+  "model": "claude-fable-5"
 }
