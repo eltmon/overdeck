@@ -70,10 +70,25 @@ describe('Definition-of-Done status rows', () => {
     expect(await checkVerificationRow(issueId, source)).toMatchObject({ status: 'miss', observed: 'verificationStatus: failed at abc123' });
   });
 
-  it('requires a commit for a passed live verification verdict', async () => {
+  it('passes a verified verdict whose best-effort commit anchor was never recorded, and names the gap', async () => {
+    // PAN-3067: lastVerifiedCommit is written best-effort by the verification runner,
+    // so its absence must neither block the row nor hide itself from the observed string.
     expect(await checkVerificationRow(issueId, deps(live({ lastVerifiedCommit: undefined })))).toMatchObject({
+      status: 'pass',
+      observed: 'verificationStatus: passed (no lastVerifiedCommit recorded)',
+    });
+    expect(
+      await checkVerificationRow(issueId, deps(live({ verificationStatus: 'skipped', lastVerifiedCommit: undefined }))),
+    ).toMatchObject({
+      status: 'pass',
+      observed: 'verificationStatus: skipped (skipped per issue policy; no lastVerifiedCommit recorded)',
+    });
+  });
+
+  it('never claims a missing anchor for a verdict that already fails on its own', async () => {
+    expect(await checkVerificationRow(issueId, deps(live({ verificationStatus: undefined, lastVerifiedCommit: undefined })))).toMatchObject({
       status: 'miss',
-      observed: 'verificationStatus: passed',
+      observed: 'verificationStatus: missing',
     });
   });
 
@@ -85,9 +100,12 @@ describe('Definition-of-Done status rows', () => {
     }
   });
 
-  it('requires a verified commit from the durable pipeline journal', async () => {
+  it('passes a durable journal verdict without a commit anchor and still reports both facts', async () => {
     const row = await checkVerificationRow(issueId, deps(null, journal({ lastVerifiedCommit: undefined })));
-    expect(row).toMatchObject({ status: 'miss', observed: expect.stringContaining('from pipeline journal') });
+    expect(row).toMatchObject({
+      status: 'pass',
+      observed: 'verificationStatus: passed (from pipeline journal; no lastVerifiedCommit recorded)',
+    });
   });
 
   it('returns misses instead of throwing when both sources are empty or a door fails', async () => {
