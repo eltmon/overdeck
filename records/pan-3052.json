@@ -65,7 +65,7 @@
     "recordedAt": "2026-07-25T12:51:35.667Z"
   },
   "created": "2026-07-25T11:59:01.400Z",
-  "updated": "2026-07-25T13:15:05.239Z",
+  "updated": "2026-07-25T13:31:27.508Z",
   "pipeline": {
     "issueId": "PAN-3052",
     "reviewStatus": "passed",
@@ -75,11 +75,11 @@
     "releaseStatus": "pending",
     "readyForMerge": true,
     "panDoneRecoveredAt": "2026-07-25T12:55:25.351Z",
-    "updatedAt": "2026-07-25T13:15:05.159Z",
+    "updatedAt": "2026-07-25T13:31:27.476Z",
     "reviewNotes": "Approved: behavior-preserving extraction is byte-identical, acyclic, under the file-size ceiling, and passes typecheck, lint, 648 cloister tests, build, and final-HEAD Node 22 boot.",
-    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3065",
     "reviewedAtCommit": "3f4c47f8227b09533ef4885220f6ed4215bda0df",
+    "lastVerifiedCommit": "3f4c47f8227b09533ef4885220f6ed4215bda0df",
     "reviewRequestedAt": "2026-07-25T12:55:25.351Z",
     "reviewSpawnedAt": "2026-07-25T12:59:31.066Z",
     "scopeDrift": {
@@ -118,9 +118,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 1348563,
-            "output": 98479,
-            "cacheRead": 17483264,
+            "input": 1352915,
+            "output": 98801,
+            "cacheRead": 17791488,
             "cacheWrite": 0
           }
         },
@@ -149,9 +149,9 @@
           "cacheWrite": 267892
         },
         "openai/gpt-5.6-sol": {
-          "input": 1972348,
-          "output": 171432,
-          "cacheRead": 45141504,
+          "input": 1976700,
+          "output": 171754,
+          "cacheRead": 45449728,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -162,8 +162,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 47.094464,
-        "pricingAsOf": "2026-07-25T13:15:05.227Z"
+        "usd": 47.279996,
+        "pricingAsOf": "2026-07-25T13:31:27.501Z"
       }
     },
     "merges": [
