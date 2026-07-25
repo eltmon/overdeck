@@ -15,18 +15,37 @@
     }
   ],
   "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "docs/ASKUSERQUESTION-DASHBOARD.md",
+      "src/dashboard/server/__tests__/read-model-pending-input.test.ts",
+      "src/dashboard/server/services/__tests__/agent-enrichment-service.test.ts",
+      "src/dashboard/server/services/agent-enrichment-service.ts"
+    ],
+    "actualChangedFiles": [
+      "docs/ASKUSERQUESTION-DASHBOARD.md",
+      "src/dashboard/server/__tests__/read-model-pending-input.test.ts",
+      "src/dashboard/server/services/__tests__/agent-enrichment-service.test.ts",
+      "src/dashboard/server/services/agent-enrichment-service.ts"
+    ],
+    "recordedAt": "2026-07-25T12:48:24.279Z"
+  },
   "created": "2026-07-25T11:59:26.466Z",
-  "updated": "2026-07-25T12:48:26.976Z",
+  "updated": "2026-07-25T12:48:29.156Z",
   "pipeline": {
     "issueId": "PAN-3055",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-25T12:48:26.974Z",
+    "updatedAt": "2026-07-25T12:48:28.737Z",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3064",
     "reviewRequestedAt": "2026-07-25T12:48:26.974Z",
+    "reviewSpawnedAt": "2026-07-25T12:48:28.736Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
       "declaredScopeUntouched": [],
@@ -43,8 +62,7 @@
         "src/dashboard/server/services/agent-enrichment-service.ts"
       ],
       "recordedAt": "2026-07-25T12:48:24.279Z"
-    },
-    "prUrl": "https://github.com/eltmon/overdeck/pull/3064"
+    }
   },
   "closeOut": {
     "usage": {
@@ -56,6 +74,14 @@
             "cacheRead": 4726974,
             "cacheWrite": 300722
           }
+        },
+        "work": {
+          "openai/gpt-5.6-sol": {
+            "input": 488083,
+            "output": 37231,
+            "cacheRead": 26425856,
+            "cacheWrite": 0
+          }
         }
       },
       "totals": {
@@ -64,14 +90,22 @@
           "output": 45407,
           "cacheRead": 4726974,
           "cacheWrite": 300722
+        },
+        "openai/gpt-5.6-sol": {
+          "input": 488083,
+          "output": 37231,
+          "cacheRead": 26425856,
+          "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 10.756914,
-        "pricingAsOf": "2026-07-25T12:11:24.418Z"
+        "usd": 27.527187,
+        "pricingAsOf": "2026-07-25T12:48:29.035Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/3064"
+    ],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
@@ -164,22 +198,5 @@
     "docs-liveness-pendingness": "completed",
     "docs-liveness-pendingness.docs-liveness-pendingness.ac1": "completed",
     "docs-liveness-pendingness.docs-liveness-pendingness.ac2": "completed"
-  },
-  "scopeDrift": {
-    "outsideDeclaredScope": [],
-    "declaredScopeUntouched": [],
-    "declaredScope": [
-      "docs/ASKUSERQUESTION-DASHBOARD.md",
-      "src/dashboard/server/__tests__/read-model-pending-input.test.ts",
-      "src/dashboard/server/services/__tests__/agent-enrichment-service.test.ts",
-      "src/dashboard/server/services/agent-enrichment-service.ts"
-    ],
-    "actualChangedFiles": [
-      "docs/ASKUSERQUESTION-DASHBOARD.md",
-      "src/dashboard/server/__tests__/read-model-pending-input.test.ts",
-      "src/dashboard/server/services/__tests__/agent-enrichment-service.test.ts",
-      "src/dashboard/server/services/agent-enrichment-service.ts"
-    ],
-    "recordedAt": "2026-07-25T12:48:24.279Z"
   }
 }
