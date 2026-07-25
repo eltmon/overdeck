@@ -346,6 +346,27 @@ async function getWorkspaceGitInfoPromise(workspacePath: string): Promise<Worksp
   }
 }
 
+declare const headAnchorBrand: unique symbol;
+
+/** A producer-issued snapshot of every code HEAD in a workspace. */
+export type HeadAnchor = string & { readonly [headAnchorBrand]: true };
+
+/** Rehydrate a persisted anchor after it crosses an unbranded storage boundary. */
+export function rehydrateHeadAnchor(anchor: string): HeadAnchor {
+  return anchor as HeadAnchor;
+}
+
+export function parseCompositeSnapshot(snapshot: string | undefined): Map<string, string> {
+  const heads = new Map<string, string>();
+  if (!snapshot) return heads;
+  for (const token of snapshot.split(/\s+/)) {
+    const separator = token.lastIndexOf('@');
+    if (separator <= 0 || separator === token.length - 1) continue;
+    heads.set(token.slice(0, separator), token.slice(separator + 1));
+  }
+  return heads;
+}
+
 /**
  * Snapshot the code HEAD(s) of a workspace for drift comparison (PAN-2948).
  *
@@ -358,7 +379,7 @@ async function getWorkspaceGitInfoPromise(workspacePath: string): Promise<Worksp
  * head is unchanged; consumers that try to use the anchor as a git ref fail
  * the ref lookup and fall back to their conservative full-rerun path.
  */
-export async function snapshotWorkspaceHeadsPromise(issueId: string, workspacePath: string): Promise<string | undefined> {
+export async function snapshotWorkspaceHeadsPromise(issueId: string, workspacePath: string): Promise<HeadAnchor | undefined> {
   // Dynamic import: project-repos → projects sits above this low-level module
   // in the layering; a static edge here would risk a require cycle.
   const { resolveWorkspaceRepoRootsSync } = await import('./project-repos.js');
@@ -372,7 +393,7 @@ export async function snapshotWorkspaceHeadsPromise(issueId: string, workspacePa
       if (sha) heads.push(isPolyrepo ? `${root.repoKey}@${sha}` : sha);
     } catch { /* unreadable root — omit from the snapshot */ }
   }
-  return heads.length > 0 ? heads.join(' ') : undefined;
+  return heads.length > 0 ? heads.join(' ') as HeadAnchor : undefined;
 }
 
 async function hasStaleLocksPromise(repoPath: string): Promise<boolean> {
