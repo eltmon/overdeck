@@ -355,10 +355,10 @@
     "recordedAt": "2026-07-25T22:13:33.131Z"
   },
   "created": "2026-07-25T20:44:21.373Z",
-  "updated": "2026-07-25T22:49:47.906Z",
+  "updated": "2026-07-25T22:55:19.401Z",
   "pipeline": {
     "issueId": "PAN-3037",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -366,8 +366,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-25T22:20:18.803Z",
-    "updatedAt": "2026-07-25T22:49:46.980Z",
-    "reviewNotes": "Configured target-branch conflicts are auto-resolved from origin/main, risking wrong or deleted pipeline artifacts",
+    "updatedAt": "2026-07-25T22:55:19.350Z",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
     "verificationNotes": "Pre-review verification already covered the reviewed commit",
     "inspectNotes": "All 5 ACs met: per-repo iteration with repoKey-prefixed paths, conflict abort leaves repo quiescent and skips remaining repos, aggregate alreadyUpToDate requires all repos current, monorepo keeps unprefixed single-element shape, abort returns cancellation + skipped entries. Extraction into sync-main-workspace.ts is logic-identical; baseline 1404 matches actual wc -l.",
@@ -441,17 +440,17 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 16007355,
-            "output": 245330,
-            "cacheRead": 36618240,
+            "input": 16011309,
+            "output": 245666,
+            "cacheRead": 36961280,
             "cacheWrite": 0
           }
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 1445935,
-            "output": 141902,
-            "cacheRead": 80028160,
+            "input": 2219041,
+            "output": 153399,
+            "cacheRead": 93245952,
             "cacheWrite": 0
           }
         }
@@ -464,15 +463,15 @@
           "cacheWrite": 311392
         },
         "openai/gpt-5.6-sol": {
-          "input": 17453290,
-          "output": 387232,
-          "cacheRead": 116646400,
+          "input": 18230350,
+          "output": 399065,
+          "cacheRead": 130207232,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 170.356968,
-        "pricingAsOf": "2026-07-25T22:49:47.007Z"
+        "usd": 181.377674,
+        "pricingAsOf": "2026-07-25T22:55:19.395Z"
       }
     },
     "merges": [
