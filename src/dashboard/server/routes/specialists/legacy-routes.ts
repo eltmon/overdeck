@@ -9,7 +9,7 @@ import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { getAgentState, getAgentRuntimeState, messageAgent, saveAgentRuntimeState, transitionIssueToInProgress } from '../../../../lib/agents.js';
 import { getUnblockedItemsSync } from '../../../../lib/cloister/task-readiness.js';
 import { resolveProjectFromIssueSync } from '../../../../lib/projects.js';
-import { getReviewStatusSync, loadReviewStatuses, setReviewStatusSync as setReviewStatusBase, type ReviewStatus } from '../../../../lib/review-status.js';
+import { getReviewStatusSync, loadReviewStatuses, setReviewStatusSync as setReviewStatusBase, type ReviewStatus, type ReviewStatusUpdate } from '../../../../lib/review-status.js';
 import { readWorkspacePlanSync } from '../../../../lib/xbrief/io.js';
 import { jsonResponse } from '../../http-helpers.js';
 import { EventStoreService } from '../../services/domain-services.js';
@@ -190,7 +190,7 @@ const postSpecialistsDoneRoute = HttpRouter.add(
     }
 
     // Build the update based on specialist type
-    const update: Partial<ReviewStatus> = {};
+    const update: ReviewStatusUpdate = {};
 
     switch (specialist) {
       case 'review':

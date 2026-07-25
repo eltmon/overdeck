@@ -39,6 +39,7 @@ import { isXBriefFilename } from '../xbrief/lifecycle.js';
 import { checkIncompletePlanItemsPromise } from '../work/done-preflight.js';
 import { capturePipelineStageForIssue } from '../telemetry/pipeline.js';
 import type { TemplatePlaceholders } from '../workspace-config.js';
+import type { HeadAnchor } from '../git-utils.js';
 
 const execAsync = promisify(exec);
 
@@ -876,7 +877,7 @@ async function runVerificationForIssuePromise(
     // after review to skip redundant test-agent when no code changed.
     // PAN-2948: polyrepo-aware — the wrapper repo's HEAD never changes, so
     // snapshotting it would make this comparison report "no drift" forever.
-    let lastVerifiedCommit: string | undefined;
+    let lastVerifiedCommit: HeadAnchor | undefined;
     try {
       const { snapshotWorkspaceHeadsPromise } = await import('../git-utils.js');
       lastVerifiedCommit = await snapshotWorkspaceHeadsPromise(issueId, workspacePath);

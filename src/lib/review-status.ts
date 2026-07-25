@@ -25,9 +25,15 @@ import {
 } from './review-status-reconcile.js';
 import { needsReviewDispatch } from './review-dispatch-decision.js';
 import { capturePipelineStageForIssue } from './telemetry/pipeline.js';
+import type { HeadAnchor } from './git-utils.js';
 
 export { reviewGatesPassedSync, verificationSatisfied } from './review-status-reconcile.js';
 export type { BlockerReason, ReviewStatus, StatusHistoryEntry } from './review-status-reconcile.js';
+
+export type ReviewStatusUpdate = Omit<Partial<ReviewStatus>, 'reviewedAtCommit' | 'lastVerifiedCommit'> & {
+  reviewedAtCommit?: HeadAnchor;
+  lastVerifiedCommit?: HeadAnchor;
+};
 
 export interface MergeGateEligibility {
   eligible: boolean;
@@ -146,7 +152,7 @@ export function saveReviewStatuses(statuses: Record<string, ReviewStatus>, fileP
 
 export function setReviewStatusSync(
   issueId: string,
-  update: Partial<ReviewStatus>,
+  update: ReviewStatusUpdate,
   existing?: ReviewStatus,
 ): ReviewStatus {
   // Guard: bare numeric IDs (no alphabetic prefix) must never reach the DB.
@@ -963,7 +969,7 @@ export class ReviewStatusError extends Data.TaggedError('ReviewStatusError')<{
 
 export const setReviewStatus = (
   issueId: string,
-  update: Partial<ReviewStatus>,
+  update: ReviewStatusUpdate,
   existing?: ReviewStatus,
 ): Effect.Effect<ReviewStatus, ReviewStatusError> =>
   Effect.tryPromise({

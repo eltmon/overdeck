@@ -123,6 +123,7 @@ describe('evaluateWorkspaceAnchorDrift', () => {
     await expect(evaluateWorkspaceAnchorDrift(
       'PAN-3076',
       workspace,
+      // The fixture simulates a legacy anchor read back from unbranded storage.
       rehydrateHeadAnchor('a'.repeat(40)),
     )).resolves.toMatchObject({ kind: 'drifted' });
   });
@@ -160,6 +161,7 @@ describe('evaluateWorkspaceAnchorDrift', () => {
     await expect(evaluateWorkspaceAnchorDrift(
       'PAN-3076',
       workspace,
+      // The fixture simulates a legacy anchor read back from unbranded storage.
       rehydrateHeadAnchor('a'.repeat(40)),
     )).resolves.toEqual({ kind: 'unreadable' });
   });
