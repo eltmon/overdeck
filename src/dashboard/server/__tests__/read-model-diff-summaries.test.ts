@@ -50,15 +50,19 @@ async function withIsolatedReadModel<T>(
 }
 
 describe('ReadModel diff summaries', () => {
-  it('converts stored activity.entry rows into snapshot recentActivity entries', () => {
+  it('converts stored activity rows and keeps only the newest state per activity id', () => {
     const entries = activityEntriesFromStoredEvents([
       {
-        timestamp: '2026-06-11T23:24:05.000Z',
-        payload: { id: 'restart-1', source: 'dashboard', message: 'Dashboard restarted via pan reload' },
+        timestamp: '2026-06-11T23:19:00.000Z',
+        payload: { id: 'restart-1', source: 'dashboard', message: 'Older state transition' },
       },
       {
         timestamp: '2026-06-11T23:20:00.000Z',
         payload: { id: 'older-1', timestamp: '2026-06-11T23:20:01.000Z', message: 'Payload timestamp wins' },
+      },
+      {
+        timestamp: '2026-06-11T23:24:05.000Z',
+        payload: { id: 'restart-1', source: 'dashboard', message: 'Dashboard restarted via pan reload' },
       },
     ]) as Array<Record<string, unknown>>
 

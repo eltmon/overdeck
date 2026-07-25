@@ -41,7 +41,7 @@ Manifest categories are assigned in `scripts/slash-commands-curation.json`, with
 
 ## Routing order
 
-Conversation and agent message endpoints validate the target and message first, then offer the exact text to the `/pan` router. A recognized portable command returns before native compaction, attachment rewriting, prompt-memory injection, FIFO/control-channel delivery, or tmux/PTY delivery can run. Ordinary text and unprefixed `pan ...` continue through those existing harness-specific stages unchanged.
+Conversation and agent message endpoints validate the target and message first, then offer the exact text to the `/pan` router. A recognized portable command returns before native compaction, attachment rewriting, prompt-memory injection, FIFO/control-channel delivery, or tmux/PTY delivery can run. When the composer has pending uploads, it submits only the typed `/pan` command and leaves those attachments pending for a later prompt. Ordinary text and unprefixed `pan ...` continue through the existing harness-specific stages unchanged.
 
 The parser rejects shell control syntax and returns typed errors for unknown commands, missing arguments, and unknown flags. The policy overlay then selects captured, detached, UI, or terminal-only execution and applies single-use confirmation requirements before any executor starts.
 

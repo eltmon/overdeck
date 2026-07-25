@@ -277,6 +277,69 @@ describe('ComposerFooter attachments', () => {
     expect(screen.queryByText('paste.png')).not.toBeInTheDocument();
   });
 
+  it('keeps attachments pending and submits only typed text for portable commands', async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes('/upload-image')) {
+        return new Response(JSON.stringify({ path: '/tmp/overdeck-paste-command.png' }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      if (url.includes('/message')) {
+        return new Response(JSON.stringify({
+          kind: 'captured',
+          status: 'completed',
+          command: '/pan status',
+          output: 'status output',
+          truncated: false,
+        }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      if (url.includes('/api/settings/claude-auth')) {
+        return new Response(JSON.stringify({ loggedIn: true, hasAnthropicApiKey: false }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+
+    const onSend = vi.fn();
+    render(<ComposerFooter conversation={conversation} onSend={onSend} />);
+    const file = new File(['png-bytes'], 'command.png', { type: 'image/png' });
+    Object.defineProperty(file, 'arrayBuffer', {
+      value: vi.fn().mockResolvedValue(Uint8Array.from([1, 2, 3, 4]).buffer),
+    });
+
+    fireEvent.paste(screen.getByTestId('composer-editor'), {
+      clipboardData: {
+        items: [{
+          kind: 'file',
+          type: 'image/png',
+          getAsFile: () => file,
+        }],
+      },
+    });
+    await screen.findByText('Uploaded');
+
+    fireEvent.change(screen.getByTestId('composer-editor'), { target: { value: '/pan status' } });
+    fireEvent.click(screen.getByTitle('Send message (Enter)'));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
+      '/api/conversations/test-conv/message',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ message: '/pan status' }),
+      }),
+    ));
+    expect(onSend).not.toHaveBeenCalled();
+    expect(screen.getByText('command.png')).toBeInTheDocument();
+  });
+
   it('opens voice input and starts recording with Ctrl+Shift+M', async () => {
     render(<ComposerFooter conversation={conversation} />);
 

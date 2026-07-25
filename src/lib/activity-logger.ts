@@ -18,6 +18,7 @@ import type { DomainEvent } from '@overdeck/contracts';
 import type { Role } from './agents.js';
 
 export type ActivityLevel = 'info' | 'warn' | 'error' | 'success';
+export type ActivityStatus = 'accepted' | 'running' | 'completed' | 'failed';
 export type ActivitySource =
   | Role
   | 'cloister'
@@ -35,10 +36,14 @@ export type ActivitySource =
   | 'start-agent';
 
 export interface EmitActivityOptions {
+  id?: string;
   source: ActivitySource;
   level: ActivityLevel;
+  status?: ActivityStatus;
+  command?: string;
   message: string;
   details?: string;
+  output?: string;
   issueId?: string;
   /** Dashboard route the feed navigates to on click (e.g. /conv/<name>, /flywheel). */
   link?: string;
@@ -83,10 +88,14 @@ function getActivityEventStore(): ActivityEventStore | null {
   }
 }
 
-function appendActivityEventAsync(event: Omit<DomainEvent, 'sequence'>): void {
+async function persistActivityEvent(event: Omit<DomainEvent, 'sequence'>): Promise<void> {
   const store = getActivityEventStore();
-  if (!store) return;
-  void store.appendAsync(event).catch(() => undefined);
+  if (!store) throw new Error('Activity event store is not initialized.');
+  await store.appendAsync(event);
+}
+
+function appendActivityEventAsync(event: Omit<DomainEvent, 'sequence'>): void {
+  void persistActivityEvent(event).catch(() => undefined);
 }
 
 function appendActivityEvent(event: Omit<DomainEvent, 'sequence'>): void {
@@ -100,27 +109,36 @@ function appendActivityEvent(event: Omit<DomainEvent, 'sequence'>): void {
 }
 
 /**
- * Emit an activity.entry domain event to the SQLite event store.
- * Non-blocking — throws silently if event store is not yet initialized.
- *
- * The event is persisted to SQLite immediately and PubSub notifies all
- * WebSocket subscribers so the ActivityPanel updates in real-time.
+ * Emit an activity.entry domain event to the SQLite event store and wait until
+ * it is durable. Reusing an id records a newer state transition for the same
+ * logical activity.
  */
-export function emitActivityEntrySync(options: EmitActivityOptions): void {
-  appendActivityEventAsync({
+export async function emitActivityEntryDurable(options: EmitActivityOptions): Promise<void> {
+  await persistActivityEvent({
     type: 'activity.entry' as const,
     timestamp: new Date().toISOString(),
     payload: {
-      id: randomUUID(),
+      id: options.id ?? randomUUID(),
       source: options.source,
       level: options.level,
+      status: options.status,
+      command: options.command,
       message: options.message,
       details: options.details,
+      output: options.output,
       issueId: options.issueId,
       link: options.link,
       desktop: options.desktop,
     },
   });
+}
+
+/**
+ * Emit an activity.entry domain event without blocking the caller. Failures are
+ * non-fatal because this path is also used during early dashboard boot.
+ */
+export function emitActivityEntrySync(options: EmitActivityOptions): void {
+  void emitActivityEntryDurable(options).catch(() => undefined);
 }
 
 /**

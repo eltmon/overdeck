@@ -46,18 +46,36 @@ export async function handleAgentMessage(
 ) {
   try {
     if (isComposerCommandMessage(message)) {
-      const agentState = await Effect.runPromise(
-        getAgentState(id).pipe(Effect.catch(() => Effect.succeed(null))),
-      );
+      let agentState;
+      try {
+        agentState = await Effect.runPromise(getAgentState(id));
+      } catch {
+        return jsonResponse({
+          error: `Failed to resolve agent target: ${id}`,
+          code: 'agent-resolution-failed',
+        }, { status: 503 });
+      }
+      if (!agentState) {
+        return jsonResponse({
+          error: `Agent not found: ${id}`,
+          code: 'agent-not-found',
+        }, { status: 404 });
+      }
+      if (!agentState.harness) {
+        return jsonResponse({
+          error: `Agent harness could not be resolved: ${id}`,
+          code: 'agent-harness-unresolved',
+        }, { status: 503 });
+      }
       const result = await handleComposerCommandMessage({
         message,
         confirmation,
         target: {
           kind: 'agent',
           id,
-          harness: agentState?.harness ?? 'claude-code',
-          cwd: agentState?.workspace,
-          issueId: agentState?.issueId,
+          harness: agentState.harness,
+          cwd: agentState.workspace,
+          issueId: agentState.issueId,
         },
       });
       if (result !== null) {

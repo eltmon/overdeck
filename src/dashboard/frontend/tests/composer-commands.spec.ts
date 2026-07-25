@@ -58,6 +58,11 @@ async function installComposerFixtures(page: Page) {
       }),
     });
   });
+  await page.route('**/api/conversations/*/upload-image', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({ path: '/tmp/composer-command.png' }),
+  }));
   await page.route('**/api/conversations/*/messages', route => route.fulfill({
     status: 200,
     contentType: 'application/json',
@@ -110,11 +115,21 @@ test.describe('composer command surface', () => {
     await menu.getByText('/pan start', { exact: true }).click();
     await expect(composer).toContainText('/pan start');
 
+    await page.locator('input[type="file"]').setInputFiles({
+      name: 'command.png',
+      mimeType: 'image/png',
+      buffer: Buffer.from([1, 2, 3, 4]),
+    });
+    await expect(page.getByText('command.png')).toBeVisible();
+    await expect(page.getByText('Uploaded')).toBeVisible();
+
     await replaceComposerText(page, '/pan status');
     await page.getByTitle('Send message (Enter)').click();
     await expect(page.getByText('/pan status completed successfully.')).toBeVisible();
     await expect(page.getByText('Pipeline status: ready')).toBeVisible();
     await expect(page.locator('[title="Pending — waiting for agent to process"]')).toHaveCount(0);
+    await expect(page.getByText('command.png')).toBeVisible();
+    await page.screenshot({ path: testInfo.outputPath('composer-command-with-pending-attachment.png') });
 
     await replaceComposerText(page, '/handoff make tests fast');
     await page.getByTitle('Send message (Enter)').click();
