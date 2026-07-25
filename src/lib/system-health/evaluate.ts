@@ -184,6 +184,42 @@ function linuxPressureReasons(
   return results;
 }
 
+/**
+ * inotify exhaustion is orthogonal to memory admission: the watch budget can
+ * run out on an otherwise healthy host, so these reasons fire regardless of
+ * the admission state (unlike the PSI/swap reasons above).
+ */
+function inotifyReasons(
+  sample: HostMetricSample,
+  thresholds: SystemHealthThresholds,
+): HealthReason[] {
+  const usedPercent = value(sample.inotifyWatchesUsedPercent);
+  if (usedPercent == null) return [];
+  if (usedPercent >= thresholds.inotifyWatchesCriticalPercent) {
+    return [reason(
+      'host.linux.inotify_watches.critical',
+      'host',
+      'critical',
+      'The per-user inotify file-watcher budget is nearly exhausted; new file-watching processes (dev servers, watchers) will fail with ENOSPC.',
+      'inotifyWatchesUsedPercent',
+      usedPercent,
+      thresholds.inotifyWatchesCriticalPercent,
+    )];
+  }
+  if (usedPercent >= thresholds.inotifyWatchesWarningPercent) {
+    return [reason(
+      'host.linux.inotify_watches.warning',
+      'host',
+      'warning',
+      'The per-user inotify file-watcher budget is running low.',
+      'inotifyWatchesUsedPercent',
+      usedPercent,
+      thresholds.inotifyWatchesWarningPercent,
+    )];
+  }
+  return [];
+}
+
 function darwinPressureReasons(sample: HostMetricSample): HealthReason[] {
   const freePercent = value(sample.memoryPressureFreePercent);
   if (freePercent == null) return [];
@@ -216,7 +252,8 @@ function hasCurrentPressureSignal(sample: HostMetricSample): boolean {
   if (sample.platform === 'linux') {
     return value(sample.memoryPressureSomeAvg10) != null
       || value(sample.memoryPressureFullAvg10) != null
-      || value(sample.swapActivityBytesPerMinute) != null;
+      || value(sample.swapActivityBytesPerMinute) != null
+      || value(sample.inotifyWatchesUsedPercent) != null;
   }
   if (sample.platform === 'darwin') return value(sample.memoryPressureFreePercent) != null;
   return false;
@@ -245,7 +282,7 @@ export function evaluateHostPressure(
   }
 
   const pressureReasons = sample.platform === 'linux'
-    ? linuxPressureReasons(sample, admission)
+    ? [...linuxPressureReasons(sample, admission), ...inotifyReasons(sample, thresholds)]
     : darwinPressureReasons(sample);
   const state: HealthState = pressureReasons.some((entry) => entry.severity === 'critical')
     ? 'critical'

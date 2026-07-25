@@ -259,6 +259,9 @@ export function createDarwinHostHealthCollector(
         committedMemoryBytes: unavailable('macOS does not expose Linux Committed_AS.'),
         commitLimitBytes: unavailable('macOS does not expose Linux CommitLimit.'),
         virtualCommitmentPercent: unavailable('macOS virtual commitment is unavailable.'),
+        inotifyWatchesUsed: unavailable('inotify is Linux-only.'),
+        inotifyWatchesMax: unavailable('inotify is Linux-only.'),
+        inotifyWatchesUsedPercent: unavailable('inotify is Linux-only.'),
         counters: {
           cpu: cpuCounters,
           swap: vmStat?.swap ?? null,

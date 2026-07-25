@@ -9,6 +9,7 @@ import { StoppedAgentsBanner } from '../components/StoppedAgentsBanner';
 import { RunningAgentsPill } from '../components/RunningAgentsPill';
 import { OrphanTestAgentsSurface } from '../components/OrphanTestAgentsSurface';
 import { CodexAuthBanner } from '../components/CodexAuthBanner';
+import { InotifyPressureBanner } from '../components/InotifyPressureBanner';
 import { SetupChecklistBanner } from '../components/SetupChecklistBanner';
 import { SyncRequiredBanner } from '../components/SyncRequiredBanner';
 import { SystemHealthPill } from '../components/SystemHealthPill';
@@ -86,6 +87,10 @@ export function AppChrome({
 
         {/* Codex Auth Banner — shown when Codex OAuth tokens are expired/burned */}
         <CodexAuthBanner />
+
+        {/* inotify file-watcher budget nearly exhausted — new dev servers
+            would fail with ENOSPC (PAN-3063) */}
+        <InotifyPressureBanner />
       </div>
 
       {/* Dashboard Restart Banner — shown during a planned restart (post-merge deploy, pan restart) */}

@@ -72,6 +72,9 @@ function createUnsupportedCollector(platform: HostPlatform = 'unsupported'): Hos
         committedMemoryBytes: signal(),
         commitLimitBytes: signal(),
         virtualCommitmentPercent: signal(),
+        inotifyWatchesUsed: signal(),
+        inotifyWatchesMax: signal(),
+        inotifyWatchesUsedPercent: signal(),
         counters: { cpu: null, swap: null },
       };
     },

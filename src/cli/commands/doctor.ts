@@ -29,6 +29,7 @@ import {
   type PrerequisiteProbe,
   type PrerequisiteResolver,
 } from '../../lib/system-prerequisites.js';
+import { checkInotify } from './doctor-inotify.js';
 import { checkStateWorktrees } from './doctor-state-worktree.js';
 import { isXBriefFilename } from '../../lib/xbrief/lifecycle.js';
 // Minimum supported omp harness version (PAN-1989); its lineage differs from pi and was baselined at 16.1.16.
@@ -895,6 +896,9 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<void> 
 
   // Check Docker devnet network pool exhaustion (PAN-2510)
   for (const c of await checkDevnetNetworkPool()) checks.push(c);
+
+  // Check inotify watch budget and persistence (PAN-3063)
+  for (const c of await checkInotify()) checks.push(c);
 
   // Check for legacy command invocations in shell rc files (PAN-705)
   const legacyPatterns = [

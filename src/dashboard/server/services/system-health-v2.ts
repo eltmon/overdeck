@@ -107,6 +107,9 @@ export function hostMetrics(
     committedMemoryBytes: signalValue(sample.committedMemoryBytes),
     commitLimitBytes: signalValue(sample.commitLimitBytes),
     virtualCommitmentPercent: signalValue(sample.virtualCommitmentPercent),
+    inotifyWatchesUsed: signalValue(sample.inotifyWatchesUsed),
+    inotifyWatchesMax: signalValue(sample.inotifyWatchesMax),
+    inotifyWatchesUsedPercent: signalValue(sample.inotifyWatchesUsedPercent),
   };
 }
 

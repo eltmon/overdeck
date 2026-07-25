@@ -57,6 +57,8 @@ describe('normalizeSystemHealthThresholds', () => {
       cpuLoadCriticalPerCore: SYSTEM_HEALTH_DEFAULTS.cpuLoadCriticalPerCore,
       overcommitWarningPercent: SYSTEM_HEALTH_DEFAULTS.overcommitWarningPercent,
       overcommitCriticalPercent: SYSTEM_HEALTH_DEFAULTS.overcommitCriticalPercent,
+      inotifyWatchesWarningPercent: SYSTEM_HEALTH_DEFAULTS.inotifyWatchesWarningPercent,
+      inotifyWatchesCriticalPercent: SYSTEM_HEALTH_DEFAULTS.inotifyWatchesCriticalPercent,
     });
     expect(result.resources.memoryWarnGb).toBeGreaterThanOrEqual(result.resources.memoryBlockGb);
     expect(result.resources.agentWarnCount).toBeLessThanOrEqual(result.resources.agentBlockCount);

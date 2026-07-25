@@ -66,6 +66,10 @@ export const HostHealthMetrics = Schema.Struct({
   committedMemoryBytes: Schema.NullOr(Schema.Number),
   commitLimitBytes: Schema.NullOr(Schema.Number),
   virtualCommitmentPercent: Schema.NullOr(Schema.Number),
+  // Optional so pre-PAN-3063 payloads and fixtures still decode.
+  inotifyWatchesUsed: Schema.optional(Schema.NullOr(Schema.Number)),
+  inotifyWatchesMax: Schema.optional(Schema.NullOr(Schema.Number)),
+  inotifyWatchesUsedPercent: Schema.optional(Schema.NullOr(Schema.Number)),
 })
 export type HostHealthMetrics = typeof HostHealthMetrics.Type
 

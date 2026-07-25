@@ -2,6 +2,7 @@ import { execFile } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import { promisify } from 'node:util';
 
+import { sampleInotify, type InotifySample } from './inotify.js';
 import {
   available,
   unavailable,
@@ -26,7 +27,15 @@ export interface LinuxCollectorAdapters {
   readFile(path: string): Promise<string>;
   readPageSizeBytes(): Promise<number>;
   now(): number;
+  sampleInotify(): Promise<InotifySample | null>;
 }
+
+/**
+ * The inotify scan walks every readable /proc/<pid>/fd entry, which is far
+ * heavier than the single-file reads above — so it refreshes on its own
+ * slower cadence and the collector serves the cached value in between.
+ */
+export const INOTIFY_REFRESH_MS = 60_000;
 
 export interface ParsedMemInfo {
   memTotalBytes?: number;
@@ -158,6 +167,7 @@ const defaultAdapters: LinuxCollectorAdapters = {
     return value;
   },
   now: () => Date.now(),
+  sampleInotify: () => sampleInotify(),
 };
 
 async function readParsed<T>(
@@ -180,10 +190,19 @@ function percent(part: number, total: number): number {
 export function createLinuxHostHealthCollector(
   adapters: LinuxCollectorAdapters = defaultAdapters,
 ): HostHealthCollector {
+  let inotifyCache: { atMs: number; sample: InotifySample | null } | null = null;
+
   return {
     platform: 'linux',
     async sample(previous?: HostMetricSample): Promise<HostMetricSample> {
       const sampledAtMs = adapters.now();
+      if (!inotifyCache || sampledAtMs - inotifyCache.atMs >= INOTIFY_REFRESH_MS) {
+        inotifyCache = {
+          atMs: sampledAtMs,
+          sample: await adapters.sampleInotify().catch(() => null),
+        };
+      }
+      const inotify = inotifyCache.sample;
       const [memInfo, procStat, pressure, vmstat, loadAverage, pageSizeBytes] = await Promise.all([
         readParsed(adapters, '/proc/meminfo', parseMemInfo),
         readParsed(adapters, '/proc/stat', parseProcStat),
@@ -266,6 +285,15 @@ export function createLinuxHostHealthCollector(
         virtualCommitmentPercent: committedMemoryBytes == null || commitLimitBytes == null
           ? unavailable('Virtual commitment cannot be derived.')
           : available(percent(committedMemoryBytes, commitLimitBytes)),
+        inotifyWatchesUsed: inotify == null
+          ? unavailable('inotify usage could not be scanned from /proc.')
+          : available(inotify.watchesUsed),
+        inotifyWatchesMax: inotify?.watchesMax == null
+          ? unavailable('fs.inotify.max_user_watches is unavailable.')
+          : available(inotify.watchesMax),
+        inotifyWatchesUsedPercent: inotify == null || inotify.watchesMax == null
+          ? unavailable('inotify watch utilization cannot be derived.')
+          : available(percent(inotify.watchesUsed, inotify.watchesMax)),
         counters: {
           cpu: cpuCounters,
           swap: swapCounters,

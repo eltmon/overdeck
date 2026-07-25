@@ -76,6 +76,9 @@ function quietHostWithHistoricalDiagnostics(): HostMetricSample {
     committedMemoryBytes: available(20 * GIB),
     commitLimitBytes: available(16 * GIB),
     virtualCommitmentPercent: available(125),
+    inotifyWatchesUsed: available(100_000),
+    inotifyWatchesMax: available(1_048_576),
+    inotifyWatchesUsedPercent: available(9.5),
     counters: { cpu: null, swap: null },
   };
 }

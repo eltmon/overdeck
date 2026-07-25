@@ -15,6 +15,8 @@ const thresholds: SystemHealthThresholds = {
   cpuLoadCriticalPerCore: 1.5,
   overcommitWarningPercent: 150,
   overcommitCriticalPercent: 200,
+  inotifyWatchesWarningPercent: 80,
+  inotifyWatchesCriticalPercent: 90,
 };
 
 function sample(
@@ -40,6 +42,9 @@ function sample(
     committedMemoryBytes: available(20 * GIB),
     commitLimitBytes: available(16 * GIB),
     virtualCommitmentPercent: available(125),
+    inotifyWatchesUsed: available(100_000),
+    inotifyWatchesMax: available(1_048_576),
+    inotifyWatchesUsedPercent: available(9.5),
     counters: { cpu: null, swap: null },
     ...overrides,
   };
@@ -183,6 +188,7 @@ describe('evaluateHostPressure', () => {
       memoryPressureSomeAvg10: unavailable('missing PSI'),
       memoryPressureFullAvg10: unavailable('missing PSI'),
       swapActivityBytesPerMinute: unavailable('missing vmstat'),
+      inotifyWatchesUsedPercent: unavailable('missing /proc scan'),
     }), thresholds);
 
     expect(result.state).toBe('unavailable');
@@ -190,5 +196,39 @@ describe('evaluateHostPressure', () => {
     expect(findReason(result, 'host.current_pressure.unavailable')).toMatchObject({
       severity: 'info',
     });
+  });
+
+  it('warns when the inotify watch budget crosses the warning band on a healthy host', () => {
+    const result = evaluateHostPressure(sample({
+      inotifyWatchesUsedPercent: available(85),
+    }), thresholds);
+
+    expect(result.state).toBe('warning');
+    expect(result.admission.state).toBe('open');
+    expect(findReason(result, 'host.linux.inotify_watches.warning')).toMatchObject({
+      severity: 'warning',
+      observed: 85,
+      threshold: 80,
+    });
+  });
+
+  it('goes critical when the inotify watch budget crosses the critical band regardless of memory admission', () => {
+    const result = evaluateHostPressure(sample({
+      inotifyWatchesUsedPercent: available(91),
+    }), thresholds);
+
+    expect(result.state).toBe('critical');
+    expect(result.admission.state).toBe('open');
+    expect(findReason(result, 'host.linux.inotify_watches.critical')).toMatchObject({
+      severity: 'critical',
+      observed: 91,
+      threshold: 90,
+    });
+  });
+
+  it('reports no inotify reason below the warning band', () => {
+    const result = evaluateHostPressure(sample(), thresholds);
+    expect(findReason(result, 'host.linux.inotify_watches.warning')).toBeUndefined();
+    expect(findReason(result, 'host.linux.inotify_watches.critical')).toBeUndefined();
   });
 });

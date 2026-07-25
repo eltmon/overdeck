@@ -15,6 +15,8 @@ export const SYSTEM_HEALTH_DEFAULTS = Object.freeze({
   cpuLoadCriticalPerCore: 1.5,
   overcommitWarningPercent: 150,
   overcommitCriticalPercent: 200,
+  inotifyWatchesWarningPercent: 80,
+  inotifyWatchesCriticalPercent: 90,
 });
 
 export interface SystemHealthThresholds {
@@ -26,6 +28,8 @@ export interface SystemHealthThresholds {
   cpuLoadCriticalPerCore: number;
   overcommitWarningPercent: number;
   overcommitCriticalPercent: number;
+  inotifyWatchesWarningPercent: number;
+  inotifyWatchesCriticalPercent: number;
 }
 
 export interface SystemHealthResourceConfig {
@@ -53,6 +57,8 @@ interface SystemHealthConfigInput {
   cpuLoadCriticalPerCore: unknown;
   overcommitWarningPercent: unknown;
   overcommitCriticalPercent: unknown;
+  inotifyWatchesWarningPercent: unknown;
+  inotifyWatchesCriticalPercent: unknown;
 }
 
 interface ResolveSystemHealthConfigOptions {
@@ -151,6 +157,12 @@ export function normalizeSystemHealthThresholds(
     SYSTEM_HEALTH_DEFAULTS.overcommitWarningPercent,
     SYSTEM_HEALTH_DEFAULTS.overcommitCriticalPercent,
   );
+  const [inotifyWatchesWarningPercent, inotifyWatchesCriticalPercent] = increasingPair(
+    'inotifyWatchesWarningPercent',
+    'inotifyWatchesCriticalPercent',
+    SYSTEM_HEALTH_DEFAULTS.inotifyWatchesWarningPercent,
+    SYSTEM_HEALTH_DEFAULTS.inotifyWatchesCriticalPercent,
+  );
 
   const pollSeconds = scalar('pollSeconds', SYSTEM_HEALTH_DEFAULTS.pollSeconds, 1);
   const agentWarnCount = Math.max(1, Math.floor(agentWarnCountValue));
@@ -177,6 +189,8 @@ export function normalizeSystemHealthThresholds(
       cpuLoadCriticalPerCore,
       overcommitWarningPercent,
       overcommitCriticalPercent,
+      inotifyWatchesWarningPercent,
+      inotifyWatchesCriticalPercent,
     },
   };
 }
@@ -199,5 +213,7 @@ export function resolveSystemHealthConfig(
     cpuLoadCriticalPerCore: env['PAN_HEALTH_LOAD_CRITICAL_PER_CORE'] ?? SYSTEM_HEALTH_DEFAULTS.cpuLoadCriticalPerCore,
     overcommitWarningPercent: env['PAN_HEALTH_OVERCOMMIT_WARN_PERCENT'] ?? SYSTEM_HEALTH_DEFAULTS.overcommitWarningPercent,
     overcommitCriticalPercent: env['PAN_HEALTH_OVERCOMMIT_CRITICAL_PERCENT'] ?? SYSTEM_HEALTH_DEFAULTS.overcommitCriticalPercent,
+    inotifyWatchesWarningPercent: env['PAN_HEALTH_INOTIFY_WARN_PERCENT'] ?? SYSTEM_HEALTH_DEFAULTS.inotifyWatchesWarningPercent,
+    inotifyWatchesCriticalPercent: env['PAN_HEALTH_INOTIFY_CRITICAL_PERCENT'] ?? SYSTEM_HEALTH_DEFAULTS.inotifyWatchesCriticalPercent,
   }, options.warn);
 }

@@ -67,6 +67,9 @@ function adapters(
       now += 60_000;
       return value;
     },
+    async sampleInotify() {
+      return null;
+    },
   };
 }
 
@@ -139,6 +142,26 @@ describe('Linux host health collector', () => {
     expectAvailable(second.swapUsedBytes, 0);
     expectAvailable(second.swapUsedPercent, 0);
     expectAvailable(second.swapActivityBytesPerMinute, 0);
+  });
+
+  it('exposes inotify watch usage from the /proc scanner', async () => {
+    const collector = createLinuxHostHealthCollector({
+      ...adapters(),
+      async sampleInotify() {
+        return {
+          watchesUsed: 943_718,
+          watchesMax: 1_048_576,
+          instancesUsed: 80,
+          instancesMax: 8_192,
+          topConsumers: [],
+        };
+      },
+    });
+
+    const sample = await collector.sample();
+    expectAvailable(sample.inotifyWatchesUsed, 943_718);
+    expectAvailable(sample.inotifyWatchesMax, 1_048_576);
+    expectAvailable(sample.inotifyWatchesUsedPercent, 90);
   });
 
   it('selects Linux and unsupported collectors by platform', async () => {

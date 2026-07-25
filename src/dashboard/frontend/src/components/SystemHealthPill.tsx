@@ -93,6 +93,10 @@ function reasonLabel(data: SystemHealthSnapshot, reasons: readonly HealthReason[
         return reason.observed == null
           ? 'swap activity detected'
           : `${formatBytes(reason.observed)} swap activity/min`;
+      case 'host.linux.inotify_watches.warning':
+        return 'file-watcher budget low';
+      case 'host.linux.inotify_watches.critical':
+        return 'file-watcher budget exhausted';
       case 'agent.context.saturated':
         return 'agent context exhausted';
       case 'agent.tmux.missing':

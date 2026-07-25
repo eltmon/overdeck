@@ -39,6 +39,9 @@ export interface HostMetricSample {
   committedMemoryBytes: HostMetricSignal<number>;
   commitLimitBytes: HostMetricSignal<number>;
   virtualCommitmentPercent: HostMetricSignal<number>;
+  inotifyWatchesUsed: HostMetricSignal<number>;
+  inotifyWatchesMax: HostMetricSignal<number>;
+  inotifyWatchesUsedPercent: HostMetricSignal<number>;
   counters: HostCollectorCounters;
 }
 
