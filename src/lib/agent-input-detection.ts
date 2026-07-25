@@ -14,6 +14,7 @@ const MAX_PROMPT_CHARS = 2_000
 const PANE_DETECTION_CACHE_TTL_MS = 10_000
 const MAX_PANE_DETECTION_CACHE_ENTRIES = 256
 const MAX_CONCURRENT_PANE_DETECTIONS = 4
+const MAX_MENU_FOOTER_LINES = 4
 
 type PaneDetectionCacheEntry = {
   expiresAt: number
@@ -100,6 +101,37 @@ function isRecentPromptIndex(lines: string[], index: number): boolean {
 function isCurrentPromptIndex(lines: string[], index: number, maxTrailingLines = 0): boolean {
   if (index < 0) return false
   return lines.length - index <= maxTrailingLines + 1
+}
+
+/**
+ * PAN-3068 — a harness footer hint line: key/action pairs separated by "·",
+ * e.g. "Esc to cancel · Tab to amend · ctrl+e to explain". Every segment must
+ * open with a key name, so real post-answer output ("● Bash(git status)") never
+ * qualifies.
+ */
+function looksLikeHarnessFooterHint(line: string): boolean {
+  const segments = line.split('·').map((segment) => segment.trim()).filter(Boolean)
+  if (segments.length === 0) return false
+  return segments.every((segment) =>
+    /^(?:esc(?:ape)?|tab|enter|return|space|backspace|shift\+\S+|ctrl\+\S+|alt\+\S+|\?)\b/i.test(segment)
+    || /^press\s+\S+/i.test(segment),
+  )
+}
+
+/**
+ * PAN-3068 — the permission menu is still on screen when nothing but harness
+ * footer chrome follows its final option. Claude Code renders "Esc to cancel ·
+ * Tab to amend · ctrl+e to explain" below "3. No", so the old rule (the option
+ * must be the literal last pane line) meant Claude permission prompts were
+ * *never* detected — agents froze on a permission gate while the dashboard
+ * reported them healthy and working. Real output below the menu means the
+ * prompt was answered and scrolled, so it still clears.
+ */
+function isPermissionMenuStillOnScreen(lines: string[], menuEndIndex: number): boolean {
+  if (menuEndIndex < 0) return false
+  const trailing = lines.slice(menuEndIndex + 1)
+  if (trailing.length > MAX_MENU_FOOTER_LINES) return false
+  return trailing.every(looksLikeHarnessFooterHint)
 }
 
 function findPermissionMenuEndIndex(lines: string[], menuStartIndex: number): number {
@@ -190,7 +222,7 @@ export function detectAwaitingInputFromPaneSync(
   if (looksLikeClaudePermissionMenu(recentText) && looksLikePermissionText(recentText)) {
     const menuIndex = lastIndexMatching(lines, (line) => /❯?\s*1\.\s*Yes\b/i.test(line))
     const menuEndIndex = findPermissionMenuEndIndex(lines, menuIndex)
-    if (isRecentPromptIndex(lines, menuIndex) && isCurrentPromptIndex(lines, menuEndIndex)) {
+    if (isRecentPromptIndex(lines, menuIndex) && isPermissionMenuStillOnScreen(lines, menuEndIndex)) {
       return {
         reason: 'tool_permission',
         prompt: snippetAround(lines, menuIndex, 10, 3),
