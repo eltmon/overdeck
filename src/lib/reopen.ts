@@ -12,9 +12,10 @@ import {
   setReviewStatusSync,
 } from './review-status.js';
 import { Data, Effect } from 'effect';
-import { resolveProjectFromIssueSync } from './projects.js';
+import { getProjectSync, resolveProjectFromIssueSync } from './projects.js';
 import { appendContinueSessionEntryForIssue } from './xbrief/lifecycle-io.js';
 import { clearIssueClosedCache } from './cloister/issue-closed.js';
+import { clearRecordPipelineClosedOutSync } from './pan-dir/records.js';
 
 export interface ReopenResult {
   specialistStatesReset: boolean;
@@ -80,6 +81,13 @@ export interface ReopenOptions {
 
   // 2. Append a reopen breadcrumb to the scope xBRIEF's continue file.
   const resolved = resolveProjectFromIssueSync(issueId);
+  if (resolved) {
+    // Clear the terminal close-out marker: status writes deliberately preserve
+    // closedOut (records.ts), so without this a reopened issue stays invisible
+    // to review dispatch and the dashboard forever (MIN-850, 2026-07-24).
+    const project = getProjectSync(resolved.projectKey);
+    if (project) clearRecordPipelineClosedOutSync(project, issueId.toUpperCase());
+  }
   if (resolved) {
     try {
       const noteParts: string[] = [`Reopened on ${new Date().toISOString().slice(0, 10)}`];
