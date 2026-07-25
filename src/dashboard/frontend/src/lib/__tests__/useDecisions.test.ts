@@ -22,8 +22,13 @@ describe('isBlockingDecision', () => {
     expect(isBlockingDecision(['exitPlanMode'])).toBe(false);
   });
 
-  it('does not treat a permission request as blocking on its own', () => {
-    expect(isBlockingDecision(['permissionRequest'])).toBe(false);
+  /**
+   * PAN-3051 — reversed. Under the PTY supervisor the agent is parked on the
+   * permission modal in its own pane and cannot run another tool until someone
+   * answers it, so it belongs at the top of the list with the other hard stops.
+   */
+  it('treats a permission request as blocking — the supervisor pane is parked on the modal', () => {
+    expect(isBlockingDecision(['permissionRequest'])).toBe(true);
   });
 
   it('is blocking when any kind blocks', () => {

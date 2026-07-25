@@ -2,7 +2,7 @@ import { exitCli } from '../exit.js';
 import chalk from 'chalk';
 import { Effect } from 'effect';
 import type { AgentStatus } from '@overdeck/contracts';
-import { existsSync, readdirSync, readFileSync, statSync, promises as fsp } from 'fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'fs';
 import { exec, execSync } from 'child_process';
 import { promisify } from 'util';
 import { getAgentSessionsSync, listSessionNamesSync } from '../../lib/tmux.js';
@@ -31,6 +31,16 @@ import {
 } from '../../lib/system-prerequisites.js';
 import { checkInotify } from './doctor-inotify.js';
 import { checkStateWorktrees } from './doctor-state-worktree.js';
+import {
+  assessBridgePoolPressure,
+  bridgePoolLimitFromPools,
+  DEFAULT_DOCKER_BRIDGE_POOL_LIMIT,
+  DOCKER_DAEMON_JSON_PATH,
+  formatBridgePoolBreakdown,
+  LIST_BRIDGE_NETWORKS_COMMAND,
+  parseBridgeNetworkNames,
+  readDockerDaemonPools,
+} from '../../lib/docker-bridge-pool.js';
 import { isXBriefFilename } from '../../lib/xbrief/lifecycle.js';
 // Minimum supported omp harness version (PAN-1989); its lineage differs from pi and was baselined at 16.1.16.
 export const SUPPORTED_OMP_VERSION_MIN = '16.1.0';
@@ -245,13 +255,16 @@ function checkComposeLabelDrift(): ComposeDriftEntry[] {
 }
 
 /**
- * PAN-2510: warn when overdeck-feature-*_devnet networks are close to exhausting
- * Docker's default bridge pool, or when /etc/docker/daemon.json lacks a wider
- * default-address-pools configuration. Advisory only — we never edit daemon.json.
+ * PAN-2510 / PAN-3053: warn when the host's bridge networks are close to
+ * exhausting Docker's address pools, or when /etc/docker/daemon.json lacks a
+ * wider default-address-pools configuration. Advisory only — we never edit
+ * daemon.json.
+ *
+ * The count is host-wide (PAN-3053). Every bridge network consumes a pool slot
+ * whatever its name, so filtering to `overdeck-feature-*_devnet` reported
+ * healthy at 100% exhaustion while every workspace rebuild failed.
  */
-const DEFAULT_DOCKER_BRIDGE_POOL_LIMIT = 31;
-const DEVNET_POOL_WARNING_THRESHOLD = DEFAULT_DOCKER_BRIDGE_POOL_LIMIT - 5;
-const DAEMON_JSON_PATH = '/etc/docker/daemon.json';
+const DAEMON_JSON_PATH = DOCKER_DAEMON_JSON_PATH;
 
 const DEFAULT_ADDRESS_POOLS_SNIPPET = `{
   "default-address-pools": [
@@ -259,44 +272,37 @@ const DEFAULT_ADDRESS_POOLS_SNIPPET = `{
   ]
 }`;
 
-async function readDockerDaemonJson(): Promise<{ 'default-address-pools'?: unknown[] } | null> {
-  try {
-    const text = await fsp.readFile(DAEMON_JSON_PATH, 'utf-8');
-    return JSON.parse(text) as { 'default-address-pools'?: unknown[] };
-  } catch {
-    return null;
-  }
-}
-
-export async function checkDevnetNetworkPool(): Promise<CheckResult[]> {
+export async function checkDockerBridgeNetworkPool(): Promise<CheckResult[]> {
   if (!checkCommand('docker')) {
     return [];
   }
 
-  const [networkResult, daemonConfig] = await Promise.all([
-    execAsync(`docker network ls --format '{{.Name}}'`).catch(() => ({ stdout: '' })),
-    readDockerDaemonJson(),
+  const [networkResult, pools] = await Promise.all([
+    execAsync(LIST_BRIDGE_NETWORKS_COMMAND).catch(() => ({ stdout: '' })),
+    readDockerDaemonPools(),
   ]);
 
-  const devnetNetworks = networkResult.stdout
-    .split('\n')
-    .map((line) => line.trim())
-    .filter((name) => /^overdeck-feature-.*_devnet$/.test(name));
-
-  const devnetCount = devnetNetworks.length;
-  const hasPools = daemonConfig?.['default-address-pools'] !== undefined;
+  const names = parseBridgeNetworkNames(networkResult.stdout);
+  const pressure = assessBridgePoolPressure(
+    names,
+    bridgePoolLimitFromPools(pools) ?? DEFAULT_DOCKER_BRIDGE_POOL_LIMIT,
+  );
+  const breakdown = formatBridgePoolBreakdown(pressure.groups);
+  const detail = breakdown ? ` (${breakdown})` : '';
   const results: CheckResult[] = [];
 
-  if (devnetCount >= DEVNET_POOL_WARNING_THRESHOLD) {
+  if (pressure.underPressure) {
     results.push({
-      name: 'Docker devnet pool',
-      status: 'warn',
-      message: `${devnetCount} overdeck-feature-*_devnet networks exist; Docker's default bridge pool is ~${DEFAULT_DOCKER_BRIDGE_POOL_LIMIT} networks`,
-      fix: `Widen the pool by adding default-address-pools to ${DAEMON_JSON_PATH}, then restart Docker:\n${DEFAULT_ADDRESS_POOLS_SNIPPET}`,
+      name: 'Docker bridge network pool',
+      status: pressure.exhausted ? 'error' : 'warn',
+      message: pressure.exhausted
+        ? `${pressure.total} bridge networks against a ~${pressure.limit}-network pool — new workspace stacks cannot be created${detail}`
+        : `${pressure.total} of ~${pressure.limit} bridge network slots used, ${pressure.headroom} left${detail}`,
+      fix: `Remove orphaned workspace networks, or widen the pool by adding default-address-pools to ${DAEMON_JSON_PATH} and restarting Docker:\n${DEFAULT_ADDRESS_POOLS_SNIPPET}`,
     });
   }
 
-  if (!hasPools) {
+  if (pools === null) {
     results.push({
       name: 'Docker default-address-pools',
       status: 'warn',
@@ -307,9 +313,9 @@ export async function checkDevnetNetworkPool(): Promise<CheckResult[]> {
 
   if (results.length === 0) {
     results.push({
-      name: 'Docker devnet pool',
+      name: 'Docker bridge network pool',
       status: 'ok',
-      message: `${devnetCount} devnet networks; default-address-pools is configured`,
+      message: `${pressure.total} of ~${pressure.limit} bridge network slots used${detail}`,
     });
   }
 
@@ -895,7 +901,7 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<void> 
   }
 
   // Check Docker devnet network pool exhaustion (PAN-2510)
-  for (const c of await checkDevnetNetworkPool()) checks.push(c);
+  for (const c of await checkDockerBridgeNetworkPool()) checks.push(c);
 
   // Check inotify watch budget and persistence (PAN-3063)
   for (const c of await checkInotify()) checks.push(c);

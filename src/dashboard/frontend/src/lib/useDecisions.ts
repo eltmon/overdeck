@@ -46,14 +46,30 @@ export interface Decision {
   /**
    * True when an agent has stopped until this is answered, as opposed to work
    * continuing around it. This is what the operator triages on, so it groups the
-   * list. A rate-limit modal or a question halts the turn outright; a permission
-   * request or a plan review does not necessarily.
+   * list. A rate-limit modal, a question, or a permission prompt halts the turn
+   * outright; a plan review does not necessarily.
    */
   blocking: boolean;
 }
 
-/** Kinds that mean the agent has actually stopped and cannot proceed. */
-const BLOCKING_KINDS = new Set(['askUserQuestion', 'rateLimit', 'sessionResume', 'agentTurnEnded']);
+/**
+ * Kinds that mean the agent has actually stopped and cannot proceed.
+ *
+ * PAN-3051 added `permissionRequest`. It was excluded on the reasoning that a
+ * permission request "does not necessarily" halt the turn, which held while the
+ * Channels bridge could answer one out-of-band. Under the PTY supervisor the
+ * agent is parked on the `❯ Do you want to proceed?` modal in its own pane and
+ * cannot advance a single tool call until a human picks an option — that is the
+ * definition of blocking, and treating it as non-blocking sorted five frozen
+ * agents below work that was still moving.
+ */
+const BLOCKING_KINDS = new Set([
+  'askUserQuestion',
+  'rateLimit',
+  'sessionResume',
+  'agentTurnEnded',
+  'permissionRequest',
+]);
 
 export function isBlockingDecision(kinds: ReadonlyArray<string>): boolean {
   return kinds.some((k) => BLOCKING_KINDS.has(k));
