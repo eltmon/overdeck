@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-25T11:59:01.400Z",
-  "updated": "2026-07-25T12:24:48.063Z",
+  "updated": "2026-07-25T12:26:23.560Z",
   "pipeline": {
     "issueId": "PAN-3052",
     "reviewStatus": "pending",
@@ -59,8 +59,16 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 2,
-    "claims": {},
+    "sequence": 3,
+    "claims": {
+      "boot-test-throwaway": {
+        "writerId": "agent-pan-3052",
+        "agentId": "agent-pan-3052",
+        "pid": 3434368,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-25T12:26:23.560Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3052",
@@ -87,6 +95,7 @@
     "extract-apply-module.extract-apply-module.ac2": "completed",
     "extract-apply-module.extract-apply-module.ac3": "completed",
     "extract-apply-module.extract-apply-module.ac4": "completed",
-    "extract-apply-module.extract-apply-module.ac5": "completed"
+    "extract-apply-module.extract-apply-module.ac5": "completed",
+    "boot-test-throwaway": "running"
   }
 }
