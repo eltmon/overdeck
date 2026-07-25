@@ -98,17 +98,17 @@
     "recordedAt": "2026-07-24T19:20:31.861Z"
   },
   "created": "2026-07-22T21:26:29.366Z",
-  "updated": "2026-07-25T06:51:08.919Z",
+  "updated": "2026-07-25T06:51:21.458Z",
   "pipeline": {
     "issueId": "PAN-2989",
     "reviewStatus": "passed",
     "testStatus": "passed",
     "verificationStatus": "passed",
     "mergeStatus": "merged",
-    "releaseStatus": "pending",
+    "releaseStatus": "skipped",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-24T19:28:22.610Z",
-    "updatedAt": "2026-07-25T06:51:08.792Z",
+    "updatedAt": "2026-07-25T06:51:21.027Z",
     "reviewNotes": "Approved: claim-everything fallback drain eliminates the cross-process overwrite race; focused tests, typecheck, lint, and diff checks pass",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3027",
     "reviewedAtCommit": "e6447d968e8aea9c05dc4bcfd45cba753e470cbc",
@@ -203,7 +203,7 @@
       },
       "costAtCloseOut": {
         "usd": 60.3096913,
-        "pricingAsOf": "2026-07-25T06:51:08.836Z"
+        "pricingAsOf": "2026-07-25T06:51:21.307Z"
       }
     },
     "merges": [
