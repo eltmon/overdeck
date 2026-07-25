@@ -109,15 +109,7 @@
       "timestamp": "2026-07-22T04:36:05.487Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-22T04:36:05Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2997\n\nKeyed delivery still loses tmux wakes before Enter and can duplicate concurrent supervisor, resume, remote, or Channels deliveries.\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2997 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "src/lib/agents/messaging.ts",
@@ -179,10 +171,10 @@
     "recordedAt": "2026-07-22T01:20:05.090Z"
   },
   "created": "2026-07-21T23:09:49.270Z",
-  "updated": "2026-07-25T08:49:13.359Z",
+  "updated": "2026-07-25T23:12:23.444Z",
   "pipeline": {
     "issueId": "PAN-2997",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -190,7 +182,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-22T01:21:05.035Z",
-    "updatedAt": "2026-07-22T04:48:07.798Z",
+    "updatedAt": "2026-07-25T23:12:22.873Z",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
     "verificationNotes": "Pre-review verification already covered the reviewed commit",
     "inspectNotes": "Fold dedupes required events per-agent via Map; latest non-null authUrl/authUrlAgentId wins; expiry computed from authUrlExpiresAt and reactivates on fresh required; healthy event closes to lastCompleted, notified targets open??lastCompleted, duplicate healthy is a no-op leaving wake set empty post-notification. All 4 ACs verified by hand against fake-timer tests.",
@@ -198,7 +190,7 @@
     "reviewedAtCommit": "d758fbb8fab7be8597583902ecb2629a5c7db322",
     "lastVerifiedCommit": "d758fbb8fab7be8597583902ecb2629a5c7db322",
     "reviewRequestedAt": "2026-07-22T01:21:05.035Z",
-    "reviewSpawnedAt": "2026-07-22T04:32:51.307Z",
+    "reviewSpawnedAt": "2026-07-25T23:12:22.871Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "src/lib/agents/messaging.ts",
@@ -318,7 +310,7 @@
       },
       "costAtCloseOut": {
         "usd": 162.230316,
-        "pricingAsOf": "2026-07-22T04:48:07.922Z"
+        "pricingAsOf": "2026-07-25T23:12:23.204Z"
       }
     },
     "merges": [
