@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-25T21:12:36.630Z",
-  "updated": "2026-07-25T21:42:42.483Z",
+  "updated": "2026-07-25T21:42:49.502Z",
   "pipeline": {
     "issueId": "PAN-3076",
     "reviewStatus": "pending",
@@ -75,8 +75,16 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 8,
-    "claims": {},
+    "sequence": 9,
+    "claims": {
+      "stamp-deacon-bypass": {
+        "writerId": "agent-pan-3076",
+        "agentId": "agent-pan-3076",
+        "pid": 2352966,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-25T21:42:49.502Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3076",
@@ -157,6 +165,7 @@
     "stamp-review-status-route.stamp-review-status-route.ac2": "completed",
     "stamp-legacy-specialists-done": "completed",
     "stamp-legacy-specialists-done.stamp-legacy-specialists-done.ac1": "completed",
-    "stamp-legacy-specialists-done.stamp-legacy-specialists-done.ac2": "completed"
+    "stamp-legacy-specialists-done.stamp-legacy-specialists-done.ac2": "completed",
+    "stamp-deacon-bypass": "running"
   }
 }
