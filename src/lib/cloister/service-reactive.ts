@@ -1,6 +1,4 @@
 /** Cloister reactive lifecycle scheduler. */
-import { exec } from 'node:child_process';
-import { promisify } from 'node:util';
 import { Effect } from 'effect';
 import { getAgentState } from '../agents.js';
 import type { Role } from '../agents.js';
@@ -14,8 +12,6 @@ import {
 import { recordDeadEndNeedsYou } from './dead-end-trip.js';
 import { isIssueClosed } from './issue-closed.js';
 import { shouldSkipDispatchAsMerged } from './merge-verification.js';
-
-const execAsync = promisify(exec);
 
 /** Return issues orphaned in reviewStatus='reviewing' with no active reviewer. */
 export function identifyOrphanedReviewingIssues(
@@ -163,18 +159,17 @@ async function activeRoleRunExists(issueId: string, role: Role, workspacePath?: 
 
   // Zombie detection: an agent that finished its work but never exited keeps
   // status:'running' forever, which would block every future re-dispatch for
-  // this role (the ship/test stall bug). When we know the workspace and the
-  // run stamped a roleRunHead, compare it against the current workspace HEAD —
-  // a HEAD that has advanced past the marker means this session ran against
-  // stale code and must not be treated as the active run for the new HEAD.
+  // this role (the ship/test stall bug). Producer-issued anchors cover every
+  // code root in monorepo and polyrepo workspaces. Persisted pre-fix short SHAs
+  // intentionally compare stale once, then the next run receives a full anchor.
   if (workspacePath && state.roleRunHead) {
     try {
-      const { stdout } = await execAsync('git rev-parse --short=8 HEAD', { cwd: workspacePath });
-      const currentHead = stdout.trim();
+      const { formatAnchorShort, snapshotWorkspaceHeadsPromise } = await import('../git-utils.js');
+      const currentHead = await snapshotWorkspaceHeadsPromise(issueId, workspacePath);
       if (currentHead && currentHead !== state.roleRunHead) {
         console.log(
           `[cloister] ${issueId}: ${role} session ${candidateId} is stale `
-          + `(ran against ${state.roleRunHead}, HEAD is now ${currentHead}) — not active`,
+          + `(ran against ${formatAnchorShort(state.roleRunHead)}, HEAD is now ${formatAnchorShort(currentHead)}) — not active`,
         );
         return false;
       }

@@ -459,15 +459,15 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
 
   markAgentRunning(state);
 
-  // Stamp the workspace HEAD this role run was launched against. The reactive
-  // scheduler uses this to tell a still-relevant run from a zombie session
-  // left behind by an agent that finished work but never exited (the ship/test
-  // stall class of bug). A non-fatal git probe — if it fails the marker is
-  // simply absent and activeRoleRunExists falls back to status-only checks.
+  // Stamp the producer-issued workspace anchor this role run was launched
+  // against. The reactive scheduler uses it to distinguish a still-relevant
+  // run from a zombie session after any monorepo or polyrepo HEAD advances.
+  // A non-fatal probe failure leaves the marker absent and preserves the
+  // status-only fallback.
   try {
-    const { stdout } = await execAsync('git rev-parse --short=8 HEAD', { cwd: workspace });
-    const head = stdout.trim();
-    if (head) state.roleRunHead = head;
+    const { snapshotWorkspaceHeadsPromise } = await import('../git-utils.js');
+    const headAnchor = await snapshotWorkspaceHeadsPromise(issueId, workspace);
+    if (headAnchor) state.roleRunHead = headAnchor;
   } catch { /* non-fatal — marker stays absent */ }
 
   await Effect.runPromise(saveAgentState(state));
