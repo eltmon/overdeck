@@ -359,17 +359,17 @@
     "recordedAt": "2026-07-25T23:26:03.281Z"
   },
   "created": "2026-07-25T20:44:21.373Z",
-  "updated": "2026-07-25T23:26:20.005Z",
+  "updated": "2026-07-25T23:30:53.272Z",
   "pipeline": {
     "issueId": "PAN-3037",
     "reviewStatus": "reviewing",
-    "testStatus": "pending",
+    "testStatus": "passed",
     "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-25T23:26:14.557Z",
+    "updatedAt": "2026-07-25T23:30:53.115Z",
     "reviewNotes": "Verification failed at test — fix and resubmit",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
     "verificationNotes": "Verification FAILED at test (424278ms):\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-3037\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-3037/src/dashboard/frontend\n\nNo test files found, exiting with code 0\n\nstdout | tests/unit/dashboard/server/routes/specialists-inspect-item.test.ts > POST /api/specialists/done inspect item attribution > checkpoints the exact structured itemId regardless of notes wording\n[specialists/done] inspect signaling passed for PAN-2724\n\nstdout | tests/unit/dashboard/server/routes/specialists-inspect-item.test.ts > POST /api/specialists/done inspect item attribution > checkpoints the exact structured itemId regardless of notes wording\n[specialists/done] Set inspect-agent-test to idle\n[specialists/done] Warm lifecycle: verdict recorded, leaving inspect-agent-test running (PAN-2579)\n[specialists/done] Cleared registry lock for inspect-agent:PAN-2724 (overdeck)\n\nstdout | tests/unit/dashboard/server/routes/specialists-inspect-item.test.ts > POST /api/specialists/done inspect item attribution > checkpoints the exact structured itemId regardless of notes wording\n[specialists/done] inspect signaling passed for PAN-2724\n\nstdout | tests/unit/dashboard/server/routes/specialists-inspect-item.test.ts > POST /api/specialists/done inspect item attribution > checkpoints the exact structured itemId regardless of notes wording\n[specialists/done] Set inspect-agent-test to idle\n[specialists/done] Warm lifecycle: verdict recorded, leaving inspect-agent-test running (PAN-2579)\n[specialists/done] Cleared registry lock for inspect-agent:PAN-2724 (overdeck)\n\n ❯ |root| tests/unit/dashboard/server/routes/specialists-inspect-item.test.ts (3 tests | 1 failed) 124ms\n     × checkpoints the exact structured itemId regardless of notes wording 99ms (retry x1)\n[prep] state-reconcile\n[prep] completed: state-reconcile (0s elapsed)\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Workspace already up to date with main\n[prep] completed: sync-main (0s ela\n…(1948 chars elided)…\ning-jqYzmO/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-jqYzmO/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-jqYzmO/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[\n...(truncated)",
@@ -446,25 +446,25 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 17077761,
-            "output": 277152,
-            "cacheRead": 44419584,
+            "input": 18208291,
+            "output": 283634,
+            "cacheRead": 46200320,
             "cacheWrite": 0
           }
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 76,
-            "output": 15482,
-            "cacheRead": 5488678,
-            "cacheWrite": 165571
+            "input": 82,
+            "output": 16321,
+            "cacheRead": 5991361,
+            "cacheWrite": 171806
           }
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 3049432,
-            "output": 160474,
-            "cacheRead": 103762432,
+            "input": 3055434,
+            "output": 160758,
+            "cacheRead": 104917504,
             "cacheWrite": 0
           }
         }
@@ -477,21 +477,21 @@
           "cacheWrite": 311392
         },
         "openai/gpt-5.6-sol": {
-          "input": 20127193,
-          "output": 437626,
-          "cacheRead": 148182016,
+          "input": 21263725,
+          "output": 444392,
+          "cacheRead": 151117824,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 76,
-          "output": 15482,
-          "cacheRead": 5488678,
-          "cacheWrite": 165571
+          "input": 82,
+          "output": 16321,
+          "cacheRead": 5991361,
+          "cacheWrite": 171806
         }
       },
       "costAtCloseOut": {
-        "usd": 202.672745,
-        "pricingAsOf": "2026-07-25T23:26:20.000Z"
+        "usd": 210.150815,
+        "pricingAsOf": "2026-07-25T23:30:53.235Z"
       }
     },
     "merges": [
