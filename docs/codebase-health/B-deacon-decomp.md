@@ -23,6 +23,8 @@ Carve four cohesive clusters out of `deacon.ts` into sibling modules, **behavior
 3. **`deacon-merge.ts`** (HIGH) — `checkReadyForMergeStuck`, `reconcileStaleMergeStatus`, `reconcileFalseMerged`, `reconcileClosedPrReadyForMerge`, `reconcileMergedButReviewing`, `checkFailedMergeRetry`, `autoCloseOut`, `checkFirstCompletionAgents` + their cooldown Maps/Sets + constants. `autoCloseOut`'s dynamic `import('postMergeLifecycle')` stays a dynamic import.
 4. **`deacon-auto-resume.ts`** (VERY HIGH — do last, its own commit) — `recoverOrphanedAgents(+Once)`, `handleAgentHeartbeatDeadEvent`, `handleAgentStoppedEvent`, `autoResumeStoppedWorkAgents`, `reconcileAgentLiveness`, `nudgeStalledResumeWorkAgents`, `nudgeIdleWorkAgentsWithOpenBeads`, `cleanupOrphanedPlanningSessions`, `isRapidPostResumeDeath`, `isPreKickoffLaunchDeath` + state (`recoverOrphanedAgentsInFlight`, `orphanFailureRecordedForAutoResume`) + constants. Keep the notifier **setters** in `deacon.ts`; the moved code calls the notifier via an imported getter/param. Preserve the `getNoResumeMode()`/concurrency-gate calls exactly.
 
+> Update (PAN-3052): `applyBootReconciliationDecision`, `bootReconciliationDecisionKey`, and the `appliedBootReconciliationDecisions` idempotency set moved to `src/lib/cloister/boot-reconciliation-apply.ts`. The extraction dropped `deacon-auto-resume.ts` below the 1,000-line ceiling and removed its `scripts/file-size-baseline.txt` row.
+
 ## Requirements
 **FR-1** Each seam's functions live in its new module; `deacon.ts` imports them and `runPatrol` calls them unchanged (same order, same args).
 **FR-2** Every symbol imported by any other file is re-exported from `deacon.ts` (verify with `grep -rn` before/after). No external import path changes.
