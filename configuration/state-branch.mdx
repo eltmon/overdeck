@@ -160,6 +160,34 @@ repo's orphan branch, and removes the legacy root copies. The host repo's
 `main` branch remains unchanged. GitHub and GitLab host remotes use the same
 migration flow.
 
+## Record writes hold a bounded per-issue lock
+
+Every per-issue record write (`records/<issue>.json`) runs under a cross-process
+lock so two writers can't lose each other's updates. The lock is held while the
+write commits and pushes from the state worktree — and that hold is **bounded**:
+if the commit-and-push doesn't finish within
+`OVERDECK_RECORD_DURABILITY_BUDGET_MS` (default **30 seconds**), the writer
+releases the lock and reports a durability timeout instead of starving other
+writers for minutes. A stalled remote can no longer block verdict writes the
+way it did before this bound existed.
+
+A timeout does not lose your update:
+
+- The mutation stays in the local record file — Overdeck never rewinds it,
+  because the slow push may still land in the background.
+- Review and test verdicts that can't take the lock in time fall back to a
+  workspace-local `pipeline-verdict.json`, which is **drained proactively**:
+  it is folded back into the canonical record after the next successful
+  journal write for the issue, or automatically within about two and a half
+  minutes (retrying at 5s, 30s, and 120s), without waiting for anyone to
+  read the issue's status.
+
+One related guarantee: the dashboard server itself never carries an agent
+identity, so record-lock owner strings name the real writer. When Overdeck
+restarts the server, the spawner's identity is preserved under
+`OVERDECK_DASHBOARD_SPAWNED_BY` (used only by the port-override guard), and
+the server's own record writes appear as `process-<pid>@<hostname>`.
+
 ## What changes day to day
 
 Almost nothing, by design. Plans finalize, records update, and task state

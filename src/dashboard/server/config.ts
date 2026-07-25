@@ -86,13 +86,16 @@ export const ServerConfigLayer = Layer.effect(
     const identity = getDashboardIdentity();
     const hostDashboardApiPort = readHostDashboardApiPort();
     const overrideRequested = process.env['OVERDECK_WORKSPACE_DASHBOARD_ALLOW_PRIMARY'] === '1';
-    const agentId = process.env['OVERDECK_AGENT_ID'];
+    // PAN-2989: the spawned server never carries OVERDECK_AGENT_ID (its record
+    // writes would be misattributed to the spawner); the spawner's identity is
+    // preserved under OVERDECK_DASHBOARD_SPAWNED_BY for this guard instead.
+    const agentId = process.env['OVERDECK_DASHBOARD_SPAWNED_BY'];
     const nonConversationUsingOverride =
       overrideRequested && agentId !== undefined && !agentId.startsWith('conv-');
     if (nonConversationUsingOverride) {
       const msg = (
         `Refusing host dashboard port override for pipeline-role identity ` +
-        `OVERDECK_AGENT_ID=${agentId}. Work, planning, review, and flywheel agents must never bind ` +
+        `OVERDECK_DASHBOARD_SPAWNED_BY=${agentId}. Work, planning, review, and flywheel agents must never bind ` +
         `the host dashboard port; use the workspace container endpoint instead. Only an operator-supervised ` +
         `conversation (conv-*) or a process with no agent identity may use this emergency override.`
       );
