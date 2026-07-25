@@ -814,8 +814,11 @@ export const ActivityEntryEvent = Schema.Struct({
     id: Schema.String,
     source: Schema.String,
     level: Schema.String,
+    status: Schema.optional(Schema.Literals(["accepted", "running", "completed", "failed"])),
+    command: Schema.optional(Schema.String),
     message: Schema.String,
     details: Schema.optional(Schema.String),
+    output: Schema.optional(Schema.String),
     issueId: Schema.optional(IssueId),
     /** Dashboard route the feed navigates to on click (e.g. /conv/<name>, /flywheel). */
     link: Schema.optional(Schema.String),

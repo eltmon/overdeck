@@ -14,6 +14,7 @@ import { jsonResponse } from "../http-helpers.js";
 import { Effect, Layer, Option } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { EventStoreService } from '../services/domain-services.js';
+import { activityEntriesFromStoredEvents } from '../read-model.js';
 
 import { getCloisterService } from '../../../lib/cloister/service.js';
 import { listRunningAgents } from '../../../lib/agents.js';
@@ -194,18 +195,9 @@ const getActivityRoute = HttpRouter.add(
   '/api/activity',
   httpHandler(Effect.gen(function* () {
     const eventStore = yield* EventStoreService;
-    // Query last 100 activity.entry events, most recent first
-    const events = yield* eventStore.queryByType('activity.entry', 100);
-    return jsonResponse(events.map((e) => ({
-      id: (e.payload as Record<string, unknown>)['id'] as string,
-      timestamp: e.timestamp,
-      source: (e.payload as Record<string, unknown>)['source'] as string,
-      level: (e.payload as Record<string, unknown>)['level'] as string,
-      message: (e.payload as Record<string, unknown>)['message'] as string,
-      details: (e.payload as Record<string, unknown>)['details'] as string | null,
-      issueId: (e.payload as Record<string, unknown>)['issueId'] as string | null,
-      link: (e.payload as Record<string, unknown>)['link'] as string | undefined,
-    })));
+    // Query enough transitions to return the latest 100 logical activities.
+    const events = yield* eventStore.queryByType('activity.entry', 300);
+    return jsonResponse(activityEntriesFromStoredEvents(events, 100));
   })),
 );
 
@@ -258,18 +250,22 @@ const getActivityByIdRoute = HttpRouter.add(
     const eventStore = yield* EventStoreService;
     const id = params['id'] ?? '';
     const events = yield* eventStore.queryByType('activity.entry', 1000);
-    const activity = events.find((e) => (e.payload as Record<string, unknown>)['id'] === id);
+    const activity = (activityEntriesFromStoredEvents(events, 1000) as Array<Record<string, unknown>>)
+      .find(entry => entry['id'] === id);
     if (!activity) {
       return jsonResponse({ error: 'Activity not found' }, { status: 404 });
     }
     return jsonResponse({
-      id: (activity.payload as Record<string, unknown>)['id'],
-      timestamp: activity.timestamp,
-      source: (activity.payload as Record<string, unknown>)['source'],
-      level: (activity.payload as Record<string, unknown>)['level'],
-      message: (activity.payload as Record<string, unknown>)['message'],
-      details: (activity.payload as Record<string, unknown>)['details'],
-      issueId: (activity.payload as Record<string, unknown>)['issueId'],
+      id: activity['id'],
+      timestamp: activity['timestamp'],
+      source: activity['source'],
+      level: activity['level'],
+      status: activity['status'],
+      command: activity['command'],
+      message: activity['message'],
+      details: activity['details'],
+      output: activity['output'],
+      issueId: activity['issueId'],
     });
   })),
 );

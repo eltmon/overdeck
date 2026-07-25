@@ -22,8 +22,15 @@ export type HarnessSessionIdSource = "launcher-session-id" | "transcript-jsonl" 
 export type HarnessContextLayerKind = "claude" | "pi" | "codex" | "acp"
 export type HarnessFeedKind = "claude_code" | "pi" | "codex" | "acp"
 
+export interface HarnessNativeCommand {
+  readonly name: string
+  readonly description: string
+  readonly insert: string
+}
+
 export interface HarnessBehavior {
   readonly displayName: string
+  readonly nativeCommands?: readonly HarnessNativeCommand[]
   readonly executableName: string
   readonly processNames: readonly string[]
   readonly launchCommandKind: HarnessLaunchCommandKind
@@ -46,6 +53,13 @@ export interface HarnessBehavior {
 
 export const CLAUDE_CODE_BEHAVIOR: HarnessBehavior = {
   displayName: "Claude Code",
+  // Verified from the installed Claude Code 2.1.209 binary on 2026-07-24.
+  nativeCommands: [
+    { name: "/model", description: "Switch the AI model for this conversation", insert: "/model " },
+    { name: "/context", description: "Inspect or expand the current context window", insert: "/context " },
+    { name: "/effort", description: "Set the reasoning effort level", insert: "/effort " },
+    { name: "/cancel", description: "Cancel the current operation", insert: "/cancel" },
+  ],
   executableName: "claude",
   processNames: ["claude"],
   launchCommandKind: "claude-code",
@@ -68,6 +82,8 @@ export const CLAUDE_CODE_BEHAVIOR: HarnessBehavior = {
 
 export const OHMYPI_BEHAVIOR: HarnessBehavior = {
   displayName: "Pi",
+  // omp 16.3.11 does not expose a machine-readable native slash-command inventory (checked 2026-07-24).
+  nativeCommands: [],
   executableName: "omp",
   processNames: ["omp"],
   launchCommandKind: "ohmypi-rpc",
@@ -90,6 +106,8 @@ export const OHMYPI_BEHAVIOR: HarnessBehavior = {
 
 export const CODEX_BEHAVIOR: HarnessBehavior = {
   displayName: "Codex",
+  // Codex CLI 0.144.4 does not expose a machine-readable native slash-command inventory (checked 2026-07-24).
+  nativeCommands: [],
   executableName: "codex",
   processNames: ["codex"],
   launchCommandKind: "codex-work-tui",
@@ -112,6 +130,8 @@ export const CODEX_BEHAVIOR: HarnessBehavior = {
 
 export const ACP_BEHAVIOR: HarnessBehavior = {
   displayName: "ACP",
+  // Kimi Code CLI 0.28.1 via ACP does not expose a machine-readable native slash-command inventory (checked 2026-07-24).
+  nativeCommands: [],
   executableName: "acp-host",
   processNames: ["acp-host", "kimi"],
   launchCommandKind: "acp-host",

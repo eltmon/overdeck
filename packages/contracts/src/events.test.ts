@@ -374,3 +374,44 @@ describe("Agent lifecycle events", () => {
     })
   })
 })
+
+describe("activity.entry", () => {
+  it("replaces an earlier state transition with the latest state for the same activity", () => {
+    const accepted = applyEvent(INITIAL_READ_MODEL_STATE, decodeDomainEvent({
+      type: "activity.entry" as const,
+      sequence: 1,
+      timestamp: "2026-07-25T00:00:00.000Z",
+      payload: {
+        id: "activity-1525",
+        source: "work-agent",
+        level: "info",
+        status: "accepted",
+        command: "/pan start PAN-1525",
+        message: "Accepted detached command",
+        issueId: "PAN-1525",
+      },
+    }))
+    const failed = applyEvent(accepted, decodeDomainEvent({
+      type: "activity.entry" as const,
+      sequence: 2,
+      timestamp: "2026-07-25T00:00:01.000Z",
+      payload: {
+        id: "activity-1525",
+        source: "work-agent",
+        level: "error",
+        status: "failed",
+        command: "/pan start PAN-1525",
+        message: "Detached command failed",
+        output: "Project resolution failed",
+        issueId: "PAN-1525",
+      },
+    }))
+
+    expect(failed.recentActivity).toEqual([expect.objectContaining({
+      id: "activity-1525",
+      status: "failed",
+      output: "Project resolution failed",
+      timestamp: "2026-07-25T00:00:01.000Z",
+    })])
+  })
+})

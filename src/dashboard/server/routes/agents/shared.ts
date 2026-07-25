@@ -1,7 +1,7 @@
-import { exec, execFile, spawn } from 'node:child_process';
+import { exec, execFile } from 'node:child_process';
 import { timingSafeEqual } from 'node:crypto';
 import { existsSync } from 'node:fs';
-import { appendFile, mkdir, open, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
@@ -13,7 +13,11 @@ import type { AgentStatus } from '@overdeck/contracts';
 import { jsonResponse } from '../../http-helpers.js';
 import { getHeaderFromMap } from '../origin-validation.js';
 import { getOverdeckHome } from '../../../../lib/paths.js';
-import { panCliInvocation } from '../../../../lib/pan-cli-invocation.js';
+import {
+  appendAgentLifecycleLog,
+  launchPanCommandDetached,
+  type DetachedPanCommandDependencies,
+} from '../../../../lib/composer-commands/detached.js';
 import {
   getAgentDir,
   getLatestSessionIdSync,
@@ -66,11 +70,9 @@ export function buildPanStartArgs(input: {
 
 /**
  * PAN-1985: detached-spawn helper for `pan <args>`, shared between the
- * standard work-spawn route and the restart-fresh route. Opens a spawn.log
- * inside the agent dir (creating the dir if missing — the dir may have been
- * just wiped), spawns `pan` detached with stdio to that log, and resolves
- * with an activity id once the child closes with code 0. Throws an Error
- * with the log contents attached on non-zero exit.
+ * standard work-spawn route and the restart-fresh route. The neutral launcher
+ * owns process/log lifecycle; this route-compatible wrapper preserves the
+ * original behavior by waiting for a successful child exit.
  */
 export async function spawnPanCommandDetached(input: {
   agentSessionName: string;
@@ -79,72 +81,10 @@ export async function spawnPanCommandDetached(input: {
   workspacePath: string;
   args: string[];
   cwd?: string;
-}): Promise<string> {
-  const { agentSessionName, issueId, role, workspacePath, args } = input;
-  const cwd = input.cwd ?? workspacePath;
-  const activityId = `activity-${Date.now()}`;
-  const agentDir = join(homedir(), '.overdeck', 'agents', agentSessionName);
-  await mkdir(agentDir, { recursive: true });
-  const spawnLogPath = join(agentDir, 'spawn.log');
-  const spawnLogHandle = await open(spawnLogPath, 'a');
-  const invocation = panCliInvocation(args);
-  const child = spawn(invocation.command, invocation.args, {
-    cwd,
-    detached: true,
-    stdio: ['ignore', spawnLogHandle.fd, spawnLogHandle.fd],
-  });
-  child.once('spawn', () => {
-    void appendAgentLifecycleLog(agentSessionName, 'agent.work_spawn_process_spawned', {
-      issueId,
-      role,
-      workspacePath,
-      activityId,
-      pid: child.pid,
-      args,
-      cwd,
-      spawnLogPath,
-    }).catch(() => undefined);
-  });
-  try {
-    const result = await new Promise<{ code: number | null; signal: NodeJS.Signals | null }>((resolve, reject) => {
-      child.once('error', (error) => {
-        void appendAgentLifecycleLog(agentSessionName, 'agent.work_spawn_process_error', {
-          issueId,
-          role,
-          workspacePath,
-          activityId,
-          error: error.message,
-          args,
-          cwd,
-          spawnLogPath,
-        }).catch(() => undefined);
-        reject(error);
-      });
-      child.once('close', (code, signal) => {
-        void appendAgentLifecycleLog(agentSessionName, 'agent.work_spawn_process_closed', {
-          issueId,
-          role,
-          workspacePath,
-          activityId,
-          code,
-          signal,
-          args,
-          cwd,
-          spawnLogPath,
-        }).catch(() => undefined);
-        resolve({ code, signal });
-      });
-    });
-    if (result.code !== 0) {
-      const output = await readFile(spawnLogPath, 'utf-8').catch(() => '');
-      const error = new Error(output.trim() || `pan ${args.join(' ')} exited with code ${result.code ?? 'null'}`);
-      Object.assign(error, { activityId, spawnLogPath, code: result.code, signal: result.signal, output });
-      throw error;
-    }
-    return activityId;
-  } finally {
-    await spawnLogHandle.close();
-  }
+}, dependencies: DetachedPanCommandDependencies = {}): Promise<string> {
+  const launch = await launchPanCommandDetached(input, dependencies);
+  await launch.completion;
+  return launch.activityId;
 }
 type StartAgentPhaseStatus = 'start' | 'success' | 'failure' | 'skipped';
 
@@ -205,17 +145,6 @@ export async function validateAgentRuntimeEventAuth(
     ok: false as const,
     response: jsonResponse({ success: false, error: 'forbidden' }, { status: 403 }),
   };
-}
-
-async function appendAgentLifecycleLog(agentId: string, event: string, details: Record<string, unknown> = {}): Promise<void> {
-  const agentDir = join(homedir(), '.overdeck', 'agents', agentId);
-  await mkdir(agentDir, { recursive: true });
-  const logLine = JSON.stringify({
-    ts: new Date().toISOString(),
-    event,
-    ...details,
-  });
-  await appendFile(join(agentDir, 'lifecycle.log'), logLine + '\n');
 }
 
 function updateRegistryForAgentStart(issueId: string, workspacePath: string, agentId: string): void {

@@ -5,6 +5,7 @@ import type { MessagesTimelineRow } from '../MessagesTimeline.logic';
 import { PlanCard } from '../PlanCard';
 import { AssistantMessageRow, UserMessageRow } from './messageRows';
 import { WorkLogGroup } from './workLogRows';
+import { CommandResultRow } from './CommandResultRow';
 import {
   CompactBoundaryDivider,
   CompactingIndicator,
@@ -23,9 +24,10 @@ interface RowProps {
   resolvedTheme?: 'light' | 'dark';
   hideToolCalls?: boolean;
   workingPhase?: WorkingPhase;
+  onConfirmCommand?: (messageId: string, typedText?: string) => Promise<void>;
 }
 
-export const TimelineRowRenderer = memo(function TimelineRowRenderer({ row, isStreaming, conversationName, cwd, issueId, turnDiffSummary, onOpenTurnDiff, resolvedTheme, hideToolCalls, workingPhase }: RowProps) {
+export const TimelineRowRenderer = memo(function TimelineRowRenderer({ row, isStreaming, conversationName, cwd, issueId, turnDiffSummary, onOpenTurnDiff, resolvedTheme, hideToolCalls, workingPhase, onConfirmCommand }: RowProps) {
   if (row.kind === 'working') {
     return <WorkingIndicator startedAt={row.createdAt} phase={workingPhase} />;
   }
@@ -40,6 +42,9 @@ export const TimelineRowRenderer = memo(function TimelineRowRenderer({ row, isSt
   }
   if (row.kind === 'compacting') {
     return <CompactingIndicator />;
+  }
+  if (row.message.commandResult) {
+    return <CommandResultRow message={row.message} onConfirm={onConfirmCommand} />;
   }
   if (row.message.role === 'system') {
     return <SessionPermissionsRow message={row.message} />;

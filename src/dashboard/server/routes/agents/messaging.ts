@@ -6,7 +6,18 @@ import { join } from 'node:path';
 import { Effect } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
-import { messageAgent } from '../../../../lib/agents.js';
+import { getAgentState, messageAgent } from '../../../../lib/agents.js';
+import {
+  ComposerCommandConfirmationError,
+  composerCommandConfirmationFromBody,
+  type ComposerCommandConfirmationInput,
+} from '../../../../lib/composer-commands/confirmations.js';
+import { ComposerCommandParseError } from '../../../../lib/composer-commands/parser.js';
+import {
+  composerCommandResultHttpStatus,
+  handleComposerCommandMessage,
+  isComposerCommandMessage,
+} from '../../../../lib/composer-commands/router.js';
 import { jsonResponse } from '../../http-helpers.js';
 import { httpHandler } from '../http-handler.js';
 import { validateOrigin } from '../origin-validation.js';
@@ -26,6 +37,69 @@ async function sendAgentMessage(id: string, message: string) {
 
   await messageAgent(id, message, 'dashboard:user-message');
   return isRemote ? { success: true, remote: true } : { success: true };
+}
+
+export async function handleAgentMessage(
+  id: string,
+  message: string,
+  confirmation?: ComposerCommandConfirmationInput,
+) {
+  try {
+    if (isComposerCommandMessage(message)) {
+      let agentState;
+      try {
+        agentState = await Effect.runPromise(getAgentState(id));
+      } catch {
+        return jsonResponse({
+          error: `Failed to resolve agent target: ${id}`,
+          code: 'agent-resolution-failed',
+        }, { status: 503 });
+      }
+      if (!agentState) {
+        return jsonResponse({
+          error: `Agent not found: ${id}`,
+          code: 'agent-not-found',
+        }, { status: 404 });
+      }
+      if (!agentState.harness) {
+        return jsonResponse({
+          error: `Agent harness could not be resolved: ${id}`,
+          code: 'agent-harness-unresolved',
+        }, { status: 503 });
+      }
+      const result = await handleComposerCommandMessage({
+        message,
+        confirmation,
+        target: {
+          kind: 'agent',
+          id,
+          harness: agentState.harness,
+          cwd: agentState.workspace,
+          issueId: agentState.issueId,
+        },
+      });
+      if (result !== null) {
+        return jsonResponse(result, { status: composerCommandResultHttpStatus(result) });
+      }
+    }
+  } catch (error) {
+    if (error instanceof ComposerCommandConfirmationError) {
+      return jsonResponse({
+        error: error.message,
+        code: error.code,
+      }, { status: 422 });
+    }
+    if (!(error instanceof ComposerCommandParseError)) throw error;
+    const status = error.code === 'unknown-command' ? 404 : error.code === 'unknown-flag' ? 422 : 400;
+    return jsonResponse({
+      error: error.message,
+      code: error.code,
+      token: error.token,
+      expected: error.expected,
+    }, { status });
+  }
+
+  return jsonResponse(await sendAgentMessage(id, message));
 }
 
 export function validateAgentMessageOrigin(request: HttpServerRequest.HttpServerRequest) {
@@ -57,9 +131,11 @@ function postAgentMessageLikeRoute(path: `/${string}`) {
         return jsonResponse({ error: 'Message required' }, { status: 400 });
       }
 
-      return yield* Effect.promise(() => sendAgentMessage(id, message)).pipe(
-        Effect.map((result) => jsonResponse(result)),
-      );
+      return yield* Effect.promise(() => handleAgentMessage(
+        id,
+        message,
+        composerCommandConfirmationFromBody(body as Record<string, unknown>),
+      ));
     })),
   );
 }
