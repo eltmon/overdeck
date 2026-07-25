@@ -196,7 +196,7 @@ async function findMergedGitHubArtifact(
   const parsedRepo = parseRepository(repository);
   if (isGitHubAppConfigured() && parsedRepo) {
     const prs = await Effect.runPromise(listPullRequestsForHead(parsedRepo.owner, parsedRepo.repo, branchName, 'all'));
-    const merged = prs.find((pr) => pr.merged || pr.mergedAt || pr.mergeCommit);
+    const merged = prs.find((pr) => pr.merged === true || pr.mergedAt != null);
     if (!merged) return null;
     return {
       forge: 'github',
@@ -207,7 +207,7 @@ async function findMergedGitHubArtifact(
   }
 
   const { stdout } = await execAsync(
-    `gh pr list --state merged --head ${branchName}${buildRepositoryFlag(repository)} --json url,number,mergedAt 2>/dev/null || true`,
+    `gh pr list --state merged --head ${branchName}${buildRepositoryFlag(repository)} --json url,number,mergedAt`,
     { cwd, encoding: 'utf-8' },
   );
   const parsed = JSON.parse(stdout.trim() || '[]') as Array<{ url?: string; number?: number }>;
@@ -227,7 +227,7 @@ async function findMergedGitLabArtifact(
   repository?: string,
 ): Promise<CreateReviewArtifactResult | null> {
   const { stdout } = await execAsync(
-    `glab mr list --source-branch ${branchName}${buildRepositoryFlag(repository)} --all --output json 2>/dev/null || true`,
+    `glab mr list --source-branch ${branchName}${buildRepositoryFlag(repository)} --all --output json`,
     { cwd, encoding: 'utf-8' },
   );
   const parsed = JSON.parse(stdout.trim() || '[]') as Array<{

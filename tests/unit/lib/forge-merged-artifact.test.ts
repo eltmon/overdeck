@@ -78,7 +78,7 @@ describe('findMergedArtifact', () => {
         state: 'open',
         merged: false,
         mergedAt: null,
-        mergeCommit: null,
+        mergeCommit: 'temporary-test-merge-sha',
         url: 'https://github.com/org/repo/pull/42',
       },
     ]));
@@ -103,7 +103,7 @@ describe('findMergedArtifact', () => {
     });
 
     expect(execMock).toHaveBeenCalledWith(
-      'gh pr list --state merged --head feature/pan-2467 --repo org/repo --json url,number,mergedAt 2>/dev/null || true',
+      'gh pr list --state merged --head feature/pan-2467 --repo org/repo --json url,number,mergedAt',
       expect.objectContaining({ cwd: '/tmp/repo' }),
     );
     expect(result).toEqual({
@@ -130,7 +130,7 @@ describe('findMergedArtifact', () => {
     });
 
     expect(execMock).toHaveBeenCalledWith(
-      'glab mr list --source-branch feature/min-857 --repo org/repo --all --output json 2>/dev/null || true',
+      'glab mr list --source-branch feature/min-857 --repo org/repo --all --output json',
       expect.objectContaining({ cwd: '/tmp/repo' }),
     );
     expect(result).toEqual({
@@ -154,6 +154,26 @@ describe('findMergedArtifact', () => {
       repository: 'org/repo',
       cwd: '/tmp/repo',
     })).resolves.toBeNull();
+  });
+
+  it('propagates GitHub CLI failures', async () => {
+    execMock.mockRejectedValueOnce(new Error('gh authentication failed'));
+
+    await expect(getForgeAdapter('github').findMergedArtifact({
+      sourceBranch: 'feature/pan-2467',
+      repository: 'org/repo',
+      cwd: '/tmp/repo',
+    })).rejects.toThrow('gh authentication failed');
+  });
+
+  it('propagates GitLab CLI failures', async () => {
+    execMock.mockRejectedValueOnce(new Error('glab network unavailable'));
+
+    await expect(getForgeAdapter('gitlab').findMergedArtifact({
+      sourceBranch: 'feature/min-857',
+      repository: 'org/repo',
+      cwd: '/tmp/repo',
+    })).rejects.toThrow('glab network unavailable');
   });
 
   it('returns null when no merged artifact exists', async () => {

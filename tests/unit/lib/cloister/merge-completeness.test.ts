@@ -204,6 +204,23 @@ describe('assessMergeCompleteness', () => {
     expect(findMergedArtifactMock).not.toHaveBeenCalled();
   });
 
+  it('fails closed when the forge cannot verify a changed required repo', async () => {
+    ensureMergeSetForIssueMock.mockReturnValue(mergeSet([repo('api', 'gitlab')]));
+    execMock.mockImplementation(async (command) => (
+      command.includes('rev-list --count') ? gitResult('2\n') : gitResult()
+    ));
+    findMergedArtifactMock.mockRejectedValue(new Error('glab authentication failed'));
+
+    const result = await assessMergeCompleteness('MIN-857');
+
+    expect(result.complete).toBe(false);
+    expect(result.repos[0]).toEqual(expect.objectContaining({
+      repoKey: 'api',
+      state: 'unverifiable',
+      reason: expect.stringContaining('glab authentication failed'),
+    }));
+  });
+
   it('falls back to the monorepo resolver and treats an absent source branch as no changes', async () => {
     ensureMergeSetForIssueMock.mockReturnValue(null);
     resolveProjectReposForIssueMock.mockReturnValue([repo('overdeck')]);
