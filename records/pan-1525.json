@@ -224,10 +224,10 @@
     "recordedAt": "2026-07-24T23:08:31.650Z"
   },
   "created": "2026-07-12T09:32:29.900Z",
-  "updated": "2026-07-25T00:48:35.096Z",
+  "updated": "2026-07-25T01:05:35.503Z",
   "pipeline": {
     "issueId": "PAN-1525",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -235,7 +235,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-24T23:12:31.996Z",
-    "updatedAt": "2026-07-25T00:48:33.961Z",
+    "updatedAt": "2026-07-25T01:05:35.115Z",
     "inspectNotes": "Composer-command parse+route inserted before compact/transform/delivery in conversation-message.ts with early return; unknown-command maps to 404 naming token + 'Type /pan to list available commands'; terminal-only policy maps to 422 naming exact command display; unprefixed text/pan-start negative control preserves original compact/transform/deliverAgentMessage path. All 4 ACs covered by router.test.ts assertions matching the exact banned-call list.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3033",
     "lastVerifiedCommit": "10c555afc0744ecb699ec50b3d95db13ec2fa92f",
@@ -417,9 +417,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 12151800,
-            "output": 966918,
-            "cacheRead": 543656960,
+            "input": 12308939,
+            "output": 1001247,
+            "cacheRead": 560129536,
             "cacheWrite": 0
           }
         }
@@ -432,9 +432,9 @@
           "cacheWrite": 921870
         },
         "openai/gpt-5.6-sol": {
-          "input": 16916552,
-          "output": 1196945,
-          "cacheRead": 614236672,
+          "input": 17073691,
+          "output": 1231274,
+          "cacheRead": 630709248,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -445,8 +445,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 463.505615,
-        "pricingAsOf": "2026-07-25T00:48:33.989Z"
+        "usd": 473.557468,
+        "pricingAsOf": "2026-07-25T01:05:35.414Z"
       }
     },
     "merges": [
