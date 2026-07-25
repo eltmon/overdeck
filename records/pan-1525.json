@@ -73,9 +73,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-25T00:00:48.635Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-25T00:05Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-25T00:05:37.040Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-25T00:05:37Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-1525\n\nCodex shared-skill seeding is fixed, but detached failures remain invisible, unresolved agent targets fail open, and attached /pan commands reach the model.\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1525 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "packages/contracts/src/composer-commands.test.ts",
@@ -214,7 +227,7 @@
     "recordedAt": "2026-07-24T23:08:31.650Z"
   },
   "created": "2026-07-12T09:32:29.900Z",
-  "updated": "2026-07-25T00:05:36.507Z",
+  "updated": "2026-07-25T00:05:37.041Z",
   "pipeline": {
     "issueId": "PAN-1525",
     "reviewStatus": "blocked",
