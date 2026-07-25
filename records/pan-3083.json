@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-25T22:42:08.234Z",
-  "updated": "2026-07-25T23:08:41.702Z",
+  "updated": "2026-07-25T23:09:32.979Z",
   "pipeline": {
     "issueId": "PAN-3083",
     "reviewStatus": "pending",
@@ -59,16 +59,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 9,
-    "claims": {
-      "docs-intent-lifecycle": {
-        "writerId": "agent-pan-3083",
-        "agentId": "agent-pan-3083",
-        "pid": 1565852,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-25T23:08:41.702Z"
-      }
-    },
+    "sequence": 10,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3083",
@@ -113,6 +105,17 @@
         "outcome": "completed",
         "reason": "Added paired UAT regression cases proving stale passed+ready intents do not invalidate a live generation while genuine ready-set departure still does.",
         "releasedAt": "2026-07-25T23:08:17.550Z"
+      },
+      {
+        "writerId": "agent-pan-3083",
+        "agentId": "agent-pan-3083",
+        "pid": 1565852,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-25T23:08:41.702Z",
+        "itemId": "docs-intent-lifecycle",
+        "outcome": "completed",
+        "reason": "Documented reviewRequestedAt written, serviced, consumed, and guarded lifecycle plus the PAN-3083 UAT invalidation incident.",
+        "releasedAt": "2026-07-25T23:09:32.979Z"
       }
     ],
     "statusReasons": {
@@ -131,6 +134,10 @@
       "uat-generation-regression-test": {
         "reason": "Added paired UAT regression cases proving stale passed+ready intents do not invalidate a live generation while genuine ready-set departure still does.",
         "updatedAt": "2026-07-25T23:08:17.550Z"
+      },
+      "docs-intent-lifecycle": {
+        "reason": "Documented reviewRequestedAt written, serviced, consumed, and guarded lifecycle plus the PAN-3083 UAT invalidation incident.",
+        "updatedAt": "2026-07-25T23:09:32.979Z"
       }
     }
   },
@@ -152,6 +159,8 @@
     "uat-generation-regression-test": "completed",
     "uat-generation-regression-test.uat-generation-regression-test.ac1": "completed",
     "uat-generation-regression-test.uat-generation-regression-test.ac2": "completed",
-    "docs-intent-lifecycle": "running"
+    "docs-intent-lifecycle": "completed",
+    "docs-intent-lifecycle.docs-intent-lifecycle.ac1": "completed",
+    "docs-intent-lifecycle.docs-intent-lifecycle.ac2": "completed"
   }
 }
