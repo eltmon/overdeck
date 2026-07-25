@@ -4,17 +4,17 @@
     "created": "2026-07-25T12:03:05Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3052: Extract applyBootReconciliationDecision out of the deacon-auto-resume god file (boot-dialog honesty fixes already landed in cb39b20958)",
-    "updated": "2026-07-25T12:06:26.305Z"
+    "updated": "2026-07-25T12:07:13.183Z"
   },
   "plan": {
     "id": "pan-3052",
     "title": "Extract applyBootReconciliationDecision out of the deacon-auto-resume god file",
-    "status": "proposed",
+    "status": "approved",
     "uid": "ec2c0707-9e45-407d-8a4a-c17a86dd6641",
     "author": "agent:claude-fable-5",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-07-25T12:03:05Z",
-    "updated": "2026-07-25T12:06:26.305Z",
+    "updated": "2026-07-25T12:07:13.183Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3052",
@@ -273,5 +273,5 @@
       "canonicalFilename": "2026-07-25-PAN-3052-extract-applybootreconciliationdecision-out-of-the-deacon-auto-resume-god-file.xbrief.json"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
