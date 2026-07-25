@@ -98,6 +98,23 @@ describe('FsError', () => {
     const eff = Effect.fail(new FsError({ path: '/tmp/foo', operation: 'write' }));
     expect(catchTag(eff, 'FsError')).toBe('caught:FsError');
   });
+
+  // PAN-3042: operator-facing surfaces render `error.message`, and a payload
+  // without a `message` field left it empty ("PRD draft promotion failed: ").
+  it('renders a non-empty message carrying operation, path, and cause', () => {
+    const err = new FsError({ path: '/state/drafts/MIN-902.md', operation: 'pushDraft', cause: new Error('push rejected') });
+    expect(err.message).toBe('pushDraft failed for /state/drafts/MIN-902.md: push rejected');
+  });
+
+  it('renders a message when no cause is attached', () => {
+    const err = new FsError({ path: '/tmp/foo', operation: 'writeFileString' });
+    expect(err.message).toBe('writeFileString failed for /tmp/foo');
+  });
+
+  it('surfaces the message when rejected through Effect.runPromise', async () => {
+    const eff = Effect.fail(new FsError({ path: '/tmp/foo', operation: 'readFileString', cause: 'EACCES' }));
+    await expect(Effect.runPromise(eff)).rejects.toThrow('readFileString failed for /tmp/foo: EACCES');
+  });
 });
 
 describe('FsNotFoundError', () => {
