@@ -214,10 +214,10 @@
     "recordedAt": "2026-07-24T23:08:31.650Z"
   },
   "created": "2026-07-12T09:32:29.900Z",
-  "updated": "2026-07-25T00:00:52.620Z",
+  "updated": "2026-07-25T00:05:36.507Z",
   "pipeline": {
     "issueId": "PAN-1525",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -225,8 +225,8 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-24T23:12:31.996Z",
-    "updatedAt": "2026-07-25T00:00:52.568Z",
-    "reviewNotes": "Agent re-review request (2/25): Fixed review issues",
+    "updatedAt": "2026-07-25T00:05:36.469Z",
+    "reviewNotes": "Codex shared-skill seeding is fixed, but detached failures remain invisible, unresolved agent targets fail open, and attached /pan commands reach the model.",
     "inspectNotes": "Composer-command parse+route inserted before compact/transform/delivery in conversation-message.ts with early return; unknown-command maps to 404 naming token + 'Type /pan to list available commands'; terminal-only policy maps to 422 naming exact command display; unprefixed text/pan-start negative control preserves original compact/transform/deliverAgentMessage path. All 4 ACs covered by router.test.ts assertions matching the exact banned-call list.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3033",
     "lastVerifiedCommit": "10c555afc0744ecb699ec50b3d95db13ec2fa92f",
@@ -392,9 +392,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 2793245,
-            "output": 213254,
-            "cacheRead": 65815552,
+            "input": 4730279,
+            "output": 224129,
+            "cacheRead": 69898240,
             "cacheWrite": 0
           }
         },
@@ -423,9 +423,9 @@
           "cacheWrite": 921870
         },
         "openai/gpt-5.6-sol": {
-          "input": 13799951,
-          "output": 1049138,
-          "cacheRead": 510886400,
+          "input": 15736985,
+          "output": 1060013,
+          "cacheRead": 514969088,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -436,8 +436,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 391.813264,
-        "pricingAsOf": "2026-07-25T00:00:52.607Z"
+        "usd": 403.866028,
+        "pricingAsOf": "2026-07-25T00:05:36.493Z"
       }
     },
     "merges": [
