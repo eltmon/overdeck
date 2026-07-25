@@ -2,7 +2,7 @@
   "issueId": "PAN-3083",
   "schemaVersion": 2,
   "created": "2026-07-25T22:42:08.234Z",
-  "updated": "2026-07-25T22:42:08.234Z",
+  "updated": "2026-07-25T22:42:08.787Z",
   "pipeline": {
     "issueId": "PAN-3083",
     "reviewStatus": "pending",
@@ -25,5 +25,7 @@
       "note": "Planning session started for PAN-3083: Passed+ready issues get re-dispatched for review, knocking them out of the ready queue and invalidating UAT generations",
       "timestamp": "2026-07-25T22:42:08.234Z"
     }
-  ]
+  ],
+  "harness": "claude-code",
+  "model": "claude-fable-5"
 }
