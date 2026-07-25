@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-25T20:44:21.373Z",
-  "updated": "2026-07-25T21:21:25.877Z",
+  "updated": "2026-07-25T21:29:24.218Z",
   "pipeline": {
     "issueId": "PAN-3037",
     "reviewStatus": "pending",
@@ -75,16 +75,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "sync-main-reporting": {
-        "writerId": "agent-pan-3037",
-        "agentId": "agent-pan-3037",
-        "pid": 1671455,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-25T21:21:25.877Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3037",
@@ -107,6 +99,17 @@
         "outcome": "completed",
         "reason": "Iterate canonical workspace repo roots sequentially, merge each configured target branch, aggregate per-repo results with prefixed polyrepo paths, stop and skip after failure, preserve cancellation cleanup, and add real-git coverage. Extracted aggregation to keep merge-agent under the file-size ratchet.",
         "releasedAt": "2026-07-25T21:15:09.143Z"
+      },
+      {
+        "writerId": "agent-pan-3037",
+        "agentId": "agent-pan-3037",
+        "pid": 1671455,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-25T21:21:25.877Z",
+        "itemId": "sync-main-reporting",
+        "outcome": "completed",
+        "reason": "Added repos to every sync-main route result, printed per-repo CLI status and grouped conflicts for polyrepos, preserved monorepo output, and added CLI coverage.",
+        "releasedAt": "2026-07-25T21:29:24.218Z"
       }
     ],
     "statusReasons": {
@@ -117,6 +120,10 @@
       "sync-main-iterate-roots": {
         "reason": "Iterate canonical workspace repo roots sequentially, merge each configured target branch, aggregate per-repo results with prefixed polyrepo paths, stop and skip after failure, preserve cancellation cleanup, and add real-git coverage. Extracted aggregation to keep merge-agent under the file-size ratchet.",
         "updatedAt": "2026-07-25T21:15:09.143Z"
+      },
+      "sync-main-reporting": {
+        "reason": "Added repos to every sync-main route result, printed per-repo CLI status and grouped conflicts for polyrepos, preserved monorepo output, and added CLI coverage.",
+        "updatedAt": "2026-07-25T21:29:24.218Z"
       }
     }
   },
@@ -131,6 +138,9 @@
     "sync-main-iterate-roots.sync-main-iterate-roots.ac3": "completed",
     "sync-main-iterate-roots.sync-main-iterate-roots.ac4": "completed",
     "sync-main-iterate-roots.sync-main-iterate-roots.ac5": "completed",
-    "sync-main-reporting": "running"
+    "sync-main-reporting": "completed",
+    "sync-main-reporting.sync-main-reporting.ac1": "completed",
+    "sync-main-reporting.sync-main-reporting.ac2": "completed",
+    "sync-main-reporting.sync-main-reporting.ac3": "completed"
   }
 }
