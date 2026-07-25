@@ -135,7 +135,7 @@ export function buildPendingReapEvent(
       pendingInputKinds: [],
       pendingAskUserQuestion: undefined,
       pendingProposedPlan: undefined,
-      resolution: previous.resolution,
+      resolution: previous.resolution as AgentEnrichmentChangedEvent['payload']['resolution'],
       resolutionCount: previous.resolutionCount,
     },
   }
