@@ -13,6 +13,7 @@ import type { AgentStatus } from '@overdeck/contracts';
 import { jsonResponse } from '../../http-helpers.js';
 import { getHeaderFromMap } from '../origin-validation.js';
 import { getOverdeckHome } from '../../../../lib/paths.js';
+import { resolvePrimaryWorkspaceRepoDirSync } from '../../../../lib/project-repos.js';
 import {
   appendAgentLifecycleLog,
   launchPanCommandDetached,
@@ -377,13 +378,14 @@ async function getWorkspaceLocation(issueId: string): Promise<'local' | 'remote'
   return undefined;
 }
 
-async function getGitStatusAsync(workspacePath: string): Promise<{ branch: string; uncommittedFiles: number; latestCommit: string } | null> {
+async function getGitStatusAsync(issueId: string, workspacePath: string): Promise<{ branch: string; uncommittedFiles: number; latestCommit: string } | null> {
   try {
     if (!existsSync(workspacePath)) return null;
+    const repoDir = resolvePrimaryWorkspaceRepoDirSync(issueId, workspacePath);
     const [branchResult, uncommittedResult, commitResult] = await Promise.all([
-      execAsync('git rev-parse --abbrev-ref HEAD 2>/dev/null || echo ""', { cwd: workspacePath }),
-      execAsync('git status --porcelain 2>/dev/null | wc -l', { cwd: workspacePath }),
-      execAsync('git log -1 --pretty=format:"%s" 2>/dev/null || echo ""', { cwd: workspacePath }),
+      execAsync('git rev-parse --abbrev-ref HEAD 2>/dev/null || echo ""', { cwd: repoDir }),
+      execAsync('git status --porcelain 2>/dev/null | wc -l', { cwd: repoDir }),
+      execAsync('git log -1 --pretty=format:"%s" 2>/dev/null || echo ""', { cwd: repoDir }),
     ]);
     const branch = branchResult.stdout.trim();
     const uncommitted = uncommittedResult.stdout.trim();

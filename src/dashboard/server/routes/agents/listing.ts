@@ -221,7 +221,7 @@ export const getAgentsRoute = HttpRouter.add(
             const workspace = isRemote && remoteState.vmName
               ? `/workspace (${String(remoteState.vmName)})`
               : state.workspace || null;
-            const gitStatus = workspace && !isRemote ? await getGitStatusAsync(workspace) : null;
+            const gitStatus = workspace && !isRemote ? await getGitStatusAsync(issueId, workspace) : null;
 
             let contextPercent: number | null = null;
             let initialContextPercent: number | null = null;
