@@ -37,6 +37,7 @@ const mocks = vi.hoisted(() => ({
     bootId: null as string | null,
     bootStartedAt: null as string | null,
     graceDeadline: null as string | null,
+    graceExtensions: 0,
   },
 }));
 
@@ -87,12 +88,19 @@ vi.mock('../../overdeck/control-settings.js', () => ({
     mocks.bootState.bootId = bootId;
     mocks.bootState.bootStartedAt = bootStartedAt;
     mocks.bootState.graceDeadline = graceDeadline;
+    mocks.bootState.graceExtensions = 0;
+  }),
+  setBootReconciliationGrace: vi.fn((graceDeadline, graceExtensions) => {
+    mocks.bootState.graceDeadline = graceDeadline;
+    mocks.bootState.graceExtensions = graceExtensions;
   }),
 }));
 
 import {
   clearBootReconciliationGraceTimer,
   DEFAULT_BOOT_RECONCILIATION_GRACE_SECS,
+  extendBootReconciliationGrace,
+  MAX_BOOT_RECONCILIATION_GRACE_EXTENSIONS,
   getBootReconciliationGraceSeconds,
   getBootReconciliationMaxCandidateAgeSeconds,
   isBootReconciliationCandidate,
@@ -380,6 +388,66 @@ describe('boot reconciliation', () => {
 
     expect(getBootReconciliationState().decision).toBe('hold_all');
     expect(onGraceExpired).toHaveBeenCalledTimes(1);
+  });
+
+  // PAN-3052: the boot dialog is the only surface on a deadline and expiry commits
+  // hold_all, so an operator answering a different blocking question must not lose
+  // the window. The extend door buys time; the cap keeps it bounded.
+  describe('grace extension while another dialog holds the operator', () => {
+    function startPendingBoot(onGraceExpired = vi.fn()) {
+      mocks.agents = [
+        stoppedWorkAgent(testHome, 'agent-pan-2076', { workspace: workspacePath(testHome, 'workspace') }),
+      ];
+      startBootReconciliation({ bootId: 'boot-extend', now: BASE_TIME, onGraceExpired });
+      return onGraceExpired;
+    }
+
+    it('pushes the deadline out a full grace period and re-arms the timer', async () => {
+      const onGraceExpired = startPendingBoot();
+
+      const result = extendBootReconciliationGrace(BASE_TIME);
+
+      expect(result).toMatchObject({
+        extended: true,
+        reason: 'extended',
+        graceExtensions: 1,
+        graceDeadline: '2026-06-29T15:01:00.000Z',
+      });
+
+      // The original 30s deadline must no longer fire.
+      await vi.advanceTimersByTimeAsync(30_000);
+      expect(getBootReconciliationState().decision).toBe('pending');
+      expect(onGraceExpired).not.toHaveBeenCalled();
+
+      // The extended one does.
+      await vi.advanceTimersByTimeAsync(30_000);
+      expect(getBootReconciliationState().decision).toBe('hold_all');
+      expect(onGraceExpired).toHaveBeenCalledTimes(1);
+    });
+
+    it('stops extending at the cap so a stuck dialog cannot hold the window open forever', () => {
+      startPendingBoot();
+
+      for (let i = 1; i <= MAX_BOOT_RECONCILIATION_GRACE_EXTENSIONS; i++) {
+        expect(extendBootReconciliationGrace(BASE_TIME)).toMatchObject({ extended: true, graceExtensions: i });
+      }
+
+      expect(extendBootReconciliationGrace(BASE_TIME)).toMatchObject({
+        extended: false,
+        reason: 'cap-reached',
+        graceExtensions: MAX_BOOT_RECONCILIATION_GRACE_EXTENSIONS,
+      });
+    });
+
+    it('refuses to extend once the operator has already decided', () => {
+      startPendingBoot();
+      setBootReconciliationDecision('resume_all');
+
+      expect(extendBootReconciliationGrace(BASE_TIME)).toMatchObject({
+        extended: false,
+        reason: 'not-pending',
+      });
+    });
   });
 
   it('uses hold_all immediately when an explicit no-resume request is active at boot', () => {

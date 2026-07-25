@@ -81,7 +81,10 @@ export function usePendingInputSubjects(): PendingInputSubject[] {
 
   return useMemo(() => {
     const out: PendingInputSubject[] = [...agentSubjects];
-    for (const c of convRows) {
+    // The REST door can hand back a non-array (error body served with 200, a
+    // shape change upstream). Iterating that throws inside a useMemo and takes
+    // down every surface built on this hook, so coerce before the loop.
+    for (const c of Array.isArray(convRows) ? convRows : []) {
       const kinds = c.pendingInputKinds?.length
         ? [...c.pendingInputKinds]
         : [

@@ -3,7 +3,7 @@ import { join } from 'path';
 import { cpus, loadavg } from 'os';
 import { Effect } from 'effect';
 import { isStartingWithinGrace } from './agent-grace.js';
-import { resumedBootReconciliationOutcome, skippedBootReconciliationOutcome, skippedBootReconciliationOutcomes, type BootReconciliationApplyResult, type BootReconciliationOutcome } from './boot-reconciliation-outcomes.js';
+import { alreadyRunningBootReconciliationOutcome, resumedBootReconciliationOutcome, skippedBootReconciliationOutcome, skippedBootReconciliationOutcomes, type BootReconciliationApplyResult, type BootReconciliationOutcome } from './boot-reconciliation-outcomes.js';
 import { isAgentIdleForNudge } from './agent-idle.js';
 import { getConcurrencyLimits, countRunningAgents, workResumeSlotsAvailable } from './concurrency.js';
 import { assessMemoryPressure } from './memory-governor.js';
@@ -997,6 +997,13 @@ export async function applyBootReconciliationDecision(
       // PAN-2500 memory-paced-boot: let RSS settle before the next candidate's
       // memory check (top of the next loop iteration) re-assesses.
       await new Promise(r => setTimeout(r, RSS_SETTLE_MS));
+    } else if (await Effect.runPromise(sessionExists(agent.id))) {
+      // PAN-3052: already live — the reactive stopped-event path won the race in
+      // the seconds between the operator saving the decision and this batch. It
+      // is counted in runningBefore, so it takes no slot; reporting it as a skip
+      // told the operator an agent was "not resumable" while it was running.
+      resumed.push(agent.id);
+      outcomes.push(alreadyRunningBootReconciliationOutcome(agent));
     } else {
       const skipReason = bootReconciliationSkipReason(agent) ?? 'other';
       skipped[skipReason]++;

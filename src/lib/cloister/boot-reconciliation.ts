@@ -4,6 +4,7 @@ import {
   type BootReconciliationDecision,
   getBootReconciliationState,
   setBootReconciliationDecision,
+  setBootReconciliationGrace,
   stampBootReconciliation,
 } from '../overdeck/control-settings.js';
 import {
@@ -17,6 +18,24 @@ import { isExplicitNoResumeRequest } from './no-resume-mode.js';
 import { bootReconciliationSkipReason } from './boot-reconciliation-predicates.js';
 
 export const DEFAULT_BOOT_RECONCILIATION_GRACE_SECS = 120;
+
+/**
+ * How many times the grace window may be pushed out because the operator is
+ * answering a different blocking question (an AskUserQuestion, a plan approval,
+ * a permission prompt). The dialog is time-boxed on purpose — expiry commits
+ * `hold_all`, which parks every candidate — so an operator who cannot even see
+ * the countdown must not lose the window. The cap keeps that bounded: a dialog
+ * nobody ever dismisses still resolves after grace * (1 + MAX_EXTENSIONS).
+ */
+export const MAX_BOOT_RECONCILIATION_GRACE_EXTENSIONS = 3;
+
+export interface BootReconciliationExtendResult {
+  extended: boolean;
+  graceDeadline: string | null;
+  graceExtensions: number;
+  maxGraceExtensions: number;
+  reason: 'extended' | 'not-pending' | 'cap-reached' | 'no-deadline';
+}
 
 type ReconciliationAgent = ReturnType<typeof listAllAgentsSync>[number];
 
@@ -35,6 +54,12 @@ export interface StartBootReconciliationOptions {
 }
 
 let graceTimer: ReturnType<typeof setTimeout> | null = null;
+/**
+ * The expiry hook the live timer was armed with. Held so `extendBootReconciliationGrace`
+ * can re-arm against the new deadline without the HTTP route having to know how
+ * the boot path wires the apply step.
+ */
+let graceExpiryHook: (() => void | Promise<void>) | null = null;
 
 function hasCompletionMarker(workspace: string | null): boolean {
   if (!workspace) return false;
@@ -112,9 +137,67 @@ export function getBootReconciliationHeldResumeSet(): Set<string> {
 }
 
 export function clearBootReconciliationGraceTimer(): void {
+  graceExpiryHook = null;
   if (!graceTimer) return;
   clearTimeout(graceTimer);
   graceTimer = null;
+}
+
+/**
+ * Push the grace deadline out by one full grace period. Only legal while the
+ * decision is still `pending`, and only up to MAX_BOOT_RECONCILIATION_GRACE_EXTENSIONS
+ * times per boot. The caller (the extend route) is expected to fire this while
+ * another blocking dialog is covering the boot modal.
+ */
+export function extendBootReconciliationGrace(now: Date = new Date()): BootReconciliationExtendResult {
+  const state = getBootReconciliationState();
+  const maxGraceExtensions = MAX_BOOT_RECONCILIATION_GRACE_EXTENSIONS;
+
+  if (state.decision !== 'pending') {
+    return {
+      extended: false,
+      graceDeadline: state.graceDeadline,
+      graceExtensions: state.graceExtensions,
+      maxGraceExtensions,
+      reason: 'not-pending',
+    };
+  }
+
+  if (state.graceExtensions >= maxGraceExtensions) {
+    return {
+      extended: false,
+      graceDeadline: state.graceDeadline,
+      graceExtensions: state.graceExtensions,
+      maxGraceExtensions,
+      reason: 'cap-reached',
+    };
+  }
+
+  const currentDeadlineMs = state.graceDeadline == null ? NaN : Date.parse(state.graceDeadline);
+  if (!Number.isFinite(currentDeadlineMs)) {
+    return {
+      extended: false,
+      graceDeadline: state.graceDeadline,
+      graceExtensions: state.graceExtensions,
+      maxGraceExtensions,
+      reason: 'no-deadline',
+    };
+  }
+
+  // Extend from whichever is later: the standing deadline, or now. A deadline
+  // that already slipped past (server was busy) must still yield a full window.
+  const graceMs = getBootReconciliationGraceSeconds() * 1000;
+  const base = Math.max(currentDeadlineMs, now.getTime());
+  const graceDeadline = new Date(base + graceMs).toISOString();
+  const graceExtensions = state.graceExtensions + 1;
+
+  setBootReconciliationGrace(graceDeadline, graceExtensions);
+  armBootReconciliationGraceTimer(graceDeadline, graceExpiryHook ?? undefined);
+  logDeaconEventSync(
+    `boot reconciliation grace extended to ${graceDeadline} (${graceExtensions}/${maxGraceExtensions}) — operator has another blocking dialog open`,
+  );
+
+  return { extended: true, graceDeadline, graceExtensions, maxGraceExtensions, reason: 'extended' };
 }
 
 export function armBootReconciliationGraceTimer(
@@ -125,6 +208,8 @@ export function armBootReconciliationGraceTimer(
   const deadlineMs = Date.parse(graceDeadline);
   if (!Number.isFinite(deadlineMs)) return false;
   const delayMs = Math.max(0, deadlineMs - Date.now());
+  // Retained so an extend can re-arm the same apply step against a later deadline.
+  graceExpiryHook = onGraceExpired;
 
   graceTimer = setTimeout(() => {
     graceTimer = null;

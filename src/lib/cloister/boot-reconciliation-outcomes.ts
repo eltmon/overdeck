@@ -1,5 +1,11 @@
 export type BootReconciliationOutcomeReason =
   | 'resumed'
+  /**
+   * The agent was already running by the time the batch reached it — the
+   * reactive stopped-event path beat the batch to it. That is a success, not a
+   * skip, and must not be reported as `no-resumable-session` (PAN-3052).
+   */
+  | 'already-running'
   | 'no-resumable-session'
   | 'deferred-concurrency'
   | 'deferred-load'
@@ -33,6 +39,13 @@ interface BootReconciliationOutcomeAgent {
 
 export function resumedBootReconciliationOutcome(agent: BootReconciliationOutcomeAgent): BootReconciliationOutcome {
   return { id: agent.id, issueId: agent.issueId, outcome: 'resumed', reason: 'resumed' };
+}
+
+/** Already running when the batch reached it — counted as resumed, not skipped. */
+export function alreadyRunningBootReconciliationOutcome(
+  agent: BootReconciliationOutcomeAgent,
+): BootReconciliationOutcome {
+  return { id: agent.id, issueId: agent.issueId, outcome: 'resumed', reason: 'already-running' };
 }
 
 export function skippedBootReconciliationOutcome(

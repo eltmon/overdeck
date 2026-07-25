@@ -53,9 +53,10 @@ This is the centerpiece and the thing you asked for. On dashboard boot:
 
 1. Compute the **reconciliation set**: agents that were running before the restart (SQLite `agents` table) whose tmux sessions are now gone.
 2. Enter a **grace window** (`startup.reconciliation_grace_secs`, default 30). During grace the deacon patrol runs (it's the recovery engine) but **holds its resume/dispatch actions for the reconciliation set**, and the flywheel is not auto-launched.
-3. Show a **reconciliation modal/banner** (PAN-2076): *"N agents were running before the restart. Auto-resuming in 0:29 — [Resume all] · [Keep all stopped] · [Review each]."*
-4. On expiry **or** [Resume all] → resume (the safe default; most restarts are benign). [Keep all stopped] → hold (the old no-resume outcome, now an explicit per-boot choice). [Review each] → per-agent disposition (PAN-2076).
+3. Show a **reconciliation modal/banner** (PAN-2076): *"N agents were held from the boot. Keeping all stopped in 0:29 — [Resume all] · [Keep all stopped] · [Review each]."*
+4. [Resume all] → resume. [Keep all stopped] → hold (the old no-resume outcome, now an explicit per-boot choice). [Review each] → per-agent disposition (PAN-2076). **On expiry → hold** — see the resolved decision below; the modal copy must state that outcome, never "auto-resuming" (PAN-3052).
 5. **Record the decision durably in SQLite** so a watchdog restart mid- or post-grace does not lose it.
+6. **Extend the window while another blocking dialog is open** (PAN-3052). The boot modal is the only surface on a deadline, and it renders above AskUserQuestion/plan-approval so it can never be the one hidden. While any other decision is pending, the client calls `POST /api/boot-reconciliation/extend`, which pushes the deadline out one grace period — capped at `MAX_BOOT_RECONCILIATION_GRACE_EXTENSIONS` (3), so an abandoned dialog still resolves after `grace × 4`.
 
 Result: resume-by-default becomes safe because the operator gets a window to abort and the brakes (#7) prevent a thundering herd — so **no-resume no longer needs to be the default**, which removes the entire death-loop class at the root.
 
@@ -81,7 +82,7 @@ This proposal is the architecture for the existing **Boot Reconciliation + Opera
 
 ## Decisions needed from the operator
 
-1. **Default grace length** (proposed 30s) and whether the default expiry action is **Resume** (recommended) or **Hold**.
+1. ~~**Default grace length** (proposed 30s) and whether the default expiry action is **Resume** (recommended) or **Hold**.~~ **Resolved:** grace defaults to 120s (`DEFAULT_BOOT_RECONCILIATION_GRACE_SECS`), and the expiry action is **Hold** — `armBootReconciliationGraceTimer` commits `hold_all`, locked by the "flips to hold_all when the grace timer expires" test. This reverses the recommendation above, so any surface describing the timer must say it holds. PAN-3052 fixed a modal that still promised "Auto-resuming all", telling the operator the opposite of what running the clock out does.
 2. **Is Freeze the canonical emergency stop?** (recommended yes — make it the prominent kill-switch, retire NO_RESUME-as-emergency-stop.)
 3. **Scope of first slice:** ship the grace+modal + durable resume state first (kills the death loops), then the unified status surface, then the scoped-control unification — or all under the PAN-2075 epic at once.
 

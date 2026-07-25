@@ -2,12 +2,14 @@ import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, CheckCircle2, Clock3, Pause, Play, Snowflake } from 'lucide-react';
 import { useAlert } from './DialogProvider';
+import { usePendingInputSubjects } from '../lib/useDecisions';
 
 export type BootReconciliationDecision = 'pending' | 'resume_all' | 'hold_all' | 'per_agent';
 export type BootReconciliationPerAgentAction = 'resume' | 'hold';
 export type BootReconciliationConcern = 'running_remote' | 'orphaned' | 'stopped_cleanly' | 'paused_troubled';
 export type BootReconciliationOutcomeReason =
   | 'resumed'
+  | 'already-running'
   | 'no-resumable-session'
   | 'deferred-concurrency'
   | 'deferred-load'
@@ -46,7 +48,15 @@ export interface BootReconciliationState {
   decidedAt: string | null;
   bootId: string | null;
   graceDeadline: string | null;
+  graceExtensions?: number;
+  maxGraceExtensions?: number;
+  /** Exactly what a decision acts on. */
   set: BootReconciliationAgent[];
+  /**
+   * Agents shown for awareness only — paused/troubled from earlier sessions, or
+   * running remote. No boot decision touches these.
+   */
+  context?: BootReconciliationAgent[];
 }
 
 export const BOOT_RECONCILIATION_QUERY_KEY = ['boot-reconciliation'] as const;
@@ -80,6 +90,11 @@ async function postBootReconciliationDecision(input: {
   return res.json();
 }
 
+async function extendBootReconciliationGrace(): Promise<void> {
+  const res = await fetch('/api/boot-reconciliation/extend', { method: 'POST' });
+  if (!res.ok) throw new Error(`POST /api/boot-reconciliation/extend -> ${res.status}`);
+}
+
 function formatDecisionSkipSummary(skipped: BootReconciliationSkipBreakdown = {}, deferred = 0): string {
   const labels: Array<[keyof BootReconciliationSkipBreakdown, string]> = [
     ['workspace_missing', 'workspace missing'],
@@ -97,6 +112,8 @@ function formatDecisionSkipSummary(skipped: BootReconciliationSkipBreakdown = {}
 
 function formatOutcomeReason(reason: string): string {
   switch (reason) {
+    case 'already-running':
+      return 'already running';
     case 'no-resumable-session':
       return 'no resumable session';
     case 'deferred-concurrency':
@@ -288,6 +305,29 @@ export function BootReconciliationModal() {
 
   const secondsLeft = useCountdown(data?.graceDeadline ?? null);
 
+  // PAN-3052: the boot dialog is the only surface with a deadline, and expiry
+  // commits `hold_all`. An operator answering an AskUserQuestion or a plan
+  // approval cannot also be watching this clock, so hold the window open while
+  // any other blocking decision is pending. The server caps how many times.
+  const pendingOtherDecisions = usePendingInputSubjects();
+  const otherDecisionOpen = pendingOtherDecisions.length > 0;
+  const graceExtensions = data?.graceExtensions ?? 0;
+  const maxGraceExtensions = data?.maxGraceExtensions ?? 0;
+  const graceHeldForDialog = otherDecisionOpen && graceExtensions < maxGraceExtensions;
+
+  useEffect(() => {
+    if (data?.decision !== 'pending' || !otherDecisionOpen) return;
+    if (graceExtensions >= maxGraceExtensions) return;
+    // Re-arm one window ahead of expiry rather than on a tick, so a slow render
+    // or a backgrounded tab cannot miss the extension.
+    if (secondsLeft > 30) return;
+    void extendBootReconciliationGrace().then(() => {
+      void queryClient.invalidateQueries({ queryKey: BOOT_RECONCILIATION_QUERY_KEY });
+    }).catch(() => {
+      // The cap or a decided window rejects the extend; the countdown just runs out.
+    });
+  }, [data?.decision, otherDecisionOpen, graceExtensions, maxGraceExtensions, secondsLeft, queryClient]);
+
   // PAN-2278: a hold_all / per_agent decision must stay visible — the boot
   // choice silently parks agents otherwise (the affordance NoResumeBanner used
   // to provide before PAN-2076 replaced it with this modal).
@@ -327,6 +367,7 @@ export function BootReconciliationModal() {
 
   const agentSet = Array.isArray(data.set) ? data.set : [];
   const resumableCount = agentSet.filter((agent) => !agent.readOnly).length;
+  const contextAgents = Array.isArray(data.context) ? data.context : [];
 
   // Nothing to reconcile — don't block the dashboard with an empty dialog.
   // The server keeps the grace window `pending` on purpose (PAN-2510: crashed
@@ -342,7 +383,7 @@ export function BootReconciliationModal() {
   };
 
   return (
-    <div className="fixed inset-0 z-[90] flex items-start justify-center overflow-y-auto bg-black/45 px-4 py-8 backdrop-blur-sm">
+    <div className="fixed inset-0 z-[110] flex items-start justify-center overflow-y-auto bg-black/45 px-4 py-8 backdrop-blur-sm">
       <section
         className="w-full max-w-5xl rounded-lg border badge-border-warning bg-card text-foreground shadow-2xl"
         data-testid="boot-reconciliation-modal"
@@ -357,9 +398,10 @@ export function BootReconciliationModal() {
               </div>
               <h2 className="mt-1 text-xl font-semibold text-foreground">Boot Reconciliation</h2>
               <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-                Agents are held from the boot at {formatTime(data.decidedAt ?? data.graceDeadline)}.
-                Resume all now, keep them stopped, or choose per agent. The server timer is
-                authoritative; no agent resumes before this boot decision is applied.
+                {resumableCount} stopped {resumableCount === 1 ? 'agent is' : 'agents are'} held from
+                the boot at {formatTime(data.decidedAt ?? data.graceDeadline)}. Resume them now, keep
+                them stopped, or choose per agent. The server timer is authoritative; no agent
+                resumes before this boot decision is applied.
               </p>
             </div>
             <div className="flex items-center gap-3 rounded-md border badge-border-warning badge-bg-warning px-3 py-2">
@@ -367,8 +409,21 @@ export function BootReconciliationModal() {
                 {secondsLeft}
               </div>
               <div className="text-sm">
-                <div className="font-semibold text-warning-foreground">Auto-resuming all in {formatCountdown(secondsLeft)}</div>
-                <div className="text-xs text-warning-foreground/70">Concurrency brakes cap the rate.</div>
+                {/*
+                  PAN-3052: this used to read "Auto-resuming all in …", which is the
+                  opposite of what the server does. Grace expiry commits `hold_all`
+                  (boot-reconciliation.ts — the safe timeout default from PAN-2076),
+                  so letting the clock run parks every candidate. The copy must state
+                  the outcome the timer actually produces.
+                */}
+                <div className="font-semibold text-warning-foreground">
+                  Keeping {resumableCount === 1 ? 'it' : 'all'} stopped in {formatCountdown(secondsLeft)}
+                </div>
+                <div className="text-xs text-warning-foreground/70">
+                  {graceHeldForDialog
+                    ? `Paused — answer the other open question first (${graceExtensions}/${maxGraceExtensions} extensions used).`
+                    : 'If the timer runs out, nothing resumes until you say so.'}
+                </div>
               </div>
             </div>
           </div>
@@ -446,6 +501,27 @@ export function BootReconciliationModal() {
               </div>
             );
           })}
+
+          {contextAgents.length > 0 && (
+            <details className="rounded-md border border-border/70 bg-background/40" data-testid="boot-reconciliation-context">
+              <summary className="cursor-pointer px-3 py-2 text-sm text-muted-foreground">
+                Not part of this boot decision ({contextAgents.length}) — paused, troubled, or
+                running remote from earlier sessions
+              </summary>
+              <div className="divide-y divide-border/60 border-t border-border/70">
+                {contextAgents.map((agent) => (
+                  <div
+                    key={agent.id}
+                    className="flex flex-wrap items-baseline gap-2 px-3 py-2"
+                    data-testid={`boot-reconciliation-context-row-${agent.issueId}`}
+                  >
+                    <span className="font-mono text-sm font-semibold text-foreground">{agent.issueId}</span>
+                    <span className="text-xs text-muted-foreground">{agent.whyStopped}</span>
+                  </div>
+                ))}
+              </div>
+            </details>
+          )}
         </div>
 
         <div className="flex flex-wrap items-center gap-2 border-t border-border/70 px-5 py-4">

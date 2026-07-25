@@ -370,6 +370,7 @@ export const BOOT_RECONCILIATION_DECIDED_AT_KEY = 'boot_reconciliation.decided_a
 export const BOOT_RECONCILIATION_BOOT_ID_KEY = 'boot_reconciliation.boot_id';
 export const BOOT_RECONCILIATION_BOOT_STARTED_AT_KEY = 'boot_reconciliation.boot_started_at';
 export const BOOT_RECONCILIATION_GRACE_DEADLINE_KEY = 'boot_reconciliation.grace_deadline';
+export const BOOT_RECONCILIATION_GRACE_EXTENSIONS_KEY = 'boot_reconciliation.grace_extensions';
 
 export type BootReconciliationDecision = 'pending' | 'resume_all' | 'hold_all' | 'per_agent';
 export type BootReconciliationPerAgentAction = 'resume' | 'hold';
@@ -382,6 +383,13 @@ export interface BootReconciliationState {
   bootId: string | null;
   bootStartedAt: string | null;
   graceDeadline: string | null;
+  /**
+   * How many times this boot's grace window has been extended because the
+   * operator was answering a different blocking question. Reset to 0 on every
+   * new boot stamp; capped by MAX_BOOT_RECONCILIATION_GRACE_EXTENSIONS so a
+   * stuck dialog can never hold the window open forever.
+   */
+  graceExtensions: number;
 }
 
 const BOOT_RECONCILIATION_DECISIONS = new Set<BootReconciliationDecision>([
@@ -437,6 +445,11 @@ function parseBootReconciliationPerAgent(value: string | null): BootReconciliati
   }
 }
 
+function parseBootReconciliationGraceExtensions(value: string | null): number {
+  const parsed = value == null ? NaN : Number.parseInt(value, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+}
+
 export function getBootReconciliationState(): BootReconciliationState {
   return {
     decision: parseBootReconciliationDecision(getSetting(BOOT_RECONCILIATION_DECISION_KEY)),
@@ -445,6 +458,9 @@ export function getBootReconciliationState(): BootReconciliationState {
     bootId: getSetting(BOOT_RECONCILIATION_BOOT_ID_KEY),
     bootStartedAt: getSetting(BOOT_RECONCILIATION_BOOT_STARTED_AT_KEY),
     graceDeadline: getSetting(BOOT_RECONCILIATION_GRACE_DEADLINE_KEY),
+    graceExtensions: parseBootReconciliationGraceExtensions(
+      getSetting(BOOT_RECONCILIATION_GRACE_EXTENSIONS_KEY),
+    ),
   };
 }
 
@@ -461,6 +477,17 @@ export function stampBootReconciliation(bootId: string, graceDeadline: string, b
   setSetting(BOOT_RECONCILIATION_BOOT_ID_KEY, bootId);
   setSetting(BOOT_RECONCILIATION_BOOT_STARTED_AT_KEY, bootStartedAt);
   setSetting(BOOT_RECONCILIATION_GRACE_DEADLINE_KEY, graceDeadline);
+  // A fresh boot starts with a fresh extension budget.
+  setSetting(BOOT_RECONCILIATION_GRACE_EXTENSIONS_KEY, '0');
+}
+
+/**
+ * Push this boot's grace deadline out without touching the decision. Used only
+ * by the extend door, which owns the extension cap.
+ */
+export function setBootReconciliationGrace(graceDeadline: string, graceExtensions: number): void {
+  setSetting(BOOT_RECONCILIATION_GRACE_DEADLINE_KEY, graceDeadline);
+  setSetting(BOOT_RECONCILIATION_GRACE_EXTENSIONS_KEY, String(graceExtensions));
 }
 
 /** Synchronous check of the global Deacon pause flag. */

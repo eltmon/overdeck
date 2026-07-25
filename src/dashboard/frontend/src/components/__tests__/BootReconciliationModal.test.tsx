@@ -94,14 +94,46 @@ describe('BootReconciliationModal', () => {
     vi.unstubAllGlobals();
   });
 
-  it('formats a 120-second auto-resume countdown as 2:00', async () => {
+  // PAN-3052: the countdown must name the outcome the server actually commits on
+  // expiry. `armBootReconciliationGraceTimer` sets `hold_all`, so a dialog that
+  // promised "Auto-resuming all" told the operator the exact opposite of what
+  // letting the clock run does.
+  it('formats a 120-second countdown as 2:00 and states that expiry holds, not resumes', async () => {
     vi.spyOn(Date, 'now').mockReturnValue(new Date('2026-06-29T15:00:00.000Z').getTime());
     renderModal(vi.fn(async () => jsonResponse({
       ...pendingState,
       graceDeadline: '2026-06-29T15:02:00.000Z',
     })));
 
-    expect(await screen.findByText('Auto-resuming all in 2:00')).toBeInTheDocument();
+    expect(await screen.findByText('Keeping all stopped in 2:00')).toBeInTheDocument();
+    expect(screen.queryByText(/Auto-resuming/)).not.toBeInTheDocument();
+    expect(screen.getByText('If the timer runs out, nothing resumes until you say so.')).toBeInTheDocument();
+  });
+
+  it('renders context rows in a separate section that no decision acts on', async () => {
+    renderModal(vi.fn(async () => jsonResponse({
+      ...pendingState,
+      context: [
+        {
+          id: 'agent-pan-2167',
+          issueId: 'PAN-2167',
+          role: 'work',
+          model: 'claude-sonnet-4-6',
+          whyStopped: 'paused: awaiting close-out (verify on main)',
+          concern: 'paused_troubled',
+          lastActivity: '2026-06-01T00:00:00.000Z',
+          cost: null,
+          remote: false,
+          readOnly: true,
+        },
+      ],
+    })));
+
+    const context = await screen.findByTestId('boot-reconciliation-context');
+    expect(within(context).getByText(/Not part of this boot decision \(1\)/)).toBeInTheDocument();
+    expect(within(context).getByText('PAN-2167')).toBeInTheDocument();
+    // The candidate list stays clean — a context row is never a decision row.
+    expect(screen.queryByTestId('boot-reconciliation-row-PAN-2167')).not.toBeInTheDocument();
   });
 
   it('renders grouped held agents and keeps read-only rows non-resumable', async () => {

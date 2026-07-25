@@ -2,8 +2,10 @@ import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
 import {
+  extendBootReconciliationGrace,
   isBootReconciliationCandidate,
   listBootReconciliationCandidates,
+  MAX_BOOT_RECONCILIATION_GRACE_EXTENSIONS,
 } from '../../../lib/cloister/boot-reconciliation.js';
 import { applyBootReconciliationDecision } from '../../../lib/cloister/deacon.js';
 import { sessionExists } from '../../../lib/tmux.js';
@@ -62,31 +64,52 @@ const getBootReconciliationRoute = HttpRouter.add(
   Effect.sync(() => {
     const state = getBootReconciliationState();
     const candidateIds = new Set(listBootReconciliationCandidates().map((agent) => agent.id));
-    const agents = listAllAgentsSync()
-      .filter((agent) => agent.role === 'work' && (
-        candidateIds.has(agent.id)
-        || agent.paused === true
+    const toRow = (agent: BootReconciliationAgent) => ({
+      id: agent.id,
+      issueId: agent.issueId,
+      role: agent.role,
+      model: agent.model,
+      whyStopped: bootReconciliationWhyStopped(agent),
+      concern: bootReconciliationConcern(agent),
+      lastActivity: agent.lastActivity ?? agent.updatedAt ?? null,
+      cost: agent.costSoFar ?? null,
+      remote: Boolean(agent.hostOverride),
+      readOnly: bootReconciliationReadOnly(agent),
+    });
+
+    // `set` is exactly what a decision acts on. Everything else the operator may
+    // want to see at boot — agents paused or troubled from earlier sessions, or
+    // running remote — goes in `context`, which no decision touches. Mixing the
+    // two made a 2-candidate boot render a 22-row dialog under a "Resume all"
+    // button, so the operator read "resumed 1" as a failure (PAN-3052).
+    const workAgents = listAllAgentsSync().filter((agent) => agent.role === 'work');
+    const set = workAgents.filter((agent) => candidateIds.has(agent.id)).map(toRow);
+    const context = workAgents
+      .filter((agent) => !candidateIds.has(agent.id) && (
+        agent.paused === true
         || agent.troubled === true
         || Boolean(agent.hostOverride)
       ))
-      .map((agent) => ({
-        id: agent.id,
-        issueId: agent.issueId,
-        role: agent.role,
-        model: agent.model,
-        whyStopped: bootReconciliationWhyStopped(agent),
-        concern: bootReconciliationConcern(agent),
-        lastActivity: agent.lastActivity ?? agent.updatedAt ?? null,
-        cost: agent.costSoFar ?? null,
-        remote: Boolean(agent.hostOverride),
-        readOnly: bootReconciliationReadOnly(agent),
-      }));
+      .map(toRow);
 
     return jsonResponse({
       ...state,
-      set: agents,
+      maxGraceExtensions: MAX_BOOT_RECONCILIATION_GRACE_EXTENSIONS,
+      set,
+      context,
     });
   }),
+);
+
+/**
+ * Push the grace deadline out while the operator is answering a different
+ * blocking dialog. Bounded server-side by MAX_BOOT_RECONCILIATION_GRACE_EXTENSIONS;
+ * the client may call this freely and the cap decides.
+ */
+const postBootReconciliationExtendRoute = HttpRouter.add(
+  'POST',
+  '/api/boot-reconciliation/extend',
+  httpHandler(Effect.sync(() => jsonResponse({ ok: true, ...extendBootReconciliationGrace() }))),
 );
 
 function isBootReconciliationDecision(value: unknown): value is BootReconciliationDecision {
@@ -136,4 +159,5 @@ const postBootReconciliationDecisionRoute = HttpRouter.add(
 export const bootReconciliationRouteLayer = Layer.mergeAll(
   getBootReconciliationRoute,
   postBootReconciliationDecisionRoute,
+  postBootReconciliationExtendRoute,
 );
