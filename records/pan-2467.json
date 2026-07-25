@@ -22,7 +22,7 @@
   ],
   "feedback": [],
   "created": "2026-07-25T20:42:32.108Z",
-  "updated": "2026-07-25T21:42:05.395Z",
+  "updated": "2026-07-25T21:43:58.730Z",
   "pipeline": {
     "issueId": "PAN-2467",
     "reviewStatus": "pending",
@@ -81,16 +81,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 13,
-    "claims": {
-      "guard-test": {
-        "writerId": "agent-pan-2467",
-        "agentId": "agent-pan-2467",
-        "pid": 2326590,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-25T21:42:05.395Z"
-      }
-    },
+    "sequence": 14,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2467",
@@ -157,6 +149,17 @@
         "outcome": "completed",
         "reason": "Added unmerged_sibling_repo to the shared merge blocker filter and covered dashboard and CLI payload visibility",
         "releasedAt": "2026-07-25T21:41:49.076Z"
+      },
+      {
+        "writerId": "agent-pan-2467",
+        "agentId": "agent-pan-2467",
+        "pid": 2326590,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-25T21:42:05.395Z",
+        "itemId": "guard-test",
+        "outcome": "completed",
+        "reason": "Added route-level regression coverage proving a stranded required sibling returns 409 without lifecycle and a change-free sibling permits merged completion",
+        "releasedAt": "2026-07-25T21:43:58.730Z"
       }
     ],
     "statusReasons": {
@@ -183,6 +186,10 @@
       "blocker-surface": {
         "reason": "Added unmerged_sibling_repo to the shared merge blocker filter and covered dashboard and CLI payload visibility",
         "updatedAt": "2026-07-25T21:41:49.076Z"
+      },
+      "guard-test": {
+        "reason": "Added route-level regression coverage proving a stranded required sibling returns 409 without lifecycle and a change-free sibling permits merged completion",
+        "updatedAt": "2026-07-25T21:43:58.730Z"
       }
     }
   },
@@ -214,6 +221,9 @@
     "blocker-surface": "completed",
     "blocker-surface.blocker-surface.ac1": "completed",
     "blocker-surface.blocker-surface.ac2": "completed",
-    "guard-test": "running"
+    "guard-test": "completed",
+    "guard-test.guard-test.ac1": "completed",
+    "guard-test.guard-test.ac2": "completed",
+    "guard-test.guard-test.ac3": "completed"
   }
 }
