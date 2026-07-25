@@ -302,7 +302,11 @@ export function IssueDetail({ issueId, density, agents, reviewStatus, tab, onSel
   );
 
   const conversationPane = (
-    <div data-section="DrawerAgentSession"><DrawerAgentSession
+    // The wrapper must be a constrained flex column (min-h-0 + flex-1): as a
+    // plain block div its min-height:auto content floor blew out the grid
+    // cell, so MessagesTimeline's overflow-y:auto never engaged and the
+    // drawer conversation could not scroll (clipped by the drawer aside).
+    <div data-section="DrawerAgentSession" className="flex min-h-0 flex-1 flex-col"><DrawerAgentSession
       view="conversation"
       agents={agents}
       agentId={effectiveAgentId}
@@ -371,7 +375,7 @@ export function IssueDetail({ issueId, density, agents, reviewStatus, tab, onSel
           ) : tab === 'conversation' ? (
             conversationPane
           ) : tab === 'terminal' ? (
-            <div data-section="DrawerAgentSession"><DrawerAgentSession
+            <div data-section="DrawerAgentSession" className="flex min-h-0 flex-1 flex-col"><DrawerAgentSession
               view="terminal"
               agents={agents}
               agentId={effectiveAgentId}
