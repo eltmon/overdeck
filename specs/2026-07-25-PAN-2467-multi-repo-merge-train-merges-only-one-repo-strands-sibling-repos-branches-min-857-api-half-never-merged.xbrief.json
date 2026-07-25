@@ -4,17 +4,17 @@
     "created": "2026-07-25T20:56:00.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2467: Multi-repo merge train merges only one repo, strands sibling repos' branches (MIN-857 api half never merged)",
-    "updated": "2026-07-25T20:56:37.743Z"
+    "updated": "2026-07-25T20:56:39.654Z"
   },
   "plan": {
     "id": "pan-2467",
     "title": "Multi-repo merge train merges only one repo, strands sibling repos' branches (MIN-857 api half never merged)",
-    "status": "approved",
+    "status": "running",
     "uid": "66e0ce90-035d-4aa0-b020-20fce1c3b938",
     "author": "agent:claude-fable-5",
-    "sequence": 5,
+    "sequence": 6,
     "created": "2026-07-25T20:56:00.000Z",
-    "updated": "2026-07-25T20:56:37.743Z",
+    "updated": "2026-07-25T20:56:39.654Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2467",
