@@ -4,7 +4,7 @@
     "created": "2026-07-25T21:17:08Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3076: Polyrepo verdict anchors: 5 wrapper-blind stamp/compare sites need the composite HeadAnchor fix (stamp + compare together)",
-    "updated": "2026-07-25T21:23:54.570Z"
+    "updated": "2026-07-25T21:23:56.522Z"
   },
   "plan": {
     "id": "pan-3076",
@@ -12,9 +12,9 @@
     "status": "approved",
     "uid": "df79b859-61e3-4600-9c31-2fd3b75014df",
     "author": "agent:claude-fable-5",
-    "sequence": 3,
+    "sequence": 5,
     "created": "2026-07-25T21:17:08Z",
-    "updated": "2026-07-25T21:23:54.570Z",
+    "updated": "2026-07-25T21:23:56.522Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3076",
