@@ -15,8 +15,59 @@
     }
   ],
   "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      "scripts/file-size-baseline.txt",
+      "src/lib/cloister/sync-main-workspace.ts",
+      "tests/lib/project-repos.test.ts",
+      "tests/unit/cli/sync-main.test.ts",
+      "tests/unit/lib/cloister/sync-main-timeouts.test.ts"
+    ],
+    "declaredScopeUntouched": [
+      "src/lib/__tests__/project-repos-primary-dir.test.ts"
+    ],
+    "declaredScope": [
+      "docs/SPECIALIST_WORKFLOW.md",
+      "src/cli/commands/start.ts",
+      "src/cli/commands/sync-main.ts",
+      "src/dashboard/server/routes/agents/listing.ts",
+      "src/dashboard/server/routes/agents/shared.ts",
+      "src/dashboard/server/routes/specialists/project-routes.ts",
+      "src/dashboard/server/routes/workspaces/merge-ops.ts",
+      "src/lib/__tests__/project-repos-primary-dir.test.ts",
+      "src/lib/cloister/__tests__/sync-main-polyrepo.test.ts",
+      "src/lib/cloister/merge-agent.ts",
+      "src/lib/cloister/review-agent.ts",
+      "src/lib/cloister/review-convoy.ts",
+      "src/lib/project-repos.ts",
+      "src/lib/review-status.ts",
+      "sync-sources/skills/pan-sync-main/SKILL.md"
+    ],
+    "actualChangedFiles": [
+      "docs/SPECIALIST_WORKFLOW.md",
+      "scripts/file-size-baseline.txt",
+      "src/cli/commands/start.ts",
+      "src/cli/commands/sync-main.ts",
+      "src/dashboard/server/routes/agents/listing.ts",
+      "src/dashboard/server/routes/agents/shared.ts",
+      "src/dashboard/server/routes/specialists/project-routes.ts",
+      "src/dashboard/server/routes/workspaces/merge-ops.ts",
+      "src/lib/cloister/__tests__/sync-main-polyrepo.test.ts",
+      "src/lib/cloister/merge-agent.ts",
+      "src/lib/cloister/review-agent.ts",
+      "src/lib/cloister/review-convoy.ts",
+      "src/lib/cloister/sync-main-workspace.ts",
+      "src/lib/project-repos.ts",
+      "src/lib/review-status.ts",
+      "sync-sources/skills/pan-sync-main/SKILL.md",
+      "tests/lib/project-repos.test.ts",
+      "tests/unit/cli/sync-main.test.ts",
+      "tests/unit/lib/cloister/sync-main-timeouts.test.ts"
+    ],
+    "recordedAt": "2026-07-25T22:13:33.131Z"
+  },
   "created": "2026-07-25T20:44:21.373Z",
-  "updated": "2026-07-25T22:13:35.842Z",
+  "updated": "2026-07-25T22:13:39.508Z",
   "pipeline": {
     "issueId": "PAN-3037",
     "reviewStatus": "pending",
@@ -26,8 +77,9 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-25T22:13:35.841Z",
+    "updatedAt": "2026-07-25T22:13:39.139Z",
     "inspectNotes": "All 5 ACs met: per-repo iteration with repoKey-prefixed paths, conflict abort leaves repo quiescent and skips remaining repos, aggregate alreadyUpToDate requires all repos current, monorepo keeps unprefixed single-element shape, abort returns cancellation + skipped entries. Extraction into sync-main-workspace.ts is logic-identical; baseline 1404 matches actual wc -l.",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3079",
     "reviewRequestedAt": "2026-07-25T22:13:35.841Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -79,8 +131,7 @@
         "tests/unit/lib/cloister/sync-main-timeouts.test.ts"
       ],
       "recordedAt": "2026-07-25T22:13:33.131Z"
-    },
-    "prUrl": "https://github.com/eltmon/overdeck/pull/3079"
+    }
   },
   "closeOut": {
     "usage": {
@@ -95,9 +146,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 871244,
-            "output": 82409,
-            "cacheRead": 21287936,
+            "input": 1443983,
+            "output": 141504,
+            "cacheRead": 79517184,
             "cacheWrite": 0
           }
         }
@@ -110,22 +161,24 @@
           "cacheWrite": 311392
         },
         "openai/gpt-5.6-sol": {
-          "input": 871244,
-          "output": 82409,
-          "cacheRead": 21287936,
+          "input": 1443983,
+          "output": 141504,
+          "cacheRead": 79517184,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 30.622816,
-        "pricingAsOf": "2026-07-25T21:16:49.494Z"
+        "usd": 64.373985,
+        "pricingAsOf": "2026-07-25T22:13:39.175Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/3079"
+    ],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-opus-5",
+  "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
     "sequence": 16,
@@ -286,56 +339,5 @@
     "docs-and-skill": "completed",
     "docs-and-skill.docs-and-skill.ac1": "completed",
     "docs-and-skill.docs-and-skill.ac2": "completed"
-  },
-  "scopeDrift": {
-    "outsideDeclaredScope": [
-      "scripts/file-size-baseline.txt",
-      "src/lib/cloister/sync-main-workspace.ts",
-      "tests/lib/project-repos.test.ts",
-      "tests/unit/cli/sync-main.test.ts",
-      "tests/unit/lib/cloister/sync-main-timeouts.test.ts"
-    ],
-    "declaredScopeUntouched": [
-      "src/lib/__tests__/project-repos-primary-dir.test.ts"
-    ],
-    "declaredScope": [
-      "docs/SPECIALIST_WORKFLOW.md",
-      "src/cli/commands/start.ts",
-      "src/cli/commands/sync-main.ts",
-      "src/dashboard/server/routes/agents/listing.ts",
-      "src/dashboard/server/routes/agents/shared.ts",
-      "src/dashboard/server/routes/specialists/project-routes.ts",
-      "src/dashboard/server/routes/workspaces/merge-ops.ts",
-      "src/lib/__tests__/project-repos-primary-dir.test.ts",
-      "src/lib/cloister/__tests__/sync-main-polyrepo.test.ts",
-      "src/lib/cloister/merge-agent.ts",
-      "src/lib/cloister/review-agent.ts",
-      "src/lib/cloister/review-convoy.ts",
-      "src/lib/project-repos.ts",
-      "src/lib/review-status.ts",
-      "sync-sources/skills/pan-sync-main/SKILL.md"
-    ],
-    "actualChangedFiles": [
-      "docs/SPECIALIST_WORKFLOW.md",
-      "scripts/file-size-baseline.txt",
-      "src/cli/commands/start.ts",
-      "src/cli/commands/sync-main.ts",
-      "src/dashboard/server/routes/agents/listing.ts",
-      "src/dashboard/server/routes/agents/shared.ts",
-      "src/dashboard/server/routes/specialists/project-routes.ts",
-      "src/dashboard/server/routes/workspaces/merge-ops.ts",
-      "src/lib/cloister/__tests__/sync-main-polyrepo.test.ts",
-      "src/lib/cloister/merge-agent.ts",
-      "src/lib/cloister/review-agent.ts",
-      "src/lib/cloister/review-convoy.ts",
-      "src/lib/cloister/sync-main-workspace.ts",
-      "src/lib/project-repos.ts",
-      "src/lib/review-status.ts",
-      "sync-sources/skills/pan-sync-main/SKILL.md",
-      "tests/lib/project-repos.test.ts",
-      "tests/unit/cli/sync-main.test.ts",
-      "tests/unit/lib/cloister/sync-main-timeouts.test.ts"
-    ],
-    "recordedAt": "2026-07-25T22:13:33.131Z"
   }
 }
