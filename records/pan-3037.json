@@ -352,18 +352,18 @@
     "recordedAt": "2026-07-25T22:13:33.131Z"
   },
   "created": "2026-07-25T20:44:21.373Z",
-  "updated": "2026-07-25T23:10:25.077Z",
+  "updated": "2026-07-25T23:10:30.941Z",
   "pipeline": {
     "issueId": "PAN-3037",
     "reviewStatus": "passed",
-    "testStatus": "pending",
+    "testStatus": "testing",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-25T22:20:18.803Z",
-    "updatedAt": "2026-07-25T23:10:23.779Z",
+    "updatedAt": "2026-07-25T23:10:30.933Z",
     "reviewNotes": "Configured target-branch conflict resolution is fixed and verified; no blocking findings remain",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
@@ -438,9 +438,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 17075017,
-            "output": 277004,
-            "cacheRead": 44023296,
+            "input": 17077761,
+            "output": 277152,
+            "cacheRead": 44419584,
             "cacheWrite": 0
           }
         },
@@ -461,15 +461,15 @@
           "cacheWrite": 311392
         },
         "openai/gpt-5.6-sol": {
-          "input": 20074959,
-          "output": 431440,
-          "cacheRead": 138432000,
+          "input": 20077703,
+          "output": 431588,
+          "cacheRead": 138828288,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 195.68435300000002,
-        "pricingAsOf": "2026-07-25T23:10:23.827Z"
+        "usd": 195.900657,
+        "pricingAsOf": "2026-07-25T23:10:30.935Z"
       }
     },
     "merges": [
@@ -478,7 +478,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
     "sequence": 16,
