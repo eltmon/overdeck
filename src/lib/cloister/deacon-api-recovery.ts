@@ -290,6 +290,41 @@ export async function checkApiErrorAgents(): Promise<string[]> {
     const hasPrompt = tmuxOutput.includes('❯');
     if (!hasPrompt) continue;
 
+    // ── Compacted-and-idle recovery (PAN-3057) ──────────────────────────────
+    // The tier above only knows about compactions Overdeck itself sent. The
+    // harness compacts on its own — notably when resuming a session whose turn
+    // was interrupted — and a manual `/compact` ends the turn, so the agent goes
+    // idle and no resume path considers it (it never stopped). Read the fact
+    // from the transcript instead of from who pressed the button. This runs
+    // BEFORE the overflow/high-water tiers so a just-compacted agent gets a
+    // nudge rather than a second compaction.
+    try {
+      const { maybeContinueCompactedAgent } = await import('./compaction-continuation.js');
+      const { findLastCompactBoundary } = await import(
+        '../../dashboard/server/services/conversation-service.js'
+      );
+      const { deliverAgentMessage } = await import('../agents/delivery.js');
+      const continued = await maybeContinueCompactedAgent({
+        agentId: sessionName,
+        tmuxOutput,
+        now,
+        send: (target, message) => deliverAgentMessage(target, message, 'deacon:compaction-continuation'),
+        findBoundary: findLastCompactBoundary,
+      });
+      if (continued) {
+        emitActivityEntrySync({
+          source: 'cloister',
+          level: 'warn',
+          message: `${sessionName} stopped after a context compaction — continuing it`,
+          issueId: getAgentStateSync(sessionName)?.issueId,
+        });
+        actions.push(continued);
+        continue;
+      }
+    } catch (err) {
+      console.error(`[deacon] Compaction-continuation check failed for ${sessionName}:`, err);
+    }
+
     // ── Context-window overflow recovery (distinct from transient errors) ──
     // A 400 "input exceeds the context window" cannot be retried by continuing.
     // Recover by compacting; once the compaction has settled and the overflow

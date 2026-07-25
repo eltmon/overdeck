@@ -15,6 +15,7 @@ The Deacon is Overdeck's health monitor, running as part of the dashboard server
 | **Dead Planning Sessions** | Planning tmux with remain-on-exit, process dead | Immediate | Kill session + reset | N/A |
 | **Context-Window Wedged** | Recent terminal tail shows `input exceeds the context window` 400 | Immediate | Mark `wedged`, Overdeck-side compaction → `/clear` + reseed → stuck | 1 clear tier |
 | **Context High-Water** | Idle work agent reaches ≥85% of effective context window | Immediate | Proactive `/compact` before the hard ceiling | Cooldown-guarded |
+| **Compacted-and-Idle** | Transcript's last `compact_boundary` has no model turn after it, pane idle | Immediate | Continue nudge from the compacted summary | 10 min per agent |
 | **Specialist Timeout** | Specialist active >15 min without completing | 15 min | Force-kill | N/A |
 | **Merge-Ready Reminder** | Issue readyForMerge for >1 hour, human hasn't clicked MERGE | 1 hour | Dashboard notification | 3 reminders |
 | **Deleted Workspaces** | readyForMerge=true but workspace directory gone | Immediate | Clear readyForMerge | N/A |
@@ -65,6 +66,15 @@ The Deacon is Overdeck's health monitor, running as part of the dashboard server
 - **Manual recovery:** Operators can drive the same Overdeck-side compaction by hand with **`pan resume <id> --compact`**, or the **"Resume (compact)"** action on the dashboard's IssueAgentCard (`POST /api/agents/:id/resume` with `{ compact: true }`). `resumeAgent({ compact: true })` compacts the JSONL **before** the zombie-session kill; if compaction fails it returns an error **without** killing the live session, leaving it intact for the `/clear` fallback.
 - **Scope note:** Non-agent sessions (specialist/planning) and the **proactive 85% high-water trigger** intentionally still use the harness `/compact` — those sessions are not yet past the hard ceiling, so `/compact` still works and preserves more conversation context than a JSONL rewrite.
 - **Proactive trigger:** For idle work agents below the hard overflow state, the deacon computes current JSONL context usage and sends one cooldown-guarded `/compact` at the 85% high-water mark. This prevents the wedge instead of waiting for the 400.
+
+### Compacted-and-Idle Recovery (`maybeContinueCompactedAgent`)
+- **File:** `src/lib/cloister/compaction-continuation.ts`, called from `checkApiErrorAgents`
+- **Runs:** Every patrol cycle, before the overflow and high-water tiers
+- **Why it exists (PAN-3057):** a *manual* `/compact` ends the turn — the harness writes the summary and drops to an idle prompt with nothing re-driving it. Overdeck's own compactions are covered by `deliverOrchestratedCompact()`, which registers the session for a follow-up nudge. But Claude Code also compacts on its own, notably when resuming a session whose turn was interrupted, and those agents were invisible to every recovery path: they never *stopped*, so `handleAgentStoppedEvent` skipped them. On 2026-07-25 a host restart left six MYN agents idle this way.
+- **Detection:** read the fact from the transcript rather than from who sent the compact — a `compact_boundary` with no model turn after it means the session compacted and never resumed. Synthetic assistant entries (`model: "<synthetic>"`, the harness answering its own meta message) do not count as a turn; neither do the summary, the `/compact` command echo, replayed file attachments, or hook results. A non-meta user message after the boundary means someone already prompted it, so the patrol stays out. This signal survives a dashboard restart, unlike the in-memory continuation map.
+- **Gate:** the agent must be `running`, not paused/troubled/operator-stopped, and must have **no completion marker** — a handed-off agent is never told to "continue" (PAN-2974: a resumed one re-ran verification and fired review commands mid-UAT).
+- **Action:** deliver a role-aware continue message through `deliverAgentMessage` (work agents are pointed at `pan task show`; other roles are told to finish and signal through their lifecycle command). Both say *do not start over*.
+- **Loop guard:** 10-minute per-agent cooldown. Self-correcting — once the agent takes a turn, the boundary has a model turn after it and the trigger goes quiet.
 
 ### Orphaned Agents (`recoverOrphanedAgents`)
 - **File:** `src/lib/cloister/deacon.ts:2362-2395`

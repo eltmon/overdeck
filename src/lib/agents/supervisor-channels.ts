@@ -36,7 +36,7 @@ export function buildDefaultResumeContinueMessage(issueId: string): string {
 }
 
 /** Completed marker check: the agent dir's own markers, or the workspace's. */
-function hasCompletionMarkerForAgent(state: AgentState): boolean {
+export function hasCompletionMarkerForAgent(state: AgentState): boolean {
   const agentDir = getAgentDir(state.id);
   if (existsSync(join(agentDir, 'completed')) || existsSync(join(agentDir, 'completed.processed'))) return true;
   const workspace = state.workspace;
