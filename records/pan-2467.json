@@ -22,7 +22,7 @@
   ],
   "feedback": [],
   "created": "2026-07-25T20:42:32.108Z",
-  "updated": "2026-07-25T21:44:14.447Z",
+  "updated": "2026-07-25T21:47:02.802Z",
   "pipeline": {
     "issueId": "PAN-2467",
     "reviewStatus": "pending",
@@ -81,16 +81,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 15,
-    "claims": {
-      "docs-completeness-gate": {
-        "writerId": "agent-pan-2467",
-        "agentId": "agent-pan-2467",
-        "pid": 2384375,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-25T21:44:14.447Z"
-      }
-    },
+    "sequence": 16,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2467",
@@ -168,6 +160,17 @@
         "outcome": "completed",
         "reason": "Added route-level regression coverage proving a stranded required sibling returns 409 without lifecycle and a change-free sibling permits merged completion",
         "releasedAt": "2026-07-25T21:43:58.730Z"
+      },
+      {
+        "writerId": "agent-pan-2467",
+        "agentId": "agent-pan-2467",
+        "pid": 2384375,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-25T21:44:14.447Z",
+        "itemId": "docs-completeness-gate",
+        "outcome": "completed",
+        "reason": "Documented the per-repo evidence and fail-closed gate plus operator blocker visibility and recovery actions",
+        "releasedAt": "2026-07-25T21:47:02.802Z"
       }
     ],
     "statusReasons": {
@@ -198,6 +201,10 @@
       "guard-test": {
         "reason": "Added route-level regression coverage proving a stranded required sibling returns 409 without lifecycle and a change-free sibling permits merged completion",
         "updatedAt": "2026-07-25T21:43:58.730Z"
+      },
+      "docs-completeness-gate": {
+        "reason": "Documented the per-repo evidence and fail-closed gate plus operator blocker visibility and recovery actions",
+        "updatedAt": "2026-07-25T21:47:02.802Z"
       }
     }
   },
@@ -233,6 +240,8 @@
     "guard-test.guard-test.ac1": "completed",
     "guard-test.guard-test.ac2": "completed",
     "guard-test.guard-test.ac3": "completed",
-    "docs-completeness-gate": "running"
+    "docs-completeness-gate": "completed",
+    "docs-completeness-gate.docs-completeness-gate.ac1": "completed",
+    "docs-completeness-gate.docs-completeness-gate.ac2": "completed"
   }
 }
