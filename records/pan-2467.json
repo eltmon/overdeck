@@ -2,7 +2,7 @@
   "issueId": "PAN-2467",
   "schemaVersion": 2,
   "created": "2026-07-25T20:42:32.108Z",
-  "updated": "2026-07-25T20:42:32.108Z",
+  "updated": "2026-07-25T20:42:32.831Z",
   "pipeline": {
     "issueId": "PAN-2467",
     "reviewStatus": "pending",
@@ -25,5 +25,7 @@
       "note": "Planning session started for PAN-2467: Multi-repo merge train merges only one repo, strands sibling repos' branches (MIN-857 api half never merged)",
       "timestamp": "2026-07-25T20:42:32.108Z"
     }
-  ]
+  ],
+  "harness": "claude-code",
+  "model": "claude-fable-5"
 }
