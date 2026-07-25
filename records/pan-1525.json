@@ -239,10 +239,10 @@
     "recordedAt": "2026-07-24T23:08:31.650Z"
   },
   "created": "2026-07-12T09:32:29.900Z",
-  "updated": "2026-07-25T01:51:43.475Z",
+  "updated": "2026-07-25T01:53:28.155Z",
   "pipeline": {
     "issueId": "PAN-1525",
-    "reviewStatus": "pending",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -250,11 +250,11 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-24T23:12:31.996Z",
-    "updatedAt": "2026-07-25T01:51:42.256Z",
-    "reviewNotes": "Review dispatch deferred: merge conflict with main must be resolved before review dispatch",
+    "updatedAt": "2026-07-25T01:53:28.107Z",
+    "reviewNotes": "Rebase introduced committed composer-manifest drift: workspace add-repo syntax is stale and a clean checkout fails the required manifest lint gate.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3033",
     "lastVerifiedCommit": "1c64f86d2f98357e43e341f8b5e2bbe6304237df",
-    "reviewSpawnedAt": "2026-07-25T01:20:57.876Z",
+    "reviewSpawnedAt": "2026-07-25T01:51:42.282Z",
     "strikeRecoveryCount": 0
   },
   "closeOut": {
@@ -278,9 +278,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 5641288,
-            "output": 280130,
-            "cacheRead": 91968512,
+            "input": 6431728,
+            "output": 289822,
+            "cacheRead": 97345536,
             "cacheWrite": 0
           }
         },
@@ -317,9 +317,9 @@
           "cacheWrite": 921870
         },
         "openai/gpt-5.6-sol": {
-          "input": 19068807,
-          "output": 1312687,
-          "cacheRead": 671316480,
+          "input": 19859247,
+          "output": 1322379,
+          "cacheRead": 676693504,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -330,8 +330,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 508.576436,
-        "pricingAsOf": "2026-07-25T01:51:42.290Z"
+        "usd": 515.507908,
+        "pricingAsOf": "2026-07-25T01:53:28.136Z"
       }
     },
     "merges": [
