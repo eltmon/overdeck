@@ -4,7 +4,9 @@ import { Effect } from 'effect';
 
 import { resolveProjectFromIssueSync } from '../projects.js';
 import { isGitHubAppConfigured, listPullRequestsForHead } from '../github-app.js';
+import { getMergeSetSync } from '../merge-set.js';
 import { resolveGitHubIssueSync } from '../tracker-utils.js';
+import { assessMergeCompleteness } from './merge-completeness.js';
 
 const execAsync = promisify(exec);
 
@@ -17,6 +19,23 @@ export interface PostMergeLifecycleOptions {
 
 function shellQuote(value: string): string {
   return `'${value.replace(/'/g, `'"'"'`)}'`;
+}
+
+async function requireCompletePolyrepoMerge(
+  issueId: string,
+  mergedResult: { merged: true; reason: string },
+): Promise<{ merged: boolean; reason: string }> {
+  const mergeSet = getMergeSetSync(issueId);
+  if (!mergeSet || mergeSet.repos.length <= 1) return mergedResult;
+
+  const completeness = await assessMergeCompleteness(issueId);
+  if (!completeness.complete) {
+    return {
+      merged: false,
+      reason: `sibling repo(s) unmerged: ${completeness.summary}`,
+    };
+  }
+  return mergedResult;
 }
 
 export async function verifyMergedBeforeLifecycle(
@@ -41,7 +60,10 @@ export async function verifyMergedBeforeLifecycle(
       const prs = await Effect.runPromise(listPullRequestsForHead(owner, repo, branchName, 'all'));
       const mergedPr = prs.find((pr) => pr.merged === true || pr.mergedAt != null);
       if (mergedPr) {
-        return { merged: true, reason: `GitHub PR #${mergedPr.number} is merged` };
+        return requireCompletePolyrepoMerge(issueId, {
+          merged: true,
+          reason: `GitHub PR #${mergedPr.number} is merged`,
+        });
       }
 
       const verifiedMergedRef = options?.verifiedMergedRef?.trim();
@@ -70,7 +92,10 @@ export async function verifyMergedBeforeLifecycle(
     const prs = JSON.parse(stdout || '[]') as Array<{ number: number; state: 'open' | 'closed' | 'MERGED'; mergedAt: string | null }>;
     const mergedPr = prs.find((pr) => (pr.state === 'closed' || pr.state === 'MERGED') && pr.mergedAt != null);
     if (mergedPr) {
-      return { merged: true, reason: `GitHub PR #${mergedPr.number} is merged` };
+      return requireCompletePolyrepoMerge(issueId, {
+        merged: true,
+        reason: `GitHub PR #${mergedPr.number} is merged`,
+      });
     }
 
     const verifiedMergedRef = options?.verifiedMergedRef?.trim();
