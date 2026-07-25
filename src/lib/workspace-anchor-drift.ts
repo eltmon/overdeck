@@ -16,7 +16,18 @@ export type WorkspaceAnchorDriftVerdict =
   | { kind: 'current'; currentAnchor: HeadAnchor }
   | { kind: 'benign'; currentAnchor: HeadAnchor; changedRepos?: string[] }
   | { kind: 'drifted'; currentAnchor: HeadAnchor; changedRepos?: string[] }
-  | { kind: 'unreadable'; currentAnchor?: HeadAnchor };
+  | { kind: 'unreadable' };
+
+export interface WorkspaceAnchorDriftChecks {
+  sameTree(repoPath: string, leftCommit: string, rightCommit: string): Promise<boolean>;
+  sameEffectiveCode(repoPath: string, leftCommit: string, rightCommit: string): Promise<boolean>;
+  sameCodeContribution(
+    repoPath: string,
+    leftCommit: string,
+    rightCommit: string,
+    baseRef: string,
+  ): Promise<boolean>;
+}
 
 async function haveSameTree(repoPath: string, leftCommit: string, rightCommit: string): Promise<boolean> {
   const [left, right] = await Promise.all([
@@ -26,15 +37,30 @@ async function haveSameTree(repoPath: string, leftCommit: string, rightCommit: s
   return left.stdout.trim() === right.stdout.trim();
 }
 
+const DEFAULT_CHECKS: WorkspaceAnchorDriftChecks = {
+  sameTree: haveSameTree,
+  sameEffectiveCode: haveSameEffectiveCodeCommit,
+  sameCodeContribution: haveSameCodeContribution,
+};
+
 async function isBenignMove(
   repoPath: string,
   leftCommit: string,
   rightCommit: string,
   baseRef: string,
+  checks: WorkspaceAnchorDriftChecks,
 ): Promise<boolean> {
-  if (await haveSameTree(repoPath, leftCommit, rightCommit)) return true;
-  if (await haveSameEffectiveCodeCommit(repoPath, leftCommit, rightCommit)) return true;
-  return haveSameCodeContribution(repoPath, leftCommit, rightCommit, baseRef);
+  try {
+    if (await checks.sameTree(repoPath, leftCommit, rightCommit)) return true;
+  } catch { /* a failed proof falls through to the next independent check */ }
+  try {
+    if (await checks.sameEffectiveCode(repoPath, leftCommit, rightCommit)) return true;
+  } catch { /* a failed proof falls through to the next independent check */ }
+  try {
+    return await checks.sameCodeContribution(repoPath, leftCommit, rightCommit, baseRef);
+  } catch {
+    return false;
+  }
 }
 
 /** Compare a persisted workspace anchor with a fresh producer-issued snapshot. */
@@ -42,6 +68,7 @@ export async function evaluateWorkspaceAnchorDrift(
   issueId: string,
   workspacePath: string,
   storedAnchor: HeadAnchor,
+  checks: WorkspaceAnchorDriftChecks = DEFAULT_CHECKS,
 ): Promise<WorkspaceAnchorDriftVerdict> {
   const currentAnchor = await snapshotWorkspaceHeadsPromise(issueId, workspacePath);
   if (!currentAnchor) return { kind: 'unreadable' };
@@ -62,12 +89,13 @@ export async function evaluateWorkspaceAnchorDrift(
 
     if (!storedIsComposite) {
       const root = roots[0];
-      if (!root) return { kind: 'unreadable', currentAnchor };
+      if (!root) return { kind: 'drifted', currentAnchor };
       const benign = await isBenignMove(
         root.dir,
         storedAnchor,
         currentAnchor,
         `origin/${root.targetBranch}`,
+        checks,
       );
       return benign
         ? { kind: 'benign', currentAnchor }
@@ -92,13 +120,14 @@ export async function evaluateWorkspaceAnchorDrift(
       const storedHead = storedHeads.get(repoKey);
       const currentHead = currentHeads.get(repoKey);
       if (!root || !storedHead || !currentHead) {
-        return { kind: 'unreadable', currentAnchor };
+        return { kind: 'drifted', currentAnchor, changedRepos };
       }
       if (!await isBenignMove(
         root.dir,
         storedHead,
         currentHead,
         `origin/${root.targetBranch}`,
+        checks,
       )) {
         return { kind: 'drifted', currentAnchor, changedRepos };
       }
@@ -106,6 +135,6 @@ export async function evaluateWorkspaceAnchorDrift(
 
     return { kind: 'benign', currentAnchor, changedRepos };
   } catch {
-    return { kind: 'unreadable', currentAnchor };
+    return { kind: 'drifted', currentAnchor };
   }
 }

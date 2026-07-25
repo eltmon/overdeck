@@ -9,10 +9,10 @@ interface AnchorWrite {
   file: string;
   field: AnchorField;
   line: number;
+  expression: string;
 }
 
-interface AllowedWriteSite {
-  fields: readonly AnchorField[];
+interface AllowedWriteSite extends AnchorWrite {
   reason: string;
 }
 
@@ -22,104 +22,57 @@ const ANCHOR_FIELDS = new Set<AnchorField>([
   'roleRunHead',
 ]);
 
-const ALLOWED_WRITE_SITES: Record<string, AllowedWriteSite> = {
-  'packages/contracts/src/types.ts': {
-    fields: ['reviewedAtCommit', 'lastVerifiedCommit', 'roleRunHead'],
-    reason: 'Wire schemas intentionally remain unbranded strings at serialization boundaries.',
-  },
-  'src/cli/commands/specialists/done.ts': {
-    fields: ['reviewedAtCommit'],
-    reason: 'The review verdict CLI stamps the producer-issued workspace snapshot.',
-  },
-  'src/dashboard/server/read-model.ts': {
-    fields: ['reviewedAtCommit'],
-    reason: 'The dashboard read model projects persisted status without fabricating an anchor.',
-  },
-  'src/dashboard/server/routes/specialists/legacy-routes.ts': {
-    fields: ['reviewedAtCommit'],
-    reason: 'The legacy review verdict route stamps snapshotWorkspaceHeadsPromise output.',
-  },
-  'src/dashboard/server/routes/workspaces/review-control.ts': {
-    fields: ['reviewedAtCommit'],
-    reason: 'Review reset explicitly clears the prior anchor with undefined.',
-  },
-  'src/dashboard/server/routes/workspaces.ts': {
-    fields: ['reviewedAtCommit'],
-    reason: 'The review status route stamps snapshotWorkspaceHeadsPromise output.',
-  },
-  'src/lib/agents/agent-state.ts': {
-    fields: ['roleRunHead'],
-    reason: 'Agent-state deserialization copies the persisted storage value.',
-  },
-  'src/lib/agents/spawn.ts': {
-    fields: ['roleRunHead'],
-    reason: 'Role spawn stamps snapshotWorkspaceHeadsPromise output.',
-  },
-  'src/lib/cloister/deacon-review-status.ts': {
-    fields: ['reviewedAtCommit'],
-    reason: 'Review recovery stamps snapshotWorkspaceHeadsPromise output.',
-  },
-  'src/lib/cloister/deacon.ts': {
-    fields: ['reviewedAtCommit', 'lastVerifiedCommit'],
-    reason: 'The deacon logs stored anchors, stamps producer/evaluator output, and clears stale verdicts.',
-  },
-  'src/lib/cloister/verification-runner.ts': {
-    fields: ['lastVerifiedCommit'],
-    reason: 'Verification stamps snapshotWorkspaceHeadsPromise output.',
-  },
-  'src/lib/database/agent-backfill.ts': {
-    fields: ['roleRunHead'],
-    reason: 'The database backfill maps the storage column name.',
-  },
-  'src/lib/database/agent-mappers.ts': {
-    fields: ['roleRunHead'],
-    reason: 'The database mapper serializes the already-stamped runtime value.',
-  },
-  'src/lib/database/agents-db.ts': {
-    fields: ['roleRunHead'],
-    reason: 'The database mapper deserializes the persisted runtime value.',
-  },
-  'src/lib/database/review-status-db.ts': {
-    fields: ['reviewedAtCommit', 'lastVerifiedCommit'],
-    reason: 'The database mapper deserializes persisted review anchors.',
-  },
-  'src/lib/overdeck/agent-state-sync.ts': {
-    fields: ['roleRunHead'],
-    reason: 'Agent cache reconciliation copies the persisted runtime value.',
-  },
-  'src/lib/overdeck/agents.ts': {
-    fields: ['roleRunHead'],
-    reason: 'Agent cache mapping deserializes the persisted runtime value.',
-  },
-  'src/lib/overdeck/review-status-record-sync.ts': {
-    fields: ['reviewedAtCommit', 'lastVerifiedCommit'],
-    reason: 'The durable record mirror copies already-validated review anchors.',
-  },
-  'src/lib/overdeck/review-status-sync.ts': {
-    fields: ['reviewedAtCommit', 'lastVerifiedCommit'],
-    reason: 'Review cache mapping deserializes persisted review anchors.',
-  },
-  'src/lib/pan-dir/records.ts': {
-    fields: ['reviewedAtCommit', 'lastVerifiedCommit'],
-    reason: 'The durable record writer mirrors already-validated review anchors.',
-  },
-  'src/lib/pan-dir/verdict-restore.ts': {
-    fields: ['reviewedAtCommit', 'lastVerifiedCommit'],
-    reason: 'Verdict restoration explicitly rehydrates stored strings at the write door.',
-  },
-  'src/lib/reconstruct/reconstruct-cache.ts': {
-    fields: ['reviewedAtCommit', 'lastVerifiedCommit', 'roleRunHead'],
-    reason: 'Cache reconstruction copies values from durable storage into cache models.',
-  },
-  'src/lib/reopen.ts': {
-    fields: ['reviewedAtCommit'],
-    reason: 'Reopening an issue explicitly clears the prior review anchor.',
-  },
-  'src/lib/review-status.ts': {
-    fields: ['reviewedAtCommit', 'lastVerifiedCommit'],
-    reason: 'Starting fresh work explicitly clears both review anchors.',
-  },
-};
+function allow(
+  file: string,
+  field: AnchorField,
+  line: number,
+  expression: string,
+  reason: string,
+): AllowedWriteSite {
+  return { file, field, line, expression, reason };
+}
+
+const ALLOWED_WRITE_SITES: AllowedWriteSite[] = [
+  allow('src/cli/commands/specialists/done.ts', 'reviewedAtCommit', 159, 'update.reviewedAtCommit = workspaceHead', 'Producer-fed review verdict CLI stamp.'),
+  allow('src/dashboard/server/read-model.ts', 'reviewedAtCommit', 336, 'reviewedAtCommit: status.reviewedAtCommit || undefined', 'Read-model projection of persisted status.'),
+  allow('src/dashboard/server/routes/specialists/legacy-routes.ts', 'reviewedAtCommit', 304, 'reviewedAtCommit: headAnchor', 'Producer-fed legacy review verdict stamp.'),
+  allow('src/dashboard/server/routes/workspaces/review-control.ts', 'reviewedAtCommit', 283, 'reviewedAtCommit: undefined', 'Explicit review-reset clear.'),
+  allow('src/dashboard/server/routes/workspaces.ts', 'reviewedAtCommit', 1466, 'update.reviewedAtCommit = headAnchor', 'Producer-fed review status route stamp.'),
+  allow('src/lib/agents/agent-state.ts', 'roleRunHead', 246, 'roleRunHead: raw.roleRunHead', 'Agent-state storage deserialization.'),
+  allow('src/lib/agents/spawn.ts', 'roleRunHead', 470, 'state.roleRunHead = headAnchor', 'Producer-fed role-run stamp.'),
+  allow('src/lib/cloister/deacon-review-status.ts', 'reviewedAtCommit', 544, "reviewUpdate['reviewedAtCommit'] = await snapshotWorkspaceHeadsPromise(issueId, workspacePath)", 'Producer-fed review recovery stamp.'),
+  allow('src/lib/cloister/deacon.ts', 'reviewedAtCommit', 1336, 'reviewedAtCommit: status.reviewedAtCommit', 'Diagnostic nudge payload mirrors persisted status.'),
+  allow('src/lib/cloister/deacon.ts', 'lastVerifiedCommit', 1337, 'lastVerifiedCommit: status.lastVerifiedCommit', 'Diagnostic nudge payload mirrors persisted status.'),
+  allow('src/lib/cloister/deacon.ts', 'reviewedAtCommit', 1535, 'reviewedAtCommit', 'Producer-fed verification-bypass stamp.'),
+  allow('src/lib/cloister/deacon.ts', 'reviewedAtCommit', 1606, 'reviewedAtCommit: verdict.currentAnchor', 'Drift evaluator advances a proven-benign anchor.'),
+  allow('src/lib/cloister/deacon.ts', 'reviewedAtCommit', 1622, 'reviewedAtCommit: undefined', 'Explicit stale-review clear.'),
+  allow('src/lib/cloister/verification-runner.ts', 'lastVerifiedCommit', 892, 'lastVerifiedCommit', 'Producer-fed verification stamp.'),
+  allow('src/lib/database/agent-backfill.ts', 'roleRunHead', 73, "roleRunHead: 'role_run_head'", 'Database backfill column mapping.'),
+  allow('src/lib/database/agent-mappers.ts', 'roleRunHead', 49, 'roleRunHead: state.roleRunHead ?? null', 'Agent runtime serialization.'),
+  allow('src/lib/database/agents-db.ts', 'roleRunHead', 104, "roleRunHead: (row['role_run_head'] as string | null) ?? null", 'Agent runtime deserialization.'),
+  allow('src/lib/database/review-status-db.ts', 'reviewedAtCommit', 479, 'reviewedAtCommit: row.reviewed_at_commit ?? undefined', 'Review cache deserialization.'),
+  allow('src/lib/database/review-status-db.ts', 'lastVerifiedCommit', 489, 'lastVerifiedCommit: row.last_verified_commit ?? undefined', 'Review cache deserialization.'),
+  allow('src/lib/overdeck/agent-state-sync.ts', 'roleRunHead', 171, 'roleRunHead: row.role_run_head ?? undefined', 'Agent cache reconciliation.'),
+  allow('src/lib/overdeck/agents.ts', 'roleRunHead', 1099, "roleRunHead: (row['role_run_head'] as string | null) ?? null", 'Agent cache deserialization.'),
+  allow('src/lib/overdeck/review-status-record-sync.ts', 'reviewedAtCommit', 121, 'reviewedAtCommit: p.reviewedAtCommit', 'Durable record mirror of validated status.'),
+  allow('src/lib/overdeck/review-status-record-sync.ts', 'lastVerifiedCommit', 122, 'lastVerifiedCommit: p.lastVerifiedCommit', 'Durable record mirror of validated status.'),
+  allow('src/lib/overdeck/review-status-sync.ts', 'reviewedAtCommit', 115, 'reviewedAtCommit: row.reviewed_at_commit ?? undefined', 'Review cache deserialization.'),
+  allow('src/lib/overdeck/review-status-sync.ts', 'lastVerifiedCommit', 127, 'lastVerifiedCommit: row.last_verified_commit ?? undefined', 'Review cache deserialization.'),
+  allow('src/lib/pan-dir/records.ts', 'reviewedAtCommit', 124, 'reviewedAtCommit: status.reviewedAtCommit', 'Durable record serialization of validated status.'),
+  allow('src/lib/pan-dir/records.ts', 'lastVerifiedCommit', 125, 'lastVerifiedCommit: status.lastVerifiedCommit', 'Durable record serialization of validated status.'),
+  allow('src/lib/pan-dir/verdict-restore.ts', 'reviewedAtCommit', 64, 'reviewedAtCommit: pipeline.reviewedAtCommit ? rehydrateHeadAnchor(pipeline.reviewedAtCommit) : undefined', 'Explicit durable-record rehydration.'),
+  allow('src/lib/pan-dir/verdict-restore.ts', 'lastVerifiedCommit', 68, 'lastVerifiedCommit: pipeline.lastVerifiedCommit ? rehydrateHeadAnchor(pipeline.lastVerifiedCommit) : undefined', 'Explicit durable-record rehydration.'),
+  allow('src/lib/reconstruct/reconstruct-cache.ts', 'roleRunHead', 88, 'roleRunHead: state.roleRunHead || undefined', 'Cache reconstruction from durable state.'),
+  allow('src/lib/reconstruct/reconstruct-cache.ts', 'reviewedAtCommit', 200, 'reviewedAtCommit: pipeline.reviewedAtCommit', 'Cache reconstruction from durable state.'),
+  allow('src/lib/reconstruct/reconstruct-cache.ts', 'lastVerifiedCommit', 201, 'lastVerifiedCommit: pipeline.lastVerifiedCommit', 'Cache reconstruction from durable state.'),
+  allow('src/lib/reconstruct/reconstruct-cache.ts', 'roleRunHead', 330, 'roleRunHead: agent.roleRunHead ?? undefined', 'Cache reconstruction from agent storage.'),
+  allow('src/lib/reopen.ts', 'reviewedAtCommit', 78, 'reviewedAtCommit: undefined', 'Explicit reopen clear.'),
+  allow('src/lib/review-status.ts', 'reviewedAtCommit', 640, 'reviewedAtCommit: undefined', 'Explicit work-start clear.'),
+  allow('src/lib/review-status.ts', 'lastVerifiedCommit', 641, 'lastVerifiedCommit: undefined', 'Explicit work-start clear.'),
+  allow('packages/contracts/src/types.ts', 'roleRunHead', 304, 'roleRunHead: Schema.optional(Schema.String)', 'Unbranded wire schema boundary.'),
+  allow('packages/contracts/src/types.ts', 'reviewedAtCommit', 381, 'reviewedAtCommit: Schema.optional(Schema.String)', 'Unbranded wire schema boundary.'),
+  allow('packages/contracts/src/types.ts', 'lastVerifiedCommit', 383, 'lastVerifiedCommit: Schema.optional(Schema.String)', 'Unbranded wire schema boundary.'),
+];
 
 function propertyName(node: ts.PropertyName): string | undefined {
   if (ts.isIdentifier(node) || ts.isStringLiteral(node)) return node.text;
@@ -136,6 +89,7 @@ function scanSource(file: string, source: string): AnchorWrite[] {
       file,
       field: field as AnchorField,
       line: sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1,
+      expression: node.getText(sourceFile).replace(/\s+/g, ' '),
     });
   }
 
@@ -176,34 +130,57 @@ function scanRepository(): AnchorWrite[] {
   ));
 }
 
-function violations(writes: AnchorWrite[]): AnchorWrite[] {
-  return writes.filter((write) => {
-    const allowed = ALLOWED_WRITE_SITES[write.file];
-    return !allowed || !allowed.fields.includes(write.field);
-  });
+function sameWrite(left: AnchorWrite, right: AnchorWrite): boolean {
+  return left.file === right.file
+    && left.field === right.field
+    && left.line === right.line
+    && left.expression === right.expression;
+}
+
+function violations(
+  writes: AnchorWrite[],
+  allowed: readonly AllowedWriteSite[] = ALLOWED_WRITE_SITES,
+): AnchorWrite[] {
+  return writes.filter(write => !allowed.some(site => sameWrite(write, site)));
+}
+
+function withoutReasons(sites: readonly AllowedWriteSite[]): AnchorWrite[] {
+  return sites.map(({ reason: _reason, ...write }) => write);
+}
+
+function sortWrites(writes: AnchorWrite[]): AnchorWrite[] {
+  return [...writes].sort((left, right) =>
+    `${left.file}:${left.line}:${left.field}`.localeCompare(`${right.file}:${right.line}:${right.field}`),
+  );
 }
 
 describe('HeadAnchor write-site inventory', () => {
-  it('allows only documented producer, clear, mirror, and deserializer sites', () => {
+  it('locks every documented write occurrence, source expression, and location', () => {
     const writes = scanRepository();
     expect(violations(writes)).toEqual([]);
-
-    const observed = new Set(writes.map(write => `${write.file}:${write.field}`));
-    const allowed = Object.entries(ALLOWED_WRITE_SITES).flatMap(([file, site]) => {
-      expect(site.reason.length).toBeGreaterThan(20);
-      return site.fields.map(field => `${file}:${field}`);
-    });
-    expect([...observed].sort()).toEqual(allowed.sort());
+    expect(sortWrites(writes)).toEqual(sortWrites(withoutReasons(ALLOWED_WRITE_SITES)));
+    for (const site of ALLOWED_WRITE_SITES) expect(site.reason.length).toBeGreaterThan(15);
   });
 
-  it('flags an unlisted raw-string write with its file and line', () => {
+  it('flags a raw write added beside a legitimate write in an allowlisted file', () => {
+    const file = 'src/lib/agents/spawn.ts';
     const writes = scanSource(
-      'src/lib/unlisted-anchor-writer.ts',
-      "const update = { reviewedAtCommit: 'raw-string' };\n",
+      file,
+      "const headAnchor = producer();\nstate.roleRunHead = headAnchor;\nstate.roleRunHead = 'raw-string';\n",
     );
+    const allowed = [allow(
+      file,
+      'roleRunHead',
+      2,
+      'state.roleRunHead = headAnchor',
+      'Fixture producer-fed write.',
+    )];
 
-    expect(violations(writes)).toEqual([
-      { file: 'src/lib/unlisted-anchor-writer.ts', field: 'reviewedAtCommit', line: 1 },
-    ]);
+    expect(violations(writes, allowed)).toEqual([{
+      file,
+      field: 'roleRunHead',
+      line: 3,
+      expression: "state.roleRunHead = 'raw-string'",
+    }]);
   });
 });

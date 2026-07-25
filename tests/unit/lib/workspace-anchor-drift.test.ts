@@ -22,7 +22,10 @@ import {
   rehydrateHeadAnchor,
   snapshotWorkspaceHeadsPromise,
 } from '../../../src/lib/git-utils.js';
-import { evaluateWorkspaceAnchorDrift } from '../../../src/lib/workspace-anchor-drift.js';
+import {
+  evaluateWorkspaceAnchorDrift,
+  type WorkspaceAnchorDriftChecks,
+} from '../../../src/lib/workspace-anchor-drift.js';
 
 function git(cwd: string, ...args: string[]): string {
   return execFileSync('git', args, { cwd, encoding: 'utf-8' }).trim();
@@ -48,6 +51,17 @@ function root(repoKey: string, dir: string, isPolyrepo: boolean) {
     sourceBranch: 'feature/pan-3076',
     targetBranch: 'main',
     isPolyrepo,
+  };
+}
+
+function checks(
+  overrides: Partial<WorkspaceAnchorDriftChecks> = {},
+): WorkspaceAnchorDriftChecks {
+  return {
+    sameTree: vi.fn().mockResolvedValue(false),
+    sameEffectiveCode: vi.fn().mockResolvedValue(false),
+    sameCodeContribution: vi.fn().mockResolvedValue(false),
+    ...overrides,
   };
 }
 
@@ -151,6 +165,80 @@ describe('evaluateWorkspaceAnchorDrift', () => {
       repo,
       storedAnchor!,
     )).resolves.toMatchObject({ kind: 'drifted' });
+  });
+
+  it('continues to later benign checks when the tree lookup fails', async () => {
+    const repo = initializeRepo(workspace, 'repo');
+    repoRootsMock.resolveWorkspaceRepoRootsSync.mockReturnValue([root('overdeck', repo, false)]);
+    const storedAnchor = await snapshotWorkspaceHeadsPromise('PAN-3076', repo);
+    writeFileSync(join(repo, 'app.ts'), "export const name = 'changed';\n");
+    git(repo, 'add', 'app.ts');
+    git(repo, 'commit', '-m', 'rewrite code');
+    const sameCodeContribution = vi.fn().mockResolvedValue(false);
+    const probeChecks = checks({
+      sameTree: vi.fn().mockRejectedValue(new Error('tree unavailable')),
+      sameEffectiveCode: vi.fn().mockResolvedValue(true),
+      sameCodeContribution,
+    });
+
+    await expect(evaluateWorkspaceAnchorDrift(
+      'PAN-3076',
+      repo,
+      storedAnchor!,
+      probeChecks,
+    )).resolves.toMatchObject({ kind: 'benign' });
+    expect(probeChecks.sameEffectiveCode).toHaveBeenCalledOnce();
+    expect(sameCodeContribution).not.toHaveBeenCalled();
+  });
+
+  it('returns drifted when every benign comparison fails', async () => {
+    const repo = initializeRepo(workspace, 'repo');
+    repoRootsMock.resolveWorkspaceRepoRootsSync.mockReturnValue([root('overdeck', repo, false)]);
+    const storedAnchor = await snapshotWorkspaceHeadsPromise('PAN-3076', repo);
+    writeFileSync(join(repo, 'app.ts'), "export const name = 'changed';\n");
+    git(repo, 'add', 'app.ts');
+    git(repo, 'commit', '-m', 'uninspectable code move');
+    const probeChecks = checks({
+      sameTree: vi.fn().mockRejectedValue(new Error('tree unavailable')),
+      sameEffectiveCode: vi.fn().mockRejectedValue(new Error('history unavailable')),
+      sameCodeContribution: vi.fn().mockRejectedValue(new Error('patch unavailable')),
+    });
+
+    await expect(evaluateWorkspaceAnchorDrift(
+      'PAN-3076',
+      repo,
+      storedAnchor!,
+      probeChecks,
+    )).resolves.toMatchObject({ kind: 'drifted' });
+    expect(probeChecks.sameTree).toHaveBeenCalledOnce();
+    expect(probeChecks.sameEffectiveCode).toHaveBeenCalledOnce();
+    expect(probeChecks.sameCodeContribution).toHaveBeenCalledOnce();
+  });
+
+  it('returns drifted when a changed composite repo has no resolved root', async () => {
+    const fe = initializeRepo(workspace, 'fe');
+    const api = initializeRepo(workspace, 'api');
+    const bothRoots = [root('fe', fe, true), root('api', api, true)];
+    repoRootsMock.resolveWorkspaceRepoRootsSync.mockReturnValue(bothRoots);
+    const storedAnchor = await snapshotWorkspaceHeadsPromise('PAN-3076', workspace);
+    writeFileSync(join(api, 'app.ts'), "export const name = 'changed';\n");
+    git(api, 'add', 'app.ts');
+    git(api, 'commit', '-m', 'change api');
+    const currentAnchor = await snapshotWorkspaceHeadsPromise('PAN-3076', workspace);
+    repoRootsMock.resolveWorkspaceRepoRootsSync
+      .mockReset()
+      .mockReturnValueOnce(bothRoots)
+      .mockReturnValueOnce([root('fe', fe, true)]);
+
+    await expect(evaluateWorkspaceAnchorDrift(
+      'PAN-3076',
+      workspace,
+      storedAnchor!,
+    )).resolves.toEqual({
+      kind: 'drifted',
+      currentAnchor,
+      changedRepos: ['api'],
+    });
   });
 
   it('reports unreadable when no current workspace head can be produced', async () => {
