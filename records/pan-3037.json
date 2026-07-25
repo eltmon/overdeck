@@ -282,9 +282,27 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-25T22:39:28.405Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-25T22:49Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-25T22:49:47.653Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-25T22:49:47.905Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-25T22:49:47Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-3037\n\nConfigured target-branch conflicts are auto-resolved from origin/main, risking wrong or deleted pipeline artifacts\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3037 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "scripts/file-size-baseline.txt",
@@ -337,7 +355,7 @@
     "recordedAt": "2026-07-25T22:13:33.131Z"
   },
   "created": "2026-07-25T20:44:21.373Z",
-  "updated": "2026-07-25T22:49:47.028Z",
+  "updated": "2026-07-25T22:49:47.906Z",
   "pipeline": {
     "issueId": "PAN-3037",
     "reviewStatus": "blocked",
