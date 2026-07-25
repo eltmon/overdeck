@@ -1,8 +1,9 @@
 import { getAllReviewStatusesFromDb } from '../overdeck/review-status-sync.js';
 
 /**
- * PRs that passed review but cannot merge for a GitHub-native reason (PAN-1620):
- * merge_conflict / failing_checks / not_mergeable. These sit forever unless rebased.
+ * PRs that passed review but cannot merge for a native gate reason (PAN-1620):
+ * merge conflicts, failing checks, a not-mergeable state, or a sibling repo stranded
+ * with unmerged commits and no merged review artifact.
  *
  * Reads `review_status` directly from SQLite — NO HTTP — so it works inside a
  * network-sandboxed harness (e.g. codex's bwrap sandbox) where a `curl` to the
@@ -10,7 +11,12 @@ import { getAllReviewStatusesFromDb } from '../overdeck/review-status-sync.js';
  * Shared by the dashboard route and the `pan flywheel merge-blockers` CLI so the
  * two surfaces can never disagree.
  */
-const MERGE_BLOCKER_TYPES = new Set(['merge_conflict', 'failing_checks', 'not_mergeable']);
+const MERGE_BLOCKER_TYPES = new Set([
+  'merge_conflict',
+  'failing_checks',
+  'not_mergeable',
+  'unmerged_sibling_repo',
+]);
 
 export interface MergeBlocker {
   issueId: string;
