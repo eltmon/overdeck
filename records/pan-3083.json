@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-25T22:42:08.234Z",
-  "updated": "2026-07-25T23:07:08.234Z",
+  "updated": "2026-07-25T23:08:17.550Z",
   "pipeline": {
     "issueId": "PAN-3083",
     "reviewStatus": "pending",
@@ -59,16 +59,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "uat-generation-regression-test": {
-        "writerId": "agent-pan-3083",
-        "agentId": "agent-pan-3083",
-        "pid": 1496788,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-25T23:07:08.234Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3083",
@@ -102,6 +94,17 @@
         "outcome": "completed",
         "reason": "Added reviewRequestedAt to fallback clear markers and covered fallback serialization plus drain clear/preserve behavior.",
         "releasedAt": "2026-07-25T23:06:50.909Z"
+      },
+      {
+        "writerId": "agent-pan-3083",
+        "agentId": "agent-pan-3083",
+        "pid": 1496788,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-25T23:07:08.234Z",
+        "itemId": "uat-generation-regression-test",
+        "outcome": "completed",
+        "reason": "Added paired UAT regression cases proving stale passed+ready intents do not invalidate a live generation while genuine ready-set departure still does.",
+        "releasedAt": "2026-07-25T23:08:17.550Z"
       }
     ],
     "statusReasons": {
@@ -116,6 +119,10 @@
       "fallback-clearable-request": {
         "reason": "Added reviewRequestedAt to fallback clear markers and covered fallback serialization plus drain clear/preserve behavior.",
         "updatedAt": "2026-07-25T23:06:50.909Z"
+      },
+      "uat-generation-regression-test": {
+        "reason": "Added paired UAT regression cases proving stale passed+ready intents do not invalidate a live generation while genuine ready-set departure still does.",
+        "updatedAt": "2026-07-25T23:08:17.550Z"
       }
     }
   },
@@ -134,6 +141,8 @@
     "fallback-clearable-request.fallback-clearable-request.ac1": "completed",
     "fallback-clearable-request.fallback-clearable-request.ac2": "completed",
     "fallback-clearable-request.fallback-clearable-request.ac3": "completed",
-    "uat-generation-regression-test": "running"
+    "uat-generation-regression-test": "completed",
+    "uat-generation-regression-test.uat-generation-regression-test.ac1": "completed",
+    "uat-generation-regression-test.uat-generation-regression-test.ac2": "completed"
   }
 }
