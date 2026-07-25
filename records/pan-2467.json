@@ -22,7 +22,7 @@
   ],
   "feedback": [],
   "created": "2026-07-25T20:42:32.108Z",
-  "updated": "2026-07-25T21:16:37.302Z",
+  "updated": "2026-07-25T21:21:01.958Z",
   "pipeline": {
     "issueId": "PAN-2467",
     "reviewStatus": "pending",
@@ -81,16 +81,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "chokepoint-gate": {
-        "writerId": "agent-pan-2467",
-        "agentId": "agent-pan-2467",
-        "pid": 1548918,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-25T21:16:37.302Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2467",
@@ -113,6 +105,17 @@
         "outcome": "completed",
         "reason": "Added fail-closed per-repo merge completeness classification using merge-set and project-repo doors",
         "releasedAt": "2026-07-25T21:09:19.428Z"
+      },
+      {
+        "writerId": "agent-pan-2467",
+        "agentId": "agent-pan-2467",
+        "pid": 1548918,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-25T21:16:37.302Z",
+        "itemId": "chokepoint-gate",
+        "outcome": "completed",
+        "reason": "Blocked post-merge lifecycle at the active merge verification chokepoint when any sibling repo is incomplete",
+        "releasedAt": "2026-07-25T21:21:01.958Z"
       }
     ],
     "statusReasons": {
@@ -123,6 +126,10 @@
       "completeness-assessor": {
         "reason": "Added fail-closed per-repo merge completeness classification using merge-set and project-repo doors",
         "updatedAt": "2026-07-25T21:09:19.428Z"
+      },
+      "chokepoint-gate": {
+        "reason": "Blocked post-merge lifecycle at the active merge verification chokepoint when any sibling repo is incomplete",
+        "updatedAt": "2026-07-25T21:21:01.958Z"
       }
     }
   },
@@ -137,6 +144,9 @@
     "completeness-assessor.completeness-assessor.ac3": "completed",
     "completeness-assessor.completeness-assessor.ac4": "completed",
     "completeness-assessor.completeness-assessor.ac5": "completed",
-    "chokepoint-gate": "running"
+    "chokepoint-gate": "completed",
+    "chokepoint-gate.chokepoint-gate.ac1": "completed",
+    "chokepoint-gate.chokepoint-gate.ac2": "completed",
+    "chokepoint-gate.chokepoint-gate.ac3": "completed"
   }
 }
