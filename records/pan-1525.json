@@ -103,17 +103,14 @@
       "reason": "feedback",
       "note": "[2026-07-25T01:53Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-07-25T01:53:28.770Z"
-    }
-  ],
-  "feedback": [
+    },
     {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-25T01:53:28Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-1525\n\nRebase introduced committed composer-manifest drift: workspace add-repo syntax is stale and a clean checkout fails the required manifest lint gate.\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1525 -m \"Fixed review issues\"`"
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-25T02:03:31.057Z"
     }
   ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "packages/contracts/src/composer-commands.test.ts",
@@ -252,7 +249,7 @@
     "recordedAt": "2026-07-24T23:08:31.650Z"
   },
   "created": "2026-07-12T09:32:29.900Z",
-  "updated": "2026-07-25T02:03:29.487Z",
+  "updated": "2026-07-25T02:03:31.058Z",
   "pipeline": {
     "issueId": "PAN-1525",
     "reviewStatus": "pending",
