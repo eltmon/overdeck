@@ -512,6 +512,7 @@ function maybeAutoDispatchReviewHostSide(issueId: string, status: ReviewStatus):
     reviewSpawnedAt: status.reviewSpawnedAt,
     reviewStatus: status.reviewStatus,
     mergeStatus: status.mergeStatus,
+    readyForMerge: status.readyForMerge,
   })) return;
   const last = reviewDispatchAttemptAt.get(issueId) ?? 0;
   if (Date.now() - last < REVIEW_AUTO_DISPATCH_THROTTLE_MS) return;
