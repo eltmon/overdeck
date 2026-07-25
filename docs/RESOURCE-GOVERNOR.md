@@ -211,6 +211,36 @@ host with:
 systemctl show overdeck-tmux-server.service -p ManagedOOMPreference
 ```
 
+## inotify watch budget (PAN-3063)
+
+`fs.inotify.max_user_watches` is a per-UID kernel budget shared by every process and container
+the Overdeck user runs. Exhaustion does not degrade gradually — the next process that tries to
+add a watch (typically a Vite dev server in a workspace container) dies with ENOSPC while the
+rest of the host looks healthy. The 2026-07-25 MIN-898 incident: six MYN fe-container Vites each
+held ~157k watches (an unignored ~144k-file `.pnpm-store/` inside the project root), saturating
+the 1,048,576 budget so whichever fe container restarted next lost.
+
+The signal lives in the system-health pipeline, not the memory governor:
+
+- `src/lib/system-health/inotify.ts` scans `/proc/<pid>/fd` for `anon_inode:inotify`
+  descriptors and sums `inotify wd:` lines from fdinfo — the kernel exposes no aggregate
+  counter. Unprivileged reads only reach same-uid processes, which matches the per-UID scope
+  of the budget.
+- The Linux collector refreshes that scan on its own 60s cadence (`INOTIFY_REFRESH_MS`) — the
+  /proc walk is far heavier than the other 15s reads — and emits
+  `inotifyWatchesUsed/Max/UsedPercent` metrics.
+- `evaluate.ts` raises `host.linux.inotify_watches.warning|critical` at 80% / 90%
+  (`PAN_HEALTH_INOTIFY_WARN_PERCENT` / `PAN_HEALTH_INOTIFY_CRITICAL_PERCENT`), independent of
+  memory admission state — the watch budget can run out on an otherwise healthy host.
+- Surfaces: the SystemHealthPill degrades, `InotifyPressureBanner` appears in the dashboard's
+  system-notices row with a copyable sysctl fix, and `pan doctor` reports usage, top consumers,
+  and whether the configured limit survives a reboot (`src/cli/commands/doctor-inotify.ts`).
+
+Raising the limit requires sudo, so remediation is always operator-run — the banner and doctor
+print the command; no Overdeck daemon ever escalates. Admission gating on watch headroom
+(deferring workspace-stack spawns the way the memory SOFT band does) is the deliberately
+deferred phase 2 of PAN-3063.
+
 ## Preemptive scheduling (PAN-2507)
 
 The governor sizes the *pool* (how many agents may run); the **preemptive scheduler** schedules

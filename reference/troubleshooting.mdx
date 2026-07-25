@@ -190,6 +190,35 @@ server: {
 
 A 3000ms interval supports 4-5 concurrent workspaces comfortably while maintaining acceptable HMR responsiveness.
 
+## Dev server dies with ENOSPC — inotify watch exhaustion
+
+If a workspace's frontend container crash-loops at startup with `ENOSPC: System limit for number of file watchers reached` while the rest of the host looks healthy, the per-user inotify watch budget (`fs.inotify.max_user_watches`) is exhausted. This budget is a kernel limit shared by **every process and container the user runs** — Docker does not isolate it — so a few heavy file watchers can starve every other workspace on the machine.
+
+The dashboard shows a **File watchers running low / exhausted** banner when usage crosses 80% / 90% of the limit, and `pan doctor` reports usage, the top consumers, and whether the configured limit survives a reboot.
+
+**Fix, in order of leverage:**
+
+1. **Shrink the watchers.** The usual culprit is a huge directory inside the watched project root that the watcher does not ignore by default — e.g. pnpm's `.pnpm-store/` (pnpm places it inside the project when installing into a Docker bind mount, and Vite ignores `node_modules` but not `.pnpm-store`). Add it to the watch ignore list:
+
+   ```javascript
+   server: {
+       watch: {
+           ignored: ['**/node_modules/**', '**/.git/**', '**/.pnpm-store/**'],
+       },
+   }
+   ```
+
+   In one real incident this cut each dev server from ~157k watches to ~13k — a 12× reduction.
+
+2. **Raise and persist the limit** (requires sudo; Overdeck never runs sudo itself):
+
+   ```bash
+   echo 'fs.inotify.max_user_watches = 2097152' | sudo tee /etc/sysctl.d/99-inotify.conf
+   sudo sysctl --system
+   ```
+
+   A `sysctl -w` alone does not survive a reboot; the `/etc/sysctl.d` file does. `pan doctor` warns when the live limit is higher than anything persisted.
+
 ## Corrupted Workspaces
 
 A workspace can become "corrupted" when it exists as a directory but is no longer a valid git worktree. The dashboard will show a yellow "Workspace Corrupted" warning with an option to clean and recreate.
