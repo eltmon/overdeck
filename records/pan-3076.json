@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-25T21:12:36.630Z",
-  "updated": "2026-07-25T22:11:32.283Z",
+  "updated": "2026-07-25T22:13:28.263Z",
   "pipeline": {
     "issueId": "PAN-3076",
     "reviewStatus": "pending",
@@ -75,16 +75,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 21,
-    "claims": {
-      "docs-head-anchor-contract": {
-        "writerId": "agent-pan-3076",
-        "agentId": "agent-pan-3076",
-        "pid": 3389588,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-25T22:11:32.283Z"
-      }
-    },
+    "sequence": 22,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3076",
@@ -195,6 +187,17 @@
         "outcome": "completed",
         "reason": "Made crash progress fingerprints polyrepo-aware and added an AST-based allowlist test for all review and role anchor writes, including a failing self-check fixture.",
         "releasedAt": "2026-07-25T22:11:20.730Z"
+      },
+      {
+        "writerId": "agent-pan-3076",
+        "agentId": "agent-pan-3076",
+        "pid": 3389588,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-25T22:11:32.283Z",
+        "itemId": "docs-head-anchor-contract",
+        "outcome": "completed",
+        "reason": "Documented the branded producer/parser contract, stamp-compare pairing, five converted sites, legacy convergence, and MIN-901 signature.",
+        "releasedAt": "2026-07-25T22:13:28.263Z"
       }
     ],
     "statusReasons": {
@@ -237,6 +240,10 @@
       "crash-fingerprint-and-scan-test": {
         "reason": "Made crash progress fingerprints polyrepo-aware and added an AST-based allowlist test for all review and role anchor writes, including a failing self-check fixture.",
         "updatedAt": "2026-07-25T22:11:20.730Z"
+      },
+      "docs-head-anchor-contract": {
+        "reason": "Documented the branded producer/parser contract, stamp-compare pairing, five converted sites, legacy convergence, and MIN-901 signature.",
+        "updatedAt": "2026-07-25T22:13:28.263Z"
       }
     }
   },
@@ -279,6 +286,8 @@
     "crash-fingerprint-and-scan-test.crash-fingerprint-and-scan-test.ac1": "completed",
     "crash-fingerprint-and-scan-test.crash-fingerprint-and-scan-test.ac2": "completed",
     "crash-fingerprint-and-scan-test.crash-fingerprint-and-scan-test.ac3": "completed",
-    "docs-head-anchor-contract": "running"
+    "docs-head-anchor-contract": "completed",
+    "docs-head-anchor-contract.docs-head-anchor-contract.ac1": "completed",
+    "docs-head-anchor-contract.docs-head-anchor-contract.ac2": "completed"
   }
 }
