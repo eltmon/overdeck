@@ -177,6 +177,14 @@ export function resolveWorkspaceRepoRootsSync(
   );
 }
 
+/** Resolve the primary git checkout used by single-repo workspace probes. */
+export function resolvePrimaryWorkspaceRepoDirSync(
+  issueId: string,
+  workspacePath: string
+): string {
+  return resolveWorkspaceRepoRootsSync(issueId, workspacePath)[0].dir;
+}
+
 // ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
 // Pure-sync project/repo resolution — additive Effect.sync wrappers.
 

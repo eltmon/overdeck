@@ -297,8 +297,8 @@ export async function computeConvoyScope(issueId: string, workspace: string): Pr
         // report zero drift and wrongly carry every verdict forward. Composite
         // or wrapper-era anchors fail the ref lookup here and fall through to
         // the conservative full-convoy path.
-        const { resolveWorkspaceRepoRootsSync } = await import('../project-repos.js');
-        const primaryRepoDir = resolveWorkspaceRepoRootsSync(issueId, workspace)[0]?.dir ?? workspace;
+        const { resolvePrimaryWorkspaceRepoDirSync } = await import('../project-repos.js');
+        const primaryRepoDir = resolvePrimaryWorkspaceRepoDirSync(issueId, workspace);
         const { stdout } = await execAsync(`git diff --name-only ${[...anchors][0]}..HEAD`, {
           cwd: primaryRepoDir, encoding: 'utf-8', timeout: 15_000,
         });

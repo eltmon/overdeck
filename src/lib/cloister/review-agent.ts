@@ -362,8 +362,8 @@ async function spawnReviewRoleForIssuePromise(
           // PAN-2948: probe the primary code repo — the polyrepo wrapper's HEAD
           // never moves, so a wrapper-derived runId would mismatch every live
           // run and kill a healthy convoy on each dispatch.
-          const { resolveWorkspaceRepoRootsSync } = await import('../project-repos.js');
-          const probeDir = resolveWorkspaceRepoRootsSync(opts.issueId, opts.workspace)[0]?.dir ?? opts.workspace;
+          const { resolvePrimaryWorkspaceRepoDirSync } = await import('../project-repos.js');
+          const probeDir = resolvePrimaryWorkspaceRepoDirSync(opts.issueId, opts.workspace);
           const { stdout } = await execAsync('git rev-parse --short=8 HEAD', {
             cwd: probeDir,
             encoding: 'utf-8',
@@ -545,8 +545,8 @@ async function spawnReviewRoleForIssuePromise(
     // pin every re-review to the same run directory.
     let headSha = 'unknown';
     try {
-      const { resolveWorkspaceRepoRootsSync } = await import('../project-repos.js');
-      const primaryRepoDir = resolveWorkspaceRepoRootsSync(opts.issueId, opts.workspace)[0]?.dir ?? opts.workspace;
+      const { resolvePrimaryWorkspaceRepoDirSync } = await import('../project-repos.js');
+      const primaryRepoDir = resolvePrimaryWorkspaceRepoDirSync(opts.issueId, opts.workspace);
       const { stdout } = await execAsync('git rev-parse --short=8 HEAD', { cwd: primaryRepoDir, encoding: 'utf-8', timeout: 10_000 });
       headSha = stdout.trim();
     } catch { /* non-fatal — fall back to static runId */ }
