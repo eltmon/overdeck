@@ -214,10 +214,10 @@
     "recordedAt": "2026-07-24T23:08:31.650Z"
   },
   "created": "2026-07-12T09:32:29.900Z",
-  "updated": "2026-07-25T00:00:48.635Z",
+  "updated": "2026-07-25T00:00:52.620Z",
   "pipeline": {
     "issueId": "PAN-1525",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -225,13 +225,13 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-24T23:12:31.996Z",
-    "updatedAt": "2026-07-25T00:00:46.717Z",
+    "updatedAt": "2026-07-25T00:00:52.568Z",
     "reviewNotes": "Agent re-review request (2/25): Fixed review issues",
     "inspectNotes": "Composer-command parse+route inserted before compact/transform/delivery in conversation-message.ts with early return; unknown-command maps to 404 naming token + 'Type /pan to list available commands'; terminal-only policy maps to 422 naming exact command display; unprefixed text/pan-start negative control preserves original compact/transform/deliverAgentMessage path. All 4 ACs covered by router.test.ts assertions matching the exact banned-call list.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3033",
     "lastVerifiedCommit": "10c555afc0744ecb699ec50b3d95db13ec2fa92f",
     "reviewRequestedAt": "2026-07-24T23:12:31.996Z",
-    "reviewSpawnedAt": "2026-07-25T00:00:38.467Z",
+    "reviewSpawnedAt": "2026-07-25T00:00:47.326Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "packages/contracts/src/composer-commands.test.ts",
@@ -437,7 +437,7 @@
       },
       "costAtCloseOut": {
         "usd": 391.813264,
-        "pricingAsOf": "2026-07-25T00:00:46.736Z"
+        "pricingAsOf": "2026-07-25T00:00:52.607Z"
       }
     },
     "merges": [
