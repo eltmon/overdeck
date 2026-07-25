@@ -101,18 +101,18 @@
     "recordedAt": "2026-07-25T22:26:00.654Z"
   },
   "created": "2026-07-25T20:42:32.108Z",
-  "updated": "2026-07-25T22:47:49.745Z",
+  "updated": "2026-07-25T22:47:51.822Z",
   "pipeline": {
     "issueId": "PAN-2467",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-25T22:26:20.039Z",
-    "updatedAt": "2026-07-25T22:47:49.624Z",
+    "updatedAt": "2026-07-25T22:47:50.300Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "inspectNotes": "AC1-5 verified against real APIs: unmerged reason names repoKey+aheadCount; merged artifact path yields state 'merged' + complete true; every git/forge error caught into 'unverifiable' (fails closed, complete false); missing source ref and single-repo resolver both land 'no-changes'/'merged' without throwing; enumeration is solely ensureMergeSetForIssueSync -> resolveProjectReposForIssueSync with promisified exec and zero workspaceType conditionals. MergeSetRepoState and ResolvedProjectRepo are both structurally compatible with RepoToAssess (repoKey/repoPath/forge/sourceBranch/targetBranch/required all present).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3080",
@@ -192,9 +192,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 2855735,
-            "output": 234458,
-            "cacheRead": 110459904,
+            "input": 2856998,
+            "output": 234839,
+            "cacheRead": 110891520,
             "cacheWrite": 0
           }
         }
@@ -207,15 +207,15 @@
           "cacheWrite": 514905
         },
         "openai/gpt-5.6-sol": {
-          "input": 4529378,
-          "output": 354450,
-          "cacheRead": 132871680,
+          "input": 4530641,
+          "output": 354831,
+          "cacheRead": 133303296,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 112.941204,
-        "pricingAsOf": "2026-07-25T22:47:49.696Z"
+        "usd": 113.174757,
+        "pricingAsOf": "2026-07-25T22:47:51.818Z"
       }
     },
     "merges": [
