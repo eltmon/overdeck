@@ -1094,7 +1094,14 @@
 /* Session Node (child of FeatureItem) */
 .sessionNode {
   display: grid;
-  grid-template-columns: 12px 12px 16px minmax(0, 1fr) auto auto auto;
+  /* Four fixed leading slots (caret, dot, icon, label); trailing metadata
+     spans (model, last-heard, input icon, status, duration/cost) vary in
+     count per row, so they flow as implicit columns. A fixed column count
+     here made overflow spans wrap onto an implicit 12px-column row where
+     "waiting" and "49m" painted on top of each other. */
+  grid-template-columns: 12px 12px 16px minmax(0, 1fr);
+  grid-auto-flow: column;
+  grid-auto-columns: max-content;
   align-items: center;
   column-gap: 6px;
   padding: 4px 8px 4px calc(8px + 24px);
