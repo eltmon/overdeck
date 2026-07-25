@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-25T11:59:01.400Z",
-  "updated": "2026-07-25T12:30:15.312Z",
+  "updated": "2026-07-25T12:31:08.643Z",
   "pipeline": {
     "issueId": "PAN-3052",
     "reviewStatus": "pending",
@@ -59,16 +59,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "docs-decomp-note": {
-        "writerId": "agent-pan-3052",
-        "agentId": "agent-pan-3052",
-        "pid": 3657639,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-25T12:30:15.312Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3052",
@@ -91,6 +83,17 @@
         "outcome": "completed",
         "reason": "Built production artifacts, booted dist/dashboard/server.js under Node 22.22.0 with isolated OVERDECK_HOME and OVERDECK_DISABLE_DEACON=1, received HTTP 200 health body {\"status\":\"ok\",\"mode\":\"peer\",\"buildCommit\":\"693571b4a84a6c257ce75cff8ea7ba0634d7e3db\"}, found no strict-ESM cycle error, stopped the process, and confirmed port 3999 was free.",
         "releasedAt": "2026-07-25T12:29:33.135Z"
+      },
+      {
+        "writerId": "agent-pan-3052",
+        "agentId": "agent-pan-3052",
+        "pid": 3657639,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-25T12:30:15.312Z",
+        "itemId": "docs-decomp-note",
+        "outcome": "completed",
+        "reason": "Added the PAN-3052 update under deacon decomposition seam 4, naming boot-reconciliation-apply.ts as the new home of the apply function, decision key helper, and idempotency set, and recording removal of the file-size baseline row.",
+        "releasedAt": "2026-07-25T12:31:08.642Z"
       }
     ],
     "statusReasons": {
@@ -101,6 +104,10 @@
       "boot-test-throwaway": {
         "reason": "Built production artifacts, booted dist/dashboard/server.js under Node 22.22.0 with isolated OVERDECK_HOME and OVERDECK_DISABLE_DEACON=1, received HTTP 200 health body {\"status\":\"ok\",\"mode\":\"peer\",\"buildCommit\":\"693571b4a84a6c257ce75cff8ea7ba0634d7e3db\"}, found no strict-ESM cycle error, stopped the process, and confirmed port 3999 was free.",
         "updatedAt": "2026-07-25T12:29:33.135Z"
+      },
+      "docs-decomp-note": {
+        "reason": "Added the PAN-3052 update under deacon decomposition seam 4, naming boot-reconciliation-apply.ts as the new home of the apply function, decision key helper, and idempotency set, and recording removal of the file-size baseline row.",
+        "updatedAt": "2026-07-25T12:31:08.642Z"
       }
     }
   },
@@ -115,6 +122,8 @@
     "boot-test-throwaway.boot-test-throwaway.ac1": "completed",
     "boot-test-throwaway.boot-test-throwaway.ac2": "completed",
     "boot-test-throwaway.boot-test-throwaway.ac3": "completed",
-    "docs-decomp-note": "running"
+    "docs-decomp-note": "completed",
+    "docs-decomp-note.docs-decomp-note.ac1": "completed",
+    "docs-decomp-note.docs-decomp-note.ac2": "completed"
   }
 }
