@@ -88,7 +88,7 @@ import {
   getSessionTreeWorkspacePath,
   getSlotWorkSessionNumber,
 } from '../../../../../src/dashboard/server/routes/projects.ts';
-import { listProjectsSync } from '../../../../../src/lib/projects.js';
+import { listProjectsSync, resolveProjectFromIssueSync } from '../../../../../src/lib/projects.js';
 import { listSessionNames } from '../../../../../src/lib/tmux.js';
 import { getAgentRuntimeState } from '../../../../../src/lib/agents.js';
 import { getReviewStatusSync } from '../../../../../src/dashboard/server/review-status.js';
@@ -723,6 +723,87 @@ describe('fetchProjectSessionTree', () => {
     expect(strikeNode).toBeDefined();
     expect(strikeNode?.type).toBe('strike');
     expect(strikeNode?.endedAt).toBe('2026-07-21T02:33:22Z');
+  });
+
+  it('emits a feature row for a strike-only workspace with no base feature dir', async () => {
+    (listProjectsSync as any).mockReturnValue([
+      {
+        key: 'overdeck',
+        config: { name: 'overdeck', path: '/tmp/overdeck', workspace: { workspaces_dir: 'workspaces' } },
+      },
+    ]);
+    (listSessionNames as any).mockReturnValue(Effect.succeed(['strike-pan-777']));
+    (getAgentRuntimeState as any).mockReturnValue(Effect.succeed({ state: 'active' }));
+    mockAgentStates.set('strike-pan-777', agentState({
+      id: 'strike-pan-777',
+      issueId: 'PAN-777',
+      role: 'strike',
+      status: 'running',
+      workspace: '/tmp/overdeck/workspaces/feature-pan-777-strike',
+    }));
+    // Only feature-pan-777-strike exists — struck without a prior base workspace.
+    mockAccess(new Set(['/tmp/overdeck/workspaces']));
+    mockWorkspaceReaddir([{ name: 'feature-pan-777-strike', isDirectory: () => true, isFile: () => false }]);
+
+    const result = await fetchProjectSessionTree('overdeck');
+
+    const tree = result as { features: Array<{ issueId: string; sessions: Array<{ sessionId: string; type: string }> }> };
+    expect(tree.features).toHaveLength(1);
+    expect(tree.features[0]?.issueId).toBe('PAN-777');
+    const strikeNode = tree.features[0]?.sessions.find((s) => s.sessionId === 'strike-pan-777');
+    expect(strikeNode).toBeDefined();
+    expect(strikeNode?.type).toBe('strike');
+  });
+
+  it('seeds a feature row from a live tmux session with no workspace directory', async () => {
+    (listProjectsSync as any).mockReturnValue([
+      {
+        key: 'overdeck',
+        config: { name: 'overdeck', path: '/tmp/overdeck', workspace: { workspaces_dir: 'workspaces' } },
+      },
+    ]);
+    (listSessionNames as any).mockReturnValue(Effect.succeed(['strike-pan-778']));
+    (getAgentRuntimeState as any).mockReturnValue(Effect.succeed({ state: 'active' }));
+    mockAgentStates.set('strike-pan-778', agentState({
+      id: 'strike-pan-778',
+      issueId: 'PAN-778',
+      role: 'strike',
+      status: 'running',
+      workspace: '/tmp/overdeck/workspaces/feature-pan-778-strike',
+    }));
+    mockAccess(new Set(['/tmp/overdeck/workspaces']));
+    mockWorkspaceReaddir([]);
+
+    const result = await fetchProjectSessionTree('overdeck');
+
+    const tree = result as { features: Array<{ issueId: string; sessions: Array<{ sessionId: string; type: string }> }> };
+    expect(tree.features).toHaveLength(1);
+    expect(tree.features[0]?.issueId).toBe('PAN-778');
+    expect(tree.features[0]?.sessions.find((s) => s.sessionId === 'strike-pan-778')?.type).toBe('strike');
+  });
+
+  it('does not seed rows from tmux sessions belonging to another project', async () => {
+    (listProjectsSync as any).mockReturnValue([
+      {
+        key: 'overdeck',
+        config: { name: 'overdeck', path: '/tmp/overdeck', workspace: { workspaces_dir: 'workspaces' } },
+      },
+    ]);
+    (listSessionNames as any).mockReturnValue(Effect.succeed(['strike-min-42']));
+    (resolveProjectFromIssueSync as any).mockReturnValueOnce({ projectKey: 'myn' });
+    mockAgentStates.set('strike-min-42', agentState({
+      id: 'strike-min-42',
+      issueId: 'MIN-42',
+      role: 'strike',
+      status: 'running',
+    }));
+    mockAccess(new Set(['/tmp/overdeck/workspaces']));
+    mockWorkspaceReaddir([]);
+
+    const result = await fetchProjectSessionTree('overdeck');
+
+    const tree = result as { features: Array<{ issueId: string }> };
+    expect(tree.features).toHaveLength(0);
   });
 
   it('classifies agent-<issue>-plan as a planning session', async () => {

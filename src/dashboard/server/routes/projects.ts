@@ -612,14 +612,29 @@ export async function fetchProjectSessionTree(
 
   if (await pathExists(workspacesDir)) {
     const entries = await readdir(workspacesDir, { withFileTypes: true }).catch(() => []);
-    const featureCandidates = entries
-      .filter(e => e.isDirectory() && e.name.startsWith('feature-'))
-      .map(e => ({
-        name: e.name,
-        issueLower: e.name.replace('feature-', ''),
-        issueId: e.name.replace('feature-', '').toUpperCase(),
-      }))
-      .filter(c => /^[a-z]+-\d+$/.test(c.issueLower));
+    // Strike and slot workspaces (feature-<issue>-strike, feature-<issue>-slot-N)
+    // map to the same issue as the base feature-<issue> workspace — a strike on
+    // an issue that never had a base workspace creates only the -strike dir.
+    const candidateIssueLowers = new Set<string>();
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue;
+      const match = /^feature-([a-z]+-\d+)(?:-strike|-slot-\d+)?$/.exec(entry.name);
+      if (match) candidateIssueLowers.add(match[1]!);
+    }
+    // Live agent sessions can exist with no workspace directory at all; seed
+    // candidates from tmux too, scoped to this project's issue prefix so one
+    // project's tree never grows rows for another project's sessions.
+    for (const issueLower of liveTmuxIssueIds) {
+      if (candidateIssueLowers.has(issueLower)) continue;
+      if (resolveProjectFromIssueSync(issueLower.toUpperCase())?.projectKey === project.key) {
+        candidateIssueLowers.add(issueLower);
+      }
+    }
+    const featureCandidates = [...candidateIssueLowers].map((issueLower) => ({
+      name: `feature-${issueLower}`,
+      issueLower,
+      issueId: issueLower.toUpperCase(),
+    }));
 
     const results = await Effect.runPromise(withConcurrencyLimit(
       featureCandidates.map((c) => Effect.promise(async () => {
