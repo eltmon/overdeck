@@ -20,6 +20,8 @@ import {
   SyncGitCommandAbortError,
   SyncGitCommandTimeoutError,
 } from './sync-main-git.js';
+import { syncMainAcrossWorkspaceRepos, type SyncMainRepoResult, type SyncMainResult } from './sync-main-workspace.js';
+export type { SyncMainRepoResult, SyncMainResult } from './sync-main-workspace.js';
 
 const execAsync = promisify(exec);
 
@@ -152,7 +154,6 @@ import { resolveGitHubIssueSync } from '../tracker-utils.js';
 import { runQualityGates } from './validation.js';
 import { loadProjectsConfigSync } from '../projects.js';
 import { cleanupStaleLocks } from '../git-utils.js';
-import { resolveWorkspaceRepoRootsSync } from '../project-repos.js';
 import { gitPush, MainDivergedError } from '../git/operations.js';
 import { getReviewStatusSync, markWorkspaceStuck, setReviewStatusSync } from '../review-status.js';
 import { appendGitOperationSync, type GitOperationType } from '../git-activity.js';
@@ -1177,30 +1178,6 @@ export async function salvageStrandedMerge(
 }
 
 /**
- * Result of syncing main into a workspace branch
- */
-export interface SyncMainRepoResult {
-  repoKey: string;
-  success: boolean;
-  alreadyUpToDate?: boolean;
-  commitCount?: number;
-  changedFiles?: string[];
-  conflictFiles?: string[];
-  reason?: string;
-  skipped?: boolean;
-}
-
-export interface SyncMainResult {
-  success: boolean;
-  alreadyUpToDate?: boolean;
-  commitCount?: number;
-  changedFiles?: string[];
-  conflictFiles?: string[];
-  reason?: string;
-  repos?: SyncMainRepoResult[];
-}
-
-/**
  * Scan workspace for leftover git conflict markers (async)
  */
 export async function scanForConflictMarkers(projectPath: string): Promise<string[]> {
@@ -1366,64 +1343,7 @@ export async function syncMainIntoWorkspace(
   issueId: string,
   signal?: AbortSignal,
 ): Promise<SyncMainResult> {
-  console.log(`[sync-main] Starting sync of main into workspace for ${issueId}`);
-  logActivity('sync_main_start', `Starting sync for ${issueId}`);
-
-  const roots = resolveWorkspaceRepoRootsSync(issueId, projectPath);
-  const repos: SyncMainRepoResult[] = [];
-  let failedRepoKey: string | undefined;
-
-  for (const root of roots) {
-    if (failedRepoKey) {
-      repos.push({
-        repoKey: root.repoKey,
-        success: false,
-        skipped: true,
-        reason: `[${root.repoKey}] Skipped because sync failed in ${failedRepoKey}`,
-      });
-      continue;
-    }
-
-    if (root.isPolyrepo) {
-      console.log(`[sync-main] [${root.repoKey}] Syncing origin/${root.targetBranch}`);
-      logActivity('sync_main_repo_start', `[${root.repoKey}] Syncing origin/${root.targetBranch}`);
-    }
-    const result = await syncMainIntoRepo(root.dir, issueId, root.targetBranch, signal);
-    const prefixPaths = (paths: string[] | undefined) => root.isPolyrepo && paths
-      ? paths.map(path => `${root.repoKey}/${path}`)
-      : paths;
-    const repoResult: SyncMainRepoResult = {
-      ...result,
-      repoKey: root.repoKey,
-    };
-    if (result.changedFiles !== undefined) repoResult.changedFiles = prefixPaths(result.changedFiles);
-    if (result.conflictFiles !== undefined) repoResult.conflictFiles = prefixPaths(result.conflictFiles);
-    if (result.reason && root.isPolyrepo) repoResult.reason = `[${root.repoKey}] ${result.reason}`;
-    repos.push(repoResult);
-    if (!result.success) failedRepoKey = root.repoKey;
-  }
-
-  const completedRepos = repos.filter(repo => !repo.skipped);
-  const changedFiles = completedRepos.flatMap(repo => repo.changedFiles ?? []);
-  const conflictFiles = completedRepos.flatMap(repo => repo.conflictFiles ?? []);
-  const countedRepos = completedRepos.filter(repo => repo.commitCount !== undefined);
-  const failedRepo = completedRepos.find(repo => !repo.success);
-  const aggregate: SyncMainResult = {
-    success: !failedRepo,
-    repos,
-  };
-
-  if (completedRepos.length > 0 && completedRepos.every(repo => repo.alreadyUpToDate === true)) {
-    aggregate.alreadyUpToDate = true;
-  }
-  if (countedRepos.length > 0) {
-    aggregate.commitCount = countedRepos.reduce((sum, repo) => sum + (repo.commitCount ?? 0), 0);
-  }
-  if (completedRepos.some(repo => repo.changedFiles !== undefined)) aggregate.changedFiles = changedFiles;
-  if (completedRepos.some(repo => repo.conflictFiles !== undefined)) aggregate.conflictFiles = conflictFiles;
-  if (failedRepo?.reason) aggregate.reason = failedRepo.reason;
-
-  return aggregate;
+  return syncMainAcrossWorkspaceRepos(projectPath, issueId, signal, syncMainIntoRepo, logActivity);
 }
 
 /**
