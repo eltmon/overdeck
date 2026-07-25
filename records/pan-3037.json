@@ -294,15 +294,7 @@
       "timestamp": "2026-07-25T22:49:47.905Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-25T22:49:47Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-3037\n\nConfigured target-branch conflicts are auto-resolved from origin/main, risking wrong or deleted pipeline artifacts\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3037 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "scripts/file-size-baseline.txt",
@@ -355,10 +347,10 @@
     "recordedAt": "2026-07-25T22:13:33.131Z"
   },
   "created": "2026-07-25T20:44:21.373Z",
-  "updated": "2026-07-25T23:03:53.834Z",
+  "updated": "2026-07-25T23:05:04.351Z",
   "pipeline": {
     "issueId": "PAN-3037",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "running",
     "inspectStatus": "passed",
@@ -366,7 +358,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-25T22:20:18.803Z",
-    "updatedAt": "2026-07-25T23:03:50.454Z",
+    "updatedAt": "2026-07-25T23:05:04.277Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
     "verificationNotes": "Pre-review verification already covered the reviewed commit",
@@ -375,7 +367,7 @@
     "reviewedAtCommit": "93ad317654fa305065e3cb80cc73f470c5817ed4",
     "lastVerifiedCommit": "93ad317654fa305065e3cb80cc73f470c5817ed4",
     "reviewRequestedAt": "2026-07-25T22:20:18.803Z",
-    "reviewSpawnedAt": "2026-07-25T22:39:26.657Z",
+    "reviewSpawnedAt": "2026-07-25T23:05:04.275Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "scripts/file-size-baseline.txt",
@@ -472,7 +464,7 @@
       },
       "costAtCloseOut": {
         "usd": 185.894665,
-        "pricingAsOf": "2026-07-25T23:03:53.766Z"
+        "pricingAsOf": "2026-07-25T23:05:04.322Z"
       }
     },
     "merges": [
