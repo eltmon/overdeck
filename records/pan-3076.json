@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-25T21:12:36.630Z",
-  "updated": "2026-07-25T21:36:01.230Z",
+  "updated": "2026-07-25T21:39:17.188Z",
   "pipeline": {
     "issueId": "PAN-3076",
     "reviewStatus": "pending",
@@ -75,16 +75,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "anchor-drift-evaluator": {
-        "writerId": "agent-pan-3076",
-        "agentId": "agent-pan-3076",
-        "pid": 2098118,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-25T21:36:01.230Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3076",
@@ -96,12 +88,27 @@
         "outcome": "completed",
         "reason": "Added branded HeadAnchor producer type, rehydration escape hatch, canonical composite parser, and compile-time brand probe.",
         "releasedAt": "2026-07-25T21:28:43.911Z"
+      },
+      {
+        "writerId": "agent-pan-3076",
+        "agentId": "agent-pan-3076",
+        "pid": 2098118,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-25T21:36:01.230Z",
+        "itemId": "anchor-drift-evaluator",
+        "outcome": "completed",
+        "reason": "Added composite-aware workspace anchor drift evaluator with per-repo tree, state-plane, and contribution checks plus real-git coverage.",
+        "releasedAt": "2026-07-25T21:39:17.188Z"
       }
     ],
     "statusReasons": {
       "head-anchor-type": {
         "reason": "Added branded HeadAnchor producer type, rehydration escape hatch, canonical composite parser, and compile-time brand probe.",
         "updatedAt": "2026-07-25T21:28:43.911Z"
+      },
+      "anchor-drift-evaluator": {
+        "reason": "Added composite-aware workspace anchor drift evaluator with per-repo tree, state-plane, and contribution checks plus real-git coverage.",
+        "updatedAt": "2026-07-25T21:39:17.188Z"
       }
     }
   },
@@ -110,6 +117,10 @@
     "head-anchor-type.head-anchor-type.ac1": "completed",
     "head-anchor-type.head-anchor-type.ac2": "completed",
     "head-anchor-type.head-anchor-type.ac3": "completed",
-    "anchor-drift-evaluator": "running"
+    "anchor-drift-evaluator": "completed",
+    "anchor-drift-evaluator.anchor-drift-evaluator.ac1": "completed",
+    "anchor-drift-evaluator.anchor-drift-evaluator.ac2": "completed",
+    "anchor-drift-evaluator.anchor-drift-evaluator.ac3": "completed",
+    "anchor-drift-evaluator.anchor-drift-evaluator.ac4": "completed"
   }
 }
