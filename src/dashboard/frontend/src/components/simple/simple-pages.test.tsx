@@ -4,7 +4,7 @@
  * pending input surfaces as an answerable question, simple issue page shows
  * the status card + conversation composer.
  */
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi, afterEach } from 'vitest';
 import type { AgentSnapshot, ReviewStatusSnapshot } from '@overdeck/contracts';
@@ -187,6 +187,42 @@ describe('SimpleIssuePage (C-SIMPLE)', () => {
     renderWithProviders(<SimpleIssuePage issueId="PAN-1" />);
     expect(screen.getByRole('button', { name: 'Merge to main' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Stop|Wipe|Reset/i })).not.toBeInTheDocument();
+  });
+
+  /**
+   * PAN-3073: the stuck signal can come from the persistent review-status flag
+   * with a perfectly healthy agent. "Get it unstuck" must call the unstick
+   * door in that case — agent recover succeeds as a no-op and clears nothing.
+   */
+  it('review-stuck: Get it unstuck calls the workspace unstick door, not agent recover', async () => {
+    const fetchMock = vi.fn(async () => Response.json({ success: true }));
+    vi.stubGlobal('fetch', fetchMock);
+    seed({
+      issues: [makeIssue()],
+      agents: { 'agent-pan-1': makeAgent() },
+      review: { 'PAN-1': { issueId: 'PAN-1', reviewStatus: 'pending', stuck: true, stuckReason: 'feedback_delivery_needs_you' } as ReviewStatusSnapshot },
+    });
+    renderWithProviders(<SimpleIssuePage issueId="PAN-1" />);
+    fireEvent.click(screen.getByRole('button', { name: 'Get it unstuck' }));
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith('/api/workspaces/PAN-1/unstick', expect.objectContaining({ method: 'POST' }));
+    });
+    expect(fetchMock).not.toHaveBeenCalledWith('/api/agents/agent-pan-1/recover', expect.anything());
+  });
+
+  it('agent-stuck: Get it unstuck still recovers the agent', async () => {
+    const fetchMock = vi.fn(async () => Response.json({ success: true }));
+    vi.stubGlobal('fetch', fetchMock);
+    seed({
+      issues: [makeIssue()],
+      agents: { 'agent-pan-1': makeAgent({ troubled: true }) },
+    });
+    renderWithProviders(<SimpleIssuePage issueId="PAN-1" />);
+    fireEvent.click(screen.getByRole('button', { name: 'Get it unstuck' }));
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith('/api/agents/agent-pan-1/recover', expect.objectContaining({ method: 'POST' }));
+    });
+    expect(fetchMock).not.toHaveBeenCalledWith('/api/workspaces/PAN-1/unstick', expect.anything());
   });
 
   /**

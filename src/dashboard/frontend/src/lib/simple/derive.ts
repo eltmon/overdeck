@@ -22,6 +22,10 @@ export interface SimpleIssueDerivation {
   primaryAgent: AgentSnapshot | undefined;
   /** First agent with an outstanding question/plan approval. */
   pendingInputAgent: AgentSnapshot | undefined;
+  /** An agent is troubled or in a problem status — "Get it unstuck" recovers the agent. */
+  agentStuck: boolean;
+  /** The review-status row carries the persistent stuck flag — "Get it unstuck" must call the unstick door (PAN-3073). */
+  reviewStuck: boolean;
   agents: AgentSnapshot[];
   taskProgress: { completed: number; total: number } | null;
   costSoFar: number | null;
@@ -92,8 +96,9 @@ export function deriveSimpleIssue(
 ): SimpleIssueDerivation {
   const primaryAgent = pickPrimaryAgent(agents);
   const pendingInputAgent = agents.find(hasPendingInput);
-  const stuck =
-    agents.some((a) => a.troubled || isAgentProblemStatus(a.status)) || reviewStatus?.stuck === true;
+  const agentStuck = agents.some((a) => a.troubled || isAgentProblemStatus(a.status));
+  const reviewStuck = reviewStatus?.stuck === true;
+  const stuck = agentStuck || reviewStuck;
 
   const pipelineState = derivePipelineState({
     reviewStatus: reviewStatus ?? null,
@@ -118,6 +123,8 @@ export function deriveSimpleIssue(
     display: userFacingDisplay({ pipelineState, pendingInput: !!pendingInputAgent, stuck }),
     primaryAgent,
     pendingInputAgent,
+    agentStuck,
+    reviewStuck,
     agents,
     taskProgress: issue.taskCounts ?? null,
     costSoFar: costs.length > 0 ? costs.reduce((a, b) => a + b, 0) : null,
@@ -153,7 +160,7 @@ export function bucketSimpleHome(
   for (const d of derivations) {
     switch (d.display.state) {
       case 'needs-you': {
-        const kind: NeedsYouKind = d.pendingInputAgent ? 'question' : d.agents.some((a) => a.troubled || isAgentProblemStatus(a.status)) ? 'stuck' : 'problems';
+        const kind: NeedsYouKind = d.pendingInputAgent ? 'question' : d.agentStuck || d.reviewStuck ? 'stuck' : 'problems';
         buckets.needsYou.push({ derivation: d, kind });
         break;
       }

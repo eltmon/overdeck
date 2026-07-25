@@ -101,7 +101,7 @@ function QuestionCard({ item, subject, onOpen }: { item: SimpleIssueDerivation; 
 function ProblemsCard({ item, kind, onOpen }: { item: SimpleIssueDerivation; kind: NeedsYouKind; onOpen: () => void }) {
   const actions = useSimpleActions();
   const agent = item.primaryAgent;
-  const busy = actions.tell.isPending || actions.recover.isPending;
+  const busy = actions.tell.isPending || actions.recover.isPending || actions.unstick.isPending;
   const isStuck = kind === 'stuck';
   return (
     <div className="mt-3 rounded-2xl border border-warning/40 bg-card p-4 shadow-sm">
@@ -112,7 +112,13 @@ function ProblemsCard({ item, kind, onOpen }: { item: SimpleIssueDerivation; kin
       <p className="mt-2 text-[13.5px] leading-relaxed">{item.display.sentence}</p>
       <div className="mt-3 flex items-center gap-2">
         {isStuck ? (
-          <PrimaryButton disabled={!agent || busy} onClick={() => agent && actions.recover.mutate({ agentId: agent.id })}>
+          <PrimaryButton
+            disabled={busy || (!item.reviewStuck && !agent)}
+            onClick={() => {
+              if (item.reviewStuck) actions.unstick.mutate({ issueId: item.issue.identifier });
+              if (item.agentStuck && agent) actions.recover.mutate({ agentId: agent.id });
+            }}
+          >
             Get it unstuck
           </PrimaryButton>
         ) : (

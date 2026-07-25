@@ -60,7 +60,7 @@ export function SimpleIssuePage({ issueId }: { issueId: string }) {
   // always talks to the agent you're looking at.
   const selectedAgent = d.agents.find((a) => a.id === selectedAgentId) ?? agent;
   const helpUrl = getHelpUrl(d.issue);
-  const busy = actions.tell.isPending || actions.answer.isPending || actions.recover.isPending || actions.merge.isPending || actions.startWork.isPending;
+  const busy = actions.tell.isPending || actions.answer.isPending || actions.recover.isPending || actions.unstick.isPending || actions.merge.isPending || actions.startWork.isPending;
 
   const sendComposer = () => {
     const text = composerText.trim();
@@ -82,7 +82,20 @@ export function SimpleIssuePage({ issueId }: { issueId: string }) {
       case 'Start work':
         return <PrimaryButton disabled={busy} onClick={() => actions.startWork.mutate({ issueId: d.issue.identifier })}>{label}</PrimaryButton>;
       case 'Get it unstuck':
-        return <PrimaryButton disabled={!agent || busy} onClick={() => agent && actions.recover.mutate({ agentId: agent.id })}>{label}</PrimaryButton>;
+        // PAN-3073: target the door(s) that actually tripped stuck — the
+        // persistent review-status flag needs unstick; agent recovery alone
+        // cannot clear it and silently no-ops on a healthy agent.
+        return (
+          <PrimaryButton
+            disabled={busy || (!d.reviewStuck && !agent)}
+            onClick={() => {
+              if (d.reviewStuck) actions.unstick.mutate({ issueId: d.issue.identifier });
+              if (d.agentStuck && agent) actions.recover.mutate({ agentId: agent.id });
+            }}
+          >
+            {label}
+          </PrimaryButton>
+        );
       case 'Tell the agent to fix them':
         return (
           <PrimaryButton disabled={!agent || busy} onClick={() => agent && actions.tell.mutate({ agentId: agent.id, message: 'Please address the review findings and get this back to green.' })}>

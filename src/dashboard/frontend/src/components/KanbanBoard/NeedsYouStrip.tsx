@@ -34,7 +34,7 @@ function NeedsYouRow({
   const [answer, setAnswer] = useState('');
   const agent = item.primaryAgent;
   const questionAgent = item.pendingInputAgent;
-  const busy = actions.tell.isPending || actions.recover.isPending || actions.answer.isPending;
+  const busy = actions.tell.isPending || actions.recover.isPending || actions.unstick.isPending || actions.answer.isPending;
   const meta = KIND_META[kind];
 
   return (
@@ -79,8 +79,11 @@ function NeedsYouRow({
         )}
         {kind === 'stuck' && (
           <button
-            disabled={!agent || busy}
-            onClick={() => agent && actions.recover.mutate({ agentId: agent.id })}
+            disabled={busy || (!item.reviewStuck && !agent)}
+            onClick={() => {
+              if (item.reviewStuck) actions.unstick.mutate({ issueId: item.issue.identifier });
+              if (item.agentStuck && agent) actions.recover.mutate({ agentId: agent.id });
+            }}
             className="h-7 rounded-md bg-primary px-2.5 text-[11px] font-medium text-primary-foreground disabled:opacity-40"
           >
             Get it unstuck
