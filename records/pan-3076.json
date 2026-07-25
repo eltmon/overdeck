@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-25T21:12:36.630Z",
-  "updated": "2026-07-25T21:40:52.440Z",
+  "updated": "2026-07-25T21:41:03.145Z",
   "pipeline": {
     "issueId": "PAN-3076",
     "reviewStatus": "pending",
@@ -75,8 +75,16 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 6,
-    "claims": {},
+    "sequence": 7,
+    "claims": {
+      "stamp-legacy-specialists-done": {
+        "writerId": "agent-pan-3076",
+        "agentId": "agent-pan-3076",
+        "pid": 2298314,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-25T21:41:03.145Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3076",
@@ -139,6 +147,7 @@
     "anchor-drift-evaluator.anchor-drift-evaluator.ac4": "completed",
     "stamp-review-status-route": "completed",
     "stamp-review-status-route.stamp-review-status-route.ac1": "completed",
-    "stamp-review-status-route.stamp-review-status-route.ac2": "completed"
+    "stamp-review-status-route.stamp-review-status-route.ac2": "completed",
+    "stamp-legacy-specialists-done": "running"
   }
 }
