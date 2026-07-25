@@ -43,7 +43,7 @@
     "recordedAt": "2026-07-25T12:48:24.279Z"
   },
   "created": "2026-07-25T11:59:26.466Z",
-  "updated": "2026-07-25T13:18:48.145Z",
+  "updated": "2026-07-25T13:18:51.126Z",
   "pipeline": {
     "issueId": "PAN-3055",
     "reviewStatus": "passed",
@@ -51,9 +51,9 @@
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": true,
+    "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-25T12:49:09.494Z",
-    "updatedAt": "2026-07-25T13:18:48.056Z",
+    "updatedAt": "2026-07-25T13:18:48.073Z",
     "reviewNotes": "Approved: census-gated falling-edge reap is correct, scoped, documented, and passes focused tests, lint, and dashboard typecheck.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3064",
@@ -136,7 +136,7 @@
       },
       "costAtCloseOut": {
         "usd": 51.45601,
-        "pricingAsOf": "2026-07-25T13:18:48.139Z"
+        "pricingAsOf": "2026-07-25T13:18:51.119Z"
       }
     },
     "merges": [
