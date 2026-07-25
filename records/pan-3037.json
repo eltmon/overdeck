@@ -332,10 +332,10 @@
     "recordedAt": "2026-07-25T22:13:33.131Z"
   },
   "created": "2026-07-25T20:44:21.373Z",
-  "updated": "2026-07-25T22:38:57.974Z",
+  "updated": "2026-07-25T22:39:27.069Z",
   "pipeline": {
     "issueId": "PAN-3037",
-    "reviewStatus": "failed",
+    "reviewStatus": "reviewing",
     "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -343,7 +343,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-25T22:20:18.803Z",
-    "updatedAt": "2026-07-25T22:38:57.967Z",
+    "updatedAt": "2026-07-25T22:39:26.659Z",
     "reviewNotes": "Review role spawn failed: Command failed: tmux -L overdeck -f /home/eltmon/.overdeck/tmux/overdeck.tmux.conf new-session -d -s agent-pan-3037-review -c /home/eltmon/Projects/overdeck/workspaces/feature-pan-3037 -x 200 -y 50 -e ANTHROPIC_API_KEY= -e ANTHROPIC_BASE_URL=http://127.0.0.1:8317 -e ANTHROPIC_AUTH_TOKEN=overdeck-local-cliproxy-key -e ANTHROPIC_DEFAULT_HAIKU_MODEL= -e OPENAI_API_KEY= -e GEMINI_API_KEY= -e API_TIMEOUT_MS= -e CLAUDE_CODE_API_KEY_HELPER_TTL_MS= -e KIMI_API_KEY= -e MINIMAX_API_KEY= -e ZAI_API_KEY= -e MIMO_API_KEY= -e OPENROUTER_API_KEY= -e NOUS_API_KEY= -e DASHSCOPE_API_KEY= -e TERM=xterm-256color -e OVERDECK_AGENT_ID=agent-pan-3037-review -e OVERDECK_ISSUE_ID=PAN-3037 -e OVERDECK_SESSION_TYPE=review -e CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false -e GIT_SEQUENCE_EDITOR=false -e OVERDECK_FLYWHEEL_RUN_ID=RUN-70 -e OVERDECK_FLYWHEEL_AGENT_ROLE=review bash /home/eltmon/.overdeck/agents/agent-pan-3037-review/launcher.sh\nduplicate session: agent-pan-3037-review\n",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
     "verificationNotes": "Pre-review verification already covered the reviewed commit",
@@ -352,7 +352,7 @@
     "reviewedAtCommit": "93ad317654fa305065e3cb80cc73f470c5817ed4",
     "lastVerifiedCommit": "93ad317654fa305065e3cb80cc73f470c5817ed4",
     "reviewRequestedAt": "2026-07-25T22:20:18.803Z",
-    "reviewSpawnedAt": "2026-07-25T22:13:41.321Z",
+    "reviewSpawnedAt": "2026-07-25T22:39:26.657Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "scripts/file-size-baseline.txt",
@@ -418,9 +418,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 14947589,
-            "output": 171844,
-            "cacheRead": 19857408,
+            "input": 15201554,
+            "output": 173534,
+            "cacheRead": 19993088,
             "cacheWrite": 0
           }
         },
@@ -441,15 +441,15 @@
           "cacheWrite": 311392
         },
         "openai/gpt-5.6-sol": {
-          "input": 16393524,
-          "output": 313746,
-          "cacheRead": 99885568,
+          "input": 16647489,
+          "output": 315436,
+          "cacheRead": 100021248,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 154.473142,
-        "pricingAsOf": "2026-07-25T22:38:57.970Z"
+        "usd": 155.861507,
+        "pricingAsOf": "2026-07-25T22:39:26.807Z"
       }
     },
     "merges": [
