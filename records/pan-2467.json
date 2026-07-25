@@ -22,7 +22,7 @@
   ],
   "feedback": [],
   "created": "2026-07-25T20:42:32.108Z",
-  "updated": "2026-07-25T20:57:11.496Z",
+  "updated": "2026-07-25T21:02:27.669Z",
   "pipeline": {
     "issueId": "PAN-2467",
     "reviewStatus": "pending",
@@ -65,18 +65,32 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "forge-merged-artifact": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-2467",
         "agentId": "agent-pan-2467",
         "pid": 1026993,
         "host": "eltmon-z790",
-        "claimedAt": "2026-07-25T20:57:11.495Z"
+        "claimedAt": "2026-07-25T20:57:11.495Z",
+        "itemId": "forge-merged-artifact",
+        "outcome": "completed",
+        "reason": "Added merged PR/MR lookup to GitHub and GitLab forge adapters with API/CLI unit coverage",
+        "releasedAt": "2026-07-25T21:02:27.669Z"
+      }
+    ],
+    "statusReasons": {
+      "forge-merged-artifact": {
+        "reason": "Added merged PR/MR lookup to GitHub and GitLab forge adapters with API/CLI unit coverage",
+        "updatedAt": "2026-07-25T21:02:27.669Z"
       }
     }
   },
   "statusOverrides": {
-    "forge-merged-artifact": "running"
+    "forge-merged-artifact": "completed",
+    "forge-merged-artifact.forge-merged-artifact.ac1": "completed",
+    "forge-merged-artifact.forge-merged-artifact.ac2": "completed",
+    "forge-merged-artifact.forge-merged-artifact.ac3": "completed"
   }
 }
