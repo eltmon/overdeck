@@ -6570,3 +6570,11 @@ Substrate bugs filed: 2897 2898 2899 2900 2901 2902 2907 2913 (8; ALL fixed and 
 - main **green** `cce23592b8`, live `cce23592b8` (in sync), 16 agents vs cap 20.
 - **NOT QUIESCENT** — MIN cohort still in review/test. No retrospective, no `pan flywheel report --force`.
 - **LESSON: a scheduled prompt is a plan, not a fact.** This one described a blocked deploy and a dirty tree that had both resolved. Re-deriving state first cost one command and prevented re-running finished work against a world that had moved.
+
+## RUN-70 tick 18 (2026-07-25 21:28Z) — steady state; pool reclaimed 21→18; PAN-3055 still awaiting operator promotion
+- Re-derived before acting (the tick-17 lesson). main==live==`cce23592b8`, CI **green**, 19 agents vs cap 20.
+- **PAN-3055 unchanged**: `review=passed test=passed` (PR #3064), bundled on `uat/pan-reef-0725`, `status: ready`. Re-emitted its **`shipping`** merge-gate verb — that verb choice is load-bearing (PAN-1736/1737: any other verb silently drops it from the merge queue). `require_uat_before_merge` is ON, so the flywheel schedules no merge; **operator promotion is the only remaining step** and it has been waiting ~20 min.
+- **Pool reclaimed 21 → 18.** PAN-3049 keeps refilling it (16→19→21 over three ticks). Audited by **attachment identity**, not prefix: removed 3 with **zero** attachments (`pan-2467_default`, `pan-3037_default`, `pan-3076_default`). Left the 3 traefik-only orphans (`min-892`, `min-903`, `pan-2997`) — they need a traefik disconnect and there are 13 slots of headroom, so the cheaper safer action sufficed. **Safety rule now 7-for-7 this run.**
+- No bridge-pool warnings in the activity feed, which is correct at 18/31 — PAN-3053's patrol only fires near the threshold. Its value is that this morning's silent 31/31 halt would now announce itself.
+- **NOT QUIESCENT** — MIN cohort (858/891/901/902) still in review/test; no retrospective, no `pan flywheel report --force`.
+- **LESSON: reclaim the cheap wins early and leave the expensive ones alone while headroom exists.** Three `docker network rm` calls on zero-attachment networks bought 3 slots at zero risk. The traefik-held orphans need a disconnect, which is a strictly larger blast radius — worth doing under pressure, not worth doing at 18/31.
