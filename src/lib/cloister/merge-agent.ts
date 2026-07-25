@@ -898,7 +898,7 @@ async function getConflictFiles(projectPath: string, signal?: AbortSignal): Prom
 async function resolveMainPreferredSyncConflicts(
   projectPath: string,
   conflictFiles: string[],
-  signal?: AbortSignal,
+  targetBranch: string, signal?: AbortSignal,
 ): Promise<{ success: boolean; reason?: string }> {
   if (conflictFiles.length === 0 || !conflictFiles.every(isSyncMainMainPreferredPath)) {
     return { success: false, reason: 'conflicts include non-pipeline-owned files' };
@@ -909,12 +909,12 @@ async function resolveMainPreferredSyncConflicts(
   try {
     for (const path of SYNC_MAIN_MAIN_PREFERRED_PATHS) {
       await run(`git rm -r --quiet --ignore-unmatch -- ${path}`);
-      await run(`git checkout origin/main -- ${path}`).catch((error) => {
+      await run(`git checkout origin/${targetBranch} -- ${path}`).catch((error) => {
         if (isSyncGitTermination(error)) throw error;
-        // The path may not exist on origin/main. The preceding git rm records
-        // main's deletion for this pipeline-owned path.
+        // The path may not exist on the target branch. The preceding git rm
+        // records that branch's deletion for this pipeline-owned path.
       });
-      await run(`git add -A -- ${path}`);
+      if ((await run(`git ls-files -- ${path}`)).stdout.trim()) await run(`git add -A -- ${path}`);
     }
 
     const remainingConflicts = await getConflictFiles(projectPath, signal);
@@ -1311,7 +1311,7 @@ async function syncMainIntoRepo(
     }
 
     const conflictFiles = await getConflictFiles(repoDir, signal);
-    const mainPreferredResolution = await resolveMainPreferredSyncConflicts(repoDir, conflictFiles, signal);
+    const mainPreferredResolution = await resolveMainPreferredSyncConflicts(repoDir, conflictFiles, targetBranch, signal);
     if (mainPreferredResolution.success) {
       mergeStarted = false;
       console.log(`[sync-main] Auto-resolved ${conflictFiles.length} pipeline-owned conflict(s) with origin/${targetBranch}`);

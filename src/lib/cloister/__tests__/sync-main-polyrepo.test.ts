@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -124,6 +124,34 @@ describe('syncMainIntoWorkspace polyrepo support', () => {
       expect.objectContaining({ repoKey: 'api', success: true, alreadyUpToDate: true }),
       expect.objectContaining({ repoKey: 'fe', success: true, alreadyUpToDate: true }),
     ]);
+  });
+
+  it('auto-resolves pipeline-owned conflicts from the configured target branch', async () => {
+    const api = createTestRepo(root, 'api');
+    const pipelineFile = join('.pan', 'continues', 'PAN-3037.json');
+    mkdirSync(join(api.seed, '.pan', 'continues'), { recursive: true });
+    writeFileSync(join(api.seed, pipelineFile), 'base\n');
+    git(api.seed, 'add', pipelineFile);
+    git(api.seed, 'commit', '-q', '-m', 'pipeline base');
+    git(api.seed, 'push', '-q', 'origin', 'main');
+    git(api.workspace, 'fetch', '-q', 'origin', 'main');
+    git(api.workspace, 'merge', '-q', 'origin/main');
+
+    git(api.seed, 'switch', '-q', '-c', 'develop');
+    writeFileSync(join(api.seed, pipelineFile), 'develop\n');
+    git(api.seed, 'commit', '-qam', 'develop pipeline state');
+    git(api.seed, 'push', '-q', '-u', 'origin', 'develop');
+    writeFileSync(join(api.workspace, pipelineFile), 'feature\n');
+    git(api.workspace, 'commit', '-qam', 'feature pipeline state');
+    repoRootsMock.mockReturnValue([
+      { repoKey: 'api', dir: api.workspace, sourceBranch: 'feature/min-850', targetBranch: 'develop', isPolyrepo: true },
+    ]);
+
+    const result = await syncMainIntoWorkspace(join(root, 'workspace'), 'MIN-850');
+
+    expect(result).toMatchObject({ success: true });
+    expect(readFileSync(join(api.workspace, pipelineFile), 'utf8')).toBe('develop\n');
+    expect(() => git(api.workspace, 'rev-parse', '-q', '--verify', 'MERGE_HEAD')).toThrow();
   });
 
   it('preserves unprefixed top-level paths for a monorepo workspace', async () => {
