@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-25T22:42:08.234Z",
-  "updated": "2026-07-25T23:08:17.550Z",
+  "updated": "2026-07-25T23:08:41.702Z",
   "pipeline": {
     "issueId": "PAN-3083",
     "reviewStatus": "pending",
@@ -59,8 +59,16 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 8,
-    "claims": {},
+    "sequence": 9,
+    "claims": {
+      "docs-intent-lifecycle": {
+        "writerId": "agent-pan-3083",
+        "agentId": "agent-pan-3083",
+        "pid": 1565852,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-25T23:08:41.702Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3083",
@@ -143,6 +151,7 @@
     "fallback-clearable-request.fallback-clearable-request.ac3": "completed",
     "uat-generation-regression-test": "completed",
     "uat-generation-regression-test.uat-generation-regression-test.ac1": "completed",
-    "uat-generation-regression-test.uat-generation-regression-test.ac2": "completed"
+    "uat-generation-regression-test.uat-generation-regression-test.ac2": "completed",
+    "docs-intent-lifecycle": "running"
   }
 }
