@@ -64,6 +64,47 @@ Do you want to proceed?
     expect(detection).toBeNull()
   })
 
+  // PAN-3068 — Claude Code renders a footer hint below "3. No", so requiring the
+  // final option to be the literal last pane line meant Claude permission
+  // prompts were never detected. Captured verbatim from agent-min-896's pane
+  // while it sat frozen on a sensitive-file gate for three hours.
+  it('detects a Claude permission menu despite the trailing footer hint', () => {
+    const detection = detectAwaitingInputFromPaneSync(`
+ Bash command
+
+   rm -r /home/eltmon/Projects/myn/workspaces/feature-min-896/.devcontainer && rm /home/eltmon/Projects/myn/workspaces/feature-min-896/dev && git status --short
+   Remove generated harness artifacts and verify cleanliness
+
+ Claude requested permissions to edit /home/eltmon/Projects/myn/workspaces/feature-min-896/.devcontainer which is a sensitive file.
+
+ Do you want to proceed?
+ ❯ 1. Yes
+   2. Yes, and don't ask again for similar commands in /home/eltmon/Projects/myn/workspaces/feature-min-896
+   3. No
+
+ Esc to cancel · Tab to amend · ctrl+e to explain
+`)
+
+    expect(detection).toMatchObject({ reason: 'tool_permission' })
+    expect(detection?.prompt).toContain('Do you want to proceed?')
+    expect(detection?.prompt).toContain('3. No')
+  })
+
+  it('still clears an answered Claude permission menu followed by a footer hint and real output', () => {
+    const detection = detectAwaitingInputFromPaneSync(`
+Do you want to proceed?
+❯ 1. Yes
+  2. Yes, allow all Bash commands
+  3. No
+
+ Esc to cancel · Tab to amend · ctrl+e to explain
+● Bash(git status)
+  ⎿ On branch feature/test
+`)
+
+    expect(detection).toBeNull()
+  })
+
   // PAN-1690 — Codex TUI approval prompts. Codex renders option descriptions
   // and a footer hint below "3. No", which defeats the Claude trailing-line
   // heuristics; these cases regressed before the codex-aware branch.
