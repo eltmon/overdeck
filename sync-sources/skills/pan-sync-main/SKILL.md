@@ -30,12 +30,12 @@ curl -X POST http://localhost:3011/api/issues/PAN-XXX/sync-main
 ## What It Does
 
 1. Checks for uncommitted changes (blocks if any — must commit, explicitly discard, or surface to the operator first; agents never `git stash`)
-2. Cleans up any stale git locks
-3. Runs `git fetch origin main`
-4. Runs `git merge origin/main`
-5. If clean merge: reports commit count and changed files
-6. If conflicts: wakes the merge-agent specialist to resolve them
-7. After conflict resolution: scans for leftover markers, then reports result
+2. Resolves the workspace's required git repos; monorepos produce one repo root
+3. Cleans up stale git locks in each repo
+4. Fetches and merges each repo's configured target branch sequentially in config order
+5. Stops at the first failed or conflicted repo and marks later repos skipped
+6. If clean: reports aggregate commit/file totals plus one result per repo
+7. If conflicts remain: aborts that repo's merge and reports its conflict files
 
 ## Outcomes
 
@@ -44,14 +44,15 @@ curl -X POST http://localhost:3011/api/issues/PAN-XXX/sync-main
 | Already up to date | Main has no new commits since last sync |
 | Success (N commits) | Clean merge or agent-resolved conflicts |
 | Uncommitted changes | Commit or discard workspace changes first |
-| Conflict (unresolvable) | Agent could not resolve — merge aborted, workspace unchanged |
+| Conflict (unresolvable) | The failing repo's merge is aborted and its conflict files are reported |
+| Per-repo / skipped | Polyrepo output shows each repo's result; repos after the first failure are skipped |
 
 ## Design Decisions
 
 - **Merge, not rebase** — Rebase rewrites SHAs and requires force-push. Merge commits serve as audit markers.
 - **No tests/builds** — Feature branch is WIP. Running tests after sync would fail on pre-existing issues.
 - **No push to remote** — This is a local workspace operation only.
-- **All-or-nothing for polyrepo** — If any repo fails, all are aborted (not implemented yet; sync is per-workspace).
+- **Sequential polyrepo sync** — Required repos sync in config order. The first failure stops iteration; earlier merges remain, later repos are skipped, and output reports every repo's result.
 
 ## Examples
 
