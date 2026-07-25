@@ -227,10 +227,10 @@
     "recordedAt": "2026-07-24T23:08:31.650Z"
   },
   "created": "2026-07-12T09:32:29.900Z",
-  "updated": "2026-07-25T00:05:37.041Z",
+  "updated": "2026-07-25T00:16:35.201Z",
   "pipeline": {
     "issueId": "PAN-1525",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -238,8 +238,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-24T23:12:31.996Z",
-    "updatedAt": "2026-07-25T00:05:36.469Z",
-    "reviewNotes": "Codex shared-skill seeding is fixed, but detached failures remain invisible, unresolved agent targets fail open, and attached /pan commands reach the model.",
+    "updatedAt": "2026-07-25T00:16:35.178Z",
     "inspectNotes": "Composer-command parse+route inserted before compact/transform/delivery in conversation-message.ts with early return; unknown-command maps to 404 naming token + 'Type /pan to list available commands'; terminal-only policy maps to 422 naming exact command display; unprefixed text/pan-start negative control preserves original compact/transform/deliverAgentMessage path. All 4 ACs covered by router.test.ts assertions matching the exact banned-call list.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3033",
     "lastVerifiedCommit": "10c555afc0744ecb699ec50b3d95db13ec2fa92f",
@@ -405,9 +404,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 4730279,
-            "output": 224129,
-            "cacheRead": 69898240,
+            "input": 4764752,
+            "output": 230027,
+            "cacheRead": 70579712,
             "cacheWrite": 0
           }
         },
@@ -421,9 +420,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 11006706,
-            "output": 835884,
-            "cacheRead": 445070848,
+            "input": 11354905,
+            "output": 893324,
+            "cacheRead": 482058752,
             "cacheWrite": 0
           }
         }
@@ -436,9 +435,9 @@
           "cacheWrite": 921870
         },
         "openai/gpt-5.6-sol": {
-          "input": 15736985,
-          "output": 1060013,
-          "cacheRead": 514969088,
+          "input": 16119657,
+          "output": 1123351,
+          "cacheRead": 552638464,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -449,8 +448,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 403.866028,
-        "pricingAsOf": "2026-07-25T00:05:36.493Z"
+        "usd": 426.514216,
+        "pricingAsOf": "2026-07-25T00:16:35.197Z"
       }
     },
     "merges": [
