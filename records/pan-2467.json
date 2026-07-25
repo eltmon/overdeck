@@ -98,18 +98,18 @@
     "recordedAt": "2026-07-25T22:26:00.654Z"
   },
   "created": "2026-07-25T20:42:32.108Z",
-  "updated": "2026-07-25T23:05:25.981Z",
+  "updated": "2026-07-25T23:09:31.170Z",
   "pipeline": {
     "issueId": "PAN-2467",
     "reviewStatus": "reviewing",
-    "testStatus": "pending",
+    "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-25T22:26:20.039Z",
-    "updatedAt": "2026-07-25T23:05:25.655Z",
+    "updatedAt": "2026-07-25T23:09:31.042Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "inspectNotes": "AC1-5 verified against real APIs: unmerged reason names repoKey+aheadCount; merged artifact path yields state 'merged' + complete true; every git/forge error caught into 'unverifiable' (fails closed, complete false); missing source ref and single-repo resolver both land 'no-changes'/'merged' without throwing; enumeration is solely ensureMergeSetForIssueSync -> resolveProjectReposForIssueSync with promisified exec and zero workspaceType conditionals. MergeSetRepoState and ResolvedProjectRepo are both structurally compatible with RepoToAssess (repoKey/repoPath/forge/sourceBranch/targetBranch/required all present).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3080",
@@ -190,10 +190,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 20,
-            "output": 2338,
-            "cacheRead": 1300681,
-            "cacheWrite": 166094
+            "input": 50,
+            "output": 8474,
+            "cacheRead": 3923244,
+            "cacheWrite": 181637
           }
         },
         "work": {
@@ -219,15 +219,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 20,
-          "output": 2338,
-          "cacheRead": 1300681,
-          "cacheWrite": 166094
+          "input": 50,
+          "output": 8474,
+          "cacheRead": 3923244,
+          "cacheWrite": 181637
         }
       },
       "costAtCloseOut": {
-        "usd": 121.82093,
-        "pricingAsOf": "2026-07-25T23:05:25.718Z"
+        "usd": 122.445722,
+        "pricingAsOf": "2026-07-25T23:09:31.151Z"
       }
     },
     "merges": [
