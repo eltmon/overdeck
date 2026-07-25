@@ -6595,3 +6595,11 @@ Substrate bugs filed: 2897 2898 2899 2900 2901 2902 2907 2913 (8; ALL fixed and 
 - PAN-3055 still `ready` on `uat/pan-reef-0725` awaiting operator promotion (~1h); `shipping` verb re-emitted. MYN stays `auto_merge_default: hold`, so **no merge verbs emitted** for the three passed MIN issues.
 - main==live==`cce23592b8` green; networks **18**, flat for a second tick (no reclaim needed).
 - **LESSON: "nearly drained" is a trend, not a terminal state, and runs end on the latter.** Two consecutive ticks looked like the last one. Checking `review_status` each time cost one query and prevented closing a run out from under two in-flight issues.
+
+## RUN-70 tick 21 (2026-07-25 22:20Z) — still not quiescent; PAN-3029 re-entered the pipeline
+- DB check, not trend: `MIN-858` still `reviewing/pending`, `PAN-2997` still `review=pending`. **Retrospective and `pan flywheel report --force` withheld for a third tick** — correctly.
+- **`PAN-3029` is now `review=pending / test=pending`** — the strike someone else started has pushed it back through the pipeline rather than leaving it stuck at `verificationStatus: missing`. **That is the right resolution to the PAN-3067 residue**: not an `--accept-verification` override, but actually running the verification the gate was asking for. The blocker I surfaced is being answered the way it should be.
+- `PAN-3051` reads `review=passed test=passed`, so its strike has produced verdicts too. Neither strike is mine — **ownership must be confirmed before anyone merges them.**
+- PAN-3055 unchanged (`ready` on `uat/pan-reef-0725`, ~1h20m awaiting operator promotion); `shipping` verb re-emitted. MYN still held → no merge verbs for MIN-891/901/902.
+- main==live==`cce23592b8` green; 17 agents (down from 18); networks **18**, flat for a third tick — the PAN-3049 refill has stopped for now, so no reclaim needed.
+- **LESSON: surfacing a blocker beats overriding it.** I refused `--accept-verification` on PAN-3029/3051/3056 for several ticks and instead documented exactly what was missing and why. Within two ticks both had strikes running that supply the missing verification. An override would have closed the issues and left the gap; the refusal got the gap filled.
