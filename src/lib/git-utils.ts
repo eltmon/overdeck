@@ -367,6 +367,14 @@ export function parseCompositeSnapshot(snapshot: string | undefined): Map<string
   return heads;
 }
 
+export function formatAnchorShort(anchor: string): string {
+  return anchor.split(/\s+/).map((token) => {
+    const separator = token.lastIndexOf('@');
+    if (separator <= 0 || separator === token.length - 1) return token.substring(0, 8);
+    return `${token.slice(0, separator)}@${token.slice(separator + 1, separator + 9)}`;
+  }).join(' ');
+}
+
 /**
  * Snapshot the code HEAD(s) of a workspace for drift comparison (PAN-2948).
  *

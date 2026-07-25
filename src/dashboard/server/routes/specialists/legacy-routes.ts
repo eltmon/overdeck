@@ -323,10 +323,12 @@ const postSpecialistsDoneRoute = HttpRouter.add(
               `feature-${normalizedIssueId.toLowerCase()}`,
             );
             if (existsSync(workspacePath)) {
-              const { getWorkspaceGitInfo } = await import('../../../../lib/git-utils.js');
-              const { HEAD } = await Effect.runPromise(getWorkspaceGitInfo(workspacePath));
-              setReviewStatusBase(normalizedIssueId, { reviewedAtCommit: HEAD });
-              console.log(`[specialists/done] Snapshotted reviewedAtCommit=${HEAD.substring(0, 8)} for ${normalizedIssueId}`);
+              const { formatAnchorShort, snapshotWorkspaceHeadsPromise } = await import('../../../../lib/git-utils.js');
+              const headAnchor = await snapshotWorkspaceHeadsPromise(normalizedIssueId, workspacePath);
+              if (headAnchor) {
+                setReviewStatusBase(normalizedIssueId, { reviewedAtCommit: headAnchor });
+                console.log(`[specialists/done] Snapshotted reviewedAtCommit=${formatAnchorShort(headAnchor)} for ${normalizedIssueId}`);
+              }
             }
           }
         } catch (err) {
