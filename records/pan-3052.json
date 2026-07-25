@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-25T11:59:01.400Z",
-  "updated": "2026-07-25T12:26:23.560Z",
+  "updated": "2026-07-25T12:29:33.135Z",
   "pipeline": {
     "issueId": "PAN-3052",
     "reviewStatus": "pending",
@@ -59,16 +59,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "boot-test-throwaway": {
-        "writerId": "agent-pan-3052",
-        "agentId": "agent-pan-3052",
-        "pid": 3434368,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-25T12:26:23.560Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3052",
@@ -80,12 +72,27 @@
         "outcome": "completed",
         "reason": "Extracted applyBootReconciliationDecision into boot-reconciliation-apply.ts, preserved the dependency-injected wrapper and acyclic import direction, removed the deacon-auto-resume file-size baseline row, and verified typecheck, lint, 18 boot tests, and 642 cloister tests.",
         "releasedAt": "2026-07-25T12:24:48.063Z"
+      },
+      {
+        "writerId": "agent-pan-3052",
+        "agentId": "agent-pan-3052",
+        "pid": 3434368,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-25T12:26:23.560Z",
+        "itemId": "boot-test-throwaway",
+        "outcome": "completed",
+        "reason": "Built production artifacts, booted dist/dashboard/server.js under Node 22.22.0 with isolated OVERDECK_HOME and OVERDECK_DISABLE_DEACON=1, received HTTP 200 health body {\"status\":\"ok\",\"mode\":\"peer\",\"buildCommit\":\"693571b4a84a6c257ce75cff8ea7ba0634d7e3db\"}, found no strict-ESM cycle error, stopped the process, and confirmed port 3999 was free.",
+        "releasedAt": "2026-07-25T12:29:33.135Z"
       }
     ],
     "statusReasons": {
       "extract-apply-module": {
         "reason": "Extracted applyBootReconciliationDecision into boot-reconciliation-apply.ts, preserved the dependency-injected wrapper and acyclic import direction, removed the deacon-auto-resume file-size baseline row, and verified typecheck, lint, 18 boot tests, and 642 cloister tests.",
         "updatedAt": "2026-07-25T12:24:48.063Z"
+      },
+      "boot-test-throwaway": {
+        "reason": "Built production artifacts, booted dist/dashboard/server.js under Node 22.22.0 with isolated OVERDECK_HOME and OVERDECK_DISABLE_DEACON=1, received HTTP 200 health body {\"status\":\"ok\",\"mode\":\"peer\",\"buildCommit\":\"693571b4a84a6c257ce75cff8ea7ba0634d7e3db\"}, found no strict-ESM cycle error, stopped the process, and confirmed port 3999 was free.",
+        "updatedAt": "2026-07-25T12:29:33.135Z"
       }
     }
   },
@@ -96,6 +103,9 @@
     "extract-apply-module.extract-apply-module.ac3": "completed",
     "extract-apply-module.extract-apply-module.ac4": "completed",
     "extract-apply-module.extract-apply-module.ac5": "completed",
-    "boot-test-throwaway": "running"
+    "boot-test-throwaway": "completed",
+    "boot-test-throwaway.boot-test-throwaway.ac1": "completed",
+    "boot-test-throwaway.boot-test-throwaway.ac2": "completed",
+    "boot-test-throwaway.boot-test-throwaway.ac3": "completed"
   }
 }
