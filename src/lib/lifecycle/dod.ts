@@ -25,7 +25,7 @@ export const DOD_ROWS: readonly DodRowDef[] = [
     id: 'verification',
     num: 3,
     title: 'Verification green on the branch',
-    expected: 'verificationStatus: passed at lastVerifiedCommit',
+    expected: 'verificationStatus: passed',
     overridable: true,
   },
   { id: 'merged', num: 4, title: 'Merged to main', expected: 'PR merged on the forge', overridable: true },

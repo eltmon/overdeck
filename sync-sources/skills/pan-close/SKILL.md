@@ -35,7 +35,7 @@ Each overridable row has one explicit acceptance flag:
 ```text
 --accept-review       Row 1: review passed
 --accept-tests        Row 2: tests passed
---accept-verification Row 3: branch verification passed at lastVerifiedCommit
+--accept-verification Row 3: branch verification passed
 --accept-merged       Row 4: PR merged on the forge
 --accept-post-merge   Row 5: post-merge lifecycle completed
 --accept-main-verify  Row 6: merge commit verified on main
