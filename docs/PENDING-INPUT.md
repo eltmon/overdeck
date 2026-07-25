@@ -17,7 +17,7 @@ at read time) enumerates the active blocking surfaces. Labels live in one map:
 | `askUserQuestion` | JSONL tool_use + PAN-1520 deny-hook tool_result | `pendingAskUserQuestion` (questions/options) | `AskUserQuestionDialog` → `POST /api/agents/:id/answer-question` (agents) / conversation message (convs) |
 | `exitPlanMode` | JSONL `ExitPlanMode` tool_use without tool_result | `pendingProposedPlan { toolUseId, askedAt, plan }` | `PlanApprovalDialog` → `POST /api/agents/:id/plan-action` (agents) / `POST /api/conversations/:name/plan-action` (convs) — native plan-menu keystrokes |
 | `enterPlanMode` | JSONL `EnterPlanMode` without a subsequent `ExitPlanMode` | — (plan being drafted) | none — informational until `exitPlanMode` fires |
-| `permissionRequest` | Channel permission event stream (server-side), merged at read time by `selectPendingInputSubjects` / `selectPendingPermissionAgentIds` | request details | `ChannelPermissionDialog` → permission response route |
+| `permissionRequest` | Two sources. (a) Channel permission event stream (server-side), merged at read time by `selectPendingInputSubjects` / `selectPendingPermissionAgentIds`. (b) PAN-3070: pane/runtime detection with `pendingQuestionReason === 'tool_permission'`, folded into `pendingInputKinds` by `appendPaneDetectionKind` — the only source that fires when the Channels bridge is off (the default under the PTY supervisor) | request details (source a only) | `ChannelPermissionDialog` → permission response route; terminal otherwise |
 | `sessionResume` | Pane pattern detection | — | terminal only |
 | `rateLimit` | Pane pattern detection (PAN-1834) | — | auto-dismissed by the deacon modal handler; terminal otherwise |
 
@@ -64,6 +64,15 @@ at read time) enumerates the active blocking surfaces. Labels live in one map:
   without a page refresh. The poller's `lastEnrichment` cache is intentionally
   not cleared, preserving the PAN-1834 awaiting-input rising edge as a
   single-shot activity entry + TTS notification.
+- **PAN-3070: health agrees with "needs you".** An agent holding an unanswered
+  blocking prompt is never reported `resolution: working`, and `GET /api/agents`
+  never reports it `status: healthy` — it reports `warning`, the same value
+  `src/lib/health.ts` uses for an agent waiting on a human.
+  `isBlockedOnPendingInput(...)` in `src/lib/agent-enrichment.ts` is the single
+  predicate; the detection wins over `runtimeData.resolution`, which is written
+  by the stop hook and stays at whatever it last was while the agent sits frozen.
+  The predicate deliberately excludes `pendingQuestionReason: 'other'` — PAN-1591
+  showed the generic fallbacks set it with no answerable prompt behind them.
 
 ## Data flow (plan approval)
 
