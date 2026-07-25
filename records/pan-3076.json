@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-25T21:12:36.630Z",
-  "updated": "2026-07-25T21:44:23.401Z",
+  "updated": "2026-07-25T21:46:42.226Z",
   "pipeline": {
     "issueId": "PAN-3076",
     "reviewStatus": "pending",
@@ -75,16 +75,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 11,
-    "claims": {
-      "deacon-post-review-compare": {
-        "writerId": "agent-pan-3076",
-        "agentId": "agent-pan-3076",
-        "pid": 2387054,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-25T21:44:23.401Z"
-      }
-    },
+    "sequence": 12,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3076",
@@ -140,6 +132,17 @@
         "outcome": "completed",
         "reason": "Changed the verification-review bypass to stamp reviewedAtCommit through snapshotWorkspaceHeadsPromise.",
         "releasedAt": "2026-07-25T21:44:06.292Z"
+      },
+      {
+        "writerId": "agent-pan-3076",
+        "agentId": "agent-pan-3076",
+        "pid": 2387054,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-25T21:44:23.401Z",
+        "itemId": "deacon-post-review-compare",
+        "outcome": "completed",
+        "reason": "Replaced wrapper-root HEAD probes with the workspace anchor drift evaluator, composite-safe logs, and the required lowered deacon size baseline.",
+        "releasedAt": "2026-07-25T21:46:42.226Z"
       }
     ],
     "statusReasons": {
@@ -162,6 +165,10 @@
       "stamp-deacon-bypass": {
         "reason": "Changed the verification-review bypass to stamp reviewedAtCommit through snapshotWorkspaceHeadsPromise.",
         "updatedAt": "2026-07-25T21:44:06.292Z"
+      },
+      "deacon-post-review-compare": {
+        "reason": "Replaced wrapper-root HEAD probes with the workspace anchor drift evaluator, composite-safe logs, and the required lowered deacon size baseline.",
+        "updatedAt": "2026-07-25T21:46:42.226Z"
       }
     }
   },
@@ -184,6 +191,9 @@
     "stamp-deacon-bypass": "completed",
     "stamp-deacon-bypass.stamp-deacon-bypass.ac1": "completed",
     "stamp-deacon-bypass.stamp-deacon-bypass.ac2": "completed",
-    "deacon-post-review-compare": "running"
+    "deacon-post-review-compare": "completed",
+    "deacon-post-review-compare.deacon-post-review-compare.ac1": "completed",
+    "deacon-post-review-compare.deacon-post-review-compare.ac2": "completed",
+    "deacon-post-review-compare.deacon-post-review-compare.ac3": "completed"
   }
 }
