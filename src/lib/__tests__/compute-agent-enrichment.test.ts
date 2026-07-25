@@ -304,3 +304,55 @@ describe('computeAgentEnrichment plan payload', () => {
     rmSync(dir, { recursive: true, force: true })
   })
 })
+
+/**
+ * PAN-3070 — an agent frozen on an unanswered tool-permission prompt was
+ * reported `resolution: working` (and `status: healthy` by the REST listing)
+ * for hours, while the Decisions surface simultaneously showed it as needing
+ * the operator. The runtime resolution is written by the stop hook and stays at
+ * whatever it last was, so the detection computed here is the fresher evidence
+ * and has to win.
+ */
+describe('computeAgentEnrichment blocking-prompt resolution', () => {
+  const getAgentRuntimeStateMock = vi.mocked(agents.getAgentRuntimeState)
+  const getAgentStateSyncMock = vi.mocked(agents.getAgentStateSync)
+  const detectAwaitingInputForAgentMock = vi.mocked(agentInputDetection.detectAwaitingInputForAgent)
+
+  function arrange(agentId: string) {
+    const agentDir = makeAgentDir('work')
+    vi.spyOn(agents, 'getAgentDir').mockReturnValue(agentDir)
+    getAgentStateSyncMock.mockReturnValue({ id: agentId, role: 'work' } as ReturnType<typeof agents.getAgentStateSync>)
+    getAgentRuntimeStateMock.mockReturnValue(Effect.succeed({ state: 'active', resolution: 'working', resolutionCount: 3 }))
+    return agentDir
+  }
+
+  it('reports needs_input and a permissionRequest kind for a parked permission prompt', async () => {
+    const agentId = 'agent-min-896'
+    const dir = arrange(agentId)
+    detectAwaitingInputForAgentMock.mockReturnValue(
+      Effect.succeed({ reason: 'tool_permission', prompt: 'Allow .devcontainer edit?' }),
+    )
+
+    const e = await Effect.runPromise(computeAgentEnrichment(agentId, undefined, false, EMPTY_PENDING_INPUTS_SCAN))
+
+    expect(e.hasPendingQuestion).toBe(true)
+    expect(e.pendingQuestionReason).toBe('tool_permission')
+    expect(e.resolution).toBe('needs_input')
+    expect(e.pendingInputKinds).toContain('permissionRequest')
+    expect(e.pendingInputCount).toBeGreaterThan(0)
+    rmSync(dir, { recursive: true, force: true })
+  })
+
+  it('leaves a genuinely working agent alone', async () => {
+    const agentId = 'agent-pan-3070'
+    const dir = arrange(agentId)
+    detectAwaitingInputForAgentMock.mockReturnValue(Effect.succeed(null))
+
+    const e = await Effect.runPromise(computeAgentEnrichment(agentId, undefined, false, EMPTY_PENDING_INPUTS_SCAN))
+
+    expect(e.hasPendingQuestion).toBe(false)
+    expect(e.resolution).toBe('working')
+    expect(e.pendingInputKinds).toEqual([])
+    rmSync(dir, { recursive: true, force: true })
+  })
+})

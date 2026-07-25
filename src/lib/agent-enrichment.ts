@@ -103,6 +103,46 @@ export function appendPaneDetectionKind(detection: AwaitingInputDetection | null
   if (detection?.reason === 'rate_limit' && !kinds.includes('rateLimit')) {
     kinds.push('rateLimit')
   }
+  // PAN-3070 — the same promotion for a detected tool-permission prompt. The
+  // Decisions surface already derives `permissionRequest` from this detection at
+  // read time (PAN-3051), but nothing folded it in here, so every other consumer
+  // of pendingInputKinds/pendingInputCount saw an empty set and described a
+  // frozen agent as working. Folding it in once makes the surfaces agree.
+  if (detection?.reason === 'tool_permission' && !kinds.includes('permissionRequest')) {
+    kinds.push('permissionRequest')
+  }
+}
+
+/**
+ * PAN-3070 — the reasons that mean the agent is parked and cannot advance a
+ * single tool call until a human answers. An agent in this state must never be
+ * reported as `resolution: working` / `status: healthy`.
+ *
+ * `other` is deliberately excluded. PAN-1591 showed it is set by the generic
+ * pane/runtime/fallback detections that carry no answerable prompt — trusting it
+ * here would report agents as blocked while they are working normally.
+ */
+const BLOCKING_AWAITING_INPUT_REASONS: ReadonlySet<string> = new Set<AwaitingInputDetection['reason']>([
+  'tool_permission',
+  'user_question',
+  'disambiguation',
+  'confirmation',
+  'planning_done',
+  'session_resume',
+  'rate_limit',
+])
+
+/**
+ * PAN-3070 — the single predicate every "is this agent stuck?" surface consults.
+ * Takes the detection fields rather than a whole enrichment so the REST listing,
+ * the enrichment itself, and tests all judge from the same two values.
+ */
+export function isBlockedOnPendingInput(agent: {
+  hasPendingQuestion?: boolean
+  pendingQuestionReason?: string
+}): boolean {
+  return agent.hasPendingQuestion === true
+    && BLOCKING_AWAITING_INPUT_REASONS.has(agent.pendingQuestionReason ?? '')
 }
 
 // PAN-1834 — an agent that IS the active specialist (review/test/ship) must
@@ -626,7 +666,13 @@ async function getAgentJsonlMtimePromise(agentId: string): Promise<number | null
     // Suppressed alongside every other pending surface: when a specialist owns
     // the issue the work agent is parked, not asking.
     pendingProposedPlan: shouldSuppressPendingInput ? undefined : scan.pendingProposedPlan,
-    resolution: runtimeState?.resolution || 'working',
+    // PAN-3070 — an agent holding an unanswered blocking prompt is not working.
+    // The runtime resolution is written by the stop hook and stays at whatever
+    // it last was, so a frozen agent kept reporting `working` for hours; the
+    // detection we just computed is the fresher evidence and wins.
+    resolution: isBlockedOnPendingInput({ hasPendingQuestion, pendingQuestionReason: detection?.reason })
+      ? 'needs_input'
+      : (runtimeState?.resolution || 'working'),
     resolutionCount: runtimeState?.resolutionCount || 0,
     jsonlScan: scan,
   }
