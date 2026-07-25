@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-25T20:44:21.373Z",
-  "updated": "2026-07-25T21:42:53.685Z",
+  "updated": "2026-07-25T21:47:31.392Z",
   "pipeline": {
     "issueId": "PAN-3037",
     "reviewStatus": "pending",
@@ -75,16 +75,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 13,
-    "claims": {
-      "start-branch-verification": {
-        "writerId": "agent-pan-3037",
-        "agentId": "agent-pan-3037",
-        "pid": 2353758,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-25T21:42:53.685Z"
-      }
-    },
+    "sequence": 14,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3037",
@@ -151,6 +143,17 @@
         "outcome": "completed",
         "reason": "Agent listings now resolve the primary workspace repo before reading branch, dirty count, and latest commit while preserving monorepo behavior.",
         "releasedAt": "2026-07-25T21:42:45.138Z"
+      },
+      {
+        "writerId": "agent-pan-3037",
+        "agentId": "agent-pan-3037",
+        "pid": 2353758,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-25T21:42:53.685Z",
+        "itemId": "start-branch-verification",
+        "outcome": "completed",
+        "reason": "pan start now verifies every canonical workspace repo root, names unsafe polyrepo members, preserves monorepo repair, and removes the hand-rolled directory scan.",
+        "releasedAt": "2026-07-25T21:47:31.392Z"
       }
     ],
     "statusReasons": {
@@ -177,6 +180,10 @@
       "agents-git-status-polyrepo": {
         "reason": "Agent listings now resolve the primary workspace repo before reading branch, dirty count, and latest commit while preserving monorepo behavior.",
         "updatedAt": "2026-07-25T21:42:45.138Z"
+      },
+      "start-branch-verification": {
+        "reason": "pan start now verifies every canonical workspace repo root, names unsafe polyrepo members, preserves monorepo repair, and removes the hand-rolled directory scan.",
+        "updatedAt": "2026-07-25T21:47:31.392Z"
       }
     }
   },
@@ -204,6 +211,9 @@
     "agents-git-status-polyrepo": "completed",
     "agents-git-status-polyrepo.agents-git-status-polyrepo.ac1": "completed",
     "agents-git-status-polyrepo.agents-git-status-polyrepo.ac2": "completed",
-    "start-branch-verification": "running"
+    "start-branch-verification": "completed",
+    "start-branch-verification.start-branch-verification.ac1": "completed",
+    "start-branch-verification.start-branch-verification.ac2": "completed",
+    "start-branch-verification.start-branch-verification.ac3": "completed"
   }
 }
