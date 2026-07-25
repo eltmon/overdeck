@@ -122,6 +122,11 @@ describe('sync-main git timeouts', () => {
     expect(result).toEqual({
       success: false,
       reason: 'git fetch origin main timed out after 60s',
+      repos: [{
+        repoKey: 'pan-1897',
+        success: false,
+        reason: 'git fetch origin main timed out after 60s',
+      }],
     });
     expect(execMock).toHaveBeenCalledWith(
       'git fetch origin main',
@@ -145,6 +150,11 @@ describe('sync-main git timeouts', () => {
     expect(result).toEqual({
       success: false,
       reason: 'git merge origin/main timed out after 120s',
+      repos: [{
+        repoKey: 'pan-1897',
+        success: false,
+        reason: 'git merge origin/main timed out after 120s',
+      }],
     });
     const mergeAbortOptions = execMock.mock.calls
       .find(([command]) => command === 'git merge --abort')?.[1];
@@ -168,6 +178,11 @@ describe('sync-main git timeouts', () => {
     expect(result).toEqual({
       success: false,
       reason: 'Auto-commit git commit timed out after 60s',
+      repos: [{
+        repoKey: 'pan-1897',
+        success: false,
+        reason: 'Auto-commit git commit timed out after 60s',
+      }],
     });
     expect(execMock).not.toHaveBeenCalledWith('git fetch origin main', expect.anything());
   });

@@ -152,6 +152,7 @@ import { resolveGitHubIssueSync } from '../tracker-utils.js';
 import { runQualityGates } from './validation.js';
 import { loadProjectsConfigSync } from '../projects.js';
 import { cleanupStaleLocks } from '../git-utils.js';
+import { resolveWorkspaceRepoRootsSync } from '../project-repos.js';
 import { gitPush, MainDivergedError } from '../git/operations.js';
 import { getReviewStatusSync, markWorkspaceStuck, setReviewStatusSync } from '../review-status.js';
 import { appendGitOperationSync, type GitOperationType } from '../git-activity.js';
@@ -1178,6 +1179,17 @@ export async function salvageStrandedMerge(
 /**
  * Result of syncing main into a workspace branch
  */
+export interface SyncMainRepoResult {
+  repoKey: string;
+  success: boolean;
+  alreadyUpToDate?: boolean;
+  commitCount?: number;
+  changedFiles?: string[];
+  conflictFiles?: string[];
+  reason?: string;
+  skipped?: boolean;
+}
+
 export interface SyncMainResult {
   success: boolean;
   alreadyUpToDate?: boolean;
@@ -1185,6 +1197,7 @@ export interface SyncMainResult {
   changedFiles?: string[];
   conflictFiles?: string[];
   reason?: string;
+  repos?: SyncMainRepoResult[];
 }
 
 /**
@@ -1235,21 +1248,20 @@ async function collectSyncMergeStats(projectPath: string, signal?: AbortSignal):
  *
  * Auto-commits any uncommitted changes before merging (with safety verification).
  */
-export async function syncMainIntoWorkspace(
-  projectPath: string,
+async function syncMainIntoRepo(
+  repoDir: string,
   issueId: string,
+  targetBranch: string,
   signal?: AbortSignal,
-): Promise<SyncMainResult> {
-  console.log(`[sync-main] Starting sync of main into workspace for ${issueId}`);
-  logActivity('sync_main_start', `Starting sync for ${issueId}`);
+): Promise<Omit<SyncMainRepoResult, 'repoKey' | 'skipped'>> {
   const run = (command: string, timeout = SYNC_GIT_STATUS_TIMEOUT_MS) =>
-    runSyncGitCommand(command, { cwd: projectPath, timeout, signal });
+    runSyncGitCommand(command, { cwd: repoDir, timeout, signal });
   let mergeStarted = false;
 
   try {
     console.log(`[sync-main] Checking for uncommitted changes...`);
     logActivity('sync_main_auto_commit', `Auto-committing uncommitted changes before sync`);
-    const autoCommit = await autoCommitWorkspaceChangesBeforeSync(projectPath, issueId, signal);
+    const autoCommit = await autoCommitWorkspaceChangesBeforeSync(repoDir, issueId, signal);
     if (!autoCommit.success) {
       const message = autoCommit.reason || 'Failed to auto-commit uncommitted changes';
       console.error(`[sync-main] ${message}`);
@@ -1271,7 +1283,7 @@ export async function syncMainIntoWorkspace(
     }
 
     try {
-      const lockCleanup = await Effect.runPromise(cleanupStaleLocks(projectPath, { signal, processProbeTimeoutMs: SYNC_GIT_STATUS_TIMEOUT_MS }));
+      const lockCleanup = await Effect.runPromise(cleanupStaleLocks(repoDir, { signal, processProbeTimeoutMs: SYNC_GIT_STATUS_TIMEOUT_MS }));
       if (lockCleanup.found.length > 0) console.log(`[sync-main] Found ${lockCleanup.found.length} lock file(s)`);
       if (lockCleanup.removed.length > 0) {
         console.log(`[sync-main] Cleaned up ${lockCleanup.removed.length} stale lock file(s)`); logActivity('git_lock_cleanup', `Removed ${lockCleanup.removed.length} stale lock file(s)`);
@@ -1288,19 +1300,19 @@ export async function syncMainIntoWorkspace(
       console.error(`[sync-main] ${message}`); logActivity('sync_main_blocked', message);
       return { success: false, reason: message };
     }
-    console.log(`[sync-main] Fetching origin/main...`);
+    console.log(`[sync-main] Fetching origin/${targetBranch}...`);
     try {
-      await run('git fetch origin main', SYNC_GIT_FETCH_TIMEOUT_MS);
+      await run(`git fetch origin ${targetBranch}`, SYNC_GIT_FETCH_TIMEOUT_MS);
     } catch (error) {
       if (isSyncGitTermination(error)) throw error;
-      return { success: false, reason: `Failed to fetch origin/main: ${(error as Error).message}` };
+      return { success: false, reason: `Failed to fetch origin/${targetBranch}: ${(error as Error).message}` };
     }
 
     let mergeOutput = '';
     let hasConflicts = false;
     try {
       mergeStarted = true;
-      const result = await run('git merge origin/main', SYNC_GIT_MERGE_TIMEOUT_MS);
+      const result = await run(`git merge origin/${targetBranch}`, SYNC_GIT_MERGE_TIMEOUT_MS);
       mergeStarted = false;
       mergeOutput = (result.stdout || '') + (result.stderr || '');
     } catch (error: any) {
@@ -1311,28 +1323,28 @@ export async function syncMainIntoWorkspace(
 
     if (mergeOutput.includes('Already up to date') || mergeOutput.includes('Already up-to-date')) {
       console.log(`[sync-main] Already up to date`);
-      logActivity('sync_main_noop', `${issueId} already up to date with main`);
+      logActivity('sync_main_noop', `${issueId} already up to date with ${targetBranch}`);
       return { success: true, alreadyUpToDate: true };
     }
 
     if (!hasConflicts) {
       console.log(`[sync-main] Clean merge completed`);
-      logActivity('sync_main_success', `Clean merge of main into ${issueId}`);
-      return { success: true, ...await collectSyncMergeStats(projectPath, signal) };
+      logActivity('sync_main_success', `Clean merge of ${targetBranch} into ${issueId}`);
+      return { success: true, ...await collectSyncMergeStats(repoDir, signal) };
     }
 
-    const conflictFiles = await getConflictFiles(projectPath, signal);
-    const mainPreferredResolution = await resolveMainPreferredSyncConflicts(projectPath, conflictFiles, signal);
+    const conflictFiles = await getConflictFiles(repoDir, signal);
+    const mainPreferredResolution = await resolveMainPreferredSyncConflicts(repoDir, conflictFiles, signal);
     if (mainPreferredResolution.success) {
       mergeStarted = false;
-      console.log(`[sync-main] Auto-resolved ${conflictFiles.length} pipeline-owned conflict(s) with origin/main`);
-      logActivity('sync_main_auto_resolved_conflicts', `Auto-resolved ${conflictFiles.length} pipeline-owned conflict(s) in ${issueId} with origin/main`);
-      return { success: true, ...await collectSyncMergeStats(projectPath, signal) };
+      console.log(`[sync-main] Auto-resolved ${conflictFiles.length} pipeline-owned conflict(s) with origin/${targetBranch}`);
+      logActivity('sync_main_auto_resolved_conflicts', `Auto-resolved ${conflictFiles.length} pipeline-owned conflict(s) in ${issueId} with origin/${targetBranch}`);
+      return { success: true, ...await collectSyncMergeStats(repoDir, signal) };
     }
 
     console.log(`[sync-main] ${conflictFiles.length} conflict(s); aborting merge for manual resolution`);
     logActivity('sync_main_conflicts', `${conflictFiles.length} conflict(s) in ${issueId}: ${conflictFiles.join(', ')}`);
-    await ensureSyncGitQuiescent(projectPath, true);
+    await ensureSyncGitQuiescent(repoDir, true);
     mergeStarted = false;
     return {
       success: false,
@@ -1341,12 +1353,77 @@ export async function syncMainIntoWorkspace(
     };
   } catch (error) {
     if (!isSyncGitTermination(error)) throw error;
-    await ensureSyncGitQuiescent(projectPath, mergeStarted);
+    await ensureSyncGitQuiescent(repoDir, mergeStarted);
     return {
       success: false,
       reason: error instanceof SyncGitCommandTimeoutError ? error.message : 'Sync-main cancelled after reaching its preparation deadline',
     };
   }
+}
+
+export async function syncMainIntoWorkspace(
+  projectPath: string,
+  issueId: string,
+  signal?: AbortSignal,
+): Promise<SyncMainResult> {
+  console.log(`[sync-main] Starting sync of main into workspace for ${issueId}`);
+  logActivity('sync_main_start', `Starting sync for ${issueId}`);
+
+  const roots = resolveWorkspaceRepoRootsSync(issueId, projectPath);
+  const repos: SyncMainRepoResult[] = [];
+  let failedRepoKey: string | undefined;
+
+  for (const root of roots) {
+    if (failedRepoKey) {
+      repos.push({
+        repoKey: root.repoKey,
+        success: false,
+        skipped: true,
+        reason: `[${root.repoKey}] Skipped because sync failed in ${failedRepoKey}`,
+      });
+      continue;
+    }
+
+    if (root.isPolyrepo) {
+      console.log(`[sync-main] [${root.repoKey}] Syncing origin/${root.targetBranch}`);
+      logActivity('sync_main_repo_start', `[${root.repoKey}] Syncing origin/${root.targetBranch}`);
+    }
+    const result = await syncMainIntoRepo(root.dir, issueId, root.targetBranch, signal);
+    const prefixPaths = (paths: string[] | undefined) => root.isPolyrepo && paths
+      ? paths.map(path => `${root.repoKey}/${path}`)
+      : paths;
+    const repoResult: SyncMainRepoResult = {
+      ...result,
+      repoKey: root.repoKey,
+    };
+    if (result.changedFiles !== undefined) repoResult.changedFiles = prefixPaths(result.changedFiles);
+    if (result.conflictFiles !== undefined) repoResult.conflictFiles = prefixPaths(result.conflictFiles);
+    if (result.reason && root.isPolyrepo) repoResult.reason = `[${root.repoKey}] ${result.reason}`;
+    repos.push(repoResult);
+    if (!result.success) failedRepoKey = root.repoKey;
+  }
+
+  const completedRepos = repos.filter(repo => !repo.skipped);
+  const changedFiles = completedRepos.flatMap(repo => repo.changedFiles ?? []);
+  const conflictFiles = completedRepos.flatMap(repo => repo.conflictFiles ?? []);
+  const countedRepos = completedRepos.filter(repo => repo.commitCount !== undefined);
+  const failedRepo = completedRepos.find(repo => !repo.success);
+  const aggregate: SyncMainResult = {
+    success: !failedRepo,
+    repos,
+  };
+
+  if (completedRepos.length > 0 && completedRepos.every(repo => repo.alreadyUpToDate === true)) {
+    aggregate.alreadyUpToDate = true;
+  }
+  if (countedRepos.length > 0) {
+    aggregate.commitCount = countedRepos.reduce((sum, repo) => sum + (repo.commitCount ?? 0), 0);
+  }
+  if (completedRepos.some(repo => repo.changedFiles !== undefined)) aggregate.changedFiles = changedFiles;
+  if (completedRepos.some(repo => repo.conflictFiles !== undefined)) aggregate.conflictFiles = conflictFiles;
+  if (failedRepo?.reason) aggregate.reason = failedRepo.reason;
+
+  return aggregate;
 }
 
 /**
