@@ -22,7 +22,7 @@
   ],
   "feedback": [],
   "created": "2026-07-25T20:42:32.108Z",
-  "updated": "2026-07-25T21:05:39.090Z",
+  "updated": "2026-07-25T21:09:19.428Z",
   "pipeline": {
     "issueId": "PAN-2467",
     "reviewStatus": "pending",
@@ -65,16 +65,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "completeness-assessor": {
-        "writerId": "agent-pan-2467",
-        "agentId": "agent-pan-2467",
-        "pid": 1212316,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-25T21:05:39.090Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2467",
@@ -86,12 +78,27 @@
         "outcome": "completed",
         "reason": "Added merged PR/MR lookup to GitHub and GitLab forge adapters with API/CLI unit coverage",
         "releasedAt": "2026-07-25T21:02:27.669Z"
+      },
+      {
+        "writerId": "agent-pan-2467",
+        "agentId": "agent-pan-2467",
+        "pid": 1212316,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-25T21:05:39.090Z",
+        "itemId": "completeness-assessor",
+        "outcome": "completed",
+        "reason": "Added fail-closed per-repo merge completeness classification using merge-set and project-repo doors",
+        "releasedAt": "2026-07-25T21:09:19.428Z"
       }
     ],
     "statusReasons": {
       "forge-merged-artifact": {
         "reason": "Added merged PR/MR lookup to GitHub and GitLab forge adapters with API/CLI unit coverage",
         "updatedAt": "2026-07-25T21:02:27.669Z"
+      },
+      "completeness-assessor": {
+        "reason": "Added fail-closed per-repo merge completeness classification using merge-set and project-repo doors",
+        "updatedAt": "2026-07-25T21:09:19.428Z"
       }
     }
   },
@@ -100,6 +107,11 @@
     "forge-merged-artifact.forge-merged-artifact.ac1": "completed",
     "forge-merged-artifact.forge-merged-artifact.ac2": "completed",
     "forge-merged-artifact.forge-merged-artifact.ac3": "completed",
-    "completeness-assessor": "running"
+    "completeness-assessor": "completed",
+    "completeness-assessor.completeness-assessor.ac1": "completed",
+    "completeness-assessor.completeness-assessor.ac2": "completed",
+    "completeness-assessor.completeness-assessor.ac3": "completed",
+    "completeness-assessor.completeness-assessor.ac4": "completed",
+    "completeness-assessor.completeness-assessor.ac5": "completed"
   }
 }
