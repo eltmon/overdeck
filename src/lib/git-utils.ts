@@ -386,6 +386,10 @@ export function formatAnchorShort(anchor: string): string {
  * "no drift" forever. Composite snapshots compare equal iff every sub-repo
  * head is unchanged; consumers that try to use the anchor as a git ref fail
  * the ref lookup and fall back to their conservative full-rerun path.
+ *
+ * Its branded return value is the only legitimate source for reviewedAtCommit,
+ * lastVerifiedCommit, and roleRunHead. Persisted values regain that brand only
+ * through rehydrateHeadAnchor at an explicitly documented storage boundary.
  */
 export async function snapshotWorkspaceHeadsPromise(issueId: string, workspacePath: string): Promise<HeadAnchor | undefined> {
   // Dynamic import: project-repos → projects sits above this low-level module
