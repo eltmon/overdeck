@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-25T20:44:21.373Z",
-  "updated": "2026-07-25T22:13:33.132Z",
+  "updated": "2026-07-25T22:13:35.842Z",
   "pipeline": {
     "issueId": "PAN-3037",
     "reviewStatus": "pending",
@@ -26,8 +26,61 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-25T21:16:49.463Z",
-    "inspectNotes": "All 5 ACs met: per-repo iteration with repoKey-prefixed paths, conflict abort leaves repo quiescent and skips remaining repos, aggregate alreadyUpToDate requires all repos current, monorepo keeps unprefixed single-element shape, abort returns cancellation + skipped entries. Extraction into sync-main-workspace.ts is logic-identical; baseline 1404 matches actual wc -l."
+    "updatedAt": "2026-07-25T22:13:35.841Z",
+    "inspectNotes": "All 5 ACs met: per-repo iteration with repoKey-prefixed paths, conflict abort leaves repo quiescent and skips remaining repos, aggregate alreadyUpToDate requires all repos current, monorepo keeps unprefixed single-element shape, abort returns cancellation + skipped entries. Extraction into sync-main-workspace.ts is logic-identical; baseline 1404 matches actual wc -l.",
+    "reviewRequestedAt": "2026-07-25T22:13:35.841Z",
+    "scopeDrift": {
+      "outsideDeclaredScope": [
+        "scripts/file-size-baseline.txt",
+        "src/lib/cloister/sync-main-workspace.ts",
+        "tests/lib/project-repos.test.ts",
+        "tests/unit/cli/sync-main.test.ts",
+        "tests/unit/lib/cloister/sync-main-timeouts.test.ts"
+      ],
+      "declaredScopeUntouched": [
+        "src/lib/__tests__/project-repos-primary-dir.test.ts"
+      ],
+      "declaredScope": [
+        "docs/SPECIALIST_WORKFLOW.md",
+        "src/cli/commands/start.ts",
+        "src/cli/commands/sync-main.ts",
+        "src/dashboard/server/routes/agents/listing.ts",
+        "src/dashboard/server/routes/agents/shared.ts",
+        "src/dashboard/server/routes/specialists/project-routes.ts",
+        "src/dashboard/server/routes/workspaces/merge-ops.ts",
+        "src/lib/__tests__/project-repos-primary-dir.test.ts",
+        "src/lib/cloister/__tests__/sync-main-polyrepo.test.ts",
+        "src/lib/cloister/merge-agent.ts",
+        "src/lib/cloister/review-agent.ts",
+        "src/lib/cloister/review-convoy.ts",
+        "src/lib/project-repos.ts",
+        "src/lib/review-status.ts",
+        "sync-sources/skills/pan-sync-main/SKILL.md"
+      ],
+      "actualChangedFiles": [
+        "docs/SPECIALIST_WORKFLOW.md",
+        "scripts/file-size-baseline.txt",
+        "src/cli/commands/start.ts",
+        "src/cli/commands/sync-main.ts",
+        "src/dashboard/server/routes/agents/listing.ts",
+        "src/dashboard/server/routes/agents/shared.ts",
+        "src/dashboard/server/routes/specialists/project-routes.ts",
+        "src/dashboard/server/routes/workspaces/merge-ops.ts",
+        "src/lib/cloister/__tests__/sync-main-polyrepo.test.ts",
+        "src/lib/cloister/merge-agent.ts",
+        "src/lib/cloister/review-agent.ts",
+        "src/lib/cloister/review-convoy.ts",
+        "src/lib/cloister/sync-main-workspace.ts",
+        "src/lib/project-repos.ts",
+        "src/lib/review-status.ts",
+        "sync-sources/skills/pan-sync-main/SKILL.md",
+        "tests/lib/project-repos.test.ts",
+        "tests/unit/cli/sync-main.test.ts",
+        "tests/unit/lib/cloister/sync-main-timeouts.test.ts"
+      ],
+      "recordedAt": "2026-07-25T22:13:33.131Z"
+    },
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3079"
   },
   "closeOut": {
     "usage": {
