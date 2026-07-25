@@ -108,8 +108,13 @@ export async function progressFingerprint(_host: CrashHost, agentId: string): Pr
   let head = '';
   if (state?.workspace) {
     try {
-      const { stdout } = await execAsync('git rev-parse HEAD', { cwd: state.workspace, encoding: 'utf-8' });
-      head = stdout.trim();
+      if (state.issueId) {
+        const { snapshotWorkspaceHeadsPromise } = await import('../git-utils.js');
+        head = await snapshotWorkspaceHeadsPromise(state.issueId, state.workspace) ?? '';
+      } else {
+        const { stdout } = await execAsync('git rev-parse HEAD', { cwd: state.workspace, encoding: 'utf-8' });
+        head = stdout.trim();
+      }
     } catch { /* workspace may be gone; pane still fingerprints */ }
   }
   let pane = '';
