@@ -72,7 +72,7 @@
     "recordedAt": "2026-07-25T22:13:33.131Z"
   },
   "created": "2026-07-25T20:44:21.373Z",
-  "updated": "2026-07-25T22:20:19.798Z",
+  "updated": "2026-07-25T22:20:22.720Z",
   "pipeline": {
     "issueId": "PAN-3037",
     "reviewStatus": "pending",
@@ -82,7 +82,8 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-25T22:20:16.551Z",
+    "panDoneRecoveredAt": "2026-07-25T22:20:18.803Z",
+    "updatedAt": "2026-07-25T22:20:19.155Z",
     "reviewNotes": "Review dispatch skipped — already running: agent-pan-3037-review",
     "inspectNotes": "All 5 ACs met: per-repo iteration with repoKey-prefixed paths, conflict abort leaves repo quiescent and skips remaining repos, aggregate alreadyUpToDate requires all repos current, monorepo keeps unprefixed single-element shape, abort returns cancellation + skipped entries. Extraction into sync-main-workspace.ts is logic-identical; baseline 1404 matches actual wc -l.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3079",
@@ -139,8 +140,7 @@
         "tests/unit/lib/cloister/sync-main-timeouts.test.ts"
       ],
       "recordedAt": "2026-07-25T22:13:33.131Z"
-    },
-    "panDoneRecoveredAt": "2026-07-25T22:20:18.803Z"
+    }
   },
   "closeOut": {
     "usage": {
@@ -186,7 +186,7 @@
       },
       "costAtCloseOut": {
         "usd": 75.948002,
-        "pricingAsOf": "2026-07-25T22:20:17.951Z"
+        "pricingAsOf": "2026-07-25T22:20:22.716Z"
       }
     },
     "merges": [
