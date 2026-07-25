@@ -145,6 +145,10 @@ vi.mock('../../../../src/lib/github-app.js', () => ({
   listPullRequestsForHead: mockListPullRequestsForHead,
 }));
 
+vi.mock('../../../../src/lib/merge-set.js', () => ({
+  getMergeSetSync: vi.fn().mockReturnValue({ repos: [{ repoKey: 'overdeck' }] }),
+}));
+
 vi.mock('../../../../src/lib/lifecycle/orphaned-tasks-sweep.js', () => ({
   sweepOrphanedTasks: mockSweepOrphanedTasks,
 }));
