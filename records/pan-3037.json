@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-25T20:44:21.373Z",
-  "updated": "2026-07-25T20:56:54.963Z",
+  "updated": "2026-07-25T21:04:08.882Z",
   "pipeline": {
     "issueId": "PAN-3037",
     "reviewStatus": "pending",
@@ -59,18 +59,32 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "primary-repo-helper": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-3037",
         "agentId": "agent-pan-3037",
         "pid": 1023065,
         "host": "eltmon-z790",
-        "claimedAt": "2026-07-25T20:56:54.963Z"
+        "claimedAt": "2026-07-25T20:56:54.963Z",
+        "itemId": "primary-repo-helper",
+        "outcome": "completed",
+        "reason": "Added a canonical primary-workspace-repo resolver, adopted it at all three existing inline review probes, and covered monorepo/polyrepo resolution with unit tests.",
+        "releasedAt": "2026-07-25T21:04:08.882Z"
+      }
+    ],
+    "statusReasons": {
+      "primary-repo-helper": {
+        "reason": "Added a canonical primary-workspace-repo resolver, adopted it at all three existing inline review probes, and covered monorepo/polyrepo resolution with unit tests.",
+        "updatedAt": "2026-07-25T21:04:08.882Z"
       }
     }
   },
   "statusOverrides": {
-    "primary-repo-helper": "running"
+    "primary-repo-helper": "completed",
+    "primary-repo-helper.primary-repo-helper.ac1": "completed",
+    "primary-repo-helper.primary-repo-helper.ac2": "completed",
+    "primary-repo-helper.primary-repo-helper.ac3": "completed"
   }
 }
