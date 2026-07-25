@@ -6636,3 +6636,13 @@ Substrate bugs filed: 2897 2898 2899 2900 2901 2902 2907 2913 (8; ALL fixed and 
 - **REPEATED A MISTAKE I HAD ALREADY WRITTEN DOWN.** The correction comment posted **garbled** because I put backticks in a shell `--body` string — the exact failure I recorded a lesson about at tick 10 ("use `--body-file` for anything containing backticks or `${}`"). Reposted cleanly via `--body-file`. **Writing a lesson down is not the same as applying it**; the tick-10 note was in this very file and I still walked into it.
 - main==live==`cce23592b8` green; 23 agents; networks 19. `verification_status` still null on PAN-3029/3051/3056 → close-outs blocked, **still no `--accept-*` anywhere this run**.
 - **LESSON: validate a proposed detector against real data before recommending it.** I invented the orphan predicate from a single instance and recommended it as "cheap and catches the class". One query against the full table showed a ~60:1 false-positive rate. A detector proposed from one example is a hypothesis, not a design — run it over the corpus before putting it in someone's backlog.
+
+## RUN-70 tick 25b (2026-07-25 23:40Z) — agent-pan-3055 stopped mid-rebase: NO damage, and the rebase turns out to be moot
+- **Operator reported `agent-pan-3055` stopped before completing its rebase onto main. Inspected read-only first; the workspace is UNDAMAGED**: on the correct branch `feature/pan-3055` (not detached), working tree clean, **no `rebase-merge`/`rebase-apply` directory**, both commits intact. It stopped *cleanly*, not mid-rebase — nothing to repair.
+- **The rebase is MOOT for shipping, which is the answer that mattered.** The feature branch is 51 behind / 5 ahead of `origin/main`, which looks alarming — but:
+  * `uat/pan-reef-0725` is **0 behind / 6 ahead** of `origin/main` → the bundle sits on **current** main, not a stale base.
+  * The bundle **contains PAN-3055's current head** `5c1fbda45e`.
+  * `git merge-tree` across the merge-base reports **zero conflict markers**.
+  So the UAT bundle already carries the latest work on a current base. **PAN-3055 is safe to promote as-is; the stalled rebase blocks nothing.**
+- **Did NOT rebase** (history rewrite / one-way door, and the agent git guard correctly refuses it) and **did NOT run `pan sync-main`** (doctrine restricts it to startup triage). Reported the finding instead.
+- **LESSON: "behind main" is not a shipping blocker on its own — check what actually gets promoted.** The feature branch's 51-commit lag is irrelevant because promotion ships the *bundle*, and the bundle was current and conflict-free. Answering "is the artifact that ships correct?" beat fixing the artifact that doesn't.
