@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-25T11:59:01.400Z",
-  "updated": "2026-07-25T12:51:35.669Z",
+  "updated": "2026-07-25T12:51:38.956Z",
   "pipeline": {
     "issueId": "PAN-3052",
     "reviewStatus": "pending",
@@ -25,7 +25,31 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-25T12:07:06.654Z"
+    "updatedAt": "2026-07-25T12:51:38.955Z",
+    "reviewRequestedAt": "2026-07-25T12:51:38.955Z",
+    "scopeDrift": {
+      "outsideDeclaredScope": [],
+      "declaredScopeUntouched": [
+        "dist/dashboard/server.js"
+      ],
+      "declaredScope": [
+        "dist/dashboard/server.js",
+        "docs/codebase-health/B-deacon-decomp.md",
+        "scripts/file-size-baseline.txt",
+        "src/lib/cloister/boot-reconciliation-apply.ts",
+        "src/lib/cloister/deacon-auto-resume.ts",
+        "src/lib/cloister/deacon.ts"
+      ],
+      "actualChangedFiles": [
+        "docs/codebase-health/B-deacon-decomp.md",
+        "scripts/file-size-baseline.txt",
+        "src/lib/cloister/boot-reconciliation-apply.ts",
+        "src/lib/cloister/deacon-auto-resume.ts",
+        "src/lib/cloister/deacon.ts"
+      ],
+      "recordedAt": "2026-07-25T12:51:35.667Z"
+    },
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3065"
   },
   "closeOut": {
     "usage": {
