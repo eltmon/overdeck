@@ -22,7 +22,7 @@
   ],
   "feedback": [],
   "created": "2026-07-25T20:42:32.108Z",
-  "updated": "2026-07-25T22:26:00.656Z",
+  "updated": "2026-07-25T22:26:03.281Z",
   "pipeline": {
     "issueId": "PAN-2467",
     "reviewStatus": "pending",
@@ -32,8 +32,61 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-25T21:10:51.350Z",
-    "inspectNotes": "AC1-5 verified against real APIs: unmerged reason names repoKey+aheadCount; merged artifact path yields state 'merged' + complete true; every git/forge error caught into 'unverifiable' (fails closed, complete false); missing source ref and single-repo resolver both land 'no-changes'/'merged' without throwing; enumeration is solely ensureMergeSetForIssueSync -> resolveProjectReposForIssueSync with promisified exec and zero workspaceType conditionals. MergeSetRepoState and ResolvedProjectRepo are both structurally compatible with RepoToAssess (repoKey/repoPath/forge/sourceBranch/targetBranch/required all present)."
+    "updatedAt": "2026-07-25T22:26:03.279Z",
+    "inspectNotes": "AC1-5 verified against real APIs: unmerged reason names repoKey+aheadCount; merged artifact path yields state 'merged' + complete true; every git/forge error caught into 'unverifiable' (fails closed, complete false); missing source ref and single-repo resolver both land 'no-changes'/'merged' without throwing; enumeration is solely ensureMergeSetForIssueSync -> resolveProjectReposForIssueSync with promisified exec and zero workspaceType conditionals. MergeSetRepoState and ResolvedProjectRepo are both structurally compatible with RepoToAssess (repoKey/repoPath/forge/sourceBranch/targetBranch/required all present).",
+    "reviewRequestedAt": "2026-07-25T22:26:03.279Z",
+    "scopeDrift": {
+      "outsideDeclaredScope": [
+        "packages/contracts/src/types.ts",
+        "src/lib/cloister/__tests__/merge-blockers.test.ts",
+        "src/lib/cloister/merge-verification.ts",
+        "src/lib/review-status-reconcile.ts",
+        "tests/unit/lib/cloister/postmerge-auto-retro.test.ts",
+        "tests/unit/lib/cloister/postmerge-cleanup-async.test.ts",
+        "tests/unit/lib/pan-444-post-merge-step0.test.ts"
+      ],
+      "declaredScopeUntouched": [
+        "src/lib/cloister/merged-pr-verification.ts",
+        "tests/unit/lib/cloister/merge-blockers.test.ts"
+      ],
+      "declaredScope": [
+        "docs/MERGE-TRAIN.md",
+        "docs/MERGE-WORKFLOW.md",
+        "scripts/file-size-baseline.txt",
+        "src/dashboard/server/routes/workspaces/__tests__/merge-ops-polyrepo-completeness.test.ts",
+        "src/dashboard/server/routes/workspaces/merge-ops.ts",
+        "src/lib/cloister/merge-blockers.ts",
+        "src/lib/cloister/merge-completeness.ts",
+        "src/lib/cloister/merged-pr-verification.ts",
+        "src/lib/forge.ts",
+        "tests/unit/lib/cloister/merge-blockers.test.ts",
+        "tests/unit/lib/cloister/merge-completeness.test.ts",
+        "tests/unit/lib/cloister/merge-verification.test.ts",
+        "tests/unit/lib/forge-merged-artifact.test.ts"
+      ],
+      "actualChangedFiles": [
+        "docs/MERGE-TRAIN.md",
+        "docs/MERGE-WORKFLOW.md",
+        "packages/contracts/src/types.ts",
+        "scripts/file-size-baseline.txt",
+        "src/dashboard/server/routes/workspaces/__tests__/merge-ops-polyrepo-completeness.test.ts",
+        "src/dashboard/server/routes/workspaces/merge-ops.ts",
+        "src/lib/cloister/__tests__/merge-blockers.test.ts",
+        "src/lib/cloister/merge-blockers.ts",
+        "src/lib/cloister/merge-completeness.ts",
+        "src/lib/cloister/merge-verification.ts",
+        "src/lib/forge.ts",
+        "src/lib/review-status-reconcile.ts",
+        "tests/unit/lib/cloister/merge-completeness.test.ts",
+        "tests/unit/lib/cloister/merge-verification.test.ts",
+        "tests/unit/lib/cloister/postmerge-auto-retro.test.ts",
+        "tests/unit/lib/cloister/postmerge-cleanup-async.test.ts",
+        "tests/unit/lib/forge-merged-artifact.test.ts",
+        "tests/unit/lib/pan-444-post-merge-step0.test.ts"
+      ],
+      "recordedAt": "2026-07-25T22:26:00.654Z"
+    },
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3080"
   },
   "closeOut": {
     "usage": {
