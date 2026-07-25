@@ -24,6 +24,37 @@ export type HarnessPolicyDecisionMap = Record<
 export type HarnessPolicyAuthModeResolver = (model: string) => Promise<AuthMode | undefined>;
 
 /**
+ * Model ids legal in the `?models=` query of GET /api/settings/harness-policy.
+ *
+ * Square brackets are significant: the long-context variants are named
+ * `k3[1m]` and `claude-opus-5[1m]`. The pickers batch every known model id
+ * into one request, so rejecting a single bracketed id 400s the whole batch
+ * and leaves every model without a policy decision.
+ */
+const SAFE_MODEL_PATTERN = /^[a-zA-Z0-9_.:\/[\]-]+$/;
+const MAX_HARNESS_POLICY_MODELS = 250;
+const MAX_HARNESS_POLICY_MODEL_LENGTH = 200;
+
+/** Parse and validate the `models` query value; `null` means reject with 400. */
+export function parseHarnessPolicyModels(rawModels: string | null): string[] | null {
+  const models = (rawModels ?? '')
+    .split(',')
+    .map((model) => model.trim())
+    .filter(Boolean);
+
+  if (models.length === 0 || models.length > MAX_HARNESS_POLICY_MODELS) return null;
+  if (
+    models.some(
+      (model) =>
+        model.length > MAX_HARNESS_POLICY_MODEL_LENGTH || !SAFE_MODEL_PATTERN.test(model),
+    )
+  ) {
+    return null;
+  }
+  return models;
+}
+
+/**
  * Resolve a per-model harness-policy decision map for `models`.
  *
  * Caches the auth-mode resolver per provider so multiple models under one

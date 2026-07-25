@@ -15,7 +15,10 @@
 
 import { describe, it, expect } from 'vitest';
 
-import { buildHarnessPolicyDecisions } from '../../../../../src/lib/harness-policy-decisions.js';
+import {
+  buildHarnessPolicyDecisions,
+  parseHarnessPolicyModels,
+} from '../../../../../src/lib/harness-policy-decisions.js';
 import { OHMYPI_ANTHROPIC_SUBSCRIPTION_BLOCK_REASON } from '../../../../../src/lib/harness-policy.js';
 import type { AuthMode } from '../../../../../src/lib/subscription-types.js';
 
@@ -134,5 +137,55 @@ describe('buildHarnessPolicyDecisions', () => {
     // Both Anthropic models share the same provider — the resolver should
     // only run once for the whole batch (matches the route's prior behavior).
     expect(resolverCalls).toEqual([ANTHROPIC_MODEL]);
+  });
+});
+/**
+ * Query-validation tests for the `?models=` parameter.
+ *
+ * The pickers batch every known model id into ONE request, so a single
+ * rejected id 400s the whole batch and every model silently loses its policy
+ * decision. Bracketed long-context ids (`k3[1m]`, `claude-opus-5[1m]`) were
+ * rejected by the original character class, which took out all 43 ids the
+ * dashboard sends on each page load.
+ */
+describe('parseHarnessPolicyModels', () => {
+  it('accepts bracketed long-context model ids', () => {
+    expect(parseHarnessPolicyModels('k3[1m]')).toEqual(['k3[1m]']);
+    expect(parseHarnessPolicyModels('claude-opus-5[1m]')).toEqual(['claude-opus-5[1m]']);
+  });
+
+  it('does not let one bracketed id reject the whole batch', () => {
+    const batch = 'claude-opus-5,k3[1m],qwen/qwen3.6-plus,gpt-5.3-codex';
+    expect(parseHarnessPolicyModels(batch)).toEqual([
+      'claude-opus-5',
+      'k3[1m]',
+      'qwen/qwen3.6-plus',
+      'gpt-5.3-codex',
+    ]);
+  });
+
+  it('still accepts the slash, dot, colon and dash ids already in use', () => {
+    const batch = 'nvidia/nemotron-3-ultra-550b-a55b:free,gpt-5.4-mini,minimax-m2.7-highspeed';
+    expect(parseHarnessPolicyModels(batch)).toHaveLength(3);
+  });
+
+  it('trims whitespace and drops empty segments', () => {
+    expect(parseHarnessPolicyModels(' claude-opus-5 , ,gpt-5.5 ')).toEqual([
+      'claude-opus-5',
+      'gpt-5.5',
+    ]);
+  });
+
+  it('rejects missing, empty, and injection-shaped values', () => {
+    expect(parseHarnessPolicyModels(null)).toBeNull();
+    expect(parseHarnessPolicyModels('')).toBeNull();
+    expect(parseHarnessPolicyModels('../../etc/passwd\0')).toBeNull();
+    expect(parseHarnessPolicyModels('model name with spaces')).toBeNull();
+    expect(parseHarnessPolicyModels('<script>')).toBeNull();
+  });
+
+  it('rejects an over-long id and an over-large batch', () => {
+    expect(parseHarnessPolicyModels('a'.repeat(201))).toBeNull();
+    expect(parseHarnessPolicyModels(Array.from({ length: 251 }, () => 'm').join(','))).toBeNull();
   });
 });

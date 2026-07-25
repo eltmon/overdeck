@@ -35,7 +35,7 @@ import { PROVIDERS, getKimiAnthropicBaseUrl } from '../../../lib/providers.js';
 import { OpenRouterService } from '../services/openrouter-service.js';
 import { httpHandler } from './http-handler.js';
 import { getProviderAuthMode, getProviderEnvForModel } from '../../../lib/agents.js';
-import { buildHarnessPolicyDecisions } from '../../../lib/harness-policy-decisions.js';
+import { buildHarnessPolicyDecisions, parseHarnessPolicyModels } from '../../../lib/harness-policy-decisions.js';
 import {
   detectProviderEnvConflicts,
 } from '../../../lib/claude-settings-overlay.js';
@@ -1010,9 +1010,7 @@ const postOpenRouterTestKeyRoute = HttpRouter.add(
 
 // ─── Route: GET /api/settings/harness-policy ────────────────────────────────
 
-const SAFE_MODEL_PATTERN = /^[a-zA-Z0-9_.:\/-]+$/;
-const MAX_HARNESS_POLICY_MODELS = 250;
-const MAX_HARNESS_POLICY_MODEL_LENGTH = 200;
+const SAFE_MODEL_PATTERN = /^[a-zA-Z0-9_.:\/[\]-]+$/;
 
 const getHarnessPolicyRoute = HttpRouter.add(
   'GET',
@@ -1021,16 +1019,9 @@ const getHarnessPolicyRoute = HttpRouter.add(
     const request = yield* HttpServerRequest.HttpServerRequest;
     return yield* Effect.promise(async () => {
       const url = new URL(request.url, 'http://localhost');
-      const models = (url.searchParams.get('models') ?? '')
-        .split(',')
-        .map((model) => model.trim())
-        .filter(Boolean);
+      const models = parseHarnessPolicyModels(url.searchParams.get('models'));
 
-      if (
-        models.length === 0
-        || models.length > MAX_HARNESS_POLICY_MODELS
-        || models.some((model) => model.length > MAX_HARNESS_POLICY_MODEL_LENGTH || !SAFE_MODEL_PATTERN.test(model))
-      ) {
+      if (!models) {
         return jsonResponse({ error: 'Valid models parameter is required' }, { status: 400 });
       }
 

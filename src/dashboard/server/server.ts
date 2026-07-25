@@ -276,6 +276,17 @@ const staticRouteLayer = HttpRouter.add(
       .pipe(Effect.catch(() => Effect.succeed(null)));
 
     if (!fileInfo || fileInfo.type !== 'File') {
+      // A request that names a concrete file (it carries an extension) is an
+      // asset request, not a client-side route. Serving the SPA shell for it
+      // hands the browser `index.html` under a `.js` URL, so a dynamic import
+      // of a build-hashed chunk fails with "Failed to fetch dynamically
+      // imported module" instead of a clean 404 — a tab left open across a
+      // rebuild then never renders the route it lazy-loads. Only extensionless
+      // navigation paths get the SPA fallback.
+      if (pathService.extname(urlPath)) {
+        return HttpServerResponse.text('Not Found', { status: 404 });
+      }
+
       // SPA fallback: serve index.html for client-side routes
       const indexPath = pathService.resolve(staticRoot, 'index.html');
       const indexInfo = yield* fileSystem
