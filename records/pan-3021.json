@@ -63,7 +63,7 @@
     "recordedAt": "2026-07-24T18:43:30.234Z"
   },
   "created": "2026-07-24T17:28:09.122Z",
-  "updated": "2026-07-25T06:16:00.118Z",
+  "updated": "2026-07-25T07:17:32.283Z",
   "pipeline": {
     "issueId": "PAN-3021",
     "reviewStatus": "passed",
@@ -73,7 +73,7 @@
     "mergeStatus": "merged",
     "releaseStatus": "skipped",
     "readyForMerge": false,
-    "updatedAt": "2026-07-25T06:16:00.088Z",
+    "updatedAt": "2026-07-25T07:17:32.195Z",
     "reviewNotes": "Approved d110b0b2: command registry generation, composer integration, no-loss gate, security, and performance checks pass",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "Verified all 4 ACs: strike/swarm registered on root program, admin/cloister/status nested correctly, spawn-reviewer confirmed {hidden:true} at src/cli/index.ts:380 and filtered by commander's visibleCommands (verified in node_modules/commander/lib/help.js), unit tests correctly assert args metadata and hidden-exclusion/ordering.",
@@ -187,7 +187,7 @@
       },
       "costAtCloseOut": {
         "usd": 75.495223,
-        "pricingAsOf": "2026-07-25T06:16:00.115Z"
+        "pricingAsOf": "2026-07-25T07:17:32.276Z"
       }
     },
     "merges": [
