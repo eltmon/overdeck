@@ -19,6 +19,7 @@ import {
   selectIssuesByCycle,
   selectMemoryObservations,
   selectMemoryStatus,
+  selectPendingInputSubjects,
   selectResetMarkersByScope,
   useDashboardStore,
   type DashboardState,
@@ -558,6 +559,89 @@ describe('selectors', () => {
       'perm-1',
       'perm-2',
     ])
+  })
+})
+
+// ─── selectPendingInputSubjects (PAN-3051) ────────────────────────────────────
+
+describe('selectPendingInputSubjects', () => {
+  /**
+   * The live defect: with `experimental.claudeCodeChannelsMcp: false` no Channels
+   * bridge runs, so `channelPermissionRequestsById` stays empty and the only
+   * evidence of the prompt is the pane detection's `tool_permission` reason.
+   * Agents froze on `❯ Do you want to proceed?` and produced no decision.
+   */
+  it('surfaces a tool-permission prompt with the Channels map empty', () => {
+    const state: DashboardState = {
+      ...emptyState,
+      agentsById: {
+        'agent-min-896': {
+          ...baseAgent,
+          id: 'agent-min-896',
+          issueId: 'MIN-896',
+          hasPendingQuestion: true,
+          pendingQuestionReason: 'tool_permission',
+          pendingQuestionPrompt: 'Claude needs your permission',
+          pendingInputKinds: [],
+        },
+      },
+      channelPermissionRequestsById: {},
+    }
+
+    const subjects = selectPendingInputSubjects(state)
+    expect(subjects).toHaveLength(1)
+    expect(subjects[0]!.agentId).toBe('agent-min-896')
+    expect(subjects[0]!.kinds).toContain('permissionRequest')
+  })
+
+  it('does not duplicate the kind when the Channels map also has the request', () => {
+    const state: DashboardState = {
+      ...emptyState,
+      agentsById: {
+        'agent-1': {
+          ...baseAgent,
+          hasPendingQuestion: true,
+          pendingQuestionReason: 'tool_permission',
+        },
+      },
+      channelPermissionRequestsById: {
+        'perm-1': {
+          requestId: 'perm-1',
+          agentId: 'agent-1',
+          issueId: 'PAN-1',
+          toolName: 'Bash',
+          description: 'Run npm test',
+          inputPreview: '{"command":"npm test"}',
+          createdAt: '2026-05-07T18:30:00.000Z',
+        },
+      },
+    }
+
+    const subjects = selectPendingInputSubjects(state)
+    expect(subjects).toHaveLength(1)
+    expect(subjects[0]!.kinds).toEqual(['permissionRequest'])
+    expect(subjects[0]!.permissionRequestIds).toEqual(['perm-1'])
+  })
+
+  /**
+   * PAN-1591 must keep holding: the fuzzy `hasPendingQuestion` bool on its own —
+   * the generic 'other' pane/runtime fallbacks — names no answerable prompt and
+   * must not put a phantom row on the operator's list.
+   */
+  it('ignores a pending question whose reason is not a tool permission', () => {
+    const state: DashboardState = {
+      ...emptyState,
+      agentsById: {
+        'agent-1': {
+          ...baseAgent,
+          hasPendingQuestion: true,
+          pendingQuestionReason: 'other',
+        },
+      },
+      channelPermissionRequestsById: {},
+    }
+
+    expect(selectPendingInputSubjects(state)).toEqual([])
   })
 })
 
