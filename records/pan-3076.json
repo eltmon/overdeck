@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-25T21:12:36.630Z",
-  "updated": "2026-07-25T22:07:06.566Z",
+  "updated": "2026-07-25T22:07:17.260Z",
   "pipeline": {
     "issueId": "PAN-3076",
     "reviewStatus": "pending",
@@ -75,8 +75,16 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 18,
-    "claims": {},
+    "sequence": 19,
+    "claims": {
+      "crash-fingerprint-and-scan-test": {
+        "writerId": "agent-pan-3076",
+        "agentId": "agent-pan-3076",
+        "pid": 3237584,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-25T22:07:17.260Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3076",
@@ -251,6 +259,7 @@
     "review-status-write-door-brand": "completed",
     "review-status-write-door-brand.review-status-write-door-brand.ac1": "completed",
     "review-status-write-door-brand.review-status-write-door-brand.ac2": "completed",
-    "review-status-write-door-brand.review-status-write-door-brand.ac3": "completed"
+    "review-status-write-door-brand.review-status-write-door-brand.ac3": "completed",
+    "crash-fingerprint-and-scan-test": "running"
   }
 }
