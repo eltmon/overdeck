@@ -13,6 +13,7 @@ import {
 } from '../../lib/projects.js';
 import { applyProjectTemplateOverlaySync, mergeSkillsIntoWorkspaceSync } from '../../lib/skills-merge.js';
 import {
+  addNewRepoToWorkspace,
   addReposToWorkspace,
   copyOverdeckSettingsToWorkspaceSync,
 } from '../../lib/workspace-manager.js';
@@ -159,6 +160,7 @@ export async function updateCommand(issueId: string, options: UpdateOptions): Pr
 interface AddRepoOptions {
   dryRun?: boolean;
   group?: string;
+  new?: string;
   project?: string;
 }
 
@@ -186,19 +188,22 @@ export async function addRepoCommand(workspaceId: string, repoNames: string[], o
     const folderName = `feature-${normalizedId}`;
 
     // Resolve project
+    let projectKey: string | null = null;
     let projectConfig: ReturnType<typeof findProjectByTeamSync> = null;
     if (options.project) {
-      projectConfig = getProjectSync(options.project);
+      projectKey = options.project;
+      projectConfig = getProjectSync(projectKey);
     }
 
     if (!projectConfig) {
       // Try to find project from workspace path
       const allProjects = listProjectsSync();
-      for (const { config: p } of allProjects) {
+      for (const { key, config: p } of allProjects) {
         if (p.workspace?.workspaces_dir) {
           const workspacesDir = join(p.path, p.workspace.workspaces_dir);
           const workspacePath = join(workspacesDir, folderName);
           if (existsSync(workspacePath)) {
+            projectKey = key;
             projectConfig = p;
             break;
           }
@@ -206,7 +211,7 @@ export async function addRepoCommand(workspaceId: string, repoNames: string[], o
       }
     }
 
-    if (!projectConfig) {
+    if (!projectConfig || !projectKey) {
       spinner.fail(`No project found for workspace ${workspaceId}`);
       return exitCli(1);
     }
@@ -217,8 +222,38 @@ export async function addRepoCommand(workspaceId: string, repoNames: string[], o
       return exitCli(1);
     }
 
+    if (options.new) {
+      if (options.group) {
+        spinner.fail('--new cannot be combined with --group');
+        return exitCli(1);
+      }
+      if (repoNames.length > 1) {
+        spinner.fail('--new accepts at most one repository name');
+        return exitCli(1);
+      }
+
+      const result = await Effect.runPromise(addNewRepoToWorkspace({
+        projectKey,
+        projectConfig,
+        featureName: normalizedId,
+        gitUrl: options.new,
+        repoName: repoNames[0],
+        dryRun: options.dryRun,
+      }));
+      if (!result.success) {
+        spinner.fail(`Failed to register new repo: ${result.errors.join(', ')}`);
+        for (const step of result.steps) console.log(chalk.dim(`  ${step}`));
+        return exitCli(1);
+      }
+
+      if (options.dryRun) spinner.succeed('Dry run complete');
+      else spinner.succeed(`Registered and added ${repoNames[0] || 'new repository'}`);
+      for (const step of result.steps) console.log(chalk.green(`  ${step}`));
+      return;
+    }
+
     if (!workspaceConfig.progressive) {
-      spinner.warn('This workspace was not created with progressive mode — all repos already exist');
+      spinner.warn('This workspace was not created with progressive mode — all configured repos should already exist');
     }
 
     // Resolve repo names (expand groups if --group specified)
@@ -269,7 +304,8 @@ export async function addRepoCommand(workspaceId: string, repoNames: string[], o
       return exitCli(1);
     }
 
-    spinner.succeed(`Added ${targetRepoNames.length} repository(s) to workspace`);
+    if (options.dryRun) spinner.succeed('Dry run complete');
+    else spinner.succeed(`Added ${targetRepoNames.length} repository(s) to workspace`);
     for (const step of result.steps) {
       if (!step.includes('Skipped')) {
         console.log(chalk.green(`  ${step}`));

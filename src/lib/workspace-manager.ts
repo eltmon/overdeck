@@ -8,13 +8,14 @@ import { Effect } from 'effect';
 import { FsError, ProcessSpawnError } from './errors.js';
 import { copyOverdeckSettingsToWorkspaceSync, ensurePanGitignoreSync, migrateOverdeckToPanSync } from './workspace-manager/migration.js';
 import { createWorkspacePromise } from './workspace-manager/create.js';
-import { addReposToWorkspacePromise } from './workspace-manager/repos.js';
+import { addNewRepoToWorkspacePromise, addReposToWorkspacePromise } from './workspace-manager/repos.js';
 import { getContainersReferencingWorkspacePathPromise, stopWorkspaceDockerPromise } from './workspace-manager/docker.js';
 import { removeWorkspacePromise } from './workspace-manager/remove.js';
 import {
   preTrustDirectorySync,
 } from './workspace-manager/worktree-ops.js';
 import type {
+  AddNewRepoToWorkspaceOptions,
   AddReposToWorkspaceOptions,
   AddReposToWorkspaceResult,
   DockerCleanupResult,
@@ -25,6 +26,7 @@ import type {
   WorkspaceRemoveResult,
 } from './workspace-manager/types.js';
 export type {
+  AddNewRepoToWorkspaceOptions,
   AddReposToWorkspaceOptions,
   AddReposToWorkspaceResult,
   DockerCleanupResult,
@@ -102,13 +104,22 @@ export const preTrustDirectory = (
     catch: (cause) => toWmFsError('preTrustDirectory', dirPath, cause),
   });
 
-/** Add additional repos (worktrees / symlinks) to an existing workspace. */
+/** Add additional configured repos (worktrees / symlinks) to an existing workspace. */
 export const addReposToWorkspace = (
   options: AddReposToWorkspaceOptions,
 ): Effect.Effect<AddReposToWorkspaceResult, ProcessSpawnError> =>
   Effect.tryPromise({
     try: () => addReposToWorkspacePromise(options),
     catch: (cause) => toWmProcessError('addReposToWorkspace', cause),
+  });
+
+/** Register a newly-created repository and add its feature worktree to a workspace. */
+export const addNewRepoToWorkspace = (
+  options: AddNewRepoToWorkspaceOptions,
+): Effect.Effect<AddReposToWorkspaceResult, ProcessSpawnError> =>
+  Effect.tryPromise({
+    try: () => addNewRepoToWorkspacePromise(options),
+    catch: (cause) => toWmProcessError('addNewRepoToWorkspace', cause),
   });
 
 /** Enumerate Docker containers whose compose files live under a workspace. */

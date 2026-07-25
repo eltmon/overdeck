@@ -86,7 +86,7 @@ start <id>            Start a hibernated remote workspace
 stop <id>             Hibernate a remote workspace
 migrate <id>          Migrate between local and remote
 update <id>           Update skills/agents/rules in existing workspace
-add-repo <ws> <repo>  Add repo to progressive polyrepo workspace
+add-repo <ws> [repo]  Add configured repo, or register one with --new <git-url>
 sync-auth <id>        Sync Claude credentials to remote
 ```
 

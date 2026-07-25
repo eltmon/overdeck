@@ -141,10 +141,11 @@ export function registerWorkspaceCommands(program: Command): void {
     .action(useConfigCommand);
 
   workspace
-    .command('add-repo <workspaceId> <repoNames...>')
-    .description('Add repositories to a progressive polyrepo workspace')
+    .command('add-repo <workspaceId> [repoNames...]')
+    .description('Add configured repositories or register a new repository in a polyrepo workspace')
     .option('--dry-run', 'Show what would be added')
     .option('--group <groupName>', 'Add all repos from a named group (from groups_file)')
-    .option('--project <path>', 'Explicit project path (overrides registry)')
+    .option('--new <gitUrl>', 'Register a repository that was created during this issue')
+    .option('--project <key>', 'Explicit project key from projects.yaml (overrides registry)')
     .action(addRepoCommand);
 }

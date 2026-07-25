@@ -581,7 +581,7 @@ export const GENERATED_SLASH_COMMANDS: SlashCommand[] = [
   {
     id: 'pan-workspace-add-repo',
     label: 'pan workspace add-repo',
-    description: 'Add repositories to a progressive polyrepo workspace',
+    description: 'Add configured repositories or register a new repository in a polyrepo workspace',
     insert: 'pan workspace add-repo ',
     category: 'Workspace',
   },

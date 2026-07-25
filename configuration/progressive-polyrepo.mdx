@@ -128,8 +128,11 @@ pan workspace add-repo <workspace-id> <repo-name> [repo-name...]
 # Add a named group
 pan workspace add-repo <workspace-id> --group <group-name>
 
-# Add all repos
+# Add all configured repos
 pan workspace add-repo <workspace-id> --group all
+
+# Register a repository created during the issue
+pan workspace add-repo <workspace-id> --new <git-url>
 ```
 
 **Examples:**
@@ -141,9 +144,16 @@ pan workspace add-repo int-123 int-provider-a int-canonical-to-hs
 # Add a named group
 pan workspace add-repo int-123 --group simphony
 
-# Add all repos
+# Add all configured repos
 pan workspace add-repo int-123 --group all
+
+# Register a new deliverable repository before writing code in it
+pan workspace add-repo int-123 --new git@github.com:acme/new-service.git
 ```
+
+`--new` clones the repository under the project root, appends it to the project's `workspace.repos` configuration, and creates the issue feature worktree inside the active workspace. Review, inspection, verification, and merge then resolve it through the same configured repo set as every other polyrepo member. If a repo name is unknown and `--new` is absent, the command fails without changing the workspace.
+
+Run `--new` before manually cloning or committing to the new repository. The command refuses to adopt an existing workspace checkout on the wrong branch because that would preserve the evidence-blind `main`-branch workflow.
 
 ### Skill: `/workspace-add-repo`
 

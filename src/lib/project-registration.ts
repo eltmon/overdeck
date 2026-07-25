@@ -4,7 +4,7 @@
  * No chalk, no console, no execSync. Import and use from API routes or CLI.
  */
 
-import { existsSync, mkdirSync, readlinkSync, readdirSync, renameSync, statSync, symlinkSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { join, basename } from 'node:path';
 
 import {
@@ -12,11 +12,10 @@ import {
   registerProjectSync,
   type ProjectConfig,
 } from './projects.js';
-import { SYNC_SOURCES } from './paths.js';
 import { ensureProjectLayer } from './context-layers/index.js';
+import { installGitHooksInDir } from './git-hooks.js';
 
-// Bundled git hooks distributed to registered projects (PAN-1201).
-const BUNDLED_HOOKS_DIR = SYNC_SOURCES.gitHooks;
+export { installGitHooksInDir } from './git-hooks.js';
 
 export class DuplicateProjectError extends Error {
   constructor(public readonly key: string, public readonly existingPath: string) {
@@ -35,45 +34,6 @@ export interface RegisterProjectResult {
   config: ProjectConfig;
   seededContextLayer: boolean;
   hooksInstalled: number;
-}
-
-export function installGitHooksInDir(gitDir: string): number {
-  const hooksTarget = join(gitDir, 'hooks');
-  let installed = 0;
-
-  if (!existsSync(hooksTarget)) {
-    mkdirSync(hooksTarget, { recursive: true });
-  }
-
-  if (!existsSync(BUNDLED_HOOKS_DIR)) return 0;
-
-  try {
-    const hooks = readdirSync(BUNDLED_HOOKS_DIR).filter((f) => {
-      const p = join(BUNDLED_HOOKS_DIR, f);
-      return existsSync(p) && statSync(p).isFile();
-    });
-
-    for (const hook of hooks) {
-      const source = join(BUNDLED_HOOKS_DIR, hook);
-      const target = join(hooksTarget, hook);
-
-      if (existsSync(target)) {
-        try {
-          if (readlinkSync(target) === source) continue;
-        } catch {
-          // not a symlink — fall through to backup
-        }
-        renameSync(target, `${target}.backup`);
-      }
-
-      symlinkSync(source, target);
-      installed++;
-    }
-  } catch {
-    // hooks are optional — non-fatal
-  }
-
-  return installed;
 }
 
 /**

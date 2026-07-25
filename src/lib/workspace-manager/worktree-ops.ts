@@ -141,7 +141,7 @@ export async function createWorktree(
       await execAsync(`git worktree add "${targetPath}" "${branchName}"`, { cwd: repoPath });
     } else {
       // Create new branch from the configured default branch
-      await execAsync(`git worktree add "${targetPath}" -b "${branchName}" "${defaultBranch}"`, { cwd: repoPath });
+      await execAsync(`git worktree add -b "${branchName}" "${targetPath}" "${defaultBranch}"`, { cwd: repoPath });
     }
 
     await installPreRebaseHook(targetPath);
