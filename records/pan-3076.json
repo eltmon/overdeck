@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-25T21:12:36.630Z",
-  "updated": "2026-07-25T21:24:37.205Z",
+  "updated": "2026-07-25T21:28:43.911Z",
   "pipeline": {
     "issueId": "PAN-3076",
     "reviewStatus": "pending",
@@ -59,18 +59,32 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "head-anchor-type": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-3076",
         "agentId": "agent-pan-3076",
         "pid": 1721493,
         "host": "eltmon-z790",
-        "claimedAt": "2026-07-25T21:24:37.205Z"
+        "claimedAt": "2026-07-25T21:24:37.205Z",
+        "itemId": "head-anchor-type",
+        "outcome": "completed",
+        "reason": "Added branded HeadAnchor producer type, rehydration escape hatch, canonical composite parser, and compile-time brand probe.",
+        "releasedAt": "2026-07-25T21:28:43.911Z"
+      }
+    ],
+    "statusReasons": {
+      "head-anchor-type": {
+        "reason": "Added branded HeadAnchor producer type, rehydration escape hatch, canonical composite parser, and compile-time brand probe.",
+        "updatedAt": "2026-07-25T21:28:43.911Z"
       }
     }
   },
   "statusOverrides": {
-    "head-anchor-type": "running"
+    "head-anchor-type": "completed",
+    "head-anchor-type.head-anchor-type.ac1": "completed",
+    "head-anchor-type.head-anchor-type.ac2": "completed",
+    "head-anchor-type.head-anchor-type.ac3": "completed"
   }
 }
