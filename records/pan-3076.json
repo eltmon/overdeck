@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-25T21:12:36.630Z",
-  "updated": "2026-07-25T21:49:07.852Z",
+  "updated": "2026-07-25T21:53:43.960Z",
   "pipeline": {
     "issueId": "PAN-3076",
     "reviewStatus": "pending",
@@ -75,16 +75,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 15,
-    "claims": {
-      "review-runid-composite": {
-        "writerId": "agent-pan-3076",
-        "agentId": "agent-pan-3076",
-        "pid": 2547888,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-25T21:49:07.852Z"
-      }
-    },
+    "sequence": 16,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3076",
@@ -162,6 +154,17 @@
         "outcome": "completed",
         "reason": "Stamped and compared roleRunHead with full producer-issued workspace anchors on both sides, including polyrepo roots.",
         "releasedAt": "2026-07-25T21:48:52.206Z"
+      },
+      {
+        "writerId": "agent-pan-3076",
+        "agentId": "agent-pan-3076",
+        "pid": 2547888,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-25T21:49:07.852Z",
+        "itemId": "review-runid-composite",
+        "outcome": "completed",
+        "reason": "Added one shared review run head helper: monorepo short HEAD, polyrepo SHA-1 of the full producer anchor, used for construction and staleness.",
+        "releasedAt": "2026-07-25T21:53:43.960Z"
       }
     ],
     "statusReasons": {
@@ -192,6 +195,10 @@
       "role-run-head-pair": {
         "reason": "Stamped and compared roleRunHead with full producer-issued workspace anchors on both sides, including polyrepo roots.",
         "updatedAt": "2026-07-25T21:48:52.206Z"
+      },
+      "review-runid-composite": {
+        "reason": "Added one shared review run head helper: monorepo short HEAD, polyrepo SHA-1 of the full producer anchor, used for construction and staleness.",
+        "updatedAt": "2026-07-25T21:53:43.960Z"
       }
     }
   },
@@ -222,6 +229,9 @@
     "role-run-head-pair.role-run-head-pair.ac1": "completed",
     "role-run-head-pair.role-run-head-pair.ac2": "completed",
     "role-run-head-pair.role-run-head-pair.ac3": "completed",
-    "review-runid-composite": "running"
+    "review-runid-composite": "completed",
+    "review-runid-composite.review-runid-composite.ac1": "completed",
+    "review-runid-composite.review-runid-composite.ac2": "completed",
+    "review-runid-composite.review-runid-composite.ac3": "completed"
   }
 }
