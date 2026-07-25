@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-25T11:59:01.400Z",
-  "updated": "2026-07-25T12:51:32.833Z",
+  "updated": "2026-07-25T12:51:34.702Z",
   "pipeline": {
     "issueId": "PAN-3052",
     "reviewStatus": "pending",
@@ -125,5 +125,12 @@
     "docs-decomp-note": "completed",
     "docs-decomp-note.docs-decomp-note.ac1": "completed",
     "docs-decomp-note.docs-decomp-note.ac2": "completed"
-  }
+  },
+  "decisions": [
+    {
+      "id": "D-test-waived",
+      "summary": "Test gate waived: Pure behavior-preserving extraction; commit cb39b20958 added the existing boot-reconciliation tests that cover this path, and this branch preserves them unmodified with 18/18 passing.",
+      "recordedAt": "2026-07-25T12:51:34.702Z"
+    }
+  ]
 }
