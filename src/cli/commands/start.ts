@@ -6,7 +6,7 @@ import { join, dirname, resolve } from 'path';
 import { homedir } from 'os';
 import { createInterface } from 'readline/promises';
 import { promisify } from 'util';
-import { exec, execFile } from 'child_process';
+import { exec, execFile, execSync } from 'child_process';
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
 import { clearAgentPausedSync, getAgentStateSync, spawnAgent } from '../../lib/agents.js';
@@ -1010,7 +1010,6 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
 
     const workspaceRepoRoots = resolveWorkspaceRepoRootsSync(normalizedId, workspace);
     if (workspaceExisted) {
-      const { execSync } = await import('child_process');
       for (const root of workspaceRepoRoots) {
         let branch = '';
         try {
@@ -1064,7 +1063,6 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     }
 
     // CRITICAL: Verify every workspace repo is NOT on main/master or an empty branch.
-    const { execSync } = await import('child_process');
     for (const root of workspaceRepoRoots) {
       let branch = '';
       try {

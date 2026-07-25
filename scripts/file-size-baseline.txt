@@ -1,5 +1,5 @@
 1028 src/cli/commands/done.ts
-1296 src/cli/commands/start.ts
+1294 src/cli/commands/start.ts
 1349 src/cli/index.ts
 1012 src/dashboard/frontend/src/components/AwaitingMergePage.tsx
 1301 src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx
