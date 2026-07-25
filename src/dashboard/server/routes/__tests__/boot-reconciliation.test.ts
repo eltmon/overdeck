@@ -91,6 +91,14 @@ const mocks = vi.hoisted(() => {
 vi.mock('../../../../lib/cloister/boot-reconciliation.js', () => ({
   isBootReconciliationCandidate: vi.fn((agent: { id: string }) => agent.id === 'agent-candidate'),
   listBootReconciliationCandidates: vi.fn(() => mocks.candidates),
+  MAX_BOOT_RECONCILIATION_GRACE_EXTENSIONS: 3,
+  extendBootReconciliationGrace: vi.fn(() => ({
+    extended: true,
+    graceDeadline: '2026-06-29T15:01:00.000Z',
+    graceExtensions: 1,
+    maxGraceExtensions: 3,
+    reason: 'extended',
+  })),
 }));
 
 vi.mock('../../../../lib/cloister/deacon.js', () => ({
@@ -144,16 +152,19 @@ async function requestRoute(path: string, init?: RequestInit): Promise<{ status:
 }
 
 describe('boot reconciliation route', () => {
-  it('omits stale stopped non-candidates while retaining read-only context rows', async () => {
+  it('puts only decision candidates in set, read-only rows in context, and omits stale stopped non-candidates', async () => {
     const response = await requestRoute('/api/boot-reconciliation');
 
     expect(response.status).toBe(200);
-    const ids = response.body.set.map((agent: { id: string }) => agent.id);
-    expect(ids).toEqual(['agent-candidate', 'agent-paused', 'agent-troubled', 'agent-remote']);
-    expect(ids).not.toContain('agent-stale');
+    const setIds = response.body.set.map((agent: { id: string }) => agent.id);
+    const contextIds = response.body.context.map((agent: { id: string }) => agent.id);
+    expect(setIds).toEqual(['agent-candidate']);
+    expect(contextIds).toEqual(['agent-paused', 'agent-troubled', 'agent-remote']);
+    expect([...setIds, ...contextIds]).not.toContain('agent-stale');
+    expect(response.body.maxGraceExtensions).toBe(3);
     expect(response.body.set.find((agent: { id: string }) => agent.id === 'agent-candidate').readOnly).toBe(false);
     for (const id of ['agent-paused', 'agent-troubled', 'agent-remote']) {
-      expect(response.body.set.find((agent: { id: string }) => agent.id === id).readOnly).toBe(true);
+      expect(response.body.context.find((agent: { id: string }) => agent.id === id).readOnly).toBe(true);
     }
   });
 
