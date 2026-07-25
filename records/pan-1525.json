@@ -252,19 +252,19 @@
     "recordedAt": "2026-07-24T23:08:31.650Z"
   },
   "created": "2026-07-12T09:32:29.900Z",
-  "updated": "2026-07-25T01:53:28.770Z",
+  "updated": "2026-07-25T01:57:56.903Z",
   "pipeline": {
     "issueId": "PAN-1525",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-24T23:12:31.996Z",
-    "updatedAt": "2026-07-25T01:53:28.107Z",
-    "reviewNotes": "Rebase introduced committed composer-manifest drift: workspace add-repo syntax is stale and a clean checkout fails the required manifest lint gate.",
+    "updatedAt": "2026-07-25T01:57:56.860Z",
+    "reviewNotes": "Agent re-review request (4/25): Fixed review issues",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3033",
     "lastVerifiedCommit": "1c64f86d2f98357e43e341f8b5e2bbe6304237df",
     "reviewSpawnedAt": "2026-07-25T01:51:42.282Z",
@@ -291,9 +291,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 6431728,
-            "output": 289822,
-            "cacheRead": 97345536,
+            "input": 6442624,
+            "output": 294149,
+            "cacheRead": 98657792,
             "cacheWrite": 0
           }
         },
@@ -315,9 +315,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 13427519,
-            "output": 1032557,
-            "cacheRead": 579347968,
+            "input": 13464626,
+            "output": 1039022,
+            "cacheRead": 585556992,
             "cacheWrite": 0
           }
         }
@@ -330,9 +330,9 @@
           "cacheWrite": 921870
         },
         "openai/gpt-5.6-sol": {
-          "input": 19859247,
-          "output": 1322379,
-          "cacheRead": 676693504,
+          "input": 19907250,
+          "output": 1333171,
+          "cacheRead": 684214784,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -343,8 +343,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 515.507908,
-        "pricingAsOf": "2026-07-25T01:53:28.136Z"
+        "usd": 519.832323,
+        "pricingAsOf": "2026-07-25T01:57:56.888Z"
       }
     },
     "merges": [
