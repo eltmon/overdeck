@@ -181,7 +181,7 @@
     "recordedAt": "2026-07-22T01:20:05.090Z"
   },
   "created": "2026-07-21T23:09:49.270Z",
-  "updated": "2026-07-25T23:43:51.443Z",
+  "updated": "2026-07-25T23:45:50.064Z",
   "pipeline": {
     "issueId": "PAN-2997",
     "reviewStatus": "passed",
@@ -191,7 +191,6 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "panDoneRecoveredAt": "2026-07-25T23:18:14.672Z",
     "updatedAt": "2026-07-25T23:43:51.396Z",
     "blockerReasons": [
       {
