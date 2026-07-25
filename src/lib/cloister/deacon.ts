@@ -2830,6 +2830,9 @@ export async function runPatrol(): Promise<PatrolResult> {
   actions.push(...idleStackActions);
   for (const a of idleStackActions) addLog('action', a, state.patrolCycle);
 
+  // PAN-3053: read-only Docker bridge-pool pressure signal; emits on transitions only.
+  for (const a of await (await import('./bridge-pool-patrol.js')).patrolDockerBridgePool()) { actions.push(a); addLog('action', a, state.patrolCycle); }
+
   // Re-send the resume continue prompt when a work agent is alive and idle after
   // resume but no user record landed in the JSONL transcript.
   const stalledResumeActions = await nudgeStalledResumeWorkAgents();

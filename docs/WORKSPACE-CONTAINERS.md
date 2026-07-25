@@ -130,4 +130,10 @@ Docker's default bridge pool supports only ~31 networks. To make a transient lea
 }
 ```
 
-`pan doctor` warns when the devnet count is within ~5 of the default limit or when `default-address-pools` is missing. Overdeck never edits `daemon.json` automatically.
+`pan doctor` warns when the host is within ~5 networks of the pool limit and errors once the pool is fully consumed. It counts **every bridge network on the host** (`docker network ls --filter driver=bridge`), because that is the quantity the limit governs — a network from any project, or Docker's own `bridge`, consumes a slot exactly like an `overdeck-feature-*_devnet` does. The message carries a per-project breakdown (`myn-feature-* 13, overdeck-feature-* 6, other 5`) so you can see who is holding the slots. When `default-address-pools` is declared, the limit is derived from it rather than assumed to be 31.
+
+Counting only `overdeck-feature-*_devnet` was PAN-3053: on a host at 31/31 the check saw 12, reported healthy, and every workspace rebuild failed while queued review feedback silently went undelivered.
+
+Pool pressure is also a live signal, not only an advisory you have to go ask for. The deacon patrol (`patrolDockerBridgePool` in `src/lib/cloister/bridge-pool-patrol.ts`) emits an activity entry when the host crosses into pressure or exhaustion, and again when it recovers. It emits on transitions only, so a sustained condition warns once rather than once per 60-second cycle, and it is strictly read-only — it never removes a network.
+
+Overdeck never edits `daemon.json` automatically.
