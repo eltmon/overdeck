@@ -4,7 +4,7 @@
     "created": "2026-07-25T20:52:50Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3037: pan sync-main fails on polyrepo workspaces — probes workspace root for .git instead of iterating member repos",
-    "updated": "2026-07-25T20:56:26.258Z"
+    "updated": "2026-07-25T20:56:28.077Z"
   },
   "plan": {
     "id": "pan-3037",
@@ -12,9 +12,9 @@
     "status": "approved",
     "uid": "6c59f2f1-155b-45ac-9dc3-854ae8cd9637",
     "author": "agent:claude-fable-5",
-    "sequence": 3,
+    "sequence": 5,
     "created": "2026-07-25T20:52:50Z",
-    "updated": "2026-07-25T20:56:26.258Z",
+    "updated": "2026-07-25T20:56:28.077Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3037",
