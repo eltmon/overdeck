@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agent-to-Agent Messaging for Overdeck — flow mockup</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --panel: #161b22;
+    --panel-2: #1c2330;
+    --border: #2d333f;
+    --text: #d6dde6;
+    --muted: #8b949e;
+    --teal: #2ea89e;
+    --teal-dim: #1f6f6a;
+    --amber: #d97706;
+    --amber-soft: #f0a93c;
+    --red: #e5534b;
+    --violet: #9e8bff;
+    --mono: "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 15px/1.6 -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 32px 24px 80px; }
+  h1 { font-size: 26px; margin: 0 0 6px; letter-spacing: -0.02em; }
+  h2 { font-size: 19px; margin: 0 0 12px; letter-spacing: -0.01em; }
+  .sub { color: var(--muted); margin: 0 0 28px; max-width: 760px; }
+  .verdict {
+    background: linear-gradient(180deg, #152030, #121a26);
+    border: 1px solid #28405c; border-left: 3px solid var(--teal);
+    border-radius: 8px; padding: 14px 18px; margin: 0 0 28px; max-width: 900px;
+  }
+  .verdict b { color: #fff; }
+  code, .mono { font-family: var(--mono); font-size: 0.92em; }
+  code { background: #21262e; border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; }
+
+  .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 24px; flex-wrap: wrap; }
+  .tab {
+    background: none; border: none; color: var(--muted); font: inherit; font-weight: 600;
+    padding: 9px 14px; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px;
+  }
+  .tab:hover { color: var(--text); }
+  .tab.active { color: var(--amber-soft); border-bottom-color: var(--amber); }
+  .pane { display: none; }
+  .pane.active { display: block; }
+
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px; margin-bottom: 18px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  @media (max-width: 900px) { .grid2 { grid-template-columns: 1fr; } }
+
+  pre {
+    background: #0a0e14; border: 1px solid var(--border); border-radius: 8px;
+    padding: 14px 16px; overflow-x: auto; font-family: var(--mono); font-size: 12.5px; line-height: 1.55;
+    color: #b7c4d4; margin: 10px 0;
+  }
+  pre .c { color: #5c6b7d; }
+  pre .k { color: var(--amber-soft); }
+  pre .s { color: #7fce6f; }
+  pre .m { color: var(--teal); }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  th { text-align: left; color: var(--muted); font-weight: 600; padding: 8px 10px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  td { padding: 9px 10px; border-bottom: 1px solid #21262e; vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  .chip {
+    display: inline-block; font-family: var(--mono); font-size: 11px; font-weight: 700;
+    padding: 2px 8px; border-radius: 4px; white-space: nowrap;
+  }
+  .chip.exists { background: #12352f; color: #3fc1a8; border: 1px solid var(--teal-dim); }
+  .chip.adapt  { background: #3a2c10; color: var(--amber-soft); border: 1px solid #6b4d16; }
+  .chip.new    { background: #2b2144; color: #b7a8ff; border: 1px solid #4c3d80; }
+  .chip.skip   { background: #262b33; color: var(--muted); border: 1px solid var(--border); }
+  .chip.defer  { background: #33262b; color: #d4899a; border: 1px solid #5c3a44; }
+
+  /* Sequence diagram */
+  .scenario-bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+  .scenario-btn {
+    background: var(--panel-2); color: var(--muted); border: 1px solid var(--border);
+    border-radius: 6px; font: inherit; font-size: 13px; font-weight: 600;
+    padding: 7px 13px; cursor: pointer;
+  }
+  .scenario-btn.active { color: #fff; border-color: var(--teal); background: #142e2b; }
+  .transport {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .step-btn {
+    background: var(--panel-2); color: var(--text); border: 1px solid var(--border);
+    border-radius: 6px; font: inherit; font-size: 13px; font-weight: 600; padding: 7px 14px; cursor: pointer;
+  }
+  .step-btn:hover { border-color: var(--teal); }
+  .step-btn.primary { background: var(--teal-dim); border-color: var(--teal); color: #fff; }
+  .step-btn:disabled { opacity: 0.4; cursor: default; }
+  .step-counter { color: var(--muted); font-family: var(--mono); font-size: 12px; min-width: 90px; text-align: center; }
+
+  .diagram-scroll { overflow-x: auto; }
+  svg text { font-family: var(--mono); }
+  .lifeline-label { font-size: 12px; font-weight: 700; fill: #e8eef5; }
+  .lifeline-sub { font-size: 10px; fill: var(--muted); }
+  .arrow-label { font-size: 10.5px; fill: #c8d4e0; }
+  .arrow-line { stroke-width: 2; fill: none; marker-end: url(#arrowhead); }
+  .arrow-line.msg { stroke: var(--teal); }
+  .arrow-line.rpc { stroke: var(--amber-soft); stroke-dasharray: 6 3; }
+  .arrow-line.notice { stroke: var(--red); stroke-dasharray: 3 3; }
+  .arrow-line.ui { stroke: var(--violet); stroke-dasharray: 2 3; }
+  .arrow-line.self { stroke: #6b7686; }
+  .step-dim { opacity: 0.14; transition: opacity 0.25s; }
+  .step-lit { opacity: 1; transition: opacity 0.25s; }
+
+  #detail-card {
+    background: #10161f; border: 1px solid #28405c; border-left: 3px solid var(--amber);
+    border-radius: 8px; padding: 14px 18px; margin-top: 14px; min-height: 96px;
+  }
+  #detail-card h3 { margin: 0 0 6px; font-size: 14.5px; color: var(--amber-soft); }
+  #detail-card p { margin: 0 0 8px; font-size: 13.5px; color: #c2cdd9; }
+  #detail-card pre { margin: 6px 0 2px; }
+
+  .flow-list { counter-reset: fl; margin: 0; padding: 0; list-style: none; }
+  .flow-list li {
+    counter-increment: fl; position: relative; padding: 0 0 14px 34px; font-size: 14px;
+  }
+  .flow-list li::before {
+    content: counter(fl); position: absolute; left: 0; top: 1px;
+    width: 22px; height: 22px; border-radius: 50%; background: var(--panel-2);
+    border: 1px solid var(--border); color: var(--amber-soft);
+    font: 700 11px/22px var(--mono); text-align: center;
+  }
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 12px; color: var(--muted); margin: 4px 0 0; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .swatch { width: 18px; height: 3px; border-radius: 2px; display: inline-block; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Agent-to-Agent Messaging for Overdeck</h1>
+  <p class="sub">Flow mockup — how Overdeck could replicate Traycer's "agents with walkie-talkies"
+    using the machinery it already has. Based on a code review of
+    <code>traycerai/traycer</code> (cloned at <code>~/Projects/traycer</code>).</p>
+
+  <div class="verdict">
+    <b>Verdict:</b> Traycer's A2A is a <b>brokered mailbox with reply-thread tracking</b>, not magic.
+    Overdeck already owns the two hardest pieces — a push-delivery door
+    (<code>deliverAgentMessage</code>: PTY supervisor → channels → tmux) and a live agent registry —
+    so the replication is mostly <b>one new broker module + one new CLI verb family</b>,
+    not a new transport. We can also skip their heaviest machinery (background monitor processes,
+    versioned RPC bridges) because our push model and single-repo contracts make them unnecessary.
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" data-pane="traycer">How Traycer does it</button>
+    <button class="tab" data-pane="flow">Overdeck flow (interactive)</button>
+    <button class="tab" data-pane="mapping">Concept mapping</button>
+    <button class="tab" data-pane="surface">Agent-facing surface</button>
+  </div>
+
+  <!-- ═══════════════ PANE 1: Traycer review ═══════════════ -->
+  <div class="pane active" id="pane-traycer">
+    <div class="card">
+      <h2>What the repo actually contains</h2>
+      <p><code>traycerai/traycer</code> is the <b>protocol + clients</b> package only — wire contracts
+        (zod schemas), the CLI (<code>traycer agent send|list|inbox|transcript</code>, <code>traycer monitor</code>),
+        and message formatting. The host broker itself (queues, sweep timers, MCP server, hook installation)
+        is <b>closed-source</b>. But the contracts alone carry the whole design:</p>
+      <ol class="flow-list">
+        <li><b>Five unary RPCs are the entire A2A surface.</b>
+          <code>agent.create</code> (spawn a child agent), <code>agent.list</code> (discovery with per-agent
+          capabilities), <code>agent.sendMessage</code> (fire-and-forget hand-off), <code>agent.getTranscript</code>
+          (read a peer's conversation, flattened to XML tags), <code>agent.stop</code> (halt, optional cascade
+          down the delegation tree). That's it — everything else is delivery plumbing.</li>
+        <li><b>Messages are brokered, never peer-to-peer.</b> <code>agent.sendMessage</code> enqueues a
+          <code>MailboxEnvelope</code> on a <b>RAM-only</b> per-receiver inbox queue in the host. The sender
+          returns immediately; a reply is a <i>separate</i> <code>agent.sendMessage</code> traveling the other way.</li>
+        <li><b>Reply threading is explicit, not conversational.</b> <code>expectReply: true</code> makes the broker
+          mint a <code>responseId</code> that names the <i>thread</i>, not the message — follow-ups may share it, and
+          one reply carrying it closes the whole thread. The receiver echoes it back with
+          <code>expectReply: false</code>.</li>
+        <li><b>TUI agents receive via a background monitor, not injection.</b> A <code>traycer monitor</code> process
+          spawned inside the Claude Code session subscribes to <code>agent.inbox.subscribe</code> (versioned
+          streaming RPC) and prints each frame to <b>stdout</b>; Claude Code's background-output notification then
+          surfaces it into the agent's context. GUI chat agents skip the inbox entirely — messages arrive as
+          ordinary chat turns with <code>sender: {type: "agent", …}</code>.</li>
+        <li><b>Stalled-receiver notices close the loop.</b> If a receiver on an <code>expectReply</code> thread goes
+          silent, the broker fires an <code>inactivity</code> notice to the <i>sender</i> with one of seven reasons:
+          <code>turn-ended</code> (Claude Code Stop hook → <code>agent.tui.turnEnded</code> — the primary signal),
+          <code>exited</code>, <code>quiet</code> (PTY watchdog), <code>user-stopped</code>, <code>errored</code>,
+          <code>awaiting-input</code>, <code>receiver-cancelled</code>.</li>
+        <li><b>Every message teaches the receiver how to reply.</b> The injected text is prefixed
+          <code>[traycer:agent-message]</code> with the exact reply command and the responseId inline — the receiving
+          model never has to guess the protocol.</li>
+        <li><b>Capability gating is honest.</b> <code>canParticipateInA2A</code> = every GUI agent, plus only Claude
+          Code among TUI harnesses. <code>agent.list</code> exposes per-row <code>{readTranscript, sendMessage}</code>
+          booleans (<code>sendMessage = sameUser ∧ isLocal ∧ canParticipate</code>), so senders can see who is
+          reachable before trying. Cross-host sends are rejected outright (<code>RECEIVER_NOT_LOCAL</code>).</li>
+        <li><b>Roles are a side-channel.</b> Agents claim durable <code>(role, scope)</code> tuples inside an epic;
+          claim/release broadcasts a <code>role-awareness</code> frame to <i>currently connected</i> monitors only
+          (never queued — a reconnecting monitor reads roles fresh from its prompt).</li>
+      </ol>
+    </div>
+
+    <div class="card">
+      <h2>The design discipline worth stealing</h2>
+      <p>Traycer freezes every shipped schema version and writes explicit <b>upgrade/downgrade bridge
+        functions</b> between them (<code>contracts.ts</code> is 700 lines of this). An old CLI talking to a new
+        host gets its responses projected down; unrepresentable requests fail with a typed
+        <code>DOWNGRADE_UNSUPPORTED</code>, never a silent semantic change. Overdeck ships all its clients from
+        one repo, so we don't need the bridges — but the <i>attitude</i> (the wire shape is a contract; the
+        receiver's negotiated version is authoritative) is worth keeping for the dashboard RPC surface.</p>
+    </div>
+  </div>
+
+  <!-- ═══════════════ PANE 2: Interactive flow ═══════════════ -->
+  <div class="pane" id="pane-flow">
+    <div class="card">
+      <h2>Proposed Overdeck flow — step through it</h2>
+      <div class="scenario-bar">
+        <button class="scenario-btn active" data-scenario="ask">Scenario A — ask a peer, get a reply</button>
+        <button class="scenario-btn" data-scenario="stall">Scenario B — stalled receiver notice</button>
+      </div>
+      <div class="transport">
+        <button class="step-btn" id="btn-prev">← Prev</button>
+        <button class="step-btn primary" id="btn-next">Next →</button>
+        <button class="step-btn" id="btn-play">▶ Play</button>
+        <button class="step-btn" id="btn-reset">Reset</button>
+        <span class="step-counter" id="step-counter">0 / 8</span>
+      </div>
+      <div class="legend">
+        <span><i class="swatch" style="background:var(--teal)"></i>agent message (deliverAgentMessage)</span>
+        <span><i class="swatch" style="background:var(--amber-soft)"></i>CLI → dashboard RPC</span>
+        <span><i class="swatch" style="background:var(--red)"></i>inactivity notice</span>
+        <span><i class="swatch" style="background:var(--violet)"></i>dashboard event (/ws/rpc)</span>
+        <span><i class="swatch" style="background:#6b7686"></i>internal / self</span>
+      </div>
+      <div class="diagram-scroll" style="margin-top:12px">
+        <svg id="diagram" width="1060" height="560" viewBox="0 0 1060 560" role="img" aria-label="Sequence diagram"></svg>
+      </div>
+      <div id="detail-card"><h3>Press Next →</h3><p>Step through the scenario to see each hop: the exact CLI command, the broker's state change, and the delivery transport used.</p></div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ PANE 3: Mapping ═══════════════ -->
+  <div class="pane" id="pane-mapping">
+    <div class="card">
+      <h2>Traycer concept → Overdeck primitive</h2>
+      <table>
+        <thead><tr><th>Traycer</th><th>Overdeck today</th><th>Proposal</th><th>Status</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><code>agent.sendMessage</code> RPC</td>
+            <td><code>pan tell</code> — operator→agent only; sender is always "the human"</td>
+            <td><code>pan msg send --to &lt;agent&gt; [--expect-reply]</code> + <code>POST /api/a2a/send</code>; sender identity from the <code>OVERDECK_AGENT_ID</code> env the launcher already exports</td>
+            <td><span class="chip new">NEW</span></td>
+          </tr>
+          <tr>
+            <td>RAM-only per-receiver inbox queues</td>
+            <td><code>deliverAgentMessage()</code> 3-tier push door (PTY supervisor → channels → tmux paste-buffer)</td>
+            <td>Reuse the door as-is; add a durable <code>agent_messages</code> table so queued messages survive a dashboard restart (Traycer loses theirs)</td>
+            <td><span class="chip exists">REUSE</span> <span class="chip new">+TABLE</span></td>
+          </tr>
+          <tr>
+            <td><code>traycer monitor</code> background process + stdout injection</td>
+            <td>PTY supervisor writes directly into the agent's PTY input and echoes to the transcript</td>
+            <td>Nothing. Traycer needs a monitor because they can't push into a TUI; we already can.</td>
+            <td><span class="chip skip">SKIP</span></td>
+          </tr>
+          <tr>
+            <td><code>expectReply</code> / <code>responseId</code> threads</td>
+            <td>—</td>
+            <td><code>a2a_threads</code> table: <code>(response_id, sender, receiver, state open|closed|stalled)</code>. Same semantics: id names the thread; one reply closes it</td>
+            <td><span class="chip new">NEW</span></td>
+          </tr>
+          <tr>
+            <td>Inactivity notices, 7 reasons; Stop hook is primary signal</td>
+            <td>Deacon patrols + tmux liveness oracle + pending-input (AUQ) pipeline + hooks infra</td>
+            <td>Broker sweep on the patrol cadence; new <code>pan agent turn-ended-from-hook</code> Stop-hook command for the accurate <code>turn-ended</code> signal; <code>awaiting-input</code> from the existing pending-input surface</td>
+            <td><span class="chip adapt">ADAPT</span></td>
+          </tr>
+          <tr>
+            <td><code>agent.list</code> with R/S capability tokens</td>
+            <td><code>pan status</code>, <code>agents</code> table, state.json</td>
+            <td><code>pan msg list</code> — live agents with a deliverability probe per transport (supervisor socket? FIFO? tmux-only?)</td>
+            <td><span class="chip adapt">ADAPT</span></td>
+          </tr>
+          <tr>
+            <td><code>agent.getTranscript</code> (XML flatten)</td>
+            <td>conv-lookup maps conversations → JSONL session files</td>
+            <td><code>pan msg transcript &lt;agent&gt;</code> — flatten the peer's JSONL to <code>&lt;user&gt;/&lt;assistant&gt;</code> blocks</td>
+            <td><span class="chip adapt">ADAPT</span></td>
+          </tr>
+          <tr>
+            <td><code>canParticipateInA2A</code> gate (GUI: all; TUI: claude only)</td>
+            <td>Per-harness delivery paths: supervisor (claude-code), rpc.in FIFO (pi), PTY socket (codex), tmux fallback (all)</td>
+            <td>Capability = live delivery-path probe. claude-code: full. codex: PTY socket (PAN-2580 caveat). pi: FIFO. anything: tmux fallback with paste reliability caveat</td>
+            <td><span class="chip adapt">ADAPT</span></td>
+          </tr>
+          <tr>
+            <td>Role claims + role-awareness broadcast</td>
+            <td>Static pipeline roles (plan / work / review / test), convoys, swarms</td>
+            <td>Defer — Overdeck's roles already encode responsibility; ephemeral claims matter only if free-form agent collectives appear</td>
+            <td><span class="chip defer">DEFER</span></td>
+          </tr>
+          <tr>
+            <td><code>agent.create</code> child agents</td>
+            <td><code>pan start</code> / <code>pan swarm</code> / <code>pan handoff</code></td>
+            <td>Exists — an agent that wants a peer spawns one through the normal pipeline entry points</td>
+            <td><span class="chip exists">EXISTS</span></td>
+          </tr>
+          <tr>
+            <td><code>agent.stop --cascade</code></td>
+            <td><code>pan kill</code> / <code>pan pause</code> with resume gates</td>
+            <td>Exists</td>
+            <td><span class="chip exists">EXISTS</span></td>
+          </tr>
+          <tr>
+            <td>Frozen schema versions + upgrade/downgrade bridges</td>
+            <td>Single-version contracts (<code>@overdeck/contracts</code>), all clients shipped from one repo</td>
+            <td>Skip bridges; keep the attitude — wire shape is a contract, receiver's version is authoritative</td>
+            <td><span class="chip skip">SKIP</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <h2>What lands where (if built)</h2>
+      <div class="grid2">
+        <div>
+          <p style="margin-top:0"><b>New code</b></p>
+          <ul style="margin:0; padding-left:20px; font-size:13.5px">
+            <li><code>src/dashboard/server/services/a2a-broker.ts</code> — mailbox, thread registry, stall sweep</li>
+            <li><code>agent_messages</code> + <code>a2a_threads</code> tables (rebuildable-cache DB, mirrored like other runtime state)</li>
+            <li><code>pan msg send|list|inbox|transcript</code> CLI verbs (+ <code>/pan-msg</code> skill per the skills convention)</li>
+            <li><code>pan agent turn-ended-from-hook</code> + Stop-hook entry in the agent-session settings the launcher writes</li>
+            <li>Message envelope formatter (<code>[overdeck:agent-message]</code>) — the Traycer format, our nouns</li>
+            <li>Dashboard Messages panel (threads, stalls, replay) fed by a domain event over <code>/ws/rpc</code></li>
+          </ul>
+        </div>
+        <div>
+          <p style="margin-top:0"><b>Touched, not new</b></p>
+          <ul style="margin:0; padding-left:20px; font-size:13.5px">
+            <li><code>deliverAgentMessage</code> — gains an <code>a2a</code> caller kind; transport logic unchanged</li>
+            <li>Deacon patrol — broker sweep registers as one more patrol tick consumer</li>
+            <li>Launcher — exports one extra env (<code>OVERDECK_A2A=1</code>) and the Stop hook</li>
+            <li>Role prompts (<code>roles/*.md</code>) — one section teaching agents the verbs and when to use them</li>
+          </ul>
+          <p><b>Explicitly not built</b></p>
+          <ul style="margin:0; padding-left:20px; font-size:13.5px">
+            <li>No background monitor processes (push model covers it)</li>
+            <li>No schema-version bridge machinery</li>
+            <li>No role-claim registry in v1</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ PANE 4: Agent surface ═══════════════ -->
+  <div class="pane" id="pane-surface">
+    <div class="card">
+      <h2>The verbs an agent learns</h2>
+      <div class="grid2">
+        <div>
+<pre><span class="c"># who can I talk to? (live agents + deliverability probe)</span>
+<span class="k">pan msg list</span>
+
+<span class="c"># ask a peer, want an answer (opens a thread)</span>
+<span class="k">pan msg send</span> --to agent-pan-3011-review \
+  --expect-reply \
+  --message <span class="s">"Does clearStuck still hold after the review-pipeline change?"</span>
+<span class="c"># → { "responseId": "thr_01JXYZ…" }</span>
+
+<span class="c"># fire-and-forget hand-off (no thread)</span>
+<span class="k">pan msg send</span> --to agent-pan-2988 \
+  --message <span class="s">"Heads up: I touched feedback-target.ts, rebase before you push"</span>
+
+<span class="c"># answer a thread (closes it)</span>
+<span class="k">pan msg send</span> --to agent-pan-3011 \
+  --response-id thr_01JXYZ… \
+  --message <span class="s">"Yes — it only touches review_status rows where …"</span></pre>
+        </div>
+        <div>
+<pre><span class="c"># recover a message that arrived truncated</span>
+<span class="k">pan msg inbox</span>
+
+<span class="c"># read a peer's transcript (flattened)</span>
+<span class="k">pan msg transcript</span> agent-pan-2988
+
+<span class="c"># Stop-hook (wired by the launcher, not typed by agents)</span>
+<span class="k">pan agent turn-ended-from-hook</span></pre>
+
+          <p style="font-size:13.5px">Discovery output marks each row's transport so the sender knows
+            <i>how</i> a message will land before it sends:</p>
+<pre>You        agent-pan-3011        work     [claude-code] supervisor
+Peer       agent-pan-3011-review review   [claude-code] supervisor
+Peer       conv-1042             conv     [codex]       pty-socket
+Peer       agent-min-846         work     [pi]          fifo
+Other      flywheel-orch…        flywheel [claude-code] supervisor</pre>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>The envelope the receiver sees</h2>
+      <p style="font-size:13.5px">Delivered through <code>deliverAgentMessage</code> (PTY supervisor first).
+        Same rule as Traycer: the prefix <i>teaches the protocol</i> so the receiving model never guesses.</p>
+<pre><span class="m">[overdeck:agent-message]</span> from work agent PAN-3011 (agent-pan-3011) [claude-code]
+<span class="m">[overdeck:agent-message]</span> A reply is expected. Reply with:
+  pan msg send --to agent-pan-3011 --response-id thr_01JXYZ --message "&lt;your reply&gt;"
+<span class="m">[overdeck:agent-message]</span> The response-id names this thread, not this single message —
+  follow-ups may arrive with the same id, and one reply with it answers them all.
+
+Does clearStuck still hold after the review-pipeline change? I'm seeing
+a row that …
+
+<span class="m">[overdeck:agent-message]</span> ─── end of message ───
+<span class="m">[overdeck:agent-message]</span> If this looks truncated, read it in full with: pan msg inbox</pre>
+
+      <p style="font-size:13.5px">And the stalled-receiver notice, when a thread goes quiet:</p>
+<pre><span class="m">[overdeck:a2a-notice]</span> kind=inactivity reason=turn-ended thread=thr_01JXYZ
+<span class="m">[overdeck:a2a-notice]</span> agent-pan-3011-review ended its turn without replying to your
+  message on thread thr_01JXYZ. Options: wait (it may be mid-work), nudge with
+  another pan msg send on the same thread, or escalate to the operator.</pre>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ─── Tabs ────────────────────────────────────────────────────────────────
+document.querySelectorAll('.tab').forEach(function (btn) {
+  btn.addEventListener('click', function () {
+    document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.pane').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('pane-' + btn.dataset.pane).classList.add('active');
+  });
+});
+
+// ─── Sequence diagram data ───────────────────────────────────────────────
+// Lifelines: 0 = Work agent, 1 = Broker (dashboard :3011), 2 = Review agent, 3 = Operator UI
+const LIFELINES = [
+  { x: 130, label: 'agent-pan-3011', sub: 'work · claude-code · tmux' },
+  { x: 420, label: 'a2a-broker', sub: 'dashboard server :3011' },
+  { x: 710, label: 'agent-pan-3011-review', sub: 'review · claude-code · tmux' },
+  { x: 960, label: 'operator', sub: 'dashboard Messages panel' },
+];
+
+const SCENARIOS = {
+  ask: [
+    { from: 0, to: 0, kind: 'self', title: 'Discovery (optional)',
+      body: 'The work agent checks who is reachable before composing. Not required — sending to an unknown id fails loudly with a typed error.',
+      code: 'pan msg list\n# Peer  agent-pan-3011-review  review  [claude-code] supervisor' },
+    { from: 0, to: 1, kind: 'rpc', title: 'Send with expect-reply',
+      body: 'The CLI reads OVERDECK_AGENT_ID from the agent’s own env (the launcher already exports it) — sender identity is ambient, never spoofable by prompt text. POSTs to the dashboard.',
+      code: 'pan msg send --to agent-pan-3011-review --expect-reply \\\n  --message "Does clearStuck still hold after the review-pipeline change?"\n\nPOST /api/a2a/send\n{ senderAgentId, receiverAgentId, expectReply: true, prompt }' },
+    { from: 1, to: 1, kind: 'self', title: 'Broker: persist + open thread',
+      body: 'The broker writes the envelope to agent_messages (durable — survives a dashboard restart, unlike Traycer’s RAM queues), mints a thread id, and probes the receiver’s delivery path: live tmux session? supervisor socket bound?',
+      code: 'INSERT INTO agent_messages …\nINSERT INTO a2a_threads (response_id=thr_01JXYZ, state=open)\ncapability = probeDeliveryPath(receiver)  // supervisor ✓' },
+    { from: 1, to: 2, kind: 'msg', title: 'Delivery via the existing door',
+      body: 'The broker wraps the body in the [overdeck:agent-message] envelope (sender label + exact reply command + thread id) and calls deliverAgentMessage — PTY supervisor socket first, channels second, tmux paste-buffer last. No new transport code.',
+      code: 'deliverAgentMessage(receiverId, envelope, caller="a2a-broker")\n// 1. pty-<id>.sock  2. channels MCP  3. tmux load-buffer + paste-buffer' },
+    { from: 1, to: 3, kind: 'ui', title: 'Operator visibility (same moment)',
+      body: 'A domain event over /ws/rpc updates the Messages panel: thread opened, envelope, delivery path taken. A2A traffic is operator-observable by default — Overdeck philosophy, and a difference from Traycer’s chat-tree-only visibility.',
+      code: 'emit DomainEvent { kind: "a2a.threadOpened", thread, envelope }' },
+    { from: 2, to: 1, kind: 'rpc', title: 'Peer replies on the thread',
+      body: 'The review agent’s turn: it reads the envelope, investigates, and replies with the response-id echoed. The broker closes the thread and routes the reply to the original sender through the same delivery door.',
+      code: 'pan msg send --to agent-pan-3011 \\\n  --response-id thr_01JXYZ \\\n  --message "Yes — it only touches review_status rows where …"\n\n→ UPDATE a2a_threads SET state=closed' },
+    { from: 1, to: 0, kind: 'msg', title: 'Reply delivered; loop complete',
+      body: 'The work agent receives the answer as an ordinary inbound message — marked as a thread reply so it knows the exchange is finished, no ack-of-ack needed.',
+      code: '[overdeck:agent-message] from review agent PAN-3011 (thread thr_01JXYZ — closed)\n\nYes — it only touches review_status rows where …' },
+    { from: 1, to: 3, kind: 'ui', title: 'Thread closed on the panel',
+      body: 'The panel shows the full exchange with timings: open → delivered → replied. Done. The whole loop used one new table family, one new verb family, and zero new transport.',
+      code: 'emit DomainEvent { kind: "a2a.threadClosed", responseId: "thr_01JXYZ" }' },
+  ],
+  stall: [
+    { from: 0, to: 1, kind: 'rpc', title: 'Same open as Scenario A',
+      body: 'Work agent sends with --expect-reply; broker persists, mints thread thr_02ABCD, probes the receiver.',
+      code: 'pan msg send --to agent-pan-3011-review --expect-reply --message "…"' },
+    { from: 1, to: 2, kind: 'msg', title: 'Delivered to the review agent',
+      body: 'Envelope lands in the receiver’s PTY via the supervisor. Thread stays open, waiting.',
+      code: 'deliverAgentMessage(receiverId, envelope, caller="a2a-broker")' },
+    { from: 2, to: 2, kind: 'self', title: 'Receiver’s turn ends — no reply',
+      body: 'The review agent finishes its turn (answered something else, hit an error, or just moved on) without sending on the thread. Claude Code’s Stop hook fires — the launcher installed it when the session spawned.',
+      code: '# .claude/settings.json Stop hook (launcher-written):\npan agent turn-ended-from-hook' },
+    { from: 2, to: 1, kind: 'rpc', title: 'Hook reports turn-ended',
+      body: 'The hook command POSTs the edge to the broker. This is the accurate primary signal — same role as Traycer’s agent.tui.turnEnded. The broker marks every open thread where this agent is the receiver.',
+      code: 'POST /api/a2a/turn-ended { agentId }\n→ a2a_threads: open → stalled (reason=turn-ended)' },
+    { from: 1, to: 0, kind: 'notice', title: 'Stalled-receiver notice to the sender',
+      body: 'The broker’s sweep (one more consumer of the deacon patrol cadence) pushes a typed notice to the original sender through the delivery door. The sender decides: wait, nudge the thread, or escalate to the operator. The notice names the reason so the sender knows how much to trust it.',
+      code: '[overdeck:a2a-notice] kind=inactivity reason=turn-ended thread=thr_02ABCD' },
+    { from: 1, to: 3, kind: 'ui', title: 'Stall visible to the operator',
+      body: 'The thread renders amber on the Messages panel with its stall reason. The operator can reply on the agent’s behalf, cancel the thread (receiver-cancelled semantics), or let the agents sort it out.',
+      code: 'emit DomainEvent { kind: "a2a.threadStalled", reason: "turn-ended" }' },
+    { from: 0, to: 1, kind: 'rpc', title: 'Sender nudges on the same thread',
+      body: 'A nudge with the same response-id keeps one thread of record — the receiver’s next reply with that id closes everything, however many messages accumulated.',
+      code: 'pan msg send --to agent-pan-3011-review \\\n  --response-id thr_02ABCD --message "gentle nudge — still need this"' },
+    { from: 1, to: 2, kind: 'msg', title: 'Nudge delivered; thread heals on reply',
+      body: 'Receiver answers, thread closes, sender and operator both see resolution. The stall record stays in the table as history — useful signal for tuning when agents should vs shouldn’t expect replies.',
+      code: '→ UPDATE a2a_threads SET state=closed, stall_reason kept for history' },
+  ],
+};
+
+// ─── Diagram rendering ───────────────────────────────────────────────────
+const svg = document.getElementById('diagram');
+const SVGNS = 'http://www.w3.org/2000/svg';
+let scenario = 'ask';
+let step = 0; // 0 = nothing shown; 1..N = steps shown
+let playTimer = null;
+
+function el(name, attrs) {
+  const n = document.createElementNS(SVGNS, name);
+  for (const k in attrs) n.setAttribute(k, attrs[k]);
+  return n;
+}
+
+function render() {
+  while (svg.firstChild) svg.removeChild(svg.firstChild);
+
+  // arrowhead marker
+  const defs = el('defs', {});
+  const marker = el('marker', { id: 'arrowhead', markerWidth: 8, markerHeight: 8, refX: 7, refY: 4, orient: 'auto' });
+  marker.appendChild(el('path', { d: 'M0,0 L8,4 L0,8 z', fill: '#8b949e' }));
+  defs.appendChild(marker);
+  svg.appendChild(defs);
+
+  const top = 44, bottom = 520;
+  const steps = SCENARIOS[scenario];
+  const stepH = Math.min(56, (bottom - top - 20) / steps.length);
+
+  // lifelines
+  LIFELINES.forEach(l => {
+    svg.appendChild(el('line', { x1: l.x, y1: top + 18, x2: l.x, y2: bottom, stroke: '#2d333f', 'stroke-width': 2, 'stroke-dasharray': '4 4' }));
+    const box = el('rect', { x: l.x - 100, y: 4, width: 200, height: 34, rx: 6, fill: '#1c2330', stroke: '#2d333f' });
+    svg.appendChild(box);
+    const t = el('text', { x: l.x, y: 18, 'text-anchor': 'middle', class: 'lifeline-label' });
+    t.textContent = l.label;
+    svg.appendChild(t);
+    const s = el('text', { x: l.x, y: 32, 'text-anchor': 'middle', class: 'lifeline-sub' });
+    s.textContent = l.sub;
+    svg.appendChild(s);
+  });
+
+  steps.forEach((st, i) => {
+    const lit = i < step;
+    const g = el('g', { class: lit ? 'step-lit' : 'step-dim' });
+    const y = top + 34 + i * stepH;
+    const fromX = LIFELINES[st.from].x, toX = LIFELINES[st.to].x;
+
+    const num = el('text', { x: 18, y: y + 4, class: 'arrow-label', fill: lit ? '#f0a93c' : '#8b949e' });
+    num.textContent = String(i + 1);
+    g.appendChild(num);
+
+    if (st.from === st.to) {
+      // self-loop
+      const w = 52;
+      g.appendChild(el('path', {
+        d: `M ${fromX} ${y} C ${fromX + w} ${y - 14}, ${fromX + w} ${y + 18}, ${fromX + 4} ${y + 10}`,
+        class: 'arrow-line self', 'marker-end': 'url(#arrowhead)',
+      }));
+      const lbl = el('text', { x: fromX + w + 10, y: y + 4, class: 'arrow-label' });
+      lbl.textContent = st.title;
+      g.appendChild(lbl);
+    } else {
+      const yMid = y;
+      g.appendChild(el('line', { x1: fromX, y1: yMid, x2: toX + (toX > fromX ? -8 : 8), y2: yMid, class: 'arrow-line ' + st.kind }));
+      const lbl = el('text', { x: (fromX + toX) / 2, y: yMid - 7, 'text-anchor': 'middle', class: 'arrow-label' });
+      lbl.textContent = st.title;
+      g.appendChild(lbl);
+    }
+    svg.appendChild(g);
+  });
+
+  // detail card
+  const card = document.getElementById('detail-card');
+  if (step === 0) {
+    card.innerHTML = '<h3>Press Next →</h3><p>Step through the scenario to see each hop: the exact CLI command, the broker’s state change, and the delivery transport used.</p>';
+  } else {
+    const st = steps[step - 1];
+    card.innerHTML = '<h3>Step ' + step + ' — ' + escapeHtml(st.title) + '</h3><p>' + escapeHtml(st.body) + '</p>' +
+      (st.code ? '<pre>' + escapeHtml(st.code) + '</pre>' : '');
+  }
+  document.getElementById('step-counter').textContent = step + ' / ' + steps.length;
+  document.getElementById('btn-prev').disabled = step === 0;
+  document.getElementById('btn-next').disabled = step === steps.length;
+}
+
+function escapeHtml(s) {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function setStep(n) {
+  step = Math.max(0, Math.min(SCENARIOS[scenario].length, n));
+  render();
+}
+
+document.getElementById('btn-next').addEventListener('click', () => setStep(step + 1));
+document.getElementById('btn-prev').addEventListener('click', () => setStep(step - 1));
+document.getElementById('btn-reset').addEventListener('click', () => { stopPlay(); setStep(0); });
+document.getElementById('btn-play').addEventListener('click', function () {
+  if (playTimer) { stopPlay(); return; }
+  if (step >= SCENARIOS[scenario].length) setStep(0);
+  this.textContent = '⏸ Pause';
+  playTimer = setInterval(() => {
+    if (step >= SCENARIOS[scenario].length) { stopPlay(); return; }
+    setStep(step + 1);
+  }, 1400);
+});
+function stopPlay() {
+  if (playTimer) { clearInterval(playTimer); playTimer = null; }
+  document.getElementById('btn-play').textContent = '▶ Play';
+}
+
+document.querySelectorAll('.scenario-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.scenario-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    stopPlay();
+    scenario = btn.dataset.scenario;
+    setStep(0);
+  });
+});
+
+render();
+</script>
+</body>
+</html>
