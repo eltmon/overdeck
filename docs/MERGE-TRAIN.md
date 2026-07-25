@@ -78,6 +78,27 @@ Frontend (4 toggle placements + flag UI + viz):
 
 Tests: `tests/unit/lib/flywheel-merge-order.test.ts`, `tests/unit/lib/cloister/{in-flight-guard,merge-train,merge-train-reconciler,merge-batch,auto-merge-policy}.test.ts`, `src/dashboard/server/routes/__tests__/flywheel.test.ts`, `tests/unit/lib/database/review-status-db.test.ts`, `src/lib/cloister/__tests__/auto-merge-eligibility.test.ts`.
 
+## Per-repo merge completeness gate
+
+A polyrepo issue can reach the issue-level `merged` state only after every required
+repository is either merged or proven change-free. The gate runs in two places:
+
+- The coordinated merge pre-flight calls `reconcileStrandedRepos()` before it builds
+  the active repository list.
+- `verifyMergedBeforeLifecycle()` checks the complete merge set after the tracker
+  repository's PR reports merged, before post-merge cleanup can start.
+
+For each required repository, Overdeck fetches the configured source and target
+branches in the primary checkout and counts commits in
+`origin/<target>..origin/<source>`. A missing source branch or a count of zero is
+change-free. A positive count requires a merged PR or MR for that source branch;
+this artifact evidence makes the check safe for squash merges, where the source
+commit is not an ancestor of the target branch.
+
+Git or forge errors produce `unverifiable`, which fails closed and blocks the merge.
+This prevents a repeat of MIN-857, where the frontend merge marked the issue done
+while two UAT-critical API commits remained on an artifact-less sibling branch.
+
 ## 5. REMAINING WORK (the plan)
 
 > **Status (2026-06-09):** 5a, 5b, 5c are **DONE, committed, pushed, built, reloaded, and visually verified**. Only **5d** remains, and it is blocked on a *live* merge an operator must trigger — it cannot be synthesized.

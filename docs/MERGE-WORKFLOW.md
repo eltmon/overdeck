@@ -125,6 +125,27 @@ of "the oracles disagree" bugs (notably PAN-1024 in May 2026).
 For non-GitHub projects (Linear with no GitHub remote), `verifyMerged` returns
 uncertain and the operator confirms manually.
 
+## Polyrepo completeness blocker
+
+`unmerged_sibling_repo` means a required sibling repository still has commits on
+its feature branch but no merged review artifact proves those commits landed. The
+issue remains unmerged even when the tracker repository's PR is already merged,
+so a partial multi-repo feature cannot enter post-merge cleanup.
+
+The blocker appears on the dashboard merge-blockers surface and in:
+
+```bash
+pan flywheel merge-blockers
+```
+
+The blocker summary names the repository, source branch, target branch, and ahead
+count. Recover by creating and merging the missing PR or MR in that repository,
+then retry the merge so Overdeck rediscovers the artifact. If the configured
+repository is intentionally read-only and should never participate in issue
+merges, set `readonly: true` on that entry under `workspace.repos` in
+`projects.yaml`; do not mark a writable code repository read-only to bypass a real
+stranded branch.
+
 ## Stash Discipline
 
 The merge workflow does not create stashes. Agents never run `git stash`.
