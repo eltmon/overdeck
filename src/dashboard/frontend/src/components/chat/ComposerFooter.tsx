@@ -445,7 +445,10 @@ export function ComposerFooter({
       .map((attachment) => `@${attachment.serverPath}`)
       .join('\n');
     const composedMessage = [attachmentPrefix, messageText].filter(Boolean).join('\n');
-    const isPortableCommand = /^\/pan(?:\s|$)/i.test(composedMessage);
+    const isPortableCommand = /^\/pan(?:\s|$)/i.test(messageText);
+    // Attachments belong to the prompt lane. Portable commands stay in the
+    // control-plane lane and leave any uploaded attachments pending.
+    const submissionMessage = isPortableCommand ? messageText : composedMessage;
     try {
       // DISABLED 2026-06-16: a plain message-send must NEVER switch the model.
       // This auto-switch silently killed a running agent's live session (the Opus
@@ -470,7 +473,7 @@ export function ComposerFooter({
 
       const commandResult = await sendConversationMessage(
         submitConversationName,
-        composedMessage,
+        submissionMessage,
         agentId,
         piConversation && deliverAs !== 'auto' ? deliverAs : undefined,
       );
@@ -481,9 +484,9 @@ export function ComposerFooter({
           commandResult.args.focus || undefined,
         );
       } else if (commandResult) {
-        addCommandResult(submitConversationName, composedMessage, commandResult);
+        addCommandResult(submitConversationName, submissionMessage, commandResult);
       } else {
-        onSendAcknowledged?.(composedMessage);
+        onSendAcknowledged?.(submissionMessage);
       }
 
       // The send consumed this conversation's attachments — revoke their previews and
@@ -491,7 +494,9 @@ export function ComposerFooter({
       // right conversation is cleared even if the user switched while the send
       // was in flight. The sent message references the server uploads by @path,
       // so consumeAttachments does NOT delete them server-side.
-      consumeAttachmentsForConversation(submitConversationName);
+      if (!isPortableCommand) {
+        consumeAttachmentsForConversation(submitConversationName);
+      }
 
       // Only clear the editor if still on the same conversation, to avoid wiping
       // the new conversation's draft if the user switched while the send was in
@@ -505,7 +510,7 @@ export function ComposerFooter({
     } catch (err) {
       console.error('[ComposerFooter] Failed to send:', err);
       toast.error(err instanceof Error ? err.message : 'Failed to send message');
-      onSendFailed?.(composedMessage, isPortableCommand ? 'command' : 'prompt');
+      onSendFailed?.(submissionMessage, isPortableCommand ? 'command' : 'prompt');
     } finally {
       // Clear the originating conversation's sending state regardless of which
       // conversation is now mounted — the send belonged to submitConversationName.

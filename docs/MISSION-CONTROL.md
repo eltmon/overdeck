@@ -206,7 +206,7 @@ Unprefixed text such as `pan start PAN-1987` remains an ordinary prompt. This pr
 Overdeck commands return one of four result forms:
 
 - **Captured** commands finish during the request and render their completed or failed status plus bounded, monospace output. A truncation notice appears when output exceeds the server limit.
-- **Detached** commands start background work and return immediately with an accepted message and an activity ID that can be followed in Mission Control.
+- **Detached** commands register an activity before starting background work, return immediately with its accepted activity ID, and update that same Mission Control entry to running, completed, or failed with bounded output.
 - **UI** commands open an existing dashboard dialog, such as the handoff or fork dialog, rather than adding command text to the agent transcript.
 - **Terminal-only** commands are recognized but rejected in the composer with an actionable instruction to run them in a terminal.
 

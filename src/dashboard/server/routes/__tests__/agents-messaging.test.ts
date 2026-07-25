@@ -67,6 +67,52 @@ describe('agent message composer routing', () => {
     expect(agentMocks.messageAgent).not.toHaveBeenCalled();
   });
 
+  it('returns 404 without executing a command when the agent target is missing', async () => {
+    agentMocks.getAgentState.mockReturnValue(Effect.succeed(null));
+
+    const response = await handleAgentMessage('missing-agent', '/pan status');
+
+    expect(response.status).toBe(404);
+    expect(decodeJsonResponse(response)).toEqual({
+      error: 'Agent not found: missing-agent',
+      code: 'agent-not-found',
+    });
+    expect(agentMocks.runCapturedCommand).not.toHaveBeenCalled();
+    expect(agentMocks.messageAgent).not.toHaveBeenCalled();
+  });
+
+  it('returns 503 without executing a command when agent resolution fails', async () => {
+    agentMocks.getAgentState.mockReturnValue(Effect.fail(new Error('registry unavailable')));
+
+    const response = await handleAgentMessage('agent-pan-42', '/pan status');
+
+    expect(response.status).toBe(503);
+    expect(decodeJsonResponse(response)).toEqual({
+      error: 'Failed to resolve agent target: agent-pan-42',
+      code: 'agent-resolution-failed',
+    });
+    expect(agentMocks.runCapturedCommand).not.toHaveBeenCalled();
+    expect(agentMocks.messageAgent).not.toHaveBeenCalled();
+  });
+
+  it('returns 503 without executing a command when the agent harness is unresolved', async () => {
+    agentMocks.getAgentState.mockReturnValue(Effect.succeed({
+      id: 'agent-pan-42',
+      issueId: 'PAN-42',
+      workspace: '/tmp/pan-42',
+    }));
+
+    const response = await handleAgentMessage('agent-pan-42', '/pan status');
+
+    expect(response.status).toBe(503);
+    expect(decodeJsonResponse(response)).toEqual({
+      error: 'Agent harness could not be resolved: agent-pan-42',
+      code: 'agent-harness-unresolved',
+    });
+    expect(agentMocks.runCapturedCommand).not.toHaveBeenCalled();
+    expect(agentMocks.messageAgent).not.toHaveBeenCalled();
+  });
+
   it('preserves ordinary agent message delivery', async () => {
     const response = await handleAgentMessage('agent-pan-42', 'please continue');
 

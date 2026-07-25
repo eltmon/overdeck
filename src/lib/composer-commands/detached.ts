@@ -1,11 +1,13 @@
 import type { ChildProcess } from 'node:child_process';
-import { appendFile, mkdir, open, readFile } from 'node:fs/promises';
+import { appendFile, mkdir, open } from 'node:fs/promises';
 import { isAbsolute, join, resolve } from 'node:path';
 
 import type { ComposerCommandResult } from '@overdeck/contracts';
+import { emitActivityEntryDurable, type EmitActivityOptions } from '../activity-logger.js';
 import { parseIssueIdSync } from '../issue-id.js';
 import { spawnPanCli } from '../pan-cli-invocation.js';
 import { getOverdeckHome } from '../paths.js';
+import { CAPTURED_COMMAND_MAX_OUTPUT_BYTES } from './executors.js';
 
 export interface DetachedPanCommandInput {
   agentSessionName: string;
@@ -14,10 +16,13 @@ export interface DetachedPanCommandInput {
   workspacePath: string;
   args: string[];
   cwd?: string;
+  activityId?: string;
 }
 
 export interface DetachedPanCommandLaunch {
   activityId: string;
+  spawnLogPath: string;
+  spawnLogStart: number;
   completion: Promise<void>;
 }
 
@@ -25,7 +30,10 @@ export interface DetachedPanCommandDependencies {
   now?: () => number;
   overdeckHome?: string;
   spawnPanCli?: typeof spawnPanCli;
+  emitActivity?: (options: EmitActivityOptions) => Promise<void>;
 }
+
+const DETACHED_TRUNCATION_MESSAGE = '\n\nOutput was truncated after 65,536 bytes.';
 
 function resolveAgentDirectory(overdeckHome: string, agentId: string): string {
   if (
@@ -39,6 +47,25 @@ function resolveAgentDirectory(overdeckHome: string, agentId: string): string {
     throw new Error('Agent ID must be a single filesystem-safe path segment.');
   }
   return join(resolve(overdeckHome, 'agents'), agentId);
+}
+
+async function readBoundedSpawnOutput(spawnLogPath: string, startOffset: number): Promise<string> {
+  const maximumPrefixBytes = CAPTURED_COMMAND_MAX_OUTPUT_BYTES - Buffer.byteLength(DETACHED_TRUNCATION_MESSAGE);
+  const handle = await open(spawnLogPath, 'r');
+  try {
+    const stats = await handle.stat();
+    const outputBytes = Math.max(0, stats.size - startOffset);
+    if (outputBytes === 0) return '';
+    const bytesToRead = Math.min(outputBytes, maximumPrefixBytes);
+    const buffer = Buffer.alloc(bytesToRead);
+    const { bytesRead } = await handle.read(buffer, 0, bytesToRead, startOffset);
+    const output = buffer.subarray(0, bytesRead).toString('utf8');
+    return outputBytes > maximumPrefixBytes
+      ? `${output}${DETACHED_TRUNCATION_MESSAGE}`
+      : output;
+  } finally {
+    await handle.close().catch(() => undefined);
+  }
 }
 
 export async function appendAgentLifecycleLog(
@@ -64,11 +91,12 @@ export async function launchPanCommandDetached(
   const { agentSessionName, issueId, role, workspacePath, args } = input;
   const cwd = input.cwd ?? workspacePath;
   const overdeckHome = dependencies.overdeckHome ?? getOverdeckHome();
-  const activityId = `activity-${(dependencies.now ?? Date.now)()}`;
+  const activityId = input.activityId ?? `activity-${(dependencies.now ?? Date.now)()}`;
   const agentDir = resolveAgentDirectory(overdeckHome, agentSessionName);
   await mkdir(agentDir, { recursive: true });
   const spawnLogPath = join(agentDir, 'spawn.log');
   const spawnLogHandle = await open(spawnLogPath, 'a');
+  const spawnLogStart = (await spawnLogHandle.stat()).size;
   const spawnCommand = dependencies.spawnPanCli ?? spawnPanCli;
   const child = spawnCommand(args, {
     cwd,
@@ -92,6 +120,7 @@ export async function launchPanCommandDetached(
     args,
     cwd,
     spawnLogPath,
+    spawnLogStart,
     spawnLogHandle,
     overdeckHome,
     onSpawn: () => {
@@ -106,7 +135,7 @@ export async function launchPanCommandDetached(
 
   await spawnPromise;
   child.unref();
-  return { activityId, completion };
+  return { activityId, spawnLogPath, spawnLogStart, completion };
 }
 
 interface CompletionContext {
@@ -118,6 +147,7 @@ interface CompletionContext {
   args: string[];
   cwd: string;
   spawnLogPath: string;
+  spawnLogStart: number;
   spawnLogHandle: Awaited<ReturnType<typeof open>>;
   overdeckHome: string;
   onSpawn(): void;
@@ -184,7 +214,7 @@ function commandCompletion(child: ChildProcess, context: CompletionContext): Pro
           await finish();
           return;
         }
-        const output = await readFile(context.spawnLogPath, 'utf8').catch(() => '');
+        const output = await readBoundedSpawnOutput(context.spawnLogPath, context.spawnLogStart).catch(() => '');
         const error = new Error(output.trim() || `pan ${context.args.join(' ')} exited with code ${code ?? 'null'}`);
         Object.assign(error, {
           activityId: context.activityId,
@@ -214,16 +244,79 @@ export async function runDetachedCommand(
   }
   const role = argv[0] === 'plan' ? 'plan' : 'work';
   const agentSessionName = `${role === 'plan' ? 'planning' : 'agent'}-${parsedIssueId.normalized}`;
-  const launch = await launchPanCommandDetached({
-    agentSessionName,
-    issueId,
-    role,
-    workspacePath: process.cwd(),
-    args: argv,
-  }, dependencies);
-  void launch.completion.catch(() => undefined);
-
   const command = `/pan ${argv.join(' ')}`;
+  const activityId = `activity-${(dependencies.now ?? Date.now)()}`;
+  const emitActivity = dependencies.emitActivity ?? emitActivityEntryDurable;
+  const source = role === 'plan' ? 'planning-agent' : 'work-agent';
+  const emitTransition = (
+    status: 'accepted' | 'running' | 'completed' | 'failed',
+    level: 'info' | 'success' | 'error',
+    message: string,
+    output?: string,
+  ) => emitActivity({
+    id: activityId,
+    source,
+    level,
+    status,
+    command,
+    message,
+    details: output,
+    output,
+    issueId,
+  });
+
+  await emitTransition(
+    'accepted',
+    'info',
+    `Accepted ${command} for ${issueId} as activity ${activityId}.`,
+  );
+
+  let launch: DetachedPanCommandLaunch;
+  try {
+    launch = await launchPanCommandDetached({
+      agentSessionName,
+      issueId,
+      role,
+      workspacePath: process.cwd(),
+      args: argv,
+      activityId,
+    }, dependencies);
+  } catch (error) {
+    const output = error instanceof Error ? error.message : String(error);
+    await emitTransition(
+      'failed',
+      'error',
+      `Activity ${activityId} failed to start ${command} for ${issueId}.`,
+      output,
+    ).catch(() => undefined);
+    throw error;
+  }
+
+  await emitTransition(
+    'running',
+    'info',
+    `Activity ${activityId} is running ${command} for ${issueId}.`,
+  ).catch(() => undefined);
+
+  void launch.completion.then(async () => {
+    const output = await readBoundedSpawnOutput(launch.spawnLogPath, launch.spawnLogStart).catch(() => '');
+    await emitTransition(
+      'completed',
+      'success',
+      `Activity ${activityId} completed ${command} for ${issueId}.`,
+      output || `Command ${command} completed without output.`,
+    );
+  }, async error => {
+    const activityError = error as Error & { output?: string };
+    const output = activityError.output?.trim() || activityError.message;
+    await emitTransition(
+      'failed',
+      'error',
+      `Activity ${activityId} failed ${command} for ${issueId}.`,
+      output,
+    );
+  }).catch(() => undefined);
+
   return {
     kind: 'activity',
     status: 'accepted',

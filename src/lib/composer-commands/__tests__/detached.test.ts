@@ -1,14 +1,16 @@
 import type { ChildProcess } from 'node:child_process';
 import { EventEmitter } from 'node:events';
-import { access, mkdtemp, readFile, rm } from 'node:fs/promises';
+import { access, appendFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { spawnPanCommandDetached } from '../../../dashboard/server/routes/agents/shared.js';
+import type { EmitActivityOptions } from '../../activity-logger.js';
 import {
   launchPanCommandDetached,
   runDetachedCommand,
 } from '../detached.js';
+import { CAPTURED_COMMAND_MAX_OUTPUT_BYTES } from '../executors.js';
 
 function createChild() {
   const child = new EventEmitter() as ChildProcess;
@@ -36,13 +38,15 @@ describe('detached composer command execution', () => {
     await rm(overdeckHome, { recursive: true, force: true });
   });
 
-  it('returns an accepted tracked activity after the detached child spawns', async () => {
+  it('returns an accepted tracked activity and records its completed transition', async () => {
     const child = createChild();
     const spawnPanCli = vi.fn(() => child);
+    const emitActivity = vi.fn(async (_entry: EmitActivityOptions) => undefined);
     const resultPromise = runDetachedCommand(['start', 'PAN-42'], {
       now: () => 1234,
       overdeckHome,
       spawnPanCli,
+      emitActivity,
     });
 
     await emitSpawnWhenReady(spawnPanCli, child);
@@ -62,21 +66,71 @@ describe('detached composer command execution', () => {
     expect(spawnPanCli.mock.calls[0][0]).not.toContain('--harness');
 
     child.emit('close', 0, null);
+    await vi.waitFor(() => expect(emitActivity).toHaveBeenLastCalledWith(expect.objectContaining({
+      id: 'activity-1234',
+      status: 'completed',
+      command: '/pan start PAN-42',
+      issueId: 'PAN-42',
+    })));
+    expect(emitActivity.mock.calls.map(([entry]) => entry.status)).toEqual([
+      'accepted',
+      'running',
+      'completed',
+    ]);
   });
 
   it('forwards plan argv without injecting provider-routing flags', async () => {
     const child = createChild();
     const spawnPanCli = vi.fn(() => child);
+    const emitActivity = vi.fn(async (_entry: EmitActivityOptions) => undefined);
     const resultPromise = runDetachedCommand(['plan', 'PAN-42', '--auto'], {
       now: () => 5678,
       overdeckHome,
       spawnPanCli,
+      emitActivity,
     });
 
     await emitSpawnWhenReady(spawnPanCli, child);
     await resultPromise;
     expect(spawnPanCli.mock.calls[0][0]).toEqual(['plan', 'PAN-42', '--auto']);
     child.emit('close', 0, null);
+  });
+
+  it('records a visible failed transition with bounded output from only this launch', async () => {
+    const child = createChild();
+    const spawnPanCli = vi.fn(() => child);
+    const emitActivity = vi.fn(async (_entry: EmitActivityOptions) => undefined);
+    const spawnLogPath = join(overdeckHome, 'agents', 'agent-pan-42', 'spawn.log');
+    await mkdir(join(overdeckHome, 'agents', 'agent-pan-42'), { recursive: true });
+    await writeFile(spawnLogPath, 'historical output must not leak\n');
+    const resultPromise = runDetachedCommand(['start', 'PAN-42'], {
+      now: () => 6789,
+      overdeckHome,
+      spawnPanCli,
+      emitActivity,
+    });
+
+    await emitSpawnWhenReady(spawnPanCli, child);
+    await resultPromise;
+    await appendFile(spawnLogPath, Buffer.alloc(CAPTURED_COMMAND_MAX_OUTPUT_BYTES + 1_024, 'x'));
+    child.emit('close', 2, null);
+
+    await vi.waitFor(() => expect(emitActivity).toHaveBeenLastCalledWith(expect.objectContaining({
+      id: 'activity-6789',
+      level: 'error',
+      status: 'failed',
+      command: '/pan start PAN-42',
+      issueId: 'PAN-42',
+    })));
+    const failedActivity = emitActivity.mock.lastCall?.[0];
+    expect(Buffer.byteLength(failedActivity?.output ?? '')).toBeLessThanOrEqual(CAPTURED_COMMAND_MAX_OUTPUT_BYTES);
+    expect(failedActivity?.output).not.toContain('historical output');
+    expect(failedActivity?.output).toContain('Output was truncated');
+    expect(emitActivity.mock.calls.map(([entry]) => entry.status)).toEqual([
+      'accepted',
+      'running',
+      'failed',
+    ]);
   });
 
   it.each([

@@ -21,8 +21,11 @@ export interface ActivityEntry {
   timestamp: string;
   source: string;
   level: 'info' | 'warn' | 'error' | 'success';
+  status?: 'accepted' | 'running' | 'completed' | 'failed';
+  command?: string | null;
   message: string;
   details?: string | null;
+  output?: string | null;
   issueId?: string | null;
   category?: string | null;
   triggeringEvent?: string | null;
