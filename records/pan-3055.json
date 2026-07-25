@@ -2,7 +2,7 @@
   "issueId": "PAN-3055",
   "schemaVersion": 2,
   "created": "2026-07-25T11:59:26.466Z",
-  "updated": "2026-07-25T11:59:26.466Z",
+  "updated": "2026-07-25T11:59:27.225Z",
   "pipeline": {
     "issueId": "PAN-3055",
     "reviewStatus": "pending",
@@ -25,5 +25,7 @@
       "note": "Planning session started for PAN-3055: A pending AskUserQuestion outlives its agent: PAN-1865's 4-week-old question re-emits (with TTS) on every boot and cannot be answered — no pane exists",
       "timestamp": "2026-07-25T11:59:26.465Z"
     }
-  ]
+  ],
+  "harness": "claude-code",
+  "model": "claude-fable-5"
 }
