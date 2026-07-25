@@ -355,18 +355,18 @@
     "recordedAt": "2026-07-25T22:13:33.131Z"
   },
   "created": "2026-07-25T20:44:21.373Z",
-  "updated": "2026-07-25T23:03:50.008Z",
+  "updated": "2026-07-25T23:03:53.834Z",
   "pipeline": {
     "issueId": "PAN-3037",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-25T22:20:18.803Z",
-    "updatedAt": "2026-07-25T23:03:49.514Z",
+    "updatedAt": "2026-07-25T23:03:50.454Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
     "verificationNotes": "Pre-review verification already covered the reviewed commit",
@@ -472,7 +472,7 @@
       },
       "costAtCloseOut": {
         "usd": 185.894665,
-        "pricingAsOf": "2026-07-25T23:03:49.690Z"
+        "pricingAsOf": "2026-07-25T23:03:53.766Z"
       }
     },
     "merges": [
