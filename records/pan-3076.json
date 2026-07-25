@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-25T21:12:36.630Z",
-  "updated": "2026-07-25T22:07:17.260Z",
+  "updated": "2026-07-25T22:11:20.731Z",
   "pipeline": {
     "issueId": "PAN-3076",
     "reviewStatus": "pending",
@@ -75,16 +75,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 19,
-    "claims": {
-      "crash-fingerprint-and-scan-test": {
-        "writerId": "agent-pan-3076",
-        "agentId": "agent-pan-3076",
-        "pid": 3237584,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-25T22:07:17.260Z"
-      }
-    },
+    "sequence": 20,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3076",
@@ -184,6 +176,17 @@
         "outcome": "completed",
         "reason": "Narrowed reviewedAtCommit and lastVerifiedCommit writes to HeadAnchor, rehydrated persisted values at restore boundaries, and updated all broad write-door callers.",
         "releasedAt": "2026-07-25T22:07:06.566Z"
+      },
+      {
+        "writerId": "agent-pan-3076",
+        "agentId": "agent-pan-3076",
+        "pid": 3237584,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-25T22:07:17.260Z",
+        "itemId": "crash-fingerprint-and-scan-test",
+        "outcome": "completed",
+        "reason": "Made crash progress fingerprints polyrepo-aware and added an AST-based allowlist test for all review and role anchor writes, including a failing self-check fixture.",
+        "releasedAt": "2026-07-25T22:11:20.730Z"
       }
     ],
     "statusReasons": {
@@ -222,6 +225,10 @@
       "review-status-write-door-brand": {
         "reason": "Narrowed reviewedAtCommit and lastVerifiedCommit writes to HeadAnchor, rehydrated persisted values at restore boundaries, and updated all broad write-door callers.",
         "updatedAt": "2026-07-25T22:07:06.566Z"
+      },
+      "crash-fingerprint-and-scan-test": {
+        "reason": "Made crash progress fingerprints polyrepo-aware and added an AST-based allowlist test for all review and role anchor writes, including a failing self-check fixture.",
+        "updatedAt": "2026-07-25T22:11:20.730Z"
       }
     }
   },
@@ -260,6 +267,9 @@
     "review-status-write-door-brand.review-status-write-door-brand.ac1": "completed",
     "review-status-write-door-brand.review-status-write-door-brand.ac2": "completed",
     "review-status-write-door-brand.review-status-write-door-brand.ac3": "completed",
-    "crash-fingerprint-and-scan-test": "running"
+    "crash-fingerprint-and-scan-test": "completed",
+    "crash-fingerprint-and-scan-test.crash-fingerprint-and-scan-test.ac1": "completed",
+    "crash-fingerprint-and-scan-test.crash-fingerprint-and-scan-test.ac2": "completed",
+    "crash-fingerprint-and-scan-test.crash-fingerprint-and-scan-test.ac3": "completed"
   }
 }
