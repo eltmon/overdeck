@@ -17,6 +17,7 @@ import { listRunningAgents, type AgentState } from '../../../lib/agents.js'
 import { computeAgentEnrichment, getAgentJsonlMtime, type AgentEnrichment, type PendingInputsScan } from '../../../lib/agent-enrichment.js'
 import { getReviewStatusSync } from '../../../lib/review-status.js'
 import { withConcurrencyLimit } from '../../../lib/concurrency.js'
+import { getRuntimeCensus, type RuntimeCensus } from '../../../lib/runtime-census.js'
 import { getEventStore } from '../event-store.js'
 import { saveAgentStateAndEmitEvent } from './agent-projection.js'
 import { emitActivityEntrySync, emitActivityTtsSync } from '../../../lib/activity-logger.js'
@@ -102,9 +103,23 @@ export function buildAwaitingInputActivityMessage(
     : `${agentId} is waiting for ${kindList}`
 }
 
+// PAN-3055 — no census evidence means no liveness claims: the listRunningAgents
+// fail-open would mark every stopped agent tmuxActive at boot and resurrect dead questions with TTS.
+export function shouldSkipEnrichmentCycle(census: Pick<RuntimeCensus, 'tmuxAvailable'>): boolean {
+  return !census.tmuxAvailable
+}
+
 // ─── Poller ───────────────────────────────────────────────────────────────────
 
 async function pollOnce(state: EnrichmentServiceState): Promise<void> {
+  let census: RuntimeCensus
+  try {
+    census = await getRuntimeCensus()
+  } catch {
+    return
+  }
+  if (shouldSkipEnrichmentCycle(census)) return
+
   let runningAgents: RunningAgent[]
   try {
     runningAgents = await Effect.runPromise(listRunningAgents())

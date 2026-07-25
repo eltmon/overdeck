@@ -3,6 +3,7 @@ import {
   buildAwaitingInputActivityMessage,
   isAwaitingInputRisingEdge,
   shouldForceReemitPendingInput,
+  shouldSkipEnrichmentCycle,
 } from '../agent-enrichment-service.js'
 import type { AgentEnrichment } from '../../../../lib/agent-enrichment.js'
 
@@ -22,6 +23,16 @@ function makeEnrichment(
     ...overrides,
   }
 }
+
+describe('shouldSkipEnrichmentCycle', () => {
+  it('returns true when tmux census evidence is unavailable', () => {
+    expect(shouldSkipEnrichmentCycle({ tmuxAvailable: false })).toBe(true)
+  })
+
+  it('returns false when tmux census evidence is available', () => {
+    expect(shouldSkipEnrichmentCycle({ tmuxAvailable: true })).toBe(false)
+  })
+})
 
 describe('isAwaitingInputRisingEdge', () => {
   it('returns true when pendingInputCount rises from 0 to greater than 0', () => {
