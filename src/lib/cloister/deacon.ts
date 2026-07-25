@@ -1521,8 +1521,8 @@ export async function checkVerificationReviewContradiction(): Promise<string[]> 
               `feature-${issueId.toLowerCase()}`,
             );
             if (existsSync(workspacePath)) {
-              const { stdout } = await execAsync('git rev-parse HEAD', { cwd: workspacePath });
-              reviewedAtCommit = stdout.trim();
+              const { snapshotWorkspaceHeadsPromise } = await import('../git-utils.js');
+              reviewedAtCommit = await snapshotWorkspaceHeadsPromise(issueId, workspacePath);
             }
           }
         } catch { /* non-fatal — leave reviewedAtCommit undefined */ }
