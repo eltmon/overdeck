@@ -43,11 +43,8 @@ import { listOverdeckAgentStatesSync } from '../overdeck/agent-state-sync.js';
 import {
   getIssueWorkspacePath,
   RECORD_SCHEMA_VERSION,
-  ensureIssueRecordSync,
-  queueIssueRecordCommit,
   readIssueRecord,
   readIssueRecordSync,
-  writeIssueRecordSync,
   type PanIssueRecord,
   type PanIssuePipelineRecord,
   type PanIssueUsageRecord,
@@ -84,24 +81,6 @@ function projectContinue(raw: ContinueFile | null): Pick<PanIssueRecord, 'decisi
     feedback: raw?.feedback ?? [],
     scopeDrift: raw?.scopeDrift,
   };
-}
-
-/**
- * Clear the terminal close-out marker so a reopened issue re-enters the
- * pipeline. Lives beside projectPipeline, whose closedOut preservation is the
- * reason ordinary status writes can never clear it (MIN-850, 2026-07-24).
- */
-export function clearRecordPipelineClosedOutSync(
-  project: ProjectConfig,
-  issueId: string,
-): void {
-  const record = ensureIssueRecordSync(project, issueId);
-  if (!record.pipeline.closedOut && !record.pipeline.closedOutAt) return;
-  record.pipeline.closedOut = undefined;
-  record.pipeline.closedOutAt = undefined;
-  record.pipeline.updatedAt = new Date().toISOString();
-  const recordPath = writeIssueRecordSync(project, issueId, record);
-  queueIssueRecordCommit(project, issueId, recordPath);
 }
 
 // ─── Pipeline projection ──────────────────────────────────────────────────────

@@ -15,7 +15,7 @@ import { Data, Effect } from 'effect';
 import { getProjectSync, resolveProjectFromIssueSync } from './projects.js';
 import { appendContinueSessionEntryForIssue } from './xbrief/lifecycle-io.js';
 import { clearIssueClosedCache } from './cloister/issue-closed.js';
-import { clearRecordPipelineClosedOutSync } from './pan-dir/records.js';
+import { clearRecordPipelineClosedOutSync } from './pan-dir/record-update.js';
 
 export interface ReopenResult {
   specialistStatesReset: boolean;
