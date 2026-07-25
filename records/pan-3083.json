@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-25T22:42:08.234Z",
-  "updated": "2026-07-25T23:03:31.336Z",
+  "updated": "2026-07-25T23:03:57.011Z",
   "pipeline": {
     "issueId": "PAN-3083",
     "reviewStatus": "pending",
@@ -59,8 +59,16 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 4,
-    "claims": {},
+    "sequence": 5,
+    "claims": {
+      "fallback-clearable-request": {
+        "writerId": "agent-pan-3083",
+        "agentId": "agent-pan-3083",
+        "pid": 1312154,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-25T23:03:57.011Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3083",
@@ -106,6 +114,7 @@
     "consume-intent-on-verdict.consume-intent-on-verdict.ac1": "completed",
     "consume-intent-on-verdict.consume-intent-on-verdict.ac2": "completed",
     "consume-intent-on-verdict.consume-intent-on-verdict.ac3": "completed",
-    "consume-intent-on-verdict.consume-intent-on-verdict.ac4": "completed"
+    "consume-intent-on-verdict.consume-intent-on-verdict.ac4": "completed",
+    "fallback-clearable-request": "running"
   }
 }
