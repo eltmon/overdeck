@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-25T11:59:26.466Z",
-  "updated": "2026-07-25T12:48:16.254Z",
+  "updated": "2026-07-25T12:48:24.280Z",
   "pipeline": {
     "issueId": "PAN-3055",
     "reviewStatus": "pending",
@@ -145,5 +145,22 @@
     "docs-liveness-pendingness": "completed",
     "docs-liveness-pendingness.docs-liveness-pendingness.ac1": "completed",
     "docs-liveness-pendingness.docs-liveness-pendingness.ac2": "completed"
+  },
+  "scopeDrift": {
+    "outsideDeclaredScope": [],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "docs/ASKUSERQUESTION-DASHBOARD.md",
+      "src/dashboard/server/__tests__/read-model-pending-input.test.ts",
+      "src/dashboard/server/services/__tests__/agent-enrichment-service.test.ts",
+      "src/dashboard/server/services/agent-enrichment-service.ts"
+    ],
+    "actualChangedFiles": [
+      "docs/ASKUSERQUESTION-DASHBOARD.md",
+      "src/dashboard/server/__tests__/read-model-pending-input.test.ts",
+      "src/dashboard/server/services/__tests__/agent-enrichment-service.test.ts",
+      "src/dashboard/server/services/agent-enrichment-service.ts"
+    ],
+    "recordedAt": "2026-07-25T12:48:24.279Z"
   }
 }
