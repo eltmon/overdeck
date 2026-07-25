@@ -38,16 +38,16 @@
     "recordedAt": "2026-07-25T12:48:24.279Z"
   },
   "created": "2026-07-25T11:59:26.466Z",
-  "updated": "2026-07-25T12:48:31.232Z",
+  "updated": "2026-07-25T12:48:33.136Z",
   "pipeline": {
     "issueId": "PAN-3055",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-25T12:48:28.737Z",
+    "updatedAt": "2026-07-25T12:48:31.297Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3064",
     "reviewRequestedAt": "2026-07-25T12:48:26.974Z",
     "reviewSpawnedAt": "2026-07-25T12:48:28.736Z",
@@ -82,9 +82,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 488083,
-            "output": 37231,
-            "cacheRead": 26425856,
+            "input": 489953,
+            "output": 37753,
+            "cacheRead": 26766848,
             "cacheWrite": 0
           }
         }
@@ -97,15 +97,15 @@
           "cacheWrite": 300722
         },
         "openai/gpt-5.6-sol": {
-          "input": 488083,
-          "output": 37231,
-          "cacheRead": 26425856,
+          "input": 489953,
+          "output": 37753,
+          "cacheRead": 26766848,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 27.527187,
-        "pricingAsOf": "2026-07-25T12:48:29.035Z"
+        "usd": 27.722693,
+        "pricingAsOf": "2026-07-25T12:48:33.128Z"
       }
     },
     "merges": [
