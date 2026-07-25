@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-25T21:12:36.630Z",
-  "updated": "2026-07-25T21:42:59.370Z",
+  "updated": "2026-07-25T21:44:06.292Z",
   "pipeline": {
     "issueId": "PAN-3076",
     "reviewStatus": "pending",
@@ -75,16 +75,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 9,
-    "claims": {
-      "stamp-deacon-bypass": {
-        "writerId": "agent-pan-3076",
-        "agentId": "agent-pan-3076",
-        "pid": 2352966,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-25T21:42:49.502Z"
-      }
-    },
+    "sequence": 10,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3076",
@@ -129,6 +121,17 @@
         "outcome": "completed",
         "reason": "Changed legacy specialists-done to stamp producer-issued workspace anchors and log composite anchors with a shared short formatter.",
         "releasedAt": "2026-07-25T21:42:42.482Z"
+      },
+      {
+        "writerId": "agent-pan-3076",
+        "agentId": "agent-pan-3076",
+        "pid": 2352966,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-25T21:42:49.502Z",
+        "itemId": "stamp-deacon-bypass",
+        "outcome": "completed",
+        "reason": "Changed the verification-review bypass to stamp reviewedAtCommit through snapshotWorkspaceHeadsPromise.",
+        "releasedAt": "2026-07-25T21:44:06.292Z"
       }
     ],
     "statusReasons": {
@@ -147,6 +150,10 @@
       "stamp-legacy-specialists-done": {
         "reason": "Changed legacy specialists-done to stamp producer-issued workspace anchors and log composite anchors with a shared short formatter.",
         "updatedAt": "2026-07-25T21:42:42.482Z"
+      },
+      "stamp-deacon-bypass": {
+        "reason": "Changed the verification-review bypass to stamp reviewedAtCommit through snapshotWorkspaceHeadsPromise.",
+        "updatedAt": "2026-07-25T21:44:06.292Z"
       }
     }
   },
@@ -166,6 +173,8 @@
     "stamp-legacy-specialists-done": "completed",
     "stamp-legacy-specialists-done.stamp-legacy-specialists-done.ac1": "completed",
     "stamp-legacy-specialists-done.stamp-legacy-specialists-done.ac2": "completed",
-    "stamp-deacon-bypass": "running"
+    "stamp-deacon-bypass": "completed",
+    "stamp-deacon-bypass.stamp-deacon-bypass.ac1": "completed",
+    "stamp-deacon-bypass.stamp-deacon-bypass.ac2": "completed"
   }
 }
