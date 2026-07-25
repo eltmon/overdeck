@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-25T11:59:01.400Z",
-  "updated": "2026-07-25T12:51:34.702Z",
+  "updated": "2026-07-25T12:51:35.669Z",
   "pipeline": {
     "issueId": "PAN-3052",
     "reviewStatus": "pending",
@@ -132,5 +132,27 @@
       "summary": "Test gate waived: Pure behavior-preserving extraction; commit cb39b20958 added the existing boot-reconciliation tests that cover this path, and this branch preserves them unmodified with 18/18 passing.",
       "recordedAt": "2026-07-25T12:51:34.702Z"
     }
-  ]
+  ],
+  "scopeDrift": {
+    "outsideDeclaredScope": [],
+    "declaredScopeUntouched": [
+      "dist/dashboard/server.js"
+    ],
+    "declaredScope": [
+      "dist/dashboard/server.js",
+      "docs/codebase-health/B-deacon-decomp.md",
+      "scripts/file-size-baseline.txt",
+      "src/lib/cloister/boot-reconciliation-apply.ts",
+      "src/lib/cloister/deacon-auto-resume.ts",
+      "src/lib/cloister/deacon.ts"
+    ],
+    "actualChangedFiles": [
+      "docs/codebase-health/B-deacon-decomp.md",
+      "scripts/file-size-baseline.txt",
+      "src/lib/cloister/boot-reconciliation-apply.ts",
+      "src/lib/cloister/deacon-auto-resume.ts",
+      "src/lib/cloister/deacon.ts"
+    ],
+    "recordedAt": "2026-07-25T12:51:35.667Z"
+  }
 }
