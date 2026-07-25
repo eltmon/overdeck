@@ -224,24 +224,24 @@
     "recordedAt": "2026-07-24T23:08:31.650Z"
   },
   "created": "2026-07-12T09:32:29.900Z",
-  "updated": "2026-07-25T01:13:24.481Z",
+  "updated": "2026-07-25T01:13:32.813Z",
   "pipeline": {
     "issueId": "PAN-1525",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-24T23:12:31.996Z",
-    "updatedAt": "2026-07-25T01:13:24.381Z",
+    "updatedAt": "2026-07-25T01:13:32.753Z",
     "reviewNotes": "Agent re-review request (3/25): Fixed review issues",
     "inspectNotes": "Composer-command parse+route inserted before compact/transform/delivery in conversation-message.ts with early return; unknown-command maps to 404 naming token + 'Type /pan to list available commands'; terminal-only policy maps to 422 naming exact command display; unprefixed text/pan-start negative control preserves original compact/transform/deliverAgentMessage path. All 4 ACs covered by router.test.ts assertions matching the exact banned-call list.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3033",
     "lastVerifiedCommit": "10c555afc0744ecb699ec50b3d95db13ec2fa92f",
     "reviewRequestedAt": "2026-07-24T23:12:31.996Z",
-    "reviewSpawnedAt": "2026-07-25T00:48:33.959Z",
+    "reviewSpawnedAt": "2026-07-25T01:13:32.751Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "packages/contracts/src/composer-commands.test.ts",
@@ -418,9 +418,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 12340042,
-            "output": 1004855,
-            "cacheRead": 563785728,
+            "input": 12341156,
+            "output": 1005015,
+            "cacheRead": 564141056,
             "cacheWrite": 0
           }
         }
@@ -433,9 +433,9 @@
           "cacheWrite": 921870
         },
         "openai/gpt-5.6-sol": {
-          "input": 17104794,
-          "output": 1234882,
-          "cacheRead": 634365440,
+          "input": 17105908,
+          "output": 1235042,
+          "cacheRead": 634720768,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -446,8 +446,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 475.649319,
-        "pricingAsOf": "2026-07-25T01:13:24.442Z"
+        "usd": 475.837353,
+        "pricingAsOf": "2026-07-25T01:13:32.781Z"
       }
     },
     "merges": [
