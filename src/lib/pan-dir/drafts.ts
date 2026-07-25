@@ -1,5 +1,5 @@
 import { join, basename } from 'path'
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync, rmSync } from 'node:fs'
 import { Effect, FileSystem, Option } from 'effect'
 import * as NodeFileSystem from '@effect/platform-node/NodeFileSystem'
 import { FsError } from '../errors.js'
@@ -225,6 +225,8 @@ export interface PromoteWorkspacePrdDraftResult {
   path?: string
   /** Workspace file the content was promoted from. */
   source?: string
+  /** True when the now-redundant workspace copy was removed after promotion. */
+  sourceRemoved?: boolean
 }
 
 /**
@@ -237,6 +239,12 @@ export interface PromoteWorkspacePrdDraftResult {
  *
  * No-loss rule: an existing canonical draft is never overwritten — the
  * canonical copy may carry operator edits the workspace copy predates.
+ *
+ * A successful promotion also removes the workspace copy: the identical content
+ * is committed and pushed on the state plane, and the leftover untracked file
+ * tripped the spawn-time dirty-workspace gate, stranding the planning→work
+ * auto-handoff with `planning_auto_handoff_failed` (PAN-3042). Removal is
+ * best-effort — the spawn gate exempts Overdeck-owned `.pan/` paths anyway.
  */
 export function promoteWorkspacePrdDraft(args: {
   projectRoot: string
@@ -272,7 +280,17 @@ export function promoteWorkspacePrdDraft(args: {
       return Effect.fail(new FsError({ path: source, operation: 'readFileString', cause }))
     }
     return writeIssueDraft(projectRoot, issueId, content).pipe(
-      Effect.map((path): PromoteWorkspacePrdDraftResult => ({ promoted: true, reason: 'promoted', path, source })),
+      Effect.map((path): PromoteWorkspacePrdDraftResult => {
+        let sourceRemoved = false
+        try {
+          rmSync(source)
+          sourceRemoved = true
+        } catch {
+          // Best effort: the canonical copy is already committed and pushed, so
+          // a failed unlink must not fail promotion.
+        }
+        return { promoted: true, reason: 'promoted', path, source, sourceRemoved }
+      }),
     )
   })
 }

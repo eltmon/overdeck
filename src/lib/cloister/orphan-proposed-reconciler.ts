@@ -161,11 +161,21 @@ async function defaultHasOpenPrForBranch(projectPath: string, issueId: string): 
 
   try {
     const resolved = resolveGitHubIssueSync(issueId);
-    if (isGitHubAppConfigured() && resolved.isGitHub) {
+    if (!resolved.isGitHub) {
+      // Linear/GitLab-tracked issue: there is no GitHub PR to probe, and `gh`
+      // would fail anyway — a polyrepo wrapper projectPath is not a git repo
+      // ("fatal: not a git repository", PAN-3042).
+      logReconcilerDiagnostic('open-pr-check-skipped', { projectPath, issueId, branch, reason: 'non-github-tracker' });
+      return false;
+    }
+    if (isGitHubAppConfigured()) {
       return (await Effect.runPromise(listPullRequestsForHead(resolved.owner, resolved.repo, branch, 'open'))).length > 0;
     }
 
-    const result = await execAsync(`gh pr list --head ${branch} --state open --json number --limit 1`, { cwd: projectPath }) as { stdout?: string } | string;
+    // `--repo` keeps the probe independent of cwd: gh otherwise resolves the
+    // repo from git remotes, which fails when projectPath has no git repo or no
+    // origin (the polyrepo wrapper case).
+    const result = await execAsync(`gh pr list --repo ${resolved.owner}/${resolved.repo} --head ${branch} --state open --json number --limit 1`, { cwd: projectPath }) as { stdout?: string } | string;
     const stdout = typeof result === 'string' ? result : result.stdout;
     const prs = JSON.parse(stdout ?? '[]') as unknown;
     return Array.isArray(prs) && prs.length > 0;

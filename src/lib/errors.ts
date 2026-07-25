@@ -29,7 +29,23 @@ export class FsError extends Data.TaggedError('FsError')<{
   readonly path: string;
   readonly operation: string;
   readonly cause?: unknown;
-}> {}
+}> {
+  /**
+   * `Data.TaggedError` only populates `message` when the payload declares one,
+   * and this payload does not — so every operator-facing surface that renders
+   * `error.message` printed an empty string (PAN-3042: "PRD draft promotion
+   * failed for MIN-902: " with nothing after the colon). Derive the message
+   * from the fields the payload does carry.
+   */
+  override get message(): string {
+    const detail = this.cause instanceof Error
+      ? this.cause.message
+      : this.cause === undefined || this.cause === null ? '' : String(this.cause);
+    return detail
+      ? `${this.operation} failed for ${this.path}: ${detail}`
+      : `${this.operation} failed for ${this.path}`;
+  }
+}
 
 /** The requested path does not exist. */
 export class FsNotFoundError extends Data.TaggedError('FsNotFoundError')<{

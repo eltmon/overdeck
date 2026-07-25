@@ -50,6 +50,41 @@ describe('promoteWorkspacePrdDraft', () => {
     expect(readFileSync(canonical, 'utf-8')).toBe('# PRD for PAN-2858\n\nbody\n');
   });
 
+  it('removes the promoted workspace copy so the workspace stays clean', async () => {
+    // PAN-3042: the leftover untracked `.pan/drafts/<ISSUE>.md` tripped the
+    // spawn-time dirty-workspace gate and stranded the planning→work handoff.
+    const wsDrafts = join(workspaceRoot, '.pan', 'drafts');
+    mkdirSync(wsDrafts, { recursive: true });
+    const source = join(wsDrafts, 'PAN-3042.md');
+    writeFileSync(source, '# PRD for PAN-3042\n', 'utf-8');
+
+    const result = await Effect.runPromise(
+      promoteWorkspacePrdDraft({ projectRoot, workspacePath: workspaceRoot, issueId: 'PAN-3042' }),
+    );
+
+    expect(result.promoted).toBe(true);
+    expect(result.sourceRemoved).toBe(true);
+    expect(existsSync(source)).toBe(false);
+    expect(readFileSync(getIssueDraftPath(projectRoot, 'PAN-3042'), 'utf-8')).toBe('# PRD for PAN-3042\n');
+  });
+
+  it('keeps the workspace copy when promotion is skipped for an existing canonical draft', async () => {
+    const draftsDir = getDraftsDir(projectRoot);
+    mkdirSync(draftsDir, { recursive: true });
+    writeFileSync(join(draftsDir, 'PAN-3042.md'), 'canonical\n', 'utf-8');
+    const wsDrafts = join(workspaceRoot, '.pan', 'drafts');
+    mkdirSync(wsDrafts, { recursive: true });
+    const source = join(wsDrafts, 'PAN-3042.md');
+    writeFileSync(source, 'workspace copy\n', 'utf-8');
+
+    const result = await Effect.runPromise(
+      promoteWorkspacePrdDraft({ projectRoot, workspacePath: workspaceRoot, issueId: 'PAN-3042' }),
+    );
+
+    expect(result.promoted).toBe(false);
+    expect(existsSync(source)).toBe(true);
+  });
+
   it('promotes a lowercase-named workspace draft', async () => {
     const wsDrafts = join(workspaceRoot, '.pan', 'drafts');
     mkdirSync(wsDrafts, { recursive: true });

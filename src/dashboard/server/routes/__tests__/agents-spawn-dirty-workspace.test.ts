@@ -18,6 +18,12 @@ describe('isOnlyOverdeckRuntimeWorkspaceChanges', () => {
     ['a canonical continue file', ' M .overdeck/continue.json'],
     ['a legacy workspace spec', '?? .pan/spec.vbrief.json'],
     ['a legacy continue file', '?? .pan/continue.json'],
+    // PAN-3042: the gate runs with --untracked-files=all, so it never sees the
+    // collapsed `?? .pan/` form — it sees expanded paths like this
+    // pipeline-authored PRD draft, which used to read as operator dirt and 409
+    // the planning→work auto-handoff.
+    ['an expanded pipeline-authored PRD draft', '?? .pan/drafts/MIN-898.md'],
+    ['any other Overdeck-owned .pan/ path', '?? .pan/user-notes.md'],
   ])('allows %s', (_label, porcelain) => {
     expect(isOnlyOverdeckRuntimeWorkspaceChanges(porcelain)).toBe(true);
   });
@@ -25,7 +31,7 @@ describe('isOnlyOverdeckRuntimeWorkspaceChanges', () => {
   it.each([
     ['a source file', ' M src/index.ts'],
     ['runtime files mixed with a source file', '?? .pan/spec.vbrief.json\n M src/index.ts'],
-    ['an unknown legacy path', '?? .pan/user-notes.md'],
+    ['a runtime-lookalike path outside the runtime dirs', '?? pan/drafts/MIN-898.md'],
   ])('rejects %s', (_label, porcelain) => {
     expect(isOnlyOverdeckRuntimeWorkspaceChanges(porcelain)).toBe(false);
   });

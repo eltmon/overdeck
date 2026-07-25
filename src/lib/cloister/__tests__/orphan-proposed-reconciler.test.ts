@@ -55,7 +55,8 @@ vi.mock('../../github-app.js', () => ({
   listPullRequestsForHead: githubAppMocks.listPullRequestsForHead,
 }));
 
-vi.mock('../../tracker-utils.js', () => ({
+vi.mock('../../tracker-utils.js', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../../tracker-utils.js')>(),
   resolveGitHubIssueSync: trackerUtilsMocks.resolveGitHubIssueSync,
 }));
 
@@ -449,9 +450,37 @@ describe('orphan proposed spec reconciler', () => {
     expect(spawnWorkAgent).not.toHaveBeenCalled();
     expect(childProcessMocks.exec).toHaveBeenCalledTimes(1);
     const [command, options] = childProcessMocks.exec.mock.calls[0];
-    expect(command).toBe('gh pr list --head feature/pan-3603 --state open --json number --limit 1');
+    // PAN-3042: --repo keeps the probe working when the project path is not a
+    // git repo (polyrepo wrapper) or has no origin remote.
+    expect(command).toBe('gh pr list --repo eltmon/overdeck --head feature/pan-3603 --state open --json number --limit 1');
     expect(options).toMatchObject({ cwd: projectPath });
     expect(activityLogger.emitActivityEntrySync).not.toHaveBeenCalled();
+  });
+
+  it('skips the gh open-PR probe for a non-GitHub tracker and still spawns', async () => {
+    // PAN-3042: MYN is Linear-tracked and its project path is not a git repo,
+    // so `gh pr list` failed with "fatal: not a git repository" every scan. The
+    // probe keys off the tracker resolver, not the issue prefix — this fixture
+    // uses an unconfigured prefix so no tracker client is constructed.
+    const projectPath = join(testDir, 'project');
+    mkdirSync(projectPath, { recursive: true });
+    writeSpec(projectPath, 'ZZZ-9042', 'proposed');
+    writeTasks(projectPath, 'ZZZ-9042');
+    trackerUtilsMocks.resolveGitHubIssueSync.mockReturnValue({ isGitHub: false } as never);
+    const spawnWorkAgent = vi.fn(async () => ({ spawned: true, agentId: 'agent-zzz-9042' }));
+
+    await expect(reconcileOrphanProposedSpecs({
+      projects: [{ key: 'other', config: { name: 'Non-GitHub Project', path: projectPath } }],
+      tmuxSessionNames: [],
+      getAgentStateForIssue: async () => null,
+      closedIssueIds: new Set(),
+      now: new Date('2026-05-25T20:00:00.000Z'),
+      config: { enabled: true, minAttemptIntervalMs: 5 * 60 * 1000 },
+      spawnWorkAgent,
+    })).resolves.toEqual(['Spawned work agent for orphan proposed spec ZZZ-9042']);
+
+    expect(childProcessMocks.exec).not.toHaveBeenCalled();
+    expect(spawnWorkAgent).toHaveBeenCalledWith('ZZZ-9042');
   });
 
   it('checks open PRs with GitHub App REST when configured', async () => {

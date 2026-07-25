@@ -577,7 +577,8 @@ export async function completePlanningForIssue(options: {
           promoteWorkspacePrdDraft({ projectRoot: projectPath, workspacePath, issueId: id }),
         );
         if (draftPromotion.promoted) {
-          emitCompletePlanningPhase(id, 'prdPromote', 'success', `promoted ${draftPromotion.source} -> ${draftPromotion.path}`);
+          const removalNote = draftPromotion.sourceRemoved ? '' : ' (workspace copy left in place)';
+          emitCompletePlanningPhase(id, 'prdPromote', 'success', `promoted ${draftPromotion.source} -> ${draftPromotion.path}${removalNote}`);
         } else {
           emitCompletePlanningPhase(id, 'prdPromote', 'skipped', draftPromotion.reason);
         }
