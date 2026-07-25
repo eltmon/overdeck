@@ -72,19 +72,20 @@
     "recordedAt": "2026-07-25T22:13:33.131Z"
   },
   "created": "2026-07-25T20:44:21.373Z",
-  "updated": "2026-07-25T22:13:45.566Z",
+  "updated": "2026-07-25T22:20:15.886Z",
   "pipeline": {
     "issueId": "PAN-3037",
     "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-25T22:13:43.393Z",
+    "updatedAt": "2026-07-25T22:20:15.832Z",
     "inspectNotes": "All 5 ACs met: per-repo iteration with repoKey-prefixed paths, conflict abort leaves repo quiescent and skips remaining repos, aggregate alreadyUpToDate requires all repos current, monorepo keeps unprefixed single-element shape, abort returns cancellation + skipped entries. Extraction into sync-main-workspace.ts is logic-identical; baseline 1404 matches actual wc -l.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3079",
+    "lastVerifiedCommit": "93ad317654fa305065e3cb80cc73f470c5817ed4",
     "reviewRequestedAt": "2026-07-25T22:13:35.841Z",
     "reviewSpawnedAt": "2026-07-25T22:13:41.321Z",
     "scopeDrift": {
@@ -150,11 +151,19 @@
             "cacheWrite": 311392
           }
         },
+        "review": {
+          "openai/gpt-5.6-sol": {
+            "input": 889835,
+            "output": 74621,
+            "cacheRead": 9218048,
+            "cacheWrite": 0
+          }
+        },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 1443983,
-            "output": 141504,
-            "cacheRead": 79517184,
+            "input": 1445935,
+            "output": 141902,
+            "cacheRead": 80028160,
             "cacheWrite": 0
           }
         }
@@ -167,15 +176,15 @@
           "cacheWrite": 311392
         },
         "openai/gpt-5.6-sol": {
-          "input": 1443983,
-          "output": 141504,
-          "cacheRead": 79517184,
+          "input": 2335770,
+          "output": 216523,
+          "cacheRead": 89246208,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 64.373985,
-        "pricingAsOf": "2026-07-25T22:13:45.562Z"
+        "usd": 75.948002,
+        "pricingAsOf": "2026-07-25T22:20:15.876Z"
       }
     },
     "merges": [
