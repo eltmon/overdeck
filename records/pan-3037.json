@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-25T20:44:21.373Z",
-  "updated": "2026-07-25T21:29:56.191Z",
+  "updated": "2026-07-25T21:35:26.455Z",
   "pipeline": {
     "issueId": "PAN-3037",
     "reviewStatus": "pending",
@@ -75,16 +75,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "review-restart-branch-probe": {
-        "writerId": "agent-pan-3037",
-        "agentId": "agent-pan-3037",
-        "pid": 1933849,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-25T21:29:56.191Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3037",
@@ -118,6 +110,17 @@
         "outcome": "completed",
         "reason": "Added repos to every sync-main route result, printed per-repo CLI status and grouped conflicts for polyrepos, preserved monorepo output, and added CLI coverage.",
         "releasedAt": "2026-07-25T21:29:24.218Z"
+      },
+      {
+        "writerId": "agent-pan-3037",
+        "agentId": "agent-pan-3037",
+        "pid": 1933849,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-25T21:29:56.191Z",
+        "itemId": "review-restart-branch-probe",
+        "outcome": "completed",
+        "reason": "Review restart now probes git from the canonical primary repo directory and falls back to the configured source branch instead of unknown.",
+        "releasedAt": "2026-07-25T21:35:26.455Z"
       }
     ],
     "statusReasons": {
@@ -132,6 +135,10 @@
       "sync-main-reporting": {
         "reason": "Added repos to every sync-main route result, printed per-repo CLI status and grouped conflicts for polyrepos, preserved monorepo output, and added CLI coverage.",
         "updatedAt": "2026-07-25T21:29:24.218Z"
+      },
+      "review-restart-branch-probe": {
+        "reason": "Review restart now probes git from the canonical primary repo directory and falls back to the configured source branch instead of unknown.",
+        "updatedAt": "2026-07-25T21:35:26.455Z"
       }
     }
   },
@@ -150,6 +157,8 @@
     "sync-main-reporting.sync-main-reporting.ac1": "completed",
     "sync-main-reporting.sync-main-reporting.ac2": "completed",
     "sync-main-reporting.sync-main-reporting.ac3": "completed",
-    "review-restart-branch-probe": "running"
+    "review-restart-branch-probe": "completed",
+    "review-restart-branch-probe.review-restart-branch-probe.ac1": "completed",
+    "review-restart-branch-probe.review-restart-branch-probe.ac2": "completed"
   }
 }
