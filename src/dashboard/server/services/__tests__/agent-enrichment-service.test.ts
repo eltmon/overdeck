@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
   buildAwaitingInputActivityMessage,
+  buildExpiredQuestionActivityMessage,
+  buildPendingReapEvent,
+  hasReapablePendingInput,
   isAwaitingInputRisingEdge,
   shouldForceReemitPendingInput,
   shouldSkipEnrichmentCycle,
@@ -31,6 +34,73 @@ describe('shouldSkipEnrichmentCycle', () => {
 
   it('returns false when tmux census evidence is available', () => {
     expect(shouldSkipEnrichmentCycle({ tmuxAvailable: true })).toBe(false)
+  })
+})
+
+describe('hasReapablePendingInput', () => {
+  it('returns true when pendingInputCount is greater than zero', () => {
+    expect(hasReapablePendingInput(makeEnrichment(1, ['askUserQuestion']))).toBe(true)
+  })
+
+  it('returns true when only an AskUserQuestion payload remains', () => {
+    expect(hasReapablePendingInput(makeEnrichment(0, [], {
+      pendingAskUserQuestion: { toolUseId: 't1' } as any,
+    }))).toBe(true)
+  })
+
+  it('returns true when only a proposed-plan payload remains', () => {
+    expect(hasReapablePendingInput(makeEnrichment(0, [], {
+      pendingProposedPlan: { toolUseId: 't2' } as any,
+    }))).toBe(true)
+  })
+
+  it('returns false when no pending input remains', () => {
+    expect(hasReapablePendingInput(makeEnrichment(0))).toBe(false)
+  })
+})
+
+describe('buildPendingReapEvent', () => {
+  it('clears every pending field and preserves role and resolution fields', () => {
+    const previous = makeEnrichment(2, ['askUserQuestion', 'plan'], {
+      role: 'plan',
+      hasPendingQuestion: true,
+      pendingQuestionCount: 1,
+      pendingQuestionPrompt: 'Choose a scope',
+      pendingQuestionReason: 'Planning is blocked',
+      pendingAskUserQuestion: { toolUseId: 't1' } as any,
+      pendingProposedPlan: { toolUseId: 't2' } as any,
+      resolution: 'awaiting_input',
+      resolutionCount: 3,
+    })
+
+    expect(buildPendingReapEvent('agent-pan-123', previous).payload).toEqual({
+      agentId: 'agent-pan-123',
+      role: 'plan',
+      hasPendingQuestion: false,
+      pendingQuestionCount: 0,
+      pendingQuestionPrompt: undefined,
+      pendingQuestionReason: undefined,
+      pendingInputCount: 0,
+      pendingInputKinds: [],
+      pendingAskUserQuestion: undefined,
+      pendingProposedPlan: undefined,
+      resolution: 'awaiting_input',
+      resolutionCount: 3,
+    })
+  })
+})
+
+describe('buildExpiredQuestionActivityMessage', () => {
+  it('includes the agent and issue identifiers', () => {
+    expect(buildExpiredQuestionActivityMessage('agent-pan-123', 'PAN-123')).toBe(
+      'agent-pan-123 on PAN-123 stopped with its question unanswered — the question has expired and is no longer actionable',
+    )
+  })
+
+  it('omits the issue clause when no issue is known', () => {
+    expect(buildExpiredQuestionActivityMessage('agent-pan-123', undefined)).toBe(
+      'agent-pan-123 stopped with its question unanswered — the question has expired and is no longer actionable',
+    )
   })
 })
 
