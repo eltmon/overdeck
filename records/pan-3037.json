@@ -359,23 +359,23 @@
     "recordedAt": "2026-07-25T23:26:03.281Z"
   },
   "created": "2026-07-25T20:44:21.373Z",
-  "updated": "2026-07-25T23:30:55.489Z",
+  "updated": "2026-07-25T23:31:49.712Z",
   "pipeline": {
     "issueId": "PAN-3037",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "passed",
     "testStatus": "passed",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-07-25T23:30:53.147Z",
-    "reviewNotes": "Verification failed at test — fix and resubmit",
+    "readyForMerge": true,
+    "updatedAt": "2026-07-25T23:31:49.613Z",
+    "reviewNotes": "Cycle-3 delta is test-only, correct, and fully verified; no blocking findings remain",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
-    "verificationNotes": "Verification FAILED at test (424278ms):\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-3037\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-3037/src/dashboard/frontend\n\nNo test files found, exiting with code 0\n\nstdout | tests/unit/dashboard/server/routes/specialists-inspect-item.test.ts > POST /api/specialists/done inspect item attribution > checkpoints the exact structured itemId regardless of notes wording\n[specialists/done] inspect signaling passed for PAN-2724\n\nstdout | tests/unit/dashboard/server/routes/specialists-inspect-item.test.ts > POST /api/specialists/done inspect item attribution > checkpoints the exact structured itemId regardless of notes wording\n[specialists/done] Set inspect-agent-test to idle\n[specialists/done] Warm lifecycle: verdict recorded, leaving inspect-agent-test running (PAN-2579)\n[specialists/done] Cleared registry lock for inspect-agent:PAN-2724 (overdeck)\n\nstdout | tests/unit/dashboard/server/routes/specialists-inspect-item.test.ts > POST /api/specialists/done inspect item attribution > checkpoints the exact structured itemId regardless of notes wording\n[specialists/done] inspect signaling passed for PAN-2724\n\nstdout | tests/unit/dashboard/server/routes/specialists-inspect-item.test.ts > POST /api/specialists/done inspect item attribution > checkpoints the exact structured itemId regardless of notes wording\n[specialists/done] Set inspect-agent-test to idle\n[specialists/done] Warm lifecycle: verdict recorded, leaving inspect-agent-test running (PAN-2579)\n[specialists/done] Cleared registry lock for inspect-agent:PAN-2724 (overdeck)\n\n ❯ |root| tests/unit/dashboard/server/routes/specialists-inspect-item.test.ts (3 tests | 1 failed) 124ms\n     × checkpoints the exact structured itemId regardless of notes wording 99ms (retry x1)\n[prep] state-reconcile\n[prep] completed: state-reconcile (0s elapsed)\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Workspace already up to date with main\n[prep] completed: sync-main (0s ela\n…(1948 chars elided)…\ning-jqYzmO/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-jqYzmO/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-jqYzmO/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[\n...(truncated)",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "All 5 ACs met: per-repo iteration with repoKey-prefixed paths, conflict abort leaves repo quiescent and skips remaining repos, aggregate alreadyUpToDate requires all repos current, monorepo keeps unprefixed single-element shape, abort returns cancellation + skipped entries. Extraction into sync-main-workspace.ts is logic-identical; baseline 1404 matches actual wc -l.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3079",
-    "reviewedAtCommit": "dddeb04bfb1336bbe3c747455537772c8a24d36c",
+    "reviewedAtCommit": "d9745b9dfc3e26cbcbc71cf229528c7d4f4dac3e",
     "lastVerifiedCommit": "93ad317654fa305065e3cb80cc73f470c5817ed4",
     "reviewRequestedAt": "2026-07-25T23:26:04.234Z",
     "reviewSpawnedAt": "2026-07-25T23:26:09.321Z",
@@ -446,18 +446,18 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 18208291,
-            "output": 283634,
-            "cacheRead": 46200320,
+            "input": 18240652,
+            "output": 287960,
+            "cacheRead": 48171008,
             "cacheWrite": 0
           }
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 84,
-            "output": 17614,
-            "cacheRead": 6163167,
-            "cacheWrite": 172381
+            "input": 94,
+            "output": 21043,
+            "cacheRead": 7047979,
+            "cacheWrite": 182049
           }
         },
         "work": {
@@ -477,21 +477,21 @@
           "cacheWrite": 311392
         },
         "openai/gpt-5.6-sol": {
-          "input": 21263725,
-          "output": 444392,
-          "cacheRead": 151117824,
+          "input": 21296086,
+          "output": 448718,
+          "cacheRead": 153088512,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 84,
-          "output": 17614,
-          "cacheRead": 6163167,
-          "cacheWrite": 172381
+          "input": 94,
+          "output": 21043,
+          "cacheRead": 7047979,
+          "cacheWrite": 182049
         }
       },
       "costAtCloseOut": {
-        "usd": 210.199548,
-        "pricingAsOf": "2026-07-25T23:30:55.480Z"
+        "usd": 211.71192,
+        "pricingAsOf": "2026-07-25T23:31:49.701Z"
       }
     },
     "merges": [
