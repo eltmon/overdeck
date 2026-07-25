@@ -1399,6 +1399,7 @@ const postForgeMergeRoute = HttpRouter.add(
       const { getMergeSetSync, upsertMergeSetSync, withRepoArtifactUrlSync, withRepoStateSync } = await import('../../../../lib/merge-set.js');
       const { getForgeAdapter } = await import('../../../../lib/forge.js');
 
+      const { assessRepoMergeCompleteness } = await import('../../../../lib/cloister/merge-completeness.js');
       let mergeSet = getMergeSetSync(issueId);
       if (!mergeSet) {
         return jsonResponse({ error: `No merge set found for ${issueId}` }, { status: 404 });
@@ -1425,22 +1426,29 @@ const postForgeMergeRoute = HttpRouter.add(
               sourceBranch: repo.sourceBranch,
               cwd: existsSync(workspacePath) ? workspacePath : repo.repoPath,
             });
-            if (discovered?.url || discovered?.id) {
-              artifactUrl = discovered.url;
-              artifactId = discovered.id;
-              mergeSet = withRepoArtifactUrlSync(mergeSet, repo.repoKey, artifactUrl ?? '', artifactId);
-              upsertMergeSetSync(mergeSet);
-              console.log(`[forge-merge] Discovered artifact for ${issueId}/${repo.repoKey}: ${artifactUrl}`);
-            } else {
-              mergeSet = withRepoStateSync(mergeSet, repo.repoKey, { mergeStatus: 'skipped' });
-              upsertMergeSetSync(mergeSet);
-              results.push({ repoKey: repo.repoKey, merged: true });
-              continue;
-            }
+            artifactUrl = discovered?.url;
+            artifactId = discovered?.id;
           } catch {
-            mergeSet = withRepoStateSync(mergeSet, repo.repoKey, { mergeStatus: 'skipped' });
+            // The completeness assessor below fails closed when forge state is unavailable.
+          }
+
+          if (artifactUrl || artifactId) {
+            mergeSet = withRepoArtifactUrlSync(mergeSet, repo.repoKey, artifactUrl ?? '', artifactId);
             upsertMergeSetSync(mergeSet);
-            results.push({ repoKey: repo.repoKey, merged: true });
+            console.log(`[forge-merge] Discovered artifact for ${issueId}/${repo.repoKey}: ${artifactUrl}`);
+          } else {
+            const classification = await assessRepoMergeCompleteness(repo);
+            if (classification.state === 'merged') {
+              mergeSet = withRepoStateSync(mergeSet, repo.repoKey, { mergeStatus: 'merged' });
+              results.push({ repoKey: repo.repoKey, merged: true });
+            } else if (classification.state === 'no-changes') {
+              mergeSet = withRepoStateSync(mergeSet, repo.repoKey, { mergeStatus: 'skipped' });
+              results.push({ repoKey: repo.repoKey, merged: true });
+            } else {
+              mergeSet = withRepoStateSync(mergeSet, repo.repoKey, { mergeStatus: 'blocked' });
+              results.push({ repoKey: repo.repoKey, merged: false, error: classification.reason });
+            }
+            upsertMergeSetSync(mergeSet);
             continue;
           }
         }

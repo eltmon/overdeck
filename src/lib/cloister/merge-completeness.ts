@@ -33,7 +33,7 @@ export interface StrandedRepoReconciliationResult {
   blockers: MergeCompletenessRepoResult[];
 }
 
-interface RepoToAssess {
+export interface RepoToAssess {
   repoKey: string;
   repoPath: string;
   forge: ForgeType;
@@ -88,7 +88,7 @@ function buildSummary(repos: MergeCompletenessRepoResult[], complete: boolean): 
   return blockers.map((repo) => repo.reason).join('; ');
 }
 
-async function assessRepo(repo: RepoToAssess): Promise<MergeCompletenessRepoResult> {
+export async function assessRepoMergeCompleteness(repo: RepoToAssess): Promise<MergeCompletenessRepoResult> {
   if (!repo.required) {
     return {
       repoKey: repo.repoKey,
@@ -167,7 +167,7 @@ export async function assessMergeCompleteness(
     return { complete: false, repos, summary: buildSummary(repos, false) };
   }
 
-  const repos = await Promise.all(resolvedRepos.map(assessRepo));
+  const repos = await Promise.all(resolvedRepos.map(assessRepoMergeCompleteness));
   const complete = repos.every((repo) => repo.state === 'merged' || repo.state === 'no-changes');
   return { complete, repos, summary: buildSummary(repos, complete) };
 }
@@ -202,7 +202,7 @@ export async function reconcileStrandedRepos(
       continue;
     }
 
-    const result = await assessRepo(repo);
+    const result = await assessRepoMergeCompleteness(repo);
     if (result.state === 'no-changes') {
       mergeSet = withRepoStateSync(mergeSet, repo.repoKey, { mergeStatus: 'skipped' });
       upsertMergeSetSync(mergeSet);
