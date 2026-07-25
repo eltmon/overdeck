@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-25T21:12:36.630Z",
-  "updated": "2026-07-25T21:41:03.145Z",
+  "updated": "2026-07-25T21:42:42.483Z",
   "pipeline": {
     "issueId": "PAN-3076",
     "reviewStatus": "pending",
@@ -75,16 +75,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "stamp-legacy-specialists-done": {
-        "writerId": "agent-pan-3076",
-        "agentId": "agent-pan-3076",
-        "pid": 2298314,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-25T21:41:03.145Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3076",
@@ -118,6 +110,17 @@
         "outcome": "completed",
         "reason": "Changed the review status route to stamp reviewedAtCommit from snapshotWorkspaceHeadsPromise inside Effect.",
         "releasedAt": "2026-07-25T21:40:52.440Z"
+      },
+      {
+        "writerId": "agent-pan-3076",
+        "agentId": "agent-pan-3076",
+        "pid": 2298314,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-25T21:41:03.145Z",
+        "itemId": "stamp-legacy-specialists-done",
+        "outcome": "completed",
+        "reason": "Changed legacy specialists-done to stamp producer-issued workspace anchors and log composite anchors with a shared short formatter.",
+        "releasedAt": "2026-07-25T21:42:42.482Z"
       }
     ],
     "statusReasons": {
@@ -132,6 +135,10 @@
       "stamp-review-status-route": {
         "reason": "Changed the review status route to stamp reviewedAtCommit from snapshotWorkspaceHeadsPromise inside Effect.",
         "updatedAt": "2026-07-25T21:40:52.440Z"
+      },
+      "stamp-legacy-specialists-done": {
+        "reason": "Changed legacy specialists-done to stamp producer-issued workspace anchors and log composite anchors with a shared short formatter.",
+        "updatedAt": "2026-07-25T21:42:42.482Z"
       }
     }
   },
@@ -148,6 +155,8 @@
     "stamp-review-status-route": "completed",
     "stamp-review-status-route.stamp-review-status-route.ac1": "completed",
     "stamp-review-status-route.stamp-review-status-route.ac2": "completed",
-    "stamp-legacy-specialists-done": "running"
+    "stamp-legacy-specialists-done": "completed",
+    "stamp-legacy-specialists-done.stamp-legacy-specialists-done.ac1": "completed",
+    "stamp-legacy-specialists-done.stamp-legacy-specialists-done.ac2": "completed"
   }
 }
