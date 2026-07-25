@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-25T21:12:36.630Z",
-  "updated": "2026-07-25T21:46:49.569Z",
+  "updated": "2026-07-25T21:48:52.206Z",
   "pipeline": {
     "issueId": "PAN-3076",
     "reviewStatus": "pending",
@@ -75,16 +75,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 13,
-    "claims": {
-      "role-run-head-pair": {
-        "writerId": "agent-pan-3076",
-        "agentId": "agent-pan-3076",
-        "pid": 2484964,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-25T21:46:49.569Z"
-      }
-    },
+    "sequence": 14,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3076",
@@ -151,6 +143,17 @@
         "outcome": "completed",
         "reason": "Replaced wrapper-root HEAD probes with the workspace anchor drift evaluator, composite-safe logs, and the required lowered deacon size baseline.",
         "releasedAt": "2026-07-25T21:46:42.226Z"
+      },
+      {
+        "writerId": "agent-pan-3076",
+        "agentId": "agent-pan-3076",
+        "pid": 2484964,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-25T21:46:49.569Z",
+        "itemId": "role-run-head-pair",
+        "outcome": "completed",
+        "reason": "Stamped and compared roleRunHead with full producer-issued workspace anchors on both sides, including polyrepo roots.",
+        "releasedAt": "2026-07-25T21:48:52.206Z"
       }
     ],
     "statusReasons": {
@@ -177,6 +180,10 @@
       "deacon-post-review-compare": {
         "reason": "Replaced wrapper-root HEAD probes with the workspace anchor drift evaluator, composite-safe logs, and the required lowered deacon size baseline.",
         "updatedAt": "2026-07-25T21:46:42.226Z"
+      },
+      "role-run-head-pair": {
+        "reason": "Stamped and compared roleRunHead with full producer-issued workspace anchors on both sides, including polyrepo roots.",
+        "updatedAt": "2026-07-25T21:48:52.206Z"
       }
     }
   },
@@ -203,6 +210,9 @@
     "deacon-post-review-compare.deacon-post-review-compare.ac1": "completed",
     "deacon-post-review-compare.deacon-post-review-compare.ac2": "completed",
     "deacon-post-review-compare.deacon-post-review-compare.ac3": "completed",
-    "role-run-head-pair": "running"
+    "role-run-head-pair": "completed",
+    "role-run-head-pair.role-run-head-pair.ac1": "completed",
+    "role-run-head-pair.role-run-head-pair.ac2": "completed",
+    "role-run-head-pair.role-run-head-pair.ac3": "completed"
   }
 }
