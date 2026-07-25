@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-25T20:44:21.373Z",
-  "updated": "2026-07-25T21:35:36.626Z",
+  "updated": "2026-07-25T21:38:54.951Z",
   "pipeline": {
     "issueId": "PAN-3037",
     "reviewStatus": "pending",
@@ -75,16 +75,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 9,
-    "claims": {
-      "review-dispatch-branch-probe": {
-        "writerId": "agent-pan-3037",
-        "agentId": "agent-pan-3037",
-        "pid": 2079466,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-25T21:35:36.626Z"
-      }
-    },
+    "sequence": 10,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3037",
@@ -129,6 +121,17 @@
         "outcome": "completed",
         "reason": "Review restart now probes git from the canonical primary repo directory and falls back to the configured source branch instead of unknown.",
         "releasedAt": "2026-07-25T21:35:26.455Z"
+      },
+      {
+        "writerId": "agent-pan-3037",
+        "agentId": "agent-pan-3037",
+        "pid": 2079466,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-25T21:35:36.626Z",
+        "itemId": "review-dispatch-branch-probe",
+        "outcome": "completed",
+        "reason": "Host-side review dispatch now probes the canonical primary repo and falls back to its configured source branch.",
+        "releasedAt": "2026-07-25T21:38:54.951Z"
       }
     ],
     "statusReasons": {
@@ -147,6 +150,10 @@
       "review-restart-branch-probe": {
         "reason": "Review restart now probes git from the canonical primary repo directory and falls back to the configured source branch instead of unknown.",
         "updatedAt": "2026-07-25T21:35:26.455Z"
+      },
+      "review-dispatch-branch-probe": {
+        "reason": "Host-side review dispatch now probes the canonical primary repo and falls back to its configured source branch.",
+        "updatedAt": "2026-07-25T21:38:54.951Z"
       }
     }
   },
@@ -168,6 +175,8 @@
     "review-restart-branch-probe": "completed",
     "review-restart-branch-probe.review-restart-branch-probe.ac1": "completed",
     "review-restart-branch-probe.review-restart-branch-probe.ac2": "completed",
-    "review-dispatch-branch-probe": "running"
+    "review-dispatch-branch-probe": "completed",
+    "review-dispatch-branch-probe.review-dispatch-branch-probe.ac1": "completed",
+    "review-dispatch-branch-probe.review-dispatch-branch-probe.ac2": "completed"
   }
 }
