@@ -359,7 +359,7 @@
     "recordedAt": "2026-07-25T23:26:03.281Z"
   },
   "created": "2026-07-25T20:44:21.373Z",
-  "updated": "2026-07-25T23:31:49.712Z",
+  "updated": "2026-07-25T23:43:00.770Z",
   "pipeline": {
     "issueId": "PAN-3037",
     "reviewStatus": "passed",
@@ -369,7 +369,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": true,
-    "updatedAt": "2026-07-25T23:31:49.613Z",
+    "updatedAt": "2026-07-25T23:43:00.319Z",
     "reviewNotes": "Cycle-3 delta is test-only, correct, and fully verified; no blocking findings remain",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
@@ -446,18 +446,18 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 18240652,
-            "output": 287960,
-            "cacheRead": 48171008,
+            "input": 18243394,
+            "output": 288114,
+            "cacheRead": 48618496,
             "cacheWrite": 0
           }
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 94,
-            "output": 21043,
-            "cacheRead": 7047979,
-            "cacheWrite": 182049
+            "input": 108,
+            "output": 26982,
+            "cacheRead": 8360671,
+            "cacheWrite": 195614
           }
         },
         "work": {
@@ -477,21 +477,21 @@
           "cacheWrite": 311392
         },
         "openai/gpt-5.6-sol": {
-          "input": 21296086,
-          "output": 448718,
-          "cacheRead": 153088512,
+          "input": 21298828,
+          "output": 448872,
+          "cacheRead": 153536000,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 94,
-          "output": 21043,
-          "cacheRead": 7047979,
-          "cacheWrite": 182049
+          "input": 108,
+          "output": 26982,
+          "cacheRead": 8360671,
+          "cacheWrite": 195614
         }
       },
       "costAtCloseOut": {
-        "usd": 211.71192,
-        "pricingAsOf": "2026-07-25T23:31:49.701Z"
+        "usd": 212.309863,
+        "pricingAsOf": "2026-07-25T23:43:00.454Z"
       }
     },
     "merges": [
