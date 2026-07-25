@@ -234,7 +234,7 @@
     "recordedAt": "2026-07-24T23:08:31.650Z"
   },
   "created": "2026-07-12T09:32:29.900Z",
-  "updated": "2026-07-25T01:43:01.926Z",
+  "updated": "2026-07-25T01:43:59.065Z",
   "pipeline": {
     "issueId": "PAN-1525",
     "reviewStatus": "passed",
@@ -245,7 +245,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-24T23:12:31.996Z",
-    "updatedAt": "2026-07-25T01:43:01.865Z",
+    "updatedAt": "2026-07-25T01:43:59.001Z",
     "blockerReasons": [
       {
         "type": "merge_conflict",
@@ -296,17 +296,17 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 80,
-            "output": 16502,
-            "cacheRead": 5837702,
-            "cacheWrite": 178616
+            "input": 102,
+            "output": 20652,
+            "cacheRead": 7867065,
+            "cacheWrite": 189936
           }
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 12342544,
-            "output": 1005263,
-            "cacheRead": 564496384,
+            "input": 13290746,
+            "output": 1018154,
+            "cacheRead": 568860672,
             "cacheWrite": 0
           }
         }
@@ -319,21 +319,21 @@
           "cacheWrite": 921870
         },
         "openai/gpt-5.6-sol": {
-          "input": 17983832,
-          "output": 1285393,
-          "cacheRead": 656464896,
+          "input": 18932034,
+          "output": 1298284,
+          "cacheRead": 660829184,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 86,
-          "output": 24533,
-          "cacheRead": 6193958,
-          "cacheWrite": 421182
+          "input": 108,
+          "output": 28683,
+          "cacheRead": 8223321,
+          "cacheWrite": 432502
         }
       },
       "costAtCloseOut": {
-        "usd": 494.388829,
-        "pricingAsOf": "2026-07-25T01:43:01.903Z"
+        "usd": 502.174429,
+        "pricingAsOf": "2026-07-25T01:43:59.058Z"
       }
     },
     "merges": [
