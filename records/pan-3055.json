@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-25T11:59:26.466Z",
-  "updated": "2026-07-25T12:25:56.284Z",
+  "updated": "2026-07-25T12:26:21.884Z",
   "pipeline": {
     "issueId": "PAN-3055",
     "reviewStatus": "pending",
@@ -59,8 +59,16 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 4,
-    "claims": {},
+    "sequence": 5,
+    "claims": {
+      "boot-rehydration-test": {
+        "writerId": "agent-pan-3055",
+        "agentId": "agent-pan-3055",
+        "pid": 3432877,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-25T12:26:21.884Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3055",
@@ -107,6 +115,7 @@
     "pending-reap.pending-reap.ac2": "completed",
     "pending-reap.pending-reap.ac3": "completed",
     "pending-reap.pending-reap.ac4": "completed",
-    "pending-reap.pending-reap.ac5": "completed"
+    "pending-reap.pending-reap.ac5": "completed",
+    "boot-rehydration-test": "running"
   }
 }
