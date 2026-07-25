@@ -130,27 +130,26 @@
     "recordedAt": "2026-07-25T23:48:58.041Z"
   },
   "created": "2026-07-25T21:12:36.630Z",
-  "updated": "2026-07-25T23:48:58.044Z",
+  "updated": "2026-07-25T23:48:59.196Z",
   "pipeline": {
     "issueId": "PAN-3076",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "failed",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-25T23:48:26.227Z",
+    "updatedAt": "2026-07-25T23:48:59.189Z",
     "reviewNotes": "Verification failed at test — fix and resubmit",
     "verificationNotes": "Verification FAILED at test (614084ms):\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-3076/src/dashboard/frontend\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-3076\n\nNo test files found, exiting with code 0\n\nstdout | tests/unit/dashboard/server/routes/specialists-inspect-item.test.ts > POST /api/specialists/done inspect item attribution > checkpoints the exact structured itemId regardless of notes wording\n[specialists/done] inspect signaling passed for PAN-2724\n\nstdout | tests/unit/dashboard/server/routes/specialists-inspect-item.test.ts > POST /api/specialists/done inspect item attribution > checkpoints the exact structured itemId regardless of notes wording\n[specialists/done] Set inspect-agent-test to idle\n[specialists/done] Warm lifecycle: verdict recorded, leaving inspect-agent-test running (PAN-2579)\n[specialists/done] Cleared registry lock for inspect-agent:PAN-2724 (overdeck)\n\nstdout | tests/unit/dashboard/server/routes/specialists-inspect-item.test.ts > POST /api/specialists/done inspect item attribution > checkpoints the exact structured itemId regardless of notes wording\n[specialists/done] inspect signaling passed for PAN-2724\n\nstdout | tests/unit/dashboard/server/routes/specialists-inspect-item.test.ts > POST /api/specialists/done inspect item attribution > checkpoints the exact structured itemId regardless of notes wording\n[specialists/done] Set inspect-agent-test to idle\n[specialists/done] Warm lifecycle: verdict recorded, leaving inspect-agent-test running (PAN-2579)\n[specialists/done] Cleared registry lock for inspect-agent:PAN-2724 (overdeck)\n\n ❯ |root| tests/unit/dashboard/server/routes/specialists-inspect-item.test.ts (3 tests | 1 failed) 90ms\n     × checkpoints the exact structured itemId regardless of notes wording 75ms (retry x1)\n[prep] state-reconcile\n[prep] completed: state-reconcile (0s elapsed)\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Workspace already up to date with main\n[prep] completed: sync-main (0s elap\n…(2631 chars elided)…\n completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] Spawning agent...\n[prep] Spawning agent...\n[prep] Spawning agent...\n[prep] Spawning agent...\n[prep] Spawning agent...\n[prep] spawn\n[prep] spawn\n[prep] spawn\n[prep] spawn\n[prep] spawn\n[prep] completed: spawn (0s elapsed)\n[prep] completed: spawn (0s elapsed)\n[prep] completed: spawn (0s elapsed)\n[prep] completed: spawn (0s elapsed)\n[prep] completed: spawn (0s elapsed)\n[prep] state-reconcile\n[prep] completed: state-reconcile (0s elapsed)\n[prep] state-reconcile\n[prep] completed: state-reconcile (0s elapsed)\n ❯ |root| tests/unit/dashboard/routes/resources-teardown.test.ts (5 tests | 5 failed) 22ms\n     × returns a short-lived typed-confirm estimate for the stack 12ms (retry x1)\n     × rejects wrong typed confirmation without executing docker commands 3ms (retry x1)\n     × rejects exp\n...(truncated)",
     "inspectNotes": "All 4 ACs demonstrated; typecheck green; 5/5 tests in tests/unit/lib/workspace-anchor-drift.test.ts pass. AC1: equal anchors -> {kind:'current'}, commit in one sub-repo -> {kind:'drifted', changedRepos:['api']}. AC2: tree-identical rewrite of one sub-repo -> {kind:'benign', changedRepos:['api']} with currentAnchor deep-equal to a fresh snapshotWorkspaceHeadsPromise call. AC3: stored plain SHA vs current composite -> drifted; I additionally probed the untested reverse direction (stored composite vs current plain) out-of-band and got drifted in 8ms with no throw and no loop - the shape-mismatch branch at workspace-anchor-drift.ts:63-65 returns before any iteration. AC4 equivalence to today's deacon.ts:1611-1640 verified structurally and empirically: isBenignMove applies haveSameTree -> haveSameEffectiveCodeCommit -> haveSameCodeContribution in deacon's exact order, and computeWorkspaceRepoRootsSync (project-repos.ts:159-166) gives the monorepo root dir === workspacePath so it inspects the same directory deacon does; state-plane-only commit under .pan/specs/ (a real STATE_PLANE_PATHS entry) -> benign, real code change -> drifted, missing workspace root -> unreadable, and an out-of-band probe confirmed monorepo tree-identical rewrite -> benign (the one AC4 clause the suite only covers via the shared polyrepo path). baseRef is refined from deacon's hardcoded 'origin/main' to origin/${root.targetBranch}, which is a superset that still equals origin/main for the default monorepo root. Two non-blocking hazards for the consumer bead, neither an AC violation: (1) the whole comparison sits in one try at workspace-anchor-drift.ts:68-109, so a git failure mid-comparison collapses to 'unreadable' where deacon today falls through to the conservative review reset - verified: an unresolvable stored SHA returns 'unreadable', so the wiring bead must map 'unreadable' to the conservative action or a force-pushed/gc'd anchor will silently preserve a stale verdict; (2) the key-set mismatch branch at workspace-anchor-drift.ts:87-92 sets changedRepos to the union of ALL repo keys including unchanged ones, and because the producer omits unreadable roots, one transiently unreadable sub-repo yields a size mismatch and a false 'drifted' naming every repo.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3082",
     "lastVerifiedCommit": "241e1f76bf1b9dd068e30765ff568e91a561488a",
-    "reviewRequestedAt": "2026-07-25T22:42:59.726Z",
+    "reviewRequestedAt": "2026-07-25T23:48:59.189Z",
     "reviewSpawnedAt": "2026-07-25T23:16:07.871Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
-        "docs/FLYWHEEL-STATE.md",
         "scripts/file-size-baseline.txt",
         "src/cli/commands/specialists/done.ts",
         "src/dashboard/server/routes/__tests__/effect-patterns.test.ts",
@@ -189,7 +188,6 @@
         "tests/unit/lib/workspace-anchor-drift.test.ts"
       ],
       "actualChangedFiles": [
-        "docs/FLYWHEEL-STATE.md",
         "docs/REVIEW-AGENT-ARCHITECTURE.md",
         "scripts/file-size-baseline.txt",
         "src/cli/commands/specialists/done.ts",
@@ -219,7 +217,7 @@
         "tests/unit/lib/review-status.test.ts",
         "tests/unit/lib/workspace-anchor-drift.test.ts"
       ],
-      "recordedAt": "2026-07-25T22:38:03.667Z"
+      "recordedAt": "2026-07-25T23:48:58.041Z"
     }
   },
   "closeOut": {
