@@ -11,12 +11,14 @@ import { EventStoreService } from '../../../../../src/dashboard/server/services/
 
 const mocks = vi.hoisted(() => ({
   resolveProject: vi.fn(),
+  getProject: vi.fn(),
   readWorkspacePlan: vi.fn(),
   onInspectComplete: vi.fn(),
 }));
 
 vi.mock('../../../../../src/lib/projects.js', () => ({
   resolveProjectFromIssueSync: mocks.resolveProject,
+  getProjectSync: mocks.getProject,
 }));
 
 vi.mock('../../../../../src/lib/xbrief/io.js', () => ({
@@ -73,6 +75,7 @@ beforeEach(async () => {
   process.env.OVERDECK_INTERNAL_TOKEN = 'test-token';
   _resetInternalTokenCacheForTests();
   mocks.resolveProject.mockReturnValue({ projectPath, projectKey: 'overdeck' });
+  mocks.getProject.mockReturnValue({ name: 'Overdeck', path: projectPath });
   mocks.readWorkspacePlan.mockReturnValue({ plan: { items: [{ id: 'issue-view-model' }] } });
   mocks.onInspectComplete.mockReturnValue(Effect.succeed(undefined));
 });
@@ -113,6 +116,7 @@ describe('POST /api/specialists/done inspect item attribution', () => {
       'issue-view-model',
       'passed',
       join(projectPath, 'workspaces', 'feature-pan-2724'),
+      'This predates this bead and is correct',
     );
   });
 });
