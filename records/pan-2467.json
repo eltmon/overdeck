@@ -83,10 +83,10 @@
     "recordedAt": "2026-07-25T22:26:00.654Z"
   },
   "created": "2026-07-25T20:42:32.108Z",
-  "updated": "2026-07-25T22:34:25.718Z",
+  "updated": "2026-07-25T22:34:35.916Z",
   "pipeline": {
     "issueId": "PAN-2467",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -94,8 +94,8 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-25T22:26:20.039Z",
-    "updatedAt": "2026-07-25T22:34:24.040Z",
-    "reviewNotes": "Review dispatch skipped — already running: agent-pan-2467-review",
+    "updatedAt": "2026-07-25T22:34:35.862Z",
+    "reviewNotes": "GitHub merged-artifact lookup accepts open PR test merge commits, and CLI forge failures are not classified as unverifiable",
     "inspectNotes": "AC1-5 verified against real APIs: unmerged reason names repoKey+aheadCount; merged artifact path yields state 'merged' + complete true; every git/forge error caught into 'unverifiable' (fails closed, complete false); missing source ref and single-repo resolver both land 'no-changes'/'merged' without throwing; enumeration is solely ensureMergeSetForIssueSync -> resolveProjectReposForIssueSync with promisified exec and zero workspaceType conditionals. MergeSetRepoState and ResolvedProjectRepo are both structurally compatible with RepoToAssess (repoKey/repoPath/forge/sourceBranch/targetBranch/required all present).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3080",
     "lastVerifiedCommit": "500ffe8f70f5b476f92dc169a050beaa39b42a3d",
@@ -197,7 +197,7 @@
       },
       "costAtCloseOut": {
         "usd": 104.003522,
-        "pricingAsOf": "2026-07-25T22:34:24.245Z"
+        "pricingAsOf": "2026-07-25T22:34:35.890Z"
       }
     },
     "merges": [
