@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-25T11:59:01.400Z",
-  "updated": "2026-07-25T12:07:51.562Z",
+  "updated": "2026-07-25T12:24:48.063Z",
   "pipeline": {
     "issueId": "PAN-3052",
     "reviewStatus": "pending",
@@ -59,18 +59,34 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "extract-apply-module": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-3052",
         "agentId": "agent-pan-3052",
         "pid": 2011858,
         "host": "eltmon-z790",
-        "claimedAt": "2026-07-25T12:07:51.562Z"
+        "claimedAt": "2026-07-25T12:07:51.562Z",
+        "itemId": "extract-apply-module",
+        "outcome": "completed",
+        "reason": "Extracted applyBootReconciliationDecision into boot-reconciliation-apply.ts, preserved the dependency-injected wrapper and acyclic import direction, removed the deacon-auto-resume file-size baseline row, and verified typecheck, lint, 18 boot tests, and 642 cloister tests.",
+        "releasedAt": "2026-07-25T12:24:48.063Z"
+      }
+    ],
+    "statusReasons": {
+      "extract-apply-module": {
+        "reason": "Extracted applyBootReconciliationDecision into boot-reconciliation-apply.ts, preserved the dependency-injected wrapper and acyclic import direction, removed the deacon-auto-resume file-size baseline row, and verified typecheck, lint, 18 boot tests, and 642 cloister tests.",
+        "updatedAt": "2026-07-25T12:24:48.063Z"
       }
     }
   },
   "statusOverrides": {
-    "extract-apply-module": "running"
+    "extract-apply-module": "completed",
+    "extract-apply-module.extract-apply-module.ac1": "completed",
+    "extract-apply-module.extract-apply-module.ac2": "completed",
+    "extract-apply-module.extract-apply-module.ac3": "completed",
+    "extract-apply-module.extract-apply-module.ac4": "completed",
+    "extract-apply-module.extract-apply-module.ac5": "completed"
   }
 }
