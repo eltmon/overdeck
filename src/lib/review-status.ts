@@ -233,6 +233,24 @@ export function setReviewStatusSync(
     merged.reviewerVerdicts = { ...status.reviewerVerdicts, ...update.reviewerVerdicts };
   }
 
+  // A terminal verdict consumes the durable request that produced this review. Preserve only a
+  // request newer than the current spawn, which represents an explicit re-review requested while
+  // this review was still running.
+  const terminalReviewVerdict =
+    update.reviewStatus !== status.reviewStatus &&
+    (update.reviewStatus === 'passed' ||
+      update.reviewStatus === 'blocked' ||
+      update.reviewStatus === 'failed' ||
+      update.reviewStatus === 'skipped');
+  if (
+    terminalReviewVerdict &&
+    merged.reviewRequestedAt &&
+    (!merged.reviewSpawnedAt ||
+      Date.parse(merged.reviewRequestedAt) <= new Date(merged.reviewSpawnedAt).getTime())
+  ) {
+    merged.reviewRequestedAt = undefined;
+  }
+
   // Track status transitions in history (last 10 entries)
   const history = [...(status.history || [])];
   const now = new Date().toISOString();
