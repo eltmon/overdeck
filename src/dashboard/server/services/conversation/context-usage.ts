@@ -69,9 +69,17 @@ function buildContextUsage(
   // tokens. We can't read the request headers, but if we've ever seen the
   // model accept more than its default window we know extended context is
   // active. Round up to the next plausible tier rather than guessing.
+  //
+  // PAN-3057: this is an ANTHROPIC-only inference. Applying it to proxied models
+  // inverted the meter exactly when it mattered — a GPT-5.6 agent that crossed
+  // its declared window got rescored against 1M, read ~18% full at 186K, and
+  // could never trip the Deacon's 85% proactive-compaction high-water. For a
+  // non-Anthropic model, observed-above-declared means the declared number is
+  // stale, not that a 1M mode exists; fix the capability entry instead.
   const observedCeiling = Math.max(usageSummary.maxObservedInputTokens, liveContextTokens);
+  const extendedContextPossible = capability.provider === 'anthropic';
   const effectiveContextWindow =
-    observedCeiling > capability.contextWindow
+    extendedContextPossible && observedCeiling > capability.contextWindow
       ? Math.max(1_000_000, capability.contextWindow)
       : capability.contextWindow;
 

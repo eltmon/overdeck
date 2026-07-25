@@ -148,6 +148,27 @@ describe('computeContextUsage', () => {
     expect(result?.percentUsed).toBeCloseTo(34, 0);
   });
 
+  it('never auto-promotes a non-Anthropic model to 1M — 1M extended context is Anthropic-only', async () => {
+    // PAN-3057: a GPT-5.6 session past its declared window used to be rescored
+    // against 1M, which read ~18% full at 186k and silently disabled the
+    // Deacon's 85% proactive compaction. Observed-above-declared on a proxied
+    // model means the capability entry is stale, not that a 1M mode exists.
+    const line = `${makeJsonlLine({
+      type: 'assistant',
+      message: {
+        model: 'gpt-5.6-sol',
+        usage: { input_tokens: 400_000, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 },
+      },
+    })}\n`;
+    mockReadFile.mockResolvedValue(Buffer.from(line));
+
+    const { computeContextUsage } = await import('../conversation-service.js');
+    const result = await computeContextUsage('/fake/context-gpt56-over.jsonl', 'gpt-5.6-sol');
+
+    expect(result?.contextWindow).toBe(372_000);
+    expect(result?.percentUsed).toBe(100);
+  });
+
   it('returns null for unknown, null, and empty models without reading the file', async () => {
     mockReadFile.mockResolvedValue(Buffer.from('ignored'));
 

@@ -8,7 +8,7 @@ import { getOpenAIAuthStatus } from '../openai-auth.js';
 import { ensureOpenAICompatibleProxyRunning } from '../openai-compatible-proxy.js';
 import { validateProviderHealth } from '../provider-health.js';
 import { getProviderEnvSync, getProviderForModelSync } from '../providers.js';
-import { hasModelCapabilitySync, getModelCapabilitySync, resolveModelIdSync } from '../model-capabilities.js';
+import { CLIPROXY_GPT56_CONTEXT_WINDOW, hasModelCapabilitySync, getModelCapabilitySync, resolveModelIdSync } from '../model-capabilities.js';
 import type { Role } from './agent-state.js';
 
 /** Map abstract/future model names to CLIProxy-supported names.
@@ -109,10 +109,11 @@ const PROVIDER_ENV_KEYS = [
   'DASHSCOPE_API_KEY',
 ] as const;
 
-// The ChatGPT/Codex subscription route reports 372K for GPT-5.6. Keep this
-// harness policy separate from generic model capabilities, whose 150K value is
-// still consumed by dashboard usage, model-switch safety, and Deacon compaction.
-const GPT_56_CODEX_CLIENT_CONTEXT_WINDOW = 372_000;
+// PAN-3057: the harness pin and the capability table are ONE number now. They
+// used to disagree (372K here, 150K in model-capabilities), so the dashboard
+// meter and the Deacon's proactive compaction scored GPT-5.6 agents against a
+// window 2.5x smaller than the one the harness was actually given.
+const GPT_56_CODEX_CLIENT_CONTEXT_WINDOW = CLIPROXY_GPT56_CONTEXT_WINDOW;
 const GPT_56_MODELS = new Set(['gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna']);
 const KIMI_K3_MODELS = new Set(['k3', 'k3[1m]']);
 
@@ -121,7 +122,7 @@ interface ClaudeCodeContextPolicy {
   maxContextTokens?: number;
 }
 
-function getClaudeCodeContextPolicyForModel(model: string): ClaudeCodeContextPolicy {
+export function getClaudeCodeContextPolicyForModel(model: string): ClaudeCodeContextPolicy {
   const provider = getProviderForModelSync(model);
   if (provider.name === 'anthropic') return {};
 
