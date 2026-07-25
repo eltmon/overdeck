@@ -1,17 +1,25 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
+  discoverArtifactMock,
   ensureMergeSetForIssueMock,
   execMock,
   findMergedArtifactMock,
   getForgeAdapterMock,
   resolveProjectReposForIssueMock,
+  upsertMergeSetMock,
+  withRepoArtifactUrlMock,
+  withRepoStateMock,
 } = vi.hoisted(() => ({
+  discoverArtifactMock: vi.fn(),
   ensureMergeSetForIssueMock: vi.fn(),
   execMock: vi.fn<[string, any?], Promise<{ stdout: string; stderr: string }>>(),
   findMergedArtifactMock: vi.fn(),
   getForgeAdapterMock: vi.fn(),
   resolveProjectReposForIssueMock: vi.fn(),
+  upsertMergeSetMock: vi.fn(),
+  withRepoArtifactUrlMock: vi.fn(),
+  withRepoStateMock: vi.fn(),
 }));
 
 vi.mock('child_process', () => {
@@ -30,6 +38,9 @@ vi.mock('child_process', () => {
 
 vi.mock('../../../../src/lib/merge-set.js', () => ({
   ensureMergeSetForIssueSync: ensureMergeSetForIssueMock,
+  upsertMergeSetSync: upsertMergeSetMock,
+  withRepoArtifactUrlSync: withRepoArtifactUrlMock,
+  withRepoStateSync: withRepoStateMock,
 }));
 
 vi.mock('../../../../src/lib/project-repos.js', () => ({
@@ -40,7 +51,10 @@ vi.mock('../../../../src/lib/forge.js', () => ({
   getForgeAdapter: getForgeAdapterMock,
 }));
 
-import { assessMergeCompleteness } from '../../../../src/lib/cloister/merge-completeness.js';
+import {
+  assessMergeCompleteness,
+  reconcileStrandedRepos,
+} from '../../../../src/lib/cloister/merge-completeness.js';
 
 function repo(
   repoKey: string,
@@ -76,9 +90,25 @@ describe('assessMergeCompleteness', () => {
     vi.clearAllMocks();
     ensureMergeSetForIssueMock.mockReturnValue(mergeSet([]));
     resolveProjectReposForIssueMock.mockReturnValue(null);
-    getForgeAdapterMock.mockReturnValue({ findMergedArtifact: findMergedArtifactMock });
+    getForgeAdapterMock.mockReturnValue({
+      discoverArtifact: discoverArtifactMock,
+      findMergedArtifact: findMergedArtifactMock,
+    });
     execMock.mockResolvedValue(gitResult());
+    discoverArtifactMock.mockResolvedValue(null);
     findMergedArtifactMock.mockResolvedValue(null);
+    withRepoArtifactUrlMock.mockImplementation((current, repoKey, artifactUrl, artifactId) => ({
+      ...current,
+      repos: current.repos.map((entry) => (
+        entry.repoKey === repoKey ? { ...entry, artifactUrl, artifactId } : entry
+      )),
+    }));
+    withRepoStateMock.mockImplementation((current, repoKey, patch) => ({
+      ...current,
+      repos: current.repos.map((entry) => (
+        entry.repoKey === repoKey ? { ...entry, ...patch } : entry
+      )),
+    }));
   });
 
   it('returns complete when every changed required repo has a merged artifact', async () => {
@@ -190,5 +220,96 @@ describe('assessMergeCompleteness', () => {
     ]);
     expect(execMock).toHaveBeenCalledTimes(2);
     expect(findMergedArtifactMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('reconcileStrandedRepos', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getForgeAdapterMock.mockReturnValue({
+      discoverArtifact: discoverArtifactMock,
+      findMergedArtifact: findMergedArtifactMock,
+    });
+    execMock.mockResolvedValue(gitResult());
+    discoverArtifactMock.mockResolvedValue(null);
+    findMergedArtifactMock.mockResolvedValue(null);
+    withRepoArtifactUrlMock.mockImplementation((current, repoKey, artifactUrl, artifactId) => ({
+      ...current,
+      repos: current.repos.map((entry) => (
+        entry.repoKey === repoKey ? { ...entry, artifactUrl, artifactId } : entry
+      )),
+    }));
+    withRepoStateMock.mockImplementation((current, repoKey, patch) => ({
+      ...current,
+      repos: current.repos.map((entry) => (
+        entry.repoKey === repoKey ? { ...entry, ...patch } : entry
+      )),
+    }));
+  });
+
+  it('self-heals an unrecorded review artifact', async () => {
+    const stranded = { ...repo('api', 'gitlab'), mergeStatus: 'pending' };
+    discoverArtifactMock.mockResolvedValue({
+      forge: 'gitlab',
+      created: false,
+      url: 'https://gitlab.com/org/api/-/merge_requests/56',
+      id: '56',
+    });
+
+    const result = await reconcileStrandedRepos(mergeSet([stranded]) as any);
+
+    expect(result.blockers).toEqual([]);
+    expect(result.mergeSet.repos[0]).toEqual(expect.objectContaining({
+      artifactUrl: 'https://gitlab.com/org/api/-/merge_requests/56',
+      artifactId: '56',
+    }));
+    expect(upsertMergeSetMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('marks a stranded change-free repo as skipped', async () => {
+    const stranded = { ...repo('api', 'gitlab'), mergeStatus: 'pending' };
+    execMock.mockImplementation(async (command) => (
+      command.includes('rev-list --count') ? gitResult('0\n') : gitResult()
+    ));
+
+    const result = await reconcileStrandedRepos(mergeSet([stranded]) as any);
+
+    expect(result.blockers).toEqual([]);
+    expect(result.mergeSet.repos[0]).toEqual(expect.objectContaining({ mergeStatus: 'skipped' }));
+    expect(upsertMergeSetMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns a repo-naming blocker for commits without an artifact', async () => {
+    const stranded = { ...repo('api', 'gitlab'), mergeStatus: 'pending' };
+    execMock.mockImplementation(async (command) => (
+      command.includes('rev-list --count') ? gitResult('2\n') : gitResult()
+    ));
+
+    const result = await reconcileStrandedRepos(mergeSet([stranded]) as any);
+
+    expect(result.blockers).toEqual([
+      expect.objectContaining({
+        repoKey: 'api',
+        state: 'unmerged',
+        reason: expect.stringContaining('api has 2 commits'),
+      }),
+    ]);
+    expect(upsertMergeSetMock).not.toHaveBeenCalled();
+  });
+
+  it('fails closed when artifact discovery cannot be verified', async () => {
+    const stranded = { ...repo('api', 'gitlab'), mergeStatus: 'pending' };
+    discoverArtifactMock.mockRejectedValue(new Error('forge unavailable'));
+
+    const result = await reconcileStrandedRepos(mergeSet([stranded]) as any);
+
+    expect(result.blockers).toEqual([
+      expect.objectContaining({
+        repoKey: 'api',
+        state: 'unverifiable',
+        reason: expect.stringContaining('forge unavailable'),
+      }),
+    ]);
+    expect(execMock).not.toHaveBeenCalled();
   });
 });

@@ -505,6 +505,7 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
       console.log(`[merge] Polyrepo detected for ${issueId}, coordinating merge set...`);
       const { getMergeSetSync, ensureMergeSetForIssueSync, upsertMergeSetSync, withRepoStateSync } = await import('../../../../lib/merge-set.js');
       const { runQualityGates } = await import('../../../../lib/cloister/validation.js');
+      const { reconcileStrandedRepos } = await import('../../../../lib/cloister/merge-completeness.js');
       const { getForgeAdapter } = await import('../../../../lib/forge.js');
       const { messageAgent } = await import('../../../../lib/agents.js');
       let mergeSet = getMergeSetSync(issueId) || ensureMergeSetForIssueSync(issueId);
@@ -515,15 +516,40 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
         return { success: false, statusCode: 400, error };
       }
 
+      const reconciliation = await reconcileStrandedRepos(mergeSet);
+      mergeSet = reconciliation.mergeSet;
+      if (reconciliation.blockers.length > 0) {
+        const error = reconciliation.blockers.map(blocker => blocker.reason).join('; ');
+        mergeSet = { ...mergeSet, status: 'failed', updatedAt: new Date().toISOString() };
+        upsertMergeSetSync(mergeSet);
+        setReviewStatus(issueId, {
+          mergeStatus: 'failed', readyForMerge: false, mergeNotes: error,
+          blockerReasons: reconciliation.blockers.map(blocker => ({
+            type: 'unmerged_sibling_repo', summary: blocker.reason, detectedAt: new Date().toISOString(),
+          })),
+        });
+        completePendingOperation(issueId, error);
+        return { success: false, statusCode: 409, error };
+      }
+
       const activeRepos = mergeSet.repos
         .filter(repo => repo.mergeStatus !== 'skipped' && !!repo.artifactUrl)
         .sort((a, b) => a.mergeOrder - b.mergeOrder);
 
       if (activeRepos.length === 0) {
-        const error = `No changed repos are marked ready for coordinated merge in ${issueId}`;
-        setReviewStatus(issueId, { mergeStatus: 'failed', readyForMerge: false, mergeNotes: error });
-        completePendingOperation(issueId, error);
-        return { success: false, statusCode: 400, error };
+        mergeSet = { ...mergeSet, status: 'merged', updatedAt: new Date().toISOString() };
+        upsertMergeSetSync(mergeSet);
+        setReviewStatus(issueId, {
+          mergeStatus: 'merged', mergeNotes: undefined, readyForMerge: false, ...mergeCompletionStatus(request),
+        });
+        completePendingOperation(issueId, null);
+        const { postMergeLifecycle } = await import('../../../../lib/cloister/merge-agent.js');
+        advanceQueue();
+        await postMergeLifecycle(issueId, projectPath);
+        return {
+          success: true, statusCode: 200, message: `No changed repos remain for ${issueId}`,
+          mergeStatus: 'merged', repos: [],
+        };
       }
 
       const agentId = `agent-${issueId.toLowerCase()}`;
