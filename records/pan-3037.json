@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-25T20:44:21.373Z",
-  "updated": "2026-07-25T21:47:40.625Z",
+  "updated": "2026-07-25T21:50:51.180Z",
   "pipeline": {
     "issueId": "PAN-3037",
     "reviewStatus": "pending",
@@ -75,16 +75,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 15,
-    "claims": {
-      "docs-and-skill": {
-        "writerId": "agent-pan-3037",
-        "agentId": "agent-pan-3037",
-        "pid": 2514446,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-25T21:47:40.625Z"
-      }
-    },
+    "sequence": 16,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3037",
@@ -162,6 +154,17 @@
         "outcome": "completed",
         "reason": "pan start now verifies every canonical workspace repo root, names unsafe polyrepo members, preserves monorepo repair, and removes the hand-rolled directory scan.",
         "releasedAt": "2026-07-25T21:47:31.392Z"
+      },
+      {
+        "writerId": "agent-pan-3037",
+        "agentId": "agent-pan-3037",
+        "pid": 2514446,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-25T21:47:40.625Z",
+        "itemId": "docs-and-skill",
+        "outcome": "completed",
+        "reason": "Updated the pan-sync-main skill and specialist workflow docs with canonical repo discovery, sequential per-repo sync, stop-on-first-failure, skipped repo reporting, and retained earlier merges.",
+        "releasedAt": "2026-07-25T21:50:51.180Z"
       }
     ],
     "statusReasons": {
@@ -192,6 +195,10 @@
       "start-branch-verification": {
         "reason": "pan start now verifies every canonical workspace repo root, names unsafe polyrepo members, preserves monorepo repair, and removes the hand-rolled directory scan.",
         "updatedAt": "2026-07-25T21:47:31.392Z"
+      },
+      "docs-and-skill": {
+        "reason": "Updated the pan-sync-main skill and specialist workflow docs with canonical repo discovery, sequential per-repo sync, stop-on-first-failure, skipped repo reporting, and retained earlier merges.",
+        "updatedAt": "2026-07-25T21:50:51.180Z"
       }
     }
   },
@@ -223,6 +230,8 @@
     "start-branch-verification.start-branch-verification.ac1": "completed",
     "start-branch-verification.start-branch-verification.ac2": "completed",
     "start-branch-verification.start-branch-verification.ac3": "completed",
-    "docs-and-skill": "running"
+    "docs-and-skill": "completed",
+    "docs-and-skill.docs-and-skill.ac1": "completed",
+    "docs-and-skill.docs-and-skill.ac2": "completed"
   }
 }
