@@ -22,18 +22,18 @@
   ],
   "feedback": [],
   "created": "2026-07-25T20:42:32.108Z",
-  "updated": "2026-07-25T21:09:37.134Z",
+  "updated": "2026-07-25T21:10:51.417Z",
   "pipeline": {
     "issueId": "PAN-2467",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "inspecting",
+    "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-25T21:09:37.117Z",
-    "inspectNotes": "Inspecting item completeness-assessor"
+    "updatedAt": "2026-07-25T21:10:51.350Z",
+    "inspectNotes": "AC1-5 verified against real APIs: unmerged reason names repoKey+aheadCount; merged artifact path yields state 'merged' + complete true; every git/forge error caught into 'unverifiable' (fails closed, complete false); missing source ref and single-repo resolver both land 'no-changes'/'merged' without throwing; enumeration is solely ensureMergeSetForIssueSync -> resolveProjectReposForIssueSync with promisified exec and zero workspaceType conditionals. MergeSetRepoState and ResolvedProjectRepo are both structurally compatible with RepoToAssess (repoKey/repoPath/forge/sourceBranch/targetBranch/required all present)."
   },
   "closeOut": {
     "usage": {
@@ -48,9 +48,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 520961,
-            "output": 68537,
-            "cacheRead": 16747008,
+            "input": 525047,
+            "output": 68637,
+            "cacheRead": 17108480,
             "cacheWrite": 0
           }
         }
@@ -63,15 +63,15 @@
           "cacheWrite": 514905
         },
         "openai/gpt-5.6-sol": {
-          "input": 520961,
-          "output": 68537,
-          "cacheRead": 16747008,
+          "input": 525047,
+          "output": 68637,
+          "cacheRead": 17108480,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 26.259393,
-        "pricingAsOf": "2026-07-25T21:09:37.127Z"
+        "usd": 26.463559,
+        "pricingAsOf": "2026-07-25T21:10:51.382Z"
       }
     },
     "merges": [],
