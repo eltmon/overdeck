@@ -1252,8 +1252,13 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
 
     case 'activity.entry': {
       const entry = event.payload as Record<string, unknown>;
-      const newEntry = { id: entry.id, timestamp: event.timestamp, ...entry };
-      const updated = [newEntry, ...(state.recentActivity as Array<Record<string, unknown>>)].slice(0, MAX_ACTIVITY_ENTRIES);
+      const previousEntries = state.recentActivity as Array<Record<string, unknown>>;
+      const previous = previousEntries.find(candidate => candidate.id === entry.id);
+      const newEntry = { ...previous, id: entry.id, timestamp: event.timestamp, ...entry };
+      const updated = [
+        newEntry,
+        ...previousEntries.filter(candidate => candidate.id !== entry.id),
+      ].slice(0, MAX_ACTIVITY_ENTRIES);
       return { ...state, sequence: Math.max(state.sequence, event.sequence), recentActivity: updated };
     }
 

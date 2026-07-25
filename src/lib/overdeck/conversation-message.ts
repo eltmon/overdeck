@@ -14,6 +14,15 @@ import type { RuntimeName } from '../runtimes/types.js';
 import { captureTranscriptUserRecordSnapshot } from '../transcript-landing.js';
 import { deliverAgentMessage, injectPiConversationMemory } from '../agents.js';
 import {
+  ComposerCommandConfirmationError,
+  composerCommandConfirmationFromBody,
+} from '../composer-commands/confirmations.js';
+import { ComposerCommandParseError } from '../composer-commands/parser.js';
+import {
+  composerCommandResultHttpStatus,
+  handleComposerCommandMessage,
+} from '../composer-commands/router.js';
+import {
   extractConversationAttachmentPaths,
   ensureConversationAttachmentDir,
   getConversationAttachmentsRoot,
@@ -194,6 +203,8 @@ function sanitizeUploadBasename(name: string): string {
 export interface ConversationMessageDependencies {
   resolveSessionFile(conv: Conversation): Promise<string | null>;
   generateAiTitle(name: string, message: string): Promise<void>;
+  shouldInterceptManualCompact?(message: string): boolean;
+  transformMessageForHarness?(message: string, harness: RuntimeName, attachmentPaths: string[]): string;
 }
 
 export function safeUploadExtension(filename: string, mimeType: string): string {
@@ -403,7 +414,44 @@ export async function handleConversationMessage(
     return jsonResponse({ error: `Message exceeds maximum length of ${MAX_MESSAGE_LENGTH} characters` }, { status: 400 });
   }
 
-  if (getHarnessBehavior(conv.harness).transcriptKind === 'claude-jsonl' && shouldInterceptManualCompact(message)) {
+  // Routing order is deliberate: validate → /pan route → native compact →
+  // attachments → harness delivery. Intercepting the portable namespace here
+  // keeps operator commands out of prompt transforms, control channels, PTY/tmux
+  // delivery, and harness transcripts while ordinary text follows the old path.
+  try {
+    const result = await handleComposerCommandMessage({
+      message,
+      confirmation: composerCommandConfirmationFromBody(body),
+      target: {
+        kind: 'conversation',
+        id: conv.name,
+        harness: conv.harness ?? 'claude-code',
+        cwd: conv.cwd,
+        issueId: conv.issueId ?? undefined,
+      },
+    });
+    if (result !== null) {
+      return jsonResponse(result, { status: composerCommandResultHttpStatus(result) });
+    }
+  } catch (error) {
+    if (error instanceof ComposerCommandConfirmationError) {
+      return jsonResponse({
+        error: error.message,
+        code: error.code,
+      }, { status: 422 });
+    }
+    if (!(error instanceof ComposerCommandParseError)) throw error;
+    const status = error.code === 'unknown-command' ? 404 : error.code === 'unknown-flag' ? 422 : 400;
+    return jsonResponse({
+      error: error.message,
+      code: error.code,
+      token: error.token,
+      expected: error.expected,
+    }, { status });
+  }
+
+  const interceptManualCompact = deps.shouldInterceptManualCompact ?? shouldInterceptManualCompact;
+  if (getHarnessBehavior(conv.harness).transcriptKind === 'claude-jsonl' && interceptManualCompact(message)) {
     const compactSessionFile = await deps.resolveSessionFile(conv);
     if (!compactSessionFile || !existsSync(compactSessionFile)) {
       return jsonResponse({ error: `No session file found for conversation ${conv.name}` }, { status: 400 });
@@ -461,7 +509,8 @@ export async function handleConversationMessage(
     );
   }
 
-  let deliveredMessage = transformMessageForHarness(outboundMessage, harness, effectiveAttachmentPaths);
+  const transformForHarness = deps.transformMessageForHarness ?? transformMessageForHarness;
+  let deliveredMessage = transformForHarness(outboundMessage, harness, effectiveAttachmentPaths);
   if (behavior.injectsPromptTimeMemory) {
     deliveredMessage = await injectPiConversationMemory(
       { cwd: conv.cwd, issueId: conv.issueId, conversationName: conv.name },

@@ -1,6 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { waitFor } from '@testing-library/react';
-import { useComposerStore, resetComposerStore } from '../composerStore';
+import {
+  resetComposerStore,
+  sendConversationMessage,
+  useComposerStore,
+} from '../composerStore';
 
 const CONV = 'conv-test';
 
@@ -118,6 +122,100 @@ describe('composerStore retryFailed — a retry never loses the text', () => {
     expect(fetchMock).toHaveBeenCalledWith(
       '/api/agents/agent-pan-42/message',
       expect.objectContaining({ method: 'POST' }),
+    );
+  });
+
+  it('retries a command without ever creating an optimistic prompt bubble', async () => {
+    const commandResult = {
+      kind: 'captured',
+      status: 'completed',
+      command: '/pan status',
+      output: 'Ready.',
+      truncated: false,
+    };
+    fetchMock.mockResolvedValue(fetchResult(true, 200, JSON.stringify(commandResult)));
+    useComposerStore.getState().failSend(CONV, '/pan status', 'command');
+    const failed = useComposerStore.getState().byConversation[CONV]!.failed[0]!;
+
+    await useComposerStore.getState().retryFailed(CONV, failed.id, failed.text, 3);
+
+    const slice = useComposerStore.getState().byConversation[CONV]!;
+    expect(slice.optimistic).toEqual([]);
+    expect(slice.failed).toEqual([]);
+    expect(slice.commandResults).toHaveLength(1);
+    expect(slice.commandResults[0]).toMatchObject({
+      role: 'system',
+      commandText: '/pan status',
+      commandResult,
+    });
+  });
+
+  it('returns a failed command to the outbox with its command identity intact', async () => {
+    fetchMock.mockRejectedValue(new Error('network down'));
+    useComposerStore.getState().failSend(CONV, '/pan status', 'command');
+    const failed = useComposerStore.getState().byConversation[CONV]!.failed[0]!;
+
+    await useComposerStore.getState().retryFailed(CONV, failed.id, failed.text, 0);
+
+    const slice = useComposerStore.getState().byConversation[CONV]!;
+    expect(slice.optimistic).toEqual([]);
+    expect(slice.failed).toEqual([
+      expect.objectContaining({ text: '/pan status', kind: 'command' }),
+    ]);
+  });
+});
+
+describe('sendConversationMessage command results', () => {
+  let fetchMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    resetComposerStore();
+    fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('returns a terminal-only structured rejection from a non-2xx response', async () => {
+    const result = {
+      kind: 'terminal-only',
+      status: 'rejected',
+      message: 'Run this command in a terminal.',
+    };
+    fetchMock.mockResolvedValue(fetchResult(false, 422, JSON.stringify(result)));
+
+    await expect(sendConversationMessage(CONV, '/pan shell')).resolves.toEqual(result);
+  });
+
+  it('binds confirmation nonce and typed text to the command resubmission payload', async () => {
+    const result = {
+      kind: 'captured',
+      status: 'completed',
+      command: '/pan dangerous',
+      output: 'Done.',
+      truncated: false,
+    };
+    fetchMock.mockResolvedValue(fetchResult(true, 200, JSON.stringify(result)));
+
+    await sendConversationMessage(
+      CONV,
+      '/pan dangerous',
+      undefined,
+      undefined,
+      { nonce: 'nonce-1', typedText: 'CONFIRM' },
+    );
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      `/api/conversations/${CONV}/message`,
+      expect.objectContaining({
+        body: JSON.stringify({
+          message: '/pan dangerous',
+          confirmationNonce: 'nonce-1',
+          confirmationText: 'CONFIRM',
+        }),
+      }),
     );
   });
 });

@@ -191,6 +191,27 @@ The conversation list shows all active and ended sessions:
 - **Title**: Auto-generated from the first message, or manually renamed
 - **Cost**: Estimated token cost for the session
 
+### Composer command lanes
+
+The conversation composer has three distinct lanes. The leading slash decides whether Overdeck handles the text or sends it to the active coding harness:
+
+```text
+/pan start PAN-1987  → Overdeck operator command; intercepted before the harness
+/model               → Harness-native command; availability varies by harness
+ordinary text        → Prompt delivered unchanged to the active harness
+```
+
+Unprefixed text such as `pan start PAN-1987` remains an ordinary prompt. This preserves the ability to ask an agent to run or discuss a CLI command without accidentally invoking the dashboard control plane.
+
+Overdeck commands return one of four result forms:
+
+- **Captured** commands finish during the request and render their completed or failed status plus bounded, monospace output. A truncation notice appears when output exceeds the server limit.
+- **Detached** commands register an activity before starting background work, return immediately with its accepted activity ID, and update that same Mission Control entry to running, completed, or failed with bounded output.
+- **UI** commands open an existing dashboard dialog, such as the handoff or fork dialog, rather than adding command text to the agent transcript.
+- **Terminal-only** commands are recognized but rejected in the composer with an actionable instruction to run them in a terminal.
+
+Commands with dialog consequences first render a confirmation control backed by a single-use nonce. Destructive commands also require the exact case-sensitive confirmation text shown in the control. Confirmations are bound to the selected target and canonical command arguments, expire after five minutes, and cannot be replayed.
+
 ### Forking Conversations
 
 Click the fork icon on any conversation to create a continuation. The fork dialog offers:

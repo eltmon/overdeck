@@ -49,8 +49,8 @@ interface ComposerFooterProps {
   onSend?: (text: string) => void;
   /** Called after the send POST resolves successfully. */
   onSendAcknowledged?: (text: string) => void;
-  /** Called when the POST fails — parent should move the optimistic message to the failed outbox */
-  onSendFailed?: (text: string) => void;
+  /** Called when the POST fails — parent preserves the original prompt/command lane. */
+  onSendFailed?: (text: string, kind: 'command' | 'prompt') => void;
   /** Agent ID for agent sessions (uses /api/agents/* endpoints instead of /api/conversations/*) */
   agentId?: string;
   /**
@@ -67,6 +67,20 @@ type DeliverAs = 'auto' | 'steer' | 'follow_up';
 
 function isPiConversation(conversation: Conversation): boolean {
   return conversation.harness === 'ohmypi' || conversation.harness === 'pi';
+}
+
+function openComposerUi(
+  conversation: Conversation,
+  action: 'handoff' | 'fork',
+  focus?: string,
+): void {
+  window.dispatchEvent(new CustomEvent('overdeck:open-fork-modal', {
+    detail: {
+      conversation,
+      mode: action === 'handoff' ? 'handoff' : 'summary',
+      focus,
+    },
+  }));
 }
 
 function formatFileSize(bytes: number): string {
@@ -112,6 +126,7 @@ export function ComposerFooter({
   const enqueueAttachmentsForConversation = useComposerStore((s) => s.enqueueAttachments);
   const removeAttachmentForConversation = useComposerStore((s) => s.removeAttachment);
   const consumeAttachmentsForConversation = useComposerStore((s) => s.consumeAttachments);
+  const addCommandResult = useComposerStore((s) => s.addCommandResult);
 
   const [text, setText] = useState('');
   const [isVoiceWidgetOpen, setIsVoiceWidgetOpen] = useState(false);
@@ -396,9 +411,7 @@ export function ComposerFooter({
     const handoffMatch = messageText.match(/^\/(?:pan[\s-])?handoff(?:\s+(.+))?$/i);
     if (handoffMatch) {
       const focus = handoffMatch[1]?.trim() || undefined;
-      window.dispatchEvent(new CustomEvent('overdeck:open-fork-modal', {
-        detail: { conversation, mode: 'handoff', focus },
-      }));
+      openComposerUi(conversation, 'handoff', focus);
       editor.update(() => {
         $getRoot().clear();
       });
@@ -432,6 +445,10 @@ export function ComposerFooter({
       .map((attachment) => `@${attachment.serverPath}`)
       .join('\n');
     const composedMessage = [attachmentPrefix, messageText].filter(Boolean).join('\n');
+    const isPortableCommand = /^\/pan(?:\s|$)/i.test(messageText);
+    // Attachments belong to the prompt lane. Portable commands stay in the
+    // control-plane lane and leave any uploaded attachments pending.
+    const submissionMessage = isPortableCommand ? messageText : composedMessage;
     try {
       // DISABLED 2026-06-16: a plain message-send must NEVER switch the model.
       // This auto-switch silently killed a running agent's live session (the Opus
@@ -449,23 +466,37 @@ export function ComposerFooter({
         return;
       }
 
-      // Optimistic: notify parent immediately so message appears before server round-trip
-      onSend?.(composedMessage);
+      // The `/pan` namespace is intercepted by the dashboard control plane and
+      // returns a structured result. It must never appear as an optimistic user
+      // prompt or reach the harness transcript.
+      if (!isPortableCommand) onSend?.(composedMessage);
 
-      await sendConversationMessage(
+      const commandResult = await sendConversationMessage(
         submitConversationName,
-        composedMessage,
+        submissionMessage,
         agentId,
         piConversation && deliverAs !== 'auto' ? deliverAs : undefined,
       );
-      onSendAcknowledged?.(composedMessage);
+      if (commandResult?.kind === 'ui') {
+        openComposerUi(
+          conversation,
+          commandResult.action,
+          commandResult.args.focus || undefined,
+        );
+      } else if (commandResult) {
+        addCommandResult(submitConversationName, submissionMessage, commandResult);
+      } else {
+        onSendAcknowledged?.(submissionMessage);
+      }
 
       // The send consumed this conversation's attachments — revoke their previews and
       // drop them from the store. Target submitConversationName explicitly so the
       // right conversation is cleared even if the user switched while the send
       // was in flight. The sent message references the server uploads by @path,
       // so consumeAttachments does NOT delete them server-side.
-      consumeAttachmentsForConversation(submitConversationName);
+      if (!isPortableCommand) {
+        consumeAttachmentsForConversation(submitConversationName);
+      }
 
       // Only clear the editor if still on the same conversation, to avoid wiping
       // the new conversation's draft if the user switched while the send was in
@@ -479,7 +510,7 @@ export function ComposerFooter({
     } catch (err) {
       console.error('[ComposerFooter] Failed to send:', err);
       toast.error(err instanceof Error ? err.message : 'Failed to send message');
-      onSendFailed?.(composedMessage);
+      onSendFailed?.(submissionMessage, isPortableCommand ? 'command' : 'prompt');
     } finally {
       // Clear the originating conversation's sending state regardless of which
       // conversation is now mounted — the send belonged to submitConversationName.
@@ -487,7 +518,7 @@ export function ComposerFooter({
       // Refocus editor
       editor.focus();
     }
-  }, [agentId, conversation.model, conversation.name, conversation.sessionAlive, consumeAttachmentsForConversation, deliverAs, harness, isDisabled, model, onSend, onSendAcknowledged, onSendFailed, piConversation, sending, setSendingFor]);
+  }, [addCommandResult, agentId, conversation, consumeAttachmentsForConversation, deliverAs, harness, isDisabled, model, onSend, onSendAcknowledged, onSendFailed, piConversation, sending, setSendingFor]);
 
   useEffect(() => {
     const previousConversationName = previousConversationNameRef.current;
@@ -604,6 +635,7 @@ export function ComposerFooter({
         {/* Editor (no border of its own) */}
         <ComposerPromptEditor
           conversationName={conversation.name}
+          harness={harness}
           disabled={isDisabled}
           onCommandKeyDown={handleCommandKey}
           editorRef={editorRef}

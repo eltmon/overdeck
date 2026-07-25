@@ -35,13 +35,19 @@ type DashboardSnapshotWithActivity = DashboardSnapshot & {
 
 export function activityEntriesFromStoredEvents(
   events: ReadonlyArray<{ timestamp: string; payload: unknown }>,
+  limit = MAX_SNAPSHOT_ACTIVITY_ENTRIES,
 ): unknown[] {
-  return events.slice(0, MAX_SNAPSHOT_ACTIVITY_ENTRIES).map((event) => {
+  const entries: Record<string, unknown>[] = [];
+  for (const event of events) {
     const entry = event.payload && typeof event.payload === 'object'
       ? event.payload as Record<string, unknown>
       : {};
-    return { id: entry.id, timestamp: event.timestamp, ...entry };
-  });
+    const previousIndex = entries.findIndex(candidate => candidate.id === entry.id);
+    const previous = previousIndex >= 0 ? entries[previousIndex] : undefined;
+    if (previousIndex >= 0) entries.splice(previousIndex, 1);
+    entries.unshift({ ...previous, id: entry.id, timestamp: event.timestamp, ...entry });
+  }
+  return entries.slice(0, limit);
 }
 
 

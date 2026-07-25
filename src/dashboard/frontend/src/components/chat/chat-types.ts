@@ -3,6 +3,8 @@
 // plain TypeScript interfaces so the frontend can use them without resolving
 // through the workspace's contracts package symlink.
 
+import type { ComposerCommandResult } from '@overdeck/contracts';
+
 export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant' | 'system';
@@ -13,13 +15,18 @@ export interface ChatMessage {
   streaming?: boolean;
   sequence?: number;
   acknowledged?: boolean;
+  /** Local-only structured result for a dashboard-intercepted `/pan` command. */
+  commandResult?: ComposerCommandResult;
+  /** Exact command text that produced commandResult, used for confirmations. */
+  commandText?: string;
 }
 
-/** A user message whose send POST failed — held in the retry outbox. */
+/** A user message or portable command whose send POST failed — held in the retry outbox. */
 export interface FailedMessage {
   id: string;
   text: string;
   createdAt: string;
+  kind: 'command' | 'prompt';
 }
 
 export interface WorkLogEntry {

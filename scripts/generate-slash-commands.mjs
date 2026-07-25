@@ -8,67 +8,48 @@ import { spawnSync } from 'node:child_process';
 const projectRoot = resolve(import.meta.dirname, '..');
 const cliEntry = join(projectRoot, 'dist', 'cli', 'index.js');
 const curationPath = join(projectRoot, 'scripts', 'slash-commands-curation.json');
-const defaultOutputPath = join(
+const defaultManifestOutputPath = join(
   projectRoot,
+  'packages',
+  'contracts',
   'src',
-  'dashboard',
-  'frontend',
-  'src',
-  'components',
-  'chat',
-  'slashCommands.generated.ts',
+  'composer-commands.generated.ts',
 );
 
 function parseOutputPath(args) {
-  if (args.length === 0) return defaultOutputPath;
-  if (args.length === 2 && args[0] === '--out' && args[1]) {
+  if (args.length === 0) return defaultManifestOutputPath;
+  if (args.length === 2 && args[0] === '--manifest-out' && args[1]) {
     return resolve(projectRoot, args[1]);
   }
-  console.error('usage: node scripts/generate-slash-commands.mjs [--out <path>]');
+  console.error('usage: node scripts/generate-slash-commands.mjs [--manifest-out <path>]');
   process.exit(2);
 }
 
-function firstSentence(description) {
-  const sentence = description.split('. ')[0];
-  if (sentence.length <= 100) return sentence;
-  return `${sentence.slice(0, 99).trimEnd()}…`;
+function portableSyntax(value) {
+  return value.replace(/^pan\b/, '/pan').replaceAll(/ {2,}/g, ' ');
 }
 
-function quote(value) {
-  return `'${value
-    .replaceAll('\\', '\\\\')
-    .replaceAll("'", "\\'")
-    .replaceAll('\r', '\\r')
-    .replaceAll('\n', '\\n')}'`;
-}
-
-function renderEntry(entry) {
-  return [
-    '  {',
-    `    id: ${quote(entry.id)},`,
-    `    label: ${quote(entry.label)},`,
-    `    description: ${quote(entry.description)},`,
-    `    insert: ${quote(entry.insert)},`,
-    `    category: ${quote(entry.category)},`,
-    '  },',
-  ].join('\n');
-}
-
-function renderModule(entries) {
+function renderManifestModule(entries, insertOverrides, variants) {
   return [
     '// GENERATED FILE — do not edit by hand.',
     '// Source: the pan CLI command registry via `pan admin commands --json`.',
     '// Regenerate: npm run generate:slash-commands   (drift-gated by scripts/lint-slash-commands.sh)',
-    "import type { SlashCommand } from './slashCommandTypes';",
+    'import type { ComposerCommandManifestEntry } from "./composer-commands"',
     '',
-    'export const GENERATED_SLASH_COMMANDS: SlashCommand[] = [',
-    ...entries.map(renderEntry),
-    '];',
+    'export const COMPOSER_COMMAND_MANIFEST: ComposerCommandManifestEntry[] = [',
+    ...entries.map(entry => `  ${JSON.stringify(entry)},`),
+    ']',
+    '',
+    `export const COMPOSER_COMMAND_INSERT_OVERRIDES: Readonly<Record<string, string>> = ${JSON.stringify(insertOverrides, null, 2)}`,
+    '',
+    'export const COMPOSER_COMMAND_VARIANTS = [',
+    ...variants.map(variant => `  ${JSON.stringify(variant)},`),
+    '] as const',
     '',
   ].join('\n');
 }
 
-const outputPath = parseOutputPath(process.argv.slice(2));
+const manifestOutputPath = parseOutputPath(process.argv.slice(2));
 
 if (!existsSync(cliEntry)) {
   console.error("dist/cli/index.js not found — run 'npm run build:cli' first");
@@ -101,25 +82,46 @@ if (!Array.isArray(commandTree)) {
 }
 
 const curation = JSON.parse(await readFile(curationPath, 'utf8'));
-const generatedEntries = commandTree
-  .filter(command => !command.hasSubcommands || command.args.length > 0)
-  .filter(command => {
-    const commandPath = command.path.join(' ');
-    return !curation.deny.some(prefix => commandPath === prefix || commandPath.startsWith(`${prefix} `));
-  })
-  .map(command => {
-    const commandPath = command.path.join(' ');
-    const label = `pan ${commandPath}`;
-    return {
-      id: `pan-${command.path.join('-')}`,
-      label,
-      description: firstSentence(command.description),
-      insert: curation.insertOverrides[commandPath] ?? `${label}${command.args.length > 0 ? ' ' : ''}`,
-      category: curation.categories[command.path[0]] ?? 'CLI',
-    };
-  });
+const manifestEntries = commandTree.map(command => {
+  const commandPath = command.path.join(' ');
+  return {
+    id: `pan-${command.path.join('-')}`,
+    path: command.path,
+    display: `/pan ${commandPath}`,
+    description: command.description,
+    args: command.args,
+    options: command.options,
+    aliases: command.aliases,
+    category: curation.categories[command.path[0]] ?? 'CLI',
+  };
+});
+const manifestPaths = new Set(manifestEntries.map(entry => entry.path.join(' ')));
+const insertOverrides = Object.fromEntries(
+  Object.entries(curation.insertOverrides).map(([path, insert]) => [path, portableSyntax(insert)]),
+);
+const variants = curation.extras.map(extra => {
+  const path = extra.label
+    .replace(/^pan\s+/, '')
+    .split(/\s+/)
+    .filter(part => !part.startsWith('--'));
+  const canonicalPath = path.join(' ');
+  if (!manifestPaths.has(canonicalPath)) {
+    throw new Error(`Curated slash-command variant does not match a visible command: ${extra.label}`);
+  }
+  return {
+    id: extra.id,
+    path,
+    display: portableSyntax(extra.label),
+    description: extra.description,
+    insert: portableSyntax(extra.insert),
+    category: extra.category,
+  };
+});
 
-const entries = [...generatedEntries, ...curation.extras];
-await mkdir(dirname(outputPath), { recursive: true });
-await writeFile(outputPath, renderModule(entries), 'utf8');
-console.log(`Generated ${entries.length} slash commands at ${outputPath}`);
+await mkdir(dirname(manifestOutputPath), { recursive: true });
+await writeFile(
+  manifestOutputPath,
+  renderManifestModule(manifestEntries, insertOverrides, variants),
+  'utf8',
+);
+console.log(`Generated ${manifestEntries.length} composer commands at ${manifestOutputPath}`);

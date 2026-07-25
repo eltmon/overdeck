@@ -30,6 +30,27 @@ function configYamlSingleChunkAssertion() {
   };
 }
 
+function cliEntrypointExclusionAssertion() {
+  return {
+    name: 'cli-entrypoint-exclusion-assertion',
+    writeBundle(
+      _outputOptions: unknown,
+      bundle: Record<string, { type: string; modules?: Record<string, unknown> }>,
+    ) {
+      const cliModules = Object.values(bundle)
+        .filter(output => output.type === 'chunk' && output.modules)
+        .flatMap(output => Object.keys(output.modules ?? {}))
+        .filter(moduleId => moduleId.replaceAll('\\', '/').endsWith('/src/cli/index.ts'));
+
+      if (cliModules.length > 0) {
+        throw new Error(
+          `Dashboard bundle must not import src/cli/index.ts; found ${cliModules.join(', ')}`,
+        );
+      }
+    },
+  };
+}
+
 function strikeLandingDeaconChunkAssertion() {
   return {
     name: 'strike-landing-deacon-chunk-assertion',
@@ -98,7 +119,11 @@ export default defineConfig(async () => {
         ],
       },
     },
-    plugins: [configYamlSingleChunkAssertion(), strikeLandingDeaconChunkAssertion()],
+    plugins: [
+      cliEntrypointExclusionAssertion(),
+      configYamlSingleChunkAssertion(),
+      strikeLandingDeaconChunkAssertion(),
+    ],
     deps: {
       alwaysBundle: [/^@overdeck\//],
       neverBundle: [
