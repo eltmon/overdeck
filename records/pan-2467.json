@@ -22,7 +22,7 @@
   ],
   "feedback": [],
   "created": "2026-07-25T20:42:32.108Z",
-  "updated": "2026-07-25T21:39:08.752Z",
+  "updated": "2026-07-25T21:39:24.980Z",
   "pipeline": {
     "issueId": "PAN-2467",
     "reviewStatus": "pending",
@@ -81,8 +81,16 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 10,
-    "claims": {},
+    "sequence": 11,
+    "claims": {
+      "blocker-surface": {
+        "writerId": "agent-pan-2467",
+        "agentId": "agent-pan-2467",
+        "pid": 2226489,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-25T21:39:24.979Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-2467",
@@ -187,6 +195,7 @@
     "forge-merge-honesty": "completed",
     "forge-merge-honesty.forge-merge-honesty.ac1": "completed",
     "forge-merge-honesty.forge-merge-honesty.ac2": "completed",
-    "forge-merge-honesty.forge-merge-honesty.ac3": "completed"
+    "forge-merge-honesty.forge-merge-honesty.ac3": "completed",
+    "blocker-surface": "running"
   }
 }
