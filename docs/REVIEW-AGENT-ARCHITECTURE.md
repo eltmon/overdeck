@@ -64,7 +64,14 @@ The full round trip between the work agent and review:
    which rebases + pushes, records the durable `reviewRequestedAt` intent in the
    journal, and triggers review dispatch. If the reactive trigger is dropped, the
    host auto-dispatches from the journal intent on the next status read
-   (PAN-1988) — no deacon required.
+   (PAN-1988) — no deacon required. The intent lifecycle has four stages: `pan
+   done` **writes** it before HTTP progression; dispatch **services** it by
+   stamping `reviewSpawnedAt`; a terminal verdict **consumes** it by clearing a
+   serviced request from status and the journal; and `needsReviewDispatch`
+   **guards** passed, skipped, and `readyForMerge` states from dispatch. Genuine
+   re-review paths reset `reviewStatus` to `pending` first. PAN-3083 added the
+   consumption and guards after an unconsumed intent repeatedly re-dispatched
+   passed-and-ready issues and invalidated their UAT generations.
 2. **Review runs** in the resolved mode (above). Sessions are **warm by
    default** (PAN-2579): recording a verdict never kills the session; re-review
    resumes reviewers with their prior-cycle context.
