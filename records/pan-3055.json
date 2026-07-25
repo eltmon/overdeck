@@ -38,7 +38,7 @@
     "recordedAt": "2026-07-25T12:48:24.279Z"
   },
   "created": "2026-07-25T11:59:26.466Z",
-  "updated": "2026-07-25T12:52:37.798Z",
+  "updated": "2026-07-25T12:52:39.860Z",
   "pipeline": {
     "issueId": "PAN-3055",
     "reviewStatus": "failed",
@@ -48,7 +48,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-25T12:49:09.494Z",
-    "updatedAt": "2026-07-25T12:52:37.682Z",
+    "updatedAt": "2026-07-25T12:52:37.727Z",
     "reviewNotes": "Verification failed at typecheck",
     "verificationNotes": "Verification FAILED at typecheck (99068ms):\n\n\n> @overdeck/core@0.45.24 pretypecheck\n> npm run build:contracts\n\n\n> @overdeck/core@0.45.24 build:contracts\n> node scripts/fs-helper.mjs rmrf packages/contracts/dist && npm --prefix ./packages/contracts run build\n\n\n> @overdeck/contracts@0.45.24 build\n> cross-env NODE_OPTIONS=--max-old-space-size=16384 tsdown\n\n\u001b[34mℹ\u001b[39m \u001b[34mtsdown v0.21.10\u001b[39m powered by \u001b[38;2;255;126;23mrolldown v1.0.0-rc.17\u001b[39m\n\u001b[34mℹ\u001b[39m config file: \u001b[4m/home/eltmon/Projects/overdeck/workspaces/feature-pan-3055/packages/contracts/tsdown.config.ts\u001b[24m \n\u001b[34mℹ\u001b[39m entry: \u001b[34msrc/index.ts\u001b[39m\n\u001b[34mℹ\u001b[39m tsconfig: \u001b[34mtsconfig.json\u001b[39m\n\u001b[34mℹ\u001b[39m entry: \u001b[34msrc/index.ts\u001b[39m\n\u001b[34mℹ\u001b[39m tsconfig: \u001b[34mtsconfig.json\u001b[39m\n\u001b[34mℹ\u001b[39m Build start\n\u001b[34mℹ\u001b[39m \u001b[33m[CJS]\u001b[39m \u001b[2mdist/\u001b[22m\u001b[1mindex.cjs\u001b[22m  \u001b[2m354.45 kB\u001b[22m \u001b[2m│ gzip: 57.30 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[33m[CJS]\u001b[39m 1 files, total: 354.45 kB\n\u001b[32m✔\u001b[39m Build complete in \u001b[32m3252ms\u001b[39m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22m\u001b[1mindex.mjs\u001b[22m       \u001b[2m325.41 kB\u001b[22m \u001b[2m│ gzip: 55.33 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22mindex.mjs.map   \u001b[2m536.05 kB\u001b[22m \u001b[2m│ gzip: 86.05 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22mindex.d.ts.map  \u001b[2m 45.06 kB\u001b[22m \u001b[2m│ gzip:  5.55 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22m\u001b[32m\u001b[1mindex.d.ts\u001b[22m\u001b[39m      \u001b[2m737.39 kB\u001b[22m \u001b[2m│ gzip: 72.77 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m 4 files, total: 1.64 MB\n\u001b[32m✔\u001b[39m Build complete in \u001b[32m3617ms\u001b[39m\n\n> @overdeck/core@0.45.24 typecheck\n> tsc --noEmit && npm run typecheck:hooks && npm run typecheck:evals && npm run typecheck:dashboard\n\n\n> @overdeck/core@0.45.24 typecheck:hooks\n> tsc --noEmit -p tsconfig.hooks.json\n\n\n> @overdeck/core@0.45.24 typecheck:evals\n> tsc --noEmit -p tsconfig.evals.json\n\n\n> @overdeck/core@0.45.24 typecheck:dashboard\n> bash scripts/lint-dashboard-types.sh\n\n\n--- stderr ---\n\u001b[33m[PLUGIN_TIMINGS] Warning:\u001b[0m Your build spent significant time in plugin `tsdown:deps`. See https://rolldown.rs/options/checks#plugintimings for more details.\n\n\u001b[33m[PLUGIN_TIMINGS] Warning:\u001b[0m Your build spent significant time in plugins. Here is a breakdown:\n  - rolldown-plugin-dts:generate (76%)\n  - rolldown-plugin-dts:fake-js (19%)\nSee https://rolldown.rs/options/checks#plugintimings for more details.\n\n✖ dashboard server typecheck regressed: 66 errors (baseline 65).\n  New type errors in src/dashboard/server. Offending lines:\nsrc/dashboard/server/pending-feedback.ts(118,9): error TS7022: 'getAgentState' implicitly has type 'any' because it does not have a type annotation and is referenced directly or indirectly in its own initializer.\nsrc/dashboard/server/pending-feedback.ts(118,53): error TS7024: Function implicitly has return type 'any' because it does not have a return type annotation and is referenced directly or indirectly in one of its return expressions.\nsrc/dashboard/\n…(3968 chars elided)…\nined; } | { alive: boolean; lastOutput: string; } | { alive: boolean; }'.\nsrc/dashboard/server\n...(truncated)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3064",
@@ -116,7 +116,7 @@
       },
       "costAtCloseOut": {
         "usd": 35.79158,
-        "pricingAsOf": "2026-07-25T12:52:37.777Z"
+        "pricingAsOf": "2026-07-25T12:52:39.854Z"
       }
     },
     "merges": [
