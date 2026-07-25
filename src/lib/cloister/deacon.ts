@@ -49,7 +49,6 @@ import { createInFlightGuard } from './in-flight-guard.js';
 // }
 import { listAllAgentsSync as listAllAgents } from '../overdeck/agents.js';
 import { isContextOverflowTail } from '../context-overflow.js';
-import type { HeadAnchor } from '../git-utils.js';
 import { REVIEW_SUB_ROLES, type ReviewSubRole } from './review-monitor.js';
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -1511,7 +1510,7 @@ export async function checkVerificationReviewContradiction(): Promise<string[]> 
         // it, checkPostReviewCommits can never confirm the review is current and
         // the canSkipTests fast-path in setReviewStatus never fires, leaving the
         // issue jammed at passed-but-stuck forever (PAN-977).
-        let reviewedAtCommit: HeadAnchor | undefined;
+        let reviewedAtCommit;
         try {
           const project = resolveProjectFromIssueSync(issueId);
           if (project) {
@@ -1599,8 +1598,7 @@ export async function checkPostReviewCommits(): Promise<string[]> {
       const verdict = await evaluateWorkspaceAnchorDrift(
         issueId,
         workspacePath,
-        // ReviewStatus deserializes anchors as strings; re-brand at the evaluator boundary.
-        rehydrateHeadAnchor(status.reviewedAtCommit),
+        rehydrateHeadAnchor(status.reviewedAtCommit), // Stored anchors re-brand at the evaluator boundary.
       );
       if (verdict.kind === 'unreadable' || verdict.kind === 'current') continue;
 
