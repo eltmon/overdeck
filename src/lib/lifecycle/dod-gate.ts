@@ -213,15 +213,24 @@ export async function checkVerificationRow(issueId: string, deps: DodStatusRowDe
   const loaded = await loadStatus(issueId, deps);
   if (!loaded) return result('verification', 'miss', 'no review status or journal record found');
 
+  // PAN-3067: the verdict alone decides this row, exactly like rows 1 and 2.
+  // `lastVerifiedCommit` is a best-effort optimization anchor — verification-runner.ts
+  // snapshots it inside a try/catch and spreads the field conditionally, and a
+  // `skipped` verdict never has one at all — so its absence says nothing about
+  // whether verification ran. Requiring it made every issue whose anchor was
+  // never written un-closable. The observed string always names the anchor's
+  // presence or absence so a reader can never mistake it for a hidden condition.
   const value = loaded.status.verificationStatus;
   const commit = loaded.status.lastVerifiedCommit;
-  const source = loaded.source === 'journal' ? ' from pipeline journal' : '';
-  const policy = value === 'skipped' ? ' (skipped per issue policy)' : '';
-  const commitNote = commit ? ` at ${commit}` : '';
-  const observed = `verificationStatus: ${value ?? 'missing'}${commitNote}${source}${policy}`;
-  const acceptedStatus = value === 'passed' || value === 'skipped';
-  const hasRequiredCommit = Boolean(commit);
-  return result('verification', acceptedStatus && hasRequiredCommit ? 'pass' : 'miss', observed);
+  const accepted = value === 'passed' || value === 'skipped';
+  const notes: string[] = [];
+  if (loaded.source === 'journal') notes.push('from pipeline journal');
+  if (value === 'skipped') notes.push('skipped per issue policy');
+  if (accepted && !commit) notes.push('no lastVerifiedCommit recorded');
+  const observed = `verificationStatus: ${value ?? 'missing'}${commit ? ` at ${commit}` : ''}${
+    notes.length > 0 ? ` (${notes.join('; ')})` : ''
+  }`;
+  return result('verification', accepted ? 'pass' : 'miss', observed);
 }
 
 export async function checkMergedRow(
