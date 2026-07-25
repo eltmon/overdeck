@@ -17,6 +17,11 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-25T22:13:42.528Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-25T22:20:54.437Z"
     }
   ],
   "feedback": [],
@@ -72,20 +77,21 @@
     "recordedAt": "2026-07-25T22:13:33.131Z"
   },
   "created": "2026-07-25T20:44:21.373Z",
-  "updated": "2026-07-25T22:20:53.526Z",
+  "updated": "2026-07-25T22:20:54.584Z",
   "pipeline": {
     "issueId": "PAN-3037",
     "reviewStatus": "passed",
-    "testStatus": "pending",
+    "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-25T22:20:18.803Z",
-    "updatedAt": "2026-07-25T22:20:52.432Z",
-    "reviewNotes": "Approved: polyrepo sync, branch probes, reporting, compatibility, and focused verification all pass with no blocking findings",
-    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
+    "updatedAt": "2026-07-25T22:20:52.449Z",
+    "reviewNotes": "Review dispatch skipped — already running: agent-pan-3037-review",
+    "testNotes": "Skipped: no code changed since pre-review verification gate",
+    "verificationNotes": "Pre-review verification already covered the reviewed commit",
     "inspectNotes": "All 5 ACs met: per-repo iteration with repoKey-prefixed paths, conflict abort leaves repo quiescent and skips remaining repos, aggregate alreadyUpToDate requires all repos current, monorepo keeps unprefixed single-element shape, abort returns cancellation + skipped entries. Extraction into sync-main-workspace.ts is logic-identical; baseline 1404 matches actual wc -l.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3079",
     "reviewedAtCommit": "93ad317654fa305065e3cb80cc73f470c5817ed4",
@@ -188,7 +194,7 @@
       },
       "costAtCloseOut": {
         "usd": 77.21867400000001,
-        "pricingAsOf": "2026-07-25T22:20:52.512Z"
+        "pricingAsOf": "2026-07-25T22:20:54.571Z"
       }
     },
     "merges": [
