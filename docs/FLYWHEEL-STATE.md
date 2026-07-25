@@ -6603,3 +6603,10 @@ Substrate bugs filed: 2897 2898 2899 2900 2901 2902 2907 2913 (8; ALL fixed and 
 - PAN-3055 unchanged (`ready` on `uat/pan-reef-0725`, ~1h20m awaiting operator promotion); `shipping` verb re-emitted. MYN still held → no merge verbs for MIN-891/901/902.
 - main==live==`cce23592b8` green; 17 agents (down from 18); networks **18**, flat for a third tick — the PAN-3049 refill has stopped for now, so no reclaim needed.
 - **LESSON: surfacing a blocker beats overriding it.** I refused `--accept-verification` on PAN-3029/3051/3056 for several ticks and instead documented exactly what was missing and why. Within two ticks both had strikes running that supply the missing verification. An override would have closed the issues and left the gap; the refusal got the gap filled.
+
+## RUN-70 tick 22 (2026-07-25 22:38Z) — not quiescent (4th tick); verification still absent on the three blocked close-outs
+- DB check: `MIN-858` `reviewing/pending`, `PAN-2997` `review=pending`. **Retrospective and `pan flywheel report --force` withheld a fourth time.**
+- **Queried `verification_status` directly this tick, and it is still `null` for PAN-3029, PAN-3051 and PAN-3056.** So although PAN-3051 and PAN-3056 read `review=passed test=passed`, **the verification row still has nothing to pass on** — their close-outs remain correctly blocked, and I did not retry them. The externally-started strikes have not yet produced verification. **Checking the specific field the gate reads, rather than inferring from review/test, is what kept this honest** — "passed/passed" looks closeable and isn't.
+- PAN-3055 unchanged (`ready` on `uat/pan-reef-0725`, ~1h40m awaiting operator promotion); `shipping` verb re-emitted. MYN held → no merge verbs for MIN-891/901/902.
+- main==live==`cce23592b8` green; 18 agents; networks **18**, flat a fourth tick.
+- **LESSON: query the exact field a gate reads, not its neighbours.** PAN-3051/3056 show `review=passed test=passed` — every signal a human scans looks done — while `verification_status` is `null`, which is the only field row 3 consults. Inferring closeability from adjacent fields is how an unearned `--accept-*` gets justified.
