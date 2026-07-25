@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   createSession: vi.fn(),
   execFileAsync: vi.fn(),
   existsSync: vi.fn(),
+  deliverAgentMessage: vi.fn(),
   deliverCommitForReview: vi.fn(),
   generateLauncherScriptSync: vi.fn(),
   getCurrentHead: vi.fn(),
@@ -107,7 +108,11 @@ vi.mock('../../agents/tier-supervisor.js', () => ({
   supervisorAgentId: vi.fn((issueId: string) => `agent-${issueId.toLowerCase()}-review-supervisor`),
 }));
 
-import { spawnInspectAgent } from '../inspect-agent.js';
+vi.mock('../../agents/delivery.js', () => ({
+  deliverAgentMessage: mocks.deliverAgentMessage,
+}));
+
+import { onInspectComplete, spawnInspectAgent } from '../inspect-agent.js';
 
 describe('spawnInspectAgent', () => {
   beforeEach(() => {
@@ -139,6 +144,7 @@ describe('spawnInspectAgent', () => {
     mocks.spawnTierSupervisor.mockResolvedValue({ id: 'agent-pan-1613-review-supervisor' });
     mocks.loadPrdDraft.mockResolvedValue('# PRD');
     mocks.deliverCommitForReview.mockResolvedValue({ delivered: true });
+    mocks.deliverAgentMessage.mockResolvedValue({ ok: true, path: 'supervisor' });
   });
 
   it('skips inspect dispatch when the issue is closed', async () => {
@@ -181,6 +187,8 @@ describe('spawnInspectAgent', () => {
     expect(mocks.sessionExists).toHaveBeenCalledWith('inspect-pan-1613-workspace-b95lw');
     expect(mocks.generateLauncherScriptSync).toHaveBeenCalledWith(expect.objectContaining({
       extraEnvExports: [`export PATH='/home/test/.local/bin':"$PATH"`],
+      // PAN-3077: --effort must never be omitted; unset config resolves to high.
+      extraArgs: '--effort high',
     }));
     expect(mocks.createSession).toHaveBeenCalledWith(
       'inspect-pan-1613-workspace-b95lw',
@@ -382,6 +390,124 @@ function tieredExecutionConfig() {
     difficultyToTier: {},
   };
 }
+
+describe('spawnInspectAgent --effort (PAN-3077)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.isIssueClosed.mockResolvedValue(false);
+    mocks.sessionExists.mockReturnValue(Effect.succeed(false));
+    mocks.createSession.mockReturnValue(Effect.succeed(undefined));
+    mocks.existsSync.mockReturnValue(true);
+    mocks.readFileSync.mockReturnValue('Inspect {{issueId}} {{itemId}} {{diffCommand}} {{diffStats}} {{itemDescription}}');
+    mocks.getInspectDiffContext.mockReturnValue(Effect.succeed({
+      currentHead: 'fedcba9876543210',
+      checkpoint: 'abcdef12',
+      diffStats: 'diff stats',
+      diffCommand: 'git diff abcdef1234567890...HEAD',
+      repos: [],
+    }));
+    mocks.getProviderEnvForModel.mockResolvedValue({});
+    mocks.prepareHarnessLaunch.mockResolvedValue({
+      binaryPath: '/home/test/.local/bin/claude',
+      pathExport: `export PATH='/home/test/.local/bin':"$PATH"`,
+    });
+    mocks.generateLauncherScriptSync.mockReturnValue('#!/usr/bin/env bash\n');
+    mocks.saveAgentState.mockReturnValue(Effect.succeed(undefined));
+    mocks.readWorkspacePlanSync.mockReturnValue(planDoc([planItem('workspace-b95lw')]));
+  });
+
+  it('honors an operator-configured roles.work.effort instead of the high default', async () => {
+    mocks.loadConfigSync.mockReturnValue({ config: { roles: { work: { effort: 'xhigh' } } } });
+
+    await Effect.runPromise(spawnInspectAgent({
+      projectKey: 'overdeck',
+      projectPath: '/repo',
+      issueId: 'PAN-1613',
+      itemId: 'workspace-b95lw',
+      workspace: '/workspace',
+    }));
+
+    expect(mocks.generateLauncherScriptSync).toHaveBeenCalledWith(expect.objectContaining({
+      extraArgs: '--effort xhigh',
+    }));
+  });
+});
+
+describe('onInspectComplete verdict delivery (PAN-3078)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.getCurrentHead.mockReturnValue(Effect.succeed('fedcba9876543210'));
+    mocks.deliverAgentMessage.mockResolvedValue({ ok: true, path: 'supervisor' });
+  });
+
+  it('delivers a passed verdict to the work agent naming the item', async () => {
+    await Effect.runPromise(onInspectComplete('overdeck', 'PAN-1613', 'workspace-b95lw', 'passed', '/workspace'));
+
+    expect(mocks.deliverAgentMessage).toHaveBeenCalledTimes(1);
+    const [agentId, message, caller] = mocks.deliverAgentMessage.mock.calls[0];
+    expect(agentId).toBe('agent-pan-1613');
+    expect(message).toContain('workspace-b95lw');
+    expect(message).toContain('PASSED');
+    expect(message).toContain('continue');
+    expect(caller).toBe('inspect-verdict');
+  });
+
+  it('delivers a failed verdict carrying the blocking finding', async () => {
+    await Effect.runPromise(onInspectComplete(
+      'overdeck', 'PAN-1613', 'workspace-b95lw', 'failed', '/workspace',
+      'imports ChatContext.tsx which the PRD prohibits',
+    ));
+
+    expect(mocks.deliverAgentMessage).toHaveBeenCalledTimes(1);
+    const [agentId, message] = mocks.deliverAgentMessage.mock.calls[0];
+    expect(agentId).toBe('agent-pan-1613');
+    expect(message).toContain('workspace-b95lw');
+    expect(message).toContain('BLOCKED');
+    expect(message).toContain('imports ChatContext.tsx which the PRD prohibits');
+    // A blocked item saves no checkpoint.
+    expect(mocks.getCurrentHead).not.toHaveBeenCalled();
+  });
+
+  it('resumes a parked agent through an injected delivery port', async () => {
+    // Integration-style: the waiting party is represented by a fake port; the
+    // verdict arriving through it is what un-parks the agent.
+    const received: string[] = [];
+    const deliver = vi.fn(async (_id: string, message: string) => {
+      received.push(message);
+      return { ok: true, path: 'supervisor' as const };
+    });
+
+    await Effect.runPromise(onInspectComplete(
+      'overdeck', 'PAN-1613', 'workspace-b95lw', 'passed', '/workspace', undefined, { deliver },
+    ));
+
+    expect(deliver).toHaveBeenCalledTimes(1);
+    expect(mocks.deliverAgentMessage).not.toHaveBeenCalled();
+    expect(received[0]).toContain('workspace-b95lw');
+  });
+
+  it('logs at error level when delivery throws instead of swallowing it', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    mocks.deliverAgentMessage.mockRejectedValue(new Error('MessageDeliveryFailed: no live session'));
+
+    await expect(Effect.runPromise(
+      onInspectComplete('overdeck', 'PAN-1613', 'workspace-b95lw', 'passed', '/workspace'),
+    )).resolves.toBeUndefined();
+
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('FAILED to deliver passed verdict for PAN-1613 item workspace-b95lw'));
+    errorSpy.mockRestore();
+  });
+
+  it('logs at error level when delivery reports ok=false', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    mocks.deliverAgentMessage.mockResolvedValue({ ok: false, path: 'tmux', failure: 'pane dead' });
+
+    await Effect.runPromise(onInspectComplete('overdeck', 'PAN-1613', 'workspace-b95lw', 'failed', '/workspace'));
+
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('pane dead'));
+    errorSpy.mockRestore();
+  });
+});
 
 function planItem(id: string) {
   return {
