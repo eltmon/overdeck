@@ -40,6 +40,25 @@ export function updateIssueRecordForWorkspace(
 
 export type IssueRecordMutator = (record: PanIssueRecord) => PanIssueRecord | void | Promise<PanIssueRecord | void>;
 
+/**
+ * Clear the terminal close-out marker so a reopened issue re-enters the pipeline (sync).
+ * Ordinary status writes deliberately preserve closedOut (projectPipeline in records.ts),
+ * so reopen needs this explicit inverse of markRecordPipelineClosedOutSync in record.ts
+ * (MIN-850, 2026-07-24).
+ */
+export function clearRecordPipelineClosedOutSync(
+  project: ProjectConfig,
+  issueId: string,
+): void {
+  const record = ensureIssueRecordSync(project, issueId);
+  if (!record.pipeline.closedOut && !record.pipeline.closedOutAt) return;
+  record.pipeline.closedOut = undefined;
+  record.pipeline.closedOutAt = undefined;
+  record.pipeline.updatedAt = new Date().toISOString();
+  const recordPath = writeIssueRecordSync(project, issueId, record);
+  queueIssueRecordCommit(project, issueId, recordPath);
+}
+
 interface GitFailure extends Error {
   stderr?: string;
   stdout?: string;
