@@ -368,6 +368,9 @@ export const selectPendingPermissionAgentIds = memoizeArraySelector<
  * channel-permission event stream — they live in different store slices and the
  * enrichment event overwrites `pendingInputKinds` each poll, so the merge must
  * happen here at read time rather than being baked into one field server-side.
+ * PAN-3051 adds the supervisor-era source for that same kind: the pane/runtime
+ * detection's `hasPendingQuestion` + `pendingQuestionReason === 'tool_permission'`,
+ * which is the only one that fires when the Channels bridge is off.
  */
 export interface PendingInputSubject {
   agentId: string
@@ -402,6 +405,24 @@ function deriveMemo<S, A, B, R>(
   }
 }
 
+/**
+ * PAN-3051 — the supervisor-era evidence of an outstanding tool-permission
+ * prompt. `channelPermissionRequestsById` is fed by the Claude Code Channels
+ * bridge, which does not run when `experimental.claudeCodeChannelsMcp` is false
+ * (the default now that the PTY supervisor is the primary transport). With
+ * Channels off, that map is always empty and a permission prompt reached no
+ * operator surface at all — agents sat frozen at `❯ Do you want to proceed?`
+ * while the dashboard reported them healthy. The pane/runtime detection does see
+ * the prompt and reports it as `pendingQuestionReason: 'tool_permission'`.
+ *
+ * Exported so the selector and the reopen router judge "still waiting" from the
+ * same evidence; when they disagreed the operator was told the question was no
+ * longer waiting while the agent was still parked on it.
+ */
+export function hasDetectedToolPermission(agent: AgentSnapshot | undefined): boolean {
+  return agent?.hasPendingQuestion === true && agent.pendingQuestionReason === 'tool_permission'
+}
+
 export const selectPendingInputSubjects = deriveMemo<
   DashboardState,
   DashboardState['agentsById'],
@@ -424,7 +445,10 @@ export const selectPendingInputSubjects = deriveMemo<
       const jsonlKinds = a.pendingInputKinds ? [...a.pendingInputKinds] : []
       const agentPerms = permByAgent.get(a.id) ?? []
       const kinds = [...jsonlKinds]
-      if (agentPerms.length > 0 && !kinds.includes('permissionRequest')) {
+      // PAN-3051 — the Channels map is one of TWO sources for this kind now; see
+      // hasDetectedToolPermission above for why the supervisor-era detection has
+      // to be read here as well.
+      if ((agentPerms.length > 0 || hasDetectedToolPermission(a)) && !kinds.includes('permissionRequest')) {
         kinds.push('permissionRequest')
       }
       // PAN-1591 — "Needs you" must be ACTIONABLE. Require a concrete pending
@@ -436,6 +460,10 @@ export const selectPendingInputSubjects = deriveMemo<
       // false-positive. Those surfaced phantom "Waiting on your input" rows that
       // said "no longer waiting" the moment you clicked them. An actionable wait
       // always carries a kind, so `kinds.length > 0` is the precise signal.
+      // The PAN-3051 read above is not a walk-back of that: it consults the bool
+      // only in conjunction with the specific `tool_permission` reason, which
+      // names a concrete answerable prompt, never the generic 'other' fallbacks
+      // PAN-1591 was about.
       const waiting = kinds.length > 0
       if (!waiting) continue
       const since =

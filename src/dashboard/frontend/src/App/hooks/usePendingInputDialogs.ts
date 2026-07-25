@@ -5,7 +5,7 @@ import type { ClaudeChannelPermissionBehavior } from '@overdeck/contracts';
 import type { ConfirmationRequest } from '../../components/ConfirmationDialog';
 import type { AskUserQuestionSubject } from '../../components/AskUserQuestionDialog';
 import type { PlanApprovalSubject } from '../../components/PlanApprovalDialog';
-import { useDashboardStore, selectAgentsWithPendingAskUserQuestion, selectAgentsWithPendingProposedPlan, selectChannelPermissionRequests } from '../../lib/store';
+import { useDashboardStore, hasDetectedToolPermission, selectAgentsWithPendingAskUserQuestion, selectAgentsWithPendingProposedPlan, selectChannelPermissionRequests } from '../../lib/store';
 import { useAskUserQuestionUiStore } from '../../lib/askUserQuestionUiStore';
 import { refreshDashboardState } from '../../lib/refresh-dashboard-state';
 import { fetchWithTimeout } from '../../lib/apiFetch';
@@ -90,18 +90,23 @@ export function usePendingInputDialogs({ agents, issues }: UsePendingInputDialog
     // sessionResume) has no AUQ payload, so the old check told the operator
     // "no longer waiting" while the agent was still modal-blocked — and the
     // needs-you entry (correctly) refused to clear.
-    const stillPending =
-      agentEntry?.pendingAskUserQuestion != null ||
-      (agentEntry?.pendingInputKinds?.length ?? 0) > 0;
+    // PAN-3051 — a tool-permission prompt under the supervisor transport adds no
+    // kind to `pendingInputKinds` and (with Channels off) no permission request,
+    // so judging by those alone told the operator the question was "no longer
+    // waiting" about an agent parked on the modal. Read the same detection the
+    // needs-you selector reads.
+    const terminalDialogPending =
+      (agentEntry?.pendingInputKinds?.length ?? 0) > 0 || hasDetectedToolPermission(agentEntry);
+    const stillPending = agentEntry?.pendingAskUserQuestion != null || terminalDialogPending;
     undismissAskUserQuestion(askUserQuestionReopenId);
     setFocusedAskUserQuestionId(askUserQuestionReopenId);
     if (knownAgent && !stillPending) {
       toast.info('That question is no longer waiting', {
         description: 'The agent stopped or already received an answer.',
       });
-    } else if (knownAgent && agentEntry?.pendingAskUserQuestion == null && (agentEntry?.pendingInputKinds?.length ?? 0) > 0) {
+    } else if (knownAgent && agentEntry?.pendingAskUserQuestion == null && terminalDialogPending) {
       toast.info('This agent is blocked on a terminal dialog', {
-        description: 'Open its terminal to answer (e.g. a harness rate-limit or session-resume prompt) — it cannot be answered from here yet.',
+        description: 'Open its terminal to answer (e.g. a tool-permission, rate-limit, or session-resume prompt) — it cannot be answered from here yet.',
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
