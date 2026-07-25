@@ -352,24 +352,24 @@
     "recordedAt": "2026-07-25T22:13:33.131Z"
   },
   "created": "2026-07-25T20:44:21.373Z",
-  "updated": "2026-07-25T23:05:05.453Z",
+  "updated": "2026-07-25T23:10:23.838Z",
   "pipeline": {
     "issueId": "PAN-3037",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "passed",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-25T22:20:18.803Z",
-    "updatedAt": "2026-07-25T23:05:04.277Z",
-    "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
+    "updatedAt": "2026-07-25T23:10:23.779Z",
+    "reviewNotes": "Configured target-branch conflict resolution is fixed and verified; no blocking findings remain",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
-    "verificationNotes": "Pre-review verification already covered the reviewed commit",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "All 5 ACs met: per-repo iteration with repoKey-prefixed paths, conflict abort leaves repo quiescent and skips remaining repos, aggregate alreadyUpToDate requires all repos current, monorepo keeps unprefixed single-element shape, abort returns cancellation + skipped entries. Extraction into sync-main-workspace.ts is logic-identical; baseline 1404 matches actual wc -l.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3079",
-    "reviewedAtCommit": "93ad317654fa305065e3cb80cc73f470c5817ed4",
+    "reviewedAtCommit": "dddeb04bfb1336bbe3c747455537772c8a24d36c",
     "lastVerifiedCommit": "93ad317654fa305065e3cb80cc73f470c5817ed4",
     "reviewRequestedAt": "2026-07-25T22:20:18.803Z",
     "reviewSpawnedAt": "2026-07-25T23:05:04.275Z",
@@ -438,9 +438,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 16011309,
-            "output": 245666,
-            "cacheRead": 36961280,
+            "input": 17075017,
+            "output": 277004,
+            "cacheRead": 44023296,
             "cacheWrite": 0
           }
         },
@@ -461,15 +461,15 @@
           "cacheWrite": 311392
         },
         "openai/gpt-5.6-sol": {
-          "input": 19011251,
-          "output": 400102,
-          "cacheRead": 131369984,
+          "input": 20074959,
+          "output": 431440,
+          "cacheRead": 138432000,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 185.894665,
-        "pricingAsOf": "2026-07-25T23:05:04.322Z"
+        "usd": 195.68435300000002,
+        "pricingAsOf": "2026-07-25T23:10:23.827Z"
       }
     },
     "merges": [
