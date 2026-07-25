@@ -249,7 +249,7 @@
     "recordedAt": "2026-07-24T23:08:31.650Z"
   },
   "created": "2026-07-12T09:32:29.900Z",
-  "updated": "2026-07-25T06:51:11.502Z",
+  "updated": "2026-07-25T06:51:21.542Z",
   "pipeline": {
     "issueId": "PAN-1525",
     "reviewStatus": "passed",
@@ -257,10 +257,10 @@
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "merged",
-    "releaseStatus": "pending",
+    "releaseStatus": "skipped",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-24T23:12:31.996Z",
-    "updatedAt": "2026-07-25T06:51:08.634Z",
+    "updatedAt": "2026-07-25T06:51:21.195Z",
     "reviewNotes": "The regenerated composer manifest is committed, matches the rebased CLI registry, and passes the canonical drift gate and contract test.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3033",
@@ -343,7 +343,7 @@
       },
       "costAtCloseOut": {
         "usd": 527.589291,
-        "pricingAsOf": "2026-07-25T06:51:08.679Z"
+        "pricingAsOf": "2026-07-25T06:51:21.336Z"
       }
     },
     "merges": [
@@ -352,7 +352,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-fable-5",
   "workModel": "gpt-5.6-sol",
   "tasks": {
     "sequence": 36,
