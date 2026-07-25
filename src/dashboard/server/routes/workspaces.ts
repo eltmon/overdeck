@@ -1459,11 +1459,11 @@ const postWorkspaceReviewStatusRoute = HttpRouter.add(
       const workspaceInfo = getWorkspaceInfoForIssue(issueId);
       if (workspaceInfo.exists && workspaceInfo.localPath) {
         const localPath = workspaceInfo.localPath;
-        const { getWorkspaceGitInfo } = yield* Effect.promise(() => import('../../../lib/git-utils.js'));
+        const { snapshotWorkspaceHeadsPromise } = yield* Effect.promise(() => import('../../../lib/git-utils.js'));
         try {
-          const gitInfo = yield* getWorkspaceGitInfo(localPath);
-          if (gitInfo.HEAD) {
-            update.reviewedAtCommit = gitInfo.HEAD;
+          const headAnchor = yield* Effect.promise(() => snapshotWorkspaceHeadsPromise(issueId, localPath));
+          if (headAnchor) {
+            update.reviewedAtCommit = headAnchor;
           }
         } catch { /* non-fatal */ }
       }
