@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-25T22:42:08.234Z",
-  "updated": "2026-07-25T23:03:57.011Z",
+  "updated": "2026-07-25T23:06:50.909Z",
   "pipeline": {
     "issueId": "PAN-3083",
     "reviewStatus": "pending",
@@ -59,16 +59,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "fallback-clearable-request": {
-        "writerId": "agent-pan-3083",
-        "agentId": "agent-pan-3083",
-        "pid": 1312154,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-25T23:03:57.011Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3083",
@@ -91,6 +83,17 @@
         "outcome": "completed",
         "reason": "Terminal review verdicts now clear serviced durable review requests while preserving newer re-review intents; unit tests cover journal serialization, missing spawn timestamps, and non-verdict updates.",
         "releasedAt": "2026-07-25T23:03:31.335Z"
+      },
+      {
+        "writerId": "agent-pan-3083",
+        "agentId": "agent-pan-3083",
+        "pid": 1312154,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-25T23:03:57.011Z",
+        "itemId": "fallback-clearable-request",
+        "outcome": "completed",
+        "reason": "Added reviewRequestedAt to fallback clear markers and covered fallback serialization plus drain clear/preserve behavior.",
+        "releasedAt": "2026-07-25T23:06:50.909Z"
       }
     ],
     "statusReasons": {
@@ -101,6 +104,10 @@
       "consume-intent-on-verdict": {
         "reason": "Terminal review verdicts now clear serviced durable review requests while preserving newer re-review intents; unit tests cover journal serialization, missing spawn timestamps, and non-verdict updates.",
         "updatedAt": "2026-07-25T23:03:31.335Z"
+      },
+      "fallback-clearable-request": {
+        "reason": "Added reviewRequestedAt to fallback clear markers and covered fallback serialization plus drain clear/preserve behavior.",
+        "updatedAt": "2026-07-25T23:06:50.909Z"
       }
     }
   },
@@ -115,6 +122,9 @@
     "consume-intent-on-verdict.consume-intent-on-verdict.ac2": "completed",
     "consume-intent-on-verdict.consume-intent-on-verdict.ac3": "completed",
     "consume-intent-on-verdict.consume-intent-on-verdict.ac4": "completed",
-    "fallback-clearable-request": "running"
+    "fallback-clearable-request": "completed",
+    "fallback-clearable-request.fallback-clearable-request.ac1": "completed",
+    "fallback-clearable-request.fallback-clearable-request.ac2": "completed",
+    "fallback-clearable-request.fallback-clearable-request.ac3": "completed"
   }
 }
