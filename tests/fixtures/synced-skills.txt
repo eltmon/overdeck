@@ -58,6 +58,7 @@ pan-new-project
 pan-orders
 pan-oversee
 pan-pause
+pan-peer-review
 pan-plan
 pan-projects
 pan-quickstart
