@@ -45,6 +45,27 @@ describe('deriveSimpleIssue', () => {
     expect(d.display.primaryAction).toBe('Answer');
   });
 
+  /**
+   * PAN-3070 — an agent parked on a tool-permission prompt used to read as
+   * "The agent is writing the code." It is not writing anything and cannot
+   * advance a tool call until a human answers. The enrichment now folds the
+   * detected prompt into `pendingInputKinds` server-side, which is the evidence
+   * this projection reads.
+   */
+  it('permission prompt → needs-you, never "writing the code"', () => {
+    const d = deriveSimpleIssue(makeIssue(), [
+      agent({
+        hasPendingQuestion: true,
+        pendingQuestionReason: 'tool_permission',
+        pendingInputKinds: ['permissionRequest'],
+        pendingInputCount: 1,
+      }),
+    ]);
+    expect(d.display.state).toBe('needs-you');
+    expect(d.display.title).toBe('Question for you');
+    expect(d.display.sentence).not.toBe('The agent is writing the code.');
+  });
+
   it('troubled agent → needs-you / stuck', () => {
     const d = deriveSimpleIssue(makeIssue(), [agent({ troubled: true })]);
     expect(d.display.state).toBe('needs-you');

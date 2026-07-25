@@ -15,7 +15,7 @@ import {
   type AgentState,
 } from '../../../../lib/agents.js';
 import { getReviewStatusSync } from '../../../../lib/review-status.js';
-import { computeAgentEnrichment } from '../../../../lib/agent-enrichment.js';
+import { computeAgentEnrichment, isBlockedOnPendingInput } from '../../../../lib/agent-enrichment.js';
 import { normalizeAwaitingInputPrompt } from '../../../../lib/agent-input-detection.js';
 import { getWorkAgentLifecycleState } from '../../../../lib/work-agent-lifecycle.js';
 import { resolveAgentGitInfo } from '../../services/git-info.js';
@@ -32,6 +32,26 @@ import {
   hasActiveAgentGateOrRetry,
   readRemoteAgentState,
 } from './shared.js';
+
+/**
+ * PAN-3070 — the health status a live agent row reports.
+ *
+ * A live tmux session used to mean `healthy` unconditionally, so an agent frozen
+ * for hours on an unanswered tool-permission prompt was reported
+ * `status: healthy` / `resolution: working` while the Decisions surface
+ * simultaneously showed it as needing the operator. Two surfaces answering "is
+ * this agent stuck?" from different evidence, and this one stale.
+ *
+ * `warning` is the value `src/lib/health.ts` already reports for an agent
+ * waiting on a human, and it stays inside the fleet-view status set, so a
+ * blocked agent is flagged without disappearing from any existing list.
+ */
+export function liveAgentHealthStatus(enrichment: {
+  hasPendingQuestion?: boolean;
+  pendingQuestionReason?: string;
+}): 'healthy' | 'warning' {
+  return isBlockedOnPendingInput(enrichment) ? 'warning' : 'healthy';
+}
 
 // ─── Route: GET /api/agents ───────────────────────────────────────────────────
 
@@ -213,12 +233,14 @@ export const getAgentsRoute = HttpRouter.add(
               initialContextPercent = parseInt((await readFile(initCtxFile, 'utf-8').catch(() => '')).trim(), 10) || null;
             } catch {}
 
+            const blockedOnPendingInput = isBlockedOnPendingInput(enrichment);
+
             return {
               id: name,
               issueId,
               runtime: state.harness ?? 'claude-code',
               model: state.model || (isPlanning ? 'opus' : 'sonnet'),
-              status: 'healthy' as const,
+              status: liveAgentHealthStatus(enrichment),
               startedAt,
               ...buildAgentGateFailureSnapshot(state),
               killCount: health.killCount || 0,
@@ -235,7 +257,13 @@ export const getAgentsRoute = HttpRouter.add(
               pendingInputCount: enrichment.pendingInputCount,
               pendingInputKinds: enrichment.pendingInputKinds,
               pendingAskUserQuestion: enrichment.pendingAskUserQuestion,
-              resolution: runtimeData?.resolution || enrichment.resolution || 'working',
+              // PAN-3070 — the detection wins over the runtime resolution here
+              // too: `runtimeData.resolution` is written by the stop hook and
+              // stays at whatever it last was, so a frozen agent reported
+              // `working` even once the enrichment knew better.
+              resolution: blockedOnPendingInput
+                ? 'needs_input'
+                : (runtimeData?.resolution || enrichment.resolution || 'working'),
               resolutionCount: runtimeData?.resolutionCount || enrichment.resolutionCount || 0,
               contextPercent,
               initialContextPercent,
