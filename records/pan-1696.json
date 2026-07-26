@@ -214,24 +214,9 @@
       "timestamp": "2026-07-26T03:29:17.360Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "failed",
-      "timestamp": "2026-07-26T03:21:11Z",
-      "markdownBody": "# Review FAILED for PAN-1696\n\nReview role spawn failed: Role run agent-pan-1696-review already running. Use 'pan tell' to message it.\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1696 -m \"Fixed review issues\"`"
-    },
-    {
-      "seq": 2,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-26T03:29:17Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-1696\n\nPOST /api/projects/:projectKey/merge-train mutates durable project configuration without the dashboard authentication and CSRF guard.\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1696 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "created": "2026-07-26T00:35:36.057Z",
-  "updated": "2026-07-26T03:32:14.875Z",
+  "updated": "2026-07-26T03:32:17.552Z",
   "pipeline": {
     "issueId": "PAN-1696",
     "reviewStatus": "pending",
@@ -240,7 +225,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T03:32:13.464Z",
+    "updatedAt": "2026-07-26T03:32:17.093Z",
     "reviewNotes": "Agent re-review request (6/25): Fixed security issue: added dashboard auth guard to POST merge-train endpoint",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/1822",
@@ -336,7 +321,7 @@
       },
       "costAtCloseOut": {
         "usd": 131.9986312,
-        "pricingAsOf": "2026-07-26T03:32:14.869Z"
+        "pricingAsOf": "2026-07-26T03:32:17.116Z"
       }
     },
     "merges": [
