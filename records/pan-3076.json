@@ -132,7 +132,7 @@
     "recordedAt": "2026-07-25T23:48:58.041Z"
   },
   "created": "2026-07-25T21:12:36.630Z",
-  "updated": "2026-07-26T00:00:33.367Z",
+  "updated": "2026-07-26T00:00:35.569Z",
   "pipeline": {
     "issueId": "PAN-3076",
     "reviewStatus": "passed",
@@ -141,9 +141,9 @@
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": true,
+    "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-25T23:50:10.735Z",
-    "updatedAt": "2026-07-26T00:00:33.232Z",
+    "updatedAt": "2026-07-26T00:00:34.011Z",
     "reviewNotes": "Approved: all prior blockers resolved; typecheck, lint, and 110 focused regression tests pass",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "All 4 ACs demonstrated; typecheck green; 5/5 tests in tests/unit/lib/workspace-anchor-drift.test.ts pass. AC1: equal anchors -> {kind:'current'}, commit in one sub-repo -> {kind:'drifted', changedRepos:['api']}. AC2: tree-identical rewrite of one sub-repo -> {kind:'benign', changedRepos:['api']} with currentAnchor deep-equal to a fresh snapshotWorkspaceHeadsPromise call. AC3: stored plain SHA vs current composite -> drifted; I additionally probed the untested reverse direction (stored composite vs current plain) out-of-band and got drifted in 8ms with no throw and no loop - the shape-mismatch branch at workspace-anchor-drift.ts:63-65 returns before any iteration. AC4 equivalence to today's deacon.ts:1611-1640 verified structurally and empirically: isBenignMove applies haveSameTree -> haveSameEffectiveCodeCommit -> haveSameCodeContribution in deacon's exact order, and computeWorkspaceRepoRootsSync (project-repos.ts:159-166) gives the monorepo root dir === workspacePath so it inspects the same directory deacon does; state-plane-only commit under .pan/specs/ (a real STATE_PLANE_PATHS entry) -> benign, real code change -> drifted, missing workspace root -> unreadable, and an out-of-band probe confirmed monorepo tree-identical rewrite -> benign (the one AC4 clause the suite only covers via the shared polyrepo path). baseRef is refined from deacon's hardcoded 'origin/main' to origin/${root.targetBranch}, which is a superset that still equals origin/main for the default monorepo root. Two non-blocking hazards for the consumer bead, neither an AC violation: (1) the whole comparison sits in one try at workspace-anchor-drift.ts:68-109, so a git failure mid-comparison collapses to 'unreadable' where deacon today falls through to the conservative review reset - verified: an unresolvable stored SHA returns 'unreadable', so the wiring bead must map 'unreadable' to the conservative action or a force-pushed/gc'd anchor will silently preserve a stale verdict; (2) the key-set mismatch branch at workspace-anchor-drift.ts:87-92 sets changedRepos to the union of ALL repo keys including unchanged ones, and because the producer omits unreadable roots, one transiently unreadable sub-repo yields a size mismatch and a false 'drifted' naming every repo.",
@@ -282,7 +282,7 @@
       },
       "costAtCloseOut": {
         "usd": 152.88929,
-        "pricingAsOf": "2026-07-26T00:00:33.321Z"
+        "pricingAsOf": "2026-07-26T00:00:35.563Z"
       }
     },
     "merges": [
