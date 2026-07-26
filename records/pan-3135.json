@@ -186,10 +186,10 @@
     "recordedAt": "2026-07-26T13:53:58.173Z"
   },
   "created": "2026-07-26T12:24:46.201Z",
-  "updated": "2026-07-26T15:50:18.400Z",
+  "updated": "2026-07-26T15:51:09.133Z",
   "pipeline": {
     "issueId": "PAN-3135",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "passed",
     "testStatus": "testing",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -197,8 +197,8 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T13:54:56.619Z",
-    "updatedAt": "2026-07-26T15:50:17.190Z",
-    "reviewNotes": "Agent re-review request (2/25): Fixed review issues",
+    "updatedAt": "2026-07-26T15:51:08.958Z",
+    "reviewNotes": "Review approved by Deacon fallback from completed reviewer reports",
     "inspectNotes": "All 4 ACs met. verification-runner.ts:387-395 gates on readPendingDeploy() before the verificationStatus:'running' write at :409, writes 'pending' + a note naming requestedAt, and self-excludes when status is already 'running'. verification-worker-supervisor.ts:140-144 sits AFTER the live-worker waitForResult join at :137, so a queued deploy blocks only new worker spawns. FOLLOW-UP FOR A LATER BEAD (outside these ACs): request-review-pipeline.ts:31-38 only branches on 'failed'/'error', so a 'deferred' outcome currently falls through to pushBranch()+dispatchReview() and advances to review as if it passed — consumers must be taught to halt on 'deferred'.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3142",
     "reviewedAtCommit": "c8973a5b95c27de791f8ed4a2c2f70bbb865932d",
@@ -263,6 +263,28 @@
         "tests/unit/lib/deploy/deploy-queue.test.ts"
       ],
       "recordedAt": "2026-07-26T13:53:58.173Z"
+    },
+    "reviewerVerdicts": {
+      "security": {
+        "status": "passed",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3135/.pan/review/agent-pan-3135-review-c8973a5b/security.md",
+        "atCommit": "c8973a5b95c27de791f8ed4a2c2f70bbb865932d"
+      },
+      "correctness": {
+        "status": "passed",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3135/.pan/review/agent-pan-3135-review-c8973a5b/correctness.md",
+        "atCommit": "c8973a5b95c27de791f8ed4a2c2f70bbb865932d"
+      },
+      "performance": {
+        "status": "passed",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3135/.pan/review/agent-pan-3135-review-c8973a5b/performance.md",
+        "atCommit": "c8973a5b95c27de791f8ed4a2c2f70bbb865932d"
+      },
+      "requirements": {
+        "status": "passed",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3135/.pan/review/agent-pan-3135-review-c8973a5b/requirements.md",
+        "atCommit": "c8973a5b95c27de791f8ed4a2c2f70bbb865932d"
+      }
     }
   },
   "closeOut": {
@@ -310,10 +332,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 2,
-            "output": 156,
-            "cacheRead": 0,
-            "cacheWrite": 126260
+            "input": 12,
+            "output": 2142,
+            "cacheRead": 662203,
+            "cacheWrite": 157440
           }
         },
         "work": {
@@ -333,15 +355,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 2,
-          "output": 156,
-          "cacheRead": 0,
-          "cacheWrite": 126260
+          "input": 12,
+          "output": 2142,
+          "cacheRead": 662203,
+          "cacheWrite": 157440
         }
       },
       "costAtCloseOut": {
-        "usd": 445.91698,
-        "pricingAsOf": "2026-07-26T15:50:17.238Z"
+        "usd": 446.147251,
+        "pricingAsOf": "2026-07-26T15:51:09.044Z"
       }
     },
     "merges": [
