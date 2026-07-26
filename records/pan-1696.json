@@ -307,14 +307,19 @@
       "reason": "feedback",
       "note": "[2026-07-26T09:34Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-07-26T09:34:46.426Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-26T11:18:34.234Z"
     }
   ],
   "feedback": [],
   "created": "2026-07-26T00:35:36.057Z",
-  "updated": "2026-07-26T11:18:32.284Z",
+  "updated": "2026-07-26T11:18:34.248Z",
   "pipeline": {
     "issueId": "PAN-1696",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -322,12 +327,12 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T08:32:36.176Z",
-    "updatedAt": "2026-07-26T11:18:32.121Z",
+    "updatedAt": "2026-07-26T11:18:32.816Z",
     "reviewNotes": "Agent re-review request (4/25): Merged main and resolved the duplicate pane-choice no-loss registrations (took main's wording; PAN-1696 matrix entries intact). All gates green: typecheck, frontend-typecheck, lint exit 0; root 10880 passed, zero failures.",
     "inspectNotes": "ac1/ac2/ac3 all met, verified against tree not just diff. ac1: getMergeTrainQueuesPayload maps every listProjectsSync() entry to {projectKey, projectName, enabled, queue}; ready set comes from listEligibleCandidatesByProject (flywheel-merge-order.ts:326 reads loadReviewStatuses/readyForMerge/mergeGateEligibility) so no activePipeline and no run is consulted anywhere in the path; effective flag is isMergeTrainEnabledForProject (merge-sync.ts:86 per-project override else global). ac2: getMergeTrainGenerationsPayload passes each project root into getUatGenerationsPayload(override) which now threads projectRoot into listUatGenerationsSync; the stack and promote handlers are byte-for-byte the legacy flywheel.ts:912/928 bodies including uatGenerationNameFromParam prefix reconstruction, firePostMergeLifecycle wiring, and the 404/500/409 reason mapping, behind the same rejectUnsafeDashboardMutationRequest gate; assemble with {project} reproduces legacy flywheel.ts:953 runUatTrainReconcile({force:true}) scoped to that root, no-project form is a deliberate superset. ac3: postMergeTrainMergeNextPayload orders the NAMED project ready set via computeMergeQueueFromCandidates(candidates, resolve(config.path)) and ships it through shipMergeBatch, unknown key -> 404 with error body naming the key, missing key / n<=0 -> 400, disabled project -> 409, all before any merge call. getUatGenerationSync is imported (uat-train.ts:37) and UatGeneration carries projectRoot (merge-sync.ts:420) so the promote root fix is sound. NO-LOSS-MATRIX carries all six routes each naming its superseded /api/flywheel route. Non-blocking notes for the frontend-migration and remove-legacy-routes items: (1) merge-next auth is STRICTER than legacy - legacy /api/flywheel/merge-next used requireTrustedOrigin only, the new route requires session cookie + CSRF, so the migrated caller must send both or it will 401; (2) assemble response shape changed from the bare ReconcileResult to {projects:[{projectKey,result}]}; (3) assemble with {project} does not gate on isMergeTrainEnabledForProject while merge-next 409s - acceptable for a forced operator action but worth making deliberate.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3095",
     "lastVerifiedCommit": "f8bb608be544918ef11179804e8b2884df07d2f3",
-    "reviewSpawnedAt": "2026-07-26T10:48:45.336Z"
+    "reviewSpawnedAt": "2026-07-26T11:18:32.815Z"
   },
   "closeOut": {
     "usage": {
@@ -419,7 +424,7 @@
       },
       "costAtCloseOut": {
         "usd": 256.97064819999997,
-        "pricingAsOf": "2026-07-26T11:18:32.275Z"
+        "pricingAsOf": "2026-07-26T11:18:32.904Z"
       }
     },
     "merges": [
@@ -428,7 +433,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-opus-5",
+  "model": "gpt-5.6-sol",
   "tasks": {
     "sequence": 38,
     "claims": {},
