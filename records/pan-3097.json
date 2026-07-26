@@ -78,25 +78,18 @@
     "recordedAt": "2026-07-26T03:36:45.308Z"
   },
   "created": "2026-07-26T02:29:08.179Z",
-  "updated": "2026-07-26T05:56:00.123Z",
+  "updated": "2026-07-26T06:15:08.340Z",
   "pipeline": {
     "issueId": "PAN-3097",
-    "reviewStatus": "passed",
-    "testStatus": "passed",
-    "verificationStatus": "passed",
-    "mergeStatus": "failed",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
+    "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T03:45:06.177Z",
-    "updatedAt": "2026-07-26T05:56:00.086Z",
-    "reviewNotes": "Approved: exact HEAD 887ba284 was fully reviewed; no correctness, security, requirements, or performance blockers",
-    "testNotes": "Ran from workspace feature/pan-3097 (clean, up to date with origin). Gates: npm run typecheck (root tsc + hooks + evals + dashboard-types guard) passed; npm run lint (eslint + effect/permissions/state-writes/overdeck-boundaries/pipeline-membership/skills/slash-commands/prompts/prompt-trailer/file-size/source-introspection/no-coderabbit-merge-gate/circular/ratchet-audit/quarantine-audit) passed, exit 0. Tests: root `OVERDECK_VERIFICATION=1 npx vitest run --changed beaf8126a8` = 478 files/4538 tests passed (2/20 pre-existing skips); frontend `cd src/dashboard/frontend && OVERDECK_VERIFICATION=1 npx vitest run --changed beaf8126a8` = 130 files/1420 tests passed, including the PAN-3097-specific suites (issueLabel.test.ts, AskUserQuestionDialog.test.tsx, DecisionsPanel.test.tsx, SessionFeedSidebar.test.tsx, useDecisions.test.ts). No UAT: all 8 xBRIEF acceptance criteria are unit/component-test observables (PRD NFR-2), and no issue/PRD/PR text requests browser/Playwright/screenshot verification, so no dashboard build or Playwright session was run.",
-    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
-    "mergeNotes": "Work agent agent-pan-3097 stopped before completing the rebase onto main",
+    "updatedAt": "2026-07-26T06:15:08.316Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3102",
-    "reviewedAtCommit": "887ba28422e0d80895d7af96be3ce759012ce75a",
-    "lastVerifiedCommit": "887ba28422e0d80895d7af96be3ce759012ce75a",
-    "reviewSpawnedAt": "2026-07-26T03:45:13.553Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "packages/contracts/src/composer-commands.generated.ts"
@@ -198,7 +191,7 @@
       },
       "costAtCloseOut": {
         "usd": 63.240692,
-        "pricingAsOf": "2026-07-26T05:56:00.117Z"
+        "pricingAsOf": "2026-07-26T06:15:08.331Z"
       }
     },
     "merges": [
