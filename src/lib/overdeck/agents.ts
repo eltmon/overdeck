@@ -700,10 +700,7 @@ export const AgentsDomainLayer = Layer.mergeAll(
 
 // ── Sync helpers (for CLI and reconstruct paths that cannot use Effect) ────────
 
-/**
- * All columns in the overdeck agents table (matches 0000_overdeck_init.sql).
- * Timestamps are stored as INTEGER (Unix ms); booleans as INTEGER 0/1.
- */
+/** Agent columns matching the init migration; timestamps use ms and booleans use 0/1. */
 const OVERDECK_AGENT_COLUMNS = [
   'id', 'issue_id', 'role', 'status', 'workspace',
   'session_id', 'harness', 'model', 'host_override', 'delivery_method',

@@ -58,6 +58,14 @@ export function resolveFlywheelSpawnEnv(role: Role, runIdOverride?: string | nul
     : {};
 }
 
+export function resolveAgentStartedBy(
+  explicit: string | undefined,
+  flywheelRunId: string | undefined,
+  environmentToken = process.env['OVERDECK_AGENT_STARTED_BY'],
+): string | undefined {
+  return explicit ?? environmentToken ?? (flywheelRunId ? `flywheel:${flywheelRunId}` : undefined);
+}
+
 export function flywheelEnvExports(env: FlywheelSpawnEnv): string[] {
   return [
     env.OVERDECK_FLYWHEEL_RUN_ID ? `export OVERDECK_FLYWHEEL_RUN_ID=${env.OVERDECK_FLYWHEEL_RUN_ID}` : undefined,

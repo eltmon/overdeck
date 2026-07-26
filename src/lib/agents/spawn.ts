@@ -54,6 +54,7 @@ import {
   buildAgentLaunchConfig,
   defaultRunWorkspace,
   flywheelEnvExports,
+  resolveAgentStartedBy,
   resolveRegisteredSlotSpawn,
   resolveSlotTierSpawnParams,
   resolveSingleWorkTierSpawnParams,
@@ -204,9 +205,7 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
     slotIndex: options.slotIndex,
     slotItemId: options.slotItemId,
     flywheelRunId: flywheelEnv.OVERDECK_FLYWHEEL_RUN_ID,
-    startedBy: options.startedBy
-      ?? process.env['OVERDECK_AGENT_STARTED_BY']
-      ?? (flywheelEnv.OVERDECK_FLYWHEEL_RUN_ID ? `flywheel:${flywheelEnv.OVERDECK_FLYWHEEL_RUN_ID}` : undefined),
+    startedBy: resolveAgentStartedBy(options.startedBy, flywheelEnv.OVERDECK_FLYWHEEL_RUN_ID),
   };
   // PAN-1048 P1: spawnRun is on the dashboard hot path (Effect routes,
   // reactive Cloister scheduler). All disk I/O here uses async fs/promises
@@ -566,9 +565,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     hostOverride: options.allowHost || undefined,
     sessionId: createFreshSessionIdentity(agentId, resolvedHarness),
     flywheelRunId: flywheelEnv.OVERDECK_FLYWHEEL_RUN_ID,
-    startedBy: options.startedBy
-      ?? process.env['OVERDECK_AGENT_STARTED_BY']
-      ?? (flywheelEnv.OVERDECK_FLYWHEEL_RUN_ID ? `flywheel:${flywheelEnv.OVERDECK_FLYWHEEL_RUN_ID}` : undefined),
+    startedBy: resolveAgentStartedBy(options.startedBy, flywheelEnv.OVERDECK_FLYWHEEL_RUN_ID),
   };
 
   const supervisorLaunch = await prepareSupervisorForFreshLaunch(agentId, options, state);

@@ -452,8 +452,7 @@ export function initSchema(db: SqliteDatabase): void {
       last_failure_at TEXT,
       last_failure_reason TEXT,
       last_failure_next_retry_at TEXT,
-      flywheel_run_id TEXT,
-      started_by TEXT,
+      flywheel_run_id TEXT, started_by TEXT,
       role_run_head TEXT,
       review_sub_role TEXT,
       review_run_id TEXT,
@@ -785,7 +784,6 @@ export function initSchema(db: SqliteDatabase): void {
  */
 export function runMigrations(db: SqliteDatabase, dbPath?: string): void {
   const currentVersion = db.pragma('user_version', { simple: true }) as number;
-
   if (currentVersion === SCHEMA_VERSION) {
     tryIdempotentDdl(db, SCHEMA_VERSION, 'ALTER TABLE flywheel_substrate_bugs ADD COLUMN affected_criteria TEXT');
     tryIdempotentDdl(db, SCHEMA_VERSION, 'ALTER TABLE agents ADD COLUMN started_by TEXT');
@@ -1723,7 +1721,6 @@ export function runMigrations(db: SqliteDatabase, dbPath?: string): void {
     tryIdempotentDdl(db, 61, 'ALTER TABLE flywheel_substrate_bugs ADD COLUMN affected_criteria TEXT');
     tryIdempotentDdl(db, 61, 'ALTER TABLE agents ADD COLUMN started_by TEXT');
   }
-
   // After all migrations, set the version
   db.pragma(`user_version = ${SCHEMA_VERSION}`);
 }
