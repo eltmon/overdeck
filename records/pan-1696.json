@@ -269,7 +269,7 @@
     }
   ],
   "created": "2026-07-26T00:35:36.057Z",
-  "updated": "2026-07-26T07:02:18.025Z",
+  "updated": "2026-07-26T07:06:12.201Z",
   "pipeline": {
     "issueId": "PAN-1696",
     "reviewStatus": "pending",
@@ -384,16 +384,8 @@
   "harness": "claude-code",
   "model": "claude-opus-5",
   "tasks": {
-    "sequence": 31,
-    "claims": {
-      "settings-scope-ux": {
-        "writerId": "agent-pan-1696",
-        "agentId": "agent-pan-1696",
-        "pid": 3284676,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-26T07:02:18.025Z"
-      }
-    },
+    "sequence": 32,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-1696",
@@ -555,6 +547,17 @@
         "outcome": "completed",
         "reason": "Scope now persists on FlywheelLaunchMetadata (written at start, re-stamped on resume when the configured value changed) and is restamped onto the status from launch metadata on every write, so the orchestrator's own POSTs cannot forge or erase it; exposed as optional fields on the FlywheelStatus contract and FlywheelRunDetail. Pane shows a live run's own scope via new pure resolveDisplayedScope(), falls back to the configured value with no run, surfaces a configured-vs-run mismatch in amber, and carries the 'applies at the next run start or resume' note. Also added an aria-label to the Run config card (its accessible name was the whole config dump, so 'resume' in the new note collided with the Resume button query). 14 new tests.",
         "releasedAt": "2026-07-26T07:02:15.427Z"
+      },
+      {
+        "writerId": "agent-pan-1696",
+        "agentId": "agent-pan-1696",
+        "pid": 3284676,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T07:02:18.025Z",
+        "itemId": "settings-scope-ux",
+        "outcome": "completed",
+        "reason": "Verified the scope select already renders without expansion (block gated on role.id, not isExpanded) and locked it with a test. Added per-value help text plus an explicit line separating orchestrator scope from per-project merge-train enablement. Corrected the blanket 'apply on the next tick' copy so scope is stated to apply at the next run start or resume. ac3 was already covered by the existing round-trip test. Browser-verified with zero interaction in an isolated Playwright chromium: select + both copy lines visible on arrival, nothing expanded, and selecting all-tracked-projects round-trips through settings PUT/GET and switches the help text. 3 new tests.",
+        "releasedAt": "2026-07-26T07:06:12.201Z"
       }
     ],
     "statusReasons": {
@@ -593,6 +596,10 @@
       "run-scope-persist": {
         "reason": "Scope now persists on FlywheelLaunchMetadata (written at start, re-stamped on resume when the configured value changed) and is restamped onto the status from launch metadata on every write, so the orchestrator's own POSTs cannot forge or erase it; exposed as optional fields on the FlywheelStatus contract and FlywheelRunDetail. Pane shows a live run's own scope via new pure resolveDisplayedScope(), falls back to the configured value with no run, surfaces a configured-vs-run mismatch in amber, and carries the 'applies at the next run start or resume' note. Also added an aria-label to the Run config card (its accessible name was the whole config dump, so 'resume' in the new note collided with the Resume button query). 14 new tests.",
         "updatedAt": "2026-07-26T07:02:15.427Z"
+      },
+      "settings-scope-ux": {
+        "reason": "Verified the scope select already renders without expansion (block gated on role.id, not isExpanded) and locked it with a test. Added per-value help text plus an explicit line separating orchestrator scope from per-project merge-train enablement. Corrected the blanket 'apply on the next tick' copy so scope is stated to apply at the next run start or resume. ac3 was already covered by the existing round-trip test. Browser-verified with zero interaction in an isolated Playwright chromium: select + both copy lines visible on arrival, nothing expanded, and selecting all-tracked-projects round-trips through settings PUT/GET and switches the help text. 3 new tests.",
+        "updatedAt": "2026-07-26T07:06:12.201Z"
       }
     }
   },
@@ -648,6 +655,9 @@
     "run-scope-persist.run-scope-persist.ac1": "completed",
     "run-scope-persist.run-scope-persist.ac2": "completed",
     "run-scope-persist.run-scope-persist.ac3": "completed",
-    "settings-scope-ux": "running"
+    "settings-scope-ux": "completed",
+    "settings-scope-ux.settings-scope-ux.ac1": "completed",
+    "settings-scope-ux.settings-scope-ux.ac2": "completed",
+    "settings-scope-ux.settings-scope-ux.ac3": "completed"
   }
 }
