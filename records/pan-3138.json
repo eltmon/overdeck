@@ -121,7 +121,7 @@
     "recordedAt": "2026-07-26T16:03:54.970Z"
   },
   "created": "2026-07-26T13:39:19.365Z",
-  "updated": "2026-07-26T16:04:29.041Z",
+  "updated": "2026-07-26T16:04:54.631Z",
   "pipeline": {
     "issueId": "PAN-3138",
     "reviewStatus": "pending",
@@ -130,7 +130,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T16:04:28.983Z",
+    "updatedAt": "2026-07-26T16:04:54.511Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed all review findings: preserved retry ownership after eager teardown failure, revalidated canonical merged status before teardown, pruned stale retries, and removed duplicate Compose teardown.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3143",
     "lastVerifiedCommit": "f0a9c2b38faee0a59137c9b52a78bae5bafc1ae0",
@@ -182,9 +182,9 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 1786064,
-            "output": 35471,
-            "cacheRead": 13315584,
+            "input": 1837918,
+            "output": 35767,
+            "cacheRead": 14138880,
             "cacheWrite": 0
           }
         },
@@ -222,24 +222,24 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 4667816,
-            "output": 263245,
-            "cacheRead": 160123392,
+            "input": 4672302,
+            "output": 264183,
+            "cacheRead": 160818688,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 19037947,
-          "output": 615742,
-          "cacheRead": 242067968,
+          "input": 19094287,
+          "output": 616976,
+          "cacheRead": 243586560,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 234.695979,
-        "pricingAsOf": "2026-07-26T16:04:29.020Z"
+        "usd": 235.773995,
+        "pricingAsOf": "2026-07-26T16:04:54.563Z"
       }
     },
     "merges": [
