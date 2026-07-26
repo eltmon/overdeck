@@ -499,22 +499,42 @@ describe('Definition-of-Done deploy row', () => {
     expect(row).toMatchObject({ status: 'miss', observed: expect.stringContaining('did not report buildCommit') });
   });
 
-  it('skips deploy ancestry when the merged row missed without a merge commit', async () => {
-    const row = await checkDeployRow(ctx, { mergedRowStatus: 'miss' }, baseDeps);
+  it('skips deploy ancestry before reading dashboard health when the merged row missed without a merge commit', async () => {
+    const dashboardUrl = vi.fn(baseDeps.dashboardUrl);
+    const readJson = vi.fn(baseDeps.readJson);
+    const commitContains = vi.fn(baseDeps.commitContains);
+    const row = await checkDeployRow(ctx, { mergedRowStatus: 'miss' }, {
+      dashboardUrl,
+      readJson,
+      commitContains,
+    });
 
     expect(row).toMatchObject({
       status: 'skip',
       observed: 'no merge commit resolved because the merged row missed — deploy ancestry depends on row 4; build ancestry unchecked',
     });
+    expect(dashboardUrl).not.toHaveBeenCalled();
+    expect(readJson).not.toHaveBeenCalled();
+    expect(commitContains).not.toHaveBeenCalled();
   });
 
-  it('misses when the merged row passed without a resolvable merge commit', async () => {
-    const row = await checkDeployRow(ctx, { mergedRowStatus: 'pass' }, baseDeps);
+  it('misses before reading dashboard health when the merged row passed without a resolvable merge commit', async () => {
+    const dashboardUrl = vi.fn(baseDeps.dashboardUrl);
+    const readJson = vi.fn(baseDeps.readJson);
+    const commitContains = vi.fn(baseDeps.commitContains);
+    const row = await checkDeployRow(ctx, { mergedRowStatus: 'pass' }, {
+      dashboardUrl,
+      readJson,
+      commitContains,
+    });
 
     expect(row).toMatchObject({
       status: 'miss',
       observed: 'merged row passed without a resolvable merge commit; build ancestry cannot be checked',
     });
+    expect(dashboardUrl).not.toHaveBeenCalled();
+    expect(readJson).not.toHaveBeenCalled();
+    expect(commitContains).not.toHaveBeenCalled();
   });
 
   it('skips another project and misses an unreachable dashboard', async () => {

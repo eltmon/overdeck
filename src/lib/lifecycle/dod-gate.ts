@@ -402,6 +402,17 @@ export async function checkDeployRow(
   },
   deps: DeployRowDeps = defaultDeployRowDeps,
 ): Promise<DodRowResult> {
+  if (!merge.mergeCommit) {
+    if (merge.mergedRowStatus === 'miss') {
+      return result(
+        'deploy',
+        'skip',
+        'no merge commit resolved because the merged row missed — deploy ancestry depends on row 4; build ancestry unchecked',
+      );
+    }
+    return result('deploy', 'miss', 'merged row passed without a resolvable merge commit; build ancestry cannot be checked');
+  }
+
   const baseUrl = deps.dashboardUrl().replace(/\/$/, '');
   let health: Record<string, unknown>;
   try {
@@ -423,17 +434,6 @@ export async function checkDeployRow(
   if (!buildCommit) {
     return result('deploy', 'miss', `dashboard at ${baseUrl} did not report buildCommit; live deployment cannot be proven`);
   }
-  if (!merge.mergeCommit) {
-    if (merge.mergedRowStatus === 'miss') {
-      return result(
-        'deploy',
-        'skip',
-        'no merge commit resolved because the merged row missed — deploy ancestry depends on row 4; build ancestry unchecked',
-      );
-    }
-    return result('deploy', 'miss', 'merged row passed without a resolvable merge commit; build ancestry cannot be checked');
-  }
-
   try {
     if (health.buildDirty === true) {
       return result(
