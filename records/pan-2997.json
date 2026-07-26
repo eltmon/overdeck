@@ -199,22 +199,7 @@
       "timestamp": "2026-07-26T10:59:48.181Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-26T10:59:29Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2997\n\nPoison-clear and post-clear verification failures escape as generic errors, so repair can be acknowledged as terminal failed before any wake is delivered.\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2997 -m \"Fixed review issues\"`"
-    },
-    {
-      "seq": 2,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-26T10:59:48Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2997\n\nPoison-clear and post-clear verification failures escape as generic errors, so pre-delivery repair can be terminally acknowledged as failed without waking the agent.\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2997 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "src/dashboard/server/event-store.ts",
@@ -306,10 +291,10 @@
     "recordedAt": "2026-07-26T10:07:26.737Z"
   },
   "created": "2026-07-21T23:09:49.270Z",
-  "updated": "2026-07-26T11:19:54.437Z",
+  "updated": "2026-07-26T11:20:24.660Z",
   "pipeline": {
     "issueId": "PAN-2997",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "running",
     "inspectStatus": "passed",
@@ -317,12 +302,12 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T10:57:04.635Z",
-    "updatedAt": "2026-07-26T11:19:49.989Z",
+    "updatedAt": "2026-07-26T11:20:24.601Z",
     "reviewNotes": "Poison-clear and post-clear verification failures escape as generic errors, so pre-delivery repair can be terminally acknowledged as failed without waking the agent.",
     "verificationNotes": "Sync with main FAILED — merge conflicts detected:\n\nMerge conflicts with main:\n  - tests/unit/lib/overdeck/no-loss-matrix.ts",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3004",
     "lastVerifiedCommit": "1700fa490854ce01aef7b32625e0a6c56d11083a",
-    "reviewSpawnedAt": "2026-07-26T10:59:28.069Z",
+    "reviewSpawnedAt": "2026-07-26T11:20:24.600Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "src/dashboard/server/event-store.ts",
@@ -472,7 +457,7 @@
       },
       "costAtCloseOut": {
         "usd": 344.2992686,
-        "pricingAsOf": "2026-07-26T11:19:54.245Z"
+        "pricingAsOf": "2026-07-26T11:20:24.615Z"
       }
     },
     "merges": [
