@@ -42,10 +42,10 @@
     "recordedAt": "2026-07-26T06:27:49.436Z"
   },
   "created": "2026-07-26T05:55:05.237Z",
-  "updated": "2026-07-26T06:34:10.355Z",
+  "updated": "2026-07-26T06:43:38.722Z",
   "pipeline": {
     "issueId": "PAN-3109",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -53,13 +53,13 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T06:31:37.155Z",
-    "updatedAt": "2026-07-26T06:34:08.369Z",
+    "updatedAt": "2026-07-26T06:43:38.041Z",
     "reviewNotes": "Review dispatch skipped — already running: agent-pan-3109-review",
     "inspectNotes": "AC1-4 verified in diff: per-line classify handles merged-work/pointer/unmerged, exact ref patterns include strike + origin remotes, polyrepo aggregates both repo paths with per-repo default branch (main vs develop). AC5: vitest run exits 0, 29 passed, zero deleted lines in the test file so no pre-existing case modified; gatherProjectLensSignals routes through the same classifier with identical sets. Nit only: no isolated case asserting mergedWorkRefs empty for a pure-pointer scenario; helper has no production consumer yet (expected for a later bead).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3112",
     "lastVerifiedCommit": "84357d37ff02b537757f2ab57034e193b752981b",
     "reviewRequestedAt": "2026-07-26T06:31:37.155Z",
-    "reviewSpawnedAt": "2026-07-26T06:27:56.392Z",
+    "reviewSpawnedAt": "2026-07-26T06:43:38.039Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
       "declaredScopeUntouched": [
@@ -123,7 +123,7 @@
       },
       "costAtCloseOut": {
         "usd": 27.484189,
-        "pricingAsOf": "2026-07-26T06:34:10.353Z"
+        "pricingAsOf": "2026-07-26T06:43:38.486Z"
       }
     },
     "merges": [
