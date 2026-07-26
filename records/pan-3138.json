@@ -87,6 +87,11 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-26T16:07:27.292Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-26T16:07:28.027Z"
     }
   ],
   "feedback": [
@@ -139,22 +144,22 @@
     "recordedAt": "2026-07-26T16:03:54.970Z"
   },
   "created": "2026-07-26T13:39:19.365Z",
-  "updated": "2026-07-26T16:07:27.292Z",
+  "updated": "2026-07-26T16:07:28.257Z",
   "pipeline": {
     "issueId": "PAN-3138",
-    "reviewStatus": "blocked",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T16:05:42.563Z",
-    "updatedAt": "2026-07-26T16:07:26.366Z",
+    "updatedAt": "2026-07-26T16:07:27.011Z",
     "reviewNotes": "A transient verifying-on-main transition failure permanently strands the remaining post-merge lifecycle",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3143",
     "lastVerifiedCommit": "f0a9c2b38faee0a59137c9b52a78bae5bafc1ae0",
     "reviewRequestedAt": "2026-07-26T16:05:42.563Z",
-    "reviewSpawnedAt": "2026-07-26T16:04:00.157Z",
+    "reviewSpawnedAt": "2026-07-26T16:07:27.010Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "scripts/file-size-baseline.txt",
@@ -194,24 +199,6 @@
         "tests/unit/lib/review-status.test.ts"
       ],
       "recordedAt": "2026-07-26T16:03:54.970Z"
-    },
-    "reviewerVerdicts": {
-      "security": {
-        "status": "passed",
-        "atCommit": "6054ba2e200db2755313b2cf82980134a04a0096"
-      },
-      "correctness": {
-        "status": "blocked",
-        "atCommit": "6054ba2e200db2755313b2cf82980134a04a0096"
-      },
-      "performance": {
-        "status": "passed",
-        "atCommit": "6054ba2e200db2755313b2cf82980134a04a0096"
-      },
-      "requirements": {
-        "status": "passed",
-        "atCommit": "6054ba2e200db2755313b2cf82980134a04a0096"
-      }
     }
   },
   "closeOut": {
@@ -276,7 +263,7 @@
       },
       "costAtCloseOut": {
         "usd": 309.129093,
-        "pricingAsOf": "2026-07-26T16:07:26.425Z"
+        "pricingAsOf": "2026-07-26T16:07:28.249Z"
       }
     },
     "merges": [
