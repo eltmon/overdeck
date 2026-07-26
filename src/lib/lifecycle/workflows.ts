@@ -171,6 +171,26 @@ export function closeOut(
     const start = Date.now();
     const allSteps: StepResult[] = [];
 
+    // Recover UAT-promotion evidence before the gate reads the verification verdict.
+    const uatEvidenceStep = yield* Effect.promise(async () => {
+      try {
+        const { healUatPromotionVerification } = await import('../cloister/uat-promote-verification.js');
+        const evidence = await healUatPromotionVerification(ctx.issueId);
+        if (!evidence) {
+          return stepSkipped('dod:uat-promotion-evidence', ['No missing UAT-promotion verification evidence found']);
+        }
+        return stepOk('dod:uat-promotion-evidence', [
+          `Recorded verification from ${evidence.generation}`,
+          ...(evidence.mergeSha ? [`Promoted to main at ${evidence.mergeSha.slice(0, 9)}`] : []),
+        ]);
+      } catch (err) {
+        return stepSkipped('dod:uat-promotion-evidence', [
+          `Evidence recovery unavailable: ${err instanceof Error ? err.message : String(err)}`,
+        ]);
+      }
+    });
+    allSteps.push(uatEvidenceStep);
+
     // 1. Evaluate every pre-teardown Definition-of-Done row before any cleanup.
     const dodGate = yield* Effect.promise(() => evaluateDodGate(ctx, {
       acceptedRows: opts.dodAcceptedRows,

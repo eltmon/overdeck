@@ -12,7 +12,7 @@ this table and that module from drifting silently.
 | --- | --- | --- | --- | --- |
 | 1 | `review` | Review passed (mode per issue policy; full = convoy + synthesis) | review role → `pan admin specialists done review` → review-status write door | `reviewStatus: passed` |
 | 2 | `tests` | Tests passed (incl. browser UAT when required) | test role → `pan admin specialists done test` | `testStatus: passed` |
-| 3 | `verification` | Verification green on the branch (typecheck, lint, suite, build) | supervised verification worker (`verification-runner.ts` / `verification-worker.ts`) | `verificationStatus: passed` (or `skipped` per issue policy) |
+| 3 | `verification` | Verification green on the branch (typecheck, lint, suite, build) | supervised verification worker (`verification-runner.ts` / `verification-worker.ts`); uat-promotion (recorded at batch promotion, PAN-3114) | `verificationStatus: passed` (or `skipped` per issue policy) |
 | 4 | `merged` | Merged to main: forge/durable merge evidence, or a non-PR landing where the shared L2-work lens finds at least one convention-branch ref contained in its repository's default branch with the tip off the first-parent line and zero unmerged refs across all configured repositories | merge door: `triggerMerge` → merge specialist (`merge-agent.ts`); fallback: `gatherIssueBranchContainment()` | PR `MERGED`, `mergeStatus: merged`, or branch-containment evidence |
 | 5 | `post-merge` | Post-merge handoff: work/planning agents paused, workspace Docker stack + networks stopped, `verifying-on-main` label; for a containment-evidenced non-PR landing, passes when no work/planning agents are running because no observed merge event could trigger the lifecycle | `postMergeLifecycle()` (`merge-agent.ts`) — at-most-once per merge (PAN-328 in-flight guard); DoD containment fallback | issue labels, agent states |
 | 6 | `main-verify` | Verified on main (post-merge verification of the merged commit) | deacon verify-on-main flow | `verifying_on_main` → verified |
@@ -44,8 +44,10 @@ this table and that module from drifting silently.
   runner writes that anchor best-effort — it snapshots HEAD inside a `try/catch` for the
   test-skip drift check, and a policy `skipped` verdict never has one — so its absence proves
   nothing about whether verification ran, while requiring it made merged, green, deployed
-  issues permanently un-closable. The row still reports the anchor's presence or absence, so
-  a reader never has to guess which condition a miss came from.
+  issues permanently un-closable. UAT batch promotion records a `passed` verdict for each
+  non-terminal member at promote time, and close-out heals members of batches promoted before
+  that write path existed (PAN-3114). The row still reports the anchor's presence or absence,
+  so a reader never has to guess which condition a miss came from.
 
 ## Related
 

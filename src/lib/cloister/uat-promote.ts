@@ -68,6 +68,7 @@ export interface UatPromoteDeps {
    * it on main.
    */
   memberEligibility(issueId: string): { eligible: boolean; reason?: string };
+  recordVerification?: (generation: UatGeneration, mergeSha: string) => void;
   log?: (msg: string) => void;
 }
 
@@ -173,6 +174,11 @@ export async function promoteUatGeneration(
   // The batch is on main: this generation is done, every other live
   // generation is stale by definition (main moved).
   deps.store.update(gen.name, { status: 'promoted' });
+  try {
+    deps.recordVerification?.(gen, mergeSha);
+  } catch (err) {
+    log(`[uat-promote] ${name}: verification verdict recording failed after merge: ${err instanceof Error ? err.message : String(err)}`);
+  }
   await deps.teardownStack(gen).catch((err) => {
     log(`[uat-promote] ${name}: stack teardown failed: ${err instanceof Error ? err.message : String(err)}`);
   });

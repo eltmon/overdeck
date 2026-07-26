@@ -33,13 +33,15 @@ function makeDeps(rows: UatGeneration[], options: { mainSha?: string; failMerge?
   merges: Array<{ branch: string; message: string }>;
   teardowns: string[];
   fired: Array<{ issueId: string; options?: { sourceBranch?: string; verifiedMergedRef?: string } }>;
+  recordings: Array<{ generation: UatGeneration; mergeSha: string }>;
 } {
   const map = new Map(rows.map((g) => [g.name, g]));
   const merges: Array<{ branch: string; message: string }> = [];
   const teardowns: string[] = [];
   const fired: Array<{ issueId: string; options?: { sourceBranch?: string; verifiedMergedRef?: string } }> = [];
+  const recordings: Array<{ generation: UatGeneration; mergeSha: string }> = [];
   return {
-    map, merges, teardowns, fired,
+    map, merges, teardowns, fired, recordings,
     git: {
       fetchMain: async () => options.mainSha ?? MAIN,
       mergeIntoMain: async (branch, message) => {
@@ -71,6 +73,7 @@ function makeDeps(rows: UatGeneration[], options: { mainSha?: string; failMerge?
       const reason = options.ineligible?.[issueId];
       return reason ? { eligible: false, reason } : { eligible: true };
     },
+    recordVerification: (generation, mergeSha) => { recordings.push({ generation, mergeSha }); },
     log: () => {},
   };
 }
@@ -91,11 +94,29 @@ describe('promoteUatGeneration — success', () => {
     expect(deps.merges[0]!.branch).toBe('uat/pan-otter-0610');
     expect(deps.merges[0]!.message).toMatch(/^Merge UAT batch uat\/pan-otter-0610 \(PAN-1, PAN-2\)/);
     expect(deps.map.get('uat/pan-otter-0610')!.status).toBe('promoted');
+    expect(deps.recordings).toEqual([
+      { generation: expect.objectContaining({ name: 'uat/pan-otter-0610' }), mergeSha: 'merge-sha-xyz' },
+    ]);
     expect(deps.teardowns).toContain('uat/pan-otter-0610');
     expect(deps.fired).toEqual([
       { issueId: 'PAN-1', options: { sourceBranch: 'feature/pan-1', verifiedMergedRef: 'h1' } },
       { issueId: 'PAN-2', options: { sourceBranch: 'feature/pan-2', verifiedMergedRef: 'h2' } },
     ]);
+  });
+
+  it('returns the successful promote result when verification recording throws', async () => {
+    const deps = makeDeps([gen('uat/pan-recorder-0610')]);
+    deps.recordVerification = () => { throw new Error('record write failed'); };
+
+    const result = await promoteUatGeneration('uat/pan-recorder-0610', PROJ, deps);
+
+    expect(result).toMatchObject({
+      success: true,
+      generation: 'uat/pan-recorder-0610',
+      mergeSha: 'merge-sha-xyz',
+      members: ['PAN-1', 'PAN-2'],
+    });
+    expect(deps.map.get('uat/pan-recorder-0610')!.status).toBe('promoted');
   });
 
   it('invalidates every other live generation (main moved) and tears their stacks down', async () => {
@@ -159,6 +180,7 @@ describe('promoteUatGeneration — rejections (no git mutation)', () => {
     expect(result.message).toContain('reassembles automatically');
     expect(deps.merges).toHaveLength(0);
     expect(deps.fired).toEqual([]);
+    expect(deps.recordings).toEqual([]);
     expect(deps.map.get('uat/pan-stale-0610')!.status).toBe('ready');
   });
 
@@ -195,6 +217,7 @@ describe('promoteUatGeneration — rejections (no git mutation)', () => {
     expect(result.message).toContain('PAN-2 (review is reviewing)');
     expect(deps.merges).toHaveLength(0);
     expect(deps.fired).toEqual([]);
+    expect(deps.recordings).toEqual([]);
     expect(deps.map.get('uat/pan-otter-0611')!.status).toBe('ready');
   });
 
@@ -208,6 +231,7 @@ describe('promoteUatGeneration — rejections (no git mutation)', () => {
     expect((await promoteUatGeneration('uat/pan-building-0610', PROJ, deps))).toMatchObject({ success: false, reason: 'wrong-status' });
     expect((await promoteUatGeneration('uat/pan-done-0610', PROJ, deps))).toMatchObject({ success: false, reason: 'wrong-status' });
     expect(deps.merges).toHaveLength(0);
+    expect(deps.recordings).toEqual([]);
   });
 
   it('surfaces merge/push failure without flipping status or firing post-merge', async () => {
@@ -218,6 +242,7 @@ describe('promoteUatGeneration — rejections (no git mutation)', () => {
     expect(result).toMatchObject({ success: false, reason: 'merge-failed' });
     expect(deps.map.get('uat/pan-race-0610')!.status).toBe('ready');
     expect(deps.fired).toEqual([]);
+    expect(deps.recordings).toEqual([]);
     expect(deps.teardowns).toEqual([]);
   });
 });
