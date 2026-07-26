@@ -109,7 +109,13 @@ describe('SessionFeedSidebar', () => {
     hookSources.useGitFeed.mockImplementation(() => hookSources.git);
     hookSources.useConversationFeed.mockClear();
     hookSources.useGitFeed.mockClear();
-    useDashboardStore.setState({ observationsByIssueId: {}, recentActivity: [] });
+    useDashboardStore.setState({
+      agentsById: {},
+      channelPermissionRequestsById: {},
+      issuesRaw: [],
+      observationsByIssueId: {},
+      recentActivity: [],
+    });
   });
 
   afterEach(async () => {
@@ -371,5 +377,50 @@ describe('SessionFeedSidebar', () => {
     expect(window.location.pathname).toBe('/conv/2762');
     expect(onPopState).toHaveBeenCalledOnce();
     window.removeEventListener('popstate', onPopState);
+  });
+
+  it('shows the issue identifier and title while preserving question deduplication', () => {
+    const pendingAskUserQuestion = {
+      toolUseId: 'toolu-shared',
+      askedAt: '2026-05-23T01:04:00.000Z',
+      questions: [{ question: 'Which option should I use?', options: [{ label: 'A' }] }],
+    };
+    useDashboardStore.setState({
+      agentsById: {
+        'agent-pan-3097-a': {
+          id: 'agent-pan-3097-a',
+          issueId: 'PAN-3097',
+          pendingInputKinds: ['askUserQuestion'],
+          pendingAskUserQuestion,
+        },
+        'agent-pan-3097-b': {
+          id: 'agent-pan-3097-b',
+          issueId: 'PAN-3097',
+          pendingInputKinds: ['askUserQuestion'],
+          pendingAskUserQuestion,
+        },
+      },
+      issuesRaw: [{ id: 'PAN-3097', title: 'Add question context' }],
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+
+    render(<SessionFeedSidebar onClose={vi.fn()} now={now} />);
+
+    expect(screen.getByText('PAN-3097 — Add question context')).toBeTruthy();
+    expect(screen.getAllByText('Which option should I use?')).toHaveLength(1);
+  });
+
+  it('falls back to the agent id for an unbound pending-input subject', () => {
+    useDashboardStore.setState({
+      agentsById: {
+        'agent-unbound': {
+          id: 'agent-unbound',
+          pendingInputKinds: ['rateLimit'],
+        },
+      },
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+
+    render(<SessionFeedSidebar onClose={vi.fn()} now={now} />);
+
+    expect(screen.getByText('agent-unbound')).toBeTruthy();
   });
 });

@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { History, TriangleAlert, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import { formatIssueRef } from '../../lib/issueLabel';
 import { formatBucketLabel, groupByContiguousLabel } from '../../lib/sessionFeedLabels';
 import { BucketSection } from './BucketSection';
 import type { SessionFeedEntry, SessionFeedTab } from './types';
@@ -244,7 +245,10 @@ function NeedsYouSection({ issueIds, unscoped, showEmpty = false }: { issueIds?:
         (!auqResolved ? q?.questions?.[0]?.question : undefined) ??
         (!planResolved && planToolUseId ? 'Plan awaiting your approval — click to review' : undefined) ??
         describePendingInput(subject.kinds);
-      const label = (subject.issueId && titleByIssueId.get(subject.issueId)) || subject.issueId || subject.agentId;
+      const label = formatIssueRef(
+        subject.issueId,
+        subject.issueId ? titleByIssueId.get(subject.issueId) : undefined,
+      ) ?? subject.agentId;
       const dedupKey = (!auqResolved ? toolUseId : undefined) ?? (!planResolved ? planToolUseId : undefined) ?? `${subject.issueId ?? subject.agentId}::${label}::${detail}`;
       if (seen.has(dedupKey)) continue;
       seen.add(dedupKey);

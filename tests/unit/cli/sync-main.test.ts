@@ -130,6 +130,58 @@ describe('syncMainCommand', () => {
     expect(errOutput).toMatch(/src\/bar\.ts/);
   });
 
+  it('prints one status line per repo for a polyrepo sync', async () => {
+    mockFetch(200, {
+      success: true,
+      commitCount: 14,
+      message: 'Synced 14 commit(s) from main',
+      repos: [
+        { repoKey: 'api', success: true, commitCount: 14 },
+        { repoKey: 'fe', success: true, alreadyUpToDate: true },
+      ],
+    });
+
+    await syncMainCommand('MIN-850');
+
+    const output = logSpy.mock.calls.map(c => c.join(' ')).join('\n');
+    expect(output).toContain('api: 14 commit(s)');
+    expect(output).toContain('fe: already up to date');
+  });
+
+  it('groups polyrepo conflicts under the failed repo and reports skipped repos', async () => {
+    mockFetch(500, {
+      success: false,
+      error: '[api] Sync-main produced conflicts',
+      conflictFiles: ['api/src/foo.ts'],
+      repos: [
+        { repoKey: 'api', success: false, reason: '[api] Sync-main produced conflicts', conflictFiles: ['api/src/foo.ts'] },
+        { repoKey: 'fe', success: false, skipped: true },
+      ],
+    });
+
+    await syncMainCommand('MIN-850');
+
+    expect(exitSpy).toHaveBeenCalledWith(1);
+    const output = errorSpy.mock.calls.map(c => c.join(' ')).join('\n');
+    expect(output).toContain('api: failed');
+    expect(output).toContain('api/src/foo.ts');
+    expect(output).toContain('fe: skipped (earlier repo failed)');
+  });
+
+  it('does not add repo status lines for a single-repo result', async () => {
+    mockFetch(200, {
+      success: true,
+      alreadyUpToDate: true,
+      repos: [{ repoKey: 'overdeck', success: true, alreadyUpToDate: true }],
+    });
+
+    await syncMainCommand('PAN-242');
+
+    const output = logSpy.mock.calls.map(c => c.join(' ')).join('\n');
+    expect(output).toMatch(/already up to date/i);
+    expect(output).not.toContain('overdeck:');
+  });
+
   it('exits with code 1 and prints dashboard hint on fetch failure', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('ECONNREFUSED')));
 

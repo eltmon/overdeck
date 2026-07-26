@@ -12,6 +12,16 @@ import { getDashboardApiUrlSync } from '../../lib/config.js';
 
 const DASHBOARD_URL = getDashboardApiUrlSync();
 
+interface SyncMainRepoResponse {
+  repoKey: string;
+  success: boolean;
+  alreadyUpToDate?: boolean;
+  commitCount?: number;
+  conflictFiles?: string[];
+  reason?: string;
+  skipped?: boolean;
+}
+
 interface SyncMainResponse {
   success: boolean;
   alreadyUpToDate?: boolean;
@@ -20,6 +30,25 @@ interface SyncMainResponse {
   conflictFiles?: string[];
   message?: string;
   error?: string;
+  repos?: SyncMainRepoResponse[];
+}
+
+function printPolyrepoResults(repos: SyncMainRepoResponse[], failed: boolean): void {
+  const write = failed ? console.error : console.log;
+  for (const repo of repos) {
+    const status = repo.skipped
+      ? 'skipped (earlier repo failed)'
+      : repo.alreadyUpToDate
+        ? 'already up to date'
+        : repo.success
+          ? `${repo.commitCount ?? 0} commit(s)`
+          : `failed${repo.reason ? ` — ${repo.reason}` : ''}`;
+    write(chalk.dim(`  ${repo.repoKey}: ${status}`));
+    if (repo.conflictFiles?.length) {
+      write(chalk.yellow('    Conflict files:'));
+      repo.conflictFiles.forEach(file => write(chalk.yellow(`      - ${file}`)));
+    }
+  }
 }
 
 export async function syncMainCommand(id: string): Promise<void> {
@@ -34,9 +63,13 @@ export async function syncMainCommand(id: string): Promise<void> {
 
     const result = await response.json() as SyncMainResponse;
 
+    const isPolyrepo = (result.repos?.length ?? 0) > 1;
+
     if (!response.ok) {
       spinner.fail(chalk.red(`Sync failed: ${result.error || 'Unknown error'}`));
-      if (result.conflictFiles && result.conflictFiles.length > 0) {
+      if (isPolyrepo) {
+        printPolyrepoResults(result.repos!, true);
+      } else if (result.conflictFiles && result.conflictFiles.length > 0) {
         console.error(chalk.yellow('\nConflict files:'));
         result.conflictFiles.forEach(f => console.error(chalk.yellow(`  - ${f}`)));
       }
@@ -45,10 +78,12 @@ export async function syncMainCommand(id: string): Promise<void> {
 
     if (result.alreadyUpToDate) {
       spinner.succeed(chalk.green(`${issueId} is already up to date with main`));
+      if (isPolyrepo) printPolyrepoResults(result.repos!, false);
       return;
     }
 
     spinner.succeed(chalk.green(`✓ ${result.message || 'Sync complete'}`));
+    if (isPolyrepo) printPolyrepoResults(result.repos!, false);
 
     if (result.commitCount !== undefined) {
       console.log(chalk.dim(`  Commits merged: ${result.commitCount}`));

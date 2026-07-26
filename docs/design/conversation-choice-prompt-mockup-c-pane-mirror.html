@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mockup C — Pane-faithful mirror</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --radius: 0.625rem;
+    --radius-sm: calc(var(--radius) - 4px);
+    --radius-md: calc(var(--radius) - 2px);
+    --background: #ffffff;
+    --foreground: #1f2937;
+    --card: #ffffff;
+    --primary: #4f46e5;
+    --primary-foreground: #ffffff;
+    --muted: rgba(0,0,0,.04);
+    --muted-foreground: #6b7280;
+    --border: rgba(0,0,0,.08);
+    --success: #10b981;
+    --success-foreground: #047857;
+    --warning: #f59e0b;
+    --warning-foreground: #b45309;
+    --mono: "SF Mono", ui-monospace, "Cascadia Code", Menlo, Consolas, monospace;
+    /* dark surface tokens (from index.css dark block) */
+    --dark-bg: #0c1018;
+    --dark-fg: #e5e7eb;
+    --dark-muted: #9ca3af;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    font-family: "DM Sans", sans-serif;
+    font-weight: 500;
+    background: #f5f5f4;
+    color: var(--foreground);
+    font-size: 15px;
+    line-height: 1.55;
+  }
+
+  /* ---- mockup chrome (NOT part of the app UI) ---- */
+  .mockup-bar {
+    background: #171717; color: #d4d4d4;
+    font-size: 12.5px; padding: 8px 16px;
+    display: flex; align-items: center; gap: 12px;
+    position: sticky; top: 0; z-index: 50;
+  }
+  .mockup-bar .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--success); flex: none; }
+  .mockup-bar strong { font-weight: 500; color: #fff; }
+  .mockup-bar .nav { margin-left: auto; display: flex; gap: 6px; }
+  .mockup-bar .nav a {
+    color: #a3a3a3; text-decoration: none; padding: 2px 8px; border-radius: var(--radius-sm);
+    border: 1px solid rgba(255,255,255,.12);
+  }
+  .mockup-bar .nav a.here { color: #fff; border-color: var(--success); background: rgba(16,185,129,.16); }
+  .mockup-bar .nav a:hover { color: #fff; }
+
+  .column {
+    max-width: 880px; margin: 0 auto; background: var(--background);
+    min-height: calc(100vh - 33px);
+    box-shadow: 0 0 32px rgba(0,0,0,.05);
+    display: flex; flex-direction: column;
+  }
+  .messages { flex: 1; padding: 28px 32px 16px; }
+  .msg { margin-bottom: 18px; }
+  .msg p { margin-bottom: 12px; }
+  .msg a { color: var(--primary); text-decoration: none; }
+  .msg a:hover { text-decoration: underline; }
+  .msg code {
+    font-family: var(--mono); font-size: .88em;
+    background: rgba(0,0,0,.05); padding: 1px 5px; border-radius: 4px;
+  }
+  .msg-meta { font-size: 12px; color: var(--muted-foreground); margin-top: 4px; }
+
+  .sys-card {
+    background: var(--muted); border-radius: var(--radius);
+    padding: 12px 16px; margin: 18px 0; font-size: 13.5px;
+  }
+  .sys-card .sys-title { display: flex; gap: 8px; align-items: baseline; }
+  .sys-card .sys-title .glyph { color: var(--muted-foreground); font-family: var(--mono); }
+  .sys-card .sys-body { color: var(--muted-foreground); margin-top: 4px; }
+  .sys-card a { color: var(--primary); text-decoration: none; }
+  .sys-card .mono { font-family: var(--mono); font-size: .92em; }
+
+  /* ---- THE CHOICE: pane mirror ---- */
+  .mirror { margin: 20px 0 8px; }
+  .mirror-head {
+    display: flex; align-items: center; gap: 10px; margin-bottom: 6px;
+  }
+  .badge {
+    display: inline-flex; align-items: center; height: 20px; padding: 0 8px;
+    border-radius: var(--radius-sm); font-size: 11.5px; font-weight: 500; flex: none;
+    background: color-mix(in srgb, var(--warning) 8%, transparent);
+    border: 1px solid color-mix(in srgb, var(--warning) 32%, transparent);
+    color: var(--warning-foreground);
+  }
+  .badge.answered {
+    background: color-mix(in srgb, var(--success) 8%, transparent);
+    border-color: color-mix(in srgb, var(--success) 32%, transparent);
+    color: var(--success-foreground);
+  }
+  .mirror-head .src { font-size: 12px; color: var(--muted-foreground); }
+  .mirror-head .open-term { margin-left: auto; font-size: 12px; color: var(--primary); cursor: pointer; white-space: nowrap; }
+
+  .term {
+    background: var(--dark-bg); color: var(--dark-fg);
+    border-radius: var(--radius-md);
+    font-family: var(--mono); font-size: 13px; line-height: 1.5;
+    padding: 14px 16px;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.06);
+  }
+  .term .t-dim { color: var(--dark-muted); }
+  .term .t-gap { height: 12px; }
+  .t-option {
+    display: flex; gap: 8px; padding: 1px 6px; margin: 0 -6px;
+    border-radius: var(--radius-sm); cursor: pointer; white-space: pre;
+  }
+  .t-option .cursor { color: var(--dark-muted); visibility: hidden; flex: none; }
+  .t-option.active { background: rgba(255,255,255,.07); }
+  .t-option.active .cursor { visibility: visible; color: #fff; }
+  .t-option .rec { color: var(--dark-muted); }
+  .term.done .t-option { cursor: default; }
+  .term.done .t-option:not(.chosen) { opacity: .45; }
+  .term.done .t-option.chosen { background: rgba(16,185,129,.12); }
+  .term.done .t-option.chosen .cursor { visibility: visible; color: var(--success); }
+
+  .mirror-foot {
+    display: flex; align-items: center; gap: 14px; margin-top: 6px;
+    font-size: 12px; color: var(--muted-foreground);
+  }
+  .mirror-foot kbd {
+    font-family: var(--mono); font-size: 10.5px;
+    border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 4px;
+    padding: 0 4px; background: #fff;
+  }
+  .mirror-foot .live { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; }
+  .mirror-foot .live .pulse {
+    width: 7px; height: 7px; border-radius: 50%; background: var(--warning);
+    animation: pulse 1.6s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .3; } }
+  .mirror.answered .mirror-foot .pulse { background: var(--success); animation: none; }
+
+  .answered-strip {
+    display: none; margin-top: 8px; align-items: center; gap: 8px;
+    font-size: 13px; color: var(--foreground);
+  }
+  .mirror.answered .answered-strip { display: flex; }
+
+  /* composer */
+  .composer { border-top: 1px solid var(--border); padding: 14px 32px 16px; background: var(--background); }
+  .input-wrap {
+    border: 1px solid var(--border); border-radius: 14px;
+    display: flex; align-items: center; gap: 8px; padding: 10px 12px; background: #fff;
+  }
+  .input-wrap .placeholder { color: var(--muted-foreground); font-size: 14.5px; flex: 1; }
+  .input-wrap .icons { display: flex; gap: 6px; align-items: center; color: var(--muted-foreground); }
+  .icon-btn { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 8px; }
+  .icon-btn.send { background: var(--primary); color: #fff; }
+  .composer-sub { display: flex; gap: 14px; margin-top: 8px; font-size: 12.5px; color: var(--muted-foreground); align-items: center; }
+  .composer-sub .warn { color: var(--warning-foreground); }
+</style>
+</head>
+<body>
+
+<div class="mockup-bar">
+  <span class="dot"></span>
+  <span><strong>Mockup C · Pane-faithful mirror</strong> — the exact menu from the tmux pane, mirrored live in the transcript: same numbering, same wording. Click a row or use ↑↓ + Enter — the keystrokes go straight to the pane.</span>
+  <span class="nav">
+    <a href="conversation-choice-prompt-mockup-a-inline-card.html">A</a>
+    <a href="conversation-choice-prompt-mockup-b-docked-bar.html">B</a>
+    <a class="here" href="conversation-choice-prompt-mockup-c-pane-mirror.html">C</a>
+  </span>
+</div>
+
+<div class="column">
+  <div class="messages">
+
+    <div class="msg">
+      <p>3. FCM push is dead at the credential layer — <a href="#">MIN-906</a> (High). Google is returning 401 to the backend's Firebase service account itself, which means no push delivery at all regardless of the device-side fixes from <a href="#">MIN-860</a>. The service-account key in the prod secret has likely been revoked or rotated.</p>
+      <p>One smaller thing folded into <a href="#">MIN-904</a>: a startup catch-up job runs synchronously on the main thread and held <code>/actuator/health</code> at 503 for an extra 2.5 minutes after the app was already serving — worth making async so health-based monitors don't lie during boots.</p>
+      <p>Bottom line: the outage is over and will recur on every deploy until <a href="#">MIN-904</a> lands; the one action only you can take right now is recharging the z.ai account, since that's breaking users' debriefs continuously.</p>
+      <div class="msg-meta">12:07 AM · 8m 6s</div>
+    </div>
+
+    <div class="sys-card">
+      <div class="sys-title"><span class="glyph">⌁</span> /pan start MIN-904 was accepted and is running in the background.</div>
+      <div class="sys-body">Started /pan start MIN-904 for MIN-904. Watch activity <a href="#">activity-1785053647313</a> or the <a href="#">MIN-904 issue view</a> for progress.</div>
+      <div class="sys-body">Activity: <span class="mono">activity-1785053647313</span></div>
+    </div>
+
+    <!-- THE CHOICE -->
+    <div class="mirror" id="mirror">
+      <div class="mirror-head">
+        <span class="badge" id="headBadge">Needs you</span>
+        <span class="src">mirrored from the agent's pane — what you see is what's on the terminal</span>
+        <span class="open-term">Open terminal ↗</span>
+      </div>
+      <div class="term" id="term" tabindex="0">
+        <div>This session is 4h 5m old and 146.9k tokens.</div>
+        <div class="t-gap"></div>
+        <div class="t-dim">Resuming the full session will consume a substantial portion of your</div>
+        <div class="t-dim">usage limits. We recommend resuming from a summary.</div>
+        <div class="t-gap"></div>
+        <div class="t-option active" data-label="Resume from summary"><span class="cursor">❯</span><span>1. Resume from summary <span class="rec">(recommended)</span></span></div>
+        <div class="t-option" data-label="Resume full session as-is"><span class="cursor">❯</span><span>2. Resume full session as-is</span></div>
+        <div class="t-option" data-label="Don't ask me again"><span class="cursor">❯</span><span>3. Don't ask me again</span></div>
+        <div class="t-gap"></div>
+        <div class="t-dim">Enter to confirm · Esc to cancel</div>
+      </div>
+      <div class="mirror-foot">
+        <span>Click a row, or press <kbd>↑</kbd><kbd>↓</kbd> then <kbd>Enter</kbd> — the exact keystrokes are sent to the pane</span>
+        <span class="live"><span class="pulse"></span><span id="liveLabel">pane is waiting</span></span>
+      </div>
+      <div class="answered-strip">
+        <span class="badge answered">Answered</span>
+        <span>You picked <span class="mono" id="answeredWhat" style="font-family:var(--mono); font-size:12.5px"></span> — the pane received <span class="mono" id="answeredKeys" style="font-family:var(--mono); font-size:12.5px"></span></span>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="composer">
+    <div class="input-wrap">
+      <span class="placeholder">Message the agent…</span>
+      <span class="icons">
+        <span class="icon-btn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 12.5l-8.5 8.5a5.5 5.5 0 01-7.8-7.8l9-9a3.5 3.5 0 015 5l-8.5 8.5a1.5 1.5 0 01-2.2-2.2l7.5-7.5"/></svg></span>
+        <span class="icon-btn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0014 0M12 18v3"/></svg></span>
+        <span class="icon-btn send"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+      </span>
+    </div>
+    <div class="composer-sub">
+      <span>❋ Claude Fable 5 <span class="warn">⚠</span></span>
+      <span>Max ⌄</span>
+    </div>
+  </div>
+</div>
+
+<script>
+  const mirror = document.getElementById('mirror');
+  const term = document.getElementById('term');
+  const opts = [...term.querySelectorAll('.t-option')];
+  let idx = 0, done = false;
+
+  function setActive(i) {
+    idx = (i + opts.length) % opts.length;
+    opts.forEach((o, j) => o.classList.toggle('active', j === idx));
+  }
+  function answer(i, keys) {
+    if (done) return;
+    done = true;
+    setActive(i);
+    opts[i].classList.add('chosen');
+    term.classList.add('done');
+    mirror.classList.add('answered');
+    document.getElementById('headBadge').textContent = 'Answered';
+    document.getElementById('headBadge').classList.add('answered');
+    document.getElementById('answeredWhat').textContent = opts[i].dataset.label;
+    document.getElementById('answeredKeys').textContent = keys;
+    document.getElementById('liveLabel').textContent = 'keystrokes delivered · 4:21 PM';
+  }
+  opts.forEach((o, i) => {
+    o.addEventListener('mouseenter', () => { if (!done) setActive(i); });
+    o.addEventListener('click', () => {
+      const keys = i === 0 ? 'Enter' : '↓ ×' + i + ' + Enter';
+      answer(i, keys);
+    });
+  });
+  document.addEventListener('keydown', (e) => {
+    if (done) return;
+    if (e.key === 'ArrowDown') { setActive(idx + 1); e.preventDefault(); }
+    if (e.key === 'ArrowUp') { setActive(idx - 1); e.preventDefault(); }
+    if (e.key >= '1' && e.key <= '3') answer(Number(e.key) - 1, '"' + e.key + '" + Enter');
+    if (e.key === 'Enter') answer(idx, idx === 0 ? 'Enter' : '↓ ×' + idx + ' + Enter');
+    if (e.key === 'Escape') answer(idx, 'Esc — prompt cancelled in the pane');
+  });
+</script>
+</body>
+</html>

@@ -20,6 +20,8 @@ import {
   SyncGitCommandAbortError,
   SyncGitCommandTimeoutError,
 } from './sync-main-git.js';
+import { syncMainAcrossWorkspaceRepos, type SyncMainRepoResult, type SyncMainResult } from './sync-main-workspace.js';
+export type { SyncMainRepoResult, SyncMainResult } from './sync-main-workspace.js';
 
 const execAsync = promisify(exec);
 
@@ -896,7 +898,7 @@ async function getConflictFiles(projectPath: string, signal?: AbortSignal): Prom
 async function resolveMainPreferredSyncConflicts(
   projectPath: string,
   conflictFiles: string[],
-  signal?: AbortSignal,
+  targetBranch: string, signal?: AbortSignal,
 ): Promise<{ success: boolean; reason?: string }> {
   if (conflictFiles.length === 0 || !conflictFiles.every(isSyncMainMainPreferredPath)) {
     return { success: false, reason: 'conflicts include non-pipeline-owned files' };
@@ -907,12 +909,12 @@ async function resolveMainPreferredSyncConflicts(
   try {
     for (const path of SYNC_MAIN_MAIN_PREFERRED_PATHS) {
       await run(`git rm -r --quiet --ignore-unmatch -- ${path}`);
-      await run(`git checkout origin/main -- ${path}`).catch((error) => {
+      await run(`git checkout origin/${targetBranch} -- ${path}`).catch((error) => {
         if (isSyncGitTermination(error)) throw error;
-        // The path may not exist on origin/main. The preceding git rm records
-        // main's deletion for this pipeline-owned path.
+        // The path may not exist on the target branch. The preceding git rm
+        // records that branch's deletion for this pipeline-owned path.
       });
-      await run(`git add -A -- ${path}`);
+      if ((await run(`git ls-files -- ${path}`)).stdout.trim()) await run(`git add -A -- ${path}`);
     }
 
     const remainingConflicts = await getConflictFiles(projectPath, signal);
@@ -1176,18 +1178,6 @@ export async function salvageStrandedMerge(
 }
 
 /**
- * Result of syncing main into a workspace branch
- */
-export interface SyncMainResult {
-  success: boolean;
-  alreadyUpToDate?: boolean;
-  commitCount?: number;
-  changedFiles?: string[];
-  conflictFiles?: string[];
-  reason?: string;
-}
-
-/**
  * Scan workspace for leftover git conflict markers (async)
  */
 export async function scanForConflictMarkers(projectPath: string): Promise<string[]> {
@@ -1235,21 +1225,20 @@ async function collectSyncMergeStats(projectPath: string, signal?: AbortSignal):
  *
  * Auto-commits any uncommitted changes before merging (with safety verification).
  */
-export async function syncMainIntoWorkspace(
-  projectPath: string,
+async function syncMainIntoRepo(
+  repoDir: string,
   issueId: string,
+  targetBranch: string,
   signal?: AbortSignal,
-): Promise<SyncMainResult> {
-  console.log(`[sync-main] Starting sync of main into workspace for ${issueId}`);
-  logActivity('sync_main_start', `Starting sync for ${issueId}`);
+): Promise<Omit<SyncMainRepoResult, 'repoKey' | 'skipped'>> {
   const run = (command: string, timeout = SYNC_GIT_STATUS_TIMEOUT_MS) =>
-    runSyncGitCommand(command, { cwd: projectPath, timeout, signal });
+    runSyncGitCommand(command, { cwd: repoDir, timeout, signal });
   let mergeStarted = false;
 
   try {
     console.log(`[sync-main] Checking for uncommitted changes...`);
     logActivity('sync_main_auto_commit', `Auto-committing uncommitted changes before sync`);
-    const autoCommit = await autoCommitWorkspaceChangesBeforeSync(projectPath, issueId, signal);
+    const autoCommit = await autoCommitWorkspaceChangesBeforeSync(repoDir, issueId, signal);
     if (!autoCommit.success) {
       const message = autoCommit.reason || 'Failed to auto-commit uncommitted changes';
       console.error(`[sync-main] ${message}`);
@@ -1271,7 +1260,7 @@ export async function syncMainIntoWorkspace(
     }
 
     try {
-      const lockCleanup = await Effect.runPromise(cleanupStaleLocks(projectPath, { signal, processProbeTimeoutMs: SYNC_GIT_STATUS_TIMEOUT_MS }));
+      const lockCleanup = await Effect.runPromise(cleanupStaleLocks(repoDir, { signal, processProbeTimeoutMs: SYNC_GIT_STATUS_TIMEOUT_MS }));
       if (lockCleanup.found.length > 0) console.log(`[sync-main] Found ${lockCleanup.found.length} lock file(s)`);
       if (lockCleanup.removed.length > 0) {
         console.log(`[sync-main] Cleaned up ${lockCleanup.removed.length} stale lock file(s)`); logActivity('git_lock_cleanup', `Removed ${lockCleanup.removed.length} stale lock file(s)`);
@@ -1288,19 +1277,19 @@ export async function syncMainIntoWorkspace(
       console.error(`[sync-main] ${message}`); logActivity('sync_main_blocked', message);
       return { success: false, reason: message };
     }
-    console.log(`[sync-main] Fetching origin/main...`);
+    console.log(`[sync-main] Fetching origin/${targetBranch}...`);
     try {
-      await run('git fetch origin main', SYNC_GIT_FETCH_TIMEOUT_MS);
+      await run(`git fetch origin ${targetBranch}`, SYNC_GIT_FETCH_TIMEOUT_MS);
     } catch (error) {
       if (isSyncGitTermination(error)) throw error;
-      return { success: false, reason: `Failed to fetch origin/main: ${(error as Error).message}` };
+      return { success: false, reason: `Failed to fetch origin/${targetBranch}: ${(error as Error).message}` };
     }
 
     let mergeOutput = '';
     let hasConflicts = false;
     try {
       mergeStarted = true;
-      const result = await run('git merge origin/main', SYNC_GIT_MERGE_TIMEOUT_MS);
+      const result = await run(`git merge origin/${targetBranch}`, SYNC_GIT_MERGE_TIMEOUT_MS);
       mergeStarted = false;
       mergeOutput = (result.stdout || '') + (result.stderr || '');
     } catch (error: any) {
@@ -1311,28 +1300,28 @@ export async function syncMainIntoWorkspace(
 
     if (mergeOutput.includes('Already up to date') || mergeOutput.includes('Already up-to-date')) {
       console.log(`[sync-main] Already up to date`);
-      logActivity('sync_main_noop', `${issueId} already up to date with main`);
+      logActivity('sync_main_noop', `${issueId} already up to date with ${targetBranch}`);
       return { success: true, alreadyUpToDate: true };
     }
 
     if (!hasConflicts) {
       console.log(`[sync-main] Clean merge completed`);
-      logActivity('sync_main_success', `Clean merge of main into ${issueId}`);
-      return { success: true, ...await collectSyncMergeStats(projectPath, signal) };
+      logActivity('sync_main_success', `Clean merge of ${targetBranch} into ${issueId}`);
+      return { success: true, ...await collectSyncMergeStats(repoDir, signal) };
     }
 
-    const conflictFiles = await getConflictFiles(projectPath, signal);
-    const mainPreferredResolution = await resolveMainPreferredSyncConflicts(projectPath, conflictFiles, signal);
+    const conflictFiles = await getConflictFiles(repoDir, signal);
+    const mainPreferredResolution = await resolveMainPreferredSyncConflicts(repoDir, conflictFiles, targetBranch, signal);
     if (mainPreferredResolution.success) {
       mergeStarted = false;
-      console.log(`[sync-main] Auto-resolved ${conflictFiles.length} pipeline-owned conflict(s) with origin/main`);
-      logActivity('sync_main_auto_resolved_conflicts', `Auto-resolved ${conflictFiles.length} pipeline-owned conflict(s) in ${issueId} with origin/main`);
-      return { success: true, ...await collectSyncMergeStats(projectPath, signal) };
+      console.log(`[sync-main] Auto-resolved ${conflictFiles.length} pipeline-owned conflict(s) with origin/${targetBranch}`);
+      logActivity('sync_main_auto_resolved_conflicts', `Auto-resolved ${conflictFiles.length} pipeline-owned conflict(s) in ${issueId} with origin/${targetBranch}`);
+      return { success: true, ...await collectSyncMergeStats(repoDir, signal) };
     }
 
     console.log(`[sync-main] ${conflictFiles.length} conflict(s); aborting merge for manual resolution`);
     logActivity('sync_main_conflicts', `${conflictFiles.length} conflict(s) in ${issueId}: ${conflictFiles.join(', ')}`);
-    await ensureSyncGitQuiescent(projectPath, true);
+    await ensureSyncGitQuiescent(repoDir, true);
     mergeStarted = false;
     return {
       success: false,
@@ -1341,12 +1330,20 @@ export async function syncMainIntoWorkspace(
     };
   } catch (error) {
     if (!isSyncGitTermination(error)) throw error;
-    await ensureSyncGitQuiescent(projectPath, mergeStarted);
+    await ensureSyncGitQuiescent(repoDir, mergeStarted);
     return {
       success: false,
       reason: error instanceof SyncGitCommandTimeoutError ? error.message : 'Sync-main cancelled after reaching its preparation deadline',
     };
   }
+}
+
+export async function syncMainIntoWorkspace(
+  projectPath: string,
+  issueId: string,
+  signal?: AbortSignal,
+): Promise<SyncMainResult> {
+  return syncMainAcrossWorkspaceRepos(projectPath, issueId, signal, syncMainIntoRepo, logActivity);
 }
 
 /**

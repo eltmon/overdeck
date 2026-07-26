@@ -18,6 +18,10 @@ import {
 import { getAutoCloseOutCanonicalState } from '../cloister/deacon-canonical-state.js';
 import { fetchCommitCheckRuns, fetchIssuePullRequest } from '../overdeck/pull-requests.js';
 import {
+  gatherIssueBranchContainment,
+  type IssueBranchContainment,
+} from '../pipeline-membership-gather.js';
+import {
   acceptFlagFor,
   BRANCH_ABSENT_MERGE_ERROR,
   canAcceptDodMisses,
@@ -44,6 +48,7 @@ export interface DodStatusRowDeps {
 export interface MergedDodRowResult extends DodRowResult {
   mergedAt?: string;
   mergeCommit?: string;
+  evidence?: 'branch-containment';
 }
 
 interface MergedRowDeps {
@@ -55,6 +60,7 @@ interface MergedRowDeps {
     mergeCommit?: { oid?: string } | string | null;
   }>;
   readDurableMerges?: (ctx: LifecycleContext) => Promise<string[]>;
+  readBranchContainment?: (ctx: LifecycleContext) => Promise<IssueBranchContainment>;
 }
 
 const defaultMergedRowDeps: MergedRowDeps = {
@@ -74,6 +80,11 @@ const defaultMergedRowDeps: MergedRowDeps = {
   readDurableMerges: async ctx => {
     const project = resolveProjectForIssue(ctx.issueId) ?? getProjectConfigFromWorkspacePath(ctx.projectPath);
     return (await readIssueRecord(project, ctx.issueId))?.closeOut.merges ?? [];
+  },
+  readBranchContainment: async ctx => {
+    const project = resolveProjectForIssue(ctx.issueId) ?? getProjectConfigFromWorkspacePath(ctx.projectPath);
+    if (!project) return { unmergedRefs: [], mergedWorkRefs: [], pointerRefs: [] };
+    return gatherIssueBranchContainment(project, ctx.issueId);
   },
 };
 
@@ -117,7 +128,7 @@ export interface EvaluateDodGateDeps {
   tests: (issueId: string) => DodRowResult | Promise<DodRowResult>;
   verification: (issueId: string) => DodRowResult | Promise<DodRowResult>;
   merged: (ctx: LifecycleContext) => MergedDodRowResult | Promise<MergedDodRowResult>;
-  postMerge: (ctx: LifecycleContext) => DodRowResult | Promise<DodRowResult>;
+  postMerge: (ctx: LifecycleContext, merged?: MergedDodRowResult) => DodRowResult | Promise<DodRowResult>;
   mainVerify: (ctx: LifecycleContext, mergeCommit?: string) => DodRowResult | Promise<DodRowResult>;
   deploy: (ctx: LifecycleContext, merge: { mergedAt?: string; mergeCommit?: string }) => DodRowResult | Promise<DodRowResult>;
   now: () => string;
@@ -290,11 +301,26 @@ export async function checkMergedRow(
     }
   }
 
+  if (merged.status === 'miss') {
+    try {
+      const containment = await (deps.readBranchContainment ?? defaultMergedRowDeps.readBranchContainment!)(ctx);
+      if (containment.mergedWorkRefs.length > 0 && containment.unmergedRefs.length === 0) {
+        merged.status = 'pass';
+        merged.evidence = 'branch-containment';
+        merged.observed = `${merged.observed}; branch work contained in default branch with no merged PR — non-PR landing (membership L2-work lens): ${containment.mergedWorkRefs.join(', ')}`;
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      merged.observed = `${merged.observed}; branch containment evidence unavailable: ${message}`;
+    }
+  }
+
   return merged;
 }
 
 export async function checkPostMergeRow(
   ctx: LifecycleContext,
+  merged?: MergedDodRowResult,
   deps: PostMergeRowDeps = defaultPostMergeRowDeps,
 ): Promise<DodRowResult> {
   try {
@@ -313,6 +339,13 @@ export async function checkPostMergeRow(
       ? `running agents: ${runningAgents.map(agent => agent.id).join(', ')}`
       : 'no running work/planning agents';
     const lifecycleObserved = canonicalState === 'verifying_on_main' || mergeStatus === 'merged';
+    if (!lifecycleObserved && merged?.evidence === 'branch-containment') {
+      return result(
+        'post-merge',
+        runningAgents.length === 0 ? 'pass' : 'miss',
+        `non-PR landing (branch-containment evidence) — post-merge lifecycle not applicable; ${agentsObserved}`,
+      );
+    }
     return result(
       'post-merge',
       lifecycleObserved && runningAgents.length === 0 ? 'pass' : 'miss',
@@ -423,7 +456,7 @@ export async function evaluateDodGate(
     deps.tests(ctx.issueId),
     deps.verification(ctx.issueId),
     Promise.resolve(merged),
-    deps.postMerge(ctx),
+    deps.postMerge(ctx, merged),
     deps.mainVerify(ctx, merged.mergeCommit),
     deps.deploy(ctx, { mergedAt: merged.mergedAt, mergeCommit: merged.mergeCommit }),
   ]);
