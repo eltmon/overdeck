@@ -56,6 +56,17 @@ Live landmines a change in this repo can step on. Verified 2026-06-13.
   `origin/…` — `GenerationGitDeps` validates with `safeBranchName(…, 'feature')`
   and resolves origin-first itself. Passing a remote-qualified ref makes every
   merge throw and every feature get held out.
+- **A ready-set branch probe must FETCH first** — `git rev-parse origin/<b>`
+  reads a local tracking ref and never contacts the remote, so a branch pushed
+  from another machine reads as absent and its project never assembles.
+- **`promoted_at` is not proof of "not landed"** — publish and stamp are two
+  writes to two systems. Promote must ask git (`findLandedMerge`) whether a
+  nominally pending repo is already contained in its target before classifying
+  it, or a crash between the two wedges the batch as stale-base forever.
+- **Stale `node_modules/.experimental-vitest-cache`** (vitest `fsModuleCache:
+  true`) serves PRE-FIX transforms: a fix appears not to work, and an inert
+  comment "fixes" it. If a change seems to have no effect, purge that directory
+  before debugging the code. It also masks unrelated failures.
 - **Polyrepo assembly is feature-atomic** — a feature applies to all its repos
   or none, rolled back with `checkout -B` to a captured head. Do NOT reintroduce
   rebuild-and-replay: it is O(repos x features²) heavyweight git and can hold the
