@@ -15,8 +15,26 @@
     }
   ],
   "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      "docs/FLYWHEEL-STATE.md"
+    ],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "docs/UAT-BATCH-TRAINS.md",
+      "src/dashboard/frontend/src/components/merge-train/MergeTrainView.tsx",
+      "src/dashboard/frontend/src/components/merge-train/__tests__/MergeTrainView.test.tsx"
+    ],
+    "actualChangedFiles": [
+      "docs/FLYWHEEL-STATE.md",
+      "docs/UAT-BATCH-TRAINS.md",
+      "src/dashboard/frontend/src/components/merge-train/MergeTrainView.tsx",
+      "src/dashboard/frontend/src/components/merge-train/__tests__/MergeTrainView.test.tsx"
+    ],
+    "recordedAt": "2026-07-26T20:44:54.187Z"
+  },
   "created": "2026-07-26T20:19:41.143Z",
-  "updated": "2026-07-26T20:44:56.828Z",
+  "updated": "2026-07-26T20:44:59.857Z",
   "pipeline": {
     "issueId": "PAN-3158",
     "reviewStatus": "pending",
@@ -25,7 +43,8 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T20:44:56.826Z",
+    "updatedAt": "2026-07-26T20:44:59.817Z",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3161",
     "reviewRequestedAt": "2026-07-26T20:44:56.826Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -44,19 +63,36 @@
         "src/dashboard/frontend/src/components/merge-train/__tests__/MergeTrainView.test.tsx"
       ],
       "recordedAt": "2026-07-26T20:44:54.187Z"
-    },
-    "prUrl": "https://github.com/eltmon/overdeck/pull/3161"
+    }
   },
   "closeOut": {
     "usage": {
-      "byStage": {},
-      "totals": {},
+      "byStage": {
+        "work": {
+          "openai/gpt-5.6-sol": {
+            "input": 349437,
+            "output": 20092,
+            "cacheRead": 12600320,
+            "cacheWrite": 0
+          }
+        }
+      },
+      "totals": {
+        "openai/gpt-5.6-sol": {
+          "input": 349437,
+          "output": 20092,
+          "cacheRead": 12600320,
+          "cacheWrite": 0
+        }
+      },
       "costAtCloseOut": {
-        "usd": 0,
-        "pricingAsOf": "2026-07-26T20:29:14.747Z"
+        "usd": 8.650105,
+        "pricingAsOf": "2026-07-26T20:44:59.845Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/3161"
+    ],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
@@ -149,23 +185,5 @@
     "update-uat-batch-trains-doc": "completed",
     "update-uat-batch-trains-doc.update-uat-batch-trains-doc.ac1": "completed",
     "update-uat-batch-trains-doc.update-uat-batch-trains-doc.ac2": "completed"
-  },
-  "scopeDrift": {
-    "outsideDeclaredScope": [
-      "docs/FLYWHEEL-STATE.md"
-    ],
-    "declaredScopeUntouched": [],
-    "declaredScope": [
-      "docs/UAT-BATCH-TRAINS.md",
-      "src/dashboard/frontend/src/components/merge-train/MergeTrainView.tsx",
-      "src/dashboard/frontend/src/components/merge-train/__tests__/MergeTrainView.test.tsx"
-    ],
-    "actualChangedFiles": [
-      "docs/FLYWHEEL-STATE.md",
-      "docs/UAT-BATCH-TRAINS.md",
-      "src/dashboard/frontend/src/components/merge-train/MergeTrainView.tsx",
-      "src/dashboard/frontend/src/components/merge-train/__tests__/MergeTrainView.test.tsx"
-    ],
-    "recordedAt": "2026-07-26T20:44:54.187Z"
   }
 }
