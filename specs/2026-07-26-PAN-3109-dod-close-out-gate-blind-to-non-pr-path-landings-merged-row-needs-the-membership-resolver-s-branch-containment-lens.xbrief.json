@@ -4,7 +4,7 @@
     "created": "2026-07-26T06:10:00.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3109: DoD close-out gate blind to non-PR-path landings — merged row needs the membership resolver's branch-containment lens",
-    "updated": "2026-07-26T06:03:48.719Z"
+    "updated": "2026-07-26T06:03:51.102Z"
   },
   "plan": {
     "id": "pan-3109",
@@ -12,9 +12,9 @@
     "status": "approved",
     "uid": "b497853b-33bf-43df-86d1-d55303f8a7a8",
     "author": "agent:claude-fable-5",
-    "sequence": 3,
+    "sequence": 5,
     "created": "2026-07-26T06:10:00.000Z",
-    "updated": "2026-07-26T06:03:48.719Z",
+    "updated": "2026-07-26T06:03:51.102Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3109",
