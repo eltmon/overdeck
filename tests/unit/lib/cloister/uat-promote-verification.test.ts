@@ -15,7 +15,9 @@ vi.mock('../../../../src/lib/review-status.js', () => ({
 
 import {
   buildUatPromotionStamp,
+  healUatPromotionVerification,
   recordUatPromotionVerdicts,
+  type UatPromotionHealDeps,
 } from '../../../../src/lib/cloister/uat-promote-verification.js';
 
 const MEMBER: UatGenerationMember = {
@@ -123,6 +125,74 @@ describe('recordUatPromotionVerdicts', () => {
       'PAN-4',
       expect.objectContaining({ verificationStatus: 'passed' }),
       undefined,
+    );
+  });
+});
+
+function makeHealDeps(overrides: Partial<UatPromotionHealDeps> = {}): UatPromotionHealDeps {
+  return {
+    resolveProject: vi.fn(() => ({ projectPath: '/project' })),
+    listGenerations: vi.fn(() => [generation([MEMBER])]),
+    getReviewStatus: vi.fn(() => status('PAN-1', 'pending')),
+    setReviewStatus: vi.fn((issueId, update, existing) => ({
+      ...(existing ?? status(issueId, 'pending')),
+      ...update,
+      issueId,
+    })),
+    findMergeSha: vi.fn(async () => '546d05b989abcdef'),
+    ...overrides,
+  };
+}
+
+describe('healUatPromotionVerification', () => {
+  it('records the latest promoted membership and returns its recovered merge evidence', async () => {
+    const older = { ...generation([MEMBER]), name: 'uat/pan-older-0725', updatedAt: '2026-07-25T08:00:00.000Z' };
+    const latest = generation([MEMBER]);
+    const deps = makeHealDeps({ listGenerations: vi.fn(() => [older, latest]) });
+
+    await expect(healUatPromotionVerification('PAN-1', deps)).resolves.toEqual({
+      generation: 'uat/pan-cedar-0726',
+      mergeSha: '546d05b989abcdef',
+    });
+    expect(deps.setReviewStatus).toHaveBeenCalledWith(
+      'PAN-1',
+      expect.objectContaining({
+        verificationStatus: 'passed',
+        verificationNotes: expect.stringContaining('546d05b98'),
+        lastVerifiedCommit: MEMBER.headSha,
+      }),
+      expect.objectContaining({ verificationStatus: 'pending' }),
+    );
+  });
+
+  it('writes nothing for terminal verdicts, absent memberships, or unresolvable projects', async () => {
+    const terminal = makeHealDeps({ getReviewStatus: vi.fn(() => status('PAN-1', 'passed')) });
+    const absent = makeHealDeps({ listGenerations: vi.fn(() => [generation([{ ...MEMBER, issueId: 'PAN-2' }])]) });
+    const unresolved = makeHealDeps({ resolveProject: vi.fn(() => null) });
+
+    await expect(healUatPromotionVerification('PAN-1', terminal)).resolves.toBeNull();
+    await expect(healUatPromotionVerification('PAN-1', absent)).resolves.toBeNull();
+    await expect(healUatPromotionVerification('PAN-1', unresolved)).resolves.toBeNull();
+    expect(terminal.setReviewStatus).not.toHaveBeenCalled();
+    expect(absent.setReviewStatus).not.toHaveBeenCalled();
+    expect(unresolved.setReviewStatus).not.toHaveBeenCalled();
+  });
+
+  it('still records the verdict when merge-SHA recovery fails', async () => {
+    const deps = makeHealDeps({
+      findMergeSha: vi.fn(async () => { throw new Error('shallow history'); }),
+    });
+
+    await expect(healUatPromotionVerification('PAN-1', deps)).resolves.toEqual({
+      generation: 'uat/pan-cedar-0726',
+    });
+    expect(deps.setReviewStatus).toHaveBeenCalledWith(
+      'PAN-1',
+      expect.objectContaining({
+        verificationStatus: 'passed',
+        verificationNotes: 'uat-promotion: operator UAT of batch uat/pan-cedar-0726 promoted to main (PAN-3114)',
+      }),
+      expect.anything(),
     );
   });
 });
