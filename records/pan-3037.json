@@ -377,18 +377,18 @@
     "recordedAt": "2026-07-26T00:21:47.769Z"
   },
   "created": "2026-07-25T20:44:21.373Z",
-  "updated": "2026-07-26T00:26:06.257Z",
+  "updated": "2026-07-26T00:26:09.420Z",
   "pipeline": {
     "issueId": "PAN-3037",
     "reviewStatus": "passed",
-    "testStatus": "passed",
+    "testStatus": "testing",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T00:22:04.323Z",
-    "updatedAt": "2026-07-26T00:26:01.488Z",
+    "updatedAt": "2026-07-26T00:26:09.400Z",
     "reviewNotes": "Verification failed at test",
     "testNotes": "Verified at current HEAD d9745b9dfc (test-only commit added mid-verification on top of the previously-approved dddeb04bfb, fixing a stale mock in tests/unit/dashboard/server/routes/specialists-inspect-item.test.ts). npm run typecheck: pass. npm run lint: pass (eslint/effect/permissions/state-writes/overdeck-boundaries/pipeline-membership/skills/circular-deps/file-size guards). Full npm test run with the agent-pan-3037-test git-guard wrapper stripped from PATH (it intercepts test-internal 'git reset --hard' calls in tests' own temp repos and produces false failures, e.g. validation.test.ts autoRevertMerge - confirmed via memory note project_git_guard_blocks_state_write_door.md): 1176 backend test files / 10705 tests passed (3 skipped), 3 frontend test files / 51 tests passed - zero real failures on the first clean run. A second clean full-suite run at the new HEAD showed one hook-timeout flake in src/cli/commands/conversations/__tests__/list.test.ts under heavy machine load (32 concurrent agents); PAN-3037's diff does not touch that file or its DB test helper, and it passes cleanly in isolation (6/6, 5.5s). Focused PAN-3037 coverage: tests/lib/project-repos.test.ts (12/12), sync-main-polyrepo.test.ts, merge-agent-auto-commit.test.ts, specialists-inspect-item.test.ts (3/3) all passed. No UAT: fix is backend/CLI git-resolver logic (pan sync-main, review-restart/dispatch branch probes, agents git status) with no UI-kind xBRIEF items or acceptance criteria referencing the dashboard; the GitHub issue body is entirely about CLI git-probe failures on polyrepo workspaces.",
     "inspectNotes": "All 5 ACs met: per-repo iteration with repoKey-prefixed paths, conflict abort leaves repo quiescent and skips remaining repos, aggregate alreadyUpToDate requires all repos current, monorepo keeps unprefixed single-element shape, abort returns cancellation + skipped entries. Extraction into sync-main-workspace.ts is logic-identical; baseline 1404 matches actual wc -l.",
@@ -462,9 +462,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 19565790,
-            "output": 300616,
-            "cacheRead": 52783616,
+            "input": 20022046,
+            "output": 300830,
+            "cacheRead": 52833792,
             "cacheWrite": 0
           }
         },
@@ -493,9 +493,9 @@
           "cacheWrite": 311392
         },
         "openai/gpt-5.6-sol": {
-          "input": 23594137,
-          "output": 481756,
-          "cacheRead": 183463424,
+          "input": 24050393,
+          "output": 481970,
+          "cacheRead": 183513600,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -506,8 +506,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 239.837314,
-        "pricingAsOf": "2026-07-26T00:26:03.415Z"
+        "usd": 242.150102,
+        "pricingAsOf": "2026-07-26T00:26:09.409Z"
       }
     },
     "merges": [
