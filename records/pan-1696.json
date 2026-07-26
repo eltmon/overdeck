@@ -222,23 +222,28 @@
       "reason": "feedback",
       "note": "[2026-07-26T03:34Z] test-agent → FAILED — seq 1",
       "timestamp": "2026-07-26T03:34:40.635Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-26T03:51:08.642Z"
     }
   ],
   "feedback": [],
   "created": "2026-07-26T00:35:36.057Z",
-  "updated": "2026-07-26T03:51:07.481Z",
+  "updated": "2026-07-26T03:51:08.801Z",
   "pipeline": {
     "issueId": "PAN-1696",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T03:51:07.128Z",
+    "updatedAt": "2026-07-26T03:51:07.493Z",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/1822",
-    "reviewSpawnedAt": "2026-07-26T03:32:17.629Z"
+    "reviewSpawnedAt": "2026-07-26T03:51:07.492Z"
   },
   "closeOut": {
     "usage": {
@@ -330,7 +335,7 @@
       },
       "costAtCloseOut": {
         "usd": 139.6672742,
-        "pricingAsOf": "2026-07-26T03:51:07.152Z"
+        "pricingAsOf": "2026-07-26T03:51:08.798Z"
       }
     },
     "merges": [
