@@ -61,3 +61,13 @@ The operator's headline scenario: **ask 5 agents the same question; a synthesize
 4. File the deferred "A2A facade for external callers" spike issue.
 5. Resolve the verb-shape decision point per §5 (`pan tell` extensions, PRD as drafted).
 6. WI-8: record MCP Agent Mail disposition — build per this PRD; the only idea worth salvaging is file reservations, tracked separately if wanted.
+
+## 7. IA placement — it IS a conversation (operator direction, 2026-07-25)
+
+The operator reviewed the UX mockup against the live dashboard and steered the surface model: **a room is a conversation with N member sessions, not a new top-level "Task" surface.** Concretely:
+
+- A multi-agent conversation lives in the project's **CONVERSATIONS** list in the Command Deck like every other conversation, at `/conv/<id>`, project-scoped, with only a "N members" chip as the list-level difference. One member = today's conversation, unchanged (PRD's degenerate-case invariant already says this — take it all the way and drop the separate surface).
+- The conversation view gains a **Room** tab (default when members > 1): the merged, provenance-marked timeline — question, answers landing inline as threads close, liveness notices as system rows, synthesis. Member tabs remain as drill-down into each member's own transcript (tools and all).
+- The composer becomes "Message the room…" with member chips; "Ask the room" is the council trigger (fan-out + arm synthesizer).
+- **Naming:** the PRD's "Task" noun should not ship as user-facing language — it collides with the xBRIEF `pan task` checklist verbs ([PAN-2648](https://github.com/eltmon/overdeck/issues/2648)). User-facing noun: **room** (or just "conversation with members"). Planner should rename the internal column (`tasks` table / `task_id` → `rooms` / `room_id`) and reconcile `pan task list|show` (PRD CLI section) against the existing checklist verb.
+- The mockup (`pan-2565-mockup-ux.html`) has been reframed to this model: both panes render inside the Command Deck conversation chrome (`/conv/1042`, "6 members" chip).

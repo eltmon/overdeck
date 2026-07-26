@@ -123,7 +123,7 @@
 
   <h1>Multi-agent UX for Overdeck</h1>
   <p class="sub">Interactive UX mockup for <a href="https://github.com/eltmon/overdeck/issues/2565">PAN-2565</a> —
-    the task surface where N agent sessions live together, plus the "ask the room" council flow:
+    a conversation with N member sessions (the "room"), plus the "ask the room" council flow:
     one question fanned out to five agents, rolled up by a synthesizer. Companion to the
     <a href="index.html">architecture flow mockup</a>.</p>
 
@@ -135,7 +135,7 @@
   </div>
 
   <div class="tabs">
-    <button class="tab active" data-pane="room">The task surface (room view)</button>
+    <button class="tab active" data-pane="room">The room (conversation view)</button>
     <button class="tab" data-pane="council">Ask the room — council flow</button>
     <button class="tab" data-pane="notes">Design notes</button>
   </div>
@@ -143,12 +143,15 @@
   <!-- ═══════════ PANE 1: ROOM ═══════════ -->
   <div class="pane active" id="pane-room">
     <div class="note">
-      <b>What you're looking at:</b> one task, six member sessions. The operator asked a design
-      question; five agents answered on their own threads and are now <i>discussing the
-      disagreements with each other</i> — agent-to-agent messages arriving as provenance-marked
-      turns. The <b>Room</b> tab merges everything the broker sees into one timeline; member tabs
-      show each session's own transcript (where A2A mail lands as <code>[overdeck inbox]</code>
-      user turns). Presence dots come from existing run-state signals.
+      <b>What you're looking at:</b> one <b>conversation</b> with six member sessions — not a new
+      surface. It lives in the project's CONVERSATIONS list in the Command Deck, at
+      <code>/conv/1042</code>, like every other conversation; the "6 members" chip is the only
+      list-level difference. The operator asked a design question; five agents answered on their
+      own threads and are now <i>discussing the disagreements with each other</i>. The
+      <b>Room</b> tab (default when a conversation has &gt;1 member) merges everything the broker
+      sees into one timeline; member tabs drill into each session's own transcript (where A2A
+      mail lands as <code>[overdeck inbox]</code> user turns). Presence dots come from existing
+      run-state signals.
     </div>
 
     <div class="dash">
@@ -156,7 +159,7 @@
         <span class="dot" style="background:var(--red)"></span>
         <span class="dot" style="background:var(--amber-soft)"></span>
         <span class="dot" style="background:var(--green)"></span>
-        <span style="margin-left:6px">overdeck.localhost/task/t_01J9KQ — “A2A wire format: adopt Google A2A or keep internal broker?”</span>
+        <span style="margin-left:6px">overdeck.localhost — panopticon-cli ▸ CONVERSATIONS ▸ <b style="color:var(--text)">/conv/1042</b> “A2A wire format council” <span style="background:#1c2a38; border:1px solid #28405c; border-radius:4px; padding:1px 6px; margin-left:6px">6 members</span></span>
       </div>
       <div class="dash-body">
         <div class="tree" id="tree"></div>
@@ -191,7 +194,7 @@
         <span class="dot" style="background:var(--red)"></span>
         <span class="dot" style="background:var(--amber-soft)"></span>
         <span class="dot" style="background:var(--green)"></span>
-        <span style="margin-left:6px">task t_01J9KQ — council: “Adopt Google A2A as our wire format, or keep the PAN-2565 internal broker?”</span>
+        <span style="margin-left:6px">overdeck.localhost — panopticon-cli ▸ CONVERSATIONS ▸ <b style="color:var(--text)">/conv/1042</b> “A2A wire format council” <span style="background:#1c2a38; border:1px solid #28405c; border-radius:4px; padding:1px 6px; margin-left:6px">6 members</span> — the council, as it happened in the conversation</span>
       </div>
       <div class="composer" style="border-top:none; border-bottom:1px solid var(--border)">
         <div class="member-pick" id="council-pick"></div>
@@ -218,6 +221,12 @@
   <!-- ═══════════ PANE 3: NOTES ═══════════ -->
   <div class="pane" id="pane-notes">
     <div class="note" style="max-width:none">
+      <b>IA placement — it IS a conversation (operator direction, 2026-07-25):</b> no new
+      top-level noun. A multi-agent "room" is a <b>conversation with N member sessions</b>,
+      project-scoped, in the existing CONVERSATIONS list; a one-member room renders exactly like
+      today's conversation. The PRD's "Task" noun stays internal domain language at most — and
+      even there it collides with the xBRIEF <code>pan task</code> checklist verbs, so the
+      planner should rename the internal column (<code>room_id</code>).<br><br>
       <b>How each UX element maps to the broker (nothing here is new machinery):</b>
       <ul style="margin:8px 0 0; padding-left:20px; line-height:1.8">
         <li><b>Room timeline</b> — a read model: union of <code>a2a_messages</code> rows for the task plus each member's public turns, ordered by time. The broker already sees every message; the room is a query, not a transport.</li>
@@ -266,7 +275,7 @@ function chip(color) { return `<span class="agent-chip" style="background:${colo
 function dot(state) { return `<span class="presence ${state}"></span>`; }
 
 function renderTree(sel) {
-  let html = `<h3>Task members</h3>
+  let html = `<h3>Members</h3>
     <div class="tnode" data-m="room"><span style="color:var(--amber-soft)">⌂</span> operator <span class="harness">room</span></div>`;
   for (const id in AGENTS) {
     const a = AGENTS[id];
