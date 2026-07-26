@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T02:29:08.179Z",
-  "updated": "2026-07-26T02:47:11.737Z",
+  "updated": "2026-07-26T02:51:40.552Z",
   "pipeline": {
     "issueId": "PAN-3097",
     "reviewStatus": "pending",
@@ -54,16 +54,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "decisions-issue-title": {
-        "writerId": "agent-pan-3097",
-        "agentId": "agent-pan-3097",
-        "pid": 1613357,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-26T02:47:11.737Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3097",
@@ -97,6 +89,17 @@
         "outcome": "completed",
         "reason": "Populated resolved issueTitle for agent and conversation plan/AUQ subjects while preserving conversation titles",
         "releasedAt": "2026-07-26T02:47:01.711Z"
+      },
+      {
+        "writerId": "agent-pan-3097",
+        "agentId": "agent-pan-3097",
+        "pid": 1613357,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T02:47:11.737Z",
+        "itemId": "decisions-issue-title",
+        "outcome": "completed",
+        "reason": "Resolved issue titles from the dashboard issue store, formatted agent decisions, and showed issue references beside conversation decisions",
+        "releasedAt": "2026-07-26T02:51:40.552Z"
       }
     ],
     "statusReasons": {
@@ -111,6 +114,10 @@
       "subject-issue-title-population": {
         "reason": "Populated resolved issueTitle for agent and conversation plan/AUQ subjects while preserving conversation titles",
         "updatedAt": "2026-07-26T02:47:01.711Z"
+      },
+      "decisions-issue-title": {
+        "reason": "Resolved issue titles from the dashboard issue store, formatted agent decisions, and showed issue references beside conversation decisions",
+        "updatedAt": "2026-07-26T02:51:40.552Z"
       }
     }
   },
@@ -127,6 +134,9 @@
     "subject-issue-title-population.subject-issue-title-population.ac1": "completed",
     "subject-issue-title-population.subject-issue-title-population.ac2": "completed",
     "subject-issue-title-population.subject-issue-title-population.ac3": "completed",
-    "decisions-issue-title": "running"
+    "decisions-issue-title": "completed",
+    "decisions-issue-title.decisions-issue-title.ac1": "completed",
+    "decisions-issue-title.decisions-issue-title.ac2": "completed",
+    "decisions-issue-title.decisions-issue-title.ac3": "completed"
   }
 }
