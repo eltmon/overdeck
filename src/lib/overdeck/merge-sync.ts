@@ -13,10 +13,9 @@
  *   - Types re-exported match OLD shapes exactly (ISO string dates, etc.)
  *     so cloister consumers need no structural changes.
  *
- * NOTE: The merge-train flag key is 'flywheel.merge_train_enabled' everywhere —
- * this module, the control-settings.ts door, and the legacy panopticon.db all
- * agree. (The control-settings door briefly used an unprefixed 'merge_train_enabled'
- * during cutover; that mismatch was fixed under PAN-1979.)
+ * NOTE: The merge-train flag keys — as of PAN-1696, the primary key is
+ * 'merge_train.enabled'. For backward compatibility, isMergeTrainEnabled()
+ * falls back to 'flywheel.merge_train_enabled' when the new key is absent.
  */
 
 import { getOverdeckDatabaseSync } from './infra.js';
@@ -60,12 +59,19 @@ export function isFlywheelGloballyPaused(): boolean {
 }
 
 /**
- * Drop-in for isMergeTrainEnabled() from app-settings.ts.
+ * Drop-in for isMergeTrainEnabled() from app-settings.ts (PAN-1696).
  *
- * Reads 'flywheel.merge_train_enabled' — the single canonical key shared by the
- * control-settings.ts door and the merge-train engine (unified in PAN-1979).
+ * Reads 'merge_train.enabled' (new key), falling back to
+ * 'flywheel.merge_train_enabled' (legacy) when the new key is absent.
  */
 export function isMergeTrainEnabled(): boolean {
+  const db = getOverdeckDatabaseSync();
+  const newRow = db.prepare('SELECT value FROM app_settings WHERE key = ?').get('merge_train.enabled') as
+    | { value: string }
+    | undefined;
+  if (newRow?.value === 'true' || newRow?.value === 'false') {
+    return newRow.value === 'true';
+  }
   return readFlag('flywheel.merge_train_enabled');
 }
 

@@ -163,6 +163,13 @@ export interface ProjectConfig {
    * Unset = fall through to the global require-UAT setting.
    */
   auto_merge_default?: 'auto' | 'hold';
+  /**
+   * PAN-1696: per-project merge-train enable/disable override. When set, this
+   * value overrides the global merge_train.enabled flag for this project only.
+   * Unset = fall through to the global setting (default OFF). Merge-train
+   * reconciles ready siblings after a merge by rebasing onto the new main.
+   */
+  merge_train?: { enabled?: boolean };
   /** Quality gates run by merge-agent before pushing (lint, typecheck, prod build, etc.) */
   quality_gates?: Record<string, QualityGateConfig>;
   /** Release components and rollout checks for coordinated post-merge release. */

@@ -257,3 +257,23 @@ export function getFlywheelActiveRunId(): string | null {
 export function setFlywheelActiveRunId(runId: string | null): void {
   setSetting(FLYWHEEL_ACTIVE_RUN_ID_KEY, runId ?? '');
 }
+
+// ============== Per-project merge train override ==============
+
+/**
+ * PAN-1696: Check if merge train is enabled for a project, respecting the
+ * per-project override in projects.yaml if set, otherwise falling back to
+ * the global merge_train.enabled flag.
+ *
+ * @param project - ProjectConfig from projects.yaml. If not set, uses global.
+ * @returns true if merge train is enabled for this project, false otherwise.
+ */
+export function isMergeTrainEnabledForProject(project?: { merge_train?: { enabled?: boolean } }): boolean {
+  // Check per-project override first
+  if (project?.merge_train?.enabled !== undefined) {
+    return project.merge_train.enabled;
+  }
+
+  // Fall back to global flag
+  return isMergeTrainEnabled();
+}
