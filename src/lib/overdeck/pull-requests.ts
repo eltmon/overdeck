@@ -1,7 +1,7 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 
-import { githubPrLookupSource, lookupPullRequestNumberForBranch } from '../github-pr-lookup.js';
+import { githubPrLookupSource, lookupPullRequestForBranch } from '../github-pr-lookup.js';
 import { resolveGitHubIssueSync } from '../tracker-utils.js';
 import {
   getCachedIssuePrTabResponse,
@@ -135,10 +135,10 @@ async function resolveIssuePullRequestRef(issueId: string): Promise<
   }
 
   // A strike lands from strike/<id>, a normal work item from feature/<id>.
-  // Try feature/ first (the common case), then fall back to strike/ so a
-  // strike-landed issue can still resolve its merged PR — otherwise close-out's
-  // deploy row cannot resolve merge time/commit and every landed strike is
-  // permanently blocked from close-out (PAN-2883).
+  // Probe feature/ first and strike/ second, then rank OPEN above MERGED above
+  // every other state. Among merged candidates, prefer the most recent merge.
+  // This keeps active feature PRs stable while allowing a merged strike PR to
+  // supersede a closed feature PR during close-out (PAN-2883).
   const branchCandidates = [
     `feature/${issueId.toLowerCase()}`,
     `strike/${issueId.toLowerCase()}`,
@@ -146,13 +146,26 @@ async function resolveIssuePullRequestRef(issueId: string): Promise<
   const repoArg = `${githubCheck.owner}/${githubCheck.repo}`;
 
   try {
+    const candidates = [];
     for (const branchName of branchCandidates) {
-      const prNumber = await lookupPullRequestNumberForBranch(githubCheck.owner, githubCheck.repo, branchName);
-      if (prNumber != null) {
-        return { issueId: upper, repoArg, prNumber: String(prNumber) };
-      }
+      const pr = await lookupPullRequestForBranch(githubCheck.owner, githubCheck.repo, branchName);
+      if (pr) candidates.push(pr);
     }
-    return { issueId: upper, repoArg: null, prNumber: null };
+    if (candidates.length === 0) {
+      return { issueId: upper, repoArg: null, prNumber: null };
+    }
+
+    const rank = (state: string) => state === 'OPEN' ? 0 : state === 'MERGED' ? 1 : 2;
+    candidates.sort((a, b) => {
+      const rankDifference = rank(a.state) - rank(b.state);
+      if (rankDifference !== 0) return rankDifference;
+      if (a.state === 'MERGED' && b.state === 'MERGED') {
+        return (Date.parse(b.mergedAt ?? '') || 0) - (Date.parse(a.mergedAt ?? '') || 0);
+      }
+      return 0;
+    });
+
+    return { issueId: upper, repoArg, prNumber: String(candidates[0].number) };
   } catch (err: any) {
     return { issueId: upper, repoArg: null, prNumber: null, error: `${githubPrLookupSource()} failed: ${err.message}` };
   }

@@ -286,8 +286,10 @@ nothing else; cross-project batches do not exist. Generation labels use the
 project's issue prefix (`uat/pan-…`, `uat/min-…`), which is what keeps names
 distinct in the globally-keyed `uat_generations` table. What spans projects is the
 **view and control surface**: the merge-train view on the Awaiting Merge page
-renders one section per project with a persisted project filter, and the Flywheel
-rail card is a second viewer of that same component. Per-project enablement lives
+renders one section per project that has ready work or a switched-off train, with
+a persisted project filter. Idle enabled projects are hidden instead of repeating
+empty boilerplate, and a footer counts the hidden projects. The Flywheel rail card
+is a second viewer of that same component. Per-project enablement lives
 in the project cockpit's settings; the global default lives on Awaiting Merge and
 in Settings → Roles → Flywheel.
 
