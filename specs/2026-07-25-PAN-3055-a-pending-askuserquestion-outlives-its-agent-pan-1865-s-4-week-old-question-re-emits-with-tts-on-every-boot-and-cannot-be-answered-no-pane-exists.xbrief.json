@@ -4,17 +4,17 @@
     "created": "2026-07-25T12:20:00.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3055: A pending AskUserQuestion outlives its agent: PAN-1865's 4-week-old question re-emits (with TTS) on every boot and cannot be answered — no pane exists",
-    "updated": "2026-07-25T12:11:39.912Z"
+    "updated": "2026-07-26T00:56:29.837Z"
   },
   "plan": {
     "id": "pan-3055",
     "title": "A pending AskUserQuestion outlives its agent: PAN-1865's 4-week-old question re-emits (with TTS) on every boot and cannot be answered — no pane exists",
-    "status": "running",
+    "status": "completed",
     "uid": "8f1818ed-82ac-4e98-9208-fe1e94271575",
     "author": "agent:claude-fable-5",
-    "sequence": 6,
+    "sequence": 7,
     "created": "2026-07-25T12:20:00.000Z",
-    "updated": "2026-07-25T12:11:39.912Z",
+    "updated": "2026-07-26T00:56:29.837Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3055",
@@ -336,5 +336,5 @@
       "canonicalFilename": "2026-07-25-PAN-3055-a-pending-askuserquestion-outlives-its-agent-pan-1865-s-4-week-old-question-re-emits-with-tts-on-every-boot-and-cannot-be-answered-no-pane-exists.xbrief.json"
     }
   },
-  "status": "active"
+  "status": "completed"
 }
