@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T20:19:41.143Z",
-  "updated": "2026-07-26T20:32:37.882Z",
+  "updated": "2026-07-26T20:32:47.007Z",
   "pipeline": {
     "issueId": "PAN-3158",
     "reviewStatus": "pending",
@@ -43,8 +43,16 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 2,
-    "claims": {},
+    "sequence": 3,
+    "claims": {
+      "idle-hidden-footer": {
+        "writerId": "agent-pan-3158",
+        "agentId": "agent-pan-3158",
+        "pid": 639238,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T20:32:47.007Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3158",
@@ -71,6 +79,7 @@
     "hide-idle-enabled-sections.hide-idle-enabled-sections.ac2": "completed",
     "hide-idle-enabled-sections.hide-idle-enabled-sections.ac3": "completed",
     "hide-idle-enabled-sections.hide-idle-enabled-sections.ac4": "completed",
-    "hide-idle-enabled-sections.hide-idle-enabled-sections.ac5": "completed"
+    "hide-idle-enabled-sections.hide-idle-enabled-sections.ac5": "completed",
+    "idle-hidden-footer": "running"
   }
 }
