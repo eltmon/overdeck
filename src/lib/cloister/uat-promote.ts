@@ -74,6 +74,19 @@ export interface PolyrepoRepoPromoteGit {
   publishPrepared(prepared: PreparedRepoMerge): Promise<void>;
   /** Drop a prepared merge's worktree. Must be safe to call twice. */
   discardPrepared(prepared: PreparedRepoMerge): Promise<void>;
+  /**
+   * If this repo's uat branch is ALREADY contained in its target branch, the
+   * merge commit that brought it in; otherwise null.
+   *
+   * Publishing and stamping are two operations against two systems. A process
+   * death, a thrown state write, or a dropped connection after the remote
+   * accepted the push leaves a repo genuinely landed with `promoted_at` null.
+   * Retry would then re-classify it as pending and — because the target has
+   * moved over the batch's own files — reject the whole promote as stale-base,
+   * wedging a half-landed batch permanently. This lets recovery prove the truth
+   * from git instead of trusting local state.
+   */
+  findLandedMerge(branchName: string): Promise<string | null>;
 }
 
 export interface UatPromoteDeps {
@@ -232,6 +245,11 @@ export async function promoteUatGeneration(
  * per-repo merge SHAs rather than an in-memory list, so it survives a restart
  * between the last publish and finalization.
  */
+/** The generation with its repo rows replaced by recovered/updated ones. */
+function withRepos(gen: UatGeneration, repos: readonly UatGenerationRepo[]): UatGeneration {
+  return { ...gen, repos: [...repos] };
+}
+
 function landedMergeRef(repos: readonly UatGenerationRepo[]): string {
   return [...repos]
     .sort((a, b) => a.mergeOrder - b.mergeOrder)
@@ -264,8 +282,39 @@ async function promotePolyrepo(
     return { success: false, reason: 'merge-failed', message: `${gen.name} records no member repos to promote` };
   }
 
-  const alreadyLanded = allRepos.filter((r) => r.promotedAt);
-  const pending = allRepos.filter((r) => !r.promotedAt);
+  const now = deps.now ?? (() => new Date());
+
+  // Reconcile local state against the remotes BEFORE classifying anything as
+  // pending. A repo whose push succeeded but whose stamp never landed is
+  // genuinely published; treating it as pending would re-trial-merge it and
+  // then reject the promote as stale-base, because the target has moved over
+  // this batch's own files.
+  const recovered: UatGenerationRepo[] = [];
+  for (const repo of allRepos) {
+    if (repo.promotedAt) { recovered.push(repo); continue; }
+    const git = repoGit.get(repo.repoKey);
+    if (!git) { recovered.push(repo); continue; }
+
+    let landedSha: string | null = null;
+    try {
+      landedSha = await git.findLandedMerge(repo.branch);
+    } catch (err) {
+      log(`[uat-promote] ${gen.name}: could not check whether ${repo.repoKey} already landed: ${err instanceof Error ? err.message : String(err)}`);
+    }
+    if (!landedSha) { recovered.push(repo); continue; }
+
+    log(`[uat-promote] ${gen.name}: ${repo.repoKey} is already contained in its target (${landedSha.slice(0, 9)}) but was never stamped — recovering`);
+    const promotedAt = now().toISOString();
+    try {
+      deps.markRepoPromoted?.(gen.name, repo.repoKey, promotedAt, landedSha);
+    } catch (err) {
+      log(`[uat-promote] ${gen.name}: recovery stamp failed for ${repo.repoKey}: ${err instanceof Error ? err.message : String(err)}`);
+    }
+    recovered.push({ ...repo, promotedAt, mergeSha: landedSha });
+  }
+
+  const alreadyLanded = recovered.filter((r) => r.promotedAt);
+  const pending = recovered.filter((r) => !r.promotedAt);
   if (alreadyLanded.length > 0) {
     log(`[uat-promote] ${gen.name}: resuming — ${alreadyLanded.map((r) => r.repoKey).join(', ')} already landed`);
   }
@@ -276,7 +325,7 @@ async function promotePolyrepo(
     // would leave a fully-published batch permanently unfinalizable: never
     // promoted, no verdicts recorded, no stack teardown, no post-merge.
     log(`[uat-promote] ${gen.name}: every repo already published — finalizing`);
-    return finishPromote(gen, projectRoot, deps, landedMergeRef(allRepos), log, true);
+    return finishPromote(withRepos(gen, recovered), projectRoot, deps, landedMergeRef(recovered), log, true);
   }
 
   const missing = pending.filter((r) => !repoGit.has(r.repoKey));
@@ -358,7 +407,6 @@ async function promotePolyrepo(
 
   // ── Phase B: publish; a failure here is resumable, never rolled back ──────
   const landed: Array<{ repoKey: string; mergeSha: string }> = [];
-  const now = deps.now ?? (() => new Date());
   for (const p of prepared) {
     try {
       await repoGit.get(p.repoKey)!.publishPrepared(p);
@@ -376,7 +424,13 @@ async function promotePolyrepo(
       };
     }
     landed.push({ repoKey: p.repoKey, mergeSha: p.mergeSha });
-    deps.markRepoPromoted?.(gen.name, p.repoKey, now().toISOString(), p.mergeSha);
+    try {
+      deps.markRepoPromoted?.(gen.name, p.repoKey, now().toISOString(), p.mergeSha);
+    } catch (err) {
+      // The push already succeeded — losing the stamp must not lose the merge.
+      // findLandedMerge recovers this repo on the next attempt.
+      log(`[uat-promote] ${gen.name}: publish stamp failed for ${p.repoKey} (merge IS live at ${p.mergeSha.slice(0, 9)}): ${err instanceof Error ? err.message : String(err)}`);
+    }
   }
 
   await discardAll();
@@ -385,7 +439,7 @@ async function promotePolyrepo(
   // same reference a single-pass promote would.
   const landedByKey = new Map(landed.map((l) => [l.repoKey, l.mergeSha]));
   const mergeSha = landedMergeRef(
-    allRepos.map((r) => ({ ...r, mergeSha: landedByKey.get(r.repoKey) ?? r.mergeSha ?? null })),
+    recovered.map((r) => ({ ...r, mergeSha: landedByKey.get(r.repoKey) ?? r.mergeSha ?? null })),
   );
   log(`[uat-promote] ${gen.name}: merged to ${landed.length} repo target(s) — ${mergeSha}`);
 
@@ -393,7 +447,7 @@ async function promotePolyrepo(
   // and the in-memory gen predates this run's publishes.
   const promotedGen: UatGeneration = {
     ...gen,
-    repos: allRepos.map((r) => ({
+    repos: recovered.map((r) => ({
       ...r,
       mergeSha: landedByKey.get(r.repoKey) ?? r.mergeSha ?? null,
       promotedAt: r.promotedAt ?? (landedByKey.has(r.repoKey) ? now().toISOString() : null),
@@ -443,16 +497,27 @@ async function finishPromote(
   // verifiedMergedRef guarantees the ancestry check fails and the lifecycle
   // refuses. Per-repo merge commits are handed over instead, each verified in
   // its own repo against its own target branch.
-  const verifiedMergedRepos = isPolyrepoGeneration
-    ? (gen.repos ?? [])
-        .filter((r) => r.mergeSha)
-        .map((r) => ({
-          repoKey: r.repoKey,
-          repoPath: r.repoPath,
-          mergeSha: r.mergeSha!,
-          targetBranch: r.targetBranch ?? 'main',
-        }))
+  const publishedRepos = isPolyrepoGeneration ? (gen.repos ?? []) : [];
+  const withEvidence = publishedRepos.filter((r) => r.mergeSha);
+  // All-or-nothing: verification accepts an evidence array once every entry in
+  // it proves out, so handing over a SUBSET would advance every member's
+  // lifecycle having proven only some repos. If any published repo lacks a
+  // merge SHA, supply no per-repo evidence at all and let the standard
+  // verification refuse, rather than passing a partial proof.
+  const verifiedMergedRepos = withEvidence.length === publishedRepos.length
+    ? withEvidence.map((r) => ({
+        repoKey: r.repoKey,
+        repoPath: r.repoPath,
+        mergeSha: r.mergeSha!,
+        targetBranch: r.targetBranch ?? 'main',
+      }))
     : [];
+  if (isPolyrepoGeneration && withEvidence.length !== publishedRepos.length) {
+    log(
+      `[uat-promote] ${gen.name}: ${publishedRepos.length - withEvidence.length} repo(s) have no recorded merge sha — ` +
+      `withholding partial per-repo evidence so post-merge verification cannot pass on an unproven subset`,
+    );
+  }
 
   const postMergeStarted: string[] = [];
   for (const member of gen.members) {
@@ -548,6 +613,35 @@ export function buildPolyrepoUatPromoteGitDeps(
         discardPrepared: async (prepared) => {
           await runGit(['worktree', 'remove', '--force', prepared.handle], repo.repoPath).catch(() => {});
           await runGit(['worktree', 'prune'], repo.repoPath).catch(() => {});
+        },
+
+        findLandedMerge: async (branchName) => {
+          const safeBranch = safeUatBranchName(branchName);
+          await runGit(['fetch', 'origin', target], repo.repoPath).catch(() => {});
+          const ref = await runGit(['rev-parse', '--verify', `origin/${safeBranch}`], repo.repoPath)
+            .then(() => `origin/${safeBranch}`)
+            .catch(() => safeBranch);
+
+          const tip = await runGit(['rev-parse', ref], repo.repoPath)
+            .then(({ stdout }) => stdout.trim())
+            .catch(() => '');
+          if (!tip) return null;
+
+          // Contained in the target? If not, this repo genuinely has not landed.
+          const contained = await runGit(['merge-base', '--is-ancestor', tip, originTarget], repo.repoPath)
+            .then(() => true)
+            .catch(() => false);
+          if (!contained) return null;
+
+          // The merge commit that brought it in: the oldest merge on the
+          // ancestry path from the batch tip to the target head.
+          const { stdout } = await runGit(
+            ['rev-list', '--ancestry-path', '--merges', '--reverse', `${tip}..${originTarget}`],
+            repo.repoPath,
+          ).catch(() => ({ stdout: '' }));
+          const mergeCommit = stdout.split('\n').map((l) => l.trim()).filter(Boolean)[0];
+          // A fast-forwarded target has no merge commit; the tip itself is what landed.
+          return mergeCommit ?? tip;
         },
       };
 

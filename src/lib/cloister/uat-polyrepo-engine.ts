@@ -13,10 +13,11 @@
  *   - **Global hold-out.** A feature that cannot be merged and resolved in ANY
  *     repo is held out of the WHOLE generation. Testers must never see a
  *     feature half-applied across repos.
- *   - **Replay, not excision.** Removing an already-merged commit from the
- *     middle of a branch is fragile, so a hold-out instead restarts assembly
- *     with the remaining features. Each pass drops at least one feature, so the
- *     loop is bounded by the feature count.
+ *   - **Atomic per feature, with rollback.** A feature applies to every repo it
+ *     contributes to or to none. Each target repo's head is captured first, and
+ *     a repo that already merged the feature is re-pointed at that head when a
+ *     later repo rejects it. Accepted features are never rebuilt, so the work
+ *     is linear in repos x features.
  *
  * Pure orchestrator: all git and store I/O is injected, so every path — happy,
  * conflict-resolved, held-out, push-failed — is unit-testable with fake deps.
@@ -291,7 +292,12 @@ export async function assemblePolyrepoUatGeneration(
       const blockedFeature = input.features.find((f) => f.issueId === blocked.issueId);
       heldOut.push({
         issueId: blocked.issueId,
-        branch: blocked.branch,
+        // The LOGICAL feature branch, not the blocking repo's contribution
+        // branch: the reconciler keys its head anchors by ReadyFeature.branch,
+        // and a repo with a custom branch_prefix (feat/ vs feature/) would make
+        // that lookup miss forever and rebuild the generation every tick. The
+        // blocking repo is already named in the reason.
+        branch: blockedFeature?.branch ?? blocked.branch,
         headSha: await heldOutAnchor(blockedFeature, deps),
         reason: blocked.reason,
       });
@@ -319,8 +325,12 @@ export async function assemblePolyrepoUatGeneration(
   const { members, resolutions } = collectMembers(input.features, heldOutIds, pass.mergedByIssue);
 
   if (members.length === 0) {
+    // Anchor on the full candidate set even though nothing published: the
+    // reconciler's desired anchor covers every ready-set contribution, and
+    // FAILED_RETRY_BACKOFF_MS only suppresses a repeat when the two signatures
+    // match exactly. Without it an all-held-out batch reassembles every tick.
     log(`[uat-polyrepo] ${name}: nothing merged (${heldOut.length} held out) — marking failed`);
-    return finish('failed', publishedRepos, [], []);
+    return finish('failed', publishedRepos, [], [], allContributing);
   }
 
   // Push every repo. A partial push is recoverable — cleanup reaps the branches

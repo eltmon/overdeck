@@ -533,3 +533,59 @@ describe('assemblePolyrepoUatGeneration — assembly cost is linear', () => {
     expect(mergeAttempts).toBe(12);
   });
 });
+
+describe('assemblePolyrepoUatGeneration — held-out rows key on the logical branch', () => {
+  it('stores the feature branch, not the blocking repo\'s branch, when prefixes differ', async () => {
+    // api uses branch_prefix `feat/`, so its contribution branch differs from
+    // the logical ReadyFeature.branch. The reconciler maps head anchors by the
+    // logical name, so persisting the repo-specific one makes that lookup miss
+    // forever and rebuilds the generation on every tick.
+    const min901: ReadyFeature = {
+      issueId: 'MIN-901',
+      title: 'Mixed prefixes',
+      branch: 'feature/min-901',
+      repoContributions: [
+        { repoKey: 'fe', repoPath: `${PROJECT_ROOT}/fe`, branch: 'feature/min-901', targetBranch: 'main', mergeOrder: 0 },
+        { repoKey: 'api', repoPath: `${PROJECT_ROOT}/api`, branch: 'feat/min-901', targetBranch: 'main', mergeOrder: 1 },
+      ],
+    };
+
+    const gen = await assemblePolyrepoUatGeneration(
+      input({ features: [min901, feature('MIN-902', ['api'])] }),
+      deps(
+        new Map([
+          ['fe', makeRepoGit('fe')],
+          ['api', makeRepoGit('api', { conflictOn: ['feat/min-901'] })],
+        ]),
+        makeStore(),
+      ),
+    );
+
+    expect(gen.heldOut).toHaveLength(1);
+    expect(gen.heldOut[0]!.branch).toBe('feature/min-901');
+    // The blocking repo is still identifiable from the reason.
+    expect(gen.heldOut[0]!.reason).toContain('in api');
+  });
+});
+
+describe('assemblePolyrepoUatGeneration — all held out', () => {
+  it('still records the composite base anchor so failed-input backoff can match', async () => {
+    // Without the anchor the reconciler's desired signature can never equal the
+    // stored one, so FAILED_RETRY_BACKOFF_MS never applies and the same doomed
+    // batch is rebuilt every minute.
+    const gen = await assemblePolyrepoUatGeneration(
+      input(),
+      deps(
+        new Map([
+          ['fe', makeRepoGit('fe', { baseSha: 'aaa1111aaa' })],
+          ['api', makeRepoGit('api', { baseSha: 'bbb2222bbb', conflictOn: ['feature/min-901', 'feature/min-902'] })],
+        ]),
+        makeStore(),
+      ),
+    );
+
+    expect(gen.status).toBe('failed');
+    expect(gen.members).toEqual([]);
+    expect(gen.baseSha).toBe('fe@aaa1111 api@bbb2222');
+  });
+});

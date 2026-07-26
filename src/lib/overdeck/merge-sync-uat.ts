@@ -577,6 +577,26 @@ export function markUatGenerationRepoPromotedSync(
   db.prepare('UPDATE uat_generations SET updated_at = ? WHERE name = ?').run(nowMillis(), name);
 }
 
+/**
+ * Does this project have a terminal generation that still owns artifacts?
+ *
+ * The idle reconciler tick asks only this, and generation rows are retained as
+ * an audit trail — hydrating every promoted/failed/invalidated row plus its four
+ * child tables to answer a yes/no question means the cost of an idle minute
+ * grows with history forever, on the event loop.
+ */
+export function hasUncleanedTerminalUatGenerationSync(projectRoot: string): boolean {
+  const db = getOverdeckDatabaseSync();
+  const row = db.prepare(
+    `SELECT 1 FROM uat_generations
+      WHERE project_root = ?
+        AND status IN ('promoted', 'failed', 'invalidated')
+        AND cleaned_at IS NULL
+      LIMIT 1`,
+  ).get(projectRoot);
+  return row !== undefined;
+}
+
 /** Drop-in for setUatGenerationStackStartedAtSync() from uat-generations-db.ts. */
 export function setUatGenerationStackStartedAtSync(name: string, startedAt: string | null): void {
   const db = getOverdeckDatabaseSync();

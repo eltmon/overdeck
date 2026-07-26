@@ -41,10 +41,12 @@ import {
   buildPolyrepoUatPromoteGitDeps,
   buildUatPromoteGitDeps,
   type PromoteResult,
+  type UatPromoteDeps,
 } from '../../../lib/cloister/uat-promote.js';
 import { notifyFlywheelOfUatPromote } from '../../../lib/cloister/uat-promote-notify.js';
 import {
   getUatGenerationSync,
+  hasUncleanedTerminalUatGenerationSync,
   isMergeTrainEnabled,
   listUatGenerationsSync,
   markUatGenerationRepoPromotedSync,
@@ -156,11 +158,10 @@ async function runUatTrainReconcileForProject(
     // live rows — so returning early without cleanup leaks every artifact the
     // batch created, permanently. Cleanup is idempotent and skips rows already
     // marked cleaned, so running it on an otherwise idle tick is cheap.
-    const uncleanedTerminal = listUatGenerationsSync({
-      projectRoot: projectPath,
-      statuses: ['promoted', 'failed', 'invalidated'],
-    }).filter((gen) => !gen.cleanedAt);
-    if (uncleanedTerminal.length > 0) {
+    // An existence check, not a load: generation rows are retained as an audit
+    // trail, so hydrating every terminal row and its four child tables to answer
+    // a yes/no question would make the idle minute cost grow with history.
+    if (hasUncleanedTerminalUatGenerationSync(projectPath)) {
       await makeCleanupForProject(projectPath)().catch((err) => {
         console.log(`[uat-train] terminal cleanup failed for ${projectPath}: ${err instanceof Error ? err.message : String(err)}`);
       });
@@ -624,7 +625,10 @@ export async function postUatGenerationStackPayload(name: string): Promise<
 
 export async function postUatGenerationPromotePayload(
   name: string,
-  firePostMerge: (issueId: string) => boolean,
+  // Typed as the full promote contract, not `(issueId) => boolean`: the narrow
+  // signature is what let the per-repo evidence be dropped by the forwarding
+  // layer without a type error.
+  firePostMerge: UatPromoteDeps['firePostMerge'],
 ): Promise<PromoteResult> {
   // PAN-1696: promote into the generation's OWN project repo. Generation rows carry
   // project_root, so a MIN generation must not be merged against the Overdeck repo.

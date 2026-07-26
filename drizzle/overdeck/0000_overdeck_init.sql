@@ -439,6 +439,7 @@ CREATE TABLE `uat_generations` (
 );
 --> statement-breakpoint
 CREATE INDEX `uat_status_idx` ON `uat_generations` (`status`);--> statement-breakpoint
+CREATE INDEX `uat_generations_uncleaned_terminal_idx` ON `uat_generations` (`project_root`,`status`) WHERE `cleaned_at` IS NULL;--> statement-breakpoint
 CREATE TABLE `uat_generation_repos` (
 	`uat_name` text NOT NULL,
 	`repo_key` text NOT NULL,

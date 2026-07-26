@@ -69,6 +69,8 @@ interface FakeRepoOptions {
   failTrialMerge?: boolean;
   failPublish?: boolean;
   failTargetHead?: boolean;
+  /** Merge commit this repo's uat branch is already contained in, if any. */
+  alreadyLanded?: string;
 }
 
 function makeRepoGit(repoKey: string, options: FakeRepoOptions = {}): FakeRepoGit {
@@ -96,6 +98,7 @@ function makeRepoGit(repoKey: string, options: FakeRepoOptions = {}): FakeRepoGi
       published.push(prepared.mergeSha);
     },
     discardPrepared: async (prepared: PreparedRepoMerge) => { discards.push(prepared.handle); },
+    findLandedMerge: async () => options.alreadyLanded ?? null,
   };
 }
 
@@ -103,8 +106,8 @@ function makeDeps(
   gen: UatGeneration,
   repoGit: Map<string, PolyrepoRepoPromoteGit>,
   overrides: Partial<UatPromoteDeps> = {},
-): UatPromoteDeps & { firePostMerge: ReturnType<typeof vi.fn>; promoted: Array<[string, string]>; statuses: string[] } {
-  const promoted: Array<[string, string]> = [];
+): UatPromoteDeps & { firePostMerge: ReturnType<typeof vi.fn>; promoted: Array<[string, string, string?]>; statuses: string[] } {
+  const promoted: Array<[string, string, string?]> = [];
   const statuses: string[] = [];
   const firePostMerge = vi.fn(() => true);
 
@@ -120,7 +123,7 @@ function makeDeps(
       batchChangedFiles: async () => { throw new Error('monorepo git must not be used'); },
     },
     polyrepoGit: repoGit,
-    markRepoPromoted: (_name, repoKey, at) => { promoted.push([repoKey, at]); },
+    markRepoPromoted: (_name, repoKey, at, mergeSha) => { promoted.push([repoKey, at, mergeSha]); },
     now: () => new Date('2026-07-27T12:00:00.000Z'),
     store: {
       get: () => gen,
@@ -132,7 +135,7 @@ function makeDeps(
     teardownStack: async () => {},
     memberEligibility: () => ({ eligible: true }),
     ...overrides,
-  } as UatPromoteDeps & { firePostMerge: ReturnType<typeof vi.fn>; promoted: Array<[string, string]>; statuses: string[] };
+  } as UatPromoteDeps & { firePostMerge: ReturnType<typeof vi.fn>; promoted: Array<[string, string, string?]>; statuses: string[] };
 }
 
 describe('polyrepo promote — phase A is all-or-nothing', () => {
@@ -230,8 +233,8 @@ describe('polyrepo promote — phase B publishes and resumes', () => {
     expect(fe.published).toEqual(['fe-merge-sha']);
     expect(api.published).toEqual(['api-merge-sha']);
     expect(deps.promoted).toEqual([
-      ['fe', '2026-07-27T12:00:00.000Z'],
-      ['api', '2026-07-27T12:00:00.000Z'],
+      ['fe', '2026-07-27T12:00:00.000Z', 'fe-merge-sha'],
+      ['api', '2026-07-27T12:00:00.000Z', 'api-merge-sha'],
     ]);
     expect(deps.statuses).toContain('promoted');
     expect((result as { mergeSha: string }).mergeSha).toBe('fe@fe-merg api@api-mer');
@@ -254,7 +257,7 @@ describe('polyrepo promote — phase B publishes and resumes', () => {
 
     // fe genuinely landed and is stamped, so the retry can skip it.
     expect(fe.published).toEqual(['fe-merge-sha']);
-    expect(deps.promoted).toEqual([['fe', '2026-07-27T12:00:00.000Z']]);
+    expect(deps.promoted).toEqual([['fe', '2026-07-27T12:00:00.000Z', 'fe-merge-sha']]);
     // Not marked promoted — the operator can retry.
     expect(deps.statuses).not.toContain('promoted');
   });
@@ -276,7 +279,7 @@ describe('polyrepo promote — phase B publishes and resumes', () => {
     expect(fe.trials).toEqual([]);
     expect(fe.published).toEqual([]);
     expect(api.published).toEqual(['api-merge-sha']);
-    expect(deps.promoted).toEqual([['api', '2026-07-27T12:00:00.000Z']]);
+    expect(deps.promoted).toEqual([['api', '2026-07-27T12:00:00.000Z', 'api-merge-sha']]);
   });
 
   it('finalizes a generation whose repos all already published', async () => {
@@ -391,5 +394,78 @@ describe('polyrepo promote — post-merge handoff', () => {
     expect(result).toMatchObject({ success: false, reason: 'member-not-ready' });
     expect(fe.published).toEqual([]);
     expect(deps.firePostMerge).not.toHaveBeenCalled();
+  });
+});
+
+// The publish and the local stamp are two writes to two systems. Everything
+// between them is a window where the remote has the merge and SQLite does not.
+describe('polyrepo promote — recovering an unstamped but landed repo', () => {
+  it('recovers a repo whose push landed but was never stamped, instead of rejecting as stale', async () => {
+    // fe landed for real; its target has therefore moved over the batch's own
+    // files, which is exactly what the stale-base check would otherwise reject.
+    const gen = generation([repoRow('fe', 0), repoRow('api', 1)]);
+    const fe = makeRepoGit('fe', {
+      alreadyLanded: 'fe-recovered-sha',
+      targetHead: 'fe-moved',
+      targetChanged: ['src/shared.ts'],
+      batchChanged: ['src/shared.ts'],
+    });
+    const api = makeRepoGit('api');
+    const deps = makeDeps(gen, new Map([['fe', fe], ['api', api]]));
+
+    const result = await promoteUatGeneration(GEN_NAME, PROJECT_ROOT, deps);
+
+    expect(result.success).toBe(true);
+    // fe is neither re-trial-merged nor re-published.
+    expect(fe.trials).toEqual([]);
+    expect(fe.published).toEqual([]);
+    expect(api.published).toEqual(['api-merge-sha']);
+    // and it is stamped with the recovered merge commit.
+    expect(deps.promoted).toContainEqual(['fe', '2026-07-27T12:00:00.000Z', 'fe-recovered-sha']);
+  });
+
+  it('finalizes when every repo turns out to have landed unstamped', async () => {
+    const gen = generation([repoRow('fe', 0), repoRow('api', 1)]);
+    const fe = makeRepoGit('fe', { alreadyLanded: 'fe-recovered' });
+    const api = makeRepoGit('api', { alreadyLanded: 'api-recovered' });
+    const deps = makeDeps(gen, new Map([['fe', fe], ['api', api]]));
+
+    const result = await promoteUatGeneration(GEN_NAME, PROJECT_ROOT, deps);
+
+    expect(result.success).toBe(true);
+    expect(fe.published).toEqual([]);
+    expect(api.published).toEqual([]);
+    expect(deps.statuses).toContain('promoted');
+    expect((result as { mergeSha: string }).mergeSha).toBe('fe@fe-reco api@api-rec');
+  });
+
+  it('does not lose a published merge when the stamp write throws', async () => {
+    const gen = generation([repoRow('fe', 0)]);
+    const fe = makeRepoGit('fe');
+    const deps = makeDeps(gen, new Map([['fe', fe]]), {
+      markRepoPromoted: () => { throw new Error('sqlite is gone'); },
+    });
+
+    const result = await promoteUatGeneration(GEN_NAME, PROJECT_ROOT, deps);
+
+    // The push happened, so the promote must still complete rather than
+    // unwinding — the next attempt recovers the stamp via findLandedMerge.
+    expect(result.success).toBe(true);
+    expect(fe.published).toEqual(['fe-merge-sha']);
+  });
+
+  it('withholds per-repo evidence when a published repo has no recorded merge sha', async () => {
+    // A resumed generation whose older row predates merge_sha capture: proving
+    // only the newer repo would advance every member on partial evidence.
+    const gen = generation([
+      repoRow('fe', 0, { promotedAt: '2026-07-27T12:00:00.000Z', mergeSha: null }),
+      repoRow('api', 1, { promotedAt: '2026-07-27T12:00:00.000Z', mergeSha: 'api-merge-sha' }),
+    ]);
+    const deps = makeDeps(gen, new Map([['fe', makeRepoGit('fe')], ['api', makeRepoGit('api')]]));
+
+    await promoteUatGeneration(GEN_NAME, PROJECT_ROOT, deps);
+
+    const options = deps.firePostMerge.mock.calls[0]![1] as { verifiedMergedRepos?: unknown[] };
+    expect(options.verifiedMergedRepos).toBeUndefined();
   });
 });

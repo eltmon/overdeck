@@ -359,14 +359,33 @@ export interface ComputePolyrepoMergeQueueOptions extends ComputeMergeQueueOptio
   onExcluded?: (issueId: string, reason: string) => void;
 }
 
+/** `git fetch origin <branch>` — updates the remote-tracking ref, ignoring absence. */
+const fetchFeatureBranch = (branch: string, cwd: string) =>
+  Effect.gen(function*() {
+    const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
+    const cmd = ChildProcess.make('git', ['fetch', 'origin', `${branch}:refs/remotes/origin/${branch}`], { cwd });
+    return yield* spawner.exitCode(cmd).pipe(
+      Effect.map(() => undefined),
+      // A branch that does not exist on the remote is the normal "no
+      // contribution" case, not an error.
+      Effect.orElseSucceed(() => undefined),
+    );
+  });
+
 /**
  * Origin-first feature-branch probe, matching branchHeadSha in
  * uat-generation-deps.ts: work agents push their branches, so the local ref can
  * lag or be missing entirely in a repo the operator never checked out.
  * Returns the ref that exists, or null when neither does.
+ *
+ * The fetch is REQUIRED, not an optimization: `git rev-parse origin/<branch>`
+ * reads a local remote-tracking ref and never contacts the remote, so a branch
+ * pushed from another machine or clone reads as absent. Without it a project
+ * whose work all happens remotely sees an empty ready set forever.
  */
 const resolveFeatureRef = (branch: string, repoPath: string) =>
   Effect.gen(function*() {
+    yield* fetchFeatureBranch(branch, repoPath);
     const originRef = `origin/${branch}`;
     if (yield* branchExists(originRef, repoPath)) return originRef;
     if (yield* branchExists(branch, repoPath)) return branch;

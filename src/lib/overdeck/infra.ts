@@ -70,6 +70,7 @@ export const OVERDECK_SCHEMA_TOP_UP_EXPECTATIONS: SchemaTopUpExpectations = {
     'release_set_components_issue_order_idx',
     'uat_generation_repos_uat_order_idx',
     'uat_generation_member_repos_uat_idx',
+    'uat_generations_uncleaned_terminal_idx',
   ],
 };
 
@@ -246,6 +247,11 @@ function ensureUatGenerationRepoTablesSync(db: SqliteDatabase): void {
     )
   `);
   db.exec('CREATE INDEX IF NOT EXISTS \`uat_generation_member_repos_uat_idx\` ON \`uat_generation_member_repos\` (\`uat_name\`,\`issue_id\`)');
+  // Partial index for the idle reconciler's uncleaned-terminal existence check,
+  // which runs once a minute per enabled project. Through runSchemaTopUp, not a
+  // bare exec: indexing a table that a partially-built database has not created
+  // yet must warn and continue, never abort the remaining top-ups.
+  runSchemaTopUp(db, "CREATE INDEX IF NOT EXISTS \`uat_generations_uncleaned_terminal_idx\` ON \`uat_generations\` (\`project_root\`,\`status\`) WHERE \`cleaned_at\` IS NULL");
   // Columns added after the tables shipped: a db created by the first PAN-3093
   // build has the tables but not these.
   runSchemaTopUp(db, "ALTER TABLE `uat_generation_repos` ADD COLUMN `target_branch` text DEFAULT 'main' NOT NULL");

@@ -38,6 +38,7 @@ const mocks = vi.hoisted(() => ({
   buildPolyrepoGitDeps: vi.fn(),
   resolveProjectFromIssueSync: vi.fn(),
   resolveProjectReposFromResolvedIssueSync: vi.fn(),
+  hasUncleanedTerminalUatGenerationSync: vi.fn(),
 }));
 
 vi.mock('../../../../lib/projects.js', async (importOriginal) => {
@@ -93,6 +94,7 @@ vi.mock('../../../../lib/overdeck/merge-sync.js', async (importOriginal) => {
     getUatGenerationSync: mocks.getUatGenerationSync,
     listUatGenerationsSync: mocks.listUatGenerationsSync,
     isMergeTrainEnabledForProject: mocks.isMergeTrainEnabledForProject,
+    hasUncleanedTerminalUatGenerationSync: mocks.hasUncleanedTerminalUatGenerationSync,
   };
 });
 
@@ -600,10 +602,8 @@ describe('runUatTrainReconcile — terminal generation cleanup', () => {
   });
 
   it('cleans an uncleaned promoted generation even with no candidates and no live rows', async () => {
-    mocks.listUatGenerationsSync.mockImplementation((opts?: { statuses?: string[] }) => {
-      if (opts?.statuses?.includes('promoted')) return [terminalGen()];
-      return [];
-    });
+    mocks.listUatGenerationsSync.mockReturnValue([]);
+    mocks.hasUncleanedTerminalUatGenerationSync.mockReturnValue(true);
 
     await runUatTrainReconcile({ projectRoot: POLY_ROOT });
 
@@ -613,12 +613,10 @@ describe('runUatTrainReconcile — terminal generation cleanup', () => {
   });
 
   it('does no cleanup work when every terminal generation is already cleaned', async () => {
-    mocks.listUatGenerationsSync.mockImplementation((opts?: { statuses?: string[] }) => {
-      if (opts?.statuses?.includes('promoted')) {
-        return [terminalGen({ cleanedAt: '2026-07-27T10:00:00.000Z' })];
-      }
-      return [];
-    });
+    mocks.listUatGenerationsSync.mockReturnValue([]);
+    // The idle tick must answer this with a single existence query, never by
+    // hydrating the retained terminal history.
+    mocks.hasUncleanedTerminalUatGenerationSync.mockReturnValue(false);
 
     const result = await runUatTrainReconcile({ projectRoot: POLY_ROOT });
 

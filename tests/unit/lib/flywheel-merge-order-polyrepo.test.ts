@@ -36,6 +36,11 @@ function repo(repoKey: string, issueId: string, mergeOrder: number): ResolvedPro
 interface FakeGit {
   /** Refs that "exist", as `<repoPath> <ref>`. */
   refs: Set<string>;
+  /**
+   * Refs the FETCH creates, as `<repoPath> <ref>` — a branch that exists only
+   * on the remote until fetched. Absent means fetch changes nothing.
+   */
+  fetchable?: Set<string>;
   /** Changed files keyed `<repoPath> <ref>`. */
   changed: Map<string, string[]>;
 }
@@ -57,6 +62,15 @@ function fakeGitLayer(git: FakeGit, calls: string[] = []): Layer.Layer<ChildProc
     exitCode: (command: ChildProcess.Command) =>
       Effect.sync(() => {
         const { args, cwd } = read(command);
+        if (args[0] === 'fetch') {
+          // `git fetch origin <branch>:refs/remotes/origin/<branch>` — makes a
+          // remote-only branch visible locally.
+          const spec = String(args[2] ?? '');
+          const branch = spec.split(':')[0]!;
+          const key = `${cwd} origin/${branch}`;
+          if (git.fetchable?.has(key)) git.refs.add(key);
+          return 0 as never;
+        }
         if (args[0] !== 'rev-parse' || args[1] !== '--verify') throw new Error(`unexpected exitCode call: ${args.join(' ')}`);
         return (git.refs.has(`${cwd} ${args[2]}`) ? 0 : 1) as never;
       }),
@@ -188,6 +202,45 @@ describe('computePolyrepoMergeQueueFromCandidates — contributions', () => {
     expect(calls).toContain(
       `git diff --name-only develop...origin/feature/min-901 @${PROJECT_ROOT}/api`,
     );
+  });
+});
+
+describe('computePolyrepoMergeQueueFromCandidates — remote-only branches', () => {
+  it('fetches a branch that exists only on the remote instead of reporting it absent', async () => {
+    // `git rev-parse origin/<branch>` reads a LOCAL tracking ref, so a branch
+    // pushed from another machine is invisible until fetched. Without the fetch
+    // a project whose work all happens remotely never assembles anything.
+    const reposByIssue = new Map([['MIN-901', [repo('api', 'MIN-901', 0)]]]);
+    const git: FakeGit = {
+      refs: new Set(),
+      fetchable: new Set([`${PROJECT_ROOT}/api origin/feature/min-901`]),
+      changed: new Map([[`${PROJECT_ROOT}/api origin/feature/min-901`, ['src/b.ts']]]),
+    };
+    const calls: string[] = [];
+
+    const queue = await run([{ issueId: 'MIN-901', title: 'Pushed elsewhere' }], reposByIssue, git, {}, calls);
+
+    expect(queue).toHaveLength(1);
+    expect(queue[0]!.repoContributions.map((c) => c.repoKey)).toEqual(['api']);
+    expect(calls).toContain(
+      `git fetch origin feature/min-901:refs/remotes/origin/feature/min-901 @${PROJECT_ROOT}/api`,
+    );
+  });
+
+  it('still excludes a branch that does not exist on the remote either', async () => {
+    const reposByIssue = new Map([['MIN-901', [repo('api', 'MIN-901', 0)]]]);
+    const git: FakeGit = { refs: new Set(), fetchable: new Set(), changed: new Map() };
+    const excluded: Array<[string, string]> = [];
+
+    const queue = await run(
+      [{ issueId: 'MIN-901', title: 'Nowhere' }],
+      reposByIssue,
+      git,
+      { onExcluded: (issueId, reason) => excluded.push([issueId, reason]) },
+    );
+
+    expect(queue).toEqual([]);
+    expect(excluded[0]![0]).toBe('MIN-901');
   });
 });
 
