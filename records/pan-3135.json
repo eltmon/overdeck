@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T12:24:46.201Z",
-  "updated": "2026-07-26T13:02:23.018Z",
+  "updated": "2026-07-26T13:02:32.882Z",
   "pipeline": {
     "issueId": "PAN-3135",
     "reviewStatus": "pending",
@@ -61,8 +61,16 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 4,
-    "claims": {},
+    "sequence": 5,
+    "claims": {
+      "request-review-deferred-handling": {
+        "writerId": "agent-pan-3135",
+        "agentId": "agent-pan-3135",
+        "pid": 1623524,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T13:02:32.882Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3135",
@@ -108,6 +116,7 @@
     "deferred-verification-outcome.deferred-verification-outcome.ac1": "completed",
     "deferred-verification-outcome.deferred-verification-outcome.ac2": "completed",
     "deferred-verification-outcome.deferred-verification-outcome.ac3": "completed",
-    "deferred-verification-outcome.deferred-verification-outcome.ac4": "completed"
+    "deferred-verification-outcome.deferred-verification-outcome.ac4": "completed",
+    "request-review-deferred-handling": "running"
   }
 }
