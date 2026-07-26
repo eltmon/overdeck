@@ -32,7 +32,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T17:27:17.644Z",
-  "updated": "2026-07-26T21:02:29.065Z",
+  "updated": "2026-07-26T21:02:31.921Z",
   "pipeline": {
     "issueId": "PAN-3148",
     "reviewStatus": "pending",
@@ -194,5 +194,59 @@
     "docs-patrol-and-dedup": "completed",
     "docs-patrol-and-dedup.docs-patrol-and-dedup.ac1": "completed",
     "docs-patrol-and-dedup.docs-patrol-and-dedup.ac2": "completed"
+  },
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      "scripts/source-introspection-baseline.txt",
+      "src/lib/cloister/__tests__/deacon-stash-janitor.test.ts",
+      "src/lib/cloister/deacon-post-review-commits.ts",
+      "tests/lib/cloister/deacon-ci-retry.test.ts",
+      "tests/lib/cloister/deacon-orphan-recovery.test.ts",
+      "tests/lib/cloister/review-agent.test.ts",
+      "tests/lib/cloister/review-verdict-feedback.test.ts",
+      "tests/unit/lib/cloister/deacon-swarm-verdict-routing.test.ts",
+      "tests/unit/lib/head-anchor-write-sites.test.ts"
+    ],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "docs/DEACON-HEALTH-MONITORING.md",
+      "docs/REVIEW-AGENT-ARCHITECTURE.md",
+      "src/cli/commands/specialists/done.ts",
+      "src/dashboard/server/routes/specialists/legacy-routes.ts",
+      "src/lib/agents/messaging.ts",
+      "src/lib/cloister/deacon-review-signals.ts",
+      "src/lib/cloister/deacon.ts",
+      "src/lib/cloister/prompts/work.md",
+      "src/lib/cloister/review-verdict-feedback.ts",
+      "tests/cli/commands/specialists/done.test.ts",
+      "tests/unit/dashboard/server/routes/specialists-reviewed-at-commit.test.ts",
+      "tests/unit/lib/cloister/deacon-post-blocked-review-commits.test.ts",
+      "tests/unit/lib/cloister/review-verdict-feedback.test.ts"
+    ],
+    "actualChangedFiles": [
+      "docs/DEACON-HEALTH-MONITORING.md",
+      "docs/REVIEW-AGENT-ARCHITECTURE.md",
+      "scripts/source-introspection-baseline.txt",
+      "src/cli/commands/specialists/done.ts",
+      "src/dashboard/server/routes/specialists/legacy-routes.ts",
+      "src/lib/agents/messaging.ts",
+      "src/lib/cloister/__tests__/deacon-stash-janitor.test.ts",
+      "src/lib/cloister/deacon-post-review-commits.ts",
+      "src/lib/cloister/deacon-review-signals.ts",
+      "src/lib/cloister/deacon.ts",
+      "src/lib/cloister/prompts/work.md",
+      "src/lib/cloister/review-verdict-feedback.ts",
+      "tests/cli/commands/specialists/done.test.ts",
+      "tests/lib/cloister/deacon-ci-retry.test.ts",
+      "tests/lib/cloister/deacon-orphan-recovery.test.ts",
+      "tests/lib/cloister/review-agent.test.ts",
+      "tests/lib/cloister/review-verdict-feedback.test.ts",
+      "tests/unit/dashboard/server/routes/specialists-reviewed-at-commit.test.ts",
+      "tests/unit/lib/cloister/deacon-post-blocked-review-commits.test.ts",
+      "tests/unit/lib/cloister/deacon-swarm-verdict-routing.test.ts",
+      "tests/unit/lib/cloister/review-verdict-feedback.test.ts",
+      "tests/unit/lib/head-anchor-write-sites.test.ts"
+    ],
+    "recordedAt": "2026-07-26T21:02:31.919Z"
   }
 }
