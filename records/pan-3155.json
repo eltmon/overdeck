@@ -2,7 +2,7 @@
   "issueId": "PAN-3155",
   "schemaVersion": 2,
   "created": "2026-07-26T19:16:39.648Z",
-  "updated": "2026-07-26T19:16:39.648Z",
+  "updated": "2026-07-26T19:16:40.967Z",
   "pipeline": {
     "issueId": "PAN-3155",
     "reviewStatus": "pending",
@@ -25,5 +25,7 @@
       "note": "Planning session started for PAN-3155: Strike-landed issues can never close out: DoD row 4 resolves 'merged' through the superseded feature branch, and row 7 cascades",
       "timestamp": "2026-07-26T19:16:39.648Z"
     }
-  ]
+  ],
+  "harness": "claude-code",
+  "model": "k3[1m]"
 }
