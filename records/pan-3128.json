@@ -92,9 +92,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-26T14:39:19.741Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-26T14:45Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-26T14:45:24.413Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-26T14:45:24Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-3128\n\n# Review Synthesis — PAN-3128 — 2026-07-26T14:44:56Z\n\n## Verdict: CHANGES REQUESTED — failed restarts leak unbounded multi-gigabyte deployment worktrees\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3128/.pan/review/agent-pan-3128-review-0d6fbd3b/context.json\n- Branch: feature/pan-3128\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3128\n- HEAD reviewed: 0d6fbd3b8842ca1370d0b2e92195e8a40ac826ef\n- Cycle number: 4\n- Prior cycle SHA: f1e3ffc058\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3128/.pan/review/agent-pan-3128-review-0d6fbd3b/security.md | 0 |\n| correctness | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3128/.pan/review/agent-pan-3128-review-0d6fbd3b/correctness.md | 0 |\n| performance | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3128/.pan/review/agent-pan-3128-review-0d6fbd3b/performance.md | 1 |\n| requirements | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3128/.pan/review/agent-pan-3128-review-0d6fbd3b/requirements.md | 0 |\n\n## Blocking Findings\n\n### [performance] Failed restarts leak multi-gigabyte deployment worktrees without a bound — `src/cli/commands/reload.ts:183`\n`reloadCommand()` advances the active-bundle marker and installs a new persistent deployment before calling `restartDashboard()`. If restart or health verification fails, the outer catch records the failure but neither restores the previous marker nor removes the failed deployment. Each PID-named deployment contains a full installed dependency tree, approximately 2 GB in the reviewed environment. Repeated boot crashes or health failures can therefore strand an unbounded number of complete Git worktrees under `${OVERDECK_HOME}/deployments/dashboard`, eventually exhausting disk. This blocker is in the cycle diff introduced after `f1e3ffc058`, so it survives the cycle-4 convergence gate.\n\nThe deployment lifecycle needs a bounded generation policy: clean up the failed generation and restore the previous active generation on restart failure, plus sweep unreferenced deployment roots or retain a fixed small number so earlier cleanup failures cannot accumulate. Regression coverage should exercise repeated restart failures and prove only active and rollback generations remain.\n\n## Non-blocking Findings\n\n### [correctness] PID reuse can delete the deployment currently serving — `src/lib/deploy/build-from-origin.ts:153`\nThe deployment root uses only the short-lived reload process PID, then unconditionally removes that path before building. A recycled PID can collide with the still-active persistent deployment and remove its on-disk chunks and dependencies before the replacement build succeeds. The correctness reviewer classified this as non-blocking (`≉`); use a collision-resistant deployment identifier or explicitly exclude the active marker's root when creating a new generation.\n\n## Clean Sub-roles\n- security\n- requirements\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3128/.pan/review/agent-pan-3128-review-0d6fbd3b/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3128 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "src/cli/commands/__tests__/reload.test.ts",
@@ -134,7 +147,7 @@
     "recordedAt": "2026-07-26T13:30:54.544Z"
   },
   "created": "2026-07-26T12:24:12.648Z",
-  "updated": "2026-07-26T14:45:23.675Z",
+  "updated": "2026-07-26T14:45:24.413Z",
   "pipeline": {
     "issueId": "PAN-3128",
     "reviewStatus": "blocked",
