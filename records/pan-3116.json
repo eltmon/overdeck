@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T09:04:01.632Z",
-  "updated": "2026-07-26T10:40:04.585Z",
+  "updated": "2026-07-26T10:40:07.681Z",
   "pipeline": {
     "issueId": "PAN-3116",
     "reviewStatus": "pending",
@@ -167,5 +167,44 @@
     "docs-a3-update-note": "completed",
     "docs-a3-update-note.docs-a3-update-note.ac1": "completed",
     "docs-a3-update-note.docs-a3-update-note.ac2": "completed"
+  },
+  "scopeDrift": {
+    "outsideDeclaredScope": [],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "docs/codebase-health/A3-file-size-guard.md",
+      "scripts/file-size-allowlist.txt",
+      "scripts/file-size-baseline.txt",
+      "scripts/lint-file-size.sh",
+      "scripts/lint-ratchet-audit.sh",
+      "src/dashboard/server/routes/__tests__/complete-planning.test.ts",
+      "src/lib/cloister/file-size-reconcile.ts",
+      "src/lib/cloister/prompts/planning.md",
+      "src/lib/cloister/uat-promote.ts",
+      "src/lib/xbrief/__tests__/quality-lint.test.ts",
+      "src/lib/xbrief/quality-lint.ts",
+      "tests/unit/lib/cloister/file-size-reconcile.test.ts",
+      "tests/unit/lib/cloister/uat-promote-baseline.test.ts",
+      "tests/unit/scripts/lint-file-size.test.ts",
+      "tests/unit/scripts/lint-ratchet-audit.test.ts"
+    ],
+    "actualChangedFiles": [
+      "docs/codebase-health/A3-file-size-guard.md",
+      "scripts/file-size-allowlist.txt",
+      "scripts/file-size-baseline.txt",
+      "scripts/lint-file-size.sh",
+      "scripts/lint-ratchet-audit.sh",
+      "src/dashboard/server/routes/__tests__/complete-planning.test.ts",
+      "src/lib/cloister/file-size-reconcile.ts",
+      "src/lib/cloister/prompts/planning.md",
+      "src/lib/cloister/uat-promote.ts",
+      "src/lib/xbrief/__tests__/quality-lint.test.ts",
+      "src/lib/xbrief/quality-lint.ts",
+      "tests/unit/lib/cloister/file-size-reconcile.test.ts",
+      "tests/unit/lib/cloister/uat-promote-baseline.test.ts",
+      "tests/unit/scripts/lint-file-size.test.ts",
+      "tests/unit/scripts/lint-ratchet-audit.test.ts"
+    ],
+    "recordedAt": "2026-07-26T10:40:07.679Z"
   }
 }
