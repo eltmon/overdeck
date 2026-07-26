@@ -401,7 +401,7 @@
     "recordedAt": "2026-07-26T19:11:42.045Z"
   },
   "created": "2026-07-26T13:39:19.365Z",
-  "updated": "2026-07-26T19:11:46.526Z",
+  "updated": "2026-07-26T19:11:48.655Z",
   "pipeline": {
     "issueId": "PAN-3138",
     "reviewStatus": "pending",
@@ -410,9 +410,8 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T19:11:46.492Z",
+    "updatedAt": "2026-07-26T19:11:48.387Z",
     "reviewNotes": "Claim recovery loses an older lifecycle when a newer pending generation exists",
-    "verificationNotes": "The supervised verification worker stopped before recording a result; verification re-runs on the next cycle.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3143",
     "lastVerifiedCommit": "45c64d10937592faceea33d0a627c6e336c9c829",
     "reviewRequestedAt": "2026-07-26T19:11:42.896Z",
@@ -560,7 +559,7 @@
       },
       "costAtCloseOut": {
         "usd": 832.51764,
-        "pricingAsOf": "2026-07-26T19:11:46.521Z"
+        "pricingAsOf": "2026-07-26T19:11:48.460Z"
       }
     },
     "merges": [
