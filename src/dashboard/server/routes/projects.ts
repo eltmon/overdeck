@@ -10,7 +10,7 @@ import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
 import { httpHandler } from './http-handler.js';
 import { postProjectRenameRoute } from './project-rename.js';
-import { resolveProjectFromIssueSync, listProjectsSync, getProjectSync, setProjectAutoMergeDefaultSync, setProjectSwarmPolicySync, setProjectMergeTrainSync } from '../../../lib/projects.js';
+import { resolveProjectFromIssueSync, listProjectsSync, getProjectSync, setProjectAutoMergeDefaultSync, setProjectSwarmPolicySync } from '../../../lib/projects.js';
 import { resolveSwarmPolicy } from '../../../lib/swarm-policy.js';
 import type { SwarmPolicyLayer } from '../../../lib/swarm-policy.js';
 import { readIssueRecordSync } from '../../../lib/pan-dir/record.js';
@@ -782,48 +782,6 @@ const postProjectAutoMergeDefaultRoute = HttpRouter.add(
   })),
 );
 
-// ─── Route: GET /api/projects/:projectKey/merge-train ────────────────
-// PAN-1696: get per-project merge-train override (enabled/disabled/null) and effective state.
-const getProjectMergeTrainRoute = HttpRouter.add(
-  'GET',
-  '/api/projects/:projectKey/merge-train',
-  httpHandler(Effect.gen(function* () {
-    const params = yield* HttpRouter.params;
-    const key = params['projectKey'] ?? '';
-    const config = getProjectSync(key);
-    if (!config) return jsonResponse({ error: 'Project not found' }, { status: 404 });
-    const { isMergeTrainEnabledForProject } = yield* Effect.promise(() => import('../../../lib/overdeck/merge-sync.js'));
-    return jsonResponse({
-      value: config.merge_train ?? null,
-      effective: isMergeTrainEnabledForProject(config),
-    });
-  })),
-);
-
-// ─── Route: POST /api/projects/:projectKey/merge-train ────────────────
-// PAN-1696: set per-project merge-train override ('enabled' | 'disabled' | null).
-const postProjectMergeTrainRoute = HttpRouter.add(
-  'POST',
-  '/api/projects/:projectKey/merge-train',
-  httpHandler(Effect.gen(function* () {
-    const params = yield* HttpRouter.params;
-    const key = params['projectKey'] ?? '';
-    if (!getProjectSync(key)) return jsonResponse({ error: 'Project not found' }, { status: 404 });
-    const body = (yield* readProjectJsonBody) as { value?: unknown };
-    const v = body.value;
-    if (v !== 'enabled' && v !== 'disabled' && v !== null) {
-      return jsonResponse({ error: "value must be 'enabled', 'disabled', or null" }, { status: 400 });
-    }
-    const { isMergeTrainEnabledForProject } = yield* Effect.promise(() => import('../../../lib/overdeck/merge-sync.js'));
-    setProjectMergeTrainSync(key, v);
-    const updated = getProjectSync(key);
-    return jsonResponse({
-      value: v,
-      effective: updated ? isMergeTrainEnabledForProject(updated) : false,
-    });
-  })),
-);
-
 const getProjectSwarmPolicyRoute = HttpRouter.add('GET', '/api/projects/:projectKey/swarm-policy', httpHandler(Effect.gen(function* () {
   const key = (yield* HttpRouter.params)['projectKey'] ?? '';
   const config = getProjectSync(key);
@@ -1093,8 +1051,6 @@ export const projectsRouteLayer = Layer.mergeAll(
   getProjectReleaseStatusRoute,
   getProjectAutoMergeDefaultRoute,
   postProjectAutoMergeDefaultRoute,
-  getProjectMergeTrainRoute,
-  postProjectMergeTrainRoute,
   postProjectRenameRoute,
   getProjectSwarmPolicyRoute,
   postProjectSwarmPolicyRoute,

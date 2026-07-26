@@ -58,6 +58,7 @@ import { conversationsRouteLayer } from './routes/conversations.js';
 import { eventsRouteLayer } from './routes/events.js';
 import { showRouteLayer } from './routes/show.js';
 import { projectsRouteLayer } from './routes/projects.js';
+import { projectsMergeTrainRouteLayer } from './routes/projects-merge-train.js';
 import { contextRouteLayer } from './routes/context.js';
 import { commandsRouteLayer } from './routes/commands.js';
 import { adminRouteLayer } from './routes/admin.js';
@@ -350,6 +351,7 @@ export const makeRoutesLayer = Layer.mergeAll(
   eventsRouteLayer,
   showRouteLayer,
   projectsRouteLayer,
+  projectsMergeTrainRouteLayer,
   contextRouteLayer,
   commandsRouteLayer,
   adminRouteLayer,
