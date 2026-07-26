@@ -202,11 +202,24 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-26T03:21:03.908Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-26T03:21Z] review-agent → FAILED — seq 1",
+      "timestamp": "2026-07-26T03:21:11.430Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "failed",
+      "timestamp": "2026-07-26T03:21:11Z",
+      "markdownBody": "# Review FAILED for PAN-1696\n\nReview role spawn failed: Role run agent-pan-1696-review already running. Use 'pan tell' to message it.\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1696 -m \"Fixed review issues\"`"
+    }
+  ],
   "created": "2026-07-26T00:35:36.057Z",
-  "updated": "2026-07-26T03:21:10.311Z",
+  "updated": "2026-07-26T03:21:11.430Z",
   "pipeline": {
     "issueId": "PAN-1696",
     "reviewStatus": "failed",
