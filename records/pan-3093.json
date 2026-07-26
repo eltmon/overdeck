@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T12:33:18.311Z",
-  "updated": "2026-07-26T12:57:41.553Z",
+  "updated": "2026-07-26T12:58:43.156Z",
   "pipeline": {
     "issueId": "PAN-3093",
     "reviewStatus": "pending",
@@ -35,5 +35,20 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-opus-5"
+  "model": "claude-opus-5",
+  "tasks": {
+    "sequence": 1,
+    "claims": {
+      "schema-per-repo-generation-tables": {
+        "writerId": "agent-pan-3093",
+        "agentId": "agent-pan-3093",
+        "pid": 1480224,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T12:58:43.156Z"
+      }
+    }
+  },
+  "statusOverrides": {
+    "schema-per-repo-generation-tables": "running"
+  }
 }
