@@ -27,7 +27,10 @@ describe('agent spawn provenance boundary', () => {
 
   it('allows only registered internal provenance tokens for internal callers', () => {
     expect(resolveRequestedStartedBy('operator:cli:pan-start', true)).toBe('operator:cli:pan-start');
+    expect(resolveRequestedStartedBy('operator:cli:pan-plan', true)).toBe('operator:cli:pan-plan');
+    expect(resolveRequestedStartedBy('flywheel:RUN-42', true)).toBe('flywheel:RUN-42');
     expect(resolveRequestedStartedBy('planning-auto-handoff', true)).toBe('planning-auto-handoff');
+    expect(resolveRequestedStartedBy('resume-agent', true)).toBe('resume-agent');
     expect(() => resolveRequestedStartedBy('flywheel:forged', true)).toThrow(
       'Invalid internal startedBy provenance token.',
     );

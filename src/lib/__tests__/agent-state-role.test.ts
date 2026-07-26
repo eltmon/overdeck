@@ -819,6 +819,7 @@ describe('AgentState role persistence', () => {
         model: 'claude-sonnet-4-6',
         status: 'stopped',
         startedAt: '2026-07-19T00:00:00.000Z',
+        startedBy: 'reactive-lifecycle',
         sessionId: 'missing-session',
       } as any);
       const agentDir = join(tempHome, 'agents', agentId);
@@ -830,7 +831,16 @@ describe('AgentState role persistence', () => {
       const result = await resumeAgent(agentId, 'continue review');
 
       expect(result).toMatchObject({ success: true, messageDelivered: true });
-      expect(createSessionAsync).toHaveBeenCalled();
+      expect(createSessionAsync).toHaveBeenCalledWith(
+        agentId,
+        workspace,
+        expect.any(String),
+        expect.objectContaining({
+          env: expect.objectContaining({
+            OVERDECK_AGENT_STARTED_BY: 'reactive-lifecycle',
+          }),
+        }),
+      );
       expect(deliverInitialPromptWithRetry).toHaveBeenCalled();
       const freshSessionId = readFileSync(join(agentDir, 'session.id'), 'utf-8').trim();
       expect(freshSessionId).not.toBe('missing-session');

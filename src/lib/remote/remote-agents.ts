@@ -286,6 +286,7 @@ export interface RemoteAgentState {
   startedAt: string;
   lastActivity?: string;
   location: 'remote';
+  startedBy: string;
   tier?: 'ephemeral' | 'durable';
 }
 
@@ -485,6 +486,7 @@ export interface SpawnRemoteAgentOptions {
   model?: string;
   prompt?: string;
   phase?: string;
+  startedBy: string;
   tier?: 'ephemeral' | 'durable';
 }
 
@@ -543,7 +545,7 @@ export async function writeRemoteFile(
  * Spawn a Claude agent on a remote VM
  */
 export async function spawnRemoteAgent(options: SpawnRemoteAgentOptions): Promise<RemoteAgentState> {
-  const { issueId, workspace, model = 'claude-sonnet-4-6', prompt } = options;
+  const { issueId, workspace, startedBy, model = 'claude-sonnet-4-6', prompt } = options;
   const project = resolveProjectForIssue(issueId);
   if (project) assertFlyRemoteStateSupported(issueId, await isStateMigrated(project));
   const tier = options.tier ?? 'ephemeral';
@@ -580,6 +582,7 @@ export async function spawnRemoteAgent(options: SpawnRemoteAgentOptions): Promis
     status: 'starting',
     startedAt: new Date().toISOString(),
     location: 'remote',
+    startedBy,
     tier,
   };
 
@@ -604,6 +607,7 @@ export async function spawnRemoteAgent(options: SpawnRemoteAgentOptions): Promis
       promptFile,
       baseCommand: 'claude',
       permissionFlags: getClaudePermissionFlagsSync(),
+      extraEnvExports: [`export OVERDECK_AGENT_STARTED_BY=${shellQuote(startedBy)}`],
       model,
     });
     await writeRemoteFile(fly, vmName, launcherScript, launcherContent);
@@ -614,7 +618,7 @@ export async function spawnRemoteAgent(options: SpawnRemoteAgentOptions): Promis
 
     claudeCmd = `bash ${launcherScript}`;
   } else {
-    claudeCmd = `claude ${getClaudePermissionFlagsStringSync()} --model ${model}`;
+    claudeCmd = `OVERDECK_AGENT_STARTED_BY=${shellQuote(startedBy)} claude ${getClaudePermissionFlagsStringSync()} --model ${model}`;
   }
 
   console.log(`[claude-invoke] purpose=remote-agent | model=${model} | source=remote-agents.ts | vm=${vmName} | agent=${agentId} | command="${claudeCmd}"`);

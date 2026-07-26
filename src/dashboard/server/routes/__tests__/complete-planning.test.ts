@@ -500,7 +500,7 @@ describe('completePlanningArtifacts', () => {
     }));
   });
 
-  it('rebuilds the stack, starts work, and consumes current-cycle consent', async () => {
+  it('queues rebuild-and-start without consuming consent before the chained start succeeds', async () => {
     const consumeAutoSpawnConsent = vi.fn(async () => undefined);
     const requests: string[] = [];
     const fetchImpl: typeof fetch = async (input, init) => {
@@ -533,7 +533,7 @@ describe('completePlanningArtifacts', () => {
       'http://127.0.0.1:3011/api/agents',
       'http://127.0.0.1:3011/api/workspaces/PAN-1147/rebuild-and-start',
     ]);
-    expect(consumeAutoSpawnConsent).toHaveBeenCalledWith('PAN-1147');
+    expect(consumeAutoSpawnConsent).not.toHaveBeenCalled();
   });
 
   it('kills the planning session immediately after autoSpawn succeeds', async () => {

@@ -33,6 +33,7 @@ import {
   checkRemoteSpendCap,
 } from '../../../lib/remote/index.js';
 import { loadConfigSync as loadPanConfig } from '../../../lib/config.js';
+import { updateAutoSpawnConsentAfterWorkStart } from '../../../lib/planning/spawn-planning-session.js';
 import { EventStoreService } from '../services/domain-services.js';
 import { httpHandler } from './http-handler.js';
 
@@ -273,10 +274,11 @@ const startRemoteAgentRoute = HttpRouter.add(
     const state = yield* Effect.tryPromise({
       try: async () => {
         await fly.syncAllCredentials(metadata.vmName!);
-        return spawnRemoteAgent({ issueId, workspace: metadata as unknown as Parameters<typeof spawnRemoteAgent>[0]['workspace'], prompt, model, tier: fly.getResiliencyTier() });
+        return spawnRemoteAgent({ issueId, workspace: metadata as unknown as Parameters<typeof spawnRemoteAgent>[0]['workspace'], prompt, model, startedBy: 'operator:dashboard', tier: fly.getResiliencyTier() });
       },
       catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
     });
+    yield* Effect.promise(() => updateAutoSpawnConsentAfterWorkStart(issueId, true));
 
     yield* eventStore.append({ type: 'issues.updated', timestamp: new Date().toISOString(), payload: { issueId } });
     return jsonResponse(state);

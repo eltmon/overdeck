@@ -44,6 +44,7 @@ import { getResourceConfig, type HealthLeakedSpecialist, type SystemHealthSnapsh
 import { classifyMemoryPressure } from '../../../../lib/cloister/memory-governor.js';
 import { capturePane } from '../../../../lib/tmux.js';
 import type { RuntimeName } from '../../../../lib/runtimes/types.js';
+import { normalizeFlywheelRunId } from '../../../../lib/agents/provenance.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -77,14 +78,18 @@ export function buildPanStartArgs(input: {
  */
 const INTERNAL_STARTED_BY_TOKENS = new Set([
   'operator:cli:pan-start',
+  'operator:cli:pan-plan',
   'planning-auto-handoff',
   'orphan-proposed-reconciler',
   'workspace-rebuild-recovery',
+  'resume-agent',
 ]);
 
 export function resolveRequestedStartedBy(value: unknown, internalRequest = false): string {
   if (!internalRequest) return 'operator:dashboard';
   const token = typeof value === 'string' ? value.trim() : '';
+  const flywheelRunId = token.startsWith('flywheel:') ? normalizeFlywheelRunId(token.slice('flywheel:'.length)) : undefined;
+  if (flywheelRunId) return `flywheel:${flywheelRunId}`;
   if (!INTERNAL_STARTED_BY_TOKENS.has(token)) throw new Error('Invalid internal startedBy provenance token.');
   return token;
 }

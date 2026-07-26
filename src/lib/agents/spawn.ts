@@ -129,6 +129,7 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
   }
 
   const flywheelEnv = resolveFlywheelSpawnEnv(role, options.flywheelRunId);
+  const startedBy = resolveAgentStartedBy(options.startedBy, flywheelEnv.OVERDECK_FLYWHEEL_RUN_ID);
   const agentId = options.agentId ?? runAgentId(issueId, role, options.subRole);
   if (await Effect.runPromise(sessionExists(agentId))) {
     // PAN-2579 (warm-by-default lifecycle): advancing-role sessions are no longer
@@ -160,7 +161,6 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
     const { killSession } = await import('../tmux.js');
     await Effect.runPromise(killSession(agentId)).catch(() => {});
   }
-
   await assertWorkspaceStackHealthyForSpawn(issueId, role, options.allowHost, workspace);
   initHookSync(agentId);
 
@@ -175,7 +175,6 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
   // PAN-2285: reject fresh Codex launches when native auth would wedge in a 401 loop.
   assertCodexNativeAuthForSpawn(resolvedHarness, listAgentStates());
   await ensureLifecycleHooksBeforeLaunch(agentId, resolvedHarness);
-
   if (
     getProviderForModelSync(selectedModel).name === 'openai'
     && (await getProviderAuthMode(selectedModel)) === 'subscription'
@@ -205,13 +204,12 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
     slotIndex: options.slotIndex,
     slotItemId: options.slotItemId,
     flywheelRunId: flywheelEnv.OVERDECK_FLYWHEEL_RUN_ID,
-    startedBy: resolveAgentStartedBy(options.startedBy, flywheelEnv.OVERDECK_FLYWHEEL_RUN_ID),
+    startedBy,
   };
   // PAN-1048 P1: spawnRun is on the dashboard hot path (Effect routes,
   // reactive Cloister scheduler). All disk I/O here uses async fs/promises
   // so we never block the Node event loop.
   await Effect.runPromise(saveAgentState(state));
-
   const isSpecialistRole = role === 'review' || role === 'test' || role === 'ship' || role === 'knowledge';
   const shouldRegisterConversation = isSpecialistRole || options.registerConversation === true;
   // PAN-1557: convoy sub-reviewers are now interactive specialists — deliver
@@ -254,7 +252,6 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
 
   const providerExports = isAcp ? undefined : await getProviderExportsForModel(selectedModel);
   const providerEnv = isAcp ? {} : await getProviderEnvForModel(selectedModel);
-
   // PAN-1048 review feedback 005 (S1): when the resolved harness is ohmypi, thread
   // the per-agent ohmypi launcher fields (--session-dir, --extension, FIFO
   // redirect) through generateLauncherScript so the role launcher emits the
@@ -388,6 +385,7 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
       OVERDECK_AGENT_ID: agentId,
       OVERDECK_ISSUE_ID: issueId,
       OVERDECK_SESSION_TYPE: role,
+      OVERDECK_AGENT_STARTED_BY: startedBy,
       CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION: 'false',
       GIT_SEQUENCE_EDITOR: 'false',
       ...flywheelEnv,
@@ -549,6 +547,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   assertCodexNativeAuthForSpawn(resolvedHarness, listAgentStates());
   await ensureLifecycleHooksBeforeLaunch(agentId, resolvedHarness);
   const flywheelEnv = resolveFlywheelSpawnEnv(role, options.flywheelRunId);
+  const startedBy = resolveAgentStartedBy(options.startedBy, flywheelEnv.OVERDECK_FLYWHEEL_RUN_ID);
   const state: AgentState = {
     id: agentId,
     issueId: options.issueId,
@@ -563,7 +562,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     hostOverride: options.allowHost || undefined,
     sessionId: createFreshSessionIdentity(agentId, resolvedHarness),
     flywheelRunId: flywheelEnv.OVERDECK_FLYWHEEL_RUN_ID,
-    startedBy: resolveAgentStartedBy(options.startedBy, flywheelEnv.OVERDECK_FLYWHEEL_RUN_ID),
+    startedBy,
   };
   const supervisorLaunch = await prepareSupervisorForFreshLaunch(agentId, options, state);
 
@@ -770,6 +769,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
       OVERDECK_AGENT_ID: agentId,
       OVERDECK_ISSUE_ID: options.issueId,
       OVERDECK_SESSION_TYPE: role,
+      OVERDECK_AGENT_STARTED_BY: startedBy,
       CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION: 'false', // Disable suggested prompts for autonomous agents (PAN-251)
       GIT_SEQUENCE_EDITOR: 'false', // Block interactive rebase / squash (agents forbidden from rewriting history)
       ...flywheelEnv,

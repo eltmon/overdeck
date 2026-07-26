@@ -378,6 +378,21 @@ function logReconcilerDiagnostic(kind: string, info: Record<string, unknown> = {
   console.debug(`[orphan-proposed-reconciler] ${kind}`, info);
 }
 
+async function recordPickupRefusal(
+  issueId: string,
+  now: number,
+  decision: Extract<AutonomousWorkDispatchDecision, { allow: false }>,
+): Promise<string[]> {
+  const reason = `pickup-gate:${decision.code}`;
+  logReconcilerDiagnostic('spawn-skipped', { issueId, reason });
+  attemptCooldowns.set(issueId, now);
+  if (pickupRefusalReasons.get(issueId) !== decision.reason) {
+    pickupRefusalReasons.set(issueId, decision.reason);
+    await recordDeadEndNeedsYou(issueId, 'orphan-proposed-pickup-gate', 'proposed', decision.reason);
+  }
+  return [`Skipped orphan proposed spec ${issueId}: ${reason}`];
+}
+
 async function defaultEvaluatePickupGate(issueId: string): Promise<AutonomousWorkDispatchDecision> {
   return decideAutonomousWorkDispatch(await gatherAutonomousWorkDispatchInput(issueId, { knownPlanned: true }));
 }
@@ -446,22 +461,18 @@ export async function handleOrphanProposedSpec(
     return [];
   }
 
-  const pickupGate = await (options.evaluatePickupGate ?? defaultEvaluatePickupGate)(upperIssueId);
-  if (!pickupGate.allow) {
-    const reason = `pickup-gate:${pickupGate.code}`;
-    logReconcilerDiagnostic('spawn-skipped', { issueId: upperIssueId, reason });
-    attemptCooldowns.set(upperIssueId, now);
-    if (pickupRefusalReasons.get(upperIssueId) !== pickupGate.reason) {
-      pickupRefusalReasons.set(upperIssueId, pickupGate.reason);
-      await recordDeadEndNeedsYou(
-        upperIssueId,
-        'orphan-proposed-pickup-gate',
-        'proposed',
-        pickupGate.reason,
-      );
-    }
-    return [`Skipped orphan proposed spec ${upperIssueId}: ${reason}`];
+  let pickupGate: AutonomousWorkDispatchDecision;
+  try {
+    pickupGate = await (options.evaluatePickupGate ?? defaultEvaluatePickupGate)(upperIssueId);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    pickupGate = {
+      allow: false,
+      code: 'labels-unavailable',
+      reason: `Autonomous work dispatch was refused because pickup evaluation failed: ${message}`,
+    };
   }
+  if (!pickupGate.allow) return recordPickupRefusal(upperIssueId, now, pickupGate);
   pickupRefusalReasons.delete(upperIssueId);
 
   const agentId = `agent-${issueLower}`;
@@ -581,6 +592,10 @@ export async function reconcileOrphanProposedSpecs(options: ReconcileOrphanPropo
   try {
     const actions: string[] = [];
     const candidates = await findOrphanProposedSpecsForReconciler(options);
+    const liveCandidateIds = new Set(candidates.map(candidate => candidate.issueId));
+    for (const issueId of pickupRefusalReasons.keys()) {
+      if (!liveCandidateIds.has(issueId)) pickupRefusalReasons.delete(issueId);
+    }
 
     for (const candidate of candidates) {
       let planDoc: XBriefDocument;

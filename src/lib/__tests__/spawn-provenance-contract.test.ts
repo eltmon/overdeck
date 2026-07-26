@@ -4,6 +4,7 @@ import {
   type SpawnOptions,
   type SpawnRunOptions,
 } from '../agents/spawn-prep.js';
+import { resolveCliStartedBy } from '../agents/provenance.js';
 import type { SpawnPlanningOptions } from '../planning/spawn-planning-session.js';
 
 type IsRequired<T, K extends keyof T> = {} extends Pick<T, K> ? false : true;
@@ -29,5 +30,16 @@ describe('spawn provenance contract', () => {
     expect(resolveAgentStartedBy(' operator:cli:pan-start ', undefined, undefined))
       .toBe('operator:cli:pan-start');
     expect(resolveAgentStartedBy(undefined, 'RUN-42', undefined)).toBe('flywheel:RUN-42');
+  });
+
+  it('treats blank inherited CLI provenance as unset', () => {
+    expect(resolveCliStartedBy('operator:cli:pan-plan', {
+      OVERDECK_AGENT_STARTED_BY: '   ',
+      OVERDECK_FLYWHEEL_RUN_ID: ' RUN-42 ',
+    })).toBe('flywheel:RUN-42');
+    expect(resolveCliStartedBy('operator:cli:pan-start', {
+      OVERDECK_AGENT_STARTED_BY: '',
+      OVERDECK_FLYWHEEL_RUN_ID: 'invalid',
+    })).toBe('operator:cli:pan-start');
   });
 });

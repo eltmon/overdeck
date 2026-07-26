@@ -12,6 +12,7 @@ import {
   saveAgentState,
   saveAgentStateSync,
 } from '../../../../lib/agents.js';
+import type { AgentState } from '../../../../lib/agents/agent-state.js';
 import type { RemoteWorkspaceMetadata } from '../../../../lib/remote/interface.js';
 import { jsonResponse } from '../../http-helpers.js';
 import { saveAgentStateAndEmitEventProgram } from '../../services/agent-projection.js';
@@ -44,11 +45,59 @@ type EventStoreAppend = {
 
 type SpawnPanCommand = (args: string[], cwd?: string) => Promise<string>;
 
+type PlaceholderHarness = 'claude-code' | 'ohmypi' | 'codex' | 'acp' | null;
+
+export function buildAgentStartPlaceholder(input: {
+  agentSessionName: string;
+  issueId: string;
+  workspacePath: string;
+  role: Role;
+  effectiveHarness: PlaceholderHarness;
+  startedBy: string;
+  allowHost: boolean;
+  startedAt: string;
+}) {
+  const state: AgentState = {
+    id: input.agentSessionName,
+    issueId: input.issueId,
+    workspace: input.workspacePath,
+    role: input.role,
+    ...(input.effectiveHarness ? { harness: input.effectiveHarness } : {}),
+    model: 'pending-work-spawn',
+    status: 'starting',
+    startedAt: input.startedAt,
+    startedBy: input.startedBy,
+    hostOverride: input.allowHost || undefined,
+  };
+  return {
+    state,
+    event: {
+      type: 'agent.started' as const,
+      timestamp: input.startedAt,
+      payload: {
+        agentId: input.agentSessionName,
+        issueId: input.issueId,
+        agent: {
+          id: input.agentSessionName,
+          issueId: input.issueId,
+          workspace: input.workspacePath,
+          status: 'starting' as const,
+          startedAt: input.startedAt,
+          role: input.role,
+          startedBy: input.startedBy,
+          ...(input.effectiveHarness ? { runtime: input.effectiveHarness } : {}),
+        },
+      },
+    },
+  };
+}
+
 export function handleRemoteAgentSpawn(input: {
   issueId: string;
   workspacePath: string;
   workspaceMetadata: RemoteWorkspaceMetadata;
   spawnModel: string;
+  startedBy: string;
   projectPath: string;
   spawnGuardrails: SpawnGuardrailDecision;
   lifecycle: LifecycleTransition;
@@ -59,6 +108,7 @@ export function handleRemoteAgentSpawn(input: {
       workspacePath,
       workspaceMetadata,
       spawnModel,
+      startedBy,
       projectPath,
       spawnGuardrails,
       lifecycle,
@@ -94,6 +144,7 @@ export function handleRemoteAgentSpawn(input: {
       workspace: workspaceMetadata,
       prompt: agentPrompt,
       model: spawnModel,
+      startedBy,
       tier: fly.getResiliencyTier(),
     }));
 
@@ -111,6 +162,7 @@ export function handleRemoteAgentSpawn(input: {
       status: 'starting',
       startedAt: state.startedAt,
       harness: 'claude-code',
+      startedBy,
     });
     updateRegistryForAgentStart(state.issueId, workspacePath, state.id);
 
@@ -140,6 +192,7 @@ export function handleRemoteAgentSpawn(input: {
       status: state.status,
       startedAt: state.startedAt,
       harness: 'claude-code',
+      startedBy,
     }, {
       type: 'agent.started',
       timestamp: new Date().toISOString(),
@@ -154,6 +207,7 @@ export function handleRemoteAgentSpawn(input: {
           status: state.status,
           startedAt: state.startedAt,
           lastActivity: state.lastActivity,
+          startedBy,
         },
       },
     });

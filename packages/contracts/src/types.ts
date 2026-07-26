@@ -315,6 +315,7 @@ export const AgentSnapshot = Schema.Struct({
   branch: Schema.optional(Schema.String),
   costSoFar: Schema.optional(Schema.Number),
   sessionId: Schema.optional(Schema.String),
+  startedBy: Schema.optional(Schema.String),
   role: Schema.optional(Role),
   phase: Schema.optional(Schema.String),
   workType: Schema.optional(Schema.String),

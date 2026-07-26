@@ -88,6 +88,10 @@ export async function writeAutoSpawnOnFinalizeFlag(issueId: string, enabled: boo
   await writeFile(flagFile, JSON.stringify({ autoSpawnOnFinalize: enabled }));
 }
 
+export async function updateAutoSpawnConsentAfterWorkStart(issueId: string, accepted: boolean): Promise<void> {
+  if (accepted) await writeAutoSpawnOnFinalizeFlag(issueId, false);
+}
+
 /**
  * Decide whether finalizing planning should auto-spawn the work agent. An
  * explicit request value always wins (`true`/`false`); otherwise fall back to
@@ -487,6 +491,10 @@ export async function resolvePlanningSessionHarness(planningModel: string, expli
   return resolveHarness({ explicit, role: 'plan', model: planningModel });
 }
 
+export function buildPlanningSessionEnv(startedBy: string): Record<string, string> {
+  return { ...BLANKED_PROVIDER_ENV, TERM: 'xterm-256color', OVERDECK_AGENT_STARTED_BY: startedBy };
+}
+
 // ─── Main spawn function ─────────────────────────────────────────────────────
 
 /**
@@ -739,10 +747,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
 
     await ensureTmuxRunning();
     await Effect.runPromise(createSession(sessionName, workspacePath, `bash '${launcherScript}'`, {
-      env: {
-        ...BLANKED_PROVIDER_ENV,
-        TERM: 'xterm-256color',
-      },
+      env: buildPlanningSessionEnv(startedBy),
     }));
     // Protect the session from being destroyed when clients disconnect.
     // When the dashboard's WebSocket terminal attaches and then detaches,

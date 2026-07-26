@@ -379,7 +379,6 @@ export async function completePlanningAutoSpawn(options: {
       );
       const recoveryBody = await recovery.json().catch(() => ({})) as Record<string, unknown>;
       if (recovery.ok && recoveryBody['success'] !== false) {
-        await (options.consumeAutoSpawnConsent ?? ((issueId) => writeAutoSpawnOnFinalizeFlag(issueId, false)))(options.issueId);
         emitCompletePlanningPhase(options.issueId, 'autoSpawn', 'success', 'stack rebuild and work-agent spawn requested', {
           agentId,
           activityId: recoveryBody['activityId'],

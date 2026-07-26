@@ -35,6 +35,7 @@ import { getWorkspaceStackHealth } from '../../../../lib/workspace/stack-health.
 import { writeAutoStartXBrief } from '../../../../lib/xbrief/auto-synthesize.js';
 import { findPlan, readPlan } from '../../../../lib/xbrief/io.js';
 import { transitionXBriefOnMain, updatePlanStatus } from '../../../../lib/xbrief/lifecycle-io.js';
+import { updateAutoSpawnConsentAfterWorkStart } from '../../../../lib/planning/spawn-planning-session.js';
 import { jsonResponse } from '../../http-helpers.js';
 import { ReadModelService } from '../../read-model.js';
 import { EventStoreService } from '../../services/domain-services.js';
@@ -65,7 +66,7 @@ import {
   updateRegistryForAgentStart,
   type AgentStartGateDecision,
 } from './shared.js';
-import { handleContainerOrchestration, handleRemoteAgentSpawn } from './spawn-helpers.js';
+import { buildAgentStartPlaceholder, handleContainerOrchestration, handleRemoteAgentSpawn } from './spawn-helpers.js';
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 export function orderDispatchConflict(decision: OrderDispatchEligibility): {
@@ -601,12 +602,10 @@ export const postAgentsRoute = HttpRouter.add(
         troubled: startGateBlock.troubled,
       });
     };
-
     let workStartAccepted = false;
     const markWorkStartAccepted = async (): Promise<void> => {
       if (workStartAccepted) return;
       workStartAccepted = true;
-
       await Effect.runPromise(transitionXBriefOnMain(
         projectPath,
         issueId,
@@ -656,8 +655,8 @@ export const postAgentsRoute = HttpRouter.add(
       if (pipelineStatus?.stuckReason === 'planning_auto_handoff_failed') {
         clearWorkspaceStuck(issueId);
       }
+      await updateAutoSpawnConsentAfterWorkStart(issueId, true);
     };
-
     if (isRemote && workspaceMetadata) {
       const admitted = yield* Effect.promise(() => withActiveOrderDispatchReservation(
         projectPath,
@@ -672,6 +671,7 @@ export const postAgentsRoute = HttpRouter.add(
             workspacePath,
             workspaceMetadata,
             spawnModel,
+            startedBy,
             projectPath,
             spawnGuardrails,
             lifecycle,
@@ -687,11 +687,9 @@ export const postAgentsRoute = HttpRouter.add(
       yield* Effect.promise(markWorkStartAccepted);
       return response;
     }
-
     // Local workspace
     const devScript = join(workspacePath, 'dev');
     const hasPlanning = existsSync(join(workspacePath, PAN_DIRNAME));
-
     yield* Effect.promise(() => appendAgentLifecycleLog(agentSessionName, 'agent.start_requested', {
       issueId,
       workspacePath,
@@ -837,37 +835,24 @@ export const postAgentsRoute = HttpRouter.add(
     // launching `pan start`: two requests can pass the lifecycle read together,
     // but only one may atomically write the starting placeholder.
     const placeholderStartedAt = new Date().toISOString();
-    const placeholderState: AgentState = {
-      id: agentSessionName,
+    const { state: placeholderState, event: placeholderEvent } = buildAgentStartPlaceholder({
+      agentSessionName,
       issueId,
-      workspace: workspacePath,
+      workspacePath,
       role,
-      ...(effectiveHarness ? { harness: effectiveHarness } : {}),
-      model: 'pending-work-spawn',
-      status: 'starting',
+      effectiveHarness,
+      startedBy,
+      allowHost,
       startedAt: placeholderStartedAt,
-      hostOverride: allowHost || undefined,
-    };
+    });
     const hasLiveTmuxSession = yield* sessionExists(agentSessionName).pipe(
       Effect.catch(() => Effect.succeed(true)),
     );
-    const placeholderClaim = yield* claimAgentStartPlaceholderProgram(placeholderState, {
-      type: 'agent.started',
-      timestamp: placeholderStartedAt,
-      payload: {
-        agentId: agentSessionName,
-        issueId,
-        agent: {
-          id: agentSessionName,
-          issueId,
-          workspace: workspacePath,
-          status: 'starting',
-          startedAt: placeholderStartedAt,
-          role,
-          ...(effectiveHarness ? { runtime: effectiveHarness } : {}),
-        },
-      },
-    }, hasLiveTmuxSession);
+    const placeholderClaim = yield* claimAgentStartPlaceholderProgram(
+      placeholderState,
+      placeholderEvent,
+      hasLiveTmuxSession,
+    );
     if (!placeholderClaim.claimed) {
       yield* Effect.promise(() => appendAgentLifecycleLog(agentSessionName, 'agent.start_placeholder_blocked', {
         issueId,

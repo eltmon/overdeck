@@ -438,6 +438,73 @@ describe('orphan proposed spec reconciler', () => {
     expect(deadEndTripMocks.recordDeadEndNeedsYou).toHaveBeenCalledTimes(1);
   });
 
+  it('prunes refusal deduplication when an issue leaves the candidate set', async () => {
+    const projectPath = join(testDir, 'project');
+    mkdirSync(projectPath, { recursive: true });
+    writeSpec(projectPath, 'PAN-3094', 'proposed');
+    writeTasks(projectPath, 'PAN-3094');
+    const projects = [{ key: 'overdeck', config: { name: 'Overdeck CLI', path: projectPath } }];
+    const evaluatePickupGate = vi.fn(async () => ({
+      allow: false as const,
+      code: 'not-released' as const,
+      reason: 'The issue is not released.',
+    }));
+    let currentTime = Date.parse('2026-07-26T10:00:00.000Z');
+    vi.spyOn(Date, 'now').mockImplementation(() => currentTime);
+    const run = () => reconcileOrphanProposedSpecs({
+      evaluatePickupGate,
+      projects,
+      tmuxSessionNames: [],
+      getAgentStateForIssue: async () => null,
+      closedIssueIds: new Set(),
+      config: { enabled: true, minAttemptIntervalMs: 5 * 60 * 1000 },
+      spawnWorkAgent: vi.fn(),
+    });
+
+    await run();
+    currentTime += 6 * 60 * 1000;
+    writeSpec(projectPath, 'PAN-3094', 'active');
+    await run();
+    currentTime += 6 * 60 * 1000;
+    writeSpec(projectPath, 'PAN-3094', 'proposed');
+    await run();
+
+    expect(deadEndTripMocks.recordDeadEndNeedsYou).toHaveBeenCalledTimes(2);
+  });
+
+  it('fails closed per candidate when pickup evaluation throws and continues the scan', async () => {
+    const projectPath = join(testDir, 'project');
+    mkdirSync(projectPath, { recursive: true });
+    for (const issueId of ['PAN-3095', 'PAN-3096']) {
+      writeSpec(projectPath, issueId, 'proposed');
+      writeTasks(projectPath, issueId);
+    }
+    const evaluatePickupGate = vi.fn()
+      .mockRejectedValueOnce(new Error('settings unavailable'))
+      .mockResolvedValue({ allow: true as const });
+    const spawnWorkAgent = vi.fn(async (issueId: string) => ({ spawned: true, agentId: `agent-${issueId.toLowerCase()}` }));
+
+    await expect(reconcileOrphanProposedSpecs({
+      evaluatePickupGate,
+      projects: [{ key: 'overdeck', config: { name: 'Overdeck CLI', path: projectPath } }],
+      tmuxSessionNames: [],
+      getAgentStateForIssue: async () => null,
+      closedIssueIds: new Set(),
+      config: { enabled: true, minAttemptIntervalMs: 5 * 60 * 1000 },
+      spawnWorkAgent,
+    })).resolves.toEqual([
+      'Skipped orphan proposed spec PAN-3095: pickup-gate:labels-unavailable',
+      'Spawned work agent for orphan proposed spec PAN-3096',
+    ]);
+    expect(deadEndTripMocks.recordDeadEndNeedsYou).toHaveBeenCalledWith(
+      'PAN-3095',
+      'orphan-proposed-pickup-gate',
+      'proposed',
+      expect.stringContaining('settings unavailable'),
+    );
+    expect(spawnWorkAgent).toHaveBeenCalledWith('PAN-3096');
+  });
+
   it.each([
     ['ready and released labels'],
     ['auto-spawn-on-finalize consent'],

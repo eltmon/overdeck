@@ -2,6 +2,8 @@ import { exitCli } from '../exit.js';
 import chalk from 'chalk';
 import ora from 'ora';
 import { getDashboardApiUrlSync } from '../../lib/config.js';
+import { resolveCliStartedBy } from '../../lib/agents/provenance.js';
+import { ensureInternalTokenSync, INTERNAL_TOKEN_HEADER } from '../../lib/internal-token.js';
 import { buildStartPlanningBody, printPlanningConnectionError, streamPlanningSession } from './planning-stream.js';
 
 interface PlanOptions {
@@ -22,7 +24,7 @@ export async function planCommand(id: string | undefined, options: PlanOptions):
   }
 
   const issueId = id.toUpperCase();
-  const startedBy = process.env['OVERDECK_AGENT_STARTED_BY'] ?? (process.env['OVERDECK_FLYWHEEL_RUN_ID'] ? `flywheel:${process.env['OVERDECK_FLYWHEEL_RUN_ID']}` : 'operator:cli:pan-plan');
+  const startedBy = resolveCliStartedBy('operator:cli:pan-plan');
 
   if (options.autoStart) {
     console.warn(chalk.yellow(
@@ -35,7 +37,7 @@ export async function planCommand(id: string | undefined, options: PlanOptions):
   try {
     const response = await fetch(`${getDashboardApiUrlSync()}/api/issues/${encodeURIComponent(issueId)}/start-planning`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', [INTERNAL_TOKEN_HEADER]: ensureInternalTokenSync() },
       body: buildStartPlanningBody({
         auto: options.auto === true,
         autoStart: options.autoStart === true,

@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { buildPlanningAgentState, buildPlanningPrompt, writeFeatureContext, type PlanningIssue } from '../spawn-planning-session.js';
+import { buildPlanningAgentState, buildPlanningPrompt, buildPlanningSessionEnv, writeFeatureContext, type PlanningIssue } from '../spawn-planning-session.js';
 import { PAN_DIRNAME, WORKSPACE_RUNTIME_DIRNAME, PAN_CONTEXT_FILENAME } from '../../pan-dir/index.js';
 
 describe('buildPlanningPrompt', () => {
@@ -98,6 +98,15 @@ describe('buildPlanningPrompt', () => {
 
     expect(prompt).not.toContain('Probe Pass (required before finalize)');
     expect(prompt).not.toContain('PROBE: no findings');
+  });
+});
+
+describe('buildPlanningSessionEnv', () => {
+  it('exports the accepted immediate origin to the planning process', () => {
+    expect(buildPlanningSessionEnv('planning-auto-handoff')).toMatchObject({
+      TERM: 'xterm-256color',
+      OVERDECK_AGENT_STARTED_BY: 'planning-auto-handoff',
+    });
   });
 });
 

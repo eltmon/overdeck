@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import {
   readAutoSpawnOnFinalizeFlag,
   resolveAutoSpawnOnFinalize,
+  updateAutoSpawnConsentAfterWorkStart,
   writeAutoSpawnOnFinalizeFlag,
 } from '../spawn-planning-session.js';
 
@@ -59,6 +60,15 @@ describe('resolveAutoSpawnOnFinalize', () => {
     await writeAutoSpawnOnFinalizeFlag(ISSUE, false);
 
     await expect(resolveAutoSpawnOnFinalize(undefined, ISSUE)).resolves.toBe(false);
+  });
+
+  it('consumes consent only after a work start is accepted', async () => {
+    stampFlag(true);
+    await updateAutoSpawnConsentAfterWorkStart(ISSUE, false);
+    expect(readAutoSpawnOnFinalizeFlag(ISSUE)).toBe(true);
+
+    await updateAutoSpawnConsentAfterWorkStart(ISSUE, true);
+    expect(readAutoSpawnOnFinalizeFlag(ISSUE)).toBe(false);
   });
 
   it('falls back to the current-cycle flag when the request omits autoSpawn', async () => {

@@ -382,7 +382,9 @@ describe('spawnAgent PTY supervisor wiring', () => {
       'agent-pan-1405',
       workspace,
       `bash ${join(agentDir, 'launcher.sh')}`,
-      expect.any(Object),
+      expect.objectContaining({
+        env: expect.objectContaining({ OVERDECK_AGENT_STARTED_BY: 'test:agents-spawn-supervisor' }),
+      }),
     );
   });
 
@@ -607,6 +609,14 @@ describe('spawnAgent PTY supervisor wiring', () => {
         claudeSessionId: expect.any(String),
         sessionModel: 'gpt-5.5',
         sessionHarness: 'codex',
+      }),
+    );
+    expect(createSessionMock).toHaveBeenCalledWith(
+      'agent-pan-1405-review',
+      workspace,
+      expect.any(String),
+      expect.objectContaining({
+        env: expect.objectContaining({ OVERDECK_AGENT_STARTED_BY: 'test:agents-spawn-supervisor' }),
       }),
     );
   });

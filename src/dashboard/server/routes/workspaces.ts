@@ -981,7 +981,7 @@ const postWorkspaceRebuildAndStartRoute = HttpRouter.add(
     const request = yield* HttpServerRequest.HttpServerRequest;
     const issueId = (yield* HttpRouter.params)['issueId'] ?? '';
     let startedBy: string;
-    try { startedBy = resolveRequestedStartedBy((yield* readJsonBody).startedBy, yield* Effect.promise(() => isInternalAgentRequest(request))); }
+    try { startedBy = resolveRequestedStartedBy((yield* readJsonBody)?.startedBy, yield* Effect.promise(() => isInternalAgentRequest(request))); }
     catch (error) { return jsonResponse({ error: error instanceof Error ? error.message : String(error) }, { status: 400 }); }
     if (!parseIssueIdSync(issueId)) {
       return jsonResponse({ error: 'Invalid issue ID' }, { status: 400 });
