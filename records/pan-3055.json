@@ -43,17 +43,16 @@
     "recordedAt": "2026-07-25T12:48:24.279Z"
   },
   "created": "2026-07-25T11:59:26.466Z",
-  "updated": "2026-07-26T00:56:46.255Z",
+  "updated": "2026-07-26T00:56:49.129Z",
   "pipeline": {
     "issueId": "PAN-3055",
     "reviewStatus": "passed",
     "testStatus": "passed",
-    "verificationStatus": "passed",
     "mergeStatus": "merged",
     "releaseStatus": "skipped",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-25T12:49:09.494Z",
-    "updatedAt": "2026-07-26T00:33:04.488Z",
+    "updatedAt": "2026-07-26T00:56:49.099Z",
     "reviewNotes": "Approved: census-gated falling-edge reap is correct, scoped, documented, and passes focused tests, lint, and dashboard typecheck.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3064",
     "reviewedAtCommit": "5c1fbda45ed271e7b94580e6a042ce7af18b80d5",
@@ -76,7 +75,9 @@
         "src/dashboard/server/services/agent-enrichment-service.ts"
       ],
       "recordedAt": "2026-07-25T12:48:24.279Z"
-    }
+    },
+    "closedOut": true,
+    "closedOutAt": "2026-07-26T00:56:49.099Z"
   },
   "closeOut": {
     "usage": {
@@ -142,7 +143,80 @@
     "merges": [
       "https://github.com/eltmon/overdeck/pull/3064"
     ],
-    "ranOn": "eltmon-z790"
+    "ranOn": "eltmon-z790",
+    "dodGate": {
+      "evaluatedAt": "2026-07-26T00:56:49.125Z",
+      "rows": [
+        {
+          "id": "review",
+          "num": 1,
+          "title": "Review passed",
+          "expected": "reviewStatus: passed",
+          "observed": "reviewStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "tests",
+          "num": 2,
+          "title": "Tests passed",
+          "expected": "testStatus: passed",
+          "observed": "testStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "verification",
+          "num": 3,
+          "title": "Verification green on the branch",
+          "expected": "verificationStatus: passed",
+          "observed": "verificationStatus: passed at 5c1fbda45ed271e7b94580e6a042ce7af18b80d5",
+          "status": "pass"
+        },
+        {
+          "id": "merged",
+          "num": 4,
+          "title": "Merged to main",
+          "expected": "PR merged on the forge",
+          "observed": "Merge specialist confirmed merge completed; PR #3064 MERGED at 2026-07-26T00:32:40Z",
+          "status": "pass",
+          "mergedAt": "2026-07-26T00:32:40Z",
+          "mergeCommit": "8fa0b5788492457baff8e267ab75f8bc6ca84eda"
+        },
+        {
+          "id": "post-merge",
+          "num": 5,
+          "title": "Post-merge lifecycle ran",
+          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
+          "observed": "canonical state: verifying_on_main; no running work/planning agents",
+          "status": "pass"
+        },
+        {
+          "id": "main-verify",
+          "num": 6,
+          "title": "Verified on main",
+          "expected": "merged commit verified on main",
+          "observed": "1 check-runs concluded successfully on 8fa0b5788492457baff8e267ab75f8bc6ca84eda",
+          "status": "pass"
+        },
+        {
+          "id": "deploy",
+          "num": 7,
+          "title": "Deployed",
+          "expected": "live server build includes the merged commit",
+          "observed": "build commit 77f78eda contains merge 8fa0b578",
+          "status": "pass"
+        },
+        {
+          "id": "teardown",
+          "num": 8,
+          "title": "Close-out teardown verified",
+          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
+          "overridable": false,
+          "status": "pass",
+          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; Stopped TLDR daemon; Stopped Docker containers; Killed 2 orphaned process(es); Removed git worktree; Removed 4 agent state directories; No strike branch strike/pan-3055 found; Pruned 95 checkpoint ref(s) for agent-pan-3055, planning-pan-3055, strike-pan-3055; No specialist registry entries for PAN-3055"
+        }
+      ],
+      "accepted": []
+    }
   },
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
