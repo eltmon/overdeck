@@ -13,6 +13,7 @@ import { extractPrefixSync } from '../../../../lib/issue-id.js';
 import { prepareHarnessLaunch } from '../../../../lib/harness-binary.js';
 import { generateLauncherScriptSync } from '../../../../lib/launcher-generator.js';
 import { PAN_CONTINUE_FILENAME, PAN_DIRNAME } from '../../../../lib/pan-dir/types.js';
+import { getOverdeckHome } from '../../../../lib/paths.js';
 import { extractTeamPrefix, findProjectByTeamSync } from '../../../../lib/projects.js';
 import { loadRemoteAgentState } from '../../../../lib/remote/remote-agents.js';
 import { createSession, killSession, resizeWindow, sendKeys, sessionExists } from '../../../../lib/tmux.js';
@@ -291,6 +292,7 @@ Continue the PLANNING session. Do NOT implement anything.
             ? `${msgAgentCmd.command} ${msgAgentCmd.args.join(' ')} ${msgPermissionFlags}`
             : `${msgAgentCmd.command} ${msgPermissionFlags}`;
 
+        const agentStateDir = join(getOverdeckHome(), 'agents', sessionName);
         const launcherScript = join(agentStateDir, 'continuation-launcher.sh');
         await mkdir(agentStateDir, { recursive: true });
 

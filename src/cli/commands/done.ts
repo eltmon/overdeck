@@ -43,7 +43,7 @@ import type { ScopeDriftRecord } from '../../lib/xbrief/continue-state.js';
 import type { XBriefDocument } from '../../lib/xbrief/types.js';
 import { hasOnlyPipelineStateChangesSinceCommit } from '../../lib/pipeline-state-paths.js';
 import { persistDoneReviewIntent } from './done-review-intent.js';
-import { verifyStrikeBranchMergedIntoMain } from './strike-merge-verification.js';
+import { recordStrikeBypassVerdicts, verifyStrikeBranchMergedIntoMain } from './strike-merge-verification.js';
 const childProcessLayer = NodeChildProcessSpawner.layer.pipe(
   Layer.provide(Layer.mergeAll(NodeFileSystem.layer, NodePath.layer)),
 );
@@ -486,6 +486,9 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
     try {
       const reason = await verifyStrikeBranchMergedIntoMain(issueId, resolved.projectPath);
       console.log(chalk.green(`✓ Verified strike merge: ${reason}`));
+
+      // PAN-3067: record the strike's by-design test/verification bypass as 'skipped' so DoD close-out can pass.
+      recordStrikeBypassVerdicts(issueId);
 
       const { postMergeLifecycle } = await import('../../lib/cloister/merge-agent.js');
       await postMergeLifecycle(issueId, resolved.projectPath, branchName, {

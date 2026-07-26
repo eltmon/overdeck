@@ -628,7 +628,7 @@ export const SessionNode = Schema.Struct({
   /** Which blocking surfaces are open — names the wait in the node's indicator. */
   pendingInputKinds: Schema.optional(Schema.Array(Schema.String)),
   roundMetadata: Schema.optional(ReviewerRoundMetadata),
-  deliveryMethod: Schema.optional(Schema.Literals(['auto', 'channels', 'tmux'])),
+  deliveryMethod: Schema.optional(Schema.Literals(['auto', 'channels', 'tmux', 'supervisor'])),
   // Pause gate (PAN-1779 issue-tree redesign): a paused agent is deliberately
   // suppressed from deacon auto-resume — the tree must show it as paused with
   // the reason, never as a generic "stopped".
