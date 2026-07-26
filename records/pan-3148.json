@@ -136,18 +136,19 @@
     "recordedAt": "2026-07-26T22:01:26.872Z"
   },
   "created": "2026-07-26T17:27:17.644Z",
-  "updated": "2026-07-26T22:52:54.795Z",
+  "updated": "2026-07-26T22:53:11.216Z",
   "pipeline": {
     "issueId": "PAN-3148",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "passed",
     "testStatus": "passed",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": false,
+    "readyForMerge": true,
     "panDoneRecoveredAt": "2026-07-26T21:02:53.986Z",
-    "updatedAt": "2026-07-26T22:52:53.686Z",
-    "reviewNotes": "Review dispatch skipped — already running: agent-pan-3148-review",
+    "updatedAt": "2026-07-26T22:53:11.128Z",
+    "reviewNotes": "Approved: run-scoped feedback identity fixes the prior duplicate/suppression defect; correctness, security, requirements, and performance checks are clean",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3163",
     "reviewedAtCommit": "a608389e1854fdeba3011bff90de9e376c242eb1",
     "lastVerifiedCommit": "a608389e1854fdeba3011bff90de9e376c242eb1",
@@ -271,7 +272,7 @@
       },
       "costAtCloseOut": {
         "usd": 144.657928,
-        "pricingAsOf": "2026-07-26T22:52:53.722Z"
+        "pricingAsOf": "2026-07-26T22:53:11.192Z"
       }
     },
     "merges": [
