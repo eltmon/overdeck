@@ -156,8 +156,10 @@ export async function postMergeTrainMergeNextPayload(
   const n = typeof body.n === 'number' && Number.isFinite(body.n) ? Math.floor(body.n) : 0;
   if (n <= 0) return { status: 400, body: { error: 'n must be a positive integer' } };
 
-  const projectKey = typeof body.project === 'string' ? body.project.trim() : '';
-  if (!projectKey) return { status: 400, body: { error: 'project is required' } };
+  if (typeof body.project !== 'string' || body.project.trim() === '') {
+    return { status: 400, body: { error: 'project must be a non-empty string' } };
+  }
+  const projectKey = body.project.trim();
   const config = getProjectSync(projectKey);
   if (!config) return { status: 404, body: { error: `Unknown project key: ${projectKey}` } };
 
@@ -185,17 +187,26 @@ export async function postMergeTrainAssemblePayload(payload: unknown): Promise<{
   if (!isJsonObject(payload)) {
     return { status: 400, body: { error: 'body must be a JSON object: {} for all projects, or { project }' } };
   }
-  const body = payload as { project?: unknown };
-  const { runUatTrainReconcile, runUatTrainReconcileAllProjects } = await import('../services/uat-train.js');
-
-  if (typeof body.project === 'string' && body.project.trim() !== '') {
-    const projectKey = body.project.trim();
+  // Only an ABSENT project field means "every project". A PRESENT but unusable one
+  // (42, null, "", {}) is a malformed SCOPED request, and letting it fall through
+  // would silently widen it into the broadest git/UAT write we have.
+  if ('project' in payload) {
+    const raw = payload['project'];
+    if (typeof raw !== 'string' || raw.trim() === '') {
+      return {
+        status: 400,
+        body: { error: 'project must be a non-empty string; omit the field entirely to reconcile every project' },
+      };
+    }
+    const projectKey = raw.trim();
     const config = getProjectSync(projectKey);
     if (!config) return { status: 404, body: { error: `Unknown project key: ${projectKey}` } };
+    const { runUatTrainReconcile } = await import('../services/uat-train.js');
     const result = await runUatTrainReconcile({ force: true, projectRoot: resolve(config.path) });
     return { status: 200, body: { projects: [{ projectKey, result }] } };
   }
 
+  const { runUatTrainReconcileAllProjects } = await import('../services/uat-train.js');
   const results = await runUatTrainReconcileAllProjects({ force: true });
   return { status: 200, body: { projects: results } };
 }

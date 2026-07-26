@@ -153,10 +153,11 @@ function goToAwaitingMerge(event: React.MouseEvent): void {
 }
 
 /**
- * PAN-1696 ac3: a compact per-project merge-train summary in the cockpit — how
- * many features are ready and what the current batch is — linking to the full
- * multi-project view on Awaiting Merge. Reads the aggregate endpoints and filters
- * to this project, so it needs no flywheel run.
+ * PAN-1696 ac3: the expanded panel's merge-train line. The count, batch name,
+ * status, and the Awaiting Merge link all live on the COLLAPSED <summary> (see
+ * ProjectSettingsSummary) because that is the surface the operator sees without
+ * opening anything; this repeats the detail in context and deliberately does NOT
+ * duplicate the link.
  */
 function MergeTrainSummary({ projectKey }: { projectKey: string }) {
   // Reuse the merge-train view's own reads instead of redeclaring queries under
@@ -181,13 +182,6 @@ function MergeTrainSummary({ projectKey }: { projectKey: string }) {
               current ? ` · batch ${shortName(current.name)} (${current.status})` : ' · no batch assembled'
             }`}
       </span>
-      <a
-        href="/awaiting-merge"
-        onClick={goToAwaitingMerge}
-        className="font-medium text-primary hover:underline"
-      >
-        Awaiting Merge →
-      </a>
     </div>
   );
 }
@@ -229,13 +223,28 @@ function ProjectSettingsSummary({ projectKey }: { projectKey: string }) {
   const currentBatch = trainSection?.generations.find((g) => g.status === 'ready')
     ?? trainSection?.generations.find((g) => g.status === 'assembling')
     ?? trainSection?.generations.find((g) => g.status === 'superseded');
+  // ac3 wants the ready count AND the current generation's STATUS legible without
+  // opening the disclosure — a batch name alone does not say whether it is ready to
+  // test, still assembling, or superseded.
   const trainLabel = trainSection && !trainSection.enabled
     ? 'Train off'
-    : `Train ${readyCount} ready${currentBatch ? ` · ${shortName(currentBatch.name)}` : ''}`;
+    : `Train ${readyCount} ready${currentBatch ? ` · ${shortName(currentBatch.name)} (${currentBatch.status})` : ' · no batch'}`;
 
   return (
-    <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--muted-foreground)' }} data-testid="project-settings-collapsed-summary">
-      {autoMergeLabel} · {swarmLabel} · {trainLabel}
+    <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--muted-foreground)', display: 'inline-flex', gap: 6, minWidth: 0 }} data-testid="project-settings-collapsed-summary">
+      <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        {autoMergeLabel} · {swarmLabel} · {trainLabel}
+      </span>
+      {/* The link lives in the <summary> so it works while collapsed. Clicking
+          anything inside a <summary> toggles the disclosure, so stop propagation
+          as well as the default navigation. */}
+      <a
+        href="/awaiting-merge"
+        onClick={(event) => { event.stopPropagation(); goToAwaitingMerge(event); }}
+        className="shrink-0 font-medium text-primary hover:underline"
+      >
+        Awaiting Merge →
+      </a>
     </span>
   );
 }

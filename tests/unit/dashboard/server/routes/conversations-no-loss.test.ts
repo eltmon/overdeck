@@ -39,6 +39,8 @@ const EXPECTED_CONVERSATION_ROUTES = [
   'POST /api/conversations/:name/delete-image',
   'POST /api/conversations/:name/message',
   'POST /api/conversations/:id/codex-approval',
+  // PAN-3113 (arrived on main): answer a claude-code pane choice menu.
+  'POST /api/conversations/:id/pane-choice',
   'POST /api/conversations/:name/delivery-method',
   'POST /api/conversations/:name/control-ack',
   'PATCH /api/conversations/:name',
@@ -100,6 +102,6 @@ describe('PAN-2145 conversations route no-loss audit', () => {
       ...unexpected.map((route) => `  unexpected: ${route}`),
     ].join('\n')).toEqual([]);
 
-    expect(liveRoutes.size).toBe(34);
+    expect(liveRoutes.size).toBe(35);
   });
 });

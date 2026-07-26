@@ -97,14 +97,14 @@ describe('ProjectSettingsDisclosure', () => {
     renderDisclosure();
 
     expect((await screen.findByTestId('project-settings-collapsed-summary')).textContent)
-      .toBe('🔒 Hold for UAT · Swarm auto · Train 0 ready');
+      .toContain('🔒 Hold for UAT · Swarm auto · Train 0 ready · no batch');
   });
 
   it('shows inherited labels when neither setting is configured', async () => {
     renderDisclosure();
 
     expect((await screen.findByTestId('project-settings-collapsed-summary')).textContent)
-      .toBe('Global default · Swarm inherit · Train 0 ready');
+      .toContain('Global default · Swarm inherit · Train 0 ready · no batch');
   });
 
   it('preserves the complete expanded settings panel', async () => {
@@ -154,14 +154,44 @@ describe('ProjectSettingsDisclosure', () => {
   });
 
   // PAN-1696 fe-cockpit-toggle ac3.
-  it('carries the merge-train state on the COLLAPSED summary line (ac3)', async () => {
+  it('carries count, batch name, STATUS and the Awaiting Merge link while COLLAPSED (ac3)', async () => {
     mergeTrainQueue = [{ issueId: 'PAN-1' }, { issueId: 'PAN-2' }];
     mergeTrainGenerations = [{ name: 'uat/pan-otter-0726', status: 'ready' }];
+    const { container } = renderDisclosure();
+
+    // Nothing is expanded — assert against what the operator sees at a glance.
+    expect(container.querySelector('details')).not.toHaveAttribute('open');
+    await waitFor(() => expect(screen.getByTestId('project-settings-collapsed-summary').textContent)
+      .toContain('Train 2 ready · pan-otter-0726 (ready)'));
+
+    // All three ac3 pieces must live on the collapsed surface, inside <summary>.
+    const link = screen.getByRole('link', { name: /Awaiting Merge/ });
+    expect(link).toHaveAttribute('href', '/awaiting-merge');
+    expect(link.closest('summary')).not.toBeNull();
+  });
+
+  it('shows an assembling batch status while COLLAPSED (ac3)', async () => {
+    mergeTrainGenerations = [{ name: 'uat/pan-copper-fox-0726', status: 'assembling' }];
     renderDisclosure();
 
-    // Nothing is expanded here — this is what the operator sees at a glance.
     await waitFor(() => expect(screen.getByTestId('project-settings-collapsed-summary').textContent)
-      .toContain('Train 2 ready · pan-otter-0726'));
+      .toContain('pan-copper-fox-0726 (assembling)'));
+  });
+
+  it('navigates to Awaiting Merge from the COLLAPSED surface (ac3)', async () => {
+    const pushState = vi.spyOn(window.history, 'pushState');
+    const { container } = renderDisclosure();
+
+    // Collapsed: the link is reachable without opening anything.
+    expect(container.querySelector('details')).not.toHaveAttribute('open');
+    const link = await screen.findByRole('link', { name: /Awaiting Merge/ });
+    fireEvent.click(link);
+
+    // In-app navigation, not a full reload. The handler also preventDefaults the
+    // <summary> toggle; jsdom applies the toggle anyway, and whether the panel
+    // opens is unobservable once we navigate away, so that is not asserted here.
+    expect(pushState).toHaveBeenCalledWith({}, '', '/awaiting-merge');
+    pushState.mockRestore();
   });
 
   it('reports an off train on the collapsed summary line (ac3)', async () => {

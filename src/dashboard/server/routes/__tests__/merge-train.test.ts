@@ -318,6 +318,42 @@ describe('PAN-1696 merge-train-routes', () => {
       expect(mergeBatchMocks.shipMergeBatch).not.toHaveBeenCalled();
     });
 
+    it('rejects a PRESENT but unusable project field instead of widening to all projects', async () => {
+      // The review's exact cases: each is an object (so the plain-object guard
+      // passes) carrying a project field that cannot name a project. Falling
+      // through would turn a malformed SCOPED request into the broadest write.
+      for (const body of [
+        { project: 42 },
+        { project: null },
+        { project: '' },
+        { project: '   ' },
+        { project: {} },
+        { project: ['myn'] },
+        { project: true },
+      ]) {
+        const result = await postMergeTrainAssemblePayload(body);
+        expect(result.status, JSON.stringify(body)).toBe(400);
+      }
+      // Neither reconciler may have run for any of them.
+      expect(uatTrainMocks.runUatTrainReconcileAllProjects).not.toHaveBeenCalled();
+      expect(uatTrainMocks.runUatTrainReconcile).not.toHaveBeenCalled();
+    });
+
+    it('rejects a PRESENT but unusable project field on merge-next too', async () => {
+      for (const body of [{ n: 1, project: 42 }, { n: 1, project: null }, { n: 1, project: '' }, { n: 1, project: {} }]) {
+        const result = await postMergeTrainMergeNextPayload(body);
+        expect(result.status, JSON.stringify(body)).toBe(400);
+      }
+      expect(mergeBatchMocks.shipMergeBatch).not.toHaveBeenCalled();
+    });
+
+    it('treats ONLY an absent project field as the all-projects form', async () => {
+      const result = await postMergeTrainAssemblePayload({});
+      expect(result.status).toBe(200);
+      expect(uatTrainMocks.runUatTrainReconcileAllProjects).toHaveBeenCalledWith({ force: true });
+      expect(uatTrainMocks.runUatTrainReconcile).not.toHaveBeenCalled();
+    });
+
     it('rejects assemble for an unknown project key with 404', async () => {
       const result = await postMergeTrainAssemblePayload({ project: 'nope' });
       expect(result.status).toBe(404);
