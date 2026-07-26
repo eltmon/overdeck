@@ -12,9 +12,27 @@
       "timestamp": "2026-07-26T19:41:27.699Z",
       "reason": "start",
       "agentModel": "gpt-5.6-sol"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-26T20:40Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-26T20:40:41.215Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-26T20:40:41.461Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-26T20:40:41Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-3155\n\nDeploy row checks dashboard health before the missing-merge dependency, so row 7 still cascades a second miss when row 4 misses\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3155 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "tests/unit/dashboard/server/routes/issue-discussions.test.ts"
@@ -46,7 +64,7 @@
     "recordedAt": "2026-07-26T20:34:03.489Z"
   },
   "created": "2026-07-26T19:16:39.648Z",
-  "updated": "2026-07-26T20:40:40.626Z",
+  "updated": "2026-07-26T20:40:41.461Z",
   "pipeline": {
     "issueId": "PAN-3155",
     "reviewStatus": "blocked",
