@@ -17,7 +17,7 @@
 1306 src/dashboard/server/ws-rpc.ts
 1148 src/lib/cloister/deacon-swarm.ts
 3605 src/lib/cloister/deacon.ts
-1404 src/lib/cloister/merge-agent.ts
+1411 src/lib/cloister/merge-agent.ts
 1195 src/lib/conversations/smart-compaction.ts
 1726 src/lib/database/schema.ts
 1377 src/lib/model-capabilities.ts
