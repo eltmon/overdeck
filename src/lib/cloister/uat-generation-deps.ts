@@ -28,10 +28,22 @@ const execFileAsync = promisify(execFile);
 const runGit = (args: string[], cwd: string) =>
   execFileAsync('git', args, { cwd, maxBuffer: 16 * 1024 * 1024 });
 
-function safeBranchName(branchName: string, prefix: 'feature' | 'uat'): string {
-  const pattern = prefix === 'feature'
-    ? /^feature\/[A-Za-z0-9][A-Za-z0-9._-]*$/
-    : /^uat\/[A-Za-z0-9][A-Za-z0-9._-]*$/;
+/**
+ * Validate a branch name against its expected namespace.
+ *
+ * `feature` accepts a CONFIGURED prefix, not a hardcoded `feature/`: a member
+ * repo may set `branch_prefix: feat/`, and rejecting that made every one of its
+ * contributions throw and get held out. The character class is unchanged, so
+ * shell metacharacters and path traversal are still refused.
+ */
+function safeBranchName(
+  branchName: string,
+  prefix: 'feature' | 'uat',
+  featurePrefix = 'feature/',
+): string {
+  const namespace = prefix === 'uat' ? 'uat/' : featurePrefix;
+  const escaped = namespace.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const pattern = new RegExp(`^${escaped}[A-Za-z0-9][A-Za-z0-9._-]*$`);
   if (!pattern.test(branchName)) {
     throw new Error(`unsafe ${prefix} branch name: ${branchName}`);
   }
@@ -69,6 +81,12 @@ export interface UatGenerationGitDepsOptions {
   workspacesRoot?: string;
   /** Branch the generation is cut from and merged back into. Defaults to `main`. */
   targetBranch?: string;
+  /**
+   * Namespace this repo's FEATURE branches live in, e.g. `feat/`. Defaults to
+   * `feature/`. Comes from the repo's configured `branch_prefix`; a mismatch
+   * makes every contribution fail validation and get held out.
+   */
+  featureBranchPrefix?: string;
 }
 
 /**
@@ -83,6 +101,7 @@ export function buildUatGenerationGitDeps(
   const workspacesRoot = options.workspacesRoot ?? projectRoot;
   const targetBranch = options.targetBranch ?? 'main';
   const originTarget = `origin/${targetBranch}`;
+  const featurePrefix = options.featureBranchPrefix ?? 'feature/';
 
   return {
     fetchMain: async () => {
@@ -102,7 +121,7 @@ export function buildUatGenerationGitDeps(
     },
 
     branchHeadSha: async (branch) => {
-      const safeBranch = safeBranchName(branch, 'feature');
+      const safeBranch = safeBranchName(branch, 'feature', featurePrefix);
       const tryRef = async (ref: string) => (await runGit(['rev-parse', ref], projectRoot)).stdout.trim();
       return tryRef(`origin/${safeBranch}`).catch(() => tryRef(safeBranch));
     },
@@ -110,7 +129,7 @@ export function buildUatGenerationGitDeps(
     mergeBranch: async (featureBranch) => {
       // Prefer the origin ref — feature branches are pushed by work agents and
       // the local ref may lag.
-      const safeFeatureBranch = safeBranchName(featureBranch, 'feature');
+      const safeFeatureBranch = safeBranchName(featureBranch, 'feature', featurePrefix);
       const originRef = `origin/${safeFeatureBranch}`;
       const ref = await runGit(['rev-parse', '--verify', originRef], worktreePath)
         .then(() => originRef)
@@ -141,6 +160,12 @@ export function buildUatGenerationGitDeps(
   };
 }
 
+/** The namespace part of a configured source branch: `feat/min-1` -> `feat/`. */
+function featureNamespaceOf(sourceBranch: string): string {
+  const slash = sourceBranch.lastIndexOf('/');
+  return slash >= 0 ? sourceBranch.slice(0, slash + 1) : 'feature/';
+}
+
 /**
  * Per-repo git deps for a polyrepo assembly, keyed by repoKey (PAN-3093).
  * Each repo runs git in its own root but writes its worktree under the wrapper
@@ -162,6 +187,8 @@ export function buildPolyrepoGitDeps(
         const base = buildUatGenerationGitDeps(repo.repoPath, {
           workspacesRoot: repo.projectPath,
           targetBranch: repo.targetBranch,
+          // From this repo's own configured branch_prefix.
+          featureBranchPrefix: featureNamespaceOf(repo.sourceBranch),
         });
 
         const git: PolyrepoRepoGit = {

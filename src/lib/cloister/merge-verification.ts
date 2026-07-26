@@ -93,6 +93,35 @@ function shellQuote(value: string): string {
   return `'${value.replace(/'/g, `'"'"'`)}'`;
 }
 
+/**
+ * Positive ancestry results for a (repo, merge, target) tuple.
+ *
+ * A batch promotion fans the SAME generation-wide evidence out to every member,
+ * so an N-member batch across R repos ran N x R identical `git merge-base`
+ * processes, N of them concurrently. Only positives are cached: once a commit is
+ * an ancestor of a branch it stays one, whereas a negative can become positive
+ * as soon as the merge lands, so caching that would be wrong.
+ */
+const provenAncestry = new Set<string>();
+/** Bound the set so a long-lived server cannot accumulate entries forever. */
+const PROVEN_ANCESTRY_LIMIT = 512;
+
+async function mergeIsAncestorOfTarget(evidence: VerifiedMergedRepo): Promise<boolean> {
+  const key = `${evidence.repoPath}|${evidence.mergeSha}|${evidence.targetBranch}`;
+  if (provenAncestry.has(key)) return true;
+  try {
+    await execAsync(
+      `git merge-base --is-ancestor ${shellQuote(evidence.mergeSha)} ${shellQuote(`origin/${evidence.targetBranch}`)}`,
+      { cwd: evidence.repoPath },
+    );
+  } catch {
+    return false;
+  }
+  if (provenAncestry.size >= PROVEN_ANCESTRY_LIMIT) provenAncestry.clear();
+  provenAncestry.add(key);
+  return true;
+}
+
 async function requireCompletePolyrepoMerge(
   issueId: string,
   mergedResult: { merged: true; reason: string },
@@ -139,12 +168,7 @@ export async function verifyMergedBeforeLifecycle(
         unproven.push(`${evidence.repoKey} (no merge sha recorded)`);
         continue;
       }
-      try {
-        await execAsync(
-          `git merge-base --is-ancestor ${shellQuote(evidence.mergeSha)} ${shellQuote(`origin/${evidence.targetBranch}`)}`,
-          { cwd: evidence.repoPath },
-        );
-      } catch {
+      if (!(await mergeIsAncestorOfTarget(evidence))) {
         unproven.push(`${evidence.repoKey}@${evidence.mergeSha.slice(0, 9)} not on origin/${evidence.targetBranch}`);
       }
     }
