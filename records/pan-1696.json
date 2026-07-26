@@ -196,16 +196,16 @@
   ],
   "feedback": [],
   "created": "2026-07-26T00:35:36.057Z",
-  "updated": "2026-07-26T02:49:08.807Z",
+  "updated": "2026-07-26T02:49:19.701Z",
   "pipeline": {
     "issueId": "PAN-1696",
     "reviewStatus": "passed",
-    "testStatus": "pending",
+    "testStatus": "testing",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T02:49:08.022Z",
+    "updatedAt": "2026-07-26T02:49:19.693Z",
     "reviewNotes": "Cycle diff correctly queries only assembling/ready/superseded generations with limit 1; no new blocking defects found.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/1822",
@@ -231,17 +231,17 @@
         },
         "memory-extraction": {
           "anthropic/claude-haiku-4-5": {
-            "input": 7266,
-            "output": 8017,
-            "cacheRead": 15,
+            "input": 8007,
+            "output": 8217,
+            "cacheRead": 18,
             "cacheWrite": 0
           }
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 4117206,
-            "output": 310395,
-            "cacheRead": 77413888,
+            "input": 4124328,
+            "output": 313557,
+            "cacheRead": 78384128,
             "cacheWrite": 0
           }
         },
@@ -268,15 +268,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5": {
-          "input": 7266,
-          "output": 8017,
-          "cacheRead": 15,
+          "input": 8007,
+          "output": 8217,
+          "cacheRead": 18,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 4117206,
-          "output": 310395,
-          "cacheRead": 77413888,
+          "input": 4124328,
+          "output": 313557,
+          "cacheRead": 78384128,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
@@ -287,8 +287,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 108.5340575,
-        "pricingAsOf": "2026-07-26T02:49:08.088Z"
+        "usd": 109.1513888,
+        "pricingAsOf": "2026-07-26T02:49:19.697Z"
       }
     },
     "merges": [
@@ -297,7 +297,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "model": "claude-haiku-4-5",
   "tasks": {
     "sequence": 11,
     "claims": {
