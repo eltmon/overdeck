@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T02:29:08.179Z",
-  "updated": "2026-07-26T02:44:43.296Z",
+  "updated": "2026-07-26T02:47:01.711Z",
   "pipeline": {
     "issueId": "PAN-3097",
     "reviewStatus": "pending",
@@ -54,16 +54,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "subject-issue-title-population": {
-        "writerId": "agent-pan-3097",
-        "agentId": "agent-pan-3097",
-        "pid": 1563594,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-26T02:44:43.295Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3097",
@@ -86,6 +78,17 @@
         "outcome": "completed",
         "reason": "Added issueTitle support, formatted header and Issue cell, removed Unknown fallback, and covered bound/unbound cases",
         "releasedAt": "2026-07-26T02:44:35.423Z"
+      },
+      {
+        "writerId": "agent-pan-3097",
+        "agentId": "agent-pan-3097",
+        "pid": 1563594,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T02:44:43.295Z",
+        "itemId": "subject-issue-title-population",
+        "outcome": "completed",
+        "reason": "Populated resolved issueTitle for agent and conversation plan/AUQ subjects while preserving conversation titles",
+        "releasedAt": "2026-07-26T02:47:01.711Z"
       }
     ],
     "statusReasons": {
@@ -96,6 +99,10 @@
       "dialog-issue-title": {
         "reason": "Added issueTitle support, formatted header and Issue cell, removed Unknown fallback, and covered bound/unbound cases",
         "updatedAt": "2026-07-26T02:44:35.423Z"
+      },
+      "subject-issue-title-population": {
+        "reason": "Populated resolved issueTitle for agent and conversation plan/AUQ subjects while preserving conversation titles",
+        "updatedAt": "2026-07-26T02:47:01.711Z"
       }
     }
   },
@@ -108,6 +115,9 @@
     "dialog-issue-title.dialog-issue-title.ac1": "completed",
     "dialog-issue-title.dialog-issue-title.ac2": "completed",
     "dialog-issue-title.dialog-issue-title.ac3": "completed",
-    "subject-issue-title-population": "running"
+    "subject-issue-title-population": "completed",
+    "subject-issue-title-population.subject-issue-title-population.ac1": "completed",
+    "subject-issue-title-population.subject-issue-title-population.ac2": "completed",
+    "subject-issue-title-population.subject-issue-title-population.ac3": "completed"
   }
 }
