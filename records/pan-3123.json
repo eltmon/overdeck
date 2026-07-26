@@ -61,7 +61,7 @@
     "recordedAt": "2026-07-26T13:26:38.219Z"
   },
   "created": "2026-07-26T12:25:26.814Z",
-  "updated": "2026-07-26T13:36:27.528Z",
+  "updated": "2026-07-26T13:38:39.656Z",
   "pipeline": {
     "issueId": "PAN-3123",
     "reviewStatus": "pending",
@@ -117,7 +117,9 @@
         "tests/unit/lib/cloister/memory-governor.test.ts"
       ],
       "recordedAt": "2026-07-26T13:26:38.219Z"
-    }
+    },
+    "reviewRequestedAt": "2026-07-26T13:38:39.318Z",
+    "panDoneRecoveredAt": "2026-07-26T13:38:39.318Z"
   },
   "closeOut": {
     "usage": {
