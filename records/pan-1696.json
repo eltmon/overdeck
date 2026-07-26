@@ -269,7 +269,7 @@
     }
   ],
   "created": "2026-07-26T00:35:36.057Z",
-  "updated": "2026-07-26T04:44:58.727Z",
+  "updated": "2026-07-26T04:52:24.733Z",
   "pipeline": {
     "issueId": "PAN-1696",
     "reviewStatus": "passed",
@@ -387,16 +387,8 @@
   "harness": "claude-code",
   "model": "claude-haiku-4-5",
   "tasks": {
-    "sequence": 19,
-    "claims": {
-      "merge-train-routes": {
-        "writerId": "agent-pan-1696",
-        "agentId": "agent-pan-1696",
-        "pid": 368474,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-26T01:56:42.620Z"
-      }
-    },
+    "sequence": 20,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-1696",
@@ -492,6 +484,17 @@
         "itemId": "fe-cockpit-toggle",
         "outcome": "completed",
         "releasedAt": "2026-07-26T04:00:39.781Z"
+      },
+      {
+        "writerId": "agent-pan-1696",
+        "agentId": "agent-pan-1696",
+        "pid": 368474,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T01:56:42.620Z",
+        "itemId": "merge-train-routes",
+        "outcome": "released",
+        "reason": "stale claim released (agent-pan-1696 dead)",
+        "releasedAt": "2026-07-26T04:52:24.543Z"
       }
     ],
     "statusReasons": {
@@ -510,6 +513,10 @@
       "reconciler-decouple": {
         "reason": "Refactored UAT train reconciler to be per-project independent with getReadySetForProject, assembleFromReadySetForProject, and makeCleanupForProject factory",
         "updatedAt": "2026-07-26T01:56:34.350Z"
+      },
+      "merge-train-routes": {
+        "reason": "stale claim released (agent-pan-1696 dead)",
+        "updatedAt": "2026-07-26T04:52:24.543Z"
       }
     }
   },
@@ -532,7 +539,7 @@
     "reconciler-decouple.reconciler-decouple.ac2": "completed",
     "reconciler-decouple.reconciler-decouple.ac3": "completed",
     "reconciler-decouple.reconciler-decouple.ac4": "completed",
-    "merge-train-routes": "running",
+    "merge-train-routes": "pending",
     "project-merge-train-endpoint": "completed",
     "project-merge-train-endpoint.project-merge-train-endpoint.ac1": "completed",
     "project-merge-train-endpoint.project-merge-train-endpoint.ac2": "completed",
