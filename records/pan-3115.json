@@ -22,7 +22,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T08:56:03.309Z",
-  "updated": "2026-07-26T10:32:11.152Z",
+  "updated": "2026-07-26T10:36:10.999Z",
   "pipeline": {
     "issueId": "PAN-3115",
     "reviewStatus": "pending",
@@ -67,16 +67,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 11,
-    "claims": {
-      "route-typed-200": {
-        "writerId": "agent-pan-3115",
-        "agentId": "agent-pan-3115",
-        "pid": 1695007,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-26T10:32:11.151Z"
-      }
-    },
+    "sequence": 12,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3115",
@@ -132,6 +124,17 @@
         "outcome": "completed",
         "reason": "Snapshot refreshes now retain typed unavailable reasons, classify unknown failures as gather_failed, clear reasons after recovery, and return the reason through both snapshot read surfaces.",
         "releasedAt": "2026-07-26T10:31:41.285Z"
+      },
+      {
+        "writerId": "agent-pan-3115",
+        "agentId": "agent-pan-3115",
+        "pid": 1695007,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T10:32:11.151Z",
+        "itemId": "route-typed-200",
+        "outcome": "completed",
+        "reason": "GET and POST membership routes now return HTTP 200 typed unavailable bodies for determined failures, preserve cold-boot 503 and healthy arrays, with route and no-loss coverage.",
+        "releasedAt": "2026-07-26T10:36:10.999Z"
       }
     ],
     "statusReasons": {
@@ -154,6 +157,10 @@
       "service-reason-propagation": {
         "reason": "Snapshot refreshes now retain typed unavailable reasons, classify unknown failures as gather_failed, clear reasons after recovery, and return the reason through both snapshot read surfaces.",
         "updatedAt": "2026-07-26T10:31:41.285Z"
+      },
+      "route-typed-200": {
+        "reason": "GET and POST membership routes now return HTTP 200 typed unavailable bodies for determined failures, preserve cold-boot 503 and healthy arrays, with route and no-loss coverage.",
+        "updatedAt": "2026-07-26T10:36:10.999Z"
       }
     }
   },
@@ -179,6 +186,11 @@
     "service-reason-propagation.service-reason-propagation.ac1": "completed",
     "service-reason-propagation.service-reason-propagation.ac2": "completed",
     "service-reason-propagation.service-reason-propagation.ac3": "completed",
-    "route-typed-200": "running"
+    "route-typed-200": "completed",
+    "route-typed-200.route-typed-200.ac1": "completed",
+    "route-typed-200.route-typed-200.ac2": "completed",
+    "route-typed-200.route-typed-200.ac3": "completed",
+    "route-typed-200.route-typed-200.ac4": "completed",
+    "route-typed-200.route-typed-200.ac5": "completed"
   }
 }
