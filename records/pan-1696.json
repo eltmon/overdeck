@@ -196,17 +196,18 @@
   ],
   "feedback": [],
   "created": "2026-07-26T00:35:36.057Z",
-  "updated": "2026-07-26T02:49:19.701Z",
+  "updated": "2026-07-26T02:59:09.369Z",
   "pipeline": {
     "issueId": "PAN-1696",
     "reviewStatus": "passed",
-    "testStatus": "testing",
+    "testStatus": "failed",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T02:49:19.693Z",
+    "updatedAt": "2026-07-26T02:59:09.075Z",
     "reviewNotes": "Cycle diff correctly queries only assembling/ready/superseded generations with limit 1; no new blocking defects found.",
+    "testNotes": "typecheck PASS; lint FAIL (file-size guard: routes/projects.ts 1108 lines vs baseline 1064, from an UNCOMMITTED diff not in reviewed HEAD d3093267ff); targeted vitest run 1 failed/60 passed (uat-train.test.ts asserts legacy no-run early-return that reconciler-decouple.ac4 required removed). Root cause: only 4/17 xBRIEF items implemented (flag-rename, per-project-flag, ready-set-source, reconciler-decouple, backend-only). 13 items unimplemented incl. merge-train-routes, all frontend items (fe-merge-train-view/fe-awaiting-merge/fe-flywheel-viewer/fe-cockpit-toggle), docs, CLI, role-prompt-scope, remove-legacy-routes -- the multi-project dashboard view the issue promises does not exist. Violates Deliver-Complete-Features policy (single plan, not phased). UAT not run: no FE/API surface exists yet for AC's that require browser verification. See .pan/test/result.json for full detail and unmet AC list.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/1822",
     "reviewedAtCommit": "d3093267ff90a33d110dafe1613101cb98c9a88d",
@@ -231,9 +232,9 @@
         },
         "memory-extraction": {
           "anthropic/claude-haiku-4-5": {
-            "input": 8007,
-            "output": 8217,
-            "cacheRead": 18,
+            "input": 14170,
+            "output": 15185,
+            "cacheRead": 1554,
             "cacheWrite": 0
           }
         },
@@ -245,12 +246,20 @@
             "cacheWrite": 0
           }
         },
+        "test": {
+          "anthropic/claude-sonnet-5": {
+            "input": 58,
+            "output": 26975,
+            "cacheRead": 4705055,
+            "cacheWrite": 197764
+          }
+        },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 2383,
-            "output": 106817,
-            "cacheRead": 56809641,
-            "cacheWrite": 2920314
+            "input": 2569,
+            "output": 115883,
+            "cacheRead": 62030822,
+            "cacheWrite": 2944112
           }
         }
       },
@@ -268,9 +277,9 @@
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5": {
-          "input": 8007,
-          "output": 8217,
-          "cacheRead": 18,
+          "input": 14170,
+          "output": 15185,
+          "cacheRead": 1554,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
@@ -279,16 +288,22 @@
           "cacheRead": 78384128,
           "cacheWrite": 0
         },
+        "anthropic/claude-sonnet-5": {
+          "input": 58,
+          "output": 26975,
+          "cacheRead": 4705055,
+          "cacheWrite": 197764
+        },
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 2383,
-          "output": 106817,
-          "cacheRead": 56809641,
-          "cacheWrite": 2920314
+          "input": 2569,
+          "output": 115883,
+          "cacheRead": 62030822,
+          "cacheWrite": 2944112
         }
       },
       "costAtCloseOut": {
-        "usd": 109.1513888,
-        "pricingAsOf": "2026-07-26T02:49:19.697Z"
+        "usd": 111.4952194,
+        "pricingAsOf": "2026-07-26T02:59:09.260Z"
       }
     },
     "merges": [
