@@ -1,17 +1,27 @@
 {
   "issueId": "PAN-3029",
   "schemaVersion": 2,
+  "sessionHistory": [
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-25T19:42:05.314Z"
+    }
+  ],
   "feedback": [],
   "created": "2026-07-24T19:21:51.138Z",
-  "updated": "2026-07-25T19:42:05.314Z",
+  "updated": "2026-07-26T05:43:36.107Z",
   "pipeline": {
     "issueId": "PAN-3029",
     "reviewStatus": "pending",
-    "testStatus": "pending",
+    "testStatus": "skipped",
+    "verificationStatus": "skipped",
     "mergeStatus": "failed",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-24T19:50:31.312Z",
+    "updatedAt": "2026-07-26T05:43:36.080Z",
+    "testNotes": "Strike path: no test specialist is dispatched for strikes by design (PAN-3067)",
+    "verificationNotes": "Strike path: quality gates run by the strike agent before landing; the verification stage is bypassed by design (PAN-3067)",
     "mergeNotes": "Failed to create PR: Command failed: gh pr create --head strike/pan-3029 --base main --title PAN-3029 --body-file /tmp/pan-pr-body-PAN-3029-1784922630246.md\npull request create failed: GraphQL: Something went wrong while executing your query on 2026-07-24T19:50:31Z. Please include `9C6C:1C98CB:183B264:55AC404:6A63C206` when reporting this issue.\n",
     "strikeReadyHead": "98cdf41f18e34567a2a26cfbcd4101020635d516",
     "strikeReadyAt": "2026-07-24T19:50:22.963Z",
@@ -32,36 +42,29 @@
       "byStage": {
         "strike": {
           "openai/gpt-5.6-sol": {
-            "input": 543746,
-            "output": 51731,
-            "cacheRead": 20928512,
+            "input": 546970,
+            "output": 51873,
+            "cacheRead": 21257216,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 543746,
-          "output": 51731,
-          "cacheRead": 20928512,
+          "input": 546970,
+          "output": 51873,
+          "cacheRead": 21257216,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 14.734916,
-        "pricingAsOf": "2026-07-24T19:50:31.313Z"
+        "usd": 14.919648,
+        "pricingAsOf": "2026-07-26T05:43:36.103Z"
       }
     },
     "merges": [],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
-  "sessionHistory": [
-    {
-      "reason": "resume",
-      "agentModel": "gpt-5.6-sol",
-      "timestamp": "2026-07-25T19:42:05.314Z"
-    }
-  ]
+  "model": "gpt-5.6-sol"
 }
