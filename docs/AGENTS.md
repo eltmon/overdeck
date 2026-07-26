@@ -46,6 +46,21 @@ Node 22, owns Claude's PTY master fd, and binds
 supervisor owns the PTY, a supervisor crash also terminates Claude; resume the
 session through the normal dashboard/Deacon flow.
 
+`resolvePtySupervisorScriptPath()` only accepts a built supervisor whose own
+bare imports resolve from where it sits — `unresolvedSupervisorImports()`
+checks them against that copy's `node_modules`. Existence is not enough: `pan
+reload` runs the dashboard out of
+`~/.overdeck/deployments/dashboard/.pan-reload-generation-{a,b}`, and a
+generation that cannot resolve `@lydell/node-pty` yields a supervisor that dies
+on `ERR_MODULE_NOT_FOUND` before binding its socket, so every conversation
+created afterwards ends on a spawn timeout (PAN-3172). Resolution therefore
+falls through to the primary checkout recorded in
+`active-dashboard-bundle.json`, whose `node_modules` is complete;
+`pan reload` runs `supervisorDeploymentFailure()` on the freshly built
+generation and fails the deploy rather than reporting "healthy"; and a spawn
+that still times out reports the supervisor's own pane output alongside the
+socket timeout.
+
 `deliverAgentMessage()` uses a three-tier router: PTY supervisor first, legacy
 Claude Code Channels MCP second, and tmux paste-buffer last. Docker workspaces
 are still excluded from supervisor wiring until host/container socket sharing is

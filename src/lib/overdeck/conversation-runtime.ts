@@ -30,6 +30,7 @@ import {
 } from './conversations.js';
 import {
   capturePane,
+  capturePaneText,
   sessionExists,
   isHarnessProcessAlive,
   killSession,
@@ -391,6 +392,22 @@ export async function handleConversationSwitchModel(
 function getPtySupervisorSocketPath(agentId: string): string {
   return join(getOverdeckHome(), 'sockets', `pty-${agentId}.sock`);
 }
+/**
+ * Pull the supervisor's own failure out of the tmux pane it died in.
+ *
+ * A supervisor that cannot load its native node-pty exits instantly with an
+ * ERR_MODULE_NOT_FOUND on stderr; all the spawn path sees is the socket that
+ * never appeared. Reporting only the timeout hides the actual cause and sent
+ * an operator hunting the memory governor instead (PAN-3172).
+ */
+export function extractSupervisorFailure(paneText: string): string | null {
+  const lines = paneText.split('\n').map((line) => line.trim()).filter(Boolean);
+  const errors = lines.filter((line) => /error|cannot find|ERR_[A-Z_]+|pty-supervisor:/i.test(line));
+  const chosen = (errors.length > 0 ? errors : lines).slice(-3);
+  if (chosen.length === 0) return null;
+  return chosen.join(' | ').slice(0, 500);
+}
+
 async function waitForPtySupervisorSocket(agentId: string, timeoutMs = PTY_SUPERVISOR_SOCKET_WAIT_MS): Promise<void> {
   const socketPath = getPtySupervisorSocketPath(agentId);
   const start = Date.now();
@@ -402,7 +419,11 @@ async function waitForPtySupervisorSocket(agentId: string, timeoutMs = PTY_SUPER
     }
     await new Promise(r => setTimeout(r, 250));
   }
-  throw new Error(`Timed out waiting for PTY supervisor socket ${socketPath}`);
+  const failure = extractSupervisorFailure(await capturePaneText(agentId, 40));
+  throw new Error(
+    `Timed out waiting for PTY supervisor socket ${socketPath}`
+    + (failure ? ` — supervisor output: ${failure}` : ''),
+  );
 }
 async function extractModelFromSessionFile(sessionFile: string): Promise<string | null> {
   try {

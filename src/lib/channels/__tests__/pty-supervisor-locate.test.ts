@@ -3,7 +3,12 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
-import { materializePtySupervisorRuntime, resolvePtySupervisorScriptPath } from '../pty-supervisor-locate.js';
+import {
+  materializePtySupervisorRuntime,
+  resolvePtySupervisorScriptPath,
+  supervisorDeploymentFailure,
+  unresolvedSupervisorImports,
+} from '../pty-supervisor-locate.js';
 
 // PAN-2592: desktop packaging stages the supervisor chunk closure plus a
 // vendored node-pty next to the server bundle; the runtime copies it onto
@@ -71,5 +76,89 @@ describe('resolvePtySupervisorScriptPath', () => {
     const resolved = resolvePtySupervisorScriptPath();
     expect(resolved.endsWith(join('dist', 'pty-supervisor.js'))).toBe(true);
     expect(existsSync(resolved)).toBe(true);
+  });
+});
+
+// PAN-3172: a `pan reload` deployment generation whose node_modules could not
+// resolve @lydell/node-pty produced a supervisor that died on
+// ERR_MODULE_NOT_FOUND before binding its socket, so every conversation created
+// afterwards timed out. Existence of the artifact is not evidence it can run.
+describe('unresolvedSupervisorImports', () => {
+  function writeScript(dir: string, body: string): string {
+    mkdirSync(dir, { recursive: true });
+    const scriptPath = join(dir, 'pty-supervisor.js');
+    writeFileSync(scriptPath, body);
+    return scriptPath;
+  }
+
+  it('reports a bare import that does not resolve from the script location', () => {
+    const scriptPath = writeScript(
+      join(tmpRoot, 'generation-b', 'dist'),
+      'import * as pty from "@lydell/node-pty";\nimport { join } from "node:path";\n',
+    );
+
+    expect(unresolvedSupervisorImports(scriptPath)).toEqual(['@lydell/node-pty']);
+  });
+
+  it('ignores relative chunks and node: builtins', () => {
+    const scriptPath = writeScript(
+      join(tmpRoot, 'builtins-only', 'dist'),
+      'import { x } from "./paths-K3noE4N_.js";\nimport { createServer } from "node:http";\nexport { y } from "../chunk.js";\n',
+    );
+
+    expect(unresolvedSupervisorImports(scriptPath)).toEqual([]);
+  });
+
+  it('accepts a bare import whose package is installed beside the script', () => {
+    const generationRoot = join(tmpRoot, 'generation-a');
+    const packageDir = join(generationRoot, 'node_modules', '@lydell', 'node-pty');
+    mkdirSync(packageDir, { recursive: true });
+    writeFileSync(join(packageDir, 'package.json'), '{"name":"@lydell/node-pty","main":"index.js"}\n');
+    writeFileSync(join(packageDir, 'index.js'), 'module.exports = {};\n');
+    const scriptPath = writeScript(join(generationRoot, 'dist'), 'import * as pty from "@lydell/node-pty";\n');
+
+    expect(unresolvedSupervisorImports(scriptPath)).toEqual([]);
+  });
+
+  it('finds every import of the real built supervisor unresolvable from a bare deployment tree', () => {
+    // The regression itself: take the artifact this repo actually ships and
+    // drop it into a generation whose node_modules is missing.
+    const built = resolvePtySupervisorScriptPath();
+    const bareDist = join(tmpRoot, 'bare-generation', 'dist');
+    mkdirSync(bareDist, { recursive: true });
+    const copied = join(bareDist, 'pty-supervisor.js');
+    writeFileSync(copied, readFileSync(built, 'utf-8'));
+
+    expect(unresolvedSupervisorImports(built)).toEqual([]);
+    expect(unresolvedSupervisorImports(copied)).toContain('@lydell/node-pty');
+  });
+});
+
+describe('supervisorDeploymentFailure', () => {
+  it('passes a deployment whose supervisor resolves its imports', () => {
+    const deployRoot = join(tmpRoot, 'good-deploy');
+    const packageDir = join(deployRoot, 'node_modules', '@lydell', 'node-pty');
+    mkdirSync(packageDir, { recursive: true });
+    writeFileSync(join(packageDir, 'package.json'), '{"name":"@lydell/node-pty","main":"index.js"}\n');
+    writeFileSync(join(packageDir, 'index.js'), 'module.exports = {};\n');
+    mkdirSync(join(deployRoot, 'dist'), { recursive: true });
+    writeFileSync(join(deployRoot, 'dist', 'pty-supervisor.js'), 'import * as pty from "@lydell/node-pty";\n');
+
+    expect(supervisorDeploymentFailure(deployRoot)).toBeNull();
+  });
+
+  it('names the missing package when the deployment cannot resolve it', () => {
+    const deployRoot = join(tmpRoot, 'bad-deploy');
+    mkdirSync(join(deployRoot, 'dist'), { recursive: true });
+    writeFileSync(join(deployRoot, 'dist', 'pty-supervisor.js'), 'import * as pty from "@lydell/node-pty";\n');
+
+    expect(supervisorDeploymentFailure(deployRoot)).toContain('@lydell/node-pty');
+  });
+
+  it('reports a deployment that never built the supervisor at all', () => {
+    const deployRoot = join(tmpRoot, 'unbuilt-deploy');
+    mkdirSync(deployRoot, { recursive: true });
+
+    expect(supervisorDeploymentFailure(deployRoot)).toContain('Build did not create');
   });
 });

@@ -29,6 +29,7 @@ const mocks = vi.hoisted(() => ({
   readActiveDashboardBundle: vi.fn(),
   writeActiveDashboardBundle: vi.fn(),
   fsMkdir: vi.fn(),
+  supervisorDeploymentFailure: vi.fn(),
 }));
 
 // reloadCommand refuses to run when a `pan dev` supervisor marker is present.
@@ -47,6 +48,10 @@ vi.mock('../../../lib/restart-lock.js', () => ({
 
 vi.mock('../../../lib/deploy/agent-restart-gate.js', () => ({
   agentRestartBlockReason: mocks.agentRestartBlockReason,
+}));
+
+vi.mock('../../../lib/channels/pty-supervisor-locate.js', () => ({
+  supervisorDeploymentFailure: mocks.supervisorDeploymentFailure,
 }));
 
 vi.mock('../../../lib/deploy/active-dashboard-bundle.js', () => ({
@@ -197,6 +202,7 @@ describe('reloadCommand', () => {
     mocks.agentRestartBlockReason.mockResolvedValue(null);
     mocks.readActiveDashboardBundle.mockReturnValue(null);
     mocks.writeActiveDashboardBundle.mockResolvedValue(undefined);
+    mocks.supervisorDeploymentFailure.mockReturnValue(null);
     mocks.fsAccess.mockImplementation(async (path: string) => {
       if (path === '/usr/bin/bun') return;
       throw Object.assign(new Error(`ENOENT: ${path}`), { code: 'ENOENT' });
@@ -360,6 +366,30 @@ describe('reloadCommand', () => {
     expect(installOrder).toBeLessThan(buildOrder);
     expect(mocks.restartDashboard).toHaveBeenCalledTimes(1);
     expect(process.exitCode).toBeUndefined();
+  });
+
+  // PAN-3172: the HTTP health check stays green when a generation's
+  // node_modules cannot resolve @lydell/node-pty, so the reload printed
+  // "healthy" while every new conversation died on a supervisor socket timeout.
+  it('fails the reload when the built deployment cannot run the PTY supervisor', async () => {
+    mocks.statSync.mockReturnValue({ mtimeMs: 2000 });
+    mocks.supervisorDeploymentFailure.mockReturnValue(
+      'Deployment cannot resolve @lydell/node-pty from /dist/pty-supervisor.js',
+    );
+    mockSpawnExits();
+
+    await reloadCommand({});
+
+    expect(mocks.supervisorDeploymentFailure).toHaveBeenCalledWith(DEFAULT_BUILD_WORKTREE);
+    expect(mocks.restartDashboard).not.toHaveBeenCalled();
+    expect(mocks.exec).toHaveBeenCalledWith(
+      `git 'worktree' 'remove' '--force' '${DEFAULT_BUILD_WORKTREE}'`,
+      expect.objectContaining({ cwd: DEFAULT_REPO_ROOT }),
+    );
+    expect(mocks.writeRestartStatus).toHaveBeenCalledWith(
+      expect.objectContaining({ success: false, error: expect.stringContaining('@lydell/node-pty') }),
+    );
+    expect(process.exitCode).toBe(1);
   });
 
   it('keeps a successful restart green when previous deployment cleanup fails', async () => {
