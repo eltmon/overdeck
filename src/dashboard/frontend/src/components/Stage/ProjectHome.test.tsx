@@ -139,6 +139,10 @@ describe('ProjectHome', () => {
       if (url === '/api/projects/myn/swarm-policy') {
         return Response.json({ configured: null })
       }
+      // PAN-1696: the settings panel also reads the per-project merge-train override.
+      if (url === '/api/projects/myn/merge-train') {
+        return Response.json({ value: null, effective: true })
+      }
       throw new Error(`Unexpected request: ${url}`)
     })
     vi.stubGlobal('fetch', fetchMock)
@@ -155,7 +159,7 @@ describe('ProjectHome', () => {
     )
 
     expect(await screen.findAllByText('Project settings')).not.toHaveLength(0)
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3))
   })
 
   it('omits project settings and settings requests without a project key', () => {

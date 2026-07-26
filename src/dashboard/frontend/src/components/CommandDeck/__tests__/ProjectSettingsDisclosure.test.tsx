@@ -7,6 +7,7 @@ import { installStrictFetchMock } from '../../../test-utils/strictFetchMock';
 let fetchControl: ReturnType<typeof installStrictFetchMock>;
 let autoMergeValue: 'auto' | 'hold' | null;
 let swarmMode: 'off' | 'auto' | 'always' | null;
+let mergeTrainValue: 'enabled' | 'disabled' | null;
 
 function renderDisclosure() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -19,6 +20,7 @@ describe('ProjectSettingsDisclosure', () => {
   beforeEach(() => {
     autoMergeValue = null;
     swarmMode = null;
+    mergeTrainValue = null;
     fetchControl = installStrictFetchMock(({ method, url, init }) => {
       if (method === 'GET' && url === '/api/projects/overdeck/auto-merge-default') {
         return Response.json({ value: autoMergeValue });
@@ -34,6 +36,17 @@ describe('ProjectSettingsDisclosure', () => {
         const value = (JSON.parse(String(init?.body)) as { value: { mode: 'off' | 'auto' | 'always' } | null }).value;
         swarmMode = value?.mode ?? null;
         return Response.json({ configured: value });
+      }
+      // PAN-1696: per-project merge-train override.
+      if (method === 'GET' && url === '/api/projects/overdeck/merge-train') {
+        return Response.json({ value: mergeTrainValue, effective: mergeTrainValue !== 'disabled' });
+      }
+      if (method === 'POST' && url === '/api/projects/overdeck/merge-train') {
+        mergeTrainValue = (JSON.parse(String(init?.body)) as { value: 'enabled' | 'disabled' | null }).value;
+        return Response.json({ value: mergeTrainValue, effective: mergeTrainValue !== 'disabled' });
+      }
+      if (method === 'GET' && url === '/api/dashboard/session') {
+        return Response.json({ csrfToken: 'test-csrf-token' });
       }
       return undefined;
     });
@@ -81,19 +94,24 @@ describe('ProjectSettingsDisclosure', () => {
     await screen.findByText('Global default · Swarm inherit');
     container.querySelector('details')?.setAttribute('open', '');
 
-    expect(screen.getByRole('button', { name: '⚡ Auto' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '🔒 Hold for UAT' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Global default' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Auto-merge default: ⚡ Auto' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Auto-merge default: 🔒 Hold for UAT' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Auto-merge default: Global default' })).toBeInTheDocument();
     expect(screen.getByRole('combobox', { name: 'Project swarm policy' })).toBeInTheDocument();
     expect(screen.getByText("Applies to this project's issues that have no explicit per-issue auto-merge setting.")).toBeInTheDocument();
     expect(screen.getByText('Future dispatches only')).toBeInTheDocument();
+    // PAN-1696: the per-project merge-train override is part of the panel now,
+    // so the no-loss assertion has to cover it too.
+    expect(screen.getByRole('button', { name: 'Merge train: Enabled' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Merge train: Disabled' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Merge train: Global default' })).toBeInTheDocument();
   });
 
   it('posts the selected auto-merge value', async () => {
     renderDisclosure();
     await screen.findByText('Global default · Swarm inherit');
 
-    fireEvent.click(screen.getByRole('button', { name: '⚡ Auto' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Auto-merge default: ⚡ Auto' }));
 
     await waitFor(() => {
       expect(fetchControl.fetchMock).toHaveBeenCalledWith(

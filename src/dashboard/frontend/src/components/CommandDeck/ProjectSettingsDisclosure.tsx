@@ -69,6 +69,11 @@ function ProjectSettingsSection({ projectKey }: { projectKey: string }) {
               <button
                 key={String(o.v)}
                 type="button"
+                // Both this group and the merge-train group below offer a
+                // "Global default" option; without a scoped accessible name the
+                // two are indistinguishable to a screen reader (and to a query).
+                aria-label={`Auto-merge default: ${o.label}`}
+                aria-pressed={active}
                 disabled={mutation.isPending}
                 onClick={() => mutation.mutate(o.v)}
                 style={{
@@ -104,6 +109,8 @@ function ProjectSettingsSection({ projectKey }: { projectKey: string }) {
             <button
               key={String(o.v)}
               type="button"
+              aria-label={`Merge train: ${o.label}`}
+              aria-pressed={active}
               disabled={mergeTrainMutation.isPending}
               onClick={() => mergeTrainMutation.mutate(o.v)}
               style={{

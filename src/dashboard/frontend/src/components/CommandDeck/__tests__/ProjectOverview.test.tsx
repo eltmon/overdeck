@@ -171,6 +171,10 @@ describe('ProjectOverview', () => {
       if (method === 'GET' && url === '/api/projects/overdeck/auto-merge-default') {
         return Response.json({ autoMerge: false });
       }
+      // PAN-1696: the settings panel also reads the per-project merge-train override.
+      if (method === 'GET' && url === '/api/projects/overdeck/merge-train') {
+        return Response.json({ value: null, effective: true });
+      }
       if (method === 'GET' && url === '/api/projects/overdeck/swarm-policy') {
         return Response.json({});
       }
