@@ -8,7 +8,7 @@ import { Effect } from 'effect';
 import { composeProjectNameForWorkspace, rebuildWorkspaceStack } from '../rebuild-stack.js';
 
 const mocks = vi.hoisted(() => ({
-  getReviewStatusSync: vi.fn(),
+  readReviewStatusMap: vi.fn(),
   isIssueClosed: vi.fn(),
   resolveProjectFromIssueSync: vi.fn(),
   getProjectSync: vi.fn(),
@@ -22,8 +22,8 @@ vi.mock('../../cloister/issue-closed.js', () => ({
   isIssueClosed: mocks.isIssueClosed,
 }));
 
-vi.mock('../../review-status.js', () => ({
-  getReviewStatusSync: mocks.getReviewStatusSync,
+vi.mock('../../cloister/review-status-source.js', () => ({
+  readReviewStatusMap: mocks.readReviewStatusMap,
 }));
 
 vi.mock('../../projects.js', () => ({
@@ -90,7 +90,7 @@ describe('composeProjectNameForWorkspace', () => {
 describe('rebuildWorkspaceStack terminal-state guard (PAN-2510)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.getReviewStatusSync.mockReturnValue(null);
+    mocks.readReviewStatusMap.mockReturnValue(null);
   });
 
   function setupProject(workspacePath: string) {
@@ -127,7 +127,7 @@ describe('rebuildWorkspaceStack terminal-state guard (PAN-2510)', () => {
     const workspacePath = makeWorkspace(null);
     setupProject(workspacePath);
     mocks.isIssueClosed.mockResolvedValue(false);
-    mocks.getReviewStatusSync.mockReturnValue({ mergeStatus: 'merged' });
+    mocks.readReviewStatusMap.mockReturnValue({ 'MIN-831': { mergeStatus: 'merged' } });
 
     const result = await Effect.runPromise(rebuildWorkspaceStack('MIN-831'));
 
@@ -140,7 +140,7 @@ describe('rebuildWorkspaceStack terminal-state guard (PAN-2510)', () => {
     const workspacePath = makeWorkspace(null);
     setupProject(workspacePath);
     mocks.isIssueClosed.mockResolvedValue(false);
-    mocks.getReviewStatusSync.mockReturnValue({ mergeStatus: 'failed' });
+    mocks.readReviewStatusMap.mockReturnValue({ 'MIN-831': { mergeStatus: 'failed' } });
     mocks.ensureDevcontainerSync.mockReturnValue({
       step: { success: true },
     });

@@ -166,8 +166,8 @@ export const rebuildWorkspaceStack = (
   return Effect.gen(function* () {
     const closed = yield* Effect.promise(() => isIssueClosed(issueId));
     const merged = yield* Effect.promise(async () => {
-      const { getReviewStatusSync } = await import('../review-status.js');
-      return getReviewStatusSync(issueId)?.mergeStatus === 'merged';
+      const { readReviewStatusMap } = await import('../cloister/review-status-source.js');
+      return readReviewStatusMap()?.[issueId.toUpperCase()]?.mergeStatus === 'merged';
     });
     if (closed || merged) {
       return {
