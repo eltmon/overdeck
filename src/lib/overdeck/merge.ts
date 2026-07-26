@@ -797,14 +797,9 @@ export const MergeWriterLive = Layer.effect(
 );
 
 // ── MergeApi — HttpApiGroup ───────────────────────────────────────────────────
-// PAN-1696: the merge-train endpoints below live under /merge-train/*, matching
-// the shipped routes. They used to be declared under /flywheel/* — the merge
-// train is a per-project pipeline concern, not a flywheel feature, and the live
-// /api/flywheel/* merge-train routes were deleted. Auto-merge schedule/cancel
-// and merge-blockers stay under /flywheel/* because they ARE flywheel surfaces.
-// query: (not urlParams:) for GET params per Effect v4.
-// Schema.Union([...]) array form.
-// HttpApiEndpoint['delete'] for reserved word.
+// query: (not urlParams:) for GET params per Effect v4. Schema.Union([...]) array form.
+// HttpApiEndpoint['delete'] for reserved word. PAN-1696: merge-train endpoints are under
+// /merge-train/* (per-project concern); auto-merge + merge-blockers stay /flywheel/*.
 
 export const MergeApi = HttpApiGroup.make('merge')
   .add(HttpApiEndpoint.get('getMergeSet', '/issues/:id/merge-set', {
