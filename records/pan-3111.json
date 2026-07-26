@@ -12,6 +12,11 @@
       "timestamp": "2026-07-26T12:58:39.211Z",
       "reason": "start",
       "agentModel": "gpt-5.6-sol"
+    },
+    {
+      "timestamp": "2026-07-26T14:50:46.177Z",
+      "reason": "end",
+      "note": "ANOMALY: the started-by-field-plumbing inspection checkpoint covered only follow-up commit ec66e8f811 because file-size guards required a second non-amended commit; full branch review must cover the preceding a4c6729fa9 plumbing commit too. DEVIATIONS: the docs item named legacy .pan/context/codebase/concerns.md, so the canonical .overdeck/context/codebase/concerns.md was updated; full-suite verification required follow-up test alignment in f1bfc2fb79. The first completion attempt hit a file-size-baseline rebase conflict; latest main was merged in 39fbfc1be4, the combined spawn file was reduced to the 1,000-line ceiling, and all gates were rerun. HAZARDS: none remain; unavailable labels fail closed and all autonomous work paths share one gate. DELIVERED: the pickup policy, gated orphan/reactive dispatch, durable needs-you refusals, persisted flywheelRunId and startedBy across state and both database paths, explicit provenance at every required spawn/resume entry point, and docs. VERIFIED after merging latest main: typecheck and lint passed; npm test passed 1,204 files and 11,099 tests with only configured skips."
     }
   ],
   "feedback": [],
@@ -143,7 +148,7 @@
     "recordedAt": "2026-07-26T14:50:39.957Z"
   },
   "created": "2026-07-26T12:26:09.908Z",
-  "updated": "2026-07-26T14:50:44.959Z",
+  "updated": "2026-07-26T14:50:46.177Z",
   "pipeline": {
     "issueId": "PAN-3111",
     "reviewStatus": "reviewing",
