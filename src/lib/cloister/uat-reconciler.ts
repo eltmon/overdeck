@@ -48,6 +48,21 @@ export interface UatReconcilerDeps {
   getMainHeadSha(): Promise<string>;
   /** Current head SHA per feature branch (origin-first). */
   getBranchHeadSha(branch: string): Promise<string>;
+  /**
+   * Polyrepo base anchor across every member repo (`fe@abc1234 api@def5678`),
+   * replacing the single main SHA. Omit for monorepo — the reconciler then
+   * behaves exactly as before, using getMainHeadSha.
+   *
+   * Staleness is decided by STRING EQUALITY against what assembly stored, so
+   * an anchor here must be produced by the same helpers the polyrepo engine
+   * uses (compositeBaseAnchor / compositeMemberAnchor).
+   */
+  getBaseAnchor?(): Promise<string>;
+  /**
+   * Polyrepo per-feature anchor across the repos it contributes to, replacing
+   * the single branch head SHA. Omit for monorepo.
+   */
+  getFeatureAnchor?(feature: ReadyFeature): Promise<string>;
   store: GenerationStorePort;
   /** Assemble the next generation from the desired set (the engine). */
   assemble(features: readonly ReadyFeature[]): Promise<UatGeneration>;
@@ -165,10 +180,18 @@ export async function reconcileUatGenerations(
     const readySet = await deps.getReadySet();
     if (readySet === null) return { action: 'no-queue', invalidated };
 
-    const mainSha = await deps.getMainHeadSha();
+    // Polyrepo supplies composite anchors in place of single SHAs; both are
+    // opaque strings to everything downstream, so the comparison logic is
+    // identical either way.
+    const mainSha = deps.getBaseAnchor
+      ? await deps.getBaseAnchor()
+      : await deps.getMainHeadSha();
     const headShas = new Map<string, string>();
     for (const f of readySet) {
-      headShas.set(f.branch, await deps.getBranchHeadSha(f.branch).catch(() => 'unknown'));
+      const anchor = deps.getFeatureAnchor
+        ? await deps.getFeatureAnchor(f).catch(() => 'unknown')
+        : await deps.getBranchHeadSha(f.branch).catch(() => 'unknown');
+      headShas.set(f.branch, anchor);
     }
     const desiredIds = new Set(readySet.map((f) => f.issueId.toUpperCase()));
 

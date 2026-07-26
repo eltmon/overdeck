@@ -11,6 +11,7 @@ import {
   type AgentState,
 } from '../../../../lib/agents.js';
 import { createInFlightGuard } from '../../../../lib/cloister/in-flight-guard.js';
+import type { VerifiedMergedRepo } from '../../../../lib/cloister/merge-verification.js';
 import { parseIssueIdSync } from '../../../../lib/issue-id.js';
 import { resolveProjectFromIssueSync } from '../../../../lib/projects.js';
 
@@ -129,6 +130,14 @@ export const _serverManagedMerges = new Set<string>();
 export interface FirePostMergeLifecycleOptions {
   sourceBranch?: string;
   verifiedMergedRef?: string;
+  /**
+   * Per-repo merge evidence from a polyrepo batch promotion (PAN-3093). It must
+   * be forwarded: a polyrepo member's single-ref evidence is a composite anchor
+   * checked against origin/main in the WRAPPER path, which is not a git repo,
+   * so dropping this silently refuses every member's post-merge transition even
+   * though all repos landed.
+   */
+  verifiedMergedRepos?: readonly VerifiedMergedRepo[];
 }
 
 export function firePostMergeLifecycle(issueId: string, options?: FirePostMergeLifecycleOptions): boolean {
@@ -144,11 +153,15 @@ export function firePostMergeLifecycle(issueId: string, options?: FirePostMergeL
     async () => {
       const projectPath = getProjectPathForIssue(parsedIssueId.prefix);
       const { postMergeLifecycle } = await import('../../../../lib/cloister/merge-agent.js');
+      const lifecycleOptions = {
+        ...(options?.verifiedMergedRef ? { verifiedMergedRef: options.verifiedMergedRef } : {}),
+        ...(options?.verifiedMergedRepos?.length ? { verifiedMergedRepos: options.verifiedMergedRepos } : {}),
+      };
       await postMergeLifecycle(
         normalizedIssueId,
         projectPath,
         options?.sourceBranch,
-        options?.verifiedMergedRef ? { verifiedMergedRef: options.verifiedMergedRef } : undefined,
+        Object.keys(lifecycleOptions).length > 0 ? lifecycleOptions : undefined,
       );
       console.log(`[merge] post-merge lifecycle completed for ${normalizedIssueId}`);
 
