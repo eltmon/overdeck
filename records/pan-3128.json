@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T12:24:12.648Z",
-  "updated": "2026-07-26T12:47:20.990Z",
+  "updated": "2026-07-26T12:53:12.664Z",
   "pipeline": {
     "issueId": "PAN-3128",
     "reviewStatus": "pending",
@@ -43,18 +43,34 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "build-from-clean-worktree": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-3128",
         "agentId": "agent-pan-3128",
         "pid": 1193399,
         "host": "eltmon-z790",
-        "claimedAt": "2026-07-26T12:47:20.989Z"
+        "claimedAt": "2026-07-26T12:47:20.989Z",
+        "itemId": "build-from-clean-worktree",
+        "outcome": "completed",
+        "reason": "Moved reload builds into an always-detached origin/main worktree, added exclusion notes and cleanup guarantees, and covered primary-tree regression plus dist swapping.",
+        "releasedAt": "2026-07-26T12:53:12.664Z"
+      }
+    ],
+    "statusReasons": {
+      "build-from-clean-worktree": {
+        "reason": "Moved reload builds into an always-detached origin/main worktree, added exclusion notes and cleanup guarantees, and covered primary-tree regression plus dist swapping.",
+        "updatedAt": "2026-07-26T12:53:12.664Z"
       }
     }
   },
   "statusOverrides": {
-    "build-from-clean-worktree": "running"
+    "build-from-clean-worktree": "completed",
+    "build-from-clean-worktree.build-from-clean-worktree.ac1": "completed",
+    "build-from-clean-worktree.build-from-clean-worktree.ac2": "completed",
+    "build-from-clean-worktree.build-from-clean-worktree.ac3": "completed",
+    "build-from-clean-worktree.build-from-clean-worktree.ac4": "completed",
+    "build-from-clean-worktree.build-from-clean-worktree.ac5": "completed"
   }
 }
