@@ -142,9 +142,22 @@
       "reason": "feedback",
       "note": "[2026-07-26T07:40Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-07-26T07:40:41.248Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-26T08:11Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-26T08:11:29.366Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-26T08:11:29Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2997\n\nThe tmux liveness check completes before the Enter branch runs, so pane death in that handoff is still falsely marked terminal with no wake delivered.\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2997 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "src/dashboard/server/event-store.ts",
@@ -224,7 +237,7 @@
     "recordedAt": "2026-07-25T23:45:57.195Z"
   },
   "created": "2026-07-21T23:09:49.270Z",
-  "updated": "2026-07-26T08:11:28.657Z",
+  "updated": "2026-07-26T08:11:29.366Z",
   "pipeline": {
     "issueId": "PAN-2997",
     "reviewStatus": "blocked",
