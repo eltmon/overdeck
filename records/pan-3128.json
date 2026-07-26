@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T12:24:12.648Z",
-  "updated": "2026-07-26T13:01:05.008Z",
+  "updated": "2026-07-26T13:04:18.977Z",
   "pipeline": {
     "issueId": "PAN-3128",
     "reviewStatus": "pending",
@@ -61,16 +61,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "deploy-docs-and-flywheel-mission": {
-        "writerId": "agent-pan-3128",
-        "agentId": "agent-pan-3128",
-        "pid": 1589513,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-26T13:01:05.007Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3128",
@@ -104,6 +96,17 @@
         "outcome": "completed",
         "reason": "DoD deploy evidence now rejects dirty builds and build commits outside origin/main before checking merge containment, with explicit pan reload remediation and regression coverage for old health payloads.",
         "releasedAt": "2026-07-26T13:00:53.416Z"
+      },
+      {
+        "writerId": "agent-pan-3128",
+        "agentId": "agent-pan-3128",
+        "pid": 1589513,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T13:01:05.007Z",
+        "itemId": "deploy-docs-and-flywheel-mission",
+        "outcome": "completed",
+        "reason": "Made pan reload the flywheel's only deploy command, documented detached origin/main builds and provenance fields, and updated DoD row 7 canonicality evidence.",
+        "releasedAt": "2026-07-26T13:04:18.977Z"
       }
     ],
     "statusReasons": {
@@ -118,6 +121,10 @@
       "dod-row7-provenance-gate": {
         "reason": "DoD deploy evidence now rejects dirty builds and build commits outside origin/main before checking merge containment, with explicit pan reload remediation and regression coverage for old health payloads.",
         "updatedAt": "2026-07-26T13:00:53.416Z"
+      },
+      "deploy-docs-and-flywheel-mission": {
+        "reason": "Made pan reload the flywheel's only deploy command, documented detached origin/main builds and provenance fields, and updated DoD row 7 canonicality evidence.",
+        "updatedAt": "2026-07-26T13:04:18.977Z"
       }
     }
   },
@@ -138,6 +145,10 @@
     "dod-row7-provenance-gate.dod-row7-provenance-gate.ac2": "completed",
     "dod-row7-provenance-gate.dod-row7-provenance-gate.ac3": "completed",
     "dod-row7-provenance-gate.dod-row7-provenance-gate.ac4": "completed",
-    "deploy-docs-and-flywheel-mission": "running"
+    "deploy-docs-and-flywheel-mission": "completed",
+    "deploy-docs-and-flywheel-mission.deploy-docs-and-flywheel-mission.ac1": "completed",
+    "deploy-docs-and-flywheel-mission.deploy-docs-and-flywheel-mission.ac2": "completed",
+    "deploy-docs-and-flywheel-mission.deploy-docs-and-flywheel-mission.ac3": "completed",
+    "deploy-docs-and-flywheel-mission.deploy-docs-and-flywheel-mission.ac4": "completed"
   }
 }
