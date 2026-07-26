@@ -232,18 +232,18 @@
     "recordedAt": "2026-07-25T23:45:57.195Z"
   },
   "created": "2026-07-21T23:09:49.270Z",
-  "updated": "2026-07-26T07:57:48.785Z",
+  "updated": "2026-07-26T07:57:50.473Z",
   "pipeline": {
     "issueId": "PAN-2997",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T05:50:39.330Z",
-    "updatedAt": "2026-07-26T07:57:48.686Z",
+    "updatedAt": "2026-07-26T07:57:49.141Z",
     "reviewNotes": "Agent re-review request (3/25): Fixed the cycle-9 blocker: the keyed tmux submit no longer claims TERMINAL before Enter. The submit if-shell now requires pending + no terminal + LIVE pane, and sends Enter before the terminal transition inside one server-owned command list. A pane that dies during the settle window leaves both markers untouched (no false delivered), throws KeyedSubmitTargetDeadError, and the wake outbox keeps the entry pending so recovery re-drives after resume. Same invariant remotely. Tests cover pane death between paste and submit (local real-tmux + remote protocol) and the wake-level retry.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3004",
     "lastVerifiedCommit": "564139032ff121944de2721020bd3f2672ca3f36",
@@ -307,7 +307,7 @@
       },
       "costAtCloseOut": {
         "usd": 237.761246,
-        "pricingAsOf": "2026-07-26T07:57:48.750Z"
+        "pricingAsOf": "2026-07-26T07:57:50.470Z"
       }
     },
     "merges": [
