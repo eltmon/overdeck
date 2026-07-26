@@ -21,7 +21,7 @@ import { promisify } from 'node:util';
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { syncMainIntoWorkspace } from '../../../../lib/cloister/merge-agent.js';
-import { postRebaseVerificationDeferral } from '../../../../lib/cloister/merge-verification.js';
+import { handlePostRebaseVerificationDeferral } from '../../../../lib/cloister/merge-verification.js';
 import { MainDivergedError, gitPush } from '../../../../lib/git/operations.js';
 import { listGitOperationsSync } from '../../../../lib/git-activity.js';
 import { extractNumberSync, extractPrefixSync, parseIssueIdSync } from '../../../../lib/issue-id.js';
@@ -326,11 +326,6 @@ function dequeueNextMerge(projectKey: string, completedIssueId?: string): void {
 
 export async function triggerMerge(issueId: string, request: TriggerMergeRequest = { kind: 'normal' }): Promise<TriggerMergeResult> {
   const reviewStatus = getReviewStatusSync(issueId);
-  const mergeStateBeforeAttempt = {
-    mergeStatus: reviewStatus?.mergeStatus === 'merging' ? undefined : reviewStatus?.mergeStatus,
-    mergeStep: reviewStatus?.mergeStep,
-    mergeNotes: reviewStatus?.mergeNotes,
-  };
   if (request.kind === 'strike') {
     if (activeStrikeMerge(getCurrentMerge((extractPrefixSync(issueId) ?? issueId.split('-')[0]).toLowerCase()) === issueId.toUpperCase() ? issueId.toUpperCase() : null, getPendingOperation(issueId))) return { success: true, statusCode: 200, message: 'Strike merge already in progress', mergeStatus: 'merging' };
     const projectPath = getProjectPath(undefined, extractPrefixSync(issueId) ?? issueId.split('-')[0]);
@@ -1006,8 +1001,7 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
       // will catch any .planning/ files that slip through.
     }
 
-    // Step 3: Post-rebase verification gate (typecheck, lint, test)
-    // Ensures the rebase didn't introduce issues before merging.
+    // Step 3: Post-rebase verification gate ensures the rebase remains valid before merging.
     setReviewStatus(issueId, { mergeStatus: 'verifying', mergeStep: 'verifying', mergeNotes: undefined });
 
     // PAN-2487: when the tip SHA being merged already has GREEN CI on GitHub,
@@ -1039,9 +1033,7 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
       }
     }
 
-    if (skipLocalVerification) {
-      appendShipLog(issueId, '✓ Local verification skipped — CI already green on this exact commit', 'verifying');
-    }
+    if (skipLocalVerification) appendShipLog(issueId, '✓ Local verification skipped — CI already green on this exact commit', 'verifying');
     const verifyResult = skipLocalVerification
       ? { outcome: 'passed' as const }
       : await (async () => {
@@ -1059,18 +1051,8 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
         ));
       })();
 
-    const verificationDeferral = postRebaseVerificationDeferral(verifyResult);
-    if (verificationDeferral) {
-      appendShipLog(issueId, verificationDeferral.message, 'verifying');
-      setReviewStatus(issueId, mergeStateBeforeAttempt);
-      completePendingOperation(issueId, verificationDeferral.message);
-      return {
-        success: false,
-        statusCode: verificationDeferral.statusCode,
-        error: verificationDeferral.message,
-      };
-    }
-
+    const verificationDeferral = handlePostRebaseVerificationDeferral(issueId, verifyResult, reviewStatus, { appendShipLog, setReviewStatus, completePendingOperation });
+    if (verificationDeferral) return verificationDeferral;
     if (verifyResult.outcome === 'failed') {
       const error = `Post-rebase verification failed at ${verifyResult.failedCheck}`;
       console.log(`[merge] ${error}`);

@@ -55,7 +55,7 @@ vi.mock('../../../../src/lib/cloister/merge-completeness.js', () => ({
 }));
 
 import {
-  postRebaseVerificationDeferral,
+  handlePostRebaseVerificationDeferral,
   shouldSkipDispatchAsMerged,
   verifyMergedBeforeLifecycle,
 } from '../../../../src/lib/cloister/merge-verification.js';
@@ -66,19 +66,45 @@ function mergeSet(repoCount: number) {
   };
 }
 
-describe('postRebaseVerificationDeferral', () => {
-  it('returns a retriable merge abort containing the deferral reason', () => {
-    expect(postRebaseVerificationDeferral({
+describe('handlePostRebaseVerificationDeferral', () => {
+  it('returns a retriable abort while restoring merge state without touching readiness', () => {
+    const deps = {
+      appendShipLog: vi.fn(),
+      setReviewStatus: vi.fn(),
+      completePendingOperation: vi.fn(),
+    };
+    const result = handlePostRebaseVerificationDeferral('PAN-3135', {
       outcome: 'deferred',
       reason: 'A dashboard deploy is queued',
-    })).toEqual({
-      message: 'Post-rebase verification deferred: A dashboard deploy is queued — merge retries after the deploy.',
-      statusCode: 409,
+    }, {
+      mergeStatus: 'queued',
+      mergeStep: 'queued',
+      mergeNotes: 'Waiting',
+    }, deps);
+    const message = 'Post-rebase verification deferred: A dashboard deploy is queued — merge retries after the deploy.';
+
+    expect(result).toEqual({ success: false, statusCode: 409, error: message });
+    expect(deps.appendShipLog).toHaveBeenCalledWith('PAN-3135', message, 'verifying');
+    expect(deps.setReviewStatus).toHaveBeenCalledWith('PAN-3135', {
+      mergeStatus: 'queued',
+      mergeStep: 'queued',
+      mergeNotes: 'Waiting',
     });
+    expect(deps.setReviewStatus.mock.calls[0]?.[1]).not.toHaveProperty('readyForMerge');
+    expect(deps.completePendingOperation).toHaveBeenCalledWith('PAN-3135', message);
   });
 
-  it('returns null for terminal verification outcomes', () => {
-    expect(postRebaseVerificationDeferral({ outcome: 'passed' })).toBeNull();
+  it('returns null without side effects for terminal verification outcomes', () => {
+    const deps = {
+      appendShipLog: vi.fn(),
+      setReviewStatus: vi.fn(),
+      completePendingOperation: vi.fn(),
+    };
+
+    expect(handlePostRebaseVerificationDeferral('PAN-3135', { outcome: 'passed' }, null, deps)).toBeNull();
+    expect(deps.appendShipLog).not.toHaveBeenCalled();
+    expect(deps.setReviewStatus).not.toHaveBeenCalled();
+    expect(deps.completePendingOperation).not.toHaveBeenCalled();
   });
 });
 

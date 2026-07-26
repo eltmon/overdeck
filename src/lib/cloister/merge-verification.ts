@@ -5,6 +5,7 @@ import { Effect } from 'effect';
 import { resolveProjectFromIssueSync } from '../projects.js';
 import { isGitHubAppConfigured, listPullRequestsForHead } from '../github-app.js';
 import { getMergeSetSync } from '../merge-set.js';
+import type { ReviewStatus, ReviewStatusUpdate } from '../review-status.js';
 import { resolveGitHubIssueSync } from '../tracker-utils.js';
 import { assessMergeCompleteness } from './merge-completeness.js';
 import type { VerificationRunnerOutcome } from './verification-types.js';
@@ -18,14 +19,33 @@ export interface PostMergeLifecycleOptions {
   verifiedMergedRef?: string;
 }
 
-export function postRebaseVerificationDeferral(
+type MergeStateBeforeAttempt = Pick<ReviewStatus, 'mergeStatus' | 'mergeStep' | 'mergeNotes'> | null | undefined;
+
+type PostRebaseVerificationDeferralDeps = {
+  appendShipLog: (issueId: string, message: string, phase: 'verifying') => void;
+  setReviewStatus: (
+    issueId: string,
+    update: Pick<ReviewStatusUpdate, 'mergeStatus' | 'mergeStep' | 'mergeNotes'>,
+  ) => unknown;
+  completePendingOperation: (issueId: string, error: string) => void;
+};
+
+export function handlePostRebaseVerificationDeferral(
+  issueId: string,
   outcome: VerificationRunnerOutcome,
-): { message: string; statusCode: 409 } | null {
+  previous: MergeStateBeforeAttempt,
+  deps: PostRebaseVerificationDeferralDeps,
+): { success: false; statusCode: 409; error: string } | null {
   if (outcome.outcome !== 'deferred') return null;
-  return {
-    message: `Post-rebase verification deferred: ${outcome.reason} — merge retries after the deploy.`,
-    statusCode: 409,
-  };
+  const message = `Post-rebase verification deferred: ${outcome.reason} — merge retries after the deploy.`;
+  deps.appendShipLog(issueId, message, 'verifying');
+  deps.setReviewStatus(issueId, {
+    mergeStatus: previous?.mergeStatus === 'merging' ? undefined : previous?.mergeStatus,
+    mergeStep: previous?.mergeStep,
+    mergeNotes: previous?.mergeNotes,
+  });
+  deps.completePendingOperation(issueId, message);
+  return { success: false, statusCode: 409, error: message };
 }
 
 function shellQuote(value: string): string {
