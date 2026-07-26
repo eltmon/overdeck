@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T12:24:46.201Z",
-  "updated": "2026-07-26T12:52:00.082Z",
+  "updated": "2026-07-26T12:56:27.610Z",
   "pipeline": {
     "issueId": "PAN-3135",
     "reviewStatus": "pending",
@@ -43,18 +43,33 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "deploy-queue-module": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-3135",
         "agentId": "agent-pan-3135",
         "pid": 1279247,
         "host": "eltmon-z790",
-        "claimedAt": "2026-07-26T12:52:00.082Z"
+        "claimedAt": "2026-07-26T12:52:00.082Z",
+        "itemId": "deploy-queue-module",
+        "outcome": "completed",
+        "reason": "Added atomic pending deploy intent storage with validation, accumulation, escalation, clearing, and focused unit coverage",
+        "releasedAt": "2026-07-26T12:56:27.609Z"
+      }
+    ],
+    "statusReasons": {
+      "deploy-queue-module": {
+        "reason": "Added atomic pending deploy intent storage with validation, accumulation, escalation, clearing, and focused unit coverage",
+        "updatedAt": "2026-07-26T12:56:27.609Z"
       }
     }
   },
   "statusOverrides": {
-    "deploy-queue-module": "running"
+    "deploy-queue-module": "completed",
+    "deploy-queue-module.deploy-queue-module.ac1": "completed",
+    "deploy-queue-module.deploy-queue-module.ac2": "completed",
+    "deploy-queue-module.deploy-queue-module.ac3": "completed",
+    "deploy-queue-module.deploy-queue-module.ac4": "completed"
   }
 }
