@@ -4,7 +4,7 @@
     "created": "2026-07-26T10:05:00.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3110: Merge-ready recovery trap — agent-independent merge executor + HEAD-keyed verdict lifecycle",
-    "updated": "2026-07-26T10:12:09.308Z"
+    "updated": "2026-07-26T10:12:12.059Z"
   },
   "plan": {
     "id": "pan-3110",
@@ -12,9 +12,9 @@
     "status": "approved",
     "uid": "2aec946e-99b7-4669-93fe-5870410164c2",
     "author": "agent:claude-fable-5",
-    "sequence": 3,
+    "sequence": 5,
     "created": "2026-07-26T10:05:00.000Z",
-    "updated": "2026-07-26T10:12:09.308Z",
+    "updated": "2026-07-26T10:12:12.059Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3110",
