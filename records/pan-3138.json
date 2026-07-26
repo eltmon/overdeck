@@ -17,9 +17,27 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-26T14:40:02.441Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-26T14:43Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-26T14:43:42.620Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-26T14:43:42.950Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-26T14:43:42Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-3138\n\n# Review Synthesis — PAN-3138 — 2026-07-26\n\n## Verdict: CHANGES REQUESTED — merged rebuilds can bypass the terminal guard when the raw review-status cache is missing or stale\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3138/.pan/review/agent-pan-3138-review-ad37787c/context.json\n- Branch: feature/pan-3138\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3138\n- HEAD reviewed: ad37787c2c81d40ae7e7365f0704b913ba266986\n- Cycle number: 1\n- Prior cycle SHA: none\n- PR commits: 7\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3138/.pan/review/agent-pan-3138-review-ad37787c/security.md | 0 |\n| correctness | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3138/.pan/review/agent-pan-3138-review-ad37787c/correctness.md | 1 |\n| performance | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3138/.pan/review/agent-pan-3138-review-ad37787c/performance.md | 0 |\n| requirements | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3138/.pan/review/agent-pan-3138-review-ad37787c/requirements.md | 1 |\n\n## Blocking Findings\n\n### [correctness] The merged-workspace rebuild gate trusts a stale, optional cache reader — `src/lib/workspace/rebuild-stack.ts:168`\nThe new terminal guard reads `readReviewStatusMap()`, a disposable cache reader that may be unregistered, missing, or behind the durable review-status journal. In those supported states the guard converts unavailable merged state into `merged = false`, so `rebuildWorkspaceStack()` can recreate the Docker stack and `_devnet` for an issue whose durable status is already `merged`. This changed line is inside the PR diff and the finding is Tier 1, so it blocks. The guard must use the canonical journal-reconciled review-status resolver, with a regression test proving a durable merged status still blocks rebuild when the raw cache is missing or stale.\n\n### [requirements] Required lifecycle documentation understates merged-issue Docker cleanup — `docs/WORKSPACE-CONTAINERS.md:119`, `CLAUDE.md:509`\nBoth changed documentation surfaces say the merged-but-not-closed reaper removes only leaked devnets. The implementation calls `teardownWorkspaceDockerByNamePromise`, which also runs compose teardown with volume removal and removes project-owned attached containers before removing the network. NFR-3 requires accurate lifecycle documentation, and the requirements reviewer classified this gap as `Scope: in_pr_scope`, so it blocks. The docs must describe the full Docker-only teardown while making clear that workspace files, branches, agents, sessions, state, and xBRIEF remain preserved.\n\n## Non-blocking Findings\n\n### [correctness] Earlier workspace cleanup failure can skip the new name-based teardown — `src/lib/cloister/merge-agent.ts:536`\n`stopWorkspaceDocker(...)` and `teardownWorkspaceDockerByNamePromise(...)` share one `try` block, so a rejection from the first operation skips the second. A later reaper patrol can retry the cleanup, which limits the impact, but isolating the independent best-effort operations would make merge-time teardown match its intended guarantee.\n\n### [performance] Batch merged-status resolution before scanning devnets — `src/lib/cloister/closed-issue-reaper.ts:224`\nThe periodic patrol performs one synchronous canonical review-status resolution per open devnet. Docker pool limits bound the count, so this is advisory, but a batch-capable read door would avoid repeated SQLite and filesystem work on the Node event loop.\n\n## Clean Sub-roles\n- security\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3138/.pan/review/agent-pan-3138-review-ad37787c/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3138 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "scripts/file-size-baseline.txt"
@@ -49,7 +67,7 @@
     "recordedAt": "2026-07-26T14:39:52.370Z"
   },
   "created": "2026-07-26T13:39:19.365Z",
-  "updated": "2026-07-26T14:43:42.019Z",
+  "updated": "2026-07-26T14:43:42.950Z",
   "pipeline": {
     "issueId": "PAN-3138",
     "reviewStatus": "blocked",
