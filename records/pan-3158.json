@@ -22,9 +22,27 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-26T20:55:43.646Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-26T20:57Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-26T20:57:26.000Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-26T20:57:26.184Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-26T20:57:25Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-3158\n\nProject filtering can falsely show the global no-ready-work message while another project has ready work\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3158 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "docs/FLYWHEEL-STATE.md",
@@ -46,7 +64,7 @@
     "recordedAt": "2026-07-26T20:50:56.555Z"
   },
   "created": "2026-07-26T20:19:41.143Z",
-  "updated": "2026-07-26T20:57:25.273Z",
+  "updated": "2026-07-26T20:57:26.185Z",
   "pipeline": {
     "issueId": "PAN-3158",
     "reviewStatus": "blocked",
