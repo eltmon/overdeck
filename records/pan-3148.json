@@ -50,15 +50,7 @@
       "timestamp": "2026-07-26T21:51:23.369Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-26T21:51:23Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-3148\n\nFeedback dedup keys omit the review run ID on primary verdict paths, causing same-run duplicates and later-run suppression\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3148 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "packages/contracts/src/composer-commands.generated.ts",
@@ -134,22 +126,22 @@
     "recordedAt": "2026-07-26T22:01:26.872Z"
   },
   "created": "2026-07-26T17:27:17.644Z",
-  "updated": "2026-07-26T22:03:48.822Z",
+  "updated": "2026-07-26T22:05:58.928Z",
   "pipeline": {
     "issueId": "PAN-3148",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T21:02:53.986Z",
-    "updatedAt": "2026-07-26T22:03:48.796Z",
+    "updatedAt": "2026-07-26T22:05:58.873Z",
     "reviewNotes": "Feedback dedup keys omit the review run ID on primary verdict paths, causing same-run duplicates and later-run suppression",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3163",
     "lastVerifiedCommit": "850679a81982462e5d74e18693cb35873e951829",
     "reviewRequestedAt": "2026-07-26T22:01:27.804Z",
-    "reviewSpawnedAt": "2026-07-26T21:50:50.342Z",
+    "reviewSpawnedAt": "2026-07-26T22:05:58.870Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "packages/contracts/src/composer-commands.generated.ts",
@@ -255,7 +247,7 @@
       },
       "costAtCloseOut": {
         "usd": 131.518221,
-        "pricingAsOf": "2026-07-26T22:03:48.816Z"
+        "pricingAsOf": "2026-07-26T22:05:58.912Z"
       }
     },
     "merges": [
