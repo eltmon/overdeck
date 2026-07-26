@@ -81,9 +81,14 @@ The full round trip between the work agent and review:
    stale dispatch-side 'reviewing' write can never clobber a terminal verdict,
    PAN-2578); then `deliverReviewVerdictFeedback` posts the PR comment, writes
    the feedback file (`.overdeck/feedback/NNN-review-agent-*.md`), and messages
-   the work agent directly. If the work agent is not running, the delivery door
-   RESURRECTS it (unpause pipeline pauses, clear troubled gates, resume stopped
-   agents — PAN-2209/PAN-2461) before ever escalating to the operator.
+   the work agent directly. The delivery key is stable for `(issueId, runId)`, so
+   writing `reviewedAtCommit` after delivery cannot create a duplicate, while a
+   later run gets a fresh key even after drift reset clears the anchor. Legacy
+   callers without a run ID fall back to the reviewed anchor; if neither identity
+   exists, delivery is unkeyed rather than risking suppression of a later run. If
+   the work agent is not running, the delivery door RESURRECTS it (unpause pipeline pauses,
+   clear troubled gates, resume stopped agents — PAN-2209/PAN-2461) before ever
+   escalating to the operator.
 5. **work again:** the work agent fixes the findings, commits, and pushes. The
    blocked-review drift patrol observes the stable new HEAD over two patrol
    ticks, resets review to `pending`, and starts a NEW review cycle, which in

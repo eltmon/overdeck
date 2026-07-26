@@ -117,12 +117,13 @@ const postSpecialistsDoneRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const body = yield* readJsonBody;
     const eventStore = yield* EventStoreService;
-    const { specialist, issueId, status, notes, itemId } = body as {
+    const { specialist, issueId, status, notes, itemId, runId } = body as {
       specialist: string;
       issueId: string;
       status: string;
       notes?: string;
       itemId?: string;
+      runId?: string;
     };
 
     // Validate specialist type
@@ -499,6 +500,7 @@ const postSpecialistsDoneRoute = HttpRouter.add(
             notes,
             workspacePath,
             prUrl: updatedStatus.prUrl,
+            ...(runId ? { runId } : {}),
           }));
           console.log(
             `[specialists/done] Delivered review verdict feedback for ${normalizedIssueId}` +

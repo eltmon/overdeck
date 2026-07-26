@@ -7,8 +7,8 @@ import { Effect } from 'effect';
  * No output parsing needed - just run this command.
  *
  * Usage:
- *   pan specialists done review MIN-665 --status passed --notes "Code looks good"
- *   pan specialists done review MIN-665 --status blocked --notes "Changes requested"
+ *   pan specialists done review MIN-665 --status passed --notes "Code looks good" --run-id "agent-min-665-review-abc12345"
+ *   pan specialists done review MIN-665 --status blocked --notes "Changes requested" --run-id "agent-min-665-review-abc12345"
  *   pan specialists done test PAN-97 --status failed --notes "3 tests failing"
  *   pan specialists done merge PAN-83 --status passed
  */
@@ -26,6 +26,8 @@ interface DoneOptions {
   status: 'passed' | 'failed' | 'blocked';
   /** xBRIEF item receiving an inspect verdict. Required for inspect. */
   item?: string;
+  /** Review cycle identity used to deduplicate blocked feedback delivery. */
+  runId?: string;
   /** PAN-1862 (FR-6): "security=passed,correctness=blocked" per-reviewer verdicts. */
   reviewers?: string;
   notes?: string;
@@ -248,6 +250,7 @@ export async function doneCommand(
         verdict: options.status,
         notes: options.notes,
         prUrl: status.prUrl,
+        ...(options.runId ? { runId: options.runId } : {}),
       }));
       let timer: ReturnType<typeof setTimeout> | undefined;
       const timeout = new Promise<never>((_, reject) => {

@@ -87,6 +87,7 @@ describe('deliverReviewVerdictFeedback', () => {
       verdict: 'blocked',
       notes: 'correctness blocker',
       workspacePath: workspace,
+      runId: 'agent-pan-1059-review-abcdef12',
     }));
 
     expect(result.prCommentPosted).toBe(true);
@@ -121,11 +122,16 @@ describe('deliverReviewVerdictFeedback', () => {
     );
   });
 
-  it('uses the same dedup key for the same verdict, run, and reviewed anchor', async () => {
-    mockGetReviewStatus.mockReturnValue({
-      prUrl: 'https://github.com/eltmon/overdeck/pull/1059',
-      reviewedAtCommit: 'head-one',
-    });
+  it('keeps one run key stable when the blocked anchor is written after delivery', async () => {
+    mockGetReviewStatus
+      .mockReturnValueOnce({ prUrl: 'https://github.com/eltmon/overdeck/pull/1059' })
+      .mockReturnValueOnce({
+        prUrl: 'https://github.com/eltmon/overdeck/pull/1059',
+        reviewedAtCommit: 'head-one',
+      });
+    mockMessageAgent
+      .mockResolvedValueOnce({ delivered: true, queuedToMail: false })
+      .mockResolvedValueOnce({ delivered: true, queuedToMail: false, deduplicated: true });
     const { deliverReviewVerdictFeedback } = await import(
       '../../../../src/lib/cloister/review-verdict-feedback.js'
     );
@@ -143,9 +149,34 @@ describe('deliverReviewVerdictFeedback', () => {
     const secondKey = mockMessageAgent.mock.calls[1]![3].dedupKey;
     expect(firstKey).toMatch(/^review-feedback:pan-1059:[a-f0-9]{16}$/);
     expect(secondKey).toBe(firstKey);
+    expect(mockSurfaceIssueFeedbackNeedsYou).not.toHaveBeenCalled();
   });
 
-  it('uses different dedup keys when the reviewed anchor changes', async () => {
+  it('uses a fresh key for a later review run after the anchor resets', async () => {
+    mockGetReviewStatus.mockReturnValue({});
+    const { deliverReviewVerdictFeedback } = await import(
+      '../../../../src/lib/cloister/review-verdict-feedback.js'
+    );
+
+    const firstResult = await Effect.runPromise(deliverReviewVerdictFeedback({
+      issueId: 'PAN-1059',
+      verdict: 'blocked',
+      runId: 'agent-pan-1059-review-abcdef12',
+    }));
+    const secondResult = await Effect.runPromise(deliverReviewVerdictFeedback({
+      issueId: 'PAN-1059',
+      verdict: 'blocked',
+      runId: 'agent-pan-1059-review-fedcba98',
+    }));
+
+    expect(firstResult.agentMessageSent).toBe(true);
+    expect(secondResult.agentMessageSent).toBe(true);
+    expect(mockMessageAgent.mock.calls[0]![3].dedupKey).not.toBe(
+      mockMessageAgent.mock.calls[1]![3].dedupKey,
+    );
+  });
+
+  it('uses the reviewed anchor as fallback identity when no run ID exists', async () => {
     mockGetReviewStatus
       .mockReturnValueOnce({ reviewedAtCommit: 'head-one' })
       .mockReturnValueOnce({ reviewedAtCommit: 'head-two' });
@@ -156,16 +187,34 @@ describe('deliverReviewVerdictFeedback', () => {
     await Effect.runPromise(deliverReviewVerdictFeedback({
       issueId: 'PAN-1059',
       verdict: 'blocked',
-      runId: 'agent-pan-1059-review-abcdef12',
     }));
     await Effect.runPromise(deliverReviewVerdictFeedback({
       issueId: 'PAN-1059',
       verdict: 'blocked',
-      runId: 'agent-pan-1059-review-abcdef12',
     }));
 
     expect(mockMessageAgent.mock.calls[0]![3].dedupKey).not.toBe(
       mockMessageAgent.mock.calls[1]![3].dedupKey,
+    );
+  });
+
+  it('delivers unkeyed when neither a run ID nor reviewed anchor exists', async () => {
+    mockGetReviewStatus.mockReturnValue({});
+    const { deliverReviewVerdictFeedback } = await import(
+      '../../../../src/lib/cloister/review-verdict-feedback.js'
+    );
+
+    const result = await Effect.runPromise(deliverReviewVerdictFeedback({
+      issueId: 'PAN-1059',
+      verdict: 'blocked',
+    }));
+
+    expect(result.agentMessageSent).toBe(true);
+    expect(mockMessageAgent).toHaveBeenCalledWith(
+      'agent-pan-1059',
+      expect.any(String),
+      'internal',
+      { owesRework: true },
     );
   });
 

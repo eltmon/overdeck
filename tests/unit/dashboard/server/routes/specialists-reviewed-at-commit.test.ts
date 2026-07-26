@@ -333,10 +333,14 @@ describe('reviewedAtCommit DB persistence (specialists/done snapshot layer)', ()
       issueId: 'PAN-RAC-HTTP',
       status: 'failed',
       notes: 'correctness blocker',
+      runId: 'agent-pan-rac-http-review-abcdef12',
     });
 
     expect(responseStatus).toBe(200);
-    expect(mockDeliverReviewVerdictFeedback).toHaveBeenCalledOnce();
+    expect(mockDeliverReviewVerdictFeedback).toHaveBeenCalledWith(expect.objectContaining({
+      issueId: 'PAN-RAC-HTTP',
+      runId: 'agent-pan-rac-http-review-abcdef12',
+    }));
     expect(mockSnapshotWorkspaceHeads).toHaveBeenCalledWith(
       'PAN-RAC-HTTP',
       '/fake/project/workspaces/feature-pan-rac-http',

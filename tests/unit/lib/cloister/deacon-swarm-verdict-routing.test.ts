@@ -124,6 +124,7 @@ describe('swarm verdict feedback routing', () => {
       notes: 'fix wi-b',
       workspacePath,
       slotItemId: 'wi-b',
+      runId: 'agent-pan-2203-review-abcdef12',
     }));
 
     expect(result.agentMessageSent).toBe(true);
@@ -156,6 +157,7 @@ describe('swarm verdict feedback routing', () => {
       notes: 'fix wi-b',
       workspacePath,
       slotItemId: 'wi-b',
+      runId: 'agent-pan-2203-review-abcdef12',
     }));
 
     expect(result.agentMessageSent).toBe(true);
@@ -190,6 +192,7 @@ describe('swarm verdict feedback routing', () => {
       notes: 'fix wi-c',
       workspacePath,
       slotItemId: 'wi-c',
+      runId: 'agent-pan-2203-review-abcdef12',
     }));
 
     expect(result.agentMessageSent).toBe(true);

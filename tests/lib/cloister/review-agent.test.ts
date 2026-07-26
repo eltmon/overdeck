@@ -510,6 +510,9 @@ describe('spawnReviewRoleForIssue review mode fan-out', () => {
     expect(parentOptions).not.toHaveProperty('subRole');
     expect(parentOptions.prompt).toContain('you are the sole reviewer');
     expect(parentOptions.prompt).not.toContain('STANDBY');
+    const runId = parentOptions.prompt.match(/Run ID: (\S+)/)?.[1];
+    expect(runId).toBeTruthy();
+    expect(parentOptions.prompt).toContain(`--run-id "${runId}"`);
   });
 
   it('full mode branches to synthesis prompt and fans out every sub-reviewer lane', async () => {

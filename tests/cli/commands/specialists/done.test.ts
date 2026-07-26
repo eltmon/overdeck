@@ -91,6 +91,7 @@ describe('specialists done command', () => {
     await doneCommand('review', 'pan-1059', {
       status: 'blocked',
       notes: 'correctness blocker',
+      runId: 'agent-pan-1059-review-abcdef12',
     });
 
     expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-1059', {
@@ -102,6 +103,7 @@ describe('specialists done command', () => {
       verdict: 'blocked',
       notes: 'correctness blocker',
       prUrl: 'https://github.com/eltmon/overdeck/pull/1059',
+      runId: 'agent-pan-1059-review-abcdef12',
     });
   });
 

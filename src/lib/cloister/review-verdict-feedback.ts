@@ -1,8 +1,10 @@
 /**
  * Delivers durable review-verdict feedback to the work agent. Agent messages
- * use a key derived from the issue, verdict, and review run/anchor so one
- * review cycle is model-visible at most once; ACP and Channels targets fall
- * back to unkeyed delivery because those transports cannot enforce the key.
+ * use a key derived from the issue and review run so one review cycle is
+ * model-visible at most once; callers without a run ID fall back to the
+ * reviewed anchor, or deliver unkeyed if neither identity exists. ACP and
+ * Channels targets fall back to unkeyed delivery because those transports
+ * cannot enforce the key.
  * Repeated keyed suppressions surface a needs-you escalation before duplicate
  * delivery attempts consume the work agent's context window.
  */
@@ -115,10 +117,17 @@ async function deliverReviewVerdictFeedbackPromise(
   const workspacePath = opts.workspacePath
     ?? (resolved ? join(resolved.projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`) : undefined);
   const existingStatus = getReviewStatusSync(issueId);
-  const dedupKey = `review-feedback:${issueId.toLowerCase()}:${createHash('sha256')
-    .update([opts.verdict, opts.runId ?? '', existingStatus?.reviewedAtCommit ?? ''].join('|'))
-    .digest('hex')
-    .slice(0, 16)}`;
+  const deliveryIdentity = opts.runId
+    ? `run:${opts.runId}`
+    : existingStatus?.reviewedAtCommit
+      ? `anchor:${existingStatus.reviewedAtCommit}`
+      : undefined;
+  const dedupKey = deliveryIdentity
+    ? `review-feedback:${issueId.toLowerCase()}:${createHash('sha256')
+      .update(deliveryIdentity)
+      .digest('hex')
+      .slice(0, 16)}`
+    : undefined;
   const synthesis = workspacePath && existsSync(workspacePath)
     ? await findLatestSynthesis(workspacePath)
     : null;
@@ -164,7 +173,7 @@ async function deliverReviewVerdictFeedbackPromise(
           try {
             deliveryOutcome = await messageAgent(target.agentId, message, 'internal', {
               owesRework: true,
-              dedupKey,
+              ...(dedupKey ? { dedupKey } : {}),
             });
           } catch (err) {
             const reason = err instanceof Error ? err.message : String(err);
@@ -183,7 +192,7 @@ async function deliverReviewVerdictFeedbackPromise(
           }
           agentMessageSent = true;
           let repeatedDeliveryLoop = false;
-          if (deliveryOutcome.deduplicated) {
+          if (deliveryOutcome.deduplicated && dedupKey) {
             const suppressedCount = (suppressedReviewFeedbackDeliveries.get(dedupKey) ?? 0) + 1;
             suppressedReviewFeedbackDeliveries.set(dedupKey, suppressedCount);
             repeatedDeliveryLoop = suppressedCount >= 2;
@@ -197,7 +206,7 @@ async function deliverReviewVerdictFeedbackPromise(
                 console.warn(`[review-verdict-feedback] Could not surface repeated delivery loop for ${issueId}: ${err instanceof Error ? err.message : String(err)}`);
               }
             }
-          } else {
+          } else if (dedupKey) {
             suppressedReviewFeedbackDeliveries.delete(dedupKey);
           }
           // PAN-3074: a fresh delivery clears stale feedback-delivery state. Once
