@@ -102,6 +102,14 @@ vi.mock('../../../lib/cloister/concurrency.js', () => ({
   canDispatchAdvancing: () => true,
 }));
 
+vi.mock('../memory-governor.js', () => ({
+  assessMemoryPressure: vi.fn(async () => ({
+    band: 'ok',
+    availableBytes: Number.MAX_SAFE_INTEGER,
+    thresholds: { warningBytes: 0, criticalBytes: 0 },
+  })),
+}));
+
 vi.mock('../issue-closed.js', () => ({
   isIssueClosed: (...args: unknown[]) => mockIsIssueClosed(...args),
 }));
