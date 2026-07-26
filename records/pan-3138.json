@@ -227,17 +227,14 @@
       "reason": "feedback",
       "note": "[2026-07-26T16:56Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-07-26T16:56:56.988Z"
-    }
-  ],
-  "feedback": [
+    },
     {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-26T16:56:56Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-3138\n\n# Review Synthesis — PAN-3138 — 2026-07-26T16:52:00Z\n\n## Verdict: CHANGES REQUESTED — [correctness] Retaining the pending file allows dashboard and Deacon processes to run post-merge lifecycle concurrently\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3138/.pan/review/agent-pan-3138-review-45c64d10/context.json\n- Branch: feature/pan-3138\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3138\n- HEAD reviewed: 45c64d10937592faceea33d0a627c6e336c9c829\n- Cycle number: 5\n- Prior cycle SHA: 6054ba2e200db2755313b2cf82980134a04a0096\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3138/.pan/review/agent-pan-3138-review-45c64d10/security.md | 0 |\n| correctness | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3138/.pan/review/agent-pan-3138-review-45c64d10/correctness.md | 1 |\n| performance | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3138/.pan/review/agent-pan-3138-review-45c64d10/performance.md | 0 |\n| requirements | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3138/.pan/review/agent-pan-3138-review-45c64d10/requirements.md | 0 |\n\n## Blocking Findings\n\n### [correctness] Retaining the pending file allows two processes to run post-merge lifecycle concurrently — `src/dashboard/server/pending-lifecycle.ts:131`\nThe current cycle changed the dashboard startup handler to retain `pending-post-merge.json` until its delayed lifecycle runner succeeds, while the separately forked Deacon process also reads and executes that same pending artifact during patrol. The lifecycle guards are process-local, so dashboard and Deacon can concurrently perform the same tracker transitions, release triggers, session cleanup, reset-marker creation, and knowledge-retro work. They then race to unlink the file, which can emit a false failure after one lifecycle body has already succeeded. This finding is inside both the PR diff and the cycle diff, so it survives the cycle-5 convergence gate. The pending artifact needs one atomic cross-process execution owner, with regression coverage proving a shared artifact produces one lifecycle invocation and one terminal event.\n\n## Non-blocking Findings\n\n### [performance] Incomplete post-merge retries serially occupy the main Deacon patrol — `src/lib/cloister/deacon-merge.ts:176`\nThe patrol awaits each recovery-only `postMergeLifecycle()` call in sequence, so several incomplete handoffs or a slow Docker/tracker dependency can delay unrelated patrol recovery work. The reviewer classified this as advisory because the path is exceptional and the backlog should normally be small; a deduplicated bounded background worker would keep the patrol responsive.\n\n## Clean Sub-roles\n- security\n- requirements\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3138/.pan/review/agent-pan-3138-review-45c64d10/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3138 -m \"Fixed review issues\"`"
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-26T17:46:22.275Z"
     }
   ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "scripts/file-size-baseline.txt",
@@ -315,7 +312,7 @@
     "recordedAt": "2026-07-26T17:46:15.742Z"
   },
   "created": "2026-07-26T13:39:19.365Z",
-  "updated": "2026-07-26T17:46:20.429Z",
+  "updated": "2026-07-26T17:46:22.275Z",
   "pipeline": {
     "issueId": "PAN-3138",
     "reviewStatus": "pending",
