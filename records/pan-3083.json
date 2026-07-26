@@ -166,23 +166,23 @@
     "recordedAt": "2026-07-25T23:54:54.328Z"
   },
   "created": "2026-07-25T22:42:08.234Z",
-  "updated": "2026-07-26T00:10:06.783Z",
+  "updated": "2026-07-26T00:10:23.354Z",
   "pipeline": {
     "issueId": "PAN-3083",
-    "reviewStatus": "failed",
+    "reviewStatus": "reviewing",
     "testStatus": "testing",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-25T23:58:42.757Z",
-    "updatedAt": "2026-07-26T00:09:58.023Z",
+    "updatedAt": "2026-07-26T00:10:22.802Z",
     "reviewNotes": "Review role spawn failed: Command failed: tmux -L overdeck -f /home/eltmon/.overdeck/tmux/overdeck.tmux.conf paste-buffer -b pan-8df08097-b712-4687-92e6-489cb47286c8 -p -t agent-pan-3083-review\ncan't find pane: agent-pan-3083-review\n",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3089",
     "reviewedAtCommit": "3f1cf7736590cf60192d97fe26c2df744cce3039",
     "reviewRequestedAt": "2026-07-25T23:58:42.757Z",
-    "reviewSpawnedAt": "2026-07-25T23:55:02.355Z",
+    "reviewSpawnedAt": "2026-07-26T00:10:22.801Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "src/lib/__tests__/review-dispatch-decision.test.ts",
@@ -227,9 +227,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 7519023,
-            "output": 87768,
-            "cacheRead": 15412224,
+            "input": 7780678,
+            "output": 89558,
+            "cacheRead": 15537664,
             "cacheWrite": 0
           }
         },
@@ -258,9 +258,9 @@
           "cacheWrite": 299804
         },
         "openai/gpt-5.6-sol": {
-          "input": 8555092,
-          "output": 150198,
-          "cacheRead": 57232384,
+          "input": 8816747,
+          "output": 151988,
+          "cacheRead": 57357824,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -271,8 +271,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 87.123668,
-        "pricingAsOf": "2026-07-26T00:10:06.770Z"
+        "usd": 88.548363,
+        "pricingAsOf": "2026-07-26T00:10:23.111Z"
       }
     },
     "merges": [
