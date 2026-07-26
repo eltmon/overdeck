@@ -459,6 +459,24 @@ describe('Definition-of-Done deploy row', () => {
     expect(row).toMatchObject({ status: 'miss', observed: expect.stringContaining('did not report buildCommit') });
   });
 
+  it('skips deploy ancestry when the merged row missed without a merge commit', async () => {
+    const row = await checkDeployRow(ctx, { mergedRowStatus: 'miss' }, baseDeps);
+
+    expect(row).toMatchObject({
+      status: 'skip',
+      observed: 'no merge commit resolved because the merged row missed — deploy ancestry depends on row 4; build ancestry unchecked',
+    });
+  });
+
+  it('misses when the merged row passed without a resolvable merge commit', async () => {
+    const row = await checkDeployRow(ctx, { mergedRowStatus: 'pass' }, baseDeps);
+
+    expect(row).toMatchObject({
+      status: 'miss',
+      observed: 'merged row passed without a resolvable merge commit; build ancestry cannot be checked',
+    });
+  });
+
   it('skips another project and misses an unreachable dashboard', async () => {
     const otherProject = await checkDeployRow(ctx, merge, {
       ...baseDeps,
@@ -489,8 +507,16 @@ describe('assembled Definition-of-Done gate', () => {
       expect(commit).toBe('abc123');
       return makeRow('main-verify');
     },
-    deploy: async (_ctx: unknown, merge: { mergedAt?: string; mergeCommit?: string }) => {
-      expect(merge).toEqual({ mergedAt: '2026-07-15T12:00:00Z', mergeCommit: 'abc123' });
+    deploy: async (_ctx: unknown, merge: {
+      mergedAt?: string;
+      mergeCommit?: string;
+      mergedRowStatus?: DodRowResult['status'];
+    }) => {
+      expect(merge).toEqual({
+        mergedAt: '2026-07-15T12:00:00Z',
+        mergeCommit: 'abc123',
+        mergedRowStatus: 'pass',
+      });
       return makeRow('deploy', deployStatus);
     },
     now: () => '2026-07-15T13:00:00Z',

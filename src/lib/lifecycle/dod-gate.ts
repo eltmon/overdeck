@@ -130,7 +130,11 @@ export interface EvaluateDodGateDeps {
   merged: (ctx: LifecycleContext) => MergedDodRowResult | Promise<MergedDodRowResult>;
   postMerge: (ctx: LifecycleContext, merged?: MergedDodRowResult) => DodRowResult | Promise<DodRowResult>;
   mainVerify: (ctx: LifecycleContext, mergeCommit?: string) => DodRowResult | Promise<DodRowResult>;
-  deploy: (ctx: LifecycleContext, merge: { mergedAt?: string; mergeCommit?: string }) => DodRowResult | Promise<DodRowResult>;
+  deploy: (ctx: LifecycleContext, merge: {
+    mergedAt?: string;
+    mergeCommit?: string;
+    mergedRowStatus?: DodRowResult['status'];
+  }) => DodRowResult | Promise<DodRowResult>;
   now: () => string;
 }
 
@@ -391,7 +395,11 @@ export async function checkMainVerifyRow(
 
 export async function checkDeployRow(
   ctx: LifecycleContext,
-  merge: { mergedAt?: string; mergeCommit?: string },
+  merge: {
+    mergedAt?: string;
+    mergeCommit?: string;
+    mergedRowStatus?: DodRowResult['status'];
+  },
   deps: DeployRowDeps = defaultDeployRowDeps,
 ): Promise<DodRowResult> {
   const baseUrl = deps.dashboardUrl().replace(/\/$/, '');
@@ -416,7 +424,14 @@ export async function checkDeployRow(
     return result('deploy', 'miss', `dashboard at ${baseUrl} did not report buildCommit; live deployment cannot be proven`);
   }
   if (!merge.mergeCommit) {
-    return result('deploy', 'miss', 'cannot resolve merge commit; live deployment cannot be proven');
+    if (merge.mergedRowStatus === 'miss') {
+      return result(
+        'deploy',
+        'skip',
+        'no merge commit resolved because the merged row missed — deploy ancestry depends on row 4; build ancestry unchecked',
+      );
+    }
+    return result('deploy', 'miss', 'merged row passed without a resolvable merge commit; build ancestry cannot be checked');
   }
 
   try {
@@ -458,7 +473,11 @@ export async function evaluateDodGate(
     Promise.resolve(merged),
     deps.postMerge(ctx, merged),
     deps.mainVerify(ctx, merged.mergeCommit),
-    deps.deploy(ctx, { mergedAt: merged.mergedAt, mergeCommit: merged.mergeCommit }),
+    deps.deploy(ctx, {
+      mergedAt: merged.mergedAt,
+      mergeCommit: merged.mergeCommit,
+      mergedRowStatus: merged.status,
+    }),
   ]);
   for (const row of rows) {
     if (row.status === 'miss' && acceptedRows.has(row.id)) {
