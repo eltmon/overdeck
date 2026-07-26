@@ -2611,26 +2611,9 @@ export async function runPatrol(): Promise<PatrolResult> {
   // In dev mode, the deploy script may fail to restart cleanly, leaving the pending file.
   try {
     const pendingFile = join(OVERDECK_HOME, 'pending-post-merge.json');
-    if (existsSync(pendingFile)) {
-      const content = readFileSync(pendingFile, 'utf-8');
-      const pending = JSON.parse(content);
-      const age = Date.now() - (pending.timestamp ?? 0);
-      if (age < 60 * 60 * 1000) { // Less than 1 hour old
-        console.log(`[deacon] Processing pending post-merge lifecycle for ${pending.issueId} (age: ${Math.round(age / 1000)}s)`);
-        // Import and run lifecycle with skipDeploy to avoid infinite restart loop
-        const { postMergeLifecycle } = await import('./merge-agent.js');
-        // Delete file first to prevent re-processing
-        const { unlinkSync } = await import('fs');
-        unlinkSync(pendingFile);
-        await postMergeLifecycle(pending.issueId, pending.projectPath, pending.sourceBranch, { skipDeploy: true });
-        actions.push(`Processed pending post-merge lifecycle for ${pending.issueId}`);
-      } else {
-        // Stale — delete it
-        const { unlinkSync } = await import('fs');
-        unlinkSync(pendingFile);
-        console.log(`[deacon] Deleted stale pending-post-merge.json (age: ${Math.round(age / 60000)}m)`);
-      }
-    }
+    const { processPendingLifecycleForPatrol } = await import('./deacon-pending-lifecycle.js');
+    const action = await processPendingLifecycleForPatrol(pendingFile);
+    if (action) actions.push(action);
   } catch (err: any) {
     console.warn(`[deacon] Failed to process pending lifecycle: ${err.message}`);
   }

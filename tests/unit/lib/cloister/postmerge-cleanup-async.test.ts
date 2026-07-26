@@ -28,6 +28,11 @@ const mockSetAgentPaused = vi.hoisted(() => vi.fn(() => Effect.succeed(null)));
 const mockCreateResetMarker = vi.hoisted(() => vi.fn(async (input: unknown) => ({ id: 'reset-1', ...(input as Record<string, unknown>) })));
 const mockSetReviewStatusSync = vi.hoisted(() => vi.fn());
 const mockKillAllReviewerSessions = vi.hoisted(() => vi.fn(() => Effect.succeed({ killed: [] as string[] })));
+const mockEnqueueMergedDockerCleanup = vi.hoisted(() => vi.fn());
+const mockTeardownWorkspaceDockerByNamePromise = vi.hoisted(() =>
+  vi.fn().mockResolvedValue({ networkRemoved: true, steps: ['Removed network'] }),
+);
+const mockTransitionState = vi.hoisted(() => ({ shouldFail: false }));
 
 // ── child_process / fs mocks ──────────────────────────────────────────────────
 const mockExecAsync = vi.hoisted(() =>
@@ -36,6 +41,9 @@ const mockExecAsync = vi.hoisted(() =>
       return { stdout: '[{"number":399,"state":"closed","mergedAt":"2026-07-12T00:00:00Z"}]', stderr: '' };
     }
     if (cmd.includes('gh label create')) return { stdout: '', stderr: '' };
+    if (mockTransitionState.shouldFail && cmd.includes('gh issue edit') && cmd.includes('--add-label')) {
+      throw new Error('tracker transition failed');
+    }
     if (cmd.includes('gh issue edit')) return { stdout: '', stderr: '' };
     if (cmd.includes('git rev-parse --verify')) return { stdout: 'deadbeef\n', stderr: '' };
     if (cmd.includes('git merge-base --is-ancestor')) return { stdout: '', stderr: '' };
@@ -172,6 +180,14 @@ vi.mock('../../../../src/lib/lifecycle/label-cleanup.js', () => ({
   cleanupMergedLabels: mockCleanupMergedLabels,
 }));
 
+vi.mock('../../../../src/lib/cloister/merged-docker-cleanup-worker.js', () => ({
+  enqueueMergedDockerCleanup: mockEnqueueMergedDockerCleanup,
+}));
+
+vi.mock('../../../../src/lib/workspace-manager/docker.js', () => ({
+  teardownWorkspaceDockerByNamePromise: mockTeardownWorkspaceDockerByNamePromise,
+}));
+
 vi.mock('../../../../src/lib/agents.js', () => ({
   setAgentPaused: mockSetAgentPaused,
   getAgentState: vi.fn(() => Effect.succeed(null)),
@@ -211,6 +227,8 @@ describe('postMergeLifecycle — release trigger does not block cleanup', () => 
     resetPostMergeState(ISSUE_ID);
     releaseResolve = null;
     releaseStarted = false;
+    mockTransitionState.shouldFail = false;
+    mockTeardownWorkspaceDockerByNamePromise.mockResolvedValue({ networkRemoved: true, steps: ['Removed network'] });
   });
 
   afterEach(() => {
@@ -233,11 +251,88 @@ describe('postMergeLifecycle — release trigger does not block cleanup', () => 
     expect(mockCleanupMergedLabels).toHaveBeenCalled();
     expect(mockSetAgentPaused).toHaveBeenCalled();
     expect(mockCreateResetMarker).toHaveBeenCalled();
+    await vi.waitFor(() =>
+      expect(mockTeardownWorkspaceDockerByNamePromise).toHaveBeenCalledWith(ISSUE_ID.toLowerCase()),
+    );
 
     // Now let the release finish.
     expect(releaseResolve).not.toBeNull();
     releaseResolve!();
 
     await lifecyclePromise;
+    expect(mockSetReviewStatusSync).toHaveBeenLastCalledWith(
+      ISSUE_ID,
+      expect.objectContaining({ mergeStatus: 'merged', mergeStep: 'merged' }),
+    );
   }, 30_000);
+
+  it('runs name-based teardown before a verifying-on-main tracker transition fails', async () => {
+    mockTransitionState.shouldFail = true;
+
+    await expect(
+      postMergeLifecycle(ISSUE_ID, PROJECT_PATH, SOURCE_BRANCH, { skipDeploy: true }),
+    ).rejects.toThrow('tracker transition failed');
+
+    expect(mockTeardownWorkspaceDockerByNamePromise).toHaveBeenCalledWith(ISSUE_ID.toLowerCase());
+    expect(mockSetReviewStatusSync).toHaveBeenCalledWith(
+      ISSUE_ID,
+      expect.objectContaining({ mergeStatus: 'merged', mergeStep: 'post-merge-cleanup' }),
+    );
+  });
+
+  it('queues retry ownership when teardown and tracker transition both fail', async () => {
+    mockTransitionState.shouldFail = true;
+    mockTeardownWorkspaceDockerByNamePromise.mockResolvedValueOnce({
+      networkRemoved: false,
+      steps: ['Network still present'],
+    });
+
+    await expect(
+      postMergeLifecycle(ISSUE_ID, PROJECT_PATH, SOURCE_BRANCH, { skipDeploy: true }),
+    ).rejects.toThrow('tracker transition failed');
+
+    expect(mockEnqueueMergedDockerCleanup).toHaveBeenCalledWith(ISSUE_ID, { mergeVerified: true });
+    expect(mockSetReviewStatusSync).toHaveBeenCalledWith(
+      ISSUE_ID,
+      expect.objectContaining({ mergeStatus: 'merged', mergeStep: 'post-merge-cleanup' }),
+    );
+  });
+
+  it('preserves verified retry ownership when the initial merged-status write fails', async () => {
+    mockSetReviewStatusSync.mockImplementationOnce(() => {
+      throw new Error('status write failed');
+    });
+    mockTeardownWorkspaceDockerByNamePromise.mockRejectedValueOnce(
+      new Error('network teardown failed'),
+    );
+
+    await expect(
+      postMergeLifecycle(ISSUE_ID, PROJECT_PATH, SOURCE_BRANCH, { skipDeploy: true }),
+    ).resolves.toBeUndefined();
+
+    expect(mockEnqueueMergedDockerCleanup).toHaveBeenCalledWith(
+      ISSUE_ID,
+      { mergeVerified: true },
+    );
+  });
+
+  it('continues post-merge cleanup when Docker network teardown fails', async () => {
+    const teardownError = new Error('network teardown failed');
+    mockTeardownWorkspaceDockerByNamePromise.mockRejectedValueOnce(teardownError);
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    try {
+      await expect(postMergeLifecycle(ISSUE_ID, PROJECT_PATH, SOURCE_BRANCH, { skipDeploy: true })).resolves.toBeUndefined();
+
+      expect(mockTeardownWorkspaceDockerByNamePromise).toHaveBeenCalledWith(ISSUE_ID.toLowerCase());
+      expect(mockEnqueueMergedDockerCleanup).toHaveBeenCalledWith(ISSUE_ID, { mergeVerified: true });
+      expect(mockSetAgentPaused).toHaveBeenCalled();
+      expect(mockCreateResetMarker).toHaveBeenCalled();
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Docker cleanup queued for retry (non-fatal): network teardown failed'),
+      );
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
 });

@@ -7,9 +7,9 @@
  * scripts/lint-circular-deps.sh). Same shape as memory-verdict-cache.ts: this
  * module has no imports of its own, so it cannot be part of any cycle.
  *
- * review-status.ts registers the reader at module load. Before registration
- * (or if the read throws) callers get null and treat NOTHING as warm-idle —
- * the ceiling stays conservative.
+ * review-status.ts registers both the raw map reader and the journal-reconciled
+ * canonical resolver at module load. Raw-map callers get null when unavailable;
+ * canonical callers receive available=false so safety gates can fail closed.
  */
 
 /** Minimal status shape needed for advancing-session lifecycle classification. */
@@ -18,6 +18,7 @@ export interface WarmIdleStatusShape {
   testStatus?: string;
   readyForMerge?: boolean;
   mergeStatus?: string;
+  mergeStep?: string;
 }
 
 export type AdvancingRole = 'review' | 'test' | 'ship';
@@ -59,8 +60,10 @@ export function isAdvancingLifecycleReclaimable(
 }
 
 type StatusMapReader = () => Record<string, WarmIdleStatusShape>;
+type CanonicalStatusResolver = (issueId: string) => WarmIdleStatusShape | null;
 
 let reader: StatusMapReader | null = null;
+let canonicalResolver: CanonicalStatusResolver | null = null;
 
 export function registerReviewStatusMapReader(fn: StatusMapReader): void {
   reader = fn;
@@ -72,5 +75,21 @@ export function readReviewStatusMap(): Record<string, WarmIdleStatusShape> | nul
     return reader();
   } catch {
     return null;
+  }
+}
+
+export function registerCanonicalReviewStatusResolver(fn: CanonicalStatusResolver): void {
+  canonicalResolver = fn;
+}
+
+export function resolveCanonicalReviewStatus(issueId: string): {
+  available: boolean;
+  status: WarmIdleStatusShape | null;
+} {
+  if (!canonicalResolver) return { available: false, status: null };
+  try {
+    return { available: true, status: canonicalResolver(issueId) };
+  } catch {
+    return { available: false, status: null };
   }
 }

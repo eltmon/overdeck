@@ -144,7 +144,6 @@ export interface PanIssueRecoveryTrip {
   open: boolean;
   needsYouEmittedAt?: string;
 }
-
 export interface PanIssuePipelineRecord extends StrikeLandingStatus {
   issueId: string;
   reviewStatus: string;
@@ -152,6 +151,7 @@ export interface PanIssuePipelineRecord extends StrikeLandingStatus {
   verificationStatus?: string;
   inspectStatus?: string;
   mergeStatus?: string;
+  mergeStep?: string;
   releaseStatus?: string;
   readyForMerge: boolean;
   reviewNotes?: string;

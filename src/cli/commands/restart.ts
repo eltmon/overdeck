@@ -33,6 +33,7 @@ import { acquireRestartLock, readRestartLockHolder, type RestartLockHandle } fro
 import { writeRestartStatus } from '../../lib/restart-status.js';
 import { applyBootGateEnv, formatBootGateState, resolveBootGates, type BootGateOptions } from '../../lib/boot-gates.js';
 import { agentRestartBlockReason } from '../../lib/deploy/agent-restart-gate.js';
+import { readActiveDashboardBundleSync } from '../../lib/deploy/active-dashboard-bundle.js';
 
 import {
   DASHBOARD_LOG_FILE,
@@ -156,6 +157,9 @@ function uniqueBundleCandidates(): DashboardBundleCandidate[] {
 }
 
 export function resolveBundledServerPath(): string {
+  const activeBundle = readActiveDashboardBundleSync();
+  if (activeBundle) return activeBundle.serverPath;
+
   const candidates = uniqueBundleCandidates();
   return candidates.find(candidate => existsSync(candidate.path))?.path
     ?? candidates.find(candidate => candidate.preferred)?.path
@@ -163,8 +167,9 @@ export function resolveBundledServerPath(): string {
 }
 
 export function resolvePrimaryDashboardIdentity(): { repoRoot: string; mode: 'primary' } {
+  const activeBundle = readActiveDashboardBundleSync();
   return {
-    repoRoot: resolve(resolveBundledServerPath(), '..', '..', '..'),
+    repoRoot: activeBundle?.repoRoot ?? resolve(resolveBundledServerPath(), '..', '..', '..'),
     mode: 'primary',
   };
 }
@@ -194,8 +199,13 @@ export function scrubAgentIdentityFromDashboardEnv(env: NodeJS.ProcessEnv): void
   }
 }
 
-export function spawnDashboardDetached(config: PlatformConfig, opts?: BootGateOptions): DashboardSpawnHandle {
-  const serverPath = resolveBundledServerPath();
+export interface DashboardSpawnOptions extends BootGateOptions {
+  readonly serverPath?: string;
+  readonly repoRoot?: string;
+}
+
+export function spawnDashboardDetached(config: PlatformConfig, opts?: DashboardSpawnOptions): DashboardSpawnHandle {
+  const serverPath = opts?.serverPath ?? resolveBundledServerPath();
   if (!existsSync(serverPath)) {
     throw new StageError({
       stage: 'dashboard',
@@ -220,7 +230,9 @@ export function spawnDashboardDetached(config: PlatformConfig, opts?: BootGateOp
     PORT: String(config.dashboardApiPort),
     OVERDECK_MODE: 'production',
   };
-  const identity = resolvePrimaryDashboardIdentity();
+  const identity = opts?.repoRoot
+    ? { repoRoot: resolve(opts.repoRoot), mode: 'primary' as const }
+    : resolvePrimaryDashboardIdentity();
 
   // PAN-2804: a plain detached spawn stays in the INVOKER's cgroup — a
   // watchdog-spawned dashboard dies when overdeck-supervisor.service restarts,

@@ -28,6 +28,7 @@ const { defaultExecAsync, mockExecAsync } = vi.hoisted(() => {
   };
 });
 const mockCreateResetMarker = vi.hoisted(() => vi.fn(async (input: unknown) => ({ id: 'reset-1', ...(input as Record<string, unknown>) })));
+const mockGetReviewStatusSync = vi.hoisted(() => vi.fn());
 const mockSetReviewStatusSync = vi.hoisted(() => vi.fn());
 const mockLoadConfigSync = vi.hoisted(() => vi.fn(() => ({ config: { knowledge: { postMergeAutoRetro: false } } })));
 const mockIsGitHubAppConfigured = vi.hoisted(() => vi.fn(() => false));
@@ -121,6 +122,10 @@ vi.mock('../../../src/lib/cloister/merge-agent-step0.js', () => ({
   shouldRestartForPostMerge: mockShouldRestartForPostMerge,
 }));
 
+vi.mock('../../../src/lib/cloister/post-merge-lifecycle-lock.js', () => ({
+  withPostMergeLifecycleLock: vi.fn((_issueId: string, run: () => Promise<unknown>) => run()),
+}));
+
 vi.mock('../../../src/lib/projects.js', () => ({
   resolveProjectFromIssue: vi.fn().mockReturnValue(null),
   resolveProjectFromIssueSync: vi.fn().mockReturnValue(null),
@@ -141,7 +146,7 @@ vi.mock('../../../src/lib/activity-log.js', () => ({
 }));
 
 vi.mock('../../../src/lib/review-status.js', () => ({
-  getReviewStatusSync: vi.fn().mockReturnValue(null),
+  getReviewStatusSync: mockGetReviewStatusSync,
   setReviewStatus: vi.fn(),
   setReviewStatusSync: mockSetReviewStatusSync,
 }));
@@ -179,6 +184,7 @@ describe('postMergeLifecycle — step 0 deploy handoff', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockExecAsync.mockImplementation(defaultExecAsync);
+    mockGetReviewStatusSync.mockReturnValue(null);
     mockIsGitHubAppConfigured.mockReturnValue(false);
     mockListPullRequestsForHead.mockReturnValue(Effect.succeed([]));
     mockShouldRestartForPostMerge.mockResolvedValue(true);
@@ -348,6 +354,7 @@ describe('postMergeLifecycle — step 0 deploy handoff', () => {
 
     expect(mockSetReviewStatusSync).toHaveBeenCalledWith(ISSUE_ID, {
       mergeStatus: 'merged',
+      mergeStep: 'post-merge-cleanup',
       readyForMerge: false,
       reviewStatus: 'passed',
     });
@@ -358,6 +365,7 @@ describe('postMergeLifecycle — step 0 deploy handoff', () => {
 
     expect(mockSetReviewStatusSync).toHaveBeenCalledWith(ISSUE_ID, {
       mergeStatus: 'merged',
+      mergeStep: 'post-merge-cleanup',
       readyForMerge: false,
     });
   });
@@ -395,6 +403,19 @@ describe('postMergeLifecycle — step 0 deploy handoff', () => {
     }));
   }, 30_000);
 
+  it('rechecks durable completion after acquiring the cross-process lock', async () => {
+    mockGetReviewStatusSync
+      .mockReturnValueOnce(null)
+      .mockReturnValue({ mergeStep: 'merged' });
+
+    await postMergeLifecycle(ISSUE_ID, PROJECT_PATH, SOURCE_BRANCH, { skipDeploy: true });
+
+    expect(mockGetReviewStatusSync).toHaveBeenCalledTimes(2);
+    expect(mockWriteFile).not.toHaveBeenCalled();
+    expect(mockSpawn).not.toHaveBeenCalled();
+    expect(mockSetReviewStatusSync).not.toHaveBeenCalled();
+  });
+
   it('step 0 does not run when idempotency guard is set', async () => {
     // Guard is set externally (simulating a second invocation after in-process lifecycle ran).
     // The guard check fires before step 0, so writeFile is never called.
@@ -425,6 +446,7 @@ describe('postMergeLifecycle — repoRoot derivation', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockExecAsync.mockImplementation(defaultExecAsync);
+    mockGetReviewStatusSync.mockReturnValue(null);
     resetPostMergeState(ISSUE_ID);
     mockWriteFile.mockResolvedValue(undefined);
     mockSpawn.mockReturnValue(mockSpawnChild);
