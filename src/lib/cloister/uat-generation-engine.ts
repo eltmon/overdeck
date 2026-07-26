@@ -17,6 +17,7 @@
  * conflict-resolved, held-out, failed — is unit-testable with fake deps.
  */
 import { makeUatCandidateName } from './uat-candidate-name.js';
+import type { PolyrepoRepoContribution } from '../flywheel-merge-order.js';
 import type {
   UatGeneration,
   UatGenerationMember,
@@ -33,6 +34,13 @@ export interface ReadyFeature {
   prUrl?: string;
   /** Issue ids this feature's changed files overlap with (from computeMergeQueue). */
   conflictsWith?: readonly string[];
+  /**
+   * Member repos this feature actually has a branch in (polyrepo only; the
+   * monorepo ready set omits it). Populated by
+   * computePolyrepoMergeQueueFromCandidates — the polyrepo engine merges only
+   * these repos and skips the rest.
+   */
+  repoContributions?: readonly PolyrepoRepoContribution[];
 }
 
 /** Context handed to the conflict-resolution hook while the merge is mid-conflict. */

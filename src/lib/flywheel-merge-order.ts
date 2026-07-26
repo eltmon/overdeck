@@ -9,6 +9,7 @@ import { compileGlob, type CompiledGlob } from './xbrief/dag.js';
 import { computeIssueFootprint } from './xbrief/swarm-readiness.js';
 import type { XBriefDocument } from './xbrief/types.js';
 import { findProjectByPathSync, getProjectSwarmHotspots, resolveProjectFromIssueSync } from './projects.js';
+import type { ResolvedProjectRepo } from './project-repos.js';
 
 export interface MergeQueueItem {
   issueId: string;
@@ -328,6 +329,157 @@ export const computeMergeQueueFromCandidates = (
       mergeOrder: idx + 1,
       conflictsWith: [...(conflictsMap.get(item.issueId) ?? [])],
       batchGroup: (conflictCount === 0 ? 'batch' : 'serialize') as 'batch' | 'serialize',
+    }));
+  });
+
+/** One member repo a candidate actually has a feature branch in. */
+export interface PolyrepoRepoContribution {
+  repoKey: string;
+  repoPath: string;
+  /** The feature branch ref that exists, origin-qualified when the remote has it. */
+  branch: string;
+  /** Branch this repo merges into, from the repo's own config. */
+  targetBranch: string;
+  /** Configured merge order for this repo within the project. */
+  mergeOrder: number;
+}
+
+export interface PolyrepoMergeQueueItem extends MergeQueueItem {
+  repoContributions: PolyrepoRepoContribution[];
+}
+
+export interface ComputePolyrepoMergeQueueOptions extends ComputeMergeQueueOptions {
+  /** Called for each candidate dropped because no member repo has its branch. */
+  onExcluded?: (issueId: string, reason: string) => void;
+}
+
+/**
+ * Origin-first feature-branch probe, matching branchHeadSha in
+ * uat-generation-deps.ts: work agents push their branches, so the local ref can
+ * lag or be missing entirely in a repo the operator never checked out.
+ * Returns the ref that exists, or null when neither does.
+ */
+const resolveFeatureRef = (branch: string, repoPath: string) =>
+  Effect.gen(function*() {
+    const originRef = `origin/${branch}`;
+    if (yield* branchExists(originRef, repoPath)) return originRef;
+    if (yield* branchExists(branch, repoPath)) return branch;
+    return null;
+  });
+
+/**
+ * PAN-3093 polyrepo ready set. The monorepo sibling
+ * (computeMergeQueueFromCandidates) derives one `feature/<issue>` branch and
+ * runs git against one project root; a polyrepo candidate instead contributes
+ * to some subset of the project's member repos, and only those repos with a
+ * real feature branch belong in the generation.
+ *
+ * Conflict prediction runs over the union of each candidate's per-repo changed
+ * files, prefixed `<repoKey>:` so the same path in two repos cannot read as an
+ * overlap. Hotspot globs are applied per repo BEFORE prefixing — a glob like
+ * `package.json` would never match `fe:package.json`.
+ */
+export const computePolyrepoMergeQueueFromCandidates = (
+  candidates: ReadonlyArray<{ issueId: string; title: string; pr?: number }>,
+  reposByIssue: ReadonlyMap<string, ReadonlyArray<ResolvedProjectRepo>>,
+  projectRoot: string,
+  options: ComputePolyrepoMergeQueueOptions = {},
+) =>
+  Effect.gen(function*() {
+    if (candidates.length === 0) return [] as PolyrepoMergeQueueItem[];
+    const gitConcurrency = Math.max(1, Math.floor(options.gitConcurrency ?? MERGE_QUEUE_GIT_CONCURRENCY));
+
+    const resolved = yield* Effect.all(
+      candidates.map((item) =>
+        Effect.gen(function*() {
+          const repos = reposByIssue.get(item.issueId) ?? [];
+          const refs = yield* Effect.all(
+            repos.map((repo) => resolveFeatureRef(repo.sourceBranch, repo.repoPath)),
+            { concurrency: gitConcurrency },
+          );
+          const contributions: PolyrepoRepoContribution[] = repos
+            .map((repo, i) => ({ repo, ref: refs[i]! }))
+            .filter((entry): entry is { repo: ResolvedProjectRepo; ref: string } => entry.ref !== null)
+            .map(({ repo, ref }) => ({
+              repoKey: repo.repoKey,
+              repoPath: repo.repoPath,
+              branch: ref,
+              targetBranch: repo.targetBranch,
+              mergeOrder: repo.mergeOrder,
+            }))
+            .sort((a, b) => a.mergeOrder - b.mergeOrder || a.repoKey.localeCompare(b.repoKey));
+          return { item, repos, contributions };
+        }),
+      ),
+      { concurrency: gitConcurrency },
+    );
+
+    const contributing: Array<{ item: typeof candidates[number]; contributions: PolyrepoRepoContribution[] }> = [];
+    for (const entry of resolved) {
+      if (entry.contributions.length === 0) {
+        options.onExcluded?.(
+          entry.item.issueId,
+          entry.repos.length === 0
+            ? 'no member repos resolved for this issue'
+            : `no feature branch in any of ${entry.repos.length} member repo(s): ${entry.repos.map((r) => r.repoKey).join(', ')}`,
+        );
+        continue;
+      }
+      contributing.push({ item: entry.item, contributions: entry.contributions });
+    }
+
+    if (contributing.length === 0) return [] as PolyrepoMergeQueueItem[];
+
+    const hotspots = (options.hotspots ?? getProjectSwarmHotspots(findProjectByPathSync(projectRoot))).map(compileGlob);
+
+    const fileSets = yield* Effect.all(
+      contributing.map(({ contributions }) =>
+        Effect.all(
+          contributions.map((c) =>
+            changedFilesVsMain(c.branch, c.repoPath, c.targetBranch).pipe(
+              // Filter hotspots against the real path, then namespace by repo so
+              // fe/src/x.ts and api/src/x.ts are not mistaken for one file.
+              Effect.map((files) =>
+                [...normalizedFootprintFiles(files, hotspots)].map((f) => `${c.repoKey}:${f}`),
+              ),
+            ),
+          ),
+          { concurrency: gitConcurrency },
+        ).pipe(Effect.map((perRepo) => new Set(perRepo.flat()))),
+      ),
+      { concurrency: gitConcurrency },
+    );
+
+    // Hotspots were already applied per repo above; re-applying them to prefixed
+    // paths would silently match nothing.
+    const conflictSignals = computePredictedConflictSignals(
+      contributing.map((c, i) => ({ issueId: c.item.issueId, source: 'actual' as const, files: fileSets[i]! })),
+    );
+    const signalByIssue = new Map(conflictSignals.map((signal) => [signal.issueId, signal]));
+    const conflictsMap = new Map(conflictSignals.map((signal) => [signal.issueId, new Set(signal.conflictsWith)]));
+
+    const sorted = orderMergeCandidates(
+      contributing.map((c, i) => ({
+        item: c.item,
+        contributions: c.contributions,
+        issueId: c.item.issueId,
+        footprint: signalByIssue.get(c.item.issueId)?.footprint ?? fileSets[i]!.size,
+        conflictCount: signalByIssue.get(c.item.issueId)?.conflictCount ?? 0,
+      })),
+    );
+
+    return sorted.map(({ item, contributions, conflictCount }, idx) => ({
+      issueId: item.issueId,
+      title: item.title,
+      // The per-repo refs live in repoContributions; this stays the logical
+      // feature-branch name so the field means the same thing as monorepo.
+      branchName: `feature/${item.issueId.toLowerCase()}`,
+      pr: item.pr,
+      prUrl: options.getPrUrl?.(item),
+      mergeOrder: idx + 1,
+      conflictsWith: [...(conflictsMap.get(item.issueId) ?? [])],
+      batchGroup: (conflictCount === 0 ? 'batch' : 'serialize') as 'batch' | 'serialize',
+      repoContributions: contributions,
     }));
   });
 
