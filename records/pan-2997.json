@@ -212,6 +212,11 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-26T11:30:01.637Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-26T11:42:15.437Z"
     }
   ],
   "feedback": [],
@@ -306,10 +311,10 @@
     "recordedAt": "2026-07-26T10:07:26.737Z"
   },
   "created": "2026-07-21T23:09:49.270Z",
-  "updated": "2026-07-26T11:42:13.917Z",
+  "updated": "2026-07-26T11:42:15.716Z",
   "pipeline": {
     "issueId": "PAN-2997",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -317,11 +322,11 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T10:57:04.635Z",
-    "updatedAt": "2026-07-26T11:42:13.467Z",
+    "updatedAt": "2026-07-26T11:42:13.948Z",
     "reviewNotes": "Agent re-review request (2/25): Fixed the cycle-15 blocker: the initial strict POISON read is now wrapped in KeyedMarkerVerificationError (cause preserved), locally and remotely — a transient read failure before any side effect keeps the outbox pending instead of recording terminal 'failed'. Missing targets stay classified upstream (messageAgent stopped/zombie → resume). Local and remote failed-poison-read tests assert the class; the wake-level regression proves the class leaves the outbox pending with no notified event until retry succeeds.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3004",
     "lastVerifiedCommit": "c79ea9b5657996d42f2df3d76eed82028e364e41",
-    "reviewSpawnedAt": "2026-07-26T11:29:59.296Z",
+    "reviewSpawnedAt": "2026-07-26T11:42:13.947Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "src/dashboard/server/event-store.ts",
@@ -471,7 +476,7 @@
       },
       "costAtCloseOut": {
         "usd": 357.0030766,
-        "pricingAsOf": "2026-07-26T11:42:13.488Z"
+        "pricingAsOf": "2026-07-26T11:42:15.698Z"
       }
     },
     "merges": [
