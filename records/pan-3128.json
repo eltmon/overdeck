@@ -117,9 +117,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-26T15:00:36.858Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-26T15:03Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-26T15:03:46.405Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-26T15:03:46Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-3128\n\n# Review Synthesis — PAN-3128 — 2026-07-26T15:03:22Z\n\n## Verdict: CHANGES REQUESTED — health-timeout rollback deletes the dashboard that the lifecycle layer deliberately leaves running\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3128/.pan/review/agent-pan-3128-review-b56ae39c/context.json\n- Branch: feature/pan-3128\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3128\n- HEAD reviewed: b56ae39c19d5930c57f68f6449618b5fe9e0d32e\n- Cycle number: 5\n- Prior cycle SHA: 0d6fbd3b8842ca1370d0b2e92195e8a40ac826ef\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3128/.pan/review/agent-pan-3128-review-b56ae39c/security.md | 0 |\n| correctness | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3128/.pan/review/agent-pan-3128-review-b56ae39c/correctness.md | 1 |\n| performance | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3128/.pan/review/agent-pan-3128-review-b56ae39c/performance.md | 0 |\n| requirements | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3128/.pan/review/agent-pan-3128-review-b56ae39c/requirements.md | 0 |\n\n## Blocking Findings\n\n### [correctness] Health-timeout recovery deletes the dashboard that was deliberately left running — `src/cli/commands/reload.ts:205`\nThe new restart-error catch restores the previous marker, rolls back primary `dist`, and removes the new deployment worktree for every `restartDashboard()` rejection. That conflicts with the PAN-3099 lifecycle contract in `restartDashboardPromise()`: after a health timeout, the freshly spawned dashboard is intentionally left running because it may still be booting, and the error explicitly promises it remains available for inspection. Reload now deletes that live process's server chunks, workspace sources, and `node_modules`, so a slow but healthy boot cannot reliably finish and a broken boot cannot be inspected in its original state.\n\nThis blocker is promotable under the cycle-5 convergence gate because the unconditional rollback/removal path was added after the prior reviewed SHA `0d6fbd3b8842ca1370d0b2e92195e8a40ac826ef`; it did not exist in earlier cycles and could not have been raised in cycle 1. Distinguish structurally between a pre-spawn failure and a health timeout that leaves a process running. Preserve the new deployment, marker, and activated `dist` for the latter, and add an integration-level test using the real lifecycle behavior to prove a delayed server can become healthy after the timeout.\n\n## Non-blocking Findings\nNone.\n\n## Clean Sub-roles\n- security\n- performance\n- requirements\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3128/.pan/review/agent-pan-3128-review-b56ae39c/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3128 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "src/cli/commands/__tests__/reload.test.ts",
@@ -159,7 +172,7 @@
     "recordedAt": "2026-07-26T13:30:54.544Z"
   },
   "created": "2026-07-26T12:24:12.648Z",
-  "updated": "2026-07-26T15:03:45.739Z",
+  "updated": "2026-07-26T15:03:46.406Z",
   "pipeline": {
     "issueId": "PAN-3128",
     "reviewStatus": "blocked",
