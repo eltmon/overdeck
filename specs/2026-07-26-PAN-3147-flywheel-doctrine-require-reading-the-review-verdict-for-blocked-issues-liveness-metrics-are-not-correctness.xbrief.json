@@ -4,17 +4,17 @@
     "created": "2026-07-26T17:33:47Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3147: Flywheel doctrine: require reading the review verdict for blocked issues — liveness metrics are not correctness",
-    "updated": "2026-07-26T17:37:13.928Z"
+    "updated": "2026-07-26T17:37:16.480Z"
   },
   "plan": {
     "id": "pan-3147",
     "title": "Flywheel doctrine: require reading the review verdict for blocked issues — liveness metrics are not correctness",
-    "status": "approved",
+    "status": "running",
     "uid": "d8ca2fda-d55b-46c1-bc3c-fa06cd9541c9",
     "author": "agent:k3[1m]",
-    "sequence": 5,
+    "sequence": 6,
     "created": "2026-07-26T17:33:47Z",
-    "updated": "2026-07-26T17:37:13.928Z",
+    "updated": "2026-07-26T17:37:16.480Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3147",
