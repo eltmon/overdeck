@@ -422,6 +422,8 @@ CREATE TABLE `uat_generation_resolutions` (
 	`issue_ids` text NOT NULL,
 	`files` text NOT NULL,
 	`commit_sha` text NOT NULL,
+	`kind` text,
+	`note` text,
 	FOREIGN KEY (`uat_name`) REFERENCES `uat_generations`(`name`) ON UPDATE no action ON DELETE no action
 );
 --> statement-breakpoint

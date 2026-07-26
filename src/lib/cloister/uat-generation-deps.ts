@@ -157,7 +157,82 @@ export function buildUatGenerationGitDeps(
     push: async (branchName) => {
       await runGit(['push', '-u', '--force-with-lease', 'origin', safeBranchName(branchName, 'uat')], worktreePath);
     },
+
+    /**
+     * Flyway migrations tracked at a ref, for the union lint (PAN-3166). Reads
+     * the ref rather than a worktree so a candidate can be linted before it is
+     * merged.
+     *
+     * Feature branches resolve origin-first for the same reason mergeBranch
+     * prefers it — work agents push, and the local ref may lag. The GENERATION
+     * branch resolves locally only: its name is deterministic per day and
+     * force-pushed, so `origin/uat/…` can still hold yesterday's tree while the
+     * local ref is the one assembly just cut.
+     */
+    listMigrationFiles: async (ref) => {
+      const safeRef = safeRefName(ref);
+      const resolved = safeRef.startsWith('uat/')
+        ? safeRef
+        : await runGit(['rev-parse', '--verify', `origin/${safeRef}`], projectRoot)
+            .then(() => `origin/${safeRef}`)
+            .catch(() => safeRef);
+      const { stdout } = await runGit(['ls-tree', '-r', '--name-only', resolved], projectRoot);
+      return stdout
+        .split('\n')
+        .map((line) => line.trim())
+        .filter((path) => /(^|\/)V\d[\w.]*__.+\.sql$/i.test(path));
+    },
+
+    /** One migration's SQL at a ref, so the lint can see what it touches. */
+    readMigrationFile: async (ref, path) => {
+      const safeRef = safeRefName(ref);
+      const resolved = safeRef.startsWith('uat/')
+        ? safeRef
+        : await runGit(['rev-parse', '--verify', `origin/${safeRef}`], projectRoot)
+            .then(() => `origin/${safeRef}`)
+            .catch(() => safeRef);
+      const { stdout } = await runGit(['show', `${resolved}:${safeRepoPath(path)}`], projectRoot);
+      return stdout;
+    },
+
+    /**
+     * Renumber migrations on the generation branch and commit. `git mv` keeps
+     * the rename visible in history, and the commit lands on the branch that
+     * promotes to main — so what the operator UATs is exactly what ships.
+     */
+    renameMigrations: async (renames, message) => {
+      if (!worktreePath) throw new Error('renameMigrations before createWorktree');
+      for (const { from, to } of renames) {
+        await runGit(['mv', safeRepoPath(from), safeRepoPath(to)], worktreePath);
+      }
+      await runGit(['commit', '--no-verify', '-m', message], worktreePath);
+      const { stdout } = await runGit(['rev-parse', 'HEAD'], worktreePath);
+      return stdout.trim();
+    },
   };
+}
+
+/**
+ * A repo-relative path safe to hand to git: no leading dash (git would read it
+ * as a flag), no absolute path, no traversal out of the repo.
+ */
+function safeRepoPath(path: string): string {
+  if (!/^[A-Za-z0-9_][A-Za-z0-9._/-]*$/.test(path) || path.includes('..')) {
+    throw new Error(`unsafe repo path: ${path}`);
+  }
+  return path;
+}
+
+/**
+ * A ref safe to pass as a git argument: no leading dash (which git would read
+ * as a flag), no path traversal, no shell metacharacters. Accepts both `uat/…`
+ * and any configured feature namespace, so the union lint can read either.
+ */
+function safeRefName(ref: string): string {
+  if (!/^[A-Za-z0-9][A-Za-z0-9._/-]*$/.test(ref) || ref.includes('..')) {
+    throw new Error(`unsafe git ref: ${ref}`);
+  }
+  return ref;
 }
 
 /**

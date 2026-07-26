@@ -45,12 +45,24 @@ interface FakeGitOptions {
   merges?: Record<string, { ok: true } | { ok: false; conflict: boolean; reason: string } | Error>;
   failWorktree?: boolean;
   failPush?: boolean;
+  /**
+   * ref → tracked migration files. Its PRESENCE wires the union lint (PAN-3166);
+   * omit it and the dep is absent, exactly as for deps built before the lint.
+   * The generation branch's own listing is keyed 'base'.
+   */
+  migrations?: Record<string, string[]>;
+  /** path → SQL. Its presence wires renumbering; without it a collision holds out. */
+  sql?: Record<string, string>;
+  /** Make a listing throw, to prove the lint fails closed rather than open. */
+  failMigrationList?: string;
 }
 
 function makeFakeGit(options: FakeGitOptions = {}): GenerationGitDeps & {
   calls: { merged: string[]; aborts: number; pushed: string[] };
 } {
-  const calls = { merged: [] as string[], aborts: 0, pushed: [] as string[] };
+  const calls = { merged: [] as string[], aborts: 0, pushed: [] as string[], renamed: [] as string[] };
+  /** The generation branch's migrations, growing as features merge. */
+  const branchMigrations: string[] = [...(options.migrations?.base ?? [])];
   return {
     calls,
     fetchMain: async () => 'main-sha-123',
@@ -62,13 +74,47 @@ function makeFakeGit(options: FakeGitOptions = {}): GenerationGitDeps & {
       calls.merged.push(branch);
       const outcome = options.merges?.[branch];
       if (outcome instanceof Error) throw outcome;
-      return outcome ?? { ok: true };
+      const result = outcome ?? { ok: true as const };
+      if (result.ok) branchMigrations.push(...(options.migrations?.[branch] ?? []));
+      return result;
     },
     abortMerge: async () => { calls.aborts += 1; },
     push: async (name) => {
       if (options.failPush) throw new Error('remote rejected');
       calls.pushed.push(name);
     },
+    ...(options.migrations
+      ? {
+          // The generation branch name carries a per-day codename, so the base
+          // entry is keyed 'base' rather than spelled out.
+          listMigrationFiles: async (ref: string) => {
+            if (options.failMigrationList && ref === options.failMigrationList) {
+              throw new Error(`fatal: bad object ${ref}`);
+            }
+            // The generation branch reflects renames applied so far.
+            if (ref.startsWith('uat/')) return [...branchMigrations];
+            return options.migrations?.[ref] ?? [];
+          },
+        }
+      : {}),
+    ...(options.sql
+      ? {
+          readMigrationFile: async (_ref: string, path: string) => {
+            const sql = options.sql?.[path];
+            if (sql === undefined) throw new Error(`no such migration: ${path}`);
+            return sql;
+          },
+          renameMigrations: async (renames: ReadonlyArray<{ from: string; to: string }>) => {
+            for (const { from, to } of renames) {
+              calls.renamed.push(`${from} -> ${to}`);
+              const at = branchMigrations.indexOf(from);
+              if (at >= 0) branchMigrations[at] = to;
+              else branchMigrations.push(to);
+            }
+            return `renumber-sha-${calls.renamed.length}`;
+          },
+        }
+      : {}),
   };
 }
 
@@ -150,7 +196,7 @@ describe('assembleUatGeneration — conflicts', () => {
     expect(gen.status).toBe('ready');
     expect(gen.members.map((m) => m.issueId)).toEqual(['PAN-1', 'PAN-2', 'PAN-3']);
     expect(gen.resolutions).toEqual([
-      { issueIds: ['PAN-3', 'PAN-1'], files: ['src/x.ts'], commitSha: 'resolved-sha' },
+      { issueIds: ['PAN-3', 'PAN-1'], files: ['src/x.ts'], commitSha: 'resolved-sha', kind: 'conflict' },
     ]);
     expect(git.calls.aborts).toBe(0);
   });
@@ -229,6 +275,197 @@ describe('assembleUatGeneration — failure paths', () => {
   it('marks failed when the push is rejected', async () => {
     const gen = await assembleUatGeneration(input(), deps(makeFakeGit({ failPush: true }), makeFakeStore()));
     expect(gen.status).toBe('failed');
+  });
+});
+
+// PAN-3166: git merges two differently named V256 migrations without a murmur,
+// and the batch then dies at Flyway startup. The lint runs against the union,
+// which is the only place the collision exists — and renumbers when it can
+// prove the migrations are independent, because sequential V<n> naming makes
+// collisions certain rather than rare.
+describe('assembleUatGeneration — union lint (Flyway version collisions)', () => {
+  const MIGRATIONS = 'src/main/resources/db/migration';
+  const TASK_COMMENT = `${MIGRATIONS}/V256__Add_author_type_to_task_comment.sql`;
+  const KAIA = `${MIGRATIONS}/V256__Kaia_session_task_binding.sql`;
+
+  const INDEPENDENT_SQL = {
+    [TASK_COMMENT]: 'ALTER TABLE task_comment ADD COLUMN author_type VARCHAR(32);',
+    [KAIA]: 'CREATE TABLE kaia_session_task (id BIGSERIAL PRIMARY KEY);',
+  };
+
+  it('renumbers the later member and keeps BOTH in the batch when they are independent', async () => {
+    const git = makeFakeGit({
+      migrations: {
+        base: [`${MIGRATIONS}/V255__Base.sql`],
+        'feature/pan-1': [TASK_COMMENT],
+        'feature/pan-2': [KAIA],
+        'feature/pan-3': [],
+      },
+      sql: INDEPENDENT_SQL,
+    });
+    const gen = await assembleUatGeneration(input(), deps(git, makeFakeStore()));
+
+    expect(gen.status).toBe('ready');
+    expect(gen.members.map((m) => m.issueId)).toEqual(['PAN-1', 'PAN-2', 'PAN-3']);
+    expect(gen.heldOut).toEqual([]);
+    // Lowest merge order keeps V256; the next takes the next free version.
+    expect(git.calls.renamed).toEqual([`${KAIA} -> ${MIGRATIONS}/V257__Kaia_session_task_binding.sql`]);
+
+    const renumber = gen.resolutions.find((r) => r.kind === 'migration-renumber');
+    expect(renumber).toMatchObject({
+      issueIds: ['PAN-2'],
+      files: [`${MIGRATIONS}/V257__Kaia_session_task_binding.sql`],
+      commitSha: 'renumber-sha-1',
+    });
+    expect(renumber!.note).toContain('V256__Kaia_session_task_binding.sql → V257__Kaia_session_task_binding.sql');
+  });
+
+  it('allocates around a version already on main and one a later member holds', async () => {
+    const git = makeFakeGit({
+      migrations: {
+        base: [`${MIGRATIONS}/V257__Already_on_main.sql`],
+        'feature/pan-1': [TASK_COMMENT],
+        'feature/pan-2': [KAIA],
+        'feature/pan-3': [`${MIGRATIONS}/V258__A_later_member_has_this.sql`],
+      },
+      sql: INDEPENDENT_SQL,
+    });
+    const gen = await assembleUatGeneration(input(), deps(git, makeFakeStore()));
+
+    expect(gen.members.map((m) => m.issueId)).toEqual(['PAN-1', 'PAN-2', 'PAN-3']);
+    expect(git.calls.renamed).toEqual([`${KAIA} -> ${MIGRATIONS}/V259__Kaia_session_task_binding.sql`]);
+  });
+
+  it('holds the later member out when the two migrations touch the same table', async () => {
+    const git = makeFakeGit({
+      migrations: {
+        base: [],
+        'feature/pan-1': [TASK_COMMENT],
+        'feature/pan-2': [KAIA],
+        'feature/pan-3': [],
+      },
+      sql: {
+        [TASK_COMMENT]: 'ALTER TABLE task_comment ADD COLUMN author_type VARCHAR(32);',
+        // Different filename, same table — a real ordering dependency.
+        [KAIA]: 'ALTER TABLE task_comment ADD COLUMN kaia_session_id BIGINT;',
+      },
+    });
+    const gen = await assembleUatGeneration(input(), deps(git, makeFakeStore()));
+
+    expect(gen.status).toBe('ready');
+    expect(gen.members.map((m) => m.issueId)).toEqual(['PAN-1', 'PAN-3']);
+    expect(git.calls.renamed).toEqual([]);
+    expect(gen.heldOut).toHaveLength(1);
+    const held = gen.heldOut[0]!;
+    expect(held.issueId).toBe('PAN-2');
+    expect(held.reason).toContain('V256__Kaia_session_task_binding.sql');
+    expect(held.reason).toContain('PAN-2');
+    expect(held.reason).toContain('V256__Add_author_type_to_task_comment.sql');
+    expect(held.reason).toContain('PAN-1');
+    expect(held.reason).toContain('both touch task_comment');
+  });
+
+  it('does not collide the same version across two migration roots', async () => {
+    const git = makeFakeGit({
+      migrations: {
+        base: [],
+        'feature/pan-1': ['services/a/db/V1__init.sql'],
+        'feature/pan-2': ['services/b/db/V1__init.sql'],
+        'feature/pan-3': [],
+      },
+      sql: {
+        'services/a/db/V1__init.sql': 'CREATE TABLE a (id int);',
+        'services/b/db/V1__init.sql': 'CREATE TABLE b (id int);',
+      },
+    });
+    const gen = await assembleUatGeneration(input(), deps(git, makeFakeStore()));
+
+    expect(gen.members.map((m) => m.issueId)).toEqual(['PAN-1', 'PAN-2', 'PAN-3']);
+    expect(git.calls.renamed).toEqual([]);
+    expect(gen.heldOut).toEqual([]);
+  });
+
+  it('holds out a member colliding with a migration already on the batch base', async () => {
+    const git = makeFakeGit({
+      migrations: {
+        base: [`${MIGRATIONS}/V256__Landed_on_main.sql`],
+        'feature/pan-1': [`${MIGRATIONS}/V256__Mine.sql`],
+      },
+      sql: {
+        [`${MIGRATIONS}/V256__Landed_on_main.sql`]: 'ALTER TABLE task ADD COLUMN a int;',
+        [`${MIGRATIONS}/V256__Mine.sql`]: 'ALTER TABLE task ADD COLUMN b int;',
+      },
+    });
+    const gen = await assembleUatGeneration(
+      input([{ issueId: 'PAN-1', title: 'First', branch: 'feature/pan-1' }]),
+      deps(git, makeFakeStore()),
+    );
+
+    expect(gen.status).toBe('failed'); // nothing merged
+    expect(gen.heldOut[0]!.reason).toContain('already on the batch base');
+    expect(git.calls.merged).toEqual([]);
+  });
+
+  it('lets a held-out member free its version for a later member', async () => {
+    const conflict = { ok: false as const, conflict: true, reason: 'CONFLICT' };
+    const git = makeFakeGit({
+      merges: { 'feature/pan-1': conflict },
+      migrations: {
+        base: [],
+        'feature/pan-1': [`${MIGRATIONS}/V256__A.sql`],
+        'feature/pan-2': [`${MIGRATIONS}/V256__B.sql`],
+        'feature/pan-3': [],
+      },
+      sql: {
+        [`${MIGRATIONS}/V256__A.sql`]: 'ALTER TABLE task ADD COLUMN a int;',
+        [`${MIGRATIONS}/V256__B.sql`]: 'ALTER TABLE task ADD COLUMN b int;',
+      },
+    });
+    const gen = await assembleUatGeneration(input(), deps(git, makeFakeStore()));
+
+    // PAN-1 never landed, so its V256 is not in the union and PAN-2 is fine.
+    expect(gen.members.map((m) => m.issueId)).toEqual(['PAN-2', 'PAN-3']);
+    expect(gen.heldOut.map((h) => h.issueId)).toEqual(['PAN-1']);
+    expect(git.calls.renamed).toEqual([]);
+  });
+
+  // Guardrail (5): the guard must never disable itself on a read error.
+  it('fails the generation when the base listing cannot be read', async () => {
+    const git = makeFakeGit({
+      migrations: { base: [], 'feature/pan-1': [] },
+      failMigrationList: 'uat/base',
+    });
+    // Make the generation-branch listing the one that throws.
+    const original = git.listMigrationFiles!.bind(git);
+    git.listMigrationFiles = async (ref: string) => {
+      if (ref.startsWith('uat/')) throw new Error('fatal: bad object HEAD');
+      return original(ref);
+    };
+
+    const gen = await assembleUatGeneration(input(), deps(git, makeFakeStore()));
+
+    expect(gen.status).toBe('failed');
+    expect(git.calls.merged).toEqual([]);
+  });
+
+  it('holds a member out when ITS branch listing cannot be read', async () => {
+    const git = makeFakeGit({
+      migrations: { base: [], 'feature/pan-1': [], 'feature/pan-2': [], 'feature/pan-3': [] },
+      failMigrationList: 'feature/pan-2',
+    });
+    const gen = await assembleUatGeneration(input(), deps(git, makeFakeStore()));
+
+    expect(gen.status).toBe('ready');
+    expect(gen.members.map((m) => m.issueId)).toEqual(['PAN-1', 'PAN-3']);
+    expect(gen.heldOut[0]!.issueId).toBe('PAN-2');
+    expect(gen.heldOut[0]!.reason).toContain('cannot rule out a migration version collision');
+  });
+
+  it('skips the lint entirely when the deps do not provide a file listing', async () => {
+    const git = makeFakeGit();
+    const gen = await assembleUatGeneration(input(), deps(git, makeFakeStore()));
+    expect(gen.status).toBe('ready');
+    expect(gen.members).toHaveLength(3);
   });
 });
 

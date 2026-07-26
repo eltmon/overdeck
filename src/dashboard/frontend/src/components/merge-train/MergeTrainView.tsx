@@ -64,7 +64,16 @@ export interface UatGenerationPayload {
   members: UatGenerationMember[];
   heldOut: Array<{ issueId: string; reason: string }>;
   resolutions: Array<{ issueIds: string[]; files: string[]; commitSha: string }>;
-  stack: { status: 'running' | 'absent'; frontendUrl: string };
+  stack: {
+    status: 'running' | 'degraded' | 'unknown' | 'absent';
+    frontendUrl: string;
+    /** Declared services that are not serving — `degraded` only (PAN-3166). */
+    downServices?: string[];
+    /** service → last error line from its logs. */
+    serviceErrors?: Record<string, string>;
+    /** Why the probe could not tell — `unknown` only. */
+    probeError?: string;
+  };
 }
 
 interface QueuesEntry {
@@ -413,6 +422,36 @@ export function MergeTrainView({ active, onNavigateIssue, showProjectFilter = tr
 
   const StackButton = ({ gen, compact }: { gen: UatGenerationPayload; compact?: boolean }) => {
     const starting = stackMutation.isPending && stackMutation.variables === gen.name;
+    // PAN-3166: a stack whose api died still has healthy containers. Offering
+    // "Open UAT frontend" there sends the operator into a gateway timeout, so a
+    // degraded stack gets a restart control instead of a link.
+    if (gen.stack.status === 'degraded' || gen.stack.status === 'unknown') {
+      const unknown = gen.stack.status === 'unknown';
+      const down = gen.stack.downServices ?? [];
+      const detail = Object.entries(gen.stack.serviceErrors ?? {})
+        .map(([service, line]) => `${service}: ${line}`)
+        .join('\n');
+      return (
+        <button
+          type="button"
+          disabled={starting}
+          onClick={() => void onStack(gen)}
+          data-testid={`uat-stack-degraded-${gen.name}`}
+          title={
+            unknown
+              ? `Could not probe the stack: ${gen.stack.probeError ?? 'unknown error'} — the stack record is preserved`
+              : detail || `Not serving: ${down.join(', ') || 'a declared service'} — restart the stack`
+          }
+          className="inline-flex items-center gap-1 rounded border border-amber-500/50 px-2 py-0.5 text-[10.5px] font-semibold text-amber-400 hover:bg-amber-500/10 disabled:opacity-60"
+        >
+          {starting
+            ? (<><Loader2 className="h-3 w-3 animate-spin" /> Restarting…</>)
+            : unknown
+              ? (<>⚠ {compact ? 'Unknown' : 'Stack state unknown'}</>)
+              : (<>⚠ {compact ? 'Degraded' : `Stack degraded — ${down.join(', ') || 'service down'}`}</>)}
+        </button>
+      );
+    }
     if (gen.stack.status === 'running') {
       return (
         <a
@@ -582,6 +621,16 @@ export function MergeTrainView({ active, onNavigateIssue, showProjectFilter = tr
                               {gen.heldOut.length > 0 && (
                                 <div className="mt-0.5 pl-4 text-[10px] text-amber-400">
                                   held out: {gen.heldOut.map((h) => `${h.issueId} (${h.reason})`).join('; ')}
+                                </div>
+                              )}
+                              {gen.stack.status === 'degraded' && (
+                                <div className="mt-0.5 pl-4 text-[10px] text-amber-400" data-testid={`uat-stack-degraded-detail-${gen.name}`}>
+                                  stack degraded — {(gen.stack.downServices ?? []).join(', ') || 'a declared service'} not serving
+                                  {Object.entries(gen.stack.serviceErrors ?? {}).map(([service, line]) => (
+                                    <div key={service} className="truncate font-mono text-[9.5px] text-muted-foreground" title={line}>
+                                      {service}: {line}
+                                    </div>
+                                  ))}
                                 </div>
                               )}
                               <div className="mt-1.5 flex flex-wrap items-center gap-1.5 pl-4">

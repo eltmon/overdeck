@@ -97,6 +97,8 @@ const uatGenerationResolutions = sqliteTable('uat_generation_resolutions', {
   issueIds:   text('issue_ids', { mode: 'json' }).notNull(),
   files:      text('files', { mode: 'json' }).notNull(),
   commitSha:  text('commit_sha').notNull(),
+  kind:       text('kind'),   // PAN-3166: null = conflict (the pre-lint kind)
+  note:       text('note'),
 });
 
 // ── Branded ids ───────────────────────────────────────────────────────────────

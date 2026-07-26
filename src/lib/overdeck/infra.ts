@@ -60,6 +60,8 @@ export const OVERDECK_SCHEMA_TOP_UP_EXPECTATIONS: SchemaTopUpExpectations = {
     { table: 'agents', column: 'last_yield_resume_at' },
     { table: 'uat_generation_repos', column: 'target_branch' },
     { table: 'uat_generation_repos', column: 'merge_sha' },
+    { table: 'uat_generation_resolutions', column: 'kind' },
+    { table: 'uat_generation_resolutions', column: 'note' },
   ],
   indexes: [
     'cost_session_id_idx',
@@ -256,6 +258,11 @@ function ensureUatGenerationRepoTablesSync(db: SqliteDatabase): void {
   // build has the tables but not these.
   runSchemaTopUp(db, "ALTER TABLE `uat_generation_repos` ADD COLUMN `target_branch` text DEFAULT 'main' NOT NULL");
   runSchemaTopUp(db, 'ALTER TABLE `uat_generation_repos` ADD COLUMN `merge_sha` text');
+  // PAN-3166: assembly-time resolutions are no longer conflict-only — the union
+  // lint also renumbers colliding Flyway migrations. Nullable, so rows written
+  // before this read back as conflict resolutions.
+  runSchemaTopUp(db, 'ALTER TABLE `uat_generation_resolutions` ADD COLUMN `kind` text');
+  runSchemaTopUp(db, 'ALTER TABLE `uat_generation_resolutions` ADD COLUMN `note` text');
 }
 
 function warnSchemaDriftSync(db: SqliteDatabase): void {
