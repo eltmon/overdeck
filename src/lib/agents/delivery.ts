@@ -138,6 +138,40 @@ function readAcpTokenSync(agentId: string): string | null {
 }
 
 /**
+ * A non-2xx RESPONSE from a protocol host. The host answered, so the outcome
+ * is definitive: for a keyed supervisor request a 502 means the injection
+ * failed and was purged and the key was never recorded — unlike a lost
+ * response, this is safe to fall back from.
+ */
+export class SocketPostStatusError extends Error {
+  readonly status: number;
+  constructor(status: number, message: string) {
+    super(message);
+    this.name = 'SocketPostStatusError';
+    this.status = status;
+  }
+}
+
+/**
+ * Thrown when a keyed delivery's outcome is UNKNOWN: the keyed supervisor
+ * request was sent but no response came back (timeout, reset, dropped
+ * connection), so the injection may have completed. Crossing to the tmux
+ * tier with the same key would risk a second visible delivery, because the
+ * supervisor and tmux keep INDEPENDENT dedup stores. The caller's recovery
+ * must retry the same key at the same tier — the supervisor's in-flight
+ * reservation and delivered set deduplicate the retry (PAN-2997 cycle 8).
+ */
+export class AmbiguousKeyedDeliveryError extends Error {
+  constructor(agentId: string, caller: string, reason: string) {
+    super(
+      `MessageDeliveryFailed: ambiguous keyed delivery for ${agentId} (${caller}): ${reason} — ` +
+      'the supervisor may have completed the injection; NOT crossing to the tmux tier with the same key',
+    );
+    this.name = 'AmbiguousKeyedDeliveryError';
+  }
+}
+
+/**
  * POST a JSON body to a Unix-domain socket using node:net + a hand-rolled
  * minimal HTTP/1.1 request. Resolves on a 200-class response, rejects on any
  * error including socket-not-found, connection refused, an optional client
@@ -200,7 +234,7 @@ async function postUnixSocketJson(
             finishOk({ status, body: responseBody });
             return;
           }
-          finishErr(new Error(`socket POST: status ${status}: ${responseBody.slice(0, 100)}`));
+          finishErr(new SocketPostStatusError(status, `socket POST: status ${status}: ${responseBody.slice(0, 100)}`));
         });
       },
     );
@@ -494,6 +528,18 @@ async function deliverKeyedAgentMessage(
       return { ok: true, path: 'supervisor', deduplicated };
     } catch (err) {
       const reason = err instanceof Error ? err.message : String(err);
+      if (!(err instanceof SocketPostStatusError)) {
+        // AMBIGUOUS (cycle 8): no response came back, so the supervisor may
+        // have completed the injection. The tmux tier keeps an INDEPENDENT
+        // key store, so crossing to it with the same key could submit a
+        // second visible wake. Stay with the same delivery owner: the
+        // caller's recovery retries the same key at the supervisor, whose
+        // in-flight reservation/delivered set deduplicates the retry.
+        throw new AmbiguousKeyedDeliveryError(normalizedId, caller, reason);
+      }
+      // A received non-2xx (e.g. 502 echo-confirm failure after purge) is a
+      // DEFINITIVE failure: the supervisor answered, recorded no key, and
+      // erased its partial write — safe to fall through to keyed tmux.
       supervisorFailure = `socket-post-failed: ${reason}`;
     }
   }

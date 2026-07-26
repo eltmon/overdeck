@@ -6,6 +6,7 @@ import {
   type StoredEvent,
 } from '../dashboard/server/event-store.js';
 import { getAgentDir } from './agents/agent-state.js';
+import { AmbiguousKeyedDeliveryError } from './agents/delivery.js';
 import { messageAgentWithOutcome } from './agents/messaging.js';
 import { createPromiseCoalescer } from './cloister/in-flight-guard.js';
 
@@ -395,7 +396,17 @@ async function deliverWakeWithOutbox(agentId: string, lifecycleId: string): Prom
       'linear-mcp-auth-wake',
       { dedupKey: `linear-mcp-auth-wake:${lifecycleId}` },
     );
-  } catch {
+  } catch (error) {
+    // AMBIGUOUS keyed delivery (cycle 8): the supervisor may have completed
+    // the injection but its answer never arrived. Do NOT record a terminal
+    // 'failed' — leave the entry pending so the next wake pass (or boot
+    // recovery) retries the SAME key at the SAME tier, where the supervisor's
+    // in-flight reservation/delivered set deduplicates it. At-most-once is
+    // preserved by the door; a terminal record would either lose a wake that
+    // never landed or misreport one that did.
+    if (error instanceof AmbiguousKeyedDeliveryError) {
+      throw error;
+    }
     outcome = 'failed';
   }
   await writeWakeOutbox({

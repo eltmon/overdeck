@@ -79,6 +79,9 @@ interface FakeBridgeOptions {
   status: number;
   body: string;
   delayMs?: number;
+  /** Accept the request, then destroy the connection WITHOUT responding —
+   * simulates a lost/reset response after possible server-side acceptance. */
+  drop?: boolean;
   capture?: { lastBody?: string; lastHeaders?: Record<string, string> };
 }
 
@@ -125,7 +128,9 @@ function startFakeBridge(socketPath: string, opts: FakeBridgeOptions): Promise<N
             opts.body;
           sock.end(resp);
         };
-        if (opts.delayMs) {
+        if (opts.drop) {
+          sock.destroy();
+        } else if (opts.delayMs) {
           setTimeout(respond, opts.delayMs);
         } else {
           respond();
@@ -636,6 +641,51 @@ describe('channel bridge delivery', () => {
     await expect(
       deliverAgentMessage(agentId, 'wake', 'caller-wake', undefined, { dedupKey: 'wake:seq-1' }),
     ).rejects.toThrow(/ACP tier cannot enforce a dedup key/);
+  });
+
+  it('does NOT cross to tmux when the keyed supervisor response is lost (ambiguous — cycle 8)', async () => {
+    const agentId = 'agent-dedup-ambiguous';
+    writeAgentState(agentId, { channelsEnabled: false });
+    await writePtyToken(agentId);
+    const socketPath = join(socketDir, `pty-${agentId}.sock`);
+    const capture: { lastBody?: string } = {};
+    // The bridge accepts the keyed request (so the supervisor MAY have
+    // injected) and then drops the connection without a response.
+    const server = await startFakeBridge(socketPath, { status: 200, body: 'ok', drop: true, capture });
+    const { sendKeysDedup } = await import('../tmux-dedup.js');
+    vi.mocked(sendKeysDedup).mockClear();
+    try {
+      await expect(
+        deliverAgentMessage(agentId, 'wake', 'caller-wake', undefined, { dedupKey: 'wake:seq-1' }),
+      ).rejects.toThrow(/ambiguous keyed delivery/);
+      // The request reached the supervisor…
+      expect(capture.lastBody).toBeDefined();
+      // …and the tmux tier — with its independent key store — was never touched.
+      expect(vi.mocked(sendKeysDedup)).not.toHaveBeenCalled();
+    } finally {
+      await new Promise<void>((r) => server.close(() => r()));
+    }
+  });
+
+  it('falls back to keyed tmux on a DEFINITIVE supervisor 502 (response received — cycle 8)', async () => {
+    const agentId = 'agent-dedup-definitive';
+    writeAgentState(agentId, { channelsEnabled: false });
+    await writePtyToken(agentId);
+    const socketPath = join(socketDir, `pty-${agentId}.sock`);
+    const server = await startFakeBridge(socketPath, { status: 502, body: 'input echo confirmation failed' });
+    const { sendKeysDedup, completeKeyedSubmit } = await import('../tmux-dedup.js');
+    vi.mocked(sendKeysDedup).mockClear();
+    vi.mocked(completeKeyedSubmit).mockClear();
+    try {
+      const result = await deliverAgentMessage(agentId, 'wake', 'caller-wake', undefined, { dedupKey: 'wake:seq-1' });
+
+      expect(result).toMatchObject({ ok: true, path: 'tmux', deduplicated: false });
+      expect(result.failure).toContain('502');
+      expect(vi.mocked(sendKeysDedup)).toHaveBeenCalledWith(agentId, 'wake', 'wake:seq-1', 'caller-wake');
+      expect(vi.mocked(completeKeyedSubmit)).toHaveBeenCalledWith(agentId, 'wake:seq-1');
+    } finally {
+      await new Promise<void>((r) => server.close(() => r()));
+    }
   });
 
   it('codex work agents use live-session delivery instead of exec resume', async () => {

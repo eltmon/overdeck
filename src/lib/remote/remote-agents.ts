@@ -755,7 +755,21 @@ export async function sendToRemoteAgentKeyed(
   } else {
     const fly = createFlyProvider();
     await ensureRemoteTmuxContext(fly, vmName);
-    run = async (command: string) => (await runSsh(fly, vmName, command)).stdout;
+    // Every protocol command must fail loudly (cycle 8): a non-zero exit on
+    // a write, buffer load, marker transition, or the Enter-submit must never
+    // be acknowledged as delivery. The marker READS are the only tolerant
+    // calls — an unset user option is a legitimate empty state, and a failed
+    // read collapses into the loud "did not land" path rather than a false
+    // success.
+    run = async (command: string) => {
+      const result = await runSsh(fly, vmName, command);
+      if (result.exitCode !== 0) {
+        throw new Error(
+          `remote keyed-delivery command failed (exit ${result.exitCode}): ${result.stderr.slice(0, 200)}`,
+        );
+      }
+      return result.stdout;
+    };
   }
 
   const pendingOption = dedupPendingOptionName(dedupKey);
@@ -800,16 +814,28 @@ export async function sendToRemoteAgentKeyed(
     }
 
     // 'pasted' (our sendId) and 'submit-pending' (a prior crashed attempt's
-    // sendId) both complete the same transaction WITHOUT re-pasting: settle,
-    // Enter, then flip the key terminal and clear the pending claim in one
-    // server-side command.
+    // sendId) both complete the same transaction WITHOUT re-pasting. The
+    // SUBMISSION is one server-owned command (cycle 8): a single if-shell
+    // whose condition requires the pending claim and no terminal marker, and
+    // whose command list flips the key terminal and clears pending BEFORE
+    // sending the Enter. The remote tmux server executes the whole sequence,
+    // so exactly one caller can complete — a concurrent or post-crash caller
+    // loses the condition and sends no stray Enter.
     await new Promise(resolve => setTimeout(resolve, 300));
-    await run(buildRemoteTmuxCommand(['send-keys', '-t', agentId, 'C-m']));
-    await run(buildRemoteTmuxCommand([
-      'set-option', '-t', agentId, terminalOption, '1',
-      ';',
-      'set-option', '-u', '-t', agentId, pendingOption,
-    ]));
+    const submitCondition =
+      `test -z "$(${innerTmux} show-option -qv -t ${agentId} ${terminalOption})" && ` +
+      `test -n "$(${innerTmux} show-option -qv -t ${agentId} ${pendingOption})"`;
+    const submitOnTrue =
+      `set-option -t ${agentId} ${terminalOption} 1 \; ` +
+      `set-option -u -t ${agentId} ${pendingOption} \; ` +
+      `send-keys -t ${agentId} C-m`;
+    await run(buildRemoteTmuxCommand(['if-shell', '-t', agentId, submitCondition, submitOnTrue]));
+
+    const terminalAfter = await readMarker(terminalOption);
+    const pendingAfter = await readMarker(pendingOption);
+    if (terminalAfter === '' && pendingAfter === '') {
+      throw new Error(`Keyed remote submit for ${agentId} found neither a pending claim nor a terminal marker — the paste vanished without submission`);
+    }
     return 'delivered';
   } finally {
     await cleanup();

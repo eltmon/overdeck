@@ -184,15 +184,23 @@ has not yet been notified:
     the agent itself died is a legitimate first delivery to the resumed
     session. The supervisor's single request covers content AND the
     standalone Enter, so the key completes only after the full submission.
+    If the keyed request's RESPONSE is lost (timeout/reset), the outcome is
+    ambiguous — the supervisor may have injected — so the dashboard does NOT
+    cross to the tmux tier (its key store is independent); it raises an
+    `AmbiguousKeyedDeliveryError` instead, the wake outbox entry stays
+    `pending`, and a later wake pass retries the SAME key at the SAME tier,
+    where the supervisor's reservation/delivered set deduplicates it. Only a
+    received non-2xx (a definitive, purged failure) may fall back to tmux.
   - **tmux fallback** uses two-phase per-session markers owned by the tmux
     server (`sendKeysDedup` + `completeKeyedSubmit`): the paste and the
-    PENDING marker are one atomic server-side `if-shell` step, the standalone
-    Enter follows after the settle window, and only then does the key flip
-    TERMINAL (pending cleared in the same server-side command). A replay that
-    finds PENDING completes the prior attempt's submission WITHOUT
-    re-pasting; a TERMINAL marker suppresses the replay entirely — a
-    dashboard crash anywhere in the transaction neither loses nor duplicates
-    the wake.
+    PENDING marker are one atomic server-side `if-shell` step, and the
+    submission itself is a second single `if-shell` — only when PENDING is
+    present and TERMINAL absent does the server flip TERMINAL, clear PENDING,
+    and send the Enter, in that order, inside one server-executed command
+    list. Exactly one caller can become the completer; concurrent or
+    post-crash callers lose the server-side condition and send nothing, so no
+    stray Enter can land in a composer holding unrelated operator text, and a
+    retried transaction never has to decide whether a prior Enter landed.
   - **Monitor mail (PAN-3015) never carries keyed deliveries.** The monitor
     claims a mail file by renaming it before emitting, so a monitor exit
     between claim and emit would lose the wake and a post-emit/pre-ack crash
@@ -208,7 +216,9 @@ has not yet been notified:
     door of the new session.
   - **Remote agents** run the same two-phase marker protocol against the
     REMOTE tmux server (`sendToRemoteAgentKeyed`), which is the
-    crash-independent component for a remote session.
+    crash-independent component for a remote session. The production executor
+    throws on any non-zero SSH exit — a failed write, paste, or Enter-submit
+    is never acknowledged as delivery.
   - Channels, codex app-server, and ACP tiers cannot enforce a key and are
     rejected for keyed payloads. Keyed Linear wakes only target Claude Code
     agents anyway — the detection hook is Claude-Code-only.

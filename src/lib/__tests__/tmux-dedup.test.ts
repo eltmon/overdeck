@@ -31,11 +31,16 @@ function occurrences(haystack: string, needle: string): number {
   return haystack.match(new RegExp(needle, 'g'))?.length ?? 0;
 }
 
+/** Type literal text into the pane WITHOUT submitting it (a busy composer). */
+function typeWithoutSubmit(text: string): void {
+  execFileSync('tmux', ['-L', socket, 'send-keys', '-t', session, '-l', text]);
+}
+
 /**
  * Real throwaway tmux server — the dedup record is a pair of tmux session
- * options set atomically with the paste by the tmux SERVER, so only a live
- * server can prove the check/paste/mark sequence and the crash boundaries
- * around the standalone Enter. (PAN-2997)
+ * options and the submission is a single server-executed `if-shell` command
+ * list, so only a live server can prove the claim/Enter ordering and the
+ * crash boundaries around it. (PAN-2997)
  */
 describe.skipIf(!hasTmux)('sendKeysDedup two-phase protocol', () => {
   beforeEach(() => {
@@ -72,8 +77,7 @@ describe.skipIf(!hasTmux)('sendKeysDedup two-phase protocol', () => {
     // First attempt pastes, then "crashes" before the submit.
     const first = await sendKeysDedup(session, 'wake up agent', 'test-key-1');
     expect(first).toBe('pasted');
-    const afterPaste = capturePane();
-    expect(occurrences(afterPaste, 'wake up agent')).toBe(1);
+    expect(occurrences(capturePane(), 'wake up agent')).toBe(1);
 
     // Recovery replay: the pending marker routes to submit-completion, not a
     // second paste.
@@ -93,24 +97,41 @@ describe.skipIf(!hasTmux)('sendKeysDedup two-phase protocol', () => {
     expect(capturePane()).toBe(settled);
   });
 
-  it('sends at most one visible message when the crash lands between Enter and the terminal flip', async () => {
-    const first = await sendKeysDedup(session, 'wake up agent', 'test-key-1');
-    expect(first).toBe('pasted');
+  it('runs the submission exactly once for TWO CONCURRENT completers (cycle 8)', async () => {
+    // Call A pastes and claims; call B observes the pending claim.
+    const a = await sendKeysDedup(session, 'wake up agent', 'test-key-1');
+    expect(a).toBe('pasted');
+    const b = await sendKeysDedup(session, 'wake up agent', 'test-key-1');
+    expect(b).toBe('submit-pending');
 
-    // Simulate Enter sent but the terminal flip interrupted: send C-m by hand,
-    // leave the pending marker in place.
-    execFileSync('tmux', ['-L', socket, 'send-keys', '-t', session, 'C-m']);
-    const afterManualEnter = capturePane();
-    expect(occurrences(afterManualEnter, 'wake up agent')).toBe(2); // input echo + cat output
+    // Both callers complete — the server-side condition admits exactly one.
+    await Promise.all([
+      completeKeyedSubmit(session, 'test-key-1'),
+      completeKeyedSubmit(session, 'test-key-1'),
+    ]);
 
-    // Recovery replay: pending is still set, so the replay completes the
-    // transaction — one more Enter lands on the now-EMPTY composer (a no-op),
-    // and the key flips terminal. The message itself is never re-pasted.
-    const replay = await sendKeysDedup(session, 'wake up agent', 'test-key-1');
-    expect(replay).toBe('submit-pending');
-    await completeKeyedSubmit(session, 'test-key-1');
+    // The wake was submitted exactly once (input echo + one cat output).
     expect(occurrences(capturePane(), 'wake up agent')).toBe(2);
     expect(showOption('@overdeck-dedup-test-key-1')).toBe('1');
+    expect(showOption('@overdeck-dedup-pending-test-key-1')).toBe('');
+  });
+
+  it('sends no second Enter when a replayed submit races a completed transaction into a busy composer (cycle 8)', async () => {
+    const first = await sendKeysDedup(session, 'wake up agent', 'test-key-1');
+    expect(first).toBe('pasted');
+    await completeKeyedSubmit(session, 'test-key-1');
+    expect(occurrences(capturePane(), 'wake up agent')).toBe(2);
+
+    // The agent reached a new prompt and the operator is typing again.
+    typeWithoutSubmit('operator follow-up');
+
+    // A misguided late completer (e.g. a recovery pass that crashed after the
+    // server claimed the submit but before it read the response) must not
+    // send another Enter into the busy composer.
+    await completeKeyedSubmit(session, 'test-key-1');
+
+    expect(occurrences(capturePane(), 'wake up agent')).toBe(2);
+    expect(occurrences(capturePane(), 'operator follow-up')).toBe(1);
   });
 
   it('delivers identical content under a different key', async () => {

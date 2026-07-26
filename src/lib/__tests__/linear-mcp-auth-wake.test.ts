@@ -25,6 +25,7 @@ vi.mock('../agents/messaging.js', () => ({
 }));
 
 import { handleCloisterDomainEvent } from '../cloister/service-reactive.js';
+import { AmbiguousKeyedDeliveryError } from '../agents/delivery.js';
 import {
   LINEAR_MCP_AUTH_WAKE_COPY,
   _resetLinearMcpAuthProjectionCacheForTests,
@@ -376,6 +377,54 @@ describe('Linear MCP auth wake processor', () => {
 
     const delays = timeoutSpy.mock.calls.map(call => call[1]);
     expect(delays.slice(0, 2)).toEqual([1000, 2000]);
+  });
+
+  it('retries the same key within the run after an AMBIGUOUS keyed delivery failure, never recording a terminal failed (cycle 8)', async () => {
+    events.push(required(1, 'agent-min-852', 'MIN-852'), healthy(2));
+    // The first attempt's outcome is UNKNOWN (e.g. the supervisor's answer was
+    // lost): the outbox entry must stay pending, not terminal 'failed'.
+    mocks.messageAgent.mockRejectedValueOnce(
+      new AmbiguousKeyedDeliveryError('agent-min-852', 'linear-mcp-auth-wake', 'socket POST timeout'),
+    );
+
+    await processLinearMcpAuthWake();
+
+    // A later pass in the same run re-drove the SAME keyed wake — the door
+    // deduplicates it if the first attempt did in fact land.
+    expect(mocks.messageAgent).toHaveBeenCalledTimes(2);
+    expect(mocks.messageAgent.mock.calls[1]).toEqual([
+      'agent-min-852',
+      LINEAR_MCP_AUTH_WAKE_COPY,
+      'linear-mcp-auth-wake',
+      { dedupKey: 'linear-mcp-auth-wake:seq-1' },
+    ]);
+    // Exactly one completion was recorded, with the real outcome — 'failed'
+    // never appears for an ambiguous attempt.
+    expect(notifiedEvents()).toHaveLength(1);
+    expect(notifiedEvents()[0]?.payload['outcome']).toBe('delivered');
+    expect(readOutbox('agent-min-852', 'seq-1')).toMatchObject({
+      state: 'acknowledged',
+      outcome: 'delivered',
+    });
+  });
+
+  it('leaves the wake pending with no completion record while the keyed delivery stays ambiguous (cycle 8)', async () => {
+    vi.useFakeTimers();
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    events.push(required(1, 'agent-min-852', 'MIN-852'), healthy(2));
+    mocks.messageAgent.mockRejectedValue(
+      new AmbiguousKeyedDeliveryError('agent-min-852', 'linear-mcp-auth-wake', 'socket POST timeout'),
+    );
+
+    await processLinearMcpAuthWake();
+
+    // No terminal outcome was recorded on any of the bounded retries, and the
+    // outbox entry is still pending — boot recovery or a later healthy event
+    // will re-drive the same key.
+    expect(notifiedEvents()).toHaveLength(0);
+    expect(readOutbox('agent-min-852', 'seq-1')).toMatchObject({ state: 'pending' });
+    expect(mocks.messageAgent.mock.calls.length).toBeGreaterThan(1);
+    expect(mocks.messageAgent.mock.calls.every(call => call[3]?.dedupKey === 'linear-mcp-auth-wake:seq-1')).toBe(true);
   });
 
   it('drains a lifecycle that completes while an earlier wake pass is still delivering', async () => {

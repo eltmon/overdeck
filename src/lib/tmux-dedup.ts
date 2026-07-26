@@ -11,21 +11,20 @@
  * so a replay after either crash is correct.
  *
  * The protocol is two-phase so the complete paste-settle-submit transaction
- * survives a dashboard crash (review cycle 7): the key becomes terminal only
- * after submission is complete.
+ * survives a dashboard crash: the key becomes terminal only as part of the
+ * server-owned submission itself.
  *
- *   (none) ──paste──► PENDING ──Enter──► TERMINAL
+ *   (none) ──paste──► PENDING ──atomic claim+Enter──► TERMINAL
  *
  * - `sendKeysDedup` atomically pastes and sets the PENDING option only when
  *   neither option is set. A replay that finds PENDING (a prior attempt
- *   crashed between paste and submit) returns 'submit-pending' WITHOUT
- *   re-pasting; the caller completes the pending submission instead.
- * - `completeKeyedSubmit` waits out the settle window, sends the standalone
- *   Enter, and only then flips the key to TERMINAL and clears PENDING. A
- *   crash between Enter and the terminal flip leaves PENDING set, so the
- *   next replay sends one more Enter — a no-op on the already-submitted,
- *   now-empty composer — and then marks the key terminal. No replay ever
- *   re-pastes the message.
+ *   crashed before submitting) returns 'submit-pending' WITHOUT re-pasting.
+ * - `completeKeyedSubmit` issues ONE `if-shell`: only when PENDING is present
+ *   and TERMINAL absent does the tmux server flip TERMINAL, clear PENDING,
+ *   and send the Enter — in that order, in a single server-executed command
+ *   list. Exactly one caller can become the completer; every other concurrent
+ *   or post-crash caller loses the server-side condition and sends nothing,
+ *   so no stray Enter can ever land in a composer holding unrelated text.
  */
 
 import { randomUUID } from 'node:crypto';
@@ -126,10 +125,22 @@ export async function sendKeysDedup(
 
 /**
  * Complete the paste-settle-submit transaction for a keyed tmux delivery.
- * Sends the standalone Enter after the settle window, then makes the key
- * TERMINAL and clears the pending claim in one server-side command. Safe to
- * call for both 'pasted' and 'submit-pending' phases; a replayed call after a
- * crash lands at worst one extra Enter on an already-empty composer.
+ *
+ * After the settle window, the SUBMISSION is one server-owned command: a
+ * single `if-shell` whose condition requires the pending claim present and
+ * the terminal marker absent, and whose command list flips the key TERMINAL
+ * and clears pending BEFORE sending the Enter. The tmux server executes the
+ * whole sequence, so exactly one caller can ever become the completer —
+ * concurrent same-key completers lose the condition and send nothing, and a
+ * dashboard that retries after a crash never has to decide whether a prior
+ * standalone Enter landed: the server-side condition answers that. No code
+ * path sends a stray Enter into a composer that may hold unrelated operator
+ * text (review cycle 8).
+ *
+ * Safe to call for both 'pasted' and 'submit-pending' phases; a call whose
+ * key is already terminal is a no-op. Throws when neither marker is present
+ * after the command — the pending claim vanished without a submission, which
+ * must surface as a delivery failure rather than silent loss.
  */
 export async function completeKeyedSubmit(sessionName: string, dedupKey: string): Promise<void> {
   validateSessionName(sessionName);
@@ -138,14 +149,19 @@ export async function completeKeyedSubmit(sessionName: string, dedupKey: string)
   const pendingOption = dedupPendingOptionName(dedupKey);
 
   await new Promise(resolve => setTimeout(resolve, PASTE_SETTLE_MS));
-  await tmuxExecAsync(['send-keys', '-t', sessionName, 'C-m'], { encoding: 'utf-8' });
-  // Submission is done — only now may the key become terminal. One
-  // server-side command so a dashboard exit cannot leave the markers
-  // half-flipped; if it fires anyway, the pending marker drives the harmless
-  // replay-Enter described above.
   await tmuxExecAsync([
-    'set-option', '-t', sessionName, terminalOption, '1',
-    ';',
-    'set-option', '-u', '-t', sessionName, pendingOption,
+    'if-shell', '-t', sessionName,
+    `test -z "$(tmux show-option -qv -t ${sessionName} ${terminalOption})" && test -n "$(tmux show-option -qv -t ${sessionName} ${pendingOption})"`,
+    `set-option -t ${sessionName} ${terminalOption} 1 \; set-option -u -t ${sessionName} ${pendingOption} \; send-keys -t ${sessionName} C-m`,
   ], { encoding: 'utf-8' });
+
+  const [terminalMarker, pendingMarker] = await Promise.all([
+    tmuxExecAsync(['show-option', '-qv', '-t', sessionName, terminalOption], { encoding: 'utf-8' })
+      .then(result => String(result.stdout).trim(), () => ''),
+    tmuxExecAsync(['show-option', '-qv', '-t', sessionName, pendingOption], { encoding: 'utf-8' })
+      .then(result => String(result.stdout).trim(), () => ''),
+  ]);
+  if (terminalMarker === '' && pendingMarker === '') {
+    throw new Error(`Keyed tmux submit for ${sessionName} found neither a pending claim nor a terminal marker — the paste vanished without submission`);
+  }
 }
