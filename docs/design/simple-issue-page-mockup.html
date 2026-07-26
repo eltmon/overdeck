@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<!-- IMPLEMENTED by PAN-3090 — kept as the design reference -->
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Mockup — Simple issue page (needs-you)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500&display=swap" rel="stylesheet" />
+<style>
+  /* ── Real tokens, copied from src/dashboard/frontend/src/index.css ── */
+  :root {
+    color-scheme: light;
+    --radius: 0.625rem;
+    --radius-sm: calc(var(--radius) - 4px);
+    --background: #ffffff;
+    --foreground: #1f2937;
+    --card: #ffffff;
+    --card-2: color-mix(in srgb, black 2.5%, transparent);
+    --primary: oklch(0.488 0.217 264);
+    --primary-foreground: #ffffff;
+    --accent: color-mix(in srgb, black 4%, transparent);
+    --muted: color-mix(in srgb, black 4%, transparent);
+    --muted-foreground: #6b7280;
+    --border: color-mix(in srgb, black 8%, transparent);
+    --input: color-mix(in srgb, black 10%, transparent);
+    --ring: oklch(0.488 0.217 264);
+    --destructive: #ef4444;
+    --destructive-foreground: #b91c1c;
+    --info: #3b82f6;
+    --info-foreground: #1d4ed8;
+    --success: #10b981;
+    --success-foreground: #047857;
+    --warning: #f59e0b;
+    --warning-foreground: #b45309;
+    --hairline: color-mix(in srgb, black 5%, transparent);
+    --ambient: 0 1px 2px rgb(0 0 0 / 0.05), 0 4px 16px rgb(0 0 0 / 0.05);
+  }
+  html.dark {
+    color-scheme: dark;
+    --background: #080b10;
+    --foreground: #e5e7eb;
+    --card: #0c1018;
+    --card-2: color-mix(in srgb, white 3%, transparent);
+    --primary: oklch(0.588 0.217 264);
+    --primary-foreground: #ffffff;
+    --accent: color-mix(in srgb, white 8%, transparent);
+    --muted: color-mix(in srgb, white 4%, transparent);
+    --muted-foreground: #9ca3af;
+    --border: color-mix(in srgb, white 6%, transparent);
+    --input: color-mix(in srgb, white 8%, transparent);
+    --ring: oklch(0.588 0.217 264);
+    --destructive: #f87171;
+    --destructive-foreground: #fca5a5;
+    --info: #3b82f6;
+    --info-foreground: #60a5fa;
+    --success: #10b981;
+    --success-foreground: #34d399;
+    --warning: #f59e0b;
+    --warning-foreground: #fbbf24;
+    --hairline: color-mix(in srgb, white 5%, transparent);
+    --ambient: none;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--background);
+    color: var(--foreground);
+    font-family: "DM Sans", ui-sans-serif, system-ui, sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  .mono { font-family: "SF Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  button { font-family: inherit; cursor: pointer; }
+
+  /* ── Mockup-only chrome (NOT part of the proposal) ── */
+  .mockbar {
+    position: sticky; top: 0; z-index: 50;
+    display: flex; align-items: center; gap: 14px;
+    padding: 8px 16px;
+    background: #111827; color: #e5e7eb;
+    font-size: 12px;
+    border-bottom: 2px dashed #f59e0b;
+  }
+  .mockbar .tag {
+    font-weight: 500; letter-spacing: 0.08em; color: #fbbf24;
+  }
+  .mockbar .seg { display: inline-flex; overflow: hidden; border-radius: 8px; border: 1px solid #374151; }
+  .mockbar .seg button {
+    border: 0; background: transparent; color: #9ca3af;
+    padding: 4px 12px; font-size: 12px; font-weight: 500;
+  }
+  .mockbar .seg button.on { background: #374151; color: #fff; }
+  .mockbar .spacer { flex: 1; }
+  .mockbar .theme {
+    border: 1px solid #374151; background: transparent; color: #9ca3af;
+    border-radius: 8px; padding: 4px 10px; font-size: 12px;
+  }
+
+  /* ── Page shell ── */
+  .page { max-width: 768px; margin: 0 auto; padding: 24px 24px 96px; }
+
+  .toprow { display: flex; align-items: center; justify-content: space-between; }
+  .backlink {
+    display: inline-flex; align-items: center; gap: 6px;
+    border: 0; background: none; color: var(--muted-foreground);
+    font-size: 12px;
+  }
+  .backlink:hover { color: var(--foreground); }
+  .modetoggle { display: inline-flex; overflow: hidden; border-radius: 8px; border: 1px solid var(--input); }
+  .modetoggle button {
+    border: 0; background: transparent; color: var(--muted-foreground);
+    padding: 6px 12px; font-size: 12px; font-weight: 500;
+  }
+  .modetoggle button.on { background: var(--accent); color: var(--foreground); }
+
+  .issuerow { margin-top: 14px; display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted-foreground); }
+  .issuerow .id { font-size: 12px; }
+  h1 { margin-top: 4px; font-size: 21px; font-weight: 500; line-height: 1.35; letter-spacing: -0.01em; }
+
+  /* ── Progress track ── */
+  .track { margin-top: 22px; display: flex; }
+  .step { position: relative; flex: 1; padding-top: 15px; text-align: center; }
+  .step .bar { position: absolute; left: 0; right: 0; top: 5px; height: 2px; background: var(--muted); }
+  .step:first-child .bar { left: 50%; }
+  .step:last-child .bar { right: 50%; }
+  .step.done .bar, .step.now .bar { background: var(--success); }
+  .step .dot {
+    position: absolute; left: 50%; top: 0; width: 12px; height: 12px;
+    transform: translateX(-50%); border-radius: 50%;
+    border: 2px solid var(--border); background: var(--muted);
+  }
+  .step.done .dot { border-color: transparent; background: var(--success); }
+  .step.now .dot { border-color: transparent; background: var(--info); box-shadow: 0 0 0 3px color-mix(in srgb, var(--info) 25%, transparent); }
+  .step.now.waiting .dot { background: var(--warning); box-shadow: 0 0 0 3px color-mix(in srgb, var(--warning) 28%, transparent); animation: pulse 2s infinite; }
+  @keyframes pulse { 50% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--warning) 12%, transparent); } }
+  .step .name { font-size: 11.5px; color: var(--muted-foreground); }
+  .step.done .name { color: var(--success-foreground); }
+  .step.now .name { color: var(--foreground); font-weight: 500; }
+  .step .wait-note { display: block; margin-top: 2px; font-size: 10.5px; color: var(--warning-foreground); }
+
+  /* ── Cards (light: borderless + ambient; dark: hairline) ── */
+  .card {
+    margin-top: 18px; border-radius: 14px; background: var(--card);
+    box-shadow: var(--ambient);
+    border: 1px solid var(--hairline);
+    padding: 16px;
+  }
+  html:not(.dark) .card { border-color: transparent; }
+  .card.accent-warning { border-left: 3px solid var(--warning); }
+  .card.accent-success { border-left: 3px solid var(--success); }
+  .card.accent-info { border-left: 3px solid var(--info); }
+
+  .cardhead { display: flex; align-items: center; gap: 12px; }
+  .iconchip {
+    flex: none; width: 32px; height: 32px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .iconchip.warning { background: color-mix(in srgb, var(--warning) 10%, transparent); color: var(--warning-foreground); }
+  .iconchip.info { background: color-mix(in srgb, var(--info) 10%, transparent); color: var(--info-foreground); }
+  .iconchip.success { background: color-mix(in srgb, var(--success) 10%, transparent); color: var(--success-foreground); }
+  .cardtitle { font-size: 15px; font-weight: 500; }
+  .cardsub { margin-top: 2px; font-size: 12px; color: var(--muted-foreground); }
+
+  /* The question itself — the part the current page never shows */
+  .question {
+    margin-top: 12px; padding: 12px 14px;
+    border-radius: 10px; background: var(--card-2);
+    font-size: 14px; line-height: 1.55;
+  }
+  .question .who { display: block; margin-bottom: 4px; font-size: 11px; color: var(--muted-foreground); }
+  .options { margin-top: 10px; display: grid; gap: 8px; }
+  .option {
+    display: flex; gap: 10px; align-items: flex-start;
+    padding: 10px 12px; border-radius: 10px;
+    border: 1px solid var(--input); background: transparent;
+    text-align: left; font-size: 13.5px; color: var(--foreground);
+  }
+  .option:hover { border-color: var(--ring); }
+  .option.selected { border-color: var(--ring); box-shadow: 0 0 0 1px var(--ring); }
+  .option .radio {
+    flex: none; margin-top: 3px; width: 14px; height: 14px; border-radius: 50%;
+    border: 2px solid var(--muted-foreground);
+  }
+  .option.selected .radio { border-color: var(--primary); background: var(--primary); box-shadow: inset 0 0 0 2.5px var(--card); }
+  .option .optbody b { display: block; font-weight: 500; }
+  .option .optbody span { color: var(--muted-foreground); font-size: 12.5px; }
+
+  .answerrow { margin-top: 12px; display: flex; align-items: center; gap: 8px; }
+  .answerrow input {
+    flex: 1; height: 38px; border-radius: 10px;
+    border: 1px solid var(--input); background: transparent;
+    padding: 0 12px; font: inherit; font-size: 13.5px; color: var(--foreground); outline: none;
+  }
+  .answerrow input:focus { border-color: var(--ring); }
+  .hint { margin-top: 8px; font-size: 11px; color: var(--muted-foreground); }
+
+  .btn {
+    display: inline-flex; align-items: center; height: 36px; padding: 0 16px;
+    border: 0; border-radius: 10px;
+    font-size: 13.5px; font-weight: 500;
+    background: var(--primary); color: var(--primary-foreground);
+  }
+  .btn:hover { opacity: 0.92; }
+  .btn.success { background: var(--success); color: #04120c; }
+  .btn.quiet {
+    background: transparent; color: var(--muted-foreground);
+    border: 1px solid var(--input);
+  }
+  .btn.quiet:hover { background: var(--accent); color: var(--foreground); }
+  .cardactions { margin-top: 14px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+
+  /* ── Feed ── */
+  .feedhead { margin-top: 28px; display: flex; align-items: baseline; gap: 10px; }
+  .feedhead h2 { font-size: 14px; font-weight: 500; }
+  .livechip { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; }
+  .livechip .dot { width: 6px; height: 6px; border-radius: 50%; }
+  .livechip.info { color: var(--info-foreground); }
+  .livechip.info .dot { background: var(--info); animation: blink 1.6s infinite; }
+  .livechip.warning { color: var(--warning-foreground); }
+  .livechip.warning .dot { background: var(--warning); }
+  @keyframes blink { 50% { opacity: 0.35; } }
+  .feedwho { margin-left: auto; font-size: 11px; color: var(--muted-foreground); }
+
+  .feed {
+    margin-top: 10px; max-height: 470px; overflow-y: auto;
+    border-top: 1px solid var(--hairline);
+  }
+  .fitem { display: flex; gap: 10px; padding: 10px 2px; border-bottom: 1px solid var(--hairline); }
+  .fitem .tic { flex: none; width: 20px; text-align: center; color: var(--muted-foreground); font-size: 12px; margin-top: 1px; }
+  .fitem .body { flex: 1; min-width: 0; font-size: 13.5px; }
+  .fitem .when { flex: none; font-size: 11px; color: var(--muted-foreground); margin-top: 2px; }
+
+  .fitem.sys .body { color: var(--muted-foreground); font-size: 12.5px; }
+  .fitem.sys details { margin-top: 6px; }
+  .fitem.sys summary { cursor: pointer; font-size: 11.5px; color: var(--muted-foreground); text-decoration: underline; text-underline-offset: 2px; }
+  .fitem.sys pre {
+    margin-top: 8px; max-height: 180px; overflow: auto;
+    padding: 10px 12px; border-radius: 8px; background: var(--card-2);
+    font-size: 11.5px; line-height: 1.5; white-space: pre-wrap; word-break: break-word;
+  }
+  .fitem.action .body { color: var(--muted-foreground); }
+  .fitem.action .body .mono { font-size: 12px; color: var(--foreground); }
+  .fitem.action .ok { color: var(--success-foreground); }
+  .fitem.action .bad { color: var(--destructive-foreground); }
+  .fitem.say .clamp { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .fitem.say .clamp.open { -webkit-line-clamp: unset; }
+  .fitem.say .more { border: 0; background: none; padding: 0; margin-top: 2px; font-size: 11.5px; color: var(--info-foreground); }
+  .fitem.you .body { color: var(--foreground); }
+  .fitem.you .who { font-size: 11px; color: var(--muted-foreground); display: block; margin-bottom: 1px; }
+
+  .fitem.live .body { font-size: 13px; }
+  .fitem.live.info .body { color: var(--info-foreground); }
+  .fitem.live.warning .body { color: var(--warning-foreground); }
+  .fitem.live.success .body { color: var(--success-foreground); }
+
+  /* steering composer (working/ready states only) */
+  .composer { margin-top: 12px; display: flex; align-items: center; gap: 8px; border: 1px solid var(--input); border-radius: 14px; padding: 6px 6px 6px 14px; }
+  .composer:focus-within { border-color: var(--ring); }
+  .composer input { flex: 1; border: 0; background: transparent; outline: none; font: inherit; font-size: 13.5px; color: var(--foreground); }
+  .composer .send {
+    flex: none; width: 32px; height: 32px; border: 0; border-radius: 8px;
+    background: var(--primary); color: var(--primary-foreground); font-size: 13px;
+  }
+
+  .advanced { margin-top: 32px; border: 1px solid var(--hairline); border-radius: 12px; }
+  .advanced button {
+    width: 100%; display: flex; gap: 8px; align-items: center;
+    border: 0; background: none; padding: 12px 16px;
+    font-size: 13px; color: var(--muted-foreground); text-align: left;
+  }
+  .advanced button:hover { color: var(--foreground); }
+  .gethelp { margin-top: 24px; text-align: center; font-size: 12px; color: var(--muted-foreground); }
+  .gethelp a { color: var(--info-foreground); }
+
+  [hidden] { display: none !important; }
+
+  /* ── Deltas panel (mockup documentation, not app UI) ── */
+  .deltas { max-width: 768px; margin: 0 auto 80px; padding: 0 24px; }
+  .deltas .panel { border: 2px dashed #f59e0b; border-radius: 12px; padding: 20px 22px; background: #fffbeb; color: #1f2937; }
+  html.dark .deltas .panel { background: #1c1917; color: #e5e7eb; }
+  .deltas h3 { font-size: 13px; font-weight: 500; letter-spacing: 0.06em; color: #b45309; margin-bottom: 10px; }
+  html.dark .deltas h3 { color: #fbbf24; }
+  .deltas ol { margin-left: 18px; display: grid; gap: 8px; font-size: 13px; line-height: 1.5; }
+  .deltas code { font-family: "SF Mono", ui-monospace, Menlo, monospace; font-size: 11.5px; background: rgb(0 0 0 / 0.06); padding: 1px 5px; border-radius: 4px; }
+  html.dark .deltas code { background: rgb(255 255 255 / 0.08); }
+</style>
+</head>
+<body>
+
+<!-- ═══ MOCKUP CHROME — not part of the proposal ═══ -->
+<div class="mockbar">
+  <span class="tag">MOCKUP</span>
+  <span>Simple issue page — preview state:</span>
+  <div class="seg" id="stateseg">
+    <button data-state="needs-you" class="on">Needs you</button>
+    <button data-state="working">Working</button>
+    <button data-state="ready">Ready to merge</button>
+  </div>
+  <span class="spacer"></span>
+  <button class="theme" id="themetoggle">Dark mode</button>
+</div>
+
+<div class="page" data-state="needs-you">
+
+  <!-- Top chrome -->
+  <div class="toprow">
+    <button class="backlink">‹ My work</button>
+    <div class="modetoggle"><button class="on">Simple</button><button>Advanced</button></div>
+  </div>
+
+  <!-- Issue identity -->
+  <div class="issuerow">
+    <span class="mono id">MIN-896</span><span>·</span><span>Mind Your Now</span>
+  </div>
+  <h1>Move login sessions to the new account model</h1>
+
+  <!-- Progress track — honest about blockage -->
+  <div class="track" id="track">
+    <div class="step done"><span class="bar"></span><span class="dot"></span><span class="name">Started</span></div>
+    <div class="step now" id="step-now"><span class="bar"></span><span class="dot"></span><span class="name">Writing code</span><span class="wait-note" id="waitnote">waiting on you</span></div>
+    <div class="step"><span class="bar"></span><span class="dot"></span><span class="name">Checking</span></div>
+    <div class="step"><span class="bar"></span><span class="dot"></span><span class="name">Ready</span></div>
+  </div>
+
+  <!-- ═══ STATUS CARD: NEEDS YOU ═══ -->
+  <div class="card accent-warning" id="card-needs-you">
+    <div id="question-live">
+      <div class="cardhead">
+        <span class="iconchip warning">?</span>
+        <div>
+          <div class="cardtitle">It has a question for you</div>
+          <div class="cardsub">Asked 14 hours ago · work pauses until you answer — everything else keeps going</div>
+        </div>
+      </div>
+      <div class="question">
+        <span class="who">The agent asked:</span>
+        The migration renames <code class="mono">sessions.user_id</code> to <code class="mono">sessions.account_id</code>.
+        Older mobile builds still write <code class="mono">user_id</code>, so they'd lose login until users update.
+        How should I handle the old app versions?
+      </div>
+      <div class="options" id="options">
+        <button class="option" data-opt="Keep a compatibility view for one release">
+          <span class="radio"></span>
+          <span class="optbody"><b>Keep a compatibility view for one release</b><span>Old apps keep working; we drop the shim in next month's cleanup.</span></span>
+        </button>
+        <button class="option" data-opt="Require the app update">
+          <span class="radio"></span>
+          <span class="optbody"><b>Require the app update</b><span>Cleaner cut; users on old builds must update to stay logged in.</span></span>
+        </button>
+      </div>
+      <div class="answerrow">
+        <input id="answerinput" placeholder="Or type your own answer…" />
+        <button class="btn" id="sendanswer">Send answer</button>
+      </div>
+      <div class="hint">Pick an option or write one sentence — it continues as soon as you answer.</div>
+    </div>
+    <div id="question-sent" hidden>
+      <div class="cardhead">
+        <span class="iconchip info">✓</span>
+        <div>
+          <div class="cardtitle">Answer sent</div>
+          <div class="cardsub">It's reading your answer and getting back to work.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ STATUS CARD: WORKING ═══ -->
+  <div class="card accent-info" id="card-working" hidden>
+    <div class="cardhead">
+      <span class="iconchip info">⟳</span>
+      <div>
+        <div class="cardtitle">Writing code</div>
+        <div class="cardsub">The agent is writing the code. Running for 2 h 10 m · usually wraps up this stage in about an hour.</div>
+      </div>
+    </div>
+    <div class="cardactions">
+      <button class="btn quiet" onclick="document.getElementById('steerinput').focus()">Tell the agent something</button>
+    </div>
+  </div>
+
+  <!-- ═══ STATUS CARD: READY ═══ -->
+  <div class="card accent-success" id="card-ready" hidden>
+    <div class="cardhead">
+      <span class="iconchip success">✓</span>
+      <div>
+        <div class="cardtitle">Ready to merge</div>
+        <div class="cardsub">Done and checked — ready to merge. Nothing merges by itself.</div>
+      </div>
+    </div>
+    <div class="cardactions">
+      <button class="btn success">Merge to main</button>
+      <button class="btn quiet">See what changed</button>
+    </div>
+  </div>
+
+  <!-- ═══ FEED ═══ -->
+  <div class="feedhead">
+    <h2>What it's doing</h2>
+    <span class="livechip warning" id="livechip"><span class="dot"></span><span id="livechiptext">waiting on you</span></span>
+    <span class="feedwho">Work agent · <span class="mono">min-896</span></span>
+  </div>
+
+  <div class="feed" id="feed">
+    <!-- The 55 KB kickoff prompt: never a wall — a quiet system line with the raw payload behind a disclosure -->
+    <div class="fitem sys">
+      <span class="tic">▸</span>
+      <div class="body">
+        Task started · told to move login sessions to the new account model
+        <details>
+          <summary>See the full instructions it was given</summary>
+          <pre class="mono"># Working on Issue: MIN-896
+
+**Workspace:** /home/eltmon/Projects/myn/workspaces/feature-min-896
+
+## Per-Issue Record
+
+Decisions, hazards, resumePoint, and sessionHistory from the planning
+agent and prior sessions:
+
+```json
+{
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [ … 48 KB more …
+```</pre>
+        </details>
+      </div>
+      <span class="when">14 h ago</span>
+    </div>
+
+    <div class="fitem say">
+      <span class="tic">💬</span>
+      <div class="body">I'll move session storage over to the new account model. First I'm reading how sessions are written today so nothing else breaks.</div>
+      <span class="when">14 h ago</span>
+    </div>
+
+    <div class="fitem action">
+      <span class="tic">⌕</span>
+      <div class="body">Searched the code for <span class="mono">sessions</span> — 42 matches</div>
+      <span class="when">14 h ago</span>
+    </div>
+
+    <div class="fitem action">
+      <span class="tic">✎</span>
+      <div class="body">Edited <span class="mono">src/auth/session.ts</span>, <span class="mono">src/auth/migrate.ts</span></div>
+      <span class="when">13 h ago</span>
+    </div>
+
+    <div class="fitem say">
+      <span class="tic">💬</span>
+      <div class="body">
+        <span class="clamp" id="clamp1">The plan: add <code class="mono">account_id</code> alongside <code class="mono">user_id</code>, backfill it from the accounts table, switch reads over, then drop the old column. Writes go through one place — <code class="mono">createSession()</code> — so the migration is contained. Mobile clients older than v2.4 still send the old field, which is the one risky edge.</span>
+        <button class="more" data-clamp="clamp1">Read more</button>
+      </div>
+      <span class="when">13 h ago</span>
+    </div>
+
+    <div class="fitem action">
+      <span class="tic">▶</span>
+      <div class="body">Ran <span class="mono">npm test</span> — <span class="ok">212 passed</span>, <span class="bad">2 failed</span></div>
+      <span class="when">13 h ago</span>
+    </div>
+
+    <div class="fitem say">
+      <span class="tic">💬</span>
+      <div class="body">Both failures are old mobile builds writing the old field. That's a product decision, not a code one — so I asked you above instead of guessing.</div>
+      <span class="when">13 h ago</span>
+    </div>
+
+    <!-- live row: the only colored line in the feed -->
+    <div class="fitem live warning" id="liverow">
+      <span class="tic">●</span>
+      <div class="body" id="liverowtext">Paused — waiting for your answer</div>
+      <span class="when">now</span>
+    </div>
+  </div>
+
+  <!-- Steering composer — only when not blocked on the human -->
+  <div id="steerblock" hidden>
+    <div class="composer">
+      <input id="steerinput" placeholder="Say something to the agent… (steer it, correct it, ask why)" />
+      <button class="send">➤</button>
+    </div>
+    <div class="hint">Talking to it never interrupts the work — it reads you between tasks.</div>
+  </div>
+
+  <!-- Advanced -->
+  <div class="advanced">
+    <button>▸ Advanced — the machinery behind this task</button>
+  </div>
+
+  <div class="gethelp">Something look wrong? <a href="#">Get help</a> — a human sees these.</div>
+</div>
+
+<!-- ═══ MOCKUP DOCUMENTATION — not app UI ═══ -->
+<div class="deltas">
+  <div class="panel">
+    <h3>WHAT CHANGES vs. TODAY'S PAGE (PAN-2908 C-SIMPLE)</h3>
+    <ol>
+      <li><b>The machine prompt never renders as content.</b> Today the first thing on this page is the agent's 55&nbsp;KB kickoff prompt dumped by <code>ChatMarkdown.tsx:459</code> (LARGE_MESSAGE_CHARS) into a raw blue plain-text wall — on a surface whose own copy is linted to ban the word "workspace". It becomes a one-line system entry; the raw payload stays reachable behind a disclosure (no information lost, none of it in your face).</li>
+      <li><b>The question is the hero.</b> Today the status card says only "The agent needs one decision from you" and the answer box sits ~700px away below the transcript wall. The card now quotes the actual pending question and its options (data the AskUserQuestion pipeline already fetches for the modal), and the composer moves <i>inside</i> the card. Pick an option or type one sentence, send, done.</li>
+      <li><b>The progress track stops lying.</b> <code>STEP_INDEX_BY_STATE</code> maps needs-you → "Writing code" with a blue working pulse. A blocked agent is not working: the current node turns amber and gets a "waiting on you" caption. Amber = human must act, blue = machine working (style-guide signal law).</li>
+      <li><b>Advanced chrome leaves simple mode.</b> The "Drifted master" warning badge, the "Tools" button, and the one-agent picker move behind the Advanced disclosure. The feed header keeps a quiet caption ("Work agent · min-896") so you still know who's talking. The picker returns only when the issue genuinely has multiple agents.</li>
+      <li><b>The feed reads as a narrative.</b> Assistant prose in DM Sans (clamped at 3 lines with "Read more"), tool calls collapsed to quiet one-liners (edited files, test runs, searches) with muted timestamps. One colored signal per row: failure counts red, pass counts green, the live row carries the single state color.</li>
+      <li><b>Surfaces follow the guide.</b> The blue info-tinted message block is gone (blue means "machine working", not content); cards are borderless + ambient shadow in light mode, hairline in dark; all type ≤ font-medium; DM Sans everywhere, SF Mono only on identifiers.</li>
+      <li><b>Same data, no new backend.</b> Everything shown derives from sources the page already has: <code>deriveSimpleIssue</code> for state, the transcript JSONL (already parsed by ConversationPanel) re-shaped into narrative + action lines instead of raw bubbles, and the pending-input payload for the question text/options.</li>
+    </ol>
+  </div>
+</div>
+
+<script>
+  const page = document.querySelector('.page');
+  const cards = { 'needs-you': 'card-needs-you', 'working': 'card-working', 'ready': 'card-ready' };
+  const livechip = document.getElementById('livechip');
+  const livechiptext = document.getElementById('livechiptext');
+  const liverow = document.getElementById('liverow');
+  const liverowtext = document.getElementById('liverowtext');
+  const steerblock = document.getElementById('steerblock');
+  const stepNow = document.getElementById('step-now');
+  const waitnote = document.getElementById('waitnote');
+  const track = document.getElementById('track');
+
+  function setState(state) {
+    page.dataset.state = state;
+    for (const [s, id] of Object.entries(cards)) document.getElementById(id).hidden = s !== state;
+    document.querySelectorAll('#stateseg button').forEach(b => b.classList.toggle('on', b.dataset.state === state));
+    steerblock.hidden = state === 'needs-you';
+    waitnote.hidden = state !== 'needs-you';
+    stepNow.classList.toggle('waiting', state === 'needs-you');
+
+    // track nodes
+    const steps = track.querySelectorAll('.step');
+    steps.forEach((el, i) => {
+      el.classList.remove('done', 'now');
+      if (state === 'ready') { el.classList.add(i < 3 ? 'done' : 'now'); }
+      else { if (i === 0) el.classList.add('done'); if (i === 1) el.classList.add('now'); }
+    });
+    if (state === 'ready') stepNow.classList.remove('waiting');
+
+    if (state === 'needs-you') { livechip.className = 'livechip warning'; livechiptext.textContent = 'waiting on you'; liverow.className = 'fitem live warning'; liverowtext.textContent = 'Paused — waiting for your answer'; }
+    if (state === 'working')   { livechip.className = 'livechip info';    livechiptext.textContent = 'live';           liverow.className = 'fitem live info';    liverowtext.textContent = 'Running npm test…'; }
+    if (state === 'ready')     { livechip.className = 'livechip success'; livechiptext.textContent = 'done';         liverow.className = 'fitem live success'; liverowtext.textContent = 'All checks passed — ready when you are'; }
+    livechip.classList.toggle('success', state === 'ready');
+  }
+  document.querySelectorAll('#stateseg button').forEach(b => b.addEventListener('click', () => setState(b.dataset.state)));
+
+  // option select
+  let chosen = null;
+  document.querySelectorAll('#options .option').forEach(o => o.addEventListener('click', () => {
+    document.querySelectorAll('#options .option').forEach(x => x.classList.remove('selected'));
+    o.classList.add('selected');
+    chosen = o.dataset.opt;
+  }));
+
+  // send answer
+  document.getElementById('sendanswer').addEventListener('click', () => {
+    const typed = document.getElementById('answerinput').value.trim();
+    const text = typed || chosen;
+    if (!text) { document.getElementById('answerinput').focus(); return; }
+    document.getElementById('question-live').hidden = true;
+    document.getElementById('question-sent').hidden = false;
+    const you = document.createElement('div');
+    you.className = 'fitem you';
+    you.innerHTML = '<span class="tic">›</span><div class="body"><span class="who">You answered</span>' +
+      text.replace(/</g, '&lt;') + '</div><span class="when">now</span>';
+    liverow.before(you);
+    liverow.className = 'fitem live info';
+    liverowtext.textContent = 'Reading your answer…';
+    livechip.className = 'livechip info';
+    livechiptext.textContent = 'live';
+    stepNow.classList.remove('waiting');
+    waitnote.hidden = true;
+    document.getElementById('feed').scrollTop = document.getElementById('feed').scrollHeight;
+  });
+
+  // read-more clamps
+  document.querySelectorAll('.more').forEach(b => b.addEventListener('click', () => {
+    const el = document.getElementById(b.dataset.clamp);
+    el.classList.toggle('open');
+    b.textContent = el.classList.contains('open') ? 'Show less' : 'Read more';
+  }));
+
+  // theme
+  document.getElementById('themetoggle').addEventListener('click', (e) => {
+    document.documentElement.classList.toggle('dark');
+    e.target.textContent = document.documentElement.classList.contains('dark') ? 'Light mode' : 'Dark mode';
+  });
+
+  // needs-you livechip starts in warning; success class defined only via JS toggle
+  setState('needs-you');
+</script>
+</body>
+</html>

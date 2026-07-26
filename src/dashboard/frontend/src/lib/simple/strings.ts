@@ -53,7 +53,6 @@ export const SIMPLE_STRINGS = {
   },
   issue: {
     backToMyWork: '← My work',
-    conversationTitle: "What it's saying and doing",
     composerPlaceholder: 'Say something to the agent… (steer it, correct it, ask why)',
     composerHint: 'Talking to it never interrupts the work — it reads you between tasks.',
     answerPlaceholder: 'Type your answer…',
@@ -80,6 +79,7 @@ export const SIMPLE_STRINGS = {
     answerSentTitle: 'Answer sent',
     answerSentSub: "It's reading your answer and getting back to work.",
     liveLabel: 'live',
+    readyLiveRow: 'All checks passed — ready when you are',
   },
   mode: {
     simple: 'Simple',
