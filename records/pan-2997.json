@@ -169,15 +169,7 @@
       "timestamp": "2026-07-26T09:18:41.088Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-26T09:18:41Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2997\n\nThe poison marker is created after TERMINAL becomes crash-visible and is read/cleared fail-open, so recovery can still suppress or duplicate the wake.\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2997 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "src/dashboard/server/event-store.ts",
@@ -269,7 +261,7 @@
     "recordedAt": "2026-07-26T10:07:26.737Z"
   },
   "created": "2026-07-21T23:09:49.270Z",
-  "updated": "2026-07-26T10:07:27.875Z",
+  "updated": "2026-07-26T10:07:34.353Z",
   "pipeline": {
     "issueId": "PAN-2997",
     "reviewStatus": "pending",
@@ -279,13 +271,13 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T10:07:27.863Z",
+    "updatedAt": "2026-07-26T10:07:33.712Z",
     "reviewNotes": "Verification failed at test — fix and resubmit",
     "verificationNotes": "Verification FAILED at test (742164ms):\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-2997\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-2997/src/dashboard/frontend\n\n ❯ |root| tests/unit/lib/overdeck/no-loss-matrix.test.ts (5 tests | 1 failed) 93ms\n     × AC1/AC2: every enumerated HTTP route is present in the matrix 86ms (retry x1)\n ❯ |root| tests/unit/dashboard/server/routes/conversations-no-loss.test.ts (2 tests | 1 failed) 10ms\n     × keeps all 34 conversationsRouteLayer method/path registrations 7ms (retry x1)\n\n Test Files  129 passed (129)\n      Tests  1415 passed (1415)\n   Start at  05:56:17\n   Duration  24.48s (transform 74.54s, setup 43.50s, import 241.32s, tests 73.72s, environment 101.99s)\n\n[prep] state-reconcile\n[prep] completed: state-reconcile (0s elapsed)\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Workspace already up to date with main\n[prep] completed: sync-main (0s elapsed)\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-fCS4Ax/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] completed: tracker-context (0s elapsed)\n[prep] Spawning agent...\n[prep] spawn\n[prep] completed: spawn (0s elapsed)\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Workspace already\n…(696 chars elided)…\n-72ngYQ/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-72ngYQ/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-72ngYQ/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-72ngYQ/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planni\n...(truncated)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3004",
     "lastVerifiedCommit": "dae8d6dfbd4da721132281460260596645c92fdb",
-    "reviewSpawnedAt": "2026-07-26T09:15:49.535Z",
     "reviewRequestedAt": "2026-07-26T10:07:27.863Z",
+    "reviewSpawnedAt": "2026-07-26T09:15:49.535Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "src/dashboard/server/event-store.ts",
@@ -382,9 +374,9 @@
       "byStage": {
         "memory-extraction": {
           "anthropic/claude-haiku-4-5": {
-            "input": 1997,
-            "output": 200,
-            "cacheRead": 0,
+            "input": 3320,
+            "output": 2942,
+            "cacheRead": 3,
             "cacheWrite": 0
           }
         },
@@ -415,9 +407,9 @@
       },
       "totals": {
         "anthropic/claude-haiku-4-5": {
-          "input": 1997,
-          "output": 200,
-          "cacheRead": 0,
+          "input": 3320,
+          "output": 2942,
+          "cacheRead": 3,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
@@ -434,8 +426,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 293.138191,
-        "pricingAsOf": "2026-07-26T10:02:47.271Z"
+        "usd": 293.1532243,
+        "pricingAsOf": "2026-07-26T10:07:33.818Z"
       }
     },
     "merges": [
