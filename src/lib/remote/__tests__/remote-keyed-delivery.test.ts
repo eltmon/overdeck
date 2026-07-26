@@ -17,6 +17,7 @@ function createFakeRemoteTmux(seed: {
   failPaste?: boolean;
   failSubmit?: boolean;
   paneDead?: boolean;
+  dieOnEnter?: boolean;
 } = {}) {
   const state = {
     pending: seed.pending ?? '',
@@ -24,6 +25,8 @@ function createFakeRemoteTmux(seed: {
     failPaste: seed.failPaste ?? false,
     failSubmit: seed.failSubmit ?? false,
     paneDead: seed.paneDead ?? false,
+    dieOnEnter: seed.dieOnEnter ?? false,
+    pid: '4242',
     pastes: 0,
     enters: 0,
     writes: [] as string[],
@@ -54,6 +57,9 @@ function createFakeRemoteTmux(seed: {
         state.enters += 1;
         state.terminal = '1';
         state.pending = '';
+        // The pane dies in the shell-to-branch handoff window: send-keys
+        // already "succeeded", the markers already flipped.
+        if (state.dieOnEnter) state.paneDead = true;
       }
       return '';
     }
@@ -63,7 +69,21 @@ function createFakeRemoteTmux(seed: {
       return `${state.terminal}\n`;
     }
     if (command.includes('display-message')) {
-      return `${state.paneDead ? '1' : '0'}\n`;
+      return `${state.pid} ${state.paneDead ? '1' : '0'}\n`;
+    }
+    if (command.includes('set-option')) {
+      // Marker rollback: each subcommand is quoted as `';'`-separated argv.
+      for (const sub of command.split(`';'`)) {
+        if (sub.includes(dedupTerminalOptionName(KEY))) {
+          state.terminal = sub.includes(`'-u'`) ? '' : '1';
+        }
+        if (sub.includes(dedupPendingOptionName(KEY))) {
+          state.pending = sub.includes(`'-u'`)
+            ? ''
+            : (sub.trim().replace(/'/g, '').split(/\s+/).at(-1) ?? '');
+        }
+      }
+      return '';
     }
     return '';
   };
@@ -163,6 +183,28 @@ describe('sendToRemoteAgentKeyed', () => {
     const outcome = await sendToRemoteAgentKeyed(AGENT, VM, 'wake up remote', KEY, exec);
     expect(outcome).toBe('delivered');
     expect(state.enters).toBe(1);
+    expect(state.terminal).toBe('1');
+  });
+
+  it('rolls the key back when the pane dies AROUND the Enter — send-keys "succeeded" but the harness is gone (cycle 10)', async () => {
+    // The if-shell condition sees a live pane, the Enter lands, the markers
+    // flip — and the pane dies in the same breath, inside the shell-to-branch
+    // handoff window. tmux reported success throughout.
+    const { exec, state } = createFakeRemoteTmux({ pending: 'earlier-send-id', dieOnEnter: true });
+
+    await expect(sendToRemoteAgentKeyed(AGENT, VM, 'wake up remote', KEY, exec))
+      .rejects.toThrow(KeyedSubmitTargetDeadError);
+    // The terminal marker was rolled back and the pending claim restored.
+    expect(state.terminal).toBe('');
+    expect(state.pending).toBe('earlier-send-id');
+
+    // Recovery after the pane is alive again: real submission, never a false dedup.
+    state.paneDead = false;
+    state.dieOnEnter = false;
+    const outcome = await sendToRemoteAgentKeyed(AGENT, VM, 'wake up remote', KEY, exec);
+    expect(outcome).toBe('delivered');
+    // Two Enters in total: the one lost to the dying pane, and the recovery's.
+    expect(state.enters).toBe(2);
     expect(state.terminal).toBe('1');
   });
 

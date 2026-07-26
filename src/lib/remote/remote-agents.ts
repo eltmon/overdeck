@@ -815,13 +815,23 @@ export async function sendToRemoteAgentKeyed(
 
     // 'pasted' (our sendId) and 'submit-pending' (a prior crashed attempt's
     // sendId) both complete the same transaction WITHOUT re-pasting. The
-    // SUBMISSION is one server-owned command (cycle 9): a single if-shell
-    // whose condition requires the pending claim, no terminal marker, AND a
-    // LIVE pane, and whose command list sends the Enter FIRST and only then
-    // flips terminal and clears pending. A pane that died during the settle
-    // window fails the liveness condition — no marker changes, no Enter — so
-    // a wake that never landed is never recorded as delivered; exactly one
-    // caller becomes the completer.
+    // SUBMISSION is one server-owned command: a single if-shell whose
+    // condition requires the pending claim, no terminal marker, AND a LIVE
+    // pane, and whose command list sends the Enter FIRST and only then flips
+    // terminal and clears pending. The pre-branch liveness check is only an
+    // optimization (cycle 10): the pane can die in the shell-to-branch
+    // handoff and remote tmux reports send-keys into a corpse as success, so
+    // acceptance is proven by the post-submit target re-read below.
+    const readPaneTarget = async (): Promise<{ pid: string; dead: boolean }> =>
+      run(buildRemoteTmuxCommand(['display-message', '-p', '-t', agentId, '#{pane_pid} #{pane_dead}']))
+        .then(stdout => {
+          const [pid = '', dead = ''] = stdout.trim().split(/\s+/);
+          return { pid, dead: dead === '1' };
+        })
+        .catch(() => ({ pid: '', dead: true }));
+
+    const preTarget = await readPaneTarget();
+    const pendingBefore = pendingMarker;
     await new Promise(resolve => setTimeout(resolve, 300));
     const submitCondition =
       `test -z "$(${innerTmux} show-option -qv -t ${agentId} ${terminalOption})" && ` +
@@ -833,17 +843,30 @@ export async function sendToRemoteAgentKeyed(
       `set-option -u -t ${agentId} ${pendingOption}`;
     await run(buildRemoteTmuxCommand(['if-shell', '-t', agentId, submitCondition, submitOnTrue]));
 
-    const terminalAfter = await readMarker(terminalOption);
-    const pendingAfter = await readMarker(pendingOption);
+    const [terminalAfter, pendingAfter, postTarget] = await Promise.all([
+      readMarker(terminalOption),
+      readMarker(pendingOption),
+      readPaneTarget(),
+    ]);
+    const targetLost = postTarget.dead || (preTarget.pid !== '' && postTarget.pid !== preTarget.pid);
+
     if (terminalAfter === '' && pendingAfter === '') {
       throw new Error(`Keyed remote submit for ${agentId} found neither a pending claim nor a terminal marker — the paste vanished without submission`);
     }
+    if (targetLost) {
+      // The pane died or was replaced around the Enter: acceptance is
+      // unprovable and the receiving harness is gone. ROLL THE KEY BACK —
+      // clear terminal, restore the pending claim — so recovery re-drives
+      // the wake after resume instead of suppressing it as delivered.
+      if (terminalAfter !== '') {
+        const rollbackArgs = pendingBefore === ''
+          ? ['set-option', '-u', '-t', agentId, terminalOption, ';', 'set-option', '-u', '-t', agentId, pendingOption]
+          : ['set-option', '-u', '-t', agentId, terminalOption, ';', 'set-option', '-t', agentId, pendingOption, pendingBefore];
+        await run(buildRemoteTmuxCommand(rollbackArgs)).catch(() => '');
+      }
+      throw new KeyedSubmitTargetDeadError(agentId, dedupKey);
+    }
     if (terminalAfter === '') {
-      // The condition rejected the submit. A dead pane is recoverable — the
-      // pending claim is preserved so recovery can retry after resume.
-      const paneDead = await run(buildRemoteTmuxCommand(['display-message', '-p', '-t', agentId, '#{pane_dead}']))
-        .then(stdout => stdout.trim() === '1', () => false);
-      if (paneDead) throw new KeyedSubmitTargetDeadError(agentId, dedupKey);
       throw new Error(`Keyed remote submit for ${agentId} was rejected with the pending claim intact on a live pane`);
     }
     return 'delivered';

@@ -171,6 +171,34 @@ describe.skipIf(!hasTmux)('sendKeysDedup two-phase protocol', () => {
     expect(showOption('@overdeck-dedup-test-key-1')).toBe('1');
   });
 
+  it('rolls the key back when the pane dies AROUND the Enter — no false terminal, recovery pastes real content (cycle 10)', async () => {
+    // Replace cat with a shell that exits as soon as it consumes the
+    // submitted line: the if-shell's condition sees a live pane, the Enter
+    // lands, and the harness dies in the same breath — the exact
+    // shell-to-branch handoff window.
+    execFileSync('tmux', ['-L', socket, 'respawn-pane', '-k', '-t', session, 'sh']);
+    execFileSync('tmux', ['-L', socket, 'set-option', '-t', session, 'remain-on-exit', 'on']);
+    const first = await sendKeysDedup(session, 'exit', 'test-key-1');
+    expect(first).toBe('pasted');
+
+    await expect(completeKeyedSubmit(session, 'test-key-1')).rejects.toThrow(KeyedSubmitTargetDeadError);
+    // The terminal marker was rolled back and the pending claim restored —
+    // the key was NOT claimed even though send-keys reported success.
+    expect(showOption('@overdeck-dedup-test-key-1')).toBe('');
+    expect(showOption('@overdeck-dedup-pending-test-key-1')).not.toBe('');
+
+    // Recovery after resume recreates the session (resumeAgent kills the
+    // zombie): fresh markers, and the keyed delivery performs a REAL content
+    // submission into the live session.
+    execFileSync('tmux', ['-L', socket, 'kill-session', '-t', session]);
+    execFileSync('tmux', ['-L', socket, 'new-session', '-d', '-s', session, '-x', '120', '-y', '30', 'cat']);
+    const replay = await sendKeysDedup(session, 'wake up agent', 'test-key-1');
+    expect(replay).toBe('pasted');
+    await completeKeyedSubmit(session, 'test-key-1');
+    expect(occurrences(capturePane(), 'wake up agent')).toBe(2); // input echo + cat output
+    expect(showOption('@overdeck-dedup-test-key-1')).toBe('1');
+  });
+
   it('delivers identical content under a different key', async () => {
     await sendKeysDedup(session, 'wake up agent', 'test-key-1');
     const third = await sendKeysDedup(session, 'wake up agent', 'test-key-2');

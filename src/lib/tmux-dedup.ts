@@ -64,19 +64,42 @@ export type KeyedTmuxPhase =
 
 /**
  * Thrown when a keyed submit found the target pane DEAD (the harness exited
- * between the paste and the submission). The pending claim is deliberately
- * preserved and the key is NOT terminal, so no recovery ever suppresses the
- * wake as delivered: the caller's recovery leaves its receipt pending and
- * re-drives the delivery after the agent resumes (PAN-2997 cycle 9).
+ * between the paste and the submission) or dying around the Enter. The
+ * pending claim is deliberately preserved/restored and the key is NOT
+ * terminal, so no recovery ever suppresses the wake as delivered: the
+ * caller's recovery leaves its receipt pending and re-drives the delivery
+ * after the agent resumes (PAN-2997 cycle 9/10).
  */
 export class KeyedSubmitTargetDeadError extends Error {
   constructor(sessionName: string, dedupKey: string) {
     super(
-      `Keyed tmux submit for ${sessionName} found a dead pane — the Enter was NOT sent, ` +
+      `Keyed tmux submit for ${sessionName} found a dead pane — the Enter was NOT accepted by a live harness, ` +
       `the pending claim for key "${dedupKey}" is preserved, and the key is not terminal`,
     );
     this.name = 'KeyedSubmitTargetDeadError';
   }
+}
+
+interface PaneTarget {
+  pid: string;
+  dead: boolean;
+}
+
+/** pane_pid + pane_dead in one read — the identity of the Enter's target. */
+async function readPaneTarget(sessionName: string): Promise<PaneTarget> {
+  return tmuxExecAsync(['display-message', '-p', '-t', sessionName, '#{pane_pid} #{pane_dead}'], { encoding: 'utf-8' })
+    .then(result => {
+      const [pid = '', dead = ''] = String(result.stdout).trim().split(/\s+/);
+      return { pid, dead: dead === '1' };
+    })
+    // An unreadable target cannot be proven alive — treat it as dead so the
+    // key is never claimed on guesswork.
+    .catch(() => ({ pid: '', dead: true }));
+}
+
+async function readMarker(sessionName: string, option: string): Promise<string> {
+  return tmuxExecAsync(['show-option', '-qv', '-t', sessionName, option], { encoding: 'utf-8' })
+    .then(result => String(result.stdout).trim(), () => '');
 }
 
 /**
@@ -153,6 +176,12 @@ export async function sendKeysDedup(
  *   NO marker changes and NO Enter is sent, so the wake is never recorded as
  *   delivered when it never landed. The preserved pending claim lets
  *   recovery retry after the agent resumes.
+ * - The pre-branch liveness condition is NOT proof of acceptance (cycle 10):
+ *   the pane can die in the shell-to-branch handoff, and tmux reports
+ *   send-keys into a remain-on-exit corpse as success. So after the command
+ *   the target is re-read — if the pane died or its pid changed around the
+ *   Enter, the terminal marker is ROLLED BACK, the pending claim restored,
+ *   and KeyedSubmitTargetDeadError is thrown.
  * - The Enter precedes the terminal transition inside the transaction, so a
  *   failed Enter (which aborts the command list) can never leave the key
  *   terminal.
@@ -172,6 +201,15 @@ export async function completeKeyedSubmit(sessionName: string, dedupKey: string)
   const pendingOption = dedupPendingOptionName(dedupKey);
 
   await new Promise(resolve => setTimeout(resolve, PASTE_SETTLE_MS));
+
+  // Snapshot the Enter target's identity BEFORE the submit. The if-shell's
+  // pre-branch liveness condition is only an optimization: the pane can die
+  // in the shell-to-branch handoff, and tmux reports send-keys into a
+  // remain-on-exit corpse as SUCCESS. What proves acceptance is the
+  // post-submit check below (cycle 10).
+  const preTarget = await readPaneTarget(sessionName);
+  const pendingBefore = await readMarker(sessionName, pendingOption);
+
   await tmuxExecAsync([
     'if-shell', '-t', sessionName,
     `test -z "$(tmux show-option -qv -t ${sessionName} ${terminalOption})" && ` +
@@ -180,20 +218,33 @@ export async function completeKeyedSubmit(sessionName: string, dedupKey: string)
     `send-keys -t ${sessionName} C-m \; set-option -t ${sessionName} ${terminalOption} 1 \; set-option -u -t ${sessionName} ${pendingOption}`,
   ], { encoding: 'utf-8' });
 
-  const [terminalMarker, pendingMarker] = await Promise.all([
-    tmuxExecAsync(['show-option', '-qv', '-t', sessionName, terminalOption], { encoding: 'utf-8' })
-      .then(result => String(result.stdout).trim(), () => ''),
-    tmuxExecAsync(['show-option', '-qv', '-t', sessionName, pendingOption], { encoding: 'utf-8' })
-      .then(result => String(result.stdout).trim(), () => ''),
+  const [terminalAfter, pendingAfter, postTarget] = await Promise.all([
+    readMarker(sessionName, terminalOption),
+    readMarker(sessionName, pendingOption),
+    readPaneTarget(sessionName),
   ]);
-  if (terminalMarker !== '') return; // Submitted — by this call or a concurrent completer.
-  if (pendingMarker !== '') {
-    // The condition rejected the submit. A dead pane is the recoverable case
-    // (the pending claim is preserved so recovery can retry after resume);
-    // anything else is a definitive delivery failure.
-    const paneDead = await tmuxExecAsync(['display-message', '-p', '-t', sessionName, '#{pane_dead}'], { encoding: 'utf-8' })
-      .then(result => String(result.stdout).trim() === '1', () => false);
-    if (paneDead) throw new KeyedSubmitTargetDeadError(sessionName, dedupKey);
+
+  const targetLost = postTarget.dead || (preTarget.pid !== '' && postTarget.pid !== preTarget.pid);
+
+  if (terminalAfter !== '') {
+    if (!targetLost) return; // Submitted to a live pane — by this call or a concurrent completer.
+    // The pane died or was replaced around the Enter: tmux may have reported
+    // send-keys as successful while the input landed nowhere, and even an
+    // accepted Enter is worthless once the receiving harness is gone. ROLL
+    // THE KEY BACK — clear the terminal marker and restore the pending claim
+    // — so recovery re-drives the wake after resume instead of suppressing
+    // it as delivered (cycle 10).
+    const rollbackArgs = pendingBefore === ''
+      ? ['set-option', '-u', '-t', sessionName, terminalOption, ';', 'set-option', '-u', '-t', sessionName, pendingOption]
+      : ['set-option', '-u', '-t', sessionName, terminalOption, ';', 'set-option', '-t', sessionName, pendingOption, pendingBefore];
+    await tmuxExecAsync(rollbackArgs, { encoding: 'utf-8' }).catch(() => {});
+    throw new KeyedSubmitTargetDeadError(sessionName, dedupKey);
+  }
+  if (pendingAfter !== '') {
+    // The condition rejected the submit. A dead/replaced pane is the
+    // recoverable case (the pending claim is preserved so recovery can retry
+    // after resume); anything else is a definitive delivery failure.
+    if (targetLost) throw new KeyedSubmitTargetDeadError(sessionName, dedupKey);
     throw new Error(`Keyed tmux submit for ${sessionName} was rejected with the pending claim intact on a live pane`);
   }
   throw new Error(`Keyed tmux submit for ${sessionName} found neither a pending claim nor a terminal marker — the paste vanished without submission`);

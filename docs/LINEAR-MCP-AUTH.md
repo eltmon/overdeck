@@ -197,22 +197,28 @@ has not yet been notified:
     submission itself is a second single `if-shell` — only when PENDING is
     present, TERMINAL is absent, AND the pane is alive does the server send
     the Enter and then flip TERMINAL and clear PENDING, in that order, inside
-    one server-executed command list. A pane that died during the settle
-    window fails the liveness condition: NO marker changes and NO Enter, so a
-    wake that never landed is never recorded as delivered — the submit throws
-    `KeyedSubmitTargetDeadError`, the outbox entry stays `pending`, and a
-    later pass re-drives the wake after the agent resumes. A failed Enter
-    aborts the command list before the terminal transition, and concurrent or
-    post-crash callers lose the server-side condition, so no stray Enter can
-    land in a composer holding unrelated operator text.
-  - **Monitor mail (PAN-3015) never carries keyed deliveries.** The monitor
-    claims a mail file by renaming it before emitting, so a monitor exit
-    between claim and emit would lose the wake and a post-emit/pre-ack crash
-    would replay it — the spool cannot enforce the key across the
+    one server-executed command list. The pre-branch liveness check is NOT
+    treated as proof of acceptance: the pane can die in the shell-to-branch
+    handoff, and tmux reports `send-keys` into a remain-on-exit corpse as
+    success. So after the command, the target is re-read — if the pane died
+    or its pid changed around the Enter, the terminal marker is ROLLED BACK,
+    the pending claim restored, and `KeyedSubmitTargetDeadError` is thrown.
+    The outbox entry stays `pending` and a later pass re-drives the wake
+    after the agent resumes — recovery never suppresses a wake that did not
+    demonstrably reach a live harness. A failed Enter aborts the command
+    list before the terminal transition, and concurrent or post-crash
+    callers lose the server-side condition, so no stray Enter can land in a
+    composer holding unrelated operator text.
+  - **Monitor mail spool (PAN-3015) never carries keyed deliveries.** The
+    monitor claims a mail file by renaming it before emitting, so a monitor
+    exit between claim and emit would lose the wake and a post-emit/pre-ack
+    crash would replay it — the spool cannot enforce the key across the
     model-visible side effect. Keyed messages skip the monitor tier and use
     the supervisor/tmux door; keyed payloads are also never written as mail
-    backups, because a monitor started later would drain the file as a second
-    visible copy.
+    backups on delivered paths, because a monitor started later would drain
+    the file as a second visible copy. (The one mail file a keyed delivery
+    can still produce is the **gated-agent queue** below — a separate
+    mechanism from the monitor spool.)
   - **Resume paths (suspended/stopped/zombie)** never let a keyed message
     ride the resume kickoff prompt: the kickoff is delivered by components
     that cannot enforce the key. The agent is resumed with its bare
@@ -226,9 +232,12 @@ has not yet been notified:
   - Channels, codex app-server, and ACP tiers cannot enforce a key and are
     rejected for keyed payloads. Keyed Linear wakes only target Claude Code
     agents anyway — the detection hook is Claude-Code-only.
-  - **Keyed mail queueing** (paused/gated agents) uses a deterministic
-    filename, so a replayed send overwrites the same durable entry instead of
-    stacking a second copy; the outcome is recorded honestly as `queued`.
+  - **Gated-agent mail queue** (paused/troubled/operator-stopped agents)
+    uses a deterministic keyed filename, so a replayed send overwrites the
+    same durable entry instead of stacking a second copy; the outcome is
+    recorded honestly as `queued`. This is the only mail path keyed payloads
+    take, and it is distinct from the monitor spool: the message is enqueued
+    at most once and the wake is never reported as delivered.
 - **Recovery semantics.** An agent stays in the wake set until a completion
   DomainEvent lands. When a pass finds no completion, it reads the keyed
   entry (one exact-path async read — no directory scans, no content or
