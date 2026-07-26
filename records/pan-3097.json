@@ -10,18 +10,59 @@
     }
   ],
   "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "docs/ASKUSERQUESTION-DASHBOARD.md",
+      "roles/plan.md",
+      "src/dashboard/frontend/src/App/hooks/usePendingInputDialogs.ts",
+      "src/dashboard/frontend/src/components/AskUserQuestionDialog.tsx",
+      "src/dashboard/frontend/src/components/DecisionsPanel.tsx",
+      "src/dashboard/frontend/src/components/__tests__/AskUserQuestionDialog.test.tsx",
+      "src/dashboard/frontend/src/components/__tests__/DecisionsPanel.test.tsx",
+      "src/dashboard/frontend/src/components/sessionFeed/SessionFeedSidebar.tsx",
+      "src/dashboard/frontend/src/components/sessionFeed/__tests__/SessionFeedSidebar.test.tsx",
+      "src/dashboard/frontend/src/lib/__tests__/issueLabel.test.ts",
+      "src/dashboard/frontend/src/lib/__tests__/useDecisions.test.ts",
+      "src/dashboard/frontend/src/lib/issueLabel.ts",
+      "src/dashboard/frontend/src/lib/useDecisions.ts",
+      "src/lib/cloister/prompts/planning.md",
+      "sync-sources/rules/ask-user-question-self-contained.md"
+    ],
+    "actualChangedFiles": [
+      "docs/ASKUSERQUESTION-DASHBOARD.md",
+      "roles/plan.md",
+      "src/dashboard/frontend/src/App/hooks/usePendingInputDialogs.ts",
+      "src/dashboard/frontend/src/components/AskUserQuestionDialog.tsx",
+      "src/dashboard/frontend/src/components/DecisionsPanel.tsx",
+      "src/dashboard/frontend/src/components/__tests__/AskUserQuestionDialog.test.tsx",
+      "src/dashboard/frontend/src/components/__tests__/DecisionsPanel.test.tsx",
+      "src/dashboard/frontend/src/components/sessionFeed/SessionFeedSidebar.tsx",
+      "src/dashboard/frontend/src/components/sessionFeed/__tests__/SessionFeedSidebar.test.tsx",
+      "src/dashboard/frontend/src/lib/__tests__/issueLabel.test.ts",
+      "src/dashboard/frontend/src/lib/__tests__/useDecisions.test.ts",
+      "src/dashboard/frontend/src/lib/issueLabel.ts",
+      "src/dashboard/frontend/src/lib/useDecisions.ts",
+      "src/lib/cloister/prompts/planning.md",
+      "sync-sources/rules/ask-user-question-self-contained.md"
+    ],
+    "recordedAt": "2026-07-26T03:30:04.529Z"
+  },
   "created": "2026-07-26T02:29:08.179Z",
-  "updated": "2026-07-26T03:30:07.283Z",
+  "updated": "2026-07-26T03:30:09.344Z",
   "pipeline": {
     "issueId": "PAN-3097",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T03:30:07.281Z",
+    "updatedAt": "2026-07-26T03:30:09.281Z",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3102",
     "reviewRequestedAt": "2026-07-26T03:30:07.281Z",
+    "reviewSpawnedAt": "2026-07-26T03:30:09.279Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
       "declaredScopeUntouched": [],
@@ -60,8 +101,7 @@
         "sync-sources/rules/ask-user-question-self-contained.md"
       ],
       "recordedAt": "2026-07-26T03:30:04.529Z"
-    },
-    "prUrl": "https://github.com/eltmon/overdeck/pull/3102"
+    }
   },
   "closeOut": {
     "usage": {
@@ -73,6 +113,14 @@
             "cacheRead": 3562717,
             "cacheWrite": 183727
           }
+        },
+        "work": {
+          "openai/gpt-5.6-sol": {
+            "input": 1023565,
+            "output": 54792,
+            "cacheRead": 39150080,
+            "cacheWrite": 0
+          }
         }
       },
       "totals": {
@@ -81,14 +129,22 @@
           "output": 38913,
           "cacheRead": 3562717,
           "cacheWrite": 183727
+        },
+        "openai/gpt-5.6-sol": {
+          "input": 1023565,
+          "output": 54792,
+          "cacheRead": 39150080,
+          "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 7.805429,
-        "pricingAsOf": "2026-07-26T02:38:32.103Z"
+        "usd": 34.142054,
+        "pricingAsOf": "2026-07-26T03:30:09.315Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/3102"
+    ],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
@@ -253,44 +309,5 @@
     "auq-docs-update": "completed",
     "auq-docs-update.auq-docs-update.ac1": "completed",
     "auq-docs-update.auq-docs-update.ac2": "completed"
-  },
-  "scopeDrift": {
-    "outsideDeclaredScope": [],
-    "declaredScopeUntouched": [],
-    "declaredScope": [
-      "docs/ASKUSERQUESTION-DASHBOARD.md",
-      "roles/plan.md",
-      "src/dashboard/frontend/src/App/hooks/usePendingInputDialogs.ts",
-      "src/dashboard/frontend/src/components/AskUserQuestionDialog.tsx",
-      "src/dashboard/frontend/src/components/DecisionsPanel.tsx",
-      "src/dashboard/frontend/src/components/__tests__/AskUserQuestionDialog.test.tsx",
-      "src/dashboard/frontend/src/components/__tests__/DecisionsPanel.test.tsx",
-      "src/dashboard/frontend/src/components/sessionFeed/SessionFeedSidebar.tsx",
-      "src/dashboard/frontend/src/components/sessionFeed/__tests__/SessionFeedSidebar.test.tsx",
-      "src/dashboard/frontend/src/lib/__tests__/issueLabel.test.ts",
-      "src/dashboard/frontend/src/lib/__tests__/useDecisions.test.ts",
-      "src/dashboard/frontend/src/lib/issueLabel.ts",
-      "src/dashboard/frontend/src/lib/useDecisions.ts",
-      "src/lib/cloister/prompts/planning.md",
-      "sync-sources/rules/ask-user-question-self-contained.md"
-    ],
-    "actualChangedFiles": [
-      "docs/ASKUSERQUESTION-DASHBOARD.md",
-      "roles/plan.md",
-      "src/dashboard/frontend/src/App/hooks/usePendingInputDialogs.ts",
-      "src/dashboard/frontend/src/components/AskUserQuestionDialog.tsx",
-      "src/dashboard/frontend/src/components/DecisionsPanel.tsx",
-      "src/dashboard/frontend/src/components/__tests__/AskUserQuestionDialog.test.tsx",
-      "src/dashboard/frontend/src/components/__tests__/DecisionsPanel.test.tsx",
-      "src/dashboard/frontend/src/components/sessionFeed/SessionFeedSidebar.tsx",
-      "src/dashboard/frontend/src/components/sessionFeed/__tests__/SessionFeedSidebar.test.tsx",
-      "src/dashboard/frontend/src/lib/__tests__/issueLabel.test.ts",
-      "src/dashboard/frontend/src/lib/__tests__/useDecisions.test.ts",
-      "src/dashboard/frontend/src/lib/issueLabel.ts",
-      "src/dashboard/frontend/src/lib/useDecisions.ts",
-      "src/lib/cloister/prompts/planning.md",
-      "sync-sources/rules/ask-user-question-self-contained.md"
-    ],
-    "recordedAt": "2026-07-26T03:30:04.529Z"
   }
 }
