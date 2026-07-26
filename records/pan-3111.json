@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T12:26:09.908Z",
-  "updated": "2026-07-26T13:08:12.817Z",
+  "updated": "2026-07-26T13:15:05.360Z",
   "pipeline": {
     "issueId": "PAN-3111",
     "reviewStatus": "pending",
@@ -61,16 +61,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "gate-orphan-proposed-reconciler": {
-        "writerId": "agent-pan-3111",
-        "agentId": "agent-pan-3111",
-        "pid": 1849927,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-26T13:08:12.817Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3111",
@@ -82,12 +74,27 @@
         "outcome": "completed",
         "reason": "Added the fail-closed autonomous work dispatch predicate, gathered release inputs through canonical sources, and covered the full decision matrix plus unavailable-source fallbacks.",
         "releasedAt": "2026-07-26T13:06:13.551Z"
+      },
+      {
+        "writerId": "agent-pan-3111",
+        "agentId": "agent-pan-3111",
+        "pid": 1849927,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T13:08:12.817Z",
+        "itemId": "gate-orphan-proposed-reconciler",
+        "outcome": "completed",
+        "reason": "Applied the autonomous pickup predicate before orphan work-agent checks, recorded durable needs-you trips on refusal without activity-feed spam, and updated the reconciler suite with explicit allow/refusal coverage.",
+        "releasedAt": "2026-07-26T13:15:05.360Z"
       }
     ],
     "statusReasons": {
       "pickup-gate-predicate": {
         "reason": "Added the fail-closed autonomous work dispatch predicate, gathered release inputs through canonical sources, and covered the full decision matrix plus unavailable-source fallbacks.",
         "updatedAt": "2026-07-26T13:06:13.551Z"
+      },
+      "gate-orphan-proposed-reconciler": {
+        "reason": "Applied the autonomous pickup predicate before orphan work-agent checks, recorded durable needs-you trips on refusal without activity-feed spam, and updated the reconciler suite with explicit allow/refusal coverage.",
+        "updatedAt": "2026-07-26T13:15:05.360Z"
       }
     }
   },
@@ -96,6 +103,9 @@
     "pickup-gate-predicate.pickup-gate-predicate.ac1": "completed",
     "pickup-gate-predicate.pickup-gate-predicate.ac2": "completed",
     "pickup-gate-predicate.pickup-gate-predicate.ac3": "completed",
-    "gate-orphan-proposed-reconciler": "running"
+    "gate-orphan-proposed-reconciler": "completed",
+    "gate-orphan-proposed-reconciler.gate-orphan-proposed-reconciler.ac1": "completed",
+    "gate-orphan-proposed-reconciler.gate-orphan-proposed-reconciler.ac2": "completed",
+    "gate-orphan-proposed-reconciler.gate-orphan-proposed-reconciler.ac3": "completed"
   }
 }
