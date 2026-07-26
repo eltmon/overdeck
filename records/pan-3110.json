@@ -22,7 +22,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T06:17:49.254Z",
-  "updated": "2026-07-26T12:02:01.309Z",
+  "updated": "2026-07-26T12:02:11.447Z",
   "pipeline": {
     "issueId": "PAN-3110",
     "reviewStatus": "pending",
@@ -175,5 +175,48 @@
     "merge-recovery-docs": "completed",
     "merge-recovery-docs.merge-recovery-docs.ac1": "completed",
     "merge-recovery-docs.merge-recovery-docs.ac2": "completed"
+  },
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      "scripts/file-size-baseline.txt",
+      "src/lib/__tests__/agents-spawn-supervisor.test.ts",
+      "src/lib/cloister/__tests__/verdict-preservation.test.ts",
+      "tests/unit/lib/head-anchor-write-sites.test.ts"
+    ],
+    "declaredScopeUntouched": [
+      "src/lib/agents/__tests__/spawn-verdict-preservation.test.ts",
+      "src/lib/cloister/deacon-merge.ts"
+    ],
+    "declaredScope": [
+      "docs/FLYWHEEL.md",
+      "docs/MERGE-WORKFLOW.md",
+      "src/dashboard/server/routes/workspaces/__tests__/merge-ops-clean-direct.test.ts",
+      "src/dashboard/server/routes/workspaces/__tests__/merge-ops-server-rebase.test.ts",
+      "src/dashboard/server/routes/workspaces/merge-ops.ts",
+      "src/dashboard/server/routes/workspaces/merge-strike.ts",
+      "src/dashboard/server/services/__tests__/auto-merge-executor.test.ts",
+      "src/dashboard/server/services/auto-merge-executor.ts",
+      "src/lib/agents/__tests__/spawn-verdict-preservation.test.ts",
+      "src/lib/agents/spawn.ts",
+      "src/lib/cloister/deacon-merge.ts",
+      "src/lib/cloister/verdict-preservation.ts"
+    ],
+    "actualChangedFiles": [
+      "docs/FLYWHEEL.md",
+      "docs/MERGE-WORKFLOW.md",
+      "scripts/file-size-baseline.txt",
+      "src/dashboard/server/routes/workspaces/__tests__/merge-ops-clean-direct.test.ts",
+      "src/dashboard/server/routes/workspaces/__tests__/merge-ops-server-rebase.test.ts",
+      "src/dashboard/server/routes/workspaces/merge-ops.ts",
+      "src/dashboard/server/routes/workspaces/merge-strike.ts",
+      "src/dashboard/server/services/__tests__/auto-merge-executor.test.ts",
+      "src/dashboard/server/services/auto-merge-executor.ts",
+      "src/lib/__tests__/agents-spawn-supervisor.test.ts",
+      "src/lib/agents/spawn.ts",
+      "src/lib/cloister/__tests__/verdict-preservation.test.ts",
+      "src/lib/cloister/verdict-preservation.ts",
+      "tests/unit/lib/head-anchor-write-sites.test.ts"
+    ],
+    "recordedAt": "2026-07-26T12:02:11.445Z"
   }
 }
