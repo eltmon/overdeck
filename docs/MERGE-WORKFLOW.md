@@ -136,24 +136,42 @@ non-retryable merge failure for operator recovery.
 
 ### merged
 
-The human has clicked the dashboard Merge button. The dashboard calls
-`gh pr merge --squash`, waits for GitHub to report success, then runs
-`postMergeLifecycle()` to clean up: label transitions, Docker network
-cleanup, agent pause, single-oracle merge verification via the GitHub PR API.
+The human has clicked the dashboard Merge button. The dashboard asks each
+repository's forge adapter to merge its PR or MR, waits for positive forge
+evidence, then runs `postMergeLifecycle()` to clean up labels, Docker networks,
+and agent sessions.
 
 ## Single Merge Oracle
 
-`verifyMergedBeforeLifecycle()` checks one thing: the GitHub PR API's
-`mergedAt` / `mergeCommit` fields. If the API answers definitively
-(merged or not merged), we use that answer. If the API is unreachable or
-returns uncertain state, we surface "Unable to verify merge state" to the
-dashboard and the human decides whether to proceed with cleanup.
+The forge review artifact is the merge oracle. GitHub repositories read the
+PR's `mergedAt` / `mergeCommit` fields. GitLab and other configured forges use
+the adapter's merged-artifact lookup for the feature branch. A polyrepo issue
+is complete only when every required repository is merged or change-free and
+at least one repository has positive merged-artifact evidence. An all
+change-free result is not proof that a merge occurred.
 
-There is no ancestor-of-main heuristic and no diff-fallback. Both were sources
-of "the oracles disagree" bugs (notably PAN-1024 in May 2026).
+`verifyMergedBeforeLifecycle()` reads this evidence without writing state.
+`observeForgeMergeState()` uses the same check during the Deacon patrol and
+writes discovered per-repository merge truth through the merge-set write door.
+Git or forge errors produce an `unverifiable` result, so the patrol leaves the
+issue unchanged and retries on a later tick.
 
-For non-GitHub projects (Linear with no GitHub remote), `verifyMerged` returns
-uncertain and the operator confirms manually.
+The Deacon also bounds `merging` and `verifying` states at 30 minutes. After
+that age it checks the forge: confirmed complete work advances to post-merge
+cleanup, unmerged work resets to `pending` with readiness derived from the
+review, test, UAT, and verification gates, and unverifiable work remains
+unchanged.
+
+A repeated Merge click first refreshes the merge set from the forge. Repositories
+already marked `merged` or `skipped` are excluded from rebase, verification, and
+merge calls. A partially merged issue processes only its unmerged repositories;
+a fully merged issue takes the existing "No changed repos remain" success path
+and starts post-merge cleanup without another forge merge call.
+
+There is no inferred ancestor-of-main or diff fallback for forge observation.
+Both were sources of "the oracles disagree" bugs (notably PAN-1024 in May
+2026). Explicit batch-promotion evidence remains separately verified by commit
+ancestry in each repository.
 
 ## Polyrepo completeness blocker
 
