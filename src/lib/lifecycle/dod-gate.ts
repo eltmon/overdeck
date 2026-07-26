@@ -128,7 +128,7 @@ export interface EvaluateDodGateDeps {
   tests: (issueId: string) => DodRowResult | Promise<DodRowResult>;
   verification: (issueId: string) => DodRowResult | Promise<DodRowResult>;
   merged: (ctx: LifecycleContext) => MergedDodRowResult | Promise<MergedDodRowResult>;
-  postMerge: (ctx: LifecycleContext) => DodRowResult | Promise<DodRowResult>;
+  postMerge: (ctx: LifecycleContext, merged?: MergedDodRowResult) => DodRowResult | Promise<DodRowResult>;
   mainVerify: (ctx: LifecycleContext, mergeCommit?: string) => DodRowResult | Promise<DodRowResult>;
   deploy: (ctx: LifecycleContext, merge: { mergedAt?: string; mergeCommit?: string }) => DodRowResult | Promise<DodRowResult>;
   now: () => string;
@@ -320,6 +320,7 @@ export async function checkMergedRow(
 
 export async function checkPostMergeRow(
   ctx: LifecycleContext,
+  merged?: MergedDodRowResult,
   deps: PostMergeRowDeps = defaultPostMergeRowDeps,
 ): Promise<DodRowResult> {
   try {
@@ -338,6 +339,13 @@ export async function checkPostMergeRow(
       ? `running agents: ${runningAgents.map(agent => agent.id).join(', ')}`
       : 'no running work/planning agents';
     const lifecycleObserved = canonicalState === 'verifying_on_main' || mergeStatus === 'merged';
+    if (!lifecycleObserved && merged?.evidence === 'branch-containment') {
+      return result(
+        'post-merge',
+        runningAgents.length === 0 ? 'pass' : 'miss',
+        `non-PR landing (branch-containment evidence) — post-merge lifecycle not applicable; ${agentsObserved}`,
+      );
+    }
     return result(
       'post-merge',
       lifecycleObserved && runningAgents.length === 0 ? 'pass' : 'miss',
@@ -448,7 +456,7 @@ export async function evaluateDodGate(
     deps.tests(ctx.issueId),
     deps.verification(ctx.issueId),
     Promise.resolve(merged),
-    deps.postMerge(ctx),
+    deps.postMerge(ctx, merged),
     deps.mainVerify(ctx, merged.mergeCommit),
     deps.deploy(ctx, { mergedAt: merged.mergedAt, mergeCommit: merged.mergeCommit }),
   ]);
