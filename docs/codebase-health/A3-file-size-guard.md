@@ -7,6 +7,8 @@
 
 ---
 
+> Update (PAN-3116): The committed baseline was deleted. The guard now derives allowed counts from `origin/main` at lint time, with `FILE_SIZE_BASE_REF` available as an override. Audited growth uses `scripts/file-size-allowlist.txt` rows in the form `<lines> <path> # <ISSUE-REF>`. The `--update` mode, `file-size-reconcile.ts`, and the UAT-promote amend step are gone, so branches that shrink god files no longer edit lint metadata.
+
 ## Glossary
 
 - **God file** — a source file so large that understanding it to make a change is itself the cost. This repo has 45 non-test `src/` files over 1,000 lines (`src/lib/cloister/deacon.ts` 7,180; `src/dashboard/server/routes/workspaces.ts` 6,638; `src/lib/agents.ts` 5,824).
