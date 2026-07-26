@@ -61,21 +61,22 @@
     "recordedAt": "2026-07-26T21:01:22.337Z"
   },
   "created": "2026-07-26T20:19:41.143Z",
-  "updated": "2026-07-26T21:08:54.644Z",
+  "updated": "2026-07-26T21:10:09.875Z",
   "pipeline": {
     "issueId": "PAN-3158",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "passed",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T21:02:53.986Z",
-    "updatedAt": "2026-07-26T21:08:53.145Z",
-    "reviewNotes": "Project filtering can falsely show the global no-ready-work message while another project has ready work",
+    "updatedAt": "2026-07-26T21:10:09.793Z",
+    "reviewNotes": "Idle merge-train filtering is correct across global, selected, disabled, and populated states; focused frontend tests pass",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3161",
+    "reviewedAtCommit": "5c9d4daa28f47c7412237c7dec2d20c4fe337572",
     "lastVerifiedCommit": "5c9d4daa28f47c7412237c7dec2d20c4fe337572",
-    "reviewRequestedAt": "2026-07-26T21:02:53.986Z",
     "reviewSpawnedAt": "2026-07-26T21:08:53.143Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -103,9 +104,9 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 1464970,
-            "output": 52599,
-            "cacheRead": 6279168,
+            "input": 2246291,
+            "output": 63304,
+            "cacheRead": 8521728,
             "cacheWrite": 0
           }
         },
@@ -120,15 +121,15 @@
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 2417621,
-          "output": 101424,
-          "cacheRead": 30028800,
+          "input": 3198942,
+          "output": 112129,
+          "cacheRead": 32271360,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 30.145225,
-        "pricingAsOf": "2026-07-26T21:08:53.490Z"
+        "usd": 35.49426,
+        "pricingAsOf": "2026-07-26T21:10:09.864Z"
       }
     },
     "merges": [
