@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>PAN-3178 mockup — First-class worktrees & diffs</title>
+<style>
+  :root {
+    --bg: #0e0f11; --panel: #14161a; --panel2: #191c21; --panel3: #1f232a;
+    --border: #262a31; --border-soft: #1e2228;
+    --text: #d8dbe0; --muted: #8b919b; --faint: #5c6270;
+    --accent: #4f9cf9; --accent-dim: rgba(79,156,249,.12);
+    --green: #3fb950; --green-bg: rgba(46,160,67,.16); --green-gutter: rgba(46,160,67,.08);
+    --red: #f85149;   --red-bg: rgba(248,81,73,.16);   --red-gutter: rgba(248,81,73,.08);
+    --amber: #d29922; --amber-bg: rgba(210,153,34,.12);
+    --mono: ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font: 13px/1.5 var(--sans); }
+  button { font: inherit; color: inherit; background: none; border: none; cursor: pointer; }
+  .wrap { max-width: 1440px; margin: 0 auto; padding: 20px 24px 60px; }
+
+  /* ---------- mockup header ---------- */
+  .mk-head h1 { font-size: 17px; font-weight: 600; letter-spacing: -.01em; }
+  .mk-head .sub { color: var(--muted); margin: 4px 0 18px; max-width: 900px; }
+  .mk-head .sub code { font-family: var(--mono); font-size: 12px; color: var(--text); background: var(--panel3); padding: 1px 5px; border-radius: 4px; }
+  .opt-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 14px; }
+  .opt-card { text-align: left; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; transition: border-color .15s, background .15s; position: relative; }
+  .opt-card:hover { border-color: #3a404b; }
+  .opt-card.active { border-color: var(--accent); background: linear-gradient(180deg, rgba(79,156,249,.07), transparent 40%), var(--panel); }
+  .opt-card h3 { font-size: 14px; font-weight: 600; margin-bottom: 4px; padding-right: 110px; }
+  .opt-card p { color: var(--muted); font-size: 12px; }
+  .opt-tag { position: absolute; top: 12px; right: 12px; font-size: 10px; font-weight: 700; letter-spacing: .08em; padding: 3px 7px; border-radius: 4px; }
+  .tag-rec { color: var(--green); background: var(--green-bg); border: 1px solid rgba(46,160,67,.4); }
+  .tag-phase2 { color: var(--accent); background: var(--accent-dim); border: 1px solid rgba(79,156,249,.35); }
+  .tag-rej { color: var(--red); background: var(--red-bg); border: 1px solid rgba(248,81,73,.35); }
+  .hint { color: var(--faint); font-size: 12px; margin-bottom: 18px; }
+  .hint b { color: var(--muted); font-weight: 600; }
+
+  /* ---------- shared app chrome ---------- */
+  .app { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+  .crumbs { display: flex; align-items: center; gap: 8px; padding: 10px 16px; border-bottom: 1px solid var(--border-soft); color: var(--faint); font-size: 12px; }
+  .crumbs .sep { opacity: .6; }
+  .issue-head { padding: 16px 20px 12px; border-bottom: 1px solid var(--border-soft); }
+  .issue-id-row { display: flex; align-items: center; gap: 10px; }
+  .issue-id { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+  .issue-title-row { display: flex; align-items: center; gap: 12px; margin-top: 3px; flex-wrap: wrap; }
+  .issue-title { font-size: 16.5px; font-weight: 600; letter-spacing: -.01em; }
+  .stat-row { display: flex; align-items: center; gap: 18px; margin-top: 10px; color: var(--faint); font-size: 11.5px; }
+  .stat-row .k { text-transform: uppercase; letter-spacing: .06em; font-size: 10px; margin-right: 5px; }
+  .stat-row .v { color: var(--muted); font-family: var(--mono); font-size: 11.5px; }
+
+  /* THE BADGE — style-guide badge formula, not a pill */
+  .chg-badge { display: inline-flex; align-items: center; gap: 7px; font-family: var(--mono); font-size: 12px; font-weight: 600; padding: 2.5px 8px; border: 1px solid var(--border); border-radius: 5px; background: var(--panel2); cursor: pointer; transition: border-color .15s, background .15s; }
+  .chg-badge:hover { border-color: var(--accent); background: var(--accent-dim); }
+  .chg-badge .a { color: var(--green); }
+  .chg-badge .d { color: var(--red); }
+  .chg-badge .u { color: var(--faint); font-weight: 400; }
+  .chg-badge .arrow { color: var(--faint); font-size: 10px; margin-left: 1px; }
+  .chg-badge.flat { border-color: transparent; background: transparent; padding: 2.5px 4px; }
+
+  .tabs { display: flex; align-items: center; gap: 2px; padding: 0 12px; border-bottom: 1px solid var(--border-soft); background: var(--panel); }
+  .tab { padding: 9px 12px; font-size: 12.5px; color: var(--muted); border-bottom: 2px solid transparent; margin-bottom: -1px; }
+  .tab:hover { color: var(--text); }
+  .tab.active { color: var(--text); border-bottom-color: var(--accent); font-weight: 550; }
+  .tab .n { color: var(--faint); font-size: 11px; margin-left: 4px; font-family: var(--mono); }
+  .tab.changes-tab { display: inline-flex; align-items: center; gap: 7px; }
+  .tab.changes-tab .mini-a { color: var(--green); font-family: var(--mono); font-size: 11px; }
+  .tab.changes-tab .mini-d { color: var(--red); font-family: var(--mono); font-size: 11px; }
+
+  .body-pane { min-height: 560px; background: var(--panel); }
+  .placeholder-pane { padding: 26px; color: var(--muted); max-width: 760px; }
+  .placeholder-pane .msg-card { background: var(--panel2); border: 1px solid var(--border-soft); border-radius: 8px; padding: 14px 16px; margin-bottom: 14px; color: var(--muted); }
+  .placeholder-pane .msg-card code { font-family: var(--mono); font-size: 11.5px; background: var(--panel3); padding: 1px 5px; border-radius: 4px; color: var(--text); }
+
+  /* ---------- changes surface ---------- */
+  .cs-toolbar { display: flex; align-items: center; gap: 10px; padding: 8px 14px; border-bottom: 1px solid var(--border-soft); background: var(--panel2); }
+  .cs-toolbar .files-n { font-size: 12px; color: var(--muted); }
+  .cs-toolbar .spacer { flex: 1; }
+  .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+  .seg button { padding: 4px 11px; font-size: 11.5px; color: var(--muted); }
+  .seg button.on { background: var(--panel3); color: var(--text); font-weight: 600; }
+  .tool-btn { padding: 4px 10px; font-size: 11.5px; color: var(--muted); border: 1px solid var(--border); border-radius: 6px; }
+  .tool-btn:hover { color: var(--text); border-color: #3a404b; }
+  .kbd { font-family: var(--mono); font-size: 10px; color: var(--faint); border: 1px solid var(--border); border-radius: 3px; padding: 0 4px; margin-left: 6px; background: var(--panel); }
+
+  .cs-grid { display: grid; grid-template-columns: 264px 1fr; min-height: 560px; }
+  .cs-rail { border-right: 1px solid var(--border-soft); background: var(--panel); display: flex; flex-direction: column; }
+  .cs-rail .search { padding: 10px; border-bottom: 1px solid var(--border-soft); }
+  .cs-rail .search input { width: 100%; background: var(--panel2); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 12px; padding: 5px 9px; outline: none; }
+  .cs-rail .search input:focus { border-color: var(--accent); }
+  .rail-scroll { overflow-y: auto; flex: 1; padding: 6px; }
+  .rail-repo { font-size: 10.5px; text-transform: uppercase; letter-spacing: .07em; color: var(--faint); padding: 8px 8px 4px; display: flex; justify-content: space-between; }
+  .rail-file { display: flex; align-items: center; gap: 7px; width: 100%; text-align: left; padding: 5px 8px; border-radius: 6px; font-family: var(--mono); font-size: 11.5px; color: var(--muted); }
+  .rail-file:hover { background: var(--panel2); color: var(--text); }
+  .rail-file.sel { background: var(--accent-dim); color: var(--text); }
+  .rail-file .fp { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: rtl; text-align: left; }
+  .rail-file .fa { color: var(--green); font-size: 10.5px; }
+  .rail-file .fd { color: var(--red); font-size: 10.5px; }
+  .rail-file .kind { width: 13px; text-align: center; font-size: 10px; color: var(--faint); flex: none; }
+  .rail-file .kind.new { color: var(--green); }
+
+  .cs-diff { background: var(--panel); overflow: auto; }
+  .diff-file { border-bottom: 1px solid var(--border-soft); }
+  .diff-file-head { display: flex; align-items: center; gap: 9px; padding: 7px 14px; background: var(--panel2); position: sticky; top: 0; font-family: var(--mono); font-size: 12px; border-bottom: 1px solid var(--border-soft); }
+  .diff-file-head .fp { color: var(--text); }
+  .diff-file-head .fa { color: var(--green); font-size: 11px; }
+  .diff-file-head .fd { color: var(--red); font-size: 11px; }
+  .diff-file-head .spacer { flex: 1; }
+  .diff-file-head .hh { color: var(--faint); font-size: 10.5px; }
+  table.dt { width: 100%; border-collapse: collapse; font-family: var(--mono); font-size: 11.5px; line-height: 1.55; }
+  table.dt td { padding: 0 10px; white-space: pre; vertical-align: top; }
+  td.ln { width: 44px; min-width: 44px; text-align: right; color: var(--faint); background: var(--panel2); border-right: 1px solid var(--border-soft); user-select: none; font-size: 10.5px; padding-right: 8px; }
+  tr.d td.code { background: var(--red-gutter); }
+  tr.d td.code .tx { background: var(--red-bg); }
+  tr.a td.code { background: var(--green-gutter); }
+  tr.a td.code .tx { background: var(--green-bg); }
+  tr.d td.code, tr.d td.ln { color: #e8a49f; }
+  tr.a td.code, tr.a td.ln { color: #7ee787; }
+  tr.c td.code { color: var(--muted); }
+  .tx { padding: 0 1px; border-radius: 2px; }
+  .tok-k { color: #ff7b72; } .tok-s { color: #a5d6ff; } .tok-c { color: #8b949e; font-style: italic; } .tok-f { color: #d2a8ff; }
+  tr.exp td { background: var(--panel2); color: var(--faint); text-align: center; font-size: 11px; padding: 4px 10px; cursor: pointer; border-top: 1px solid var(--border-soft); border-bottom: 1px solid var(--border-soft); }
+  tr.exp td:hover { color: var(--text); background: var(--panel3); }
+  tr.exp td .chev { font-family: var(--mono); margin-right: 8px; }
+
+  /* ---------- annotation strip (conversation worktree note) ---------- */
+  .note-strip { margin: 14px 0 0; border: 1px dashed var(--border); border-radius: 10px; padding: 12px 16px; color: var(--muted); font-size: 12px; background: rgba(79,156,249,.03); }
+  .note-strip b { color: var(--text); }
+  .note-strip code { font-family: var(--mono); font-size: 11px; background: var(--panel3); padding: 1px 5px; border-radius: 4px; color: var(--text); }
+
+  /* ---------- placements strip ---------- */
+  .placements { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 14px; }
+  .pl-card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
+  .pl-card h4 { font-size: 11px; text-transform: uppercase; letter-spacing: .07em; color: var(--faint); margin-bottom: 10px; font-weight: 600; }
+  .kanban-card { background: var(--panel2); border: 1px solid var(--border-soft); border-radius: 8px; padding: 10px 12px; max-width: 340px; }
+  .kanban-card .kt { font-size: 12.5px; font-weight: 550; margin-bottom: 8px; }
+  .kanban-card .kf { display: flex; align-items: center; gap: 10px; color: var(--faint); font-size: 11px; }
+  .kanban-card .kf .dots { display: inline-flex; gap: 3px; }
+  .kanban-card .kf .dots i { width: 6px; height: 6px; border-radius: 50%; background: var(--panel3); display: block; }
+  .kanban-card .kf .dots i.on { background: var(--accent); }
+  .conv-head-mock { background: var(--panel2); border: 1px solid var(--border-soft); border-radius: 8px; padding: 10px 12px; }
+  .conv-head-mock .ct { font-size: 12.5px; font-weight: 550; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .conv-head-mock .cmeta { display: flex; align-items: center; gap: 12px; margin-top: 7px; color: var(--faint); font-size: 11px; }
+  .branch-chip { font-family: var(--mono); font-size: 10.5px; color: var(--muted); background: var(--panel3); border: 1px solid var(--border); border-radius: 4px; padding: 1px 6px; }
+  .branch-chip.new-wt { color: var(--green); border-color: rgba(46,160,67,.4); }
+
+  /* ---------- option B: review stack ---------- */
+  .rs-banner { margin: 0; padding: 9px 16px; background: var(--accent-dim); border-bottom: 1px solid rgba(79,156,249,.3); color: var(--accent); font-size: 12px; }
+  .rs-grid { display: grid; grid-template-columns: 280px 1fr 260px; min-height: 560px; }
+  .rs-rail { border-right: 1px solid var(--border-soft); background: var(--panel); padding: 10px; overflow-y: auto; }
+  .cohort { margin-bottom: 14px; }
+  .cohort-h { font-size: 12px; font-weight: 600; padding: 6px 8px; display: flex; gap: 8px; align-items: center; }
+  .cohort-h .cn { color: var(--faint); font-family: var(--mono); font-size: 10.5px; }
+  .layer { display: block; width: 100%; text-align: left; padding: 7px 9px 7px 22px; border-radius: 6px; color: var(--muted); font-size: 12px; border-left: 2px solid transparent; }
+  .layer:hover { background: var(--panel2); color: var(--text); }
+  .layer.sel { background: var(--accent-dim); color: var(--text); border-left-color: var(--accent); border-radius: 0 6px 6px 0; }
+  .layer .ls { display: block; font-size: 10.5px; color: var(--faint); margin-top: 2px; }
+  .layer.sel .ls { color: var(--muted); }
+  .rs-right { border-left: 1px solid var(--border-soft); background: var(--panel); padding: 12px; overflow-y: auto; }
+  .rs-right h5 { font-size: 10.5px; text-transform: uppercase; letter-spacing: .07em; color: var(--faint); margin-bottom: 8px; }
+  .sum-card { border: 1px solid var(--border-soft); border-radius: 8px; padding: 9px 11px; margin-bottom: 8px; font-size: 11.5px; color: var(--muted); background: var(--panel2); transition: border-color .15s; }
+  .sum-card.hot { border-color: var(--accent); color: var(--text); background: var(--accent-dim); }
+  .sum-card .sl { font-family: var(--mono); font-size: 10px; color: var(--faint); display: block; margin-bottom: 3px; }
+
+  /* ---------- option C: docked panel ---------- */
+  .dock-wrap { position: relative; }
+  .dock-panel { position: absolute; top: 0; right: 0; bottom: 0; width: 430px; background: var(--panel2); border-left: 1px solid var(--border); box-shadow: -18px 0 40px rgba(0,0,0,.45); display: flex; flex-direction: column; }
+  .dock-head { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--border-soft); font-size: 12.5px; font-weight: 600; }
+  .dock-head .x { margin-left: auto; color: var(--faint); font-size: 15px; padding: 2px 6px; }
+  .dock-head .x:hover { color: var(--text); }
+  .dock-files { padding: 8px; border-bottom: 1px solid var(--border-soft); }
+  .dock-diff { overflow: auto; flex: 1; }
+  .rej-strip { padding: 10px 16px; background: var(--red-bg); border-top: 1px solid rgba(248,81,73,.3); color: #e8a49f; font-size: 12px; }
+  .rej-strip b { color: var(--red); }
+
+  .hidden { display: none !important; }
+  .foot { margin-top: 22px; color: var(--faint); font-size: 11.5px; }
+  .foot code { font-family: var(--mono); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="mk-head">
+    <h1>PAN-3178 — First-class worktrees &amp; diffs</h1>
+    <div class="sub">Three UX options for the <code>+N −M</code> changes badge and the diff surface it opens. All mocks use PAN-3165's real shape (issue page, conversation chrome). Click things — badge, tabs, files, toggles are live.</div>
+  </div>
+
+  <div class="opt-cards">
+    <button class="opt-card active" data-opt="a">
+      <span class="opt-tag tag-rec">RECOMMENDED</span>
+      <h3>A — Dedicated Changes surface</h3>
+      <p>Badge next to the title on every surface; one click opens a full Changes tab (file rail + virtualized diff). Absorbs Files/Code tabs; conversations get the same view + their own worktree.</p>
+    </button>
+    <button class="opt-card" data-opt="b">
+      <span class="opt-tag tag-phase2">PHASE 2</span>
+      <h3>B — Guided review stack</h3>
+      <p>CodeRabbit Change-Stack style: AI cohorts/layers with per-range summaries, layer-scoped diffs, synced summary rail. Built later on Option A's surface — rail already supports groups.</p>
+    </button>
+    <button class="opt-card" data-opt="c">
+      <span class="opt-tag tag-rej">REJECTED</span>
+      <h3>C — Docked quick panel</h3>
+      <p>Badge opens a right-docked mini diff panel. Cheapest, but keeps diff as an afterthought pane — the same mistake as today's leaking conversation pane.</p>
+    </button>
+  </div>
+  <div class="hint">Try this first: in <b>Option A</b>, click the <b>+529 −106</b> badge next to the issue title (or the <b>Changes</b> tab). Then toggle <b>Split</b>, click files in the rail, expand the “unchanged lines” row.</div>
+
+  <!-- ============================== OPTION A ============================== -->
+  <div id="opt-a" class="opt-stage">
+    <div class="app">
+      <div class="crumbs">panopticon-cli <span class="sep">/</span> Issues <span class="sep">/</span> PAN-3165</div>
+      <div class="issue-head">
+        <div class="issue-id-row"><span class="issue-id">PAN-3165</span></div>
+        <div class="issue-title-row">
+          <span class="issue-title">UAT panel claims “No UAT steps in plan” — xbrief-index reads the pre-cutover .pan/specs path</span>
+          <button class="chg-badge" id="badge-a" title="Open Changes surface">
+            <span class="a">+529</span><span class="d">−106</span><span class="u">· 2 untracked</span><span class="arrow">▸</span>
+          </button>
+        </div>
+        <div class="stat-row">
+          <span><span class="k">Branch</span><span class="v">feature/pan-3165</span></span>
+          <span><span class="k">PR / CI</span><span class="v">no PR</span></span>
+          <span><span class="k">Base</span><span class="v">main…HEAD + uncommitted</span></span>
+          <span><span class="k">Cost</span><span class="v">—</span></span>
+        </div>
+      </div>
+      <div class="tabs" id="tabs-a">
+        <button class="tab active" data-tab="conv">Conversation</button>
+        <button class="tab">Overview</button>
+        <button class="tab">Plan map</button>
+        <button class="tab">Tasks <span class="n">6/8</span></button>
+        <button class="tab changes-tab" data-tab="changes">Changes <span class="mini-a">+529</span><span class="mini-d">−106</span></button>
+        <button class="tab">Terminal</button>
+        <button class="tab">Activity</button>
+        <button class="tab">Artifacts</button>
+      </div>
+
+      <!-- conversation placeholder pane -->
+      <div class="body-pane" id="pane-conv-a">
+        <div class="placeholder-pane">
+          <div class="msg-card">…<code>~/.overdeck/state/panopticon-cli/specs</code> (402 specs, versus 4 stale files in the old in-repo directory), and PAN-3158's spec yields exactly the 14 acceptance criteria the issue reported.</div>
+          <div class="msg-card">Tests added: a four-case regression suite asserting the two resolvers agree on the same path for a migrated project, an unmigrated project, a stale legacy <code>.pan/specs</code> shadowing it, and a missing spec…</div>
+          <div class="note-strip" style="margin-top:18px">
+            <b>What changed here:</b> nothing visual — that's the point. The diff signal moved out of the conversation flow and up into the header badge + its own tab. The old folder-row → second-pane flow (the one that leaked across conversations) is deleted, not reskinned.
+          </div>
+        </div>
+      </div>
+
+      <!-- changes surface pane -->
+      <div class="body-pane hidden" id="pane-changes-a">
+        <div class="cs-toolbar">
+          <span class="files-n"><b>7 files</b> changed &nbsp;<span style="color:var(--green);font-family:var(--mono)">+529</span> <span style="color:var(--red);font-family:var(--mono)">−106</span> <span style="color:var(--faint)">· 2 untracked</span></span>
+          <span class="spacer"></span>
+          <button class="tool-btn" id="expand-all">Expand all</button>
+          <span class="seg" id="mode-seg">
+            <button class="on" data-mode="unified">Unified<span class="kbd">[</span></button>
+            <button data-mode="split">Split<span class="kbd">]</span></button>
+          </span>
+        </div>
+        <div class="cs-grid">
+          <div class="cs-rail">
+            <div class="search"><input id="rail-filter" placeholder="Filter files…" autocomplete="off"></div>
+            <div class="rail-scroll" id="rail"></div>
+          </div>
+          <div class="cs-diff" id="diff-host"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- placements strip -->
+    <div class="placements">
+      <div class="pl-card">
+        <h4>Same badge — kanban card footer</h4>
+        <div class="kanban-card">
+          <div class="kt">UAT panel claims “No UAT steps in plan”…</div>
+          <div class="kf">
+            <span class="dots"><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i></span>
+            <span class="chg-badge flat" style="cursor:default"><span class="a">+529</span><span class="d">−106</span></span>
+            <span style="margin-left:auto">review · 12m</span>
+          </div>
+        </div>
+      </div>
+      <div class="pl-card">
+        <h4>Same badge — conversation chrome (with conv worktree)</h4>
+        <div class="conv-head-mock">
+          <div class="ct">Overdeck agent-to-agent communication design
+            <span class="chg-badge flat" style="cursor:default"><span class="a">+73</span><span class="d">−0</span></span>
+          </div>
+          <div class="cmeta">
+            <span>● active</span>
+            <span class="branch-chip new-wt" title="Created automatically at conversation start">worktree conv/a2a-comms-design</span>
+            <span>Cursor</span>
+          </div>
+        </div>
+        <div class="note-strip">Conversations in a project get <code>workspaces/conv-&lt;slug&gt;/</code> on branch <code>conv/&lt;slug&gt;</code> at creation — so this badge is real git state, edits never touch the primary checkout, and the conversation's Changes view is the same surface as the issue's. Polyrepo: primary repo worktree first, more repos added lazily.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================== OPTION B ============================== -->
+  <div id="opt-b" class="opt-stage hidden">
+    <div class="app">
+      <div class="rs-banner">Phase 2 preview — CodeRabbit Change-Stack-style guided review. Same surface as Option A; the left rail gains AI cohort/layer groups, the right rail syncs summaries to what you're viewing. No AI plumbing exists yet — that's the follow-up issue.</div>
+      <div class="rs-grid">
+        <div class="rs-rail" id="rs-rail"></div>
+        <div class="cs-diff" id="rs-diff"></div>
+        <div class="rs-right">
+          <h5>Summaries — synced to view</h5>
+          <div id="rs-sums"></div>
+          <div class="note-strip" style="margin-top:10px">Keyboard: <span class="kbd">J</span> next layer · <span class="kbd">K</span> previous · <span class="kbd">Z</span> focus mode</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================== OPTION C ============================== -->
+  <div id="opt-c" class="opt-stage hidden">
+    <div class="app dock-wrap">
+      <div class="crumbs">panopticon-cli <span class="sep">/</span> Issues <span class="sep">/</span> PAN-3165</div>
+      <div class="issue-head">
+        <div class="issue-id-row"><span class="issue-id">PAN-3165</span></div>
+        <div class="issue-title-row">
+          <span class="issue-title">UAT panel claims “No UAT steps in plan” — xbrief-index reads the pre-cutover .pan/specs path</span>
+          <button class="chg-badge" id="badge-c"><span class="a">+529</span><span class="d">−106</span><span class="arrow">▸</span></button>
+        </div>
+        <div class="stat-row">
+          <span><span class="k">Branch</span><span class="v">feature/pan-3165</span></span>
+          <span><span class="k">PR / CI</span><span class="v">no PR</span></span>
+          <span><span class="k">Cost</span><span class="v">—</span></span>
+        </div>
+      </div>
+      <div class="tabs">
+        <button class="tab active">Conversation</button>
+        <button class="tab">Overview</button>
+        <button class="tab">Plan map</button>
+        <button class="tab">Tasks <span class="n">6/8</span></button>
+        <button class="tab">Terminal</button>
+        <button class="tab">Activity</button>
+        <button class="tab">Files</button>
+        <button class="tab">Artifacts</button>
+      </div>
+      <div class="body-pane" style="min-height:520px">
+        <div class="placeholder-pane">
+          <div class="msg-card">…and PAN-3158's spec yields exactly the 14 acceptance criteria the issue reported.</div>
+          <div class="msg-card">Tests added: a four-case regression suite asserting the two resolvers agree…</div>
+        </div>
+      </div>
+      <div class="dock-panel hidden" id="dock-c">
+        <div class="dock-head">Changes <span style="color:var(--green);font-family:var(--mono);font-size:11px">+529</span> <span style="color:var(--red);font-family:var(--mono);font-size:11px">−106</span>
+          <button class="x" id="dock-close">✕</button>
+        </div>
+        <div class="dock-files" id="dock-files"></div>
+        <div class="dock-diff" id="dock-diff"></div>
+        <div class="rej-strip"><b>Why this loses:</b> 430px is not enough for a real diff; it covers the conversation it sits on; and it's the same “diff lives in a side pane” thinking as the leaking pane we're deleting. Diff deserves the whole stage.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="foot">PAN-3178 · mockup v1 · <code>drafts/pan-3178-mockup.html</code> on <code>overdeck-state</code> · renderer: our own <code>@pierre/diffs</code> (split/unified, hunk expansion, virtualization all built-in) · badge formula per pan-style-guide (no pills)</div>
+</div>
+
+<script>
+/* ---------------- data ---------------- */
+const FILES = [
+  { path: "src/lib/xbrief-index.ts", adds: 84, dels: 12, kind: "M", hunks: [
+    { exp: 18, lines: [
+      {t:"c", o:19, n:19, x:'import { existsSync } from <span class="tok-s">"node:fs"</span>;'},
+      {t:"c", o:20, n:20, x:'import path from <span class="tok-s">"node:path"</span>;'},
+      {t:"d", o:21, n:null, x:'<span class="tok-k">const</span> SPEC_DIR = path.<span class="tok-f">join</span>(projectRoot, <span class="tok-s">".pan/specs"</span>);'},
+      {t:"a", o:null, n:21, x:'<span class="tok-k">const</span> LEGACY_SPEC_DIR = path.<span class="tok-f">join</span>(projectRoot, <span class="tok-s">".pan/specs"</span>); <span class="tok-c">// pre-cutover fallback</span>'},
+      {t:"a", o:null, n:22, x:'<span class="tok-k">const</span> STATE_SPEC_DIR = path.<span class="tok-f">join</span>(<span class="tok-f">stateWorktreeRoot</span>(projectRoot), <span class="tok-s">"specs"</span>);'},
+      {t:"c", o:22, n:23, x:''},
+      {t:"d", o:23, n:null, x:'<span class="tok-k">export function</span> <span class="tok-f">resolveSpecPath</span>(issueId: <span class="tok-k">string</span>) {'},
+      {t:"d", o:24, n:null, x:'  <span class="tok-k">return</span> <span class="tok-f">firstExisting</span>(SPEC_DIR, issueId);'},
+      {t:"a", o:null, n:24, x:'<span class="tok-k">export function</span> <span class="tok-f">resolveSpecPath</span>(issueId: <span class="tok-k">string</span>) {'},
+      {t:"a", o:null, n:25, x:'  <span class="tok-c">// state worktree wins; legacy path only when no migration marker</span>'},
+      {t:"a", o:null, n:26, x:'  <span class="tok-k">return</span> <span class="tok-f">firstExisting</span>(STATE_SPEC_DIR, issueId) ?? <span class="tok-f">legacyFallback</span>(LEGACY_SPEC_DIR, issueId);'},
+      {t:"c", o:25, n:27, x:'}'},
+    ]},
+    { exp: 42, lines: [
+      {t:"c", o:68, n:69, x:'<span class="tok-k">function</span> <span class="tok-f">firstExisting</span>(dir: <span class="tok-k">string</span>, issueId: <span class="tok-k">string</span>) {'},
+      {t:"d", o:69, n:null, x:'  <span class="tok-k">const</span> hit = <span class="tok-f">readdirSync</span>(dir).<span class="tok-f">find</span>(f => f.<span class="tok-f">includes</span>(issueId));'},
+      {t:"a", o:null, n:70, x:'  <span class="tok-k">if</span> (!<span class="tok-f">existsSync</span>(dir)) <span class="tok-k">return null</span>;'},
+      {t:"a", o:null, n:71, x:'  <span class="tok-k">const</span> hit = <span class="tok-f">readdirSync</span>(dir).<span class="tok-f">find</span>(f => f.<span class="tok-f">includes</span>(issueId.<span class="tok-f">toLowerCase</span>()));'},
+      {t:"c", o:70, n:72, x:'  <span class="tok-k">return</span> hit ? path.<span class="tok-f">join</span>(dir, hit) : <span class="tok-k">null</span>;'},
+      {t:"c", o:71, n:73, x:'}'},
+    ]},
+  ]},
+  { path: "src/lib/pan-dir/specs.ts", adds: 42, dels: 31, kind: "M", hunks: [
+    { exp: 9, lines: [
+      {t:"c", o:10, n:10, x:'<span class="tok-k">export function</span> <span class="tok-f">findSpecByIssue</span>(projectRoot: <span class="tok-k">string</span>, issueId: <span class="tok-k">string</span>) {'},
+      {t:"d", o:11, n:null, x:'  <span class="tok-k">const</span> p = <span class="tok-f">resolveSpecPath</span>(issueId); <span class="tok-c">// null for migrated projects</span>'},
+      {t:"a", o:null, n:11, x:'  <span class="tok-k">const</span> p = <span class="tok-f">resolveSpecPath</span>(issueId); <span class="tok-c">// state-first after PAN-3165</span>'},
+      {t:"a", o:null, n:12, x:'  <span class="tok-f">assertResolversAgree</span>(projectRoot, issueId, p);'},
+      {t:"c", o:12, n:13, x:'  <span class="tok-k">return</span> p ? <span class="tok-f">readSpec</span>(p) : <span class="tok-k">null</span>;'},
+      {t:"c", o:13, n:14, x:'}'},
+    ]},
+  ]},
+  { path: "src/dashboard/frontend/src/components/MergeTrainView.tsx", adds: 56, dels: 40, kind: "M", hunks: [
+    { exp: 14, lines: [
+      {t:"d", o:88, n:null, x:'  {uatSteps.length === 0 && <span class="tok-s">&lt;EmptyState text="No UAT steps in plan" /&gt;</span>}'},
+      {t:"a", o:null, n:88, x:'  {uatSteps === <span class="tok-k">null</span> && <span class="tok-s">&lt;EmptyState text="Plan not resolved yet…" /&gt;</span>}'},
+      {t:"a", o:null, n:89, x:'  {uatSteps?.length === 0 && <span class="tok-s">&lt;EmptyState text="No UAT steps in plan" /&gt;</span>}'},
+      {t:"c", o:89, n:90, x:'  {uatSteps?.<span class="tok-f">map</span>(s => <span class="tok-s">&lt;UatRow key={s.id} step={s} /&gt;</span>)}'},
+    ]},
+  ]},
+  { path: "tests/unit/lib/xbrief-index-regression.test.ts", adds: 118, dels: 0, kind: "A", hunks: [
+    { exp: 0, lines: [
+      {t:"a", o:null, n:1, x:'<span class="tok-f">describe</span>(<span class="tok-s">"xbrief-index resolver cutover"</span>, () => {'},
+      {t:"a", o:null, n:2, x:'  <span class="tok-f">it</span>(<span class="tok-s">"agrees on state path for a migrated project"</span>, …);'},
+      {t:"a", o:null, n:3, x:'  <span class="tok-f">it</span>(<span class="tok-s">"agrees on legacy path for an unmigrated project"</span>, …);'},
+      {t:"a", o:null, n:4, x:'  <span class="tok-f">it</span>(<span class="tok-s">"ignores stale legacy shadow when marker exists"</span>, …);'},
+      {t:"a", o:null, n:5, x:'  <span class="tok-f">it</span>(<span class="tok-s">"returns null when spec is missing everywhere"</span>, …);'},
+      {t:"a", o:null, n:6, x:'});'},
+    ]},
+  ]},
+  { path: "src/dashboard/server/routes/workspaces/workspace-data.ts", adds: 28, dels: 6, kind: "M", hunks: [ { exp: 31, lines: [
+      {t:"c", o:80, n:80, x:'<span class="tok-k">const</span> git = <span class="tok-k">await</span> <span class="tok-f">getGitStatusAsync</span>(workspacePath);'},
+      {t:"a", o:null, n:81, x:'<span class="tok-k">const</span> stats = <span class="tok-k">await</span> <span class="tok-f">getDiffStatsAsync</span>(workspacePath); <span class="tok-c">// FR-1</span>'},
+      {t:"c", o:81, n:82, x:'<span class="tok-k">return</span> { git, containers, stackHealth };'},
+  ]} ]},
+  { path: "tests/unit/dashboard/server/merge-train-view.test.ts", adds: 64, dels: 8, kind: "M", hunks: [ { exp: 12, lines: [
+      {t:"a", o:null, n:44, x:'<span class="tok-f">it</span>(<span class="tok-s">"renders both UAT branches after resolver fix"</span>, …);'},
+  ]} ]},
+  { path: "docs/XBRIEF.md", adds: 37, dels: 9, kind: "M", hunks: [ { exp: 22, lines: [
+      {t:"d", o:141, n:null, x:'Specs resolve from <span class="tok-s">`.pan/specs`</span> in the project repo.'},
+      {t:"a", o:null, n:141, x:'Specs resolve from <span class="tok-s">`specs/`</span> on <span class="tok-s">`overdeck-state`</span>; <span class="tok-s">`.pan/specs`</span> is legacy fallback only.'},
+  ]} ]},
+];
+
+/* ---------------- option state ---------------- */
+let mode = "unified";
+let selFile = 0;
+let expanded = new Set();
+
+/* ---------------- diff renderers ---------------- */
+function ln(v){ return v == null ? "" : v; }
+function rowUnified(l){
+  const cls = l.t==="a"?"a":l.t==="d"?"d":"c";
+  return `<tr class="${cls}"><td class="ln">${ln(l.o)}</td><td class="ln">${ln(l.n)}</td><td class="code"><span class="tx">${l.x || " "}</span></td></tr>`;
+}
+function rowsSplit(lines){
+  let out = [];
+  for (let i=0;i<lines.length;i++){
+    const l = lines[i];
+    if (l.t==="c"){ out.push(`<tr class="c"><td class="ln">${ln(l.o)}</td><td class="code"><span class="tx">${l.x||" "}</span></td><td class="ln">${ln(l.n)}</td><td class="code"><span class="tx">${l.x||" "}</span></td></tr>`); continue; }
+    if (l.t==="d"){
+      // gather del run and following add run
+      let dels = [], adds = [];
+      while (i<lines.length && lines[i].t==="d"){ dels.push(lines[i]); i++; }
+      while (i<lines.length && lines[i].t==="a"){ adds.push(lines[i]); i++; }
+      i--;
+      const n = Math.max(dels.length, adds.length);
+      for (let k=0;k<n;k++){
+        const d = dels[k], a = adds[k];
+        out.push(`<tr>
+          <td class="ln">${d?ln(d.o):""}</td><td class="code" ${d?'style="background:var(--red-gutter)"':""}>${d?`<span class="tx" style="background:var(--red-bg)">${d.x||" "}</span>`:""}</td>
+          <td class="ln">${a?ln(a.n):""}</td><td class="code" ${a?'style="background:var(--green-gutter)"':""}>${a?`<span class="tx" style="background:var(--green-bg)">${a.x||" "}</span>`:""}</td>
+        </tr>`);
+      }
+      continue;
+    }
+    if (l.t==="a"){ out.push(`<tr><td class="ln"></td><td class="code"></td><td class="ln">${ln(l.n)}</td><td class="code" style="background:var(--green-gutter)"><span class="tx" style="background:var(--green-bg)">${l.x||" "}</span></td></tr>`); }
+  }
+  return out.join("");
+}
+function fileHtml(f, fi, split){
+  const body = f.hunks.map((h,hi)=>{
+    const key = fi+":"+hi;
+    const expRow = h.exp>0 && !expanded.has(key)
+      ? `<tr class="exp" data-exp="${key}"><td colspan="${split?4:3}"><span class="chev">⇕</span> ${h.exp} unchanged lines — click to expand</td></tr>` : "";
+    const hidden = h.exp>0 && expanded.has(key)
+      ? `<tr class="c"><td class="ln">…</td>${split?'<td class="code" colspan="2"':'<td class="code" colspan="1"'} style="color:var(--faint)">(${h.exp} unchanged lines expanded in real build — pierre HunkExpansionRegion)</td>${split?'<td class="code"></td>':""}</tr>` : "";
+    return expRow + hidden + (split ? rowsSplit(h.lines) : h.lines.map(rowUnified).join(""));
+  }).join("");
+  return `<div class="diff-file" id="file-${fi}">
+    <div class="diff-file-head"><span class="fp">${f.path}</span><span class="fa">+${f.adds}</span><span class="fd">−${f.dels}</span><span class="spacer"></span><span class="hh">${f.kind==="A"?"new file":"modified"}</span></div>
+    <table class="dt">${body}</table>
+  </div>`;
+}
+
+function renderRail(filter=""){
+  const host = document.getElementById("rail");
+  const q = filter.toLowerCase();
+  host.innerHTML = `<div class="rail-repo"><span>overdeck</span><span>${FILES.length} files</span></div>` +
+    FILES.map((f,i)=>{
+      if (q && !f.path.toLowerCase().includes(q)) return "";
+      return `<button class="rail-file ${i===selFile?"sel":""}" data-fi="${i}">
+        <span class="kind ${f.kind==="A"?"new":""}">${f.kind}</span>
+        <span class="fp">${f.path}</span>
+        <span class="fa">+${f.adds}</span><span class="fd">−${f.dels}</span>
+      </button>`;
+    }).join("");
+  host.querySelectorAll(".rail-file").forEach(b=>b.addEventListener("click",()=>{ selFile=+b.dataset.fi; renderRail(document.getElementById("rail-filter").value); scrollToFile(selFile); }));
+}
+function renderDiffs(){
+  const host = document.getElementById("diff-host");
+  host.innerHTML = FILES.map((f,i)=>fileHtml(f,i,mode==="split")).join("");
+  host.querySelectorAll("tr.exp").forEach(r=>r.addEventListener("click",()=>{ expanded.add(r.dataset.exp); renderDiffs(); }));
+}
+function scrollToFile(i){
+  const el = document.getElementById("file-"+i);
+  if (el) el.scrollIntoView({behavior:"smooth", block:"start"});
+}
+
+/* ---------------- option A wiring ---------------- */
+const paneConv = document.getElementById("pane-conv-a");
+const paneChanges = document.getElementById("pane-changes-a");
+function showTabA(which){
+  paneConv.classList.toggle("hidden", which!=="conv");
+  paneChanges.classList.toggle("hidden", which!=="changes");
+  document.querySelectorAll("#tabs-a .tab").forEach(t=>t.classList.toggle("active", t.dataset.tab===which));
+  if (which==="changes"){ renderRail(document.getElementById("rail-filter").value); renderDiffs(); }
+}
+document.getElementById("badge-a").addEventListener("click",()=>showTabA("changes"));
+document.querySelectorAll("#tabs-a .tab").forEach(t=>t.addEventListener("click",()=>{ if(t.dataset.tab) showTabA(t.dataset.tab); }));
+document.getElementById("mode-seg").querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{
+  mode = b.dataset.mode;
+  document.querySelectorAll("#mode-seg button").forEach(x=>x.classList.toggle("on",x===b));
+  renderDiffs();
+}));
+document.getElementById("expand-all").addEventListener("click",()=>{
+  FILES.forEach((f,fi)=>f.hunks.forEach((h,hi)=>expanded.add(fi+":"+hi)));
+  renderDiffs();
+});
+document.getElementById("rail-filter").addEventListener("input",e=>renderRail(e.target.value));
+document.addEventListener("keydown",e=>{
+  if (document.getElementById("opt-a").classList.contains("hidden")) return;
+  if (/input|textarea/i.test(e.target.tagName)) return;
+  if (e.key==="["||e.key==="]"){
+    mode = mode==="unified" ? "split" : "unified";
+    document.querySelectorAll("#mode-seg button").forEach(x=>x.classList.toggle("on",x.dataset.mode===mode));
+    renderDiffs();
+  }
+  if (e.key==="j"){ selFile=Math.min(FILES.length-1,selFile+1); renderRail(document.getElementById("rail-filter").value); scrollToFile(selFile); }
+  if (e.key==="k"){ selFile=Math.max(0,selFile-1); renderRail(document.getElementById("rail-filter").value); scrollToFile(selFile); }
+});
+
+/* ---------------- option B: review stack ---------------- */
+const COHORTS = [
+  { n:"1", name:"Spec resolver cutover", layers:[
+    { f:0, t:"State-first spec resolution", s:"xbrief-index now reads specs/ on overdeck-state first; .pan/specs demoted to legacy fallback gated on the migration marker. This is the root fix." },
+    { f:1, t:"Resolver agreement guard", s:"findSpecByIssue asserts both resolvers agree, so a stale shadow directory fails loudly instead of returning null plans." },
+    { f:3, t:"Regression suite", s:"Four cases: migrated, unmigrated, stale shadow, missing spec. Locks the cutover matrix." },
+  ]},
+  { n:"2", name:"UAT panel + server wiring", layers:[
+    { f:2, t:"Null vs empty UAT steps", s:"MergeTrainView distinguishes plan-not-resolved (null) from plan-has-no-steps (empty) — the reported symptom disappears." },
+    { f:4, t:"Workspace diff stats", s:"workspace-data gains async diff-stat collection (this very feature's FR-1 endpoint)." },
+  ]},
+];
+let selLayer = "0:0";
+function renderRs(){
+  document.getElementById("rs-rail").innerHTML = COHORTS.map((c,ci)=>`
+    <div class="cohort"><div class="cohort-h"><span class="cn">C${c.n}</span>${c.name}</div>
+      ${c.layers.map((l,li)=>`<button class="layer ${selLayer===ci+":"+li?"sel":""}" data-l="${ci}:${li}">${l.t}<span class="ls">${FILES[l.f].path}</span></button>`).join("")}
+    </div>`).join("");
+  document.getElementById("rs-sums").innerHTML = COHORTS.flatMap((c,ci)=>c.layers.map((l,li)=>`
+    <div class="sum-card ${selLayer===ci+":"+li?"hot":""}" data-l="${ci}:${li}"><span class="sl">C${c.n}·L${li+1}</span>${l.s}</div>`)).join("");
+  const [ci,li] = selLayer.split(":").map(Number);
+  const f = FILES[COHORTS[ci].layers[li].f];
+  document.getElementById("rs-diff").innerHTML = fileHtml(f, 99, false);
+  document.querySelectorAll("#rs-rail .layer").forEach(b=>b.addEventListener("click",()=>{ selLayer=b.dataset.l; renderRs(); }));
+  document.querySelectorAll("#rs-sums .sum-card").forEach(b=>b.addEventListener("click",()=>{ selLayer=b.dataset.l; renderRs(); }));
+}
+renderRs();
+
+/* ---------------- option C: dock ---------------- */
+document.getElementById("badge-c").addEventListener("click",()=>{
+  document.getElementById("dock-c").classList.remove("hidden");
+  document.getElementById("dock-files").innerHTML = FILES.slice(0,5).map(f=>`<button class="rail-file" style="pointer-events:none"><span class="kind">${f.kind}</span><span class="fp">${f.path}</span><span class="fa">+${f.adds}</span><span class="fd">−${f.dels}</span></button>`).join("");
+  document.getElementById("dock-diff").innerHTML = fileHtml(FILES[0], 0, false);
+});
+document.getElementById("dock-close").addEventListener("click",()=>document.getElementById("dock-c").classList.add("hidden"));
+
+/* ---------------- option switcher ---------------- */
+document.querySelectorAll(".opt-card").forEach(c=>c.addEventListener("click",()=>{
+  document.querySelectorAll(".opt-card").forEach(x=>x.classList.toggle("active",x===c));
+  ["a","b","c"].forEach(o=>document.getElementById("opt-"+o).classList.toggle("hidden", o!==c.dataset.opt));
+}));
+
+/* deep-link: #a | #a-changes | #b | #c | #c-dock */
+const hash = (location.hash || "#a").slice(1);
+const [hOpt, hView] = hash.split("-");
+const optEl = document.querySelector(`.opt-card[data-opt="${hOpt}"]`) || document.querySelector('.opt-card[data-opt="a"]');
+optEl.click();
+if (hOpt === "a" && hView === "changes") showTabA("changes");
+if (hOpt === "c" && hView === "dock") document.getElementById("badge-c").click();
+
+/* initial */
+renderRail(); renderDiffs();
+</script>
+</body>
+</html>
