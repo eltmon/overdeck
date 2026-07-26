@@ -246,17 +246,18 @@
   ],
   "feedback": [],
   "created": "2026-07-26T00:35:36.057Z",
-  "updated": "2026-07-26T04:09:31.180Z",
+  "updated": "2026-07-26T04:11:48.734Z",
   "pipeline": {
     "issueId": "PAN-1696",
     "reviewStatus": "reviewing",
-    "testStatus": "pending",
+    "testStatus": "failed",
     "verificationStatus": "skipped",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T04:09:31.099Z",
+    "updatedAt": "2026-07-26T04:11:48.513Z",
     "reviewNotes": "Agent re-review request (7/25): Fixed review issues: CSRF headers on toggle, merge queue without active run",
+    "testNotes": "Commands: npm run typecheck (PASS). npm run lint (FAIL) — composer-commands.generated.ts in this branch is stale vs main's already-regenerated copy for pan reload/restart --health-timeout flag text; needs npm run generate:slash-commands + commit (or sync-main). npm test (full suite): 11 failed/10769 passed/50 skipped; 9 of the 11 are confirmed environmental noise from the agent git-guard blocking git reset --hard/rebase in test sandboxes (re-ran with OVERDECK_PAN_GIT_OP=1 and they pass clean). Two are real regressions from this branch's own commits: (1) tests/unit/lib/overdeck/no-loss-matrix.test.ts — new GET/POST /api/projects/:projectKey/merge-train routes (project-merge-train-endpoint item) have no NO_LOSS_MATRIX entry, violating the additive-refactor no-loss-audit rule. (2) src/cli/commands/__tests__/flywheel.test.ts 'exits 1 when no active run exists' — stale assertion; cli-flywheel-status (marked completed) changed the command to exit 0 with an empty queue per its own AC2, but this pre-existing test was never updated, so it now fails with exitCode=undefined. UAT not run: zero frontend files touched in this diff (git diff main...HEAD --stat confirms), and none of the implemented items (project-merge-train-endpoint=API, uat-stack-domain=backend URL builder, cli-flywheel-status=CLI) have a browser-facing surface, so hazard H6 does not yet apply. Bigger picture from .pan/records/pan-1696.json + the xBRIEF spec: only 7 of 17 plan items are completed; merge-train-routes is still 'running' (only the narrow toggle endpoint shipped, not the full /api/merge-train/* namespace); all 4 frontend view items, run-scope-persist, settings-scope-ux, role-prompt-scope, remove-legacy-routes, and docs-decouple have zero code — including everything that delivers the 'multi-project view' named in the issue title. Actionable: add the NO_LOSS_MATRIX entry, fix the stale flywheel CLI test, regenerate/sync the composer manifest, and continue through the remaining 10 xBRIEF items before this is ready — per the no-partial-implementations rule, backend-only plumbing with no multi-project view delivers no user-visible value yet.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/1822",
     "reviewSpawnedAt": "2026-07-26T04:09:24.289Z"
@@ -288,18 +289,18 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 7821131,
-            "output": 441431,
-            "cacheRead": 126186496,
+            "input": 8997569,
+            "output": 454335,
+            "cacheRead": 129277952,
             "cacheWrite": 0
           }
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 104,
-            "output": 44847,
-            "cacheRead": 8441917,
-            "cacheWrite": 396046
+            "input": 112,
+            "output": 49580,
+            "cacheRead": 9219576,
+            "cacheWrite": 405501
           }
         },
         "work": {
@@ -331,16 +332,16 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 7821131,
-          "output": 441431,
-          "cacheRead": 126186496,
+          "input": 8997569,
+          "output": 454335,
+          "cacheRead": 129277952,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 104,
-          "output": 44847,
-          "cacheRead": 8441917,
-          "cacheWrite": 396046
+          "input": 112,
+          "output": 49580,
+          "cacheRead": 9219576,
+          "cacheWrite": 405501
         },
         "anthropic/claude-haiku-4-5-20251001": {
           "input": 3825,
@@ -350,8 +351,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 163.8528142,
-        "pricingAsOf": "2026-07-26T04:09:31.150Z"
+        "usd": 171.8943672,
+        "pricingAsOf": "2026-07-26T04:11:48.711Z"
       }
     },
     "merges": [
