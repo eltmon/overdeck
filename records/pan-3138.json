@@ -61,6 +61,8 @@
   "scopeDrift": {
     "outsideDeclaredScope": [
       "scripts/file-size-baseline.txt",
+      "src/lib/cloister/__tests__/merged-docker-cleanup-worker.test.ts",
+      "src/lib/cloister/merged-docker-cleanup-worker.ts",
       "src/lib/cloister/review-status-source.ts",
       "src/lib/review-status-read.ts",
       "src/lib/review-status.ts",
@@ -82,8 +84,10 @@
       "docs/WORKSPACE-CONTAINERS.md",
       "scripts/file-size-baseline.txt",
       "src/lib/cloister/__tests__/closed-issue-reaper.test.ts",
+      "src/lib/cloister/__tests__/merged-docker-cleanup-worker.test.ts",
       "src/lib/cloister/closed-issue-reaper.ts",
       "src/lib/cloister/merge-agent.ts",
+      "src/lib/cloister/merged-docker-cleanup-worker.ts",
       "src/lib/cloister/review-status-source.ts",
       "src/lib/review-status-read.ts",
       "src/lib/review-status.ts",
@@ -92,10 +96,10 @@
       "tests/unit/lib/cloister/postmerge-cleanup-async.test.ts",
       "tests/unit/lib/review-status.test.ts"
     ],
-    "recordedAt": "2026-07-26T15:10:38.144Z"
+    "recordedAt": "2026-07-26T15:34:06.412Z"
   },
   "created": "2026-07-26T13:39:19.365Z",
-  "updated": "2026-07-26T15:33:55.370Z",
+  "updated": "2026-07-26T15:34:06.413Z",
   "pipeline": {
     "issueId": "PAN-3138",
     "reviewStatus": "failed",
