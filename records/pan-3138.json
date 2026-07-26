@@ -156,17 +156,18 @@
     "recordedAt": "2026-07-26T16:03:54.970Z"
   },
   "created": "2026-07-26T13:39:19.365Z",
-  "updated": "2026-07-26T16:15:03.466Z",
+  "updated": "2026-07-26T16:15:08.870Z",
   "pipeline": {
     "issueId": "PAN-3138",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T16:05:42.563Z",
-    "updatedAt": "2026-07-26T16:15:01.918Z",
+    "updatedAt": "2026-07-26T16:15:08.853Z",
+    "reviewNotes": "[correctness] A failed verifying-on-main transition now strands the rest of post-merge lifecycle — `src/lib/cloister/merge-agent.ts:451`",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3143",
     "lastVerifiedCommit": "6054ba2e200db2755313b2cf82980134a04a0096",
     "reviewSpawnedAt": "2026-07-26T16:15:01.918Z",
@@ -209,6 +210,28 @@
         "tests/unit/lib/review-status.test.ts"
       ],
       "recordedAt": "2026-07-26T16:03:54.970Z"
+    },
+    "reviewerVerdicts": {
+      "security": {
+        "status": "passed",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3138/.pan/review/agent-pan-3138-review-6054ba2e/security.md",
+        "atCommit": "6054ba2e200db2755313b2cf82980134a04a0096"
+      },
+      "correctness": {
+        "status": "blocked",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3138/.pan/review/agent-pan-3138-review-6054ba2e/correctness.md",
+        "atCommit": "6054ba2e200db2755313b2cf82980134a04a0096"
+      },
+      "performance": {
+        "status": "passed",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3138/.pan/review/agent-pan-3138-review-6054ba2e/performance.md",
+        "atCommit": "6054ba2e200db2755313b2cf82980134a04a0096"
+      },
+      "requirements": {
+        "status": "passed",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3138/.pan/review/agent-pan-3138-review-6054ba2e/requirements.md",
+        "atCommit": "6054ba2e200db2755313b2cf82980134a04a0096"
+      }
     }
   },
   "closeOut": {
@@ -273,7 +296,7 @@
       },
       "costAtCloseOut": {
         "usd": 326.78793,
-        "pricingAsOf": "2026-07-26T16:15:03.461Z"
+        "pricingAsOf": "2026-07-26T16:15:08.858Z"
       }
     },
     "merges": [
