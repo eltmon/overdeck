@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T12:24:46.201Z",
-  "updated": "2026-07-26T13:28:42.529Z",
+  "updated": "2026-07-26T13:31:50.471Z",
   "pipeline": {
     "issueId": "PAN-3135",
     "reviewStatus": "pending",
@@ -61,16 +61,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 13,
-    "claims": {
-      "deploy-queue-escalation": {
-        "writerId": "agent-pan-3135",
-        "agentId": "agent-pan-3135",
-        "pid": 2578062,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-26T13:28:42.529Z"
-      }
-    },
+    "sequence": 14,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3135",
@@ -137,6 +129,17 @@
         "outcome": "completed",
         "reason": "Deploy patrol now fires queued deploys at the first debounce/CI/gate-clear boundary even with auto_deploy off, registers blocked automatic deploys, clears only after freshness, and exposes a 30-minute queue deadline config",
         "releasedAt": "2026-07-26T13:28:16.878Z"
+      },
+      {
+        "writerId": "agent-pan-3135",
+        "agentId": "agent-pan-3135",
+        "pid": 2578062,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T13:28:42.529Z",
+        "itemId": "deploy-queue-escalation",
+        "outcome": "completed",
+        "reason": "Long-queued blocked deploys now emit one error and priority-1 TTS, trip needs-you on the first active verifier, and persist escalation to prevent repeats",
+        "releasedAt": "2026-07-26T13:31:50.471Z"
       }
     ],
     "statusReasons": {
@@ -163,6 +166,10 @@
       "deploy-patrol-queue-integration": {
         "reason": "Deploy patrol now fires queued deploys at the first debounce/CI/gate-clear boundary even with auto_deploy off, registers blocked automatic deploys, clears only after freshness, and exposes a 30-minute queue deadline config",
         "updatedAt": "2026-07-26T13:28:16.878Z"
+      },
+      "deploy-queue-escalation": {
+        "reason": "Long-queued blocked deploys now emit one error and priority-1 TTS, trip needs-you on the first active verifier, and persist escalation to prevent repeats",
+        "updatedAt": "2026-07-26T13:31:50.471Z"
       }
     }
   },
@@ -194,6 +201,9 @@
     "deploy-patrol-queue-integration.deploy-patrol-queue-integration.ac3": "completed",
     "deploy-patrol-queue-integration.deploy-patrol-queue-integration.ac4": "completed",
     "deploy-patrol-queue-integration.deploy-patrol-queue-integration.ac5": "completed",
-    "deploy-queue-escalation": "running"
+    "deploy-queue-escalation": "completed",
+    "deploy-queue-escalation.deploy-queue-escalation.ac1": "completed",
+    "deploy-queue-escalation.deploy-queue-escalation.ac2": "completed",
+    "deploy-queue-escalation.deploy-queue-escalation.ac3": "completed"
   }
 }
