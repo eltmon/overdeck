@@ -4,7 +4,7 @@
     "created": "2026-07-26T09:45:08.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3114: UAT-promoted merges leave DoD row 3 (verification) permanently unsatisfiable — same shape as the PAN-3067 strike gap",
-    "updated": "2026-07-26T09:48:49.275Z"
+    "updated": "2026-07-26T09:48:51.306Z"
   },
   "plan": {
     "id": "pan-3114",
@@ -12,9 +12,9 @@
     "status": "approved",
     "uid": "59919231-fbac-49c0-b3ee-d04bcb66eeec",
     "author": "agent:k3[1m]",
-    "sequence": 3,
+    "sequence": 5,
     "created": "2026-07-26T09:45:08.000Z",
-    "updated": "2026-07-26T09:48:49.275Z",
+    "updated": "2026-07-26T09:48:51.306Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3114",
