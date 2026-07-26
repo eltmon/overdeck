@@ -2,7 +2,7 @@
   "issueId": "PAN-3158",
   "schemaVersion": 2,
   "created": "2026-07-26T20:19:41.143Z",
-  "updated": "2026-07-26T20:19:41.143Z",
+  "updated": "2026-07-26T20:19:43.176Z",
   "pipeline": {
     "issueId": "PAN-3158",
     "reviewStatus": "pending",
@@ -25,5 +25,7 @@
       "note": "Planning session started for PAN-3158: Awaiting Merge: hide projects with nothing ready instead of repeating 'No features are ready to merge' for each",
       "timestamp": "2026-07-26T20:19:41.143Z"
     }
-  ]
+  ],
+  "harness": "claude-code",
+  "model": "k3[1m]"
 }
