@@ -221,7 +221,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T00:35:36.057Z",
-  "updated": "2026-07-26T03:32:19.194Z",
+  "updated": "2026-07-26T03:32:25.842Z",
   "pipeline": {
     "issueId": "PAN-1696",
     "reviewStatus": "reviewing",
@@ -230,7 +230,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T03:32:17.630Z",
+    "updatedAt": "2026-07-26T03:32:25.705Z",
     "reviewNotes": "Agent re-review request (6/25): Fixed security issue: added dashboard auth guard to POST merge-train endpoint",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/1822",
@@ -326,7 +326,7 @@
       },
       "costAtCloseOut": {
         "usd": 131.9986312,
-        "pricingAsOf": "2026-07-26T03:32:19.187Z"
+        "pricingAsOf": "2026-07-26T03:32:25.786Z"
       }
     },
     "merges": [
