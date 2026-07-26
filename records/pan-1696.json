@@ -121,7 +121,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T00:35:36.057Z",
-  "updated": "2026-07-26T01:00:01.428Z",
+  "updated": "2026-07-26T01:00:10.409Z",
   "pipeline": {
     "issueId": "PAN-1696",
     "reviewStatus": "reviewing",
@@ -192,18 +192,10 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-haiku-4-5",
+  "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "ready-set-source": {
-        "writerId": "agent-pan-1696",
-        "agentId": "agent-pan-1696",
-        "pid": 2688554,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-26T00:52:07.464Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-1696",
@@ -226,6 +218,17 @@
         "outcome": "completed",
         "reason": "Per-project override in projects.yaml.merge_train.enabled, isMergeTrainEnabledForProject helper, runMergeTrainReconcile updated",
         "releasedAt": "2026-07-26T00:51:57.593Z"
+      },
+      {
+        "writerId": "agent-pan-1696",
+        "agentId": "agent-pan-1696",
+        "pid": 2688554,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T00:52:07.464Z",
+        "itemId": "ready-set-source",
+        "outcome": "released",
+        "reason": "stale claim released (agent-pan-1696 dead)",
+        "releasedAt": "2026-07-26T01:00:10.144Z"
       }
     ],
     "statusReasons": {
@@ -236,6 +239,10 @@
       "per-project-flag": {
         "reason": "Per-project override in projects.yaml.merge_train.enabled, isMergeTrainEnabledForProject helper, runMergeTrainReconcile updated",
         "updatedAt": "2026-07-26T00:51:57.593Z"
+      },
+      "ready-set-source": {
+        "reason": "stale claim released (agent-pan-1696 dead)",
+        "updatedAt": "2026-07-26T01:00:10.144Z"
       }
     }
   },
@@ -248,6 +255,6 @@
     "per-project-flag.per-project-flag.ac1": "completed",
     "per-project-flag.per-project-flag.ac2": "completed",
     "per-project-flag.per-project-flag.ac3": "completed",
-    "ready-set-source": "running"
+    "ready-set-source": "pending"
   }
 }
