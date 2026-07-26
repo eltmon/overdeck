@@ -177,20 +177,19 @@
     "recordedAt": "2026-07-26T00:59:07.168Z"
   },
   "created": "2026-07-25T21:12:36.630Z",
-  "updated": "2026-07-26T02:32:46.364Z",
+  "updated": "2026-07-26T02:36:16.061Z",
   "pipeline": {
     "issueId": "PAN-3076",
     "reviewStatus": "passed",
     "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
-    "mergeStatus": "failed",
+    "mergeStatus": "merged",
     "releaseStatus": "skipped",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T01:00:25.237Z",
-    "updatedAt": "2026-07-26T02:32:45.686Z",
+    "updatedAt": "2026-07-26T02:36:16.043Z",
     "reviewNotes": "All changed regions reviewed; correctness, security, requirements, performance, lint, typecheck, and 114 focused tests are clean",
-    "mergeNotes": "Work agent agent-pan-3076 stopped before completing the rebase onto main",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3082",
     "reviewedAtCommit": "39d5480caead737c18ee0f37a62de1d3fcb5085b",
     "lastVerifiedCommit": "39d5480caead737c18ee0f37a62de1d3fcb5085b",
@@ -325,7 +324,7 @@
       },
       "costAtCloseOut": {
         "usd": 207.185821,
-        "pricingAsOf": "2026-07-26T02:32:45.719Z"
+        "pricingAsOf": "2026-07-26T02:36:16.049Z"
       }
     },
     "merges": [
