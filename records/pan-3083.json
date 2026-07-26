@@ -181,22 +181,22 @@
     "recordedAt": "2026-07-26T00:26:11.651Z"
   },
   "created": "2026-07-25T22:42:08.234Z",
-  "updated": "2026-07-26T00:26:18.415Z",
+  "updated": "2026-07-26T00:26:21.014Z",
   "pipeline": {
     "issueId": "PAN-3083",
-    "reviewStatus": "pending",
+    "reviewStatus": "failed",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T00:26:16.843Z",
-    "reviewNotes": "Verification failed at test",
+    "updatedAt": "2026-07-26T00:26:19.044Z",
+    "reviewNotes": "Review role spawn failed: Role run agent-pan-3083-review already running. Use 'pan tell' to message it.",
     "verificationNotes": "Verification FAILED at test (331773ms):\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-3083/src/dashboard/frontend\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-3083\n\nNo test files found, exiting with code 0\n\nstdout | tests/unit/dashboard/server/routes/specialists-inspect-item.test.ts > POST /api/specialists/done inspect item attribution > checkpoints the exact structured itemId regardless of notes wording\n[specialists/done] inspect signaling passed for PAN-2724\n\nstdout | tests/unit/dashboard/server/routes/specialists-inspect-item.test.ts > POST /api/specialists/done inspect item attribution > checkpoints the exact structured itemId regardless of notes wording\n[specialists/done] Set inspect-agent-test to idle\n[specialists/done] Warm lifecycle: verdict recorded, leaving inspect-agent-test running (PAN-2579)\n[specialists/done] Cleared registry lock for inspect-agent:PAN-2724 (overdeck)\n\nstdout | tests/unit/dashboard/server/routes/specialists-inspect-item.test.ts > POST /api/specialists/done inspect item attribution > checkpoints the exact structured itemId regardless of notes wording\n[specialists/done] inspect signaling passed for PAN-2724\n\nstdout | tests/unit/dashboard/server/routes/specialists-inspect-item.test.ts > POST /api/specialists/done inspect item attribution > checkpoints the exact structured itemId regardless of notes wording\n[specialists/done] Set inspect-agent-test to idle\n[specialists/done] Warm lifecycle: verdict recorded, leaving inspect-agent-test running (PAN-2579)\n[specialists/done] Cleared registry lock for inspect-agent:PAN-2724 (overdeck)\n\n ❯ |root| tests/unit/dashboard/server/routes/specialists-inspect-item.test.ts (3 tests | 1 failed) 103ms\n     × checkpoints the exact structured itemId regardless of notes wording 81ms (retry x1)\n[prep] state-reconcile\n[prep] completed: state-reconcile (0s elapsed)\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Workspace already up to date with main\n[prep] completed: sync-main (0s ela\n…(1563 chars elided)…\npan-auto-resume-gating-BDBDj8/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Found workspace: /tmp/pan-auto-resume-gating-BDBDj8/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace: /tmp/pan-auto-resume-gating-BDBDj8/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace: /tmp/pan-auto-resume-gating-BDBDj8/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace: /tmp/pan-auto-resume-gating-BDBDj8/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with plan\n...(truncated)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3089",
     "reviewedAtCommit": "3f1cf7736590cf60192d97fe26c2df744cce3039",
     "reviewRequestedAt": "2026-07-26T00:26:12.534Z",
-    "reviewSpawnedAt": "2026-07-26T00:10:22.801Z",
+    "reviewSpawnedAt": "2026-07-26T00:26:17.608Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "src/lib/__tests__/review-dispatch-decision.test.ts",
@@ -286,7 +286,7 @@
       },
       "costAtCloseOut": {
         "usd": 103.28126,
-        "pricingAsOf": "2026-07-26T00:26:16.879Z"
+        "pricingAsOf": "2026-07-26T00:26:21.003Z"
       }
     },
     "merges": [
