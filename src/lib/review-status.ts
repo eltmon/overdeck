@@ -530,11 +530,15 @@ function maybeAutoDispatchReviewHostSide(issueId: string, status: ReviewStatus):
 }
 async function dispatchReviewHostSide(issueId: string, prUrl?: string): Promise<void> {
   try {
-    const { startDurableReviewPipelineHostSide } = await import('./cloister/durable-review-pipeline.js');
+    const [{ startDurableReviewPipelineHostSide }, { spawnReviewRoleForIssue }] = await Promise.all([
+      import('./cloister/durable-review-pipeline.js'),
+      import('./cloister/review-agent.js'),
+    ]);
     const started = await startDurableReviewPipelineHostSide({
       issueId,
       ...(prUrl ? { prUrl } : {}),
       setReviewPending: (update) => setReviewStatusSync(issueId, update),
+      dispatchReview: (context) => Effect.runPromise(spawnReviewRoleForIssue(context)),
     });
     if (!started) {
       console.log(`[review-status] durable review pipeline unavailable or already in flight for ${issueId} (host-side)`);
