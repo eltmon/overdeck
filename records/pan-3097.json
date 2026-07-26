@@ -26,7 +26,9 @@
   ],
   "feedback": [],
   "scopeDrift": {
-    "outsideDeclaredScope": [],
+    "outsideDeclaredScope": [
+      "packages/contracts/src/composer-commands.generated.ts"
+    ],
     "declaredScopeUntouched": [],
     "declaredScope": [
       "docs/ASKUSERQUESTION-DASHBOARD.md",
@@ -47,6 +49,7 @@
     ],
     "actualChangedFiles": [
       "docs/ASKUSERQUESTION-DASHBOARD.md",
+      "packages/contracts/src/composer-commands.generated.ts",
       "roles/plan.md",
       "src/dashboard/frontend/src/App/hooks/usePendingInputDialogs.ts",
       "src/dashboard/frontend/src/components/AskUserQuestionDialog.tsx",
@@ -62,10 +65,10 @@
       "src/lib/cloister/prompts/planning.md",
       "sync-sources/rules/ask-user-question-self-contained.md"
     ],
-    "recordedAt": "2026-07-26T03:30:04.529Z"
+    "recordedAt": "2026-07-26T03:36:45.308Z"
   },
   "created": "2026-07-26T02:29:08.179Z",
-  "updated": "2026-07-26T03:36:38.227Z",
+  "updated": "2026-07-26T03:36:45.309Z",
   "pipeline": {
     "issueId": "PAN-3097",
     "reviewStatus": "passed",
