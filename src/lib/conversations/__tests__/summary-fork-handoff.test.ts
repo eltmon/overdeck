@@ -443,7 +443,7 @@ describe('handoff fork handshake', () => {
     expect(result.summary).toContain('## Conversation Summary Fork');
     expect(result.handoffDocPath).toBeNull();
     rmSync(home, { recursive: true, force: true });
-  }, 15_000);
+  });
 
   it('times out distinctly when the document and sentinel do not both appear', async () => {
     vi.useFakeTimers();

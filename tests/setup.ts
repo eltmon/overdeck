@@ -4,18 +4,7 @@
 
 import { vi, beforeEach, afterEach } from 'vitest';
 import { rmSync, mkdirSync, existsSync } from 'fs';
-import { delimiter, join } from 'path';
-
-// Work-agent launchers prepend a git-guard wrapper to PATH. Tests that exercise
-// Git safety and hook behavior must reach the real git binary, not the outer
-// agent policy wrapper, or expected human-shell operations fail before the code
-// under test runs.
-if (process.env.PATH) {
-  process.env.PATH = process.env.PATH
-    .split(delimiter)
-    .filter((entry) => !entry.includes('/git-guard'))
-    .join(delimiter);
-}
+import { join } from 'path';
 
 // Test fixtures directory
 export const FIXTURES_DIR = join(__dirname, 'fixtures');

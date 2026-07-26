@@ -90,10 +90,6 @@ vi.mock('../../../lib/review-status.js', () => ({
   loadReviewStatuses: () => ({}),
 }));
 
-vi.mock('../memory-governor.js', () => ({
-  assessMemoryPressure: vi.fn(async () => ({ band: 'ok', availableBytes: Number.MAX_SAFE_INTEGER })),
-}));
-
 vi.mock('../../../lib/cloister/concurrency.js', () => ({
   workResumeSlotsAvailable: (...args: unknown[]) => mockWorkResumeSlotsAvailable(...args),
   countRunningAgents: () => mockCountRunningAgents(),
