@@ -22,7 +22,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T17:27:17.644Z",
-  "updated": "2026-07-26T18:38:12.750Z",
+  "updated": "2026-07-26T18:38:26.113Z",
   "pipeline": {
     "issueId": "PAN-3148",
     "reviewStatus": "pending",
@@ -49,8 +49,16 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 10,
-    "claims": {},
+    "sequence": 11,
+    "claims": {
+      "docs-patrol-and-dedup": {
+        "writerId": "agent-pan-3148",
+        "agentId": "agent-pan-3148",
+        "pid": 2112248,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T18:38:26.113Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3148",
@@ -155,6 +163,7 @@
     "escalate-suppressed-redelivery.escalate-suppressed-redelivery.ac4": "completed",
     "work-prompt-run-id-guidance": "completed",
     "work-prompt-run-id-guidance.work-prompt-run-id-guidance.ac1": "completed",
-    "work-prompt-run-id-guidance.work-prompt-run-id-guidance.ac2": "completed"
+    "work-prompt-run-id-guidance.work-prompt-run-id-guidance.ac2": "completed",
+    "docs-patrol-and-dedup": "running"
   }
 }
