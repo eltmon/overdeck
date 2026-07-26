@@ -222,11 +222,6 @@
       "reason": "feedback",
       "note": "[2026-07-26T18:01Z] review-agent → CHANGES-REQUESTED — seq 2",
       "timestamp": "2026-07-26T18:01:05.309Z"
-    },
-    {
-      "reason": "resume",
-      "agentModel": "gpt-5.6-sol",
-      "timestamp": "2026-07-26T18:25:15.412Z"
     }
   ],
   "feedback": [],
@@ -312,7 +307,7 @@
     "recordedAt": "2026-07-26T18:25:06.675Z"
   },
   "created": "2026-07-26T12:33:18.311Z",
-  "updated": "2026-07-26T18:25:15.448Z",
+  "updated": "2026-07-26T18:25:17.551Z",
   "pipeline": {
     "issueId": "PAN-3093",
     "reviewStatus": "pending",
@@ -322,8 +317,9 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T18:25:12.142Z",
+    "updatedAt": "2026-07-26T18:25:11.931Z",
     "reviewNotes": "The configured branch-prefix fix reaches assembly but not reconciler anchors, so valid custom-prefix generations are invalidated",
+    "verificationNotes": "Verification FAILED at test (599354ms):\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-3093\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-3093/src/dashboard/frontend\n\nNo test files found, exiting with code 0\n\n[prep] state-reconcile\n[prep] completed: state-reconcile (0s elapsed)\nstdout | src/lib/conversations/__tests__/summary-fork-handoff.test.ts > summary fork transcript resolution > summarizes an ACP conversation without a Claude session ID\n[summary-fork] Forking conv=conv-source launchModel=claude-haiku-4-5 summaryModel=claude-haiku-4-5 localOnly=false forkMode=summary\n\nstdout | src/lib/conversations/__tests__/summary-fork-handoff.test.ts > summary fork transcript resolution > summarizes an ACP conversation without a Claude session ID\n[summary-fork] Forking conv=conv-source launchModel=claude-haiku-4-5 summaryModel=claude-haiku-4-5 localOnly=false forkMode=summary\n\nstdout | src/lib/conversations/__tests__/summary-fork-handoff.test.ts > summary fork transcript resolution > summarizes an ACP conversation without a Claude session ID\n[claude-invoke] purpose=summary-fork | model=claude-haiku-4-5 | summaryHarness=claude-code | sourceHarness=acp | source=summary-fork.ts:generateSummaryForFork | jsonl=/tmp/pan-summary-fork-acp-1785088250272/agents/conv-acp-source/acp-session.jsonl\n\nstdout | src/lib/conversations/__tests__/summary-fork-handoff.test.ts > summary fork transcript resolution > summarizes an ACP conversation without a Claude session ID\n[claude-invoke] purpose=summary-fork | model=claude-haiku-4-5 | summaryHarness=claude-code | sourceHarness=acp | source=summary-fork.ts:generateSummaryForFork | jsonl=/tmp/pan-summary-fork-acp-1785088250272/agents/conv-acp-source/acp-session.jsonl\n\nstdout | src/lib/conversations/__tests__/summary-fork-handoff.test.ts > summary fork transcript resolution > summarizes an ACP conversation without a Claude session ID\n[claude-invoke] SUCCESS purpose=summary-fork | model=claude-haiku-4-5 | outputChars=110\n\nstdout | src/lib/convers\n…(2330 chars elided)…\neature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-ajodQQ/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-ajodQQ/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-ajodQQ/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-conte\n...(truncated)",
     "inspectNotes": "All 4 ACs verified; ran uat-polyrepo-engine.test.ts + uat-generation-engine.test.ts, 33/33 pass. AC1: runAssemblyPass calls each repo's own fetchMain then createWorktree and records that repo's baseSha; finish() writes compositeBaseAnchor -> 'fe@aaa1111 api@bbb2222' on the generation row (asserted on both the returned object and the store row). AC2: a block returns from the pass, the issue is added to heldOutIds once and pushed to heldOut with reason suffixed '(in <repoKey>)', then assembly replays from base; verified in real git too, since createWorktree does 'worktree remove --force' + 'worktree add -B <branch> <path> origin/<target>', which resets the sibling repo's branch, so the fake's merged-reset is faithful. Push happens only after the accepted pass, so a held-out feature is never published in repo A. AC3: contributingRepos filters by repoContributions; infra gets zero worktreeCreations and zero pushes. AC4: the push loop returns finish('failed', ...) on the first throw, with fe.pushes=[name] and api.pushes=[] proving the sibling had landed. Deviation 1 confirmed necessary: safeGenerationWorktreePath (uat-generation-deps.ts:39) resolves <projectRoot>/workspaces, and a member repo runs git in <projectRoot>/<repoKey> while its worktree sits under the wrapper's workspaces, so the old signature would throw; workspacesRoot defaults to projectRoot and targetBranch to 'main', reproducing the prior origin/main behavior exactly. Per-repo deps each close over their own worktreePath, so merge/abort/push cannot cross repos. Deviation 2 confirmed: GenerationStorePort.update's Pick had no 'repos'. Non-blocking notes: (a) a repo dropped between passes keeps its unpushed local uat/ branch and worktree until the generation folder is reaped - harmless since 'worktree add -B' force-resets, but cleanup (WI-7) should reap the branch; (b) listRemoteUatBranchesMulti, buildPolyrepoGitDeps, and assemblePolyrepoUatGeneration have no callers yet, which is expected until the WI-5/WI-6 wiring lands.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3145",
     "lastVerifiedCommit": "cd81b757bcb11b125bf455e605a0d0a443c1f23e",
@@ -409,6 +405,24 @@
         "tests/unit/lib/overdeck/uat-generation-repos.test.ts"
       ],
       "recordedAt": "2026-07-26T18:25:06.675Z"
+    },
+    "reviewerVerdicts": {
+      "security": {
+        "status": "passed",
+        "atCommit": "f75a76c41ccd76fa4f94b6f9a6492d9f0f0e559c"
+      },
+      "correctness": {
+        "status": "blocked",
+        "atCommit": "f75a76c41ccd76fa4f94b6f9a6492d9f0f0e559c"
+      },
+      "performance": {
+        "status": "blocked",
+        "atCommit": "f75a76c41ccd76fa4f94b6f9a6492d9f0f0e559c"
+      },
+      "requirements": {
+        "status": "passed",
+        "atCommit": "f75a76c41ccd76fa4f94b6f9a6492d9f0f0e559c"
+      }
     }
   },
   "closeOut": {
@@ -479,7 +493,7 @@
       },
       "costAtCloseOut": {
         "usd": 297.7195823,
-        "pricingAsOf": "2026-07-26T18:25:14.516Z"
+        "pricingAsOf": "2026-07-26T18:25:12.023Z"
       }
     },
     "merges": [
@@ -488,7 +502,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-opus-5",
   "tasks": {
     "sequence": 16,
     "claims": {},
