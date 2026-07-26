@@ -177,6 +177,11 @@
       "reason": "feedback",
       "note": "[2026-07-26T10:15Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-07-26T10:15:02.021Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "k3[1m]",
+      "timestamp": "2026-07-26T10:15:02.527Z"
     }
   ],
   "feedback": [
@@ -279,7 +284,7 @@
     "recordedAt": "2026-07-26T10:07:26.737Z"
   },
   "created": "2026-07-21T23:09:49.270Z",
-  "updated": "2026-07-26T10:15:02.022Z",
+  "updated": "2026-07-26T10:15:02.527Z",
   "pipeline": {
     "issueId": "PAN-2997",
     "reviewStatus": "blocked",
