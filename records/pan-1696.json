@@ -149,18 +149,18 @@
     }
   ],
   "created": "2026-07-26T00:35:36.057Z",
-  "updated": "2026-07-26T01:27:06.917Z",
+  "updated": "2026-07-26T01:30:28.802Z",
   "pipeline": {
     "issueId": "PAN-1696",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "failed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T01:27:06.331Z",
+    "updatedAt": "2026-07-26T01:30:28.753Z",
     "reviewNotes": "UAT reconciliation is still flywheel-dependent, polyrepo skips still repeat git work, and the required API/view/test surface remains incomplete.",
-    "verificationNotes": "Verification FAILED at lint (87108ms):\n\n\n> @overdeck/core@0.45.24 lint\n> eslint src/ --ext .js,.ts,.tsx --no-inline-config && npm run lint:effect && npm run lint:permissions && npm run lint:state-writes && npm run lint:overdeck-boundaries && npm run lint:pipeline-membership && npm run lint:skills && npm run lint:slash-commands && npm run lint:prompts && npm run lint:prompt-trailer && npm run lint:file-size && npm run lint:source-introspection && npm run lint:no-coderabbit-merge-gate && npm run lint:circular && npm run lint:ratchet-audit && npm run lint:quarantine-audit\n\n\n> @overdeck/core@0.45.24 lint:effect\n> node scripts/check-effect-versions.mjs\n\n✓ Effect pinning OK — all effect/@effect/* on 4.0.0-beta.73, effect is a direct runtime dependency.\n\n> @overdeck/core@0.45.24 lint:permissions\n> bash scripts/lint-permissions.sh\n\n✓ permission-flag lint passed (no leaks or resolver omissions outside allowlist)\n\n> @overdeck/core@0.45.24 lint:state-writes\n> bash scripts/lint-state-writes.sh\n\n✓ state-write lint passed (single write surface intact)\n\n> @overdeck/core@0.45.24 lint:overdeck-boundaries\n> PAN_OVERDECK_BOUNDARY_LINT=1 bash scripts/lint-overdeck-boundaries.sh\n\n✓ overdeck boundary gate: zero consumers on the old database\n\n> @overdeck/core@0.45.24 lint:pipeline-membership\n> bash scripts/lint-pipeline-membership.sh\n\n✓ pipeline-membership boundary passed: six consumers delegate and durable lenses remain L5-free\n\n> @overdeck/core@0.45.24 prelint:skills\n> npm run build:contracts && npm run build:pi-extension && npm run build:ohmypi-extension && npm run build:cli\n\n\n> @overdeck/core@0.45.24 build:contracts\n> node scripts/fs-helper.mjs rmrf packages/contracts/dist && npm --prefix ./packages/contracts run build\n\n\n> @overdeck/contracts@0.45.24 build\n> cross-env NODE_OPTIONS=--max-old-space-size=16384 tsdown\n\n\u001b[34mℹ\u001b[39m \u001b[34mtsdown v0.21.10\u001b[39m powered by \u001b[38;2;255;126;23mrolldown v1.0.0-rc.17\u001b[39m\n\u001b[34mℹ\u001b[39m config file: \u001b[4m/home/eltmon/Projects/overdeck/workspaces/feature-pan-1696/packages/contracts/tsdown.conf\n…(55696 chars elided)…\n\u001b[2m│ gzip:   0.10 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[2mdist/\u001b[22mrecords-backfill-C35Ut_iy.js                   \u001b[2m  0.11 kB\u001b[22m \u001b[2m│ gzip:   0.09 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[2mdist/\u001b[22mstate-migrate-BSUUgRsh.js                      \u001b[2m  0.10 kB\u001b[22m \u001b[2m│ gzip:   0.09 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[2mdist/\u001b[22msrc-CzKMRfE-.js                                \u001b[2m  0.10 kB\u001b[22m \u001b[2m│ gzip:   0.10 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[2mdist/\u001b[22mflywheel-BzvETF-b.js                           \u001b[2m  0.09 kB\u001b[22m \u001b[2m│ gzip:   0.09 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[2mdist/\u001b[22msearch-DtybTWyh.js                             \u001b[2m  0.09 kB\u001b[22m \u001b[2m│ gzip:   0.09 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[2mdist/\u001b[22msync--GrtoXdr.js                               \u001b[2m  0.08 kB\u001b[22m \u001b[2m│ gzip:   0.08 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[2mdist/\u001b[22m\u001b[32m\u001b[1mindex.d.ts\u001b[22m\u001b[39m                                     \u001b[2m 69.79 kB\u001b[22m \u001b[2m│ gzip:  19.32 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[2mdist/\u001b[22m\u001b[32m\u001b[1macp-host.d.ts\u001b[22m\u001b[39m                                  \u001b[2m \n...(truncated)",
+    "verificationNotes": "Verification FAILED at test (413986ms):\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-1696/src/dashboard/frontend\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-1696\n\nNo test files found, exiting with code 0\n\nstdout | tests/integration/merge-validation.test.ts > merge-validation integration > auto-revert workflow > should revert merge when validation fails\n[validation] Auto-reverting merge in /tmp/pan-mv-7lUZsY\n\nstdout | tests/integration/merge-validation.test.ts > merge-validation integration > auto-revert workflow > should revert merge when validation fails\n[validation] Auto-reverting merge in /tmp/pan-mv-tTAxCT\n\n ❯ |root| tests/integration/merge-validation.test.ts (7 tests | 1 failed) 357ms\n       × should revert merge when validation fails 190ms (retry x1)\n ❯ |root| tests/unit/lib/workspace-manager-pre-rebase.test.ts (7 tests | 2 failed) 472ms\n     × preserves an existing project pre-rebase hook for human shells 101ms (retry x1)\n     × allows rebases from human shells without an agent id 98ms (retry x1)\nstdout | tests/unit/lib/cloister/validation.test.ts > validation > autoRevertMerge > should revert last commit when successful\n[validation] Auto-reverting merge in /tmp/overdeck-validation-test-1785029237143-zq120uj83g\n\nstdout | tests/unit/lib/cloister/validation.test.ts > validation > autoRevertMerge > should revert last commit when successful\n[validation] Auto-reverting merge in /tmp/overdeck-validation-test-1785029237204-g5uqwju8smp\n\n ❯ |root| tests/unit/lib/cloister/validation.test.ts (11 tests | 1 failed) 188ms\n       × should revert last commit when successful 128ms (retry x1)\n ❯ |root| src/lib/pan-dir/__tests__/record-update.test.ts (3 tests | 2 failed) 968ms\n     × restores retryable state when a remote-ref race survives reconciliation 377ms (retry x1)\n     × replays the concrete record mutation after a concurrent overdeck-state advance 452ms (retry x1)\n ❯ |root| tests/unit/lib/overdeck/control-settings.test.ts (13 tests | 1 failed) 25ms\n     × setFly\n…(4696 chars elided)…\nan-auto-resume-gating-WZ9YFs/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Found workspace: /tmp/pan-auto-resume-gating-WZ9YFs/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace: /tmp/pan-auto-resume-gating-WZ9YFs/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace: /tmp/pan-auto-resume-gating-WZ9YFs/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace: /tmp/pan-auto-resume-gating-WZ9YFs/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with plann\n...(truncated)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/1822",
     "reviewSpawnedAt": "2026-07-26T01:21:23.010Z"
   },
@@ -183,18 +183,18 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 1325744,
-            "output": 139580,
-            "cacheRead": 29743616,
+            "input": 1344032,
+            "output": 147944,
+            "cacheRead": 31098368,
             "cacheWrite": 0
           }
         },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 1036,
-            "output": 47596,
-            "cacheRead": 24077696,
-            "cacheWrite": 1359745
+            "input": 1086,
+            "output": 49068,
+            "cacheRead": 25066443,
+            "cacheWrite": 1502707
           }
         }
       },
@@ -212,21 +212,21 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 1325744,
-          "output": 139580,
-          "cacheRead": 29743616,
+          "input": 1344032,
+          "output": 147944,
+          "cacheRead": 31098368,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 1036,
-          "output": 47596,
-          "cacheRead": 24077696,
-          "cacheWrite": 1359745
+          "input": 1086,
+          "output": 49068,
+          "cacheRead": 25066443,
+          "cacheWrite": 1502707
         }
       },
       "costAtCloseOut": {
-        "usd": 60.048447,
-        "pricingAsOf": "2026-07-26T01:27:06.351Z"
+        "usd": 61.35317,
+        "pricingAsOf": "2026-07-26T01:30:28.767Z"
       }
     },
     "merges": [
