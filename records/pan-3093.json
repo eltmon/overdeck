@@ -187,9 +187,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-26T17:36:22.836Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-26T17:40Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-26T17:40:35.749Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-26T17:40:35Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-3093\n\n# Review Synthesis — PAN-3093 — 2026-07-26T17:39:00Z\n\n## Verdict: CHANGES REQUESTED — a transient member-repo ref refresh failure is converted into an authoritative empty ready set, invalidating and tearing down the live UAT generation\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3093/.pan/review/agent-pan-3093-review-a0bd3511/context.json\n- Branch: feature/pan-3093\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3093\n- HEAD reviewed: a0bd35113418eed8c372b6caa82b73c8f89c416e\n- Cycle number: 4\n- Prior cycle SHA: cd81b757bcb11b125bf455e605a0d0a443c1f23e\n- PR diff: ce4ace8275179642723ae5dc7b459f125623e4d0..a0bd35113418eed8c372b6caa82b73c8f89c416e (14 commits)\n- Cycle diff: cd81b757bcb11b125bf455e605a0d0a443c1f23e..a0bd35113418eed8c372b6caa82b73c8f89c416e\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings after gates |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3093/.pan/review/agent-pan-3093-review-a0bd3511/security.md | 0 |\n| correctness | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3093/.pan/review/agent-pan-3093-review-a0bd3511/correctness.md | 0 |\n| performance | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3093/.pan/review/agent-pan-3093-review-a0bd3511/performance.md | 0 |\n| requirements | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3093/.pan/review/agent-pan-3093-review-a0bd3511/requirements.md | 1 |\n\n## Blocking Findings\n\n### [requirements] A ref-refresh outage invalidates the live generation instead of preserving unavailable state — `src/lib/flywheel-merge-order.ts:473`\nThe current cycle correctly stops trusting stale tracking refs, but it represents an operational refresh failure by excluding every affected candidate and returning the same empty array used for a verified empty ready set. `getPolyrepoReadySetForProject` forwards that result unchanged, while the reconciler reserves `null` for unavailable input. It therefore computes `desiredIds = ∅`, marks every live member departed, invalidates the generation, and tears down its stack. A temporary transport, authentication, or repository outage can destroy the current testable batch even though no feature left the queue. Preserve an explicit unavailable result and abort the reconciliation tick without lifecycle mutation; add a live-generation integration test proving failed repo refresh causes no status update or teardown.\n\nThis finding survives the cycle-4 convergence gate because the fail-closed exclusion and ordinary-empty-array behavior were introduced in the current cycle at `src/lib/flywheel-merge-order.ts:455-537`.\n\n## Non-blocking Findings\n\n### [correctness] [demoted: previously reviewed] Missing merge evidence is terminalized instead of recovered — `src/lib/cloister/uat-promote.ts:327`\nA row with `promotedAt` but no `mergeSha` bypasses remote recovery, and an all-stamped generation can finalize while withholding all polyrepo verification evidence. That can make post-merge refusal permanent. The relevant `promotedAt` fast path, all-pending completion branch, and evidence-withholding behavior were already present at the prior cycle SHA and were not changed by this cycle, so cycle-4 convergence forbids promoting the finding to a blocker.\n\n### [performance] [demoted: outside reviewed HEAD and previously reviewed] Concurrent ancestry checks are not coalesced — `src/lib/cloister/merge-verification.ts:60`\nThe performance report analyzed an uncommitted positive-cache implementation in the dirty workspace; that cache is not present in reviewed HEAD `a0bd35113418eed8c372b6caa82b73c8f89c416e`. The underlying F × R duplicate ancestry-check issue was already raised in cycle 3, and the current committed cycle does not change `src/lib/cloister/merge-verification.ts`, so it is not promotable in cycle 4.\n\n### [requirements] Cross-machine recovery does not fetch the UAT branch ref — `src/lib/cloister/uat-promote.ts:681`\n`findLandedMerge` refreshes the target branch but resolves the UAT branch only from existing local refs. A fresh checkout without that tracking ref can misclassify a landed unstamped repo as pending. This remains advisory because the reviewer classified it as non-blocking.\n\n## Clean Sub-roles\n- security\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3093/.pan/review/agent-pan-3093-review-a0bd3511/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3093 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       ".overdeck/context/codebase/concerns.md",
@@ -264,7 +277,7 @@
     "recordedAt": "2026-07-26T16:24:11.129Z"
   },
   "created": "2026-07-26T12:33:18.311Z",
-  "updated": "2026-07-26T17:40:35.063Z",
+  "updated": "2026-07-26T17:40:35.750Z",
   "pipeline": {
     "issueId": "PAN-3093",
     "reviewStatus": "blocked",
