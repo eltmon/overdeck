@@ -4,17 +4,17 @@
     "created": "2026-07-26T09:45:08.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3114: UAT-promoted merges leave DoD row 3 (verification) permanently unsatisfiable — same shape as the PAN-3067 strike gap",
-    "updated": "2026-07-26T09:48:53.899Z"
+    "updated": "2026-07-26T13:54:34.632Z"
   },
   "plan": {
     "id": "pan-3114",
     "title": "UAT-promoted merges leave DoD row 3 (verification) permanently unsatisfiable — same shape as the PAN-3067 strike gap",
-    "status": "running",
+    "status": "completed",
     "uid": "59919231-fbac-49c0-b3ee-d04bcb66eeec",
     "author": "agent:k3[1m]",
-    "sequence": 6,
+    "sequence": 7,
     "created": "2026-07-26T09:45:08.000Z",
-    "updated": "2026-07-26T09:48:53.899Z",
+    "updated": "2026-07-26T13:54:34.632Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3114",
@@ -345,5 +345,5 @@
       "canonicalFilename": "2026-07-26-PAN-3114-uat-promoted-merges-leave-dod-row-3-verification-permanently-unsatisfiable-same-shape-as-the-pan-3067-strike-gap.xbrief.json"
     }
   },
-  "status": "active"
+  "status": "completed"
 }
