@@ -181,16 +181,16 @@
     "recordedAt": "2026-07-26T00:26:11.651Z"
   },
   "created": "2026-07-25T22:42:08.234Z",
-  "updated": "2026-07-26T00:32:47.381Z",
+  "updated": "2026-07-26T00:33:05.872Z",
   "pipeline": {
     "issueId": "PAN-3083",
     "reviewStatus": "passed",
     "testStatus": "passed",
     "verificationStatus": "passed",
     "mergeStatus": "merged",
-    "releaseStatus": "pending",
+    "releaseStatus": "skipped",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T00:32:45.174Z",
+    "updatedAt": "2026-07-26T00:33:05.059Z",
     "reviewNotes": "Review role spawn failed: Role run agent-pan-3083-review already running. Use 'pan tell' to message it.",
     "testNotes": "Gates: npm run typecheck PASS (incl. hooks/evals/dashboard-types guard); npm run lint PASS (eslint + effect/permissions/state-writes/overdeck-boundaries/pipeline-membership/skills/slash-commands/prompts/prompt-trailer/file-size/source-introspection/circular/ratchet/quarantine guards all clean). Focused suite for this issue's diff: `npx vitest run tests/unit/lib/review-dispatch-decision.test.ts tests/unit/lib/review-status.test.ts tests/unit/lib/overdeck/review-status-record-sync-fallback.test.ts tests/unit/lib/overdeck/review-status-record-sync-drain.test.ts tests/unit/lib/cloister/uat-reconciler.test.ts src/lib/__tests__/review-dispatch-decision.test.ts` -> 6 files / 70 tests passed. Full `npm test` run: 11 files / 17 tests failed, all outside the diff's file set (diff touches only src/lib/review-dispatch-decision.ts, src/lib/review-status.ts, src/lib/overdeck/review-status-record-sync.ts, docs/REVIEW-AGENT-ARCHITECTURE.md, and their own test files). Investigated each failure: 7 files (merge-validation, validation, dangerous-git-ops, record-update, auto-commit, pipeline-state-paths-contribution, workspace-manager-pre-rebase) fail because the agent-shell git-guard shim blocks real `git rebase`/`reset --hard` these tests intentionally exercise -- 6/7 pass when re-run with OVERDECK_PAN_GIT_OP=1, and the 7th (workspace-manager-pre-rebase) fails only because that env var defeats the exact human-shell-vs-agent-shell behavior it tests, confirming the guard as root cause, not a code regression. auto-resume-gating.test.ts, reactive-scheduler.test.ts, and harness-metadata.test.ts passed cleanly when re-run in isolation (47/47 and 1/1), confirming resource-contention flakiness under the full parallel run. specialists-inspect-item.test.ts fails consistently on a mock-drift error ('getProjectSync' not exported by an unrelated vi.mock) in dashboard specialists-done inspect-item attribution, a route untouched by this diff -- pre-existing and out of scope. No UAT: acceptance criteria (FR-1..FR-9, NFR-1/2) are all backend predicate/state-machine/doc behavior verified by unit tests, with no UI or dashboard-observable surface, so browser verification does not apply.",
     "verificationNotes": "The supervised verification worker stopped before recording a result; verification re-runs on the next cycle.",
@@ -287,7 +287,7 @@
       },
       "costAtCloseOut": {
         "usd": 110.039409,
-        "pricingAsOf": "2026-07-26T00:32:45.996Z"
+        "pricingAsOf": "2026-07-26T00:33:05.511Z"
       }
     },
     "merges": [
