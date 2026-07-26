@@ -237,11 +237,15 @@
     "outsideDeclaredScope": [
       ".overdeck/context/codebase/concerns.md",
       "drizzle/overdeck/0000_overdeck_init.sql",
+      "src/dashboard/server/routes/specialists/shared.ts",
       "src/lib/cloister/merge-verification.ts",
       "src/lib/overdeck/infra.ts",
       "src/lib/overdeck/merge-sync-time.ts",
       "src/lib/overdeck/merge-sync-uat.ts",
-      "src/lib/overdeck/paths.ts"
+      "src/lib/overdeck/paths.ts",
+      "tests/unit/lib/cloister/merge-verification-ancestry.test.ts",
+      "tests/unit/lib/cloister/uat-branch-prefix.test.ts",
+      "tests/unit/lib/cloister/uat-reconciler-unavailable.test.ts"
     ],
     "declaredScopeUntouched": [
       ".pan/context/codebase/concerns.md",
@@ -281,6 +285,7 @@
       "docs/UAT-BATCH-TRAINS.md",
       "drizzle/overdeck/0000_overdeck_init.sql",
       "features/merge-batches.mdx",
+      "src/dashboard/server/routes/specialists/shared.ts",
       "src/dashboard/server/services/__tests__/uat-train.test.ts",
       "src/dashboard/server/services/uat-train.ts",
       "src/lib/cloister/merge-verification.ts",
@@ -297,17 +302,20 @@
       "src/lib/overdeck/merge-sync.ts",
       "src/lib/overdeck/merge-types.ts",
       "src/lib/overdeck/paths.ts",
+      "tests/unit/lib/cloister/merge-verification-ancestry.test.ts",
+      "tests/unit/lib/cloister/uat-branch-prefix.test.ts",
       "tests/unit/lib/cloister/uat-conflict-agent.test.ts",
       "tests/unit/lib/cloister/uat-polyrepo-cleanup.test.ts",
       "tests/unit/lib/cloister/uat-polyrepo-engine.test.ts",
       "tests/unit/lib/cloister/uat-promote-polyrepo.test.ts",
+      "tests/unit/lib/cloister/uat-reconciler-unavailable.test.ts",
       "tests/unit/lib/flywheel-merge-order-polyrepo.test.ts",
       "tests/unit/lib/overdeck/uat-generation-repos.test.ts"
     ],
-    "recordedAt": "2026-07-26T16:24:11.129Z"
+    "recordedAt": "2026-07-26T18:25:06.675Z"
   },
   "created": "2026-07-26T12:33:18.311Z",
-  "updated": "2026-07-26T18:24:56.692Z",
+  "updated": "2026-07-26T18:25:06.678Z",
   "pipeline": {
     "issueId": "PAN-3093",
     "reviewStatus": "blocked",
