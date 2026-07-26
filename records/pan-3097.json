@@ -78,7 +78,7 @@
     "recordedAt": "2026-07-26T03:36:45.308Z"
   },
   "created": "2026-07-26T02:29:08.179Z",
-  "updated": "2026-07-26T03:50:03.427Z",
+  "updated": "2026-07-26T03:50:05.572Z",
   "pipeline": {
     "issueId": "PAN-3097",
     "reviewStatus": "passed",
@@ -86,9 +86,9 @@
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": true,
+    "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T03:45:06.177Z",
-    "updatedAt": "2026-07-26T03:50:03.363Z",
+    "updatedAt": "2026-07-26T03:50:03.384Z",
     "reviewNotes": "Approved: exact HEAD 887ba284 was fully reviewed; no correctness, security, requirements, or performance blockers",
     "testNotes": "Ran from workspace feature/pan-3097 (clean, up to date with origin). Gates: npm run typecheck (root tsc + hooks + evals + dashboard-types guard) passed; npm run lint (eslint + effect/permissions/state-writes/overdeck-boundaries/pipeline-membership/skills/slash-commands/prompts/prompt-trailer/file-size/source-introspection/no-coderabbit-merge-gate/circular/ratchet-audit/quarantine-audit) passed, exit 0. Tests: root `OVERDECK_VERIFICATION=1 npx vitest run --changed beaf8126a8` = 478 files/4538 tests passed (2/20 pre-existing skips); frontend `cd src/dashboard/frontend && OVERDECK_VERIFICATION=1 npx vitest run --changed beaf8126a8` = 130 files/1420 tests passed, including the PAN-3097-specific suites (issueLabel.test.ts, AskUserQuestionDialog.test.tsx, DecisionsPanel.test.tsx, SessionFeedSidebar.test.tsx, useDecisions.test.ts). No UAT: all 8 xBRIEF acceptance criteria are unit/component-test observables (PRD NFR-2), and no issue/PRD/PR text requests browser/Playwright/screenshot verification, so no dashboard build or Playwright session was run.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
@@ -160,10 +160,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 7230,
-            "output": 11973,
-            "cacheRead": 4750295,
-            "cacheWrite": 377182
+            "input": 7232,
+            "output": 12158,
+            "cacheRead": 4948959,
+            "cacheWrite": 378240
           }
         },
         "work": {
@@ -189,15 +189,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 7230,
-          "output": 11973,
-          "cacheRead": 4750295,
-          "cacheWrite": 377182
+          "input": 7232,
+          "output": 12158,
+          "cacheRead": 4948959,
+          "cacheWrite": 378240
         }
       },
       "costAtCloseOut": {
-        "usd": 63.19646,
-        "pricingAsOf": "2026-07-26T03:50:03.417Z"
+        "usd": 63.240692,
+        "pricingAsOf": "2026-07-26T03:50:05.567Z"
       }
     },
     "merges": [
