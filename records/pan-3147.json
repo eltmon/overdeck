@@ -1,6 +1,13 @@
 {
   "issueId": "PAN-3147",
   "schemaVersion": 2,
+  "decisions": [
+    {
+      "id": "D-test-waived",
+      "summary": "Test gate waived: Prompt-only doctrine change; existing tests/unit/prompts/prompt-invariants.test.ts covers flywheel prompt rails and passed at blob 74ef381f4a586edb2e08cdb72a95bc49f0866915. The issue's 'stall test' wording is prose, not a request for a new automated test.",
+      "recordedAt": "2026-07-26T17:50:04.789Z"
+    }
+  ],
   "sessionHistory": [
     {
       "reason": "planning",
@@ -21,8 +28,19 @@
     }
   ],
   "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "roles/flywheel.md"
+    ],
+    "actualChangedFiles": [
+      "roles/flywheel.md"
+    ],
+    "recordedAt": "2026-07-26T17:50:09.960Z"
+  },
   "created": "2026-07-26T17:26:24.283Z",
-  "updated": "2026-07-26T17:50:12.674Z",
+  "updated": "2026-07-26T17:50:16.757Z",
   "pipeline": {
     "issueId": "PAN-3147",
     "reviewStatus": "pending",
@@ -31,7 +49,8 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T17:50:12.670Z",
+    "updatedAt": "2026-07-26T17:50:16.285Z",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3149",
     "reviewRequestedAt": "2026-07-26T17:50:12.670Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
@@ -43,19 +62,36 @@
         "roles/flywheel.md"
       ],
       "recordedAt": "2026-07-26T17:50:09.960Z"
-    },
-    "prUrl": "https://github.com/eltmon/overdeck/pull/3149"
+    }
   },
   "closeOut": {
     "usage": {
-      "byStage": {},
-      "totals": {},
+      "byStage": {
+        "work": {
+          "openai/gpt-5.6-sol": {
+            "input": 446815,
+            "output": 13859,
+            "cacheRead": 7027712,
+            "cacheWrite": 0
+          }
+        }
+      },
+      "totals": {
+        "openai/gpt-5.6-sol": {
+          "input": 446815,
+          "output": 13859,
+          "cacheRead": 7027712,
+          "cacheWrite": 0
+        }
+      },
       "costAtCloseOut": {
-        "usd": 0,
-        "pricingAsOf": "2026-07-26T17:37:02.862Z"
+        "usd": 6.1637010000000005,
+        "pricingAsOf": "2026-07-26T17:50:16.385Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/3149"
+    ],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
@@ -90,23 +126,5 @@
     "insert-liveness-doctrine.insert-liveness-doctrine.ac2": "completed",
     "insert-liveness-doctrine.insert-liveness-doctrine.ac3": "completed",
     "insert-liveness-doctrine.insert-liveness-doctrine.ac4": "completed"
-  },
-  "decisions": [
-    {
-      "id": "D-test-waived",
-      "summary": "Test gate waived: Prompt-only doctrine change; existing tests/unit/prompts/prompt-invariants.test.ts covers flywheel prompt rails and passed at blob 74ef381f4a586edb2e08cdb72a95bc49f0866915. The issue's 'stall test' wording is prose, not a request for a new automated test.",
-      "recordedAt": "2026-07-26T17:50:04.789Z"
-    }
-  ],
-  "scopeDrift": {
-    "outsideDeclaredScope": [],
-    "declaredScopeUntouched": [],
-    "declaredScope": [
-      "roles/flywheel.md"
-    ],
-    "actualChangedFiles": [
-      "roles/flywheel.md"
-    ],
-    "recordedAt": "2026-07-26T17:50:09.960Z"
   }
 }
