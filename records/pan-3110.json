@@ -22,7 +22,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T06:17:49.254Z",
-  "updated": "2026-07-26T10:29:42.374Z",
+  "updated": "2026-07-26T10:39:57.765Z",
   "pipeline": {
     "issueId": "PAN-3110",
     "reviewStatus": "pending",
@@ -49,16 +49,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "clean-pr-direct-merge": {
-        "writerId": "agent-pan-3110",
-        "agentId": "agent-pan-3110",
-        "pid": 1609213,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-26T10:29:42.374Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3110",
@@ -70,12 +62,27 @@
         "outcome": "completed",
         "reason": "Preserved anchored review/test/verification verdicts across work-agent restarts, refreshed benign anchors, and added regression coverage",
         "releasedAt": "2026-07-26T10:29:32.580Z"
+      },
+      {
+        "writerId": "agent-pan-3110",
+        "agentId": "agent-pan-3110",
+        "pid": 1609213,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T10:29:42.374Z",
+        "itemId": "clean-pr-direct-merge",
+        "outcome": "completed",
+        "reason": "Directly merges GitHub-clean PRs without agent liveness or rebase, while preserving fallback rebase behavior for behind, pending, and unreadable states",
+        "releasedAt": "2026-07-26T10:39:57.765Z"
       }
     ],
     "statusReasons": {
       "verdict-anchor-guard-on-spawn": {
         "reason": "Preserved anchored review/test/verification verdicts across work-agent restarts, refreshed benign anchors, and added regression coverage",
         "updatedAt": "2026-07-26T10:29:32.580Z"
+      },
+      "clean-pr-direct-merge": {
+        "reason": "Directly merges GitHub-clean PRs without agent liveness or rebase, while preserving fallback rebase behavior for behind, pending, and unreadable states",
+        "updatedAt": "2026-07-26T10:39:57.765Z"
       }
     }
   },
@@ -86,6 +93,10 @@
     "verdict-anchor-guard-on-spawn.verdict-anchor-guard-on-spawn.ac3": "completed",
     "verdict-anchor-guard-on-spawn.verdict-anchor-guard-on-spawn.ac4": "completed",
     "verdict-anchor-guard-on-spawn.verdict-anchor-guard-on-spawn.ac5": "completed",
-    "clean-pr-direct-merge": "running"
+    "clean-pr-direct-merge": "completed",
+    "clean-pr-direct-merge.clean-pr-direct-merge.ac1": "completed",
+    "clean-pr-direct-merge.clean-pr-direct-merge.ac2": "completed",
+    "clean-pr-direct-merge.clean-pr-direct-merge.ac3": "completed",
+    "clean-pr-direct-merge.clean-pr-direct-merge.ac4": "completed"
   }
 }
