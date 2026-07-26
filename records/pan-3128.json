@@ -2,7 +2,7 @@
   "issueId": "PAN-3128",
   "schemaVersion": 2,
   "created": "2026-07-26T12:24:12.648Z",
-  "updated": "2026-07-26T12:24:14.553Z",
+  "updated": "2026-07-26T12:46:45.481Z",
   "pipeline": {
     "issueId": "PAN-3128",
     "reviewStatus": "pending",
@@ -27,5 +27,6 @@
     }
   ],
   "harness": "claude-code",
-  "model": "k3[1m]"
+  "model": "k3[1m]",
+  "workModel": "gpt-5.6-sol"
 }
