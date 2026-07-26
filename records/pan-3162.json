@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T20:52:58.018Z",
-  "updated": "2026-07-26T21:45:03.140Z",
+  "updated": "2026-07-26T21:48:30.617Z",
   "pipeline": {
     "issueId": "PAN-3162",
     "reviewStatus": "pending",
@@ -61,16 +61,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 9,
-    "claims": {
-      "merge-click-skips-merged-repos": {
-        "writerId": "agent-pan-3162",
-        "agentId": "agent-pan-3162",
-        "pid": 491046,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-26T21:45:03.140Z"
-      }
-    },
+    "sequence": 10,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3162",
@@ -115,6 +107,17 @@
         "outcome": "completed",
         "reason": "Replaced non-GitHub hard refusal with pure merge-completeness verification, positive-evidence gating, fail-open reasons, and dispatch-guard regression coverage",
         "releasedAt": "2026-07-26T21:44:48.583Z"
+      },
+      {
+        "writerId": "agent-pan-3162",
+        "agentId": "agent-pan-3162",
+        "pid": 491046,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T21:45:03.140Z",
+        "itemId": "merge-click-skips-merged-repos",
+        "outcome": "completed",
+        "reason": "Excluded forge-merged repos from active polyrepo merge work and added fully/partially merged click-path regression coverage",
+        "releasedAt": "2026-07-26T21:48:30.617Z"
       }
     ],
     "statusReasons": {
@@ -133,6 +136,10 @@
       "non-github-merge-verification": {
         "reason": "Replaced non-GitHub hard refusal with pure merge-completeness verification, positive-evidence gating, fail-open reasons, and dispatch-guard regression coverage",
         "updatedAt": "2026-07-26T21:44:48.583Z"
+      },
+      "merge-click-skips-merged-repos": {
+        "reason": "Excluded forge-merged repos from active polyrepo merge work and added fully/partially merged click-path regression coverage",
+        "updatedAt": "2026-07-26T21:48:30.617Z"
       }
     }
   },
@@ -158,6 +165,9 @@
     "non-github-merge-verification.non-github-merge-verification.ac2": "completed",
     "non-github-merge-verification.non-github-merge-verification.ac3": "completed",
     "non-github-merge-verification.non-github-merge-verification.ac4": "completed",
-    "merge-click-skips-merged-repos": "running"
+    "merge-click-skips-merged-repos": "completed",
+    "merge-click-skips-merged-repos.merge-click-skips-merged-repos.ac1": "completed",
+    "merge-click-skips-merged-repos.merge-click-skips-merged-repos.ac2": "completed",
+    "merge-click-skips-merged-repos.merge-click-skips-merged-repos.ac3": "completed"
   }
 }
