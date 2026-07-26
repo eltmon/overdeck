@@ -61,7 +61,7 @@
     "recordedAt": "2026-07-26T21:01:22.337Z"
   },
   "created": "2026-07-26T20:19:41.143Z",
-  "updated": "2026-07-26T21:20:10.095Z",
+  "updated": "2026-07-26T21:20:39.749Z",
   "pipeline": {
     "issueId": "PAN-3158",
     "reviewStatus": "passed",
@@ -69,10 +69,10 @@
     "verificationStatus": "passed",
     "mergeStatus": "merged",
     "mergeStep": "post-merge-cleanup",
-    "releaseStatus": "pending",
+    "releaseStatus": "skipped",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T21:02:53.986Z",
-    "updatedAt": "2026-07-26T21:20:10.005Z",
+    "updatedAt": "2026-07-26T21:20:39.314Z",
     "reviewNotes": "Idle merge-train filtering is correct across global, selected, disabled, and populated states; focused frontend tests pass",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3161",
@@ -130,7 +130,7 @@
       },
       "costAtCloseOut": {
         "usd": 35.97735,
-        "pricingAsOf": "2026-07-26T21:20:10.065Z"
+        "pricingAsOf": "2026-07-26T21:20:39.591Z"
       }
     },
     "merges": [
@@ -139,7 +139,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "k3[1m]",
   "workModel": "gpt-5.6-sol",
   "tasks": {
     "sequence": 8,
