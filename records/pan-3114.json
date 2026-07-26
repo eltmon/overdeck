@@ -22,7 +22,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T08:55:24.679Z",
-  "updated": "2026-07-26T10:01:46.277Z",
+  "updated": "2026-07-26T10:02:00.732Z",
   "pipeline": {
     "issueId": "PAN-3114",
     "reviewStatus": "pending",
@@ -67,8 +67,16 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 4,
-    "claims": {},
+    "sequence": 5,
+    "claims": {
+      "close-out-heal": {
+        "writerId": "agent-pan-3114",
+        "agentId": "agent-pan-3114",
+        "pid": 4145523,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T10:02:00.732Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3114",
@@ -114,6 +122,7 @@
     "promote-wiring.promote-wiring.ac1": "completed",
     "promote-wiring.promote-wiring.ac2": "completed",
     "promote-wiring.promote-wiring.ac3": "completed",
-    "promote-wiring.promote-wiring.ac4": "completed"
+    "promote-wiring.promote-wiring.ac4": "completed",
+    "close-out-heal": "running"
   }
 }
