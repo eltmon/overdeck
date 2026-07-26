@@ -190,6 +190,15 @@ export function markBlocked(id: number, reason: string): boolean {
   return result.changes === 1;
 }
 
+/** Atomically stop an in-progress auto-merge after its retry circuit breaker opens. */
+export function markMergingBlocked(id: number, reason: string): boolean {
+  const db = getOverdeckDatabaseSync();
+  const result = db.prepare(
+    "UPDATE pending_auto_merges SET status = 'blocked', failure_reason = ? WHERE id = ? AND status = 'merging'",
+  ).run(truncateReason(reason), id);
+  return result.changes === 1;
+}
+
 /** Drop-in for markMerged() from pending-auto-merges-db.ts. */
 export function markMerged(id: number): boolean {
   const db = getOverdeckDatabaseSync();

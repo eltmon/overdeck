@@ -40,6 +40,7 @@ const ALLOWED_WRITE_SITES: AllowedWriteSite[] = [
   allow('src/dashboard/server/routes/workspaces.ts', 'reviewedAtCommit', 'update.reviewedAtCommit = headAnchor', 'Producer-fed review status route stamp.'),
   allow('src/lib/agents/agent-state.ts', 'roleRunHead', 'roleRunHead: raw.roleRunHead', 'Agent-state storage deserialization.'),
   allow('src/lib/agents/spawn.ts', 'roleRunHead', 'state.roleRunHead = headAnchor', 'Producer-fed role-run stamp.'),
+  allow('src/lib/agents/spawn.ts', 'reviewedAtCommit', 'reviewedAtCommit: preservation.refreshedAnchor', 'Drift evaluator advances a proven-benign anchor before work-agent spawn.'),
   allow('src/lib/cloister/deacon-review-status.ts', 'reviewedAtCommit', "reviewUpdate['reviewedAtCommit'] = await snapshotWorkspaceHeadsPromise(issueId, workspacePath)", 'Producer-fed review recovery stamp.'),
   allow('src/lib/cloister/deacon.ts', 'reviewedAtCommit', 'reviewedAtCommit: status.reviewedAtCommit', 'Diagnostic nudge payload mirrors persisted status.'),
   allow('src/lib/cloister/deacon.ts', 'lastVerifiedCommit', 'lastVerifiedCommit: status.lastVerifiedCommit', 'Diagnostic nudge payload mirrors persisted status.'),

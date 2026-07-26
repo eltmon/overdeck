@@ -156,6 +156,30 @@ ${OVERDECK_HOME:-~/.overdeck}/flywheel/runs/<RUN-ID>/
 
 Status writes must be atomic. Write a temporary file in the run directory, then rename it over `latest.json`.
 
+## Scheduled auto-merge recovery
+
+The auto-merge executor rechecks eligibility when a scheduled row becomes due,
+then records one of three outcomes:
+
+- **Requeue:** A transient merge-preparation failure returns `retryable: true`,
+  including a missing local workspace, a non-conflict rebase failure, or an
+  agent that stops or times out before pushing. The executor increments
+  `mergeRetryCount`, moves the row back to `pending`, and schedules it 60
+  seconds later. The issue keeps its earned review, test, and verification
+  verdicts because the failure does not invalidate the reviewed HEAD.
+- **Failed:** A content failure, such as red required CI, a closed or draft PR,
+  or unresolved conflicts, marks the scheduled merge `failed`. The executor
+  does not retry code or repository-state failures automatically.
+- **Blocked:** After `FAILED_MERGE_MAX_RETRIES` transient attempts, the circuit
+  breaker marks the row `blocked` and announces the retry count. Fix the
+  underlying cause, then schedule auto-merge again; restarting a work agent is
+  unnecessary when the reviewed HEAD has not changed.
+
+The requeue path uses the same merge executor described in
+[`MERGE-WORKFLOW.md`](./MERGE-WORKFLOW.md): GitHub-clean PRs merge directly,
+branches that are behind use the server-side rebase first, and only conflicts
+escalate to a work agent.
+
 ## Merge: UAT batch trains
 
 When a project's merge train is on, merge-ready features don't wait in a queue for

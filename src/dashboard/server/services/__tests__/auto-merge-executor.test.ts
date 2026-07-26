@@ -161,9 +161,92 @@ describe('auto-merge executor', () => {
     );
   });
 
-  it('marks failed merges as failed and announces the failure', async () => {
+  it('requeues retryable failures below the circuit-breaker ceiling', async () => {
+    const markMergingBlocked = vi.fn();
     const markFailed = vi.fn();
     const announceFailure = vi.fn();
+    const requeueToPending = vi.fn().mockReturnValue(true);
+    const setMergeRetryCount = vi.fn();
+
+    await tickAutoMergeExecutor({
+      now: () => NOW,
+      listEntries: () => [pendingEntry()],
+      isPaused: () => false,
+      isEligible: async () => ({ eligible: true }),
+      transition: () => true,
+      mergeIssue: async () => ({ success: false, statusCode: 500, error: 'agent stopped', retryable: true }),
+      getMergeRetryCount: () => 1,
+      setMergeRetryCount,
+      markMergingBlocked,
+      markFailed,
+      announceFailure,
+      requeueToPending,
+    });
+
+    expect(setMergeRetryCount).toHaveBeenCalledWith('PAN-1486', 2);
+    expect(requeueToPending).toHaveBeenCalledWith(1, new Date(NOW.getTime() + 60_000).toISOString());
+    expect(markMergingBlocked).not.toHaveBeenCalled();
+    expect(markFailed).not.toHaveBeenCalled();
+    expect(announceFailure).not.toHaveBeenCalled();
+  });
+
+  it('blocks retryable failures at the circuit-breaker ceiling', async () => {
+    const markMergingBlocked = vi.fn().mockReturnValue(true);
+    const markFailed = vi.fn();
+    const announceFailure = vi.fn();
+    const requeueToPending = vi.fn();
+    const setMergeRetryCount = vi.fn();
+
+    await tickAutoMergeExecutor({
+      now: () => NOW,
+      listEntries: () => [pendingEntry()],
+      isPaused: () => false,
+      isEligible: async () => ({ eligible: true }),
+      transition: () => true,
+      mergeIssue: async () => ({ success: false, statusCode: 500, error: 'agent stopped', retryable: true }),
+      getMergeRetryCount: () => 3,
+      setMergeRetryCount,
+      markMergingBlocked,
+      markFailed,
+      announceFailure,
+      requeueToPending,
+    });
+
+    const reason = 'Auto-merge for PAN-1486 blocked: agent stopped (retried 3 times — fix the underlying cause and re-schedule)';
+    expect(markMergingBlocked).toHaveBeenCalledWith(1, reason);
+    expect(announceFailure).toHaveBeenCalledWith('PAN-1486', reason);
+    expect(setMergeRetryCount).not.toHaveBeenCalled();
+    expect(requeueToPending).not.toHaveBeenCalled();
+    expect(markFailed).not.toHaveBeenCalled();
+  });
+
+  it('does not announce a circuit-breaker block when the durable transition loses its race', async () => {
+    const announceFailure = vi.fn();
+    const log = vi.fn();
+
+    await tickAutoMergeExecutor({
+      now: () => NOW,
+      listEntries: () => [pendingEntry()],
+      isPaused: () => false,
+      isEligible: async () => ({ eligible: true }),
+      transition: () => true,
+      mergeIssue: async () => ({ success: false, statusCode: 500, error: 'agent stopped', retryable: true }),
+      getMergeRetryCount: () => 3,
+      markMergingBlocked: () => false,
+      announceFailure,
+      log,
+    });
+
+    expect(announceFailure).not.toHaveBeenCalled();
+    expect(log).toHaveBeenCalledWith(
+      '[auto-merge] lost circuit-breaker block race for PAN-1486 (#1), skipping announcement',
+    );
+  });
+
+  it('marks non-retryable failed merges as failed and announces the failure', async () => {
+    const markFailed = vi.fn();
+    const announceFailure = vi.fn();
+    const requeueToPending = vi.fn();
 
     await tickAutoMergeExecutor({
       now: () => NOW,
@@ -174,10 +257,12 @@ describe('auto-merge executor', () => {
       mergeIssue: async () => ({ success: false, statusCode: 500, error: 'merge exploded' }),
       markFailed,
       announceFailure,
+      requeueToPending,
     });
 
     expect(markFailed).toHaveBeenCalledWith(1, 'merge exploded');
     expect(announceFailure).toHaveBeenCalledWith('PAN-1486', 'merge exploded');
+    expect(requeueToPending).not.toHaveBeenCalled();
   });
 
   it('ticks every 30 seconds when started', async () => {

@@ -14,7 +14,8 @@ import { startWorkSync } from '../cv.js';
 import { generateFixedPointPromptSync, checkHookSync, initHookSync } from '../hooks.js';
 import { generateLauncherScriptSync } from '../launcher-generator.js';
 import { getProviderForModelSync, setupCredentialFileAuthSync, clearCredentialFileAuthSync } from '../providers.js';
-import { resetPipelineVerdictsForWorkStartSync } from '../review-status.js';
+import { resetPipelineVerdictsForWorkStartSync, setReviewStatusSync } from '../review-status.js';
+import { shouldPreservePipelineVerdicts } from '../cloister/verdict-preservation.js';
 import { resolveHarness } from '../harness-resolve.js';
 import { prepareHarnessLaunch } from '../harness-binary.js';
 import { assertCodexNativeAuthForSpawn } from '../codex-auth.js';
@@ -570,10 +571,13 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   // Only for work agents, not planning/specialist agents.
   if (role === 'work') {
     try {
-      const resetStatus = resetPipelineVerdictsForWorkStartSync(options.issueId);
-      if (resetStatus) {
-        const { resetPostMergeState } = await import('../cloister/merge-agent.js');
-        resetPostMergeState(options.issueId);
+      const preservation = await shouldPreservePipelineVerdicts(options.issueId, options.workspace);
+      if (preservation.preserve) {
+        if (preservation.refreshedAnchor) setReviewStatusSync(options.issueId, { reviewedAtCommit: preservation.refreshedAnchor });
+        console.log(`[spawn] Preserved pipeline verdicts for ${options.issueId} — ${preservation.reason}`);
+      } else {
+        const resetStatus = resetPipelineVerdictsForWorkStartSync(options.issueId);
+        if (resetStatus) (await import('../cloister/merge-agent.js')).resetPostMergeState(options.issueId);
       }
     } catch (err) {
       console.warn(`[agents] Could not reset stale pipeline verdicts for ${options.issueId}: ${err instanceof Error ? err.message : String(err)}`);

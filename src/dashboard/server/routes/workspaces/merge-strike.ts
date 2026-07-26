@@ -1,3 +1,6 @@
+import { exec } from 'node:child_process';
+import { existsSync } from 'node:fs';
+import { promisify } from 'node:util';
 import { Effect } from 'effect';
 
 import { getAgentState, messageAgent, spawnAgent } from '../../../../lib/agents.js';
@@ -11,6 +14,10 @@ import {
 import { getWorkAgentLifecycleStateSync } from '../../../../lib/work-agent-lifecycle.js';
 import type { VerificationRunnerOptions } from '../../../../lib/cloister/verification-types.js';
 import type { ReviewStatus, ReviewStatusUpdate } from '../../../../lib/review-status.js';
+import { rebaseFeatureBranch } from '../../../../lib/cloister/merge-rebase.js';
+import { sessionExists } from '../../../../lib/tmux.js';
+
+const execAsync = promisify(exec);
 
 export interface StrikeMergeRequest {
   kind: 'strike'; markerHead: string; workspacePath: string; branchName: string; recoveryTarget: string;
@@ -63,6 +70,7 @@ export async function prepareWorkAgentForRebase(opts: {
   allowFreshStart?: boolean;
   scopeNote: string;
   setStatus: (update: ReviewStatusUpdate) => void;
+  deferFailureStatus?: boolean;
 }): Promise<{ ok: true; detail: string } | { ok: false; error: string }> {
   const { appendShipLog } = await import('../../../../lib/cloister/ship-log.js');
   opts.setStatus({ mergeStep: 'preparing-work-agent', mergeNotes: `Preparing work agent ${opts.agentId} to rebase ${opts.scopeNote}…` });
@@ -79,7 +87,9 @@ export async function prepareWorkAgentForRebase(opts: {
   } catch (prepError) {
     const message = prepError instanceof Error ? prepError.message : String(prepError);
     const error = `Work agent ${opts.agentId} could not be prepared for the rebase: ${message}`;
-    opts.setStatus({ mergeStatus: 'failed', readyForMerge: false, mergeNotes: error });
+    opts.setStatus(opts.deferFailureStatus
+      ? { mergeNotes: error }
+      : { mergeStatus: 'failed', readyForMerge: false, mergeNotes: error });
     appendShipLog(opts.issueId, `✗ ${error}`, 'rebasing');
     return { ok: false, error };
   }
@@ -89,6 +99,7 @@ export interface TriggerMergeResult {
   success: boolean;
   statusCode: number;
   error?: string;
+  retryable?: boolean;
   message?: string;
   reviewStatus?: string;
   testStatus?: string;
@@ -220,4 +231,102 @@ export async function ensureAgentReadyForMerge(issueId: string, workspacePath: s
   if (options?.allowFreshStart === false || !lifecycle.canStartFresh) throw new Error(lifecycle.reason || `Work agent ${agentId} cannot be resumed or started for merge preparation.`);
   const state = await spawnAgent({ issueId, workspace: workspacePath, role: 'work', prompt: rebaseMsg });
   return { recovered: true, agentId, detail: `Started fresh work agent ${state.id} and sent merge preparation request.` };
+}
+
+export interface RebaseEscalationResult {
+  success: boolean;
+  reason?: string;
+  conflictFiles?: string[];
+  newHead?: string;
+  retryable?: boolean;
+}
+
+export async function rebaseWithAgentFallback(options: {
+  issueId: string;
+  workspacePath: string;
+  branchName: string;
+  targetBranch: string;
+  agentId: string;
+  rebaseMsg: string;
+  allowFreshStart: boolean;
+  setStatus: (update: ReviewStatusUpdate) => void;
+}): Promise<RebaseEscalationResult> {
+  const { issueId, workspacePath, branchName, targetBranch, agentId, rebaseMsg, allowFreshStart, setStatus } = options;
+  let serverRebaseReason: string | undefined;
+  let conflictFiles: string[] = [];
+
+  if (existsSync(workspacePath)) {
+    try {
+      const result = await Effect.runPromise(rebaseFeatureBranch(workspacePath, branchName, targetBranch, issueId));
+      console.log(`[merge] Server-side rebase completed for ${issueId}`);
+      return { success: true, newHead: result.newHead };
+    } catch (error: unknown) {
+      const detail = error as { conflictedFiles?: unknown; message?: unknown };
+      conflictFiles = Array.isArray(detail.conflictedFiles)
+        ? detail.conflictedFiles.filter((file): file is string => typeof file === 'string')
+        : [];
+      const message = error instanceof Error ? error.message : typeof detail.message === 'string' ? detail.message : undefined;
+      serverRebaseReason = conflictFiles.length > 0
+        ? `Rebase conflicts in: ${conflictFiles.join(', ')}`
+        : message || 'Server-side rebase failed';
+      console.warn(`[merge] ${serverRebaseReason} — escalating to the work agent for ${issueId}`);
+    }
+  }
+
+  try {
+    const preparation = await prepareWorkAgentForRebase({
+      issueId, workspacePath, agentId, rebaseMsg, allowFreshStart, scopeNote: branchName, setStatus,
+      deferFailureStatus: true,
+    });
+    if (!preparation.ok) throw new Error(preparation.error);
+    const { stdout: headBefore } = await execAsync(
+      `git rev-parse origin/${branchName} 2>/dev/null || echo NONE`,
+      { cwd: workspacePath, encoding: 'utf-8', timeout: 10000 }
+    );
+    const timeoutMs = 30 * 60 * 1000;
+    const startTime = Date.now();
+    let newHead: string | null = null;
+
+    while (Date.now() - startTime < timeoutMs) {
+      await new Promise(resolve => setTimeout(resolve, 5000));
+      try {
+        await execAsync('git fetch origin', { cwd: workspacePath, encoding: 'utf-8', timeout: 15000 });
+        const { stdout: headNow } = await execAsync(`git rev-parse origin/${branchName}`, { cwd: workspacePath, encoding: 'utf-8', timeout: 5000 });
+        if (headNow.trim() !== headBefore.trim()) {
+          newHead = headNow.trim();
+          console.log(`[merge] Work agent pushed rebased branch for ${issueId} (new HEAD: ${newHead.slice(0, 8)})`);
+          break;
+        }
+      } catch { /* fetch failed, retry */ }
+      if (!await Effect.runPromise(sessionExists(agentId))) {
+        console.log(`[merge] Work agent ${agentId} stopped during rebase`);
+        break;
+      }
+    }
+
+    if (newHead) return { success: true, newHead };
+    if (!await Effect.runPromise(sessionExists(agentId))) {
+      const agentReason = `Work agent ${agentId} stopped before completing the rebase onto ${targetBranch}`;
+      return {
+        success: false,
+        reason: serverRebaseReason ? `${serverRebaseReason}; ${agentReason}` : agentReason,
+        conflictFiles,
+        retryable: conflictFiles.length === 0,
+      };
+    }
+    return {
+      success: false,
+      reason: `Work agent did not push the rebased branch within ${timeoutMs / 60000} minutes`,
+      conflictFiles,
+      retryable: conflictFiles.length === 0,
+    };
+  } catch (error: unknown) {
+    const agentReason = error instanceof Error ? error.message : `Work agent ${agentId} could not be prepared for merge`;
+    return {
+      success: false,
+      reason: serverRebaseReason ? `${serverRebaseReason}; ${agentReason}` : agentReason,
+      conflictFiles,
+      retryable: conflictFiles.length === 0,
+    };
+  }
 }
