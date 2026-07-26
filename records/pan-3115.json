@@ -23,9 +23,27 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-26T11:37:56.248Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-26T11:47Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-26T11:47:00.067Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-26T11:47:00.356Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-26T11:47:00Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-3115\n\nDefault-branch resolution accepts dangling/unborn symbolic refs without verifying targets\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3115 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "tests/unit/dashboard/routes/registered-projects-route.test.ts"
@@ -67,7 +85,7 @@
     "recordedAt": "2026-07-26T11:22:12.725Z"
   },
   "created": "2026-07-26T08:56:03.309Z",
-  "updated": "2026-07-26T11:46:59.516Z",
+  "updated": "2026-07-26T11:47:00.356Z",
   "pipeline": {
     "issueId": "PAN-3115",
     "reviewStatus": "blocked",
