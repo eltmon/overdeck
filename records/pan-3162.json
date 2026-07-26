@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T20:52:58.018Z",
-  "updated": "2026-07-26T21:48:48.350Z",
+  "updated": "2026-07-26T21:51:43.900Z",
   "pipeline": {
     "issueId": "PAN-3162",
     "reviewStatus": "pending",
@@ -61,16 +61,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 11,
-    "claims": {
-      "ready-set-propagation-and-live-checkpoint": {
-        "writerId": "agent-pan-3162",
-        "agentId": "agent-pan-3162",
-        "pid": 995077,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-26T21:48:48.350Z"
-      }
-    },
+    "sequence": 12,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3162",
@@ -126,6 +118,17 @@
         "outcome": "completed",
         "reason": "Excluded forge-merged repos from active polyrepo merge work and added fully/partially merged click-path regression coverage",
         "releasedAt": "2026-07-26T21:48:30.617Z"
+      },
+      {
+        "writerId": "agent-pan-3162",
+        "agentId": "agent-pan-3162",
+        "pid": 995077,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T21:48:48.350Z",
+        "itemId": "ready-set-propagation-and-live-checkpoint",
+        "outcome": "completed",
+        "reason": "Pinned listEligibleCandidatesByProject exclusion for mergeStatus=merged; existing uat-reconciler test proves 'left the ready queue' invalidation. Read-only checkpoint: GitLab shows MIN-898 fe !85 and MIN-858 fe !86 merged while api !69/!70 and docs !14/!15 remain open; merge-set resolver shows both fe rows merged, and pan show reports both issues mergeStatus=pending readyForMerge=true, so neither is terminalized.",
+        "releasedAt": "2026-07-26T21:51:43.900Z"
       }
     ],
     "statusReasons": {
@@ -148,6 +151,10 @@
       "merge-click-skips-merged-repos": {
         "reason": "Excluded forge-merged repos from active polyrepo merge work and added fully/partially merged click-path regression coverage",
         "updatedAt": "2026-07-26T21:48:30.617Z"
+      },
+      "ready-set-propagation-and-live-checkpoint": {
+        "reason": "Pinned listEligibleCandidatesByProject exclusion for mergeStatus=merged; existing uat-reconciler test proves 'left the ready queue' invalidation. Read-only checkpoint: GitLab shows MIN-898 fe !85 and MIN-858 fe !86 merged while api !69/!70 and docs !14/!15 remain open; merge-set resolver shows both fe rows merged, and pan show reports both issues mergeStatus=pending readyForMerge=true, so neither is terminalized.",
+        "updatedAt": "2026-07-26T21:51:43.900Z"
       }
     }
   },
@@ -177,6 +184,9 @@
     "merge-click-skips-merged-repos.merge-click-skips-merged-repos.ac1": "completed",
     "merge-click-skips-merged-repos.merge-click-skips-merged-repos.ac2": "completed",
     "merge-click-skips-merged-repos.merge-click-skips-merged-repos.ac3": "completed",
-    "ready-set-propagation-and-live-checkpoint": "running"
+    "ready-set-propagation-and-live-checkpoint": "completed",
+    "ready-set-propagation-and-live-checkpoint.ready-set-propagation-and-live-checkpoint.ac1": "completed",
+    "ready-set-propagation-and-live-checkpoint.ready-set-propagation-and-live-checkpoint.ac2": "completed",
+    "ready-set-propagation-and-live-checkpoint.ready-set-propagation-and-live-checkpoint.ac3": "completed"
   }
 }
