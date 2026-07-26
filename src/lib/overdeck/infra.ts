@@ -58,6 +58,8 @@ export const OVERDECK_SCHEMA_TOP_UP_EXPECTATIONS: SchemaTopUpExpectations = {
     { table: 'agents', column: 'review_forked_from_parent' },
     { table: 'agents', column: 'yielded_at' },
     { table: 'agents', column: 'last_yield_resume_at' },
+    { table: 'uat_generation_repos', column: 'target_branch' },
+    { table: 'uat_generation_repos', column: 'merge_sha' },
   ],
   indexes: [
     'cost_session_id_idx',
@@ -220,9 +222,11 @@ function ensureUatGenerationRepoTablesSync(db: SqliteDatabase): void {
       \`repo_path\` text NOT NULL,
       \`branch\` text NOT NULL,
       \`base_sha\` text NOT NULL,
+      \`target_branch\` text DEFAULT 'main' NOT NULL,
       \`worktree_path\` text NOT NULL,
       \`merge_order\` integer DEFAULT 0 NOT NULL,
       \`promoted_at\` integer,
+      \`merge_sha\` text,
       PRIMARY KEY(\`uat_name\`, \`repo_key\`),
       FOREIGN KEY (\`uat_name\`) REFERENCES \`uat_generations\`(\`name\`) ON UPDATE no action ON DELETE no action
     )
@@ -242,6 +246,10 @@ function ensureUatGenerationRepoTablesSync(db: SqliteDatabase): void {
     )
   `);
   db.exec('CREATE INDEX IF NOT EXISTS \`uat_generation_member_repos_uat_idx\` ON \`uat_generation_member_repos\` (\`uat_name\`,\`issue_id\`)');
+  // Columns added after the tables shipped: a db created by the first PAN-3093
+  // build has the tables but not these.
+  runSchemaTopUp(db, "ALTER TABLE `uat_generation_repos` ADD COLUMN `target_branch` text DEFAULT 'main' NOT NULL");
+  runSchemaTopUp(db, 'ALTER TABLE `uat_generation_repos` ADD COLUMN `merge_sha` text');
 }
 
 function warnSchemaDriftSync(db: SqliteDatabase): void {

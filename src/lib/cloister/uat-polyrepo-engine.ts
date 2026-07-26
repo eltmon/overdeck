@@ -59,9 +59,24 @@ export interface PolyrepoAssembleInput {
   repos: readonly ResolvedProjectRepo[];
 }
 
+/**
+ * One member repo's git, plus the two primitives per-feature atomicity needs.
+ *
+ * Without them the only way to un-apply a feature that failed in a later repo
+ * is to rebuild every repo branch from base and replay the survivors — O(R×F²)
+ * heavyweight git work, which for a 20-feature batch across 3 repos is hundreds
+ * of merges and can hold the project's single-flight reconcile slot for hours.
+ */
+export interface PolyrepoRepoGit extends GenerationGitDeps {
+  /** Current head of this repo's generation branch. */
+  generationHeadSha(): Promise<string>;
+  /** Move this repo's generation branch back to a previously captured head. */
+  resetGenerationTo(sha: string): Promise<void>;
+}
+
 export interface PolyrepoAssembleDeps {
-  /** One GenerationGitDeps per repoKey — see buildPolyrepoGitDeps. */
-  repoGit: ReadonlyMap<string, GenerationGitDeps>;
+  /** One PolyrepoRepoGit per repoKey — see buildPolyrepoGitDeps. */
+  repoGit: ReadonlyMap<string, PolyrepoRepoGit>;
   store: GenerationStorePort;
   /**
    * The assembly agent, called mid-conflict with the conflicting repo named in
@@ -80,15 +95,22 @@ interface RepoMergeOutcome {
   conflictingIssueIds: string[];
 }
 
-/** Everything one assembly pass produced, before it is accepted or replayed. */
+/** A feature that could not be applied everywhere and is held out globally. */
+interface BlockedFeature {
+  issueId: string;
+  /** The repo that rejected it. */
+  repoKey: string;
+  branch: string;
+  reason: string;
+}
+
+/** Everything the assembly pass produced. */
 interface AssemblyPass {
   /** Per-repo base SHA and worktree, in merge order. */
   repos: UatGenerationRepo[];
   /** issueId → the repos it merged cleanly into. */
   mergedByIssue: Map<string, RepoMergeOutcome[]>;
-  /** The first feature that failed in some repo, which forces a replay. */
-  blocked: { issueId: string; repoKey: string; branch: string; headSha: string; reason: string } | null;
-  /** A repo-level failure (worktree creation) aborts the whole generation. */
+  /** A repo-level failure (worktree creation, failed rollback) aborts the generation. */
   fatal: string | null;
 }
 
@@ -133,6 +155,27 @@ export function compositeMemberAnchor(
     .sort((a, b) => a.repoKey.localeCompare(b.repoKey))
     .map((r) => `${r.repoKey}@${r.headSha.slice(0, SHORT_SHA_LENGTH)}`)
     .join(' ');
+}
+
+/**
+ * Composite anchor over every repo a held-out feature contributes to, in the
+ * same shape a merged member gets, so the reconciler's per-feature anchor can
+ * be compared against it by string equality.
+ */
+async function heldOutAnchor(
+  feature: ReadyFeature | undefined,
+  deps: PolyrepoAssembleDeps,
+): Promise<string> {
+  const contributions = feature?.repoContributions ?? [];
+  if (contributions.length === 0) return 'unknown';
+
+  const entries = await Promise.all(
+    contributions.map(async (c) => ({
+      repoKey: c.repoKey,
+      headSha: await deps.repoGit.get(c.repoKey)?.branchHeadSha(c.branch).catch(() => 'unknown') ?? 'unknown',
+    })),
+  );
+  return compositeMemberAnchor(entries);
 }
 
 /** Repos some feature contributes to, in configured merge order. */
@@ -189,13 +232,29 @@ export async function assemblePolyrepoUatGeneration(
   const heldOut: UatGenerationHeldOut[] = [];
   const heldOutIds = new Set<string>();
 
+  /**
+   * Base SHA per repo, accumulated across passes. The generation's base anchor
+   * covers every repo the INPUT features contribute to, not just the repos the
+   * final pass branched: a hold-out can drop a repo, and if the anchor shrank
+   * with it the reconciler — which derives its anchor from the ready set —
+   * could never match, so it would rebuild the same generation every tick.
+   */
+  const baseShaByRepo = new Map<string, string>();
+
   const finish = (
     status: UatGenerationStatus,
     repos: UatGenerationRepo[],
     members: UatGenerationMember[],
     resolutions: UatGenerationResolution[],
+    anchorRepos?: readonly ResolvedProjectRepo[],
   ): UatGeneration => {
-    const baseSha = compositeBaseAnchor(repos);
+    const baseSha = anchorRepos
+      ? compositeAnchor(
+          anchorRepos
+            .filter((r) => baseShaByRepo.has(r.repoKey))
+            .map((r) => ({ repoKey: r.repoKey, sha: baseShaByRepo.get(r.repoKey)!, mergeOrder: r.mergeOrder })),
+        )
+      : compositeBaseAnchor(repos);
     deps.store.update(name, { status, baseSha, repos, members, heldOut, resolutions });
     return {
       name, worktreePath, projectRoot: input.projectRoot, baseSha,
@@ -217,66 +276,61 @@ export async function assemblePolyrepoUatGeneration(
     return finish('failed', [], [], []);
   }
 
-  /** Repos that had a worktree built in any pass, including abandoned ones. */
-  const everTouched = new Set<string>();
+  // ONE pass, feature-atomic. Each feature is merged into every repo it
+  // contributes to; if any repo rejects it, the repos that already took it are
+  // rolled back to the head they had before that feature, and assembly moves on.
+  // Earlier accepted features are never rebuilt, so the work is O(R x F) rather
+  // than the O(R x F^2) a rebuild-and-replay design costs.
+  const pass = await runAssemblyPass(name, input.features, allContributing, repoWorktree, deps, log, {
+    onHeldOut: async (blocked) => {
+      heldOutIds.add(blocked.issueId);
+      // The reconciler compares a held-out feature's stored headSha against a
+      // composite anchor over ALL its contributions, so storing the single
+      // blocking repo's SHA would never match and would churn the generation
+      // every tick. Record the same composite shape members use.
+      const blockedFeature = input.features.find((f) => f.issueId === blocked.issueId);
+      heldOut.push({
+        issueId: blocked.issueId,
+        branch: blocked.branch,
+        headSha: await heldOutAnchor(blockedFeature, deps),
+        reason: blocked.reason,
+      });
+      deps.store.update(name, { heldOut });
+      log(`[uat-polyrepo] ${name}: holding ${blocked.issueId} out of the whole generation (${blocked.repoKey})`);
+    },
+  });
+  for (const repo of pass.repos) baseShaByRepo.set(repo.repoKey, repo.baseSha);
 
-  // Each pass either succeeds outright or drops one feature and replays, so the
-  // loop cannot run more times than there are features.
-  let pass: AssemblyPass | null = null;
-  for (let attempt = 0; attempt <= input.features.length; attempt++) {
-    const remaining = input.features.filter((f) => !heldOutIds.has(f.issueId));
-    if (remaining.length === 0) break;
-
-    // Recomputed per pass: holding a feature out can leave a repo with nothing
-    // to contribute, and such a repo must get no branch at all.
-    const active = contributingRepos(remaining, input.repos);
-    for (const repo of active) everTouched.add(repo.repoKey);
-
-    pass = await runAssemblyPass(name, remaining, active, repoWorktree, deps, log);
-
-    if (pass.fatal) {
-      log(`[uat-polyrepo] ${name}: ${pass.fatal}`);
-      return finish('failed', pass.repos, [], []);
-    }
-
-    if (!pass.blocked) break;
-
-    const { issueId, repoKey, branch, headSha, reason } = pass.blocked;
-    heldOutIds.add(issueId);
-    heldOut.push({ issueId, branch, headSha, reason });
-    deps.store.update(name, { heldOut });
-    log(`[uat-polyrepo] ${name}: holding ${issueId} out of the whole generation (${repoKey}); replaying ${input.features.length - heldOutIds.size} feature(s)`);
-    pass = null;
+  if (pass.fatal) {
+    log(`[uat-polyrepo] ${name}: ${pass.fatal}`);
+    return finish('failed', pass.repos, [], []);
   }
 
-  if (!pass) {
-    log(`[uat-polyrepo] ${name}: every feature held out — marking failed`);
-    return finish('failed', [], [], []);
-  }
-
-  // A repo can be dropped between passes once the feature that needed it is
-  // held out. Its worktree lives inside the generation folder and its branch was
-  // never pushed, but cleanup must know the local artifacts exist.
-  const abandoned = [...everTouched].filter((key) => !pass!.repos.some((r) => r.repoKey === key));
+  // A repo every one of whose features was held out carries nothing. Its
+  // worktree and branch exist locally but are never pushed; cleanup reaps them
+  // with the generation folder.
+  const carrying = new Set([...pass.mergedByIssue.values()].flat().map((o) => o.repoKey));
+  const abandoned = pass.repos.filter((r) => !carrying.has(r.repoKey));
   if (abandoned.length > 0) {
-    log(`[uat-polyrepo] ${name}: repo(s) ${abandoned.join(', ')} lost every contribution to a hold-out — no branch published; local worktree reaped with the generation folder`);
+    log(`[uat-polyrepo] ${name}: repo(s) ${abandoned.map((r) => r.repoKey).join(', ')} lost every contribution to a hold-out — no branch published; local worktree reaped with the generation folder`);
   }
+  const publishedRepos = pass.repos.filter((r) => carrying.has(r.repoKey));
 
   const { members, resolutions } = collectMembers(input.features, heldOutIds, pass.mergedByIssue);
 
   if (members.length === 0) {
     log(`[uat-polyrepo] ${name}: nothing merged (${heldOut.length} held out) — marking failed`);
-    return finish('failed', pass.repos, [], []);
+    return finish('failed', publishedRepos, [], []);
   }
 
   // Push every repo. A partial push is recoverable — cleanup reaps the branches
   // that did land — but the generation is not testable, so it is failed.
-  for (const repo of pass.repos) {
+  for (const repo of publishedRepos) {
     try {
       await deps.repoGit.get(repo.repoKey)!.push(name);
     } catch (err) {
       log(`[uat-polyrepo] ${name}: push failed in ${repo.repoKey}: ${err instanceof Error ? err.message : String(err)}`);
-      return finish('failed', pass.repos, members, resolutions);
+      return finish('failed', publishedRepos, members, resolutions);
     }
   }
 
@@ -284,14 +338,17 @@ export async function assemblePolyrepoUatGeneration(
     if (older.name !== name) deps.store.update(older.name, { status: 'superseded' });
   }
 
-  log(`[uat-polyrepo] ${name}: ready — ${members.length} member(s) across ${pass.repos.length} repo(s), ${resolutions.length} resolution(s), ${heldOut.length} held out`);
-  return finish('ready', pass.repos, members, resolutions);
+  log(`[uat-polyrepo] ${name}: ready — ${members.length} member(s) across ${publishedRepos.length} repo(s), ${resolutions.length} resolution(s), ${heldOut.length} held out`);
+  return finish('ready', publishedRepos, members, resolutions, allContributing);
 }
 
 /**
- * Build every repo's branch from base and merge the given features in order.
- * Stops at the first feature that cannot land in some repo and reports it, so
- * the caller can hold it out globally and replay.
+ * Build every repo's branch from base, then apply features one at a time.
+ *
+ * A feature is applied to every repo it contributes to or to none: if a later
+ * repo rejects it, the repos that already merged it are reset to the head they
+ * had before, and it is reported held out. Accepted features are never
+ * disturbed, so total git work is linear in (repos x features).
  */
 async function runAssemblyPass(
   name: string,
@@ -300,9 +357,12 @@ async function runAssemblyPass(
   repoWorktree: (repoKey: string) => string,
   deps: PolyrepoAssembleDeps,
   log: (msg: string) => void,
+  hooks: { onHeldOut: (blocked: BlockedFeature) => Promise<void> },
 ): Promise<AssemblyPass> {
   const repos: UatGenerationRepo[] = [];
   const mergedByIssue = new Map<string, RepoMergeOutcome[]>();
+  /** Merge count per repo, which is that repo's mergeOrderInRepo counter. */
+  const mergedInRepo = new Map<string, string[]>();
 
   for (const repo of active) {
     const git = deps.repoGit.get(repo.repoKey)!;
@@ -316,7 +376,6 @@ async function runAssemblyPass(
       return {
         repos,
         mergedByIssue,
-        blocked: null,
         fatal: `worktree creation failed in ${repo.repoKey}: ${err instanceof Error ? err.message : String(err)}`,
       };
     }
@@ -326,47 +385,101 @@ async function runAssemblyPass(
       repoPath: repo.repoPath,
       branch: name,
       baseSha,
+      // Persisted so promote merges back into the branch this was cut from,
+      // rather than assuming main long after assembly.
+      targetBranch: repo.targetBranch,
       worktreePath: path,
       mergeOrder: repo.mergeOrder,
       promotedAt: null,
+      mergeSha: null,
     });
+    mergedInRepo.set(repo.repoKey, []);
+  }
 
-    const mergedHere: string[] = [];
-    for (const feature of features) {
-      const contribution = contributionFor(feature, repo.repoKey);
-      if (!contribution) continue;
+  for (const feature of features) {
+    const targets = active.filter((repo) => contributionFor(feature, repo.repoKey));
+    if (targets.length === 0) continue;
 
+    // Capture each target's head BEFORE this feature, so a partial application
+    // can be undone without rebuilding the branch from base.
+    const snapshots = new Map<string, string>();
+    let snapshotFailure: string | null = null;
+    for (const repo of targets) {
+      try {
+        snapshots.set(repo.repoKey, await deps.repoGit.get(repo.repoKey)!.generationHeadSha());
+      } catch (err) {
+        snapshotFailure = `could not read ${repo.repoKey} head: ${err instanceof Error ? err.message : String(err)}`;
+        break;
+      }
+    }
+    if (snapshotFailure) {
+      await hooks.onHeldOut({
+        issueId: feature.issueId,
+        repoKey: targets[0]!.repoKey,
+        branch: contributionFor(feature, targets[0]!.repoKey)?.branch ?? feature.branch,
+        reason: snapshotFailure,
+      });
+      continue;
+    }
+
+    const applied: RepoMergeOutcome[] = [];
+    let blocked: BlockedFeature | null = null;
+
+    for (const repo of targets) {
+      const contribution = contributionFor(feature, repo.repoKey)!;
+      const git = deps.repoGit.get(repo.repoKey)!;
       const outcome = await mergeOneFeature({
         name,
         feature,
         featureBranch: contribution.branch,
         repoKey: repo.repoKey,
-        worktreePath: path,
-        mergedIssueIds: mergedHere,
-        mergeOrderInRepo: mergedHere.length + 1,
+        worktreePath: repoWorktree(repo.repoKey),
+        mergedIssueIds: mergedInRepo.get(repo.repoKey) ?? [],
+        mergeOrderInRepo: (mergedInRepo.get(repo.repoKey)?.length ?? 0) + 1,
         git,
       }, deps, log);
-      if ('reason' in outcome) {
-        return {
-          repos,
-          mergedByIssue,
-          blocked: {
-            issueId: feature.issueId,
-            repoKey: repo.repoKey,
-            branch: contribution.branch,
-            headSha: outcome.headSha,
-            reason: `${outcome.reason} (in ${repo.repoKey})`,
-          },
-          fatal: null,
-        };
-      }
 
-      mergedHere.push(feature.issueId);
-      mergedByIssue.set(feature.issueId, [...(mergedByIssue.get(feature.issueId) ?? []), outcome]);
+      if ('reason' in outcome) {
+        blocked = {
+          issueId: feature.issueId,
+          repoKey: repo.repoKey,
+          branch: contribution.branch,
+          reason: `${outcome.reason} (in ${repo.repoKey})`,
+        };
+        break;
+      }
+      applied.push(outcome);
     }
+
+    if (blocked) {
+      // Roll the repos that took it back to their pre-feature head. A failure
+      // here cannot be ignored: the branch would carry a feature recorded as
+      // held out, so the generation is abandoned rather than shipped wrong.
+      for (const outcome of applied) {
+        const snapshot = snapshots.get(outcome.repoKey)!;
+        try {
+          await deps.repoGit.get(outcome.repoKey)!.resetGenerationTo(snapshot);
+        } catch (err) {
+          return {
+            repos,
+            mergedByIssue,
+            fatal:
+              `could not roll ${outcome.repoKey} back to ${snapshot.slice(0, 9)} after holding out ` +
+              `${feature.issueId}: ${err instanceof Error ? err.message : String(err)}`,
+          };
+        }
+      }
+      await hooks.onHeldOut(blocked);
+      continue;
+    }
+
+    for (const outcome of applied) {
+      mergedInRepo.get(outcome.repoKey)!.push(feature.issueId);
+    }
+    mergedByIssue.set(feature.issueId, applied);
   }
 
-  return { repos, mergedByIssue, blocked: null, fatal: null };
+  return { repos, mergedByIssue, fatal: null };
 }
 
 interface MergeOneFeatureArgs {

@@ -11,11 +11,34 @@ import type { VerificationRunnerOutcome } from './verification-types.js';
 
 const execAsync = promisify(exec);
 
+/**
+ * One repo's positive merge evidence from a polyrepo batch promotion
+ * (PAN-3093): a real merge commit, in a real git repo, against the branch that
+ * repo actually targets.
+ */
+export interface VerifiedMergedRepo {
+  repoKey: string;
+  /** Absolute path to that member repo's git root — NOT the wrapper. */
+  repoPath: string;
+  /** The merge commit published to `targetBranch`. */
+  mergeSha: string;
+  /** The branch it was published to; often but not always `main`. */
+  targetBranch: string;
+}
+
 export interface PostMergeLifecycleOptions {
   skipDeploy?: boolean;
   allowVerifiedNoPrMerge?: boolean;
   markReviewPassed?: boolean;
   verifiedMergedRef?: string;
+  /**
+   * Per-repo merge evidence for a batch promotion that spans several repos.
+   * The single-ref `verifiedMergedRef` cannot express this: its ancestry check
+   * runs one `git merge-base` against `origin/main` in the PROJECT path, which
+   * for a polyrepo project is a wrapper with no git repo, and the repos may
+   * target branches other than main.
+   */
+  verifiedMergedRepos?: readonly VerifiedMergedRepo[];
 }
 
 type MergeStatus = 'pending' | 'queued' | 'merging' | 'verifying' | 'merged' | 'failed';
@@ -96,12 +119,43 @@ export async function verifyMergedBeforeLifecycle(
   issueId: string,
   projectPath: string,
   sourceBranch?: string,
-  options?: Pick<PostMergeLifecycleOptions, 'allowVerifiedNoPrMerge' | 'verifiedMergedRef'>,
+  options?: Pick<PostMergeLifecycleOptions, 'allowVerifiedNoPrMerge' | 'verifiedMergedRef' | 'verifiedMergedRepos'>,
 ): Promise<{ merged: boolean; reason: string }> {
   // PAN-1531: GitHub PR state remains the authoritative merge oracle. A caller-
   // supplied merged ref is only accepted when git proves it is reachable from main.
   const branchName = sourceBranch?.trim() || `feature/${issueId.toLowerCase()}`;
   const quotedBranch = shellQuote(branchName);
+
+  // Batch promotion across several repos proves itself directly: each repo's
+  // merge commit must be an ancestor of the branch it was published to, checked
+  // inside that repo. This runs before the GitHub PR oracle because the
+  // per-feature PRs of a polyrepo batch are not what landed — the uat branch
+  // was — and because non-GitHub members are rejected outright below.
+  const verifiedRepos = options?.verifiedMergedRepos ?? [];
+  if (verifiedRepos.length > 0) {
+    const unproven: string[] = [];
+    for (const evidence of verifiedRepos) {
+      if (!/^[0-9a-f]{7,40}$/i.test(evidence.mergeSha)) {
+        unproven.push(`${evidence.repoKey} (no merge sha recorded)`);
+        continue;
+      }
+      try {
+        await execAsync(
+          `git merge-base --is-ancestor ${shellQuote(evidence.mergeSha)} ${shellQuote(`origin/${evidence.targetBranch}`)}`,
+          { cwd: evidence.repoPath },
+        );
+      } catch {
+        unproven.push(`${evidence.repoKey}@${evidence.mergeSha.slice(0, 9)} not on origin/${evidence.targetBranch}`);
+      }
+    }
+    if (unproven.length === 0) {
+      return {
+        merged: true,
+        reason: `batch promotion verified in ${verifiedRepos.length} repo(s): ${verifiedRepos.map((r: VerifiedMergedRepo) => r.repoKey).join(', ')}`,
+      };
+    }
+    return { merged: false, reason: `batch promotion unverified: ${unproven.join('; ')}` };
+  }
 
   const ghResolved = resolveGitHubIssueSync(issueId);
   if (!ghResolved.isGitHub) {

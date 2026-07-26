@@ -199,6 +199,49 @@ describe('getUatGenerationsPayload', () => {
     tmp = undefined;
   });
 
+  // PAN-3093: the payload gains per-repo detail additively so the follow-up
+  // presentation work has data to render.
+  it('projects per-repo generation detail onto the payload', async () => {
+    const polyGen = {
+      ...gen([]),
+      repos: [
+        {
+          repoKey: 'fe', repoPath: '/repos/myn/fe', branch: 'uat/min-otter-0727',
+          baseSha: 'aaa1111', targetBranch: 'main',
+          worktreePath: '/repos/myn/workspaces/uat-min-otter-0727/fe',
+          mergeOrder: 0, promotedAt: null, mergeSha: null,
+        },
+      ],
+    } as UatGeneration;
+    mocks.listUatGenerationsSync.mockReturnValue([polyGen]);
+    mocks.findXBriefByIssue.mockReturnValue(Effect.succeed(null));
+
+    const payload = await getUatGenerationsPayload('/repos/myn');
+
+    expect(payload[0]!.repos).toEqual(polyGen.repos);
+  });
+
+  it('projects the synthesized single repo for a monorepo generation', async () => {
+    // The store always yields at least one entry, so the payload shape is the
+    // same whether or not the project is polyrepo.
+    const monoGen = {
+      ...gen([]),
+      repos: [{
+        repoKey: 'overdeck', repoPath: '/proj', branch: 'uat/pan-otter-0610',
+        baseSha: 'main-sha', targetBranch: 'main',
+        worktreePath: '/proj/workspaces/uat-pan-otter-0610',
+        mergeOrder: 0, promotedAt: null, mergeSha: null,
+      }],
+    } as UatGeneration;
+    mocks.listUatGenerationsSync.mockReturnValue([monoGen]);
+    mocks.findXBriefByIssue.mockReturnValue(Effect.succeed(null));
+
+    const payload = await getUatGenerationsPayload('/repos/myn');
+
+    expect(payload[0]!.repos).toHaveLength(1);
+    expect(payload[0]!.repos[0]!.repoKey).toBe('overdeck');
+  });
+
   // PAN-1696 review finding: once this payload started serving every tracked
   // project, resolving each member's xBRIEF against the DASHBOARD's repo left
   // every non-PAN batch with an empty "What to UAT" checklist.
@@ -517,5 +560,69 @@ describe('runUatTrainReconcile — polyrepo routing', () => {
     expect(deps.getBaseAnchor).toBeUndefined();
     expect(deps.getFeatureAnchor).toBeUndefined();
     expect(mocks.assemblePolyrepoUatGeneration).not.toHaveBeenCalled();
+  });
+});
+
+// PAN-3093 review: terminal generations still own branches, worktrees, and a
+// wrapper folder. Promoting the last ready batch leaves zero candidates and
+// zero live rows, which used to return early and leak every artifact.
+describe('runUatTrainReconcile — terminal generation cleanup', () => {
+  const POLY_ROOT = '/repos/myn';
+
+  function terminalGen(overrides: Partial<UatGeneration> = {}): UatGeneration {
+    return {
+      name: 'uat/min-otter-0727',
+      worktreePath: `${POLY_ROOT}/workspaces/uat-min-otter-0727`,
+      projectRoot: POLY_ROOT,
+      baseSha: 'fe@aaa1111',
+      status: 'promoted',
+      members: [],
+      heldOut: [],
+      resolutions: [],
+      stackStartedAt: null,
+      cleanedAt: null,
+      createdAt: '2026-07-27T00:00:00.000Z',
+      updatedAt: '2026-07-27T00:00:00.000Z',
+      ...overrides,
+    } as UatGeneration;
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.isMergeTrainEnabledForProject.mockReturnValue(true);
+    mocks.listEligibleCandidatesByProject.mockReturnValue([]);
+    mocks.buildUatGenerationStore.mockReturnValue({
+      insert: vi.fn(), update: vi.fn(), listNames: () => [], listChain: () => [],
+    });
+    mocks.findProjectByPathSync.mockReturnValue({
+      name: 'myn', path: POLY_ROOT, workspace: { type: 'polyrepo' },
+    });
+  });
+
+  it('cleans an uncleaned promoted generation even with no candidates and no live rows', async () => {
+    mocks.listUatGenerationsSync.mockImplementation((opts?: { statuses?: string[] }) => {
+      if (opts?.statuses?.includes('promoted')) return [terminalGen()];
+      return [];
+    });
+
+    await runUatTrainReconcile({ projectRoot: POLY_ROOT });
+
+    // Reaching the cleanup path at all is the proof; it builds its store here.
+    expect(mocks.buildUatGenerationStore).toHaveBeenCalled();
+    expect(mocks.reconcileUatGenerations).not.toHaveBeenCalled();
+  });
+
+  it('does no cleanup work when every terminal generation is already cleaned', async () => {
+    mocks.listUatGenerationsSync.mockImplementation((opts?: { statuses?: string[] }) => {
+      if (opts?.statuses?.includes('promoted')) {
+        return [terminalGen({ cleanedAt: '2026-07-27T10:00:00.000Z' })];
+      }
+      return [];
+    });
+
+    const result = await runUatTrainReconcile({ projectRoot: POLY_ROOT });
+
+    expect(mocks.buildUatGenerationStore).not.toHaveBeenCalled();
+    expect(result).toEqual({ action: 'idle', invalidated: [] });
   });
 });

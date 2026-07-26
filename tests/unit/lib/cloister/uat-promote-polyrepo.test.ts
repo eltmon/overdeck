@@ -279,17 +279,78 @@ describe('polyrepo promote — phase B publishes and resumes', () => {
     expect(deps.promoted).toEqual([['api', '2026-07-27T12:00:00.000Z']]);
   });
 
-  it('refuses a generation whose repos have all already published', async () => {
+  it('finalizes a generation whose repos all already published', async () => {
+    // The crash window: every repo landed and is stamped, but the process died
+    // before finalization. Retry is the documented recovery, so this must
+    // complete rather than error — otherwise the batch is on every remote yet
+    // never promoted, never verified, and never handed to post-merge.
     const gen = generation([
-      repoRow('fe', 0, { promotedAt: '2026-07-27T12:00:00.000Z' }),
-      repoRow('api', 1, { promotedAt: '2026-07-27T12:00:00.000Z' }),
+      repoRow('fe', 0, { promotedAt: '2026-07-27T12:00:00.000Z', mergeSha: 'fe-merge-sha' }),
+      repoRow('api', 1, { promotedAt: '2026-07-27T12:00:00.000Z', mergeSha: 'api-merge-sha' }),
     ]);
-    const deps = makeDeps(gen, new Map([['fe', makeRepoGit('fe')], ['api', makeRepoGit('api')]]));
+    const fe = makeRepoGit('fe');
+    const api = makeRepoGit('api');
+    const deps = makeDeps(gen, new Map([['fe', fe], ['api', api]]));
 
     const result = await promoteUatGeneration(GEN_NAME, PROJECT_ROOT, deps);
 
-    expect(result).toMatchObject({ success: false, reason: 'merge-failed' });
-    expect((result as { message: string }).message).toContain('already published every member repo');
+    expect(result.success).toBe(true);
+    // Nothing is re-merged or re-pushed.
+    expect(fe.trials).toEqual([]);
+    expect(api.published).toEqual([]);
+    // The composite ref is rebuilt from the STORED shas, not an in-memory list.
+    expect((result as { mergeSha: string }).mergeSha).toBe('fe@fe-merg api@api-mer');
+    expect(deps.statuses).toContain('promoted');
+    expect(deps.firePostMerge).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('polyrepo promote — per-repo merge evidence', () => {
+  it('stamps each repo with the merge sha it published', async () => {
+    const gen = generation([repoRow('fe', 0), repoRow('api', 1)]);
+    const stamped: Array<[string, string | undefined]> = [];
+    const deps = makeDeps(gen, new Map([['fe', makeRepoGit('fe')], ['api', makeRepoGit('api')]]), {
+      markRepoPromoted: (_n, repoKey, _at, mergeSha) => { stamped.push([repoKey, mergeSha]); },
+    });
+
+    await promoteUatGeneration(GEN_NAME, PROJECT_ROOT, deps);
+
+    expect(stamped).toEqual([['fe', 'fe-merge-sha'], ['api', 'api-merge-sha']]);
+  });
+
+  it('hands post-merge the per-repo merge commits, not the composite anchor', async () => {
+    // A member's headSha is `fe@a api@b` — not a git ref — and the wrapper
+    // project path is not a git repo, so passing it as verifiedMergedRef would
+    // guarantee the lifecycle refuses.
+    const gen = generation([repoRow('fe', 0), repoRow('api', 1)]);
+    const deps = makeDeps(gen, new Map([['fe', makeRepoGit('fe')], ['api', makeRepoGit('api')]]));
+
+    await promoteUatGeneration(GEN_NAME, PROJECT_ROOT, deps);
+
+    const options = deps.firePostMerge.mock.calls[0]![1] as {
+      verifiedMergedRef?: string;
+      verifiedMergedRepos?: Array<{ repoKey: string; mergeSha: string; targetBranch: string; repoPath: string }>;
+    };
+    expect(options.verifiedMergedRef).toBeUndefined();
+    expect(options.verifiedMergedRepos).toEqual([
+      { repoKey: 'fe', repoPath: `${PROJECT_ROOT}/fe`, mergeSha: 'fe-merge-sha', targetBranch: 'main' },
+      { repoKey: 'api', repoPath: `${PROJECT_ROOT}/api`, mergeSha: 'api-merge-sha', targetBranch: 'main' },
+    ]);
+  });
+
+  it('carries each repo\'s own target branch through to post-merge evidence', async () => {
+    const gen = generation([
+      repoRow('fe', 0),
+      repoRow('api', 1, { targetBranch: 'develop' }),
+    ]);
+    const deps = makeDeps(gen, new Map([['fe', makeRepoGit('fe')], ['api', makeRepoGit('api')]]));
+
+    await promoteUatGeneration(GEN_NAME, PROJECT_ROOT, deps);
+
+    const options = deps.firePostMerge.mock.calls[0]![1] as {
+      verifiedMergedRepos?: Array<{ repoKey: string; targetBranch: string }>;
+    };
+    expect(options.verifiedMergedRepos!.find((r) => r.repoKey === 'api')!.targetBranch).toBe('develop');
   });
 });
 

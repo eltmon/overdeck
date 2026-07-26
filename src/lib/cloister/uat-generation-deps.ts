@@ -20,6 +20,7 @@ import {
   updateUatGenerationSync,
 } from '../overdeck/merge-sync.js';
 import type { GenerationGitDeps, GenerationStorePort } from './uat-generation-engine.js';
+import type { PolyrepoRepoGit } from './uat-polyrepo-engine.js';
 import type { ResolvedProjectRepo } from '../project-repos.js';
 
 const execFileAsync = promisify(execFile);
@@ -147,15 +148,45 @@ export function buildUatGenerationGitDeps(
  */
 export function buildPolyrepoGitDeps(
   repos: readonly ResolvedProjectRepo[],
-): Map<string, GenerationGitDeps> {
+): Map<string, PolyrepoRepoGit> {
   return new Map(
-    repos.map((repo) => [
-      repo.repoKey,
-      buildUatGenerationGitDeps(repo.repoPath, {
-        workspacesRoot: repo.projectPath,
-        targetBranch: repo.targetBranch,
+    repos
+      // A repo configured `readonly: true` (required === false) is never a
+      // write target. Omitting it here means assembly cannot branch or push to
+      // it even if a caller passes it in — the ready-set filter is the first
+      // line of defense, this is the second.
+      .filter((repo) => repo.required)
+      .map((repo) => {
+        let worktreePath = '';
+        let generationBranch = '';
+        const base = buildUatGenerationGitDeps(repo.repoPath, {
+          workspacesRoot: repo.projectPath,
+          targetBranch: repo.targetBranch,
+        });
+
+        const git: PolyrepoRepoGit = {
+          ...base,
+          createWorktree: async (branchName, path) => {
+            await base.createWorktree(branchName, path);
+            generationBranch = safeBranchName(branchName, 'uat');
+            worktreePath = safeGenerationWorktreePath(repo.projectPath, path);
+          },
+          generationHeadSha: async () =>
+            (await runGit(['rev-parse', 'HEAD'], worktreePath)).stdout.trim(),
+          /**
+           * Undo the merges applied since `sha` by re-pointing the generation
+           * branch at it. `git reset --hard` is forbidden repo-wide, and
+           * `checkout -B` reaches the same state: the branch moves, the
+           * worktree follows, and nothing outside this throwaway branch moves.
+           */
+          resetGenerationTo: async (sha) => {
+            if (!/^[0-9a-f]{7,40}$/i.test(sha)) throw new Error(`unsafe rollback sha: ${sha}`);
+            if (!generationBranch) throw new Error('rollback before createWorktree');
+            await runGit(['checkout', '-B', generationBranch, sha], worktreePath);
+          },
+        };
+        return [repo.repoKey, git] as const;
       }),
-    ]),
   );
 }
 
@@ -199,7 +230,10 @@ export function buildPolyrepoCleanupGit(
   removeRepoArtifacts(repo: { repoKey: string; repoPath: string; branch: string; worktreePath: string }): Promise<void>;
   removeGenerationResidue(generation: { name: string; worktreePath: string }): Promise<void>;
 } {
-  const byKey = new Map(repos.map((r) => [r.repoKey, r]));
+  // Cleanup deletes branches locally AND on the remote, so a read-only repo must
+  // be excluded here for the same reason it is excluded from assembly.
+  const writable = repos.filter((repo) => repo.required);
+  const byKey = new Map(writable.map((r) => [r.repoKey, r]));
 
   const deleteBranchIn = async (repoPath: string, branchName: string) => {
     const safeBranch = safeBranchName(branchName, 'uat');
@@ -214,7 +248,13 @@ export function buildPolyrepoCleanupGit(
     deleteBranch: async () => {},
 
     removeRepoArtifacts: async (repo) => {
-      const repoPath = byKey.get(repo.repoKey)?.repoPath ?? repo.repoPath;
+      // Unknown key here means the repo is not in the writable set — refuse
+      // rather than fall back to the caller-supplied path.
+      const configured = byKey.get(repo.repoKey);
+      if (!configured) {
+        throw new Error(`[uat-cleanup] refusing to mutate non-writable or unknown repo: ${repo.repoKey}`);
+      }
+      const repoPath = configured.repoPath;
       const safePath = safeGenerationWorktreePath(projectPath, repo.worktreePath);
       await runGit(['worktree', 'remove', '--force', safePath], repoPath).catch(() => {});
       await runGit(['worktree', 'prune'], repoPath).catch(() => {});
@@ -222,7 +262,7 @@ export function buildPolyrepoCleanupGit(
     },
 
     removeGenerationResidue: async (generation) => {
-      for (const repo of repos) {
+      for (const repo of writable) {
         await deleteBranchIn(repo.repoPath, generation.name);
         await runGit(['worktree', 'prune'], repo.repoPath).catch(() => {});
       }

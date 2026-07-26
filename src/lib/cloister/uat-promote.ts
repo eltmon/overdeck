@@ -20,7 +20,8 @@ import { join } from 'path';
 import { tmpdir } from 'os';
 import { promisify } from 'util';
 import { execFile } from 'child_process';
-import type { UatGeneration, UatGenerationStatus } from '../overdeck/merge-sync.js';
+import type { UatGeneration, UatGenerationRepo, UatGenerationStatus } from '../overdeck/merge-sync.js';
+import type { VerifiedMergedRepo } from './merge-verification.js';
 import type { GenerationStorePort } from './uat-generation-engine.js';
 
 const execFileAsync = promisify(execFile);
@@ -88,7 +89,7 @@ export interface UatPromoteDeps {
    * Record that one repo's merge landed, so a retry after a partial publish
    * skips it. Required whenever polyrepoGit is supplied.
    */
-  markRepoPromoted?: (name: string, repoKey: string, promotedAt: string) => void;
+  markRepoPromoted?: (name: string, repoKey: string, promotedAt: string, mergeSha?: string) => void;
   now?: () => Date;
   store: GenerationStorePort & { get(name: string): UatGeneration | null };
   teardownStack(generation: UatGeneration): Promise<void>;
@@ -96,7 +97,15 @@ export interface UatPromoteDeps {
    * Kick off the per-issue post-merge lifecycle (through the PAN-328 guard).
    * Returns false when a run for that issue is already in flight.
    */
-  firePostMerge(issueId: string, options?: { sourceBranch?: string; verifiedMergedRef?: string }): boolean;
+  firePostMerge(
+    issueId: string,
+    options?: {
+      sourceBranch?: string;
+      verifiedMergedRef?: string;
+      /** Per-repo merge evidence for a polyrepo batch (PAN-3093). */
+      verifiedMergedRepos?: readonly VerifiedMergedRepo[];
+    },
+  ): boolean;
   /**
    * Authoritative per-member merge eligibility (PAN-1759), checked at promote
    * time as defense-in-depth: batch membership is computed from orchestrator
@@ -219,6 +228,18 @@ export async function promoteUatGeneration(
 }
 
 /**
+ * Composite merge reference for a polyrepo generation, rebuilt from the stored
+ * per-repo merge SHAs rather than an in-memory list, so it survives a restart
+ * between the last publish and finalization.
+ */
+function landedMergeRef(repos: readonly UatGenerationRepo[]): string {
+  return [...repos]
+    .sort((a, b) => a.mergeOrder - b.mergeOrder)
+    .map((r) => `${r.repoKey}@${(r.mergeSha ?? 'landed').slice(0, 7)}`)
+    .join(' ');
+}
+
+/**
  * Two-phase polyrepo promote.
  *
  * Phase A validates and trial-merges EVERY repo without pushing anything, so
@@ -249,7 +270,13 @@ async function promotePolyrepo(
     log(`[uat-promote] ${gen.name}: resuming — ${alreadyLanded.map((r) => r.repoKey).join(', ')} already landed`);
   }
   if (pending.length === 0) {
-    return { success: false, reason: 'merge-failed', message: `${gen.name} has already published every member repo` };
+    // Every repo already landed. This is the crash window between the last
+    // publish stamp and finalization, and retry is the documented recovery —
+    // so it is the idempotent completion case, not an error. Rejecting it
+    // would leave a fully-published batch permanently unfinalizable: never
+    // promoted, no verdicts recorded, no stack teardown, no post-merge.
+    log(`[uat-promote] ${gen.name}: every repo already published — finalizing`);
+    return finishPromote(gen, projectRoot, deps, landedMergeRef(allRepos), log, true);
   }
 
   const missing = pending.filter((r) => !repoGit.has(r.repoKey));
@@ -349,15 +376,31 @@ async function promotePolyrepo(
       };
     }
     landed.push({ repoKey: p.repoKey, mergeSha: p.mergeSha });
-    deps.markRepoPromoted?.(gen.name, p.repoKey, now().toISOString());
+    deps.markRepoPromoted?.(gen.name, p.repoKey, now().toISOString(), p.mergeSha);
   }
 
   await discardAll();
 
-  const mergeSha = [...alreadyLanded.map((r) => `${r.repoKey}@landed`), ...landed.map((l) => `${l.repoKey}@${l.mergeSha.slice(0, 7)}`)].join(' ');
+  // Built from stored SHAs plus this run's, so a resumed promote reports the
+  // same reference a single-pass promote would.
+  const landedByKey = new Map(landed.map((l) => [l.repoKey, l.mergeSha]));
+  const mergeSha = landedMergeRef(
+    allRepos.map((r) => ({ ...r, mergeSha: landedByKey.get(r.repoKey) ?? r.mergeSha ?? null })),
+  );
   log(`[uat-promote] ${gen.name}: merged to ${landed.length} repo target(s) — ${mergeSha}`);
 
-  return finishPromote(gen, projectRoot, deps, mergeSha, log);
+  // finishPromote needs the per-repo merge evidence for post-merge verification,
+  // and the in-memory gen predates this run's publishes.
+  const promotedGen: UatGeneration = {
+    ...gen,
+    repos: allRepos.map((r) => ({
+      ...r,
+      mergeSha: landedByKey.get(r.repoKey) ?? r.mergeSha ?? null,
+      promotedAt: r.promotedAt ?? (landedByKey.has(r.repoKey) ? now().toISOString() : null),
+    })),
+  };
+
+  return finishPromote(promotedGen, projectRoot, deps, mergeSha, log, true);
 }
 
 /**
@@ -371,6 +414,7 @@ async function finishPromote(
   deps: UatPromoteDeps,
   mergeSha: string,
   log: (msg: string) => void,
+  isPolyrepoGeneration = false,
 ): Promise<PromoteResult> {
   deps.store.update(gen.name, { status: 'promoted' });
   try {
@@ -393,12 +437,29 @@ async function finishPromote(
   // Standard per-issue post-merge handoff, exactly once each (PAN-328 guard).
   // For polyrepo this runs only after EVERY repo published, so a member is
   // never handed off while part of its work is still unlanded.
+  //
+  // A polyrepo member's headSha is a composite anchor (`fe@abc api@def`), not a
+  // git ref, and the wrapper project path is not a git repo — passing it as
+  // verifiedMergedRef guarantees the ancestry check fails and the lifecycle
+  // refuses. Per-repo merge commits are handed over instead, each verified in
+  // its own repo against its own target branch.
+  const verifiedMergedRepos = isPolyrepoGeneration
+    ? (gen.repos ?? [])
+        .filter((r) => r.mergeSha)
+        .map((r) => ({
+          repoKey: r.repoKey,
+          repoPath: r.repoPath,
+          mergeSha: r.mergeSha!,
+          targetBranch: r.targetBranch ?? 'main',
+        }))
+    : [];
+
   const postMergeStarted: string[] = [];
   for (const member of gen.members) {
-    if (deps.firePostMerge(member.issueId, {
-      sourceBranch: member.branch,
-      verifiedMergedRef: member.headSha || member.branch,
-    })) postMergeStarted.push(member.issueId);
+    const options = verifiedMergedRepos.length > 0
+      ? { sourceBranch: member.branch, verifiedMergedRepos }
+      : { sourceBranch: member.branch, verifiedMergedRef: member.headSha || member.branch };
+    if (deps.firePostMerge(member.issueId, options)) postMergeStarted.push(member.issueId);
     else log(`[uat-promote] ${gen.name}: post-merge for ${member.issueId} already in flight — skipped`);
   }
 

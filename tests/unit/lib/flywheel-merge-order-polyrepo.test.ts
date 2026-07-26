@@ -113,9 +113,11 @@ describe('computePolyrepoMergeQueueFromCandidates — contributions', () => {
 
     expect(queue).toHaveLength(1);
     expect(queue[0]!.repoContributions.map((c) => c.repoKey)).toEqual(['fe', 'api']);
+    // The LOGICAL name, never origin-qualified: assembly validates it with
+    // safeBranchName(…, 'feature') and resolves origin-first itself.
     expect(queue[0]!.repoContributions.map((c) => c.branch)).toEqual([
-      'origin/feature/min-901',
-      'origin/feature/min-901',
+      'feature/min-901',
+      'feature/min-901',
     ]);
     expect(queue[0]!.repoContributions.map((c) => c.repoPath)).toEqual([
       `${PROJECT_ROOT}/fe`,
@@ -123,7 +125,7 @@ describe('computePolyrepoMergeQueueFromCandidates — contributions', () => {
     ]);
   });
 
-  it('falls back to the local ref when origin does not have the branch', async () => {
+  it('still reports the logical branch when only the local ref exists', async () => {
     const reposByIssue = new Map([['MIN-901', [repo('api', 'MIN-901', 0)]]]);
     const git: FakeGit = {
       refs: new Set([`${PROJECT_ROOT}/api feature/min-901`]),
@@ -135,7 +137,7 @@ describe('computePolyrepoMergeQueueFromCandidates — contributions', () => {
     expect(queue[0]!.repoContributions[0]!.branch).toBe('feature/min-901');
   });
 
-  it('prefers the origin ref when both exist', async () => {
+  it('diffs against the origin ref when both exist, without leaking it into the contribution', async () => {
     const reposByIssue = new Map([['MIN-901', [repo('api', 'MIN-901', 0)]]]);
     const git: FakeGit = {
       refs: new Set([
@@ -145,9 +147,13 @@ describe('computePolyrepoMergeQueueFromCandidates — contributions', () => {
       changed: new Map([[`${PROJECT_ROOT}/api origin/feature/min-901`, ['src/b.ts']]]),
     };
 
-    const queue = await run([{ issueId: 'MIN-901', title: 'Both refs' }], reposByIssue, git);
+    const calls: string[] = [];
+    const queue = await run([{ issueId: 'MIN-901', title: 'Both refs' }], reposByIssue, git, {}, calls);
 
-    expect(queue[0]!.repoContributions[0]!.branch).toBe('origin/feature/min-901');
+    expect(queue[0]!.repoContributions[0]!.branch).toBe('feature/min-901');
+    expect(calls).toContain(
+      `git diff --name-only main...origin/feature/min-901 @${PROJECT_ROOT}/api`,
+    );
   });
 
   it('orders contributions by the repo merge order from config', async () => {
@@ -185,6 +191,49 @@ describe('computePolyrepoMergeQueueFromCandidates — contributions', () => {
   });
 });
 
+describe('computePolyrepoMergeQueueFromCandidates — read-only repos', () => {
+  it('never contributes a repo configured read-only, even when it holds the branch', async () => {
+    const readOnly = { ...repo('docs', 'MIN-901', 1), required: false };
+    const reposByIssue = new Map([['MIN-901', [repo('api', 'MIN-901', 0), readOnly]]]);
+    const git: FakeGit = {
+      // The branch EXISTS in the read-only repo — the policy, not absence, is
+      // what must keep it out.
+      refs: new Set([
+        `${PROJECT_ROOT}/api origin/feature/min-901`,
+        `${PROJECT_ROOT}/docs origin/feature/min-901`,
+      ]),
+      changed: new Map([[`${PROJECT_ROOT}/api origin/feature/min-901`, ['src/b.ts']]]),
+    };
+    const calls: string[] = [];
+
+    const queue = await run([{ issueId: 'MIN-901', title: 'Touches docs' }], reposByIssue, git, {}, calls);
+
+    expect(queue[0]!.repoContributions.map((c) => c.repoKey)).toEqual(['api']);
+    // Not even probed: no git command may name the read-only repo path.
+    expect(calls.filter((c) => c.includes(`${PROJECT_ROOT}/docs`))).toEqual([]);
+  });
+
+  it('excludes a candidate whose only branch lives in a read-only repo', async () => {
+    const readOnly = { ...repo('docs', 'MIN-901', 0), required: false };
+    const reposByIssue = new Map([['MIN-901', [readOnly]]]);
+    const git: FakeGit = {
+      refs: new Set([`${PROJECT_ROOT}/docs origin/feature/min-901`]),
+      changed: new Map(),
+    };
+    const excluded: Array<[string, string]> = [];
+
+    const queue = await run(
+      [{ issueId: 'MIN-901', title: 'Docs only' }],
+      reposByIssue,
+      git,
+      { onExcluded: (issueId, reason) => excluded.push([issueId, reason]) },
+    );
+
+    expect(queue).toEqual([]);
+    expect(excluded[0]![1]).toContain('docs excluded as read-only');
+  });
+});
+
 describe('computePolyrepoMergeQueueFromCandidates — exclusions', () => {
   it('excludes a candidate with no feature branch in any repo and reports the reason', async () => {
     const reposByIssue = new Map([
@@ -203,7 +252,7 @@ describe('computePolyrepoMergeQueueFromCandidates — exclusions', () => {
     expect(queue).toEqual([]);
     expect(excluded).toHaveLength(1);
     expect(excluded[0]![0]).toBe('MIN-901');
-    expect(excluded[0]![1]).toContain('no feature branch in any of 2 member repo(s)');
+    expect(excluded[0]![1]).toContain('no feature branch in any of 2 writable member repo(s)');
     expect(excluded[0]![1]).toContain('fe, api');
   });
 
@@ -219,7 +268,7 @@ describe('computePolyrepoMergeQueueFromCandidates — exclusions', () => {
     );
 
     expect(queue).toEqual([]);
-    expect(excluded).toEqual([['MIN-999', 'no member repos resolved for this issue']]);
+    expect(excluded).toEqual([['MIN-999', 'no writable member repos resolved for this issue']]);
   });
 
   it('keeps contributing candidates when a sibling candidate is excluded', async () => {

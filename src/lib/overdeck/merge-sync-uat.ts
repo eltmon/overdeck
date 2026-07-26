@@ -83,9 +83,11 @@ interface OverdeckUatRepoRow {
   repo_path: string;
   branch: string;
   base_sha: string;
+  target_branch: string;
   worktree_path: string;
   merge_order: number;
   promoted_at: number | null;
+  merge_sha: string | null;
 }
 
 interface OverdeckUatMemberRepoRow {
@@ -115,9 +117,11 @@ function synthesizeSingleRepo(row: OverdeckUatGenerationRow): UatGenerationRepo 
     repoPath: row.project_root,
     branch: row.name,
     baseSha: row.base_sha,
+    targetBranch: 'main',
     worktreePath: row.worktree_path,
     mergeOrder: 0,
     promotedAt: null,
+    mergeSha: null,
   };
 }
 
@@ -164,9 +168,11 @@ function rowToUatGeneration(
           repoPath: r.repo_path,
           branch: r.branch,
           baseSha: r.base_sha,
+          targetBranch: r.target_branch ?? 'main',
           worktreePath: r.worktree_path,
           mergeOrder: r.merge_order,
           promotedAt: isoFromMillis(r.promoted_at) ?? null,
+          mergeSha: r.merge_sha ?? null,
         }))
     : [synthesizeSingleRepo(row)];
 
@@ -218,6 +224,52 @@ function loadMemberReposForUat(db: ReturnType<typeof getOverdeckDatabaseSync>, u
   return db.prepare('SELECT * FROM uat_generation_member_repos WHERE uat_name = ?').all(uatName) as OverdeckUatMemberRepoRow[];
 }
 
+/**
+ * Load many generations with a FIXED number of statements: one per child table
+ * with an `IN (…)` filter, grouped in memory.
+ *
+ * The per-generation loader below costs four synchronous SQLite round-trips
+ * each, so listing G generations cost 1 + 4G statements on the Node event loop
+ * — and these lists are read by the generations HTTP route, the minute
+ * reconciler, and cleanup, which walks the full retained history.
+ */
+function loadUatGenerations(
+  db: ReturnType<typeof getOverdeckDatabaseSync>,
+  rows: OverdeckUatGenerationRow[],
+): UatGeneration[] {
+  if (rows.length === 0) return [];
+
+  const names = rows.map((r) => r.name);
+  const placeholders = names.map(() => '?').join(', ');
+  const childRows = <T>(table: string): T[] =>
+    db.prepare(`SELECT * FROM ${table} WHERE uat_name IN (${placeholders})`).all(...names) as T[];
+
+  const groupBy = <T extends { uat_name: string }>(all: T[]): Map<string, T[]> => {
+    const byName = new Map<string, T[]>();
+    for (const row of all) {
+      const list = byName.get(row.uat_name);
+      if (list) list.push(row);
+      else byName.set(row.uat_name, [row]);
+    }
+    return byName;
+  };
+
+  const members = groupBy(childRows<OverdeckUatMemberRow>('uat_generation_members'));
+  const resolutions = groupBy(childRows<OverdeckUatResolutionRow>('uat_generation_resolutions'));
+  const repos = groupBy(childRows<OverdeckUatRepoRow>('uat_generation_repos'));
+  const memberRepos = groupBy(childRows<OverdeckUatMemberRepoRow>('uat_generation_member_repos'));
+
+  return rows.map((row) =>
+    rowToUatGeneration(
+      row,
+      members.get(row.name) ?? [],
+      resolutions.get(row.name) ?? [],
+      repos.get(row.name) ?? [],
+      memberRepos.get(row.name) ?? [],
+    ),
+  );
+}
+
 /** Load one generation with every child table it owns. */
 function loadUatGeneration(
   db: ReturnType<typeof getOverdeckDatabaseSync>,
@@ -247,8 +299,8 @@ function writeUatGenerationRepoRows(
 
   const insertRepo = db.prepare(`
     INSERT INTO uat_generation_repos
-      (uat_name, repo_key, repo_path, branch, base_sha, worktree_path, merge_order, promoted_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      (uat_name, repo_key, repo_path, branch, base_sha, target_branch, worktree_path, merge_order, promoted_at, merge_sha)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
   for (const r of repos) {
     insertRepo.run(
@@ -257,9 +309,11 @@ function writeUatGenerationRepoRows(
       r.repoPath,
       r.branch,
       r.baseSha,
+      r.targetBranch ?? 'main',
       r.worktreePath,
       r.mergeOrder,
       r.promotedAt ? millisFromIso(r.promotedAt) : null,
+      r.mergeSha ?? null,
     );
   }
 }
@@ -382,9 +436,7 @@ export function listUatGenerationsSync(options: {
     `SELECT * FROM uat_generations ${whereSql} ORDER BY created_at DESC, name DESC ${limitSql}`,
   ).all(...params) as OverdeckUatGenerationRow[];
 
-  return rows.map((row) =>
-    loadUatGeneration(db, row),
-  );
+  return loadUatGenerations(db, rows);
 }
 
 /** Drop-in for listUatGenerationNamesSync() from uat-generations-db.ts. */
@@ -510,11 +562,15 @@ export function markUatGenerationRepoPromotedSync(
   name: string,
   repoKey: string,
   promotedAt: string,
+  mergeSha?: string,
 ): void {
   const db = getOverdeckDatabaseSync();
+  // The merge SHA is stamped with the timestamp, not separately: a promote
+  // interrupted between the two would otherwise leave a landed repo whose merge
+  // commit is unknown, and finalization needs that ref.
   const result = db.prepare(
-    'UPDATE uat_generation_repos SET promoted_at = ? WHERE uat_name = ? AND repo_key = ?',
-  ).run(millisFromIso(promotedAt), name, repoKey);
+    'UPDATE uat_generation_repos SET promoted_at = ?, merge_sha = COALESCE(?, merge_sha) WHERE uat_name = ? AND repo_key = ?',
+  ).run(millisFromIso(promotedAt), mergeSha ?? null, name, repoKey);
   if (result.changes === 0) {
     throw new Error(`[merge-sync] uat generation repo not found: ${name} / ${repoKey}`);
   }
@@ -538,8 +594,6 @@ export function listUatGenerationsWithStacksSync(): UatGeneration[] {
   const rows = db.prepare(
     'SELECT * FROM uat_generations WHERE stack_started_at IS NOT NULL ORDER BY stack_started_at ASC',
   ).all() as OverdeckUatGenerationRow[];
-  return rows.map((row) =>
-    loadUatGeneration(db, row),
-  );
+  return loadUatGenerations(db, rows);
 }
 

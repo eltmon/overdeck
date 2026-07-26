@@ -4,7 +4,8 @@
  * All git and store I/O is faked per repo — no live git. The behaviours that
  * distinguish polyrepo assembly from N independent assemblies are the ones
  * pinned hardest here: a feature that fails in one repo is held out of ALL
- * repos, and the branches that already merged it are rebuilt without it.
+ * repos — rolled back in the repos that already took it, without rebuilding
+ * the accepted features around it.
  */
 
 import { describe, it, expect, vi } from 'vitest';
@@ -17,10 +18,10 @@ import {
 import type {
   ConflictContext,
   ConflictResolutionResult,
-  GenerationGitDeps,
   GenerationStorePort,
   ReadyFeature,
 } from '../../../../src/lib/cloister/uat-generation-engine.js';
+import type { PolyrepoRepoGit } from '../../../../src/lib/cloister/uat-polyrepo-engine.js';
 import type { UatGeneration } from '../../../../src/lib/overdeck/merge-sync.js';
 import type { ResolvedProjectRepo } from '../../../../src/lib/project-repos.js';
 
@@ -61,7 +62,7 @@ function feature(
   };
 }
 
-interface FakeRepoGit extends GenerationGitDeps {
+interface FakeRepoGit extends PolyrepoRepoGit {
   /** Feature branches merged into this repo's branch, in order. */
   merged: string[];
   /** Every worktree creation, so a replay is observable. */
@@ -94,6 +95,14 @@ function makeRepoGit(repoKey: string, options: FakeRepoOptions = {}): FakeRepoGi
       worktreeCreations.push(path);
       // A rebuild resets the branch to base — drop everything merged so far.
       merged.length = 0;
+    },
+    // Head is modelled as the merge count, so a rollback truncates the log
+    // exactly the way re-pointing the branch would.
+    generationHeadSha: async () => `${repoKey}-head-${merged.length}`,
+    resetGenerationTo: async (sha) => {
+      const depth = Number(sha.replace(`${repoKey}-head-`, ''));
+      if (!Number.isFinite(depth)) throw new Error(`unknown rollback sha ${sha}`);
+      merged.length = depth;
     },
     branchHeadSha: async (branch) => `${repoKey}-${branch.replace(/\W/g, '')}-head`,
     mergeBranch: async (branch) => {
@@ -312,13 +321,17 @@ describe('assemblePolyrepoUatGeneration — global hold-out', () => {
 
     expect(gen.repos!.map((r) => r.repoKey)).toEqual(['api']);
     expect(fe.pushes).toEqual([]);
-    // Anchor covers only the repos that actually carry the generation.
-    expect(gen.baseSha).toBe('api@api-bas');
+    // The anchor still covers fe even though the hold-out dropped it: the
+    // reconciler derives its anchor from the READY SET, which includes MIN-901,
+    // so shrinking the anchor with the repo would make the two never match and
+    // rebuild this generation on every tick.
+    expect(gen.baseSha).toBe('fe@fe-base api@api-bas');
   });
 
-  it('rebuilds a still-contributing repo from base when a shared feature is held out', async () => {
-    // MIN-903 keeps fe in the generation, so fe is rebuilt without MIN-901
-    // rather than dropped.
+  it('rolls back only the held-out feature, leaving accepted ones untouched', async () => {
+    // MIN-903 keeps fe in the generation. MIN-901 merged into fe before api
+    // rejected it, so fe must lose MIN-901 and nothing else — and must not be
+    // rebuilt from base, which is what made the old design quadratic.
     const fe = makeRepoGit('fe');
     const api = makeRepoGit('api', { conflictOn: ['feature/min-901'] });
 
@@ -335,9 +348,10 @@ describe('assemblePolyrepoUatGeneration — global hold-out', () => {
 
     expect(gen.status).toBe('ready');
     expect(gen.repos!.map((r) => r.repoKey)).toEqual(['fe', 'api']);
-    // Rebuilt: MIN-901 gone, MIN-903 still there.
+    // MIN-901 rolled back out of fe; MIN-903 applied after it.
     expect(fe.merged).toEqual(['feature/min-903']);
-    expect(fe.worktreeCreations.length).toBe(2);
+    // ONE worktree per repo for the whole assembly — no replay.
+    expect(fe.worktreeCreations.length).toBe(1);
     expect(gen.members.map((m) => m.issueId)).toEqual(['MIN-902', 'MIN-903']);
   });
 
@@ -473,5 +487,49 @@ describe('compositeBaseAnchor', () => {
     ]);
 
     expect(anchor).toBe('fe@aaa1111 api@bbb2222');
+  });
+});
+
+describe('assemblePolyrepoUatGeneration — assembly cost is linear', () => {
+  it('creates one worktree per repo and merges each contribution once, despite several hold-outs', async () => {
+    // The old rebuild-and-replay design re-created every worktree and re-merged
+    // every survivor once per hold-out — O(repos x features^2). With three
+    // hold-outs among eight features that is a large multiple of this count.
+    const features = [
+      feature('MIN-901', ['fe', 'api']),
+      feature('MIN-902', ['api']),            // held out in api
+      feature('MIN-903', ['fe', 'api']),
+      feature('MIN-904', ['fe']),
+      feature('MIN-905', ['fe', 'api']),      // held out in api
+      feature('MIN-906', ['api']),
+      feature('MIN-907', ['fe']),
+      feature('MIN-908', ['fe', 'api']),      // held out in api
+    ];
+    const fe = makeRepoGit('fe');
+    const api = makeRepoGit('api', {
+      conflictOn: ['feature/min-902', 'feature/min-905', 'feature/min-908'],
+    });
+
+    let mergeAttempts = 0;
+    const counting = (git: FakeRepoGit): FakeRepoGit => ({
+      ...git,
+      mergeBranch: async (branch) => { mergeAttempts += 1; return git.mergeBranch(branch); },
+    });
+
+    const gen = await assemblePolyrepoUatGeneration(
+      input({ features, repos: [repo('fe', 0), repo('api', 1)] }),
+      deps(new Map([['fe', counting(fe)], ['api', counting(api)]]), makeStore()),
+    );
+
+    expect(gen.status).toBe('ready');
+    expect(gen.heldOut.map((h) => h.issueId)).toEqual(['MIN-902', 'MIN-905', 'MIN-908']);
+
+    // One worktree per repo for the entire assembly.
+    expect(fe.worktreeCreations).toHaveLength(1);
+    expect(api.worktreeCreations).toHaveLength(1);
+
+    // Contributions: 2+1+2+1+2+1+1+2 = 12. Each is attempted exactly once, so
+    // no accepted feature is ever re-merged on behalf of a later hold-out.
+    expect(mergeAttempts).toBe(12);
   });
 });

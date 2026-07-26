@@ -336,7 +336,13 @@ export const computeMergeQueueFromCandidates = (
 export interface PolyrepoRepoContribution {
   repoKey: string;
   repoPath: string;
-  /** The feature branch ref that exists, origin-qualified when the remote has it. */
+  /**
+   * The LOGICAL feature branch, always `feature/<issue>` — never
+   * origin-qualified. Assembly hands this straight to `GenerationGitDeps`,
+   * whose `safeBranchName(branch, 'feature')` accepts only `feature/…` and
+   * which already resolves origin-first internally. Passing `origin/feature/…`
+   * here makes every merge throw and every feature get held out.
+   */
   branch: string;
   /** Branch this repo merges into, from the repo's own config. */
   targetBranch: string;
@@ -389,66 +395,115 @@ export const computePolyrepoMergeQueueFromCandidates = (
     if (candidates.length === 0) return [] as PolyrepoMergeQueueItem[];
     const gitConcurrency = Math.max(1, Math.floor(options.gitConcurrency ?? MERGE_QUEUE_GIT_CONCURRENCY));
 
-    const resolved = yield* Effect.all(
-      candidates.map((item) =>
-        Effect.gen(function*() {
-          const repos = reposByIssue.get(item.issueId) ?? [];
-          const refs = yield* Effect.all(
-            repos.map((repo) => resolveFeatureRef(repo.sourceBranch, repo.repoPath)),
-            { concurrency: gitConcurrency },
-          );
-          const contributions: PolyrepoRepoContribution[] = repos
-            .map((repo, i) => ({ repo, ref: refs[i]! }))
-            .filter((entry): entry is { repo: ResolvedProjectRepo; ref: string } => entry.ref !== null)
-            .map(({ repo, ref }) => ({
-              repoKey: repo.repoKey,
-              repoPath: repo.repoPath,
-              branch: ref,
-              targetBranch: repo.targetBranch,
-              mergeOrder: repo.mergeOrder,
-            }))
-            .sort((a, b) => a.mergeOrder - b.mergeOrder || a.repoKey.localeCompare(b.repoKey));
-          return { item, repos, contributions };
-        }),
+    // A repo configured `readonly: true` (required === false) must never become
+    // a UAT target: assembly pushes branches to it, promote pushes merges, and
+    // cleanup deletes remote branches. Excluding it here keeps it out of every
+    // one of those write paths.
+    const perCandidate = candidates.map((item) => {
+      const configured = reposByIssue.get(item.issueId) ?? [];
+      return {
+        item,
+        configured,
+        repos: configured.filter((repo) => repo.required),
+        readOnlySkipped: configured.filter((repo) => !repo.required),
+      };
+    });
+
+    // One flat, concurrency-governed collection: nesting Effect.all inside
+    // Effect.all applies the limit at both levels, making the real ceiling
+    // gitConcurrency² git subprocesses per project.
+    const probeJobs = perCandidate.flatMap((entry, candidateIndex) =>
+      entry.repos.map((repo) => ({ candidateIndex, repo })),
+    );
+    const probeResults = yield* Effect.all(
+      probeJobs.map(({ candidateIndex, repo }) =>
+        resolveFeatureRef(repo.sourceBranch, repo.repoPath).pipe(
+          Effect.map((ref) => ({ candidateIndex, repo, ref })),
+        ),
       ),
       { concurrency: gitConcurrency },
     );
 
-    const contributing: Array<{ item: typeof candidates[number]; contributions: PolyrepoRepoContribution[] }> = [];
+    const foundByCandidate = perCandidate.map(() => [] as Array<{ repo: ResolvedProjectRepo; ref: string }>);
+    for (const { candidateIndex, repo, ref } of probeResults) {
+      if (ref !== null) foundByCandidate[candidateIndex]!.push({ repo, ref });
+    }
+
+    const resolved = perCandidate.map((entry, candidateIndex) => {
+      const found = [...foundByCandidate[candidateIndex]!].sort(
+        (a, b) => a.repo.mergeOrder - b.repo.mergeOrder || a.repo.repoKey.localeCompare(b.repo.repoKey),
+      );
+      return {
+        ...entry,
+        contributions: found.map(({ repo }) => ({
+          repoKey: repo.repoKey,
+          repoPath: repo.repoPath,
+          // Logical name only — see PolyrepoRepoContribution.branch.
+          branch: repo.sourceBranch,
+          targetBranch: repo.targetBranch,
+          mergeOrder: repo.mergeOrder,
+        })) as PolyrepoRepoContribution[],
+        // The resolved ref is for THIS function's diffing only; it never leaves
+        // as part of the contribution contract.
+        diffRefs: found.map(({ ref }) => ref),
+      };
+    });
+
+    const contributing: Array<{
+      item: typeof candidates[number];
+      contributions: PolyrepoRepoContribution[];
+      diffRefs: string[];
+    }> = [];
     for (const entry of resolved) {
       if (entry.contributions.length === 0) {
+        const readOnlyNote = entry.readOnlySkipped.length > 0
+          ? ` (${entry.readOnlySkipped.map((r) => r.repoKey).join(', ')} excluded as read-only)`
+          : '';
         options.onExcluded?.(
           entry.item.issueId,
           entry.repos.length === 0
-            ? 'no member repos resolved for this issue'
-            : `no feature branch in any of ${entry.repos.length} member repo(s): ${entry.repos.map((r) => r.repoKey).join(', ')}`,
+            ? `no writable member repos resolved for this issue${readOnlyNote}`
+            : `no feature branch in any of ${entry.repos.length} writable member repo(s): ${entry.repos.map((r) => r.repoKey).join(', ')}${readOnlyNote}`,
         );
         continue;
       }
-      contributing.push({ item: entry.item, contributions: entry.contributions });
+      contributing.push({
+        item: entry.item,
+        contributions: entry.contributions,
+        diffRefs: entry.diffRefs,
+      });
     }
 
     if (contributing.length === 0) return [] as PolyrepoMergeQueueItem[];
 
     const hotspots = (options.hotspots ?? getProjectSwarmHotspots(findProjectByPathSync(projectRoot))).map(compileGlob);
 
-    const fileSets = yield* Effect.all(
-      contributing.map(({ contributions }) =>
-        Effect.all(
-          contributions.map((c) =>
-            changedFilesVsMain(c.branch, c.repoPath, c.targetBranch).pipe(
-              // Filter hotspots against the real path, then namespace by repo so
-              // fe/src/x.ts and api/src/x.ts are not mistaken for one file.
-              Effect.map((files) =>
-                [...normalizedFootprintFiles(files, hotspots)].map((f) => `${c.repoKey}:${f}`),
-              ),
-            ),
-          ),
-          { concurrency: gitConcurrency },
-        ).pipe(Effect.map((perRepo) => new Set(perRepo.flat()))),
+    // Flattened to ONE concurrency-governed collection: nesting Effect.all
+    // inside Effect.all applies the limit at both levels, so the real ceiling
+    // was gitConcurrency² subprocesses per project.
+    const diffJobs = contributing.flatMap(({ contributions, diffRefs }, candidateIndex) =>
+      contributions.map((c, repoIndex) => ({ candidateIndex, contribution: c, ref: diffRefs[repoIndex]! })),
+    );
+    const diffResults = yield* Effect.all(
+      // The diff uses the RESOLVED ref (possibly origin-qualified); the
+      // contribution keeps the logical name for assembly.
+      diffJobs.map(({ candidateIndex, contribution, ref }) =>
+        changedFilesVsMain(ref, contribution.repoPath, contribution.targetBranch).pipe(
+          // Filter hotspots against the real path, then namespace by repo so
+          // fe/src/x.ts and api/src/x.ts are not mistaken for one file.
+          Effect.map((files) => ({
+            candidateIndex,
+            files: [...normalizedFootprintFiles(files, hotspots)].map((f) => `${contribution.repoKey}:${f}`),
+          })),
+        ),
       ),
       { concurrency: gitConcurrency },
     );
+
+    const fileSets = contributing.map(() => new Set<string>());
+    for (const { candidateIndex, files } of diffResults) {
+      for (const file of files) fileSets[candidateIndex]!.add(file);
+    }
 
     // Hotspots were already applied per repo above; re-applying them to prefixed
     // paths would silently match nothing.

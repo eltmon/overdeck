@@ -49,12 +49,14 @@ import {
   listUatGenerationsSync,
   markUatGenerationRepoPromotedSync,
   type UatGeneration,
+  type UatGenerationRepo,
 } from '../../../lib/overdeck/merge-sync.js';
 import { listEligibleCandidatesByProject } from '../../../lib/flywheel-merge-order.js';
 import { extractACFromDocument } from '../../../lib/xbrief/acceptance-criteria.js';
 import { findXBriefByIssue, readXBriefDocument } from '../../../lib/xbrief/xbrief-index.js';
-import { findProjectByPathSync, resolveProjectFromIssueSync } from '../../../lib/projects.js';
+import { findProjectByPathSync, listProjectsSync, resolveProjectFromIssueSync } from '../../../lib/projects.js';
 import {
+  resolveConfiguredReposSync,
   resolveProjectReposFromResolvedIssueSync,
   type ResolvedProjectRepo,
 } from '../../../lib/project-repos.js';
@@ -149,20 +151,40 @@ async function runUatTrainReconcileForProject(
     limit: 1,
   });
   if (candidates.length === 0 && liveGenerations.length === 0) {
+    // Terminal generations still own branches, worktrees, and a wrapper folder.
+    // Promoting the LAST ready batch lands exactly here — no candidates, no
+    // live rows — so returning early without cleanup leaks every artifact the
+    // batch created, permanently. Cleanup is idempotent and skips rows already
+    // marked cleaned, so running it on an otherwise idle tick is cheap.
+    const uncleanedTerminal = listUatGenerationsSync({
+      projectRoot: projectPath,
+      statuses: ['promoted', 'failed', 'invalidated'],
+    }).filter((gen) => !gen.cleanedAt);
+    if (uncleanedTerminal.length > 0) {
+      await makeCleanupForProject(projectPath)().catch((err) => {
+        console.log(`[uat-train] terminal cleanup failed for ${projectPath}: ${err instanceof Error ? err.message : String(err)}`);
+      });
+    }
     return { action: 'idle', invalidated: [] };
   }
 
   // A polyrepo project has no git repo at its own path, so every git dep must
   // be per member repo and staleness must compare composite anchors.
   if (projectConfig.workspace?.type === 'polyrepo') {
+    // The base anchor must cover exactly the ready set's contributing repos, so
+    // both callbacks read one memoized ready set — recomputing it would also
+    // re-run every git probe.
+    let readySetOnce: Promise<ReadyFeature[] | null> | undefined;
+    const readySet = () => (readySetOnce ??= getPolyrepoReadySetForProject(projectPath));
+
     return reconcileUatGenerations(projectPath, {
       isEnabled: () => true,  // Already checked above
-      getReadySet: () => getPolyrepoReadySetForProject(projectPath),
+      getReadySet: readySet,
       // Unused on this path — getBaseAnchor/getFeatureAnchor take over — but
       // the deps contract still requires them.
       getMainHeadSha: async () => '',
       getBranchHeadSha: async () => '',
-      getBaseAnchor: () => getPolyrepoBaseAnchor(projectPath),
+      getBaseAnchor: async () => getPolyrepoBaseAnchor(projectPath, await readySet()),
       getFeatureAnchor: (feature) => getPolyrepoFeatureAnchor(feature),
       store: buildUatGenerationStore(),
       assemble: (features) => assemblePolyrepoFromReadySetForProject(projectPath, features),
@@ -232,8 +254,18 @@ function resolveReposForIssue(issueId: string): ResolvedProjectRepo[] {
  * from each feature's own contributions rather than these.
  */
 function resolveProjectRepos(projectPath: string, preferredIssueId?: string): ResolvedProjectRepo[] {
-  const issueId = preferredIssueId ?? listEligibleCandidatesByProject(projectPath)[0]?.issueId;
-  return issueId ? resolveReposForIssue(issueId) : [];
+  const issueId = preferredIssueId ?? listEligibleCandidatesByProject(projectPath)?.[0]?.issueId;
+  if (issueId) return resolveReposForIssue(issueId);
+
+  // No candidate to resolve through — the exact state cleanup runs in after the
+  // last batch is promoted. Resolve the configured repo set straight from
+  // project config instead; the per-issue branch names it derives are unused
+  // here, only the repo paths and targets matter.
+  const resolved = findProjectByPathSync(projectPath);
+  if (!resolved) return [];
+  const entry = listProjectsSync().find(({ config }) => resolve(config.path) === resolve(projectPath));
+  if (!entry) return [];
+  return resolveConfiguredReposSync(entry.key, projectPath, entry.config, `${entry.key}-cleanup`);
 }
 
 /** Polyrepo ready set: per-candidate contributions across member repos. */
@@ -266,11 +298,20 @@ async function getPolyrepoReadySetForProject(projectPath: string): Promise<Ready
 }
 
 /**
- * Composite base anchor across every configured member repo. Must be built by
- * the same helper assembly uses, since staleness is string equality.
+ * Composite base anchor over exactly the repos the ready set contributes to.
+ *
+ * NOT every configured repo: assembly anchors on the contributing set, and
+ * staleness is string equality, so including an untouched repo would make the
+ * two anchors differ forever and rebuild the same generation every tick.
  */
-async function getPolyrepoBaseAnchor(projectPath: string): Promise<string> {
-  const repos = resolveProjectRepos(projectPath);
+async function getPolyrepoBaseAnchor(
+  projectPath: string,
+  readySet: readonly ReadyFeature[] | null,
+): Promise<string> {
+  const contributingKeys = new Set(
+    (readySet ?? []).flatMap((f) => (f.repoContributions ?? []).map((c) => c.repoKey)),
+  );
+  const repos = resolveProjectRepos(projectPath).filter((r) => contributingKeys.has(r.repoKey));
   if (repos.length === 0) return '';
   const gitByRepo = buildPolyrepoGitDeps(repos);
 
@@ -435,6 +476,13 @@ export interface UatGenerationPayload {
   members: UatGenerationMemberPayload[];
   heldOut: UatGeneration['heldOut'];
   resolutions: UatGeneration['resolutions'];
+  /**
+   * Per-repo generation detail, additive (PAN-3093). Always present and
+   * non-empty: a monorepo generation projects the single synthesized entry, so
+   * consumers read one shape. Rendering it is deliberately a follow-up; the
+   * data ships now so that follow-up has something to render.
+   */
+  repos: UatGenerationRepo[];
   stack: { status: 'running' | 'absent'; frontendUrl: string };
 }
 
@@ -533,6 +581,7 @@ export async function getUatGenerationsPayload(projectRootOverride?: string): Pr
       members,
       heldOut: gen.heldOut,
       resolutions: gen.resolutions,
+      repos: gen.repos ?? [],
       stack: { status: probe.status, frontendUrl: probe.frontendUrl },
     });
   }
@@ -593,15 +642,40 @@ export async function postUatGenerationPromotePayload(
   // (trial-merge everything, then publish) path.
   const projectConfig = findProjectByPathSync(root);
   const polyrepo = projectConfig?.workspace?.type === 'polyrepo';
-  const generationRepos = polyrepo ? (getUatGenerationSync(name)?.repos ?? []) : [];
+  const storedRepos = polyrepo ? (getUatGenerationSync(name)?.repos ?? []) : [];
+
+  // Re-check writability against CURRENT config, not the config that was live
+  // at assembly: a repo can be flipped to readonly between assembly and merge,
+  // and promote pushes to it. Fail closed rather than silently skipping a repo,
+  // which would publish a partial batch.
+  const writableKeys = polyrepo
+    ? new Set(resolveProjectRepos(root).filter((r) => r.required).map((r) => r.repoKey))
+    : new Set<string>();
+  const nowReadOnly = polyrepo ? storedRepos.filter((r) => !writableKeys.has(r.repoKey)) : [];
+  if (nowReadOnly.length > 0) {
+    const detail = nowReadOnly.map((r) => r.repoKey).join(', ');
+    const result: PromoteResult = {
+      success: false,
+      reason: 'merge-failed',
+      message:
+        `${name} includes repo(s) that are no longer writable in project config: ${detail}. ` +
+        `Nothing was published. Restore write access or let the reconciler rebuild the batch without them.`,
+    };
+    await notifyFlywheelOfUatPromote(result).catch(() => {});
+    return result;
+  }
+  const generationRepos = storedRepos;
 
   const result = await promoteUatGeneration(name, root, {
     git: buildUatPromoteGitDeps(root),
     ...(polyrepo && generationRepos.length > 0
       ? {
+          // generationRepos carry their own persisted targetBranch, so a repo
+          // configured for `develop` is fetched, trial-merged, and published
+          // there rather than silently defaulting to main.
           polyrepoGit: buildPolyrepoUatPromoteGitDeps(generationRepos),
-          markRepoPromoted: (genName, repoKey, at) =>
-            markUatGenerationRepoPromotedSync(genName, repoKey, at),
+          markRepoPromoted: (genName, repoKey, at, mergeSha) =>
+            markUatGenerationRepoPromotedSync(genName, repoKey, at, mergeSha),
         }
       : {}),
     store: { ...buildUatGenerationStore(), get: (n) => getUatGenerationSync(n) },

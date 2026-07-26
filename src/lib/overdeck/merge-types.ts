@@ -51,12 +51,25 @@ export interface UatGenerationRepo {
   branch: string;
   /** Head SHA of this repo's target branch the uat branch was cut from. */
   baseSha: string;
+  /**
+   * The branch this repo's uat branch was cut from and must be promoted back
+   * into. Persisted rather than re-derived: promote runs long after assembly,
+   * and defaulting to `main` would land a repo configured for `develop` on the
+   * wrong branch entirely.
+   */
+  targetBranch: string;
   /** Absolute path to this repo's worktree, <generationFolder>/<repoKey>. */
   worktreePath: string;
   /** Publish order during promote; ascending. */
   mergeOrder: number;
   /** ISO timestamp once this repo's merge landed on its target branch. */
   promotedAt?: string | null;
+  /**
+   * The merge commit published to this repo's target branch. Recorded with the
+   * publish stamp so a promote interrupted after its last push can still be
+   * finalized — and so post-merge verification has a real, per-repo git ref.
+   */
+  mergeSha?: string | null;
 }
 
 /** One (member, repo) contribution — the feature branch this issue has in a repo. */

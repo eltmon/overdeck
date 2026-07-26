@@ -60,6 +60,7 @@ function makePolyrepoGeneration(
         repoPath: '/tmp/myn/frontend',
         branch: 'uat/min-otter-0727',
         baseSha: 'aaa1111',
+        targetBranch: 'main',
         worktreePath: '/tmp/myn/workspaces/uat-min-otter-0727/fe',
         mergeOrder: 0,
       },
@@ -68,6 +69,7 @@ function makePolyrepoGeneration(
         repoPath: '/tmp/myn/api',
         branch: 'uat/min-otter-0727',
         baseSha: 'bbb2222',
+        targetBranch: 'main',
         worktreePath: '/tmp/myn/workspaces/uat-min-otter-0727/api',
         mergeOrder: 1,
       },
@@ -194,6 +196,7 @@ describe('per-repo generation round-trip', () => {
         repoPath: '/tmp/myn/api',
         branch: 'uat/min-otter-0727',
         baseSha: 'eee5555',
+        targetBranch: 'main',
         worktreePath: '/tmp/myn/workspaces/uat-min-otter-0727/api',
         mergeOrder: 0,
       }],
@@ -228,9 +231,11 @@ describe('legacy and monorepo rows synthesize a single repo', () => {
       repoPath: '/tmp/project',
       branch: 'uat/pan-otter-0610',
       baseSha: 'abc123',
+      targetBranch: 'main',
       worktreePath: '/tmp/project/workspaces/uat-pan-otter-0610',
       mergeOrder: 0,
       promotedAt: null,
+      mergeSha: null,
     }]);
   });
 
@@ -257,6 +262,7 @@ describe('updateUatGenerationSync with per-repo state', () => {
         repoPath: '/tmp/myn/api',
         branch: 'uat/min-otter-0727',
         baseSha: 'fff6666',
+        targetBranch: 'main',
         worktreePath: '/tmp/myn/workspaces/uat-min-otter-0727/api',
         mergeOrder: 0,
       }],
@@ -286,6 +292,52 @@ describe('updateUatGenerationSync with per-repo state', () => {
       { issueId: 'MIN-903', reason: 'conflict in api could not be resolved' },
     ]);
     expect(loaded.members.find((m) => m.issueId === 'MIN-901')!.repos).toHaveLength(2);
+  });
+});
+
+describe('per-repo target branch and merge sha', () => {
+  it('round-trips a non-main target branch', async () => {
+    const db = odb.raw();
+    seedIssue(db, 'MIN-901');
+    seedIssue(db, 'MIN-902');
+    const gen = makePolyrepoGeneration();
+    // api merges into develop, not main — promote must publish there.
+    insertUatGenerationSync({
+      ...gen,
+      repos: gen.repos!.map((r) => (r.repoKey === 'api' ? { ...r, targetBranch: 'develop' } : r)),
+    });
+
+    const loaded = getUatGenerationSync(gen.name)!;
+    expect(loaded.repos!.find((r) => r.repoKey === 'api')!.targetBranch).toBe('develop');
+    expect(loaded.repos!.find((r) => r.repoKey === 'fe')!.targetBranch).toBe('main');
+  });
+
+  it('stamps the merge sha alongside promoted_at so a resumed promote can finalize', async () => {
+    const db = odb.raw();
+    seedIssue(db, 'MIN-901');
+    seedIssue(db, 'MIN-902');
+    const gen = makePolyrepoGeneration();
+    insertUatGenerationSync(gen);
+
+    markUatGenerationRepoPromotedSync(gen.name, 'fe', '2026-07-27T10:00:00.000Z', 'fe1234567890');
+
+    const fe = getUatGenerationSync(gen.name)!.repos!.find((r) => r.repoKey === 'fe')!;
+    expect(fe.promotedAt).toBe('2026-07-27T10:00:00.000Z');
+    expect(fe.mergeSha).toBe('fe1234567890');
+  });
+
+  it('keeps an existing merge sha when a later stamp omits it', async () => {
+    const db = odb.raw();
+    seedIssue(db, 'MIN-901');
+    seedIssue(db, 'MIN-902');
+    const gen = makePolyrepoGeneration();
+    insertUatGenerationSync(gen);
+
+    markUatGenerationRepoPromotedSync(gen.name, 'fe', '2026-07-27T10:00:00.000Z', 'fe1234567890');
+    markUatGenerationRepoPromotedSync(gen.name, 'fe', '2026-07-27T11:00:00.000Z');
+
+    expect(getUatGenerationSync(gen.name)!.repos!.find((r) => r.repoKey === 'fe')!.mergeSha)
+      .toBe('fe1234567890');
   });
 });
 

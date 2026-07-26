@@ -445,9 +445,11 @@ CREATE TABLE `uat_generation_repos` (
 	`repo_path` text NOT NULL,
 	`branch` text NOT NULL,
 	`base_sha` text NOT NULL,
+	`target_branch` text DEFAULT 'main' NOT NULL,
 	`worktree_path` text NOT NULL,
 	`merge_order` integer DEFAULT 0 NOT NULL,
 	`promoted_at` integer,
+	`merge_sha` text,
 	PRIMARY KEY(`uat_name`, `repo_key`),
 	FOREIGN KEY (`uat_name`) REFERENCES `uat_generations`(`name`) ON UPDATE no action ON DELETE no action
 );
