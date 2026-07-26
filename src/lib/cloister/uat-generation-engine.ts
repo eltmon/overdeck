@@ -44,6 +44,13 @@ export interface ConflictContext {
   conflictingIssueIds: readonly string[];
   branchName: string;
   worktreePath: string;
+  /**
+   * Member repo this conflict occurred in (polyrepo assembly only). Absent for
+   * monorepo assembly. The hook already works purely on `worktreePath`, so
+   * per-repo worktrees scope it automatically — this only names the repo in the
+   * prompt and logs so an operator can tell which one blocked.
+   */
+  repoKey?: string;
 }
 
 /** Successful resolution: the hook committed the merge on the branch. */
