@@ -127,17 +127,14 @@
       "reason": "feedback",
       "note": "[2026-07-26T16:25Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-07-26T16:25:12.324Z"
-    }
-  ],
-  "feedback": [
+    },
     {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-26T16:25:12Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-3111\n\n# Review Synthesis — PAN-3111 — 2026-07-26T16:23:03Z\n\n## Verdict: CHANGES REQUESTED — Flywheel-owned `pan start` cannot begin planning because its authenticated provenance token is rejected\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3111/.pan/review/agent-pan-3111-review-bf70912d/context.json\n- Branch: feature/pan-3111\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3111\n- HEAD reviewed: bf70912de84c2cf8b2e94982013282a2b69dceab\n- Cycle number: 2\n- Prior cycle SHA: 39fbfc1be47a62ba7fc81ccb1f7573ea02b71321\n- PR merge base: ce4ace8275179642723ae5dc7b459f125623e4d0\n- PR commits: 11\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3111/.pan/review/agent-pan-3111-review-bf70912d/security.md | 0 |\n| correctness | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3111/.pan/review/agent-pan-3111-review-bf70912d/correctness.md | 4 |\n| performance | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3111/.pan/review/agent-pan-3111-review-bf70912d/performance.md | 1 |\n| requirements | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3111/.pan/review/agent-pan-3111-review-bf70912d/requirements.md | 2 |\n\n## Blocking Findings\n\n### [correctness] CLI planning provenance is discarded or rejected — `src/dashboard/server/routes/agents/shared.ts:78`\nThe new internal-origin allowlist accepts `operator:cli:pan-start` but omits `operator:cli:pan-plan` and every validated dynamic `flywheel:RUN-…` origin. In parallel, the changed `pan plan` request at `src/cli/commands/plan.ts:25-48` sends `startedBy` without the internal-token header, so the route rewrites it to `operator:dashboard`. The more serious path is Flywheel-owned `pan start`: it authenticates the request and sends `flywheel:<runId>`, which the exact-value allowlist rejects with HTTP 400, preventing planning and subsequent work from starting. Authenticate `pan plan`, allow its registered CLI origin, and validate Flywheel origins through the existing normalized `RUN-\\d+` contract.\n\n### [correctness/requirements] Accepted provenance is not preserved through state and process launch — `src/dashboard/server/routes/agents/spawn.ts:234`\nThe changed route resolves a trusted `startedBy` token, but does not thread it into the remote-spawn call or the local in-flight placeholder; remote state and failed/in-flight local state can therefore persist null provenance. The changed state construction in `src/lib/agents/spawn.ts:207-208` and `src/lib/agents/spawn.ts:565-566` introduces a second divergence: `state.startedBy` is persisted, but fresh work, specialist, planning, and resume session environments omit `OVERDECK_AGENT_STARTED_BY`. Nested launches then lose the immediate autonomous origin and derive an incorrect fallback. Thread one resolved token through remote state/event writes, placeholder state/events, every fresh launcher, planning launch, and resume environment, with focused coverage for each path.\n\n### [requirements] Successful direct work starts leave one-shot planning consent active — `src/lib/cloister/autonomous-work-dispatch.ts:175`\nThe new pickup predicate treats the persisted planning auto-start flag as a release source, and the new documentation defines that consent as current-cycle and one-shot. Complete-planning auto-handoff and orphan recovery clear it, but a successful direct `pan start` or accepted dashboard start does not. A later cycle can therefore be autonomously released by stale consent from an earlier cycle. Clear the flag only after a direct work start is successfully accepted, while retaining it on failed starts, and add both success and failure regression tests.\n\n### [correctness] Rebuild recovery consumes consent when work is only queued — `src/lib/overdeck/planning-promotion.ts:382`\nThe changed recovery branch clears auto-start consent as soon as `/api/workspaces/:issueId/rebuild-and-start` returns 200. That endpoint acknowledges a detached Docker rebuild and chained `pan start`; either command can still fail after the response. If consent was the only release source, the failed chain leaves a proposed issue without a work agent and the orphan reconciler then refuses recovery as `not-released`. Consume consent only after the chained `pan start` exits successfully or canonical work-start acceptance is recorded.\n\n### [performance] Pickup-refusal deduplication state grows for the daemon lifetime — `src/lib/cloister/orphan-proposed-reconciler.ts:38`\nThe PR adds a process-global `pickupRefusalReasons` map. Refused issues are inserted, but entries are removed only if that same issue later passes the pickup gate; issues that close, leave `proposed`, or disappear from the candidate set remain retained until process restart. This creates monotonic memory growth with historical refused issues in the long-lived dashboard/Deacon process. Prune against the live candidate set or use a bounded TTL/LRU structure, and test that an issue leaving the candidate set releases its entry.\n\n## Non-blocking Findings\n\n### [correctness/requirements] A throwing pickup evaluator aborts the reconciliation pass — `src/lib/cloister/orphan-proposed-reconciler.ts:449`\nThe injectable evaluator is awaited outside the handler's defensive error boundaries, so one rejection prevents later candidates from being evaluated. Catch per candidate, record a fail-closed dead-end result, and continue the scan.\n\n### [correctness] Non-object JSON can make rebuild-and-start return 500 — `src/dashboard/server/routes/workspaces.ts:984`\nThe changed route reads `.startedBy` directly from `readJsonBody`; valid JSON such as `null` is returned verbatim and causes property access to throw. Normalize non-object bodies to `{}` so malformed-but-valid JSON receives the normal dashboard provenance fallback or a controlled 400 response.\n\n### [correctness] Blank inherited provenance values are not normalized at CLI entry points — `src/cli/commands/plan.ts:25`\nThe CLI selection uses nullish fallback semantics, so empty or whitespace-only provenance variables can suppress a valid default or Flywheel fallback. Trim and treat blank values as unset in both `pan plan` and `pan start` derivation.\n\n## Clean Sub-roles\n- security\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3111/.pan/review/agent-pan-3111-review-bf70912d/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3111 -m \"Fixed review issues\"`"
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-26T16:29:45.909Z"
     }
   ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       ".overdeck/context/codebase/concerns.md",
@@ -266,10 +263,10 @@
     "recordedAt": "2026-07-26T14:50:39.957Z"
   },
   "created": "2026-07-26T12:26:09.908Z",
-  "updated": "2026-07-26T16:29:44.091Z",
+  "updated": "2026-07-26T16:29:46.297Z",
   "pipeline": {
     "issueId": "PAN-3111",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -277,12 +274,12 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T14:51:03.445Z",
-    "updatedAt": "2026-07-26T16:29:44.058Z",
+    "updatedAt": "2026-07-26T16:29:44.662Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "inspectNotes": "AC1-3 met at this tree state (bead work landed in a4c6729fa9; ec66e8f8 is a behavior-preserving extraction). AC1: agents-state-db.test.ts:92 round-trips 'operator:cli:pan-start' through state.json and the agents-table started_by column with getAgentStateSync returning it; verified both read paths (overdeck agent-state-sync.ts:175 and parseAgentState agent-state.ts:250) and confirmed the insert column list ('flywheel_run_id','started_by','cost_so_far') aligns positionally with the values array (state.flywheelRunId, state.startedBy, state.costSoFar) -- no off-by-one. AC2: resolveAgentStartedBy preserves the exact explicit ?? env ?? flywheel order, and the environmentToken default parameter is evaluated per call so env mutation is still observed; spawn-flywheel-provenance.test.ts covers explicit token, env-over-flywheel precedence, flywheel:<runId>, and undefined. AC3: schema-migrations.test.ts:71 adds started_by to a current-version agents table without throwing; both the currentVersion===SCHEMA_VERSION top-up and the <61 block apply it, and tryIdempotentDdl swallows duplicate-column. Non-blocking observation for the review convoy: this commit is line-count golf for a file ratchet (joining 'flywheel_run_id TEXT, started_by TEXT' onto one CREATE TABLE line, deleting two blank lines in runMigrations, compressing the OVERDECK_AGENT_COLUMNS comment and dropping its 0000_overdeck_init.sql reference) -- semantically inert, but shrinking declarations to fit a ratchet suppresses the growth signal the ratchet exists to surface.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3144",
     "lastVerifiedCommit": "bf70912de84c2cf8b2e94982013282a2b69dceab",
-    "reviewSpawnedAt": "2026-07-26T16:19:05.870Z",
+    "reviewSpawnedAt": "2026-07-26T16:29:44.661Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         ".overdeck/context/codebase/concerns.md",
@@ -473,7 +470,7 @@
       },
       "costAtCloseOut": {
         "usd": 380.161964,
-        "pricingAsOf": "2026-07-26T16:29:44.084Z"
+        "pricingAsOf": "2026-07-26T16:29:46.245Z"
       }
     },
     "merges": [
