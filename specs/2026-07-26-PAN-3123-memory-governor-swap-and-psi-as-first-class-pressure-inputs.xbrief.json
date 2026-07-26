@@ -4,17 +4,17 @@
     "created": "2026-07-26T12:40:00.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3123: Memory governor ignores swap entirely — swap can hit 0 free while it reports 'admitting', removing all OOM runway",
-    "updated": "2026-07-26T12:39:37.334Z"
+    "updated": "2026-07-26T12:39:39.002Z"
   },
   "plan": {
     "id": "pan-3123",
     "title": "Memory governor: swap and PSI as first-class pressure inputs",
-    "status": "approved",
+    "status": "running",
     "uid": "b56a82fc-24d5-451f-a801-f69ef080ec8c",
     "author": "agent:k3[1m]",
-    "sequence": 5,
+    "sequence": 6,
     "created": "2026-07-26T12:40:00.000Z",
-    "updated": "2026-07-26T12:39:37.334Z",
+    "updated": "2026-07-26T12:39:39.002Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3123",
