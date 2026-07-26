@@ -59,6 +59,15 @@ describe('parsePaneChoiceMenu — resume gate (real capture)', () => {
     expect(menu!.title).toBe('This session is 4h 5m old and 146.9k tokens.')
   })
 
+  it('parses when tmux pads the pane with blank filler to full height', () => {
+    // A 30-row pane: the menu occupies the top 9 lines, 21 blanks follow.
+    const pane = RESUME_GATE_MENU + '\n' + Array.from({ length: 21 }, () => '').join('\n')
+    const menu = parsePaneChoiceMenu(pane)
+    expect(menu).not.toBeNull()
+    expect(menu!.confidence).toBe('high')
+    expect(menu!.options).toHaveLength(3)
+  })
+
   it('strips ANSI escapes before parsing', () => {
     const ansi = RESUME_GATE_MENU.replace('❯ 1. Resume', '\x1b[32m❯\x1b[0m 1. Resume')
       .replace('This session is', '\x1b[1mThis session is\x1b[0m')
