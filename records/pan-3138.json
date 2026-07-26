@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T13:39:19.365Z",
-  "updated": "2026-07-26T14:02:07.527Z",
+  "updated": "2026-07-26T14:05:22.812Z",
   "pipeline": {
     "issueId": "PAN-3138",
     "reviewStatus": "pending",
@@ -43,16 +43,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "reaper-merged-devnet-teardown": {
-        "writerId": "agent-pan-3138",
-        "agentId": "agent-pan-3138",
-        "pid": 3919142,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-26T14:02:07.527Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3138",
@@ -64,12 +56,27 @@
         "outcome": "completed",
         "reason": "Added idempotent name-based Docker network teardown after the existing stop block, covered missing-workspace and non-fatal failure behavior, and audited the required merge-agent file-size growth.",
         "releasedAt": "2026-07-26T14:00:57.340Z"
+      },
+      {
+        "writerId": "agent-pan-3138",
+        "agentId": "agent-pan-3138",
+        "pid": 3919142,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T14:02:07.527Z",
+        "itemId": "reaper-merged-devnet-teardown",
+        "outcome": "completed",
+        "reason": "Extended the devnet patrol to remove Docker networks for merged-but-open issues only, preserved full closed-issue residue cleanup, and added regression coverage for merged and untracked status cases.",
+        "releasedAt": "2026-07-26T14:05:22.811Z"
       }
     ],
     "statusReasons": {
       "merge-time-network-teardown": {
         "reason": "Added idempotent name-based Docker network teardown after the existing stop block, covered missing-workspace and non-fatal failure behavior, and audited the required merge-agent file-size growth.",
         "updatedAt": "2026-07-26T14:00:57.340Z"
+      },
+      "reaper-merged-devnet-teardown": {
+        "reason": "Extended the devnet patrol to remove Docker networks for merged-but-open issues only, preserved full closed-issue residue cleanup, and added regression coverage for merged and untracked status cases.",
+        "updatedAt": "2026-07-26T14:05:22.811Z"
       }
     }
   },
@@ -78,6 +85,10 @@
     "merge-time-network-teardown.merge-time-network-teardown.ac1": "completed",
     "merge-time-network-teardown.merge-time-network-teardown.ac2": "completed",
     "merge-time-network-teardown.merge-time-network-teardown.ac3": "completed",
-    "reaper-merged-devnet-teardown": "running"
+    "reaper-merged-devnet-teardown": "completed",
+    "reaper-merged-devnet-teardown.reaper-merged-devnet-teardown.ac1": "completed",
+    "reaper-merged-devnet-teardown.reaper-merged-devnet-teardown.ac2": "completed",
+    "reaper-merged-devnet-teardown.reaper-merged-devnet-teardown.ac3": "completed",
+    "reaper-merged-devnet-teardown.reaper-merged-devnet-teardown.ac4": "completed"
   }
 }
