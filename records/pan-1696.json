@@ -234,7 +234,7 @@
     }
   ],
   "created": "2026-07-26T00:35:36.057Z",
-  "updated": "2026-07-26T03:47:21.590Z",
+  "updated": "2026-07-26T03:50:54.417Z",
   "pipeline": {
     "issueId": "PAN-1696",
     "reviewStatus": "passed",
@@ -352,7 +352,7 @@
   "harness": "claude-code",
   "model": "claude-haiku-4-5",
   "tasks": {
-    "sequence": 14,
+    "sequence": 15,
     "claims": {
       "merge-train-routes": {
         "writerId": "agent-pan-1696",
@@ -360,13 +360,6 @@
         "pid": 368474,
         "host": "eltmon-z790",
         "claimedAt": "2026-07-26T01:56:42.620Z"
-      },
-      "uat-stack-domain": {
-        "writerId": "agent-pan-1696",
-        "agentId": "agent-pan-1696",
-        "pid": 3737688,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-26T03:47:21.590Z"
       }
     },
     "claimHistory": [
@@ -434,6 +427,16 @@
         "itemId": "project-merge-train-endpoint",
         "outcome": "completed",
         "releasedAt": "2026-07-26T03:47:05.253Z"
+      },
+      {
+        "writerId": "agent-pan-1696",
+        "agentId": "agent-pan-1696",
+        "pid": 3737688,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T03:47:21.590Z",
+        "itemId": "uat-stack-domain",
+        "outcome": "completed",
+        "releasedAt": "2026-07-26T03:50:54.417Z"
       }
     ],
     "statusReasons": {
@@ -478,6 +481,8 @@
     "project-merge-train-endpoint": "completed",
     "project-merge-train-endpoint.project-merge-train-endpoint.ac1": "completed",
     "project-merge-train-endpoint.project-merge-train-endpoint.ac2": "completed",
-    "uat-stack-domain": "running"
+    "uat-stack-domain": "completed",
+    "uat-stack-domain.uat-stack-domain.ac1": "completed",
+    "uat-stack-domain.uat-stack-domain.ac2": "completed"
   }
 }
