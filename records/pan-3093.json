@@ -42,6 +42,7 @@
     "outsideDeclaredScope": [
       ".overdeck/context/codebase/concerns.md",
       "drizzle/overdeck/0000_overdeck_init.sql",
+      "src/lib/cloister/merge-verification.ts",
       "src/lib/overdeck/infra.ts",
       "src/lib/overdeck/merge-sync-time.ts",
       "src/lib/overdeck/merge-sync-uat.ts",
@@ -87,6 +88,7 @@
       "features/merge-batches.mdx",
       "src/dashboard/server/services/__tests__/uat-train.test.ts",
       "src/dashboard/server/services/uat-train.ts",
+      "src/lib/cloister/merge-verification.ts",
       "src/lib/cloister/uat-conflict-agent.ts",
       "src/lib/cloister/uat-generation-deps.ts",
       "src/lib/cloister/uat-generation-engine.ts",
@@ -107,10 +109,10 @@
       "tests/unit/lib/flywheel-merge-order-polyrepo.test.ts",
       "tests/unit/lib/overdeck/uat-generation-repos.test.ts"
     ],
-    "recordedAt": "2026-07-26T15:26:28.528Z"
+    "recordedAt": "2026-07-26T16:24:11.129Z"
   },
   "created": "2026-07-26T12:33:18.311Z",
-  "updated": "2026-07-26T16:24:08.006Z",
+  "updated": "2026-07-26T16:24:11.131Z",
   "pipeline": {
     "issueId": "PAN-3093",
     "reviewStatus": "blocked",
