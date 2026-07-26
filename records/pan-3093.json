@@ -287,6 +287,11 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-26T18:55:45.616Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-26T18:56:16.135Z"
     }
   ],
   "feedback": [],
@@ -372,10 +377,10 @@
     "recordedAt": "2026-07-26T18:25:06.675Z"
   },
   "created": "2026-07-26T12:33:18.311Z",
-  "updated": "2026-07-26T18:56:14.109Z",
+  "updated": "2026-07-26T18:56:16.158Z",
   "pipeline": {
     "issueId": "PAN-3093",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -383,12 +388,12 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T18:27:46.686Z",
-    "updatedAt": "2026-07-26T18:56:14.078Z",
+    "updatedAt": "2026-07-26T18:56:14.830Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed the cycle-6 blocker: a stamped repo row with no provable merge no longer finalizes the batch. Promote now fails retryably on promotedAt-without-mergeSha when no merge is findable on the target, and finishPromote enforces complete per-repo evidence at the single point a generation turns terminal.",
     "inspectNotes": "All 4 ACs verified; ran uat-polyrepo-engine.test.ts + uat-generation-engine.test.ts, 33/33 pass. AC1: runAssemblyPass calls each repo's own fetchMain then createWorktree and records that repo's baseSha; finish() writes compositeBaseAnchor -> 'fe@aaa1111 api@bbb2222' on the generation row (asserted on both the returned object and the store row). AC2: a block returns from the pass, the issue is added to heldOutIds once and pushed to heldOut with reason suffixed '(in <repoKey>)', then assembly replays from base; verified in real git too, since createWorktree does 'worktree remove --force' + 'worktree add -B <branch> <path> origin/<target>', which resets the sibling repo's branch, so the fake's merged-reset is faithful. Push happens only after the accepted pass, so a held-out feature is never published in repo A. AC3: contributingRepos filters by repoContributions; infra gets zero worktreeCreations and zero pushes. AC4: the push loop returns finish('failed', ...) on the first throw, with fe.pushes=[name] and api.pushes=[] proving the sibling had landed. Deviation 1 confirmed necessary: safeGenerationWorktreePath (uat-generation-deps.ts:39) resolves <projectRoot>/workspaces, and a member repo runs git in <projectRoot>/<repoKey> while its worktree sits under the wrapper's workspaces, so the old signature would throw; workspacesRoot defaults to projectRoot and targetBranch to 'main', reproducing the prior origin/main behavior exactly. Per-repo deps each close over their own worktreePath, so merge/abort/push cannot cross repos. Deviation 2 confirmed: GenerationStorePort.update's Pick had no 'repos'. Non-blocking notes: (a) a repo dropped between passes keeps its unpushed local uat/ branch and worktree until the generation folder is reaped - harmless since 'worktree add -B' force-resets, but cleanup (WI-7) should reap the branch; (b) listRemoteUatBranchesMulti, buildPolyrepoGitDeps, and assemblePolyrepoUatGeneration have no callers yet, which is expected until the WI-5/WI-6 wiring lands.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3145",
     "lastVerifiedCommit": "e5842a75877f1fafa947405e9d21c4038a5b2145",
-    "reviewSpawnedAt": "2026-07-26T18:52:14.145Z",
+    "reviewSpawnedAt": "2026-07-26T18:56:14.829Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         ".overdeck/context/codebase/concerns.md",
@@ -484,9 +489,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 39605001,
-            "output": 940539,
-            "cacheRead": 256028672,
+            "input": 39663121,
+            "output": 942429,
+            "cacheRead": 256732672,
             "cacheWrite": 0
           }
         },
@@ -531,15 +536,15 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 41979454,
-          "output": 1154495,
-          "cacheRead": 299710464,
+          "input": 42037574,
+          "output": 1156385,
+          "cacheRead": 300414464,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 394.4034823,
-        "pricingAsOf": "2026-07-26T18:56:14.101Z"
+        "usd": 395.1027823,
+        "pricingAsOf": "2026-07-26T18:56:14.985Z"
       }
     },
     "merges": [
@@ -548,7 +553,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-opus-5",
+  "model": "gpt-5.6-sol",
   "tasks": {
     "sequence": 16,
     "claims": {},
