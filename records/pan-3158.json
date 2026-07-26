@@ -34,15 +34,7 @@
       "timestamp": "2026-07-26T20:57:26.184Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-26T20:57:25Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-3158\n\nProject filtering can falsely show the global no-ready-work message while another project has ready work\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3158 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "docs/FLYWHEEL-STATE.md",
@@ -64,7 +56,7 @@
     "recordedAt": "2026-07-26T21:01:22.337Z"
   },
   "created": "2026-07-26T20:19:41.143Z",
-  "updated": "2026-07-26T21:08:51.916Z",
+  "updated": "2026-07-26T21:08:52.921Z",
   "pipeline": {
     "issueId": "PAN-3158",
     "reviewStatus": "pending",
