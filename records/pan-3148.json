@@ -31,8 +31,62 @@
     }
   ],
   "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      "scripts/source-introspection-baseline.txt",
+      "src/lib/cloister/__tests__/deacon-stash-janitor.test.ts",
+      "src/lib/cloister/deacon-post-review-commits.ts",
+      "tests/lib/cloister/deacon-ci-retry.test.ts",
+      "tests/lib/cloister/deacon-orphan-recovery.test.ts",
+      "tests/lib/cloister/review-agent.test.ts",
+      "tests/lib/cloister/review-verdict-feedback.test.ts",
+      "tests/unit/lib/cloister/deacon-swarm-verdict-routing.test.ts",
+      "tests/unit/lib/head-anchor-write-sites.test.ts"
+    ],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "docs/DEACON-HEALTH-MONITORING.md",
+      "docs/REVIEW-AGENT-ARCHITECTURE.md",
+      "src/cli/commands/specialists/done.ts",
+      "src/dashboard/server/routes/specialists/legacy-routes.ts",
+      "src/lib/agents/messaging.ts",
+      "src/lib/cloister/deacon-review-signals.ts",
+      "src/lib/cloister/deacon.ts",
+      "src/lib/cloister/prompts/work.md",
+      "src/lib/cloister/review-verdict-feedback.ts",
+      "tests/cli/commands/specialists/done.test.ts",
+      "tests/unit/dashboard/server/routes/specialists-reviewed-at-commit.test.ts",
+      "tests/unit/lib/cloister/deacon-post-blocked-review-commits.test.ts",
+      "tests/unit/lib/cloister/review-verdict-feedback.test.ts"
+    ],
+    "actualChangedFiles": [
+      "docs/DEACON-HEALTH-MONITORING.md",
+      "docs/REVIEW-AGENT-ARCHITECTURE.md",
+      "scripts/source-introspection-baseline.txt",
+      "src/cli/commands/specialists/done.ts",
+      "src/dashboard/server/routes/specialists/legacy-routes.ts",
+      "src/lib/agents/messaging.ts",
+      "src/lib/cloister/__tests__/deacon-stash-janitor.test.ts",
+      "src/lib/cloister/deacon-post-review-commits.ts",
+      "src/lib/cloister/deacon-review-signals.ts",
+      "src/lib/cloister/deacon.ts",
+      "src/lib/cloister/prompts/work.md",
+      "src/lib/cloister/review-verdict-feedback.ts",
+      "tests/cli/commands/specialists/done.test.ts",
+      "tests/lib/cloister/deacon-ci-retry.test.ts",
+      "tests/lib/cloister/deacon-orphan-recovery.test.ts",
+      "tests/lib/cloister/review-agent.test.ts",
+      "tests/lib/cloister/review-verdict-feedback.test.ts",
+      "tests/unit/dashboard/server/routes/specialists-reviewed-at-commit.test.ts",
+      "tests/unit/lib/cloister/deacon-post-blocked-review-commits.test.ts",
+      "tests/unit/lib/cloister/deacon-swarm-verdict-routing.test.ts",
+      "tests/unit/lib/cloister/review-verdict-feedback.test.ts",
+      "tests/unit/lib/head-anchor-write-sites.test.ts"
+    ],
+    "recordedAt": "2026-07-26T21:02:31.919Z"
+  },
   "created": "2026-07-26T17:27:17.644Z",
-  "updated": "2026-07-26T21:02:34.532Z",
+  "updated": "2026-07-26T21:02:37.758Z",
   "pipeline": {
     "issueId": "PAN-3148",
     "reviewStatus": "pending",
@@ -41,7 +95,8 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T21:02:34.530Z",
+    "updatedAt": "2026-07-26T21:02:37.719Z",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3163",
     "reviewRequestedAt": "2026-07-26T21:02:34.530Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -96,19 +151,36 @@
         "tests/unit/lib/head-anchor-write-sites.test.ts"
       ],
       "recordedAt": "2026-07-26T21:02:31.919Z"
-    },
-    "prUrl": "https://github.com/eltmon/overdeck/pull/3163"
+    }
   },
   "closeOut": {
     "usage": {
-      "byStage": {},
-      "totals": {},
+      "byStage": {
+        "work": {
+          "openai/gpt-5.6-sol": {
+            "input": 2555464,
+            "output": 240700,
+            "cacheRead": 106645504,
+            "cacheWrite": 0
+          }
+        }
+      },
+      "totals": {
+        "openai/gpt-5.6-sol": {
+          "input": 2555464,
+          "output": 240700,
+          "cacheRead": 106645504,
+          "cacheWrite": 0
+        }
+      },
       "costAtCloseOut": {
-        "usd": 0,
-        "pricingAsOf": "2026-07-26T17:57:04.295Z"
+        "usd": 73.321072,
+        "pricingAsOf": "2026-07-26T21:02:37.754Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/3163"
+    ],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
@@ -250,59 +322,5 @@
     "docs-patrol-and-dedup": "completed",
     "docs-patrol-and-dedup.docs-patrol-and-dedup.ac1": "completed",
     "docs-patrol-and-dedup.docs-patrol-and-dedup.ac2": "completed"
-  },
-  "scopeDrift": {
-    "outsideDeclaredScope": [
-      "scripts/source-introspection-baseline.txt",
-      "src/lib/cloister/__tests__/deacon-stash-janitor.test.ts",
-      "src/lib/cloister/deacon-post-review-commits.ts",
-      "tests/lib/cloister/deacon-ci-retry.test.ts",
-      "tests/lib/cloister/deacon-orphan-recovery.test.ts",
-      "tests/lib/cloister/review-agent.test.ts",
-      "tests/lib/cloister/review-verdict-feedback.test.ts",
-      "tests/unit/lib/cloister/deacon-swarm-verdict-routing.test.ts",
-      "tests/unit/lib/head-anchor-write-sites.test.ts"
-    ],
-    "declaredScopeUntouched": [],
-    "declaredScope": [
-      "docs/DEACON-HEALTH-MONITORING.md",
-      "docs/REVIEW-AGENT-ARCHITECTURE.md",
-      "src/cli/commands/specialists/done.ts",
-      "src/dashboard/server/routes/specialists/legacy-routes.ts",
-      "src/lib/agents/messaging.ts",
-      "src/lib/cloister/deacon-review-signals.ts",
-      "src/lib/cloister/deacon.ts",
-      "src/lib/cloister/prompts/work.md",
-      "src/lib/cloister/review-verdict-feedback.ts",
-      "tests/cli/commands/specialists/done.test.ts",
-      "tests/unit/dashboard/server/routes/specialists-reviewed-at-commit.test.ts",
-      "tests/unit/lib/cloister/deacon-post-blocked-review-commits.test.ts",
-      "tests/unit/lib/cloister/review-verdict-feedback.test.ts"
-    ],
-    "actualChangedFiles": [
-      "docs/DEACON-HEALTH-MONITORING.md",
-      "docs/REVIEW-AGENT-ARCHITECTURE.md",
-      "scripts/source-introspection-baseline.txt",
-      "src/cli/commands/specialists/done.ts",
-      "src/dashboard/server/routes/specialists/legacy-routes.ts",
-      "src/lib/agents/messaging.ts",
-      "src/lib/cloister/__tests__/deacon-stash-janitor.test.ts",
-      "src/lib/cloister/deacon-post-review-commits.ts",
-      "src/lib/cloister/deacon-review-signals.ts",
-      "src/lib/cloister/deacon.ts",
-      "src/lib/cloister/prompts/work.md",
-      "src/lib/cloister/review-verdict-feedback.ts",
-      "tests/cli/commands/specialists/done.test.ts",
-      "tests/lib/cloister/deacon-ci-retry.test.ts",
-      "tests/lib/cloister/deacon-orphan-recovery.test.ts",
-      "tests/lib/cloister/review-agent.test.ts",
-      "tests/lib/cloister/review-verdict-feedback.test.ts",
-      "tests/unit/dashboard/server/routes/specialists-reviewed-at-commit.test.ts",
-      "tests/unit/lib/cloister/deacon-post-blocked-review-commits.test.ts",
-      "tests/unit/lib/cloister/deacon-swarm-verdict-routing.test.ts",
-      "tests/unit/lib/cloister/review-verdict-feedback.test.ts",
-      "tests/unit/lib/head-anchor-write-sites.test.ts"
-    ],
-    "recordedAt": "2026-07-26T21:02:31.919Z"
   }
 }
