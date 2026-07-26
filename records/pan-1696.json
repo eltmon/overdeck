@@ -269,7 +269,7 @@
     }
   ],
   "created": "2026-07-26T00:35:36.057Z",
-  "updated": "2026-07-26T05:53:17.191Z",
+  "updated": "2026-07-26T05:55:59.354Z",
   "pipeline": {
     "issueId": "PAN-1696",
     "reviewStatus": "pending",
@@ -382,8 +382,16 @@
   "harness": "claude-code",
   "model": "claude-opus-5",
   "tasks": {
-    "sequence": 20,
-    "claims": {},
+    "sequence": 21,
+    "claims": {
+      "merge-train-routes": {
+        "writerId": "agent-pan-1696",
+        "agentId": "agent-pan-1696",
+        "pid": 1245460,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T05:55:59.354Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-1696",
@@ -534,7 +542,7 @@
     "reconciler-decouple.reconciler-decouple.ac2": "completed",
     "reconciler-decouple.reconciler-decouple.ac3": "completed",
     "reconciler-decouple.reconciler-decouple.ac4": "completed",
-    "merge-train-routes": "pending",
+    "merge-train-routes": "running",
     "project-merge-train-endpoint": "completed",
     "project-merge-train-endpoint.project-merge-train-endpoint.ac1": "completed",
     "project-merge-train-endpoint.project-merge-train-endpoint.ac2": "completed",
