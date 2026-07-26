@@ -22,7 +22,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T08:55:24.679Z",
-  "updated": "2026-07-26T10:02:00.732Z",
+  "updated": "2026-07-26T10:08:59.497Z",
   "pipeline": {
     "issueId": "PAN-3114",
     "reviewStatus": "pending",
@@ -67,16 +67,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "close-out-heal": {
-        "writerId": "agent-pan-3114",
-        "agentId": "agent-pan-3114",
-        "pid": 4145523,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-26T10:02:00.732Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3114",
@@ -99,6 +91,17 @@
         "outcome": "completed",
         "reason": "Injected post-promote verdict recording, wired dashboard service, and covered success/failure/throw paths",
         "releasedAt": "2026-07-26T10:01:46.277Z"
+      },
+      {
+        "writerId": "agent-pan-3114",
+        "agentId": "agent-pan-3114",
+        "pid": 4145523,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T10:02:00.732Z",
+        "itemId": "close-out-heal",
+        "outcome": "completed",
+        "reason": "Added promoted-generation evidence recovery before the DoD gate with best-effort merge-SHA lookup and failure-tolerant ceremony output",
+        "releasedAt": "2026-07-26T10:08:59.496Z"
       }
     ],
     "statusReasons": {
@@ -109,6 +112,10 @@
       "promote-wiring": {
         "reason": "Injected post-promote verdict recording, wired dashboard service, and covered success/failure/throw paths",
         "updatedAt": "2026-07-26T10:01:46.277Z"
+      },
+      "close-out-heal": {
+        "reason": "Added promoted-generation evidence recovery before the DoD gate with best-effort merge-SHA lookup and failure-tolerant ceremony output",
+        "updatedAt": "2026-07-26T10:08:59.496Z"
       }
     }
   },
@@ -123,6 +130,10 @@
     "promote-wiring.promote-wiring.ac2": "completed",
     "promote-wiring.promote-wiring.ac3": "completed",
     "promote-wiring.promote-wiring.ac4": "completed",
-    "close-out-heal": "running"
+    "close-out-heal": "completed",
+    "close-out-heal.close-out-heal.ac1": "completed",
+    "close-out-heal.close-out-heal.ac2": "completed",
+    "close-out-heal.close-out-heal.ac3": "completed",
+    "close-out-heal.close-out-heal.ac4": "completed"
   }
 }
