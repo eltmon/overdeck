@@ -21,8 +21,51 @@
     }
   ],
   "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      "scripts/file-size-baseline.txt",
+      "src/lib/__tests__/agents-spawn-supervisor.test.ts",
+      "src/lib/cloister/__tests__/verdict-preservation.test.ts",
+      "tests/unit/lib/head-anchor-write-sites.test.ts"
+    ],
+    "declaredScopeUntouched": [
+      "src/lib/agents/__tests__/spawn-verdict-preservation.test.ts",
+      "src/lib/cloister/deacon-merge.ts"
+    ],
+    "declaredScope": [
+      "docs/FLYWHEEL.md",
+      "docs/MERGE-WORKFLOW.md",
+      "src/dashboard/server/routes/workspaces/__tests__/merge-ops-clean-direct.test.ts",
+      "src/dashboard/server/routes/workspaces/__tests__/merge-ops-server-rebase.test.ts",
+      "src/dashboard/server/routes/workspaces/merge-ops.ts",
+      "src/dashboard/server/routes/workspaces/merge-strike.ts",
+      "src/dashboard/server/services/__tests__/auto-merge-executor.test.ts",
+      "src/dashboard/server/services/auto-merge-executor.ts",
+      "src/lib/agents/__tests__/spawn-verdict-preservation.test.ts",
+      "src/lib/agents/spawn.ts",
+      "src/lib/cloister/deacon-merge.ts",
+      "src/lib/cloister/verdict-preservation.ts"
+    ],
+    "actualChangedFiles": [
+      "docs/FLYWHEEL.md",
+      "docs/MERGE-WORKFLOW.md",
+      "scripts/file-size-baseline.txt",
+      "src/dashboard/server/routes/workspaces/__tests__/merge-ops-clean-direct.test.ts",
+      "src/dashboard/server/routes/workspaces/__tests__/merge-ops-server-rebase.test.ts",
+      "src/dashboard/server/routes/workspaces/merge-ops.ts",
+      "src/dashboard/server/routes/workspaces/merge-strike.ts",
+      "src/dashboard/server/services/__tests__/auto-merge-executor.test.ts",
+      "src/dashboard/server/services/auto-merge-executor.ts",
+      "src/lib/__tests__/agents-spawn-supervisor.test.ts",
+      "src/lib/agents/spawn.ts",
+      "src/lib/cloister/__tests__/verdict-preservation.test.ts",
+      "src/lib/cloister/verdict-preservation.ts",
+      "tests/unit/lib/head-anchor-write-sites.test.ts"
+    ],
+    "recordedAt": "2026-07-26T12:02:11.445Z"
+  },
   "created": "2026-07-26T06:17:49.254Z",
-  "updated": "2026-07-26T12:02:14.119Z",
+  "updated": "2026-07-26T12:02:17.921Z",
   "pipeline": {
     "issueId": "PAN-3110",
     "reviewStatus": "pending",
@@ -32,8 +75,9 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T12:02:14.117Z",
+    "updatedAt": "2026-07-26T12:02:17.469Z",
     "inspectNotes": "All 5 ACs verified against code, not just tests. AC1: mergeableState 'behind' skips canMergeCleanPrDirectly, isBranchAlreadyRebased fails, rebaseWithAgentFallback (merge-strike.ts:165) runs rebaseFeatureBranch and returns on success with no ensureAgentReadyForMerge/messageAgent call. AC2: the catch at merge-strike.ts:190 records conflictedFiles then falls through to the agent path. AC3: merge-ops.ts:945-948 returns retryable:true and writes only {mergeStatus:'queued', mergeNotes}, leaving readyForMerge/reviewStatus/testStatus/verificationStatus untouched; that matches the existing contract at review-status.ts:781 where 'queued' is the re-drivable state and 'failed' is human-review-only, so the write is not inert. AC4: the checksFailed 409 at merge-ops.ts:851-856 is untouched and returns before any rebase, still with mergeStatus 'failed'+readyForMerge:false and no retryable field. AC5: merge-ops.ts:74-75 console.warn present. Verified empirically that Effect.runPromise rejects with the raw error value, so MergeConflictError.conflictedFiles is genuinely reachable and conflicts classify non-retryable. TWO NON-BLOCKING NOTES: (1) merge-strike.ts:196 reads error.message, but Data.TaggedError sets message to empty string, so a real non-conflict GitError collapses to the generic 'Server-side rebase failed' and its stderr never reaches mergeNotes - consider also reading detail.stderr. (2) conflict-then-agent-stopped is classified non-retryable via conflictFiles.length===0; AC3's wording is literally unconditional but this reading is correct because auto-requeuing a conflict would loop forever.",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3136",
     "reviewRequestedAt": "2026-07-26T12:02:14.117Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -77,39 +121,40 @@
         "tests/unit/lib/head-anchor-write-sites.test.ts"
       ],
       "recordedAt": "2026-07-26T12:02:11.445Z"
-    },
-    "prUrl": "https://github.com/eltmon/overdeck/pull/3136"
+    }
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 885406,
-            "output": 175314,
-            "cacheRead": 54308864,
+            "input": 2493770,
+            "output": 228905,
+            "cacheRead": 97849344,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 885406,
-          "output": 175314,
-          "cacheRead": 54308864,
+          "input": 2493770,
+          "output": 228905,
+          "cacheRead": 97849344,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 36.840882,
-        "pricingAsOf": "2026-07-26T10:53:35.307Z"
+        "usd": 68.260672,
+        "pricingAsOf": "2026-07-26T12:02:17.524Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/3136"
+    ],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-opus-5",
+  "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
     "sequence": 10,
@@ -220,48 +265,5 @@
     "merge-recovery-docs": "completed",
     "merge-recovery-docs.merge-recovery-docs.ac1": "completed",
     "merge-recovery-docs.merge-recovery-docs.ac2": "completed"
-  },
-  "scopeDrift": {
-    "outsideDeclaredScope": [
-      "scripts/file-size-baseline.txt",
-      "src/lib/__tests__/agents-spawn-supervisor.test.ts",
-      "src/lib/cloister/__tests__/verdict-preservation.test.ts",
-      "tests/unit/lib/head-anchor-write-sites.test.ts"
-    ],
-    "declaredScopeUntouched": [
-      "src/lib/agents/__tests__/spawn-verdict-preservation.test.ts",
-      "src/lib/cloister/deacon-merge.ts"
-    ],
-    "declaredScope": [
-      "docs/FLYWHEEL.md",
-      "docs/MERGE-WORKFLOW.md",
-      "src/dashboard/server/routes/workspaces/__tests__/merge-ops-clean-direct.test.ts",
-      "src/dashboard/server/routes/workspaces/__tests__/merge-ops-server-rebase.test.ts",
-      "src/dashboard/server/routes/workspaces/merge-ops.ts",
-      "src/dashboard/server/routes/workspaces/merge-strike.ts",
-      "src/dashboard/server/services/__tests__/auto-merge-executor.test.ts",
-      "src/dashboard/server/services/auto-merge-executor.ts",
-      "src/lib/agents/__tests__/spawn-verdict-preservation.test.ts",
-      "src/lib/agents/spawn.ts",
-      "src/lib/cloister/deacon-merge.ts",
-      "src/lib/cloister/verdict-preservation.ts"
-    ],
-    "actualChangedFiles": [
-      "docs/FLYWHEEL.md",
-      "docs/MERGE-WORKFLOW.md",
-      "scripts/file-size-baseline.txt",
-      "src/dashboard/server/routes/workspaces/__tests__/merge-ops-clean-direct.test.ts",
-      "src/dashboard/server/routes/workspaces/__tests__/merge-ops-server-rebase.test.ts",
-      "src/dashboard/server/routes/workspaces/merge-ops.ts",
-      "src/dashboard/server/routes/workspaces/merge-strike.ts",
-      "src/dashboard/server/services/__tests__/auto-merge-executor.test.ts",
-      "src/dashboard/server/services/auto-merge-executor.ts",
-      "src/lib/__tests__/agents-spawn-supervisor.test.ts",
-      "src/lib/agents/spawn.ts",
-      "src/lib/cloister/__tests__/verdict-preservation.test.ts",
-      "src/lib/cloister/verdict-preservation.ts",
-      "tests/unit/lib/head-anchor-write-sites.test.ts"
-    ],
-    "recordedAt": "2026-07-26T12:02:11.445Z"
   }
 }
