@@ -68,23 +68,25 @@
     "recordedAt": "2026-07-26T03:36:45.308Z"
   },
   "created": "2026-07-26T02:29:08.179Z",
-  "updated": "2026-07-26T03:36:45.309Z",
+  "updated": "2026-07-26T03:36:46.178Z",
   "pipeline": {
     "issueId": "PAN-3097",
-    "reviewStatus": "passed",
-    "testStatus": "testing",
-    "verificationStatus": "passed",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T03:34:18.373Z",
+    "updatedAt": "2026-07-26T03:36:46.177Z",
     "reviewNotes": "Approved: issue-title context and self-contained-question guidance satisfy all acceptance criteria with no blocking findings",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3102",
     "reviewedAtCommit": "4e640da0d8cbb0b6ffbbfe9fef19317b3d7a1369",
     "reviewSpawnedAt": "2026-07-26T03:33:42.415Z",
     "scopeDrift": {
-      "outsideDeclaredScope": [],
+      "outsideDeclaredScope": [
+        "packages/contracts/src/composer-commands.generated.ts"
+      ],
       "declaredScopeUntouched": [],
       "declaredScope": [
         "docs/ASKUSERQUESTION-DASHBOARD.md",
@@ -105,6 +107,7 @@
       ],
       "actualChangedFiles": [
         "docs/ASKUSERQUESTION-DASHBOARD.md",
+        "packages/contracts/src/composer-commands.generated.ts",
         "roles/plan.md",
         "src/dashboard/frontend/src/App/hooks/usePendingInputDialogs.ts",
         "src/dashboard/frontend/src/components/AskUserQuestionDialog.tsx",
@@ -120,8 +123,9 @@
         "src/lib/cloister/prompts/planning.md",
         "sync-sources/rules/ask-user-question-self-contained.md"
       ],
-      "recordedAt": "2026-07-26T03:30:04.529Z"
-    }
+      "recordedAt": "2026-07-26T03:36:45.308Z"
+    },
+    "reviewRequestedAt": "2026-07-26T03:36:46.177Z"
   },
   "closeOut": {
     "usage": {
