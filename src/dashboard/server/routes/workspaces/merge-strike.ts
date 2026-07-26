@@ -19,6 +19,28 @@ export function mergeVerificationOptions(
   };
 }
 
+/**
+ * PAN-3067: the PAN-2487 CI-green skip bypasses the verification runner — which
+ * is what records verificationStatus on local runs — and that skip is the exact
+ * path every strike merge takes (its CI is already green). Record the verdict
+ * here so DoD row 3 has evidence and close-out can proceed.
+ */
+export async function recordCiGreenVerificationVerdict(issueId: string, workspacePath: string): Promise<void> {
+  try {
+    const { snapshotWorkspaceHeadsPromise } = await import('../../../../lib/git-utils.js');
+    const verifiedAnchor = await snapshotWorkspaceHeadsPromise(issueId, workspacePath).catch(() => undefined);
+    const { setReviewStatusSync } = await import('../../../../lib/review-status.js');
+    setReviewStatusSync(issueId, {
+      verificationStatus: 'passed',
+      verificationNotes: 'merge-verify: CI green on the merged tip (PAN-2487 local-gate skip)',
+      ...(verifiedAnchor ? { lastVerifiedCommit: verifiedAnchor } : {}),
+    });
+  } catch (recordErr) {
+    const message = recordErr instanceof Error ? recordErr.message : String(recordErr);
+    console.warn(`[merge] Could not record CI-green verification verdict for ${issueId}: ${message}`);
+  }
+}
+
 export interface TriggerMergeResult {
   success: boolean;
   statusCode: number;

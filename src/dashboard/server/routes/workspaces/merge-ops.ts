@@ -40,7 +40,7 @@ import { _serverManagedMerges } from '../specialists.js';
 import { completePendingOperation, getPendingOperation, getProjectPath, getWorkspaceInfoForIssue, readJsonBody, setPendingOperation, setReviewStatus } from '../workspaces.js';
 import { buildLocalMainRecoveryError } from './git-recovery-advice.js';
 import { internalStrikeMergeRoute } from './internal-strike-merge.js';
-import { activeStrikeMerge, ensureAgentReadyForMerge, mergeCompletionStatus, mergeVerificationOptions, normalMergeEligibility, validateStrikeMergeRequest, type StrikeMergeRequest, type TriggerMergeRequest, type TriggerMergeResult } from './merge-strike.js';
+import { activeStrikeMerge, ensureAgentReadyForMerge, mergeCompletionStatus, mergeVerificationOptions, normalMergeEligibility, recordCiGreenVerificationVerdict, validateStrikeMergeRequest, type StrikeMergeRequest, type TriggerMergeRequest, type TriggerMergeResult } from './merge-strike.js';
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
 export const shouldBlockApproveForDirtyStatus = (status: string): boolean =>
@@ -1119,24 +1119,9 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
     }
     console.log(`[merge] Post-rebase verification ${verifyResult.outcome} for ${issueId}`);
 
-    // PAN-3067: record the verdict, not just the outcome. When the runner
-    // executes locally it records verificationStatus itself, but the PAN-2487
-    // CI-green skip bypassed the runner entirely — the exact path every strike
-    // merge takes — so verificationStatus stayed 'missing' and DoD row 3
-    // blocked close-out forever.
-    if (skipLocalVerification) {
-      try {
-        const { snapshotWorkspaceHeadsPromise } = await import('../../../../lib/git-utils.js');
-        const verifiedAnchor = await snapshotWorkspaceHeadsPromise(issueId, workspacePath).catch(() => undefined);
-        setReviewStatus(issueId, {
-          verificationStatus: 'passed',
-          verificationNotes: 'merge-verify: CI green on the merged tip (PAN-2487 local-gate skip)',
-          ...(verifiedAnchor ? { lastVerifiedCommit: verifiedAnchor } : {}),
-        });
-      } catch (recordErr: any) {
-        console.warn(`[merge] Could not record CI-green verification verdict for ${issueId}: ${recordErr.message}`);
-      }
-    }
+    // PAN-3067: local runs record verificationStatus inside the runner; the
+    // CI-green skip must record it here or DoD row 3 blocks close-out forever.
+    if (skipLocalVerification) await recordCiGreenVerificationVerdict(issueId, workspacePath);
 
     // Step 4a: Report commit statuses on post-rebase HEAD (branch protection requires them).
     // Must happen AFTER rebase because rebase changes the HEAD SHA.
