@@ -22,6 +22,11 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-26T14:00:02.316Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-26T14:00:03.086Z"
     }
   ],
   "feedback": [],
@@ -86,10 +91,10 @@
     "recordedAt": "2026-07-26T13:53:58.173Z"
   },
   "created": "2026-07-26T12:24:46.201Z",
-  "updated": "2026-07-26T14:00:02.316Z",
+  "updated": "2026-07-26T14:00:03.521Z",
   "pipeline": {
     "issueId": "PAN-3135",
-    "reviewStatus": "blocked",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
@@ -97,12 +102,12 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T13:54:56.619Z",
-    "updatedAt": "2026-07-26T14:00:01.300Z",
+    "updatedAt": "2026-07-26T14:00:02.053Z",
     "reviewNotes": "Deferred verification can bypass the quality gate, and deferred merges lose retry scheduling.",
     "inspectNotes": "All 4 ACs met. verification-runner.ts:387-395 gates on readPendingDeploy() before the verificationStatus:'running' write at :409, writes 'pending' + a note naming requestedAt, and self-excludes when status is already 'running'. verification-worker-supervisor.ts:140-144 sits AFTER the live-worker waitForResult join at :137, so a queued deploy blocks only new worker spawns. FOLLOW-UP FOR A LATER BEAD (outside these ACs): request-review-pipeline.ts:31-38 only branches on 'failed'/'error', so a 'deferred' outcome currently falls through to pushBranch()+dispatchReview() and advances to review as if it passed — consumers must be taught to halt on 'deferred'.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3142",
     "reviewRequestedAt": "2026-07-26T13:54:56.619Z",
-    "reviewSpawnedAt": "2026-07-26T13:54:06.505Z",
+    "reviewSpawnedAt": "2026-07-26T14:00:02.052Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "src/lib/cloister/merge-verification.ts",
@@ -162,24 +167,6 @@
         "tests/unit/lib/deploy/deploy-queue.test.ts"
       ],
       "recordedAt": "2026-07-26T13:53:58.173Z"
-    },
-    "reviewerVerdicts": {
-      "security": {
-        "status": "passed",
-        "atCommit": "27f89adb9576474823407bf0fba3f7d03d8d46e2"
-      },
-      "correctness": {
-        "status": "blocked",
-        "atCommit": "27f89adb9576474823407bf0fba3f7d03d8d46e2"
-      },
-      "performance": {
-        "status": "blocked",
-        "atCommit": "27f89adb9576474823407bf0fba3f7d03d8d46e2"
-      },
-      "requirements": {
-        "status": "blocked",
-        "atCommit": "27f89adb9576474823407bf0fba3f7d03d8d46e2"
-      }
     }
   },
   "closeOut": {
@@ -244,7 +231,7 @@
       },
       "costAtCloseOut": {
         "usd": 122.424406,
-        "pricingAsOf": "2026-07-26T14:00:01.342Z"
+        "pricingAsOf": "2026-07-26T14:00:03.512Z"
       }
     },
     "merges": [
