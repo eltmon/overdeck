@@ -101,10 +101,10 @@
     "recordedAt": "2026-07-26T13:53:58.173Z"
   },
   "created": "2026-07-26T12:24:46.201Z",
-  "updated": "2026-07-26T14:09:57.628Z",
+  "updated": "2026-07-26T14:12:48.491Z",
   "pipeline": {
     "issueId": "PAN-3135",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -112,8 +112,8 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T13:54:56.619Z",
-    "updatedAt": "2026-07-26T14:09:56.625Z",
-    "reviewNotes": "Review dispatch skipped — already running: agent-pan-3135-review",
+    "updatedAt": "2026-07-26T14:12:48.460Z",
+    "reviewNotes": "Deferred verification still bypasses required quality gates, deferred merges lose retry scheduling, and deadline escalation remains incomplete.",
     "inspectNotes": "All 4 ACs met. verification-runner.ts:387-395 gates on readPendingDeploy() before the verificationStatus:'running' write at :409, writes 'pending' + a note naming requestedAt, and self-excludes when status is already 'running'. verification-worker-supervisor.ts:140-144 sits AFTER the live-worker waitForResult join at :137, so a queued deploy blocks only new worker spawns. FOLLOW-UP FOR A LATER BEAD (outside these ACs): request-review-pipeline.ts:31-38 only branches on 'failed'/'error', so a 'deferred' outcome currently falls through to pushBranch()+dispatchReview() and advances to review as if it passed — consumers must be taught to halt on 'deferred'.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3142",
     "lastVerifiedCommit": "27f89adb9576474823407bf0fba3f7d03d8d46e2",
@@ -177,6 +177,24 @@
         "tests/unit/lib/deploy/deploy-queue.test.ts"
       ],
       "recordedAt": "2026-07-26T13:53:58.173Z"
+    },
+    "reviewerVerdicts": {
+      "security": {
+        "status": "passed",
+        "atCommit": "6680864c8f13ec69ba20911801160e2233e65a3a"
+      },
+      "correctness": {
+        "status": "blocked",
+        "atCommit": "6680864c8f13ec69ba20911801160e2233e65a3a"
+      },
+      "performance": {
+        "status": "passed",
+        "atCommit": "6680864c8f13ec69ba20911801160e2233e65a3a"
+      },
+      "requirements": {
+        "status": "blocked",
+        "atCommit": "6680864c8f13ec69ba20911801160e2233e65a3a"
+      }
     }
   },
   "closeOut": {
@@ -184,64 +202,64 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 1170195,
-            "output": 26392,
-            "cacheRead": 6717952,
+            "input": 1854915,
+            "output": 34640,
+            "cacheRead": 12068352,
             "cacheWrite": 0
           }
         },
         "review.correctness": {
           "openai/gpt-5.6-sol": {
-            "input": 1656783,
-            "output": 55493,
-            "cacheRead": 12899328,
+            "input": 4952707,
+            "output": 93567,
+            "cacheRead": 22443008,
             "cacheWrite": 0
           }
         },
         "review.performance": {
           "openai/gpt-5.6-sol": {
-            "input": 1230491,
-            "output": 30967,
-            "cacheRead": 5547008,
+            "input": 4189817,
+            "output": 67654,
+            "cacheRead": 15658496,
             "cacheWrite": 0
           }
         },
         "review.requirements": {
           "openai/gpt-5.6-sol": {
-            "input": 2028792,
-            "output": 31128,
-            "cacheRead": 2496000,
+            "input": 4782469,
+            "output": 77082,
+            "cacheRead": 10607104,
             "cacheWrite": 0
           }
         },
         "review.security": {
           "openai/gpt-5.6-sol": {
-            "input": 1204395,
-            "output": 19957,
-            "cacheRead": 3334656,
+            "input": 2948812,
+            "output": 48445,
+            "cacheRead": 11282944,
             "cacheWrite": 0
           }
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 2362731,
-            "output": 207255,
-            "cacheRead": 138846208,
+            "input": 2502825,
+            "output": 209709,
+            "cacheRead": 140269568,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 9653387,
-          "output": 371192,
-          "cacheRead": 169841152,
+          "input": 21231545,
+          "output": 531097,
+          "cacheRead": 212329472,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 144.323271,
-        "pricingAsOf": "2026-07-26T14:09:56.654Z"
+        "usd": 228.255371,
+        "pricingAsOf": "2026-07-26T14:12:48.479Z"
       }
     },
     "merges": [
