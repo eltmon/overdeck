@@ -545,6 +545,13 @@ export async function postMergeLifecycle(
           logActivity('docker_cleanup', `Stopped Docker for ${issueId}: ${dockerResult.steps.join('; ')}`);
         }
       }
+
+      const { teardownWorkspaceDockerByNamePromise } = await import('../workspace-manager/docker.js');
+      const teardown = await teardownWorkspaceDockerByNamePromise(issueLower);
+      if (teardown.networkRemoved) {
+        console.log(`[merge-agent] ✓ Removed Docker network: ${teardown.steps.join('; ')}`);
+        logActivity('docker_cleanup', `Removed Docker network for ${issueId}: ${teardown.steps.join('; ')}`);
+      }
     } catch (err) {
       console.warn(`[merge-agent] Docker cleanup failed (non-fatal): ${err}`);
     }
