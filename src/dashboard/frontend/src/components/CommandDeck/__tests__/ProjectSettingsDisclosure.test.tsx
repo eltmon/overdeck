@@ -8,6 +8,9 @@ let fetchControl: ReturnType<typeof installStrictFetchMock>;
 let autoMergeValue: 'auto' | 'hold' | null;
 let swarmMode: 'off' | 'auto' | 'always' | null;
 let mergeTrainValue: 'enabled' | 'disabled' | null;
+let mergeTrainEffective: boolean;
+let mergeTrainQueue: unknown[];
+let mergeTrainGenerations: Array<{ name: string; status: string }>;
 
 function renderDisclosure() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -21,6 +24,9 @@ describe('ProjectSettingsDisclosure', () => {
     autoMergeValue = null;
     swarmMode = null;
     mergeTrainValue = null;
+    mergeTrainEffective = true;
+    mergeTrainQueue = [];
+    mergeTrainGenerations = [];
     fetchControl = installStrictFetchMock(({ method, url, init }) => {
       if (method === 'GET' && url === '/api/projects/overdeck/auto-merge-default') {
         return Response.json({ value: autoMergeValue });
@@ -39,14 +45,21 @@ describe('ProjectSettingsDisclosure', () => {
       }
       // PAN-1696: per-project merge-train override.
       if (method === 'GET' && url === '/api/projects/overdeck/merge-train') {
-        return Response.json({ value: mergeTrainValue, effective: mergeTrainValue !== 'disabled' });
+        return Response.json({ value: mergeTrainValue, effective: mergeTrainValue === null ? mergeTrainEffective : mergeTrainValue !== 'disabled' });
       }
       if (method === 'POST' && url === '/api/projects/overdeck/merge-train') {
         mergeTrainValue = (JSON.parse(String(init?.body)) as { value: 'enabled' | 'disabled' | null }).value;
-        return Response.json({ value: mergeTrainValue, effective: mergeTrainValue !== 'disabled' });
+        return Response.json({ value: mergeTrainValue, effective: mergeTrainValue === null ? mergeTrainEffective : mergeTrainValue !== 'disabled' });
       }
       if (method === 'GET' && url === '/api/dashboard/session') {
         return Response.json({ csrfToken: 'test-csrf-token' });
+      }
+      // PAN-1696 ac3: the cockpit merge-train summary reads the aggregate endpoints.
+      if (method === 'GET' && url === '/api/merge-train/queues') {
+        return Response.json([{ projectKey: 'overdeck', projectName: 'Overdeck', enabled: true, queue: mergeTrainQueue }]);
+      }
+      if (method === 'GET' && url === '/api/merge-train/generations') {
+        return Response.json([{ projectKey: 'overdeck', projectName: 'Overdeck', enabled: true, generations: mergeTrainGenerations }]);
       }
       return undefined;
     });
@@ -105,6 +118,68 @@ describe('ProjectSettingsDisclosure', () => {
     expect(screen.getByRole('button', { name: 'Merge train: Enabled' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Merge train: Disabled' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Merge train: Global default' })).toBeInTheDocument();
+  });
+
+  // PAN-1696 fe-cockpit-toggle ac1: "Global default" must resolve to what is
+  // actually in force, otherwise the operator cannot tell on from off.
+  it('resolves the effective state when Global default is selected (ac1)', async () => {
+    mergeTrainValue = null;
+    mergeTrainEffective = true;
+    renderDisclosure();
+
+    expect((await screen.findByTestId('merge-train-effective')).textContent)
+      .toBe('Following the global default — currently on for this project.');
+  });
+
+  it('shows the global default resolving to off (ac1)', async () => {
+    mergeTrainValue = null;
+    mergeTrainEffective = false;
+    renderDisclosure();
+
+    expect((await screen.findByTestId('merge-train-effective')).textContent)
+      .toContain('currently off for this project');
+  });
+
+  it('omits the effective gloss when the project sets an explicit value (ac1)', async () => {
+    mergeTrainValue = 'disabled';
+    renderDisclosure();
+
+    await screen.findByRole('button', { name: 'Merge train: Disabled' });
+    expect(screen.queryByTestId('merge-train-effective')).not.toBeInTheDocument();
+  });
+
+  // PAN-1696 fe-cockpit-toggle ac3.
+  it('summarises the ready-feature count and current batch, linking to Awaiting Merge (ac3)', async () => {
+    mergeTrainQueue = [{ issueId: 'PAN-1' }, { issueId: 'PAN-2' }];
+    mergeTrainGenerations = [
+      { name: 'uat/pan-copper-fox-0726', status: 'assembling' },
+      { name: 'uat/pan-otter-0726', status: 'ready' },
+    ];
+    renderDisclosure();
+
+    // The summary renders with zeros before the queries settle, so wait on content.
+    await waitFor(() => expect(screen.getByTestId('merge-train-summary').textContent).toContain('2 features ready'));
+    // The ready batch wins over the assembling one, matching the merge-train view.
+    expect(screen.getByTestId('merge-train-summary').textContent).toContain('batch pan-otter-0726 (ready)');
+    expect(screen.getByRole('link', { name: /Awaiting Merge/ })).toHaveAttribute('href', '/awaiting-merge');
+  });
+
+  it('says so plainly when no batch is assembled (ac3)', async () => {
+    mergeTrainQueue = [{ issueId: 'PAN-1' }];
+    renderDisclosure();
+
+    await waitFor(() => expect(screen.getByTestId('merge-train-summary').textContent).toContain('1 feature ready'));
+    expect(screen.getByTestId('merge-train-summary').textContent).toContain('no batch assembled');
+  });
+
+  it('navigates to Awaiting Merge in-app rather than reloading (ac3)', async () => {
+    const pushState = vi.spyOn(window.history, 'pushState');
+    renderDisclosure();
+
+    fireEvent.click(await screen.findByRole('link', { name: /Awaiting Merge/ }));
+
+    expect(pushState).toHaveBeenCalledWith({}, '', '/awaiting-merge');
+    pushState.mockRestore();
   });
 
   it('posts the selected auto-merge value', async () => {

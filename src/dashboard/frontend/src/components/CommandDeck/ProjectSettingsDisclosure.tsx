@@ -129,7 +129,76 @@ function ProjectSettingsSection({ projectKey }: { projectKey: string }) {
             </button>
           );
         })}
-      </div></div>
+      </div>
+      {/* PAN-1696 ac1: "Global default" alone does not tell the operator whether
+          the train is actually running here, so resolve it from the endpoint's
+          effective field. An explicit Enabled/Disabled needs no gloss. */}
+      {mergeTrainData && mergeTrainData.value === null && (
+        <span className="text-[11px] text-muted-foreground" data-testid="merge-train-effective">
+          Following the global default — currently {mergeTrainData.effective ? 'on' : 'off'} for this project.
+        </span>
+      )}
+      </div>
+      <MergeTrainSummary projectKey={projectKey} />
+    </div>
+  );
+}
+
+/** SPA navigation to a tab: the router keys off the path and listens for popstate. */
+function goToAwaitingMerge(event: React.MouseEvent): void {
+  event.preventDefault();
+  window.history.pushState({}, '', '/awaiting-merge');
+  window.dispatchEvent(new PopStateEvent('popstate'));
+}
+
+/**
+ * PAN-1696 ac3: a compact per-project merge-train summary in the cockpit — how
+ * many features are ready and what the current batch is — linking to the full
+ * multi-project view on Awaiting Merge. Reads the aggregate endpoints and filters
+ * to this project, so it needs no flywheel run.
+ */
+function MergeTrainSummary({ projectKey }: { projectKey: string }) {
+  const { data: queues } = useQuery({
+    queryKey: ['merge-train-queues'],
+    queryFn: async (): Promise<Array<{ projectKey: string; queue: unknown[] }>> => {
+      const res = await fetch('/api/merge-train/queues');
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!projectKey,
+  });
+  const { data: generations } = useQuery({
+    queryKey: ['merge-train-generations'],
+    queryFn: async (): Promise<Array<{ projectKey: string; generations: Array<{ name: string; status: string }> }>> => {
+      const res = await fetch('/api/merge-train/generations');
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!projectKey,
+  });
+
+  const readyCount = (Array.isArray(queues) ? queues : []).find((q) => q.projectKey === projectKey)?.queue?.length ?? 0;
+  const chain = (Array.isArray(generations) ? generations : []).find((g) => g.projectKey === projectKey)?.generations ?? [];
+  // Newest testable batch first — the same set the merge-train view shows.
+  const current = chain.find((g) => g.status === 'ready')
+    ?? chain.find((g) => g.status === 'assembling')
+    ?? chain.find((g) => g.status === 'superseded');
+
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-border pt-3 text-[11px]" data-testid="merge-train-summary">
+      <span className="text-muted-foreground">
+        {readyCount} feature{readyCount === 1 ? '' : 's'} ready
+        {current
+          ? ` · batch ${current.name.replace(/^uat\//, '')} (${current.status})`
+          : ' · no batch assembled'}
+      </span>
+      <a
+        href="/awaiting-merge"
+        onClick={goToAwaitingMerge}
+        className="font-medium text-primary hover:underline"
+      >
+        Awaiting Merge →
+      </a>
     </div>
   );
 }
