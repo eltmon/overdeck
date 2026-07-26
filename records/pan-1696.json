@@ -269,7 +269,7 @@
     }
   ],
   "created": "2026-07-26T00:35:36.057Z",
-  "updated": "2026-07-26T06:48:50.915Z",
+  "updated": "2026-07-26T07:02:15.427Z",
   "pipeline": {
     "issueId": "PAN-1696",
     "reviewStatus": "pending",
@@ -384,16 +384,8 @@
   "harness": "claude-code",
   "model": "claude-opus-5",
   "tasks": {
-    "sequence": 29,
-    "claims": {
-      "run-scope-persist": {
-        "writerId": "agent-pan-1696",
-        "agentId": "agent-pan-1696",
-        "pid": 3017170,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-26T06:48:50.914Z"
-      }
-    },
+    "sequence": 30,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-1696",
@@ -544,6 +536,17 @@
         "outcome": "completed",
         "reason": "MergeQueueCard is now a thin RailCard shell around the shared MergeTrainView (457 to 34 lines), reading only /api/merge-train/*; run-active gating removed (FlywheelPage passes active unconditionally, and active controls polling only, not whether reads happen). Extracted useMergeTrainData/mergeTrainTotals so the card labels its header from the same payloads. The page's Merge train ToggleSwitch is untouched and still posts merge_train_enabled; FlywheelConversationPane needed no change (no legacy endpoints). Card tests rewritten for the wrapper contract. Browser-verified at 460px rail width with no run data: aggregate endpoints only, zero legacy, correct cross-project count, zero console errors.",
         "releasedAt": "2026-07-26T06:48:37.294Z"
+      },
+      {
+        "writerId": "agent-pan-1696",
+        "agentId": "agent-pan-1696",
+        "pid": 3017170,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T06:48:50.914Z",
+        "itemId": "run-scope-persist",
+        "outcome": "completed",
+        "reason": "Scope now persists on FlywheelLaunchMetadata (written at start, re-stamped on resume when the configured value changed) and is restamped onto the status from launch metadata on every write, so the orchestrator's own POSTs cannot forge or erase it; exposed as optional fields on the FlywheelStatus contract and FlywheelRunDetail. Pane shows a live run's own scope via new pure resolveDisplayedScope(), falls back to the configured value with no run, surfaces a configured-vs-run mismatch in amber, and carries the 'applies at the next run start or resume' note. Also added an aria-label to the Run config card (its accessible name was the whole config dump, so 'resume' in the new note collided with the Resume button query). 14 new tests.",
+        "releasedAt": "2026-07-26T07:02:15.427Z"
       }
     ],
     "statusReasons": {
@@ -578,6 +581,10 @@
       "fe-flywheel-viewer": {
         "reason": "MergeQueueCard is now a thin RailCard shell around the shared MergeTrainView (457 to 34 lines), reading only /api/merge-train/*; run-active gating removed (FlywheelPage passes active unconditionally, and active controls polling only, not whether reads happen). Extracted useMergeTrainData/mergeTrainTotals so the card labels its header from the same payloads. The page's Merge train ToggleSwitch is untouched and still posts merge_train_enabled; FlywheelConversationPane needed no change (no legacy endpoints). Card tests rewritten for the wrapper contract. Browser-verified at 460px rail width with no run data: aggregate endpoints only, zero legacy, correct cross-project count, zero console errors.",
         "updatedAt": "2026-07-26T06:48:37.294Z"
+      },
+      "run-scope-persist": {
+        "reason": "Scope now persists on FlywheelLaunchMetadata (written at start, re-stamped on resume when the configured value changed) and is restamped onto the status from launch metadata on every write, so the orchestrator's own POSTs cannot forge or erase it; exposed as optional fields on the FlywheelStatus contract and FlywheelRunDetail. Pane shows a live run's own scope via new pure resolveDisplayedScope(), falls back to the configured value with no run, surfaces a configured-vs-run mismatch in amber, and carries the 'applies at the next run start or resume' note. Also added an aria-label to the Run config card (its accessible name was the whole config dump, so 'resume' in the new note collided with the Resume button query). 14 new tests.",
+        "updatedAt": "2026-07-26T07:02:15.427Z"
       }
     }
   },
@@ -629,6 +636,9 @@
     "fe-flywheel-viewer": "completed",
     "fe-flywheel-viewer.fe-flywheel-viewer.ac1": "completed",
     "fe-flywheel-viewer.fe-flywheel-viewer.ac2": "completed",
-    "run-scope-persist": "running"
+    "run-scope-persist": "completed",
+    "run-scope-persist.run-scope-persist.ac1": "completed",
+    "run-scope-persist.run-scope-persist.ac2": "completed",
+    "run-scope-persist.run-scope-persist.ac3": "completed"
   }
 }
