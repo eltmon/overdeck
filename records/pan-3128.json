@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T12:24:12.648Z",
-  "updated": "2026-07-26T13:00:53.416Z",
+  "updated": "2026-07-26T13:01:05.008Z",
   "pipeline": {
     "issueId": "PAN-3128",
     "reviewStatus": "pending",
@@ -61,8 +61,16 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 6,
-    "claims": {},
+    "sequence": 7,
+    "claims": {
+      "deploy-docs-and-flywheel-mission": {
+        "writerId": "agent-pan-3128",
+        "agentId": "agent-pan-3128",
+        "pid": 1589513,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T13:01:05.007Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3128",
@@ -129,6 +137,7 @@
     "dod-row7-provenance-gate.dod-row7-provenance-gate.ac1": "completed",
     "dod-row7-provenance-gate.dod-row7-provenance-gate.ac2": "completed",
     "dod-row7-provenance-gate.dod-row7-provenance-gate.ac3": "completed",
-    "dod-row7-provenance-gate.dod-row7-provenance-gate.ac4": "completed"
+    "dod-row7-provenance-gate.dod-row7-provenance-gate.ac4": "completed",
+    "deploy-docs-and-flywheel-mission": "running"
   }
 }
