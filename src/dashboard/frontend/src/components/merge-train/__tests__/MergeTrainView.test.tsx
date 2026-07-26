@@ -331,6 +331,25 @@ describe('project filter chips (ac2)', () => {
     expect(screen.queryByTestId('merge-train-project-overdeck')).toBeNull();
   });
 
+  it('scopes the empty message to selected projects when filtered-out work is ready', async () => {
+    window.localStorage.setItem(MERGE_TRAIN_PROJECT_FILTER_KEY, JSON.stringify(['myn']));
+    mockFetch({
+      '/api/merge-train/queues': [
+        { projectKey: 'overdeck', projectName: 'Overdeck', enabled: true, queue: PAN_QUEUE },
+        { projectKey: 'myn', projectName: 'Mind Your Now', enabled: true, queue: [] },
+      ],
+      '/api/merge-train/generations': [
+        { projectKey: 'overdeck', projectName: 'Overdeck', enabled: true, generations: [PAN_READY_GEN] },
+      ],
+    });
+    renderView();
+
+    await screen.findByText(/No features are ready to merge in the selected projects/);
+    expect(screen.queryByText(/No features are ready to merge in any project/)).toBeNull();
+    expect(screen.queryByTestId('merge-train-project-overdeck')).toBeNull();
+    expect(screen.queryByTestId('merge-train-project-myn')).toBeNull();
+  });
+
   it('shows every project by default when nothing is stored', async () => {
     mockFetch(twoProjectResponses());
     renderView();

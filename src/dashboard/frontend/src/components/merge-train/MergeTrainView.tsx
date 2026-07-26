@@ -485,7 +485,9 @@ export function MergeTrainView({ active, onNavigateIssue, showProjectFilter = tr
         <p className="px-1 py-1.5 text-xs text-muted-foreground">
           {loading
             ? 'Loading the merge train…'
-            : 'No features are ready to merge in any project. When work passes review and tests, it lines up here and a test batch assembles automatically.'}
+            : visibleSections.length === sections.length
+              ? 'No features are ready to merge in any project. When work passes review and tests, it lines up here and a test batch assembles automatically.'
+              : 'No features are ready to merge in the selected projects. Other projects may still have ready work.'}
         </p>
       ) : (
         <>
