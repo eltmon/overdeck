@@ -65,17 +65,17 @@
     "recordedAt": "2026-07-26T12:02:11.445Z"
   },
   "created": "2026-07-26T06:17:49.254Z",
-  "updated": "2026-07-26T12:02:19.799Z",
+  "updated": "2026-07-26T12:02:22.732Z",
   "pipeline": {
     "issueId": "PAN-3110",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "failed",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T12:02:18.332Z",
+    "updatedAt": "2026-07-26T12:02:22.668Z",
     "inspectNotes": "All 5 ACs verified against code, not just tests. AC1: mergeableState 'behind' skips canMergeCleanPrDirectly, isBranchAlreadyRebased fails, rebaseWithAgentFallback (merge-strike.ts:165) runs rebaseFeatureBranch and returns on success with no ensureAgentReadyForMerge/messageAgent call. AC2: the catch at merge-strike.ts:190 records conflictedFiles then falls through to the agent path. AC3: merge-ops.ts:945-948 returns retryable:true and writes only {mergeStatus:'queued', mergeNotes}, leaving readyForMerge/reviewStatus/testStatus/verificationStatus untouched; that matches the existing contract at review-status.ts:781 where 'queued' is the re-drivable state and 'failed' is human-review-only, so the write is not inert. AC4: the checksFailed 409 at merge-ops.ts:851-856 is untouched and returns before any rebase, still with mergeStatus 'failed'+readyForMerge:false and no retryable field. AC5: merge-ops.ts:74-75 console.warn present. Verified empirically that Effect.runPromise rejects with the raw error value, so MergeConflictError.conflictedFiles is genuinely reachable and conflicts classify non-retryable. TWO NON-BLOCKING NOTES: (1) merge-strike.ts:196 reads error.message, but Data.TaggedError sets message to empty string, so a real non-conflict GitError collapses to the generic 'Server-side rebase failed' and its stderr never reaches mergeNotes - consider also reading detail.stderr. (2) conflict-then-agent-stopped is classified non-retryable via conflictFiles.length===0; AC3's wording is literally unconditional but this reading is correct because auto-requeuing a conflict would loop forever.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3136",
     "reviewRequestedAt": "2026-07-26T12:02:14.117Z",
@@ -129,24 +129,24 @@
       "byStage": {
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 2493770,
-            "output": 228905,
-            "cacheRead": 97849344,
+            "input": 2497240,
+            "output": 229351,
+            "cacheRead": 98330624,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 2493770,
-          "output": 228905,
-          "cacheRead": 97849344,
+          "input": 2497240,
+          "output": 229351,
+          "cacheRead": 98330624,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 68.260672,
-        "pricingAsOf": "2026-07-26T12:02:19.794Z"
+        "usd": 68.532042,
+        "pricingAsOf": "2026-07-26T12:02:22.727Z"
       }
     },
     "merges": [
