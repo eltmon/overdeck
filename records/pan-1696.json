@@ -299,17 +299,9 @@
       "timestamp": "2026-07-26T09:06:26.450Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "verification-gate",
-      "outcome": "failed",
-      "timestamp": "2026-07-26T09:06:26Z",
-      "markdownBody": "VERIFICATION FAILED for PAN-1696 (attempt 2/3):\n\nFailed check: sync-target-branch\n\nSync with main FAILED — merge conflicts detected:\n\nMerge conflicts with main:\n  - scripts/file-size-baseline.txt\n\n## REQUIRED: Resolve merge conflicts BEFORE resubmitting\n\n1. Run: `git fetch origin main && git merge origin/main`\n2. Resolve all conflicts in the listed files\n3. Run the project's build and tests to verify nothing broke\n4. Commit and push ALL changes\n\nAfter fixing:\n1. Run the project's build and tests\n2. Commit and push ALL changes\n3. ONLY THEN resubmit: pan review request PAN-1696 -m \"Fixed sync-target-branch\"\n\nDo NOT resubmit until all repos sync cleanly and tests pass."
-    }
-  ],
+  "feedback": [],
   "created": "2026-07-26T00:35:36.057Z",
-  "updated": "2026-07-26T09:24:20.643Z",
+  "updated": "2026-07-26T09:24:24.019Z",
   "pipeline": {
     "issueId": "PAN-1696",
     "reviewStatus": "pending",
@@ -320,7 +312,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T08:32:36.176Z",
-    "updatedAt": "2026-07-26T09:24:20.597Z",
+    "updatedAt": "2026-07-26T09:24:23.343Z",
     "reviewNotes": "Agent re-review request (2/25): Fixed sync-target-branch: merged 41 commits of main and resolved the scripts/file-size-baseline.txt conflict (main re-added an AwaitingMergePage.tsx entry at 1012 lines because its copy is unchanged; this branch extracted that file's API helpers down to 939 lines, under the god-file ceiling, so the entry stays removed). All seven gates re-run green on the merged tree: install, typecheck, frontend-typecheck, lint, build, server-bundle exit 0; root 10845 passed, frontend 2510 passed, zero failures.",
     "inspectNotes": "ac1/ac2/ac3 all met, verified against tree not just diff. ac1: getMergeTrainQueuesPayload maps every listProjectsSync() entry to {projectKey, projectName, enabled, queue}; ready set comes from listEligibleCandidatesByProject (flywheel-merge-order.ts:326 reads loadReviewStatuses/readyForMerge/mergeGateEligibility) so no activePipeline and no run is consulted anywhere in the path; effective flag is isMergeTrainEnabledForProject (merge-sync.ts:86 per-project override else global). ac2: getMergeTrainGenerationsPayload passes each project root into getUatGenerationsPayload(override) which now threads projectRoot into listUatGenerationsSync; the stack and promote handlers are byte-for-byte the legacy flywheel.ts:912/928 bodies including uatGenerationNameFromParam prefix reconstruction, firePostMergeLifecycle wiring, and the 404/500/409 reason mapping, behind the same rejectUnsafeDashboardMutationRequest gate; assemble with {project} reproduces legacy flywheel.ts:953 runUatTrainReconcile({force:true}) scoped to that root, no-project form is a deliberate superset. ac3: postMergeTrainMergeNextPayload orders the NAMED project ready set via computeMergeQueueFromCandidates(candidates, resolve(config.path)) and ships it through shipMergeBatch, unknown key -> 404 with error body naming the key, missing key / n<=0 -> 400, disabled project -> 409, all before any merge call. getUatGenerationSync is imported (uat-train.ts:37) and UatGeneration carries projectRoot (merge-sync.ts:420) so the promote root fix is sound. NO-LOSS-MATRIX carries all six routes each naming its superseded /api/flywheel route. Non-blocking notes for the frontend-migration and remove-legacy-routes items: (1) merge-next auth is STRICTER than legacy - legacy /api/flywheel/merge-next used requireTrustedOrigin only, the new route requires session cookie + CSRF, so the migrated caller must send both or it will 401; (2) assemble response shape changed from the bare ReconcileResult to {projects:[{projectKey,result}]}; (3) assemble with {project} does not gate on isMergeTrainEnabledForProject while merge-next 409s - acceptable for a forced operator action but worth making deliberate.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3095",
@@ -417,7 +409,7 @@
       },
       "costAtCloseOut": {
         "usd": 238.4473572,
-        "pricingAsOf": "2026-07-26T09:24:20.636Z"
+        "pricingAsOf": "2026-07-26T09:24:23.507Z"
       }
     },
     "merges": [
