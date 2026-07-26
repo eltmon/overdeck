@@ -2,6 +2,7 @@ import { execFile } from 'node:child_process';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 
+import type { MembershipUnavailableReason } from '@overdeck/contracts';
 import { Effect } from 'effect';
 
 import {
@@ -231,6 +232,16 @@ async function listProjectTrackerIssues(project: ProjectConfig): Promise<Project
       labels: issue.labels,
     }];
   });
+}
+
+export class PipelineMembershipUnavailableError extends Error {
+  public readonly reason: MembershipUnavailableReason;
+
+  constructor(reason: MembershipUnavailableReason, message: string) {
+    super(message);
+    this.name = 'PipelineMembershipUnavailableError';
+    this.reason = reason;
+  }
 }
 
 export interface PipelineMembershipGatherDeps {

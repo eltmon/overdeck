@@ -2,6 +2,10 @@ import { readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import {
+  MEMBERSHIP_UNAVAILABLE_REASONS,
+  type MembershipUnavailableReason,
+} from '@overdeck/contracts';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
@@ -11,6 +15,7 @@ import {
   PIPELINE_PROJECT_CONCURRENCY,
   listIssueStatesBatched,
   listMergedPullRequestHeadsBatched,
+  PipelineMembershipUnavailableError,
   type PipelineMembershipGatherDeps,
 } from '../../../src/lib/pipeline-membership-gather.js';
 import { resolvePipelineMembership } from '../../../src/lib/pipeline-membership.js';
@@ -58,6 +63,28 @@ function deps(): PipelineMembershipGatherDeps {
     }),
   };
 }
+
+describe('pipeline membership unavailability contract', () => {
+  it('exports the ordered reason set used by the typed gather error', () => {
+    const expectedReasons: MembershipUnavailableReason[] = [
+      'missing_issue_prefix',
+      'repo_unavailable',
+      'default_branch_unresolved',
+      'forge_unavailable',
+      'tracker_unconfigured',
+      'gather_failed',
+    ];
+
+    expect(MEMBERSHIP_UNAVAILABLE_REASONS).toEqual(expectedReasons);
+
+    const error = new PipelineMembershipUnavailableError('repo_unavailable', 'msg');
+    expect(error).toMatchObject({
+      name: 'PipelineMembershipUnavailableError',
+      reason: 'repo_unavailable',
+      message: 'msg',
+    });
+  });
+});
 
 describe('gatherIssueBranchContainment', () => {
   it('classifies merged work, pointers, and unmerged feature and strike refs', async () => {
