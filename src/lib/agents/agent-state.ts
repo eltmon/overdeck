@@ -719,7 +719,7 @@ export type ResumeGateBlock =
   | { gate: 'stopped-by-user'; reason: string }
   | { gate: 'failure-backoff'; reason: string; consecutiveFailures: number };
 
-export type ResumeIntent = 'autonomous' | 'operator-start' | 'message-delivery';
+export type ResumeIntent = 'autonomous' | 'operator-start' | 'message-delivery' | 'merge-preparation';
 
 /** PAN-2668: messageAgent options — owesRework marks the message as pipeline
  *  feedback requiring rework (failed verification/review), which may re-drive
@@ -734,7 +734,7 @@ export interface ResumeGateContext {
 }
 
 export type ResumeGateDecision =
-  | { decision: 'proceed'; clearStoppedByUser?: true; overrideFailureBackoff?: true; warning?: string }
+  | { decision: 'proceed'; clearStoppedByUser?: true; clearYield?: true; overrideFailureBackoff?: true; warning?: string }
   | { decision: 'block'; reason: string; needsYou?: true }
   | { decision: 'queue-message'; reason: string };
 
@@ -784,6 +784,24 @@ export function decideResumeGate(
       return { decision: 'proceed', clearStoppedByUser: true };
     }
     return { decision: 'queue-message', reason: block.reason };
+  }
+
+  // PAN-3120: clicking MERGE is an explicit operator action on this issue, and
+  // the polyrepo/rebase path NEEDS the work agent. A scheduler yield is a
+  // resource pause the system chose on its own (self-clearing by design), so it
+  // must never be what stops a merge the operator asked for. An operator's own
+  // pause, or a troubled agent, still blocks — those are decisions/faults a
+  // human should see rather than have silently overridden.
+  if (intent === 'merge-preparation') {
+    if (block.gate === 'paused') {
+      if (block.yieldedByScheduler === true) return { decision: 'proceed', clearYield: true };
+      return { decision: 'block', reason: `${block.reason}; run pan unpause before merging`, needsYou: true };
+    }
+    if (block.gate === 'troubled') {
+      return { decision: 'block', reason: `${block.reason}; run pan untroubled after investigating the crash`, needsYou: true };
+    }
+    if (block.gate === 'stopped-by-user') return { decision: 'proceed', clearStoppedByUser: true };
+    return { decision: 'proceed', overrideFailureBackoff: true, warning: `Merge preparation overrides ${block.reason}` };
   }
 
   if (intent === 'operator-start') {
