@@ -14,6 +14,7 @@ import { MessagesTimeline, type RoundMarker } from './MessagesTimeline';
 import { ComposerFooter } from './ComposerFooter';
 import { toContextWindowSnapshot } from '../../lib/contextWindow';
 import { fetchWithTimeout } from '../../lib/apiFetch';
+import { useConversationPaneChoice } from '../../lib/useConversationPaneChoice';
 import { ModelPicker, saveStoredHarness, saveStoredModel, type Harness } from './ModelPicker';
 import { getDefaultConversationModel } from './defaultConversationModel';
 import type { ChatMessage, CompactBoundary, ContextUsage, ProposedPlan, TurnDiffSummary, WorkLogEntry } from './chat-types';
@@ -1026,6 +1027,7 @@ export function ConversationPanel({
               streamMessagesEnabled={streamMessagesEnabled}
               messagesData={messagesData}
               messagesLoading={messagesLoading}
+              onOpenTerminal={showTerminal ? () => handleViewMode('terminal') : undefined}
               targetMessageId={targetMessageId}
               targetMessageIndex={targetMessageIndex}
               targetMessageNonce={targetMessageNonce}
@@ -1217,6 +1219,8 @@ interface ConversationViewProps {
   /** True when the shared conversation-messages cache is fed by the WS stream. */
   streamMessagesEnabled?: boolean;
   messagesData?: MessagesResponse;
+  /** PAN-3113 — switch the panel to terminal mode (pane choice card). */
+  onOpenTerminal?: () => void;
   messagesLoading?: boolean;
   targetMessageId?: string;
   targetMessageIndex?: number;
@@ -1226,7 +1230,7 @@ interface ConversationViewProps {
 
 export type { FailedMessage } from './chat-types';
 
-function ConversationView({ conversation, onResume, onArchive, resumePending, resumeLabel, hideComposer = false, onSendFailed: onSendFailedProp, modelPicker, roundMarkers, roundMetadata, turnDiffSummaryByAssistantMessageId, onOpenTurnDiff, resolvedTheme, agentId, hideToolCalls, workingPhase, agentBusy = false, streamMessagesEnabled, messagesData, messagesLoading, targetMessageId, targetMessageIndex, targetMessageNonce, onTargetMessageHandled }: ConversationViewProps) {
+function ConversationView({ conversation, onResume, onArchive, resumePending, resumeLabel, hideComposer = false, onSendFailed: onSendFailedProp, modelPicker, roundMarkers, roundMetadata, turnDiffSummaryByAssistantMessageId, onOpenTurnDiff, resolvedTheme, agentId, hideToolCalls, workingPhase, agentBusy = false, streamMessagesEnabled, messagesData, messagesLoading, onOpenTerminal, targetMessageId, targetMessageIndex, targetMessageNonce, onTargetMessageHandled }: ConversationViewProps) {
   const isCompacting = useDashboardStore((s) => s.conversationsCompactingByName?.[conversation.name] ?? false);
   // Optimistic sent messages and the failed-send retry outbox live in the
   // module-level composerStore, keyed by conversation name. ConversationView is
@@ -1255,6 +1259,11 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, re
 
   const data = messagesData;
   const isLoading = messagesLoading ?? false;
+
+  // PAN-3113 — this conversation's blocking pane choice menu (session-resume
+  // gate et al.) and the mount-local record of dashboard-answered choices.
+  const { livePaneChoice, answeredPaneChoices, handlePaneChoiceAnswered } =
+    useConversationPaneChoice(conversation.name, agentId);
 
   const serverMessages = data?.messages ?? [];
   const workLog = data?.workLog ?? [];
@@ -1480,6 +1489,10 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, re
           onDiscardFailed={handleDiscardFailed}
           onConfirmCommand={handleConfirmCommand}
           proposedPlan={data?.proposedPlan}
+          paneChoice={livePaneChoice}
+          answeredPaneChoices={answeredPaneChoices}
+          onPaneChoiceAnswered={handlePaneChoiceAnswered}
+          onOpenTerminal={onOpenTerminal}
           compactBoundaries={data?.compactBoundaries}
           compacting={isCompacting}
           conversationName={conversation.name}

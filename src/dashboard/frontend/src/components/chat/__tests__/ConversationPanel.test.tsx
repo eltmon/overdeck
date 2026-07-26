@@ -105,6 +105,11 @@ function defaultConversationResponse(method: string, url: string): Response | un
   if (method === 'GET' && /^\/api\/conversations\/(test-conv|next-conv)\/diffs$/.test(url)) {
     return Response.json({ summaries: [] });
   }
+  // PAN-3113 — the panel polls the shared pending-input feed for pane choice
+  // menus; nothing is pending in these fixtures.
+  if (method === 'GET' && url.endsWith('/api/conversations/pending-input')) {
+    return Response.json([]);
+  }
   return undefined;
 }
 
