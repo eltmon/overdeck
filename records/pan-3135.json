@@ -2,7 +2,7 @@
   "issueId": "PAN-3135",
   "schemaVersion": 2,
   "created": "2026-07-26T12:24:46.201Z",
-  "updated": "2026-07-26T12:24:46.201Z",
+  "updated": "2026-07-26T12:24:47.118Z",
   "pipeline": {
     "issueId": "PAN-3135",
     "reviewStatus": "pending",
@@ -25,5 +25,7 @@
       "note": "Planning session started for PAN-3135: Deploy gate can starve the deployer: 'any verification in flight' has no queue or deadline, and blockers hand off to each other",
       "timestamp": "2026-07-26T12:24:46.201Z"
     }
-  ]
+  ],
+  "harness": "claude-code",
+  "model": "k3[1m]"
 }
