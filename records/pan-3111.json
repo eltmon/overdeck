@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T12:26:09.908Z",
-  "updated": "2026-07-26T13:18:23.971Z",
+  "updated": "2026-07-26T13:25:54.468Z",
   "pipeline": {
     "issueId": "PAN-3111",
     "reviewStatus": "pending",
@@ -61,16 +61,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "persist-flywheel-run-id": {
-        "writerId": "agent-pan-3111",
-        "agentId": "agent-pan-3111",
-        "pid": 2185996,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-26T13:18:23.970Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3111",
@@ -104,6 +96,17 @@
         "outcome": "completed",
         "reason": "Gated in_progress lifecycle work dispatch through the shared autonomous pickup predicate and added warning plus durable needs-you handling on refusal while preserving allowed spawns.",
         "releasedAt": "2026-07-26T13:18:13.812Z"
+      },
+      {
+        "writerId": "agent-pan-3111",
+        "agentId": "agent-pan-3111",
+        "pid": 2185996,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T13:18:23.970Z",
+        "itemId": "persist-flywheel-run-id",
+        "outcome": "completed",
+        "reason": "Persisted the normalized flywheel run id into both spawnAgent and spawnRun AgentState saves, verified undefined behavior without a run, and confirmed the existing database mapper carries the value.",
+        "releasedAt": "2026-07-26T13:25:54.467Z"
       }
     ],
     "statusReasons": {
@@ -118,6 +121,10 @@
       "gate-reactive-work-dispatch": {
         "reason": "Gated in_progress lifecycle work dispatch through the shared autonomous pickup predicate and added warning plus durable needs-you handling on refusal while preserving allowed spawns.",
         "updatedAt": "2026-07-26T13:18:13.812Z"
+      },
+      "persist-flywheel-run-id": {
+        "reason": "Persisted the normalized flywheel run id into both spawnAgent and spawnRun AgentState saves, verified undefined behavior without a run, and confirmed the existing database mapper carries the value.",
+        "updatedAt": "2026-07-26T13:25:54.467Z"
       }
     }
   },
@@ -133,6 +140,8 @@
     "gate-reactive-work-dispatch": "completed",
     "gate-reactive-work-dispatch.gate-reactive-work-dispatch.ac1": "completed",
     "gate-reactive-work-dispatch.gate-reactive-work-dispatch.ac2": "completed",
-    "persist-flywheel-run-id": "running"
+    "persist-flywheel-run-id": "completed",
+    "persist-flywheel-run-id.persist-flywheel-run-id.ac1": "completed",
+    "persist-flywheel-run-id.persist-flywheel-run-id.ac2": "completed"
   }
 }
