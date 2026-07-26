@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T20:52:58.018Z",
-  "updated": "2026-07-26T21:51:59.697Z",
+  "updated": "2026-07-26T21:55:52.140Z",
   "pipeline": {
     "issueId": "PAN-3162",
     "reviewStatus": "pending",
@@ -61,16 +61,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 13,
-    "claims": {
-      "merge-oracle-docs": {
-        "writerId": "agent-pan-3162",
-        "agentId": "agent-pan-3162",
-        "pid": 1404492,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-26T21:51:59.697Z"
-      }
-    },
+    "sequence": 14,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3162",
@@ -137,6 +129,17 @@
         "outcome": "completed",
         "reason": "Pinned listEligibleCandidatesByProject exclusion for mergeStatus=merged; existing uat-reconciler test proves 'left the ready queue' invalidation. Read-only checkpoint: GitLab shows MIN-898 fe !85 and MIN-858 fe !86 merged while api !69/!70 and docs !14/!15 remain open; merge-set resolver shows both fe rows merged, and pan show reports both issues mergeStatus=pending readyForMerge=true, so neither is terminalized.",
         "releasedAt": "2026-07-26T21:51:43.900Z"
+      },
+      {
+        "writerId": "agent-pan-3162",
+        "agentId": "agent-pan-3162",
+        "pid": 1404492,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T21:51:59.697Z",
+        "itemId": "merge-oracle-docs",
+        "outcome": "completed",
+        "reason": "Documented per-repo forge merge evidence, positive-evidence terminalization, 30-minute recovery patrol, skip-merged merge clicks, and ready-set generation invalidation",
+        "releasedAt": "2026-07-26T21:55:52.140Z"
       }
     ],
     "statusReasons": {
@@ -163,6 +166,10 @@
       "ready-set-propagation-and-live-checkpoint": {
         "reason": "Pinned listEligibleCandidatesByProject exclusion for mergeStatus=merged; existing uat-reconciler test proves 'left the ready queue' invalidation. Read-only checkpoint: GitLab shows MIN-898 fe !85 and MIN-858 fe !86 merged while api !69/!70 and docs !14/!15 remain open; merge-set resolver shows both fe rows merged, and pan show reports both issues mergeStatus=pending readyForMerge=true, so neither is terminalized.",
         "updatedAt": "2026-07-26T21:51:43.900Z"
+      },
+      "merge-oracle-docs": {
+        "reason": "Documented per-repo forge merge evidence, positive-evidence terminalization, 30-minute recovery patrol, skip-merged merge clicks, and ready-set generation invalidation",
+        "updatedAt": "2026-07-26T21:55:52.140Z"
       }
     }
   },
@@ -196,6 +203,9 @@
     "ready-set-propagation-and-live-checkpoint.ready-set-propagation-and-live-checkpoint.ac1": "completed",
     "ready-set-propagation-and-live-checkpoint.ready-set-propagation-and-live-checkpoint.ac2": "completed",
     "ready-set-propagation-and-live-checkpoint.ready-set-propagation-and-live-checkpoint.ac3": "completed",
-    "merge-oracle-docs": "running"
+    "merge-oracle-docs": "completed",
+    "merge-oracle-docs.merge-oracle-docs.ac1": "completed",
+    "merge-oracle-docs.merge-oracle-docs.ac2": "completed",
+    "merge-oracle-docs.merge-oracle-docs.ac3": "completed"
   }
 }
