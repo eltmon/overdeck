@@ -54,7 +54,7 @@
     "recordedAt": "2026-07-26T10:37:54.195Z"
   },
   "created": "2026-07-26T08:55:24.679Z",
-  "updated": "2026-07-26T10:39:12.504Z",
+  "updated": "2026-07-26T10:40:13.830Z",
   "pipeline": {
     "issueId": "PAN-3114",
     "reviewStatus": "pending",
@@ -100,7 +100,9 @@
         "tests/unit/lib/lifecycle/workflows.test.ts"
       ],
       "recordedAt": "2026-07-26T10:37:54.195Z"
-    }
+    },
+    "reviewRequestedAt": "2026-07-26T10:40:13.370Z",
+    "panDoneRecoveredAt": "2026-07-26T10:40:13.370Z"
   },
   "closeOut": {
     "usage": {
