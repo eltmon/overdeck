@@ -42,9 +42,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-26T15:15:28.534Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-26T15:16Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-26T15:16:46.315Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-26T15:16:46Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-3138\n\n# Review Synthesis — PAN-3138 — 2026-07-26T15:15:00Z\n\n## Verdict: CHANGES REQUESTED — a failed verifying-on-main tracker transition permanently skips the required merge-time Docker teardown\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3138/.pan/review/agent-pan-3138-review-2ae7a297/context.json\n- Branch: feature/pan-3138\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3138\n- HEAD reviewed: 2ae7a2971a8c4516de6fe78b878d3c2fb986c98e\n- Cycle number: 2\n- Prior cycle SHA: ad37787c2c81d40ae7e7365f0704b913ba266986\n- PR commits: 8\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3138/.pan/review/agent-pan-3138-review-2ae7a297/security.md | 0 |\n| correctness | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3138/.pan/review/agent-pan-3138-review-2ae7a297/correctness.md | 1 |\n| performance | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3138/.pan/review/agent-pan-3138-review-2ae7a297/performance.md | 0 |\n| requirements | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3138/.pan/review/agent-pan-3138-review-2ae7a297/requirements.md | 0 |\n\n## Blocking Findings\n\n### [correctness] Merge-time teardown is skipped permanently when the verifying-on-main transition fails — `src/lib/cloister/merge-agent.ts:548`\nThe new name-based teardown remains after `transitionIssueToVerifyingOnMain()`. If that external tracker transition fails after `verifyMergedBeforeLifecycle()` has already established that the merge succeeded, the catch at lines 427–441 writes `mergeStatus: 'failed'` and rethrows, so execution never reaches the changed teardown call at lines 548–556. The reaper fallback introduced by this PR only cleans open devnets whose canonical local merge status is `merged`, so the overwritten `failed` status prevents later recovery and leaves the `_devnet` allocated indefinitely. The teardown placement is inside the PR diff and directly defeats the feature's address-pool-leak guarantee on a supported failure path. Run the non-fatal name-based teardown immediately after merge verification and before unrelated fatal lifecycle operations, or put it in a guaranteed verified-merge cleanup path, with a regression test covering tracker-transition failure.\n\n## Non-blocking Findings\n\n### [performance] Merged Docker cleanup serially occupies the main Deacon patrol — `src/lib/cloister/closed-issue-reaper.ts:751`\nThe patrol awaits each multi-command Docker teardown serially, so a degraded Docker daemon or a backlog of leaked devnets can delay later patrol responsibilities for minutes. This is advisory because healthy commands are bounded and the serial execution avoids overloading Docker, but a dedicated deduplicated worker with retry backoff would keep the main patrol responsive.\n\n## Clean Sub-roles\n- security\n- requirements\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3138/.pan/review/agent-pan-3138-review-2ae7a297/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3138 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "scripts/file-size-baseline.txt",
@@ -82,7 +95,7 @@
     "recordedAt": "2026-07-26T15:10:38.144Z"
   },
   "created": "2026-07-26T13:39:19.365Z",
-  "updated": "2026-07-26T15:16:45.714Z",
+  "updated": "2026-07-26T15:16:46.315Z",
   "pipeline": {
     "issueId": "PAN-3138",
     "reviewStatus": "blocked",
