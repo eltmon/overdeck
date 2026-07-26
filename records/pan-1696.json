@@ -236,16 +236,17 @@
   ],
   "feedback": [],
   "created": "2026-07-26T00:35:36.057Z",
-  "updated": "2026-07-26T04:01:25.062Z",
+  "updated": "2026-07-26T04:05:37.047Z",
   "pipeline": {
     "issueId": "PAN-1696",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T04:01:17.297Z",
+    "updatedAt": "2026-07-26T04:05:37.012Z",
+    "reviewNotes": "pan flywheel status remains active-run-only and queue-free, while the new cockpit toggle omits required CSRF headers and its focused component suite fails 6/6 tests.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/1822",
     "reviewSpawnedAt": "2026-07-26T04:01:17.296Z"
@@ -277,18 +278,18 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 7116484,
-            "output": 400615,
-            "cacheRead": 114023424,
+            "input": 7809094,
+            "output": 430372,
+            "cacheRead": 124813824,
             "cacheWrite": 0
           }
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 96,
-            "output": 40345,
-            "cacheRead": 7703356,
-            "cacheWrite": 388052
+            "input": 100,
+            "output": 42483,
+            "cacheRead": 8069131,
+            "cacheWrite": 390348
           }
         },
         "work": {
@@ -320,16 +321,16 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 7116484,
-          "output": 400615,
-          "cacheRead": 114023424,
+          "input": 7809094,
+          "output": 430372,
+          "cacheRead": 124813824,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 96,
-          "output": 40345,
-          "cacheRead": 7703356,
-          "cacheWrite": 388052
+          "input": 100,
+          "output": 42483,
+          "cacheRead": 8069131,
+          "cacheWrite": 390348
         },
         "anthropic/claude-haiku-4-5-20251001": {
           "input": 3646,
@@ -339,8 +340,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 151.9935512,
-        "pricingAsOf": "2026-07-26T04:01:18.723Z"
+        "usd": 161.8447942,
+        "pricingAsOf": "2026-07-26T04:05:37.040Z"
       }
     },
     "merges": [
@@ -349,7 +350,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-haiku-4-5",
   "tasks": {
     "sequence": 19,
     "claims": {
