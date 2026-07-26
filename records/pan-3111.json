@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T12:26:09.908Z",
-  "updated": "2026-07-26T14:14:39.844Z",
+  "updated": "2026-07-26T14:15:09.723Z",
   "pipeline": {
     "issueId": "PAN-3111",
     "reviewStatus": "pending",
@@ -61,8 +61,16 @@
   "model": "claude-opus-5",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 12,
-    "claims": {},
+    "sequence": 13,
+    "claims": {
+      "docs-pickup-gate-provenance": {
+        "writerId": "agent-pan-3111",
+        "agentId": "agent-pan-3111",
+        "pid": 378848,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T14:15:09.723Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3111",
@@ -182,6 +190,7 @@
     "started-by-call-sites.started-by-call-sites.ac2": "completed",
     "started-by-call-sites.started-by-call-sites.ac3": "completed",
     "started-by-call-sites.started-by-call-sites.ac4": "completed",
-    "started-by-call-sites.started-by-call-sites.ac5": "completed"
+    "started-by-call-sites.started-by-call-sites.ac5": "completed",
+    "docs-pickup-gate-provenance": "running"
   }
 }
