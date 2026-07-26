@@ -166,7 +166,7 @@
     }
   ],
   "created": "2026-07-26T00:35:36.057Z",
-  "updated": "2026-07-26T01:54:13.464Z",
+  "updated": "2026-07-26T01:56:34.350Z",
   "pipeline": {
     "issueId": "PAN-1696",
     "reviewStatus": "pending",
@@ -254,16 +254,8 @@
   "harness": "claude-code",
   "model": "claude-haiku-4-5",
   "tasks": {
-    "sequence": 9,
-    "claims": {
-      "reconciler-decouple": {
-        "writerId": "agent-pan-1696",
-        "agentId": "agent-pan-1696",
-        "pid": 321054,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-26T01:54:13.464Z"
-      }
-    },
+    "sequence": 10,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-1696",
@@ -308,6 +300,17 @@
         "outcome": "completed",
         "reason": "Refactored getReadySet() to source from review-status DB; removed flywheel-run dependency",
         "releasedAt": "2026-07-26T01:54:05.057Z"
+      },
+      {
+        "writerId": "agent-pan-1696",
+        "agentId": "agent-pan-1696",
+        "pid": 321054,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T01:54:13.464Z",
+        "itemId": "reconciler-decouple",
+        "outcome": "completed",
+        "reason": "Refactored UAT train reconciler to be per-project independent with getReadySetForProject, assembleFromReadySetForProject, and makeCleanupForProject factory",
+        "releasedAt": "2026-07-26T01:56:34.350Z"
       }
     ],
     "statusReasons": {
@@ -322,6 +325,10 @@
       "ready-set-source": {
         "reason": "Refactored getReadySet() to source from review-status DB; removed flywheel-run dependency",
         "updatedAt": "2026-07-26T01:54:05.057Z"
+      },
+      "reconciler-decouple": {
+        "reason": "Refactored UAT train reconciler to be per-project independent with getReadySetForProject, assembleFromReadySetForProject, and makeCleanupForProject factory",
+        "updatedAt": "2026-07-26T01:56:34.350Z"
       }
     }
   },
@@ -339,6 +346,10 @@
     "ready-set-source.ready-set-source.ac2": "completed",
     "ready-set-source.ready-set-source.ac3": "completed",
     "ready-set-source.ready-set-source.ac4": "completed",
-    "reconciler-decouple": "running"
+    "reconciler-decouple": "completed",
+    "reconciler-decouple.reconciler-decouple.ac1": "completed",
+    "reconciler-decouple.reconciler-decouple.ac2": "completed",
+    "reconciler-decouple.reconciler-decouple.ac3": "completed",
+    "reconciler-decouple.reconciler-decouple.ac4": "completed"
   }
 }
