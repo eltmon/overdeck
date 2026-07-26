@@ -420,6 +420,23 @@ export async function checkDeployRow(
   }
 
   try {
+    if (health.buildDirty === true) {
+      return result(
+        'deploy',
+        'miss',
+        `live build ${buildCommit.slice(0, 8)} was built from a dirty working tree — uncommitted changes may be serving; redeploy canonically with \`pan reload\``,
+      );
+    }
+
+    const canonical = await deps.commitContains(repoRoot, buildCommit, 'origin/main');
+    if (!canonical) {
+      return result(
+        'deploy',
+        'miss',
+        `live build commit ${buildCommit.slice(0, 8)} is not an ancestor of origin/main — the server is running a build of local-only commits; redeploy with \`pan reload\``,
+      );
+    }
+
     const contains = await deps.commitContains(repoRoot, merge.mergeCommit, buildCommit);
     const observed = `build commit ${buildCommit.slice(0, 8)} ${contains ? 'contains' : 'does not contain'} merge ${merge.mergeCommit.slice(0, 8)}`;
     return result('deploy', contains ? 'pass' : 'miss', observed);
