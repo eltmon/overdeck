@@ -63,7 +63,7 @@
     "recordedAt": "2026-07-26T22:02:33.712Z"
   },
   "created": "2026-07-26T20:52:58.018Z",
-  "updated": "2026-07-26T22:02:44.361Z",
+  "updated": "2026-07-26T22:02:50.712Z",
   "pipeline": {
     "issueId": "PAN-3162",
     "reviewStatus": "pending",
@@ -76,7 +76,7 @@
     "updatedAt": "2026-07-26T22:02:44.131Z",
     "inspectNotes": "All 4 ACs met. observeForgeMergeState (merge-completeness.ts:189-232) persists mergeStatus='merged'+artifactUrl via withRepoStateSync/upsertMergeSetSync only for state==='merged' rows lacking that evidence, and is gated on no repo being unverifiable, so unmerged/no-changes/unverifiable verdicts write nothing and hasPositiveMergedEvidence is false for all-no-changes. reconcileStrandedRepos (lines 280-308) flips required, non-skipped, artifact-backed pending/failed/merging rows to merged (with artifactId) only when findMergedArtifact returns an artifact, and continues untouched on null. Forge errors in both paths become unverifiable blockers; reconcile now batches writes and returns initialMergeSet with zero upserts when any unverifiable blocker exists (lines 310-313), covered by both new cases in merge-completeness-forge-error.test.ts. Notes, non-blocking: (a) observeForgeMergeState has no production caller yet — presumably a later bead wires it; (b) mixed sets where one repo is verifiably merged and another is unverifiable discard the confirmed evidence, which is the AC4-mandated fail-open reading; (c) merge-ops.ts:533-535 activeRepos still includes rows this flips to merged, so a reconciled-merged repo will still be walked by the rebase/merge loop — worth a follow-on look outside this bead.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3170",
-    "reviewRequestedAt": "2026-07-26T22:02:36.408Z",
+    "reviewRequestedAt": "2026-07-26T22:02:50.304Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "src/dashboard/server/routes/workspaces/__tests__/merge-ops-polyrepo-completeness.test.ts",
@@ -123,7 +123,8 @@
         "tests/unit/lib/flywheel-merge-order.test.ts"
       ],
       "recordedAt": "2026-07-26T22:02:33.712Z"
-    }
+    },
+    "panDoneRecoveredAt": "2026-07-26T22:02:50.304Z"
   },
   "closeOut": {
     "usage": {
