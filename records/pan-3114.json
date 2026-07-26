@@ -22,7 +22,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T08:55:24.679Z",
-  "updated": "2026-07-26T09:49:29.284Z",
+  "updated": "2026-07-26T09:54:40.048Z",
   "pipeline": {
     "issueId": "PAN-3114",
     "reviewStatus": "pending",
@@ -49,18 +49,33 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "stamp-module": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-3114",
         "agentId": "agent-pan-3114",
         "pid": 3639407,
         "host": "eltmon-z790",
-        "claimedAt": "2026-07-26T09:49:29.284Z"
+        "claimedAt": "2026-07-26T09:49:29.284Z",
+        "itemId": "stamp-module",
+        "outcome": "completed",
+        "reason": "Added UAT promotion stamp builder/recorder, regression tests, and anchor write-site guard entry",
+        "releasedAt": "2026-07-26T09:54:40.048Z"
+      }
+    ],
+    "statusReasons": {
+      "stamp-module": {
+        "reason": "Added UAT promotion stamp builder/recorder, regression tests, and anchor write-site guard entry",
+        "updatedAt": "2026-07-26T09:54:40.048Z"
       }
     }
   },
   "statusOverrides": {
-    "stamp-module": "running"
+    "stamp-module": "completed",
+    "stamp-module.stamp-module.ac1": "completed",
+    "stamp-module.stamp-module.ac2": "completed",
+    "stamp-module.stamp-module.ac3": "completed",
+    "stamp-module.stamp-module.ac4": "completed"
   }
 }
