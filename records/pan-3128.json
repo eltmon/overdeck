@@ -169,7 +169,7 @@
     "recordedAt": "2026-07-26T13:30:54.544Z"
   },
   "created": "2026-07-26T12:24:12.648Z",
-  "updated": "2026-07-26T15:33:01.780Z",
+  "updated": "2026-07-26T15:33:06.169Z",
   "pipeline": {
     "issueId": "PAN-3128",
     "reviewStatus": "reviewing",
@@ -180,7 +180,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T13:31:33.728Z",
-    "updatedAt": "2026-07-26T15:33:00.226Z",
+    "updatedAt": "2026-07-26T15:33:06.107Z",
     "reviewNotes": "Agent re-review request (4/25): Fixed review issues",
     "inspectNotes": "All 5 ACs verified: installAndBuild only ever receives the detached worktree (asserted across clean/dirty/ahead/behind); dirty + HEAD-divergence emit notes and continue; build failure propagates with 'old dashboard left running' -> exitCode 1 and removes worktree + dist.incoming in finally; grep merge-base on reload.ts returns no matches; typecheck clean and build-from-origin.test.ts 7/7 pass.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3141",
@@ -287,7 +287,7 @@
       },
       "costAtCloseOut": {
         "usd": 454.259854,
-        "pricingAsOf": "2026-07-26T15:33:00.484Z"
+        "pricingAsOf": "2026-07-26T15:33:06.154Z"
       }
     },
     "merges": [
