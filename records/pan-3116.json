@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T09:04:01.632Z",
-  "updated": "2026-07-26T09:39:09.128Z",
+  "updated": "2026-07-26T09:39:45.570Z",
   "pipeline": {
     "issueId": "PAN-3116",
     "reviewStatus": "pending",
@@ -61,16 +61,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 9,
-    "claims": {
-      "docs-a3-update-note": {
-        "writerId": "agent-pan-3116",
-        "agentId": "agent-pan-3116",
-        "pid": 3206200,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-26T09:39:09.128Z"
-      }
-    },
+    "sequence": 10,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3116",
@@ -115,6 +107,17 @@
         "outcome": "completed",
         "reason": "Removed the deferred stored-baseline quality rule, its dedicated tests and fixture item, and updated planning guidance to the derive-at-lint-time allowlist contract.",
         "releasedAt": "2026-07-26T09:38:59.212Z"
+      },
+      {
+        "writerId": "agent-pan-3116",
+        "agentId": "agent-pan-3116",
+        "pid": 3206200,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T09:39:09.128Z",
+        "itemId": "docs-a3-update-note",
+        "outcome": "completed",
+        "reason": "Added the PAN-3116 update note documenting derive-at-lint-time counts, the audited allowlist format, and removal of baseline reconciliation machinery.",
+        "releasedAt": "2026-07-26T09:39:45.569Z"
       }
     ],
     "statusReasons": {
@@ -133,6 +136,10 @@
       "remove-quality-lint-ratchet-rule": {
         "reason": "Removed the deferred stored-baseline quality rule, its dedicated tests and fixture item, and updated planning guidance to the derive-at-lint-time allowlist contract.",
         "updatedAt": "2026-07-26T09:38:59.212Z"
+      },
+      "docs-a3-update-note": {
+        "reason": "Added the PAN-3116 update note documenting derive-at-lint-time counts, the audited allowlist format, and removal of baseline reconciliation machinery.",
+        "updatedAt": "2026-07-26T09:39:45.569Z"
       }
     }
   },
@@ -157,6 +164,8 @@
     "remove-quality-lint-ratchet-rule.remove-quality-lint-ratchet-rule.ac2": "completed",
     "remove-quality-lint-ratchet-rule.remove-quality-lint-ratchet-rule.ac3": "completed",
     "remove-quality-lint-ratchet-rule.remove-quality-lint-ratchet-rule.ac4": "completed",
-    "docs-a3-update-note": "running"
+    "docs-a3-update-note": "completed",
+    "docs-a3-update-note.docs-a3-update-note.ac1": "completed",
+    "docs-a3-update-note.docs-a3-update-note.ac2": "completed"
   }
 }
