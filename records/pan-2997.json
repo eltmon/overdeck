@@ -227,7 +227,7 @@
     "recordedAt": "2026-07-25T23:45:57.195Z"
   },
   "created": "2026-07-21T23:09:49.270Z",
-  "updated": "2026-07-26T07:37:56.334Z",
+  "updated": "2026-07-26T07:37:59.027Z",
   "pipeline": {
     "issueId": "PAN-2997",
     "reviewStatus": "pending",
@@ -238,7 +238,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T05:50:39.330Z",
-    "updatedAt": "2026-07-26T07:37:56.297Z",
+    "updatedAt": "2026-07-26T07:37:59.006Z",
     "reviewNotes": "Agent re-review request (2/25): Fixed all three cycle-8 blockers: tmux submit is now one server-owned if-shell (claim terminal + clear pending + Enter atomically — exactly one completer, no stray Enter into a busy composer, same protocol remotely); lost supervisor responses no longer cross to the independent tmux key store — AmbiguousKeyedDeliveryError leaves the wake pending and recovery retries the same key at the same tier (received 502 still falls back); remote executor throws on any non-zero SSH exit. New tests cover concurrent completers, busy composer, dropped responses, and remote failure steps.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3004",
     "lastVerifiedCommit": "564139032ff121944de2721020bd3f2672ca3f36",
@@ -302,7 +302,7 @@
       },
       "costAtCloseOut": {
         "usd": 217.494617,
-        "pricingAsOf": "2026-07-26T07:37:56.328Z"
+        "pricingAsOf": "2026-07-26T07:37:59.024Z"
       }
     },
     "merges": [
