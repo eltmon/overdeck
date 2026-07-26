@@ -55,7 +55,7 @@
     "recordedAt": "2026-07-26T03:30:04.529Z"
   },
   "created": "2026-07-26T02:29:08.179Z",
-  "updated": "2026-07-26T03:31:04.873Z",
+  "updated": "2026-07-26T03:31:10.909Z",
   "pipeline": {
     "issueId": "PAN-3097",
     "reviewStatus": "pending",
@@ -64,9 +64,11 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T03:31:00.469Z",
+    "panDoneRecoveredAt": "2026-07-26T03:31:04.453Z",
+    "updatedAt": "2026-07-26T03:31:04.850Z",
     "reviewNotes": "Review role spawn failed: Command failed: tmux -L overdeck -f /home/eltmon/.overdeck/tmux/overdeck.tmux.conf send-keys -t agent-pan-3097-review C-m\ncan't find pane: agent-pan-3097-review\n",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3102",
+    "reviewRequestedAt": "2026-07-26T03:31:04.453Z",
     "reviewSpawnedAt": "2026-07-26T03:30:14.747Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
@@ -106,9 +108,7 @@
         "sync-sources/rules/ask-user-question-self-contained.md"
       ],
       "recordedAt": "2026-07-26T03:30:04.529Z"
-    },
-    "reviewRequestedAt": "2026-07-26T03:31:04.453Z",
-    "panDoneRecoveredAt": "2026-07-26T03:31:04.453Z"
+    }
   },
   "closeOut": {
     "usage": {
@@ -123,9 +123,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 516716,
-            "output": 7115,
-            "cacheRead": 686592,
+            "input": 575492,
+            "output": 12971,
+            "cacheRead": 1411584,
             "cacheWrite": 0
           }
         },
@@ -146,15 +146,15 @@
           "cacheWrite": 183727
         },
         "openai/gpt-5.6-sol": {
-          "input": 1544107,
-          "output": 62905,
-          "cacheRead": 40904192,
+          "input": 1602883,
+          "output": 68761,
+          "cacheRead": 41629184,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 37.86521,
-        "pricingAsOf": "2026-07-26T03:31:00.493Z"
+        "usd": 38.697266,
+        "pricingAsOf": "2026-07-26T03:31:10.905Z"
       }
     },
     "merges": [
