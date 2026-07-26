@@ -23,9 +23,27 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-26T12:11:46.511Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-26T12:19Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-26T12:19:47.093Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-26T12:19:47.276Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-26T12:19:47Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-3110\n\nRetry exhaustion cannot persist merging-to-blocked, and recovery still mishandles partial verdict failures and missing workspaces\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3110 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "scripts/file-size-baseline.txt",
@@ -70,7 +88,7 @@
     "recordedAt": "2026-07-26T12:02:11.445Z"
   },
   "created": "2026-07-26T06:17:49.254Z",
-  "updated": "2026-07-26T12:19:46.545Z",
+  "updated": "2026-07-26T12:19:47.276Z",
   "pipeline": {
     "issueId": "PAN-3110",
     "reviewStatus": "blocked",
