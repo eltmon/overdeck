@@ -22,7 +22,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T17:27:17.644Z",
-  "updated": "2026-07-26T18:24:17.985Z",
+  "updated": "2026-07-26T18:29:43.409Z",
   "pipeline": {
     "issueId": "PAN-3148",
     "reviewStatus": "pending",
@@ -49,16 +49,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "keyed-feedback-delivery": {
-        "writerId": "agent-pan-3148",
-        "agentId": "agent-pan-3148",
-        "pid": 1368515,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-26T18:24:17.985Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3148",
@@ -81,6 +73,17 @@
         "outcome": "completed",
         "reason": "Detected blocked-review HEAD drift with uniform-anchor fallback and two-tick stability debounce, preserved existing notes/tests on reset, and re-dispatched review. Extracted the patrol into a dedicated module and lowered the file-size baseline because the deacon god-file ratchet rejected growth.",
         "releasedAt": "2026-07-26T18:24:06.050Z"
+      },
+      {
+        "writerId": "agent-pan-3148",
+        "agentId": "agent-pan-3148",
+        "pid": 1368515,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T18:24:17.985Z",
+        "itemId": "keyed-feedback-delivery",
+        "outcome": "completed",
+        "reason": "Added deterministic review-feedback dedup keys from verdict, run ID, and reviewed anchor; threaded fallback run IDs; and retried unkeyed only when ACP or Channels cannot enforce keyed delivery.",
+        "releasedAt": "2026-07-26T18:29:43.408Z"
       }
     ],
     "statusReasons": {
@@ -91,6 +94,10 @@
       "blocked-drift-patrol": {
         "reason": "Detected blocked-review HEAD drift with uniform-anchor fallback and two-tick stability debounce, preserved existing notes/tests on reset, and re-dispatched review. Extracted the patrol into a dedicated module and lowered the file-size baseline because the deacon god-file ratchet rejected growth.",
         "updatedAt": "2026-07-26T18:24:06.050Z"
+      },
+      "keyed-feedback-delivery": {
+        "reason": "Added deterministic review-feedback dedup keys from verdict, run ID, and reviewed anchor; threaded fallback run IDs; and retried unkeyed only when ACP or Channels cannot enforce keyed delivery.",
+        "updatedAt": "2026-07-26T18:29:43.408Z"
       }
     }
   },
@@ -106,6 +113,10 @@
     "blocked-drift-patrol.blocked-drift-patrol.ac3": "completed",
     "blocked-drift-patrol.blocked-drift-patrol.ac4": "completed",
     "blocked-drift-patrol.blocked-drift-patrol.ac5": "completed",
-    "keyed-feedback-delivery": "running"
+    "keyed-feedback-delivery": "completed",
+    "keyed-feedback-delivery.keyed-feedback-delivery.ac1": "completed",
+    "keyed-feedback-delivery.keyed-feedback-delivery.ac2": "completed",
+    "keyed-feedback-delivery.keyed-feedback-delivery.ac3": "completed",
+    "keyed-feedback-delivery.keyed-feedback-delivery.ac4": "completed"
   }
 }
