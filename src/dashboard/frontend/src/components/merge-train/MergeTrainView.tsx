@@ -193,24 +193,27 @@ export function useMergeTrainData(active: boolean) {
     queryFn: () => fetchJson<GenerationsEntry[]>('/api/merge-train/generations'),
     refetchInterval: active ? 15000 : false,
   });
-  // Capability probe, not flywheel run state: it reports whether a GitHub App
-  // or gh CLI can merge at all. Kept so the "cannot merge" warning is not lost.
-  const mergeBackendQuery = useQuery({
-    queryKey: ['merge-train-merge-backend'],
-    queryFn: () => fetchJson<MergeBackendStatus>('/api/flywheel/merge-backend'),
-    refetchInterval: active ? 15000 : false,
-  });
-
   const sections = mergeTrainSections(
     Array.isArray(queuesQuery.data) ? queuesQuery.data : [],
     Array.isArray(generationsQuery.data) ? generationsQuery.data : [],
   );
 
-  return {
-    sections,
-    isLoading: queuesQuery.isLoading || generationsQuery.isLoading,
-    mergeBackendUnavailable: mergeBackendQuery.data?.available === false,
-  };
+  return { sections, isLoading: queuesQuery.isLoading || generationsQuery.isLoading };
+}
+
+/**
+ * Capability probe, not flywheel run state: whether a GitHub App or gh CLI can
+ * merge at all. Deliberately NOT part of useMergeTrainData — only the full view
+ * renders the warning, so a host that just wants counts (the Flywheel rail card,
+ * the cockpit summary) should not pay for this request.
+ */
+export function useMergeBackendStatus(active: boolean): { unavailable: boolean } {
+  const query = useQuery({
+    queryKey: ['merge-train-merge-backend'],
+    queryFn: () => fetchJson<MergeBackendStatus>('/api/flywheel/merge-backend'),
+    refetchInterval: active ? 15000 : false,
+  });
+  return { unavailable: query.data?.available === false };
 }
 
 /** Totals across every project, for a host that shows one summary count. */
@@ -245,7 +248,8 @@ export function MergeTrainView({ active, onNavigateIssue, showProjectFilter = tr
   // null = "all projects", the default. A stored array selects a subset.
   const [selectedProjects, setSelectedProjects] = useState<string[] | null>(() => readStoredFilter());
 
-  const { sections, isLoading: loading, mergeBackendUnavailable } = useMergeTrainData(active);
+  const { sections, isLoading: loading } = useMergeTrainData(active);
+  const { unavailable: mergeBackendUnavailable } = useMergeBackendStatus(active);
 
   // Drop filter entries for projects that no longer exist, so a renamed or
   // removed project cannot leave the view permanently empty.
@@ -349,6 +353,24 @@ export function MergeTrainView({ active, onNavigateIssue, showProjectFilter = tr
     if (ok) promoteMutation.mutate(gen.name);
   };
 
+  const onStack = async (gen: UatGenerationPayload) => {
+    const ok = await confirm({
+      title: `Start a live UAT stack for ${shortName(gen.name)}?`,
+      message: `Builds and runs a dashboard stack serving this exact batch (${gen.members.map((m) => m.issueId).join(', ')}) — about a minute — then opens it.\n\nAt most two UAT stacks run at once, so starting this one may stop the oldest running stack.`,
+      confirmLabel: 'Start & open',
+    });
+    if (ok) stackMutation.mutate(gen.name);
+  };
+
+  const onRebuild = async (section: MergeTrainProjectSection, gen: UatGenerationPayload) => {
+    const ok = await confirm({
+      title: `Rebuild ${shortName(gen.name)} from current main?`,
+      message: `Re-merges ${section.projectName}'s ready features onto a fresh branch off current main, replacing this batch.\n\nThis runs git operations in ${section.projectName} and discards the batch you may already be testing — any UAT you have done against it no longer applies.`,
+      confirmLabel: 'Rebuild batch',
+    });
+    if (ok) rebuildMutation.mutate(section.projectKey);
+  };
+
   const onMergeOne = async (section: MergeTrainProjectSection) => {
     const head = section.queue[0];
     if (!head) return;
@@ -389,7 +411,7 @@ export function MergeTrainView({ active, onNavigateIssue, showProjectFilter = tr
       <button
         type="button"
         disabled={starting}
-        onClick={() => stackMutation.mutate(gen.name)}
+        onClick={() => void onStack(gen)}
         title="Starts a live dashboard stack serving this exact batch (~1 min), then opens it"
         className="inline-flex items-center gap-1 rounded border border-emerald-500/40 px-2 py-0.5 text-[10.5px] font-semibold text-emerald-400 hover:bg-emerald-500/10 disabled:opacity-60"
       >
@@ -398,8 +420,14 @@ export function MergeTrainView({ active, onNavigateIssue, showProjectFilter = tr
     );
   };
 
+  // "Nothing ready anywhere" is only honest when at least one project could have
+  // had something ready. With every train switched off, collapsing to that message
+  // hides the disabled rows and misreports the reason — the operator would go
+  // hunting for missing work when the answer is that the feature is off.
+  const allDisabled = sections.length > 0 && sections.every((s) => !s.enabled);
   const nothingAnywhere =
     !loading &&
+    !allDisabled &&
     sections.length > 0 &&
     sections.every((s) => s.queue.length === 0 && visibleGenerationsOf(s).length === 0);
 
@@ -562,7 +590,7 @@ export function MergeTrainView({ active, onNavigateIssue, showProjectFilter = tr
                                   <button
                                     type="button"
                                     disabled={rebuildMutation.isPending}
-                                    onClick={() => rebuildMutation.mutate(section.projectKey)}
+                                    onClick={() => void onRebuild(section, gen)}
                                     title="Re-merge the ready features onto a fresh branch off current main — use if you suspect this batch is stale"
                                     className="rounded border border-border px-1.5 py-0.5 text-[10.5px] text-muted-foreground hover:bg-accent disabled:opacity-50"
                                   >

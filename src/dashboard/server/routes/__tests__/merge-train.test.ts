@@ -273,6 +273,32 @@ describe('PAN-1696 merge-train-routes', () => {
       expect(uatTrainMocks.runUatTrainReconcile).not.toHaveBeenCalled();
     });
 
+    it('400s malformed assemble JSON instead of reconciling every project', async () => {
+      // A typo'd body must never become the all-projects form: that is a forced
+      // git fetch/worktree sweep across every tracked repo.
+      const cookie = dashboardSessionCookieHeader().split(';')[0]!;
+      const result = await requestMergeTrainRoute('/api/merge-train/assemble', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          cookie: `${DASHBOARD_SESSION_COOKIE}=${cookie.split('=')[1]}`,
+          [DASHBOARD_CSRF_HEADER]: dashboardCsrfToken(),
+          origin: 'http://localhost:3011',
+        },
+        body: '{ project: "myn" ',
+      });
+
+      expect(result.status).toBe(400);
+      expect(uatTrainMocks.runUatTrainReconcileAllProjects).not.toHaveBeenCalled();
+      expect(uatTrainMocks.runUatTrainReconcile).not.toHaveBeenCalled();
+    });
+
+    it('still treats a genuinely empty body as the all-projects form', async () => {
+      const result = await requestMergeTrainRoute('/api/merge-train/assemble', authedInit());
+      expect(result.status).toBe(200);
+      expect(uatTrainMocks.runUatTrainReconcileAllProjects).toHaveBeenCalledWith({ force: true });
+    });
+
     it('rejects assemble for an unknown project key with 404', async () => {
       const result = await postMergeTrainAssemblePayload({ project: 'nope' });
       expect(result.status).toBe(404);

@@ -313,11 +313,21 @@ async function mapBounded<T>(items: readonly T[], concurrency: number, worker: (
   await Promise.all(workers);
 }
 
-async function loadAcceptanceCriteriaCache(issueIds: ReadonlySet<string>): Promise<Map<string, AcceptanceCriteriaSummary>> {
+/**
+ * PAN-1696: `root` is the project the issues belong to, NOT the dashboard's own
+ * repo. Once the generations payload started serving every tracked project, a
+ * dashboard-rooted xBRIEF lookup silently returned no acceptance criteria for
+ * every non-PAN generation, so those batches showed an empty "What to UAT" list.
+ * Issue ids are prefix-distinct across projects, so the module-level mtime cache
+ * stays safe to key by issue id alone.
+ */
+async function loadAcceptanceCriteriaCache(
+  issueIds: ReadonlySet<string>,
+  root: string,
+): Promise<Map<string, AcceptanceCriteriaSummary>> {
   const cache = new Map<string, AcceptanceCriteriaSummary>();
   if (issueIds.size === 0) return cache;
 
-  const root = projectRoot();
   await mapBounded([...issueIds], ACCEPTANCE_CRITERIA_READ_CONCURRENCY, async (issueId) => {
     const upperIssueId = issueId.toUpperCase();
     const existing = acceptanceCriteriaByIssue.get(upperIssueId);
@@ -357,13 +367,12 @@ export async function getUatGenerationsPayload(projectRootOverride?: string): Pr
   // PAN-1696: no flywheel-run requirement — list generations directly from store.
   // projectRootOverride lets the aggregate /api/merge-train/generations route read
   // each tracked project's chain instead of only the dashboard's own repo.
-  const chain = listUatGenerationsSync({
-    projectRoot: projectRootOverride ? resolve(projectRootOverride) : projectRoot(),
-    limit: CHAIN_PAYLOAD_LIMIT,
-  });
+  const root = projectRootOverride ? resolve(projectRootOverride) : projectRoot();
+  const chain = listUatGenerationsSync({ projectRoot: root, limit: CHAIN_PAYLOAD_LIMIT });
   if (chain.length === 0) return [];
   const memberIssueIds = new Set(chain.flatMap((gen) => gen.members.map((member) => member.issueId.toUpperCase())));
-  const acCache = await loadAcceptanceCriteriaCache(memberIssueIds);
+  // Resolve each member's xBRIEF in ITS OWN project, not the dashboard's repo.
+  const acCache = await loadAcceptanceCriteriaCache(memberIssueIds, root);
   const payload: UatGenerationPayload[] = [];
   for (const gen of chain) {
     const probe = await probeUatStack(gen);

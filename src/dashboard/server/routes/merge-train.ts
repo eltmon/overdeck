@@ -257,10 +257,13 @@ const postMergeTrainAssembleRoute = HttpRouter.add(
     const authError = rejectUnsafeDashboardMutationRequest(request);
     if (authError) return authError;
     const parsed = yield* readUnknownJsonBody;
-    // An empty body is the "reconcile every project" form, so a body-less POST
-    // must not 400 the way a malformed body does.
-    const body = parsed.ok ? parsed.body : {};
-    const result = yield* Effect.promise(() => postMergeTrainAssemblePayload(body));
+    // Malformed JSON must 400. Coercing it to {} would silently mean "no project
+    // named", i.e. a forced reconcile of EVERY tracked project — a git-heavy
+    // fetch/worktree sweep across every repo triggered by a typo'd body. A
+    // genuinely empty body still parses to {} in readUnknownJsonBody, so the
+    // all-projects form keeps working.
+    if (!parsed.ok) return jsonResponse({ error: parsed.error }, { status: 400 });
+    const result = yield* Effect.promise(() => postMergeTrainAssemblePayload(parsed.body));
     return jsonResponse(result.body, { status: result.status });
   })),
 );

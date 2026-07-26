@@ -19,7 +19,7 @@ import { AutoMergeToggle } from './AutoMergeToggle';
 import { MergeTrainSection } from './merge-train/MergeTrainSection';
 import { UatStackStatus } from './CommandDeck/UatStackStatus';
 import { fetchUatContext, fetchWorkspace, forgeApprove, forgeMerge, mergeIssue, rebuildStack, type UatContext, type WorkspaceInfo } from './awaitingMergeApi';
-import type { WorkspaceContainerStatus, WorkspacePendingOperation, WorkspaceStackHealth } from './CommandDeck/ZoneCOverviewTabs/queries';
+import type { WorkspaceContainerStatus, WorkspacePendingOperation } from './CommandDeck/ZoneCOverviewTabs/queries';
 import type { Issue } from '../types';
 
 function isVerifyingIssue(issue?: Issue): boolean {

@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChevronRight } from 'lucide-react';
 import { dashboardMutationJsonHeaders } from '../../lib/wsTransport';
+import { shortName, useMergeTrainData } from '../merge-train/MergeTrainView';
 
 /** PAN-1693/1695: per-project settings in the cockpit — currently the auto-merge default. */
 function ProjectSettingsSection({ projectKey }: { projectKey: string }) {
@@ -158,28 +159,15 @@ function goToAwaitingMerge(event: React.MouseEvent): void {
  * to this project, so it needs no flywheel run.
  */
 function MergeTrainSummary({ projectKey }: { projectKey: string }) {
-  const { data: queues } = useQuery({
-    queryKey: ['merge-train-queues'],
-    queryFn: async (): Promise<Array<{ projectKey: string; queue: unknown[] }>> => {
-      const res = await fetch('/api/merge-train/queues');
-      if (!res.ok) return [];
-      return res.json();
-    },
-    enabled: !!projectKey,
-  });
-  const { data: generations } = useQuery({
-    queryKey: ['merge-train-generations'],
-    queryFn: async (): Promise<Array<{ projectKey: string; generations: Array<{ name: string; status: string }> }>> => {
-      const res = await fetch('/api/merge-train/generations');
-      if (!res.ok) return [];
-      return res.json();
-    },
-    enabled: !!projectKey,
-  });
-
-  const readyCount = (Array.isArray(queues) ? queues : []).find((q) => q.projectKey === projectKey)?.queue?.length ?? 0;
-  const chain = (Array.isArray(generations) ? generations : []).find((g) => g.projectKey === projectKey)?.generations ?? [];
-  // Newest testable batch first — the same set the merge-train view shows.
+  // Reuse the merge-train view's own reads instead of redeclaring queries under
+  // the same react-query keys: duplicate definitions on one key mean whichever
+  // component mounts first decides the fetcher and the polling interval, and the
+  // two copies disagreed on error handling. One hook, one contract.
+  const { sections, isLoading } = useMergeTrainData(false);
+  const section = sections.find((s) => s.projectKey === projectKey);
+  const readyCount = section?.queue.length ?? 0;
+  const chain = section?.generations ?? [];
+  // Newest testable batch first — the same precedence the merge-train view uses.
   const current = chain.find((g) => g.status === 'ready')
     ?? chain.find((g) => g.status === 'assembling')
     ?? chain.find((g) => g.status === 'superseded');
@@ -187,10 +175,11 @@ function MergeTrainSummary({ projectKey }: { projectKey: string }) {
   return (
     <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-border pt-3 text-[11px]" data-testid="merge-train-summary">
       <span className="text-muted-foreground">
-        {readyCount} feature{readyCount === 1 ? '' : 's'} ready
-        {current
-          ? ` · batch ${current.name.replace(/^uat\//, '')} (${current.status})`
-          : ' · no batch assembled'}
+        {isLoading
+          ? 'Loading the merge train…'
+          : `${readyCount} feature${readyCount === 1 ? '' : 's'} ready${
+              current ? ` · batch ${shortName(current.name)} (${current.status})` : ' · no batch assembled'
+            }`}
       </span>
       <a
         href="/awaiting-merge"

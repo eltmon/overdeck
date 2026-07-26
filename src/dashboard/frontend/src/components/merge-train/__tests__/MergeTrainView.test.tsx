@@ -203,6 +203,24 @@ describe('one section per project (ac1)', () => {
     expect(myn.textContent).toContain('turned off for Mind Your Now');
   });
 
+  it('keeps the off rows visible when EVERY project has the train disabled', async () => {
+    // Collapsing to "nothing ready anywhere" here would send the operator hunting
+    // for missing work when the real answer is that the feature is switched off.
+    mockFetch({
+      '/api/merge-train/queues': [
+        { projectKey: 'overdeck', projectName: 'Overdeck', enabled: false, queue: [] },
+        { projectKey: 'myn', projectName: 'Mind Your Now', enabled: false, queue: [] },
+      ],
+      '/api/merge-train/generations': [],
+    });
+    renderView();
+
+    await waitFor(() => expect(screen.getByTestId('merge-train-project-overdeck')).toBeTruthy());
+    expect(screen.getByTestId('merge-train-project-myn')).toBeTruthy();
+    expect(screen.queryByText(/No features are ready to merge in any project/)).toBeNull();
+    expect(screen.getByTestId('merge-train-project-overdeck').textContent).toContain('turned off for Overdeck');
+  });
+
   it('explains an all-empty merge train without mentioning a flywheel run', async () => {
     mockFetch({
       '/api/merge-train/queues': [{ projectKey: 'overdeck', projectName: 'Overdeck', enabled: true, queue: [] }],
@@ -342,6 +360,55 @@ describe('actions post to the new endpoints behind confirms (ac3)', () => {
       expect(call).toBeTruthy();
       expect(JSON.parse(String((call![1] as RequestInit).body))).toEqual({ n: 1, project: 'myn' });
     });
+  });
+
+  it('rebuild confirms, naming the project and the discarded batch (ac3)', async () => {
+    mockFetch(twoProjectResponses());
+    renderView();
+    await waitFor(() => expect(screen.getByTestId('merge-train-project-overdeck')).toBeTruthy());
+
+    fireEvent.click(
+      Array.from(screen.getByTestId('merge-train-project-overdeck').querySelectorAll('button'))
+        .find((b) => b.textContent === '↻')!,
+    );
+
+    await waitFor(() => expect(mocks.confirm).toHaveBeenCalled());
+    const arg = mocks.confirm.mock.calls[0]![0] as { title: string; message: string };
+    expect(arg.title).toContain('pan-otter-0610');
+    expect(arg.message).toContain('Overdeck');
+    expect(arg.message).toMatch(/discards the batch/);
+  });
+
+  it('cancelling rebuild fires no request', async () => {
+    mocks.confirm.mockResolvedValue(false);
+    const fetchMock = mockFetch(twoProjectResponses());
+    renderView();
+    await waitFor(() => expect(screen.getByTestId('merge-train-project-overdeck')).toBeTruthy());
+
+    fireEvent.click(
+      Array.from(screen.getByTestId('merge-train-project-overdeck').querySelectorAll('button'))
+        .find((b) => b.textContent === '↻')!,
+    );
+    await waitFor(() => expect(mocks.confirm).toHaveBeenCalled());
+
+    expect(fetchMock.mock.calls.some(([u]) => String(u).includes('/assemble'))).toBe(false);
+  });
+
+  it('stack confirms, warning that starting one may evict the oldest', async () => {
+    mockFetch(twoProjectResponses());
+    vi.stubGlobal('open', vi.fn());
+    renderView();
+    await waitFor(() => expect(screen.getByTestId('merge-train-project-overdeck')).toBeTruthy());
+
+    fireEvent.click(
+      Array.from(screen.getByTestId('merge-train-project-overdeck').querySelectorAll('button'))
+        .find((b) => b.textContent?.includes('Start & open'))!,
+    );
+
+    await waitFor(() => expect(mocks.confirm).toHaveBeenCalled());
+    const arg = mocks.confirm.mock.calls[0]![0] as { title: string; message: string };
+    expect(arg.title).toContain('pan-otter-0610');
+    expect(arg.message).toMatch(/two UAT stacks run at once/);
   });
 
   it('rebuild POSTs assemble scoped to that project', async () => {
