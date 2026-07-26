@@ -5,6 +5,7 @@ import {
   useComposerStore,
   useConversationCommandResults,
   useConversationFailed,
+  type SendFailureDetails,
 } from '../../lib/composerStore';
 
 interface ComposerDeliveryStateOptions {
@@ -42,8 +43,8 @@ export function useComposerDeliveryState({
   const replaceCommandResult = useComposerStore((state) => state.replaceCommandResult);
   const removeCommandResult = useComposerStore((state) => state.removeCommandResult);
 
-  const handleSendFailed = useCallback((text: string, kind: 'command' | 'prompt') => {
-    failSend(conversation.name, text, kind);
+  const handleSendFailed = useCallback((text: string, kind: 'command' | 'prompt', details?: SendFailureDetails) => {
+    failSend(conversation.name, text, kind, details);
     onSendFailed?.();
   }, [conversation.name, failSend, onSendFailed]);
 

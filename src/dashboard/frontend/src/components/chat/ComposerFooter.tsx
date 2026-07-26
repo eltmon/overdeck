@@ -32,7 +32,9 @@ import {
   useConversationAttachments,
   getConversationAttachments,
   sendConversationMessage,
+  sendFailureDetails,
   getAttachmentAccept,
+  type SendFailureDetails,
 } from '../../lib/composerStore';
 import { classifyAttachmentKind, isDotfileAttachment, isExtensionlessAttachment } from '../../lib/attachmentTypes';
 import styles from '../CommandDeck/styles/command-deck.module.css';
@@ -50,7 +52,7 @@ interface ComposerFooterProps {
   /** Called after the send POST resolves successfully. */
   onSendAcknowledged?: (text: string) => void;
   /** Called when the POST fails — parent preserves the original prompt/command lane. */
-  onSendFailed?: (text: string, kind: 'command' | 'prompt') => void;
+  onSendFailed?: (text: string, kind: 'command' | 'prompt', details?: SendFailureDetails) => void;
   /** Agent ID for agent sessions (uses /api/agents/* endpoints instead of /api/conversations/*) */
   agentId?: string;
   /**
@@ -510,7 +512,7 @@ export function ComposerFooter({
     } catch (err) {
       console.error('[ComposerFooter] Failed to send:', err);
       toast.error(err instanceof Error ? err.message : 'Failed to send message');
-      onSendFailed?.(submissionMessage, isPortableCommand ? 'command' : 'prompt');
+      onSendFailed?.(submissionMessage, isPortableCommand ? 'command' : 'prompt', sendFailureDetails(err));
     } finally {
       // Clear the originating conversation's sending state regardless of which
       // conversation is now mounted — the send belonged to submitConversationName.

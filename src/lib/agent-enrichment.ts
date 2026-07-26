@@ -50,6 +50,10 @@ export type PendingInputKind =
   | 'enterPlanMode'
   | 'sessionResume'
   | 'rateLimit'
+  // PAN-3113 — a blocking numbered-choice menu parsed from a claude-code
+  // conversation's pane (session-resume gate et al.). Carries parsed options
+  // and is answerable from the dashboard via /api/conversations/:id/pane-choice.
+  | 'paneChoice'
   // An interactive session ended its turn — the operator's move. This is the
   // only kind for a question asked in prose, which carries no tool call and no
   // modal, and is therefore invisible to every other detector.

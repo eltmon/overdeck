@@ -52,6 +52,7 @@ import {
   resolvePiSessionPath,
 } from '../../dashboard/server/routes/jsonl-resolver.js';
 import { codexConversationPendingInput } from './conversation-delivery.js';
+import { claudeConversationPaneChoice, type PendingPaneChoice } from './conversation-pane-choice.js';
 
 export interface ConversationReadResult {
   body: unknown;
@@ -391,13 +392,21 @@ export async function getConversationsPendingInputFeed(
           );
           if (codex.approval) pending = codex.approval;
         }
-        if (!pending && !pendingPlan) return null;
+        // PAN-3113 — blocking numbered-choice menus (the Claude Code
+        // session-resume gate et al.) never reach the JSONL transcript, so
+        // the scan above cannot see them; they exist only in the pane.
+        let paneChoice: PendingPaneChoice | null = null;
+        if (!pending && !pendingPlan) {
+          paneChoice = await claudeConversationPaneChoice(conv);
+        }
+        if (!pending && !pendingPlan && !paneChoice) return null;
         return {
           name: conv.name,
           title: conv.title ?? null,
           issueId: conv.issueId ?? null,
           ...(pending ? { pendingAskUserQuestion: pending } : {}),
           ...(pendingPlan ? { pendingProposedPlan: pendingPlan } : {}),
+          ...(paneChoice ? { pendingPaneChoice: paneChoice } : {}),
         };
       })),
       8,
@@ -461,6 +470,16 @@ export async function getConversationRead(
         if (codex.approval) pendingAskUserQuestion = codex.approval;
       }
     }
+    // PAN-3113 — pane choice menus are pane-only; check them when nothing
+    // else is pending so one decision surface shows at a time.
+    let pendingPaneChoice: PendingPaneChoice | null = null;
+    if (sessionAlive && pendingInputCount === 0) {
+      pendingPaneChoice = await claudeConversationPaneChoice(conv);
+      if (pendingPaneChoice) {
+        pendingInputKinds = [...pendingInputKinds, 'paneChoice'];
+        pendingInputCount = pendingInputKinds.length;
+      }
+    }
     return result({
       ...conv,
       sessionAlive,
@@ -470,6 +489,7 @@ export async function getConversationRead(
       pendingInputCount,
       pendingInputKinds,
       pendingAskUserQuestion,
+      ...(pendingPaneChoice ? { pendingPaneChoice } : {}),
       transcriptMissing: conversationTranscriptMissing(conv, sessionAlive, convSf),
       needsTerminal: await conversationNeedsTerminal(conv, sessionAlive, convSf),
     });
