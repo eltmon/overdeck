@@ -249,17 +249,17 @@
     }
   ],
   "created": "2026-07-26T00:35:36.057Z",
-  "updated": "2026-07-26T04:05:37.730Z",
+  "updated": "2026-07-26T04:09:18.772Z",
   "pipeline": {
     "issueId": "PAN-1696",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T04:05:37.012Z",
-    "reviewNotes": "pan flywheel status remains active-run-only and queue-free, while the new cockpit toggle omits required CSRF headers and its focused component suite fails 6/6 tests.",
+    "updatedAt": "2026-07-26T04:09:18.728Z",
+    "reviewNotes": "Agent re-review request (7/25): Fixed review issues: CSRF headers on toggle, merge queue without active run",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/1822",
     "reviewSpawnedAt": "2026-07-26T04:01:17.296Z"
@@ -291,26 +291,26 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 7809094,
-            "output": 430372,
-            "cacheRead": 124813824,
+            "input": 7821131,
+            "output": 441431,
+            "cacheRead": 126186496,
             "cacheWrite": 0
           }
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 100,
-            "output": 42483,
-            "cacheRead": 8069131,
-            "cacheWrite": 390348
+            "input": 104,
+            "output": 44847,
+            "cacheRead": 8441917,
+            "cacheWrite": 396046
           }
         },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 3646,
-            "output": 153633,
-            "cacheRead": 89070741,
-            "cacheWrite": 3709374
+            "input": 3825,
+            "output": 161148,
+            "cacheRead": 94805964,
+            "cacheWrite": 3874175
           }
         }
       },
@@ -334,27 +334,27 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 7809094,
-          "output": 430372,
-          "cacheRead": 124813824,
+          "input": 7821131,
+          "output": 441431,
+          "cacheRead": 126186496,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 100,
-          "output": 42483,
-          "cacheRead": 8069131,
-          "cacheWrite": 390348
+          "input": 104,
+          "output": 44847,
+          "cacheRead": 8441917,
+          "cacheWrite": 396046
         },
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 3646,
-          "output": 153633,
-          "cacheRead": 89070741,
-          "cacheWrite": 3709374
+          "input": 3825,
+          "output": 161148,
+          "cacheRead": 94805964,
+          "cacheWrite": 3874175
         }
       },
       "costAtCloseOut": {
-        "usd": 161.8447942,
-        "pricingAsOf": "2026-07-26T04:05:37.040Z"
+        "usd": 163.8528142,
+        "pricingAsOf": "2026-07-26T04:09:18.765Z"
       }
     },
     "merges": [
