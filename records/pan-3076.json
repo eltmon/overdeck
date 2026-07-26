@@ -177,7 +177,7 @@
     "recordedAt": "2026-07-26T00:59:07.168Z"
   },
   "created": "2026-07-25T21:12:36.630Z",
-  "updated": "2026-07-26T01:16:51.439Z",
+  "updated": "2026-07-26T01:16:54.363Z",
   "pipeline": {
     "issueId": "PAN-3076",
     "reviewStatus": "reviewing",
@@ -188,7 +188,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T01:00:25.237Z",
-    "updatedAt": "2026-07-26T01:16:51.359Z",
+    "updatedAt": "2026-07-26T01:16:51.378Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "testNotes": "typecheck: npm run typecheck PASS (tsc --noEmit + hooks/evals/dashboard-types guard, 0 new errors). lint: npm run lint PASS (eslint + all custom guards: effect, permissions, state-writes, overdeck-boundaries, pipeline-membership, skills, slash-commands, prompts, file-size, source-introspection, circular-deps, ratchet-audit, quarantine-audit). tests: npm test -> 10 failures across 7 files (merge-validation.test.ts, pipeline-state-paths-contribution.test.ts, workspace-manager-pre-rebase.test.ts, record-update.test.ts, dangerous-git-ops.test.ts, cloister/validation.test.ts, auto-commit.test.ts) all confirmed as git-guard false positives: this agent shell has OVERDECK_AGENT_ID set and a git-guard shim prepended to PATH that unconditionally blocks git rebase/stash/reset --hard for any caller. Verified root cause 3 ways: (1) git diff main...HEAD shows these test files and their source (workspace-manager.ts) are completely untouched by the PAN-3076 diff; (2) re-running 6/7 files with OVERDECK_PAN_GIT_OP=1 (the sanctioned escape hatch) -> all pass; (3) the 7th file (workspace-manager-pre-rebase.test.ts, 'human shell' cases that strip OVERDECK_AGENT_ID/OVERDECK_PAN_GIT_OP from the child env but not PATH) passes 7/7 when re-run with the git-guard directories excluded from PATH for that single command. No code, test, or config was modified. UAT: not required -- xBRIEF/issue/PR contain no UI, dashboard, or browser-facing acceptance criteria; all 28 changed files are src/lib, src/dashboard/server routes (non-frontend), src/cli, and tests implementing a branded HeadAnchor type across deacon compare/stamp sites. xBRIEF: all 41 statusOverrides completed, reviewedAtCommit f909f3d1 matches current HEAD.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3082",
@@ -325,7 +325,7 @@
       },
       "costAtCloseOut": {
         "usd": 207.12524,
-        "pricingAsOf": "2026-07-26T01:16:51.433Z"
+        "pricingAsOf": "2026-07-26T01:16:51.434Z"
       }
     },
     "merges": [
