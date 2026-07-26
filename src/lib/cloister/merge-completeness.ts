@@ -28,6 +28,11 @@ export interface MergeCompletenessResult {
   summary: string;
 }
 
+export interface ForgeMergeObservationResult extends MergeCompletenessResult {
+  hasPositiveMergedEvidence: boolean;
+  mergeSet: MergeSet | null;
+}
+
 export interface StrandedRepoReconciliationResult {
   mergeSet: MergeSet;
   blockers: MergeCompletenessRepoResult[];
@@ -74,10 +79,15 @@ async function fetchBranches(repo: RepoToAssess): Promise<boolean> {
   }
 }
 
-function resolveRepos(issueId: string, labels: string[]): RepoToAssess[] | null {
+function resolveRepos(
+  issueId: string,
+  labels: string[],
+): { mergeSet: MergeSet | null; repos: RepoToAssess[] | null } {
   const mergeSet = ensureMergeSetForIssueSync(issueId, labels);
-  if (mergeSet) return mergeSet.repos;
-  return resolveProjectReposForIssueSync(issueId, labels);
+  return {
+    mergeSet,
+    repos: mergeSet?.repos ?? resolveProjectReposForIssueSync(issueId, labels),
+  };
 }
 
 function buildSummary(repos: MergeCompletenessRepoResult[], complete: boolean): string {
@@ -157,25 +167,75 @@ export async function assessRepoMergeCompleteness(repo: RepoToAssess): Promise<M
   }
 }
 
+export function hasPositiveMergedEvidence(repos: MergeCompletenessRepoResult[]): boolean {
+  return repos.some((repo) => repo.state === 'merged');
+}
+
 export async function assessMergeCompleteness(
   issueId: string,
   labels: string[] = [],
 ): Promise<MergeCompletenessResult> {
-  const resolvedRepos = resolveRepos(issueId, labels);
-  if (!resolvedRepos || resolvedRepos.length === 0) {
+  const resolved = resolveRepos(issueId, labels);
+  if (!resolved.repos || resolved.repos.length === 0) {
     const repos: MergeCompletenessRepoResult[] = [];
     return { complete: false, repos, summary: buildSummary(repos, false) };
   }
 
-  const repos = await Promise.all(resolvedRepos.map(assessRepoMergeCompleteness));
+  const repos = await Promise.all(resolved.repos.map(assessRepoMergeCompleteness));
   const complete = repos.every((repo) => repo.state === 'merged' || repo.state === 'no-changes');
   return { complete, repos, summary: buildSummary(repos, complete) };
+}
+
+export async function observeForgeMergeState(
+  issueId: string,
+  labels: string[] = [],
+): Promise<ForgeMergeObservationResult> {
+  const resolved = resolveRepos(issueId, labels);
+  if (!resolved.repos || resolved.repos.length === 0) {
+    const repos: MergeCompletenessRepoResult[] = [];
+    return {
+      complete: false,
+      hasPositiveMergedEvidence: false,
+      mergeSet: resolved.mergeSet,
+      repos,
+      summary: buildSummary(repos, false),
+    };
+  }
+
+  const repos = await Promise.all(resolved.repos.map(assessRepoMergeCompleteness));
+  const complete = repos.every((repo) => repo.state === 'merged' || repo.state === 'no-changes');
+  const positiveMergedEvidence = hasPositiveMergedEvidence(repos);
+  let mergeSet = resolved.mergeSet;
+
+  if (mergeSet && !repos.some((repo) => repo.state === 'unverifiable')) {
+    let changed = false;
+    for (const result of repos) {
+      if (result.state !== 'merged' || !result.artifactUrl) continue;
+      const current = mergeSet.repos.find((repo) => repo.repoKey === result.repoKey);
+      if (!current || (current.mergeStatus === 'merged' && current.artifactUrl === result.artifactUrl)) continue;
+      mergeSet = withRepoStateSync(mergeSet, result.repoKey, {
+        mergeStatus: 'merged',
+        artifactUrl: result.artifactUrl,
+      });
+      changed = true;
+    }
+    if (changed) upsertMergeSetSync(mergeSet);
+  }
+
+  return {
+    complete,
+    hasPositiveMergedEvidence: positiveMergedEvidence,
+    mergeSet,
+    repos,
+    summary: buildSummary(repos, complete),
+  };
 }
 
 export async function reconcileStrandedRepos(
   initialMergeSet: MergeSet,
 ): Promise<StrandedRepoReconciliationResult> {
   let mergeSet = initialMergeSet;
+  let changed = false;
   const blockers: MergeCompletenessRepoResult[] = [];
   const stranded = mergeSet.repos.filter(
     (repo) => repo.required && repo.mergeStatus !== 'skipped' && !repo.artifactUrl,
@@ -189,7 +249,7 @@ export async function reconcileStrandedRepos(
       });
       if (discovered?.url) {
         mergeSet = withRepoArtifactUrlSync(mergeSet, repo.repoKey, discovered.url, discovered.id);
-        upsertMergeSetSync(mergeSet);
+        changed = true;
         continue;
       }
     } catch (error) {
@@ -205,14 +265,51 @@ export async function reconcileStrandedRepos(
     const result = await assessRepoMergeCompleteness(repo);
     if (result.state === 'no-changes') {
       mergeSet = withRepoStateSync(mergeSet, repo.repoKey, { mergeStatus: 'skipped' });
-      upsertMergeSetSync(mergeSet);
+      changed = true;
     } else if (result.state === 'merged' && result.artifactUrl) {
-      mergeSet = withRepoArtifactUrlSync(mergeSet, repo.repoKey, result.artifactUrl);
-      upsertMergeSetSync(mergeSet);
+      mergeSet = withRepoStateSync(mergeSet, repo.repoKey, {
+        artifactUrl: result.artifactUrl,
+        mergeStatus: 'merged',
+      });
+      changed = true;
     } else if (result.state === 'unmerged' || result.state === 'unverifiable') {
       blockers.push(result);
     }
   }
 
+  const candidates = mergeSet.repos.filter(
+    (repo) => repo.required
+      && repo.mergeStatus !== 'skipped'
+      && Boolean(repo.artifactUrl)
+      && (repo.mergeStatus === 'pending' || repo.mergeStatus === 'failed' || repo.mergeStatus === 'merging'),
+  );
+
+  for (const repo of candidates) {
+    try {
+      const artifact = await getForgeAdapter(repo.forge).findMergedArtifact({
+        sourceBranch: repo.sourceBranch,
+        cwd: repo.repoPath,
+      });
+      if (!artifact) continue;
+      mergeSet = withRepoStateSync(mergeSet, repo.repoKey, {
+        artifactId: artifact.id,
+        artifactUrl: artifact.url,
+        mergeStatus: 'merged',
+      });
+      changed = true;
+    } catch (error) {
+      blockers.push({
+        repoKey: repo.repoKey,
+        state: 'unverifiable',
+        aheadCount: 0,
+        reason: `${repo.repoKey} merged artifact lookup is unverifiable: ${errorMessage(error)}`,
+      });
+    }
+  }
+
+  if (blockers.some((blocker) => blocker.state === 'unverifiable')) {
+    return { mergeSet: initialMergeSet, blockers };
+  }
+  if (changed) upsertMergeSetSync(mergeSet);
   return { mergeSet, blockers };
 }

@@ -53,6 +53,7 @@ vi.mock('../../../../src/lib/forge.js', () => ({
 
 import {
   assessMergeCompleteness,
+  observeForgeMergeState,
   reconcileStrandedRepos,
 } from '../../../../src/lib/cloister/merge-completeness.js';
 
@@ -240,6 +241,75 @@ describe('assessMergeCompleteness', () => {
   });
 });
 
+describe('observeForgeMergeState', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resolveProjectReposForIssueMock.mockReturnValue(null);
+    getForgeAdapterMock.mockReturnValue({
+      discoverArtifact: discoverArtifactMock,
+      findMergedArtifact: findMergedArtifactMock,
+    });
+    execMock.mockResolvedValue(gitResult());
+    findMergedArtifactMock.mockResolvedValue(null);
+    withRepoStateMock.mockImplementation((current, repoKey, patch) => ({
+      ...current,
+      repos: current.repos.map((entry) => (
+        entry.repoKey === repoKey ? { ...entry, ...patch } : entry
+      )),
+    }));
+  });
+
+  it('persists artifact-backed merged repo evidence through the merge-set write door', async () => {
+    const pending = { ...repo('api', 'gitlab'), mergeStatus: 'pending' };
+    ensureMergeSetForIssueMock.mockReturnValue(mergeSet([pending]));
+    execMock.mockImplementation(async (command) => (
+      command.includes('rev-list --count') ? gitResult('2\n') : gitResult()
+    ));
+    findMergedArtifactMock.mockResolvedValue({
+      forge: 'gitlab',
+      created: false,
+      url: 'https://gitlab.com/org/api/-/merge_requests/56',
+      id: '56',
+    });
+
+    const result = await observeForgeMergeState('MIN-857');
+
+    expect(result.complete).toBe(true);
+    expect(result.hasPositiveMergedEvidence).toBe(true);
+    expect(result.mergeSet?.repos[0]).toEqual(expect.objectContaining({
+      artifactUrl: 'https://gitlab.com/org/api/-/merge_requests/56',
+      mergeStatus: 'merged',
+    }));
+    expect(withRepoStateMock).toHaveBeenCalledWith(
+      expect.anything(),
+      'api',
+      {
+        artifactUrl: 'https://gitlab.com/org/api/-/merge_requests/56',
+        mergeStatus: 'merged',
+      },
+    );
+    expect(upsertMergeSetMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not write merge state without positive merged evidence', async () => {
+    const pending = { ...repo('api', 'gitlab'), mergeStatus: 'pending' };
+    ensureMergeSetForIssueMock.mockReturnValue(mergeSet([pending]));
+    execMock.mockImplementation(async (command) => (
+      command.includes('rev-list --count') ? gitResult('0\n') : gitResult()
+    ));
+
+    const result = await observeForgeMergeState('MIN-857');
+
+    expect(result.complete).toBe(true);
+    expect(result.hasPositiveMergedEvidence).toBe(false);
+    expect(result.repos).toEqual([
+      expect.objectContaining({ repoKey: 'api', state: 'no-changes' }),
+    ]);
+    expect(withRepoStateMock).not.toHaveBeenCalled();
+    expect(upsertMergeSetMock).not.toHaveBeenCalled();
+  });
+});
+
 describe('reconcileStrandedRepos', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -314,6 +384,47 @@ describe('reconcileStrandedRepos', () => {
     expect(upsertMergeSetMock).not.toHaveBeenCalled();
   });
 
+  it.each(['pending', 'failed', 'merging'] as const)(
+    'marks an artifact-backed %s repo as merged when the forge proves it landed',
+    async (mergeStatus) => {
+      const stranded = {
+        ...repo('api', 'gitlab'),
+        artifactUrl: 'https://gitlab.com/org/api/-/merge_requests/56',
+        mergeStatus,
+      };
+      findMergedArtifactMock.mockResolvedValue({
+        forge: 'gitlab',
+        created: false,
+        url: 'https://gitlab.com/org/api/-/merge_requests/56',
+        id: '56',
+      });
+
+      const result = await reconcileStrandedRepos(mergeSet([stranded]) as any);
+
+      expect(result.blockers).toEqual([]);
+      expect(result.mergeSet.repos[0]).toEqual(expect.objectContaining({
+        artifactId: '56',
+        artifactUrl: 'https://gitlab.com/org/api/-/merge_requests/56',
+        mergeStatus: 'merged',
+      }));
+      expect(upsertMergeSetMock).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it('leaves an artifact-backed repo unchanged when the forge has no merged evidence', async () => {
+    const stranded = {
+      ...repo('api', 'gitlab'),
+      artifactUrl: 'https://gitlab.com/org/api/-/merge_requests/56',
+      mergeStatus: 'failed',
+    };
+
+    const result = await reconcileStrandedRepos(mergeSet([stranded]) as any);
+
+    expect(result.blockers).toEqual([]);
+    expect(result.mergeSet.repos[0]).toEqual(stranded);
+    expect(upsertMergeSetMock).not.toHaveBeenCalled();
+  });
+
   it('fails closed when artifact discovery cannot be verified', async () => {
     const stranded = { ...repo('api', 'gitlab'), mergeStatus: 'pending' };
     discoverArtifactMock.mockRejectedValue(new Error('forge unavailable'));
@@ -328,5 +439,6 @@ describe('reconcileStrandedRepos', () => {
       }),
     ]);
     expect(execMock).not.toHaveBeenCalled();
+    expect(upsertMergeSetMock).not.toHaveBeenCalled();
   });
 });
