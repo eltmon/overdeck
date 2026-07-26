@@ -29,6 +29,21 @@ Live landmines a change in this repo can step on. Verified 2026-06-13.
 - **`postMergeLifecycle` idempotency** — guarded by
   `src/lib/cloister/in-flight-guard.ts` + its test. Weakening it reopens the
   PAN-328 infinite-loop (24k tracker calls). Keep the test green.
+- **Polyrepo UAT: never gate on `repos.length`** (PAN-3093) — every generation
+  reads back with at least one `repos` entry because monorepo rows synthesize
+  one, and a polyrepo project with a single contributing repo still needs the
+  per-repo path. Gate on the injected per-repo deps instead (`polyrepoGit` in
+  `uat-promote.ts`, `removeRepoArtifacts` in `uat-generation-engine.ts`).
+- **UAT anchors are compared by string equality** (PAN-3093) — the reconciler
+  decides staleness by comparing an anchor it computes now against what
+  assembly stored, so both sides must build anchors with the shared helpers in
+  `src/lib/cloister/uat-polyrepo-engine.ts`. Member anchors order by `repoKey`
+  because `mergeOrderInRepo` is knowable only to assembly; ordering on it makes
+  every generation read stale and reassemble forever.
+- **Polyrepo promote is resumable, not transactional** — phase A trial-merges
+  every repo before anything is pushed, but a phase-B failure leaves earlier
+  repos landed on purpose. Recovery is retry-with-skip via `promoted_at`; never
+  force-push or rewind a member repo's main (one-way door).
 - **Single Deacon invariant** — never mount `~/.overdeck` into workspace
   containers; `OVERDECK_DISABLE_DEACON=1` belt-and-suspenders.
 - **Dashboard runtime** — Node 22 + built `dist/` only (node-pty native addon
