@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T09:04:01.632Z",
-  "updated": "2026-07-26T09:34:29.952Z",
+  "updated": "2026-07-26T09:38:59.212Z",
   "pipeline": {
     "issueId": "PAN-3116",
     "reviewStatus": "pending",
@@ -61,16 +61,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "remove-quality-lint-ratchet-rule": {
-        "writerId": "agent-pan-3116",
-        "agentId": "agent-pan-3116",
-        "pid": 2989677,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-26T09:34:29.952Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3116",
@@ -104,6 +96,17 @@
         "outcome": "completed",
         "reason": "Deleted the obsolete baseline reconcile module and tests, and removed the UAT promotion reconcile/amend step while preserving no-ff merge and push behavior.",
         "releasedAt": "2026-07-26T09:34:14.612Z"
+      },
+      {
+        "writerId": "agent-pan-3116",
+        "agentId": "agent-pan-3116",
+        "pid": 2989677,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T09:34:29.952Z",
+        "itemId": "remove-quality-lint-ratchet-rule",
+        "outcome": "completed",
+        "reason": "Removed the deferred stored-baseline quality rule, its dedicated tests and fixture item, and updated planning guidance to the derive-at-lint-time allowlist contract.",
+        "releasedAt": "2026-07-26T09:38:59.212Z"
       }
     ],
     "statusReasons": {
@@ -118,6 +121,10 @@
       "remove-baseline-reconcile": {
         "reason": "Deleted the obsolete baseline reconcile module and tests, and removed the UAT promotion reconcile/amend step while preserving no-ff merge and push behavior.",
         "updatedAt": "2026-07-26T09:34:14.612Z"
+      },
+      "remove-quality-lint-ratchet-rule": {
+        "reason": "Removed the deferred stored-baseline quality rule, its dedicated tests and fixture item, and updated planning guidance to the derive-at-lint-time allowlist contract.",
+        "updatedAt": "2026-07-26T09:38:59.212Z"
       }
     }
   },
@@ -137,6 +144,10 @@
     "remove-baseline-reconcile.remove-baseline-reconcile.ac1": "completed",
     "remove-baseline-reconcile.remove-baseline-reconcile.ac2": "completed",
     "remove-baseline-reconcile.remove-baseline-reconcile.ac3": "completed",
-    "remove-quality-lint-ratchet-rule": "running"
+    "remove-quality-lint-ratchet-rule": "completed",
+    "remove-quality-lint-ratchet-rule.remove-quality-lint-ratchet-rule.ac1": "completed",
+    "remove-quality-lint-ratchet-rule.remove-quality-lint-ratchet-rule.ac2": "completed",
+    "remove-quality-lint-ratchet-rule.remove-quality-lint-ratchet-rule.ac3": "completed",
+    "remove-quality-lint-ratchet-rule.remove-quality-lint-ratchet-rule.ac4": "completed"
   }
 }
