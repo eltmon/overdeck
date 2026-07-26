@@ -64,19 +64,20 @@
     "recordedAt": "2026-07-26T20:34:03.489Z"
   },
   "created": "2026-07-26T19:16:39.648Z",
-  "updated": "2026-07-26T20:40:41.461Z",
+  "updated": "2026-07-26T20:40:53.733Z",
   "pipeline": {
     "issueId": "PAN-3155",
     "reviewStatus": "blocked",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T20:34:33.677Z",
-    "updatedAt": "2026-07-26T20:40:40.585Z",
+    "updatedAt": "2026-07-26T20:40:53.687Z",
     "reviewNotes": "Deploy row checks dashboard health before the missing-merge dependency, so row 7 still cascades a second miss when row 4 misses",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3160",
+    "lastVerifiedCommit": "bd4a385669bbffd1723280ab898395c8a5428867",
     "reviewSpawnedAt": "2026-07-26T20:36:32.504Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -114,32 +115,32 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 946058,
-            "output": 67713,
-            "cacheRead": 7527424,
+            "input": 952494,
+            "output": 67895,
+            "cacheRead": 7806976,
             "cacheWrite": 0
           }
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 887760,
-            "output": 115904,
-            "cacheRead": 47280128,
+            "input": 890780,
+            "output": 116504,
+            "cacheRead": 47741952,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 1833818,
-          "output": 183617,
-          "cacheRead": 54807552,
+          "input": 1843274,
+          "output": 184399,
+          "cacheRead": 55548928,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 42.081376,
-        "pricingAsOf": "2026-07-26T20:40:40.608Z"
+        "usd": 42.522804,
+        "pricingAsOf": "2026-07-26T20:40:53.722Z"
       }
     },
     "merges": [
