@@ -411,17 +411,16 @@
     "recordedAt": "2026-07-26T19:11:42.045Z"
   },
   "created": "2026-07-26T13:39:19.365Z",
-  "updated": "2026-07-26T20:06:08.932Z",
+  "updated": "2026-07-26T20:23:09.840Z",
   "pipeline": {
     "issueId": "PAN-3138",
     "reviewStatus": "passed",
     "testStatus": "passed",
-    "verificationStatus": "passed",
     "mergeStatus": "merged",
     "releaseStatus": "skipped",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T19:12:23.171Z",
-    "updatedAt": "2026-07-26T20:04:40.970Z",
+    "updatedAt": "2026-07-26T20:23:09.787Z",
     "reviewNotes": "Approved after cycle-8 convergence gate; current recovery changes have no blockers",
     "testNotes": "No UAT required: PAN-3138 is a backend/infra fix (merge-time Docker devnet teardown, deacon reaper backstop, rebuild-stack terminal gate) with acceptance criteria verified entirely by mocked-Docker unit tests; PRD and issue have no UI/dashboard/browser wording. Gates run from workspace feature-pan-3138 at HEAD 5e0867c1823c974f31d83bbb2a8d4be80fe33f15 (matches reviewedAtCommit; review verdict APPROVED, cycle 8): bun install --frozen-lockfile clean; npm run typecheck pass (root tsc, hooks, evals, dashboard-types guard); frontend `npx tsc --noEmit` pass; npm run lint pass (eslint + effect/permissions/state-writes/overdeck-boundaries/pipeline-membership/skills/slash-commands/prompts/prompt-trailer/file-size/source-introspection/no-coderabbit/circular/ratchet-audit/quarantine-audit); npm run build pass; npm run build:dashboard:server:bundle pass. Full vitest suite (root, clean PATH): 1210 files / 11134 tests passed, 0 failed, 50 skipped. Frontend issueActions tests (parity/no-actions-lost): 51 passed. xBRIEF item-targeted tests all pass: tests/unit/lib/cloister/postmerge-cleanup-async.test.ts, src/lib/cloister/__tests__/closed-issue-reaper.test.ts, src/lib/workspace/__tests__/rebuild-stack.test.ts. Docs item verified: `grep -n postMergeLifecycle docs/WORKSPACE-CONTAINERS.md CLAUDE.md` shows the merge-time-teardown/close-out/reaper-backstop language. Investigated 10 initial full-suite failures (autoRevertMerge, installPreRebaseHook x2, auto-commit x2, record-update x2, dangerous-git-ops, merge-validation, pipeline-state-paths-contribution): zero diff on any of those files or dependencies vs main; root-caused to this test-agent's own git-guard PATH shim intercepting real `git reset --hard` subprocess calls inside test sandboxes; confirmed environmental by rerunning with PATH stripped of the shim, which turned all 10 green with no other change.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
@@ -508,7 +507,9 @@
         "tests/unit/lib/review-status.test.ts"
       ],
       "recordedAt": "2026-07-26T19:11:42.045Z"
-    }
+    },
+    "closedOut": true,
+    "closedOutAt": "2026-07-26T20:23:09.787Z"
   },
   "closeOut": {
     "usage": {
@@ -592,7 +593,80 @@
     "merges": [
       "https://github.com/eltmon/overdeck/pull/3143"
     ],
-    "ranOn": "eltmon-z790"
+    "ranOn": "eltmon-z790",
+    "dodGate": {
+      "evaluatedAt": "2026-07-26T20:23:09.836Z",
+      "rows": [
+        {
+          "id": "review",
+          "num": 1,
+          "title": "Review passed",
+          "expected": "reviewStatus: passed",
+          "observed": "reviewStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "tests",
+          "num": 2,
+          "title": "Tests passed",
+          "expected": "testStatus: passed",
+          "observed": "testStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "verification",
+          "num": 3,
+          "title": "Verification green on the branch",
+          "expected": "verificationStatus: passed",
+          "observed": "verificationStatus: passed at 45c64d10937592faceea33d0a627c6e336c9c829",
+          "status": "pass"
+        },
+        {
+          "id": "merged",
+          "num": 4,
+          "title": "Merged to main",
+          "expected": "PR merged on the forge, or branch work contained in main (non-PR landing)",
+          "observed": "Merge specialist confirmed merge completed; PR #3143 MERGED at 2026-07-26T20:04:21Z",
+          "status": "pass",
+          "mergedAt": "2026-07-26T20:04:21Z",
+          "mergeCommit": "f180ed4b8c910b81d4342819c81685a394b7d1a6"
+        },
+        {
+          "id": "post-merge",
+          "num": 5,
+          "title": "Post-merge lifecycle ran",
+          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
+          "observed": "canonical state: verifying_on_main; no running work/planning agents",
+          "status": "pass"
+        },
+        {
+          "id": "main-verify",
+          "num": 6,
+          "title": "Verified on main",
+          "expected": "merged commit verified on main",
+          "observed": "no CI check-runs on merge commit f180ed4b8c910b81d4342819c81685a394b7d1a6",
+          "status": "skip"
+        },
+        {
+          "id": "deploy",
+          "num": 7,
+          "title": "Deployed",
+          "expected": "live server build includes the merged commit",
+          "observed": "build commit 49e25319 contains merge f180ed4b",
+          "status": "pass"
+        },
+        {
+          "id": "teardown",
+          "num": 8,
+          "title": "Close-out teardown verified",
+          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
+          "overridable": false,
+          "status": "pass",
+          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; Stopped TLDR daemon; Stopped Docker containers; Killed 2 orphaned process(es); Removed git worktree; Removed 8 agent state directories; No strike branch strike/pan-3138 found; Pruned 535 checkpoint ref(s) for agent-pan-3138, planning-pan-3138, strike-pan-3138; No specialist registry entries for PAN-3138"
+        }
+      ],
+      "accepted": []
+    }
   },
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
