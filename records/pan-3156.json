@@ -3,7 +3,7 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-07-26T20:09:18.080Z",
-  "updated": "2026-07-26T23:26:17.267Z",
+  "updated": "2026-07-26T23:37:18.212Z",
   "pipeline": {
     "issueId": "PAN-3156",
     "reviewStatus": "pending",
@@ -13,7 +13,7 @@
     "mergeStep": "verifying",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T23:26:17.257Z",
+    "updatedAt": "2026-07-26T23:37:18.173Z",
     "verificationNotes": "Verification FAILED at frontend-typecheck (11371ms):\n\nsrc/App.tsx(1,67): error TS2307: Cannot find module 'react' or its corresponding type declarations.\nsrc/App.tsx(2,55): error TS2307: Cannot find module '@tanstack/react-query' or its corresponding type declarations.\nsrc/App.tsx(3,32): error TS2307: Cannot find module 'sonner' or its corresponding type declarations.\nsrc/App.tsx(98,12): error TS2875: This JSX tag requires the module path 'react/jsx-runtime' to exist, but none could be found. Make sure you have types for the appropriate package installed.\nsrc/App.tsx(182,31): error TS7006: Parameter 'current' implicitly has an 'any' type.\nsrc/App.tsx(203,45): error TS7006: Parameter 'state' implicitly has an 'any' type.\nsrc/App.tsx(246,44): error TS7006: Parameter 'state' implicitly has an 'any' type.\nsrc/App.tsx(248,40): error TS7006: Parameter 'state' implicitly has an 'any' type.\nsrc/App.tsx(249,49): error TS7006: Parameter 'state' implicitly has an 'any' type.\nsrc/App.tsx(250,48): error TS7006: Parameter 'state' implicitly has an 'any' type.\nsrc/App.tsx(305,63): error TS7006: Parameter 't' implicitly has an 'any' type.\nsrc/App.tsx(533,70): error TS7006: Parameter 'p' implicitly has an 'any' type.\nsrc/App.tsx(651,27): error TS7006: Parameter 'prev' implicitly has an 'any' type.\nsrc/App.tsx(736,8): error TS7006: Parameter 'p' implicitly has an 'any' type.\nsrc/App.tsx(781,5): error TS7026: JSX element implicitly has type 'any' because no interface 'JSX.IntrinsicElements' exists.\nsrc/App.tsx(807,7): error TS7026: JSX element implicitly has type 'any' because no interface 'JSX.IntrinsicElements' exists.\nsrc/App.tsx(830,9): error TS7026: JSX element implicitly has type 'any' because no interface 'JSX.IntrinsicElements' exists.\nsrc/App.tsx(831,9): error TS7026: JSX element implicitly has type 'any' because no interface 'JSX.IntrinsicElements' exists.\nsrc/App.tsx(861,9): error TS7026: JSX element implicitly has type 'any' because no interface 'JSX.IntrinsicElements' exists.\nsrc/App.tsx(867,9): error TS7026: JSX element imp\n…(3152251 chars elided)…\ns.\nsrc/recovery.tsx(300,43): error TS2339: Property 'props' does not exist on type 'RootErrorBoundary'.\nsrc/recovery.tsx(302,7): error TS7026: JSX element implicitly has type 'any' because no interface 'JSX.IntrinsicElements' exists.\nsrc/recovery.tsx(302,7): error TS2875: This JSX tag requires the module path 'react/jsx-runtime' to exist, but none could be found. Make sure you have types for the appropriate package installed.\nsrc/recovery.tsx(317,9): error TS7026: JSX element implicitly has type 'any' because no interface 'JSX.IntrinsicElements' exists.\nsrc/recovery.tsx(317,41): error TS7026: JSX element implicitly has type 'any' because no interface 'JSX.IntrinsicElements' exists.\nsrc/recovery.tsx(318,9): error TS7026: JSX element implicitly has type 'any' because no interface 'JSX.IntrinsicElements' exists.\nsrc/recovery.tsx(331,9): error TS7026: JSX element implicitly has type 'any' because no interface 'JSX.IntrinsicElements' exists.\nsrc/recovery.tsx(332,7)\n...(truncated)",
     "mergeNotes": "Post-rebase verification failed at frontend-typecheck",
     "strikeReadyHead": "06dc4fd53d967992b35cdb761306d2aa81f9b025",
@@ -36,7 +36,7 @@
       "totals": {},
       "costAtCloseOut": {
         "usd": 0,
-        "pricingAsOf": "2026-07-26T23:26:17.262Z"
+        "pricingAsOf": "2026-07-26T23:37:18.177Z"
       }
     },
     "merges": [],
