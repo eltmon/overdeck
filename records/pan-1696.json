@@ -286,10 +286,10 @@
   ],
   "feedback": [],
   "created": "2026-07-26T00:35:36.057Z",
-  "updated": "2026-07-26T08:32:42.358Z",
+  "updated": "2026-07-26T08:36:04.878Z",
   "pipeline": {
     "issueId": "PAN-1696",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "running",
     "inspectStatus": "passed",
@@ -297,12 +297,11 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T08:32:36.176Z",
-    "updatedAt": "2026-07-26T08:32:37.152Z",
-    "reviewNotes": "Agent re-review request (1/25): Fixed frontend-typecheck (unused WorkspaceStackHealth import) and all review findings: malformed assemble JSON now 400s instead of forcing an all-project reconcile; UAT acceptance criteria resolve in the generation's own project instead of the dashboard repo; stack and rebuild are confirm-gated; disabled rows stay visible when every train is off; the cockpit summary now consumes the shared hook and the merge-backend probe was split out. All six gates green, 10821 root tests passing.",
+    "updatedAt": "2026-07-26T08:36:04.839Z",
+    "reviewNotes": "Valid non-object assemble JSON still triggers all-project reconciliation; rebuild member names, the collapsed cockpit summary, and mixed disabled-project rows also remain incomplete.",
     "verificationNotes": "Verification FAILED at frontend-typecheck (22634ms):\n\nsrc/components/AwaitingMergePage.tsx(22,68): error TS6196: 'WorkspaceStackHealth' is declared but never used.\n",
     "inspectNotes": "ac1/ac2/ac3 all met, verified against tree not just diff. ac1: getMergeTrainQueuesPayload maps every listProjectsSync() entry to {projectKey, projectName, enabled, queue}; ready set comes from listEligibleCandidatesByProject (flywheel-merge-order.ts:326 reads loadReviewStatuses/readyForMerge/mergeGateEligibility) so no activePipeline and no run is consulted anywhere in the path; effective flag is isMergeTrainEnabledForProject (merge-sync.ts:86 per-project override else global). ac2: getMergeTrainGenerationsPayload passes each project root into getUatGenerationsPayload(override) which now threads projectRoot into listUatGenerationsSync; the stack and promote handlers are byte-for-byte the legacy flywheel.ts:912/928 bodies including uatGenerationNameFromParam prefix reconstruction, firePostMergeLifecycle wiring, and the 404/500/409 reason mapping, behind the same rejectUnsafeDashboardMutationRequest gate; assemble with {project} reproduces legacy flywheel.ts:953 runUatTrainReconcile({force:true}) scoped to that root, no-project form is a deliberate superset. ac3: postMergeTrainMergeNextPayload orders the NAMED project ready set via computeMergeQueueFromCandidates(candidates, resolve(config.path)) and ships it through shipMergeBatch, unknown key -> 404 with error body naming the key, missing key / n<=0 -> 400, disabled project -> 409, all before any merge call. getUatGenerationSync is imported (uat-train.ts:37) and UatGeneration carries projectRoot (merge-sync.ts:420) so the promote root fix is sound. NO-LOSS-MATRIX carries all six routes each naming its superseded /api/flywheel route. Non-blocking notes for the frontend-migration and remove-legacy-routes items: (1) merge-next auth is STRICTER than legacy - legacy /api/flywheel/merge-next used requireTrustedOrigin only, the new route requires session cookie + CSRF, so the migrated caller must send both or it will 401; (2) assemble response shape changed from the bare ReconcileResult to {projects:[{projectKey,result}]}; (3) assemble with {project} does not gate on isMergeTrainEnabledForProject while merge-next 409s - acceptable for a forced operator action but worth making deliberate.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3095",
-    "reviewRequestedAt": "2026-07-26T08:32:36.176Z",
     "reviewSpawnedAt": "2026-07-26T08:32:37.151Z"
   },
   "closeOut": {
@@ -332,9 +331,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 13697331,
-            "output": 618306,
-            "cacheRead": 163176960,
+            "input": 15188121,
+            "output": 660003,
+            "cacheRead": 174695424,
             "cacheWrite": 0
           }
         },
@@ -375,9 +374,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 13697331,
-          "output": 618306,
-          "cacheRead": 163176960,
+          "input": 15188121,
+          "output": 660003,
+          "cacheRead": 174695424,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -394,8 +393,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 223.6600952,
-        "pricingAsOf": "2026-07-26T08:32:37.321Z"
+        "usd": 238.1241872,
+        "pricingAsOf": "2026-07-26T08:36:04.862Z"
       }
     },
     "merges": [
@@ -404,7 +403,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-opus-5",
   "tasks": {
     "sequence": 38,
     "claims": {},
