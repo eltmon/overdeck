@@ -93,18 +93,18 @@
     "recordedAt": "2026-07-26T22:02:33.712Z"
   },
   "created": "2026-07-26T20:52:58.018Z",
-  "updated": "2026-07-26T23:43:08.923Z",
+  "updated": "2026-07-26T23:49:19.652Z",
   "pipeline": {
     "issueId": "PAN-3162",
     "reviewStatus": "passed",
-    "testStatus": "testing",
+    "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": false,
+    "readyForMerge": true,
     "panDoneRecoveredAt": "2026-07-26T22:02:50.304Z",
-    "updatedAt": "2026-07-26T23:43:08.913Z",
+    "updatedAt": "2026-07-26T23:49:19.570Z",
     "reviewNotes": "Atomic reconciliation fixes prior blockers; focused tests, typecheck, and lint pass",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "All 4 ACs met. observeForgeMergeState (merge-completeness.ts:189-232) persists mergeStatus='merged'+artifactUrl via withRepoStateSync/upsertMergeSetSync only for state==='merged' rows lacking that evidence, and is gated on no repo being unverifiable, so unmerged/no-changes/unverifiable verdicts write nothing and hasPositiveMergedEvidence is false for all-no-changes. reconcileStrandedRepos (lines 280-308) flips required, non-skipped, artifact-backed pending/failed/merging rows to merged (with artifactId) only when findMergedArtifact returns an artifact, and continues untouched on null. Forge errors in both paths become unverifiable blockers; reconcile now batches writes and returns initialMergeSet with zero upserts when any unverifiable blocker exists (lines 310-313), covered by both new cases in merge-completeness-forge-error.test.ts. Notes, non-blocking: (a) observeForgeMergeState has no production caller yet — presumably a later bead wires it; (b) mixed sets where one repo is verifiably merged and another is unverifiable discard the confirmed evidence, which is the AC4-mandated fail-open reading; (c) merge-ops.ts:533-535 activeRepos still includes rows this flips to merged, so a reconciled-merged repo will still be walked by the rebase/merge loop — worth a follow-on look outside this bead.",
@@ -171,26 +171,40 @@
             "cacheWrite": 0
           }
         },
+        "test": {
+          "anthropic/claude-sonnet-5": {
+            "input": 32,
+            "output": 8211,
+            "cacheRead": 2666791,
+            "cacheWrite": 200716
+          }
+        },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 4126612,
-            "output": 469365,
-            "cacheRead": 171843584,
+            "input": 4132365,
+            "output": 469935,
+            "cacheRead": 173540864,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 10859548,
-          "output": 916929,
-          "cacheRead": 252548608,
+          "input": 10865301,
+          "output": 917499,
+          "cacheRead": 254245888,
           "cacheWrite": 0
+        },
+        "anthropic/claude-sonnet-5": {
+          "input": 32,
+          "output": 8211,
+          "cacheRead": 2666791,
+          "cacheWrite": 200716
         }
       },
       "costAtCloseOut": {
-        "usd": 208.079914,
-        "pricingAsOf": "2026-07-26T23:43:08.918Z"
+        "usd": 210.091744,
+        "pricingAsOf": "2026-07-26T23:49:19.639Z"
       }
     },
     "merges": [
