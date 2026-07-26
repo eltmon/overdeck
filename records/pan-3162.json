@@ -15,8 +15,55 @@
     }
   ],
   "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      "src/dashboard/server/routes/workspaces/__tests__/merge-ops-polyrepo-completeness.test.ts",
+      "src/lib/cloister/deacon-stuck-merging.ts"
+    ],
+    "declaredScopeUntouched": [
+      "src/dashboard/server/routes/__tests__/merge-ops.test.ts",
+      "tests/unit/lib/cloister/uat-reconciler.test.ts"
+    ],
+    "declaredScope": [
+      "docs/MERGE-TRAIN.md",
+      "docs/MERGE-WORKFLOW.md",
+      "docs/RECOVERY-NET.md",
+      "src/dashboard/server/routes/__tests__/merge-ops.test.ts",
+      "src/dashboard/server/routes/workspaces/merge-ops.ts",
+      "src/lib/cloister/deacon-merge.ts",
+      "src/lib/cloister/deacon.ts",
+      "src/lib/cloister/merge-completeness.ts",
+      "src/lib/cloister/merge-verification.ts",
+      "tests/unit/lib/cloister/deacon-forge-merge-reconcile.test.ts",
+      "tests/unit/lib/cloister/deacon-stuck-merging.test.ts",
+      "tests/unit/lib/cloister/merge-completeness-forge-error.test.ts",
+      "tests/unit/lib/cloister/merge-completeness.test.ts",
+      "tests/unit/lib/cloister/merge-verification.test.ts",
+      "tests/unit/lib/cloister/uat-reconciler.test.ts",
+      "tests/unit/lib/flywheel-merge-order.test.ts"
+    ],
+    "actualChangedFiles": [
+      "docs/MERGE-TRAIN.md",
+      "docs/MERGE-WORKFLOW.md",
+      "docs/RECOVERY-NET.md",
+      "src/dashboard/server/routes/workspaces/__tests__/merge-ops-polyrepo-completeness.test.ts",
+      "src/dashboard/server/routes/workspaces/merge-ops.ts",
+      "src/lib/cloister/deacon-merge.ts",
+      "src/lib/cloister/deacon-stuck-merging.ts",
+      "src/lib/cloister/deacon.ts",
+      "src/lib/cloister/merge-completeness.ts",
+      "src/lib/cloister/merge-verification.ts",
+      "tests/unit/lib/cloister/deacon-forge-merge-reconcile.test.ts",
+      "tests/unit/lib/cloister/deacon-stuck-merging.test.ts",
+      "tests/unit/lib/cloister/merge-completeness-forge-error.test.ts",
+      "tests/unit/lib/cloister/merge-completeness.test.ts",
+      "tests/unit/lib/cloister/merge-verification.test.ts",
+      "tests/unit/lib/flywheel-merge-order.test.ts"
+    ],
+    "recordedAt": "2026-07-26T22:02:33.712Z"
+  },
   "created": "2026-07-26T20:52:58.018Z",
-  "updated": "2026-07-26T22:02:36.411Z",
+  "updated": "2026-07-26T22:02:39.753Z",
   "pipeline": {
     "issueId": "PAN-3162",
     "reviewStatus": "pending",
@@ -26,8 +73,9 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T22:02:36.408Z",
+    "updatedAt": "2026-07-26T22:02:39.702Z",
     "inspectNotes": "All 4 ACs met. observeForgeMergeState (merge-completeness.ts:189-232) persists mergeStatus='merged'+artifactUrl via withRepoStateSync/upsertMergeSetSync only for state==='merged' rows lacking that evidence, and is gated on no repo being unverifiable, so unmerged/no-changes/unverifiable verdicts write nothing and hasPositiveMergedEvidence is false for all-no-changes. reconcileStrandedRepos (lines 280-308) flips required, non-skipped, artifact-backed pending/failed/merging rows to merged (with artifactId) only when findMergedArtifact returns an artifact, and continues untouched on null. Forge errors in both paths become unverifiable blockers; reconcile now batches writes and returns initialMergeSet with zero upserts when any unverifiable blocker exists (lines 310-313), covered by both new cases in merge-completeness-forge-error.test.ts. Notes, non-blocking: (a) observeForgeMergeState has no production caller yet — presumably a later bead wires it; (b) mixed sets where one repo is verifiably merged and another is unverifiable discard the confirmed evidence, which is the AC4-mandated fail-open reading; (c) merge-ops.ts:533-535 activeRepos still includes rows this flips to merged, so a reconciled-merged repo will still be walked by the rebase/merge loop — worth a follow-on look outside this bead.",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3170",
     "reviewRequestedAt": "2026-07-26T22:02:36.408Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -75,35 +123,36 @@
         "tests/unit/lib/flywheel-merge-order.test.ts"
       ],
       "recordedAt": "2026-07-26T22:02:33.712Z"
-    },
-    "prUrl": "https://github.com/eltmon/overdeck/pull/3170"
+    }
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 576305,
-            "output": 91967,
-            "cacheRead": 10253824,
+            "input": 1278241,
+            "output": 236018,
+            "cacheRead": 66781696,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 576305,
-          "output": 91967,
-          "cacheRead": 10253824,
+          "input": 1278241,
+          "output": 236018,
+          "cacheRead": 66781696,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 10.767447,
-        "pricingAsOf": "2026-07-26T21:27:04.966Z"
+        "usd": 46.862593,
+        "pricingAsOf": "2026-07-26T22:02:39.744Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/3170"
+    ],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
@@ -256,52 +305,5 @@
     "merge-oracle-docs.merge-oracle-docs.ac1": "completed",
     "merge-oracle-docs.merge-oracle-docs.ac2": "completed",
     "merge-oracle-docs.merge-oracle-docs.ac3": "completed"
-  },
-  "scopeDrift": {
-    "outsideDeclaredScope": [
-      "src/dashboard/server/routes/workspaces/__tests__/merge-ops-polyrepo-completeness.test.ts",
-      "src/lib/cloister/deacon-stuck-merging.ts"
-    ],
-    "declaredScopeUntouched": [
-      "src/dashboard/server/routes/__tests__/merge-ops.test.ts",
-      "tests/unit/lib/cloister/uat-reconciler.test.ts"
-    ],
-    "declaredScope": [
-      "docs/MERGE-TRAIN.md",
-      "docs/MERGE-WORKFLOW.md",
-      "docs/RECOVERY-NET.md",
-      "src/dashboard/server/routes/__tests__/merge-ops.test.ts",
-      "src/dashboard/server/routes/workspaces/merge-ops.ts",
-      "src/lib/cloister/deacon-merge.ts",
-      "src/lib/cloister/deacon.ts",
-      "src/lib/cloister/merge-completeness.ts",
-      "src/lib/cloister/merge-verification.ts",
-      "tests/unit/lib/cloister/deacon-forge-merge-reconcile.test.ts",
-      "tests/unit/lib/cloister/deacon-stuck-merging.test.ts",
-      "tests/unit/lib/cloister/merge-completeness-forge-error.test.ts",
-      "tests/unit/lib/cloister/merge-completeness.test.ts",
-      "tests/unit/lib/cloister/merge-verification.test.ts",
-      "tests/unit/lib/cloister/uat-reconciler.test.ts",
-      "tests/unit/lib/flywheel-merge-order.test.ts"
-    ],
-    "actualChangedFiles": [
-      "docs/MERGE-TRAIN.md",
-      "docs/MERGE-WORKFLOW.md",
-      "docs/RECOVERY-NET.md",
-      "src/dashboard/server/routes/workspaces/__tests__/merge-ops-polyrepo-completeness.test.ts",
-      "src/dashboard/server/routes/workspaces/merge-ops.ts",
-      "src/lib/cloister/deacon-merge.ts",
-      "src/lib/cloister/deacon-stuck-merging.ts",
-      "src/lib/cloister/deacon.ts",
-      "src/lib/cloister/merge-completeness.ts",
-      "src/lib/cloister/merge-verification.ts",
-      "tests/unit/lib/cloister/deacon-forge-merge-reconcile.test.ts",
-      "tests/unit/lib/cloister/deacon-stuck-merging.test.ts",
-      "tests/unit/lib/cloister/merge-completeness-forge-error.test.ts",
-      "tests/unit/lib/cloister/merge-completeness.test.ts",
-      "tests/unit/lib/cloister/merge-verification.test.ts",
-      "tests/unit/lib/flywheel-merge-order.test.ts"
-    ],
-    "recordedAt": "2026-07-26T22:02:33.712Z"
   }
 }
