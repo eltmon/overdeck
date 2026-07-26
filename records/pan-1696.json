@@ -259,7 +259,7 @@
     }
   ],
   "created": "2026-07-26T00:35:36.057Z",
-  "updated": "2026-07-26T04:11:54.357Z",
+  "updated": "2026-07-26T04:12:04.569Z",
   "pipeline": {
     "issueId": "PAN-1696",
     "reviewStatus": "blocked",
@@ -268,7 +268,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T04:11:53.781Z",
+    "updatedAt": "2026-07-26T04:12:04.533Z",
     "reviewNotes": "The new no-active-run status path ignores --json and leaves the focused Flywheel CLI suite red with no populated or empty ready-set coverage.",
     "testNotes": "probe",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
@@ -302,26 +302,26 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 9043468,
-            "output": 461349,
-            "cacheRead": 130808320,
+            "input": 9051392,
+            "output": 463713,
+            "cacheRead": 131709440,
             "cacheWrite": 0
           }
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 116,
-            "output": 52350,
-            "cacheRead": 9621856,
-            "cacheWrite": 409981
+            "input": 118,
+            "output": 52623,
+            "cacheRead": 9826157,
+            "cacheWrite": 411008
           }
         },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 3825,
-            "output": 161148,
-            "cacheRead": 94805964,
-            "cacheWrite": 3874175
+            "input": 3836,
+            "output": 161658,
+            "cacheRead": 95186837,
+            "cacheWrite": 3874600
           }
         }
       },
@@ -345,27 +345,27 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 9043468,
-          "output": 461349,
-          "cacheRead": 130808320,
+          "input": 9051392,
+          "output": 463713,
+          "cacheRead": 131709440,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 116,
-          "output": 52350,
-          "cacheRead": 9621856,
-          "cacheWrite": 409981
+          "input": 118,
+          "output": 52623,
+          "cacheRead": 9826157,
+          "cacheWrite": 411008
         },
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 3825,
-          "output": 161148,
-          "cacheRead": 94805964,
-          "cacheWrite": 3874175
+          "input": 3836,
+          "output": 161658,
+          "cacheRead": 95186837,
+          "cacheWrite": 3874600
         }
       },
       "costAtCloseOut": {
-        "usd": 173.2188302,
-        "pricingAsOf": "2026-07-26T04:11:53.803Z"
+        "usd": 173.8672712,
+        "pricingAsOf": "2026-07-26T04:12:04.551Z"
       }
     },
     "merges": [
