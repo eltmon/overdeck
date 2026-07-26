@@ -186,6 +186,12 @@ export function scrubAgentIdentityFromDashboardEnv(env: NodeJS.ProcessEnv): void
   delete env.OVERDECK_AGENT_ID;
   delete env.OVERDECK_ISSUE_ID;
   delete env.OVERDECK_SESSION_TYPE;
+  // An agent-launched restart inherits the launcher's git-guard shim dir on
+  // PATH; a dashboard running behind that shim has every `git stash`/`git
+  // rebase` it issues rejected (the 2026-07-26 workspaces-route GitError storm).
+  if (env.PATH !== undefined) {
+    env.PATH = env.PATH.split(':').filter(segment => !segment.endsWith('/git-guard')).join(':');
+  }
 }
 
 export function spawnDashboardDetached(config: PlatformConfig, opts?: BootGateOptions): DashboardSpawnHandle {
