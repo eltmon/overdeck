@@ -237,32 +237,29 @@
       "reason": "feedback",
       "note": "[2026-07-26T04:05Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-07-26T04:05:37.730Z"
-    }
-  ],
-  "feedback": [
+    },
     {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-26T04:05:37Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-1696\n\npan flywheel status remains active-run-only and queue-free, while the new cockpit toggle omits required CSRF headers and its focused component suite fails 6/6 tests.\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1696 -m \"Fixed review issues\"`"
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-26T04:09:25.494Z"
     }
   ],
+  "feedback": [],
   "created": "2026-07-26T00:35:36.057Z",
-  "updated": "2026-07-26T04:09:22.923Z",
+  "updated": "2026-07-26T04:09:25.996Z",
   "pipeline": {
     "issueId": "PAN-1696",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "skipped",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T04:09:22.852Z",
+    "updatedAt": "2026-07-26T04:09:24.290Z",
     "reviewNotes": "Agent re-review request (7/25): Fixed review issues: CSRF headers on toggle, merge queue without active run",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/1822",
-    "reviewSpawnedAt": "2026-07-26T04:01:17.296Z"
+    "reviewSpawnedAt": "2026-07-26T04:09:24.289Z"
   },
   "closeOut": {
     "usage": {
@@ -354,7 +351,7 @@
       },
       "costAtCloseOut": {
         "usd": 163.8528142,
-        "pricingAsOf": "2026-07-26T04:09:22.871Z"
+        "pricingAsOf": "2026-07-26T04:09:25.982Z"
       }
     },
     "merges": [
