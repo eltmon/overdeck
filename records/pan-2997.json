@@ -192,6 +192,11 @@
       "reason": "feedback",
       "note": "[2026-07-26T10:59Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-07-26T10:59:29.460Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-26T10:59Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-07-26T10:59:48.181Z"
     }
   ],
   "feedback": [
@@ -201,6 +206,13 @@
       "outcome": "changes-requested",
       "timestamp": "2026-07-26T10:59:29Z",
       "markdownBody": "# Review CHANGES REQUESTED for PAN-2997\n\nPoison-clear and post-clear verification failures escape as generic errors, so repair can be acknowledged as terminal failed before any wake is delivered.\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2997 -m \"Fixed review issues\"`"
+    },
+    {
+      "seq": 2,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-26T10:59:48Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2997\n\nPoison-clear and post-clear verification failures escape as generic errors, so pre-delivery repair can be terminally acknowledged as failed without waking the agent.\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2997 -m \"Fixed review issues\"`"
     }
   ],
   "scopeDrift": {
@@ -294,7 +306,7 @@
     "recordedAt": "2026-07-26T10:07:26.737Z"
   },
   "created": "2026-07-21T23:09:49.270Z",
-  "updated": "2026-07-26T10:59:39.927Z",
+  "updated": "2026-07-26T10:59:48.181Z",
   "pipeline": {
     "issueId": "PAN-2997",
     "reviewStatus": "blocked",
@@ -305,8 +317,8 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T10:57:04.635Z",
-    "updatedAt": "2026-07-26T10:59:28.794Z",
-    "reviewNotes": "Poison-clear and post-clear verification failures escape as generic errors, so repair can be acknowledged as terminal failed before any wake is delivered.",
+    "updatedAt": "2026-07-26T10:59:47.547Z",
+    "reviewNotes": "Poison-clear and post-clear verification failures escape as generic errors, so pre-delivery repair can be terminally acknowledged as failed without waking the agent.",
     "verificationNotes": "Sync with main FAILED — merge conflicts detected:\n\nMerge conflicts with main:\n  - tests/unit/lib/overdeck/no-loss-matrix.ts",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3004",
     "lastVerifiedCommit": "1700fa490854ce01aef7b32625e0a6c56d11083a",
@@ -460,7 +472,7 @@
       },
       "costAtCloseOut": {
         "usd": 342.4053506,
-        "pricingAsOf": "2026-07-26T10:59:28.846Z"
+        "pricingAsOf": "2026-07-26T10:59:47.596Z"
       }
     },
     "merges": [
@@ -470,7 +482,7 @@
   },
   "workModel": "k3[1m]",
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "k3[1m]",
   "tasks": {
     "sequence": 20,
     "claims": {},
