@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T05:55:05.237Z",
-  "updated": "2026-07-26T06:27:46.454Z",
+  "updated": "2026-07-26T06:27:49.437Z",
   "pipeline": {
     "issueId": "PAN-3109",
     "reviewStatus": "pending",
@@ -164,5 +164,31 @@
     "docs-dod-containment.docs-dod-containment.ac1": "completed",
     "docs-dod-containment.docs-dod-containment.ac2": "completed",
     "docs-dod-containment.docs-dod-containment.ac3": "completed"
+  },
+  "scopeDrift": {
+    "outsideDeclaredScope": [],
+    "declaredScopeUntouched": [
+      "tests/unit/lib/lifecycle/dod-doc-drift.test.ts"
+    ],
+    "declaredScope": [
+      "docs/DEFINITION-OF-DONE.md",
+      "docs/PIPELINE-MEMBERSHIP.md",
+      "src/lib/lifecycle/dod-gate.ts",
+      "src/lib/lifecycle/dod.ts",
+      "src/lib/pipeline-membership-gather.ts",
+      "tests/unit/lib/lifecycle/dod-doc-drift.test.ts",
+      "tests/unit/lib/lifecycle/dod-gate.test.ts",
+      "tests/unit/lib/pipeline-membership-gather.test.ts"
+    ],
+    "actualChangedFiles": [
+      "docs/DEFINITION-OF-DONE.md",
+      "docs/PIPELINE-MEMBERSHIP.md",
+      "src/lib/lifecycle/dod-gate.ts",
+      "src/lib/lifecycle/dod.ts",
+      "src/lib/pipeline-membership-gather.ts",
+      "tests/unit/lib/lifecycle/dod-gate.test.ts",
+      "tests/unit/lib/pipeline-membership-gather.test.ts"
+    ],
+    "recordedAt": "2026-07-26T06:27:49.436Z"
   }
 }
