@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T13:39:19.365Z",
-  "updated": "2026-07-26T14:08:43.137Z",
+  "updated": "2026-07-26T14:10:15.521Z",
   "pipeline": {
     "issueId": "PAN-3138",
     "reviewStatus": "pending",
@@ -43,16 +43,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "docs-docker-teardown-lifecycle": {
-        "writerId": "agent-pan-3138",
-        "agentId": "agent-pan-3138",
-        "pid": 38108,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-26T14:08:43.137Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3138",
@@ -86,6 +78,17 @@
         "outcome": "completed",
         "reason": "Extended the workspace stack rebuild terminal gate to honor mergeStatus=merged and added tests proving merged issues stop before rendering while failed/unset states continue.",
         "releasedAt": "2026-07-26T14:08:27.370Z"
+      },
+      {
+        "writerId": "agent-pan-3138",
+        "agentId": "agent-pan-3138",
+        "pid": 38108,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T14:08:43.137Z",
+        "itemId": "docs-docker-teardown-lifecycle",
+        "outcome": "completed",
+        "reason": "Documented eager merge-time stack/network removal, close-out as the durable verified owner, merged-issue reaper backstop behavior, and the closed/merged rebuild guard.",
+        "releasedAt": "2026-07-26T14:10:15.521Z"
       }
     ],
     "statusReasons": {
@@ -100,6 +103,10 @@
       "rebuild-gate-merged-terminal": {
         "reason": "Extended the workspace stack rebuild terminal gate to honor mergeStatus=merged and added tests proving merged issues stop before rendering while failed/unset states continue.",
         "updatedAt": "2026-07-26T14:08:27.370Z"
+      },
+      "docs-docker-teardown-lifecycle": {
+        "reason": "Documented eager merge-time stack/network removal, close-out as the durable verified owner, merged-issue reaper backstop behavior, and the closed/merged rebuild guard.",
+        "updatedAt": "2026-07-26T14:10:15.521Z"
       }
     }
   },
@@ -116,6 +123,8 @@
     "rebuild-gate-merged-terminal": "completed",
     "rebuild-gate-merged-terminal.rebuild-gate-merged-terminal.ac1": "completed",
     "rebuild-gate-merged-terminal.rebuild-gate-merged-terminal.ac2": "completed",
-    "docs-docker-teardown-lifecycle": "running"
+    "docs-docker-teardown-lifecycle": "completed",
+    "docs-docker-teardown-lifecycle.docs-docker-teardown-lifecycle.ac1": "completed",
+    "docs-docker-teardown-lifecycle.docs-docker-teardown-lifecycle.ac2": "completed"
   }
 }
