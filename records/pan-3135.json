@@ -117,6 +117,11 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-26T15:47:01.372Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-26T15:50:11.303Z"
     }
   ],
   "feedback": [],
@@ -181,10 +186,10 @@
     "recordedAt": "2026-07-26T13:53:58.173Z"
   },
   "created": "2026-07-26T12:24:46.201Z",
-  "updated": "2026-07-26T15:50:10.178Z",
+  "updated": "2026-07-26T15:50:12.043Z",
   "pipeline": {
     "issueId": "PAN-3135",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -192,13 +197,13 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T13:54:56.619Z",
-    "updatedAt": "2026-07-26T15:50:09.637Z",
+    "updatedAt": "2026-07-26T15:50:10.194Z",
     "reviewNotes": "Agent re-review request (2/25): Fixed review issues",
     "inspectNotes": "All 4 ACs met. verification-runner.ts:387-395 gates on readPendingDeploy() before the verificationStatus:'running' write at :409, writes 'pending' + a note naming requestedAt, and self-excludes when status is already 'running'. verification-worker-supervisor.ts:140-144 sits AFTER the live-worker waitForResult join at :137, so a queued deploy blocks only new worker spawns. FOLLOW-UP FOR A LATER BEAD (outside these ACs): request-review-pipeline.ts:31-38 only branches on 'failed'/'error', so a 'deferred' outcome currently falls through to pushBranch()+dispatchReview() and advances to review as if it passed — consumers must be taught to halt on 'deferred'.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3142",
     "reviewedAtCommit": "c8973a5b95c27de791f8ed4a2c2f70bbb865932d",
     "lastVerifiedCommit": "c8973a5b95c27de791f8ed4a2c2f70bbb865932d",
-    "reviewSpawnedAt": "2026-07-26T15:44:01.359Z",
+    "reviewSpawnedAt": "2026-07-26T15:50:10.193Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "src/lib/cloister/merge-verification.ts",
@@ -322,7 +327,7 @@
       },
       "costAtCloseOut": {
         "usd": 445.599766,
-        "pricingAsOf": "2026-07-26T15:50:09.655Z"
+        "pricingAsOf": "2026-07-26T15:50:11.894Z"
       }
     },
     "merges": [
@@ -331,7 +336,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-sonnet-5",
   "workModel": "gpt-5.6-sol",
   "tasks": {
     "sequence": 18,
