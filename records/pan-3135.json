@@ -131,10 +131,10 @@
     "recordedAt": "2026-07-26T13:53:58.173Z"
   },
   "created": "2026-07-26T12:24:46.201Z",
-  "updated": "2026-07-26T15:08:38.344Z",
+  "updated": "2026-07-26T15:13:46.894Z",
   "pipeline": {
     "issueId": "PAN-3135",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "running",
     "inspectStatus": "passed",
@@ -142,8 +142,8 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T13:54:56.619Z",
-    "updatedAt": "2026-07-26T15:08:01.297Z",
-    "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
+    "updatedAt": "2026-07-26T15:13:46.859Z",
+    "reviewNotes": "The new durable review continuation cannot recover supported remote and polyrepo requests and can retain hanging git pushes.",
     "inspectNotes": "All 4 ACs met. verification-runner.ts:387-395 gates on readPendingDeploy() before the verificationStatus:'running' write at :409, writes 'pending' + a note naming requestedAt, and self-excludes when status is already 'running'. verification-worker-supervisor.ts:140-144 sits AFTER the live-worker waitForResult join at :137, so a queued deploy blocks only new worker spawns. FOLLOW-UP FOR A LATER BEAD (outside these ACs): request-review-pipeline.ts:31-38 only branches on 'failed'/'error', so a 'deferred' outcome currently falls through to pushBranch()+dispatchReview() and advances to review as if it passed — consumers must be taught to halt on 'deferred'.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3142",
     "lastVerifiedCommit": "27f89adb9576474823407bf0fba3f7d03d8d46e2",
@@ -207,6 +207,24 @@
         "tests/unit/lib/deploy/deploy-queue.test.ts"
       ],
       "recordedAt": "2026-07-26T13:53:58.173Z"
+    },
+    "reviewerVerdicts": {
+      "security": {
+        "status": "passed",
+        "atCommit": "dafef43b8d0a334724280cc3145f6a93bee9512f"
+      },
+      "correctness": {
+        "status": "blocked",
+        "atCommit": "dafef43b8d0a334724280cc3145f6a93bee9512f"
+      },
+      "performance": {
+        "status": "blocked",
+        "atCommit": "dafef43b8d0a334724280cc3145f6a93bee9512f"
+      },
+      "requirements": {
+        "status": "passed",
+        "atCommit": "dafef43b8d0a334724280cc3145f6a93bee9512f"
+      }
     }
   },
   "closeOut": {
@@ -214,9 +232,9 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 1859387,
-            "output": 34836,
-            "cacheRead": 12493312,
+            "input": 12586483,
+            "output": 201445,
+            "cacheRead": 59001344,
             "cacheWrite": 0
           }
         },
@@ -263,15 +281,15 @@
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 22173779,
-          "output": 636713,
-          "cacheRead": 272331264,
+          "input": 32900875,
+          "output": 803322,
+          "cacheRead": 318839296,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 266.135917,
-        "pricingAsOf": "2026-07-26T15:08:01.339Z"
+        "usd": 348.023683,
+        "pricingAsOf": "2026-07-26T15:13:46.880Z"
       }
     },
     "merges": [
