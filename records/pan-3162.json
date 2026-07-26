@@ -93,21 +93,23 @@
     "recordedAt": "2026-07-26T22:02:33.712Z"
   },
   "created": "2026-07-26T20:52:58.018Z",
-  "updated": "2026-07-26T23:37:49.070Z",
+  "updated": "2026-07-26T23:43:02.389Z",
   "pipeline": {
     "issueId": "PAN-3162",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "passed",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T22:02:50.304Z",
-    "updatedAt": "2026-07-26T23:37:48.128Z",
-    "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
+    "updatedAt": "2026-07-26T23:43:02.344Z",
+    "reviewNotes": "Atomic reconciliation fixes prior blockers; focused tests, typecheck, and lint pass",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "All 4 ACs met. observeForgeMergeState (merge-completeness.ts:189-232) persists mergeStatus='merged'+artifactUrl via withRepoStateSync/upsertMergeSetSync only for state==='merged' rows lacking that evidence, and is gated on no repo being unverifiable, so unmerged/no-changes/unverifiable verdicts write nothing and hasPositiveMergedEvidence is false for all-no-changes. reconcileStrandedRepos (lines 280-308) flips required, non-skipped, artifact-backed pending/failed/merging rows to merged (with artifactId) only when findMergedArtifact returns an artifact, and continues untouched on null. Forge errors in both paths become unverifiable blockers; reconcile now batches writes and returns initialMergeSet with zero upserts when any unverifiable blocker exists (lines 310-313), covered by both new cases in merge-completeness-forge-error.test.ts. Notes, non-blocking: (a) observeForgeMergeState has no production caller yet — presumably a later bead wires it; (b) mixed sets where one repo is verifiably merged and another is unverifiable discard the confirmed evidence, which is the AC4-mandated fail-open reading; (c) merge-ops.ts:533-535 activeRepos still includes rows this flips to merged, so a reconciled-merged repo will still be walked by the rebase/merge loop — worth a follow-on look outside this bead.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3170",
+    "reviewedAtCommit": "1d12abadfcac1b7a3abf44a076a681de6313e23e",
     "lastVerifiedCommit": "05abfc31e22c2b86fdff8ff38cccb705234b2e78",
     "reviewSpawnedAt": "2026-07-26T23:37:48.127Z",
     "scopeDrift": {
@@ -163,32 +165,32 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 6218654,
-            "output": 405267,
-            "cacheRead": 72065024,
+            "input": 6715492,
+            "output": 441671,
+            "cacheRead": 79667200,
             "cacheWrite": 0
           }
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 4113124,
-            "output": 466585,
-            "cacheRead": 167761408,
+            "input": 4124371,
+            "output": 468507,
+            "cacheRead": 171120128,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 10331778,
-          "output": 871852,
-          "cacheRead": 239826432,
+          "input": 10839863,
+          "output": 910178,
+          "cacheRead": 250787328,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 197.727666,
-        "pricingAsOf": "2026-07-26T23:37:48.145Z"
+        "usd": 206.898319,
+        "pricingAsOf": "2026-07-26T23:43:02.378Z"
       }
     },
     "merges": [
