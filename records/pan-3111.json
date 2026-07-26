@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T12:26:09.908Z",
-  "updated": "2026-07-26T13:46:41.252Z",
+  "updated": "2026-07-26T13:46:58.971Z",
   "pipeline": {
     "issueId": "PAN-3111",
     "reviewStatus": "pending",
@@ -61,8 +61,16 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 10,
-    "claims": {},
+    "sequence": 11,
+    "claims": {
+      "started-by-call-sites": {
+        "writerId": "agent-pan-3111",
+        "agentId": "agent-pan-3111",
+        "pid": 3352334,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T13:46:58.970Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3111",
@@ -161,6 +169,7 @@
     "started-by-field-plumbing": "completed",
     "started-by-field-plumbing.started-by-field-plumbing.ac1": "completed",
     "started-by-field-plumbing.started-by-field-plumbing.ac2": "completed",
-    "started-by-field-plumbing.started-by-field-plumbing.ac3": "completed"
+    "started-by-field-plumbing.started-by-field-plumbing.ac3": "completed",
+    "started-by-call-sites": "running"
   }
 }
