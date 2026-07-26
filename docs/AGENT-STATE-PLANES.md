@@ -69,6 +69,15 @@ status, lifecycle events, and conversations. It is a disposable cache rebuilt
 from Git state, JSONL transcripts, tracker data, and tmux through the canonical
 domain resolvers.
 
+### Agent spawn provenance
+
+Agent state records two complementary provenance fields:
+
+- `flywheelRunId` is the active `RUN-…` identity when a Flywheel run owns the spawn. Spawn options and the inherited Flywheel environment feed it into `state.json` and the agents-table `flywheel_run_id` column.
+- `startedBy` identifies the immediate launch path. Stable values include operator CLI/dashboard starts, `flywheel:<runId>`, planning auto-handoff, orphan reconciliation, reactive lifecycle dispatch, Deacon resume/crash recovery, handoff, and merge strike. It persists in `state.json` and the agents-table `started_by` column.
+
+Dashboard `POST /api/agents` accepts an optional `startedBy` and defaults to `operator:dashboard`. Its detached `pan start` child receives the token through `OVERDECK_AGENT_STARTED_BY`; `pan start` preserves inherited provenance and defaults a direct CLI invocation to `operator:cli:pan-start`. Planning routes persist the selected token on the planning-agent state as well. Every new spawn or resume path must stamp a meaningful token rather than relying on an unrelated caller's environment.
+
 ## Liveness oracle — tmux
 
 A session on the `overdeck` tmux socket is the physical liveness authority.

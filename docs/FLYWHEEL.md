@@ -140,6 +140,12 @@ The reactive lifecycle scheduler treats permission and staffing as separate oper
 
 After permission passes, the scheduler reuses a model recorded on the current or legacy planning agent, then tries the optional scalar `roles.plan.autonomousModel`. If neither resolves, it records a needs-you refusal; it never falls through to the ordinary `roles.plan.model`. The operator can authorize autonomous planning by fixing the labels or pickup posture and configure its staffing with `roles.plan.autonomousModel`, or bypass this autonomous path deliberately with `pan plan`.
 
+### Autonomous work pickup
+
+The orphan-proposed reconciler and reactive lifecycle work dispatch use the same fail-closed pickup predicate as Flywheel backlog pickup. The issue must be ready and planned, and release must come from a case-insensitive `released` label, `flywheel.auto_pickup_backlog`, active order-book membership, or the planning session's persisted auto-start consent flag. `parked` (including the legacy `needs-design` and `needs-discussion` forms), `vetoed`, `objection`, and `epic` always block work dispatch.
+
+The planning consent flag authorizes the planning-to-work handoff but does not waive readiness or any blocker. If tracker labels are unavailable, the predicate refuses the dispatch. Refusals create a durable needs-you trip; reactive dispatch also emits one warning, while the patrol-based orphan reconciler keeps repeated refusals out of the activity feed.
+
 For local stack startup, Deacon/Cloister should be running before starting or resuming the Flywheel; see [`OVERDECK_DEV_SOP.md`](./OVERDECK_DEV_SOP.md#deacon-and-flywheel-startup-order).
 
 Run artifacts live under the Flywheel home:

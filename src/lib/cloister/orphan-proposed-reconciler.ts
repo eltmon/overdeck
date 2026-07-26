@@ -1,3 +1,8 @@
+/**
+ * Reconciles proposed specs only after the shared autonomous-work pickup gate
+ * passes; explicit planning auto-start consent is a release source, not a bypass
+ * for readiness, tracker-label availability, or blocker labels.
+ */
 import { exec } from 'child_process';
 import { existsSync } from 'fs';
 import { readdir, readFile } from 'fs/promises';
