@@ -2,7 +2,7 @@
   "issueId": "PAN-3148",
   "schemaVersion": 2,
   "created": "2026-07-26T17:27:17.644Z",
-  "updated": "2026-07-26T17:27:17.644Z",
+  "updated": "2026-07-26T17:27:18.644Z",
   "pipeline": {
     "issueId": "PAN-3148",
     "reviewStatus": "pending",
@@ -25,5 +25,7 @@
       "note": "Planning session started for PAN-3148: Review feedback redelivered 3x to the same agent for one run ID, burning context (81%) in a wait-for-new-run-ID standoff",
       "timestamp": "2026-07-26T17:27:17.644Z"
     }
-  ]
+  ],
+  "harness": "claude-code",
+  "model": "k3[1m]"
 }
