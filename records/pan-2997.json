@@ -247,18 +247,19 @@
     "recordedAt": "2026-07-25T23:45:57.195Z"
   },
   "created": "2026-07-21T23:09:49.270Z",
-  "updated": "2026-07-26T08:50:34.902Z",
+  "updated": "2026-07-26T09:08:14.056Z",
   "pipeline": {
     "issueId": "PAN-2997",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T05:50:39.330Z",
-    "updatedAt": "2026-07-26T08:50:34.849Z",
+    "updatedAt": "2026-07-26T09:08:14.016Z",
+    "reviewNotes": "Agent re-review request (5/25): Fixed both cycle-11 blockers: (1) rollback is now a verified protocol transition — a POISON breadcrumb is written before the rollback attempt, so a failed rollback can never leave a false TERMINAL honorable; any later keyed call repairs poisoned markers FIRST and never returns 'deduplicated' from them (remote test covers Enter→terminal→pane death→failed rollback→repair→real delivery). (2) the pre-submit target check now fails CLOSED — the key only becomes terminal when both target reads succeed, both live, pid matches; unreadable pre-target rolls the claim back (local + remote tests). Also split remote-agents.ts under the file-size ratchet into remote-tmux.ts + remote-keyed-delivery.ts with unchanged re-exports.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3004",
     "lastVerifiedCommit": "bb28e3e9c44b6cfa4ca4b733cdd423bb5a977dea",
     "reviewSpawnedAt": "2026-07-26T08:35:16.165Z"
@@ -321,7 +322,7 @@
       },
       "costAtCloseOut": {
         "usd": 275.274257,
-        "pricingAsOf": "2026-07-26T08:50:34.868Z"
+        "pricingAsOf": "2026-07-26T09:08:14.050Z"
       }
     },
     "merges": [
