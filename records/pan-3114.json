@@ -54,18 +54,18 @@
     "recordedAt": "2026-07-26T10:37:54.195Z"
   },
   "created": "2026-07-26T08:55:24.679Z",
-  "updated": "2026-07-26T10:47:38.177Z",
+  "updated": "2026-07-26T10:47:45.005Z",
   "pipeline": {
     "issueId": "PAN-3114",
     "reviewStatus": "passed",
-    "testStatus": "pending",
+    "testStatus": "testing",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T10:40:13.370Z",
-    "updatedAt": "2026-07-26T10:47:34.496Z",
+    "updatedAt": "2026-07-26T10:47:44.994Z",
     "reviewNotes": "Approved: all requirements implemented; correctness, security, and performance review clean; focused tests, typecheck, lint, and diff check pass.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "All 4 ACs met: pending->passed stamp with 'uat-promotion' + generation name + 9-char SHA (slice(0,9)); passed/skipped short-circuit to {} so recordUatPromotionVerdicts skips and preserves existing verdict/notes; lastVerifiedCommit = rehydrateHeadAnchor(member.headSha) via conditional spread, omitted on empty headSha; recordUatPromotionVerdicts returns only non-terminal issue IDs and persists via setReviewStatusSync(issueId, stamp, current ?? undefined) — signature verified against src/lib/review-status.ts:147. Head-anchor guard entry expression matches the AST text exactly and the inventory comparison is order-insensitive.",
@@ -136,7 +136,7 @@
       },
       "costAtCloseOut": {
         "usd": 42.3015,
-        "pricingAsOf": "2026-07-26T10:47:34.683Z"
+        "pricingAsOf": "2026-07-26T10:47:44.997Z"
       }
     },
     "merges": [
@@ -145,7 +145,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
     "sequence": 8,
