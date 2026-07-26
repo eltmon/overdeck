@@ -2,7 +2,7 @@
   "issueId": "PAN-3093",
   "schemaVersion": 2,
   "created": "2026-07-26T12:33:18.311Z",
-  "updated": "2026-07-26T12:33:18.311Z",
+  "updated": "2026-07-26T12:33:19.779Z",
   "pipeline": {
     "issueId": "PAN-3093",
     "reviewStatus": "pending",
@@ -25,5 +25,7 @@
       "note": "Planning session started for PAN-3093: Polyrepo UAT assembly: per-repo generation branches, per-repo base SHAs, all-or-nothing promote (unblocks the MYN train)",
       "timestamp": "2026-07-26T12:33:18.311Z"
     }
-  ]
+  ],
+  "harness": "claude-code",
+  "model": "k3[1m]"
 }
