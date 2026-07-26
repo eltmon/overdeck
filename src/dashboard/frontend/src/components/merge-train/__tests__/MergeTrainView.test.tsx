@@ -1,0 +1,428 @@
+/**
+ * Multi-project merge-train view tests (PAN-1696 fe-merge-train-view).
+ *
+ * The decoupling claim is asserted structurally: no test mocks any flywheel
+ * run/state endpoint, and one test asserts the view never requests the legacy
+ * per-repo endpoints or any flywheel run state, so a reintroduced dependency
+ * on an active run fails here rather than silently in production.
+ */
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import {
+  MergeTrainView,
+  MERGE_TRAIN_PROJECT_FILTER_KEY,
+  mergeTrainSections,
+} from '../MergeTrainView';
+
+const mocks = vi.hoisted(() => ({
+  confirm: vi.fn(async () => true),
+}));
+
+vi.mock('../../DialogProvider', () => ({
+  useConfirm: () => mocks.confirm,
+}));
+
+vi.mock('sonner', () => ({
+  toast: { success: vi.fn(), error: vi.fn(), info: vi.fn(), warning: vi.fn() },
+}));
+
+type FetchResponses = Record<string, unknown>;
+
+/** Keys are `'<METHOD> <url-substring>'`, or a bare url substring for GET. */
+function mockFetch(responses: FetchResponses): ReturnType<typeof vi.fn> {
+  const fn = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    if (url.includes('/api/dashboard/session')) {
+      return { ok: true, status: 200, json: async () => ({ csrfToken: 'test-csrf-token' }) } as Response;
+    }
+    const method = init?.method ?? 'GET';
+    const key = Object.keys(responses).find(
+      (k) => url.includes(k.split(' ').pop()!) && (k.includes(' ') ? k.startsWith(method) : method === 'GET'),
+    );
+    if (!key) return { ok: true, json: async () => ({}) } as Response;
+    return { ok: true, json: async () => responses[key] } as Response;
+  });
+  vi.stubGlobal('fetch', fn);
+  return fn;
+}
+
+const PAN_QUEUE = [
+  { issueId: 'PAN-1', title: 'Loading-wedge fix', branchName: 'feature/pan-1', pr: 11, prUrl: 'https://x/pull/11', mergeOrder: 1, conflictsWith: [] },
+  { issueId: 'PAN-2', title: 'Transcript paths', branchName: 'feature/pan-2', mergeOrder: 2, conflictsWith: ['PAN-1'] },
+];
+
+const MIN_QUEUE = [
+  { issueId: 'MIN-831', title: 'Compass briefing', branchName: 'feature/min-831', pr: 42, prUrl: 'https://y/pull/42', mergeOrder: 1, conflictsWith: [] },
+];
+
+const PAN_READY_GEN = {
+  name: 'uat/pan-otter-0610',
+  status: 'ready',
+  baseSha: 'abc',
+  createdAt: '2026-06-10T02:00:00.000Z',
+  updatedAt: '',
+  members: [
+    { issueId: 'PAN-1', title: 'Loading-wedge fix', branch: 'feature/pan-1', pr: 11, prUrl: 'https://x/pull/11', mergeOrder: 1, acceptanceCriteria: [{ title: 'Inspector opens in <1s', status: 'pending' }] },
+    { issueId: 'PAN-2', title: 'Transcript paths', branch: 'feature/pan-2', mergeOrder: 2, acceptanceCriteria: [] },
+  ],
+  heldOut: [],
+  resolutions: [{ issueIds: ['PAN-2', 'PAN-1'], files: ['src/x.ts'], commitSha: 'r1' }],
+  stack: { status: 'absent', frontendUrl: 'https://uat-pan-otter-0610.overdeck.localhost' },
+};
+
+const MIN_READY_GEN = {
+  ...PAN_READY_GEN,
+  name: 'uat/min-badger-0726',
+  members: [{ issueId: 'MIN-831', title: 'Compass briefing', branch: 'feature/min-831', mergeOrder: 1, acceptanceCriteria: [] }],
+  resolutions: [],
+  stack: { status: 'running', frontendUrl: 'https://uat-min-badger-0726.overdeck.localhost' },
+};
+
+const PAN_ASSEMBLING_GEN = {
+  ...PAN_READY_GEN,
+  name: 'uat/pan-copper-fox-0610',
+  status: 'assembling',
+  createdAt: '2026-06-10T03:00:00.000Z',
+  resolutions: [],
+  stack: { status: 'absent', frontendUrl: 'https://x' },
+};
+
+/** Two projects, both enabled, both with ready work. */
+function twoProjectResponses(overrides: FetchResponses = {}): FetchResponses {
+  return {
+    '/api/merge-train/queues': [
+      { projectKey: 'overdeck', projectName: 'Overdeck', enabled: true, queue: PAN_QUEUE },
+      { projectKey: 'myn', projectName: 'Mind Your Now', enabled: true, queue: MIN_QUEUE },
+    ],
+    '/api/merge-train/generations': [
+      { projectKey: 'overdeck', projectName: 'Overdeck', enabled: true, generations: [PAN_ASSEMBLING_GEN, PAN_READY_GEN] },
+      { projectKey: 'myn', projectName: 'Mind Your Now', enabled: true, generations: [MIN_READY_GEN] },
+    ],
+    '/api/flywheel/merge-backend': { available: true, mode: 'gh-cli', detail: 'ok' },
+    ...overrides,
+  };
+}
+
+function renderView(props: { showProjectFilter?: boolean } = {}) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(
+    <QueryClientProvider client={client}>
+      <MergeTrainView active={false} {...props} />
+    </QueryClientProvider>,
+  );
+}
+
+beforeEach(() => {
+  mocks.confirm.mockClear();
+  mocks.confirm.mockResolvedValue(true);
+  window.localStorage.clear();
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+  window.localStorage.clear();
+});
+
+// ── AC1 ───────────────────────────────────────────────────────────────────────
+describe('one section per project (ac1)', () => {
+  it('renders each project with its batches, ready features, and escape hatch', async () => {
+    mockFetch(twoProjectResponses());
+    renderView();
+
+    await waitFor(() => expect(screen.getByTestId('merge-train-project-overdeck')).toBeTruthy());
+    const pan = screen.getByTestId('merge-train-project-overdeck');
+    const myn = screen.getByTestId('merge-train-project-myn');
+
+    expect(pan.textContent).toContain('Overdeck');
+    expect(pan.textContent).toContain('merge train on');
+    // Batch, its checklist, and the branch reference row all land in the section.
+    expect(pan.textContent).toContain('pan-otter-0610');
+    expect(pan.textContent).toContain('Inspector opens in <1s');
+    expect(pan.textContent).toContain('feature/pan-1');
+    expect(pan.textContent).toContain('Merge one feature to main…');
+    // The assembling batch shows alongside the still-testable ready batch.
+    expect(pan.textContent).toContain('pan-copper-fox-0610');
+    expect(pan.textContent).toContain('assembling');
+
+    // The MIN project is a peer section, not a footnote — the exact gap that
+    // left a ready MIN-831 with no MYN generation while the run was pan-scoped.
+    expect(myn.textContent).toContain('Mind Your Now');
+    expect(myn.textContent).toContain('min-badger-0726');
+    expect(myn.textContent).toContain('MIN-831');
+    expect(myn.textContent).toContain('feature/min-831');
+  });
+
+  it('reads only the aggregate endpoints — never legacy per-repo or flywheel-run state', async () => {
+    const fetchMock = mockFetch(twoProjectResponses());
+    renderView();
+    await waitFor(() => expect(screen.getByTestId('merge-train-project-overdeck')).toBeTruthy());
+
+    const urls = fetchMock.mock.calls.map((c) => String(c[0]));
+    expect(urls.some((u) => u.includes('/api/merge-train/queues'))).toBe(true);
+    expect(urls.some((u) => u.includes('/api/merge-train/generations'))).toBe(true);
+    for (const forbidden of [
+      '/api/flywheel/uat-generations',
+      '/api/flywheel/merge-queue',
+      '/api/flywheel/current',
+      '/api/flywheel/status',
+      '/api/flywheel/state',
+      '/api/flywheel/runs',
+    ]) {
+      expect(urls.some((u) => u.includes(forbidden)), forbidden).toBe(false);
+    }
+  });
+
+  it('renders live generations with no flywheel run anywhere in the data (ac4)', async () => {
+    // Nothing in these payloads carries run state; the view must still show the batch.
+    mockFetch({
+      '/api/merge-train/queues': [{ projectKey: 'overdeck', projectName: 'Overdeck', enabled: true, queue: [] }],
+      '/api/merge-train/generations': [
+        { projectKey: 'overdeck', projectName: 'Overdeck', enabled: true, generations: [PAN_READY_GEN] },
+      ],
+    });
+    renderView();
+    await waitFor(() => expect(screen.getByText('pan-otter-0610')).toBeTruthy());
+    expect(screen.getByText(/Merge batch \(2\) to main/)).toBeTruthy();
+  });
+
+  it('shows a disabled project as an explicit off row, not as "nothing ready"', async () => {
+    mockFetch({
+      '/api/merge-train/queues': [
+        { projectKey: 'overdeck', projectName: 'Overdeck', enabled: true, queue: PAN_QUEUE },
+        { projectKey: 'myn', projectName: 'Mind Your Now', enabled: false, queue: [] },
+      ],
+      '/api/merge-train/generations': [
+        { projectKey: 'overdeck', projectName: 'Overdeck', enabled: true, generations: [PAN_READY_GEN] },
+      ],
+    });
+    renderView();
+    await waitFor(() => expect(screen.getByTestId('merge-train-project-myn')).toBeTruthy());
+    const myn = screen.getByTestId('merge-train-project-myn');
+    expect(myn.textContent).toContain('merge train off');
+    expect(myn.textContent).toContain('turned off for Mind Your Now');
+  });
+
+  it('explains an all-empty merge train without mentioning a flywheel run', async () => {
+    mockFetch({
+      '/api/merge-train/queues': [{ projectKey: 'overdeck', projectName: 'Overdeck', enabled: true, queue: [] }],
+      '/api/merge-train/generations': [],
+    });
+    renderView();
+    const empty = await screen.findByText(/No features are ready to merge in any project/);
+    expect(empty.textContent).not.toMatch(/flywheel/i);
+  });
+
+  it('warns when the merge backend cannot merge at all', async () => {
+    mockFetch(twoProjectResponses({ '/api/flywheel/merge-backend': { available: false, mode: 'none', detail: 'no auth' } }));
+    renderView();
+    expect(await screen.findByText('Merge backend unavailable')).toBeTruthy();
+  });
+});
+
+// ── AC2 ───────────────────────────────────────────────────────────────────────
+describe('project filter chips (ac2)', () => {
+  it('hides deselected projects and persists the selection to localStorage', async () => {
+    mockFetch(twoProjectResponses());
+    renderView();
+    await waitFor(() => expect(screen.getByTestId('merge-train-project-myn')).toBeTruthy());
+
+    fireEvent.click(screen.getByRole('button', { name: 'Mind Your Now' }));
+
+    await waitFor(() => expect(screen.queryByTestId('merge-train-project-myn')).toBeNull());
+    expect(screen.getByTestId('merge-train-project-overdeck')).toBeTruthy();
+    expect(JSON.parse(window.localStorage.getItem(MERGE_TRAIN_PROJECT_FILTER_KEY)!)).toEqual(['overdeck']);
+  });
+
+  it('restores a stored selection on mount so it survives reload', async () => {
+    window.localStorage.setItem(MERGE_TRAIN_PROJECT_FILTER_KEY, JSON.stringify(['myn']));
+    mockFetch(twoProjectResponses());
+    renderView();
+
+    await waitFor(() => expect(screen.getByTestId('merge-train-project-myn')).toBeTruthy());
+    expect(screen.queryByTestId('merge-train-project-overdeck')).toBeNull();
+  });
+
+  it('shows every project by default when nothing is stored', async () => {
+    mockFetch(twoProjectResponses());
+    renderView();
+    await waitFor(() => expect(screen.getByTestId('merge-train-project-overdeck')).toBeTruthy());
+    expect(screen.getByTestId('merge-train-project-myn')).toBeTruthy();
+    expect(window.localStorage.getItem(MERGE_TRAIN_PROJECT_FILTER_KEY)).toBeNull();
+  });
+
+  it('"show all" clears the stored filter', async () => {
+    window.localStorage.setItem(MERGE_TRAIN_PROJECT_FILTER_KEY, JSON.stringify(['myn']));
+    mockFetch(twoProjectResponses());
+    renderView();
+    await waitFor(() => expect(screen.getByTestId('merge-train-project-myn')).toBeTruthy());
+
+    fireEvent.click(screen.getByRole('button', { name: 'show all' }));
+
+    await waitFor(() => expect(screen.getByTestId('merge-train-project-overdeck')).toBeTruthy());
+    expect(window.localStorage.getItem(MERGE_TRAIN_PROJECT_FILTER_KEY)).toBeNull();
+  });
+
+  it('drops a stale stored project so the view cannot stay permanently empty', async () => {
+    window.localStorage.setItem(MERGE_TRAIN_PROJECT_FILTER_KEY, JSON.stringify(['deleted-project']));
+    mockFetch(twoProjectResponses());
+    renderView();
+
+    await waitFor(() => expect(screen.getByTestId('merge-train-project-overdeck')).toBeTruthy());
+    expect(screen.getByTestId('merge-train-project-myn')).toBeTruthy();
+    expect(window.localStorage.getItem(MERGE_TRAIN_PROJECT_FILTER_KEY)).toBeNull();
+  });
+
+  it('omits the chips when the host asks for a single-project render', async () => {
+    mockFetch(twoProjectResponses());
+    renderView({ showProjectFilter: false });
+    await waitFor(() => expect(screen.getByTestId('merge-train-project-overdeck')).toBeTruthy());
+    expect(screen.queryByTestId('merge-train-project-filter')).toBeNull();
+  });
+});
+
+// ── AC3 ───────────────────────────────────────────────────────────────────────
+describe('actions post to the new endpoints behind confirms (ac3)', () => {
+  it('promote confirms with the exact members and POSTs the aggregate promote route', async () => {
+    const fetchMock = mockFetch(twoProjectResponses());
+    renderView();
+    await waitFor(() => expect(screen.getByTestId('merge-train-project-overdeck')).toBeTruthy());
+
+    fireEvent.click(screen.getAllByText(/Merge batch \(2\) to main/)[0]!);
+
+    await waitFor(() => expect(mocks.confirm).toHaveBeenCalled());
+    const arg = mocks.confirm.mock.calls[0]![0] as { title: string; message: string };
+    expect(arg.title).toContain('pan-otter-0610');
+    expect(arg.message).toContain('PAN-1');
+    expect(arg.message).toContain('PAN-2');
+
+    await waitFor(() =>
+      expect(
+        fetchMock.mock.calls.some(
+          ([u, i]) => String(u) === '/api/merge-train/generations/pan-otter-0610/promote' && (i as RequestInit)?.method === 'POST',
+        ),
+      ).toBe(true),
+    );
+  });
+
+  it('cancelling promote fires no request', async () => {
+    mocks.confirm.mockResolvedValue(false);
+    const fetchMock = mockFetch(twoProjectResponses());
+    renderView();
+    await waitFor(() => expect(screen.getByTestId('merge-train-project-overdeck')).toBeTruthy());
+
+    fireEvent.click(screen.getAllByText(/Merge batch \(2\) to main/)[0]!);
+    await waitFor(() => expect(mocks.confirm).toHaveBeenCalled());
+
+    expect(fetchMock.mock.calls.some(([u]) => String(u).includes('/promote'))).toBe(false);
+  });
+
+  it('the escape hatch names the project queue head and merges that project only', async () => {
+    const fetchMock = mockFetch(
+      twoProjectResponses({ 'POST /api/merge-train/merge-next': { projectKey: 'myn', outcomes: [{ issueId: 'MIN-831', result: 'merged' }] } }),
+    );
+    renderView();
+    await waitFor(() => expect(screen.getByTestId('merge-train-project-myn')).toBeTruthy());
+
+    // The MYN section's own escape hatch, not the PAN one.
+    fireEvent.click(
+      Array.from(screen.getByTestId('merge-train-project-myn').querySelectorAll('button'))
+        .find((b) => b.textContent?.includes('Merge one feature to main'))!,
+    );
+
+    await waitFor(() => expect(mocks.confirm).toHaveBeenCalled());
+    const arg = mocks.confirm.mock.calls[0]![0] as { title: string; message: string; variant?: string };
+    expect(arg.title).toContain('MIN-831');
+    expect(arg.message).toContain('Mind Your Now');
+    expect(arg.message).toContain('bypasses batch testing');
+    expect(arg.variant).toBe('destructive');
+
+    await waitFor(() => {
+      const call = fetchMock.mock.calls.find(([u]) => String(u) === '/api/merge-train/merge-next');
+      expect(call).toBeTruthy();
+      expect(JSON.parse(String((call![1] as RequestInit).body))).toEqual({ n: 1, project: 'myn' });
+    });
+  });
+
+  it('rebuild POSTs assemble scoped to that project', async () => {
+    const fetchMock = mockFetch(
+      twoProjectResponses({ 'POST /api/merge-train/assemble': { projects: [{ projectKey: 'overdeck', result: { action: 'assembled' } }] } }),
+    );
+    renderView();
+    await waitFor(() => expect(screen.getByTestId('merge-train-project-overdeck')).toBeTruthy());
+
+    fireEvent.click(
+      Array.from(screen.getByTestId('merge-train-project-overdeck').querySelectorAll('button'))
+        .find((b) => b.textContent === '↻')!,
+    );
+
+    await waitFor(() => {
+      const call = fetchMock.mock.calls.find(([u]) => String(u) === '/api/merge-train/assemble');
+      expect(call).toBeTruthy();
+      expect(JSON.parse(String((call![1] as RequestInit).body))).toEqual({ project: 'overdeck' });
+    });
+  });
+
+  it('a running stack links out instead of offering to start one', async () => {
+    mockFetch(twoProjectResponses());
+    renderView();
+    await waitFor(() => expect(screen.getByTestId('merge-train-project-myn')).toBeTruthy());
+
+    const link = screen.getByTestId('merge-train-project-myn').querySelector('a[href*="uat-min-badger-0726"]');
+    expect(link).toBeTruthy();
+    expect(link!.textContent).toContain('Open');
+  });
+
+  it('stack POSTs the aggregate stack route for a batch with no live stack', async () => {
+    const fetchMock = mockFetch(
+      twoProjectResponses({ 'POST /api/merge-train/generations': { frontendUrl: 'https://uat-pan-otter-0610.overdeck.localhost', evicted: [] } }),
+    );
+    vi.stubGlobal('open', vi.fn());
+    renderView();
+    await waitFor(() => expect(screen.getByTestId('merge-train-project-overdeck')).toBeTruthy());
+
+    fireEvent.click(
+      Array.from(screen.getByTestId('merge-train-project-overdeck').querySelectorAll('button'))
+        .find((b) => b.textContent?.includes('Start & open'))!,
+    );
+
+    await waitFor(() =>
+      expect(
+        fetchMock.mock.calls.some(
+          ([u, i]) => String(u) === '/api/merge-train/generations/pan-otter-0610/stack' && (i as RequestInit)?.method === 'POST',
+        ),
+      ).toBe(true),
+    );
+  });
+});
+
+// ── Pure join ─────────────────────────────────────────────────────────────────
+describe('mergeTrainSections', () => {
+  it('joins queues and generations on projectKey', () => {
+    const sections = mergeTrainSections(
+      [{ projectKey: 'overdeck', projectName: 'Overdeck', enabled: true, queue: PAN_QUEUE }],
+      [{ projectKey: 'overdeck', projectName: 'Overdeck', enabled: true, generations: [PAN_READY_GEN as never] }],
+    );
+    expect(sections).toHaveLength(1);
+    expect(sections[0]!.queue).toHaveLength(2);
+    expect(sections[0]!.generations).toHaveLength(1);
+  });
+
+  it('keeps a project that has generations but no queues row', () => {
+    const sections = mergeTrainSections(
+      [],
+      [{ projectKey: 'myn', projectName: 'Mind Your Now', enabled: true, generations: [MIN_READY_GEN as never] }],
+    );
+    expect(sections.map((s) => s.projectKey)).toEqual(['myn']);
+    expect(sections[0]!.queue).toEqual([]);
+  });
+
+  it('tolerates a non-array queue or generations field', () => {
+    const sections = mergeTrainSections(
+      [{ projectKey: 'overdeck', projectName: 'Overdeck', enabled: true, queue: null as never }],
+      [{ projectKey: 'overdeck', projectName: 'Overdeck', enabled: true, generations: undefined as never }],
+    );
+    expect(sections[0]!.queue).toEqual([]);
+    expect(sections[0]!.generations).toEqual([]);
+  });
+});
