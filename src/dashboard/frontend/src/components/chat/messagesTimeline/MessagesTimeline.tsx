@@ -603,14 +603,21 @@ export const MessagesTimeline = memo(function MessagesTimeline({
               <span className={styles.failedMessageLabel}>
                 {fm.kind === 'command' ? 'Command request failed' : 'Failed to send'}
               </span>
-              <button
-                className={styles.failedMessageBtn}
-                onClick={() => onRetryFailed?.(fm.id, fm.text)}
-                title="Retry sending"
-              >
-                <RotateCcw size={12} />
-                Retry
-              </button>
+              {fm.error && (
+                <span className={styles.failedMessageReason} title={fm.error}>
+                  {fm.error}
+                </span>
+              )}
+              {fm.retryable !== false && (
+                <button
+                  className={styles.failedMessageBtn}
+                  onClick={() => onRetryFailed?.(fm.id, fm.text)}
+                  title="Retry sending"
+                >
+                  <RotateCcw size={12} />
+                  Retry
+                </button>
+              )}
               <button
                 className={styles.failedMessageBtn}
                 onClick={() => onDiscardFailed?.(fm.id)}

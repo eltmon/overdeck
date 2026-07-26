@@ -5672,6 +5672,15 @@
   font-weight: 500;
 }
 
+.failedMessageReason {
+  color: var(--muted-foreground);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 420px;
+}
+
 .failedMessageBtn {
   display: inline-flex;
   align-items: center;

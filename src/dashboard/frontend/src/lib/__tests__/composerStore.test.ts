@@ -304,3 +304,74 @@ describe('composerStore attachments', () => {
     expect(formData.get('mimeType')).toBe('text/typescript');
   });
 });
+
+describe('send failure details — the outbox keeps the reason and retryability (PAN-3117)', () => {
+  let fetchMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    resetComposerStore();
+    fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  function seedFailed(text: string): string {
+    useComposerStore.getState().failSend(CONV, text);
+    const failed = useComposerStore.getState().byConversation[CONV]?.failed ?? [];
+    return failed[failed.length - 1]!.id;
+  }
+
+  it('marks a 400 rejection non-retryable and preserves the server reason', async () => {
+    fetchMock.mockResolvedValue(
+      fetchResult(false, 400, JSON.stringify({ error: 'One or more attached images are unavailable for this conversation' })),
+    );
+    const id = seedFailed('@/other-conv/attach.png hello');
+
+    await useComposerStore.getState().retryFailed(CONV, id, '@/other-conv/attach.png hello', 0);
+
+    const failed = useComposerStore.getState().byConversation[CONV]?.failed ?? [];
+    expect(failed).toHaveLength(1);
+    expect(failed[0]!.retryable).toBe(false);
+    expect(failed[0]!.error).toBe('One or more attached images are unavailable for this conversation');
+  });
+
+  it('keeps a 503 retryable', async () => {
+    fetchMock.mockResolvedValue(
+      fetchResult(false, 503, JSON.stringify({ error: 'Message delivery failed — text did not reach the terminal' })),
+    );
+    const id = seedFailed('hello');
+
+    await useComposerStore.getState().retryFailed(CONV, id, 'hello', 0);
+
+    const failed = useComposerStore.getState().byConversation[CONV]?.failed ?? [];
+    expect(failed[0]!.retryable).toBe(true);
+    expect(failed[0]!.error).toContain('did not reach the terminal');
+  });
+
+  it('keeps a network-level rejection retryable', async () => {
+    fetchMock.mockRejectedValue(new Error('network down'));
+    const id = seedFailed('hello');
+
+    await useComposerStore.getState().retryFailed(CONV, id, 'hello', 0);
+
+    const failed = useComposerStore.getState().byConversation[CONV]?.failed ?? [];
+    expect(failed[0]!.retryable).toBe(true);
+    expect(failed[0]!.error).toContain('network down');
+  });
+
+  it('treats 408 and 429 as retryable even though they are 4xx', async () => {
+    for (const status of [408, 429]) {
+      resetComposerStore();
+      fetchMock.mockResolvedValue(fetchResult(false, status, 'slow down'));
+      const id = seedFailed('hello');
+
+      await useComposerStore.getState().retryFailed(CONV, id, 'hello', 0);
+
+      const failed = useComposerStore.getState().byConversation[CONV]?.failed ?? [];
+      expect(failed[0]!.retryable).toBe(true);
+    }
+  });
+});

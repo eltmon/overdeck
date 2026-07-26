@@ -27,6 +27,10 @@ export interface FailedMessage {
   text: string;
   createdAt: string;
   kind: 'command' | 'prompt';
+  /** Server/transport reason captured at failure time, rendered inline in the bubble. */
+  error?: string;
+  /** False for deterministic rejections (most 4xx) where an identical retry cannot succeed. */
+  retryable?: boolean;
 }
 
 export interface WorkLogEntry {

@@ -64,17 +64,16 @@ import {
   handleConversationAbort,
   handleConversationCompact,
   handleConversationCodexApproval,
-  handleConversationControlAck,
-  handleConversationDeliveryMethod,
+  handleConversationControlAck,  handleConversationDeliveryMethod,
   handleConversationPlanAction,
   handleConversationThinkingLevel,
   isPiControlChannelHarness,
   pickDeliverAs,
-  resolveConversationControlAck,
-  resolveConversationDeliveryMethod,
+  resolveConversationControlAck,  resolveConversationDeliveryMethod,
   sendConversationControlCommand,
   validateConversationControlAckOrigin,
 } from '../../../lib/overdeck/conversation-delivery.js';
+import { handleConversationPaneChoiceAnswer } from '../../../lib/overdeck/conversation-pane-choice.js';
 import {
   checkConversationUploadRateLimit,
   handleConversationImageDelete,
@@ -620,6 +619,29 @@ const postConversationCodexApprovalRoute = HttpRouter.add(
     return yield* Effect.promise(() => handleConversationCodexApproval(rawId, body));
   }),
 );
+//
+// PAN-3113 — answer a claude-code pane choice menu (session-resume gate et
+// al.) from the dashboard. The body carries the 0-based option index and the
+// menu signature the card was rendered from; the handler re-parses the live
+// pane and refuses on any drift before sending Up/Down + Enter keystrokes.
+const postConversationPaneChoiceRoute = HttpRouter.add(
+  'POST',
+  '/api/conversations/:id/pane-choice',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateOrigin(request);
+    if (!originCheck.ok) {
+      return jsonResponse({ error: originCheck.error }, { status: 403 });
+    }
+    const params = yield* HttpRouter.params;
+    const rawId = params['id'] ?? '';
+    const body = yield* readJsonBody;
+    return yield* Effect.promise(async () => {
+      const result = await handleConversationPaneChoiceAnswer(rawId, body);
+      return jsonResponse(result.body, { status: result.status });
+    });
+  }),
+);
 const postConversationDeliveryMethodRoute = HttpRouter.add(
   'POST',
   '/api/conversations/:name/delivery-method',
@@ -966,6 +988,7 @@ export const conversationsRouteLayer = Layer.mergeAll(
   postConversationDeleteImageRoute,
   postConversationMessageRoute,
   postConversationCodexApprovalRoute,
+  postConversationPaneChoiceRoute,
   postConversationDeliveryMethodRoute,
   postConversationControlAckRoute,
   postConversationFavoriteRoute,

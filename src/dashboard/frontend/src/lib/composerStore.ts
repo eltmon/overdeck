@@ -145,6 +145,42 @@ export interface ComposerCommandConfirmation {
 }
 
 /**
+ * Structured send failure. `status` is the HTTP status when the server
+ * answered at all (undefined for network-level failures). `reason` is the
+ * server-supplied error text when present. `retryable` is false for
+ * deterministic rejections — a 4xx other than 408/429 will fail an identical
+ * retry every time, so the outbox must not offer Retry for it (PAN-3117).
+ */
+export class MessageSendError extends Error {
+  readonly status?: number;
+  readonly reason?: string;
+  readonly retryable: boolean;
+  constructor(message: string, opts: { status?: number; reason?: string }) {
+    super(message);
+    this.name = 'MessageSendError';
+    this.status = opts.status;
+    this.reason = opts.reason;
+    this.retryable = opts.status === undefined
+      || opts.status >= 500
+      || opts.status === 408
+      || opts.status === 429;
+  }
+}
+
+export interface SendFailureDetails {
+  error?: string;
+  retryable?: boolean;
+}
+
+/** Extract the display reason + retryability the outbox preserves from any send failure. */
+export function sendFailureDetails(err: unknown): SendFailureDetails {
+  if (err instanceof MessageSendError) {
+    return { error: err.reason ?? err.message, retryable: err.retryable };
+  }
+  return { error: err instanceof Error ? err.message : String(err), retryable: true };
+}
+
+/**
  * POST a message to a conversation (or agent) session. The single source of
  * truth for the send endpoint + payload, used by both the composer's first send
  * (ComposerFooter.handleSubmit), confirmation resubmissions, and the failed-
@@ -173,11 +209,21 @@ export async function sendConversationMessage(
         : {}),
     } : {}),
   };
-  const res = await fetch(endpoint, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
+  let res: Response;
+  try {
+    res = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+  } catch (err) {
+    // Network-level failure (server unreachable, connection reset): no status,
+    // always retryable.
+    throw new MessageSendError(
+      `Failed to send message: ${err instanceof Error ? err.message : String(err)}`,
+      {},
+    );
+  }
   const body = await res.text().catch(() => '');
   let responseBody: unknown = null;
   if (body) {
@@ -193,7 +239,10 @@ export async function sendConversationMessage(
       'error' in responseBody && typeof responseBody.error === 'string'
       ? responseBody.error
       : body;
-    throw new Error(`Failed to send message (${res.status})${error ? `: ${error}` : ''}`);
+    throw new MessageSendError(
+      `Failed to send message (${res.status})${error ? `: ${error}` : ''}`,
+      { status: res.status, reason: error || undefined },
+    );
   }
   return null;
 }
@@ -329,7 +378,7 @@ interface ComposerStore {
   clearOptimistic(conversationName: string): void;
 
   /** A send POST failed: preserve it in the retry outbox with its original lane. */
-  failSend(conversationName: string, text: string, kind?: FailedMessage['kind']): void;
+  failSend(conversationName: string, text: string, kind?: FailedMessage['kind'], details?: SendFailureDetails): void;
   removeFailed(conversationName: string, id: string): void;
 
   addCommandResult(
@@ -506,7 +555,7 @@ export const useComposerStore = create<ComposerStore>((set, get) => ({
       ),
     })),
 
-  failSend: (conversationName, text, kind = 'prompt') =>
+  failSend: (conversationName, text, kind = 'prompt', details) =>
     set((state) => ({
       byConversation: mutateSlice(state.byConversation, conversationName, (s) => ({
         ...s,
@@ -514,7 +563,14 @@ export const useComposerStore = create<ComposerStore>((set, get) => ({
         optimisticBaseCount: kind === 'prompt' ? 0 : s.optimisticBaseCount,
         failed: [
           ...s.failed,
-          { id: `failed-${Date.now()}`, text, kind, createdAt: new Date().toISOString() },
+          {
+            id: `failed-${Date.now()}`,
+            text,
+            kind,
+            createdAt: new Date().toISOString(),
+            ...(details?.error !== undefined ? { error: details.error } : {}),
+            ...(details?.retryable !== undefined ? { retryable: details.retryable } : {}),
+          },
         ],
       })),
     })),
@@ -581,8 +637,8 @@ export const useComposerStore = create<ComposerStore>((set, get) => ({
         addCommandResult(conversationName, text, result);
       }
       return result;
-    } catch {
-      failSend(conversationName, text, kind);
+    } catch (err) {
+      failSend(conversationName, text, kind, sendFailureDetails(err));
       return null;
     }
   },
