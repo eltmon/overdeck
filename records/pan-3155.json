@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T19:16:39.648Z",
-  "updated": "2026-07-26T19:47:51.565Z",
+  "updated": "2026-07-26T19:52:11.188Z",
   "pipeline": {
     "issueId": "PAN-3155",
     "reviewStatus": "pending",
@@ -43,16 +43,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "prefer-merged-pr-resolution": {
-        "writerId": "agent-pan-3155",
-        "agentId": "agent-pan-3155",
-        "pid": 3458100,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-26T19:47:51.565Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3155",
@@ -64,12 +56,27 @@
         "outcome": "completed",
         "reason": "Extracted branch verification into a reusable convention-branch cascade, added strike fallback with superseded feature residual evidence, and covered strike success/absence/short-circuit behavior with regression tests.",
         "releasedAt": "2026-07-26T19:47:43.666Z"
+      },
+      {
+        "writerId": "agent-pan-3155",
+        "agentId": "agent-pan-3155",
+        "pid": 3458100,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T19:47:51.565Z",
+        "itemId": "prefer-merged-pr-resolution",
+        "outcome": "completed",
+        "reason": "Added state-aware branch PR lookup for gh and GitHub App paths, ranked both convention heads OPEN then latest MERGED then other, preserved the numeric lookup wrapper, and added route-level ranking regressions.",
+        "releasedAt": "2026-07-26T19:52:11.188Z"
       }
     ],
     "statusReasons": {
       "strike-cascade-verify-merged": {
         "reason": "Extracted branch verification into a reusable convention-branch cascade, added strike fallback with superseded feature residual evidence, and covered strike success/absence/short-circuit behavior with regression tests.",
         "updatedAt": "2026-07-26T19:47:43.666Z"
+      },
+      "prefer-merged-pr-resolution": {
+        "reason": "Added state-aware branch PR lookup for gh and GitHub App paths, ranked both convention heads OPEN then latest MERGED then other, preserved the numeric lookup wrapper, and added route-level ranking regressions.",
+        "updatedAt": "2026-07-26T19:52:11.188Z"
       }
     }
   },
@@ -78,6 +85,9 @@
     "strike-cascade-verify-merged.strike-cascade-verify-merged.ac1": "completed",
     "strike-cascade-verify-merged.strike-cascade-verify-merged.ac2": "completed",
     "strike-cascade-verify-merged.strike-cascade-verify-merged.ac3": "completed",
-    "prefer-merged-pr-resolution": "running"
+    "prefer-merged-pr-resolution": "completed",
+    "prefer-merged-pr-resolution.prefer-merged-pr-resolution.ac1": "completed",
+    "prefer-merged-pr-resolution.prefer-merged-pr-resolution.ac2": "completed",
+    "prefer-merged-pr-resolution.prefer-merged-pr-resolution.ac3": "completed"
   }
 }
