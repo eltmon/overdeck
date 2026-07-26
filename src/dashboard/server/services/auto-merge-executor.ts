@@ -12,6 +12,7 @@ import {
 } from '../../../lib/overdeck/merge-sync.js';
 import { isAutoMergeEligible, type AutoMergeEligibility } from '../../../lib/cloister/auto-merge-eligibility.js';
 import { FAILED_MERGE_MAX_RETRIES } from '../../../lib/cloister/deacon-merge.js';
+import { readPendingDeploy } from '../../../lib/deploy/deploy-queue.js';
 import { getReviewStatusSync, setReviewStatusSync } from '../../../lib/review-status.js';
 
 export const AUTO_MERGE_EXECUTOR_INTERVAL_MS = 30_000;
@@ -31,6 +32,7 @@ export interface AutoMergeExecutorDeps {
   listEntries?: () => PendingAutoMerge[];
   isPaused?: () => boolean;
   isEligible?: (issueId: string) => Promise<AutoMergeEligibility>;
+  hasPendingDeploy?: () => Promise<boolean>;
   transition?: (id: number) => boolean;
   markBlocked?: (id: number, reason: string) => boolean;
   markMergingBlocked?: (id: number, reason: string) => boolean;
@@ -88,6 +90,12 @@ export async function tickAutoMergeExecutor(deps: AutoMergeExecutorDeps = {}): P
   const log = deps.log ?? console.log;
   if (isPaused()) {
     log('[auto-merge] flywheel paused, skipping tick');
+    return;
+  }
+  const hasPendingDeploy = deps.hasPendingDeploy
+    ?? (async () => (await readPendingDeploy()) !== null);
+  if (await hasPendingDeploy()) {
+    log(`[auto-merge] dashboard deploy queued, deferring ${entries.length} merge(s) before preparation`);
     return;
   }
 

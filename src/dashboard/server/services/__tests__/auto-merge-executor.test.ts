@@ -49,6 +49,7 @@ describe('auto-merge executor', () => {
       now: () => NOW,
       listEntries: () => [pendingEntry({ scheduledMergeAt: '2026-05-25T10:00:01.000Z' })],
       isPaused: () => false,
+      hasPendingDeploy: async () => false,
       transition,
       mergeIssue,
     });
@@ -73,6 +74,40 @@ describe('auto-merge executor', () => {
     expect(transition).not.toHaveBeenCalled();
   });
 
+  it('defers before merge preparation and retries on the first tick after the deploy clears', async () => {
+    let deployQueued = true;
+    const isEligible = vi.fn(async () => ({ eligible: true as const }));
+    const transition = vi.fn(() => true);
+    const mergeIssue = vi.fn(async () => ({ success: true, mergeStatus: 'merged' }));
+    const markMerged = vi.fn();
+    const log = vi.fn();
+    const deps = {
+      now: () => NOW,
+      listEntries: () => [pendingEntry(), pendingEntry({ id: 2, issueId: 'PAN-1487' })],
+      isPaused: () => false,
+      hasPendingDeploy: async () => deployQueued,
+      isEligible,
+      transition,
+      mergeIssue,
+      markMerged,
+      log,
+    };
+
+    await tickAutoMergeExecutor(deps);
+    expect(isEligible).not.toHaveBeenCalled();
+    expect(transition).not.toHaveBeenCalled();
+    expect(mergeIssue).not.toHaveBeenCalled();
+    expect(log).toHaveBeenCalledWith(
+      '[auto-merge] dashboard deploy queued, deferring 2 merge(s) before preparation',
+    );
+
+    deployQueued = false;
+    await tickAutoMergeExecutor(deps);
+    expect(isEligible).toHaveBeenCalledTimes(2);
+    expect(mergeIssue).toHaveBeenCalledTimes(2);
+    expect(markMerged).toHaveBeenCalledTimes(2);
+  });
+
   it('marks due entries blocked when fire-time eligibility fails', async () => {
     const markBlocked = vi.fn();
     const transition = vi.fn();
@@ -81,6 +116,7 @@ describe('auto-merge executor', () => {
       now: () => NOW,
       listEntries: () => [pendingEntry()],
       isPaused: () => false,
+      hasPendingDeploy: async () => false,
       isEligible: async () => ({ eligible: false, reason: 'CI checks failing on PR HEAD abc123' }),
       markBlocked,
       transition,
@@ -98,6 +134,7 @@ describe('auto-merge executor', () => {
       now: () => NOW,
       listEntries: () => [pendingEntry()],
       isPaused: () => false,
+      hasPendingDeploy: async () => false,
       isEligible: async () => ({ eligible: true }),
       transition: () => false,
       mergeIssue,
@@ -117,6 +154,7 @@ describe('auto-merge executor', () => {
       now: () => NOW,
       listEntries: () => [pendingEntry()],
       isPaused: () => false,
+      hasPendingDeploy: async () => false,
       isEligible: async () => ({ eligible: true }),
       transition: () => true,
       mergeIssue,
@@ -140,6 +178,7 @@ describe('auto-merge executor', () => {
       now: () => NOW,
       listEntries: () => [pendingEntry()],
       isPaused: () => false,
+      hasPendingDeploy: async () => false,
       isEligible: async () => ({ eligible: true }),
       transition: () => true,
       mergeIssue: async () => ({ success: true, statusCode: 200, message: 'Queued for merge', mergeStatus: 'queued' }),
@@ -172,6 +211,7 @@ describe('auto-merge executor', () => {
       now: () => NOW,
       listEntries: () => [pendingEntry()],
       isPaused: () => false,
+      hasPendingDeploy: async () => false,
       isEligible: async () => ({ eligible: true }),
       transition: () => true,
       mergeIssue: async () => ({
@@ -207,6 +247,7 @@ describe('auto-merge executor', () => {
       now: () => NOW,
       listEntries: () => [pendingEntry()],
       isPaused: () => false,
+      hasPendingDeploy: async () => false,
       isEligible: async () => ({ eligible: true }),
       transition: () => true,
       mergeIssue: async () => ({ success: false, statusCode: 500, error: 'agent stopped', retryable: true }),
@@ -236,6 +277,7 @@ describe('auto-merge executor', () => {
       now: () => NOW,
       listEntries: () => [pendingEntry()],
       isPaused: () => false,
+      hasPendingDeploy: async () => false,
       isEligible: async () => ({ eligible: true }),
       transition: () => true,
       mergeIssue: async () => ({ success: false, statusCode: 500, error: 'agent stopped', retryable: true }),
@@ -263,6 +305,7 @@ describe('auto-merge executor', () => {
       now: () => NOW,
       listEntries: () => [pendingEntry()],
       isPaused: () => false,
+      hasPendingDeploy: async () => false,
       isEligible: async () => ({ eligible: true }),
       transition: () => true,
       mergeIssue: async () => ({ success: false, statusCode: 500, error: 'agent stopped', retryable: true }),
@@ -287,6 +330,7 @@ describe('auto-merge executor', () => {
       now: () => NOW,
       listEntries: () => [pendingEntry()],
       isPaused: () => false,
+      hasPendingDeploy: async () => false,
       isEligible: async () => ({ eligible: true }),
       transition: () => true,
       mergeIssue: async () => ({ success: false, statusCode: 500, error: 'merge exploded' }),
