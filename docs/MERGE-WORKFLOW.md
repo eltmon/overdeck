@@ -1,9 +1,9 @@
 # Merge Workflow
 
 Overdeck's merge workflow is a four-state pipeline between two actors: the
-**dashboard server** and **GitHub**. Agents participate in the upstream work
-(implementation, review, test) but no agent makes the merge decision and no
-agent performs the rebase.
+**dashboard server** and **GitHub**. Agents participate in implementation,
+review, and test. The dashboard owns the merge decision and deterministic
+rebase; a work agent joins only when a rebase needs conflict resolution.
 
 > **Scope.** This describes the **per-issue** merge — one feature, one click. While
 > a Flywheel run with the merge train enabled is active, the primary path is
@@ -55,11 +55,12 @@ agent performs the rebase.
 
 The only Overdeck component that mutates git state on the merge side. It:
 
-- Runs `rebaseFeatureBranch(workspacePath, featureBranch, baseBranch)` from
-  [`src/lib/cloister/merge-rebase.ts`](../src/lib/cloister/merge-rebase.ts)
-  after review + test pass.
-- Surfaces rebase conflicts to the dashboard UI with a "Resume in workspace"
-  action — never auto-resolves.
+- Merges a GitHub-clean PR directly because its head already contains the
+  required base and its required checks are complete.
+- Otherwise runs `rebaseFeatureBranch(workspacePath, featureBranch, baseBranch)`
+  from [`src/lib/cloister/merge-rebase.ts`](../src/lib/cloister/merge-rebase.ts).
+- Escalates conflicts to the work agent for resolution; the server does not
+  invent conflict resolutions.
 - Calls `gh pr merge --squash` when the human clicks the Merge button.
 - Runs `postMergeLifecycle()` after the squash succeeds — labels, agent pause,
   Docker cleanup, single-oracle merge verification.
@@ -68,6 +69,33 @@ The only Overdeck component that mutates git state on the merge side. It:
 
 Owns the actual ref movement on `origin/main`. The dashboard never pushes to
 main directly — every change lands via squash-merge through GitHub's PR API.
+
+## Merge-executor escalation
+
+The per-issue merge executor uses this order:
+
+1. **GitHub-clean PR:** When GitHub reports `mergeable: true`,
+   `mergeableState: clean`, no pending or failed checks, and a non-draft open
+   PR, the server skips rebase preparation and squash-merges through the forge
+   adapter. Work-agent liveness does not affect this path.
+2. **Server-side rebase:** For a branch that still needs its target branch, the
+   server runs `rebaseFeatureBranch()` and pushes with `--force-with-lease`.
+3. **Agent conflict resolution:** If the deterministic rebase reports conflicts,
+   the server engages the work agent and waits for the resolved branch to be
+   pushed. Non-conflict workspace failures use the same agent path because the
+   agent may repair the workspace.
+
+A transient preparation failure returns `retryable: true` and writes
+`mergeStatus: queued`, so `readyForMerge` remains derivable from the passed
+review, test, and verification verdicts. Content failures such as red CI, a
+closed or draft PR, or unresolved conflicts remain non-retryable and set
+`mergeStatus: failed`.
+
+Pipeline verdicts belong to reviewed code, not to an agent session. Starting a
+fresh or resumed work agent preserves earned verdicts while the current HEAD
+matches `reviewedAtCommit`, including a proven-benign commit-anchor move. A
+real code change, an unreadable anchor, or a missing passed-review anchor resets
+the verdicts before new work starts.
 
 ## States
 
@@ -99,10 +127,10 @@ branch to `origin/feature/<issue>` with `--force-with-lease`. The PR is now
 fast-forwardable on top of current `origin/main`. The dashboard flips
 `readyForMerge: true` on the review status, which renders the Merge button.
 
-If the rebase produces conflicts, the dashboard surfaces them with the
-conflict file list and a "Resume in workspace" action. The work-agent or
-operator resolves manually in the worktree, pushes, and the dashboard
-re-attempts the rebase.
+If the server-side rebase produces conflicts, the merge executor engages the
+work agent with the conflict-resolution request and waits for a pushed branch.
+If that path cannot finish, the dashboard keeps the conflict file list as a
+non-retryable merge failure for operator recovery.
 
 ### merged
 
