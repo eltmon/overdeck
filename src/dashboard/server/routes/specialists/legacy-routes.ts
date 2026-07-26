@@ -510,6 +510,35 @@ const postSpecialistsDoneRoute = HttpRouter.add(
       });
     }
 
+    // PAN-3148: the HTTP review prompt reports changes requested as status=failed,
+    // which the durable write above maps to reviewStatus=blocked. Snapshot the
+    // reviewed HEAD only after feedback delivery so the verdict remains durable
+    // even when the git probe stalls or fails (PAN-2524 ordering).
+    if (specialist === 'review' && status === 'failed') {
+      yield* Effect.promise(async () => {
+        try {
+          const project = resolveProjectFromIssueSync(normalizedIssueId);
+          if (project) {
+            const workspacePath = join(
+              project.projectPath,
+              'workspaces',
+              `feature-${normalizedIssueId.toLowerCase()}`,
+            );
+            if (existsSync(workspacePath)) {
+              const { formatAnchorShort, snapshotWorkspaceHeadsPromise } = await import('../../../../lib/git-utils.js');
+              const reviewedAtCommit = await snapshotWorkspaceHeadsPromise(normalizedIssueId, workspacePath);
+              if (reviewedAtCommit) {
+                setReviewStatusBase(normalizedIssueId, { reviewedAtCommit });
+                console.log(`[specialists/done] Snapshotted blocked reviewedAtCommit=${formatAnchorShort(reviewedAtCommit)} for ${normalizedIssueId}`);
+              }
+            }
+          }
+        } catch (err) {
+          console.error(`[specialists/done] Failed to snapshot blocked reviewedAtCommit for ${normalizedIssueId}:`, err);
+        }
+      });
+    }
+
     // Emit domain event for role-backed specialist completion/failure.
     const eventRole = specialistEventRole(specialist);
     if (eventRole) {

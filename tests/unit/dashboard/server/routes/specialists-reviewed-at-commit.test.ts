@@ -19,6 +19,7 @@
  * it depends on (DB write + deacon reader) independently.
  */
 
+import { join } from 'node:path';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
 // PAN-1938: the production code now reads/writes overdeck.db via
@@ -183,7 +184,7 @@ vi.mock('node:fs', async (importActual) => {
   return { ...actual, existsSync: vi.fn().mockReturnValue(true) };
 });
 
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { getRealExistsSync } from './_real-exists-sync.js';
 
 let realExistsSync: (path: string) => boolean = () => false;
@@ -239,6 +240,45 @@ describe('reviewedAtCommit DB persistence (specialists/done snapshot layer)', ()
 
     const row = getReviewStatusFromDbSync('PAN-RAC1');
     expect(row?.reviewedAtCommit).toBe(sha);
+  });
+
+  it('persists a blocked verdict anchor in a second partial update', () => {
+    const sha = 'blocked123456789012345678901234567890abcd';
+    setReviewStatusSync('PAN-RAC-BLOCKED', {
+      reviewStatus: 'blocked',
+      reviewNotes: 'correctness blocker',
+    });
+    setReviewStatusSync('PAN-RAC-BLOCKED', { reviewedAtCommit: sha });
+
+    const row = getReviewStatusFromDbSync('PAN-RAC-BLOCKED');
+    expect(row?.reviewStatus).toBe('blocked');
+    expect(row?.reviewedAtCommit).toBe(sha);
+  });
+
+  it('keeps the HTTP blocked anchor write after feedback delivery', () => {
+    const source = readFileSync(join(
+      process.cwd(),
+      'src/dashboard/server/routes/specialists/legacy-routes.ts',
+    ), 'utf8');
+    const feedbackWrite = source.indexOf('[specialists/done] Delivered review verdict feedback');
+    const blockedAnchorWrite = source.indexOf('// PAN-3148: the HTTP review prompt reports changes requested');
+
+    expect(feedbackWrite).toBeGreaterThan(-1);
+    expect(blockedAnchorWrite).toBeGreaterThan(feedbackWrite);
+    expect(source.slice(blockedAnchorWrite, blockedAnchorWrite + 2_000)).toContain(
+      'setReviewStatusBase(normalizedIssueId, { reviewedAtCommit })',
+    );
+  });
+
+  it('includes fallbackHead on a blocked deacon fallback synthesis verdict', () => {
+    const source = readFileSync(join(
+      process.cwd(),
+      'src/lib/cloister/deacon-review-signals.ts',
+    ), 'utf8');
+
+    expect(source).toContain(
+      "...(synthesis.verdict === 'blocked' && fallbackHead ? { reviewedAtCommit: fallbackHead } : {})",
+    );
   });
 
   it('reviewedAtCommit survives a subsequent partial update (not clobbered)', () => {
