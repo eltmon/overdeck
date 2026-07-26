@@ -80,6 +80,7 @@ describe('auto-resume gates', () => {
     vi.doUnmock('../../../src/lib/tmux.js');
     vi.doUnmock('../../../src/lib/cloister/concurrency.js');
     vi.doUnmock('../../../src/lib/cloister/preemption.js');
+    vi.doUnmock('../../../src/lib/cloister/memory-governor.js');
     vi.doUnmock('os');
     vi.doUnmock('child_process');
     vi.doUnmock('ora');
@@ -168,6 +169,9 @@ describe('auto-resume gates', () => {
       tryReserveSwarmSlot: () => true,
       releaseSwarmSlot: vi.fn(),
       canDispatchAdvancing: () => true,
+    }));
+    vi.doMock('../../../src/lib/cloister/memory-governor.js', () => ({
+      assessMemoryPressure: vi.fn(async () => ({ band: 'ok', availableBytes: Number.MAX_SAFE_INTEGER })),
     }));
     // PAN-2507: mock the preemption module so the resume-yielded-first insertion
     // and the dispatch-site yield helper are deterministic spies.

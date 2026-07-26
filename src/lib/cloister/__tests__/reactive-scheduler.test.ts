@@ -126,6 +126,10 @@ vi.mock('../no-resume-mode.js', () => ({
   getNoResumeMode: () => ({ active: false, since: null }),
 }));
 
+vi.mock('../memory-governor.js', () => ({
+  assessMemoryPressure: vi.fn(async () => ({ band: 'ok', availableBytes: Number.MAX_SAFE_INTEGER })),
+}));
+
 vi.mock('../concurrency.js', () => ({
   workResumeSlotsAvailable: () => 1,
   countRunningAgents: () => ({ work: 0, advancing: 0, total: 0 }),
