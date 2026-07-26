@@ -33,7 +33,7 @@ export async function agentRestartBlockReason(
   const blockReason = await getDeployBlockReason(deployDeps);
   if (!blockReason) return null;
 
-  const queued = recordDeployIntent({
+  const queued = await recordDeployIntent({
     requestedBy: initiator,
     reason: blockReason,
     blockedBy: listVerifyingIssues(deployDeps.loadReviewStatuses),

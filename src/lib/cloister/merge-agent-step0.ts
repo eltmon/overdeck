@@ -36,7 +36,7 @@ export async function shouldRestartForPostMerge(
       ?? (await import('../deploy/deploy-queue.js')).recordDeployIntent;
     const getVerifyingIssues = dependencies.listVerifyingIssues
       ?? (await import('../deploy/deploy-window.js')).listVerifyingIssues;
-    recordIntent({
+    await recordIntent({
       requestedBy: 'merge-step0',
       reason,
       blockedBy: getVerifyingIssues(),

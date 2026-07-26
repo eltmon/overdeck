@@ -4,7 +4,7 @@ import { shouldRestartForPostMerge } from '../../../../src/lib/cloister/merge-ag
 import type { BuildStaleness } from '../../../../src/lib/deploy/staleness.js';
 
 function recordIntentMock() {
-  return vi.fn(() => ({
+  return vi.fn(async () => ({
     requestedAt: '2026-07-26T12:00:00.000Z',
     requestedBy: ['merge-step0'],
     lastReason: 'blocked',

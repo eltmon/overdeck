@@ -47,10 +47,10 @@ function context(staleness: BuildStaleness = stale()) {
     computeStaleness: vi.fn(async () => staleness),
     getCiState: vi.fn(async () => ({ status: 'green' as const })),
     getBlockReason: vi.fn(async () => null),
-    readQueue: vi.fn(() => null as PendingDeploy | null),
-    clearQueue: vi.fn(),
-    recordIntent: vi.fn(() => queuedDeploy()),
-    markQueueEscalated: vi.fn(),
+    readQueue: vi.fn(async () => null as PendingDeploy | null),
+    clearQueue: vi.fn(async () => undefined),
+    recordIntent: vi.fn(async () => queuedDeploy()),
+    markQueueEscalated: vi.fn(async () => undefined),
     listVerifyingIssues: vi.fn((): string[] => []),
     recordNeedsYou: vi.fn(async () => undefined as string | undefined),
     spawnReload: vi.fn(async () => undefined),
@@ -152,7 +152,7 @@ describe('runDeployPatrol', () => {
   it('fires a queued deploy even when automatic deployment is disabled', async () => {
     const ctx = context();
     ctx.config.auto_deploy = false;
-    ctx.readQueue.mockReturnValue(queuedDeploy({ requestedBy: ['agent-a', 'agent-z'] }));
+    ctx.readQueue.mockResolvedValue(queuedDeploy({ requestedBy: ['agent-a', 'agent-z'] }));
 
     await runDeployPatrol(ctx);
 
@@ -165,7 +165,7 @@ describe('runDeployPatrol', () => {
 
   it('keeps a queued deploy pending while the deploy gate remains blocked', async () => {
     const ctx = context();
-    ctx.readQueue.mockReturnValue(queuedDeploy());
+    ctx.readQueue.mockResolvedValue(queuedDeploy());
     ctx.getBlockReason.mockResolvedValue('Deployment deferred because verification is in flight for PAN-10.');
 
     await runDeployPatrol(ctx);
@@ -177,10 +177,10 @@ describe('runDeployPatrol', () => {
   it('escalates one long-queued deploy and persists the escalated flag', async () => {
     const ctx = context();
     let queue = queuedDeploy({ requestedAt: '2026-07-15T11:29:00.000Z' });
-    ctx.readQueue.mockImplementation(() => queue);
+    ctx.readQueue.mockImplementation(async () => queue);
     ctx.getBlockReason.mockResolvedValue('Deployment deferred because verification is in flight for PAN-10.');
     ctx.listVerifyingIssues.mockReturnValue(['PAN-10']);
-    ctx.markQueueEscalated.mockImplementation(() => {
+    ctx.markQueueEscalated.mockImplementation(async () => {
       queue = { ...queue, escalated: true };
     });
 
@@ -215,7 +215,7 @@ describe('runDeployPatrol', () => {
 
   it('does not escalate a queued deploy before its deadline', async () => {
     const ctx = context();
-    ctx.readQueue.mockReturnValue(queuedDeploy({ requestedAt: '2026-07-15T11:31:00.000Z' }));
+    ctx.readQueue.mockResolvedValue(queuedDeploy({ requestedAt: '2026-07-15T11:31:00.000Z' }));
     ctx.getBlockReason.mockResolvedValue('Deployment deferred because verification is in flight for PAN-10.');
     ctx.listVerifyingIssues.mockReturnValue(['PAN-10']);
 
@@ -229,7 +229,7 @@ describe('runDeployPatrol', () => {
 
   it('does not escalate a long-queued deploy when the gate is clear', async () => {
     const ctx = context();
-    ctx.readQueue.mockReturnValue(queuedDeploy({ requestedAt: '2026-07-15T11:00:00.000Z' }));
+    ctx.readQueue.mockResolvedValue(queuedDeploy({ requestedAt: '2026-07-15T11:00:00.000Z' }));
 
     await runDeployPatrol(ctx);
 
@@ -243,7 +243,7 @@ describe('runDeployPatrol', () => {
 
   it('keeps a queued deploy pending until CI is green', async () => {
     const ctx = context();
-    ctx.readQueue.mockReturnValue(queuedDeploy());
+    ctx.readQueue.mockResolvedValue(queuedDeploy());
     ctx.getCiState.mockResolvedValue({
       status: 'red',
       reason: 'Automatic deployment blocked because CI failed.',
@@ -260,7 +260,7 @@ describe('runDeployPatrol', () => {
     const ctx = context(stale({
       originMainLastBuildInputCommitAt: NOW - 4 * 60 * 1000,
     }));
-    ctx.readQueue.mockReturnValue(queuedDeploy());
+    ctx.readQueue.mockResolvedValue(queuedDeploy());
 
     await runDeployPatrol(ctx);
 

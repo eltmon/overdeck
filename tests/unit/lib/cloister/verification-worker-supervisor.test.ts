@@ -128,7 +128,7 @@ describe('verification worker supervisor', () => {
 
   it('defers a new worker while a dashboard deploy is queued', async () => {
     useFixture();
-    const queued = recordDeployIntent({
+    const queued = await recordDeployIntent({
       requestedBy: 'agent-pan-3135',
       reason: 'Verification is running',
       blockedBy: ['PAN-10'],
@@ -152,7 +152,7 @@ describe('verification worker supervisor', () => {
     const first = runSupervisedVerification('PAN-2597', '/tmp/workspace', { isRemote: false }, 'test');
     await vi.waitFor(() => expect(isVerificationWorkerActive('PAN-2597')).toBe(true));
     const firstPid = readVerificationWorkerState('PAN-2597')!.pid;
-    recordDeployIntent({
+    await recordDeployIntent({
       requestedBy: 'agent-pan-3135',
       reason: 'Verification is running',
       blockedBy: ['PAN-10'],

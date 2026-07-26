@@ -137,7 +137,7 @@ export async function runSupervisedVerification(
     return waitForResult(existing);
   }
 
-  const pendingDeploy = readPendingDeploy();
+  const pendingDeploy = await readPendingDeploy();
   if (pendingDeploy) {
     const reason = `Verification deferred: a dashboard deploy is queued (requested ${pendingDeploy.requestedAt} by ${pendingDeploy.requestedBy.join(', ')}). It re-runs automatically after the deploy.`;
     return { outcome: 'deferred', reason };

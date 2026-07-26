@@ -66,10 +66,10 @@ export interface DeployPatrolContext {
   readonly computeStaleness?: () => Promise<BuildStaleness>;
   readonly getCiState?: (sha: string) => Promise<DeployCiState>;
   readonly getBlockReason?: () => Promise<string | null>;
-  readonly readQueue?: () => PendingDeploy | null;
-  readonly clearQueue?: () => void;
+  readonly readQueue?: typeof readPendingDeploy;
+  readonly clearQueue?: typeof clearPendingDeploy;
   readonly recordIntent?: typeof recordDeployIntent;
-  readonly markQueueEscalated?: () => void;
+  readonly markQueueEscalated?: typeof markPendingDeployEscalated;
   readonly listVerifyingIssues?: () => string[];
   readonly recordNeedsYou?: typeof recordDeadEndNeedsYou;
   readonly spawnReload?: (request: ReloadRequest) => Promise<void>;
@@ -301,12 +301,12 @@ export async function runDeployPatrol(context: DeployPatrolContext): Promise<voi
 
   if (staleness.status === 'fresh') {
     clearState();
-    (context.clearQueue ?? clearPendingDeploy)();
+    await (context.clearQueue ?? clearPendingDeploy)();
     return;
   }
 
   state.unknownObserved = false;
-  const queuedDeploy = (context.readQueue ?? readPendingDeploy)();
+  const queuedDeploy = await (context.readQueue ?? readPendingDeploy)();
   const behind = staleness.behindBuildInputs ?? 0;
   if (
     state.lastObservedBehind !== behind ||
@@ -347,7 +347,7 @@ export async function runDeployPatrol(context: DeployPatrolContext): Promise<voi
     emitDeferral(blockReason, now, emitEntry);
     const verifyingIssues = (context.listVerifyingIssues ?? listVerifyingIssues)();
     if (context.config.auto_deploy) {
-      (context.recordIntent ?? recordDeployIntent)({
+      await (context.recordIntent ?? recordDeployIntent)({
         requestedBy: DEPLOY_PATROL_INITIATOR,
         reason: blockReason,
         blockedBy: verifyingIssues,
@@ -378,7 +378,7 @@ export async function runDeployPatrol(context: DeployPatrolContext): Promise<voi
           );
         }
       } finally {
-        (context.markQueueEscalated ?? markPendingDeployEscalated)();
+        await (context.markQueueEscalated ?? markPendingDeployEscalated)();
       }
     }
     return;

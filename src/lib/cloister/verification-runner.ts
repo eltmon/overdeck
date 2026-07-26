@@ -384,7 +384,7 @@ async function runVerificationForIssuePromise(
   options: VerificationRunnerOptions = {},
 ): Promise<VerificationRunnerOutcome> {
   const currentStatus = getReviewStatusSync(issueId);
-  const pendingDeploy = readPendingDeploy();
+  const pendingDeploy = await readPendingDeploy();
   if (pendingDeploy && currentStatus?.verificationStatus !== 'running') {
     const reason = `Verification deferred: a dashboard deploy is queued (requested ${pendingDeploy.requestedAt} by ${pendingDeploy.requestedBy.join(', ')}). It re-runs automatically after the deploy.`;
     setReviewStatusSync(issueId, {

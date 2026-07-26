@@ -21,18 +21,18 @@ describe('deploy queue', () => {
     rmSync(home, { recursive: true, force: true });
   });
 
-  it('returns null when no pending deploy exists', () => {
-    expect(readPendingDeploy({ overdeckHome: home })).toBeNull();
+  it('returns null when no pending deploy exists', async () => {
+    await expect(readPendingDeploy({ overdeckHome: home })).resolves.toBeNull();
   });
 
-  it('creates and reads a pending deploy record', () => {
-    const created = recordDeployIntent({
+  it('creates and reads a pending deploy record', async () => {
+    const created = await recordDeployIntent({
       requestedBy: 'agent-pan-3135',
       reason: 'Verification is running',
       blockedBy: ['PAN-20', 'PAN-10'],
     }, { overdeckHome: home });
 
-    expect(readPendingDeploy({ overdeckHome: home })).toEqual(created);
+    await expect(readPendingDeploy({ overdeckHome: home })).resolves.toEqual(created);
     expect(created).toEqual({
       requestedAt: created.requestedAt,
       requestedBy: ['agent-pan-3135'],
@@ -44,13 +44,13 @@ describe('deploy queue', () => {
     expect(JSON.parse(readFileSync(join(home, 'pending-deploy.json'), 'utf8'))).toEqual(created);
   });
 
-  it('refreshes a pending deploy without replacing its original request time', () => {
-    const first = recordDeployIntent({
+  it('refreshes a pending deploy without replacing its original request time', async () => {
+    const first = await recordDeployIntent({
       requestedBy: 'agent-z',
       reason: 'First blocker',
       blockedBy: ['PAN-20', 'PAN-10', 'PAN-10'],
     }, { overdeckHome: home });
-    const second = recordDeployIntent({
+    const second = await recordDeployIntent({
       requestedBy: 'agent-a',
       reason: 'Second blocker',
       blockedBy: ['PAN-30', 'PAN-20'],
@@ -66,49 +66,94 @@ describe('deploy queue', () => {
     });
   });
 
-  it('returns null for invalid record shapes', () => {
-    writeFileSync(join(home, 'pending-deploy.json'), JSON.stringify({ requestedAt: 42 }));
+  it('serializes concurrent registrations without losing callers or blockers', async () => {
+    await Promise.all([
+      recordDeployIntent({
+        requestedBy: 'agent-z',
+        reason: 'First blocker',
+        blockedBy: ['PAN-20'],
+      }, { overdeckHome: home }),
+      recordDeployIntent({
+        requestedBy: 'agent-a',
+        reason: 'Second blocker',
+        blockedBy: ['PAN-10'],
+      }, { overdeckHome: home }),
+    ]);
 
-    expect(readPendingDeploy({ overdeckHome: home })).toBeNull();
+    await expect(readPendingDeploy({ overdeckHome: home })).resolves.toMatchObject({
+      requestedBy: ['agent-a', 'agent-z'],
+      blockedBy: ['PAN-10', 'PAN-20'],
+      deferralCount: 2,
+    });
   });
 
-  it('replaces corrupt JSON with a fresh pending deploy record', () => {
+  it('preserves escalation across concurrent registration and escalation', async () => {
+    await recordDeployIntent({
+      requestedBy: 'agent-a',
+      reason: 'First blocker',
+      blockedBy: ['PAN-10'],
+    }, { overdeckHome: home });
+
+    await Promise.all([
+      markPendingDeployEscalated({ overdeckHome: home }),
+      recordDeployIntent({
+        requestedBy: 'agent-z',
+        reason: 'Second blocker',
+        blockedBy: ['PAN-20'],
+      }, { overdeckHome: home }),
+    ]);
+
+    await expect(readPendingDeploy({ overdeckHome: home })).resolves.toMatchObject({
+      requestedBy: ['agent-a', 'agent-z'],
+      blockedBy: ['PAN-10', 'PAN-20'],
+      deferralCount: 2,
+      escalated: true,
+    });
+  });
+
+  it('returns null for invalid record shapes', async () => {
+    writeFileSync(join(home, 'pending-deploy.json'), JSON.stringify({ requestedAt: 42 }));
+
+    await expect(readPendingDeploy({ overdeckHome: home })).resolves.toBeNull();
+  });
+
+  it('replaces corrupt JSON with a fresh pending deploy record', async () => {
     writeFileSync(join(home, 'pending-deploy.json'), '{not-json');
 
-    expect(readPendingDeploy({ overdeckHome: home })).toBeNull();
-    const created = recordDeployIntent({
+    await expect(readPendingDeploy({ overdeckHome: home })).resolves.toBeNull();
+    const created = await recordDeployIntent({
       requestedBy: 'agent-pan-3135',
       reason: 'Verification is running',
       blockedBy: ['PAN-10'],
     }, { overdeckHome: home });
 
-    expect(readPendingDeploy({ overdeckHome: home })).toEqual(created);
+    await expect(readPendingDeploy({ overdeckHome: home })).resolves.toEqual(created);
     expect(created.deferralCount).toBe(1);
   });
 
-  it('clears a pending deploy and tolerates repeated clears', () => {
-    recordDeployIntent({
+  it('clears a pending deploy and tolerates repeated clears', async () => {
+    await recordDeployIntent({
       requestedBy: 'agent-pan-3135',
       reason: 'Verification is running',
       blockedBy: ['PAN-10'],
     }, { overdeckHome: home });
 
-    clearPendingDeploy({ overdeckHome: home });
-    expect(readPendingDeploy({ overdeckHome: home })).toBeNull();
+    await clearPendingDeploy({ overdeckHome: home });
+    await expect(readPendingDeploy({ overdeckHome: home })).resolves.toBeNull();
     expect(existsSync(join(home, 'pending-deploy.json'))).toBe(false);
-    expect(() => clearPendingDeploy({ overdeckHome: home })).not.toThrow();
+    await expect(clearPendingDeploy({ overdeckHome: home })).resolves.toBeUndefined();
   });
 
-  it('marks an existing pending deploy as escalated and ignores absence', () => {
-    expect(() => markPendingDeployEscalated({ overdeckHome: home })).not.toThrow();
-    recordDeployIntent({
+  it('marks an existing pending deploy as escalated and ignores absence', async () => {
+    await expect(markPendingDeployEscalated({ overdeckHome: home })).resolves.toBeUndefined();
+    await recordDeployIntent({
       requestedBy: 'agent-pan-3135',
       reason: 'Verification is running',
       blockedBy: ['PAN-10'],
     }, { overdeckHome: home });
 
-    markPendingDeployEscalated({ overdeckHome: home });
+    await markPendingDeployEscalated({ overdeckHome: home });
 
-    expect(readPendingDeploy({ overdeckHome: home })?.escalated).toBe(true);
+    await expect(readPendingDeploy({ overdeckHome: home })).resolves.toMatchObject({ escalated: true });
   });
 });

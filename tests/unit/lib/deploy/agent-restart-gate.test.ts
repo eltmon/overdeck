@@ -47,7 +47,7 @@ describe('agentRestartBlockReason', () => {
 
       await expect(agentRestartBlockReason({ initiator, force: false }, deps)).resolves.toBeNull();
       expectNoDependencyCalls(deps);
-      expect(readPendingDeploy()).toBeNull();
+      expect(await readPendingDeploy()).toBeNull();
     },
   );
 
@@ -56,7 +56,7 @@ describe('agentRestartBlockReason', () => {
 
     await expect(agentRestartBlockReason({ initiator: 'agent-pan-2772', force: true }, deps)).resolves.toBeNull();
     expectNoDependencyCalls(deps);
-    expect(readPendingDeploy()).toBeNull();
+    expect(await readPendingDeploy()).toBeNull();
   });
 
   it('queues a refused restart and explains its age and distinct verification blockers', async () => {
@@ -69,7 +69,7 @@ describe('agentRestartBlockReason', () => {
     });
 
     const result = await agentRestartBlockReason({ initiator: 'agent-pan-2772', force: false }, deps);
-    const queued = readPendingDeploy();
+    const queued = await readPendingDeploy();
 
     expect(queued).toEqual({
       requestedAt: '2026-07-26T12:00:00.000Z',
@@ -100,7 +100,7 @@ describe('agentRestartBlockReason', () => {
     });
     const result = await agentRestartBlockReason({ initiator: 'agent-z', force: false }, deps);
 
-    expect(readPendingDeploy()).toMatchObject({
+    expect(await readPendingDeploy()).toMatchObject({
       requestedAt: '2026-07-26T12:00:00.000Z',
       requestedBy: ['agent-a', 'agent-z'],
       blockedBy: ['PAN-10', 'PAN-20'],
@@ -119,7 +119,7 @@ describe('agentRestartBlockReason', () => {
       force: false,
     }, deps)).resolves.toBeNull();
     expect(deps.getFlywheelActiveRunId).not.toHaveBeenCalled();
-    expect(readPendingDeploy()).toBeNull();
+    expect(await readPendingDeploy()).toBeNull();
   });
 
   it('still blocks the flywheel while verification is in flight', async () => {
@@ -137,7 +137,7 @@ describe('agentRestartBlockReason', () => {
     expect(result).toContain('"Deployment deferred because verification is in flight for PAN-100."');
     expect(result).toContain('1 distinct verification: PAN-100');
     expect(result).toContain('do not retry or use --force');
-    expect(readPendingDeploy()?.requestedBy).toEqual(['flywheel-orchestrator']);
+    expect((await readPendingDeploy())?.requestedBy).toEqual(['flywheel-orchestrator']);
     expect(deps.getFlywheelActiveRunId).not.toHaveBeenCalled();
   });
 });
