@@ -50,17 +50,16 @@
     "recordedAt": "2026-07-26T17:50:09.960Z"
   },
   "created": "2026-07-26T17:26:24.283Z",
-  "updated": "2026-07-26T20:21:32.587Z",
+  "updated": "2026-07-26T20:21:35.156Z",
   "pipeline": {
     "issueId": "PAN-3147",
     "reviewStatus": "passed",
     "testStatus": "passed",
-    "verificationStatus": "passed",
     "mergeStatus": "merged",
     "releaseStatus": "skipped",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T17:53:11.161Z",
-    "updatedAt": "2026-07-26T20:04:40.264Z",
+    "updatedAt": "2026-07-26T20:21:35.131Z",
     "reviewNotes": "Review approved by Deacon fallback from completed reviewer reports",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3149",
     "lastVerifiedCommit": "f43c24ef38f9044256a187b58c3712d12d1694c2",
@@ -75,7 +74,9 @@
         "roles/flywheel.md"
       ],
       "recordedAt": "2026-07-26T17:50:09.960Z"
-    }
+    },
+    "closedOut": true,
+    "closedOutAt": "2026-07-26T20:21:35.131Z"
   },
   "closeOut": {
     "usage": {
@@ -159,7 +160,80 @@
     "merges": [
       "https://github.com/eltmon/overdeck/pull/3149"
     ],
-    "ranOn": "eltmon-z790"
+    "ranOn": "eltmon-z790",
+    "dodGate": {
+      "evaluatedAt": "2026-07-26T20:21:35.149Z",
+      "rows": [
+        {
+          "id": "review",
+          "num": 1,
+          "title": "Review passed",
+          "expected": "reviewStatus: passed",
+          "observed": "reviewStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "tests",
+          "num": 2,
+          "title": "Tests passed",
+          "expected": "testStatus: passed",
+          "observed": "testStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "verification",
+          "num": 3,
+          "title": "Verification green on the branch",
+          "expected": "verificationStatus: passed",
+          "observed": "verificationStatus: passed at f43c24ef38f9044256a187b58c3712d12d1694c2",
+          "status": "pass"
+        },
+        {
+          "id": "merged",
+          "num": 4,
+          "title": "Merged to main",
+          "expected": "PR merged on the forge, or branch work contained in main (non-PR landing)",
+          "observed": "Merge specialist confirmed merge completed; PR #3149 MERGED at 2026-07-26T20:04:21Z",
+          "status": "pass",
+          "mergedAt": "2026-07-26T20:04:21Z",
+          "mergeCommit": "dababfcb8f410c76ff091a5a8a0137dae517d678"
+        },
+        {
+          "id": "post-merge",
+          "num": 5,
+          "title": "Post-merge lifecycle ran",
+          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
+          "observed": "canonical state: verifying_on_main; no running work/planning agents",
+          "status": "pass"
+        },
+        {
+          "id": "main-verify",
+          "num": 6,
+          "title": "Verified on main",
+          "expected": "merged commit verified on main",
+          "observed": "no CI check-runs on merge commit dababfcb8f410c76ff091a5a8a0137dae517d678",
+          "status": "skip"
+        },
+        {
+          "id": "deploy",
+          "num": 7,
+          "title": "Deployed",
+          "expected": "live server build includes the merged commit",
+          "observed": "build commit 49e25319 contains merge dababfcb",
+          "status": "pass"
+        },
+        {
+          "id": "teardown",
+          "num": 8,
+          "title": "Close-out teardown verified",
+          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
+          "overridable": false,
+          "status": "pass",
+          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; Stopped TLDR daemon; Stopped Docker containers; Killed 4 orphaned process(es); Removed git worktree; Removed 8 agent state directories; No strike branch strike/pan-3147 found; Pruned 43 checkpoint ref(s) for agent-pan-3147, planning-pan-3147, strike-pan-3147; No specialist registry entries for PAN-3147"
+        }
+      ],
+      "accepted": []
+    }
   },
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
