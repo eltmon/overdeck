@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T20:52:58.018Z",
-  "updated": "2026-07-26T21:51:43.900Z",
+  "updated": "2026-07-26T21:51:59.697Z",
   "pipeline": {
     "issueId": "PAN-3162",
     "reviewStatus": "pending",
@@ -61,8 +61,16 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 12,
-    "claims": {},
+    "sequence": 13,
+    "claims": {
+      "merge-oracle-docs": {
+        "writerId": "agent-pan-3162",
+        "agentId": "agent-pan-3162",
+        "pid": 1404492,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T21:51:59.697Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3162",
@@ -187,6 +195,7 @@
     "ready-set-propagation-and-live-checkpoint": "completed",
     "ready-set-propagation-and-live-checkpoint.ready-set-propagation-and-live-checkpoint.ac1": "completed",
     "ready-set-propagation-and-live-checkpoint.ready-set-propagation-and-live-checkpoint.ac2": "completed",
-    "ready-set-propagation-and-live-checkpoint.ready-set-propagation-and-live-checkpoint.ac3": "completed"
+    "ready-set-propagation-and-live-checkpoint.ready-set-propagation-and-live-checkpoint.ac3": "completed",
+    "merge-oracle-docs": "running"
   }
 }
