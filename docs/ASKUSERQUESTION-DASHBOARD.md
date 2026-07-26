@@ -243,6 +243,22 @@ replacement carrying the same shape, so existing dedup and dismissed logic keeps
 working. `DecisionsPanel` groups by consequence (Blocking work / Waiting) rather
 than by kind, because that is what the operator triages on.
 
+### Issue context and self-contained questions
+
+The AUQ dialog, `DecisionsPanel`, and `SessionFeedSidebar` Needs-you rows render
+`<issueId> — <issue title>` through `formatIssueRef` in
+`src/dashboard/frontend/src/lib/issueLabel.ts`. The title is joined client-side
+from resolver-fed store issues; these surfaces do not read a tracker or store
+directly. An unbound subject omits the dialog's Issue cell instead of rendering
+the old `Unknown` placeholder.
+
+Agents receive the universal bundled rule
+`sync-sources/rules/ask-user-question-self-contained.md`, reinforced by the
+planning prompt, which requires each question to state the situation, the plain-
+language decision, and each option's consequence. The PreToolUse hook fires
+after the agent has written the question, so the question text itself must carry
+the context the operator needs without the transcript.
+
 ### The `agentTurnEnded` kind
 
 An agent that simply finished its turn is waiting on the operator just as surely
