@@ -101,6 +101,25 @@ otherwise                                                -> hold the current mod
 The governor's mode is module-level state, persisted across calls within the process — it is not
 recomputed from scratch each time, which is what makes the hold behavior possible.
 
+### Swap runway and PSI
+
+The governor composes three host signals into that single mode:
+
+- `MemAvailable` measures how much memory the kernel can allocate now.
+- `SwapFree` measures the remaining runway for an allocation burst. When free swap falls below
+  `governor_swap_soft_free_percent`, the governor enters `holding` even if RAM is above RECOVERY.
+- Memory Pressure Stall Information (PSI) `full avg10` measures how much time all runnable work spent
+  stalled on memory during the last ten seconds. Low swap upgrades from `holding` to `shedding` only
+  when `full avg10` reaches `governor_psi_full_shed_avg10`.
+
+Swap uses the same hysteresis latch as RAM. After the governor stops admitting, free swap must reach
+`governor_swap_recovery_free_percent` before the swap signal clears. Re-admission requires both
+`MemAvailable >= RECOVERY` and `SwapFree` at or above that recovery percentage, so a machine with
+healthy RAM but exhausted swap does not admit another workspace stack.
+
+A machine with `SwapTotal = 0` keeps the RAM-only behavior. If PSI is unavailable, low swap still
+holds admissions, but it cannot trigger shedding by itself; only the RAM HARD threshold can do that.
+
 ## Footprint budget
 
 Count-based caps (`max_work_agents`) don't bound gigabytes: the dominant RAM consumer for a work
@@ -334,11 +353,14 @@ the normalized in-process config uses the camelCase names shown in parentheses.
 | `governor_soft_reserve_gb` | `governorSoftReserveGb` | `max(15% of total RAM, 8 GiB)` | Below this, stop admitting. |
 | `governor_hard_reserve_gb` | `governorHardReserveGb` | `max(8% of total RAM, 4 GiB)` | Below this, start shedding. |
 | `governor_recovery_reserve_gb` | `governorRecoveryReserveGb` | `max(25% of total RAM, 12 GiB)` | Above this, resume admitting. Always normalized to exceed the SOFT reserve, even if misconfigured. |
+| `governor_swap_soft_free_percent` | `governorSwapSoftFreePercent` | `25` | Below this percentage of free swap, stop admitting. |
+| `governor_swap_recovery_free_percent` | `governorSwapRecoveryFreePercent` | `50` | Free-swap percentage required before re-admission. Always normalized above the swap SOFT percentage, up to 100. |
+| `governor_psi_full_shed_avg10` | `governorPsiFullShedAvg10` | `1` | With low swap, PSI `full avg10` at or above this value upgrades the mode to shedding. |
 | `governor_footprint_default_work_gb` | `governorFootprintDefaultWorkGb` | `2` | Cold-start footprint estimate for a work agent. |
 | `governor_footprint_default_review_gb` | `governorFootprintDefaultReviewGb` | `1` | Cold-start footprint estimate for a review agent. |
 | `governor_footprint_default_test_gb` | `governorFootprintDefaultTestGb` | `1` | Cold-start footprint estimate for a test agent. |
 
-Percentage defaults are computed once at process startup from `os.totalmem()`
+The RAM reserve defaults are computed once at process startup from `os.totalmem()`
 (`computeGovernorReserveDefaultsGb` in `src/lib/config-yaml/defaults.ts`) — they scale to the host,
 not a fixed constant. Every value can be overridden explicitly in `config.yaml`; an unset value
 always falls back to the documented default, never a silent inline literal.

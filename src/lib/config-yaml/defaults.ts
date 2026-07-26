@@ -210,6 +210,9 @@ export const DEFAULT_CONFIG: NormalizedConfig = {
     governorFootprintDefaultWorkGb: 2,
     governorFootprintDefaultReviewGb: 1,
     governorFootprintDefaultTestGb: 1,
+    governorSwapSoftFreePercent: 25,
+    governorSwapRecoveryFreePercent: 50,
+    governorPsiFullShedAvg10: 1,
   },
   issues: {
     closedWindowDays: 14,
