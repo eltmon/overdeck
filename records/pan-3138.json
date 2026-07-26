@@ -124,16 +124,16 @@
     "recordedAt": "2026-07-26T16:03:54.970Z"
   },
   "created": "2026-07-26T13:39:19.365Z",
-  "updated": "2026-07-26T16:03:54.971Z",
+  "updated": "2026-07-26T16:03:55.878Z",
   "pipeline": {
     "issueId": "PAN-3138",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T15:57:07.154Z",
+    "updatedAt": "2026-07-26T16:03:55.877Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3143",
     "lastVerifiedCommit": "f0a9c2b38faee0a59137c9b52a78bae5bafc1ae0",
     "reviewSpawnedAt": "2026-07-26T15:41:22.660Z",
@@ -175,8 +175,9 @@
         "tests/unit/lib/cloister/postmerge-cleanup-async.test.ts",
         "tests/unit/lib/review-status.test.ts"
       ],
-      "recordedAt": "2026-07-26T15:34:06.412Z"
-    }
+      "recordedAt": "2026-07-26T16:03:54.970Z"
+    },
+    "reviewRequestedAt": "2026-07-26T16:03:55.877Z"
   },
   "closeOut": {
     "usage": {
