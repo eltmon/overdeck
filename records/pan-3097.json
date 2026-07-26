@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T02:29:08.179Z",
-  "updated": "2026-07-26T02:54:42.083Z",
+  "updated": "2026-07-26T02:54:51.286Z",
   "pipeline": {
     "issueId": "PAN-3097",
     "reviewStatus": "pending",
@@ -54,8 +54,16 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 10,
-    "claims": {},
+    "sequence": 11,
+    "claims": {
+      "auq-self-contained-rule": {
+        "writerId": "agent-pan-3097",
+        "agentId": "agent-pan-3097",
+        "pid": 1958869,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T02:54:51.285Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3097",
@@ -156,6 +164,7 @@
     "sessionfeed-issue-title": "completed",
     "sessionfeed-issue-title.sessionfeed-issue-title.ac1": "completed",
     "sessionfeed-issue-title.sessionfeed-issue-title.ac2": "completed",
-    "sessionfeed-issue-title.sessionfeed-issue-title.ac3": "completed"
+    "sessionfeed-issue-title.sessionfeed-issue-title.ac3": "completed",
+    "auq-self-contained-rule": "running"
   }
 }
