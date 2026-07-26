@@ -186,10 +186,10 @@
     "recordedAt": "2026-07-26T14:50:39.957Z"
   },
   "created": "2026-07-26T12:26:09.908Z",
-  "updated": "2026-07-26T15:38:11.797Z",
+  "updated": "2026-07-26T15:42:01.168Z",
   "pipeline": {
     "issueId": "PAN-3111",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -197,8 +197,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T14:51:03.445Z",
-    "updatedAt": "2026-07-26T15:38:11.135Z",
-    "reviewNotes": "[correctness] Stale auto-start consent can release later planning cycles — `src/lib/cloister/autonomous-work-dispatch.ts:96`",
+    "updatedAt": "2026-07-26T15:42:01.123Z",
     "inspectNotes": "AC1-3 met at this tree state (bead work landed in a4c6729fa9; ec66e8f8 is a behavior-preserving extraction). AC1: agents-state-db.test.ts:92 round-trips 'operator:cli:pan-start' through state.json and the agents-table started_by column with getAgentStateSync returning it; verified both read paths (overdeck agent-state-sync.ts:175 and parseAgentState agent-state.ts:250) and confirmed the insert column list ('flywheel_run_id','started_by','cost_so_far') aligns positionally with the values array (state.flywheelRunId, state.startedBy, state.costSoFar) -- no off-by-one. AC2: resolveAgentStartedBy preserves the exact explicit ?? env ?? flywheel order, and the environmentToken default parameter is evaluated per call so env mutation is still observed; spawn-flywheel-provenance.test.ts covers explicit token, env-over-flywheel precedence, flywheel:<runId>, and undefined. AC3: schema-migrations.test.ts:71 adds started_by to a current-version agents table without throwing; both the currentVersion===SCHEMA_VERSION top-up and the <61 block apply it, and tryIdempotentDdl swallows duplicate-column. Non-blocking observation for the review convoy: this commit is line-count golf for a file ratchet (joining 'flywheel_run_id TEXT, started_by TEXT' onto one CREATE TABLE line, deleting two blank lines in runMigrations, compressing the OVERDECK_AGENT_COLUMNS comment and dropping its 0000_overdeck_init.sql reference) -- semantically inert, but shrinking declarations to fit a ratchet suppresses the growth signal the ratchet exists to surface.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3144",
     "lastVerifiedCommit": "39fbfc1be47a62ba7fc81ccb1f7573ea02b71321",
@@ -329,28 +328,6 @@
         "tests/unit/lib/pan-1908-no-loss-audit.test.ts"
       ],
       "recordedAt": "2026-07-26T14:50:39.957Z"
-    },
-    "reviewerVerdicts": {
-      "security": {
-        "status": "passed",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3111/.pan/review/agent-pan-3111-review-39fbfc1b/security.md",
-        "atCommit": "39fbfc1be47a62ba7fc81ccb1f7573ea02b71321"
-      },
-      "correctness": {
-        "status": "blocked",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3111/.pan/review/agent-pan-3111-review-39fbfc1b/correctness.md",
-        "atCommit": "39fbfc1be47a62ba7fc81ccb1f7573ea02b71321"
-      },
-      "performance": {
-        "status": "blocked",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3111/.pan/review/agent-pan-3111-review-39fbfc1b/performance.md",
-        "atCommit": "39fbfc1be47a62ba7fc81ccb1f7573ea02b71321"
-      },
-      "requirements": {
-        "status": "blocked",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3111/.pan/review/agent-pan-3111-review-39fbfc1b/requirements.md",
-        "atCommit": "39fbfc1be47a62ba7fc81ccb1f7573ea02b71321"
-      }
     }
   },
   "closeOut": {
@@ -398,24 +375,24 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 4887083,
-            "output": 445393,
-            "cacheRead": 305284608,
+            "input": 4918332,
+            "output": 448479,
+            "cacheRead": 309173248,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 13412376,
-          "output": 659979,
-          "cacheRead": 341754368,
+          "input": 13443625,
+          "output": 663065,
+          "cacheRead": 345643008,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 257.738434,
-        "pricingAsOf": "2026-07-26T15:38:11.141Z"
+        "usd": 259.931579,
+        "pricingAsOf": "2026-07-26T15:42:01.160Z"
       }
     },
     "merges": [
