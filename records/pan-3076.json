@@ -165,18 +165,19 @@
     "recordedAt": "2026-07-26T00:18:45.985Z"
   },
   "created": "2026-07-25T21:12:36.630Z",
-  "updated": "2026-07-26T00:53:18.677Z",
+  "updated": "2026-07-26T00:55:24.944Z",
   "pipeline": {
     "issueId": "PAN-3076",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "failed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T00:53:17.737Z",
+    "updatedAt": "2026-07-26T00:55:24.843Z",
     "reviewNotes": "Lint is red: PAN-3076 grows src/lib/review-status.ts from main's 1000 lines to 1006, violating the file-size gate",
+    "verificationNotes": "Verification FAILED at lint (90551ms):\n\n\n> @overdeck/core@0.45.24 lint\n> eslint src/ --ext .js,.ts,.tsx --no-inline-config && npm run lint:effect && npm run lint:permissions && npm run lint:state-writes && npm run lint:overdeck-boundaries && npm run lint:pipeline-membership && npm run lint:skills && npm run lint:slash-commands && npm run lint:prompts && npm run lint:prompt-trailer && npm run lint:file-size && npm run lint:source-introspection && npm run lint:no-coderabbit-merge-gate && npm run lint:circular && npm run lint:ratchet-audit && npm run lint:quarantine-audit\n\n\n> @overdeck/core@0.45.24 lint:effect\n> node scripts/check-effect-versions.mjs\n\n✓ Effect pinning OK — all effect/@effect/* on 4.0.0-beta.73, effect is a direct runtime dependency.\n\n> @overdeck/core@0.45.24 lint:permissions\n> bash scripts/lint-permissions.sh\n\n✓ permission-flag lint passed (no leaks or resolver omissions outside allowlist)\n\n> @overdeck/core@0.45.24 lint:state-writes\n> bash scripts/lint-state-writes.sh\n\n✓ state-write lint passed (single write surface intact)\n\n> @overdeck/core@0.45.24 lint:overdeck-boundaries\n> PAN_OVERDECK_BOUNDARY_LINT=1 bash scripts/lint-overdeck-boundaries.sh\n\n✓ overdeck boundary gate: zero consumers on the old database\n\n> @overdeck/core@0.45.24 lint:pipeline-membership\n> bash scripts/lint-pipeline-membership.sh\n\n✓ pipeline-membership boundary passed: six consumers delegate and durable lenses remain L5-free\n\n> @overdeck/core@0.45.24 prelint:skills\n> npm run build:contracts && npm run build:pi-extension && npm run build:ohmypi-extension && npm run build:cli\n\n\n> @overdeck/core@0.45.24 build:contracts\n> node scripts/fs-helper.mjs rmrf packages/contracts/dist && npm --prefix ./packages/contracts run build\n\n\n> @overdeck/contracts@0.45.24 build\n> cross-env NODE_OPTIONS=--max-old-space-size=16384 tsdown\n\nℹ tsdown v0.21.10 powered by rolldown v1.0.0-rc.17\nℹ config file: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3076/packages/contracts/tsdown.config.ts \nℹ entry: src/index.ts\nℹ tsconfig: tsconfig.json\nℹ \n…(38175 chars elided)…\n kB │ gzip:   0.10 kB\nℹ dist/records-backfill-C35Ut_iy.js                     0.11 kB │ gzip:   0.09 kB\nℹ dist/state-migrate-BSUUgRsh.js                        0.10 kB │ gzip:   0.09 kB\nℹ dist/src-CzKMRfE-.js                                  0.10 kB │ gzip:   0.10 kB\nℹ dist/flywheel-y8KYOkh1.js                             0.09 kB │ gzip:   0.09 kB\nℹ dist/search-DtybTWyh.js                               0.09 kB │ gzip:   0.09 kB\nℹ dist/sync-Be52tptl.js                                 0.08 kB │ gzip:   0.08 kB\nℹ dist/index.d.ts                                      69.79 kB │ gzip:  19.32 kB\nℹ dist/acp-host.d.ts                                   11.54 kB │ gzip:   2.46 kB\nℹ dist/codex-app-server-host.d.ts                       3.16 kB │ gzip:   1.09 kB\nℹ dist/pty-supervisor.d.ts                              1.53 kB │ gzip:   0.64 kB\nℹ dist/cli/index.d.ts                                   0.01 kB │ gzip:   0.03 kB\nℹ dist/lib/memory/fts-worker.d.ts                   \n...(truncated)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3082",
     "reviewedAtCommit": "f909f3d177827021a7b3463d93fadf30b252ceb4",
     "lastVerifiedCommit": "241e1f76bf1b9dd068e30765ff568e91a561488a",
@@ -195,9 +196,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 8704696,
-            "output": 151781,
-            "cacheRead": 36541440,
+            "input": 8726651,
+            "output": 159386,
+            "cacheRead": 38651392,
             "cacheWrite": 0
           }
         },
@@ -211,9 +212,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 5364561,
-            "output": 295623,
-            "cacheRead": 150046208,
+            "input": 5702843,
+            "output": 322844,
+            "cacheRead": 155861504,
             "cacheWrite": 0
           }
         }
@@ -226,9 +227,9 @@
           "cacheWrite": 200270
         },
         "openai/gpt-5.6-sol": {
-          "input": 14069257,
-          "output": 447404,
-          "cacheRead": 186587648,
+          "input": 14429494,
+          "output": 482230,
+          "cacheRead": 194512896,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -239,8 +240,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 188.958625,
-        "pricingAsOf": "2026-07-26T00:53:17.766Z"
+        "usd": 195.767214,
+        "pricingAsOf": "2026-07-26T00:55:24.889Z"
       }
     },
     "merges": [
