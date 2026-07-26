@@ -2,7 +2,7 @@
   "issueId": "PAN-3109",
   "schemaVersion": 2,
   "created": "2026-07-26T05:55:05.237Z",
-  "updated": "2026-07-26T05:55:05.237Z",
+  "updated": "2026-07-26T05:55:06.170Z",
   "pipeline": {
     "issueId": "PAN-3109",
     "reviewStatus": "pending",
@@ -25,5 +25,7 @@
       "note": "Planning session started for PAN-3109: DoD close-out gate blind to non-PR-path landings — merged row needs the membership resolver's branch-containment lens",
       "timestamp": "2026-07-26T05:55:05.237Z"
     }
-  ]
+  ],
+  "harness": "claude-code",
+  "model": "claude-fable-5"
 }
