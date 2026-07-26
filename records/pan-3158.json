@@ -22,7 +22,8 @@
   "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
-      "docs/FLYWHEEL-STATE.md"
+      "docs/FLYWHEEL-STATE.md",
+      "src/dashboard/frontend/src/components/AwaitingMergePage.test.tsx"
     ],
     "declaredScopeUntouched": [],
     "declaredScope": [
@@ -33,13 +34,14 @@
     "actualChangedFiles": [
       "docs/FLYWHEEL-STATE.md",
       "docs/UAT-BATCH-TRAINS.md",
+      "src/dashboard/frontend/src/components/AwaitingMergePage.test.tsx",
       "src/dashboard/frontend/src/components/merge-train/MergeTrainView.tsx",
       "src/dashboard/frontend/src/components/merge-train/__tests__/MergeTrainView.test.tsx"
     ],
-    "recordedAt": "2026-07-26T20:44:54.187Z"
+    "recordedAt": "2026-07-26T20:50:56.555Z"
   },
   "created": "2026-07-26T20:19:41.143Z",
-  "updated": "2026-07-26T20:50:49.638Z",
+  "updated": "2026-07-26T20:50:56.556Z",
   "pipeline": {
     "issueId": "PAN-3158",
     "reviewStatus": "failed",
