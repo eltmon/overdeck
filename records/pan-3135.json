@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T12:24:46.201Z",
-  "updated": "2026-07-26T13:23:05.141Z",
+  "updated": "2026-07-26T13:28:16.879Z",
   "pipeline": {
     "issueId": "PAN-3135",
     "reviewStatus": "pending",
@@ -61,16 +61,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 11,
-    "claims": {
-      "deploy-patrol-queue-integration": {
-        "writerId": "agent-pan-3135",
-        "agentId": "agent-pan-3135",
-        "pid": 2362780,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-26T13:23:05.141Z"
-      }
-    },
+    "sequence": 12,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3135",
@@ -126,6 +118,17 @@
         "outcome": "completed",
         "reason": "Agent restart refusals now register cumulative deploy intent, report queue age and distinct verification blockers, and tell agents to wait for automatic firing instead of retrying or forcing",
         "releasedAt": "2026-07-26T13:22:53.738Z"
+      },
+      {
+        "writerId": "agent-pan-3135",
+        "agentId": "agent-pan-3135",
+        "pid": 2362780,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T13:23:05.141Z",
+        "itemId": "deploy-patrol-queue-integration",
+        "outcome": "completed",
+        "reason": "Deploy patrol now fires queued deploys at the first debounce/CI/gate-clear boundary even with auto_deploy off, registers blocked automatic deploys, clears only after freshness, and exposes a 30-minute queue deadline config",
+        "releasedAt": "2026-07-26T13:28:16.878Z"
       }
     ],
     "statusReasons": {
@@ -148,6 +151,10 @@
       "restart-gate-queue-registration": {
         "reason": "Agent restart refusals now register cumulative deploy intent, report queue age and distinct verification blockers, and tell agents to wait for automatic firing instead of retrying or forcing",
         "updatedAt": "2026-07-26T13:22:53.738Z"
+      },
+      "deploy-patrol-queue-integration": {
+        "reason": "Deploy patrol now fires queued deploys at the first debounce/CI/gate-clear boundary even with auto_deploy off, registers blocked automatic deploys, clears only after freshness, and exposes a 30-minute queue deadline config",
+        "updatedAt": "2026-07-26T13:28:16.878Z"
       }
     }
   },
@@ -173,6 +180,11 @@
     "restart-gate-queue-registration.restart-gate-queue-registration.ac1": "completed",
     "restart-gate-queue-registration.restart-gate-queue-registration.ac2": "completed",
     "restart-gate-queue-registration.restart-gate-queue-registration.ac3": "completed",
-    "deploy-patrol-queue-integration": "running"
+    "deploy-patrol-queue-integration": "completed",
+    "deploy-patrol-queue-integration.deploy-patrol-queue-integration.ac1": "completed",
+    "deploy-patrol-queue-integration.deploy-patrol-queue-integration.ac2": "completed",
+    "deploy-patrol-queue-integration.deploy-patrol-queue-integration.ac3": "completed",
+    "deploy-patrol-queue-integration.deploy-patrol-queue-integration.ac4": "completed",
+    "deploy-patrol-queue-integration.deploy-patrol-queue-integration.ac5": "completed"
   }
 }
