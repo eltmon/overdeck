@@ -411,18 +411,19 @@
     "recordedAt": "2026-07-26T19:11:42.045Z"
   },
   "created": "2026-07-26T13:39:19.365Z",
-  "updated": "2026-07-26T19:20:24.539Z",
+  "updated": "2026-07-26T19:40:34.953Z",
   "pipeline": {
     "issueId": "PAN-3138",
     "reviewStatus": "passed",
-    "testStatus": "testing",
+    "testStatus": "passed",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": false,
+    "readyForMerge": true,
     "panDoneRecoveredAt": "2026-07-26T19:12:23.171Z",
-    "updatedAt": "2026-07-26T19:20:24.523Z",
+    "updatedAt": "2026-07-26T19:40:34.904Z",
     "reviewNotes": "Approved after cycle-8 convergence gate; current recovery changes have no blockers",
+    "testNotes": "No UAT required: PAN-3138 is a backend/infra fix (merge-time Docker devnet teardown, deacon reaper backstop, rebuild-stack terminal gate) with acceptance criteria verified entirely by mocked-Docker unit tests; PRD and issue have no UI/dashboard/browser wording. Gates run from workspace feature-pan-3138 at HEAD 5e0867c1823c974f31d83bbb2a8d4be80fe33f15 (matches reviewedAtCommit; review verdict APPROVED, cycle 8): bun install --frozen-lockfile clean; npm run typecheck pass (root tsc, hooks, evals, dashboard-types guard); frontend `npx tsc --noEmit` pass; npm run lint pass (eslint + effect/permissions/state-writes/overdeck-boundaries/pipeline-membership/skills/slash-commands/prompts/prompt-trailer/file-size/source-introspection/no-coderabbit/circular/ratchet-audit/quarantine-audit); npm run build pass; npm run build:dashboard:server:bundle pass. Full vitest suite (root, clean PATH): 1210 files / 11134 tests passed, 0 failed, 50 skipped. Frontend issueActions tests (parity/no-actions-lost): 51 passed. xBRIEF item-targeted tests all pass: tests/unit/lib/cloister/postmerge-cleanup-async.test.ts, src/lib/cloister/__tests__/closed-issue-reaper.test.ts, src/lib/workspace/__tests__/rebuild-stack.test.ts. Docs item verified: `grep -n postMergeLifecycle docs/WORKSPACE-CONTAINERS.md CLAUDE.md` shows the merge-time-teardown/close-out/reaper-backstop language. Investigated 10 initial full-suite failures (autoRevertMerge, installPreRebaseHook x2, auto-commit x2, record-update x2, dangerous-git-ops, merge-validation, pipeline-state-paths-contribution): zero diff on any of those files or dependencies vs main; root-caused to this test-agent's own git-guard PATH shim intercepting real `git reset --hard` subprocess calls inside test sandboxes; confirmed environmental by rerunning with PATH stripped of the shim, which turned all 10 green with no other change.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3143",
     "reviewedAtCommit": "5e0867c1823c974f31d83bbb2a8d4be80fe33f15",
@@ -552,6 +553,14 @@
             "cacheWrite": 0
           }
         },
+        "test": {
+          "anthropic/claude-sonnet-5": {
+            "input": 118,
+            "output": 18788,
+            "cacheRead": 10877376,
+            "cacheWrite": 223146
+          }
+        },
         "work": {
           "openai/gpt-5.6-sol": {
             "input": 9848229,
@@ -567,11 +576,17 @@
           "output": 1873029,
           "cacheRead": 675723264,
           "cacheWrite": 0
+        },
+        "anthropic/claude-sonnet-5": {
+          "input": 118,
+          "output": 18788,
+          "cacheRead": 10877376,
+          "cacheWrite": 223146
         }
       },
       "costAtCloseOut": {
-        "usd": 866.485047,
-        "pricingAsOf": "2026-07-26T19:20:24.530Z"
+        "usd": 869.406506,
+        "pricingAsOf": "2026-07-26T19:40:34.935Z"
       }
     },
     "merges": [
