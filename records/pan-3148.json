@@ -22,7 +22,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T17:27:17.644Z",
-  "updated": "2026-07-26T18:36:15.584Z",
+  "updated": "2026-07-26T18:38:12.750Z",
   "pipeline": {
     "issueId": "PAN-3148",
     "reviewStatus": "pending",
@@ -49,16 +49,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 9,
-    "claims": {
-      "work-prompt-run-id-guidance": {
-        "writerId": "agent-pan-3148",
-        "agentId": "agent-pan-3148",
-        "pid": 2045929,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-26T18:36:15.584Z"
-      }
-    },
+    "sequence": 10,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3148",
@@ -103,6 +95,17 @@
         "outcome": "completed",
         "reason": "Threaded deduplicated delivery outcomes through messageAgent, counted suppressed review-feedback deliveries per key, escalated exactly once on the second suppression, and reset only after a fresh delivery.",
         "releasedAt": "2026-07-26T18:36:02.182Z"
+      },
+      {
+        "writerId": "agent-pan-3148",
+        "agentId": "agent-pan-3148",
+        "pid": 2045929,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T18:36:15.584Z",
+        "itemId": "work-prompt-run-id-guidance",
+        "outcome": "completed",
+        "reason": "Documented that pushed fixes during BLOCKED review auto-trigger re-review, waiting for a new run ID is incorrect, and pan review request is the fallback.",
+        "releasedAt": "2026-07-26T18:38:12.750Z"
       }
     ],
     "statusReasons": {
@@ -121,6 +124,10 @@
       "escalate-suppressed-redelivery": {
         "reason": "Threaded deduplicated delivery outcomes through messageAgent, counted suppressed review-feedback deliveries per key, escalated exactly once on the second suppression, and reset only after a fresh delivery.",
         "updatedAt": "2026-07-26T18:36:02.182Z"
+      },
+      "work-prompt-run-id-guidance": {
+        "reason": "Documented that pushed fixes during BLOCKED review auto-trigger re-review, waiting for a new run ID is incorrect, and pan review request is the fallback.",
+        "updatedAt": "2026-07-26T18:38:12.750Z"
       }
     }
   },
@@ -146,6 +153,8 @@
     "escalate-suppressed-redelivery.escalate-suppressed-redelivery.ac2": "completed",
     "escalate-suppressed-redelivery.escalate-suppressed-redelivery.ac3": "completed",
     "escalate-suppressed-redelivery.escalate-suppressed-redelivery.ac4": "completed",
-    "work-prompt-run-id-guidance": "running"
+    "work-prompt-run-id-guidance": "completed",
+    "work-prompt-run-id-guidance.work-prompt-run-id-guidance.ac1": "completed",
+    "work-prompt-run-id-guidance.work-prompt-run-id-guidance.ac2": "completed"
   }
 }
