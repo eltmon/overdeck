@@ -167,6 +167,7 @@ async function createInitialFlywheelStatus(
       prsMerged: 0,
       awaitingUat: 0,
     },
+    scope: roleConfig.scope,
     activePipeline: [],
     substrateBugs: [],
     agents: [{
@@ -224,14 +225,17 @@ export async function startFlywheelRunForDashboard(options: StartOptions = {}): 
   const brief = await requireFlywheelBrief(cwd, options.brief ?? DEFAULT_BRIEF_PATH);
   const runId = await nextFlywheelRunId();
   const startedAt = new Date().toISOString();
+  // PAN-1696: resolve the role config first so the scope actually baked into the
+  // run prompt is recorded on the launch metadata in the same write.
+  const roleConfig = await resolveFlywheelRoleConfig();
   await writeFlywheelLaunchMetadata({
     version: 1,
     runId,
     workspace: cwd,
     briefPath: brief.absolutePath,
     briefDisplayPath: brief.displayPath,
+    scope: roleConfig.scope,
   });
-  const roleConfig = await resolveFlywheelRoleConfig();
   const agent = await spawnFlywheelAgent(runId, {
     briefPath: brief.absolutePath,
     workspace: cwd,
@@ -302,6 +306,12 @@ export async function resumeFlywheelRunForDashboard(): Promise<{ before: Flywhee
   }
   const brief = await requireFlywheelBrief(launch.workspace, launch.briefPath);
   const roleConfig = await resolveFlywheelRoleConfig();
+  // PAN-1696: resume re-bakes the CURRENTLY configured scope into the prompt, so
+  // the run is now operating under that value — record it, preserving the rest of
+  // the launch metadata.
+  if (launch.scope !== roleConfig.scope) {
+    await writeFlywheelLaunchMetadata({ ...launch, version: 1, scope: roleConfig.scope });
+  }
   const resumeSessionId = await loadResumeSessionId(before.activeRunId) ?? undefined;
   await spawnFlywheelAgent(before.activeRunId, {
     workspace: launch.workspace,

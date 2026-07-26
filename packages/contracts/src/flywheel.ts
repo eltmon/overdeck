@@ -22,6 +22,15 @@ export const FlywheelOrchestrator = Schema.Struct({
   ctxPercent: Schema.Number,
 })
 
+/**
+ * Which projects the Flywheel orchestrator inventories. PAN-1696: this is the
+ * ORCHESTRATOR's scope, not the merge/UAT trains' — those assemble per project
+ * independent of it. Mirrors FlywheelScope in src/lib/config-yaml/schema.ts.
+ */
+export type FlywheelScopeValue = 'pan-only' | 'all-tracked-projects'
+
+export const FlywheelScope = Schema.Literals(['pan-only', 'all-tracked-projects'])
+
 export interface FlywheelHeadline {
   bugsFixed: number
   swarmItemsMerged: number
@@ -249,6 +258,14 @@ export interface FlywheelStatus {
   system: FlywheelSystemStatus
   openQuestions: ReadonlyArray<string>
   orders?: FlywheelOrders | undefined
+  /**
+   * PAN-1696: the orchestrator scope this run was actually STARTED or RESUMED
+   * with, stamped server-side from the run's launch metadata. It is deliberately
+   * not the live settings value: scope is baked into the run prompt at spawn, so
+   * a settings change does not reach a running orchestrator until the next start
+   * or resume. Optional because runs recorded before PAN-1696 have none.
+   */
+  scope?: FlywheelScopeValue | undefined
   ticks: number
   lastTickAt: string
 }
@@ -269,6 +286,7 @@ export const FlywheelStatus = Schema.Struct({
   system: FlywheelSystemStatus,
   openQuestions: Schema.Array(Schema.String),
   orders: Schema.optional(FlywheelOrders),
+  scope: Schema.optional(FlywheelScope),
   ticks: Schema.Number,
   lastTickAt: Schema.String,
 })
