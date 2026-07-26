@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T12:25:26.814Z",
-  "updated": "2026-07-26T12:49:54.554Z",
+  "updated": "2026-07-26T12:53:22.281Z",
   "pipeline": {
     "issueId": "PAN-3123",
     "reviewStatus": "pending",
@@ -43,16 +43,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "governor-runway-config": {
-        "writerId": "agent-pan-3123",
-        "agentId": "agent-pan-3123",
-        "pid": 1230233,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-26T12:49:54.554Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3123",
@@ -64,12 +56,27 @@
         "outcome": "completed",
         "reason": "Added PSI avg10 parsing and Linux/Darwin snapshot fields with parser and fallback tests",
         "releasedAt": "2026-07-26T12:48:08.059Z"
+      },
+      {
+        "writerId": "agent-pan-3123",
+        "agentId": "agent-pan-3123",
+        "pid": 1230233,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T12:49:54.554Z",
+        "itemId": "governor-runway-config",
+        "outcome": "completed",
+        "reason": "Added normalized swap-free and PSI threshold config defaults, overrides, tests, and audited the schema crossing the 1000-line file-size ceiling",
+        "releasedAt": "2026-07-26T12:53:22.281Z"
       }
     ],
     "statusReasons": {
       "psi-snapshot-reader": {
         "reason": "Added PSI avg10 parsing and Linux/Darwin snapshot fields with parser and fallback tests",
         "updatedAt": "2026-07-26T12:48:08.059Z"
+      },
+      "governor-runway-config": {
+        "reason": "Added normalized swap-free and PSI threshold config defaults, overrides, tests, and audited the schema crossing the 1000-line file-size ceiling",
+        "updatedAt": "2026-07-26T12:53:22.281Z"
       }
     }
   },
@@ -78,6 +85,9 @@
     "psi-snapshot-reader.psi-snapshot-reader.ac1": "completed",
     "psi-snapshot-reader.psi-snapshot-reader.ac2": "completed",
     "psi-snapshot-reader.psi-snapshot-reader.ac3": "completed",
-    "governor-runway-config": "running"
+    "governor-runway-config": "completed",
+    "governor-runway-config.governor-runway-config.ac1": "completed",
+    "governor-runway-config.governor-runway-config.ac2": "completed",
+    "governor-runway-config.governor-runway-config.ac3": "completed"
   }
 }
