@@ -19,6 +19,7 @@ import {
   updateUatGenerationSync,
 } from '../overdeck/merge-sync.js';
 import type { GenerationGitDeps, GenerationStorePort } from './uat-generation-engine.js';
+import type { ResolvedProjectRepo } from '../project-repos.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -56,28 +57,46 @@ export function buildUatGenerationStore(): GenerationStorePort {
   };
 }
 
+export interface UatGenerationGitDepsOptions {
+  /**
+   * Root whose `workspaces/` directory may hold the worktree. Defaults to
+   * `projectRoot`. A polyrepo member repo runs git in its own git root but
+   * places its worktree under the WRAPPER project's `workspaces/`, so the two
+   * roots differ and the path check has to be told which one governs.
+   */
+  workspacesRoot?: string;
+  /** Branch the generation is cut from and merged back into. Defaults to `main`. */
+  targetBranch?: string;
+}
+
 /**
  * Git deps for one assembly run. The worktree path is bound on createWorktree
  * and reused by the merge/push operations that follow.
  */
-export function buildUatGenerationGitDeps(projectRoot: string): GenerationGitDeps {
+export function buildUatGenerationGitDeps(
+  projectRoot: string,
+  options: UatGenerationGitDepsOptions = {},
+): GenerationGitDeps {
   let worktreePath = '';
+  const workspacesRoot = options.workspacesRoot ?? projectRoot;
+  const targetBranch = options.targetBranch ?? 'main';
+  const originTarget = `origin/${targetBranch}`;
 
   return {
     fetchMain: async () => {
-      await runGit(['fetch', 'origin', 'main'], projectRoot);
-      const { stdout } = await runGit(['rev-parse', 'origin/main'], projectRoot);
+      await runGit(['fetch', 'origin', targetBranch], projectRoot);
+      const { stdout } = await runGit(['rev-parse', originTarget], projectRoot);
       return stdout.trim();
     },
 
     createWorktree: async (branchName, path) => {
       const safeBranch = safeBranchName(branchName, 'uat');
-      worktreePath = safeGenerationWorktreePath(projectRoot, path);
+      worktreePath = safeGenerationWorktreePath(workspacesRoot, path);
       // A leftover worktree at this path means a previous assembly of the SAME
       // name crashed mid-build (names are collision-checked) — reclaim it.
       await runGit(['worktree', 'remove', '--force', worktreePath], projectRoot).catch(() => {});
       await runGit(['worktree', 'prune'], projectRoot).catch(() => {});
-      await runGit(['worktree', 'add', '-B', safeBranch, worktreePath, 'origin/main'], projectRoot);
+      await runGit(['worktree', 'add', '-B', safeBranch, worktreePath, originTarget], projectRoot);
     },
 
     branchHeadSha: async (branch) => {
@@ -118,6 +137,36 @@ export function buildUatGenerationGitDeps(projectRoot: string): GenerationGitDep
       await runGit(['push', '-u', '--force-with-lease', 'origin', safeBranchName(branchName, 'uat')], worktreePath);
     },
   };
+}
+
+/**
+ * Per-repo git deps for a polyrepo assembly, keyed by repoKey (PAN-3093).
+ * Each repo runs git in its own root but writes its worktree under the wrapper
+ * project's `workspaces/`, and cuts from its own configured target branch.
+ */
+export function buildPolyrepoGitDeps(
+  repos: readonly ResolvedProjectRepo[],
+): Map<string, GenerationGitDeps> {
+  return new Map(
+    repos.map((repo) => [
+      repo.repoKey,
+      buildUatGenerationGitDeps(repo.repoPath, {
+        workspacesRoot: repo.projectPath,
+        targetBranch: repo.targetBranch,
+      }),
+    ]),
+  );
+}
+
+/**
+ * Union of uat/* branches across every member repo. A generation name collides
+ * if ANY member repo already has it, since the name is shared across repos.
+ */
+export async function listRemoteUatBranchesMulti(
+  repos: readonly ResolvedProjectRepo[],
+): Promise<string[]> {
+  const perRepo = await Promise.all(repos.map((repo) => listRemoteUatBranches(repo.repoPath)));
+  return [...new Set(perRepo.flat())];
 }
 
 /** Branch names currently present on origin under uat/* — naming collision input. */

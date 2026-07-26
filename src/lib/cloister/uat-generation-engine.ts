@@ -93,7 +93,9 @@ export interface GenerationStorePort {
   insert(gen: Omit<UatGeneration, 'createdAt' | 'updatedAt'>): void;
   update(
     name: string,
-    patch: Partial<Pick<UatGeneration, 'status' | 'baseSha' | 'members' | 'heldOut' | 'resolutions' | 'cleanedAt'>>,
+    // 'repos' is written only by the polyrepo engine; the monorepo path never
+    // sets it, so its generations keep reading back as a synthesized N=1 entry.
+    patch: Partial<Pick<UatGeneration, 'status' | 'baseSha' | 'members' | 'heldOut' | 'resolutions' | 'cleanedAt' | 'repos'>>,
   ): void;
   /** Existing generation names. */
   listNames(): string[];
