@@ -24,15 +24,7 @@
       "timestamp": "2026-07-26T20:40:41.461Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-26T20:40:41Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-3155\n\nDeploy row checks dashboard health before the missing-merge dependency, so row 7 still cascades a second miss when row 4 misses\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3155 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "tests/unit/dashboard/server/routes/issue-discussions.test.ts"
@@ -64,21 +56,21 @@
     "recordedAt": "2026-07-26T20:34:03.489Z"
   },
   "created": "2026-07-26T19:16:39.648Z",
-  "updated": "2026-07-26T20:40:57.846Z",
+  "updated": "2026-07-26T21:02:46.317Z",
   "pipeline": {
     "issueId": "PAN-3155",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T20:34:33.677Z",
-    "updatedAt": "2026-07-26T20:40:57.168Z",
+    "updatedAt": "2026-07-26T21:02:46.266Z",
     "reviewNotes": "Review dispatch skipped — already running: agent-pan-3155-review",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3160",
     "lastVerifiedCommit": "bd4a385669bbffd1723280ab898395c8a5428867",
-    "reviewSpawnedAt": "2026-07-26T20:36:32.504Z",
+    "reviewSpawnedAt": "2026-07-26T21:02:46.265Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "tests/unit/dashboard/server/routes/issue-discussions.test.ts"
@@ -123,24 +115,24 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 890780,
-            "output": 116504,
-            "cacheRead": 47741952,
+            "input": 1803475,
+            "output": 129075,
+            "cacheRead": 55757312,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 1843274,
-          "output": 184399,
-          "cacheRead": 55548928,
+          "input": 2755969,
+          "output": 196970,
+          "cacheRead": 63564288,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 42.522804,
-        "pricingAsOf": "2026-07-26T20:40:57.193Z"
+        "usd": 51.471089,
+        "pricingAsOf": "2026-07-26T21:02:46.275Z"
       }
     },
     "merges": [
