@@ -15,7 +15,7 @@ interface GitResult {
 export interface BuildFromOriginDeps {
   readonly runGit: (args: string[], cwd: string) => Promise<GitResult>;
   readonly installAndBuild: (cwd: string) => Promise<void>;
-  readonly swapDist: (repoRoot: string, buildWorktree: string) => Promise<void>;
+  readonly swapArtifacts: (repoRoot: string, buildWorktree: string) => Promise<void>;
   readonly removePath: (path: string) => Promise<void>;
   readonly note: (message: string) => void;
   readonly success: (message: string) => void;
@@ -99,39 +99,58 @@ async function runInstallAndBuild(cwd: string): Promise<void> {
   }
 }
 
-async function swapBuiltDist(repoRoot: string, buildWorktree: string): Promise<void> {
+async function renameIfPresent(from: string, to: string): Promise<boolean> {
+  try {
+    await fs.rename(from, to);
+    return true;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false;
+    throw error;
+  }
+}
+
+async function swapBuiltArtifacts(repoRoot: string, buildWorktree: string): Promise<void> {
   const incomingDist = join(repoRoot, 'dist.incoming');
   const currentDist = join(repoRoot, 'dist');
   const oldDist = join(repoRoot, `dist.old.${process.pid}`);
+  const incomingModules = join(repoRoot, 'node_modules.incoming');
+  const currentModules = join(repoRoot, 'node_modules');
+  const oldModules = join(repoRoot, `node_modules.old.${process.pid}`);
 
   await fs.rm(incomingDist, { recursive: true, force: true });
-  await fs.cp(join(buildWorktree, 'dist'), incomingDist, { recursive: true });
+  await fs.rm(incomingModules, { recursive: true, force: true });
   await fs.rm(oldDist, { recursive: true, force: true });
+  await fs.rm(oldModules, { recursive: true, force: true });
+  await fs.cp(join(buildWorktree, 'dist'), incomingDist, { recursive: true });
+  await fs.rename(join(buildWorktree, 'node_modules'), incomingModules);
 
   let movedOldDist = false;
+  let movedOldModules = false;
+  let installedDist = false;
+  let installedModules = false;
   try {
-    await fs.rename(currentDist, oldDist);
-    movedOldDist = true;
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
-  }
-
-  try {
+    movedOldDist = await renameIfPresent(currentDist, oldDist);
+    movedOldModules = await renameIfPresent(currentModules, oldModules);
     await fs.rename(incomingDist, currentDist);
+    installedDist = true;
+    await fs.rename(incomingModules, currentModules);
+    installedModules = true;
   } catch (error) {
-    if (movedOldDist) {
-      await fs.rename(oldDist, currentDist).catch(() => undefined);
-    }
+    if (installedDist) await fs.rm(currentDist, { recursive: true, force: true }).catch(() => undefined);
+    if (installedModules) await fs.rm(currentModules, { recursive: true, force: true }).catch(() => undefined);
+    if (movedOldDist) await fs.rename(oldDist, currentDist).catch(() => undefined);
+    if (movedOldModules) await fs.rename(oldModules, currentModules).catch(() => undefined);
     throw error;
   }
 
   await fs.rm(oldDist, { recursive: true, force: true });
+  await fs.rm(oldModules, { recursive: true, force: true });
 }
 
 const defaultDependencies: BuildFromOriginDeps = {
   runGit: runGitAsync,
   installAndBuild: runInstallAndBuild,
-  swapDist: swapBuiltDist,
+  swapArtifacts: swapBuiltArtifacts,
   removePath: (path) => fs.rm(path, { recursive: true, force: true }),
   note: (message) => console.warn(chalk.yellow(message)),
   success: (message) => console.log(chalk.green(message)),
@@ -157,17 +176,18 @@ export async function buildDashboardFromOriginMain(
   }
 
   const buildWorktree = join(dirname(repoRoot), `.pan-reload-build-${deps.processId}`);
-  await deps.runGit(['worktree', 'prune'], repoRoot);
   await deps.removePath(buildWorktree);
+  await deps.runGit(['worktree', 'prune'], repoRoot);
 
   try {
     await deps.runGit(['worktree', 'add', '--detach', buildWorktree, 'origin/main'], repoRoot);
     await deps.installAndBuild(buildWorktree);
-    await deps.swapDist(repoRoot, buildWorktree);
+    await deps.swapArtifacts(repoRoot, buildWorktree);
     deps.success(`✓ Built dashboard from origin/main ${originMainSha.slice(0, 12)}`);
   } finally {
     await deps.runGit(['worktree', 'remove', '--force', buildWorktree], repoRoot).catch(() => undefined);
     await deps.removePath(buildWorktree).catch(() => undefined);
     await deps.removePath(join(repoRoot, 'dist.incoming')).catch(() => undefined);
+    await deps.removePath(join(repoRoot, 'node_modules.incoming')).catch(() => undefined);
   }
 }

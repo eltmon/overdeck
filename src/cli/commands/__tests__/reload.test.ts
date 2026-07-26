@@ -424,8 +424,11 @@ describe('reloadCommand', () => {
     expect(mocks.spawn).toHaveBeenCalledWith('/usr/bin/bun', ['install'], expect.objectContaining({ cwd: buildWorktree }));
     expect(mocks.spawn).toHaveBeenCalledWith('npm', ['run', 'build'], expect.objectContaining({ cwd: buildWorktree }));
     expect(mocks.fsCp).toHaveBeenCalledWith(`${buildWorktree}/dist`, `${repoRoot}/dist.incoming`, { recursive: true });
+    expect(mocks.fsRename).toHaveBeenCalledWith(`${buildWorktree}/node_modules`, `${repoRoot}/node_modules.incoming`);
     expect(mocks.fsRename).toHaveBeenCalledWith(`${repoRoot}/dist`, `${repoRoot}/dist.old.${process.pid}`);
+    expect(mocks.fsRename).toHaveBeenCalledWith(`${repoRoot}/node_modules`, `${repoRoot}/node_modules.old.${process.pid}`);
     expect(mocks.fsRename).toHaveBeenCalledWith(`${repoRoot}/dist.incoming`, `${repoRoot}/dist`);
+    expect(mocks.fsRename).toHaveBeenCalledWith(`${repoRoot}/node_modules.incoming`, `${repoRoot}/node_modules`);
     expect(mocks.exec).toHaveBeenCalledWith(
       `git 'worktree' 'remove' '--force' '${buildWorktree}'`,
       expect.objectContaining({ cwd: repoRoot }),
