@@ -9,12 +9,14 @@ const mocks = vi.hoisted(() => ({
   completePendingOperation: vi.fn(),
   exec: vi.fn<[string, any?], Promise<{ stdout: string; stderr: string }>>(),
   execFile: vi.fn<[string, string[], any?], Promise<{ stdout: string; stderr: string }>>(),
+  existsSync: vi.fn(() => true),
   getPullRequestState: vi.fn(),
   mergeReviewArtifact: vi.fn(),
   messageAgent: vi.fn(),
   postMergeLifecycle: vi.fn(),
   rebaseFeatureBranch: vi.fn(),
   reviewStatus: {} as Record<string, unknown>,
+  sessionExists: vi.fn(),
   setReviewStatus: vi.fn(),
 }));
 
@@ -39,7 +41,7 @@ vi.mock('node:child_process', () => {
 
 vi.mock('node:fs', async importOriginal => ({
   ...await importOriginal<typeof import('node:fs')>(),
-  existsSync: vi.fn(() => true),
+  existsSync: mocks.existsSync,
 }));
 vi.mock('../../../../../lib/agents.js', () => ({
   getAgentState: vi.fn(() => Effect.succeed(null)),
@@ -96,7 +98,7 @@ vi.mock('../../../../../lib/review-status.js', () => ({
   markWorkspaceStuck: vi.fn(),
   setReviewStatusSync: vi.fn(),
 }));
-vi.mock('../../../../../lib/tmux.js', () => ({ sessionExists: vi.fn(() => Effect.succeed(false)) }));
+vi.mock('../../../../../lib/tmux.js', () => ({ sessionExists: mocks.sessionExists }));
 vi.mock('../../../../../lib/forge.js', () => ({
   getForgeAdapter: vi.fn(() => ({ commentOnArtifact: vi.fn(), mergeReviewArtifact: mocks.mergeReviewArtifact })),
 }));
@@ -134,10 +136,12 @@ describe('triggerMerge server rebase escalation', () => {
     vi.useFakeTimers();
     vi.clearAllMocks();
     mocks.reviewStatus = {};
+    mocks.existsSync.mockReturnValue(true);
     mocks.getPullRequestState.mockReturnValue(Effect.succeed(pullRequestState()));
     mocks.rebaseFeatureBranch.mockReturnValue(Effect.succeed({ success: true, newHead: HEAD_SHA }));
     mocks.mergeReviewArtifact.mockResolvedValue(undefined);
     mocks.messageAgent.mockResolvedValue({ delivered: true });
+    mocks.sessionExists.mockReturnValue(Effect.succeed(false));
     mocks.exec.mockImplementation(async (command) => ({
       stdout: command.includes('git rev-parse HEAD') ? `${HEAD_SHA}\n` : command.includes('git rev-parse origin/') ? 'old-head\n' : '',
       stderr: '',
@@ -151,6 +155,28 @@ describe('triggerMerge server rebase escalation', () => {
 
   afterEach(() => {
     vi.useRealTimers();
+  });
+
+  it('queues a retry without clearing verdict readiness when the local workspace is missing', async () => {
+    mocks.existsSync.mockReturnValue(false);
+
+    const result = await triggerMerge('PAN-3110');
+
+    expect(result).toEqual({
+      success: false,
+      statusCode: 500,
+      error: 'Workspace does not exist',
+      retryable: true,
+    });
+    expect(mocks.setReviewStatus).toHaveBeenCalledWith('PAN-3110', {
+      mergeStatus: 'queued',
+      mergeNotes: 'Workspace does not exist',
+    });
+    expect(mocks.setReviewStatus).not.toHaveBeenCalledWith(
+      'PAN-3110',
+      expect.objectContaining({ readyForMerge: false }),
+    );
+    expect(mocks.rebaseFeatureBranch).not.toHaveBeenCalled();
   });
 
   it('uses the server-side rebase for a behind branch without engaging the stopped agent', async () => {
@@ -195,6 +221,25 @@ describe('triggerMerge server rebase escalation', () => {
       mergeNotes: expect.stringContaining('stopped before completing the rebase'),
     }));
     expect(mocks.setReviewStatus).not.toHaveBeenCalledWith('PAN-3110', expect.objectContaining({ readyForMerge: false }));
+  });
+
+  it('queues a retry when a non-conflict rebase times out with the agent still running', async () => {
+    mocks.rebaseFeatureBranch.mockReturnValue(Effect.fail(new Error('git fetch failed')));
+    mocks.sessionExists.mockReturnValue(Effect.succeed(true));
+
+    const resultPromise = triggerMerge('PAN-3110');
+    await vi.advanceTimersByTimeAsync(30 * 60 * 1000);
+    const result = await resultPromise;
+
+    expect(result).toEqual(expect.objectContaining({ success: false, retryable: true }));
+    expect(mocks.setReviewStatus).toHaveBeenCalledWith('PAN-3110', expect.objectContaining({
+      mergeStatus: 'queued',
+      mergeNotes: expect.stringContaining('did not push the rebased branch within 30 minutes'),
+    }));
+    expect(mocks.setReviewStatus).not.toHaveBeenCalledWith(
+      'PAN-3110',
+      expect.objectContaining({ readyForMerge: false }),
+    );
   });
 
   it('keeps failing CI as a non-retryable content failure', async () => {

@@ -20,6 +20,12 @@ export async function shouldPreservePipelineVerdicts(
     if (status.reviewStatus !== 'passed' && status.reviewStatus !== 'skipped') {
       return { preserve: false, reason: `review is ${status.reviewStatus}` };
     }
+    if (status.testStatus !== 'passed') {
+      return { preserve: false, reason: `tests are ${status.testStatus}` };
+    }
+    if (status.verificationStatus !== 'passed') {
+      return { preserve: false, reason: `verification is ${status.verificationStatus ?? 'missing'}` };
+    }
 
     const verdict = await evaluateWorkspaceAnchorDrift(
       issueId,

@@ -5,6 +5,7 @@ import {
   markBlocked,
   markFailed,
   markMerged,
+  markMergingBlocked,
   requeueToPending,
   transitionToMerging,
   type PendingAutoMerge,
@@ -31,6 +32,7 @@ export interface AutoMergeExecutorDeps {
   isEligible?: (issueId: string) => Promise<AutoMergeEligibility>;
   transition?: (id: number) => boolean;
   markBlocked?: (id: number, reason: string) => boolean;
+  markMergingBlocked?: (id: number, reason: string) => boolean;
   markMerged?: (id: number) => boolean;
   markFailed?: (id: number, reason: string) => boolean;
   requeueToPending?: (id: number, nextScheduledMergeAt: string) => boolean;
@@ -134,8 +136,12 @@ export async function tickAutoMergeExecutor(deps: AutoMergeExecutorDeps = {}): P
         const retryCount = (deps.getMergeRetryCount ?? ((issueId) => getReviewStatusSync(issueId)?.mergeRetryCount ?? 0))(entry.issueId);
         if (retryCount >= FAILED_MERGE_MAX_RETRIES) {
           const blockedReason = `Auto-merge for ${entry.issueId} blocked: ${reason} (retried ${retryCount} times — fix the underlying cause and re-schedule)`;
-          (deps.markBlocked ?? markBlocked)(entry.id, blockedReason);
-          (deps.announceFailure ?? defaultAnnounceFailure)(entry.issueId, blockedReason);
+          const blocked = (deps.markMergingBlocked ?? markMergingBlocked)(entry.id, blockedReason);
+          if (blocked) {
+            (deps.announceFailure ?? defaultAnnounceFailure)(entry.issueId, blockedReason);
+          } else {
+            log(`[auto-merge] lost circuit-breaker block race for ${entry.issueId} (#${entry.id}), skipping announcement`);
+          }
         } else {
           const nextRetryCount = retryCount + 1;
           (deps.setMergeRetryCount ?? ((issueId, count) => setReviewStatusSync(issueId, { mergeRetryCount: count })))(entry.issueId, nextRetryCount);

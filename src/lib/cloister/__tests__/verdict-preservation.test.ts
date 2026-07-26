@@ -114,6 +114,21 @@ describe('shouldPreservePipelineVerdicts', () => {
     expect(mocks.evaluateWorkspaceAnchorDrift).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ['test', { testStatus: 'failed' as const }, 'tests are failed'],
+    ['test', { testStatus: 'pending' as const }, 'tests are pending'],
+    ['verification', { verificationStatus: 'failed' as const }, 'verification is failed'],
+    ['verification', { verificationStatus: 'pending' as const }, 'verification is pending'],
+  ])('resets verdicts without evaluating drift when %s has not passed', async (_gate, statusOverride, reason) => {
+    mocks.getReviewStatusSync.mockReturnValue(reviewStatus(statusOverride));
+
+    await expect(shouldPreservePipelineVerdicts('PAN-3110', '/workspace')).resolves.toEqual({
+      preserve: false,
+      reason,
+    });
+    expect(mocks.evaluateWorkspaceAnchorDrift).not.toHaveBeenCalled();
+  });
+
   it('fails closed when the preservation check throws', async () => {
     mocks.evaluateWorkspaceAnchorDrift.mockRejectedValue(new Error('git unavailable'));
 

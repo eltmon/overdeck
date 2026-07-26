@@ -87,9 +87,11 @@ The per-issue merge executor uses this order:
 
 A transient preparation failure returns `retryable: true` and writes
 `mergeStatus: queued`, so `readyForMerge` remains derivable from the passed
-review, test, and verification verdicts. Content failures such as red CI, a
-closed or draft PR, or unresolved conflicts remain non-retryable and set
-`mergeStatus: failed`.
+review, test, and verification verdicts. This includes a missing local
+monorepo workspace, a non-conflict server-side rebase failure, an agent that
+stops, and a live agent that times out without pushing. Content failures such
+as red CI, a closed or draft PR, or unresolved conflicts remain non-retryable
+and set `mergeStatus: failed`.
 
 Pipeline verdicts belong to reviewed code, not to an agent session. Starting a
 fresh or resumed work agent preserves earned verdicts while the current HEAD

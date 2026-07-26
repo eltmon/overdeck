@@ -493,15 +493,15 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
         };
       }
     }
-
-    if (!existsSync(workspacePath)) {
-      completePendingOperation(issueId, 'Workspace does not exist');
-      return { success: false, statusCode: 400, error: 'Workspace does not exist' };
-    }
-
     const projectConfig = findProjectByTeamSync(issuePrefix);
     const isPolyrepo = projectConfig?.workspace?.type === 'polyrepo';
-
+    if (!existsSync(workspacePath)) {
+      const error = 'Workspace does not exist';
+      const retryable = request.kind === 'normal' && !workspaceInfo.isRemote && !isPolyrepo;
+      if (retryable) setReviewStatus(issueId, { mergeStatus: 'queued', mergeNotes: error });
+      completePendingOperation(issueId, error);
+      return { success: false, statusCode: retryable ? 500 : 400, error, ...(retryable ? { retryable: true } : {}) };
+    }
     if (isPolyrepo && projectConfig?.workspace?.repos) {
       console.log(`[merge] Polyrepo detected for ${issueId}, coordinating merge set...`);
       const { getMergeSetSync, ensureMergeSetForIssueSync, upsertMergeSetSync, withRepoStateSync } = await import('../../../../lib/merge-set.js');

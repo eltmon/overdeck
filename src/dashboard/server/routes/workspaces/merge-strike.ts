@@ -314,7 +314,12 @@ export async function rebaseWithAgentFallback(options: {
         retryable: conflictFiles.length === 0,
       };
     }
-    return { success: false, reason: `Work agent did not push the rebased branch within ${timeoutMs / 60000} minutes`, conflictFiles };
+    return {
+      success: false,
+      reason: `Work agent did not push the rebased branch within ${timeoutMs / 60000} minutes`,
+      conflictFiles,
+      retryable: conflictFiles.length === 0,
+    };
   } catch (error: unknown) {
     const agentReason = error instanceof Error ? error.message : `Work agent ${agentId} could not be prepared for merge`;
     return {

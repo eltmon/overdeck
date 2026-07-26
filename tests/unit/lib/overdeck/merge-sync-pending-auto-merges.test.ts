@@ -19,6 +19,7 @@ import {
   markFailed,
   markBlocked,
   markMerged,
+  markMergingBlocked,
   requeueToPending,
 } from '../../../../src/lib/overdeck/merge-sync.js';
 
@@ -147,6 +148,27 @@ describe('markBlocked', () => {
     const row = db.prepare('SELECT status, failure_reason FROM pending_auto_merges WHERE id = ?').get(id) as any;
     expect(row.status).toBe('blocked');
     expect(row.failure_reason).toBe('CI failing');
+  });
+});
+
+describe('markMergingBlocked', () => {
+  it('marks merging → blocked and stores failure_reason', () => {
+    const db = odb.raw();
+    seedIssue(db, 'PAN-1');
+    const id = seedPendingAutoMerge(db, { issueId: 'PAN-1', status: 'merging' });
+
+    expect(markMergingBlocked(id, 'retry ceiling reached')).toBe(true);
+    const row = db.prepare('SELECT status, failure_reason FROM pending_auto_merges WHERE id = ?').get(id) as any;
+    expect(row.status).toBe('blocked');
+    expect(row.failure_reason).toBe('retry ceiling reached');
+  });
+
+  it('returns false if the row is not merging', () => {
+    const db = odb.raw();
+    seedIssue(db, 'PAN-1');
+    const id = seedPendingAutoMerge(db, { issueId: 'PAN-1', status: 'pending' });
+
+    expect(markMergingBlocked(id, 'retry ceiling reached')).toBe(false);
   });
 });
 
