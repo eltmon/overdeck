@@ -43,7 +43,23 @@ Live landmines a change in this repo can step on. Verified 2026-06-13.
 - **Polyrepo promote is resumable, not transactional** — phase A trial-merges
   every repo before anything is pushed, but a phase-B failure leaves earlier
   repos landed on purpose. Recovery is retry-with-skip via `promoted_at`; never
-  force-push or rewind a member repo's main (one-way door).
+  force-push or rewind a member repo's main (one-way door). A retry that finds
+  every repo landed must FINALIZE, not error — that is the crash window between
+  the last push and finalization.
+- **Read-only member repos are never UAT targets** (PAN-3093) — `required ===
+  false` (from `readonly: true`) is enforced in the ready set, in
+  `buildPolyrepoGitDeps`/`buildPolyrepoCleanupGit`, and re-checked against
+  current config at promote time. Assembly pushes branches, promote pushes
+  merges, and cleanup deletes remote branches, so every one of those is a write
+  boundary.
+- **Feature contributions carry the LOGICAL branch** (`feature/<issue>`), never
+  `origin/…` — `GenerationGitDeps` validates with `safeBranchName(…, 'feature')`
+  and resolves origin-first itself. Passing a remote-qualified ref makes every
+  merge throw and every feature get held out.
+- **Polyrepo assembly is feature-atomic** — a feature applies to all its repos
+  or none, rolled back with `checkout -B` to a captured head. Do NOT reintroduce
+  rebuild-and-replay: it is O(repos x features²) heavyweight git and can hold the
+  project's single-flight reconcile slot for hours.
 - **Single Deacon invariant** — never mount `~/.overdeck` into workspace
   containers; `OVERDECK_DISABLE_DEACON=1` belt-and-suspenders.
 - **Dashboard runtime** — Node 22 + built `dist/` only (node-pty native addon

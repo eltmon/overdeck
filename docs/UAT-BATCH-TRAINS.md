@@ -222,27 +222,41 @@ both sides can compute. Monorepo generations write no per-repo rows and read
 back as a single synthesized entry, so consumers loop `repos` without branching
 on project type.
 
-**A hold-out is global.** A feature that cannot be merged and resolved in *any*
-repo is held out of the whole generation — a tester must never see a feature
-half-applied across repos. Rather than excise an already-merged commit from the
-middle of a branch, assembly **replays**: it restarts with the remaining
-features. Each pass drops at least one feature, so the loop is bounded by the
-feature count. Contributing repos are recomputed per pass, so a repo left with
-nothing to carry after a hold-out is dropped rather than publishing an empty
-branch. The conflict hook runs per repo with `repoKey` in its context, naming
-the repo in its prompt and logs.
+**A hold-out is global, and applying a feature is atomic.** A feature that
+cannot be merged and resolved in *any* repo is held out of the whole generation
+— a tester must never see a feature half-applied across repos. Each feature is
+applied to every repo it contributes to or to none: assembly captures each
+target repo's head first, and if a later repo rejects the feature, the repos
+that already took it are re-pointed at that captured head (`checkout -B`, never
+`reset --hard`). Accepted features are never disturbed, so total git work stays
+linear in repos × features rather than the quadratic cost of rebuilding and
+replaying. A repo left carrying nothing after its features are held out gets no
+published branch. The conflict hook runs per repo with `repoKey` in its context,
+naming the repo in its prompt and logs.
+
+**Read-only repos are never targets.** A member repo configured `readonly: true`
+is excluded from the ready set before it is even probed, omitted from the git
+and cleanup deps, and re-checked against current config at promote time — a repo
+flipped read-only after assembly fails the promote closed rather than publishing
+part of the batch.
 
 **Promotion is two-phase and all-or-nothing.** Phase A validates and
 trial-merges every repo *without pushing*: per-repo target head, the same
 disjoint-movement stale-base rule applied per repo, then a no-ff merge committed
 locally in a throwaway worktree. Any failure discards every prepared worktree
 and returns with nothing published and the batch still promotable. Phase B
-publishes in merge order. A failure partway is **resumable, not rolled back** —
-undoing a landed merge would mean force-pushing a member repo's main, a one-way
-door. Each landed repo is stamped with `promoted_at`, the failure names landed
-vs pending repos, and a retry skips whatever already landed. Post-merge
-lifecycles fire only after *every* repo publishes, so a member is never handed
-off with part of its work unlanded.
+publishes in merge order, each repo into its own recorded `target_branch` —
+a repo configured for `develop` is fetched, trial-merged, and published there.
+A failure partway is **resumable, not rolled back** — undoing a landed merge
+would mean force-pushing a member repo's main, a one-way door. Each landed repo
+is stamped with `promoted_at` and its `merge_sha`, the failure names landed vs
+pending repos, and a retry skips whatever already landed. A retry that finds
+every repo already landed *finalizes* rather than erroring, which is what makes
+a crash between the last push and finalization recoverable. Post-merge
+lifecycles fire only after *every* repo publishes, and receive the per-repo
+merge commits as evidence — each verified inside its own repo against its own
+target branch, since a composite anchor is not a git ref and the wrapper is not
+a git repo.
 
 **Teardown covers every repo.** Cleanup removes each member repo's worktree and
 branch (local and remote), then the wrapper folder, and sweeps the generation
