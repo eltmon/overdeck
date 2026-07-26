@@ -22,15 +22,15 @@ function installScript(root: string): string {
   return scriptDest;
 }
 
-function writeBaseline(root: string, entries: Array<[number, string]>): void {
+function writeFileSizeAllowlist(root: string, entries: Array<[number, string]>): void {
   mkdirSync(join(root, 'scripts'), { recursive: true });
   writeFileSync(
-    join(root, 'scripts', 'file-size-baseline.txt'),
-    entries.map(([lines, path]) => `${lines} ${path}`).join('\n') + '\n',
+    join(root, 'scripts', 'file-size-allowlist.txt'),
+    entries.map(([lines, path]) => `${lines} ${path} # PAN-3116`).join('\n') + '\n',
   );
 }
 
-function writeAllowlist(root: string, paths: string[]): void {
+function writeEslintAllowlist(root: string, paths: string[]): void {
   writeFileSync(join(root, 'eslint-any-allowlist.json'), `${JSON.stringify(paths, null, 2)}\n`);
 }
 
@@ -48,8 +48,8 @@ function commitAll(root: string, message: string): string {
 function setupRepo(): string {
   const root = makeTempRepo();
   installScript(root);
-  writeBaseline(root, [[1200, 'src/base.ts']]);
-  writeAllowlist(root, ['src/legacy.ts']);
+  writeFileSizeAllowlist(root, [[1200, 'src/base.ts']]);
+  writeEslintAllowlist(root, ['src/legacy.ts']);
   commitAll(root, 'initial PAN-0000');
   return root;
 }
@@ -68,23 +68,23 @@ function runAudit(root: string, args: string[] = []): { ok: boolean; output: str
 }
 
 describe('lint-ratchet-audit.sh', () => {
-  it('fails range mode and names the commit when a baseline entry rises without an issue ref', () => {
+  it('fails range mode and names the commit when a file-size allowlist entry rises without an issue ref', () => {
     const root = setupRepo();
-    writeBaseline(root, [[1300, 'src/base.ts']]);
-    const commit = commitAll(root, 'raise baseline');
+    writeFileSizeAllowlist(root, [[1300, 'src/base.ts']]);
+    const commit = commitAll(root, 'raise file-size allowance');
 
     const result = runAudit(root, ['--range', 'HEAD~1..HEAD']);
 
     expect(result.ok).toBe(false);
     expect(result.output).toContain(commit.slice(0, 12));
-    expect(result.output).toContain('baseline raised: src/base.ts 1200 -> 1300');
+    expect(result.output).toContain('file-size allowlist raised: src/base.ts 1200 -> 1300');
     expect(result.output).toContain('must reference an issue');
   });
 
-  it('passes range mode when a baseline raise commit carries an issue ref', () => {
+  it('passes range mode when a file-size allowlist raise commit carries an issue ref', () => {
     const root = setupRepo();
-    writeBaseline(root, [[1300, 'src/base.ts']]);
-    commitAll(root, 'raise baseline PAN-123');
+    writeFileSizeAllowlist(root, [[1300, 'src/base.ts']]);
+    commitAll(root, 'raise file-size allowance PAN-123');
 
     const result = runAudit(root, ['--range', 'HEAD~1..HEAD']);
 
@@ -94,7 +94,7 @@ describe('lint-ratchet-audit.sh', () => {
 
   it('fails or passes allowlist additions based on whether the commit has an issue ref', () => {
     const refLessRoot = setupRepo();
-    writeAllowlist(refLessRoot, ['src/legacy.ts', 'src/new-any.ts']);
+    writeEslintAllowlist(refLessRoot, ['src/legacy.ts', 'src/new-any.ts']);
     const badCommit = commitAll(refLessRoot, 'add any allowlist');
 
     const refLess = runAudit(refLessRoot, ['--range', 'HEAD~1..HEAD']);
@@ -104,7 +104,7 @@ describe('lint-ratchet-audit.sh', () => {
     expect(refLess.output).toContain('allowlist added: src/new-any.ts');
 
     const refRoot = setupRepo();
-    writeAllowlist(refRoot, ['src/legacy.ts', 'src/new-any.ts']);
+    writeEslintAllowlist(refRoot, ['src/legacy.ts', 'src/new-any.ts']);
     commitAll(refRoot, 'add any allowlist #456');
 
     const withRef = runAudit(refRoot, ['--range', 'HEAD~1..HEAD']);
@@ -113,10 +113,10 @@ describe('lint-ratchet-audit.sh', () => {
     expect(withRef.output).toContain('ratchet audit passed');
   });
 
-  it('passes range mode for baseline lowerings and allowlist removals without issue refs', () => {
+  it('passes range mode for file-size allowlist lowerings and ESLint allowlist removals without issue refs', () => {
     const root = setupRepo();
-    writeBaseline(root, [[1100, 'src/base.ts']]);
-    writeAllowlist(root, []);
+    writeFileSizeAllowlist(root, [[1100, 'src/base.ts']]);
+    writeEslintAllowlist(root, []);
     commitAll(root, 'lower ratchets');
 
     const result = runAudit(root, ['--range', 'HEAD~1..HEAD']);
@@ -125,11 +125,11 @@ describe('lint-ratchet-audit.sh', () => {
     expect(result.output).toContain('ratchet audit passed');
   });
 
-  it('ignores malformed conflict-marker rows in the baseline', () => {
+  it('ignores malformed conflict-marker rows in the file-size allowlist', () => {
     const root = setupRepo();
     writeFileSync(
-      join(root, 'scripts', 'file-size-baseline.txt'),
-      '1200 src/base.ts\n<<<<<<< HEAD\n=======\n>>>>>>> feature/slot\n',
+      join(root, 'scripts', 'file-size-allowlist.txt'),
+      '1200 src/base.ts # PAN-3116\n<<<<<<< HEAD\n=======\n>>>>>>> feature/slot\n',
     );
     commitAll(root, 'accidental conflict markers');
 
@@ -141,8 +141,8 @@ describe('lint-ratchet-audit.sh', () => {
 
   it('last-commit mode audits the newest ratchet commit even when newer unrelated commits exist', () => {
     const root = setupRepo();
-    writeBaseline(root, [[1300, 'src/base.ts']]);
-    const ratchetCommit = commitAll(root, 'raise baseline');
+    writeFileSizeAllowlist(root, [[1300, 'src/base.ts']]);
+    const ratchetCommit = commitAll(root, 'raise file-size allowance');
     writeFileSync(join(root, 'README.md'), 'unrelated\n');
     commitAll(root, 'unrelated change');
 
@@ -150,14 +150,14 @@ describe('lint-ratchet-audit.sh', () => {
 
     expect(result.ok).toBe(false);
     expect(result.output).toContain(ratchetCommit.slice(0, 12));
-    expect(result.output).toContain('baseline raised: src/base.ts 1200 -> 1300');
+    expect(result.output).toContain('file-size allowlist raised: src/base.ts 1200 -> 1300');
   });
 
   it('warns and passes when a root commit touches a ratchet file', () => {
     const root = makeTempRepo();
     installScript(root);
-    writeBaseline(root, [[1200, 'src/base.ts']]);
-    writeAllowlist(root, ['src/legacy.ts']);
+    writeFileSizeAllowlist(root, [[1200, 'src/base.ts']]);
+    writeEslintAllowlist(root, ['src/legacy.ts']);
     const rootCommit = commitAll(root, 'root ratchet');
 
     const result = runAudit(root, ['--range', rootCommit]);
@@ -240,7 +240,7 @@ describe('lint-ratchet-audit.sh', () => {
     commitAll(root, 'feature work');
 
     execFileSync('git', ['checkout', 'master'], { cwd: root });
-    writeAllowlist(root, ['src/legacy.ts', 'src/main-added.ts']);
+    writeEslintAllowlist(root, ['src/legacy.ts', 'src/main-added.ts']);
     const mainTip = commitAll(root, 'main adds allowlist');
 
     execFileSync('git', ['checkout', 'feature'], { cwd: root });
