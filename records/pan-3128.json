@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T12:24:12.648Z",
-  "updated": "2026-07-26T12:58:09.970Z",
+  "updated": "2026-07-26T12:58:21.377Z",
   "pipeline": {
     "issueId": "PAN-3128",
     "reviewStatus": "pending",
@@ -61,8 +61,16 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 4,
-    "claims": {},
+    "sequence": 5,
+    "claims": {
+      "dod-row7-provenance-gate": {
+        "writerId": "agent-pan-3128",
+        "agentId": "agent-pan-3128",
+        "pid": 1473426,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T12:58:21.377Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3128",
@@ -109,6 +117,7 @@
     "stamp-build-provenance.stamp-build-provenance.ac1": "completed",
     "stamp-build-provenance.stamp-build-provenance.ac2": "completed",
     "stamp-build-provenance.stamp-build-provenance.ac3": "completed",
-    "stamp-build-provenance.stamp-build-provenance.ac4": "completed"
+    "stamp-build-provenance.stamp-build-provenance.ac4": "completed",
+    "dod-row7-provenance-gate": "running"
   }
 }
