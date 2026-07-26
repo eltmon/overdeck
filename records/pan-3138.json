@@ -15,8 +15,36 @@
     }
   ],
   "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      "scripts/file-size-baseline.txt"
+    ],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "CLAUDE.md",
+      "docs/WORKSPACE-CONTAINERS.md",
+      "src/lib/cloister/__tests__/closed-issue-reaper.test.ts",
+      "src/lib/cloister/closed-issue-reaper.ts",
+      "src/lib/cloister/merge-agent.ts",
+      "src/lib/workspace/__tests__/rebuild-stack.test.ts",
+      "src/lib/workspace/rebuild-stack.ts",
+      "tests/unit/lib/cloister/postmerge-cleanup-async.test.ts"
+    ],
+    "actualChangedFiles": [
+      "CLAUDE.md",
+      "docs/WORKSPACE-CONTAINERS.md",
+      "scripts/file-size-baseline.txt",
+      "src/lib/cloister/__tests__/closed-issue-reaper.test.ts",
+      "src/lib/cloister/closed-issue-reaper.ts",
+      "src/lib/cloister/merge-agent.ts",
+      "src/lib/workspace/__tests__/rebuild-stack.test.ts",
+      "src/lib/workspace/rebuild-stack.ts",
+      "tests/unit/lib/cloister/postmerge-cleanup-async.test.ts"
+    ],
+    "recordedAt": "2026-07-26T14:39:52.370Z"
+  },
   "created": "2026-07-26T13:39:19.365Z",
-  "updated": "2026-07-26T14:39:55.336Z",
+  "updated": "2026-07-26T14:39:59.217Z",
   "pipeline": {
     "issueId": "PAN-3138",
     "reviewStatus": "pending",
@@ -25,7 +53,8 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T14:39:55.335Z",
+    "updatedAt": "2026-07-26T14:39:58.754Z",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3143",
     "reviewRequestedAt": "2026-07-26T14:39:55.335Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -54,19 +83,36 @@
         "tests/unit/lib/cloister/postmerge-cleanup-async.test.ts"
       ],
       "recordedAt": "2026-07-26T14:39:52.370Z"
-    },
-    "prUrl": "https://github.com/eltmon/overdeck/pull/3143"
+    }
   },
   "closeOut": {
     "usage": {
-      "byStage": {},
-      "totals": {},
+      "byStage": {
+        "work": {
+          "openai/gpt-5.6-sol": {
+            "input": 1025769,
+            "output": 65414,
+            "cacheRead": 38477824,
+            "cacheWrite": 0
+          }
+        }
+      },
+      "totals": {
+        "openai/gpt-5.6-sol": {
+          "input": 1025769,
+          "output": 65414,
+          "cacheRead": 38477824,
+          "cacheWrite": 0
+        }
+      },
       "costAtCloseOut": {
-        "usd": 0,
-        "pricingAsOf": "2026-07-26T13:56:30.386Z"
+        "usd": 26.330177,
+        "pricingAsOf": "2026-07-26T14:39:58.815Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/3143"
+    ],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
@@ -156,33 +202,5 @@
     "docs-docker-teardown-lifecycle": "completed",
     "docs-docker-teardown-lifecycle.docs-docker-teardown-lifecycle.ac1": "completed",
     "docs-docker-teardown-lifecycle.docs-docker-teardown-lifecycle.ac2": "completed"
-  },
-  "scopeDrift": {
-    "outsideDeclaredScope": [
-      "scripts/file-size-baseline.txt"
-    ],
-    "declaredScopeUntouched": [],
-    "declaredScope": [
-      "CLAUDE.md",
-      "docs/WORKSPACE-CONTAINERS.md",
-      "src/lib/cloister/__tests__/closed-issue-reaper.test.ts",
-      "src/lib/cloister/closed-issue-reaper.ts",
-      "src/lib/cloister/merge-agent.ts",
-      "src/lib/workspace/__tests__/rebuild-stack.test.ts",
-      "src/lib/workspace/rebuild-stack.ts",
-      "tests/unit/lib/cloister/postmerge-cleanup-async.test.ts"
-    ],
-    "actualChangedFiles": [
-      "CLAUDE.md",
-      "docs/WORKSPACE-CONTAINERS.md",
-      "scripts/file-size-baseline.txt",
-      "src/lib/cloister/__tests__/closed-issue-reaper.test.ts",
-      "src/lib/cloister/closed-issue-reaper.ts",
-      "src/lib/cloister/merge-agent.ts",
-      "src/lib/workspace/__tests__/rebuild-stack.test.ts",
-      "src/lib/workspace/rebuild-stack.ts",
-      "tests/unit/lib/cloister/postmerge-cleanup-async.test.ts"
-    ],
-    "recordedAt": "2026-07-26T14:39:52.370Z"
   }
 }
