@@ -22,7 +22,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T08:56:03.309Z",
-  "updated": "2026-07-26T10:26:33.310Z",
+  "updated": "2026-07-26T10:31:41.285Z",
   "pipeline": {
     "issueId": "PAN-3115",
     "reviewStatus": "pending",
@@ -67,16 +67,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 9,
-    "claims": {
-      "service-reason-propagation": {
-        "writerId": "agent-pan-3115",
-        "agentId": "agent-pan-3115",
-        "pid": 1478157,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-26T10:26:33.306Z"
-      }
-    },
+    "sequence": 10,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3115",
@@ -121,6 +113,17 @@
         "outcome": "completed",
         "reason": "Added typed boundary wrappers for forge/tracker and spec lenses, converted missing config errors, preserved existing typed errors, and covered 404/spec/preflight cases.",
         "releasedAt": "2026-07-26T10:26:11.405Z"
+      },
+      {
+        "writerId": "agent-pan-3115",
+        "agentId": "agent-pan-3115",
+        "pid": 1478157,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T10:26:33.306Z",
+        "itemId": "service-reason-propagation",
+        "outcome": "completed",
+        "reason": "Snapshot refreshes now retain typed unavailable reasons, classify unknown failures as gather_failed, clear reasons after recovery, and return the reason through both snapshot read surfaces.",
+        "releasedAt": "2026-07-26T10:31:41.285Z"
       }
     ],
     "statusReasons": {
@@ -139,6 +142,10 @@
       "gather-forge-error-typing": {
         "reason": "Added typed boundary wrappers for forge/tracker and spec lenses, converted missing config errors, preserved existing typed errors, and covered 404/spec/preflight cases.",
         "updatedAt": "2026-07-26T10:26:11.405Z"
+      },
+      "service-reason-propagation": {
+        "reason": "Snapshot refreshes now retain typed unavailable reasons, classify unknown failures as gather_failed, clear reasons after recovery, and return the reason through both snapshot read surfaces.",
+        "updatedAt": "2026-07-26T10:31:41.285Z"
       }
     }
   },
@@ -160,6 +167,9 @@
     "gather-forge-error-typing.gather-forge-error-typing.ac2": "completed",
     "gather-forge-error-typing.gather-forge-error-typing.ac3": "completed",
     "gather-forge-error-typing.gather-forge-error-typing.ac4": "completed",
-    "service-reason-propagation": "running"
+    "service-reason-propagation": "completed",
+    "service-reason-propagation.service-reason-propagation.ac1": "completed",
+    "service-reason-propagation.service-reason-propagation.ac2": "completed",
+    "service-reason-propagation.service-reason-propagation.ac3": "completed"
   }
 }
