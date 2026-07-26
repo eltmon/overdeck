@@ -232,11 +232,24 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-26T04:01:18.683Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-26T04:05Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-26T04:05:37.730Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-26T04:05:37Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-1696\n\npan flywheel status remains active-run-only and queue-free, while the new cockpit toggle omits required CSRF headers and its focused component suite fails 6/6 tests.\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1696 -m \"Fixed review issues\"`"
+    }
+  ],
   "created": "2026-07-26T00:35:36.057Z",
-  "updated": "2026-07-26T04:05:37.047Z",
+  "updated": "2026-07-26T04:05:37.730Z",
   "pipeline": {
     "issueId": "PAN-1696",
     "reviewStatus": "blocked",
