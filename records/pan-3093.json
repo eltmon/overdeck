@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T12:33:18.311Z",
-  "updated": "2026-07-26T13:37:51.750Z",
+  "updated": "2026-07-26T13:54:37.421Z",
   "pipeline": {
     "issueId": "PAN-3093",
     "reviewStatus": "pending",
@@ -55,16 +55,8 @@
   "harness": "claude-code",
   "model": "claude-opus-5",
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "polyrepo-ready-set": {
-        "writerId": "agent-pan-3093",
-        "agentId": "agent-pan-3093",
-        "pid": 2958702,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-26T13:37:51.749Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3093",
@@ -87,6 +79,17 @@
         "outcome": "completed",
         "reason": "ConflictContext gains optional repoKey; prompt and log tag name the repo when present, byte-identical when absent. 3 new tests; engine tests unmodified.",
         "releasedAt": "2026-07-26T13:37:39.366Z"
+      },
+      {
+        "writerId": "agent-pan-3093",
+        "agentId": "agent-pan-3093",
+        "pid": 2958702,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T13:37:51.749Z",
+        "itemId": "polyrepo-ready-set",
+        "outcome": "completed",
+        "reason": "Added computePolyrepoMergeQueueFromCandidates with origin-first per-repo branch probing, repoContributions output, zero-contribution exclusion with logged reason, and repo-prefixed conflict prediction (hotspots applied pre-prefix). 12 new tests using a fake ChildProcessSpawner.",
+        "releasedAt": "2026-07-26T13:54:37.421Z"
       }
     ],
     "statusReasons": {
@@ -97,6 +100,10 @@
       "conflict-hook-repo-scope": {
         "reason": "ConflictContext gains optional repoKey; prompt and log tag name the repo when present, byte-identical when absent. 3 new tests; engine tests unmodified.",
         "updatedAt": "2026-07-26T13:37:39.366Z"
+      },
+      "polyrepo-ready-set": {
+        "reason": "Added computePolyrepoMergeQueueFromCandidates with origin-first per-repo branch probing, repoContributions output, zero-contribution exclusion with logged reason, and repo-prefixed conflict prediction (hotspots applied pre-prefix). 12 new tests using a fake ChildProcessSpawner.",
+        "updatedAt": "2026-07-26T13:54:37.421Z"
       }
     }
   },
@@ -108,6 +115,9 @@
     "conflict-hook-repo-scope": "completed",
     "conflict-hook-repo-scope.conflict-hook-repo-scope.ac1": "completed",
     "conflict-hook-repo-scope.conflict-hook-repo-scope.ac2": "completed",
-    "polyrepo-ready-set": "running"
+    "polyrepo-ready-set": "completed",
+    "polyrepo-ready-set.polyrepo-ready-set.ac1": "completed",
+    "polyrepo-ready-set.polyrepo-ready-set.ac2": "completed",
+    "polyrepo-ready-set.polyrepo-ready-set.ac3": "completed"
   }
 }
