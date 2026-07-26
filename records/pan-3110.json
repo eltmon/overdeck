@@ -22,7 +22,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T06:17:49.254Z",
-  "updated": "2026-07-26T10:57:55.355Z",
+  "updated": "2026-07-26T11:00:23.460Z",
   "pipeline": {
     "issueId": "PAN-3110",
     "reviewStatus": "pending",
@@ -67,16 +67,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 9,
-    "claims": {
-      "merge-recovery-docs": {
-        "writerId": "agent-pan-3110",
-        "agentId": "agent-pan-3110",
-        "pid": 2512751,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-26T10:57:55.355Z"
-      }
-    },
+    "sequence": 10,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3110",
@@ -121,6 +113,17 @@
         "outcome": "completed",
         "reason": "Retryable merge failures now requeue with backoff and retry-count persistence, then block with operator guidance at the circuit-breaker ceiling",
         "releasedAt": "2026-07-26T10:57:42.228Z"
+      },
+      {
+        "writerId": "agent-pan-3110",
+        "agentId": "agent-pan-3110",
+        "pid": 2512751,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T10:57:55.355Z",
+        "itemId": "merge-recovery-docs",
+        "outcome": "completed",
+        "reason": "Documented clean-direct/server-rebase/agent-conflict escalation, retryable queue semantics, circuit-breaker outcomes, and verdict preservation",
+        "releasedAt": "2026-07-26T11:00:23.455Z"
       }
     ],
     "statusReasons": {
@@ -139,6 +142,10 @@
       "auto-merge-executor-requeue": {
         "reason": "Retryable merge failures now requeue with backoff and retry-count persistence, then block with operator guidance at the circuit-breaker ceiling",
         "updatedAt": "2026-07-26T10:57:42.228Z"
+      },
+      "merge-recovery-docs": {
+        "reason": "Documented clean-direct/server-rebase/agent-conflict escalation, retryable queue semantics, circuit-breaker outcomes, and verdict preservation",
+        "updatedAt": "2026-07-26T11:00:23.455Z"
       }
     }
   },
@@ -165,6 +172,8 @@
     "auto-merge-executor-requeue.auto-merge-executor-requeue.ac2": "completed",
     "auto-merge-executor-requeue.auto-merge-executor-requeue.ac3": "completed",
     "auto-merge-executor-requeue.auto-merge-executor-requeue.ac4": "completed",
-    "merge-recovery-docs": "running"
+    "merge-recovery-docs": "completed",
+    "merge-recovery-docs.merge-recovery-docs.ac1": "completed",
+    "merge-recovery-docs.merge-recovery-docs.ac2": "completed"
   }
 }
