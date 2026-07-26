@@ -22,7 +22,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T08:56:03.309Z",
-  "updated": "2026-07-26T10:10:35.730Z",
+  "updated": "2026-07-26T10:17:04.719Z",
   "pipeline": {
     "issueId": "PAN-3115",
     "reviewStatus": "pending",
@@ -67,16 +67,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "gather-repo-preflight": {
-        "writerId": "agent-pan-3115",
-        "agentId": "agent-pan-3115",
-        "pid": 407637,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-26T10:10:35.730Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3115",
@@ -88,12 +80,27 @@
         "outcome": "completed",
         "reason": "Added the shared typed unavailable reason/body contract and gather error, with unit coverage; contracts build and root typecheck pass.",
         "releasedAt": "2026-07-26T10:09:15.191Z"
+      },
+      {
+        "writerId": "agent-pan-3115",
+        "agentId": "agent-pan-3115",
+        "pid": 407637,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T10:10:35.730Z",
+        "itemId": "gather-repo-preflight",
+        "outcome": "completed",
+        "reason": "Added git-toplevel preflight with realpath comparison so missing paths and unrelated parent repositories fail closed as repo_unavailable; added direct and integration fixture coverage.",
+        "releasedAt": "2026-07-26T10:17:04.718Z"
       }
     ],
     "statusReasons": {
       "typed-unavailable-contract": {
         "reason": "Added the shared typed unavailable reason/body contract and gather error, with unit coverage; contracts build and root typecheck pass.",
         "updatedAt": "2026-07-26T10:09:15.191Z"
+      },
+      "gather-repo-preflight": {
+        "reason": "Added git-toplevel preflight with realpath comparison so missing paths and unrelated parent repositories fail closed as repo_unavailable; added direct and integration fixture coverage.",
+        "updatedAt": "2026-07-26T10:17:04.718Z"
       }
     }
   },
@@ -102,6 +109,9 @@
     "typed-unavailable-contract.typed-unavailable-contract.ac1": "completed",
     "typed-unavailable-contract.typed-unavailable-contract.ac2": "completed",
     "typed-unavailable-contract.typed-unavailable-contract.ac3": "completed",
-    "gather-repo-preflight": "running"
+    "gather-repo-preflight": "completed",
+    "gather-repo-preflight.gather-repo-preflight.ac1": "completed",
+    "gather-repo-preflight.gather-repo-preflight.ac2": "completed",
+    "gather-repo-preflight.gather-repo-preflight.ac3": "completed"
   }
 }
