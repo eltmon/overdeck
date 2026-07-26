@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T19:16:39.648Z",
-  "updated": "2026-07-26T20:34:03.490Z",
+  "updated": "2026-07-26T20:34:05.955Z",
   "pipeline": {
     "issueId": "PAN-3155",
     "reviewStatus": "pending",
@@ -25,7 +25,39 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T19:41:17.753Z"
+    "updatedAt": "2026-07-26T20:34:05.953Z",
+    "reviewRequestedAt": "2026-07-26T20:34:05.953Z",
+    "scopeDrift": {
+      "outsideDeclaredScope": [
+        "tests/unit/dashboard/server/routes/issue-discussions.test.ts"
+      ],
+      "declaredScopeUntouched": [],
+      "declaredScope": [
+        "docs/DEFINITION-OF-DONE.md",
+        "src/lib/github-pr-lookup.ts",
+        "src/lib/lifecycle/dod-gate.ts",
+        "src/lib/lifecycle/dod.ts",
+        "src/lib/lifecycle/workflows.ts",
+        "src/lib/overdeck/pull-requests.ts",
+        "tests/unit/dashboard/server/routes/issue-pr.test.ts",
+        "tests/unit/lib/lifecycle/dod-gate.test.ts",
+        "tests/unit/lib/lifecycle/workflows.test.ts"
+      ],
+      "actualChangedFiles": [
+        "docs/DEFINITION-OF-DONE.md",
+        "src/lib/github-pr-lookup.ts",
+        "src/lib/lifecycle/dod-gate.ts",
+        "src/lib/lifecycle/dod.ts",
+        "src/lib/lifecycle/workflows.ts",
+        "src/lib/overdeck/pull-requests.ts",
+        "tests/unit/dashboard/server/routes/issue-discussions.test.ts",
+        "tests/unit/dashboard/server/routes/issue-pr.test.ts",
+        "tests/unit/lib/lifecycle/dod-gate.test.ts",
+        "tests/unit/lib/lifecycle/workflows.test.ts"
+      ],
+      "recordedAt": "2026-07-26T20:34:03.489Z"
+    },
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3160"
   },
   "closeOut": {
     "usage": {
