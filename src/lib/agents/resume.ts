@@ -119,7 +119,7 @@ export async function buildCompactRecoverySeed(agentId: string): Promise<{ seed:
   };
 }
 
-export async function resumeAgent(agentId: string, message?: string, opts?: { model?: string; harness?: RuntimeName; allowHost?: boolean; compact?: boolean; recoverGated?: boolean }): Promise<{ success: boolean; messageDelivered?: boolean; error?: string }> {
+export async function resumeAgent(agentId: string, message?: string, opts?: { model?: string; harness?: RuntimeName; allowHost?: boolean; compact?: boolean; recoverGated?: boolean; startedBy?: string }): Promise<{ success: boolean; messageDelivered?: boolean; error?: string }> {
   const normalizedId = normalizeAgentId(agentId);
   const requestedModel = normalizeModelOverrideSync(opts?.model);
   logAgentLifecycleSync(normalizedId, `resumeAgent called (message=${message ? 'yes' : 'no'}, harness=${opts?.harness || 'unchanged'})`);
@@ -307,6 +307,7 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
 
   try {
     const resumeStartedAt = new Date().toISOString();
+    if (opts?.startedBy) agentState.startedBy = opts.startedBy;
     // Clear ready signal before resuming (clean slate for PAN-87 fix)
     clearReadySignal(normalizedId);
 

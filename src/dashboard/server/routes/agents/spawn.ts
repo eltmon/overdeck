@@ -59,12 +59,12 @@ import {
   getProjectPath,
   invalidateAgentsCache,
   readJsonBody,
+  resolveRequestedStartedBy,
   spawnPanCommandDetached,
   updateRegistryForAgentStart,
   type AgentStartGateDecision,
 } from './shared.js';
 import { handleContainerOrchestration, handleRemoteAgentSpawn } from './spawn-helpers.js';
-
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 export function orderDispatchConflict(decision: OrderDispatchEligibility): {
@@ -233,6 +233,7 @@ export const postAgentsRoute = HttpRouter.add(
     const readModel = yield* ReadModelService;
 
     const { issueId, projectId } = body as any;
+    const startedBy = resolveRequestedStartedBy((body as any).startedBy);
     const autoStart = (body as any).auto === true;
     const guardrailAcknowledged = (body as any).guardrailAcknowledged === true;
     const offBook = (body as any).offBook === true;
@@ -793,7 +794,7 @@ export const postAgentsRoute = HttpRouter.add(
           agentSessionName,
           gate: gatesCommitted ? null : startGateBlock,
           initialState: initialAgentState,
-          spawn: () => spawnPanCommandDetached({ agentSessionName, issueId, role, workspacePath, args, cwd }),
+          spawn: () => spawnPanCommandDetached({ agentSessionName, issueId, role, workspacePath, args, cwd, env: { OVERDECK_AGENT_STARTED_BY: startedBy } }),
         }),
       );
       if (!admitted.check.decision.eligible || !admitted.result) {

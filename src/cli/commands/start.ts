@@ -706,6 +706,7 @@ export function resolveSpawnModel(
 }
 
 export async function issueCommand(id: string, options: IssueOptions): Promise<void> {
+  process.env['OVERDECK_AGENT_STARTED_BY'] ??= process.env['OVERDECK_FLYWHEEL_RUN_ID'] ? `flywheel:${process.env['OVERDECK_FLYWHEEL_RUN_ID']}` : 'operator:cli:pan-start';
   try {
     const model = normalizeModelOverrideSync(options.model);
     if (model) options.model = model;
@@ -715,7 +716,6 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     process.stderr.write(`${err instanceof Error ? err.message : String(err)}\n`);
     return exitCli(1);
   }
-
   if (!(await confirmHostOverride(options))) {
     return exitCli(1);
   }
@@ -872,9 +872,8 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
 
         spinner.text = `Starting ${resolvedPlanningMode} planning session for ${id}...`;
         if (options.model) {
-          // --model is the WORK model (already persisted to the issue record by
-          // applyStartPolicyOptions above) — the planning agent keeps the
-          // configured planning default unless --plan-model names one. Say so,
+          // --model is the persisted WORK model; planning keeps its configured
+          // default unless --plan-model names one. Say so,
           // because the pre-fix behavior silently handed the model to planning
           // instead.
           spinner.info(
@@ -897,6 +896,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
                 harness: options.harness,
                 effort: options.effort,
                 workspaceLocation: effectiveRemote ? 'remote' : 'local',
+                startedBy: process.env['OVERDECK_AGENT_STARTED_BY'],
               }),
             },
           );

@@ -73,6 +73,7 @@ export function buildStartPlanningBody(input: {
   harness?: string;
   effort?: string;
   workspaceLocation?: 'remote' | 'local';
+  startedBy?: string;
 }): string {
   return JSON.stringify({
     auto: input.auto,
@@ -83,6 +84,7 @@ export function buildStartPlanningBody(input: {
     harness: input.harness || undefined,
     effort: input.effort || undefined,
     workspaceLocation: input.workspaceLocation ?? 'local',
+    startedBy: input.startedBy || undefined,
   });
 }
 

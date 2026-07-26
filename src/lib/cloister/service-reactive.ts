@@ -325,6 +325,7 @@ async function resolveWorkspaceForIssue(issueId: string): Promise<string | null>
       const run = await spawnRun(normalizedIssueId, 'plan', {
         prompt: buildReactiveRolePrompt(normalizedIssueId, newState, 'plan'),
         model: decision.model,
+        startedBy: 'reactive-lifecycle',
       });
       const message = `${normalizedIssueId}: ${role} role started from lifecycle state '${newState}' as ${run.id}`;
       console.log(`[cloister] ${message}`);
@@ -352,6 +353,7 @@ async function resolveWorkspaceForIssue(issueId: string): Promise<string | null>
 
     const run = await spawnRun(normalizedIssueId, role, {
       prompt: buildReactiveRolePrompt(normalizedIssueId, newState, role),
+      startedBy: 'reactive-lifecycle',
     });
     const message = `${normalizedIssueId}: ${role} role started from lifecycle state '${newState}' as ${run.id}`;
     console.log(`[cloister] ${message}`);

@@ -273,7 +273,7 @@ export async function spawnWorkAgentThroughAgentsEndpoint(issueId: string, dashb
       origin: dashboardOrigin,
       ...(internalToken ? { [INTERNAL_TOKEN_HEADER]: internalToken } : {}),
     },
-    body: JSON.stringify({ issueId, role: 'work' }),
+    body: JSON.stringify({ issueId, role: 'work', startedBy: 'orphan-proposed-reconciler' }),
   });
   const body = await response.json().catch(() => ({})) as Record<string, unknown>;
   const agentId = typeof body['agentId'] === 'string' ? body['agentId'] : `agent-${issueId.toLowerCase()}`;
@@ -320,6 +320,7 @@ export async function triggerRebuildAndStart(
         origin: dashboardOrigin,
         ...(internalToken ? { [INTERNAL_TOKEN_HEADER]: internalToken } : {}),
       },
+      body: JSON.stringify({ startedBy: 'workspace-rebuild-recovery' }),
     },
   );
   const body = await response.json().catch(() => ({})) as Record<string, unknown>;

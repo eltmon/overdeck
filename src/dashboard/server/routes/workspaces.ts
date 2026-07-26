@@ -489,6 +489,7 @@ export function spawnPanCommand(
      * streaming into the same activity. Used by the rebuild-and-start route to
      * chain `pan start` after a successful `pan workspace rebuild`. */
     chainOnSuccess?: ChainPanOnSuccess;
+    env?: NodeJS.ProcessEnv;
   },
 ): string {
   const activityId = Date.now().toString();
@@ -527,7 +528,7 @@ export function spawnPanCommand(
     }
   };
 
-  const child = spawnPanCli(args, { cwd: cwd || process.cwd(), detached: true, stdio: ['ignore', 'pipe', 'pipe'] });
+  const child = spawnPanCli(args, { cwd: cwd || process.cwd(), detached: true, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, ...options?.env } });
   attachPanOutputStreams(child, activityId);
 
   child.on('close', (code) => {
@@ -541,7 +542,7 @@ export function spawnPanCommand(
         });
       }
       appendActivityOutput(activityId, `--- ${chain.phaseLabel} ---`);
-      const next = spawnPanCli(chain.args, { cwd: cwd || process.cwd(), detached: true, stdio: ['ignore', 'pipe', 'pipe'] });
+      const next = spawnPanCli(chain.args, { cwd: cwd || process.cwd(), detached: true, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, ...options?.env } });
       attachPanOutputStreams(next, activityId);
       next.on('close', (nextCode) => finalize(nextCode, `pan ${chain.args.join(' ')}`));
     } else {
@@ -972,18 +973,15 @@ const postWorkspaceRebuildRoute = HttpRouter.add(
   }))
 );
 
-// ─── Route: POST /api/workspaces/:issueId/rebuild-and-start ──────────────────
-// Recovery action for the `stack-unhealthy` work-agent spawn block: rebuild the
-// workspace's Docker stack, then spawn the work agent once the stack is healthy.
-// Fire-and-forget like the rebuild-stack route, but chains `pan start` after a
-// successful `pan workspace rebuild` under a single activityId so the dashboard
-// streams both phases as one operation.
+// Recovery route: rebuild an unhealthy stack, then chain `pan start` into the same activity.
 const postWorkspaceRebuildAndStartRoute = HttpRouter.add(
   'POST',
   '/api/workspaces/:issueId/rebuild-and-start',
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
+    const body = yield* readJsonBody;
     const issueId = params['issueId'] ?? '';
+    const startedBy = typeof body.startedBy === 'string' && body.startedBy.trim() ? body.startedBy.trim() : 'operator:dashboard';
     if (!parseIssueIdSync(issueId)) {
       return jsonResponse({ error: 'Invalid issue ID' }, { status: 400 });
     }
@@ -1000,6 +998,7 @@ const postWorkspaceRebuildAndStartRoute = HttpRouter.add(
           args: ['start', issueId],
           phaseLabel: `Stack rebuilt — starting agent for ${issueId.toUpperCase()}`,
         },
+        env: { OVERDECK_AGENT_STARTED_BY: startedBy },
       },
     );
     return jsonResponse({

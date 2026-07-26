@@ -16,6 +16,7 @@ export interface DetachedPanCommandInput {
   workspacePath: string;
   args: string[];
   cwd?: string;
+  env?: NodeJS.ProcessEnv;
   activityId?: string;
 }
 
@@ -102,6 +103,7 @@ export async function launchPanCommandDetached(
     cwd,
     detached: true,
     stdio: ['ignore', spawnLogHandle.fd, spawnLogHandle.fd],
+    env: { ...process.env, ...input.env },
   });
 
   let spawned = false;

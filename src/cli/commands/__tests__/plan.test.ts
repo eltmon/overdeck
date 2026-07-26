@@ -21,6 +21,8 @@ describe('planCommand', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    delete process.env['OVERDECK_AGENT_STARTED_BY'];
+    delete process.env['OVERDECK_FLYWHEEL_RUN_ID'];
     spinner.text = '';
     global.fetch = vi.fn(async () => ({
       ok: true,
@@ -53,6 +55,7 @@ describe('planCommand', () => {
     expect(body).toMatchObject({
       auto: true,
       autoStart: true,
+      startedBy: 'operator:cli:pan-plan',
     });
     expect(consoleWarnSpy).toHaveBeenCalledWith(
       expect.stringContaining('--auto-start is deprecated'),
@@ -61,6 +64,16 @@ describe('planCommand', () => {
       expect.stringContaining('pan start'),
     );
     consoleWarnSpy.mockRestore();
+  });
+
+  it('stamps flywheel planning provenance when a run id is inherited', async () => {
+    process.env['OVERDECK_FLYWHEEL_RUN_ID'] = 'RUN-81';
+    const { planCommand } = await import('../plan.js');
+
+    await planCommand('PAN-123', { auto: true });
+
+    const body = JSON.parse((global.fetch as any).mock.calls[0][1].body);
+    expect(body.startedBy).toBe('flywheel:RUN-81');
   });
 
   it('sends probe when --probe is provided', async () => {

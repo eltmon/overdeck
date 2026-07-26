@@ -130,6 +130,15 @@ describe('buildPlanningAgentState', () => {
     });
   });
 
+  it('persists planning start provenance', () => {
+    expect(buildPlanningAgentState({
+      ...baseState,
+      startedBy: 'flywheel:RUN-81',
+    })).toMatchObject({
+      startedBy: 'flywheel:RUN-81',
+    });
+  });
+
   it('persists autoSpawnOnFinalize when requested', () => {
     expect(buildPlanningAgentState({
       ...baseState,

@@ -403,7 +403,11 @@ describe('completePlanningArtifacts', () => {
         origin: 'http://127.0.0.1:3011',
         [INTERNAL_TOKEN_HEADER]: 'test-internal-token',
       });
-      expect(JSON.parse(String(init?.body))).toEqual({ issueId: 'PAN-1146', role: 'work' });
+      expect(JSON.parse(String(init?.body))).toEqual({
+        issueId: 'PAN-1146',
+        role: 'work',
+        startedBy: 'planning-auto-handoff',
+      });
       return new Response(JSON.stringify({ success: true, agentId: 'agent-pan-1146' }), { status: 200 });
     };
 
@@ -492,6 +496,7 @@ describe('completePlanningArtifacts', () => {
           stackHealth: { healthy: false, reasons: ['no containers found'] },
         }), { status: 422 });
       }
+      expect(JSON.parse(String(init?.body))).toEqual({ startedBy: 'planning-auto-handoff' });
       return new Response(JSON.stringify({ success: true, activityId: 'activity-rebuild' }), { status: 200 });
     };
 

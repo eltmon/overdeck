@@ -173,6 +173,8 @@ export interface SpawnPlanningOptions {
   probe?: boolean;
   /** Automatically start the work agent after finalize; stamped by trusted callers only. */
   autoSpawnOnFinalize?: boolean;
+  /** Origin token for the planning agent state. */
+  startedBy?: string;
   /** Optional callback for streaming progress events to the client. */
   onProgress?: (event: PlanningProgress) => void;
 }
@@ -191,6 +193,7 @@ export interface PlanningAgentStateInput {
   workspaceLocation: 'local' | 'remote';
   auto?: boolean;
   autoSpawnOnFinalize?: boolean;
+  startedBy?: string;
   startedAt?: string;
 }
 
@@ -207,6 +210,7 @@ export function buildPlanningAgentState(input: PlanningAgentStateInput): Record<
     location: input.workspaceLocation,
     auto: input.auto === true,
     autoSpawnOnFinalize: input.autoSpawnOnFinalize === true,
+    startedBy: input.startedBy,
   };
 }
 
@@ -479,7 +483,7 @@ export async function resolvePlanningSessionHarness(planningModel: string, expli
  * is sent. It updates agent state to 'running' on success or 'failed' on error.
  */
 export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<SpawnPlanningResult> {
-  const { issue, workspacePath, projectPath, sessionName, workspaceLocation, startDocker, shadowMode, model: modelOverride, effort, auto, probe, autoSpawnOnFinalize, onProgress } = opts;
+  const { issue, workspacePath, projectPath, sessionName, workspaceLocation, startDocker, shadowMode, model: modelOverride, effort, auto, probe, autoSpawnOnFinalize, startedBy, onProgress } = opts;
   const issueLower = issue.identifier.toLowerCase();
   const agentStateDir = join(homedir(), '.overdeck', 'agents', sessionName);
 
@@ -745,6 +749,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
         role: 'plan',
         harness: effectiveHarness,
         auto: auto === true,
+        startedBy,
       });
       if (autoSpawnOnFinalize) {
         await writeFile(

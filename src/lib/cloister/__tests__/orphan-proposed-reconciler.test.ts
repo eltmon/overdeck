@@ -721,7 +721,11 @@ describe('orphan proposed spec reconciler', () => {
       origin: 'http://127.0.0.1:3011',
       [INTERNAL_TOKEN_HEADER]: 'test-internal-token',
     });
-    expect(JSON.parse(String(init?.body))).toEqual({ issueId: 'PAN-3301', role: 'work' });
+    expect(JSON.parse(String(init?.body))).toEqual({
+      issueId: 'PAN-3301',
+      role: 'work',
+      startedBy: 'orphan-proposed-reconciler',
+    });
   });
 
   it('classifies unauthorized spawn responses explicitly', async () => {
@@ -750,6 +754,7 @@ describe('orphan proposed spec reconciler', () => {
       origin: 'http://127.0.0.1:3011',
       [INTERNAL_TOKEN_HEADER]: 'test-internal-token',
     });
+    expect(JSON.parse(String(init?.body))).toEqual({ startedBy: 'workspace-rebuild-recovery' });
   });
 
   it('reports a failed rebuild-and-start without throwing', async () => {

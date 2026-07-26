@@ -347,7 +347,7 @@ export async function completePlanningAutoSpawn(options: {
         origin: dashboardOrigin,
         ...internalTokenHeaders,
       },
-      body: JSON.stringify({ issueId: options.issueId, role: 'work' }),
+      body: JSON.stringify({ issueId: options.issueId, role: 'work', startedBy: 'planning-auto-handoff' }),
     });
 
     const body = await response.json().catch(() => ({})) as Record<string, unknown>;
@@ -371,7 +371,8 @@ export async function completePlanningAutoSpawn(options: {
         new URL(`/api/workspaces/${encodeURIComponent(options.issueId)}/rebuild-and-start`, dashboardOrigin),
         {
           method: 'POST',
-          headers: { origin: dashboardOrigin, ...internalTokenHeaders },
+          headers: { 'content-type': 'application/json', origin: dashboardOrigin, ...internalTokenHeaders },
+          body: JSON.stringify({ startedBy: 'planning-auto-handoff' }),
         },
       );
       const recoveryBody = await recovery.json().catch(() => ({})) as Record<string, unknown>;

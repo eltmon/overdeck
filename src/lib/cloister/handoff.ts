@@ -142,6 +142,7 @@ async function performKillAndSpawn(
       role: 'work',
       prompt,
       allowHost: state.hostOverride === true,
+      startedBy: 'handoff',
     });
 
     // Preserve accumulated cost without reintroducing legacy phase/complexity routing fields.

@@ -146,6 +146,7 @@ export function startPlanningForIssue(options: {
       probe = false,
       harness = 'claude-code',
     } = body as any;
+    const startedBy = typeof body.startedBy === 'string' && body.startedBy.trim() ? body.startedBy.trim() : 'operator:dashboard';
     void skipWorkspace;
     void startDocker;
     const requestedHarness = harness === 'ohmypi' || harness === 'claude-code' || harness === 'codex' || harness === 'acp' ? harness : 'claude-code';
@@ -316,6 +317,7 @@ export function startPlanningForIssue(options: {
         role: 'plan',
         model: '',
         auto: auto === true,
+        startedBy,
       });
       return Promise.resolve();
     });
@@ -402,6 +404,7 @@ export function startPlanningForIssue(options: {
             auto: auto === true,
             probe: probe === true,
             autoSpawnOnFinalize: autoStart === true,
+            startedBy,
             onProgress: (event) => {
               console.log(`[start-planning] Progress: step=${event.step} label="${event.label}" status=${event.status} detail="${event.detail}"`);
               sendEvent({ type: 'progress', ...event });

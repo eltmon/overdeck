@@ -22,6 +22,7 @@ export async function planCommand(id: string | undefined, options: PlanOptions):
   }
 
   const issueId = id.toUpperCase();
+  const startedBy = process.env['OVERDECK_AGENT_STARTED_BY'] ?? (process.env['OVERDECK_FLYWHEEL_RUN_ID'] ? `flywheel:${process.env['OVERDECK_FLYWHEEL_RUN_ID']}` : 'operator:cli:pan-plan');
 
   if (options.autoStart) {
     console.warn(chalk.yellow(
@@ -43,6 +44,7 @@ export async function planCommand(id: string | undefined, options: PlanOptions):
         harness: options.harness,
         effort: options.effort,
         workspaceLocation: options.remote ? 'remote' : 'local',
+        startedBy,
       }),
     });
 

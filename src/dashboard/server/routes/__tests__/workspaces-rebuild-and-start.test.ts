@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 // hoisted `harness` is shared with the (hoisted) mock factory so the test body
 // can observe call order and emit close events.
 const harness = vi.hoisted(() => ({
-  spawnCalls: [] as { cmd: string; args: string[] }[],
+  spawnCalls: [] as { cmd: string; args: string[]; env?: NodeJS.ProcessEnv }[],
   children: [] as Array<{ emit: (event: string, ...args: unknown[]) => void }>,
 }));
 
@@ -15,11 +15,11 @@ vi.mock('node:child_process', async (importOriginal) => {
   const { EventEmitter } = await import('node:events');
   return {
     ...actual,
-    spawn: (cmd: string, args: readonly string[]) => {
+    spawn: (cmd: string, args: readonly string[], options?: { env?: NodeJS.ProcessEnv }) => {
       const child = new EventEmitter();
       (child as { stdout: EventEmitter }).stdout = new EventEmitter();
       (child as { stderr: EventEmitter }).stderr = new EventEmitter();
-      harness.spawnCalls.push({ cmd, args: [...args] });
+      harness.spawnCalls.push({ cmd, args: [...args], env: options?.env });
       harness.children.push(child);
       return child;
     },
@@ -38,7 +38,7 @@ import { panCliInvocation } from '../../../../lib/pan-cli-invocation.js';
 const CHAIN = { args: ['start', 'MIN-831'], phaseLabel: 'Stack rebuilt — starting agent for MIN-831' };
 const expectedSpawn = (args: string[]) => {
   const invocation = panCliInvocation(args);
-  return { cmd: invocation.command, args: invocation.args };
+  return { cmd: invocation.command, args: invocation.args, env: expect.any(Object) };
 };
 
 describe('spawnPanCommand chainOnSuccess (rebuild-and-start)', () => {
@@ -52,16 +52,19 @@ describe('spawnPanCommand chainOnSuccess (rebuild-and-start)', () => {
       issueId: 'MIN-831',
       pendingOperation: 'rebuild-stack',
       chainOnSuccess: CHAIN,
+      env: { OVERDECK_AGENT_STARTED_BY: 'workspace-rebuild-recovery' },
     });
 
     // Phase 1 fired immediately; phase 2 has not.
     expect(harness.spawnCalls).toHaveLength(1);
     expect(harness.spawnCalls[0]).toEqual(expectedSpawn(['workspace', 'rebuild', 'MIN-831']));
+    expect(harness.spawnCalls[0].env).toMatchObject({ OVERDECK_AGENT_STARTED_BY: 'workspace-rebuild-recovery' });
 
     // Rebuild succeeds → start spawns.
     harness.children[0].emit('close', 0);
     expect(harness.spawnCalls).toHaveLength(2);
     expect(harness.spawnCalls[1]).toEqual(expectedSpawn(['start', 'MIN-831']));
+    expect(harness.spawnCalls[1].env).toMatchObject({ OVERDECK_AGENT_STARTED_BY: 'workspace-rebuild-recovery' });
 
     // Start succeeds → no further spawns.
     harness.children[1].emit('close', 0);

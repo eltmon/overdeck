@@ -330,6 +330,7 @@ describe('reactive Cloister scheduler', () => {
     expect(spawnRun).toHaveBeenCalledWith('PAN-503', 'plan', {
       prompt: expect.stringContaining('PLAN TASK for PAN-503'),
       model: 'claude-haiku-4-5',
+      startedBy: 'reactive-lifecycle',
     });
   });
 
@@ -341,6 +342,7 @@ describe('reactive Cloister scheduler', () => {
     expect(spawnRun).toHaveBeenCalledWith('PAN-503', 'plan', {
       prompt: expect.stringContaining('PLAN TASK for PAN-503'),
       model: 'gpt-5.5',
+      startedBy: 'reactive-lifecycle',
     });
   });
 
@@ -382,6 +384,7 @@ describe('reactive Cloister scheduler', () => {
 
     expect(spawnRun).toHaveBeenCalledWith('PAN-503', 'work', {
       prompt: expect.stringContaining('WORK TASK for PAN-503'),
+      startedBy: 'reactive-lifecycle',
     });
     expect(recordDeadEndNeedsYou).not.toHaveBeenCalled();
   });
@@ -566,7 +569,7 @@ describe('reactive Cloister scheduler', () => {
       payload: { agentId: 'agent-pan-503', issueId: 'PAN-503' },
     }));
 
-    expect(resumeAgent).toHaveBeenCalledWith('agent-pan-503');
+    expect(resumeAgent).toHaveBeenCalledWith('agent-pan-503', undefined, { startedBy: 'deacon:auto-resume' });
   });
 
   it('routes agent.heartbeat_dead events to the deacon orphan handler', async () => {

@@ -261,6 +261,10 @@ describe('POST /api/issues/:id/start-planning GitHub hydration', () => {
       id: 'planning-pan-1993',
       issueId: 'PAN-1993',
       role: 'plan',
+      startedBy: 'operator:dashboard',
+    }));
+    expect(mockSpawnPlanningSession).toHaveBeenCalledWith(expect.objectContaining({
+      startedBy: 'operator:dashboard',
     }));
   });
 

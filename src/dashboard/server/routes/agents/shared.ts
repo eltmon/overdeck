@@ -75,6 +75,10 @@ export function buildPanStartArgs(input: {
  * owns process/log lifecycle; this route-compatible wrapper preserves the
  * original behavior by waiting for a successful child exit.
  */
+export function resolveRequestedStartedBy(value: unknown, fallback = 'operator:dashboard'): string {
+  return typeof value === 'string' && value.trim() ? value.trim() : fallback;
+}
+
 export async function spawnPanCommandDetached(input: {
   agentSessionName: string;
   issueId: string;
@@ -82,6 +86,7 @@ export async function spawnPanCommandDetached(input: {
   workspacePath: string;
   args: string[];
   cwd?: string;
+  env?: NodeJS.ProcessEnv;
 }, dependencies: DetachedPanCommandDependencies = {}): Promise<string> {
   const launch = await launchPanCommandDetached(input, dependencies);
   await launch.completion;
