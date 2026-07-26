@@ -43,9 +43,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-26T21:50:51.608Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-26T21:51Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-26T21:51:23.369Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-26T21:51:23Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-3148\n\nFeedback dedup keys omit the review run ID on primary verdict paths, causing same-run duplicates and later-run suppression\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3148 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "scripts/source-introspection-baseline.txt",
@@ -101,7 +114,7 @@
     "recordedAt": "2026-07-26T21:02:31.919Z"
   },
   "created": "2026-07-26T17:27:17.644Z",
-  "updated": "2026-07-26T21:51:22.837Z",
+  "updated": "2026-07-26T21:51:23.370Z",
   "pipeline": {
     "issueId": "PAN-3148",
     "reviewStatus": "blocked",
