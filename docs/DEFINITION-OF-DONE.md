@@ -13,8 +13,8 @@ this table and that module from drifting silently.
 | 1 | `review` | Review passed (mode per issue policy; full = convoy + synthesis) | review role → `pan admin specialists done review` → review-status write door | `reviewStatus: passed` |
 | 2 | `tests` | Tests passed (incl. browser UAT when required) | test role → `pan admin specialists done test` | `testStatus: passed` |
 | 3 | `verification` | Verification green on the branch (typecheck, lint, suite, build) | supervised verification worker (`verification-runner.ts` / `verification-worker.ts`) | `verificationStatus: passed` (or `skipped` per issue policy) |
-| 4 | `merged` | Merged to main (squash PR, revertible history) | merge door: `triggerMerge` → merge specialist (`merge-agent.ts`) | PR `MERGED`, `mergeStatus: merged` |
-| 5 | `post-merge` | Post-merge handoff: work/planning agents paused, workspace Docker stack + networks stopped, `verifying-on-main` label | `postMergeLifecycle()` (`merge-agent.ts`) — at-most-once per merge (PAN-328 in-flight guard) | issue labels, agent states |
+| 4 | `merged` | Merged to main: forge/durable merge evidence, or a non-PR landing where the shared L2-work lens finds at least one convention-branch ref contained in its repository's default branch with the tip off the first-parent line and zero unmerged refs across all configured repositories | merge door: `triggerMerge` → merge specialist (`merge-agent.ts`); fallback: `gatherIssueBranchContainment()` | PR `MERGED`, `mergeStatus: merged`, or branch-containment evidence |
+| 5 | `post-merge` | Post-merge handoff: work/planning agents paused, workspace Docker stack + networks stopped, `verifying-on-main` label; for a containment-evidenced non-PR landing, passes when no work/planning agents are running because no observed merge event could trigger the lifecycle | `postMergeLifecycle()` (`merge-agent.ts`) — at-most-once per merge (PAN-328 in-flight guard); DoD containment fallback | issue labels, agent states |
 | 6 | `main-verify` | Verified on main (post-merge verification of the merged commit) | deacon verify-on-main flow | `verifying_on_main` → verified |
 | 7 | `deploy` | **Deployed: the live dashboard runs a build that includes the merge** | staleness-gated Step 0 (`merge-agent.ts`) + Deacon deploy patrol (`deploy-patrol.ts`), guarded by `getDeployBlockReason()` | `/api/health` `buildCommit` + stale-build chip |
 | 8 | `teardown` | Close-out: worktree removed, branches per `close_out` config, xBRIEF `plan.status: completed`, planning artifacts archived, tracker issue CLOSED + `closed-out` label, review status cleared, Docker `_devnet` teardown verified | `pan close <id>` / dashboard Close Out (`closeOut`); closed-issue reaper (`reapIssueResidue`) as backstop | issue state, `workspaces/` dir |
@@ -36,7 +36,10 @@ this table and that module from drifting silently.
   surfaces through its recorded auto-close-out failure. Automation never accepts a miss on
   the operator's behalf; `flywheel-*` callers are mechanically barred from `--accept-*`.
 - **Branch absence is not merge evidence.** The `merged` row requires positive evidence from
-  the forge or the durable close-out merge record; deleting an unmerged branch remains a miss.
+  the forge, the durable close-out merge record, or the shared L2-work containment lens. The
+  containment fallback passes only when merged-work refs exist and no configured repository
+  reports an unmerged ref, so deleting an unmerged branch or finding only fresh pointers remains
+  a miss.
 - **The verification verdict is the row; `lastVerifiedCommit` is not required** (PAN-3067). The
   runner writes that anchor best-effort — it snapshots HEAD inside a `try/catch` for the
   test-skip drift check, and a policy `skipped` verdict never has one — so its absence proves
