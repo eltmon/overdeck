@@ -10,8 +10,79 @@
     }
   ],
   "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      ".overdeck/context/codebase/concerns.md",
+      "drizzle/overdeck/0000_overdeck_init.sql",
+      "src/lib/overdeck/infra.ts",
+      "src/lib/overdeck/merge-sync-time.ts",
+      "src/lib/overdeck/merge-sync-uat.ts",
+      "src/lib/overdeck/paths.ts"
+    ],
+    "declaredScopeUntouched": [
+      ".pan/context/codebase/concerns.md",
+      "docs/ORDER-BOOKS.md",
+      "src/lib/database/schema.ts",
+      "src/lib/database/uat-generations-db.ts"
+    ],
+    "declaredScope": [
+      ".pan/context/codebase/concerns.md",
+      "docs/MERGE-TRAIN.md",
+      "docs/ORDER-BOOKS.md",
+      "docs/UAT-BATCH-TRAINS.md",
+      "features/merge-batches.mdx",
+      "src/dashboard/server/services/__tests__/uat-train.test.ts",
+      "src/dashboard/server/services/uat-train.ts",
+      "src/lib/cloister/uat-conflict-agent.ts",
+      "src/lib/cloister/uat-generation-deps.ts",
+      "src/lib/cloister/uat-generation-engine.ts",
+      "src/lib/cloister/uat-polyrepo-engine.ts",
+      "src/lib/cloister/uat-promote.ts",
+      "src/lib/cloister/uat-reconciler.ts",
+      "src/lib/database/schema.ts",
+      "src/lib/database/uat-generations-db.ts",
+      "src/lib/flywheel-merge-order.ts",
+      "src/lib/overdeck/merge-sync.ts",
+      "src/lib/overdeck/merge-types.ts",
+      "tests/unit/lib/cloister/uat-conflict-agent.test.ts",
+      "tests/unit/lib/cloister/uat-polyrepo-cleanup.test.ts",
+      "tests/unit/lib/cloister/uat-polyrepo-engine.test.ts",
+      "tests/unit/lib/cloister/uat-promote-polyrepo.test.ts",
+      "tests/unit/lib/flywheel-merge-order-polyrepo.test.ts",
+      "tests/unit/lib/overdeck/uat-generation-repos.test.ts"
+    ],
+    "actualChangedFiles": [
+      ".overdeck/context/codebase/concerns.md",
+      "docs/MERGE-TRAIN.md",
+      "docs/UAT-BATCH-TRAINS.md",
+      "drizzle/overdeck/0000_overdeck_init.sql",
+      "features/merge-batches.mdx",
+      "src/dashboard/server/services/__tests__/uat-train.test.ts",
+      "src/dashboard/server/services/uat-train.ts",
+      "src/lib/cloister/uat-conflict-agent.ts",
+      "src/lib/cloister/uat-generation-deps.ts",
+      "src/lib/cloister/uat-generation-engine.ts",
+      "src/lib/cloister/uat-polyrepo-engine.ts",
+      "src/lib/cloister/uat-promote.ts",
+      "src/lib/cloister/uat-reconciler.ts",
+      "src/lib/flywheel-merge-order.ts",
+      "src/lib/overdeck/infra.ts",
+      "src/lib/overdeck/merge-sync-time.ts",
+      "src/lib/overdeck/merge-sync-uat.ts",
+      "src/lib/overdeck/merge-sync.ts",
+      "src/lib/overdeck/merge-types.ts",
+      "src/lib/overdeck/paths.ts",
+      "tests/unit/lib/cloister/uat-conflict-agent.test.ts",
+      "tests/unit/lib/cloister/uat-polyrepo-cleanup.test.ts",
+      "tests/unit/lib/cloister/uat-polyrepo-engine.test.ts",
+      "tests/unit/lib/cloister/uat-promote-polyrepo.test.ts",
+      "tests/unit/lib/flywheel-merge-order-polyrepo.test.ts",
+      "tests/unit/lib/overdeck/uat-generation-repos.test.ts"
+    ],
+    "recordedAt": "2026-07-26T15:26:28.528Z"
+  },
   "created": "2026-07-26T12:33:18.311Z",
-  "updated": "2026-07-26T15:26:31.292Z",
+  "updated": "2026-07-26T15:26:35.177Z",
   "pipeline": {
     "issueId": "PAN-3093",
     "reviewStatus": "pending",
@@ -21,8 +92,9 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T15:26:31.291Z",
+    "updatedAt": "2026-07-26T15:26:34.716Z",
     "inspectNotes": "All 4 ACs verified; ran uat-polyrepo-engine.test.ts + uat-generation-engine.test.ts, 33/33 pass. AC1: runAssemblyPass calls each repo's own fetchMain then createWorktree and records that repo's baseSha; finish() writes compositeBaseAnchor -> 'fe@aaa1111 api@bbb2222' on the generation row (asserted on both the returned object and the store row). AC2: a block returns from the pass, the issue is added to heldOutIds once and pushed to heldOut with reason suffixed '(in <repoKey>)', then assembly replays from base; verified in real git too, since createWorktree does 'worktree remove --force' + 'worktree add -B <branch> <path> origin/<target>', which resets the sibling repo's branch, so the fake's merged-reset is faithful. Push happens only after the accepted pass, so a held-out feature is never published in repo A. AC3: contributingRepos filters by repoContributions; infra gets zero worktreeCreations and zero pushes. AC4: the push loop returns finish('failed', ...) on the first throw, with fe.pushes=[name] and api.pushes=[] proving the sibling had landed. Deviation 1 confirmed necessary: safeGenerationWorktreePath (uat-generation-deps.ts:39) resolves <projectRoot>/workspaces, and a member repo runs git in <projectRoot>/<repoKey> while its worktree sits under the wrapper's workspaces, so the old signature would throw; workspacesRoot defaults to projectRoot and targetBranch to 'main', reproducing the prior origin/main behavior exactly. Per-repo deps each close over their own worktreePath, so merge/abort/push cannot cross repos. Deviation 2 confirmed: GenerationStorePort.update's Pick had no 'repos'. Non-blocking notes: (a) a repo dropped between passes keeps its unpushed local uat/ branch and worktree until the generation folder is reaped - harmless since 'worktree add -B' force-resets, but cleanup (WI-7) should reap the branch; (b) listRemoteUatBranchesMulti, buildPolyrepoGitDeps, and assemblePolyrepoUatGeneration have no callers yet, which is expected until the WI-5/WI-6 wiring lands.",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3145",
     "reviewRequestedAt": "2026-07-26T15:26:31.291Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -94,8 +166,7 @@
         "tests/unit/lib/overdeck/uat-generation-repos.test.ts"
       ],
       "recordedAt": "2026-07-26T15:26:28.528Z"
-    },
-    "prUrl": "https://github.com/eltmon/overdeck/pull/3145"
+    }
   },
   "closeOut": {
     "usage": {
@@ -119,10 +190,12 @@
       },
       "costAtCloseOut": {
         "usd": 0.0161303,
-        "pricingAsOf": "2026-07-26T14:13:27.084Z"
+        "pricingAsOf": "2026-07-26T15:26:34.761Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/3145"
+    ],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
@@ -286,76 +359,5 @@
     "docs-polyrepo-uat": "completed",
     "docs-polyrepo-uat.docs-polyrepo-uat.ac1": "completed",
     "docs-polyrepo-uat.docs-polyrepo-uat.ac2": "completed"
-  },
-  "scopeDrift": {
-    "outsideDeclaredScope": [
-      ".overdeck/context/codebase/concerns.md",
-      "drizzle/overdeck/0000_overdeck_init.sql",
-      "src/lib/overdeck/infra.ts",
-      "src/lib/overdeck/merge-sync-time.ts",
-      "src/lib/overdeck/merge-sync-uat.ts",
-      "src/lib/overdeck/paths.ts"
-    ],
-    "declaredScopeUntouched": [
-      ".pan/context/codebase/concerns.md",
-      "docs/ORDER-BOOKS.md",
-      "src/lib/database/schema.ts",
-      "src/lib/database/uat-generations-db.ts"
-    ],
-    "declaredScope": [
-      ".pan/context/codebase/concerns.md",
-      "docs/MERGE-TRAIN.md",
-      "docs/ORDER-BOOKS.md",
-      "docs/UAT-BATCH-TRAINS.md",
-      "features/merge-batches.mdx",
-      "src/dashboard/server/services/__tests__/uat-train.test.ts",
-      "src/dashboard/server/services/uat-train.ts",
-      "src/lib/cloister/uat-conflict-agent.ts",
-      "src/lib/cloister/uat-generation-deps.ts",
-      "src/lib/cloister/uat-generation-engine.ts",
-      "src/lib/cloister/uat-polyrepo-engine.ts",
-      "src/lib/cloister/uat-promote.ts",
-      "src/lib/cloister/uat-reconciler.ts",
-      "src/lib/database/schema.ts",
-      "src/lib/database/uat-generations-db.ts",
-      "src/lib/flywheel-merge-order.ts",
-      "src/lib/overdeck/merge-sync.ts",
-      "src/lib/overdeck/merge-types.ts",
-      "tests/unit/lib/cloister/uat-conflict-agent.test.ts",
-      "tests/unit/lib/cloister/uat-polyrepo-cleanup.test.ts",
-      "tests/unit/lib/cloister/uat-polyrepo-engine.test.ts",
-      "tests/unit/lib/cloister/uat-promote-polyrepo.test.ts",
-      "tests/unit/lib/flywheel-merge-order-polyrepo.test.ts",
-      "tests/unit/lib/overdeck/uat-generation-repos.test.ts"
-    ],
-    "actualChangedFiles": [
-      ".overdeck/context/codebase/concerns.md",
-      "docs/MERGE-TRAIN.md",
-      "docs/UAT-BATCH-TRAINS.md",
-      "drizzle/overdeck/0000_overdeck_init.sql",
-      "features/merge-batches.mdx",
-      "src/dashboard/server/services/__tests__/uat-train.test.ts",
-      "src/dashboard/server/services/uat-train.ts",
-      "src/lib/cloister/uat-conflict-agent.ts",
-      "src/lib/cloister/uat-generation-deps.ts",
-      "src/lib/cloister/uat-generation-engine.ts",
-      "src/lib/cloister/uat-polyrepo-engine.ts",
-      "src/lib/cloister/uat-promote.ts",
-      "src/lib/cloister/uat-reconciler.ts",
-      "src/lib/flywheel-merge-order.ts",
-      "src/lib/overdeck/infra.ts",
-      "src/lib/overdeck/merge-sync-time.ts",
-      "src/lib/overdeck/merge-sync-uat.ts",
-      "src/lib/overdeck/merge-sync.ts",
-      "src/lib/overdeck/merge-types.ts",
-      "src/lib/overdeck/paths.ts",
-      "tests/unit/lib/cloister/uat-conflict-agent.test.ts",
-      "tests/unit/lib/cloister/uat-polyrepo-cleanup.test.ts",
-      "tests/unit/lib/cloister/uat-polyrepo-engine.test.ts",
-      "tests/unit/lib/cloister/uat-promote-polyrepo.test.ts",
-      "tests/unit/lib/flywheel-merge-order-polyrepo.test.ts",
-      "tests/unit/lib/overdeck/uat-generation-repos.test.ts"
-    ],
-    "recordedAt": "2026-07-26T15:26:28.528Z"
   }
 }
