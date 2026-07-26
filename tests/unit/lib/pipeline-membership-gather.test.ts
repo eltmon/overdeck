@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
+  gatherIssueBranchContainment,
   gatherProjectLensSignals,
   mapPipelineProjects,
   PIPELINE_PROJECT_CONCURRENCY,
@@ -57,6 +58,83 @@ function deps(): PipelineMembershipGatherDeps {
     }),
   };
 }
+
+describe('gatherIssueBranchContainment', () => {
+  it('classifies merged work, pointers, and unmerged feature and strike refs', async () => {
+    const run = vi.fn().mockImplementation(async (command: string, args: string[], cwd?: string) => {
+      expect(command).toBe('git');
+      expect(cwd).toBe(project.path);
+      if (args[0] === 'rev-list') return 'aaa\n';
+      if (args.includes('--no-merged=main')) return 'strike/pan-3109\norigin/strike/pan-3109\n';
+      return [
+        'bbb feature/pan-3109',
+        'aaa origin/feature/pan-3109',
+        'ccc strike/pan-3109',
+        'ddd origin/strike/pan-3109',
+      ].join('\n');
+    });
+
+    await expect(gatherIssueBranchContainment(project, 'PAN-3109', run)).resolves.toEqual({
+      mergedWorkRefs: ['/project:feature/pan-3109'],
+      pointerRefs: ['/project:origin/feature/pan-3109'],
+      unmergedRefs: ['/project:strike/pan-3109', '/project:origin/strike/pan-3109'],
+    });
+    expect(run).toHaveBeenCalledWith('git', [
+      'for-each-ref',
+      '--format=%(objectname) %(refname:short)',
+      'refs/heads/feature/pan-3109',
+      'refs/remotes/origin/feature/pan-3109',
+      'refs/heads/strike/pan-3109',
+      'refs/remotes/origin/strike/pan-3109',
+    ], project.path);
+  });
+
+  it('aggregates polyrepo refs using each repository default branch', async () => {
+    const polyrepoProject: ProjectConfig = {
+      name: 'mind-your-now',
+      path: '/myn',
+      issue_prefix: 'MIN',
+      workspace: {
+        type: 'polyrepo',
+        default_branch: 'develop',
+        repos: [
+          { name: 'fe', path: 'frontend', default_branch: 'main' },
+          { name: 'api', path: 'api' },
+        ],
+      },
+    };
+    const run = vi.fn().mockImplementation(async (_command: string, args: string[], cwd?: string) => {
+      if (args[0] === 'rev-list') return cwd === '/myn/frontend' ? 'front-main\n' : 'api-main\n';
+      if (args.some((arg) => arg.startsWith('--no-merged='))) return '';
+      if (cwd === '/myn/frontend') return 'front-merge feature/min-873\n';
+      if (cwd === '/myn/api') return 'api-main feature/min-873\n';
+      throw new Error(`Unexpected repository: ${cwd}`);
+    });
+
+    await expect(gatherIssueBranchContainment(polyrepoProject, 'MIN-873', run)).resolves.toEqual({
+      mergedWorkRefs: ['/myn/frontend:feature/min-873'],
+      pointerRefs: ['/myn/api:feature/min-873'],
+      unmergedRefs: [],
+    });
+    expect(run).toHaveBeenCalledWith('git', ['rev-list', '--first-parent', 'main'], '/myn/frontend');
+    expect(run).toHaveBeenCalledWith('git', ['rev-list', '--first-parent', 'develop'], '/myn/api');
+    expect(run).toHaveBeenCalledWith('git', expect.arrayContaining([
+      '--no-merged=main',
+      'refs/remotes/origin/strike/min-873',
+    ]), '/myn/frontend');
+    expect(run).toHaveBeenCalledWith('git', expect.arrayContaining([
+      '--no-merged=develop',
+      'refs/remotes/origin/strike/min-873',
+    ]), '/myn/api');
+  });
+
+  it('propagates git snapshot failures', async () => {
+    const run = vi.fn().mockRejectedValue(new Error('git unavailable'));
+
+    await expect(gatherIssueBranchContainment(project, 'PAN-3109', run))
+      .rejects.toThrow('git unavailable');
+  });
+});
 
 describe('gatherProjectLensSignals', () => {
   it('bounds concurrent project gathers', async () => {
