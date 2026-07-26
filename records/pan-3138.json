@@ -2,7 +2,7 @@
   "issueId": "PAN-3138",
   "schemaVersion": 2,
   "created": "2026-07-26T13:39:19.365Z",
-  "updated": "2026-07-26T13:39:19.365Z",
+  "updated": "2026-07-26T13:39:20.812Z",
   "pipeline": {
     "issueId": "PAN-3138",
     "reviewStatus": "pending",
@@ -25,5 +25,7 @@
       "note": "Planning session started for PAN-3138: Merge-time Docker cleanup leaves workspace devnet behind — leaked subnets exhaust Docker address pools and block new workspaces",
       "timestamp": "2026-07-26T13:39:19.365Z"
     }
-  ]
+  ],
+  "harness": "claude-code",
+  "model": "k3[1m]"
 }
