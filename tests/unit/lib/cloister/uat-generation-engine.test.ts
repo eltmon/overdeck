@@ -320,20 +320,49 @@ describe('assembleUatGeneration — union lint (Flyway version collisions)', () 
     expect(renumber!.note).toContain('V256__Kaia_session_task_binding.sql → V257__Kaia_session_task_binding.sql');
   });
 
-  it('allocates around a version already on main and one a later member holds', async () => {
+  // FIELD EVIDENCE (min-quartz-0726): V257 already existed on main and indexes
+  // the column the moved migration adds, so allocating the next UNUSED integer
+  // sent it to the tail at V259 — past its own dependent — and boot failed with
+  // `column task_id does not exist`. The slot must be the next GAP, which here
+  // means a dotted version.
+  it('threads a dotted slot rather than moving a migration past a later dependent', async () => {
     const git = makeFakeGit({
       migrations: {
-        base: [`${MIGRATIONS}/V257__Already_on_main.sql`],
+        base: [
+          `${MIGRATIONS}/V255__Base.sql`,
+          `${MIGRATIONS}/V257__Unique_resumable_kaia_task_session.sql`,
+          `${MIGRATIONS}/V258__Already_on_main.sql`,
+        ],
         'feature/pan-1': [TASK_COMMENT],
         'feature/pan-2': [KAIA],
-        'feature/pan-3': [`${MIGRATIONS}/V258__A_later_member_has_this.sql`],
+        'feature/pan-3': [],
       },
       sql: INDEPENDENT_SQL,
     });
     const gen = await assembleUatGeneration(input(), deps(git, makeFakeStore()));
 
     expect(gen.members.map((m) => m.issueId)).toEqual(['PAN-1', 'PAN-2', 'PAN-3']);
-    expect(git.calls.renamed).toEqual([`${KAIA} -> ${MIGRATIONS}/V259__Kaia_session_task_binding.sql`]);
+    expect(git.calls.renamed).toEqual([`${KAIA} -> ${MIGRATIONS}/V256.1__Kaia_session_task_binding.sql`]);
+    expect(gen.heldOut).toEqual([]);
+  });
+
+  it('holds the member out when no slot preserves order, instead of moving it to the tail', async () => {
+    const git = makeFakeGit({
+      migrations: {
+        // 256.1 already occupies the only gap after 256.
+        base: [`${MIGRATIONS}/V256.1__Threaded.sql`, `${MIGRATIONS}/V257__Next.sql`],
+        'feature/pan-1': [TASK_COMMENT],
+        'feature/pan-2': [KAIA],
+        'feature/pan-3': [],
+      },
+      sql: INDEPENDENT_SQL,
+    });
+    const gen = await assembleUatGeneration(input(), deps(git, makeFakeStore()));
+
+    expect(gen.members.map((m) => m.issueId)).toEqual(['PAN-1', 'PAN-3']);
+    expect(git.calls.renamed).toEqual([]);
+    expect(gen.heldOut[0]!.issueId).toBe('PAN-2');
+    expect(gen.heldOut[0]!.reason).toContain('no slot exists between V256');
   });
 
   it('holds the later member out when the two migrations touch the same table', async () => {

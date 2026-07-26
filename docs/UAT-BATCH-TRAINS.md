@@ -151,7 +151,7 @@ exists — and dispositions it by what the migrations actually touch:
 
 | Case | Action |
 | --- | --- |
-| Provably independent | **Renumber.** The earlier member keeps `V256`; the later takes the next version unused anywhere in the union. Recorded as a resolution with `kind: 'migration-renumber'`. |
+| Provably independent | **Renumber.** The earlier member keeps `V256`; the later moves into the gap immediately after it. Recorded as a resolution with `kind: 'migration-renumber'`. |
 | Anything else | **Hold out**, with a reason naming both migration files and both issues. Assembly continues and the generation still reaches `ready` with the remainder. |
 
 Renumbering is legitimate because the UAT branch content is exactly what
@@ -173,12 +173,36 @@ DML sources — and **any** overlap holds out. These also hold out:
 
 **Two invariants that are easy to get wrong:**
 
-- **The allocator reserves the whole union.** Blind `V256 → V257` is a bug: V257
-  may already be on main, or a later member may hold it. The ledger seeds
+- **The new slot is the next GAP, never the tail** — and the whole union
+  decides where that gap is. Blind `V256 → V257` is a bug because V257 may
+  already be on main or be held by a later member; the ledger therefore seeds
   *owners* from the generation branch as cut from its target and *reservations*
-  from every candidate branch, held out or not, then allocates the first
-  integer free in both — and immediately reserves it, so two renames in one
-  assembly can never land on the same number.
+  from every candidate branch, held out or not.
+
+  But "next unused integer" is a worse bug, and the field proved it. Renumbering
+  `V256__Kaia_session_task_binding` (which adds `task_id`) to V259 put it after
+  `V257__Unique_resumable_kaia_task_session`, which indexes that column — the
+  stack failed to boot with `column task_id does not exist`. That dependent was
+  neither a batch member nor part of the collision, so **relative order must be
+  preserved against every migration in the repo**, and the tail is the one place
+  a migration can never safely go. `allocateSlotAfter` therefore takes:
+
+  | Situation | Slot |
+  | --- | --- |
+  | Nothing follows the collision | `V257` — nothing can depend on it |
+  | An integer gap follows | `V257` |
+  | No integer gap | a **dotted** version threaded into the gap: `V256.1`, which Flyway orders as 256 < 256.1 < 257 and this repo already uses (`V38.1`, `V124.1`) |
+  | Not even a dotted slot fits | **hold out** — never guess |
+
+  Emitting a dotted version is not the same as renumbering a dotted *input*,
+  which still holds out: an author-chosen `V1_1` encodes deliberate ordering
+  that is not ours to reassign. Allocations are reserved immediately, so two
+  renames in one assembly can never land on the same slot.
+
+  A related constraint the field surfaced: the live `flyway_schema_history` had
+  V256 recorded as applied, so V256 could not be reassigned to a different file
+  at all. The lint already satisfies this by construction — the base/earlier
+  owner keeps its version and only the incoming migration moves.
 - **One repo is not one Flyway namespace.** A multi-service repo runs several
   independent histories, each restarting at V1. Every comparison, reservation,
   and allocation is keyed by the migration's own directory, so two services'

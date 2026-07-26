@@ -10,6 +10,7 @@ import { describe, it, expect } from 'vitest';
 import {
   MigrationVersionLedger,
   analyzeMigration,
+  compareMigrationVersions,
   migrationEntries,
   migrationRootOf,
   migrationVersionOf,
@@ -127,17 +128,81 @@ describe('MigrationVersionLedger', () => {
   });
 
   // Guardrail (2): the allocator reserves the whole union.
-  it('allocates the next version free across owners, reservations, and prior allocations', () => {
-    const ledger = new MigrationVersionLedger([`${DIR}/V256__Base.sql`, `${DIR}/V257__AlsoOnMain.sql`]);
-    ledger.reserve([`${DIR}/V258__ALaterMemberHasThis.sql`]);
-    expect(ledger.allocateVersion(`${DIR}/`, 256)).toBe(259);
-    // The allocation itself is reserved, so the next one cannot reuse it.
-    expect(ledger.allocateVersion(`${DIR}/`, 256)).toBe(260);
+  it('takes the next integer when the gap after the collision is free', () => {
+    const ledger = new MigrationVersionLedger([`${DIR}/V256__Base.sql`, `${DIR}/V260__Later.sql`]);
+    expect(ledger.allocateSlotAfter(`${DIR}/`, '256')).toBe('257');
   });
 
-  it('allocates per migration root, so one service does not skip numbers for another', () => {
-    const ledger = new MigrationVersionLedger(['services/a/db/V1__x.sql', 'services/b/db/V2__y.sql']);
-    expect(ledger.allocateVersion('services/b/db/', 1)).toBe(3);
+  it('takes the next integer when nothing follows the collision at all', () => {
+    const ledger = new MigrationVersionLedger([`${DIR}/V256__Base.sql`]);
+    expect(ledger.allocateSlotAfter(`${DIR}/`, '256')).toBe('257');
+  });
+
+  // FIELD EVIDENCE: allocating the next UNUSED integer moved a migration to the
+  // tail, past V257 which indexed the column it adds — `column task_id does not
+  // exist` at boot. The slot must be the next GAP, not the next free number.
+  it('never moves a migration past a later one — it threads a dotted slot into the occupied gap', () => {
+    const ledger = new MigrationVersionLedger([
+      `${DIR}/V256__Add_author_type_to_task_comment.sql`,
+      `${DIR}/V257__Unique_resumable_kaia_task_session.sql`,
+      `${DIR}/V258__Voice_config_nullable_model.sql`,
+    ]);
+    expect(ledger.allocateSlotAfter(`${DIR}/`, '256')).toBe('256.1');
+  });
+
+  it('holds out a second collision at the same version rather than ordering it behind the first', () => {
+    const ledger = new MigrationVersionLedger([`${DIR}/V256__A.sql`, `${DIR}/V257__B.sql`]);
+    expect(ledger.allocateSlotAfter(`${DIR}/`, '256')).toBe('256.1');
+    // 256.2 would sit AFTER the slot just handed out, and nothing proved this
+    // migration may follow that one — they were concurrent, both at V256. The
+    // allocator refuses to invent that order; the caller holds out.
+    expect(ledger.allocateSlotAfter(`${DIR}/`, '256')).toBeNull();
+  });
+
+  it('refuses to step over a dotted version the repo already carries', () => {
+    // 124.2 sorts after 124.1, so it would move this migration past one that
+    // may depend on it — the same shape as the V259 field failure, one decimal
+    // place down.
+    const ledger = new MigrationVersionLedger([
+      `${DIR}/V124__A.sql`,
+      `${DIR}/V124.1__AlreadyThreaded.sql`,
+      `${DIR}/V125__B.sql`,
+    ]);
+    expect(ledger.allocateSlotAfter(`${DIR}/`, '124')).toBeNull();
+  });
+
+  it('returns null when not even a dotted slot fits, so the caller holds out', () => {
+    // V256.1 already occupies the only space between 256 and 257; anything the
+    // allocator could emit would sort at or after it.
+    const ledger = new MigrationVersionLedger([`${DIR}/V256__A.sql`, `${DIR}/V256.1__B.sql`]);
+    expect(ledger.allocateSlotAfter(`${DIR}/`, '256')).toBeNull();
+  });
+
+  it('refuses to reassign a dotted version — that ordering is the author\'s', () => {
+    const ledger = new MigrationVersionLedger([`${DIR}/V256.1__A.sql`]);
+    expect(ledger.allocateSlotAfter(`${DIR}/`, '256.1')).toBeNull();
+  });
+
+  it('allocates per migration root, so one service does not constrain another', () => {
+    const ledger = new MigrationVersionLedger(['services/a/db/V2__x.sql', 'services/b/db/V2__y.sql']);
+    // b's own V2 is the collision; a's V2 is a different history entirely.
+    expect(ledger.allocateSlotAfter('services/b/db/', '2')).toBe('3');
+  });
+});
+
+describe('compareMigrationVersions', () => {
+  it('orders a dotted version between its integer and the next', () => {
+    expect(compareMigrationVersions('256', '256.1')).toBeLessThan(0);
+    expect(compareMigrationVersions('256.1', '257')).toBeLessThan(0);
+  });
+
+  it('treats a missing part as zero', () => {
+    expect(compareMigrationVersions('256', '256.0')).toBe(0);
+  });
+
+  it('compares numerically, not lexically', () => {
+    expect(compareMigrationVersions('9', '10')).toBeLessThan(0);
+    expect(compareMigrationVersions('256.10', '256.9')).toBeGreaterThan(0);
   });
 });
 
@@ -174,6 +239,50 @@ describe('resolveUnionCollisions', () => {
       }],
       note: 'V256__Kaia_session_task_binding.sql → V257__Kaia_session_task_binding.sql',
     });
+  });
+
+  // The min-quartz-0726 batch, end to end. V257 already existed and indexes
+  // the column the moved migration adds, so the only correct slot is 256.1.
+  it('reproduces the field batch: threads the Kaia binding to V256.1, not the tail', async () => {
+    const AUTHOR = `${DIR}/V256__Add_author_type_to_task_comment.sql`;
+    const KAIA = `${DIR}/V256__Kaia_session_task_binding.sql`;
+    const ledger = new MigrationVersionLedger([
+      AUTHOR,
+      `${DIR}/V257__Unique_resumable_kaia_task_session.sql`,
+      `${DIR}/V258__Voice_config_nullable_model.sql`,
+    ]);
+
+    const disposition = await resolveUnionCollisions({
+      ledger,
+      files: [KAIA],
+      issueId: 'MIN-902',
+      readMigration: reader({
+        [KAIA]: SQL.kaiaBinding,
+        [AUTHOR]: SQL.taskComment,
+      }),
+    });
+
+    expect(disposition).toMatchObject({ kind: 'renumber' });
+    const { renames } = disposition as { renames: Array<{ to: string; toVersion: string }> };
+    expect(renames[0]!.toVersion).toBe('256.1');
+    expect(renames[0]!.to).toBe(`${DIR}/V256.1__Kaia_session_task_binding.sql`);
+  });
+
+  it('holds out when no slot preserves order, instead of moving to the tail', async () => {
+    const A = `${DIR}/V256__A.sql`;
+    const B = `${DIR}/V256__B.sql`;
+    // 256.1 already occupies the gap, so nothing can be threaded after 256.
+    const ledger = new MigrationVersionLedger([A, `${DIR}/V256.1__Threaded.sql`, `${DIR}/V257__C.sql`]);
+
+    const disposition = await resolveUnionCollisions({
+      ledger,
+      files: [B],
+      issueId: 'MIN-902',
+      readMigration: reader({ [A]: SQL.taskComment, [B]: SQL.kaiaBinding }),
+    });
+
+    expect(disposition.kind).toBe('hold-out');
+    expect((disposition as { reason: string }).reason).toContain('no slot exists between V256');
   });
 
   it('holds out when both migrations touch the same table', async () => {
