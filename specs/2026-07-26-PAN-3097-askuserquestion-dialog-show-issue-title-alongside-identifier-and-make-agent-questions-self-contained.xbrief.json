@@ -4,17 +4,17 @@
     "created": "2026-07-25T22:35:11-04:00",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3097: AskUserQuestion dialog: show issue title alongside identifier, and make agent questions self-contained",
-    "updated": "2026-07-26T02:37:58.292Z"
+    "updated": "2026-07-26T02:38:38.831Z"
   },
   "plan": {
     "id": "pan-3097",
     "title": "AskUserQuestion dialog: show issue title alongside identifier, and make agent questions self-contained",
-    "status": "proposed",
+    "status": "approved",
     "uid": "15ffc783-d4e6-429b-a43f-122bbb9130b1",
     "author": "agent:claude-fable-5",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-07-25T22:35:11-04:00",
-    "updated": "2026-07-26T02:37:58.292Z",
+    "updated": "2026-07-26T02:38:38.831Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3097",
@@ -566,5 +566,5 @@
       "canonicalFilename": "2026-07-26-PAN-3097-askuserquestion-dialog-show-issue-title-alongside-identifier-and-make-agent-questions-self-contained.xbrief.json"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
