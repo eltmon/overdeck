@@ -2,7 +2,7 @@
   "issueId": "PAN-3116",
   "schemaVersion": 2,
   "created": "2026-07-26T09:04:01.632Z",
-  "updated": "2026-07-26T09:04:01.632Z",
+  "updated": "2026-07-26T09:04:02.906Z",
   "pipeline": {
     "issueId": "PAN-3116",
     "reviewStatus": "pending",
@@ -25,5 +25,7 @@
       "note": "Planning session started for PAN-3116: scripts/file-size-baseline.txt is a cross-branch serialization point — every concurrent branch conflicts on the same 31 lines",
       "timestamp": "2026-07-26T09:04:01.632Z"
     }
-  ]
+  ],
+  "harness": "claude-code",
+  "model": "k3[1m]"
 }
