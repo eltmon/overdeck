@@ -76,7 +76,7 @@
     "recordedAt": "2026-07-26T13:53:58.173Z"
   },
   "created": "2026-07-26T12:24:46.201Z",
-  "updated": "2026-07-26T13:54:54.170Z",
+  "updated": "2026-07-26T13:54:56.994Z",
   "pipeline": {
     "issueId": "PAN-3135",
     "reviewStatus": "pending",
@@ -150,7 +150,9 @@
         "tests/unit/lib/deploy/deploy-queue.test.ts"
       ],
       "recordedAt": "2026-07-26T13:53:58.173Z"
-    }
+    },
+    "reviewRequestedAt": "2026-07-26T13:54:56.619Z",
+    "panDoneRecoveredAt": "2026-07-26T13:54:56.619Z"
   },
   "closeOut": {
     "usage": {
