@@ -30,8 +30,13 @@ import { getReleaseSetSync } from '../../../../lib/release-set.js';
 import { getCachedConflictGateMergeability } from '../../../../lib/cloister/conflict-gate.js';
 import { transitionIssueToInReview, spawnRun } from '../../../../lib/agents.js';
 import { runVerificationForIssue } from '../../../../lib/cloister/verification-runner.js';
-import { createRequestReviewPipeline } from '../../../../lib/cloister/request-review-pipeline.js';
+import { pushLocalReviewBranches } from '../../../../lib/cloister/review-branch-push.js';
+import { requestReviewPipeline } from '../../../../lib/cloister/request-review-pipeline.js';
 import { jsonResponse } from '../../http-helpers.js';
+import {
+  pushDashboardReviewBranch,
+  registerDashboardDurableReviewPipeline,
+} from '../../services/durable-review-pipeline.js';
 import { httpHandler } from '../http-handler.js';
 import {
   getProjectPath,
@@ -47,8 +52,15 @@ import {
 
 const execAsync = promisify(exec);
 const MAX_AUTO_REQUEUE = 25;
-const requestReviewPipeline = createRequestReviewPipeline();
 
+const pushRemoteReviewBranch = async (vmName: string, workspacePath: string, branchName: string): Promise<void> => {
+  const command = `cd ${workspacePath} && GIT_TERMINAL_PROMPT=0 GIT_ASKPASS=true SSH_ASKPASS=true git push origin ${branchName}`;
+  await execAsync(flyExecCmd(vmName, command), { encoding: 'utf-8', timeout: 30_000 });
+};
+registerDashboardDurableReviewPipeline({
+  getWorkspaceInfo: getWorkspaceInfoForIssue,
+  pushRemote: pushRemoteReviewBranch,
+});
 /** Safe `.message` read for caught values of unknown shape. */
 const errorMessage = (e: unknown): string | undefined => e instanceof Error ? e.message : undefined;
 
@@ -63,21 +75,7 @@ const errorMessage = (e: unknown): string | undefined => e instanceof Error ? e.
  * the workspace path, preserving the previous behavior.
  */
 async function pushFeatureBranches(issueId: string, workspacePath: string): Promise<void> {
-  const { resolveWorkspaceRepoRootsSync } = await import('../../../../lib/project-repos.js');
-  for (const root of resolveWorkspaceRepoRootsSync(issueId, workspacePath)) {
-    try {
-      await execAsync(`git rev-parse --verify --quiet refs/heads/${root.sourceBranch}`, {
-        cwd: root.dir,
-        encoding: 'utf-8',
-      });
-    } catch {
-      continue;
-    }
-    await execAsync(`git push origin ${root.sourceBranch}`, {
-      cwd: root.dir,
-      encoding: 'utf-8',
-    });
-  }
+  await pushLocalReviewBranches(issueId, workspacePath);
 }
 
 function shouldTreatAsRerun(status: Pick<ReviewStatus, 'readyForMerge' | 'reviewStatus' | 'testStatus' | 'mergeStatus'> | null | undefined): boolean {
@@ -120,7 +118,6 @@ async function getDirtyWorkspaceErrorForReviewRequest(
   }
 }
 // ─── Route: POST /api/review/:issueId/trigger ─────────────────────────────
-
 const postWorkspaceReviewRoute = HttpRouter.add(
   'POST',
   '/api/review/:issueId/trigger',
@@ -333,6 +330,11 @@ const postWorkspaceReviewRoute = HttpRouter.add(
               } catch { /* non-fatal */ }
               return;
             }
+            if (verifyOutcome.outcome === 'deferred') {
+              console.log(`[review] Verification deferred for ${issueId}: ${verifyOutcome.reason}`);
+              completePendingOperation(issueId, verifyOutcome.reason);
+              return;
+            }
 
             // PAN-1048 C1/R3: review now runs as the role primitive via spawnRun
             // (loads roles/review.md → Agent tool fans out to code-review-* sub-agents).
@@ -402,7 +404,6 @@ const postWorkspaceReviewRoute = HttpRouter.add(
   }))
 );
 // ─── Route: POST /api/review/:issueId/request ─────────────────────
-
 const postWorkspaceRequestReviewRoute = HttpRouter.add(
   'POST',
   '/api/review/:issueId/request',
@@ -736,15 +737,15 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
           autoRequeueCount: currentCount,
         });
       },
+      onVerificationDeferred: (outcome) => {
+        console.log(`[request-review] Verification deferred for ${issueId}: ${outcome.reason}`);
+        completePendingOperation(issueId, outcome.reason);
+      },
       pushBranch: async () => {
-        if (workspaceInfo.isRemote && workspaceInfo.vmName) {
-          // Remote workspaces are single-repo (PAN-1676) — push in place via fly exec.
-          await execAsync(flyExecCmd(workspaceInfo.vmName, `cd ${workspacePath} && git push origin ${branchName}`), {
-            encoding: 'utf-8',
-          });
-        } else {
-          await pushFeatureBranches(issueId, workspacePath);
-        }
+        await pushDashboardReviewBranch(
+          { issueId, workspacePath, workspaceInfo, branchName },
+          { pushRemote: pushRemoteReviewBranch },
+        );
         console.log(`[request-review] Pushed verified branch ${branchName} for ${issueId}`);
       },
       dispatchReview: async () => {

@@ -21,6 +21,7 @@ import { promisify } from 'node:util';
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { syncMainIntoWorkspace } from '../../../../lib/cloister/merge-agent.js';
+import { handlePostRebaseVerificationDeferral } from '../../../../lib/cloister/merge-verification.js';
 import { MainDivergedError, gitPush } from '../../../../lib/git/operations.js';
 import { listGitOperationsSync } from '../../../../lib/git-activity.js';
 import { extractNumberSync, extractPrefixSync, parseIssueIdSync } from '../../../../lib/issue-id.js';
@@ -420,21 +421,17 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
     : workspaceDirName.startsWith('feature-')
       ? `feature/${workspaceDirName.slice('feature-'.length)}`
       : `feature/${issueLower}`;
-
   setReviewStatus(issueId, { mergeStatus: 'merging', mergeStep: 'validating-pr' });
-
   const normalizedMergeId = issueId.toUpperCase();
   _serverManagedMerges.add(normalizedMergeId);
   setPendingOperation(issueId, 'merge');
-  let queueAdvanced = false;
-
+  let queueAdvanced = false, preserveQueue = false;
   const advanceQueue = (): void => {
     if (queueAdvanced) return;
     queueAdvanced = true;
     _serverManagedMerges.delete(normalizedMergeId);
     dequeueNextMerge(projectKey, normalizedId);
   };
-
   try {
     if (request.kind === 'normal' && workspaceInfo.isRemote && workspaceInfo.vmName) {
       console.log(
@@ -1000,8 +997,7 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
       // will catch any .planning/ files that slip through.
     }
 
-    // Step 3: Post-rebase verification gate (typecheck, lint, test)
-    // Ensures the rebase didn't introduce issues before merging.
+    // Step 3: Post-rebase verification gate ensures the rebase remains valid before merging.
     setReviewStatus(issueId, { mergeStatus: 'verifying', mergeStep: 'verifying', mergeNotes: undefined });
 
     // PAN-2487: when the tip SHA being merged already has GREEN CI on GitHub,
@@ -1033,9 +1029,7 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
       }
     }
 
-    if (skipLocalVerification) {
-      appendShipLog(issueId, '✓ Local verification skipped — CI already green on this exact commit', 'verifying');
-    }
+    if (skipLocalVerification) appendShipLog(issueId, '✓ Local verification skipped — CI already green on this exact commit', 'verifying');
     const verifyResult = skipLocalVerification
       ? { outcome: 'passed' as const }
       : await (async () => {
@@ -1052,7 +1046,13 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
           { ...mergeVerificationOptions(request), onGateLog: (line) => appendShipLog(issueId, line, 'verifying') },
         ));
       })();
-
+    const verificationDeferral = handlePostRebaseVerificationDeferral(issueId, verifyResult, reviewStatus, { appendShipLog, setReviewStatus, completePendingOperation });
+    if (verificationDeferral) {
+      markMergeProcessing(projectKey, normalizedId, false);
+      _serverManagedMerges.delete(normalizedMergeId);
+      preserveQueue = true;
+      return verificationDeferral;
+    }
     if (verifyResult.outcome === 'failed') {
       const error = `Post-rebase verification failed at ${verifyResult.failedCheck}`;
       console.log(`[merge] ${error}`);
@@ -1198,7 +1198,7 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
     completePendingOperation(issueId, error.message);
     return { success: false, statusCode: 500, error: error.message };
   } finally {
-    advanceQueue();
+    if (!preserveQueue) advanceQueue();
   }
 }
 
