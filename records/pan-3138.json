@@ -282,11 +282,14 @@
     "outsideDeclaredScope": [
       "scripts/file-size-baseline.txt",
       "src/dashboard/server/pending-lifecycle.ts",
+      "src/dashboard/server/routes/__tests__/specialists-shared.test.ts",
+      "src/dashboard/server/routes/specialists/shared.ts",
       "src/lib/cloister/__tests__/merged-docker-cleanup-worker.test.ts",
       "src/lib/cloister/__tests__/pending-lifecycle-claim.test.ts",
       "src/lib/cloister/__tests__/post-merge-lifecycle-lock.test.ts",
       "src/lib/cloister/__tests__/post-merge-lifecycle-worker.test.ts",
       "src/lib/cloister/deacon-merge.ts",
+      "src/lib/cloister/deacon-pending-lifecycle.ts",
       "src/lib/cloister/deacon.ts",
       "src/lib/cloister/merged-docker-cleanup-worker.ts",
       "src/lib/cloister/pending-lifecycle-claim.ts",
@@ -322,6 +325,8 @@
       "docs/WORKSPACE-CONTAINERS.md",
       "scripts/file-size-baseline.txt",
       "src/dashboard/server/pending-lifecycle.ts",
+      "src/dashboard/server/routes/__tests__/specialists-shared.test.ts",
+      "src/dashboard/server/routes/specialists/shared.ts",
       "src/lib/cloister/__tests__/closed-issue-reaper.test.ts",
       "src/lib/cloister/__tests__/merged-docker-cleanup-worker.test.ts",
       "src/lib/cloister/__tests__/pending-lifecycle-claim.test.ts",
@@ -329,6 +334,7 @@
       "src/lib/cloister/__tests__/post-merge-lifecycle-worker.test.ts",
       "src/lib/cloister/closed-issue-reaper.ts",
       "src/lib/cloister/deacon-merge.ts",
+      "src/lib/cloister/deacon-pending-lifecycle.ts",
       "src/lib/cloister/deacon.ts",
       "src/lib/cloister/merge-agent.ts",
       "src/lib/cloister/merged-docker-cleanup-worker.ts",
@@ -352,10 +358,10 @@
       "tests/unit/lib/pan-444-post-merge-step0.test.ts",
       "tests/unit/lib/review-status.test.ts"
     ],
-    "recordedAt": "2026-07-26T17:46:15.742Z"
+    "recordedAt": "2026-07-26T18:42:41.042Z"
   },
   "created": "2026-07-26T13:39:19.365Z",
-  "updated": "2026-07-26T18:42:25.710Z",
+  "updated": "2026-07-26T18:42:41.044Z",
   "pipeline": {
     "issueId": "PAN-3138",
     "reviewStatus": "failed",
