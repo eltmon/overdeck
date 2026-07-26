@@ -306,18 +306,18 @@
     "recordedAt": "2026-07-26T10:07:26.737Z"
   },
   "created": "2026-07-21T23:09:49.270Z",
-  "updated": "2026-07-26T11:31:12.453Z",
+  "updated": "2026-07-26T11:31:14.841Z",
   "pipeline": {
     "issueId": "PAN-2997",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T10:57:04.635Z",
-    "updatedAt": "2026-07-26T11:31:12.344Z",
+    "updatedAt": "2026-07-26T11:31:13.288Z",
     "reviewNotes": "Agent re-review request (2/25): Fixed the cycle-15 blocker: the initial strict POISON read is now wrapped in KeyedMarkerVerificationError (cause preserved), locally and remotely — a transient read failure before any side effect keeps the outbox pending instead of recording terminal 'failed'. Missing targets stay classified upstream (messageAgent stopped/zombie → resume). Local and remote failed-poison-read tests assert the class; the wake-level regression proves the class leaves the outbox pending with no notified event until retry succeeds.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3004",
     "lastVerifiedCommit": "4cdeddfe137f2baf82a463230ca972820e69ac68",
@@ -471,7 +471,7 @@
       },
       "costAtCloseOut": {
         "usd": 357.0030766,
-        "pricingAsOf": "2026-07-26T11:31:12.425Z"
+        "pricingAsOf": "2026-07-26T11:31:14.837Z"
       }
     },
     "merges": [
