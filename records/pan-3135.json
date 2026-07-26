@@ -164,19 +164,19 @@
     "recordedAt": "2026-07-26T13:53:58.173Z"
   },
   "created": "2026-07-26T12:24:46.201Z",
-  "updated": "2026-07-26T15:29:32.634Z",
+  "updated": "2026-07-26T15:43:30.656Z",
   "pipeline": {
     "issueId": "PAN-3135",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T13:54:56.619Z",
-    "updatedAt": "2026-07-26T15:29:32.044Z",
-    "reviewNotes": "[correctness] Durable review recovery cannot resume remote workspaces and fails on untouched polyrepo repositories — `src/dashboard/server/services/durable-review-pipeline.ts:23`",
+    "updatedAt": "2026-07-26T15:43:30.624Z",
+    "reviewNotes": "Agent re-review request (2/25): Fixed review issues",
     "inspectNotes": "All 4 ACs met. verification-runner.ts:387-395 gates on readPendingDeploy() before the verificationStatus:'running' write at :409, writes 'pending' + a note naming requestedAt, and self-excludes when status is already 'running'. verification-worker-supervisor.ts:140-144 sits AFTER the live-worker waitForResult join at :137, so a queued deploy blocks only new worker spawns. FOLLOW-UP FOR A LATER BEAD (outside these ACs): request-review-pipeline.ts:31-38 only branches on 'failed'/'error', so a 'deferred' outcome currently falls through to pushBranch()+dispatchReview() and advances to review as if it passed — consumers must be taught to halt on 'deferred'.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3142",
     "lastVerifiedCommit": "dafef43b8d0a334724280cc3145f6a93bee9512f",
@@ -240,28 +240,6 @@
         "tests/unit/lib/deploy/deploy-queue.test.ts"
       ],
       "recordedAt": "2026-07-26T13:53:58.173Z"
-    },
-    "reviewerVerdicts": {
-      "security": {
-        "status": "passed",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3135/.pan/review/agent-pan-3135-review-dafef43b/security.md",
-        "atCommit": "dafef43b8d0a334724280cc3145f6a93bee9512f"
-      },
-      "correctness": {
-        "status": "blocked",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3135/.pan/review/agent-pan-3135-review-dafef43b/correctness.md",
-        "atCommit": "dafef43b8d0a334724280cc3145f6a93bee9512f"
-      },
-      "performance": {
-        "status": "blocked",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3135/.pan/review/agent-pan-3135-review-dafef43b/performance.md",
-        "atCommit": "dafef43b8d0a334724280cc3145f6a93bee9512f"
-      },
-      "requirements": {
-        "status": "passed",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3135/.pan/review/agent-pan-3135-review-dafef43b/requirements.md",
-        "atCommit": "dafef43b8d0a334724280cc3145f6a93bee9512f"
-      }
     }
   },
   "closeOut": {
@@ -309,24 +287,24 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 3746603,
-            "output": 375511,
-            "cacheRead": 237998080,
+            "input": 3828773,
+            "output": 391071,
+            "cacheRead": 255207424,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 33211749,
-          "output": 863942,
-          "cacheRead": 357542912,
+          "input": 33293919,
+          "output": 879502,
+          "cacheRead": 374752256,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 370.748461,
-        "pricingAsOf": "2026-07-26T15:29:32.048Z"
+        "usd": 380.230783,
+        "pricingAsOf": "2026-07-26T15:43:30.649Z"
       }
     },
     "merges": [
