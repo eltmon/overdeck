@@ -269,7 +269,7 @@
     }
   ],
   "created": "2026-07-26T00:35:36.057Z",
-  "updated": "2026-07-26T06:41:20.445Z",
+  "updated": "2026-07-26T06:48:37.294Z",
   "pipeline": {
     "issueId": "PAN-1696",
     "reviewStatus": "pending",
@@ -384,16 +384,8 @@
   "harness": "claude-code",
   "model": "claude-opus-5",
   "tasks": {
-    "sequence": 27,
-    "claims": {
-      "fe-flywheel-viewer": {
-        "writerId": "agent-pan-1696",
-        "agentId": "agent-pan-1696",
-        "pid": 2705211,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-26T06:41:20.445Z"
-      }
-    },
+    "sequence": 28,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-1696",
@@ -533,6 +525,17 @@
         "outcome": "completed",
         "reason": "AwaitingMergePage now hosts MergeTrainSection (shared MergeTrainView + global merge_train_enabled toggle via /api/flywheel/config) above the per-issue rows; all per-row actions untouched. Browser-verified in an isolated Playwright chromium against a throwaway stub API: 3 project sections incl. an explicit 'merge train off' row, batches/held-out/checklist/escape hatch, toggle state, and filter persistence surviving a reload; zero console errors. ALSO fixed 8 tests left red by this branch's earlier fe-cockpit-toggle commit (missing merge-train endpoint in 3 strict fetch mocks, stale call-count, and two buttons sharing the accessible name 'Global default' — now scoped aria-labels). Extracted the page's API helpers to awaitingMergeApi.ts to satisfy the file-size guard, dropping the page under the god-file ceiling. Left alone: the page's pre-existing EmptyState still says 'The flywheel is idling — run /all-up' (per-issue empty state, outside this item).",
         "releasedAt": "2026-07-26T06:41:13.019Z"
+      },
+      {
+        "writerId": "agent-pan-1696",
+        "agentId": "agent-pan-1696",
+        "pid": 2705211,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T06:41:20.445Z",
+        "itemId": "fe-flywheel-viewer",
+        "outcome": "completed",
+        "reason": "MergeQueueCard is now a thin RailCard shell around the shared MergeTrainView (457 to 34 lines), reading only /api/merge-train/*; run-active gating removed (FlywheelPage passes active unconditionally, and active controls polling only, not whether reads happen). Extracted useMergeTrainData/mergeTrainTotals so the card labels its header from the same payloads. The page's Merge train ToggleSwitch is untouched and still posts merge_train_enabled; FlywheelConversationPane needed no change (no legacy endpoints). Card tests rewritten for the wrapper contract. Browser-verified at 460px rail width with no run data: aggregate endpoints only, zero legacy, correct cross-project count, zero console errors.",
+        "releasedAt": "2026-07-26T06:48:37.294Z"
       }
     ],
     "statusReasons": {
@@ -563,6 +566,10 @@
       "fe-awaiting-merge": {
         "reason": "AwaitingMergePage now hosts MergeTrainSection (shared MergeTrainView + global merge_train_enabled toggle via /api/flywheel/config) above the per-issue rows; all per-row actions untouched. Browser-verified in an isolated Playwright chromium against a throwaway stub API: 3 project sections incl. an explicit 'merge train off' row, batches/held-out/checklist/escape hatch, toggle state, and filter persistence surviving a reload; zero console errors. ALSO fixed 8 tests left red by this branch's earlier fe-cockpit-toggle commit (missing merge-train endpoint in 3 strict fetch mocks, stale call-count, and two buttons sharing the accessible name 'Global default' — now scoped aria-labels). Extracted the page's API helpers to awaitingMergeApi.ts to satisfy the file-size guard, dropping the page under the god-file ceiling. Left alone: the page's pre-existing EmptyState still says 'The flywheel is idling — run /all-up' (per-issue empty state, outside this item).",
         "updatedAt": "2026-07-26T06:41:13.019Z"
+      },
+      "fe-flywheel-viewer": {
+        "reason": "MergeQueueCard is now a thin RailCard shell around the shared MergeTrainView (457 to 34 lines), reading only /api/merge-train/*; run-active gating removed (FlywheelPage passes active unconditionally, and active controls polling only, not whether reads happen). Extracted useMergeTrainData/mergeTrainTotals so the card labels its header from the same payloads. The page's Merge train ToggleSwitch is untouched and still posts merge_train_enabled; FlywheelConversationPane needed no change (no legacy endpoints). Card tests rewritten for the wrapper contract. Browser-verified at 460px rail width with no run data: aggregate endpoints only, zero legacy, correct cross-project count, zero console errors.",
+        "updatedAt": "2026-07-26T06:48:37.294Z"
       }
     }
   },
@@ -611,6 +618,8 @@
     "fe-awaiting-merge.fe-awaiting-merge.ac1": "completed",
     "fe-awaiting-merge.fe-awaiting-merge.ac2": "completed",
     "fe-awaiting-merge.fe-awaiting-merge.ac3": "completed",
-    "fe-flywheel-viewer": "running"
+    "fe-flywheel-viewer": "completed",
+    "fe-flywheel-viewer.fe-flywheel-viewer.ac1": "completed",
+    "fe-flywheel-viewer.fe-flywheel-viewer.ac2": "completed"
   }
 }
