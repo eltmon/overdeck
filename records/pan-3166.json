@@ -3,17 +3,18 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-07-26T21:27:05.281Z",
-  "updated": "2026-07-26T22:49:06.961Z",
+  "updated": "2026-07-26T22:49:12.465Z",
   "pipeline": {
     "issueId": "PAN-3166",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "passed",
-    "mergeStatus": "merged",
+    "mergeStatus": "failed",
     "mergeStep": "post-merge-cleanup",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T22:49:05.167Z",
+    "updatedAt": "2026-07-26T22:49:06.436Z",
+    "mergeNotes": "Merge pipeline error: Cannot find package 'effect' imported from /home/eltmon/.overdeck/deployments/dashboard/.pan-reload-generation-b/dist/dashboard/deploy-window-Dchy3FNh.js",
     "lastVerifiedCommit": "55dc93ff7b5cfd1f76b003b64253164c9738546a",
     "strikeLandingState": "landed",
     "strikeRecoveryCount": 0,
@@ -25,7 +26,7 @@
       "totals": {},
       "costAtCloseOut": {
         "usd": 0,
-        "pricingAsOf": "2026-07-26T22:49:06.955Z"
+        "pricingAsOf": "2026-07-26T22:49:12.460Z"
       }
     },
     "merges": [],
