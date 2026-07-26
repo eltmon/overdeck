@@ -281,18 +281,18 @@
     "recordedAt": "2026-07-26T10:07:26.737Z"
   },
   "created": "2026-07-21T23:09:49.270Z",
-  "updated": "2026-07-26T10:55:05.960Z",
+  "updated": "2026-07-26T10:56:14.397Z",
   "pipeline": {
     "issueId": "PAN-2997",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T10:55:04.631Z",
-    "reviewNotes": "Provisional recovery loses the original pane identity, and poison repair/clear verification still treats failed marker reads as empty state.",
+    "updatedAt": "2026-07-26T10:56:12.488Z",
+    "reviewNotes": "Agent re-review request (1/25): Fixed both cycle-13 blockers: (1) a fourth marker records the paste target's pane_pid atomically with the paste (set-option -F), the submit condition requires the current pane to BE the recorded target, and a replaced pane now gets a REAL re-paste instead of a blank-Enter completion — local real-tmux and remote tests prove replacement-pane recovery delivers the content exactly once. (2) All safety-critical marker reads are strict: repair/rollback/post-clear verifications abort as KeyedMarkerVerificationError (wake outbox stays pending) instead of converting failed reads to empty state; local and remote tests cover rejected reads at each boundary.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3004",
     "lastVerifiedCommit": "1700fa490854ce01aef7b32625e0a6c56d11083a",
     "reviewSpawnedAt": "2026-07-26T10:55:04.629Z",
@@ -400,9 +400,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 29597634,
-            "output": 1067328,
-            "cacheRead": 163621376,
+            "input": 30341599,
+            "output": 1071690,
+            "cacheRead": 164608512,
             "cacheWrite": 0
           }
         },
@@ -431,9 +431,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 31071407,
-          "output": 1256449,
-          "cacheRead": 258950144,
+          "input": 31815372,
+          "output": 1260811,
+          "cacheRead": 259937280,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -444,8 +444,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 322.8763726,
-        "pricingAsOf": "2026-07-26T10:55:04.670Z"
+        "usd": 327.2206256,
+        "pricingAsOf": "2026-07-26T10:56:13.246Z"
       }
     },
     "merges": [
@@ -455,7 +455,7 @@
   },
   "workModel": "k3[1m]",
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "k3[1m]",
   "tasks": {
     "sequence": 20,
     "claims": {},
