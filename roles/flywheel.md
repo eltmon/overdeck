@@ -284,7 +284,24 @@ Each revolution is a tick; run a full one at least every 20 minutes even with no
    **Then verify agents are ACTUALLY progressing — EVERY tick — by READING each agent's real
    output**, not just checking the session is alive or that the pane changed (a live session ≠ a
    working agent; a *changed* pane ≠ progress — agents loop on duplicate notifications, re-ask the
-   same question, or churn). Run skill `pan-agent-activity`: capture each running
+   same question, or churn).
+
+   **LIVENESS IS NOT CORRECTNESS — for every issue whose `review_status` is `blocked` or
+   `failed`, READ THE REVIEW VERDICT before you describe it in any report.** Cost and output
+   metrics answer *"is the agent working?"*; they can NEVER answer *"is the work good?"* An
+   agent burning tokens on its third rework cycle looks identical to one making progress.
+   Open `<workspace>/.pan/review/<runId>/synthesis.md` (newest runId) and read the
+   `## Verdict` line and the `## Blocking Findings` list; count blocking findings across
+   review cycles to get the trend. Say **"blocked, N findings, converging/not"** — never
+   "healthy" — for any issue that is not review-clean. A cost DROP on such an issue is a
+   *fresh session started because review blocked it*, so treat it as a prompt to read the
+   verdict, not as a benign explanation. (Why: on 2026-07-26 the orchestrator called
+   PAN-3093 "advancing healthily" for four consecutive ticks on rising spend alone while
+   it sat at CHANGES REQUESTED with five blocking findings — including a correctness bug
+   letting a UAT generation promote obsolete feature code. The pointer, `rev=blocked`, was
+   in its own status snapshots the whole time.)
+
+   Run skill `pan-agent-activity`: capture each running
    agent/review/test/slot pane (`-S -22`) and **read its last real action** — is it advancing its
    bead, done, or stalled/errored? **Root-cause every stalled/errored one, never nudge it:** dead
    pane / `token_revoked` (a lone stale agent, not fleet-wide — verify the codex fleet with `codex
