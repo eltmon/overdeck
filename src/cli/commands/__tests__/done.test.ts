@@ -4,7 +4,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { join } from 'path';
 import { existsSync, mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
-import { augmentCommentWithWaiver, recordTestWaiver } from '../done.js';
+import { augmentCommentWithWaiver, buildStrikeBypassStamp, recordTestWaiver } from '../done.js';
 import { verifyStrikeBranchMergedIntoMain } from '../strike-merge-verification.js';
 import { getProjectConfigFromWorkspacePath, readIssueRecordSync, writeIssueRecordSync } from '../../../lib/pan-dir/record.js';
 
@@ -144,5 +144,27 @@ describe('verifyStrikeBranchMergedIntoMain', () => {
     await git(projectPath, ['commit', '-m', 'strike work']);
 
     await expect(verifyStrikeBranchMergedIntoMain('PAN-2013', projectPath)).rejects.toThrow();
+  });
+});
+
+describe('buildStrikeBypassStamp (PAN-3067)', () => {
+  it('stamps verification and tests as skipped when no review status exists', () => {
+    const stamp = buildStrikeBypassStamp(null);
+    expect(stamp.verificationStatus).toBe('skipped');
+    expect(stamp.verificationNotes).toContain('bypassed by design');
+    expect(stamp.testStatus).toBe('skipped');
+    expect(stamp.testNotes).toContain('by design');
+  });
+
+  it('stamps only the missing verdicts when tests already passed', () => {
+    const stamp = buildStrikeBypassStamp({ testStatus: 'passed', verificationStatus: 'pending' });
+    expect(stamp.verificationStatus).toBe('skipped');
+    expect(stamp.testStatus).toBeUndefined();
+    expect(stamp.testNotes).toBeUndefined();
+  });
+
+  it('leaves already-terminal verdicts untouched', () => {
+    expect(buildStrikeBypassStamp({ testStatus: 'skipped', verificationStatus: 'passed' })).toEqual({});
+    expect(buildStrikeBypassStamp({ testStatus: 'passed', verificationStatus: 'skipped' })).toEqual({});
   });
 });

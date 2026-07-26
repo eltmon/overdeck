@@ -465,6 +465,32 @@ export async function completeSlotWork(issueId: string, slot: SlotCompletionCont
   console.log(chalk.dim('  Swarm coordination will verify and merge this slot before issue-level review.'));
 }
 
+/**
+ * PAN-3067: the review-status patch that records a strike's by-design bypass
+ * of the test and verification stages as 'skipped' verdicts (DoD rows 2 and 3
+ * accept 'skipped'; a silent gap reads as 'missing' and blocks close-out
+ * forever). Verdicts already terminal (passed/skipped) are left untouched.
+ */
+export function buildStrikeBypassStamp(
+  current: { verificationStatus?: string; testStatus?: string } | null,
+): {
+  verificationStatus?: 'skipped';
+  verificationNotes?: string;
+  testStatus?: 'skipped';
+  testNotes?: string;
+} {
+  const stamp: ReturnType<typeof buildStrikeBypassStamp> = {};
+  if (current?.verificationStatus !== 'passed' && current?.verificationStatus !== 'skipped') {
+    stamp.verificationStatus = 'skipped';
+    stamp.verificationNotes = 'Strike path: quality gates run by the strike agent before landing; the verification stage is bypassed by design (PAN-3067)';
+  }
+  if (current?.testStatus !== 'passed' && current?.testStatus !== 'skipped') {
+    stamp.testStatus = 'skipped';
+    stamp.testNotes = 'Strike path: no test specialist is dispatched for strikes by design (PAN-3067)';
+  }
+  return stamp;
+}
+
 export async function doneCommand(id: string, options: DoneOptions = {}): Promise<void> {
   // Support both "pan done MIN-123" and "pan done agent-min-123"
   const slotInput = parseSlotAgentId(id);
@@ -486,6 +512,18 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
     try {
       const reason = await verifyStrikeBranchMergedIntoMain(issueId, resolved.projectPath);
       console.log(chalk.green(`✓ Verified strike merge: ${reason}`));
+
+      // PAN-3067: strikes bypass the test and verification stages by design,
+      // but bypassed must be RECORDED as 'skipped' (which DoD rows 2 and 3
+      // accept) — a silent gap reads as 'missing' and blocks close-out forever.
+      // Stamped before postMergeLifecycle so a re-run heals older strikes even
+      // when the lifecycle itself no-ops as already completed.
+      const { getReviewStatusSync, setReviewStatusSync } = await import('../../lib/review-status.js');
+      const strikeStamp = buildStrikeBypassStamp(getReviewStatusSync(issueId));
+      if (Object.keys(strikeStamp).length > 0) {
+        setReviewStatusSync(issueId, strikeStamp);
+        console.log(chalk.green(`✓ Recorded strike-bypass verdicts (${Object.keys(strikeStamp).filter(k => k.endsWith('Status')).join(', ')}) for DoD close-out`));
+      }
 
       const { postMergeLifecycle } = await import('../../lib/cloister/merge-agent.js');
       await postMergeLifecycle(issueId, resolved.projectPath, branchName, {
