@@ -114,16 +114,34 @@ async function runUatTrainReconcileForProject(
   const { isMergeTrainEnabledForProject } = await import('../../../lib/overdeck/merge-sync.js');
   const projectConfig = findProjectByPathSync(projectPath);
 
+  // Fail closed: if project cannot be resolved, don't proceed
+  if (!projectConfig) {
+    console.log(`[uat-train] project at ${projectPath} not found in config — skipping`);
+    return { action: 'no-queue', invalidated: [] };
+  }
+
   // PAN-1696: polyrepo assembly not yet supported — skip before git operations
-  if (projectConfig?.workspace?.type === 'polyrepo') {
+  if (projectConfig.workspace?.type === 'polyrepo') {
     console.log(`[uat-train] polyrepo project type not supported for UAT assembly — skipping`);
     return { action: 'no-queue', invalidated: [] };
+  }
+
+  // Check if enabled before building git deps (fail closed on null config)
+  if (!isMergeTrainEnabledForProject(projectConfig)) {
+    return { action: 'disabled', invalidated: [] };
+  }
+
+  // Early exit if no candidates — skip git operations
+  const candidates = listEligibleCandidatesByProject(projectPath);
+  const liveGenerations = listUatGenerationsSync({ projectRoot: projectPath, limit: 1 });
+  if (candidates.length === 0 && liveGenerations.length === 0) {
+    return { action: 'idle', invalidated: [] };
   }
 
   const gitDeps = buildUatGenerationGitDeps(projectPath);
 
   return reconcileUatGenerations(projectPath, {
-    isEnabled: () => isMergeTrainEnabledForProject(projectConfig),
+    isEnabled: () => true,  // Already checked above
     getReadySet: () => getReadySetForProject(projectPath),
     getMainHeadSha: () => gitDeps.fetchMain(),
     getBranchHeadSha: (branch) => gitDeps.branchHeadSha(branch),
@@ -181,7 +199,7 @@ async function assembleFromReadySetForProject(
     {
       git: buildUatGenerationGitDeps(projectPath),
       store,
-      resolveConflict: buildConflictAgentHook(projectPath),
+      resolveConflict: buildConflictAgentHook(),
       log: (msg) => console.log(msg),
     },
   );
@@ -191,26 +209,38 @@ async function assembleFromReadySetForProject(
 
 /**
  * PAN-1696 reconciler-decouple: Run UAT reconciliation for all tracked projects.
- * Reconciles only enabled projects; skips empty/unsupported projects before git work.
+ * Reconciles only enabled projects; isolates errors per project so one project's failure
+ * doesn't prevent others from reconciling. Returns aggregated success/idle/failure state.
  */
 export async function runUatTrainReconcile(options: { force?: boolean } = {}): Promise<ReconcileResult> {
   const { listProjectsSync } = await import('../../../lib/projects.js');
   const { isMergeTrainEnabledForProject } = await import('../../../lib/overdeck/merge-sync.js');
 
   const projects = listProjectsSync();
-  const results: ReconcileResult[] = [];
+  const results = await Promise.allSettled(
+    projects.map(async ({ config }) => {
+      // PAN-1696: skip projects with merge-train disabled
+      if (!isMergeTrainEnabledForProject(config)) {
+        return { action: 'disabled', invalidated: [] } as ReconcileResult;
+      }
 
-  for (const { config } of projects) {
-    // PAN-1696: skip projects with merge-train disabled
-    if (!isMergeTrainEnabledForProject(config)) continue;
+      const projectPath = resolve(config.path);
+      try {
+        return await runUatTrainReconcileForProject(projectPath, options);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error(`[uat-train] project ${projectPath} failed:`, msg);
+        return { action: 'idle', invalidated: [] } as ReconcileResult; // Fail closed; continue other projects
+      }
+    }),
+  );
 
-    const projectPath = resolve(config.path);
-    const result = await runUatTrainReconcileForProject(projectPath, options);
-    results.push(result);
-  }
+  // Extract fulfilled results and return the final state
+  const fulfilled = results
+    .filter((r) => r.status === 'fulfilled')
+    .map((r) => (r as PromiseFulfilledResult<ReconcileResult>).value);
 
-  // Return aggregated result (final result, or no-queue if all projects skipped)
-  return results[results.length - 1] ?? { action: 'no-queue', invalidated: [] };
+  return fulfilled[fulfilled.length - 1] ?? { action: 'no-queue', invalidated: [] };
 }
 
 let reconcilerTimer: ReturnType<typeof setInterval> | null = null;
