@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T12:25:26.814Z",
-  "updated": "2026-07-26T13:01:41.417Z",
+  "updated": "2026-07-26T13:01:50.568Z",
   "pipeline": {
     "issueId": "PAN-3123",
     "reviewStatus": "pending",
@@ -61,8 +61,16 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 6,
-    "claims": {},
+    "sequence": 7,
+    "claims": {
+      "governor-runway-docs": {
+        "writerId": "agent-pan-3123",
+        "agentId": "agent-pan-3123",
+        "pid": 1611253,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T13:01:50.568Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3123",
@@ -127,6 +135,7 @@
     "governor-swap-psi-hysteresis.governor-swap-psi-hysteresis.ac2": "completed",
     "governor-swap-psi-hysteresis.governor-swap-psi-hysteresis.ac3": "completed",
     "governor-swap-psi-hysteresis.governor-swap-psi-hysteresis.ac4": "completed",
-    "governor-swap-psi-hysteresis.governor-swap-psi-hysteresis.ac5": "completed"
+    "governor-swap-psi-hysteresis.governor-swap-psi-hysteresis.ac5": "completed",
+    "governor-runway-docs": "running"
   }
 }
