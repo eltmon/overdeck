@@ -82,22 +82,22 @@
     "recordedAt": "2026-07-26T15:10:38.144Z"
   },
   "created": "2026-07-26T13:39:19.365Z",
-  "updated": "2026-07-26T15:15:28.535Z",
+  "updated": "2026-07-26T15:15:29.717Z",
   "pipeline": {
     "issueId": "PAN-3138",
-    "reviewStatus": "blocked",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T15:10:55.975Z",
-    "updatedAt": "2026-07-26T15:15:27.589Z",
+    "updatedAt": "2026-07-26T15:15:28.631Z",
     "reviewNotes": "A failed verifying-on-main tracker transition permanently skips merge-time Docker teardown",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3143",
     "lastVerifiedCommit": "ad37787c2c81d40ae7e7365f0704b913ba266986",
     "reviewRequestedAt": "2026-07-26T15:10:55.975Z",
-    "reviewSpawnedAt": "2026-07-26T15:10:11.957Z",
+    "reviewSpawnedAt": "2026-07-26T15:15:28.630Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "scripts/file-size-baseline.txt",
@@ -133,24 +133,6 @@
         "tests/unit/lib/review-status.test.ts"
       ],
       "recordedAt": "2026-07-26T15:10:38.144Z"
-    },
-    "reviewerVerdicts": {
-      "security": {
-        "status": "passed",
-        "atCommit": "2ae7a2971a8c4516de6fe78b878d3c2fb986c98e"
-      },
-      "correctness": {
-        "status": "blocked",
-        "atCommit": "2ae7a2971a8c4516de6fe78b878d3c2fb986c98e"
-      },
-      "performance": {
-        "status": "passed",
-        "atCommit": "2ae7a2971a8c4516de6fe78b878d3c2fb986c98e"
-      },
-      "requirements": {
-        "status": "passed",
-        "atCommit": "2ae7a2971a8c4516de6fe78b878d3c2fb986c98e"
-      }
     }
   },
   "closeOut": {
@@ -215,7 +197,7 @@
       },
       "costAtCloseOut": {
         "usd": 121.388799,
-        "pricingAsOf": "2026-07-26T15:15:27.628Z"
+        "pricingAsOf": "2026-07-26T15:15:28.999Z"
       }
     },
     "merges": [
