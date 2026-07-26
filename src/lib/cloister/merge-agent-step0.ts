@@ -3,6 +3,8 @@ import type { BuildStaleness } from '../deploy/staleness.js';
 interface Step0Dependencies {
   readonly computeStaleness: () => Promise<BuildStaleness>;
   readonly getBlockReason: () => Promise<string | null>;
+  readonly recordIntent: typeof import('../deploy/deploy-queue.js').recordDeployIntent;
+  readonly listVerifyingIssues: () => string[];
   readonly log: (message: string) => void;
 }
 
@@ -30,6 +32,15 @@ export async function shouldRestartForPostMerge(
     (await import('../deploy/deploy-window.js')).getDeployBlockReason());
   const reason = await getBlockReason();
   if (reason) {
+    const recordIntent = dependencies.recordIntent
+      ?? (await import('../deploy/deploy-queue.js')).recordDeployIntent;
+    const getVerifyingIssues = dependencies.listVerifyingIssues
+      ?? (await import('../deploy/deploy-window.js')).listVerifyingIssues;
+    recordIntent({
+      requestedBy: 'merge-step0',
+      reason,
+      blockedBy: getVerifyingIssues(),
+    });
     (dependencies.log ?? console.log)(
       `Deploy window unsafe (${reason}) — deferring deploy to the staleness patrol`,
     );
