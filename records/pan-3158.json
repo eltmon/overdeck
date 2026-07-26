@@ -64,16 +64,16 @@
     "recordedAt": "2026-07-26T21:01:22.337Z"
   },
   "created": "2026-07-26T20:19:41.143Z",
-  "updated": "2026-07-26T21:01:22.339Z",
+  "updated": "2026-07-26T21:01:23.418Z",
   "pipeline": {
     "issueId": "PAN-3158",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T20:57:25.249Z",
+    "updatedAt": "2026-07-26T21:01:23.416Z",
     "reviewNotes": "Project filtering can falsely show the global no-ready-work message while another project has ready work",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3161",
     "lastVerifiedCommit": "6487d8b6389e5cb5c8b2bb6b48c9926fe0fdc0e8",
@@ -96,8 +96,9 @@
         "src/dashboard/frontend/src/components/merge-train/MergeTrainView.tsx",
         "src/dashboard/frontend/src/components/merge-train/__tests__/MergeTrainView.test.tsx"
       ],
-      "recordedAt": "2026-07-26T20:50:56.555Z"
-    }
+      "recordedAt": "2026-07-26T21:01:22.337Z"
+    },
+    "reviewRequestedAt": "2026-07-26T21:01:23.416Z"
   },
   "closeOut": {
     "usage": {
