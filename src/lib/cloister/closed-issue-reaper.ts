@@ -222,8 +222,25 @@ export async function reconcileClosedIssueAgents(): Promise<string[]> {
   }
 
   for (const issueId of await listFeatureDevnetIssueIds()) {
-    if (!await isClosedIssue(issueId, closedChecks)) continue;
-    await reapResolvedIssueResidue(issueId, actions, reapedIssueKeys);
+    if (await isClosedIssue(issueId, closedChecks)) {
+      await reapResolvedIssueResidue(issueId, actions, reapedIssueKeys);
+      continue;
+    }
+
+    try {
+      const { getReviewStatusSync } = await import('../review-status.js');
+      if (getReviewStatusSync(issueId)?.mergeStatus !== 'merged') continue;
+
+      const { teardownWorkspaceDockerByNamePromise } = await import('../workspace-manager/docker.js');
+      const result = await teardownWorkspaceDockerByNamePromise(issueId.toLowerCase());
+      actions.push(
+        result.networkRemoved
+          ? `Removed merged-issue Docker network for ${issueId}: ${result.steps.join('; ')}`
+          : `Merged-issue Docker network still present for ${issueId}: ${result.steps.join('; ')}`,
+      );
+    } catch (error) {
+      actions.push(`Failed to remove merged-issue Docker network for ${issueId}: ${error}`);
+    }
   }
 
   return actions;

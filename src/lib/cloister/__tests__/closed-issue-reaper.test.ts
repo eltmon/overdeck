@@ -7,6 +7,7 @@ import { join } from 'node:path';
 const mocks = vi.hoisted(() => ({
   emitActivityEntrySync: vi.fn(),
   exec: vi.fn(),
+  getReviewStatusSync: vi.fn(),
   isIssueClosed: vi.fn(),
   listRunningAgents: vi.fn(),
   listProjectsSync: vi.fn(),
@@ -14,6 +15,7 @@ const mocks = vi.hoisted(() => ({
   reapIssueResidue: vi.fn(),
   resolveProjectForIssue: vi.fn(),
   stopAgent: vi.fn(),
+  teardownWorkspaceDockerByNamePromise: vi.fn(),
 }));
 
 vi.mock('node:child_process', async (importOriginal) => {
@@ -59,6 +61,14 @@ vi.mock('../reap-issue-residue.js', () => ({
   reapIssueResidue: mocks.reapIssueResidue,
 }));
 
+vi.mock('../../review-status.js', () => ({
+  getReviewStatusSync: mocks.getReviewStatusSync,
+}));
+
+vi.mock('../../workspace-manager/docker.js', () => ({
+  teardownWorkspaceDockerByNamePromise: mocks.teardownWorkspaceDockerByNamePromise,
+}));
+
 import { reconcileClosedIssueAgents } from '../closed-issue-reaper.js';
 
 describe('reconcileClosedIssueAgents', () => {
@@ -72,9 +82,14 @@ describe('reconcileClosedIssueAgents', () => {
     mocks.listRunningAgents.mockReturnValue(Effect.succeed([]));
     mocks.listProjectsSync.mockReturnValue([]);
     mocks.listSessionNames.mockReturnValue(Effect.succeed([]));
+    mocks.getReviewStatusSync.mockReturnValue(null);
     mocks.reapIssueResidue.mockResolvedValue([]);
     mocks.resolveProjectForIssue.mockReturnValue(null);
     mocks.stopAgent.mockReturnValue(Effect.succeed(undefined));
+    mocks.teardownWorkspaceDockerByNamePromise.mockResolvedValue({
+      networkRemoved: true,
+      steps: ['Removed network'],
+    });
     mocks.isIssueClosed.mockResolvedValue(false);
     mocks.exec.mockImplementation((_command: string, opts: unknown, callback?: (error: Error | null, result: { stdout: string; stderr: string }) => void) => {
       const cb = typeof opts === 'function' ? opts : callback;
@@ -258,6 +273,44 @@ describe('reconcileClosedIssueAgents', () => {
     expect(mocks.reapIssueResidue).toHaveBeenCalledTimes(1);
     expect(mocks.reapIssueResidue).toHaveBeenCalledWith(projectPath, 'PAN-5558');
     rmSync(projectPath, { recursive: true, force: true });
+  });
+
+  it('removes leaked devnets for merged issues without reaping other residue', async () => {
+    mocks.exec.mockImplementation((command: string, opts: unknown, callback?: (error: Error | null, result: { stdout: string; stderr: string }) => void) => {
+      const cb = typeof opts === 'function' ? opts : callback;
+      const stdout = String(command).includes('docker network ls')
+        ? 'overdeck-feature-pan-5559_devnet\nbridge\n'
+        : '';
+      cb?.(null, { stdout, stderr: '' });
+      return { on: vi.fn() };
+    });
+    mocks.getReviewStatusSync.mockReturnValue({ mergeStatus: 'merged' });
+
+    await expect(reconcileClosedIssueAgents()).resolves.toEqual([
+      'Removed merged-issue Docker network for PAN-5559: Removed network',
+    ]);
+
+    expect(mocks.teardownWorkspaceDockerByNamePromise).toHaveBeenCalledWith('pan-5559');
+    expect(mocks.reapIssueResidue).not.toHaveBeenCalled();
+    expect(mocks.stopAgent).not.toHaveBeenCalled();
+  });
+
+  it('ignores leaked devnets without merged review status', async () => {
+    mocks.exec.mockImplementation((command: string, opts: unknown, callback?: (error: Error | null, result: { stdout: string; stderr: string }) => void) => {
+      const cb = typeof opts === 'function' ? opts : callback;
+      const stdout = String(command).includes('docker network ls')
+        ? 'overdeck-feature-pan-5559_devnet\nbridge\n'
+        : '';
+      cb?.(null, { stdout, stderr: '' });
+      return { on: vi.fn() };
+    });
+
+    await expect(reconcileClosedIssueAgents()).resolves.toEqual([]);
+
+    expect(mocks.getReviewStatusSync).toHaveBeenCalledWith('PAN-5559');
+    expect(mocks.teardownWorkspaceDockerByNamePromise).not.toHaveBeenCalled();
+    expect(mocks.reapIssueResidue).not.toHaveBeenCalled();
+    expect(mocks.stopAgent).not.toHaveBeenCalled();
   });
 
   it('preserves open pure-disk residue', async () => {
