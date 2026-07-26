@@ -374,13 +374,20 @@ export async function postUatGenerationPromotePayload(
   firePostMerge: (issueId: string) => boolean,
 ): Promise<PromoteResult> {
   const root = projectRoot();
-  const { reviewRecordEligibility } = await import('../../../lib/flywheel-merge-order.js');
+  const [
+    { reviewRecordEligibility },
+    { recordUatPromotionVerdicts },
+  ] = await Promise.all([
+    import('../../../lib/flywheel-merge-order.js'),
+    import('../../../lib/cloister/uat-promote-verification.js'),
+  ]);
   const result = await promoteUatGeneration(name, root, {
     git: buildUatPromoteGitDeps(root),
     store: { ...buildUatGenerationStore(), get: (n) => getUatGenerationSync(n) },
     teardownStack: (gen) => teardownUatStack(gen),
     firePostMerge,
     memberEligibility: reviewRecordEligibility,
+    recordVerification: (generation, mergeSha) => recordUatPromotionVerdicts(generation, mergeSha),
     log: (msg) => console.log(msg),
   });
   await notifyFlywheelOfUatPromote(result).catch(() => {});
