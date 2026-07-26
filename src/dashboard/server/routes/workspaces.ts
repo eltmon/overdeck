@@ -75,7 +75,7 @@ import {
   markWorkspaceStuck,
   setDeaconIgnored,
   setAutoMerge,
-  type ReviewStatus,
+  type ReviewStatus, type ReviewStatusUpdate,
 } from '../../../lib/review-status.js';
 import {
   getCachedConflictGateMergeability,
@@ -926,7 +926,7 @@ export async function repairFlywayIfNeeded(
 // setReviewStatus wrapper (mirrors the index.ts version; side-effects are
 // intentionally omitted here — the server-side side-effects (auto-PR, auto-merge)
 // live in the Express server until full migration is complete).
-export function setReviewStatus(issueId: string, update: Partial<ReviewStatus>): ReviewStatus {
+export function setReviewStatus(issueId: string, update: ReviewStatusUpdate): ReviewStatus {
   return setReviewStatusBase(issueId, update);
 }
 
@@ -1454,16 +1454,16 @@ const postWorkspaceReviewStatusRoute = HttpRouter.add(
     // Snapshot reviewedAtCommit BEFORE the first setReviewStatus call so canSkipTests
     // fires correctly in that same call — setting it afterward is too late (the
     // async test-agent dispatch is already scheduled).
-    const update: Partial<ReviewStatus> = {};
+    const update: ReviewStatusUpdate = {};
     if (reviewStatus === 'passed') {
       const workspaceInfo = getWorkspaceInfoForIssue(issueId);
       if (workspaceInfo.exists && workspaceInfo.localPath) {
         const localPath = workspaceInfo.localPath;
-        const { getWorkspaceGitInfo } = yield* Effect.promise(() => import('../../../lib/git-utils.js'));
+        const { snapshotWorkspaceHeadsPromise } = yield* Effect.promise(() => import('../../../lib/git-utils.js'));
         try {
-          const gitInfo = yield* getWorkspaceGitInfo(localPath);
-          if (gitInfo.HEAD) {
-            update.reviewedAtCommit = gitInfo.HEAD;
+          const headAnchor = yield* Effect.promise(() => snapshotWorkspaceHeadsPromise(issueId, localPath));
+          if (headAnchor) {
+            update.reviewedAtCommit = headAnchor;
           }
         } catch { /* non-fatal */ }
       }

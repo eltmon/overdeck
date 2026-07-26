@@ -104,8 +104,9 @@ workspace path:
   and an additive `repos: [{repoKey, branch, headSha, diffBase, fileCount}]`
   manifest field. Top-level `headSha`/`branch` come from the first sub-repo
   with changes.
-- **runId head suffix** (`review-agent.ts`): resolved from the primary sub-repo
-  so re-review runs get distinct directories.
+- **runId head suffix** (`review-agent.ts`): monorepos keep their short HEAD;
+  polyrepos use the first eight hex characters of a SHA-1 over the full composite
+  snapshot, so a commit in any sub-repo creates a distinct review directory.
 - **Dispatch pushes** (`review-pipeline.ts`): one shared helper pushes each
   sub-repo's `feature/<issue>` where the branch exists locally; the wrapper is
   never pushed.
@@ -124,6 +125,39 @@ workspace path:
   repo satisfies the guard; a failed repo diff skips the guard conservatively.
   When a container gate reports infrastructure unavailable, verification waits
   for the triggered stack rebuild to settle before another cycle can start.
+
+### Verdict anchors (`HeadAnchor`)
+
+`snapshotWorkspaceHeadsPromise()` is the only producer of `HeadAnchor`: one full
+SHA for a monorepo, or a space-separated `repoKey@sha` token for every polyrepo
+code root. `parseCompositeSnapshot()` is the one lenient parser for inspecting
+that composite shape; `parseWorkspaceHeadAnchor()` remains the strict validator
+used before passing an anchor to Git.
+
+The TypeScript brand prevents a plain string from entering the review-status
+write door. A value read from SQLite, a durable issue record, or another wire
+boundary may regain the brand only through `rehydrateHeadAnchor()`, with a
+comment naming that storage boundary. The pairing rule is: **a compare site may only compare against what the producer stamped**.
+
+The five converted stamp/compare sites are:
+
+1. `checkPostReviewCommits()` in `cloister/deacon.ts` compares
+   `reviewedAtCommit` through the composite-aware drift evaluator.
+2. Role-run liveness stamps in `agents/spawn.ts` and compares in
+   `cloister/service-reactive.ts` using the same full `roleRunHead` anchor.
+3. `POST /api/review/:issueId/status` in `routes/workspaces.ts` stamps
+   `reviewedAtCommit` from the producer.
+4. The legacy specialists-done route stamps `reviewedAtCommit` from the
+   producer.
+5. The verification/review contradiction bypass in `cloister/deacon.ts` stamps
+   `reviewedAtCommit` from the producer.
+
+A legacy wrapper SHA compared with a current composite anchor is intentionally
+reported as drift once. That conservative reset writes the new producer shape,
+so subsequent patrols stabilize instead of repeating. The historical failure
+signature was MIN-901 logging 56 resets like `(fe@52d65 → 7492ae82)`: the first
+value was a composite truncated with `substring(0, 8)`, while the second was the
+wrapper SHA. Logs now render every token as `repoKey@<8-char sha>`.
 
 ---
 

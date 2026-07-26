@@ -128,12 +128,14 @@ describe('EventStoreServiceLive + ReadModelServiceLive end-to-end', () => {
   }, 30000);
 });
 
-describe('Effect-returning helper composition', () => {
-  it('does not wrap workspace git info Effect in Effect.promise', () => {
+describe('Effect helper composition', () => {
+  it('wraps the promise-based workspace head snapshot in Effect.promise', () => {
     const source = readFileSync(resolve(process.cwd(), 'src/dashboard/server/routes/workspaces.ts'), 'utf8');
 
-    expect(source).not.toMatch(/Effect\.promise\(\(\) => getWorkspaceGitInfo\(/);
-    expect(source).toMatch(/yield\* getWorkspaceGitInfo\((?:workspacePath|localPath)\)/);
+    expect(source).not.toContain('getWorkspaceGitInfo(localPath)');
+    expect(source).toContain(
+      'yield* Effect.promise(() => snapshotWorkspaceHeadsPromise(issueId, localPath))',
+    );
   });
 });
 

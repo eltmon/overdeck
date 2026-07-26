@@ -18,7 +18,9 @@ import {
   setReviewStatusSync,
   getReviewStatusSync,
   type ReviewStatus,
+  type ReviewStatusUpdate,
 } from '../../../lib/review-status.js';
+import type { HeadAnchor } from '../../../lib/git-utils.js';
 
 interface DoneOptions {
   status: 'passed' | 'failed' | 'blocked';
@@ -94,7 +96,7 @@ export async function doneCommand(
   // computed readyForMerge, and JSON persistence in one call.
   // This eliminates the read-modify-write race that caused duplicate
   // specialist runs to overwrite each other's results.
-  const update: Partial<ReviewStatus> = {};
+  const update: ReviewStatusUpdate = {};
 
   switch (specialist) {
     case 'review':
@@ -128,7 +130,7 @@ export async function doneCommand(
       // A bare blocked verdict (no --reviewers) skips the git probe so the durable
       // write stays synchronous ahead of feedback delivery (PAN-2524).
       if (options.status === 'passed' || update.reviewerVerdicts) {
-        let workspaceHead: string | undefined;
+        let workspaceHead: HeadAnchor | undefined;
         try {
           const { resolveProjectFromIssueSync } = await import('../../../lib/projects.js');
           const { existsSync } = await import('node:fs');

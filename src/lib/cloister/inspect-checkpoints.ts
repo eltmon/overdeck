@@ -12,7 +12,7 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import { Effect } from 'effect';
 import { resolveWorkspaceRepoRootsSync, type WorkspaceRepoRoot } from '../project-repos.js';
-import { snapshotWorkspaceHeadsPromise } from '../git-utils.js';
+import { parseCompositeSnapshot, snapshotWorkspaceHeadsPromise } from '../git-utils.js';
 
 const execAsync = promisify(exec);
 
@@ -114,17 +114,6 @@ export interface InspectDiffContext {
 
 function shellQuote(value: string): string {
   return `'${value.replace(/'/g, `'"'"'`)}'`;
-}
-
-function parseCompositeSnapshot(snapshot: string | undefined): Map<string, string> {
-  const heads = new Map<string, string>();
-  if (!snapshot) return heads;
-  for (const token of snapshot.split(/\s+/)) {
-    const separator = token.lastIndexOf('@');
-    if (separator <= 0 || separator === token.length - 1) continue;
-    heads.set(token.slice(0, separator), token.slice(separator + 1));
-  }
-  return heads;
 }
 
 async function readHead(root: WorkspaceRepoRoot): Promise<string | null> {
