@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T05:55:05.237Z",
-  "updated": "2026-07-26T06:04:29.373Z",
+  "updated": "2026-07-26T06:09:53.432Z",
   "pipeline": {
     "issueId": "PAN-3109",
     "reviewStatus": "pending",
@@ -59,18 +59,34 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "extract-containment-lens": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-3109",
         "agentId": "agent-pan-3109",
         "pid": 1563035,
         "host": "eltmon-z790",
-        "claimedAt": "2026-07-26T06:04:29.373Z"
+        "claimedAt": "2026-07-26T06:04:29.373Z",
+        "itemId": "extract-containment-lens",
+        "outcome": "completed",
+        "reason": "Extracted and exported the shared branch snapshot/classification lens, added issue-scoped polyrepo aggregation, rewired membership gathering through it, and added focused tests; typecheck and targeted tests pass.",
+        "releasedAt": "2026-07-26T06:09:53.432Z"
+      }
+    ],
+    "statusReasons": {
+      "extract-containment-lens": {
+        "reason": "Extracted and exported the shared branch snapshot/classification lens, added issue-scoped polyrepo aggregation, rewired membership gathering through it, and added focused tests; typecheck and targeted tests pass.",
+        "updatedAt": "2026-07-26T06:09:53.432Z"
       }
     }
   },
   "statusOverrides": {
-    "extract-containment-lens": "running"
+    "extract-containment-lens": "completed",
+    "extract-containment-lens.extract-containment-lens.ac1": "completed",
+    "extract-containment-lens.extract-containment-lens.ac2": "completed",
+    "extract-containment-lens.extract-containment-lens.ac3": "completed",
+    "extract-containment-lens.extract-containment-lens.ac4": "completed",
+    "extract-containment-lens.extract-containment-lens.ac5": "completed"
   }
 }
