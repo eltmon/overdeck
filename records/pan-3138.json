@@ -101,17 +101,17 @@
     "recordedAt": "2026-07-26T15:34:06.412Z"
   },
   "created": "2026-07-26T13:39:19.365Z",
-  "updated": "2026-07-26T15:34:18.327Z",
+  "updated": "2026-07-26T15:34:57.425Z",
   "pipeline": {
     "issueId": "PAN-3138",
-    "reviewStatus": "failed",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T15:34:16.413Z",
-    "reviewNotes": "Review role spawn failed: Role run agent-pan-3138-review already running. Use 'pan tell' to message it.",
+    "updatedAt": "2026-07-26T15:34:56.768Z",
+    "reviewNotes": "Agent re-review request (1/25): Fixed typecheck and all second-cycle review issues",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3143",
     "lastVerifiedCommit": "ad37787c2c81d40ae7e7365f0704b913ba266986",
     "reviewSpawnedAt": "2026-07-26T15:34:09.887Z",
@@ -161,9 +161,9 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 795519,
-            "output": 24168,
-            "cacheRead": 7394816,
+            "input": 1048006,
+            "output": 25440,
+            "cacheRead": 8735744,
             "cacheWrite": 0
           }
         },
@@ -201,24 +201,24 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 3272049,
-            "output": 213482,
-            "cacheRead": 121590784,
+            "input": 3278100,
+            "output": 214549,
+            "cacheRead": 123142656,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 10528463,
-          "output": 435140,
-          "cacheRead": 161873408,
+          "input": 10787001,
+          "output": 437479,
+          "cacheRead": 164766208,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 146.633219,
-        "pricingAsOf": "2026-07-26T15:34:18.066Z"
+        "usd": 149.442479,
+        "pricingAsOf": "2026-07-26T15:34:56.896Z"
       }
     },
     "merges": [
