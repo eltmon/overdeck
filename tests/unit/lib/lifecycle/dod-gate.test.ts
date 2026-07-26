@@ -276,7 +276,7 @@ describe('Definition-of-Done merged row', () => {
 
   it('describes branch containment as accepted merged-row evidence', () => {
     expect(DOD_ROWS.find(row => row.id === 'merged')?.expected)
-      .toBe('PR merged on the forge, or branch work contained in main (non-PR landing)');
+      .toBe('PR merged on the forge (feature or strike head), or branch work contained in main (non-PR landing)');
   });
 });
 
