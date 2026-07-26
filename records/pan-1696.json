@@ -331,7 +331,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T00:35:36.057Z",
-  "updated": "2026-07-26T12:33:44.520Z",
+  "updated": "2026-07-26T13:32:04.481Z",
   "pipeline": {
     "issueId": "PAN-1696",
     "reviewStatus": "passed",
@@ -342,7 +342,7 @@
     "releaseStatus": "skipped",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T11:50:51.889Z",
-    "updatedAt": "2026-07-26T12:31:55.861Z",
+    "updatedAt": "2026-07-26T13:32:04.440Z",
     "reviewNotes": "Approved at ca167961: main-line UAT promotion and Awaiting Merge integrations preserve all PAN-1696 behavior; focused server/frontend tests, typecheck, lint, and file-size checks pass. Report: .pan/review/agent-pan-1696-review-ca167961/review.md",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3095",
     "reviewedAtCommit": "ca167961dcf75dd71f2e4b2cd00afbbc9726e2e6",
@@ -439,7 +439,7 @@
       },
       "costAtCloseOut": {
         "usd": 292.1565652,
-        "pricingAsOf": "2026-07-26T12:31:56.327Z"
+        "pricingAsOf": "2026-07-26T13:32:04.476Z"
       }
     },
     "merges": [
@@ -448,7 +448,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "model": "claude-opus-5",
   "tasks": {
     "sequence": 38,
     "claims": {},
