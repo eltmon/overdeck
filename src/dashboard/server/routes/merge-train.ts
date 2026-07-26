@@ -1,0 +1,291 @@
+/**
+ * PAN-1696 merge-train-routes: the aggregate `/api/merge-train/*` namespace.
+ *
+ * The merge-train (conflict-aware merge order + UAT batch trains) is a
+ * per-project pipeline concern, but its only HTTP surface used to live under
+ * `/api/flywheel/*` and answered for the Overdeck repo alone. These routes
+ * answer for EVERY tracked project and require no active flywheel run: the
+ * ready set comes from the review-status records via
+ * `listEligibleCandidatesByProject`, not from a run's `activePipeline`.
+ *
+ * The legacy `/api/flywheel/*` merge-train routes stay in place until the
+ * frontend migrates — removing them is the remove-legacy-routes item.
+ */
+
+import { Effect, Layer } from 'effect';
+import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
+import { layer as nodeServicesLayer } from '@effect/platform-node/NodeServices';
+import { resolve } from 'node:path';
+import { httpHandler } from './http-handler.js';
+import { jsonResponse } from '../http-helpers.js';
+import { rejectUnsafeDashboardMutationRequest } from './dashboard-auth.js';
+import { getProjectSync, listProjectsSync, type ProjectConfig } from '../../../lib/projects.js';
+import {
+  computeMergeQueueFromCandidates,
+  listEligibleCandidatesByProject,
+  type MergeQueueItem,
+} from '../../../lib/flywheel-merge-order.js';
+
+const readUnknownJsonBody = Effect.gen(function* () {
+  const request = yield* HttpServerRequest.HttpServerRequest;
+  const text = yield* request.text;
+  try {
+    return { ok: true as const, body: text ? (JSON.parse(text) as unknown) : {} };
+  } catch {
+    return { ok: false as const, error: 'Request body must be valid JSON' };
+  }
+});
+
+/** One project's merge-train queue as served by GET /api/merge-train/queues. */
+export interface MergeTrainQueueEntry {
+  projectKey: string;
+  projectName: string;
+  /** Effective per-project flag: the project override, else the global setting. */
+  enabled: boolean;
+  queue: MergeQueueItem[];
+}
+
+/** One project's UAT generation chain as served by GET /api/merge-train/generations. */
+export interface MergeTrainGenerationsEntry {
+  projectKey: string;
+  projectName: string;
+  enabled: boolean;
+  generations: unknown[];
+}
+
+/**
+ * A disabled project reports an empty queue rather than being omitted, so the
+ * multi-project view can render it as an explicitly-off row instead of making
+ * "off" and "no ready work" look identical.
+ */
+async function queueEntryForProject(
+  key: string,
+  config: ProjectConfig,
+  enabled: boolean,
+): Promise<MergeTrainQueueEntry> {
+  const base = { projectKey: key, projectName: config.name, enabled };
+  if (!enabled) return { ...base, queue: [] };
+
+  const projectPath = resolve(config.path);
+  const candidates = listEligibleCandidatesByProject(projectPath);
+  if (candidates.length === 0) return { ...base, queue: [] };
+
+  const queue = await Effect.runPromise(
+    computeMergeQueueFromCandidates(candidates, projectPath).pipe(Effect.provide(nodeServicesLayer)),
+  );
+  return { ...base, queue };
+}
+
+/**
+ * PAN-1696 AC1: one entry per tracked project, with that project's effective
+ * flag and queue, with no flywheel run active. One project's git failure must
+ * not blank the whole response, so a failed project reports an empty queue.
+ */
+export async function getMergeTrainQueuesPayload(): Promise<MergeTrainQueueEntry[]> {
+  const { isMergeTrainEnabledForProject } = await import('../../../lib/overdeck/merge-sync.js');
+  const projects = listProjectsSync();
+  const settled = await Promise.allSettled(
+    projects.map(({ key, config }) =>
+      queueEntryForProject(key, config, isMergeTrainEnabledForProject(config)),
+    ),
+  );
+  return settled.flatMap((outcome, i) => {
+    if (outcome.status === 'fulfilled') return [outcome.value];
+    const entry = projects[i];
+    if (!entry) return [];
+    const reason = outcome.reason instanceof Error ? outcome.reason.message : String(outcome.reason);
+    console.warn(`[merge-train] queue for project ${entry.key} failed: ${reason}`);
+    return [{ projectKey: entry.key, projectName: entry.config.name, enabled: true, queue: [] }];
+  });
+}
+
+/** PAN-1696 AC2: per-project generation chains across every tracked project. */
+export async function getMergeTrainGenerationsPayload(): Promise<MergeTrainGenerationsEntry[]> {
+  const { isMergeTrainEnabledForProject } = await import('../../../lib/overdeck/merge-sync.js');
+  const { getUatGenerationsPayload } = await import('../services/uat-train.js');
+
+  const settled = await Promise.allSettled(
+    listProjectsSync().map(async ({ key, config }) => ({
+      projectKey: key,
+      projectName: config.name,
+      enabled: isMergeTrainEnabledForProject(config),
+      generations: await getUatGenerationsPayload(resolve(config.path)),
+    })),
+  );
+  return settled.flatMap((outcome) => (outcome.status === 'fulfilled' ? [outcome.value] : []));
+}
+
+/**
+ * PAN-1696 AC3: merge the first N issues of the named project's ready set,
+ * one at a time, stopping at the first failure (the rest would need
+ * re-rebasing). An unknown project key is a 4xx, never a silent empty merge.
+ */
+export interface MergeTrainMergeNextDeps {
+  getOrderedIssueIds?: (projectPath: string) => Promise<string[]>;
+  merge?: (issueId: string) => Promise<{ ok: true } | { ok: false; reason: string }>;
+}
+
+async function defaultOrderedIssueIdsForProject(projectPath: string): Promise<string[]> {
+  const candidates = listEligibleCandidatesByProject(projectPath);
+  if (candidates.length === 0) return [];
+  const queue = await Effect.runPromise(
+    computeMergeQueueFromCandidates(candidates, projectPath).pipe(Effect.provide(nodeServicesLayer)),
+  );
+  return queue.map((item) => item.issueId);
+}
+
+async function defaultMergeOne(issueId: string): Promise<{ ok: true } | { ok: false; reason: string }> {
+  const { triggerMerge } = await import('./workspaces/merge-ops.js');
+  const r = await triggerMerge(issueId);
+  return r.success ? { ok: true } : { ok: false, reason: r.error ?? r.message ?? 'merge failed' };
+}
+
+export async function postMergeTrainMergeNextPayload(
+  payload: unknown,
+  deps: MergeTrainMergeNextDeps = {},
+): Promise<{ status: number; body: unknown }> {
+  const body = (payload ?? {}) as { n?: unknown; project?: unknown };
+  const n = typeof body.n === 'number' && Number.isFinite(body.n) ? Math.floor(body.n) : 0;
+  if (n <= 0) return { status: 400, body: { error: 'n must be a positive integer' } };
+
+  const projectKey = typeof body.project === 'string' ? body.project.trim() : '';
+  if (!projectKey) return { status: 400, body: { error: 'project is required' } };
+  const config = getProjectSync(projectKey);
+  if (!config) return { status: 404, body: { error: `Unknown project key: ${projectKey}` } };
+
+  const { isMergeTrainEnabledForProject } = await import('../../../lib/overdeck/merge-sync.js');
+  if (!isMergeTrainEnabledForProject(config)) {
+    return { status: 409, body: { error: `merge-train is disabled for project ${projectKey}` } };
+  }
+
+  const ordered = await (deps.getOrderedIssueIds ?? defaultOrderedIssueIdsForProject)(resolve(config.path));
+  const issueIds = ordered.slice(0, n);
+  const { shipMergeBatch } = await import('../../../lib/cloister/merge-batch.js');
+  const outcomes = await shipMergeBatch(issueIds, { merge: deps.merge ?? defaultMergeOne });
+  return { status: 200, body: { projectKey, outcomes } };
+}
+
+/**
+ * PAN-1696: forced reconcile. With `{ project }` it rebuilds that one project's
+ * generation; with no body it reconciles every merge-train-enabled project.
+ */
+export async function postMergeTrainAssemblePayload(payload: unknown): Promise<{ status: number; body: unknown }> {
+  const body = (payload ?? {}) as { project?: unknown };
+  const { runUatTrainReconcile, runUatTrainReconcileAllProjects } = await import('../services/uat-train.js');
+
+  if (typeof body.project === 'string' && body.project.trim() !== '') {
+    const projectKey = body.project.trim();
+    const config = getProjectSync(projectKey);
+    if (!config) return { status: 404, body: { error: `Unknown project key: ${projectKey}` } };
+    const result = await runUatTrainReconcile({ force: true, projectRoot: resolve(config.path) });
+    return { status: 200, body: { projects: [{ projectKey, result }] } };
+  }
+
+  const results = await runUatTrainReconcileAllProjects({ force: true });
+  return { status: 200, body: { projects: results } };
+}
+
+/**
+ * PAN-1737 generation names contain a slash (`uat/pan-otter-0610`); URL params
+ * carry the name WITHOUT the `uat/` prefix and handlers reconstitute it. Same
+ * reconstruction as the legacy flywheel routes so links stay interchangeable.
+ */
+function uatGenerationNameFromParam(param: string): string {
+  const decoded = decodeURIComponent(param);
+  return decoded.startsWith('uat/') ? decoded : `uat/${decoded}`;
+}
+
+// ─── Routes ───────────────────────────────────────────────────────────────────
+
+const getMergeTrainQueuesRoute = HttpRouter.add(
+  'GET',
+  '/api/merge-train/queues',
+  httpHandler(Effect.gen(function* () {
+    return jsonResponse(yield* Effect.promise(() => getMergeTrainQueuesPayload()));
+  })),
+);
+
+const getMergeTrainGenerationsRoute = HttpRouter.add(
+  'GET',
+  '/api/merge-train/generations',
+  httpHandler(Effect.gen(function* () {
+    return jsonResponse(yield* Effect.promise(() => getMergeTrainGenerationsPayload()));
+  })),
+);
+
+const postMergeTrainGenerationStackRoute = HttpRouter.add(
+  'POST',
+  '/api/merge-train/generations/:name/stack',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const authError = rejectUnsafeDashboardMutationRequest(request);
+    if (authError) return authError;
+    const params = yield* HttpRouter.params;
+    const name = uatGenerationNameFromParam(params['name'] ?? '');
+    const { postUatGenerationStackPayload } = yield* Effect.promise(() => import('../services/uat-train.js'));
+    const result = yield* Effect.promise(() => postUatGenerationStackPayload(name));
+    if (!result.ok) return jsonResponse({ error: result.error }, { status: result.status });
+    return jsonResponse({ frontendUrl: result.frontendUrl, evicted: result.evicted });
+  })),
+);
+
+const postMergeTrainGenerationPromoteRoute = HttpRouter.add(
+  'POST',
+  '/api/merge-train/generations/:name/promote',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const authError = rejectUnsafeDashboardMutationRequest(request);
+    if (authError) return authError;
+    const params = yield* HttpRouter.params;
+    const name = uatGenerationNameFromParam(params['name'] ?? '');
+    const { postUatGenerationPromotePayload } = yield* Effect.promise(() => import('../services/uat-train.js'));
+    const { firePostMergeLifecycle } = yield* Effect.promise(() => import('./specialists.js'));
+    const result = yield* Effect.promise(() => postUatGenerationPromotePayload(name, firePostMergeLifecycle));
+    if (!result.success) {
+      const status = result.reason === 'not-found' ? 404 : result.reason === 'merge-failed' ? 500 : 409;
+      return jsonResponse(result, { status });
+    }
+    return jsonResponse(result);
+  })),
+);
+
+const postMergeTrainAssembleRoute = HttpRouter.add(
+  'POST',
+  '/api/merge-train/assemble',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const authError = rejectUnsafeDashboardMutationRequest(request);
+    if (authError) return authError;
+    const parsed = yield* readUnknownJsonBody;
+    // An empty body is the "reconcile every project" form, so a body-less POST
+    // must not 400 the way a malformed body does.
+    const body = parsed.ok ? parsed.body : {};
+    const result = yield* Effect.promise(() => postMergeTrainAssemblePayload(body));
+    return jsonResponse(result.body, { status: result.status });
+  })),
+);
+
+const postMergeTrainMergeNextRoute = HttpRouter.add(
+  'POST',
+  '/api/merge-train/merge-next',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const authError = rejectUnsafeDashboardMutationRequest(request);
+    if (authError) return authError;
+    const parsed = yield* readUnknownJsonBody;
+    if (!parsed.ok) return jsonResponse({ error: parsed.error }, { status: 400 });
+    const result = yield* Effect.promise(() => postMergeTrainMergeNextPayload(parsed.body));
+    return jsonResponse(result.body, { status: result.status });
+  })),
+);
+
+export const mergeTrainRouteLayer = Layer.mergeAll(
+  getMergeTrainQueuesRoute,
+  getMergeTrainGenerationsRoute,
+  postMergeTrainGenerationStackRoute,
+  postMergeTrainGenerationPromoteRoute,
+  postMergeTrainAssembleRoute,
+  postMergeTrainMergeNextRoute,
+);
+
+export default mergeTrainRouteLayer;

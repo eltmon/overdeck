@@ -398,6 +398,14 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'GET /api/projects/:projectKey/merge-train',           kind: 'http', disposition: 'READ',        door: 'ConfigResolver.getProject (merge_train override + effective state, PAN-1696)' },
   { surface: 'POST /api/projects/:projectKey/merge-train',          kind: 'http', disposition: 'WRITE',       door: 'Project config writer sets the per-project merge-train override (setProjectMergeTrainSync, PAN-1696)' },
 
+  // ── merge-train.ts (PAN-1696: aggregate namespace, superset of the /api/flywheel merge-train routes) ──
+  { surface: 'GET /api/merge-train/queues',                         kind: 'http', disposition: 'AGGREGATE',   door: 'Merge-train queues across all tracked projects (review-status ready set, no flywheel run)' },
+  { surface: 'GET /api/merge-train/generations',                    kind: 'http', disposition: 'AGGREGATE',   door: 'UAT generation chains across all tracked projects (getUatGenerationsPayload per project)' },
+  { surface: 'POST /api/merge-train/generations/:name/stack',       kind: 'http', disposition: 'WRITE',       door: 'UAT stack write door (postUatGenerationStackPayload) — supersedes POST /api/flywheel/uat-generations/:name/stack' },
+  { surface: 'POST /api/merge-train/generations/:name/promote',     kind: 'http', disposition: 'WRITE',       door: 'UAT promote write door (postUatGenerationPromotePayload + firePostMergeLifecycle) — supersedes POST /api/flywheel/uat-generations/:name/promote' },
+  { surface: 'POST /api/merge-train/assemble',                      kind: 'http', disposition: 'WRITE',       door: 'Forced UAT reconcile for one project or all — supersedes POST /api/flywheel/assemble-uat' },
+  { surface: 'POST /api/merge-train/merge-next',                    kind: 'http', disposition: 'WRITE',       door: 'Escape-hatch batch merge from a named project ready set — supersedes POST /api/flywheel/merge-next' },
+
   // ── remote.ts ─────────────────────────────────────────────────────────────
   { surface: 'GET /api/remote/status',                                      kind: 'http', disposition: 'RELOCATE',    door: 'Infra/Settings (remote substrate health)' },
   { surface: 'GET /api/remote/workspaces',                                  kind: 'http', disposition: 'RELOCATE',    door: 'Workspace' },

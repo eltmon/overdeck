@@ -216,34 +216,36 @@ async function assembleFromReadySetForProject(
  * PAN-1696 reconciler-decouple: Single-project reconciliation (used by forced-rebuild endpoint).
  * When called from /api/flywheel/assemble-uat with force:true, reconciles only projectRoot().
  */
-export async function runUatTrainReconcile(options: { force?: boolean } = {}): Promise<ReconcileResult> {
-  const projectPath = projectRoot();
-  return runUatTrainReconcileForProject(projectPath, options);
+export async function runUatTrainReconcile(
+  options: { force?: boolean; projectRoot?: string } = {},
+): Promise<ReconcileResult> {
+  const projectPath = options.projectRoot ? resolve(options.projectRoot) : projectRoot();
+  return runUatTrainReconcileForProject(projectPath, { ...(options.force !== undefined ? { force: options.force } : {}) });
 }
 
 /**
- * Internal: Periodic all-project reconciliation for the 60-second tick.
- * Reconciles each enabled project independently with error isolation.
- * Not exported — only used by startUatTrainReconciler.
+ * PAN-1696 merge-train-routes: reconcile every tracked project whose effective
+ * merge-train flag is on, isolating failures so one project's git error cannot
+ * abort the others. Returns one result per attempted project so the caller can
+ * report which projects moved and which errored.
  */
-async function _reconcileAllProjectsForTick(): Promise<void> {
+export async function runUatTrainReconcileAllProjects(
+  options: { force?: boolean } = {},
+): Promise<Array<{ projectKey: string; result?: ReconcileResult; error?: string }>> {
   const { listProjectsSync } = await import('../../../lib/projects.js');
   const { isMergeTrainEnabledForProject } = await import('../../../lib/overdeck/merge-sync.js');
 
-  const projects = listProjectsSync();
-  const results = await Promise.allSettled(
-    projects.map(async ({ config }) => {
-      // PAN-1696: skip projects with merge-train disabled
-      if (!isMergeTrainEnabledForProject(config)) {
-        return;
-      }
-
+  const enabled = listProjectsSync().filter(({ config }) => isMergeTrainEnabledForProject(config));
+  return Promise.all(
+    enabled.map(async ({ key, config }) => {
       const projectPath = resolve(config.path);
       try {
-        await runUatTrainReconcileForProject(projectPath, {});
+        const result = await runUatTrainReconcileForProject(projectPath, options);
+        return { projectKey: key, result };
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        console.error(`[uat-train] project ${projectPath} failed during periodic tick:`, msg);
+        console.error(`[uat-train] project ${projectPath} failed to reconcile:`, msg);
+        return { projectKey: key, error: msg };
       }
     }),
   );
@@ -255,12 +257,12 @@ export function startUatTrainReconciler(): boolean {
   if (!canStartUatTrainReconciler()) return false;
   if (reconcilerTimer) return true;
   reconcilerTimer = setInterval(() => {
-    void _reconcileAllProjectsForTick().catch((err) => {
+    void runUatTrainReconcileAllProjects().catch((err) => {
       console.warn('[uat-train] reconcile tick failed:', err instanceof Error ? err.message : err);
     });
   }, RECONCILE_INTERVAL_MS);
   reconcilerTimer.unref?.();
-  void _reconcileAllProjectsForTick().catch((err) => {
+  void runUatTrainReconcileAllProjects().catch((err) => {
     console.warn('[uat-train] initial reconcile failed:', err instanceof Error ? err.message : err);
   });
   return true;
@@ -349,9 +351,14 @@ async function loadAcceptanceCriteriaCache(issueIds: ReadonlySet<string>): Promi
 }
 
 /** The generation chain, newest first, enriched for the UAT batches card. */
-export async function getUatGenerationsPayload(): Promise<UatGenerationPayload[]> {
-  // PAN-1696: no flywheel-run requirement — list generations directly from store
-  const chain = listUatGenerationsSync({ projectRoot: projectRoot(), limit: CHAIN_PAYLOAD_LIMIT });
+export async function getUatGenerationsPayload(projectRootOverride?: string): Promise<UatGenerationPayload[]> {
+  // PAN-1696: no flywheel-run requirement — list generations directly from store.
+  // projectRootOverride lets the aggregate /api/merge-train/generations route read
+  // each tracked project's chain instead of only the dashboard's own repo.
+  const chain = listUatGenerationsSync({
+    projectRoot: projectRootOverride ? resolve(projectRootOverride) : projectRoot(),
+    limit: CHAIN_PAYLOAD_LIMIT,
+  });
   if (chain.length === 0) return [];
   const memberIssueIds = new Set(chain.flatMap((gen) => gen.members.map((member) => member.issueId.toUpperCase())));
   const acCache = await loadAcceptanceCriteriaCache(memberIssueIds);
@@ -423,7 +430,10 @@ export async function postUatGenerationPromotePayload(
   name: string,
   firePostMerge: (issueId: string) => boolean,
 ): Promise<PromoteResult> {
-  const root = projectRoot();
+  // PAN-1696: promote into the generation's OWN project repo. Generation rows carry
+  // project_root, so a MIN generation must not be merged against the Overdeck repo.
+  // For a generation belonging to this repo this resolves to the same path as before.
+  const root = resolve(getUatGenerationSync(name)?.projectRoot ?? projectRoot());
   const { reviewRecordEligibility } = await import('../../../lib/flywheel-merge-order.js');
   const result = await promoteUatGeneration(name, root, {
     git: buildUatPromoteGitDeps(root),
