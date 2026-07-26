@@ -199,18 +199,17 @@
     "recordedAt": "2026-07-26T16:03:54.970Z"
   },
   "created": "2026-07-26T13:39:19.365Z",
-  "updated": "2026-07-26T16:22:09.068Z",
+  "updated": "2026-07-26T16:25:13.657Z",
   "pipeline": {
     "issueId": "PAN-3138",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T16:05:42.563Z",
-    "updatedAt": "2026-07-26T16:22:08.459Z",
-    "reviewNotes": "[correctness] A failed verifying-on-main transition now strands the rest of post-merge lifecycle — `src/lib/cloister/merge-agent.ts:451`",
+    "updatedAt": "2026-07-26T16:25:13.589Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3143",
     "lastVerifiedCommit": "6054ba2e200db2755313b2cf82980134a04a0096",
     "reviewSpawnedAt": "2026-07-26T16:22:00.616Z",
@@ -253,28 +252,6 @@
         "tests/unit/lib/review-status.test.ts"
       ],
       "recordedAt": "2026-07-26T16:03:54.970Z"
-    },
-    "reviewerVerdicts": {
-      "security": {
-        "status": "passed",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3138/.pan/review/agent-pan-3138-review-6054ba2e/security.md",
-        "atCommit": "6054ba2e200db2755313b2cf82980134a04a0096"
-      },
-      "correctness": {
-        "status": "blocked",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3138/.pan/review/agent-pan-3138-review-6054ba2e/correctness.md",
-        "atCommit": "6054ba2e200db2755313b2cf82980134a04a0096"
-      },
-      "performance": {
-        "status": "passed",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3138/.pan/review/agent-pan-3138-review-6054ba2e/performance.md",
-        "atCommit": "6054ba2e200db2755313b2cf82980134a04a0096"
-      },
-      "requirements": {
-        "status": "passed",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3138/.pan/review/agent-pan-3138-review-6054ba2e/requirements.md",
-        "atCommit": "6054ba2e200db2755313b2cf82980134a04a0096"
-      }
     }
   },
   "closeOut": {
@@ -322,24 +299,24 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 5315167,
-            "output": 349529,
-            "cacheRead": 201463296,
+            "input": 5322946,
+            "output": 350882,
+            "cacheRead": 202950656,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 28548054,
-          "output": 832564,
-          "cacheRead": 338781696,
+          "input": 28555833,
+          "output": 833917,
+          "cacheRead": 340269056,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 337.108038,
-        "pricingAsOf": "2026-07-26T16:22:08.467Z"
+        "usd": 337.931203,
+        "pricingAsOf": "2026-07-26T16:25:13.649Z"
       }
     },
     "merges": [
