@@ -61,7 +61,7 @@ The targets and architecture are documented in [DASHBOARD-PERFORMANCE.md](./DASH
 
 ## Restart behavior guarantees
 
-`pan reload` builds before it touches the running dashboard. If the build fails, the old dashboard keeps running and the command exits non-zero. If the build succeeds, `pan reload` restarts only the dashboard and waits for `/api/health`.
+`pan reload` builds before it touches the running dashboard. It fetches `origin/main` and builds in a temporary detached worktree, then swaps the completed `dist/` into the primary checkout, so uncommitted changes and local-only commits in the primary worktree can neither contaminate nor block a deploy. If the build fails, the old dashboard keeps running and the command exits non-zero. If the build succeeds, `pan reload` restarts only the dashboard and waits for `/api/health`. The health payload reports the raw build provenance as `buildCommit`, `buildDirty`, and `buildBranch`; a canonical reload reports `buildDirty: false` and a null branch because its build worktree is detached.
 
 Restart operations are serialized by `${OVERDECK_HOME}/restart.lock`. The lock records the holder PID, timestamp, and caller. Stale locks recover when the holder PID is dead or the lock is older than five minutes.
 

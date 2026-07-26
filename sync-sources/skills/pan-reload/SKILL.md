@@ -14,7 +14,7 @@ pan reload
 pan reload --force   # explicit operator bypass of the deploy-window gate
 ```
 
-`pan reload` runs `bun install` and then `npm run build` first. If either fails, it leaves the current dashboard running and exits non-zero. If both succeed, it restarts the dashboard and waits for `http://127.0.0.1:3011/api/health`.
+`pan reload` fetches `origin/main`, creates a temporary detached worktree at that commit, and runs `bun install` followed by `npm run build` there — never in the primary working tree. If the primary tree has uncommitted changes or its `HEAD` differs from `origin/main`, the command notes that those changes are excluded and continues with the canonical build. If installation or build fails, it leaves the current dashboard running and exits non-zero; after a successful build, it swaps in the new `dist/`, restarts the dashboard, and waits for `http://127.0.0.1:3011/api/health`.
 
 `npm run build` already rebuilds the dashboard **server** bundle (via `build-post-cli.mjs` → `build:dashboard:server:bundle`), so `pan reload` picks up server/deacon code changes — you do **not** need a separate `npm run build:dashboard:server`. The `bun install` step runs first so a merge/rebase that added a runtime dependency (e.g. `chokidar`) can't produce a freshly-built server that boot-crashes with `ERR_MODULE_NOT_FOUND`.
 
