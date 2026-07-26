@@ -321,7 +321,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T00:35:36.057Z",
-  "updated": "2026-07-26T11:50:35.964Z",
+  "updated": "2026-07-26T11:50:52.290Z",
   "pipeline": {
     "issueId": "PAN-1696",
     "reviewStatus": "pending",
@@ -335,8 +335,9 @@
     "reviewNotes": "Agent re-review request (5/25): Resolved the standing merge conflict with origin/main preserving BOTH intents. The single conflict was in postUatGenerationPromotePayload (uat-train.ts): main's PAN-3114 (a8bb20a61b) added Promise.all imports plus recordVerification -> recordUatPromotionVerdicts so UAT verdicts persist after promotion, while PAN-1696 derives the promote root from the generation's own stored projectRoot so a MIN batch promotes into the MIN repo. Kept both — taking either side alone would have silently dropped main's verdict persistence or this branch's cross-project promote fix. Verified: uat-train + merge-train-routes + no-loss-matrix suites (42 tests), typecheck, frontend-typecheck, lint all pass; full root suite 10898 passed, zero failures. Branch is synced with main and pushed.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3095",
     "lastVerifiedCommit": "f8bb608be544918ef11179804e8b2884df07d2f3",
-    "reviewRequestedAt": "2026-07-26T11:49:58.635Z",
-    "reviewSpawnedAt": "2026-07-26T11:50:10.266Z"
+    "reviewRequestedAt": "2026-07-26T11:50:51.889Z",
+    "reviewSpawnedAt": "2026-07-26T11:50:10.266Z",
+    "panDoneRecoveredAt": "2026-07-26T11:50:51.889Z"
   },
   "closeOut": {
     "usage": {
