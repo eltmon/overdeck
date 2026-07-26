@@ -67,18 +67,19 @@
     "recordedAt": "2026-07-26T14:39:52.370Z"
   },
   "created": "2026-07-26T13:39:19.365Z",
-  "updated": "2026-07-26T14:43:42.950Z",
+  "updated": "2026-07-26T14:51:10.806Z",
   "pipeline": {
     "issueId": "PAN-3138",
     "reviewStatus": "blocked",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T14:43:41.977Z",
+    "updatedAt": "2026-07-26T14:51:10.760Z",
     "reviewNotes": "Merged rebuilds can bypass the terminal guard when the raw review-status cache is missing or stale",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3143",
+    "lastVerifiedCommit": "ad37787c2c81d40ae7e7365f0704b913ba266986",
     "reviewSpawnedAt": "2026-07-26T14:39:59.764Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -107,24 +108,6 @@
         "tests/unit/lib/cloister/postmerge-cleanup-async.test.ts"
       ],
       "recordedAt": "2026-07-26T14:39:52.370Z"
-    },
-    "reviewerVerdicts": {
-      "security": {
-        "status": "passed",
-        "atCommit": "ad37787c2c81d40ae7e7365f0704b913ba266986"
-      },
-      "correctness": {
-        "status": "blocked",
-        "atCommit": "ad37787c2c81d40ae7e7365f0704b913ba266986"
-      },
-      "performance": {
-        "status": "passed",
-        "atCommit": "ad37787c2c81d40ae7e7365f0704b913ba266986"
-      },
-      "requirements": {
-        "status": "blocked",
-        "atCommit": "ad37787c2c81d40ae7e7365f0704b913ba266986"
-      }
     }
   },
   "closeOut": {
@@ -132,9 +115,9 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 300357,
-            "output": 8875,
-            "cacheRead": 2361344,
+            "input": 303567,
+            "output": 9153,
+            "cacheRead": 2563072,
             "cacheWrite": 0
           }
         },
@@ -172,24 +155,24 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 1031671,
-            "output": 65938,
-            "cacheRead": 39288832,
+            "input": 1774868,
+            "output": 141271,
+            "cacheRead": 60233728,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 4548258,
-          "output": 192381,
-          "cacheRead": 53267968,
+          "input": 5294665,
+          "output": 267992,
+          "cacheRead": 74414592,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 55.146704,
-        "pricingAsOf": "2026-07-26T14:43:41.998Z"
+        "usd": 71.720381,
+        "pricingAsOf": "2026-07-26T14:51:10.795Z"
       }
     },
     "merges": [
