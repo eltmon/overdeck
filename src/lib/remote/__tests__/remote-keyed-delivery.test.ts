@@ -2,26 +2,28 @@ import { Effect } from 'effect';
 import { describe, expect, it, vi } from 'vitest';
 
 import { sendToRemoteAgentKeyed } from '../remote-agents.js';
-import { dedupPendingOptionName, dedupTerminalOptionName } from '../../tmux-dedup.js';
+import { dedupPendingOptionName, dedupTerminalOptionName, KeyedSubmitTargetDeadError } from '../../tmux-dedup.js';
 
 /**
  * Fake remote tmux server for the keyed remote-delivery protocol (PAN-2997
- * cycle 8). Implements just enough of the marker/paste semantics to prove the
- * command sequencing: option state per marker, a paste log, and an Enter log.
- * The submit phase is the atomic if-shell (claim terminal + clear pending +
- * Enter in one server-owned command list).
+ * cycle 9). Implements just enough of the marker/paste/liveness semantics to
+ * prove the command sequencing: option state per marker, pane liveness, a
+ * paste log, and an Enter log. The submit phase is the atomic if-shell
+ * (liveness check, Enter, then terminal claim — in one server-owned list).
  */
 function createFakeRemoteTmux(seed: {
   pending?: string;
   terminal?: string;
   failPaste?: boolean;
   failSubmit?: boolean;
+  paneDead?: boolean;
 } = {}) {
   const state = {
     pending: seed.pending ?? '',
     terminal: seed.terminal ?? '',
     failPaste: seed.failPaste ?? false,
     failSubmit: seed.failSubmit ?? false,
+    paneDead: seed.paneDead ?? false,
     pastes: 0,
     enters: 0,
     writes: [] as string[],
@@ -46,12 +48,12 @@ function createFakeRemoteTmux(seed: {
       return '';
     }
     if (command.includes('if-shell') && command.includes('send-keys')) {
-      // Phase 2: atomic submit — claim terminal, clear pending, then Enter.
+      // Phase 2: atomic submit — liveness gate, Enter, then terminal claim.
       if (state.failSubmit) throw new Error('exit 1: simulated submit failure');
-      if (state.pending !== '' && state.terminal === '') {
+      if (state.pending !== '' && state.terminal === '' && !state.paneDead) {
+        state.enters += 1;
         state.terminal = '1';
         state.pending = '';
-        state.enters += 1;
       }
       return '';
     }
@@ -59,6 +61,9 @@ function createFakeRemoteTmux(seed: {
       const option = command.trim().split(/\s+/).at(-1)?.replace(/'/g, '') ?? '';
       if (option.includes('-pending-')) return `${state.pending}\n`;
       return `${state.terminal}\n`;
+    }
+    if (command.includes('display-message')) {
+      return `${state.paneDead ? '1' : '0'}\n`;
     }
     return '';
   };
@@ -139,6 +144,26 @@ describe('sendToRemoteAgentKeyed', () => {
       .rejects.toThrow(/simulated submit failure/);
     expect(state.enters).toBe(0);
     expect(state.terminal).toBe('');
+  });
+
+  it('a pane that dies after the paste keeps the key NON-terminal and recoverable (cycle 9)', async () => {
+    // The harness exited during the settle window: pending claim exists, pane dead.
+    const { exec, state } = createFakeRemoteTmux({ pending: 'earlier-send-id', paneDead: true });
+
+    await expect(sendToRemoteAgentKeyed(AGENT, VM, 'wake up remote', KEY, exec))
+      .rejects.toThrow(KeyedSubmitTargetDeadError);
+    // No Enter was attempted, no terminal marker was written, and the pending
+    // claim survived so recovery can retry after the agent resumes.
+    expect(state.enters).toBe(0);
+    expect(state.terminal).toBe('');
+    expect(state.pending).toBe('earlier-send-id');
+
+    // Recovery once the pane is alive again: never a false dedup.
+    state.paneDead = false;
+    const outcome = await sendToRemoteAgentKeyed(AGENT, VM, 'wake up remote', KEY, exec);
+    expect(outcome).toBe('delivered');
+    expect(state.enters).toBe(1);
+    expect(state.terminal).toBe('1');
   });
 
   it('rejects keys that are unsafe for tmux option names', async () => {

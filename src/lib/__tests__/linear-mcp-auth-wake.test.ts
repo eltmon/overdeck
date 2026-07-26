@@ -26,6 +26,7 @@ vi.mock('../agents/messaging.js', () => ({
 
 import { handleCloisterDomainEvent } from '../cloister/service-reactive.js';
 import { AmbiguousKeyedDeliveryError } from '../agents/delivery.js';
+import { KeyedSubmitTargetDeadError } from '../tmux-dedup.js';
 import {
   LINEAR_MCP_AUTH_WAKE_COPY,
   _resetLinearMcpAuthProjectionCacheForTests,
@@ -425,6 +426,34 @@ describe('Linear MCP auth wake processor', () => {
     expect(readOutbox('agent-min-852', 'seq-1')).toMatchObject({ state: 'pending' });
     expect(mocks.messageAgent.mock.calls.length).toBeGreaterThan(1);
     expect(mocks.messageAgent.mock.calls.every(call => call[3]?.dedupKey === 'linear-mcp-auth-wake:seq-1')).toBe(true);
+  });
+
+  it('leaves the wake pending and retries after the tmux target dies mid-delivery (cycle 9)', async () => {
+    events.push(required(1, 'agent-min-852', 'MIN-852'), healthy(2));
+    // The pane died between paste and submit: NO Enter was sent and the key
+    // was deliberately left non-terminal — this must not become terminal
+    // 'failed' any more than it may become 'delivered'.
+    mocks.messageAgent.mockRejectedValueOnce(
+      new KeyedSubmitTargetDeadError('agent-min-852', 'linear-mcp-auth-wake:seq-1'),
+    );
+
+    await processLinearMcpAuthWake();
+
+    // A later pass in the same run re-drove the same keyed wake (by then the
+    // agent has resumed) and exactly one completion was recorded.
+    expect(mocks.messageAgent).toHaveBeenCalledTimes(2);
+    expect(mocks.messageAgent.mock.calls[1]).toEqual([
+      'agent-min-852',
+      LINEAR_MCP_AUTH_WAKE_COPY,
+      'linear-mcp-auth-wake',
+      { dedupKey: 'linear-mcp-auth-wake:seq-1' },
+    ]);
+    expect(notifiedEvents()).toHaveLength(1);
+    expect(notifiedEvents()[0]?.payload['outcome']).toBe('delivered');
+    expect(readOutbox('agent-min-852', 'seq-1')).toMatchObject({
+      state: 'acknowledged',
+      outcome: 'delivered',
+    });
   });
 
   it('drains a lifecycle that completes while an earlier wake pass is still delivering', async () => {

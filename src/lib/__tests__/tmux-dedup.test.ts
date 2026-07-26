@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { completeKeyedSubmit, sendKeysDedup } from '../tmux-dedup.js';
+import { completeKeyedSubmit, KeyedSubmitTargetDeadError, sendKeysDedup } from '../tmux-dedup.js';
 
 const socket = `dedup-test-${process.pid}`;
 const session = 'agent-dedup';
@@ -25,6 +25,10 @@ function showOption(name: string): string {
   } catch {
     return '';
   }
+}
+
+function showPaneDead(): string {
+  return execFileSync('tmux', ['-L', socket, 'display-message', '-p', '-t', session, '#{pane_dead}'], { encoding: 'utf-8' }).trim();
 }
 
 function occurrences(haystack: string, needle: string): number {
@@ -132,6 +136,39 @@ describe.skipIf(!hasTmux)('sendKeysDedup two-phase protocol', () => {
 
     expect(occurrences(capturePane(), 'wake up agent')).toBe(2);
     expect(occurrences(capturePane(), 'operator follow-up')).toBe(1);
+  });
+
+  it('refuses to claim the key when the pane dies after the paste — no terminal, no Enter, pending preserved (cycle 9)', async () => {
+    // remain-on-exit keeps the session (and its option markers) alive as a
+    // corpse after the pane process exits.
+    execFileSync('tmux', ['-L', socket, 'set-option', '-t', session, 'remain-on-exit', 'on']);
+    const first = await sendKeysDedup(session, 'wake up agent', 'test-key-1');
+    expect(first).toBe('pasted');
+    const pendingBefore = showOption('@overdeck-dedup-pending-test-key-1');
+    expect(pendingBefore).not.toBe('');
+
+    // The harness exits during the settle window: C-c kills the cat.
+    execFileSync('tmux', ['-L', socket, 'send-keys', '-t', session, 'C-c']);
+    const deadline = Date.now() + 3_000;
+    while (showPaneDead() !== '1' && Date.now() < deadline) {
+      execFileSync('sleep', ['0.05']);
+    }
+    expect(showPaneDead()).toBe('1');
+
+    // The submit must NOT flip the key terminal and must NOT send Enter.
+    await expect(completeKeyedSubmit(session, 'test-key-1')).rejects.toThrow(KeyedSubmitTargetDeadError);
+    expect(showOption('@overdeck-dedup-test-key-1')).toBe('');
+    expect(showOption('@overdeck-dedup-pending-test-key-1')).toBe(pendingBefore);
+
+    // Recovery after the agent "resumes" (pane respawned): the preserved
+    // pending claim routes to completion, never to a false dedup. The wake
+    // CONTENT re-delivery belongs to the resume path; the marker protocol's
+    // job here is to prove the key was never falsely claimed.
+    execFileSync('tmux', ['-L', socket, 'respawn-pane', '-k', '-t', session, 'cat']);
+    const replay = await sendKeysDedup(session, 'wake up agent', 'test-key-1');
+    expect(replay).toBe('submit-pending');
+    await completeKeyedSubmit(session, 'test-key-1');
+    expect(showOption('@overdeck-dedup-test-key-1')).toBe('1');
   });
 
   it('delivers identical content under a different key', async () => {

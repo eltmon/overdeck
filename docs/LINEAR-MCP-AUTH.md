@@ -195,12 +195,16 @@ has not yet been notified:
     server (`sendKeysDedup` + `completeKeyedSubmit`): the paste and the
     PENDING marker are one atomic server-side `if-shell` step, and the
     submission itself is a second single `if-shell` — only when PENDING is
-    present and TERMINAL absent does the server flip TERMINAL, clear PENDING,
-    and send the Enter, in that order, inside one server-executed command
-    list. Exactly one caller can become the completer; concurrent or
-    post-crash callers lose the server-side condition and send nothing, so no
-    stray Enter can land in a composer holding unrelated operator text, and a
-    retried transaction never has to decide whether a prior Enter landed.
+    present, TERMINAL is absent, AND the pane is alive does the server send
+    the Enter and then flip TERMINAL and clear PENDING, in that order, inside
+    one server-executed command list. A pane that died during the settle
+    window fails the liveness condition: NO marker changes and NO Enter, so a
+    wake that never landed is never recorded as delivered — the submit throws
+    `KeyedSubmitTargetDeadError`, the outbox entry stays `pending`, and a
+    later pass re-drives the wake after the agent resumes. A failed Enter
+    aborts the command list before the terminal transition, and concurrent or
+    post-crash callers lose the server-side condition, so no stray Enter can
+    land in a composer holding unrelated operator text.
   - **Monitor mail (PAN-3015) never carries keyed deliveries.** The monitor
     claims a mail file by renaming it before emitting, so a monitor exit
     between claim and emit would lose the wake and a post-emit/pre-ack crash

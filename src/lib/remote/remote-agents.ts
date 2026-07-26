@@ -19,7 +19,7 @@ import { join } from 'path';
 import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync } from 'fs';
 import { homedir } from 'os';
 import { getManagedTmuxSocketName } from '../tmux.js';
-import { assertValidDedupKey, dedupPendingOptionName, dedupTerminalOptionName } from '../tmux-dedup.js';
+import { assertValidDedupKey, dedupPendingOptionName, dedupTerminalOptionName, KeyedSubmitTargetDeadError } from '../tmux-dedup.js';
 import { generateLauncherScriptSync } from '../launcher-generator.js';
 import { getClaudePermissionFlagsSync, getClaudePermissionFlagsStringSync } from '../claude-permissions.js';
 import { resolveProjectForIssue } from '../pan-dir/record.js';
@@ -815,26 +815,36 @@ export async function sendToRemoteAgentKeyed(
 
     // 'pasted' (our sendId) and 'submit-pending' (a prior crashed attempt's
     // sendId) both complete the same transaction WITHOUT re-pasting. The
-    // SUBMISSION is one server-owned command (cycle 8): a single if-shell
-    // whose condition requires the pending claim and no terminal marker, and
-    // whose command list flips the key terminal and clears pending BEFORE
-    // sending the Enter. The remote tmux server executes the whole sequence,
-    // so exactly one caller can complete — a concurrent or post-crash caller
-    // loses the condition and sends no stray Enter.
+    // SUBMISSION is one server-owned command (cycle 9): a single if-shell
+    // whose condition requires the pending claim, no terminal marker, AND a
+    // LIVE pane, and whose command list sends the Enter FIRST and only then
+    // flips terminal and clears pending. A pane that died during the settle
+    // window fails the liveness condition — no marker changes, no Enter — so
+    // a wake that never landed is never recorded as delivered; exactly one
+    // caller becomes the completer.
     await new Promise(resolve => setTimeout(resolve, 300));
     const submitCondition =
       `test -z "$(${innerTmux} show-option -qv -t ${agentId} ${terminalOption})" && ` +
-      `test -n "$(${innerTmux} show-option -qv -t ${agentId} ${pendingOption})"`;
+      `test -n "$(${innerTmux} show-option -qv -t ${agentId} ${pendingOption})" && ` +
+      `test "$(${innerTmux} display-message -p -t ${agentId} '#{pane_dead}')" = "0"`;
     const submitOnTrue =
+      `send-keys -t ${agentId} C-m \; ` +
       `set-option -t ${agentId} ${terminalOption} 1 \; ` +
-      `set-option -u -t ${agentId} ${pendingOption} \; ` +
-      `send-keys -t ${agentId} C-m`;
+      `set-option -u -t ${agentId} ${pendingOption}`;
     await run(buildRemoteTmuxCommand(['if-shell', '-t', agentId, submitCondition, submitOnTrue]));
 
     const terminalAfter = await readMarker(terminalOption);
     const pendingAfter = await readMarker(pendingOption);
     if (terminalAfter === '' && pendingAfter === '') {
       throw new Error(`Keyed remote submit for ${agentId} found neither a pending claim nor a terminal marker — the paste vanished without submission`);
+    }
+    if (terminalAfter === '') {
+      // The condition rejected the submit. A dead pane is recoverable — the
+      // pending claim is preserved so recovery can retry after resume.
+      const paneDead = await run(buildRemoteTmuxCommand(['display-message', '-p', '-t', agentId, '#{pane_dead}']))
+        .then(stdout => stdout.trim() === '1', () => false);
+      if (paneDead) throw new KeyedSubmitTargetDeadError(agentId, dedupKey);
+      throw new Error(`Keyed remote submit for ${agentId} was rejected with the pending claim intact on a live pane`);
     }
     return 'delivered';
   } finally {

@@ -8,6 +8,7 @@ import {
 import { getAgentDir } from './agents/agent-state.js';
 import { AmbiguousKeyedDeliveryError } from './agents/delivery.js';
 import { messageAgentWithOutcome } from './agents/messaging.js';
+import { KeyedSubmitTargetDeadError } from './tmux-dedup.js';
 import { createPromiseCoalescer } from './cloister/in-flight-guard.js';
 
 export const LINEAR_MCP_AUTH_URL_TTL_MS = 30 * 60 * 1000;
@@ -404,7 +405,13 @@ async function deliverWakeWithOutbox(agentId: string, lifecycleId: string): Prom
     // in-flight reservation/delivered set deduplicates it. At-most-once is
     // preserved by the door; a terminal record would either lose a wake that
     // never landed or misreport one that did.
-    if (error instanceof AmbiguousKeyedDeliveryError) {
+    //
+    // DEAD TARGET (cycle 9): the tmux submit found the pane dead and sent NO
+    // Enter, deliberately preserving the pending claim and leaving the key
+    // non-terminal. Same handling: the entry stays pending so a later pass
+    // re-drives the wake — by then messageAgent's zombie/stopped detection
+    // resumes the agent and the keyed door of the new session delivers.
+    if (error instanceof AmbiguousKeyedDeliveryError || error instanceof KeyedSubmitTargetDeadError) {
       throw error;
     }
     outcome = 'failed';

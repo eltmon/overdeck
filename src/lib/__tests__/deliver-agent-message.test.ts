@@ -37,6 +37,12 @@ vi.mock('../tmux.js', () => ({
 vi.mock('../tmux-dedup.js', () => ({
   sendKeysDedup: vi.fn(async () => 'pasted'),
   completeKeyedSubmit: vi.fn(async () => undefined),
+  KeyedSubmitTargetDeadError: class KeyedSubmitTargetDeadError extends Error {
+    constructor(sessionName: string, dedupKey: string) {
+      super(`dead pane for ${sessionName} key ${dedupKey}`);
+      this.name = 'KeyedSubmitTargetDeadError';
+    }
+  },
 }));
 
 vi.mock('../paths.js', async (importOriginal) => {
@@ -686,6 +692,19 @@ describe('channel bridge delivery', () => {
     } finally {
       await new Promise<void>((r) => server.close(() => r()));
     }
+  });
+
+  it('propagates a dead-pane keyed submit failure instead of acknowledging delivery (cycle 9)', async () => {
+    const agentId = 'agent-dedup-dead-pane';
+    writeAgentState(agentId, { channelsEnabled: false, deliveryMethod: 'tmux' });
+    const { completeKeyedSubmit, KeyedSubmitTargetDeadError } = await import('../tmux-dedup.js');
+    vi.mocked(completeKeyedSubmit).mockRejectedValueOnce(
+      new (KeyedSubmitTargetDeadError as unknown as new (s: string, k: string) => Error)(agentId, 'wake:seq-1'),
+    );
+
+    await expect(
+      deliverAgentMessage(agentId, 'wake', 'caller-wake', 'tmux', { dedupKey: 'wake:seq-1' }),
+    ).rejects.toThrow(/dead pane/);
   });
 
   it('codex work agents use live-session delivery instead of exec resume', async () => {
