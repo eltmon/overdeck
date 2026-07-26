@@ -422,7 +422,7 @@
     "recordedAt": "2026-07-26T18:25:06.675Z"
   },
   "created": "2026-07-26T12:33:18.311Z",
-  "updated": "2026-07-26T20:04:22.227Z",
+  "updated": "2026-07-26T20:04:39.432Z",
   "pipeline": {
     "issueId": "PAN-3093",
     "reviewStatus": "passed",
@@ -430,10 +430,10 @@
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "merged",
-    "releaseStatus": "pending",
+    "releaseStatus": "skipped",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T18:27:46.686Z",
-    "updatedAt": "2026-07-26T20:04:21.517Z",
+    "updatedAt": "2026-07-26T20:04:39.042Z",
     "reviewNotes": "No current-cycle blocker survived convergence; the rebased head preserves the approved complete-evidence promotion fix",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3145",
@@ -523,7 +523,7 @@
       },
       "costAtCloseOut": {
         "usd": 448.9367133,
-        "pricingAsOf": "2026-07-26T20:04:21.638Z"
+        "pricingAsOf": "2026-07-26T20:04:39.263Z"
       }
     },
     "merges": [
@@ -532,7 +532,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-opus-5",
+  "model": "k3[1m]",
   "tasks": {
     "sequence": 16,
     "claims": {},
