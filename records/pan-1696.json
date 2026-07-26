@@ -249,31 +249,23 @@
       "timestamp": "2026-07-26T04:11:54.357Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 2,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-26T04:11:54Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-1696\n\nThe new no-active-run status path ignores --json and leaves the focused Flywheel CLI suite red with no populated or empty ready-set coverage.\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1696 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "created": "2026-07-26T00:35:36.057Z",
-  "updated": "2026-07-26T04:21:19.214Z",
+  "updated": "2026-07-26T04:21:21.046Z",
   "pipeline": {
     "issueId": "PAN-1696",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "skipped",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T04:21:17.931Z",
+    "updatedAt": "2026-07-26T04:21:20.899Z",
     "reviewNotes": "Agent re-review request (8/25): All test failures fixed: NO-LOSS-MATRIX entry for merge-train routes, flywheelStatusCommand honors --json flag when no active run, stale CLI test updated, file-size ceiling respected (999 lines)",
     "testNotes": "Commands: npm run typecheck (PASS). npm run lint (FAIL) — lint:slash-commands: packages/contracts/src/composer-commands.generated.ts in this branch's working tree still has the old --health-timeout <ms> flag description for pan reload/restart, while main's committed copy already has the new <duration> (Ns/Nm suffix) description from PR #3099 (c804c5cae2, which IS in this branch's ancestry per src/cli/index.ts already using <duration>). The generated manifest was never regenerated on this branch — needs `npm run generate:slash-commands` + commit; unrelated to PAN-1696's own diff but still a hard gate failure. npm test (full suite): 11 failed / 10769 passed / 50 skipped across 8 files. Re-ran the failing files with OVERDECK_PAN_GIT_OP=1: tests/unit/lib/cloister/validation.test.ts, src/lib/safety/__tests__/dangerous-git-ops.test.ts, tests/integration/merge-validation.test.ts, tests/unit/lib/pipeline-state-paths-contribution.test.ts, tests/unit/lib/workspace-manager-pre-rebase.test.ts, src/lib/pan-dir/__tests__/auto-commit.test.ts, src/lib/pan-dir/__tests__/record-update.test.ts all pass — known environmental noise from the agent git-guard blocking git reset --hard/rebase inside test sandboxes (matches prior recorded incident), NOT caused by this PR. Two failures ARE real and directly caused by this branch's own commits: (1) tests/unit/lib/overdeck/no-loss-matrix.test.ts G3 AC1/AC2 — GET and POST /api/projects/:projectKey/merge-train (added by the project-merge-train-endpoint item, commit 7d789d5fcc/75ed5661a6) have no entry in NO_LOSS_MATRIX, violating the repo's additive-refactor no-loss-audit rule; the new routes were never registered with a disposition. (2) src/cli/commands/__tests__/flywheel.test.ts > 'exits 1 when no active run exists' — asserts process.exitCode===1 and an error log, but the cli-flywheel-status item (marked completed in statusOverrides, commit 284698c068) changed flywheelStatusCommand behavior per its own AC2 ('exits 0 and renders an empty queue, not an error, when no issues are eligible') without updating this pre-existing test, so it now gets exitCode=undefined and fails — an incomplete-update regression in the same pattern flagged on the prior test cycle for uat-train.test.ts. UAT: not run. None of the items implemented in this branch's diff have any frontend/UI surface — project-merge-train-endpoint is a backend API, uat-stack-domain is a backend URL builder (unit-tested), cli-flywheel-status is a CLI command. Zero files under src/dashboard/frontend/ are touched (git diff main...HEAD --stat confirms), so hazard H6 (browser verification required for dashboard beads) does not yet apply — none of fe-merge-train-view/fe-awaiting-merge/fe-flywheel-viewer/fe-cockpit-toggle/settings-scope-ux have any code. Plan completeness (read from .pan/records/pan-1696.json statusOverrides and the xBRIEF at specs/2026-06-12-PAN-1696-...vbrief.json): 7 of 17 items fully completed (flag-rename, per-project-flag, ready-set-source, reconciler-decouple, project-merge-train-endpoint, uat-stack-domain, cli-flywheel-status); merge-train-routes remains status 'running' (only the narrow per-project toggle endpoint shipped, not the full /api/merge-train/* aggregate namespace — no src/dashboard/server/routes/merge-train.ts exists); the other 9 items (all 4 frontend view items, run-scope-persist, settings-scope-ux, role-prompt-scope, remove-legacy-routes, docs-decouple) have zero code — including every item that delivers the 'multi-project view' the issue title promises. Actionable: (1) fix or add a NO_LOSS_MATRIX entry for the two new merge-train routes; (2) update the stale flywheel.test.ts assertion to match cli-flywheel-status.ac2's new exit-0/empty-queue contract; (3) regenerate the composer-commands manifest (or sync-main to pick up the already-regenerated main copy); (4) continue the work agent through the remaining 10 xBRIEF items (merge-train-routes completion + all frontend/docs/cleanup items) before the issue is ready — per CLAUDE.md's no-partial-implementations rule, shipping backend-only plumbing with no multi-project view delivers no user-visible value for this issue.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/1822",
-    "reviewSpawnedAt": "2026-07-26T04:09:24.289Z"
+    "reviewSpawnedAt": "2026-07-26T04:21:20.898Z"
   },
   "closeOut": {
     "usage": {
@@ -365,7 +357,7 @@
       },
       "costAtCloseOut": {
         "usd": 174.8352912,
-        "pricingAsOf": "2026-07-26T04:21:19.205Z"
+        "pricingAsOf": "2026-07-26T04:21:21.041Z"
       }
     },
     "merges": [
