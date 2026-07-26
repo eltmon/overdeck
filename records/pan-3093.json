@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T12:33:18.311Z",
-  "updated": "2026-07-26T14:51:09.320Z",
+  "updated": "2026-07-26T15:05:46.259Z",
   "pipeline": {
     "issueId": "PAN-3093",
     "reviewStatus": "pending",
@@ -55,16 +55,8 @@
   "harness": "claude-code",
   "model": "claude-opus-5",
   "tasks": {
-    "sequence": 13,
-    "claims": {
-      "per-repo-teardown": {
-        "writerId": "agent-pan-3093",
-        "agentId": "agent-pan-3093",
-        "pid": 1968915,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-26T14:51:09.320Z"
-      }
-    },
+    "sequence": 14,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3093",
@@ -131,6 +123,17 @@
         "outcome": "completed",
         "reason": "Two-phase promote: phase A trial-merges every repo without pushing (all-or-nothing decision point), phase B publishes in merge order with per-repo promotedAt stamping and idempotent resume. Shared finishPromote tail. Selection is injected polyrepoGit presence, not repos.length>1 (which misroutes single-contributing-repo polyrepo). Wired buildPolyrepoUatPromoteGitDeps. 12 new tests.",
         "releasedAt": "2026-07-26T14:50:58.319Z"
+      },
+      {
+        "writerId": "agent-pan-3093",
+        "agentId": "agent-pan-3093",
+        "pid": 1968915,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T14:51:09.320Z",
+        "itemId": "per-repo-teardown",
+        "outcome": "completed",
+        "reason": "Per-repo teardown via optional removeRepoArtifacts/removeGenerationResidue hooks (presence-selected, same as promote); buildPolyrepoCleanupGit sweeps the generation branch from every configured repo to catch hold-out-dropped repos; wrapper folder removal validated by safeGenerationWorktreePath. Verified MYN's devcontainer template already expects the <folder>/<repoKey> layout — no template gap. 8 new tests.",
+        "releasedAt": "2026-07-26T15:05:46.258Z"
       }
     ],
     "statusReasons": {
@@ -157,6 +160,10 @@
       "two-phase-promote": {
         "reason": "Two-phase promote: phase A trial-merges every repo without pushing (all-or-nothing decision point), phase B publishes in merge order with per-repo promotedAt stamping and idempotent resume. Shared finishPromote tail. Selection is injected polyrepoGit presence, not repos.length>1 (which misroutes single-contributing-repo polyrepo). Wired buildPolyrepoUatPromoteGitDeps. 12 new tests.",
         "updatedAt": "2026-07-26T14:50:58.319Z"
+      },
+      "per-repo-teardown": {
+        "reason": "Per-repo teardown via optional removeRepoArtifacts/removeGenerationResidue hooks (presence-selected, same as promote); buildPolyrepoCleanupGit sweeps the generation branch from every configured repo to catch hold-out-dropped repos; wrapper folder removal validated by safeGenerationWorktreePath. Verified MYN's devcontainer template already expects the <folder>/<repoKey> layout — no template gap. 8 new tests.",
+        "updatedAt": "2026-07-26T15:05:46.258Z"
       }
     }
   },
@@ -185,6 +192,8 @@
     "two-phase-promote.two-phase-promote.ac1": "completed",
     "two-phase-promote.two-phase-promote.ac2": "completed",
     "two-phase-promote.two-phase-promote.ac3": "completed",
-    "per-repo-teardown": "running"
+    "per-repo-teardown": "completed",
+    "per-repo-teardown.per-repo-teardown.ac1": "completed",
+    "per-repo-teardown.per-repo-teardown.ac2": "completed"
   }
 }
