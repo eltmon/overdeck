@@ -206,16 +206,17 @@
   ],
   "feedback": [],
   "created": "2026-07-26T00:35:36.057Z",
-  "updated": "2026-07-26T03:21:03.926Z",
+  "updated": "2026-07-26T03:21:10.311Z",
   "pipeline": {
     "issueId": "PAN-1696",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "failed",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T03:21:02.400Z",
+    "updatedAt": "2026-07-26T03:21:10.260Z",
+    "reviewNotes": "Review role spawn failed: Role run agent-pan-1696-review already running. Use 'pan tell' to message it.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/1822",
     "reviewSpawnedAt": "2026-07-26T03:21:02.399Z"
@@ -310,7 +311,7 @@
       },
       "costAtCloseOut": {
         "usd": 120.2451482,
-        "pricingAsOf": "2026-07-26T03:21:03.800Z"
+        "pricingAsOf": "2026-07-26T03:21:10.284Z"
       }
     },
     "merges": [
@@ -319,7 +320,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-haiku-4-5",
   "tasks": {
     "sequence": 11,
     "claims": {
