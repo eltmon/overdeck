@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T19:16:39.648Z",
-  "updated": "2026-07-26T19:54:57.257Z",
+  "updated": "2026-07-26T19:57:34.997Z",
   "pipeline": {
     "issueId": "PAN-3155",
     "reviewStatus": "pending",
@@ -43,16 +43,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "dod-docs-strike-landing": {
-        "writerId": "agent-pan-3155",
-        "agentId": "agent-pan-3155",
-        "pid": 3587249,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-26T19:54:57.257Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3155",
@@ -86,6 +78,17 @@
         "outcome": "completed",
         "reason": "Threaded merged-row status into deploy evaluation, changed missing-commit cascades from a duplicate miss to an explicit dependency skip, retained a miss when row 4 passed without a commit, and added regression coverage.",
         "releasedAt": "2026-07-26T19:54:44.869Z"
+      },
+      {
+        "writerId": "agent-pan-3155",
+        "agentId": "agent-pan-3155",
+        "pid": 3587249,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T19:54:57.257Z",
+        "itemId": "dod-docs-strike-landing",
+        "outcome": "completed",
+        "reason": "Documented merge evidence across feature and strike heads, superseded feature residual reporting, deploy-row dependency skips, and aligned the canonical merged-row expected text.",
+        "releasedAt": "2026-07-26T19:57:34.997Z"
       }
     ],
     "statusReasons": {
@@ -100,6 +103,10 @@
       "deploy-row-dependency-semantics": {
         "reason": "Threaded merged-row status into deploy evaluation, changed missing-commit cascades from a duplicate miss to an explicit dependency skip, retained a miss when row 4 passed without a commit, and added regression coverage.",
         "updatedAt": "2026-07-26T19:54:44.869Z"
+      },
+      "dod-docs-strike-landing": {
+        "reason": "Documented merge evidence across feature and strike heads, superseded feature residual reporting, deploy-row dependency skips, and aligned the canonical merged-row expected text.",
+        "updatedAt": "2026-07-26T19:57:34.997Z"
       }
     }
   },
@@ -116,6 +123,9 @@
     "deploy-row-dependency-semantics.deploy-row-dependency-semantics.ac1": "completed",
     "deploy-row-dependency-semantics.deploy-row-dependency-semantics.ac2": "completed",
     "deploy-row-dependency-semantics.deploy-row-dependency-semantics.ac3": "completed",
-    "dod-docs-strike-landing": "running"
+    "dod-docs-strike-landing": "completed",
+    "dod-docs-strike-landing.dod-docs-strike-landing.ac1": "completed",
+    "dod-docs-strike-landing.dod-docs-strike-landing.ac2": "completed",
+    "dod-docs-strike-landing.dod-docs-strike-landing.ac3": "completed"
   }
 }
