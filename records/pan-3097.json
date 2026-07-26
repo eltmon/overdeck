@@ -73,7 +73,7 @@
     "recordedAt": "2026-07-26T03:36:45.308Z"
   },
   "created": "2026-07-26T02:29:08.179Z",
-  "updated": "2026-07-26T03:39:40.213Z",
+  "updated": "2026-07-26T03:44:36.474Z",
   "pipeline": {
     "issueId": "PAN-3097",
     "reviewStatus": "passed",
@@ -82,11 +82,11 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T03:39:40.202Z",
+    "updatedAt": "2026-07-26T03:44:36.431Z",
     "reviewNotes": "Approved after rebase: PAN-3097 behavior remains correct and the refreshed generated command manifest matches the CLI registry",
-    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3102",
     "reviewedAtCommit": "887ba28422e0d80895d7af96be3ce759012ce75a",
+    "lastVerifiedCommit": "887ba28422e0d80895d7af96be3ce759012ce75a",
     "reviewSpawnedAt": "2026-07-26T03:36:50.992Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -152,10 +152,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 7194,
-            "output": 3393,
-            "cacheRead": 1894905,
-            "cacheWrite": 178518
+            "input": 7212,
+            "output": 7257,
+            "cacheRead": 3055959,
+            "cacheWrite": 357102
           }
         },
         "work": {
@@ -181,15 +181,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 7194,
-          "output": 3393,
-          "cacheRead": 1894905,
-          "cacheWrite": 178518
+          "input": 7212,
+          "output": 7257,
+          "cacheRead": 3055959,
+          "cacheWrite": 357102
         }
       },
       "costAtCloseOut": {
-        "usd": 58.701844,
-        "pricingAsOf": "2026-07-26T03:39:40.206Z"
+        "usd": 59.419193,
+        "pricingAsOf": "2026-07-26T03:44:36.463Z"
       }
     },
     "merges": [
