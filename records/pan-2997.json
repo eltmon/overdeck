@@ -182,17 +182,14 @@
       "reason": "resume",
       "agentModel": "k3[1m]",
       "timestamp": "2026-07-26T10:15:02.527Z"
-    }
-  ],
-  "feedback": [
+    },
     {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-26T10:15:01Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2997\n\nProvisional recovery loses the original pane identity, and poison repair/clear verification still treats failed marker reads as empty state.\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2997 -m \"Fixed review issues\"`"
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-26T10:55:05.936Z"
     }
   ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "src/dashboard/server/event-store.ts",
@@ -284,21 +281,21 @@
     "recordedAt": "2026-07-26T10:07:26.737Z"
   },
   "created": "2026-07-21T23:09:49.270Z",
-  "updated": "2026-07-26T10:55:04.888Z",
+  "updated": "2026-07-26T10:55:05.960Z",
   "pipeline": {
     "issueId": "PAN-2997",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T10:55:03.704Z",
-    "reviewNotes": "Review dispatch skipped — already running: agent-pan-2997-review",
+    "updatedAt": "2026-07-26T10:55:04.631Z",
+    "reviewNotes": "Provisional recovery loses the original pane identity, and poison repair/clear verification still treats failed marker reads as empty state.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3004",
     "lastVerifiedCommit": "1700fa490854ce01aef7b32625e0a6c56d11083a",
-    "reviewSpawnedAt": "2026-07-26T10:07:38.654Z",
+    "reviewSpawnedAt": "2026-07-26T10:55:04.629Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "src/dashboard/server/event-store.ts",
@@ -448,7 +445,7 @@
       },
       "costAtCloseOut": {
         "usd": 322.8763726,
-        "pricingAsOf": "2026-07-26T10:55:03.777Z"
+        "pricingAsOf": "2026-07-26T10:55:04.670Z"
       }
     },
     "merges": [
@@ -458,7 +455,7 @@
   },
   "workModel": "k3[1m]",
   "harness": "claude-code",
-  "model": "k3[1m]",
+  "model": "gpt-5.6-sol",
   "tasks": {
     "sequence": 20,
     "claims": {},
