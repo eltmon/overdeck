@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T20:52:58.018Z",
-  "updated": "2026-07-26T21:41:16.708Z",
+  "updated": "2026-07-26T21:44:48.584Z",
   "pipeline": {
     "issueId": "PAN-3162",
     "reviewStatus": "pending",
@@ -61,16 +61,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "non-github-merge-verification": {
-        "writerId": "agent-pan-3162",
-        "agentId": "agent-pan-3162",
-        "pid": 4050076,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-26T21:41:16.707Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3162",
@@ -104,6 +96,17 @@
         "outcome": "completed",
         "reason": "Added a fake-timer-tested 30-minute patrol bound for merging/verifying, forge reconciliation before reset, gate-derived readyForMerge recovery, and shared GitHub merge observation",
         "releasedAt": "2026-07-26T21:40:53.276Z"
+      },
+      {
+        "writerId": "agent-pan-3162",
+        "agentId": "agent-pan-3162",
+        "pid": 4050076,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T21:41:16.707Z",
+        "itemId": "non-github-merge-verification",
+        "outcome": "completed",
+        "reason": "Replaced non-GitHub hard refusal with pure merge-completeness verification, positive-evidence gating, fail-open reasons, and dispatch-guard regression coverage",
+        "releasedAt": "2026-07-26T21:44:48.583Z"
       }
     ],
     "statusReasons": {
@@ -118,6 +121,10 @@
       "stuck-merging-bound": {
         "reason": "Added a fake-timer-tested 30-minute patrol bound for merging/verifying, forge reconciliation before reset, gate-derived readyForMerge recovery, and shared GitHub merge observation",
         "updatedAt": "2026-07-26T21:40:53.276Z"
+      },
+      "non-github-merge-verification": {
+        "reason": "Replaced non-GitHub hard refusal with pure merge-completeness verification, positive-evidence gating, fail-open reasons, and dispatch-guard regression coverage",
+        "updatedAt": "2026-07-26T21:44:48.583Z"
       }
     }
   },
@@ -138,6 +145,10 @@
     "stuck-merging-bound.stuck-merging-bound.ac2": "completed",
     "stuck-merging-bound.stuck-merging-bound.ac3": "completed",
     "stuck-merging-bound.stuck-merging-bound.ac4": "completed",
-    "non-github-merge-verification": "running"
+    "non-github-merge-verification": "completed",
+    "non-github-merge-verification.non-github-merge-verification.ac1": "completed",
+    "non-github-merge-verification.non-github-merge-verification.ac2": "completed",
+    "non-github-merge-verification.non-github-merge-verification.ac3": "completed",
+    "non-github-merge-verification.non-github-merge-verification.ac4": "completed"
   }
 }
