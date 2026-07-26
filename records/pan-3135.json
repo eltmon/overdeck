@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T12:24:46.201Z",
-  "updated": "2026-07-26T13:28:16.879Z",
+  "updated": "2026-07-26T13:28:42.529Z",
   "pipeline": {
     "issueId": "PAN-3135",
     "reviewStatus": "pending",
@@ -61,8 +61,16 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 12,
-    "claims": {},
+    "sequence": 13,
+    "claims": {
+      "deploy-queue-escalation": {
+        "writerId": "agent-pan-3135",
+        "agentId": "agent-pan-3135",
+        "pid": 2578062,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T13:28:42.529Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3135",
@@ -185,6 +193,7 @@
     "deploy-patrol-queue-integration.deploy-patrol-queue-integration.ac2": "completed",
     "deploy-patrol-queue-integration.deploy-patrol-queue-integration.ac3": "completed",
     "deploy-patrol-queue-integration.deploy-patrol-queue-integration.ac4": "completed",
-    "deploy-patrol-queue-integration.deploy-patrol-queue-integration.ac5": "completed"
+    "deploy-patrol-queue-integration.deploy-patrol-queue-integration.ac5": "completed",
+    "deploy-queue-escalation": "running"
   }
 }
