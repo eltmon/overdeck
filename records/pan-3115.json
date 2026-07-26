@@ -21,8 +21,48 @@
     }
   ],
   "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      "tests/unit/dashboard/routes/registered-projects-route.test.ts"
+    ],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "docs/PIPELINE-MEMBERSHIP.md",
+      "packages/contracts/src/types.ts",
+      "roles/flywheel.md",
+      "src/dashboard/frontend/src/components/CommandDeck/projectsData.test.ts",
+      "src/dashboard/frontend/src/components/CommandDeck/projectsData.ts",
+      "src/dashboard/server/routes/misc/meta.ts",
+      "src/dashboard/server/routes/pipeline-membership.ts",
+      "src/dashboard/server/services/pipeline-membership.ts",
+      "src/lib/cloister/uat-promote-notify.ts",
+      "src/lib/pipeline-membership-gather.ts",
+      "sync-sources/skills/pipeline-status/SKILL.md",
+      "tests/unit/dashboard/pipeline-membership-service.test.ts",
+      "tests/unit/dashboard/routes/pipeline-membership-route.test.ts",
+      "tests/unit/lib/pipeline-membership-gather.test.ts"
+    ],
+    "actualChangedFiles": [
+      "docs/PIPELINE-MEMBERSHIP.md",
+      "packages/contracts/src/types.ts",
+      "roles/flywheel.md",
+      "src/dashboard/frontend/src/components/CommandDeck/projectsData.test.ts",
+      "src/dashboard/frontend/src/components/CommandDeck/projectsData.ts",
+      "src/dashboard/server/routes/misc/meta.ts",
+      "src/dashboard/server/routes/pipeline-membership.ts",
+      "src/dashboard/server/services/pipeline-membership.ts",
+      "src/lib/cloister/uat-promote-notify.ts",
+      "src/lib/pipeline-membership-gather.ts",
+      "sync-sources/skills/pipeline-status/SKILL.md",
+      "tests/unit/dashboard/pipeline-membership-service.test.ts",
+      "tests/unit/dashboard/routes/pipeline-membership-route.test.ts",
+      "tests/unit/dashboard/routes/registered-projects-route.test.ts",
+      "tests/unit/lib/pipeline-membership-gather.test.ts"
+    ],
+    "recordedAt": "2026-07-26T11:22:12.725Z"
+  },
   "created": "2026-07-26T08:56:03.309Z",
-  "updated": "2026-07-26T11:22:15.615Z",
+  "updated": "2026-07-26T11:22:19.316Z",
   "pipeline": {
     "issueId": "PAN-3115",
     "reviewStatus": "pending",
@@ -32,8 +72,9 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T11:22:15.614Z",
+    "updatedAt": "2026-07-26T11:22:18.943Z",
     "inspectNotes": "AC1: MEMBERSHIP_UNAVAILABLE_REASONS in packages/contracts/src/types.ts:15-22 holds exactly the six documented reasons and MembershipUnavailableReason derives from it via typeof[number]; reachable through 'export * from ./types' in index.ts. AC2: PipelineMembershipUnavailableError (src/lib/pipeline-membership-gather.ts:237-245) sets name, readonly reason, and passes message to super, so new(...'repo_unavailable','msg') reads back correctly. AC3: contracts change is type-only plus one const array and the gather import is 'import type', so no runtime cycle or emit hazard; build/typecheck left to the verification gate. PipelineMembershipUnavailableBody added as specified. Locking test added at tests/unit/lib/pipeline-membership-gather.test.ts:67-87.",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3134",
     "reviewRequestedAt": "2026-07-26T11:22:15.614Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -74,39 +115,40 @@
         "tests/unit/lib/pipeline-membership-gather.test.ts"
       ],
       "recordedAt": "2026-07-26T11:22:12.725Z"
-    },
-    "prUrl": "https://github.com/eltmon/overdeck/pull/3134"
+    }
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 363712,
-            "output": 11320,
-            "cacheRead": 7514112,
+            "input": 1429766,
+            "output": 114069,
+            "cacheRead": 84952576,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 363712,
-          "output": 11320,
-          "cacheRead": 7514112,
+          "input": 1429766,
+          "output": 114069,
+          "cacheRead": 84952576,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 5.915216,
-        "pricingAsOf": "2026-07-26T10:10:18.501Z"
+        "usd": 53.047188,
+        "pricingAsOf": "2026-07-26T11:22:18.999Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/3134"
+    ],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-opus-5",
+  "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
     "sequence": 18,
@@ -290,45 +332,5 @@
     "docs-prompts-contract.docs-prompts-contract.ac1": "completed",
     "docs-prompts-contract.docs-prompts-contract.ac2": "completed",
     "docs-prompts-contract.docs-prompts-contract.ac3": "completed"
-  },
-  "scopeDrift": {
-    "outsideDeclaredScope": [
-      "tests/unit/dashboard/routes/registered-projects-route.test.ts"
-    ],
-    "declaredScopeUntouched": [],
-    "declaredScope": [
-      "docs/PIPELINE-MEMBERSHIP.md",
-      "packages/contracts/src/types.ts",
-      "roles/flywheel.md",
-      "src/dashboard/frontend/src/components/CommandDeck/projectsData.test.ts",
-      "src/dashboard/frontend/src/components/CommandDeck/projectsData.ts",
-      "src/dashboard/server/routes/misc/meta.ts",
-      "src/dashboard/server/routes/pipeline-membership.ts",
-      "src/dashboard/server/services/pipeline-membership.ts",
-      "src/lib/cloister/uat-promote-notify.ts",
-      "src/lib/pipeline-membership-gather.ts",
-      "sync-sources/skills/pipeline-status/SKILL.md",
-      "tests/unit/dashboard/pipeline-membership-service.test.ts",
-      "tests/unit/dashboard/routes/pipeline-membership-route.test.ts",
-      "tests/unit/lib/pipeline-membership-gather.test.ts"
-    ],
-    "actualChangedFiles": [
-      "docs/PIPELINE-MEMBERSHIP.md",
-      "packages/contracts/src/types.ts",
-      "roles/flywheel.md",
-      "src/dashboard/frontend/src/components/CommandDeck/projectsData.test.ts",
-      "src/dashboard/frontend/src/components/CommandDeck/projectsData.ts",
-      "src/dashboard/server/routes/misc/meta.ts",
-      "src/dashboard/server/routes/pipeline-membership.ts",
-      "src/dashboard/server/services/pipeline-membership.ts",
-      "src/lib/cloister/uat-promote-notify.ts",
-      "src/lib/pipeline-membership-gather.ts",
-      "sync-sources/skills/pipeline-status/SKILL.md",
-      "tests/unit/dashboard/pipeline-membership-service.test.ts",
-      "tests/unit/dashboard/routes/pipeline-membership-route.test.ts",
-      "tests/unit/dashboard/routes/registered-projects-route.test.ts",
-      "tests/unit/lib/pipeline-membership-gather.test.ts"
-    ],
-    "recordedAt": "2026-07-26T11:22:12.725Z"
   }
 }
