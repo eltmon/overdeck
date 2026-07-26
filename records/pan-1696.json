@@ -131,7 +131,7 @@
     }
   ],
   "created": "2026-07-26T00:35:36.057Z",
-  "updated": "2026-07-26T00:35:36.130Z",
+  "updated": "2026-07-26T00:36:08.500Z",
   "pipeline": {
     "issueId": "PAN-1696",
     "reviewStatus": "pending",
@@ -183,5 +183,20 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-haiku-4-5"
+  "model": "claude-haiku-4-5",
+  "tasks": {
+    "sequence": 1,
+    "claims": {
+      "flag-rename": {
+        "writerId": "agent-pan-1696",
+        "agentId": "agent-pan-1696",
+        "pid": 1587606,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T00:36:08.500Z"
+      }
+    }
+  },
+  "statusOverrides": {
+    "flag-rename": "running"
+  }
 }
