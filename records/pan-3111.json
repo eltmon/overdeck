@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T12:26:09.908Z",
-  "updated": "2026-07-26T13:53:01.451Z",
+  "updated": "2026-07-26T14:14:39.844Z",
   "pipeline": {
     "issueId": "PAN-3111",
     "reviewStatus": "pending",
@@ -61,16 +61,8 @@
   "model": "claude-opus-5",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 11,
-    "claims": {
-      "started-by-call-sites": {
-        "writerId": "agent-pan-3111",
-        "agentId": "agent-pan-3111",
-        "pid": 3352334,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-26T13:46:58.970Z"
-      }
-    },
+    "sequence": 12,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3111",
@@ -126,6 +118,17 @@
         "outcome": "completed",
         "reason": "Added startedBy across AgentState, spawn options and both state literals; preserved flywheel provenance through state.json cleaning; added both database schemas, migrations, writers, readers, backfill, and round-trip/no-loss tests.",
         "releasedAt": "2026-07-26T13:44:51.834Z"
+      },
+      {
+        "writerId": "agent-pan-3111",
+        "agentId": "agent-pan-3111",
+        "pid": 3352334,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T13:46:58.970Z",
+        "itemId": "started-by-call-sites",
+        "outcome": "completed",
+        "reason": "Stamped explicit startedBy tokens across dashboard/CLI, planning, reconciliation, reactive, deacon recovery, handoff, and merge-strike launch paths; focused tests, typecheck, and lint pass. The prescribed broad Cloister directory run still exposes three pre-existing incomplete paths.js mocks (deacon auto-closeout/stash-janitor/stuck-skip), while all 204 touched-path tests pass.",
+        "releasedAt": "2026-07-26T14:14:39.844Z"
       }
     ],
     "statusReasons": {
@@ -148,6 +151,10 @@
       "started-by-field-plumbing": {
         "reason": "Added startedBy across AgentState, spawn options and both state literals; preserved flywheel provenance through state.json cleaning; added both database schemas, migrations, writers, readers, backfill, and round-trip/no-loss tests.",
         "updatedAt": "2026-07-26T13:44:51.834Z"
+      },
+      "started-by-call-sites": {
+        "reason": "Stamped explicit startedBy tokens across dashboard/CLI, planning, reconciliation, reactive, deacon recovery, handoff, and merge-strike launch paths; focused tests, typecheck, and lint pass. The prescribed broad Cloister directory run still exposes three pre-existing incomplete paths.js mocks (deacon auto-closeout/stash-janitor/stuck-skip), while all 204 touched-path tests pass.",
+        "updatedAt": "2026-07-26T14:14:39.844Z"
       }
     }
   },
@@ -170,6 +177,11 @@
     "started-by-field-plumbing.started-by-field-plumbing.ac1": "completed",
     "started-by-field-plumbing.started-by-field-plumbing.ac2": "completed",
     "started-by-field-plumbing.started-by-field-plumbing.ac3": "completed",
-    "started-by-call-sites": "running"
+    "started-by-call-sites": "completed",
+    "started-by-call-sites.started-by-call-sites.ac1": "completed",
+    "started-by-call-sites.started-by-call-sites.ac2": "completed",
+    "started-by-call-sites.started-by-call-sites.ac3": "completed",
+    "started-by-call-sites.started-by-call-sites.ac4": "completed",
+    "started-by-call-sites.started-by-call-sites.ac5": "completed"
   }
 }
