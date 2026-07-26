@@ -326,7 +326,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T00:35:36.057Z",
-  "updated": "2026-07-26T11:55:38.165Z",
+  "updated": "2026-07-26T12:08:20.439Z",
   "pipeline": {
     "issueId": "PAN-1696",
     "reviewStatus": "passed",
@@ -337,12 +337,12 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T11:50:51.889Z",
-    "updatedAt": "2026-07-26T11:55:38.129Z",
+    "updatedAt": "2026-07-26T12:08:20.395Z",
     "reviewNotes": "Agent re-review request (5/25): Resolved the standing merge conflict with origin/main preserving BOTH intents. The single conflict was in postUatGenerationPromotePayload (uat-train.ts): main's PAN-3114 (a8bb20a61b) added Promise.all imports plus recordVerification -> recordUatPromotionVerdicts so UAT verdicts persist after promotion, while PAN-1696 derives the promote root from the generation's own stored projectRoot so a MIN batch promotes into the MIN repo. Kept both — taking either side alone would have silently dropped main's verdict persistence or this branch's cross-project promote fix. Verified: uat-train + merge-train-routes + no-loss-matrix suites (42 tests), typecheck, frontend-typecheck, lint all pass; full root suite 10898 passed, zero failures. Branch is synced with main and pushed.",
     "testNotes": "Commands: npm run typecheck (PASS). npm run lint (PASS, all sub-checks incl. lint:file-size, lint:circular, lint:ratchet-audit, lint:prompt-trailer). npm test with OVERDECK_PAN_GIT_OP=1 (PASS): 10884 passed / 2 failed / 50 skipped across 1192 files. The 2 failures are tests/unit/lib/workspace-manager-pre-rebase.test.ts 'preserves an existing project pre-rebase hook for human shells' and 'allows rebases from human shells without an agent id' — CONFIRMED pre-existing environmental noise, not caused by this branch: git diff main...HEAD touches zero files under workspace-manager.ts or that test; root-caused by inspecting PATH/which git — this test-agent's git-guard wrapper (~/.overdeck/agents/agent-pan-1696-test/git-guard/git) sits ahead of the real git binary and unconditionally blocks git rebase when OVERDECK_PAN_GIT_OP is absent, which is exactly the human-shell condition the test deliberately simulates by clearing that var. Also verified the NO_LOSS_MATRIX entries for GET/POST /api/projects/:projectKey/merge-train exist (tests/unit/lib/overdeck/no-loss-matrix.ts:399-400) — the prior test cycle's cited gap is fixed. UAT: required (dashboard/UI beads with explicit browser-verification ACs: fe-cockpit-toggle, fe-merge-train-view, fe-awaiting-merge, fe-flywheel-viewer, settings-scope-ux) and performed. Built and ran this workspace's dashboard in isolation (PORT=3211, OVERDECK_DISABLE_DEACON=1, OVERDECK_DISABLE_AUTO_MERGE=1 — never touched the live production dashboard on :3011), drove it with Playwright. Specifically re-verified the two ACs a prior test cycle found missing: fe-cockpit-toggle.ac1 (resolved effective state for 'Global default') and .ac3 (ready-feature count + generation status + Awaiting Merge link) — both are now genuinely implemented and rendered correctly in the live cockpit ('Following the global default — currently on for this project.' and '0 features ready · no batch assembled', with a working Awaiting Merge link). Round-tripped fe-cockpit-toggle.ac2: selected Enabled, confirmed via GET /api/projects/panopticon-cli/merge-train ({value:'enabled'}), reloaded the page and confirmed the Enabled button stayed pressed, then reverted to Global default (confirmed {value:null} via API) to leave no residual state change. Also verified: Awaiting Merge page renders the shared multi-project MergeTrainView with project filter chips for panopticon-cli AND mind-your-now (a real non-PAN project), a working global toggle, and live cross-project ready items linked to GitLab MRs — direct evidence the core per-project decoupling works; the Flywheel page rail renders the same shared view plus the Scope definition showing the exact apply-timing copy; Settings > Roles > Flywheel shows the Scope select at 'All tracked projects' with the specified help text and apply-timing paragraph, visible without any expand interaction. Zero browser console errors or warnings across all four pages visited (cockpit, Awaiting Merge, Flywheel, Settings).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3095",
     "reviewedAtCommit": "ca167961dcf75dd71f2e4b2cd00afbbc9726e2e6",
-    "lastVerifiedCommit": "f8bb608be544918ef11179804e8b2884df07d2f3",
+    "lastVerifiedCommit": "ca167961dcf75dd71f2e4b2cd00afbbc9726e2e6",
     "reviewRequestedAt": "2026-07-26T11:50:51.889Z",
     "reviewSpawnedAt": "2026-07-26T11:50:53.162Z"
   },
@@ -381,10 +381,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 456,
-            "output": 120921,
-            "cacheRead": 47436298,
-            "cacheWrite": 973035
+            "input": 468,
+            "output": 124603,
+            "cacheRead": 48119346,
+            "cacheWrite": 1147619
           }
         },
         "work": {
@@ -422,10 +422,10 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 456,
-          "output": 120921,
-          "cacheRead": 47436298,
-          "cacheWrite": 973035
+          "input": 468,
+          "output": 124603,
+          "cacheRead": 48119346,
+          "cacheWrite": 1147619
         },
         "anthropic/claude-haiku-4-5-20251001": {
           "input": 10579,
@@ -435,8 +435,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 287.0630532,
-        "pricingAsOf": "2026-07-26T11:55:38.156Z"
+        "usd": 287.6729672,
+        "pricingAsOf": "2026-07-26T12:08:20.430Z"
       }
     },
     "merges": [
