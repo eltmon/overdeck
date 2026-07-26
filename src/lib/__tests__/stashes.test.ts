@@ -176,6 +176,17 @@ describe('stashes', () => {
     ]);
   });
 
+  it('returns no stashes for a directory that is not a git repository', async () => {
+    mockExecImplementation((cmd) => {
+      if (cmd === 'git stash list --format="%gd%x09%H%x09%cI%x09%gs"') {
+        throw new Error('Command failed: git stash list\nfatal: not a git repository (or any of the parent directories): .git');
+      }
+      throw new Error(`unexpected command: ${cmd}`);
+    });
+
+    await expect(Effect.runPromise(listStashes('/tmp/wrapper-workspace'))).resolves.toEqual([]);
+  });
+
   it('re-resolves a stable stash sha before destructive operations', async () => {
     mockExecImplementation((cmd) => {
       if (cmd === 'git stash list --format="%gd%x09%H%x09%cI%x09%gs"') {

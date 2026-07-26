@@ -37,6 +37,16 @@ describe('scrubAgentIdentityFromDashboardEnv (PAN-2989)', () => {
     expect(env.OVERDECK_AGENT_ID).toBeUndefined();
   });
 
+  it('strips launcher git-guard shim dirs from PATH so the server runs real git', () => {
+    const env: NodeJS.ProcessEnv = {
+      PATH: '/home/u/.overdeck/agents/agent-pan-1/git-guard:/usr/bin:/home/u/.overdeck/agents/conv-2/git-guard:/bin',
+    };
+
+    scrubAgentIdentityFromDashboardEnv(env);
+
+    expect(env.PATH).toBe('/usr/bin:/bin');
+  });
+
   it('deletes stale issue/session identity even without an agent id', () => {
     const env: NodeJS.ProcessEnv = {
       OVERDECK_ISSUE_ID: 'PAN-2989',

@@ -164,10 +164,20 @@ export function parseStashListLine(line: string): ParsedStashEntry | null {
   const parsed = parseCanonicalStashMessage(message);
   return { ...parsed, ref: stackRef, stackRef, message };
 }async function listStashesPromise(repoPath: string): Promise<ParsedStashEntry[]> {
-  const { stdout } = await execAsync('git stash list --format="%gd%x09%H%x09%cI%x09%gs"', {
-    cwd: repoPath,
-    encoding: 'utf-8',
-  });
+  let stdout: string;
+  try {
+    ({ stdout } = await execAsync('git stash list --format="%gd%x09%H%x09%cI%x09%gs"', {
+      cwd: repoPath,
+      encoding: 'utf-8',
+    }));
+  } catch (error) {
+    // A polyrepo wrapper workspace has no root git repo (subrepos carry their
+    // own); enumerating its stashes is honestly "none", not a 500 on every
+    // workspaces read (2026-07-26 MIN-864 GET /api/workspaces storm).
+    const message = error instanceof Error ? error.message : String(error);
+    if (message.includes('not a git repository')) return [];
+    throw error;
+  }
   return stdout
     .split('\n')
     .map((line) => parseStashListLine(line))

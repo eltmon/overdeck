@@ -40,7 +40,7 @@ import { _serverManagedMerges } from '../specialists.js';
 import { completePendingOperation, getPendingOperation, getProjectPath, getWorkspaceInfoForIssue, readJsonBody, setPendingOperation, setReviewStatus } from '../workspaces.js';
 import { buildLocalMainRecoveryError } from './git-recovery-advice.js';
 import { internalStrikeMergeRoute } from './internal-strike-merge.js';
-import { activeStrikeMerge, ensureAgentReadyForMerge, mergeCompletionStatus, mergeVerificationOptions, normalMergeEligibility, validateStrikeMergeRequest, type StrikeMergeRequest, type TriggerMergeRequest, type TriggerMergeResult } from './merge-strike.js';
+import { activeStrikeMerge, ensureAgentReadyForMerge, mergeCompletionStatus, mergeVerificationOptions, normalMergeEligibility, recordCiGreenVerificationVerdict, validateStrikeMergeRequest, type StrikeMergeRequest, type TriggerMergeRequest, type TriggerMergeResult } from './merge-strike.js';
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
 export const shouldBlockApproveForDirtyStatus = (status: string): boolean =>
@@ -1118,6 +1118,10 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
       return { success: false, statusCode: 500, error };
     }
     console.log(`[merge] Post-rebase verification ${verifyResult.outcome} for ${issueId}`);
+
+    // PAN-3067: local runs record verificationStatus inside the runner; the
+    // CI-green skip must record it here or DoD row 3 blocks close-out forever.
+    if (skipLocalVerification) await recordCiGreenVerificationVerdict(issueId, workspacePath);
 
     // Step 4a: Report commit statuses on post-rebase HEAD (branch protection requires them).
     // Must happen AFTER rebase because rebase changes the HEAD SHA.

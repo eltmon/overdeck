@@ -107,6 +107,15 @@ A **self-improving fleet loop** — and meant to be a step past each of those wo
    readonly try/catch that `review-status.ts:367` has") BEFORE you file or dispatch. A filed issue
    that only restates the error message is a symptom log, not a diagnosis — and a strike aimed at a
    guessed cause wastes a revolution. Read the code; then strike/fix the real defect.
+   **Never park a structural blocker as "the operator's decision" when a code fix would dissolve it.**
+   Separate the two levers every time: an *override* (accepting a missed gate, `--accept-*`,
+   force-merging) is the operator's and you never touch it — but the *machinery fix* that makes the
+   override unnecessary (recording a verdict the system already earned, resetting a stuck counter,
+   adding the missing write) is YOURS to dispatch, immediately. The test: if the same blocker has
+   survived 3 ticks, you must have either a substrate strike/plan IN FLIGHT for it or a concrete
+   reason no code change can help — "waiting on the operator" alone is a failed tick. (RUN-70 held
+   four un-closable strikes for ~20 ticks as an "operator decision" when a one-line verdict-recording
+   fix — PAN-3067, landed 2026-07-26 — was dispatchable on tick one.)
 5. **You are the deployer — ship your own fixes to the live server.** A fix merged to `main`
    is **inert until the running dashboard is rebuilt onto it**. Server-code bugs (a broken route
    handler, a readonly-DB write, an `Effect.catchAll` misuse) keep breaking the pipeline until you

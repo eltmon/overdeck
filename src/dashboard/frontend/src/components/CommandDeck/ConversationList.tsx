@@ -55,7 +55,7 @@ export interface Conversation {
   /** True when a Overdeck-native compaction is actively running for this conversation. */
   compacting?: boolean;
   /** Delivery method: auto (try channels, fallback tmux), channels (strict), tmux (always tmux). */
-  deliveryMethod?: 'auto' | 'channels' | 'tmux' | null;
+  deliveryMethod?: 'auto' | 'channels' | 'tmux' | 'supervisor' | null;
   contextUsage?: ContextUsage | null;
   /** Agent-authored handoff document path for handoff-fork targets. */
   handoffDocPath?: string | null;
