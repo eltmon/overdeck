@@ -8,6 +8,7 @@ import { Effect } from 'effect';
 import { composeProjectNameForWorkspace, rebuildWorkspaceStack } from '../rebuild-stack.js';
 
 const mocks = vi.hoisted(() => ({
+  getReviewStatusSync: vi.fn(),
   isIssueClosed: vi.fn(),
   resolveProjectFromIssueSync: vi.fn(),
   getProjectSync: vi.fn(),
@@ -19,6 +20,10 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('../../cloister/issue-closed.js', () => ({
   isIssueClosed: mocks.isIssueClosed,
+}));
+
+vi.mock('../../review-status.js', () => ({
+  getReviewStatusSync: mocks.getReviewStatusSync,
 }));
 
 vi.mock('../../projects.js', () => ({
@@ -85,6 +90,7 @@ describe('composeProjectNameForWorkspace', () => {
 describe('rebuildWorkspaceStack terminal-state guard (PAN-2510)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.getReviewStatusSync.mockReturnValue(null);
   });
 
   function setupProject(workspacePath: string) {
@@ -105,10 +111,23 @@ describe('rebuildWorkspaceStack terminal-state guard (PAN-2510)', () => {
     });
   }
 
-  it('returns terminal error and skips rebuild when the issue is closed/merged', async () => {
+  it('returns terminal error and skips rebuild when the issue is closed', async () => {
     const workspacePath = makeWorkspace(null);
     setupProject(workspacePath);
     mocks.isIssueClosed.mockResolvedValue(true);
+
+    const result = await Effect.runPromise(rebuildWorkspaceStack('MIN-831'));
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('terminal');
+    expect(mocks.ensureDevcontainerSync).not.toHaveBeenCalled();
+  });
+
+  it('returns terminal error and skips rebuild when the issue is merged but open', async () => {
+    const workspacePath = makeWorkspace(null);
+    setupProject(workspacePath);
+    mocks.isIssueClosed.mockResolvedValue(false);
+    mocks.getReviewStatusSync.mockReturnValue({ mergeStatus: 'merged' });
 
     const result = await Effect.runPromise(rebuildWorkspaceStack('MIN-831'));
 
@@ -121,6 +140,7 @@ describe('rebuildWorkspaceStack terminal-state guard (PAN-2510)', () => {
     const workspacePath = makeWorkspace(null);
     setupProject(workspacePath);
     mocks.isIssueClosed.mockResolvedValue(false);
+    mocks.getReviewStatusSync.mockReturnValue({ mergeStatus: 'failed' });
     mocks.ensureDevcontainerSync.mockReturnValue({
       step: { success: true },
     });

@@ -165,7 +165,11 @@ export const rebuildWorkspaceStack = (
 
   return Effect.gen(function* () {
     const closed = yield* Effect.promise(() => isIssueClosed(issueId));
-    if (closed) {
+    const merged = yield* Effect.promise(async () => {
+      const { getReviewStatusSync } = await import('../review-status.js');
+      return getReviewStatusSync(issueId)?.mergeStatus === 'merged';
+    });
+    if (closed || merged) {
       return {
         success: false,
         error: 'Issue is terminal (closed/merged) — skipping stack rebuild',
