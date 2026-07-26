@@ -281,7 +281,7 @@
     "recordedAt": "2026-07-26T10:07:26.737Z"
   },
   "created": "2026-07-21T23:09:49.270Z",
-  "updated": "2026-07-26T10:56:23.608Z",
+  "updated": "2026-07-26T10:57:05.039Z",
   "pipeline": {
     "issueId": "PAN-2997",
     "reviewStatus": "pending",
@@ -386,7 +386,9 @@
         "tests/unit/lib/overdeck/no-loss-matrix.ts"
       ],
       "recordedAt": "2026-07-26T10:07:26.737Z"
-    }
+    },
+    "reviewRequestedAt": "2026-07-26T10:57:04.635Z",
+    "panDoneRecoveredAt": "2026-07-26T10:57:04.635Z"
   },
   "closeOut": {
     "usage": {
