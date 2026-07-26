@@ -273,6 +273,38 @@ function unstampableFailure(
   };
 }
 
+/**
+ * A repo row that claims a promote stamp but has no merge SHA and no merge
+ * findable on its target.
+ *
+ * Deliberately non-terminal. `promotedAt` on its own is enough to keep the row
+ * out of the pending set, so letting it through would finalize a generation
+ * that can never produce complete per-repo merge evidence: post-merge
+ * verification would refuse every member forever, while the terminal `promoted`
+ * status would block the retry that is the only way to recover the missing SHA.
+ * Failing here keeps the batch promotable so a later attempt — once the remote
+ * is reachable, or the row is repaired — can finish it properly.
+ */
+function unprovenStampFailure(
+  gen: UatGeneration,
+  unproven: ReadonlyArray<{ repoKey: string; why: string }>,
+  log: (msg: string) => void,
+): PromoteResult {
+  const detail = unproven.map((u) => `${u.repoKey} (${u.why})`).join('; ');
+  log(`[uat-promote] ${gen.name}: stamped repo(s) cannot be proven merged — not finalizing: ${detail}`);
+  return {
+    success: false,
+    reason: 'merge-failed',
+    message:
+      `${gen.name}: ${unproven.length} repo(s) are recorded as promoted but their merge cannot be proven: ${detail}. ` +
+      `Nothing was published on this attempt. A batch is only finalized once every repo carries both a promote ` +
+      `timestamp and the merge commit it landed, because post-merge verification checks each repo's merge against ` +
+      `its own target branch and refuses on missing evidence. The batch stays promotable: retry once the remote is ` +
+      `reachable, or correct the repo row, and repos that genuinely landed are detected and skipped rather than ` +
+      `republished.`,
+  };
+}
+
 /** The generation with its repo rows replaced by recovered/updated ones. */
 function withRepos(gen: UatGeneration, repos: readonly UatGenerationRepo[]): UatGeneration {
   return { ...gen, repos: [...repos] };
@@ -313,6 +345,8 @@ async function promotePolyrepo(
   const now = deps.now ?? (() => new Date());
   /** Repos whose merge is live on the remote but whose durable stamp failed. */
   const unstampable: Array<{ repoKey: string; mergeSha: string; error: unknown }> = [];
+  /** Repos that claim a promote stamp but can produce no merge SHA to prove it. */
+  const unproven: Array<{ repoKey: string; why: string }> = [];
 
   // Reconcile local state against the remotes BEFORE classifying anything as
   // pending. A repo whose push succeeded but whose stamp never landed is
@@ -327,7 +361,17 @@ async function promotePolyrepo(
     // way out, and it is exactly what findLandedMerge answers.
     if (repo.promotedAt && repo.mergeSha) { recovered.push(repo); continue; }
     const git = repoGit.get(repo.repoKey);
-    if (!git) { recovered.push(repo); continue; }
+    if (!git) {
+      // An unstamped row without deps is simply pending, and the `missing` check
+      // below rejects it by name. A STAMPED one is the dangerous case: the stamp
+      // alone keeps it out of `pending`, so with no way to look up its merge it
+      // would sail through to finalization unproven.
+      if (repo.promotedAt) {
+        unproven.push({ repoKey: repo.repoKey, why: 'there are no promote git deps for it, so its target cannot be inspected' });
+      }
+      recovered.push(repo);
+      continue;
+    }
 
     let landedSha: string | null = null;
     try {
@@ -344,7 +388,20 @@ async function promotePolyrepo(
           `Nothing was published; retry once the remote is reachable.`,
       };
     }
-    if (!landedSha) { recovered.push(repo); continue; }
+    if (!landedSha) {
+      // No stamp and no landed merge is the ordinary pending case. A stamp with
+      // no merge SHA and no merge on the target is a row that CLAIMS to have
+      // been promoted and cannot back it up — the probe just came back empty, so
+      // there is no evidence left to find on this attempt.
+      if (repo.promotedAt) {
+        unproven.push({
+          repoKey: repo.repoKey,
+          why: `it is stamped promoted at ${repo.promotedAt} with no recorded merge sha, and ${repo.branch} is not contained in ${repo.targetBranch ?? 'main'}`,
+        });
+      }
+      recovered.push(repo);
+      continue;
+    }
 
     log(
       `[uat-promote] ${gen.name}: ${repo.repoKey} is contained in its target (${landedSha.slice(0, 9)}) ` +
@@ -368,6 +425,9 @@ async function promotePolyrepo(
 
   if (unstampable.length > 0) {
     return unstampableFailure(gen, unstampable, log);
+  }
+  if (unproven.length > 0) {
+    return unprovenStampFailure(gen, unproven, log);
   }
 
   const alreadyLanded = recovered.filter((r) => r.promotedAt);
@@ -535,6 +595,26 @@ async function finishPromote(
   log: (msg: string) => void,
   isPolyrepoGeneration = false,
 ): Promise<PromoteResult> {
+  // The one place a generation becomes terminal, so the completeness invariant
+  // is enforced here rather than at each caller: a polyrepo batch is finalized
+  // only when EVERY repo carries both a promote stamp and the merge commit it
+  // landed. Anything less cannot supply the per-repo evidence post-merge
+  // verification needs, and `promoted` would foreclose the retry that could
+  // still recover it.
+  if (isPolyrepoGeneration) {
+    const incomplete = (gen.repos ?? []).filter((r) => !r.promotedAt || !r.mergeSha);
+    if (incomplete.length > 0) {
+      return unprovenStampFailure(
+        gen,
+        incomplete.map((r) => ({
+          repoKey: r.repoKey,
+          why: r.promotedAt ? 'no merge sha was recorded for it' : 'it was never stamped as promoted',
+        })),
+        log,
+      );
+    }
+  }
+
   deps.store.update(gen.name, { status: 'promoted' });
   try {
     deps.recordVerification?.(gen, mergeSha);
@@ -562,27 +642,19 @@ async function finishPromote(
   // verifiedMergedRef guarantees the ancestry check fails and the lifecycle
   // refuses. Per-repo merge commits are handed over instead, each verified in
   // its own repo against its own target branch.
-  const publishedRepos = isPolyrepoGeneration ? (gen.repos ?? []) : [];
-  const withEvidence = publishedRepos.filter((r) => r.mergeSha);
-  // All-or-nothing: verification accepts an evidence array once every entry in
-  // it proves out, so handing over a SUBSET would advance every member's
-  // lifecycle having proven only some repos. If any published repo lacks a
-  // merge SHA, supply no per-repo evidence at all and let the standard
-  // verification refuse, rather than passing a partial proof.
-  const verifiedMergedRepos = withEvidence.length === publishedRepos.length
-    ? withEvidence.map((r) => ({
+  //
+  // The completeness guard above already refused anything short of a merge SHA
+  // per repo, so this evidence set covers every repo the batch touched — never
+  // a subset, which would advance every member's lifecycle having proven only
+  // some of the repos their work landed in.
+  const verifiedMergedRepos = isPolyrepoGeneration
+    ? (gen.repos ?? []).map((r) => ({
         repoKey: r.repoKey,
         repoPath: r.repoPath,
         mergeSha: r.mergeSha!,
         targetBranch: r.targetBranch ?? 'main',
       }))
     : [];
-  if (isPolyrepoGeneration && withEvidence.length !== publishedRepos.length) {
-    log(
-      `[uat-promote] ${gen.name}: ${publishedRepos.length - withEvidence.length} repo(s) have no recorded merge sha — ` +
-      `withholding partial per-repo evidence so post-merge verification cannot pass on an unproven subset`,
-    );
-  }
 
   const postMergeStarted: string[] = [];
   for (const member of gen.members) {

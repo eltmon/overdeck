@@ -252,7 +252,19 @@ would mean force-pushing a member repo's main, a one-way door. Each landed repo
 is stamped with `promoted_at` and its `merge_sha`, the failure names landed vs
 pending repos, and a retry skips whatever already landed. A retry that finds
 every repo already landed *finalizes* rather than erroring, which is what makes
-a crash between the last push and finalization recoverable. Post-merge
+a crash between the last push and finalization recoverable.
+
+**Finalization requires complete evidence: every repo must carry both
+`promoted_at` and `merge_sha`.** A row stamped without a merge SHA is repaired
+first — the retry looks the merge up on the repo's target and records it — but
+if no merge can be found there, the promote fails *retryably* instead of
+finalizing. This matters because `promoted_at` alone is enough to keep a row out
+of the pending set: finalizing on it would mark the generation `promoted` while
+permanently unable to produce that repo's merge commit, so post-merge
+verification would refuse every member forever and the terminal status would
+block the only retry that could still recover the SHA. `finishPromote()`
+enforces the invariant at the single point a generation turns terminal, so no
+caller can bypass it. Post-merge
 lifecycles fire only after *every* repo publishes, and receive the per-repo
 merge commits as evidence — each verified inside its own repo against its own
 target branch, since a composite anchor is not a git ref and the wrapper is not

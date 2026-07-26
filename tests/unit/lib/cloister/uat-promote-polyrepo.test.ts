@@ -263,9 +263,10 @@ describe('polyrepo promote — phase B publishes and resumes', () => {
   });
 
   it('skips an already-landed repo on retry and publishes only the pending one', async () => {
-    // State after the previous test's partial publish: fe carries promotedAt.
+    // State after the previous test's partial publish: fe carries both the
+    // promote stamp and the merge it landed, which is what publishing writes.
     const gen = generation([
-      repoRow('fe', 0, { promotedAt: '2026-07-27T12:00:00.000Z' }),
+      repoRow('fe', 0, { promotedAt: '2026-07-27T12:00:00.000Z', mergeSha: 'fe-merge-sha' }),
       repoRow('api', 1),
     ]);
     const fe = makeRepoGit('fe');
@@ -478,18 +479,72 @@ describe('polyrepo promote — recovering an unstamped but landed repo', () => {
     expect(api.published).toEqual([]);
   });
 
-  it('withholds per-repo evidence when a published repo has no recorded merge sha', async () => {
-    // A resumed generation whose older row predates merge_sha capture: proving
-    // only the newer repo would advance every member on partial evidence.
+  it('recovers the merge sha for a row stamped before merge_sha capture existed', async () => {
+    // The stamp is real and the merge IS on the target — findLandedMerge can
+    // still name it, so the row is repaired rather than refused.
     const gen = generation([
-      repoRow('fe', 0, { promotedAt: '2026-07-27T12:00:00.000Z', mergeSha: null }),
-      repoRow('api', 1, { promotedAt: '2026-07-27T12:00:00.000Z', mergeSha: 'api-merge-sha' }),
+      repoRow('fe', 0, { promotedAt: '2026-07-27T09:00:00.000Z', mergeSha: null }),
+      repoRow('api', 1, { promotedAt: '2026-07-27T09:00:00.000Z', mergeSha: 'api-merge-sha' }),
     ]);
-    const deps = makeDeps(gen, new Map([['fe', makeRepoGit('fe')], ['api', makeRepoGit('api')]]));
+    const fe = makeRepoGit('fe', { alreadyLanded: 'fe-recovered' });
+    const deps = makeDeps(gen, new Map([['fe', fe], ['api', makeRepoGit('api')]]));
 
-    await promoteUatGeneration(GEN_NAME, PROJECT_ROOT, deps);
+    const result = await promoteUatGeneration(GEN_NAME, PROJECT_ROOT, deps);
 
-    const options = deps.firePostMerge.mock.calls[0]![1] as { verifiedMergedRepos?: unknown[] };
-    expect(options.verifiedMergedRepos).toBeUndefined();
+    expect(result.success).toBe(true);
+    // The original stamp time is kept — only the missing evidence is filled in.
+    expect(deps.promoted).toContainEqual(['fe', '2026-07-27T09:00:00.000Z', 'fe-recovered']);
+    const options = deps.firePostMerge.mock.calls[0]![1] as {
+      verifiedMergedRepos?: Array<{ repoKey: string; mergeSha: string }>;
+    };
+    expect(options.verifiedMergedRepos).toEqual([
+      expect.objectContaining({ repoKey: 'fe', mergeSha: 'fe-recovered' }),
+      expect.objectContaining({ repoKey: 'api', mergeSha: 'api-merge-sha' }),
+    ]);
+  });
+
+  it('stays retryable instead of finalizing when a stamped row has no provable merge', async () => {
+    // Same shape as above, except the probe comes back empty: the row claims a
+    // promote it cannot back up. Finalizing would mark the batch promoted while
+    // permanently unable to produce fe's merge evidence — post-merge would
+    // refuse every member forever and `promoted` would block the retry that is
+    // the only route to the missing sha.
+    const gen = generation([
+      repoRow('fe', 0, { promotedAt: '2026-07-27T09:00:00.000Z', mergeSha: null }),
+      repoRow('api', 1, { promotedAt: '2026-07-27T09:00:00.000Z', mergeSha: 'api-merge-sha' }),
+    ]);
+    const fe = makeRepoGit('fe');
+    const api = makeRepoGit('api');
+    const deps = makeDeps(gen, new Map([['fe', fe], ['api', api]]));
+
+    const result = await promoteUatGeneration(GEN_NAME, PROJECT_ROOT, deps);
+
+    expect(result).toMatchObject({ success: false, reason: 'merge-failed' });
+    const message = (result as { message: string }).message;
+    expect(message).toContain('recorded as promoted but their merge cannot be proven');
+    expect(message).toContain('fe');
+    expect(message).toContain('stays promotable');
+    // Not terminal, no lifecycle fired, and nothing published on the way out.
+    expect(deps.statuses).not.toContain('promoted');
+    expect(deps.firePostMerge).not.toHaveBeenCalled();
+    expect(fe.published).toEqual([]);
+    expect(api.published).toEqual([]);
+  });
+
+  it('refuses to finalize a stamped row whose repo has no promote git deps', async () => {
+    // A stamp with no deps to check it against is unprovable for the same
+    // reason, and `promotedAt` alone would keep it out of the pending set.
+    const gen = generation([
+      repoRow('fe', 0, { promotedAt: '2026-07-27T09:00:00.000Z', mergeSha: null }),
+      repoRow('api', 1, { promotedAt: '2026-07-27T09:00:00.000Z', mergeSha: 'api-merge-sha' }),
+    ]);
+    const deps = makeDeps(gen, new Map([['api', makeRepoGit('api')]]));
+
+    const result = await promoteUatGeneration(GEN_NAME, PROJECT_ROOT, deps);
+
+    expect(result).toMatchObject({ success: false, reason: 'merge-failed' });
+    expect((result as { message: string }).message).toContain('no promote git deps');
+    expect(deps.statuses).not.toContain('promoted');
+    expect(deps.firePostMerge).not.toHaveBeenCalled();
   });
 });
