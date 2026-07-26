@@ -66,6 +66,8 @@ export const OVERDECK_SCHEMA_TOP_UP_EXPECTATIONS: SchemaTopUpExpectations = {
     'release_sets_project_idx',
     'release_set_components_issue_component_idx',
     'release_set_components_issue_order_idx',
+    'uat_generation_repos_uat_order_idx',
+    'uat_generation_member_repos_uat_idx',
   ],
 };
 
@@ -139,6 +141,7 @@ function ensureRuntimeIndexesSync(db: SqliteDatabase): void {
   runSchemaTopUp(db, 'ALTER TABLE `review_status` ADD COLUMN `strike_next_attempt_at` integer');
   runSchemaTopUp(db, 'ALTER TABLE `review_status` ADD COLUMN `strike_landing_attempts` text');
   ensureReleaseSetTablesSync(db);
+  ensureUatGenerationRepoTablesSync(db);
   // PAN-1491: existing overdeck.db files created before substrate-bug weights need
   // the new `affected_criteria` column added idempotently.
   runSchemaTopUp(db, 'ALTER TABLE `flywheel_substrate_bugs` ADD COLUMN `affected_criteria` text');
@@ -200,6 +203,45 @@ function ensureReleaseSetTablesSync(db: SqliteDatabase): void {
   `);
   db.exec('CREATE UNIQUE INDEX IF NOT EXISTS \`release_set_components_issue_component_idx\` ON \`release_set_components\` (\`issue_id\`,\`component_key\`)');
   db.exec('CREATE INDEX IF NOT EXISTS \`release_set_components_issue_order_idx\` ON \`release_set_components\` (\`issue_id\`,\`release_order\`,\`component_key\`)');
+}
+
+/**
+ * Idempotent schema top-up for per-repo UAT generation tables (PAN-3093).
+ * A polyrepo generation spans N member repos, so its per-repo branch, base SHA,
+ * worktree, and publish state cannot live in the single-valued `uat_generations`
+ * columns. Existing overdeck.db files predate these tables and need them added
+ * without a migration reset — same shape as ensureReleaseSetTablesSync above.
+ */
+function ensureUatGenerationRepoTablesSync(db: SqliteDatabase): void {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS \`uat_generation_repos\` (
+      \`uat_name\` text NOT NULL,
+      \`repo_key\` text NOT NULL,
+      \`repo_path\` text NOT NULL,
+      \`branch\` text NOT NULL,
+      \`base_sha\` text NOT NULL,
+      \`worktree_path\` text NOT NULL,
+      \`merge_order\` integer DEFAULT 0 NOT NULL,
+      \`promoted_at\` integer,
+      PRIMARY KEY(\`uat_name\`, \`repo_key\`),
+      FOREIGN KEY (\`uat_name\`) REFERENCES \`uat_generations\`(\`name\`) ON UPDATE no action ON DELETE no action
+    )
+  `);
+  db.exec('CREATE INDEX IF NOT EXISTS \`uat_generation_repos_uat_order_idx\` ON \`uat_generation_repos\` (\`uat_name\`,\`merge_order\`)');
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS \`uat_generation_member_repos\` (
+      \`uat_name\` text NOT NULL,
+      \`issue_id\` text NOT NULL,
+      \`repo_key\` text NOT NULL,
+      \`branch\` text NOT NULL,
+      \`head_sha\` text NOT NULL,
+      \`merge_order_in_repo\` integer DEFAULT 0 NOT NULL,
+      PRIMARY KEY(\`uat_name\`, \`issue_id\`, \`repo_key\`),
+      FOREIGN KEY (\`uat_name\`) REFERENCES \`uat_generations\`(\`name\`) ON UPDATE no action ON DELETE no action,
+      FOREIGN KEY (\`issue_id\`) REFERENCES \`issues\`(\`id\`) ON UPDATE no action ON DELETE no action
+    )
+  `);
+  db.exec('CREATE INDEX IF NOT EXISTS \`uat_generation_member_repos_uat_idx\` ON \`uat_generation_member_repos\` (\`uat_name\`,\`issue_id\`)');
 }
 
 function warnSchemaDriftSync(db: SqliteDatabase): void {

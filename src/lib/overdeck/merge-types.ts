@@ -36,6 +36,40 @@ export type UatGenerationStatus =
   | 'promoted'
   | 'failed';
 
+/**
+ * One member repo a generation actually branched (PAN-3093). A polyrepo project
+ * spans N git repos, so each contributing repo carries its own uat branch, base
+ * SHA, and worktree; `uat_generations.base_sha` holds only the composite anchor.
+ * Monorepo generations write no rows here — readers get a synthesized N=1 entry.
+ */
+export interface UatGenerationRepo {
+  /** Repo key from the project's repo resolver, e.g. 'fe' / 'api'. */
+  repoKey: string;
+  /** Absolute path to this member repo's git root. */
+  repoPath: string;
+  /** The uat/<label>-<codename>-<MMDD> branch created in THIS repo. */
+  branch: string;
+  /** Head SHA of this repo's target branch the uat branch was cut from. */
+  baseSha: string;
+  /** Absolute path to this repo's worktree, <generationFolder>/<repoKey>. */
+  worktreePath: string;
+  /** Publish order during promote; ascending. */
+  mergeOrder: number;
+  /** ISO timestamp once this repo's merge landed on its target branch. */
+  promotedAt?: string | null;
+}
+
+/** One (member, repo) contribution — the feature branch this issue has in a repo. */
+export interface UatGenerationMemberRepo {
+  repoKey: string;
+  /** Feature branch in THIS repo, e.g. feature/min-901. */
+  branch: string;
+  /** Head SHA of that feature branch at assembly time — staleness detection. */
+  headSha: string;
+  /** Position within this repo's merge order. */
+  mergeOrderInRepo: number;
+}
+
 /** A feature bundled into (or queued for) a generation. */
 export interface UatGenerationMember {
   issueId: string;
@@ -48,6 +82,8 @@ export interface UatGenerationMember {
   mergeOrder: number;
   pr?: number;
   prUrl?: string;
+  /** Per-repo contributions (polyrepo only); absent for monorepo members. */
+  repos?: UatGenerationMemberRepo[];
 }
 
 export interface UatGenerationHeldOut {
@@ -69,11 +105,31 @@ export interface UatGenerationResolution {
 export interface UatGeneration {
   /** Branch name doubles as the identifier, e.g. uat/calm-otter-0610. */
   name: string;
+  /**
+   * Monorepo: the generation's single worktree. Polyrepo: the wrapper folder
+   * containing one `<repoKey>/` worktree per contributing repo, keeping the
+   * stack contract (compose project name, Traefik host) identical either way.
+   */
   worktreePath: string;
   projectRoot: string;
-  /** SHA of origin/main the branch was assembled off. */
+  /**
+   * Monorepo: SHA of origin/main the branch was assembled off. Polyrepo: the
+   * composite anchor `<repoKey>@<shortSha> …` in merge order; the authoritative
+   * per-repo SHAs live in `repos[].baseSha`.
+   */
   baseSha: string;
   status: UatGenerationStatus;
+  /**
+   * One entry per repo the generation branched, ascending by mergeOrder.
+   *
+   * Optional for WRITERS — the monorepo engine constructs generations without
+   * it — but every merge-sync read path populates it, so it is always present
+   * and non-empty on a generation loaded from the store. A generation with no
+   * stored per-repo rows (every monorepo generation, plus rows written before
+   * PAN-3093) reads back as a single entry synthesized from
+   * `baseSha`/`worktreePath`, so consumers never branch on project type.
+   */
+  repos?: UatGenerationRepo[];
   members: UatGenerationMember[];
   heldOut: UatGenerationHeldOut[];
   resolutions: UatGenerationResolution[];
