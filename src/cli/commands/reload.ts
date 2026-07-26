@@ -2,7 +2,17 @@ import { Effect } from 'effect';
 import chalk from 'chalk';
 import { statSync } from 'fs';
 import { resolve } from 'path';
-import { buildDashboardFromOriginMain, runGitAsync } from '../../lib/deploy/build-from-origin.js';
+import {
+  buildDashboardFromOriginMain,
+  installDashboardDeployment,
+  removeDashboardDeployment,
+  runGitAsync,
+  type DashboardDeployment,
+} from '../../lib/deploy/build-from-origin.js';
+import {
+  readActiveDashboardBundleSync,
+  writeActiveDashboardBundle,
+} from '../../lib/deploy/active-dashboard-bundle.js';
 import { acquireRestartLock, readRestartLockHolder } from '../../lib/restart-lock.js';
 import { readPlatformConfigSync, restartDashboard, StageError, parseHealthTimeoutMs } from '../../lib/platform-lifecycle.js';
 import { writeRestartStatus } from '../../lib/restart-status.js';
@@ -10,7 +20,6 @@ import { agentRestartBlockReason } from '../../lib/deploy/agent-restart-gate.js'
 import {
   refuseNonPrimaryDashboardCwd,
   resolveBundledServerPath,
-  resolvePrimaryDashboardIdentity,
   spawnDashboardDetached,
 } from './restart.js';
 
@@ -31,9 +40,9 @@ function parseHealthTimeout(value: string | undefined): number {
   }
 }
 
-function dashboardBundleMtimeMs(): number {
+function dashboardBundleMtimeMs(bundlePath = resolveBundledServerPath()): number {
   try {
-    return statSync(resolveBundledServerPath()).mtimeMs;
+    return statSync(bundlePath).mtimeMs;
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return 0;
     throw error;
@@ -139,12 +148,27 @@ export async function reloadCommand(options: ReloadOptions): Promise<void> {
 
     const config = readPlatformConfigSync();
     let repoRoot = process.cwd();
+    let deployment: DashboardDeployment | null = null;
+    const previousBundle = readActiveDashboardBundleSync();
     if (!options.skipBuild) {
-      const beforeMtime = dashboardBundleMtimeMs();
       try {
         repoRoot = await resolvePrimaryRepoRoot(process.cwd());
-        await buildDashboardFromOriginMain(repoRoot);
+        deployment = await buildDashboardFromOriginMain(repoRoot);
+        const deployedMtime = dashboardBundleMtimeMs(deployment.serverPath);
+        if (deployedMtime <= 0) {
+          throw new Error(`Build did not create ${deployment.serverPath}`);
+        }
+        await writeActiveDashboardBundle({ repoRoot, ...deployment });
+        try {
+          await installDashboardDeployment(repoRoot, deployment);
+        } catch (error) {
+          await writeActiveDashboardBundle(previousBundle).catch(() => undefined);
+          throw error;
+        }
       } catch (error) {
+        if (deployment) {
+          await removeDashboardDeployment(repoRoot, deployment.deployRoot);
+        }
         const message = (error as Error)?.message || String(error);
         const reloadError = message.includes('old dashboard left running')
           ? message
@@ -154,21 +178,20 @@ export async function reloadCommand(options: ReloadOptions): Promise<void> {
         process.exitCode = 1;
         return;
       }
-
-      const afterMtime = dashboardBundleMtimeMs();
-      if (afterMtime <= beforeMtime) {
-        const error = `Build did not refresh ${resolveBundledServerPath()} — old dashboard left running`;
-        console.error(chalk.red(error));
-        await recordReloadStatus(startedAt, false, error);
-        process.exitCode = 1;
-        return;
-      }
     }
 
-    await Effect.runPromise(restartDashboard(config, () => spawnDashboardDetached(config, { deacon: options.deacon }), {
+    await Effect.runPromise(restartDashboard(config, () => spawnDashboardDetached(config, {
+      deacon: options.deacon,
+      serverPath: deployment?.serverPath,
+      repoRoot,
+    }), {
       healthTimeoutMs,
-      expectedIdentity: resolvePrimaryDashboardIdentity(),
+      expectedIdentity: { repoRoot, mode: 'primary' },
     }));
+
+    if (deployment && previousBundle && previousBundle.deployRoot !== deployment.deployRoot) {
+      await removeDashboardDeployment(previousBundle.repoRoot, previousBundle.deployRoot);
+    }
     await recordReloadStatus(startedAt, true);
     console.log(chalk.green('✓ Dashboard reloaded and healthy'));
   } catch (error) {

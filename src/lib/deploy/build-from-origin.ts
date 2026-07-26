@@ -5,6 +5,8 @@ import { homedir } from 'os';
 import { delimiter, dirname, isAbsolute, join, resolve } from 'path';
 import { promisify } from 'util';
 
+import { getOverdeckHome } from '../paths.js';
+
 const execAsync = promisify(exec);
 
 interface GitResult {
@@ -12,11 +14,17 @@ interface GitResult {
   stderr: string;
 }
 
+export interface DashboardDeployment {
+  readonly deployRoot: string;
+  readonly serverPath: string;
+}
+
 export interface BuildFromOriginDeps {
   readonly runGit: (args: string[], cwd: string) => Promise<GitResult>;
   readonly installAndBuild: (cwd: string) => Promise<void>;
-  readonly swapArtifacts: (repoRoot: string, buildWorktree: string) => Promise<void>;
   readonly removePath: (path: string) => Promise<void>;
+  readonly ensureParent: (path: string) => Promise<void>;
+  readonly deploymentRoot: (repoRoot: string, processId: number) => string;
   readonly note: (message: string) => void;
   readonly success: (message: string) => void;
   readonly processId: number;
@@ -109,58 +117,66 @@ async function renameIfPresent(from: string, to: string): Promise<boolean> {
   }
 }
 
-async function swapBuiltArtifacts(repoRoot: string, buildWorktree: string): Promise<void> {
+async function installPrimaryDist(repoRoot: string, deployRoot: string): Promise<void> {
   const incomingDist = join(repoRoot, 'dist.incoming');
   const currentDist = join(repoRoot, 'dist');
   const oldDist = join(repoRoot, `dist.old.${process.pid}`);
-  const incomingModules = join(repoRoot, 'node_modules.incoming');
-  const currentModules = join(repoRoot, 'node_modules');
-  const oldModules = join(repoRoot, `node_modules.old.${process.pid}`);
 
   await fs.rm(incomingDist, { recursive: true, force: true });
-  await fs.rm(incomingModules, { recursive: true, force: true });
   await fs.rm(oldDist, { recursive: true, force: true });
-  await fs.rm(oldModules, { recursive: true, force: true });
-  await fs.cp(join(buildWorktree, 'dist'), incomingDist, { recursive: true });
-  await fs.rename(join(buildWorktree, 'node_modules'), incomingModules);
+  await fs.cp(join(deployRoot, 'dist'), incomingDist, { recursive: true });
+  await fs.symlink(join(deployRoot, 'node_modules'), join(incomingDist, 'node_modules'), 'dir');
 
-  let movedOldDist = false;
-  let movedOldModules = false;
-  let installedDist = false;
-  let installedModules = false;
+  const movedOldDist = await renameIfPresent(currentDist, oldDist);
   try {
-    movedOldDist = await renameIfPresent(currentDist, oldDist);
-    movedOldModules = await renameIfPresent(currentModules, oldModules);
     await fs.rename(incomingDist, currentDist);
-    installedDist = true;
-    await fs.rename(incomingModules, currentModules);
-    installedModules = true;
   } catch (error) {
-    if (installedDist) await fs.rm(currentDist, { recursive: true, force: true }).catch(() => undefined);
-    if (installedModules) await fs.rm(currentModules, { recursive: true, force: true }).catch(() => undefined);
     if (movedOldDist) await fs.rename(oldDist, currentDist).catch(() => undefined);
-    if (movedOldModules) await fs.rename(oldModules, currentModules).catch(() => undefined);
     throw error;
   }
 
-  await fs.rm(oldDist, { recursive: true, force: true });
-  await fs.rm(oldModules, { recursive: true, force: true });
+  await fs.rm(oldDist, { recursive: true, force: true }).catch(() => undefined);
+}
+
+export async function installDashboardDeployment(
+  repoRoot: string,
+  deployment: DashboardDeployment,
+): Promise<void> {
+  await installPrimaryDist(repoRoot, deployment.deployRoot);
 }
 
 const defaultDependencies: BuildFromOriginDeps = {
   runGit: runGitAsync,
   installAndBuild: runInstallAndBuild,
-  swapArtifacts: swapBuiltArtifacts,
   removePath: (path) => fs.rm(path, { recursive: true, force: true }),
+  ensureParent: async (path) => { await fs.mkdir(dirname(path), { recursive: true }); },
+  deploymentRoot: (_repoRoot, processId) => join(
+    getOverdeckHome(),
+    'deployments',
+    'dashboard',
+    `.pan-reload-build-${processId}`,
+  ),
   note: (message) => console.warn(chalk.yellow(message)),
   success: (message) => console.log(chalk.green(message)),
   processId: process.pid,
 };
 
+export async function removeDashboardDeployment(
+  repoRoot: string,
+  deployRoot: string,
+  dependencies: Partial<Pick<BuildFromOriginDeps, 'runGit' | 'removePath'>> = {},
+): Promise<void> {
+  const runGit = dependencies.runGit ?? defaultDependencies.runGit;
+  const removePath = dependencies.removePath ?? defaultDependencies.removePath;
+  await runGit(['worktree', 'remove', '--force', deployRoot], repoRoot).catch(() => undefined);
+  await removePath(deployRoot).catch(() => undefined);
+  await runGit(['worktree', 'prune'], repoRoot).catch(() => undefined);
+}
+
 export async function buildDashboardFromOriginMain(
   repoRoot: string,
   dependencies: Partial<BuildFromOriginDeps> = {},
-): Promise<void> {
+): Promise<DashboardDeployment> {
   const deps = { ...defaultDependencies, ...dependencies };
   await deps.runGit(['fetch', 'origin', 'main'], repoRoot);
 
@@ -175,19 +191,25 @@ export async function buildDashboardFromOriginMain(
     deps.note('Primary worktree HEAD differs from origin/main; only origin/main is being deployed.');
   }
 
-  const buildWorktree = join(dirname(repoRoot), `.pan-reload-build-${deps.processId}`);
-  await deps.removePath(buildWorktree);
+  const deployRoot = deps.deploymentRoot(repoRoot, deps.processId);
+  await deps.removePath(deployRoot);
   await deps.runGit(['worktree', 'prune'], repoRoot);
+  await deps.ensureParent(deployRoot);
 
+  let completed = false;
   try {
-    await deps.runGit(['worktree', 'add', '--detach', buildWorktree, 'origin/main'], repoRoot);
-    await deps.installAndBuild(buildWorktree);
-    await deps.swapArtifacts(repoRoot, buildWorktree);
+    await deps.runGit(['worktree', 'add', '--detach', deployRoot, 'origin/main'], repoRoot);
+    await deps.installAndBuild(deployRoot);
+    const deployment = {
+      deployRoot,
+      serverPath: join(deployRoot, 'dist', 'dashboard', 'server.js'),
+    };
+    completed = true;
     deps.success(`✓ Built dashboard from origin/main ${originMainSha.slice(0, 12)}`);
+    return deployment;
   } finally {
-    await deps.runGit(['worktree', 'remove', '--force', buildWorktree], repoRoot).catch(() => undefined);
-    await deps.removePath(buildWorktree).catch(() => undefined);
-    await deps.removePath(join(repoRoot, 'dist.incoming')).catch(() => undefined);
-    await deps.removePath(join(repoRoot, 'node_modules.incoming')).catch(() => undefined);
+    if (!completed) {
+      await removeDashboardDeployment(repoRoot, deployRoot, deps);
+    }
   }
 }

@@ -9,6 +9,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   buildDashboardFromOriginMain,
+  installDashboardDeployment,
+  removeDashboardDeployment,
   type BuildFromOriginDeps,
 } from '../../../../src/lib/deploy/build-from-origin.js';
 
@@ -31,7 +33,6 @@ function createDependencies(options: {
   const installAndBuild = vi.fn(async () => {
     if (options.installError) throw options.installError;
   });
-  const swapArtifacts = vi.fn(async () => undefined);
 
   const deps: BuildFromOriginDeps = {
     runGit: vi.fn(async (args) => {
@@ -45,10 +46,11 @@ function createDependencies(options: {
       return { stdout: '', stderr: '' };
     }),
     installAndBuild,
-    swapArtifacts,
     removePath: vi.fn(async (path) => {
       removedPaths.push(path);
     }),
+    ensureParent: vi.fn(async () => undefined),
+    deploymentRoot: vi.fn(() => BUILD_WORKTREE),
     note: vi.fn((message) => {
       notes.push(message);
     }),
@@ -56,7 +58,7 @@ function createDependencies(options: {
     processId: PROCESS_ID,
   };
 
-  return { deps, gitCalls, removedPaths, notes, installAndBuild, swapArtifacts };
+  return { deps, gitCalls, removedPaths, notes, installAndBuild };
 }
 
 const temporaryRoots: string[] = [];
@@ -72,16 +74,20 @@ describe('buildDashboardFromOriginMain', () => {
     { state: 'ahead of origin/main', status: '', headSha: '2222222222222222222222222222222222222222' },
     { state: 'behind origin/main', status: '', headSha: '0000000000000000000000000000000000000000' },
   ])('builds only in the detached worktree when the primary tree is $state', async ({ status, headSha }) => {
-    const { deps, installAndBuild, swapArtifacts, gitCalls } = createDependencies({ status, headSha });
+    const { deps, installAndBuild, gitCalls } = createDependencies({ status, headSha });
 
-    await buildDashboardFromOriginMain(REPO_ROOT, deps);
+    const deployment = await buildDashboardFromOriginMain(REPO_ROOT, deps);
 
     expect(installAndBuild).toHaveBeenCalledOnce();
     expect(installAndBuild).toHaveBeenCalledWith(BUILD_WORKTREE);
     expect(installAndBuild).not.toHaveBeenCalledWith(REPO_ROOT);
-    expect(swapArtifacts).toHaveBeenCalledWith(REPO_ROOT, BUILD_WORKTREE);
+    expect(deployment).toEqual({
+      deployRoot: BUILD_WORKTREE,
+      serverPath: join(BUILD_WORKTREE, 'dist', 'dashboard', 'server.js'),
+    });
     expect(gitCalls).toContainEqual(['worktree', 'add', '--detach', BUILD_WORKTREE, 'origin/main']);
     expect(gitCalls.some((args) => args.includes('merge-base'))).toBe(false);
+    expect(gitCalls).not.toContainEqual(['worktree', 'remove', '--force', BUILD_WORKTREE]);
   });
 
   it('notes excluded primary-tree changes while continuing the deploy', async () => {
@@ -97,28 +103,22 @@ describe('buildDashboardFromOriginMain', () => {
     expect(installAndBuild).toHaveBeenCalledWith(BUILD_WORKTREE);
   });
 
-  it('propagates build failures and removes temporary deploy state', async () => {
+  it('propagates build failures and removes the failed deployment worktree', async () => {
     const buildError = new Error('Build failed in detached worktree — old dashboard left running');
-    const { deps, gitCalls, removedPaths, swapArtifacts } = createDependencies({ installError: buildError });
+    const { deps, gitCalls, removedPaths } = createDependencies({ installError: buildError });
 
     await expect(buildDashboardFromOriginMain(REPO_ROOT, deps)).rejects.toBe(buildError);
 
-    expect(swapArtifacts).not.toHaveBeenCalled();
     expect(gitCalls).toContainEqual(['worktree', 'remove', '--force', BUILD_WORKTREE]);
-    expect(removedPaths).toEqual([
-      BUILD_WORKTREE,
-      BUILD_WORKTREE,
-      join(REPO_ROOT, 'dist.incoming'),
-      join(REPO_ROOT, 'node_modules.incoming'),
-    ]);
+    expect(removedPaths).toEqual([BUILD_WORKTREE, BUILD_WORKTREE]);
   });
 
-  it('removes a stale registered worktree before creating the next build worktree', async () => {
+  it('removes a stale registered worktree before creating the next deployment worktree', async () => {
     const root = await fs.mkdtemp(join(tmpdir(), 'overdeck-stale-worktree-'));
     temporaryRoots.push(root);
     const repoRoot = join(root, 'repo');
     const processId = 888;
-    const buildWorktree = join(root, `.pan-reload-build-${processId}`);
+    const deployRoot = join(root, `.pan-reload-build-${processId}`);
     await fs.mkdir(repoRoot);
     await execFileAsync('git', ['init'], { cwd: repoRoot });
     await execFileAsync('git', ['config', 'user.name', 'Overdeck Test'], { cwd: repoRoot });
@@ -127,41 +127,43 @@ describe('buildDashboardFromOriginMain', () => {
     await execFileAsync('git', ['add', 'README.md'], { cwd: repoRoot });
     await execFileAsync('git', ['commit', '-m', 'fixture'], { cwd: repoRoot });
     await execFileAsync('git', ['update-ref', 'refs/remotes/origin/main', 'HEAD'], { cwd: repoRoot });
-    await execFileAsync('git', ['worktree', 'add', '--detach', buildWorktree, 'HEAD'], { cwd: repoRoot });
+    await execFileAsync('git', ['worktree', 'add', '--detach', deployRoot, 'HEAD'], { cwd: repoRoot });
 
     const runGit = async (args: string[], cwd: string) => {
       if (args[0] === 'fetch') return { stdout: '', stderr: '' };
       const result = await execFileAsync('git', args, { cwd, encoding: 'utf8' });
       return { stdout: String(result.stdout), stderr: String(result.stderr) };
     };
-    const swapArtifacts = vi.fn(async () => undefined);
 
-    await buildDashboardFromOriginMain(repoRoot, {
+    const deployment = await buildDashboardFromOriginMain(repoRoot, {
       runGit,
       installAndBuild: vi.fn(async () => undefined),
-      swapArtifacts,
+        deploymentRoot: () => deployRoot,
       note: vi.fn(),
       success: vi.fn(),
       processId,
     });
 
-    expect(swapArtifacts).toHaveBeenCalledWith(repoRoot, buildWorktree);
+    expect(deployment.deployRoot).toBe(deployRoot);
     const worktreeList = await execFileAsync('git', ['worktree', 'list', '--porcelain'], {
       cwd: repoRoot,
       encoding: 'utf8',
     });
-    expect(String(worktreeList.stdout)).not.toContain(buildWorktree);
+    expect(String(worktreeList.stdout)).toContain(deployRoot);
+    await removeDashboardDeployment(repoRoot, deployRoot, { runGit });
   });
 
-  it('atomically swaps the canonical build and its runtime dependencies into the primary checkout', async () => {
+  it('resolves canonical dependencies without changing the primary dependency environment', async () => {
     const root = await fs.mkdtemp(join(tmpdir(), 'overdeck-build-from-origin-'));
     temporaryRoots.push(root);
     const repoRoot = join(root, 'repo');
     const processId = 777;
-    const buildWorktree = join(root, `.pan-reload-build-${processId}`);
-    await fs.mkdir(join(repoRoot, 'dist'), { recursive: true });
-    await fs.mkdir(join(repoRoot, 'node_modules'), { recursive: true });
-    await fs.writeFile(join(repoRoot, 'dist', 'server.mjs'), 'export default "old bundle";');
+    const deployRoot = join(root, `.pan-reload-build-${processId}`);
+    await fs.mkdir(join(repoRoot, 'node_modules', 'wip-only'), { recursive: true });
+    await fs.mkdir(join(repoRoot, 'packages', 'workspace-runtime'), { recursive: true });
+    await fs.writeFile(join(repoRoot, 'node_modules', 'wip-only', 'sentinel.txt'), 'primary WIP dependency');
+    await fs.writeFile(join(repoRoot, 'packages', 'workspace-runtime', 'index.js'), 'export const workspaceValue = "primary WIP";');
+    await fs.symlink('../packages/workspace-runtime', join(repoRoot, 'node_modules', 'workspace-runtime'));
 
     const runGit = vi.fn(async (args: string[]) => {
       const command = args.join(' ');
@@ -170,36 +172,56 @@ describe('buildDashboardFromOriginMain', () => {
         return { stdout: `${ORIGIN_MAIN_SHA}\n`, stderr: '' };
       }
       if (args[0] === 'worktree' && args[1] === 'add') {
-        await fs.mkdir(join(buildWorktree, 'dist'), { recursive: true });
-        await fs.mkdir(join(buildWorktree, 'node_modules', 'runtime-package'), { recursive: true });
+        await fs.mkdir(join(deployRoot, 'dist', 'dashboard'), { recursive: true });
+        await fs.mkdir(join(deployRoot, 'node_modules', 'runtime-package'), { recursive: true });
+        await fs.mkdir(join(deployRoot, 'packages', 'workspace-runtime'), { recursive: true });
         await fs.writeFile(
-          join(buildWorktree, 'dist', 'server.mjs'),
-          'import { value } from "runtime-package"; export default value;',
+          join(deployRoot, 'dist', 'dashboard', 'server.mjs'),
+          'import { value } from "runtime-package"; import { workspaceValue } from "workspace-runtime"; export default `${value}:${workspaceValue}`;',
         );
         await fs.writeFile(
-          join(buildWorktree, 'node_modules', 'runtime-package', 'package.json'),
+          join(deployRoot, 'node_modules', 'runtime-package', 'package.json'),
           JSON.stringify({ name: 'runtime-package', type: 'module', exports: './index.js' }),
         );
         await fs.writeFile(
-          join(buildWorktree, 'node_modules', 'runtime-package', 'index.js'),
+          join(deployRoot, 'node_modules', 'runtime-package', 'index.js'),
           'export const value = "canonical runtime dependency";',
         );
+        await fs.writeFile(
+          join(deployRoot, 'packages', 'workspace-runtime', 'package.json'),
+          JSON.stringify({ name: 'workspace-runtime', type: 'module', exports: './index.js' }),
+        );
+        await fs.writeFile(
+          join(deployRoot, 'packages', 'workspace-runtime', 'index.js'),
+          'export const workspaceValue = "canonical workspace dependency";',
+        );
+        await fs.symlink('../packages/workspace-runtime', join(deployRoot, 'node_modules', 'workspace-runtime'));
       }
       return { stdout: '', stderr: '' };
     });
 
-    await buildDashboardFromOriginMain(repoRoot, {
+    const deployment = await buildDashboardFromOriginMain(repoRoot, {
       runGit,
       installAndBuild: vi.fn(async () => undefined),
+      deploymentRoot: () => deployRoot,
       note: vi.fn(),
       success: vi.fn(),
       processId,
     });
 
-    const deployedBundle = await import(`${pathToFileURL(join(repoRoot, 'dist', 'server.mjs')).href}?test=${processId}`);
-    expect(deployedBundle.default).toBe('canonical runtime dependency');
-    await expect(fs.access(buildWorktree)).rejects.toMatchObject({ code: 'ENOENT' });
-    await expect(fs.access(join(repoRoot, 'dist.incoming'))).rejects.toMatchObject({ code: 'ENOENT' });
-    await expect(fs.access(join(repoRoot, 'node_modules.incoming'))).rejects.toMatchObject({ code: 'ENOENT' });
+    await installDashboardDeployment(repoRoot, deployment);
+    const deployedBundle = await import(`${pathToFileURL(join(deployment.deployRoot, 'dist', 'dashboard', 'server.mjs')).href}?test=${processId}`);
+    expect(deployedBundle.default).toBe('canonical runtime dependency:canonical workspace dependency');
+    await expect(fs.readFile(join(repoRoot, 'node_modules', 'wip-only', 'sentinel.txt'), 'utf8'))
+      .resolves.toBe('primary WIP dependency');
+    await expect(fs.readFile(join(repoRoot, 'packages', 'workspace-runtime', 'index.js'), 'utf8'))
+      .resolves.toContain('primary WIP');
+    expect((await fs.lstat(join(repoRoot, 'node_modules', 'workspace-runtime'))).isSymbolicLink()).toBe(true);
+    expect((await fs.lstat(join(repoRoot, 'dist', 'node_modules'))).isSymbolicLink()).toBe(true);
+    await expect(fs.readlink(join(repoRoot, 'dist', 'node_modules')))
+      .resolves.toBe(join(deployRoot, 'node_modules'));
+    await removeDashboardDeployment(repoRoot, deployRoot, {
+      runGit: async () => ({ stdout: '', stderr: '' }),
+    });
   });
 });
