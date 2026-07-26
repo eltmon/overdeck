@@ -22,7 +22,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T17:26:24.283Z",
-  "updated": "2026-07-26T17:37:48.835Z",
+  "updated": "2026-07-26T17:39:24.251Z",
   "pipeline": {
     "issueId": "PAN-3147",
     "reviewStatus": "pending",
@@ -49,18 +49,33 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "insert-liveness-doctrine": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-3147",
         "agentId": "agent-pan-3147",
         "pid": 3887572,
         "host": "eltmon-z790",
-        "claimedAt": "2026-07-26T17:37:48.835Z"
+        "claimedAt": "2026-07-26T17:37:48.835Z",
+        "itemId": "insert-liveness-doctrine",
+        "outcome": "completed",
+        "reason": "Inserted the verbatim blocked-review doctrine into the Observe step, preserved prompt rails, passed invariant tests, and added the required Prompt-Change trailer.",
+        "releasedAt": "2026-07-26T17:39:24.251Z"
+      }
+    ],
+    "statusReasons": {
+      "insert-liveness-doctrine": {
+        "reason": "Inserted the verbatim blocked-review doctrine into the Observe step, preserved prompt rails, passed invariant tests, and added the required Prompt-Change trailer.",
+        "updatedAt": "2026-07-26T17:39:24.251Z"
       }
     }
   },
   "statusOverrides": {
-    "insert-liveness-doctrine": "running"
+    "insert-liveness-doctrine": "completed",
+    "insert-liveness-doctrine.insert-liveness-doctrine.ac1": "completed",
+    "insert-liveness-doctrine.insert-liveness-doctrine.ac2": "completed",
+    "insert-liveness-doctrine.insert-liveness-doctrine.ac3": "completed",
+    "insert-liveness-doctrine.insert-liveness-doctrine.ac4": "completed"
   }
 }
