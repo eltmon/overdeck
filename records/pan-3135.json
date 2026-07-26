@@ -76,20 +76,21 @@
     "recordedAt": "2026-07-26T13:53:58.173Z"
   },
   "created": "2026-07-26T12:24:46.201Z",
-  "updated": "2026-07-26T13:54:06.405Z",
+  "updated": "2026-07-26T13:54:08.213Z",
   "pipeline": {
     "issueId": "PAN-3135",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T13:54:05.576Z",
+    "updatedAt": "2026-07-26T13:54:06.506Z",
     "inspectNotes": "All 4 ACs met. verification-runner.ts:387-395 gates on readPendingDeploy() before the verificationStatus:'running' write at :409, writes 'pending' + a note naming requestedAt, and self-excludes when status is already 'running'. verification-worker-supervisor.ts:140-144 sits AFTER the live-worker waitForResult join at :137, so a queued deploy blocks only new worker spawns. FOLLOW-UP FOR A LATER BEAD (outside these ACs): request-review-pipeline.ts:31-38 only branches on 'failed'/'error', so a 'deferred' outcome currently falls through to pushBranch()+dispatchReview() and advances to review as if it passed — consumers must be taught to halt on 'deferred'.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3142",
     "reviewRequestedAt": "2026-07-26T13:54:00.967Z",
+    "reviewSpawnedAt": "2026-07-26T13:54:06.505Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "src/lib/cloister/merge-verification.ts",
@@ -173,7 +174,7 @@
       },
       "costAtCloseOut": {
         "usd": 66.983207,
-        "pricingAsOf": "2026-07-26T13:54:05.661Z"
+        "pricingAsOf": "2026-07-26T13:54:08.205Z"
       }
     },
     "merges": [
