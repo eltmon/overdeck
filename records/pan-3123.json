@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T12:25:26.814Z",
-  "updated": "2026-07-26T12:40:12.736Z",
+  "updated": "2026-07-26T12:48:08.059Z",
   "pipeline": {
     "issueId": "PAN-3123",
     "reviewStatus": "pending",
@@ -43,18 +43,32 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "psi-snapshot-reader": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-3123",
         "agentId": "agent-pan-3123",
         "pid": 1068782,
         "host": "eltmon-z790",
-        "claimedAt": "2026-07-26T12:40:12.736Z"
+        "claimedAt": "2026-07-26T12:40:12.736Z",
+        "itemId": "psi-snapshot-reader",
+        "outcome": "completed",
+        "reason": "Added PSI avg10 parsing and Linux/Darwin snapshot fields with parser and fallback tests",
+        "releasedAt": "2026-07-26T12:48:08.059Z"
+      }
+    ],
+    "statusReasons": {
+      "psi-snapshot-reader": {
+        "reason": "Added PSI avg10 parsing and Linux/Darwin snapshot fields with parser and fallback tests",
+        "updatedAt": "2026-07-26T12:48:08.059Z"
       }
     }
   },
   "statusOverrides": {
-    "psi-snapshot-reader": "running"
+    "psi-snapshot-reader": "completed",
+    "psi-snapshot-reader.psi-snapshot-reader.ac1": "completed",
+    "psi-snapshot-reader.psi-snapshot-reader.ac2": "completed",
+    "psi-snapshot-reader.psi-snapshot-reader.ac3": "completed"
   }
 }
