@@ -137,6 +137,54 @@ describe('workspace verdict fallback drain (PAN-2989)', () => {
     expect(status.strikeNextAttemptAt).toBeUndefined();
   });
 
+  it('removes reviewRequestedAt from the record when the drained fallback clears it', async () => {
+    state.pipeline = {
+      reviewStatus: 'reviewing',
+      testStatus: 'pending',
+      reviewRequestedAt: '2026-07-22T09:00:00.000Z',
+      updatedAt: '2026-07-22T09:00:00.000Z',
+    };
+    writeFallback(
+      '2026-07-22T10:00:00.000Z',
+      { reviewStatus: 'passed', testStatus: 'pending' },
+      ['reviewRequestedAt'],
+    );
+    mockUpdateIssueRecordForIssue.mockImplementation(async (_issueId, status: ReviewStatus) => {
+      state.pipeline = JSON.parse(JSON.stringify(status));
+      return true;
+    });
+
+    await expect(drainWorkspaceVerdictFallback(ISSUE)).resolves.toBe(true);
+
+    expect(state.pipeline).not.toHaveProperty('reviewRequestedAt');
+    const [, status] = mockUpdateIssueRecordForIssue.mock.calls[0] as [string, ReviewStatus];
+    expect(status.reviewRequestedAt).toBeUndefined();
+  });
+
+  it('preserves reviewRequestedAt when the drained fallback still carries it', async () => {
+    state.pipeline = {
+      reviewStatus: 'reviewing',
+      testStatus: 'pending',
+      reviewRequestedAt: '2026-07-22T09:00:00.000Z',
+      updatedAt: '2026-07-22T09:00:00.000Z',
+    };
+    writeFallback('2026-07-22T10:00:00.000Z', {
+      reviewStatus: 'failed',
+      testStatus: 'pending',
+      reviewRequestedAt: '2026-07-22T10:30:00.000Z',
+    });
+    mockUpdateIssueRecordForIssue.mockImplementation(async (_issueId, status: ReviewStatus) => {
+      state.pipeline = JSON.parse(JSON.stringify(status));
+      return true;
+    });
+
+    await expect(drainWorkspaceVerdictFallback(ISSUE)).resolves.toBe(true);
+
+    expect(state.pipeline?.reviewRequestedAt).toBe('2026-07-22T10:30:00.000Z');
+    const [, status] = mockUpdateIssueRecordForIssue.mock.calls[0] as [string, ReviewStatus];
+    expect(status.reviewRequestedAt).toBe('2026-07-22T10:30:00.000Z');
+  });
+
   it('keeps the fallback when the record write does not land', async () => {
     writeFallback('2026-07-22T10:00:00.000Z', { reviewStatus: 'blocked' });
     mockUpdateIssueRecordForIssue.mockResolvedValue(false);

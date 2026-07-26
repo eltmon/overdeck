@@ -10,16 +10,18 @@ import { getMergeBlockersPayload } from '../merge-blockers.js';
 describe('getMergeBlockersPayload (PAN-1620, sandbox-safe — reads SQLite, no HTTP)', () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it('returns only passed, unmerged PRs whose blockers are GitHub-native reasons', () => {
+  it('returns only passed, unmerged PRs whose blockers are merge-gate reasons', () => {
     mockGetAll.mockReturnValue({
       'PAN-1': { reviewStatus: 'passed', mergeStatus: 'pending', prUrl: 'u1', blockerReasons: [{ type: 'merge_conflict', summary: 'conflict' }] },
       'PAN-2': { reviewStatus: 'passed', mergeStatus: 'merged', blockerReasons: [{ type: 'failing_checks', summary: 'x' }] }, // merged → excluded
       'PAN-3': { reviewStatus: 'pending', blockerReasons: [{ type: 'merge_conflict', summary: 'x' }] }, // not passed → excluded
-      'PAN-4': { reviewStatus: 'passed', mergeStatus: 'pending', blockerReasons: [{ type: 'reviewer_unresponsive', summary: 'x' }] }, // non-native reason → excluded
+      'PAN-4': { reviewStatus: 'passed', mergeStatus: 'pending', blockerReasons: [{ type: 'reviewer_unresponsive', summary: 'x' }] }, // unlisted reason → excluded
       'PAN-5': { reviewStatus: 'passed', mergeStatus: 'pending', blockerReasons: [] }, // no reasons → excluded
+      'PAN-6': { reviewStatus: 'passed', mergeStatus: 'failed', prUrl: 'u6', blockerReasons: [{ type: 'unmerged_sibling_repo', summary: 'api has 2 unmerged commits' }] },
     });
     expect(getMergeBlockersPayload()).toEqual([
       { issueId: 'PAN-1', prUrl: 'u1', reasons: [{ type: 'merge_conflict', summary: 'conflict' }] },
+      { issueId: 'PAN-6', prUrl: 'u6', reasons: [{ type: 'unmerged_sibling_repo', summary: 'api has 2 unmerged commits' }] },
     ]);
   });
 

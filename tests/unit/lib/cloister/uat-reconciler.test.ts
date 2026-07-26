@@ -11,6 +11,7 @@ import {
   type UatReconcilerDeps,
 } from '../../../../src/lib/cloister/uat-reconciler.js';
 import type { ReadyFeature } from '../../../../src/lib/cloister/uat-generation-engine.js';
+import { needsReviewDispatch } from '../../../../src/lib/review-dispatch-decision.js';
 import type { UatGeneration, UatGenerationStatus } from '../../../../src/lib/database/uat-generations-db.js';
 
 const MAIN = 'main-sha-1';
@@ -224,6 +225,48 @@ describe('growth and invalidation', () => {
     expect(result.invalidated).toEqual([]);
     expect(deps.rows.get('uat/pan-held-0610')!.status).toBe('ready');
     expect(result.action).toBe('assembled'); // retry chance for PAN-2 in a fresh generation
+  });
+});
+
+describe('PAN-3083 passed and ready review intents', () => {
+  const stalePassedStatus = {
+    reviewStatus: 'passed',
+    testStatus: 'passed',
+    readyForMerge: true,
+    reviewRequestedAt: '2026-07-25T10:01:00.000Z',
+    reviewSpawnedAt: '2026-07-25T10:00:00.000Z',
+  };
+
+  it('keeps the generation live when the stale intent does not redispatch review', async () => {
+    expect(needsReviewDispatch(stalePassedStatus)).toBe(false);
+
+    const proj = freshProject();
+    const current = gen(proj, 'uat/pan-stable-0725', 'ready', {
+      members: [{ issueId: 'PAN-1', title: 'First', branch: 'feature/pan-1', headSha: 'h1', mergeOrder: 1 }],
+    });
+    const deps = makeDeps(proj, { rows: [current], readySet: [READY[0]!] });
+
+    const result = await reconcileUatGenerations(proj, deps);
+
+    expect(result.action).toBe('idle');
+    expect(result.invalidated).toEqual([]);
+    expect(deps.rows.get(current.name)?.status).toBe('ready');
+  });
+
+  it('invalidates the generation when the member genuinely leaves the ready queue', async () => {
+    const proj = freshProject();
+    const current = gen(proj, 'uat/pan-left-0725', 'ready', {
+      members: [{ issueId: 'PAN-1', title: 'First', branch: 'feature/pan-1', headSha: 'h1', mergeOrder: 1 }],
+    });
+    const deps = makeDeps(proj, { rows: [current], readySet: [] });
+    const log = vi.fn();
+    deps.log = log;
+
+    const result = await reconcileUatGenerations(proj, deps);
+
+    expect(result.invalidated).toEqual([current.name]);
+    expect(deps.rows.get(current.name)?.status).toBe('invalidated');
+    expect(log).toHaveBeenCalledWith(expect.stringContaining('PAN-1 left the ready queue'));
   });
 });
 

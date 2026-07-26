@@ -17,6 +17,7 @@ import { listRunningAgents, type AgentState } from '../../../lib/agents.js'
 import { computeAgentEnrichment, getAgentJsonlMtime, type AgentEnrichment, type PendingInputsScan } from '../../../lib/agent-enrichment.js'
 import { getReviewStatusSync } from '../../../lib/review-status.js'
 import { withConcurrencyLimit } from '../../../lib/concurrency.js'
+import { getRuntimeCensus, type RuntimeCensus } from '../../../lib/runtime-census.js'
 import { getEventStore } from '../event-store.js'
 import { saveAgentStateAndEmitEvent } from './agent-projection.js'
 import { emitActivityEntrySync, emitActivityTtsSync } from '../../../lib/activity-logger.js'
@@ -102,9 +103,60 @@ export function buildAwaitingInputActivityMessage(
     : `${agentId} is waiting for ${kindList}`
 }
 
+// PAN-3055 — no census evidence means no liveness claims: the listRunningAgents
+// fail-open would mark every stopped agent tmuxActive at boot and resurrect dead questions with TTS.
+export function shouldSkipEnrichmentCycle(census: Pick<RuntimeCensus, 'tmuxAvailable'>): boolean {
+  return !census.tmuxAvailable
+}
+
+export function hasReapablePendingInput(enrichment: AgentEnrichment): boolean {
+  return (
+    enrichment.pendingInputCount > 0 ||
+    enrichment.pendingAskUserQuestion != null ||
+    enrichment.pendingProposedPlan != null
+  )
+}
+
+export function buildPendingReapEvent(
+  agentId: string,
+  previous: AgentEnrichment,
+): Omit<AgentEnrichmentChangedEvent, 'sequence'> {
+  return {
+    type: 'agent.enrichment_changed',
+    timestamp: new Date().toISOString(),
+    payload: {
+      agentId,
+      role: previous.role,
+      hasPendingQuestion: false,
+      pendingQuestionCount: 0,
+      pendingQuestionPrompt: undefined,
+      pendingQuestionReason: undefined,
+      pendingInputCount: 0,
+      pendingInputKinds: [],
+      pendingAskUserQuestion: undefined,
+      pendingProposedPlan: undefined,
+      resolution: previous.resolution as AgentEnrichmentChangedEvent['payload']['resolution'],
+      resolutionCount: previous.resolutionCount,
+    },
+  }
+}
+
+export function buildExpiredQuestionActivityMessage(agentId: string, issueId: string | undefined): string {
+  const subject = issueId ? `${agentId} on ${issueId}` : agentId
+  return `${subject} stopped with its question unanswered — the question has expired and is no longer actionable`
+}
+
 // ─── Poller ───────────────────────────────────────────────────────────────────
 
 async function pollOnce(state: EnrichmentServiceState): Promise<void> {
+  let census: RuntimeCensus
+  try {
+    census = await getRuntimeCensus()
+  } catch {
+    return
+  }
+  if (shouldSkipEnrichmentCycle(census)) return
+
   let runningAgents: RunningAgent[]
   try {
     runningAgents = await Effect.runPromise(listRunningAgents())
@@ -275,8 +327,25 @@ async function pollOnce(state: EnrichmentServiceState): Promise<void> {
 
   // Clean up stale entries for agents that have stopped
   const activeIds = new Set(activeAgents.map(a => a.id))
-  for (const id of state.lastEnrichment.keys()) {
+  for (const [id, previousEnrichment] of state.lastEnrichment) {
     if (!activeIds.has(id)) {
+      if (hasReapablePendingInput(previousEnrichment)) {
+        try {
+          await eventStore.appendAsync(buildPendingReapEvent(id, previousEnrichment) as never)
+        } catch {
+          // Non-fatal — event store may not be initialized yet at startup
+        }
+
+        const agentRecord = runningAgents.find(agent => agent.id === id)
+        const issueId = agentRecord?.issueId
+        emitActivityEntrySync({
+          source: toRole(agentRecord?.role) ?? 'work',
+          level: 'info',
+          message: buildExpiredQuestionActivityMessage(id, issueId),
+          issueId,
+        })
+      }
+
       state.lastEnrichment.delete(id)
       state.lastScan.delete(id)
     }

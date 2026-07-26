@@ -279,7 +279,7 @@ export function useReleaseSetQuery(
 }
 
 export interface BlockerReason {
-  type: 'failing_checks' | 'merge_conflict' | 'unresolved_conversations' | 'changes_requested' | 'draft_pr' | 'not_mergeable';
+  type: 'failing_checks' | 'merge_conflict' | 'unresolved_conversations' | 'changes_requested' | 'draft_pr' | 'not_mergeable' | 'unmerged_sibling_repo';
   summary: string;
   details?: string;
   detectedAt: string;

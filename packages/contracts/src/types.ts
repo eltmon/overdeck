@@ -413,9 +413,9 @@ export const ReviewStatusSnapshot = Schema.Struct({
   mergeRetryCount: Schema.optional(Schema.Number),
   /** PAN-905: free-form notes about the merge attempt */
   mergeNotes: Schema.optional(Schema.String),
-  /** PAN-905: GitHub-native merge blocker reasons */
+  /** Merge blocker reasons surfaced to operators. */
   blockerReasons: Schema.optional(Schema.Array(Schema.Struct({
-    type: Schema.Literals(['failing_checks', 'merge_conflict', 'unresolved_conversations', 'changes_requested', 'draft_pr', 'not_mergeable']),
+    type: Schema.Literals(['failing_checks', 'merge_conflict', 'unresolved_conversations', 'changes_requested', 'draft_pr', 'not_mergeable', 'unmerged_sibling_repo']),
     summary: Schema.String,
     details: Schema.optional(Schema.String),
     detectedAt: Schema.String,

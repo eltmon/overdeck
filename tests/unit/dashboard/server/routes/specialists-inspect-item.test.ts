@@ -107,12 +107,40 @@ describe('POST /api/specialists/done inspect item attribution', () => {
     });
 
     expect(result.status).toBe(200);
+    // The itemId argument stays the exact structured id even though the notes
+    // talk about a different bead — attribution comes from the caller's
+    // `--item`, never from notes wording. Notes ride along as the trailing
+    // argument (PAN-3078) so a blocked verdict can carry its finding.
     expect(mocks.onInspectComplete).toHaveBeenCalledWith(
       'overdeck',
       'PAN-2724',
       'issue-view-model',
       'passed',
       join(projectPath, 'workspaces', 'feature-pan-2724'),
+      'This predates this bead and is correct',
+    );
+  });
+
+  it('checkpoints the exact structured itemId on a failed verdict too', async () => {
+    const result = await postDone({
+      specialist: 'inspect',
+      issueId: 'PAN-2724',
+      itemId: 'issue-view-model',
+      status: 'failed',
+      notes: 'This predates this bead and is correct',
+    });
+
+    expect(result.status).toBe(200);
+    // PAN-3086: the failed branch falls back to the stamped inspectBeadId only
+    // when itemId is genuinely absent. An explicit structured itemId always
+    // wins, so the blocked verdict cannot be reattributed to another item.
+    expect(mocks.onInspectComplete).toHaveBeenCalledWith(
+      'overdeck',
+      'PAN-2724',
+      'issue-view-model',
+      'failed',
+      join(projectPath, 'workspaces', 'feature-pan-2724'),
+      'This predates this bead and is correct',
     );
   });
 });

@@ -94,6 +94,7 @@ type DurableStatusFields = Partial<ReviewStatus> & { closedOut?: boolean; closed
 const FALLBACK_CLEARABLE_FIELDS = [
   'strikeTransportRetryCount',
   'strikeNextAttemptAt',
+  'reviewRequestedAt',
 ] as const;
 type FallbackClearableField = typeof FALLBACK_CLEARABLE_FIELDS[number];
 

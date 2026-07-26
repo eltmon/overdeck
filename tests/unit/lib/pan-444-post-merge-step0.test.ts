@@ -163,6 +163,10 @@ vi.mock('../../../src/lib/github-app.js', () => ({
   listPullRequestsForHead: mockListPullRequestsForHead,
 }));
 
+vi.mock('../../../src/lib/merge-set.js', () => ({
+  getMergeSetSync: vi.fn().mockReturnValue({ repos: [{ repoKey: 'overdeck' }] }),
+}));
+
 // ── Subject ───────────────────────────────────────────────────────────────────
 import { postMergeLifecycle, resetPostMergeState } from '../../../src/lib/cloister/merge-agent.js';
 

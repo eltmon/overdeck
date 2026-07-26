@@ -21,11 +21,11 @@ describe('needsReviewDispatch (PAN-1988 — auto-heal from durable journal inten
       })).toBe(true);
     });
 
-    it('re-request after a passed verdict with new commits', () => {
+    it('re-request after new commits reset review to pending', () => {
       expect(needsReviewDispatch({
         reviewRequestedAt: '2026-06-20T12:00:00Z',
         reviewSpawnedAt: '2026-06-20T10:00:00Z',
-        reviewStatus: 'passed',
+        reviewStatus: 'pending',
       })).toBe(true);
     });
   });

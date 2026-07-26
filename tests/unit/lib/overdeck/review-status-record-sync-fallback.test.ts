@@ -198,7 +198,7 @@ describe('workspace verdict fallback (PAN-2583)', () => {
     expect(result?.durable.reviewStatus).toBe('blocked');
   });
 
-  it('writes the fallback when the journal write does not land', async () => {
+  it('writes the fallback with reviewRequestedAt marked clear when the journal write does not land', async () => {
     state.recordLanded = false;
     updateIssueRecordForReviewStatusSync(ISSUE, {
       issueId: ISSUE,
@@ -217,6 +217,7 @@ describe('workspace verdict fallback (PAN-2583)', () => {
     expect(written.clearedFields).toEqual([
       'strikeTransportRetryCount',
       'strikeNextAttemptAt',
+      'reviewRequestedAt',
     ]);
     expect(written.updatedAt).toBe('2026-07-11T13:00:00.000Z');
   });
