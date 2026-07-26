@@ -22,7 +22,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T08:56:03.309Z",
-  "updated": "2026-07-26T10:31:41.285Z",
+  "updated": "2026-07-26T10:32:11.152Z",
   "pipeline": {
     "issueId": "PAN-3115",
     "reviewStatus": "pending",
@@ -67,8 +67,16 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 10,
-    "claims": {},
+    "sequence": 11,
+    "claims": {
+      "route-typed-200": {
+        "writerId": "agent-pan-3115",
+        "agentId": "agent-pan-3115",
+        "pid": 1695007,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T10:32:11.151Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3115",
@@ -170,6 +178,7 @@
     "service-reason-propagation": "completed",
     "service-reason-propagation.service-reason-propagation.ac1": "completed",
     "service-reason-propagation.service-reason-propagation.ac2": "completed",
-    "service-reason-propagation.service-reason-propagation.ac3": "completed"
+    "service-reason-propagation.service-reason-propagation.ac3": "completed",
+    "route-typed-200": "running"
   }
 }
