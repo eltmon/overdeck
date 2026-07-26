@@ -17,6 +17,27 @@ function ProjectSettingsSection({ projectKey }: { projectKey: string }) {
   const value = data?.value ?? null;
   const { data: swarmData } = useQuery({ queryKey: ['project-swarm-policy', projectKey], queryFn: async () => (await fetch(`/api/projects/${encodeURIComponent(projectKey)}/swarm-policy`)).json() as Promise<{ configured: { mode?: 'off' | 'auto' | 'always' } | null }> });
   const swarmMutation = useMutation({ mutationFn: async (mode: 'off' | 'auto' | 'always' | null) => { const res = await fetch(`/api/projects/${encodeURIComponent(projectKey)}/swarm-policy`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ value: mode ? { mode } : null }) }); if (!res.ok) throw new Error('Failed to save swarm policy'); }, onSuccess: () => queryClient.invalidateQueries({ queryKey: ['project-swarm-policy', projectKey] }) });
+  const { data: mergeTrainData } = useQuery({
+    queryKey: ['project-merge-train', projectKey],
+    queryFn: async (): Promise<{ value: 'enabled' | 'disabled' | null; effective: boolean }> => {
+      const res = await fetch(`/api/projects/${encodeURIComponent(projectKey)}/merge-train`);
+      if (!res.ok) return { value: null, effective: false };
+      return res.json();
+    },
+    enabled: !!projectKey,
+  });
+  const mergeTrainMutation = useMutation({
+    mutationFn: async (next: 'enabled' | 'disabled' | null) => {
+      const res = await fetch(`/api/projects/${encodeURIComponent(projectKey)}/merge-train`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ value: next }),
+      });
+      if (!res.ok) throw new Error('Failed to save merge-train setting');
+      return res.json();
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['project-merge-train', projectKey] }),
+  });
   const mutation = useMutation({
     mutationFn: async (next: 'auto' | 'hold' | null) => {
       const res = await fetch(`/api/projects/${encodeURIComponent(projectKey)}/auto-merge-default`, {
@@ -70,6 +91,36 @@ function ProjectSettingsSection({ projectKey }: { projectKey: string }) {
         Applies to this project's issues that have no explicit per-issue auto-merge setting.
       </div>
       <div className="mt-2 flex flex-wrap items-center gap-3 border-t border-border pt-3"><span className="text-[13px] text-foreground">Automatic swarming</span><select aria-label="Project swarm policy" className="rounded-md border border-input bg-background px-2 py-1.5 text-xs" value={swarmData?.configured?.mode ?? ''} onChange={e => { const value = e.target.value; swarmMutation.mutate(value === 'off' || value === 'auto' || value === 'always' ? value : null); }}><option value="">Inherit global</option><option value="off">Off</option><option value="auto">Auto</option><option value="always">Always</option></select><span className="text-[11px] text-muted-foreground">Future dispatches only</span></div>
+      <div className="mt-2 flex flex-wrap items-center gap-3 border-t border-border pt-3"><span className="text-[13px] text-foreground">Merge train</span><div style={{ display: 'inline-flex', border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
+        {[
+          { v: 'enabled' as const, label: 'Enabled' },
+          { v: 'disabled' as const, label: 'Disabled' },
+          { v: null, label: 'Global default' },
+        ].map((o, i) => {
+          const active = mergeTrainData?.value === o.v;
+          return (
+            <button
+              key={String(o.v)}
+              type="button"
+              disabled={mergeTrainMutation.isPending}
+              onClick={() => mergeTrainMutation.mutate(o.v)}
+              style={{
+                appearance: 'none',
+                border: 0,
+                borderLeft: i === 0 ? 0 : '1px solid var(--border)',
+                padding: '6px 12px',
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: 'pointer',
+                background: active ? 'color-mix(in srgb, var(--primary) 16%, transparent)' : 'transparent',
+                color: active ? 'var(--primary)' : 'var(--muted-foreground)',
+              }}
+            >
+              {o.label}
+            </button>
+          );
+        })}
+      </div></div>
     </div>
   );
 }
