@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T09:04:01.632Z",
-  "updated": "2026-07-26T09:21:31.504Z",
+  "updated": "2026-07-26T09:24:42.841Z",
   "pipeline": {
     "issueId": "PAN-3116",
     "reviewStatus": "pending",
@@ -43,18 +43,34 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "rewrite-lint-derive-from-base": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-3116",
         "agentId": "agent-pan-3116",
         "pid": 2307146,
         "host": "eltmon-z790",
-        "claimedAt": "2026-07-26T09:21:31.504Z"
+        "claimedAt": "2026-07-26T09:21:31.504Z",
+        "itemId": "rewrite-lint-derive-from-base",
+        "outcome": "completed",
+        "reason": "Replaced the shared baseline with an origin/main-derived ratchet, added audited allowlist parsing, and covered base, growth, malformed, missing-ref, and shrink cases.",
+        "releasedAt": "2026-07-26T09:24:42.841Z"
+      }
+    ],
+    "statusReasons": {
+      "rewrite-lint-derive-from-base": {
+        "reason": "Replaced the shared baseline with an origin/main-derived ratchet, added audited allowlist parsing, and covered base, growth, malformed, missing-ref, and shrink cases.",
+        "updatedAt": "2026-07-26T09:24:42.841Z"
       }
     }
   },
   "statusOverrides": {
-    "rewrite-lint-derive-from-base": "running"
+    "rewrite-lint-derive-from-base": "completed",
+    "rewrite-lint-derive-from-base.rewrite-lint-derive-from-base.ac1": "completed",
+    "rewrite-lint-derive-from-base.rewrite-lint-derive-from-base.ac2": "completed",
+    "rewrite-lint-derive-from-base.rewrite-lint-derive-from-base.ac3": "completed",
+    "rewrite-lint-derive-from-base.rewrite-lint-derive-from-base.ac4": "completed",
+    "rewrite-lint-derive-from-base.rewrite-lint-derive-from-base.ac5": "completed"
   }
 }
