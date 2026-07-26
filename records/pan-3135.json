@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T12:24:46.201Z",
-  "updated": "2026-07-26T12:57:38.468Z",
+  "updated": "2026-07-26T13:01:31.535Z",
   "pipeline": {
     "issueId": "PAN-3135",
     "reviewStatus": "pending",
@@ -61,16 +61,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "deferred-verification-outcome": {
-        "writerId": "agent-pan-3135",
-        "agentId": "agent-pan-3135",
-        "pid": 1456094,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-26T12:57:38.468Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3135",
@@ -82,12 +74,27 @@
         "outcome": "completed",
         "reason": "Added atomic pending deploy intent storage with validation, accumulation, escalation, clearing, and focused unit coverage",
         "releasedAt": "2026-07-26T12:56:27.609Z"
+      },
+      {
+        "writerId": "agent-pan-3135",
+        "agentId": "agent-pan-3135",
+        "pid": 1456094,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T12:57:38.468Z",
+        "itemId": "deferred-verification-outcome",
+        "outcome": "completed",
+        "reason": "Added deferred verification outcome, fresh-admission queue guard, live-worker drain behavior, and focused runner/supervisor tests",
+        "releasedAt": "2026-07-26T13:01:31.535Z"
       }
     ],
     "statusReasons": {
       "deploy-queue-module": {
         "reason": "Added atomic pending deploy intent storage with validation, accumulation, escalation, clearing, and focused unit coverage",
         "updatedAt": "2026-07-26T12:56:27.609Z"
+      },
+      "deferred-verification-outcome": {
+        "reason": "Added deferred verification outcome, fresh-admission queue guard, live-worker drain behavior, and focused runner/supervisor tests",
+        "updatedAt": "2026-07-26T13:01:31.535Z"
       }
     }
   },
@@ -97,6 +104,10 @@
     "deploy-queue-module.deploy-queue-module.ac2": "completed",
     "deploy-queue-module.deploy-queue-module.ac3": "completed",
     "deploy-queue-module.deploy-queue-module.ac4": "completed",
-    "deferred-verification-outcome": "running"
+    "deferred-verification-outcome": "completed",
+    "deferred-verification-outcome.deferred-verification-outcome.ac1": "completed",
+    "deferred-verification-outcome.deferred-verification-outcome.ac2": "completed",
+    "deferred-verification-outcome.deferred-verification-outcome.ac3": "completed",
+    "deferred-verification-outcome.deferred-verification-outcome.ac4": "completed"
   }
 }
