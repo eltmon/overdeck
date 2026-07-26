@@ -144,15 +144,7 @@
       "timestamp": "2026-07-26T07:40:41.248Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-26T07:40:41Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2997\n\nLocal and remote tmux commit the terminal key before Enter, so pane death during the settle window is permanently acknowledged as delivery with no wake.\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2997 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "src/dashboard/server/event-store.ts",
@@ -232,10 +224,10 @@
     "recordedAt": "2026-07-25T23:45:57.195Z"
   },
   "created": "2026-07-21T23:09:49.270Z",
-  "updated": "2026-07-26T08:04:16.770Z",
+  "updated": "2026-07-26T08:04:20.357Z",
   "pipeline": {
     "issueId": "PAN-2997",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -243,11 +235,11 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T05:50:39.330Z",
-    "updatedAt": "2026-07-26T08:04:16.731Z",
+    "updatedAt": "2026-07-26T08:04:17.206Z",
     "reviewNotes": "Agent re-review request (3/25): Fixed the cycle-9 blocker: the keyed tmux submit no longer claims TERMINAL before Enter. The submit if-shell now requires pending + no terminal + LIVE pane, and sends Enter before the terminal transition inside one server-owned command list. A pane that dies during the settle window leaves both markers untouched (no false delivered), throws KeyedSubmitTargetDeadError, and the wake outbox keeps the entry pending so recovery re-drives after resume. Same invariant remotely. Tests cover pane death between paste and submit (local real-tmux + remote protocol) and the wake-level retry.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3004",
     "lastVerifiedCommit": "93b46b172c28bb0634ae73e2831d6680d3642793",
-    "reviewSpawnedAt": "2026-07-26T07:37:59.716Z"
+    "reviewSpawnedAt": "2026-07-26T08:04:17.205Z"
   },
   "closeOut": {
     "usage": {
@@ -307,7 +299,7 @@
       },
       "costAtCloseOut": {
         "usd": 237.761246,
-        "pricingAsOf": "2026-07-26T08:04:16.755Z"
+        "pricingAsOf": "2026-07-26T08:04:20.332Z"
       }
     },
     "merges": [
