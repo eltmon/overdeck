@@ -57,6 +57,11 @@
       "reason": "feedback",
       "note": "[2026-07-26T14:07Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-07-26T14:07:11.627Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-26T14:08:32.974Z"
     }
   ],
   "feedback": [],
@@ -99,10 +104,10 @@
     "recordedAt": "2026-07-26T13:30:54.544Z"
   },
   "created": "2026-07-26T12:24:12.648Z",
-  "updated": "2026-07-26T14:08:31.470Z",
+  "updated": "2026-07-26T14:08:33.334Z",
   "pipeline": {
     "issueId": "PAN-3128",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -110,12 +115,12 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T13:31:33.728Z",
-    "updatedAt": "2026-07-26T14:08:31.090Z",
+    "updatedAt": "2026-07-26T14:08:31.495Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "inspectNotes": "All 5 ACs verified: installAndBuild only ever receives the detached worktree (asserted across clean/dirty/ahead/behind); dirty + HEAD-divergence emit notes and continue; build failure propagates with 'old dashboard left running' -> exitCode 1 and removes worktree + dist.incoming in finally; grep merge-base on reload.ts returns no matches; typecheck clean and build-from-origin.test.ts 7/7 pass.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3141",
     "lastVerifiedCommit": "f1e3ffc058e523db1cf53b714c37544cf5509f3e",
-    "reviewSpawnedAt": "2026-07-26T14:02:56.898Z",
+    "reviewSpawnedAt": "2026-07-26T14:08:31.494Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "src/cli/commands/__tests__/reload.test.ts",
@@ -217,7 +222,7 @@
       },
       "costAtCloseOut": {
         "usd": 243.061216,
-        "pricingAsOf": "2026-07-26T14:08:31.115Z"
+        "pricingAsOf": "2026-07-26T14:08:33.329Z"
       }
     },
     "merges": [
