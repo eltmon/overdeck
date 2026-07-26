@@ -67,7 +67,7 @@
     "recordedAt": "2026-07-26T14:39:52.370Z"
   },
   "created": "2026-07-26T13:39:19.365Z",
-  "updated": "2026-07-26T14:51:12.606Z",
+  "updated": "2026-07-26T14:51:57.971Z",
   "pipeline": {
     "issueId": "PAN-3138",
     "reviewStatus": "pending",
@@ -108,7 +108,9 @@
         "tests/unit/lib/cloister/postmerge-cleanup-async.test.ts"
       ],
       "recordedAt": "2026-07-26T14:39:52.370Z"
-    }
+    },
+    "reviewRequestedAt": "2026-07-26T14:51:57.638Z",
+    "panDoneRecoveredAt": "2026-07-26T14:51:57.638Z"
   },
   "closeOut": {
     "usage": {
