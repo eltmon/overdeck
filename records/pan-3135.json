@@ -186,18 +186,17 @@
     "recordedAt": "2026-07-26T13:53:58.173Z"
   },
   "created": "2026-07-26T12:24:46.201Z",
-  "updated": "2026-07-26T18:39:20.495Z",
+  "updated": "2026-07-26T19:14:33.385Z",
   "pipeline": {
     "issueId": "PAN-3135",
     "reviewStatus": "passed",
     "testStatus": "passed",
-    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "merged",
     "releaseStatus": "skipped",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T13:54:56.619Z",
-    "updatedAt": "2026-07-26T18:39:20.445Z",
+    "updatedAt": "2026-07-26T19:14:33.364Z",
     "reviewNotes": "Review approved by Deacon fallback from completed reviewer reports",
     "testNotes": "npm run typecheck: PASS (tsc + hooks + evals + dashboard-types guard). npm run lint: PASS (eslint + all lint:* checks incl. file-size, circular, ratchet-audit, quarantine-audit). npm test (full vitest suite, 1210 files/11158 tests): 10 tests failed across 7 files, all pre-existing environment artifacts unrelated to this diff — the launcher-git-guard PATH wrapper installed for this agent session unconditionally intercepts `git reset --hard`/`git rebase`/`git stash` even inside disposable temp repos that tests spin up for autoRevertMerge, dangerous-git-ops, auto-commit, record-update, and pre-rebase-hook coverage. Confirmed by: (1) none of the 7 failing test files or their subject source files (validation.ts, workspace-manager.ts, launcher-git-guard.ts) appear in this PR's declared or actual changed-files list; (2) re-running the same 7 files with OVERDECK_PAN_GIT_OP=1 (documented guard bypass) turned 8 of 10 failures green; (3) the remaining 2 (workspace-manager-pre-rebase.test.ts, human-shell-without-agent-id cases) fail because the deployed git-guard script blocks `git rebase` unconditionally with no OVERDECK_AGENT_ID-based exemption, a static property of this session's guard build that predates and is untouched by this branch. No UAT required: xBRIEF NonGoals explicitly excludes a dashboard UI surface for the deploy queue, all 9 items are backend/CLI/docs kind with verify_commands limited to vitest+typecheck+lint, and neither the PR description nor the latest review notes (agent-pan-3135-review-c8973a5b) mention browser/Playwright verification. Reviewed and approved at HEAD c8973a5b95 (reviewedAtCommit match).",
     "verificationNotes": "merge-verify: CI green on the merged tip (PAN-2487 local-gate skip)",
@@ -265,7 +264,9 @@
         "tests/unit/lib/deploy/deploy-queue.test.ts"
       ],
       "recordedAt": "2026-07-26T13:53:58.173Z"
-    }
+    },
+    "closedOut": true,
+    "closedOutAt": "2026-07-26T19:14:33.364Z"
   },
   "closeOut": {
     "usage": {
@@ -349,7 +350,80 @@
     "merges": [
       "https://github.com/eltmon/overdeck/pull/3142"
     ],
-    "ranOn": "eltmon-z790"
+    "ranOn": "eltmon-z790",
+    "dodGate": {
+      "evaluatedAt": "2026-07-26T19:14:33.382Z",
+      "rows": [
+        {
+          "id": "review",
+          "num": 1,
+          "title": "Review passed",
+          "expected": "reviewStatus: passed",
+          "observed": "reviewStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "tests",
+          "num": 2,
+          "title": "Tests passed",
+          "expected": "testStatus: passed",
+          "observed": "testStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "verification",
+          "num": 3,
+          "title": "Verification green on the branch",
+          "expected": "verificationStatus: passed",
+          "observed": "verificationStatus: passed at c8973a5b95c27de791f8ed4a2c2f70bbb865932d",
+          "status": "pass"
+        },
+        {
+          "id": "merged",
+          "num": 4,
+          "title": "Merged to main",
+          "expected": "PR merged on the forge, or branch work contained in main (non-PR landing)",
+          "observed": "Merge specialist confirmed merge completed; PR #3142 MERGED at 2026-07-26T17:38:13Z",
+          "status": "pass",
+          "mergedAt": "2026-07-26T17:38:13Z",
+          "mergeCommit": "6409d5ea9304dcf9a31cae03fad4bfd165e29c53"
+        },
+        {
+          "id": "post-merge",
+          "num": 5,
+          "title": "Post-merge lifecycle ran",
+          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
+          "observed": "canonical state: verifying_on_main; no running work/planning agents",
+          "status": "pass"
+        },
+        {
+          "id": "main-verify",
+          "num": 6,
+          "title": "Verified on main",
+          "expected": "merged commit verified on main",
+          "observed": "8 check-runs concluded successfully on 6409d5ea9304dcf9a31cae03fad4bfd165e29c53",
+          "status": "pass"
+        },
+        {
+          "id": "deploy",
+          "num": 7,
+          "title": "Deployed",
+          "expected": "live server build includes the merged commit",
+          "observed": "build commit 6ac4a3dc contains merge 6409d5ea",
+          "status": "pass"
+        },
+        {
+          "id": "teardown",
+          "num": 8,
+          "title": "Close-out teardown verified",
+          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
+          "overridable": false,
+          "status": "pass",
+          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; Stopped TLDR daemon; Stopped Docker containers; Killed 2 orphaned process(es); Removed git worktree; Removed 8 agent state directories; No strike branch strike/pan-3135 found; Pruned 413 checkpoint ref(s) for agent-pan-3135, planning-pan-3135, strike-pan-3135; No specialist registry entries for PAN-3135"
+        }
+      ],
+      "accepted": []
+    }
   },
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
