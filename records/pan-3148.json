@@ -27,7 +27,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T17:27:17.644Z",
-  "updated": "2026-07-26T18:42:53.552Z",
+  "updated": "2026-07-26T18:44:08.002Z",
   "pipeline": {
     "issueId": "PAN-3148",
     "reviewStatus": "pending",
@@ -54,16 +54,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 11,
-    "claims": {
-      "docs-patrol-and-dedup": {
-        "writerId": "agent-pan-3148",
-        "agentId": "agent-pan-3148",
-        "pid": 2112248,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-26T18:38:26.113Z"
-      }
-    },
+    "sequence": 12,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3148",
@@ -119,6 +111,17 @@
         "outcome": "completed",
         "reason": "Documented that pushed fixes during BLOCKED review auto-trigger re-review, waiting for a new run ID is incorrect, and pan review request is the fallback.",
         "releasedAt": "2026-07-26T18:38:12.750Z"
+      },
+      {
+        "writerId": "agent-pan-3148",
+        "agentId": "agent-pan-3148",
+        "pid": 2112248,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T18:38:26.113Z",
+        "itemId": "docs-patrol-and-dedup",
+        "outcome": "released",
+        "reason": "stale claim released (agent-pan-3148 dead)",
+        "releasedAt": "2026-07-26T18:44:07.944Z"
       }
     ],
     "statusReasons": {
@@ -141,6 +144,10 @@
       "work-prompt-run-id-guidance": {
         "reason": "Documented that pushed fixes during BLOCKED review auto-trigger re-review, waiting for a new run ID is incorrect, and pan review request is the fallback.",
         "updatedAt": "2026-07-26T18:38:12.750Z"
+      },
+      "docs-patrol-and-dedup": {
+        "reason": "stale claim released (agent-pan-3148 dead)",
+        "updatedAt": "2026-07-26T18:44:07.944Z"
       }
     }
   },
@@ -169,6 +176,6 @@
     "work-prompt-run-id-guidance": "completed",
     "work-prompt-run-id-guidance.work-prompt-run-id-guidance.ac1": "completed",
     "work-prompt-run-id-guidance.work-prompt-run-id-guidance.ac2": "completed",
-    "docs-patrol-and-dedup": "running"
+    "docs-patrol-and-dedup": "pending"
   }
 }
