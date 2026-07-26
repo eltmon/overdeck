@@ -282,11 +282,24 @@
       "reason": "feedback",
       "note": "[2026-07-26T08:13Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-07-26T08:13:00.219Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-26T08:36Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-26T08:36:05.393Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-26T08:36:05Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-1696\n\nValid non-object assemble JSON still triggers all-project reconciliation; rebuild member names, the collapsed cockpit summary, and mixed disabled-project rows also remain incomplete.\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1696 -m \"Fixed review issues\"`"
+    }
+  ],
   "created": "2026-07-26T00:35:36.057Z",
-  "updated": "2026-07-26T08:36:04.878Z",
+  "updated": "2026-07-26T08:36:05.393Z",
   "pipeline": {
     "issueId": "PAN-1696",
     "reviewStatus": "blocked",
