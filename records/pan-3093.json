@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T12:33:18.311Z",
-  "updated": "2026-07-26T14:50:58.319Z",
+  "updated": "2026-07-26T14:51:09.320Z",
   "pipeline": {
     "issueId": "PAN-3093",
     "reviewStatus": "pending",
@@ -55,8 +55,16 @@
   "harness": "claude-code",
   "model": "claude-opus-5",
   "tasks": {
-    "sequence": 12,
-    "claims": {},
+    "sequence": 13,
+    "claims": {
+      "per-repo-teardown": {
+        "writerId": "agent-pan-3093",
+        "agentId": "agent-pan-3093",
+        "pid": 1968915,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T14:51:09.320Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3093",
@@ -176,6 +184,7 @@
     "two-phase-promote": "completed",
     "two-phase-promote.two-phase-promote.ac1": "completed",
     "two-phase-promote.two-phase-promote.ac2": "completed",
-    "two-phase-promote.two-phase-promote.ac3": "completed"
+    "two-phase-promote.two-phase-promote.ac3": "completed",
+    "per-repo-teardown": "running"
   }
 }
