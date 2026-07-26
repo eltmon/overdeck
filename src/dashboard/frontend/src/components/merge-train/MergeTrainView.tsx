@@ -272,6 +272,7 @@ export function MergeTrainView({ active, onNavigateIssue, showProjectFilter = tr
   // Idle enabled sections repeat boilerplate without adding information. Disabled
   // sections are never hidden because "merge train off" is meaningful state.
   const renderedSections = visibleSections.filter((section) => !section.enabled || !isIdleSection(section));
+  const idleHiddenCount = visibleSections.length - renderedSections.length;
 
   const toggleProject = (projectKey: string) => {
     const current = selectedProjects ?? sections.map((s) => s.projectKey);
@@ -487,8 +488,9 @@ export function MergeTrainView({ active, onNavigateIssue, showProjectFilter = tr
             : 'No features are ready to merge in any project. When work passes review and tests, it lines up here and a test batch assembles automatically.'}
         </p>
       ) : (
-        <div className="space-y-3">
-          {renderedSections.map((section) => {
+        <>
+          <div className="space-y-3">
+            {renderedSections.map((section) => {
             const visibleGenerations = visibleGenerationsOf(section);
             const currentBatch =
               visibleGenerations.find((g) => g.status === 'ready') ??
@@ -715,9 +717,19 @@ export function MergeTrainView({ active, onNavigateIssue, showProjectFilter = tr
                   </div>
                 )}
               </section>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+          {idleHiddenCount > 0 && (
+            <p
+              className="px-1 pt-1 text-[10.5px] text-muted-foreground"
+              data-testid="merge-train-idle-hidden-note"
+            >
+              {idleHiddenCount} project{idleHiddenCount === 1 ? '' : 's'} with nothing ready{' '}
+              {idleHiddenCount === 1 ? 'is' : 'are'} hidden
+            </p>
+          )}
+        </>
       )}
     </div>
   );
