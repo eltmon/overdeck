@@ -159,15 +159,7 @@
       "timestamp": "2026-07-26T08:38:08.904Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-26T08:38:08Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2997\n\nRemote rollback failures are swallowed and unreadable pre-submit targets are ignored, so false terminal markers can still suppress an undelivered wake.\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2997 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "src/dashboard/server/event-store.ts",
@@ -247,7 +239,7 @@
     "recordedAt": "2026-07-25T23:45:57.195Z"
   },
   "created": "2026-07-21T23:09:49.270Z",
-  "updated": "2026-07-26T09:15:45.292Z",
+  "updated": "2026-07-26T09:15:49.481Z",
   "pipeline": {
     "issueId": "PAN-2997",
     "reviewStatus": "pending",
@@ -258,7 +250,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T05:50:39.330Z",
-    "updatedAt": "2026-07-26T09:15:45.244Z",
+    "updatedAt": "2026-07-26T09:15:49.004Z",
     "reviewNotes": "Agent re-review request (5/25): Fixed both cycle-11 blockers: (1) rollback is now a verified protocol transition — a POISON breadcrumb is written before the rollback attempt, so a failed rollback can never leave a false TERMINAL honorable; any later keyed call repairs poisoned markers FIRST and never returns 'deduplicated' from them (remote test covers Enter→terminal→pane death→failed rollback→repair→real delivery). (2) the pre-submit target check now fails CLOSED — the key only becomes terminal when both target reads succeed, both live, pid matches; unreadable pre-target rolls the claim back (local + remote tests). Also split remote-agents.ts under the file-size ratchet into remote-tmux.ts + remote-keyed-delivery.ts with unchanged re-exports.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3004",
     "lastVerifiedCommit": "dae8d6dfbd4da721132281460260596645c92fdb",
@@ -322,7 +314,7 @@
       },
       "costAtCloseOut": {
         "usd": 275.274257,
-        "pricingAsOf": "2026-07-26T09:15:45.282Z"
+        "pricingAsOf": "2026-07-26T09:15:49.040Z"
       }
     },
     "merges": [
