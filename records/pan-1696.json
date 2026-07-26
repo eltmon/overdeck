@@ -152,11 +152,24 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-26T02:03:35.703Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-26T02:08Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-26T02:08:00.842Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-26T02:08:00Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-1696\n\nNew UAT decoupling code does not compile, crashes generation payloads, ignores project overrides, and still reconciles only one project.\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1696 -m \"Fixed review issues\"`"
+    }
+  ],
   "created": "2026-07-26T00:35:36.057Z",
-  "updated": "2026-07-26T02:08:00.231Z",
+  "updated": "2026-07-26T02:08:00.842Z",
   "pipeline": {
     "issueId": "PAN-1696",
     "reviewStatus": "blocked",
