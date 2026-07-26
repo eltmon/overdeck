@@ -85,7 +85,13 @@ describe('restartDashboard — scope contract', () => {
       while (fetchMock.mock.calls.length === 0) {
         await new Promise<void>((resolve) => setImmediate(resolve));
       }
-      const rejection = expect(restart).rejects.toThrowError(/LEFT RUNNING/);
+      const rejection = expect(restart).rejects.toMatchObject({
+        failure: {
+          stage: 'dashboard',
+          reason: expect.stringContaining('LEFT RUNNING'),
+          recovery: 'dashboard-left-running',
+        },
+      });
       await vi.advanceTimersByTimeAsync(500);
 
       await rejection;

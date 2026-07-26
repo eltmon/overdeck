@@ -50,6 +50,7 @@ function pipelineToDurableUpdate(pipeline: PanIssuePipelineRecord): ReviewStatus
     reviewStatus: pipeline.reviewStatus as ReviewStatus['reviewStatus'],
     testStatus: pipeline.testStatus as ReviewStatus['testStatus'],
     mergeStatus: pipeline.mergeStatus as ReviewStatus['mergeStatus'] ?? undefined,
+    mergeStep: pipeline.mergeStep,
     inspectStatus: pipeline.inspectStatus as ReviewStatus['inspectStatus'] ?? undefined,
     inspectNotes: pipeline.inspectNotes,
     verificationStatus: pipeline.verificationStatus as ReviewStatus['verificationStatus'] ?? undefined,

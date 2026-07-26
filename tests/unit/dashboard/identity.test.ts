@@ -14,7 +14,12 @@ import {
 
 describe('dashboard build identity', () => {
   it('returns null build metadata when build-time globals are undefined', () => {
-    expect(getBuildInfo()).toEqual({ buildCommit: null, builtAt: null });
+    expect(getBuildInfo()).toEqual({
+      buildCommit: null,
+      builtAt: null,
+      buildDirty: null,
+      buildBranch: null,
+    });
   });
 
   it('includes build metadata without removing existing identity fields', () => {
@@ -23,6 +28,8 @@ describe('dashboard build identity', () => {
       mode: expect.stringMatching(/^(primary|peer)$/),
       buildCommit: null,
       builtAt: null,
+      buildDirty: null,
+      buildBranch: null,
     });
   });
 });

@@ -72,6 +72,45 @@ describe('buildConflictAgentHook — success', () => {
   });
 });
 
+describe('repo scoping (PAN-3093)', () => {
+  const POLY_CTX: ConflictContext = { ...CTX, repoKey: 'api' };
+
+  it('names the repo in the prompt when repoKey is set', () => {
+    const prompt = buildConflictResolutionPrompt(POLY_CTX, ['src/x.ts']);
+    expect(prompt).toContain('inside the api repo of a UAT batch assembly worktree');
+  });
+
+  it('leaves the prompt byte-identical to the monorepo prompt when repoKey is absent', () => {
+    // The only difference between the two prompts must be the opening line, so
+    // a monorepo assembly sees exactly the text it saw before per-repo scoping.
+    const monorepo = buildConflictResolutionPrompt(CTX, ['src/x.ts']);
+    const polyrepo = buildConflictResolutionPrompt(POLY_CTX, ['src/x.ts']);
+
+    expect(monorepo).toContain('inside a UAT batch assembly worktree');
+    expect(monorepo).not.toContain('api repo');
+    expect(monorepo.split('\n').slice(1)).toEqual(polyrepo.split('\n').slice(1));
+  });
+
+  it('tags log lines with the repo key when set, and omits it when absent', async () => {
+    const polyLogs: string[] = [];
+    const monoLogs: string[] = [];
+    // filesWithConflictMarkers returning a file drives the hook down a logging
+    // failure path without needing any real git.
+    const failing = { filesWithConflictMarkers: async () => ['src/x.ts'] };
+
+    await buildConflictAgentHook({
+      deps: { ...makeDeps({ ...failing, log: (m) => polyLogs.push(m) }) },
+    })(POLY_CTX);
+    await buildConflictAgentHook({
+      deps: { ...makeDeps({ ...failing, log: (m) => monoLogs.push(m) }) },
+    })(CTX);
+
+    expect(polyLogs.join('\n')).toContain('uat/pan-otter-0610 api PAN-3');
+    expect(monoLogs.join('\n')).toContain('uat/pan-otter-0610 PAN-3');
+    expect(monoLogs.join('\n')).not.toContain('api');
+  });
+});
+
 describe('buildConflictAgentHook — failure paths all return null (never throw)', () => {
   it('agent spawn/timeout failure', async () => {
     const hook = buildConflictAgentHook({

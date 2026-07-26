@@ -13,6 +13,8 @@ import { capturePane, killSession, listSessionNames, sendKeys, sessionExists } f
 import { emitActivityEntrySync, emitActivityTtsSync } from '../activity-logger.js';
 import { loadConfigSync } from '../config-yaml.js';
 import { shouldRestartForPostMerge } from './merge-agent-step0.js'; import { capturePipelineStageForIssue } from '../telemetry/pipeline.js';
+import { enqueueMergedDockerCleanup } from './merged-docker-cleanup-worker.js';
+import { withPostMergeLifecycleLock } from './post-merge-lifecycle-lock.js';
 import {
   ensureSyncGitQuiescent,
   probeGitOperationHeads,
@@ -298,13 +300,10 @@ export async function postMergeLifecycle(
   sourceBranch?: string,
   options?: PostMergeLifecycleOptions,
 ): Promise<void> {
-  // PAN-1517: the per-slot swarm runtime is gone. Slot branches no longer exist
-  // — parallelism is an in-context concern owned by the work agent (see
-  // roles/work.md "Parallel work via subagents"). postMergeLifecycle fires only
-  // for the issue's main feature branch merging to `main`.
-
+  // PAN-1517: postMergeLifecycle fires only when the issue's main feature branch merges to `main`.
   // Guard 1: skip if already completed (defense-in-depth against infinite loops)
-  if (_completedPostMerge.has(issueId)) {
+  if (_completedPostMerge.has(issueId) || getReviewStatusSync(issueId)?.mergeStep === 'merged') {
+    _completedPostMerge.add(issueId);
     console.log(`[merge-agent] postMergeLifecycle already completed for ${issueId}, skipping`);
     return;
   }
@@ -315,9 +314,13 @@ export async function postMergeLifecycle(
     return inFlight;
   }
 
-  const run = (async () => {
-    // Guard 2: closed-out is TERMINAL. Close-out flips the spec on main to
-    // completed/cancelled, clears review status, and closes the tracker issue.
+  const run = withPostMergeLifecycleLock(issueId, async () => {
+    if (_completedPostMerge.has(issueId) || getReviewStatusSync(issueId)?.mergeStep === 'merged') {
+      _completedPostMerge.add(issueId); console.log(`[merge-agent] postMergeLifecycle completed while waiting for ${issueId}, skipping`);
+      return;
+    }
+    // Guard 2: closed-out is TERMINAL. Close-out flips the spec to completed/cancelled,
+    // clears review status, and closes the tracker issue.
     // Re-running the handoff after that resurrects the review row and REOPENS
     // the closed issue — observed live on PAN-1190 (2026-06-11): the deacon's
     // stale-mergeStatus sweep saw the cleared row as "stale" 47 minutes after
@@ -344,13 +347,31 @@ export async function postMergeLifecycle(
     // Set mergeStatus='merged' after verifying the branch or PR actually landed.
     try {
       setReviewStatusSync(issueId, {
-        mergeStatus: 'merged',
+        mergeStatus: 'merged', mergeStep: 'post-merge-cleanup',
         readyForMerge: false,
         ...(options?.markReviewPassed ? { reviewStatus: 'passed' as const } : {}),
       });
       console.log(`[merge-agent] ✓ mergeStatus set to 'merged' for ${issueId}`);
     } catch (err: any) {
       console.warn(`[merge-agent] Could not set mergeStatus: ${err.message}`);
+    }
+    // Eager Docker cleanup must run before any fatal post-merge handoff step.
+    let dockerRetryReason: string | null = null;
+    try {
+      const { teardownWorkspaceDockerByNamePromise } = await import('../workspace-manager/docker.js');
+      const teardown = await teardownWorkspaceDockerByNamePromise(issueId.toLowerCase());
+      if (teardown.networkRemoved) {
+        console.log(`[merge-agent] ✓ Removed Docker stack/network: ${teardown.steps.join('; ')}`);
+        logActivity('docker_cleanup', `Removed Docker stack/network for ${issueId}: ${teardown.steps.join('; ')}`);
+      } else {
+        dockerRetryReason = teardown.steps.join('; ') || 'network remained after teardown';
+      }
+    } catch (err) {
+      dockerRetryReason = err instanceof Error ? err.message : String(err);
+    }
+    if (dockerRetryReason) {
+      enqueueMergedDockerCleanup(issueId, { mergeVerified: true });
+      console.warn(`[merge-agent] Docker cleanup queued for retry (non-fatal): ${dockerRetryReason}`);
     }
 
     // Step 0: restart only when the running build is stale and the deploy window is safe.
@@ -429,7 +450,7 @@ export async function postMergeLifecycle(
       console.warn(`[merge-agent] Could not transition issue to verifying_on_main: ${message}`);
       try {
         setReviewStatusSync(issueId, {
-          mergeStatus: 'failed',
+          mergeStatus: 'merged', mergeStep: 'post-merge-cleanup',
           readyForMerge: false,
           mergeNotes: `Post-merge verifying_on_main transition failed: ${message}`,
         });
@@ -529,38 +550,16 @@ export async function postMergeLifecycle(
     } catch (err) {
       console.warn(`[merge-agent] Memory reset marker creation failed (non-fatal): ${err}`);
     }
-
-    // 4. Stop Docker containers + networks to prevent network pool exhaustion (non-fatal)
-    // Orphaned Docker networks accumulate when workspaces are merged but containers are never
-    // torn down, eventually exhausting Docker's address pool and blocking new workspace creation.
-    try {
-      const { findWorkspacePath } = await import('../lifecycle/archive-planning.js');
-      const { stopWorkspaceDocker } = await import('../workspace-manager.js');
-      const issueLower = issueId.toLowerCase();
-      const workspacePath = findWorkspacePath(projectPath, issueLower);
-      if (workspacePath) {
-        const dockerResult = await Effect.runPromise(stopWorkspaceDocker(workspacePath, issueLower));
-        if (dockerResult.containersFound) {
-          console.log(`[merge-agent] ✓ Stopped Docker containers: ${dockerResult.steps.join('; ')}`);
-          logActivity('docker_cleanup', `Stopped Docker for ${issueId}: ${dockerResult.steps.join('; ')}`);
-        }
-      }
-    } catch (err) {
-      console.warn(`[merge-agent] Docker cleanup failed (non-fatal): ${err}`);
-    }
-
     await notifyTldrDaemon(projectPath, sourceBranch ?? '');
     await maybeSpawnPostMergeKnowledgeRetro(issueId, projectPath);
 
-    // Mark completed BEFORE logging — prevents re-entry even if the log line triggers something
+    setReviewStatusSync(issueId, { mergeStatus: 'merged', mergeStep: 'merged', readyForMerge: false });
     _completedPostMerge.add(issueId); void capturePipelineStageForIssue(issueId, 'merged');
 
     console.log(`[merge-agent] Post-merge handoff completed for ${issueId}. Awaiting close-out (verify on main).`);
     announceMerge('completed', issueId);
     logActivity('merge_complete', `Merged ${issueId}. Awaiting close-out (verify on main).`);
-  })().finally(() => {
-    _postMergeInFlight.delete(issueId);
-  });
+  }).finally(() => { _postMergeInFlight.delete(issueId); });
   _postMergeInFlight.set(issueId, run);
   return run;
 }
