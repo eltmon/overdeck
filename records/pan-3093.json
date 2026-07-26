@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T12:33:18.311Z",
-  "updated": "2026-07-26T13:54:37.421Z",
+  "updated": "2026-07-26T13:54:47.378Z",
   "pipeline": {
     "issueId": "PAN-3093",
     "reviewStatus": "pending",
@@ -55,8 +55,16 @@
   "harness": "claude-code",
   "model": "claude-opus-5",
   "tasks": {
-    "sequence": 6,
-    "claims": {},
+    "sequence": 7,
+    "claims": {
+      "polyrepo-assembly-engine": {
+        "writerId": "agent-pan-3093",
+        "agentId": "agent-pan-3093",
+        "pid": 3615760,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T13:54:47.378Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3093",
@@ -118,6 +126,7 @@
     "polyrepo-ready-set": "completed",
     "polyrepo-ready-set.polyrepo-ready-set.ac1": "completed",
     "polyrepo-ready-set.polyrepo-ready-set.ac2": "completed",
-    "polyrepo-ready-set.polyrepo-ready-set.ac3": "completed"
+    "polyrepo-ready-set.polyrepo-ready-set.ac3": "completed",
+    "polyrepo-assembly-engine": "running"
   }
 }
