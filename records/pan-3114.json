@@ -54,20 +54,21 @@
     "recordedAt": "2026-07-26T10:37:54.195Z"
   },
   "created": "2026-07-26T08:55:24.679Z",
-  "updated": "2026-07-26T10:38:01.647Z",
+  "updated": "2026-07-26T10:38:03.353Z",
   "pipeline": {
     "issueId": "PAN-3114",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T10:38:00.732Z",
+    "updatedAt": "2026-07-26T10:38:01.189Z",
     "inspectNotes": "All 4 ACs met: pending->passed stamp with 'uat-promotion' + generation name + 9-char SHA (slice(0,9)); passed/skipped short-circuit to {} so recordUatPromotionVerdicts skips and preserves existing verdict/notes; lastVerifiedCommit = rehydrateHeadAnchor(member.headSha) via conditional spread, omitted on empty headSha; recordUatPromotionVerdicts returns only non-terminal issue IDs and persists via setReviewStatusSync(issueId, stamp, current ?? undefined) — signature verified against src/lib/review-status.ts:147. Head-anchor guard entry expression matches the AST text exactly and the inventory comparison is order-insensitive.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3126",
     "reviewRequestedAt": "2026-07-26T10:37:57.025Z",
+    "reviewSpawnedAt": "2026-07-26T10:38:01.187Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "src/dashboard/server/services/__tests__/uat-train.test.ts",
@@ -123,7 +124,7 @@
       },
       "costAtCloseOut": {
         "usd": 22.594003,
-        "pricingAsOf": "2026-07-26T10:38:00.780Z"
+        "pricingAsOf": "2026-07-26T10:38:03.345Z"
       }
     },
     "merges": [
