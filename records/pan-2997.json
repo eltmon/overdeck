@@ -311,18 +311,18 @@
     "recordedAt": "2026-07-26T10:07:26.737Z"
   },
   "created": "2026-07-21T23:09:49.270Z",
-  "updated": "2026-07-26T11:43:53.595Z",
+  "updated": "2026-07-26T12:31:42.585Z",
   "pipeline": {
     "issueId": "PAN-2997",
     "reviewStatus": "passed",
-    "testStatus": "pending",
+    "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
-    "mergeStatus": "pending",
+    "mergeStatus": "merged",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T10:57:04.635Z",
-    "updatedAt": "2026-07-26T11:43:50.971Z",
+    "updatedAt": "2026-07-26T12:31:42.419Z",
     "reviewNotes": "All correctness, security, requirements, and performance checks pass; keyed wake recovery now preserves exactly-once delivery across every reviewed crash and marker-failure path.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3004",
@@ -433,9 +433,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 34772003,
-            "output": 1330042,
-            "cacheRead": 190190080,
+            "input": 34778199,
+            "output": 1330222,
+            "cacheRead": 190756352,
             "cacheWrite": 0
           }
         },
@@ -464,9 +464,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 36245776,
-          "output": 1519163,
-          "cacheRead": 285518848,
+          "input": 36251972,
+          "output": 1519343,
+          "cacheRead": 286085120,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -477,8 +477,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 369.9139896,
-        "pricingAsOf": "2026-07-26T11:43:51.032Z"
+        "usd": 370.2335056,
+        "pricingAsOf": "2026-07-26T12:31:42.511Z"
       }
     },
     "merges": [
