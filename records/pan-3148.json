@@ -22,7 +22,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T17:27:17.644Z",
-  "updated": "2026-07-26T18:29:55.014Z",
+  "updated": "2026-07-26T18:36:02.182Z",
   "pipeline": {
     "issueId": "PAN-3148",
     "reviewStatus": "pending",
@@ -49,16 +49,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "escalate-suppressed-redelivery": {
-        "writerId": "agent-pan-3148",
-        "agentId": "agent-pan-3148",
-        "pid": 1732630,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-26T18:29:55.014Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3148",
@@ -92,6 +84,17 @@
         "outcome": "completed",
         "reason": "Added deterministic review-feedback dedup keys from verdict, run ID, and reviewed anchor; threaded fallback run IDs; and retried unkeyed only when ACP or Channels cannot enforce keyed delivery.",
         "releasedAt": "2026-07-26T18:29:43.408Z"
+      },
+      {
+        "writerId": "agent-pan-3148",
+        "agentId": "agent-pan-3148",
+        "pid": 1732630,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T18:29:55.014Z",
+        "itemId": "escalate-suppressed-redelivery",
+        "outcome": "completed",
+        "reason": "Threaded deduplicated delivery outcomes through messageAgent, counted suppressed review-feedback deliveries per key, escalated exactly once on the second suppression, and reset only after a fresh delivery.",
+        "releasedAt": "2026-07-26T18:36:02.182Z"
       }
     ],
     "statusReasons": {
@@ -106,6 +109,10 @@
       "keyed-feedback-delivery": {
         "reason": "Added deterministic review-feedback dedup keys from verdict, run ID, and reviewed anchor; threaded fallback run IDs; and retried unkeyed only when ACP or Channels cannot enforce keyed delivery.",
         "updatedAt": "2026-07-26T18:29:43.408Z"
+      },
+      "escalate-suppressed-redelivery": {
+        "reason": "Threaded deduplicated delivery outcomes through messageAgent, counted suppressed review-feedback deliveries per key, escalated exactly once on the second suppression, and reset only after a fresh delivery.",
+        "updatedAt": "2026-07-26T18:36:02.182Z"
       }
     }
   },
@@ -126,6 +133,10 @@
     "keyed-feedback-delivery.keyed-feedback-delivery.ac2": "completed",
     "keyed-feedback-delivery.keyed-feedback-delivery.ac3": "completed",
     "keyed-feedback-delivery.keyed-feedback-delivery.ac4": "completed",
-    "escalate-suppressed-redelivery": "running"
+    "escalate-suppressed-redelivery": "completed",
+    "escalate-suppressed-redelivery.escalate-suppressed-redelivery.ac1": "completed",
+    "escalate-suppressed-redelivery.escalate-suppressed-redelivery.ac2": "completed",
+    "escalate-suppressed-redelivery.escalate-suppressed-redelivery.ac3": "completed",
+    "escalate-suppressed-redelivery.escalate-suppressed-redelivery.ac4": "completed"
   }
 }
