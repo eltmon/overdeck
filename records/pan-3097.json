@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T02:29:08.179Z",
-  "updated": "2026-07-26T02:56:52.405Z",
+  "updated": "2026-07-26T02:57:39.561Z",
   "pipeline": {
     "issueId": "PAN-3097",
     "reviewStatus": "pending",
@@ -54,16 +54,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 15,
-    "claims": {
-      "auq-docs-update": {
-        "writerId": "agent-pan-3097",
-        "agentId": "agent-pan-3097",
-        "pid": 2102677,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-26T02:56:52.405Z"
-      }
-    },
+    "sequence": 16,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3097",
@@ -141,6 +133,17 @@
         "outcome": "completed",
         "reason": "Reinforced self-contained question structure in the planning prompt and plan role process",
         "releasedAt": "2026-07-26T02:56:41.733Z"
+      },
+      {
+        "writerId": "agent-pan-3097",
+        "agentId": "agent-pan-3097",
+        "pid": 2102677,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T02:56:52.405Z",
+        "itemId": "auq-docs-update",
+        "outcome": "completed",
+        "reason": "Documented identifier-plus-title rendering, resolver-fed title source, unbound behavior, and universal self-contained question guidance",
+        "releasedAt": "2026-07-26T02:57:39.561Z"
       }
     ],
     "statusReasons": {
@@ -171,6 +174,10 @@
       "planning-prompt-guidance": {
         "reason": "Reinforced self-contained question structure in the planning prompt and plan role process",
         "updatedAt": "2026-07-26T02:56:41.733Z"
+      },
+      "auq-docs-update": {
+        "reason": "Documented identifier-plus-title rendering, resolver-fed title source, unbound behavior, and universal self-contained question guidance",
+        "updatedAt": "2026-07-26T02:57:39.561Z"
       }
     }
   },
@@ -202,6 +209,8 @@
     "planning-prompt-guidance": "completed",
     "planning-prompt-guidance.planning-prompt-guidance.ac1": "completed",
     "planning-prompt-guidance.planning-prompt-guidance.ac2": "completed",
-    "auq-docs-update": "running"
+    "auq-docs-update": "completed",
+    "auq-docs-update.auq-docs-update.ac1": "completed",
+    "auq-docs-update.auq-docs-update.ac2": "completed"
   }
 }
