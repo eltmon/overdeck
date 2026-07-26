@@ -3,7 +3,7 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-07-26T21:27:05.281Z",
-  "updated": "2026-07-26T22:49:12.465Z",
+  "updated": "2026-07-26T22:49:15.829Z",
   "pipeline": {
     "issueId": "PAN-3166",
     "reviewStatus": "pending",
@@ -13,12 +13,20 @@
     "mergeStep": "post-merge-cleanup",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T22:49:06.436Z",
-    "mergeNotes": "Merge pipeline error: Cannot find package 'effect' imported from /home/eltmon/.overdeck/deployments/dashboard/.pan-reload-generation-b/dist/dashboard/deploy-window-Dchy3FNh.js",
+    "updatedAt": "2026-07-26T22:49:15.821Z",
+    "mergeNotes": "Cannot find package 'effect' imported from /home/eltmon/.overdeck/deployments/dashboard/.pan-reload-generation-b/dist/dashboard/deploy-window-Dchy3FNh.js",
     "lastVerifiedCommit": "55dc93ff7b5cfd1f76b003b64253164c9738546a",
-    "strikeLandingState": "landed",
-    "strikeRecoveryCount": 0,
-    "strikeLandingAttempts": []
+    "strikeLandingState": "recovering",
+    "strikeRecoveryCount": 1,
+    "strikeLandingAttempts": [
+      {
+        "timestamp": "2026-07-26T22:49:06.443Z",
+        "strikeHead": "55dc93ff7b5cfd1f76b003b64253164c9738546a",
+        "mainHead": "d122ce89822e2f816f1508e3e475f3a867ed717e",
+        "outcome": "failed",
+        "detail": "Cannot find package 'effect' imported from /home/eltmon/.overdeck/deployments/dashboard/.pan-reload-generation-b/dist/dashboard/deploy-window-Dchy3FNh.js"
+      }
+    ]
   },
   "closeOut": {
     "usage": {
@@ -26,7 +34,7 @@
       "totals": {},
       "costAtCloseOut": {
         "usd": 0,
-        "pricingAsOf": "2026-07-26T22:49:12.460Z"
+        "pricingAsOf": "2026-07-26T22:49:15.823Z"
       }
     },
     "merges": [],
