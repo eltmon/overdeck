@@ -73,17 +73,17 @@
     "recordedAt": "2026-07-26T03:36:45.308Z"
   },
   "created": "2026-07-26T02:29:08.179Z",
-  "updated": "2026-07-26T03:44:36.474Z",
+  "updated": "2026-07-26T03:44:39.193Z",
   "pipeline": {
     "issueId": "PAN-3097",
-    "reviewStatus": "passed",
+    "reviewStatus": "pending",
     "testStatus": "testing",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T03:44:36.431Z",
-    "reviewNotes": "Approved after rebase: PAN-3097 behavior remains correct and the refreshed generated command manifest matches the CLI registry",
+    "updatedAt": "2026-07-26T03:44:38.892Z",
+    "reviewNotes": "Review dispatch skipped — already running: agent-pan-3097-review",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3102",
     "reviewedAtCommit": "887ba28422e0d80895d7af96be3ce759012ce75a",
     "lastVerifiedCommit": "887ba28422e0d80895d7af96be3ce759012ce75a",
@@ -189,7 +189,7 @@
       },
       "costAtCloseOut": {
         "usd": 59.419193,
-        "pricingAsOf": "2026-07-26T03:44:36.463Z"
+        "pricingAsOf": "2026-07-26T03:44:38.976Z"
       }
     },
     "merges": [
