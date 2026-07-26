@@ -126,16 +126,16 @@
   ],
   "feedback": [],
   "created": "2026-07-26T00:35:36.057Z",
-  "updated": "2026-07-26T01:08:24.581Z",
+  "updated": "2026-07-26T01:08:26.942Z",
   "pipeline": {
     "issueId": "PAN-1696",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T01:08:24.525Z",
+    "updatedAt": "2026-07-26T01:08:25.531Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed lint: moved isMergeTrainEnabledForProject to overdeck door",
     "verificationNotes": "Verification FAILED at lint (62467ms):\n\n\n> @overdeck/core@0.45.24 lint\n> eslint src/ --ext .js,.ts,.tsx --no-inline-config && npm run lint:effect && npm run lint:permissions && npm run lint:state-writes && npm run lint:overdeck-boundaries && npm run lint:pipeline-membership && npm run lint:skills && npm run lint:slash-commands && npm run lint:prompts && npm run lint:prompt-trailer && npm run lint:file-size && npm run lint:source-introspection && npm run lint:no-coderabbit-merge-gate && npm run lint:circular && npm run lint:ratchet-audit && npm run lint:quarantine-audit\n\n\n> @overdeck/core@0.45.24 lint:effect\n> node scripts/check-effect-versions.mjs\n\n✓ Effect pinning OK — all effect/@effect/* on 4.0.0-beta.73, effect is a direct runtime dependency.\n\n> @overdeck/core@0.45.24 lint:permissions\n> bash scripts/lint-permissions.sh\n\n✓ permission-flag lint passed (no leaks or resolver omissions outside allowlist)\n\n> @overdeck/core@0.45.24 lint:state-writes\n> bash scripts/lint-state-writes.sh\n\n✓ state-write lint passed (single write surface intact)\n\n> @overdeck/core@0.45.24 lint:overdeck-boundaries\n> PAN_OVERDECK_BOUNDARY_LINT=1 bash scripts/lint-overdeck-boundaries.sh\n\n\n--- stderr ---\n✗ overdeck boundary gate: 1 site(s) across 1 file(s) still on the OLD panopticon.db\n\nsrc/lib/cloister/merge-train.ts:13:import { isMergeTrainEnabledForProject } from '../database/app-settings.js';\n\nEach must go through an overdeck door (src/lib/overdeck/*) — not getDatabase() or a database/* store.\n",
     "prUrl": "https://github.com/eltmon/overdeck/pull/1822",
@@ -168,10 +168,10 @@
         },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 715,
-            "output": 33411,
-            "cacheRead": 16981413,
-            "cacheWrite": 750193
+            "input": 729,
+            "output": 33763,
+            "cacheRead": 17189434,
+            "cacheWrite": 903313
           }
         }
       },
@@ -195,15 +195,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 715,
-          "output": 33411,
-          "cacheRead": 16981413,
-          "cacheWrite": 750193
+          "input": 729,
+          "output": 33763,
+          "cacheRead": 17189434,
+          "cacheWrite": 903313
         }
       },
       "costAtCloseOut": {
-        "usd": 39.688066,
-        "pricingAsOf": "2026-07-26T01:08:24.571Z"
+        "usd": 39.902042,
+        "pricingAsOf": "2026-07-26T01:08:26.890Z"
       }
     },
     "merges": [
