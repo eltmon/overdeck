@@ -87,10 +87,23 @@ export function ensurePolyrepoWorkspaceGitignoreSync(
   // (continue.json, transcripts, feedback); durable state lives on the
   // overdeck-state branch. Without this entry the scaffold repo shows
   // `?? .overdeck/` and agents invent local .git/info/exclude edits.
-  const addRuntimeEntry =
-    !normalizedLines.includes('.overdeck/') && !normalizedLines.includes('.overdeck');
+  const runtimeEntries: string[] = [];
+  if (!normalizedLines.includes('.overdeck/') && !normalizedLines.includes('.overdeck')) {
+    runtimeEntries.push('.overdeck/');
+  }
+  // Generated devcontainer harness (`pan workspace render-devcontainer`):
+  // `.devcontainer/` (rendered compose/config) and `dev` (symlink into it).
+  // These are reproducible runtime artifacts, never commit targets — without
+  // the entries, `pan done` preflight fails on the untracked files and agents
+  // try to delete workspace infrastructure to unblock it (MIN-896/MIN-898).
+  if (!normalizedLines.includes('.devcontainer/') && !normalizedLines.includes('.devcontainer')) {
+    runtimeEntries.push('.devcontainer/');
+  }
+  if (!normalizedLines.includes('dev')) {
+    runtimeEntries.push('dev');
+  }
 
-  if (added.length === 0 && !addRuntimeEntry && removed.length === 0) {
+  if (added.length === 0 && runtimeEntries.length === 0 && removed.length === 0) {
     return { added, removed };
   }
 
@@ -103,9 +116,10 @@ export function ensurePolyrepoWorkspaceGitignoreSync(
     }
     content += added.join('\n') + '\n';
   }
-  if (addRuntimeEntry) {
-    content += '\n# Overdeck workspace runtime (PAN-2541: durable state lives on overdeck-state)\n.overdeck/\n';
-    added.push('.overdeck/');
+  if (runtimeEntries.length > 0) {
+    content += '\n# Overdeck workspace runtime (PAN-2541: durable state lives on overdeck-state; devcontainer harness is generated)\n';
+    content += runtimeEntries.join('\n') + '\n';
+    added.push(...runtimeEntries);
   }
   writeFileSync(gitignorePath, content, 'utf-8');
   return { added, removed };

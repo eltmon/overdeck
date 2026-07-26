@@ -612,9 +612,14 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
         // Agents never use git stash. Dirty work must be committed, explicitly
         // discarded, or surfaced to the operator.
         console.error(chalk.dim('  Resolve uncommitted changes by picking ONE:'));
-        console.error(chalk.dim('    1. Commit:  git add -A && git commit -m "<message>"'));
-        console.error(chalk.dim('    2. Discard: git restore --staged --worktree . (destructive; type the command yourself)'));
+        console.error(chalk.dim('    1. Commit:  git add -A && git commit -m "<message>" (in the repo that owns the file)'));
+        console.error(chalk.dim('    2. Discard: git restore --staged --worktree . (tracked files only; destructive)'));
         console.error(chalk.dim('    3. Surface: pan tell ' + issueId + ' "Uncommitted changes need operator decision"'));
+        console.error('');
+        console.error(chalk.dim('  Generated harness files (.devcontainer/, dev symlink, .pan/, .overdeck/) are'));
+        console.error(chalk.dim('  already excluded from this check. If any listed file looks like workspace'));
+        console.error(chalk.dim('  infrastructure, treat it as a bug: surface it (option 3). NEVER delete'));
+        console.error(chalk.dim('  workspace infrastructure to pass this check.'));
         console.error('');
         console.error(chalk.dim(`  After resolving, run 'pan done ${issueId}' again.`));
         console.error(chalk.dim('  Use --force to skip checks (NOT recommended — leaves uncommitted work behind).'));
