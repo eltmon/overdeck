@@ -269,7 +269,7 @@
     }
   ],
   "created": "2026-07-26T00:35:36.057Z",
-  "updated": "2026-07-26T07:35:31.371Z",
+  "updated": "2026-07-26T07:35:33.810Z",
   "pipeline": {
     "issueId": "PAN-1696",
     "reviewStatus": "pending",
@@ -384,8 +384,16 @@
   "harness": "claude-code",
   "model": "claude-opus-5",
   "tasks": {
-    "sequence": 36,
-    "claims": {},
+    "sequence": 37,
+    "claims": {
+      "docs-decouple": {
+        "writerId": "agent-pan-1696",
+        "agentId": "agent-pan-1696",
+        "pid": 3901633,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T07:35:33.810Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-1696",
@@ -694,6 +702,7 @@
     "role-prompt-scope.role-prompt-scope.ac2": "completed",
     "remove-legacy-routes": "completed",
     "remove-legacy-routes.remove-legacy-routes.ac1": "completed",
-    "remove-legacy-routes.remove-legacy-routes.ac2": "completed"
+    "remove-legacy-routes.remove-legacy-routes.ac2": "completed",
+    "docs-decouple": "running"
   }
 }
