@@ -284,18 +284,18 @@
     "recordedAt": "2026-07-26T10:07:26.737Z"
   },
   "created": "2026-07-21T23:09:49.270Z",
-  "updated": "2026-07-26T10:55:02.845Z",
+  "updated": "2026-07-26T10:55:04.888Z",
   "pipeline": {
     "issueId": "PAN-2997",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T10:55:02.771Z",
-    "reviewNotes": "Provisional recovery loses the original pane identity, and poison repair/clear verification still treats failed marker reads as empty state.",
+    "updatedAt": "2026-07-26T10:55:03.704Z",
+    "reviewNotes": "Review dispatch skipped — already running: agent-pan-2997-review",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3004",
     "lastVerifiedCommit": "1700fa490854ce01aef7b32625e0a6c56d11083a",
     "reviewSpawnedAt": "2026-07-26T10:07:38.654Z",
@@ -448,7 +448,7 @@
       },
       "costAtCloseOut": {
         "usd": 322.8763726,
-        "pricingAsOf": "2026-07-26T10:55:02.832Z"
+        "pricingAsOf": "2026-07-26T10:55:03.777Z"
       }
     },
     "merges": [
