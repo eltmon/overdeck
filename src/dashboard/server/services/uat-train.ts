@@ -537,7 +537,20 @@ export interface UatGenerationPayload {
    * disclose host filesystem topology.
    */
   repos: UatGenerationRepoPayload[];
-  stack: { status: 'running' | 'absent'; frontendUrl: string };
+  /**
+   * Live stack state (PAN-3166). `degraded` means containers are up but a
+   * service the compose file declares is not serving — `downServices` names
+   * them and `serviceErrors` carries each one's last error line, so the panel
+   * can say why instead of offering a link into a gateway timeout. `unknown`
+   * means the probe itself failed, which is not proof the stack is gone.
+   */
+  stack: {
+    status: 'running' | 'degraded' | 'unknown' | 'absent';
+    frontendUrl: string;
+    downServices?: string[];
+    serviceErrors?: Record<string, string>;
+    probeError?: string;
+  };
 }
 
 async function mapBounded<T>(items: readonly T[], concurrency: number, worker: (item: T) => Promise<void>): Promise<void> {
@@ -651,7 +664,13 @@ export async function getUatGenerationsPayload(projectRootOverride?: string): Pr
         promotedAt: r.promotedAt ?? null,
         mergeSha: r.mergeSha ?? null,
       })),
-      stack: { status: probe.status, frontendUrl: probe.frontendUrl },
+      stack: {
+        status: probe.status,
+        frontendUrl: probe.frontendUrl,
+        ...(probe.downServices ? { downServices: probe.downServices } : {}),
+        ...(probe.serviceErrors ? { serviceErrors: probe.serviceErrors } : {}),
+        ...(probe.probeError ? { probeError: probe.probeError } : {}),
+      },
     });
   }
   return payload;

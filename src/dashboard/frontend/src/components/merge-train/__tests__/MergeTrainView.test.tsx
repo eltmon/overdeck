@@ -583,6 +583,46 @@ describe('actions post to the new endpoints behind confirms (ac3)', () => {
     expect(link!.textContent).toContain('Open');
   });
 
+  // PAN-3166: the min-quartz-0726 failure — the api container had exited at
+  // Flyway startup, yet the panel still offered "Open UAT frontend" in success
+  // green, which is a link straight into a gateway timeout.
+  it('a degraded stack offers a restart control, not an open link, and shows why', async () => {
+    mockFetch(
+      twoProjectResponses({
+        '/api/merge-train/generations': [
+          { projectKey: 'overdeck', projectName: 'Overdeck', enabled: true, generations: [PAN_READY_GEN] },
+          {
+            projectKey: 'myn',
+            projectName: 'Mind Your Now',
+            enabled: true,
+            generations: [{
+              ...MIN_READY_GEN,
+              stack: {
+                status: 'degraded',
+                frontendUrl: 'https://uat-min-badger-0726.overdeck.localhost',
+                downServices: ['api'],
+                serviceErrors: {
+                  api: 'Caused by: org.flywaydb.core.api.FlywayException: Found more than one migration with version 256',
+                },
+              },
+            }],
+          },
+        ],
+      }),
+    );
+    renderView();
+    const panel = await screen.findByTestId('merge-train-project-myn');
+
+    expect(panel.querySelector('a[href*="uat-min-badger-0726"]')).toBeNull();
+    const control = screen.getByTestId('uat-stack-degraded-uat/min-badger-0726');
+    expect(control.tagName).toBe('BUTTON');
+    expect(control.textContent).toContain('Stack degraded');
+    expect(control.textContent).toContain('api');
+    expect(screen.getByTestId('uat-stack-degraded-detail-uat/min-badger-0726').textContent).toContain(
+      'Found more than one migration with version 256',
+    );
+  });
+
   it('stack POSTs the aggregate stack route for a batch with no live stack', async () => {
     const fetchMock = mockFetch(
       twoProjectResponses({ 'POST /api/merge-train/generations': { frontendUrl: 'https://uat-pan-otter-0610.overdeck.localhost', evicted: [] } }),
