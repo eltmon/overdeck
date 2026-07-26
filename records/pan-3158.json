@@ -34,7 +34,7 @@
     "recordedAt": "2026-07-26T20:44:54.187Z"
   },
   "created": "2026-07-26T20:19:41.143Z",
-  "updated": "2026-07-26T20:45:04.309Z",
+  "updated": "2026-07-26T20:45:37.192Z",
   "pipeline": {
     "issueId": "PAN-3158",
     "reviewStatus": "pending",
@@ -45,7 +45,7 @@
     "readyForMerge": false,
     "updatedAt": "2026-07-26T20:45:04.269Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3161",
-    "reviewRequestedAt": "2026-07-26T20:44:56.826Z",
+    "reviewRequestedAt": "2026-07-26T20:45:36.822Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "docs/FLYWHEEL-STATE.md"
@@ -63,7 +63,8 @@
         "src/dashboard/frontend/src/components/merge-train/__tests__/MergeTrainView.test.tsx"
       ],
       "recordedAt": "2026-07-26T20:44:54.187Z"
-    }
+    },
+    "panDoneRecoveredAt": "2026-07-26T20:45:36.822Z"
   },
   "closeOut": {
     "usage": {
