@@ -2,7 +2,7 @@
   "issueId": "PAN-3147",
   "schemaVersion": 2,
   "created": "2026-07-26T17:26:24.283Z",
-  "updated": "2026-07-26T17:26:24.283Z",
+  "updated": "2026-07-26T17:26:25.615Z",
   "pipeline": {
     "issueId": "PAN-3147",
     "reviewStatus": "pending",
@@ -25,5 +25,7 @@
       "note": "Planning session started for PAN-3147: Flywheel doctrine: require reading the review verdict for blocked issues — liveness metrics are not correctness",
       "timestamp": "2026-07-26T17:26:24.283Z"
     }
-  ]
+  ],
+  "harness": "claude-code",
+  "model": "k3[1m]"
 }
