@@ -78,10 +78,10 @@
     "recordedAt": "2026-07-26T22:02:33.712Z"
   },
   "created": "2026-07-26T20:52:58.018Z",
-  "updated": "2026-07-26T23:06:55.748Z",
+  "updated": "2026-07-26T23:11:02.684Z",
   "pipeline": {
     "issueId": "PAN-3162",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -89,11 +89,11 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T22:02:50.304Z",
-    "updatedAt": "2026-07-26T23:06:55.707Z",
+    "updatedAt": "2026-07-26T23:11:02.613Z",
     "inspectNotes": "All 4 ACs met. observeForgeMergeState (merge-completeness.ts:189-232) persists mergeStatus='merged'+artifactUrl via withRepoStateSync/upsertMergeSetSync only for state==='merged' rows lacking that evidence, and is gated on no repo being unverifiable, so unmerged/no-changes/unverifiable verdicts write nothing and hasPositiveMergedEvidence is false for all-no-changes. reconcileStrandedRepos (lines 280-308) flips required, non-skipped, artifact-backed pending/failed/merging rows to merged (with artifactId) only when findMergedArtifact returns an artifact, and continues untouched on null. Forge errors in both paths become unverifiable blockers; reconcile now batches writes and returns initialMergeSet with zero upserts when any unverifiable blocker exists (lines 310-313), covered by both new cases in merge-completeness-forge-error.test.ts. Notes, non-blocking: (a) observeForgeMergeState has no production caller yet — presumably a later bead wires it; (b) mixed sets where one repo is verifiably merged and another is unverifiable discard the confirmed evidence, which is the AC4-mandated fail-open reading; (c) merge-ops.ts:533-535 activeRepos still includes rows this flips to merged, so a reconciled-merged repo will still be walked by the rebase/merge loop — worth a follow-on look outside this bead.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3170",
     "lastVerifiedCommit": "05abfc31e22c2b86fdff8ff38cccb705234b2e78",
-    "reviewSpawnedAt": "2026-07-26T22:50:50.480Z",
+    "reviewSpawnedAt": "2026-07-26T23:11:02.612Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "src/dashboard/server/routes/workspaces/__tests__/merge-ops-polyrepo-completeness.test.ts",
@@ -155,24 +155,24 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 3467928,
-            "output": 409689,
-            "cacheRead": 133384704,
+            "input": 3533693,
+            "output": 419355,
+            "cacheRead": 139031040,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 7512439,
-          "output": 726928,
-          "cacheRead": 183158784,
+          "input": 7578204,
+          "output": 736594,
+          "cacheRead": 188805120,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 150.949427,
-        "pricingAsOf": "2026-07-26T23:06:55.743Z"
+        "usd": 154.3914,
+        "pricingAsOf": "2026-07-26T23:11:02.652Z"
       }
     },
     "merges": [
