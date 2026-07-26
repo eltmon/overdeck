@@ -202,6 +202,7 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
     hostOverride: options.allowHost || undefined,
     slotIndex: options.slotIndex,
     slotItemId: options.slotItemId,
+    flywheelRunId: flywheelEnv.OVERDECK_FLYWHEEL_RUN_ID,
   };
   // PAN-1048 P1: spawnRun is on the dashboard hot path (Effect routes,
   // reactive Cloister scheduler). All disk I/O here uses async fs/promises
@@ -545,6 +546,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   // missing/expired/burned — it would wedge silently in a 401 loop.
   assertCodexNativeAuthForSpawn(resolvedHarness, listAgentStates());
   await ensureLifecycleHooksBeforeLaunch(agentId, resolvedHarness);
+  const flywheelEnv = resolveFlywheelSpawnEnv(role, options.flywheelRunId);
   // Create state
   const state: AgentState = {
     id: agentId,
@@ -559,6 +561,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     ...(resolvedHarness === 'codex' ? {} : { costSoFar: 0 }),
     hostOverride: options.allowHost || undefined,
     sessionId: createFreshSessionIdentity(agentId, resolvedHarness),
+    flywheelRunId: flywheelEnv.OVERDECK_FLYWHEEL_RUN_ID,
   };
 
   const supervisorLaunch = await prepareSupervisorForFreshLaunch(agentId, options, state);
@@ -707,7 +710,6 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     saveAgentStateSync(state);
   }
 
-  const flywheelEnv = resolveFlywheelSpawnEnv(role, options.flywheelRunId);
   const { launcherContent, providerEnv } = await buildAgentLaunchConfig({
     agentId,
     model: selectedModel,
