@@ -273,11 +273,46 @@ describe('runDeployPatrol', () => {
     await runDeployPatrol(ctx);
 
     expect(ctx.spawnReload).not.toHaveBeenCalled();
-    expect(ctx.markQueueEscalated).toHaveBeenCalledOnce();
+    expect(ctx.markQueueEscalated).not.toHaveBeenCalled();
+    expect(ctx.recordNeedsYou).not.toHaveBeenCalled();
     expect(ctx.emitEntry).toHaveBeenCalledWith(expect.objectContaining({
       level: 'error',
       message: expect.stringContaining('current block: Automatic deployment blocked because CI failed.'),
     }));
+  });
+
+  it('waits for a current verifier before latching needs-you after a historical CI blocker', async () => {
+    const ctx = context();
+    ctx.readQueue.mockResolvedValue(queuedDeploy({
+      requestedAt: '2026-07-15T11:00:00.000Z',
+      blockedBy: ['PAN-OLD'],
+    }));
+    ctx.getCiState.mockResolvedValue({
+      status: 'red',
+      reason: 'Automatic deployment blocked because CI failed.',
+    });
+
+    await runDeployPatrol(ctx);
+    expect(ctx.recordNeedsYou).not.toHaveBeenCalled();
+    expect(ctx.markQueueEscalated).not.toHaveBeenCalled();
+
+    ctx.getCiState.mockResolvedValue({ status: 'green' });
+    ctx.getWindowAssessment.mockResolvedValue({
+      reason: 'Deployment deferred because verification is in flight for PAN-CURRENT.',
+      verifyingIssues: ['PAN-CURRENT'],
+    });
+    await runDeployPatrol(ctx);
+
+    expect(ctx.recordNeedsYou).toHaveBeenCalledOnce();
+    expect(ctx.recordNeedsYou).toHaveBeenCalledWith(
+      'PAN-CURRENT',
+      'deploy-queue',
+      '2026-07-15T11:00:00.000Z',
+      expect.stringContaining('Stored verification blockers: PAN-OLD'),
+    );
+    expect(ctx.markQueueEscalated).toHaveBeenCalledOnce();
+    expect(ctx.emitEntry.mock.calls.filter(([entry]) => entry.level === 'error')).toHaveLength(2);
+    expect(ctx.emitTts.mock.calls.filter(([entry]) => entry.eventType === 'deploy_queue_stuck')).toHaveLength(2);
   });
 
   it('keeps a queued deploy pending during the merge debounce', async () => {
@@ -302,7 +337,8 @@ describe('runDeployPatrol', () => {
     await runDeployPatrol(ctx);
 
     expect(ctx.getCiState).not.toHaveBeenCalled();
-    expect(ctx.markQueueEscalated).toHaveBeenCalledOnce();
+    expect(ctx.markQueueEscalated).not.toHaveBeenCalled();
+    expect(ctx.recordNeedsYou).not.toHaveBeenCalled();
     expect(ctx.emitEntry).toHaveBeenCalledWith(expect.objectContaining({
       level: 'error',
       message: expect.stringContaining('merge debounce has not elapsed'),
