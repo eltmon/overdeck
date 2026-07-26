@@ -19,6 +19,10 @@ let ensureLifecycleHooksMock: ReturnType<typeof vi.fn>;
 let deliverAgentMessageMock: ReturnType<typeof vi.fn>;
 let waitForPromptReadyMock: ReturnType<typeof vi.fn>;
 let stopAgentMock: ReturnType<typeof vi.fn>;
+let shouldPreservePipelineVerdictsMock: ReturnType<typeof vi.fn>;
+let resetPipelineVerdictsForWorkStartMock: ReturnType<typeof vi.fn>;
+let setReviewStatusMock: ReturnType<typeof vi.fn>;
+let resetPostMergeStateMock: ReturnType<typeof vi.fn>;
 let capturePaneText: string;
 let channelsMcpEnabled: boolean;
 let activeFlywheelRunId: string | null;
@@ -53,6 +57,13 @@ function mockSpawnDependencies(): void {
   deliverAgentMessageMock = vi.fn(async () => ({ ok: true, path: 'acp' }));
   waitForPromptReadyMock = vi.fn(async () => true);
   stopAgentMock = vi.fn(() => Effect.void);
+  shouldPreservePipelineVerdictsMock = vi.fn(async () => ({
+    preserve: false,
+    reason: 'no pipeline verdicts are recorded',
+  }));
+  resetPipelineVerdictsForWorkStartMock = vi.fn(() => null);
+  setReviewStatusMock = vi.fn();
+  resetPostMergeStateMock = vi.fn();
   resolveHarnessMock = vi.fn(async ({ explicit, model }: { explicit?: string; model: string }) => {
     if (explicit) return explicit;
     if (model === 'gpt-5.5') return 'codex';
@@ -151,6 +162,17 @@ function mockSpawnDependencies(): void {
     emitActivityEntrySync: vi.fn(),
     emitActivityTtsSync: vi.fn(),
   }));
+  vi.doMock('../cloister/verdict-preservation.js', () => ({
+    shouldPreservePipelineVerdicts: shouldPreservePipelineVerdictsMock,
+  }));
+  vi.doMock('../review-status.js', async (importOriginal) => ({
+    ...((await importOriginal()) as typeof import('../review-status.js')),
+    resetPipelineVerdictsForWorkStartSync: resetPipelineVerdictsForWorkStartMock,
+    setReviewStatusSync: setReviewStatusMock,
+  }));
+  vi.doMock('../cloister/merge-agent.js', () => ({
+    resetPostMergeState: resetPostMergeStateMock,
+  }));
   vi.doMock('../cloister/work-agent-prompt.js', () => ({
     writeStoryFeatureContext: vi.fn(async () => undefined),
   }));
@@ -237,6 +259,9 @@ afterEach(() => {
   vi.doUnmock('../workspace/stack-health.js');
   vi.doUnmock('../xbrief/io.js');
   vi.doUnmock('../activity-logger.js');
+  vi.doUnmock('../cloister/verdict-preservation.js');
+  vi.doUnmock('../review-status.js');
+  vi.doUnmock('../cloister/merge-agent.js');
   vi.doUnmock('../cloister/work-agent-prompt.js');
   vi.doUnmock('../config-yaml.js');
   vi.doUnmock('../claude-auth.js');
@@ -357,6 +382,91 @@ describe('spawnAgent PTY supervisor wiring', () => {
       `bash ${join(agentDir, 'launcher.sh')}`,
       expect.any(Object),
     );
+  });
+
+  it('preserves pipeline verdicts and post-merge state when the reviewed anchor is current', async () => {
+    writeSupervisorArtifact();
+    shouldPreservePipelineVerdictsMock.mockResolvedValue({
+      preserve: true,
+      reason: 'workspace HEAD matches the reviewed commit anchor',
+    });
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const { spawnAgent } = await import('../agents.js');
+
+    try {
+      await spawnAgent({
+        issueId: 'PAN-3110',
+        workspace,
+        role: 'work',
+        model: 'claude-sonnet-4-6',
+      });
+
+      expect(shouldPreservePipelineVerdictsMock).toHaveBeenCalledWith('PAN-3110', workspace);
+      expect(resetPipelineVerdictsForWorkStartMock).not.toHaveBeenCalled();
+      expect(setReviewStatusMock).not.toHaveBeenCalled();
+      expect(resetPostMergeStateMock).not.toHaveBeenCalled();
+      expect(logSpy).toHaveBeenCalledWith(
+        '[spawn] Preserved pipeline verdicts for PAN-3110 — workspace HEAD matches the reviewed commit anchor',
+      );
+    } finally {
+      logSpy.mockRestore();
+    }
+  });
+
+  it('refreshes the reviewed anchor while preserving verdicts after benign drift', async () => {
+    writeSupervisorArtifact();
+    const refreshedAnchor = 'b'.repeat(40);
+    shouldPreservePipelineVerdictsMock.mockResolvedValue({
+      preserve: true,
+      reason: 'workspace HEAD moved without changing the reviewed code',
+      refreshedAnchor,
+    });
+    const { spawnAgent } = await import('../agents.js');
+
+    await spawnAgent({
+      issueId: 'PAN-3110',
+      workspace,
+      role: 'work',
+      model: 'claude-sonnet-4-6',
+    });
+
+    expect(setReviewStatusMock).toHaveBeenCalledWith('PAN-3110', {
+      reviewedAtCommit: refreshedAnchor,
+    });
+    expect(resetPipelineVerdictsForWorkStartMock).not.toHaveBeenCalled();
+    expect(resetPostMergeStateMock).not.toHaveBeenCalled();
+  });
+
+  it('resets pipeline and post-merge state when reviewed code drifted', async () => {
+    writeSupervisorArtifact();
+    shouldPreservePipelineVerdictsMock.mockResolvedValue({
+      preserve: false,
+      reason: 'workspace code changed after review',
+    });
+    resetPipelineVerdictsForWorkStartMock.mockReturnValue({ issueId: 'PAN-3110' });
+    const { spawnAgent } = await import('../agents.js');
+
+    await spawnAgent({
+      issueId: 'PAN-3110',
+      workspace,
+      role: 'work',
+      model: 'claude-sonnet-4-6',
+    });
+
+    expect(resetPipelineVerdictsForWorkStartMock).toHaveBeenCalledWith('PAN-3110');
+    expect(resetPostMergeStateMock).toHaveBeenCalledWith('PAN-3110');
+  });
+
+  it('does not evaluate work-verdict preservation for non-work role spawns', async () => {
+    const { spawnRun } = await import('../agents.js');
+
+    await spawnRun('PAN-3110', 'review', {
+      workspace,
+      model: 'gpt-5.5',
+    });
+
+    expect(shouldPreservePipelineVerdictsMock).not.toHaveBeenCalled();
+    expect(resetPipelineVerdictsForWorkStartMock).not.toHaveBeenCalled();
   });
 
   it('pins and persists a fresh Claude work-agent session before hooks run', async () => {
