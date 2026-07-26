@@ -22,7 +22,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T08:56:03.309Z",
-  "updated": "2026-07-26T10:17:33.412Z",
+  "updated": "2026-07-26T10:21:42.523Z",
   "pipeline": {
     "issueId": "PAN-3115",
     "reviewStatus": "pending",
@@ -67,16 +67,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "gather-default-branch-resolution": {
-        "writerId": "agent-pan-3115",
-        "agentId": "agent-pan-3115",
-        "pid": 881846,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-26T10:17:33.412Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3115",
@@ -99,6 +91,17 @@
         "outcome": "completed",
         "reason": "Added git-toplevel preflight with realpath comparison so missing paths and unrelated parent repositories fail closed as repo_unavailable; added direct and integration fixture coverage.",
         "releasedAt": "2026-07-26T10:17:04.718Z"
+      },
+      {
+        "writerId": "agent-pan-3115",
+        "agentId": "agent-pan-3115",
+        "pid": 881846,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T10:17:33.412Z",
+        "itemId": "gather-default-branch-resolution",
+        "outcome": "completed",
+        "reason": "Added deterministic default-branch resolution from configured refs, origin HEAD, current HEAD, and main/master probes; snapshot commands now use the resolved branch with typed unresolved errors.",
+        "releasedAt": "2026-07-26T10:21:42.522Z"
       }
     ],
     "statusReasons": {
@@ -109,6 +112,10 @@
       "gather-repo-preflight": {
         "reason": "Added git-toplevel preflight with realpath comparison so missing paths and unrelated parent repositories fail closed as repo_unavailable; added direct and integration fixture coverage.",
         "updatedAt": "2026-07-26T10:17:04.718Z"
+      },
+      "gather-default-branch-resolution": {
+        "reason": "Added deterministic default-branch resolution from configured refs, origin HEAD, current HEAD, and main/master probes; snapshot commands now use the resolved branch with typed unresolved errors.",
+        "updatedAt": "2026-07-26T10:21:42.522Z"
       }
     }
   },
@@ -121,6 +128,9 @@
     "gather-repo-preflight.gather-repo-preflight.ac1": "completed",
     "gather-repo-preflight.gather-repo-preflight.ac2": "completed",
     "gather-repo-preflight.gather-repo-preflight.ac3": "completed",
-    "gather-default-branch-resolution": "running"
+    "gather-default-branch-resolution": "completed",
+    "gather-default-branch-resolution.gather-default-branch-resolution.ac1": "completed",
+    "gather-default-branch-resolution.gather-default-branch-resolution.ac2": "completed",
+    "gather-default-branch-resolution.gather-default-branch-resolution.ac3": "completed"
   }
 }
