@@ -121,7 +121,7 @@
     "recordedAt": "2026-07-26T16:03:54.970Z"
   },
   "created": "2026-07-26T13:39:19.365Z",
-  "updated": "2026-07-26T16:04:59.085Z",
+  "updated": "2026-07-26T16:05:42.986Z",
   "pipeline": {
     "issueId": "PAN-3138",
     "reviewStatus": "pending",
@@ -134,7 +134,7 @@
     "reviewNotes": "Agent re-review request (1/25): Fixed all review findings: preserved retry ownership after eager teardown failure, revalidated canonical merged status before teardown, pruned stale retries, and removed duplicate Compose teardown.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3143",
     "lastVerifiedCommit": "f0a9c2b38faee0a59137c9b52a78bae5bafc1ae0",
-    "reviewRequestedAt": "2026-07-26T16:03:55.877Z",
+    "reviewRequestedAt": "2026-07-26T16:05:42.563Z",
     "reviewSpawnedAt": "2026-07-26T16:04:00.157Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -175,7 +175,8 @@
         "tests/unit/lib/review-status.test.ts"
       ],
       "recordedAt": "2026-07-26T16:03:54.970Z"
-    }
+    },
+    "panDoneRecoveredAt": "2026-07-26T16:05:42.563Z"
   },
   "closeOut": {
     "usage": {
