@@ -46,7 +46,7 @@
     "recordedAt": "2026-07-26T20:34:03.489Z"
   },
   "created": "2026-07-26T19:16:39.648Z",
-  "updated": "2026-07-26T20:34:14.303Z",
+  "updated": "2026-07-26T20:34:34.019Z",
   "pipeline": {
     "issueId": "PAN-3155",
     "reviewStatus": "pending",
@@ -57,7 +57,7 @@
     "readyForMerge": false,
     "updatedAt": "2026-07-26T20:34:13.971Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3160",
-    "reviewRequestedAt": "2026-07-26T20:34:05.953Z",
+    "reviewRequestedAt": "2026-07-26T20:34:33.677Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "tests/unit/dashboard/server/routes/issue-discussions.test.ts"
@@ -87,7 +87,8 @@
         "tests/unit/lib/lifecycle/workflows.test.ts"
       ],
       "recordedAt": "2026-07-26T20:34:03.489Z"
-    }
+    },
+    "panDoneRecoveredAt": "2026-07-26T20:34:33.677Z"
   },
   "closeOut": {
     "usage": {
