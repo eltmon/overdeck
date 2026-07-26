@@ -6716,3 +6716,11 @@ Substrate bugs filed: 2897 2898 2899 2900 2901 2902 2907 2913 (8; ALL fixed and 
 - `verification_status` still `null` on PAN-3029/3051/3056 → close-outs correctly blocked; **zero `--accept-*` across 32 ticks**.
 - main **green** on `a52a00e600`; 19 agents; networks **19** (no reclaim needed). Not quiescent — no retrospective.
 - **LESSON: distinguish dispatch latency from a stall using the corrected predicate, not elapsed time.** MIN-858 reading `pending` looks identical to PAN-2997's orphan an hour ago. The difference is that PAN-2997 had a terminal prior-stage verdict and no agent for ~90 minutes; MIN-858 just finished a cycle. Same field value, different diagnosis — and the tick-25 predicate is what separates them.
+
+## RUN-70 tick 33 (2026-07-26 01:28Z) — applied the corrected orphan predicate; MIN-858 cleared as NOT an orphan
+- **Ran the tick-25 corrected predicate against MIN-858 rather than eyeballing it, and it cleared.** The row looks exactly like an orphan — `review=pending`, `test=pending`, with a terminal prior verdict (`verification_status: passed`) — but **`agent-min-858-test` is attached**, so this is an in-progress test cycle, not a dropped handoff. **The agent-list join is the whole predicate**; the DB row alone would have produced a false alarm and a needless `pan review restart` that destroyed a live cycle.
+- **MIN-902 unchanged and PAN-3092 confirmed still OPEN.** `agent-min-902-review` is attached and holding the lock that blocks its own verdict. Did not redispatch — that remains the one action that would destroy a good verdict to re-earn it.
+- **PAN-2997 at `review=passed test=passed`, verification pending**, agents attached — the tick-24 orphan recovery is holding through a full cycle.
+- `verification_status` still `null` on PAN-3029/3051/3056 → close-outs correctly blocked. **Zero `--accept-*` across 33 ticks.**
+- main green `a52a00e600`; live `77f78eda15`; 20 agents; networks **19**, no reclaim needed. Not quiescent — no retrospective.
+- **LESSON: a predicate is only as good as its cheapest-to-skip clause.** The "no agent attached" term is the one that takes an extra command, and it is the term doing all the work — without it the predicate matches ~60 backlog rows *and* live cycles like this one. The clause you are tempted to skip is usually the discriminating one.
