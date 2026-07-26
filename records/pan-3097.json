@@ -65,7 +65,7 @@
     "recordedAt": "2026-07-26T03:30:04.529Z"
   },
   "created": "2026-07-26T02:29:08.179Z",
-  "updated": "2026-07-26T03:34:18.381Z",
+  "updated": "2026-07-26T03:36:38.227Z",
   "pipeline": {
     "issueId": "PAN-3097",
     "reviewStatus": "passed",
@@ -74,7 +74,6 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "panDoneRecoveredAt": "2026-07-26T03:31:04.453Z",
     "updatedAt": "2026-07-26T03:34:18.373Z",
     "reviewNotes": "Approved: issue-title context and self-contained-question guidance satisfy all acceptance criteria with no blocking findings",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
