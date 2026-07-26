@@ -377,23 +377,24 @@
     "recordedAt": "2026-07-26T00:21:47.769Z"
   },
   "created": "2026-07-25T20:44:21.373Z",
-  "updated": "2026-07-26T00:25:50.430Z",
+  "updated": "2026-07-26T00:26:01.487Z",
   "pipeline": {
     "issueId": "PAN-3037",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "passed",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T00:22:04.323Z",
-    "updatedAt": "2026-07-26T00:25:48.921Z",
-    "reviewNotes": "Verification failed at test",
+    "updatedAt": "2026-07-26T00:26:01.422Z",
+    "reviewNotes": "Current main merge changes no PR-scoped feature code; 59 focused tests and all quality gates pass",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "All 5 ACs met: per-repo iteration with repoKey-prefixed paths, conflict abort leaves repo quiescent and skips remaining repos, aggregate alreadyUpToDate requires all repos current, monorepo keeps unprefixed single-element shape, abort returns cancellation + skipped entries. Extraction into sync-main-workspace.ts is logic-identical; baseline 1404 matches actual wc -l.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3079",
-    "reviewedAtCommit": "d9745b9dfc3e26cbcbc71cf229528c7d4f4dac3e",
+    "reviewedAtCommit": "be16726d7f6a0977a5cbe338826575bca3c0641a",
     "lastVerifiedCommit": "93ad317654fa305065e3cb80cc73f470c5817ed4",
     "reviewRequestedAt": "2026-07-26T00:22:04.323Z",
     "reviewSpawnedAt": "2026-07-26T00:25:48.920Z",
@@ -507,7 +508,7 @@
       },
       "costAtCloseOut": {
         "usd": 239.837314,
-        "pricingAsOf": "2026-07-26T00:25:49.188Z"
+        "pricingAsOf": "2026-07-26T00:26:01.476Z"
       }
     },
     "merges": [
