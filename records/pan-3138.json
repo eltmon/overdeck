@@ -269,15 +269,7 @@
       "timestamp": "2026-07-26T17:54:02.534Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-26T17:54:02Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-3138\n\n# Review Synthesis — PAN-3138 — 2026-07-26T17:53:00Z\n\n## Verdict: CHANGES REQUESTED — unvalidated lifecycle lock paths permit directory escape, and failed claimed runs can lose all retry ownership\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3138/.pan/review/agent-pan-3138-review-dcbf2cc1/context.json\n- Branch: feature/pan-3138\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3138\n- HEAD reviewed: dcbf2cc13eea0e22b227559a2601c3751f815f90\n- Cycle number: 6\n- Prior cycle SHA: 45c64d10937592faceea33d0a627c6e336c9c829\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3138/.pan/review/agent-pan-3138-review-dcbf2cc1/security.md | 1 |\n| correctness | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3138/.pan/review/agent-pan-3138-review-dcbf2cc1/correctness.md | 1 |\n| performance | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3138/.pan/review/agent-pan-3138-review-dcbf2cc1/performance.md | 0 |\n| requirements | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3138/.pan/review/agent-pan-3138-review-dcbf2cc1/requirements.md | 0 |\n\n## Blocking Findings\n\n### [security] Unvalidated issue IDs escape the lifecycle lock directory — `src/lib/cloister/post-merge-lifecycle-lock.ts:27`\nThe new lock constructs a filesystem path by interpolating the caller-provided issue ID into `join(lockDir, issueId + '.lock')` before merge verification. Traversal-bearing IDs can normalize outside the intended lock directory, allowing an authorized specialist-completion caller to create and remove a caller-selected lock path or delete a stale-PID lock file outside `${OVERDECK_HOME}/locks/post-merge-lifecycle`. The file is new in this cycle, so the finding is inside both the PR diff and cycle diff and survives the cycle-6 convergence gate. Validate at the route and lock boundary, derive a guaranteed single-segment lock filename, assert containment, and add traversal regression tests.\n\n### [correctness] A failed claimed lifecycle can still lose all retry ownership — `src/dashboard/server/pending-lifecycle.ts:139`\nThe new atomic claim prevents concurrent dashboard and Deacon execution, but the dashboard unconditionally discards the claimed artifact in `finally` when the lifecycle runner fails. The durable `mergeStep: 'post-merge-cleanup'` marker is only best-effort: if its write fails and the claimed run later rejects, the claim is deleted and Deacon has no canonical marker from which to queue another attempt. The issue can therefore remain permanently stranded with neither retry owner. This failure behavior was introduced in the current cycle, so it survives the convergence gate. Restore the claim to the canonical pending path on failure unless durable retry ownership is positively verified, and add a missing-marker retry regression test.\n\n## Non-blocking Findings\n\n### [correctness] The at-most-once completion check is outside the cross-process lock — `src/lib/cloister/merge-agent.ts:309`\nA contender can read an incomplete marker before waiting for the lock, acquire ownership after the first process records completion, and then execute the lifecycle again because completion is not rechecked inside the critical section. Recheck canonical `mergeStep` immediately after acquiring the lock and cover the waiting-contender transition.\n\n### [performance] Pending lifecycle execution now serially delays the remaining dashboard bootstrap — `src/dashboard/server/pending-lifecycle.ts:128`\n`processPendingLifecycle()` now awaits both the delay and the complete lifecycle while dashboard startup awaits the function. Slow Docker, tracker, or session operations can defer Deacon recovery and later post-listen bootstrap work for minutes. Keep the atomic claim held, but run the lifecycle as a supervised background promise whose own `finally` releases or restores the claim.\n\n## Clean Sub-roles\n- requirements\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3138/.pan/review/agent-pan-3138-review-dcbf2cc1/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3138 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "scripts/file-size-baseline.txt",
@@ -361,7 +353,7 @@
     "recordedAt": "2026-07-26T18:42:41.042Z"
   },
   "created": "2026-07-26T13:39:19.365Z",
-  "updated": "2026-07-26T18:42:46.124Z",
+  "updated": "2026-07-26T18:42:47.094Z",
   "pipeline": {
     "issueId": "PAN-3138",
     "reviewStatus": "pending",
