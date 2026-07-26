@@ -27,22 +27,9 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-26T22:50:51.586Z"
-    },
-    {
-      "reason": "feedback",
-      "note": "[2026-07-26T22:58Z] review-agent → CHANGES-REQUESTED — seq 1",
-      "timestamp": "2026-07-26T22:58:20.152Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-26T22:58:20Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-3162\n\nPR HEAD is unchanged and still contains both prior correctness blockers; the uncommitted rework also leaves a reverse merge-set lost-update race\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3162 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "src/dashboard/server/routes/workspaces/__tests__/merge-ops-polyrepo-completeness.test.ts",
@@ -91,7 +78,7 @@
     "recordedAt": "2026-07-26T22:02:33.712Z"
   },
   "created": "2026-07-26T20:52:58.018Z",
-  "updated": "2026-07-26T22:58:20.152Z",
+  "updated": "2026-07-26T22:58:27.402Z",
   "pipeline": {
     "issueId": "PAN-3162",
     "reviewStatus": "blocked",
