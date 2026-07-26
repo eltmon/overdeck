@@ -167,7 +167,7 @@
     "recordedAt": "2026-07-26T00:59:07.168Z"
   },
   "created": "2026-07-25T21:12:36.630Z",
-  "updated": "2026-07-26T00:59:29.949Z",
+  "updated": "2026-07-26T01:00:25.592Z",
   "pipeline": {
     "issueId": "PAN-3076",
     "reviewStatus": "pending",
@@ -183,7 +183,7 @@
     "prUrl": "https://github.com/eltmon/overdeck/pull/3082",
     "reviewedAtCommit": "f909f3d177827021a7b3463d93fadf30b252ceb4",
     "lastVerifiedCommit": "241e1f76bf1b9dd068e30765ff568e91a561488a",
-    "reviewRequestedAt": "2026-07-26T00:59:08.084Z",
+    "reviewRequestedAt": "2026-07-26T01:00:25.237Z",
     "reviewSpawnedAt": "2026-07-26T00:59:13.085Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -255,7 +255,8 @@
         "tests/unit/lib/workspace-anchor-drift.test.ts"
       ],
       "recordedAt": "2026-07-26T00:59:07.168Z"
-    }
+    },
+    "panDoneRecoveredAt": "2026-07-26T01:00:25.237Z"
   },
   "closeOut": {
     "usage": {
