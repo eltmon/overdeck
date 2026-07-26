@@ -4,17 +4,17 @@
     "created": "2026-07-26T12:37:36Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3128: Deploys build from the mutable primary worktree — a restart can ship whatever is uncommitted at build time",
-    "updated": "2026-07-26T12:46:13.324Z"
+    "updated": "2026-07-26T12:46:56.141Z"
   },
   "plan": {
     "id": "pan-3128",
     "title": "Deploys build from the mutable primary worktree — a restart can ship whatever is uncommitted at build time",
-    "status": "proposed",
+    "status": "approved",
     "uid": "d95839ed-0d76-4c06-b56a-96ff18b61005",
     "author": "agent:k3[1m]",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-07-26T12:37:36Z",
-    "updated": "2026-07-26T12:46:13.324Z",
+    "updated": "2026-07-26T12:46:56.141Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3128",
@@ -378,5 +378,5 @@
       "canonicalFilename": "2026-07-26-PAN-3128-deploys-build-from-the-mutable-primary-worktree-a-restart-can-ship-whatever-is-uncommitted-at-build-time.xbrief.json"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
