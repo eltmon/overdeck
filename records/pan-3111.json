@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T12:26:09.908Z",
-  "updated": "2026-07-26T13:18:13.812Z",
+  "updated": "2026-07-26T13:18:23.971Z",
   "pipeline": {
     "issueId": "PAN-3111",
     "reviewStatus": "pending",
@@ -61,8 +61,16 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 6,
-    "claims": {},
+    "sequence": 7,
+    "claims": {
+      "persist-flywheel-run-id": {
+        "writerId": "agent-pan-3111",
+        "agentId": "agent-pan-3111",
+        "pid": 2185996,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T13:18:23.970Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3111",
@@ -124,6 +132,7 @@
     "gate-orphan-proposed-reconciler.gate-orphan-proposed-reconciler.ac3": "completed",
     "gate-reactive-work-dispatch": "completed",
     "gate-reactive-work-dispatch.gate-reactive-work-dispatch.ac1": "completed",
-    "gate-reactive-work-dispatch.gate-reactive-work-dispatch.ac2": "completed"
+    "gate-reactive-work-dispatch.gate-reactive-work-dispatch.ac2": "completed",
+    "persist-flywheel-run-id": "running"
   }
 }
