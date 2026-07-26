@@ -40,7 +40,7 @@ import { _serverManagedMerges } from '../specialists.js';
 import { completePendingOperation, getPendingOperation, getProjectPath, getWorkspaceInfoForIssue, readJsonBody, setPendingOperation, setReviewStatus } from '../workspaces.js';
 import { buildLocalMainRecoveryError } from './git-recovery-advice.js';
 import { internalStrikeMergeRoute } from './internal-strike-merge.js';
-import { activeStrikeMerge, ensureAgentReadyForMerge, mergeCompletionStatus, mergeVerificationOptions, normalMergeEligibility, recordCiGreenVerificationVerdict, validateStrikeMergeRequest, type StrikeMergeRequest, type TriggerMergeRequest, type TriggerMergeResult } from './merge-strike.js';
+import { activeStrikeMerge, mergeCompletionStatus, mergeVerificationOptions, normalMergeEligibility, rebaseWithAgentFallback, recordCiGreenVerificationVerdict, validateStrikeMergeRequest, type StrikeMergeRequest, type TriggerMergeRequest, type TriggerMergeResult } from './merge-strike.js';
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
 export const shouldBlockApproveForDirtyStatus = (status: string): boolean =>
@@ -71,7 +71,8 @@ export async function isBranchAlreadyRebased(
       { cwd: workspacePath, encoding: 'utf-8', timeout: 5000 }
     );
     return { alreadyRebased: true, currentHead: currentHead.trim() };
-  } catch {
+  } catch (error) {
+    console.warn(`[merge] Could not determine whether ${branchName} contains origin/${targetBranch}: ${error instanceof Error ? error.message : String(error)}`);
     return { alreadyRebased: false };
   }
 }
@@ -901,7 +902,7 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
     const { postMergeLifecycle } = await import(
       '../../../../lib/cloister/merge-agent.js'
     );
-    let rebaseResult: { success: boolean; reason?: string; conflictFiles?: string[]; newHead?: string };
+    let rebaseResult: { success: boolean; reason?: string; conflictFiles?: string[]; newHead?: string; retryable?: boolean } | undefined;
     const canMergeCleanPrDirectly = preMergePrState?.mergeable === true && preMergePrState.mergeableState === 'clean' && !preMergePrState.checksFailed && !preMergePrState.checksPending && !preMergePrState.draft && !preMergePrState.merged;
 
     if (canMergeCleanPrDirectly) {
@@ -931,67 +932,21 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
         console.log(`[merge] ${branchName} already contains origin/${targetBranch} — skipping rebase request for ${issueId}`);
         rebaseResult = { success: true, newHead: currentHead };
       } else {
-        try {
-          const recovery = await ensureAgentReadyForMerge(issueId, workspacePath, rebaseMsg, {
-            agentId,
-            allowFreshStart: request.kind !== 'strike',
-          });
-          console.log(`[merge] ${recovery.detail}`);
-
-          // Poll for the push: check if remote HEAD changed
-          const { stdout: headBefore } = await execAsync(
-            `git rev-parse origin/${branchName} 2>/dev/null || echo NONE`,
-            { cwd: workspacePath, encoding: 'utf-8', timeout: 10000 }
-          );
-
-          const REBASE_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes — complex rebases with conflicts need time
-          const POLL_INTERVAL_MS = 5000;
-          const startTime = Date.now();
-          let newHead: string | null = null;
-
-          while (Date.now() - startTime < REBASE_TIMEOUT_MS) {
-            await new Promise(r => setTimeout(r, POLL_INTERVAL_MS));
-
-            try {
-              await execAsync('git fetch origin', { cwd: workspacePath, encoding: 'utf-8', timeout: 15000 });
-              const { stdout: headNow } = await execAsync(
-                `git rev-parse origin/${branchName}`,
-                { cwd: workspacePath, encoding: 'utf-8', timeout: 5000 }
-              );
-              if (headNow.trim() !== headBefore.trim()) {
-                newHead = headNow.trim();
-                console.log(`[merge] Work agent pushed rebased branch for ${issueId} (new HEAD: ${newHead.slice(0, 8)})`);
-                break;
-              }
-            } catch { /* fetch failed, retry */ }
-
-            if (!await Effect.runPromise(sessionExists(agentId))) {
-              console.log(`[merge] Work agent ${agentId} stopped during rebase`);
-              break;
-            }
-          }
-
-          if (newHead) {
-            rebaseResult = { success: true, newHead };
-          } else if (!await Effect.runPromise(sessionExists(agentId))) {
-            rebaseResult = {
-              success: false,
-              reason: `Work agent ${agentId} stopped before completing the rebase onto ${targetBranch}`,
-            };
-          } else {
-            rebaseResult = { success: false, reason: `Work agent did not push the rebased branch within ${REBASE_TIMEOUT_MS / 60000} minutes` };
-          }
-        } catch (recoveryErr: any) {
-          rebaseResult = {
-            success: false,
-            reason: recoveryErr.message || `Work agent ${agentId} could not be prepared for merge`,
-          };
-        }
+        rebaseResult = await rebaseWithAgentFallback({
+          issueId, workspacePath, branchName, targetBranch, agentId, rebaseMsg,
+          allowFreshStart: request.kind !== 'strike',
+        });
       }
     }
 
+    if (!rebaseResult) throw new Error(`Rebase escalation produced no result for ${issueId}`);
     if (!rebaseResult.success) {
       const error = rebaseResult.reason || 'Rebase failed';
+      if (rebaseResult.retryable) {
+        setReviewStatus(issueId, { mergeStatus: 'queued', mergeNotes: error });
+        completePendingOperation(issueId, error);
+        return { success: false, statusCode: 500, error, retryable: true };
+      }
       setReviewStatus(issueId, { mergeStatus: 'failed', mergeNotes: error, readyForMerge: false });
       completePendingOperation(issueId, error);
 

@@ -128,6 +128,14 @@ vi.mock('../merge-strike.js', () => ({
   mergeCompletionStatus: vi.fn(() => ({})),
   mergeVerificationOptions: vi.fn(() => ({})),
   normalMergeEligibility: vi.fn(() => null),
+  rebaseWithAgentFallback: vi.fn(async () => {
+    try {
+      await mocks.ensureAgentReadyForMerge();
+      return { success: true, newHead: HEAD_SHA };
+    } catch (error) {
+      return { success: false, reason: error instanceof Error ? error.message : String(error), retryable: true };
+    }
+  }),
   recordCiGreenVerificationVerdict: mocks.recordCiGreenVerificationVerdict,
   validateStrikeMergeRequest: vi.fn(() => null),
 }));
