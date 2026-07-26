@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T12:33:18.311Z",
-  "updated": "2026-07-26T15:05:55.648Z",
+  "updated": "2026-07-26T15:17:30.385Z",
   "pipeline": {
     "issueId": "PAN-3093",
     "reviewStatus": "pending",
@@ -55,16 +55,8 @@
   "harness": "claude-code",
   "model": "claude-opus-5",
   "tasks": {
-    "sequence": 15,
-    "claims": {
-      "docs-polyrepo-uat": {
-        "writerId": "agent-pan-3093",
-        "agentId": "agent-pan-3093",
-        "pid": 2523505,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-26T15:05:55.648Z"
-      }
-    },
+    "sequence": 16,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3093",
@@ -142,6 +134,17 @@
         "outcome": "completed",
         "reason": "Per-repo teardown via optional removeRepoArtifacts/removeGenerationResidue hooks (presence-selected, same as promote); buildPolyrepoCleanupGit sweeps the generation branch from every configured repo to catch hold-out-dropped repos; wrapper folder removal validated by safeGenerationWorktreePath. Verified MYN's devcontainer template already expects the <folder>/<repoKey> layout — no template gap. 8 new tests.",
         "releasedAt": "2026-07-26T15:05:46.258Z"
+      },
+      {
+        "writerId": "agent-pan-3093",
+        "agentId": "agent-pan-3093",
+        "pid": 2523505,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T15:05:55.648Z",
+        "itemId": "docs-polyrepo-uat",
+        "outcome": "completed",
+        "reason": "Added Polyrepo generations section to UAT-BATCH-TRAINS.md, eligibility note to MERGE-TRAIN.md, user-facing multi-repo section to merge-batches.mdx, and polyrepo hazards to the TRACKED codebase map (.overdeck/, not the gitignored .pan/ path the PRD named). ORDER-BOOKS.md checked - no single-repo UAT reference existed, left unchanged. Both docs ACs verified by grep.",
+        "releasedAt": "2026-07-26T15:17:30.385Z"
       }
     ],
     "statusReasons": {
@@ -172,6 +175,10 @@
       "per-repo-teardown": {
         "reason": "Per-repo teardown via optional removeRepoArtifacts/removeGenerationResidue hooks (presence-selected, same as promote); buildPolyrepoCleanupGit sweeps the generation branch from every configured repo to catch hold-out-dropped repos; wrapper folder removal validated by safeGenerationWorktreePath. Verified MYN's devcontainer template already expects the <folder>/<repoKey> layout — no template gap. 8 new tests.",
         "updatedAt": "2026-07-26T15:05:46.258Z"
+      },
+      "docs-polyrepo-uat": {
+        "reason": "Added Polyrepo generations section to UAT-BATCH-TRAINS.md, eligibility note to MERGE-TRAIN.md, user-facing multi-repo section to merge-batches.mdx, and polyrepo hazards to the TRACKED codebase map (.overdeck/, not the gitignored .pan/ path the PRD named). ORDER-BOOKS.md checked - no single-repo UAT reference existed, left unchanged. Both docs ACs verified by grep.",
+        "updatedAt": "2026-07-26T15:17:30.385Z"
       }
     }
   },
@@ -203,6 +210,8 @@
     "per-repo-teardown": "completed",
     "per-repo-teardown.per-repo-teardown.ac1": "completed",
     "per-repo-teardown.per-repo-teardown.ac2": "completed",
-    "docs-polyrepo-uat": "running"
+    "docs-polyrepo-uat": "completed",
+    "docs-polyrepo-uat.docs-polyrepo-uat.ac1": "completed",
+    "docs-polyrepo-uat.docs-polyrepo-uat.ac2": "completed"
   }
 }
