@@ -136,14 +136,20 @@ export function parsePaneChoiceMenu(paneText: string): PaneChoiceMenu | null {
   if (!paneText) return null
   const lines = paneText.split('\n').map(cleanLine)
 
+  // tmux pads the capture with blank filler to the pane's full height — anchor
+  // all scanning at the last non-blank line, not the physical end.
+  let end = lines.length - 1
+  while (end >= 0 && lines[end]!.trim() === '') end -= 1
+  if (end < 0) return null
+
   // Find the last line that parses as a numbered option — the candidate
   // menu's final row — then walk upward collecting the contiguous option run.
   let lastOption = -1
-  for (let i = lines.length - 1; i >= 0; i -= 1) {
+  for (let i = end; i >= 0; i -= 1) {
     if (parseOptionLine(lines[i]!)) { lastOption = i; break }
     // Don't scan the whole scrollback: menus are current-surface UI, so only
     // look back through what trailing chrome we would accept anyway.
-    if (lines.length - 1 - i > MAX_TRAILING_LINES + MAX_OPTIONS) break
+    if (end - i > MAX_TRAILING_LINES + MAX_OPTIONS) break
   }
   if (lastOption < 0) return null
 

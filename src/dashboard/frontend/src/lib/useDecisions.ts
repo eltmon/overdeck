@@ -24,6 +24,7 @@ import {
 } from './store';
 import { fetchWithTimeout } from './apiFetch';
 import { formatIssueRef } from './issueLabel';
+import type { PendingPaneChoice } from './paneChoice';
 
 /** A conversation with an open blocking surface, as served by the REST door. */
 export interface ConversationPendingInputRow {
@@ -33,6 +34,8 @@ export interface ConversationPendingInputRow {
   pendingInputKinds?: ReadonlyArray<string>;
   pendingAskUserQuestion?: PendingInputSubject['pendingAskUserQuestion'];
   pendingProposedPlan?: PendingInputSubject['pendingProposedPlan'];
+  /** PAN-3113 — a blocking numbered-choice menu parsed from the pane. */
+  pendingPaneChoice?: PendingPaneChoice;
 }
 
 export type DecisionSource = 'agent' | 'conversation';
@@ -48,6 +51,8 @@ export interface Decision {
   kinds: ReadonlyArray<string>;
   pendingAskUserQuestion?: PendingInputSubject['pendingAskUserQuestion'];
   pendingProposedPlan?: PendingInputSubject['pendingProposedPlan'];
+  /** PAN-3113 — parsed pane choice menu, present on the paneChoice kind. */
+  pendingPaneChoice?: PendingPaneChoice;
   /** Oldest blocking timestamp — drives ordering and the age column. */
   since: string;
   /**
@@ -74,6 +79,9 @@ const BLOCKING_KINDS = new Set([
   'askUserQuestion',
   'rateLimit',
   'sessionResume',
+  // A pane choice menu (session-resume gate et al.) owns the session's input
+  // loop — nothing advances until a human picks an option.
+  'paneChoice',
   'agentTurnEnded',
   'permissionRequest',
 ]);
@@ -113,6 +121,7 @@ export function usePendingInputSubjects(): PendingInputSubject[] {
         : [
             ...(c.pendingAskUserQuestion ? ['askUserQuestion'] : []),
             ...(c.pendingProposedPlan ? ['exitPlanMode'] : []),
+            ...(c.pendingPaneChoice ? ['paneChoice'] : []),
           ];
       if (kinds.length === 0) continue;
       out.push({
@@ -175,6 +184,7 @@ export function useDecisions(): Decision[] {
         : [
             ...(c.pendingAskUserQuestion ? ['askUserQuestion'] : []),
             ...(c.pendingProposedPlan ? ['exitPlanMode'] : []),
+            ...(c.pendingPaneChoice ? ['paneChoice'] : []),
           ];
       if (kinds.length === 0) continue;
       const issueTitle = c.issueId ? titleByIssueId.get(c.issueId) : undefined;
@@ -187,6 +197,7 @@ export function useDecisions(): Decision[] {
         kinds,
         pendingAskUserQuestion: c.pendingAskUserQuestion,
         pendingProposedPlan: c.pendingProposedPlan,
+        pendingPaneChoice: c.pendingPaneChoice,
         since: c.pendingAskUserQuestion?.askedAt ?? c.pendingProposedPlan?.askedAt ?? '',
         blocking: isBlockingDecision(kinds),
       });

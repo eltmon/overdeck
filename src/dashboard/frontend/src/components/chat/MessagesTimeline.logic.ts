@@ -9,6 +9,7 @@
  */
 
 import type { ChatMessage, CompactBoundary, ProposedPlan, WorkLogEntry } from './chat-types';
+import type { AnsweredPaneChoice, PendingPaneChoice } from '../../lib/paneChoice';
 
 // ─── Timeline entry types ─────────────────────────────────────────────────────
 
@@ -38,6 +39,20 @@ export type MessagesTimelineRow =
       id: string;
       createdAt: string;
       plan: ProposedPlan;
+    }
+  | {
+      /** PAN-3113 — a live blocking choice menu parsed from the conversation's pane. */
+      kind: 'pending-choice';
+      id: string;
+      createdAt: string;
+      choice: PendingPaneChoice;
+    }
+  | {
+      /** PAN-3113 — a pane choice the operator answered from the dashboard this mount. */
+      kind: 'answered-choice';
+      id: string;
+      createdAt: string;
+      answered: AnsweredPaneChoice;
     }
   | {
       kind: 'compact-boundary';
@@ -242,6 +257,12 @@ export function estimateMessagesTimelineRowHeight(
   if (row.kind === 'working') return 40;
   if (row.kind === 'compact-boundary') return 40;
   if (row.kind === 'compacting') return 40;
+  if (row.kind === 'answered-choice') return 48;
+  if (row.kind === 'pending-choice') {
+    const contextLines = Math.min(row.choice.contextLines.length, 4);
+    const optionLines = row.choice.options.length;
+    return 148 + contextLines * 20 + optionLines * 40;
+  }
   if (row.kind === 'proposed-plan') {
     const lines = Math.max(3, Math.ceil(row.plan.plan.length / 60));
     return 120 + lines * 20;

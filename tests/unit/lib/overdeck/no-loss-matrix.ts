@@ -168,6 +168,7 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'POST /api/conversations/:name/delete-image',               kind: 'http', disposition: 'RELOCATE',    door: 'ConversationRuntime.removeAttachment' },
   { surface: 'POST /api/conversations/:name/message',                    kind: 'http', disposition: 'RELOCATE',    door: 'ConversationRuntime.deliver' },
   { surface: 'POST /api/conversations/:id/codex-approval',               kind: 'http', disposition: 'RELOCATE',    door: 'ConversationRuntime.approve' },
+  { surface: 'POST /api/conversations/:id/pane-choice',                  kind: 'http', disposition: 'RELOCATE',    door: 'ConversationRuntime.answerPaneChoice (pane keystrokes; no durable state)' },
   { surface: 'POST /api/conversations/:name/delivery-method',            kind: 'http', disposition: 'RELOCATE',    door: 'ConversationRuntime.setDeliveryMethod' },
   { surface: 'POST /api/conversations/:name/thinking-level',             kind: 'http', disposition: 'WRITE',       door: 'ConversationWriter.setEffort + ConversationRuntime.controlChannel' },
   { surface: 'POST /api/conversations/:name/compact',                    kind: 'http', disposition: 'RELOCATE',    door: 'ConversationRuntime.controlChannel.compact' },
