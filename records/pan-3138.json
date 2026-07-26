@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T13:39:19.365Z",
-  "updated": "2026-07-26T13:57:31.560Z",
+  "updated": "2026-07-26T14:00:57.340Z",
   "pipeline": {
     "issueId": "PAN-3138",
     "reviewStatus": "pending",
@@ -43,18 +43,32 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "merge-time-network-teardown": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-3138",
         "agentId": "agent-pan-3138",
         "pid": 3737091,
         "host": "eltmon-z790",
-        "claimedAt": "2026-07-26T13:57:31.560Z"
+        "claimedAt": "2026-07-26T13:57:31.560Z",
+        "itemId": "merge-time-network-teardown",
+        "outcome": "completed",
+        "reason": "Added idempotent name-based Docker network teardown after the existing stop block, covered missing-workspace and non-fatal failure behavior, and audited the required merge-agent file-size growth.",
+        "releasedAt": "2026-07-26T14:00:57.340Z"
+      }
+    ],
+    "statusReasons": {
+      "merge-time-network-teardown": {
+        "reason": "Added idempotent name-based Docker network teardown after the existing stop block, covered missing-workspace and non-fatal failure behavior, and audited the required merge-agent file-size growth.",
+        "updatedAt": "2026-07-26T14:00:57.340Z"
       }
     }
   },
   "statusOverrides": {
-    "merge-time-network-teardown": "running"
+    "merge-time-network-teardown": "completed",
+    "merge-time-network-teardown.merge-time-network-teardown.ac1": "completed",
+    "merge-time-network-teardown.merge-time-network-teardown.ac2": "completed",
+    "merge-time-network-teardown.merge-time-network-teardown.ac3": "completed"
   }
 }
