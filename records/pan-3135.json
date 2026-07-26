@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T12:24:46.201Z",
-  "updated": "2026-07-26T13:05:48.496Z",
+  "updated": "2026-07-26T13:18:17.787Z",
   "pipeline": {
     "issueId": "PAN-3135",
     "reviewStatus": "pending",
@@ -61,16 +61,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "merge-ops-deferred-handling": {
-        "writerId": "agent-pan-3135",
-        "agentId": "agent-pan-3135",
-        "pid": 1760559,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-26T13:05:48.496Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3135",
@@ -104,6 +96,17 @@
         "outcome": "completed",
         "reason": "Stopped both review pipeline flows on deferred verification, completed pending operations with the queue reason, and covered callback/no-callback behavior",
         "releasedAt": "2026-07-26T13:05:37.645Z"
+      },
+      {
+        "writerId": "agent-pan-3135",
+        "agentId": "agent-pan-3135",
+        "pid": 1760559,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T13:05:48.496Z",
+        "itemId": "merge-ops-deferred-handling",
+        "outcome": "completed",
+        "reason": "Added retriable post-rebase deferral with ship-log evidence and merge-state restoration; a second fix commit moved side effects into a tested helper after the file-size pre-push ratchet rejected route growth",
+        "releasedAt": "2026-07-26T13:18:17.787Z"
       }
     ],
     "statusReasons": {
@@ -118,6 +121,10 @@
       "request-review-deferred-handling": {
         "reason": "Stopped both review pipeline flows on deferred verification, completed pending operations with the queue reason, and covered callback/no-callback behavior",
         "updatedAt": "2026-07-26T13:05:37.645Z"
+      },
+      "merge-ops-deferred-handling": {
+        "reason": "Added retriable post-rebase deferral with ship-log evidence and merge-state restoration; a second fix commit moved side effects into a tested helper after the file-size pre-push ratchet rejected route growth",
+        "updatedAt": "2026-07-26T13:18:17.787Z"
       }
     }
   },
@@ -136,6 +143,8 @@
     "request-review-deferred-handling.request-review-deferred-handling.ac1": "completed",
     "request-review-deferred-handling.request-review-deferred-handling.ac2": "completed",
     "request-review-deferred-handling.request-review-deferred-handling.ac3": "completed",
-    "merge-ops-deferred-handling": "running"
+    "merge-ops-deferred-handling": "completed",
+    "merge-ops-deferred-handling.merge-ops-deferred-handling.ac1": "completed",
+    "merge-ops-deferred-handling.merge-ops-deferred-handling.ac2": "completed"
   }
 }
