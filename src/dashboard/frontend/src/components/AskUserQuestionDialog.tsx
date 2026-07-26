@@ -16,6 +16,7 @@
  */
 import { useState } from 'react'
 import { Loader2, MessageCircleQuestion, Minus } from 'lucide-react'
+import { formatIssueRef } from '../lib/issueLabel'
 import { bucketCount, capture } from '../lib/telemetry'
 
 /**
@@ -27,6 +28,8 @@ export interface AskUserQuestionSubject {
   id: string
   /** Optional — agent.issueId or conv.issueId. Displayed in the header. */
   issueId?: string | null
+  /** Tracker issue title resolved through the issues read door. */
+  issueTitle?: string | null
   /** Display label — 'Agent' or 'Conversation'. Falls back to 'Subject'. */
   kindLabel?: string
   /** Optional human-readable title (e.g. conversation title) shown under the id. */
@@ -71,9 +74,8 @@ export function AskUserQuestionDialog({
 
   if (!isOpen || !agent || !pending || questions.length === 0) return null
 
-  // Prefer a human title (conversation title) over the raw id; keep the id as a
-  // secondary mono line. PAN-1520 — operators reported the bare conv-<ts> id.
-  const displayName = agent.title?.trim() || agent.id
+  const issueRef = formatIssueRef(agent.issueId, agent.issueTitle)
+  const displayName = issueRef ?? (agent.title?.trim() || agent.id)
   const allSelected = selections.length === questions.length && selections.every((s) => s.length > 0)
   const canSubmit = allSelected || customText.trim().length > 0
 
@@ -130,10 +132,12 @@ export function AskUserQuestionDialog({
                 <p className="mt-1 text-sm font-medium text-foreground">{agent.title}</p>
               ) : null}
             </div>
-            <div>
-              <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Issue</p>
-              <p className="font-mono text-sm text-foreground">{agent.issueId ?? 'Unknown'}</p>
-            </div>
+            {issueRef ? (
+              <div>
+                <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Issue</p>
+                <p className="font-mono text-sm text-foreground">{issueRef}</p>
+              </div>
+            ) : null}
           </div>
 
           {questions.map((q, qIdx) => (
