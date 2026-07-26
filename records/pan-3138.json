@@ -37,7 +37,11 @@
   "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
-      "scripts/file-size-baseline.txt"
+      "scripts/file-size-baseline.txt",
+      "src/lib/cloister/review-status-source.ts",
+      "src/lib/review-status-read.ts",
+      "src/lib/review-status.ts",
+      "tests/unit/lib/review-status.test.ts"
     ],
     "declaredScopeUntouched": [],
     "declaredScope": [
@@ -57,14 +61,18 @@
       "src/lib/cloister/__tests__/closed-issue-reaper.test.ts",
       "src/lib/cloister/closed-issue-reaper.ts",
       "src/lib/cloister/merge-agent.ts",
+      "src/lib/cloister/review-status-source.ts",
+      "src/lib/review-status-read.ts",
+      "src/lib/review-status.ts",
       "src/lib/workspace/__tests__/rebuild-stack.test.ts",
       "src/lib/workspace/rebuild-stack.ts",
-      "tests/unit/lib/cloister/postmerge-cleanup-async.test.ts"
+      "tests/unit/lib/cloister/postmerge-cleanup-async.test.ts",
+      "tests/unit/lib/review-status.test.ts"
     ],
-    "recordedAt": "2026-07-26T14:39:52.370Z"
+    "recordedAt": "2026-07-26T15:10:38.144Z"
   },
   "created": "2026-07-26T13:39:19.365Z",
-  "updated": "2026-07-26T15:10:35.040Z",
+  "updated": "2026-07-26T15:10:38.145Z",
   "pipeline": {
     "issueId": "PAN-3138",
     "reviewStatus": "reviewing",
