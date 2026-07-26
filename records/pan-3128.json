@@ -177,8 +177,15 @@
   "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
+      "src/cli/commands/__tests__/dashboard-cwd-guard.test.ts",
+      "src/cli/commands/__tests__/reload-health-timeout.integration.test.ts",
       "src/cli/commands/__tests__/reload.test.ts",
-      "tests/unit/dashboard/identity.test.ts"
+      "src/cli/commands/restart.ts",
+      "src/lib/deploy/active-dashboard-bundle.ts",
+      "src/lib/platform-lifecycle.ts",
+      "tests/unit/dashboard/identity.test.ts",
+      "tests/unit/lib/deploy/active-dashboard-bundle.test.ts",
+      "tests/unit/lib/platform-lifecycle.test.ts"
     ],
     "declaredScopeUntouched": [],
     "declaredScope": [
@@ -199,22 +206,29 @@
       "docs/DEFINITION-OF-DONE.md",
       "docs/OVERDECK_DEV_SOP.md",
       "roles/flywheel.md",
+      "src/cli/commands/__tests__/dashboard-cwd-guard.test.ts",
+      "src/cli/commands/__tests__/reload-health-timeout.integration.test.ts",
       "src/cli/commands/__tests__/reload.test.ts",
       "src/cli/commands/reload.ts",
+      "src/cli/commands/restart.ts",
       "src/dashboard/server/tsdown.config.ts",
+      "src/lib/deploy/active-dashboard-bundle.ts",
       "src/lib/deploy/build-from-origin.ts",
       "src/lib/deploy/build-info.ts",
       "src/lib/lifecycle/dod-gate.ts",
+      "src/lib/platform-lifecycle.ts",
       "sync-sources/skills/pan-reload/SKILL.md",
       "tests/unit/dashboard/identity.test.ts",
+      "tests/unit/lib/deploy/active-dashboard-bundle.test.ts",
       "tests/unit/lib/deploy/build-from-origin.test.ts",
       "tests/unit/lib/deploy/build-info.test.ts",
-      "tests/unit/lib/lifecycle/dod-gate.test.ts"
+      "tests/unit/lib/lifecycle/dod-gate.test.ts",
+      "tests/unit/lib/platform-lifecycle.test.ts"
     ],
-    "recordedAt": "2026-07-26T13:30:54.544Z"
+    "recordedAt": "2026-07-26T18:09:43.613Z"
   },
   "created": "2026-07-26T12:24:12.648Z",
-  "updated": "2026-07-26T18:09:33.138Z",
+  "updated": "2026-07-26T18:09:43.615Z",
   "pipeline": {
     "issueId": "PAN-3128",
     "reviewStatus": "reviewing",
