@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T02:29:08.179Z",
-  "updated": "2026-07-26T03:30:04.531Z",
+  "updated": "2026-07-26T03:30:07.283Z",
   "pipeline": {
     "issueId": "PAN-3097",
     "reviewStatus": "pending",
@@ -20,7 +20,48 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T02:38:32.087Z"
+    "updatedAt": "2026-07-26T03:30:07.281Z",
+    "reviewRequestedAt": "2026-07-26T03:30:07.281Z",
+    "scopeDrift": {
+      "outsideDeclaredScope": [],
+      "declaredScopeUntouched": [],
+      "declaredScope": [
+        "docs/ASKUSERQUESTION-DASHBOARD.md",
+        "roles/plan.md",
+        "src/dashboard/frontend/src/App/hooks/usePendingInputDialogs.ts",
+        "src/dashboard/frontend/src/components/AskUserQuestionDialog.tsx",
+        "src/dashboard/frontend/src/components/DecisionsPanel.tsx",
+        "src/dashboard/frontend/src/components/__tests__/AskUserQuestionDialog.test.tsx",
+        "src/dashboard/frontend/src/components/__tests__/DecisionsPanel.test.tsx",
+        "src/dashboard/frontend/src/components/sessionFeed/SessionFeedSidebar.tsx",
+        "src/dashboard/frontend/src/components/sessionFeed/__tests__/SessionFeedSidebar.test.tsx",
+        "src/dashboard/frontend/src/lib/__tests__/issueLabel.test.ts",
+        "src/dashboard/frontend/src/lib/__tests__/useDecisions.test.ts",
+        "src/dashboard/frontend/src/lib/issueLabel.ts",
+        "src/dashboard/frontend/src/lib/useDecisions.ts",
+        "src/lib/cloister/prompts/planning.md",
+        "sync-sources/rules/ask-user-question-self-contained.md"
+      ],
+      "actualChangedFiles": [
+        "docs/ASKUSERQUESTION-DASHBOARD.md",
+        "roles/plan.md",
+        "src/dashboard/frontend/src/App/hooks/usePendingInputDialogs.ts",
+        "src/dashboard/frontend/src/components/AskUserQuestionDialog.tsx",
+        "src/dashboard/frontend/src/components/DecisionsPanel.tsx",
+        "src/dashboard/frontend/src/components/__tests__/AskUserQuestionDialog.test.tsx",
+        "src/dashboard/frontend/src/components/__tests__/DecisionsPanel.test.tsx",
+        "src/dashboard/frontend/src/components/sessionFeed/SessionFeedSidebar.tsx",
+        "src/dashboard/frontend/src/components/sessionFeed/__tests__/SessionFeedSidebar.test.tsx",
+        "src/dashboard/frontend/src/lib/__tests__/issueLabel.test.ts",
+        "src/dashboard/frontend/src/lib/__tests__/useDecisions.test.ts",
+        "src/dashboard/frontend/src/lib/issueLabel.ts",
+        "src/dashboard/frontend/src/lib/useDecisions.ts",
+        "src/lib/cloister/prompts/planning.md",
+        "sync-sources/rules/ask-user-question-self-contained.md"
+      ],
+      "recordedAt": "2026-07-26T03:30:04.529Z"
+    },
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3102"
   },
   "closeOut": {
     "usage": {
