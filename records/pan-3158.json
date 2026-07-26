@@ -12,6 +12,11 @@
       "timestamp": "2026-07-26T20:29:25.608Z",
       "reason": "start",
       "agentModel": "gpt-5.6-sol"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-26T20:49:01.177Z"
     }
   ],
   "feedback": [],
@@ -34,17 +39,18 @@
     "recordedAt": "2026-07-26T20:44:54.187Z"
   },
   "created": "2026-07-26T20:19:41.143Z",
-  "updated": "2026-07-26T20:48:37.033Z",
+  "updated": "2026-07-26T20:49:01.177Z",
   "pipeline": {
     "issueId": "PAN-3158",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "failed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T20:45:36.822Z",
-    "updatedAt": "2026-07-26T20:48:36.961Z",
+    "updatedAt": "2026-07-26T20:49:00.865Z",
+    "verificationNotes": "Verification FAILED at test (33582ms):\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-3158\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-3158/src/dashboard/frontend\n\n ❯ src/components/AwaitingMergePage.test.tsx (8 tests | 1 failed) 138ms\n     × renders the multi-project merge-train view above the per-issue rows (ac1) 18ms\n\n Test Files  1 failed | 8 passed (9)\n      Tests  1 failed | 169 passed (170)\n   Start at  16:48:51\n   Duration  3.82s (transform 5.82s, setup 1.78s, import 13.07s, tests 3.40s, environment 2.66s)\n\nNo test files found, exiting with code 0\n\n\n--- stderr ---\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  src/components/AwaitingMergePage.test.tsx > AwaitingMergePage merge train > renders the multi-project merge-train view above the per-issue rows (ac1)\nTestingLibraryElementError: Unable to find an element by: [data-testid=\"merge-train-project-myn\"]\n\nIgnored nodes: comments, script, style\n\u001b[36m<body>\u001b[39m\n  \u001b[36m<div>\u001b[39m\n    \u001b[36m<div\u001b[39m\n      \u001b[33mclass\u001b[39m=\u001b[32m\"flex-1 overflow-y-auto bg-background\"\u001b[39m\n    \u001b[36m>\u001b[39m\n      \u001b[36m<div\u001b[39m\n        \u001b[33mclass\u001b[39m=\u001b[32m\"max-w-5xl mx-auto p-6\"\u001b[39m\n      \u001b[36m>\u001b[39m\n        \u001b[36m<header\u001b[39m\n          \u001b[33mclass\u001b[39m=\u001b[32m\"mb-6\"\u001b[39m\n        \u001b[36m>\u001b[39m\n          \u001b[36m<div\u001b[39m\n            \u001b[33mclass\u001b[39m=\u001b[32m\"flex items-center gap-3 mb-1\"\u001b[39m\n          \u001b[36m>\u001b[39m\n            \u001b[36m<svg\u001b[39m\n              \u001b[33mclass\u001b[39m=\u001b[32m\"lucide lucide-git-merge w-6 h-6 text-primary\"\u001b[39m\n              \u001b[33mfill\u001b[39m=\u001b[32m\"none\"\u001b[39m\n              \u001b[33mheight\u001b[39m=\u001b[32m\"24\"\u001b[39m\n              \u001b[33mstro\n…(7213 chars elided)…\nsection precedes the merge …\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\ninclude: tests/**/*.test.ts, tests/**/*.spec.ts, src/**/__tests__/**/*.test.ts, packages/**/src/__tests__/**/*.test.ts, packages/effect-acp/src/**/*.test.ts\nexclude:  **/node_modules/**, **/dist/**, src/dashboard/frontend/**, **/*.slow.test.ts, tests/playwright/conversation-supervisor-uat.test.ts, src/dashboard/server/routes/__tests__/agents-switch-model.test.ts, src/dashboard/server/routes/__tests__/cloister-config.test.ts, src/dashboard/server/routes/__tests__/conversations-fork-recovery.test.ts, src/dashboard/server/routes/__tests__/operator-interventions.test.ts, src/dashboard/server/services/__tests__/issue-lifecycle.test.ts, tests/unit/lib/cloister/deacon-swarm-enumerate.test.ts, tests/unit/lib/cloister/deacon-swarm-hold.test.ts, tests/cli/commands/work/reopen.test.ts, tests/unit/cli/commands/pause.test.ts, tests/unit/lib/cloister/deacon-swarm-doneness.test.ts, tests/cli/commands/work/start-workspace-rollback.test.ts\n\n",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3161",
     "reviewRequestedAt": "2026-07-26T20:45:36.822Z",
     "reviewSpawnedAt": "2026-07-26T20:48:36.960Z",
@@ -70,6 +76,14 @@
   "closeOut": {
     "usage": {
       "byStage": {
+        "review": {
+          "openai/gpt-5.6-sol": {
+            "input": 467526,
+            "output": 2622,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
         "work": {
           "openai/gpt-5.6-sol": {
             "input": 358571,
@@ -81,15 +95,15 @@
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 358571,
-          "output": 22568,
+          "input": 826097,
+          "output": 25190,
           "cacheRead": 13434880,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 9.187335,
-        "pricingAsOf": "2026-07-26T20:48:37.000Z"
+        "usd": 11.603625,
+        "pricingAsOf": "2026-07-26T20:49:00.912Z"
       }
     },
     "merges": [
