@@ -134,17 +134,17 @@
     "recordedAt": "2026-07-26T22:01:26.872Z"
   },
   "created": "2026-07-26T17:27:17.644Z",
-  "updated": "2026-07-26T22:01:36.466Z",
+  "updated": "2026-07-26T22:03:44.637Z",
   "pipeline": {
     "issueId": "PAN-3148",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T21:02:53.986Z",
-    "updatedAt": "2026-07-26T22:01:36.376Z",
+    "updatedAt": "2026-07-26T22:03:44.518Z",
     "reviewNotes": "Feedback dedup keys omit the review run ID on primary verdict paths, causing same-run duplicates and later-run suppression",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3163",
     "lastVerifiedCommit": "850679a81982462e5d74e18693cb35873e951829",
@@ -238,24 +238,24 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 3476257,
-            "output": 315777,
-            "cacheRead": 177635328,
+            "input": 3486741,
+            "output": 317451,
+            "cacheRead": 180229632,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 4840167,
-          "output": 369763,
-          "cacheRead": 189649408,
+          "input": 4850651,
+          "output": 371437,
+          "cacheRead": 192243712,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 130.118429,
-        "pricingAsOf": "2026-07-26T22:01:36.434Z"
+        "usd": 131.518221,
+        "pricingAsOf": "2026-07-26T22:03:44.609Z"
       }
     },
     "merges": [
