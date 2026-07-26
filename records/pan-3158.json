@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T20:19:41.143Z",
-  "updated": "2026-07-26T20:44:53.134Z",
+  "updated": "2026-07-26T20:44:54.188Z",
   "pipeline": {
     "issueId": "PAN-3158",
     "reviewStatus": "pending",
@@ -129,5 +129,23 @@
     "update-uat-batch-trains-doc": "completed",
     "update-uat-batch-trains-doc.update-uat-batch-trains-doc.ac1": "completed",
     "update-uat-batch-trains-doc.update-uat-batch-trains-doc.ac2": "completed"
+  },
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      "docs/FLYWHEEL-STATE.md"
+    ],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "docs/UAT-BATCH-TRAINS.md",
+      "src/dashboard/frontend/src/components/merge-train/MergeTrainView.tsx",
+      "src/dashboard/frontend/src/components/merge-train/__tests__/MergeTrainView.test.tsx"
+    ],
+    "actualChangedFiles": [
+      "docs/FLYWHEEL-STATE.md",
+      "docs/UAT-BATCH-TRAINS.md",
+      "src/dashboard/frontend/src/components/merge-train/MergeTrainView.tsx",
+      "src/dashboard/frontend/src/components/merge-train/__tests__/MergeTrainView.test.tsx"
+    ],
+    "recordedAt": "2026-07-26T20:44:54.187Z"
   }
 }
