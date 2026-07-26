@@ -171,7 +171,7 @@
     "recordedAt": "2026-07-25T23:54:54.328Z"
   },
   "created": "2026-07-25T22:42:08.234Z",
-  "updated": "2026-07-26T00:17:10.088Z",
+  "updated": "2026-07-26T00:17:47.713Z",
   "pipeline": {
     "issueId": "PAN-3083",
     "reviewStatus": "passed",
@@ -181,43 +181,17 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-25T23:58:42.757Z",
-    "updatedAt": "2026-07-26T00:17:07.819Z",
-    "reviewNotes": "Approved: dispatch guards, intent consumption, fallback propagation, UAT regression coverage, and docs are correct; focused tests and typecheck pass.",
-    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
+    "updatedAt": "2026-07-26T00:17:47.676Z",
+    "blockerReasons": [
+      {
+        "type": "failing_checks",
+        "summary": "Required checks are failing",
+        "detectedAt": "2026-07-26T00:17:47.676Z"
+      }
+    ],
     "prUrl": "https://github.com/eltmon/overdeck/pull/3089",
     "reviewedAtCommit": "3f1cf7736590cf60192d97fe26c2df744cce3039",
-    "reviewRequestedAt": "2026-07-25T23:58:42.757Z",
-    "reviewSpawnedAt": "2026-07-26T00:10:22.801Z",
-    "scopeDrift": {
-      "outsideDeclaredScope": [
-        "src/lib/__tests__/review-dispatch-decision.test.ts",
-        "tests/unit/lib/overdeck/review-status-record-sync-drain.test.ts"
-      ],
-      "declaredScopeUntouched": [],
-      "declaredScope": [
-        "docs/REVIEW-AGENT-ARCHITECTURE.md",
-        "src/lib/overdeck/review-status-record-sync.ts",
-        "src/lib/review-dispatch-decision.ts",
-        "src/lib/review-status.ts",
-        "tests/unit/lib/cloister/uat-reconciler.test.ts",
-        "tests/unit/lib/overdeck/review-status-record-sync-fallback.test.ts",
-        "tests/unit/lib/review-dispatch-decision.test.ts",
-        "tests/unit/lib/review-status.test.ts"
-      ],
-      "actualChangedFiles": [
-        "docs/REVIEW-AGENT-ARCHITECTURE.md",
-        "src/lib/__tests__/review-dispatch-decision.test.ts",
-        "src/lib/overdeck/review-status-record-sync.ts",
-        "src/lib/review-dispatch-decision.ts",
-        "src/lib/review-status.ts",
-        "tests/unit/lib/cloister/uat-reconciler.test.ts",
-        "tests/unit/lib/overdeck/review-status-record-sync-drain.test.ts",
-        "tests/unit/lib/overdeck/review-status-record-sync-fallback.test.ts",
-        "tests/unit/lib/review-dispatch-decision.test.ts",
-        "tests/unit/lib/review-status.test.ts"
-      ],
-      "recordedAt": "2026-07-25T23:54:54.328Z"
-    }
+    "reviewSpawnedAt": "2026-07-26T00:10:22.801Z"
   },
   "closeOut": {
     "usage": {
@@ -277,7 +251,7 @@
       },
       "costAtCloseOut": {
         "usd": 96.765856,
-        "pricingAsOf": "2026-07-26T00:17:10.082Z"
+        "pricingAsOf": "2026-07-26T00:17:47.707Z"
       }
     },
     "merges": [
