@@ -217,10 +217,14 @@ has not yet been notified:
     `KeyedSubmitTargetDeadError` is thrown. Poison reads and every
     verification read (repair, rollback, post-clear) are strict: a failed
     read aborts as `KeyedMarkerVerificationError` with the breadcrumb
-    authoritative, never converted to empty state. The outbox entry stays
-    `pending` on every recoverable failure and a later pass re-drives the
-    wake after the agent resumes — recovery never suppresses a wake that did
-    not demonstrably reach a live harness holding the real content. A failed Enter aborts the command
+    authoritative, never converted to empty state. Every poison-clear failure
+    — the clear command, the post-clear verification read, or a surviving
+    breadcrumb — is the same recoverable class, so a repair that stops
+    before any delivery is never recorded as terminal `failed`. The outbox
+    entry stays `pending` on every recoverable failure and a later pass
+    re-drives the wake after the agent resumes — recovery never suppresses a
+    wake that did not demonstrably reach a live harness holding the real
+    content. A failed Enter aborts the command
     list before the terminal transition, and concurrent or post-crash
     callers lose the server-side condition, so no stray Enter can land in a
     composer holding unrelated operator text.

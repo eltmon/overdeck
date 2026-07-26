@@ -108,14 +108,16 @@ export class KeyedSubmitTargetDeadError extends Error {
 }
 
 /**
- * A safety-critical marker read/verification failed (cycle 13) — the marker
- * state is UNPROVEN, neither delivered nor lost. Recoverable: the caller's
+ * A safety-critical marker read/verification failed (cycle 13) or a poison
+ * breadcrumb could not be verifiably cleared (cycle 14) — the marker state
+ * is UNPROVEN, neither delivered nor lost. Recoverable: the caller's
  * recovery retries; the poison breadcrumb (if set) stays authoritative in
- * the meantime and is never bypassed by a failed read.
+ * the meantime and is never bypassed by a failed read or a failed clear.
  */
 export class KeyedMarkerVerificationError extends Error {
-  constructor(sessionName: string, context: string) {
-    super(`Keyed tmux markers for ${sessionName} could not be verified (${context})`);
+  constructor(sessionName: string, context: string, options?: { cause?: unknown }) {
+    const causeText = options?.cause instanceof Error ? `: ${options.cause.message}` : '';
+    super(`Keyed tmux markers for ${sessionName} could not be verified (${context})${causeText}`, options);
     this.name = 'KeyedMarkerVerificationError';
   }
 }
@@ -154,17 +156,32 @@ async function readMarkerStrict(sessionName: string, option: string): Promise<st
   return String(result.stdout).trim();
 }
 
-/** Clear the poison breadcrumb and VERIFY it is gone with a strict read (cycle 13). */
+/**
+ * Clear the poison breadcrumb and VERIFY it is gone with a strict read.
+ * EVERY failure here — the clear command, the verification read, or a
+ * surviving breadcrumb — is a recoverable KeyedMarkerVerificationError
+ * (cycle 14): a repair that stops at this boundary has delivered nothing,
+ * so the wake outbox must stay pending, never terminal 'failed'.
+ */
 async function clearPoisonVerified(
   sessionName: string,
   poisonOption: string,
   context: string,
   readStrict: (sessionName: string, option: string) => Promise<string> = readMarkerStrict,
 ): Promise<void> {
-  await tmuxExecAsync(['set-option', '-u', '-t', sessionName, poisonOption], { encoding: 'utf-8' });
-  const remaining = await readStrict(sessionName, poisonOption);
+  try {
+    await tmuxExecAsync(['set-option', '-u', '-t', sessionName, poisonOption], { encoding: 'utf-8' });
+  } catch (error) {
+    throw new KeyedMarkerVerificationError(sessionName, `poison clear command failed (${context})`, { cause: error });
+  }
+  let remaining: string;
+  try {
+    remaining = await readStrict(sessionName, poisonOption);
+  } catch (error) {
+    throw new KeyedMarkerVerificationError(sessionName, `post-clear verification read failed (${context})`, { cause: error });
+  }
   if (remaining !== '') {
-    throw new Error(`Keyed tmux markers for ${sessionName}: poison breadcrumb could not be cleared (${context})`);
+    throw new KeyedMarkerVerificationError(sessionName, `poison breadcrumb survived the clear (${context})`);
   }
 }
 

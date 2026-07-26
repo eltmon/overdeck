@@ -416,11 +416,11 @@ describe('sendToRemoteAgentKeyed', () => {
     expect(state.enters).toBe(0);
   });
 
-  it('a FAILED poison clear after verified delivery is loud — no success with a stale breadcrumb (cycle 12)', async () => {
+  it('a FAILED poison clear after verified delivery is a RECOVERABLE marker error (cycle 12/14)', async () => {
     const { exec, state } = createFakeRemoteTmux({ pending: 'earlier-send-id', targetPid: '4242', failPoisonClear: true });
 
     await expect(sendToRemoteAgentKeyed(AGENT, VM, 'wake up remote', KEY, exec))
-      .rejects.toThrow(/poison/i);
+      .rejects.toThrow(KeyedMarkerVerificationError);
     // The submission happened and is terminal, but success was NOT reported
     // while the breadcrumb survived.
     expect(state.terminal).toBe('1');
@@ -428,6 +428,26 @@ describe('sendToRemoteAgentKeyed', () => {
 
     // Recovery: the breadcrumb forces repair-first handling, the clear works
     // now, and the delivery completes with the breadcrumb verifiably gone.
+    state.failPoisonClear = false;
+    const outcome = await sendToRemoteAgentKeyed(AGENT, VM, 'wake up remote', KEY, exec);
+    expect(outcome).toBe('delivered');
+    expect(state.terminal).toBe('1');
+    expect(state.poison).toBe('');
+  });
+
+  it('a FAILED poison clear during REPAIR is a RECOVERABLE marker error before any delivery (cycle 14)', async () => {
+    // Repair reaches the breadcrumb clear with nothing delivered yet; the
+    // clear command itself fails.
+    const { exec, state } = createFakeRemoteTmux({ terminal: '1', poison: '1', failPoisonClear: true });
+
+    await expect(sendToRemoteAgentKeyed(AGENT, VM, 'wake up remote', KEY, exec))
+      .rejects.toThrow(KeyedMarkerVerificationError);
+    // The rollback already ran (recoverable state), and the breadcrumb stays
+    // authoritative for the next attempt — which then delivers for real.
+    expect(state.terminal).toBe('');
+    expect(state.pending).not.toBe('');
+    expect(state.poison).toBe('1');
+
     state.failPoisonClear = false;
     const outcome = await sendToRemoteAgentKeyed(AGENT, VM, 'wake up remote', KEY, exec);
     expect(outcome).toBe('delivered');

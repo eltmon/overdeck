@@ -1,4 +1,7 @@
 import { execFileSync } from 'node:child_process';
+import { rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { completeKeyedSubmit, KeyedMarkerVerificationError, KeyedSubmitTargetDeadError, sendKeysDedup } from '../tmux-dedup.js';
@@ -55,6 +58,19 @@ function typeWithoutSubmit(text: string): void {
 describe.skipIf(!hasTmux)('sendKeysDedup two-phase protocol', () => {
   beforeEach(() => {
     process.env.OVERDECK_TMUX_SOCKET_NAME = socket;
+    // Clean up any leftover server/socket file from the previous test on
+    // this (process-constant) socket name — a stale socket makes new-session
+    // fail with "server exited unexpectedly".
+    try {
+      execFileSync('tmux', ['-L', socket, 'kill-server'], { stdio: 'ignore' });
+    } catch {
+      // No server was running.
+    }
+    try {
+      rmSync(join(tmpdir(), `tmux-${process.getuid?.() ?? 1000}`, socket), { force: true });
+    } catch {
+      // No socket file.
+    }
     execFileSync('tmux', ['-L', socket, 'new-session', '-d', '-s', session, '-x', '120', '-y', '30', 'cat']);
   });
 
@@ -269,7 +285,8 @@ describe.skipIf(!hasTmux)('sendKeysDedup two-phase protocol', () => {
     expect(first).toBe('pasted');
 
     // The delivery verifies live, but the breadcrumb-clear verification reads
-    // a stale poison — the call must NOT report success.
+    // a stale poison — the call must NOT report success, and the failure is a
+    // RECOVERABLE marker error so the wake outbox stays pending.
     await expect(
       completeKeyedSubmit(session, 'test-key-1', {
         readMarkerStrict: (name: string, option: string) => {
@@ -279,7 +296,7 @@ describe.skipIf(!hasTmux)('sendKeysDedup two-phase protocol', () => {
           return Promise.resolve(showOption(option));
         },
       }),
-    ).rejects.toThrow(/poison breadcrumb could not be cleared/);
+    ).rejects.toThrow(KeyedMarkerVerificationError);
 
     // The terminal is legitimately set and the REAL breadcrumb was cleared —
     // only the verification read lied — so a healthy recovery dedups on the
@@ -381,6 +398,30 @@ describe.skipIf(!hasTmux)('sendKeysDedup two-phase protocol', () => {
       }),
     ).rejects.toThrow(KeyedMarkerVerificationError);
     expect(showOption('@overdeck-dedup-poison-test-key-1')).toBe('1');
+  });
+
+  it('a failed post-clear verification during REPAIR aborts as a RECOVERABLE marker error (cycle 14)', async () => {
+    // Repair reaches the breadcrumb clear with nothing delivered yet; the
+    // post-clear verification keeps reading a stale poison.
+    execFileSync('tmux', ['-L', socket, 'set-option', '-t', session, '@overdeck-dedup-test-key-1', '1']);
+    execFileSync('tmux', ['-L', socket, 'set-option', '-t', session, '@overdeck-dedup-poison-test-key-1', '1']);
+
+    await expect(
+      sendKeysDedup(session, 'wake up agent', 'test-key-1', 'test', {
+        readMarkerStrict: (name: string, option: string) => {
+          if (option === '@overdeck-dedup-poison-test-key-1') {
+            // The initial strict read sees the real breadcrumb; the post-clear
+            // verification read reports it as surviving.
+            return Promise.resolve(showOption(option) === '' ? '1' : showOption(option));
+          }
+          return Promise.resolve(showOption(option));
+        },
+      }),
+    ).rejects.toThrow(KeyedMarkerVerificationError);
+    // The rollback already ran (recoverable state), and the breadcrumb stays
+    // authoritative for the next attempt.
+    expect(showOption('@overdeck-dedup-test-key-1')).toBe('');
+    expect(showOption('@overdeck-dedup-poison-test-key-1')).toBe('');
   });
 
   it('delivers identical content under a different key', async () => {

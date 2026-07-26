@@ -98,12 +98,25 @@ export async function sendToRemoteAgentKeyed(
     run(buildRemoteTmuxCommand(['show-option', '-qv', '-t', agentId, option]))
       .then(stdout => stdout.trim());
 
-  // Clear the poison breadcrumb and VERIFY it is gone with a strict read (cycle 13).
+  // Clear the poison breadcrumb and VERIFY it is gone with a strict read.
+  // EVERY failure here — the clear command, the verification read, or a
+  // surviving breadcrumb — is a recoverable KeyedMarkerVerificationError
+  // (cycle 14): a repair that stops at this boundary has delivered nothing,
+  // so the wake outbox must stay pending, never terminal 'failed'.
   const clearPoisonVerified = async (context: string): Promise<void> => {
-    await run(buildRemoteTmuxCommand(['set-option', '-u', '-t', agentId, poisonOption]));
-    const remaining = await readMarkerStrict(poisonOption);
+    try {
+      await run(buildRemoteTmuxCommand(['set-option', '-u', '-t', agentId, poisonOption]));
+    } catch (error) {
+      throw new KeyedMarkerVerificationError(agentId, `poison clear command failed (${context})`, { cause: error });
+    }
+    let remaining: string;
+    try {
+      remaining = await readMarkerStrict(poisonOption);
+    } catch (error) {
+      throw new KeyedMarkerVerificationError(agentId, `post-clear verification read failed (${context})`, { cause: error });
+    }
     if (remaining !== '') {
-      throw new Error(`Keyed remote markers for ${agentId}: poison breadcrumb could not be cleared (${context})`);
+      throw new KeyedMarkerVerificationError(agentId, `poison breadcrumb survived the clear (${context})`);
     }
   };
 

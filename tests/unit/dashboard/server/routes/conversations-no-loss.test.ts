@@ -78,7 +78,7 @@ describe('PAN-2145 conversations route no-loss audit', () => {
     expect(conversationsRouteLayer).toBeDefined();
   });
 
-  it('keeps all 34 conversationsRouteLayer method/path registrations', () => {
+  it('keeps all 35 conversationsRouteLayer method/path registrations', () => {
     const liveRoutes = enumerateConversationRoutes();
     const expectedRoutes = new Set(EXPECTED_CONVERSATION_ROUTES);
 
