@@ -6806,3 +6806,11 @@ Substrate bugs filed: 2897 2898 2899 2900 2901 2902 2907 2913 (8; ALL fixed and 
   * Worth restating plainly for whoever decides it: **the strike path is the pipeline's emergency lane, and every issue that uses it becomes permanently un-closable.** Four this run. The fix is either `pan done --strike` recording the gates the strike owner already runs before merging, or an explicit operator override — but the flywheel cannot and should not be the one to decide that.
 - `agent-min-858-test` unchanged (`$6.8805`), PAN-3092 open, `verification_status` still null on the other three. **Zero `--accept-*` across 42 ticks.**
 - **LESSON: a blocker that recurs on every instance of a workflow is a design gap, not a backlog item.** I first read the strike close-out failure (tick 27) as three unlucky issues. At four-for-four it is clearly structural — the count is what converts "these are stuck" into "this path always ends stuck", and that reframing is what makes it prioritisable.
+
+## RUN-70 tick 43 (2026-07-26 04:15Z) — PAN-3067 CLOSED but the four strikes are STILL blocked; tested rather than assumed
+- **PAN-3067 is now CLOSED** — and since it was itself a strike blocked on row 3, that looked like evidence the path had changed. **Tested it instead of inferring**: retried `pan close PAN-3056 --force` → still `✗ dod:verification — verificationStatus: missing`.
+- **So PAN-3067 was closed by some other route** (an operator override, or verification genuinely ran for it), and nothing changed for PAN-3029/3051/3056/3101. All four remain un-closable. **Still no `--accept-*` — unbroken for 43 ticks.**
+  * This is worth noting precisely because the inference was tempting and wrong: "the issue about the blocker is closed" does **not** imply "the blocker is gone". One command distinguished them.
+- `agent-min-858-test`: `$6.8805 / out 1.1k` — **NINTH identical reading (~7.5h)**. PAN-3092 still OPEN. Unchanged and unrecoverable without an external collector.
+- main CI green on `092c180cb1`; live `66860ff9b5`; 23 agents; networks 20.
+- **LESSON: a closed issue is not a fixed system.** Issue state tracks the conversation; the gate tracks reality. When a tracker says resolved, re-run the failing operation before believing it — especially when the "resolution" would let you skip a rail you have been holding for 43 ticks.
