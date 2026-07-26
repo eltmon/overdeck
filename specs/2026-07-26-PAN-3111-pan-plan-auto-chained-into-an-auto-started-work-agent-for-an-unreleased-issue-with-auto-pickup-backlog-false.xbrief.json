@@ -4,17 +4,17 @@
     "created": "2026-07-26T12:49:18Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3111: pan plan --auto chained into an auto-started work agent for an unreleased issue with auto_pickup_backlog=false",
-    "updated": "2026-07-26T12:57:48.755Z"
+    "updated": "2026-07-26T12:58:35.551Z"
   },
   "plan": {
     "id": "pan-3111",
     "title": "pan plan --auto chained into an auto-started work agent for an unreleased issue with auto_pickup_backlog=false",
-    "status": "proposed",
+    "status": "approved",
     "uid": "fa57f21e-934b-4eaf-8ae3-14d454844717",
     "author": "agent:k3[1m]",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-07-26T12:49:18Z",
-    "updated": "2026-07-26T12:57:48.755Z",
+    "updated": "2026-07-26T12:58:35.551Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3111",
@@ -543,5 +543,5 @@
       "canonicalFilename": "2026-07-26-PAN-3111-pan-plan-auto-chained-into-an-auto-started-work-agent-for-an-unreleased-issue-with-auto-pickup-backlog-false.xbrief.json"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
