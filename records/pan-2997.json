@@ -306,19 +306,19 @@
     "recordedAt": "2026-07-26T10:07:26.737Z"
   },
   "created": "2026-07-21T23:09:49.270Z",
-  "updated": "2026-07-26T10:59:48.181Z",
+  "updated": "2026-07-26T11:19:50.043Z",
   "pipeline": {
     "issueId": "PAN-2997",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "failed",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T10:57:04.635Z",
-    "updatedAt": "2026-07-26T10:59:47.547Z",
-    "reviewNotes": "Poison-clear and post-clear verification failures escape as generic errors, so pre-delivery repair can be terminally acknowledged as failed without waking the agent.",
+    "updatedAt": "2026-07-26T11:19:49.379Z",
+    "reviewNotes": "Agent re-review request (1/25): Fixed the cycle-14 blocker and the sync conflict: every clearPoisonVerified failure (clear command, post-clear verification read, surviving breadcrumb) is now KeyedMarkerVerificationError with the cause preserved — a repair that stops before any delivery keeps the outbox pending instead of recording terminal 'failed' (local + remote repair-time tests, recovery-on-retry proven). Also resolved the no-loss-matrix merge conflict (kept the accurate pane-choice door) and deflaked the real-tmux test setup against stale socket files.",
     "verificationNotes": "Sync with main FAILED — merge conflicts detected:\n\nMerge conflicts with main:\n  - tests/unit/lib/overdeck/no-loss-matrix.ts",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3004",
     "lastVerifiedCommit": "1700fa490854ce01aef7b32625e0a6c56d11083a",
@@ -427,9 +427,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 31015196,
-            "output": 1266456,
-            "cacheRead": 176556032,
+            "input": 31387474,
+            "output": 1266704,
+            "cacheRead": 176606208,
             "cacheWrite": 0
           }
         },
@@ -458,9 +458,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 32488969,
-          "output": 1455577,
-          "cacheRead": 271884800,
+          "input": 32861247,
+          "output": 1455825,
+          "cacheRead": 271934976,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -471,8 +471,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 342.4053506,
-        "pricingAsOf": "2026-07-26T10:59:47.596Z"
+        "usd": 344.2992686,
+        "pricingAsOf": "2026-07-26T11:19:49.625Z"
       }
     },
     "merges": [
