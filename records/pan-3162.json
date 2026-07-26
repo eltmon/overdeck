@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T20:52:58.018Z",
-  "updated": "2026-07-26T21:33:00.168Z",
+  "updated": "2026-07-26T21:40:53.276Z",
   "pipeline": {
     "issueId": "PAN-3162",
     "reviewStatus": "pending",
@@ -61,16 +61,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "stuck-merging-bound": {
-        "writerId": "agent-pan-3162",
-        "agentId": "agent-pan-3162",
-        "pid": 2617743,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-26T21:33:00.168Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3162",
@@ -93,6 +85,17 @@
         "outcome": "completed",
         "reason": "Added merge-relevant forge observation to stale-merge patrol, preserved replan/closed-spec guards, terminalized only complete positive evidence, and covered partial/unverifiable/non-scope cases",
         "releasedAt": "2026-07-26T21:32:48.079Z"
+      },
+      {
+        "writerId": "agent-pan-3162",
+        "agentId": "agent-pan-3162",
+        "pid": 2617743,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T21:33:00.168Z",
+        "itemId": "stuck-merging-bound",
+        "outcome": "completed",
+        "reason": "Added a fake-timer-tested 30-minute patrol bound for merging/verifying, forge reconciliation before reset, gate-derived readyForMerge recovery, and shared GitHub merge observation",
+        "releasedAt": "2026-07-26T21:40:53.276Z"
       }
     ],
     "statusReasons": {
@@ -103,6 +106,10 @@
       "deacon-forge-merge-reconciler": {
         "reason": "Added merge-relevant forge observation to stale-merge patrol, preserved replan/closed-spec guards, terminalized only complete positive evidence, and covered partial/unverifiable/non-scope cases",
         "updatedAt": "2026-07-26T21:32:48.079Z"
+      },
+      "stuck-merging-bound": {
+        "reason": "Added a fake-timer-tested 30-minute patrol bound for merging/verifying, forge reconciliation before reset, gate-derived readyForMerge recovery, and shared GitHub merge observation",
+        "updatedAt": "2026-07-26T21:40:53.276Z"
       }
     }
   },
@@ -118,6 +125,10 @@
     "deacon-forge-merge-reconciler.deacon-forge-merge-reconciler.ac3": "completed",
     "deacon-forge-merge-reconciler.deacon-forge-merge-reconciler.ac4": "completed",
     "deacon-forge-merge-reconciler.deacon-forge-merge-reconciler.ac5": "completed",
-    "stuck-merging-bound": "running"
+    "stuck-merging-bound": "completed",
+    "stuck-merging-bound.stuck-merging-bound.ac1": "completed",
+    "stuck-merging-bound.stuck-merging-bound.ac2": "completed",
+    "stuck-merging-bound.stuck-merging-bound.ac3": "completed",
+    "stuck-merging-bound.stuck-merging-bound.ac4": "completed"
   }
 }
