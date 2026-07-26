@@ -4,7 +4,7 @@
     "created": "2026-07-26T19:37:46.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3155: Strike-landed issues can never close out: DoD row 4 resolves 'merged' through the superseded feature branch, and row 7 cascades",
-    "updated": "2026-07-26T19:41:24.017Z"
+    "updated": "2026-07-26T19:41:26.038Z"
   },
   "plan": {
     "id": "pan-3155",
@@ -12,9 +12,9 @@
     "status": "approved",
     "uid": "1a2d13ef-486d-4ef0-809e-bbbf3b7fba1e",
     "author": "agent:k3[1m]",
-    "sequence": 3,
+    "sequence": 5,
     "created": "2026-07-26T19:37:46.000Z",
-    "updated": "2026-07-26T19:41:24.017Z",
+    "updated": "2026-07-26T19:41:26.038Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3155",
