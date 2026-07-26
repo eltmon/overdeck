@@ -322,7 +322,6 @@
   ],
   "scopeDrift": {
     "outsideDeclaredScope": [
-      "scripts/file-size-baseline.txt",
       "src/dashboard/server/pending-lifecycle.ts",
       "src/dashboard/server/routes/__tests__/specialists-shared.test.ts",
       "src/dashboard/server/routes/specialists/shared.ts",
@@ -365,7 +364,6 @@
     "actualChangedFiles": [
       "CLAUDE.md",
       "docs/WORKSPACE-CONTAINERS.md",
-      "scripts/file-size-baseline.txt",
       "src/dashboard/server/pending-lifecycle.ts",
       "src/dashboard/server/routes/__tests__/specialists-shared.test.ts",
       "src/dashboard/server/routes/specialists/shared.ts",
@@ -400,10 +398,10 @@
       "tests/unit/lib/pan-444-post-merge-step0.test.ts",
       "tests/unit/lib/review-status.test.ts"
     ],
-    "recordedAt": "2026-07-26T18:42:41.042Z"
+    "recordedAt": "2026-07-26T19:11:42.045Z"
   },
   "created": "2026-07-26T13:39:19.365Z",
-  "updated": "2026-07-26T19:11:35.909Z",
+  "updated": "2026-07-26T19:11:42.046Z",
   "pipeline": {
     "issueId": "PAN-3138",
     "reviewStatus": "blocked",
