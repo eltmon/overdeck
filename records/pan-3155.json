@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T19:16:39.648Z",
-  "updated": "2026-07-26T19:52:22.853Z",
+  "updated": "2026-07-26T19:54:44.869Z",
   "pipeline": {
     "issueId": "PAN-3155",
     "reviewStatus": "pending",
@@ -43,16 +43,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "deploy-row-dependency-semantics": {
-        "writerId": "agent-pan-3155",
-        "agentId": "agent-pan-3155",
-        "pid": 3529318,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-26T19:52:22.853Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3155",
@@ -75,6 +67,17 @@
         "outcome": "completed",
         "reason": "Added state-aware branch PR lookup for gh and GitHub App paths, ranked both convention heads OPEN then latest MERGED then other, preserved the numeric lookup wrapper, and added route-level ranking regressions.",
         "releasedAt": "2026-07-26T19:52:11.188Z"
+      },
+      {
+        "writerId": "agent-pan-3155",
+        "agentId": "agent-pan-3155",
+        "pid": 3529318,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T19:52:22.853Z",
+        "itemId": "deploy-row-dependency-semantics",
+        "outcome": "completed",
+        "reason": "Threaded merged-row status into deploy evaluation, changed missing-commit cascades from a duplicate miss to an explicit dependency skip, retained a miss when row 4 passed without a commit, and added regression coverage.",
+        "releasedAt": "2026-07-26T19:54:44.869Z"
       }
     ],
     "statusReasons": {
@@ -85,6 +88,10 @@
       "prefer-merged-pr-resolution": {
         "reason": "Added state-aware branch PR lookup for gh and GitHub App paths, ranked both convention heads OPEN then latest MERGED then other, preserved the numeric lookup wrapper, and added route-level ranking regressions.",
         "updatedAt": "2026-07-26T19:52:11.188Z"
+      },
+      "deploy-row-dependency-semantics": {
+        "reason": "Threaded merged-row status into deploy evaluation, changed missing-commit cascades from a duplicate miss to an explicit dependency skip, retained a miss when row 4 passed without a commit, and added regression coverage.",
+        "updatedAt": "2026-07-26T19:54:44.869Z"
       }
     }
   },
@@ -97,6 +104,9 @@
     "prefer-merged-pr-resolution.prefer-merged-pr-resolution.ac1": "completed",
     "prefer-merged-pr-resolution.prefer-merged-pr-resolution.ac2": "completed",
     "prefer-merged-pr-resolution.prefer-merged-pr-resolution.ac3": "completed",
-    "deploy-row-dependency-semantics": "running"
+    "deploy-row-dependency-semantics": "completed",
+    "deploy-row-dependency-semantics.deploy-row-dependency-semantics.ac1": "completed",
+    "deploy-row-dependency-semantics.deploy-row-dependency-semantics.ac2": "completed",
+    "deploy-row-dependency-semantics.deploy-row-dependency-semantics.ac3": "completed"
   }
 }
