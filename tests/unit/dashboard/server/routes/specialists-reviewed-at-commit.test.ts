@@ -19,7 +19,16 @@
  * it depends on (DB write + deacon reader) independently.
  */
 
+import { Effect, Layer, Stream } from 'effect';
+import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+
+import { specialistsLegacyRouteLayer } from '../../../../../src/dashboard/server/routes/specialists/legacy-routes.js';
+import { EventStoreService } from '../../../../../src/dashboard/server/services/domain-services.js';
+import {
+  INTERNAL_TOKEN_HEADER,
+  _resetInternalTokenCacheForTests,
+} from '../../../../../src/lib/internal-token.js';
 
 // PAN-1938: the production code now reads/writes overdeck.db via
 // src/lib/overdeck/review-status-sync.ts. The old in-memory panopticon.db
@@ -95,6 +104,13 @@ let mockDiffNameOnlyStdout = '';
 
 // ─── Stub modules that deacon imports ────────────────────────────────────────
 
+const {
+  mockDeliverReviewVerdictFeedback,
+  mockSnapshotWorkspaceHeads,
+} = vi.hoisted(() => ({
+  mockDeliverReviewVerdictFeedback: vi.fn(),
+  mockSnapshotWorkspaceHeads: vi.fn(),
+}));
 const mockResolveProject = vi.fn();
 vi.mock('../../../../../src/lib/projects.js', () => ({
   getProjectSync: vi.fn(() => ({ name: 'overdeck', path: '/fake/project' })),
@@ -103,6 +119,19 @@ vi.mock('../../../../../src/lib/projects.js', () => ({
   ]),
   resolveProjectFromIssue: (...args: unknown[]) => mockResolveProject(...args),
   resolveProjectFromIssueSync: (...args: unknown[]) => mockResolveProject(...args),
+}));
+
+vi.mock('../../../../../src/lib/git-utils.js', async (importActual) => ({
+  ...(await importActual<typeof import('../../../../../src/lib/git-utils.js')>()),
+  snapshotWorkspaceHeadsPromise: mockSnapshotWorkspaceHeads,
+}));
+
+vi.mock('../../../../../src/lib/cloister/review-verdict-feedback.js', () => ({
+  deliverReviewVerdictFeedback: mockDeliverReviewVerdictFeedback,
+}));
+
+vi.mock('../../../../../src/lib/cloister/specialist-handoff-logger.js', () => ({
+  updateSpecialistHandoffStatus: vi.fn(() => Effect.succeed(false)),
 }));
 
 vi.mock('../../../../../src/lib/activity-logger.js', () => ({
@@ -167,6 +196,7 @@ vi.mock('../../../../../src/lib/agents.js', () => ({
   getAgentStateSync: vi.fn().mockReturnValue(null),
   messageAgent: vi.fn(),
   spawnAgent: vi.fn(),
+  transitionIssueToInProgress: vi.fn(() => Promise.resolve()),
   transitionIssueToInReview: vi.fn(),
 }));
 
@@ -187,6 +217,32 @@ import { existsSync } from 'node:fs';
 import { getRealExistsSync } from './_real-exists-sync.js';
 
 let realExistsSync: (path: string) => boolean = () => false;
+
+const eventStoreLayer = Layer.succeed(EventStoreService, {
+  append: () => Effect.succeed(1),
+  appendAsync: () => Effect.succeed(1),
+  readFrom: () => Effect.succeed([]),
+  queryByType: () => Effect.succeed([]),
+  getLatestSequence: Effect.succeed(0),
+  streamEvents: Stream.empty,
+});
+
+async function postDone(body: Record<string, unknown>): Promise<number> {
+  const request = HttpServerRequest.fromWeb(new Request('http://localhost/api/specialists/done', {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      [INTERNAL_TOKEN_HEADER]: 'test-token',
+    },
+    body: JSON.stringify(body),
+  }));
+  const response = await Effect.runPromise(Effect.scoped(
+    Effect.flatMap(HttpRouter.toHttpEffect(specialistsLegacyRouteLayer), app =>
+      Effect.provideService(app, HttpServerRequest.HttpServerRequest, request),
+    ).pipe(Effect.provide(eventStoreLayer)),
+  ));
+  return response.status;
+}
 
 beforeEach(async () => {
   realExistsSync = await getRealExistsSync();
@@ -212,10 +268,19 @@ beforeEach(async () => {
   mockParentShaByCommit.clear();
   mockDiffNameOnlyByRange.clear();
   mockDiffNameOnlyStdout = '';
-  mockResolveProject.mockReturnValue({ projectPath: '/fake/project' });
+  mockResolveProject.mockReturnValue({ projectPath: '/fake/project', projectKey: 'overdeck' });
+  mockSnapshotWorkspaceHeads.mockImplementation(async () => mockExecHeadSha);
+  mockDeliverReviewVerdictFeedback.mockReturnValue(Effect.succeed({
+    prCommentPosted: false,
+    agentMessageSent: true,
+  }));
+  process.env.OVERDECK_INTERNAL_TOKEN = 'test-token';
+  _resetInternalTokenCacheForTests();
 }, 30_000);
 
 afterEach(() => {
+  delete process.env.OVERDECK_INTERNAL_TOKEN;
+  _resetInternalTokenCacheForTests();
   if (odb) teardownOverdeckTestDb(odb);
   odb = undefined;
 });
@@ -239,6 +304,53 @@ describe('reviewedAtCommit DB persistence (specialists/done snapshot layer)', ()
 
     const row = getReviewStatusFromDbSync('PAN-RAC1');
     expect(row?.reviewedAtCommit).toBe(sha);
+  });
+
+  it('persists a blocked verdict anchor in a second partial update', () => {
+    const sha = 'blocked123456789012345678901234567890abcd';
+    setReviewStatusSync('PAN-RAC-BLOCKED', {
+      reviewStatus: 'blocked',
+      reviewNotes: 'correctness blocker',
+    });
+    setReviewStatusSync('PAN-RAC-BLOCKED', { reviewedAtCommit: sha });
+
+    const row = getReviewStatusFromDbSync('PAN-RAC-BLOCKED');
+    expect(row?.reviewStatus).toBe('blocked');
+    expect(row?.reviewedAtCommit).toBe(sha);
+  });
+
+  it('writes the HTTP blocked anchor only after feedback delivery', async () => {
+    mockExecHeadSha = 'blocked-http-head';
+    mockDeliverReviewVerdictFeedback.mockImplementation(() => {
+      const duringDelivery = getReviewStatusFromDbSync('PAN-RAC-HTTP');
+      expect(duringDelivery?.reviewStatus).toBe('blocked');
+      expect(duringDelivery?.reviewedAtCommit).toBeUndefined();
+      return Effect.succeed({ prCommentPosted: false, agentMessageSent: true });
+    });
+
+    const responseStatus = await postDone({
+      specialist: 'review',
+      issueId: 'PAN-RAC-HTTP',
+      status: 'failed',
+      notes: 'correctness blocker',
+      runId: 'agent-pan-rac-http-review-abcdef12',
+    });
+
+    expect(responseStatus).toBe(200);
+    expect(mockDeliverReviewVerdictFeedback).toHaveBeenCalledWith(expect.objectContaining({
+      issueId: 'PAN-RAC-HTTP',
+      runId: 'agent-pan-rac-http-review-abcdef12',
+    }));
+    expect(mockSnapshotWorkspaceHeads).toHaveBeenCalledWith(
+      'PAN-RAC-HTTP',
+      '/fake/project/workspaces/feature-pan-rac-http',
+    );
+    expect(
+      mockDeliverReviewVerdictFeedback.mock.invocationCallOrder[0],
+    ).toBeLessThan(mockSnapshotWorkspaceHeads.mock.invocationCallOrder[0]!);
+    expect(getReviewStatusFromDbSync('PAN-RAC-HTTP')?.reviewedAtCommit).toBe(
+      'blocked-http-head',
+    );
   });
 
   it('reviewedAtCommit survives a subsequent partial update (not clobbered)', () => {

@@ -502,11 +502,14 @@ async function deliverReviewVerdictFeedbackHostSide(
 ): Promise<void> {
   try {
     const { deliverReviewVerdictFeedback } = await import('./cloister/review-verdict-feedback.js');
+    const { getAgentStateSync } = await import('./agents.js');
+    const runId = getAgentStateSync(`agent-${issueId.toLowerCase()}-review`)?.reviewRunId;
     const result = await Effect.runPromise(deliverReviewVerdictFeedback({
       issueId,
       verdict: status.reviewStatus === 'failed' ? 'failed' : 'blocked',
       notes: status.reviewNotes,
       prUrl: status.prUrl,
+      ...(runId ? { runId } : {}),
     }));
     if (result.agentMessageSent) {
       console.log(`[review-status] delivered review feedback to the work agent for ${issueId} (host-side)`);

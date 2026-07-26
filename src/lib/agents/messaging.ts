@@ -59,6 +59,7 @@ export interface MessageDeliveryOutcome {
   delivered: boolean;
   queuedToMail: boolean;
   reason?: string;
+  deduplicated?: boolean;
 }
 
 export type MessageAgentOutcome = 'delivered' | 'queued';
@@ -167,7 +168,11 @@ async function resumeThenDeliverKeyed(
     { dedupKey },
   );
   await appendTellInterventionForUserSource(normalizedId, caller);
-  return { delivered: delivery.ok, queuedToMail: false };
+  return {
+    delivered: delivery.ok,
+    queuedToMail: false,
+    ...(delivery.deduplicated ? { deduplicated: true } : {}),
+  };
 }
 
 
@@ -452,7 +457,13 @@ export async function messageAgent(
       // drains the local mail dir, so this cannot replay.
       queueAgentMail(normalizedId, message, false, opts.dedupKey);
       await appendTellInterventionForUserSource(normalizedId, caller);
-      return { delivered: true, queuedToMail: true, ...(remoteOutcome === 'deduplicated' ? { reason: 'deduplicated' } : {}) };
+      return {
+        delivered: true,
+        queuedToMail: true,
+        ...(remoteOutcome === 'deduplicated'
+          ? { reason: 'deduplicated', deduplicated: true }
+          : {}),
+      };
     }
     await sendToRemoteAgent(normalizedId, remoteState.vmName, message);
 
@@ -508,7 +519,11 @@ export async function messageAgent(
     const delivery = await deliverWithOptionalKey(normalizedId, message, `messageAgent:${caller}`, deliveryMethod, opts.dedupKey);
     queueAgentMail(normalizedId, message, false, opts.dedupKey);
     await appendTellInterventionForUserSource(normalizedId, caller);
-    return { delivered: delivery.ok, queuedToMail: true };
+    return {
+      delivered: delivery.ok,
+      queuedToMail: true,
+      ...(delivery.deduplicated ? { deduplicated: true } : {}),
+    };
   }
 
   if (!(await Effect.runPromise(sessionExists(normalizedId)))) {
@@ -561,7 +576,11 @@ export async function messageAgent(
     queueAgentMail(normalizedId, message, false);
   }
   await appendTellInterventionForUserSource(normalizedId, caller);
-  return { delivered: delivery.ok, queuedToMail: opts.dedupKey === undefined };
+  return {
+    delivered: delivery.ok,
+    queuedToMail: opts.dedupKey === undefined,
+    ...(delivery.deduplicated ? { deduplicated: true } : {}),
+  };
 }
 
 export async function messageAgentWithOutcome(
