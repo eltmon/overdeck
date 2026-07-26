@@ -6,7 +6,7 @@ import { resolveProjectFromIssueSync } from '../projects.js';
 import { isGitHubAppConfigured, listPullRequestsForHead } from '../github-app.js';
 import { getMergeSetSync } from '../merge-set.js';
 import { resolveGitHubIssueSync } from '../tracker-utils.js';
-import { assessMergeCompleteness } from './merge-completeness.js';
+import { assessMergeCompleteness, hasPositiveMergedEvidence } from './merge-completeness.js';
 import type { VerificationRunnerOutcome } from './verification-types.js';
 
 const execAsync = promisify(exec);
@@ -209,7 +209,20 @@ export async function verifyMergedBeforeLifecycle(
 
   const ghResolved = resolveGitHubIssueSync(issueId);
   if (!ghResolved.isGitHub) {
-    return { merged: false, reason: `Non-GitHub project for ${issueId}; merge state cannot be auto-verified` };
+    try {
+      const completeness = await assessMergeCompleteness(issueId);
+      const mergedRepos = completeness.repos.filter((repo) => repo.state === 'merged');
+      if (completeness.complete && hasPositiveMergedEvidence(completeness.repos)) {
+        return {
+          merged: true,
+          reason: `Forge confirms merge complete for ${mergedRepos.map((repo) => repo.repoKey).join(', ')}`,
+        };
+      }
+      return { merged: false, reason: completeness.summary };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return { merged: false, reason: `Non-GitHub merge state is unverifiable: ${message}` };
+    }
   }
 
   const { owner, repo } = ghResolved;

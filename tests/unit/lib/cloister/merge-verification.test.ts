@@ -52,6 +52,7 @@ vi.mock('../../../../src/lib/tracker-utils.js', () => ({
 
 vi.mock('../../../../src/lib/cloister/merge-completeness.js', () => ({
   assessMergeCompleteness: assessMergeCompletenessMock,
+  hasPositiveMergedEvidence: (repos: Array<{ state: string }>) => repos.some((repo) => repo.state === 'merged'),
 }));
 
 import {
@@ -134,6 +135,89 @@ describe('verifyMergedBeforeLifecycle', () => {
       summary: 'Merge complete across 2 repositories',
     });
     execMock.mockResolvedValue({ stdout: '[]', stderr: '' });
+  });
+
+  it('accepts a complete non-GitHub merge with positive per-repo evidence', async () => {
+    resolveGitHubIssueMock.mockReturnValue({ isGitHub: false });
+    assessMergeCompletenessMock.mockResolvedValue({
+      complete: true,
+      repos: [
+        { repoKey: 'fe', state: 'merged', aheadCount: 1 },
+        { repoKey: 'api', state: 'no-changes', aheadCount: 0 },
+      ],
+      summary: 'Merge complete across 2 repositories',
+    });
+
+    const result = await verifyMergedBeforeLifecycle('MIN-898', '/projects/myn');
+
+    expect(result).toEqual({
+      merged: true,
+      reason: 'Forge confirms merge complete for fe',
+    });
+    expect(assessMergeCompletenessMock).toHaveBeenCalledWith('MIN-898');
+    expect(listPullRequestsForHeadMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects a partially merged non-GitHub issue with the sibling reason', async () => {
+    resolveGitHubIssueMock.mockReturnValue({ isGitHub: false });
+    assessMergeCompletenessMock.mockResolvedValue({
+      complete: false,
+      repos: [
+        { repoKey: 'fe', state: 'merged', aheadCount: 1 },
+        { repoKey: 'api', state: 'unmerged', aheadCount: 2 },
+      ],
+      summary: 'api has 2 commits with no merged review artifact',
+    });
+
+    const result = await verifyMergedBeforeLifecycle('MIN-898', '/projects/myn');
+
+    expect(result).toEqual({
+      merged: false,
+      reason: 'api has 2 commits with no merged review artifact',
+    });
+  });
+
+  it('fails open for an unverifiable non-GitHub forge verdict', async () => {
+    resolveGitHubIssueMock.mockReturnValue({ isGitHub: false });
+    resolveProjectMock.mockReturnValue({ projectPath: '/projects/myn' });
+    assessMergeCompletenessMock.mockResolvedValue({
+      complete: false,
+      repos: [{
+        repoKey: 'api',
+        state: 'unverifiable',
+        aheadCount: 0,
+        reason: 'glab authentication failed',
+      }],
+      summary: 'api merge state is unverifiable: glab authentication failed',
+    });
+
+    const verified = await verifyMergedBeforeLifecycle('MIN-898', '/projects/myn');
+    const dispatch = await shouldSkipDispatchAsMerged('MIN-898');
+
+    expect(verified).toEqual({
+      merged: false,
+      reason: 'api merge state is unverifiable: glab authentication failed',
+    });
+    expect(dispatch).toEqual({
+      skip: false,
+      reason: 'api merge state is unverifiable: glab authentication failed',
+    });
+  });
+
+  it('does not infer a non-GitHub merge from all-no-changes evidence', async () => {
+    resolveGitHubIssueMock.mockReturnValue({ isGitHub: false });
+    assessMergeCompletenessMock.mockResolvedValue({
+      complete: true,
+      repos: [{ repoKey: 'api', state: 'no-changes', aheadCount: 0 }],
+      summary: 'Merge complete across 1 repository',
+    });
+
+    const result = await verifyMergedBeforeLifecycle('MIN-898', '/projects/myn');
+
+    expect(result).toEqual({
+      merged: false,
+      reason: 'Merge complete across 1 repository',
+    });
   });
 
   it('blocks a merged tracker PR when a sibling repo is unmerged', async () => {
