@@ -124,6 +124,10 @@ record, so the verification row uses recorded evidence instead of an operator
 override. The promoted generation is reaped; all other live generations
 invalidate (main moved) and the reconciler rebuilds.
 
+A polyrepo generation promotes through a two-phase variant of this — every repo
+is trial-merged before anything is pushed — described under
+[Polyrepo generations](#polyrepo-generations).
+
 ### Live stacks — the hard cap
 
 `ensureUatStack` renders the devcontainer on the generation worktree — the folder
@@ -184,6 +188,70 @@ A project with a live generation but an empty ready set is still reconciled, so
 invalidation runs when its last ready feature merges elsewhere. A project with
 neither skips the tick before doing any git work, which is what keeps the sweep
 from touching every tracked repo every 60 seconds.
+
+### Polyrepo generations
+
+A polyrepo project (`workspace.type: polyrepo`) has no git repo at its own path
+— that path is a wrapper holding one real repo per configured member. A
+generation there is not one branch off one main but an **N-tuple**: one
+`uat/<label>-<codename>-<MMDD>` branch per member repo, each cut from that
+repo's own target head. [PAN-1696](https://github.com/eltmon/overdeck/issues/1696)
+shipped a guard that skipped these projects outright;
+[PAN-3093](https://github.com/eltmon/overdeck/issues/3093) removed it by making
+assembly work per repo.
+
+**Only contributing repos get a branch.** The ready set resolves each
+candidate's member repos through `resolveProjectReposFromResolvedIssueSync` and
+probes each one origin-first for the issue's feature branch. Repos with no
+branch contribute nothing and get no branch and no worktree; a candidate with no
+branch in *any* repo is excluded from the ready set with a logged reason.
+Conflict prediction runs over the union of each candidate's per-repo changed
+files, namespaced `<repoKey>:` so the same path in two repos is not mistaken for
+an overlap — hotspot globs apply per repo, before that prefix is added.
+
+**Per-repo SHAs, one composite anchor.** Each repo's branch, base SHA, worktree,
+and publish stamp live in `uat_generation_repos`; each `(member, repo)`
+contribution lives in `uat_generation_member_repos`. The single-valued
+`uat_generations.base_sha` holds the **composite anchor** `fe@aaa1111 api@bbb2222`
+— the same tuple format the review pipeline already records. Member `headSha`
+is likewise a composite over the repos that member touched. This matters because
+the reconciler decides staleness by *string equality* between the anchor it
+computes now and what assembly stored: both sides build anchors through the same
+helpers, and member anchors order by `repoKey` because that is the only ordering
+both sides can compute. Monorepo generations write no per-repo rows and read
+back as a single synthesized entry, so consumers loop `repos` without branching
+on project type.
+
+**A hold-out is global.** A feature that cannot be merged and resolved in *any*
+repo is held out of the whole generation — a tester must never see a feature
+half-applied across repos. Rather than excise an already-merged commit from the
+middle of a branch, assembly **replays**: it restarts with the remaining
+features. Each pass drops at least one feature, so the loop is bounded by the
+feature count. Contributing repos are recomputed per pass, so a repo left with
+nothing to carry after a hold-out is dropped rather than publishing an empty
+branch. The conflict hook runs per repo with `repoKey` in its context, naming
+the repo in its prompt and logs.
+
+**Promotion is two-phase and all-or-nothing.** Phase A validates and
+trial-merges every repo *without pushing*: per-repo target head, the same
+disjoint-movement stale-base rule applied per repo, then a no-ff merge committed
+locally in a throwaway worktree. Any failure discards every prepared worktree
+and returns with nothing published and the batch still promotable. Phase B
+publishes in merge order. A failure partway is **resumable, not rolled back** —
+undoing a landed merge would mean force-pushing a member repo's main, a one-way
+door. Each landed repo is stamped with `promoted_at`, the failure names landed
+vs pending repos, and a retry skips whatever already landed. Post-merge
+lifecycles fire only after *every* repo publishes, so a member is never handed
+off with part of its work unlanded.
+
+**Teardown covers every repo.** Cleanup removes each member repo's worktree and
+branch (local and remote), then the wrapper folder, and sweeps the generation
+branch from every configured member repo — a hold-out can drop a repo after its
+branch was created locally, and that branch is never pushed but would otherwise
+linger. Every repo is attempted even after one fails, and `cleanedAt` stays
+unset so the next patrol retries. The live stack is unchanged: the generation's
+`worktreePath` is the wrapper folder, so the folder-name → Traefik host contract
+and the 2-stack cap work exactly as for a monorepo.
 
 ### Multi-project shape
 
