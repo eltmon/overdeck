@@ -15,8 +15,38 @@
     }
   ],
   "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      "tests/unit/dashboard/server/routes/issue-discussions.test.ts"
+    ],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "docs/DEFINITION-OF-DONE.md",
+      "src/lib/github-pr-lookup.ts",
+      "src/lib/lifecycle/dod-gate.ts",
+      "src/lib/lifecycle/dod.ts",
+      "src/lib/lifecycle/workflows.ts",
+      "src/lib/overdeck/pull-requests.ts",
+      "tests/unit/dashboard/server/routes/issue-pr.test.ts",
+      "tests/unit/lib/lifecycle/dod-gate.test.ts",
+      "tests/unit/lib/lifecycle/workflows.test.ts"
+    ],
+    "actualChangedFiles": [
+      "docs/DEFINITION-OF-DONE.md",
+      "src/lib/github-pr-lookup.ts",
+      "src/lib/lifecycle/dod-gate.ts",
+      "src/lib/lifecycle/dod.ts",
+      "src/lib/lifecycle/workflows.ts",
+      "src/lib/overdeck/pull-requests.ts",
+      "tests/unit/dashboard/server/routes/issue-discussions.test.ts",
+      "tests/unit/dashboard/server/routes/issue-pr.test.ts",
+      "tests/unit/lib/lifecycle/dod-gate.test.ts",
+      "tests/unit/lib/lifecycle/workflows.test.ts"
+    ],
+    "recordedAt": "2026-07-26T20:34:03.489Z"
+  },
   "created": "2026-07-26T19:16:39.648Z",
-  "updated": "2026-07-26T20:34:05.955Z",
+  "updated": "2026-07-26T20:34:09.185Z",
   "pipeline": {
     "issueId": "PAN-3155",
     "reviewStatus": "pending",
@@ -25,7 +55,8 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T20:34:05.953Z",
+    "updatedAt": "2026-07-26T20:34:09.145Z",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3160",
     "reviewRequestedAt": "2026-07-26T20:34:05.953Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -56,19 +87,36 @@
         "tests/unit/lib/lifecycle/workflows.test.ts"
       ],
       "recordedAt": "2026-07-26T20:34:03.489Z"
-    },
-    "prUrl": "https://github.com/eltmon/overdeck/pull/3160"
+    }
   },
   "closeOut": {
     "usage": {
-      "byStage": {},
-      "totals": {},
+      "byStage": {
+        "work": {
+          "openai/gpt-5.6-sol": {
+            "input": 885596,
+            "output": 115516,
+            "cacheRead": 46818304,
+            "cacheWrite": 0
+          }
+        }
+      },
+      "totals": {
+        "openai/gpt-5.6-sol": {
+          "input": 885596,
+          "output": 115516,
+          "cacheRead": 46818304,
+          "cacheWrite": 0
+        }
+      },
       "costAtCloseOut": {
-        "usd": 0,
-        "pricingAsOf": "2026-07-26T19:41:17.764Z"
+        "usd": 31.302612,
+        "pricingAsOf": "2026-07-26T20:34:09.179Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/3160"
+    ],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
@@ -159,35 +207,5 @@
     "dod-docs-strike-landing.dod-docs-strike-landing.ac1": "completed",
     "dod-docs-strike-landing.dod-docs-strike-landing.ac2": "completed",
     "dod-docs-strike-landing.dod-docs-strike-landing.ac3": "completed"
-  },
-  "scopeDrift": {
-    "outsideDeclaredScope": [
-      "tests/unit/dashboard/server/routes/issue-discussions.test.ts"
-    ],
-    "declaredScopeUntouched": [],
-    "declaredScope": [
-      "docs/DEFINITION-OF-DONE.md",
-      "src/lib/github-pr-lookup.ts",
-      "src/lib/lifecycle/dod-gate.ts",
-      "src/lib/lifecycle/dod.ts",
-      "src/lib/lifecycle/workflows.ts",
-      "src/lib/overdeck/pull-requests.ts",
-      "tests/unit/dashboard/server/routes/issue-pr.test.ts",
-      "tests/unit/lib/lifecycle/dod-gate.test.ts",
-      "tests/unit/lib/lifecycle/workflows.test.ts"
-    ],
-    "actualChangedFiles": [
-      "docs/DEFINITION-OF-DONE.md",
-      "src/lib/github-pr-lookup.ts",
-      "src/lib/lifecycle/dod-gate.ts",
-      "src/lib/lifecycle/dod.ts",
-      "src/lib/lifecycle/workflows.ts",
-      "src/lib/overdeck/pull-requests.ts",
-      "tests/unit/dashboard/server/routes/issue-discussions.test.ts",
-      "tests/unit/dashboard/server/routes/issue-pr.test.ts",
-      "tests/unit/lib/lifecycle/dod-gate.test.ts",
-      "tests/unit/lib/lifecycle/workflows.test.ts"
-    ],
-    "recordedAt": "2026-07-26T20:34:03.489Z"
   }
 }
