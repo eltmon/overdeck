@@ -4,17 +4,17 @@
     "created": "2026-07-25T23:05:00.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3083: Passed+ready issues get re-dispatched for review, knocking them out of the ready queue and invalidating UAT generations",
-    "updated": "2026-07-25T22:51:46.113Z"
+    "updated": "2026-07-26T00:56:55.265Z"
   },
   "plan": {
     "id": "pan-3083",
     "title": "Passed+ready issues get re-dispatched for review, knocking them out of the ready queue and invalidating UAT generations",
-    "status": "running",
+    "status": "completed",
     "uid": "9192640e-e87f-445a-a0e9-c4b76e52fe8d",
     "author": "agent:claude-fable-5",
-    "sequence": 6,
+    "sequence": 7,
     "created": "2026-07-25T23:05:00.000Z",
-    "updated": "2026-07-25T22:51:46.113Z",
+    "updated": "2026-07-26T00:56:55.265Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3083",
@@ -390,5 +390,5 @@
       "canonicalFilename": "2026-07-25-PAN-3083-passed-ready-issues-get-re-dispatched-for-review-knocking-them-out-of-the-ready-queue-and-invalidating-uat-generations.xbrief.json"
     }
   },
-  "status": "active"
+  "status": "completed"
 }
