@@ -40,7 +40,7 @@ import { _serverManagedMerges } from '../specialists.js';
 import { completePendingOperation, getPendingOperation, getProjectPath, getWorkspaceInfoForIssue, readJsonBody, setPendingOperation, setReviewStatus } from '../workspaces.js';
 import { buildLocalMainRecoveryError } from './git-recovery-advice.js';
 import { internalStrikeMergeRoute } from './internal-strike-merge.js';
-import { activeStrikeMerge, ensureAgentReadyForMerge, mergeCompletionStatus, mergeVerificationOptions, normalMergeEligibility, recordCiGreenVerificationVerdict, validateStrikeMergeRequest, type StrikeMergeRequest, type TriggerMergeRequest, type TriggerMergeResult } from './merge-strike.js';
+import { activeStrikeMerge, mergeCompletionStatus, mergeVerificationOptions, normalMergeEligibility, prepareWorkAgentForRebase, recordCiGreenVerificationVerdict, validateStrikeMergeRequest, type StrikeMergeRequest, type TriggerMergeRequest, type TriggerMergeResult } from './merge-strike.js';
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
 export const shouldBlockApproveForDirtyStatus = (status: string): boolean =>
@@ -616,19 +616,21 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
 
       const reposNeedingRebase = activeRepos.filter(repo => !alreadyRebased.has(repo.repoKey));
 
-      if (reposNeedingRebase.length > 0 && !await Effect.runPromise(sessionExists(agentId))) {
-        const error = `Work agent ${agentId} is not running. Polyrepo merge requires the work agent to rebase every affected repo and push.`;
-        setReviewStatus(issueId, { mergeStatus: 'failed', readyForMerge: false, mergeNotes: error });
-        completePendingOperation(issueId, error);
-        return { success: false, statusCode: 400, error };
-      }
-
       if (reposNeedingRebase.length > 0) {
         const rebaseInstructions = reposNeedingRebase.map((repo, index) => (
           `${index + 1}. cd ${repo.repoKey}\n   git fetch origin ${repo.targetBranch}\n   git rebase origin/${repo.targetBranch}\n   git push --force-with-lease`
         )).join('\n');
         const rebaseMsg = `MERGE REQUESTED: The human has clicked MERGE for ${issueId}. Rebase and push every affected repo in this merge set:\n\n${rebaseInstructions}\n\nResolve any conflicts in the workspaces above, complete every rebase, and push all affected branches. Do NOT merge PRs/MRs yourself.`;
-        await messageAgent(agentId, rebaseMsg);
+
+        // PAN-3120: a polyrepo merge needs the work agent to rebase every repo,
+        // and the scheduler routinely yields idle work agents to free slots — so
+        // refusing here made a system-chosen pause look like an operator dead
+        // end. Resume it (same recovery the single-repo path uses) and say so.
+        const prep = await prepareWorkAgentForRebase({ issueId, workspacePath, agentId, rebaseMsg, scopeNote: `${reposNeedingRebase.length} repo(s)`, setStatus: u => setReviewStatus(issueId, u) });
+        if (!prep.ok) {
+          completePendingOperation(issueId, prep.error);
+          return { success: false, statusCode: 400, error: prep.error };
+        }
       }
 
       const REBASE_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes — complex polyrepo rebases need time for conflict resolution
@@ -917,11 +919,9 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
 
     setReviewStatus(issueId, { mergeStep: 'rebasing' });
     console.log(`[merge] Rebasing ${branchName} onto ${targetBranch} for ${issueId} (agent=${await Effect.runPromise(sessionExists(agentId)) ? 'running' : 'stopped'})...`);
-    {
-      const { beginShipLog, appendShipLog } = await import('../../../../lib/cloister/ship-log.js');
-      beginShipLog(issueId);
-      appendShipLog(issueId, `Ship started: rebasing ${branchName} onto ${targetBranch}…`, 'rebasing');
-    }
+    const { beginShipLog, appendShipLog } = await import('../../../../lib/cloister/ship-log.js');
+    beginShipLog(issueId);
+    appendShipLog(issueId, `Ship started: rebasing ${branchName} onto ${targetBranch}…`, 'rebasing');
 
     let rebaseResult: { success: boolean; reason?: string; conflictFiles?: string[]; newHead?: string };
 
@@ -934,11 +934,9 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
       rebaseResult = { success: true, newHead: currentHead };
     } else {
       try {
-        const recovery = await ensureAgentReadyForMerge(issueId, workspacePath, rebaseMsg, {
-          agentId,
-          allowFreshStart: request.kind !== 'strike',
-        });
-        console.log(`[merge] ${recovery.detail}`);
+        // PAN-3120: the scheduler may have yielded this agent — resume it and narrate it.
+        const prep = await prepareWorkAgentForRebase({ issueId, workspacePath, agentId, rebaseMsg, allowFreshStart: request.kind !== 'strike', scopeNote: branchName, setStatus: u => setReviewStatus(issueId, u) });
+        if (!prep.ok) throw new Error(prep.error);
 
         // Poll for the push: check if remote HEAD changed
         const { stdout: headBefore } = await execAsync(
@@ -1075,7 +1073,6 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
       }
     }
 
-    const { appendShipLog } = await import('../../../../lib/cloister/ship-log.js');
     if (skipLocalVerification) {
       appendShipLog(issueId, '✓ Local verification skipped — CI already green on this exact commit', 'verifying');
     }
