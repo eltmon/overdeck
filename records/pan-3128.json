@@ -189,7 +189,7 @@
     "recordedAt": "2026-07-26T13:30:54.544Z"
   },
   "created": "2026-07-26T12:24:12.648Z",
-  "updated": "2026-07-26T15:38:56.024Z",
+  "updated": "2026-07-26T17:39:42.223Z",
   "pipeline": {
     "issueId": "PAN-3128",
     "reviewStatus": "passed",
@@ -200,62 +200,27 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T13:31:33.728Z",
-    "updatedAt": "2026-07-26T15:38:54.134Z",
-    "reviewNotes": "Agent re-review request (4/25): Fixed review issues",
-    "testNotes": "Skipped: no code changed since pre-review verification gate",
-    "verificationNotes": "Pre-review verification already covered the reviewed commit",
-    "inspectNotes": "All 5 ACs verified: installAndBuild only ever receives the detached worktree (asserted across clean/dirty/ahead/behind); dirty + HEAD-divergence emit notes and continue; build failure propagates with 'old dashboard left running' -> exitCode 1 and removes worktree + dist.incoming in finally; grep merge-base on reload.ts returns no matches; typecheck clean and build-from-origin.test.ts 7/7 pass.",
+    "updatedAt": "2026-07-26T17:39:42.184Z",
+    "blockerReasons": [
+      {
+        "type": "merge_conflict",
+        "summary": "Merge conflict with target branch",
+        "detectedAt": "2026-07-26T17:39:42.183Z"
+      }
+    ],
     "prUrl": "https://github.com/eltmon/overdeck/pull/3141",
     "reviewedAtCommit": "9628312af60685c3beef95a2c1530d76033d6a63",
     "lastVerifiedCommit": "9628312af60685c3beef95a2c1530d76033d6a63",
-    "reviewSpawnedAt": "2026-07-26T15:33:00.225Z",
-    "scopeDrift": {
-      "outsideDeclaredScope": [
-        "src/cli/commands/__tests__/reload.test.ts",
-        "tests/unit/dashboard/identity.test.ts"
-      ],
-      "declaredScopeUntouched": [],
-      "declaredScope": [
-        "docs/DEFINITION-OF-DONE.md",
-        "docs/OVERDECK_DEV_SOP.md",
-        "roles/flywheel.md",
-        "src/cli/commands/reload.ts",
-        "src/dashboard/server/tsdown.config.ts",
-        "src/lib/deploy/build-from-origin.ts",
-        "src/lib/deploy/build-info.ts",
-        "src/lib/lifecycle/dod-gate.ts",
-        "sync-sources/skills/pan-reload/SKILL.md",
-        "tests/unit/lib/deploy/build-from-origin.test.ts",
-        "tests/unit/lib/deploy/build-info.test.ts",
-        "tests/unit/lib/lifecycle/dod-gate.test.ts"
-      ],
-      "actualChangedFiles": [
-        "docs/DEFINITION-OF-DONE.md",
-        "docs/OVERDECK_DEV_SOP.md",
-        "roles/flywheel.md",
-        "src/cli/commands/__tests__/reload.test.ts",
-        "src/cli/commands/reload.ts",
-        "src/dashboard/server/tsdown.config.ts",
-        "src/lib/deploy/build-from-origin.ts",
-        "src/lib/deploy/build-info.ts",
-        "src/lib/lifecycle/dod-gate.ts",
-        "sync-sources/skills/pan-reload/SKILL.md",
-        "tests/unit/dashboard/identity.test.ts",
-        "tests/unit/lib/deploy/build-from-origin.test.ts",
-        "tests/unit/lib/deploy/build-info.test.ts",
-        "tests/unit/lib/lifecycle/dod-gate.test.ts"
-      ],
-      "recordedAt": "2026-07-26T13:30:54.544Z"
-    }
+    "reviewSpawnedAt": "2026-07-26T15:33:00.225Z"
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 29954156,
-            "output": 499751,
-            "cacheRead": 119401472,
+            "input": 29956155,
+            "output": 500438,
+            "cacheRead": 120019968,
             "cacheWrite": 0
           }
         },
@@ -302,15 +267,15 @@
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 51684396,
-          "output": 1735575,
-          "cacheRead": 410650112,
+          "input": 51686395,
+          "output": 1736262,
+          "cacheRead": 411268608,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 515.814286,
-        "pricingAsOf": "2026-07-26T15:38:56.020Z"
+        "usd": 516.154139,
+        "pricingAsOf": "2026-07-26T17:39:42.214Z"
       }
     },
     "merges": [
