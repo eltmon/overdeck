@@ -166,7 +166,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T00:35:36.057Z",
-  "updated": "2026-07-26T02:12:27.231Z",
+  "updated": "2026-07-26T02:12:32.955Z",
   "pipeline": {
     "issueId": "PAN-1696",
     "reviewStatus": "reviewing",
@@ -175,7 +175,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T02:12:25.129Z",
+    "updatedAt": "2026-07-26T02:12:32.851Z",
     "reviewNotes": "Agent re-review request (2/25): Fixed all review blockers: type errors, dependency removal, per-project iteration, deacon-ignored filtering",
     "verificationNotes": "Verification FAILED at test (413986ms):\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-1696/src/dashboard/frontend\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-1696\n\nNo test files found, exiting with code 0\n\nstdout | tests/integration/merge-validation.test.ts > merge-validation integration > auto-revert workflow > should revert merge when validation fails\n[validation] Auto-reverting merge in /tmp/pan-mv-7lUZsY\n\nstdout | tests/integration/merge-validation.test.ts > merge-validation integration > auto-revert workflow > should revert merge when validation fails\n[validation] Auto-reverting merge in /tmp/pan-mv-tTAxCT\n\n ❯ |root| tests/integration/merge-validation.test.ts (7 tests | 1 failed) 357ms\n       × should revert merge when validation fails 190ms (retry x1)\n ❯ |root| tests/unit/lib/workspace-manager-pre-rebase.test.ts (7 tests | 2 failed) 472ms\n     × preserves an existing project pre-rebase hook for human shells 101ms (retry x1)\n     × allows rebases from human shells without an agent id 98ms (retry x1)\nstdout | tests/unit/lib/cloister/validation.test.ts > validation > autoRevertMerge > should revert last commit when successful\n[validation] Auto-reverting merge in /tmp/overdeck-validation-test-1785029237143-zq120uj83g\n\nstdout | tests/unit/lib/cloister/validation.test.ts > validation > autoRevertMerge > should revert last commit when successful\n[validation] Auto-reverting merge in /tmp/overdeck-validation-test-1785029237204-g5uqwju8smp\n\n ❯ |root| tests/unit/lib/cloister/validation.test.ts (11 tests | 1 failed) 188ms\n       × should revert last commit when successful 128ms (retry x1)\n ❯ |root| src/lib/pan-dir/__tests__/record-update.test.ts (3 tests | 2 failed) 968ms\n     × restores retryable state when a remote-ref race survives reconciliation 377ms (retry x1)\n     × replays the concrete record mutation after a concurrent overdeck-state advance 452ms (retry x1)\n ❯ |root| tests/unit/lib/overdeck/control-settings.test.ts (13 tests | 1 failed) 25ms\n     × setFly\n…(4696 chars elided)…\nan-auto-resume-gating-WZ9YFs/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Found workspace: /tmp/pan-auto-resume-gating-WZ9YFs/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace: /tmp/pan-auto-resume-gating-WZ9YFs/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace: /tmp/pan-auto-resume-gating-WZ9YFs/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace: /tmp/pan-auto-resume-gating-WZ9YFs/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with plann\n...(truncated)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/1822",
@@ -243,7 +243,7 @@
       },
       "costAtCloseOut": {
         "usd": 76.09811499999999,
-        "pricingAsOf": "2026-07-26T02:12:25.383Z"
+        "pricingAsOf": "2026-07-26T02:12:32.909Z"
       }
     },
     "merges": [
@@ -252,7 +252,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-haiku-4-5",
   "tasks": {
     "sequence": 11,
     "claims": {
