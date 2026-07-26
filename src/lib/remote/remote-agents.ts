@@ -11,6 +11,7 @@
  */
 
 import { Effect } from 'effect';
+import { randomUUID } from 'node:crypto';
 import { createFlyProvider } from './fly-provider.js';
 import type { FlyProvider } from './fly-provider.js';
 import type { RemoteWorkspaceMetadata, ExecResult } from './interface.js';
@@ -18,6 +19,7 @@ import { join } from 'path';
 import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync } from 'fs';
 import { homedir } from 'os';
 import { getManagedTmuxSocketName } from '../tmux.js';
+import { assertValidDedupKey, dedupPendingOptionName, dedupTerminalOptionName } from '../tmux-dedup.js';
 import { generateLauncherScriptSync } from '../launcher-generator.js';
 import { getClaudePermissionFlagsSync, getClaudePermissionFlagsStringSync } from '../claude-permissions.js';
 import { resolveProjectForIssue } from '../pan-dir/record.js';
@@ -721,6 +723,97 @@ export async function sendToRemoteAgent(
   await new Promise(resolve => setTimeout(resolve, 300));
   await runSsh(fly, vmName, buildRemoteTmuxCommand(['send-keys', '-t', agentId, 'C-m']));
   await runSsh(fly, vmName, `rm -f ${shellQuote(promptFile)}`);
+}
+
+export type RemoteKeyedDeliveryOutcome = 'delivered' | 'deduplicated';
+
+/** Injectable command runner for tests — resolves with the command's stdout. */
+export type RemoteKeyedExec = (command: string) => Promise<string>;
+
+/**
+ * Keyed remote delivery (PAN-2997 review cycle 7). The REMOTE tmux server is
+ * the crash-independent component: it survives both the local dashboard and
+ * the remote agent shell, so the same two-phase pending/terminal marker
+ * protocol as the local tmux tier (src/lib/tmux-dedup.ts) enforces the dedup
+ * key across the complete paste-settle-submit transaction. A local dashboard
+ * crash anywhere in the sequence replays into either a completed pending
+ * submission (no second paste) or a terminal-marker dedup — never a lost or
+ * duplicated wake.
+ */
+export async function sendToRemoteAgentKeyed(
+  agentId: string,
+  vmName: string,
+  message: string,
+  dedupKey: string,
+  exec?: RemoteKeyedExec,
+): Promise<RemoteKeyedDeliveryOutcome> {
+  assertValidDedupKey(dedupKey);
+
+  let run: RemoteKeyedExec;
+  if (exec) {
+    run = exec;
+  } else {
+    const fly = createFlyProvider();
+    await ensureRemoteTmuxContext(fly, vmName);
+    run = async (command: string) => (await runSsh(fly, vmName, command)).stdout;
+  }
+
+  const pendingOption = dedupPendingOptionName(dedupKey);
+  const terminalOption = dedupTerminalOptionName(dedupKey);
+  const sendId = randomUUID();
+  const bufferName = `pan-keyed-${sendId}`;
+  const promptFile = `${REMOTE_PAN_DIR}/prompts/${agentId}-keyed-${sendId}.txt`;
+  // Inner marker reads must target the managed remote server explicitly —
+  // the if-shell condition cannot rely on a TMUX env the remote server may
+  // not have inherited.
+  const innerTmux = ['tmux', ...getRemoteTmuxBaseArgs()].map(shellQuote).join(' ');
+
+  const cleanup = async (): Promise<void> => {
+    await run(buildRemoteTmuxCommand(['delete-buffer', '-b', bufferName])).catch(() => '');
+    await run(`rm -f ${shellQuote(promptFile)}`).catch(() => '');
+  };
+
+  try {
+    const messageBase64 = Buffer.from(message).toString('base64');
+    await run(
+      `mkdir -p ${shellQuote(`${REMOTE_PAN_DIR}/prompts`)} && echo ${shellQuote(messageBase64)} | base64 -d > ${shellQuote(promptFile)}`,
+    );
+    await run(buildRemoteTmuxCommand(['load-buffer', '-b', bufferName, promptFile]));
+
+    // One server-side command: paste only when NEITHER marker is set, and
+    // record OUR sendId in the pending option in the same breath.
+    const condition =
+      `test -z "$(${innerTmux} show-option -qv -t ${agentId} ${pendingOption})" && ` +
+      `test -z "$(${innerTmux} show-option -qv -t ${agentId} ${terminalOption})"`;
+    const onTrue = `paste-buffer -b ${bufferName} -p -t ${agentId} \; set-option -t ${agentId} ${pendingOption} ${sendId}`;
+    await run(buildRemoteTmuxCommand(['if-shell', '-t', agentId, condition, onTrue]));
+
+    const readMarker = async (option: string): Promise<string> =>
+      run(buildRemoteTmuxCommand(['show-option', '-qv', '-t', agentId, option]))
+        .then(stdout => stdout.trim(), () => '');
+    const pendingMarker = await readMarker(pendingOption);
+    const terminalMarker = await readMarker(terminalOption);
+
+    if (terminalMarker !== '') return 'deduplicated';
+    if (pendingMarker === '') {
+      throw new Error(`Keyed remote paste for ${agentId} did not land and no dedup marker was recorded`);
+    }
+
+    // 'pasted' (our sendId) and 'submit-pending' (a prior crashed attempt's
+    // sendId) both complete the same transaction WITHOUT re-pasting: settle,
+    // Enter, then flip the key terminal and clear the pending claim in one
+    // server-side command.
+    await new Promise(resolve => setTimeout(resolve, 300));
+    await run(buildRemoteTmuxCommand(['send-keys', '-t', agentId, 'C-m']));
+    await run(buildRemoteTmuxCommand([
+      'set-option', '-t', agentId, terminalOption, '1',
+      ';',
+      'set-option', '-u', '-t', agentId, pendingOption,
+    ]));
+    return 'delivered';
+  } finally {
+    await cleanup();
+  }
 }
 
 /**

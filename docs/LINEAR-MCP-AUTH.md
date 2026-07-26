@@ -168,25 +168,53 @@ has not yet been notified:
   a *completed* delivery whose ack was lost to a dashboard crash — that is
   why the wake key (`linear-mcp-auth-wake:<lifecycleId>`) is also threaded
   through `messageAgentWithOutcome` into `deliverAgentMessage`, where the
-  crash-independent components deduplicate the injection itself:
-  - **PTY supervisor** keeps a per-server set of delivered keys. Its own exit
-    kills the agent with it (H1 lifecycle), so an in-memory set is exactly as
-    durable as the side effect it guards: a replay after a dashboard crash
-    hits the surviving supervisor and gets `{ deduplicated: true }` instead
-    of a second PTY write; a replay after the agent itself died is a
-    legitimate first delivery to the resumed session. A
-    `record-delivered` operation lets paths that bypass the supervisor
-    (resume kickoff prompts) still register the key.
-  - **tmux fallback** marks a per-session user option in the same
-    server-side `if-shell` command that pastes (`sendKeysDedup`), so the
-    check, paste, and mark are one atomic step the tmux server executes —
-    a dashboard exit cannot interrupt it. A deduplicated replay sends no
-    stray Enter, because the composer may hold unrelated operator text.
-  - **Keyed mail backups** use a deterministic filename, so a replayed send
-    overwrites the same durable backup instead of stacking a second copy.
-  - Channels, codex app-server, and ACP tiers receive the key as advisory
-    metadata only; they are unreachable for this feature because the
-    detection hook is Claude-Code-only.
+  crash-independent components deduplicate the injection itself. Only tiers
+  whose crash-independent component enforces the key across the COMPLETE
+  visible side effect may carry a keyed message; the others acknowledge
+  receipt without enforcing the key, so keyed payloads bypass them entirely
+  (auto mode skips them; requesting one explicitly with a key is a loud
+  error, not a silent downgrade):
+  - **PTY supervisor** keeps a per-server set of delivered keys and reserves
+    a key synchronously before injecting, so two concurrent same-key requests
+    coalesce onto one injection instead of racing past the dedup check. Its
+    own exit kills the agent with it (H1 lifecycle), so an in-memory set is
+    exactly as durable as the side effect it guards: a replay after a
+    dashboard crash hits the surviving supervisor and gets
+    `{ deduplicated: true }` instead of a second PTY write; a replay after
+    the agent itself died is a legitimate first delivery to the resumed
+    session. The supervisor's single request covers content AND the
+    standalone Enter, so the key completes only after the full submission.
+  - **tmux fallback** uses two-phase per-session markers owned by the tmux
+    server (`sendKeysDedup` + `completeKeyedSubmit`): the paste and the
+    PENDING marker are one atomic server-side `if-shell` step, the standalone
+    Enter follows after the settle window, and only then does the key flip
+    TERMINAL (pending cleared in the same server-side command). A replay that
+    finds PENDING completes the prior attempt's submission WITHOUT
+    re-pasting; a TERMINAL marker suppresses the replay entirely — a
+    dashboard crash anywhere in the transaction neither loses nor duplicates
+    the wake.
+  - **Monitor mail (PAN-3015) never carries keyed deliveries.** The monitor
+    claims a mail file by renaming it before emitting, so a monitor exit
+    between claim and emit would lose the wake and a post-emit/pre-ack crash
+    would replay it — the spool cannot enforce the key across the
+    model-visible side effect. Keyed messages skip the monitor tier and use
+    the supervisor/tmux door; keyed payloads are also never written as mail
+    backups, because a monitor started later would drain the file as a second
+    visible copy.
+  - **Resume paths (suspended/stopped/zombie)** never let a keyed message
+    ride the resume kickoff prompt: the kickoff is delivered by components
+    that cannot enforce the key. The agent is resumed with its bare
+    auto-continue prompt and the keyed message then goes through the keyed
+    door of the new session.
+  - **Remote agents** run the same two-phase marker protocol against the
+    REMOTE tmux server (`sendToRemoteAgentKeyed`), which is the
+    crash-independent component for a remote session.
+  - Channels, codex app-server, and ACP tiers cannot enforce a key and are
+    rejected for keyed payloads. Keyed Linear wakes only target Claude Code
+    agents anyway — the detection hook is Claude-Code-only.
+  - **Keyed mail queueing** (paused/gated agents) uses a deterministic
+    filename, so a replayed send overwrites the same durable entry instead of
+    stacking a second copy; the outcome is recorded honestly as `queued`.
 - **Recovery semantics.** An agent stays in the wake set until a completion
   DomainEvent lands. When a pass finds no completion, it reads the keyed
   entry (one exact-path async read — no directory scans, no content or

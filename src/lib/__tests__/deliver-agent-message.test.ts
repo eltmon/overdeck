@@ -35,8 +35,8 @@ vi.mock('../tmux.js', () => ({
 }));
 
 vi.mock('../tmux-dedup.js', () => ({
-  sendKeysDedup: vi.fn(async () => 'delivered'),
-  sendEnterKey: vi.fn(async () => undefined),
+  sendKeysDedup: vi.fn(async () => 'pasted'),
+  completeKeyedSubmit: vi.fn(async () => undefined),
 }));
 
 vi.mock('../paths.js', async (importOriginal) => {
@@ -555,32 +555,87 @@ describe('channel bridge delivery', () => {
     }
   });
 
-  it('uses the atomic tmux dedup path for keyed tmux deliveries (PAN-2997)', async () => {
+  it('uses the two-phase tmux dedup path for keyed tmux deliveries (PAN-2997)', async () => {
     const agentId = 'agent-dedup-tmux';
     writeAgentState(agentId, { channelsEnabled: false, deliveryMethod: 'tmux' });
-    const { sendKeysDedup, sendEnterKey } = await import('../tmux-dedup.js');
+    const { sendKeysDedup, completeKeyedSubmit } = await import('../tmux-dedup.js');
     vi.mocked(sendKeysDedup).mockClear();
-    vi.mocked(sendEnterKey).mockClear();
+    vi.mocked(completeKeyedSubmit).mockClear();
 
     const result = await deliverAgentMessage(agentId, 'wake', 'caller-wake', 'tmux', { dedupKey: 'wake:seq-1' });
 
     expect(result).toEqual({ ok: true, path: 'tmux', deduplicated: false });
     expect(vi.mocked(sendKeysDedup)).toHaveBeenCalledWith(agentId, 'wake', 'wake:seq-1', 'caller-wake');
-    expect(vi.mocked(sendEnterKey)).toHaveBeenCalledWith(agentId);
+    expect(vi.mocked(completeKeyedSubmit)).toHaveBeenCalledWith(agentId, 'wake:seq-1');
+  });
+
+  it('completes a crashed pending tmux submission WITHOUT re-pasting (PAN-2997 cycle 7)', async () => {
+    const agentId = 'agent-dedup-tmux-pending';
+    writeAgentState(agentId, { channelsEnabled: false, deliveryMethod: 'tmux' });
+    const { sendKeysDedup, completeKeyedSubmit } = await import('../tmux-dedup.js');
+    vi.mocked(sendKeysDedup).mockClear();
+    vi.mocked(completeKeyedSubmit).mockClear();
+    vi.mocked(sendKeysDedup).mockResolvedValueOnce('submit-pending');
+
+    const result = await deliverAgentMessage(agentId, 'wake', 'caller-wake', 'tmux', { dedupKey: 'wake:seq-1' });
+
+    expect(result).toEqual({ ok: true, path: 'tmux', deduplicated: false });
+    expect(vi.mocked(completeKeyedSubmit)).toHaveBeenCalledWith(agentId, 'wake:seq-1');
   });
 
   it('sends no Enter when the tmux dedup path reports a prior delivery (PAN-2997)', async () => {
     const agentId = 'agent-dedup-tmux-replay';
     writeAgentState(agentId, { channelsEnabled: false, deliveryMethod: 'tmux' });
-    const { sendKeysDedup, sendEnterKey } = await import('../tmux-dedup.js');
+    const { sendKeysDedup, completeKeyedSubmit } = await import('../tmux-dedup.js');
     vi.mocked(sendKeysDedup).mockClear();
-    vi.mocked(sendEnterKey).mockClear();
+    vi.mocked(completeKeyedSubmit).mockClear();
     vi.mocked(sendKeysDedup).mockResolvedValueOnce('deduplicated');
 
     const result = await deliverAgentMessage(agentId, 'wake', 'caller-wake', 'tmux', { dedupKey: 'wake:seq-1' });
 
     expect(result).toEqual({ ok: true, path: 'tmux', deduplicated: true });
-    expect(vi.mocked(sendEnterKey)).not.toHaveBeenCalled();
+    expect(vi.mocked(completeKeyedSubmit)).not.toHaveBeenCalled();
+  });
+
+  it('keyed deliveries SKIP the Channels tier in auto mode and land on keyed tmux (PAN-2997 cycle 7)', async () => {
+    const agentId = 'agent-dedup-channels-skip';
+    writeAgentState(agentId, { channelsEnabled: true });
+    // No supervisor socket — auto mode would normally fall to Channels, which
+    // acknowledges without enforcing the key. The keyed cascade must bypass it.
+    const channelSocketPath = join(socketDir, `agent-${agentId}.sock`);
+    const channelCapture: { lastBody?: string } = {};
+    const channelServer = await startFakeBridge(channelSocketPath, { status: 200, body: 'ok', capture: channelCapture });
+    const { sendKeysDedup, completeKeyedSubmit } = await import('../tmux-dedup.js');
+    vi.mocked(sendKeysDedup).mockClear();
+    vi.mocked(completeKeyedSubmit).mockClear();
+    try {
+      const result = await deliverAgentMessage(agentId, 'wake', 'caller-wake', undefined, { dedupKey: 'wake:seq-1' });
+
+      expect(result).toMatchObject({ ok: true, path: 'tmux', deduplicated: false });
+      expect(channelCapture.lastBody).toBeUndefined();
+      expect(vi.mocked(sendKeysDedup)).toHaveBeenCalledWith(agentId, 'wake', 'wake:seq-1', 'caller-wake');
+      expect(vi.mocked(completeKeyedSubmit)).toHaveBeenCalledWith(agentId, 'wake:seq-1');
+    } finally {
+      await new Promise<void>((r) => channelServer.close(() => r()));
+    }
+  });
+
+  it('rejects an explicit keyed Channels request instead of delivering unenforced (PAN-2997 cycle 7)', async () => {
+    const agentId = 'agent-dedup-channels-explicit';
+    writeAgentState(agentId, { channelsEnabled: true });
+
+    await expect(
+      deliverAgentMessage(agentId, 'wake', 'caller-wake', 'channels', { dedupKey: 'wake:seq-1' }),
+    ).rejects.toThrow(/Channels tier cannot enforce a dedup key/);
+  });
+
+  it('rejects keyed delivery to an ACP target (PAN-2997 cycle 7)', async () => {
+    const agentId = 'agent-dedup-acp';
+    writeAgentState(agentId, { harness: 'acp' });
+
+    await expect(
+      deliverAgentMessage(agentId, 'wake', 'caller-wake', undefined, { dedupKey: 'wake:seq-1' }),
+    ).rejects.toThrow(/ACP tier cannot enforce a dedup key/);
   });
 
   it('codex work agents use live-session delivery instead of exec resume', async () => {

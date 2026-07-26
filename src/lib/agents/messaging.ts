@@ -32,7 +32,6 @@ import { getLatestSessionIdSync } from './activity.js';
 import {
   deliverAgentMessage,
   deliverResumeMessageWithTranscriptConfirmation,
-  recordDeliveredKeyWithSupervisor,
   resilientDeliveryMethod,
 } from './delivery.js';
 import { formatMailFileContent, isMonitorLive } from './monitor-transport.js';
@@ -137,6 +136,40 @@ function deliverWithOptionalKey(
     : deliverAgentMessage(normalizedId, message, caller, deliveryMethod);
 }
 
+/**
+ * Keyed delivery to an agent that must be resumed first (PAN-2997 review
+ * cycle 7). The keyed message NEVER rides the resume kickoff prompt: the
+ * kickoff is delivered by components that cannot enforce the key, so a
+ * dashboard crash after the kickoff but before any post-hoc key bookkeeping
+ * would replay the wake. Instead the agent is resumed with its bare
+ * auto-continue prompt, and the keyed message then goes through the keyed
+ * delivery door, where the crash-independent component — the new session's
+ * supervisor key set or the tmux session's two-phase markers — enforces
+ * at-most-once across the whole replay window.
+ */
+async function resumeThenDeliverKeyed(
+  normalizedId: string,
+  message: string,
+  caller: string,
+  agentState: AgentState | null,
+  dedupKey: string,
+): Promise<MessageDeliveryOutcome> {
+  const { resumeAgent } = await import('../agents.js');
+  const result = await resumeAgent(normalizedId);
+  if (!result.success) {
+    throw new Error(`Failed to auto-resume agent: ${result.error}`);
+  }
+  const delivery = await deliverAgentMessage(
+    normalizedId,
+    message,
+    `messageAgent:${caller}`,
+    resolveAgentDeliveryMethod(agentState),
+    { dedupKey },
+  );
+  await appendTellInterventionForUserSource(normalizedId, caller);
+  return { delivered: delivery.ok, queuedToMail: false };
+}
+
 
 export async function messageAgent(
   agentId: string,
@@ -188,6 +221,9 @@ export async function messageAgent(
       return { delivered: false, queuedToMail: true, reason: gateBlockReason };
     }
     console.log(`[agents] Auto-resuming suspended agent ${normalizedId} to deliver message`);
+    if (opts.dedupKey !== undefined) {
+      return resumeThenDeliverKeyed(normalizedId, message, caller, agentState, opts.dedupKey);
+    }
     const { resumeAgent } = await import('../agents.js');
     const result = await resumeAgent(normalizedId, message);
     if (!result.success) {
@@ -197,11 +233,6 @@ export async function messageAgent(
       throw new Error(`Agent resumed but ready signal did not fire — message not delivered. Feedback is in the mail queue.`);
     }
     // Message already sent during resume
-    if (opts.dedupKey !== undefined) {
-      // The resume kickoff prompt carried the keyed message without the new
-      // supervisor mediating it — record the key so a crash replay dedups.
-      await recordDeliveredKeyWithSupervisor(normalizedId, opts.dedupKey);
-    }
     await appendTellInterventionForUserSource(normalizedId, caller);
     return { delivered: true, queuedToMail: false };
   }
@@ -230,16 +261,21 @@ export async function messageAgent(
     }
     console.log(`[agents] Auto-resuming stopped agent ${normalizedId} to deliver feedback (session exists: ${await Effect.runPromise(sessionExists(normalizedId))})`);
 
+    if (opts.dedupKey !== undefined) {
+      // Keyed deliveries resume bare and then enforce the key at the delivery
+      // door — no kickoff-riding, no post-hoc key recording, and no mail
+      // backup (a keyed mail file is a replay channel: a monitor started
+      // later would drain and print it as a second copy).
+      return resumeThenDeliverKeyed(normalizedId, message, caller, agentState, opts.dedupKey);
+    }
+
     const { resumeAgent } = await import('../agents.js');
     const resumeResult = await resumeAgent(normalizedId, message);
 
     // Save to mail queue regardless so the agent can re-read feedback if needed
-    queueAgentMail(normalizedId, message, false, opts.dedupKey);
+    queueAgentMail(normalizedId, message, false);
 
     if (resumeResult.success && resumeResult.messageDelivered !== false) {
-      if (opts.dedupKey !== undefined) {
-        await recordDeliveredKeyWithSupervisor(normalizedId, opts.dedupKey);
-      }
       await appendTellInterventionForUserSource(normalizedId, caller);
       console.log(`[agents] Resumed ${normalizedId} and delivered feedback`);
       return { delivered: true, queuedToMail: true };
@@ -405,10 +441,23 @@ export async function messageAgent(
   const remoteState = loadRemoteAgentState(normalizedId);
   if (remoteState && remoteState.vmName) {
     console.log(`[agents] Sending message to remote agent ${normalizedId} on ${remoteState.vmName}`);
+    if (opts.dedupKey !== undefined) {
+      // Keyed: the REMOTE tmux server is the crash-independent component and
+      // enforces the key across the complete paste-settle-submit transaction
+      // via the same two-phase marker protocol as the local tmux tier — a
+      // dashboard crash mid-send replays into a dedup, never a second wake.
+      const { sendToRemoteAgentKeyed } = await import('../remote/remote-agents.js');
+      const remoteOutcome = await sendToRemoteAgentKeyed(normalizedId, remoteState.vmName, message, opts.dedupKey);
+      // Durable backup (idempotent keyed filename); the remote agent never
+      // drains the local mail dir, so this cannot replay.
+      queueAgentMail(normalizedId, message, false, opts.dedupKey);
+      await appendTellInterventionForUserSource(normalizedId, caller);
+      return { delivered: true, queuedToMail: true, ...(remoteOutcome === 'deduplicated' ? { reason: 'deduplicated' } : {}) };
+    }
     await sendToRemoteAgent(normalizedId, remoteState.vmName, message);
 
     // Also save to mail queue for persistence
-    queueAgentMail(normalizedId, message, false, opts.dedupKey);
+    queueAgentMail(normalizedId, message, false);
     await appendTellInterventionForUserSource(normalizedId, caller);
     return { delivered: true, queuedToMail: true };
   }
@@ -423,7 +472,14 @@ export async function messageAgent(
   // PAN-1988). Mid-session tells only: kickoff/resume never reach this path
   // (no monitor exists before the session's first turn), and a stale
   // heartbeat or dead pid falls through to the normal cascade.
-  if (expectedHarness === 'claude-code' && isMonitorLive(normalizedId)) {
+  //
+  // KEYED deliveries never take this tier (PAN-2997 review cycle 7): the
+  // monitor claims a mail file by renaming it before emitting, so a monitor
+  // exit between claim and emit loses the wake, and a dashboard crash after
+  // the emit but before the outbox ack replays it — the mail spool cannot
+  // enforce the key across the complete model-visible side effect. Keyed
+  // messages fall through to the supervisor/tmux door, which can.
+  if (expectedHarness === 'claude-code' && opts.dedupKey === undefined && isMonitorLive(normalizedId)) {
     queueAgentMail(normalizedId, message, false, opts.dedupKey, caller);
     logAgentLifecycleSync(normalizedId, `messageAgent delivered via monitor mail (caller: ${caller})`);
     console.log(`[agents] Delivered message to ${normalizedId} via monitor inbox`);
@@ -469,14 +525,14 @@ export async function messageAgent(
   const panePids = await Effect.runPromise(listPaneValues(normalizedId, '#{pane_pid}'));
   if (panePids.length > 0 && !(await hasAgentRuntimeInSubtree(panePids[0], expectedHarness))) {
     console.warn(`[agents] ${normalizedId} tmux session is a zombie (no ${expectedHarness} runtime) — attempting resume`);
+    if (opts.dedupKey !== undefined) {
+      return resumeThenDeliverKeyed(normalizedId, message, caller, agentState, opts.dedupKey);
+    }
     const { resumeAgent } = await import('../agents.js');
     const resumeResult = await resumeAgent(normalizedId, message);
     if (resumeResult.success) {
       const delivered = resumeResult.messageDelivered !== false;
       if (delivered) {
-        if (opts.dedupKey !== undefined) {
-          await recordDeliveredKeyWithSupervisor(normalizedId, opts.dedupKey);
-        }
         await appendTellInterventionForUserSource(normalizedId, caller);
       }
       return { delivered, queuedToMail: false };
@@ -498,9 +554,14 @@ export async function messageAgent(
 
   // Save a durable backup. Unlike `.pending.md` busy-turn mail, the Codex hook
   // does not replay ordinary `.md` backups because they have already landed.
-  queueAgentMail(normalizedId, message, false, opts.dedupKey);
+  // Keyed deliveries skip the backup: the caller's outbox is the durable
+  // receipt, and a keyed mail file is a replay channel — a monitor started
+  // later would drain and print it as a second visible copy (cycle 7).
+  if (opts.dedupKey === undefined) {
+    queueAgentMail(normalizedId, message, false);
+  }
   await appendTellInterventionForUserSource(normalizedId, caller);
-  return { delivered: delivery.ok, queuedToMail: true };
+  return { delivered: delivery.ok, queuedToMail: opts.dedupKey === undefined };
 }
 
 export async function messageAgentWithOutcome(

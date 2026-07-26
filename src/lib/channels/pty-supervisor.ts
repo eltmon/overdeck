@@ -61,13 +61,6 @@ export interface PtySupervisorPayload {
    * dedup instead of a second PTY write.
    */
   dedupKey?: string;
-  /**
-   * When 'record-delivered', no content is injected — the key is simply added
-   * to the dedup set. Used when the message reached the agent through a
-   * channel the supervisor did not mediate (e.g. a resume kickoff prompt),
-   * so a later keyed replay still deduplicates.
-   */
-  op?: 'record-delivered';
 }
 
 /** Max accepted dedup key length; keys are free-form caller namespaces. */
@@ -134,13 +127,6 @@ async function readJsonBody(req: IncomingMessage): Promise<unknown> {
 function parsePayload(value: unknown): PtySupervisorPayload | null {
   if (value === null || typeof value !== 'object') return null;
   const payload = value as Partial<PtySupervisorPayload>;
-  if (payload.op === 'record-delivered') {
-    // Key-only operation: no content required.
-    return typeof payload.dedupKey === 'string' && payload.dedupKey.length > 0
-      && payload.dedupKey.length <= DEDUP_KEY_MAX_CHARS
-      ? payload as PtySupervisorPayload
-      : null;
-  }
   if (typeof payload.content !== 'string' || payload.content.length === 0) return null;
   if (payload.content.length > INPUT_PURGE_MAX_CHARS) return null;
   if (payload.echo !== undefined && typeof payload.echo !== 'boolean') return null;
@@ -409,6 +395,12 @@ export function createPtySupervisorServer(agentId: string, child: pty.IPty): Ser
   // dashboard, whose crash between the supervisor's injection and the
   // dashboard's own ack bookkeeping is exactly the replay this suppresses.
   const deliveredDedupKeys = new Set<string>();
+  // In-flight keyed injections. The reservation is made SYNCHRONOUSLY before
+  // the first await of the injection, so two concurrent same-key requests can
+  // never both pass the dedup check and inject twice (review cycle 7): the
+  // second coalesces onto the first attempt's promise and answers dedup if it
+  // succeeded, or becomes the next attempt if it failed.
+  const inFlightDedupKeys = new Map<string, { promise: Promise<void>; settle: (error?: unknown) => void }>();
 
   return createServer(async (req, res) => {
     if (req.method !== 'POST') {
@@ -434,32 +426,62 @@ export function createPtySupervisorServer(agentId: string, child: pty.IPty): Ser
       return;
     }
 
-    if (payload.dedupKey !== undefined && deliveredDedupKeys.has(payload.dedupKey)) {
-      // Already injected (or recorded) — suppress the replay. This is what
-      // keeps a dashboard crash-and-recovery from delivering the same keyed
-      // message twice.
-      writeJson(res, 200, { ok: true, deduplicated: true });
-      return;
-    }
-
-    if (payload.op === 'record-delivered') {
+    if (payload.dedupKey !== undefined) {
       const key = payload.dedupKey;
-      if (key === undefined) {
-        writeJson(res, 400, { error: 'dedupKey is required for record-delivered' });
-        return;
+      // Coalesce concurrent same-key deliveries. The loop re-checks after
+      // each await: a waiter that watched a FAILED attempt re-enters and may
+      // find another waiter already holding the fresh reservation.
+      for (;;) {
+        if (deliveredDedupKeys.has(key)) {
+          // Already injected — suppress the replay. This is what keeps a
+          // dashboard crash-and-recovery from delivering the same keyed
+          // message twice.
+          writeJson(res, 200, { ok: true, deduplicated: true });
+          return;
+        }
+        const inFlight = inFlightDedupKeys.get(key);
+        if (inFlight === undefined) break;
+        try {
+          await inFlight.promise;
+        } catch {
+          // The first attempt failed — loop to re-check and retry.
+        }
       }
-      deliveredDedupKeys.add(key);
-      writeJson(res, 200, { ok: true, recorded: true });
+
+      // Reserve the key synchronously, before any injection await.
+      let settle!: (error?: unknown) => void;
+      const promise = new Promise<void>((resolve, reject) => {
+        settle = (error?: unknown) => {
+          if (error === undefined) resolve();
+          else reject(error);
+        };
+      });
+      // A rejected reservation with no coalesced waiter must not surface as
+      // an unhandled rejection.
+      promise.catch(() => {});
+      inFlightDedupKeys.set(key, { promise, settle });
+
+      try {
+        await injectPtyMessage(child, agentId, payload);
+        // Completed only after a confirmed injection, inside the
+        // supervisor's own crash boundary — the dashboard cannot interrupt
+        // this ordering.
+        deliveredDedupKeys.add(key);
+        inFlightDedupKeys.delete(key);
+        settle();
+        writeJson(res, 200, 'ok');
+      } catch (error) {
+        // Release the reservation so a later retry can attempt the injection.
+        inFlightDedupKeys.delete(key);
+        settle(error);
+        const message = error instanceof Error ? error.message : String(error);
+        writeJson(res, 502, { error: message });
+      }
       return;
     }
 
     try {
       await injectPtyMessage(child, agentId, payload);
-      if (payload.dedupKey !== undefined) {
-        // Recorded only after a confirmed injection, inside the supervisor's
-        // own crash boundary — the dashboard cannot interrupt this ordering.
-        deliveredDedupKeys.add(payload.dedupKey);
-      }
       writeJson(res, 200, 'ok');
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
