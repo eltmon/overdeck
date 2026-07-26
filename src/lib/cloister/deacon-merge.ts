@@ -11,6 +11,7 @@ import { withConcurrencyLimit } from '../concurrency.js';
 import { loadReviewStatuses, setReviewStatusSync, reviewGatesPassedSync } from '../review-status.js';
 import { resolveProjectFromIssueSync } from '../projects.js';
 import { resolveGitHubIssueSync } from '../tracker-utils.js';
+import { getMergeSetSync } from '../merge-set.js';
 import { sessionExistsSync, sendKeys } from '../tmux.js';
 import { isAgentIdleForNudge } from './agent-idle.js';
 import { loadCloisterConfig } from './config.js';
@@ -155,6 +156,15 @@ export async function reconcileStaleMergeStatus(): Promise<string[]> {
       const project = resolveProjectFromIssueSync(issueId);
       if (!project) continue;
 
+      const githubIssue = resolveGitHubIssueSync(issueId);
+      const mergeSet = getMergeSetSync(issueId);
+      const hasNonGitHubRepos = mergeSet?.repos.some((repo) => repo.forge !== 'github') ?? false;
+      const shouldObserveForge = !githubIssue.isGitHub || hasNonGitHubRepos;
+      const mergeRelevant = status.readyForMerge === true
+        || ['merging', 'verifying', 'queued', 'failed'].includes(status.mergeStatus ?? '')
+        || mergeSet?.status === 'merging'
+        || mergeSet?.status === 'failed';
+
       // Closed-out issues are TERMINAL: close-out flips the spec to
       // completed/cancelled and clears review status. Treating the cleared/
       // resurrected row as "stale" here re-fires the post-merge handoff,
@@ -223,6 +233,22 @@ export async function reconcileStaleMergeStatus(): Promise<string[]> {
           } catch {
             // gh query failed — leave isMerged as false rather than guess.
           }
+        }
+      }
+
+      if (shouldObserveForge && mergeRelevant) {
+        try {
+          const { observeForgeMergeState } = await import('./merge-completeness.js');
+          const observation = await observeForgeMergeState(issueId);
+          const unverifiable = observation.repos.filter((repo) => repo.state === 'unverifiable');
+          if (unverifiable.length > 0) {
+            console.warn(`[deacon] ${issueId}: forge merge state is unverifiable — ${unverifiable.map((repo) => repo.reason).join('; ')}`);
+            continue;
+          }
+          isMerged = observation.complete && observation.hasPositiveMergedEvidence;
+        } catch (error) {
+          console.warn(`[deacon] ${issueId}: forge merge observation failed — ${error instanceof Error ? error.message : String(error)}`);
+          continue;
         }
       }
 
