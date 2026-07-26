@@ -264,7 +264,7 @@
     "recordedAt": "2026-07-26T16:03:54.970Z"
   },
   "created": "2026-07-26T13:39:19.365Z",
-  "updated": "2026-07-26T16:45:19.995Z",
+  "updated": "2026-07-26T16:47:43.834Z",
   "pipeline": {
     "issueId": "PAN-3138",
     "reviewStatus": "blocked",
@@ -273,7 +273,6 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "panDoneRecoveredAt": "2026-07-26T16:05:42.563Z",
     "updatedAt": "2026-07-26T16:45:19.394Z",
     "reviewNotes": "[correctness] A failed verifying-on-main transition now strands the rest of post-merge lifecycle — `src/lib/cloister/merge-agent.ts:451`",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3143",
