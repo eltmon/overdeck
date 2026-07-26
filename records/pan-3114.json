@@ -54,21 +54,23 @@
     "recordedAt": "2026-07-26T10:37:54.195Z"
   },
   "created": "2026-07-26T08:55:24.679Z",
-  "updated": "2026-07-26T10:40:56.612Z",
+  "updated": "2026-07-26T10:47:35.455Z",
   "pipeline": {
     "issueId": "PAN-3114",
-    "reviewStatus": "pending",
+    "reviewStatus": "passed",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T10:40:13.370Z",
-    "updatedAt": "2026-07-26T10:40:13.800Z",
-    "reviewNotes": "Agent re-review request (1/25): Retry review after agents-db lock during role spawn; no code findings were emitted",
+    "updatedAt": "2026-07-26T10:47:34.496Z",
+    "reviewNotes": "Approved: all requirements implemented; correctness, security, and performance review clean; focused tests, typecheck, lint, and diff check pass.",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "All 4 ACs met: pending->passed stamp with 'uat-promotion' + generation name + 9-char SHA (slice(0,9)); passed/skipped short-circuit to {} so recordUatPromotionVerdicts skips and preserves existing verdict/notes; lastVerifiedCommit = rehydrateHeadAnchor(member.headSha) via conditional spread, omitted on empty headSha; recordUatPromotionVerdicts returns only non-terminal issue IDs and persists via setReviewStatusSync(issueId, stamp, current ?? undefined) — signature verified against src/lib/review-status.ts:147. Head-anchor guard entry expression matches the AST text exactly and the inventory comparison is order-insensitive.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3126",
+    "reviewedAtCommit": "cde4b4cfa471d802dbc9297a6f3efafd172a0a28",
     "reviewRequestedAt": "2026-07-26T10:40:13.370Z",
     "reviewSpawnedAt": "2026-07-26T10:38:01.780Z",
     "scopeDrift": {
@@ -109,9 +111,9 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 637046,
-            "output": 21862,
-            "cacheRead": 6448128,
+            "input": 810580,
+            "output": 88386,
+            "cacheRead": 18901504,
             "cacheWrite": 0
           }
         },
@@ -126,15 +128,15 @@
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 1968166,
-          "output": 86096,
-          "cacheRead": 41575424,
+          "input": 2141700,
+          "output": 152620,
+          "cacheRead": 54028800,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 33.211422,
-        "pricingAsOf": "2026-07-26T10:40:56.602Z"
+        "usd": 42.3015,
+        "pricingAsOf": "2026-07-26T10:47:34.683Z"
       }
     },
     "merges": [
