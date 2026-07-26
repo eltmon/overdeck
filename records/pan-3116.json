@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T09:04:01.632Z",
-  "updated": "2026-07-26T09:26:19.666Z",
+  "updated": "2026-07-26T09:26:41.867Z",
   "pipeline": {
     "issueId": "PAN-3116",
     "reviewStatus": "pending",
@@ -61,8 +61,16 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 2,
-    "claims": {},
+    "sequence": 3,
+    "claims": {
+      "ratchet-audit-allowlist": {
+        "writerId": "agent-pan-3116",
+        "agentId": "agent-pan-3116",
+        "pid": 2524944,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T09:26:41.867Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3116",
@@ -89,6 +97,7 @@
     "rewrite-lint-derive-from-base.rewrite-lint-derive-from-base.ac2": "completed",
     "rewrite-lint-derive-from-base.rewrite-lint-derive-from-base.ac3": "completed",
     "rewrite-lint-derive-from-base.rewrite-lint-derive-from-base.ac4": "completed",
-    "rewrite-lint-derive-from-base.rewrite-lint-derive-from-base.ac5": "completed"
+    "rewrite-lint-derive-from-base.rewrite-lint-derive-from-base.ac5": "completed",
+    "ratchet-audit-allowlist": "running"
   }
 }
