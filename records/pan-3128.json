@@ -228,7 +228,7 @@
     "recordedAt": "2026-07-26T18:09:43.613Z"
   },
   "created": "2026-07-26T12:24:12.648Z",
-  "updated": "2026-07-26T20:04:22.274Z",
+  "updated": "2026-07-26T20:04:43.131Z",
   "pipeline": {
     "issueId": "PAN-3128",
     "reviewStatus": "passed",
@@ -236,10 +236,10 @@
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "merged",
-    "releaseStatus": "pending",
+    "releaseStatus": "skipped",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T18:38:50.655Z",
-    "updatedAt": "2026-07-26T20:04:21.639Z",
+    "updatedAt": "2026-07-26T20:04:42.515Z",
     "reviewNotes": "Canonical deployment review passed: timeout recovery preserves slow-boot deployments, other failures roll back safely, storage stays bounded, and provenance requirements are complete.",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3141",
@@ -361,7 +361,7 @@
       },
       "costAtCloseOut": {
         "usd": 536.959724,
-        "pricingAsOf": "2026-07-26T20:04:22.107Z"
+        "pricingAsOf": "2026-07-26T20:04:42.695Z"
       }
     },
     "merges": [
@@ -370,7 +370,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "k3[1m]",
   "workModel": "gpt-5.6-sol",
   "tasks": {
     "sequence": 8,
