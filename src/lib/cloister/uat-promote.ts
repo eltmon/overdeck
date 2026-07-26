@@ -47,8 +47,49 @@ export interface UatPromoteGitDeps {
   batchChangedFiles(branchName: string): Promise<string[]>;
 }
 
+/**
+ * A merge prepared in a throwaway worktree but NOT pushed. Phase A produces one
+ * per repo; phase B publishes them. The opaque `handle` is whatever the git
+ * implementation needs to find the prepared tree again (a worktree path in the
+ * real wiring).
+ */
+export interface PreparedRepoMerge {
+  repoKey: string;
+  handle: string;
+  mergeSha: string;
+}
+
+/** Per-repo promote operations for one member repo of a polyrepo project. */
+export interface PolyrepoRepoPromoteGit {
+  /** Fetch the repo's target branch and return its head SHA. */
+  targetHeadSha(): Promise<string>;
+  /** Files changed on the target branch since the given SHA. */
+  changedFilesSince(baseSha: string): Promise<string[]>;
+  /** Files this repo's uat branch changes vs its merge-base with the target. */
+  batchChangedFiles(branchName: string): Promise<string[]>;
+  /** Merge the uat branch into the target locally. MUST NOT push. */
+  trialMerge(branchName: string, message: string): Promise<PreparedRepoMerge>;
+  /** Push an already-prepared merge to the target branch. */
+  publishPrepared(prepared: PreparedRepoMerge): Promise<void>;
+  /** Drop a prepared merge's worktree. Must be safe to call twice. */
+  discardPrepared(prepared: PreparedRepoMerge): Promise<void>;
+}
+
 export interface UatPromoteDeps {
   git: UatPromoteGitDeps;
+  /**
+   * Per-repo git for a polyrepo project, keyed by repoKey. Its PRESENCE — not
+   * a repo count — selects the two-phase path: a polyrepo project with a single
+   * contributing repo still has no git repo at its own project root, so the
+   * monorepo path would run git against a non-repo and fail.
+   */
+  polyrepoGit?: ReadonlyMap<string, PolyrepoRepoPromoteGit>;
+  /**
+   * Record that one repo's merge landed, so a retry after a partial publish
+   * skips it. Required whenever polyrepoGit is supplied.
+   */
+  markRepoPromoted?: (name: string, repoKey: string, promotedAt: string) => void;
+  now?: () => Date;
   store: GenerationStorePort & { get(name: string): UatGeneration | null };
   teardownStack(generation: UatGeneration): Promise<void>;
   /**
@@ -127,6 +168,10 @@ export async function promoteUatGeneration(
     };
   }
 
+  if (deps.polyrepoGit) {
+    return promotePolyrepo(gen, projectRoot, deps, deps.polyrepoGit, log);
+  }
+
   const mainSha = await deps.git.fetchMain();
   if (gen.baseSha !== mainSha) {
     // Main moved since assembly. An active flywheel run lands commits on main
@@ -170,14 +215,171 @@ export async function promoteUatGeneration(
 
   // The batch is on main: this generation is done, every other live
   // generation is stale by definition (main moved).
+  return finishPromote(gen, projectRoot, deps, mergeSha, log);
+}
+
+/**
+ * Two-phase polyrepo promote.
+ *
+ * Phase A validates and trial-merges EVERY repo without pushing anything, so
+ * the all-or-nothing decision is made while nothing is published: a failure in
+ * repo 3 of 3 leaves repos 1 and 2 untouched on their remotes.
+ *
+ * Phase B publishes the prepared merges in merge order. A failure partway is
+ * NOT rolled back — undoing a landed merge means force-pushing a member repo's
+ * main, a one-way door. It is instead resumable: each landed repo is stamped
+ * with promoted_at, the result names landed vs pending, the generation stays
+ * promotable, and a retry skips whatever already landed.
+ */
+async function promotePolyrepo(
+  gen: UatGeneration,
+  projectRoot: string,
+  deps: UatPromoteDeps,
+  repoGit: ReadonlyMap<string, PolyrepoRepoPromoteGit>,
+  log: (msg: string) => void,
+): Promise<PromoteResult> {
+  const allRepos = [...(gen.repos ?? [])].sort((a, b) => a.mergeOrder - b.mergeOrder);
+  if (allRepos.length === 0) {
+    return { success: false, reason: 'merge-failed', message: `${gen.name} records no member repos to promote` };
+  }
+
+  const alreadyLanded = allRepos.filter((r) => r.promotedAt);
+  const pending = allRepos.filter((r) => !r.promotedAt);
+  if (alreadyLanded.length > 0) {
+    log(`[uat-promote] ${gen.name}: resuming — ${alreadyLanded.map((r) => r.repoKey).join(', ')} already landed`);
+  }
+  if (pending.length === 0) {
+    return { success: false, reason: 'merge-failed', message: `${gen.name} has already published every member repo` };
+  }
+
+  const missing = pending.filter((r) => !repoGit.has(r.repoKey));
+  if (missing.length > 0) {
+    return {
+      success: false,
+      reason: 'merge-failed',
+      message: `${gen.name}: no promote git deps for repo(s) ${missing.map((r) => r.repoKey).join(', ')}`,
+    };
+  }
+
+  const message = buildPromoteMergeMessage(gen);
+  const prepared: PreparedRepoMerge[] = [];
+  const discardAll = async () => {
+    for (const p of prepared) {
+      await repoGit.get(p.repoKey)!.discardPrepared(p).catch((err) => {
+        log(`[uat-promote] ${gen.name}: discarding ${p.repoKey} trial merge failed: ${err instanceof Error ? err.message : String(err)}`);
+      });
+    }
+  };
+
+  // ── Phase A: validate + trial-merge everything, push nothing ──────────────
+  for (const repo of pending) {
+    const git = repoGit.get(repo.repoKey)!;
+
+    let targetHead: string;
+    try {
+      targetHead = await git.targetHeadSha();
+    } catch (err) {
+      await discardAll();
+      return {
+        success: false,
+        reason: 'merge-failed',
+        message: `${gen.name}: could not read ${repo.repoKey} target head: ${err instanceof Error ? err.message : String(err)}`,
+      };
+    }
+
+    if (repo.baseSha !== targetHead) {
+      // Same disjoint-movement rule as the monorepo path, per repo: reject only
+      // when this repo's target gained commits touching files this repo's uat
+      // branch also changes.
+      const [targetChanged, batchChanged] = await Promise.all([
+        git.changedFilesSince(repo.baseSha),
+        git.batchChangedFiles(repo.branch),
+      ]);
+      const batchSet = new Set(batchChanged);
+      const overlap = targetChanged.filter((f) => batchSet.has(f));
+      if (overlap.length > 0) {
+        await discardAll();
+        return {
+          success: false,
+          reason: 'stale-base',
+          message:
+            `${gen.name} was assembled off ${repo.repoKey}@${repo.baseSha.slice(0, 9)} but that repo is now at ` +
+            `${targetHead.slice(0, 9)}, and the new commits touch ${overlap.length} file(s) this batch also changes ` +
+            `(${overlap.slice(0, 3).join(', ')}${overlap.length > 3 ? ', …' : ''}) — ` +
+            `the tree you tested may not match what would land. Nothing was published. A fresh batch reassembles automatically; re-test before merging.`,
+        };
+      }
+      log(`[uat-promote] ${gen.name}: ${repo.repoKey} base moved ${repo.baseSha.slice(0, 9)} → ${targetHead.slice(0, 9)} with no member-file overlap — proceeding`);
+    }
+
+    try {
+      prepared.push(await git.trialMerge(repo.branch, message));
+    } catch (err) {
+      await discardAll();
+      return {
+        success: false,
+        reason: 'merge-failed',
+        message:
+          `${gen.name}: trial merge failed in ${repo.repoKey} — ` +
+          `${err instanceof Error ? (err.message.split('\n')[0] ?? 'merge failed') : String(err)}. ` +
+          `Nothing was published; the batch is unchanged and still promotable.`,
+      };
+    }
+  }
+
+  log(`[uat-promote] ${gen.name}: all ${prepared.length} repo(s) trial-merged cleanly — publishing`);
+
+  // ── Phase B: publish; a failure here is resumable, never rolled back ──────
+  const landed: Array<{ repoKey: string; mergeSha: string }> = [];
+  const now = deps.now ?? (() => new Date());
+  for (const p of prepared) {
+    try {
+      await repoGit.get(p.repoKey)!.publishPrepared(p);
+    } catch (err) {
+      const stillPending = prepared.slice(prepared.indexOf(p)).map((x) => x.repoKey);
+      await discardAll();
+      return {
+        success: false,
+        reason: 'merge-failed',
+        message:
+          `${gen.name}: published ${landed.length > 0 ? landed.map((l) => l.repoKey).join(', ') : 'no repos'} ` +
+          `but failed on ${p.repoKey} (${err instanceof Error ? (err.message.split('\n')[0] ?? 'push failed') : String(err)}). ` +
+          `Still pending: ${stillPending.join(', ')}. Nothing is rolled back — main is never rewound — ` +
+          `retry the merge and the repos that already landed are skipped.`,
+      };
+    }
+    landed.push({ repoKey: p.repoKey, mergeSha: p.mergeSha });
+    deps.markRepoPromoted?.(gen.name, p.repoKey, now().toISOString());
+  }
+
+  await discardAll();
+
+  const mergeSha = [...alreadyLanded.map((r) => `${r.repoKey}@landed`), ...landed.map((l) => `${l.repoKey}@${l.mergeSha.slice(0, 7)}`)].join(' ');
+  log(`[uat-promote] ${gen.name}: merged to ${landed.length} repo target(s) — ${mergeSha}`);
+
+  return finishPromote(gen, projectRoot, deps, mergeSha, log);
+}
+
+/**
+ * Everything after the merge itself lands: status, verification verdicts, stack
+ * teardown, invalidating the rest of the chain, and the per-issue post-merge
+ * handoff. Shared so the monorepo and polyrepo paths cannot drift.
+ */
+async function finishPromote(
+  gen: UatGeneration,
+  projectRoot: string,
+  deps: UatPromoteDeps,
+  mergeSha: string,
+  log: (msg: string) => void,
+): Promise<PromoteResult> {
   deps.store.update(gen.name, { status: 'promoted' });
   try {
     deps.recordVerification?.(gen, mergeSha);
   } catch (err) {
-    log(`[uat-promote] ${name}: verification verdict recording failed after merge: ${err instanceof Error ? err.message : String(err)}`);
+    log(`[uat-promote] ${gen.name}: verification verdict recording failed after merge: ${err instanceof Error ? err.message : String(err)}`);
   }
   await deps.teardownStack(gen).catch((err) => {
-    log(`[uat-promote] ${name}: stack teardown failed: ${err instanceof Error ? err.message : String(err)}`);
+    log(`[uat-promote] ${gen.name}: stack teardown failed: ${err instanceof Error ? err.message : String(err)}`);
   });
 
   const invalidated: string[] = [];
@@ -189,13 +391,15 @@ export async function promoteUatGeneration(
   }
 
   // Standard per-issue post-merge handoff, exactly once each (PAN-328 guard).
+  // For polyrepo this runs only after EVERY repo published, so a member is
+  // never handed off while part of its work is still unlanded.
   const postMergeStarted: string[] = [];
   for (const member of gen.members) {
     if (deps.firePostMerge(member.issueId, {
       sourceBranch: member.branch,
       verifiedMergedRef: member.headSha || member.branch,
     })) postMergeStarted.push(member.issueId);
-    else log(`[uat-promote] ${name}: post-merge for ${member.issueId} already in flight — skipped`);
+    else log(`[uat-promote] ${gen.name}: post-merge for ${member.issueId} already in flight — skipped`);
   }
 
   return {
@@ -206,6 +410,89 @@ export async function promoteUatGeneration(
     postMergeStarted,
     invalidated,
   };
+}
+
+/**
+ * Real per-repo promote wiring for a polyrepo project (PAN-3093), keyed by
+ * repoKey. Each repo merges its own uat branch into its own target branch in a
+ * throwaway detached worktree.
+ *
+ * The split that makes phase A safe: trialMerge does everything EXCEPT the
+ * push, and leaves the worktree in place so publishPrepared only has to push
+ * it. Nothing reaches a remote until every repo has produced a merge commit
+ * locally.
+ */
+export function buildPolyrepoUatPromoteGitDeps(
+  repos: ReadonlyArray<{ repoKey: string; repoPath: string; targetBranch?: string }>,
+): Map<string, PolyrepoRepoPromoteGit> {
+  const runGit = (args: string[], cwd: string) =>
+    execFileAsync('git', args, { cwd, maxBuffer: 16 * 1024 * 1024 });
+
+  return new Map(
+    repos.map((repo) => {
+      const target = repo.targetBranch ?? 'main';
+      const originTarget = `origin/${target}`;
+      const worktreeFor = (branchName: string) =>
+        join(tmpdir(), `uat-promote-${repo.repoKey}-${branchName.replace(/[^a-z0-9]/gi, '-')}`);
+
+      const git: PolyrepoRepoPromoteGit = {
+        targetHeadSha: async () => {
+          await runGit(['fetch', 'origin', target], repo.repoPath);
+          return (await runGit(['rev-parse', originTarget], repo.repoPath)).stdout.trim();
+        },
+
+        changedFilesSince: async (baseSha) => {
+          if (!/^[0-9a-f]{7,40}$/i.test(baseSha)) throw new Error(`unsafe base sha: ${baseSha}`);
+          const { stdout } = await runGit(['diff', '--name-only', `${baseSha}..${originTarget}`], repo.repoPath);
+          return stdout.split('\n').map((l) => l.trim()).filter(Boolean);
+        },
+
+        batchChangedFiles: async (branchName) => {
+          const safeBranch = safeUatBranchName(branchName);
+          const ref = await runGit(['rev-parse', '--verify', `origin/${safeBranch}`], repo.repoPath)
+            .then(() => `origin/${safeBranch}`)
+            .catch(() => safeBranch);
+          const mergeBase = (await runGit(['merge-base', originTarget, ref], repo.repoPath)).stdout.trim();
+          const { stdout } = await runGit(['diff', '--name-only', `${mergeBase}..${ref}`], repo.repoPath);
+          return stdout.split('\n').map((l) => l.trim()).filter(Boolean);
+        },
+
+        trialMerge: async (branchName, message) => {
+          const safeBranch = safeUatBranchName(branchName);
+          const worktreePath = worktreeFor(safeBranch);
+          await runGit(['worktree', 'remove', '--force', worktreePath], repo.repoPath).catch(() => {});
+          await runGit(['worktree', 'prune'], repo.repoPath).catch(() => {});
+          await runGit(['worktree', 'add', '--detach', worktreePath, originTarget], repo.repoPath);
+          try {
+            const originRef = `origin/${safeBranch}`;
+            const ref = await runGit(['rev-parse', '--verify', originRef], worktreePath)
+              .then(() => originRef)
+              .catch(() => safeBranch);
+            await runGit(['merge', '--no-ff', ref, '-m', message], worktreePath);
+            const mergeSha = (await runGit(['rev-parse', 'HEAD'], worktreePath)).stdout.trim();
+            return { repoKey: repo.repoKey, handle: worktreePath, mergeSha };
+          } catch (err) {
+            // Clean up our own worktree before propagating; the caller discards
+            // the ones that already succeeded.
+            await runGit(['worktree', 'remove', '--force', worktreePath], repo.repoPath).catch(() => {});
+            await runGit(['worktree', 'prune'], repo.repoPath).catch(() => {});
+            throw err;
+          }
+        },
+
+        publishPrepared: async (prepared) => {
+          await runGit(['push', 'origin', `HEAD:${target}`], prepared.handle);
+        },
+
+        discardPrepared: async (prepared) => {
+          await runGit(['worktree', 'remove', '--force', prepared.handle], repo.repoPath).catch(() => {});
+          await runGit(['worktree', 'prune'], repo.repoPath).catch(() => {});
+        },
+      };
+
+      return [repo.repoKey, git] as const;
+    }),
+  );
 }
 
 /** Real git wiring: throwaway detached worktree off origin/main, no-ff merge, push. */

@@ -1,0 +1,334 @@
+/**
+ * Tests for two-phase polyrepo promote (PAN-3093).
+ *
+ * The property that matters most is all-or-nothing at the decision point: a
+ * failure in ANY repo during phase A must leave every remote untouched. Phase B
+ * is deliberately NOT transactional — undoing a landed merge would mean
+ * force-pushing a member repo's main — so it is tested for resumability
+ * instead: landed repos are stamped and a retry skips them.
+ */
+
+import { describe, it, expect, vi } from 'vitest';
+import {
+  promoteUatGeneration,
+  type PolyrepoRepoPromoteGit,
+  type PreparedRepoMerge,
+  type UatPromoteDeps,
+} from '../../../../src/lib/cloister/uat-promote.js';
+import type { UatGeneration, UatGenerationRepo } from '../../../../src/lib/overdeck/merge-sync.js';
+
+const PROJECT_ROOT = '/tmp/myn';
+const GEN_NAME = 'uat/min-otter-0727';
+
+function repoRow(repoKey: string, mergeOrder: number, overrides: Partial<UatGenerationRepo> = {}): UatGenerationRepo {
+  return {
+    repoKey,
+    repoPath: `${PROJECT_ROOT}/${repoKey}`,
+    branch: GEN_NAME,
+    baseSha: `${repoKey}-base`,
+    worktreePath: `${PROJECT_ROOT}/workspaces/uat-min-otter-0727/${repoKey}`,
+    mergeOrder,
+    promotedAt: null,
+    ...overrides,
+  };
+}
+
+function generation(repos: UatGenerationRepo[], overrides: Partial<UatGeneration> = {}): UatGeneration {
+  return {
+    name: GEN_NAME,
+    worktreePath: `${PROJECT_ROOT}/workspaces/uat-min-otter-0727`,
+    projectRoot: PROJECT_ROOT,
+    baseSha: repos.map((r) => `${r.repoKey}@${r.baseSha}`).join(' '),
+    status: 'ready',
+    repos,
+    members: [
+      { issueId: 'MIN-901', title: 'One', branch: 'feature/min-901', headSha: 'fe@a api@b', mergeOrder: 1 },
+      { issueId: 'MIN-902', title: 'Two', branch: 'feature/min-902', headSha: 'api@c', mergeOrder: 2 },
+    ],
+    heldOut: [],
+    resolutions: [],
+    stackStartedAt: null,
+    cleanedAt: null,
+    createdAt: '2026-07-27T00:00:00.000Z',
+    updatedAt: '2026-07-27T00:00:00.000Z',
+    ...overrides,
+  };
+}
+
+interface FakeRepoGit extends PolyrepoRepoPromoteGit {
+  published: string[];
+  trials: string[];
+  discards: string[];
+}
+
+interface FakeRepoOptions {
+  /** Target head; defaults to the recorded base (no movement). */
+  targetHead?: string;
+  targetChanged?: string[];
+  batchChanged?: string[];
+  failTrialMerge?: boolean;
+  failPublish?: boolean;
+  failTargetHead?: boolean;
+}
+
+function makeRepoGit(repoKey: string, options: FakeRepoOptions = {}): FakeRepoGit {
+  const published: string[] = [];
+  const trials: string[] = [];
+  const discards: string[] = [];
+
+  return {
+    published,
+    trials,
+    discards,
+    targetHeadSha: async () => {
+      if (options.failTargetHead) throw new Error(`fetch boom in ${repoKey}`);
+      return options.targetHead ?? `${repoKey}-base`;
+    },
+    changedFilesSince: async () => options.targetChanged ?? [],
+    batchChangedFiles: async () => options.batchChanged ?? [],
+    trialMerge: async (branchName) => {
+      if (options.failTrialMerge) throw new Error(`conflict in ${repoKey}`);
+      trials.push(branchName);
+      return { repoKey, handle: `/tmp/wt-${repoKey}`, mergeSha: `${repoKey}-merge-sha` };
+    },
+    publishPrepared: async (prepared: PreparedRepoMerge) => {
+      if (options.failPublish) throw new Error(`push rejected in ${repoKey}`);
+      published.push(prepared.mergeSha);
+    },
+    discardPrepared: async (prepared: PreparedRepoMerge) => { discards.push(prepared.handle); },
+  };
+}
+
+function makeDeps(
+  gen: UatGeneration,
+  repoGit: Map<string, PolyrepoRepoPromoteGit>,
+  overrides: Partial<UatPromoteDeps> = {},
+): UatPromoteDeps & { firePostMerge: ReturnType<typeof vi.fn>; promoted: Array<[string, string]>; statuses: string[] } {
+  const promoted: Array<[string, string]> = [];
+  const statuses: string[] = [];
+  const firePostMerge = vi.fn(() => true);
+
+  return {
+    promoted,
+    statuses,
+    firePostMerge,
+    // Never used on the polyrepo path; a call would mean the wrong branch ran.
+    git: {
+      fetchMain: async () => { throw new Error('monorepo git must not be used for a polyrepo generation'); },
+      mergeIntoMain: async () => { throw new Error('monorepo git must not be used for a polyrepo generation'); },
+      changedFilesSince: async () => { throw new Error('monorepo git must not be used'); },
+      batchChangedFiles: async () => { throw new Error('monorepo git must not be used'); },
+    },
+    polyrepoGit: repoGit,
+    markRepoPromoted: (_name, repoKey, at) => { promoted.push([repoKey, at]); },
+    now: () => new Date('2026-07-27T12:00:00.000Z'),
+    store: {
+      get: () => gen,
+      insert: () => {},
+      update: (_name, patch) => { if (patch.status) statuses.push(patch.status); },
+      listNames: () => [gen.name],
+      listChain: () => [],
+    },
+    teardownStack: async () => {},
+    memberEligibility: () => ({ eligible: true }),
+    ...overrides,
+  } as UatPromoteDeps & { firePostMerge: ReturnType<typeof vi.fn>; promoted: Array<[string, string]>; statuses: string[] };
+}
+
+describe('polyrepo promote — phase A is all-or-nothing', () => {
+  it('publishes nothing when repo 2 of 3 fails its trial merge', async () => {
+    const gen = generation([repoRow('fe', 0), repoRow('api', 1), repoRow('infra', 2)]);
+    const fe = makeRepoGit('fe');
+    const api = makeRepoGit('api', { failTrialMerge: true });
+    const infra = makeRepoGit('infra');
+    const deps = makeDeps(gen, new Map([['fe', fe], ['api', api], ['infra', infra]]));
+
+    const result = await promoteUatGeneration(GEN_NAME, PROJECT_ROOT, deps);
+
+    expect(result.success).toBe(false);
+    expect(result).toMatchObject({ reason: 'merge-failed' });
+    expect((result as { message: string }).message).toContain('trial merge failed in api');
+    expect((result as { message: string }).message).toContain('Nothing was published');
+
+    // Not one repo published, including the one that trial-merged first.
+    expect(fe.published).toEqual([]);
+    expect(api.published).toEqual([]);
+    expect(infra.published).toEqual([]);
+    // repo 3 is never even attempted once repo 2 fails.
+    expect(infra.trials).toEqual([]);
+    // The generation stays promotable.
+    expect(deps.statuses).not.toContain('promoted');
+  });
+
+  it('discards every prepared worktree when a later repo fails', async () => {
+    const gen = generation([repoRow('fe', 0), repoRow('api', 1)]);
+    const fe = makeRepoGit('fe');
+    const api = makeRepoGit('api', { failTrialMerge: true });
+    const deps = makeDeps(gen, new Map([['fe', fe], ['api', api]]));
+
+    await promoteUatGeneration(GEN_NAME, PROJECT_ROOT, deps);
+
+    expect(fe.discards).toEqual(['/tmp/wt-fe']);
+  });
+
+  it('rejects on a stale base in one repo before anything is prepared or pushed', async () => {
+    const gen = generation([repoRow('fe', 0), repoRow('api', 1)]);
+    const fe = makeRepoGit('fe');
+    const api = makeRepoGit('api', {
+      targetHead: 'api-moved',
+      targetChanged: ['src/shared.ts'],
+      batchChanged: ['src/shared.ts'],
+    });
+    const deps = makeDeps(gen, new Map([['fe', fe], ['api', api]]));
+
+    const result = await promoteUatGeneration(GEN_NAME, PROJECT_ROOT, deps);
+
+    expect(result).toMatchObject({ success: false, reason: 'stale-base' });
+    expect((result as { message: string }).message).toContain('api@api-base');
+    expect(fe.published).toEqual([]);
+    expect(api.published).toEqual([]);
+  });
+
+  it('proceeds when a repo base moved without touching batch files', async () => {
+    const gen = generation([repoRow('api', 0)]);
+    const api = makeRepoGit('api', {
+      targetHead: 'api-moved',
+      targetChanged: ['docs/unrelated.md'],
+      batchChanged: ['src/a.ts'],
+    });
+    const deps = makeDeps(gen, new Map([['api', api]]));
+
+    const result = await promoteUatGeneration(GEN_NAME, PROJECT_ROOT, deps);
+
+    expect(result.success).toBe(true);
+    expect(api.published).toEqual(['api-merge-sha']);
+  });
+
+  it('fails without publishing when a repo target head cannot be read', async () => {
+    const gen = generation([repoRow('fe', 0), repoRow('api', 1)]);
+    const fe = makeRepoGit('fe');
+    const api = makeRepoGit('api', { failTargetHead: true });
+    const deps = makeDeps(gen, new Map([['fe', fe], ['api', api]]));
+
+    const result = await promoteUatGeneration(GEN_NAME, PROJECT_ROOT, deps);
+
+    expect(result).toMatchObject({ success: false, reason: 'merge-failed' });
+    expect(fe.published).toEqual([]);
+  });
+});
+
+describe('polyrepo promote — phase B publishes and resumes', () => {
+  it('publishes every repo in merge order and stamps each one', async () => {
+    const gen = generation([repoRow('fe', 0), repoRow('api', 1)]);
+    const fe = makeRepoGit('fe');
+    const api = makeRepoGit('api');
+    const deps = makeDeps(gen, new Map([['fe', fe], ['api', api]]));
+
+    const result = await promoteUatGeneration(GEN_NAME, PROJECT_ROOT, deps);
+
+    expect(result.success).toBe(true);
+    expect(fe.published).toEqual(['fe-merge-sha']);
+    expect(api.published).toEqual(['api-merge-sha']);
+    expect(deps.promoted).toEqual([
+      ['fe', '2026-07-27T12:00:00.000Z'],
+      ['api', '2026-07-27T12:00:00.000Z'],
+    ]);
+    expect(deps.statuses).toContain('promoted');
+    expect((result as { mergeSha: string }).mergeSha).toBe('fe@fe-merg api@api-mer');
+  });
+
+  it('names landed and pending repos when a publish fails partway', async () => {
+    const gen = generation([repoRow('fe', 0), repoRow('api', 1)]);
+    const fe = makeRepoGit('fe');
+    const api = makeRepoGit('api', { failPublish: true });
+    const deps = makeDeps(gen, new Map([['fe', fe], ['api', api]]));
+
+    const result = await promoteUatGeneration(GEN_NAME, PROJECT_ROOT, deps);
+
+    expect(result).toMatchObject({ success: false, reason: 'merge-failed' });
+    const message = (result as { message: string }).message;
+    expect(message).toContain('published fe');
+    expect(message).toContain('failed on api');
+    expect(message).toContain('Still pending: api');
+    expect(message).toContain('never rewound');
+
+    // fe genuinely landed and is stamped, so the retry can skip it.
+    expect(fe.published).toEqual(['fe-merge-sha']);
+    expect(deps.promoted).toEqual([['fe', '2026-07-27T12:00:00.000Z']]);
+    // Not marked promoted — the operator can retry.
+    expect(deps.statuses).not.toContain('promoted');
+  });
+
+  it('skips an already-landed repo on retry and publishes only the pending one', async () => {
+    // State after the previous test's partial publish: fe carries promotedAt.
+    const gen = generation([
+      repoRow('fe', 0, { promotedAt: '2026-07-27T12:00:00.000Z' }),
+      repoRow('api', 1),
+    ]);
+    const fe = makeRepoGit('fe');
+    const api = makeRepoGit('api');
+    const deps = makeDeps(gen, new Map([['fe', fe], ['api', api]]));
+
+    const result = await promoteUatGeneration(GEN_NAME, PROJECT_ROOT, deps);
+
+    expect(result.success).toBe(true);
+    // fe is skipped entirely — not re-trial-merged, not re-published.
+    expect(fe.trials).toEqual([]);
+    expect(fe.published).toEqual([]);
+    expect(api.published).toEqual(['api-merge-sha']);
+    expect(deps.promoted).toEqual([['api', '2026-07-27T12:00:00.000Z']]);
+  });
+
+  it('refuses a generation whose repos have all already published', async () => {
+    const gen = generation([
+      repoRow('fe', 0, { promotedAt: '2026-07-27T12:00:00.000Z' }),
+      repoRow('api', 1, { promotedAt: '2026-07-27T12:00:00.000Z' }),
+    ]);
+    const deps = makeDeps(gen, new Map([['fe', makeRepoGit('fe')], ['api', makeRepoGit('api')]]));
+
+    const result = await promoteUatGeneration(GEN_NAME, PROJECT_ROOT, deps);
+
+    expect(result).toMatchObject({ success: false, reason: 'merge-failed' });
+    expect((result as { message: string }).message).toContain('already published every member repo');
+  });
+});
+
+describe('polyrepo promote — post-merge handoff', () => {
+  it('fires each member post-merge exactly once, only after every repo published', async () => {
+    const gen = generation([repoRow('fe', 0), repoRow('api', 1)]);
+    const deps = makeDeps(gen, new Map([['fe', makeRepoGit('fe')], ['api', makeRepoGit('api')]]));
+
+    const result = await promoteUatGeneration(GEN_NAME, PROJECT_ROOT, deps);
+
+    expect(deps.firePostMerge).toHaveBeenCalledTimes(2);
+    expect(deps.firePostMerge.mock.calls.map((c) => c[0])).toEqual(['MIN-901', 'MIN-902']);
+    expect((result as { postMergeStarted: string[] }).postMergeStarted).toEqual(['MIN-901', 'MIN-902']);
+  });
+
+  it('fires no post-merge when phase B failed partway', async () => {
+    const gen = generation([repoRow('fe', 0), repoRow('api', 1)]);
+    const deps = makeDeps(
+      gen,
+      new Map([['fe', makeRepoGit('fe')], ['api', makeRepoGit('api', { failPublish: true })]]),
+    );
+
+    await promoteUatGeneration(GEN_NAME, PROJECT_ROOT, deps);
+
+    expect(deps.firePostMerge).not.toHaveBeenCalled();
+  });
+
+  it('fires no post-merge when a member is not merge-eligible', async () => {
+    const gen = generation([repoRow('fe', 0)]);
+    const fe = makeRepoGit('fe');
+    const deps = makeDeps(gen, new Map([['fe', fe]]), {
+      memberEligibility: (issueId: string) =>
+        issueId === 'MIN-902' ? { eligible: false, reason: 'review pending' } : { eligible: true },
+    });
+
+    const result = await promoteUatGeneration(GEN_NAME, PROJECT_ROOT, deps);
+
+    expect(result).toMatchObject({ success: false, reason: 'member-not-ready' });
+    expect(fe.published).toEqual([]);
+    expect(deps.firePostMerge).not.toHaveBeenCalled();
+  });
+});

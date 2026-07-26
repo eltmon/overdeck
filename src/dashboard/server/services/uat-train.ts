@@ -37,6 +37,7 @@ import { reconcileUatGenerations, type ReconcileResult } from '../../../lib/cloi
 import { ensureUatStack, probeUatStack, teardownUatStack } from '../../../lib/cloister/uat-stack.js';
 import {
   promoteUatGeneration,
+  buildPolyrepoUatPromoteGitDeps,
   buildUatPromoteGitDeps,
   type PromoteResult,
 } from '../../../lib/cloister/uat-promote.js';
@@ -45,6 +46,7 @@ import {
   getUatGenerationSync,
   isMergeTrainEnabled,
   listUatGenerationsSync,
+  markUatGenerationRepoPromotedSync,
   type UatGeneration,
 } from '../../../lib/overdeck/merge-sync.js';
 import { listEligibleCandidatesByProject } from '../../../lib/flywheel-merge-order.js';
@@ -578,8 +580,22 @@ export async function postUatGenerationPromotePayload(
     import('../../../lib/flywheel-merge-order.js'),
     import('../../../lib/cloister/uat-promote-verification.js'),
   ]);
+  // A polyrepo generation merges into each member repo's own target branch, so
+  // it needs per-repo promote git. Supplying it is what selects the two-phase
+  // (trial-merge everything, then publish) path.
+  const projectConfig = findProjectByPathSync(root);
+  const polyrepo = projectConfig?.workspace?.type === 'polyrepo';
+  const generationRepos = polyrepo ? (getUatGenerationSync(name)?.repos ?? []) : [];
+
   const result = await promoteUatGeneration(name, root, {
     git: buildUatPromoteGitDeps(root),
+    ...(polyrepo && generationRepos.length > 0
+      ? {
+          polyrepoGit: buildPolyrepoUatPromoteGitDeps(generationRepos),
+          markRepoPromoted: (genName, repoKey, at) =>
+            markUatGenerationRepoPromotedSync(genName, repoKey, at),
+        }
+      : {}),
     store: { ...buildUatGenerationStore(), get: (n) => getUatGenerationSync(n) },
     teardownStack: (gen) => teardownUatStack(gen),
     firePostMerge,
