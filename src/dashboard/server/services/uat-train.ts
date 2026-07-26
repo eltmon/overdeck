@@ -134,8 +134,11 @@ async function runUatTrainReconcileForProject(
 
   // Early exit if no candidates and no live generations — skip git operations
   const candidates = listEligibleCandidatesByProject(projectPath);
-  const allGenerations = listUatGenerationsSync({ projectRoot: projectPath, limit: 100 });
-  const liveGenerations = allGenerations.filter((g) => g.status === 'ready' || g.status === 'superseded');
+  const liveGenerations = listUatGenerationsSync({
+    projectRoot: projectPath,
+    statuses: ['assembling', 'ready', 'superseded'],
+    limit: 1,
+  });
   if (candidates.length === 0 && liveGenerations.length === 0) {
     return { action: 'idle', invalidated: [] };
   }
