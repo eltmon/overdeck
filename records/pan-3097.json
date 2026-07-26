@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T02:29:08.179Z",
-  "updated": "2026-07-26T02:55:58.072Z",
+  "updated": "2026-07-26T02:56:41.733Z",
   "pipeline": {
     "issueId": "PAN-3097",
     "reviewStatus": "pending",
@@ -54,16 +54,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 13,
-    "claims": {
-      "planning-prompt-guidance": {
-        "writerId": "agent-pan-3097",
-        "agentId": "agent-pan-3097",
-        "pid": 2041242,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-26T02:55:58.072Z"
-      }
-    },
+    "sequence": 14,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3097",
@@ -130,6 +122,17 @@
         "outcome": "completed",
         "reason": "Added a universal bundled rule requiring situation, decision, and option consequences in standalone questions",
         "releasedAt": "2026-07-26T02:55:41.731Z"
+      },
+      {
+        "writerId": "agent-pan-3097",
+        "agentId": "agent-pan-3097",
+        "pid": 2041242,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T02:55:58.072Z",
+        "itemId": "planning-prompt-guidance",
+        "outcome": "completed",
+        "reason": "Reinforced self-contained question structure in the planning prompt and plan role process",
+        "releasedAt": "2026-07-26T02:56:41.733Z"
       }
     ],
     "statusReasons": {
@@ -156,6 +159,10 @@
       "auq-self-contained-rule": {
         "reason": "Added a universal bundled rule requiring situation, decision, and option consequences in standalone questions",
         "updatedAt": "2026-07-26T02:55:41.731Z"
+      },
+      "planning-prompt-guidance": {
+        "reason": "Reinforced self-contained question structure in the planning prompt and plan role process",
+        "updatedAt": "2026-07-26T02:56:41.733Z"
       }
     }
   },
@@ -184,6 +191,8 @@
     "auq-self-contained-rule.auq-self-contained-rule.ac1": "completed",
     "auq-self-contained-rule.auq-self-contained-rule.ac2": "completed",
     "auq-self-contained-rule.auq-self-contained-rule.ac3": "completed",
-    "planning-prompt-guidance": "running"
+    "planning-prompt-guidance": "completed",
+    "planning-prompt-guidance.planning-prompt-guidance.ac1": "completed",
+    "planning-prompt-guidance.planning-prompt-guidance.ac2": "completed"
   }
 }
