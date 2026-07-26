@@ -231,18 +231,20 @@
   ],
   "feedback": [],
   "created": "2026-07-26T00:35:36.057Z",
-  "updated": "2026-07-26T03:52:39.897Z",
+  "updated": "2026-07-26T03:57:20.551Z",
   "pipeline": {
     "issueId": "PAN-1696",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "passed",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T03:51:07.493Z",
+    "updatedAt": "2026-07-26T03:57:20.510Z",
+    "reviewNotes": "Per-project UAT frontend URLs correctly use the generation project's configured DNS domain with pan.localhost fallback; no new blockers found.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/1822",
+    "reviewedAtCommit": "284698c068f8a1abe69bdc5985b4f7e4218a3b25",
     "reviewSpawnedAt": "2026-07-26T03:51:07.492Z"
   },
   "closeOut": {
@@ -272,9 +274,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 5899801,
-            "output": 375259,
-            "cacheRead": 106317312,
+            "input": 7107584,
+            "output": 395459,
+            "cacheRead": 113283072,
             "cacheWrite": 0
           }
         },
@@ -288,10 +290,10 @@
         },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 3473,
-            "output": 146988,
-            "cacheRead": 84161336,
-            "cacheWrite": 3553464
+            "input": 3545,
+            "output": 149325,
+            "cacheRead": 86289940,
+            "cacheWrite": 3558468
           }
         }
       },
@@ -315,9 +317,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 5899801,
-          "output": 375259,
-          "cacheRead": 106317312,
+          "input": 7107584,
+          "output": 395459,
+          "cacheRead": 113283072,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -327,15 +329,15 @@
           "cacheWrite": 205680
         },
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 3473,
-          "output": 146988,
-          "cacheRead": 84161336,
-          "cacheWrite": 3553464
+          "input": 3545,
+          "output": 149325,
+          "cacheRead": 86289940,
+          "cacheWrite": 3558468
         }
       },
       "costAtCloseOut": {
-        "usd": 139.6672742,
-        "pricingAsOf": "2026-07-26T03:51:08.798Z"
+        "usd": 150.0259412,
+        "pricingAsOf": "2026-07-26T03:57:20.544Z"
       }
     },
     "merges": [
@@ -344,7 +346,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-haiku-4-5",
   "tasks": {
     "sequence": 17,
     "claims": {
