@@ -26,6 +26,17 @@ vi.mock('../autonomous-plan-dispatch.js', async (importOriginal) => {
   };
 });
 
+const autonomousWorkMock = vi.hoisted(() => ({
+  decision: { allow: true } as
+    | { allow: true }
+    | { allow: false; code: 'not-ready' | 'not-released' | 'labels-unavailable'; reason: string },
+}));
+
+vi.mock('../autonomous-work-dispatch.js', () => ({
+  gatherAutonomousWorkDispatchInput: vi.fn(async () => ({})),
+  decideAutonomousWorkDispatch: vi.fn(() => autonomousWorkMock.decision),
+}));
+
 vi.mock('../dead-end-trip.js', () => ({
   recordDeadEndNeedsYou: vi.fn(async () => undefined),
 }));
@@ -268,6 +279,7 @@ describe('reactive Cloister scheduler', () => {
     autonomousPlanMock.labels = ['released'];
     autonomousPlanMock.recordedModel = undefined;
     autonomousPlanMock.autonomousModel = 'workhorse:cheap';
+    autonomousWorkMock.decision = { allow: true };
     mockHeadSha = 'newhead1';
   });
 
@@ -332,9 +344,39 @@ describe('reactive Cloister scheduler', () => {
     });
   });
 
-  it('keeps work-role dispatch unchanged and does not apply autonomous planning staffing', async () => {
+  it('refuses reactive work dispatch when the pickup gate blocks the issue', async () => {
+    autonomousWorkMock.decision = {
+      allow: false,
+      code: 'not-ready',
+      reason: 'Autonomous work dispatch was refused because the issue is not ready.',
+    };
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+
+    await Effect.runPromise(onIssueStateChange('PAN-503', 'in_progress'));
+
+    const message = 'PAN-503: Autonomous work dispatch was refused because the issue is not ready.';
+    expect(spawnRun).not.toHaveBeenCalled();
+    expect(logSpy).toHaveBeenCalledWith(`[cloister] ${message}`);
+    expect(emitActivityEntrySync).toHaveBeenCalledWith({
+      source: 'cloister',
+      level: 'warn',
+      message,
+      issueId: 'PAN-503',
+    });
+    expect(recordDeadEndNeedsYou).toHaveBeenCalledWith(
+      'PAN-503',
+      'reactive-work-dispatch-pickup-gate',
+      'in_progress',
+      message,
+    );
+
+    logSpy.mockRestore();
+  });
+
+  it('preserves reactive work spawning when the pickup gate allows dispatch', async () => {
     autonomousPlanMock.labels = [];
     autonomousPlanMock.autonomousModel = undefined;
+    autonomousWorkMock.decision = { allow: true };
 
     await Effect.runPromise(onIssueStateChange('PAN-503', 'in_progress'));
 

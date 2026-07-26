@@ -9,6 +9,10 @@ import {
   decideAutonomousPlanDispatch,
   gatherAutonomousPlanDispatchInput,
 } from './autonomous-plan-dispatch.js';
+import {
+  decideAutonomousWorkDispatch,
+  gatherAutonomousWorkDispatchInput,
+} from './autonomous-work-dispatch.js';
 import { recordDeadEndNeedsYou } from './dead-end-trip.js';
 import { isIssueClosed } from './issue-closed.js';
 import { shouldSkipDispatchAsMerged } from './merge-verification.js';
@@ -326,6 +330,24 @@ async function resolveWorkspaceForIssue(issueId: string): Promise<string | null>
       console.log(`[cloister] ${message}`);
       emitActivityEntrySync({ source: 'cloister', level: 'info', message, issueId: normalizedIssueId });
       return;
+    }
+
+    if (role === 'work') {
+      const decision = decideAutonomousWorkDispatch(
+        await gatherAutonomousWorkDispatchInput(normalizedIssueId),
+      );
+      if (!decision.allow) {
+        const message = `${normalizedIssueId}: ${decision.reason}`;
+        console.log(`[cloister] ${message}`);
+        emitActivityEntrySync({ source: 'cloister', level: 'warn', message, issueId: normalizedIssueId });
+        await recordDeadEndNeedsYou(
+          normalizedIssueId,
+          'reactive-work-dispatch-pickup-gate',
+          newState,
+          message,
+        );
+        return;
+      }
     }
 
     const run = await spawnRun(normalizedIssueId, role, {
