@@ -187,9 +187,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-26T10:55:05.936Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-26T10:59Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-26T10:59:29.460Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-26T10:59:29Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2997\n\nPoison-clear and post-clear verification failures escape as generic errors, so repair can be acknowledged as terminal failed before any wake is delivered.\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2997 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "src/dashboard/server/event-store.ts",
@@ -281,7 +294,7 @@
     "recordedAt": "2026-07-26T10:07:26.737Z"
   },
   "created": "2026-07-21T23:09:49.270Z",
-  "updated": "2026-07-26T10:59:28.872Z",
+  "updated": "2026-07-26T10:59:29.460Z",
   "pipeline": {
     "issueId": "PAN-2997",
     "reviewStatus": "blocked",
