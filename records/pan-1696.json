@@ -231,17 +231,17 @@
     }
   ],
   "created": "2026-07-26T00:35:36.057Z",
-  "updated": "2026-07-26T03:29:17.360Z",
+  "updated": "2026-07-26T03:32:12.880Z",
   "pipeline": {
     "issueId": "PAN-1696",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T03:29:16.763Z",
-    "reviewNotes": "POST /api/projects/:projectKey/merge-train mutates durable project configuration without the dashboard authentication and CSRF guard.",
+    "updatedAt": "2026-07-26T03:32:12.642Z",
+    "reviewNotes": "Agent re-review request (6/25): Fixed security issue: added dashboard auth guard to POST merge-train endpoint",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/1822",
     "reviewSpawnedAt": "2026-07-26T03:21:02.399Z"
@@ -273,9 +273,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 5274888,
-            "output": 368034,
-            "cacheRead": 99685888,
+            "input": 5280014,
+            "output": 368196,
+            "cacheRead": 100252160,
             "cacheWrite": 0
           }
         },
@@ -289,10 +289,10 @@
         },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 2996,
-            "output": 130251,
-            "cacheRead": 72844810,
-            "cacheWrite": 3216588
+            "input": 3082,
+            "output": 133115,
+            "cacheRead": 74500445,
+            "cacheWrite": 3311730
           }
         }
       },
@@ -316,9 +316,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 5274888,
-          "output": 368034,
-          "cacheRead": 99685888,
+          "input": 5280014,
+          "output": 368196,
+          "cacheRead": 100252160,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -328,15 +328,15 @@
           "cacheWrite": 205680
         },
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 2996,
-          "output": 130251,
-          "cacheRead": 72844810,
-          "cacheWrite": 3216588
+          "input": 3082,
+          "output": 133115,
+          "cacheRead": 74500445,
+          "cacheWrite": 3311730
         }
       },
       "costAtCloseOut": {
-        "usd": 131.3733322,
-        "pricingAsOf": "2026-07-26T03:29:16.790Z"
+        "usd": 131.9858562,
+        "pricingAsOf": "2026-07-26T03:32:12.798Z"
       }
     },
     "merges": [
