@@ -99,6 +99,10 @@ export function getRowSearchText(row: MessagesTimelineRow): string {
       .join('\n');
   }
   if (row.kind === 'proposed-plan') return row.plan.plan;
+  if (row.kind === 'pending-choice') {
+    return [row.choice.title, ...row.choice.contextLines, ...row.choice.options.map((o) => o.label)].join('\n');
+  }
+  if (row.kind === 'answered-choice') return `Answered: ${row.answered.label}`;
   if (row.kind === 'compact-boundary') return `Conversation compacted ${row.boundary.trigger ?? ''} ${row.boundary.model ?? ''}`;
   if (row.kind === 'compacting') return 'Compacting conversation';
   if (row.kind === 'working') return 'Working';
