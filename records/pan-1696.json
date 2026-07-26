@@ -269,7 +269,7 @@
     }
   ],
   "created": "2026-07-26T00:35:36.057Z",
-  "updated": "2026-07-26T06:18:56.745Z",
+  "updated": "2026-07-26T06:19:08.106Z",
   "pipeline": {
     "issueId": "PAN-1696",
     "reviewStatus": "pending",
@@ -384,8 +384,16 @@
   "harness": "claude-code",
   "model": "claude-opus-5",
   "tasks": {
-    "sequence": 24,
-    "claims": {},
+    "sequence": 25,
+    "claims": {
+      "fe-awaiting-merge": {
+        "writerId": "agent-pan-1696",
+        "agentId": "agent-pan-1696",
+        "pid": 2051539,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T06:19:08.105Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-1696",
@@ -583,6 +591,7 @@
     "fe-merge-train-view.fe-merge-train-view.ac1": "completed",
     "fe-merge-train-view.fe-merge-train-view.ac2": "completed",
     "fe-merge-train-view.fe-merge-train-view.ac3": "completed",
-    "fe-merge-train-view.fe-merge-train-view.ac4": "completed"
+    "fe-merge-train-view.fe-merge-train-view.ac4": "completed",
+    "fe-awaiting-merge": "running"
   }
 }
