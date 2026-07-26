@@ -22,7 +22,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T06:17:49.254Z",
-  "updated": "2026-07-26T10:40:09.801Z",
+  "updated": "2026-07-26T10:51:14.730Z",
   "pipeline": {
     "issueId": "PAN-3110",
     "reviewStatus": "pending",
@@ -49,16 +49,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "server-rebase-fallback-retryable": {
-        "writerId": "agent-pan-3110",
-        "agentId": "agent-pan-3110",
-        "pid": 1998089,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-26T10:40:09.801Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3110",
@@ -81,6 +73,17 @@
         "outcome": "completed",
         "reason": "Directly merges GitHub-clean PRs without agent liveness or rebase, while preserving fallback rebase behavior for behind, pending, and unreadable states",
         "releasedAt": "2026-07-26T10:39:57.765Z"
+      },
+      {
+        "writerId": "agent-pan-3110",
+        "agentId": "agent-pan-3110",
+        "pid": 1998089,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T10:40:09.801Z",
+        "itemId": "server-rebase-fallback-retryable",
+        "outcome": "completed",
+        "reason": "Added server-first rebase escalation, conflict-aware agent fallback, retryable queued failures, and regression coverage",
+        "releasedAt": "2026-07-26T10:51:14.730Z"
       }
     ],
     "statusReasons": {
@@ -91,6 +94,10 @@
       "clean-pr-direct-merge": {
         "reason": "Directly merges GitHub-clean PRs without agent liveness or rebase, while preserving fallback rebase behavior for behind, pending, and unreadable states",
         "updatedAt": "2026-07-26T10:39:57.765Z"
+      },
+      "server-rebase-fallback-retryable": {
+        "reason": "Added server-first rebase escalation, conflict-aware agent fallback, retryable queued failures, and regression coverage",
+        "updatedAt": "2026-07-26T10:51:14.730Z"
       }
     }
   },
@@ -106,6 +113,11 @@
     "clean-pr-direct-merge.clean-pr-direct-merge.ac2": "completed",
     "clean-pr-direct-merge.clean-pr-direct-merge.ac3": "completed",
     "clean-pr-direct-merge.clean-pr-direct-merge.ac4": "completed",
-    "server-rebase-fallback-retryable": "running"
+    "server-rebase-fallback-retryable": "completed",
+    "server-rebase-fallback-retryable.server-rebase-fallback-retryable.ac1": "completed",
+    "server-rebase-fallback-retryable.server-rebase-fallback-retryable.ac2": "completed",
+    "server-rebase-fallback-retryable.server-rebase-fallback-retryable.ac3": "completed",
+    "server-rebase-fallback-retryable.server-rebase-fallback-retryable.ac4": "completed",
+    "server-rebase-fallback-retryable.server-rebase-fallback-retryable.ac5": "completed"
   }
 }
