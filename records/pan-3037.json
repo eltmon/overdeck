@@ -374,10 +374,10 @@
       "tests/unit/cli/sync-main.test.ts",
       "tests/unit/lib/cloister/sync-main-timeouts.test.ts"
     ],
-    "recordedAt": "2026-07-26T00:21:47.769Z"
+    "recordedAt": "2026-07-26T00:40:41.538Z"
   },
   "created": "2026-07-25T20:44:21.373Z",
-  "updated": "2026-07-26T00:40:38.236Z",
+  "updated": "2026-07-26T00:40:41.540Z",
   "pipeline": {
     "issueId": "PAN-3037",
     "reviewStatus": "passed",
