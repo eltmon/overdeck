@@ -934,7 +934,12 @@ export async function getRoleRuntimeBaseCommand(
   // prompt instead of `--agent <file>` (Claude Code dropped --agent file support).
   const roleInject = definitionPath ? roleSystemPromptInjectionSync(definitionPath, effort) : '';
   const nameFlag = ` --name ${agentName}`;
-  const effortFlag = (!definitionPath && effort) ? ` --effort ${effort}` : '';
+  // PAN-3077: never omit --effort on definition-less runs (review sub-roles,
+  // standing supervisor). Omission hands the choice to the harness default —
+  // xhigh on Opus 5 — violating the effort-defaults-to-high policy. An
+  // explicitly passed effort still wins; role-file runs get effort from
+  // frontmatter via roleSystemPromptInjectionSync.
+  const effortFlag = !definitionPath ? ` --effort ${effort ?? 'high'}` : '';
   // permissionMode now comes from the global permission flags for EVERY role
   // (the old --agent path relied on role frontmatter, which Claude Code no longer
   // applies). This honors the user's bypass/auto setting uniformly.

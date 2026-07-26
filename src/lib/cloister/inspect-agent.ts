@@ -46,6 +46,7 @@ import {
   spawnTierSupervisor,
   supervisorAgentId,
 } from '../agents/tier-supervisor.js';
+import { deliverAgentMessage } from '../agents/delivery.js';
 
 const execAsync = promisify(exec);
 
@@ -217,6 +218,10 @@ async function spawnInspectAgentPromise(
     // Resolve model via the role primitive: work.<inspect|inspect-deep>.
     const { config } = loadYamlConfig();
     const model = resolveModel('work', subRole, config);
+    // PAN-3077: never omit --effort — this launcher bypasses the role-file
+    // injection path, so omission inherits the harness default (xhigh on
+    // Opus 5), violating the effort-defaults-to-high policy.
+    const effort = config.roles?.work?.effort ?? 'high';
 
     // Provider env (BASE_URL/AUTH_TOKEN) for non-Anthropic models routed via cliproxy.
     const providerEnv = await getProviderEnvForModel(model);
@@ -259,6 +264,7 @@ async function spawnInspectAgentPromise(
         baseCommand: 'claude',
         sessionId,
         model,
+        extraArgs: `--effort ${effort}`,
         permissionFlags: getClaudePermissionFlagsSync(),
       }),
       { mode: 0o755 },
@@ -323,7 +329,9 @@ async function spawnInspectAgentPromise(
   issueId: string,
   itemId: string,
   status: 'passed' | 'failed',
-  workspacePath: string
+  workspacePath: string,
+  notes?: string,
+  deps: { deliver?: typeof deliverAgentMessage } = {},
 ): Promise<void> {
   if (status === 'passed') {
     const commitSha = await Effect.runPromise(getCurrentHead(issueId, workspacePath));
@@ -332,6 +340,24 @@ async function spawnInspectAgentPromise(
 
   } else {
     console.log(`[inspect] Item ${itemId} blocked for ${issueId} — no checkpoint saved`);
+  }
+
+  // PAN-3078: the verdict must reach the work agent. An agent that parks
+  // waiting for its inspection result deadlocks forever without this — the
+  // status is persisted to review_status, but nothing reads it back to the
+  // waiting session.
+  const workAgentId = `agent-${issueId.toLowerCase()}`;
+  const message = status === 'passed'
+    ? `Inspection verdict for xBRIEF item ${itemId}: PASSED. The checkpoint is saved — continue to your next item.`
+    : `Inspection verdict for xBRIEF item ${itemId}: BLOCKED. Do not build on this item's changes until the finding is addressed.${notes ? ` Finding: ${notes}` : ''}`;
+  try {
+    const deliver = deps.deliver ?? deliverAgentMessage;
+    const result = await deliver(workAgentId, message, 'inspect-verdict');
+    if (!result.ok) {
+      console.error(`[inspect] FAILED to deliver ${status} verdict for ${issueId} item ${itemId} to ${workAgentId}: ${result.failure ?? 'unknown'}`);
+    }
+  } catch (err) {
+    console.error(`[inspect] FAILED to deliver ${status} verdict for ${issueId} item ${itemId} to ${workAgentId}: ${err instanceof Error ? err.message : String(err)}`);
   }
 }
 
@@ -385,6 +411,8 @@ export function onInspectComplete(
   itemId: string,
   status: 'passed' | 'failed',
   workspacePath: string,
+  notes?: string,
+  deps: { deliver?: typeof deliverAgentMessage } = {},
 ): Effect.Effect<void> {
-  return Effect.promise(() => onInspectCompletePromise(projectKey, issueId, itemId, status, workspacePath));
+  return Effect.promise(() => onInspectCompletePromise(projectKey, issueId, itemId, status, workspacePath, notes, deps));
 }
