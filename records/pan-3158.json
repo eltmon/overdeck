@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T20:19:41.143Z",
-  "updated": "2026-07-26T20:44:54.188Z",
+  "updated": "2026-07-26T20:44:56.828Z",
   "pipeline": {
     "issueId": "PAN-3158",
     "reviewStatus": "pending",
@@ -25,7 +25,27 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T20:29:14.728Z"
+    "updatedAt": "2026-07-26T20:44:56.826Z",
+    "reviewRequestedAt": "2026-07-26T20:44:56.826Z",
+    "scopeDrift": {
+      "outsideDeclaredScope": [
+        "docs/FLYWHEEL-STATE.md"
+      ],
+      "declaredScopeUntouched": [],
+      "declaredScope": [
+        "docs/UAT-BATCH-TRAINS.md",
+        "src/dashboard/frontend/src/components/merge-train/MergeTrainView.tsx",
+        "src/dashboard/frontend/src/components/merge-train/__tests__/MergeTrainView.test.tsx"
+      ],
+      "actualChangedFiles": [
+        "docs/FLYWHEEL-STATE.md",
+        "docs/UAT-BATCH-TRAINS.md",
+        "src/dashboard/frontend/src/components/merge-train/MergeTrainView.tsx",
+        "src/dashboard/frontend/src/components/merge-train/__tests__/MergeTrainView.test.tsx"
+      ],
+      "recordedAt": "2026-07-26T20:44:54.187Z"
+    },
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3161"
   },
   "closeOut": {
     "usage": {
