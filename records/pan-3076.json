@@ -142,7 +142,7 @@
     "recordedAt": "2026-07-26T00:18:45.985Z"
   },
   "created": "2026-07-25T21:12:36.630Z",
-  "updated": "2026-07-26T00:18:53.661Z",
+  "updated": "2026-07-26T00:18:55.806Z",
   "pipeline": {
     "issueId": "PAN-3076",
     "reviewStatus": "failed",
@@ -152,7 +152,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T00:18:52.470Z",
+    "updatedAt": "2026-07-26T00:18:55.759Z",
     "reviewNotes": "Review role spawn failed: Role run agent-pan-3076-review already running. Use 'pan tell' to message it.",
     "verificationNotes": "Verification FAILED at test (605097ms):\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-3076\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-3076/src/dashboard/frontend\n\nNo test files found, exiting with code 0\n\n ❯ |root| src/lib/cloister/__tests__/reactive-scheduler.test.ts (25 tests | 1 failed) 162ms\n     × routes agent.stopped events to the deacon resume handler 47ms (retry x1)\n ❯ |root| src/lib/cloister/__tests__/pan-1908-reactive-liveness.test.ts (22 tests | 3 failed) 893ms\n       × resumes a stopped work agent with pending review feedback 12ms (retry x1)\n       × resumes normally once a decision is made (no pending window) 3ms (retry x1)\n       × resumes a completed done-handoff agent when review is blocked 4ms (retry x1)\n ❯ |root| tests/lib/cloister/failure-tracking.test.ts (9 tests | 3 failed) 3068ms\n     × increments the counter when resumeAgent fails during auto-resume 1459ms (retry x1)\n     × reconciles a stopped agent with a live tmux session to running 292ms (retry x1)\n     × treats lastFailureNextRetryAt equality as eligible to retry 277ms (retry x1)\nstdout | tests/unit/dashboard/server/routes/specialists-inspect-item.test.ts > POST /api/specialists/done inspect item attribution > checkpoints the exact structured itemId regardless of notes wording\n[specialists/done] inspect signaling passed for PAN-2724\n\nstdout | tests/unit/dashboard/server/routes/specialists-inspect-item.test.ts > POST /api/specialists/done inspect item attribution > checkpoints the exact structured itemId regardless of notes wording\n[specialists/done] Set inspect-agent-test to idle\n[specialists/done] Warm lifecycle: verdict recorded, leaving inspect-agent-test running (PAN-2579)\n[specialists/done] Cleared registry lock for inspect-agent:PAN-2724 (overdeck)\n\nstdout | tests/unit/dashboard/server/routes/specialists-inspect-item.test.ts > POST /api/specialists/done inspect item attribution > checkpoints the exact structured itemId regardless of notes wording\n[specialists/done] inspect s\n…(2802 chars elided)…\nproject/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace: /tmp/pan-auto-resume-gating-ZlQl6i/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace: /tmp/pan-auto-resume-gating-ZlQl6i/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] Spawning agent...\n[prep] Spawning agent...\n[prep] Spawning agent...\n[prep] Spawning agent.\n...(truncated)",
     "blockerReasons": [
@@ -297,7 +297,7 @@
       },
       "costAtCloseOut": {
         "usd": 155.344428,
-        "pricingAsOf": "2026-07-26T00:18:52.514Z"
+        "pricingAsOf": "2026-07-26T00:18:55.799Z"
       }
     },
     "merges": [
