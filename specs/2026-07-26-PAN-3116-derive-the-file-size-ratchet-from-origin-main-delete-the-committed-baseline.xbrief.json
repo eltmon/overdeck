@@ -4,17 +4,17 @@
     "created": "2026-07-26T09:12:47Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3116: scripts/file-size-baseline.txt is a cross-branch serialization point — every concurrent branch conflicts on the same 31 lines",
-    "updated": "2026-07-26T09:18:56.880Z"
+    "updated": "2026-07-26T09:19:39.630Z"
   },
   "plan": {
     "id": "pan-3116",
     "title": "Derive the file-size ratchet from origin/main; delete the committed baseline",
-    "status": "proposed",
+    "status": "approved",
     "uid": "f06adf53-cc94-4904-b79e-e0916fa06a1a",
     "author": "agent:k3[1m]",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-07-26T09:12:47Z",
-    "updated": "2026-07-26T09:18:56.880Z",
+    "updated": "2026-07-26T09:19:39.630Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3116",
@@ -420,5 +420,5 @@
       "canonicalFilename": "2026-07-26-PAN-3116-derive-the-file-size-ratchet-from-origin-main-delete-the-committed-baseline.xbrief.json"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
