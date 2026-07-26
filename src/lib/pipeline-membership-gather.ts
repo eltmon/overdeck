@@ -1,5 +1,6 @@
 import { execFile } from 'node:child_process';
-import { join } from 'node:path';
+import { realpath } from 'node:fs/promises';
+import { join, resolve } from 'node:path';
 import { promisify } from 'node:util';
 
 import type { MembershipUnavailableReason } from '@overdeck/contracts';
@@ -318,12 +319,34 @@ export function projectRepositories(project: ProjectConfig): ProjectRepository[]
   }));
 }
 
+async function normalizeRepoPath(path: string): Promise<string> {
+  return realpath(path).catch(() => resolve(path));
+}
+
 export async function snapshotBranchRefs(
   repoPath: string,
   defaultBranch: string,
   refPatterns: string[],
   run: PipelineMembershipGatherDeps['run'] = defaultDeps.run,
 ): Promise<BranchRefSnapshot> {
+  const unavailable = () => new PipelineMembershipUnavailableError(
+    'repo_unavailable',
+    `Workspace repo path is not a git repository: ${repoPath}`,
+  );
+
+  let gitTopLevel: string;
+  try {
+    gitTopLevel = (await run('git', ['rev-parse', '--show-toplevel'], repoPath)).trim();
+  } catch {
+    throw unavailable();
+  }
+
+  const [normalizedRepoPath, normalizedGitTopLevel] = await Promise.all([
+    normalizeRepoPath(repoPath),
+    normalizeRepoPath(gitTopLevel),
+  ]);
+  if (normalizedRepoPath !== normalizedGitTopLevel) throw unavailable();
+
   const [refs, unmergedRefs, firstParentShas] = await Promise.all([
     run('git', ['for-each-ref', '--format=%(objectname) %(refname:short)', ...refPatterns], repoPath),
     run('git', [

@@ -16,6 +16,7 @@ import {
   listIssueStatesBatched,
   listMergedPullRequestHeadsBatched,
   PipelineMembershipUnavailableError,
+  snapshotBranchRefs,
   type PipelineMembershipGatherDeps,
 } from '../../../src/lib/pipeline-membership-gather.js';
 import { resolvePipelineMembership } from '../../../src/lib/pipeline-membership.js';
@@ -56,7 +57,8 @@ function deps(): PipelineMembershipGatherDeps {
       numbers.map((number) => ({ number, state: number === 4 ? 'open' as const : 'closed' as const }))),
     listTrackerIssues: vi.fn().mockResolvedValue([]),
     listSpecIssueIds: vi.fn().mockResolvedValue(['PAN-4']),
-    run: vi.fn().mockImplementation(async (command, args) => {
+    run: vi.fn().mockImplementation(async (command, args, cwd) => {
+      if (command === 'git' && args[0] === 'rev-parse') return cwd;
       if (command === 'git' && args.includes('--no-merged=main')) return 'feature/pan-1\norigin/feature/pan-3\n';
       if (command === 'git') return 'feature/pan-1\norigin/feature/pan-3\n';
       throw new Error(`Unexpected command: ${command} ${args.join(' ')}`);
@@ -86,11 +88,59 @@ describe('pipeline membership unavailability contract', () => {
   });
 });
 
+describe('snapshotBranchRefs', () => {
+  const refPatterns = ['refs/heads/feature/*'];
+
+  it('throws typed repo_unavailable when git rejects the configured path', async () => {
+    const run = vi.fn().mockRejectedValue(new Error('not a git repository'));
+
+    await expect(snapshotBranchRefs('/missing/repo', 'main', refPatterns, run)).rejects.toMatchObject({
+      name: 'PipelineMembershipUnavailableError',
+      reason: 'repo_unavailable',
+      message: expect.stringContaining('/missing/repo'),
+    });
+  });
+
+  it('throws typed repo_unavailable when git resolves an unrelated parent repository', async () => {
+    const run = vi.fn().mockResolvedValue('/other/repo\n');
+
+    await expect(snapshotBranchRefs('/expected/repo', 'main', refPatterns, run)).rejects.toMatchObject({
+      reason: 'repo_unavailable',
+      message: expect.stringContaining('/expected/repo'),
+    });
+    expect(run).toHaveBeenCalledTimes(1);
+  });
+
+  it('gathers branch refs after the configured path matches the git toplevel', async () => {
+    const run = vi.fn().mockImplementation(async (_command: string, args: string[]) => {
+      if (args[0] === 'rev-parse') return '/expected/repo\n';
+      if (args.includes('--no-merged=main')) return 'feature/pan-2\n';
+      if (args[0] === 'rev-list') return 'aaa\n';
+      return 'bbb feature/pan-1\n';
+    });
+
+    await expect(snapshotBranchRefs('/expected/repo', 'main', refPatterns, run)).resolves.toEqual({
+      refs: 'bbb feature/pan-1\n',
+      unmergedRefs: 'feature/pan-2\n',
+      firstParentShas: 'aaa\n',
+    });
+    expect(run).toHaveBeenCalledWith('git', ['rev-parse', '--show-toplevel'], '/expected/repo');
+    expect(run).toHaveBeenCalledWith('git', [
+      'for-each-ref', '--format=%(objectname) %(refname:short)', ...refPatterns,
+    ], '/expected/repo');
+    expect(run).toHaveBeenCalledWith('git', [
+      'for-each-ref', '--no-merged=main', '--format=%(refname:short)', ...refPatterns,
+    ], '/expected/repo');
+    expect(run).toHaveBeenCalledWith('git', ['rev-list', '--first-parent', 'main'], '/expected/repo');
+  });
+});
+
 describe('gatherIssueBranchContainment', () => {
   it('classifies merged work, pointers, and unmerged feature and strike refs', async () => {
     const run = vi.fn().mockImplementation(async (command: string, args: string[], cwd?: string) => {
       expect(command).toBe('git');
       expect(cwd).toBe(project.path);
+      if (args[0] === 'rev-parse') return cwd;
       if (args[0] === 'rev-list') return 'aaa\n';
       if (args.includes('--no-merged=main')) return 'strike/pan-3109\norigin/strike/pan-3109\n';
       return [
@@ -131,6 +181,7 @@ describe('gatherIssueBranchContainment', () => {
       },
     };
     const run = vi.fn().mockImplementation(async (_command: string, args: string[], cwd?: string) => {
+      if (args[0] === 'rev-parse') return cwd;
       if (args[0] === 'rev-list') return cwd === '/myn/frontend' ? 'front-main\n' : 'api-main\n';
       if (args.some((arg) => arg.startsWith('--no-merged='))) return '';
       if (cwd === '/myn/frontend') return 'front-merge feature/min-873\n';
@@ -155,11 +206,13 @@ describe('gatherIssueBranchContainment', () => {
     ]), '/myn/api');
   });
 
-  it('propagates git snapshot failures', async () => {
+  it('classifies git snapshot failures as repo_unavailable', async () => {
     const run = vi.fn().mockRejectedValue(new Error('git unavailable'));
 
-    await expect(gatherIssueBranchContainment(project, 'PAN-3109', run))
-      .rejects.toThrow('git unavailable');
+    await expect(gatherIssueBranchContainment(project, 'PAN-3109', run)).rejects.toMatchObject({
+      reason: 'repo_unavailable',
+      message: expect.stringContaining(project.path),
+    });
   });
 });
 
@@ -209,8 +262,9 @@ describe('gatherProjectLensSignals', () => {
     mocked.listOpenPullRequests = vi.fn().mockResolvedValue([]);
     mocked.listMergedPullRequestHeads = vi.fn().mockResolvedValue([]);
     mocked.listSpecIssueIds = vi.fn().mockResolvedValue([]);
-    mocked.run = vi.fn().mockImplementation(async (command, args: string[]) => {
+    mocked.run = vi.fn().mockImplementation(async (command, args: string[], cwd?: string) => {
       if (command !== 'git') throw new Error(`Unexpected command: ${command}`);
+      if (args[0] === 'rev-parse') return cwd;
       // feature/pan-7 tip = merge-lineage commit (bbb, NOT first-parent) → landed work.
       // feature/pan-8 tip = main's HEAD (aaa, first-parent) → fresh branch, no work.
       if (args[0] === 'rev-list') return 'aaa\nccc\n';
@@ -235,7 +289,8 @@ describe('gatherProjectLensSignals', () => {
       { number: 21, state: 'closed' },
     ]);
     mocked.listSpecIssueIds = vi.fn().mockResolvedValue([]);
-    mocked.run = vi.fn().mockImplementation(async (command, args) => {
+    mocked.run = vi.fn().mockImplementation(async (command, args, cwd) => {
+      if (command === 'git' && args[0] === 'rev-parse') return cwd;
       if (command === 'git' && args.includes('--no-merged=main')) {
         return 'strike/pan-20\norigin/strike/pan-21\n';
       }
@@ -290,7 +345,8 @@ describe('gatherProjectLensSignals', () => {
     mocked.listMergedPullRequestHeads = vi.fn().mockResolvedValue([]);
     mocked.listIssueStates = vi.fn().mockResolvedValue([{ number: 2879, state: 'open' }]);
     mocked.listSpecIssueIds = vi.fn().mockResolvedValue([]);
-    mocked.run = vi.fn().mockResolvedValue('strike/pan-2879\nstrike/pan-2778\n');
+    mocked.run = vi.fn().mockImplementation(async (_command, args, cwd) =>
+      args[0] === 'rev-parse' ? cwd : 'strike/pan-2879\nstrike/pan-2778\n');
 
     await expect(gatherProjectLensSignals(project, mocked)).resolves.toEqual([
       { issueId: 'PAN-2879', issueOpen: true, hasOpenPr: false, hasMergedPr: false, hasConventionBranch: true, branchUnmerged: true, hasMergedBranchWork: false, phaseLabel: null, hasXbriefSpec: false, explicitlyReady: false },
@@ -306,7 +362,8 @@ describe('gatherProjectLensSignals', () => {
     }]);
     mocked.listMergedPullRequestHeads = vi.fn().mockResolvedValue([]);
     mocked.listSpecIssueIds = vi.fn().mockResolvedValue([]);
-    mocked.run = vi.fn().mockResolvedValue('');
+    mocked.run = vi.fn().mockImplementation(async (_command, args, cwd) =>
+      args[0] === 'rev-parse' ? cwd : '');
 
     const result = await gatherProjectLensSignals(project, mocked);
 
@@ -334,7 +391,8 @@ describe('gatherProjectLensSignals', () => {
     mocked.listOpenPullRequests = vi.fn().mockResolvedValue([]);
     mocked.listMergedPullRequestHeads = vi.fn().mockResolvedValue(['strike/pan-23']);
     mocked.listSpecIssueIds = vi.fn().mockResolvedValue([]);
-    mocked.run = vi.fn().mockResolvedValue('');
+    mocked.run = vi.fn().mockImplementation(async (_command, args, cwd) =>
+      args[0] === 'rev-parse' ? cwd : '');
 
     const result = await gatherProjectLensSignals(project, mocked);
 
@@ -367,7 +425,8 @@ describe('gatherProjectLensSignals', () => {
     mocked.listOpenPullRequests = vi.fn().mockResolvedValue([]);
     mocked.listMergedPullRequestHeads = vi.fn().mockResolvedValue(['strike/pan-24']);
     mocked.listSpecIssueIds = vi.fn().mockResolvedValue([]);
-    mocked.run = vi.fn().mockImplementation(async (command, args) => {
+    mocked.run = vi.fn().mockImplementation(async (command, args, cwd) => {
+      if (command === 'git' && args[0] === 'rev-parse') return cwd;
       if (command === 'git' && args.includes('--no-merged=main')) return 'feature/pan-24\n';
       if (command === 'git') return 'feature/pan-24\n';
       throw new Error(`Unexpected command: ${command} ${args.join(' ')}`);
@@ -419,6 +478,7 @@ describe('gatherProjectLensSignals', () => {
     ]);
     mocked.listSpecIssueIds = vi.fn().mockResolvedValue(['MIN-3']);
     mocked.run = vi.fn().mockImplementation(async (_command, args, cwd) => {
+      if (args[0] === 'rev-parse') return cwd;
       if (cwd === '/myn/frontend') {
         return args.includes('--no-merged=main') ? 'feature/min-2\n' : 'feature/min-2\n';
       }
@@ -449,7 +509,7 @@ describe('gatherProjectLensSignals', () => {
     expect(mocked.listOpenPullRequests).not.toHaveBeenCalled();
     expect(mocked.listMergedPullRequestHeads).not.toHaveBeenCalled();
     expect(mocked.listIssueStates).not.toHaveBeenCalled();
-    expect(mocked.run).toHaveBeenCalledTimes(6);
+    expect(mocked.run).toHaveBeenCalledTimes(8);
   });
 
   it('rejects GitHub projects without an issue prefix', async () => {
@@ -466,7 +526,8 @@ describe('gatherProjectLensSignals', () => {
       { headRefName: 'feature/krux-3', headRepoFullName: 'eltmon/overdeck' },
     ]);
     mocked.listSpecIssueIds = vi.fn().mockResolvedValue(['KRUX-4']);
-    mocked.run = vi.fn().mockResolvedValue('feature/krux-5\nstrike/krux-9\n');
+    mocked.run = vi.fn().mockImplementation(async (_command, args, cwd) =>
+      args[0] === 'rev-parse' ? cwd : 'feature/krux-5\nstrike/krux-9\n');
 
     await expect(gatherProjectLensSignals(project, mocked)).resolves.toEqual([]);
   });
@@ -479,7 +540,8 @@ describe('gatherProjectLensSignals', () => {
     mocked.listSpecIssueIds = vi.fn().mockResolvedValue(
       Array.from({ length: 40 }, (_, index) => `PAN-${index + 1}`),
     );
-    mocked.run = vi.fn().mockResolvedValue('');
+    mocked.run = vi.fn().mockImplementation(async (_command, args, cwd) =>
+      args[0] === 'rev-parse' ? cwd : '');
 
     await expect(gatherProjectLensSignals(project, mocked)).resolves.toEqual([]);
 
@@ -495,7 +557,8 @@ describe('gatherProjectLensSignals', () => {
     ]);
     mocked.listOpenPullRequests = vi.fn().mockResolvedValue([]);
     mocked.listSpecIssueIds = vi.fn().mockResolvedValue(['PAN-10', 'PAN-11']);
-    mocked.run = vi.fn().mockResolvedValue('');
+    mocked.run = vi.fn().mockImplementation(async (_command, args, cwd) =>
+      args[0] === 'rev-parse' ? cwd : '');
     mocked.listMergedPullRequestHeads = vi.fn().mockResolvedValue([]);
 
     await gatherProjectLensSignals(project, mocked);
@@ -601,7 +664,8 @@ describe('gatherProjectLensSignals', () => {
     mocked.listOpenPullRequests = vi.fn().mockResolvedValue([]);
     mocked.listMergedPullRequestHeads = vi.fn().mockResolvedValue([]);
     mocked.listSpecIssueIds = vi.fn().mockResolvedValue([]);
-    mocked.run = vi.fn().mockResolvedValue('');
+    mocked.run = vi.fn().mockImplementation(async (_command, args, cwd) =>
+      args[0] === 'rev-parse' ? cwd : '');
 
     const [signal] = await gatherProjectLensSignals(project, mocked);
 
@@ -618,7 +682,8 @@ describe('gatherProjectLensSignals', () => {
     mocked.listOpenPullRequests = vi.fn().mockResolvedValue([]);
     mocked.listMergedPullRequestHeads = vi.fn().mockResolvedValue([]);
     mocked.listSpecIssueIds = vi.fn().mockResolvedValue([]);
-    mocked.run = vi.fn().mockResolvedValue('');
+    mocked.run = vi.fn().mockImplementation(async (_command, args, cwd) =>
+      args[0] === 'rev-parse' ? cwd : '');
 
     const [signal] = await gatherProjectLensSignals(project, mocked);
 
