@@ -34,15 +34,7 @@
       "timestamp": "2026-07-26T14:00:17.273Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-26T14:00:17Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-3135\n\n# Review Synthesis — PAN-3135 — 2026-07-26T13:59:27Z\n\n## Verdict: CHANGES REQUESTED — deferred verification can bypass the quality gate and deferred merges lose their retry scheduling\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3135/.pan/review/agent-pan-3135-review-27f89adb/context.json\n- Branch: feature/pan-3135\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3135\n- HEAD reviewed: 27f89adb9576474823407bf0fba3f7d03d8d46e2\n- Cycle number: 1\n- Prior cycle SHA: none\n- PR commits: 11\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3135/.pan/review/agent-pan-3135-review-27f89adb/security.md | 0 |\n| correctness | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3135/.pan/review/agent-pan-3135-review-27f89adb/correctness.md | 2 |\n| performance | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3135/.pan/review/agent-pan-3135-review-27f89adb/performance.md | 1 |\n| requirements | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3135/.pan/review/agent-pan-3135-review-27f89adb/requirements.md | 1 |\n\n## Blocking Findings\n\n### [correctness] Deferred verification can dispatch review without re-running the quality gate — `src/lib/cloister/verification-runner.ts:387`\nThe new queue admission branch leaves verification pending and returns `deferred`, while the route callers preserve the durable `reviewRequestedAt` request. A later status read invokes `maybeAutoDispatchReviewHostSide()` in `src/lib/review-status.ts`, which calls `spawnReviewRoleForIssue()` directly and bypasses the verification-first continuation. That entry point assumes verification already ran and, in `review.mode = none`, can immediately mark review skipped. A queued deploy can therefore cause a branch that never completed the required quality gates to advance into or through review. Durable review recovery must re-enter one canonical verification → push → review path, with an integration test covering behavior before and after the queue clears.\n\n### [correctness] Post-rebase verification deferral is terminal to auto-merge and removes persistent queue scheduling — `src/lib/cloister/merge-verification.ts:39`\n`handlePostRebaseVerificationDeferral()` returns an unsuccessful 409 without a distinct deferred state or `retryable` marker. `tickAutoMergeExecutor()` consequently marks the entry failed, and `triggerMerge()` unconditionally calls `advanceQueue()` in `finally`, removing the current persistent merge-queue item. Restoring the visible status to `queued` does not restore either scheduler, so the message that the merge retries after deployment is false. The deferral needs an explicit non-terminal result handled by both schedulers without consuming retry budget, plus tests for auto-merge and persistent merge-queue attempts.\n\n### [requirements] Deadline escalation misses queues blocked before the deploy-window check — `src/lib/cloister/deploy-patrol.ts:324`\nFR-6 and the updated SOP promise escalation whenever a queued deploy remains blocked past `queue_deadline_minutes`, but the deadline check runs only inside the final deploy-window-block branch. Debounce, spawn cooldown, unknown origin SHA, and pending, failed, or unreadable CI all return before escalation is evaluated, so those queues can remain stuck indefinitely without the required error activity or TTS warning. Evaluate overdue escalation for every blocking exit while preserving the one-shot latch, and add focused tests for overdue CI and pre-CI blockers.\n\n### [performance] Deploy queue performs synchronous filesystem I/O on dashboard-server paths — `src/lib/deploy/deploy-queue.ts:51`\nThe new queue API uses `readFileSync`, `mkdirSync`, `writeFileSync`, `renameSync`, and `rmSync`, and the dashboard server calls it from verification admission, restart gating, and the Deacon patrol. Filesystem latency therefore blocks the single Node event loop, pausing HTTP, RPC/WebSocket, terminal, and patrol work; repeated deferred admissions amplify that stall. Convert the queue to `node:fs/promises`, preserve atomic temp-file rename semantics, and propagate `await` through the changed call sites.\n\n## Non-blocking Findings\n\n### [correctness] Concurrent queue mutations can lose registrations or reset escalation — `src/lib/deploy/deploy-queue.ts:68`\nThe atomic rename prevents partial files but does not serialize cross-process read-modify-write operations. A CLI restart and dashboard patrol can overwrite each other's unions, counters, or escalation state. Route mutations through one writer or use cross-process locking, then test interleaved updates.\n\n### [performance] Blocked deploy handling loads all review statuses twice — `src/lib/deploy/agent-restart-gate.ts:33`\nBoth restart gating and deploy patrol call `getDeployBlockReason()` and then independently call `listVerifyingIssues()`, repeating the full review-status and status-history load. Reuse one snapshot or return the reason and verifying issue IDs from one canonical deploy-window read.\n\n## Clean Sub-roles\n- security\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3135/.pan/review/agent-pan-3135-review-27f89adb/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3135 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "src/lib/cloister/merge-verification.ts",
@@ -104,10 +96,10 @@
     "recordedAt": "2026-07-26T13:53:58.173Z"
   },
   "created": "2026-07-26T12:24:46.201Z",
-  "updated": "2026-07-26T14:01:16.232Z",
+  "updated": "2026-07-26T14:09:56.680Z",
   "pipeline": {
     "issueId": "PAN-3135",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -115,12 +107,12 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T13:54:56.619Z",
-    "updatedAt": "2026-07-26T14:01:13.387Z",
+    "updatedAt": "2026-07-26T14:09:56.625Z",
     "reviewNotes": "Review dispatch skipped — already running: agent-pan-3135-review",
     "inspectNotes": "All 4 ACs met. verification-runner.ts:387-395 gates on readPendingDeploy() before the verificationStatus:'running' write at :409, writes 'pending' + a note naming requestedAt, and self-excludes when status is already 'running'. verification-worker-supervisor.ts:140-144 sits AFTER the live-worker waitForResult join at :137, so a queued deploy blocks only new worker spawns. FOLLOW-UP FOR A LATER BEAD (outside these ACs): request-review-pipeline.ts:31-38 only branches on 'failed'/'error', so a 'deferred' outcome currently falls through to pushBranch()+dispatchReview() and advances to review as if it passed — consumers must be taught to halt on 'deferred'.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3142",
     "lastVerifiedCommit": "27f89adb9576474823407bf0fba3f7d03d8d46e2",
-    "reviewSpawnedAt": "2026-07-26T14:00:02.199Z",
+    "reviewSpawnedAt": "2026-07-26T14:09:56.624Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "src/lib/cloister/merge-verification.ts",
@@ -227,24 +219,24 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 2262142,
-            "output": 178753,
-            "cacheRead": 114480128,
+            "input": 2362731,
+            "output": 207255,
+            "cacheRead": 138846208,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 9552798,
-          "output": 342690,
-          "cacheRead": 145475072,
+          "input": 9653387,
+          "output": 371192,
+          "cacheRead": 169841152,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 130.782226,
-        "pricingAsOf": "2026-07-26T14:01:16.227Z"
+        "usd": 144.323271,
+        "pricingAsOf": "2026-07-26T14:09:56.654Z"
       }
     },
     "merges": [
