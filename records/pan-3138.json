@@ -285,7 +285,7 @@
     "recordedAt": "2026-07-26T16:47:46.685Z"
   },
   "created": "2026-07-26T13:39:19.365Z",
-  "updated": "2026-07-26T16:55:13.661Z",
+  "updated": "2026-07-26T16:56:04.307Z",
   "pipeline": {
     "issueId": "PAN-3138",
     "reviewStatus": "pending",
@@ -298,7 +298,7 @@
     "reviewNotes": "Review dispatch skipped — already running: agent-pan-3138-review",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3143",
     "lastVerifiedCommit": "45c64d10937592faceea33d0a627c6e336c9c829",
-    "reviewRequestedAt": "2026-07-26T16:47:47.444Z",
+    "reviewRequestedAt": "2026-07-26T16:56:03.888Z",
     "reviewSpawnedAt": "2026-07-26T16:47:51.843Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -363,7 +363,8 @@
         "tests/unit/lib/review-status.test.ts"
       ],
       "recordedAt": "2026-07-26T16:47:46.685Z"
-    }
+    },
+    "panDoneRecoveredAt": "2026-07-26T16:56:03.888Z"
   },
   "closeOut": {
     "usage": {
