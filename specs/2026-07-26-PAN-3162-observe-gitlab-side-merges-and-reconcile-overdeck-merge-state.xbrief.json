@@ -4,17 +4,17 @@
     "created": "2026-07-26T21:09:50.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3162: GitLab-side merges are never observed: MIN-898 merged 3.5h ago still shows as awaiting merge and hangs in 'merging'",
-    "updated": "2026-07-26T21:19:00.723Z"
+    "updated": "2026-07-26T21:19:02.738Z"
   },
   "plan": {
     "id": "pan-3162",
     "title": "Observe GitLab-side merges and reconcile Overdeck merge state",
-    "status": "approved",
+    "status": "running",
     "uid": "25f997bd-491a-4a1c-bea4-a44f1266692e",
     "author": "agent:k3[1m]",
-    "sequence": 5,
+    "sequence": 6,
     "created": "2026-07-26T21:09:50.000Z",
-    "updated": "2026-07-26T21:19:00.723Z",
+    "updated": "2026-07-26T21:19:02.738Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3162",
