@@ -5,7 +5,6 @@ import { Effect } from 'effect';
 import { resolveProjectFromIssueSync } from '../projects.js';
 import { isGitHubAppConfigured, listPullRequestsForHead } from '../github-app.js';
 import { getMergeSetSync } from '../merge-set.js';
-import type { ReviewStatus, ReviewStatusUpdate } from '../review-status.js';
 import { resolveGitHubIssueSync } from '../tracker-utils.js';
 import { assessMergeCompleteness } from './merge-completeness.js';
 import type { VerificationRunnerOutcome } from './verification-types.js';
@@ -19,14 +18,21 @@ export interface PostMergeLifecycleOptions {
   verifiedMergedRef?: string;
 }
 
-type MergeStateBeforeAttempt = Pick<ReviewStatus, 'mergeStatus' | 'mergeStep' | 'mergeNotes'> | null | undefined;
+type MergeStatus = 'pending' | 'queued' | 'merging' | 'verifying' | 'merged' | 'failed';
+
+type MergeStateBeforeAttempt = {
+  mergeStatus?: MergeStatus;
+  mergeStep?: string;
+  mergeNotes?: string;
+} | null | undefined;
 
 type PostRebaseVerificationDeferralDeps = {
   appendShipLog: (issueId: string, message: string, phase: 'verifying') => void;
-  setReviewStatus: (
-    issueId: string,
-    update: Pick<ReviewStatusUpdate, 'mergeStatus' | 'mergeStep' | 'mergeNotes'>,
-  ) => unknown;
+  setReviewStatus: (issueId: string, update: {
+    mergeStatus?: MergeStatus;
+    mergeStep?: string;
+    mergeNotes?: string;
+  }) => unknown;
   completePendingOperation: (issueId: string, error: string) => void;
 };
 
