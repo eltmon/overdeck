@@ -22,7 +22,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T08:56:03.309Z",
-  "updated": "2026-07-26T11:22:04.605Z",
+  "updated": "2026-07-26T11:22:12.727Z",
   "pipeline": {
     "issueId": "PAN-3115",
     "reviewStatus": "pending",
@@ -248,5 +248,45 @@
     "docs-prompts-contract.docs-prompts-contract.ac1": "completed",
     "docs-prompts-contract.docs-prompts-contract.ac2": "completed",
     "docs-prompts-contract.docs-prompts-contract.ac3": "completed"
+  },
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      "tests/unit/dashboard/routes/registered-projects-route.test.ts"
+    ],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "docs/PIPELINE-MEMBERSHIP.md",
+      "packages/contracts/src/types.ts",
+      "roles/flywheel.md",
+      "src/dashboard/frontend/src/components/CommandDeck/projectsData.test.ts",
+      "src/dashboard/frontend/src/components/CommandDeck/projectsData.ts",
+      "src/dashboard/server/routes/misc/meta.ts",
+      "src/dashboard/server/routes/pipeline-membership.ts",
+      "src/dashboard/server/services/pipeline-membership.ts",
+      "src/lib/cloister/uat-promote-notify.ts",
+      "src/lib/pipeline-membership-gather.ts",
+      "sync-sources/skills/pipeline-status/SKILL.md",
+      "tests/unit/dashboard/pipeline-membership-service.test.ts",
+      "tests/unit/dashboard/routes/pipeline-membership-route.test.ts",
+      "tests/unit/lib/pipeline-membership-gather.test.ts"
+    ],
+    "actualChangedFiles": [
+      "docs/PIPELINE-MEMBERSHIP.md",
+      "packages/contracts/src/types.ts",
+      "roles/flywheel.md",
+      "src/dashboard/frontend/src/components/CommandDeck/projectsData.test.ts",
+      "src/dashboard/frontend/src/components/CommandDeck/projectsData.ts",
+      "src/dashboard/server/routes/misc/meta.ts",
+      "src/dashboard/server/routes/pipeline-membership.ts",
+      "src/dashboard/server/services/pipeline-membership.ts",
+      "src/lib/cloister/uat-promote-notify.ts",
+      "src/lib/pipeline-membership-gather.ts",
+      "sync-sources/skills/pipeline-status/SKILL.md",
+      "tests/unit/dashboard/pipeline-membership-service.test.ts",
+      "tests/unit/dashboard/routes/pipeline-membership-route.test.ts",
+      "tests/unit/dashboard/routes/registered-projects-route.test.ts",
+      "tests/unit/lib/pipeline-membership-gather.test.ts"
+    ],
+    "recordedAt": "2026-07-26T11:22:12.725Z"
   }
 }
