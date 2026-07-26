@@ -42,7 +42,7 @@
     "recordedAt": "2026-07-26T06:27:49.436Z"
   },
   "created": "2026-07-26T05:55:05.237Z",
-  "updated": "2026-07-26T06:30:35.168Z",
+  "updated": "2026-07-26T06:31:37.508Z",
   "pipeline": {
     "issueId": "PAN-3109",
     "reviewStatus": "pending",
@@ -82,7 +82,9 @@
         "tests/unit/lib/pipeline-membership-gather.test.ts"
       ],
       "recordedAt": "2026-07-26T06:27:49.436Z"
-    }
+    },
+    "reviewRequestedAt": "2026-07-26T06:31:37.155Z",
+    "panDoneRecoveredAt": "2026-07-26T06:31:37.155Z"
   },
   "closeOut": {
     "usage": {
