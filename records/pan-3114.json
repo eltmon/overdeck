@@ -2,7 +2,7 @@
   "issueId": "PAN-3114",
   "schemaVersion": 2,
   "created": "2026-07-26T08:55:24.679Z",
-  "updated": "2026-07-26T08:55:24.679Z",
+  "updated": "2026-07-26T08:55:25.414Z",
   "pipeline": {
     "issueId": "PAN-3114",
     "reviewStatus": "pending",
@@ -25,5 +25,7 @@
       "note": "Planning session started for PAN-3114: UAT-promoted merges leave DoD row 3 (verification) permanently unsatisfiable — same shape as the PAN-3067 strike gap",
       "timestamp": "2026-07-26T08:55:24.678Z"
     }
-  ]
+  ],
+  "harness": "claude-code",
+  "model": "claude-fable-5"
 }
