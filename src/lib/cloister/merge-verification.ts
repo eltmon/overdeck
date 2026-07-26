@@ -7,6 +7,7 @@ import { isGitHubAppConfigured, listPullRequestsForHead } from '../github-app.js
 import { getMergeSetSync } from '../merge-set.js';
 import { resolveGitHubIssueSync } from '../tracker-utils.js';
 import { assessMergeCompleteness } from './merge-completeness.js';
+import type { VerificationRunnerOutcome } from './verification-types.js';
 
 const execAsync = promisify(exec);
 
@@ -15,6 +16,16 @@ export interface PostMergeLifecycleOptions {
   allowVerifiedNoPrMerge?: boolean;
   markReviewPassed?: boolean;
   verifiedMergedRef?: string;
+}
+
+export function postRebaseVerificationDeferral(
+  outcome: VerificationRunnerOutcome,
+): { message: string; statusCode: 409 } | null {
+  if (outcome.outcome !== 'deferred') return null;
+  return {
+    message: `Post-rebase verification deferred: ${outcome.reason} — merge retries after the deploy.`,
+    statusCode: 409,
+  };
 }
 
 function shellQuote(value: string): string {

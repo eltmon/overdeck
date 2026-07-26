@@ -21,6 +21,7 @@ import { promisify } from 'node:util';
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { syncMainIntoWorkspace } from '../../../../lib/cloister/merge-agent.js';
+import { postRebaseVerificationDeferral } from '../../../../lib/cloister/merge-verification.js';
 import { MainDivergedError, gitPush } from '../../../../lib/git/operations.js';
 import { listGitOperationsSync } from '../../../../lib/git-activity.js';
 import { extractNumberSync, extractPrefixSync, parseIssueIdSync } from '../../../../lib/issue-id.js';
@@ -325,6 +326,11 @@ function dequeueNextMerge(projectKey: string, completedIssueId?: string): void {
 
 export async function triggerMerge(issueId: string, request: TriggerMergeRequest = { kind: 'normal' }): Promise<TriggerMergeResult> {
   const reviewStatus = getReviewStatusSync(issueId);
+  const mergeStateBeforeAttempt = {
+    mergeStatus: reviewStatus?.mergeStatus === 'merging' ? undefined : reviewStatus?.mergeStatus,
+    mergeStep: reviewStatus?.mergeStep,
+    mergeNotes: reviewStatus?.mergeNotes,
+  };
   if (request.kind === 'strike') {
     if (activeStrikeMerge(getCurrentMerge((extractPrefixSync(issueId) ?? issueId.split('-')[0]).toLowerCase()) === issueId.toUpperCase() ? issueId.toUpperCase() : null, getPendingOperation(issueId))) return { success: true, statusCode: 200, message: 'Strike merge already in progress', mergeStatus: 'merging' };
     const projectPath = getProjectPath(undefined, extractPrefixSync(issueId) ?? issueId.split('-')[0]);
@@ -1052,6 +1058,18 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
           { ...mergeVerificationOptions(request), onGateLog: (line) => appendShipLog(issueId, line, 'verifying') },
         ));
       })();
+
+    const verificationDeferral = postRebaseVerificationDeferral(verifyResult);
+    if (verificationDeferral) {
+      appendShipLog(issueId, verificationDeferral.message, 'verifying');
+      setReviewStatus(issueId, mergeStateBeforeAttempt);
+      completePendingOperation(issueId, verificationDeferral.message);
+      return {
+        success: false,
+        statusCode: verificationDeferral.statusCode,
+        error: verificationDeferral.message,
+      };
+    }
 
     if (verifyResult.outcome === 'failed') {
       const error = `Post-rebase verification failed at ${verifyResult.failedCheck}`;

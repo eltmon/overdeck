@@ -55,6 +55,7 @@ vi.mock('../../../../src/lib/cloister/merge-completeness.js', () => ({
 }));
 
 import {
+  postRebaseVerificationDeferral,
   shouldSkipDispatchAsMerged,
   verifyMergedBeforeLifecycle,
 } from '../../../../src/lib/cloister/merge-verification.js';
@@ -64,6 +65,22 @@ function mergeSet(repoCount: number) {
     repos: Array.from({ length: repoCount }, (_, index) => ({ repoKey: `repo-${index}` })),
   };
 }
+
+describe('postRebaseVerificationDeferral', () => {
+  it('returns a retriable merge abort containing the deferral reason', () => {
+    expect(postRebaseVerificationDeferral({
+      outcome: 'deferred',
+      reason: 'A dashboard deploy is queued',
+    })).toEqual({
+      message: 'Post-rebase verification deferred: A dashboard deploy is queued — merge retries after the deploy.',
+      statusCode: 409,
+    });
+  });
+
+  it('returns null for terminal verification outcomes', () => {
+    expect(postRebaseVerificationDeferral({ outcome: 'passed' })).toBeNull();
+  });
+});
 
 describe('verifyMergedBeforeLifecycle', () => {
   beforeEach(() => {
