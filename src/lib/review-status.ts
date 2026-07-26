@@ -528,7 +528,6 @@ function maybeAutoDispatchReviewHostSide(issueId: string, status: ReviewStatus):
   reviewDispatchAttemptAt.set(issueId, Date.now());
   void dispatchReviewHostSide(issueId, status.prUrl);
 }
-
 async function dispatchReviewHostSide(issueId: string, prUrl?: string): Promise<void> {
   try {
     const { resolveProjectFromIssueSync } = await import('./projects.js');
