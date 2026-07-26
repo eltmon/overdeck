@@ -22,7 +22,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T17:27:17.644Z",
-  "updated": "2026-07-26T18:11:13.056Z",
+  "updated": "2026-07-26T18:24:06.050Z",
   "pipeline": {
     "issueId": "PAN-3148",
     "reviewStatus": "pending",
@@ -49,16 +49,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "blocked-drift-patrol": {
-        "writerId": "agent-pan-3148",
-        "agentId": "agent-pan-3148",
-        "pid": 698150,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-26T18:11:13.056Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3148",
@@ -70,12 +62,27 @@
         "outcome": "completed",
         "reason": "Anchored blocked verdicts after feedback delivery across CLI and HTTP paths, included fallback synthesis anchors, and added regression coverage plus the head-anchor write-site audit.",
         "releasedAt": "2026-07-26T18:10:57.426Z"
+      },
+      {
+        "writerId": "agent-pan-3148",
+        "agentId": "agent-pan-3148",
+        "pid": 698150,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T18:11:13.056Z",
+        "itemId": "blocked-drift-patrol",
+        "outcome": "completed",
+        "reason": "Detected blocked-review HEAD drift with uniform-anchor fallback and two-tick stability debounce, preserved existing notes/tests on reset, and re-dispatched review. Extracted the patrol into a dedicated module and lowered the file-size baseline because the deacon god-file ratchet rejected growth.",
+        "releasedAt": "2026-07-26T18:24:06.050Z"
       }
     ],
     "statusReasons": {
       "anchor-blocked-verdicts": {
         "reason": "Anchored blocked verdicts after feedback delivery across CLI and HTTP paths, included fallback synthesis anchors, and added regression coverage plus the head-anchor write-site audit.",
         "updatedAt": "2026-07-26T18:10:57.426Z"
+      },
+      "blocked-drift-patrol": {
+        "reason": "Detected blocked-review HEAD drift with uniform-anchor fallback and two-tick stability debounce, preserved existing notes/tests on reset, and re-dispatched review. Extracted the patrol into a dedicated module and lowered the file-size baseline because the deacon god-file ratchet rejected growth.",
+        "updatedAt": "2026-07-26T18:24:06.050Z"
       }
     }
   },
@@ -85,6 +92,11 @@
     "anchor-blocked-verdicts.anchor-blocked-verdicts.ac2": "completed",
     "anchor-blocked-verdicts.anchor-blocked-verdicts.ac3": "completed",
     "anchor-blocked-verdicts.anchor-blocked-verdicts.ac4": "completed",
-    "blocked-drift-patrol": "running"
+    "blocked-drift-patrol": "completed",
+    "blocked-drift-patrol.blocked-drift-patrol.ac1": "completed",
+    "blocked-drift-patrol.blocked-drift-patrol.ac2": "completed",
+    "blocked-drift-patrol.blocked-drift-patrol.ac3": "completed",
+    "blocked-drift-patrol.blocked-drift-patrol.ac4": "completed",
+    "blocked-drift-patrol.blocked-drift-patrol.ac5": "completed"
   }
 }
