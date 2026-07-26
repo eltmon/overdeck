@@ -181,16 +181,15 @@
     "recordedAt": "2026-07-26T00:26:11.651Z"
   },
   "created": "2026-07-25T22:42:08.234Z",
-  "updated": "2026-07-26T00:57:10.778Z",
+  "updated": "2026-07-26T00:57:13.550Z",
   "pipeline": {
     "issueId": "PAN-3083",
     "reviewStatus": "passed",
     "testStatus": "passed",
-    "verificationStatus": "passed",
     "mergeStatus": "merged",
     "releaseStatus": "skipped",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T00:33:05.059Z",
+    "updatedAt": "2026-07-26T00:57:13.520Z",
     "reviewNotes": "Review role spawn failed: Role run agent-pan-3083-review already running. Use 'pan tell' to message it.",
     "testNotes": "Gates: npm run typecheck PASS (incl. hooks/evals/dashboard-types guard); npm run lint PASS (eslint + effect/permissions/state-writes/overdeck-boundaries/pipeline-membership/skills/slash-commands/prompts/prompt-trailer/file-size/source-introspection/circular/ratchet/quarantine guards all clean). Focused suite for this issue's diff: `npx vitest run tests/unit/lib/review-dispatch-decision.test.ts tests/unit/lib/review-status.test.ts tests/unit/lib/overdeck/review-status-record-sync-fallback.test.ts tests/unit/lib/overdeck/review-status-record-sync-drain.test.ts tests/unit/lib/cloister/uat-reconciler.test.ts src/lib/__tests__/review-dispatch-decision.test.ts` -> 6 files / 70 tests passed. Full `npm test` run: 11 files / 17 tests failed, all outside the diff's file set (diff touches only src/lib/review-dispatch-decision.ts, src/lib/review-status.ts, src/lib/overdeck/review-status-record-sync.ts, docs/REVIEW-AGENT-ARCHITECTURE.md, and their own test files). Investigated each failure: 7 files (merge-validation, validation, dangerous-git-ops, record-update, auto-commit, pipeline-state-paths-contribution, workspace-manager-pre-rebase) fail because the agent-shell git-guard shim blocks real `git rebase`/`reset --hard` these tests intentionally exercise -- 6/7 pass when re-run with OVERDECK_PAN_GIT_OP=1, and the 7th (workspace-manager-pre-rebase) fails only because that env var defeats the exact human-shell-vs-agent-shell behavior it tests, confirming the guard as root cause, not a code regression. auto-resume-gating.test.ts, reactive-scheduler.test.ts, and harness-metadata.test.ts passed cleanly when re-run in isolation (47/47 and 1/1), confirming resource-contention flakiness under the full parallel run. specialists-inspect-item.test.ts fails consistently on a mock-drift error ('getProjectSync' not exported by an unrelated vi.mock) in dashboard specialists-done inspect-item attribution, a route untouched by this diff -- pre-existing and out of scope. No UAT: acceptance criteria (FR-1..FR-9, NFR-1/2) are all backend predicate/state-machine/doc behavior verified by unit tests, with no UI or dashboard-observable surface, so browser verification does not apply.",
     "verificationNotes": "The supervised verification worker stopped before recording a result; verification re-runs on the next cycle.",
@@ -227,7 +226,9 @@
         "tests/unit/lib/review-status.test.ts"
       ],
       "recordedAt": "2026-07-26T00:26:11.651Z"
-    }
+    },
+    "closedOut": true,
+    "closedOutAt": "2026-07-26T00:57:13.520Z"
   },
   "closeOut": {
     "usage": {
@@ -293,7 +294,80 @@
     "merges": [
       "https://github.com/eltmon/overdeck/pull/3089"
     ],
-    "ranOn": "eltmon-z790"
+    "ranOn": "eltmon-z790",
+    "dodGate": {
+      "evaluatedAt": "2026-07-26T00:57:13.545Z",
+      "rows": [
+        {
+          "id": "review",
+          "num": 1,
+          "title": "Review passed",
+          "expected": "reviewStatus: passed",
+          "observed": "reviewStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "tests",
+          "num": 2,
+          "title": "Tests passed",
+          "expected": "testStatus: passed",
+          "observed": "testStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "verification",
+          "num": 3,
+          "title": "Verification green on the branch",
+          "expected": "verificationStatus: passed",
+          "observed": "verificationStatus: passed (no lastVerifiedCommit recorded)",
+          "status": "pass"
+        },
+        {
+          "id": "merged",
+          "num": 4,
+          "title": "Merged to main",
+          "expected": "PR merged on the forge",
+          "observed": "Merge specialist confirmed merge completed; PR #3089 MERGED at 2026-07-26T00:32:40Z",
+          "status": "pass",
+          "mergedAt": "2026-07-26T00:32:40Z",
+          "mergeCommit": "f8e2cb34d8448586246b063e0c247b39480b212e"
+        },
+        {
+          "id": "post-merge",
+          "num": 5,
+          "title": "Post-merge lifecycle ran",
+          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
+          "observed": "canonical state: verifying_on_main; no running work/planning agents",
+          "status": "pass"
+        },
+        {
+          "id": "main-verify",
+          "num": 6,
+          "title": "Verified on main",
+          "expected": "merged commit verified on main",
+          "observed": "1 check-runs concluded successfully on f8e2cb34d8448586246b063e0c247b39480b212e",
+          "status": "pass"
+        },
+        {
+          "id": "deploy",
+          "num": 7,
+          "title": "Deployed",
+          "expected": "live server build includes the merged commit",
+          "observed": "build commit 77f78eda contains merge f8e2cb34",
+          "status": "pass"
+        },
+        {
+          "id": "teardown",
+          "num": 8,
+          "title": "Close-out teardown verified",
+          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
+          "overridable": false,
+          "status": "pass",
+          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; Stopped TLDR daemon; Stopped Docker containers; Killed 2 orphaned process(es); Removed git worktree; Removed 4 agent state directories; No strike branch strike/pan-3083 found; Pruned 104 checkpoint ref(s) for agent-pan-3083, planning-pan-3083, strike-pan-3083; No specialist registry entries for PAN-3083"
+        }
+      ],
+      "accepted": []
+    }
   },
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
