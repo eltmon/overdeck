@@ -372,17 +372,17 @@
     "recordedAt": "2026-07-26T00:21:47.769Z"
   },
   "created": "2026-07-25T20:44:21.373Z",
-  "updated": "2026-07-26T00:21:59.874Z",
+  "updated": "2026-07-26T00:22:02.218Z",
   "pipeline": {
     "issueId": "PAN-3037",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T00:21:58.087Z",
+    "updatedAt": "2026-07-26T00:22:02.028Z",
     "reviewNotes": "Verification failed at test",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
     "inspectNotes": "All 5 ACs met: per-repo iteration with repoKey-prefixed paths, conflict abort leaves repo quiescent and skips remaining repos, aggregate alreadyUpToDate requires all repos current, monorepo keeps unprefixed single-element shape, abort returns cancellation + skipped entries. Extraction into sync-main-workspace.ts is logic-identical; baseline 1404 matches actual wc -l.",
@@ -501,7 +501,7 @@
       },
       "costAtCloseOut": {
         "usd": 230.425886,
-        "pricingAsOf": "2026-07-26T00:21:59.868Z"
+        "pricingAsOf": "2026-07-26T00:22:02.056Z"
       }
     },
     "merges": [
