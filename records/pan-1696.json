@@ -242,21 +242,34 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-26T04:09:25.494Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-26T04:11Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-07-26T04:11:54.357Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 2,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-26T04:11:54Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-1696\n\nThe new no-active-run status path ignores --json and leaves the focused Flywheel CLI suite red with no populated or empty ready-set coverage.\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1696 -m \"Fixed review issues\"`"
+    }
+  ],
   "created": "2026-07-26T00:35:36.057Z",
-  "updated": "2026-07-26T04:11:52.395Z",
+  "updated": "2026-07-26T04:11:54.357Z",
   "pipeline": {
     "issueId": "PAN-1696",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "failed",
     "verificationStatus": "skipped",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T04:11:52.365Z",
-    "reviewNotes": "Agent re-review request (7/25): Fixed review issues: CSRF headers on toggle, merge queue without active run",
+    "updatedAt": "2026-07-26T04:11:53.781Z",
+    "reviewNotes": "The new no-active-run status path ignores --json and leaves the focused Flywheel CLI suite red with no populated or empty ready-set coverage.",
     "testNotes": "probe",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/1822",
@@ -297,10 +310,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 114,
-            "output": 51353,
-            "cacheRead": 9419397,
-            "cacheWrite": 408139
+            "input": 116,
+            "output": 52350,
+            "cacheRead": 9621856,
+            "cacheWrite": 409981
           }
         },
         "work": {
@@ -338,10 +351,10 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 114,
-          "output": 51353,
-          "cacheRead": 9419397,
-          "cacheWrite": 408139
+          "input": 116,
+          "output": 52350,
+          "cacheRead": 9621856,
+          "cacheWrite": 409981
         },
         "anthropic/claude-haiku-4-5-20251001": {
           "input": 3825,
@@ -351,8 +364,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 173.1637592,
-        "pricingAsOf": "2026-07-26T04:11:52.391Z"
+        "usd": 173.2188302,
+        "pricingAsOf": "2026-07-26T04:11:53.803Z"
       }
     },
     "merges": [
