@@ -422,18 +422,18 @@
     "recordedAt": "2026-07-26T18:25:06.675Z"
   },
   "created": "2026-07-26T12:33:18.311Z",
-  "updated": "2026-07-26T19:18:09.422Z",
+  "updated": "2026-07-26T19:38:32.396Z",
   "pipeline": {
     "issueId": "PAN-3093",
     "reviewStatus": "passed",
-    "testStatus": "testing",
+    "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": false,
+    "readyForMerge": true,
     "panDoneRecoveredAt": "2026-07-26T18:27:46.686Z",
-    "updatedAt": "2026-07-26T19:17:47.209Z",
+    "updatedAt": "2026-07-26T19:38:32.166Z",
     "reviewNotes": "No current-cycle blocker survived convergence; the rebased head preserves the approved complete-evidence promotion fix",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3145",
@@ -491,6 +491,14 @@
             "cacheRead": 8370688,
             "cacheWrite": 0
           }
+        },
+        "test": {
+          "anthropic/claude-sonnet-5": {
+            "input": 88,
+            "output": 18855,
+            "cacheRead": 8420968,
+            "cacheWrite": 239379
+          }
         }
       },
       "totals": {
@@ -505,11 +513,17 @@
           "output": 1256938,
           "cacheRead": 327011840,
           "cacheWrite": 0
+        },
+        "anthropic/claude-sonnet-5": {
+          "input": 88,
+          "output": 18855,
+          "cacheRead": 8420968,
+          "cacheWrite": 239379
         }
       },
       "costAtCloseOut": {
-        "usd": 446.3556403,
-        "pricingAsOf": "2026-07-26T19:17:47.217Z"
+        "usd": 448.8270123,
+        "pricingAsOf": "2026-07-26T19:38:32.373Z"
       }
     },
     "merges": [
@@ -518,7 +532,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-opus-5",
   "tasks": {
     "sequence": 16,
     "claims": {},
