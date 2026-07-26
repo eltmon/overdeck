@@ -42,12 +42,6 @@ import { recoverOrphanedAgents as recoverOrphanedAgentsWithDeps, handleAgentHear
 import { applyBootReconciliationDecision as applyBootReconciliationDecisionWithDeps, type BootReconciliationApplyResult } from './boot-reconciliation-apply.js';
 import { listFeatureWorkspaces } from './deacon-workspaces.js';
 import { createInFlightGuard } from './in-flight-guard.js';
-// Review gated-dispatch behavior moved to deacon-review-status.ts:
-// keep the source guard anchors here: releaseAdvancingSlot, if (dispatchResult.gated),
-// Deferred review re-dispatch for, Deferred post-review re-dispatch for.
-// if (dispatchResult.gated) {
-//   releaseAdvancingSlot();
-// }
 import { listAllAgentsSync as listAllAgents } from '../overdeck/agents.js';
 import { isContextOverflowTail } from '../context-overflow.js';
 import { REVIEW_SUB_ROLES, type ReviewSubRole } from './review-monitor.js';

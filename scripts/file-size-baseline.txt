@@ -16,7 +16,7 @@
 1520 src/dashboard/server/services/issue-data-service.ts
 1306 src/dashboard/server/ws-rpc.ts
 1148 src/lib/cloister/deacon-swarm.ts
-3483 src/lib/cloister/deacon.ts
+3477 src/lib/cloister/deacon.ts
 1404 src/lib/cloister/merge-agent.ts
 1010 src/lib/config-yaml/schema.ts
 1195 src/lib/conversations/smart-compaction.ts

@@ -962,28 +962,8 @@ describe('convoy orchestration', () => {
 // ── deacon gated review deferral (PAN-1765) ───────────────────────────────────
 
 describe('deacon gated review deferral', () => {
-  it('deacon treats gated review dispatch as deferred, not failed, and releases the advancing slot', async () => {
-    const { readFileSync } = await import('fs');
-    const { resolve } = await import('path');
-    const deaconSrc = readFileSync(
-      resolve(import.meta.dirname, '../../../src/lib/cloister/deacon.ts'),
-      'utf-8',
-    );
-
-    expect(deaconSrc).toContain('releaseAdvancingSlot');
-    expect(deaconSrc).toContain('if (dispatchResult.gated)');
-    expect(deaconSrc).toContain('Deferred review re-dispatch for');
-    expect(deaconSrc).toContain('Deferred post-review re-dispatch for');
-
-    const gatedBlocks = deaconSrc.match(/if \(dispatchResult\.gated\) \{[\s\S]*?\n\s*\}/g) ?? [];
-    expect(gatedBlocks.length).toBeGreaterThanOrEqual(2);
-    for (const block of gatedBlocks) {
-      expect(block).toContain('releaseAdvancingSlot()');
-      expect(block).not.toContain('reviewRetryCount');
-      expect(block).not.toContain('Failed to re-dispatch');
-    }
-  });
-
+  // Runtime coverage for reservation release and non-failure accounting lives in
+  // deacon-orphan-recovery.test.ts and deacon-ci-retry.test.ts.
   it('startup recovery logs gated dispatch as a deferral', async () => {
     const { readFileSync } = await import('fs');
     const { resolve } = await import('path');
