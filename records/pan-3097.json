@@ -55,7 +55,7 @@
     "recordedAt": "2026-07-26T03:30:04.529Z"
   },
   "created": "2026-07-26T02:29:08.179Z",
-  "updated": "2026-07-26T03:31:00.500Z",
+  "updated": "2026-07-26T03:31:04.873Z",
   "pipeline": {
     "issueId": "PAN-3097",
     "reviewStatus": "pending",
@@ -106,7 +106,9 @@
         "sync-sources/rules/ask-user-question-self-contained.md"
       ],
       "recordedAt": "2026-07-26T03:30:04.529Z"
-    }
+    },
+    "reviewRequestedAt": "2026-07-26T03:31:04.453Z",
+    "panDoneRecoveredAt": "2026-07-26T03:31:04.453Z"
   },
   "closeOut": {
     "usage": {
