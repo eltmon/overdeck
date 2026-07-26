@@ -234,10 +234,10 @@
     "recordedAt": "2026-07-25T23:45:57.195Z"
   },
   "created": "2026-07-21T23:09:49.270Z",
-  "updated": "2026-07-26T08:35:25.222Z",
+  "updated": "2026-07-26T08:38:08.371Z",
   "pipeline": {
     "issueId": "PAN-2997",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -245,8 +245,8 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T05:50:39.330Z",
-    "updatedAt": "2026-07-26T08:35:24.802Z",
-    "reviewNotes": "Agent re-review request (4/25): Fixed the cycle-10 blocker: the pre-branch pane_dead snapshot is no longer treated as proof of acceptance. completeKeyedSubmit now snapshots pane_pid/pane_dead + the pending claim before the if-shell and re-reads the target afterwards — if the pane died or was replaced around the Enter, the terminal marker is rolled back, pending restored, and KeyedSubmitTargetDeadError thrown (outbox stays pending, recovery re-drives after resume). Same invariant + rollback remotely. New tests: pane exits upon consuming the submitted line (exact handoff window), terminal rollback + pending restoration proven, real-content recovery after session recreation; remote dieOnEnter coverage. Also fixed the monitor-spool vs gated-queue docs terminology note.",
+    "updatedAt": "2026-07-26T08:38:08.303Z",
+    "reviewNotes": "Remote rollback failures are swallowed and unreadable pre-submit targets are ignored, so false terminal markers can still suppress an undelivered wake.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3004",
     "lastVerifiedCommit": "bb28e3e9c44b6cfa4ca4b733cdd423bb5a977dea",
     "reviewSpawnedAt": "2026-07-26T08:35:16.165Z"
@@ -264,9 +264,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 22133130,
-            "output": 735810,
-            "cacheRead": 133307904,
+            "input": 23653812,
+            "output": 771228,
+            "cacheRead": 139165184,
             "cacheWrite": 0
           }
         },
@@ -295,9 +295,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 23606903,
-          "output": 924931,
-          "cacheRead": 228636672,
+          "input": 25127585,
+          "output": 960349,
+          "cacheRead": 234493952,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -308,8 +308,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 260.418437,
-        "pricingAsOf": "2026-07-26T08:35:24.847Z"
+        "usd": 272.013027,
+        "pricingAsOf": "2026-07-26T08:38:08.345Z"
       }
     },
     "merges": [
