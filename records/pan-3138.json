@@ -101,7 +101,7 @@
     "recordedAt": "2026-07-26T15:34:06.412Z"
   },
   "created": "2026-07-26T13:39:19.365Z",
-  "updated": "2026-07-26T15:35:03.376Z",
+  "updated": "2026-07-26T15:35:09.439Z",
   "pipeline": {
     "issueId": "PAN-3138",
     "reviewStatus": "pending",
@@ -110,10 +110,12 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T15:34:56.768Z",
+    "panDoneRecoveredAt": "2026-07-26T15:35:02.947Z",
+    "updatedAt": "2026-07-26T15:35:03.353Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed typecheck and all second-cycle review issues",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3143",
     "lastVerifiedCommit": "ad37787c2c81d40ae7e7365f0704b913ba266986",
+    "reviewRequestedAt": "2026-07-26T15:35:02.947Z",
     "reviewSpawnedAt": "2026-07-26T15:34:09.887Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -154,18 +156,16 @@
         "tests/unit/lib/review-status.test.ts"
       ],
       "recordedAt": "2026-07-26T15:34:06.412Z"
-    },
-    "reviewRequestedAt": "2026-07-26T15:35:02.947Z",
-    "panDoneRecoveredAt": "2026-07-26T15:35:02.947Z"
+    }
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 1048006,
-            "output": 25440,
-            "cacheRead": 8735744,
+            "input": 1100538,
+            "output": 25770,
+            "cacheRead": 9374720,
             "cacheWrite": 0
           }
         },
@@ -179,9 +179,9 @@
         },
         "review.performance": {
           "openai/gpt-5.6-sol": {
-            "input": 1624488,
-            "output": 38593,
-            "cacheRead": 7731200,
+            "input": 2864249,
+            "output": 56014,
+            "cacheRead": 14275072,
             "cacheWrite": 0
           }
         },
@@ -195,9 +195,9 @@
         },
         "review.security": {
           "openai/gpt-5.6-sol": {
-            "input": 1259064,
-            "output": 26343,
-            "cacheRead": 8727552,
+            "input": 2647255,
+            "output": 43784,
+            "cacheRead": 15296512,
             "cacheWrite": 0
           }
         },
@@ -212,15 +212,15 @@
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 10787001,
-          "output": 437479,
-          "cacheRead": 164766208,
+          "input": 13467485,
+          "output": 472671,
+          "cacheRead": 178518016,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 149.442479,
-        "pricingAsOf": "2026-07-26T15:34:56.896Z"
+        "usd": 170.776563,
+        "pricingAsOf": "2026-07-26T15:35:09.421Z"
       }
     },
     "merges": [
