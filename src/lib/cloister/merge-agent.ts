@@ -352,6 +352,32 @@ export async function postMergeLifecycle(
     } catch (err: any) {
       console.warn(`[merge-agent] Could not set mergeStatus: ${err.message}`);
     }
+    // Eager Docker cleanup must run before any fatal post-merge handoff step.
+    const issueLower = issueId.toLowerCase();
+    try {
+      const { findWorkspacePath } = await import('../lifecycle/archive-planning.js');
+      const { stopWorkspaceDocker } = await import('../workspace-manager.js');
+      const workspacePath = findWorkspacePath(projectPath, issueLower);
+      if (workspacePath) {
+        const dockerResult = await Effect.runPromise(stopWorkspaceDocker(workspacePath, issueLower));
+        if (dockerResult.containersFound) {
+          console.log(`[merge-agent] ✓ Stopped Docker containers: ${dockerResult.steps.join('; ')}`);
+          logActivity('docker_cleanup', `Stopped Docker for ${issueId}: ${dockerResult.steps.join('; ')}`);
+        }
+      }
+    } catch (err) {
+      console.warn(`[merge-agent] Docker container stop failed (non-fatal): ${err}`);
+    }
+    try {
+      const { teardownWorkspaceDockerByNamePromise } = await import('../workspace-manager/docker.js');
+      const teardown = await teardownWorkspaceDockerByNamePromise(issueLower);
+      if (teardown.networkRemoved) {
+        console.log(`[merge-agent] ✓ Removed Docker network: ${teardown.steps.join('; ')}`);
+        logActivity('docker_cleanup', `Removed Docker network for ${issueId}: ${teardown.steps.join('; ')}`);
+      }
+    } catch (err) {
+      console.warn(`[merge-agent] Docker network teardown failed (non-fatal): ${err}`);
+    }
 
     // Step 0: restart only when the running build is stale and the deploy window is safe.
     if (!options?.skipDeploy) {
@@ -529,33 +555,6 @@ export async function postMergeLifecycle(
     } catch (err) {
       console.warn(`[merge-agent] Memory reset marker creation failed (non-fatal): ${err}`);
     }
-    // 4. Stop Docker containers + networks to prevent network pool exhaustion (non-fatal)
-    const issueLower = issueId.toLowerCase();
-    try {
-      const { findWorkspacePath } = await import('../lifecycle/archive-planning.js');
-      const { stopWorkspaceDocker } = await import('../workspace-manager.js');
-      const workspacePath = findWorkspacePath(projectPath, issueLower);
-      if (workspacePath) {
-        const dockerResult = await Effect.runPromise(stopWorkspaceDocker(workspacePath, issueLower));
-        if (dockerResult.containersFound) {
-          console.log(`[merge-agent] ✓ Stopped Docker containers: ${dockerResult.steps.join('; ')}`);
-          logActivity('docker_cleanup', `Stopped Docker for ${issueId}: ${dockerResult.steps.join('; ')}`);
-        }
-      }
-    } catch (err) {
-      console.warn(`[merge-agent] Docker container stop failed (non-fatal): ${err}`);
-    }
-    try {
-      const { teardownWorkspaceDockerByNamePromise } = await import('../workspace-manager/docker.js');
-      const teardown = await teardownWorkspaceDockerByNamePromise(issueLower);
-      if (teardown.networkRemoved) {
-        console.log(`[merge-agent] ✓ Removed Docker network: ${teardown.steps.join('; ')}`);
-        logActivity('docker_cleanup', `Removed Docker network for ${issueId}: ${teardown.steps.join('; ')}`);
-      }
-    } catch (err) {
-      console.warn(`[merge-agent] Docker network teardown failed (non-fatal): ${err}`);
-    }
-
     await notifyTldrDaemon(projectPath, sourceBranch ?? '');
     await maybeSpawnPostMergeKnowledgeRetro(issueId, projectPath);
 

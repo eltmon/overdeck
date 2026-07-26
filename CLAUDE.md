@@ -507,9 +507,10 @@ The durable, verified teardown owner is **close-out**: `pan close <id>` / dashbo
 Close Out stops and removes the workspace Docker stack (including the
 `overdeck-feature-<issue>_devnet` network) and verifies the network is gone. The deacon's
 reaper is the backstop: it runs full `reapIssueResidue` cleanup for tracker-closed issues
-and Docker-only teardown for merged-but-not-closed issues, removing Compose volumes,
-project-owned containers, and the leaked devnet while preserving workspace files,
-branches, agents, sessions, state, and xBRIEF. The single `rebuildWorkspaceStack`
+and queues Docker-only teardown for merged-but-not-closed issues on a deduplicated serial
+worker with retry backoff. The worker removes Compose volumes, project-owned containers,
+and the leaked devnet while preserving workspace files, branches, agents, sessions, state,
+and xBRIEF. The single `rebuildWorkspaceStack`
 chokepoint no-ops for closed and merged issues, so patrols never recreate a terminal stack.
 
 The destructive/non-reversible completion steps are owned by close-out, not merge:

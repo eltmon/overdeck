@@ -35,6 +35,7 @@ const mockStopWorkspaceDocker = vi.hoisted(() =>
 const mockTeardownWorkspaceDockerByNamePromise = vi.hoisted(() =>
   vi.fn().mockResolvedValue({ networkRemoved: true, steps: ['Removed network'] }),
 );
+const mockTransitionState = vi.hoisted(() => ({ shouldFail: false }));
 
 // ── child_process / fs mocks ──────────────────────────────────────────────────
 const mockExecAsync = vi.hoisted(() =>
@@ -43,6 +44,9 @@ const mockExecAsync = vi.hoisted(() =>
       return { stdout: '[{"number":399,"state":"closed","mergedAt":"2026-07-12T00:00:00Z"}]', stderr: '' };
     }
     if (cmd.includes('gh label create')) return { stdout: '', stderr: '' };
+    if (mockTransitionState.shouldFail && cmd.includes('gh issue edit') && cmd.includes('--add-label')) {
+      throw new Error('tracker transition failed');
+    }
     if (cmd.includes('gh issue edit')) return { stdout: '', stderr: '' };
     if (cmd.includes('git rev-parse --verify')) return { stdout: 'deadbeef\n', stderr: '' };
     if (cmd.includes('git merge-base --is-ancestor')) return { stdout: '', stderr: '' };
@@ -230,6 +234,7 @@ describe('postMergeLifecycle — release trigger does not block cleanup', () => 
     resetPostMergeState(ISSUE_ID);
     releaseResolve = null;
     releaseStarted = false;
+    mockTransitionState.shouldFail = false;
     mockFindWorkspacePath.mockReturnValue(null);
     mockStopWorkspaceDocker.mockReturnValue(Effect.succeed({ containersFound: false, steps: [] }));
     mockTeardownWorkspaceDockerByNamePromise.mockResolvedValue({ networkRemoved: true, steps: ['Removed network'] });
@@ -265,6 +270,20 @@ describe('postMergeLifecycle — release trigger does not block cleanup', () => 
 
     await lifecyclePromise;
   }, 30_000);
+
+  it('runs name-based teardown before a verifying-on-main tracker transition fails', async () => {
+    mockTransitionState.shouldFail = true;
+
+    await expect(
+      postMergeLifecycle(ISSUE_ID, PROJECT_PATH, SOURCE_BRANCH, { skipDeploy: true }),
+    ).rejects.toThrow('tracker transition failed');
+
+    expect(mockTeardownWorkspaceDockerByNamePromise).toHaveBeenCalledWith(ISSUE_ID.toLowerCase());
+    expect(mockSetReviewStatusSync).toHaveBeenCalledWith(
+      ISSUE_ID,
+      expect.objectContaining({ mergeStatus: 'failed' }),
+    );
+  });
 
   it('runs name-based teardown when workspace container stopping fails', async () => {
     mockFindWorkspacePath.mockReturnValue('/tmp/test-workspace');
