@@ -97,10 +97,10 @@
     "recordedAt": "2026-07-26T15:26:28.528Z"
   },
   "created": "2026-07-26T12:33:18.311Z",
-  "updated": "2026-07-26T15:43:39.297Z",
+  "updated": "2026-07-26T15:44:07.721Z",
   "pipeline": {
     "issueId": "PAN-3093",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
@@ -108,11 +108,10 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T15:27:32.338Z",
-    "updatedAt": "2026-07-26T15:43:37.937Z",
-    "reviewNotes": "Normal pushed polyrepo refs are origin-qualified, but the assembly adapter rejects them, so no testable generation can be built; nine additional security, correctness, requirements, and performance blockers are documented in synthesis.md.",
+    "updatedAt": "2026-07-26T15:44:07.673Z",
+    "reviewNotes": "[security] Read-only member repositories are treated as writable UAT targets — `src/lib/flywheel-merge-order.ts:395`",
     "inspectNotes": "All 4 ACs verified; ran uat-polyrepo-engine.test.ts + uat-generation-engine.test.ts, 33/33 pass. AC1: runAssemblyPass calls each repo's own fetchMain then createWorktree and records that repo's baseSha; finish() writes compositeBaseAnchor -> 'fe@aaa1111 api@bbb2222' on the generation row (asserted on both the returned object and the store row). AC2: a block returns from the pass, the issue is added to heldOutIds once and pushed to heldOut with reason suffixed '(in <repoKey>)', then assembly replays from base; verified in real git too, since createWorktree does 'worktree remove --force' + 'worktree add -B <branch> <path> origin/<target>', which resets the sibling repo's branch, so the fake's merged-reset is faithful. Push happens only after the accepted pass, so a held-out feature is never published in repo A. AC3: contributingRepos filters by repoContributions; infra gets zero worktreeCreations and zero pushes. AC4: the push loop returns finish('failed', ...) on the first throw, with fe.pushes=[name] and api.pushes=[] proving the sibling had landed. Deviation 1 confirmed necessary: safeGenerationWorktreePath (uat-generation-deps.ts:39) resolves <projectRoot>/workspaces, and a member repo runs git in <projectRoot>/<repoKey> while its worktree sits under the wrapper's workspaces, so the old signature would throw; workspacesRoot defaults to projectRoot and targetBranch to 'main', reproducing the prior origin/main behavior exactly. Per-repo deps each close over their own worktreePath, so merge/abort/push cannot cross repos. Deviation 2 confirmed: GenerationStorePort.update's Pick had no 'repos'. Non-blocking notes: (a) a repo dropped between passes keeps its unpushed local uat/ branch and worktree until the generation folder is reaped - harmless since 'worktree add -B' force-resets, but cleanup (WI-7) should reap the branch; (b) listRemoteUatBranchesMulti, buildPolyrepoGitDeps, and assemblePolyrepoUatGeneration have no callers yet, which is expected until the WI-5/WI-6 wiring lands.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3145",
-    "reviewRequestedAt": "2026-07-26T15:27:32.338Z",
     "reviewSpawnedAt": "2026-07-26T15:43:37.935Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -184,6 +183,28 @@
         "tests/unit/lib/overdeck/uat-generation-repos.test.ts"
       ],
       "recordedAt": "2026-07-26T15:26:28.528Z"
+    },
+    "reviewerVerdicts": {
+      "security": {
+        "status": "blocked",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3093/.pan/review/agent-pan-3093-review-3624f23f/security.md",
+        "atCommit": "3624f23fa9e3fdde7a780dfe7c90587934bae2a6"
+      },
+      "correctness": {
+        "status": "blocked",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3093/.pan/review/agent-pan-3093-review-3624f23f/correctness.md",
+        "atCommit": "3624f23fa9e3fdde7a780dfe7c90587934bae2a6"
+      },
+      "performance": {
+        "status": "blocked",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3093/.pan/review/agent-pan-3093-review-3624f23f/performance.md",
+        "atCommit": "3624f23fa9e3fdde7a780dfe7c90587934bae2a6"
+      },
+      "requirements": {
+        "status": "blocked",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3093/.pan/review/agent-pan-3093-review-3624f23f/requirements.md",
+        "atCommit": "3624f23fa9e3fdde7a780dfe7c90587934bae2a6"
+      }
     }
   },
   "closeOut": {
@@ -199,9 +220,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 1198444,
-            "output": 68883,
-            "cacheRead": 16239104,
+            "input": 1303940,
+            "output": 69227,
+            "cacheRead": 16289280,
             "cacheWrite": 0
           }
         },
@@ -246,15 +267,15 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 3572897,
-          "output": 282839,
-          "cacheRead": 59920896,
+          "input": 3678393,
+          "output": 283183,
+          "cacheRead": 59971072,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 56.3262333,
-        "pricingAsOf": "2026-07-26T15:43:39.283Z"
+        "usd": 56.8891213,
+        "pricingAsOf": "2026-07-26T15:44:07.706Z"
       }
     },
     "merges": [
