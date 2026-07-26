@@ -39,8 +39,24 @@ const execAsync = promisify(exec);
 /** Idle duration before a workspace's UI stack is reaped. */
 const GRACE_MS = 10 * 60 * 1000; // 10 minutes
 
+/**
+ * Idle duration before a workspace's FULL stack is reaped (all services except
+ * the dev attach target). The 10-minute UI tier only matches the overdeck
+ * project's own server/frontend naming, so other projects' stacks (postgres,
+ * redis, api/JVM, vite) lived forever — 35 myn-feature containers were resident
+ * for agents stopped 17h+, and that idle RSS feeds the memory-governor pressure
+ * that forces scheduler yields (MIN-858/MIN-891 yielded under it, 2026-07-25).
+ */
+const FULL_STACK_GRACE_MS = 2 * 60 * 60 * 1000; // 2 hours
+
 /** `overdeck-feature-<issue>-server-1` / `-frontend-1`. */
 const UI_CONTAINER_RE = /^overdeck-feature-([a-z0-9]+-\d+)-(server|frontend)-1$/i;
+
+/** Compose project names end in `feature-<issue>` by construction (stack-health). */
+const FEATURE_PROJECT_RE = /(?:^|[-_])feature-([a-z0-9]+-\d+)$/i;
+
+/** Never stop the `dev` container — it is the operator's VS Code attach target. */
+const DEV_CONTAINER_RE = /-dev-1$/i;
 
 /**
  * issueLower -> epoch ms first observed idle. Module-level so the grace clock
@@ -75,9 +91,16 @@ export function resetIdleStackGraceClock(issueLower: string): void {
   firstIdleAt.delete(issueLower);
 }
 
+export interface ComposeContainerRef {
+  name: string;
+  composeProject?: string;
+}
+
 export interface IdleStackReaperDeps {
   /** Names of currently-running docker containers. */
   listContainerNames: () => Promise<string[]>;
+  /** Running containers with their compose-project label (full-stack tier). */
+  listComposeContainers: () => Promise<ComposeContainerRef[]>;
   /** Live tmux session names (host `overdeck` socket). */
   listSessions: () => Promise<readonly string[]>;
   /** Stop the given containers (light, reversible). */
@@ -86,6 +109,8 @@ export interface IdleStackReaperDeps {
   now: () => number;
   /** Idle grace window in ms. */
   graceMs: number;
+  /** Idle grace window for the full-stack tier in ms. */
+  fullStackGraceMs: number;
 }
 
 function defaultDeps(): IdleStackReaperDeps {
@@ -94,6 +119,23 @@ function defaultDeps(): IdleStackReaperDeps {
       const { stdout } = await execAsync(`docker ps --format '{{.Names}}'`, { timeout: 15000 });
       return stdout.split('\n').map(s => s.trim()).filter(Boolean);
     },
+    listComposeContainers: async () => {
+      const { stdout } = await execAsync(`docker ps --format '{{.Names}}\t{{json .Labels}}'`, { timeout: 15000 });
+      const out: ComposeContainerRef[] = [];
+      for (const line of stdout.split('\n')) {
+        const tab = line.indexOf('\t');
+        if (tab <= 0) continue;
+        const name = line.slice(0, tab).trim();
+        if (!name) continue;
+        try {
+          const labels = JSON.parse(line.slice(tab + 1)) as Record<string, string>;
+          out.push({ name, composeProject: labels['com.docker.compose.project'] });
+        } catch {
+          out.push({ name });
+        }
+      }
+      return out;
+    },
     listSessions: () => Effect.runPromise(listSessionNames()),
     stopContainers: async (names) => {
       if (names.length === 0) return;
@@ -101,6 +143,7 @@ function defaultDeps(): IdleStackReaperDeps {
     },
     now: () => Date.now(),
     graceMs: GRACE_MS,
+    fullStackGraceMs: FULL_STACK_GRACE_MS,
   };
 }
 
@@ -132,10 +175,12 @@ export async function reconcileIdleWorkspaceStacks(
   }
 
   // Forget grace clocks for issues whose UI containers are already gone.
+  // (`full:` keys belong to the full-stack tier below — they track compose
+  // projects, not UI containers, and must not be pruned here.)
   for (const issue of [...firstIdleAt.keys()]) {
+    if (issue.startsWith('full:')) continue;
     if (!byIssue.has(issue)) firstIdleAt.delete(issue);
   }
-  if (byIssue.size === 0) return actions;
 
   const sessions = await d.listSessions().catch(() => [] as readonly string[]);
   // Any tmux session for the issue (agent / review / test / inspect / strike)
@@ -172,6 +217,73 @@ export async function reconcileIdleWorkspaceStacks(
       });
     } catch (err: any) {
       console.warn(`[deacon] idle-stack reaper: failed to stop ${issueLower} UI containers: ${err?.message ?? err}`);
+    }
+  }
+
+  // Full-stack tier: any compose project ending in `feature-<issue>`, idle past
+  // the full grace window → stop every running service except the dev attach
+  // target. Label-scoped (project-agnostic), so non-overdeck projects' stacks
+  // are reaped too. docker stop keeps named volumes; the spawn path rebuilds
+  // and agents restart services on demand.
+  let composeContainers: ComposeContainerRef[] = [];
+  try {
+    composeContainers = await d.listComposeContainers();
+  } catch {
+    composeContainers = []; // docker not reachable for labels — skip the tier
+  }
+
+  const byProject = new Map<string, { issueLower: string; names: string[] }>();
+  for (const c of composeContainers) {
+    if (!c.composeProject) continue;
+    const m = c.composeProject.match(FEATURE_PROJECT_RE);
+    if (!m) continue;
+    const entry = byProject.get(c.composeProject) ?? { issueLower: m[1].toLowerCase(), names: [] };
+    entry.names.push(c.name);
+    byProject.set(c.composeProject, entry);
+  }
+
+  // Forget full-tier grace clocks for projects that vanished entirely.
+  for (const key of [...firstIdleAt.keys()]) {
+    if (!key.startsWith('full:')) continue;
+    if (!byProject.has(key.slice(5))) firstIdleAt.delete(key);
+  }
+
+  for (const [project, { issueLower, names }] of byProject) {
+    const clockKey = `full:${project}`;
+    if (sessionBlob.includes(issueLower)) {
+      firstIdleAt.delete(clockKey); // active — reset the clock
+      continue;
+    }
+
+    const since = firstIdleAt.get(clockKey);
+    if (since === undefined) {
+      firstIdleAt.set(clockKey, nowMs); // start the grace clock
+      continue;
+    }
+    if (nowMs - since < d.fullStackGraceMs) continue; // still within grace
+
+    const targets = names.filter((n) => !DEV_CONTAINER_RE.test(n));
+    if (targets.length === 0) {
+      firstIdleAt.delete(clockKey);
+      continue; // only the dev container is left — nothing to reap
+    }
+
+    try {
+      await d.stopContainers(targets);
+      firstIdleAt.delete(clockKey);
+      const issueId = issueLower.toUpperCase();
+      const idleMin = Math.round((nowMs - since) / 60000);
+      const action = `Reaped idle workspace stack for ${issueId} — stopped ${targets.length}/${names.length} container(s) in ${project} after ${idleMin}m idle (no agent, no tmux)`;
+      actions.push(action);
+      console.log(`[deacon] ${action}`);
+      emitActivityEntrySync({
+        source: 'cloister',
+        level: 'info',
+        issueId,
+        message: `[deacon] reaped idle workspace stack for ${issueId} — ${targets.length} container(s) stopped, dev attach target preserved`,
+      });
+    } catch (err: any) {
+      console.warn(`[deacon] idle-stack reaper: failed to stop ${project} containers: ${err?.message ?? err}`);
     }
   }
 
