@@ -327,6 +327,7 @@ export interface OrphanProposedReconcilerConfig {
 export interface DeployConfig {
   auto_deploy: boolean;
   debounce_minutes: number;
+  queue_deadline_minutes: number;
 }
 
 /**
@@ -391,6 +392,7 @@ export const DEFAULT_CLOISTER_CONFIG: CloisterConfig = {
   deploy: {
     auto_deploy: true,
     debounce_minutes: 5,
+    queue_deadline_minutes: 30,
   },
   concurrency: {
     max_work_agents: 6,

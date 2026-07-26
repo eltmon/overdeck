@@ -5,7 +5,13 @@ import type { ChildProcess } from 'node:child_process';
 
 import { emitActivityEntrySync, emitActivityTtsSync } from '../activity-logger.js';
 import { getBuildInfo } from '../deploy/build-info.js';
-import { getDeployBlockReason } from '../deploy/deploy-window.js';
+import {
+  clearPendingDeploy,
+  readPendingDeploy,
+  recordDeployIntent,
+  type PendingDeploy,
+} from '../deploy/deploy-queue.js';
+import { getDeployBlockReason, listVerifyingIssues } from '../deploy/deploy-window.js';
 import { computeBuildStaleness, type BuildStaleness } from '../deploy/staleness.js';
 import { OVERDECK_HOME } from '../paths.js';
 import { loadCloisterConfigSync, type DeployConfig } from './config.js';
@@ -58,6 +64,10 @@ export interface DeployPatrolContext {
   readonly computeStaleness?: () => Promise<BuildStaleness>;
   readonly getCiState?: (sha: string) => Promise<DeployCiState>;
   readonly getBlockReason?: () => Promise<string | null>;
+  readonly readQueue?: () => PendingDeploy | null;
+  readonly clearQueue?: () => void;
+  readonly recordIntent?: typeof recordDeployIntent;
+  readonly listVerifyingIssues?: () => string[];
   readonly spawnReload?: (request: ReloadRequest) => Promise<void>;
   readonly emitEntry?: EmitEntry;
   readonly emitTts?: EmitTts;
@@ -287,10 +297,12 @@ export async function runDeployPatrol(context: DeployPatrolContext): Promise<voi
 
   if (staleness.status === 'fresh') {
     clearState();
+    (context.clearQueue ?? clearPendingDeploy)();
     return;
   }
 
   state.unknownObserved = false;
+  const queuedDeploy = (context.readQueue ?? readPendingDeploy)();
   const behind = staleness.behindBuildInputs ?? 0;
   if (
     state.lastObservedBehind !== behind ||
@@ -299,13 +311,13 @@ export async function runDeployPatrol(context: DeployPatrolContext): Promise<voi
     emitEntry({
       source: 'deploy-script',
       level: 'warn',
-      message: `The running build ${shortSha(staleness.buildCommit)} is ${behind} build-input commit(s) behind origin/main ${shortSha(staleness.originMainSha)}. ${context.config.auto_deploy ? 'Automatic deployment will start after the merge debounce and safety checks clear.' : 'Automatic deployment is disabled, so operator action is required.'}`,
+      message: `The running build ${shortSha(staleness.buildCommit)} is ${behind} build-input commit(s) behind origin/main ${shortSha(staleness.originMainSha)}. ${context.config.auto_deploy || queuedDeploy ? 'Automatic deployment will start after the merge debounce and safety checks clear.' : 'Automatic deployment is disabled, so operator action is required.'}`,
     });
     state.lastObservedBehind = behind;
     state.lastObservationAt = now;
   }
 
-  if (!context.config.auto_deploy) return;
+  if (!context.config.auto_deploy && !queuedDeploy) return;
   if (
     staleness.originMainLastBuildInputCommitAt !== null &&
     now - staleness.originMainLastBuildInputCommitAt < context.config.debounce_minutes * 60 * 1000
@@ -329,6 +341,13 @@ export async function runDeployPatrol(context: DeployPatrolContext): Promise<voi
   const blockReason = await (context.getBlockReason ?? getDeployBlockReason)();
   if (blockReason) {
     emitDeferral(blockReason, now, emitEntry);
+    if (context.config.auto_deploy) {
+      (context.recordIntent ?? recordDeployIntent)({
+        requestedBy: DEPLOY_PATROL_INITIATOR,
+        reason: blockReason,
+        blockedBy: (context.listVerifyingIssues ?? listVerifyingIssues)(),
+      });
+    }
     return;
   }
 
@@ -346,7 +365,7 @@ export async function runDeployPatrol(context: DeployPatrolContext): Promise<voi
   emitEntry({
     source: 'deploy-script',
     level: 'info',
-    message: `Automatic deployment started for origin/main ${shortSha(staleness.originMainSha)}; the dashboard will rebuild and restart with a 120-second health timeout.`,
+    message: `Automatic deployment started for origin/main ${shortSha(staleness.originMainSha)}; the dashboard will rebuild and restart with a 120-second health timeout.${queuedDeploy ? ` This was a queued deploy requested by ${queuedDeploy.requestedBy.join(', ')}.` : ''}`,
   });
   emitTts({
     utterance: 'Automatic dashboard deployment started.',
