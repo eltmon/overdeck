@@ -61,18 +61,18 @@
     "recordedAt": "2026-07-26T13:26:38.219Z"
   },
   "created": "2026-07-26T12:25:26.814Z",
-  "updated": "2026-07-26T14:17:04.190Z",
+  "updated": "2026-07-26T14:17:09.101Z",
   "pipeline": {
     "issueId": "PAN-3123",
     "reviewStatus": "passed",
     "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
-    "mergeStatus": "verifying",
+    "mergeStatus": "merged",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T13:38:39.318Z",
-    "updatedAt": "2026-07-26T14:17:03.521Z",
+    "updatedAt": "2026-07-26T14:17:08.424Z",
     "reviewNotes": "Approved: same reviewed HEAD; no correctness, security, requirements, or performance findings, and focused validation passed",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "All 5 ACs met. nextGovernorModeWithRunway composes swap runway over nextGovernorMode with asymmetric swap hysteresis (soft% while admitting, recovery% once held), so SwapFree 0/8GiB with RAM above RECOVERY yields holding (AC1) and re-admission needs SwapFree >= recovery% AND RAM >= RECOVERY (AC2). PSI shed is gated on swapLow && psiFullAvg10 != null && >= threshold, so null PSI degrades to holding (AC3). swapTotalBytes <= 0 early-returns the RAM-only mode, and canAdmit/nextGovernorMode logic is untouched (AC4). Verdict carries swapTotalBytes/swapFreeBytes/psiFullAvg10 as optional MemoryVerdict fields (AC5). Verified beyond the mocks: readProcMemoryLinux/Darwin really populate swapTotal/swapFree/psiFullAvg10, config keys governorSwapSoftFreePercent/RecoveryFreePercent/PsiFullShedAvg10 exist in defaults+schema+merge with a recovery>soft clamp, and every autonomous admission path (boot-reconciliation-apply, deacon-auto-resume, preemption) goes through assessMemoryPressure, so no path bypasses the swap gate. Non-blocking note: the single previousMode variable is shared by both hysteresis axes, so a hold entered for low RAM raises the swap bar to recovery% - swap sitting between soft% and recovery% can prolong a hold it never caused. Conservative (errs toward holding) and consistent with AC2's wording, but worth a follow-up if operators see slow re-admission on hosts with mid-range swap.",
@@ -165,7 +165,7 @@
       },
       "costAtCloseOut": {
         "usd": 43.720857,
-        "pricingAsOf": "2026-07-26T14:17:03.643Z"
+        "pricingAsOf": "2026-07-26T14:17:08.781Z"
       }
     },
     "merges": [
