@@ -72,6 +72,11 @@
       "reason": "feedback",
       "note": "[2026-07-26T15:13Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-07-26T15:13:47.511Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-26T15:25:14.471Z"
     }
   ],
   "feedback": [],
@@ -136,10 +141,10 @@
     "recordedAt": "2026-07-26T13:53:58.173Z"
   },
   "created": "2026-07-26T12:24:46.201Z",
-  "updated": "2026-07-26T15:25:13.202Z",
+  "updated": "2026-07-26T15:25:15.233Z",
   "pipeline": {
     "issueId": "PAN-3135",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -147,12 +152,12 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T13:54:56.619Z",
-    "updatedAt": "2026-07-26T15:25:12.800Z",
+    "updatedAt": "2026-07-26T15:25:13.227Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "inspectNotes": "All 4 ACs met. verification-runner.ts:387-395 gates on readPendingDeploy() before the verificationStatus:'running' write at :409, writes 'pending' + a note naming requestedAt, and self-excludes when status is already 'running'. verification-worker-supervisor.ts:140-144 sits AFTER the live-worker waitForResult join at :137, so a queued deploy blocks only new worker spawns. FOLLOW-UP FOR A LATER BEAD (outside these ACs): request-review-pipeline.ts:31-38 only branches on 'failed'/'error', so a 'deferred' outcome currently falls through to pushBranch()+dispatchReview() and advances to review as if it passed — consumers must be taught to halt on 'deferred'.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3142",
     "lastVerifiedCommit": "dafef43b8d0a334724280cc3145f6a93bee9512f",
-    "reviewSpawnedAt": "2026-07-26T15:08:01.295Z",
+    "reviewSpawnedAt": "2026-07-26T15:25:13.225Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "src/lib/cloister/merge-verification.ts",
@@ -276,7 +281,7 @@
       },
       "costAtCloseOut": {
         "usd": 365.464508,
-        "pricingAsOf": "2026-07-26T15:25:12.824Z"
+        "pricingAsOf": "2026-07-26T15:25:15.181Z"
       }
     },
     "merges": [
