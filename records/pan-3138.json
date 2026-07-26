@@ -144,22 +144,21 @@
     "recordedAt": "2026-07-26T16:03:54.970Z"
   },
   "created": "2026-07-26T13:39:19.365Z",
-  "updated": "2026-07-26T16:07:28.257Z",
+  "updated": "2026-07-26T16:07:35.713Z",
   "pipeline": {
     "issueId": "PAN-3138",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "failed",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T16:05:42.563Z",
-    "updatedAt": "2026-07-26T16:07:27.011Z",
-    "reviewNotes": "A transient verifying-on-main transition failure permanently strands the remaining post-merge lifecycle",
+    "updatedAt": "2026-07-26T16:07:28.358Z",
+    "reviewNotes": "Review role spawn failed: Role run agent-pan-3138-review already running. Use 'pan tell' to message it.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3143",
     "lastVerifiedCommit": "f0a9c2b38faee0a59137c9b52a78bae5bafc1ae0",
-    "reviewRequestedAt": "2026-07-26T16:05:42.563Z",
-    "reviewSpawnedAt": "2026-07-26T16:07:27.010Z",
+    "reviewSpawnedAt": "2026-07-26T16:07:27.069Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "scripts/file-size-baseline.txt",
@@ -263,7 +262,7 @@
       },
       "costAtCloseOut": {
         "usd": 309.129093,
-        "pricingAsOf": "2026-07-26T16:07:28.249Z"
+        "pricingAsOf": "2026-07-26T16:07:35.705Z"
       }
     },
     "merges": [
