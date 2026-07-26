@@ -65,18 +65,18 @@
     "recordedAt": "2026-07-26T10:40:53.843Z"
   },
   "created": "2026-07-26T09:04:01.632Z",
-  "updated": "2026-07-26T18:59:11.279Z",
+  "updated": "2026-07-26T18:59:38.552Z",
   "pipeline": {
     "issueId": "PAN-3116",
     "reviewStatus": "passed",
     "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
-    "mergeStatus": "merged",
+    "mergeStatus": "pending",
     "releaseStatus": "skipped",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T10:42:05.667Z",
-    "updatedAt": "2026-07-26T18:59:11.143Z",
+    "updatedAt": "2026-07-26T18:59:38.542Z",
     "blockerReasons": [
       {
         "type": "merge_conflict",
@@ -159,7 +159,7 @@
       },
       "costAtCloseOut": {
         "usd": 43.4386743,
-        "pricingAsOf": "2026-07-26T18:59:11.151Z"
+        "pricingAsOf": "2026-07-26T18:59:38.546Z"
       }
     },
     "merges": [
@@ -168,7 +168,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "k3[1m]",
+  "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
     "sequence": 10,
