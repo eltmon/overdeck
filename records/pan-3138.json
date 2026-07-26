@@ -401,16 +401,16 @@
     "recordedAt": "2026-07-26T19:11:42.045Z"
   },
   "created": "2026-07-26T13:39:19.365Z",
-  "updated": "2026-07-26T19:11:42.046Z",
+  "updated": "2026-07-26T19:11:42.897Z",
   "pipeline": {
     "issueId": "PAN-3138",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T18:46:12.839Z",
+    "updatedAt": "2026-07-26T19:11:42.896Z",
     "reviewNotes": "Claim recovery loses an older lifecycle when a newer pending generation exists",
     "verificationNotes": "The supervised verification worker stopped before recording a result; verification re-runs on the next cycle.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3143",
@@ -418,7 +418,6 @@
     "reviewSpawnedAt": "2026-07-26T18:42:48.185Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
-        "scripts/file-size-baseline.txt",
         "src/dashboard/server/pending-lifecycle.ts",
         "src/dashboard/server/routes/__tests__/specialists-shared.test.ts",
         "src/dashboard/server/routes/specialists/shared.ts",
@@ -461,7 +460,6 @@
       "actualChangedFiles": [
         "CLAUDE.md",
         "docs/WORKSPACE-CONTAINERS.md",
-        "scripts/file-size-baseline.txt",
         "src/dashboard/server/pending-lifecycle.ts",
         "src/dashboard/server/routes/__tests__/specialists-shared.test.ts",
         "src/dashboard/server/routes/specialists/shared.ts",
@@ -496,7 +494,7 @@
         "tests/unit/lib/pan-444-post-merge-step0.test.ts",
         "tests/unit/lib/review-status.test.ts"
       ],
-      "recordedAt": "2026-07-26T18:42:41.042Z"
+      "recordedAt": "2026-07-26T19:11:42.045Z"
     },
     "reviewerVerdicts": {
       "security": {
@@ -515,7 +513,8 @@
         "status": "passed",
         "atCommit": "12e875a85f8c9386b618dc4b93d82b901b96f325"
       }
-    }
+    },
+    "reviewRequestedAt": "2026-07-26T19:11:42.896Z"
   },
   "closeOut": {
     "usage": {
