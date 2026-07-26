@@ -65,7 +65,7 @@
     "recordedAt": "2026-07-26T10:40:53.843Z"
   },
   "created": "2026-07-26T09:04:01.632Z",
-  "updated": "2026-07-26T19:01:06.956Z",
+  "updated": "2026-07-26T19:01:41.727Z",
   "pipeline": {
     "issueId": "PAN-3116",
     "reviewStatus": "passed",
@@ -74,16 +74,9 @@
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "skipped",
-    "readyForMerge": false,
+    "readyForMerge": true,
     "panDoneRecoveredAt": "2026-07-26T10:42:05.667Z",
-    "updatedAt": "2026-07-26T18:59:38.542Z",
-    "blockerReasons": [
-      {
-        "type": "merge_conflict",
-        "summary": "Conflicts with main",
-        "detectedAt": "2026-07-26T18:45:40.819Z"
-      }
-    ],
+    "updatedAt": "2026-07-26T19:01:41.649Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3127",
     "reviewedAtCommit": "113377f24f76727263cb7061cd16a25eef6e4609",
     "reviewSpawnedAt": "2026-07-26T10:40:12.609Z",
@@ -159,7 +152,7 @@
       },
       "costAtCloseOut": {
         "usd": 43.4386743,
-        "pricingAsOf": "2026-07-26T18:59:38.546Z"
+        "pricingAsOf": "2026-07-26T19:01:41.701Z"
       }
     },
     "merges": [
@@ -168,7 +161,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
     "sequence": 10,
