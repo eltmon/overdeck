@@ -34,7 +34,7 @@ vi.mock('../../../src/lib/telemetry/pipeline.js', () => ({
 
 import { getReviewStatusSync, setReviewStatusSync } from '../../../src/lib/review-status.js';
 
-describe('review status scope drift', () => {
+describe('review status', () => {
   beforeEach(() => {
     testDb = openDatabase(':memory:');
     testDb.pragma('foreign_keys = ON');
@@ -89,5 +89,66 @@ describe('review status scope drift', () => {
     });
     expect(capturePipelineStageForIssueMock).toHaveBeenCalledTimes(1);
     expect(capturePipelineStageForIssueMock).toHaveBeenCalledWith('PAN-2200', 'review_passed');
+  });
+
+  it('consumes a serviced review request when review passes', () => {
+    const initial = setReviewStatusSync('PAN-3083', {
+      reviewStatus: 'pending',
+      reviewRequestedAt: '2026-07-25T10:00:00.000Z',
+      reviewSpawnedAt: '2026-07-25T10:01:00.000Z',
+    });
+    mockUpdateIssueRecordForIssue.mockClear();
+
+    const status = setReviewStatusSync('PAN-3083', { reviewStatus: 'passed' }, initial);
+
+    expect(status.reviewRequestedAt).toBeUndefined();
+    const [, journalStatus] = mockUpdateIssueRecordForIssue.mock.calls.at(-1)!;
+    const journalPipeline = JSON.parse(JSON.stringify(journalStatus));
+    expect(journalPipeline).not.toHaveProperty('reviewRequestedAt');
+  });
+
+  it('preserves a review request newer than the current spawn', () => {
+    const initial = setReviewStatusSync('PAN-3084', {
+      reviewStatus: 'pending',
+      reviewRequestedAt: '2026-07-25T10:02:00.000Z',
+      reviewSpawnedAt: '2026-07-25T10:01:00.000Z',
+    });
+    mockUpdateIssueRecordForIssue.mockClear();
+
+    const status = setReviewStatusSync('PAN-3084', { reviewStatus: 'failed' }, initial);
+
+    expect(status.reviewRequestedAt).toBe('2026-07-25T10:02:00.000Z');
+    const [, journalStatus] = mockUpdateIssueRecordForIssue.mock.calls.at(-1)!;
+    expect(journalStatus.reviewRequestedAt).toBe('2026-07-25T10:02:00.000Z');
+  });
+
+  it('consumes a review request without a spawn timestamp when review blocks', () => {
+    const initial = setReviewStatusSync('PAN-3085', {
+      reviewStatus: 'pending',
+      reviewRequestedAt: '2026-07-25T10:00:00.000Z',
+    });
+    mockUpdateIssueRecordForIssue.mockClear();
+
+    const status = setReviewStatusSync('PAN-3085', { reviewStatus: 'blocked' }, initial);
+
+    expect(status.reviewRequestedAt).toBeUndefined();
+    const [, journalStatus] = mockUpdateIssueRecordForIssue.mock.calls.at(-1)!;
+    const journalPipeline = JSON.parse(JSON.stringify(journalStatus));
+    expect(journalPipeline).not.toHaveProperty('reviewRequestedAt');
+  });
+
+  it('preserves a pending review request during non-verdict updates', () => {
+    const initial = setReviewStatusSync('PAN-3086', {
+      reviewStatus: 'pending',
+      reviewRequestedAt: '2026-07-25T10:00:00.000Z',
+      reviewSpawnedAt: '2026-07-25T10:01:00.000Z',
+    });
+    mockUpdateIssueRecordForIssue.mockClear();
+
+    const status = setReviewStatusSync('PAN-3086', { testStatus: 'running' }, initial);
+
+    expect(status.reviewRequestedAt).toBe('2026-07-25T10:00:00.000Z');
+    const [, journalStatus] = mockUpdateIssueRecordForIssue.mock.calls.at(-1)!;
+    expect(journalStatus.reviewRequestedAt).toBe('2026-07-25T10:00:00.000Z');
   });
 });
