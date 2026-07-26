@@ -12,9 +12,27 @@
       "timestamp": "2026-07-26T21:19:02.739Z",
       "reason": "start",
       "agentModel": "gpt-5.6-sol"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-26T22:15Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-26T22:15:01.528Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-26T22:15:01.867Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-26T22:15:01Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-3162\n\nForge observation can accept a historical MR for the same source branch and can overwrite concurrent merge-set progress from a stale full snapshot\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3162 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "src/dashboard/server/routes/workspaces/__tests__/merge-ops-polyrepo-completeness.test.ts",
@@ -63,7 +81,7 @@
     "recordedAt": "2026-07-26T22:02:33.712Z"
   },
   "created": "2026-07-26T20:52:58.018Z",
-  "updated": "2026-07-26T22:15:00.897Z",
+  "updated": "2026-07-26T22:15:01.867Z",
   "pipeline": {
     "issueId": "PAN-3162",
     "reviewStatus": "blocked",
