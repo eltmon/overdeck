@@ -42,6 +42,11 @@
       "timestamp": "2026-07-26T16:24:14.527Z",
       "reason": "end",
       "note": "All 12 blocking review findings fixed; +57 tests (11146 total, all green), lint and typecheck clean. Two findings were showstoppers rather than polish: contributions stored origin/feature/<issue> while the assembly adapter validates ^feature/, so every polyrepo feature would have been held out and no generation could ever assemble; and read-only member repos were probed, branched, pushed to, promoted into, and had remote branches deleted, which is now blocked at the ready set, the git/cleanup deps, and re-checked against current config at promote time. Also fixed: reconciler and assembly anchored on different repo sets so any project with an untouched repo rebuilt every 60s; targetBranch was dropped before promote so a repo configured for develop would have landed on main; a crash between the last publish and finalization left a fully-published batch permanently unfinalizable, now the idempotent completion case with per-repo merge SHAs persisted; post-merge received a composite anchor as a git ref checked in the non-git wrapper, replaced with a per-repo VerifiedMergedRepo contract; hold-out recovery rebuilt and replayed at O(repos x features^2), now feature-atomic with checkout -B rollback and a test pinning 12 merge attempts for 12 contributions across 8 features with 3 hold-outs; list paths did 1+4G synchronous SQLite statements, now batch-loaded; the ready set's nested Effect.all had a gitConcurrency^2 subprocess ceiling, now flattened; the payload gained repos additively; and terminal generations were skipped by the no-candidates early return, so promoting the last batch leaked every branch, worktree, and the wrapper folder forever. Docs and the tracked codebase map updated to the corrected behavior. ONE PRE-EXISTING FAILURE NOT MINE: tests/unit/lib/cloister/validation.test.ts fails under an agent shell because the review agent's git-guard shim leaks onto PATH and blocks git reset --hard; it passes with a clean PATH and is untouched by this change. Still NOT verified live: mind-your-now assembling a real generation is the post-merge operator checkpoint."
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-26T16:25:16.912Z"
     }
   ],
   "feedback": [],
@@ -119,7 +124,7 @@
     "recordedAt": "2026-07-26T16:24:11.129Z"
   },
   "created": "2026-07-26T12:33:18.311Z",
-  "updated": "2026-07-26T16:24:59.303Z",
+  "updated": "2026-07-26T16:25:16.913Z",
   "pipeline": {
     "issueId": "PAN-3093",
     "reviewStatus": "pending",
@@ -286,7 +291,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-opus-5",
+  "model": "gpt-5.6-sol",
   "tasks": {
     "sequence": 16,
     "claims": {},
