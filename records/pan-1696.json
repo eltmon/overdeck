@@ -196,19 +196,20 @@
   ],
   "feedback": [],
   "created": "2026-07-26T00:35:36.057Z",
-  "updated": "2026-07-26T02:46:00.491Z",
+  "updated": "2026-07-26T02:49:08.097Z",
   "pipeline": {
     "issueId": "PAN-1696",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "passed",
     "testStatus": "pending",
-    "verificationStatus": "skipped",
+    "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T02:46:00.451Z",
-    "reviewNotes": "Agent re-review request (5/25): Fixed review issues: use statuses parameter for efficient live-generation filtering with assembling status",
-    "verificationNotes": "Verification FAILED at test (413986ms):\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-1696/src/dashboard/frontend\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-1696\n\nNo test files found, exiting with code 0\n\nstdout | tests/integration/merge-validation.test.ts > merge-validation integration > auto-revert workflow > should revert merge when validation fails\n[validation] Auto-reverting merge in /tmp/pan-mv-7lUZsY\n\nstdout | tests/integration/merge-validation.test.ts > merge-validation integration > auto-revert workflow > should revert merge when validation fails\n[validation] Auto-reverting merge in /tmp/pan-mv-tTAxCT\n\n ❯ |root| tests/integration/merge-validation.test.ts (7 tests | 1 failed) 357ms\n       × should revert merge when validation fails 190ms (retry x1)\n ❯ |root| tests/unit/lib/workspace-manager-pre-rebase.test.ts (7 tests | 2 failed) 472ms\n     × preserves an existing project pre-rebase hook for human shells 101ms (retry x1)\n     × allows rebases from human shells without an agent id 98ms (retry x1)\nstdout | tests/unit/lib/cloister/validation.test.ts > validation > autoRevertMerge > should revert last commit when successful\n[validation] Auto-reverting merge in /tmp/overdeck-validation-test-1785029237143-zq120uj83g\n\nstdout | tests/unit/lib/cloister/validation.test.ts > validation > autoRevertMerge > should revert last commit when successful\n[validation] Auto-reverting merge in /tmp/overdeck-validation-test-1785029237204-g5uqwju8smp\n\n ❯ |root| tests/unit/lib/cloister/validation.test.ts (11 tests | 1 failed) 188ms\n       × should revert last commit when successful 128ms (retry x1)\n ❯ |root| src/lib/pan-dir/__tests__/record-update.test.ts (3 tests | 2 failed) 968ms\n     × restores retryable state when a remote-ref race survives reconciliation 377ms (retry x1)\n     × replays the concrete record mutation after a concurrent overdeck-state advance 452ms (retry x1)\n ❯ |root| tests/unit/lib/overdeck/control-settings.test.ts (13 tests | 1 failed) 25ms\n     × setFly\n…(4696 chars elided)…\nan-auto-resume-gating-WZ9YFs/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Found workspace: /tmp/pan-auto-resume-gating-WZ9YFs/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace: /tmp/pan-auto-resume-gating-WZ9YFs/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace: /tmp/pan-auto-resume-gating-WZ9YFs/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace: /tmp/pan-auto-resume-gating-WZ9YFs/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with plann\n...(truncated)",
+    "updatedAt": "2026-07-26T02:49:08.022Z",
+    "reviewNotes": "Cycle diff correctly queries only assembling/ready/superseded generations with limit 1; no new blocking defects found.",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/1822",
+    "reviewedAtCommit": "d3093267ff90a33d110dafe1613101cb98c9a88d",
     "reviewSpawnedAt": "2026-07-26T02:45:53.517Z"
   },
   "closeOut": {
@@ -230,17 +231,17 @@
         },
         "memory-extraction": {
           "anthropic/claude-haiku-4-5": {
-            "input": 2712,
-            "output": 2228,
-            "cacheRead": 3,
+            "input": 7266,
+            "output": 8017,
+            "cacheRead": 15,
             "cacheWrite": 0
           }
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 3747766,
-            "output": 304677,
-            "cacheRead": 74461696,
+            "input": 4117206,
+            "output": 310395,
+            "cacheRead": 77413888,
             "cacheWrite": 0
           }
         },
@@ -267,15 +268,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5": {
-          "input": 2712,
-          "output": 2228,
-          "cacheRead": 3,
+          "input": 7266,
+          "output": 8017,
+          "cacheRead": 15,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 3747766,
-          "output": 304677,
-          "cacheRead": 74461696,
+          "input": 4117206,
+          "output": 310395,
+          "cacheRead": 77413888,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
@@ -286,8 +287,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 105.0057213,
-        "pricingAsOf": "2026-07-26T02:46:00.463Z"
+        "usd": 108.5340575,
+        "pricingAsOf": "2026-07-26T02:49:08.088Z"
       }
     },
     "merges": [
