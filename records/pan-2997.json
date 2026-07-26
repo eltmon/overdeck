@@ -294,7 +294,7 @@
     "recordedAt": "2026-07-26T10:07:26.737Z"
   },
   "created": "2026-07-21T23:09:49.270Z",
-  "updated": "2026-07-26T10:59:32.408Z",
+  "updated": "2026-07-26T10:59:39.927Z",
   "pipeline": {
     "issueId": "PAN-2997",
     "reviewStatus": "blocked",
@@ -470,7 +470,7 @@
   },
   "workModel": "k3[1m]",
   "harness": "claude-code",
-  "model": "k3[1m]",
+  "model": "gpt-5.6-sol",
   "tasks": {
     "sequence": 20,
     "claims": {},
