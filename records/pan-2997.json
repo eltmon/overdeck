@@ -217,7 +217,7 @@
     "recordedAt": "2026-07-25T23:45:57.195Z"
   },
   "created": "2026-07-21T23:09:49.270Z",
-  "updated": "2026-07-26T07:04:00.282Z",
+  "updated": "2026-07-26T07:04:03.686Z",
   "pipeline": {
     "issueId": "PAN-2997",
     "reviewStatus": "pending",
@@ -228,7 +228,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T05:50:39.330Z",
-    "updatedAt": "2026-07-26T07:04:00.243Z",
+    "updatedAt": "2026-07-26T07:04:03.665Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed all four cycle-7 blockers: tmux two-phase pending/terminal markers (crash-safe across Enter), supervisor synchronous key reservation (concurrent same-key coalescing), monitor tier bypassed for keyed payloads, resume paths deliver keyed via the door after a bare resume, remote keyed protocol added, Channels/app-server/ACP rejected for keyed payloads. record-delivered removed. New tests cover each crash window; docs updated.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3004",
     "lastVerifiedCommit": "ac67558fa7805c8e9b0050f8fe39c56921b962cd",
@@ -292,7 +292,7 @@
       },
       "costAtCloseOut": {
         "usd": 193.547367,
-        "pricingAsOf": "2026-07-26T07:04:00.275Z"
+        "pricingAsOf": "2026-07-26T07:04:03.682Z"
       }
     },
     "merges": [
