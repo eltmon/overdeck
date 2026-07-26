@@ -109,6 +109,23 @@ describe('resolveRepositoryDefaultBranch', () => {
       message: expect.stringMatching(/\/repo.*develop/),
     });
   });
+
+  it('rejects an unborn symbolic HEAD whose target ref does not exist', async () => {
+    const run = vi.fn().mockImplementation(async (_command: string, args: string[]) => {
+      if (args[0] === 'symbolic-ref' && args.at(-1) === 'HEAD') return 'main\n';
+      throw new Error('unknown revision');
+    });
+
+    await expect(resolveRepositoryDefaultBranch('/empty-repo', 'main', run)).rejects.toMatchObject({
+      reason: 'default_branch_unresolved',
+      message: expect.stringContaining('/empty-repo'),
+    });
+    expect(run).toHaveBeenCalledWith(
+      'git',
+      ['rev-parse', '--verify', '--quiet', 'refs/heads/main'],
+      '/empty-repo',
+    );
+  });
 });
 
 describe('snapshotBranchRefs', () => {
@@ -134,12 +151,13 @@ describe('snapshotBranchRefs', () => {
     expect(run).toHaveBeenCalledTimes(1);
   });
 
-  it('uses the current HEAD when the configured branch is unverifiable', async () => {
+  it('falls through a dangling origin HEAD to a verifiable current branch', async () => {
     const run = vi.fn().mockImplementation(async (_command: string, args: string[]) => {
       if (args[0] === 'rev-parse' && args[1] === '--show-toplevel') return '/master-only\n';
+      if (args[0] === 'rev-parse' && args.at(-1) === 'refs/heads/master') return 'aaa\n';
       if (args[0] === 'rev-parse') throw new Error('unknown revision');
       if (args[0] === 'symbolic-ref' && args.at(-1) === 'refs/remotes/origin/HEAD') {
-        throw new Error('missing origin HEAD');
+        return 'origin/main\n';
       }
       if (args[0] === 'symbolic-ref' && args.at(-1) === 'HEAD') return 'master\n';
       if (args[0] === 'rev-list') return 'aaa\n';
@@ -148,6 +166,16 @@ describe('snapshotBranchRefs', () => {
 
     await snapshotBranchRefs('/master-only', 'main', refPatterns, run);
 
+    expect(run).toHaveBeenCalledWith(
+      'git',
+      ['rev-parse', '--verify', '--quiet', 'refs/remotes/origin/main'],
+      '/master-only',
+    );
+    expect(run).toHaveBeenCalledWith(
+      'git',
+      ['rev-parse', '--verify', '--quiet', 'refs/heads/master'],
+      '/master-only',
+    );
     expect(run).toHaveBeenCalledWith('git', ['rev-list', '--first-parent', 'master'], '/master-only');
     expect(run).toHaveBeenCalledWith('git', expect.arrayContaining(['--no-merged=master']), '/master-only');
   });

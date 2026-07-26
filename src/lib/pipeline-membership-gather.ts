@@ -375,7 +375,7 @@ export async function resolveRepositoryDefaultBranch(
   for (const ref of ['refs/remotes/origin/HEAD', 'HEAD']) {
     try {
       const branch = (await run('git', ['symbolic-ref', '--quiet', '--short', ref], repoPath)).trim();
-      if (branch) return branch;
+      if (branch && await hasGitRef(repoPath, branch, run)) return branch;
     } catch {
       // Continue to the next source of repository truth.
     }
