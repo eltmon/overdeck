@@ -142,17 +142,17 @@
     "recordedAt": "2026-07-26T00:18:45.985Z"
   },
   "created": "2026-07-25T21:12:36.630Z",
-  "updated": "2026-07-26T00:22:50.230Z",
+  "updated": "2026-07-26T00:41:59.528Z",
   "pipeline": {
     "issueId": "PAN-3076",
-    "reviewStatus": "passed",
-    "testStatus": "testing",
+    "reviewStatus": "failed",
+    "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T00:22:50.198Z",
+    "updatedAt": "2026-07-26T00:41:59.372Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3082",
     "reviewedAtCommit": "f909f3d177827021a7b3463d93fadf30b252ceb4",
     "lastVerifiedCommit": "241e1f76bf1b9dd068e30765ff568e91a561488a",
@@ -179,17 +179,17 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 44,
-            "output": 8481,
-            "cacheRead": 3044115,
-            "cacheWrite": 309951
+            "input": 98,
+            "output": 19287,
+            "cacheRead": 6935820,
+            "cacheWrite": 353677
           }
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 4687184,
-            "output": 283945,
-            "cacheRead": 144111616,
+            "input": 5364561,
+            "output": 295623,
+            "cacheRead": 150046208,
             "cacheWrite": 0
           }
         }
@@ -202,21 +202,21 @@
           "cacheWrite": 200270
         },
         "openai/gpt-5.6-sol": {
-          "input": 11147687,
-          "output": 414503,
-          "cacheRead": 173058560,
+          "input": 11825064,
+          "output": 426181,
+          "cacheRead": 178993152,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 44,
-          "output": 8481,
-          "cacheRead": 3044115,
-          "cacheWrite": 309951
+          "input": 98,
+          "output": 19287,
+          "cacheRead": 6935820,
+          "cacheWrite": 353677
         }
       },
       "costAtCloseOut": {
-        "usd": 165.551323,
-        "pricingAsOf": "2026-07-26T00:22:50.223Z"
+        "usd": 173.251667,
+        "pricingAsOf": "2026-07-26T00:41:59.491Z"
       }
     },
     "merges": [
