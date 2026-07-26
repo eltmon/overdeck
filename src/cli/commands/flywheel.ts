@@ -434,7 +434,12 @@ export async function flywheelStatusCommand(options: StatusOptions): Promise<voi
   try {
     const status = await loadActiveFlywheelStatus();
     if (!status) {
-      console.log(await formatMergeQueueForCli(process.cwd()));
+      if (options.json) {
+        const q = await Effect.runPromise(computeMergeQueueFromCandidates(listEligibleCandidatesByProject(process.cwd()), process.cwd()).pipe(Effect.provide(nodeServicesLayer)));
+        console.log(JSON.stringify({ mergeQueue: q }, null, 2));
+      } else {
+        console.log(await formatMergeQueueForCli(process.cwd()));
+      }
       return;
     }
     const mergeBackend = await loadMergeBackendStatusForCli();
