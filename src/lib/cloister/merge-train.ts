@@ -11,7 +11,7 @@
  * agent-spawn machinery.
  */
 import { isMergeTrainEnabledForProject } from '../database/app-settings.js';
-import { resolveProjectFromIssueSync } from '../projects.js';
+import { getProjectSync, resolveProjectFromIssueSync, type ProjectConfig } from '../projects.js';
 import { reconcileStaleSiblings, type ReconcileDeps, type SiblingOutcome } from './merge-train-reconciler.js';
 
 export interface RunMergeTrainOptions {
@@ -30,12 +30,14 @@ export async function runMergeTrainReconcile(
   mergedIssueId: string,
   opts: RunMergeTrainOptions = {},
 ): Promise<SiblingOutcome[]> {
-  const enabled = opts.enabled ?? (() => {
-    const project = resolveProjectFromIssueSync(mergedIssueId);
-    return isMergeTrainEnabledForProject(project ?? undefined);
+  const enabledCheck = opts.enabled ?? (() => {
+    const resolved = resolveProjectFromIssueSync(mergedIssueId);
+    // Resolve to full ProjectConfig for merge_train check (resolveProjectFromIssueSync returns ResolvedProject)
+    const config = resolved ? getProjectSync(resolved.projectKey) : undefined;
+    return isMergeTrainEnabledForProject(config ?? undefined);
   });
 
-  if (!enabled()) return [];
+  if (!enabledCheck()) return [];
 
   const deps = opts.deps ?? (await import('./merge-train-deps.js')).buildRealReconcileDeps();
   return reconcileStaleSiblings(mergedIssueId, deps);
