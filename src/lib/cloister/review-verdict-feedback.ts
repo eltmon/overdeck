@@ -1,3 +1,11 @@
+/**
+ * Delivers durable review-verdict feedback to the work agent. Agent messages
+ * use a key derived from the issue, verdict, and review run/anchor so one
+ * review cycle is model-visible at most once; ACP and Channels targets fall
+ * back to unkeyed delivery because those transports cannot enforce the key.
+ * Repeated keyed suppressions surface a needs-you escalation before duplicate
+ * delivery attempts consume the work agent's context window.
+ */
 import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
