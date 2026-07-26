@@ -64,7 +64,7 @@
     "recordedAt": "2026-07-26T20:50:56.555Z"
   },
   "created": "2026-07-26T20:19:41.143Z",
-  "updated": "2026-07-26T20:57:26.185Z",
+  "updated": "2026-07-26T21:01:14.557Z",
   "pipeline": {
     "issueId": "PAN-3158",
     "reviewStatus": "blocked",
@@ -73,7 +73,6 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "panDoneRecoveredAt": "2026-07-26T20:51:34.016Z",
     "updatedAt": "2026-07-26T20:57:25.249Z",
     "reviewNotes": "Project filtering can falsely show the global no-ready-work message while another project has ready work",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3161",
