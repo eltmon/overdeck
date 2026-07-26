@@ -311,10 +311,10 @@
     "recordedAt": "2026-07-26T10:07:26.737Z"
   },
   "created": "2026-07-21T23:09:49.270Z",
-  "updated": "2026-07-26T11:42:27.301Z",
+  "updated": "2026-07-26T11:43:51.046Z",
   "pipeline": {
     "issueId": "PAN-2997",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "passed",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -322,9 +322,11 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T10:57:04.635Z",
-    "updatedAt": "2026-07-26T11:42:19.836Z",
-    "reviewNotes": "Agent re-review request (2/25): Fixed the cycle-15 blocker: the initial strict POISON read is now wrapped in KeyedMarkerVerificationError (cause preserved), locally and remotely — a transient read failure before any side effect keeps the outbox pending instead of recording terminal 'failed'. Missing targets stay classified upstream (messageAgent stopped/zombie → resume). Local and remote failed-poison-read tests assert the class; the wake-level regression proves the class leaves the outbox pending with no notified event until retry succeeds.",
+    "updatedAt": "2026-07-26T11:43:50.971Z",
+    "reviewNotes": "All correctness, security, requirements, and performance checks pass; keyed wake recovery now preserves exactly-once delivery across every reviewed crash and marker-failure path.",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3004",
+    "reviewedAtCommit": "c79ea9b5657996d42f2df3d76eed82028e364e41",
     "lastVerifiedCommit": "c79ea9b5657996d42f2df3d76eed82028e364e41",
     "reviewSpawnedAt": "2026-07-26T11:42:13.947Z",
     "scopeDrift": {
@@ -431,9 +433,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 32770490,
-            "output": 1311540,
-            "cacheRead": 185493504,
+            "input": 34772003,
+            "output": 1330042,
+            "cacheRead": 190190080,
             "cacheWrite": 0
           }
         },
@@ -462,9 +464,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 34244263,
-          "output": 1500661,
-          "cacheRead": 280822272,
+          "input": 36245776,
+          "output": 1519163,
+          "cacheRead": 285518848,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -475,8 +477,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 357.0030766,
-        "pricingAsOf": "2026-07-26T11:42:27.297Z"
+        "usd": 369.9139896,
+        "pricingAsOf": "2026-07-26T11:43:51.032Z"
       }
     },
     "merges": [
