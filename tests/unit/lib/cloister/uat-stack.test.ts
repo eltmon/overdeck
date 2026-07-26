@@ -74,7 +74,7 @@ describe('ensureUatStack', () => {
     const result = await ensureUatStack(g, deps);
 
     expect(result.success).toBe(true);
-    expect(result.frontendUrl).toBe('https://uat-pan-otter-0610.overdeck.localhost');
+    expect(result.frontendUrl).toBe('https://uat-pan-otter-0610.pan.localhost');
     expect(deps.ups).toEqual(['overdeck-uat-pan-otter-0610']);
     expect(deps.stackWrites).toHaveLength(1);
     expect(deps.stackWrites[0]![0]).toBe('uat/pan-otter-0610');
@@ -183,7 +183,7 @@ describe('probeUatStack', () => {
     const deps = makeDeps({ psCount: 3 });
     const probe = await probeUatStack(gen('uat/pan-up-0610', { stackStartedAt: '2026-06-10T01:00:00.000Z' }), deps);
     expect(probe.status).toBe('running');
-    expect(probe.frontendUrl).toBe('https://uat-pan-up-0610.overdeck.localhost');
+    expect(probe.frontendUrl).toBe('https://uat-pan-up-0610.pan.localhost');
   });
 
   it('reports absent with no stack record', async () => {
@@ -208,8 +208,8 @@ describe('uatFrontendUrl', () => {
     expect(url).toBe('https://uat-pan-host-0610.custom.localhost');
   });
 
-  it('falls back to the FEATURE_FOLDER convention without a rendered compose', async () => {
+  it('falls back to the FEATURE_FOLDER convention without a rendered compose (PAN-1696: using pan.localhost)', async () => {
     const url = await uatFrontendUrl(gen('uat/pan-conv-0610'), makeDeps({ composeFileExists: false }));
-    expect(url).toBe('https://uat-pan-conv-0610.overdeck.localhost');
+    expect(url).toBe('https://uat-pan-conv-0610.pan.localhost');
   });
 });
