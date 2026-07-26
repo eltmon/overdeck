@@ -217,10 +217,10 @@
     "recordedAt": "2026-07-25T23:45:57.195Z"
   },
   "created": "2026-07-21T23:09:49.270Z",
-  "updated": "2026-07-26T05:54:36.079Z",
+  "updated": "2026-07-26T06:57:21.654Z",
   "pipeline": {
     "issueId": "PAN-2997",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
@@ -228,8 +228,8 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T05:50:39.330Z",
-    "updatedAt": "2026-07-26T05:54:35.438Z",
-    "reviewNotes": "The new monitor-mail route can lose or replay keyed wakes, and the prior tmux, supervisor-race, and unkeyed fallback blockers remain unchanged.",
+    "updatedAt": "2026-07-26T06:57:21.574Z",
+    "reviewNotes": "Agent re-review request (1/25): Fixed all four cycle-7 blockers: tmux two-phase pending/terminal markers (crash-safe across Enter), supervisor synchronous key reservation (concurrent same-key coalescing), monitor tier bypassed for keyed payloads, resume paths deliver keyed via the door after a bare resume, remote keyed protocol added, Channels/app-server/ACP rejected for keyed payloads. record-delivered removed. New tests cover each crash window; docs updated.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3004",
     "reviewSpawnedAt": "2026-07-26T05:50:43.285Z"
   },
@@ -246,9 +246,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 14155942,
-            "output": 470982,
-            "cacheRead": 94777856,
+            "input": 14163964,
+            "output": 471214,
+            "cacheRead": 95133184,
             "cacheWrite": 0
           }
         },
@@ -277,9 +277,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 15629715,
-          "output": 660103,
-          "cacheRead": 190106624,
+          "input": 15637737,
+          "output": 660335,
+          "cacheRead": 190461952,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -290,8 +290,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 193.322633,
-        "pricingAsOf": "2026-07-26T05:54:35.465Z"
+        "usd": 193.547367,
+        "pricingAsOf": "2026-07-26T06:57:21.637Z"
       }
     },
     "merges": [
