@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T02:29:08.179Z",
-  "updated": "2026-07-26T02:51:48.302Z",
+  "updated": "2026-07-26T02:54:42.083Z",
   "pipeline": {
     "issueId": "PAN-3097",
     "reviewStatus": "pending",
@@ -54,16 +54,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 9,
-    "claims": {
-      "sessionfeed-issue-title": {
-        "writerId": "agent-pan-3097",
-        "agentId": "agent-pan-3097",
-        "pid": 1831036,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-26T02:51:48.301Z"
-      }
-    },
+    "sequence": 10,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3097",
@@ -108,6 +100,17 @@
         "outcome": "completed",
         "reason": "Resolved issue titles from the dashboard issue store, formatted agent decisions, and showed issue references beside conversation decisions",
         "releasedAt": "2026-07-26T02:51:40.552Z"
+      },
+      {
+        "writerId": "agent-pan-3097",
+        "agentId": "agent-pan-3097",
+        "pid": 1831036,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T02:51:48.301Z",
+        "itemId": "sessionfeed-issue-title",
+        "outcome": "completed",
+        "reason": "Formatted needs-you labels as identifier plus title, preserved unbound fallback and tool-use deduplication, and added regression coverage",
+        "releasedAt": "2026-07-26T02:54:42.083Z"
       }
     ],
     "statusReasons": {
@@ -126,6 +129,10 @@
       "decisions-issue-title": {
         "reason": "Resolved issue titles from the dashboard issue store, formatted agent decisions, and showed issue references beside conversation decisions",
         "updatedAt": "2026-07-26T02:51:40.552Z"
+      },
+      "sessionfeed-issue-title": {
+        "reason": "Formatted needs-you labels as identifier plus title, preserved unbound fallback and tool-use deduplication, and added regression coverage",
+        "updatedAt": "2026-07-26T02:54:42.083Z"
       }
     }
   },
@@ -146,6 +153,9 @@
     "decisions-issue-title.decisions-issue-title.ac1": "completed",
     "decisions-issue-title.decisions-issue-title.ac2": "completed",
     "decisions-issue-title.decisions-issue-title.ac3": "completed",
-    "sessionfeed-issue-title": "running"
+    "sessionfeed-issue-title": "completed",
+    "sessionfeed-issue-title.sessionfeed-issue-title.ac1": "completed",
+    "sessionfeed-issue-title.sessionfeed-issue-title.ac2": "completed",
+    "sessionfeed-issue-title.sessionfeed-issue-title.ac3": "completed"
   }
 }
