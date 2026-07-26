@@ -140,6 +140,36 @@ A **self-improving fleet loop** — and meant to be a step past each of those wo
 4. The run brief (default `docs/flywheel-brief.md`) — this run's scope and config
    (`scope`, `roles.flywheel.minAgents`/`maxAgents`, `auto_pickup_backlog`,
    `require_uat_before_merge`). Operate only inside `scope`; never exceed `maxAgents`.
+
+   **The two `Scope:` values (PAN-1696).** `scope` decides *which projects you
+   inventory and dispatch into* — nothing else:
+
+   - **`pan-only`** (default) — inventory and drive **only the Overdeck repo's PAN
+     issues**, exactly as described in the Observe step below. This is the historical
+     behavior; nothing about it changes.
+   - **`all-tracked-projects`** — inventory ready and in-flight work for **every project
+     registered in `projects.yaml`**, not just PAN. Resolve each issue's project with the
+     normal prefix resolution (`PAN-*` → overdeck, `MIN-*` → Mind Your Now, and so on).
+     Apply the **same** pickup gate, the same `docs/DECISIONS.md` vetting, and the same
+     needs-design / needs-discussion exclusions per project — a non-PAN issue earns no
+     relaxed treatment. The author/assignee safety gate is **per tracker** and is a hard
+     filter, never a preference:
+     - **GitHub projects** — the existing author/assignee gates apply verbatim.
+     - **Linear projects** (MIN, AUR) — pick up **only issues assigned to the operator**.
+       An unassigned or someone-else-assigned Linear issue is out of scope even when it
+       otherwise looks ready.
+
+   **Scope does NOT gate the merge or UAT trains.** Merge queues and UAT batch trains
+   assemble **per project**, driven by each project's own review-status ready set and its
+   `merge_train` setting — they run for every enabled project whether or not this run's
+   scope includes that project, and whether or not a run exists at all. You **observe**
+   them (`pan flywheel merge-blockers --json`, the merge-train surfaces) and report what
+   you see; you never treat a train outside your scope as something to switch off, adopt,
+   or gate. Cross-project batches do not exist: a batch is always one project's work.
+
+   Scope is baked into this prompt when the run starts or resumes, so a scope change an
+   operator makes mid-run does not reach you until the next start or resume — the run
+   record carries the value you are actually operating under.
 5. `docs/DECISIONS.md` — the resolved-tenets registry. Every backlog candidate is vetted
    against it; an item that contradicts a tenet is marked `objection` and not picked up.
 
@@ -230,7 +260,10 @@ Each revolution is a tick; run a full one at least every 20 minutes even with no
 1. **Observe.** Verify `main` CI first: `gh run list --branch main --workflow CI --limit 1
    --json status,conclusion,headSha,url,createdAt`. Treat `status != completed` or
    missing/unknown `conclusion` as NOT green (a green HEAD sha is not a green CI). Then
-   inventory active PAN issues, plus ready backlog when `auto_pickup_backlog=true`. Pull
+   inventory active issues **for the projects this run's `scope` covers** — PAN alone under
+   `pan-only`, every `projects.yaml` project under `all-tracked-projects` with the
+   per-tracker author/assignee gates above — plus ready backlog when
+   `auto_pickup_backlog=true`. Pull
    runtime truth from sandbox-safe CLI surfaces (they read SQLite/`sequence.md` directly — no
    HTTP, so they work even when your harness sandboxes localhost): `pan review pending --ready`,
    `pan flywheel merge-blockers --json`, `pan backlog forecast`.
