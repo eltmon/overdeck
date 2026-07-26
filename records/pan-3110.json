@@ -22,7 +22,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T06:17:49.254Z",
-  "updated": "2026-07-26T10:39:57.765Z",
+  "updated": "2026-07-26T10:40:09.801Z",
   "pipeline": {
     "issueId": "PAN-3110",
     "reviewStatus": "pending",
@@ -49,8 +49,16 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 4,
-    "claims": {},
+    "sequence": 5,
+    "claims": {
+      "server-rebase-fallback-retryable": {
+        "writerId": "agent-pan-3110",
+        "agentId": "agent-pan-3110",
+        "pid": 1998089,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T10:40:09.801Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3110",
@@ -97,6 +105,7 @@
     "clean-pr-direct-merge.clean-pr-direct-merge.ac1": "completed",
     "clean-pr-direct-merge.clean-pr-direct-merge.ac2": "completed",
     "clean-pr-direct-merge.clean-pr-direct-merge.ac3": "completed",
-    "clean-pr-direct-merge.clean-pr-direct-merge.ac4": "completed"
+    "clean-pr-direct-merge.clean-pr-direct-merge.ac4": "completed",
+    "server-rebase-fallback-retryable": "running"
   }
 }
