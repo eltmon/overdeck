@@ -131,21 +131,22 @@
     "recordedAt": "2026-07-26T22:01:26.872Z"
   },
   "created": "2026-07-26T17:27:17.644Z",
-  "updated": "2026-07-26T22:05:59.985Z",
+  "updated": "2026-07-26T22:11:38.132Z",
   "pipeline": {
     "issueId": "PAN-3148",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "passed",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T21:02:53.986Z",
-    "updatedAt": "2026-07-26T22:05:58.873Z",
-    "reviewNotes": "Feedback dedup keys omit the review run ID on primary verdict paths, causing same-run duplicates and later-run suppression",
+    "updatedAt": "2026-07-26T22:11:38.059Z",
+    "reviewNotes": "Approved: run-scoped feedback identity fixes the prior duplicate/suppression defect; correctness, security, requirements, and performance checks are clean",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3163",
+    "reviewedAtCommit": "a608389e1854fdeba3011bff90de9e376c242eb1",
     "lastVerifiedCommit": "850679a81982462e5d74e18693cb35873e951829",
-    "reviewRequestedAt": "2026-07-26T22:01:27.804Z",
     "reviewSpawnedAt": "2026-07-26T22:05:58.870Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -227,9 +228,9 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 1363910,
-            "output": 53986,
-            "cacheRead": 12014080,
+            "input": 2500646,
+            "output": 79702,
+            "cacheRead": 19373568,
             "cacheWrite": 0
           }
         },
@@ -244,15 +245,15 @@
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 4850651,
-          "output": 371437,
-          "cacheRead": 192243712,
+          "input": 5987387,
+          "output": 397153,
+          "cacheRead": 199603200,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 131.518221,
-        "pricingAsOf": "2026-07-26T22:05:58.912Z"
+        "usd": 141.653125,
+        "pricingAsOf": "2026-07-26T22:11:38.120Z"
       }
     },
     "merges": [
