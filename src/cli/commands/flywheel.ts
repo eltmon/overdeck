@@ -425,15 +425,18 @@ export function formatFlywheelStatus(status: FlywheelStatus): string {
   ].join('\n');
 }
 
+async function formatMergeQueueForCli(cwd: string): Promise<string> {
+  const q = await Effect.runPromise(computeMergeQueueFromCandidates(listEligibleCandidatesByProject(cwd), cwd).pipe(Effect.provide(nodeServicesLayer)));
+  return `Merge queue:\n${q.map(i => `  ${i.pr ? `#${i.pr}` : 'no-pr'} ${i.issueId} ${i.title}`).join('\n') || '  (empty)'}`;
+}
+
 export async function flywheelStatusCommand(options: StatusOptions): Promise<void> {
   try {
     const status = await loadActiveFlywheelStatus();
     if (!status) {
-      console.error('no active flywheel run');
-      process.exitCode = 1;
+      console.log(await formatMergeQueueForCli(process.cwd()));
       return;
     }
-
     const mergeBackend = await loadMergeBackendStatusForCli();
     console.log(options.json
       ? JSON.stringify({ ...status, mergeBackend }, null, 2)

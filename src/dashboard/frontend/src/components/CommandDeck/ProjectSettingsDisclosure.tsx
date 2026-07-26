@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChevronRight } from 'lucide-react';
+import { dashboardMutationJsonHeaders } from '../../lib/wsTransport';
 
 /** PAN-1693/1695: per-project settings in the cockpit — currently the auto-merge default. */
 function ProjectSettingsSection({ projectKey }: { projectKey: string }) {
@@ -28,9 +29,10 @@ function ProjectSettingsSection({ projectKey }: { projectKey: string }) {
   });
   const mergeTrainMutation = useMutation({
     mutationFn: async (next: 'enabled' | 'disabled' | null) => {
+      const headers = await dashboardMutationJsonHeaders();
       const res = await fetch(`/api/projects/${encodeURIComponent(projectKey)}/merge-train`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ value: next }),
       });
       if (!res.ok) throw new Error('Failed to save merge-train setting');
