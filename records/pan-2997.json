@@ -224,10 +224,10 @@
     "recordedAt": "2026-07-25T23:45:57.195Z"
   },
   "created": "2026-07-21T23:09:49.270Z",
-  "updated": "2026-07-26T08:04:24.473Z",
+  "updated": "2026-07-26T08:11:28.657Z",
   "pipeline": {
     "issueId": "PAN-2997",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -235,8 +235,8 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T05:50:39.330Z",
-    "updatedAt": "2026-07-26T08:04:24.349Z",
-    "reviewNotes": "Agent re-review request (3/25): Fixed the cycle-9 blocker: the keyed tmux submit no longer claims TERMINAL before Enter. The submit if-shell now requires pending + no terminal + LIVE pane, and sends Enter before the terminal transition inside one server-owned command list. A pane that dies during the settle window leaves both markers untouched (no false delivered), throws KeyedSubmitTargetDeadError, and the wake outbox keeps the entry pending so recovery re-drives after resume. Same invariant remotely. Tests cover pane death between paste and submit (local real-tmux + remote protocol) and the wake-level retry.",
+    "updatedAt": "2026-07-26T08:11:28.600Z",
+    "reviewNotes": "The tmux liveness check completes before the Enter branch runs, so pane death in that handoff is still falsely marked terminal with no wake delivered.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3004",
     "lastVerifiedCommit": "93b46b172c28bb0634ae73e2831d6680d3642793",
     "reviewSpawnedAt": "2026-07-26T08:04:17.205Z"
@@ -254,9 +254,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 19000773,
-            "output": 669465,
-            "cacheRead": 123297792,
+            "input": 22103456,
+            "output": 717122,
+            "cacheRead": 131954176,
             "cacheWrite": 0
           }
         },
@@ -285,9 +285,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 20474546,
-          "output": 858586,
-          "cacheRead": 218626560,
+          "input": 23577229,
+          "output": 906243,
+          "cacheRead": 227282944,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -298,8 +298,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 237.761246,
-        "pricingAsOf": "2026-07-26T08:04:24.453Z"
+        "usd": 259.032563,
+        "pricingAsOf": "2026-07-26T08:11:28.633Z"
       }
     },
     "merges": [
