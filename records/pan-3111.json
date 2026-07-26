@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T12:26:09.908Z",
-  "updated": "2026-07-26T13:07:52.930Z",
+  "updated": "2026-07-26T13:08:12.817Z",
   "pipeline": {
     "issueId": "PAN-3111",
     "reviewStatus": "pending",
@@ -61,8 +61,16 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 2,
-    "claims": {},
+    "sequence": 3,
+    "claims": {
+      "gate-orphan-proposed-reconciler": {
+        "writerId": "agent-pan-3111",
+        "agentId": "agent-pan-3111",
+        "pid": 1849927,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T13:08:12.817Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3111",
@@ -87,6 +95,7 @@
     "pickup-gate-predicate": "completed",
     "pickup-gate-predicate.pickup-gate-predicate.ac1": "completed",
     "pickup-gate-predicate.pickup-gate-predicate.ac2": "completed",
-    "pickup-gate-predicate.pickup-gate-predicate.ac3": "completed"
+    "pickup-gate-predicate.pickup-gate-predicate.ac3": "completed",
+    "gate-orphan-proposed-reconciler": "running"
   }
 }
