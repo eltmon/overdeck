@@ -46,19 +46,19 @@
     "recordedAt": "2026-07-26T20:34:03.489Z"
   },
   "created": "2026-07-26T19:16:39.648Z",
-  "updated": "2026-07-26T20:36:32.685Z",
+  "updated": "2026-07-26T20:40:40.626Z",
   "pipeline": {
     "issueId": "PAN-3155",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T20:34:33.677Z",
-    "updatedAt": "2026-07-26T20:36:32.505Z",
+    "updatedAt": "2026-07-26T20:40:40.585Z",
+    "reviewNotes": "Deploy row checks dashboard health before the missing-merge dependency, so row 7 still cascades a second miss when row 4 misses",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3160",
-    "reviewRequestedAt": "2026-07-26T20:34:33.677Z",
     "reviewSpawnedAt": "2026-07-26T20:36:32.504Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -94,6 +94,14 @@
   "closeOut": {
     "usage": {
       "byStage": {
+        "review": {
+          "openai/gpt-5.6-sol": {
+            "input": 946058,
+            "output": 67713,
+            "cacheRead": 7527424,
+            "cacheWrite": 0
+          }
+        },
         "work": {
           "openai/gpt-5.6-sol": {
             "input": 887760,
@@ -105,15 +113,15 @@
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 887760,
-          "output": 115904,
-          "cacheRead": 47280128,
+          "input": 1833818,
+          "output": 183617,
+          "cacheRead": 54807552,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 31.555984,
-        "pricingAsOf": "2026-07-26T20:36:32.519Z"
+        "usd": 42.081376,
+        "pricingAsOf": "2026-07-26T20:40:40.608Z"
       }
     },
     "merges": [
