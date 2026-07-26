@@ -47,24 +47,26 @@
     "recordedAt": "2026-07-26T06:27:49.436Z"
   },
   "created": "2026-07-26T05:55:05.237Z",
-  "updated": "2026-07-26T06:50:05.179Z",
+  "updated": "2026-07-26T06:50:07.027Z",
   "pipeline": {
     "issueId": "PAN-3109",
     "reviewStatus": "passed",
-    "testStatus": "pending",
+    "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T06:31:37.155Z",
-    "updatedAt": "2026-07-26T06:50:05.094Z",
-    "reviewNotes": "Approved: shared containment lens and DoD fallbacks satisfy all requirements; focused tests, typecheck, lint, and boundary checks pass.",
-    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
+    "updatedAt": "2026-07-26T06:50:05.104Z",
+    "reviewNotes": "Review dispatch skipped — already running: agent-pan-3109-review",
+    "testNotes": "Skipped: no code changed since pre-review verification gate",
+    "verificationNotes": "Pre-review verification already covered the reviewed commit",
     "inspectNotes": "AC1-4 verified in diff: per-line classify handles merged-work/pointer/unmerged, exact ref patterns include strike + origin remotes, polyrepo aggregates both repo paths with per-repo default branch (main vs develop). AC5: vitest run exits 0, 29 passed, zero deleted lines in the test file so no pre-existing case modified; gatherProjectLensSignals routes through the same classifier with identical sets. Nit only: no isolated case asserting mergedWorkRefs empty for a pure-pointer scenario; helper has no production consumer yet (expected for a later bead).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3112",
     "reviewedAtCommit": "84357d37ff02b537757f2ab57034e193b752981b",
     "lastVerifiedCommit": "84357d37ff02b537757f2ab57034e193b752981b",
+    "reviewRequestedAt": "2026-07-26T06:31:37.155Z",
     "reviewSpawnedAt": "2026-07-26T06:43:38.039Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
@@ -137,7 +139,7 @@
       },
       "costAtCloseOut": {
         "usd": 35.982959,
-        "pricingAsOf": "2026-07-26T06:50:05.166Z"
+        "pricingAsOf": "2026-07-26T06:50:07.021Z"
       }
     },
     "merges": [
