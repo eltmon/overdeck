@@ -231,7 +231,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T00:35:36.057Z",
-  "updated": "2026-07-26T03:51:08.801Z",
+  "updated": "2026-07-26T03:51:12.423Z",
   "pipeline": {
     "issueId": "PAN-1696",
     "reviewStatus": "reviewing",
@@ -344,7 +344,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-haiku-4-5",
+  "model": "gpt-5.6-sol",
   "tasks": {
     "sequence": 16,
     "claims": {
