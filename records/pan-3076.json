@@ -147,17 +147,18 @@
     "recordedAt": "2026-07-26T00:18:45.985Z"
   },
   "created": "2026-07-25T21:12:36.630Z",
-  "updated": "2026-07-26T00:44:09.785Z",
+  "updated": "2026-07-26T00:53:17.789Z",
   "pipeline": {
     "issueId": "PAN-3076",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T00:44:08.786Z",
+    "updatedAt": "2026-07-26T00:53:17.737Z",
+    "reviewNotes": "Lint is red: PAN-3076 grows src/lib/review-status.ts from main's 1000 lines to 1006, violating the file-size gate",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3082",
     "reviewedAtCommit": "f909f3d177827021a7b3463d93fadf30b252ceb4",
     "lastVerifiedCommit": "241e1f76bf1b9dd068e30765ff568e91a561488a",
@@ -176,9 +177,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 6460503,
-            "output": 130558,
-            "cacheRead": 28946944,
+            "input": 8704696,
+            "output": 151781,
+            "cacheRead": 36541440,
             "cacheWrite": 0
           }
         },
@@ -207,9 +208,9 @@
           "cacheWrite": 200270
         },
         "openai/gpt-5.6-sol": {
-          "input": 11825064,
-          "output": 426181,
-          "cacheRead": 178993152,
+          "input": 14069257,
+          "output": 447404,
+          "cacheRead": 186587648,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -220,8 +221,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 173.303722,
-        "pricingAsOf": "2026-07-26T00:44:08.809Z"
+        "usd": 188.958625,
+        "pricingAsOf": "2026-07-26T00:53:17.766Z"
       }
     },
     "merges": [
