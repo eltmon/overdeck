@@ -234,7 +234,7 @@
     }
   ],
   "created": "2026-07-26T00:35:36.057Z",
-  "updated": "2026-07-26T03:46:42.550Z",
+  "updated": "2026-07-26T03:47:05.253Z",
   "pipeline": {
     "issueId": "PAN-1696",
     "reviewStatus": "passed",
@@ -352,7 +352,7 @@
   "harness": "claude-code",
   "model": "claude-haiku-4-5",
   "tasks": {
-    "sequence": 12,
+    "sequence": 13,
     "claims": {
       "merge-train-routes": {
         "writerId": "agent-pan-1696",
@@ -360,13 +360,6 @@
         "pid": 368474,
         "host": "eltmon-z790",
         "claimedAt": "2026-07-26T01:56:42.620Z"
-      },
-      "project-merge-train-endpoint": {
-        "writerId": "agent-pan-1696",
-        "agentId": "agent-pan-1696",
-        "pid": 3730418,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-26T03:46:42.550Z"
       }
     },
     "claimHistory": [
@@ -424,6 +417,16 @@
         "outcome": "completed",
         "reason": "Refactored UAT train reconciler to be per-project independent with getReadySetForProject, assembleFromReadySetForProject, and makeCleanupForProject factory",
         "releasedAt": "2026-07-26T01:56:34.350Z"
+      },
+      {
+        "writerId": "agent-pan-1696",
+        "agentId": "agent-pan-1696",
+        "pid": 3730418,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T03:46:42.550Z",
+        "itemId": "project-merge-train-endpoint",
+        "outcome": "completed",
+        "releasedAt": "2026-07-26T03:47:05.253Z"
       }
     ],
     "statusReasons": {
@@ -465,6 +468,8 @@
     "reconciler-decouple.reconciler-decouple.ac3": "completed",
     "reconciler-decouple.reconciler-decouple.ac4": "completed",
     "merge-train-routes": "running",
-    "project-merge-train-endpoint": "running"
+    "project-merge-train-endpoint": "completed",
+    "project-merge-train-endpoint.project-merge-train-endpoint.ac1": "completed",
+    "project-merge-train-endpoint.project-merge-train-endpoint.ac2": "completed"
   }
 }
