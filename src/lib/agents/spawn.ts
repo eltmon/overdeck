@@ -14,7 +14,8 @@ import { startWorkSync } from '../cv.js';
 import { generateFixedPointPromptSync, checkHookSync, initHookSync } from '../hooks.js';
 import { generateLauncherScriptSync } from '../launcher-generator.js';
 import { getProviderForModelSync, setupCredentialFileAuthSync, clearCredentialFileAuthSync } from '../providers.js';
-import { resetPipelineVerdictsForWorkStartSync } from '../review-status.js';
+import { resetPipelineVerdictsForWorkStartSync, setReviewStatusSync } from '../review-status.js';
+import { shouldPreservePipelineVerdicts } from '../cloister/verdict-preservation.js';
 import { resolveHarness } from '../harness-resolve.js';
 import { prepareHarnessLaunch } from '../harness-binary.js';
 import { assertCodexNativeAuthForSpawn } from '../codex-auth.js';
@@ -171,8 +172,7 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
   const harnessBehavior = getHarnessBehavior(resolvedHarness);
   const isAcp = harnessBehavior.launchCommandKind === 'acp-host';
   const harnessLaunch = await prepareHarnessLaunch(resolvedHarness);
-  // PAN-2285: never launch a fresh Codex agent when native Codex auth is
-  // missing/expired/burned — it would wedge silently in a 401 loop.
+  // PAN-2285: reject fresh Codex launches when native auth would wedge in a 401 loop.
   assertCodexNativeAuthForSpawn(resolvedHarness, listAgentStates());
   await ensureLifecycleHooksBeforeLaunch(agentId, resolvedHarness);
 
@@ -545,12 +545,10 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   });
   const isAcp = getHarnessBehavior(resolvedHarness).launchCommandKind === 'acp-host';
   const harnessLaunch = await prepareHarnessLaunch(resolvedHarness);
-  // PAN-2285: never launch a fresh Codex agent when native Codex auth is
-  // missing/expired/burned — it would wedge silently in a 401 loop.
+  // PAN-2285: reject fresh Codex launches when native auth would wedge in a 401 loop.
   assertCodexNativeAuthForSpawn(resolvedHarness, listAgentStates());
   await ensureLifecycleHooksBeforeLaunch(agentId, resolvedHarness);
   const flywheelEnv = resolveFlywheelSpawnEnv(role, options.flywheelRunId);
-  // Create state
   const state: AgentState = {
     id: agentId,
     issueId: options.issueId,
@@ -567,7 +565,6 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     flywheelRunId: flywheelEnv.OVERDECK_FLYWHEEL_RUN_ID,
     startedBy: resolveAgentStartedBy(options.startedBy, flywheelEnv.OVERDECK_FLYWHEEL_RUN_ID),
   };
-
   const supervisorLaunch = await prepareSupervisorForFreshLaunch(agentId, options, state);
 
   saveAgentStateSync(state);
@@ -577,10 +574,13 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   // Only for work agents, not planning/specialist agents.
   if (role === 'work') {
     try {
-      const resetStatus = resetPipelineVerdictsForWorkStartSync(options.issueId);
-      if (resetStatus) {
-        const { resetPostMergeState } = await import('../cloister/merge-agent.js');
-        resetPostMergeState(options.issueId);
+      const preservation = await shouldPreservePipelineVerdicts(options.issueId, options.workspace);
+      if (preservation.preserve) {
+        if (preservation.refreshedAnchor) setReviewStatusSync(options.issueId, { reviewedAtCommit: preservation.refreshedAnchor });
+        console.log(`[spawn] Preserved pipeline verdicts for ${options.issueId} — ${preservation.reason}`);
+      } else {
+        const resetStatus = resetPipelineVerdictsForWorkStartSync(options.issueId);
+        if (resetStatus) (await import('../cloister/merge-agent.js')).resetPostMergeState(options.issueId);
       }
     } catch (err) {
       console.warn(`[agents] Could not reset stale pipeline verdicts for ${options.issueId}: ${err instanceof Error ? err.message : String(err)}`);

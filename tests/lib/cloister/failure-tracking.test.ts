@@ -41,6 +41,7 @@ describe('agent failure tracking and auto-resume backoff', () => {
     vi.doUnmock('../../../src/lib/cloister/specialists.js');
     vi.doUnmock('../../../src/lib/tmux.js');
     vi.doUnmock('../../../src/lib/cloister/concurrency.js');
+    vi.doUnmock('../../../src/lib/cloister/memory-governor.js');
     vi.doUnmock('os');
     vi.resetModules();
 
@@ -96,6 +97,13 @@ describe('agent failure tracking and auto-resume backoff', () => {
       tryReserveSwarmSlot: () => true,
       releaseSwarmSlot: vi.fn(),
       canDispatchAdvancing: () => true,
+    }));
+    vi.doMock('../../../src/lib/cloister/memory-governor.js', () => ({
+      assessMemoryPressure: vi.fn(async () => ({
+        band: 'ok',
+        availableBytes: Number.MAX_SAFE_INTEGER,
+        thresholds: { warningBytes: 0, criticalBytes: 0 },
+      })),
     }));
     vi.doMock('../../../src/lib/agents.js', async (importOriginal) => {
       const actual = await importOriginal<typeof import('../../../src/lib/agents.js')>();

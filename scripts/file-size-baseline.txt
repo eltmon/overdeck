@@ -11,13 +11,14 @@
 1064 src/dashboard/server/routes/projects.ts
 1134 src/dashboard/server/routes/settings.ts
 1726 src/dashboard/server/routes/workspaces.ts
-1958 src/dashboard/server/routes/workspaces/merge-ops.ts
+1918 src/dashboard/server/routes/workspaces/merge-ops.ts
 1013 src/dashboard/server/routes/workspaces/workspace-data.ts
 1520 src/dashboard/server/services/issue-data-service.ts
 1306 src/dashboard/server/ws-rpc.ts
 1148 src/lib/cloister/deacon-swarm.ts
 3605 src/lib/cloister/deacon.ts
 1404 src/lib/cloister/merge-agent.ts
+1010 src/lib/config-yaml/schema.ts
 1195 src/lib/conversations/smart-compaction.ts
 1726 src/lib/database/schema.ts
 1377 src/lib/model-capabilities.ts

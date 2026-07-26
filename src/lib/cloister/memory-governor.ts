@@ -63,6 +63,18 @@ export interface GovernorReserves {
   recoveryBytes: number;
 }
 
+export interface GovernorRunway {
+  swapTotalBytes: number;
+  swapFreeBytes: number;
+  psiFullAvg10: number | null;
+}
+
+export interface GovernorRunwayThresholds {
+  swapSoftFreePercent: number;
+  swapRecoveryFreePercent: number;
+  psiFullShedAvg10: number;
+}
+
 let governorMode: GovernorMode = 'admitting';
 
 /** Test-only: reset the module-level hysteresis state between test cases. */
@@ -77,6 +89,15 @@ export function readGovernorReserves(): GovernorReserves {
     softBytes: resources.governorSoftReserveGb * GIB,
     hardBytes: resources.governorHardReserveGb * GIB,
     recoveryBytes: resources.governorRecoveryReserveGb * GIB,
+  };
+}
+
+export function readGovernorRunwayThresholds(): GovernorRunwayThresholds {
+  const resources = loadConfigSync().config.resources;
+  return {
+    swapSoftFreePercent: resources.governorSwapSoftFreePercent,
+    swapRecoveryFreePercent: resources.governorSwapRecoveryFreePercent,
+    psiFullShedAvg10: resources.governorPsiFullShedAvg10,
   };
 }
 
@@ -100,6 +121,30 @@ export function nextGovernorMode(
   return 'holding';
 }
 
+export function nextGovernorModeWithRunway(
+  availableBytes: number,
+  reserves: GovernorReserves,
+  runway: GovernorRunway,
+  runwayThresholds: GovernorRunwayThresholds,
+  previousMode: GovernorMode,
+): GovernorMode {
+  const memoryMode = nextGovernorMode(availableBytes, reserves, previousMode);
+  if (runway.swapTotalBytes <= 0) return memoryMode;
+
+  const swapSoftBytes = runway.swapTotalBytes * runwayThresholds.swapSoftFreePercent / 100;
+  const swapRecoveryBytes = runway.swapTotalBytes * runwayThresholds.swapRecoveryFreePercent / 100;
+  const swapLow = previousMode === 'admitting'
+    ? runway.swapFreeBytes < swapSoftBytes
+    : runway.swapFreeBytes < swapRecoveryBytes;
+  const psiShed = swapLow
+    && runway.psiFullAvg10 != null
+    && runway.psiFullAvg10 >= runwayThresholds.psiFullShedAvg10;
+
+  if (memoryMode === 'shedding' || psiShed) return 'shedding';
+  if (swapLow) return 'holding';
+  return memoryMode;
+}
+
 function bandForGovernorMode(mode: GovernorMode): MemoryPressureBand {
   if (mode === 'shedding') return 'hard';
   if (mode === 'holding') return 'soft';
@@ -115,12 +160,26 @@ function bandForGovernorMode(mode: GovernorMode): MemoryPressureBand {
  */
 export async function assessMemoryPressure(): Promise<MemoryVerdict> {
   const reserves = readGovernorReserves();
+  const runwayThresholds = readGovernorRunwayThresholds();
   const snapshot = await readProcMemory();
-  governorMode = nextGovernorMode(snapshot.memAvailable, reserves, governorMode);
+  governorMode = nextGovernorModeWithRunway(
+    snapshot.memAvailable,
+    reserves,
+    {
+      swapTotalBytes: snapshot.swapTotal,
+      swapFreeBytes: snapshot.swapFree,
+      psiFullAvg10: snapshot.psiFullAvg10,
+    },
+    runwayThresholds,
+    governorMode,
+  );
   const verdict: MemoryVerdict = {
     band: bandForGovernorMode(governorMode),
     availableBytes: snapshot.memAvailable,
     thresholds: { warningBytes: reserves.softBytes, criticalBytes: reserves.hardBytes },
+    swapTotalBytes: snapshot.swapTotal,
+    swapFreeBytes: snapshot.swapFree,
+    psiFullAvg10: snapshot.psiFullAvg10,
   };
   setCachedMemoryVerdict(verdict);
   return verdict;

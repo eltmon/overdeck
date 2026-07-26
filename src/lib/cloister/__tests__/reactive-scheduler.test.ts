@@ -154,6 +154,14 @@ vi.mock('../concurrency.js', () => ({
   describeRunningAgents: () => 'counts: work=0 advancing=0 total=0/9 | advancing=[] work=[]',
 }));
 
+vi.mock('../memory-governor.js', () => ({
+  assessMemoryPressure: vi.fn(async () => ({
+    band: 'ok',
+    availableBytes: Number.MAX_SAFE_INTEGER,
+    thresholds: { warningBytes: 0, criticalBytes: 0 },
+  })),
+}));
+
 vi.mock('os', async (importOriginal) => {
   const actual = await importOriginal<typeof import('os')>();
   return {
