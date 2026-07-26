@@ -60,7 +60,7 @@
     "recordedAt": "2026-07-26T10:40:53.843Z"
   },
   "created": "2026-07-26T09:04:01.632Z",
-  "updated": "2026-07-26T10:42:06.092Z",
+  "updated": "2026-07-26T10:42:12.136Z",
   "pipeline": {
     "issueId": "PAN-3116",
     "reviewStatus": "pending",
@@ -70,7 +70,8 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T10:41:09.593Z",
+    "panDoneRecoveredAt": "2026-07-26T10:42:05.667Z",
+    "updatedAt": "2026-07-26T10:42:06.082Z",
     "inspectNotes": "All 5 ACs verified by running the guard in a scratch repo: new 1001-line file absent from base exits 1 naming the path plus the '1001 <path> # <ISSUE-REF>' allowlist remedy; base-1200 file passes at 1200 and fails at 1201; allowlist row '1300 src/foo.ts # PAN-3116' passes at 1300 and fails at 1301; a row missing the issue ref exits 1 naming 'malformed ... line 2'; FILE_SIZE_BASE_REF=no-such-ref exits 1 naming the ref plus the fetch/override remedy. scripts/file-size-baseline.txt deleted, scripts/file-size-allowlist.txt created with the documented header format. Downstream baseline callers (lint-ratchet-audit.sh, file-size-reconcile.ts, quality-lint.ts) are still stale but are owned by later beads in this plan, so out of scope here.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3127",
     "reviewRequestedAt": "2026-07-26T10:42:05.667Z",
@@ -113,8 +114,7 @@
         "tests/unit/scripts/lint-ratchet-audit.test.ts"
       ],
       "recordedAt": "2026-07-26T10:40:53.843Z"
-    },
-    "panDoneRecoveredAt": "2026-07-26T10:42:05.667Z"
+    }
   },
   "closeOut": {
     "usage": {
@@ -160,7 +160,7 @@
       },
       "costAtCloseOut": {
         "usd": 34.7468533,
-        "pricingAsOf": "2026-07-26T10:41:09.133Z"
+        "pricingAsOf": "2026-07-26T10:42:12.131Z"
       }
     },
     "merges": [
