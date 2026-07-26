@@ -105,6 +105,23 @@ describe('merged Docker cleanup worker', () => {
     });
   });
 
+  it('uses fresh merge verification when canonical persistence has not caught up', async () => {
+    mocks.resolveCanonicalReviewStatus.mockReturnValue({
+      available: true,
+      status: { mergeStatus: 'failed' },
+    });
+    mocks.teardownWorkspaceDockerByNamePromise.mockResolvedValue({
+      networkRemoved: true,
+      steps: ['Removed network'],
+    });
+
+    enqueueMergedDockerCleanup('PAN-5559', { mergeVerified: true });
+    await waitForMergedDockerCleanupIdleForTests();
+
+    expect(mocks.teardownWorkspaceDockerByNamePromise).toHaveBeenCalledWith('pan-5559');
+    expect(getMergedDockerCleanupStateForTests('PAN-5559')).toBeNull();
+  });
+
   it('prunes failed entries that disappear from the patrol eligible set', async () => {
     mocks.teardownWorkspaceDockerByNamePromise.mockResolvedValue({
       networkRemoved: false,

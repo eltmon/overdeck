@@ -148,8 +148,9 @@ export async function reconcileStaleMergeStatus(): Promise<string[]> {
     const statuses = loadReviewStatuses();
 
     for (const [issueId, status] of Object.entries(statuses)) {
-      if (status.mergeStatus === 'merged') continue;
-      if (staleMergeReconciled.has(issueId)) continue;
+      const postMergeIncomplete = status.mergeStatus === 'merged' && status.mergeStep === 'post-merge-cleanup';
+      if (status.mergeStatus === 'merged' && !postMergeIncomplete) continue;
+      if (!postMergeIncomplete && staleMergeReconciled.has(issueId)) continue;
 
       const project = resolveProjectFromIssueSync(issueId);
       if (!project) continue;
@@ -172,6 +173,20 @@ export async function reconcileStaleMergeStatus(): Promise<string[]> {
       }
 
       const branch = `feature/${issueId.toLowerCase()}`;
+      if (postMergeIncomplete) {
+        try {
+          const { postMergeLifecycle } = await import('./merge-agent.js');
+          await postMergeLifecycle(issueId, project.projectPath, branch, { skipDeploy: true });
+          staleMergeReconciled.add(issueId);
+          const msg = `Completed pending post-merge lifecycle for ${issueId}`;
+          actions.push(msg);
+          console.log(`[deacon] ${msg}`);
+        } catch (err) {
+          console.warn(`[deacon] Pending post-merge lifecycle retry failed for ${issueId}: ${err}`);
+        }
+        continue;
+      }
+
       let isMerged = false;
 
       // Check 1: diagnostic only. Branch topology alone is not proof of a
@@ -238,24 +253,20 @@ export async function reconcileStaleMergeStatus(): Promise<string[]> {
           continue;
         }
 
-        setReviewStatusSync(issueId, { mergeStatus: 'merged', readyForMerge: false });
-        staleMergeReconciled.add(issueId);
+        setReviewStatusSync(issueId, { mergeStatus: 'merged', mergeStep: 'post-merge-cleanup', readyForMerge: false });
         const msg = `Reconciled stale mergeStatus for ${issueId} — branch ${branch} is merged to main`;
         actions.push(msg);
         console.log(`[deacon] ${msg}`);
 
-        // PAN-1027: also run the post-merge handoff so labels get cleaned, work
-        // agent tmux session is killed, beads compacted, etc. Without this the
-        // dashboard knows the issue is merged but GitHub labels stay stale
-        // ("in-progress"/"in-review") and orphaned tmux sessions leak memory.
-        // skipDeploy avoids respawning the server — best-effort reconciliation.
+        // PAN-1027: also run the post-merge handoff so labels get cleaned and
+        // sessions are released. Await it so a failed handoff remains eligible
+        // for the next patrol instead of being hidden by staleMergeReconciled.
         try {
           const { postMergeLifecycle } = await import('./merge-agent.js');
-          postMergeLifecycle(issueId, project.projectPath, branch, { skipDeploy: true }).catch(err =>
-            console.warn(`[deacon] postMergeLifecycle (reconcile) failed for ${issueId}: ${err}`)
-          );
+          await postMergeLifecycle(issueId, project.projectPath, branch, { skipDeploy: true });
+          staleMergeReconciled.add(issueId);
         } catch (err) {
-          console.warn(`[deacon] Could not import postMergeLifecycle: ${err}`);
+          console.warn(`[deacon] postMergeLifecycle (reconcile) failed for ${issueId}: ${err}`);
         }
       }
     }

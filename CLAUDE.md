@@ -509,9 +509,12 @@ Close Out stops and removes the workspace Docker stack (including the
 reaper is the backstop: it runs full `reapIssueResidue` cleanup for tracker-closed issues
 and queues Docker-only teardown for merged-but-not-closed issues on a deduplicated serial
 worker with retry backoff. The worker revalidates canonical merged status before each
-attempt, and patrol reconciliation prunes retries that are no longer eligible. It removes
-Compose volumes, project-owned containers, and the leaked devnet while preserving workspace
-files, branches, agents, sessions, state, and xBRIEF. The single `rebuildWorkspaceStack`
+attempt, while a fresh merge-agent enqueue may use its just-verified merge for the first
+retry if status persistence lags. Durable `mergeStep: post-merge-cleanup` marks an incomplete
+handoff; boot and patrol retry it until completion records `mergeStep: merged`. Patrol
+reconciliation prunes Docker retries that are no longer eligible. The worker removes Compose
+volumes, project-owned containers, and the leaked devnet while preserving workspace files,
+branches, agents, sessions, state, and xBRIEF. The single `rebuildWorkspaceStack`
 chokepoint no-ops for closed and merged issues, so patrols never recreate a terminal stack.
 
 The destructive/non-reversible completion steps are owned by close-out, not merge:

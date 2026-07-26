@@ -9,6 +9,12 @@ interface CleanupEntry {
   attempts: number;
   nextAttemptAt: number;
   running: boolean;
+  mergeVerified: boolean;
+}
+
+interface EnqueueOptions {
+  /** Trust the merge-agent's just-completed merge verification for the first retry. */
+  mergeVerified?: boolean;
 }
 
 const queue = new Map<string, CleanupEntry>();
@@ -48,11 +54,16 @@ async function drainQueue(): Promise<void> {
   for (let entry = nextEligibleEntry(); entry; entry = nextEligibleEntry()) {
     entry.running = true;
     const eligibility = resolveCanonicalReviewStatus(entry.issueId);
-    if (!eligibility.available) {
+    if (eligibility.status?.mergeStatus === 'merged') {
+      entry.mergeVerified = false;
+    } else if (entry.mergeVerified) {
+      // The merge-agent verified the merge immediately before enqueueing. Consume
+      // that proof once so a failed status write cannot cancel the first retry.
+      entry.mergeVerified = false;
+    } else if (!eligibility.available) {
       recordFailure(entry, 'canonical merge status unavailable');
       continue;
-    }
-    if (eligibility.status?.mergeStatus !== 'merged') {
+    } else {
       queue.delete(entry.issueId);
       console.log(`[deacon] Cancelled merged Docker cleanup for ${entry.issueId} — issue is no longer merged`);
       continue;
@@ -99,19 +110,25 @@ export function reconcileMergedDockerCleanupQueue(eligibleIssueIds: string[]): s
   });
 }
 
-export function enqueueMergedDockerCleanup(issueId: string): string | null {
+export function enqueueMergedDockerCleanup(
+  issueId: string,
+  options?: EnqueueOptions,
+): string | null {
   const normalizedIssueId = issueId.trim().toUpperCase();
   if (!normalizedIssueId) return null;
-  if (!queue.has(normalizedIssueId)) {
+  const existing = queue.get(normalizedIssueId);
+  if (!existing) {
     queue.set(normalizedIssueId, {
       issueId: normalizedIssueId,
       attempts: 0,
       nextAttemptAt: 0,
       running: false,
+      mergeVerified: options?.mergeVerified === true,
     });
     startWorker();
     return `Queued merged-issue Docker cleanup for ${normalizedIssueId}`;
   }
+  if (options?.mergeVerified) existing.mergeVerified = true;
   startWorker();
   return null;
 }

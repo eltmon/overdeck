@@ -64,8 +64,8 @@ vi.mock('../../../../src/lib/concurrency.js', () => ({
 
 import { reconcileStaleMergeStatus } from '../../../../src/lib/cloister/deacon-merge.js';
 
-function makeStatus(mergeStatus = 'failed') {
-  return { mergeStatus, readyForMerge: false };
+function makeStatus(mergeStatus = 'failed', mergeStep?: string) {
+  return { mergeStatus, mergeStep, readyForMerge: false };
 }
 
 describe('reconcileStaleMergeStatus (PAN-2420)', () => {
@@ -96,8 +96,34 @@ describe('reconcileStaleMergeStatus (PAN-2420)', () => {
     const actions = await reconcileStaleMergeStatus();
 
     expect(actions.some(a => a.includes('Reconciled stale mergeStatus'))).toBe(true);
-    expect(mockSetReviewStatusSync).toHaveBeenCalledWith('PAN-2420', { mergeStatus: 'merged', readyForMerge: false });
+    expect(mockSetReviewStatusSync).toHaveBeenCalledWith('PAN-2420', {
+      mergeStatus: 'merged',
+      mergeStep: 'post-merge-cleanup',
+      readyForMerge: false,
+    });
     expect(mockPostMergeLifecycle).toHaveBeenCalledWith('PAN-2420', '/tmp/project', 'feature/pan-2420', { skipDeploy: true });
+  });
+
+  it('retries an incomplete post-merge lifecycle on the next patrol', async () => {
+    mockLoadReviewStatuses.mockReturnValue({
+      'PAN-2421': makeStatus('merged', 'post-merge-cleanup'),
+    });
+    mockPostMergeLifecycle
+      .mockRejectedValueOnce(new Error('tracker transition failed'))
+      .mockResolvedValueOnce(undefined);
+
+    const firstActions = await reconcileStaleMergeStatus();
+    const secondActions = await reconcileStaleMergeStatus();
+
+    expect(firstActions).toEqual([]);
+    expect(secondActions).toContain('Completed pending post-merge lifecycle for PAN-2421');
+    expect(mockPostMergeLifecycle).toHaveBeenCalledTimes(2);
+    expect(mockPostMergeLifecycle).toHaveBeenCalledWith(
+      'PAN-2421',
+      '/tmp/project',
+      'feature/pan-2421',
+      { skipDeploy: true },
+    );
   });
 
   it('defers terminalization when a planning agent is actively running', async () => {

@@ -345,7 +345,7 @@ export async function postMergeLifecycle(
     // Set mergeStatus='merged' after verifying the branch or PR actually landed.
     try {
       setReviewStatusSync(issueId, {
-        mergeStatus: 'merged',
+        mergeStatus: 'merged', mergeStep: 'post-merge-cleanup',
         readyForMerge: false,
         ...(options?.markReviewPassed ? { reviewStatus: 'passed' as const } : {}),
       });
@@ -368,7 +368,7 @@ export async function postMergeLifecycle(
       dockerRetryReason = err instanceof Error ? err.message : String(err);
     }
     if (dockerRetryReason) {
-      enqueueMergedDockerCleanup(issueId);
+      enqueueMergedDockerCleanup(issueId, { mergeVerified: true });
       console.warn(`[merge-agent] Docker cleanup queued for retry (non-fatal): ${dockerRetryReason}`);
     }
 
@@ -448,7 +448,7 @@ export async function postMergeLifecycle(
       console.warn(`[merge-agent] Could not transition issue to verifying_on_main: ${message}`);
       try {
         setReviewStatusSync(issueId, {
-          mergeStatus: 'merged',
+          mergeStatus: 'merged', mergeStep: 'post-merge-cleanup',
           readyForMerge: false,
           mergeNotes: `Post-merge verifying_on_main transition failed: ${message}`,
         });
@@ -551,7 +551,7 @@ export async function postMergeLifecycle(
     await notifyTldrDaemon(projectPath, sourceBranch ?? '');
     await maybeSpawnPostMergeKnowledgeRetro(issueId, projectPath);
 
-    // Mark completed BEFORE logging — prevents re-entry even if the log line triggers something
+    setReviewStatusSync(issueId, { mergeStatus: 'merged', mergeStep: 'merged', readyForMerge: false });
     _completedPostMerge.add(issueId); void capturePipelineStageForIssue(issueId, 'merged');
 
     console.log(`[merge-agent] Post-merge handoff completed for ${issueId}. Awaiting close-out (verify on main).`);

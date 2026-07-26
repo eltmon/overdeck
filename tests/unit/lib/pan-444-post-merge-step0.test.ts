@@ -348,6 +348,7 @@ describe('postMergeLifecycle — step 0 deploy handoff', () => {
 
     expect(mockSetReviewStatusSync).toHaveBeenCalledWith(ISSUE_ID, {
       mergeStatus: 'merged',
+      mergeStep: 'post-merge-cleanup',
       readyForMerge: false,
       reviewStatus: 'passed',
     });
@@ -358,6 +359,7 @@ describe('postMergeLifecycle — step 0 deploy handoff', () => {
 
     expect(mockSetReviewStatusSync).toHaveBeenCalledWith(ISSUE_ID, {
       mergeStatus: 'merged',
+      mergeStep: 'post-merge-cleanup',
       readyForMerge: false,
     });
   });

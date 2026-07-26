@@ -100,7 +100,7 @@ describe('processPendingLifecycle', () => {
     });
   });
 
-  it('reads and deletes the pending file', async () => {
+  it('deletes the pending file only after the lifecycle succeeds', async () => {
     const data = makePendingData();
     mockExistsSync.mockReturnValue(true);
     mockReadFile.mockResolvedValue(JSON.stringify(data));
@@ -114,6 +114,8 @@ describe('processPendingLifecycle', () => {
     });
 
     expect(mockReadFile).toHaveBeenCalledWith(PENDING_FILE, 'utf-8');
+    expect(mockUnlink).not.toHaveBeenCalledWith(PENDING_FILE);
+    await vi.runAllTimersAsync();
     expect(mockUnlink).toHaveBeenCalledWith(PENDING_FILE);
   });
 
@@ -220,7 +222,7 @@ describe('processPendingLifecycle', () => {
     expect(runner).not.toHaveBeenCalled();
   });
 
-  it('does not throw when runner throws', async () => {
+  it('retains the pending file when the runner throws', async () => {
     const data = makePendingData();
     mockExistsSync.mockReturnValue(true);
     mockReadFile.mockResolvedValue(JSON.stringify(data));
@@ -234,5 +236,36 @@ describe('processPendingLifecycle', () => {
       _runner: runner,
     });
     await expect(vi.runAllTimersAsync()).resolves.not.toThrow();
+    expect(mockUnlink).not.toHaveBeenCalledWith(PENDING_FILE);
+  });
+
+  it('retries a retained lifecycle on the next boot and deletes it after success', async () => {
+    const data = makePendingData();
+    mockExistsSync.mockReturnValue(true);
+    mockReadFile.mockResolvedValue(JSON.stringify(data));
+    mockUnlink.mockResolvedValue(undefined);
+    const runner = vi.fn()
+      .mockRejectedValueOnce(new Error('tracker transition failed'))
+      .mockResolvedValueOnce(undefined);
+
+    await processPendingLifecycle({
+      pendingFile: PENDING_FILE,
+      lifecycleDelayMs: 0,
+      now: data.timestamp + 1000,
+      _runner: runner,
+    });
+    await vi.runAllTimersAsync();
+    expect(mockUnlink).not.toHaveBeenCalledWith(PENDING_FILE);
+
+    await processPendingLifecycle({
+      pendingFile: PENDING_FILE,
+      lifecycleDelayMs: 0,
+      now: data.timestamp + 2000,
+      _runner: runner,
+    });
+    await vi.runAllTimersAsync();
+
+    expect(runner).toHaveBeenCalledTimes(2);
+    expect(mockUnlink).toHaveBeenCalledWith(PENDING_FILE);
   });
 });

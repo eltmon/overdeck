@@ -2745,12 +2745,11 @@ export async function runPatrol(): Promise<PatrolResult> {
       const age = Date.now() - (pending.timestamp ?? 0);
       if (age < 60 * 60 * 1000) { // Less than 1 hour old
         console.log(`[deacon] Processing pending post-merge lifecycle for ${pending.issueId} (age: ${Math.round(age / 1000)}s)`);
-        // Import and run lifecycle with skipDeploy to avoid infinite restart loop
+        // Delete only after a successful skipDeploy run so patrol can retry failures.
         const { postMergeLifecycle } = await import('./merge-agent.js');
-        // Delete file first to prevent re-processing
+        await postMergeLifecycle(pending.issueId, pending.projectPath, pending.sourceBranch, { skipDeploy: true });
         const { unlinkSync } = await import('fs');
         unlinkSync(pendingFile);
-        await postMergeLifecycle(pending.issueId, pending.projectPath, pending.sourceBranch, { skipDeploy: true });
         actions.push(`Processed pending post-merge lifecycle for ${pending.issueId}`);
       } else {
         // Stale — delete it

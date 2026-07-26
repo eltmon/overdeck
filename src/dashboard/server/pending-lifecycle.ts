@@ -54,8 +54,8 @@ async function defaultLifecycleRunner(pending: PendingLifecycleData): Promise<vo
 
 /**
  * Check for and process a pending post-merge lifecycle file.
- * Reads, validates, deletes the file, then schedules lifecycle execution.
- * Safe to call unconditionally on server startup — no-op if file absent.
+ * Reads and validates the file, then deletes it only after lifecycle execution
+ * succeeds. A failed handoff remains durable for the next boot or patrol retry.
  *
  * Also checks for a RESTART_MARKER file (written by deploy script before killing
  * the old server) and emits dashboard.lifecycle_started if found.
@@ -106,13 +106,18 @@ export async function processPendingLifecycle(options?: {
 
   try {
     const raw = await readFile(pendingFile, 'utf-8');
-    await unlink(pendingFile);
-
-    const pending = JSON.parse(raw) as PendingLifecycleData;
+    let pending: PendingLifecycleData;
+    try {
+      pending = JSON.parse(raw) as PendingLifecycleData;
+    } catch (error) {
+      await unlink(pendingFile);
+      throw error;
+    }
     const now = options?.now ?? Date.now();
     const age = now - (pending.timestamp ?? 0);
 
     if (age > staleThresholdMs) {
+      await unlink(pendingFile);
       console.warn(
         `[overdeck] Ignoring stale pending-post-merge.json (age: ${Math.round(age / 60000)}min) for ${pending.issueId}`
       );
@@ -126,6 +131,7 @@ export async function processPendingLifecycle(options?: {
     setTimeout(async () => {
       try {
         await runner(pending);
+        await unlink(pendingFile);
         emitDashboardLifecycleSync('completed', {
           reason: pending.reason ?? 'post-merge',
           issueId: pending.issueId,
