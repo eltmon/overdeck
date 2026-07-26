@@ -425,21 +425,16 @@ export function formatFlywheelStatus(status: FlywheelStatus): string {
   ].join('\n');
 }
 
-async function formatMergeQueueForCli(cwd: string): Promise<string> {
+async function formatMergeQueueForCli(cwd: string, json?: boolean): Promise<string> {
   const q = await Effect.runPromise(computeMergeQueueFromCandidates(listEligibleCandidatesByProject(cwd), cwd).pipe(Effect.provide(nodeServicesLayer)));
-  return `Merge queue:\n${q.map(i => `  ${i.pr ? `#${i.pr}` : 'no-pr'} ${i.issueId} ${i.title}`).join('\n') || '  (empty)'}`;
+  return json ? JSON.stringify({ mergeQueue: q }, null, 2) : `Merge queue:\n${q.map(i => `  ${i.pr ? `#${i.pr}` : 'no-pr'} ${i.issueId} ${i.title}`).join('\n') || '  (empty)'}`;
 }
 
 export async function flywheelStatusCommand(options: StatusOptions): Promise<void> {
   try {
     const status = await loadActiveFlywheelStatus();
     if (!status) {
-      if (options.json) {
-        const q = await Effect.runPromise(computeMergeQueueFromCandidates(listEligibleCandidatesByProject(process.cwd()), process.cwd()).pipe(Effect.provide(nodeServicesLayer)));
-        console.log(JSON.stringify({ mergeQueue: q }, null, 2));
-      } else {
-        console.log(await formatMergeQueueForCli(process.cwd()));
-      }
+      console.log(await formatMergeQueueForCli(process.cwd(), options.json));
       return;
     }
     const mergeBackend = await loadMergeBackendStatusForCli();
