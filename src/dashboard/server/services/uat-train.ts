@@ -43,7 +43,6 @@ import { extractACFromDocument } from '../../../lib/xbrief/acceptance-criteria.j
 import { findXBriefByIssue, readXBriefDocument } from '../../../lib/xbrief/xbrief-index.js';
 import { findProjectByPathSync } from '../../../lib/projects.js';
 import { getDashboardIdentity } from '../identity.js';
-import { readCurrentFlywheelStatusForDashboard } from './flywheel-actions.js';
 
 const RECONCILE_INTERVAL_MS = 60_000;
 const CHAIN_PAYLOAD_LIMIT = 10;
@@ -77,21 +76,24 @@ export function canStartUatTrainReconciler(): boolean {
   return identity.mode === 'primary' && resolve(identity.repoRoot) === projectRoot();
 }
 
-/** Ready set in merge order, or null when no flywheel run is active. */
+/** Ready set in merge order, sourced from review-status DB (no flywheel run required). */
 async function getReadySet(): Promise<ReadyFeature[] | null> {
-  const status = await readCurrentFlywheelStatusForDashboard();
-  if (!status) return null;
-  const { computeMergeQueue, resolveMergeQueuePrUrl } = await import('../../../lib/flywheel-merge-order.js');
+  const { computeMergeQueueFromCandidates, listEligibleCandidatesByProject, resolveMergeQueuePrUrl } = await import('../../../lib/flywheel-merge-order.js');
+  const root = projectRoot();
+
+  // PAN-1696: source candidates directly from review-status DB per project
+  const candidates = listEligibleCandidatesByProject(root);
+  if (candidates.length === 0) return [];
+
   const queue = await Effect.runPromise(
-    computeMergeQueue(status.activePipeline, projectRoot(), {
+    computeMergeQueueFromCandidates(candidates, root, {
       getPrUrl: resolveMergeQueuePrUrl,
-      onIneligible: (issueId, reason) =>
-        console.log(`[uat-train] ${issueId} has a merge verb but is not merge-eligible (${reason}) — excluded from the ready set`),
     }).pipe(
       Effect.provide(nodeServicesLayer),
     ),
   );
-  const fromVerbs: ReadyFeature[] = queue.map((item) => ({
+
+  return queue.map((item) => ({
     issueId: item.issueId,
     title: item.title,
     branch: item.branchName,
@@ -99,51 +101,8 @@ async function getReadySet(): Promise<ReadyFeature[] | null> {
     ...(item.prUrl !== undefined ? { prUrl: item.prUrl } : {}),
     conflictsWith: item.conflictsWith,
   }));
-  const swept = await sweepEligibleFeatures(new Set(fromVerbs.map((f) => f.issueId)));
-  return [...fromVerbs, ...swept];
 }
 
-/**
- * PAN-2484: the verb-based ready set misses merge-eligible issues that entered
- * the pipeline outside the active flywheel run (operator revivals, strikes,
- * externally-requested reviews) — those sat at readyForMerge with no train ever
- * assembling around them. Sweep review status for THIS project's merge-eligible
- * issues whose feature branch exists and append any the verb set missed. The
- * flywheel's ordering still leads; swept extras ride at the tail (the assembly
- * engine's conflict hook owns any cross-feature conflicts).
- */
-async function sweepEligibleFeatures(alreadyIncluded: ReadySet): Promise<ReadyFeature[]> {
-  try {
-    const { loadReviewStatuses, mergeGateEligibility } = await import('../../../lib/review-status.js');
-    const { resolveProjectFromIssueSync } = await import('../../../lib/projects.js');
-    const { execFile } = await import('node:child_process');
-    const { promisify } = await import('node:util');
-    const execFileAsync = promisify(execFile);
-    const root = projectRoot();
-    const extras: ReadyFeature[] = [];
-    for (const [issueId, rs] of Object.entries(loadReviewStatuses())) {
-      if (alreadyIncluded.has(issueId)) continue;
-      if (rs.readyForMerge !== true) continue;
-      if (!mergeGateEligibility(rs).eligible) continue;
-      const project = resolveProjectFromIssueSync(issueId);
-      if (!project || resolve(project.projectPath) !== root) continue;
-      const branch = `feature/${issueId.toLowerCase()}`;
-      try {
-        await execFileAsync('git', ['show-ref', '--verify', '--quiet', `refs/heads/${branch}`], { cwd: root, timeout: 10_000 });
-      } catch {
-        continue; // no local branch — nothing to assemble
-      }
-      console.log(`[uat-train] ${issueId} is merge-eligible without a flywheel merge verb — swept into the ready set (PAN-2484)`);
-      extras.push({ issueId, title: issueId, branch, conflictsWith: [] });
-    }
-    return extras;
-  } catch (err) {
-    console.warn(`[uat-train] eligibility sweep failed: ${err instanceof Error ? err.message : String(err)}`);
-    return [];
-  }
-}
-
-type ReadySet = Set<string>;
 
 function codenameLabel(features: readonly ReadyFeature[]): string {
   const prefix = features[0]?.issueId.split('-')[0];

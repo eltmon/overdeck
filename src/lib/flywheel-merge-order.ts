@@ -1,14 +1,14 @@
 import { Effect } from 'effect';
 import { ChildProcess, ChildProcessSpawner } from 'effect/unstable/process';
 import type { FlywheelPipelineItem } from '@overdeck/contracts';
-import { getReviewStatusSync, mergeGateEligibility, type MergeGateEligibility } from './review-status.js';
+import { getReviewStatusSync, loadReviewStatuses, mergeGateEligibility, type MergeGateEligibility } from './review-status.js';
 import { resolveGitHubIssueSync } from './tracker-utils.js';
 import type { SequenceNode } from './backlog/types.js';
 import { classifyIssue, isAutoPickable, type ClassifyLookups } from './backlog/pickup.js';
 import { compileGlob, type CompiledGlob } from './xbrief/dag.js';
 import { computeIssueFootprint } from './xbrief/swarm-readiness.js';
 import type { XBriefDocument } from './xbrief/types.js';
-import { findProjectByPathSync, getProjectSwarmHotspots } from './projects.js';
+import { findProjectByPathSync, getProjectSwarmHotspots, resolveProjectFromIssueSync } from './projects.js';
 
 export interface MergeQueueItem {
   issueId: string;
@@ -312,6 +312,94 @@ export const computeMergeQueue = (
       branchName: `feature/${item.issueId.toLowerCase()}`,
       pr: item.pr,
       prUrl: options.getPrUrl?.(item),
+      mergeOrder: idx + 1,
+      conflictsWith: [...(conflictsMap.get(item.issueId) ?? [])],
+      batchGroup: (conflictCount === 0 ? 'batch' : 'serialize') as 'batch' | 'serialize',
+    }));
+  });
+
+/**
+ * PAN-1696 ready-set-source: List all merge-eligible candidates from review-status DB for a given project.
+ * No flywheel run required — sources directly from persistent pipeline state.
+ * Returns an array of candidate items compatible with computeMergeQueueFromCandidates.
+ */
+export function listEligibleCandidatesByProject(projectRoot: string): Array<{ issueId: string; title: string; pr?: number }> {
+  const project = findProjectByPathSync(projectRoot);
+  if (!project) return [];
+
+  const candidates: Array<{ issueId: string; title: string; pr?: number }> = [];
+  const allStatuses = loadReviewStatuses();
+
+  for (const [issueId, rs] of Object.entries(allStatuses)) {
+    // Check if this issue belongs to this project
+    const issueProject = resolveProjectFromIssueSync(issueId);
+    if (!issueProject || issueProject.projectPath !== project.path) continue;
+
+    // Check if it's merge-eligible
+    if (rs.readyForMerge !== true) continue;
+    const eligibility = mergeGateEligibility(rs);
+    if (!eligibility.eligible) continue;
+
+    candidates.push({ issueId, title: issueId, pr: rs.prNumber });
+  }
+
+  return candidates;
+}
+
+/**
+ * PAN-1696 ready-set-source: Compute merge queue from a pre-filtered candidate list.
+ * Accepts candidates from review-status or flywheel pipeline — decouples the source.
+ * This refactored version extracts the core conflict-analysis logic from computeMergeQueue.
+ */
+export const computeMergeQueueFromCandidates = (
+  candidates: ReadonlyArray<{ issueId: string; title: string; pr?: number }>,
+  projectRoot: string,
+  options: ComputeMergeQueueOptions = {},
+) =>
+  Effect.gen(function*() {
+    if (candidates.length === 0) return [] as MergeQueueItem[];
+    const gitConcurrency = Math.max(1, Math.floor(options.gitConcurrency ?? MERGE_QUEUE_GIT_CONCURRENCY));
+
+    const branches = candidates.map((item) => `feature/${item.issueId.toLowerCase()}`);
+
+    const existsFlags = yield* Effect.all(
+      branches.map((branch) => branchExists(branch, projectRoot)),
+      { concurrency: gitConcurrency },
+    );
+
+    const existing = candidates
+      .map((item, i) => ({ item, branch: branches[i]!, exists: existsFlags[i]! }))
+      .filter(({ exists }) => exists);
+
+    if (existing.length === 0) return [] as MergeQueueItem[];
+
+    const fileSets = yield* Effect.all(
+      existing.map(({ branch }) => changedFilesVsMain(branch, projectRoot)),
+      { concurrency: gitConcurrency },
+    );
+    const hotspots = options.hotspots ?? getProjectSwarmHotspots(findProjectByPathSync(projectRoot));
+    const conflictSignals = computePredictedConflictSignals(
+      existing.map((e, i) => ({ issueId: e.item.issueId, source: 'actual' as const, files: fileSets[i]! })),
+      { hotspots },
+    );
+    const signalByIssue = new Map(conflictSignals.map(signal => [signal.issueId, signal]));
+    const conflictsMap = new Map(conflictSignals.map(signal => [signal.issueId, new Set(signal.conflictsWith)]));
+
+    const sorted = orderMergeCandidates(
+      existing.map((e, i) => ({
+        item: e.item,
+        issueId: e.item.issueId,
+        footprint: signalByIssue.get(e.item.issueId)?.footprint ?? fileSets[i]!.size,
+        conflictCount: signalByIssue.get(e.item.issueId)?.conflictCount ?? 0,
+      })),
+    );
+
+    return sorted.map(({ item, conflictCount }, idx) => ({
+      issueId: item.issueId,
+      title: item.title,
+      branchName: `feature/${item.issueId.toLowerCase()}`,
+      pr: item.pr,
+      prUrl: options.getPrUrl?.(item as any),
       mergeOrder: idx + 1,
       conflictsWith: [...(conflictsMap.get(item.issueId) ?? [])],
       batchGroup: (conflictCount === 0 ? 'batch' : 'serialize') as 'batch' | 'serialize',
