@@ -18,7 +18,13 @@ import {
   writeActiveDashboardBundle,
 } from '../../lib/deploy/active-dashboard-bundle.js';
 import { acquireRestartLock, readRestartLockHolder } from '../../lib/restart-lock.js';
-import { readPlatformConfigSync, restartDashboard, StageError, parseHealthTimeoutMs } from '../../lib/platform-lifecycle.js';
+import {
+  leavesDashboardRunning,
+  parseHealthTimeoutMs,
+  readPlatformConfigSync,
+  restartDashboard,
+  StageError,
+} from '../../lib/platform-lifecycle.js';
 import { writeRestartStatus } from '../../lib/restart-status.js';
 import { agentRestartBlockReason } from '../../lib/deploy/agent-restart-gate.js';
 import {
@@ -204,13 +210,18 @@ export async function reloadCommand(options: ReloadOptions): Promise<void> {
       }));
     } catch (error) {
       if (deployment) {
-        await writeActiveDashboardBundle(previousBundle).catch(() => undefined);
-        await activation?.rollback();
-        await removeDashboardDeployment(repoRoot, deployment.deployRoot);
-        await sweepDashboardDeployments(repoRoot, [
-          ...dashboardDeploymentRoots(),
-          ...(previousBundle ? [previousBundle.deployRoot] : []),
-        ]).catch(() => undefined);
+        if (leavesDashboardRunning(error)) {
+          await activation?.commit();
+          await sweepDashboardDeployments(repoRoot, dashboardDeploymentRoots()).catch(() => undefined);
+        } else {
+          await writeActiveDashboardBundle(previousBundle).catch(() => undefined);
+          await activation?.rollback();
+          await removeDashboardDeployment(repoRoot, deployment.deployRoot);
+          await sweepDashboardDeployments(repoRoot, [
+            ...dashboardDeploymentRoots(),
+            ...(previousBundle ? [previousBundle.deployRoot] : []),
+          ]).catch(() => undefined);
+        }
       }
       throw error;
     }

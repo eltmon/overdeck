@@ -66,12 +66,15 @@ vi.mock('../../../lib/platform-lifecycle.js', () => ({
     return n;
   },
   StageError: class StageError extends Error {
-    failure: { stage: string; reason: string };
-    constructor(failure: { stage: string; reason: string }) {
+    failure: { stage: string; reason: string; recovery?: 'dashboard-left-running' };
+    constructor(failure: { stage: string; reason: string; recovery?: 'dashboard-left-running' }) {
       super(`[${failure.stage}] ${failure.reason}`);
       this.failure = failure;
     }
   },
+  leavesDashboardRunning: (error: unknown) => (
+    (error as { failure?: { recovery?: string } })?.failure?.recovery === 'dashboard-left-running'
+  ),
 }));
 
 vi.mock('../../../lib/restart-status.js', () => ({
@@ -429,6 +432,40 @@ describe('reloadCommand', () => {
     expect(mocks.fsRename).toHaveBeenCalledWith(
       `/repo/dist.rollback.${process.pid}`,
       '/repo/dist',
+    );
+    expect(process.exitCode).toBe(1);
+  });
+
+  it('preserves a deployment when the lifecycle leaves its dashboard running after health timeout', async () => {
+    mocks.statSync.mockReturnValue({ mtimeMs: 2000 });
+    mocks.restartDashboard.mockReturnValue(Effect.fail(Object.assign(new Error('health timed out'), {
+      failure: {
+        stage: 'dashboard',
+        reason: 'health timed out; dashboard left running',
+        recovery: 'dashboard-left-running',
+      },
+    })));
+    mockSpawnExits();
+
+    await reloadCommand({});
+
+    expect(mocks.writeActiveDashboardBundle).toHaveBeenCalledTimes(1);
+    expect(mocks.writeActiveDashboardBundle).toHaveBeenCalledWith({
+      repoRoot: DEFAULT_REPO_ROOT,
+      deployRoot: DEFAULT_BUILD_WORKTREE,
+      serverPath: `${DEFAULT_BUILD_WORKTREE}/dist/dashboard/server.js`,
+    });
+    expect(mocks.exec).not.toHaveBeenCalledWith(
+      `git 'worktree' 'remove' '--force' '${DEFAULT_BUILD_WORKTREE}'`,
+      expect.anything(),
+    );
+    expect(mocks.fsRename).not.toHaveBeenCalledWith(
+      `/repo/dist.rollback.${process.pid}`,
+      '/repo/dist',
+    );
+    expect(mocks.fsRm).toHaveBeenCalledWith(
+      `/repo/dist.rollback.${process.pid}`,
+      { recursive: true, force: true },
     );
     expect(process.exitCode).toBe(1);
   });
