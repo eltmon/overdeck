@@ -343,18 +343,8 @@ export function listEligibleCandidatesByProject(projectRoot: string): Array<{ is
     const eligibility = mergeGateEligibility(rs);
     if (!eligibility.eligible) continue;
 
-    // AC 10: resolve title from tracker, fall back to issue ID if not found
-    let title = issueId;
-    try {
-      const githubIssue = resolveGitHubIssueSync(issueId);
-      if (githubIssue?.title) {
-        title = githubIssue.title;
-      }
-    } catch {
-      // Fall back to issue ID if resolution fails
-    }
-
-    candidates.push({ issueId, title, pr: rs.prNumber });
+    // AC 10: title resolved downstream by computeMergeQueueFromCandidates; here use issue ID
+    candidates.push({ issueId, title: issueId, pr: rs.prNumber });
   }
 
   return candidates;
