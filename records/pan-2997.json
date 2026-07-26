@@ -157,6 +157,11 @@
       "reason": "feedback",
       "note": "[2026-07-26T08:38Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-07-26T08:38:08.904Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-26T09:15:50.980Z"
     }
   ],
   "feedback": [],
@@ -239,10 +244,10 @@
     "recordedAt": "2026-07-25T23:45:57.195Z"
   },
   "created": "2026-07-21T23:09:49.270Z",
-  "updated": "2026-07-26T09:15:49.481Z",
+  "updated": "2026-07-26T09:15:51.247Z",
   "pipeline": {
     "issueId": "PAN-2997",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -250,11 +255,11 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T05:50:39.330Z",
-    "updatedAt": "2026-07-26T09:15:49.004Z",
+    "updatedAt": "2026-07-26T09:15:49.536Z",
     "reviewNotes": "Agent re-review request (5/25): Fixed both cycle-11 blockers: (1) rollback is now a verified protocol transition — a POISON breadcrumb is written before the rollback attempt, so a failed rollback can never leave a false TERMINAL honorable; any later keyed call repairs poisoned markers FIRST and never returns 'deduplicated' from them (remote test covers Enter→terminal→pane death→failed rollback→repair→real delivery). (2) the pre-submit target check now fails CLOSED — the key only becomes terminal when both target reads succeed, both live, pid matches; unreadable pre-target rolls the claim back (local + remote tests). Also split remote-agents.ts under the file-size ratchet into remote-tmux.ts + remote-keyed-delivery.ts with unchanged re-exports.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3004",
     "lastVerifiedCommit": "dae8d6dfbd4da721132281460260596645c92fdb",
-    "reviewSpawnedAt": "2026-07-26T08:35:16.165Z"
+    "reviewSpawnedAt": "2026-07-26T09:15:49.535Z"
   },
   "closeOut": {
     "usage": {
@@ -314,7 +319,7 @@
       },
       "costAtCloseOut": {
         "usd": 275.274257,
-        "pricingAsOf": "2026-07-26T09:15:49.040Z"
+        "pricingAsOf": "2026-07-26T09:15:51.243Z"
       }
     },
     "merges": [
