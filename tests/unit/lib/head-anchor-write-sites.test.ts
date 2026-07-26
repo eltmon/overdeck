@@ -47,6 +47,7 @@ const ALLOWED_WRITE_SITES: AllowedWriteSite[] = [
   allow('src/lib/cloister/deacon.ts', 'reviewedAtCommit', 'reviewedAtCommit: verdict.currentAnchor', 'Drift evaluator advances a proven-benign anchor.'),
   allow('src/lib/cloister/deacon.ts', 'reviewedAtCommit', 'reviewedAtCommit: undefined', 'Explicit stale-review clear.'),
   allow('src/dashboard/server/routes/workspaces/merge-strike.ts', 'lastVerifiedCommit', 'lastVerifiedCommit: verifiedAnchor', 'Producer-fed CI-green merge verification stamp (PAN-3067).'),
+  allow('src/lib/cloister/uat-promote-verification.ts', 'lastVerifiedCommit', 'lastVerifiedCommit: rehydrateHeadAnchor(member.headSha)', 'UAT member HEAD rehydrated at the generation-record boundary (PAN-3114).'),
   allow('src/lib/cloister/verification-runner.ts', 'lastVerifiedCommit', 'lastVerifiedCommit', 'Producer-fed verification stamp.'),
   allow('src/lib/database/agent-backfill.ts', 'roleRunHead', "roleRunHead: 'role_run_head'", 'Database backfill column mapping.'),
   allow('src/lib/database/agent-mappers.ts', 'roleRunHead', 'roleRunHead: state.roleRunHead ?? null', 'Agent runtime serialization.'),
