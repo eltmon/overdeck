@@ -132,9 +132,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-26T07:04:05.538Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-26T07:08Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-26T07:08:25.536Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-26T07:08:25Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2997\n\nThe two-phase tmux protocol can submit Enter twice, ambiguous supervisor failures cross to an independent tmux key store, and remote SSH failures are falsely acknowledged.\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2997 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "src/dashboard/server/event-store.ts",
@@ -214,7 +227,7 @@
     "recordedAt": "2026-07-25T23:45:57.195Z"
   },
   "created": "2026-07-21T23:09:49.270Z",
-  "updated": "2026-07-26T07:08:25.044Z",
+  "updated": "2026-07-26T07:08:25.536Z",
   "pipeline": {
     "issueId": "PAN-2997",
     "reviewStatus": "blocked",
