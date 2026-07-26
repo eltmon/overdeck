@@ -86,7 +86,7 @@
     "recordedAt": "2026-07-26T21:02:31.919Z"
   },
   "created": "2026-07-26T17:27:17.644Z",
-  "updated": "2026-07-26T21:02:42.719Z",
+  "updated": "2026-07-26T21:02:54.338Z",
   "pipeline": {
     "issueId": "PAN-3148",
     "reviewStatus": "pending",
@@ -97,7 +97,7 @@
     "readyForMerge": false,
     "updatedAt": "2026-07-26T21:02:42.584Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3163",
-    "reviewRequestedAt": "2026-07-26T21:02:34.530Z",
+    "reviewRequestedAt": "2026-07-26T21:02:53.986Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "scripts/source-introspection-baseline.txt",
@@ -151,7 +151,8 @@
         "tests/unit/lib/head-anchor-write-sites.test.ts"
       ],
       "recordedAt": "2026-07-26T21:02:31.919Z"
-    }
+    },
+    "panDoneRecoveredAt": "2026-07-26T21:02:53.986Z"
   },
   "closeOut": {
     "usage": {
