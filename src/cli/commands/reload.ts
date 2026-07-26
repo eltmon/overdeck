@@ -6,7 +6,7 @@ import { homedir } from 'os';
 import { delimiter, dirname, isAbsolute, join, resolve } from 'path';
 import { promisify } from 'util';
 import { acquireRestartLock, readRestartLockHolder } from '../../lib/restart-lock.js';
-import { readPlatformConfigSync, restartDashboard, StageError } from '../../lib/platform-lifecycle.js';
+import { readPlatformConfigSync, restartDashboard, StageError, parseHealthTimeoutMs } from '../../lib/platform-lifecycle.js';
 import { writeRestartStatus } from '../../lib/restart-status.js';
 import { agentRestartBlockReason } from '../../lib/deploy/agent-restart-gate.js';
 import {
@@ -28,12 +28,11 @@ class UsageError extends Error {}
 const execAsync = promisify(exec);
 
 function parseHealthTimeout(value: string | undefined): number {
-  if (!value) return 30_000;
-  const parsed = Number.parseInt(value, 10);
-  if (!Number.isFinite(parsed) || parsed <= 0) {
-    throw new UsageError(`--health-timeout must be a positive integer, got ${value}`);
+  try {
+    return parseHealthTimeoutMs(value, 30_000);
+  } catch (err) {
+    throw new UsageError((err as Error).message);
   }
-  return parsed;
 }
 
 function dashboardBundleMtimeMs(): number {

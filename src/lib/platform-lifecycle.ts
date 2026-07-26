@@ -28,6 +28,50 @@ import { readDevSupervisorMarker } from './dev-supervisor.js';
 
 const execAsync = promisify(exec);
 
+/**
+ * Minimum health-wait budget: a dashboard cold boot cannot bind + answer
+ * /api/health faster than this, so anything below it is a guaranteed false
+ * failure — and a false failure here used to reap the healthy new server,
+ * leaving ZERO listeners (#3099, 2026-07-26 dashboard-down incident caused by
+ * `--health-timeout 120` being read as 120ms).
+ */
+export const MIN_HEALTH_TIMEOUT_MS = 1000;
+
+/**
+ * Parse the operator-facing `--health-timeout` flag. Bare numbers are
+ * milliseconds (back-compat) but floored at MIN_HEALTH_TIMEOUT_MS; `s`/`m`
+ * suffixes give seconds/minutes (`120s`, `2m`). Throws on garbage, NaN, and
+ * sub-floor values with the unit spelled out — the incident above came from
+ * the operator reasonably assuming seconds.
+ */
+export function parseHealthTimeoutMs(value: string | undefined, defaultMs: number): number {
+  if (value === undefined || value === '') return defaultMs;
+  const m = value.trim().match(/^(\d+)(ms|s|m)?$/i);
+  if (!m) {
+    throw new Error(
+      `--health-timeout must be a positive integer with an optional unit suffix ` +
+      `(e.g. "30000", "30s", "2m"), got "${value}"`,
+    );
+  }
+  const n = Number.parseInt(m[1], 10);
+  const unit = (m[2] ?? 'ms').toLowerCase();
+  const ms = unit === 'ms' ? n : unit === 's' ? n * 1000 : n * 60_000;
+  if (ms < MIN_HEALTH_TIMEOUT_MS) {
+    const hint = m[2] ? '' : ` — did you mean ${n}s?`;
+    throw new Error(
+      `--health-timeout of ${ms}ms is below the ${MIN_HEALTH_TIMEOUT_MS}ms floor; ` +
+      `a dashboard cold boot cannot health-check that fast${hint}`,
+    );
+  }
+  return ms;
+}
+
+/** Human-readable timeout for health-gate messages (`120s` / `500ms`). */
+function formatTimeoutMs(timeoutMs: number): string {
+  if (timeoutMs >= 1000 && timeoutMs % 1000 === 0) return `${timeoutMs / 1000}s`;
+  return `${timeoutMs}ms`;
+}
+
 export const DASHBOARD_LOG_FILE = join(LOGS_DIR, 'dashboard.log');
 
 /**
@@ -234,7 +278,7 @@ async function describePid(pid: number): Promise<string> {
   }
   throw new StageError({
     stage: 'dashboard',
-    reason: `health check at ${url} did not pass within ${timeoutMs}ms (last: ${lastError})`,
+    reason: `health check at ${url} did not pass within ${formatTimeoutMs(timeoutMs)} (last: ${lastError})`,
   });
 }async function waitForTraefikHealthPromise(
   traefikDomain: string,
@@ -310,26 +354,26 @@ async function restartDashboardPromise(
   } = {},
 ): Promise<void> {
   await Effect.runPromise(stopDashboard(config));
-  const spawned = await startDashboardFn();
+  await startDashboardFn();
   try {
     await Effect.runPromise(waitForDashboardHealth(config.dashboardApiPort, {
       timeoutMs: opts.healthTimeoutMs,
       expectedIdentity: opts.expectedIdentity,
     }));
   } catch (error) {
-    if (spawned) {
-      try {
-        await spawned.stop();
-      } catch (stopError) {
-        const healthFailure = error instanceof Error ? error.message : String(error);
-        const stopFailure = stopError instanceof Error ? stopError.message : String(stopError);
-        throw new StageError({
-          stage: 'dashboard',
-          reason: `${healthFailure}; failed to reap unhealthy dashboard: ${stopFailure}`,
-        });
-      }
-    }
-    throw error;
+    // #3099: NEVER reap the freshly spawned server on a health timeout. The old
+    // policy killed the new server after a false-fast health check and exited
+    // with zero listeners — a full dashboard outage caused by a slow-but-healthy
+    // boot. Leaving the spawn costs nothing: a slow boot comes healthy on its
+    // own, a genuinely broken one is visible for inspection, and the next
+    // `pan restart` stops whatever holds the port anyway.
+    const healthFailure = error instanceof Error ? error.message : String(error);
+    throw new StageError({
+      stage: 'dashboard',
+      reason:
+        `${healthFailure}; the newly spawned dashboard was LEFT RUNNING for inspection ` +
+        `(it may still be booting — re-check ${config.dashboardApiPort ? `http://127.0.0.1:${config.dashboardApiPort}/api/health` : 'the health endpoint'} shortly)`,
+    });
   }
 }async function restartCliproxyPromise(
   cliproxy: {

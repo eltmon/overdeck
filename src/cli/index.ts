@@ -1220,7 +1220,7 @@ program
   .description('Build Overdeck, then restart the dashboard only after the build succeeds')
   .option('--skip-build', 'Skip npm run build and restart the existing bundle')
   .option('--force', 'Bypass the agent deploy-window gate (agent-initiated reloads are otherwise refused while deploy-window block reasons are active)')
-  .option('--health-timeout <ms>', 'Dashboard /api/health wait budget in ms (default 30000)')
+  .option('--health-timeout <duration>', 'Dashboard /api/health wait budget — ms, or Ns/Nm suffix (default 30s; floor 1000ms)')
   .option('--no-deacon', 'Skip Cloister/Deacon auto-start after reload')
   .action(reloadCommand);
 
@@ -1235,7 +1235,7 @@ program
   .option('--traefik', 'Restart only Traefik')
   .option('--full', 'Restart the entire stack (equivalent to pan down && pan up)')
   .option('--force', 'For --cliproxy: redownload binary at the pinned version before restarting (use after bumping CLIPROXY_RELEASE_VERSION). For dashboard scope: bypass the agent deploy-window gate (agent-initiated restarts are otherwise refused while deploy-window block reasons are active)')
-  .option('--health-timeout <ms>', 'Dashboard /api/health wait budget in ms (default 15000)')
+  .option('--health-timeout <duration>', 'Dashboard /api/health wait budget — ms, or Ns/Nm suffix (default 15s; floor 1000ms)')
   .option('--deacon', 'Force Cloister/Deacon auto-start even if the shell inherited OVERDECK_DISABLE_DEACON')
   .option('--no-deacon', 'Skip Cloister/Deacon auto-start on restart (escape hatch when deacon\'s startup scan is starving the event loop)')
   .option('--resume', 'Enable agent auto-resume on boot — auto-resume is ON by default (flag kept for explicitness)')

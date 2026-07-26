@@ -46,6 +46,7 @@ import {
   StageError,
   waitForDashboardHealth,
   stopDashboard,
+  parseHealthTimeoutMs,
   type DashboardSpawnHandle,
   type PlatformConfig,
 } from '../../lib/platform-lifecycle.js';
@@ -338,9 +339,15 @@ export async function restartCommand(options: RestartOptions): Promise<void> {
     return;
   }
   const config = readPlatformConfigSync();
-  const healthTimeoutMs = options.healthTimeout
-    ? parseInt(options.healthTimeout, 10)
-    : undefined;
+  let healthTimeoutMs: number | undefined;
+  try {
+    healthTimeoutMs = options.healthTimeout
+      ? parseHealthTimeoutMs(options.healthTimeout, 15_000)
+      : undefined;
+  } catch (err) {
+    console.error(chalk.red(`Error: ${(err as Error).message}`));
+    return exitCli(2);
+  }
 
   const bootGates = resolveBootGates(options);
   console.log(chalk.dim(`  Boot gates: ${formatBootGateState(bootGates)}`));
