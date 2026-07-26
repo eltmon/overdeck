@@ -27,6 +27,21 @@
       "reason": "feedback",
       "note": "[2026-07-26T15:44Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-07-26T15:44:09.135Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-26T16:24:13.778Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-26T16:24:14.252Z"
+    },
+    {
+      "timestamp": "2026-07-26T16:24:14.527Z",
+      "reason": "end",
+      "note": "All 12 blocking review findings fixed; +57 tests (11146 total, all green), lint and typecheck clean. Two findings were showstoppers rather than polish: contributions stored origin/feature/<issue> while the assembly adapter validates ^feature/, so every polyrepo feature would have been held out and no generation could ever assemble; and read-only member repos were probed, branched, pushed to, promoted into, and had remote branches deleted, which is now blocked at the ready set, the git/cleanup deps, and re-checked against current config at promote time. Also fixed: reconciler and assembly anchored on different repo sets so any project with an untouched repo rebuilt every 60s; targetBranch was dropped before promote so a repo configured for develop would have landed on main; a crash between the last publish and finalization left a fully-published batch permanently unfinalizable, now the idempotent completion case with per-repo merge SHAs persisted; post-merge received a composite anchor as a git ref checked in the non-git wrapper, replaced with a per-repo VerifiedMergedRepo contract; hold-out recovery rebuilt and replayed at O(repos x features^2), now feature-atomic with checkout -B rollback and a test pinning 12 merge attempts for 12 contributions across 8 features with 3 hold-outs; list paths did 1+4G synchronous SQLite statements, now batch-loaded; the ready set's nested Effect.all had a gitConcurrency^2 subprocess ceiling, now flattened; the payload gained repos additively; and terminal generations were skipped by the no-candidates early return, so promoting the last batch leaked every branch, worktree, and the wrapper folder forever. Docs and the tracked codebase map updated to the corrected behavior. ONE PRE-EXISTING FAILURE NOT MINE: tests/unit/lib/cloister/validation.test.ts fails under an agent shell because the review agent's git-guard shim leaks onto PATH and blocks git reset --hard; it passes with a clean PATH and is untouched by this change. Still NOT verified live: mind-your-now assembling a real generation is the post-merge operator checkpoint."
     }
   ],
   "feedback": [],
@@ -104,21 +119,22 @@
     "recordedAt": "2026-07-26T16:24:11.129Z"
   },
   "created": "2026-07-26T12:33:18.311Z",
-  "updated": "2026-07-26T16:24:12.699Z",
+  "updated": "2026-07-26T16:24:14.528Z",
   "pipeline": {
     "issueId": "PAN-3093",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T16:24:11.856Z",
+    "updatedAt": "2026-07-26T16:24:12.713Z",
     "reviewNotes": "[security] Read-only member repositories are treated as writable UAT targets — `src/lib/flywheel-merge-order.ts:395`",
     "inspectNotes": "All 4 ACs verified; ran uat-polyrepo-engine.test.ts + uat-generation-engine.test.ts, 33/33 pass. AC1: runAssemblyPass calls each repo's own fetchMain then createWorktree and records that repo's baseSha; finish() writes compositeBaseAnchor -> 'fe@aaa1111 api@bbb2222' on the generation row (asserted on both the returned object and the store row). AC2: a block returns from the pass, the issue is added to heldOutIds once and pushed to heldOut with reason suffixed '(in <repoKey>)', then assembly replays from base; verified in real git too, since createWorktree does 'worktree remove --force' + 'worktree add -B <branch> <path> origin/<target>', which resets the sibling repo's branch, so the fake's merged-reset is faithful. Push happens only after the accepted pass, so a held-out feature is never published in repo A. AC3: contributingRepos filters by repoContributions; infra gets zero worktreeCreations and zero pushes. AC4: the push loop returns finish('failed', ...) on the first throw, with fe.pushes=[name] and api.pushes=[] proving the sibling had landed. Deviation 1 confirmed necessary: safeGenerationWorktreePath (uat-generation-deps.ts:39) resolves <projectRoot>/workspaces, and a member repo runs git in <projectRoot>/<repoKey> while its worktree sits under the wrapper's workspaces, so the old signature would throw; workspacesRoot defaults to projectRoot and targetBranch to 'main', reproducing the prior origin/main behavior exactly. Per-repo deps each close over their own worktreePath, so merge/abort/push cannot cross repos. Deviation 2 confirmed: GenerationStorePort.update's Pick had no 'repos'. Non-blocking notes: (a) a repo dropped between passes keeps its unpushed local uat/ branch and worktree until the generation folder is reaped - harmless since 'worktree add -B' force-resets, but cleanup (WI-7) should reap the branch; (b) listRemoteUatBranchesMulti, buildPolyrepoGitDeps, and assemblePolyrepoUatGeneration have no callers yet, which is expected until the WI-5/WI-6 wiring lands.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3145",
-    "reviewSpawnedAt": "2026-07-26T15:43:37.935Z",
+    "reviewRequestedAt": "2026-07-26T16:24:11.856Z",
+    "reviewSpawnedAt": "2026-07-26T16:24:12.712Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         ".overdeck/context/codebase/concerns.md",
@@ -191,30 +207,7 @@
         "tests/unit/lib/overdeck/uat-generation-repos.test.ts"
       ],
       "recordedAt": "2026-07-26T16:24:11.129Z"
-    },
-    "reviewerVerdicts": {
-      "security": {
-        "status": "blocked",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3093/.pan/review/agent-pan-3093-review-3624f23f/security.md",
-        "atCommit": "3624f23fa9e3fdde7a780dfe7c90587934bae2a6"
-      },
-      "correctness": {
-        "status": "blocked",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3093/.pan/review/agent-pan-3093-review-3624f23f/correctness.md",
-        "atCommit": "3624f23fa9e3fdde7a780dfe7c90587934bae2a6"
-      },
-      "performance": {
-        "status": "blocked",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3093/.pan/review/agent-pan-3093-review-3624f23f/performance.md",
-        "atCommit": "3624f23fa9e3fdde7a780dfe7c90587934bae2a6"
-      },
-      "requirements": {
-        "status": "blocked",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3093/.pan/review/agent-pan-3093-review-3624f23f/requirements.md",
-        "atCommit": "3624f23fa9e3fdde7a780dfe7c90587934bae2a6"
-      }
-    },
-    "reviewRequestedAt": "2026-07-26T16:24:11.856Z"
+    }
   },
   "closeOut": {
     "usage": {
@@ -229,9 +222,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 1303940,
-            "output": 69227,
-            "cacheRead": 16289280,
+            "input": 1322943,
+            "output": 73175,
+            "cacheRead": 16923136,
             "cacheWrite": 0
           }
         },
@@ -276,15 +269,15 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 3678393,
-          "output": 283183,
-          "cacheRead": 59971072,
+          "input": 3697396,
+          "output": 287131,
+          "cacheRead": 60604928,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 56.8891213,
-        "pricingAsOf": "2026-07-26T15:44:07.706Z"
+        "usd": 57.4195043,
+        "pricingAsOf": "2026-07-26T16:24:12.727Z"
       }
     },
     "merges": [
@@ -293,7 +286,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-opus-5",
   "tasks": {
     "sequence": 16,
     "claims": {},
