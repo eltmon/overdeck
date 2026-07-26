@@ -22,7 +22,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T17:27:17.644Z",
-  "updated": "2026-07-26T18:24:06.050Z",
+  "updated": "2026-07-26T18:24:17.985Z",
   "pipeline": {
     "issueId": "PAN-3148",
     "reviewStatus": "pending",
@@ -49,8 +49,16 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 4,
-    "claims": {},
+    "sequence": 5,
+    "claims": {
+      "keyed-feedback-delivery": {
+        "writerId": "agent-pan-3148",
+        "agentId": "agent-pan-3148",
+        "pid": 1368515,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T18:24:17.985Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3148",
@@ -97,6 +105,7 @@
     "blocked-drift-patrol.blocked-drift-patrol.ac2": "completed",
     "blocked-drift-patrol.blocked-drift-patrol.ac3": "completed",
     "blocked-drift-patrol.blocked-drift-patrol.ac4": "completed",
-    "blocked-drift-patrol.blocked-drift-patrol.ac5": "completed"
+    "blocked-drift-patrol.blocked-drift-patrol.ac5": "completed",
+    "keyed-feedback-delivery": "running"
   }
 }
