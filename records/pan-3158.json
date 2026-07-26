@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T20:19:41.143Z",
-  "updated": "2026-07-26T20:29:50.961Z",
+  "updated": "2026-07-26T20:32:37.882Z",
   "pipeline": {
     "issueId": "PAN-3158",
     "reviewStatus": "pending",
@@ -43,18 +43,34 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "hide-idle-enabled-sections": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-3158",
         "agentId": "agent-pan-3158",
         "pid": 546665,
         "host": "eltmon-z790",
-        "claimedAt": "2026-07-26T20:29:50.961Z"
+        "claimedAt": "2026-07-26T20:29:50.961Z",
+        "itemId": "hide-idle-enabled-sections",
+        "outcome": "completed",
+        "reason": "Filtered idle enabled projects from rendered sections while preserving disabled rows and the page-level empty state",
+        "releasedAt": "2026-07-26T20:32:37.882Z"
+      }
+    ],
+    "statusReasons": {
+      "hide-idle-enabled-sections": {
+        "reason": "Filtered idle enabled projects from rendered sections while preserving disabled rows and the page-level empty state",
+        "updatedAt": "2026-07-26T20:32:37.882Z"
       }
     }
   },
   "statusOverrides": {
-    "hide-idle-enabled-sections": "running"
+    "hide-idle-enabled-sections": "completed",
+    "hide-idle-enabled-sections.hide-idle-enabled-sections.ac1": "completed",
+    "hide-idle-enabled-sections.hide-idle-enabled-sections.ac2": "completed",
+    "hide-idle-enabled-sections.hide-idle-enabled-sections.ac3": "completed",
+    "hide-idle-enabled-sections.hide-idle-enabled-sections.ac4": "completed",
+    "hide-idle-enabled-sections.hide-idle-enabled-sections.ac5": "completed"
   }
 }
