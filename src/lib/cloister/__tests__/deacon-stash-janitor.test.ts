@@ -471,6 +471,7 @@ describe('monitorReviewConvoySignals', () => {
       notes: '[correctness] Missing null check — `src/example.ts:42`',
       workspacePath: '/workspace',
       prUrl: 'https://github.com/eltmon/overdeck/pull/880',
+      runId,
     });
     expect(actions).toEqual([
       'Synthesized review for PAN-880 from 4 reviewer reports: blocked',

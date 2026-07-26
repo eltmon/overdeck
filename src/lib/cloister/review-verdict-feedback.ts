@@ -1,4 +1,5 @@
 import { execFile } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { readdir, readFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -24,6 +25,7 @@ export interface DeliverReviewVerdictFeedbackOptions {
   workspacePath?: string;
   prUrl?: string;
   slotItemId?: string;
+  runId?: string;
 }
 
 export interface DeliverReviewVerdictFeedbackResult {
@@ -102,6 +104,10 @@ async function deliverReviewVerdictFeedbackPromise(
   const workspacePath = opts.workspacePath
     ?? (resolved ? join(resolved.projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`) : undefined);
   const existingStatus = getReviewStatusSync(issueId);
+  const dedupKey = `review-feedback:${issueId.toLowerCase()}:${createHash('sha256')
+    .update([opts.verdict, opts.runId ?? '', existingStatus?.reviewedAtCommit ?? ''].join('|'))
+    .digest('hex')
+    .slice(0, 16)}`;
   const synthesis = workspacePath && existsSync(workspacePath)
     ? await findLatestSynthesis(workspacePath)
     : null;
@@ -143,7 +149,21 @@ async function deliverReviewVerdictFeedbackPromise(
         try {
           // PAN-2668: a blocked/failed review verdict owes rework — re-drive a
           // stopped-by-user agent with a completed handoff instead of queueing.
-          await messageAgent(target.agentId, message, 'internal', { owesRework: true });
+          try {
+            await messageAgent(target.agentId, message, 'internal', {
+              owesRework: true,
+              dedupKey,
+            });
+          } catch (err) {
+            const reason = err instanceof Error ? err.message : String(err);
+            if (!reason.includes('cannot enforce a dedup key')) throw err;
+            // ACP and explicit Channels targets cannot enforce keyed delivery.
+            // Delivery still wins over deduplication for those transports.
+            console.warn(
+              `[review-verdict-feedback] ${target.agentId} cannot enforce keyed delivery; retrying unkeyed`,
+            );
+            await messageAgent(target.agentId, message, 'internal', { owesRework: true });
+          }
           agentMessageSent = true;
           // PAN-3074: delivery succeeded — a prior feedback_delivery_needs_you
           // flag no longer describes reality.

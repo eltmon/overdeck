@@ -257,6 +257,7 @@ async function nudgeSynthesisForCompleteReviewerReports(states: readonly AgentSt
           notes: synthesis.topBlocker || 'Review blocked by Deacon fallback from completed reviewer reports',
           workspacePath: state.workspace,
           prUrl: status.prUrl,
+          runId: state.reviewRunId,
         }));
       }
       if (sessionAlive) {
