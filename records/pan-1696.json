@@ -317,27 +317,32 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-26T11:50:12.229Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-26T11:50:55.054Z"
     }
   ],
   "feedback": [],
   "created": "2026-07-26T00:35:36.057Z",
-  "updated": "2026-07-26T11:50:53.125Z",
+  "updated": "2026-07-26T11:50:55.074Z",
   "pipeline": {
     "issueId": "PAN-1696",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T11:50:34.123Z",
+    "panDoneRecoveredAt": "2026-07-26T11:50:51.889Z",
+    "updatedAt": "2026-07-26T11:50:53.164Z",
     "reviewNotes": "Agent re-review request (5/25): Resolved the standing merge conflict with origin/main preserving BOTH intents. The single conflict was in postUatGenerationPromotePayload (uat-train.ts): main's PAN-3114 (a8bb20a61b) added Promise.all imports plus recordVerification -> recordUatPromotionVerdicts so UAT verdicts persist after promotion, while PAN-1696 derives the promote root from the generation's own stored projectRoot so a MIN batch promotes into the MIN repo. Kept both — taking either side alone would have silently dropped main's verdict persistence or this branch's cross-project promote fix. Verified: uat-train + merge-train-routes + no-loss-matrix suites (42 tests), typecheck, frontend-typecheck, lint all pass; full root suite 10898 passed, zero failures. Branch is synced with main and pushed.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3095",
     "lastVerifiedCommit": "f8bb608be544918ef11179804e8b2884df07d2f3",
     "reviewRequestedAt": "2026-07-26T11:50:51.889Z",
-    "reviewSpawnedAt": "2026-07-26T11:50:10.266Z",
-    "panDoneRecoveredAt": "2026-07-26T11:50:51.889Z"
+    "reviewSpawnedAt": "2026-07-26T11:50:53.162Z"
   },
   "closeOut": {
     "usage": {
@@ -429,7 +434,7 @@
       },
       "costAtCloseOut": {
         "usd": 273.2560052,
-        "pricingAsOf": "2026-07-26T11:50:35.922Z"
+        "pricingAsOf": "2026-07-26T11:50:53.249Z"
       }
     },
     "merges": [
@@ -438,7 +443,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-opus-5",
+  "model": "gpt-5.6-sol",
   "tasks": {
     "sequence": 38,
     "claims": {},
