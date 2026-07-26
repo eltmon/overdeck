@@ -272,6 +272,46 @@ describe('getUatGenerationsPayload', () => {
     );
   });
 
+  // PAN-3165: an unresolvable spec must not be reported as a plan that listed
+  // no criteria — the UAT panel renders that as a factual claim and deletes the
+  // operator's checklist.
+  it('marks a member whose spec cannot be resolved as planResolved: false', async () => {
+    mocks.listUatGenerationsSync.mockReturnValue([
+      gen([{ issueId: 'PAN-3158', title: 'Cedar', branch: 'feature/pan-3158', headSha: 'h1', mergeOrder: 1 }]),
+    ]);
+    mocks.findXBriefByIssue.mockReturnValue(Effect.succeed(null));
+
+    const payload = await getUatGenerationsPayload('/repos/myn');
+
+    expect(payload[0]!.members[0]!.planResolved).toBe(false);
+    expect(payload[0]!.members[0]!.acceptanceCriteria).toEqual([]);
+  });
+
+  it('marks a member whose spec resolves as planResolved: true', async () => {
+    tmp = await mkdtemp(join(tmpdir(), 'pan-uat-train-'));
+    const specPath = join(tmp, 'PAN-3158.xbrief.json');
+    await writeFile(specPath, '{}');
+    mocks.listUatGenerationsSync.mockReturnValue([
+      gen([{ issueId: 'PAN-3158', title: 'Cedar', branch: 'feature/pan-3158', headSha: 'h1', mergeOrder: 1 }]),
+    ]);
+    mocks.findXBriefByIssue.mockReturnValue(Effect.succeed({
+      path: specPath,
+      lifecycleDir: 'proposed',
+      issueId: 'PAN-3158',
+      slug: 'cedar',
+      date: '2026-07-26',
+      filename: 'PAN-3158.xbrief.json',
+    }));
+    mocks.readXBriefDocument.mockReturnValue(Effect.succeed(doc('Given a member, when read, then 14 criteria') as never));
+
+    const payload = await getUatGenerationsPayload('/repos/myn');
+
+    expect(payload[0]!.members[0]!.planResolved).toBe(true);
+    expect(payload[0]!.members[0]!.acceptanceCriteria).toEqual([
+      { title: 'Given a member, when read, then 14 criteria', status: 'pending' },
+    ]);
+  });
+
   it('returns generations without flywheel run active (PAN-1696: reconciler-decouple.ac4)', async () => {
     // With reconciler-decouple, generations are visible regardless of flywheel run state
     const generation = gen([

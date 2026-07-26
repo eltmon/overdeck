@@ -1,9 +1,10 @@
 /**
  * xBRIEF Index — async, cached issue→xBRIEF lookups for server hot paths.
  *
- * PAN-967 Phase 2 makes `.pan/specs/` the canonical spec store. During the
- * migration window, legacy `vbrief/<lifecycle>/` directories remain as fallback
- * reads when no `.pan/specs` entry exists for an issue.
+ * The canonical spec store is the `specs/` directory resolved by
+ * `getProjectPanPaths()` — `overdeck-state` for a migrated project, legacy
+ * `<projectRoot>/.pan/specs` otherwise. Legacy `vbrief/<lifecycle>/`
+ * directories remain as fallback reads when no spec entry exists for an issue.
  */
 import { readdir, readFile } from 'fs/promises';
 import { existsSync } from 'fs';
@@ -19,7 +20,8 @@ import {
 import type { XBriefDocument } from './types.js';
 import { normalizeXBriefEnvelope, XBriefInvalidFormatError, XBriefMergeConflictTaggedError, type XBriefReadError } from './io.js';
 import { FsError } from '../errors.js';
-import { PAN_DIRNAME, PAN_SPECS_DIRNAME, isPanSpecStatus } from '../pan-dir/types.js';
+import { isPanSpecStatus } from '../pan-dir/types.js';
+import { getProjectPanPaths } from '../pan-dir/paths.js';
 
 const CACHE_TTL_MS = 5_000;
 
@@ -41,7 +43,11 @@ interface ProjectIndex {
 const projectIndexCache = new Map<string, ProjectIndex>();
 
 async function scanPanSpecs(projectRoot: string): Promise<IndexEntry[]> {
-  const specsDir = join(projectRoot, PAN_DIRNAME, PAN_SPECS_DIRNAME);
+  // PAN-3165: resolve through the shared path authority. Hardcoding
+  // `<projectRoot>/.pan/specs` here read the pre-PAN-2541 in-repo location, so
+  // every spec written to `overdeck-state` since the cutover resolved to null —
+  // and the UAT panel rendered that lookup miss as "No UAT steps in plan".
+  const { specsDir } = getProjectPanPaths(projectRoot);
   if (!existsSync(specsDir)) return [];
 
   let names: string[];

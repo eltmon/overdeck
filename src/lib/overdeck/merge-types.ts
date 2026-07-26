@@ -108,11 +108,21 @@ export interface UatGenerationHeldOut {
   reason: string;
 }
 
+/**
+ * One assembly-time resolution recorded on a generation branch.
+ *
+ * Originally conflict-only; PAN-3166 generalized it, so `kind` distinguishes an
+ * assembly-agent conflict fix from a union-lint migration renumbering. `kind`
+ * is nullable for rows written before it existed — absent reads as `conflict`.
+ */
 export interface UatGenerationResolution {
   /** The member being merged plus the already-merged members it collided with. */
   issueIds: string[];
   files: string[];
   commitSha: string;
+  kind?: 'conflict' | 'migration-renumber';
+  /** Human-readable disposition, e.g. `V256__X.sql → V257__X.sql`. */
+  note?: string;
 }
 
 export interface UatGeneration {

@@ -117,12 +117,13 @@ const postSpecialistsDoneRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const body = yield* readJsonBody;
     const eventStore = yield* EventStoreService;
-    const { specialist, issueId, status, notes, itemId } = body as {
+    const { specialist, issueId, status, notes, itemId, runId } = body as {
       specialist: string;
       issueId: string;
       status: string;
       notes?: string;
       itemId?: string;
+      runId?: string;
     };
 
     // Validate specialist type
@@ -499,6 +500,7 @@ const postSpecialistsDoneRoute = HttpRouter.add(
             notes,
             workspacePath,
             prUrl: updatedStatus.prUrl,
+            ...(runId ? { runId } : {}),
           }));
           console.log(
             `[specialists/done] Delivered review verdict feedback for ${normalizedIssueId}` +
@@ -506,6 +508,35 @@ const postSpecialistsDoneRoute = HttpRouter.add(
           );
         } catch (err: any) {
           console.warn(`[specialists/done] Failed to deliver review verdict feedback: ${err.message}`);
+        }
+      });
+    }
+
+    // PAN-3148: the HTTP review prompt reports changes requested as status=failed,
+    // which the durable write above maps to reviewStatus=blocked. Snapshot the
+    // reviewed HEAD only after feedback delivery so the verdict remains durable
+    // even when the git probe stalls or fails (PAN-2524 ordering).
+    if (specialist === 'review' && status === 'failed') {
+      yield* Effect.promise(async () => {
+        try {
+          const project = resolveProjectFromIssueSync(normalizedIssueId);
+          if (project) {
+            const workspacePath = join(
+              project.projectPath,
+              'workspaces',
+              `feature-${normalizedIssueId.toLowerCase()}`,
+            );
+            if (existsSync(workspacePath)) {
+              const { formatAnchorShort, snapshotWorkspaceHeadsPromise } = await import('../../../../lib/git-utils.js');
+              const reviewedAtCommit = await snapshotWorkspaceHeadsPromise(normalizedIssueId, workspacePath);
+              if (reviewedAtCommit) {
+                setReviewStatusBase(normalizedIssueId, { reviewedAtCommit });
+                console.log(`[specialists/done] Snapshotted blocked reviewedAtCommit=${formatAnchorShort(reviewedAtCommit)} for ${normalizedIssueId}`);
+              }
+            }
+          }
+        } catch (err) {
+          console.error(`[specialists/done] Failed to snapshot blocked reviewedAtCommit for ${normalizedIssueId}:`, err);
         }
       });
     }

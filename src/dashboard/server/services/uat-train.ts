@@ -71,6 +71,17 @@ const ACCEPTANCE_CRITERIA_READ_CONCURRENCY = 4;
 
 type AcceptanceCriteriaSummary = Array<{ title: string; status: string }>;
 
+/**
+ * PAN-3165: an unresolvable plan is not a plan with no criteria. Collapsing the
+ * two let a resolver bug render as the confident claim "No UAT steps in plan",
+ * silently deleting the operator's checklist, so the lookup outcome travels
+ * alongside the criteria all the way to the UI.
+ */
+interface AcceptanceCriteriaLookup {
+  planResolved: boolean;
+  criteria: AcceptanceCriteriaSummary;
+}
+
 interface AcceptanceCriteriaCacheEntry {
   path: string;
   mtimeMs: number;
@@ -487,6 +498,12 @@ export interface UatGenerationMemberPayload {
   mergeOrder: number;
   /** What-to-UAT checklist from the issue's xBRIEF spec (shared extractor). */
   acceptanceCriteria: Array<{ title: string; status: string }>;
+  /**
+   * False when the issue's spec could not be resolved or read at all (PAN-3165).
+   * An empty `acceptanceCriteria` then means "we don't know", not "the plan
+   * specified nothing" — the UI must say so rather than assert the latter.
+   */
+  planResolved: boolean;
 }
 
 /** Per-repo detail safe to return over HTTP — no host filesystem paths. */
@@ -520,7 +537,20 @@ export interface UatGenerationPayload {
    * disclose host filesystem topology.
    */
   repos: UatGenerationRepoPayload[];
-  stack: { status: 'running' | 'absent'; frontendUrl: string };
+  /**
+   * Live stack state (PAN-3166). `degraded` means containers are up but a
+   * service the compose file declares is not serving — `downServices` names
+   * them and `serviceErrors` carries each one's last error line, so the panel
+   * can say why instead of offering a link into a gateway timeout. `unknown`
+   * means the probe itself failed, which is not proof the stack is gone.
+   */
+  stack: {
+    status: 'running' | 'degraded' | 'unknown' | 'absent';
+    frontendUrl: string;
+    downServices?: string[];
+    serviceErrors?: Record<string, string>;
+    probeError?: string;
+  };
 }
 
 async function mapBounded<T>(items: readonly T[], concurrency: number, worker: (item: T) => Promise<void>): Promise<void> {
@@ -545,8 +575,8 @@ async function mapBounded<T>(items: readonly T[], concurrency: number, worker: (
 async function loadAcceptanceCriteriaCache(
   issueIds: ReadonlySet<string>,
   root: string,
-): Promise<Map<string, AcceptanceCriteriaSummary>> {
-  const cache = new Map<string, AcceptanceCriteriaSummary>();
+): Promise<Map<string, AcceptanceCriteriaLookup>> {
+  const cache = new Map<string, AcceptanceCriteriaLookup>();
   if (issueIds.size === 0) return cache;
 
   await mapBounded([...issueIds], ACCEPTANCE_CRITERIA_READ_CONCURRENCY, async (issueId) => {
@@ -556,7 +586,7 @@ async function loadAcceptanceCriteriaCache(
       try {
         const { mtimeMs } = await stat(existing.path);
         if (existing.mtimeMs === mtimeMs) {
-          cache.set(upperIssueId, existing.criteria);
+          cache.set(upperIssueId, { planResolved: true, criteria: existing.criteria });
           return;
         }
       } catch {
@@ -568,16 +598,21 @@ async function loadAcceptanceCriteriaCache(
       const found = await Effect.runPromise(findXBriefByIssue(root, upperIssueId));
       if (!found) {
         acceptanceCriteriaByIssue.delete(upperIssueId);
-        cache.set(upperIssueId, []);
+        console.warn(`[uat-train] no xBRIEF spec resolved for ${upperIssueId} under ${root} — UAT checklist unavailable`);
+        cache.set(upperIssueId, { planResolved: false, criteria: [] });
         return;
       }
       const { mtimeMs } = await stat(found.path);
       const document = await Effect.runPromise(readXBriefDocument(found.path));
       const criteria = extractACFromDocument(document).map((ac) => ({ title: ac.title, status: ac.status }));
       acceptanceCriteriaByIssue.set(upperIssueId, { path: found.path, mtimeMs, criteria });
-      cache.set(upperIssueId, criteria);
-    } catch {
-      cache.set(upperIssueId, []);
+      cache.set(upperIssueId, { planResolved: true, criteria });
+    } catch (err) {
+      console.warn(
+        `[uat-train] failed to read xBRIEF spec for ${upperIssueId}:`,
+        err instanceof Error ? err.message : err,
+      );
+      cache.set(upperIssueId, { planResolved: false, criteria: [] });
     }
   });
   return cache;
@@ -599,6 +634,7 @@ export async function getUatGenerationsPayload(projectRootOverride?: string): Pr
     const probe = await probeUatStack(gen);
     const members: UatGenerationMemberPayload[] = [];
     for (const member of gen.members) {
+      const lookup = acCache.get(member.issueId.toUpperCase());
       members.push({
         issueId: member.issueId,
         title: member.title,
@@ -606,7 +642,8 @@ export async function getUatGenerationsPayload(projectRootOverride?: string): Pr
         ...(member.pr !== undefined ? { pr: member.pr } : {}),
         ...(member.prUrl !== undefined ? { prUrl: member.prUrl } : {}),
         mergeOrder: member.mergeOrder,
-        acceptanceCriteria: acCache.get(member.issueId.toUpperCase()) ?? [],
+        acceptanceCriteria: lookup?.criteria ?? [],
+        planResolved: lookup?.planResolved ?? false,
       });
     }
     payload.push({
@@ -627,7 +664,13 @@ export async function getUatGenerationsPayload(projectRootOverride?: string): Pr
         promotedAt: r.promotedAt ?? null,
         mergeSha: r.mergeSha ?? null,
       })),
-      stack: { status: probe.status, frontendUrl: probe.frontendUrl },
+      stack: {
+        status: probe.status,
+        frontendUrl: probe.frontendUrl,
+        ...(probe.downServices ? { downServices: probe.downServices } : {}),
+        ...(probe.serviceErrors ? { serviceErrors: probe.serviceErrors } : {}),
+        ...(probe.probeError ? { probeError: probe.probeError } : {}),
+      },
     });
   }
   return payload;

@@ -9,7 +9,10 @@ import {
   teardownUatStack,
   probeUatStack,
   uatFrontendUrl,
+  parseComposePs,
+  lastErrorLine,
   MAX_UAT_STACKS,
+  type ComposeServiceState,
   type UatStackDeps,
 } from '../../../../src/lib/cloister/uat-stack.js';
 import type { UatGeneration } from '../../../../src/lib/database/uat-generations-db.js';
@@ -37,6 +40,11 @@ function makeDeps(options: {
   composeFileExists?: boolean;
   composeContent?: string;
   psCount?: number;
+  /** Declared services (`docker compose config --services`). */
+  services?: string[];
+  /** Per-service container state; defaults to `psCount` generic running rows. */
+  containers?: ComposeServiceState[];
+  logsByService?: Record<string, string>;
   failUp?: boolean;
   failRender?: boolean;
 } = {}): UatStackDeps & {
@@ -54,7 +62,17 @@ function makeDeps(options: {
       ups.push(project);
     },
     composeDown: async (_file, project) => { downs.push(project); },
-    composePsCount: async () => options.psCount ?? 1,
+    composePs: async () =>
+      options.containers ??
+      Array.from({ length: options.psCount ?? 1 }, (_, i) => ({
+        service: `svc${i + 1}`,
+        running: true,
+        status: 'Up 3 minutes',
+        exitCode: null,
+      })),
+    composeServices: async () =>
+      options.services ?? (options.containers ?? []).map((c) => c.service),
+    composeServiceLogs: async (_file, _project, service) => options.logsByService?.[service] ?? '',
     findComposeFile: (workspacePath) =>
       (options.composeFileExists ?? true) ? `${workspacePath}/.devcontainer/docker-compose.devcontainer.yml` : null,
     readComposeFile: async () => options.composeContent ?? '',
@@ -196,6 +214,164 @@ describe('probeUatStack', () => {
     const probe = await probeUatStack(gen('uat/pan-stale-0610', { stackStartedAt: '2026-06-10T01:00:00.000Z' }), deps);
     expect(probe.status).toBe('absent');
     expect(deps.stackWrites).toEqual([['uat/pan-stale-0610', null]]);
+  });
+
+  // PAN-3166: the min-quartz-0726 failure — 4 declared services, the api dead
+  // at Flyway startup, and the probe still reporting a healthy 'running'.
+  it('reports degraded and names the service when a declared service is not up', async () => {
+    const deps = makeDeps({
+      services: ['postgres', 'redis', 'api', 'fe'],
+      containers: [
+        { service: 'postgres', running: true, status: 'Up 11 minutes (healthy)', exitCode: null },
+        { service: 'redis', running: true, status: 'Up 11 minutes (healthy)', exitCode: null },
+        { service: 'api', running: false, status: 'Exited (0) 7 minutes ago', exitCode: 0 },
+        { service: 'fe', running: true, status: 'Up 11 minutes', exitCode: null },
+      ],
+      logsByService: {
+        api: [
+          'BUILD SUCCESS',
+          'org.springframework.beans.factory.BeanCreationException: Error creating bean',
+          'Caused by: org.flywaydb.core.api.FlywayException: Found more than one migration with version 256',
+        ].join('\n'),
+      },
+    });
+
+    const probe = await probeUatStack(gen('uat/min-quartz-0726', { stackStartedAt: '2026-07-26T01:00:00.000Z' }), deps);
+
+    expect(probe.status).toBe('degraded');
+    expect(probe.downServices).toEqual(['api']);
+    expect(probe.serviceErrors?.api).toContain('Found more than one migration with version 256');
+    expect(deps.stackWrites).toEqual([]); // degraded is not stale — the record stands
+  });
+
+  it('does not call a stack degraded for a one-shot init service that exited cleanly', async () => {
+    const deps = makeDeps({
+      services: ['init', 'server'],
+      containers: [
+        { service: 'init', running: false, status: 'Exited (0) 5 minutes ago', exitCode: 0 },
+        { service: 'server', running: true, status: 'Up 5 minutes', exitCode: null },
+      ],
+    });
+    const probe = await probeUatStack(gen('uat/pan-init-0610', { stackStartedAt: '2026-06-10T01:00:00.000Z' }), deps);
+    expect(probe.status).toBe('running');
+  });
+
+  it('reports degraded when a one-shot init service exited non-zero', async () => {
+    const deps = makeDeps({
+      services: ['init', 'server'],
+      containers: [
+        { service: 'init', running: false, status: 'Exited (1) 5 minutes ago', exitCode: 1 },
+        { service: 'server', running: true, status: 'Up 5 minutes', exitCode: null },
+      ],
+      logsByService: { init: 'ERROR: bun install failed' },
+    });
+    const probe = await probeUatStack(gen('uat/pan-badinit-0610', { stackStartedAt: '2026-06-10T01:00:00.000Z' }), deps);
+    expect(probe.status).toBe('degraded');
+    expect(probe.downServices).toEqual(['init']);
+  });
+
+  // Guardrail (4): absent is the only status that clears the record, because
+  // clearing it destroys the evidence the operator needs.
+  it('reports unknown and PRESERVES the record when the probe itself fails', async () => {
+    const deps = makeDeps();
+    deps.composePs = async () => { throw new Error('Cannot connect to the Docker daemon'); };
+
+    const probe = await probeUatStack(gen('uat/pan-probefail-0610', { stackStartedAt: '2026-06-10T01:00:00.000Z' }), deps);
+
+    expect(probe.status).toBe('unknown');
+    expect(probe.probeError).toContain('Cannot connect to the Docker daemon');
+    expect(deps.stackWrites).toEqual([]);
+  });
+
+  it('reports unknown and preserves the record when the declared services cannot be read', async () => {
+    const deps = makeDeps({
+      containers: [{ service: 'api', running: true, status: 'Up 1 minute', exitCode: null }],
+    });
+    deps.composeServices = async () => { throw new Error('compose config failed') };
+
+    const probe = await probeUatStack(gen('uat/pan-cfgfail-0610', { stackStartedAt: '2026-06-10T01:00:00.000Z' }), deps);
+
+    expect(probe.status).toBe('unknown');
+    expect(deps.stackWrites).toEqual([]);
+  });
+
+  it('reports degraded for a running service Compose calls unhealthy', async () => {
+    const deps = makeDeps({
+      services: ['api', 'fe'],
+      containers: [
+        { service: 'api', running: true, status: 'Up 2 minutes (unhealthy)', exitCode: null, health: 'unhealthy' },
+        { service: 'fe', running: true, status: 'Up 2 minutes', exitCode: null },
+      ],
+      logsByService: { api: 'ERROR: connection refused' },
+    });
+    const probe = await probeUatStack(gen('uat/pan-unhealthy-0610', { stackStartedAt: '2026-06-10T01:00:00.000Z' }), deps);
+    expect(probe.status).toBe('degraded');
+    expect(probe.downServices).toEqual(['api']);
+    expect(deps.stackWrites).toEqual([]);
+  });
+
+  it('reports degraded when a declared service never produced a container', async () => {
+    const deps = makeDeps({
+      services: ['api', 'fe'],
+      containers: [{ service: 'fe', running: true, status: 'Up 2 minutes', exitCode: null }],
+    });
+    const probe = await probeUatStack(gen('uat/pan-nocreate-0610', { stackStartedAt: '2026-06-10T01:00:00.000Z' }), deps);
+    expect(probe.status).toBe('degraded');
+    expect(probe.downServices).toEqual(['api']);
+  });
+});
+
+describe('parseComposePs', () => {
+  it('parses the per-line JSON object form', () => {
+    const stdout = [
+      '{"Service":"api","State":"exited","Status":"Exited (0) 7 minutes ago","ExitCode":0}',
+      '{"Service":"fe","State":"running","Status":"Up 11 minutes"}',
+    ].join('\n');
+    expect(parseComposePs(stdout)).toEqual([
+      { service: 'api', running: false, status: 'Exited (0) 7 minutes ago', exitCode: 0 },
+      { service: 'fe', running: true, status: 'Up 11 minutes', exitCode: null },
+    ]);
+  });
+
+  it('reads health from the Health field and from the Status suffix', () => {
+    const fromField = parseComposePs('{"Service":"api","State":"running","Status":"Up 2m","Health":"unhealthy"}');
+    expect(fromField[0]!.health).toBe('unhealthy');
+    // Older Compose folds it into Status instead of emitting Health.
+    const fromStatus = parseComposePs('{"Service":"api","State":"running","Status":"Up 2 minutes (unhealthy)"}');
+    expect(fromStatus[0]!.health).toBe('unhealthy');
+  });
+
+  it('parses the single JSON array form', () => {
+    const stdout = '[{"Service":"api","State":"running","Status":"Up 1 minute"}]';
+    expect(parseComposePs(stdout)).toEqual([
+      { service: 'api', running: true, status: 'Up 1 minute', exitCode: null },
+    ]);
+  });
+
+  it('returns nothing for empty or malformed output', () => {
+    expect(parseComposePs('')).toEqual([]);
+    expect(parseComposePs('not json')).toEqual([]);
+  });
+});
+
+describe('lastErrorLine', () => {
+  it('prefers the JVM root cause over the wrapper exception above it', () => {
+    const logs = [
+      'org.springframework.beans.factory.BeanCreationException: Error creating bean',
+      'Caused by: org.flywaydb.core.api.FlywayException: Found more than one migration with version 256',
+      '\tat org.flywaydb.core.Flyway.execute(Flyway.java:1)',
+    ].join('\n');
+    expect(lastErrorLine(logs)).toBe(
+      'Caused by: org.flywaydb.core.api.FlywayException: Found more than one migration with version 256',
+    );
+  });
+
+  it('falls back to the last non-empty line when nothing looks like an error', () => {
+    expect(lastErrorLine('starting\nlistening on 8080\n\n')).toBe('listening on 8080');
+  });
+
+  it('returns null for empty logs', () => {
+    expect(lastErrorLine('   \n\n')).toBeNull();
   });
 });
 

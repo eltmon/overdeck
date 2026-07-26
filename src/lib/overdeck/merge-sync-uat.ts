@@ -75,6 +75,9 @@ interface OverdeckUatResolutionRow {
   issue_ids: string; // JSON-encoded string[]
   files: string;     // JSON-encoded string[]
   commit_sha: string;
+  /** PAN-3166: null on rows written before assembly had a union lint. */
+  kind: string | null;
+  note: string | null;
 }
 
 interface OverdeckUatRepoRow {
@@ -189,6 +192,10 @@ function rowToUatGeneration(
     issueIds: JSON.parse(r.issue_ids) as string[],
     files: JSON.parse(r.files) as string[],
     commitSha: r.commit_sha,
+    // A row predating PAN-3166 has no kind, and every one of those was an
+    // assembly-agent conflict fix — the only kind that existed.
+    kind: (r.kind as UatGenerationResolution['kind']) ?? 'conflict',
+    ...(r.note ? { note: r.note } : {}),
   }));
 
   return {
@@ -388,11 +395,11 @@ export function insertUatGenerationSync(
     }
 
     const insertResolution = db.prepare(`
-      INSERT INTO uat_generation_resolutions (uat_name, issue_ids, files, commit_sha)
-      VALUES (?, ?, ?, ?)
+      INSERT INTO uat_generation_resolutions (uat_name, issue_ids, files, commit_sha, kind, note)
+      VALUES (?, ?, ?, ?, ?, ?)
     `);
     for (const r of gen.resolutions) {
-      insertResolution.run(gen.name, JSON.stringify(r.issueIds), JSON.stringify(r.files), r.commitSha);
+      insertResolution.run(gen.name, JSON.stringify(r.issueIds), JSON.stringify(r.files), r.commitSha, r.kind ?? 'conflict', r.note ?? null);
     }
 
     writeUatGenerationRepoRows(db, gen.name, gen.repos);
@@ -540,11 +547,11 @@ export function updateUatGenerationSync(
     if (patch.resolutions !== undefined) {
       db.prepare('DELETE FROM uat_generation_resolutions WHERE uat_name = ?').run(name);
       const insertRes = db.prepare(`
-        INSERT INTO uat_generation_resolutions (uat_name, issue_ids, files, commit_sha)
-        VALUES (?, ?, ?, ?)
+        INSERT INTO uat_generation_resolutions (uat_name, issue_ids, files, commit_sha, kind, note)
+        VALUES (?, ?, ?, ?, ?, ?)
       `);
       for (const r of patch.resolutions) {
-        insertRes.run(name, JSON.stringify(r.issueIds), JSON.stringify(r.files), r.commitSha);
+        insertRes.run(name, JSON.stringify(r.issueIds), JSON.stringify(r.files), r.commitSha, r.kind ?? 'conflict', r.note ?? null);
       }
     }
   });

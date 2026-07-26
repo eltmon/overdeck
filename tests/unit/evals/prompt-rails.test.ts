@@ -42,6 +42,10 @@ describe('prompt load-bearing rails', () => {
     it('signals passed status through the CLI', () => {
       expect(prompt).toMatch(/pan admin specialists done review.*--status passed/);
     });
+
+    it('threads the review run ID into verdict signals', () => {
+      expect(prompt).toMatch(/pan admin specialists done review.*--run-id "<runId>"/);
+    });
   });
 
   describe('docs/flywheel-brief.md', () => {

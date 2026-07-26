@@ -373,6 +373,8 @@ pan done {{ISSUE_ID}} -c "Brief summary"      # Signal completion — creates Gi
 
 **If you make commits AFTER review already passed:** the review is automatically invalidated — the pipeline detects new commits and resets review to pending. Re-run `pan done` ONLY if you made NEW commits after receiving APPROVED feedback.
 
+**If you push commits while review is BLOCKED:** the pipeline detects the new HEAD within a couple of patrol cycles and re-dispatches review automatically. Never wait for a "new run ID" — if your rework is complete and pushed and no review starts, invoke `/rebase-and-submit` (`pan review request {{ISSUE_ID}} -m "Addressed feedback: <summary>"`).
+
 **If the latest feedback says "CODE APPROVED — YOUR WORK IS COMPLETE": STOP.** Do NOT make further changes. Do NOT run `pan done` again. The pipeline handles testing and merge automatically.
 
 **If you see feedback files in `.pan/feedback/`:** read and address them before resubmitting. Ignore obsolete legacy feedback leftovers if any remain in older workspaces.

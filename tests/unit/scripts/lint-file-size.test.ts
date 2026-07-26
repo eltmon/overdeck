@@ -130,8 +130,11 @@ describe('lint-file-size.sh', () => {
     expect(ok).toBe(true);
     expect(output).toContain('file-size guard passed');
     expect(existsSync(join(root, 'scripts', 'file-size-baseline.txt'))).toBe(false);
+    // The guard must not REWRITE the allowlist — asserting a literal header
+    // instead would fail the moment anyone lands an audited exception, which
+    // is the very remedy the guard's own failure message prescribes.
     expect(readFileSync(join(root, 'scripts', 'file-size-allowlist.txt'), 'utf-8')).toBe(
-      '# Audited growth exceptions: <lines> <path> # <ISSUE-REF>\n',
+      readFileSync(ALLOWLIST_SOURCE, 'utf-8'),
     );
   });
 });

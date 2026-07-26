@@ -25,6 +25,14 @@
 
 import { makeUatCandidateName } from './uat-candidate-name.js';
 import { generationFolderName } from './uat-generation-engine.js';
+import {
+  applyUnionLintPlan,
+  planUnionLint,
+  plannedFiles,
+  seedUnionLedger,
+  type MigrationVersionLedger,
+  type UnionLintPlan,
+} from './uat-union-lint.js';
 import type {
   ConflictContext,
   ConflictResolutionResult,
@@ -93,6 +101,8 @@ interface RepoMergeOutcome {
   headSha: string;
   mergeOrderInRepo: number;
   resolution?: ConflictResolutionResult;
+  /** Union-lint renumbering applied on this repo's branch (PAN-3166). */
+  renumber?: { files: string[]; commitSha: string; note: string };
   conflictingIssueIds: string[];
 }
 
@@ -373,6 +383,8 @@ async function runAssemblyPass(
   const mergedByIssue = new Map<string, RepoMergeOutcome[]>();
   /** Merge count per repo, which is that repo's mergeOrderInRepo counter. */
   const mergedInRepo = new Map<string, string[]>();
+  /** Union lint state per repo (PAN-3166) — absent when the repo's deps omit it. */
+  const ledgers = new Map<string, MigrationVersionLedger>();
 
   for (const repo of active) {
     const git = deps.repoGit.get(repo.repoKey)!;
@@ -404,11 +416,61 @@ async function runAssemblyPass(
       mergeSha: null,
     });
     mergedInRepo.set(repo.repoKey, []);
+
+    // Union lint (PAN-3166), per repo: owners from this repo's freshly cut
+    // branch, reservations from every contributing candidate branch in THIS
+    // repo. A read failure is fatal to the assembly rather than silently
+    // disabling the lint.
+    try {
+      const candidates = features
+        .map((feature) => contributionFor(feature, repo.repoKey)?.branch)
+        .filter((branch): branch is string => Boolean(branch));
+      const ledger = await seedUnionLedger(git, name, candidates);
+      if (ledger) ledgers.set(repo.repoKey, ledger);
+    } catch (err) {
+      return {
+        repos,
+        mergedByIssue,
+        fatal: `union lint could not read migrations in ${repo.repoKey}: ${err instanceof Error ? err.message : String(err)}`,
+      };
+    }
   }
 
   for (const feature of features) {
     const targets = active.filter((repo) => contributionFor(feature, repo.repoKey));
     if (targets.length === 0) continue;
+
+    // Union lint (PAN-3166) — planned for every repo BEFORE any merge, so a
+    // hold-out costs one `git ls-tree` per repo and never needs the rollback
+    // machinery. A hold-out is global here, exactly like a merge conflict: one
+    // repo's colliding migration keeps the whole feature out of the generation.
+    const plans = new Map<string, UnionLintPlan>();
+    let unionCollision: BlockedFeature | null = null;
+    for (const repo of targets) {
+      const contribution = contributionFor(feature, repo.repoKey)!;
+      const plan = await planUnionLint({
+        git: deps.repoGit.get(repo.repoKey)!,
+        ledger: ledgers.get(repo.repoKey) ?? null,
+        generationBranch: name,
+        featureBranch: contribution.branch,
+        issueId: feature.issueId,
+      });
+      plans.set(repo.repoKey, plan);
+      if (plan.disposition.kind === 'hold-out') {
+        unionCollision = {
+          issueId: feature.issueId,
+          repoKey: repo.repoKey,
+          branch: contribution.branch,
+          reason: `${plan.disposition.reason} (in ${repo.repoKey})`,
+        };
+        break;
+      }
+    }
+    if (unionCollision) {
+      log(`[uat-polyrepo] ${name}: holding ${feature.issueId} out — ${unionCollision.reason}`);
+      await hooks.onHeldOut(unionCollision);
+      continue;
+    }
 
     // Capture each target's head BEFORE this feature, so a partial application
     // can be undone without rebuilding the branch from base.
@@ -459,6 +521,37 @@ async function runAssemblyPass(
         break;
       }
       applied.push(outcome);
+
+      // The renumbering can only land once the merge brought the files onto
+      // this repo's branch. It is committed ABOVE the snapshot taken before
+      // this feature, so the rollback below removes it with everything else —
+      // a rolled-back feature never leaves an orphaned rename behind.
+      const plan = plans.get(repo.repoKey);
+      if (plan) {
+        try {
+          const renumber = await applyUnionLintPlan(git, plan, feature.issueId);
+          if (renumber) {
+            outcome.renumber = renumber;
+            log(`[uat-polyrepo] ${name}: renumbered ${feature.issueId} migrations in ${repo.repoKey} — ${renumber.note}`);
+          } else if (plan.disposition.kind === 'renumber') {
+            blocked = {
+              issueId: feature.issueId,
+              repoKey: repo.repoKey,
+              branch: contribution.branch,
+              reason: `migration renumbering is required but no rename primitive is wired (in ${repo.repoKey})`,
+            };
+            break;
+          }
+        } catch (err) {
+          blocked = {
+            issueId: feature.issueId,
+            repoKey: repo.repoKey,
+            branch: contribution.branch,
+            reason: `migration renumbering failed: ${err instanceof Error ? err.message.split('\n')[0] : String(err)} (in ${repo.repoKey})`,
+          };
+          break;
+        }
+      }
     }
 
     if (blocked) {
@@ -483,8 +576,14 @@ async function runAssemblyPass(
       continue;
     }
 
+    // Only now, with the feature accepted in EVERY repo it contributes to, is
+    // it attributed in the ledgers — and by its POST-rename paths. Recording
+    // per repo as the loop went would leave a half-recorded rename behind when
+    // a later repo rejected the feature and rolled the earlier ones back.
     for (const outcome of applied) {
       mergedInRepo.get(outcome.repoKey)!.push(feature.issueId);
+      const plan = plans.get(outcome.repoKey);
+      if (plan) ledgers.get(outcome.repoKey)?.record(plannedFiles(plan), feature.issueId);
     }
     mergedByIssue.set(feature.issueId, applied);
   }
@@ -603,12 +702,23 @@ function collectMembers(
     });
 
     for (const outcome of outcomes) {
-      if (!outcome.resolution) continue;
-      resolutions.push({
-        issueIds: [feature.issueId, ...outcome.conflictingIssueIds],
-        files: outcome.resolution.files,
-        commitSha: outcome.resolution.commitSha,
-      });
+      if (outcome.resolution) {
+        resolutions.push({
+          issueIds: [feature.issueId, ...outcome.conflictingIssueIds],
+          files: outcome.resolution.files,
+          commitSha: outcome.resolution.commitSha,
+          kind: 'conflict',
+        });
+      }
+      if (outcome.renumber) {
+        resolutions.push({
+          issueIds: [feature.issueId],
+          files: outcome.renumber.files,
+          commitSha: outcome.renumber.commitSha,
+          kind: 'migration-renumber',
+          note: `${outcome.renumber.note} (in ${outcome.repoKey})`,
+        });
+      }
     }
   }
 

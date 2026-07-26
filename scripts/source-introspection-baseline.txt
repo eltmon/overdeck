@@ -9,7 +9,7 @@
 1 src/lib/cost-parsers/__tests__/ohmypi-parser.test.ts
 1 tests/dashboard/cache-service-init-home.test.ts
 1 tests/lib/cloister/deacon-queue.test.ts
-20 tests/lib/cloister/review-agent.test.ts
+19 tests/lib/cloister/review-agent.test.ts
 1 tests/lib/mirrorProjectSkills.test.ts
 1 tests/lib/settings-api.test.ts
 1 tests/unit/dashboard/routes/dashboard-continue-readers.test.ts

@@ -2,11 +2,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Effect } from 'effect';
 import { verificationSatisfied } from '../../../../src/lib/review-status.js';
 
-const { mockSetReviewStatus, mockDeliverReviewVerdictFeedback, mockResolveProject, mockReadWorkspacePlan } = vi.hoisted(() => ({
+const {
+  mockSetReviewStatus,
+  mockDeliverReviewVerdictFeedback,
+  mockResolveProject,
+  mockReadWorkspacePlan,
+  mockSnapshotWorkspaceHeads,
+} = vi.hoisted(() => ({
   mockSetReviewStatus: vi.fn(),
   mockDeliverReviewVerdictFeedback: vi.fn(),
   mockResolveProject: vi.fn(),
   mockReadWorkspacePlan: vi.fn(),
+  mockSnapshotWorkspaceHeads: vi.fn(),
 }));
 
 vi.mock('../../../../src/lib/review-status.js', async (importOriginal) => {
@@ -32,11 +39,23 @@ vi.mock('../../../../src/lib/xbrief/io.js', () => ({
   readWorkspacePlanSync: mockReadWorkspacePlan,
 }));
 
+vi.mock('../../../../src/lib/git-utils.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../src/lib/git-utils.js')>()),
+  snapshotWorkspaceHeadsPromise: mockSnapshotWorkspaceHeads,
+}));
+
+vi.mock('node:fs', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('node:fs')>()),
+  existsSync: vi.fn(() => true),
+}));
+
 describe('specialists done command', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.stubEnv('OVERDECK_DASHBOARD_URL', 'http://localhost:3011');
     vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    mockSnapshotWorkspaceHeads.mockResolvedValue(undefined);
     mockSetReviewStatus.mockImplementation((_issueId: string, update: Record<string, unknown>) => {
       return {
         issueId: 'PAN-1059',
@@ -72,6 +91,7 @@ describe('specialists done command', () => {
     await doneCommand('review', 'pan-1059', {
       status: 'blocked',
       notes: 'correctness blocker',
+      runId: 'agent-pan-1059-review-abcdef12',
     });
 
     expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-1059', {
@@ -83,7 +103,50 @@ describe('specialists done command', () => {
       verdict: 'blocked',
       notes: 'correctness blocker',
       prUrl: 'https://github.com/eltmon/overdeck/pull/1059',
+      runId: 'agent-pan-1059-review-abcdef12',
     });
+  });
+
+  it('anchors a blocked verdict after feedback delivery', async () => {
+    mockSnapshotWorkspaceHeads.mockResolvedValue('blocked-head');
+    const { doneCommand } = await import('../../../../src/cli/commands/specialists/done.js');
+
+    await doneCommand('review', 'pan-1059', {
+      status: 'blocked',
+      notes: 'correctness blocker',
+    });
+
+    expect(mockSnapshotWorkspaceHeads).toHaveBeenCalledWith(
+      'PAN-1059',
+      '/project/workspaces/feature-pan-1059',
+    );
+    expect(mockSetReviewStatus).toHaveBeenNthCalledWith(1, 'PAN-1059', {
+      reviewStatus: 'blocked',
+      reviewNotes: 'correctness blocker',
+    });
+    expect(mockSetReviewStatus).toHaveBeenNthCalledWith(2, 'PAN-1059', {
+      reviewedAtCommit: 'blocked-head',
+    });
+    expect(mockDeliverReviewVerdictFeedback.mock.invocationCallOrder[0]).toBeLessThan(
+      mockSetReviewStatus.mock.invocationCallOrder[1]!,
+    );
+  });
+
+  it('preserves a blocked verdict when the post-feedback HEAD snapshot fails', async () => {
+    mockSnapshotWorkspaceHeads.mockRejectedValue(new Error('git unavailable'));
+    const { doneCommand } = await import('../../../../src/cli/commands/specialists/done.js');
+
+    await expect(doneCommand('review', 'pan-1059', {
+      status: 'blocked',
+      notes: 'correctness blocker',
+    })).resolves.toBeUndefined();
+
+    expect(mockSetReviewStatus).toHaveBeenCalledTimes(1);
+    expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-1059', {
+      reviewStatus: 'blocked',
+      reviewNotes: 'correctness blocker',
+    });
+    expect(mockDeliverReviewVerdictFeedback).toHaveBeenCalledOnce();
   });
 
   it('delivers synthesis feedback when review signals failed status', async () => {

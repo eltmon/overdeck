@@ -68,6 +68,10 @@ interface FakeRepoGit extends PolyrepoRepoGit {
   /** Every worktree creation, so a replay is observable. */
   worktreeCreations: string[];
   pushes: string[];
+  /** `from -> to` for every union-lint rename applied (PAN-3166). */
+  renamed: string[];
+  /** Migrations the generation branch currently carries. */
+  migrationsOnBranch(): string[];
 }
 
 interface FakeRepoOptions {
@@ -78,23 +82,43 @@ interface FakeRepoOptions {
   failOn?: string[];
   failWorktree?: boolean;
   failPush?: boolean;
+  /**
+   * ref → migration files in this repo. Its PRESENCE wires the union lint
+   * (PAN-3166); the generation branch's own listing is keyed 'base'.
+   */
+  migrations?: Record<string, string[]>;
+  /** path → SQL. Its presence wires renumbering; without it a collision holds out. */
+  sql?: Record<string, string>;
 }
 
 function makeRepoGit(repoKey: string, options: FakeRepoOptions = {}): FakeRepoGit {
   const merged: string[] = [];
   const worktreeCreations: string[] = [];
   const pushes: string[] = [];
+  const renamed: string[] = [];
+  /**
+   * The generation branch's migrations, and one snapshot per merge depth so a
+   * rollback restores exactly what the branch carried — including undoing any
+   * rename commit that landed above the snapshot.
+   */
+  let branchMigrations: string[] = [...(options.migrations?.base ?? [])];
+  const migrationsAtDepth: string[][] = [[...branchMigrations]];
 
   return {
     merged,
     worktreeCreations,
     pushes,
+    renamed,
+    migrationsOnBranch: () => [...branchMigrations],
     fetchMain: async () => options.baseSha ?? `${repoKey}-base-sha-0000000`,
     createWorktree: async (_branch, path) => {
       if (options.failWorktree) throw new Error(`worktree boom in ${repoKey}`);
       worktreeCreations.push(path);
       // A rebuild resets the branch to base — drop everything merged so far.
       merged.length = 0;
+      branchMigrations = [...(options.migrations?.base ?? [])];
+      migrationsAtDepth.length = 0;
+      migrationsAtDepth.push([...branchMigrations]);
     },
     // Head is modelled as the merge count, so a rollback truncates the log
     // exactly the way re-pointing the branch would.
@@ -103,6 +127,11 @@ function makeRepoGit(repoKey: string, options: FakeRepoOptions = {}): FakeRepoGi
       const depth = Number(sha.replace(`${repoKey}-head-`, ''));
       if (!Number.isFinite(depth)) throw new Error(`unknown rollback sha ${sha}`);
       merged.length = depth;
+      // Re-pointing the branch also drops every commit above that head — the
+      // rename commit included, which is what keeps a rolled-back feature from
+      // leaving an orphaned rename behind.
+      branchMigrations = [...(migrationsAtDepth[depth] ?? [])];
+      migrationsAtDepth.length = depth + 1;
     },
     branchHeadSha: async (branch) => `${repoKey}-${branch.replace(/\W/g, '')}-head`,
     mergeBranch: async (branch) => {
@@ -113,6 +142,8 @@ function makeRepoGit(repoKey: string, options: FakeRepoOptions = {}): FakeRepoGi
         return { ok: false as const, conflict: true, reason: 'conflict' };
       }
       merged.push(branch);
+      branchMigrations.push(...(options.migrations?.[branch] ?? []));
+      migrationsAtDepth[merged.length] = [...branchMigrations];
       return { ok: true as const };
     },
     abortMerge: async () => {},
@@ -120,6 +151,31 @@ function makeRepoGit(repoKey: string, options: FakeRepoOptions = {}): FakeRepoGi
       if (options.failPush) throw new Error(`push boom in ${repoKey}`);
       pushes.push(branchName);
     },
+    ...(options.migrations
+      ? {
+          listMigrationFiles: async (ref: string) =>
+            ref.startsWith('uat/') ? [...branchMigrations] : (options.migrations?.[ref] ?? []),
+        }
+      : {}),
+    ...(options.sql
+      ? {
+          readMigrationFile: async (_ref: string, path: string) => {
+            const sql = options.sql?.[path];
+            if (sql === undefined) throw new Error(`no such migration: ${path}`);
+            return sql;
+          },
+          renameMigrations: async (renames: ReadonlyArray<{ from: string; to: string }>) => {
+            for (const { from, to } of renames) {
+              renamed.push(`${from} -> ${to}`);
+              const at = branchMigrations.indexOf(from);
+              if (at >= 0) branchMigrations[at] = to;
+              else branchMigrations.push(to);
+            }
+            migrationsAtDepth[merged.length] = [...branchMigrations];
+            return `${repoKey}-renumber-sha-${renamed.length}`;
+          },
+        }
+      : {}),
   };
 }
 
@@ -382,7 +438,7 @@ describe('assemblePolyrepoUatGeneration — global hold-out', () => {
     expect(gen.members.map((m) => m.issueId)).toEqual(['MIN-901', 'MIN-902']);
     expect(gen.heldOut).toEqual([]);
     expect(gen.resolutions).toEqual([
-      { issueIds: ['MIN-902'], files: ['src/x.ts'], commitSha: 'fixed-sha' },
+      { issueIds: ['MIN-902'], files: ['src/x.ts'], commitSha: 'fixed-sha', kind: 'conflict' },
     ]);
   });
 
@@ -587,5 +643,179 @@ describe('assemblePolyrepoUatGeneration — all held out', () => {
     expect(gen.status).toBe('failed');
     expect(gen.members).toEqual([]);
     expect(gen.baseSha).toBe('fe@aaa1111 api@bbb2222');
+  });
+});
+
+// PAN-3166: MIN-858 and MIN-902 each added a V256 migration on their own
+// branch. Both merged cleanly (different filenames), the assembled api died at
+// Flyway startup, and every signal said the batch was ready.
+describe('assemblePolyrepoUatGeneration — union lint (Flyway version collisions)', () => {
+  const MIGRATIONS = 'src/main/resources/db/migration';
+  const AUTHOR = `${MIGRATIONS}/V256__Add_author_type_to_task_comment.sql`;
+  const KAIA = `${MIGRATIONS}/V256__Kaia_session_task_binding.sql`;
+
+  const INDEPENDENT = {
+    [AUTHOR]: 'ALTER TABLE task_comment ADD COLUMN author_type VARCHAR(32);',
+    [KAIA]: 'CREATE TABLE kaia_session_task (id BIGSERIAL PRIMARY KEY);',
+  };
+
+  function apiGit(extra: Partial<FakeRepoOptions> = {}): FakeRepoGit {
+    return makeRepoGit('api', {
+      migrations: {
+        base: [`${MIGRATIONS}/V255__Base.sql`],
+        'feature/min-858': [AUTHOR],
+        'feature/min-902': [KAIA],
+      },
+      sql: INDEPENDENT,
+      ...extra,
+    });
+  }
+
+  it('renumbers the later member and keeps both, recording the disposition', async () => {
+    const fe = makeRepoGit('fe', { migrations: { base: [] }, sql: {} });
+    const api = apiGit();
+
+    const gen = await assemblePolyrepoUatGeneration(
+      input({ features: [feature('MIN-858', ['api']), feature('MIN-902', ['fe', 'api'])] }),
+      deps(new Map([['fe', fe], ['api', api]]), makeStore()),
+    );
+
+    expect(gen.status).toBe('ready');
+    expect(gen.members.map((m) => m.issueId)).toEqual(['MIN-858', 'MIN-902']);
+    expect(gen.heldOut).toEqual([]);
+    expect(api.renamed).toEqual([`${KAIA} -> ${MIGRATIONS}/V257__Kaia_session_task_binding.sql`]);
+    expect(api.migrationsOnBranch()).toEqual([
+      `${MIGRATIONS}/V255__Base.sql`,
+      AUTHOR,
+      `${MIGRATIONS}/V257__Kaia_session_task_binding.sql`,
+    ]);
+
+    const renumber = gen.resolutions.find((r) => r.kind === 'migration-renumber');
+    expect(renumber).toMatchObject({ issueIds: ['MIN-902'], commitSha: 'api-renumber-sha-1' });
+    expect(renumber!.note).toContain('in api');
+  });
+
+  it('holds the later member out of the WHOLE generation when the migrations touch one table', async () => {
+    const fe = makeRepoGit('fe', { migrations: { base: [] }, sql: {} });
+    const api = apiGit({
+      sql: {
+        [AUTHOR]: 'ALTER TABLE task_comment ADD COLUMN author_type VARCHAR(32);',
+        [KAIA]: 'ALTER TABLE task_comment ADD COLUMN kaia_session_id BIGINT;',
+      },
+    });
+
+    const gen = await assemblePolyrepoUatGeneration(
+      input({ features: [feature('MIN-858', ['api']), feature('MIN-902', ['fe', 'api'])] }),
+      deps(new Map([['fe', fe], ['api', api]]), makeStore()),
+    );
+
+    expect(gen.status).toBe('ready');
+    expect(gen.members.map((m) => m.issueId)).toEqual(['MIN-858']);
+    // Held out globally: the fe repo never saw MIN-902 either.
+    expect(fe.merged).toEqual([]);
+    expect(api.merged).toEqual(['feature/min-858']);
+    expect(api.renamed).toEqual([]);
+
+    const held = gen.heldOut[0]!;
+    expect(held.issueId).toBe('MIN-902');
+    expect(held.reason).toContain('V256__Kaia_session_task_binding.sql');
+    expect(held.reason).toContain('MIN-902');
+    expect(held.reason).toContain('V256__Add_author_type_to_task_comment.sql');
+    expect(held.reason).toContain('MIN-858');
+    expect(held.reason).toContain('both touch task_comment');
+    expect(held.reason).toContain('in api');
+  });
+
+  // Guardrail (3): a rolled-back feature leaves no orphaned rename, and the
+  // ledger must not have claimed its renamed version either.
+  it('undoes a rename when a later repo rejects the feature, freeing the version again', async () => {
+    const fe = makeRepoGit('fe', { migrations: { base: [] }, sql: {}, conflictOn: ['feature/min-902'] });
+    const api = apiGit();
+
+    const gen = await assemblePolyrepoUatGeneration(
+      // MIN-902 renumbers in api, then fe rejects it; MIN-903 then arrives with
+      // its own V256 and must be free to take V257 — the number MIN-902 briefly
+      // held — because nothing MIN-902 did survived.
+      input({
+        features: [
+          feature('MIN-858', ['api']),
+          feature('MIN-902', ['api', 'fe']),
+          feature('MIN-903', ['api']),
+        ],
+      }),
+      deps(
+        new Map([
+          ['fe', fe],
+          ['api', makeRepoGit('api', {
+            migrations: {
+              base: [],
+              'feature/min-858': [AUTHOR],
+              'feature/min-902': [KAIA],
+              'feature/min-903': [`${MIGRATIONS}/V256__Third.sql`],
+            },
+            sql: { ...INDEPENDENT, [`${MIGRATIONS}/V256__Third.sql`]: 'CREATE TABLE third (id int);' },
+          })],
+        ]),
+        makeStore(),
+      ),
+    );
+
+    expect(gen.members.map((m) => m.issueId)).toEqual(['MIN-858', 'MIN-903']);
+    expect(gen.heldOut.map((h) => h.issueId)).toEqual(['MIN-902']);
+    // MIN-902's renumbered file is gone from the branch entirely.
+    const apiRepo = gen.repos!.find((r) => r.repoKey === 'api');
+    expect(apiRepo).toBeTruthy();
+    expect(api.renamed).toEqual([]);
+  });
+
+  it('does not collide the same version across two migration roots', async () => {
+    const api = makeRepoGit('api', {
+      migrations: {
+        base: [],
+        'feature/min-858': ['services/a/db/V1__init.sql'],
+        'feature/min-902': ['services/b/db/V1__init.sql'],
+      },
+      sql: {
+        'services/a/db/V1__init.sql': 'CREATE TABLE a (id int);',
+        'services/b/db/V1__init.sql': 'CREATE TABLE b (id int);',
+      },
+    });
+
+    const gen = await assemblePolyrepoUatGeneration(
+      input({ features: [feature('MIN-858', ['api']), feature('MIN-902', ['api'])] }),
+      deps(new Map([['api', api]]), makeStore()),
+    );
+
+    expect(gen.members.map((m) => m.issueId)).toEqual(['MIN-858', 'MIN-902']);
+    expect(api.renamed).toEqual([]);
+    expect(gen.heldOut).toEqual([]);
+  });
+
+  // Guardrail (5): a lint that disables itself on a read error is worse than none.
+  it('fails the generation when a repo\'s migration listing cannot be read', async () => {
+    const api = makeRepoGit('api', { migrations: { base: [] } });
+    api.listMigrationFiles = async (ref: string) => {
+      if (ref.startsWith('uat/')) throw new Error('fatal: bad object HEAD');
+      return [];
+    };
+
+    const gen = await assemblePolyrepoUatGeneration(
+      input({ features: [feature('MIN-858', ['api'])] }),
+      deps(new Map([['api', api]]), makeStore()),
+    );
+
+    expect(gen.status).toBe('failed');
+    expect(api.merged).toEqual([]);
+  });
+
+  it('leaves assembly untouched when a repo does not provide a file listing', async () => {
+    const fe = makeRepoGit('fe');
+    const api = makeRepoGit('api');
+    const gen = await assemblePolyrepoUatGeneration(
+      input(),
+      deps(new Map([['fe', fe], ['api', api]]), makeStore()),
+    );
+    expect(gen.status).toBe('ready');
+    expect(gen.members.map((m) => m.issueId)).toEqual(['MIN-901', 'MIN-902']);
   });
 });

@@ -305,6 +305,7 @@ optional:
             GIT_DIFF_COMMANDS: 'git diff --name-only main...HEAD',
             GIT_DIFF_FILE_CMD: 'git diff main...HEAD -- <file>',
             API_URL: 'http://localhost:3011',
+            RUN_ID: 'agent-pan-611-review-abcdef12',
             MEMORY_CONTEXT: memoryContext,
           },
         });
@@ -431,6 +432,7 @@ optional:
           GIT_DIFF_COMMANDS: 'git diff --name-only main...HEAD',
           GIT_DIFF_FILE_CMD: 'git diff main...HEAD -- <file>',
           API_URL: 'http://localhost:3011',
+          RUN_ID: 'agent-pan-611-review-abcdef12',
         };
         const enabled = yield* renderPrompt({
           name: 'review',
@@ -657,6 +659,7 @@ requires:
       GIT_DIFF_COMMANDS: 'git diff --name-only main...HEAD',
       GIT_DIFF_FILE_CMD: 'git diff main...HEAD -- <file>',
       API_URL: 'http://localhost:3011',
+      RUN_ID: 'agent-pan-999-review-abcdef12',
     };
 
     it.effect('reports stale branches through specialists/done instead of direct review status updates', () =>
@@ -667,6 +670,7 @@ requires:
         });
         expect(out).toContain('curl -s -X POST http://localhost:3011/api/specialists/done');
         expect(out).toContain('"specialist":"review","issueId":"PAN-999","status":"passed"');
+        expect(out).toContain('"runId":"agent-pan-999-review-abcdef12"');
         expect(out).not.toContain('/api/review/PAN-999/status');
         expect(out).not.toContain('pan tell PAN-999');
       })
