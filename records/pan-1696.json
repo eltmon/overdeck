@@ -246,7 +246,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T00:35:36.057Z",
-  "updated": "2026-07-26T04:09:25.996Z",
+  "updated": "2026-07-26T04:09:31.180Z",
   "pipeline": {
     "issueId": "PAN-1696",
     "reviewStatus": "reviewing",
@@ -255,7 +255,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T04:09:24.290Z",
+    "updatedAt": "2026-07-26T04:09:31.099Z",
     "reviewNotes": "Agent re-review request (7/25): Fixed review issues: CSRF headers on toggle, merge queue without active run",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/1822",
@@ -351,7 +351,7 @@
       },
       "costAtCloseOut": {
         "usd": 163.8528142,
-        "pricingAsOf": "2026-07-26T04:09:25.982Z"
+        "pricingAsOf": "2026-07-26T04:09:31.150Z"
       }
     },
     "merges": [
