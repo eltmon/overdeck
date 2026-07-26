@@ -122,9 +122,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-26T05:50:44.448Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-26T05:54Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-26T05:54:36.079Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-26T05:54:36Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2997\n\nThe new monitor-mail route can lose or replay keyed wakes, and the prior tmux, supervisor-race, and unkeyed fallback blockers remain unchanged.\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2997 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "src/dashboard/server/event-store.ts",
@@ -204,7 +217,7 @@
     "recordedAt": "2026-07-25T23:45:57.195Z"
   },
   "created": "2026-07-21T23:09:49.270Z",
-  "updated": "2026-07-26T05:54:35.483Z",
+  "updated": "2026-07-26T05:54:36.079Z",
   "pipeline": {
     "issueId": "PAN-2997",
     "reviewStatus": "blocked",
