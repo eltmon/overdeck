@@ -107,21 +107,22 @@
     "recordedAt": "2026-07-26T13:30:54.544Z"
   },
   "created": "2026-07-26T12:24:12.648Z",
-  "updated": "2026-07-26T14:07:16.765Z",
+  "updated": "2026-07-26T14:08:27.175Z",
   "pipeline": {
     "issueId": "PAN-3128",
     "reviewStatus": "blocked",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T13:31:33.728Z",
-    "updatedAt": "2026-07-26T14:07:10.941Z",
+    "updatedAt": "2026-07-26T14:08:27.124Z",
     "reviewNotes": "[correctness] Reload destroys the active primary checkout's dependency environment — `src/lib/deploy/build-from-origin.ts:125`",
     "inspectNotes": "All 5 ACs verified: installAndBuild only ever receives the detached worktree (asserted across clean/dirty/ahead/behind); dirty + HEAD-divergence emit notes and continue; build failure propagates with 'old dashboard left running' -> exitCode 1 and removes worktree + dist.incoming in finally; grep merge-base on reload.ts returns no matches; typecheck clean and build-from-origin.test.ts 7/7 pass.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3141",
+    "lastVerifiedCommit": "f1e3ffc058e523db1cf53b714c37544cf5509f3e",
     "reviewSpawnedAt": "2026-07-26T14:02:56.898Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -160,28 +161,6 @@
         "tests/unit/lib/lifecycle/dod-gate.test.ts"
       ],
       "recordedAt": "2026-07-26T13:30:54.544Z"
-    },
-    "reviewerVerdicts": {
-      "security": {
-        "status": "passed",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3128/.pan/review/agent-pan-3128-review-f1e3ffc0/security.md",
-        "atCommit": "f1e3ffc058e523db1cf53b714c37544cf5509f3e"
-      },
-      "correctness": {
-        "status": "blocked",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3128/.pan/review/agent-pan-3128-review-f1e3ffc0/correctness.md",
-        "atCommit": "f1e3ffc058e523db1cf53b714c37544cf5509f3e"
-      },
-      "performance": {
-        "status": "passed",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3128/.pan/review/agent-pan-3128-review-f1e3ffc0/performance.md",
-        "atCommit": "f1e3ffc058e523db1cf53b714c37544cf5509f3e"
-      },
-      "requirements": {
-        "status": "blocked",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3128/.pan/review/agent-pan-3128-review-f1e3ffc0/requirements.md",
-        "atCommit": "f1e3ffc058e523db1cf53b714c37544cf5509f3e"
-      }
     }
   },
   "closeOut": {
@@ -229,24 +208,24 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 1610939,
-            "output": 195820,
-            "cacheRead": 65454080,
+            "input": 1641779,
+            "output": 198141,
+            "cacheRead": 68725760,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 22976482,
-          "output": 1044720,
-          "cacheRead": 189955072,
+          "input": 23007322,
+          "output": 1047041,
+          "cacheRead": 193226752,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 241.201546,
-        "pricingAsOf": "2026-07-26T14:07:10.950Z"
+        "usd": 243.061216,
+        "pricingAsOf": "2026-07-26T14:08:27.159Z"
       }
     },
     "merges": [
