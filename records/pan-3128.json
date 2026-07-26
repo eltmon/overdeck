@@ -22,17 +22,19 @@
       "reason": "feedback",
       "note": "[2026-07-26T13:37Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-07-26T13:37:25.690Z"
-    }
-  ],
-  "feedback": [
+    },
     {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-26T13:37:25Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-3128\n\nCanonical reload deletes its installed runtime dependencies before restart; stale worktree registrations also block recovery.\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3128 -m \"Fixed review issues\"`"
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-26T13:37:25.983Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-26T13:37:26.849Z"
     }
   ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "src/cli/commands/__tests__/reload.test.ts",
@@ -72,10 +74,10 @@
     "recordedAt": "2026-07-26T13:30:54.544Z"
   },
   "created": "2026-07-26T12:24:12.648Z",
-  "updated": "2026-07-26T13:37:25.691Z",
+  "updated": "2026-07-26T13:37:27.254Z",
   "pipeline": {
     "issueId": "PAN-3128",
-    "reviewStatus": "blocked",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
@@ -83,12 +85,12 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T13:31:33.728Z",
-    "updatedAt": "2026-07-26T13:37:25.070Z",
+    "updatedAt": "2026-07-26T13:37:25.783Z",
     "reviewNotes": "Canonical reload deletes its installed runtime dependencies before restart; stale worktree registrations also block recovery.",
     "inspectNotes": "All 5 ACs verified: installAndBuild only ever receives the detached worktree (asserted across clean/dirty/ahead/behind); dirty + HEAD-divergence emit notes and continue; build failure propagates with 'old dashboard left running' -> exitCode 1 and removes worktree + dist.incoming in finally; grep merge-base on reload.ts returns no matches; typecheck clean and build-from-origin.test.ts 7/7 pass.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3141",
     "reviewRequestedAt": "2026-07-26T13:31:33.728Z",
-    "reviewSpawnedAt": "2026-07-26T13:30:58.829Z",
+    "reviewSpawnedAt": "2026-07-26T13:37:25.782Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "src/cli/commands/__tests__/reload.test.ts",
@@ -158,7 +160,7 @@
       },
       "costAtCloseOut": {
         "usd": 37.819148,
-        "pricingAsOf": "2026-07-26T13:37:25.144Z"
+        "pricingAsOf": "2026-07-26T13:37:27.246Z"
       }
     },
     "merges": [
