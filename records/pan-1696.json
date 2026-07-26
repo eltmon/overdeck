@@ -212,24 +212,29 @@
       "reason": "feedback",
       "note": "[2026-07-26T03:29Z] review-agent → CHANGES-REQUESTED — seq 2",
       "timestamp": "2026-07-26T03:29:17.360Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-26T03:32:18.947Z"
     }
   ],
   "feedback": [],
   "created": "2026-07-26T00:35:36.057Z",
-  "updated": "2026-07-26T03:32:17.552Z",
+  "updated": "2026-07-26T03:32:19.194Z",
   "pipeline": {
     "issueId": "PAN-1696",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "skipped",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T03:32:17.093Z",
+    "updatedAt": "2026-07-26T03:32:17.630Z",
     "reviewNotes": "Agent re-review request (6/25): Fixed security issue: added dashboard auth guard to POST merge-train endpoint",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/1822",
-    "reviewSpawnedAt": "2026-07-26T03:21:02.399Z"
+    "reviewSpawnedAt": "2026-07-26T03:32:17.629Z"
   },
   "closeOut": {
     "usage": {
@@ -321,7 +326,7 @@
       },
       "costAtCloseOut": {
         "usd": 131.9986312,
-        "pricingAsOf": "2026-07-26T03:32:17.116Z"
+        "pricingAsOf": "2026-07-26T03:32:19.187Z"
       }
     },
     "merges": [
