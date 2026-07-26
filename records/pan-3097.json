@@ -55,16 +55,16 @@
     "recordedAt": "2026-07-26T03:30:04.529Z"
   },
   "created": "2026-07-26T02:29:08.179Z",
-  "updated": "2026-07-26T03:30:19.470Z",
+  "updated": "2026-07-26T03:30:55.996Z",
   "pipeline": {
     "issueId": "PAN-3097",
-    "reviewStatus": "failed",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T03:30:19.098Z",
+    "updatedAt": "2026-07-26T03:30:55.924Z",
     "reviewNotes": "Review role spawn failed: Command failed: tmux -L overdeck -f /home/eltmon/.overdeck/tmux/overdeck.tmux.conf send-keys -t agent-pan-3097-review C-m\ncan't find pane: agent-pan-3097-review\n",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3102",
     "reviewSpawnedAt": "2026-07-26T03:30:14.747Z",
@@ -119,6 +119,14 @@
             "cacheWrite": 183727
           }
         },
+        "review": {
+          "openai/gpt-5.6-sol": {
+            "input": 516716,
+            "output": 7115,
+            "cacheRead": 686592,
+            "cacheWrite": 0
+          }
+        },
         "work": {
           "openai/gpt-5.6-sol": {
             "input": 1027391,
@@ -136,15 +144,15 @@
           "cacheWrite": 183727
         },
         "openai/gpt-5.6-sol": {
-          "input": 1027391,
-          "output": 55790,
-          "cacheRead": 40217600,
+          "input": 1544107,
+          "output": 62905,
+          "cacheRead": 40904192,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 34.724884,
-        "pricingAsOf": "2026-07-26T03:30:19.135Z"
+        "usd": 37.86521,
+        "pricingAsOf": "2026-07-26T03:30:55.990Z"
       }
     },
     "merges": [
