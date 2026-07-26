@@ -46,21 +46,20 @@
     "recordedAt": "2026-07-26T20:50:56.555Z"
   },
   "created": "2026-07-26T20:19:41.143Z",
-  "updated": "2026-07-26T20:55:43.646Z",
+  "updated": "2026-07-26T20:57:25.273Z",
   "pipeline": {
     "issueId": "PAN-3158",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T20:51:34.016Z",
-    "updatedAt": "2026-07-26T20:55:42.271Z",
-    "reviewNotes": "Verification failed at test",
+    "updatedAt": "2026-07-26T20:57:25.249Z",
+    "reviewNotes": "Project filtering can falsely show the global no-ready-work message while another project has ready work",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3161",
     "lastVerifiedCommit": "6487d8b6389e5cb5c8b2bb6b48c9926fe0fdc0e8",
-    "reviewRequestedAt": "2026-07-26T20:51:34.016Z",
     "reviewSpawnedAt": "2026-07-26T20:55:42.270Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -88,9 +87,9 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 715890,
-            "output": 18613,
-            "cacheRead": 1381888,
+            "input": 1450908,
+            "output": 46349,
+            "cacheRead": 5284352,
             "cacheWrite": 0
           }
         },
@@ -105,15 +104,15 @@
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 1349755,
-          "output": 47054,
-          "cacheRead": 19022336,
+          "input": 2084773,
+          "output": 74790,
+          "cacheRead": 22924800,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 17.671563,
-        "pricingAsOf": "2026-07-26T20:55:42.576Z"
+        "usd": 24.129965,
+        "pricingAsOf": "2026-07-26T20:57:25.267Z"
       }
     },
     "merges": [
