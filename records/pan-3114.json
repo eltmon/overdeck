@@ -22,7 +22,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T08:55:24.679Z",
-  "updated": "2026-07-26T10:37:50.530Z",
+  "updated": "2026-07-26T10:37:54.197Z",
   "pipeline": {
     "issueId": "PAN-3114",
     "reviewStatus": "pending",
@@ -154,5 +154,37 @@
     "docs.docs.ac1": "completed",
     "docs.docs.ac2": "completed",
     "docs.docs.ac3": "completed"
+  },
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      "src/dashboard/server/services/__tests__/uat-train.test.ts",
+      "tests/unit/lib/head-anchor-write-sites.test.ts"
+    ],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "docs/DEFINITION-OF-DONE.md",
+      "docs/UAT-BATCH-TRAINS.md",
+      "src/dashboard/server/services/uat-train.ts",
+      "src/lib/cloister/uat-promote-verification.ts",
+      "src/lib/cloister/uat-promote.ts",
+      "src/lib/lifecycle/workflows.ts",
+      "tests/unit/lib/cloister/uat-promote-verification.test.ts",
+      "tests/unit/lib/cloister/uat-promote.test.ts",
+      "tests/unit/lib/lifecycle/workflows.test.ts"
+    ],
+    "actualChangedFiles": [
+      "docs/DEFINITION-OF-DONE.md",
+      "docs/UAT-BATCH-TRAINS.md",
+      "src/dashboard/server/services/__tests__/uat-train.test.ts",
+      "src/dashboard/server/services/uat-train.ts",
+      "src/lib/cloister/uat-promote-verification.ts",
+      "src/lib/cloister/uat-promote.ts",
+      "src/lib/lifecycle/workflows.ts",
+      "tests/unit/lib/cloister/uat-promote-verification.test.ts",
+      "tests/unit/lib/cloister/uat-promote.test.ts",
+      "tests/unit/lib/head-anchor-write-sites.test.ts",
+      "tests/unit/lib/lifecycle/workflows.test.ts"
+    ],
+    "recordedAt": "2026-07-26T10:37:54.195Z"
   }
 }
