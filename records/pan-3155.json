@@ -64,18 +64,18 @@
     "recordedAt": "2026-07-26T20:34:03.489Z"
   },
   "created": "2026-07-26T19:16:39.648Z",
-  "updated": "2026-07-26T20:40:53.733Z",
+  "updated": "2026-07-26T20:40:55.541Z",
   "pipeline": {
     "issueId": "PAN-3155",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T20:34:33.677Z",
-    "updatedAt": "2026-07-26T20:40:53.687Z",
-    "reviewNotes": "Deploy row checks dashboard health before the missing-merge dependency, so row 7 still cascades a second miss when row 4 misses",
+    "updatedAt": "2026-07-26T20:40:54.243Z",
+    "reviewNotes": "Review dispatch skipped — already running: agent-pan-3155-review",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3160",
     "lastVerifiedCommit": "bd4a385669bbffd1723280ab898395c8a5428867",
     "reviewSpawnedAt": "2026-07-26T20:36:32.504Z",
@@ -140,7 +140,7 @@
       },
       "costAtCloseOut": {
         "usd": 42.522804,
-        "pricingAsOf": "2026-07-26T20:40:53.722Z"
+        "pricingAsOf": "2026-07-26T20:40:55.535Z"
       }
     },
     "merges": [
