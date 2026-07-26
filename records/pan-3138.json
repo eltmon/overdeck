@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T13:39:19.365Z",
-  "updated": "2026-07-26T14:39:49.071Z",
+  "updated": "2026-07-26T14:39:52.372Z",
   "pipeline": {
     "issueId": "PAN-3138",
     "reviewStatus": "pending",
@@ -126,5 +126,33 @@
     "docs-docker-teardown-lifecycle": "completed",
     "docs-docker-teardown-lifecycle.docs-docker-teardown-lifecycle.ac1": "completed",
     "docs-docker-teardown-lifecycle.docs-docker-teardown-lifecycle.ac2": "completed"
+  },
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      "scripts/file-size-baseline.txt"
+    ],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "CLAUDE.md",
+      "docs/WORKSPACE-CONTAINERS.md",
+      "src/lib/cloister/__tests__/closed-issue-reaper.test.ts",
+      "src/lib/cloister/closed-issue-reaper.ts",
+      "src/lib/cloister/merge-agent.ts",
+      "src/lib/workspace/__tests__/rebuild-stack.test.ts",
+      "src/lib/workspace/rebuild-stack.ts",
+      "tests/unit/lib/cloister/postmerge-cleanup-async.test.ts"
+    ],
+    "actualChangedFiles": [
+      "CLAUDE.md",
+      "docs/WORKSPACE-CONTAINERS.md",
+      "scripts/file-size-baseline.txt",
+      "src/lib/cloister/__tests__/closed-issue-reaper.test.ts",
+      "src/lib/cloister/closed-issue-reaper.ts",
+      "src/lib/cloister/merge-agent.ts",
+      "src/lib/workspace/__tests__/rebuild-stack.test.ts",
+      "src/lib/workspace/rebuild-stack.ts",
+      "tests/unit/lib/cloister/postmerge-cleanup-async.test.ts"
+    ],
+    "recordedAt": "2026-07-26T14:39:52.370Z"
   }
 }
