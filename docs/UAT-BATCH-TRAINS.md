@@ -166,6 +166,11 @@ matching [`design/pan-1737-uat-batch-trains.html`](./design/pan-1737-uat-batch-t
 - **Plain-language intro** — "N features passed review & tests. They're assembled into the test batches below…".
 - **Batches, newest first** — ready (Open UAT frontend + Merge batch (N) to main + rebuild), assembling (live progress while the current batch stays actionable), superseded (still testable/promotable), held-out chips with reasons.
 - **What to UAT** — the current batch's acceptance criteria grouped per member, with explicit "verify the touchpoint" items where the assembly agent resolved a conflict.
+  Each member carries `planResolved` alongside its criteria (PAN-3165). When the
+  server could not resolve or read the issue's xBRIEF at all, the panel says
+  *"Plan not found for PAN-XXXX"* — it must never render a lookup miss as the
+  factual claim *"No UAT steps in plan"*, which silently removes the operator's
+  checklist. That claim is reserved for a plan that resolved and authored none.
 - **Ready features (merge order)** — reference rows with monospace branch + PR link.
 - **Escape hatch** — "Merge one feature to main…", which states it bypasses batch testing.
 
