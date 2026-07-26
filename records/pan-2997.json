@@ -199,27 +199,18 @@
     "recordedAt": "2026-07-25T23:45:57.195Z"
   },
   "created": "2026-07-21T23:09:49.270Z",
-  "updated": "2026-07-26T05:43:15.620Z",
+  "updated": "2026-07-26T05:50:33.417Z",
   "pipeline": {
     "issueId": "PAN-2997",
-    "reviewStatus": "passed",
-    "testStatus": "passed",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T05:43:14.851Z",
-    "blockerReasons": [
-      {
-        "type": "failing_checks",
-        "summary": "Required checks are failing",
-        "detectedAt": "2026-07-26T00:29:46.133Z"
-      }
-    ],
-    "prUrl": "https://github.com/eltmon/overdeck/pull/3004",
-    "reviewedAtCommit": "2a18288c5c11db41cc738ecf375456224032207c",
-    "reviewSpawnedAt": "2026-07-25T23:18:16.162Z"
+    "updatedAt": "2026-07-26T05:50:33.396Z",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3004"
   },
   "closeOut": {
     "usage": {
@@ -279,7 +270,7 @@
       },
       "costAtCloseOut": {
         "usd": 179.62106,
-        "pricingAsOf": "2026-07-26T05:43:15.566Z"
+        "pricingAsOf": "2026-07-26T05:50:33.412Z"
       }
     },
     "merges": [
@@ -289,7 +280,7 @@
   },
   "workModel": "k3[1m]",
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "k3[1m]",
   "tasks": {
     "sequence": 20,
     "claims": {},
