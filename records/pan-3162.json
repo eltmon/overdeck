@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T20:52:58.018Z",
-  "updated": "2026-07-26T21:19:34.046Z",
+  "updated": "2026-07-26T21:25:14.515Z",
   "pipeline": {
     "issueId": "PAN-3162",
     "reviewStatus": "pending",
@@ -43,18 +43,33 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "forge-merge-observation-door": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-3162",
         "agentId": "agent-pan-3162",
         "pid": 1917068,
         "host": "eltmon-z790",
-        "claimedAt": "2026-07-26T21:19:34.046Z"
+        "claimedAt": "2026-07-26T21:19:34.046Z",
+        "itemId": "forge-merge-observation-door",
+        "outcome": "completed",
+        "reason": "Added forge-neutral per-repo observation writeback, positive merged evidence semantics, stranded artifact refresh, and fail-open regression coverage",
+        "releasedAt": "2026-07-26T21:25:14.515Z"
+      }
+    ],
+    "statusReasons": {
+      "forge-merge-observation-door": {
+        "reason": "Added forge-neutral per-repo observation writeback, positive merged evidence semantics, stranded artifact refresh, and fail-open regression coverage",
+        "updatedAt": "2026-07-26T21:25:14.515Z"
       }
     }
   },
   "statusOverrides": {
-    "forge-merge-observation-door": "running"
+    "forge-merge-observation-door": "completed",
+    "forge-merge-observation-door.forge-merge-observation-door.ac1": "completed",
+    "forge-merge-observation-door.forge-merge-observation-door.ac2": "completed",
+    "forge-merge-observation-door.forge-merge-observation-door.ac3": "completed",
+    "forge-merge-observation-door.forge-merge-observation-door.ac4": "completed"
   }
 }
