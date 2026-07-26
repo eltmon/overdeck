@@ -231,16 +231,16 @@
     }
   ],
   "created": "2026-07-26T00:35:36.057Z",
-  "updated": "2026-07-26T03:32:12.880Z",
+  "updated": "2026-07-26T03:32:14.875Z",
   "pipeline": {
     "issueId": "PAN-1696",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "skipped",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T03:32:12.642Z",
+    "updatedAt": "2026-07-26T03:32:13.464Z",
     "reviewNotes": "Agent re-review request (6/25): Fixed security issue: added dashboard auth guard to POST merge-train endpoint",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/1822",
@@ -289,10 +289,10 @@
         },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 3082,
-            "output": 133115,
-            "cacheRead": 74500445,
-            "cacheWrite": 3311730
+            "input": 3088,
+            "output": 133234,
+            "cacheRead": 74620296,
+            "cacheWrite": 3311881
           }
         }
       },
@@ -328,15 +328,15 @@
           "cacheWrite": 205680
         },
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 3082,
-          "output": 133115,
-          "cacheRead": 74500445,
-          "cacheWrite": 3311730
+          "input": 3088,
+          "output": 133234,
+          "cacheRead": 74620296,
+          "cacheWrite": 3311881
         }
       },
       "costAtCloseOut": {
-        "usd": 131.9858562,
-        "pricingAsOf": "2026-07-26T03:32:12.798Z"
+        "usd": 131.9986312,
+        "pricingAsOf": "2026-07-26T03:32:14.869Z"
       }
     },
     "merges": [
