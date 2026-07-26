@@ -61,10 +61,10 @@
     "recordedAt": "2026-07-26T13:26:38.219Z"
   },
   "created": "2026-07-26T12:25:26.814Z",
-  "updated": "2026-07-26T13:38:48.692Z",
+  "updated": "2026-07-26T13:39:07.108Z",
   "pipeline": {
     "issueId": "PAN-3123",
-    "reviewStatus": "failed",
+    "reviewStatus": "passed",
     "testStatus": "testing",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -72,8 +72,9 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T13:38:39.318Z",
-    "updatedAt": "2026-07-26T13:38:48.225Z",
-    "reviewNotes": "Review role spawn failed: Role run agent-pan-3123-review already running. Use 'pan tell' to message it.",
+    "updatedAt": "2026-07-26T13:39:06.985Z",
+    "reviewNotes": "Approved: same reviewed HEAD; no correctness, security, requirements, or performance findings, and focused validation passed",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "All 5 ACs met. nextGovernorModeWithRunway composes swap runway over nextGovernorMode with asymmetric swap hysteresis (soft% while admitting, recovery% once held), so SwapFree 0/8GiB with RAM above RECOVERY yields holding (AC1) and re-admission needs SwapFree >= recovery% AND RAM >= RECOVERY (AC2). PSI shed is gated on swapLow && psiFullAvg10 != null && >= threshold, so null PSI degrades to holding (AC3). swapTotalBytes <= 0 early-returns the RAM-only mode, and canAdmit/nextGovernorMode logic is untouched (AC4). Verdict carries swapTotalBytes/swapFreeBytes/psiFullAvg10 as optional MemoryVerdict fields (AC5). Verified beyond the mocks: readProcMemoryLinux/Darwin really populate swapTotal/swapFree/psiFullAvg10, config keys governorSwapSoftFreePercent/RecoveryFreePercent/PsiFullShedAvg10 exist in defaults+schema+merge with a recovery>soft clamp, and every autonomous admission path (boot-reconciliation-apply, deacon-auto-resume, preemption) goes through assessMemoryPressure, so no path bypasses the swap gate. Non-blocking note: the single previousMode variable is shared by both hysteresis axes, so a hold entered for low RAM raises the swap bar to recovery% - swap sitting between soft% and recovery% can prolong a hold it never caused. Conservative (errs toward holding) and consistent with AC2's wording, but worth a follow-up if operators see slow re-admission on hosts with mid-range swap.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3140",
     "reviewedAtCommit": "e577068943087fae95def0f1e2c74880de34b526",
@@ -125,18 +126,18 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 1247712,
-            "output": 70181,
-            "cacheRead": 9839616,
+            "input": 1249149,
+            "output": 70587,
+            "cacheRead": 10307072,
             "cacheWrite": 0
           }
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 84,
-            "output": 2286,
-            "cacheRead": 670680,
-            "cacheWrite": 160768
+            "input": 86,
+            "output": 2420,
+            "cacheRead": 831448,
+            "cacheWrite": 162284
           }
         },
         "work": {
@@ -150,21 +151,21 @@
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 1903197,
-          "output": 150883,
-          "cacheRead": 50280960,
+          "input": 1904634,
+          "output": 151289,
+          "cacheRead": 50748416,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 84,
-          "output": 2286,
-          "cacheRead": 670680,
-          "cacheWrite": 160768
+          "input": 86,
+          "output": 2420,
+          "cacheRead": 831448,
+          "cacheWrite": 162284
         }
       },
       "costAtCloseOut": {
-        "usd": 39.74204,
-        "pricingAsOf": "2026-07-26T13:38:48.570Z"
+        "usd": 40.032421,
+        "pricingAsOf": "2026-07-26T13:39:07.094Z"
       }
     },
     "merges": [
