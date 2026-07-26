@@ -31,6 +31,12 @@ function showPaneDead(): string {
   return execFileSync('tmux', ['-L', socket, 'display-message', '-p', '-t', session, '#{pane_dead}'], { encoding: 'utf-8' }).trim();
 }
 
+function readPaneTargetReal(name: string): Promise<{ pid: string; dead: boolean }> {
+  const out = execFileSync('tmux', ['-L', socket, 'display-message', '-p', '-t', name, '#{pane_pid} #{pane_dead}'], { encoding: 'utf-8' }).trim();
+  const [pid = '', dead = ''] = out.split(/\s+/);
+  return Promise.resolve({ pid, dead: dead === '1' });
+}
+
 function occurrences(haystack: string, needle: string): number {
   return haystack.match(new RegExp(needle, 'g'))?.length ?? 0;
 }
@@ -196,6 +202,54 @@ describe.skipIf(!hasTmux)('sendKeysDedup two-phase protocol', () => {
     expect(replay).toBe('pasted');
     await completeKeyedSubmit(session, 'test-key-1');
     expect(occurrences(capturePane(), 'wake up agent')).toBe(2); // input echo + cat output
+    expect(showOption('@overdeck-dedup-test-key-1')).toBe('1');
+  });
+
+  it('repairs a poisoned false-terminal before honoring anything (cycle 11)', async () => {
+    // A prior post-submit check proved this terminal marker FALSE but could
+    // not verify its rollback: terminal sits there next to the poison
+    // breadcrumb.
+    execFileSync('tmux', ['-L', socket, 'set-option', '-t', session, '@overdeck-dedup-test-key-1', '1']);
+    execFileSync('tmux', ['-L', socket, 'set-option', '-t', session, '@overdeck-dedup-poison-test-key-1', '1']);
+
+    const phase = await sendKeysDedup(session, 'wake up agent', 'test-key-1');
+
+    // NEVER 'deduplicated' from a false terminal: the repair clears terminal,
+    // restores a pending claim, and lifts the breadcrumb.
+    expect(phase).toBe('submit-pending');
+    expect(showOption('@overdeck-dedup-test-key-1')).toBe('');
+    expect(showOption('@overdeck-dedup-pending-test-key-1')).not.toBe('');
+    expect(showOption('@overdeck-dedup-poison-test-key-1')).toBe('');
+  });
+
+  it('fails CLOSED when the pre-submit target read fails — the Enter lands but the claim rolls back (cycle 11)', async () => {
+    const first = await sendKeysDedup(session, 'wake up agent', 'test-key-1');
+    expect(first).toBe('pasted');
+
+    // Transient pre-target read failure: the pane's identity is unprovable,
+    // so even though the Enter lands on the live pane the key must NOT stay
+    // terminal (the pane could have been a contentless replacement).
+    let reads = 0;
+    await expect(
+      completeKeyedSubmit(session, 'test-key-1', {
+        readPaneTarget: (name: string) => {
+          reads += 1;
+          // The production helper converts a failed read into an unprovable
+          // target rather than rejecting — mirror that contract.
+          if (reads === 1) return Promise.resolve({ pid: '', dead: true });
+          return readPaneTargetReal(name);
+        },
+      }),
+    ).rejects.toThrow(KeyedSubmitTargetDeadError);
+    expect(showOption('@overdeck-dedup-test-key-1')).toBe('');
+    expect(showOption('@overdeck-dedup-pending-test-key-1')).not.toBe('');
+    // The rollback was verified, so the poison breadcrumb was lifted.
+    expect(showOption('@overdeck-dedup-poison-test-key-1')).toBe('');
+
+    // Recovery completes the preserved claim.
+    const replay = await sendKeysDedup(session, 'wake up agent', 'test-key-1');
+    expect(replay).toBe('submit-pending');
+    await completeKeyedSubmit(session, 'test-key-1');
     expect(showOption('@overdeck-dedup-test-key-1')).toBe('1');
   });
 

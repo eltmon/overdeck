@@ -11,31 +11,29 @@
  */
 
 import { Effect } from 'effect';
-import { randomUUID } from 'node:crypto';
 import { createFlyProvider } from './fly-provider.js';
 import type { FlyProvider } from './fly-provider.js';
 import type { RemoteWorkspaceMetadata, ExecResult } from './interface.js';
 import { join } from 'path';
 import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync } from 'fs';
 import { homedir } from 'os';
-import { getManagedTmuxSocketName } from '../tmux.js';
-import { assertValidDedupKey, dedupPendingOptionName, dedupTerminalOptionName, KeyedSubmitTargetDeadError } from '../tmux-dedup.js';
+import {
+  buildRemoteTmuxCommand,
+  ensureRemoteTmuxContext,
+  REMOTE_PAN_DIR,
+  runSsh,
+  shellQuote,
+} from './remote-tmux.js';
 import { generateLauncherScriptSync } from '../launcher-generator.js';
 import { getClaudePermissionFlagsSync, getClaudePermissionFlagsStringSync } from '../claude-permissions.js';
 import { resolveProjectForIssue } from '../pan-dir/record.js';
 import { isStateMigrated } from '../state-home.js';
 
+export { sendToRemoteAgentKeyed } from './remote-keyed-delivery.js';
+export type { RemoteKeyedDeliveryOutcome, RemoteKeyedExec } from './remote-keyed-delivery.js';
+
 const AGENTS_DIR = join(homedir(), '.overdeck', 'agents');
-const REMOTE_PAN_DIR = '/workspace/.pan';
-const REMOTE_TMUX_DIR = `${REMOTE_PAN_DIR}/tmux`;
-const REMOTE_TMUX_CONFIG_PATH = `${REMOTE_TMUX_DIR}/overdeck.tmux.conf`;
 const REMOTE_HOST_HEARTBEAT_PATH = `${REMOTE_PAN_DIR}/host-heartbeat`;
-const REMOTE_TMUX_CONFIG_CONTENT = [
-  '# Overdeck-managed tmux config',
-  '# Keep this minimal and include only behavior Overdeck intentionally depends on.',
-  'set -g mouse on',
-  '',
-].join('\n');
 
 const PUSH_DAEMON_INTERVAL_SECONDS = 300;
 const EPHEMERAL_WATCHDOG_INTERVAL_SECONDS = 60;
@@ -335,15 +333,6 @@ export function listActiveRemoteAgentStates(): RemoteAgentState[] {
       state?.location === 'remote' && (state.status === 'running' || state.status === 'starting'));
 }
 
-/** Run a FlyProvider Effect at the async/Promise boundary. */
-function runSsh(
-  provider: FlyProvider,
-  vmName: string,
-  command: string,
-): Promise<ExecResult> {
-  return Effect.runPromise(provider.ssh(vmName, command));
-}
-
 export interface RefreshHostHeartbeatDeps {
   listActiveRemoteAgentStates?: typeof listActiveRemoteAgentStates;
   createFlyProvider?: typeof createFlyProvider;
@@ -505,27 +494,6 @@ export function assertFlyRemoteStateSupported(issueId: string, migrated: boolean
       `Fly remote spawn blocked for ${issueId.toUpperCase()}: PAN-2541 D14 forbids remote work on migrated projects until PAN-2549 implements overdeck-state synchronization.`,
     );
   }
-}
-
-function shellQuote(value: string): string {
-  return `'${value.replace(/'/g, `'\\''`)}'`;
-}
-
-function getRemoteTmuxBaseArgs(): string[] {
-  return ['-L', getManagedTmuxSocketName(), '-f', REMOTE_TMUX_CONFIG_PATH];
-}
-
-function buildRemoteTmuxCommand(args: string[]): string {
-  return ['tmux', ...getRemoteTmuxBaseArgs(), ...args].map(shellQuote).join(' ');
-}
-
-async function ensureRemoteTmuxContext(provider: FlyProvider, vmName: string): Promise<void> {
-  const configBase64 = Buffer.from(REMOTE_TMUX_CONFIG_CONTENT).toString('base64');
-  await runSsh(
-    provider,
-    vmName,
-    `mkdir -p ${shellQuote(REMOTE_TMUX_DIR)} && echo ${shellQuote(configBase64)} | base64 -d > ${shellQuote(REMOTE_TMUX_CONFIG_PATH)}`,
-  );
 }
 
 /**
@@ -725,155 +693,6 @@ export async function sendToRemoteAgent(
   await runSsh(fly, vmName, `rm -f ${shellQuote(promptFile)}`);
 }
 
-export type RemoteKeyedDeliveryOutcome = 'delivered' | 'deduplicated';
-
-/** Injectable command runner for tests — resolves with the command's stdout. */
-export type RemoteKeyedExec = (command: string) => Promise<string>;
-
-/**
- * Keyed remote delivery (PAN-2997 review cycle 7). The REMOTE tmux server is
- * the crash-independent component: it survives both the local dashboard and
- * the remote agent shell, so the same two-phase pending/terminal marker
- * protocol as the local tmux tier (src/lib/tmux-dedup.ts) enforces the dedup
- * key across the complete paste-settle-submit transaction. A local dashboard
- * crash anywhere in the sequence replays into either a completed pending
- * submission (no second paste) or a terminal-marker dedup — never a lost or
- * duplicated wake.
- */
-export async function sendToRemoteAgentKeyed(
-  agentId: string,
-  vmName: string,
-  message: string,
-  dedupKey: string,
-  exec?: RemoteKeyedExec,
-): Promise<RemoteKeyedDeliveryOutcome> {
-  assertValidDedupKey(dedupKey);
-
-  let run: RemoteKeyedExec;
-  if (exec) {
-    run = exec;
-  } else {
-    const fly = createFlyProvider();
-    await ensureRemoteTmuxContext(fly, vmName);
-    // Every protocol command must fail loudly (cycle 8): a non-zero exit on
-    // a write, buffer load, marker transition, or the Enter-submit must never
-    // be acknowledged as delivery. The marker READS are the only tolerant
-    // calls — an unset user option is a legitimate empty state, and a failed
-    // read collapses into the loud "did not land" path rather than a false
-    // success.
-    run = async (command: string) => {
-      const result = await runSsh(fly, vmName, command);
-      if (result.exitCode !== 0) {
-        throw new Error(
-          `remote keyed-delivery command failed (exit ${result.exitCode}): ${result.stderr.slice(0, 200)}`,
-        );
-      }
-      return result.stdout;
-    };
-  }
-
-  const pendingOption = dedupPendingOptionName(dedupKey);
-  const terminalOption = dedupTerminalOptionName(dedupKey);
-  const sendId = randomUUID();
-  const bufferName = `pan-keyed-${sendId}`;
-  const promptFile = `${REMOTE_PAN_DIR}/prompts/${agentId}-keyed-${sendId}.txt`;
-  // Inner marker reads must target the managed remote server explicitly —
-  // the if-shell condition cannot rely on a TMUX env the remote server may
-  // not have inherited.
-  const innerTmux = ['tmux', ...getRemoteTmuxBaseArgs()].map(shellQuote).join(' ');
-
-  const cleanup = async (): Promise<void> => {
-    await run(buildRemoteTmuxCommand(['delete-buffer', '-b', bufferName])).catch(() => '');
-    await run(`rm -f ${shellQuote(promptFile)}`).catch(() => '');
-  };
-
-  try {
-    const messageBase64 = Buffer.from(message).toString('base64');
-    await run(
-      `mkdir -p ${shellQuote(`${REMOTE_PAN_DIR}/prompts`)} && echo ${shellQuote(messageBase64)} | base64 -d > ${shellQuote(promptFile)}`,
-    );
-    await run(buildRemoteTmuxCommand(['load-buffer', '-b', bufferName, promptFile]));
-
-    // One server-side command: paste only when NEITHER marker is set, and
-    // record OUR sendId in the pending option in the same breath.
-    const condition =
-      `test -z "$(${innerTmux} show-option -qv -t ${agentId} ${pendingOption})" && ` +
-      `test -z "$(${innerTmux} show-option -qv -t ${agentId} ${terminalOption})"`;
-    const onTrue = `paste-buffer -b ${bufferName} -p -t ${agentId} \; set-option -t ${agentId} ${pendingOption} ${sendId}`;
-    await run(buildRemoteTmuxCommand(['if-shell', '-t', agentId, condition, onTrue]));
-
-    const readMarker = async (option: string): Promise<string> =>
-      run(buildRemoteTmuxCommand(['show-option', '-qv', '-t', agentId, option]))
-        .then(stdout => stdout.trim(), () => '');
-    const pendingMarker = await readMarker(pendingOption);
-    const terminalMarker = await readMarker(terminalOption);
-
-    if (terminalMarker !== '') return 'deduplicated';
-    if (pendingMarker === '') {
-      throw new Error(`Keyed remote paste for ${agentId} did not land and no dedup marker was recorded`);
-    }
-
-    // 'pasted' (our sendId) and 'submit-pending' (a prior crashed attempt's
-    // sendId) both complete the same transaction WITHOUT re-pasting. The
-    // SUBMISSION is one server-owned command: a single if-shell whose
-    // condition requires the pending claim, no terminal marker, AND a LIVE
-    // pane, and whose command list sends the Enter FIRST and only then flips
-    // terminal and clears pending. The pre-branch liveness check is only an
-    // optimization (cycle 10): the pane can die in the shell-to-branch
-    // handoff and remote tmux reports send-keys into a corpse as success, so
-    // acceptance is proven by the post-submit target re-read below.
-    const readPaneTarget = async (): Promise<{ pid: string; dead: boolean }> =>
-      run(buildRemoteTmuxCommand(['display-message', '-p', '-t', agentId, '#{pane_pid} #{pane_dead}']))
-        .then(stdout => {
-          const [pid = '', dead = ''] = stdout.trim().split(/\s+/);
-          return { pid, dead: dead === '1' };
-        })
-        .catch(() => ({ pid: '', dead: true }));
-
-    const preTarget = await readPaneTarget();
-    const pendingBefore = pendingMarker;
-    await new Promise(resolve => setTimeout(resolve, 300));
-    const submitCondition =
-      `test -z "$(${innerTmux} show-option -qv -t ${agentId} ${terminalOption})" && ` +
-      `test -n "$(${innerTmux} show-option -qv -t ${agentId} ${pendingOption})" && ` +
-      `test "$(${innerTmux} display-message -p -t ${agentId} '#{pane_dead}')" = "0"`;
-    const submitOnTrue =
-      `send-keys -t ${agentId} C-m \; ` +
-      `set-option -t ${agentId} ${terminalOption} 1 \; ` +
-      `set-option -u -t ${agentId} ${pendingOption}`;
-    await run(buildRemoteTmuxCommand(['if-shell', '-t', agentId, submitCondition, submitOnTrue]));
-
-    const [terminalAfter, pendingAfter, postTarget] = await Promise.all([
-      readMarker(terminalOption),
-      readMarker(pendingOption),
-      readPaneTarget(),
-    ]);
-    const targetLost = postTarget.dead || (preTarget.pid !== '' && postTarget.pid !== preTarget.pid);
-
-    if (terminalAfter === '' && pendingAfter === '') {
-      throw new Error(`Keyed remote submit for ${agentId} found neither a pending claim nor a terminal marker — the paste vanished without submission`);
-    }
-    if (targetLost) {
-      // The pane died or was replaced around the Enter: acceptance is
-      // unprovable and the receiving harness is gone. ROLL THE KEY BACK —
-      // clear terminal, restore the pending claim — so recovery re-drives
-      // the wake after resume instead of suppressing it as delivered.
-      if (terminalAfter !== '') {
-        const rollbackArgs = pendingBefore === ''
-          ? ['set-option', '-u', '-t', agentId, terminalOption, ';', 'set-option', '-u', '-t', agentId, pendingOption]
-          : ['set-option', '-u', '-t', agentId, terminalOption, ';', 'set-option', '-t', agentId, pendingOption, pendingBefore];
-        await run(buildRemoteTmuxCommand(rollbackArgs)).catch(() => '');
-      }
-      throw new KeyedSubmitTargetDeadError(agentId, dedupKey);
-    }
-    if (terminalAfter === '') {
-      throw new Error(`Keyed remote submit for ${agentId} was rejected with the pending claim intact on a live pane`);
-    }
-    return 'delivered';
-  } finally {
-    await cleanup();
-  }
-}
 
 /**
  * Check if remote agent is still running

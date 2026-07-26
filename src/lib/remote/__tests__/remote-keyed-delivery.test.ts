@@ -2,28 +2,35 @@ import { Effect } from 'effect';
 import { describe, expect, it, vi } from 'vitest';
 
 import { sendToRemoteAgentKeyed } from '../remote-agents.js';
-import { dedupPendingOptionName, dedupTerminalOptionName, KeyedSubmitTargetDeadError } from '../../tmux-dedup.js';
+import { dedupPendingOptionName, dedupPoisonOptionName, dedupTerminalOptionName, KeyedSubmitTargetDeadError } from '../../tmux-dedup.js';
 
 /**
  * Fake remote tmux server for the keyed remote-delivery protocol (PAN-2997
- * cycle 9). Implements just enough of the marker/paste/liveness semantics to
- * prove the command sequencing: option state per marker, pane liveness, a
- * paste log, and an Enter log. The submit phase is the atomic if-shell
- * (liveness check, Enter, then terminal claim — in one server-owned list).
+ * cycle 11). Implements just enough of the marker/paste/liveness semantics to
+ * prove the command sequencing: option state per marker (pending, terminal,
+ * poison breadcrumb), pane liveness, a paste log, and an Enter log. The
+ * submit phase is the atomic if-shell (liveness gate, Enter, then terminal
+ * claim — in one server-owned list) plus the verified rollback.
  */
 function createFakeRemoteTmux(seed: {
   pending?: string;
   terminal?: string;
+  poison?: string;
   failPaste?: boolean;
   failSubmit?: boolean;
+  failMarkerSetOption?: boolean;
+  failNextTargetRead?: boolean;
   paneDead?: boolean;
   dieOnEnter?: boolean;
 } = {}) {
   const state = {
     pending: seed.pending ?? '',
     terminal: seed.terminal ?? '',
+    poison: seed.poison ?? '',
     failPaste: seed.failPaste ?? false,
     failSubmit: seed.failSubmit ?? false,
+    failMarkerSetOption: seed.failMarkerSetOption ?? false,
+    failNextTargetRead: seed.failNextTargetRead ?? false,
     paneDead: seed.paneDead ?? false,
     dieOnEnter: seed.dieOnEnter ?? false,
     pid: '4242',
@@ -65,22 +72,34 @@ function createFakeRemoteTmux(seed: {
     }
     if (command.includes('show-option')) {
       const option = command.trim().split(/\s+/).at(-1)?.replace(/'/g, '') ?? '';
+      if (option.includes('-poison-')) return `${state.poison}\n`;
       if (option.includes('-pending-')) return `${state.pending}\n`;
       return `${state.terminal}\n`;
     }
     if (command.includes('display-message')) {
+      if (state.failNextTargetRead) {
+        state.failNextTargetRead = false;
+        throw new Error('exit 1: simulated transient target-read failure');
+      }
       return `${state.pid} ${state.paneDead ? '1' : '0'}\n`;
     }
     if (command.includes('set-option')) {
-      // Marker rollback: each subcommand is quoted as `';'`-separated argv.
+      // Direct marker mutations (rollback, poison, repair): each subcommand
+      // is quoted as `';'`-separated argv.
       for (const sub of command.split(`';'`)) {
-        if (sub.includes(dedupTerminalOptionName(KEY))) {
-          state.terminal = sub.includes(`'-u'`) ? '' : '1';
+        const touchesMarker =
+          sub.includes(dedupTerminalOptionName(KEY)) || sub.includes(dedupPendingOptionName(KEY));
+        if (state.failMarkerSetOption && touchesMarker) {
+          throw new Error('exit 1: simulated rollback failure');
         }
-        if (sub.includes(dedupPendingOptionName(KEY))) {
+        if (sub.includes(dedupPoisonOptionName(KEY))) {
+          state.poison = sub.includes(`'-u'`) ? '' : '1';
+        } else if (sub.includes(dedupPendingOptionName(KEY))) {
           state.pending = sub.includes(`'-u'`)
             ? ''
             : (sub.trim().replace(/'/g, '').split(/\s+/).at(-1) ?? '');
+        } else if (sub.includes(dedupTerminalOptionName(KEY))) {
+          state.terminal = sub.includes(`'-u'`) ? '' : '1';
         }
       }
       return '';
@@ -205,6 +224,61 @@ describe('sendToRemoteAgentKeyed', () => {
     expect(outcome).toBe('delivered');
     // Two Enters in total: the one lost to the dying pane, and the recovery's.
     expect(state.enters).toBe(2);
+    expect(state.terminal).toBe('1');
+  });
+
+  it('a FAILED rollback leaves a poison breadcrumb — recovery repairs the false terminal instead of honoring it (cycle 11)', async () => {
+    // The Enter sets TERMINAL, the pane dies in the handoff, the poison
+    // breadcrumb lands — and the rollback itself fails.
+    const { exec, state } = createFakeRemoteTmux({
+      pending: 'earlier-send-id',
+      dieOnEnter: true,
+      failMarkerSetOption: true,
+    });
+
+    await expect(sendToRemoteAgentKeyed(AGENT, VM, 'wake up remote', KEY, exec))
+      .rejects.toThrow(KeyedSubmitTargetDeadError);
+    // The false terminal marker survived the failed rollback, but the poison
+    // breadcrumb marks it as rollback-required.
+    expect(state.terminal).toBe('1');
+    expect(state.poison).toBe('1');
+    expect(state.pending).toBe('');
+
+    // Next attempt (transport healthy again): the breadcrumb forces a repair
+    // BEFORE anything is honored — never a 'deduplicated' from the false
+    // terminal, even though it is still sitting there.
+    state.failMarkerSetOption = false;
+    await expect(sendToRemoteAgentKeyed(AGENT, VM, 'wake up remote', KEY, exec))
+      .rejects.toThrow(KeyedSubmitTargetDeadError); // pane still dead
+    expect(state.terminal).toBe('');
+    expect(state.pending).not.toBe('');
+    expect(state.poison).toBe('');
+
+    // Recovery after the pane is alive again: real submission completes.
+    state.paneDead = false;
+    state.dieOnEnter = false;
+    const outcome = await sendToRemoteAgentKeyed(AGENT, VM, 'wake up remote', KEY, exec);
+    expect(outcome).toBe('delivered');
+    expect(state.terminal).toBe('1');
+  });
+
+  it('fails CLOSED when the pre-submit target is unreadable and a live pane appears (cycle 11)', async () => {
+    // The pre-submit target read fails transiently; the submit then "succeeds"
+    // against a pane whose identity cannot be proven — the Enter may have
+    // landed on a replacement with no pasted content.
+    const { exec, state } = createFakeRemoteTmux({ pending: 'earlier-send-id', failNextTargetRead: true });
+
+    await expect(sendToRemoteAgentKeyed(AGENT, VM, 'wake up remote', KEY, exec))
+      .rejects.toThrow(KeyedSubmitTargetDeadError);
+    // The terminal claim was rolled back and verified, so the breadcrumb is
+    // cleared and the pending claim restored.
+    expect(state.terminal).toBe('');
+    expect(state.pending).not.toBe('');
+    expect(state.poison).toBe('');
+
+    // Recovery re-drives the delivery and claims the key for real.
+    const outcome = await sendToRemoteAgentKeyed(AGENT, VM, 'wake up remote', KEY, exec);
+    expect(outcome).toBe('delivered');
     expect(state.terminal).toBe('1');
   });
 

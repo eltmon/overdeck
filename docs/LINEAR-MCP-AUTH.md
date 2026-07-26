@@ -200,11 +200,18 @@ has not yet been notified:
     one server-executed command list. The pre-branch liveness check is NOT
     treated as proof of acceptance: the pane can die in the shell-to-branch
     handoff, and tmux reports `send-keys` into a remain-on-exit corpse as
-    success. So after the command, the target is re-read — if the pane died
-    or its pid changed around the Enter, the terminal marker is ROLLED BACK,
-    the pending claim restored, and `KeyedSubmitTargetDeadError` is thrown.
-    The outbox entry stays `pending` and a later pass re-drives the wake
-    after the agent resumes — recovery never suppresses a wake that did not
+    success. So after the command, the target is re-read — and the key may
+    only become terminal when BOTH target reads succeeded, BOTH report a live
+    pane, and the pid identity matches (an unreadable pre-target fails
+    CLOSED: the pane could have been replaced without its pasted content).
+    If the target was lost around the Enter, the terminal marker is ROLLED
+    BACK as a verified transition: a POISON breadcrumb is written first (so a
+    failed rollback can never leave a false terminal honorable), the rollback
+    runs and is verified, and `KeyedSubmitTargetDeadError` is thrown. A later
+    keyed call that finds the breadcrumb repairs the markers before anything
+    else — it never returns `deduplicated` from a poisoned terminal. The
+    outbox entry stays `pending` and a later pass re-drives the wake after
+    the agent resumes — recovery never suppresses a wake that did not
     demonstrably reach a live harness. A failed Enter aborts the command
     list before the terminal transition, and concurrent or post-crash
     callers lose the server-side condition, so no stray Enter can land in a
