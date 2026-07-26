@@ -134,17 +134,17 @@
     "recordedAt": "2026-07-26T22:01:26.872Z"
   },
   "created": "2026-07-26T17:27:17.644Z",
-  "updated": "2026-07-26T22:01:31.671Z",
+  "updated": "2026-07-26T22:01:34.154Z",
   "pipeline": {
     "issueId": "PAN-3148",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T21:02:53.986Z",
-    "updatedAt": "2026-07-26T22:01:31.601Z",
+    "updatedAt": "2026-07-26T22:01:32.541Z",
     "reviewNotes": "Feedback dedup keys omit the review run ID on primary verdict paths, causing same-run duplicates and later-run suppression",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3163",
     "lastVerifiedCommit": "850679a81982462e5d74e18693cb35873e951829",
@@ -255,7 +255,7 @@
       },
       "costAtCloseOut": {
         "usd": 130.118429,
-        "pricingAsOf": "2026-07-26T22:01:31.660Z"
+        "pricingAsOf": "2026-07-26T22:01:34.144Z"
       }
     },
     "merges": [
