@@ -231,16 +231,16 @@
   ],
   "feedback": [],
   "created": "2026-07-26T00:35:36.057Z",
-  "updated": "2026-07-26T03:57:21.582Z",
+  "updated": "2026-07-26T03:57:28.129Z",
   "pipeline": {
     "issueId": "PAN-1696",
     "reviewStatus": "passed",
-    "testStatus": "pending",
+    "testStatus": "testing",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T03:57:20.510Z",
+    "updatedAt": "2026-07-26T03:57:28.115Z",
     "reviewNotes": "Per-project UAT frontend URLs correctly use the generation project's configured DNS domain with pan.localhost fallback; no new blockers found.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/1822",
@@ -274,9 +274,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 7107584,
-            "output": 395459,
-            "cacheRead": 113283072,
+            "input": 7116484,
+            "output": 400615,
+            "cacheRead": 114023424,
             "cacheWrite": 0
           }
         },
@@ -317,9 +317,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 7107584,
-          "output": 395459,
-          "cacheRead": 113283072,
+          "input": 7116484,
+          "output": 400615,
+          "cacheRead": 114023424,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -336,8 +336,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 150.0259412,
-        "pricingAsOf": "2026-07-26T03:57:20.544Z"
+        "usd": 150.5952972,
+        "pricingAsOf": "2026-07-26T03:57:28.120Z"
       }
     },
     "merges": [
@@ -346,7 +346,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "model": "claude-haiku-4-5",
   "tasks": {
     "sequence": 17,
     "claims": {
