@@ -175,27 +175,14 @@ function writeStoredFilter(keys: string[] | null): void {
   }
 }
 
-const ZoneHeader = ({ children }: { children: React.ReactNode }) => (
-  <div className="mt-3 mb-1.5 flex items-center gap-2 text-[9.5px] font-bold uppercase tracking-wider text-muted-foreground after:h-px after:flex-1 after:bg-border">
-    {children}
-  </div>
-);
-
-export interface MergeTrainViewProps {
-  /** Poll while the surface is on screen; false stops the refetch interval. */
-  active: boolean;
-  onNavigateIssue?: (issueId: string) => void;
-  /** Hide the project filter chips when the host renders a single project. */
-  showProjectFilter?: boolean;
-}
-
-export function MergeTrainView({ active, onNavigateIssue, showProjectFilter = true }: MergeTrainViewProps) {
-  const queryClient = useQueryClient();
-  const confirm = useConfirm();
-  const [expandedUat, setExpandedUat] = useState<Record<string, boolean>>({});
-  // null = "all projects", the default. A stored array selects a subset.
-  const [selectedProjects, setSelectedProjects] = useState<string[] | null>(() => readStoredFilter());
-
+/**
+ * The view's data reads, shared so a host can label itself (e.g. the Flywheel
+ * rail card's count) from the same payloads the sections render. React Query
+ * dedupes by key, so calling this alongside <MergeTrainView> costs no extra
+ * requests. `active` only controls polling — the reads happen either way, which
+ * is what lets the Flywheel rail render with no run in progress.
+ */
+export function useMergeTrainData(active: boolean) {
   const queuesQuery = useQuery({
     queryKey: ['merge-train-queues'],
     queryFn: () => fetchJson<QueuesEntry[]>('/api/merge-train/queues'),
@@ -218,7 +205,47 @@ export function MergeTrainView({ active, onNavigateIssue, showProjectFilter = tr
     Array.isArray(queuesQuery.data) ? queuesQuery.data : [],
     Array.isArray(generationsQuery.data) ? generationsQuery.data : [],
   );
-  const mergeBackendUnavailable = mergeBackendQuery.data?.available === false;
+
+  return {
+    sections,
+    isLoading: queuesQuery.isLoading || generationsQuery.isLoading,
+    mergeBackendUnavailable: mergeBackendQuery.data?.available === false,
+  };
+}
+
+/** Totals across every project, for a host that shows one summary count. */
+export function mergeTrainTotals(sections: MergeTrainProjectSection[]): { features: number; batches: number } {
+  let features = 0;
+  let batches = 0;
+  for (const section of sections) {
+    features += section.queue.length;
+    batches += visibleGenerationsOf(section).filter((g) => g.status !== 'assembling').length;
+  }
+  return { features, batches };
+}
+
+const ZoneHeader = ({ children }: { children: React.ReactNode }) => (
+  <div className="mt-3 mb-1.5 flex items-center gap-2 text-[9.5px] font-bold uppercase tracking-wider text-muted-foreground after:h-px after:flex-1 after:bg-border">
+    {children}
+  </div>
+);
+
+export interface MergeTrainViewProps {
+  /** Poll while the surface is on screen; false stops the refetch interval. */
+  active: boolean;
+  onNavigateIssue?: (issueId: string) => void;
+  /** Hide the project filter chips when the host renders a single project. */
+  showProjectFilter?: boolean;
+}
+
+export function MergeTrainView({ active, onNavigateIssue, showProjectFilter = true }: MergeTrainViewProps) {
+  const queryClient = useQueryClient();
+  const confirm = useConfirm();
+  const [expandedUat, setExpandedUat] = useState<Record<string, boolean>>({});
+  // null = "all projects", the default. A stored array selects a subset.
+  const [selectedProjects, setSelectedProjects] = useState<string[] | null>(() => readStoredFilter());
+
+  const { sections, isLoading: loading, mergeBackendUnavailable } = useMergeTrainData(active);
 
   // Drop filter entries for projects that no longer exist, so a renamed or
   // removed project cannot leave the view permanently empty.
@@ -371,7 +398,6 @@ export function MergeTrainView({ active, onNavigateIssue, showProjectFilter = tr
     );
   };
 
-  const loading = queuesQuery.isLoading || generationsQuery.isLoading;
   const nothingAnywhere =
     !loading &&
     sections.length > 0 &&

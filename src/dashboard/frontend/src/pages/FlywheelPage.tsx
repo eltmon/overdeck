@@ -475,7 +475,9 @@ export function FlywheelPage({ onOpenSettings, onNavigateAgent, onNavigateIssue 
           style={{ width: `${leftWidth}px`, minWidth: `${SPLIT_MIN_LEFT}px` }}
           aria-label="Flywheel control rail"
         >
-          <MergeQueueCard active={!!effectiveStatus || isPaused} onNavigateIssue={onNavigateIssue} />
+          {/* PAN-1696: no run-active gating — the merge train is a per-project
+              pipeline feature, so the card polls whenever the rail is mounted. */}
+          <MergeQueueCard active onNavigateIssue={onNavigateIssue} />
           <MergePolicySection onNavigateIssue={onNavigateIssue} />
           <PendingAutoMergesBanner onNavigateIssue={onNavigateIssue} />
           {effectiveStatus?.orders ? <OrderBookModule status={effectiveStatus} /> : null}
