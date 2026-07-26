@@ -228,7 +228,7 @@
     "recordedAt": "2026-07-26T18:09:43.613Z"
   },
   "created": "2026-07-26T12:24:12.648Z",
-  "updated": "2026-07-26T18:37:19.628Z",
+  "updated": "2026-07-26T18:38:51.113Z",
   "pipeline": {
     "issueId": "PAN-3128",
     "reviewStatus": "pending",
@@ -296,7 +296,9 @@
         "tests/unit/lib/platform-lifecycle.test.ts"
       ],
       "recordedAt": "2026-07-26T18:09:43.613Z"
-    }
+    },
+    "reviewRequestedAt": "2026-07-26T18:38:50.655Z",
+    "panDoneRecoveredAt": "2026-07-26T18:38:50.655Z"
   },
   "closeOut": {
     "usage": {
