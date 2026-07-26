@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { ReviewStatus } from '../../../../src/lib/review-status.js';
 import type { PanIssuePipelineRecord } from '../../../../src/lib/pan-dir/record.js';
 import {
@@ -210,6 +210,74 @@ describe('Definition-of-Done merged row', () => {
       observed: expect.stringContaining('forge metadata unavailable: gh timed out'),
     });
   });
+
+  it('accepts branch work contained in main as a non-PR landing', async () => {
+    const row = await checkMergedRow(ctx, {
+      verifyMerged: async () => stepFailed('close-out:verify-merged', BRANCH_ABSENT_MERGE_ERROR),
+      readPullRequest: async () => ({}),
+      readDurableMerges: async () => [],
+      readBranchContainment: async () => ({
+        mergedWorkRefs: ['frontend:feature/min-873'],
+        unmergedRefs: [],
+        pointerRefs: [],
+      }),
+    });
+
+    expect(row).toMatchObject({
+      status: 'pass',
+      evidence: 'branch-containment',
+      observed: expect.stringContaining('frontend:feature/min-873'),
+    });
+    expect(row.mergedAt).toBeUndefined();
+    expect(row.mergeCommit).toBeUndefined();
+  });
+
+  it('does not accept containment while any issue branch remains unmerged', async () => {
+    const row = await checkMergedRow(ctx, {
+      verifyMerged: async () => stepFailed('close-out:verify-merged', BRANCH_ABSENT_MERGE_ERROR),
+      readPullRequest: async () => ({}),
+      readDurableMerges: async () => [],
+      readBranchContainment: async () => ({
+        mergedWorkRefs: ['frontend:feature/min-873'],
+        unmergedRefs: ['api:feature/min-873'],
+        pointerRefs: [],
+      }),
+    });
+
+    expect(row.status).toBe('miss');
+    expect(row.evidence).toBeUndefined();
+  });
+
+  it('reports unavailable containment evidence and keeps the merged row missing', async () => {
+    const row = await checkMergedRow(ctx, {
+      verifyMerged: async () => stepFailed('close-out:verify-merged', BRANCH_ABSENT_MERGE_ERROR),
+      readPullRequest: async () => ({}),
+      readDurableMerges: async () => [],
+      readBranchContainment: async () => { throw new Error('git unavailable'); },
+    });
+
+    expect(row).toMatchObject({
+      status: 'miss',
+      observed: expect.stringContaining('branch containment evidence unavailable: git unavailable'),
+    });
+  });
+
+  it('does not gather containment when merge evidence already passes', async () => {
+    const readBranchContainment = vi.fn();
+    const row = await checkMergedRow(ctx, {
+      verifyMerged: async () => stepOk('close-out:verify-merged', ['All commits merged to main']),
+      readPullRequest: async () => ({}),
+      readBranchContainment,
+    });
+
+    expect(row.status).toBe('pass');
+    expect(readBranchContainment).not.toHaveBeenCalled();
+  });
+
+  it('describes branch containment as accepted merged-row evidence', () => {
+    expect(DOD_ROWS.find(row => row.id === 'merged')?.expected)
+      .toBe('PR merged on the forge, or branch work contained in main (non-PR landing)');
+  });
 });
 
 describe('Definition-of-Done post-merge row', () => {
@@ -221,7 +289,7 @@ describe('Definition-of-Done post-merge row', () => {
   const clearAgents = () => [];
 
   it('passes when the issue is verifying on main and issue agents are stopped', async () => {
-    const row = await checkPostMergeRow(ctx, {
+    const row = await checkPostMergeRow(ctx, undefined, {
       readCanonicalState: async () => 'verifying_on_main',
       readMergeStatus: () => 'merged',
       listAgents: clearAgents,
@@ -230,7 +298,7 @@ describe('Definition-of-Done post-merge row', () => {
   });
 
   it('misses and names running work or planning agents', async () => {
-    const row = await checkPostMergeRow(ctx, {
+    const row = await checkPostMergeRow(ctx, undefined, {
       readCanonicalState: async () => 'verifying_on_main',
       readMergeStatus: () => 'merged',
       listAgents: () => [
@@ -244,7 +312,7 @@ describe('Definition-of-Done post-merge row', () => {
   });
 
   it('misses when neither canonical state nor merge status proves lifecycle completion', async () => {
-    const row = await checkPostMergeRow(ctx, {
+    const row = await checkPostMergeRow(ctx, undefined, {
       readCanonicalState: async () => 'in_review',
       readMergeStatus: () => 'verifying',
       listAgents: clearAgents,
@@ -253,12 +321,48 @@ describe('Definition-of-Done post-merge row', () => {
   });
 
   it('turns canonical-state probe failures into an observed miss', async () => {
-    const row = await checkPostMergeRow(ctx, {
+    const row = await checkPostMergeRow(ctx, undefined, {
       readCanonicalState: async () => { throw new Error('gh timed out'); },
       readMergeStatus: () => 'merged',
       listAgents: clearAgents,
     });
     expect(row).toMatchObject({ status: 'miss', observed: expect.stringContaining('gh timed out') });
+  });
+
+  it('waives the unobservable lifecycle half for a quiescent non-PR landing', async () => {
+    const merged = {
+      ...DOD_ROWS.find(row => row.id === 'merged')!,
+      status: 'pass' as const,
+      observed: 'branch work contained',
+      evidence: 'branch-containment' as const,
+    };
+    const row = await checkPostMergeRow(ctx, merged, {
+      readCanonicalState: async () => 'in_review',
+      readMergeStatus: () => 'verifying',
+      listAgents: clearAgents,
+    });
+
+    expect(row).toMatchObject({
+      status: 'pass',
+      observed: expect.stringContaining('post-merge lifecycle not applicable'),
+    });
+  });
+
+  it('keeps a containment-evidenced landing blocked while an issue agent runs', async () => {
+    const merged = {
+      ...DOD_ROWS.find(row => row.id === 'merged')!,
+      status: 'pass' as const,
+      observed: 'branch work contained',
+      evidence: 'branch-containment' as const,
+    };
+    const row = await checkPostMergeRow(ctx, merged, {
+      readCanonicalState: async () => 'in_review',
+      readMergeStatus: () => 'verifying',
+      listAgents: () => [{ id: 'agent-pan-2715', issueId, role: 'work', status: 'running' }],
+    });
+
+    expect(row).toMatchObject({ status: 'miss' });
+    expect(row.observed).toContain('agent-pan-2715');
   });
 });
 
@@ -408,6 +512,38 @@ describe('assembled Definition-of-Done gate', () => {
       by: 'operator',
       at: '2026-07-15T13:00:00Z',
     });
+  });
+
+  it('leaves only review, tests, and verification missing for a quiescent non-PR landing', async () => {
+    const nonPrCtx = { issueId: 'MIN-305', projectPath: '/myn' };
+    const merged = await checkMergedRow(nonPrCtx, {
+      verifyMerged: async () => stepFailed('close-out:verify-merged', BRANCH_ABSENT_MERGE_ERROR),
+      readPullRequest: async () => ({}),
+      readDurableMerges: async () => [],
+      readBranchContainment: async () => ({
+        mergedWorkRefs: ['frontend:feature/min-305'],
+        unmergedRefs: [],
+        pointerRefs: [],
+      }),
+    });
+    const gate = await evaluateDodGate(nonPrCtx, {}, {
+      review: async () => makeRow('review', 'miss'),
+      tests: async () => makeRow('tests', 'miss'),
+      verification: async () => makeRow('verification', 'miss'),
+      merged: async () => merged,
+      postMerge: (postMergeCtx, mergedRow) => checkPostMergeRow(postMergeCtx, mergedRow, {
+        readCanonicalState: async () => 'in_review',
+        readMergeStatus: () => 'verifying',
+        listAgents: () => [],
+      }),
+      mainVerify: async () => makeRow('main-verify', 'skip'),
+      deploy: async () => makeRow('deploy', 'skip'),
+      now: () => '2026-07-15T13:00:00Z',
+    });
+
+    expect(gate.misses).toEqual(['review', 'tests', 'verification']);
+    expect(gate.rows.find(row => row.id === 'merged')).toMatchObject({ status: 'pass' });
+    expect(gate.rows.find(row => row.id === 'post-merge')).toMatchObject({ status: 'pass' });
   });
 
   it('rejects Definition-of-Done overrides issued by the autonomous flywheel', async () => {
