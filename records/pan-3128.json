@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T12:24:12.648Z",
-  "updated": "2026-07-26T13:30:54.545Z",
+  "updated": "2026-07-26T13:30:57.420Z",
   "pipeline": {
     "issueId": "PAN-3128",
     "reviewStatus": "pending",
@@ -26,8 +26,48 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T12:54:44.527Z",
-    "inspectNotes": "All 5 ACs verified: installAndBuild only ever receives the detached worktree (asserted across clean/dirty/ahead/behind); dirty + HEAD-divergence emit notes and continue; build failure propagates with 'old dashboard left running' -> exitCode 1 and removes worktree + dist.incoming in finally; grep merge-base on reload.ts returns no matches; typecheck clean and build-from-origin.test.ts 7/7 pass."
+    "updatedAt": "2026-07-26T13:30:57.418Z",
+    "inspectNotes": "All 5 ACs verified: installAndBuild only ever receives the detached worktree (asserted across clean/dirty/ahead/behind); dirty + HEAD-divergence emit notes and continue; build failure propagates with 'old dashboard left running' -> exitCode 1 and removes worktree + dist.incoming in finally; grep merge-base on reload.ts returns no matches; typecheck clean and build-from-origin.test.ts 7/7 pass.",
+    "reviewRequestedAt": "2026-07-26T13:30:57.418Z",
+    "scopeDrift": {
+      "outsideDeclaredScope": [
+        "src/cli/commands/__tests__/reload.test.ts",
+        "tests/unit/dashboard/identity.test.ts"
+      ],
+      "declaredScopeUntouched": [],
+      "declaredScope": [
+        "docs/DEFINITION-OF-DONE.md",
+        "docs/OVERDECK_DEV_SOP.md",
+        "roles/flywheel.md",
+        "src/cli/commands/reload.ts",
+        "src/dashboard/server/tsdown.config.ts",
+        "src/lib/deploy/build-from-origin.ts",
+        "src/lib/deploy/build-info.ts",
+        "src/lib/lifecycle/dod-gate.ts",
+        "sync-sources/skills/pan-reload/SKILL.md",
+        "tests/unit/lib/deploy/build-from-origin.test.ts",
+        "tests/unit/lib/deploy/build-info.test.ts",
+        "tests/unit/lib/lifecycle/dod-gate.test.ts"
+      ],
+      "actualChangedFiles": [
+        "docs/DEFINITION-OF-DONE.md",
+        "docs/OVERDECK_DEV_SOP.md",
+        "roles/flywheel.md",
+        "src/cli/commands/__tests__/reload.test.ts",
+        "src/cli/commands/reload.ts",
+        "src/dashboard/server/tsdown.config.ts",
+        "src/lib/deploy/build-from-origin.ts",
+        "src/lib/deploy/build-info.ts",
+        "src/lib/lifecycle/dod-gate.ts",
+        "sync-sources/skills/pan-reload/SKILL.md",
+        "tests/unit/dashboard/identity.test.ts",
+        "tests/unit/lib/deploy/build-from-origin.test.ts",
+        "tests/unit/lib/deploy/build-info.test.ts",
+        "tests/unit/lib/lifecycle/dod-gate.test.ts"
+      ],
+      "recordedAt": "2026-07-26T13:30:54.544Z"
+    },
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3141"
   },
   "closeOut": {
     "usage": {
