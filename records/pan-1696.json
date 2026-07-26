@@ -302,11 +302,24 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-26T09:24:25.885Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-26T09:34Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-26T09:34:46.426Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-26T09:34:46Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-1696\n\nBlocked at a489dd94: assemble still treats objects with invalid/empty project fields as all-project forced reconcile, and the collapsed cockpit summary still omits generation status plus the Awaiting Merge link. Report: .pan/review/agent-pan-1696-review-a489dd94/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1696 -m \"Fixed review issues\"`"
+    }
+  ],
   "created": "2026-07-26T00:35:36.057Z",
-  "updated": "2026-07-26T09:34:45.864Z",
+  "updated": "2026-07-26T09:34:46.426Z",
   "pipeline": {
     "issueId": "PAN-1696",
     "reviewStatus": "blocked",
