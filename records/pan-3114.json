@@ -54,7 +54,7 @@
     "recordedAt": "2026-07-26T10:37:54.195Z"
   },
   "created": "2026-07-26T08:55:24.679Z",
-  "updated": "2026-07-26T10:40:19.887Z",
+  "updated": "2026-07-26T10:40:26.463Z",
   "pipeline": {
     "issueId": "PAN-3114",
     "reviewStatus": "pending",
@@ -64,12 +64,10 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "panDoneRecoveredAt": "2026-07-26T10:40:13.370Z",
-    "updatedAt": "2026-07-26T10:40:13.800Z",
+    "updatedAt": "2026-07-26T10:39:12.235Z",
     "reviewNotes": "Agent re-review request (1/25): Retry review after agents-db lock during role spawn; no code findings were emitted",
     "inspectNotes": "All 4 ACs met: pending->passed stamp with 'uat-promotion' + generation name + 9-char SHA (slice(0,9)); passed/skipped short-circuit to {} so recordUatPromotionVerdicts skips and preserves existing verdict/notes; lastVerifiedCommit = rehydrateHeadAnchor(member.headSha) via conditional spread, omitted on empty headSha; recordUatPromotionVerdicts returns only non-terminal issue IDs and persists via setReviewStatusSync(issueId, stamp, current ?? undefined) — signature verified against src/lib/review-status.ts:147. Head-anchor guard entry expression matches the AST text exactly and the inventory comparison is order-insensitive.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3126",
-    "reviewRequestedAt": "2026-07-26T10:40:13.370Z",
     "reviewSpawnedAt": "2026-07-26T10:38:01.780Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -102,39 +100,41 @@
         "tests/unit/lib/lifecycle/workflows.test.ts"
       ],
       "recordedAt": "2026-07-26T10:37:54.195Z"
-    }
+    },
+    "reviewRequestedAt": "2026-07-26T10:40:13.370Z",
+    "panDoneRecoveredAt": "2026-07-26T10:40:13.370Z"
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 621209,
-            "output": 21531,
-            "cacheRead": 5839872,
+            "input": 300871,
+            "output": 6544,
+            "cacheRead": 1433600,
             "cacheWrite": 0
           }
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 1331120,
-            "output": 64234,
-            "cacheRead": 35127296,
+            "input": 1328364,
+            "output": 63932,
+            "cacheRead": 34718720,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 1952329,
-          "output": 85765,
-          "cacheRead": 40967168,
+          "input": 1629235,
+          "output": 70476,
+          "cacheRead": 36152320,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 32.818179,
-        "pricingAsOf": "2026-07-26T10:40:19.879Z"
+        "usd": 28.336615,
+        "pricingAsOf": "2026-07-26T10:39:12.331Z"
       }
     },
     "merges": [
@@ -143,7 +143,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-opus-5",
   "workModel": "gpt-5.6-sol",
   "tasks": {
     "sequence": 8,
