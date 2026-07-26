@@ -210,7 +210,7 @@ export const MERGE_GATE_VERBS: ReadonlySet<FlywheelPipelineItem['verb']> = new S
 export const MERGE_QUEUE_GIT_CONCURRENCY = 4;
 
 export interface ComputeMergeQueueOptions {
-  getPrUrl?: (item: FlywheelPipelineItem) => string | undefined;
+  getPrUrl?: (item: { issueId: string; pr?: number }) => string | undefined;
   gitConcurrency?: number;
   /**
    * Authoritative merge eligibility per issue (PAN-1759). Defaults to the
@@ -335,6 +335,9 @@ export function listEligibleCandidatesByProject(projectRoot: string): Array<{ is
     const issueProject = resolveProjectFromIssueSync(issueId);
     if (!issueProject || issueProject.projectPath !== project.path) continue;
 
+    // Exclude deacon-ignored issues (AC 8)
+    if (rs.deaconIgnored === true) continue;
+
     // Check if it's merge-eligible
     if (rs.readyForMerge !== true) continue;
     const eligibility = mergeGateEligibility(rs);
@@ -399,7 +402,7 @@ export const computeMergeQueueFromCandidates = (
       title: item.title,
       branchName: `feature/${item.issueId.toLowerCase()}`,
       pr: item.pr,
-      prUrl: options.getPrUrl?.(item as any),
+      prUrl: options.getPrUrl?.(item),
       mergeOrder: idx + 1,
       conflictsWith: [...(conflictsMap.get(item.issueId) ?? [])],
       batchGroup: (conflictCount === 0 ? 'batch' : 'serialize') as 'batch' | 'serialize',

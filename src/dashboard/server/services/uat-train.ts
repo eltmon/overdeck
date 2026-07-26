@@ -111,11 +111,19 @@ async function runUatTrainReconcileForProject(
   projectPath: string,
   options: { force?: boolean } = {},
 ): Promise<ReconcileResult> {
-  const gitDeps = buildUatGenerationGitDeps(projectPath);
   const { isMergeTrainEnabledForProject } = await import('../../../lib/overdeck/merge-sync.js');
+  const projectConfig = findProjectByPathSync(projectPath);
+
+  // PAN-1696: polyrepo assembly not yet supported — skip before git operations
+  if (projectConfig?.workspace?.type === 'polyrepo') {
+    console.log(`[uat-train] polyrepo project type not supported for UAT assembly — skipping`);
+    return { action: 'no-queue', invalidated: [] };
+  }
+
+  const gitDeps = buildUatGenerationGitDeps(projectPath);
 
   return reconcileUatGenerations(projectPath, {
-    isEnabled: () => isMergeTrainEnabledForProject(projectPath),
+    isEnabled: () => isMergeTrainEnabledForProject(projectConfig),
     getReadySet: () => getReadySetForProject(projectPath),
     getMainHeadSha: () => gitDeps.fetchMain(),
     getBranchHeadSha: (branch) => gitDeps.branchHeadSha(branch),
@@ -161,13 +169,6 @@ async function assembleFromReadySetForProject(
   projectPath: string,
   features: readonly ReadyFeature[],
 ): Promise<UatGeneration> {
-  const { findProjectByPathSync } = await import('../../../lib/projects.js');
-  const project = findProjectByPathSync(projectPath);
-  if (project?.workspace?.type === 'polyrepo') {
-    console.log(`[uat-train] polyrepo project type not supported for UAT assembly — skipping`);
-    throw new PolyrepoAssemblyUnsupported();
-  }
-
   const store = buildUatGenerationStore();
   return assembleUatGeneration(
     {
@@ -180,21 +181,36 @@ async function assembleFromReadySetForProject(
     {
       git: buildUatGenerationGitDeps(projectPath),
       store,
-      buildCleanup: () => buildUatGenerationCleanupGit(projectPath),
-      buildConflictHook: () => buildConflictAgentHook(projectPath),
+      resolveConflict: buildConflictAgentHook(projectPath),
+      log: (msg) => console.log(msg),
     },
   );
 }
 
+// Removed PolyrepoAssemblyUnsupported class — polyrepo guard moved to runUatTrainReconcileForProject
+
 /**
- * PAN-1696 reconciler-decouple: Legacy entry point for backward compatibility.
- * Now delegates to per-project reconciliation for all tracked projects.
+ * PAN-1696 reconciler-decouple: Run UAT reconciliation for all tracked projects.
+ * Reconciles only enabled projects; skips empty/unsupported projects before git work.
  */
 export async function runUatTrainReconcile(options: { force?: boolean } = {}): Promise<ReconcileResult> {
-  const root = projectRoot();
-  // For backward compatibility, when called without a specific project,
-  // run the reconciler for the primary project (Overdeck repo itself).
-  return runUatTrainReconcileForProject(root, options);
+  const { listProjectsSync } = await import('../../../lib/projects.js');
+  const { isMergeTrainEnabledForProject } = await import('../../../lib/overdeck/merge-sync.js');
+
+  const projects = listProjectsSync();
+  const results: ReconcileResult[] = [];
+
+  for (const { config } of projects) {
+    // PAN-1696: skip projects with merge-train disabled
+    if (!isMergeTrainEnabledForProject(config)) continue;
+
+    const projectPath = resolve(config.path);
+    const result = await runUatTrainReconcileForProject(projectPath, options);
+    results.push(result);
+  }
+
+  // Return aggregated result (final result, or no-queue if all projects skipped)
+  return results[results.length - 1] ?? { action: 'no-queue', invalidated: [] };
 }
 
 let reconcilerTimer: ReturnType<typeof setInterval> | null = null;
@@ -298,9 +314,7 @@ async function loadAcceptanceCriteriaCache(issueIds: ReadonlySet<string>): Promi
 
 /** The generation chain, newest first, enriched for the UAT batches card. */
 export async function getUatGenerationsPayload(): Promise<UatGenerationPayload[]> {
-  const status = await readCurrentFlywheelStatusForDashboard();
-  if (!status) return [];
-
+  // PAN-1696: no flywheel-run requirement — list generations directly from store
   const chain = listUatGenerationsSync({ projectRoot: projectRoot(), limit: CHAIN_PAYLOAD_LIMIT });
   if (chain.length === 0) return [];
   const memberIssueIds = new Set(chain.flatMap((gen) => gen.members.map((member) => member.issueId.toUpperCase())));
