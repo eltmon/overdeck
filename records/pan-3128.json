@@ -2,7 +2,7 @@
   "issueId": "PAN-3128",
   "schemaVersion": 2,
   "created": "2026-07-26T12:24:12.648Z",
-  "updated": "2026-07-26T12:24:12.648Z",
+  "updated": "2026-07-26T12:24:14.553Z",
   "pipeline": {
     "issueId": "PAN-3128",
     "reviewStatus": "pending",
@@ -25,5 +25,7 @@
       "note": "Planning session started for PAN-3128: Deploys build from the mutable primary worktree — a restart can ship whatever is uncommitted at build time",
       "timestamp": "2026-07-26T12:24:12.648Z"
     }
-  ]
+  ],
+  "harness": "claude-code",
+  "model": "k3[1m]"
 }
