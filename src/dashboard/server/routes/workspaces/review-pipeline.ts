@@ -333,6 +333,11 @@ const postWorkspaceReviewRoute = HttpRouter.add(
               } catch { /* non-fatal */ }
               return;
             }
+            if (verifyOutcome.outcome === 'deferred') {
+              console.log(`[review] Verification deferred for ${issueId}: ${verifyOutcome.reason}`);
+              completePendingOperation(issueId, verifyOutcome.reason);
+              return;
+            }
 
             // PAN-1048 C1/R3: review now runs as the role primitive via spawnRun
             // (loads roles/review.md → Agent tool fans out to code-review-* sub-agents).
@@ -735,6 +740,10 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
           reviewNotes: `Verification infrastructure error: ${outcome.message}`,
           autoRequeueCount: currentCount,
         });
+      },
+      onVerificationDeferred: (outcome) => {
+        console.log(`[request-review] Verification deferred for ${issueId}: ${outcome.reason}`);
+        completePendingOperation(issueId, outcome.reason);
       },
       pushBranch: async () => {
         if (workspaceInfo.isRemote && workspaceInfo.vmName) {

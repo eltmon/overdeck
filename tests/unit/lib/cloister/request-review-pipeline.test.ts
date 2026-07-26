@@ -98,6 +98,56 @@ describe('request review pipeline', () => {
     expect(dispatchReview).not.toHaveBeenCalled();
   });
 
+  it('records deferred verification without pushing or dispatching review', async () => {
+    const pipeline = createRequestReviewPipeline();
+    let finish!: () => void;
+    const finished = new Promise<void>((resolve) => { finish = resolve; });
+    const outcome = {
+      outcome: 'deferred' as const,
+      reason: 'A dashboard deploy is queued',
+    };
+    const onVerificationDeferred = vi.fn(() => { finish(); });
+    const pushBranch = vi.fn(async () => {});
+    const dispatchReview = vi.fn(async () => {});
+
+    const started = pipeline.start('PAN-3135', {
+      verify: async () => outcome,
+      pushBranch,
+      dispatchReview,
+      onVerificationFailed: vi.fn(),
+      onVerificationError: vi.fn(),
+      onVerificationDeferred,
+    });
+    await finished;
+
+    expect(started).toBe(true);
+    expect(onVerificationDeferred).toHaveBeenCalledWith(outcome);
+    expect(pushBranch).not.toHaveBeenCalled();
+    expect(dispatchReview).not.toHaveBeenCalled();
+  });
+
+  it('stops on deferred verification when no callback is configured', async () => {
+    const pipeline = createRequestReviewPipeline();
+    const pushBranch = vi.fn(async () => {});
+    const dispatchReview = vi.fn(async () => {});
+
+    const started = pipeline.start('PAN-3135', {
+      verify: async () => ({
+        outcome: 'deferred',
+        reason: 'A dashboard deploy is queued',
+      }),
+      pushBranch,
+      dispatchReview,
+      onVerificationFailed: vi.fn(),
+      onVerificationError: vi.fn(),
+    });
+    await vi.waitFor(() => expect(pipeline.isInFlight('PAN-3135')).toBe(false));
+
+    expect(started).toBe(true);
+    expect(pushBranch).not.toHaveBeenCalled();
+    expect(dispatchReview).not.toHaveBeenCalled();
+  });
+
   it('does not dispatch when the verified branch cannot be pushed', async () => {
     const pipeline = createRequestReviewPipeline();
     let finish!: () => void;
