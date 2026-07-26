@@ -269,7 +269,7 @@
     }
   ],
   "created": "2026-07-26T00:35:36.057Z",
-  "updated": "2026-07-26T07:08:36.786Z",
+  "updated": "2026-07-26T07:35:31.371Z",
   "pipeline": {
     "issueId": "PAN-1696",
     "reviewStatus": "pending",
@@ -384,16 +384,8 @@
   "harness": "claude-code",
   "model": "claude-opus-5",
   "tasks": {
-    "sequence": 35,
-    "claims": {
-      "remove-legacy-routes": {
-        "writerId": "agent-pan-1696",
-        "agentId": "agent-pan-1696",
-        "pid": 3383847,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-26T07:08:36.786Z"
-      }
-    },
+    "sequence": 36,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-1696",
@@ -577,6 +569,17 @@
         "outcome": "completed",
         "reason": "roles/flywheel.md now defines both scope values where the Scope: config line is interpreted: pan-only keeps the PAN inventory verbatim; all-tracked-projects inventories every projects.yaml project under the same pickup gate/DECISIONS vetting/exclusions, with the author-assignee safety gate stated per tracker as a hard filter (GitHub gates verbatim; Linear = operator-assigned only). The Observe step now scopes its inventory instead of hardcoding PAN. Added the explicit statement that merge/UAT trains assemble per project regardless of run scope (orchestrator observes, never gates), that cross-project batches do not exist, and that scope is baked in at start/resume.",
         "releasedAt": "2026-07-26T07:08:34.433Z"
+      },
+      {
+        "writerId": "agent-pan-1696",
+        "agentId": "agent-pan-1696",
+        "pid": 3383847,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T07:08:36.786Z",
+        "itemId": "remove-legacy-routes",
+        "outcome": "completed",
+        "reason": "Deleted all six legacy /api/flywheel merge-train routes plus dead helpers and layer entries (flywheel.ts 1005->857, now under the god-file ceiling); config and auto-merge routes untouched. Applied D3: computeMergeQueue + MERGE_GATE_VERBS deleted, contracts verb comment rewritten to review-status sourcing, orphaned CLI import dropped. FOUND AND FIXED an unlisted live consumer: FeatureItem.tsx fetched the removed uat-generations for its train chip; now reads the aggregate namespace and flattens per-project chains (non-PAN issues get a chip for the first time). No-loss: 6 matrix entries re-registered as RELOCATE naming their successors; the PAN-1691 merge-order/stop-at-failure and internal-token auth tests PORTED to merge-train.test.ts; the PAN-1759 eligibility-gate test rewritten against listEligibleCandidatesByProject (which had no coverage) instead of dropped; MERGE_GATE_VERBS tests deleted as a retired contract. Also retargeted 2 Playwright specs (one in CI) and stale comments, retargeted the not-yet-served merge.ts design paths rather than deleting design surface, and fixed a prompt-invariant regression my earlier scope wording caused (my text contained the PAN-2229 rail's anchor phrase 'author/assignee gate').",
+        "releasedAt": "2026-07-26T07:35:31.371Z"
       }
     ],
     "statusReasons": {
@@ -623,6 +626,10 @@
       "role-prompt-scope": {
         "reason": "roles/flywheel.md now defines both scope values where the Scope: config line is interpreted: pan-only keeps the PAN inventory verbatim; all-tracked-projects inventories every projects.yaml project under the same pickup gate/DECISIONS vetting/exclusions, with the author-assignee safety gate stated per tracker as a hard filter (GitHub gates verbatim; Linear = operator-assigned only). The Observe step now scopes its inventory instead of hardcoding PAN. Added the explicit statement that merge/UAT trains assemble per project regardless of run scope (orchestrator observes, never gates), that cross-project batches do not exist, and that scope is baked in at start/resume.",
         "updatedAt": "2026-07-26T07:08:34.433Z"
+      },
+      "remove-legacy-routes": {
+        "reason": "Deleted all six legacy /api/flywheel merge-train routes plus dead helpers and layer entries (flywheel.ts 1005->857, now under the god-file ceiling); config and auto-merge routes untouched. Applied D3: computeMergeQueue + MERGE_GATE_VERBS deleted, contracts verb comment rewritten to review-status sourcing, orphaned CLI import dropped. FOUND AND FIXED an unlisted live consumer: FeatureItem.tsx fetched the removed uat-generations for its train chip; now reads the aggregate namespace and flattens per-project chains (non-PAN issues get a chip for the first time). No-loss: 6 matrix entries re-registered as RELOCATE naming their successors; the PAN-1691 merge-order/stop-at-failure and internal-token auth tests PORTED to merge-train.test.ts; the PAN-1759 eligibility-gate test rewritten against listEligibleCandidatesByProject (which had no coverage) instead of dropped; MERGE_GATE_VERBS tests deleted as a retired contract. Also retargeted 2 Playwright specs (one in CI) and stale comments, retargeted the not-yet-served merge.ts design paths rather than deleting design surface, and fixed a prompt-invariant regression my earlier scope wording caused (my text contained the PAN-2229 rail's anchor phrase 'author/assignee gate').",
+        "updatedAt": "2026-07-26T07:35:31.371Z"
       }
     }
   },
@@ -685,6 +692,8 @@
     "role-prompt-scope": "completed",
     "role-prompt-scope.role-prompt-scope.ac1": "completed",
     "role-prompt-scope.role-prompt-scope.ac2": "completed",
-    "remove-legacy-routes": "running"
+    "remove-legacy-routes": "completed",
+    "remove-legacy-routes.remove-legacy-routes.ac1": "completed",
+    "remove-legacy-routes.remove-legacy-routes.ac2": "completed"
   }
 }
