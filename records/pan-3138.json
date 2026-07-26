@@ -401,7 +401,7 @@
     "recordedAt": "2026-07-26T19:11:42.045Z"
   },
   "created": "2026-07-26T13:39:19.365Z",
-  "updated": "2026-07-26T19:12:23.554Z",
+  "updated": "2026-07-26T19:12:29.589Z",
   "pipeline": {
     "issueId": "PAN-3138",
     "reviewStatus": "pending",
@@ -410,7 +410,8 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T19:12:20.715Z",
+    "panDoneRecoveredAt": "2026-07-26T19:12:23.171Z",
+    "updatedAt": "2026-07-26T19:12:23.543Z",
     "reviewNotes": "Verification deferred: a dashboard deploy is queued (requested 2026-07-26T19:11:07.858Z by deploy-patrol). It re-runs automatically after the deploy.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3143",
     "lastVerifiedCommit": "45c64d10937592faceea33d0a627c6e336c9c829",
@@ -495,8 +496,7 @@
         "tests/unit/lib/review-status.test.ts"
       ],
       "recordedAt": "2026-07-26T19:11:42.045Z"
-    },
-    "panDoneRecoveredAt": "2026-07-26T19:12:23.171Z"
+    }
   },
   "closeOut": {
     "usage": {
@@ -560,7 +560,7 @@
       },
       "costAtCloseOut": {
         "usd": 833.376508,
-        "pricingAsOf": "2026-07-26T19:12:20.742Z"
+        "pricingAsOf": "2026-07-26T19:12:29.584Z"
       }
     },
     "merges": [
