@@ -311,7 +311,7 @@
     "recordedAt": "2026-07-26T10:07:26.737Z"
   },
   "created": "2026-07-21T23:09:49.270Z",
-  "updated": "2026-07-26T12:33:44.583Z",
+  "updated": "2026-07-26T13:32:04.309Z",
   "pipeline": {
     "issueId": "PAN-2997",
     "reviewStatus": "passed",
@@ -322,7 +322,7 @@
     "releaseStatus": "skipped",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T10:57:04.635Z",
-    "updatedAt": "2026-07-26T12:31:56.151Z",
+    "updatedAt": "2026-07-26T13:32:04.295Z",
     "reviewNotes": "All correctness, security, requirements, and performance checks pass; keyed wake recovery now preserves exactly-once delivery across every reviewed crash and marker-failure path.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3004",
@@ -478,7 +478,7 @@
       },
       "costAtCloseOut": {
         "usd": 370.2335056,
-        "pricingAsOf": "2026-07-26T12:31:56.509Z"
+        "pricingAsOf": "2026-07-26T13:32:04.304Z"
       }
     },
     "merges": [
@@ -488,7 +488,7 @@
   },
   "workModel": "k3[1m]",
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "k3[1m]",
   "tasks": {
     "sequence": 20,
     "claims": {},
