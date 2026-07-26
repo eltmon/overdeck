@@ -12,6 +12,7 @@ import {
 } from '../../../lib/overdeck/merge-sync.js';
 import { isAutoMergeEligible, type AutoMergeEligibility } from '../../../lib/cloister/auto-merge-eligibility.js';
 import { FAILED_MERGE_MAX_RETRIES } from '../../../lib/cloister/deacon-merge.js';
+import { readPendingDeploy } from '../../../lib/deploy/deploy-queue.js';
 import { getReviewStatusSync, setReviewStatusSync } from '../../../lib/review-status.js';
 
 export const AUTO_MERGE_EXECUTOR_INTERVAL_MS = 30_000;
@@ -23,6 +24,7 @@ interface MergeResult {
   statusCode?: number;
   mergeStatus?: string;
   retryable?: boolean;
+  deferred?: boolean;
 }
 
 export interface AutoMergeExecutorDeps {
@@ -30,6 +32,7 @@ export interface AutoMergeExecutorDeps {
   listEntries?: () => PendingAutoMerge[];
   isPaused?: () => boolean;
   isEligible?: (issueId: string) => Promise<AutoMergeEligibility>;
+  hasPendingDeploy?: () => Promise<boolean>;
   transition?: (id: number) => boolean;
   markBlocked?: (id: number, reason: string) => boolean;
   markMergingBlocked?: (id: number, reason: string) => boolean;
@@ -89,6 +92,12 @@ export async function tickAutoMergeExecutor(deps: AutoMergeExecutorDeps = {}): P
     log('[auto-merge] flywheel paused, skipping tick');
     return;
   }
+  const hasPendingDeploy = deps.hasPendingDeploy
+    ?? (async () => (await readPendingDeploy()) !== null);
+  if (await hasPendingDeploy()) {
+    log(`[auto-merge] dashboard deploy queued, deferring ${entries.length} merge(s) before preparation`);
+    return;
+  }
 
   for (const entry of entries) {
     if (isPaused()) {
@@ -132,6 +141,14 @@ export async function tickAutoMergeExecutor(deps: AutoMergeExecutorDeps = {}): P
       }
 
       const reason = failureReason(result);
+      if (result.deferred) {
+        const retryAt = new Date(nowDate.getTime() + REQUEUE_BACKOFF_MS).toISOString();
+        const requeued = (deps.requeueToPending ?? requeueToPending)(entry.id, retryAt);
+        log(requeued
+          ? `[auto-merge] merge deferred for ${entry.issueId}; requeued without consuming retry budget for ${retryAt}`
+          : `[auto-merge] failed to requeue deferred merge for ${entry.issueId} (#${entry.id})`);
+        continue;
+      }
       if (result.retryable) {
         const retryCount = (deps.getMergeRetryCount ?? ((issueId) => getReviewStatusSync(issueId)?.mergeRetryCount ?? 0))(entry.issueId);
         if (retryCount >= FAILED_MERGE_MAX_RETRIES) {

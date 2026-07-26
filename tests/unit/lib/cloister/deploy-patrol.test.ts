@@ -8,6 +8,8 @@ import {
   runDeployPatrol,
   waitForChildSpawn,
 } from '../../../../src/lib/cloister/deploy-patrol.js';
+import { DEFAULT_CLOISTER_CONFIG } from '../../../../src/lib/cloister/config.js';
+import type { PendingDeploy } from '../../../../src/lib/deploy/deploy-queue.js';
 import type { BuildStaleness } from '../../../../src/lib/deploy/staleness.js';
 
 const NOW = new Date('2026-07-15T12:00:00.000Z').getTime();
@@ -26,13 +28,30 @@ function stale(overrides: Partial<BuildStaleness> = {}): BuildStaleness {
   };
 }
 
+function queuedDeploy(overrides: Partial<PendingDeploy> = {}): PendingDeploy {
+  return {
+    requestedAt: '2026-07-15T11:30:00.000Z',
+    requestedBy: ['agent-pan-3135'],
+    lastReason: 'Verification is running',
+    blockedBy: ['PAN-10'],
+    deferralCount: 1,
+    escalated: false,
+    ...overrides,
+  };
+}
+
 function context(staleness: BuildStaleness = stale()) {
   return {
     repoRoot: '/repo',
-    config: { auto_deploy: true, debounce_minutes: 5 },
+    config: { auto_deploy: true, debounce_minutes: 5, queue_deadline_minutes: 30 },
     computeStaleness: vi.fn(async () => staleness),
     getCiState: vi.fn(async () => ({ status: 'green' as const })),
-    getBlockReason: vi.fn(async () => null),
+    getWindowAssessment: vi.fn(async () => ({ reason: null, verifyingIssues: [] as string[] })),
+    readQueue: vi.fn(async () => null as PendingDeploy | null),
+    clearQueue: vi.fn(async () => undefined),
+    recordIntent: vi.fn(async () => queuedDeploy()),
+    markQueueEscalated: vi.fn(async () => undefined),
+    recordNeedsYou: vi.fn(async () => undefined as string | undefined),
     spawnReload: vi.fn(async () => undefined),
     emitEntry: vi.fn(),
     emitTts: vi.fn(),
@@ -102,6 +121,12 @@ describe('getDeployCiState', () => {
   });
 });
 
+describe('deploy configuration', () => {
+  it('defaults queued deploy escalation to 30 minutes', () => {
+    expect(DEFAULT_CLOISTER_CONFIG.deploy.queue_deadline_minutes).toBe(30);
+  });
+});
+
 describe('runDeployPatrol', () => {
   it('starts one reload and announces it when the safety window is clear', async () => {
     const ctx = context();
@@ -123,6 +148,203 @@ describe('runDeployPatrol', () => {
     }));
   });
 
+  it('fires a queued deploy even when automatic deployment is disabled', async () => {
+    const ctx = context();
+    ctx.config.auto_deploy = false;
+    ctx.readQueue.mockResolvedValue(queuedDeploy({ requestedBy: ['agent-a', 'agent-z'] }));
+
+    await runDeployPatrol(ctx);
+
+    expect(ctx.spawnReload).toHaveBeenCalledTimes(1);
+    expect(ctx.clearQueue).not.toHaveBeenCalled();
+    expect(ctx.emitEntry).toHaveBeenCalledWith(expect.objectContaining({
+      message: expect.stringContaining('queued deploy requested by agent-a, agent-z'),
+    }));
+  });
+
+  it('keeps a queued deploy pending while the deploy gate remains blocked', async () => {
+    const ctx = context();
+    ctx.readQueue.mockResolvedValue(queuedDeploy());
+    ctx.getWindowAssessment.mockResolvedValue({
+      reason: 'Deployment deferred because verification is in flight for PAN-10.',
+      verifyingIssues: ['PAN-10'],
+    });
+
+    await runDeployPatrol(ctx);
+
+    expect(ctx.spawnReload).not.toHaveBeenCalled();
+    expect(ctx.clearQueue).not.toHaveBeenCalled();
+  });
+
+  it('escalates one long-queued deploy and persists the escalated flag', async () => {
+    const ctx = context();
+    let queue = queuedDeploy({ requestedAt: '2026-07-15T11:29:00.000Z' });
+    ctx.readQueue.mockImplementation(async () => queue);
+    ctx.getWindowAssessment.mockResolvedValue({
+      reason: 'Deployment deferred because verification is in flight for PAN-10.',
+      verifyingIssues: ['PAN-10'],
+    });
+    ctx.markQueueEscalated.mockImplementation(async () => {
+      queue = { ...queue, escalated: true };
+    });
+
+    await runDeployPatrol(ctx);
+    await runDeployPatrol(ctx);
+
+    expect(ctx.emitEntry.mock.calls.filter(([entry]) => entry.level === 'error')).toEqual([[
+      expect.objectContaining({
+        source: 'deploy-script',
+        message: expect.stringContaining('waited 31 minutes'),
+      }),
+    ]]);
+    expect(ctx.emitEntry).toHaveBeenCalledWith(expect.objectContaining({
+      level: 'error',
+      message: expect.stringContaining('Stored verification blockers: PAN-10'),
+    }));
+    expect(ctx.emitTts).toHaveBeenCalledTimes(1);
+    expect(ctx.emitTts).toHaveBeenCalledWith(expect.objectContaining({
+      priority: 1,
+      eventType: 'deploy_queue_stuck',
+    }));
+    expect(ctx.recordNeedsYou).toHaveBeenCalledOnce();
+    expect(ctx.recordNeedsYou).toHaveBeenCalledWith(
+      'PAN-10',
+      'deploy-queue',
+      '2026-07-15T11:29:00.000Z',
+      expect.stringContaining('current block'),
+    );
+    expect(ctx.markQueueEscalated).toHaveBeenCalledOnce();
+    expect(queue.escalated).toBe(true);
+  });
+
+  it('does not escalate a queued deploy before its deadline', async () => {
+    const ctx = context();
+    ctx.readQueue.mockResolvedValue(queuedDeploy({ requestedAt: '2026-07-15T11:31:00.000Z' }));
+    ctx.getWindowAssessment.mockResolvedValue({
+      reason: 'Deployment deferred because verification is in flight for PAN-10.',
+      verifyingIssues: ['PAN-10'],
+    });
+
+    await runDeployPatrol(ctx);
+
+    expect(ctx.emitEntry.mock.calls.some(([entry]) => entry.level === 'error')).toBe(false);
+    expect(ctx.emitTts).not.toHaveBeenCalled();
+    expect(ctx.recordNeedsYou).not.toHaveBeenCalled();
+    expect(ctx.markQueueEscalated).not.toHaveBeenCalled();
+  });
+
+  it('does not escalate a long-queued deploy when the gate is clear', async () => {
+    const ctx = context();
+    ctx.readQueue.mockResolvedValue(queuedDeploy({ requestedAt: '2026-07-15T11:00:00.000Z' }));
+
+    await runDeployPatrol(ctx);
+
+    expect(ctx.spawnReload).toHaveBeenCalledOnce();
+    expect(ctx.emitEntry.mock.calls.some(([entry]) => entry.level === 'error')).toBe(false);
+    expect(ctx.emitTts).toHaveBeenCalledTimes(1);
+    expect(ctx.emitTts).not.toHaveBeenCalledWith(expect.objectContaining({ priority: 1 }));
+    expect(ctx.recordNeedsYou).not.toHaveBeenCalled();
+    expect(ctx.markQueueEscalated).not.toHaveBeenCalled();
+  });
+
+  it('keeps a queued deploy pending until CI is green', async () => {
+    const ctx = context();
+    ctx.readQueue.mockResolvedValue(queuedDeploy());
+    ctx.getCiState.mockResolvedValue({
+      status: 'red',
+      reason: 'Automatic deployment blocked because CI failed.',
+    });
+
+    await runDeployPatrol(ctx);
+
+    expect(ctx.spawnReload).not.toHaveBeenCalled();
+    expect(ctx.getWindowAssessment).not.toHaveBeenCalled();
+    expect(ctx.clearQueue).not.toHaveBeenCalled();
+  });
+
+  it('escalates an overdue queued deploy while CI is blocked', async () => {
+    const ctx = context();
+    ctx.readQueue.mockResolvedValue(queuedDeploy({ requestedAt: '2026-07-15T11:00:00.000Z' }));
+    ctx.getCiState.mockResolvedValue({
+      status: 'red',
+      reason: 'Automatic deployment blocked because CI failed.',
+    });
+
+    await runDeployPatrol(ctx);
+
+    expect(ctx.spawnReload).not.toHaveBeenCalled();
+    expect(ctx.markQueueEscalated).not.toHaveBeenCalled();
+    expect(ctx.recordNeedsYou).not.toHaveBeenCalled();
+    expect(ctx.emitEntry).toHaveBeenCalledWith(expect.objectContaining({
+      level: 'error',
+      message: expect.stringContaining('current block: Automatic deployment blocked because CI failed.'),
+    }));
+  });
+
+  it('waits for a current verifier before latching needs-you after a historical CI blocker', async () => {
+    const ctx = context();
+    ctx.readQueue.mockResolvedValue(queuedDeploy({
+      requestedAt: '2026-07-15T11:00:00.000Z',
+      blockedBy: ['PAN-OLD'],
+    }));
+    ctx.getCiState.mockResolvedValue({
+      status: 'red',
+      reason: 'Automatic deployment blocked because CI failed.',
+    });
+
+    await runDeployPatrol(ctx);
+    expect(ctx.recordNeedsYou).not.toHaveBeenCalled();
+    expect(ctx.markQueueEscalated).not.toHaveBeenCalled();
+
+    ctx.getCiState.mockResolvedValue({ status: 'green' });
+    ctx.getWindowAssessment.mockResolvedValue({
+      reason: 'Deployment deferred because verification is in flight for PAN-CURRENT.',
+      verifyingIssues: ['PAN-CURRENT'],
+    });
+    await runDeployPatrol(ctx);
+
+    expect(ctx.recordNeedsYou).toHaveBeenCalledOnce();
+    expect(ctx.recordNeedsYou).toHaveBeenCalledWith(
+      'PAN-CURRENT',
+      'deploy-queue',
+      '2026-07-15T11:00:00.000Z',
+      expect.stringContaining('Stored verification blockers: PAN-OLD'),
+    );
+    expect(ctx.markQueueEscalated).toHaveBeenCalledOnce();
+    expect(ctx.emitEntry.mock.calls.filter(([entry]) => entry.level === 'error')).toHaveLength(2);
+    expect(ctx.emitTts.mock.calls.filter(([entry]) => entry.eventType === 'deploy_queue_stuck')).toHaveLength(2);
+  });
+
+  it('keeps a queued deploy pending during the merge debounce', async () => {
+    const ctx = context(stale({
+      originMainLastBuildInputCommitAt: NOW - 4 * 60 * 1000,
+    }));
+    ctx.readQueue.mockResolvedValue(queuedDeploy());
+
+    await runDeployPatrol(ctx);
+
+    expect(ctx.spawnReload).not.toHaveBeenCalled();
+    expect(ctx.getCiState).not.toHaveBeenCalled();
+    expect(ctx.clearQueue).not.toHaveBeenCalled();
+  });
+
+  it('escalates an overdue queued deploy during the merge debounce', async () => {
+    const ctx = context(stale({
+      originMainLastBuildInputCommitAt: NOW - 4 * 60 * 1000,
+    }));
+    ctx.readQueue.mockResolvedValue(queuedDeploy({ requestedAt: '2026-07-15T11:00:00.000Z' }));
+
+    await runDeployPatrol(ctx);
+
+    expect(ctx.getCiState).not.toHaveBeenCalled();
+    expect(ctx.markQueueEscalated).not.toHaveBeenCalled();
+    expect(ctx.recordNeedsYou).not.toHaveBeenCalled();
+    expect(ctx.emitEntry).toHaveBeenCalledWith(expect.objectContaining({
+      level: 'error',
+      message: expect.stringContaining('merge debounce has not elapsed'),
+    }));
+  });
+
   it('defers while CI for the origin/main tip is pending', async () => {
     const ctx = context();
     ctx.getCiState.mockResolvedValue({
@@ -134,7 +356,7 @@ describe('runDeployPatrol', () => {
     await runDeployPatrol(ctx);
 
     expect(ctx.spawnReload).not.toHaveBeenCalled();
-    expect(ctx.getBlockReason).not.toHaveBeenCalled();
+    expect(ctx.getWindowAssessment).not.toHaveBeenCalled();
     expect(ctx.emitEntry.mock.calls.filter(([entry]) => entry.message.includes('CI is still in progress'))).toHaveLength(1);
   });
 
@@ -148,21 +370,28 @@ describe('runDeployPatrol', () => {
     await runDeployPatrol(ctx);
 
     expect(ctx.spawnReload).not.toHaveBeenCalled();
-    expect(ctx.getBlockReason).not.toHaveBeenCalled();
+    expect(ctx.getWindowAssessment).not.toHaveBeenCalled();
     expect(ctx.emitEntry).toHaveBeenCalledWith(expect.objectContaining({
       message: expect.stringContaining('CI failed'),
     }));
   });
 
-  it('emits a throttled deferral when the deploy window is blocked', async () => {
+  it('emits a throttled deferral and queues intent when the deploy window is blocked', async () => {
     const ctx = context();
-    ctx.getBlockReason.mockResolvedValue('Deployment deferred because verification is in flight for PAN-1.');
+    const reason = 'Deployment deferred because verification is in flight for PAN-1.';
+    ctx.getWindowAssessment.mockResolvedValue({ reason, verifyingIssues: ['PAN-1'] });
 
     await runDeployPatrol(ctx);
     await runDeployPatrol(ctx);
 
     expect(ctx.spawnReload).not.toHaveBeenCalled();
     expect(ctx.emitEntry.mock.calls.filter(([entry]) => entry.message.includes('verification'))).toHaveLength(1);
+    expect(ctx.getWindowAssessment).toHaveBeenCalledTimes(2);
+    expect(ctx.recordIntent).toHaveBeenCalledWith({
+      requestedBy: 'deploy-patrol',
+      reason,
+      blockedBy: ['PAN-1'],
+    });
   });
 
   it('waits for the build-input debounce interval under fake timers', async () => {
@@ -216,6 +445,7 @@ describe('runDeployPatrol', () => {
     await runDeployPatrol(freshCtx);
     expect(freshCtx.spawnReload).not.toHaveBeenCalled();
     expect(freshCtx.emitEntry).not.toHaveBeenCalled();
+    expect(freshCtx.clearQueue).toHaveBeenCalledOnce();
 
     const unknownCtx = context(stale({ status: 'unknown', reason: 'missing stamp' }));
     await runDeployPatrol(unknownCtx);

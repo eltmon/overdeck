@@ -11,6 +11,7 @@ import {
   runSupervisedVerification,
   verificationWorkerDeadline,
 } from '../../../../src/lib/cloister/verification-worker-supervisor.js';
+import { recordDeployIntent } from '../../../../src/lib/deploy/deploy-queue.js';
 
 const originalHome = process.env.OVERDECK_HOME;
 const originalWorkerPath = process.env.OVERDECK_VERIFICATION_WORKER_PATH;
@@ -125,12 +126,37 @@ describe('verification worker supervisor', () => {
     });
   });
 
+  it('defers a new worker while a dashboard deploy is queued', async () => {
+    useFixture();
+    const queued = await recordDeployIntent({
+      requestedBy: 'agent-pan-3135',
+      reason: 'Verification is running',
+      blockedBy: ['PAN-10'],
+    });
+
+    await expect(runSupervisedVerification(
+      'PAN-2597',
+      '/tmp/workspace',
+      { isRemote: false },
+      'test',
+    )).resolves.toEqual({
+      outcome: 'deferred',
+      reason: `Verification deferred: a dashboard deploy is queued (requested ${queued.requestedAt} by agent-pan-3135). It re-runs automatically after the deploy.`,
+    });
+    expect(readVerificationWorkerState('PAN-2597')).toBeNull();
+  });
+
   it('joins one live worker instead of starting duplicate verification', async () => {
     useFixture(500);
 
     const first = runSupervisedVerification('PAN-2597', '/tmp/workspace', { isRemote: false }, 'test');
     await vi.waitFor(() => expect(isVerificationWorkerActive('PAN-2597')).toBe(true));
     const firstPid = readVerificationWorkerState('PAN-2597')!.pid;
+    await recordDeployIntent({
+      requestedBy: 'agent-pan-3135',
+      reason: 'Verification is running',
+      blockedBy: ['PAN-10'],
+    });
     const second = runSupervisedVerification('PAN-2597', '/tmp/workspace', { isRemote: false }, 'test');
 
     await expect(Promise.all([first, second])).resolves.toEqual([

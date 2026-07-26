@@ -38,40 +38,63 @@ const defaultDependencies: DeployWindowDependencies = {
   readDevSupervisorMarker,
 };
 
-export async function getDeployBlockReason(
-  dependencies: Partial<DeployWindowDependencies> = {},
-): Promise<string | null> {
-  const deps = { ...defaultDependencies, ...dependencies };
-  const verifyingIssues = Object.entries(deps.loadReviewStatuses())
+export function listVerifyingIssues(
+  loadStatuses: () => Record<string, ReviewStatus> = loadReviewStatuses,
+): string[] {
+  return Object.entries(loadStatuses())
     .filter(([, status]) => status.verificationStatus === 'running' && status.mergeStatus !== 'merged')
     .map(([issueId]) => issueId)
     .sort();
+}
+
+export interface DeployWindowAssessment {
+  readonly reason: string | null;
+  readonly verifyingIssues: string[];
+}
+
+export async function getDeployWindowAssessment(
+  dependencies: Partial<DeployWindowDependencies> = {},
+): Promise<DeployWindowAssessment> {
+  const deps = { ...defaultDependencies, ...dependencies };
+  const verifyingIssues = listVerifyingIssues(deps.loadReviewStatuses);
 
   if (verifyingIssues.length > 0) {
-    return `Deployment deferred because verification is in flight for ${verifyingIssues.join(', ')}.`;
+    return {
+      reason: `Deployment deferred because verification is in flight for ${verifyingIssues.join(', ')}.`,
+      verifyingIssues,
+    };
   }
 
   const activeFlywheelRunId = deps.getFlywheelActiveRunId();
   if (activeFlywheelRunId) {
-    return `Deployment deferred because flywheel run ${activeFlywheelRunId} owns deployment.`;
+    return { reason: `Deployment deferred because flywheel run ${activeFlywheelRunId} owns deployment.`, verifyingIssues };
   }
 
   if (await deps.isMergeAgentRunning()) {
-    return 'Deployment deferred because a merge specialist session is active.';
+    return { reason: 'Deployment deferred because a merge specialist session is active.', verifyingIssues };
   }
 
   if (await deps.pendingPostMergeExists()) {
-    return 'Deployment deferred because the post-merge lifecycle is pending.';
+    return { reason: 'Deployment deferred because the post-merge lifecycle is pending.', verifyingIssues };
   }
 
   const restartLock = await deps.readRestartLockHolder();
   if (restartLock) {
-    return `Deployment deferred because a restart is already in progress (pid ${restartLock.pid}, ${restartLock.caller}).`;
+    return {
+      reason: `Deployment deferred because a restart is already in progress (pid ${restartLock.pid}, ${restartLock.caller}).`,
+      verifyingIssues,
+    };
   }
 
   if (deps.readDevSupervisorMarker()) {
-    return 'Deployment deferred because a pan dev session owns the dashboard.';
+    return { reason: 'Deployment deferred because a pan dev session owns the dashboard.', verifyingIssues };
   }
 
-  return null;
+  return { reason: null, verifyingIssues };
+}
+
+export async function getDeployBlockReason(
+  dependencies: Partial<DeployWindowDependencies> = {},
+): Promise<string | null> {
+  return (await getDeployWindowAssessment(dependencies)).reason;
 }
