@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T20:52:58.018Z",
-  "updated": "2026-07-26T21:32:48.079Z",
+  "updated": "2026-07-26T21:33:00.168Z",
   "pipeline": {
     "issueId": "PAN-3162",
     "reviewStatus": "pending",
@@ -61,8 +61,16 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 4,
-    "claims": {},
+    "sequence": 5,
+    "claims": {
+      "stuck-merging-bound": {
+        "writerId": "agent-pan-3162",
+        "agentId": "agent-pan-3162",
+        "pid": 2617743,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T21:33:00.168Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3162",
@@ -109,6 +117,7 @@
     "deacon-forge-merge-reconciler.deacon-forge-merge-reconciler.ac2": "completed",
     "deacon-forge-merge-reconciler.deacon-forge-merge-reconciler.ac3": "completed",
     "deacon-forge-merge-reconciler.deacon-forge-merge-reconciler.ac4": "completed",
-    "deacon-forge-merge-reconciler.deacon-forge-merge-reconciler.ac5": "completed"
+    "deacon-forge-merge-reconciler.deacon-forge-merge-reconciler.ac5": "completed",
+    "stuck-merging-bound": "running"
   }
 }
