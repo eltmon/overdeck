@@ -56,20 +56,21 @@
     "recordedAt": "2026-07-26T13:26:38.219Z"
   },
   "created": "2026-07-26T12:25:26.814Z",
-  "updated": "2026-07-26T13:26:45.555Z",
+  "updated": "2026-07-26T13:26:48.889Z",
   "pipeline": {
     "issueId": "PAN-3123",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T13:26:43.959Z",
+    "updatedAt": "2026-07-26T13:26:45.640Z",
     "inspectNotes": "All 5 ACs met. nextGovernorModeWithRunway composes swap runway over nextGovernorMode with asymmetric swap hysteresis (soft% while admitting, recovery% once held), so SwapFree 0/8GiB with RAM above RECOVERY yields holding (AC1) and re-admission needs SwapFree >= recovery% AND RAM >= RECOVERY (AC2). PSI shed is gated on swapLow && psiFullAvg10 != null && >= threshold, so null PSI degrades to holding (AC3). swapTotalBytes <= 0 early-returns the RAM-only mode, and canAdmit/nextGovernorMode logic is untouched (AC4). Verdict carries swapTotalBytes/swapFreeBytes/psiFullAvg10 as optional MemoryVerdict fields (AC5). Verified beyond the mocks: readProcMemoryLinux/Darwin really populate swapTotal/swapFree/psiFullAvg10, config keys governorSwapSoftFreePercent/RecoveryFreePercent/PsiFullShedAvg10 exist in defaults+schema+merge with a recovery>soft clamp, and every autonomous admission path (boot-reconciliation-apply, deacon-auto-resume, preemption) goes through assessMemoryPressure, so no path bypasses the swap gate. Non-blocking note: the single previousMode variable is shared by both hysteresis axes, so a hold entered for low RAM raises the swap bar to recovery% - swap sitting between soft% and recovery% can prolong a hold it never caused. Conservative (errs toward holding) and consistent with AC2's wording, but worth a follow-up if operators see slow re-admission on hosts with mid-range swap.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3140",
     "reviewRequestedAt": "2026-07-26T13:26:40.849Z",
+    "reviewSpawnedAt": "2026-07-26T13:26:45.629Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "scripts/file-size-baseline.txt",
@@ -133,7 +134,7 @@
       },
       "costAtCloseOut": {
         "usd": 25.686269,
-        "pricingAsOf": "2026-07-26T13:26:44.012Z"
+        "pricingAsOf": "2026-07-26T13:26:48.867Z"
       }
     },
     "merges": [
