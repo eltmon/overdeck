@@ -16,7 +16,7 @@ import { sessionExistsSync, sendKeys } from '../tmux.js';
 import { isAgentIdleForNudge } from './agent-idle.js';
 import { loadCloisterConfig } from './config.js';
 import { getAutoCloseOutCanonicalState, sweepAutoCloseOutCache } from './deacon-canonical-state.js';
-import { observeGitHubBranchMerge } from './deacon-stuck-merging.js';
+import { isStuckMergingState, observeGitHubBranchMerge } from './deacon-stuck-merging.js';
 
 export { reconcileStuckMergingStates } from './deacon-stuck-merging.js';
 
@@ -154,6 +154,7 @@ export async function reconcileStaleMergeStatus(): Promise<string[]> {
     for (const [issueId, status] of Object.entries(statuses)) {
       const postMergeIncomplete = status.mergeStatus === 'merged' && status.mergeStep === 'post-merge-cleanup';
       if (status.mergeStatus === 'merged' && !postMergeIncomplete) continue;
+      if (isStuckMergingState(status, Date.now())) continue;
       if (!postMergeIncomplete && staleMergeReconciled.has(issueId)) continue;
 
       const project = resolveProjectFromIssueSync(issueId);

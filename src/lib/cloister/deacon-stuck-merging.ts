@@ -2,7 +2,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { Effect } from 'effect';
 import { getAgentStateSync } from '../agents.js';
-import { getMergeSetSync } from '../merge-set.js';
+import { getMergeSetSync, type MergeSet } from '../merge-set.js';
 import { resolveProjectFromIssueSync } from '../projects.js';
 import {
   loadReviewStatuses,
@@ -11,7 +11,10 @@ import {
   type ReviewStatus,
 } from '../review-status.js';
 import { resolveGitHubIssueSync } from '../tracker-utils.js';
-import { observeForgeMergeState } from './merge-completeness.js';
+import {
+  observeForgeMergeState,
+  type ForgeMergeObservationResult,
+} from './merge-completeness.js';
 
 const execFileAsync = promisify(execFile);
 export const STUCK_MERGING_MS = 30 * 60 * 1000;
@@ -50,6 +53,12 @@ function latestMergeActivityAt(status: ReviewStatus): number | null {
   return Number.isFinite(timestamp) ? timestamp : null;
 }
 
+export function isStuckMergingState(status: ReviewStatus, now: number): boolean {
+  if (status.mergeStatus !== 'merging' && status.mergeStatus !== 'verifying') return false;
+  const activityAt = latestMergeActivityAt(status);
+  return activityAt !== null && now - activityAt >= STUCK_MERGING_MS;
+}
+
 async function readSpecStatus(projectPath: string, issueId: string): Promise<string | undefined> {
   try {
     const { findSpecByIssue } = await import('../pan-dir/specs.js');
@@ -64,31 +73,44 @@ function hasPlanningAgent(issueId: string): boolean {
   return planState?.status === 'running' || planState?.status === 'starting';
 }
 
-export async function reconcileStuckMergingStates(): Promise<string[]> {
+export interface StuckMergingDeps {
+  now(): number;
+  loadStatuses(): Record<string, ReviewStatus>;
+  resolveProject(issueId: string): { projectPath: string } | null;
+  getMergeSet(issueId: string): MergeSet | null;
+  resolveGitHubIssue(issueId: string): { isGitHub: boolean };
+  observeForge(issueId: string): Promise<ForgeMergeObservationResult>;
+  observeGitHub(issueId: string, branch: string, projectPath: string): Promise<GitHubBranchMergeObservation>;
+  readSpecStatus(projectPath: string, issueId: string): Promise<string | undefined>;
+  hasPlanningAgent(issueId: string): boolean;
+  reviewGatesPassed(status: ReviewStatus): boolean;
+  setReviewStatus: typeof setReviewStatusSync;
+  enqueuePostMerge(issueId: string, projectPath: string, branch: string): Promise<string | null | undefined>;
+  warn(message: string): void;
+}
+
+export async function reconcileStuckMergingStatesWithDeps(deps: StuckMergingDeps): Promise<string[]> {
   const actions: string[] = [];
-  const now = Date.now();
+  const now = deps.now();
 
-  for (const [issueId, status] of Object.entries(loadReviewStatuses())) {
-    if (status.mergeStatus !== 'merging' && status.mergeStatus !== 'verifying') continue;
-    const activityAt = latestMergeActivityAt(status);
-    if (activityAt === null || now - activityAt < STUCK_MERGING_MS) continue;
-
-    const project = resolveProjectFromIssueSync(issueId);
+  for (const [issueId, status] of Object.entries(deps.loadStatuses())) {
+    if (!isStuckMergingState(status, now)) continue;
+    const project = deps.resolveProject(issueId);
     if (!project) continue;
-    const specStatus = await readSpecStatus(project.projectPath, issueId);
+    const specStatus = await deps.readSpecStatus(project.projectPath, issueId);
     if (specStatus === 'completed' || specStatus === 'cancelled') continue;
 
     const branch = `feature/${issueId.toLowerCase()}`;
-    const mergeSet = getMergeSetSync(issueId);
+    const mergeSet = deps.getMergeSet(issueId);
     const hasNonGitHubRepos = mergeSet?.repos.some((repo) => repo.forge !== 'github') === true;
-    const githubIssue = resolveGitHubIssueSync(issueId);
+    const githubIssue = deps.resolveGitHubIssue(issueId);
     let complete = false;
     let positiveMergedEvidence = false;
     let unverifiableReason: string | undefined;
 
     if (!githubIssue.isGitHub || hasNonGitHubRepos) {
       try {
-        const observation = await observeForgeMergeState(issueId);
+        const observation = await deps.observeForge(issueId);
         complete = observation.complete;
         positiveMergedEvidence = observation.hasPositiveMergedEvidence;
         unverifiableReason = observation.repos.find((repo) => repo.state === 'unverifiable')?.reason;
@@ -96,34 +118,30 @@ export async function reconcileStuckMergingStates(): Promise<string[]> {
         unverifiableReason = error instanceof Error ? error.message : String(error);
       }
     } else {
-      const observation = await observeGitHubBranchMerge(issueId, branch, project.projectPath);
+      const observation = await deps.observeGitHub(issueId, branch, project.projectPath);
       complete = observation.merged;
       positiveMergedEvidence = observation.merged;
       unverifiableReason = observation.unverifiableReason;
     }
 
     if (unverifiableReason) {
-      console.warn(`[deacon] ${issueId}: stuck ${status.mergeStatus} state is unverifiable — ${unverifiableReason}`);
+      deps.warn(`[deacon] ${issueId}: stuck ${status.mergeStatus} state is unverifiable — ${unverifiableReason}`);
       continue;
     }
 
     if (complete && positiveMergedEvidence) {
-      if (hasPlanningAgent(issueId) || specStatus === 'draft' || specStatus === 'proposed') continue;
-      setReviewStatusSync(issueId, {
-        mergeStatus: 'merged',
-        mergeStep: 'post-merge-cleanup',
-        readyForMerge: false,
+      if (deps.hasPlanningAgent(issueId) || specStatus === 'draft' || specStatus === 'proposed') continue;
+      deps.setReviewStatus(issueId, {
+        mergeStatus: 'merged', mergeStep: 'post-merge-cleanup', readyForMerge: false,
       });
-      const msg = `Reconciled stuck ${status.mergeStatus} state for ${issueId} — forge confirms the merge`;
-      actions.push(msg);
-      const { enqueuePostMergeLifecycle } = await import('./post-merge-lifecycle-worker.js');
-      const action = enqueuePostMergeLifecycle(issueId, project.projectPath, branch);
+      actions.push(`Reconciled stuck ${status.mergeStatus} state for ${issueId} — forge confirms the merge`);
+      const action = await deps.enqueuePostMerge(issueId, project.projectPath, branch);
       if (action) actions.push(action);
       continue;
     }
 
-    const readyForMerge = reviewGatesPassedSync({ ...status, mergeStatus: 'pending' });
-    setReviewStatusSync(issueId, {
+    const readyForMerge = deps.reviewGatesPassed({ ...status, mergeStatus: 'pending' });
+    deps.setReviewStatus(issueId, {
       mergeStatus: 'pending',
       mergeNotes: `Reset stuck ${status.mergeStatus} state after 30 minutes because the forge has no completed merge evidence`,
       readyForMerge,
@@ -132,4 +150,25 @@ export async function reconcileStuckMergingStates(): Promise<string[]> {
   }
 
   return actions;
+}
+
+export async function reconcileStuckMergingStates(): Promise<string[]> {
+  return reconcileStuckMergingStatesWithDeps({
+    now: Date.now,
+    loadStatuses: loadReviewStatuses,
+    resolveProject: resolveProjectFromIssueSync,
+    getMergeSet: getMergeSetSync,
+    resolveGitHubIssue: resolveGitHubIssueSync,
+    observeForge: observeForgeMergeState,
+    observeGitHub: observeGitHubBranchMerge,
+    readSpecStatus,
+    hasPlanningAgent,
+    reviewGatesPassed: reviewGatesPassedSync,
+    setReviewStatus: setReviewStatusSync,
+    enqueuePostMerge: async (issueId, projectPath, branch) => {
+      const { enqueuePostMergeLifecycle } = await import('./post-merge-lifecycle-worker.js');
+      return enqueuePostMergeLifecycle(issueId, projectPath, branch);
+    },
+    warn: (message) => console.warn(message),
+  });
 }

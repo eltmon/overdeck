@@ -23,6 +23,7 @@ export class ForgeError extends Data.TaggedError('ForgeError')<{
 
 const execAsync = promisify(exec);
 const GITHUB_MERGE_POLL_INTERVAL_MS = 5000;
+const FORGE_OBSERVATION_TIMEOUT_MS = 30000;
 export const GITHUB_MERGE_TIMEOUT_MS = 15 * 60 * 1000;
 
 export type ForgeType = 'github' | 'gitlab';
@@ -92,6 +93,13 @@ export interface DiscoverArtifactInput {
   repository?: string;
 }
 
+export interface FindMergedArtifactInput extends DiscoverArtifactInput {
+  artifactUrl?: string;
+  artifactId?: string;
+  targetBranch?: string;
+  headSha?: string;
+}
+
 export interface ForgeAdapter {
   readonly forge: ForgeType;
   createReviewArtifact(input: CreateReviewArtifactInput): Promise<CreateReviewArtifactResult>;
@@ -99,7 +107,7 @@ export interface ForgeAdapter {
   commentOnArtifact(input: CommentOnArtifactInput): Promise<void>;
   approveReviewArtifact(input: ApproveReviewArtifactInput): Promise<void>;
   discoverArtifact(input: DiscoverArtifactInput): Promise<CreateReviewArtifactResult | null>;
-  findMergedArtifact(input: DiscoverArtifactInput): Promise<CreateReviewArtifactResult | null>;
+  findMergedArtifact(input: FindMergedArtifactInput): Promise<CreateReviewArtifactResult | null>;
 }
 
 async function withBodyFile<T>(body: string | undefined, prefix: string, fn: (bodyFile?: string) => Promise<T>): Promise<T> {
@@ -188,61 +196,130 @@ async function getExistingGitLabArtifact(
   };
 }
 
+function matchesCurrentArtifact(
+  input: FindMergedArtifactInput,
+  artifact: { sourceBranch?: string; targetBranch?: string; headSha?: string },
+): boolean {
+  return artifact.sourceBranch === undefined || artifact.sourceBranch === input.sourceBranch
+    ? (input.targetBranch === undefined || artifact.targetBranch === input.targetBranch)
+      && (input.headSha === undefined || artifact.headSha === input.headSha)
+    : false;
+}
+
 async function findMergedGitHubArtifact(
-  branchName: string,
-  cwd?: string,
-  repository?: string,
+  input: FindMergedArtifactInput,
 ): Promise<CreateReviewArtifactResult | null> {
-  const parsedRepo = parseRepository(repository);
+  const parsedRepo = parseRepository(input.repository);
+  const parsedId = input.artifactId ? Number.parseInt(input.artifactId, 10) : Number.NaN;
+  const parsedUrl = parseArtifactRef(input.artifactUrl);
+  const exactNumber = Number.isFinite(parsedId)
+    ? parsedId
+    : parsedUrl?.forge === 'github' ? parsedUrl.number : undefined;
+
   if (isGitHubAppConfigured() && parsedRepo) {
-    const prs = await Effect.runPromise(listPullRequestsForHead(parsedRepo.owner, parsedRepo.repo, branchName, 'all'));
-    const merged = prs.find((pr) => pr.merged === true || pr.mergedAt != null);
-    if (!merged) return null;
-    return {
-      forge: 'github',
-      created: false,
-      url: merged.url ?? `https://github.com/${parsedRepo.owner}/${parsedRepo.repo}/pull/${merged.number}`,
-      id: String(merged.number),
+    if (Number.isFinite(exactNumber)) {
+      const state = await Effect.runPromise(getPullRequestState(parsedRepo.owner, parsedRepo.repo, exactNumber!));
+      if (!state.merged || !matchesCurrentArtifact(input, {
+        sourceBranch: input.sourceBranch,
+        targetBranch: state.baseBranch,
+        headSha: state.headSha,
+      })) return null;
+      return {
+        forge: 'github',
+        created: false,
+        url: state.url ?? input.artifactUrl,
+        id: String(state.number),
+      };
+    }
+
+    const prs = await Effect.runPromise(listPullRequestsForHead(parsedRepo.owner, parsedRepo.repo, input.sourceBranch, 'all'));
+    for (const pr of prs.filter((candidate) => candidate.merged === true || candidate.mergedAt != null)) {
+      if (input.targetBranch === undefined && input.headSha === undefined) {
+        return {
+          forge: 'github', created: false,
+          url: pr.url ?? `https://github.com/${parsedRepo.owner}/${parsedRepo.repo}/pull/${pr.number}`,
+          id: String(pr.number),
+        };
+      }
+      const state = await Effect.runPromise(getPullRequestState(parsedRepo.owner, parsedRepo.repo, pr.number));
+      if (state.merged && matchesCurrentArtifact(input, {
+        sourceBranch: input.sourceBranch,
+        targetBranch: state.baseBranch,
+        headSha: state.headSha,
+      })) return { forge: 'github', created: false, url: state.url ?? pr.url, id: String(pr.number) };
+    }
+    return null;
+  }
+
+  if (Number.isFinite(exactNumber)) {
+    const target = input.artifactUrl || input.artifactId!;
+    const { stdout } = await execAsync(
+      `gh pr view ${target}${buildRepositoryFlag(input.repository)} --json url,number,state,mergedAt,headRefOid,baseRefName,headRefName`,
+      { cwd: input.cwd, encoding: 'utf-8', timeout: FORGE_OBSERVATION_TIMEOUT_MS },
+    );
+    const pr = JSON.parse(stdout.trim()) as {
+      url?: string; number?: number; state?: string; mergedAt?: string | null;
+      headRefOid?: string; baseRefName?: string; headRefName?: string;
     };
+    if (!pr.mergedAt || !matchesCurrentArtifact(input, {
+      sourceBranch: pr.headRefName,
+      targetBranch: pr.baseRefName,
+      headSha: pr.headRefOid,
+    })) return null;
+    return { forge: 'github', created: false, url: pr.url, id: pr.number ? String(pr.number) : input.artifactId };
   }
 
   const { stdout } = await execAsync(
-    `gh pr list --state merged --head ${branchName}${buildRepositoryFlag(repository)} --json url,number,mergedAt`,
-    { cwd, encoding: 'utf-8' },
+    `gh pr list --state merged --head ${input.sourceBranch}${buildRepositoryFlag(input.repository)} --json url,number,mergedAt,headRefOid,baseRefName,headRefName`,
+    { cwd: input.cwd, encoding: 'utf-8', timeout: FORGE_OBSERVATION_TIMEOUT_MS },
   );
-  const parsed = JSON.parse(stdout.trim() || '[]') as Array<{ url?: string; number?: number }>;
-  const merged = parsed[0];
-  if (!merged) return null;
-  return {
-    forge: 'github',
-    created: false,
-    url: merged.url,
+  const parsed = JSON.parse(stdout.trim() || '[]') as Array<{
+    url?: string; number?: number; mergedAt?: string | null;
+    headRefOid?: string; baseRefName?: string; headRefName?: string;
+  }>;
+  const merged = parsed.find((pr) => pr.mergedAt && matchesCurrentArtifact(input, {
+    sourceBranch: pr.headRefName,
+    targetBranch: pr.baseRefName,
+    headSha: pr.headRefOid,
+  }));
+  return merged ? {
+    forge: 'github', created: false, url: merged.url,
     id: merged.number ? String(merged.number) : undefined,
-  };
+  } : null;
 }
 
 async function findMergedGitLabArtifact(
-  branchName: string,
-  cwd?: string,
-  repository?: string,
+  input: FindMergedArtifactInput,
 ): Promise<CreateReviewArtifactResult | null> {
-  const { stdout } = await execAsync(
-    `glab mr list --source-branch ${branchName}${buildRepositoryFlag(repository)} --all --output json`,
-    { cwd, encoding: 'utf-8' },
-  );
-  const parsed = JSON.parse(stdout.trim() || '[]') as Array<{
-    iid?: number;
-    web_url?: string;
-    state?: string;
+  const parsedId = input.artifactId ? Number.parseInt(input.artifactId, 10) : Number.NaN;
+  const parsedUrl = parseArtifactRef(input.artifactUrl);
+  const target = Number.isFinite(parsedId)
+    ? String(parsedId)
+    : parsedUrl?.forge === 'gitlab' ? String(parsedUrl.number) : undefined;
+  const command = target
+    ? `glab mr view ${target}${buildRepositoryFlag(input.repository)} --output json`
+    : `glab mr list --source-branch ${input.sourceBranch}${buildRepositoryFlag(input.repository)} --all --output json`;
+  const { stdout } = await execAsync(command, {
+    cwd: input.cwd,
+    encoding: 'utf-8',
+    timeout: FORGE_OBSERVATION_TIMEOUT_MS,
+  });
+  const artifacts = target ? [JSON.parse(stdout.trim())] : JSON.parse(stdout.trim() || '[]') as Array<{
+    iid?: number; web_url?: string; state?: string; source_branch?: string;
+    target_branch?: string; sha?: string;
   }>;
-  const merged = parsed.find((artifact) => artifact.state === 'merged');
-  if (!merged) return null;
-  return {
-    forge: 'gitlab',
-    created: false,
-    url: merged.web_url,
-    id: merged.iid ? String(merged.iid) : undefined,
-  };
+  const merged = artifacts.find((artifact: {
+    iid?: number; web_url?: string; state?: string; source_branch?: string;
+    target_branch?: string; sha?: string;
+  }) => artifact.state === 'merged' && matchesCurrentArtifact(input, {
+    sourceBranch: artifact.source_branch,
+    targetBranch: artifact.target_branch,
+    headSha: artifact.sha,
+  }));
+  return merged ? {
+    forge: 'gitlab', created: false, url: merged.web_url,
+    id: merged.iid ? String(merged.iid) : input.artifactId,
+  } : null;
 }
 
 function delay(ms: number): Promise<void> {
@@ -381,7 +458,7 @@ const githubForgeAdapter: ForgeAdapter = {
   },
 
   async findMergedArtifact(input) {
-    return findMergedGitHubArtifact(input.sourceBranch, input.cwd, input.repository);
+    return findMergedGitHubArtifact(input);
   },
 };
 
@@ -455,7 +532,7 @@ const gitlabForgeAdapter: ForgeAdapter = {
   },
 
   async findMergedArtifact(input) {
-    return findMergedGitLabArtifact(input.sourceBranch, input.cwd, input.repository);
+    return findMergedGitLabArtifact(input);
   },
 };
 

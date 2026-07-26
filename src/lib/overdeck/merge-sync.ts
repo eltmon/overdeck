@@ -469,6 +469,40 @@ export function upsertMergeSet(mergeSet: MergeSet): void {
   tx(mergeSet);
 }
 
+export function patchMergeSetRepo(
+  issueId: string,
+  repoKey: string,
+  expected: Pick<MergeSetRepoState, 'sourceBranch' | 'targetBranch' | 'artifactUrl' | 'artifactId'>,
+  patch: Partial<Pick<MergeSetRepoState, 'artifactUrl' | 'artifactId' | 'mergeStatus'>>,
+): boolean {
+  const db = getOverdeckDatabaseSync();
+  const assignments: string[] = [];
+  const values: unknown[] = [];
+  if (patch.artifactUrl !== undefined) { assignments.push('artifact_url = ?'); values.push(patch.artifactUrl); }
+  if (patch.artifactId !== undefined) { assignments.push('artifact_id = ?'); values.push(patch.artifactId); }
+  if (patch.mergeStatus !== undefined) { assignments.push('merge_status = ?'); values.push(patch.mergeStatus); }
+  if (assignments.length === 0) return true;
+
+  return db.transaction(() => {
+    const result = db.prepare(`
+      UPDATE merge_set_repos SET ${assignments.join(', ')}
+      WHERE issue_id = ? AND repo_key = ? AND source_branch = ? AND target_branch = ?
+        AND artifact_url IS ? AND artifact_id IS ?
+    `).run(
+      ...values,
+      issueId,
+      repoKey,
+      expected.sourceBranch,
+      expected.targetBranch,
+      expected.artifactUrl ?? null,
+      expected.artifactId ?? null,
+    );
+    if (result.changes !== 1) return false;
+    db.prepare('UPDATE merge_sets SET updated_at = ? WHERE issue_id = ?').run(nowMillis(), issueId);
+    return true;
+  })();
+}
+
 /** Drop-in for getMergeSetFromDb() from merge-set-db.ts. */
 export function getMergeSetFromDb(issueId: string): MergeSet | null {
   const db = getOverdeckDatabaseSync();

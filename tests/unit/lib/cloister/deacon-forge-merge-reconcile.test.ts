@@ -216,6 +216,25 @@ describe('reconcileStaleMergeStatus forge observation', () => {
     expect(actions).toEqual([]);
   });
 
+  it('leaves expired transient rows to the stuck-state patrol instead of polling twice', async () => {
+    mockLoadReviewStatuses.mockReturnValue({
+      'MIN-904': {
+        mergeStatus: 'merging',
+        readyForMerge: false,
+        updatedAt: '2020-01-01T00:00:00.000Z',
+        history: [{ type: 'merge', status: 'merging', timestamp: '2020-01-01T00:00:00.000Z' }],
+      },
+    });
+
+    const actions = await reconcileStaleMergeStatus();
+
+    expect(mockResolveProjectFromIssueSync).not.toHaveBeenCalled();
+    expect(mockObserveForgeMergeState).not.toHaveBeenCalled();
+    expect(mockExecFile).not.toHaveBeenCalled();
+    expect(mockSetReviewStatusSync).not.toHaveBeenCalled();
+    expect(actions).toEqual([]);
+  });
+
   it('warns and writes no terminal state when forge evidence is unverifiable', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     mockLoadReviewStatuses.mockReturnValue({ 'MIN-903': status('failed') });

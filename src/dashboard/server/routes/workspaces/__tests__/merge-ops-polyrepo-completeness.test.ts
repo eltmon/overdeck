@@ -108,6 +108,21 @@ vi.mock('../../../services/merge-queue-service.js', () => ({
 vi.mock('../../../../../lib/merge-set.js', () => ({
   ensureMergeSetForIssueSync: vi.fn(() => mocks.mergeSet),
   getMergeSetSync: vi.fn(() => mocks.mergeSet),
+  patchMergeSetRepoSync: vi.fn((_issueId: string, repoKey: string, expected: any, patch: any) => {
+    const current = mocks.mergeSet?.repos.find((repo: any) => repo.repoKey === repoKey);
+    if (!current
+      || current.sourceBranch !== expected.sourceBranch
+      || current.targetBranch !== expected.targetBranch
+      || current.artifactUrl !== expected.artifactUrl
+      || current.artifactId !== expected.artifactId) return false;
+    mocks.mergeSet = {
+      ...mocks.mergeSet,
+      repos: mocks.mergeSet.repos.map((repo: any) => (
+        repo.repoKey === repoKey ? { ...repo, ...patch } : repo
+      )),
+    };
+    return true;
+  }),
   upsertMergeSetSync: (mergeSet: any) => {
     mocks.mergeSet = mergeSet;
     mocks.upsertMergeSet(mergeSet);
@@ -176,7 +191,12 @@ describe('coordinated polyrepo merge completeness gate', () => {
     mocks.discoverArtifact.mockResolvedValue(null);
     mocks.findMergedArtifact.mockResolvedValue(null);
     mocks.mergeReviewArtifact.mockResolvedValue(undefined);
-    mocks.exec.mockResolvedValue({ stdout: '', stderr: '' });
+    mocks.exec.mockImplementation(async (command) => ({
+      stdout: command.includes('rev-list --count')
+        ? '2\n'
+        : command.includes('rev-parse') ? 'current-head-sha\n' : '',
+      stderr: '',
+    }));
   });
 
   it('blocks the merge before lifecycle when a required sibling is stranded', async () => {
@@ -185,7 +205,9 @@ describe('coordinated polyrepo merge completeness gate', () => {
       repo('repo-b'),
     ]);
     mocks.exec.mockImplementation(async (command) => ({
-      stdout: command.includes('rev-list --count') ? '2\n' : '',
+      stdout: command.includes('rev-list --count')
+        ? '2\n'
+        : command.includes('rev-parse') ? 'current-head-sha\n' : '',
       stderr: '',
     }));
 

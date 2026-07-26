@@ -4,13 +4,17 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const {
   ensureMergeSetForIssueMock,
   execMock,
+  getMergeSetMock,
   isGitHubAppConfiguredMock,
+  patchMergeSetRepoMock,
   upsertMergeSetMock,
   withRepoStateMock,
 } = vi.hoisted(() => ({
   ensureMergeSetForIssueMock: vi.fn(),
   execMock: vi.fn<[string, any?], Promise<{ stdout: string; stderr: string }>>(),
+  getMergeSetMock: vi.fn(),
   isGitHubAppConfiguredMock: vi.fn(),
+  patchMergeSetRepoMock: vi.fn(),
   upsertMergeSetMock: vi.fn(),
   withRepoStateMock: vi.fn(),
 }));
@@ -39,6 +43,8 @@ vi.mock('../../../../src/lib/github-app.js', () => ({
 
 vi.mock('../../../../src/lib/merge-set.js', () => ({
   ensureMergeSetForIssueSync: ensureMergeSetForIssueMock,
+  getMergeSetSync: getMergeSetMock,
+  patchMergeSetRepoSync: patchMergeSetRepoMock,
   upsertMergeSetSync: upsertMergeSetMock,
   withRepoArtifactUrlSync: vi.fn(),
   withRepoStateSync: withRepoStateMock,
@@ -69,9 +75,14 @@ describe('merge completeness forge error propagation', () => {
         required: true,
       }],
     });
+    getMergeSetMock.mockReturnValue(null);
+    patchMergeSetRepoMock.mockReturnValue(true);
     execMock.mockImplementation(async (command) => {
       if (command.includes('git rev-list --count')) return { stdout: '2\n', stderr: '' };
-      if (command.includes('gh pr list')) throw new Error('gh authentication failed');
+      if (command.includes('git rev-parse')) return { stdout: 'current-head-sha\n', stderr: '' };
+      if (command.includes('gh pr list') || command.includes('gh pr view')) {
+        throw new Error('gh authentication failed');
+      }
       return { stdout: '', stderr: '' };
     });
   });
@@ -88,7 +99,7 @@ describe('merge completeness forge error propagation', () => {
       }),
     ]);
     expect(execMock).toHaveBeenCalledWith(
-      'gh pr list --state merged --head feature/min-857 --json url,number,mergedAt',
+      'gh pr list --state merged --head feature/min-857 --json url,number,mergedAt,headRefOid,baseRefName,headRefName',
       expect.objectContaining({ cwd: '/projects/myn/api' }),
     );
   });
@@ -105,6 +116,7 @@ describe('merge completeness forge error propagation', () => {
         reason: expect.stringContaining('gh authentication failed'),
       }),
     ]);
+    expect(patchMergeSetRepoMock).not.toHaveBeenCalled();
     expect(withRepoStateMock).not.toHaveBeenCalled();
     expect(upsertMergeSetMock).not.toHaveBeenCalled();
   });
@@ -133,6 +145,7 @@ describe('merge completeness forge error propagation', () => {
         reason: expect.stringContaining('gh authentication failed'),
       }),
     ]);
+    expect(patchMergeSetRepoMock).not.toHaveBeenCalled();
     expect(withRepoStateMock).not.toHaveBeenCalled();
     expect(upsertMergeSetMock).not.toHaveBeenCalled();
   });
