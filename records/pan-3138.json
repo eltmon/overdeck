@@ -74,15 +74,7 @@
       "timestamp": "2026-07-26T15:43:23.681Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-26T15:43:23Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-3138\n\n# Review Synthesis — PAN-3138 — 2026-07-26T15:43:00Z\n\n## Verdict: CHANGES REQUESTED — Docker cleanup retries can be lost or later tear down a reopened issue's live stack\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3138/.pan/review/agent-pan-3138-review-f0a9c2b3/context.json\n- Branch: feature/pan-3138\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3138\n- HEAD reviewed: f0a9c2b38faee0a59137c9b52a78bae5bafc1ae0\n- Cycle number: 3\n- Prior cycle SHA: 2ae7a2971a8c4516de6fe78b878d3c2fb986c98e\n- PR commits: 9\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3138/.pan/review/agent-pan-3138-review-f0a9c2b3/security.md | 0 |\n| correctness | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3138/.pan/review/agent-pan-3138-review-f0a9c2b3/correctness.md | 2 |\n| performance | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3138/.pan/review/agent-pan-3138-review-f0a9c2b3/performance.md | 1 |\n| requirements | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3138/.pan/review/agent-pan-3138-review-f0a9c2b3/requirements.md | 0 |\n\n## Blocking Findings\n\n### [correctness] Failed eager teardown can lose its only retry owner — `src/lib/cloister/merge-agent.ts:371`\nThe relocated eager teardown now runs before fatal handoff work, but `networkRemoved: false` is ignored and a rejection is only logged. If the subsequent tracker transition also fails, its existing error path overwrites the already-verified local merge state with `mergeStatus: 'failed'`. The patrol only queues cleanup for canonical `mergeStatus: 'merged'`, so the failed eager attempt is never handed to the new retry worker and the `_devnet` can remain indefinitely. This code was moved and changed in the current cycle, so the cycle-3 convergence gate permits the blocker. Every unsuccessful eager teardown must register with a retry owner before proceeding, with a regression test that combines Docker teardown failure and tracker-transition failure.\n\n### [correctness] A stale retry entry can tear down a reopened issue's live stack — `src/lib/cloister/merged-docker-cleanup-worker.ts:45`\nFailed entries remain in the process-global queue with future eligibility, but `drainQueue()` never revalidates canonical merge state before running the destructive name-based teardown. If the issue is reopened and rebuilt during backoff, a later enqueue for any issue can wake the worker and select the stale entry, running `docker compose down -v` against the reopened issue's active containers and volumes. The worker is entirely new in this cycle, so this blocker survives the convergence gate. Revalidate canonical merged eligibility immediately before teardown, fail closed when status is unavailable, and cancel or discard pending entries when an issue is no longer merged; cover failed cleanup → reopen → later worker wake-up with fake timers.\n\n### [performance] Failed cleanup entries are never pruned when eligibility disappears — `src/lib/cloister/merged-docker-cleanup-worker.ts:35`\n`recordFailure()` retains each issue indefinitely, while future patrols only enqueue issues that still have an extant devnet and canonical merged status. Close-out, manual cleanup, or reopen can remove an issue from that eligible set without removing its queued entry, so the long-lived dashboard process accumulates stale issue IDs and retry state across failures. This new cycle's worker needs a reconciliation door that receives the current eligible set on each patrol and removes non-running entries no longer present. The same reconciliation also prevents stale reopened entries from becoming destructive retries.\n\n## Non-blocking Findings\n\n### [performance] Merge-time cleanup performs overlapping Compose teardown passes — `src/lib/cloister/merge-agent.ts:357`\nThe lifecycle awaits `stopWorkspaceDocker()` and then the name-based teardown primitive, and both can run Compose teardown for the same stack. This is advisory because it is bounded, asynchronous subprocess work and the second pass owns durable network removal, but retaining only behavior unique to the workspace-scoped cleanup would avoid duplicate Docker latency.\n\n## Clean Sub-roles\n- security\n- requirements\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3138/.pan/review/agent-pan-3138-review-f0a9c2b3/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3138 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "scripts/file-size-baseline.txt",
@@ -124,7 +116,7 @@
     "recordedAt": "2026-07-26T16:03:54.970Z"
   },
   "created": "2026-07-26T13:39:19.365Z",
-  "updated": "2026-07-26T16:03:55.878Z",
+  "updated": "2026-07-26T16:03:59.837Z",
   "pipeline": {
     "issueId": "PAN-3138",
     "reviewStatus": "pending",
@@ -133,9 +125,10 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T16:03:55.877Z",
+    "updatedAt": "2026-07-26T16:03:59.441Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3143",
     "lastVerifiedCommit": "f0a9c2b38faee0a59137c9b52a78bae5bafc1ae0",
+    "reviewRequestedAt": "2026-07-26T16:03:55.877Z",
     "reviewSpawnedAt": "2026-07-26T15:41:22.660Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -176,8 +169,7 @@
         "tests/unit/lib/review-status.test.ts"
       ],
       "recordedAt": "2026-07-26T16:03:54.970Z"
-    },
-    "reviewRequestedAt": "2026-07-26T16:03:55.877Z"
+    }
   },
   "closeOut": {
     "usage": {
@@ -224,24 +216,24 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 4451655,
-            "output": 258561,
-            "cacheRead": 157177344,
+            "input": 4659544,
+            "output": 262397,
+            "cacheRead": 159440384,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 18481986,
-          "output": 610220,
-          "cacheRead": 237925888,
+          "input": 18689875,
+          "output": 614056,
+          "cacheRead": 240188928,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 229.679474,
-        "pricingAsOf": "2026-07-26T15:57:07.196Z"
+        "usd": 231.965519,
+        "pricingAsOf": "2026-07-26T16:03:59.485Z"
       }
     },
     "merges": [
