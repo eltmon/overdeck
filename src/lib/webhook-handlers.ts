@@ -7,7 +7,7 @@
  */
 
 import { Effect } from 'effect';
-import { setReviewStatus, getReviewStatus, loadReviewStatuses, type BlockerReason, type ReviewStatus } from './review-status.js';
+import { setReviewStatus, getReviewStatus, loadReviewStatuses, type BlockerReason, type ReviewStatus, type ReviewStatusUpdate } from './review-status.js';
 import { getGitHubConfig } from '../dashboard/server/services/tracker-config.js';
 import { GitHubApiError } from './errors.js';
 import { relayCiFailureFeedback } from './cloister/ci-failure-feedback.js';
@@ -349,7 +349,7 @@ export async function refreshMergeStateFromGitHub(issueId: string, repo: string,
       }
     }
 
-    const update: Partial<ReviewStatus> = {};
+    const update: ReviewStatusUpdate = {};
     if (blockers.length > 0) update.blockerReasons = blockers;
     else if (status.blockerReasons && status.blockerReasons.length > 0) update.blockerReasons = undefined;
 
@@ -396,7 +396,7 @@ export async function refreshMergeStateFromGitHub(issueId: string, repo: string,
       }
     }
 
-    const update: Partial<ReviewStatus> = {};
+    const update: ReviewStatusUpdate = {};
     if (blockers.length > 0) update.blockerReasons = blockers;
     else if (status.blockerReasons && status.blockerReasons.length > 0) update.blockerReasons = undefined;
 
@@ -443,7 +443,7 @@ export async function refreshMergeStateFromGitHub(issueId: string, repo: string,
   const status = await loadAndValidateStatus(issueId, repo, pr.number, headMayHaveMoved ? undefined : pr.head.sha);
   if (!status) return;
 
-  const update: Partial<ReviewStatus> = {};
+  const update: ReviewStatusUpdate = {};
   let blockers = [...(status.blockerReasons ?? [])];
 
   // Populate missing PR identity and keep head SHA in sync on synchronize
@@ -532,7 +532,7 @@ export async function refreshMergeStateFromGitHub(issueId: string, repo: string,
     blockers = blockers.filter((b) => b.type !== 'changes_requested');
   }
 
-  const update: Partial<ReviewStatus> = {};
+  const update: ReviewStatusUpdate = {};
   if (blockers.length > 0) update.blockerReasons = blockers;
   else if (status.blockerReasons && status.blockerReasons.length > 0) update.blockerReasons = undefined;
 
@@ -622,7 +622,7 @@ async function handlePullRequestReviewThreadPromise(payload: WebhookPayload): Pr
     }
   }
 
-  const update: Partial<ReviewStatus> = {};
+  const update: ReviewStatusUpdate = {};
   if (blockers.length > 0) update.blockerReasons = blockers;
   else if (status.blockerReasons && status.blockerReasons.length > 0) update.blockerReasons = undefined;
 
@@ -671,7 +671,7 @@ async function handlePullRequestReviewThreadPromise(payload: WebhookPayload): Pr
         }
       }
 
-      const update: Partial<ReviewStatus> = {};
+      const update: ReviewStatusUpdate = {};
       if (blockers.length > 0) update.blockerReasons = blockers;
       else if (status.blockerReasons && status.blockerReasons.length > 0) update.blockerReasons = undefined;
 

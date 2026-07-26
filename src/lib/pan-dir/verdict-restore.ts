@@ -14,7 +14,8 @@ import {
   resolveProjectFromIssueSync,
   type ProjectConfig,
 } from '../projects.js';
-import { setReviewStatusSync, type ReviewStatus } from '../review-status.js';
+import { setReviewStatusSync, type ReviewStatus, type ReviewStatusUpdate } from '../review-status.js';
+import { rehydrateHeadAnchor } from '../git-utils.js';
 import { collectInFlightIssueIds } from './records-backfill.js';
 import { readIssueRecord, type PanIssuePipelineRecord } from './records.js';
 
@@ -44,7 +45,7 @@ function parseRepoFromPrUrl(prUrl: string): string | null {
  * to a Partial<ReviewStatus> update. Derived/live columns (blockerReasons,
  * readyForMerge) are intentionally omitted.
  */
-function pipelineToDurableUpdate(pipeline: PanIssuePipelineRecord): Partial<ReviewStatus> {
+function pipelineToDurableUpdate(pipeline: PanIssuePipelineRecord): ReviewStatusUpdate {
   return {
     reviewStatus: pipeline.reviewStatus as ReviewStatus['reviewStatus'],
     testStatus: pipeline.testStatus as ReviewStatus['testStatus'],
@@ -59,8 +60,14 @@ function pipelineToDurableUpdate(pipeline: PanIssuePipelineRecord): Partial<Revi
     prUrl: pipeline.prUrl,
     prNumber: pipeline.prNumber,
     prHeadSha: pipeline.prHeadSha,
-    reviewedAtCommit: pipeline.reviewedAtCommit,
-    lastVerifiedCommit: pipeline.lastVerifiedCommit,
+    // Durable records deserialize anchors as strings; re-brand only at the write door.
+    reviewedAtCommit: pipeline.reviewedAtCommit
+      ? rehydrateHeadAnchor(pipeline.reviewedAtCommit)
+      : undefined,
+    // Durable records deserialize anchors as strings; re-brand only at the write door.
+    lastVerifiedCommit: pipeline.lastVerifiedCommit
+      ? rehydrateHeadAnchor(pipeline.lastVerifiedCommit)
+      : undefined,
     autoMerge: pipeline.autoMerge,
     deaconIgnored: pipeline.deaconIgnored,
     deaconIgnoredAt: pipeline.deaconIgnoredAt,

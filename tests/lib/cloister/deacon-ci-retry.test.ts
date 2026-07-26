@@ -36,6 +36,11 @@ const mockSaveAgentStateSync = vi.fn();
 const mockClearAgentTroubledSync = vi.fn();
 const mockSpawnWorkAgentThroughAgentsEndpoint = vi.fn();
 const mockRecordDeadEndNeedsYou = vi.fn();
+const mockEvaluateWorkspaceAnchorDrift = vi.fn();
+
+vi.mock('../../../src/lib/workspace-anchor-drift.js', () => ({
+  evaluateWorkspaceAnchorDrift: (...args: unknown[]) => mockEvaluateWorkspaceAnchorDrift(...args),
+}));
 
 vi.mock('../../../src/lib/cloister/dead-end-trip.js', () => ({
   recordDeadEndNeedsYou: (...args: unknown[]) => mockRecordDeadEndNeedsYou(...args),
@@ -177,6 +182,10 @@ describe('checkFailedMergeRetry — CI transient retry state machine', () => {
     mockResolveProjectFromIssue.mockReset().mockReturnValue(null);
     mockSpawnReviewRoleForIssue.mockReset().mockResolvedValue({ success: true, message: 'dispatched' });
     mockIsIssueClosed.mockReset().mockResolvedValue(false);
+    mockEvaluateWorkspaceAnchorDrift.mockReset().mockResolvedValue({
+      kind: 'drifted',
+      currentAnchor: 'feedface00000000000000000000000000000000',
+    });
     // Default: read the real review-status.json so tests that write to it work
     mockLoadReviewStatuses.mockReset().mockImplementation(() => {
       try {

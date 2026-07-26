@@ -50,7 +50,6 @@ import { createInFlightGuard } from './in-flight-guard.js';
 import { listAllAgentsSync as listAllAgents } from '../overdeck/agents.js';
 import { isContextOverflowTail } from '../context-overflow.js';
 import { REVIEW_SUB_ROLES, type ReviewSubRole } from './review-monitor.js';
-import { haveSameEffectiveCodeCommit, haveSameCodeContribution } from '../pipeline-state-paths.js';
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
 // ---------------------------------------------------------------------------
@@ -1511,7 +1510,7 @@ export async function checkVerificationReviewContradiction(): Promise<string[]> 
         // it, checkPostReviewCommits can never confirm the review is current and
         // the canSkipTests fast-path in setReviewStatus never fires, leaving the
         // issue jammed at passed-but-stuck forever (PAN-977).
-        let reviewedAtCommit: string | undefined;
+        let reviewedAtCommit;
         try {
           const project = resolveProjectFromIssueSync(issueId);
           if (project) {
@@ -1521,8 +1520,8 @@ export async function checkVerificationReviewContradiction(): Promise<string[]> 
               `feature-${issueId.toLowerCase()}`,
             );
             if (existsSync(workspacePath)) {
-              const { stdout } = await execAsync('git rev-parse HEAD', { cwd: workspacePath });
-              reviewedAtCommit = stdout.trim();
+              const { snapshotWorkspaceHeadsPromise } = await import('../git-utils.js');
+              reviewedAtCommit = await snapshotWorkspaceHeadsPromise(issueId, workspacePath);
             }
           }
         } catch { /* non-fatal — leave reviewedAtCommit undefined */ }
@@ -1594,55 +1593,27 @@ export async function checkPostReviewCommits(): Promise<string[]> {
       );
       if (!existsSync(workspacePath)) continue;
 
-      // Get current HEAD
-      let currentHead: string;
-      try {
-        const { stdout } = await execAsync('git rev-parse HEAD', { cwd: workspacePath });
-        currentHead = stdout.trim();
-      } catch {
-        continue; // not a git repo or git unavailable
+      const { formatAnchorShort, rehydrateHeadAnchor } = await import('../git-utils.js');
+      const { evaluateWorkspaceAnchorDrift } = await import('../workspace-anchor-drift.js');
+      const verdict = await evaluateWorkspaceAnchorDrift(
+        issueId,
+        workspacePath,
+        rehydrateHeadAnchor(status.reviewedAtCommit), // Stored anchors re-brand at the evaluator boundary.
+      );
+      if (verdict.kind === 'unreadable' || verdict.kind === 'current') continue;
+
+      if (verdict.kind === 'benign') {
+        setReviewStatusSync(issueId, { reviewedAtCommit: verdict.currentAnchor });
+        console.log(`[deacon] Benign post-review HEAD move for ${issueId}: ${formatAnchorShort(status.reviewedAtCommit)} → ${formatAnchorShort(verdict.currentAnchor)} — review/test preserved`);
+        continue;
       }
 
-      if (currentHead === status.reviewedAtCommit) continue;
-
-      // Tree-identical rebases and state-plane-only commits move HEAD without
-      // invalidating review/test verdicts. Preserve the gates and advance the
-      // snapshot so this patrol does not repeatedly compare against old HEAD.
-      try {
-        const [oldTree, newTree] = await Promise.all([
-          execAsync(`git rev-parse ${status.reviewedAtCommit}^{tree}`, { cwd: workspacePath }),
-          execAsync(`git rev-parse ${currentHead}^{tree}`, { cwd: workspacePath }),
-        ]);
-        if (oldTree.stdout.trim() === newTree.stdout.trim()) {
-          setReviewStatusSync(issueId, { reviewedAtCommit: currentHead });
-          console.log(`[deacon] Tree-identical rebase for ${issueId}: ${status.reviewedAtCommit.substring(0, 8)} → ${currentHead.substring(0, 8)} (same tree) — review/test preserved`);
-          continue;
-        }
-      } catch {
-        // Fall through to reset if we can't read tree SHAs — safer than skipping
-      }
-
-      // State-plane-only commits (same effective code commit) and rebases onto a
-      // newer main (same non-state contribution by patch-id, despite rewritten
-      // SHAs — PAN-2468) move HEAD without changing the branch's own work.
-      // Preserve the verdicts and advance the snapshot rather than re-reviewing.
-      try {
-        const sameContribution =
-          (await haveSameEffectiveCodeCommit(workspacePath, status.reviewedAtCommit, currentHead)) ||
-          (await haveSameCodeContribution(workspacePath, status.reviewedAtCommit, currentHead));
-        if (sameContribution) {
-          setReviewStatusSync(issueId, { reviewedAtCommit: currentHead });
-          console.log(`[deacon] Benign post-review HEAD move for ${issueId}: ${status.reviewedAtCommit.substring(0, 8)} → ${currentHead.substring(0, 8)} — review/test preserved`);
-          continue;
-        }
-      } catch {
-        // Fall through to reset if the move cannot be inspected.
-      }
+      const currentHead = verdict.currentAnchor;
 
       // HEAD moved with a real tree change — new commits since review. Reset review pipeline.
       console.log(
         `[deacon] Post-review commit detected for ${issueId}: ` +
-        `was ${status.reviewedAtCommit.substring(0, 8)}, now ${currentHead.substring(0, 8)} — resetting review`,
+        `was ${formatAnchorShort(status.reviewedAtCommit)}, now ${formatAnchorShort(currentHead)} — resetting review`,
       );
       setReviewStatusSync(issueId, {
         reviewStatus: 'pending',
@@ -1663,7 +1634,7 @@ export async function checkPostReviewCommits(): Promise<string[]> {
       // starts fresh. Without this, ciRetryMap retains count=6 from the previous
       // CI failure cycle, permanently blocking transient retries for this issue.
       ciRetryMap.delete(issueId);
-      actions.push(`Reset review for ${issueId}: new commits after review passed (${status.reviewedAtCommit.substring(0, 8)} → ${currentHead.substring(0, 8)})`);
+      actions.push(`Reset review for ${issueId}: new commits after review passed (${formatAnchorShort(status.reviewedAtCommit)} → ${formatAnchorShort(currentHead)})`);
 
       // Redispatch a fresh review convoy. Re-read status to guard against races
       // with other dispatch paths (HTTP request-review, manual CLI) that may have

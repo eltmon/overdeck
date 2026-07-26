@@ -13,16 +13,33 @@ vi.mock('../../../src/lib/project-repos.js', async () => {
 });
 
 import {
+  type HeadAnchor,
   parseWorkspaceHeadAnchor,
   renderWorkspaceGitShowPromise,
+  snapshotWorkspaceHeadsPromise,
 } from '../../../src/lib/git-utils.js';
 
 const FE_SHA = 'a'.repeat(40);
 const API_SHA = 'b'.repeat(40);
 
+type ProducedHeadAnchor = Exclude<
+  Awaited<ReturnType<typeof snapshotWorkspaceHeadsPromise>>,
+  undefined
+>;
+
+function acceptsHeadAnchor(_anchor: HeadAnchor): void {}
+
 describe('polyrepo workspace head anchors', () => {
   beforeEach(() => {
     repoRootsMock.resolveWorkspaceRepoRootsSync.mockReset();
+  });
+
+  it('only accepts producer-issued values as head anchors', () => {
+    const producedAnchor = '' as ProducedHeadAnchor;
+    acceptsHeadAnchor(producedAnchor);
+
+    // @ts-expect-error Plain strings must not satisfy the branded write-door type.
+    acceptsHeadAnchor('plain-string');
   });
 
   it('keeps a plain sha on the single workspace git-show path', async () => {

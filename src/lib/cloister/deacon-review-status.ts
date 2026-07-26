@@ -9,7 +9,7 @@ import { listAllAgentsSync as listAllAgents } from '../overdeck/agents.js';
 import { markWorkspaceStuck } from '../overdeck/review-status-sync.js';
 import { AGENTS_DIR } from '../paths.js';
 import { resolveProjectFromIssueSync } from '../projects.js';
-import { getReviewStatusSync, loadReviewStatuses, setReviewStatusSync, type ReviewStatus } from '../review-status.js';
+import { getReviewStatusSync, loadReviewStatuses, setReviewStatusSync, type ReviewStatus, type ReviewStatusUpdate } from '../review-status.js';
 import { logDeaconEventSync } from '../persistent-logger.js';
 import { recordDeaconNudge } from './deacon-nudge-log.js';
 import { REVIEW_SUB_ROLES } from './review-monitor.js';
@@ -245,7 +245,7 @@ function latestHistoryByType(
 
 export function completedReviewSnapshotAfterCoordinatorExit(
   status: Pick<ReviewStatus, 'history'>,
-): Partial<ReviewStatus> | null {
+): ReviewStatusUpdate | null {
   const review = latestHistoryEntry(status.history, 'review', ['passed', 'failed', 'blocked']);
   if (review?.status !== 'passed') return null;
   const test = latestHistoryEntry(status.history, 'test', ['passed', 'failed', 'skipped']);
