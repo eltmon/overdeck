@@ -204,6 +204,12 @@ function ProjectSettingsSummary({ projectKey }: { projectKey: string }) {
   });
   const { data: swarmData } = useQuery({ queryKey: ['project-swarm-policy', projectKey], queryFn: async () => (await fetch(`/api/projects/${encodeURIComponent(projectKey)}/swarm-policy`)).json() as Promise<{ configured: { mode?: 'off' | 'auto' | 'always' } | null }> });
 
+  // PAN-1696 ac3: the merge-train state has to be legible while the disclosure is
+  // COLLAPSED. The expanded panel's summary is invisible until the operator opens
+  // it, so "the cockpit shows the ready-feature count" was only half true.
+  const { sections } = useMergeTrainData(false);
+  const trainSection = sections.find((sec) => sec.projectKey === projectKey);
+
   if (!data || !swarmData) return null;
 
   const autoMergeLabel = data.value === 'auto'
@@ -219,9 +225,17 @@ function ProjectSettingsSummary({ projectKey }: { projectKey: string }) {
         ? 'Swarm always'
         : 'Swarm inherit';
 
+  const readyCount = trainSection?.queue.length ?? 0;
+  const currentBatch = trainSection?.generations.find((g) => g.status === 'ready')
+    ?? trainSection?.generations.find((g) => g.status === 'assembling')
+    ?? trainSection?.generations.find((g) => g.status === 'superseded');
+  const trainLabel = trainSection && !trainSection.enabled
+    ? 'Train off'
+    : `Train ${readyCount} ready${currentBatch ? ` · ${shortName(currentBatch.name)}` : ''}`;
+
   return (
-    <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--muted-foreground)' }}>
-      {autoMergeLabel} · {swarmLabel}
+    <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--muted-foreground)' }} data-testid="project-settings-collapsed-summary">
+      {autoMergeLabel} · {swarmLabel} · {trainLabel}
     </span>
   );
 }

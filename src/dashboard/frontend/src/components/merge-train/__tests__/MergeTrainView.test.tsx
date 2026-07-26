@@ -203,6 +203,25 @@ describe('one section per project (ac1)', () => {
     expect(myn.textContent).toContain('turned off for Mind Your Now');
   });
 
+  it('keeps a disabled row visible when it is MIXED with idle enabled projects', async () => {
+    // The dangerous case: one enabled project with nothing ready plus one disabled
+    // project. Every queue is empty, so the collapse shortcut would fire and hide
+    // the fact that the second project's train is switched off.
+    mockFetch({
+      '/api/merge-train/queues': [
+        { projectKey: 'overdeck', projectName: 'Overdeck', enabled: true, queue: [] },
+        { projectKey: 'myn', projectName: 'Mind Your Now', enabled: false, queue: [] },
+      ],
+      '/api/merge-train/generations': [],
+    });
+    renderView();
+
+    await waitFor(() => expect(screen.getByTestId('merge-train-project-myn')).toBeTruthy());
+    expect(screen.getByTestId('merge-train-project-myn').textContent).toContain('turned off for Mind Your Now');
+    expect(screen.getByTestId('merge-train-project-overdeck')).toBeTruthy();
+    expect(screen.queryByText(/No features are ready to merge in any project/)).toBeNull();
+  });
+
   it('keeps the off rows visible when EVERY project has the train disabled', async () => {
     // Collapsing to "nothing ready anywhere" here would send the operator hunting
     // for missing work when the real answer is that the feature is switched off.
@@ -376,7 +395,12 @@ describe('actions post to the new endpoints behind confirms (ac3)', () => {
     const arg = mocks.confirm.mock.calls[0]![0] as { title: string; message: string };
     expect(arg.title).toContain('pan-otter-0610');
     expect(arg.message).toContain('Overdeck');
-    expect(arg.message).toMatch(/discards the batch/);
+    // The dialog must name the members it is about to throw away, like promote does.
+    expect(arg.message).toContain('PAN-1');
+    expect(arg.message).toContain('PAN-2');
+    expect(arg.message).toContain('feature/pan-1');
+    expect(arg.message).toMatch(/conflict resolution/);
+    expect(arg.message).toMatch(/no longer applies/);
   });
 
   it('cancelling rebuild fires no request', async () => {

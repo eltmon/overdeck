@@ -11,6 +11,8 @@ let mergeTrainValue: 'enabled' | 'disabled' | null;
 let mergeTrainEffective: boolean;
 let mergeTrainQueue: unknown[];
 let mergeTrainGenerations: Array<{ name: string; status: string }>;
+/** The server-computed effective flag on the aggregate payloads. */
+let mergeTrainAggregateEnabled: boolean;
 
 function renderDisclosure() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -27,6 +29,7 @@ describe('ProjectSettingsDisclosure', () => {
     mergeTrainEffective = true;
     mergeTrainQueue = [];
     mergeTrainGenerations = [];
+    mergeTrainAggregateEnabled = true;
     fetchControl = installStrictFetchMock(({ method, url, init }) => {
       if (method === 'GET' && url === '/api/projects/overdeck/auto-merge-default') {
         return Response.json({ value: autoMergeValue });
@@ -56,10 +59,10 @@ describe('ProjectSettingsDisclosure', () => {
       }
       // PAN-1696 ac3: the cockpit merge-train summary reads the aggregate endpoints.
       if (method === 'GET' && url === '/api/merge-train/queues') {
-        return Response.json([{ projectKey: 'overdeck', projectName: 'Overdeck', enabled: true, queue: mergeTrainQueue }]);
+        return Response.json([{ projectKey: 'overdeck', projectName: 'Overdeck', enabled: mergeTrainAggregateEnabled, queue: mergeTrainQueue }]);
       }
       if (method === 'GET' && url === '/api/merge-train/generations') {
-        return Response.json([{ projectKey: 'overdeck', projectName: 'Overdeck', enabled: true, generations: mergeTrainGenerations }]);
+        return Response.json([{ projectKey: 'overdeck', projectName: 'Overdeck', enabled: mergeTrainAggregateEnabled, generations: mergeTrainGenerations }]);
       }
       return undefined;
     });
@@ -93,18 +96,20 @@ describe('ProjectSettingsDisclosure', () => {
     swarmMode = 'auto';
     renderDisclosure();
 
-    expect(await screen.findByText('🔒 Hold for UAT · Swarm auto')).toBeInTheDocument();
+    expect((await screen.findByTestId('project-settings-collapsed-summary')).textContent)
+      .toBe('🔒 Hold for UAT · Swarm auto · Train 0 ready');
   });
 
   it('shows inherited labels when neither setting is configured', async () => {
     renderDisclosure();
 
-    expect(await screen.findByText('Global default · Swarm inherit')).toBeInTheDocument();
+    expect((await screen.findByTestId('project-settings-collapsed-summary')).textContent)
+      .toBe('Global default · Swarm inherit · Train 0 ready');
   });
 
   it('preserves the complete expanded settings panel', async () => {
     const { container } = renderDisclosure();
-    await screen.findByText('Global default · Swarm inherit');
+    await screen.findByTestId('project-settings-collapsed-summary');
     container.querySelector('details')?.setAttribute('open', '');
 
     expect(screen.getByRole('button', { name: 'Auto-merge default: ⚡ Auto' })).toBeInTheDocument();
@@ -149,6 +154,26 @@ describe('ProjectSettingsDisclosure', () => {
   });
 
   // PAN-1696 fe-cockpit-toggle ac3.
+  it('carries the merge-train state on the COLLAPSED summary line (ac3)', async () => {
+    mergeTrainQueue = [{ issueId: 'PAN-1' }, { issueId: 'PAN-2' }];
+    mergeTrainGenerations = [{ name: 'uat/pan-otter-0726', status: 'ready' }];
+    renderDisclosure();
+
+    // Nothing is expanded here — this is what the operator sees at a glance.
+    await waitFor(() => expect(screen.getByTestId('project-settings-collapsed-summary').textContent)
+      .toContain('Train 2 ready · pan-otter-0726'));
+  });
+
+  it('reports an off train on the collapsed summary line (ac3)', async () => {
+    // The collapsed line reads the server-computed effective flag off the same
+    // aggregate payload as the ready count, not the raw per-project override.
+    mergeTrainAggregateEnabled = false;
+    renderDisclosure();
+
+    await waitFor(() => expect(screen.getByTestId('project-settings-collapsed-summary').textContent)
+      .toContain('Train off'));
+  });
+
   it('summarises the ready-feature count and current batch, linking to Awaiting Merge (ac3)', async () => {
     mergeTrainQueue = [{ issueId: 'PAN-1' }, { issueId: 'PAN-2' }];
     mergeTrainGenerations = [
@@ -184,7 +209,7 @@ describe('ProjectSettingsDisclosure', () => {
 
   it('posts the selected auto-merge value', async () => {
     renderDisclosure();
-    await screen.findByText('Global default · Swarm inherit');
+    await screen.findByTestId('project-settings-collapsed-summary');
 
     fireEvent.click(screen.getByRole('button', { name: 'Auto-merge default: ⚡ Auto' }));
 

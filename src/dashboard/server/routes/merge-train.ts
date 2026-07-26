@@ -36,6 +36,11 @@ const readUnknownJsonBody = Effect.gen(function* () {
   }
 });
 
+/** A plain JSON object — not null, not an array, not a primitive. */
+function isJsonObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
 /** One project's merge-train queue as served by GET /api/merge-train/queues. */
 export interface MergeTrainQueueEntry {
   projectKey: string;
@@ -144,7 +149,10 @@ export async function postMergeTrainMergeNextPayload(
   payload: unknown,
   deps: MergeTrainMergeNextDeps = {},
 ): Promise<{ status: number; body: unknown }> {
-  const body = (payload ?? {}) as { n?: unknown; project?: unknown };
+  if (!isJsonObject(payload)) {
+    return { status: 400, body: { error: 'body must be a JSON object: { n, project }' } };
+  }
+  const body = payload as { n?: unknown; project?: unknown };
   const n = typeof body.n === 'number' && Number.isFinite(body.n) ? Math.floor(body.n) : 0;
   if (n <= 0) return { status: 400, body: { error: 'n must be a positive integer' } };
 
@@ -170,7 +178,14 @@ export async function postMergeTrainMergeNextPayload(
  * generation; with no body it reconciles every merge-train-enabled project.
  */
 export async function postMergeTrainAssemblePayload(payload: unknown): Promise<{ status: number; body: unknown }> {
-  const body = (payload ?? {}) as { project?: unknown };
+  // Only a JSON OBJECT may reach the all-projects path. `"x"`, `123`, `null` and
+  // `[…]` are all valid JSON that would otherwise read as "no project named" and
+  // force a git fetch/worktree sweep across every tracked repo. An absent body
+  // arrives here as {} from readUnknownJsonBody, which is the deliberate form.
+  if (!isJsonObject(payload)) {
+    return { status: 400, body: { error: 'body must be a JSON object: {} for all projects, or { project }' } };
+  }
+  const body = payload as { project?: unknown };
   const { runUatTrainReconcile, runUatTrainReconcileAllProjects } = await import('../services/uat-train.js');
 
   if (typeof body.project === 'string' && body.project.trim() !== '') {

@@ -363,9 +363,13 @@ export function MergeTrainView({ active, onNavigateIssue, showProjectFilter = tr
   };
 
   const onRebuild = async (section: MergeTrainProjectSection, gen: UatGenerationPayload) => {
+    const discarded = gen.members.map((m, i) => `${i + 1}. ${m.issueId} (${m.branch}) — ${m.title}`).join('\n');
+    const resolutionNote = gen.resolutions.length > 0
+      ? `\n\nThe ${gen.resolutions.length} conflict resolution${gen.resolutions.length === 1 ? '' : 's'} in this batch (${gen.resolutions.map((r) => r.issueIds.join(' ↔ ')).join('; ')}) will be redone from scratch.`
+      : '';
     const ok = await confirm({
       title: `Rebuild ${shortName(gen.name)} from current main?`,
-      message: `Re-merges ${section.projectName}'s ready features onto a fresh branch off current main, replacing this batch.\n\nThis runs git operations in ${section.projectName} and discards the batch you may already be testing — any UAT you have done against it no longer applies.`,
+      message: `Discards this batch and re-merges ${section.projectName}'s ready features onto a fresh branch off current main. The batch being discarded contains:\n${discarded}${resolutionNote}\n\nThis runs git operations in ${section.projectName}, and any UAT you already did against ${shortName(gen.name)} no longer applies.`,
       confirmLabel: 'Rebuild batch',
     });
     if (ok) rebuildMutation.mutate(section.projectKey);
@@ -420,14 +424,16 @@ export function MergeTrainView({ active, onNavigateIssue, showProjectFilter = tr
     );
   };
 
-  // "Nothing ready anywhere" is only honest when at least one project could have
-  // had something ready. With every train switched off, collapsing to that message
-  // hides the disabled rows and misreports the reason — the operator would go
-  // hunting for missing work when the answer is that the feature is off.
-  const allDisabled = sections.length > 0 && sections.every((s) => !s.enabled);
+  // "Nothing ready anywhere" may only replace the sections when there is nothing
+  // a section would have told the operator. A disabled project's row carries real
+  // information — the train is OFF here, which is a different answer from "nothing
+  // is ready" — so ANY disabled row suppresses the collapse, not just the
+  // all-disabled case. Otherwise a mix of idle-enabled and disabled projects hides
+  // the off rows and sends the operator hunting for work that was never coming.
+  const anyDisabled = sections.some((s) => !s.enabled);
   const nothingAnywhere =
     !loading &&
-    !allDisabled &&
+    !anyDisabled &&
     sections.length > 0 &&
     sections.every((s) => s.queue.length === 0 && visibleGenerationsOf(s).length === 0);
 

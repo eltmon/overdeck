@@ -299,6 +299,25 @@ describe('PAN-1696 merge-train-routes', () => {
       expect(uatTrainMocks.runUatTrainReconcileAllProjects).toHaveBeenCalledWith({ force: true });
     });
 
+    it('rejects VALID non-object assemble bodies instead of reconciling everything', async () => {
+      // These all parse as JSON, so the malformed-JSON guard never sees them; each
+      // would previously read as "no project named" = force-reconcile every repo.
+      for (const body of ['"myn"', '123', 'null', '[{"project":"myn"}]', 'true'] as const) {
+        const result = await postMergeTrainAssemblePayload(JSON.parse(body));
+        expect(result.status, body).toBe(400);
+      }
+      expect(uatTrainMocks.runUatTrainReconcileAllProjects).not.toHaveBeenCalled();
+      expect(uatTrainMocks.runUatTrainReconcile).not.toHaveBeenCalled();
+    });
+
+    it('rejects VALID non-object merge-next bodies', async () => {
+      for (const body of ['"myn"', '7', 'null', '[]'] as const) {
+        const result = await postMergeTrainMergeNextPayload(JSON.parse(body));
+        expect(result.status, body).toBe(400);
+      }
+      expect(mergeBatchMocks.shipMergeBatch).not.toHaveBeenCalled();
+    });
+
     it('rejects assemble for an unknown project key with 404', async () => {
       const result = await postMergeTrainAssemblePayload({ project: 'nope' });
       expect(result.status).toBe(404);
