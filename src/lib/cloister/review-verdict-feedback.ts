@@ -83,6 +83,9 @@ function buildReviewFeedbackBody(opts: {
 // command and the issue stalls in-review. A bounded timeout turns a stall into
 // a rejection the caller already swallows.
 const PR_COMMENT_TIMEOUT_MS = 15_000;
+const suppressedReviewFeedbackDeliveries = new Map<string, number>();
+const REPEATED_DELIVERY_LOOP_MESSAGE =
+  'Review feedback for this verdict was already delivered to the agent; the pipeline re-triggered delivery 3+ times — possible stuck loop. Investigate before the agent context burns.';
 
 export async function postPrComment(prUrl: string | undefined, body: string): Promise<boolean> {
   const parsed = parseGitHubPrUrl(prUrl);
@@ -149,8 +152,9 @@ async function deliverReviewVerdictFeedbackPromise(
         try {
           // PAN-2668: a blocked/failed review verdict owes rework — re-drive a
           // stopped-by-user agent with a completed handoff instead of queueing.
+          let deliveryOutcome;
           try {
-            await messageAgent(target.agentId, message, 'internal', {
+            deliveryOutcome = await messageAgent(target.agentId, message, 'internal', {
               owesRework: true,
               dedupKey,
             });
@@ -162,12 +166,36 @@ async function deliverReviewVerdictFeedbackPromise(
             console.warn(
               `[review-verdict-feedback] ${target.agentId} cannot enforce keyed delivery; retrying unkeyed`,
             );
-            await messageAgent(target.agentId, message, 'internal', { owesRework: true });
+            deliveryOutcome = await messageAgent(
+              target.agentId,
+              message,
+              'internal',
+              { owesRework: true },
+            );
           }
           agentMessageSent = true;
-          // PAN-3074: delivery succeeded — a prior feedback_delivery_needs_you
-          // flag no longer describes reality.
-          clearFeedbackDeliveryStuck(issueId);
+          let repeatedDeliveryLoop = false;
+          if (deliveryOutcome.deduplicated) {
+            const suppressedCount = (suppressedReviewFeedbackDeliveries.get(dedupKey) ?? 0) + 1;
+            suppressedReviewFeedbackDeliveries.set(dedupKey, suppressedCount);
+            repeatedDeliveryLoop = suppressedCount >= 2;
+            if (suppressedCount === 2) {
+              try {
+                await surfaceIssueFeedbackNeedsYou(issueId, REPEATED_DELIVERY_LOOP_MESSAGE, {
+                  specialist: 'review-agent',
+                  feedbackPath: fileResult.filePath,
+                });
+              } catch (err) {
+                console.warn(`[review-verdict-feedback] Could not surface repeated delivery loop for ${issueId}: ${err instanceof Error ? err.message : String(err)}`);
+              }
+            }
+          } else {
+            suppressedReviewFeedbackDeliveries.delete(dedupKey);
+          }
+          // PAN-3074: a fresh delivery clears stale feedback-delivery state. Once
+          // repeated suppressions surface a loop, preserve that operator-visible
+          // state until a non-deduplicated delivery proves the loop ended.
+          if (!repeatedDeliveryLoop) clearFeedbackDeliveryStuck(issueId);
         } catch (err) {
           // PAN-2228: a resolved-but-unreachable target is a real delivery failure,
           // not a shrug. Surface it as needs-you so the stall is visible instead of

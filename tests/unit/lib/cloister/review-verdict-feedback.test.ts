@@ -13,6 +13,7 @@ const {
   mockWriteFeedbackFile,
   mockResolveIssueFeedbackTarget,
   mockSurfaceIssueFeedbackNeedsYou,
+  mockClearFeedbackDeliveryStuck,
 } = vi.hoisted(() => ({
   mockMessageAgent: vi.fn(),
   mockResolveProjectFromIssue: vi.fn(),
@@ -20,6 +21,7 @@ const {
   mockWriteFeedbackFile: vi.fn(),
   mockResolveIssueFeedbackTarget: vi.fn(),
   mockSurfaceIssueFeedbackNeedsYou: vi.fn(),
+  mockClearFeedbackDeliveryStuck: vi.fn(),
 }));
 
 vi.mock('node:child_process', () => ({
@@ -38,6 +40,7 @@ vi.mock('../../../../src/lib/projects.js', () => ({
 vi.mock('../../../../src/lib/review-status.js', () => ({
   getReviewStatus: mockGetReviewStatus,
   getReviewStatusSync: mockGetReviewStatus,
+  clearFeedbackDeliveryStuck: mockClearFeedbackDeliveryStuck,
 }));
 
 vi.mock('../../../../src/lib/cloister/feedback-writer.js', () => ({
@@ -57,6 +60,7 @@ describe('deliverReviewVerdictFeedback', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockResolveProjectFromIssue.mockReturnValue(null);
+    mockMessageAgent.mockResolvedValue({ delivered: true, queuedToMail: false });
     mockGetReviewStatus.mockReturnValue({ prUrl: 'https://github.com/eltmon/overdeck/pull/1059' });
     mockWriteFeedbackFile.mockReturnValue(Effect.succeed({
       success: true,
@@ -165,12 +169,72 @@ describe('deliverReviewVerdictFeedback', () => {
     );
   });
 
+  it('escalates once on the second suppressed re-delivery for one key', async () => {
+    mockMessageAgent.mockResolvedValue({
+      delivered: true,
+      queuedToMail: false,
+      deduplicated: true,
+    });
+    const { deliverReviewVerdictFeedback } = await import(
+      '../../../../src/lib/cloister/review-verdict-feedback.js'
+    );
+    const options = {
+      issueId: 'PAN-2059',
+      verdict: 'blocked' as const,
+      runId: 'agent-pan-2059-review-abcdef12',
+    };
+
+    await Effect.runPromise(deliverReviewVerdictFeedback(options));
+    expect(mockSurfaceIssueFeedbackNeedsYou).not.toHaveBeenCalled();
+
+    await Effect.runPromise(deliverReviewVerdictFeedback(options));
+    expect(mockSurfaceIssueFeedbackNeedsYou).toHaveBeenCalledOnce();
+    expect(mockSurfaceIssueFeedbackNeedsYou).toHaveBeenCalledWith(
+      'PAN-2059',
+      'Review feedback for this verdict was already delivered to the agent; the pipeline re-triggered delivery 3+ times — possible stuck loop. Investigate before the agent context burns.',
+      {
+        specialist: 'review-agent',
+        feedbackPath: '/tmp/workspace/.pan/feedback/001-review-agent-changes-requested.md',
+      },
+    );
+
+    await Effect.runPromise(deliverReviewVerdictFeedback(options));
+    expect(mockSurfaceIssueFeedbackNeedsYou).toHaveBeenCalledOnce();
+    expect(mockClearFeedbackDeliveryStuck).toHaveBeenCalledTimes(1);
+  });
+
+  it('resets the suppression counter after a fresh delivery for the same key', async () => {
+    mockMessageAgent
+      .mockResolvedValueOnce({ delivered: true, queuedToMail: false, deduplicated: true })
+      .mockResolvedValueOnce({ delivered: true, queuedToMail: false, deduplicated: true })
+      .mockResolvedValueOnce({ delivered: true, queuedToMail: false })
+      .mockResolvedValueOnce({ delivered: true, queuedToMail: false, deduplicated: true });
+    const { deliverReviewVerdictFeedback } = await import(
+      '../../../../src/lib/cloister/review-verdict-feedback.js'
+    );
+    const options = {
+      issueId: 'PAN-3059',
+      verdict: 'blocked' as const,
+      runId: 'agent-pan-3059-review-abcdef12',
+    };
+
+    await Effect.runPromise(deliverReviewVerdictFeedback(options));
+    await Effect.runPromise(deliverReviewVerdictFeedback(options));
+    expect(mockSurfaceIssueFeedbackNeedsYou).toHaveBeenCalledOnce();
+
+    await Effect.runPromise(deliverReviewVerdictFeedback(options));
+    await Effect.runPromise(deliverReviewVerdictFeedback(options));
+
+    expect(mockSurfaceIssueFeedbackNeedsYou).toHaveBeenCalledOnce();
+    expect(mockClearFeedbackDeliveryStuck).toHaveBeenCalledTimes(3);
+  });
+
   it('falls back to unkeyed delivery when the target transport cannot enforce a key', async () => {
     mockMessageAgent
       .mockRejectedValueOnce(new Error(
         'MessageDeliveryFailed: keyed delivery failed for agent-pan-1059 (internal): the ACP tier cannot enforce a dedup key',
       ))
-      .mockResolvedValueOnce(undefined);
+      .mockResolvedValueOnce({ delivered: true, queuedToMail: false });
     const { deliverReviewVerdictFeedback } = await import(
       '../../../../src/lib/cloister/review-verdict-feedback.js'
     );
