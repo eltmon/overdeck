@@ -1553,18 +1553,28 @@ export async function checkVerificationReviewContradiction(): Promise<string[]> 
 // Post-review commit detection
 // ============================================================================
 
+const BLOCKED_REVIEW_MISSING_ANCHOR_LOG_INTERVAL_MS = 60 * 60 * 1000;
+const blockedReviewMissingAnchorLogs = new Map<string, number>();
+const blockedReviewDriftObservations = new Map<
+  string,
+  { reviewedAnchor: string; currentAnchor: string }
+>();
+
+function uniformReviewerVerdictAnchor(status: ReviewStatus): string | undefined {
+  const verdicts = Object.values(status.reviewerVerdicts ?? {});
+  if (verdicts.length === 0) return undefined;
+  const anchors = verdicts.map(verdict => verdict?.atCommit).filter((anchor): anchor is string => Boolean(anchor));
+  if (anchors.length !== verdicts.length) return undefined;
+  return anchors.every(anchor => anchor === anchors[0]) ? anchors[0] : undefined;
+}
+
 /**
- * Detect issues where the agent pushed new commits AFTER review passed.
+ * Detect issues where the agent pushed new commits after a review verdict.
  *
- * When review passes, specialists.ts snapshots the HEAD commit SHA into
- * `reviewedAtCommit`. On each patrol, we check all passed/readyForMerge
- * issues: if the workspace HEAD has moved past that snapshot, the review
- * is stale and must be re-run.
- *
- * Guards:
- *   - Only fires when reviewedAtCommit is populated (set since the review passed)
- *   - Skips issues already merged (mergeStatus === 'merged')
- *   - Skips issues whose workspace directory doesn't exist
+ * Passed reviews are invalidated immediately when the reviewed tree changes.
+ * Blocked reviews use the same drift evaluator, but require two consecutive
+ * patrols at the same new HEAD before re-dispatching so a work agent that is
+ * still pushing per-item commits does not start review mid-rework.
  */
 export async function checkPostReviewCommits(): Promise<string[]> {
   const actions: string[] = [];
@@ -1574,16 +1584,37 @@ export async function checkPostReviewCommits(): Promise<string[]> {
     const { resolveProjectFromIssueSync } = await import('../projects.js');
 
     for (const [issueId, status] of Object.entries(statuses)) {
-      // Only check passed reviews not yet merged
-      if (status.mergeStatus === 'merged') continue;
-      if (!status.reviewedAtCommit) continue;
-      if (status.reviewStatus !== 'passed' && !status.readyForMerge) continue;
+      const isBlocked = status.reviewStatus === 'blocked';
+      if (!isBlocked) blockedReviewDriftObservations.delete(issueId);
+
+      if (status.mergeStatus === 'merged') {
+        blockedReviewDriftObservations.delete(issueId);
+        continue;
+      }
+      if (!isBlocked && status.reviewStatus !== 'passed' && !status.readyForMerge) continue;
+
+      const reviewedAnchor = status.reviewedAtCommit
+        ?? (isBlocked ? uniformReviewerVerdictAnchor(status) : undefined);
+      if (!reviewedAnchor) {
+        blockedReviewDriftObservations.delete(issueId);
+        if (isBlocked) {
+          const now = Date.now();
+          const lastLoggedAt = blockedReviewMissingAnchorLogs.get(issueId) ?? 0;
+          if (now - lastLoggedAt >= BLOCKED_REVIEW_MISSING_ANCHOR_LOG_INTERVAL_MS) {
+            blockedReviewMissingAnchorLogs.set(issueId, now);
+            logDeaconEventSync(
+              `checkPostReviewCommits: ${issueId} blocked without anchor — cannot detect drift`,
+            );
+          }
+        }
+        continue;
+      }
       if (await isIssueClosed(issueId)) {
+        blockedReviewDriftObservations.delete(issueId);
         console.log(`[deacon] ${issueId}: skipping review re-dispatch — issue is closed`);
         continue;
       }
 
-      // Resolve workspace path
       const project = resolveProjectFromIssueSync(issueId);
       if (!project) continue;
       const workspacePath = join(
@@ -1598,43 +1629,73 @@ export async function checkPostReviewCommits(): Promise<string[]> {
       const verdict = await evaluateWorkspaceAnchorDrift(
         issueId,
         workspacePath,
-        rehydrateHeadAnchor(status.reviewedAtCommit), // Stored anchors re-brand at the evaluator boundary.
+        rehydrateHeadAnchor(reviewedAnchor),
       );
-      if (verdict.kind === 'unreadable' || verdict.kind === 'current') continue;
+      if (verdict.kind === 'unreadable' || verdict.kind === 'current') {
+        blockedReviewDriftObservations.delete(issueId);
+        continue;
+      }
 
       if (verdict.kind === 'benign') {
+        blockedReviewDriftObservations.delete(issueId);
         setReviewStatusSync(issueId, { reviewedAtCommit: verdict.currentAnchor });
-        console.log(`[deacon] Benign post-review HEAD move for ${issueId}: ${formatAnchorShort(status.reviewedAtCommit)} → ${formatAnchorShort(verdict.currentAnchor)} — review/test preserved`);
+        console.log(`[deacon] Benign post-review HEAD move for ${issueId}: ${formatAnchorShort(reviewedAnchor)} → ${formatAnchorShort(verdict.currentAnchor)} — review/test preserved`);
         continue;
       }
 
       const currentHead = verdict.currentAnchor;
+      if (isBlocked) {
+        const priorObservation = blockedReviewDriftObservations.get(issueId);
+        if (
+          !priorObservation
+          || priorObservation.reviewedAnchor !== reviewedAnchor
+          || priorObservation.currentAnchor !== currentHead
+        ) {
+          blockedReviewDriftObservations.set(issueId, {
+            reviewedAnchor,
+            currentAnchor: currentHead,
+          });
+          continue;
+        }
+        blockedReviewDriftObservations.delete(issueId);
+      }
 
-      // HEAD moved with a real tree change — new commits since review. Reset review pipeline.
       console.log(
         `[deacon] Post-review commit detected for ${issueId}: ` +
-        `was ${formatAnchorShort(status.reviewedAtCommit)}, now ${formatAnchorShort(currentHead)} — resetting review`,
+        `was ${formatAnchorShort(reviewedAnchor)}, now ${formatAnchorShort(currentHead)} — resetting review`,
       );
-      setReviewStatusSync(issueId, {
-        reviewStatus: 'pending',
-        testStatus: 'pending',
-        readyForMerge: false,
-        reviewedAtCommit: undefined,
-        reviewNotes: undefined,
-        testNotes: undefined,
-        // Reset merge retry counter so checkFailedMergeRetry can retry again after
-        // the work agent pushes a fix (e.g. to address a CI check failure).
-        mergeRetryCount: 0,
-        // PAN-794: new commits open a fresh recovery cycle — stale infra
-        // failures from the previous cycle must not poison the breaker budget.
-        reviewRetryCount: 0,
-        recoveryStartedAt: undefined,
-      });
+      if (isBlocked) {
+        setReviewStatusSync(issueId, {
+          reviewStatus: 'pending',
+          readyForMerge: false,
+          reviewedAtCommit: undefined,
+          reviewRetryCount: 0,
+          recoveryStartedAt: undefined,
+        });
+      } else {
+        setReviewStatusSync(issueId, {
+          reviewStatus: 'pending',
+          testStatus: 'pending',
+          readyForMerge: false,
+          reviewedAtCommit: undefined,
+          reviewNotes: undefined,
+          testNotes: undefined,
+          // Reset merge retry counter so checkFailedMergeRetry can retry again after
+          // the work agent pushes a fix (e.g. to address a CI check failure).
+          mergeRetryCount: 0,
+          // PAN-794: new commits open a fresh recovery cycle — stale infra
+          // failures from the previous cycle must not poison the breaker budget.
+          reviewRetryCount: 0,
+          recoveryStartedAt: undefined,
+        });
+      }
       // Also clear the CI transient retry counter so the next merge attempt
       // starts fresh. Without this, ciRetryMap retains count=6 from the previous
       // CI failure cycle, permanently blocking transient retries for this issue.
       ciRetryMap.delete(issueId);
-      actions.push(`Reset review for ${issueId}: new commits after review passed (${formatAnchorShort(status.reviewedAtCommit)} → ${formatAnchorShort(currentHead)})`);
+      if (!isBlocked) {
+        actions.push(`Reset review for ${issueId}: new commits after review passed (${formatAnchorShort(reviewedAnchor)} → ${formatAnchorShort(currentHead)})`);
+      }
 
       // Redispatch a fresh review convoy. Re-read status to guard against races
       // with other dispatch paths (HTTP request-review, manual CLI) that may have
@@ -1662,8 +1723,11 @@ export async function checkPostReviewCommits(): Promise<string[]> {
           actions.push(`Deferred post-review re-dispatch for ${issueId} — ${dispatchResult.message}`);
           console.log(`[deacon] Deferred post-review re-dispatch for ${issueId}: ${dispatchResult.message}`);
         } else if (dispatchResult.success) {
-          actions.push(`Re-dispatched review for ${issueId}`);
-          console.log(`[deacon] Re-dispatched review convoy for ${issueId} after post-review commit reset`);
+          const action = isBlocked
+            ? `Re-dispatched review for ${issueId}: rework commit after BLOCKED verdict (${formatAnchorShort(reviewedAnchor)} → ${formatAnchorShort(currentHead)})`
+            : `Re-dispatched review for ${issueId}`;
+          actions.push(action);
+          console.log(`[deacon] ${action}`);
         } else {
           actions.push(`Failed to re-dispatch review for ${issueId}: ${dispatchResult.error || dispatchResult.message}`);
           console.error(`[deacon] Failed to re-dispatch review for ${issueId}:`, dispatchResult.error || dispatchResult.message);
