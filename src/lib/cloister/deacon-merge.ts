@@ -16,6 +16,9 @@ import { sessionExistsSync, sendKeys } from '../tmux.js';
 import { isAgentIdleForNudge } from './agent-idle.js';
 import { loadCloisterConfig } from './config.js';
 import { getAutoCloseOutCanonicalState, sweepAutoCloseOutCache } from './deacon-canonical-state.js';
+import { observeGitHubBranchMerge } from './deacon-stuck-merging.js';
+
+export { reconcileStuckMergingStates } from './deacon-stuck-merging.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -214,23 +217,8 @@ export async function reconcileStaleMergeStatus(): Promise<string[]> {
       // unrelated commits landed on main with `(PAN-977)` references and the
       // deacon trusted them. GitHub's API is the only authoritative source.
       if (!isMerged) {
-        const { resolveGitHubIssueSync: _resolveGitHubIssue } = await import('../tracker-utils.js');
-        const ghResolved = _resolveGitHubIssue(issueId);
-        if (ghResolved.isGitHub) {
-          try {
-            const repoArg = `${ghResolved.owner}/${ghResolved.repo}`;
-            const { stdout } = await execFileAsync(
-              'gh', ['pr', 'list', '--repo', repoArg, '--head', branch, '--state', 'all', '--json', 'number,mergedAt,mergeCommit', '--limit', '5'],
-              { cwd: project.projectPath },
-            );
-            const prs = JSON.parse(stdout || '[]') as Array<{ number: number; mergedAt: string | null; mergeCommit: unknown | null }>;
-            if (prs.some((pr) => pr.mergedAt || pr.mergeCommit)) {
-              isMerged = true;
-            }
-          } catch {
-            // gh query failed — leave isMerged as false rather than guess.
-          }
-        }
+        const githubObservation = await observeGitHubBranchMerge(issueId, branch, project.projectPath);
+        isMerged = githubObservation.merged;
       }
       if (shouldObserveForge && mergeRelevant) {
         try {
