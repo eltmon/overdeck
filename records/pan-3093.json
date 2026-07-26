@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T12:33:18.311Z",
-  "updated": "2026-07-26T13:37:39.366Z",
+  "updated": "2026-07-26T13:37:51.750Z",
   "pipeline": {
     "issueId": "PAN-3093",
     "reviewStatus": "pending",
@@ -55,8 +55,16 @@
   "harness": "claude-code",
   "model": "claude-opus-5",
   "tasks": {
-    "sequence": 4,
-    "claims": {},
+    "sequence": 5,
+    "claims": {
+      "polyrepo-ready-set": {
+        "writerId": "agent-pan-3093",
+        "agentId": "agent-pan-3093",
+        "pid": 2958702,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T13:37:51.749Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3093",
@@ -99,6 +107,7 @@
     "schema-per-repo-generation-tables.schema-per-repo-generation-tables.ac3": "completed",
     "conflict-hook-repo-scope": "completed",
     "conflict-hook-repo-scope.conflict-hook-repo-scope.ac1": "completed",
-    "conflict-hook-repo-scope.conflict-hook-repo-scope.ac2": "completed"
+    "conflict-hook-repo-scope.conflict-hook-repo-scope.ac2": "completed",
+    "polyrepo-ready-set": "running"
   }
 }
