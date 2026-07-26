@@ -16,9 +16,11 @@ allowed-tools:
   - Read
 ---
 
-# Overdeck Dashboard Restart (production-safe, detached)
+# Overdeck Dashboard Restart (production-safe)
 
 The dashboard the browser talks to is the **pre-built `dist/dashboard/server.js` running under Node 22**, started from the **primary repo checkout** (NOT a `workspaces/feature-*` copy). It serves both the built frontend and the API on one port. **Never** run the production server via `npm run dev`, `tsx`, `vite`, or Bun — that violates the dashboard-node22-only rule (node-pty native addon + circular ESM). `pan dev` is the *development* path (vite HMR for the frontend + Node server); `pan up` is the *production* path.
+
+The **supervisor sidecar** (`overdeck-supervisor.service`, port 3012) owns the dashboard lifecycle: it health-checks the server and respawns it as a systemd unit with the full env from `config.yaml`. Restart **through** it (`POST :3012/restart-dashboard`) — a manually spawned server is a duplicate it will replace, and racing it costs minutes of churn. The manual detached start below is the fallback for when the supervisor itself is down, and it must carry the Traefik env block (gotcha 7).
 
 ## When to use this skill
 
@@ -35,33 +37,53 @@ The dashboard the browser talks to is the **pre-built `dist/dashboard/server.js`
 3. **Exactly ONE server.** Two servers = two deacons racing the same `~/.overdeck` state (the duel), and the PAN-1625 janitor reaps/churns extras. A single port-owner is left alone.
 4. **Work-agent tmux sessions survive a dashboard restart** — they are separate processes on the `overdeck` socket. Restarting the dashboard does NOT kill agents; the new deacon reconciles them as running.
 5. **Run from the primary repo**, not a workspace. If `readlink /proc/<pid>/cwd` is a `workspaces/feature-*` path, a workspace dashboard hijacked the port — kill it and restart from the primary checkout.
+6. **The supervisor sidecar owns the dashboard lifecycle.** `overdeck-supervisor.service` (port 3012) health-checks the dashboard and respawns it as a systemd unit with the full env from `config.yaml`. A manual server you spawn yourself is a duplicate it will replace — so restart THROUGH the supervisor (below) instead of racing it, and never kill a systemd-parented server that carries `OVERDECK_TRAEFIK_*` env: that is the supervisor's correctly-configured replacement, not a stray.
+7. **A bare `node dist/dashboard/server.js` launch 403s the domain on dists without the config fallback.** `getTrustedOrigins()` reads the launch env; no `OVERDECK_TRAEFIK_*` → only loopback is trusted → `/ws/*` 403s `https://overdeck.localhost` → the dashboard hangs on "Reconnecting to the dashboard…" while `localhost:3011` works. `/api/health` returns 200 the whole time because it does no origin validation. Newer dists fall back to `config.yaml` (commit `e86d125071`), but always launch WITH the env block below — it costs nothing and works on every dist.
 
 ## Procedure
 
 ```bash
 cd ~/Projects/overdeck   # the PRIMARY checkout
 
+# 0. Domain comes from config.yaml — the same source pan up / the supervisor use
+DOMAIN=$(awk '/^traefik:/{f=1} f && /^  domain:/{print $2; exit}' ~/.overdeck/config.yaml)
+DOMAIN=${DOMAIN:-overdeck.localhost}
+
 # 1. Rebuild ONLY if you changed server/lib source (the Node 22 dist is what runs)
 npm run build
 
-# 2. Find the live dashboard port + PID, kill by EXPLICIT PID (never pkill -f self-matching)
-PORT_LINE=$(ss -ltnp 2>/dev/null | grep -E ':(3010|3011|3012)\b' | grep node | head -1)
-OLD=$(echo "$PORT_LINE" | grep -oE 'pid=[0-9]+' | head -1 | cut -d= -f2)
-echo "current server: pid=$OLD"
+# 2. PREFERRED: restart through the supervisor (it owns the lifecycle, sets the
+#    correct env from config.yaml, and systemd-manages the result). Skip to step 3
+#    only when port 3012 refuses connections.
+curl -s -X POST http://127.0.0.1:3012/restart-dashboard   # → 202 Accepted
+
+# 3. Supervisor down? Manual detached start — WITH the Traefik env block (gotcha 7).
+#    Kill the old server by EXPLICIT PID (never pkill -f self-matching).
+OLD=$(ss -ltnp 2>/dev/null | grep -E ':3011\b' | grep node | grep -oE 'pid=[0-9]+' | head -1 | cut -d= -f2)
 [ -n "$OLD" ] && kill -TERM "$OLD"
 for i in $(seq 1 15); do { [ -n "$OLD" ] && kill -0 "$OLD" 2>/dev/null; } && sleep 1 || break; done
 { [ -n "$OLD" ] && kill -0 "$OLD" 2>/dev/null; } && kill -9 "$OLD"
 
-# 3. Start ONE fully-detached server (survives the shell; not a child of any wrapper).
-#    PORT is inherited from the environment; set it explicitly if you need a specific port.
-setsid bash -c 'exec node dist/dashboard/server.js' > /tmp/pan-dash.log 2>&1 < /dev/null &
+setsid env \
+  DASHBOARD_URL="https://${DOMAIN}" OVERDECK_TRAEFIK_ENABLED=1 \
+  OVERDECK_TRAEFIK_DOMAIN="${DOMAIN}" OVERDECK_TRUSTED_ORIGINS="https://${DOMAIN}" \
+  DASHBOARD_PORT=3010 API_PORT=3011 PORT=3011 OVERDECK_MODE=production \
+  bash -c 'exec node dist/dashboard/server.js' > /tmp/pan-dash.log 2>&1 < /dev/null &
 
-# 4. Verify health (Traefik routes overdeck.localhost -> the API port)
+# 4. Verify health AND the WebSocket origin path. /api/health does no origin
+#    validation — it returns 200 even while /ws/* 403s the domain (gotcha 7).
+#    The WS check is the only one that proves the browser can actually connect.
 for i in $(seq 1 40); do
-  code=$(curl -sk -o /dev/null -w '%{http_code}' --max-time 3 https://overdeck.localhost/api/health 2>/dev/null)
+  code=$(curl -sk -o /dev/null -w '%{http_code}' --max-time 3 "https://${DOMAIN}/api/health" 2>/dev/null)
   [ "$code" = 200 ] && { echo "healthy after ${i}s"; break; }
   sleep 1
 done
+ws=$(curl -sk -o /dev/null -w '%{http_code}' --http1.1 --max-time 5 \
+  -H "Origin: https://${DOMAIN}" -H "Connection: Upgrade" -H "Upgrade: websocket" \
+  -H "Sec-WebSocket-Version: 13" -H "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==" \
+  "https://${DOMAIN}/ws/rpc")
+[ "$ws" = 101 ] && echo "WS origin OK" \
+  || echo "WS origin FAILED (got $ws) — server does not trust the domain; relaunch with the env block (or a dist with the config fallback)"
 
 # 5. Confirm SINGLE instance, correct dist path (primary repo, not a workspace)
 ss -ltnp 2>/dev/null | grep -E ':(3010|3011)\b'
@@ -79,6 +101,7 @@ readlink -f /proc/$NEW/cwd      # must be the primary repo path
 ## Verify success
 
 - `overdeck.localhost/api/health` returns `{"status":"ok"}` and `curl http://localhost:<port>/api/health` returns 200.
+- **The WebSocket origin check returns 101** (procedure step 4). Health alone is not success — a server missing its Traefik env is healthy on `/api/health` and dead to the browser at the same time.
 - Exactly one **host-level** `node dist/dashboard/server.js` process; its `/proc/<pid>/cwd` is the primary repo.
   **Do not count workspace-container servers.** Each running workspace devcontainer has its own `server` service whose `dist/dashboard/server.js` process is visible in host `ps` — those are legitimate read/UI peers (cwd `/workspaces/overdeck`, parent `containerd-shim`, `OVERDECK_DISABLE_DEACON=1`), NOT duplicate dashboards and NOT a single-deacon hazard. Seeing N+1 server processes with N containers up is the healthy state. Container-aware census:
   ```bash
@@ -89,6 +112,7 @@ readlink -f /proc/$NEW/cwd      # must be the primary repo path
   done
   ```
   Exactly one `HOST` line, with cwd = the primary repo, is success. Multiple `HOST` lines = a real orphan (the deacon's orphan-server reaper, PAN-1625, will also catch it).
+- **Do not kill the supervisor's server.** If a HOST server is parented to systemd and its env contains `OVERDECK_TRAEFIK_DOMAIN`, it is the supervisor's correctly-configured managed instance (gotcha 6). If you spawned a manual server and then see a second one appear, kill YOURS (the one without the Traefik env), never the supervisor's.
 - Agent tmux sessions (`tmux -L overdeck list-sessions`) are intact.
 - The deacon log (`/tmp/pan-dash.log` or the dashboard log) shows a single `Deacon started` and patrols advancing — no `received SIGTERM` loop.
 
