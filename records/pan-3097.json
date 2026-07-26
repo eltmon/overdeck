@@ -73,20 +73,20 @@
     "recordedAt": "2026-07-26T03:36:45.308Z"
   },
   "created": "2026-07-26T02:29:08.179Z",
-  "updated": "2026-07-26T03:37:01.609Z",
+  "updated": "2026-07-26T03:39:31.919Z",
   "pipeline": {
     "issueId": "PAN-3097",
-    "reviewStatus": "failed",
+    "reviewStatus": "passed",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T03:36:56.134Z",
-    "reviewNotes": "Review role spawn failed: Role run agent-pan-3097-review already running. Use 'pan tell' to message it.",
+    "updatedAt": "2026-07-26T03:39:31.812Z",
+    "reviewNotes": "Approved after rebase: PAN-3097 behavior remains correct and the refreshed generated command manifest matches the CLI registry",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3102",
-    "reviewedAtCommit": "4e640da0d8cbb0b6ffbbfe9fef19317b3d7a1369",
+    "reviewedAtCommit": "887ba28422e0d80895d7af96be3ce759012ce75a",
     "reviewSpawnedAt": "2026-07-26T03:36:50.992Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -144,25 +144,25 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 1083648,
-            "output": 41430,
-            "cacheRead": 5811712,
+            "input": 2189860,
+            "output": 58656,
+            "cacheRead": 8597504,
             "cacheWrite": 0
           }
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 7192,
-            "output": 3259,
-            "cacheRead": 1717874,
-            "cacheWrite": 177031
+            "input": 7194,
+            "output": 3393,
+            "cacheRead": 1894905,
+            "cacheWrite": 178518
           }
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 1449830,
-            "output": 60770,
-            "cacheRead": 46187008,
+            "input": 1463344,
+            "output": 61515,
+            "cacheRead": 47319040,
             "cacheWrite": 0
           }
         }
@@ -175,21 +175,21 @@
           "cacheWrite": 183727
         },
         "openai/gpt-5.6-sol": {
-          "input": 2533478,
-          "output": 102200,
-          "cacheRead": 51998720,
+          "input": 3653204,
+          "output": 120171,
+          "cacheRead": 55916544,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 7192,
-          "output": 3259,
-          "cacheRead": 1717874,
-          "cacheWrite": 177031
+          "input": 7194,
+          "output": 3393,
+          "cacheRead": 1894905,
+          "cacheWrite": 178518
         }
       },
       "costAtCloseOut": {
-        "usd": 50.371306,
-        "pricingAsOf": "2026-07-26T03:37:01.594Z"
+        "usd": 58.508446,
+        "pricingAsOf": "2026-07-26T03:39:31.900Z"
       }
     },
     "merges": [
