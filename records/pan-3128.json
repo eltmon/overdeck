@@ -228,23 +228,25 @@
     "recordedAt": "2026-07-26T18:09:43.613Z"
   },
   "created": "2026-07-26T12:24:12.648Z",
-  "updated": "2026-07-26T18:38:51.113Z",
+  "updated": "2026-07-26T18:38:55.156Z",
   "pipeline": {
     "issueId": "PAN-3128",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T18:37:18.281Z",
+    "panDoneRecoveredAt": "2026-07-26T18:38:50.655Z",
+    "updatedAt": "2026-07-26T18:38:54.960Z",
     "reviewNotes": "Review dispatch skipped — already running: agent-pan-3128-review",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3141",
     "reviewedAtCommit": "6efc905e3235aa4579b58d036e43b416f9eb3ea8",
     "lastVerifiedCommit": "6efc905e3235aa4579b58d036e43b416f9eb3ea8",
-    "reviewSpawnedAt": "2026-07-26T18:09:54.438Z",
+    "reviewRequestedAt": "2026-07-26T18:38:50.655Z",
+    "reviewSpawnedAt": "2026-07-26T18:38:54.959Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "src/cli/commands/__tests__/dashboard-cwd-guard.test.ts",
@@ -296,9 +298,7 @@
         "tests/unit/lib/platform-lifecycle.test.ts"
       ],
       "recordedAt": "2026-07-26T18:09:43.613Z"
-    },
-    "reviewRequestedAt": "2026-07-26T18:38:50.655Z",
-    "panDoneRecoveredAt": "2026-07-26T18:38:50.655Z"
+    }
   },
   "closeOut": {
     "usage": {
@@ -362,7 +362,7 @@
       },
       "costAtCloseOut": {
         "usd": 534.897418,
-        "pricingAsOf": "2026-07-26T18:37:19.620Z"
+        "pricingAsOf": "2026-07-26T18:38:55.088Z"
       }
     },
     "merges": [
