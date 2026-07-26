@@ -142,7 +142,7 @@ describe('RolesPanel', () => {
     expect(screen.getByLabelText('Flywheel effort')).toHaveValue('high');
     expect(screen.getByLabelText('Flywheel max agents')).toHaveValue(8);
     expect(screen.getByLabelText('Flywheel scope')).toHaveValue('pan-only');
-    expect(screen.getByText('Changes apply on the next tick — no restart needed.')).toBeInTheDocument();
+    expect(screen.getByText(/Effort and max agents apply on the next tick — no restart needed\./)).toBeInTheDocument();
     expect(screen.getAllByText('Expensive (claude-opus-4-7)').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Anthropic > Claude Opus 4.7').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Kimi > Kimi K2.6 Flash').length).toBeGreaterThan(0);
@@ -205,6 +205,41 @@ describe('RolesPanel', () => {
     expect(body.roles.review.sub.security.model).toBe('kimi-k2.6-flash');
     expect(body.roles.review.sub.correctness.model).toBe('workhorse:mid');
     expect(body.roles.plan.model).toBe('workhorse:expensive');
+  });
+
+  // PAN-1696 settings-scope-ux: the scope select and its copy must be reachable
+  // without any expansion interaction — the flywheel config block is gated on
+  // role.id === 'flywheel', not on isExpanded (which gates sub-roles only).
+  it('renders the scope select and its help text with no expansion interaction (ac1)', async () => {
+    renderPanel();
+
+    await screen.findByLabelText('Flywheel scope');
+    // Nothing was clicked: no "Show sub-roles" toggle, no card expansion.
+    expect(screen.queryByText('Hide sub-roles')).not.toBeInTheDocument();
+
+    expect(screen.getByTestId('flywheel-scope-help').textContent)
+      .toBe("Orchestrate only the Panopticon repo's issues.");
+    expect(screen.getByTestId('flywheel-scope-not-merge-train').textContent)
+      .toMatch(/separate from whether the merge train is enabled for a project/);
+  });
+
+  it('describes the all-tracked-projects value once selected (ac1)', async () => {
+    const user = userEvent.setup();
+    renderPanel();
+
+    await screen.findByLabelText('Flywheel scope');
+    await user.selectOptions(screen.getByLabelText('Flywheel scope'), 'all-tracked-projects');
+
+    await waitFor(() => expect(screen.getByTestId('flywheel-scope-help').textContent)
+      .toBe('Inventory and adopt ready work across every registered project (same author/assignee safety rules).'));
+  });
+
+  it('states that scope applies at the next run start or resume (ac2)', async () => {
+    renderPanel();
+
+    await screen.findByLabelText('Flywheel scope');
+    expect(screen.getByTestId('flywheel-scope-timing').textContent)
+      .toMatch(/scope change applies at the next run start or resume/);
   });
 
   it('persists flywheel-specific settings and reloads the saved value', async () => {
