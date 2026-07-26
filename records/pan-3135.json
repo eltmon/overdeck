@@ -114,18 +114,18 @@
     "recordedAt": "2026-07-26T13:53:58.173Z"
   },
   "created": "2026-07-26T12:24:46.201Z",
-  "updated": "2026-07-26T15:07:05.396Z",
+  "updated": "2026-07-26T15:07:07.505Z",
   "pipeline": {
     "issueId": "PAN-3135",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T13:54:56.619Z",
-    "updatedAt": "2026-07-26T15:07:05.217Z",
+    "updatedAt": "2026-07-26T15:07:05.999Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "inspectNotes": "All 4 ACs met. verification-runner.ts:387-395 gates on readPendingDeploy() before the verificationStatus:'running' write at :409, writes 'pending' + a note naming requestedAt, and self-excludes when status is already 'running'. verification-worker-supervisor.ts:140-144 sits AFTER the live-worker waitForResult join at :137, so a queued deploy blocks only new worker spawns. FOLLOW-UP FOR A LATER BEAD (outside these ACs): request-review-pipeline.ts:31-38 only branches on 'failed'/'error', so a 'deferred' outcome currently falls through to pushBranch()+dispatchReview() and advances to review as if it passed — consumers must be taught to halt on 'deferred'.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3142",
@@ -237,24 +237,24 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 3033127,
-            "output": 314367,
-            "cacheRead": 198486528,
+            "input": 3436677,
+            "output": 314527,
+            "cacheRead": 198524416,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 21766319,
-          "output": 635951,
-          "cacheRead": 270971392,
+          "input": 22169869,
+          "output": 636111,
+          "cacheRead": 271009280,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 263.395821,
-        "pricingAsOf": "2026-07-26T15:07:05.324Z"
+        "usd": 265.437315,
+        "pricingAsOf": "2026-07-26T15:07:07.500Z"
       }
     },
     "merges": [
