@@ -82,21 +82,20 @@
     "recordedAt": "2026-07-26T15:10:38.144Z"
   },
   "created": "2026-07-26T13:39:19.365Z",
-  "updated": "2026-07-26T15:15:29.717Z",
+  "updated": "2026-07-26T15:15:31.298Z",
   "pipeline": {
     "issueId": "PAN-3138",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "failed",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T15:10:55.975Z",
-    "updatedAt": "2026-07-26T15:15:28.631Z",
-    "reviewNotes": "A failed verifying-on-main tracker transition permanently skips merge-time Docker teardown",
+    "updatedAt": "2026-07-26T15:15:30.057Z",
+    "reviewNotes": "Review role spawn failed: Role run agent-pan-3138-review already running. Use 'pan tell' to message it.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3143",
     "lastVerifiedCommit": "ad37787c2c81d40ae7e7365f0704b913ba266986",
-    "reviewRequestedAt": "2026-07-26T15:10:55.975Z",
     "reviewSpawnedAt": "2026-07-26T15:15:28.630Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -197,7 +196,7 @@
       },
       "costAtCloseOut": {
         "usd": 121.388799,
-        "pricingAsOf": "2026-07-26T15:15:28.999Z"
+        "pricingAsOf": "2026-07-26T15:15:31.290Z"
       }
     },
     "merges": [
