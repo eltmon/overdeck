@@ -1,4 +1,5 @@
 import { emitActivityEntrySync } from '../activity-logger.js';
+import { resolveCanonicalReviewStatus } from './review-status-source.js';
 
 const RETRY_BASE_MS = 60_000;
 const RETRY_MAX_MS = 15 * 60_000;
@@ -46,6 +47,16 @@ async function drainQueue(): Promise<void> {
   const { teardownWorkspaceDockerByNamePromise } = await import('../workspace-manager/docker.js');
   for (let entry = nextEligibleEntry(); entry; entry = nextEligibleEntry()) {
     entry.running = true;
+    const eligibility = resolveCanonicalReviewStatus(entry.issueId);
+    if (!eligibility.available) {
+      recordFailure(entry, 'canonical merge status unavailable');
+      continue;
+    }
+    if (eligibility.status?.mergeStatus !== 'merged') {
+      queue.delete(entry.issueId);
+      console.log(`[deacon] Cancelled merged Docker cleanup for ${entry.issueId} — issue is no longer merged`);
+      continue;
+    }
     try {
       const result = await teardownWorkspaceDockerByNamePromise(entry.issueId.toLowerCase());
       if (result.networkRemoved) {
@@ -73,6 +84,19 @@ function startWorker(): void {
       workerPromise = null;
       if (nextEligibleEntry()) startWorker();
     });
+}
+
+export function reconcileMergedDockerCleanupQueue(eligibleIssueIds: string[]): string[] {
+  const eligible = new Set(
+    eligibleIssueIds.map((issueId) => issueId.trim().toUpperCase()).filter(Boolean),
+  );
+  for (const [issueId, entry] of queue) {
+    if (!entry.running && !eligible.has(issueId)) queue.delete(issueId);
+  }
+  return [...eligible].flatMap((issueId) => {
+    const action = enqueueMergedDockerCleanup(issueId);
+    return action ? [action] : [];
+  });
 }
 
 export function enqueueMergedDockerCleanup(issueId: string): string | null {

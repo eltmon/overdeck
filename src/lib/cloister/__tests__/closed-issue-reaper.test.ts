@@ -6,7 +6,7 @@ import { join } from 'node:path';
 
 const mocks = vi.hoisted(() => ({
   emitActivityEntrySync: vi.fn(),
-  enqueueMergedDockerCleanup: vi.fn(),
+  reconcileMergedDockerCleanupQueue: vi.fn(),
   exec: vi.fn(),
   getReviewStatusesSync: vi.fn(),
   isIssueClosed: vi.fn(),
@@ -66,7 +66,7 @@ vi.mock('../../review-status.js', () => ({
 }));
 
 vi.mock('../merged-docker-cleanup-worker.js', () => ({
-  enqueueMergedDockerCleanup: mocks.enqueueMergedDockerCleanup,
+  reconcileMergedDockerCleanupQueue: mocks.reconcileMergedDockerCleanupQueue,
 }));
 
 import { reconcileClosedIssueAgents } from '../closed-issue-reaper.js';
@@ -86,8 +86,8 @@ describe('reconcileClosedIssueAgents', () => {
     mocks.reapIssueResidue.mockResolvedValue([]);
     mocks.resolveProjectForIssue.mockReturnValue(null);
     mocks.stopAgent.mockReturnValue(Effect.succeed(undefined));
-    mocks.enqueueMergedDockerCleanup.mockImplementation(
-      (issueId: string) => `Queued merged-issue Docker cleanup for ${issueId}`,
+    mocks.reconcileMergedDockerCleanupQueue.mockImplementation(
+      (issueIds: string[]) => issueIds.map((issueId) => `Queued merged-issue Docker cleanup for ${issueId}`),
     );
     mocks.isIssueClosed.mockResolvedValue(false);
     mocks.exec.mockImplementation((_command: string, opts: unknown, callback?: (error: Error | null, result: { stdout: string; stderr: string }) => void) => {
@@ -293,7 +293,7 @@ describe('reconcileClosedIssueAgents', () => {
 
     expect(mocks.getReviewStatusesSync).toHaveBeenCalledTimes(1);
     expect(mocks.getReviewStatusesSync).toHaveBeenCalledWith(['PAN-5559']);
-    expect(mocks.enqueueMergedDockerCleanup).toHaveBeenCalledWith('PAN-5559');
+    expect(mocks.reconcileMergedDockerCleanupQueue).toHaveBeenCalledWith(['PAN-5559']);
     expect(mocks.reapIssueResidue).not.toHaveBeenCalled();
     expect(mocks.stopAgent).not.toHaveBeenCalled();
   });
@@ -311,9 +311,21 @@ describe('reconcileClosedIssueAgents', () => {
     await expect(reconcileClosedIssueAgents()).resolves.toEqual([]);
 
     expect(mocks.getReviewStatusesSync).toHaveBeenCalledWith(['PAN-5559']);
-    expect(mocks.enqueueMergedDockerCleanup).not.toHaveBeenCalled();
+    expect(mocks.reconcileMergedDockerCleanupQueue).toHaveBeenCalledWith([]);
     expect(mocks.reapIssueResidue).not.toHaveBeenCalled();
     expect(mocks.stopAgent).not.toHaveBeenCalled();
+  });
+
+  it('preserves queued cleanup when Docker network discovery is unavailable', async () => {
+    mocks.exec.mockImplementation((_command: string, opts: unknown, callback?: (error: Error | null, result: { stdout: string; stderr: string }) => void) => {
+      const cb = typeof opts === 'function' ? opts : callback;
+      cb?.(new Error('docker unavailable'), { stdout: '', stderr: '' });
+      return { on: vi.fn() };
+    });
+
+    await expect(reconcileClosedIssueAgents()).resolves.toEqual([]);
+
+    expect(mocks.reconcileMergedDockerCleanupQueue).not.toHaveBeenCalled();
   });
 
   it('preserves open pure-disk residue', async () => {

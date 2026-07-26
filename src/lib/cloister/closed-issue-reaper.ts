@@ -36,7 +36,7 @@ const execAsync = promisify(exec);
 // Leaked `_devnet` networks are a residue source of their own: a closed issue
 // whose sessions, workspace, and agent dirs are already gone can still hold a
 // bridge network, and Docker's default address pools support only ~31 of them.
-async function listFeatureDevnetIssueIds(): Promise<string[]> {
+async function listFeatureDevnetIssueIds(): Promise<string[] | null> {
   try {
     const { stdout } = await execAsync(`docker network ls --format '{{.Name}}'`, {
       encoding: 'utf-8',
@@ -49,7 +49,7 @@ async function listFeatureDevnetIssueIds(): Promise<string[]> {
     }
     return [...issueIds];
   } catch {
-    return [];
+    return null;
   }
 }
 
@@ -221,31 +221,37 @@ export async function reconcileClosedIssueAgents(): Promise<string[]> {
     await reapResolvedIssueResidue(issueId, actions, reapedIssueKeys);
   }
 
+  const devnetIssueIds = await listFeatureDevnetIssueIds();
   const openDevnetIssueIds: string[] = [];
-  for (const issueId of await listFeatureDevnetIssueIds()) {
-    if (await isClosedIssue(issueId, closedChecks)) {
-      await reapResolvedIssueResidue(issueId, actions, reapedIssueKeys);
-    } else {
-      openDevnetIssueIds.push(issueId);
+  if (devnetIssueIds) {
+    for (const issueId of devnetIssueIds) {
+      if (await isClosedIssue(issueId, closedChecks)) {
+        await reapResolvedIssueResidue(issueId, actions, reapedIssueKeys);
+      } else {
+        openDevnetIssueIds.push(issueId);
+      }
     }
   }
 
+  let mergedIssueIds: string[] | null = devnetIssueIds ? [] : null;
   if (openDevnetIssueIds.length > 0) {
     try {
       const { getReviewStatusesSync } = await import('../review-status.js');
       const statuses = getReviewStatusesSync(openDevnetIssueIds);
-      const mergedIssueIds = openDevnetIssueIds.filter(
+      mergedIssueIds = openDevnetIssueIds.filter(
         (issueId) => statuses[issueId]?.mergeStatus === 'merged',
       );
-      if (mergedIssueIds.length > 0) {
-        const { enqueueMergedDockerCleanup } = await import('./merged-docker-cleanup-worker.js');
-        for (const issueId of mergedIssueIds) {
-          const action = enqueueMergedDockerCleanup(issueId);
-          if (action) actions.push(action);
-        }
-      }
     } catch (error) {
+      mergedIssueIds = null;
       actions.push(`Failed to resolve merged-issue Docker cleanup status: ${error}`);
+    }
+  }
+  if (mergedIssueIds) {
+    try {
+      const { reconcileMergedDockerCleanupQueue } = await import('./merged-docker-cleanup-worker.js');
+      actions.push(...reconcileMergedDockerCleanupQueue(mergedIssueIds));
+    } catch (error) {
+      actions.push(`Failed to reconcile merged-issue Docker cleanup queue: ${error}`);
     }
   }
 

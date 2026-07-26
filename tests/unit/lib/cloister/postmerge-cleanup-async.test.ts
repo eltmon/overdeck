@@ -28,10 +28,7 @@ const mockSetAgentPaused = vi.hoisted(() => vi.fn(() => Effect.succeed(null)));
 const mockCreateResetMarker = vi.hoisted(() => vi.fn(async (input: unknown) => ({ id: 'reset-1', ...(input as Record<string, unknown>) })));
 const mockSetReviewStatusSync = vi.hoisted(() => vi.fn());
 const mockKillAllReviewerSessions = vi.hoisted(() => vi.fn(() => Effect.succeed({ killed: [] as string[] })));
-const mockFindWorkspacePath = vi.hoisted(() => vi.fn().mockReturnValue(null));
-const mockStopWorkspaceDocker = vi.hoisted(() =>
-  vi.fn(() => Effect.succeed({ containersFound: false, steps: [] })),
-);
+const mockEnqueueMergedDockerCleanup = vi.hoisted(() => vi.fn());
 const mockTeardownWorkspaceDockerByNamePromise = vi.hoisted(() =>
   vi.fn().mockResolvedValue({ networkRemoved: true, steps: ['Removed network'] }),
 );
@@ -183,12 +180,8 @@ vi.mock('../../../../src/lib/lifecycle/label-cleanup.js', () => ({
   cleanupMergedLabels: mockCleanupMergedLabels,
 }));
 
-vi.mock('../../../../src/lib/lifecycle/archive-planning.js', () => ({
-  findWorkspacePath: mockFindWorkspacePath,
-}));
-
-vi.mock('../../../../src/lib/workspace-manager.js', () => ({
-  stopWorkspaceDocker: mockStopWorkspaceDocker,
+vi.mock('../../../../src/lib/cloister/merged-docker-cleanup-worker.js', () => ({
+  enqueueMergedDockerCleanup: mockEnqueueMergedDockerCleanup,
 }));
 
 vi.mock('../../../../src/lib/workspace-manager/docker.js', () => ({
@@ -235,8 +228,6 @@ describe('postMergeLifecycle — release trigger does not block cleanup', () => 
     releaseResolve = null;
     releaseStarted = false;
     mockTransitionState.shouldFail = false;
-    mockFindWorkspacePath.mockReturnValue(null);
-    mockStopWorkspaceDocker.mockReturnValue(Effect.succeed({ containersFound: false, steps: [] }));
     mockTeardownWorkspaceDockerByNamePromise.mockResolvedValue({ networkRemoved: true, steps: ['Removed network'] });
   });
 
@@ -281,26 +272,26 @@ describe('postMergeLifecycle — release trigger does not block cleanup', () => 
     expect(mockTeardownWorkspaceDockerByNamePromise).toHaveBeenCalledWith(ISSUE_ID.toLowerCase());
     expect(mockSetReviewStatusSync).toHaveBeenCalledWith(
       ISSUE_ID,
-      expect.objectContaining({ mergeStatus: 'failed' }),
+      expect.objectContaining({ mergeStatus: 'merged' }),
     );
   });
 
-  it('runs name-based teardown when workspace container stopping fails', async () => {
-    mockFindWorkspacePath.mockReturnValue('/tmp/test-workspace');
-    mockStopWorkspaceDocker.mockReturnValue(Effect.fail(new Error('container stop failed')));
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+  it('queues retry ownership when teardown and tracker transition both fail', async () => {
+    mockTransitionState.shouldFail = true;
+    mockTeardownWorkspaceDockerByNamePromise.mockResolvedValueOnce({
+      networkRemoved: false,
+      steps: ['Network still present'],
+    });
 
-    try {
-      await expect(postMergeLifecycle(ISSUE_ID, PROJECT_PATH, SOURCE_BRANCH, { skipDeploy: true })).resolves.toBeUndefined();
+    await expect(
+      postMergeLifecycle(ISSUE_ID, PROJECT_PATH, SOURCE_BRANCH, { skipDeploy: true }),
+    ).rejects.toThrow('tracker transition failed');
 
-      expect(mockStopWorkspaceDocker).toHaveBeenCalledWith('/tmp/test-workspace', ISSUE_ID.toLowerCase());
-      expect(mockTeardownWorkspaceDockerByNamePromise).toHaveBeenCalledWith(ISSUE_ID.toLowerCase());
-      expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Docker container stop failed (non-fatal): Error: container stop failed'),
-      );
-    } finally {
-      warnSpy.mockRestore();
-    }
+    expect(mockEnqueueMergedDockerCleanup).toHaveBeenCalledWith(ISSUE_ID);
+    expect(mockSetReviewStatusSync).toHaveBeenCalledWith(
+      ISSUE_ID,
+      expect.objectContaining({ mergeStatus: 'merged' }),
+    );
   });
 
   it('continues post-merge cleanup when Docker network teardown fails', async () => {
@@ -312,10 +303,11 @@ describe('postMergeLifecycle — release trigger does not block cleanup', () => 
       await expect(postMergeLifecycle(ISSUE_ID, PROJECT_PATH, SOURCE_BRANCH, { skipDeploy: true })).resolves.toBeUndefined();
 
       expect(mockTeardownWorkspaceDockerByNamePromise).toHaveBeenCalledWith(ISSUE_ID.toLowerCase());
+      expect(mockEnqueueMergedDockerCleanup).toHaveBeenCalledWith(ISSUE_ID);
       expect(mockSetAgentPaused).toHaveBeenCalled();
       expect(mockCreateResetMarker).toHaveBeenCalled();
       expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Docker network teardown failed (non-fatal): Error: network teardown failed'),
+        expect.stringContaining('Docker cleanup queued for retry (non-fatal): network teardown failed'),
       );
     } finally {
       warnSpy.mockRestore();
