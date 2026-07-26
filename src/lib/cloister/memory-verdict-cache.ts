@@ -22,6 +22,9 @@ export interface MemoryVerdict {
   band: MemoryPressureBand;
   availableBytes: number;
   thresholds: MemoryPressureThresholds;
+  swapTotalBytes?: number;
+  swapFreeBytes?: number;
+  psiFullAvg10?: number | null;
 }
 
 let cachedVerdict: MemoryVerdict | null = null;

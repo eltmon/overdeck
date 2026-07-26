@@ -208,6 +208,35 @@ api_keys:
       ).toBe(false);
     });
 
+    it('defaults memory governor swap runway and PSI thresholds', () => {
+      expect(mergeConfigs().config.resources).toMatchObject({
+        governorSwapSoftFreePercent: 25,
+        governorSwapRecoveryFreePercent: 50,
+        governorPsiFullShedAvg10: 1,
+      });
+    });
+
+    it('normalizes memory governor swap runway config', () => {
+      expect(mergeConfigs({
+        resources: {
+          governor_swap_soft_free_percent: 30,
+          governor_swap_recovery_free_percent: 60,
+          governor_psi_full_shed_avg10: 2.5,
+        },
+      }).config.resources).toMatchObject({
+        governorSwapSoftFreePercent: 30,
+        governorSwapRecoveryFreePercent: 60,
+        governorPsiFullShedAvg10: 2.5,
+      });
+
+      expect(mergeConfigs({
+        resources: {
+          governor_swap_soft_free_percent: 95,
+          governor_swap_recovery_free_percent: 20,
+        },
+      }).config.resources.governorSwapRecoveryFreePercent).toBe(100);
+    });
+
     it('normalizes compliance mode with advisory as the default', () => {
       expect(mergeConfigs().config.compliance.mode).toBe('advisory');
       expect(mergeConfigs({ compliance: { mode: 'off' } }).config.compliance.mode).toBe('off');

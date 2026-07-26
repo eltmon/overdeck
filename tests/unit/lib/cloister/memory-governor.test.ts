@@ -77,6 +77,31 @@ import {
 } from '../../../../src/dashboard/server/routes/resources/stacks.js';
 
 const GIB = 1024 ** 3;
+const GOVERNOR_RESOURCES = {
+  governorSoftReserveGb: 8,
+  governorHardReserveGb: 4,
+  governorRecoveryReserveGb: 12,
+  governorSwapSoftFreePercent: 25,
+  governorSwapRecoveryFreePercent: 50,
+  governorPsiFullShedAvg10: 1,
+};
+
+function procMemory(
+  memAvailable: number,
+  overrides: Partial<{
+    swapTotal: number;
+    swapFree: number;
+    psiFullAvg10: number | null;
+  }> = {},
+) {
+  return {
+    memAvailable,
+    swapTotal: 8 * GIB,
+    swapFree: 8 * GIB,
+    psiFullAvg10: 0,
+    ...overrides,
+  };
+}
 
 beforeEach(() => {
   setResourceStackReviewStatusReaderForTests(() => null);
@@ -151,41 +176,101 @@ describe('assessMemoryPressure', () => {
   beforeEach(() => {
     resetGovernorModeForTests();
     loadConfigSyncMock.mockReturnValue({
-      config: {
-        resources: {
-          governorSoftReserveGb: 8,
-          governorHardReserveGb: 4,
-          governorRecoveryReserveGb: 12,
-        },
-      },
+      config: { resources: GOVERNOR_RESOURCES },
     });
   });
 
   it('reads MemAvailable via the async proc parser and derives the band from governor reserves', async () => {
-    readProcMemoryMock.mockResolvedValue({ memAvailable: 2 * GIB });
+    readProcMemoryMock.mockResolvedValue(procMemory(2 * GIB));
     const verdict = await assessMemoryPressure();
     expect(verdict.band).toBe('hard');
     expect(verdict.availableBytes).toBe(2 * GIB);
   });
 
   it('returns ok when memory is plentiful', async () => {
-    readProcMemoryMock.mockResolvedValue({ memAvailable: 20 * GIB });
+    readProcMemoryMock.mockResolvedValue(procMemory(20 * GIB));
     const verdict = await assessMemoryPressure();
     expect(verdict.band).toBe('ok');
   });
 
   it('holds across successive calls per the hysteresis state machine', async () => {
-    readProcMemoryMock.mockResolvedValue({ memAvailable: 7 * GIB });
+    readProcMemoryMock.mockResolvedValue(procMemory(7 * GIB));
     expect((await assessMemoryPressure()).band).toBe('soft');
-    readProcMemoryMock.mockResolvedValue({ memAvailable: 9 * GIB }); // above soft, below recovery
+    readProcMemoryMock.mockResolvedValue(procMemory(9 * GIB)); // above soft, below recovery
     expect((await assessMemoryPressure()).band).toBe('soft'); // still holding, not ok
-    readProcMemoryMock.mockResolvedValue({ memAvailable: 13 * GIB }); // above recovery
+    readProcMemoryMock.mockResolvedValue(procMemory(13 * GIB)); // above recovery
     expect((await assessMemoryPressure()).band).toBe('ok');
+  });
+
+  it('holds admissions when RAM is healthy but swap has no free runway', async () => {
+    readProcMemoryMock.mockResolvedValue(procMemory(20 * GIB, {
+      swapFree: 0,
+    }));
+
+    expect((await assessMemoryPressure()).band).toBe('soft');
+  });
+
+  it('re-admits from low swap only after swap reaches its recovery threshold', async () => {
+    readProcMemoryMock.mockResolvedValue(procMemory(20 * GIB, {
+      swapFree: 1 * GIB,
+    }));
+    expect((await assessMemoryPressure()).band).toBe('soft');
+
+    readProcMemoryMock.mockResolvedValue(procMemory(20 * GIB, {
+      swapFree: 3 * GIB,
+    }));
+    expect((await assessMemoryPressure()).band).toBe('soft');
+
+    readProcMemoryMock.mockResolvedValue(procMemory(20 * GIB, {
+      swapFree: 4 * GIB,
+    }));
+    expect((await assessMemoryPressure()).band).toBe('ok');
+  });
+
+  it('sheds when low swap is accompanied by full memory stalls', async () => {
+    readProcMemoryMock.mockResolvedValue(procMemory(20 * GIB, {
+      swapFree: 0,
+      psiFullAvg10: 1,
+    }));
+
+    expect((await assessMemoryPressure()).band).toBe('hard');
+  });
+
+  it('holds instead of shedding when PSI is unavailable', async () => {
+    readProcMemoryMock.mockResolvedValue(procMemory(20 * GIB, {
+      swapFree: 0,
+      psiFullAvg10: null,
+    }));
+
+    expect((await assessMemoryPressure()).band).toBe('soft');
+  });
+
+  it('preserves RAM-only behavior when the host has no configured swap', async () => {
+    readProcMemoryMock.mockResolvedValue(procMemory(20 * GIB, {
+      swapTotal: 0,
+      swapFree: 0,
+      psiFullAvg10: 10,
+    }));
+
+    expect((await assessMemoryPressure()).band).toBe('ok');
+  });
+
+  it('returns swap and PSI evidence in the verdict', async () => {
+    readProcMemoryMock.mockResolvedValue(procMemory(20 * GIB, {
+      swapFree: 2 * GIB,
+      psiFullAvg10: 0.25,
+    }));
+
+    await expect(assessMemoryPressure()).resolves.toMatchObject({
+      swapTotalBytes: 8 * GIB,
+      swapFreeBytes: 2 * GIB,
+      psiFullAvg10: 0.25,
+    });
   });
 
   it('caches the verdict for synchronous consumers (PAN-2500 specialist-budget)', async () => {
     expect(getCachedMemoryVerdict()).toBeNull();
-    readProcMemoryMock.mockResolvedValue({ memAvailable: 2 * GIB });
+    readProcMemoryMock.mockResolvedValue(procMemory(2 * GIB));
     const verdict = await assessMemoryPressure();
     expect(getCachedMemoryVerdict()).toEqual(verdict);
   });
@@ -222,9 +307,7 @@ describe('estimateFootprint (PAN-2500 footprint-budget)', () => {
     loadConfigSyncMock.mockReturnValue({
       config: {
         resources: {
-          governorSoftReserveGb: 8,
-          governorHardReserveGb: 4,
-          governorRecoveryReserveGb: 12,
+          ...GOVERNOR_RESOURCES,
           governorFootprintDefaultWorkGb: 2,
           governorFootprintDefaultReviewGb: 1,
           governorFootprintDefaultTestGb: 1,
@@ -252,7 +335,7 @@ describe('estimateFootprint (PAN-2500 footprint-budget)', () => {
 describe('canAdmit (PAN-2500 footprint-budget)', () => {
   beforeEach(() => {
     loadConfigSyncMock.mockReturnValue({
-      config: { resources: { governorSoftReserveGb: 8, governorHardReserveGb: 4, governorRecoveryReserveGb: 12 } },
+      config: { resources: GOVERNOR_RESOURCES },
     });
   });
 
@@ -329,7 +412,7 @@ describe('shed() (PAN-2500 tiered-eviction integration)', () => {
   beforeEach(() => {
     resetGovernorModeForTests();
     loadConfigSyncMock.mockReturnValue({
-      config: { resources: { governorSoftReserveGb: 8, governorHardReserveGb: 4, governorRecoveryReserveGb: 12 } },
+      config: { resources: GOVERNOR_RESOURCES },
     });
     loadCloisterConfigSyncMock.mockReturnValue({ concurrency: { exempt_operator_started: true } });
     execFileMock.mockClear();
@@ -347,7 +430,7 @@ describe('shed() (PAN-2500 tiered-eviction integration)', () => {
     ]);
     getAgentRuntimeStateSyncMock.mockReturnValue({ state: 'idle' });
     // First assess (after stacks): still hard. Second (after pausing the agent): clears to ok.
-    readProcMemoryMock.mockResolvedValueOnce({ memAvailable: 1 * GIB }).mockResolvedValue({ memAvailable: 20 * GIB });
+    readProcMemoryMock.mockResolvedValueOnce(procMemory(1 * GIB)).mockResolvedValue(procMemory(20 * GIB));
 
     const result = await shed();
 
@@ -366,7 +449,7 @@ describe('shed() (PAN-2500 tiered-eviction integration)', () => {
       { id: 'agent-operator', issueId: 'PAN-4', role: 'work', tmuxActive: true, flywheelRunId: undefined },
     ]);
     getAgentRuntimeStateSyncMock.mockReturnValue({ state: 'idle' });
-    readProcMemoryMock.mockResolvedValue({ memAvailable: 1 * GIB }); // stays hard forever
+    readProcMemoryMock.mockResolvedValue(procMemory(1 * GIB)); // stays hard forever
 
     const result = await shed();
 
