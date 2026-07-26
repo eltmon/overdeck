@@ -65,7 +65,7 @@
     "recordedAt": "2026-07-26T10:40:53.843Z"
   },
   "created": "2026-07-26T09:04:01.632Z",
-  "updated": "2026-07-26T18:45:46.838Z",
+  "updated": "2026-07-26T18:46:04.908Z",
   "pipeline": {
     "issueId": "PAN-3116",
     "reviewStatus": "passed",
@@ -76,16 +76,31 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T10:42:05.667Z",
-    "updatedAt": "2026-07-26T18:45:40.820Z",
+    "updatedAt": "2026-07-26T18:46:04.827Z",
     "mergeNotes": "GitHub PR #3127 is CONFLICTING with main. Resolve conflicts before merging — see https://github.com/eltmon/overdeck/pull/3127.",
+    "blockerReasons": [
+      {
+        "type": "merge_conflict",
+        "summary": "Conflicts with main",
+        "detectedAt": "2026-07-26T18:45:40.819Z"
+      }
+    ],
     "prUrl": "https://github.com/eltmon/overdeck/pull/3127",
     "reviewedAtCommit": "113377f24f76727263cb7061cd16a25eef6e4609",
     "reviewSpawnedAt": "2026-07-26T10:40:12.609Z",
     "strikeReadyHead": "1f3cd2a7d42161863de1bb2e64ab9f3d8e43f607",
     "strikeReadyAt": "2026-07-26T18:43:36.202Z",
-    "strikeLandingState": "landing",
-    "strikeRecoveryCount": 0,
-    "strikeLandingAttempts": []
+    "strikeLandingState": "recovering",
+    "strikeRecoveryCount": 1,
+    "strikeLandingAttempts": [
+      {
+        "timestamp": "2026-07-26T18:45:40.825Z",
+        "strikeHead": "1f3cd2a7d42161863de1bb2e64ab9f3d8e43f607",
+        "mainHead": "6409d5ea9304dcf9a31cae03fad4bfd165e29c53",
+        "outcome": "failed",
+        "detail": "GitHub PR #3127 is CONFLICTING with main. Resolve conflicts before merging — see https://github.com/eltmon/overdeck/pull/3127."
+      }
+    ]
   },
   "closeOut": {
     "usage": {
@@ -145,7 +160,7 @@
       },
       "costAtCloseOut": {
         "usd": 43.4386743,
-        "pricingAsOf": "2026-07-26T18:45:46.834Z"
+        "pricingAsOf": "2026-07-26T18:46:04.877Z"
       }
     },
     "merges": [
