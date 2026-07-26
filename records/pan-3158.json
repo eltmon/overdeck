@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T20:19:41.143Z",
-  "updated": "2026-07-26T20:34:48.737Z",
+  "updated": "2026-07-26T20:36:16.275Z",
   "pipeline": {
     "issueId": "PAN-3158",
     "reviewStatus": "pending",
@@ -43,16 +43,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "merge-train-view-tests": {
-        "writerId": "agent-pan-3158",
-        "agentId": "agent-pan-3158",
-        "pid": 706950,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-26T20:34:48.737Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3158",
@@ -75,6 +67,17 @@
         "outcome": "completed",
         "reason": "Added singular/plural footer copy reporting hidden idle enabled projects while omitting it from the all-empty collapse",
         "releasedAt": "2026-07-26T20:34:41.698Z"
+      },
+      {
+        "writerId": "agent-pan-3158",
+        "agentId": "agent-pan-3158",
+        "pid": 706950,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T20:34:48.737Z",
+        "itemId": "merge-train-view-tests",
+        "outcome": "completed",
+        "reason": "Updated mixed disabled/idle expectations and added singular, plural, and all-idle regression coverage; frontend suite passes 29 tests",
+        "releasedAt": "2026-07-26T20:36:16.275Z"
       }
     ],
     "statusReasons": {
@@ -85,6 +88,10 @@
       "idle-hidden-footer": {
         "reason": "Added singular/plural footer copy reporting hidden idle enabled projects while omitting it from the all-empty collapse",
         "updatedAt": "2026-07-26T20:34:41.698Z"
+      },
+      "merge-train-view-tests": {
+        "reason": "Updated mixed disabled/idle expectations and added singular, plural, and all-idle regression coverage; frontend suite passes 29 tests",
+        "updatedAt": "2026-07-26T20:36:16.275Z"
       }
     }
   },
@@ -99,6 +106,10 @@
     "idle-hidden-footer.idle-hidden-footer.ac1": "completed",
     "idle-hidden-footer.idle-hidden-footer.ac2": "completed",
     "idle-hidden-footer.idle-hidden-footer.ac3": "completed",
-    "merge-train-view-tests": "running"
+    "merge-train-view-tests": "completed",
+    "merge-train-view-tests.merge-train-view-tests.ac1": "completed",
+    "merge-train-view-tests.merge-train-view-tests.ac2": "completed",
+    "merge-train-view-tests.merge-train-view-tests.ac3": "completed",
+    "merge-train-view-tests.merge-train-view-tests.ac4": "completed"
   }
 }
