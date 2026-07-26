@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T12:25:26.814Z",
-  "updated": "2026-07-26T12:53:37.657Z",
+  "updated": "2026-07-26T12:59:52.796Z",
   "pipeline": {
     "issueId": "PAN-3123",
     "reviewStatus": "pending",
@@ -43,16 +43,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "governor-swap-psi-hysteresis": {
-        "writerId": "agent-pan-3123",
-        "agentId": "agent-pan-3123",
-        "pid": 1367300,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-26T12:53:37.657Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3123",
@@ -75,6 +67,17 @@
         "outcome": "completed",
         "reason": "Added normalized swap-free and PSI threshold config defaults, overrides, tests, and audited the schema crossing the 1000-line file-size ceiling",
         "releasedAt": "2026-07-26T12:53:22.281Z"
+      },
+      {
+        "writerId": "agent-pan-3123",
+        "agentId": "agent-pan-3123",
+        "pid": 1367300,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T12:53:37.657Z",
+        "itemId": "governor-swap-psi-hysteresis",
+        "outcome": "completed",
+        "reason": "Composed swap runway and PSI into the existing governor hysteresis, preserved RAM-only behavior, and exposed evidence in cached verdicts",
+        "releasedAt": "2026-07-26T12:59:52.796Z"
       }
     ],
     "statusReasons": {
@@ -85,6 +88,10 @@
       "governor-runway-config": {
         "reason": "Added normalized swap-free and PSI threshold config defaults, overrides, tests, and audited the schema crossing the 1000-line file-size ceiling",
         "updatedAt": "2026-07-26T12:53:22.281Z"
+      },
+      "governor-swap-psi-hysteresis": {
+        "reason": "Composed swap runway and PSI into the existing governor hysteresis, preserved RAM-only behavior, and exposed evidence in cached verdicts",
+        "updatedAt": "2026-07-26T12:59:52.796Z"
       }
     }
   },
@@ -97,6 +104,11 @@
     "governor-runway-config.governor-runway-config.ac1": "completed",
     "governor-runway-config.governor-runway-config.ac2": "completed",
     "governor-runway-config.governor-runway-config.ac3": "completed",
-    "governor-swap-psi-hysteresis": "running"
+    "governor-swap-psi-hysteresis": "completed",
+    "governor-swap-psi-hysteresis.governor-swap-psi-hysteresis.ac1": "completed",
+    "governor-swap-psi-hysteresis.governor-swap-psi-hysteresis.ac2": "completed",
+    "governor-swap-psi-hysteresis.governor-swap-psi-hysteresis.ac3": "completed",
+    "governor-swap-psi-hysteresis.governor-swap-psi-hysteresis.ac4": "completed",
+    "governor-swap-psi-hysteresis.governor-swap-psi-hysteresis.ac5": "completed"
   }
 }
