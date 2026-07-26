@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T20:52:58.018Z",
-  "updated": "2026-07-26T21:27:17.902Z",
+  "updated": "2026-07-26T21:32:48.079Z",
   "pipeline": {
     "issueId": "PAN-3162",
     "reviewStatus": "pending",
@@ -61,16 +61,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "deacon-forge-merge-reconciler": {
-        "writerId": "agent-pan-3162",
-        "agentId": "agent-pan-3162",
-        "pid": 2186985,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-26T21:27:17.902Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3162",
@@ -82,12 +74,27 @@
         "outcome": "completed",
         "reason": "Added forge-neutral per-repo observation writeback, positive merged evidence semantics, stranded artifact refresh, and fail-open regression coverage",
         "releasedAt": "2026-07-26T21:25:14.515Z"
+      },
+      {
+        "writerId": "agent-pan-3162",
+        "agentId": "agent-pan-3162",
+        "pid": 2186985,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T21:27:17.902Z",
+        "itemId": "deacon-forge-merge-reconciler",
+        "outcome": "completed",
+        "reason": "Added merge-relevant forge observation to stale-merge patrol, preserved replan/closed-spec guards, terminalized only complete positive evidence, and covered partial/unverifiable/non-scope cases",
+        "releasedAt": "2026-07-26T21:32:48.079Z"
       }
     ],
     "statusReasons": {
       "forge-merge-observation-door": {
         "reason": "Added forge-neutral per-repo observation writeback, positive merged evidence semantics, stranded artifact refresh, and fail-open regression coverage",
         "updatedAt": "2026-07-26T21:25:14.515Z"
+      },
+      "deacon-forge-merge-reconciler": {
+        "reason": "Added merge-relevant forge observation to stale-merge patrol, preserved replan/closed-spec guards, terminalized only complete positive evidence, and covered partial/unverifiable/non-scope cases",
+        "updatedAt": "2026-07-26T21:32:48.079Z"
       }
     }
   },
@@ -97,6 +104,11 @@
     "forge-merge-observation-door.forge-merge-observation-door.ac2": "completed",
     "forge-merge-observation-door.forge-merge-observation-door.ac3": "completed",
     "forge-merge-observation-door.forge-merge-observation-door.ac4": "completed",
-    "deacon-forge-merge-reconciler": "running"
+    "deacon-forge-merge-reconciler": "completed",
+    "deacon-forge-merge-reconciler.deacon-forge-merge-reconciler.ac1": "completed",
+    "deacon-forge-merge-reconciler.deacon-forge-merge-reconciler.ac2": "completed",
+    "deacon-forge-merge-reconciler.deacon-forge-merge-reconciler.ac3": "completed",
+    "deacon-forge-merge-reconciler.deacon-forge-merge-reconciler.ac4": "completed",
+    "deacon-forge-merge-reconciler.deacon-forge-merge-reconciler.ac5": "completed"
   }
 }
