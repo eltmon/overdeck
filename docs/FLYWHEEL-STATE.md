@@ -6791,3 +6791,11 @@ Substrate bugs filed: 2897 2898 2899 2900 2901 2902 2907 2913 (8; ALL fixed and 
 - `agent-min-858-test` unchanged at `$6.8805 / out 1.1k`, PAN-3092 still OPEN — the stranded verdict is now the longest-running unresolved item of the run.
 - **Zero `--accept-*` across 40 ticks.** MIN-902 fully passed but MYN is `auto_merge_default: hold` → no merge verb emitted.
 - **LESSON: when a gate prescribes its own fix, verify against that gate specifically.** Running the full `npm run lint` would have cost minutes and mixed the signal with unrelated checks; running `lint-slash-commands.sh` alone answered the only question that mattered in seconds. Match the verification to the claim.
+
+## RUN-70 tick 41 (2026-07-26 03:55Z) — main GREEN on 81bced7cae; deploy armed; min-858-test at an EIGHTH identical reading
+- **Main CI `81bced7cae` = completed/SUCCESS. Red main confirmed cleared** (the prior head `beaf8126a8` was the failing one). Fourth red main of the run, closed.
+- **Preflight clean**: merged `origin/main` (never rebase), confirmed `81bced7cae` is an ancestor of HEAD, tree clean. Built and armed a gate-aware deploy — live was `40293bd24b`, which predates the fix.
+- **`agent-min-858-test`: `$6.8805 / out 1.1k` — EIGHTH consecutive identical reading (~7h).** Still holding an undelivered passing test verdict; `test_status: pending`. PAN-3092 still OPEN. **This is now unambiguously the run's longest-lived unresolved defect**, and unlike MIN-902 it cannot self-recover because it is not retrying at all.
+- **The contrast between the two PAN-3092 modes is now fully resolved by outcome, not theory**: the *spinner* (MIN-902) succeeded on its own after ~1h and $2.50 of contention; the *frozen* agent has produced literally zero change across 8 samples spanning 7 hours. Persistence, even wasteful persistence, beat giving up.
+- `verification_status` still `null` on PAN-3029/3051/3056; PAN-2997 verification still pending. **Zero `--accept-*` across 41 ticks.** networks 20; 25 agents.
+- **LESSON: the cheapest useful telemetry is the same number sampled repeatedly.** `$6.8805` means nothing once. Eight times, unchanged, across seven hours, it is a proof — and it cost one `grep` per tick. No new instrumentation was needed to establish the most important fact about this defect.
