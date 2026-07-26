@@ -214,10 +214,10 @@
     "recordedAt": "2026-07-25T23:45:57.195Z"
   },
   "created": "2026-07-21T23:09:49.270Z",
-  "updated": "2026-07-26T07:04:11.180Z",
+  "updated": "2026-07-26T07:08:25.044Z",
   "pipeline": {
     "issueId": "PAN-2997",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -225,8 +225,8 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T05:50:39.330Z",
-    "updatedAt": "2026-07-26T07:04:11.164Z",
-    "reviewNotes": "Agent re-review request (1/25): Fixed all four cycle-7 blockers: tmux two-phase pending/terminal markers (crash-safe across Enter), supervisor synchronous key reservation (concurrent same-key coalescing), monitor tier bypassed for keyed payloads, resume paths deliver keyed via the door after a bare resume, remote keyed protocol added, Channels/app-server/ACP rejected for keyed payloads. record-delivered removed. New tests cover each crash window; docs updated.",
+    "updatedAt": "2026-07-26T07:08:25.011Z",
+    "reviewNotes": "The two-phase tmux protocol can submit Enter twice, ambiguous supervisor failures cross to an independent tmux key store, and remote SSH failures are falsely acknowledged.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3004",
     "lastVerifiedCommit": "ac67558fa7805c8e9b0050f8fe39c56921b962cd",
     "reviewSpawnedAt": "2026-07-26T07:04:04.228Z"
@@ -244,9 +244,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 14163964,
-            "output": 471214,
-            "cacheRead": 95133184,
+            "input": 16586284,
+            "output": 598887,
+            "cacheRead": 110532608,
             "cacheWrite": 0
           }
         },
@@ -275,9 +275,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 15637737,
-          "output": 660335,
-          "cacheRead": 190461952,
+          "input": 18060057,
+          "output": 788008,
+          "cacheRead": 205861376,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -288,8 +288,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 193.547367,
-        "pricingAsOf": "2026-07-26T07:04:11.176Z"
+        "usd": 217.188869,
+        "pricingAsOf": "2026-07-26T07:08:25.031Z"
       }
     },
     "merges": [
