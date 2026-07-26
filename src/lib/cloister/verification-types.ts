@@ -2,6 +2,7 @@
 export type VerificationRunnerOutcome =
   | { outcome: 'passed' }
   | { outcome: 'skipped'; reason: string }
+  | { outcome: 'deferred'; reason: string }
   | { outcome: 'failed'; failedCheck: string; cycleCount: number; maxCycles: number }
   | { outcome: 'error'; message: string };
 
