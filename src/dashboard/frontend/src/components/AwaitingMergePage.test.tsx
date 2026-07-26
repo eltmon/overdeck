@@ -274,9 +274,13 @@ describe('AwaitingMergePage merge train', () => {
     expect(section.textContent).toContain('Assembles and batch-tests ready features per project');
 
     // Populated from the aggregate endpoints with no flywheel run in the data.
+    // The active project renders while the idle enabled project is summarized below it.
     await waitFor(() => expect(screen.getByTestId('merge-train-project-overdeck')).toBeTruthy());
     expect(screen.getByTestId('merge-train-project-overdeck').textContent).toContain('pan-otter-0610');
-    expect(screen.getByTestId('merge-train-project-myn')).toBeTruthy();
+    expect(screen.queryByTestId('merge-train-project-myn')).toBeNull();
+    expect(screen.getByTestId('merge-train-idle-hidden-note').textContent).toContain(
+      '1 project with nothing ready is hidden',
+    );
 
     // Above the rows, not after them: the section precedes the merge list in DOM order.
     const view = screen.getByTestId('merge-train-view');
