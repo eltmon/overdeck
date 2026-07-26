@@ -101,7 +101,7 @@
     "recordedAt": "2026-07-26T15:34:06.412Z"
   },
   "created": "2026-07-26T13:39:19.365Z",
-  "updated": "2026-07-26T15:34:57.425Z",
+  "updated": "2026-07-26T15:35:03.376Z",
   "pipeline": {
     "issueId": "PAN-3138",
     "reviewStatus": "pending",
@@ -154,7 +154,9 @@
         "tests/unit/lib/review-status.test.ts"
       ],
       "recordedAt": "2026-07-26T15:34:06.412Z"
-    }
+    },
+    "reviewRequestedAt": "2026-07-26T15:35:02.947Z",
+    "panDoneRecoveredAt": "2026-07-26T15:35:02.947Z"
   },
   "closeOut": {
     "usage": {
