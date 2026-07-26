@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T12:33:18.311Z",
-  "updated": "2026-07-26T13:33:26.594Z",
+  "updated": "2026-07-26T13:37:39.366Z",
   "pipeline": {
     "issueId": "PAN-3093",
     "reviewStatus": "pending",
@@ -55,16 +55,8 @@
   "harness": "claude-code",
   "model": "claude-opus-5",
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "conflict-hook-repo-scope": {
-        "writerId": "agent-pan-3093",
-        "agentId": "agent-pan-3093",
-        "pid": 2793675,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-26T13:33:26.594Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3093",
@@ -76,12 +68,27 @@
         "outcome": "completed",
         "reason": "Added uat_generation_repos + uat_generation_member_repos to overdeck.db (init SQL + idempotent top-up), UatGenerationRepo/UatGenerationMemberRepo types, store I/O with N=1 synthesis for legacy rows, and markUatGenerationRepoPromotedSync. Split merge-sync.ts UAT domain into merge-sync-uat.ts to stay under the file-size ceiling. 11 new tests; full suite green.",
         "releasedAt": "2026-07-26T13:30:47.569Z"
+      },
+      {
+        "writerId": "agent-pan-3093",
+        "agentId": "agent-pan-3093",
+        "pid": 2793675,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T13:33:26.594Z",
+        "itemId": "conflict-hook-repo-scope",
+        "outcome": "completed",
+        "reason": "ConflictContext gains optional repoKey; prompt and log tag name the repo when present, byte-identical when absent. 3 new tests; engine tests unmodified.",
+        "releasedAt": "2026-07-26T13:37:39.366Z"
       }
     ],
     "statusReasons": {
       "schema-per-repo-generation-tables": {
         "reason": "Added uat_generation_repos + uat_generation_member_repos to overdeck.db (init SQL + idempotent top-up), UatGenerationRepo/UatGenerationMemberRepo types, store I/O with N=1 synthesis for legacy rows, and markUatGenerationRepoPromotedSync. Split merge-sync.ts UAT domain into merge-sync-uat.ts to stay under the file-size ceiling. 11 new tests; full suite green.",
         "updatedAt": "2026-07-26T13:30:47.569Z"
+      },
+      "conflict-hook-repo-scope": {
+        "reason": "ConflictContext gains optional repoKey; prompt and log tag name the repo when present, byte-identical when absent. 3 new tests; engine tests unmodified.",
+        "updatedAt": "2026-07-26T13:37:39.366Z"
       }
     }
   },
@@ -90,6 +97,8 @@
     "schema-per-repo-generation-tables.schema-per-repo-generation-tables.ac1": "completed",
     "schema-per-repo-generation-tables.schema-per-repo-generation-tables.ac2": "completed",
     "schema-per-repo-generation-tables.schema-per-repo-generation-tables.ac3": "completed",
-    "conflict-hook-repo-scope": "running"
+    "conflict-hook-repo-scope": "completed",
+    "conflict-hook-repo-scope.conflict-hook-repo-scope.ac1": "completed",
+    "conflict-hook-repo-scope.conflict-hook-repo-scope.ac2": "completed"
   }
 }
