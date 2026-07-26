@@ -269,7 +269,7 @@
     }
   ],
   "created": "2026-07-26T00:35:36.057Z",
-  "updated": "2026-07-26T05:55:59.354Z",
+  "updated": "2026-07-26T06:08:51.199Z",
   "pipeline": {
     "issueId": "PAN-1696",
     "reviewStatus": "pending",
@@ -382,16 +382,8 @@
   "harness": "claude-code",
   "model": "claude-opus-5",
   "tasks": {
-    "sequence": 21,
-    "claims": {
-      "merge-train-routes": {
-        "writerId": "agent-pan-1696",
-        "agentId": "agent-pan-1696",
-        "pid": 1245460,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-26T05:55:59.354Z"
-      }
-    },
+    "sequence": 22,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-1696",
@@ -498,6 +490,17 @@
         "outcome": "released",
         "reason": "stale claim released (agent-pan-1696 dead)",
         "releasedAt": "2026-07-26T04:52:24.543Z"
+      },
+      {
+        "writerId": "agent-pan-1696",
+        "agentId": "agent-pan-1696",
+        "pid": 1245460,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T05:55:59.354Z",
+        "itemId": "merge-train-routes",
+        "outcome": "completed",
+        "reason": "Added src/dashboard/server/routes/merge-train.ts with the aggregate namespace: GET queues (per-project key/name/effective-flag/queue from the review-status ready set, no flywheel run), GET generations (per-project chains), POST generations/:name/stack and /promote (same handlers, uat/ prefix reconstruction, auth gate, firePostMergeLifecycle), POST assemble (one project or all), POST merge-next {n,project} with 404 on unknown key. Composed the layer in server.ts, registered all six routes in NO_LOSS_MATRIX, and added 16 route tests. Legacy flywheel routes untouched per D5.",
+        "releasedAt": "2026-07-26T06:08:51.199Z"
       }
     ],
     "statusReasons": {
@@ -518,8 +521,8 @@
         "updatedAt": "2026-07-26T01:56:34.350Z"
       },
       "merge-train-routes": {
-        "reason": "stale claim released (agent-pan-1696 dead)",
-        "updatedAt": "2026-07-26T04:52:24.543Z"
+        "reason": "Added src/dashboard/server/routes/merge-train.ts with the aggregate namespace: GET queues (per-project key/name/effective-flag/queue from the review-status ready set, no flywheel run), GET generations (per-project chains), POST generations/:name/stack and /promote (same handlers, uat/ prefix reconstruction, auth gate, firePostMergeLifecycle), POST assemble (one project or all), POST merge-next {n,project} with 404 on unknown key. Composed the layer in server.ts, registered all six routes in NO_LOSS_MATRIX, and added 16 route tests. Legacy flywheel routes untouched per D5.",
+        "updatedAt": "2026-07-26T06:08:51.199Z"
       }
     }
   },
@@ -542,7 +545,7 @@
     "reconciler-decouple.reconciler-decouple.ac2": "completed",
     "reconciler-decouple.reconciler-decouple.ac3": "completed",
     "reconciler-decouple.reconciler-decouple.ac4": "completed",
-    "merge-train-routes": "running",
+    "merge-train-routes": "completed",
     "project-merge-train-endpoint": "completed",
     "project-merge-train-endpoint.project-merge-train-endpoint.ac1": "completed",
     "project-merge-train-endpoint.project-merge-train-endpoint.ac2": "completed",
@@ -555,6 +558,9 @@
     "fe-cockpit-toggle": "completed",
     "fe-cockpit-toggle.fe-cockpit-toggle.ac1": "completed",
     "fe-cockpit-toggle.fe-cockpit-toggle.ac2": "completed",
-    "fe-cockpit-toggle.fe-cockpit-toggle.ac3": "completed"
+    "fe-cockpit-toggle.fe-cockpit-toggle.ac3": "completed",
+    "merge-train-routes.merge-train-routes.ac1": "completed",
+    "merge-train-routes.merge-train-routes.ac2": "completed",
+    "merge-train-routes.merge-train-routes.ac3": "completed"
   }
 }
